@@ -315,6 +315,7 @@ export function createKeyboard(host, {
   onDown = () => {}, onUp = () => {}, keys: keyOpts = null,
   onPanic = null, onOctave = null, minBase = 24, maxBase = 96, letters = true,
   pad: wantPad = true, sustain: wantSustain = false, onSustain = null,
+  loop: wantLoop = false, onLoop = null,
   names: wantNames = true,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
@@ -777,6 +778,29 @@ export function createKeyboard(host, {
    * ⚠️ AND IT IS OFF BY DEFAULT, because a chord chart and a keyboard nobody
    * sustains should not grow a control they cannot use.
    */
+  /**
+   * 🔴 `Loop` SITS LEFT OF `Sustain`, AND IT IS A KEYBOARD FUNCTION RATHER THAN A
+   * PAGE MODE. Asked 2026-09-23: *"wait make it a keyboard funcion, a button in
+   * bottom rihjt (left from sustain) called 'Loop'"*, after a first reading that
+   * would have made it a third option on `/nola/`'s roll picker.
+   * ⚠️ THE CORRECTION IS THE INTERESTING PART AND IS WHY IT IS HERE. A mode is
+   * something a PAGE is in and excludes the others; looping what you play is
+   * something you do WHILE typing chords, or while the page is learning them, or
+   * on a page that has neither. It belongs to the instrument, beside the damper,
+   * which is the same argument the sustain button itself was moved on.
+   * ⚠️ AND THE COMPONENT DRAWS IT AND THE PAGE OWNS WHAT IT MEANS. Nothing here
+   * records or plays anything: it reports that the button went on or off, and a
+   * page decides what looping IS on its own graph. Same division as the damper.
+   * ⚠️ OFF BY DEFAULT, because a keyboard nobody loops should not grow a control
+   * it cannot use.
+   */
+  const loopBtn = wantLoop
+    ? createToggle({ label: 'Loop', size: 'small',
+                     title: 'record what you play and play it back around, '
+                          + 'until you switch it off',
+                     onChange: (on) => setLoop(on) })
+    : null;
+  if (loopBtn) pad.append(loopBtn.el);
   const sustainBtn = wantSustain
     ? createToggle({ label: 'Sustain', size: 'small',
                      title: 'hold the notes on after the keys come up, the way a pedal does',
@@ -798,13 +822,127 @@ export function createKeyboard(host, {
   function press(k, how = 'key') {
     if (!(k in map) || held.has(k)) return;
     held.add(k);
+    onTape(k, true);
     onDown(noteOf(k), how);
   }
 
   function release(k, how = 'key') {
     if (!held.has(k)) return;
     held.delete(k);
+    onTape(k, false);
     onUp(noteOf(k), how);
+  }
+
+  /**
+   * 🔴 THE LOOP LIVES HERE, WHERE THE FILE ALREADY SAID IT WOULD. The comment
+   * above `press` has read *"it is where a recorder would attach if the loop
+   * idea in BACKLOG.md is ever built"* since that funnel was made, and this is
+   * that. Asked 2026-09-23: *"do not wire nola, its gloabl keyboard fn. nola
+   * gets just chords as if i played htem"*, after a first build put the tape on
+   * one page.
+   * ⚠️ THAT CORRECTION IS THE WHOLE ARCHITECTURE. A page owning the tape is one
+   * page solving a problem every page with keys has, and it would have had to
+   * know about recording, laps and scheduling to get chords it already knows how
+   * to play. Here it needs no code at all: playback goes through `press` and
+   * `release`, so a looped note is indistinguishable from a finger, arrives on
+   * the page's own `onDown` with `how` saying `loop`, lights the key, feeds the
+   * roll and takes the damper.
+   * ⚠️ IT RECORDS KEYS, NOT NOTES, so a loop follows the octave pad: shift the
+   * keyboard while a loop is running and it transposes with you. That is a
+   * consequence rather than a decision, and it is the one a keyboard should
+   * have.
+   * ⚠️ AND THE LAP IS THE TAKE. There is no clock in this component and no tempo
+   * anywhere near it, so a loop is as long as what you played, first press to
+   * the moment you pressed `Loop` again. Rounding to a beat would invent a grid
+   * nobody set.
+   */
+  let tape = null, tapeAt = 0, tapeTimers = [], looping = false;
+
+  const onTape = (k, down) => {
+    if (tape === null || looping) return;
+    tape.push({ k, down, t: Math.round(performance.now() - tapeAt) });
+  };
+
+  const stopLoop = () => {
+    for (const t of tapeTimers) clearTimeout(t);
+    tapeTimers = [];
+    tape = null;
+    looping = false;
+  };
+
+  /**
+   * 🔴 THREE STATES ON A TWO STATE BUTTON, AND THE MAPPING IS THE WHOLE OF IT.
+   * A loop is *recording*, then *going round*, then *off*, and `createToggle`
+   * has two. The first build called `setLoop(true)` twice and nothing happened
+   * the second time, because a toggle only reports a CHANGE: setting an on
+   * button on again is not an event. MEASURED in `/kit/`: four movements taped
+   * and zero notes ever came back.
+   * ✅ SO THE BUTTON IS ON FOR BOTH LIVE STATES AND THE PRESSES ALTERNATE.
+   * Press one turns it on and starts recording. Press two turns it off, which is
+   * where the take closes and starts going round, and the button is quietly put
+   * back ON, because a loop that is playing is a loop that is on. Press three
+   * turns it off again and that one really stops.
+   * ⚠️ `set(x, true)` IS THE QUIET SET and it matters: without it, putting the
+   * button back on would call straight back into here and record over the loop
+   * that had just started.
+   * ⚠️ AND THE TWO LIVE STATES ARE TOLD APART ON THE BUTTON rather than left to
+   * the page, because a control that looks identical while writing and while
+   * playing is the one thing a looper must not do.
+   */
+  function setLoop(on) {
+    if (on) {
+      /* Turned on with nothing in hand: start a take. */
+      tape = [];
+      tapeAt = performance.now();
+      looping = false;
+      loopBtn?.el.setAttribute('data-loop', 'recording');
+      onLoop?.(true, { state: 'recording' });
+      return;
+    }
+    /* Turned off while a loop is going round: that press is the stop. */
+    if (looping) {
+      stopLoop();
+      loopBtn?.el.removeAttribute('data-loop');
+      onLoop?.(false, { state: 'off' });
+      return;
+    }
+    /* Turned off while recording: the take closes and starts going round. */
+    /* 🔴 A LAP HAS A FLOOR, AND THE CHECK IN `/kit/` IS WHAT FOUND IT. That
+       check presses and releases four keys with no waiting between them, so the
+       take was a few milliseconds long and the loop turned **118 times in 260
+       ms**, which is not a loop, it is a stuck note with extra steps. A person
+       cannot play a take that short, but a person CAN arm the button and press
+       it again straight away, and that is the same thing.
+       ⚠️ 250 ms IS A QUARTER OF A SECOND AND IS A JUDGEMENT, not a measurement:
+       short enough that a deliberate one bar stab still loops, long enough that
+       nothing turns faster than a tremolo. It is the floor on the LAP and never
+       on the events, so a take of two quick notes still plays them where they
+       fell and simply waits before coming round. */
+    const MIN_LAP = 250;
+    const lap = Math.max(MIN_LAP, Math.round(performance.now() - tapeAt));
+    if (tape === null || !tape.length) {
+      /* ⚠️ NOTHING PLAYED IS NOT A LOOP, and the button stays off rather than
+         sitting on with nothing behind it. */
+      stopLoop();
+      loopBtn?.el.removeAttribute('data-loop');
+      onLoop?.(false, { state: 'empty' });
+      return;
+    }
+    looping = true;
+    loopBtn?.set(true, true);
+    loopBtn?.el.setAttribute('data-loop', 'looping');
+    onLoop?.(true, { state: 'looping', lap, moves: tape.length });
+    const round = () => {
+      if (!looping) return;
+      for (const e of tape) {
+        tapeTimers.push(setTimeout(() => {
+          if (!looping) return;
+          if (e.down) { held.delete(e.k); press(e.k, 'loop'); } else release(e.k, 'loop');
+        }, e.t));
+      }
+      tapeTimers.push(setTimeout(round, lap));
+    };
+    round();
   }
 
   // An octave button at the end of the range that still looks pressable is a
@@ -879,6 +1017,12 @@ export function createKeyboard(host, {
      * this method.
      */
     sustain: sustainBtn,
+    /** the `Loop` toggle, or null when the caller did not ask for one */
+    loop: loopBtn,
+    /** what the loop is doing, for a page that wants to say so and for a check */
+    looping: () => looping,
+    /** how many key movements are on the tape, or 0 when there is none */
+    taped: () => (tape ? tape.length : 0),
     /** how far this keyboard has moved from where it was built, in semitones */
     displacement: () => base - HOME,
     /** the naming control's two buttons, in the order they are drawn */

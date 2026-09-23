@@ -3859,6 +3859,13 @@ createRoll(parent, { base, keys, map, sharps })   // on its own`,
       box.append(stack.el);
     });
 
+  /* ⚠️ HOISTED SO THE CHECK AT THE FOOT CAN REACH THEM. Every specimen is built
+     inside its own `section` callback, which is right for a gallery and means a
+     check at module scope can see none of it. These two are the keyboard and
+     what its callbacks heard, and the loop check below reads both. */
+  let kitKb = null;
+  const kitHeard = [];
+
   section('input', 'KEYBOARD',
     'An octave of piano keys where a swipe scrolls the row and a press then a slide plays.',
     `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })
@@ -3869,9 +3876,18 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
       const o = out('');
 
       const holder = el('div', '', null); holder.style.width = '100%';
+      /* 🔴 `loop: true`, SO THE GALLERY CARRIES THE COMPONENT'S NEWEST FUNCTION.
+         Asked 2026-09-23 as *"a keyboard funcion, a button in bottom rihjt (left
+         from sustain) called 'Loop'"* and then, pointedly, *"do not wire nola,
+         its gloabl keyboard fn"*. The keyboard records what it emits and replays
+         it through its own press path, so a page needs no code for it, and this
+         block is where that claim gets to be true in front of a reader. */
       const kb = createKeyboard(holder, {
-        base: 60,
-        onDown: (n) => { kb.lightNote(n, true); o.textContent = `note ${n} down`; },
+        base: 60, loop: true, sustain: true,
+        onDown: (n, how) => {
+          kb.lightNote(n, true); kitHeard.push({ n, how });
+          o.textContent = `note ${n} down${how === 'loop' ? ', from the loop' : ''}`;
+        },
         onUp: (n) => { kb.lightNote(n, false); o.textContent = `note ${n} up`; },
         onOctave: (n) => { o.textContent = `octave moved, leftmost note is now ${n}`; },
         // The keyboard has already released every key it was holding by the
@@ -3879,6 +3895,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
         // the component cannot reach.
         onPanic: () => { o.textContent = 'notes off'; },
       });
+      kitKb = kb;
 
       /**
        * 🔴 THE SAME COMPONENT IN A PHONE'S WIDTH, WHERE IT SCROLLS. Asked
@@ -8687,6 +8704,54 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
        than by hoping no rule uses it. */
     const onPress = rules.filter((r) => /:focus(?![-a-z])/.test(r.selectorText)
       && !/:focus:not\(:focus-visible\)/.test(r.selectorText) && paints(r));
+    /* 🔴 THE KEYBOARD LOOPS WITHOUT THE PAGE KNOWING HOW, which is the claim the
+       whole design rests on. Asked 2026-09-23: *"do not wire nola, its gloabl
+       keyboard fn. nola gets just chords as if i played htem"*, after a first
+       build put the tape on one page.
+       ⚠️ GRADED THROUGH THE BUTTON AND THE KEYS, and on what the PAGE hears
+       rather than on the component's own counter: what is promised is that a
+       looped note is indistinguishable from a finger, so the check reads the
+       callbacks this block already wires and looks for `how === 'loop'`. */
+    {
+      const kb = kitKb;
+      const before = kitHeard.length;
+      kb.loop.set(true);                       // press one: record
+      kb.press('a'); kb.release('a');
+      kb.press('d'); kb.release('d');
+      const taped = kb.taped();
+      kb.loop.set(false);                      // press two: close the take, turn it
+      await new Promise((r) => setTimeout(r, 260));
+      const fromLoop = kitHeard.slice(before).filter((e) => e.how === 'loop');
+      const wasLooping = kb.looping(), btnOn = kb.loop.get();
+      kb.loop.set(false);                      // press three: stop
+      d.assert('the keyboard records what it emits and plays it back as ordinary presses',
+        taped === 4 && wasLooping === true && btnOn === true
+          && kb.looping() === false && fromLoop.length >= 2
+          && fromLoop.every((e) => Number.isFinite(e.n)),
+        `${taped} key movement(s) taped, ${fromLoop.length} note(s) came back marked `
+        + 'as coming from the loop');
+
+      /* 🔴 AND A TAKE WITH ALMOST NOTHING IN IT DOES NOT RUN AWAY. This check
+         presses four keys with no waiting between them, so the take is a few
+         milliseconds long, and without a floor on the lap it turned 118 times in
+         260 ms. That is not a loop, it is a stuck note with extra steps, and a
+         person arming the button and pressing it again straight away produces
+         exactly the same take. */
+      d.assert('NEGATIVE CONTROL: a take of no length does not turn faster than a tremolo',
+        fromLoop.length <= 12,
+        `${fromLoop.length} note(s) in 260 ms, which is at most one lap of four `
+        + 'movements plus the one that was already playing');
+
+      /* ⚠️ AND NOTHING PLAYED IS NOT A LOOP. The button comes back off rather
+         than sitting on with an empty tape behind it, which is the state a
+         reader cannot tell from a working one. */
+      kb.loop.set(true);
+      kb.loop.set(false);
+      d.assert('NEGATIVE CONTROL: arming and closing with nothing played leaves the button off',
+        kb.looping() === false && kb.taped() === 0 && kb.loop.get() === false,
+        `looping ${kb.looping()}, ${kb.taped()} taped, button ${kb.loop.get() ? 'on' : 'off'}`);
+    }
+
     d.assert('every focus ring in the shell is 1 px, and not one of them paints on a mouse press',
       rules.length > 0 && rings.length >= 12 && wide.length === 0 && onPress.length === 0,
       `${rings.length} ring(s) across ${rules.length} rules, ${wide.length} not 1 px`

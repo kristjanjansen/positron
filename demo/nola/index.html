@@ -943,6 +943,13 @@
        red under that flag, and a SUSTAIN button that turned sustain off. */
     sustain: true,
     onSustain: (on) => pedal.set(on),
+    /* 🔴 THE KEYBOARD'S OWN `Loop`, AND THE COMPONENT DOES THE LOOPING. Asked
+       2026-09-23: *"do not wire nola, its gloabl keyboard fn. nola gets just
+       chords as if i played htem"*. The first build put a tape on this page, and
+       that is one page solving a problem every page with keys has. The keyboard
+       records what it emits and replays it through its own press path, so this
+       page sees looped notes as ordinary ones and needs no code at all. */
+    loop: true,
   });
 
   /**
