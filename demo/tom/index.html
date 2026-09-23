@@ -1573,7 +1573,8 @@
          * `getComputedStyle().filter` in the same turn reports **brightness(1)**
          * on a pad that is on its way to 1.45. This check read it that way and
          * called a working playhead a broken one.
-         * ⚠️ IT IS THE SAME FAULT `switch.mjs` FOUND THE SAME DAY IN A
+         * ⚠️ IT IS THE SAME FAULT `demo/shell/toggle.mjs` (then `switch.mjs`,
+         * deleted 2026-09-23) FOUND THE SAME DAY IN A
          * DIFFERENT PROPERTY, where a knob measured 157.4 px before a press and
          * 157.4 px in the same task after it. **Anything with a transition on
          * it has to be read after the transition**, which is what `settle`
