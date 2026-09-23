@@ -3623,6 +3623,24 @@ button.pos-pg-lab:hover { color: var(--fg); }
    any check counts, and is `aria-hidden`. */
 .roll-rest { position: relative; display: block; width: 100%;
              height: var(--roll-row-h, 26px); pointer-events: none; }
+/* 🔴 THE FIRST ROW SITS AS FAR FROM THE TOP AS THE ROWS SIT FROM EACH OTHER.
+   Asked 2026-09-23 with a crop: *"add more space on first row on top of dots /
+   label so disace from separators and from top is rohghly same"*.
+   Every dot is centred in a row, so dot to dot is a whole row and the top edge
+   to the first dot is HALF of one. Two spacings that should read as one, and the
+   picture starts crowded against the box above it.
+   ⚠️ THE ROOM GOES INSIDE THE FIRST CELL, NOT ON THE ROLL. Padding on `.roll`
+   would push the white key rules down with it and leave a strip at the top with
+   no lines in it, because those rules are drawn on the CELLS. Inside the cell,
+   the line spans the taller box and the dot centres in what is left. */
+/* ⚠️ HALF A ROW, DERIVED AND NOT TYPED. A dot is centred in its row, so it
+   already sits half a row below the row's top; adding another half puts it a
+   WHOLE row from the top of the picture, which is exactly the spacing between
+   one dot and the next. A number typed here would be right at one row height and
+   wrong at every other, and `--roll-row-h` follows the page's button height. */
+.roll { --roll-top: calc(var(--roll-row-h, 26px) / 2); }
+.roll > :first-child { height: calc(var(--roll-row-h, 26px) + var(--roll-top)); }
+.roll > :first-child .roll-cell { height: 100%; padding-top: var(--roll-top); }
 /* 🔴 A RULE WHERE EACH WHITE KEY BEGINS, RUNNING THE WHOLE HEIGHT OF THE ROLL.
    Asked for, then reported as not continuous, then removed on a misreading of
    that report, then asked for again in four words. They are drawn on the CELL
