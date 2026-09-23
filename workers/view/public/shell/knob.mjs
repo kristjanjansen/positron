@@ -691,8 +691,19 @@ function arcPath(cx, cy, r, a0, a1) {
  * `min-width: 0`. Without that, `overflow-x` cannot shrink a flex item below its
  * content and the PAGE drags sideways instead of the row. MEASURED once at
  * 390 px as 141 px of page overflow.
+ *
+ * @param {number[]} [o.split]  indices to draw a hairline BEFORE, so one row can
+ *   say it is one row with a grouping in it. Asked for 2026-09-23 on `/evo/`:
+ *   *"use std knob grid and separartors on c1-c9. in general, make evo roghly
+ *   made of stadard pieces"*, and that page had hand rolled both the row and the
+ *   divider.
+ *   🔴 **IT IS A DIVIDER AND NOT TWO BANKS, WHICH IS THE WHOLE REASON IT IS AN
+ *   OPTION.** `/evo/`'s eight rotaries are ONE row of eight with a 4 and 4
+ *   split, and its own research names that split as the feature most likely to
+ *   be misread as two rows. Drawing it as two banks would make the misreading
+ *   true; a hairline inside one row says grouped without saying separate.
  */
-export function createKnobBank(knobs = [], { label = '' } = {}) {
+export function createKnobBank(knobs = [], { label = '', split = [] } = {}) {
   if (!knobs.length) throw new Error('a knob bank with no knobs is an empty box painting its own edges');
   const wrap = document.createElement('div');
   wrap.className = 'pos-knob-bank';
@@ -704,11 +715,25 @@ export function createKnobBank(knobs = [], { label = '' } = {}) {
   }
   const row = document.createElement('div');
   row.className = 'pos-knob-row';
-  for (const k of knobs) row.append(k.el);
+  const cuts = new Set(split.filter((i) => i > 0 && i < knobs.length));
+  knobs.forEach((k, i) => {
+    if (cuts.has(i)) {
+      const d = document.createElement('div');
+      d.className = 'pos-knob-div';
+      /* ⚠️ IT IS FURNITURE AND SAYS SO. A hairline between two knobs is a
+         grouping a sighted reader gets for free and a screen reader would
+         otherwise be told about as an empty group. */
+      d.setAttribute('aria-hidden', 'true');
+      row.append(d);
+    }
+    row.append(k.el);
+  });
   wrap.append(row);
   return {
     el: wrap,
     knobs,
+    /** where the hairlines are, so a check can grade the grouping */
+    splits: () => [...cuts],
     /** How many have ever been moved by hardware, which is what "is it bound" means. */
     bound: () => knobs.filter((k) => k.hardwareMoves() > 0).length,
     repaint: () => knobs.forEach((k) => k.repaint()),
