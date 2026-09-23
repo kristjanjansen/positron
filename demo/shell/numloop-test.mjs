@@ -66,17 +66,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   n.destroy();
 }
 
-// 5. 🔴 THE TRAP. A double press must CLEAR and must not walk the machine on the
-//    way, which is what a naive wiring to `click` does.
+// 5. 🔴 THE TRAP. A double press must not WALK the machine on the way, which is
+//    what a naive wiring to `click` does: the browser fires click twice before
+//    dblclick, so an unheld press would record and then stop into a loop first.
+//    ⚠️ AND THIS CHECK REVERSED ON 2026-09-23. It read `a double press on an
+//    empty slot clears it and never records`, and a double press on an empty
+//    slot now RECORDS, because *"when doubleclick on empty slot, it stops others
+//    possible loops playing and starts rec"*. What it still has to prove is that
+//    it reaches recording in ONE step rather than by walking the whole cycle.
 {
   const seen = [];
   const n = createNumLoop({ doubleMs: 40, onEnter: (i, s) => seen.push(s) });
   n.press(0);
   n.press(0);                                    // inside the window
   await sleep(80);
-  ok('a double press on an empty slot clears it and never records',
-    n.state(0) === 'empty' && !seen.includes('recording'),
+  ok('a double press on an empty slot records at once, without walking the cycle',
+    n.state(0) === 'recording' && seen.join(',') === 'recording',
     `state ${n.state(0)}, saw ${seen.join(',') || 'nothing'}`);
+  n.destroy();
+}
+
+// 5b. and it silences whatever else was playing, without throwing it away
+{
+  const n = createNumLoop({ doubleMs: 40 });
+  n.press(1); n.settle(1); n.press(1); n.settle(1);   // 1 looping
+  n.press(2); n.settle(2);                            // 2 recording
+  n.press(0); n.press(0); await sleep(80);            // double press on empty 0
+  ok('a double press on an empty slot stops the other loops and starts recording',
+    n.state(0) === 'recording' && n.state(1) === 'stopped' && n.state(2) === 'recording',
+    `0 ${n.state(0)}, 1 ${n.state(1)}, 2 ${n.state(2)}`);
+  n.press(1); n.settle(1);
+  ok('NEGATIVE CONTROL: and the stopped loop is still there, one press from playing',
+    n.state(1) === 'looping',
+    `one press brought slot 1 back to ${n.state(1)}`);
   n.destroy();
 }
 

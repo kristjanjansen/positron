@@ -646,6 +646,12 @@ effect  = _, _;
     value: PRESETS[0].code,
     onInput: onType,
   });
+  /* 🔴 THE NAME THE HIDDEN LABEL USED TO CARRY. `.pos-field-l` is `display: none`
+     on this page, and `field.mjs` wires no `aria-label`, `for` or `labelledby`,
+     so without this the editor is an unnamed text box. A caption is furniture
+     here and a name is not. */
+  source.input.setAttribute('aria-label', 'the Faust program this page compiles');
+
   function showSource() {
     setCell('source', new TextEncoder().encode(source.value()).length);
   }
@@ -1434,6 +1440,31 @@ effect  = _, _;
      than one line of Faust, which is why the plain row this replaced carried
      the same single line. */
   .fau-panel .panel-strip > .pos-field { flex: 1 1 100%; min-width: 0; }
+
+  /* 🔴 EDGE TO EDGE MEANS THE BOX'S OWN EDGES, AND IT WAS ONLY HALF TRUE. Asked
+     2026-09-23 off a crop: *"edit field edge to edge, no bottom padding no field
+     title"*, which is the same `edge to edge` as the original ask finally taken
+     the whole way.
+     ⚠️ THREE THINGS WERE INSETTING IT AND THEY ARE THREE DIFFERENT BOXES: the
+     strip's own `--panel-gap` at the sides, the strip's `--panel-pad` under it,
+     and the field's `FAUST` label above it. Removing one and leaving the others
+     is how a thing looks *nearly* edge to edge for a week.
+     🔴 AND THE LABEL GOES RATHER THAN BEING HIDDEN. A `FAUST` over a box holding
+     Faust is a caption naming what a reader is already reading, and this page's
+     title, its sentence and the patch picker all say it again. The field keeps
+     its `aria-label`, because what a caption does for a sighted reader the
+     accessible name does for everybody else and only one of the two was ever
+     furniture. ⚠️ AND `createField` DOES NOT WIRE ONE, checked rather than
+     assumed: there is no `aria-label`, no `for` and no `labelledby` in that
+     module, so hiding the span would have left the textarea with no name at all.
+     The page sets it below. */
+  .fau-panel .panel-strip { padding-block: 0; padding-left: 0; padding-right: 0; }
+  .fau-panel .pos-field { gap: 0; }
+  .fau-panel .pos-field-l { display: none; }
+  /* The resize grip is the textarea's own and sits on its corner; with the box
+     at the case's edge it would sit on the case's corner, which reads as the
+     PANEL being resizable. */
+  .fau-panel .pos-field textarea { border-radius: 0; border-width: 0 0 1px 0; resize: vertical; }
 
   /* A row of keys wider than the page scrolls itself rather than dragging the
      page sideways. `min-width: 0` is what lets a flex child shrink below its
