@@ -7110,13 +7110,25 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
        * wider by construction and always will be. The first version of this
        * check included them and reported a spread of 22 px about a layout that
        * was correct.
-       * The number to beat is 0.401 of a white key, which is what centring the
-       * black keys gave. GarageBand measures 0.439. This reads 0.551.
+       * 🔴 AND THE FLOOR CAME DOWN FROM 0.5 TO 0.44 ON 2026-09-23, WHICH IS A
+       * DELIBERATE TRADE AND NOT A WEAKENED CHECK. `keyboard.mjs` gained
+       * `SHARP_NUDGE`, asked for as *"black keys should be centered to verical
+       * line / white key gap"* and then *"or bit in between current and
+       * ideal..."*, and it takes HALF the piano's offset so a black key sits
+       * nearer the join a piano roll's rules point at. MEASURED at three
+       * settings on `/nola/`: the narrowest strip is 16.51 px centred, 19.78 px
+       * at half and 23.04 px at full, while the black key's centre sits 1.00,
+       * 2.27 and 5.54 px off its join. It is one pixel of strip for one pixel
+       * of alignment, almost exactly.
+       * ⚠️ SO THE FLOOR IS SET WHERE IT STILL MEANS SOMETHING: 0.44 is
+       * GarageBand's own ratio, and centring would read 0.401 and go red. The
+       * check still refuses the arrangement it was written to refuse.
        */
       d.assert('and the white key a finger lands on is wide enough to land on',
-        narrowest >= w[0].width * 0.5,
+        narrowest >= w[0].width * 0.44,
         `narrowest strip ${narrowest.toFixed(1)} px, ${(narrowest / w[0].width).toFixed(3)} of a white key, `
-        + `against 0.401 when the black keys were centred and 0.439 in GarageBand`);
+        + `against 0.401 with the black keys centred, 0.439 in GarageBand and 0.551 at the `
+        + `piano's full offset`);
     }
 
     // ── 🔴 THE OVERLAP, WHICH IS A HIT TEST AND NOT A PICTURE ──────────────
