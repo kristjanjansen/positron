@@ -666,6 +666,25 @@ export const DEMOS = [
     one: 'a piano you play from a MIDI keyboard, with a line of chords drawn out above it',
     tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },
 
+  /**
+   * 🔴 THE ONE PAGE HERE WHERE THE VISITOR WRITES THE INSTRUMENT. Asked
+   * 2026-09-22 as *"in bg do faust research. demo called fau"*, answered in
+   * `plans/plan-fau.md` at 1,419 lines, and built to its §9.4 order of work.
+   * `/grains/` ships a SynthDef compiled on the Raspberry Pi and `/muta/` ships
+   * two fixed wasm modules: both are binaries somebody made earlier. This one
+   * makes the binary while you watch, out of ten lines of text.
+   * ⚠️ AND THE HEADLINE THE ASK ASSUMED DOES NOT HOLD, which the plan measured:
+   * the browser build of libfaust has three backends and C++ is not one of
+   * them, so the tab cannot emit the code a Raspberry Pi would compile. The
+   * claim that survives is one SOURCE and two compilers, and the board half is
+   * not built, so no board is drawn.
+   * ⚠️ NO `settleMs`. Every control is an async handler, so `verify.mjs` waits
+   * for `data-busy` to clear rather than for a number somebody guessed.
+   */
+  { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
+    one: 'a synthesiser you type in, compiled to machine code in this tab in about ten milliseconds',
+    tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
+
   { name: 'able', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
     one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
     tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
