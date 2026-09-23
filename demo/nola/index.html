@@ -1509,6 +1509,28 @@
           charts.map((c) => `${c.label} ${Math.min(...c.notes)}-${Math.max(...c.notes)}`).join(', '));
       }
 
+      /* 🔴 THE ROLL IS ONE TAB STOP AND THE ARROWS MOVE INSIDE IT, WHICH IS THE
+         RULE `table.mjs` ALREADY CARRIES AND THE HALF THAT IS EASY TO GET
+         WRONG. Every row a tab stop would cost a reader four presses to get
+         past a line of chords and sixty-three past a song. The negative half is
+         what makes this an assert rather than a decoration: one row at 0 AND
+         every other at -1, because a roving tabindex that forgets to take the
+         old one away is the same defect as none at all. */
+      {
+        const tabs = () => [...keys.el.querySelectorAll('.roll-row')].map((r) => r.tabIndex);
+        const atRest = tabs();
+        roll.focus(2);
+        const moved = tabs();
+        const landed = document.activeElement === keys.el.querySelectorAll('.roll-row')[2];
+        roll.focus(0);
+        d.assert('the roll is one tab stop, and the arrows move the landing row inside it',
+          atRest.filter((t) => t === 0).length === 1 && atRest[0] === 0
+          && moved.filter((t) => t === 0).length === 1 && moved[2] === 0
+          && moved.filter((t) => t === -1).length === moved.length - 1 && landed,
+          `${atRest.join(',')} at rest became ${moved.join(',')} after moving to row 2, `
+          + `and the browser put focus there`);
+      }
+
       const refused = drawChords('Cmaj wibble');
       d.assert('a token that is not a chord is shown back rather than dropped',
         refused.bad.length === 1 && chordList.querySelector('.nola-bad')?.textContent.includes('wibble'),

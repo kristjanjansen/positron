@@ -7923,6 +7923,64 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         : `${ids.length} addresses, ${idFor('SLIDER')} is in ${sectionTab.get(idFor('SLIDER'))}`);
   }
 
+  /**
+   * 🔴 EVERY FOCUS RING IN THE SHELL IS 1 px AND EVERY ONE IS ON THE KEYBOARD.
+   * Asked for 2026-09-23 as *"make focus styles appear only on keyb nav not
+   * mouse and make it 1px. change everywhere"*, which is fourteen rules in one
+   * stylesheet and exactly the shape a later edit puts back one rule at a time.
+   *
+   * 🔴 IT READS THE STYLESHEET RATHER THAN THE SCREEN, AND THAT IS THE ONLY
+   * HONEST WAY TO GRADE IT HERE. `:focus-visible` is decided by the browser's
+   * MODALITY: it matches after a Tab and not after a press, and a page cannot
+   * make a trusted key event, so `el.focus()` from a check lands in whichever
+   * modality the harness happens to be in. An assert built on that would be
+   * green or red for a reason that has nothing to do with the rule. The rules
+   * themselves are same-origin and free to read.
+   *
+   * ⚠️ AND THE SECOND HALF IS THE ONE THAT MATTERS MOST: no rule may paint on
+   * plain `:focus`, because that is the selector that fires for a mouse. It is
+   * asserted as an ABSENCE over every rule in the sheet, so a new control
+   * cannot bring one back quietly.
+   *
+   * 🔴 IT READS `cssText`, NOT `style.outlineWidth`, AND THE FIRST VERSION READ
+   * THE LONGHAND AND FOUND **0 rings across 644 rules**. Every one of these is
+   * written `outline: 1px solid var(--hi)`, and a shorthand holding a `var()`
+   * is a pending substitution: the CSSOM hands back an EMPTY STRING for every
+   * longhand in it. So the check would have passed an empty set forever, which
+   * is this project's own rule about a statistic whose denominator nobody
+   * looked at. `rings.length >= 12` is the floor that makes an empty answer red
+   * rather than green.
+   */
+  {
+    const sheet = [...document.styleSheets].find((s) => (s.href || '').includes('shell.css'));
+    const rules = sheet ? [...sheet.cssRules].filter((r) => r.selectorText) : [];
+    /* A ring is an outline with a WIDTH in it. `outline: none` is a suppression
+       and paints nothing, and reading it as a ring is how the second version of
+       this check went red on `input:focus-visible`, which exists precisely to
+       take the ring OFF a field and colour its border instead.
+       ⚠️ AND THE LENGTH IS FOUND ANYWHERE IN THE DECLARATION, NOT AT THE FRONT
+       OF IT. A shorthand with a `var()` in it survives verbatim, so the shipped
+       rules read `outline: 1px solid var(--hi)`; one WITHOUT a var is
+       canonicalised by the browser to `outline: red solid 3px`, and a check
+       anchored on the width coming first found the fourteen real rules and
+       missed a sabotage typed by hand. */
+    const widthOf = (r) => (/outline(?:-width)?:[^;]*?([\d.]+)px/.exec(r.cssText) || [])[1];
+    const paints = (r) => widthOf(r) !== undefined;
+    const rings = rules.filter((r) => /:focus-visible/.test(r.selectorText) && paints(r));
+    const wide = rings.filter((r) => widthOf(r) !== '1');
+    /* A ring on plain `:focus` is the defect. `:focus:not(:focus-visible)` is
+       the suppression idiom and is not one, so it is excluded by name rather
+       than by hoping no rule uses it. */
+    const onPress = rules.filter((r) => /:focus(?![-a-z])/.test(r.selectorText)
+      && !/:focus:not\(:focus-visible\)/.test(r.selectorText) && paints(r));
+    d.assert('every focus ring in the shell is 1 px, and not one of them paints on a mouse press',
+      rules.length > 0 && rings.length >= 12 && wide.length === 0 && onPress.length === 0,
+      `${rings.length} ring(s) across ${rules.length} rules, ${wide.length} not 1 px`
+      + `${wide.length ? ` (${wide[0].selectorText} at ${widthOf(wide[0])}px)` : ''}`
+      + `, ${onPress.length} painting on plain :focus`
+      + `${onPress.length ? ` (${onPress[0].selectorText})` : ''}`);
+  }
+
   d.ready();
 
 </script>
