@@ -954,6 +954,11 @@
        back silent. The component knows what its loop is doing and this page owns
        the log, so it lends it one rather than reporting on the loop itself. */
     loop: true,
+    /* 🔴 TEN TAKES, DRIVEN BY THE NUMBER PAD ON THE MIDI KEYBOARD. Asked
+       2026-09-23: *"num works. how come you can not add it to keyboard"*. The
+       button is slot 1 and the pad reaches the other nine, so a take per number
+       is the same gesture `/num/` was built to get right. */
+    loops: 10,
     log: d.log,
   });
 
@@ -1373,10 +1378,32 @@
         + `so open it with ?pedal=${cc} if that is the foot`);
   }
 
+  /**
+   * 🔴 THE NUMBER PAD DRIVES THE KEYBOARD'S OWN LOOPS, AND THAT IS THE WHOLE OF
+   * WHAT THIS PAGE OWES THEM. Asked 2026-09-23: *"num works. how come you can not
+   * add it to keyboard"*. A page owns MIDI, by `midi.mjs`'s one path rule, and
+   * the keyboard owns looping, so the wiring is a program number becoming a slot
+   * number and nothing else. No tape, no lap and no scheduling on this page,
+   * which is what *"do not wire nola, its gloabl keyboard fn"* asks for.
+   * 🔴 MEASURED OFF THE WIRE 2026-09-23, not read from a manual. One press of a
+   * pad button on the MK-425C is three messages on MIDI CHANNEL 2: bank select
+   * LSB, bank select MSB, both zero every time, then a program change carrying
+   * the number printed on the key. All ten were pressed and all ten arrived.
+   * ⚠️ AND THE PAD'S `0` IS PROGRAM 0, WHICH IS SLOT 10. The printed number is
+   * the program number, so the mapping is the panel's own printing rather than an
+   * order this page invented.
+   */
+  function midiProgram(program) {
+    const slot = program === 0 ? 9 : program - 1;
+    if (slot < 0 || slot >= keys.loops.slots) return;
+    keys.loops.press(slot);
+  }
+
   const midi = createMidi({
     onDown: midiDown,
     onUp: midiUp,
     onControl: midiControl,
+    onProgram: midiProgram,
     log: d.log,
     onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
                             : 'no MIDI keyboard is plugged in, and the keys on screen still play'),
@@ -3066,21 +3093,40 @@
            perfect through the api. */
         const b0 = d.tap();
         const loopEl = keys.loop.el;
-        loopEl.click();
+        loopEl.click(); keys.loops.settle(0);
         for (const n of [60, 64, 67]) midiDown(n, 96, 0, performance.now());
         await sleep(60);
         for (const n of [60, 64, 67]) midiUp(n);
         const movements = keys.taped();
-        loopEl.click();
+        loopEl.click(); keys.loops.settle(0);
         await sleep(600);
         const b1 = d.tap();
-        loopEl.click();
+        loopEl.click(); keys.loops.settle(0);
         await quiet();
         d.assert('a chord played over MIDI comes back around while the keyboard is looping',
           movements === 6 && b1.on - b0.on === 3 && b1.voiced - b0.voiced >= 6,
           `${movements} movement(s) taped from 3 MIDI notes, and after the loop went `
           + `round the wire had still sent only ${b1.on - b0.on} note on(s) while the `
           + `instrument made ${b1.voiced - b0.voiced} voice(s)`);
+
+        /* 🔴 AND THE NUMBER PAD REACHES THOSE TAKES. Asked *"num works. how come
+           you can not add it to keyboard"*. Driven through `midiProgram`, which
+           is the function a real program change lands on, so this grades the
+           mapping rather than a restatement of it.
+           ⚠️ THE NUMBERS ARE THE PANEL'S OWN PRINTING, measured off the wire: the
+           pad sends the number printed on the key, so program 2 is the second
+           take and the pad's `0` is program 0 and the tenth. */
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        midiProgram(2); keys.loops.settle(1);
+        midiProgram(0); keys.loops.settle(9);
+        const two = keys.loops.state(1), ten = keys.loops.state(9);
+        const rest = keys.loops.states().filter((s) => s !== 'empty').length;
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        d.assert('the number pad on the keyboard arms the take its key is printed with',
+          two === 'recording' && ten === 'recording' && rest === 2
+            && keys.loops.slots === 10,
+          `program 2 left take 2 ${two} and the pad’s 0 left take 10 ${ten}, `
+          + `with ${rest} of ${keys.loops.slots} armed and the rest untouched`);
       }
 
       /* 🔴 AND THE WARM UP IS WHAT KEEPS A NOTE FROM BEING LATE IN THE FIRST
