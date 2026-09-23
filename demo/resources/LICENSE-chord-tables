@@ -1,0 +1,40 @@
+Chord transition tables in chord-tables.json, and where they came from.
+
+These tables are COUNTS over a key-relative chord alphabet. They are derived
+works. Neither corpus is redistributed here: both stay in tmp/, which is
+gitignored, and are fetched once by demo/resources/fetch-chord-corpora.mjs.
+
+Written by demo/resources/build-chord-tables.mjs on 2026-09-23.
+Pruned at ctx>=8 row>=3 keep 3. Do not edit by hand: run the script.
+
+-- The jazz table -----------------------------------------------------------
+
+The iRealPro Corpus of Jazz Standards (the iRb corpus), version 1.0.
+Daniel Shanahan and Yuri Broze.
+https://doi.org/10.5281/zenodo.3546040
+
+Licensed CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+CC BY requires attribution to travel with the work AND with derivatives of it,
+which is why this file sits beside the table rather than in a commit message.
+The table is a derivative: it carries counts taken from that corpus and no part
+of the corpus itself.
+
+Cited by its authors as:
+  Broze, Y. and Shanahan, D. (2013). "Diachronic Changes in Jazz Harmony:
+  A Cognitive Perspective." Music Perception 31(1), 32-45.
+
+-- The pop table ------------------------------------------------------------
+
+The McGill Billboard Project (Chord Analysis Dataset).
+John Ashley Burgoyne, Jonathan Wild and Ichiro Fujinaga, DDMAL, McGill.
+https://ddmal.ca/research/The_McGill_Billboard_Project_(Chord_Analysis_Dataset)/
+
+Released CC0: the DDMAL has waived all copyright and related or neighbouring
+rights. CC0 attaches no condition to anything derived from it. The citation the
+DDMAL asks for is a scholarly norm rather than a licence condition, and it is
+carried here because a table nobody can trace back is a table nobody can check:
+  Burgoyne, J. A., Wild, J. and Fujinaga, I. (2011). "An Expert Ground Truth
+  Set for Audio Chord Recognition and Music Analysis." ISMIR 2011, 633-638.
+
+The URL everybody cites, ddmal.music.mcgill.ca, is dead and answers a 404.
+The live host is ddmal.ca.
