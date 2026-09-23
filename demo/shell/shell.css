@@ -3377,6 +3377,8 @@ button.pos-pg-lab:hover { color: var(--fg); }
    ⚠️ ITS OWN SCROLLBAR IS HIDDEN AND IT IS NEVER DRAGGED DIRECTLY: the keys
    own the gesture and `roll.mjs` follows their `scrollLeft`. Two scrollers a
    person can both drag is two sources of truth. */
+/* ⚠️ THE 3 px GAP IS BACK, because the only reason it was closed was to join
+   the white key rules into continuous lines, and those are gone. */
 .roll { display: flex; flex-direction: column; gap: 3px;
         overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
 .roll::-webkit-scrollbar { display: none; }
@@ -3453,16 +3455,29 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 .roll-row:hover::before { background: color-mix(in srgb, var(--fg) 4%, transparent); }
 .roll-row:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
-/* ⚠️ THE PICKED ROW IS A GROUND, NOT A BRIGHTER DOT. The dots say which notes;
-   the row says which chord, and colouring the dots would be two channels
-   saying one thing, with the second one stealing the ink that means `held`. */
-.roll-row[data-on]::before { background: color-mix(in srgb, var(--fg) 9%, transparent); }
-/* 🔴 THE ROW YOU ARE PLAYING, WHICH IS AN EVENT AND THEREFORE `--hi`. Picking
-   is a choice and stays grey; holding the chord is something HAPPENING, and
-   this project's own colour rule reserves the yellow ink for that. A row can be
-   both at once, which is exactly what happens when you pick a chord and then
-   play it, so this rule comes second and wins. */
-.roll-row[data-held]::before { background: color-mix(in srgb, var(--hi) 16%, transparent); }
+/* 🔴 NO GROUND ON A PICKED ROW. THE DOTS AND THE NAME CARRY BOTH STATES, AND
+   THIS REVERSES WHAT WAS WRITTEN HERE AN HOUR AGO. The rule said the dots say
+   which notes and the row says which chord, so colouring the dots would be two
+   channels saying one thing. Asked for the other way with the picture in front
+   of the person asking: *"when i have chord in keyboard the resp dots in
+   pianoroll cshould turn yellow. rm bg hilite from pianoroll row selected. just
+   play with dots/label lightness"*.
+   ⚠️ AND IT IS BETTER FOR A REASON WORTH KEEPING. A filled band behind a lane
+   competes with the dots that are the picture; lightness on the marks
+   themselves says the same two things in the channel a reader is already
+   looking at. The keys under the roll do exactly this: a dot brightens, the key
+   does not repaint.
+   ⚠️ THE HOVER GROUND STAYS. That one is an affordance rather than a state, it
+   is there only while a pointer is, and it is what says a row can be pressed. */
+.roll-row[data-on] .roll-cell.on::after { background: var(--fg); }
+.roll-row[data-on] .roll-label { color: var(--fg); }
+/* 🔴 AND THE ROW YOU ARE PLAYING GOES YELLOW, WHICH IS THE SAME INK THE KEY
+   UNDER YOUR FINGER USES. Picking is a choice and stays grey; holding the chord
+   is something HAPPENING, and this project's colour rule reserves `--hi` for
+   that. A row can be both at once, which is what happens when you pick a chord
+   and then play it, so this comes second and wins. */
+.roll-row[data-held] .roll-cell.on::after { background: var(--hi); }
+.roll-row[data-held] .roll-label { color: var(--hi); }
 .roll-lane {
   display: grid; grid-auto-flow: column;
   grid-template-columns: repeat(var(--k-cols, 8), minmax(var(--k-min, 49px), var(--k-max, 62px)));
@@ -3477,6 +3492,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .roll-lane { position: relative; }
 .roll-cell { grid-row: 1; min-width: 0; height: var(--roll-row-h, 26px);
               display: grid; place-items: center; }
+
 /* the same pull onto the join the black keys take, from the same property */
 .roll-cell.sharp {
   width: 66%; justify-self: start;
@@ -3493,9 +3509,13 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 /* ⚠️ A DOT ON A BLACK KEY'S COLUMN IS THE SAME INK. The keys under it tell a
    reader which is which, and a second colour here would be a legend. */
+/* ⚠️ AT THE RIGHT END: *"move chord names to right"*, 2026-09-23. A chord
+   voiced into this window sits low on the keyboard, so the left of a lane is
+   where its dots are and the right is the empty half. The name was landing on
+   the root of its own chord. */
 .roll-label {
-  position: absolute; left: 0; top: 0; height: var(--roll-row-h, 26px);
-  display: flex; align-items: center; padding: 0 6px 0 2px;
+  position: absolute; right: 0; top: 0; height: var(--roll-row-h, 26px);
+  display: flex; align-items: center; padding: 0 2px 0 6px;
   /* ⚠️ 9.5px: *"make chord labels bit smaller"*, 2026-09-23. It is a caption on
      a picture rather than a heading over it, and the picture is the dots. */
   font: 500 9.5px/1 'positron-accidentals', var(--mono);

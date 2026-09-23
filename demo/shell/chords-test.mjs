@@ -12,7 +12,7 @@
 // TWENTY OF THESE ARE NEGATIVE CONTROLS: written so that the bug they name
 // would fail them, rather than so that today's code passes.
 
-import { parseChord, parseChords, roman, QUALITIES, QUALITY_SAYS, noteName, ROOT_OCTAVE }
+import { parseChord, parseChords, roman, voiceChord, VOICINGS, QUALITIES, QUALITY_SAYS, noteName, ROOT_OCTAVE }
   from './chords.mjs';
 
 let pass = 0, fail = 0;
@@ -291,6 +291,132 @@ ok('an empty line has no key', parseChords('').key === null);
   ok('no em dash and no middot in anything the parser says',
     strings.every((s) => !String(s).includes('—') && !String(s).includes('·')),
     `${strings.length} strings`);
+}
+
+// ── the voicings, which are what makes a chord playable on 25 keys ─────────
+//
+// 🔴 EVERY ONE OF THESE IS A NEGATIVE CONTROL FOR ROOT POSITION, which is the
+// answer this module gave for a week and which `/nola/` could not fit: a chord
+// spelled upward from one octave is a SPELLING, and a hand needs a voicing.
+{
+  const LO = 48, HI = 72;                       // the two octaves `/nola/` draws
+  const span = (ns) => Math.max(...ns) - Math.min(...ns);
+
+  // 1. close voicing really is the smallest span there is
+  {
+    const { notes: c } = parseChord('Cmaj7').ok ? parseChord('Cmaj7') : {};
+    const root = parseChord('Cmaj7').notes;
+    const close = voiceChord(root, { mode: 'close', lo: LO, hi: HI }).notes;
+    ok('a close voicing is narrower than the spelling it came from',
+      span(close) < span(root), `${span(close)} semitones against ${span(root)}`);
+    ok('and it holds the same pitch classes, because a voicing moves notes rather than changing them',
+      new Set(close.map((n) => n % 12)).size === new Set(root.map((n) => n % 12)).size
+      && close.every((n) => root.some((r) => (r - n) % 12 === 0)),
+      close.join(','));
+    void c;
+  }
+
+  // 2. NEGATIVE CONTROL: root position is left exactly as it was
+  {
+    const root = parseChord('Fm6/C').notes;
+    const same = voiceChord(root, { mode: 'root', lo: LO, hi: HI }).notes;
+    ok('NEGATIVE CONTROL: root position is not rearranged, only moved to fit',
+      same.every((n, i) => (n - same[0]) === (root[i] - root[0])),
+      `${root.join(',')} became ${same.join(',')}`);
+  }
+
+  // 3. leading picks the inversion nearest the hand, not the lowest one
+  {
+    const first = voiceChord(parseChord('Cmaj').notes, { mode: 'close', lo: LO, hi: HI }).notes;
+    const led = voiceChord(parseChord('F').notes,
+      { mode: 'lead', lo: LO, hi: HI, near: first }).notes;
+    const plain = voiceChord(parseChord('F').notes, { mode: 'close', lo: LO, hi: HI }).notes;
+    const move = (a, b) => a.reduce((s, n) => s + Math.min(...b.map((m) => Math.abs(m - n))), 0);
+    /* 🔴 MEASURED OVER A LINE RATHER THAN OVER ONE PAIR, because one chord
+       after another can tie by luck: `Cmaj` to `F` is 8 semitones of movement
+       either way. What leading is FOR is a progression, so the claim is about
+       the whole line and the number is the total the hand travels. */
+    const LINE = ['Cmaj', 'F/C', 'G7', 'Am', 'Dm', 'G', 'Cmaj'];
+    const walk = (mode) => {
+      let prev = [], total = 0;
+      for (const text of LINE) {
+        const parsed = parseChord(text);
+        const { notes } = voiceChord(parsed.notes,
+          { mode, lo: LO, hi: HI, near: prev, bass: parsed.bass !== null });
+        if (prev.length) total += move(notes, prev);
+        prev = notes;
+      }
+      return total;
+    };
+    ok('leading moves the hand less than closing does over a whole line of chords',
+      walk('lead') < walk('close'),
+      `${walk('lead')} semitones against ${walk('close')} for close and ${walk('root')} for root`);
+    ok('and on one pair it can tie, which is why the line above is what is measured',
+      move(led, first) <= move(plain, first),
+      `${move(led, first)} semitones against ${move(plain, first)}`);
+    // NEGATIVE CONTROL: with nothing to lead from it is simply the close one
+    const cold = voiceChord(parseChord('F').notes, { mode: 'lead', lo: LO, hi: HI, near: [] }).notes;
+    ok('NEGATIVE CONTROL: with no previous chord, leading is the close voicing',
+      cold.join(',') === plain.join(','), `${cold.join(',')} against ${plain.join(',')}`);
+  }
+
+  // 4. the bass of a slash chord stays underneath, in every mode
+  {
+    const parsed = parseChord('F/C');
+    for (const mode of VOICINGS) {
+      const { notes } = voiceChord(parsed.notes, { mode, lo: LO, hi: HI, bass: true });
+      ok(`the slash bass is still the lowest note in the ${mode} voicing`,
+        notes[0] === Math.min(...notes) && ((notes[0] % 12) === parsed.bass),
+        notes.join(','));
+    }
+  }
+
+  /* 5. 🔴 WHAT A VOICING ACTUALLY BUYS, AND THE FIRST VERSION OF THIS CHECK
+        CLAIMED THE WRONG THING AND WENT RED SAYING SO. It asserted that root
+        position does not FIT two octaves. It does: the widest of these is
+        fourteen semitones and the window is twenty four, so every one of them
+        fits and the negative control found nothing to report.
+        ✅ THE REAL CLAIM IS THE SPAN, AND IT IS ABOUT A HAND. A chord inside one
+        octave is a chord one hand can hold; `Fm6/C` in root position spans
+        FOURTEEN semitones, which is a stretch nobody makes. Fitting the screen
+        was never the problem. Reaching it was. */
+  {
+    const LINE = ['Cmaj', 'C9', 'F/C', 'Fm6/C', 'Bmaj7', 'Ab7', 'Dm'];
+    const spanOf = (text, mode) => {
+      const parsed = parseChord(text);
+      const { notes } = voiceChord(parsed.notes,
+        { mode, lo: LO, hi: HI, bass: parsed.bass !== null });
+      return span(notes);
+    };
+    const closeSpans = LINE.map((t) => spanOf(t, 'close'));
+    const rootSpans = LINE.map((t) => spanOf(t, 'root'));
+    /* 🔴 THE INVARIANT IS THAT IT NEVER WIDENS ONE, and stating it that way is
+       what caught the defect. `every close voicing is inside one octave` was
+       the first claim, it went red at twenty semitones, and the cause was real:
+       packing the BODY tight pulled it away from a slash bass that cannot move
+       with it. A chord with a bass under it cannot be one octave wide and
+       should not pretend to be. */
+    ok('a close voicing never widens a chord, bass and all',
+      closeSpans.every((n, i) => n <= rootSpans[i]),
+      closeSpans.map((n, i) => `${LINE[i]} ${rootSpans[i]}->${n}`).join(', '));
+    ok('and every chord with no slash bass ends up inside one octave, which is one hand',
+      LINE.filter((t) => parseChord(t).bass === null).every((t) => spanOf(t, 'close') <= 12),
+      LINE.filter((t) => parseChord(t).bass === null)
+        .map((t) => `${t} ${spanOf(t, 'close')}`).join(', '));
+    ok('NEGATIVE CONTROL: and in root position some of them are wider than a hand',
+      rootSpans.some((n) => n > 12),
+      `widest ${Math.max(...rootSpans)} semitones, on `
+      + `${LINE[rootSpans.indexOf(Math.max(...rootSpans))]}`);
+    // and everything still lands on the keys, in both modes
+    const outsideAny = LINE.flatMap((text) => VOICINGS.map((mode) => {
+      const parsed = parseChord(text);
+      const { outside } = voiceChord(parsed.notes,
+        { mode, lo: LO, hi: HI, bass: parsed.bass !== null });
+      return outside.length ? `${text} ${mode}` : null;
+    })).filter(Boolean);
+    ok('and every chord in every voicing lands on the two octaves this keyboard draws',
+      outsideAny.length === 0, outsideAny.join(', ') || 'all of them inside 48 to 72');
+  }
 }
 
 console.log(`\n${pass} ok, ${fail} failed`);

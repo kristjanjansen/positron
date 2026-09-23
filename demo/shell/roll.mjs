@@ -54,6 +54,7 @@ import { placeKey } from './keyboard.mjs';
  *   follows. Pass a keyboard's `keysEl`.
  * @param {(row:object|null, i:number)=>void} [o.onPick] a row was picked, or
  *   unpicked, in which case `row` is null. See below.
+
  * @returns {{el, setRows, setBase, rows, dotsOf, destroy}}
  */
 export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new Set(),
@@ -61,6 +62,22 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
                                    onPick = null } = {}) {
   const el = document.createElement('div');
   el.className = 'roll';
+  /**
+   * 🔴 THE WHITE KEY RULES WERE BUILT, LOOKED AT AND REMOVED, ALL IN ONE HOUR,
+   * AND THE RECORD OF THAT IS WORTH MORE THAN THE FEATURE WAS. Asked with the
+   * doubt attached: *"add faint vertical lines to indicate white key separatoes
+   * to piano roll. make this rollbackablge (not sure how good idea)"*, then
+   * *"make vertical lines on pianoroll continuous"*, then *"no continous
+   * vertical bars on pianoroll!"*.
+   * ✅ THE DOUBT WAS RIGHT AND THE ROLLBACK COST ONE ATTRIBUTE AND ONE RULE,
+   * which is the whole reason it was built that way. The argument against them
+   * is the one written down before they were drawn: the roll's columns already
+   * line up with the keys under it, so a rule at every white key division says
+   * a second time what the instrument says once, and a lane carrying four dots
+   * and fifteen lines is mostly lines.
+   * ⚠️ IT IS NOTED HERE RATHER THAN DELETED SILENTLY, so the next person who
+   * thinks a dot is hard to trace down to a key knows it has been tried.
+   */
 
   let at = base;
   let current = rows;

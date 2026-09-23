@@ -654,16 +654,24 @@ export const DEMOS = [
    * one buffer source per note, `demo/shell/midi.mjs` for the keys and a new
    * `demo/shell/pedal.mjs` for the foot. Not scsynth, not a worklet, not a
    * physical model.
-   * ⚠️ THIS IS THE PLAN'S PHASE ZERO AND IT IS FINISHED RATHER THAN PARTIAL.
-   * Every part of the shipping machinery is here; what is phase zero is the
-   * RECORDINGS, 30 notes at one velocity layer out of FluidR3 where the
-   * Salamander pack will be 30 at three with releases beside them. The page
-   * says on its own face that velocity is only volume here.
-   * ⚠️ NO `settleMs`. The phrase button is an async handler, so `verify.mjs`
-   * waits for `data-busy` to clear rather than for a number somebody guessed.
+   * ⚠️ THE PIANO IS THE PLAN'S PHASE ZERO AND IT IS FINISHED RATHER THAN
+   * PARTIAL. Every part of the shipping machinery is here; what is phase zero
+   * is the piano's RECORDINGS, 30 notes at one velocity layer out of FluidR3
+   * where the Salamander pack will be 30 at three with releases beside them.
+   * 🔴 THE RHODES IS NOT PHASE ZERO AND IS THE FIRST REAL PACK ON THIS PAGE.
+   * Asked 2026-09-23 as *"get that rhodes"*. Jeff Learman's jRhodes3d, the mono
+   * set, 15 notes and five velocity layers of his own 1977 Rhodes Mark I Stage
+   * 73, under CC BY-NC-SA 4.0 with the attribution on the face of the page.
+   * `research/rhodes-packs-2026-09-23.md` surveyed every free Rhodes there is.
+   * ⚠️ AND A SECOND INSTRUMENT IS NOT THE SECOND ENGINE §6.1 ITEM 6 ASKS FOR.
+   * Both are recordings played by one sampler, and `demo/shell/rhodes.mjs`,
+   * which is arithmetic rather than a recording, is still in nothing.
+   * ⚠️ NO `settleMs`. The page has no control row at all, so its checks run at
+   * load behind `SELFCHECK` and `verify.mjs` waits on the assert count.
    */
   { name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true,
-    one: 'a piano you play from a MIDI keyboard, with a line of chords drawn out above it',
+    one: 'a piano and a 1977 Rhodes you play from one MIDI keyboard, '
+       + 'with a line of chords drawn out above the keys',
     tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },
 
   /**
