@@ -250,7 +250,28 @@ body {
   -webkit-text-size-adjust: 100%;
   overflow-x: hidden;
 }
-:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+/* 🔴 A RING ONLY WHEN SOMEBODY IS ON THE KEYBOARD, AND IT IS 1 px. Asked for
+   2026-09-23: *"make focus styles appear only on keyb nav not mouse and make it
+   1px. change everywhere"*. Every ring in this file was 2 px; fourteen rules
+   moved to 1 px in one pass, so a page cannot be half converted.
+   🔴 `:focus-visible`, NEVER `:focus`, AND THE BROWSER IS THE ONE THAT DECIDES.
+   It paints for Tab and for a key and stays away for a pointer press, with two
+   exceptions it makes on purpose and this file does not fight: a TEXT FIELD and
+   a `<select>` match it even when clicked, because a caret with nowhere visible
+   to be is unusable. MEASURED 2026-09-23 in the harness Chrome, one fresh press
+   per control: a mouse press on a button, a tab, a toggle, a lane, a pad or a
+   range handle computes `outline-style: none`, and a Tab onto the same control
+   computes `solid 1px`.
+   ⚠️ **AND THREE `:focus { outline: none }` RULES WENT WITH IT, BECAUSE THEY
+   WERE DEAD.** `.sld-knob`, `.pos-choice button` with `.pos-pick button`, and
+   `.pos-tabs-t` each carried one to suppress a pointer ring. Nothing in this
+   file has ever painted on plain `:focus`, and the browsers that use
+   `:focus-visible` for their own default ring are exactly the browsers that
+   parse those selectors at all. Two of the three were written
+   `:focus:not(:focus-visible)`, which an older engine drops whole. The proof
+   is a plain `button`, which never had a suppressor and shows no ring on a
+   press either. */
+:focus-visible { outline: 1px solid var(--hi); outline-offset: 2px; }
 /* 🔴 A CONTROL THAT ALREADY HAS A BORDER COLOURS IT. IT DOES NOT GROW A SECOND
    ONE. The rule above is right for a bare button or a link, which have no edge
    of their own and need one drawn. An input and a textarea already have a
@@ -1426,17 +1447,32 @@ video[hidden] { display: none; }
    ⚠️ NO SCROLLBAR. A classic scrollbar adds ~15 px to the box on the platforms
    that draw one, so the keyboard would be a different height on Windows from
    on macOS. What says there is more is the key cut off at the edge. */
+/* 🔴 A KEY HAS A CEILING AS WELL AS A FLOOR, AND THE `1fr` THAT USED TO BE
+   HERE IS WHY A DESKTOP KEYBOARD READ AS SQUAT. Asked 2026-09-23 with a
+   screenshot of `/kit/`: *"make it higher in desktop to have similar
+   proportions as monile. do not stretch it ever"*. On a phone eight white keys
+   in 390 px are about 50 px wide against 74 tall, which is 1 to 1.48 and reads
+   as a piano. In a 1310 px gallery the same eight keys stretched to 160 px
+   against 92.5 tall, which is 1 to 0.58: the same component, drawn as a row of
+   wide flat slabs.
+   ✅ **62 px IS THE CEILING AND IT IS NOT A TASTE.** 92.5 divided by 1.48, the
+   phone's own proportion, is 62.5. So a desktop key is the phone's key, larger,
+   rather than the phone's key pulled sideways.
+   ⚠️ AND IT BINDS ON ALMOST NOTHING ELSE. `/nola/` and `/fau/` draw fifteen
+   white keys in 688 px, which is 45.8 px each and already under the ceiling, so
+   neither page moves. What it catches is a keyboard with room to spare, which
+   is the gallery and any panel wider than its instrument. */
 .keys { display: grid; grid-auto-flow: column;
-        grid-template-columns: repeat(var(--k-cols, 8), minmax(var(--k-min, 49px), 1fr));
-        grid-auto-columns: 0; column-gap: 3px; align-items: stretch;
+        grid-template-columns: repeat(var(--k-cols, 8), minmax(var(--k-min, 49px), var(--k-max, 62px)));
+        grid-auto-columns: 0; column-gap: var(--k-gap, 3px); align-items: stretch;
         margin: 0 0 10px; touch-action: pan-x;
         -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         overflow-x: auto; overscroll-behavior-x: contain; scroll-behavior: auto;
         scrollbar-width: none; }
 .keys::-webkit-scrollbar { display: none; }
-.k { grid-row: 1; min-width: 0; height: 74px; border-radius: 4px; background: var(--card2);
+.k { grid-row: 1; min-width: 0; height: var(--k-h, 74px); border-radius: 4px; background: var(--card2);
      border: 1px solid var(--line2); display: grid; grid-template-rows: auto 1fr auto;
-     justify-items: center; padding: 6px 0;
+     justify-items: center; padding: var(--k-pad, 6px) 0;
      font: 500 10px/1 var(--mono); color: var(--dim2); cursor: pointer;
      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 /* 🔴 SHORTER, NARROWER, ON TOP, AND STRADDLING THE JOIN. 66% is two thirds of
@@ -1456,18 +1492,83 @@ video[hidden] { display: none; }
    width it is a fraction of is the key minus the 3 px column gap, which is the
    amount of WHITE the key actually eats. MEASURED: identical to the arithmetic
    within 0.001 px at 390 and at 1400. */
-.k.sharp { align-self: start; height: 46px; width: 66%; justify-self: start;
-           transform: translateX(calc(-50% - 1.5px + var(--k-off, 0) * (100% - 3px)));
+/* 🔴 `--k-gap` RATHER THAN A LITERAL 3px, IN ALL THREE PLACES IT APPEARS, AND
+   IT COST A MEASUREMENT TO FIND. `/nola/` sets `column-gap: 2px` on its own
+   keys, so a second grid built to the same template with the gap typed in was
+   one pixel wider per column: MEASURED at `0,27,47,82,94` px against
+   `0,26,46,80,92` on the instrument, identical 44 px tracks and identical
+   container width, with the whole difference in one property. Half the gap is
+   the pull-back, and the gap comes out of the key's own width, so a literal in
+   the transform is the same defect twice more. */
+.k.sharp { align-self: start; height: var(--k-hs, 46px); width: 66%; justify-self: start;
+           transform: translateX(calc(-50% - var(--k-gap, 3px) / 2
+                                      + var(--k-off, 0) * (100% - var(--k-gap, 3px))));
            z-index: 2;
            background: #0e1219; border-color: var(--line); }
 /* the pitch on top, the keystroke underneath: the pitch is what moves when the
    octave shifts, and it is what a player is looking for */
-.k .kn { grid-row: 1; color: var(--dim); font-weight: 500; }
-.k .kk { grid-row: 3; opacity: .65; }
-.k.down .kn, .k.down .kk, .k.remote .kn, .k.remote .kk { color: inherit; opacity: 1; }
+/* 🔴 THE NOTE ON TOP AND THE DOT UNDERNEATH, WHICH IS THE SECOND ARRANGEMENT
+   OF THESE TWO IN ONE HOUR AND IS THE ONE THAT WAS ASKED FOR: *"dots go where
+   you have notes atm, and notes go where you have dots"*, 2026-09-23, with the
+   picture in front of the person asking.
+   ⚠️ THE OTHER WAY ROUND CLOSED A KNOWN DEFECT AND THAT DEFECT IS THEREFORE
+   STILL OPEN. `BACKLOG.md`, 2026-09-22: a black key is drawn over the top
+   corner of the white key it straddles, so `F4` rendered with its `4` half
+   covered by `F#4` and `B4` read as `34` under `A#4`. Putting the name at the
+   BOTTOM, below where a black key ends, fixed it for free while the bottom row
+   happened to be empty. **It is not fixed now.** The entry stays open, the
+   measurement in it is still good, and the thing that changed is that the
+   bottom row belongs to the dot.
+   ⚠️ SO THE FIX, WHEN IT COMES BACK, IS NOT ANOTHER SWAP. It is the white key's
+   name keeping clear of the black key's width, which is a horizontal question
+   rather than a vertical one. */
+/* 🔴 QUIETER, AND NUDGED SIDEWAYS OUT FROM UNDER THE BLACK KEY. Asked
+   2026-09-23 with a crop of four keys, *"make key names lighter and adjust
+   positions to avoid overlap"*, and then, when the first answer moved them down
+   the key, *"move c3 d3 et back. nudge on x-axis"*. So the name stays at the
+   top where a reader looks for it and moves ALONG the key instead.
+   ⚠️ THE DIRECTION IS READ OFF THE MAP, NOT TYPED. `keyboard.mjs` asks whether
+   the semitone above and below a white key is a sharp IN THIS KEYBOARD and sets
+   `--kn-x` accordingly: away from one black neighbour, centred between two,
+   because a white key with sharps on both shoulders has about fourteen clear
+   pixels in the middle and the name is narrower than that anyway.
+   ⚠️ AND IT IS THE DEFECT `BACKLOG.md` PHOTOGRAPHED IN SEPTEMBER: `C3` losing
+   its `3` under `C#3`, `B4` reading as `34` under `A#4`. That entry said the
+   answer was horizontal and that moving the name LEFT everywhere would put it
+   under the black key on the other shoulder. Both halves are honoured here. */
+.k .kn { grid-row: 1; color: var(--dim2); font-weight: 400;
+         font-family: 'positron-accidentals', var(--mono);
+         transform: translateX(var(--kn-x, 0px)); }
+/* 🔴 THE DOT IS THE STATE AND THE KEY'S GROUND NO LONGER MOVES. Asked
+   2026-09-23: *"do not change bg colors. do colored dots istead. rm wasd hints,
+   dots will be there. lightlightgray dots for hints, yellow for actual
+   presses."* A key used to repaint its whole face yellow under a finger, which
+   on a row of fifteen is the loudest thing on the page for the smallest fact on
+   it, and the letter that used to sit here said one thing only: this key is
+   reachable from the computer keyboard. One mark now carries four states.
+   ⚠️ IT IS ALWAYS DRAWN, TRANSPARENT WHEN IT HAS NOTHING TO SAY, because a
+   mark that appears and disappears changes a key's inner layout per key.
+   ⚠️ AND THE BORDER STILL MOVES. The ask is about the FILL: a pressed key with
+   an unchanged edge and a 6 px dot is legible at arm's length on a phone, and
+   the edge is the one channel that costs nothing to read. */
+.k .kd {
+  grid-row: 3; width: var(--k-dot, 6px); height: var(--k-dot, 6px); border-radius: 50%;
+  background: transparent; transition: background .06s linear;
+}
+.k.hint .kd { background: var(--dim2); }
+.k.remote .kd { background: var(--ok); }
+/* 🔴 LAST, SO A HELD KEY READS AS HELD WHATEVER ELSE IT IS. Same order the
+   old background rules carried, and the same reason: you play along with a
+   chord on screen, and what you are doing outranks what you were being shown. */
+.k.down .kd { background: var(--hi); }
+.k.down .kn, .k.remote .kn { color: var(--fg); }
 .k.sharp { background: #0e1219; }
-.k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
-.k.remote { background: var(--ok); color: #0b0e14; border-color: var(--ok); }
+/* 🔴 AND NOT THE BORDER EITHER. Asked 2026-09-23 in four words, *"no keyboard
+   border color change"*, after the first version kept a coloured edge on a
+   pressed key on the argument that an edge costs nothing to read. It is one
+   channel too many: the dot says it, and a key whose outline changes colour
+   under a finger is the same loud repaint the background rule was removed for,
+   drawn one pixel thinner. THE DOT IS THE WHOLE SIGNAL. */
 /* 🔴 MUTED GREY, AND IT IS THE QUIETEST OF THE THREE ON PURPOSE. `.down` and
    `.remote` both say something HAPPENED: a finger here, a player elsewhere.
    This one says something COULD, which is a chord's notes with nobody holding
@@ -1482,11 +1583,10 @@ video[hidden] { display: none; }
    not exist in this stylesheet, and a variable that always falls through reads
    as a token somebody can retheme when it is not. These two greys are picked
    against `--card2` (#151b26), which is the key's own ground. */
-.k.hint { background: #222a37; border-color: #39424f; }
-.k.hint .kn, .k.hint .kk { color: var(--fg); opacity: .8; }
-.k.sharp.hint { background: #242b36; }
-.k.hint.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
-.k.hint.down .kn, .k.hint.down .kk { color: inherit; opacity: 1; }
+/* ⚠️ THE TWO LITERAL GREYS ARE GONE WITH THE BACKGROUNDS THEY PAINTED, and so
+   are the `.kk` selectors that went with the letter. A hint is a dot now, one
+   step brighter than the letter marker and one step under a press. */
+.k.hint .kn { color: var(--fg); opacity: .8; }
 
 
 /* ── in a headset ─────────────────────────────────────────────────────────
@@ -1642,7 +1742,7 @@ video[hidden] { display: none; }
   cursor: pointer; touch-action: none;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
-.sld-lane:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+.sld-lane:focus-visible { outline: 1px solid var(--hi); outline-offset: 1px; }
 /* `left` is set from script as a share of the TRAVEL, never of the width, so
    the two ends land flush — see slider.mjs. */
 .sld-knob {
@@ -1815,8 +1915,7 @@ video[hidden] { display: none; }
    is a control where one of them cannot be reached from a keyboard at all.
    ⚠️ THE RING IS GREY. `--hi` is already the handle's own fill, so a yellow
    ring on a yellow block says nothing. Same answer `.pos-choice` reached. */
-.sld-knob[role="slider"]:focus { outline: none; }
-.sld-knob[role="slider"]:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
+.sld-knob[role="slider"]:focus-visible { outline: 1px solid var(--dim2); outline-offset: 2px; }
 
 /* ── stepper (demo/shell/stepper.mjs) ────────────────────────────────────
    🔴 ONE OBJECT, NOT THREE BUTTONS. Laid out with a gap, each button carried
@@ -1860,7 +1959,7 @@ video[hidden] { display: none; }
    the same thing at a tenth of the volume, and it leaves the LABEL readable in
    the page's own text colour instead of knocking it out to the background.
    ⚠️ AND THE FILL IS WHAT COLLIDES WITH FOCUS. The shell's :focus-visible is
-   `2px solid var(--hi)`, so a filled armed state and a focused unarmed one were
+   `1px solid var(--hi)`, so a filled armed state and a focused unarmed one were
    already two yellow shapes meaning different things (LESSONS #43). Focus is
    grey on these, below. */
 .pos-choice button[aria-pressed="true"] {
@@ -1906,10 +2005,8 @@ video[hidden] { display: none; }
 }
 /* Focus is grey here and nowhere near the armed colour — one colour, one
    meaning, which is the rule this project already applies to marks in a strip. */
-.pos-choice button:focus:not(:focus-visible),
-.pos-pick button:focus:not(:focus-visible) { outline: none; }
 .pos-choice button:focus-visible,
-.pos-pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
+.pos-pick button:focus-visible { outline: 1px solid var(--dim2); outline-offset: 2px; }
 
 /* ── choice, standing up (demo/shell/choice.mjs, orient: 'column') ─────────
    🔴 THE SEGMENT JOIN TURNS WITH THE ROW AND THE CORNERS TURN WITH IT. `.pos-seg`
@@ -2003,7 +2100,7 @@ video[hidden] { display: none; }
 /* Grey, and nowhere near `--hi`, which is already the checked colour. One
    colour, one meaning, which is the answer `.pos-choice` reached for the same
    collision. */
-.pos-check-i:focus-visible + .pos-check-b { outline: 2px solid var(--dim2); outline-offset: 2px; }
+.pos-check-i:focus-visible + .pos-check-b { outline: 1px solid var(--dim2); outline-offset: 2px; }
 .pos-check-t { font: 500 11px/1 var(--mono); color: var(--fg); white-space: nowrap; }
 .pos-check-i:disabled ~ .pos-check-t { color: var(--dim2); }
 .pos-check:has(.pos-check-i:disabled) { cursor: default; opacity: .45; }
@@ -2101,9 +2198,13 @@ button.pos-pg-pad:hover { filter: brightness(1.35); }
    and read as a rendering fault. `outline-offset: -1px` puts it INSIDE the pad,
    where it cannot reach a neighbour at any gap, and one pixel is enough on a
    shape this small. The ring keeps the accent colour, because focus is the one
-   thing on this grid that is about the person rather than about the music. */
+   thing on this grid that is about the person rather than about the music.
+   ⚠️ THE RING IS 1 px EVERYWHERE SINCE 2026-09-23 AND THE NEGATIVE OFFSET STILL
+   EARNS ITS KEEP. A 1 px ring standing 0 px off the pad would sit exactly on
+   the gutter's edge; inside, it cannot reach a neighbour whatever the gap
+   becomes. The 2 px above is what was reported, not what is drawn now. */
 .pos-pg-pad:focus-visible {
-  outline: 2px solid var(--hi); outline-offset: -1px; border-radius: 3px;
+  outline: 1px solid var(--hi); outline-offset: -1px; border-radius: 3px;
 }
 /* 🔴 A READ ONLY GRID MUST NOT LOOK PRESSABLE, AND IT IS NOT `disabled`. Greying
    it out would say *this is switched off* about a picture that is perfectly
@@ -2392,6 +2493,20 @@ button.pos-pg-lab:hover { color: var(--fg); }
   font: 400 12.5px/1.4 var(--mono); color: var(--fg); background: var(--bg);
   border: 1px solid var(--line2); border-radius: 4px;
   padding: 0 9px; height: 34px; width: 100%; min-width: 0;
+}
+/* 🔴 AND THE FOCUS COLOUR HAS TO BE RE-DECLARED HERE, BECAUSE THE GLOBAL ONE
+   LOSES. MEASURED 2026-09-23 with `CSS.getMatchedStylesForNode` on a field with
+   the keyboard in it: `input:focus-visible` up at the top of this file sets
+   `outline: none; border-color: var(--hi)`, and it is (0,1,1); the rule
+   directly above is `.pos-field input`, also (0,1,1), and it is 2200 lines
+   later. Same weight, later in source, so the border stayed `--line2` while the
+   outline was already gone. **A focused field looked exactly like an unfocused
+   one**, which is the one place where no ring at all is worse than a loud one:
+   somebody tabbing through the feedback box could not tell where the keyboard
+   was. The global rule is still right and still the contract; a component that
+   re-declares an input's `border` has to say what focus does to it. */
+.pos-field input:focus-visible, .pos-field textarea:focus-visible {
+  border-color: var(--hi);
 }
 /* `rows` on createField. ⚠️ THE HEIGHT COMES FROM `rows`, NOT FROM CSS — the
    caller asked for four lines and four lines is what the attribute means, so
@@ -2732,8 +2847,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    can read is one that does not exist, which is the distinction this rule was
    written to preserve. One step lighter than live, not invisible. */
 .pos-tabs-t:disabled { color: var(--dim2); opacity: .7; cursor: default; }
-.pos-tabs-t:focus:not(:focus-visible) { outline: none; }
-.pos-tabs-t:focus-visible { outline: 2px solid var(--dim2); outline-offset: 3px; }
+.pos-tabs-t:focus-visible { outline: 1px solid var(--dim2); outline-offset: 3px; }
 /* ⚠️ The panels carry the shell's own vertical rhythm INSIDE them, because a
    panel is a `.pos-body` child's child and the `* + *` rule does not reach it. */
 .pos-tabs-p > * + * { margin-top: 22px; }
@@ -2858,7 +2972,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-tbl-row[hidden] { display: none; }
 .pos-tbl-row.pick { cursor: pointer; }
 .pos-tbl-row.pick:hover { background: var(--card2); }
-.pos-tbl-row.pick:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
+.pos-tbl-row.pick:focus-visible { outline: 1px solid var(--hi); outline-offset: -2px; }
 /* 🔴 THE ROW THAT IS PLAYING. Asked for: *"i do not see which one is actiev on
    table"*. A left edge and a lit name rather than a filled row: the table is a
    list to read, and a block of colour across it would make the live row the
@@ -3054,7 +3168,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-pick-sel:disabled { cursor: default; }
 /* Focus lands on the select, so the ring has to be drawn on the cell around it.
    Grey, never `--hi` — green means armed here and nothing else. */
-.pos-pick-cell:has(.pos-pick-sel:focus-visible) { outline: 2px solid var(--dim2); outline-offset: 2px; z-index: 1; }
+.pos-pick-cell:has(.pos-pick-sel:focus-visible) { outline: 1px solid var(--dim2); outline-offset: 2px; z-index: 1; }
 /* The raise on hover is `.pos-seg`'s; the edge colour is this cell's own. */
 .pos-pick-cell:hover { border-color: var(--line2); }
 /* ⚠️ A GAP, SO IT IS NOT A FOURTH STEP. The die is a different kind of move
@@ -3132,6 +3246,49 @@ button.pos-pg-lab:hover { color: var(--fg); }
    from how wide the glyph happens to be in whatever font arrived. */
 .step button.ico { width: 34px; padding: 0; font-size: 15px; line-height: 1; }
 
+/* ── the accidentals, in a real notation face ──────────────────────────────
+   demo/shell/vendor/bravura-text-accidentals.woff2
+
+   🔴 THREE GLYPHS AND NOTHING ELSE: `♭` U+266D, `♮` U+266E, `♯` U+266F. Asked
+   2026-09-23, *"can we use good notation font insteead?"*, then *"do Bravura
+   Text"*, *"on keys and labels"*.
+
+   ✅ AND IT IS 4,508 BYTES BECAUSE IT WAS SUBSET. Bravura Text is **457,872
+   bytes** as published, which is 70 per cent of `/nola/`'s entire sample pack
+   for three characters, on every page that draws a keyboard. Subset to the
+   three it is **0.98 per cent of that**, MEASURED both ways with the command in
+   `demo/resources/subset-bravura.mjs`.
+
+   🔴 `unicode-range` IS THE WHOLE MECHANISM AND IT IS NOT AN OPTIMISATION. It
+   says these three codepoints ONLY, so every letter, digit and symbol beside
+   them stays in the mono face they were designed with: a key reads `C` in
+   SFMono and `♯` in Bravura, in one string, with no markup. Without it the
+   whole label would fall into a notation font that has no letters.
+   ⚠️ AND THE TEXT STILL ROUND-TRIPS. SMuFL fonts keep their glyphs in the
+   Private Use Area, and a page built on those would copy out as junk; Bravura
+   TEXT maps the real Unicode codepoints, so `C♯4` selected off the page is
+   `C♯4` in the clipboard.
+   ⚠️ `font-display: block` DELIBERATELY. This is 4.5 KB and a swap would show
+   the system glyph first and reflow a key label a moment later, which is the
+   one thing a live picture may not do. There is nothing to see while it loads.
+
+   ⚠️ IT WAS MEASURED BEFORE IT WAS DECIDED, AND THE SYSTEM FACE IS NOT BROKEN.
+   `ui-monospace` carries all three properly drawn: MEASURED as rendered ink
+   against a deliberate tofu box, `♯` 20 px, `♭` 17, `♮` 12, tofu 44. Width
+   could not have said so, because in a mono face every glyph is one advance
+   including the tofu. What this buys is notation proportions rather than a
+   missing glyph.
+
+   LICENCE: SIL Open Font License 1.1, Steinberg Media Technologies, reserved
+   font name "Bravura". The text ships beside the binary as
+   `LICENSE-bravura`. */
+@font-face {
+  font-family: 'positron-accidentals';
+  src: url('/shell/vendor/bravura-text-accidentals.woff2') format('woff2');
+  unicode-range: U+266D-266F;
+  font-display: block;
+}
+
 /* ── the keyboard's pad (demo/shell/keyboard.mjs) ─────────────────────────
    Octave down, octave up, notes off — drawn under the keys by the keyboard
    itself, on every page that draws one. They used to be ordinary controls in
@@ -3156,13 +3313,346 @@ button.pos-pg-lab:hover { color: var(--fg); }
    ⚠️ THE PAD BELONGS TO THE KEYBOARD, so the gap above it is small (4 px) and
    the gap that used to sit under the keys moves to the pair as a whole. Two
    things 10 px apart are two things; 4 px apart they are one. */
-.kbd { margin: 0 0 10px; }
-.kbd .keys { margin-bottom: 4px; }
+/* 🔴 THE KEYBOARD IS A SURFACE NOW, AND IT TAKES THE PAD GRID'S COLOURS.
+   Asked 2026-09-23: *"keyboard: make it into wrapper, gluable, use same colors
+   as in pad grid"*. A row of keys with a footer under it and nothing round the
+   two was two blocks that happened to be near each other; `.pos-pad` is
+   `var(--card)` on `var(--line)` and this is the same box, so an instrument and
+   a grid of pads on one page read as the same kind of object.
+   ⚠️ AND IT IS `--card` RATHER THAN `--card2`, WHICH IS WHAT A KEY IS. The
+   wrapper has to sit UNDER the keys or a white key disappears into it.
+   ⚠️ THE KEY ROW KEEPS ITS OWN 4 px GAP TO THE PAD. Two things 10 px apart are
+   two things, 4 px apart they are one, and that was true before there was a box
+   round them. */
+/* 🔴 PADDING ON ALL FOUR SIDES, ASKED FOR WITH A PICTURE OF THE KEYS TOUCHING
+   THE BOX: *"when keyboard in box, add padding on all sides"*, 2026-09-23. It
+   was vertical only for one iteration, and the reason is worth keeping because
+   it is the cost: 9 px each side takes 18 px off the key row, and `/nola/`
+   fits fifteen white keys into 688 px with nothing to spare, so its own `every
+   key fits the page` assert goes red the moment the box has edges. **That page
+   scrolls a little at desktop width now**, which is what the component already
+   does on a phone and what its 44 px floor exists to force rather than squeeze
+   under.
+   ✅ AND IT IS THE STANDARD BOX, EDGE INCLUDED: *"use std box around keyboard
+   incl border"*, 2026-09-23. `var(--card)` on `var(--line)` is what `.pos-pad`,
+   the readout and the log are, so an instrument is the same kind of object as
+   everything else on the page rather than a filled shape of its own.
+   ⚠️ IT WAS BORDERLESS FOR ONE ITERATION TO SAVE `/nola/` TWO PIXELS, and that
+   is not a reason to draw a different box: the page's own assert now measures
+   the KEY against the touch floor, which is the thing that actually matters,
+   and lets the row scroll. ⚠️ Inside a glue the edge comes off again, which is
+   the rule directly below. */
+.kbd {
+  /* the box's own padding, published so a glued child can bleed to its edges */
+  --kbd-pad: 9px;
+  margin: 0 0 10px; padding: var(--kbd-pad);
+  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  /* 🔴 THE BOX IS AS WIDE AS THE INSTRUMENT, WHICH IS THE OTHER HALF OF NOT
+     STRETCHING. With a ceiling on a key, a full width panel holding a 496 px
+     keyboard is 800 px of empty surface, which reads as a layout that failed
+     rather than as an instrument at its own size. `max-width` keeps it inside
+     the page when the keys overflow, and then the row scrolls the way it
+     already did. */
+  width: fit-content; max-width: 100%;
+}
+/* ⚠️ NO PADDING ON THE PAD ROW, REPORTED TWICE IN ONE MINUTE WITH A DEVTOOLS
+   SHOT OF `div.kpad  padding 0px 9px`: *"transpose has extra padding left not
+   needed"* and *"notes off have extra padding on right, rm"*. The keys start at
+   the box's own left edge, so anything under them that starts 9 px in is a
+   column that does not line up with the instrument. The rounded corner it was
+   keeping clear of is 4 px and costs nothing to sit inside. */
+/* ⚠️ 10 px UNDER THE KEYS, NOT 4: *"add more space below keyboard and above
+   small buttons"*, 2026-09-23. The pad sat tight under the keys on the rule
+   that two things 4 px apart are one thing, which is true of a footer and its
+   instrument and was too tight once that footer grew from three controls to
+   six. The keys are the thing being looked at and the row under them is
+   machinery. */
+.kbd .keys { margin-bottom: 10px; }
+/* 🔴 INSIDE A GLUE IT GIVES UP ITS OWN EDGE, which is what makes a glue ONE
+   surface rather than two boxes touching. Same contract every other glued child
+   keeps, and it is why the wrapper exists at all: a piano roll sitting on the
+   keyboard it names is the claim `glue.mjs` was written for. */
+.pos-glue > .kbd { margin: 0; border: 0; border-radius: 0; background: transparent; }
+
+/* ⚠️ 25 PER CENT TALLER ON A DESKTOP, AND THE BLOCK IS HERE RATHER THAN BESIDE
+   `.k` FOR ONE REASON: A MEDIA QUERY ADDS NO SPECIFICITY, so a plain `.k` rule
+   written after it would win at every width. `.pos-pick`'s entire phone layout
+   sat above the plain rule that beat it and had never run in its life. This
+   sets the two PROPERTIES `.k` reads, after every rule that reads them.
+   ⚠️ AND IT IS `min-width: 561px`, THE OTHER SIDE OF THE 560 px THIS
+   STYLESHEET ALREADY USES SEVEN TIMES. A third breakpoint would be a third
+   answer to a question already settled. */
+@media (min-width: 561px) {
+  .keys { --k-h: calc(74px * 1.25); --k-hs: calc(46px * 1.25); }
+}
 
 .kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* `notes off` is not a third octave button — it undoes something rather than
    moving somewhere, so it sits apart from the pair instead of beside it. */
 .kpad-right { margin-left: auto; }
+/* 🔴 HOW FAR FROM HOME, BESIDE THE PAIR THAT MOVES IT. `keyboard.mjs` argues
+   why this is not the octave number its own header refuses: a key prints the
+   octave it is IN, and this is the displacement from where the keyboard
+   started, which no key can show.
+   ⚠️ `tabular-nums` AND A RESERVED WIDTH, because it changes while somebody is
+   looking at it and nothing that redraws may change how much room it takes.
+   Three characters is `+2st`'s worth at this size. */
+/* ── the piano roll (demo/shell/roll.mjs) ─────────────────────────────────
+   Pitch across, time down, one row per chord, drawn above the keys it names.
+
+   🔴 THE LANE IS THE KEYBOARD'S OWN GRID TEMPLATE, character for character.
+   That is not tidiness: a roll whose columns are a few pixels off the keys
+   under it is a roll you cannot read a shape off, which is the only thing it
+   is for. `roll.mjs` imports `placeKey` from the keyboard for the same reason,
+   so there is one arithmetic and one template rather than two that agree today.
+
+   ⚠️ THE LABEL IS ABSOLUTE, OVER THE LANE. In its own column it would take
+   width off the keys and every dot would sit left of the key it names. It gets
+   the page's own ground behind it so it stays readable where a dot is under
+   it. */
+/* 🔴 IT SCROLLS WITH THE KEYBOARD, WHICH IS THE OTHER HALF OF LINING UP.
+   Reported as *"dots should move along keyboard"*: the key row is a scroller
+   and this was not, so the moment somebody dragged the keys sideways every dot
+   stayed where it was and pointed at the wrong note. Lining up at rest and
+   lying under a finger is worse than not lining up at all.
+   ⚠️ ITS OWN SCROLLBAR IS HIDDEN AND IT IS NEVER DRAGGED DIRECTLY: the keys
+   own the gesture and `roll.mjs` follows their `scrollLeft`. Two scrollers a
+   person can both drag is two sources of truth. */
+/* 🔴 NO GAP BETWEEN ROWS, AND THAT IS WHAT MAKES THE WHITE KEY RULES
+   CONTINUOUS. They are drawn on each white CELL, so any gap between rows cuts
+   every one of them into row-high dashes. Closing it joins them by
+   construction, with no second element and no absolutely positioned layer
+   inside a scroller, which is where this would otherwise go wrong: an absolute
+   child of a scroller is laid out against the padding box and would stand still
+   while the lane scrolled under it. */
+.roll { display: flex; flex-direction: column; gap: 0;
+        overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.roll::-webkit-scrollbar { display: none; }
+/* 🔴 ON ITS OWN IT IS A SURFACE LIKE ANY OTHER, AND GLUED IT IS NOT. Asked
+   2026-09-23: *"pianoroll should be work standalone too"*. A roll above a
+   keyboard is one object with it and gives up its edges to the box round both;
+   a roll on its own has nothing to belong to, so it is the standard card that
+   every other surface here is. Nothing in `roll.mjs` chooses: being inside a
+   `.kbd` is the whole condition. */
+.roll:not(.kbd > *) {
+  padding: 9px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 4px;
+}
+/* 🔴 A GLUED ROLL SPANS THE BOX AND GIVES THE WIDTH STRAIGHT BACK. The margin
+   is what lets a picked row's ground reach the surface's own edges; the equal
+   padding is what keeps the lane the same width as the key row, which is the
+   thing that must not move. Take one away and either the highlight stops short
+   or every column misses its key by nine pixels. */
+.kbd > .roll {
+  /* ⚠️ AND UPWARDS TOO: *"you still have top and bottom baddiong"*, 2026-09-23,
+     with a crop of a picked row floating inside the box on three sides. The
+     horizontal bleed landed first and left the vertical one behind, so the top
+     row still began nine pixels down. A ground that reaches two edges and stops
+     short of a third reads as a box inside a box, which is the thing being
+     removed. The seam below takes the other end. */
+  margin-inline: calc(var(--kbd-pad, 9px) * -1);
+  margin-block-start: calc(var(--kbd-pad, 9px) * -1);
+  padding-inline: var(--kbd-pad, 9px);
+}
+
+/* the seam a glued roll brings with it, bleeding to the box's own edges */
+/* 🔴 NOTHING ABOVE IT AND AIR BELOW IT. The last row's ground runs into the
+   seam, which is what makes the two parts one surface with a line between them;
+   the space under it is the *"leave space above keyboard"* that was asked for
+   in the same breath as the seam itself. */
+.roll-seam {
+  height: 1px; background: var(--line);
+  margin: 0 calc(var(--kbd-pad, 9px) * -1) 9px;
+}
+/* A row is a `button`, so it gives up every default a button has: this is a
+   lane of dots you can pick, not a control with a face. */
+/* 🔴 THE ROW IS EXACTLY ITS LANE'S HEIGHT, AND NOT SAYING SO LEFT THE WHITE KEY
+   RULES BROKEN AFTER THE ROW GAP WAS CLOSED TO JOIN THEM. MEASURED: the row
+   came out **34 px** against a 26 px lane, centred, so every rule had a 4 px
+   dead band above and below it and the lines were dashes with no gap anywhere
+   in the stylesheet to explain them. 34 px is the height every BUTTON in this
+   project has, and a row is a button. Reported twice as *"make them
+   continuous"* while `gap: 0` was already in force and looked correct.
+   ⚠️ THE LESSON IS THAT `gap: 0` WAS NEVER THE WHOLE ANSWER. Two boxes touching
+   is not the same as their CONTENTS touching, and only a rect said so. */
+.roll-row {
+  position: relative; display: block; width: 100%; height: var(--roll-row-h, 26px);
+  padding: 0; margin: 0;
+  background: none; border: 0; text-align: left;
+  color: inherit; font: inherit; cursor: pointer;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+/* 🔴 THE GROUND IS A PSEUDO-ELEMENT AS WIDE AS THE KEY ROW'S CONTENT, AND THE
+   OBVIOUS FIX FOR THIS BROKE THE ALIGNMENT INSTEAD. Reported with a picture,
+   *"hilite goes edge to edge"*: inside a scroller `width: 100%` is the VISIBLE
+   width, so a picked row's ground stopped at the scrollport and left a strip of
+   unpainted lane beyond it. Widening the ROW to `max-content` fixed that and
+   immediately took the alignment assert red at `0,36,64,113,128` px against
+   `0,25,45,79,89` on the instrument, because a `max-content` row lets the grid
+   size every track to its 62 px CEILING rather than to the room it has.
+   ✅ SO THE LANE KEEPS ITS `100%` SIZING, WHICH IS WHAT MAKES IT AGREE WITH THE
+   KEYS, and an element with no content of its own carries the ground.
+   `roll.mjs` writes `--roll-w` from the key row's `scrollWidth`, so the two are
+   the same fact rather than two measurements of it. */
+/* ⚠️ AND IT BLEEDS THROUGH THE BOX'S PADDING: *"rm padding"*, 2026-09-23, and
+   then *"still padded box, rm padding"* with a crop showing it had not worked.
+   🔴 THE FIRST ATTEMPT WAS A NEGATIVE OFFSET ALONE AND A SCROLLER CANNOT LET
+   ONE OUT. `.roll` is `overflow-x: auto`, which CLIPS anything reaching past
+   its padding box, so `left: -9px` was drawn and then cut off at exactly the
+   edge it was trying to escape. Nothing in the rule was wrong and nothing moved
+   a pixel. **The roll itself now reaches into the box's padding** and takes an
+   equal padding back, so its CONTENT box is unchanged and every column still
+   lines up with the keys, while the ground has somewhere to go. */
+.roll-row::before {
+  content: ''; position: absolute; top: 0; bottom: 0;
+  left: calc(var(--kbd-pad, 0px) * -1);
+  width: calc(var(--roll-w, 100%) + var(--kbd-pad, 0px) * 2);
+  border-radius: 3px; background: transparent; pointer-events: none;
+}
+/* 🔴 A LINE THROUGH THE DOTS, NOT A BAND BEHIND THEM. Asked 2026-09-23:
+   *"instead on hover bg, make a line that crosses dots from center. make it
+   faint"*. A filled row competes with the dots that are the picture; a rule
+   through their centres points at them instead, and it is the same shape as
+   the white key rules crossing the other way. */
+.roll-row:hover::before {
+  top: 50%; bottom: auto; height: 1px;
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+}
+.roll-row:focus-visible { outline: 1px solid var(--hi); outline-offset: -2px; }
+/* 🔴 NO GROUND ON A PICKED ROW. THE DOTS AND THE NAME CARRY BOTH STATES, AND
+   THIS REVERSES WHAT WAS WRITTEN HERE AN HOUR AGO. The rule said the dots say
+   which notes and the row says which chord, so colouring the dots would be two
+   channels saying one thing. Asked for the other way with the picture in front
+   of the person asking: *"when i have chord in keyboard the resp dots in
+   pianoroll cshould turn yellow. rm bg hilite from pianoroll row selected. just
+   play with dots/label lightness"*.
+   ⚠️ AND IT IS BETTER FOR A REASON WORTH KEEPING. A filled band behind a lane
+   competes with the dots that are the picture; lightness on the marks
+   themselves says the same two things in the channel a reader is already
+   looking at. The keys under the roll do exactly this: a dot brightens, the key
+   does not repaint.
+   ⚠️ THE HOVER GROUND STAYS. That one is an affordance rather than a state, it
+   is there only while a pointer is, and it is what says a row can be pressed. */
+.roll-row[data-on] .roll-cell.on::after { background: var(--fg); }
+.roll-row[data-on] .roll-label { color: var(--fg); }
+/* 🔴 AND THE ROW YOU ARE PLAYING GOES YELLOW, WHICH IS THE SAME INK THE KEY
+   UNDER YOUR FINGER USES. Picking is a choice and stays grey; holding the chord
+   is something HAPPENING, and this project's colour rule reserves `--hi` for
+   that. A row can be both at once, which is what happens when you pick a chord
+   and then play it, so this comes second and wins. */
+.roll-row[data-held] .roll-cell.on::after { background: var(--hi); }
+.roll-row[data-held] .roll-label { color: var(--hi); }
+.roll-lane {
+  display: grid; grid-auto-flow: column;
+  grid-template-columns: repeat(var(--k-cols, 8), minmax(var(--k-min, 49px), var(--k-max, 62px)));
+  grid-auto-columns: 0; column-gap: var(--k-gap, 3px); align-items: center;
+  /* ⚠️ 26 px: *"add biit more heigt to piano roll rows"*, 2026-09-23. It is the
+     pad's own height, which is the one other short row this component draws, so
+     a roll and a footer are the same unit tall rather than two near misses. */
+  height: var(--roll-row-h, 26px);
+}
+/* A cell is a place a dot can be, and mostly is not. It draws nothing at all
+   until it is on, so an empty roll is empty rather than a field of grey. */
+.roll-lane { position: relative; }
+.roll-cell { grid-row: 1; min-width: 0; height: var(--roll-row-h, 26px);
+              display: grid; place-items: center; }
+/* 🔴 A RULE WHERE EACH WHITE KEY BEGINS, RUNNING THE WHOLE HEIGHT OF THE ROLL.
+   Asked for, then reported as not continuous, then removed on a misreading of
+   that report, then asked for again in four words. They are drawn on the CELL
+   and joined by the row gap being zero, so a dot three rows up can be traced
+   straight down to the key it names.
+   ⚠️ THE FIRST COLUMN HAS NONE, because the box's own edge is already there. */
+.roll[data-lines] .roll-cell:not(.sharp) {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--fg) 7%, transparent);
+}
+.roll[data-lines] .roll-lane .roll-cell:first-child { box-shadow: none; }
+
+/* the same pull onto the join the black keys take, from the same property */
+.roll-cell.sharp {
+  width: 66%; justify-self: start;
+  transform: translateX(calc(-50% - var(--k-gap, 3px) / 2
+                             + var(--k-off, 0) * (100% - var(--k-gap, 3px))));
+}
+/* ⚠️ THE SAME SIZE AS A KEY'S DOT, FROM THE SAME PROPERTY. Reported with a
+   screenshot: *"dots same size"*. They were 8 px here against 6 px on the keys,
+   and two marks that mean the same thing at two sizes read as two kinds of
+   mark. */
+.roll-cell.on::after {
+  content: ''; width: var(--k-dot, 6px); height: var(--k-dot, 6px); border-radius: 50%;
+  background: var(--dim2);
+}
+/* ⚠️ A DOT ON A BLACK KEY'S COLUMN IS THE SAME INK. The keys under it tell a
+   reader which is which, and a second colour here would be a legend. */
+/* ⚠️ AT THE RIGHT END: *"move chord names to right"*, 2026-09-23. A chord
+   voiced into this window sits low on the keyboard, so the left of a lane is
+   where its dots are and the right is the empty half. The name was landing on
+   the root of its own chord. */
+.roll-label {
+  position: absolute; right: 0; top: 0; height: var(--roll-row-h, 26px);
+  display: flex; align-items: center; padding: 0 2px 0 6px;
+  /* ⚠️ 9.5px: *"make chord labels bit smaller"*, 2026-09-23. It is a caption on
+     a picture rather than a heading over it, and the picture is the dots. */
+  font: 500 9.5px/1 'positron-accidentals', var(--mono);
+  color: var(--fg); white-space: nowrap;
+  /* ⚠️ NO GROUND BEHIND IT: *"no bg for chord labels"*, 2026-09-23. It carried
+     a fade of `--card` so a dot underneath could not collide with it, and on a
+     picked row that fade was a second rectangle inside the highlight. The dots
+     of a chord voiced into this window start well right of a four character
+     name, so the collision it was insuring against does not happen. */
+  pointer-events: none;
+}
+
+/* ── the toggle button (demo/shell/toggle.mjs) ─────────────────────────────
+   🔴 IT TAKES THE PAD GRID'S COLOURS, which is what was asked for about this
+   whole area: `.pos-pad` is `var(--card)` on `var(--line)` and lights by mixing
+   its tint into its own ground rather than by swapping to a flat colour. A
+   toggle is a pad that carries a word instead of a face.
+   ⚠️ TWO SIZES AND ONE SET OF RULES. `big` is the 34 px every control on a
+   page is; `small` is the 26 px `.kpad` already argues for, and it is the one
+   that goes under a keyboard. */
+/* ⚠️ IT IS NOT UPPERCASED, ASKED FOR IN FOUR CHARACTERS: `SUSTAIN -> Sustain`,
+   2026-09-23. The button beside it says `Notes off` as typed, and two controls
+   in one row shouting at different volumes is the row telling a reader there
+   are two kinds of thing in it when there are not. A LABEL is uppercased here
+   (`.kpad-l`, a readout key); a button's own word is not. */
+.pos-toggle {
+  height: 34px; padding: 0 11px;
+  font: 500 11px/1 var(--mono);
+  color: var(--dim); background: var(--card);
+  border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+  -webkit-touch-callout: none; touch-action: manipulation;
+  transition: background .08s linear, border-color .08s linear, color .08s linear;
+}
+.pos-toggle[data-size="small"] { height: 26px; padding: 0 9px; font-size: 10.5px; }
+.pos-toggle:hover:not([disabled]) { color: var(--fg); border-color: var(--dim2); }
+.pos-toggle[aria-pressed="true"] {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--hi) 22%, var(--card));
+  border-color: var(--hi);
+}
+.pos-toggle:focus-visible { outline: 1px solid var(--hi); outline-offset: 1px; }
+.pos-toggle[disabled] { opacity: .4; cursor: default; }
+/* 🔴 IT SITS AT THE RIGHT OF THE PAD, IMMEDIATELY LEFT OF `Notes off`, AND
+   THE PAIR IS CLOSER TOGETHER THAN THE ROW'S OWN GAP. Reported 2026-09-23:
+   *"reduce distace bterrn sustain and noteoff"*. The pad's 8 px gap is the
+   distance between UNRELATED controls in a row; these two are both about what
+   is sounding right now, so they read as a pair at 4 px and as two strangers at
+   8. The octave pair beside them is already tighter still, at zero, because it
+   is one control. */
+.kpad .pos-toggle { margin-left: auto; }
+.kpad .pos-toggle + .kpad-right { margin-left: -4px; }
+
+/* the two note namings, `C` or `1`, in the pad's own segmented geometry */
+.kpad-names button { width: auto; padding: 0 8px; font-size: 10.5px;
+                     font-family: 'positron-accidentals', var(--mono); }
+.kpad-names button[data-on] { color: var(--fg); background: var(--line); }
+
+.kpad-at {
+  min-width: 3.2em; font: 500 11px/1 var(--mono); color: var(--dim);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* at home it is a fact rather than a reading, so it says so quietly */
+.kpad-at[data-home] { color: var(--dim2); }
 /* the same gutter label as a slider's, for the same reason: one word saying
    what the control next to it moves, in a face that cannot be mistaken for the
    control itself */
@@ -4183,7 +4673,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   touch-action: none;
   border-radius: 50%; outline-offset: 2px;
 }
-.pos-knob-dial:focus-visible { outline: 2px solid var(--hi); }
+.pos-knob-dial:focus-visible { outline: 1px solid var(--hi); }
 /* 🔴 THE INVISIBLE HAND'S BUTTON, ON THE RING'S LOWER EDGE. Asked for
    2026-09-22: *"add this mode to knobs: button in the h center, vertically
    centered to the lower edge ot the \"ring\" use same icon"*.
@@ -4347,7 +4837,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 }
 /* The step head walking the grid, and a note arriving from a device. */
 .pos-pad[data-hit] { background: color-mix(in srgb, var(--pad-tint) 80%, #fff 10%); }
-.pos-pad:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+.pos-pad:focus-visible { outline: 1px solid var(--hi); outline-offset: 1px; }
 /* ⚠️ A FACE CUTS LIKE A LABEL DOES. It had no overflow handling at all, so a
    word too long for a pad simply drew past its border. Same rule as the top and
    bottom slots: the ellipsis is the signal that the word is in the wrong place,
@@ -4600,7 +5090,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   cursor: ns-resize; touch-action: none;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
-.pos-fdr-lane:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+.pos-fdr-lane:focus-visible { outline: 1px solid var(--hi); outline-offset: 1px; }
 /* `bottom` is set from script as a share of the TRAVEL, never of the height, so
    the two ends land flush. Same arithmetic as the slider's `left`. */
 /* 🔴 THE HANDLE SITS INSIDE THE LANE BORDER, NOT ON IT. Reported 2026-09-21
@@ -5450,95 +5940,3 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   padding: 8px 16px;
 }
 .pos-drop-note[hidden] { display: none; }
-
-/* ── switch (demo/shell/switch.mjs) ───────────────────────────────────────
-   🔴 APPENDED AT THE FOOT OF THIS FILE RATHER THAN BESIDE `.pos-check`, WHERE
-   IT BELONGS BY SUBJECT. Another session was editing this stylesheet in the
-   same checkout while this block was written, and an append cannot land inside
-   somebody else's half finished rule. Nothing here shares a selector with
-   anything above it, so source order carries no meaning and the block can be
-   moved up beside the checkbox whenever this file is quiet.
-
-   🔴 A REAL `<input type="checkbox">` WEARING `role="switch"`, CLIPPED, WITH
-   THE TRACK AND THE KNOB DRAWN BESIDE IT. The reasons are in the module header
-   and they are the checkbox's four plus one attribute. What is left for CSS is
-   the picture, and the picture is the whole of what was asked for: a rounded
-   rectangle, yellow for a primary switch and grey for a secondary one.
-
-   ⚠️ CLIPPED, NEVER `display: none`. A `display: none` input is not focusable,
-   so the keyboard path would be gone and nothing on the page would say so. This
-   is the same clip `.pos-check-i` uses, and `/kit/` asserts the input is still
-   in the tab order and still 1 px rather than 0. */
-.pos-switch {
-  display: inline-flex; align-items: center; gap: 8px; height: 34px;
-  cursor: pointer;
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-  touch-action: manipulation;
-}
-.pos-switch-i {
-  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
-}
-/* 🔴 A ROUNDED RECTANGLE, NOT A PILL, AND THAT IS WHAT WAS ASKED FOR. Every
-   other control in this kit has square shoulders with a 3 or 4 px radius on
-   them, and a pill would be the one component on the page drawn to a different
-   system. The 4 px here is `.pos-check-b`'s 3 px one step up for a box twice as
-   wide, so the two sit next to each other as one family.
-
-   The same inset shadow the checkbox and the slider's lane use rather than a
-   border, for the same reason: a border insets the padding box, and the knob
-   inside it would be a pixel off centre at this size. */
-.pos-switch-b {
-  position: relative; flex: none; width: 34px; height: 18px; border-radius: 4px;
-  background: var(--card2); box-shadow: inset 0 0 0 1px var(--line2);
-}
-/* 🔴 THE KNOB IS AN ELEMENT AND ITS TRAVEL IS ONE NUMBER, DECLARED ONCE. The
-   track is 34 wide, the knob is 14 and sits 2 in from the end, so it moves
-   34 - 14 - 2 - 2 = 16 px. Typing 16 in one place and the widths in another is
-   a measurement in two files waiting to disagree, which `--sld-col` and
-   `--ctl-gap` were both repaired for, so the travel is computed from the
-   figures it comes from and the check reads the rendered edges rather than
-   either. */
-.pos-switch-k {
-  position: absolute; left: 2px; top: 2px; width: 14px; height: 14px;
-  border-radius: 3px; background: var(--dim2);
-  transition: transform .12s ease, background-color .12s ease;
-}
-.pos-switch-i:checked + .pos-switch-b .pos-switch-k {
-  transform: translateX(calc(34px - 14px - 2px - 2px));
-  background: var(--bg);
-}
-/* 🔴 ONE YELLOW, AND THE SECOND WEIGHT DOES NOT GET TO INVENT ANOTHER. `--hi`
-   means *the thing this control is about* on every page here, so a primary
-   switch lights in it and a secondary switch lights in `--dim`, a grey that is
-   already in this file. `/kit/` asserts the primary's lit track against the
-   token read off the stylesheet, so the two are one measurement rather than two
-   that happen to match, and asserts that the secondary is NOT that colour,
-   which is the half that catches a secondary quietly reaching for the yellow.
-
-   ⚠️ BOTH WEIGHTS SHARE ONE OFF PICTURE, which is the rule rather than an
-   economy: weight says how loudly the ON state announces itself, so two
-   switches that are both off have nothing to say about each other. */
-.pos-switch-i:checked + .pos-switch-b {
-  background: var(--hi); box-shadow: inset 0 0 0 1px var(--hi);
-}
-/* (0,3,0) against (0,2,0), so this wins on weight and source order is not
-   load-bearing. It is still written after the rule it overrides, because the
-   day a specificity tie is introduced is the day it silently stops working. */
-.pos-switch[data-weight="secondary"] .pos-switch-i:checked + .pos-switch-b {
-  background: var(--dim); box-shadow: inset 0 0 0 1px var(--dim);
-}
-/* Focus is grey here and nowhere near the lit colour. One colour, one meaning,
-   which is the answer `.pos-check` and `.pos-choice` both reached. */
-.pos-switch-i:focus-visible + .pos-switch-b {
-  outline: 2px solid var(--dim2); outline-offset: 2px;
-}
-.pos-switch-t { font: 500 11px/1 var(--mono); color: var(--fg); white-space: nowrap; }
-.pos-switch-i:disabled ~ .pos-switch-t { color: var(--dim2); }
-.pos-switch:has(.pos-switch-i:disabled) { cursor: default; opacity: .45; }
-/* The knob slides because sliding is what says there are two positions and this
-   is one of them. Somebody who has asked for less movement gets the position
-   and none of the travel. */
-@media (prefers-reduced-motion: reduce) {
-  .pos-switch-k { transition: none; }
-}
