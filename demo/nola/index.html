@@ -2394,6 +2394,35 @@
         onRoll.join(',') === onKeys.join(','),
         `roll at ${onRoll.join(',')} px against ${onKeys.join(',')} px on the instrument`);
 
+      /* 🔴 THE FIRST ROW IS AS FAR FROM THE TOP AS THE ROWS ARE FROM EACH OTHER.
+         Asked with a crop: *"add more space on first row on top of dots / label
+         so disace from separators and from top is rohghly same"*. Every dot is
+         centred in its row, so dot to dot is a whole row and the top edge to the
+         first dot was HALF of one, which is two spacings that should read as
+         one. MEASURED as the two distances rather than as the padding that
+         produces them, because the padding is the cause and this is the claim. */
+      {
+        const rollBox = keys.el.querySelector('.roll').getBoundingClientRect();
+        /* ⚠️ THE DOT, NOT THE CELL. A pseudo-element cannot be measured, and the
+           cell it lives in is taller than the dot's own box on the first row,
+           so the cell's centre is not the dot's. The dot is centred in the
+           CONTENT box, which is the cell minus its padding. Reading the cell
+           gave 19.5 px for a dot that is at 29.3. */
+        const midOf = (row) => {
+          const c = row.querySelector('.roll-cell.on') || row.querySelector('.roll-cell');
+          const b = c.getBoundingClientRect();
+          const pt = parseFloat(getComputedStyle(c).paddingTop) || 0;
+          return b.top + pt + (b.height - pt) / 2 - rollBox.top;
+        };
+        const rws = [...keys.el.querySelectorAll('.roll-row')];
+        const first = midOf(rws[0]);
+        const step = rws.length > 1 ? midOf(rws[1]) - first : 0;
+        d.assert('the first row sits as far from the top as the rows sit from each other',
+          rws.length > 1 && Math.abs(first - step) <= 4,
+          `the first dot is ${first.toFixed(1)} px below the top and the rows are `
+          + `${step.toFixed(1)} px apart`);
+      }
+
       /* 🔴 AND THE BLACK ONES DELIBERATELY DO NOT, WHICH IS A CLAIM AND NOT A
          LOOSENED CHECK. Asked as *"move piano roll dots to cross the divider from
          the middle"* and then *"lines stay. black key dots move"*. A real black
