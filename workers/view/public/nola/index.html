@@ -1786,8 +1786,28 @@
        is the one that ships.
        ⚠️ NOBODY HAS PLAYED IT. This is a reading, not an ear, and the line
        below is the whole of changing its mind. */
-    const show = r.picks.filter((p) => p.role === 'other').slice(0, 1);
-    for (const p of (show.length ? show : r.picks.slice(0, 1))) {
+    /**
+     * 🔴 NEVER PROPOSE A CHORD THAT IS ALREADY IN THE ROLL. Reported 2026-09-23
+     * with a screenshot of `C#min7`, `F#min7` and a proposal reading `C#min7`:
+     * *"you suggested what i played"*.
+     * The table answers *what follows these chords*, and the commonest answer to
+     * a two chord vamp is one of those two chords, which is true and useless: a
+     * proposal is a thing to TRY, and one you are already playing is nothing to
+     * try. It also makes the roll say the same chord twice in one picture, which
+     * reads as the page having lost track.
+     * ⚠️ IT IS FILTERED RATHER THAN RE-RANKED. `suggest.mjs` decides what is
+     * idiomatic and what is obvious, and this page has no business reordering
+     * that; what it can say is that one of the answers is not available here.
+     * ⚠️ AND IF EVERY ANSWER IS ALREADY LEARNED, NOTHING IS PROPOSED. An empty
+     * row is honest and a repeat is not.
+     */
+    const mine = new Set(learned.map((l) => l.key));
+    const free = r.picks.filter((p) => {
+      const c = parseChord(p.name);
+      return c.ok && !mine.has(chordKey(c.root, c.quality));
+    });
+    const show = free.filter((p) => p.role === 'other').slice(0, 1);
+    for (const p of (show.length ? show : free.slice(0, 1))) {
       const c = parseChord(p.name);
       if (!c.ok) continue;
       const { notes, outside } = voiceRow(c.notes, near, { wide: true });
@@ -3358,6 +3378,18 @@
         fadedAt < 0.95 && fadedAt > 0.5 && playedAt === 1 && backAt < 0.95,
         `${fadedAt} when it is only a proposal, ${playedAt} while you are playing it, `
         + `and ${backAt} once you let go`);
+
+      /* 🔴 AND IT IS NEVER A CHORD ALREADY IN THE ROLL. Reported with a
+         screenshot of two learned rows and a proposal repeating the first:
+         *"you suggested what i played"*. The commonest answer to a two chord
+         vamp is one of those two chords, which is true and useless. */
+      d.assert('NEGATIVE CONTROL: the proposal is never a chord already in the roll',
+        !learned.some((l) => {
+          const c = parseChord(guesses[0].name);
+          return c.ok && chordKey(c.root, c.quality) === l.key;
+        }),
+        `the roll holds ${learned.map((l) => l.name).join(', ')} and proposes `
+        + `${guesses[0].name}`);
 
       /* 🔴 AND IT IS PROPOSED WHERE THE HANDS ARE, NOT AT THE BOTTOM OF THE
          PICTURE. Reported with a screenshot: chords played at A3 to A4 and a
