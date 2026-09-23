@@ -1632,8 +1632,23 @@
   /** Put a learned or proposed chord where this keyboard's hands can reach it,
    *  which is the same arithmetic `drawChords` already uses. A row voiced any
    *  other way is the one row on the page the player cannot play. */
-  const voiceRow = (notes, near) => voiceChord(notes, {
-    mode: voicing, lo: keys.base, hi: keys.base + REACH, near, bass: false });
+  /**
+   * 🔴 TWO WINDOWS, AND WHICH ONE IS THE DIFFERENCE BETWEEN A SUGGESTION THAT
+   * READS AND ONE THAT LOOKS LIKE NONSENSE. Reported 2026-09-23 with a
+   * screenshot: chords played at A3 to A4 and a proposal drawn at C3 to A3,
+   * *"suggeston does no make sense, tis way down"*.
+   * ⚠️ `REACH` IS THE LETTER KEYS, fourteen semitones from the bottom, and it is
+   * the right window for the TYPED line, which exists so a line of chords can be
+   * played on a laptop with no keyboard plugged in. That is what the voicing
+   * control was asked for in the first place.
+   * ✅ IT IS THE WRONG WINDOW FOR A PROPOSAL, because a proposal answers chords
+   * somebody just played and they played them wherever their hands were. Given
+   * the whole keyboard to work in, `near` can put it beside the last chord
+   * instead of at the bottom of the picture.
+   */
+  const voiceRow = (notes, near, { wide = false } = {}) => voiceChord(notes, {
+    mode: voicing, lo: keys.base, hi: keys.base + (wide ? SHOWN() : REACH),
+    near, bass: false });
 
   function showReading(r) {
     readLine.textContent = !r ? 'nothing held'
@@ -1688,7 +1703,7 @@
     for (const p of (show.length ? show : r.picks.slice(0, 1))) {
       const c = parseChord(p.name);
       if (!c.ok) continue;
-      const { notes, outside } = voiceRow(c.notes, near);
+      const { notes, outside } = voiceRow(c.notes, near, { wide: true });
       near = notes;
       guesses.push({ ...p, notes });
       roll.addRow({ kind: 'guess', notes, label: rowLabel(p.name, outside) });
@@ -2986,7 +3001,7 @@
         guesses.length === 1 && guesses[0].role === 'other'
         && lastGuess.picks.length === 2 && lastGuess.picks[0].role === 'usual'
         && guesses[0].name !== lastGuess.picks[0].name
-        && guesses.every((g) => g.notes.every((n) => n >= keys.base && n <= keys.base + REACH)),
+        && guesses.every((g) => g.notes.every((n) => n >= keys.base && n <= keys.base + SHOWN())),
         `after ${learned.map((l) => l.name).join(' then ')} the table offers `
         + `${lastGuess.picks[0].name} as the usual one and ${guesses[0].name} as the less `
         + `obvious one, and the roll draws ${guesses.map((g) => g.name).join(', ')}`);
@@ -3014,6 +3029,26 @@
         fadedAt < 0.9 && fadedAt > 0.3 && playedAt === 1 && backAt < 0.9,
         `${fadedAt} when it is only a proposal, ${playedAt} while you are playing it, `
         + `and ${backAt} once you let go`);
+
+      /* 🔴 AND IT IS PROPOSED WHERE THE HANDS ARE, NOT AT THE BOTTOM OF THE
+         PICTURE. Reported with a screenshot: chords played at A3 to A4 and a
+         proposal drawn at C3 to A3, *"suggeston does no make sense, tis way
+         down"*. Every voiced chord was being squeezed into the fourteen
+         semitones the LETTER keys cover, which is right for a typed line a
+         laptop has to play and wrong for an answer to something somebody just
+         played up the keyboard. MEASURED as the distance between the middle of
+         the proposal and the middle of the chord it answers. */
+      const mid = (ns) => ns.reduce((a, b) => a + b, 0) / ns.length;
+      const apart = Math.abs(mid(guesses[0].notes) - mid(learned[learned.length - 1].notes));
+      /* ⚠️ AN OCTAVE IS THE LINE, AND IT IS A REAL ONE RATHER THAN A ROUND
+         NUMBER: a chord voiced more than twelve semitones from the one it
+         follows is in a different register, which is what made the reported
+         screenshot read as nonsense. It measures 8.2 with the fix and goes over
+         without it. */
+      d.assert('the proposal is voiced beside the chord it answers, not at the bottom of the keys',
+        apart <= 12,
+        `the proposal sits ${apart.toFixed(1)} semitones from the middle of `
+        + `${learned[learned.length - 1].name}, against the ${SHOWN()} the keyboard draws`);
 
       /* 🔴 WHAT YOU PLAYED COMES FIRST, ASKED FOR IN THOSE WORDS: *"played is
          first choice"*. It was already true, by the order `addLearned` appends
