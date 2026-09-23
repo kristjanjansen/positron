@@ -337,6 +337,46 @@ const FILES = [
   ['demo/muta/vendor/warp.wasm', 'muta/vendor/warp.wasm'],
   ['demo/muta/vendor/LICENSE-warps', 'muta/vendor/LICENSE-warps'],
 
+  // ── the Faust compiler itself, for `/fau/` ─────────────────────────────────
+  //
+  // ⚠️ THE FOURTH CASE OF THE SAME RULE: `demoFiles()` takes neither a `.wasm`
+  // nor a subdirectory, and `.data` is not a web extension at all, so all four
+  // of these would be declined in silence and the page would ship pointing at
+  // four 404s. `checkVendorUrls()` is what refuses the build instead, which is
+  // why `demo/fau/index.html` writes each of them out as a whole quoted path in
+  // one object at the top of the file. ⚠️ AND WHY NEITHER FILE SPELLS A VENDOR
+  // PATH IN PROSE: this check reads comments as well as code, and refused this
+  // very build over an ellipsis standing in for a file name.
+  //
+  // 🔴 6,162,473 BYTES OF COMPILER, WHICH IS 2.49 TIMES THE VENDORED SCSYNTH
+  // ALREADY IN THIS REPOSITORY OVER BROTLI. `plans/plan-fau.md` §1 prices it
+  // file by file: 3,598,106 for the compiler, 2,407,445 that is not data at all
+  // but the 53 standard library `.lib` files as plain Faust source, and 156,922
+  // of Emscripten glue. The page fetches none of it on a visit — the first
+  // press does — and says in its own log what pressing will cost.
+  //
+  // ⚠️ WHETHER THE EDGE COMPRESSES `libfaust-wasm.data` IS UNVERIFIED and it is
+  // the difference between 1.0 MB and 2.9 MB over the wire. It has no extension
+  // Cloudflare recognises. One `curl -I -H 'Accept-Encoding: br'` against the
+  // deployed copy settles it, and this list is where the rename would go if the
+  // answer is no. `plans/plan-fau.md` §11 item 3.
+  //
+  // LICENCE: LGPL 2.1 or later. The text shipped in the package is the FAUST
+  // wasm copyright header (GRAME, 2021-2024) over the full LGPL 2.1, and it is
+  // vendored verbatim beside the binaries. ⚠️ npm's own metadata for
+  // `@grame/faustwasm@0.18.5` says `LGPL-3.0`, which disagrees with the file in
+  // the tarball; the file is what ships here and what a reader can check.
+  // ⚠️ THE STANDARD LIBRARY IS A PATCHWORK and the licence above does not cover
+  // it: of the 53 `.lib` files inside the `.data` blob, five declare
+  // `LicenseRef-LGPL-2.1-or-later-with-Faust-exception`, THREE declare
+  // `STK-4.3`, two declare `LGPL with exception`, one `LGPL-2.1-or-later`, and
+  // 42 declare nothing at all. `plans/plan-fau.md` §7.2 lists them.
+  ['demo/fau/vendor/libfaust-wasm.wasm', 'fau/vendor/libfaust-wasm.wasm'],
+  ['demo/fau/vendor/libfaust-wasm.data', 'fau/vendor/libfaust-wasm.data'],
+  ['demo/fau/vendor/libfaust-wasm.js', 'fau/vendor/libfaust-wasm.js'],
+  ['demo/fau/vendor/faustwasm.mjs', 'fau/vendor/faustwasm.mjs'],
+  ['demo/fau/vendor/LICENSE-faustwasm', 'fau/vendor/LICENSE-faustwasm'],
+
   ...extraPages(),
   ...demoFiles(),
 ];

@@ -155,6 +155,16 @@ Worker, `terminate()` on a 2 s watchdog, refuse a factory whose `meta.size` is
 negative or over a few megabytes, never instantiate on the main thread. **A
 negative size is the testable symptom that makes the overflow catchable.** That
 is a plan and not a measurement.
+🔴 **AND `/fau/` SHIPPED 2026-09-23 WITHOUT NEEDING THE ANSWER, BY REFUSING THE
+QUESTION.** No patch reaches that page from anywhere: no relay, no room, no
+query string, and the page's own header says so. So the containment design is
+still untried and nothing depends on it until somebody wants shared editing.
+⚠️ **WHAT DID GET MEASURED IS THE COMPILER'S ERROR PATH**, which is the same
+machinery one layer up: libfaust is built with C++ exception catching disabled,
+so every failed compile reaches Emscripten's `abort()`, which prints to
+`console.error` and throws a `WebAssembly.RuntimeError` that `faustwasm` catches
+and turns back into the real message. The instance stays usable, MEASURED, and a
+good compile after a bad one is byte identical to one before it.
 ⚠️ **AND IT PROTECTS THE PAGE, NOT THE PHONE.** A watchdog stops a hostile
 patch. It does not stop an expensive one, and the machine that pays is the
 visitor's, which is `CLAUDE.md`'s ERR rule one layer out.
@@ -248,7 +258,82 @@ at the BOTTOM of a white key, below where a black key ends, which is where a
 real keyboard overlay prints it and where the letter (`a`, `s`, `d`) already
 sits.
 
-### Asked 2026-09-22, not started: Faust research, for a demo called `fau`
+### Open 2026-09-23: the three things `/fau/` is waiting on, each one cheap
+
+🔴 **1. IS THERE A FAUST COMPILER ON THE BOARD, AND WHICH VERSION.** One command,
+`faust --version` over ssh, and `plans/plan-fau.md` §11 item 1 calls it the
+cheapest and most decisive thing in that document: everything in its §3 about
+the two ends is arithmetic over a version number nobody has read. **It could not
+be run on 2026-09-23**: `ssh positron@192.168.1.213` answers `No route to host`
+from this laptop today, and the port 22 sweep `positron-hardware` recommends was
+refused by the sandbox. The relay answers verbs, not shell commands, so it
+cannot settle this either.
+⚠️ **AND UNTIL IT IS ANSWERED, `/fau/` DRAWS NO RASPBERRY PI.** A diagram may not
+draw a mechanism the page does not have, so the board is absent rather than
+dashed. The moment there is a compiler on it, the box and the second half of the
+two-ends claim can both be drawn.
+
+🔴 **2. DOES THE EDGE COMPRESS `libfaust-wasm.data`, AND THE PAGE NOW ANSWERS IT
+ITSELF.** `plan-fau.md` §11 item 3 says the difference is **1.0 MB against
+2.9 MB** over the wire and that the file has no extension Cloudflare
+recognises. `/fau/` logs both numbers on the first compile, read off
+`decodedBodySize` and `encodedBodySize`, and says in words whether whatever
+served it compressed it. **Open the deployed page and read its log.** Locally it
+says `6.38 MB and 6.38 MB of that crossed the wire, so whatever served it did
+not compress it`, which is the dev server behaving exactly as expected and is
+the negative control for the reading.
+⚠️ If the answer on the edge is no, `workers/view/build.mjs` is where the rename
+goes, and the allowlist comment beside those five lines says so.
+
+🔴 **3. `demo/shell/worklet.mjs` HAS NO CALLER, WHICH IS SAID HERE RATHER THAN
+LEFT TO BE NOTICED.** `plan-fau.md` §9.4 step 2 asks for it on its own, before
+anything else, because it is true whether or not Faust is ever built: stringify
+the functions a worklet needs, blob them, `addModule` the object URL, and
+`demo/shell/rhodes.mjs` reaches an audio thread with ONE copy of its arithmetic.
+32 checks with no browser, 23 of them refusals or negative controls, five
+sabotages measured. **The caller it was written for is `/nola/`'s second engine,
+`plans/plan-nola.md` §6.1 item 6.** If that lands another way, delete the module
+rather than leaving a kit component nothing uses.
+⚠️ **AND ITS BROWSER HALF IS UNPROVEN.** `new Function` is not an
+`AudioWorkletGlobalScope`: what a node test cannot answer is whether `addModule`
+takes the blob, whether the origin counts as secure, and whether a
+Content-Security-Policy refuses `blob:`. The first page to use it grades all
+three at once.
+
+### Done 2026-09-23: `/fau/`, and the research entry below is what it was built from
+
+✅ **THE PAGE IS BUILT AND IT IS 31/31**, `demo/fau/index.html`, 25 page asserts,
+against `plans/plan-fau.md` §9.4 steps 2 to 5. A text area of Faust, a COMPILE
+button, three presets, a keyboard, `demo/shell/pedal.mjs` above the node, six
+readout cells and a diagram.
+✅ **AND THE THREE NUMBERS THE ENTRY BELOW ASKED FOR ARE MEASURED IN A BROWSER
+NOW**, which is what that entry said was missing: the compiler is
+**6,379,006 bytes** and the page asserts that figure to the byte off the
+browser's own resource timing, a small `.dsp` compiles in **66 to 68 ms** as a
+polyphonic instrument, and **eight voices with the pedal down all keep sounding**
+with the level measured either side of the gesture.
+🔴 **THE TRUST QUESTION IS ANSWERED THE WAY THE ENTRY BELOW EXPECTED: NO PATCH
+ARRIVES FROM ANYWHERE.** No relay, no room, no query string. The text area is
+the visitor's own machine editing its own copy, and the reasons are
+`plan-fau.md` §6.2's 603 MiB and its signed overflow.
+⚠️ **WHAT IS NOT BUILT**: the STK piano preset (1,690 ms of frozen page, and it
+belongs behind a Worker), and the board half, which is blocked on the entry
+below about `faust --version`.
+
+### Found 2026-09-23, not fixed: `/items/` draws two containers with nothing in them
+
+🔴 **`node demo/verify.mjs items` IS RED ON ITS OWN PICTURE AND IT IS NOT NEW.**
+`the diagram drew every name and every arrow whole · container store, container
+fcm`. Both are `kind: 'cloud'` boxes with no `children`, which `createDiagram`
+refuses and reports on `cuts`, and `CLAUDE.md` already records the same defect
+being reported on `/floor/` and `/blocks/` in one afternoon.
+⚠️ **FOUND WHILE CHECKING SOMETHING ELSE.** `demo/shell/field.mjs` gained an
+option on 2026-09-23 and `items` is one of two pages with five fields in it, so
+it was run to diff the assert count. `kit` is 177 green beside it.
+⚠️ **THE FIX IS A BOX INSIDE EACH**, which is what the rule asks for: the
+Durable Object and the topic are what run on those two machines.
+
+### Asked 2026-09-22, DONE 2026-09-23: Faust research, for a demo called `fau`
 
 🔴 **ASKED IN THESE WORDS:** *"in bg do faust research. demo called fau"*, then
 *"also loop up similar alternatives"*, after a reply arguing that `libfaust`

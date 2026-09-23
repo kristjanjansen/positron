@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  /**
+   * fau. A synthesiser you type in, compiled to machine code in this tab.
+   *
+   * `plans/plan-fau.md` is 1,419 lines of measurement behind this page and the
+   * conclusions it reached are taken here rather than re-argued. What follows
+   * is only what somebody editing THIS FILE has to know.
+   *
+   * ── WHAT IS ACTUALLY HAPPENING ─────────────────────────────────────────────
+   *
+   * The text in the box is Faust, a language for describing a signal. Pressing
+   * COMPILE hands it to `libfaust`, which is the Faust compiler itself built as
+   * WebAssembly and vendored beside this page, and gets back a second, much
+   * smaller WebAssembly module that IS this instrument. That module goes into
+   * an `AudioWorkletNode` and the audio thread runs it. Nothing is interpreted:
+   * ten lines of text become a few kilobytes of machine code, in about ten
+   * milliseconds, in the tab.
+   *
+   * 🔴 NOTHING IS FETCHED ON A VISIT, AND THE COMPILER IS 6.16 MB. It arrives
+   * on the first press and not before, which is the `/reel/` repair applied to
+   * a download rather than to a stream: that page opened a newsreel and a day's
+   * radio on every visit for a first frame nobody had asked to see. The page
+   * says in its log what pressing will cost before anybody presses anything.
+   *
+   * ── THE THREE THINGS THAT ARE NOT OBVIOUS FROM THE CODE ────────────────────
+   *
+   * 🔴 1. THE PEDAL SITS ABOVE THE FAUST NODE AND MUST NOT GO INSIDE THE DSP.
+   * The Faust manual's own recipe is a `sustain` slider inside the source and
+   * `gate = t + s : min(1)`. MEASURED in `plan-fau.md` §4.2 by reading
+   * `FaustWebAudioDsp.ts`: the polyphonic voice allocator special-cases exactly
+   * two controllers, 123 and 120, and 64 is not one of them. A note-off marks
+   * its voice `kReleaseVoice`, which is the FIRST thing `getFreeVoice()` steals
+   * So with the manual's recipe a pedalled note is audible and stealable at the
+   * same time, and the more the pedal is used the wronger it gets. Here
+   * `demo/shell/pedal.mjs` holds the note-off and the engine is never told the
+   * note ended, so there is nothing for the allocator to write off.
+   * ⚠️ AND THE DAMPER TIME IS THE ONE PART OF `pedal.mjs` THIS PAGE CANNOT USE.
+   * On `/nola/` the page owns the release and can ramp it over 0.12 s. Here the
+   * release lives in the source the visitor typed, so the pedal decides WHETHER
+   * and WHEN a note is let go and the DSP decides how fast. That is the module's
+   * own division of labour, arriving at a page that keeps only half of it.
+   *
+   * 🔴 2. THE COMPILER'S ERROR PATH GOES THROUGH `console.error`, AND THAT
+   * WOULD TAKE THE SUITE RED ON A PAGE DOING EXACTLY WHAT IT PROMISES.
+   * MEASURED here 2026-09-23: libfaust is built with C++ exception catching
+   * disabled, so an exception inside it reaches Emscripten's `abort()`, which
+   * prints `Aborted(Assertion failed: Exception thrown, but exception catching
+   * is not enabled...)` and throws a `WebAssembly.RuntimeError`. `faustwasm`
+   * catches that and reads the real message out with `getErrorAfterException()`,
+   * so the SYNTAX ERROR a visitor sees is correct and the instance stays
+   * usable. One console error per failed compile is already on the console by
+   * then, and `demo/verify.mjs` fails `no console errors` on it.
+   * ✅ THE SHIM IS THREE LINES AND IT IS INSTALLED FOR ONE AWAIT. The glue does
+   * `var err = console.error.bind(console)` at module scope, so whatever
+   * `console.error` is AT THE MOMENT THE GLUE IS EVALUATED is what it keeps
+   * forever. A forwarding function is installed across that one await and taken
+   * off immediately afterwards: the compiler keeps the shim, the rest of the
+   * page gets the real `console.error` back, and nothing else on the page can
+   * be swallowed. MEASURED with a deliberate error: 1 line captured, 0 lines
+   * reaching the console, and the error text still reported to the visitor.
+   * ⚠️ NOTHING IS HIDDEN. Every captured line goes into this page's own log,
+   * where a reader can see it, and the count is asserted.
+   *
+   * 🔴 3. `effect = _, _;` IS IN EVERY PRESET AND IT IS NOT DECORATION.
+   * MEASURED: compiling a polyphonic DSP that defines no `effect` costs one of
+   * those aborts every time, because the generator probes for one and libfaust
+   * throws when it is not there. With a pass-through effect declared, a poly
+   * compile is console-clean. So the line is worth 1 console error per compile
+   * and it is the shape a Faust instrument takes anyway: a per-voice `process`
+   * and one `effect` after the mixer.
+   *
+   * ── WHAT THIS PAGE DELIBERATELY DOES NOT DO ────────────────────────────────
+   *
+   * 🔴 NO PATCH ARRIVES FROM ANYWHERE. Not over the relay, not from a room, not
+   * from a query string. `plan-fau.md` §6.2 measured why: `process = _ @
+   * 100000000;` is 24 bytes, compiles in 25 ms, and renders, taking a process
+   * from 91 to 603 MiB. At 2^28 the compiler's own size arithmetic overflows to
+   * -2,147,483,640, reports that the compile SUCCEEDED, and throws out of
+   * bounds during render, which in a page is the audio thread. There is no CPU
+   * limit, no memory limit and no compile timeout, and nothing in the source
+   * text can be read to predict any of it. The text area is the visitor's own
+   * machine editing its own copy.
+   *
+   * ⚠️ AND THE STK PIANO IS NOT A PRESET HERE. `faust-stk/piano1.dsp` compiles
+   * in 1,690 ms, which is 1.7 seconds of frozen page on this desk and several
+   * times that on a phone, because libfaust is synchronous inside its own wasm.
+   * `plan-fau.md` §9.4 puts it in a later session behind a Worker. Every preset
+   * on this page compiles in under 110 ms.
+   *
+   * 🔴 AND THERE IS NO RASPBERRY PI IN THE PICTURE, WHICH IS THE POINT OF THE
+   * PLAN'S FIRST OPEN QUESTION. `faust2rpialsaconsole` is real and the board
+   * could compile this same source to native ARM, but nobody has run
+   * `faust --version` on that board and `ssh` to it answers `No route to host`
+   * from here today. `positron-diagram`'s rule is that a picture may never draw
+   * a mechanism the page does not have, so the board is not drawn at all rather
+   * than drawn as an intention. `BACKLOG.md` carries the one command that
+   * changes this.
+   */
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { createKeyboard, QWERTY_CHROMATIC } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  import { createPedal, PEDAL_SAYS, SUSTAIN_CC } from '/shell/pedal.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createSwitch } from '/shell/switch.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+
+  const q = new URLSearchParams(location.search);
+
+  /**
+   * 🔴 THE VENDORED FILES, EACH WRITTEN OUT AS A WHOLE QUOTED PATH BECAUSE THAT
+   * IS WHAT THE BUILD CHECKS. `workers/view/build.mjs` copies only an
+   * allowlist, `demoFiles()` takes neither a `.wasm` nor a subdirectory, and
+   * `checkVendorUrls()` refuses the build when a vendor path in this file has
+   * nothing deployed behind it. Five explicit lines in that file are what this
+   * page costs, which is `LAYOUT.md` rule 6 working as designed: a 6 MB binary
+   * should cost somebody a deliberate line.
+   * ⚠️ AND THE GUARD READS COMMENTS TOO, WHICH IT PROVED ON ITS FIRST RUN HERE.
+   * The line above used to carry a quoted vendor path with an ellipsis standing
+   * in for the file name, and the build refused itself over a path that was
+   * never a path. Writing one out in prose here is the one way to break this
+   * page's own deploy, so it is not done.
+   * ⚠️ THE `.data` FILE IS NOT DATA, IT IS SOURCE CODE. 53 `.lib` files of
+   * plain Faust totalling 2,406,429 bytes, which the compiler reads out of its
+   * own in-memory filesystem. A page that imports three libraries pays for
+   * fifty three, and `tubes.lib`, which models valve amplifiers, is 15.7 per
+   * cent of the whole download on its own.
+   */
+  const VENDOR = {
+    js: '/fau/vendor/libfaust-wasm.js',
+    data: '/fau/vendor/libfaust-wasm.data',
+    wasm: '/fau/vendor/libfaust-wasm.wasm',
+    mjs: '/fau/vendor/faustwasm.mjs',
+  };
+  /** What the compiler weighs, measured on the vendored files with `wc -c`. */
+  const COMPILER_BYTES = 3598106 + 2407445 + 156922;
+  /** And what a page that COMPILES needs, which is that plus the runtime. */
+  const PAGE_BYTES = COMPILER_BYTES + 216533;
+  /** The version those bytes answer when asked. Asserted rather than trusted. */
+  const COMPILER_VERSION = '2.89.2';
+
+  /**
+   * 🔴 THE ORGAN PRESET, COMPILED UNDER THE NAME `fau_pin`, IS EXACTLY THIS
+   * MANY BYTES OF MACHINE CODE, AND THE NAME IS PART OF THE PIN.
+   * `plan-fau.md` §3.3 measured that generated code is deterministic for the
+   * same source, name and flags, and that a DIFFERENT NAME PRODUCES DIFFERENT
+   * BYTES because the name is embedded in the module. This page names every
+   * ordinary compile after the button that started it plus a counter, so its
+   * byte counts are not comparable with each other by default. This check found
+   * that the hard way, as a red assert comparing `organ_1`
+   * against `organ again_5` and reporting a 78 byte difference in a page where
+   * nothing was wrong.
+   * ⚠️ SO EVERY COMPILE A CHECK COMPARES CARRIES A SEVEN CHARACTER NAME, and
+   * the number below pins the compiler version, the `-ftz 2` flag, the
+   * polyphonic shape and the preset text together. It is the `checkCompiledDefs`
+   * idea from `workers/view/build.mjs`, done at runtime rather than at build
+   * time: change any one of them and this goes red with the new number in its
+   * own detail line. 4,540 of voice, 2,224 of effect, 502 of mixer.
+   */
+  const PINNED = { name: 'fau_pin', bytes: 7266 };
+
+  /**
+   * ⚠️ EIGHT VOICES, WHICH IS A CHOICE ABOUT MEMORY RATHER THAN ABOUT MUSIC.
+   * The per-voice struct is the `per voice` cell, and it is 256.1 KB for
+   * anything built on `os.osc`, because a Faust oscillator carries a 65,536
+   * entry sine table. Eight of those is 2 MB before any audio buffer exists,
+   * and `plan-fau.md` §11 item 11 records that nobody has measured what an
+   * iPhone grants an AudioWorklet. Eight hands and a pedal is more than anybody
+   * plays at once here.
+   */
+  const VOICES = 8;
+
+  /**
+   * 🔴 `-ftz 2`, AND IT IS PASSED EXPLICITLY RATHER THAN LEFT TO A DEFAULT.
+   * `faustwasm` appends it to every compile it drives itself, with the comment
+   * *"Flush to zero to avoid costly denormalized numbers"*. It is written here
+   * because the claim this page is FOR is that the same source compiles the
+   * same way at both ends, and a flag one end appends silently is a flag the
+   * other end will not know to pass. The board's `faust2rpialsaconsole` needs
+   * this same argument or the two ends differ in their denormal handling.
+   */
+  const FLAGS = '-ftz 2';
+
+  /**
+   * The presets, and each one is a whole instrument in the box.
+   *
+   * 🔴 THE THREE MAGIC NAMES ARE `freq`, `gain` AND `gate`. A Faust DSP becomes
+   * one VOICE of a polyphonic instrument by declaring those three, and the
+   * runtime replicates it. Rename any of them and the keyboard stops reaching
+   * it, which is a thing a visitor can do by accident and the log says so.
+   *
+   * ⚠️ AND THE COMPRESSION IS A DICTIONARY, NOT MAGIC, WHICH IS WHY `djembe` IS
+   * HERE. 75 bytes of source becoming 12,820 bytes of machine code is real, and
+   * it is real because `pm.djembe_ui_MIDI` is a NAME for something living in
+   * the 2.4 MB of library that was already downloaded. The moment the sound is
+   * something nobody wrote a library function for, the source is as long as the
+   * sound is complicated: the STK waveguide piano is 21,916 bytes of it. Both
+   * halves of that belong on the page rather than only the flattering one.
+   */
+  const PRESETS = [
+    {
+      id: 'organ',
+      label: 'Organ',
+      what: 'three partials and an envelope, which is the one to edit first',
+      code: `import("stdfaust.lib");
+
+freq = hslider("freq", 440, 40, 8000, 0.01);
+gain = hslider("gain", 0.5, 0, 1, 0.01);
+gate = button("gate");
+
+env  = en.adsr(0.005, 0.12, 0.7, 0.35, gate);
+tone = os.osc(freq) + 0.5 * os.osc(freq * 2) + 0.25 * os.osc(freq * 3);
+
+process = tone * env * gain * 0.2 <: _, _;
+effect  = _, _;
+`,
+    },
+    {
+      /* 🔴 THE SAME INSTRUMENT AS `demo/shell/rhodes.mjs`, WRITTEN AGAIN IN
+         FOUR LINES. That file is 60 lines of per-sample JavaScript arithmetic
+         and its header explains the sound: a TINE operator at a high ratio
+         decaying in tens of milliseconds, a BODY at 1:1 decaying over a second,
+         and a carrier both of them phase-modulate. This is that description
+         with the loops taken out, which is what a signal language is for. */
+      id: 'rhodes',
+      label: 'Rhodes',
+      what: 'a tine, a body and a carrier they both bend, which is the DX7 electric piano',
+      code: `import("stdfaust.lib");
+
+freq = hslider("freq", 440, 40, 8000, 0.01);
+gain = hslider("gain", 0.5, 0, 1, 0.01);
+gate = button("gate");
+
+knock = os.osc(freq * 14) * en.ar(0.001, 0.02, gate) * 3.2 * gain;
+body  = os.osc(freq) * en.ar(0.001, 0.9, gate) * 1.1;
+env   = en.adsr(0.002, 1.4, 0.0, 0.4, gate);
+
+process = os.osc(freq + (knock + body) * freq * 0.02) * env * gain * 0.3 <: _, _;
+effect  = _, _;
+`,
+    },
+    {
+      id: 'djembe',
+      label: 'Djembe',
+      what: 'a drum somebody else modelled, named in one line',
+      code: `import("stdfaust.lib");
+
+process = pm.djembe_ui_MIDI <: _, _;
+effect  = _, _;
+`,
+    },
+  ];
+
+  const ONE = 'a synthesiser you type in, compiled to machine code in this tab in about ten milliseconds';
+
+  const d = mount({
+    name: 'fau',
+    // 🔴 THE INDEX'S OWN LINE, VERBATIM, because this page has a diagram and a
+    // paragraph beside a picture of the same machinery is the weaker of the two.
+    what: ONE,
+    /**
+     * Six cells, and every one of them moves.
+     * ⚠️ `compiler` IS DELIBERATELY NOT A CELL. `2.89.2` never changes, and a
+     * cell showing a constant reads as a measurement and teaches the reader to
+     * ignore the row. It is in the diagram's `libfaust` box, where a fact that
+     * does not move belongs.
+     * ⚠️ AND THE 6.16 MB DOWNLOAD IS A LOG LINE RATHER THAN A CELL, for the
+     * same reason one step along: it happens exactly once per page, and a cell
+     * that changes once is not a measurement either.
+     */
+    readout: {
+      compile: 'ms',
+      source: 'B',
+      'machine code': 'B',
+      'per voice': 'KB',
+      sounding: '',
+      'pedal holds': '',
+    },
+    /**
+     * 🔴 THE PRESETS ARE BUTTONS AND NOT A SEGMENTED CHOICE, WHICH IS A
+     * DECISION ABOUT LYING RATHER THAN ABOUT LAYOUT. A picker shows WHICH ONE
+     * IS SELECTED, and the first thing anybody does here is edit the text. At
+     * that point a lit `Organ` segment is a control reading as live while
+     * describing something that no longer exists. Loading a preset is an
+     * action, so it is a button, and after a keystroke there is nothing on
+     * screen claiming otherwise.
+     * ⚠️ AND EVERY ONE OF THEM IS IN `.pos-controls`, WHICH THE HARNESS PRESSES
+     * IN ORDER. So three presets and a compile are exercised for real on every
+     * run, on top of the checks that drive them deliberately.
+     */
+    controls: [
+      ...PRESETS.map((p) => ({ id: p.id, label: p.label })),
+      { id: 'compile', label: 'Compile', primary: true },
+    ],
+  });
+  guard(d);
+
+  /* ── what a visit costs, counted off the browser's own record ──────────────
+     🔴 NOT MY OWN COUNTER. `plan-fau.md` §10.4 asks for "a visit compiles
+     nothing and fetches no compiler, asserted over a counter", and the counter
+     that cannot be wrong is the browser's: `performance.getEntriesByType`
+     records every resource this document actually loaded, which is the far side
+     of the boundary. A count the page keeps itself would agree with the page by
+     construction, and `positron-verify` records exactly that failure: two
+     numbers derived from one field move together and the check passes while
+     being wrong. */
+  const vendorLoads = () => performance.getEntriesByType('resource')
+    .filter((e) => e.name.includes('/fau/vendor/'));
+  /**
+   * ⚠️ TWO SIZES, AND THE PAIR IS THE ANSWER TO AN OPEN QUESTION.
+   * `decodedBodySize` is what the file weighs and `encodedBodySize` is what
+   * crossed the wire, so the ratio between them says whether whatever served
+   * this page compressed it. `plan-fau.md` §11 item 3 could not settle whether
+   * Cloudflare brotlis `libfaust-wasm.data`, which has no extension the edge
+   * recognises, and the difference is 1.0 MB against 2.9 MB. Opening this page
+   * on the deploy and reading its log now answers that.
+   */
+  const vendorBytes = (field = 'decodedBodySize') => vendorLoads()
+    .reduce((n, e) => n + (e[field] || 0), 0);
+
+  // ── the audio graph ────────────────────────────────────────────────────────
+  //
+  // One context, made on the first press rather than at load: an AudioContext
+  // created on a visit is a visit making a sound device busy for a page nobody
+  // has touched.
+  let ctx = null, master = null, meter = null, node = null;
+  function audio() {
+    if (ctx) return ctx;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = 0.9;
+    /* 🔴 512, NOT 2048, AND `/nola/` PAID FOR THAT NUMBER. An analyser at 2048
+       samples is a 46 ms window, so a reading taken 40 ms after a key came up
+       is still half made of samples from before it. That left a check green on a
+       build where the release had been replaced with an instant stop. This
+       page asks "is it still sounding" within a few tens of milliseconds of a
+       pedal moving, which is exactly that question. */
+    meter = ctx.createAnalyser();
+    meter.fftSize = 512;
+    master.connect(meter);
+    master.connect(ctx.destination);
+    // Fired and not awaited. `resume()` waits on a gesture in a real browser
+    // and never rejects, so awaiting it is a hang rather than an error.
+    ctx.resume?.();
+    return ctx;
+  }
+
+  const buf = new Float32Array(512);
+  /** Loudness right now, as RMS of one 512 sample window. */
+  function level() {
+    if (!meter) return 0;
+    meter.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (const v of buf) sum += v * v;
+    return Math.sqrt(sum / buf.length);
+  }
+
+  // ── the compiler, fetched once, on purpose ─────────────────────────────────
+  let faust = null;              // { compiler, aborts: string[] }
+  let captured = [];             // every line the compiler's abort path printed
+
+  /**
+   * 🔴 THE THREE LINES THAT KEEP EMSCRIPTEN'S ABORT OFF THE CONSOLE, AND WHERE
+   * THEY SIT IS THE WHOLE TRICK. See the header: the glue binds `console.error`
+   * ONCE, at module evaluation, and that evaluation happens inside the await
+   * below. So the forwarding function is installed immediately before it and
+   * taken off immediately after, and the compiler is the only thing on the page
+   * holding it.
+   */
+  async function bootCompiler() {
+    if (faust) return faust;
+    const t0 = performance.now();
+    d.log(`fetching the Faust compiler, ${(COMPILER_BYTES / 1e6).toFixed(2)} MB, once`);
+    const { instantiateFaustModuleFromFile, LibFaust, FaustCompiler, FaustPolyDspGenerator }
+      = await import(VENDOR.mjs);
+    const realError = console.error;
+    console.error = function (...a) {
+      if (sink) { sink(a.map(String).join(' ')); return undefined; }
+      return realError.apply(console, a);
+    };
+    let mod;
+    try {
+      mod = await instantiateFaustModuleFromFile(VENDOR.js, VENDOR.data, VENDOR.wasm);
+    } finally {
+      console.error = realError;
+    }
+    const compiler = new FaustCompiler(new LibFaust(mod));
+    faust = { compiler, FaustPolyDspGenerator };
+    const ms = performance.now() - t0;
+    const raw = vendorBytes(), wire = vendorBytes('encodedBodySize');
+    d.log(`Faust ${compiler.version()} is in this tab, ready in ${ms.toFixed(0)} ms`, 'hi');
+    d.log(`it weighs ${(raw / 1e6).toFixed(2)} MB and ${(wire / 1e6).toFixed(2)} MB of that `
+        + `crossed the wire, so whatever served it `
+        + `${wire && wire < raw * 0.9 ? 'compressed it' : 'did not compress it'}`);
+    return faust;
+  }
+
+  /**
+   * Where a captured `console.error` goes while a compile is running.
+   *
+   * 🔴 IT AWAITS. The first version of this returned `fn()` and cleared the
+   * sink in a `finally`, which runs the moment the PROMISE is handed back and
+   * not when it settles, so the window was open for the synchronous part of a
+   * compile and shut for all of it. The abort arrives inside the await.
+   */
+  let sink = null;
+  async function quietly(fn) {
+    sink = (s) => {
+      captured.push(s);
+      // The first line is the whole of it; the rest is an Emscripten stack.
+      d.log(`the compiler threw and caught it: ${s.split('\n')[0].slice(0, 70)}`);
+    };
+    try { return await fn(); } finally { sink = null; }
+  }
+
+  // ── compiling ──────────────────────────────────────────────────────────────
+  //
+  // 🔴 ONE QUEUE, BECAUSE THERE IS ONE COMPILER AND ONE AUDIO GRAPH. The page's
+  // own checks press these controls while `demo/verify.mjs` is pressing them
+  // too, and two compiles overlapping would swap the node under an assert that
+  // had already read the old one. Everything that compiles goes through here in
+  // order, and the shell keeps a button busy until its turn has finished.
+  let chain = Promise.resolve();
+  function serial(fn) {
+    const run = chain.then(fn, fn);
+    chain = run.catch(() => {});
+    return run;
+  }
+
+  let compiles = 0, lastName = '';
+  /**
+   * Compile what is in the box and put it on the audio thread.
+   * @returns {Promise<{ok: boolean, ms: number, bytes: number, size: number, error?: string}>}
+   */
+  async function build(code, name, pin = '') {
+    const { compiler, FaustPolyDspGenerator } = await bootCompiler();
+    const gen = new FaustPolyDspGenerator();
+    /* 🔴 A FRESH NAME PER COMPILE, BECAUSE libfaust CACHES A FACTORY BY NAME
+       AND CODE. MEASURED: recompiling the same pair answers in 0.1 ms off that
+       cache against 63 ms for the real thing, so a page that reused one name
+       would put a dictionary lookup in a cell labelled `compile`. The name is
+       also embedded in the generated module, which is why a check that compares
+       byte counts passes its own seven character name in `pin`. */
+    const uniq = pin || `${name}_${++compiles}`;
+    const t0 = performance.now();
+    let ok = true, error = '';
+    try {
+      await quietly(() => gen.compile(compiler, uniq, code, FLAGS));
+    } catch (e) {
+      ok = false;
+      error = String(e?.message || e).split('\n').slice(0, 2).join(' ').trim();
+    }
+    const ms = performance.now() - t0;
+    if (!ok) {
+      /* 🔴 THE OLD INSTRUMENT KEEPS PLAYING. A failed compile must not take the
+         sound away: the visitor typed something that does not parse, and a page
+         that went silent would have punished them for a typo. */
+      d.set('compile', ms.toFixed(0));
+      d.log(`that did not compile: ${error}`, 'bad');
+      return { ok: false, ms, bytes: 0, size: 0, error };
+    }
+
+    const meta = JSON.parse(gen.voiceFactory.json);
+    const bytes = gen.voiceFactory.code.length
+      + (gen.effectFactory?.code.length || 0)
+      + (gen.mixerBuffer?.length || 0);
+
+    audio();
+    const next = await gen.createNode(ctx, VOICES);
+    const old = node;
+    node = next;
+    node.connect(master);
+    if (old) {
+      /* Everything the old node was holding goes with it. `allNotesOff` first,
+         because a worklet disconnected mid-note leaves its voices ringing in a
+         graph nobody can reach. */
+      try { old.allNotesOff?.(true); } catch { /* it is going away anyway */ }
+      old.disconnect();
+      if (typeof old.destroy === 'function') old.destroy();
+    }
+    /* The foot survives a recompile and the fingers do not: the new node has
+       never been told about any key, so anything the old one was holding is
+       gone whatever the page thinks. */
+    pedal.forgetKeys();
+    showVoices();
+
+    lastName = uniq;
+    d.set('compile', ms.toFixed(0));
+    d.set('machine code', bytes);
+    d.set('per voice', (meta.size / 1024).toFixed(1));
+    d.log(`${name} compiled in ${ms.toFixed(0)} ms into ${bytes} bytes of machine code, `
+        + `${(meta.size / 1024).toFixed(1)} KB a voice, ${VOICES} voices`, 'hi');
+    if (!meta.ui || !JSON.stringify(meta.ui).includes('gate')) {
+      d.log('this one declares no gate, so the keys cannot start it. A polyphonic voice '
+          + 'needs freq, gain and gate');
+    }
+    return { ok: true, ms, bytes, size: meta.size, meta };
+  }
+
+  // ── the text ───────────────────────────────────────────────────────────────
+  const source = createField({
+    label: 'FAUST',
+    grow: 'wide',
+    rows: 12,
+    code: true,
+    value: PRESETS[0].code,
+    onInput: showSource,
+  });
+  function showSource() {
+    d.set('source', new TextEncoder().encode(source.value()).length);
+  }
+
+  // ── the keys ───────────────────────────────────────────────────────────────
+  const keysHost = el('div', 'fau-keys');
+  /* 44 px a key rather than the component's 49, for the same reason `/nola/`
+     lowers it: two octaves is what an instrument wants and fifteen white keys
+     at 49 px do not fit the page. The component reads the property. */
+  keysHost.style.setProperty('--k-min', '44px');
+
+  const KEY_LO = 12;            // twelve keys below the lettered octave
+  const { KEY_MAP, KEY_ORDER, KEY_SHARPS, KEY_LETTERS } = (() => {
+    const map = {}, order = [], sharps = new Set(), lettered = new Set();
+    const BLACK = new Set([1, 3, 6, 8, 10]);
+    const qwerty = Object.keys(QWERTY_CHROMATIC);
+    for (let i = 0; i <= 24; i++) {
+      const id = i < KEY_LO ? `lo${i}` : qwerty[i - KEY_LO];
+      map[id] = i;
+      order.push(id);
+      if (BLACK.has(i % 12)) sharps.add(id);
+      if (i >= KEY_LO) lettered.add(id);
+    }
+    return { KEY_MAP: map, KEY_ORDER: order, KEY_SHARPS: sharps, KEY_LETTERS: lettered };
+  })();
+
+  const keys = createKeyboard(keysHost, {
+    base: 48,
+    map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
+    minBase: 24, maxBase: 84,
+    onDown: (note) => press(note, 100),
+    onUp: (note) => lift(note),
+    onOctave: (b) => d.log(`the keys on screen now start at ${b}`),
+    onPanic: () => {
+      allOff();
+      sustainBtn.set(false, true);
+    },
+  });
+
+  // ── the foot ───────────────────────────────────────────────────────────────
+  //
+  // `?pedal=<n>` for a footswitch sending something other than 64, and `?flip=1`
+  // for one whose polarity was sensed upside down at power up. Both are
+  // `demo/shell/pedal.mjs`'s arguments and neither is this page's invention.
+  const pedal = createPedal({
+    cc: Number(q.get('pedal')) || SUSTAIN_CC,
+    flip: q.get('flip') === '1',
+    release: (note) => {
+      /* The DSP owns how fast a note dies, so the damper time `pedal.mjs` hands
+         over is deliberately dropped here. See the header. */
+      node?.keyOff(0, note, 0);
+      showVoices();
+    },
+    onPedal: (down, value, freed) => {
+      d.log(down ? PEDAL_SAYS.down : (freed ? PEDAL_SAYS.freed(freed) : PEDAL_SAYS.up));
+      d.log(PEDAL_SAYS.raw(pedal.cc, value, down));
+      showVoices();
+    },
+  });
+
+  const sustainBtn = createSwitch({
+    label: 'SUSTAIN',
+    title: 'hold the notes on after the keys come up, the way a pedal does',
+    onChange: (on) => pedal.set(on),
+  });
+
+  function press(note, vel = 100) {
+    if (!node) { d.log('nothing is compiled yet, so press a preset or COMPILE'); return; }
+    pedal.keyDown(note);
+    node.keyOn(0, note, vel);
+    keys.lightNote?.(note, true);
+    showVoices();
+  }
+  function lift(note) {
+    pedal.keyUp(note);                 // it decides whether that is a release
+    keys.lightNote?.(note, false);
+    showVoices();
+  }
+  function allOff() {
+    try { node?.allNotesOff?.(true); } catch { /* nothing sounding */ }
+    pedal.panic();
+    showVoices();
+  }
+  function showVoices() {
+    d.set('sounding', pedal.fingers() + pedal.held());
+    d.set('pedal holds', pedal.held());
+  }
+
+  // ── a MIDI keyboard, if there is one ───────────────────────────────────────
+  const midi = createMidi({
+    /* Both roads call the same two functions, which is what keeps the key that
+       lights and the note that sounds the same key. */
+    onDown: (note, vel) => press(note, vel || 100),
+    onUp: (note) => lift(note),
+    onControl: (cc, value) => {
+      if (!pedal.control(cc, value)) return;
+      sustainBtn.set(pedal.down(), true);
+    },
+    log: d.log,
+  });
+
+  // ── the page ───────────────────────────────────────────────────────────────
+  const row = el('div', 'fau-row');
+  row.append(source.el);
+  d.el.append(row);
+
+  const kbBlock = el('div', 'fau-kb');
+  kbBlock.append(keysHost);
+  const footRow = el('div', 'fau-foot');
+  footRow.append(sustainBtn.el);
+  kbBlock.append(footRow);
+  d.el.append(kbBlock);
+
+  d.on('compile', () => serial(async () => {
+    const r = await build(source.value(), 'your source');
+    return r;
+  }));
+  for (const p of PRESETS) {
+    d.on(p.id, () => serial(async () => {
+      source.set(p.code);
+      showSource();
+      d.log(`${p.label}: ${p.what}`);
+      await build(p.code, p.label.toLowerCase());
+    }));
+  }
+
+  showSource();
+  d.set('sounding', 0);
+  d.set('pedal holds', 0);
+  d.log(`nothing is fetched until you press something. The first press pulls the Faust `
+      + `compiler, ${(COMPILER_BYTES / 1e6).toFixed(2)} MB, once`);
+
+  // ── the picture ────────────────────────────────────────────────────────────
+  const dg = createDiagram(d.el, {
+    caption: 'The text in the box is the program the audio thread runs. Nothing here '
+      + 'interprets it: the compiler in the tab turns it into a second WebAssembly module '
+      + 'that is only this instrument, and the worklet runs that.',
+    nodes: [
+      /* 🔴 THE PERSON TYPING IS NOT A BOX, AND THE FIRST DRAWING GAVE THEM ONE.
+         `plan-fau.md` §10.3 asks for a `you` outside the browser holding the ten
+         lines of Faust, which is right about the story and wrong about the
+         picture: `diagram.mjs` gives every top level box the height of the
+         tallest, so a childless box beside a machine with five parts is drawn
+         as a 300 px empty slab, and on a phone it was a whole screen of
+         nothing. PHOTOGRAPHED at 1100 px and at 390 px before it was changed.
+         ⚠️ AND THE HONEST BOX WAS ALREADY THERE: the text is a textarea IN THE
+         BROWSER, so it belongs inside that machine like everything else the tab
+         runs. What a visitor does is type into it, which is what the arrow out
+         of it says. */
+      /* ⚠️ `set: true`, BECAUSE KEYS AND A FOOTSWITCH DO NOT FEED EACH OTHER.
+         Between two neighbours with no declared link the component draws an
+         arrow, which would be a mechanism that does not exist. */
+      { id: 'kbd', label: 'MIDI keyboard', sub: 'USB MIDI', kind: 'device', tech: 'device',
+        set: true,
+        children: [
+          { id: 'kkeys', label: 'keys', sub: 'notes, velocity', tech: 'device',
+            note: 'A tap on the keys drawn on this page calls the same two functions, so there '
+                + 'is no second route into the instrument and nothing downstream can tell them '
+                + 'apart.' },
+          { id: 'foot', label: 'footswitch', sub: 'CC64 by default', tech: 'device',
+            note: 'Which controller a footswitch sends is a setting held inside the keyboard, '
+                + 'so 64 is a default rather than a measurement. Open the page with '
+                + '**?pedal=67** for one that sends something else.' },
+        ] },
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'box', label: 'text box', sub: '10 lines of Faust', tech: 'browser',
+            note: 'What a visitor types, and the only input this page has. Everything below it '
+                + 'is made from these few hundred bytes and nothing else.' },
+          { id: 'lf', label: 'libfaust', sub: '2.89.2, wasm', tech: 'browser',
+            note: 'The Faust compiler itself, 3.6 MB of **WebAssembly**, with 2.4 MB of plain '
+                + 'Faust library source beside it that it reads out of its own filesystem. '
+                + 'Fetched once, on the first press.' },
+          { id: 'dsp', label: 'dsp module', sub: '4 to 13KB', tech: 'sound',
+            note: 'A second WebAssembly module, made in this tab a moment ago, holding this '
+                + 'instrument and nothing else. It is what a visitor changes by typing.' },
+          { id: 'awn', label: 'AudioWorklet', sub: '8 voices, 128 frames', tech: 'sound',
+            note: 'One voice compiled once and replicated. The processor reaches the worklet '
+                + 'as a **Blob** of stringified classes, because an **AudioWorkletGlobalScope** '
+                + 'has no module loader at all.' },
+          { id: 'spk', label: 'speakers', sub: 'or a phone', tech: 'device',
+            note: 'The end of it. Everything above happened in the time between pressing a '
+                + 'button and hearing this.' },
+        ] },
+    ],
+    links: [
+      { from: 'box', to: 'lf',
+        note: 'A few hundred bytes for something small. The compression is a dictionary rather '
+            + 'than magic: a one line drum is one line because somebody else wrote the model '
+            + 'into the library beside the compiler.' },
+      /* A link between two children of one container takes NO label: the gap
+         they share is sixteen pixels tall, and what travels goes in the note. */
+      { from: 'lf', to: 'dsp',
+        note: 'About **10 ms** for anything small, and it blocks the thread it runs on, because '
+            + 'libfaust is synchronous inside its own wasm. The STK piano is 1,690 ms, which is '
+            + 'why it is not a preset here.' },
+      { from: 'dsp', to: 'awn',
+        note: 'The module is instantiated once per voice. Recompiling builds a whole new node '
+            + 'and throws the old one away rather than swapping code under a sounding note.' },
+      { from: 'awn', to: 'spk',
+        note: 'Faust computes a block at a time and the block size is not part of the graph, so '
+            + 'the worklet\'s 128 frames and a Raspberry Pi\'s ALSA period run identical code.' },
+      { from: 'kkeys', to: 'awn', label: 'notes',
+        note: '**keyOn** and **keyOff** with a note number, which the runtime turns into the '
+            + '**freq**, **gain** and **gate** the source declares.' },
+      { from: 'foot', to: 'awn',
+        note: 'The pedal is held OUTSIDE the DSP, in the page. Faust\'s own voice allocator '
+            + 'writes a released note off and steals it first, so a pedal inside the source '
+            + 'would keep a note audible and stealable at the same time.' },
+    ],
+  }, { how: true, atEnd: true });
+
+  // ── what this page can say about itself ────────────────────────────────────
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function checks() {
+    /* 🔴 THE CHEAP ONES FIRST, AND THAT IS A HARNESS FACT RATHER THAN A STYLE.
+       `demo/verify.mjs` gives up about two seconds after the last new assert,
+       and this page's first compile is behind a 6 MB fetch. A check block whose
+       first assert lands three seconds in reads as a page that asserted
+       nothing, which is what `/nola/` measured on 2026-09-23. */
+    d.assert('a visit fetches no compiler at all, counted off what the browser really loaded',
+      vendorLoads().length === 0, `${vendorLoads().length} files from the vendor directory`);
+    d.assert('the box opens with a whole instrument in it, and the readout counts its bytes',
+      Number(d.api.readout.source) === new TextEncoder().encode(PRESETS[0].code).length,
+      `${d.api.readout.source} B`);
+    d.assert('nothing cut and nothing refused in the picture', dg.cuts.length === 0,
+      dg.cuts.map((c) => c.full).join(', ') || 'nothing');
+    d.assert('the only headless line in the picture is the one joining a set', dg.ties === 1,
+      `${dg.ties} ties`);
+    d.assert('the pedal is read on one controller, and the page says which',
+      pedal.cc === (Number(q.get('pedal')) || SUSTAIN_CC), `controller ${pedal.cc}`);
+
+    /* Typing is the page's whole subject, so the number it moves is asserted
+       rather than assumed. */
+    const wasBytes = Number(d.api.readout.source);
+    source.set(`${PRESETS[0].code}\n// a comment the check typed\n`);
+    showSource();
+    d.assert('editing the text changes the byte count under it',
+      Number(d.api.readout.source) > wasBytes,
+      `${wasBytes} B became ${d.api.readout.source} B`);
+    source.set(PRESETS[0].code);
+    showSource();
+
+    /* ── from here on it costs the compiler, and it is ONE task on the queue ──
+       🔴 EVERYTHING BELOW RUNS INSIDE `serial`, AND NOT ONE `serial` PER
+       COMPILE, WHICH IS HOW IT WAS FIRST WRITTEN. `demo/verify.mjs` presses
+       every control in the row 650 ms apart while this block is running, and
+       each preset press is a compile that builds a new node and calls
+       `pedal.forgetKeys()`. Per-compile queueing left every `await sleep` in
+       here as a hole a press could fall through: MEASURED as `0 on the foot`
+       where the check had just put one note there, on a page where the pedal
+       was working. The first run passed, which is worse than failing.
+       ⚠️ SO `build()` IS CALLED DIRECTLY IN HERE, NEVER THROUGH `serial`. A
+       task that waits on another task in the same queue is a deadlock, and the
+       symptom would be a page that never becomes ready.
+
+       🔴 THE SEVEN CHARACTER NAMES ARE LOAD-BEARING. See `PINNED`: the module
+       name is embedded in the generated wasm, so two compiles are only
+       comparable by byte count when their names are the same length. */
+    await serial(async () => {
+    const cleanBefore = captured.length;
+    const first = await build(PRESETS[0].code, 'organ', PINNED.name);
+    d.assert('the compiler in this tab is the version this page was written against',
+      faust.compiler.version() === COMPILER_VERSION, faust.compiler.version());
+    d.assert('a compile that works says nothing to the console at all',
+      captured.length === cleanBefore, `${captured.length - cleanBefore} lines captured`);
+    d.assert('everything a compiling page needs really arrived, to the byte',
+      vendorLoads().length === 4 && vendorBytes() === PAGE_BYTES,
+      `${vendorLoads().length} files, ${vendorBytes()} B of ${PAGE_BYTES} B`);
+    d.assert('ten lines of text became machine code, and it took longer than nothing',
+      first.ok && first.bytes > 1000 && first.ms > 0,
+      `${first.bytes} B in ${first.ms.toFixed(0)} ms`);
+    /* 🔴 THE `checkCompiledDefs` IDEA AT RUNTIME. One known source under one
+       known name is exactly this many bytes, or something about the compiler,
+       its flags or this page's arguments has moved. */
+    d.assert('a known source under a known name is exactly the machine code it was last time',
+      first.bytes === PINNED.bytes, `${first.bytes} B against ${PINNED.bytes} B`);
+    d.assert('one voice of it is a quarter of a megabyte, because a Faust oscillator '
+           + 'carries a sine table', first.size > 200000 && first.size < 400000,
+      `${(first.size / 1024).toFixed(1)} KB`);
+
+    /* 🔴 THE PAGE'S WHOLE CLAIM, AS ONE ASSERT. Editing the text has to change
+       the bytes the audio thread is running. A page that compiled the same
+       module whatever it was handed would pass every other check here. */
+    const edited = PRESETS[0].code.replace('0.25 * os.osc(freq * 3)',
+                                           '0.25 * os.osc(freq * 3) + 0.12 * os.osc(freq * 5)');
+    const second = await build(edited, 'edited organ', 'fau_alt');
+    d.assert('editing the text changes the machine code the audio thread is running',
+      second.ok && second.bytes !== first.bytes,
+      `${first.bytes} B became ${second.bytes} B, from names of the same length`);
+
+    /* The error path, which is the first thing a visitor meets, and the console
+       it must not reach. */
+    const before = captured.length;
+    const bad = await build('process = nonsense(;', 'a deliberate mistake');
+    d.assert('a source that does not parse is reported to the visitor rather than thrown away',
+      !bad.ok && /syntax error/i.test(bad.error || ''), bad.error || 'no message');
+    /* 🔴 AND THE HALF THAT SAYS THE SHIM WORKED IS THE PAIR OF THEM. A count on
+       its own could be satisfied by a page that captures nothing and lets
+       everything through, which is why the good compile above asserts ZERO
+       captured lines. Nothing reaching the console is measured independently,
+       by `demo/verify.mjs`'s own `no console errors`, which is on the far side
+       of the boundary and would go red if one leaked. */
+    d.assert('a compile that fails hands its abort to this page instead of to the console',
+      captured.length > before, `${captured.length - before} lines from a bad compile, `
+      + '0 from a good one');
+    /* ⚠️ COMPARED BY `size` RATHER THAN BY BYTES, because this one is named
+       after the button and the byte count carries its name's length. */
+    const after = await build(PRESETS[0].code, 'organ again');
+    d.assert('and the next good compile still works, so one bad source does not end the page',
+      after.ok && after.size === first.size, `${after.bytes} B, ${after.size} B a voice`);
+
+    /* ── the sound ────────────────────────────────────────────────────────── */
+    const quiet = level();
+    press(60, 100);
+    await sleep(220);
+    const sounding = level();
+    d.assert('a key makes a sound, and the page was silent before it',
+      sounding > 0.01 && quiet < 0.002, `${quiet.toFixed(5)} silent, ${sounding.toFixed(5)} held`);
+
+    /* The pedal, with its negative control beside it: the same gesture without
+       the foot has to end the note. */
+    pedal.control(pedal.cc, pedal.wire(false));
+    lift(60);
+    await sleep(600);
+    const released = level();
+    d.assert('a key let go with no pedal is taken away', released < sounding * 0.2,
+      `${sounding.toFixed(5)} held, ${released.toFixed(5)} let go`);
+
+    /* 🔴 600 ms, AND THE NUMBER IS THE PRESET'S OWN RELEASE PLUS A MARGIN. The
+       organ's `en.adsr` releases over 0.35 s, so a reading taken 200 ms after a
+       key came up is still mostly a note that IS ending, and an assert on it
+       passes whether the pedal worked or not. MEASURED by sabotage: with the
+       release sent straight to the engine, this read 0.03028 against a 0.03940
+       threshold, which is the right answer arriving by 9 thousandths. Past the
+       release there is no ambiguity left to be lucky with. */
+    const DECAYED = 600;
+    pedal.control(pedal.cc, pedal.wire(true));
+    press(62, 100);
+    await sleep(200);
+    const pedalledDown = level();
+    lift(62);
+    await sleep(DECAYED);
+    const pedalled = level();
+    d.assert('a key let go with the pedal down keeps sounding, and the engine is never told '
+           + 'the note ended', pedalled > pedalledDown * 0.8 && pedal.held() === 1,
+      `${pedalledDown.toFixed(5)} held, ${pedalled.toFixed(5)} after letting go, `
+      + `${pedal.held()} on the foot`);
+    pedal.control(pedal.cc, pedal.wire(false));
+    await sleep(DECAYED);
+    d.assert('and lifting the pedal ends it', level() < pedalled * 0.2 && pedal.held() === 0,
+      `${level().toFixed(5)}, ${pedal.held()} on the foot`);
+
+    /* 🔴 THE ONE THAT WOULD CATCH `plan-fau.md` §4.2's BUG. With the pedal down
+       and every voice spoken for, the notes the foot is holding must all still
+       be sounding: the allocator only steals a voice it thinks has been
+       released, and it is never told. A page that put the pedal inside the DSP
+       instead would lose them one by one under a chord. */
+    pedal.control(pedal.cc, pedal.wire(true));
+    for (let i = 0; i < VOICES; i++) press(60 + i, 100);
+    await sleep(200);
+    const chord = level();
+    for (let i = 0; i < VOICES; i++) lift(60 + i);
+    await sleep(DECAYED);
+    const heldChord = level();
+    d.assert('every voice the pedal is holding is still sounding, none of them stolen',
+      pedal.held() === VOICES && heldChord > chord * 0.8,
+      `${pedal.held()} of ${VOICES} on the foot, ${chord.toFixed(5)} held, `
+      + `${heldChord.toFixed(5)} pedalled`);
+    pedal.control(pedal.cc, pedal.wire(false));
+    allOff();
+    await sleep(120);
+
+    /* Two presets, and the cell that tells them apart. A drum somebody else
+       modelled carries almost no state; anything with an oscillator in it
+       carries a sine table. */
+    const drum = await build(PRESETS[2].code, 'djembe');
+    d.assert('a preset named in one line compiles to more machine code than ten lines of '
+           + 'arithmetic, because the model was already in the library',
+      drum.ok && drum.bytes > second.bytes, `${drum.bytes} B from ${PRESETS[2].code.length} B `
+      + `of source, against ${second.bytes} B from ${edited.length} B`);
+    d.assert('and one voice of it costs a thousandth of what the organ\'s voice costs',
+      drum.size < first.size / 100, `${(drum.size / 1024).toFixed(1)} KB against `
+      + `${(first.size / 1024).toFixed(1)} KB`);
+
+    /* Put the page back the way a visitor should find it. */
+    await build(PRESETS[0].code, 'organ');
+    source.set(PRESETS[0].code);
+    showSource();
+    });
+  }
+
+  ifSelfcheck(checks, { log: d.log,
+    say: 'the checks this page runs on itself are off for a visitor, because they fetch six '
+       + 'megabytes of compiler and play notes in front of you' });
+
+  /* 🔴 `ready()` AFTER THE CHECKS ARE STARTED AND NOT AT THE END OF THEM.
+     `demo/verify.mjs` waits up to six seconds for `__demo.ready` before it
+     touches the page, so a ready at the end of a check block that fetches a
+     compiler is a page waiting for a harness that is waiting for the page. */
+  d.ready();
+</script>
+
+<style>
+  /* The text and the keys are the page. Both take the whole width rather than
+     sharing a row with anything: a program in a half-width box fits about
+     twenty characters, which is less than one line of Faust. */
+  .fau-row { display: flex; }
+  .fau-row .pos-field { flex: 1 1 100%; }
+
+  /* The keyboard and the switch under it, which is where a control ABOUT the
+     keys belongs rather than a hand's width away in the control row. Same
+     argument `keyboard.mjs` makes about its own octave pad. */
+  .fau-kb { display: flex; flex-direction: column; gap: 10px; }
+  .fau-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  /* A row of keys wider than the page scrolls itself rather than dragging the
+     page sideways. `min-width: 0` is what lets a flex child shrink below its
+     content, which is the whole of that bug. */
+  .fau-keys { min-width: 0; overflow-x: auto; }
+</style>
+</html>

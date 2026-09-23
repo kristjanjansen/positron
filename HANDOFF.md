@@ -1,3 +1,143 @@
+# Handoff, 2026-09-23, session 46, closed
+
+**`/fau/` is a synthesiser you type in: ten lines of Faust in a text area become
+a WebAssembly module on the audio thread in about seventy milliseconds, and the
+keyboard plays it. 31/31.** `plans/plan-fau.md` is 1,419 lines of measurement
+and this is its §9.4 order of work, steps 2 to 5.
+
+```sh
+node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"   # 61 today
+node demo/check-html.mjs demo/fau/index.html   # no browser at all
+node demo/shell/worklet-test.mjs               # 32 ok, no browser
+node demo/verify.mjs fau                       # 31/31, 25 page asserts
+```
+
+## What to open
+
+- **http://127.0.0.1:8898/fau/** with `node demo/server.mjs` running, which it
+  is as this is written. **NOT DEPLOYED**, and that is a decision rather than an
+  omission: `git status` shows `LESSONS.md`, `demo/verify.mjs` and
+  `demo/wish/index.html` modified by another session, and `build.mjs` copies the
+  working tree, so a deploy from here ships their unfinished work. Handoff 45
+  records exactly that happening.
+- Press **Organ**, **Rhodes** or **Djembe**, then edit the text and press
+  **COMPILE**. The keys are playable from a mouse, from `a s d f g h j k`, and
+  from a MIDI keyboard; **SUSTAIN** under them is the pedal if there is no real
+  one.
+
+## What it costs and what it does, MEASURED 2026-09-23 in a browser
+
+| | |
+| --- | --- |
+| what a compiling page downloads | **6,379,006 B**, asserted to the byte off the browser's own resource timing |
+| what a visit downloads | **0 B**. The compiler arrives on the first press |
+| compile, ten lines, polyphonic | **66 to 68 ms** |
+| machine code out of it | **7,266 B**, pinned exactly, name included |
+| one voice of it | **256.1 KB**, because a Faust oscillator carries a 65,536 entry sine table |
+| a drum named in one line | 78 B of source, **17,224 B** of machine code, **0.6 KB** a voice |
+
+## The five things that were found rather than assumed
+
+🔴 **THE COMPILER'S ERROR PATH GOES THROUGH `console.error`, WHICH WOULD TAKE
+THE SUITE RED ON A PAGE DOING EXACTLY WHAT IT PROMISES.** libfaust is built with
+C++ exception catching disabled, so every failed compile reaches Emscripten's
+`abort()`, which prints `Aborted(Assertion failed: Exception thrown...)` and
+throws a `WebAssembly.RuntimeError`. `faustwasm` catches it and reads the real
+message out, so the visitor sees `syntax error, unexpected ENDDEF` and the
+instance stays usable. ✅ **The repair is three lines in one place**: the glue
+binds `console.error` ONCE, at module evaluation, so a forwarding function is
+installed across that one await and taken off immediately after. The compiler
+keeps the shim, the page gets the real console back. MEASURED: **2 lines
+captured from a bad compile, 0 from a good one, 0 reaching the console**.
+
+🔴 **AND A POLYPHONIC COMPILE THAT DEFINES NO `effect` COSTS ONE OF THOSE EVERY
+TIME.** The generator probes for an effect and libfaust throws when there is
+none. `effect = _, _;` is in every preset for that reason and it is the shape a
+Faust instrument takes anyway. MEASURED both ways: **1 console error without it,
+0 with it.**
+
+🔴 **A MODULE'S NAME IS EMBEDDED IN THE WASM IT GENERATES, SO TWO COMPILES ARE
+NOT COMPARABLE BY BYTE COUNT UNLESS THEIR NAMES ARE THE SAME LENGTH.**
+`plan-fau.md` §3.3 says so and this page broke it anyway: an assert comparing
+`organ_1` against `organ again_5` reported a 78 byte difference on a page where
+nothing was wrong. Every compile a check compares now carries a seven character
+name, and `fau_pin` pins 7,266 bytes exactly.
+
+🔴 **THE PEDALLED CHORD CHECK WAS GREEN UNDER THE SABOTAGE IT WAS WRITTEN TO
+CATCH.** With the release sent straight to the engine, `heldChord > chord * 0.5`
+read 0.03028 against a 0.03940 threshold and passed, because the reading was
+taken 200 ms into a 350 ms release. **It reads at 600 ms now, past the release,
+where there is no ambiguity to be lucky with**, and the same sabotage takes 3
+red. The other four sabotages that day each took the right asserts red first
+time.
+
+🔴 **A HARNESS PRESS CAN REBUILD THE AUDIO NODE IN THE MIDDLE OF AN AUDIO
+CHECK.** `demo/verify.mjs` presses every control 650 ms apart while the page's
+own checks are running, and each preset press is a compile that calls
+`pedal.forgetKeys()`. Per-compile queueing left every `await sleep` as a hole a
+press could fall through: MEASURED as `0 on the foot` where the check had just
+put one note there. **The whole compiler half of the check block is ONE task on
+the queue now**, and `build()` is called directly inside it, because a queued
+task awaiting another task in the same queue is a deadlock.
+
+## Two things the pictures caught and nothing else could
+
+🔴 **`you` WAS DRAWN AS A 300 px EMPTY SLAB.** `plan-fau.md` §10.3 asks for a
+`you` box outside the browser holding the ten lines of Faust, which is right
+about the story and wrong about the picture: every top level box takes the
+height of the tallest, so a childless box beside a machine with five parts is a
+screen of nothing on a phone. **The honest box was already there** — the text is
+a textarea IN the browser — so it moved inside and the picture is two machines.
+🔴 **AND TWO ARROW LABELS PRINTED OVER EACH OTHER AT 390 px**, `notes` and
+`CC64` arriving at one box from one side, rendering as `notCC64`. One label now,
+and the footswitch's own `sub` carries `CC64 by default`.
+⚠️ **THE CODE BOX WRAPS RATHER THAN SCROLLING SIDEWAYS**, for the same reason:
+at 390 px `pre` put half of every long line off the right edge of a page whose
+subject is reading ten lines of Faust before you change one.
+
+## What is in the kit now, done once
+
+- **`demo/shell/worklet.mjs` + `worklet-test.mjs`.** `Function.prototype
+  .toString()` into a Blob into `addModule`, which is how anything in
+  `demo/shell/` reaches an `AudioWorkletGlobalScope` with no module loader in
+  it. **32 checks, 23 of them refusals or negative controls, five sabotages
+  measured** (the value guard 9 red, the name check 4, the `[native code]` guard
+  2, `let` for `const` 2, reversing the emission order **0**, which is the
+  useful one and is kept).
+  🔴 **ITS OWN TEST FOUND TWO DEFECTS IN IT ON THE FIRST RUN.** A `Map`
+  stringifies to `{}` rather than to `undefined`, so the guard that tested for
+  `undefined` accepted one and a worklet would have been handed an EMPTY OBJECT
+  where a page passed a filled table. `NaN` and `Infinity` become `null` the
+  same way. The guard walks the value now.
+  🔴 **AND IT HAS NO CALLER YET**, which is in `BACKLOG.md` with the rule that
+  if `/nola/`'s second engine lands another way, this module is deleted rather
+  than left as a kit component nothing uses.
+- **`demo/shell/field.mjs` takes `code: true`**, which is the third case that
+  component now has: a one-line field turns the browser's writing help off
+  because a value has to round-trip, a tall field turns it on because it holds
+  prose, and a code box is tall AND has to round-trip. `autocapitalize:
+  sentences` turning `os.osc` into `Os.osc` on a phone is a compile error the
+  visitor did not type.
+
+## What is open
+
+1. 🔴 **`faust --version` ON THE BOARD, WHICH IS FOUR SECONDS AND DECIDES THE
+   SECOND HALF OF THE PAGE.** `ssh positron@192.168.1.213` answers `No route to
+   host` from this laptop today and the port 22 sweep was refused by the
+   sandbox. Until it is answered `/fau/` draws no Raspberry Pi, because a
+   diagram may not draw a mechanism the page does not have.
+2. **DOES THE EDGE COMPRESS `libfaust-wasm.data`.** The page answers it itself
+   now: it logs the decoded and the transferred size on the first compile and
+   says in words whether whatever served it compressed it. **Open the deployed
+   page and read the log.** 1.0 MB against 2.9 MB is the difference.
+3. **THE STK PIANO PRESET**, `plan-fau.md` §9.4 step 6: 1,690 ms of frozen page,
+   so it belongs behind a Worker, and the listening test that document could not
+   do is still not done. **Nothing on `/fau/` has been heard through a speaker.**
+4. **`/items/` IS RED ON ITS OWN DIAGRAM**, two `cloud` containers with no boxes
+   inside them, found while diffing assert counts after the `field.mjs` change.
+   Pre-existing, in `BACKLOG.md`.
+5. **Everything from session 45 that was not touched**, below.
+
 # Handoff, 2026-09-23, session 45, closed
 
 **`/nola/` is a piano you play from a MIDI keyboard, with a line of chord

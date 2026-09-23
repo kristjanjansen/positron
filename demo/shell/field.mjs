@@ -35,6 +35,15 @@
 // spellcheck are off, because a browser that silently rewrites the value breaks
 // it. A four-line field holds PROSE written by a person, where sentence
 // capitals and a spell checker are the whole reason those features exist.
+//
+// 🔴 `code: true` IS THE THIRD CASE, AND IT EXISTS BECAUSE THE SECOND ONE IS
+// WRONG FOR IT. A box holding a PROGRAM is neither of the two above: it is many
+// lines, and it still has to round-trip exactly. `/fau/` compiles what is in
+// the box, so `autocapitalize: sentences` turning `os.osc` into `Os.osc` at the
+// start of a line on a phone is a compile error the visitor did not type, and a
+// spelling underline under every identifier is noise on the one thing they came
+// to read. It takes the one-line field's attributes with the tall field's
+// shape, and brings back the mono face that `rows` gave up when it became prose.
 
 import { el } from './shell.mjs';
 
@@ -51,19 +60,26 @@ import { el } from './shell.mjs';
  *                                use anything but text
  * @param {number} [o.rows]       more than one makes it a textarea of that many
  *                                lines, and turns the browser's writing help ON
+ * @param {boolean} [o.code]      with `rows`, the box holds a program: mono
+ *                                face, and the writing help stays OFF
  * @param {(value:string)=>void} [o.onInput]
  * @returns {{el:HTMLElement, input:HTMLInputElement|HTMLTextAreaElement,
  *            value:()=>string, set:(v:string)=>void, disabled:(v:boolean)=>void}}
  */
 export function createField({ label, value = '', placeholder = '', grow = '',
-                              type = 'text', rows = 0, onInput } = {}) {
-  const wrap = el('label', `pos-field${grow ? ` ${grow}` : ''}${rows > 1 ? ' tall' : ''}`);
+                              type = 'text', rows = 0, code = false, onInput } = {}) {
+  const wrap = el('label', `pos-field${grow ? ` ${grow}` : ''}${rows > 1 ? ' tall' : ''}`
+                          + `${rows > 1 && code ? ' code' : ''}`);
   if (label) wrap.append(el('span', 'pos-field-l', label));
   const input = rows > 1
     ? el('textarea', '', null, {
         rows: String(rows),
-        // prose, so the browser's writing help is the point rather than a risk
-        autocomplete: 'off', autocorrect: 'on', autocapitalize: 'sentences', spellcheck: 'true',
+        // prose, so the browser's writing help is the point rather than a risk.
+        // Unless it is a program, where every one of those is a rewrite
+        autocomplete: 'off',
+        autocorrect: code ? 'off' : 'on',
+        autocapitalize: code ? 'off' : 'sentences',
+        spellcheck: code ? 'false' : 'true',
       })
     : el('input', '', null, {
         type,
