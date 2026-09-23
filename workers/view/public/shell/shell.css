@@ -5086,6 +5086,20 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 /* a round pad centres in a column sized for square ones */
 .pos-pad-wrap:has(.pos-pad-round) { align-items: center; }
 
+/* 🔴 THREE QUARTERS, IN EVERY SHAPE, AND WRITTEN AFTER ALL THREE SO IT REACHES
+   THEM. Asked on `/evo/`: *"do you have small version of pad buttons?"* and
+   *"also smaller versions of +- circlar ones"*. `.pos-pad`, `.pos-pad-half` and
+   `.pos-pad-round` all set their own width and height at the same specificity,
+   so a size written before any of them would be overridden by whichever came
+   later, which is the tie-broken-by-source-order defect this file has paid for
+   three times. ⚠️ THE TYPE DOES NOT SCALE: a face at three quarters stops being
+   readable, and being read is the whole reason a face is there. */
+.pos-pad-small { width: calc(var(--ctl-w) * .75); height: calc(var(--ctl-w) * .75); }
+.pos-pad-small.pos-pad-half { height: calc(var(--ctl-w) * .375); }
+.pos-pad-small.pos-pad-round {
+  width: calc(var(--ctl-w) * .675); height: calc(var(--ctl-w) * .675);
+}
+
 /* 🔴 A DISABLED CONTROL SAYS SO IN INK, NOT IN COLOUR ALONE, and it keeps its
    shape. A control that shrinks or loses its border when switched off changes
    the layout under whatever is beside it, and a row that reflows when one
@@ -5127,10 +5141,18 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    ⚠️ AND `disabled` HERE MEANS *you cannot press this*, NOT *nothing happens to
    it*. A panel mirror is exactly the case: the hardware presses it, you do not.
    It needs (0,3,0) and it needs to be after the block it beats. */
+/* ⚠️ AND IT IS A LIFT, NOT A LAMP. The first version reused the pressed pad's
+   own 80 per cent mix, which is right for a tint that is a COLOUR and wrong for
+   one that is a light grey: `/evo/` sets its ink to `--fg`, so the flash came
+   out near white and the number on it, also `--fg`, went unreadable. Reported in
+   one line: *"toggle button flash is excessive and white num makes it
+   unreadable"*.
+   ✅ A THIRD OF THE WAY IS ENOUGH TO SEE AND LEAVES THE FACE LEGIBLE, and the
+   border carries the rest, which is the channel a number does not sit on. */
 .pos-pad:disabled[data-hit] {
   opacity: 1;
-  background: color-mix(in srgb, var(--pad-tint) 80%, #fff 10%);
-  border-color: color-mix(in srgb, var(--pad-tint) 55%, var(--line));
+  background: color-mix(in srgb, var(--pad-tint) 26%, var(--card));
+  border-color: color-mix(in srgb, var(--pad-tint) 70%, var(--line));
 }
 .pos-pad:disabled[data-hit] .pos-pad-face { color: var(--fg); }
 /* The labels live OUTSIDE the button, so :disabled cannot reach them. The
