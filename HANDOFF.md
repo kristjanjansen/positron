@@ -149,6 +149,15 @@ subject is reading ten lines of Faust before you change one.
   sentences` turning `os.osc` into `Os.osc` on a phone is a compile error the
   visitor did not type.
 
+## Pushed, and the account put back
+
+`00b8669..b258310` on `origin/session-28-station-videoradio`, four commits, a
+clean fast forward: divergence read **0 behind 4 ahead** before and **0 0**
+after, so **no force and no lease were needed**. The dance was the one in
+`CLAUDE.md`: switch to `kristjanjansen`, fetch, push, switch back to
+`Kristjan-Jansen_enefit`. The active account is the work one again, checked
+rather than assumed.
+
 ## What is open
 
 1. 🔴 **`faust --version` ON THE BOARD, WHICH IS FOUR SECONDS AND DECIDES THE
