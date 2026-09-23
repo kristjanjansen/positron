@@ -3442,7 +3442,6 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* `notes off` is not a third octave button — it undoes something rather than
    moving somewhere, so it sits apart from the pair instead of beside it. */
-.kpad-right { margin-left: auto; }
 /* 🔴 HOW FAR FROM HOME, BESIDE THE PAIR THAT MOVES IT. `keyboard.mjs` argues
    why this is not the octave number its own header refuses: a key prints the
    octave it is IN, and this is the displacement from where the keyboard
@@ -3724,8 +3723,21 @@ button.pos-pg-lab:hover { color: var(--fg); }
    is sounding right now, so they read as a pair at 4 px and as two strangers at
    8. The octave pair beside them is already tighter still, at zero, because it
    is one control. */
-.kpad .pos-toggle { margin-left: auto; }
-.kpad .pos-toggle + .kpad-right { margin-left: -4px; }
+/* 🔴 THE RIGHT HAND GROUP IS MARKED BY THE BUILDER, NOT INFERRED BY SELECTORS,
+   AND THAT IS A REPAIR. The rules here used to read `.kpad .pos-toggle {
+   margin-left: auto }` plus a `+ .kpad-right` for the gap, which was correct for
+   exactly the row it was written against: one toggle and one `Notes off`. A flex
+   line hands its free space to every auto margin on it EQUALLY, so the moment a
+   keyboard carried both `Sustain` and `Loop` that rule stopped meaning *push the
+   group right* and started meaning *spread these across the row*, with a control
+   stranded in the middle next to nothing.
+   ⚠️ AND IT WOULD HAVE BROKEN AGAIN ON THE NEXT CONTROL, differently, because
+   every one of those selectors encodes a guess about what sits next to what.
+   The row knows its own order and now says so: the first of the right hand
+   controls carries `kpad-right` and takes the room, the rest carry `kpad-tight`
+   and sit 4 px from their neighbour. Adding a fourth control changes no CSS. */
+.kpad-right { margin-left: auto; }
+.kpad-tight { margin-left: -4px; }
 
 /* the two note namings, `C` or `1`, in the pad's own segmented geometry */
 .kpad-names button { width: auto; padding: 0 8px; font-size: 10.5px;

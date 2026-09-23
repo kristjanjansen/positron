@@ -316,6 +316,8 @@ export function createKeyboard(host, {
   onPanic = null, onOctave = null, minBase = 24, maxBase = 96, letters = true,
   pad: wantPad = true, sustain: wantSustain = false, onSustain = null,
   loop: wantLoop = false, onLoop = null,
+  /** where this component says what its loop is doing. `d.log`, normally. */
+  log = null,
   names: wantNames = true,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
@@ -759,7 +761,7 @@ export function createKeyboard(host, {
     if (d === 0) atEl.dataset.home = '1'; else delete atEl.dataset.home;
   };
   pad.append(atEl);
-  const panicBtn = make('button', 'kpad-right', 'Notes off', {
+  const panicBtn = make('button', '', 'Notes off', {
     type: 'button', title: 'stop every note that is still sounding',
   });
   panicBtn.onclick = () => api.panic();
@@ -779,10 +781,15 @@ export function createKeyboard(host, {
    * sustains should not grow a control they cannot use.
    */
   /**
-   * 🔴 `Loop` SITS LEFT OF `Sustain`, AND IT IS A KEYBOARD FUNCTION RATHER THAN A
-   * PAGE MODE. Asked 2026-09-23: *"wait make it a keyboard funcion, a button in
-   * bottom rihjt (left from sustain) called 'Loop'"*, after a first reading that
-   * would have made it a third option on `/nola/`'s roll picker.
+   * 🔴 `Loop` SITS AT THE RIGHT END, AND IT IS A KEYBOARD FUNCTION RATHER THAN A
+   * PAGE MODE. Asked 2026-09-23 as *"wait make it a keyboard funcion, a button
+   * in bottom rihjt (left from sustain) called 'Loop'"*, after a first reading
+   * that would have made it a third option on `/nola/`'s roll picker, then moved
+   * the same day: *"move loop button to right"*, with *"loop is leftmost of 3 in
+   * riht"* saying where it was.
+   * ⚠️ SO THE ROW READS `Sustain`, `Notes off`, `Loop`, AND THAT PUTS A PANIC
+   * BUTTON BETWEEN THE TWO TOGGLES, which is not how it would have been drawn
+   * from scratch. The ask is the reason and it outranks the symmetry.
    * ⚠️ THE CORRECTION IS THE INTERESTING PART AND IS WHY IT IS HERE. A mode is
    * something a PAGE is in and excludes the others; looping what you play is
    * something you do WHILE typing chords, or while the page is learning them, or
@@ -800,14 +807,21 @@ export function createKeyboard(host, {
                           + 'until you switch it off',
                      onChange: (on) => setLoop(on) })
     : null;
-  if (loopBtn) pad.append(loopBtn.el);
   const sustainBtn = wantSustain
     ? createToggle({ label: 'Sustain', size: 'small',
                      title: 'hold the notes on after the keys come up, the way a pedal does',
                      onChange: (on) => onSustain?.(on) })
     : null;
-  if (sustainBtn) pad.append(sustainBtn.el);
-  pad.append(panicBtn);
+  /* 🔴 THE ROW SAYS WHERE ITS OWN GROUPS ARE, AND THE STYLESHEET NO LONGER
+     GUESSES. The first of these takes the free space and pushes the rest to the
+     right; the others sit tight against it. Adding a fourth control is one more
+     entry in this array and no CSS at all, which is the opposite of what the
+     `margin-left: auto` on every toggle did when `Loop` arrived. */
+  const rightSide = [sustainBtn?.el, panicBtn, loopBtn?.el].filter(Boolean);
+  rightSide.forEach((node, i) => {
+    node.classList.add(i === 0 ? 'kpad-right' : 'kpad-tight');
+    pad.append(node);
+  });
   if (wantPad) el.append(pad);
 
   host.append(el);
@@ -819,18 +833,29 @@ export function createKeyboard(host, {
   // across the keys, the letter row, a page calling `api.press`. That is what
   // let hold-to-retrigger be added and removed in one place, and it is where a
   // recorder would attach if the loop idea in `BACKLOG.md` is ever built.
+  /* 🔴 THE FUNNEL MARKS ITSELF WHILE IT IS INSIDE THE PAGE'S CALLBACK, and the
+     one thing that reads this is `lightNote`. A page's `onDown` almost always
+     lights the key it was just handed, so without a mark the component cannot
+     tell its OWN note coming back from a note the page played on its own, and a
+     key press would be taped twice. `release` is the half that proves it is
+     needed: it deletes from `held` BEFORE calling `onUp`, so a membership test
+     answers the wrong way on every key up. */
+  let viaKey = 0;
+
   function press(k, how = 'key') {
     if (!(k in map) || held.has(k)) return;
     held.add(k);
     onTape(k, true);
-    onDown(noteOf(k), how);
+    viaKey++;
+    try { onDown(noteOf(k), how); } finally { viaKey--; }
   }
 
   function release(k, how = 'key') {
     if (!held.has(k)) return;
     held.delete(k);
     onTape(k, false);
-    onUp(noteOf(k), how);
+    viaKey++;
+    try { onUp(noteOf(k), how); } finally { viaKey--; }
   }
 
   /**
@@ -857,17 +882,61 @@ export function createKeyboard(host, {
    * nobody set.
    */
   let tape = null, tapeAt = 0, tapeTimers = [], looping = false;
+  /* what the LOOP itself currently has sounding, which is not the same set as
+     `held`: that one is fingers and loop keys together. */
+  const loopKeys = new Set(), loopNotes = new Set();
+  let outside = 0;          // how many taped movements came in around the keys
 
   const onTape = (k, down) => {
     if (tape === null || looping) return;
     tape.push({ k, down, t: Math.round(performance.now() - tapeAt) });
   };
 
+  /**
+   * 🔴 A NOTE THE PAGE PLAYED WITHOUT TOUCHING THESE KEYS, AND IT IS THE WHOLE
+   * REASON THE FIRST BUILD WAS SILENT. Reported 2026-09-23: *"can not hear
+   * looping"*. The funnel above is honest about what it covers, which is *every
+   * note this COMPONENT produces*: a finger, a slide, the letter row, a page
+   * calling `api.press`. A MIDI keyboard produces none of them. `/nola/` takes
+   * its own `midiDown` straight to its own `press`, so the component never saw a
+   * note, the tape stayed empty, and a loop with nothing in it is correctly
+   * silent. Playing the same notes on screen worked perfectly.
+   * 🔴 THIS IS THE THIRD TIME THAT SHAPE HAS COST A SESSION ON THIS PAGE. The
+   * Rhodes was inaudible over MIDI and audible on screen for the same reason a
+   * layer down, and the fix there was the same sentence: the on-screen path and
+   * the MIDI path are two paths, and anything that must be true of PLAYING has
+   * to sit where both of them pass.
+   * ✅ AND BOTH OF THEM PASS THROUGH `lightNote`. Every page here lights the key
+   * it is sounding, by every route, which makes that the note level funnel this
+   * component already had and had named after the lamp. So the loop records
+   * there and no page needs a line of code, which is what *"do not wire nola,
+   * its gloabl keyboard fn"* asks for.
+   * ⚠️ IT RECORDS THE NOTE AND NOT A KEY, so unlike a finger it does NOT follow
+   * the octave pad, and it can hold a note this keyboard does not draw. Both are
+   * right: what arrived was a note number somebody played, and the pad moves
+   * which keys are on screen rather than what a MIDI keyboard sent.
+   */
+  const tapeNote = (note, down) => {
+    if (tape === null || looping) return;
+    outside++;
+    tape.push({ note, down, t: Math.round(performance.now() - tapeAt) });
+  };
+
+  /* 🔴 STOPPING A LOOP MID NOTE MUST NOT LEAVE THE NOTE ON, and nothing here did
+     that until the loop could hold a note. Cutting the timers stops the next
+     movement arriving, which means the note-off that was due never comes: what
+     a player hears is the loop stopping with a chord still sounding, and the
+     only way out is `Notes off`. */
   const stopLoop = () => {
     for (const t of tapeTimers) clearTimeout(t);
     tapeTimers = [];
-    tape = null;
     looping = false;
+    tape = null;
+    for (const k of loopKeys) release(k, 'loop');
+    loopKeys.clear();
+    for (const n of loopNotes) onUp(n, 'loop');
+    loopNotes.clear();
+    outside = 0;
   };
 
   /**
@@ -895,14 +964,20 @@ export function createKeyboard(host, {
       tape = [];
       tapeAt = performance.now();
       looping = false;
+      outside = 0;
       loopBtn?.el.setAttribute('data-loop', 'recording');
+      log?.('loop armed and recording. Play something, then press Loop again to '
+          + 'send it round');
       onLoop?.(true, { state: 'recording' });
       return;
     }
     /* Turned off while a loop is going round: that press is the stop. */
     if (looping) {
+      const still = loopKeys.size + loopNotes.size;
       stopLoop();
       loopBtn?.el.removeAttribute('data-loop');
+      log?.(`loop stopped${still ? `, and ${still} note(s) it still had down were let go`
+                                : ''}`);
       onLoop?.(false, { state: 'off' });
       return;
     }
@@ -919,25 +994,43 @@ export function createKeyboard(host, {
        on the events, so a take of two quick notes still plays them where they
        fell and simply waits before coming round. */
     const MIN_LAP = 250;
-    const lap = Math.max(MIN_LAP, Math.round(performance.now() - tapeAt));
+    const raw = Math.round(performance.now() - tapeAt);
+    const lap = Math.max(MIN_LAP, raw);
     if (tape === null || !tape.length) {
       /* ⚠️ NOTHING PLAYED IS NOT A LOOP, and the button stays off rather than
          sitting on with nothing behind it. */
       stopLoop();
       loopBtn?.el.removeAttribute('data-loop');
+      log?.('nothing was played while the loop was armed, so there is no loop', 'warn');
       onLoop?.(false, { state: 'empty' });
       return;
     }
     looping = true;
     loopBtn?.set(true, true);
     loopBtn?.el.setAttribute('data-loop', 'looping');
-    onLoop?.(true, { state: 'looping', lap, moves: tape.length });
+    /* ⚠️ THE LOG SAYS WHERE THE MOVEMENTS CAME FROM, because that is the one
+       thing that was impossible to see when this went wrong: a MIDI take and an
+       on-screen take fail differently and looked identical. */
+    const fromKeys = tape.length - outside;
+    log?.(`looping ${tape.length} key movement(s) over ${lap} ms`
+        + `${raw < MIN_LAP ? `, the take being ${raw} ms and held to the 250 ms floor` : ''}`
+        + `${outside ? `, ${outside} of them played past the keys on screen` : ''}`
+        + `${fromKeys && outside ? ` and ${fromKeys} on them` : ''}`);
+    onLoop?.(true, { state: 'looping', lap, moves: tape.length, outside });
     const round = () => {
       if (!looping) return;
       for (const e of tape) {
         tapeTimers.push(setTimeout(() => {
           if (!looping) return;
-          if (e.down) { held.delete(e.k); press(e.k, 'loop'); } else release(e.k, 'loop');
+          /* 🔴 TWO KINDS OF MOVEMENT AND THEY REPLAY DIFFERENTLY. A key goes back
+             through `press`, so it follows the octave pad and lights up like a
+             finger. A note played past the keys has no key to press, so it is
+             handed to the page directly, marked `loop` exactly the same way. */
+          if (e.k !== undefined) {
+            if (e.down) { held.delete(e.k); press(e.k, 'loop'); loopKeys.add(e.k); }
+            else { release(e.k, 'loop'); loopKeys.delete(e.k); }
+          } else if (e.down) { onDown(e.note, 'loop'); loopNotes.add(e.note); }
+          else { onUp(e.note, 'loop'); loopNotes.delete(e.note); }
         }, e.t));
       }
       tapeTimers.push(setTimeout(round, lap));
@@ -1117,6 +1210,12 @@ export function createKeyboard(host, {
      */
     lightNote(note, on, who = 'self') {
       const k = keyOf(note);
+      /* 🔴 AND THIS IS WHERE A NOTE PLAYED PAST THE KEYS REACHES THE LOOP. See
+         `tapeNote`. Only the plain lamp counts: `hint`, `ai` and `remote` are
+         somebody else's notes or a suggestion nobody played, and looping those
+         would record a proposal as a performance. `viaKey` excludes this
+         component's own notes coming back through the page's callback. */
+      if (who === 'self' && !viaKey) tapeNote(note, !!on);
       if (!k) return;
       /* 🔴 `ai` IS A FOURTH LAMP AND NOT A FOURTH COLOUR OF THE SAME ONE. Asked
          2026-09-23: *"when fading, fade them also in keyboard so smaller are on
