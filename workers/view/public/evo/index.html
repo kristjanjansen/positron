@@ -249,7 +249,7 @@
      old page grouped them WITH the wheels, which is a count without a layout.
      They are the only round buttons and the only coloured ones on the panel. */
   .evo-oct { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-  .evo-oct-row { position: relative; display: flex; gap: 12px; padding-bottom: 16px; }
+  .evo-oct-row { position: relative; display: flex; gap: 12px; }
   /* 🔴 ONE INK FOR EVERY CONTROL ON THE PANEL, DECLARED ONCE. Asked 2026-09-23:
      *"use lightgray brand color on all controls on evo"*. It was `#7fb2ff`, a
      blue, typed in two places: once here for the octave pair and once in the
@@ -265,11 +265,17 @@
   /* Coloured at rest, which is a fact about the object rather than a state this
      page is claiming: `--pad-tint` is the component's own published knob, so
      this is not a page writing a colour the component cannot override. */
+  /* ⚠️ AND THE MIXES CAME DOWN WHEN THE INK WENT GREY. Reported off a crop:
+     *"cotrol still light"*. 16 and 45 per cent were chosen against a BLUE tint,
+     where a low mix reads as a hint of colour; against `--fg` the same numbers
+     are just a paler grey, so a resting octave button was the brightest thing on
+     a panel where nothing else is lit. Halved, it reads as a drawn button again
+     rather than a lamp. */
   .evo-oct .pos-pad:not([data-on]) {
-    background: color-mix(in srgb, var(--pad-tint) 16%, var(--card));
-    border-color: color-mix(in srgb, var(--pad-tint) 45%, var(--line));
+    background: color-mix(in srgb, var(--pad-tint) 7%, var(--card));
+    border-color: color-mix(in srgb, var(--pad-tint) 22%, var(--line));
   }
-  .evo-oct-lab { position: absolute; left: -20px; right: -20px; bottom: 0; }
+
 
   /* ── the eight rotaries ────────────────────────────────────────────────── */
   /* 🔴 ONE ROW OF EIGHT, `C1` TO `C8`, LEFT TO RIGHT, WITH A PRINTED DIVIDER
@@ -879,9 +885,20 @@
     top: '+', round: true, small: true, latch: false, disabled: true, aria: 'octave up',
     title: 'octave up. Nothing this sends has ever been captured',
   });
-  octRow.append(octDown.el, octUp.el,
-    el('div', 'panel-sub evo-oct-lab', 'TRANSPOSE'));
-  oct.append(el('div', 'panel-cap', 'OCTAVE'), octRow);
+  /* 🔴 NEITHER NAME IS PRINTED HERE ANY MORE. Asked 2026-09-23: *"rm octave and
+     transpose labels"*, which is the last of this afternoon's printed type to
+     come off this panel after the two group boxes and `SNAP SHOT`.
+     ⚠️ WHAT THEY SAID IS REAL AND IS NOT LOST. `OCTAVE` named the pair and
+     `TRANSPOSE` named what the same two buttons do pressed together, and both
+     are in the hover on those buttons and in
+     `research/evo-mk425c-face-2026-09-21.md`, which is where the whole face is
+     recorded. What came off the face is grey type naming two buttons that carry
+     a minus and a plus and are lit by nothing.
+     ⚠️ AND THE ROW LOSES THE ROOM IT KEPT FOR THEM: `.evo-oct-row`'s bottom
+     padding existed to hold the absolutely positioned `TRANSPOSE` under the
+     pair, so leaving it would be reserving space for a label that is gone. */
+  octRow.append(octDown.el, octUp.el);
+  oct.append(octRow);
   row.append(oct);
 
   /* The nameplate, in the middle of the back strip where the logo sits, between
@@ -1607,7 +1624,7 @@
       d.assert('the nameplate sits between the octave pair and the rotaries, inside the strip',
         pr.width > 0 && or.right <= pr.left + 1 && pr.right <= rr.left + 1
           && mid > fr.left && mid < fr.right,
-        `${(pr.left - or.right).toFixed(0)} px after TRANSPOSE, `
+        `${(pr.left - or.right).toFixed(0)} px after the octave pair, `
         + `${(rr.left - pr.right).toFixed(0)} px before C1, centre `
         + `${(mid - fr.left).toFixed(0)} of ${fr.width.toFixed(0)} px of panel`);
 
@@ -1964,21 +1981,34 @@
         const [hi, lo] = [relLum(mix), relLum(bg)].sort((m, n) => n - m);
         return (hi + 0.05) / (lo + 0.05);
       };
-      const dimmedNames = [...card.querySelectorAll('.panel-sub, .panel-cap')]
+      /* 🔴 THE KNOB NAMES COUNT, AND WITHOUT THEM THIS CHECK HAS NO SUBJECT LEFT.
+         `C1` to `C10` are the only type this panel still prints: the two group
+         boxes, the function buttons, `SNAP SHOT`, `OCTAVE` and `TRANSPOSE` all
+         came off across one afternoon, and the sweep only looked at
+         `.panel-sub` and `.panel-cap`. The list went empty, `reduce` seeded on
+         `undefined`, and the page threw `Cannot read properties of undefined`
+         and took itself to 0 asserts.
+         ⚠️ THAT IS THE THIRD TIME THIS CHECK HAS BEEN WRONG ABOUT ITS OWN
+         SUBJECT in an afternoon, twice as a floor that had to be lowered and now
+         as a selector that had stopped matching anything. A check that counts
+         what it finds needs to look where the thing actually is. */
+      const dimmedNames = [...card.querySelectorAll('.panel-sub, .panel-cap, .pos-knob-lab')]
         .filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
         .map((e) => ({ t: e.textContent.replace(/\s+/g, ' ').trim().slice(0, 16),
                        r: seenRatio(e) }));
-      const loudest = dimmedNames.reduce((a, b) => (b.r > a.r ? b : a), dimmedNames[0]);
-      const faintest = dimmedNames.reduce((a, b) => (b.r < a.r ? b : a), dimmedNames[0]);
-      /* ⚠️ THE FLOOR WAS SIX, THEN THREE, AND IS TWO, because the names it counts
-         keep leaving: eleven went with the function buttons and one more with
-         `SNAP SHOT`. The floor is here so a sweep that found NOTHING cannot
-         pass. It is not a claim about how many names a panel has, and every time
-         it is left behind, removing a control looks like a regression in a check
-         about ink. Derive it from what is drawn or keep moving it, and this page
-         has now moved it twice in an hour. */
+      const rotCount = rot.querySelectorAll('.pos-knob-lab').length;
+      /* ⚠️ SEEDED SO IT CANNOT THROW ON AN EMPTY LIST, which is what took this
+         page to zero asserts once. An empty sweep is a finding, not a crash. */
+      const none = { t: 'nothing', r: 1 };
+      const loudest = dimmedNames.reduce((a, b) => (b.r > a.r ? b : a), dimmedNames[0] || none);
+      const faintest = dimmedNames.reduce((a, b) => (b.r < a.r ? b : a), dimmedNames[0] || none);
+      /* ⚠️ AND THE FLOOR IS DERIVED NOW RATHER THAN TYPED. It was six, then three,
+         then two, moved every time a control left, and each move made a removal
+         look like a regression in a check about ink. What it is really for is
+         that a sweep finding NOTHING must not pass, and the panel's eight
+         rotaries are the thing it can count on. */
       d.assert('every printed name on the panel is dimmed with the controls it names',
-        dimmedNames.length >= 2 && loudest.r < 3 && faintest.r > 1.5,
+        dimmedNames.length >= rotCount && loudest.r < 3 && faintest.r > 1.5,
         `${dimmedNames.length} names, "${loudest.t}" loudest at ${loudest.r.toFixed(2)}:1, `
         + `"${faintest.t}" faintest at ${faintest.r.toFixed(2)}:1`);
 
