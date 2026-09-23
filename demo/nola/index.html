@@ -1716,12 +1716,48 @@
     for (const n of aiLit) keys.lightNote(n, true, 'ai');
   };
 
-  function drawGuesses() {
+  /** when the proposal on screen was offered, and whether it has been played */
+  let guessAt = 0, guessPlayed = false, guessRedraws = 0;
+  /**
+   * 🔴 HOW LONG A PROPOSAL IS LEFT ALONE. Asked 2026-09-23: *"do not offer new
+   * when i hae not played old suggestion for a while"*. A proposal is a thing to
+   * TRY, and one that is replaced before you have got round to it is not an
+   * offer, it is a page talking over you: every chord admitted redrew the row,
+   * so the thing you were reaching for could change while your hands were
+   * moving toward it.
+   * ⚠️ IT IS A JUDGEMENT AND NOT A MEASUREMENT, unlike the window and the floor,
+   * and it is written here so it can be argued with. On the takes from this desk
+   * a chord lands every one to three seconds, so twenty seconds is several
+   * chords of thinking time and still short enough that a proposal cannot go
+   * stale for a whole minute.
+   * ✅ AND PLAYING IT ENDS THE HOLD AT ONCE, which is the half that makes the
+   * number matter less: the timer is the fallback for a proposal nobody wanted,
+   * not the thing deciding when you are finished with one.
+   */
+  const GUESS_HOLD = 20000;
+
+  function drawGuesses({ force = false } = {}) {
+    /* Keep the one on screen if it is still unplayed and still fresh. It must be
+       re-added rather than left alone, because `addLearned` has already trimmed
+       the rows back to the learned ones by the time this runs. */
+    const keep = !force && guesses.length && !guessPlayed
+      && performance.now() - guessAt < GUESS_HOLD;
+    if (keep) {
+      roll.trimRows(learned.length);
+      for (const g of guesses) {
+        roll.addRow({ kind: 'guess', notes: g.notes, label: rowLabel(g.name, g.outside) });
+      }
+      lightGuess(guesses[guesses.length - 1].notes);
+      return;
+    }
     roll.trimRows(learned.length);
+    guessRedraws++;
     guesses = [];
     lastGuess = null;
+    guessPlayed = false;
     lightGuess([]);
     if (mode !== 'learn' || learned.length < 2) return;
+    guessAt = performance.now();
     const r = suggest({ chords: learned }, { style: LEARN_STYLE });
     if (!r.ok) return;
     lastGuess = r;
@@ -1751,7 +1787,7 @@
       if (!c.ok) continue;
       const { notes, outside } = voiceRow(c.notes, near, { wide: true });
       near = notes;
-      guesses.push({ ...p, notes });
+      guesses.push({ ...p, notes, outside });
       roll.addRow({ kind: 'guess', notes, label: rowLabel(p.name, outside) });
       /* 🔴 AND IT IS ON THE KEYS AS WELL AS IN THE ROLL, asked for as *"fade
          them also in keyboard so smaller are on top of larger"*. The roll says
@@ -1911,6 +1947,17 @@
        naming is FOR, so the voicing has to be kept beside it rather than
        recovered from it. The LAST way a chord was played is the one kept: come
        back to it in a better place and the roll follows you. */
+    /* 🔴 PLAYING THE PROPOSAL IS WHAT ENDS ITS HOLD, and it is read off the
+       chord KEY rather than off the exact notes, because taking up an offer in
+       your own voicing is still taking it up. */
+    if (guesses.length && !guessPlayed) {
+      const c = parseChord(guesses[guesses.length - 1].name);
+      if (c.ok && chordKey(c.root, c.quality) === key) {
+        guessPlayed = true;
+        d.log(`you played ${guesses[guesses.length - 1].name}, so the next chord you `
+            + 'keep coming back to will bring a new proposal with it');
+      }
+    }
     playedAs.set(key, [...got.notes].sort((a, b) => a - b));
     tally.hold(key, at);
     const due = tally.dueAt(at);
@@ -3198,6 +3245,44 @@
         `the proposal sits ${apart.toFixed(1)} semitones from the middle of `
         + `${learned[learned.length - 1].name}, against the ${SHOWN()} the keyboard draws`);
 
+      /* 🔴 A PROPOSAL NOBODY HAS PLAYED IS LEFT ALONE. Asked as *"do not offer
+         new when i hae not played old suggestion for a while"*. Every redraw used
+         to recompute it, so the thing you were reaching for could change while
+         your hands were moving toward it.
+         ⚠️ DRIVEN BY CALLING THE REDRAW RATHER THAN BY LEARNING A THIRD CHORD,
+         because a third chord costs three more arrivals and takes this block
+         past the harness's patience, and what is in question is the redraw. */
+      /* ⚠️ ONE REDRAW FIRST, TO START FROM AN UNPLAYED PROPOSAL. The fade check
+         above PLAYS this chord to measure the row coming forward, which
+         legitimately releases the hold, and a check that began there would be
+         measuring the release rather than the hold. Found by the count: the
+         first redraw recomputed and the second did not. */
+      drawGuesses();
+      const offered = guesses[0].name;
+      const redrawsWas = guessRedraws;
+      drawGuesses();
+      drawGuesses();
+      d.assert('a redraw leaves a proposal you have not played where it is',
+        guesses.length === 1 && guesses[0].name === offered
+        && guessRedraws === redrawsWas,
+        `the proposal is still ${guesses[0].name} after two redraws, and it was `
+        + `recomputed ${guessRedraws - redrawsWas} time(s)`);
+
+      /* ⚠️ AND PLAYING IT RELEASES THE HOLD, which is what keeps this from being
+         a proposal frozen on the screen. */
+      const held0 = guessPlayed;
+      hold(guesses[0].notes);
+      await sleep(LEARN_WINDOW + 140);
+      drop(guesses[0].notes);
+      await sleep(80);
+      const freedAfter = guessPlayed;
+      drawGuesses();
+      d.assert('and playing it releases the hold, so the next redraw may offer something else',
+        held0 === false && freedAfter === true && guessRedraws > redrawsWas,
+        `the proposal was ${held0 ? 'already' : 'not'} taken up, was `
+        + `${freedAfter ? 'taken up' : 'still waiting'} after playing it, and the next `
+        + `redraw ${guessRedraws > redrawsWas ? 'recomputed' : 'still held'}`);
+
       /* 🔴 THE PROPOSAL IS ON THE KEYS, SMALLER, AND UNDERNEATH WHAT YOU PLAY.
          Asked as *"make suggested notes appear subtly and be smaller that real
          ones"* and *"fade them also in keyboard so smaller are on top of
@@ -3540,12 +3625,22 @@
      because `positron-ui` forbids an animation that changes how much room a
      thing takes and a dot that resized its cell would move the columns under a
      reader. */
+  /* 🔴 A RING, NOT A SMALLER DOT, AND THE SMALLER DOT WAS TRIED FIRST AND
+     REPORTED AS *"not small dots, do not work"*. A small filled dot says
+     *quieter*, which a reader has to compare against a neighbour to notice, and
+     on a key with nothing beside it there is nothing to compare against. An
+     outline at the SAME size says *empty*, which needs no comparison: it is a
+     place for a dot rather than a faint one. Asked as *"try large circles with
+     only outine"* and *"make it radiobutton"*, which is exactly the idea, a slot
+     that fills when you take it.
+     ⚠️ AND IT FILLS WHEN YOU PLAY IT, which is the same fact the row's opacity
+     already carries, said in the one channel a player is actually looking at. */
   .roll-row[data-kind="guess"] .roll-label { color: var(--ai); }
   .roll-row[data-kind="guess"] .roll-cell.on::after {
-    background: var(--ai); transform: scale(.62);
-    transition: transform 120ms ease-out, opacity 120ms linear;
+    background: transparent; box-shadow: inset 0 0 0 1.5px var(--ai);
+    transition: background 120ms linear;
   }
-  .roll-row[data-kind="guess"][data-held] .roll-cell.on::after { transform: scale(1); }
+  .roll-row[data-kind="guess"][data-held] .roll-cell.on::after { background: var(--ai); }
   /* 🔴 A PROPOSAL SITS BACK UNTIL YOU PLAY IT, asked for as *"fade 'ai row'
      subtly. when i play it, rm fading"*. The fade is the row saying it is not
      one of yours yet, and landing the chord is the moment it stops being a
