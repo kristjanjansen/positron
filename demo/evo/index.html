@@ -677,7 +677,25 @@
   win.append(disp2.el, disp3.el);
   fixed.append(win);
 
-  /** Both fields at once, so a reading can never be half replaced. */
+  /**
+   * Both fields at once, so a reading can never be half replaced.
+   *
+   * 🔴 THE LARGE FIELD IS THE VALUE AND THE SMALL ONE IS THE CONTROL'S OWN
+   * NUMBER, THE `C1` TO `C10` PRINTED ON THE PANEL. Asked 2026-09-23 as *"small
+   * shows cc num, large the value"*, which I first read as the MIDI CC and got
+   * wrong. The correction was *"ptichbend is 09 and mod 10, can not see it on
+   * small segmented"*, and it is the panel's own vocabulary: every control on
+   * this instrument is printed `C` and a number, so `cc num` here is the C
+   * NUMBER. The MIDI CC is a different fact and is already beside each rotary.
+   * ✅ SO ONLY THE LARGE FIELD DEPARTS FROM THE INSTRUMENT. 📄 The manual's table
+   * reads *"default, after a control moved | 3 digits: the MIDI CC assigned to
+   * it | 2 digits: the control's own number"*, so the small field is doing
+   * exactly what the manual says and the large one shows what a reader cannot
+   * otherwise see, which is what the knob just sent.
+   * ⚠️ AND TWO DIGITS IS ENOUGH FOR IT, which the MIDI CC reading was not:
+   * controls run C1 to C10 and a CC runs to 127, so the first fits the field the
+   * instrument has and the second would have overflowed above 99.
+   */
   function show(value, about) {
     disp3.set(value);
     disp2.set(about);
@@ -795,34 +813,20 @@
 
   const row = el('div', 'panel-row evo-row');
 
-  const fnRow = el('div', 'evo-fn-row');
-  const fnPads = [];
-  for (let i = 0; i < FN_ONE.length; i++) {
-    const p = createPad({
-      latch: false, disabled: true,
-      aria: FN_ONE[i].replace('\n', ' ').toLowerCase(),
-      title: `${FN_ONE[i].replace('\n', ' ')} on a single press. Nothing this `
-           + 'sends has ever been captured, and the manual says no data leaves '
-           + 'the keyboard in edit mode except program and bank changes',
-    });
-    fnPads.push(p);
-    fnRow.append(p.el);
-    const lab = el('div', 'panel-sub evo-fn-lab', FN_ONE[i]);
-    lab.style.setProperty('--i', String(i));
-    fnRow.append(lab);
-  }
-  for (let i = 0; i < FN_PAIR.length; i++) {
-    const lab = el('div', 'panel-sub evo-fn-pair', FN_PAIR[i]);
-    lab.style.setProperty('--i', String(i));
-    fnRow.append(lab);
-  }
-  /* 🔴 NO WRAPPER AND NO GROUP HEADING. The six buttons go straight into the
-     row now that the `FUNCTION BUTTONS` bar is gone, because a wrapper holding
-     one child has a `gap` with nothing to act on: this project measured a page
-     whose `.pos-body` had exactly one child getting no vertical rhythm at all,
-     the rule working perfectly with nothing to act on. Count the siblings
-     before hunting for a rule that lost. */
-  row.append(fnRow);
+  /* 🔴 THE SIX FUNCTION BUTTONS ARE GONE, ASKED 2026-09-23: *"rm/arhive funciton
+     buttons (they are disabled anyway, rigt)"*. They were, and more than that:
+     `fnPads` was pushed to and never read, so nothing on this page could ever
+     light one, and the manual says why nothing could. 📄 *"no data leaves the
+     keyboard in edit mode except program and bank changes"*, so there is no
+     message any of them can send for this page to hear. Six controls that can
+     neither be pressed nor lit are a picture of a picture.
+     ⚠️ WHAT WENT WITH THEM IS THEIR PRINTED NAMES, and that is the real cost:
+     `GLOBAL CHANNEL`, `CONTROL ASSIGN`, `PROGRAM`, the five dual press pairs.
+     Those are the panel's own vocabulary and the only place this page said them.
+     They are in `research/evo-mk425c-face-2026-09-21.md`, which is where the
+     whole face is recorded, and in this repository's history.
+     ⚠️ AND THE ROW IS NOT REPLACED BY A GAP. `row` holds the octave pair, the
+     nameplate and the rotaries, which is what the back strip is for. */
 
   /**
    * ⚠️ OCTAVE AND TRANSPOSE ARE DRAWN AND ARE LIT BY NOTHING. The manual gives
@@ -1047,20 +1051,25 @@
     if (m.kind === 'pitch bend') {
       bendRaw = (m.d2 << 7) | m.d1;
       bend.set(bendRaw, { from: 'hardware' });
-      /* ⚠️ AND THE DISPLAY SAYS NOTHING ABOUT IT, because the real one does
-         not: there is no bend row in any reading the manuals print. A 14 bit
-         value would also overflow a three digit field and show dashes, which
-         would read as a fault rather than as a page declining to invent a
-         reading. */
+      /* 🔴 THE SMALL FIELD SAYS `C9` AND THE LARGE ONE STAYS OUT OF IT. Asked
+         2026-09-23: *"ptichbend is 09 and mod 10, can not see it on small
+         segmented"*. Which control moved is a fact this page knows for certain,
+         printed on the panel, and it costs nothing to say.
+         ⚠️ THE VALUE IS STILL NOT SHOWN, and that half of the old comment
+         stands: a 14 bit bend overflows a three digit field and would draw
+         dashes, which reads as a fault rather than as a page declining to
+         invent a reading. The wheel itself carries the value. */
+      show('', BEND_SLOT);
       return;
     }
 
     if (m.kind === 'control' && m.cc === 1) {
       mod.set(m.d2, { from: 'hardware' });
-      /* 🔴 THE ONE CONTROL WHOSE SLOT AND CONTROLLER NUMBER ARE BOTH KNOWN, so
-         it is the one reading where both fields of the display are filled: the
-         panel prints `C10` under this wheel and the wire says CC 1. */
-      show(m.cc, MOD_SLOT);
+      /* 🔴 THE ONE CONTROL WHOSE SLOT AND CONTROLLER NUMBER ARE BOTH KNOWN. The
+         panel prints `C10` under this wheel, so that is what the small field
+         says, and the wire's CC 1 is a different fact printed beside the wheel
+         itself. */
+      show(m.d2, MOD_SLOT);
       return;
     }
 
@@ -1122,7 +1131,7 @@
          has a slot in hand. It is an inference and the log already says so in
          those words, which is why the small field carries the rotary and not a
          claim about the hardware. */
-      show(m.cc, slot + 1);
+      show(m.d2, slot + 1);
     }
   }
 
@@ -1201,8 +1210,12 @@
      * small field has anything to say. Asserted here rather than at the end,
      * because the next few messages replace it.
      */
-    d.assert('the mod wheel fills both fields, because its slot is printed on the panel',
-      disp3.text().trim() === '1' && disp2.text().trim() === String(MOD_SLOT),
+    /* ⚠️ THE VALUE IN THE LARGE FIELD AND THE CC IN THE SMALL ONE, which reverses
+       what this check asserted an hour ago and is written down in `show()` with
+       the manual's own contrary table beside it. The mod wheel is CC 1, so the
+       small field is the one that reads 1 now. */
+    d.assert('the mod wheel fills both fields, its value and the C number on the panel',
+      disp3.text().trim() === '100' && disp2.text().trim() === String(MOD_SLOT),
       `three digits "${disp3.text()}", two digits "${disp2.text()}"`);
 
     for (const cc of KNOB_CC_SEEN) take([0xb0 | ch, cc, 64]);
@@ -1222,9 +1235,8 @@
        arrival, which is an inference; the log says so in those words already,
        and the small field carries the page's best reading rather than a claim
        about what the hardware sent. */
-    d.assert('and a rotary fills both fields, the value and the rotary it was read as',
-      disp3.text().trim() === String(KNOB_CC_SEEN[KNOB_CC_SEEN.length - 1])
-        && /^[1-8]$/.test(disp2.text().trim()),
+    d.assert('and a rotary fills both fields, the value it sent and the rotary it was read as',
+      disp3.text().trim() === '64' && /^[1-8]$/.test(disp2.text().trim()),
       `three digits "${disp3.text()}", two digits "${disp2.text()}"`);
 
     take([0xb0 | ch, 32, 0]); take([0xb0 | ch, 0, 0]); take([0xc0 | ch, 3]);   // a button
@@ -1322,11 +1334,16 @@
      * a 449C, and a cover photograph in one of this instrument's own manuals is
      * a third keyboard entirely.
      */
-    d.assert('six function buttons, and five dual press labels one to a pair',
-      fnPads.length === 6 && fnRow.querySelectorAll('.evo-fn-pair').length === 5
-        && fnRow.querySelectorAll('.evo-fn-lab').length === 6,
-      `${fnPads.length} buttons, ${fnRow.querySelectorAll('.evo-fn-lab').length} names, `
-      + `${fnRow.querySelectorAll('.evo-fn-pair').length} pairs`);
+    /* 🔴 THIS CHECK COUNTED SIX FUNCTION BUTTONS AND NOW ASSERTS THERE ARE NONE,
+       which is the shape a removal has to take here or the count quietly drops
+       out of the run. Asked as *"rm/arhive funciton buttons (they are disabled
+       anyway, rigt)"*, and they were: nothing read `fnPads` and the manual says
+       no data leaves the keyboard in edit mode except program and bank changes,
+       so no message exists for this page to light one with. */
+    d.assert('NEGATIVE CONTROL: the function buttons and their printed names are gone',
+      panel.el.querySelectorAll('.evo-fn-row, .evo-fn-lab, .evo-fn-pair').length === 0,
+      `${panel.el.querySelectorAll('.evo-fn-row, .evo-fn-lab, .evo-fn-pair').length} `
+      + 'function button parts left on the panel');
 
     /**
      * 🔴 THE DISPLAY IS TWO FIELDS, READ OFF THE PICTURE RATHER THAN OFF THE
@@ -1522,24 +1539,15 @@
         bottom.join('') === `${MINUS}0+` && topRow.join('') === '123',
         `top "${topRow.join(' ')}", bottom "${bottom.join(' ')}"`);
 
-      /**
-       * 🔴 EACH DUAL PRESS NAME IS CENTRED ON THE MIDPOINT OF ITS PAIR, AND
-       * THIS ASSERT EXISTS BECAUSE THE CONNECTOR WENT. With a rule and a tick
-       * drawn from the label to both buttons, centring was decoration. With them
-       * gone it is the only thing saying the name belongs to both rather than to
-       * the left one, so it is now load-bearing and is measured.
-       */
-      const pairLabs = [...fnRow.querySelectorAll('.evo-fn-pair')];
-      const offBy = pairLabs.map((lab, i) => {
-        const a = fnPads[i].button.getBoundingClientRect();
-        const b = fnPads[i + 1].button.getBoundingClientRect();
-        const l = lab.getBoundingClientRect();
-        return Math.abs((l.left + l.width / 2) - (a.left + a.width / 2
-          + (b.left + b.width / 2 - (a.left + a.width / 2)) / 2));
-      });
-      d.assert('each dual press name is centred across the pair it belongs to',
-        pairLabs.length === 5 && Math.max(...offBy) < 1,
-        `worst ${Math.max(...offBy).toFixed(2)} px off its pair's midpoint`);
+      /* 🔴 THE DUAL PRESS CENTRING CHECK WENT WITH THE BUTTONS IT MEASURED, and
+         it is recorded here rather than deleted quietly. It asserted that each
+         of the five dual press names sat on the midpoint of its own pair, within
+         a pixel, and it was load bearing: with the connector rules gone, that
+         centring was the only thing saying a name belonged to both buttons
+         rather than to the left one. There are no pairs now, so there is nothing
+         for it to be true about, and an assert about furniture that does not
+         exist is worse than no assert at all. The layout rule it protected lives
+         in `research/evo-mk425c-face-2026-09-21.md` with the rest of the face. */
 
       /**
        * 🔴 THE NAMEPLATE SITS BETWEEN THE OCTAVE PAIR AND THE ROTARIES, INSIDE
@@ -1925,8 +1933,13 @@
                        r: seenRatio(e) }));
       const loudest = dimmedNames.reduce((a, b) => (b.r > a.r ? b : a), dimmedNames[0]);
       const faintest = dimmedNames.reduce((a, b) => (b.r < a.r ? b : a), dimmedNames[0]);
+      /* ⚠️ THE FLOOR WAS SIX AND IS THREE, because eleven of the names it was
+         counting were the function buttons' and went with them on 2026-09-23.
+         The floor is here so a sweep that found NOTHING cannot pass; it is not a
+         claim about how many names a panel has, and leaving it at six would have
+         made removing a control look like a regression in a check about ink. */
       d.assert('every printed name on the panel is dimmed with the controls it names',
-        dimmedNames.length >= 6 && loudest.r < 3 && faintest.r > 1.5,
+        dimmedNames.length >= 3 && loudest.r < 3 && faintest.r > 1.5,
         `${dimmedNames.length} names, "${loudest.t}" loudest at ${loudest.r.toFixed(2)}:1, `
         + `"${faintest.t}" faintest at ${faintest.r.toFixed(2)}:1`);
 
