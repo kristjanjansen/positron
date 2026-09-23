@@ -337,16 +337,32 @@ export function createSettler({ windowMs = 200, minNotes = 3 } = {}) {
  * there by construction. **If a real player's gap is a factor of two rather
  * than ten, this gate is a much harder choice and might not exist.**
  *
- * @param {number} [o.admitMs] 🔴 A GUESS. 2,000 ms of time held that counts is
- *   roughly two visits to a chord you mean.
+ * 🔴 AND THE GATE IS A COUNT OF VISITS, NOT A TOTAL OF TIME. Asked 2026-09-23:
+ * *"just monitor what i play and save repeating ones"*. A total admits a chord
+ * you rested on once while you were thinking, which is the commonest thing a
+ * pair of hands does and the opposite of a chord you came back to. Counting
+ * ARRIVALS says what was asked for, and the time floor above is what makes an
+ * arrival real, so a chord you only pass through still never accrues however
+ * often you pass through it.
+ * ⚠️ THE RESEARCH MEASURED RAW COUNT FAILING AND THIS IS NOT THAT. It found
+ * count and visit count both putting a PASSING chord in the top four, on data
+ * whose gap between held and passing was a factor of ten by construction, and
+ * it said so. Count with a floor under it is strictly better than either, and
+ * nobody has played any of it.
+ *
+ * @param {number} [o.times] 🔴 A JUDGEMENT. 2, because *repeating* in its
+ *   plainest reading is played, left, played again, and three arrivals before
+ *   anything appears makes a mode that looks broken for its first minute.
  * @param {number} [o.minHoldMs] 🔴 A GUESS, in the middle of the 200 to 800 ms
  *   band the research swept. A hold shorter than this is a chord you were on
- *   your way through.
+ *   your way through, and it counts as no arrival at all.
  * @param {number} [o.slots] four to six, per the research.
  */
-export function createTally({ admitMs = 2000, minHoldMs = 400, slots = 6 } = {}) {
+export function createTally({ times = 2, minHoldMs = 400, slots = 6 } = {}) {
   /** key -> milliseconds of holds that were long enough to count. */
   const banked = new Map();
+  /** key -> how many separate holds got past the gate. This is the gate now. */
+  const visits = new Map();
   const pinned = [];
   let live = null, since = 0, saidFull = false;
 
@@ -361,9 +377,18 @@ export function createTally({ admitMs = 2000, minHoldMs = 400, slots = 6 } = {})
 
   const closeOut = (at) => {
     if (live === null) return;
-    banked.set(live, (banked.get(live) || 0) + liveMs(at));
+    const ms = liveMs(at);
+    banked.set(live, (banked.get(live) || 0) + ms);
+    /* ⚠️ AN ARRIVAL IS BANKED ONLY IF IT GOT PAST THE FLOOR, which is the whole
+       difference between this and counting events. `liveMs` already returns 0
+       for a hold under the gate, so one test covers both. */
+    if (ms > 0) visits.set(live, (visits.get(live) || 0) + 1);
     live = null;
   };
+  /** Arrivals so far, counting the one under the fingers once it is past the
+   *  floor. Same shape as `total`, for the same reason. */
+  const seen = (key, at) => (visits.get(key) || 0)
+    + (live === key && liveMs(at) > 0 ? 1 : 0);
 
   return {
     /** This chord is under the fingers from now. */
@@ -383,7 +408,7 @@ export function createTally({ admitMs = 2000, minHoldMs = 400, slots = 6 } = {})
       const ready = [];
       for (const key of new Set([...banked.keys(), ...(live ? [live] : [])])) {
         if (pinned.includes(key)) continue;
-        if (total(key, at) >= admitMs) ready.push(key);
+        if (seen(key, at) >= times) ready.push(key);
       }
       ready.sort((a, b) => total(b, at) - total(a, at));
       const admitted = [];
@@ -407,12 +432,16 @@ export function createTally({ admitMs = 2000, minHoldMs = 400, slots = 6 } = {})
      */
     dueAt(at) {
       if (live === null || pinned.includes(live)) return null;
-      const need = admitMs - (banked.get(live) || 0);
-      /* The live hold counts for nothing until the gate, then for all of it at
-         once, so the crossing is the later of the two. */
-      return since + Math.max(minHoldMs, Math.max(0, need));
+      /* 🔴 A COUNT LANDS ON AN EVENT, NOT ON A COUNTDOWN, and that is the whole
+         change in one function. The hold under the fingers becomes an arrival
+         the instant it passes the floor, so if this is the last one needed the
+         chord is due exactly then, and if it is not, no timer will ever admit
+         it: the player has to let go and come back. */
+      return (visits.get(live) || 0) >= times - 1 ? since + minHoldMs : null;
     },
     msOf: (key, at) => total(key, at),
+    /** How many times a chord has been arrived at and stayed with. */
+    timesOf: (key, at) => seen(key, at),
     minHoldMs,
     /** The pinned list, in the order it was admitted. Never re-sorted. */
     rows: () => pinned.slice(),
@@ -424,7 +453,7 @@ export function createTally({ admitMs = 2000, minHoldMs = 400, slots = 6 } = {})
       return out;
     },
     held: () => live,
-    admitMs,
+    times,
     slots,
   };
 }

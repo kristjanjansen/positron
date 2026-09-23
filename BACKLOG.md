@@ -1,5 +1,79 @@
 ## Open
 
+### Found 2026-09-23, NOT FIXED, reported from the deploy: Rhodes does not sound from MIDI
+
+🔴 **REPORTED IN THESE WORDS:** *"turing rjodes on and pressing midi does not
+enable rhodes sound"*, with *"backlog"* attached, so it is written and not
+worked.
+
+**What is known without touching it.** `/nola/` has two instruments behind
+`INSTRUMENT`, `piano` and `rhodes`, 65 `rhodes-*.m4a` recordings, and a measured
+make-up gain per pack (`PIANO_PEAK 0.097`, `RHODES_PEAK 0.9981`, about 20 dB
+apart). The page reads the instrument ONCE at the top of `press()` and carries it
+as a local, because there is an `await` under that line.
+⚠️ **AND THE REPORT IS SPECIFICALLY ABOUT MIDI**, which is the path no harness
+here can drive: `verify.mjs` presses screen keys. So a fault that lives between a
+MIDI note arriving and the sample starting is invisible to every check on the
+page, and `/nola/` is green at 72/72 while this is true.
+⚠️ **THE FIRST THING TO SEPARATE IS WHICH HALF IS SILENT**: whether the Rhodes
+buffers were never fetched, or were fetched and the voice is built against the
+piano's gain. The page logs what it loads, so the log says which before anything
+is opened.
+⚠️ **AND THE INSTRUMENT SWITCH HAS A KNOWN SHAPE OF BUG NEARBY.** Reading `inst`
+after an await lets a switch during a fetch decide the level of a note that
+started before it, which is why it is read once as a local. A MIDI note arriving
+during the first Rhodes fetch is exactly that race from the other side.
+
+### Asked 2026-09-23, DONE 2026-09-23: the piano roll's look, four small asks while playing it
+
+🔴 **ASKED IN THESE WORDS, WHILE TRYING IT:** *"rm italic from piano roll"*,
+*"rm 'maybe next'"*, *"fade 'ai row' subtly. when i play it, rm fading"*, and
+*"As written: Exact"*.
+
+The proposal row is `--ai` with no italic, its label is the chord name and
+nothing else, and it sits at `opacity: .62` until the chord is under your fingers,
+when it goes to 1.
+⚠️ **THE FADE IS ASSERTED AS A COMPUTED OPACITY EITHER SIDE OF THE CHORD GOING
+DOWN**, because a transition written in a stylesheet and a rule that never wins
+look identical in the source. It reads 0.62, then 1, then 0.62.
+✅ **AND UNFADING ON A FULL MATCH RATHER THAN A PARTIAL ONE IS A CHOICE**: the
+dots already go faint yellow while you reach for it, so the row coming forward is
+the arrival rather than the reaching.
+
+### Asked 2026-09-23, doing now: a chord is saved because it came BACK, not because it was held
+
+🔴 **ASKED IN THESE WORDS:** *"just monitor what i play and save repeating
+ones"*, which is the original ask said again and more plainly: *"the ones i keep
+returning to add them to piano roll"*.
+
+**What shipped an hour ago and why it is not this.** `LEARN_ADMIT = 2000` is
+TOTAL time held across every visit, so a chord you keep returning to does
+accumulate. What it does not require is a return at all: **one long hold admits**,
+and holding one chord while you think is the commonest thing a pair of hands
+does. So the page currently saves chords you rested on as readily as chords you
+came back to, and those are opposite facts about a player.
+
+✅ **THE GATE BECOMES A COUNT OF VISITS, WITH THE TIME FLOOR KEPT AS WHAT MAKES A
+VISIT REAL.** Two separate holds, each past `LEARN_GATE` (400 ms). The floor is
+the half the research measured and must not be dropped: raw event count put a
+PASSING chord in the top four of a synthetic session, and what separated the loop
+chords from the passing ones was that you stay when you arrive. **Count the
+arrivals, but only count an arrival you stopped at.**
+⚠️ **AND THE RESEARCH'S WARNING IS ABOUT COUNT ALONE, WHICH THIS IS NOT.** It
+measured raw count and visit count both failing, on data where the gap between
+held and passing was a factor of ten BY CONSTRUCTION, and it said so. Count plus a
+floor is strictly better than either, and the honest sentence is that nobody has
+played any of it.
+⚠️ **TWO RATHER THAN THREE**, because *repeating* in the plainest reading is
+played, left, and played again, and three visits before anything appears makes a
+mode that looks broken for its first minute. This is a judgement, it is written
+here so it can be argued with, and it is one constant.
+
+⚠️ **IT CHANGES WHEN ADMISSION HAPPENS, NOT ONLY WHETHER.** A time threshold is a
+timer; a visit count lands the moment the qualifying hold passes the floor. So
+`dueAt` is `since + minHoldMs` on the last needed visit rather than a countdown,
+and the page's log line about holding a chord for two seconds stops being true.
+
 ### Asked 2026-09-23, doing now: a half played chord shows faint yellow dots
 
 🔴 **ASKED IN THESE WORDS:** *"when partial match with piano roll chord use faint

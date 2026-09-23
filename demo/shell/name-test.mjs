@@ -441,15 +441,18 @@ const session = (() => {
 
 // 25. A full list says so rather than evicting.
 {
-  const t = createTally({ admitMs: 100, slots: 2 });
+  const t = createTally({ slots: 2 });
+  /* Each one arrived at twice, because two arrivals is what admits now. */
   for (const [i, key] of ['0:maj', '7:maj', '9:min'].entries()) {
-    t.hold(key, i * 1000);
-    t.release(i * 1000 + 500);
+    for (const visit of [0, 1]) {
+      t.hold(key, i * 2000 + visit * 800);
+      t.release(i * 2000 + visit * 800 + 500);
+    }
   }
-  const r = t.check(4000);
+  const r = t.check(9000);
   ok('a full list refuses a new chord out loud rather than dropping an old one',
     t.rows().length === 2 && r.full === true && r.sayFull === true
-    && t.check(5000).sayFull === false,
+    && t.check(10000).sayFull === false,
     `${t.rows().join(' ')} held, and it says it is full once rather than every time`);
 }
 
@@ -457,7 +460,7 @@ const session = (() => {
 //     page sets one timeout at `max(0, dueAt - now)` and nothing runs while
 //     somebody is looking at a page and not playing it.
 {
-  const t = createTally({ admitMs: 2000 });
+  const t = createTally({ times: 2, minHoldMs: 400 });
   t.hold('0:maj', 1000);
   /* ⚠️ READ BEFORE THE NEXT HOLD, not inside the assert. The first version of
      this check called `dueAt` from the assert expression, which runs after
@@ -466,10 +469,30 @@ const session = (() => {
   const first = t.dueAt(1000), mid = t.dueAt(2500);
   t.release(3100);
   t.hold('0:maj', 4000);
-  ok('the tally says when the chord under the fingers would cross, so nothing polls',
-    first === 3000 && mid === 3000 && t.dueAt(4000) === 4400,
-    `a first hold from 1000 crosses at ${first}, and after 2100 ms are banked the gate `
-    + `is what is left, so a second hold from 4000 crosses at ${t.dueAt(4000)}`);
+  const second = t.dueAt(4000);
+  /* 🔴 THE FIRST ARRIVAL HAS NO DUE TIME AT ALL, and that is the change from a
+     total to a count said as a number. No amount of holding admits a chord you
+     have only arrived at once: you have to let go and come back. The second
+     arrival is due the moment it passes the floor. */
+  ok('a first arrival never falls due however long it is held, and the second does at the floor',
+    first === null && mid === null && second === 4400,
+    `a first hold from 1000 is due at ${first} and still ${mid} at 2500, and a second `
+    + `hold from 4000 is due at ${second}`);
+}
+
+// 27. And the count is of ARRIVALS YOU STAYED AT, which is the floor doing the
+//     work the research says it has to do.
+{
+  const t = createTally({ times: 2, minHoldMs: 400 });
+  for (let i = 0; i < 6; i++) { t.hold('0:maj', i * 1000); t.release(i * 1000 + 100); }
+  const passing = t.check(9000).admitted.length;
+  t.hold('7:maj', 20000); t.release(20500);
+  t.hold('7:maj', 22000); t.release(22500);
+  const stayed = t.check(23000).admitted.length;
+  ok('NEGATIVE CONTROL: six passes through a chord admit nothing, two real arrivals admit it',
+    passing === 0 && stayed === 1 && t.rows().join(' ') === '7:maj',
+    `six holds of 100 ms admitted ${passing}, two holds of 500 ms admitted ${stayed}, `
+    + `and the list reads ${t.rows().join(' ') || 'nothing'}`);
 }
 
 console.log(`\n${pass} ok, ${fail} failed`);
