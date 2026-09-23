@@ -1,0 +1,119 @@
+THE RHODES ON THIS PAGE IS JEFF LEARMAN'S RECORDING OF HIS OWN PIANO
+=====================================================================
+
+The 65 files named `rhodes-<midi>-<layer>.m4a` in this directory are made from
+jRhodes3d, a sample set by Jeff Learman.
+
+    Author      Jeff Learman
+    Instrument  a 1977 Rhodes Mark I Stage 73, his own, bought new in 1978 and
+                recorded around 2006 directly from the harp connector
+    Source      https://github.com/sfzinstruments/jlearman.jRhodes3d
+                the `jRhodes3d-mono` directory, 65 FLAC files, 22,884,538 bytes
+    Taken       2026-09-23
+    Licence     Creative Commons Attribution NonCommercial ShareAlike 4.0
+                https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+positron.studio is a personal research site and nothing on it is sold, which is
+what the NonCommercial term permits.
+
+
+THESE ARE NOT HIS FILES
+=======================
+
+Every file here is a DERIVATIVE and none of them is what he published. What was
+done to each one, by `demo/resources/fetch-jrhodes3d.mjs`, which is in this
+repository and rebuilds all 65 from the source with one command:
+
+    capped    at 4 seconds, rounded down to a whole AAC frame
+    faded     out over the last 8 ms so a cut note does not click
+    re-encoded from 44.1 kHz 16 bit mono FLAC to AAC in m4a at 96 kbps mono
+    renamed   by MIDI note number and velocity layer
+
+Nothing was equalised, compressed, normalised, pitch shifted or level adjusted.
+The audio is his, shorter and through a codec.
+
+SHARE ALIKE: these derivatives carry the same licence as the originals, CC
+BY-NC-SA 4.0. Anyone taking them on from here takes them on under that.
+
+`PROVENANCE-rhodes.json`, beside this file, records every source file, its byte
+count, its duration, its peak, and the bytes and duration of what came out.
+
+
+WHAT THE UPSTREAM LICENCE ACTUALLY SAYS, WHICH IS THREE THINGS
+==============================================================
+
+The label above is the strictest of the three statements the author's own files
+make, because it is the only one that satisfies all of them. They are quoted
+here in full rather than reconciled, so a reader can check.
+
+1. The repository's own `LICENSE` file, in full:
+
+    License for samples: CC BY-NC
+    License for everything else: CC0
+    License for musicians using this to make music: CC0
+
+    Details:
+
+    This sample set is provided free for use as a musical instrument.
+    You can use the sounds in any way in your works as an artist,
+    just as you could with a real instrument.
+
+    To distribute the samples themselves, such as in an application, software
+    instrument, or as a sample set, the jRhodes samples are licensed under
+    CC BY-NC 4.0. To view a copy of this license, visit
+    https://creativecommons.org/licenses/by-nc/4.0 .
+
+        BY: Credit must be given to the creator.
+        NC: Only noncommercial use of the work is permitted.
+
+    To use the samples in a commercial product, please contact me and I will be
+    happy to grant a license.
+
+    jjlearman@gmail.com
+
+    Control files and example clips are in the public domain using CC0:
+    "To the extent possible under law, Jeffrey Learman has waived all copyright
+    and related or neighboring rights to jRhodes control files and example clips.
+    This work is published from: United States."
+
+2. The header of `jRhodes3d-mono.sfz`, the control file in the same repository,
+   which drops the NonCommercial term and adds ShareAlike:
+
+    // license: CC-SA-BY: Creative Commons Share Alike with Attribution
+    // comment: Free to use in your music without share-alike or attribution
+
+3. The index at `sfzinstruments.github.io/pianos/`, which lists this set as
+   `CC-BY-NC-4.0` and the looped set jRhodes3c as `CC-BY-NC-SA-4.0`.
+
+Serving the samples from a web page is distribution of the samples themselves,
+which is the case his second paragraph names, so the artist grant in his first
+paragraph is not the one that applies here and the NonCommercial term is.
+Labelling these derivatives BY-NC-SA rather than BY-NC is a deliberate choice to
+be stricter than the file requires under the reading that is most favourable to
+this project, and it is what every one of the three statements above permits.
+
+He invites a different licence in writing and has granted one before, a bespoke
+CC BY-SA to the Strudel project. Nobody has written to him about this. His
+address is in the licence he published.
+
+`research/rhodes-packs-2026-09-23.md` sections 2 and 3 survey the whole question,
+including a fourth statement in another of his repositories that reads CC0.
+
+
+HIS OWN WORDS ABOUT THE RECORDING
+=================================
+
+From `README.md` in the same repository, because a visitor hearing this should
+know what it is and what it is not:
+
+    jRhodes3 is my sampling of my 1977 Rhodes Mark I Stage 73 electric piano,
+    which I purchased new back in 1978. [...] It was recorded with EQ, with a
+    treble boost and low-mid scoop, emphasizing the bell tones, and with
+    substantial bark on the higher velocity layers.
+
+    This is not intended to be the authentic original unprocessed Rhodes; it's
+    intended to be what I wanted the Rhodes to sound like most of the time.
+
+    I lost the original sample recordings in a home fire, but fortunately I did
+    have distribution copies of the original looped and unlooped soundfont files,
+    and these sample sets are recreated from them.
