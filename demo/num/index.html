@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 THIS PAGE IS A WORKBENCH FOR ONE INTERACTION AND NOTHING ELSE. Asked
+     2026-09-23: *"can make a separate tmp demo too get it right 'num'"*, after
+     *"use numpad from evo: when i press a number the loop rec stars until i prss
+     same number again it starts looping. third click stops, fourth plays again
+     erc. dubleclick clrears"*.
+     ⚠️ SO THERE IS NO AUDIO, NO ROLL AND NO CHORDS ON IT. What is being got
+     right is a four state machine with ten instances and a timing window in it,
+     and every one of those is easier to see with nothing else moving.
+     ⚠️ AND THE PAD GRID IS `/evo/`'s, WHICH IS THE POINT OF BUILDING IT HERE:
+     the same `createPadGrid` in the same three by four telephone layout, so what
+     is learned here transfers to the panel without a second drawing. */
+  .num-wrap { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .num-pad { display: flex; flex-direction: column; gap: 8px; }
+
+  /* 🔴 ONE COLOUR PER STATE, AND THE STATE IS ON THE PAD RATHER THAN BESIDE IT.
+     A looper is played by looking at your hands, so a legend in the corner is a
+     legend nobody reads. `--rec` is this project's record ink and is the one
+     control that starts writing; `--ok` is playing; a stopped slot keeps its
+     edge and loses its fill, which says *there is something here and it is
+     silent* rather than *there is nothing here*. */
+  .num-pad .pos-pad[data-st="recording"] {
+    background: color-mix(in srgb, var(--rec) 38%, var(--card));
+    border-color: var(--rec);
+  }
+  .num-pad .pos-pad[data-st="looping"] {
+    background: color-mix(in srgb, var(--ok) 30%, var(--card));
+    border-color: var(--ok);
+  }
+  .num-pad .pos-pad[data-st="stopped"] {
+    background: var(--card); border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+  }
+  /* ⚠️ THE TOUCH LAMP IS NOT A STATE, which is why it is an outline and not a
+     fill: it says *this page heard you* during the window where the transport
+     has deliberately not decided yet. */
+  .num-pad .pos-pad[data-touch] { outline: 1px solid var(--hi); outline-offset: -3px; }
+
+  .num-side { display: flex; flex-direction: column; gap: 10px; min-width: 210px; }
+  .num-line { font: 400 11.5px/1.6 var(--mono); color: var(--dim); }
+  .num-line b { color: var(--fg); font-weight: 600; }
+  .num-walk { font: 400 11px/1.7 var(--mono); color: var(--dim2); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { createPadGrid } from '/shell/pad.mjs';
+  import { createNumLoop, NEXT } from '/shell/numloop.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+
+  const ONE = 'ten numbers, each one a loop you record, play, stop and throw away with the same key';
+
+  const d = mount({
+    name: 'num',
+    what: ONE,
+    /**
+     * ⚠️ FOUR CELLS, AND NONE OF THEM IS A CONSTANT. `live` and `empty` are a
+     * census of what is on screen, `waiting` is the thing this page exists to
+     * make visible, and `window` is the one number the whole feel turns on.
+     * ⚠️ AND NOTHING PRINTS `0` BEFORE IT HAS HAPPENED. A census of a pad that
+     * is visibly empty is a real reading; `waiting` starts blank because no
+     * press has been judged yet.
+     */
+    readout: { live: '', empty: '', waiting: '', window: 'ms' },
+  });
+
+  /* 🔴 `/evo/`'s OWN LAYOUT, TYPED THE SAME WAY. A telephone keypad is `1 2 3`
+     on top and `0` at the bottom between two others, and the commonest mistake
+     available is drawing `0` first because that is where it sits in a loop. */
+  const MINUS = '−';
+  const KEYPAD = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], [MINUS, '0', '+']];
+  /** face -> slot, so ten keys drive ten machines and the two brackets drive none */
+  const SLOT = new Map();
+  KEYPAD.flat().filter((f) => /\d/.test(f)).forEach((f, i) => SLOT.set(f, i));
+
+  const DOUBLE_MS = Number(new URLSearchParams(location.search).get('double')) || 250;
+
+  const wrap = el('div', 'num-wrap');
+  const padBox = el('div', 'num-pad');
+  const side = el('div', 'num-side');
+
+  const say = el('div', 'num-line');
+  const walk = el('div', 'num-walk');
+  walk.textContent = Object.entries(NEXT)
+    .map(([from, to]) => `${from} → ${to}`).join('\n');
+  walk.style.whiteSpace = 'pre';
+  side.append(say, walk);
+
+  const padOf = new Map();
+  const grid = createPadGrid({
+    cols: 3, rows: 4,
+    pad: (x, y) => {
+      const face = KEYPAD[y][x];
+      const digit = /\d/.test(face);
+      return {
+        label: face, half: false, latch: false, disabled: !digit,
+        tint: 'var(--fg)',
+        aria: digit ? `loop ${face}` : `${face}`,
+        title: digit
+          ? `loop ${face}. Press to record, again to loop, again to stop, again to `
+            + 'play. Press twice quickly to throw it away'
+          : 'not a loop key on this bench',
+      };
+    },
+    /* ⚠️ `(on, x, y, self)`, WHICH IS THE GRID'S ORDER AND NOT THE PAD'S. Getting
+       it wrong reads `KEYPAD[undefined][undefined]` and throws on every press,
+       which is what it did. */
+    onPress: (on, x, y) => {
+      const face = KEYPAD[y][x];
+      if (!SLOT.has(face)) return;
+      loop.press(SLOT.get(face));
+    },
+  });
+  KEYPAD.forEach((row, y) => row.forEach((face, x) => {
+    if (SLOT.has(face)) padOf.set(SLOT.get(face), grid.at(x, y));
+  }));
+  padBox.append(grid.el);
+  wrap.append(padBox, side);
+  d.stack.add(wrap);
+
+  /* ⚠️ THE LAMP IS SET ON THE TOUCH AND THE FILL ON THE STATE, which is the
+     whole of what `onTouch` is for: a page that painted only on `onEnter` would
+     look dead for a quarter of a second on every press, and a page that painted
+     the STATE on the touch would be lying about a transport that has not
+     decided. */
+  const paint = () => {
+    for (const [i, pad] of padOf) {
+      const st = loop.state(i);
+      if (st === 'empty') delete pad.button.dataset.st; else pad.button.dataset.st = st;
+      if (loop.pending(i)) pad.button.dataset.touch = '1';
+      else delete pad.button.dataset.touch;
+    }
+    const states = loop.states();
+    d.set('live', states.filter((s) => s === 'recording' || s === 'looping').length);
+    d.set('empty', states.filter((s) => s === 'empty').length);
+    d.set('waiting', states.map((_, i) => i).filter((i) => loop.pending(i)).length);
+    d.set('window', DOUBLE_MS);
+  };
+
+  const loop = createNumLoop({
+    doubleMs: DOUBLE_MS,
+    onTouch: () => paint(),
+    onEnter: (i, st, { was }) => {
+      paint();
+      const face = [...SLOT.entries()].find(([, s]) => s === i)?.[0] ?? String(i);
+      say.innerHTML = `<b>${face}</b> went ${was} to ${st}`;
+      d.log(`${face}: ${was} to ${st}`);
+    },
+  });
+  paint();
+  d.set('waiting', '');
+
+  d.log(`press a number to record, the same number again to loop it, again to stop, `
+      + `again to play. Press twice inside ${DOUBLE_MS} ms to throw it away. `
+      + 'Open with ?double=120 to try a shorter window');
+
+  /* ── what only this page can say ─────────────────────────────────────── */
+  ifSelfcheck();
+
+  function ifSelfcheck() {
+    if (!SELFCHECK) { d.ready(); return; }
+    run().then(() => d.ready());
+  }
+
+  async function run() {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const hit = (face) => padOf.get(SLOT.get(face)).button.click();
+    const stOf = (face) => padOf.get(SLOT.get(face)).button.dataset.st || 'empty';
+
+    /* 🔴 THE PAD IS PRESSED RATHER THAN THE MACHINE CALLED, which is the only
+       way this page can fail differently from `numloop-test.mjs`. That file
+       already grades the arithmetic with no browser; what is left for a page to
+       say is that the pads are wired to it at all and that the drawing follows. */
+    d.assert('the ten digits drive ten loops and the two brackets drive none',
+      padOf.size === 10 && SLOT.size === 10
+        && grid.el.querySelectorAll('.pos-pad').length === 12,
+      `${padOf.size} loop keys of ${grid.el.querySelectorAll('.pos-pad').length} pads`);
+
+    hit('1');
+    const lamp = padOf.get(SLOT.get('1')).button.dataset.touch;
+    d.assert('a press lights the key at once, before the transport has decided',
+      lamp === '1' && stOf('1') === 'empty',
+      `the lamp is ${lamp ? 'on' : 'off'} and the state is still ${stOf('1')}`);
+
+    await sleep(DOUBLE_MS + 120);
+    d.assert('and the transport commits once the double press window has passed',
+      stOf('1') === 'recording' && !padOf.get(SLOT.get('1')).button.dataset.touch,
+      `key 1 reads ${stOf('1')}`);
+
+    hit('1'); await sleep(DOUBLE_MS + 120);
+    const looping = stOf('1');
+    hit('1'); await sleep(DOUBLE_MS + 120);
+    const stopped = stOf('1');
+    hit('1'); await sleep(DOUBLE_MS + 120);
+    d.assert('the same key walks record, loop, stop and play again',
+      looping === 'looping' && stopped === 'stopped' && stOf('1') === 'looping',
+      `${looping}, then ${stopped}, then ${stOf('1')}`);
+
+    /* 🔴 THE TRAP, DRIVEN THROUGH THE PAD. Two clicks inside the window must
+       clear and must not walk the machine on the way, and the page is where a
+       `click` really fires twice. */
+    hit('2'); hit('2');
+    await sleep(DOUBLE_MS + 120);
+    d.assert('two quick presses throw a loop away rather than recording one',
+      stOf('2') === 'empty',
+      `key 2 reads ${stOf('2')} after a double press on an empty key`);
+
+    hit('3'); await sleep(DOUBLE_MS + 120);
+    hit('3'); await sleep(DOUBLE_MS + 120);
+    const before = stOf('3');
+    hit('3'); hit('3'); await sleep(DOUBLE_MS + 120);
+    d.assert('and two quick presses on a running loop empty it',
+      before === 'looping' && stOf('3') === 'empty',
+      `${before} then ${stOf('3')}`);
+
+    /* ⚠️ THE NEGATIVE HALF, and it is what makes this a looper rather than a
+       transport: ten machines that do not know about each other. */
+    hit('4'); await sleep(DOUBLE_MS + 120);
+    d.assert('NEGATIVE CONTROL: one number does not touch another',
+      stOf('4') === 'recording' && stOf('1') === 'looping' && stOf('2') === 'empty',
+      `4 ${stOf('4')}, 1 ${stOf('1')}, 2 ${stOf('2')}`);
+
+    d.assert('the readout counts what is on the pad rather than what was pressed',
+      Number(d.api.readout.live) === 2 && Number(d.api.readout.empty) === 8,
+      `${d.api.readout.live} live, ${d.api.readout.empty} empty`);
+
+    /* 🔴 AND THE COST IS MEASURED RATHER THAN DESCRIBED. Every single press is
+       late by the window, because the machine cannot know a press was single
+       until it has passed. This is the number to argue with. */
+    const t0 = performance.now();
+    hit('5');
+    await new Promise((r) => {
+      const check = () => (stOf('5') !== 'empty' ? r() : setTimeout(check, 5));
+      check();
+    });
+    const late = performance.now() - t0;
+    d.assert('a single press costs the double press window before it takes effect',
+      late >= DOUBLE_MS && late < DOUBLE_MS + 200,
+      `${late.toFixed(0)} ms from the click to the state, against a ${DOUBLE_MS} ms window`);
+  }
+</script>
+</html>

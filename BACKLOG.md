@@ -1,5 +1,43 @@
 ## Open
 
+### Asked 2026-09-23, doing now: a `Looped` mode on `/nola/`, driven by `/evo/`'s numpad
+
+🔴 **ASKED IN THESE WORDS:** *"Add second mode 'Looped' (move typed to third)"* and
+*"use numpad from evo: when i press a number the loop rec stars until i prss same
+number again it starts looping. third click stops, fourth plays again erc.
+dubleclick clrears. can make a separate tmp demo too get it right 'num'"*.
+
+**The state machine, read off that sentence and written down before anything is
+built, because it is the whole feature:**
+
+| press | from | to |
+| --- | --- | --- |
+| 1st | empty | RECORDING |
+| 2nd | recording | LOOPING |
+| 3rd | looping | STOPPED |
+| 4th | stopped | LOOPING |
+| double | any | empty |
+
+⚠️ **AND IT IS ONE MACHINE PER NUMBER**, ten of them, independent. That is what
+makes it a looper rather than a transport: pressing 3 while 1 is looping does not
+stop 1.
+🔴 **A DOUBLE PRESS IS TWO SINGLE PRESSES PLUS A CLEAR, AND THAT IS THE TRAP.**
+The browser fires `click` twice before `dblclick`, so a naive wiring runs the
+state machine twice on the way to clearing and a double press on an empty slot
+would start recording and then stop it. The machine has to hold a press until the
+double press window has passed, which makes every single press LATE by that
+window, and on a looper that is the one thing you can feel. Whether that is
+acceptable is the first thing `/num/` exists to find out.
+
+✅ **BUILT AS `/num/` FIRST, ASKED FOR IN THOSE WORDS.** A page with the numpad and
+nothing else: no audio, no roll, no chords. The arithmetic goes in a module graded
+with no browser at all, the way `looper.mjs` and `name.mjs` already are, because a
+transport with four states and ten instances is exactly the shape that is cheap to
+grade and expensive to debug through a page.
+⚠️ **AND `/nola/`'s PICKER GAINS A THIRD OPTION, WHICH MOVES EVERY CHECK THAT
+PRESSES IT BY INDEX.** `Suggested, Looped, Typed`, and `modePick.buttons[1]` stops
+meaning `Typed`.
+
 ### Found 2026-09-23, not fixed: `/circuit/`'s printed names sit 20 px lower than their sides
 
 🔴 **`node demo/verify.mjs circuit` READS 33/34**, red on `the printed names sit the

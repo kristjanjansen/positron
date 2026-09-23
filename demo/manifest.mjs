@@ -628,6 +628,22 @@ export const DEMOS = [
    * flat), every release a note on at velocity 0, a seven bit pitch wheel in a
    * fourteen bit message, and six controller numbers for eight knobs.
    */
+  /**
+   * 🔴 A BENCH FOR ONE INTERACTION, ASKED FOR IN THOSE WORDS. 2026-09-23: *"can
+   * make a separate tmp demo too get it right 'num'"*, about a looper driven
+   * from `/evo/`'s numpad that is meant to land on `/nola/` as a third mode.
+   * ⚠️ SO IT IS DELIBERATELY NOT AN INSTRUMENT. No audio, no roll, no chords:
+   * what is being got right is a four state machine with ten instances and a
+   * timing window, and `demo/shell/numloop.mjs` holds that with
+   * `numloop-test.mjs` grading it in no browser at all.
+   * ⚠️ AND IT MAY NOT SURVIVE. It was asked for as a temporary one, so when the
+   * mode lands this row is a candidate for `built: false` or for going
+   * altogether, and the module it proved is the part that stays.
+   */
+  { name: 'num', group: 'instruments', act: 4, created: '2026-09-23', built: true,
+    one: 'ten numbers, each one a loop you record, play, stop and throw away with the same key',
+    tags: ['transport'] },
+
   { name: 'evo', group: 'hardware', act: 4, created: '2026-09-21', built: true,
     one: 'an Evolution MK-425C on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
