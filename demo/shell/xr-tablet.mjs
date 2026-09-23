@@ -212,7 +212,7 @@ const SLIDERS = DEFAULT_CONTROLS.filter((c) => !isButton(c));
 //   shell.css `.sld-head`   column · gap 4px  ← the value UNDER the label,
 //                           which changed today; the old side-by-side is gone
 //   shell.css `.sld-lane:focus-visible`
-//                           outline 2px solid --hi · outline-offset 1px
+//                           outline 1px solid --hi · outline-offset 1px
 //   shell.css `.sld-group`  row gap 10px
 //
 //   shell.css `button, .pos-btn`
@@ -227,11 +227,16 @@ const SLIDERS = DEFAULT_CONTROLS.filter((c) => !isButton(c));
 //                           stylesheet and it IS `--bg`, so the token is what
 //                           gets read below — one value, still live.
 //   shell.css `:focus-visible`
-//                           outline 2px solid --hi · outline-offset 2px
+//                           outline 1px solid --hi · outline-offset 2px
 //                           ⚠️ TWO px OF OFFSET, NOT ONE. `.sld-lane` overrides
 //                           the root rule for the lane only; a button gets the
 //                           root one, so the two rings genuinely differ and the
 //                           row has to be tall enough for the larger.
+//                           🔴 AND BOTH WIDTHS WENT 2 px TO 1 px ON 2026-09-23,
+//                           when every ring on the site did. The OFFSETS did
+//                           not move, so the button is still the taller of the
+//                           two and the row is still sized on it. What changed
+//                           is the row: 208 design pixels to 200.
 //
 // ⚠️ `button:hover { border-color: --dim2 }` WAS READ AND DELIBERATELY NOT
 // USED. In a headset the ray is hover and focus at the same instant, so
@@ -255,12 +260,12 @@ const KIT = {
   labelPx: 9.5 * K,
   labelTrack: 0.1,        // em
   valuePx: 12 * K,
-  ring: 2 * K,            // .sld-lane:focus-visible outline-width
+  ring: 1 * K,            // .sld-lane:focus-visible outline-width
   ringOffset: 1 * K,      // .sld-lane:focus-visible outline-offset
   btnH: 34 * K,           // button height
   btnPadX: 14 * K,        // button padding, each side
   btnPx: 13 * K,          // button font size
-  btnRing: 2 * K,         // :focus-visible outline-width
+  btnRing: 1 * K,         // :focus-visible outline-width
   btnRingOffset: 2 * K,   // :focus-visible outline-offset
 };
 
@@ -309,9 +314,10 @@ const PAD = 48;
 // rather than as a control with the pointer on it.
 const RING_OUT = KIT.ringOffset + KIT.ring;
 // ⚠️ AND THE BUTTON'S RING IS THE BIGGER ONE. `.sld-lane` overrides the root
-// `:focus-visible` offset down to 1px; a button keeps the root's 2px. Four
-// design pixels, and they are the difference between a ring with air round it
-// and a ring touching the row above.
+// `:focus-visible` offset down to 1px; a button keeps the root's 2px. The two
+// widths are equal since 2026-09-23, so the whole difference is now the offset:
+// four design pixels, and they are the difference between a ring with air round
+// it and a ring touching the row above.
 const BTN_RING_OUT = KIT.btnRingOffset + KIT.btnRing;
 // The row's content is whichever is taller: the two columns of a slider row, or
 // the button plus its larger ring.
@@ -922,7 +928,7 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
     g.stroke();
 
     // 🔴 THE RAY'S FEEDBACK IS THE SITE'S OWN FOCUS RING, NOT A BIGGER KNOB.
-    // `shell.css`: `.sld-lane:focus-visible { outline: 2px solid var(--hi);
+    // `shell.css`: `.sld-lane:focus-visible { outline: 1px solid var(--hi);
     // outline-offset: 1px }`. A knob that swelled past its lane was tried and
     // it read as a drawing fault — the handle is the same height as the lane
     // by design, so anything taller looks like it has come loose. The ring is

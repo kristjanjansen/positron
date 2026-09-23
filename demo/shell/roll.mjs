@@ -59,30 +59,33 @@ import { placeKey } from './keyboard.mjs';
  */
 export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new Set(),
                                    rows = [], prepend = false, scroller = null,
-                                   onPick = null } = {}) {
+                                   onPick = null, lines = true } = {}) {
   const el = document.createElement('div');
   el.className = 'roll';
   /**
-   * 🔴 THE WHITE KEY RULES WERE BUILT, LOOKED AT AND REMOVED, ALL IN ONE HOUR,
-   * AND THE RECORD OF THAT IS WORTH MORE THAN THE FEATURE WAS. Asked with the
-   * doubt attached: *"add faint vertical lines to indicate white key separatoes
-   * to piano roll. make this rollbackablge (not sure how good idea)"*, then
-   * *"make vertical lines on pianoroll continuous"*, then *"no continous
-   * vertical bars on pianoroll!"*.
-   * ✅ THE DOUBT WAS RIGHT AND THE ROLLBACK COST ONE ATTRIBUTE AND ONE RULE,
-   * which is the whole reason it was built that way. The argument against them
-   * is the one written down before they were drawn: the roll's columns already
-   * line up with the keys under it, so a rule at every white key division says
-   * a second time what the instrument says once, and a lane carrying four dots
-   * and fifteen lines is mostly lines.
-   * ⚠️ IT IS NOTED HERE RATHER THAN DELETED SILENTLY, so the next person who
-   * thinks a dot is hard to trace down to a key knows it has been tried.
+   * 🔴 FAINT RULES WHERE THE WHITE KEYS DIVIDE, AND THE HISTORY IS THE LESSON.
+   * Asked for with a doubt attached: *"add faint vertical lines to indicate
+   * white key separatoes to piano roll. make this rollbackablge (not sure how
+   * good idea)"*. Then *"make vertical lines on pianoroll continuous"*, which
+   * was done by closing the row gap. Then *"no continous vertical bars on
+   * pianoroll!"*, WHICH WAS READ HERE AS `remove them` AND MEANT `they are
+   * still not continuous`, so they were deleted. Then, four words: *"you lost
+   * vertical lines on piano roll"*.
+   * ⚠️ THE MISTAKE IS WORTH MORE THAN THE FEATURE. A report with no verb is
+   * ambiguous, and the reading that DESTROYS work is the one to check before
+   * acting on it. Asking would have cost one line.
+   * ✅ AND THE ROLLBACK SWITCH STAYS, because it is what made the round trip
+   * cost one attribute both ways. `lines: false` turns them off.
    */
+  if (lines) el.dataset.lines = '1';
 
   let at = base;
   let current = rows;
   /** which row is picked, or -1. A redraw forgets it: the rows are new rows. */
   let picked = -1;
+  /** which row Tab would land on. Never -1 while there are rows, or the roll
+   *  falls out of the tab order entirely and cannot be reached at all. */
+  let focused = 0;
   /**
    * The seam a glued roll draws between itself and the keys.
    *
@@ -122,6 +125,12 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
       const r = document.createElement('button');
       r.type = 'button';
       r.className = 'roll-row';
+      /* 🔴 ONE TAB STOP FOR THE WHOLE ROLL, NOT ONE PER ROW. `table.mjs`
+         already refuses the alternative for a sixty-three row list, where
+         tabbing past it costs sixty-three presses, and a line of chords is only
+         short today. The roving tabindex is the standard answer: exactly one
+         row is reachable by Tab and the arrows move between them. */
+      r.tabIndex = i === focused ? 0 : -1;
       const lane = document.createElement('div');
       lane.className = 'roll-lane';
       let whites = 0;
@@ -224,6 +233,36 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
    * ⚠️ `passive`, because this never calls `preventDefault` and a listener that
    * might would put itself in the way of the platform's own scrolling.
    */
+  /**
+   * 🔴 THE ARROWS MOVE AND ENTER PICKS, WHICH IS NOT THE SAME KEY DOING BOTH.
+   * Asked 2026-09-23: *"make pianoroll naigatable with keyboard"*. `table.mjs`
+   * learned this the expensive way on `/making/`: an arrow that moved the
+   * SELECTION called `onPick` per row, and that page's `onPick` fetches a
+   * picture off a bucket, so a held-down arrow pulled sixty-three files nobody
+   * asked to see. Moving focus is free; picking is a decision and gets its own
+   * key. A row is a `button`, so Enter and Space already pick it and nothing
+   * here has to handle them.
+   * ⚠️ AND IT IS ON THE ROLL RATHER THAN ON EACH ROW, so the listener count
+   * does not grow with the music.
+   */
+  const moveFocus = (to) => {
+    const rows = [...el.children];
+    if (!rows.length) return;
+    focused = Math.max(0, Math.min(rows.length - 1, to));
+    rows.forEach((r, i) => { r.tabIndex = i === focused ? 0 : -1; });
+    rows[focused].focus();
+  };
+  el.addEventListener('keydown', (e) => {
+    const rows = [...el.children];
+    if (!rows.length) return;
+    const at = rows.indexOf(document.activeElement);
+    if (at < 0) return;
+    const go = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: rows.length - 1 }[e.key];
+    if (go === undefined) return;
+    e.preventDefault();          // or the page scrolls under the arrows
+    moveFocus(go);
+  });
+
   const follow = scroller ? () => {
     el.scrollLeft = scroller.scrollLeft;
     /* ⚠️ AND THE PICKED ROW'S GROUND IS AS WIDE AS THE KEYS' OWN CONTENT.
@@ -241,7 +280,15 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
     el,
     /** Replace every row. The whole picture is redrawn, which is cheap and has
      *  no state to get wrong: a roll is a function of its rows. */
-    setRows(next) { current = next || []; picked = -1; draw(); follow?.(); },
+    setRows(next) {
+      current = next || [];
+      picked = -1;
+      /* ⚠️ AND THE LANDING ROW COMES BACK TO THE TOP. The rows are new rows, so
+         a remembered index would point at a chord nobody typed. */
+      focused = 0;
+      draw();
+      follow?.();
+    },
     /**
      * Pick a row from the page, or -1 for none.
      *
@@ -289,6 +336,9 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
         if (same) r.dataset.held = '1'; else delete r.dataset.held;
       });
     },
+    /** Move the keyboard's landing row, for a page's own check. */
+    focus: (i) => moveFocus(i),
+    focused: () => focused,
     /** every drawn dot, as element -> note, for a page's own check */
     dotsOf: () => new Map(noteOfDot),
     /** Put the rows where the keys are, for a page whose check moved the row. */

@@ -669,7 +669,7 @@ export const DEMOS = [
    * ⚠️ NO `settleMs`. The page has no control row at all, so its checks run at
    * load behind `SELFCHECK` and `verify.mjs` waits on the assert count.
    */
-  { name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true,
+  { name: 'nola', group: 'hardware', act: 4, created: '2026-09-22', built: true,
     one: 'a piano and a 1977 Rhodes you play from one MIDI keyboard, '
        + 'with a line of chords drawn out above the keys',
     tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },
@@ -689,8 +689,9 @@ export const DEMOS = [
    * ⚠️ NO `settleMs`. Every control is an async handler, so `verify.mjs` waits
    * for `data-busy` to clear rather than for a number somebody guessed.
    */
-  { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
-    one: 'a synthesiser you type in, compiled to machine code in this tab in about ten milliseconds',
+  { name: 'fau', group: 'hardware', act: 4, created: '2026-09-23', built: true,
+    one: 'a synthesiser you type in, compiled to machine code in this tab '
+       + 'a moment after you stop typing',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
 
   { name: 'able', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',

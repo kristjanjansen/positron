@@ -78,6 +78,53 @@
    * and it is the shape a Faust instrument takes anyway: a per-voice `process`
    * and one `effect` after the mixer.
    *
+   * 🔴 4. AN AUTOCOMPILE THAT FIRES UNDER A HELD NOTE TAKES THE NOTE AWAY.
+   * Asked 2026-09-23 as *"autocompile on cerain interval / inactivity"*, and
+   * the two halves of that ask are not equally safe. A compile blocks the
+   * thread it runs on, builds a WHOLE NEW `AudioWorkletNode` and calls
+   * `pedal.forgetKeys()`, so an INTERVAL fires in the middle of a word being
+   * typed and in the middle of a chord being held. This page compiles when
+   * typing has STOPPED for `AUTO_IDLE_MS`, and then only while nothing is
+   * sounding: the timer re-arms every `AUTO_HOLD_MS` for as long as a finger or
+   * the pedal is holding anything, so the new instrument arrives after the last
+   * note has been let go rather than instead of it.
+   * ⚠️ AND IT IS OFF UNDER `SELFCHECK`. A compile nobody asked for, landing
+   * between an assert and the reading it is about, is a check grading a
+   * different page. The check block switches it on for a window of its own and
+   * off again, which is also the only way it is graded at all.
+   *
+   * ── THE PANEL, THE SWITCH AND `custom` ─────────────────────────────────────
+   *
+   * 🔴 THE INSTRUMENT IS A `createInstrument` CASE AND NOT A ROW OF BUTTONS.
+   * Asked 2026-09-23: *"create instument panel, fau on top right, below the
+   * textarea (edge to edge), below it footer with on/off"*. The nameplate is
+   * the case's own, printed at the top right; the text box is the whole of the
+   * strip under it; and the footer is that component's glued header at
+   * `at: 'foot'`, which is the same seam a transport bar has over the strip it
+   * drives. Nothing here is drawn by this page.
+   *
+   * 🔴 `custom` IS THE ANSWER TO THE OBJECTION THAT MADE THE PRESETS BUTTONS,
+   * RATHER THAN A REVERSAL OF IT. The argument written here until 2026-09-23
+   * was that a picker shows which one is SELECTED, and that the first thing
+   * anybody does is edit the text, at which point a lit `Organ` is a control
+   * describing something that no longer exists. Every word of that still holds.
+   * `custom` is the fourth state that answers it: a keystroke that moves the
+   * text off a preset moves the selector into it, and typing back to a preset's
+   * exact source moves the selector back.
+   * ⚠️ NOBODY CAN PICK IT. It is not in the platform's list. While it is
+   * showing, the invisible `<select>` has NOTHING selected, so choosing the
+   * preset that was loaded a moment ago still fires a change rather than being
+   * swallowed as "no change".
+   *
+   * 🔴 AND THE SWITCH IS NOW THE ONLY THING THAT OPENS ANYTHING. `on` fetches
+   * the compiler, compiles the patch in the box and asks for Web MIDI. Those
+   * were three separate presses, and one of them was not a press at all:
+   * `createMidi` asks the browser for access the moment it is built, so this
+   * page was asking every visitor about a MIDI keyboard before they had touched
+   * it. A visit now fetches nothing, compiles nothing, builds no AudioContext
+   * and asks for no MIDI, and the first two of those are asserted against the
+   * browser's own record rather than a counter this page keeps.
+   *
    * ── WHAT THIS PAGE DELIBERATELY DOES NOT DO ────────────────────────────────
    *
    * 🔴 NO PATCH ARRIVES FROM ANYWHERE. Not over the relay, not from a room, not
@@ -112,6 +159,8 @@
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC } from '/shell/pedal.mjs';
   import { createField } from '/shell/field.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+  import { createInstrument } from '/shell/instrument.mjs';
+  import { createPicker } from '/shell/picker.mjs';
 
   const q = new URLSearchParams(location.search);
 
@@ -275,9 +324,33 @@ process = pm.djembe_ui_MIDI <: _, _;
 effect  = _, _;
 `,
     },
+    {
+      /* 🔴 THE FOURTH, ADDED 2026-09-23 BECAUSE THE ASK SAID SO: *"patch
+         selector holds organ and rhodes (add more)"*. It is the Rhodes with one
+         number changed and it sounds nothing like it, which is the cheapest
+         thing this page can show a visitor about the language: `3.51` is not a
+         whole multiple of the note, so the partials it adds belong to no
+         harmonic series and the ear hears metal instead of a piano. */
+      id: 'bell',
+      label: 'Bell',
+      what: 'the same three lines as the Rhodes at a ratio that is not a whole number',
+      code: `import("stdfaust.lib");
+
+freq = hslider("freq", 440, 40, 8000, 0.01);
+gain = hslider("gain", 0.5, 0, 1, 0.01);
+gate = button("gate");
+
+strike = os.osc(freq * 3.51) * en.ar(0.001, 0.35, gate) * 2.0;
+env    = en.ar(0.002, 2.2, gate);
+
+process = os.osc(freq + strike * freq * 0.03) * env * gain * 0.25 <: _, _;
+effect  = _, _;
+`,
+    },
   ];
 
-  const ONE = 'a synthesiser you type in, compiled to machine code in this tab in about ten milliseconds';
+  const ONE = 'a synthesiser you type in, compiled to machine code in this tab '
+            + 'a moment after you stop typing';
 
   const d = mount({
     name: 'fau',
@@ -285,7 +358,14 @@ effect  = _, _;
     // paragraph beside a picture of the same machinery is the weaker of the two.
     what: ONE,
     /**
-     * Six cells, and every one of them moves.
+     * Four cells, and every one of them moves.
+     *
+     * 🔴 IT WAS SIX UNTIL 2026-09-23 AND IT LOST `sounding` AND `pedal holds`,
+     * ASKED FOR TWICE IN ONE STREAM: *"rm slounding / pedal holds"*, then
+     * *"rm sounding / pedal holds from readings"*. Four is still EVEN, which
+     * `mount()` throws on failing, and the cut cost no asserts: every check
+     * about the foot reads `pedal.held()` directly rather than reading the cell
+     * it used to print in, which was checked rather than assumed.
      * ⚠️ `compiler` IS DELIBERATELY NOT A CELL. `2.89.2` never changes, and a
      * cell showing a constant reads as a measurement and teaches the reader to
      * ignore the row. It is in the diagram's `libfaust` box, where a fact that
@@ -299,27 +379,39 @@ effect  = _, _;
       source: 'B',
       'machine code': 'B',
       'per voice': 'KB',
-      sounding: '',
-      'pedal holds': '',
     },
     /**
-     * 🔴 THE PRESETS ARE BUTTONS AND NOT A SEGMENTED CHOICE, WHICH IS A
-     * DECISION ABOUT LYING RATHER THAN ABOUT LAYOUT. A picker shows WHICH ONE
-     * IS SELECTED, and the first thing anybody does here is edit the text. At
-     * that point a lit `Organ` segment is a control reading as live while
-     * describing something that no longer exists. Loading a preset is an
-     * action, so it is a button, and after a keystroke there is nothing on
-     * screen claiming otherwise.
-     * ⚠️ AND EVERY ONE OF THEM IS IN `.pos-controls`, WHICH THE HARNESS PRESSES
-     * IN ORDER. So three presets and a compile are exercised for real on every
-     * run, on top of the checks that drive them deliberately.
+     * 🔴 ONE CONTROL, AND IT IS DISABLED UNTIL THE INSTRUMENT IS SWITCHED ON.
+     * The presets were four buttons in this row until 2026-09-23 and they are
+     * the patch selector in the panel's footer now, which is where the ask put
+     * them. What is left in `.pos-controls` is the one verb that is neither a
+     * patch nor a power state.
+     * ⚠️ AND A DISABLED CONTROL IS A CHECK THE HARNESS CANNOT REACH, which
+     * `positron-verify` measured on two pages in one day. It is accounted for
+     * here: the check block compiles by calling `build()` itself, so nothing
+     * behind this button is graded only by a press, and the switch it depends
+     * on is pressed for real rather than called.
      */
     controls: [
-      ...PRESETS.map((p) => ({ id: p.id, label: p.label })),
       { id: 'compile', label: 'Compile', primary: true },
     ],
   });
   guard(d);
+
+  /**
+   * 🔴 WHAT EACH CELL HAS EVER SHOWN, BECAUSE "EVERY CELL CAN MOVE" IS A CLAIM
+   * AND NOT A STYLE NOTE. A cell printing a constant reads as a measurement and
+   * teaches a reader to ignore the row, which is why this page has no `compiler`
+   * cell. The only way to say a cell moves is to remember what it has held, so
+   * every write goes through here and the check reads the sets at the end.
+   * ⚠️ THE KEYS COME OFF `d.api.readout` RATHER THAN BEING TYPED AGAIN. A list
+   * of cells written twice is a list that will disagree with itself.
+   */
+  const moved = new Map(Object.keys(d.api.readout).map((k) => [k, new Set()]));
+  function setCell(k, v) {
+    moved.get(k)?.add(String(v));
+    d.set(k, v);
+  }
 
   /* ── what a visit costs, counted off the browser's own record ──────────────
      🔴 NOT MY OWN COUNTER. `plan-fau.md` §10.4 asks for "a visit compiles
@@ -351,7 +443,12 @@ effect  = _, _;
   // has touched.
   let ctx = null, master = null, meter = null, node = null;
   function audio() {
-    if (ctx) return ctx;
+    /* 🔴 THE RESUME IS OUTSIDE THE ONCE-ONLY HALF, because a context is
+       suspended by more than its own creation: a tab in the background
+       suspends one, and so does a switch-off if this page ever grows one. It
+       used to sit beside `new AudioContext`, where it ran exactly once in the
+       life of the page and could never bring a stopped one back. */
+    if (ctx) { ctx.resume?.(); return ctx; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain();
     master.gain.value = 0.9;
@@ -455,10 +552,21 @@ effect  = _, _;
 
   let compiles = 0, lastName = '';
   /**
+   * 🔴 A SECOND COUNTER, AND IT IS NOT `compiles`. That one is part of the
+   * NAME a compile is given, so a pinned compile deliberately does not touch
+   * it and two runs can share a number. `runs` counts times this function was
+   * entered, whatever it was called and whether or not the source parsed, and
+   * it is what the autocompile checks read: a claim about when a compile
+   * happened has to be measured on a compile rather than on the timer that was
+   * supposed to cause one.
+   */
+  let runs = 0;
+  /**
    * Compile what is in the box and put it on the audio thread.
    * @returns {Promise<{ok: boolean, ms: number, bytes: number, size: number, error?: string}>}
    */
   async function build(code, name, pin = '') {
+    runs++;
     const { compiler, FaustPolyDspGenerator } = await bootCompiler();
     const gen = new FaustPolyDspGenerator();
     /* 🔴 A FRESH NAME PER COMPILE, BECAUSE libfaust CACHES A FACTORY BY NAME
@@ -481,7 +589,7 @@ effect  = _, _;
       /* 🔴 THE OLD INSTRUMENT KEEPS PLAYING. A failed compile must not take the
          sound away: the visitor typed something that does not parse, and a page
          that went silent would have punished them for a typo. */
-      d.set('compile', ms.toFixed(0));
+      setCell('compile', ms.toFixed(0));
       d.log(`that did not compile: ${error}`, 'bad');
       return { ok: false, ms, bytes: 0, size: 0, error };
     }
@@ -508,12 +616,11 @@ effect  = _, _;
        never been told about any key, so anything the old one was holding is
        gone whatever the page thinks. */
     pedal.forgetKeys();
-    showVoices();
 
     lastName = uniq;
-    d.set('compile', ms.toFixed(0));
-    d.set('machine code', bytes);
-    d.set('per voice', (meta.size / 1024).toFixed(1));
+    setCell('compile', ms.toFixed(0));
+    setCell('machine code', bytes);
+    setCell('per voice', (meta.size / 1024).toFixed(1));
     d.log(`${name} compiled in ${ms.toFixed(0)} ms into ${bytes} bytes of machine code, `
         + `${(meta.size / 1024).toFixed(1)} KB a voice, ${VOICES} voices`, 'hi');
     if (!meta.ui || !JSON.stringify(meta.ui).includes('gate')) {
@@ -524,16 +631,28 @@ effect  = _, _;
   }
 
   // ── the text ───────────────────────────────────────────────────────────────
+  //
+  // 🔴 TYPING AND SETTING ARE TWO DIFFERENT EVENTS AND ONLY ONE OF THEM ARMS
+  // ANYTHING. `onType` is a person at the keyboard: it re-counts the bytes,
+  // moves the patch selector to `custom` if the text has left its preset, and
+  // starts the idle timer. `showSource()` is the page writing into its own box,
+  // which happens every time a patch is loaded, and arming an autocompile there
+  // would schedule a second compile of what was just compiled.
   const source = createField({
     label: 'FAUST',
     grow: 'wide',
     rows: 12,
     code: true,
     value: PRESETS[0].code,
-    onInput: showSource,
+    onInput: onType,
   });
   function showSource() {
-    d.set('source', new TextEncoder().encode(source.value()).length);
+    setCell('source', new TextEncoder().encode(source.value()).length);
+  }
+  function onType() {
+    showSource();
+    matchPatch();
+    armAuto();
   }
 
   // ── the keys ───────────────────────────────────────────────────────────────
@@ -609,75 +728,264 @@ effect  = _, _;
       /* The DSP owns how fast a note dies, so the damper time `pedal.mjs` hands
          over is deliberately dropped here. See the header. */
       node?.keyOff(0, note, 0);
-      showVoices();
     },
     onPedal: (down, value, freed) => {
       d.log(down ? PEDAL_SAYS.down : (freed ? PEDAL_SAYS.freed(freed) : PEDAL_SAYS.up));
       d.log(PEDAL_SAYS.raw(pedal.cc, value, down));
-      showVoices();
     },
   });
 
+  /** How many notes this page believes are being held, by hand or by foot. */
+  const holding = () => pedal.fingers() + pedal.held();
 
   function press(note, vel = 100) {
-    if (!node) { d.log('nothing is compiled yet, so press a preset or COMPILE'); return; }
+    if (!node) { d.log('nothing is on the audio thread, so switch FAU on'); return; }
     pedal.keyDown(note);
     node.keyOn(0, note, vel);
     keys.lightNote?.(note, true);
-    showVoices();
   }
   function lift(note) {
     pedal.keyUp(note);                 // it decides whether that is a release
     keys.lightNote?.(note, false);
-    showVoices();
   }
   function allOff() {
     try { node?.allNotesOff?.(true); } catch { /* nothing sounding */ }
     pedal.panic();
-    showVoices();
-  }
-  function showVoices() {
-    d.set('sounding', pedal.fingers() + pedal.held());
-    d.set('pedal holds', pedal.held());
   }
 
   // ── a MIDI keyboard, if there is one ───────────────────────────────────────
-  const midi = createMidi({
-    /* Both roads call the same two functions, which is what keeps the key that
-       lights and the note that sounds the same key. */
-    onDown: (note, vel) => press(note, vel || 100),
-    onUp: (note) => lift(note),
-    onControl: (cc, value) => {
-      if (!pedal.control(cc, value)) return;
-      keys.sustain.set(pedal.down(), true);
-    },
-    log: d.log,
+  //
+  // 🔴 BUILT BY THE SWITCH, NOT BY THE PAGE. `createMidi` asks the browser for
+  // access the moment it is constructed, and it was constructed at load until
+  // 2026-09-23, so a visit to this page asked a question about a MIDI keyboard
+  // that nobody here had pressed anything to deserve. It is the same rule as
+  // the 6 MB download beside it, in a thing that costs no bytes: a visit opens
+  // nothing.
+  let midi = null;
+  function startMidi() {
+    if (midi) return midi;
+    midi = createMidi({
+      /* Both roads call the same two functions, which is what keeps the key
+         that lights and the note that sounds the same key. */
+      onDown: (note, vel) => press(note, vel || 100),
+      onUp: (note) => lift(note),
+      onControl: (cc, value) => {
+        if (!pedal.control(cc, value)) return;
+        keys.sustain.set(pedal.down(), true);
+      },
+      log: d.log,
+    });
+    return midi;
+  }
+
+  // ── the patch selector, and the fourth state ───────────────────────────────
+  //
+  // See the header for why `custom` exists and why it is not in the list.
+  const CUSTOM = 'custom';
+  const patch = createPicker({
+    label: 'patch',
+    what: 'patch',
+    prev: () => stepPatch(-1),
+    next: () => stepPatch(+1),
+    onPick: (i) => loadPatch(i),
   });
+  patch.options(PRESETS.map((p) => p.label), 0);
+
+  /** Which preset is in the box, or -1 for text that is nobody's preset. */
+  let picked = 0;
+  /** The last real preset, so the arrows have somewhere to step FROM in custom. */
+  let lastPatch = 0;
+
+  function showPatch(i) {
+    picked = i;
+    if (i >= 0) { lastPatch = i; patch.show(PRESETS[i].label, i); return; }
+    patch.show(CUSTOM);
+    /* 🔴 NOTHING SELECTED IN THE PLATFORM'S LIST WHILE THE TEXT IS THE
+       VISITOR'S, AND IT IS NOT DECORATION. A `<select>` fires `change` only
+       when the selection MOVES, so leaving `Organ` selected under the word
+       `custom` would make choosing Organ again do nothing at all. That is the
+       one gesture somebody in custom is most likely to make. */
+    patch.select.selectedIndex = -1;
+  }
+  /** Does the text still say exactly what a preset says? */
+  function matchPatch() {
+    const now = source.value();
+    const i = PRESETS.findIndex((p) => p.code === now);
+    if (i !== picked) showPatch(i);
+  }
+  function stepPatch(n) {
+    const from = picked >= 0 ? picked : lastPatch;
+    loadPatch((from + n + PRESETS.length) % PRESETS.length);
+  }
+
+  /**
+   * Put a preset in the box, and compile it if the instrument is on.
+   *
+   * 🔴 TWO FUNCTIONS FOR ONE ACTION, AND THE SPLIT IS THE QUEUE. `loadPatch` is
+   * what a control calls and it takes a turn on the compile queue; `applyPatch`
+   * is the work, and it is what the check block calls, because a task that
+   * waits on another task in the same queue is a deadlock and the symptom is a
+   * page that never becomes ready. `build()` is split the same way and for the
+   * same reason.
+   */
+  async function applyPatch(i) {
+    const p = PRESETS[i];
+    source.set(p.code);
+    showSource();
+    showPatch(i);
+    d.log(`${p.label}: ${p.what}`);
+    if (!powered) return { ok: false, off: true };
+    return build(p.code, p.label.toLowerCase());
+  }
+  const loadPatch = (i) => serial(() => applyPatch(i));
+
+  // ── compiling when the typing stops ────────────────────────────────────────
+  //
+  // See the header: inactivity rather than an interval, and never under a held
+  // note.
+  /** How long the typing has to have stopped. Long enough to cross a pause for
+   *  thought mid-line, short enough that nobody waits for it on purpose. */
+  const AUTO_IDLE_MS = 800;
+  /** And how often it looks again while something is sounding. A re-arm rather
+   *  than a full idle wait, so the new instrument arrives just after the last
+   *  key comes up rather than a second later. */
+  const AUTO_HOLD_MS = 150;
+  /**
+   * 🔴 OFF UNDER `SELFCHECK`, AND THE CHECK BLOCK TURNS IT ON FOR ITS OWN
+   * WINDOW. A compile nobody asked for, landing between an assert and the
+   * reading it is about, grades a page that is not the one on screen.
+   */
+  let autoOn = !SELFCHECK;
+  let autoTimer = 0;
+  /**
+   * 🔴 A COUNTER OF AUTOCOMPILES, WHICH IS NOT `runs` AND NOT A TIMER.
+   * `runs` counts every compile from every road, so an assert reading it could
+   * be satisfied, or broken, by the harness pressing COMPILE at the wrong
+   * moment. This only moves when an autocompile reaches `build`, which is the
+   * far side of every decision this feature makes: the idle wait, the held-note
+   * re-arm and the queue.
+   */
+  let autos = 0;
+  function armAuto() {
+    clearTimeout(autoTimer);
+    if (!autoOn || !powered) return;
+    autoTimer = setTimeout(fireAuto, AUTO_IDLE_MS);
+  }
+  function fireAuto() {
+    if (!autoOn || !powered) return;
+    /* A compile builds a new node and forgets every key, so one that fires
+       under a chord takes the chord away. It waits instead. */
+    if (holding()) { autoTimer = setTimeout(fireAuto, AUTO_HOLD_MS); return; }
+    serial(async () => { autos++; return build(source.value(), 'typing'); });
+  }
+
+  // ── the switch ─────────────────────────────────────────────────────────────
+  //
+  // 🔴 ONE PRESS DOES THE THREE THINGS THAT USED TO BE THREE PRESSES: it pulls
+  // the compiler, compiles what is in the box, and looks for a MIDI keyboard.
+  // ⚠️ AND IT IS AWAITABLE FROM OUTSIDE. `createPresenceButton`'s handler does
+  // not await anything, so the page keeps the promise: a check that pressed the
+  // switch and then read the page would otherwise be reading it 6 MB early.
+  let powered = false;
+  let powerJob = Promise.resolve();
+
+  function togglePower() {
+    powerJob = powered ? powerOff() : powerOn();
+    return powerJob;
+  }
+
+  async function powerOn() {
+    if (powered) return;
+    powered = true;
+    paintPower(true);
+    d.log(`switching on: the compiler is ${(COMPILER_BYTES / 1e6).toFixed(2)} MB and this is `
+        + `the press that pulls it`);
+    try {
+      await bootCompiler();
+      await applyPatch(picked >= 0 ? picked : lastPatch);
+      startMidi();
+    } catch (e) {
+      /* A switch that says it is on while nothing arrived is the lying control
+         this project has a rule about, so it goes back off with the reason. */
+      powered = false;
+      paintPower(false);
+      d.log(`switching on failed: ${String(e?.message || e)}`, 'bad');
+    }
+  }
+
+  async function powerOff() {
+    powered = false;
+    clearTimeout(autoTimer);
+    allOff();
+    if (node) {
+      try { node.allNotesOff?.(true); } catch { /* it is going away anyway */ }
+      node.disconnect();
+      node.destroy?.();
+      node = null;
+    }
+    midi?.close();
+    midi = null;
+    paintPower(false);
+    /* 🔴 THE CONTEXT IS LEFT RUNNING ON PURPOSE. Suspending it freezes the
+       analyser, which then keeps handing back the last window it measured, so a
+       check asking "is this silent now" would read the sound that was playing a
+       moment ago and believe it. With nothing connected to the master the
+       context is already silent, and the meter keeps saying so honestly. */
+    d.log('switched off: there is nothing on the audio thread now');
+  }
+
+  function paintPower(on) {
+    inst.online.set(on ? 'online' : 'offline');
+    const b = d.button('compile');
+    if (b) b.disabled = !on;
+  }
 
   // ── the page ───────────────────────────────────────────────────────────────
-  const row = el('div', 'fau-row');
-  row.append(source.el);
-  d.el.append(row);
+  //
+  // 🔴 THE CASE IS `createInstrument` AND THE FOOTER IS ITS HEADER AT THE FOOT.
+  // `/muta/` is the other caller of that arrangement. The plate stays with the
+  // CASE rather than moving into the bar (`plate: false`), which is what puts
+  // `FAU` at the top right instead of at the bottom of the panel, where a name
+  // is read after the thing it names.
+  // ⚠️ `side: null` AND `flow: false`, BOTH FOR ONE REASON: there is exactly one
+  // thing in this instrument and it is the text. A fixed column holds what must
+  // stay put while the rest scrolls, and a flow stacks rows; one text box needs
+  // neither, and `.panel-flow` is `width: max-content`, which on a textarea is
+  // its `cols` attribute and would draw this program about twenty characters
+  // wide. That is the exact box the row this panel replaced was written to
+  // avoid, and its one line survives in the stylesheet below.
+  const inst = createInstrument({
+    name: 'FAU',
+    maker: '',
+    host: d.el,
+    header: {
+      at: 'foot',
+      plate: false,
+      online: { of: 'FAU', state: 'offline', press: () => togglePower() },
+      patch: patch.el,
+    },
+    panel: { side: null, flow: false, cls: { panel: 'fau-panel' } },
+  });
+  inst.add(source.el);
 
   d.el.append(keysHost);
 
+  /* 🔴 THE GUARD IS INSIDE THE QUEUED TASK, NOT ON THE BUTTON. Disabling the
+     control stops a press being MADE while the instrument is off; it does
+     nothing about a press already queued behind a compile when the switch goes
+     off underneath it, which is exactly the order a check runs in. A compile
+     that built a node onto a page saying it was off would be the lying control
+     this project keeps writing rules about, arriving from the one direction a
+     `disabled` attribute cannot see. */
   d.on('compile', () => serial(async () => {
+    if (!powered) { d.log('FAU is off, so there is nothing to compile onto'); return null; }
     const r = await build(source.value(), 'your source');
     return r;
   }));
-  for (const p of PRESETS) {
-    d.on(p.id, () => serial(async () => {
-      source.set(p.code);
-      showSource();
-      d.log(`${p.label}: ${p.what}`);
-      await build(p.code, p.label.toLowerCase());
-    }));
-  }
 
   showSource();
-  d.set('sounding', 0);
-  d.set('pedal holds', 0);
-  d.log(`nothing is fetched until you press something. The first press pulls the Faust `
+  paintPower(false);
+  d.log(`nothing is fetched until you switch FAU on. That press pulls the Faust `
       + `compiler, ${(COMPILER_BYTES / 1e6).toFixed(2)} MB, once`);
 
   // ── the picture ────────────────────────────────────────────────────────────
@@ -771,9 +1079,22 @@ effect  = _, _;
        nothing, which is what `/nola/` measured on 2026-09-23. */
     d.assert('a visit fetches no compiler at all, counted off what the browser really loaded',
       vendorLoads().length === 0, `${vendorLoads().length} files from the vendor directory`);
+    /* 🔴 THE NEGATIVE CONTROL BESIDE IT, AND IT IS FOUR SEPARATE COSTS. Nothing
+       is compiled, no sound device is open, nobody has been asked about a MIDI
+       keyboard, and the one control that could start any of it refuses to be
+       pressed. A page that fetched nothing while quietly doing the other three
+       would pass the assert above. */
+    d.assert('and a page nobody has switched on compiles nothing, opens no sound device and '
+           + 'asks for no MIDI',
+      runs === 0 && node === null && ctx === null && midi === null
+        && d.button('compile').disabled === true,
+      `${runs} compiles, node ${node ? 'built' : 'none'}, audio ${ctx ? 'open' : 'none'}, `
+      + `MIDI ${midi ? 'asked' : 'not asked'}, COMPILE ${d.button('compile').disabled ? 'off' : 'on'}`);
     d.assert('the box opens with a whole instrument in it, and the readout counts its bytes',
       Number(d.api.readout.source) === new TextEncoder().encode(PRESETS[0].code).length,
       `${d.api.readout.source} B`);
+    d.assert('the readout is the four cells the ask left it with, which is an even count',
+      Object.keys(d.api.readout).length === 4, Object.keys(d.api.readout).join(', '));
     d.assert('nothing cut and nothing refused in the picture', dg.cuts.length === 0,
       dg.cuts.map((c) => c.full).join(', ') || 'nothing');
     d.assert('the only headless line in the picture is the one joining a set', dg.ties === 1,
@@ -791,6 +1112,110 @@ effect  = _, _;
       `${wasBytes} B became ${d.api.readout.source} B`);
     source.set(PRESETS[0].code);
     showSource();
+
+    /* ── the patch selector's fourth state ─────────────────────────────────
+       🔴 DRIVEN BY A REAL `input` EVENT, NOT BY CALLING THE HANDLER. What is
+       being claimed is that TYPING moves the selector, and a check that calls
+       `onType()` itself grades the function rather than the wiring between the
+       textarea and it. `positron-verify` records the same thing about a meter
+       gated on intent: drive the gesture.
+       ⚠️ AND IT ALL HAPPENS WHILE THE INSTRUMENT IS OFF, so it costs nothing:
+       nothing here compiles, which is also the second reading of the assert
+       above. */
+    const typeInto = (text) => {
+      source.input.value = text;
+      source.input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    /* ⚠️ WHAT THE CONTROL DRAWS, NOT WHAT THIS PAGE BELIEVES. `picked` is the
+       page's own idea and would agree with itself whatever the control showed,
+       which is two numbers from one field. `createPicker` publishes `show()`
+       and not what it is showing, so the drawn name is read off the
+       component's own class. `createNameplate` grew a `shown()` for exactly
+       this reason and the picker has not; it is worth one line in the kit and
+       is not this page's to add today. */
+    const patchSays = () => patch.el.querySelector('.pos-pick-n')?.textContent;
+    const wasSaying = patchSays();
+    typeInto(`${PRESETS[0].code}\n// and the check typed this\n`);
+    d.assert('a keystroke moves the patch selector to custom, because a lit Organ would be '
+           + 'naming something that is no longer in the box',
+      patchSays() === CUSTOM && picked === -1 && patch.select.selectedIndex === -1,
+      `${wasSaying} became ${patchSays()}, with nothing selected in the list under it`);
+    /* The other half. A selector that said `custom` whatever it was shown would
+       pass the assert above, so it has to be able to come back. */
+    await applyPatch(0);
+    d.assert('and loading a preset again takes it off custom, having compiled nothing to do it',
+      patchSays() === PRESETS[0].label && picked === 0 && runs === 0,
+      `${patchSays()} selected, ${runs} compiles`);
+
+    /* ── the switch, pressed rather than called ────────────────────────────
+       🔴 A REAL CLICK ON THE REAL CONTROL. Calling `powerOn()` would grade the
+       function and say nothing about the button in the panel's footer being
+       wired to it, which is the half a visitor touches. `positron-verify`
+       records a page whose checks went silent the day a control was disabled,
+       and the opposite mistake is this one: a check that never presses.
+       ⚠️ AND IT IS AWAITED THROUGH `powerJob`, because the presence button's
+       own handler does not await anything. Reading the page straight after the
+       click would be reading it 6 MB early. */
+    const beforeOn = runs;
+    inst.online.el.click();
+    await powerJob;
+    d.assert('the switch is the one press that fetches the compiler, compiles the patch in the '
+           + 'box and reaches for MIDI',
+      inst.online.state() === 'online' && node !== null && runs === beforeOn + 1
+        && midi !== null && vendorLoads().length === 4
+        && d.button('compile').disabled === false,
+      `${inst.online.state()}, ${runs - beforeOn} compile, MIDI ${midi?.state()}, `
+      + `${vendorLoads().length} vendor files, COMPILE ${d.button('compile').disabled ? 'off' : 'on'}`);
+
+    /* ── the autocompile, and the two things it must never do ──────────────
+       🔴 IT IS SWITCHED ON HERE AND OFF AGAIN, because the default under
+       `SELFCHECK` is off and has to stay off: a compile nobody asked for,
+       landing between an assert and the reading it is about, grades a page that
+       is not the one on screen. This window is the only time it runs in a
+       harness, and it is the only reason the feature is graded at all.
+       ⚠️ MEASURED ON `autos`, WHICH ONLY AN AUTOCOMPILE MOVES. `runs` counts
+       every compile from every road, so a COMPILE press arriving from the
+       harness in the middle of this would break an assert about a feature it
+       has nothing to do with. */
+    autoOn = true;
+    const autoBefore = autos;
+    /* Three keystrokes 500 ms apart is 1.2 s of typing, which is longer than
+       `AUTO_IDLE_MS`. An interval would have fired inside it and an idle timer
+       that is not re-armed on every keystroke would have fired too. */
+    typeInto(`${PRESETS[0].code}\n// one\n`);
+    await sleep(500);
+    typeInto(`${PRESETS[0].code}\n// one two\n`);
+    await sleep(500);
+    typeInto(`${PRESETS[0].code}\n// one two three\n`);
+    await sleep(200);
+    d.assert('typing does not compile in the middle of a word, however long the typing goes on',
+      autos === autoBefore,
+      `${autos - autoBefore} autocompiles in 1.2 s of typing, past a ${AUTO_IDLE_MS} ms wait`);
+    await sleep(AUTO_IDLE_MS + 400);
+    d.assert('and exactly one compile lands once the typing has stopped',
+      autos === autoBefore + 1, `${autos - autoBefore} autocompile after the keys went quiet`);
+
+    /* 🔴 THE ONE WITH THE TRAP IN IT. A compile builds a whole new
+       `AudioWorkletNode` and calls `pedal.forgetKeys()`, so an autocompile
+       under a held chord takes the chord away, and the visitor's own typing is
+       what caused it. */
+    const heldBefore = autos;
+    press(60, 100);
+    await sleep(120);
+    const heldLevel = level();
+    typeInto(`${PRESETS[0].code}\n// typed while a key was down\n`);
+    await sleep(AUTO_IDLE_MS + 400);
+    d.assert('an autocompile waits while a note is being held, because building a new node '
+           + 'takes the note away',
+      autos === heldBefore && level() > heldLevel * 0.5,
+      `${autos - heldBefore} autocompiles, ${heldLevel.toFixed(5)} held, `
+      + `${level().toFixed(5)} still sounding`);
+    lift(60);
+    await sleep(AUTO_HOLD_MS + 600);
+    d.assert('and it lands as soon as the key comes up, rather than waiting out another silence',
+      autos === heldBefore + 1, `${autos - heldBefore} autocompile after the key came up`);
+    autoOn = false;
+    clearTimeout(autoTimer);
 
     /* ── from here on it costs the compiler, and it is ONE task on the queue ──
        🔴 EVERYTHING BELOW RUNS INSIDE `serial`, AND NOT ONE `serial` PER
@@ -934,11 +1359,58 @@ effect  = _, _;
       drum.size < first.size / 100, `${(drum.size / 1024).toFixed(1)} KB against `
       + `${(first.size / 1024).toFixed(1)} KB`);
 
+    /* 🔴 EVERY PRESET IN THE LIST, WHICH IS THE ONLY THING THAT CATCHES ONE
+       THAT DOES NOT COMPILE. The checks above name three of the four by index,
+       and the fourth arrived with the ask that said *"(add more)"*: nothing in
+       this block would have compiled it, so a preset that does not parse would
+       have shipped and the first person to find out would be a visitor picking
+       it. A list is exactly where a broken member hides. */
+    const each = [];
+    for (const p of PRESETS) {
+      const r = await build(p.code, p.label.toLowerCase());
+      each.push(`${p.label} ${r.ok ? `${r.bytes} B` : `FAILED, ${r.error}`}`);
+    }
+    d.assert('every preset in the selector compiles, including the ones no other check names',
+      each.every((s) => !s.includes('FAILED')), each.join(', '));
+
     /* Put the page back the way a visitor should find it. */
     await build(PRESETS[0].code, 'organ');
     source.set(PRESETS[0].code);
     showSource();
+    showPatch(0);
     });
+
+    /* ── switching it off, which is the negative control for switching it on ──
+       🔴 OUTSIDE THE QUEUE, because `powerOff` is not a queued task and a check
+       that waited for one from inside another would deadlock. What makes this
+       safe against the harness's own COMPILE press is the guard inside that
+       handler rather than the `disabled` attribute on the button: a press
+       queued while the instrument was on arrives after this and finds it off. */
+    inst.online.el.click();
+    await powerJob;
+    press(60, 100);
+    await sleep(400);
+    d.assert('switching it off takes the instrument off the audio thread, and then a key does '
+           + 'nothing at all',
+      inst.online.state() === 'offline' && node === null && midi === null && level() < 0.002
+        && d.button('compile').disabled === true,
+      `${inst.online.state()}, node ${node ? 'still built' : 'gone'}, `
+      + `${level().toFixed(5)} after pressing a key`);
+
+    /* 🔴 EVERY CELL HAS MOVED BY NOW OR ONE OF THEM IS A CONSTANT. This is the
+       only assert on the page that can say a readout row is worth looking at,
+       and it is read off what was written rather than off what is on screen now:
+       a cell's CURRENT value says nothing about whether it has ever changed. */
+    const stuck = [...moved].filter(([, seen]) => seen.size < 2).map(([k]) => k);
+    d.assert('every cell in the readout took more than one value, so none of them is a constant '
+           + 'wearing a measurement\'s clothes',
+      stuck.length === 0,
+      [...moved].map(([k, seen]) => `${k} ${seen.size}`).join(', '));
+
+    /* And back on, so a person opening this page with the checks running finds
+       an instrument rather than the wreckage of one. */
+    inst.online.el.click();
+    await powerJob;
   }
 
   ifSelfcheck(checks, { log: d.log,
@@ -953,12 +1425,15 @@ effect  = _, _;
 </script>
 
 <style>
-  /* The text and the keys are the page. Both take the whole width rather than
-     sharing a row with anything: a program in a half-width box fits about
-     twenty characters, which is less than one line of Faust. */
-  .fau-row { display: flex; }
-  .fau-row .pos-field { flex: 1 1 100%; }
-
+  /* 🔴 THE TEXT TAKES THE WHOLE PANEL, WHICH IS WHAT `edge to edge` IN THE ASK
+     MEANS AND IS NOT WHAT A PANEL DOES BY DEFAULT. `.panel-strip` is a flex row
+     whose children keep their own width, because the panels this component was
+     written for are as wide as the instrument they draw and the strip is what
+     scrolls. Here the instrument IS the text, so the one child grows to the
+     case instead. A program in a box that fits about twenty characters is less
+     than one line of Faust, which is why the plain row this replaced carried
+     the same single line. */
+  .fau-panel .panel-strip > .pos-field { flex: 1 1 100%; min-width: 0; }
 
   /* A row of keys wider than the page scrolls itself rather than dragging the
      page sideways. `min-width: 0` is what lets a flex child shrink below its
