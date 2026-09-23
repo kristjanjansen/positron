@@ -747,18 +747,41 @@
    * ⚠️ IT IS STILL NOT A VISIT. Nothing here runs on load: the page opens on the
    * piano and `warmUp` is reached only from `setInstrument`, which only a press
    * calls.
-   * ⚠️ AND IT WARMS WHAT THE KEYS CAN REACH, not the whole pack. The window is
-   * 25 keys, which is six of the Rhodes's fifteen recorded notes.
+   * 🔴 AND IT WARMED THE WRONG WINDOW, WHICH IS WHY THE REPORT CAME BACK A THIRD
+   * TIME AS *"midi does not play rhodes, sceen keyb does?!"*. That sentence is
+   * the whole diagnosis: this warmed `keys.base + REACH`, which is 48 to 62, the
+   * fourteen semitones the LETTER keys cover. A screen press lands inside it and
+   * sounds. A MIDI keyboard plays wherever the hands are, which on the reported
+   * take was A3 to A4, entirely above it, so every MIDI note was a cold fetch
+   * and every cold fetch is a note that arrives after the key is up.
+   * ⚠️ THIRD TIME FOR THIS EXACT CONFUSION IN ONE DAY. `REACH` is what a laptop
+   * can play and `SHOWN()` is what the keyboard draws, and they are 14 against
+   * 24 semitones. It has now been the wrong one in the fit test for a learned
+   * row, in the voicing of a proposal, and here. When two windows differ by an
+   * octave, the one a PERSON can see is almost always the right one.
+   * ✅ AND IT WARMS IN TWO WAVES. The keys on screen first, because that is what
+   * makes it playable in the next second, then the rest of the pack behind it,
+   * because a MIDI keyboard is not limited to the keys this page happens to
+   * draw and the second wave costs nothing anybody is waiting on.
    */
   function warmUp(ins) {
     if (ins === PIANO) return;
-    const want = new Set();
-    for (let n = keys.base; n <= keys.base + REACH; n++) want.add(nearestIn(ins.notes, n));
-    const plans = [...want].map((near) => planFor(ins, near, 1));
+    const shown = new Set();
+    for (let n = keys.base; n <= keys.base + SHOWN(); n++) shown.add(nearestIn(ins.notes, n));
+    const rest = ins.notes.filter((n) => !shown.has(n));
+    const plans = [...shown].map((near) => planFor(ins, near, 1));
     const files = plans.reduce((n, p) => n + p.urls.length, 0);
     d.log(`fetching the ${files} recordings the ${ins.say} needs for the keys on screen, `
         + 'so the first note you play is not waiting on a download');
-    Promise.all(plans.map(fetchPlan)).then(() => d.log(`the ${ins.say} is ready`));
+    Promise.all(plans.map(fetchPlan)).then(() => {
+      d.log(`the ${ins.say} is ready across the keys on screen`);
+      /* ⚠️ THE SECOND WAVE IS NOT AWAITED AND SAYS SO ONLY WHEN IT LANDS. A MIDI
+         keyboard reaches past the drawn keys, and a note out there would
+         otherwise be the one cold fetch left. */
+      Promise.all(rest.map((near) => fetchPlan(planFor(ins, near, 1))))
+        .then(() => d.log(`and across the rest of the ${ins.say}, so any key on a `
+            + 'MIDI keyboard sounds without waiting'));
+    });
   }
 
   // ── the foot ──────────────────────────────────────────────────────────────
@@ -1651,9 +1674,9 @@
     near, bass: false });
 
   function showReading(r) {
-    readLine.textContent = !r ? 'nothing held'
-      : r.sure ? r.label
-      : r.alts.map((a) => a.name).join(' or ');
+    /* 🔴 ONE NAME, ALWAYS. *"just forget about or...rec it, interpet it"*. The
+       margin decides the ink rather than the words. */
+    readLine.textContent = !r ? 'nothing held' : r.label;
     /* ⚠️ DELETED RATHER THAN SET EMPTY. `[data-sure]` matches on PRESENCE, so
        an empty string would leave a guess wearing the confident ink for the
        rest of the page's life. Measured elsewhere in this project as exactly
@@ -1756,6 +1779,14 @@
   /** the notes of the last reading that counted, so a finger moving inside a
    *  chord can be told from a chord change. Cleared when the hands come off. */
   let lastSet = null;
+  /** the timer that gives a smaller chord its second window */
+  let subsetTimer = 0;
+  /** 🔴 HOW LONG A SMALLER CHORD HAS TO STAND BEFORE IT IS BELIEVED. Longer than
+   *  a settle, because a settle is about a chord arriving and this is about one
+   *  that may be a finger on its way back. MEASURED on a take from this desk:
+   *  the gap between chords is 120 ms at its shortest and the median hold is
+   *  292 ms, so 250 ms is inside a real chord and well past a lift. */
+  const SUBSET_HOLD = 250;
   function settleNow(at) {
     const got = settler.settle(at);
     if (!got) return;
@@ -1779,7 +1810,31 @@
      * after a rest would be read as a finger lift and ignored.
      */
     if (lastSet && got.notes.length < lastSet.length
-        && got.notes.every((n) => lastSet.includes(n))) return;
+        && got.notes.every((n) => lastSet.includes(n))) {
+      /* 🔴 SUPPRESSED FOR NOW, NOT FOREVER, AND THE FIRST VERSION OF THIS DID
+         DROP IT FOREVER. Reported within the hour: *"rec got worse, my 2nd and
+         3rd chord is not picked up"*. A smaller chord really can follow a bigger
+         one, and it is routinely a subset of it: `Fmaj7` is C F A C E and an
+         `Amin` after it is A C E, three of those same notes. Refusing every
+         subset threw those away.
+         ✅ WHAT SEPARATES A FINGER LIFTED FROM A CHORD CHANGE IS TIME, NOT
+         SHAPE. A lift is momentary and the finger comes back; a smaller chord
+         is held. So a subset is given a second window to prove it, and it is
+         read only if it is still exactly what is under the hands when that one
+         is up. A finger coming back cancels it, because `heardChange` clears
+         this timer the way it clears the others. */
+      clearTimeout(subsetTimer);
+      const want = [...got.notes].sort((a, b) => a - b).join(',');
+      subsetTimer = setTimeout(() => {
+        if ([...heldNotes].sort((a, b) => a - b).join(',') !== want) return;
+        lastSet = null;                 // it stood, so it is a chord in its own right
+        settler.reset();
+        settler.held([...heldNotes], performance.now() - LEARN_WINDOW - 1);
+        settleNow(performance.now());
+      }, SUBSET_HOLD);
+      return;
+    }
+    clearTimeout(subsetTimer);
     lastSet = [...got.notes];
     const r = nameChord(got.notes);
     if (!r.ok) { showReading(null); return; }
@@ -1791,22 +1846,33 @@
        the note count gates the COMPLAINT and the margin gates the answer. A
        page that said `C5 or F5` every time somebody rested a finger on a key
        would be chattering about nothing. */
-    showReading(got.enough || r.sure ? r : null);
+    showReading(got.enough ? r : null);
     /* 🔴 BELOW THE MARGIN, TWO NAMES AND NOTHING WRITTEN DOWN. MEASURED: at a
        margin of 1.0 the recogniser is never wrong about the 66.7 per cent of
        voicings it speaks about, and what is left is augmented triads, sus2
        against sus4, and a seventh missing its fifth. Those are facts about
        music rather than bugs, and naming one of them confidently is a coin toss
        with a name on it. */
-    if (!r.sure) {
-      if (!got.enough) return;
-      const pair = r.alts.map((a) => a.name).join(' or ');
-      if (!saidUnsure.has(pair)) {
-        saidUnsure.add(pair);
-        d.log(`those notes are ${pair} and nothing can tell which, so the roll was left alone`);
-      }
-      return;
-    }
+    /**
+     * 🔴 IT COMMITS. Asked 2026-09-23 in those words: *"just forget about
+     * or...rec it, interpet it"*, after *"when x or y, just pick what makes
+     * sense"*. This used to stop here whenever the margin was short, print
+     * `Caug or Eaug`, and leave the roll alone, and the reasoning written beside
+     * it was that two names are the truth about three notes that really are two
+     * chords.
+     * ⚠️ THAT REASONING IS STILL CORRECT AND IT WAS STILL THE WRONG BEHAVIOUR.
+     * MEASURED on three takes from this desk: 40 to 108 readings a minute came
+     * back as a pair, so the page spent a good part of every minute refusing to
+     * write down chords somebody had plainly played. A page that goes quiet a
+     * third of the time is not being careful, it is being useless, and the
+     * player can see the keys they pressed.
+     * ✅ THE MARGIN IS NOT DELETED, IT IS DEMOTED. It no longer decides whether
+     * to act, only how loudly to say it: a close reading still loses the
+     * confident ink, so a name that was a coin toss looks different from one
+     * that was not, and `alts` still carries the other name for anything that
+     * wants it.
+     */
+    if (!got.enough) return;
     const key = chordKey(r.root, r.quality);
     /* 🔴 REMEMBER WHERE THE HANDS WERE, NOT ONLY WHAT THEY SPELLED. Reported
        2026-09-23 with a screenshot: A major was played as A3 C#4 E4 and drawn as
@@ -1840,6 +1906,7 @@
     if (mode !== 'learn') return;
     clearTimeout(settleTimer);
     clearTimeout(admitTimer);
+    clearTimeout(subsetTimer);
     const now = performance.now();
     /* The fingers moved, so whatever was being held is no longer being held.
        The tally banks it and the next settle starts a new one. */
@@ -2698,16 +2765,26 @@
          note was a cold fetch, so almost every note was a 120 ms one. Pressing
          the instrument warms what the keys can reach, and this measures that a
          note played afterwards is an ordinary note rather than a late one. */
+      /* 🔴 ABOVE THE LETTER KEYS ON PURPOSE, AND THAT IS THE WHOLE POINT OF THIS
+         CHECK. It used to press note 62, which is the top of `REACH`, so it sat
+         inside the only window the warm up covered and could not have caught the
+         fault it exists for. Reported as *"midi does not play rhodes, sceen keyb
+         does?!"*: the screen's letter keys were warm and a MIDI keyboard playing
+         an octave up was cold on every note. This presses A4, which a MIDI
+         keyboard reaches and the letter keys never do. */
+      const HIGH = keys.base + SHOWN() - 3;
       await sleep(900);
       const warm0 = d.tap();
-      midiDown(62 - transpose, 88, 0, performance.now());
+      midiDown(HIGH - transpose, 88, 0, performance.now());
       await sleep(120);
       const warm1 = d.tap();
-      midiUp(62 - transpose);
-      d.assert('after switching instrument the keys are warm, so a note is not a late one',
-        warm1.voiced - warm0.voiced === 1 && warm1.late === warm0.late,
-        `${warm1.voiced - warm0.voiced} voice(s) from one press, `
-        + `${warm1.late - warm0.late} of them arriving after the key came up`);
+      midiUp(HIGH - transpose);
+      d.assert('a MIDI note above the letter keys is warm too, not a late one',
+        warm1.voiced - warm0.voiced === 1 && warm1.late === warm0.late
+        && HIGH > keys.base + REACH,
+        `note ${HIGH} is ${HIGH - keys.base - REACH} semitone(s) above the letter keys, and `
+        + `gave ${warm1.voiced - warm0.voiced} voice(s) with `
+        + `${warm1.late - warm0.late} arriving after the key came up`);
       await quiet();
 
       /* 🔴 THE ONE THAT WAS REALLY LOSING NOTES, AND IT NEEDS AN UNFETCHED
@@ -3158,11 +3235,26 @@
          unsure chord must never start accruing at all. */
       const unsureTallied = tally.held();
       drop([60, 64, 68]);
-      d.assert('a chord with more than one name shows both of them and starts no tally at all',
-        unsureRead === 'Caug or Eaug' && unsureSure === undefined
-        && unsureTallied === null && unsureRows === 3 && learned.length === 2,
-        `the page read ${unsureRead} while the keys were down, the roll stayed at `
-        + `${unsureRows} rows, and the tally is holding ${unsureTallied ?? 'nothing'}`);
+      /* 🔴 THIS CHECK REVERSED ON 2026-09-23 AND THE OLD ONE IS QUOTED HERE SO IT
+         IS NOT RE-ARGUED. It read `a chord with more than one name shows both of
+         them and starts no tally at all`, and asserted `Caug or Eaug` with
+         nothing accruing. Asked, in these words: *"just forget about or...rec
+         it, interpet it"*.
+         ⚠️ THE OLD REASONING WAS TRUE AND LOST ANYWAY. An augmented triad really
+         is three chords and naming one is a coin toss. But MEASURED across three
+         takes from this desk, 40 to 108 readings a minute came back as a pair,
+         so the page spent much of every minute refusing to write down chords
+         somebody had plainly played, and a page that goes quiet a third of the
+         time is not careful, it is useless.
+         ✅ WHAT SURVIVES IS THE INK. A close reading still has no `data-sure`,
+         so a coin toss looks different from a certainty, and `alts` still
+         carries the other name. The margin decides how loudly, not whether. */
+      d.assert('a chord with more than one name is still written down, and still looks unsure',
+        unsureRead === 'Caug' && unsureSure === undefined
+        && unsureTallied === '0:aug' && unsureRows === 3 && learned.length === 2,
+        `the page read ${unsureRead} while the keys were down without the confident ink, `
+        + `the roll stayed at ${unsureRows} rows, and the tally is holding `
+        + `${unsureTallied ?? 'nothing'}`);
 
       /* ── and none of it happens when the roll is the typed line ────────── */
       const scoredBeforeTyped = tally.scores(performance.now()).length;
