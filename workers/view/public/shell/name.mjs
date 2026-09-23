@@ -189,8 +189,25 @@ export function nameChord(notes, { bassWeight = BASS_WEIGHT,
   /* Ties go to the earlier quality and then to the lower root, which is why the
      order of `RECOGNISED` is a statement about music rather than an accident of
      the file. */
+  /**
+   * 🔴 A BARE FIFTH IS A TWO NOTE THING, AND LETTING IT COMPETE WITH REAL CHORDS
+   * BLOCKS THEM. MEASURED 2026-09-23 on a take from this desk: `G2 D3 E3 G3`,
+   * played as a chord, read as *"Emin7 or G5"* and went into the roll as
+   * nothing. `G5` matches two of the three notes held with none missing, and it
+   * takes the bass bonus because the hand had a G underneath, so it scores 1.5
+   * against `Emin7`'s 2.0 and the margin never reaches 1.
+   * ✅ SO `5` IS OUT OF THE RUNNING ONCE THREE DIFFERENT NOTES ARE DOWN. That is
+   * a statement about music rather than a tuning: a power chord is a root and a
+   * fifth, and a third note means somebody is playing a chord. It stays exactly
+   * as it was for two notes, which is the one job it has and the one this
+   * file's own check asserts.
+   */
+  const bare = RECOGNISED.findIndex(([q]) => q === '5');
+  const skipBare = heldCount >= 3 && bare >= 0;
+
   let bestScore = -Infinity, bestQ = 0, bestR = 0;
   for (let qi = 0; qi < RECOGNISED.length; qi++) {
+    if (skipBare && qi === bare) continue;
     const mask = RECOGNISED[qi][1];
     for (let r = 0; r < 12; r++) {
       const score = scoreOf(rot(mask, r)) + (r === bass ? bassWeight : 0);
@@ -244,6 +261,7 @@ export function nameChord(notes, { bassWeight = BASS_WEIGHT,
   const stated = POP[held & bestT] >= 3;
   let nextScore = -Infinity, nextQ = bestQ, nextR = bestR;
   for (let qi = 0; qi < RECOGNISED.length; qi++) {
+    if (skipBare && qi === bare) continue;
     const mask = RECOGNISED[qi][1];
     for (let r = 0; r < 12; r++) {
       if (qi === bestQ && r === bestR) continue;
