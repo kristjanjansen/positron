@@ -273,7 +273,18 @@ draw a mechanism the page does not have, so the board is absent rather than
 dashed. The moment there is a compiler on it, the box and the second half of the
 two-ends claim can both be drawn.
 
-🔴 **2. DOES THE EDGE COMPRESS `libfaust-wasm.data`, AND THE PAGE NOW ANSWERS IT
+✅ **2. ANSWERED 2026-09-23 BY DEPLOYING IT: NO, AND IT COST 2 MB A VISITOR
+UNTIL THE FILE WAS RENAMED.** MEASURED on the edge: with its own `.data` name it
+came back with **no content-type at all and no content-encoding**, 2,407,445
+bytes whole, while the `.wasm`, the `.js` and the `.mjs` beside it were all
+brotli. It is served as `libfaust-wasm.data.txt` now, which is honest (99.95 per
+cent of its bytes are printable) and which the edge compresses to **542,430 B**.
+A first press is **1,405,215 B** over the wire against 6,379,006 on disk.
+⚠️ **THE ORIGINAL ENTRY IS KEPT BELOW BECAUSE THE PAGE STILL CARRIES THE
+INSTRUMENT**, and it is what will answer this again the day anything about the
+edge's compression changes.
+
+🔴 **2b. DOES THE EDGE COMPRESS `libfaust-wasm.data`, AND THE PAGE NOW ANSWERS IT
 ITSELF.** `plan-fau.md` §11 item 3 says the difference is **1.0 MB against
 2.9 MB** over the wire and that the file has no extension Cloudflare
 recognises. `/fau/` logs both numbers on the first compile, read off

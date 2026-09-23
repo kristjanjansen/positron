@@ -14,16 +14,46 @@ node demo/verify.mjs fau                       # 31/31, 25 page asserts
 
 ## What to open
 
-- **http://127.0.0.1:8898/fau/** with `node demo/server.mjs` running, which it
-  is as this is written. **NOT DEPLOYED**, and that is a decision rather than an
-  omission: `git status` shows `LESSONS.md`, `demo/verify.mjs` and
-  `demo/wish/index.html` modified by another session, and `build.mjs` copies the
-  working tree, so a deploy from here ships their unfinished work. Handoff 45
-  records exactly that happening.
+- **https://positron.studio/fau/** deployed, **BUILD bbd506e-055152-e266**, and
+  **31/31 against the edge** with `DEMO_BASE=https://positron.studio node
+  demo/verify.mjs fau`.
 - Press **Organ**, **Rhodes** or **Djembe**, then edit the text and press
   **COMPILE**. The keys are playable from a mouse, from `a s d f g h j k`, and
   from a MIDI keyboard; **SUSTAIN** under them is the pedal if there is no real
   one.
+- ⚠️ **THE DEPLOY SHIPPED TWO FILES THIS SESSION DID NOT WRITE**, because
+  `build.mjs` copies the working tree: `demo/verify.mjs` and
+  `demo/wish/index.html` are another session's in flight work, they are in none
+  of these commits, and `/wish/` on the edge carries an unfinished change.
+  Handoff 45 records the same thing happening for the same reason.
+
+## The question `plan-fau.md` could not settle, answered by deploying
+
+🔴 **THE EDGE DOES NOT COMPRESS AN EXTENSION IT HAS NEVER HEARD OF, AND THAT WAS
+2 MB OF SOMEBODY'S BANDWIDTH.** §11 item 3 of that plan asked for one `curl -I`
+against a deployed copy and named the stake as 1.0 MB against 2.9 MB. MEASURED
+on the first deploy: `libfaust-wasm.data` came back with **no content-type at
+all and no content-encoding**, 2,407,445 bytes whole, while the `.wasm`, the
+`.js` and the `.mjs` beside it were all brotli. The one file in the set that
+compresses best was the only one going out uncompressed.
+✅ **IT IS SERVED AS `.txt` NOW AND IT IS HONESTLY ONE**: 99.95 per cent of its
+bytes are printable, because it is 53 Faust library sources concatenated by
+Emscripten's `file_packager`, and it opens with a small WebAssembly module which
+is the other 0.05 per cent. MEASURED after the second deploy, per file, over the
+wire:
+
+| file | over the wire |
+| --- | --- |
+| `libfaust-wasm.data.txt` | 542,430 |
+| `libfaust-wasm.wasm` | 773,853 |
+| `libfaust-wasm.js` | 45,723 |
+| `faustwasm.mjs` | 43,209 |
+| **a first press, total** | **1,405,215** against 6,379,006 on disk |
+
+⚠️ **AND THE PACKAGE NAME BAKED INSIDE THE COMPILER DOES NOT MOVE WITH IT.** The
+glue asks its host for a package called `libfaust-wasm.data` and `faustwasm`
+answers with whatever bytes it fetched from the path the page names, so a rename
+on the wire cannot desynchronise the two.
 
 ## What it costs and what it does, MEASURED 2026-09-23 in a browser
 
@@ -126,10 +156,9 @@ subject is reading ten lines of Faust before you change one.
    host` from this laptop today and the port 22 sweep was refused by the
    sandbox. Until it is answered `/fau/` draws no Raspberry Pi, because a
    diagram may not draw a mechanism the page does not have.
-2. **DOES THE EDGE COMPRESS `libfaust-wasm.data`.** The page answers it itself
-   now: it logs the decoded and the transferred size on the first compile and
-   says in words whether whatever served it compressed it. **Open the deployed
-   page and read the log.** 1.0 MB against 2.9 MB is the difference.
+2. ✅ **DONE, AND IT IS ABOVE: the edge does not compress an extension it has
+   never heard of.** Fixed by serving the library blob as `.txt`, measured
+   either side. A first press is **1,405,215 B** over the wire now.
 3. **THE STK PIANO PRESET**, `plan-fau.md` §9.4 step 6: 1,690 ms of frozen page,
    so it belongs behind a Worker, and the listening test that document could not
    do is still not done. **Nothing on `/fau/` has been heard through a speaker.**
