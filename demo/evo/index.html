@@ -85,7 +85,10 @@
      ════════════════════════════════════════════════════════════════════════ */
 
   .evo-fixed { gap: 12px; }
-  .evo-row { gap: 20px; }
+  /* ⚠️ AND THE GROUPS IN THE BACK STRIP CENTRE ON EACH OTHER, same ask: the
+     octave pair, the nameplate and the eight rotaries are three things of three
+     heights and their midpoints are what should agree. */
+  .evo-row { gap: 20px; align-items: center; }
   /* The wheels are the FRONTMOST thing on the case, at the very edge nearest
      the player, so they go to the foot of the column whatever room is left. */
   /* 🔴 AND THEY ARE CENTRED. Asked 2026-09-21: *"align pitch / mod to centr"*.
@@ -278,7 +281,20 @@
      did: it marks a 4 and 4 split inside ONE row, which the research names as
      the feature most likely to be misread as two rows. Removing it would lose a
      fact rather than a graphic. Reversible in one declaration. */
-  .evo-rot { display: flex; align-items: flex-end; gap: var(--ctl-gap); padding: 8px 10px; }
+  /* 🔴 NO BOX ROUND THE ROTARIES. Asked 2026-09-23: *"rm panel around c1-8"*, on
+     the same afternoon the keypad lost its own and for the same reason: the box
+     was a printed area of the real case, its name came off when the printed bars
+     went, and what was left was an edge round eight controls that each already
+     have one. ⚠️ THE DIVIDER STAYS: it marks the 4 and 4 split inside ONE row,
+     which the research names as the feature most likely to be misread as two
+     rows, so removing it would lose a fact rather than a graphic.
+     🔴 AND THE KNOBS CENTRE ON THEIR MIDPOINTS RATHER THAN SITTING ON A FLOOR.
+     Asked as *"all funtional,+0and c1-c8 control buttons should be vertcally
+     centered, ther midpoints"*. `flex-end` lined up their BOTTOMS, which is
+     right when a row of controls stands on a printed baseline and wrong once the
+     baseline is gone: a knob with a two line name under it then hangs lower than
+     its neighbours and the row reads as sagging. */
+  .evo-rot { display: flex; align-items: center; gap: var(--ctl-gap); padding: 0; }
   .evo-rot-div { align-self: stretch; width: 0; border-left: 1px solid var(--line2); }
   .evo-rot .pos-knob-lab { color: var(--dim); }
 
@@ -640,15 +656,26 @@
      and that is what makes two of them side by side read as one instrument. */
   const DISP_THICK = 1.7;
   const DISP_GHOST = 0.16;
+  /* 🔴 THE SMALL FIELD NEEDS A HEAVIER BAR TO COME OUT THE SAME COLOUR, WHICH IS
+     NOT THE SAME AS NEEDING A HEAVIER LOOK. Reported *"small segment should have
+     same color as large"*, and both fields are already the same scheme, the same
+     ink and the same ghost. What differs is PIXELS: the glyph is 20 units tall,
+     so at `size: 38` a 1.7 unit bar renders 3.2 px and at `size: 20` it renders
+     1.7 px, and a 1.7 px line is mostly antialiasing, which reads as a paler
+     colour rather than as a thinner one.
+     ⚠️ SO THE NUMBER IS DERIVED FROM THE TWO SIZES rather than eyeballed, and it
+     lands both fields at the same rendered weight. */
+  const DISP_SIZE3 = 38, DISP_SIZE2 = 20;
+  const DISP_THICK2 = Number((DISP_THICK * (DISP_SIZE3 / DISP_SIZE2)).toFixed(2));
   const disp3 = createSegment({
-    digits: 3, frame: false, size: 38, scheme: 'backlit',
+    digits: 3, frame: false, size: DISP_SIZE3, scheme: 'backlit',
     thick: DISP_THICK, ghost: DISP_GHOST,
     title: 'the three digit field. On this instrument it carries the value: a '
          + 'controller number, a program number, or a velocity',
   });
   const disp2 = createSegment({
-    digits: 2, frame: false, size: 20, scheme: 'backlit',
-    thick: DISP_THICK, ghost: DISP_GHOST, value: '00',
+    digits: 2, frame: false, size: DISP_SIZE2, scheme: 'backlit',
+    thick: DISP_THICK2, ghost: DISP_GHOST, value: '00',
     /* 🔴 WHAT THIS FIELD IS FOR, FROM THE MANUAL RATHER THAN FROM INFERENCE.
        Asked 2026-09-23: *"read from manual whar left smaller segmented numebr
        does i do not know"*. The Advanced Guide's Default mode paragraph, quoted
@@ -761,11 +788,13 @@
     if (/\d/.test(face)) padByDigit.set(face, keypad.at(x, y));
   }));
 
-  /* `SNAP SHOT` is what the `-` and `+` pressed together do, printed under the
-     bottom row. The bracket that used to tie it to them is gone; the label is
-     centred across the row those two buttons end. */
-  const snap = el('div', 'panel-sub evo-snapbox', 'SNAP SHOT');
-  keypadBox.append(keypad.el, snap);
+  /* 🔴 THE `SNAP SHOT` LABEL IS GONE, ASKED 2026-09-23: *"rm 'snap sot' label"*.
+     It named what the `-` and `+` buttons do when pressed together, which is a
+     real function of the panel and is in the hover on those two buttons and in
+     `research/evo-mk425c-face-2026-09-21.md`. What it was on the face was a
+     third line of small grey type under a grid that had just lost its box, in
+     the narrowest column on the page, naming something nothing here can do. */
+  keypadBox.append(keypad.el);
   fixed.append(keypadBox);
 
   // ── the two wheels, frontmost on the case ───────────────────────────────
@@ -838,12 +867,16 @@
    */
   const oct = el('div', 'evo-oct');
   const octRow = el('div', 'evo-oct-row');
+  /* 🔴 SMALLER CIRCLES, ASKED AS *"also smaller versions of +- circlar ones"*.
+     A panel MIRROR draws a button at the size the real one is relative to what
+     is around it, and `--ctl-w` is sized for a control somebody presses with a
+     finger. These two are drawn, not pressed. */
   const octDown = createPad({
-    top: MINUS, round: true, latch: false, disabled: true, aria: 'octave down',
+    top: MINUS, round: true, small: true, latch: false, disabled: true, aria: 'octave down',
     title: 'octave down. Nothing this sends has ever been captured',
   });
   const octUp = createPad({
-    top: '+', round: true, latch: false, disabled: true, aria: 'octave up',
+    top: '+', round: true, small: true, latch: false, disabled: true, aria: 'octave up',
     title: 'octave up. Nothing this sends has ever been captured',
   });
   octRow.append(octDown.el, octUp.el,
@@ -863,7 +896,7 @@
   const plate = nameplate.el;
   row.append(plate);
 
-  const rot = el('div', 'panel-group evo-rot');
+  const rot = el('div', 'evo-rot');
   const knobs = [];
   for (let i = 0; i < ROTARIES.length; i++) {
     if (i === ROTARY_SPLIT) rot.append(el('div', 'evo-rot-div'));
@@ -1055,11 +1088,15 @@
          2026-09-23: *"ptichbend is 09 and mod 10, can not see it on small
          segmented"*. Which control moved is a fact this page knows for certain,
          printed on the panel, and it costs nothing to say.
-         ⚠️ THE VALUE IS STILL NOT SHOWN, and that half of the old comment
-         stands: a 14 bit bend overflows a three digit field and would draw
-         dashes, which reads as a fault rather than as a page declining to
-         invent a reading. The wheel itself carries the value. */
-      show('', BEND_SLOT);
+         🔴 AND THE VALUE IS THE SEVEN BIT ONE, WHICH IS THE ONLY ONE THIS WHEEL
+         HAS. Asked *"can not see pbend value on segmented"*, and the old comment
+         refused on the grounds that 14 bits overflow three digits, which is true
+         of the NUMBER and false of the INSTRUMENT: this page's own header
+         records 106 bend messages measured with **an LSB of 0 on every one**, so
+         the wheel resolves 128 steps and sends them in the MSB. Three digits
+         hold that exactly, and showing the 14 bit number would be printing
+         precision the hardware does not have. */
+      show(m.d2, BEND_SLOT);
       return;
     }
 
@@ -1933,13 +1970,15 @@
                        r: seenRatio(e) }));
       const loudest = dimmedNames.reduce((a, b) => (b.r > a.r ? b : a), dimmedNames[0]);
       const faintest = dimmedNames.reduce((a, b) => (b.r < a.r ? b : a), dimmedNames[0]);
-      /* ⚠️ THE FLOOR WAS SIX AND IS THREE, because eleven of the names it was
-         counting were the function buttons' and went with them on 2026-09-23.
-         The floor is here so a sweep that found NOTHING cannot pass; it is not a
-         claim about how many names a panel has, and leaving it at six would have
-         made removing a control look like a regression in a check about ink. */
+      /* ⚠️ THE FLOOR WAS SIX, THEN THREE, AND IS TWO, because the names it counts
+         keep leaving: eleven went with the function buttons and one more with
+         `SNAP SHOT`. The floor is here so a sweep that found NOTHING cannot
+         pass. It is not a claim about how many names a panel has, and every time
+         it is left behind, removing a control looks like a regression in a check
+         about ink. Derive it from what is drawn or keep moving it, and this page
+         has now moved it twice in an hour. */
       d.assert('every printed name on the panel is dimmed with the controls it names',
-        dimmedNames.length >= 3 && loudest.r < 3 && faintest.r > 1.5,
+        dimmedNames.length >= 2 && loudest.r < 3 && faintest.r > 1.5,
         `${dimmedNames.length} names, "${loudest.t}" loudest at ${loudest.r.toFixed(2)}:1, `
         + `"${faintest.t}" faintest at ${faintest.r.toFixed(2)}:1`);
 
