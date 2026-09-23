@@ -74,6 +74,14 @@
      played and cannot. Here it CAN be, the moment a row is pressed, so the box
      says that rather than sitting there. It goes on the first press and does
      not come back. */
+  /* ⚠️ NO `text-wrap: balance` HERE, AND IT WAS CONSIDERED AND MEASURED ON
+     2026-09-23 RATHER THAN MISSED. `shell.css` carries the argument at
+     `.pos-lr-say`: the property is for a centred SENTENCE that wraps, and
+     these two do not. MEASURED at 390 px and at 320: `press a recording below`
+     is 156.8 px and `press a picture below` is 140.3, both on one line in a
+     286 px box, and this well is never narrower than the page. A declaration
+     that reads as done and moves nothing is this project's second most
+     expensive kind of defect, so it is a note instead of a rule. */
   .mk-hint {
     position: absolute; inset: 0; display: grid; place-items: center;
     color: var(--dim); font-size: 13px; letter-spacing: .04em; text-align: center;

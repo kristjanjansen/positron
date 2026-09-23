@@ -47,7 +47,18 @@
      exists — same rule as the chain on /able/. */
   .none { padding: 22px 14px; text-align: center; font: 500 13px/1.7 var(--mono); color: var(--dim2);
           background: var(--card); border: 1px solid var(--line); border-radius: 4px; margin: 0 0 12px; }
-  .none b { display: block; color: var(--fg); font-size: 15px; margin-bottom: 6px; font-weight: 600; }
+  /* ⚠️ THE HEADING IS BALANCED AND THE PARAGRAPH UNDER IT IS NOT, AND THAT IS
+     WHERE THE LINE GOES. `shell.css` carries the argument at `.pos-lr-say`:
+     `text-wrap: balance` is for short centred prose, and Chromium stops
+     balancing past a handful of lines, so the span below, which holds four
+     sentences at 62 characters a line, is a paragraph and gets nothing.
+     MEASURED on the five headings this page can show, 2026-09-23: all five fit
+     one line down to 390 px, and at 360, which is an ordinary Android phone,
+     `Another page took the granulator out` lays out **289.0 px over 27.1 px**
+     greedily and **153.5 over 162.6** balanced. One word alone under a full
+     line, centred, is exactly the shape this property exists for. */
+  .none b { display: block; color: var(--fg); font-size: 15px; margin-bottom: 6px; font-weight: 600;
+            text-wrap: balance; }
   .none span { display: block; max-width: 62ch; margin: 0 auto; }
   /* Two engines, two pictures, side by side — the `mirror` shape, because the
      difference between the two panes IS the subject. One column on a phone:
