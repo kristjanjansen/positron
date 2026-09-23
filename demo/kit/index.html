@@ -8750,6 +8750,77 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       d.assert('NEGATIVE CONTROL: arming and closing with nothing played leaves the button off',
         kb.looping() === false && kb.taped() === 0 && kb.loop.get() === false,
         `looping ${kb.looping()}, ${kb.taped()} taped, button ${kb.loop.get() ? 'on' : 'off'}`);
+
+      /* 🔴 THE FOOTER ROW READS `Sustain`, `Loop`, `Notes off`, AND IT IS
+         MEASURED RATHER THAN READ OFF THE SOURCE. Asked 2026-09-23: *"move loop
+         button to right"*. The append order in `keyboard.mjs` says what the
+         author meant and the COMPUTED left edge says what happened, and those
+         two came apart the moment this keyboard carried two toggles: a flex line
+         hands its free space to every `margin-left: auto` on it EQUALLY, so the
+         rule that pushed one toggle to the right spread two of them across the
+         row with `Loop` stranded in the middle.
+         ⚠️ SO THE CLAIM IS THE GAP AND NOT ONLY THE ORDER. Reordering the appends
+         alone would have satisfied a left-to-right check while leaving the two
+         controls half a keyboard apart, which is the defect somebody would see. */
+      /* 🔴 A NOTE PLAYED PAST THE KEYS IS STILL LOOPED, AND THIS IS THE CHECK
+         THE FIRST BUILD NEEDED. Reported 2026-09-23: *"can not hear looping"*.
+         The tape sat on `press`/`release`, which is every note the COMPONENT
+         produces and no note a MIDI keyboard sends: `/nola/` takes `midiDown`
+         straight to its own `press`, so a take played on the controller recorded
+         nothing and a loop with nothing in it was correctly silent. Playing the
+         same notes on screen worked, which is what made it look like a loop bug
+         rather than a routing one.
+         ⚠️ SO THE CHECK PLAYS THE NOTE THE WAY MIDI DOES: `lightNote` and
+         nothing else, never touching a key. That is exactly what every page here
+         does with a note that did not come from these keys. */
+      {
+        const was = kitHeard.length;
+        kb.loop.set(true);
+        kb.lightNote(67, true);
+        kb.lightNote(67, false);
+        const tapedOutside = kb.taped();
+        kb.loop.set(false);
+        await new Promise((r) => setTimeout(r, 300));
+        const back = kitHeard.slice(was).filter((e) => e.how === 'loop' && e.n === 67);
+        kb.loop.set(false);
+        d.assert('a note played past the keys, the way MIDI arrives, is taped and comes back',
+          tapedOutside === 2 && back.length >= 1,
+          `${tapedOutside} movement(s) taped from a note that touched no key, `
+          + `${back.length} came back`);
+
+        /* ⚠️ AND A SUGGESTION IS NOT A PERFORMANCE. The same call with a lamp
+           name is a hint or a proposal drawn on the keys, and looping those would
+           record something nobody played. */
+        kb.loop.set(true);
+        kb.lightNote(71, true, 'ai');
+        kb.lightNote(72, true, 'hint');
+        const tapedLamps = kb.taped();
+        kb.loop.set(false);
+        d.assert('NEGATIVE CONTROL: a hinted or proposed key is drawn, never recorded',
+          tapedLamps === 0,
+          `${tapedLamps} movement(s) taped from two keys lit as a proposal`);
+        kb.lightNote(71, false, 'ai'); kb.lightNote(72, false, 'hint');
+      }
+
+      const kpad = kb.el.querySelector('.kpad');
+      const sus = [...kpad.querySelectorAll('.pos-toggle')]
+        .find((e) => /sustain/i.test(e.textContent))?.getBoundingClientRect();
+      const lp = [...kpad.querySelectorAll('.pos-toggle')]
+        .find((e) => /loop/i.test(e.textContent))?.getBoundingClientRect();
+      /* ⚠️ FOUND BY ITS WORD AND NOT BY `.kpad-right`, WHICH IS NOW A POSITION
+         RATHER THAN A CONTROL. That class marks whichever control STARTS the
+         right hand group, so it moved onto `Sustain` when the row was reordered
+         and this check quietly began measuring the same element twice: it read
+         left edges 444 and 444 and went red for the right reason with the wrong
+         story. A check that names a control has to name the control. */
+      const off = [...kpad.querySelectorAll('button')]
+        .find((e) => /notes off/i.test(e.textContent))?.getBoundingClientRect();
+      const gap = lp && off ? Math.round(lp.left - off.right) : -1;
+      d.assert('Sustain, Notes off and Loop sit in that order, tight against each other',
+        !!(sus && lp && off) && sus.left < off.left && off.left < lp.left
+          && Math.abs(sus.top - lp.top) < 1 && gap >= 0 && gap <= 12,
+        `left edges ${Math.round(sus?.left)}, ${Math.round(off?.left)}, `
+        + `${Math.round(lp?.left)}, and ${gap} px between Notes off and Loop`);
     }
 
     d.assert('every focus ring in the shell is 1 px, and not one of them paints on a mouse press',

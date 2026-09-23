@@ -1,5 +1,15 @@
 ## Open
 
+### Asked 2026-09-23, open: the played chord name on the roll wants room above and left of it
+
+🔴 **ASKED IN THESE WORDS:** *"add top and left padding on chord name on
+pianoroll"*. That is the PLAYED reading moved onto the roll's top left earlier the
+same day (*"add played chord to top left of pianoroll, grayer than right side
+chord names"*), drawn in `--dim2`. It sits hard against the corner.
+⚠️ **`demo/shell/roll.mjs`**, and the roll already had a top-room rule added for
+its first row (`.roll > :first-child`), so check the two do not fight before
+adding a third number.
+
 ### Found 2026-09-23, not fixed: `/circuit/`'s printed names sit 20 px lower than their sides
 
 🔴 **`node demo/verify.mjs circuit` READS 33/34**, red on `the printed names sit the
