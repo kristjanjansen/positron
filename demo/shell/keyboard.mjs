@@ -115,6 +115,14 @@
  * on a narrow one and the two queries were inert. One rule, no breakpoint.
  */
 import { createToggle } from './toggle.mjs';
+/* 🔴 THE SAME MACHINE `/num/` WAS BUILT TO GET RIGHT, AND NOT A SECOND COPY OF
+   IT. Asked 2026-09-23: *"num works. how come you can not add it to keyboard"*.
+   Nothing prevented it: the ten slot state machine was already written and
+   already graded with no browser, and this component had one tape and one
+   button. `numloop.mjs` owns WHICH slot is doing what; the keyboard owns what
+   recording and looping MEAN, which is the same division the page keeps with the
+   keyboard. */
+import { createNumLoop } from './numloop.mjs';
 
 /**
  * 🔴 WHERE A BLACK KEY SITS, AS FRACTIONS OF ITS OWN WIDTH, FROM
@@ -316,6 +324,9 @@ export function createKeyboard(host, {
   onPanic = null, onOctave = null, minBase = 24, maxBase = 96, letters = true,
   pad: wantPad = true, sustain: wantSustain = false, onSustain = null,
   loop: wantLoop = false, onLoop = null,
+  /** how many takes this keyboard can hold. One is the button on its own; ten is
+   *  a number pad driving it. */
+  loops: wantLoops = 1,
   /** where this component says what its loop is doing. `d.log`, normally. */
   log = null,
   names: wantNames = true,
@@ -812,7 +823,7 @@ export function createKeyboard(host, {
     ? createToggle({ label: 'Loop', size: 'small',
                      title: 'record what you play and play it back around, '
                           + 'until you switch it off',
-                     onChange: (on) => setLoop(on) })
+                     onChange: () => setLoop() })
     : null;
   const sustainBtn = wantSustain
     ? createToggle({ label: 'Sustain', size: 'small',
@@ -888,31 +899,62 @@ export function createKeyboard(host, {
    * the moment you pressed `Loop` again. Rounding to a beat would invent a grid
    * nobody set.
    */
-  let tape = null, tapeAt = 0, tapeTimers = [], looping = false;
-  /* what the LOOP itself currently has sounding, which is not the same set as
-     `held`: that one is fingers and loop keys together. */
-  const loopKeys = new Set(), loopNotes = new Set();
-  let outside = 0;          // how many taped movements came in around the keys
+  /**
+   * 🔴 TEN TAKES, NOT ONE, AND THE STATE MACHINE IS `/num/`'s. Asked 2026-09-23:
+   * *"num works. how come you can not add it to keyboard"*, and the honest answer
+   * was that nothing prevented it. `numloop.mjs` had been built, graded with no
+   * browser and proved against the real number pad; this component had one tape
+   * and one button, so the two halves of a looper were sitting in the repository
+   * not talking to each other.
+   * ⚠️ THE DIVISION IS THE SAME ONE THIS FILE ALREADY KEEPS. `numloop.mjs` owns
+   * WHICH slot is recording, looping, stopped or empty, and knows nothing about
+   * audio or keys. This owns what those words MEAN: a take is a list of key
+   * movements, a lap is how long it ran, and playing one back is pressing keys.
+   * ⚠️ A TAKE IS A KEY MOVEMENT LIST AND NOTHING ELSE. No audio is copied, so ten
+   * loops cost ten arrays of small objects and the sound is made fresh every lap
+   * by the page, exactly as it is for a finger.
+   */
+  const SLOTS = Math.max(1, Math.round(wantLoops));
+  const takes = Array.from({ length: SLOTS }, () => ({
+    tape: null,        // the movements, or null when this slot is empty
+    at: 0,             // when the first movement landed. See the lead-in note below
+    lap: 0,            // how long one turn is
+    timers: [],
+    going: false,      // is this slot playing right now
+    rec: false,        // is this slot taking movements right now
+    keys: new Set(),   // what this slot has down, which is NOT the same as `held`
+    notes: new Set(),
+    outside: 0,        // movements that came in past the keys, for the log
+    pressedAt: 0,      // when the button was touched. See `onTouch` below
+  }));
 
-  /* 🔴 THE TAKE STARTS AT THE FIRST NOTE, NOT AT THE BUTTON, AND THIS IS WHAT
-     MADE A WORKING LOOP FEEL DEAD. Reported as *"still no looping"* with the
-     machinery already correct and graded on both paths. The clock used to start
-     when the button was armed, so arming, getting your hands down, and then
-     playing put every one of those seconds INSIDE the take: the loop came round
-     and did nothing at all until that lead-in had elapsed again. Four seconds of
-     silence after pressing a loop button is indistinguishable from a loop button
-     that does not work, and the natural thing to do about it is press it again,
-     which stops the loop for good.
+  /* 🔴 ONE FLAG FOR *THESE NOTES ARE COMING BACK, NOT GOING IN*, AND IT REPLACED
+     A PER SLOT ONE THE MOMENT THERE WAS MORE THAN ONE SLOT. A note replayed by
+     loop 1 reaches the page, which lights it, which is where the tape listens, so
+     without this loop 2 would record loop 1 while it recorded you and the two
+     would compound every lap. The old single loop checked its OWN `looping`,
+     which is exactly the test that stops working when a second slot exists. */
+  let replaying = 0;
+
+  /* 🔴 THE TAKE STARTS AT THE FIRST NOTE, NOT AT THE BUTTON. Reported as *"still
+     no looping"* with the machinery correct and graded on both paths, then said
+     plainly: *"arm should as long as it takes when i start to play"*. The clock
+     used to start when the button was armed, so arming, getting your hands down
+     and then playing put every one of those seconds INSIDE the take: the loop
+     came round and did nothing at all until the lead-in had elapsed again, which
+     is indistinguishable from a loop button that does not work.
      ⚠️ THE TRAILING SILENCE IS KEPT AND ONLY THE LEAD-IN IS DROPPED. Where you
-     stop is a decision, so a lap runs first note to closing press and a rest at
-     the end of a phrase survives. Where you START is not a decision, it is how
-     long it took to get ready. */
-  const startClock = () => { if (!tapeAt) tapeAt = performance.now(); };
+     stop is a decision and a rest at the end of a phrase should survive. Where
+     you START is not a decision, it is how long it took to get ready. */
+  const startClock = (t) => { if (!t.at) t.at = performance.now(); };
 
   const onTape = (k, down) => {
-    if (tape === null || looping) return;
-    startClock();
-    tape.push({ k, down, t: Math.round(performance.now() - tapeAt) });
+    if (replaying) return;
+    for (const t of takes) {
+      if (!t.rec) continue;
+      startClock(t);
+      t.tape.push({ k, down, t: Math.round(performance.now() - t.at) });
+    }
   };
 
   /**
@@ -926,141 +968,159 @@ export function createKeyboard(host, {
    * silent. Playing the same notes on screen worked perfectly.
    * 🔴 THIS IS THE THIRD TIME THAT SHAPE HAS COST A SESSION ON THIS PAGE. The
    * Rhodes was inaudible over MIDI and audible on screen for the same reason a
-   * layer down, and the fix there was the same sentence: the on-screen path and
-   * the MIDI path are two paths, and anything that must be true of PLAYING has
-   * to sit where both of them pass.
+   * layer down, and the fix is the same sentence: the on-screen path and the MIDI
+   * path are two paths, and anything that must be true of PLAYING has to sit
+   * where both of them pass.
    * ✅ AND BOTH OF THEM PASS THROUGH `lightNote`. Every page here lights the key
    * it is sounding, by every route, which makes that the note level funnel this
-   * component already had and had named after the lamp. So the loop records
-   * there and no page needs a line of code, which is what *"do not wire nola,
-   * its gloabl keyboard fn"* asks for.
-   * ⚠️ IT RECORDS THE NOTE AND NOT A KEY, so unlike a finger it does NOT follow
+   * component already had and had named after the lamp. So the loop records there
+   * and no page needs a line of code, which is what *"do not wire nola, its
+   * gloabl keyboard fn"* asks for.
+   * ⚠️ IT RECORDS THE NOTE AND NOT A KEY, so unlike a finger it does not follow
    * the octave pad, and it can hold a note this keyboard does not draw. Both are
    * right: what arrived was a note number somebody played, and the pad moves
    * which keys are on screen rather than what a MIDI keyboard sent.
    */
   const tapeNote = (note, down) => {
-    if (tape === null || looping) return;
-    startClock();
-    outside++;
-    tape.push({ note, down, t: Math.round(performance.now() - tapeAt) });
+    if (replaying) return;
+    for (const t of takes) {
+      if (!t.rec) continue;
+      startClock(t);
+      t.outside++;
+      t.tape.push({ note, down, t: Math.round(performance.now() - t.at) });
+    }
   };
 
-  /* 🔴 STOPPING A LOOP MID NOTE MUST NOT LEAVE THE NOTE ON, and nothing here did
-     that until the loop could hold a note. Cutting the timers stops the next
-     movement arriving, which means the note-off that was due never comes: what
-     a player hears is the loop stopping with a chord still sounding, and the
-     only way out is `Notes off`. */
-  const stopLoop = () => {
-    for (const t of tapeTimers) clearTimeout(t);
-    tapeTimers = [];
-    looping = false;
-    tape = null;
-    for (const k of loopKeys) release(k, 'loop');
-    loopKeys.clear();
-    for (const n of loopNotes) onUp(n, 'loop');
-    loopNotes.clear();
-    outside = 0;
+  /* 🔴 STOPPING A LOOP MID NOTE MUST NOT LEAVE THE NOTE ON. Cutting the timers
+     stops the next movement arriving, which means the note-off that was due never
+     comes: what a player hears is the loop stopping with a chord still sounding,
+     and the only way out is `Notes off`. */
+  const stopTake = (i) => {
+    const t = takes[i];
+    for (const timer of t.timers) clearTimeout(timer);
+    t.timers = [];
+    t.going = false;
+    t.rec = false;
+    for (const k of t.keys) release(k, 'loop');
+    t.keys.clear();
+    for (const n of t.notes) onUp(n, 'loop');
+    t.notes.clear();
+  };
+
+  const runTake = (i) => {
+    const t = takes[i];
+    const round = () => {
+      if (!t.going) return;
+      for (const e of t.tape) {
+        t.timers.push(setTimeout(() => {
+          if (!t.going) return;
+          replaying++;
+          try {
+            /* 🔴 TWO KINDS OF MOVEMENT AND THEY REPLAY DIFFERENTLY. A key goes
+               back through `press`, so it follows the octave pad and lights up
+               like a finger. A note played past the keys has no key to press, so
+               it is handed to the page directly, marked `loop` the same way. */
+            if (e.k !== undefined) {
+              if (e.down) { held.delete(e.k); press(e.k, 'loop'); t.keys.add(e.k); }
+              else { release(e.k, 'loop'); t.keys.delete(e.k); }
+            } else if (e.down) { onDown(e.note, 'loop'); t.notes.add(e.note); }
+            else { onUp(e.note, 'loop'); t.notes.delete(e.note); }
+          } finally { replaying--; }
+        }, e.t));
+      }
+      t.timers.push(setTimeout(round, t.lap));
+    };
+    round();
   };
 
   /**
-   * 🔴 THREE STATES ON A TWO STATE BUTTON, AND THE MAPPING IS THE WHOLE OF IT.
-   * A loop is *recording*, then *going round*, then *off*, and `createToggle`
-   * has two. The first build called `setLoop(true)` twice and nothing happened
-   * the second time, because a toggle only reports a CHANGE: setting an on
-   * button on again is not an event. MEASURED in `/kit/`: four movements taped
-   * and zero notes ever came back.
-   * ✅ SO THE BUTTON IS ON FOR BOTH LIVE STATES AND THE PRESSES ALTERNATE.
-   * Press one turns it on and starts recording. Press two turns it off, which is
-   * where the take closes and starts going round, and the button is quietly put
-   * back ON, because a loop that is playing is a loop that is on. Press three
-   * turns it off again and that one really stops.
-   * ⚠️ `set(x, true)` IS THE QUIET SET and it matters: without it, putting the
-   * button back on would call straight back into here and record over the loop
-   * that had just started.
-   * ⚠️ AND THE TWO LIVE STATES ARE TOLD APART ON THE BUTTON rather than left to
-   * the page, because a control that looks identical while writing and while
-   * playing is the one thing a looper must not do.
+   * 🔴 250 ms IS A JUDGEMENT ON THE LAP AND NOT ON THE EVENTS. Found by the check
+   * in `/kit/`, which presses four keys with no waiting between them: the take
+   * was a few milliseconds long and the loop turned 118 times in 260 ms, which is
+   * a stuck note with extra steps. A person cannot play a take that short but CAN
+   * arm and press again straight away, which is the same take.
    */
-  function setLoop(on) {
-    if (on) {
-      /* Turned on with nothing in hand: start a take. */
-      tape = [];
-      tapeAt = 0;                 // the first note starts the clock. See `startClock`.
-      looping = false;
-      outside = 0;
-      loopBtn?.el.setAttribute('data-loop', 'recording');
-      log?.('loop armed. The take starts at your first note, so take your time, '
-          + 'then press Loop again to send it round');
-      onLoop?.(true, { state: 'recording' });
-      return;
-    }
-    /* Turned off while a loop is going round: that press is the stop. */
-    if (looping) {
-      const still = loopKeys.size + loopNotes.size;
-      stopLoop();
-      loopBtn?.el.removeAttribute('data-loop');
-      log?.(`loop stopped${still ? `, and ${still} note(s) it still had down were let go`
-                                : ''}`);
-      onLoop?.(false, { state: 'off' });
-      return;
-    }
-    /* Turned off while recording: the take closes and starts going round. */
-    /* 🔴 A LAP HAS A FLOOR, AND THE CHECK IN `/kit/` IS WHAT FOUND IT. That
-       check presses and releases four keys with no waiting between them, so the
-       take was a few milliseconds long and the loop turned **118 times in 260
-       ms**, which is not a loop, it is a stuck note with extra steps. A person
-       cannot play a take that short, but a person CAN arm the button and press
-       it again straight away, and that is the same thing.
-       ⚠️ 250 ms IS A QUARTER OF A SECOND AND IS A JUDGEMENT, not a measurement:
-       short enough that a deliberate one bar stab still loops, long enough that
-       nothing turns faster than a tremolo. It is the floor on the LAP and never
-       on the events, so a take of two quick notes still plays them where they
-       fell and simply waits before coming round. */
-    const MIN_LAP = 250;
-    const raw = tapeAt ? Math.round(performance.now() - tapeAt) : 0;
-    const lap = Math.max(MIN_LAP, raw);
-    if (tape === null || !tape.length) {
-      /* ⚠️ NOTHING PLAYED IS NOT A LOOP, and the button stays off rather than
-         sitting on with nothing behind it. */
-      stopLoop();
-      loopBtn?.el.removeAttribute('data-loop');
-      log?.('nothing was played while the loop was armed, so there is no loop', 'warn');
-      onLoop?.(false, { state: 'empty' });
-      return;
-    }
-    looping = true;
-    loopBtn?.set(true, true);
-    loopBtn?.el.setAttribute('data-loop', 'looping');
-    /* ⚠️ THE LOG SAYS WHERE THE MOVEMENTS CAME FROM, because that is the one
-       thing that was impossible to see when this went wrong: a MIDI take and an
-       on-screen take fail differently and looked identical. */
-    const fromKeys = tape.length - outside;
-    log?.(`looping ${tape.length} key movement(s) over ${lap} ms`
-        + `${raw < MIN_LAP ? `, the take being ${raw} ms and held to the 250 ms floor` : ''}`
-        + `${outside ? `, ${outside} of them played past the keys on screen` : ''}`
-        + `${fromKeys && outside ? ` and ${fromKeys} on them` : ''}`);
-    onLoop?.(true, { state: 'looping', lap, moves: tape.length, outside });
-    const round = () => {
-      if (!looping) return;
-      for (const e of tape) {
-        tapeTimers.push(setTimeout(() => {
-          if (!looping) return;
-          /* 🔴 TWO KINDS OF MOVEMENT AND THEY REPLAY DIFFERENTLY. A key goes back
-             through `press`, so it follows the octave pad and lights up like a
-             finger. A note played past the keys has no key to press, so it is
-             handed to the page directly, marked `loop` exactly the same way. */
-          if (e.k !== undefined) {
-            if (e.down) { held.delete(e.k); press(e.k, 'loop'); loopKeys.add(e.k); }
-            else { release(e.k, 'loop'); loopKeys.delete(e.k); }
-          } else if (e.down) { onDown(e.note, 'loop'); loopNotes.add(e.note); }
-          else { onUp(e.note, 'loop'); loopNotes.delete(e.note); }
-        }, e.t));
+  const MIN_LAP = 250;
+
+  const paintLoop = () => {
+    if (!loopBtn) return;
+    const s = machine.state(0);
+    loopBtn.set(s === 'recording' || s === 'looping', true);
+    if (s === 'empty') loopBtn.el.removeAttribute('data-loop');
+    else loopBtn.el.setAttribute('data-loop', s);
+  };
+
+  const enterLoop = (i, to, was) => {
+    const t = takes[i];
+    const n = SLOTS > 1 ? `loop ${i + 1}` : 'loop';
+    if (to === 'recording') {
+      t.tape = []; t.at = 0; t.outside = 0; t.going = false; t.rec = true;
+      log?.(`${n} armed. The take starts at your first note, so take your time, `
+          + 'then press again to send it round');
+    } else if (to === 'looping') {
+      if (was === 'recording') {
+        t.rec = false;
+        /* 🔴 THE LAP IS MEASURED TO THE PRESS AND NOT TO THE SETTLE, WHICH IS THE
+           ONE PLACE THE DOUBLE PRESS WINDOW WOULD HAVE BEEN AUDIBLE. A press is
+           held for 250 ms to find out whether it is half of a double one, so
+           closing a take on the settle would put that 250 ms inside the lap: at a
+           two second loop that is 12 per cent too long, every turn, for ever.
+           `onTouch` stamps the real moment and this reads it. */
+        const raw = t.at ? Math.round(t.pressedAt - t.at) : 0;
+        if (!t.tape || !t.tape.length) {
+          /* ⚠️ NOTHING PLAYED IS NOT A LOOP, so the slot goes back to empty
+             rather than sitting on with nothing behind it. */
+          stopTake(i);
+          t.tape = null;
+          machine.clear(i);
+          log?.(`nothing was played into ${n}, so there is no loop`, 'warn');
+          paintLoop();
+          onLoop?.(false, { slot: i, state: 'empty' });
+          return;
+        }
+        t.lap = Math.max(MIN_LAP, raw);
+        const fromKeys = t.tape.length - t.outside;
+        log?.(`${n} is going round: ${t.tape.length} movement(s) over ${t.lap} ms`
+            + `${raw < MIN_LAP ? `, the take being ${raw} ms and held to the 250 ms floor` : ''}`
+            + `${t.outside ? `, ${t.outside} of them played past the keys on screen` : ''}`
+            + `${fromKeys && t.outside ? ` and ${fromKeys} on them` : ''}`);
+      } else {
+        log?.(`${n} is playing again`);
       }
-      tapeTimers.push(setTimeout(round, lap));
-    };
-    round();
-  }
+      t.going = true;
+      runTake(i);
+      onLoop?.(true, { slot: i, state: 'looping', lap: t.lap, moves: t.tape.length,
+                       outside: t.outside });
+    } else if (to === 'stopped') {
+      const still = t.keys.size + t.notes.size;
+      stopTake(i);
+      log?.(`${n} stopped${still ? `, and ${still} note(s) it still had down were let go` : ''}`);
+      onLoop?.(false, { slot: i, state: 'off' });
+    } else {
+      /* empty, which is the double press meaning *throw this away* */
+      const had = t.tape ? t.tape.length : 0;
+      stopTake(i);
+      t.tape = null;
+      if (had) log?.(`${n} thrown away, ${had} movement(s) with it`);
+      onLoop?.(false, { slot: i, state: 'empty' });
+    }
+    paintLoop();
+  };
+
+  /**
+   * 🔴 THE MACHINE IS `/num/`'s, PRESS FOR PRESS. A slot walks empty, recording,
+   * looping, stopped and then alternates for ever, and a double press inside the
+   * window throws it away or, on an empty slot, silences the others and records.
+   * ⚠️ AND THE BUTTON IS SLOT 1. A keyboard with `loops: 1` is exactly what it
+   * was before this, one take on one button, which is why no page had to change.
+   */
+  const machine = createNumLoop({
+    slots: SLOTS,
+    onTouch: (i) => { takes[i].pressedAt = performance.now(); },
+    onEnter: (i, to, o) => enterLoop(i, to, o.was),
+  });
+
+  function setLoop() { machine.press(0); }
 
   // An octave button at the end of the range that still looks pressable is a
   // control that lies about having somewhere to go.
@@ -1136,10 +1196,31 @@ export function createKeyboard(host, {
     sustain: sustainBtn,
     /** the `Loop` toggle, or null when the caller did not ask for one */
     loop: loopBtn,
-    /** what the loop is doing, for a page that wants to say so and for a check */
-    looping: () => looping,
-    /** how many key movements are on the tape, or 0 when there is none */
-    taped: () => (tape ? tape.length : 0),
+    /**
+     * 🔴 THE TAKES, AND THIS IS WHAT A NUMBER PAD DRIVES. Asked 2026-09-23:
+     * *"num works. how come you can not add it to keyboard"*. A page that has a
+     * numeric pad on its MIDI keyboard calls `press(i)` with the slot and gets
+     * the whole of `/num/`'s behaviour: record, loop, stop, play again, and a
+     * double press inside the window to throw it away.
+     * ⚠️ THE PAGE OWNS THE PAD AND THIS OWNS THE LOOP, which is the same division
+     * as everywhere else here. Nothing in this component listens to MIDI, so a
+     * page maps a program change to a slot number and stops there.
+     * ⚠️ `settle` IS FOR A CHECK, and it says so on `numloop.mjs`: it runs a held
+     * press now rather than waiting out the double press window, which only a
+     * clock or a test can know is safe.
+     */
+    loops: {
+      press: (i) => machine.press(i),
+      settle: (i) => machine.settle(i),
+      clear: (i) => machine.clear(i),
+      state: (i) => machine.state(i),
+      states: () => machine.states(),
+      slots: SLOTS,
+    },
+    /** what a loop is doing, for a page that wants to say so and for a check */
+    looping: (i = 0) => !!takes[i]?.going,
+    /** how many key movements are on a take, or 0 when there is none */
+    taped: (i = 0) => (takes[i]?.tape ? takes[i].tape.length : 0),
     /** how far this keyboard has moved from where it was built, in semitones */
     displacement: () => base - HOME,
     /** the naming control's two buttons, in the order they are drawn */
