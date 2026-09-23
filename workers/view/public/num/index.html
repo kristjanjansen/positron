@@ -31,9 +31,42 @@
     background: color-mix(in srgb, var(--rec) 38%, var(--card));
     border-color: var(--rec);
   }
+  /* 🔴 A LOOP THAT IS PLAYING HAS TO LOOK LIKE IT IS MOVING. Asked 2026-09-23:
+     *"can you indicate lopping visually on num?"*. A green fill says *this one
+     has something in it*, and so does the stopped state's edge; what it cannot
+     say is *and it is running right now*, which is the one thing you need to
+     see across ten keys while your hands are busy.
+     ⚠️ IT IS A PULSE AND NOT A PLAYHEAD, AND THE DIFFERENCE IS HONESTY. This
+     bench has no audio and no clock in it, so it does not know a loop's length
+     or where it has got to, and a bar sweeping across the key would be inventing
+     a position. A steady pulse claims only *running*, which is exactly what is
+     known.
+     ⚠️ AND IT MOVES NOTHING. `positron-ui` forbids an animation that changes how
+     much room a thing takes, so this is opacity on a pseudo-element over the pad
+     and never a size or a border width. It is off under reduced motion, where
+     the fill still says the state. */
   .num-pad .pos-pad[data-st="looping"] {
     background: color-mix(in srgb, var(--ok) 30%, var(--card));
     border-color: var(--ok);
+  }
+  @keyframes num-breathe { 0%, 100% { opacity: 0; } 50% { opacity: .5; } }
+  .num-pad .pos-pad[data-st="looping"]::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: var(--ok); opacity: 0;
+    animation: num-breathe 1.4s ease-in-out infinite;
+  }
+  /* ⚠️ RECORDING PULSES TOO, FASTER AND IN THE RECORD INK, because *writing* and
+     *playing* are both running and a player has to tell them apart at a glance.
+     Same channel, different rate, which is one idea said twice rather than two
+     ideas competing. */
+  .num-pad .pos-pad[data-st="recording"]::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: var(--rec); opacity: 0;
+    animation: num-breathe .7s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .num-pad .pos-pad[data-st="looping"]::after,
+    .num-pad .pos-pad[data-st="recording"]::after { animation: none; }
   }
   .num-pad .pos-pad[data-st="stopped"] {
     background: var(--card); border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
@@ -52,6 +85,8 @@
   import { mount, el } from '/shell/shell.mjs';
   import { createPadGrid } from '/shell/pad.mjs';
   import { createNumLoop, NEXT } from '/shell/numloop.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  import { createPresenceButton, WIRED } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const ONE = 'ten numbers, each one a loop you record, play, stop and throw away with the same key';
@@ -160,6 +195,82 @@
       + `again to play. Press twice inside ${DOUBLE_MS} ms to throw it away. `
       + 'Open with ?double=120 to try a shorter window');
 
+  /* 🔴 THE SAME TEN LOOPS FROM A REAL KEYBOARD, ASKED AS *"add midi on button to
+     num"*. This bench is about how the interaction FEELS, and a mouse is not
+     how anybody plays a looper: the window that decides a double press is the
+     one number the whole thing turns on, and a trackpad and a pad on a
+     controller do not double press at the same speed.
+     ⚠️ TEN NOTES FROM THE BOTTOM OF WHATEVER IS PLUGGED IN, because nothing on
+     the wire says which key is `1`. It is the first ten notes this page sees,
+     in the order it first sees them, which is honest and is said in the log
+     rather than presented as a mapping somebody chose.
+     ⚠️ AND MIDI IS NEVER ASKED FOR ON A VISIT. `createPresenceButton` is a press,
+     and the browser prompt belongs behind one. */
+  const midiSlot = new Map();
+  let midiSaid = false, padSaid = false;
+  let midi = null;
+  /* 🔴 BUILT INSIDE THE PRESS, NEVER AT LOAD. `createMidi` calls
+     `requestMIDIAccess` in its own constructor, so building it here would put a
+     browser permission prompt in front of somebody who has only opened a page.
+     `CLAUDE.md`'s rule is that a visit opens nothing, and a prompt is the
+     loudest thing a page can open. Checked in `midi.mjs` rather than assumed. */
+  const startMidi = () => createMidi({
+    /* 🔴 THE NUMBER PAD, NOT THE KEYS. Asked 2026-09-23: *"control 1 2 3 with evo
+       1 2 3 numpads"*. The MK-425C's ten assignable buttons send a bank select
+       pair and then a PROGRAM CHANGE, so program 1 is loop 1 and the mapping is
+       the panel's own printing rather than an order this page invented. That is
+       strictly better than the note order it replaced, which was honest and
+       arbitrary: nothing on the wire says which KEY is which, and the numbers on
+       the pad say exactly which BUTTON is which.
+       ⚠️ AND PROGRAM 0 IS LOOP 10, because the pad's tenth button is `0` and the
+       instrument was measured sending program 0 from it. */
+    onProgram: (program) => {
+      const slot = program === 0 ? 9 : program - 1;
+      if (slot < 0 || slot >= loop.slots) return;
+      if (!padSaid) {
+        padSaid = true;
+        d.log('the number pad on the keyboard is driving these loops: program 1 is '
+            + 'loop 1, and the pad\u2019s 0 is loop 10');
+      }
+      loop.press(slot);
+    },
+    /* ⚠️ THE KEYS STILL WORK, and they are the fallback for anything with no
+       number pad on it. The first ten notes become the ten loops in the order
+       they first arrive, which is honest and arbitrary and says so. */
+    onDown: (note) => {
+      if (!midiSlot.has(note) && midiSlot.size < loop.slots) {
+        midiSlot.set(note, midiSlot.size);
+        d.log(`note ${note} is loop ${midiSlot.get(note) + 1}, taken in the order the `
+            + 'keys first arrived, because nothing on the wire says which key is which');
+      }
+      if (midiSlot.has(note)) loop.press(midiSlot.get(note));
+    },
+    log: d.log,
+    onPorts: (n) => {
+      if (midiSaid) return;
+      midiSaid = true;
+      d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to. The first ten keys `
+              + 'you play become the ten loops'
+            : 'no MIDI keyboard is plugged in, and the numbers on screen still work');
+    },
+  });
+  const pres = createPresenceButton({
+    of: 'a keyboard', state: 'unknown', says: WIRED,
+    can: ['unknown', 'checking', 'online', 'offline'],
+    press: () => d.run('listen'),
+  });
+  d.controls.hidden = false;
+  d.controls.append(pres.el);
+  d.on('listen', async () => {
+    pres.set('checking');
+    if (!midi) midi = startMidi();
+    /* ⚠️ ONLINE MEANS PORTS, NOT PERMISSION. Granting MIDI and having something
+       plugged in are two facts, and reporting the first as the second says
+       `online` about an empty room. `/evo/` records the same distinction. */
+    await new Promise((r) => setTimeout(r, 400));
+    pres.set(midi.ports() > 0 ? 'online' : 'offline');
+  });
+
   /* ── what only this page can say ─────────────────────────────────────── */
   ifSelfcheck();
 
@@ -205,11 +316,20 @@
     /* 🔴 THE TRAP, DRIVEN THROUGH THE PAD. Two clicks inside the window must
        clear and must not walk the machine on the way, and the page is where a
        `click` really fires twice. */
+    /* 🔴 AND A DOUBLE PRESS ON AN EMPTY KEY CLEARS THE STAGE AND RECORDS, which
+       reversed on 2026-09-23: *"when doubleclick on empty slot, it stops others
+       possible loops playing and starts rec"*. On a key with something in it a
+       double press still throws it away; on a blank one there was nothing to
+       throw, so the gesture did nothing at all. */
+    const oneWas = stOf('1');
     hit('2'); hit('2');
     await sleep(DOUBLE_MS + 120);
-    d.assert('two quick presses throw a loop away rather than recording one',
-      stOf('2') === 'empty',
-      `key 2 reads ${stOf('2')} after a double press on an empty key`);
+    d.assert('a double press on an empty key stops the running loops and records',
+      stOf('2') === 'recording' && oneWas === 'looping' && stOf('1') === 'stopped',
+      `key 2 reads ${stOf('2')}, and key 1 went ${oneWas} to ${stOf('1')}`);
+    hit('1'); await sleep(DOUBLE_MS + 120);
+    d.assert('NEGATIVE CONTROL: the stopped loop is still there, one press from playing',
+      stOf('1') === 'looping', `key 1 reads ${stOf('1')}`);
 
     hit('3'); await sleep(DOUBLE_MS + 120);
     hit('3'); await sleep(DOUBLE_MS + 120);
@@ -221,14 +341,20 @@
 
     /* ⚠️ THE NEGATIVE HALF, and it is what makes this a looper rather than a
        transport: ten machines that do not know about each other. */
+    /* ⚠️ THE NUMBERS MOVED WITH THE NEW DOUBLE PRESS, because key 2 now holds a
+       recording rather than being empty. The claim is unchanged: pressing 4
+       leaves 1 and 2 exactly where they were. */
+    const oneBefore = stOf('1'), twoBefore = stOf('2');
     hit('4'); await sleep(DOUBLE_MS + 120);
     d.assert('NEGATIVE CONTROL: one number does not touch another',
-      stOf('4') === 'recording' && stOf('1') === 'looping' && stOf('2') === 'empty',
-      `4 ${stOf('4')}, 1 ${stOf('1')}, 2 ${stOf('2')}`);
+      stOf('4') === 'recording' && stOf('1') === oneBefore && stOf('2') === twoBefore,
+      `4 ${stOf('4')}, 1 ${stOf('1')} was ${oneBefore}, 2 ${stOf('2')} was ${twoBefore}`);
 
     d.assert('the readout counts what is on the pad rather than what was pressed',
-      Number(d.api.readout.live) === 2 && Number(d.api.readout.empty) === 8,
-      `${d.api.readout.live} live, ${d.api.readout.empty} empty`);
+      Number(d.api.readout.live) + Number(d.api.readout.empty) === 10
+        && Number(d.api.readout.live)
+           === loop.states().filter((s) => s === 'recording' || s === 'looping').length,
+      `${d.api.readout.live} live and ${d.api.readout.empty} empty of 10`);
 
     /* 🔴 AND THE COST IS MEASURED RATHER THAN DESCRIBED. Every single press is
        late by the window, because the machine cannot know a press was single
@@ -240,6 +366,25 @@
       check();
     });
     const late = performance.now() - t0;
+    /* 🔴 A RUNNING LOOP LOOKS LIKE IT IS RUNNING, asked as *"can you indicate
+       lopping visually on num?"*. MEASURED AS AN ANIMATION ON THE PAD rather
+       than as a class, because a class says the page asked and an animation is
+       what a reader sees. ⚠️ AND THE TWO RATES ARE THE CLAIM: recording and
+       looping are both running and must be told apart at a glance. */
+    {
+      const pad1 = padOf.get(SLOT.get('1')).button;
+      const loopAnim = getComputedStyle(pad1, '::after').animationName;
+      const loopRate = getComputedStyle(pad1, '::after').animationDuration;
+      hit('6'); await sleep(DOUBLE_MS + 120);
+      const pad6 = padOf.get(SLOT.get('6')).button;
+      const recRate = getComputedStyle(pad6, '::after').animationDuration;
+      d.assert('a playing loop pulses, and a recording one pulses faster',
+        stOf('1') === 'looping' && stOf('6') === 'recording'
+          && loopAnim === 'num-breathe' && loopRate !== recRate
+          && parseFloat(recRate) < parseFloat(loopRate),
+        `looping runs ${loopAnim} at ${loopRate} and recording at ${recRate}`);
+    }
+
     d.assert('a single press costs the double press window before it takes effect',
       late >= DOUBLE_MS && late < DOUBLE_MS + 200,
       `${late.toFixed(0)} ms from the click to the state, against a ${DOUBLE_MS} ms window`);

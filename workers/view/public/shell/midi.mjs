@@ -27,7 +27,9 @@
  * @param {(n:number)=>void} [o.onPorts]  called with the input count, on every change
  * @returns {{ports:()=>number, state:()=>string, close:()=>void}}
  */
-export function createMidi({ onDown, onUp, onControl, log = () => {}, onPorts = () => {} } = {}) {
+export function createMidi({
+  onDown, onUp, onControl, onProgram, log = () => {}, onPorts = () => {},
+} = {}) {
   let ports = 0, state = 'asking', access = null;
 
   const wire = (port) => {
@@ -46,6 +48,15 @@ export function createMidi({ onDown, onUp, onControl, log = () => {}, onPorts = 
       if (kind === 0x90 && b > 0) onDown?.(a, b, ch, e.timeStamp);
       else if (kind === 0x80 || (kind === 0x90 && b === 0)) onUp?.(a, ch, e.timeStamp);
       else if (kind === 0xb0) onControl?.(a, b, ch, e.timeStamp);
+      /* 🔴 PROGRAM CHANGE IS TWO BYTES, NOT THREE, AND THAT IS WHY IT NEEDED ITS
+         OWN LINE RATHER THAN FALLING OUT OF THE CONTROL ONE. `0xc0` carries a
+         single data byte, so `b` is `undefined` and every handler above would
+         have read a number that is not there.
+         ⚠️ AND IT IS WHAT A NUMBER PAD SENDS. Added 2026-09-23 for *"control 1 2
+         3 with evo 1 2 3 numpads"*: the MK-425C's ten assignable buttons send a
+         bank select pair and then a program change, so a page listening only for
+         notes and controllers hears a keypad as silence. */
+      else if (kind === 0xc0) onProgram?.(a, ch, e.timeStamp);
     };
   };
 
