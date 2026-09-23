@@ -3377,6 +3377,29 @@
         readLine.textContent === 'Fmaj' && roll.picked() === 0 && rows() === 1,
         `the page reads ${readLine.textContent} and row ${roll.picked()} is still chosen`);
 
+      /* 🔴 AND THE READING IS NOT FLUSH WITH THE CORNER IT SITS IN. Asked
+         2026-09-23: *"add top and left padding on chord name on pianoroll"*.
+         ⚠️ MEASURED AGAINST THE ROLL RATHER THAN AGAINST THE DECLARATION. Reading
+         the padding back off `getComputedStyle` would only prove the stylesheet
+         says what it says; what the ask is about is the gap between the first
+         letter and the roll's own edge, so this compares where the TEXT starts
+         with where the roll starts. A range walker put the box around the text
+         itself, because the element is absolute and its own rect never moves
+         when padding is what changed. */
+      const readBox = readLine.getBoundingClientRect();
+      const rollBox = roll.el.getBoundingClientRect();
+      const rng = document.createRange();
+      rng.selectNodeContents(readLine);
+      const inkBox = rng.getBoundingClientRect();
+      rng.detach?.();
+      const inL = Math.round(inkBox.left - readBox.left);
+      const inT = Math.round(inkBox.top - readBox.top);
+      d.assert('the played reading sits in from the roll’s corner rather than against it',
+        inL >= 4 && inL <= 12 && inT >= 2 && inT <= 10
+          && readBox.left >= rollBox.left - 1 && readBox.top >= rollBox.top - 1,
+        `its first letter is ${inL} px in and ${inT} px down from the corner of a `
+        + `box that starts ${Math.round(readBox.left - rollBox.left)} px from the roll`);
+
       await sleep(900);
       d.assert('NEGATIVE CONTROL: and the second chord is tallied separately rather than added on',
         rows() === 1 && learned.length === 1
@@ -3859,7 +3882,19 @@
      `--dim`. Those are a record of chords that are IN the roll; this is a
      reading of the moment and must not compete with them. */
   .nola-keys { position: relative; }
+  /* 🔴 AND IT IS NOT FLUSH WITH THE CORNER. Asked 2026-09-23: *"add top and left
+     padding on chord name on pianoroll"*. It was pinned at `left: 0; top: 0`,
+     which put the first letter hard against the roll's own left rule and the top
+     of the picture, so it read as a label stuck to the frame rather than as a
+     reading sitting in the room the roll already reserves above its first row.
+     ⚠️ THE NUMBERS ARE A JUDGEMENT AND NOT A DERIVATION, which is worth saying
+     because most measurements on this page are tied to something. 6 px left
+     clears the lane rule without reaching the first dot column, and 3 px top
+     keeps it inside `--roll-top`, the half row the roll already holds back.
+     ⚠️ PADDING RATHER THAN A MOVED CORNER, so the box stays anchored and its
+     `text-overflow` still clips against the same edge when a name is long. */
   .nola-read { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none;
+               padding: 3px 0 0 6px;
                font: 500 11px/1.5 var(--mono); letter-spacing: .04em; color: var(--dim2);
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* ⚠️ A SECOND INK FOR A SECOND KIND OF FACT, which is the rule `.nola-chord-r`

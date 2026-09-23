@@ -781,15 +781,22 @@ export function createKeyboard(host, {
    * sustains should not grow a control they cannot use.
    */
   /**
-   * 🔴 `Loop` SITS AT THE RIGHT END, AND IT IS A KEYBOARD FUNCTION RATHER THAN A
-   * PAGE MODE. Asked 2026-09-23 as *"wait make it a keyboard funcion, a button
-   * in bottom rihjt (left from sustain) called 'Loop'"*, after a first reading
-   * that would have made it a third option on `/nola/`'s roll picker, then moved
-   * the same day: *"move loop button to right"*, with *"loop is leftmost of 3 in
-   * riht"* saying where it was.
-   * ⚠️ SO THE ROW READS `Sustain`, `Notes off`, `Loop`, AND THAT PUTS A PANIC
-   * BUTTON BETWEEN THE TWO TOGGLES, which is not how it would have been drawn
-   * from scratch. The ask is the reason and it outranks the symmetry.
+   * 🔴 THE ROW IS `Loop`, `Sustain`, `Notes off`, STATED IN THOSE WORDS, and it
+   * is a keyboard function rather than a page mode. Asked 2026-09-23 as *"wait
+   * make it a keyboard funcion, a button in bottom rihjt (left from sustain)
+   * called 'Loop'"*, after a first reading that would have made it a third option
+   * on `/nola/`'s roll picker.
+   * ⚠️ AND THE ORDER TOOK THREE MESSAGES, WHICH IS WORTH RECORDING BECAUSE THE
+   * FIRST TWO WERE READ WRONG. *"move loop button to right"* and then *"loop is
+   * leftmost of 3 in riht"* were both read as *move Loop along the row*, so it
+   * went to the middle and then to the end. What they were about was the GROUP:
+   * two `margin-left: auto` on one flex line split the free space instead of
+   * sharing it, so `Loop` was stranded out in the row rather than sitting with
+   * the others, and it was leftmost of three that were not together. Settled by
+   * *"buttons: Loop Sustain Notes off"*, which is where it started.
+   * 🔴 SO THE DEFECT WAS THE GAP AND THE REPORT NAMED A POSITION. Moving the
+   * button twice was answering the words rather than the picture, and the
+   * stylesheet is where it was wrong the whole time.
    * ⚠️ THE CORRECTION IS THE INTERESTING PART AND IS WHY IT IS HERE. A mode is
    * something a PAGE is in and excludes the others; looping what you play is
    * something you do WHILE typing chords, or while the page is learning them, or
@@ -817,7 +824,7 @@ export function createKeyboard(host, {
      right; the others sit tight against it. Adding a fourth control is one more
      entry in this array and no CSS at all, which is the opposite of what the
      `margin-left: auto` on every toggle did when `Loop` arrived. */
-  const rightSide = [sustainBtn?.el, panicBtn, loopBtn?.el].filter(Boolean);
+  const rightSide = [loopBtn?.el, sustainBtn?.el, panicBtn].filter(Boolean);
   rightSide.forEach((node, i) => {
     node.classList.add(i === 0 ? 'kpad-right' : 'kpad-tight');
     pad.append(node);

@@ -86,6 +86,7 @@
   import { createPadGrid } from '/shell/pad.mjs';
   import { createNumLoop, NEXT } from '/shell/numloop.mjs';
   import { createMidi } from '/shell/midi.mjs';
+  import { noteName } from '/shell/midi-decode.mjs';
   import { createPresenceButton, WIRED } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
@@ -208,6 +209,9 @@
      and the browser prompt belongs behind one. */
   const midiSlot = new Map();
   let midiSaid = false, padSaid = false;
+  /* the raw monitor's own state. See `onAny` below. */
+  let rawSeen = 0;
+  const rawShapes = new Set();
   let midi = null;
   /* 🔴 BUILT INSIDE THE PRESS, NEVER AT LOAD. `createMidi` calls
      `requestMIDIAccess` in its own constructor, so building it here would put a
@@ -244,6 +248,35 @@
             + 'keys first arrived, because nothing on the wire says which key is which');
       }
       if (midiSlot.has(note)) loop.press(midiSlot.get(note));
+    },
+    /* 🔴 EVERY MESSAGE IS PRINTED UNTIL SOMETHING IS RECOGNISED, BECAUSE
+       *"there is no events when i press numpad"* and *"no events"* is the one
+       report this page could not tell apart from a dead cable. The four kinds
+       below are handled and everything else was dropped in silence, so a pad
+       sending a shape nobody listens for reads exactly like nothing arriving.
+       ⚠️ IT STOPS ON ITS OWN. The first 24 messages are printed in full, and
+       after that only a SHAPE nobody has seen yet, so holding a key down or
+       sweeping a knob cannot bury the answer. A monitor that floods the log is a
+       monitor somebody switches off. */
+    onAny: (data) => {
+      const [st, a, b] = data;
+      const kind = st & 0xf0;
+      const shape = `${kind.toString(16)}:${data.length}`;
+      if (rawSeen < 24 || !rawShapes.has(shape)) {
+        rawShapes.add(shape);
+        rawSeen++;
+        const bytes = [...data].map((x) => x.toString(16).padStart(2, '0')).join(' ');
+        const what = kind === 0x90 && b > 0 ? `note ${a} on, which is ${noteName(a)}`
+          : kind === 0x80 || kind === 0x90 ? `note ${a} off, which is ${noteName(a)}`
+          : kind === 0xb0 ? `controller ${a} at ${b}`
+          : kind === 0xc0 ? `program ${a}, which this page reads as a pad button`
+          : kind === 0xe0 ? 'pitch bend'
+          : kind === 0xa0 || kind === 0xd0 ? 'aftertouch'
+          : st === 0xf0 ? 'a system exclusive message, which this page ignores'
+          : 'a kind this page does not listen for';
+        d.log(`${bytes}   ${what}`);
+        if (rawSeen === 24) d.log('that is the first 24 messages. Only new shapes from here');
+      }
     },
     log: d.log,
     onPorts: (n) => {
