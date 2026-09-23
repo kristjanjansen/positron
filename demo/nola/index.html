@@ -1753,9 +1753,34 @@
     for (const key of admitted) addLearned(key);
   }
 
+  /** the notes of the last reading that counted, so a finger moving inside a
+   *  chord can be told from a chord change. Cleared when the hands come off. */
+  let lastSet = null;
   function settleNow(at) {
     const got = settler.settle(at);
     if (!got) return;
+    /**
+     * 🔴 A FINGER LIFTED IS NOT A NEW CHORD, AND THIS IS THE FAULT BEHIND
+     * *"my scond chord is not proerly recorded"*. MEASURED on a 46 second take
+     * recorded on this desk: of 181 transitions between readings, **55 were the
+     * new set being a SUBSET of the one before it** and 38 were a superset, so
+     * **51 per cent of everything the page read was one chord with a finger
+     * moving in it**. Holding `C3 F3 A3 C4 E4` and letting the E4 go for a
+     * moment produced `Fmaj7/C`, then `Fmaj/C`, then `Fmaj7/C` again, and every
+     * one of those went into the tally as a different chord. That is how a
+     * chord nobody meant to play gets admitted and a chord somebody did play
+     * never reaches three arrivals.
+     * ✅ A READING THAT IS A SUBSET OF THE ONE BEFORE IT IS THE SAME CHORD, LESS
+     * COMPLETELY STATED, so the fuller reading stands and nothing is re-tallied.
+     * ⚠️ A SUPERSET IS NOT SUPPRESSED, because that is the chord arriving more
+     * completely and the fuller reading is the better one. The floor protects
+     * the partial that preceded it: under 120 ms it banks nothing at all.
+     * ⚠️ AND IT RESETS WHEN THE HANDS COME OFF, or playing the same chord again
+     * after a rest would be read as a finger lift and ignored.
+     */
+    if (lastSet && got.notes.length < lastSet.length
+        && got.notes.every((n) => lastSet.includes(n))) return;
+    lastSet = [...got.notes];
     const r = nameChord(got.notes);
     if (!r.ok) { showReading(null); return; }
     /* 🔴 TWO NOTES DO NOT NAME A CHORD AND THE ONE EXCEPTION IS A BARE FIFTH,
@@ -1820,7 +1845,7 @@
        The tally banks it and the next settle starts a new one. */
     tally.release(now);
     const due = settler.held([...heldNotes], now);
-    if (due === null) { showReading(null); return; }
+    if (due === null) { lastSet = null; showReading(null); return; }
     settleTimer = setTimeout(() => settleNow(performance.now()), Math.max(0, due - now));
   }
 
@@ -2909,6 +2934,24 @@
       d.assert('and pressing a voicing moves a learned row, because that is you asking it to',
         ledTo !== wasAt && ledTo === '48,52,55',
         `played at ${wasAt} and drawn at ${ledTo} once a voicing was pressed`);
+
+      /* 🔴 A FINGER LIFTED INSIDE A CHORD IS NOT A NEW CHORD. MEASURED on a 46
+         second take from this desk: 55 of 181 transitions between readings were
+         the new set being a SUBSET of the one before, and holding one chord with
+         the fingers moving produced `Fmaj7/C`, `Fmaj/C`, `Fmaj7/C` in a row,
+         each going into the tally as its own chord. */
+      const beforeLift = readLine.textContent;
+      drop([67]);                                             // one finger off Cmaj
+      await sleep(LEARN_WINDOW + 120);
+      const onLift = readLine.textContent;
+      const scoredOnLift = tally.scores(performance.now()).length;
+      hold([67]);
+      await sleep(LEARN_WINDOW + 120);
+      d.assert('lifting one finger inside a held chord does not read as a different chord',
+        beforeLift === 'Cmaj' && onLift === 'Cmaj'
+        && tally.scores(performance.now()).length === scoredOnLift,
+        `the page read ${beforeLift} with the chord down and ${onLift} with a finger off it, `
+        + `and the tally still knows ${scoredOnLift} chord(s)`);
 
       /* 🔴 A CHORD YOU ARE HALF WAY INTO MARKS ITS OWN DOTS, asked for as *"when
          partial match with piano roll chord use faint yellow on dots"*. The row
