@@ -1,5 +1,53 @@
 ## Open
 
+### Asked 2026-09-23, doing now: benchmark the suggester, and a style dial, and no cliches
+
+🔴 **ASKED IN THESE WORDS, THREE MESSAGES IN A ROW:** *"can you benchmark yr
+suggestions. want them to be openstudiojazz quality stuff"*, then *"no cliches"*,
+then *"perhaps a setting to toggle jazzyness / style?"*.
+⚠️ **`no cliches` IS READ AS BEING ABOUT THE SUGGESTIONS, NOT THE PROSE**,
+because it arrived between two messages that are both about the suggester. The
+words are kept verbatim here so that reading can be checked rather than
+inherited.
+
+🔴 **THE 173 BYTE RULE CANNOT REACH THIS AND NO AMOUNT OF RE-ORDERING WILL.**
+`research/chord-learning-2026-09-23.md` graded it against 24 loops written from
+memory, and its whole vocabulary is diatonic triads in a major key. Open Studio
+teaches ii-V-I, minor ii-V, secondary dominants, tritone subs, backdoor
+cadences, turnarounds and modal interchange. **Not one of those is expressible in
+that rule**, so this is a different rule rather than a tuned one, and the
+research's own recommendation to download no corpus was reached under a
+requirement that has now changed.
+
+🔴 **AND THE TWO ASKS PULL AGAINST EACH OTHER, WHICH IS THE INTERESTING PART.**
+A suggester scored only on *did it predict the next chord* is maximised by always
+offering the commonest continuation in the corpus, and the commonest continuation
+is the definition of a cliche. **Top 1 accuracy and `no cliches` are opposed**, so
+a benchmark reporting accuracy alone will drive the build in exactly the wrong
+direction.
+✅ **THE RESOLUTION THAT FITS THE ORIGINAL ASK:** the ask was already for a THIRD
+and a FOURTH chord, which is two slots. Make them two different jobs. One is the
+idiomatic continuation, one is the one worth hearing, and the benchmark scores
+each on its own terms.
+⚠️ **AND `not idiomatic` IS NOT THE SAME AS `adventurous`.** A suggestion no real
+standard ever makes in that context is wrong, not daring. The floor is corpus
+support above zero; the cliche test sits above that floor, not instead of it.
+
+🔴 **THE STYLE DIAL IS LITERALLY WHICH TABLE IS READ**, which is why it is cheap
+and why it decides the benchmark's shape. The two clean corpora the research
+already cleared are different styles: **McGill Billboard, CC0, 740 pop songs**
+and **the iRealPro corpus (iRb), CC BY 4.0, 1,186 jazz standards, 530,984
+bytes**. Both may be redistributed. So the dial is a table per style plus a
+vocabulary per style, and the benchmark has to produce both tables to measure
+either.
+⚠️ **THIS IS THE ONE ASK THAT JUSTIFIES A DOWNLOAD**, and it is one fetch of one
+CC BY 4.0 file. The rule about somebody else's server stands: fetch once, cache
+beside the recipe, never ask again, and carry the licence. That is the shape
+`demo/resources/subset-bravura.mjs` and `fetch-jrhodes3d.mjs` already have.
+⚠️ **AND WHAT SHIPS IS A TABLE, NOT A CORPUS.** A trigram over roman numerals is
+2,744 cells against 110,592 over absolute names, which the research measured.
+Work key-relative and transpose at display.
+
 ### Asked 2026-09-23, doing now: balanced wrapping on every centred text
 
 🔴 **ASKED IN THESE WORDS:** *"the board has not answered since you opened this
