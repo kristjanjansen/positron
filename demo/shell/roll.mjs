@@ -397,6 +397,28 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
      * a selection inside the part being dropped cannot, and is cleared rather
      * than left pointing at a row that is gone.
      */
+    /**
+     * Drop one row, keeping every other row where it is.
+     *
+     * 🔴 `trimRows` CANNOT DO THIS AND THE DIFFERENCE IS THE WHOLE POINT. It
+     * keeps a PREFIX, which is right when a page owns a tail it rebuilds; it is
+     * useless when the row to remove is in the middle of a list that is a LOG.
+     * `/nola/` reads its roll downward as time, so a proposal sits at the moment
+     * it was offered and chords played afterwards land below it, and replacing
+     * that proposal must not move anything under it.
+     * ⚠️ THE SELECTION FOLLOWS THE ROWS RATHER THAN THE INDEX. A pick below the
+     * dropped row is one row higher afterwards, and a pick ON it is gone, which
+     * is the only honest answer: the row it named does not exist any more.
+     */
+    dropRow(i) {
+      if (i < 0 || i >= current.length) return;
+      current = current.filter((_, at) => at !== i);
+      if (picked === i) picked = -1; else if (picked > i) picked -= 1;
+      if (focused > i) focused -= 1;
+      focused = Math.max(0, Math.min(focused, Math.max(0, current.length - 1)));
+      draw();
+      follow?.();
+    },
     trimRows(n) {
       const keep = Math.max(0, Math.min(n, current.length));
       if (keep === current.length) return keep;

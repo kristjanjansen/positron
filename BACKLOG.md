@@ -1,5 +1,25 @@
 ## Open
 
+### Found 2026-09-23, NOT ASSERTED: the roll's timeline order has no check on it
+
+🔴 **THE CLAIM IS NEW AND NOTHING GRADES IT.** Asked as *"do not push suggested row
+down when new recoded one appears, rec one apears below suggestion (timeline
+loging downwards)"*. `addLearned` no longer trims the proposal off and re-adds it
+underneath, so a chord learned while a proposal is on screen lands BELOW it and
+the proposal keeps the moment it was offered.
+⚠️ **AND IT REVERSES AN EARLIER ASK IN THE SAME DAY**, *"played is first choice"*,
+which put every learned row above every proposal. That was an ordering rule and
+this is a TIME rule, and time is the stronger of the two, but the assert written
+for the first one is the only one either claim has.
+⚠️ **THE CHECK BLOCK NEVER REACHES THE CASE.** It learns two chords, draws a
+proposal, and stops, so the only ordering it can see is the one both rules agree
+on. Showing the difference costs a third chord, which is three more arrivals and
+takes that block past `verify.mjs`'s two second patience, which is why it is
+written down rather than bolted on.
+✅ **THE CHEAP VERSION IS AT THE COMPONENT**, not the page: `roll.dropRow(i)`
+removes a row from the middle and every row under it keeps its place, and that is
+gradable in `/kit/` with no chords and no clock.
+
 ### Asked 2026-09-23, DONE 2026-09-23: the proposal is quieter than your playing, and the voicing control is put away
 
 🔴 **ASKED IN THESE WORDS, ACROSS FOUR MESSAGES WHILE PLAYING:** *"make suggested
