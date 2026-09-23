@@ -301,7 +301,8 @@
      baseline is gone: a knob with a two line name under it then hangs lower than
      its neighbours and the row reads as sagging. */
   .evo-rot { display: flex; align-items: center; gap: var(--ctl-gap); padding: 0; }
-  .evo-rot-div { align-self: stretch; width: 0; border-left: 1px solid var(--line2); }
+  /* ⚠️ THE DIVIDER RULE MOVED INTO `shell.css` AS `.pos-knob-div` when this row
+     became `createKnobBank`. Nothing draws `.evo-rot-div` any more. */
   .evo-rot .pos-knob-lab { color: var(--dim); }
 
   /* ── the keys ──────────────────────────────────────────────────────────── */
@@ -375,7 +376,7 @@
 </style>
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { createKnob } from '/shell/knob.mjs';
+  import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader } from '/shell/fader.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
@@ -913,10 +914,19 @@
   const plate = nameplate.el;
   row.append(plate);
 
-  const rot = el('div', 'evo-rot');
+  /* 🔴 THE KIT'S OWN KNOB BANK, NOT A SECOND ROW OF KNOBS. Asked 2026-09-23:
+     *"use std knob grid and separartors on c1-c9. in general, make evo roghly
+     made of stadard pieces"*. This page had hand rolled both the row and the
+     hairline in it, and `createKnobBank` already existed with a `.pos-knob-row`
+     that does the sideways scrolling and the `min-width: 0` that goes with it.
+     What it did not have was the divider, so the divider moved INTO it rather
+     than a second row being kept here.
+     ⚠️ THE SPLIT IS ONE ROW WITH A GROUPING, NOT TWO BANKS. This instrument's
+     eight rotaries are one row of eight, and this page's own research names the
+     4 and 4 split as the feature most likely to be misread as two rows. Two
+     banks would make the misreading true. */
   const knobs = [];
   for (let i = 0; i < ROTARIES.length; i++) {
-    if (i === ROTARY_SPLIT) rot.append(el('div', 'evo-rot-div'));
     const k = createKnob({
       label: ROTARIES[i], min: 0, max: 127, value: 0,
       /* 🔴 NO `sub`, WHICH IS WHERE THE WORD `unbound` USED TO BE, EIGHT TIMES
@@ -932,8 +942,10 @@
       disabled: true,
     });
     knobs.push(k);
-    rot.append(k.el);
   }
+  const rotBank = createKnobBank(knobs, { split: [ROTARY_SPLIT] });
+  const rot = rotBank.el;
+  rot.classList.add('evo-rot');
   row.append(rot);
   flow.append(row);
 
@@ -2007,6 +2019,20 @@
          look like a regression in a check about ink. What it is really for is
          that a sweep finding NOTHING must not pass, and the panel's eight
          rotaries are the thing it can count on. */
+      /* 🔴 THE ROTARIES ARE THE KIT'S BANK, WITH ITS OWN DIVIDER, and that is
+         worth an assert because *"make evo roghly made of stadard pieces"* is
+         only true if it stays true. A page that quietly grows a second copy of a
+         component is this project's most repeated defect. */
+      d.assert('the rotaries are the kit’s knob bank, with one hairline at the four four split',
+        rot.classList.contains('pos-knob-bank')
+          && rot.querySelectorAll('.pos-knob-div').length === 1
+          && rotBank.splits().join(',') === String(ROTARY_SPLIT)
+          && rot.querySelectorAll('.pos-knob').length === ROTARIES.length,
+        `${rot.querySelectorAll('.pos-knob').length} knobs in a `
+        + `${rot.classList.contains('pos-knob-bank') ? 'kit bank' : 'hand rolled row'} `
+        + `with ${rot.querySelectorAll('.pos-knob-div').length} divider(s) at `
+        + `${rotBank.splits().join(',')}`);
+
       d.assert('every printed name on the panel is dimmed with the controls it names',
         dimmedNames.length >= rotCount && loudest.r < 3 && faintest.r > 1.5,
         `${dimmedNames.length} names, "${loudest.t}" loudest at ${loudest.r.toFixed(2)}:1, `
