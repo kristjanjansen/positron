@@ -1051,6 +1051,15 @@
       target: '_blank', rel: 'noopener' }),
     '.');
 
+  /* 🔴 DECLARED HERE AND NOT BESIDE THE HANDLERS THAT FILL IT, because the SAVE
+     control below is built before them and a `const` shadows its whole block
+     from the top. Written down there it read `Cannot access 'RECORDING' before
+     initialization` and took the page to 0/1. That is the fourth temporal dead
+     zone in this session and the symptom is never near the cause. */
+  const RECORDING = q.get('rec') === '1';
+  const tape = [];
+  const tapeAt = () => Math.round(performance.now());
+
   const instrument = el('div', 'nola-inst');
   /* ⚠️ THE TWO PICKERS ARE ONE ROW: what is playing and where the chords are
      put are both about the instrument under them, and two labelled choices on
@@ -1058,6 +1067,44 @@
   const picks = el('div', 'nola-picks');
   picks.append(instPick.el, voicePick.el);
   instrument.append(picks, keysHost, credit);
+
+  /* 🔴 THE ONE CONTROL THAT ONLY EXISTS UNDER `?rec=1`, so no visitor meets it
+     and no harness press moves. It writes the take to a file and says how much
+     is in it, because a recorder with no readout is a recorder nobody can tell
+     is running. */
+  if (RECORDING) {
+    const bar = el('div', 'nola-rec');
+    const said = el('span', 'nola-rec-say', 'recording every key from the MIDI keyboard');
+    const save = el('button', 'pos-btn', 'SAVE TAKE', { type: 'button' });
+    save.onclick = () => {
+      const doc = {
+        what: 'a take off the MIDI keyboard on this desk, raw note numbers before transpose',
+        when: new Date().toISOString(),
+        build: (document.querySelector('.pos-build') || {}).textContent || '',
+        transpose,
+        instrument: inst.id,
+        gate: { LEARN_WINDOW, LEARN_GATE, LEARN_TIMES, minNotes: 3 },
+        events: tape,
+      };
+      const blob = new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' });
+      const a = el('a', '', '', { href: URL.createObjectURL(blob),
+        download: `nola-take-${Date.now()}.json` });
+      document.body.append(a); a.click(); a.remove();
+      d.log(`wrote a take of ${tape.length} messages over `
+          + `${((tape.length ? tape[tape.length - 1].t - tape[0].t : 0) / 1000).toFixed(1)} s`);
+    };
+    const tick = () => {
+      said.textContent = tape.length
+        ? `${tape.length} messages over ${((tape[tape.length - 1].t - tape[0].t) / 1000)
+            .toFixed(1)} s. Play, then save.`
+        : 'recording every key from the MIDI keyboard. Nothing yet.';
+    };
+    setInterval(tick, 500);
+    bar.append(said, save);
+    instrument.append(bar);
+    d.log('this page is recording what you play, because it was opened with ?rec=1. '
+        + 'Play for a minute or two, press SAVE TAKE, and the file lands in your downloads');
+  }
   /* 🔴 THE MODE SITS BESIDE THE FIELD IT TURNS OFF, not down with the keys.
      `Played` disables the CHORDS field, and a control that greys out something
      three blocks away is a page asking a reader to work out what happened. The
@@ -1154,7 +1201,24 @@
     return { missing, extra };
   };
 
+  /**
+   * 🔴 THE TAPE, AND IT EXISTS BECAUSE EVERY TIMING NUMBER ON THIS PAGE IS A
+   * GUESS. Asked 2026-09-23: *"should i play and you measure?"*, *"save sample
+   * for testing?"*, *"real human data"*.
+   * `research/chord-learning-2026-09-23.md` says it in its own words: nobody
+   * played any of it, its session was synthetic, and it put a factor of ten
+   * between a chord held and a chord passed through BY CONSTRUCTION. So
+   * `LEARN_GATE`, `LEARN_WINDOW` and `LEARN_TIMES` are three numbers nothing has
+   * ever checked against a pair of hands.
+   * ⚠️ IT RECORDS THE WIRE, NOT THIS PAGE'S READING OF IT. What is wanted is the
+   * playing, so that a different gate can be tried against the same take without
+   * anybody playing it twice. Raw note numbers, before transpose.
+   * ⚠️ AND IT IS BEHIND `?rec=1`, so no control appears for anybody else and no
+   * harness press moves. Nothing is recorded, offered or sent unless somebody
+   * opened the page asking for it.
+   */
   function midiDown(note, vel, ch, at) {
+    if (RECORDING) tape.push({ t: tapeAt(), on: note, vel });
     tap.on++;
     tap.down.add(note);
     if (note < 48 && !flatSaid) {
@@ -1166,6 +1230,7 @@
     tapCheck('down', note);
   }
   function midiUp(note) {
+    if (RECORDING) tape.push({ t: tapeAt(), off: note });
     tap.off++;
     tap.down.delete(note);
     lift(note + transpose);
@@ -3066,6 +3131,9 @@
      paints the whole column instead of the mark, which is what the first
      version of these two rules did. `shell.css` draws every dot that way and
      `[data-held]` above is the pattern to copy. */
+  .nola-rec { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .nola-rec-say { color: var(--dim); font: 400 11px/1.4 var(--mono); }
+
   .roll-row[data-kind="guess"] .roll-label { color: var(--ai); }
   .roll-row[data-kind="guess"] .roll-cell.on::after { background: var(--ai); }
   /* 🔴 A PROPOSAL SITS BACK UNTIL YOU PLAY IT, asked for as *"fade 'ai row'
