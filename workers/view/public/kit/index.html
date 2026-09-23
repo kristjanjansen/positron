@@ -154,6 +154,12 @@
      invisible reads as a row that has been cut off. */
   .kit-phone { width: 320px; max-width: 100%; border: 1px dashed var(--kit-edge);
                border-radius: 4px; padding: 8px; }
+  /* ⚠️ CENTRED AND NOT BALANCED, WHICH WAS DECIDED BY MEASURING IT ON
+     2026-09-23. A stand-in block carries a short label at `line-height: 1`,
+     never a sentence, and of the 44 centred elements measured on this page at
+     756 px and again at 390 not one `.kit-blk` or `.kit-mid` wrapped: the
+     longest is `this block carries .panel-grow`. `text-wrap: balance` does
+     nothing to a line that does not wrap. See `.pos-lr-say` in `shell.css`. */
   .kit-blk { border: 1px dashed var(--kit-edge); border-radius: 4px; color: var(--dim2);
              font: 400 11px/1 var(--mono); text-align: center; padding: 18px 0; }
   /* The stand-in for a page that covers the screen with a bare canvas, which is
@@ -887,8 +893,11 @@
      and it is the first thing to check when a block below reports that it did
      not build. */
   let lrWide = null;          // audio on one side, video on the other
+  let lrPair = null;          // a waveform on both sides
   let lrMissing = null;       // the far end not answering, which is the ordinary case
+  let lrGone = null;          // nothing coming back on the LEFT, a waveform on the right
   let lrPhone = null;         // the same component pinned to the phone arrangement
+  let lrWaves = null;         // every wave view in that block, for the pixel readback
   let panelWith = null;       // { panel, reading }  the absorber is on the block
   let panelWithout = null;    // { panel, reading }  NEGATIVE CONTROL: no absorber
   let panelGrowBlk = null;    // the dashed block that absorbs the slack
@@ -1082,14 +1091,25 @@
    * scope?"*, *"viz can be audio (waveforms), video or missing."* and *"its
    * 'glue' thing"*.
    *
-   * 🔴 THREE SPECIMENS, AND EACH ONE IS HERE FOR A CLAIM RATHER THAN FOR A
-   * LOOK. The first is the two viz kinds the ask names, a waveform on one side
-   * and a picture on the other. The second is `missing`, which is the state
-   * this component was designed around first, because a remote with nothing
-   * coming back is the ordinary case on this desk and a pane that draws nothing
-   * and says nothing is indistinguishable from one that is broken. The third is
-   * the phone arrangement, which is a DIFFERENT STRUCTURE rather than a reflow:
+   * 🔴 FIVE SPECIMENS, AND EACH ONE IS HERE FOR A CLAIM RATHER THAN FOR A
+   * LOOK. A waveform against a picture, a waveform against a waveform, a
+   * picture against nothing at all, nothing at all against a waveform, and the
+   * phone arrangement, which is a DIFFERENT STRUCTURE rather than a reflow:
    * the labels move out of the shared bar and into their own panes' footers.
+   * `missing` is the state this component was designed around first, because a
+   * remote with nothing coming back is the ordinary case on this desk and a
+   * pane that draws nothing and says nothing is indistinguishable from one that
+   * is broken.
+   *
+   * 🔴 AND IT WAS THREE UNTIL 2026-09-23, WHICH LEFT TWO OF THE THREE KINDS
+   * VISIBLE ON ONE SIDE ONLY. Asked for as *"add waveform examples and no
+   * viz/wave examples"*. `KINDS` is `['video', 'audio', 'missing']` and this
+   * block is what a reader checks the component against, so a kind only ever
+   * drawn on the left is a kind whose right hand shape nobody can see. Before
+   * the two new rows, `audio` had never been on the right, `missing` had never
+   * been on the left, and `missing` had never been shown beside a waveform at
+   * all. The check at the foot of this file walks the specimens and asserts
+   * that every kind now appears on BOTH sides, so removing one takes it red.
    *
    * 🔴 AND THE PHONE ONE IS GRADED HERE, AT DESKTOP WIDTH, WHICH NO OTHER
    * PHONE LAYOUT IN THIS REPOSITORY IS. `demo/verify.mjs` runs at 756 px with
@@ -1142,18 +1162,68 @@ lr.remote.kind('missing', { say: 'the board has not answered yet' });`,
        * can be audio (waveforms)"*. The material is made here rather than
        * fetched: a decaying sine is enough to show a shape, and a gallery is
        * the last place to ask somebody else's server for a sound.
+       *
+       * 🔴 AND `set()` TAKES THREE ARGUMENTS, WHICH THIS BLOCK GOT WRONG AND
+       * NOTHING SAID SO UNTIL 2026-09-23. It was called as
+       * `wave.set({ samples, rate, name })`, so the component read `s.length`
+       * off an object, found `undefined`, and returned
+       * `{ ok: false, why: 'no samples in that, so there is nothing to draw' }`
+       * to a caller that read nothing back. The wrapper stayed `hidden` and was
+       * on screen anyway, because `.pos-lr .pos-vp-stage > .pos-wave` is
+       * (0,3,0) and `wave-view.mjs`'s own `.pos-wave[hidden]` is (0,2,0).
+       * MEASURED on the live page: a 328 by 150 canvas with **0 of 49,200
+       * pixels painted**, sitting in the gallery that exists to show what a
+       * waveform looks like. Both halves are repaired: the call here, and a
+       * rule in `shell.css` so `hidden` means hidden inside a pane too.
+       * ⚠️ THE CHECKS AT THE FOOT OF THIS FILE READ THE PIXELS NOW rather than
+       * the envelope's own numbers, which is `wave-view.mjs`'s own note about
+       * `ink()`: every field in `facts()` would read exactly the same if the
+       * fill were the field colour or the scale were zero.
+       * ⚠️ AND NO FRAME LOOP, WHICH IS WHAT `follow()` WOULD START AND NOTHING
+       * HERE CALLS. `set()` draws once and `stopLoop()` is the first thing it
+       * does. This block is about the arrangement and the fader, and a second
+       * loop on a page that already runs several costs a reader something for
+       * nothing.
        */
-      const seconds = 1.5, rate = 22050;
-      const samples = new Float32Array(Math.round(seconds * rate));
-      for (let i = 0; i < samples.length; i++) {
-        const t = i / rate;
-        samples[i] = Math.sin(2 * Math.PI * 220 * t) * Math.exp(-2.1 * t);
-      }
-      const wave = createWaveView(document.createElement('div'), { height: 150 });
-      wave.set({ samples, rate, name: 'a plucked string' });
+      const RATE = 22050;
+      /** One decaying sine, as the mono floats `set()` takes. */
+      const pluck = (hz, decay, secs) => {
+        const s = new Float32Array(Math.round(secs * RATE));
+        for (let i = 0; i < s.length; i++) {
+          const t = i / RATE;
+          s[i] = Math.sin(2 * Math.PI * hz * t) * Math.exp(-decay * t);
+        }
+        return s;
+      };
+      /**
+       * An empty wave view. One per pane, because a canvas cannot be in two
+       * places, which is the same reason `picture()` above blits a fresh copy
+       * of the master frame per well.
+       */
+      const waveView = () => createWaveView(document.createElement('div'), { height: 150 });
+      /**
+       * 🔴 THE PICTURE GOES IN AFTER THE PANE IS IN THE PAGE, WHICH IS
+       * ARITHMETIC RATHER THAN TIDINESS. `set()` reads `clientWidth` and paints
+       * ONCE, so a wave view filled while its wrapper is still detached
+       * measures 0 wide, paints nothing at all, and waits for a
+       * `ResizeObserver` to deliver a width on the next frame. The checks at
+       * the foot of this file run before that frame, so `ink()` would report
+       * `the bitmap is empty` about a picture a reader can see perfectly well.
+       * ⚠️ AND THE RETURN VALUE IS READ, WHICH IS THE HALF THAT WAS MISSING
+       * ABOVE. A block that will not draw reports itself through `section()` as
+       * `this block did not build`, which is a sentence on the page, rather
+       * than as an empty box nobody can tell from a picture that has not
+       * arrived yet.
+       */
+      const fill = (v, hz, decay, secs, name) => {
+        const r = v.set(pluck(hz, decay, secs), RATE, { name });
+        if (!r.ok) throw new Error(`the ${name} wave did not draw: ${r.why}`);
+        return r;
+      };
 
       // ── the two viz kinds the ask names, side by side ────────────────────
       stack.add(el('p', 'kit-cap', 'audio on one side, video on the other'));
+      const wave = waveView();
       lrWide = createLocalRemote({
         local: { label: 'this page', kind: 'audio', media: wave.el },
         remote: { label: 'the board', kind: 'video', media: picture(),
@@ -1161,6 +1231,29 @@ lr.remote.kind('missing', { say: 'the board has not answered yet' });`,
       });
       lrWide.remote.presence.set('online');
       stack.add(lrWide.el);
+      fill(wave, 220, 2.1, 1.5, 'a plucked string');
+
+      /**
+       * ── a waveform against a waveform ──────────────────────────────
+       * 🔴 TWO DIFFERENT SOUNDS, NOT ONE PICTURE TWICE. The claim a pair makes
+       * is that two wells of the same kind read as two views of one subject,
+       * and two identical envelopes would read as one picture that had been
+       * copied. A short bright pluck against a long low note is visibly two
+       * things, and the check reads the ink off both canvases rather than the
+       * column counts, which would agree whatever was drawn.
+       */
+      stack.add(el('p', 'kit-cap', 'a waveform on both sides'));
+      const pairNear = waveView(), pairFar = waveView();
+      lrPair = createLocalRemote({
+        local: { label: 'this page', kind: 'audio', media: pairNear.el },
+        remote: { label: 'the board', kind: 'audio', media: pairFar.el,
+          of: 'the Raspberry Pi' },
+        value: 0.5,
+      });
+      lrPair.remote.presence.set('online');
+      stack.add(lrPair.el);
+      fill(pairNear, 220, 2.1, 1.5, 'a plucked string');
+      fill(pairFar, 70, 0.7, 3, 'a long low note');
 
       // ── missing, which is the state this was designed around first ───────
       stack.add(el('p', 'kit-cap', 'and the far end not answering'));
@@ -1183,6 +1276,39 @@ lr.remote.kind('missing', { say: 'the board has not answered yet' });`,
        * says the far end is gone, so fading into silence is the truthful output
        * rather than a control lying.
        */
+
+      /**
+       * ── nothing at all on the LEFT, against a waveform ─────────────────
+       * 🔴 THE SIDE IS THE POINT OF THIS ONE. Every other specimen puts the
+       * absent pane on the RIGHT, because the far end is what comes and goes on
+       * this desk, and a reader checking the component against this block could
+       * not see what `missing` looks like on the near side. It is a real state
+       * of the near side too, and the module's own header names both sentences:
+       * *"the board has not answered yet"* and *"no camera on this machine"*
+       * are different facts and only the page knows which it has.
+       * ⚠️ NO PRESENCE DOT ON THIS PANE, AND THAT IS THE DEFAULT RATHER THAN AN
+       * OMISSION. Only a side that can be absent gets a badge; a dot under the
+       * near picture is a badge about the browser you are reading this in,
+       * which can never say anything but online.
+       * ⚠️ AND THE FADER OPENS AT THE END THAT HAS SOMETHING. It is still
+       * enabled, for the reason above, and starting it at 0 would make the one
+       * specimen whose near side is empty also the one specimen that is silent,
+       * which is two facts in one picture.
+       */
+      stack.add(el('p', 'kit-cap', 'a pane with no picture at all, beside a waveform'));
+      const goneWave = waveView();
+      lrGone = createLocalRemote({
+        local: { label: 'this page', kind: 'missing',
+          say: 'no microphone on this machine' },
+        remote: { label: 'the board', kind: 'audio', media: goneWave.el,
+          of: 'the Raspberry Pi' },
+        value: 1,
+      });
+      lrGone.remote.presence.set('online');
+      stack.add(lrGone.el);
+      fill(goneWave, 330, 1.2, 1.2, 'what the far end is sending');
+
+      lrWaves = { wide: wave, pairNear, pairFar, gone: goneWave };
 
       // ── the phone arrangement, at a phone's width ────────────────────────
       stack.add(el('p', 'kit-cap', 'the same component at 375 px'));
@@ -7889,7 +8015,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   // 🔴 EVERY CLAIM HERE IS A COMPARISON OR A LEVEL, WHICH IS WHAT ONLY THIS
   // PAGE CAN MAKE. The three specimens differ in exactly one thing each, so a
   // check reads one against another rather than against a number typed into it.
-  if (lrWide && lrMissing && lrPhone) {
+  if (lrWide && lrPair && lrMissing && lrGone && lrPhone && lrWaves) {
     const px = (n) => +n.toFixed(1);
     const rect = (n) => n.getBoundingClientRect();
 
@@ -8021,6 +8147,125 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         `far end ${lrMissing.remote.kind()}: disabled ${gone.hasAttribute('aria-disabled')}, `
         + `tab stop ${gone.getAttribute('tabindex')}. far end ${lrWide.remote.kind()}: `
         + `disabled ${live.hasAttribute('aria-disabled')}, tab stop ${live.getAttribute('tabindex')}`);
+    }
+
+    /**
+     * 🔴 EVERY KIND ON BOTH SIDES, WHICH IS EXACTLY WHAT *"add waveform
+     * examples and no viz/wave examples"* BOUGHT AND IS THE CHECK THAT KEEPS
+     * IT. `KINDS` is `['video', 'audio', 'missing']` and this block is what a
+     * reader checks the component against, so a kind only ever drawn on the
+     * left is a kind whose right hand shape nobody here can see. Until
+     * 2026-09-23 `audio` was never on the right and `missing` was never on the
+     * left, over three specimens that all looked deliberate.
+     * ⚠️ IT IS READ OFF THE SPECIMENS RATHER THAN OFF A LIST TYPED HERE. A
+     * table of what this block is supposed to contain would agree with itself
+     * forever, which is the two-numbers-from-one-field defect this repository
+     * has already paid for; `kind()` asks each pane what it is actually
+     * holding, and dropping a specimen from the array above takes this red.
+     */
+    {
+      const specimens = [lrWide, lrPair, lrMissing, lrGone, lrPhone];
+      const seen = { local: new Set(), remote: new Set() };
+      for (const lr of specimens) {
+        seen.local.add(lr.local.kind());
+        seen.remote.add(lr.remote.kind());
+      }
+      const short = KINDS.filter((k) => !seen.local.has(k) || !seen.remote.has(k));
+      d.assert('every kind this component knows is drawn on both sides of the block',
+        short.length === 0,
+        `over ${specimens.length} specimens the near side shows `
+        + `${[...seen.local].sort().join(', ')} and the far side shows `
+        + `${[...seen.remote].sort().join(', ')}`
+        + (short.length ? `, so ${short.join(' and ')} is on one side only` : ''));
+    }
+
+    /**
+     * 🔴 A WAVEFORM PAIR IS TWO PICTURES DRAWN ONCE, AND THIS READS THE PIXELS
+     * RATHER THAN THE ENVELOPE. `wave-view.mjs` says why in its own comment on
+     * `ink()`: every number in `facts()` reads exactly the same if the fill
+     * colour were the field colour, if the scale were zero, or if `paint()`
+     * returned early. That is not hypothetical here. This block called
+     * `set({ samples, rate, name })` against a `set(samples, rate, opts)`
+     * signature until 2026-09-23, so the component refused the material and
+     * said so in a return value nobody read, and the gallery showed **0 of
+     * 49,200 pixels painted** inside a box that was on screen anyway.
+     * ⚠️ AND THE TWO ARE REQUIRED TO DIFFER, which is the half that catches one
+     * picture drawn twice: two identical envelopes would pass every other claim
+     * here and would say a pair of wells is one view copied.
+     * 🔴 NO FRAME LOOP, WHICH IS THE CONSTRAINT THE ASK CAME WITH. `follow()`
+     * is the only thing in that component that starts one and nothing in this
+     * block calls it, so `moving` is false and `ticks` has never run. A counter
+     * that has never moved is the claim; a boolean asked whether it thinks it
+     * has stopped is not.
+     */
+    {
+      const near = lrWaves.pairNear, far = lrWaves.pairFar;
+      const ia = near.ink(), ib = far.ink();
+      const fa = near.facts(), fb = far.facts();
+      const pc = (x) => `${(x * 100).toFixed(1)} per cent`;
+      const still = !fa.moving && !fb.moving && fa.ticks === 0 && fb.ticks === 0;
+      d.assert('a waveform on both sides is two different pictures, drawn once, read off the canvas',
+        ia.measured && ib.measured && ia.share > 0.05 && ib.share > 0.05
+        && Math.abs(ia.share - ib.share) > 0.02 && still
+        && lrPair.local.kind() === 'audio' && lrPair.remote.kind() === 'audio',
+        ia.measured && ib.measured
+          ? `the near canvas is ${pc(ia.share)} ink over ${fa.frames} frames and the far one `
+            + `${pc(ib.share)} over ${fb.frames}, and between them they have asked for `
+            + `${fa.ticks + fb.ticks} animation frames`
+          : `nothing to measure: ${ia.why || ib.why}`);
+    }
+
+    /**
+     * 🔴 THE SENTENCE IN AN EMPTY PANE IS BALANCED, MEASURED AS LINE BOXES AND
+     * NOT READ OFF THE STYLESHEET. Asked for 2026-09-23 as *"the board has not
+     * answered since you opened this page - add balanced text wrapping on all
+     * similar cenered h w texts"*.
+     * 🔴 A PROPERTY SET ON A RULE THAT LOSES TO ANOTHER RULE IS THIS PROJECT'S
+     * SECOND MOST EXPENSIVE DEFECT, and this one had a second way to be inert
+     * on top of that: `.pos-lr-say` is a flex box, so the sentence is an
+     * anonymous block nothing can name, and whether an inherited property
+     * reaches it is a question for a browser rather than for a reader.
+     * MEASURED before the change: **297.7 px over 62.3 px** in a 327.5 px box,
+     * and **332.3 over 27.7** in the phone specimen, which is one word on its
+     * own under a full line. After: 180.0 and 180.0 in both.
+     * ⚠️ THE CLAIM IS A RATIO RATHER THAN A WIDTH, so it survives a font or a
+     * pane getting wider, and it is the quantity the property is about: how
+     * uneven the lines are. Greedy wrapping reads 0.21 and 0.08 here.
+     */
+    {
+      const lineWidths = (node) => {
+        const walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+        const rows = new Map();
+        let t;
+        while ((t = walk.nextNode())) {
+          if (!t.nodeValue.trim()) continue;
+          const r = document.createRange();
+          r.selectNodeContents(t);
+          for (const b of r.getClientRects()) {
+            if (!(b.width > 0)) continue;
+            const key = Math.round(b.top * 2) / 2;
+            const cur = rows.get(key);
+            if (!cur) rows.set(key, { l: b.left, r: b.right });
+            else { cur.l = Math.min(cur.l, b.left); cur.r = Math.max(cur.r, b.right); }
+          }
+        }
+        return [...rows.entries()].sort((a, b) => a[0] - b[0])
+          .map(([, v]) => +(v.r - v.l).toFixed(1));
+      };
+      const notes = [lrMissing.remote.sayEl, lrPhone.remote.sayEl];
+      const read = notes.map((n) => {
+        const w = lineWidths(n);
+        return {
+          style: getComputedStyle(n).textWrapStyle,
+          lines: w,
+          ratio: w.length > 1 ? +(Math.min(...w) / Math.max(...w)).toFixed(2) : 1,
+        };
+      });
+      d.assert('a note that wraps is balanced across its lines rather than left with a stub under a full one',
+        read.every((r) => r.style === 'balance' && r.lines.length > 1 && r.ratio >= 0.5),
+        read.map((r, i) => `${i ? 'at 375 px' : 'side by side'} it lays out `
+          + `${r.lines.join(' and ')} px, a ratio of ${r.ratio}, at text-wrap-style `
+          + `${r.style}`).join('. '));
     }
   }
 
