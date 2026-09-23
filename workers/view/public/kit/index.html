@@ -476,7 +476,8 @@
   import { createStepGrid, cellSize as padWidth, PAD_MIN, RISE_MS, FALL_MS }
     from '/shell/step-grid.mjs';
   import { createCheck, createCheckGroup } from '/shell/check.mjs';
-  import { createSwitch } from '/shell/switch.mjs';
+  import { createToggle } from '/shell/toggle.mjs';
+  import { createRoll } from '/shell/roll.mjs';
   import { createEnvelopeView, createFilterView, createWaveShape, shapeFor, filterShapeFor }
     from '/shell/synth-view.mjs';
   import { OSC_WAVES, FILTER_TYPES, FIRST_WAVETABLE } from '/shell/circuit-patch.mjs';
@@ -486,7 +487,7 @@
   import { createNoteGrid } from '/shell/note-grid.mjs';
   import { createCard, createCardGrid } from '/shell/card.mjs';
   import { DEMOS } from '/manifest.mjs';
-  import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createKeyboard, QWERTY_CHROMATIC, SHARP_KEYS } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createField } from '/shell/field.mjs';
   import { createStripView, createStripFooter, STRIP_FOOTER_EMPTY } from '/shell/strip.mjs';
@@ -965,7 +966,8 @@
   // and a `let` left where a block used to be is read in its dead zone: this
   // page has already been taken out that way once, and `section()` swallowed
   // the throw so the message named a different line.
-  let switchSpec = null;      // { lit, dark, quietOn, quietOff, dim, presses }
+  let toggleSpec = null;
+  let rollSpec = null;      // { lit, dark, quietOn, quietOff, dim, presses }
   let checkSpec = null;       // { one, off, some, dim, across, down }
   let standSpec = null;       // { lying, standing, empty }
   let envSpec = null;         // { one, two, three, flat }
@@ -1093,10 +1095,14 @@
    *
    * 🔴 **THE QUESTION THEY ANSWER IS DIFFERENT AND THE LOOK FOLLOWS FROM IT.**
    * A box is a member of a set, so it is small, square and read as part of a
-   * list with a heading over it. A switch is one thing running or not, so it
-   * has two positions and a knob that is in one of them. `switch.mjs` carries
-   * the argument in full, and the half that decides it is the announcement:
-   * `role="switch"` exists so that *on* is not announced as *in the set*.
+   * list with a heading over it. A toggle is one thing running or not, so it
+   * is a button that stays down. `toggle.mjs` carries the argument in full, and
+   * the half that decides it is the announcement: `aria-pressed` says PRESSED
+   * where a checkbox says *in the set*.
+   * ⚠️ IT SAID `switch.mjs` AND `role="switch"` UNTIL 2026-09-23, when that
+   * module was deleted and its three callers swept. A path in a comment that no
+   * longer resolves is this project's most repeated defect in its cheapest
+   * form.
    * ⚠️ **WHAT THAT ROLE SOUNDS LIKE IS NOT MEASURED ANYWHERE.** No screen
    * reader was run on this machine. What is graded below is that the role is on
    * the element carrying the state, which is the half a browser can answer.
@@ -1107,37 +1113,45 @@
    * the same counter as the other four, so a press that gets through shows up
    * as a number rather than as a look.
    */
-  section('input', 'SWITCH',
-    'One thing running or not, in the yellow that means this is what the page is '
-    + 'about and in a grey for a switch that is not, with a disabled one beside them.',
-    `createSwitch({ label: 'monitor', checked: true, onChange })
-createSwitch({ label: 'follow', checked: true, weight: 'secondary', onChange })
-createSwitch({ label: 'board', checked: true, disabled: true })`,
+  /**
+   * 🔴 IT REPLACED `SWITCH` ON 2026-09-23, ASKED FOR IN ONE LINE: *"integrate
+   * sustain to footer, create toggle button, big and small, use small below
+   * keyboard, left from notes off. rm switch button from all uis / kit"*.
+   * `switch.mjs` and its test are deleted and its three callers are swept.
+   * ⚠️ WHAT THE SWITCH BLOCK GRADED AND THIS ONE STILL DOES: one counter behind
+   * every specimen, so a press that got through the DISABLED one is an integer
+   * here rather than something nobody would see in a screenshot.
+   * ⚠️ AND `weight` DID NOT SURVIVE THE MOVE. A switch had a loud state and a
+   * quiet one; a toggle button has a SIZE instead, because the thing that
+   * varies between a page control and a keyboard's own footer is how much room
+   * it may take, not how loudly it may speak.
+   */
+  section('input', 'TOGGLE',
+    'A button that stays down, in the two sizes: the page\'s own 34 px and the '
+    + '26 px a keyboard footer takes, with a disabled one beside them.',
+    `createToggle({ label: 'Monitor', checked: true, onChange })
+createToggle({ label: 'Sustain', size: 'small', onChange })
+createToggle({ label: 'Board', checked: true, disabled: true })`,
     (box) => {
-      const o = out('nothing flipped');
-      // 🔴 ONE COUNTER BEHIND ALL FIVE, WHICH IS WHAT MAKES THE DISABLED ONE A
-      // MEASUREMENT. A press that got through a control that says it cannot be
-      // pressed would be invisible in a screenshot and is one integer here.
+      const o = out('nothing pressed');
       const presses = { n: 0, last: '' };
       const say = (name) => (on) => {
         presses.n++;
-        presses.last = `${name} ${on ? 'on' : 'off'}`;
+        presses.last = `${name} ${on ? 'down' : 'up'}`;
         o.textContent = presses.last;
       };
-      const lit = createSwitch({ label: 'monitor', checked: true, onChange: say('monitor') });
-      const dark = createSwitch({ label: 'click', checked: false, onChange: say('click') });
-      const quietOn = createSwitch({
-        label: 'follow', checked: true, weight: 'secondary', onChange: say('follow'),
+      const lit = createToggle({ label: 'Monitor', checked: true, onChange: say('monitor') });
+      const dark = createToggle({ label: 'Click', checked: false, onChange: say('click') });
+      const small = createToggle({ label: 'Sustain', size: 'small', onChange: say('sustain') });
+      const smallOn = createToggle({
+        label: 'Hold', size: 'small', checked: true, onChange: say('hold'),
       });
-      const quietOff = createSwitch({
-        label: 'snap', checked: false, weight: 'secondary', onChange: say('snap'),
+      const dim = createToggle({
+        label: 'Board', checked: true, disabled: true, onChange: say('board'),
       });
-      const dim = createSwitch({
-        label: 'board', checked: true, disabled: true, onChange: say('board'),
-      });
-      switchSpec = { lit, dark, quietOn, quietOff, dim, presses };
+      toggleSpec = { lit, dark, small, smallOn, dim, presses };
       const row = el('div', 'kit-row');
-      row.append(lit.el, dark.el, quietOn.el, quietOff.el, dim.el);
+      row.append(lit.el, dark.el, small.el, smallOn.el, dim.el);
       box.append(row, o);
     });
 
@@ -3515,6 +3529,64 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
   // `/looper/` and `/able/` have paragraphs about where their SOUND comes from
   // and are already at the length the house rule allows. A gallery of controls
   // is the right home for what a control does.
+  /**
+   * 🔴 BOTH SHAPES, BECAUSE BOTH WERE ASKED FOR. *"add component that can be
+   * glued top of it that is vertical piano roll"*, then *"pianoroll should be
+   * work standalone too. add to kit both options"*, 2026-09-23.
+   * ⚠️ AND THE DIFFERENCE IS NOT A FLAG IN THE COMPONENT. Being inside a `.kbd`
+   * is the whole condition: glued it gives up its edges and brings a seam, on
+   * its own it is the standard card every other surface here is. A roll that
+   * chose its own look would be a second place for that decision to live.
+   * 🔴 THE ONE CLAIM WORTH GRADING IS THE ALIGNMENT, and it is asserted as a
+   * COLUMN POSITION IN PIXELS rather than as a base number, which is how the
+   * same defect was caught on `/nola/` twice: once as chord charts that had a
+   * different base, and once as a roll whose gap was 3 px where the keyboard's
+   * was 2.
+   */
+  section('input', 'PIANO ROLL',
+    'Pitch across, time down, one row per chord, and the columns are the keyboard\'s own. '
+    + 'Glued on top of an instrument, or on its own.',
+    `createRoll(kb.el, { base, keys, map, sharps, prepend: true, scroller: kb.keysEl, onPick })
+createRoll(parent, { base, keys, map, sharps })   // on its own`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+      const o = out('nothing picked');
+      const ROWS = [
+        { label: 'Cmaj I', notes: [60, 64, 67] },
+        { label: 'F/C IV', notes: [60, 65, 69] },
+        { label: 'G7 V', notes: [59, 62, 65, 67] },
+      ];
+
+      /* Glued: the roll, a seam and the keys in one box. */
+      const gluedHost = el('div', '', null); gluedHost.style.width = '100%';
+      const gluedKb = createKeyboard(gluedHost, {
+        base: 60, letters: false,
+        onDown: (n) => gluedKb.lightNote(n, true),
+        onUp: (n) => gluedKb.lightNote(n, false),
+      });
+      const glued = createRoll(gluedKb.el, {
+        base: 60, keys: Object.keys(QWERTY_CHROMATIC), map: QWERTY_CHROMATIC,
+        sharps: SHARP_KEYS, rows: ROWS, prepend: true, scroller: gluedKb.keysEl,
+        onPick: (row) => {
+          for (const n of ROWS.flatMap((r) => r.notes)) gluedKb.lightNote(n, false, 'hint');
+          if (row) for (const n of row.notes) gluedKb.lightNote(n, true, 'hint');
+          o.textContent = row ? `picked ${row.label}` : 'nothing picked';
+        },
+      });
+
+      /* On its own: the same rows, the same columns, its own surface. */
+      const soloHost = el('div', '', null); soloHost.style.width = '100%';
+      const solo = createRoll(soloHost, {
+        base: 60, keys: Object.keys(QWERTY_CHROMATIC), map: QWERTY_CHROMATIC,
+        sharps: SHARP_KEYS, rows: ROWS,
+      });
+
+      rollSpec = { glued, solo, gluedKb, rows: ROWS };
+      stack.add(gluedHost, soloHost, o);
+      box.append(stack.el);
+    });
+
   section('input', 'KEYBOARD',
     'An octave of piano keys where a swipe scrolls the row and a press then a slide plays.',
     `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })
@@ -5308,83 +5380,66 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   }
 
   /**
-   * 🔴 THE SWITCH ACTS OR IT IS NOT A CONTROL, SO NOTHING BELOW ASSERTS AN
+   * 🔴 THE TOGGLE ACTS OR IT IS NOT A CONTROL, SO NOTHING BELOW ASSERTS AN
    * OPTION THAT WAS PASSED IN. A real click goes down the same path a finger
    * takes, the counter behind all five specimens says whether the page was
    * told, and the disabled one is clicked on purpose to prove the counter can
-   * refuse to move.
+   * refuse to move. That is what the SWITCH block asserted until 2026-09-23 and
+   * it is what this one inherits; what left with the switch is the knob travel
+   * and the two weights, because a button has neither.
    */
-  if (switchSpec) {
-    const i = switchSpec.lit.input;
-    const r = i.getBoundingClientRect();
-    const cs = getComputedStyle(i);
-    d.assert('the switch is a real checkbox wearing the switch role, clipped to a pixel and still focusable',
-      i.tagName === 'INPUT' && i.type === 'checkbox' && i.getAttribute('role') === 'switch'
-      && cs.display !== 'none' && cs.visibility !== 'hidden'
-      && r.width <= 2 && r.height <= 2 && i.tabIndex >= 0
-      && !i.hasAttribute('aria-pressed')
-      && switchSpec.lit.track.getAttribute('aria-hidden') === 'true',
-      `${r.width.toFixed(0)} by ${r.height.toFixed(0)} px at tab index ${i.tabIndex}, `
-      + `display ${cs.display}, role ${i.getAttribute('role')}, and the drawn track is `
-      + `hidden from a reader`);
+  if (toggleSpec) {
+    const b = toggleSpec.lit.button;
+    /* 🔴 `aria-pressed` IS THE STATE AND `get()` READS THE SAME ATTRIBUTE,
+       which is the claim rather than a detail: a control whose picture and
+       whose announcement come from two copies of one boolean will eventually
+       disagree, and only one of the two is visible in a screenshot. */
+    d.assert('a toggle is a real button that says whether it is pressed',
+      b.tagName === 'BUTTON' && b.type === 'button'
+      && b.getAttribute('aria-pressed') === 'true' && toggleSpec.lit.get() === true
+      && toggleSpec.dark.getAttribute?.('aria-pressed') !== 'true'
+      && toggleSpec.dark.button.getAttribute('aria-pressed') === 'false'
+      && b.tabIndex >= 0,
+      `${b.tagName} at tab index ${b.tabIndex}, pressed ${b.getAttribute('aria-pressed')} `
+      + `against ${toggleSpec.dark.button.getAttribute('aria-pressed')} on the one that is up`);
 
-    /* A press, down the path a finger takes, and the page put back afterwards.
-       Nothing is awaited between the click and the reading. */
-    const was = switchSpec.dark.get();
-    const saidWas = switchSpec.presses.n;
-    const kWas = switchSpec.dark.knob.getBoundingClientRect().left;
-    switchSpec.dark.input.click();
-    const now = switchSpec.dark.get();
-    const kNow = switchSpec.dark.knob.getBoundingClientRect().left;
-    const told = switchSpec.presses.last, said = switchSpec.presses.n;
-    switchSpec.dark.set(was, true);
-    d.assert('a press flips the switch and tells the page, which is the whole of it acting',
-      was === false && now === true && said === saidWas + 1 && told === 'click on'
-      && switchSpec.dark.get() === was,
-      `it said "${told}" on press ${said} and the check put it back, and the knob read `
-      + `${kWas.toFixed(1)} px before the press against ${kNow.toFixed(1)} px in the same task`);
+    /* A press, down the path a finger takes, and the page put back afterwards. */
+    const was = toggleSpec.dark.get();
+    const saidWas = toggleSpec.presses.n;
+    toggleSpec.dark.button.click();
+    const now = toggleSpec.dark.get();
+    const told = toggleSpec.presses.last, said = toggleSpec.presses.n;
+    const marked = toggleSpec.dark.button.getAttribute('aria-pressed');
+    toggleSpec.dark.set(was, true);
+    d.assert('a press puts it down, tells the page, and says so to a reader who cannot see it',
+      was === false && now === true && said === saidWas + 1 && told === 'click down'
+      && marked === 'true' && toggleSpec.dark.get() === was
+      && toggleSpec.dark.button.getAttribute('aria-pressed') === 'false',
+      `it said "${told}" on press ${said}, marked itself ${marked}, and the check put it back`);
 
     /**
-     * 🔴 THE TRAVEL IS READ OFF TWO SETTLED SPECIMENS RATHER THAN BEFORE AND
-     * AFTER ONE PRESS, AND THE ASSERT ABOVE CARRIES THE MEASUREMENT THAT SAYS
-     * WHY. The knob slides, so a rect taken in the same task as the click is the
-     * START of a transition rather than the position it is heading for.
-     * MEASURED 2026-09-22: `157.4 px before the press against 157.4 px in the
-     * same task`, so a switch that works perfectly reads as one that never
-     * moved. The off specimen and the on one have both been sitting still since
-     * the page was laid out, so both are asked at rest.
-     * ⚠️ AND THE GAPS AT THE TWO ENDS ARE COMPARED, not just the distance. A
-     * knob that moved by the right amount and overshot the track would pass a
-     * check that only measured travel.
-     * ✅ PROVED BY BREAKING IT: with the moved rule sabotaged to
-     * `translateX(0px)` this reads `0.0 px of travel` and goes red on its own,
-     * 187/188, with nothing else moving.
+     * 🔴 THE TWO SIZES ARE A REAL DIFFERENCE AND THE SMALL ONE IS THE PAD'S
+     * OWN HEIGHT. 34 px is every control on a page and 26 px is what
+     * `shell.css` argues for under a keyboard, which is 34 minus one gap. A
+     * check that only asked *is there a data-size attribute* would pass a
+     * stylesheet that had stopped reading it.
      */
-    const offT = switchSpec.dark.track.getBoundingClientRect();
-    const offK = switchSpec.dark.knob.getBoundingClientRect();
-    const onT = switchSpec.lit.track.getBoundingClientRect();
-    const onK = switchSpec.lit.knob.getBoundingClientRect();
-    const head = offK.left - offT.left;
-    const tail = onT.right - onK.right;
-    const travel = (onK.left - onT.left) - head;
-    d.assert('the knob sits at one end of its track when the switch is off and at the other when it is on',
-      offK.width > 6 && travel >= 12 && head > 0.5
-      && Math.abs(head - tail) < 0.6 && Math.abs(onT.width - offT.width) < 0.01,
-      `a ${offT.width.toFixed(0)} px track and a ${offK.width.toFixed(0)} px knob, `
-      + `${head.toFixed(1)} px in from the left when off and ${tail.toFixed(1)} px in from `
-      + `the right when on, ${travel.toFixed(1)} px of travel between them`);
+    const bigH = toggleSpec.lit.button.getBoundingClientRect().height;
+    const smallH = toggleSpec.small.button.getBoundingClientRect().height;
+    d.assert('the small toggle is the keyboard footer\'s own height and the big one is a control\'s',
+      Math.abs(bigH - 34) < 0.6 && Math.abs(smallH - 26) < 0.6
+      && toggleSpec.small.button.dataset.size === 'small'
+      && !toggleSpec.lit.button.hasAttribute('data-size'),
+      `${bigH.toFixed(1)} px big against ${smallH.toFixed(1)} px small`);
 
     /**
-     * 🔴 ONE YELLOW, AND THE SECOND WEIGHT DOES NOT GET TO INVENT ANOTHER.
-     * `--hi` means *the thing this control is about* on every page here, so the
-     * primary is compared against the token READ OFF THE STYLESHEET rather than
-     * against a colour typed into this check: two sources that can disagree.
+     * 🔴 ONE YELLOW, READ OFF THE STYLESHEET RATHER THAN TYPED HERE. `--hi`
+     * means *the thing this control is about* on every page in this project, so
+     * a pressed toggle is compared against the token itself: a colour typed
+     * into a check is a second source that can disagree with the first.
      * ⚠️ AND THE NEGATIVE HALF IS THE ONE WORTH HAVING. A check that only asked
-     * *is the primary yellow* would pass a page on which BOTH weights are, which
-     * is the drift this block exists to catch. Three grounds are told apart
-     * here, not two.
-     * ✅ PROVED BY BREAKING IT: with the secondary rule given `--hi` this goes
-     * red on its own, 187/188, reporting the secondary as `rgb(255, 212, 0)`.
+     * *is a pressed one tinted* would pass a stylesheet on which every toggle
+     * is, which is the drift this grades.
      */
     {
       const asColour = (v) => {
@@ -5395,44 +5450,16 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         probe.remove();
         return c;
       };
-      const root = getComputedStyle(document.documentElement);
-      const hi = asColour(root.getPropertyValue('--hi').trim());
-      const grey = asColour(root.getPropertyValue('--dim').trim());
-      const litBack = getComputedStyle(switchSpec.lit.track).backgroundColor;
-      const quietBack = getComputedStyle(switchSpec.quietOn.track).backgroundColor;
-      const offBack = getComputedStyle(switchSpec.dark.track).backgroundColor;
-      d.assert('the lit primary is this page’s own --hi and NEGATIVE CONTROL: the lit secondary is not',
-        litBack === hi && quietBack === grey && quietBack !== hi
-        && offBack !== hi && offBack !== grey
-        && getComputedStyle(switchSpec.quietOff.track).backgroundColor === offBack,
-        `primary ${litBack} against --hi ${hi}, secondary ${quietBack} against --dim ${grey}, `
-        + `and both weights share one unlit ground at ${offBack}`);
-
-      /**
-       * 🔴 THE WEIGHT CAN BE CHANGED AFTER THE FACT, AND A SETTER NOBODY CALLS
-       * IS A SETTER THAT WILL BE WRONG. Nothing on this page needs to change a
-       * switch's weight, so without this the path is reachable only by a caller
-       * who does not exist yet, which is the shape this project already records
-       * as the place a count lies quietest.
-       * ⚠️ AND IT GOES BOTH WAYS, because the half that fails is the way BACK:
-       * a setter that adds the attribute and never removes it leaves a switch
-       * stuck on the quiet weight, and the attribute is deleted rather than set
-       * empty for exactly that reason.
-       * ✅ PROVED BY BREAKING IT: with `switch.mjs` writing `= ''` instead of
-       * deleting, this goes red on its own, 188/189, and so does the matching
-       * check in `switch-test.mjs`.
-       */
-      const one = switchSpec.quietOn;
-      one.weight('primary');
-      const asLoud = getComputedStyle(one.track).backgroundColor;
-      const markedLoud = one.el.hasAttribute('data-weight');
-      one.weight('secondary');
-      const asQuiet = getComputedStyle(one.track).backgroundColor;
-      d.assert('a switch can be told its weight afterwards, and the way back works too',
-        asLoud === hi && asQuiet === grey && markedLoud === false
-        && one.el.dataset.weight === 'secondary',
-        `it went to ${asLoud} with no mark on it and back to ${asQuiet} marked `
-        + `"${one.el.dataset.weight}"`);
+      const hi = asColour(getComputedStyle(document.documentElement)
+        .getPropertyValue('--hi').trim());
+      const downEdge = getComputedStyle(toggleSpec.lit.button).borderColor;
+      const upEdge = getComputedStyle(toggleSpec.dark.button).borderColor;
+      const downBack = getComputedStyle(toggleSpec.lit.button).backgroundColor;
+      const upBack = getComputedStyle(toggleSpec.dark.button).backgroundColor;
+      d.assert('a pressed toggle takes the page’s own --hi and NEGATIVE CONTROL: an unpressed one does not',
+        downEdge === hi && upEdge !== hi && downBack !== upBack,
+        `pressed edge ${downEdge} against --hi ${hi}, unpressed edge ${upEdge}, `
+        + `and two different grounds`);
     }
 
     /**
@@ -5443,18 +5470,15 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
      * screenshot.
      */
     {
-      const wasN = switchSpec.presses.n, wasOn = switchSpec.dim.get();
-      switchSpec.dim.input.click();
-      const faded = getComputedStyle(switchSpec.dim.el).opacity;
-      const quietWord = getComputedStyle(switchSpec.dim.el.querySelector('.pos-switch-t')).color;
-      const loudWord = getComputedStyle(switchSpec.lit.el.querySelector('.pos-switch-t')).color;
-      d.assert('NEGATIVE CONTROL: a switch nobody may press does not move and does not speak',
-        switchSpec.dim.input.disabled === true
-        && switchSpec.dim.get() === wasOn && switchSpec.presses.n === wasN
-        && Number(faded) < 1 && quietWord !== loudWord,
-        `a real click left it ${switchSpec.dim.get() ? 'on' : 'off'} with the counter still at `
-        + `${switchSpec.presses.n}, and the whole control is at opacity ${faded} with its word `
-        + `in ${quietWord} against ${loudWord}`);
+      const wasN = toggleSpec.presses.n, wasOn = toggleSpec.dim.get();
+      toggleSpec.dim.button.click();
+      const faded = getComputedStyle(toggleSpec.dim.button).opacity;
+      d.assert('NEGATIVE CONTROL: a toggle nobody may press does not move and does not speak',
+        toggleSpec.dim.button.disabled === true
+        && toggleSpec.dim.get() === wasOn && toggleSpec.presses.n === wasN
+        && Number(faded) < 1,
+        `a real click left it ${toggleSpec.dim.get() ? 'down' : 'up'} with the counter still at `
+        + `${toggleSpec.presses.n}, at opacity ${faded}`);
     }
   }
 
@@ -7047,8 +7071,17 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const shorter = b.every((r) => r.height < w[0].height - 10);
       const narrower = b.every((r) => Math.abs(r.width / w[0].width - BLACK_RATIO) < 0.02);
       const aligned = b.every((r) => r.top === w[0].top);
+      /* ⚠️ THE COUNTS COME OFF `QWERTY_CHROMATIC` RATHER THAN FROM TWO
+         LITERALS, AND THAT IS WHY. This said `8 white and 5 black`, which was
+         true for as long as the letter row was one octave and its top C; `l`
+         was added on 2026-09-23 and the specimen grew a ninth white key, so a
+         check about the SHAPE of a sharp went red over a number that has
+         nothing to do with sharps. A count typed twice is a count that will
+         disagree with the thing it counts. */
+      const wantBlack = Object.keys(QWERTY_CHROMATIC).filter((k) => SHARP_KEYS.has(k)).length;
+      const wantWhite = Object.keys(QWERTY_CHROMATIC).length - wantBlack;
       d.assert('the sharps are raised: shorter than a white key, narrower, and sitting on its top edge',
-        w.length === 8 && b.length === 5 && shorter && narrower && aligned,
+        w.length === wantWhite && b.length === wantBlack && shorter && narrower && aligned,
         `${w.length} white and ${b.length} black · white ${w[0].width.toFixed(1)}x${w[0].height} · `
         + `black ${b[0].width.toFixed(1)}x${b[0].height}, ${(b[0].width / w[0].width).toFixed(3)} of a white`);
       /**
@@ -7110,7 +7143,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const belowL = nameAt(b0.left + 2, b0.bottom + 8);
       const belowR = nameAt(b0.right - 2, b0.bottom + 8);
       d.assert('where a raised sharp covers a white key the sharp wins, on BOTH sides, and only where it covers',
-        overC === 'C#4' && overD === 'C#4' && belowL === 'C4' && belowR === 'D4',
+        overC === 'C\u266f4' && overD === 'C\u266f4' && belowL === 'C4' && belowR === 'D4',
         `over its left white: ${overC} · over its right white: ${overD} · `
         + `below it: ${belowL} then ${belowR}`);
     }
@@ -7888,6 +7921,64 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       unresolved.length || wrong.length
         ? `${unresolved.length} with no element, ${wrong.length} in the wrong part`
         : `${ids.length} addresses, ${idFor('SLIDER')} is in ${sectionTab.get(idFor('SLIDER'))}`);
+  }
+
+  /**
+   * 🔴 EVERY FOCUS RING IN THE SHELL IS 1 px AND EVERY ONE IS ON THE KEYBOARD.
+   * Asked for 2026-09-23 as *"make focus styles appear only on keyb nav not
+   * mouse and make it 1px. change everywhere"*, which is fourteen rules in one
+   * stylesheet and exactly the shape a later edit puts back one rule at a time.
+   *
+   * 🔴 IT READS THE STYLESHEET RATHER THAN THE SCREEN, AND THAT IS THE ONLY
+   * HONEST WAY TO GRADE IT HERE. `:focus-visible` is decided by the browser's
+   * MODALITY: it matches after a Tab and not after a press, and a page cannot
+   * make a trusted key event, so `el.focus()` from a check lands in whichever
+   * modality the harness happens to be in. An assert built on that would be
+   * green or red for a reason that has nothing to do with the rule. The rules
+   * themselves are same-origin and free to read.
+   *
+   * ⚠️ AND THE SECOND HALF IS THE ONE THAT MATTERS MOST: no rule may paint on
+   * plain `:focus`, because that is the selector that fires for a mouse. It is
+   * asserted as an ABSENCE over every rule in the sheet, so a new control
+   * cannot bring one back quietly.
+   *
+   * 🔴 IT READS `cssText`, NOT `style.outlineWidth`, AND THE FIRST VERSION READ
+   * THE LONGHAND AND FOUND **0 rings across 644 rules**. Every one of these is
+   * written `outline: 1px solid var(--hi)`, and a shorthand holding a `var()`
+   * is a pending substitution: the CSSOM hands back an EMPTY STRING for every
+   * longhand in it. So the check would have passed an empty set forever, which
+   * is this project's own rule about a statistic whose denominator nobody
+   * looked at. `rings.length >= 12` is the floor that makes an empty answer red
+   * rather than green.
+   */
+  {
+    const sheet = [...document.styleSheets].find((s) => (s.href || '').includes('shell.css'));
+    const rules = sheet ? [...sheet.cssRules].filter((r) => r.selectorText) : [];
+    /* A ring is an outline with a WIDTH in it. `outline: none` is a suppression
+       and paints nothing, and reading it as a ring is how the second version of
+       this check went red on `input:focus-visible`, which exists precisely to
+       take the ring OFF a field and colour its border instead.
+       ⚠️ AND THE LENGTH IS FOUND ANYWHERE IN THE DECLARATION, NOT AT THE FRONT
+       OF IT. A shorthand with a `var()` in it survives verbatim, so the shipped
+       rules read `outline: 1px solid var(--hi)`; one WITHOUT a var is
+       canonicalised by the browser to `outline: red solid 3px`, and a check
+       anchored on the width coming first found the fourteen real rules and
+       missed a sabotage typed by hand. */
+    const widthOf = (r) => (/outline(?:-width)?:[^;]*?([\d.]+)px/.exec(r.cssText) || [])[1];
+    const paints = (r) => widthOf(r) !== undefined;
+    const rings = rules.filter((r) => /:focus-visible/.test(r.selectorText) && paints(r));
+    const wide = rings.filter((r) => widthOf(r) !== '1');
+    /* A ring on plain `:focus` is the defect. `:focus:not(:focus-visible)` is
+       the suppression idiom and is not one, so it is excluded by name rather
+       than by hoping no rule uses it. */
+    const onPress = rules.filter((r) => /:focus(?![-a-z])/.test(r.selectorText)
+      && !/:focus:not\(:focus-visible\)/.test(r.selectorText) && paints(r));
+    d.assert('every focus ring in the shell is 1 px, and not one of them paints on a mouse press',
+      rules.length > 0 && rings.length >= 12 && wide.length === 0 && onPress.length === 0,
+      `${rings.length} ring(s) across ${rules.length} rules, ${wide.length} not 1 px`
+      + `${wide.length ? ` (${wide[0].selectorText} at ${widthOf(wide[0])}px)` : ''}`
+      + `, ${onPress.length} painting on plain :focus`
+      + `${onPress.length ? ` (${onPress[0].selectorText})` : ''}`);
   }
 
   d.ready();
