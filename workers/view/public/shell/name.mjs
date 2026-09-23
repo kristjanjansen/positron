@@ -181,31 +181,84 @@ export function nameChord(notes, { bassWeight = BASS_WEIGHT,
   const bass = pcOf(low);
   const heldCount = POP[held];
 
-  /* One pass, no allocation, no sort. Ties go to the earlier quality and then
-     to the lower root, which is why the order of `RECOGNISED` is a statement
-     about music rather than an accident of the file. */
+  const scoreOf = (t) => {
+    const matched = POP[held & t];
+    return matched - missingWeight * (POP[t] - matched) - (heldCount - matched);
+  };
+
+  /* Ties go to the earlier quality and then to the lower root, which is why the
+     order of `RECOGNISED` is a statement about music rather than an accident of
+     the file. */
   let bestScore = -Infinity, bestQ = 0, bestR = 0;
-  let nextScore = -Infinity, nextQ = 0, nextR = 0;
   for (let qi = 0; qi < RECOGNISED.length; qi++) {
     const mask = RECOGNISED[qi][1];
     for (let r = 0; r < 12; r++) {
+      const score = scoreOf(rot(mask, r)) + (r === bass ? bassWeight : 0);
+      if (score > bestScore) { bestScore = score; bestQ = qi; bestR = r; }
+    }
+  }
+
+  /**
+   * 🔴 A RIVAL ONLY COUNTS IF YOU COULD HEAR THE DIFFERENCE, AND THIS WAS
+   * MEASURED ON A PERSON RATHER THAN REASONED ABOUT. 2026-09-23, on 63 seconds
+   * of real playing recorded off the keyboard on this desk: 108 of 236 readings
+   * came back unnameable, and **51 of those were one shape**. `D E G` scored
+   * `Emin7` and `Emin7b5` DEAD EQUAL, thirty times, because what separates them
+   * is a B against a B flat and neither was ever played. The page said *two
+   * names and no verdict* about a distinction that did not exist.
+   * ✅ SO A CANDIDATE THAT DIFFERS FROM THE WINNER ONLY IN NOTES NOBODY PLAYED
+   * DOES NOT BLOCK CONFIDENCE. You cannot hear a flat five that is not there,
+   * and refusing to name the chord does not make the page more honest, it makes
+   * it quiet at the moment somebody played something perfectly ordinary.
+   * 🔴 AND THE CASE THIS MUST NOT BREAK IS THE ONE THE PAGE IS PROUDEST OF.
+   * `Caug` and `Eaug` are the SAME THREE PITCH CLASSES under a different name,
+   * and so are `Csus2` and `Gsus4`, and all four inversions of a diminished
+   * seventh. Those are real ambiguity and they still read as two names, because
+   * the test below is about the pitch classes that DIFFER: where two candidates
+   * cover an identical set, there is nothing unevidenced about their
+   * disagreement, and they block each other exactly as before.
+   * ⚠️ MEASURED BOTH WAYS on that take: `C D E F G` still refuses `Cmaj` against
+   * `Csus4`, because the E and the F that separate them were both played.
+   * 🔴 AND THE RIVAL HAS TO BE THE SAME SIZE, WHICH THE GUARD BELOW FOUND BY
+   * GOING RED. Without that test the rule also waves away a rival that is
+   * simply BIGGER, so two notes C and F read as a confident `F5` and twelve
+   * generated `sus4 no fifth` cases became confidently wrong. A chord with
+   * fewer notes in it is not a better reading of an incomplete one, it is a
+   * smaller claim, and `at a margin of 1.0 the recogniser is never wrong` is
+   * the assert this whole feature was made to rest on.
+   */
+  const bestT = rot(RECOGNISED[bestQ][1], bestR);
+  /* 🔴 AND ONLY WHEN ENOUGH OF THE WINNER WAS ACTUALLY PLAYED, WHICH IS THE
+     SECOND THING THE TESTS FOUND. The rule below waves away a rival whose
+     disagreement with the winner is entirely in notes nobody played, and on two
+     notes that is almost every rival: `C E` would confidently become `Cmaj`
+     when it is equally `Cmaj7`, `C6`, `Caug` or `Amin`. The research already
+     measured that from the other side, that of the 132 chords this vocabulary
+     spells, a major third is in 10 of them and a perfect fifth in 13, so two
+     notes do not pin a chord down.
+     ✅ THREE OF THE WINNER'S OWN TONES HELD IS THE LINE, and it is the fifth
+     being the omittable one that makes it musical rather than arbitrary: a
+     seventh chord with its root, third and seventh down is stated, and the
+     fifth is the note players drop. `D E G` has three and is rescued; `C E` has
+     two and stays two names and no verdict. */
+  const stated = POP[held & bestT] >= 3;
+  let nextScore = -Infinity, nextQ = bestQ, nextR = bestR;
+  for (let qi = 0; qi < RECOGNISED.length; qi++) {
+    const mask = RECOGNISED[qi][1];
+    for (let r = 0; r < 12; r++) {
+      if (qi === bestQ && r === bestR) continue;
       const t = rot(mask, r);
-      const matched = POP[held & t];
-      const score = matched
-        - missingWeight * (POP[t] - matched)
-        - (heldCount - matched)
-        + (r === bass ? bassWeight : 0);
-      if (score > bestScore) {
-        nextScore = bestScore; nextQ = bestQ; nextR = bestR;
-        bestScore = score; bestQ = qi; bestR = r;
-      } else if (score > nextScore) {
-        nextScore = score; nextQ = qi; nextR = r;
-      }
+      const differs = bestT ^ t;
+      /* Same pitch classes, different name: a real ambiguity, it blocks.
+         Different pitch classes, none of them played: nothing to hear, it does
+         not block. Otherwise it is an ordinary rival. */
+      if (stated && differs !== 0 && (differs & held) === 0 && POP[t] === POP[bestT]) continue;
+      const score = scoreOf(t) + (r === bass ? bassWeight : 0);
+      if (score > nextScore) { nextScore = score; nextQ = qi; nextR = r; }
     }
   }
 
   const say = (qi, r) => `${PC_NAME[r]}${RECOGNISED[qi][0]}`;
-  const bestT = rot(RECOGNISED[bestQ][1], bestR);
   const extra = heldCount - POP[held & bestT];
   const gap = bestScore - nextScore;
   const over = bass === bestR ? null : PC_NAME[bass];
