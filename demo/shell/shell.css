@@ -5640,8 +5640,18 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   display: flex; flex: 1 1 auto; min-width: 0; overflow-x: auto;
   padding-block: var(--panel-pad);
 }
-.panel-strip-l { margin-left: var(--panel-gap); }   /* fixed column on the left */
-.panel-strip-r { margin-right: var(--panel-gap); }  /* fixed column on the right */
+/* 🔴 THE GAP IS PADDING INSIDE THE SCROLLER, NOT A MARGIN AROUND IT. Asked
+   2026-09-23 off a crop of `/evo/`: *"rm x paddings from scrollable area. keep
+   them initally but when scolled whole rigth side is scrolling/overflow"*.
+   As a MARGIN the scroller's own box stopped short of the card, so the strip
+   could never reach the edge: content scrolled inside a narrower window and the
+   inset sat there whatever the scroll position, which reads as the panel being
+   cut off rather than continuing.
+   ✅ AS PADDING THE BOX REACHES THE EDGE AND THE INSET SCROLLS AWAY WITH THE
+   CONTENT, which is exactly what was asked for: there at rest, gone once you
+   move, and the whole right side is scrollable. */
+.panel-strip-l { padding-left: var(--panel-gap); }   /* fixed column on the left */
+.panel-strip-r { padding-right: var(--panel-gap); }  /* fixed column on the right */
 
 /* 🔴 `width: max-content`, SO THE PANEL KEEPS ITS OWN WIDTH AT EVERY WINDOW
    SIZE AND THE STRIP IS WHAT MOVES. `height: 100%` is the other half: it gives
