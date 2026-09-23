@@ -495,6 +495,9 @@
     from '/shell/fullscreen.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createVideoPanel, FULL_MODES } from '/shell/video-panel.mjs';
+  import { createLocalRemote, fadeGains, NARROW_PX, KINDS, ARRANGEMENTS }
+    from '/shell/local-remote.mjs';
+  import { createWaveView } from '/shell/wave-view.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
@@ -876,6 +879,16 @@
   // and a `let` left where a block used to be is read in its dead zone,
   // swallowed by `section()` into `failed`, and reported much later with a
   // message about a different line.
+  /* 🔴 THE THREE `local and remote` SPECIMENS, DECLARED UP HERE WITH EVERY
+     OTHER HOLDER. This is the newest block and therefore the topmost one, and a
+     `let` left where a block used to be is read in its temporal dead zone,
+     swallowed by `section()` into `failed`, and reported much later with a
+     message about a different line. That has happened on this page three times
+     and it is the first thing to check when a block below reports that it did
+     not build. */
+  let lrWide = null;          // audio on one side, video on the other
+  let lrMissing = null;       // the far end not answering, which is the ordinary case
+  let lrPhone = null;         // the same component pinned to the phone arrangement
   let panelWith = null;       // { panel, reading }  the absorber is on the block
   let panelWithout = null;    // { panel, reading }  NEGATIVE CONTROL: no absorber
   let panelGrowBlk = null;    // the dashed block that absorbs the slack
@@ -1062,6 +1075,139 @@
    * cursor, the opacity and the rendered tab stops, and no check makes those
    * claims any more.
    */
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Local and remote, as of
+   * 2026-09-23, asked for as *"make general 'local and remote' component that
+   * can be used for video and audio"* with a drawing, and then *"some kind of
+   * scope?"*, *"viz can be audio (waveforms), video or missing."* and *"its
+   * 'glue' thing"*.
+   *
+   * 🔴 THREE SPECIMENS, AND EACH ONE IS HERE FOR A CLAIM RATHER THAN FOR A
+   * LOOK. The first is the two viz kinds the ask names, a waveform on one side
+   * and a picture on the other. The second is `missing`, which is the state
+   * this component was designed around first, because a remote with nothing
+   * coming back is the ordinary case on this desk and a pane that draws nothing
+   * and says nothing is indistinguishable from one that is broken. The third is
+   * the phone arrangement, which is a DIFFERENT STRUCTURE rather than a reflow:
+   * the labels move out of the shared bar and into their own panes' footers.
+   *
+   * 🔴 AND THE PHONE ONE IS GRADED HERE, AT DESKTOP WIDTH, WHICH NO OTHER
+   * PHONE LAYOUT IN THIS REPOSITORY IS. `demo/verify.mjs` runs at 756 px with
+   * no viewport override, so every assert on every page passes without ever
+   * entering a media query, and `.pos-pick`'s entire phone layout sat dead in
+   * `shell.css` for weeks with every line of it correct. This component decides
+   * its arrangement in JavaScript, off its own box's width, so both
+   * arrangements are reachable and measurable at any window size.
+   *
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the blocks
+   * below give: both harnesses press that row by position, so a new top block
+   * with a control in it moves every other block's press. The fader lives
+   * inside the component's own footer band, which is where it belongs anyway.
+   *
+   * ⚠️ AND THE PICTURE IS DRAWN ONCE RATHER THAN ANIMATED. `pattern.mjs` into a
+   * canvas, this project's own image, from nobody's server. What this block is
+   * about is the arrangement and the fader, and a second frame loop on a page
+   * that already runs several would cost a reader something for nothing.
+   */
+  section('timeline', 'LOCAL AND REMOTE',
+    'One thing running here and the same thing running somewhere else, side by '
+    + 'side, with one fader between them.',
+    `const lr = createLocalRemote({
+  local:  { label: 'this page', kind: 'audio', media: wave.el },
+  remote: { label: 'the board', kind: 'video', media: canvas, of: 'the Raspberry Pi' },
+  onFade: (v, g) => { /* g.local and g.remote are equal power */ },
+});
+lr.gain({ local: pageGain, remote: boardGain });    // once the graph exists
+lr.remote.kind('missing', { say: 'the board has not answered yet' });`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      // One master frame, drawn once, blitted into every picture well that
+      // wants one. A canvas cannot be in two places, which is why `/stage/` and
+      // the VIDEO PANEL block below both do it this way.
+      const master = document.createElement('canvas');
+      master.width = FRAME_W; master.height = FRAME_H;
+      burn(master.getContext('2d', { alpha: false }), FRAME_W, FRAME_H, 0,
+        { hue: videoHue(1) });
+      const picture = () => {
+        const c = document.createElement('canvas');
+        c.width = FRAME_W; c.height = FRAME_H;
+        c.getContext('2d', { alpha: false }).drawImage(master, 0, 0);
+        return c;
+      };
+
+      /**
+       * 🔴 THE AUDIO CASE IS A WAVE VIEW, WHICH IS THE KIT'S ANSWER TO *"viz
+       * can be audio (waveforms)"*. The material is made here rather than
+       * fetched: a decaying sine is enough to show a shape, and a gallery is
+       * the last place to ask somebody else's server for a sound.
+       */
+      const seconds = 1.5, rate = 22050;
+      const samples = new Float32Array(Math.round(seconds * rate));
+      for (let i = 0; i < samples.length; i++) {
+        const t = i / rate;
+        samples[i] = Math.sin(2 * Math.PI * 220 * t) * Math.exp(-2.1 * t);
+      }
+      const wave = createWaveView(document.createElement('div'), { height: 150 });
+      wave.set({ samples, rate, name: 'a plucked string' });
+
+      // ── the two viz kinds the ask names, side by side ────────────────────
+      stack.add(el('p', 'kit-cap', 'audio on one side, video on the other'));
+      lrWide = createLocalRemote({
+        local: { label: 'this page', kind: 'audio', media: wave.el },
+        remote: { label: 'the board', kind: 'video', media: picture(),
+          of: 'the Raspberry Pi' },
+      });
+      lrWide.remote.presence.set('online');
+      stack.add(lrWide.el);
+
+      // ── missing, which is the state this was designed around first ───────
+      stack.add(el('p', 'kit-cap', 'and the far end not answering'));
+      lrMissing = createLocalRemote({
+        local: { label: 'this page', kind: 'video', media: picture() },
+        remote: { label: 'the board', kind: 'missing', of: 'the Raspberry Pi',
+          say: 'the board has not answered since you opened this page' },
+        value: 0.35,
+      });
+      lrMissing.remote.presence.set('offline', 'no socket has been opened');
+      stack.add(lrMissing.el);
+
+      /**
+       * ⚠️ THE FADER IS STILL ENABLED IN THAT SECOND SPECIMEN, AND THAT IS THE
+       * DECISION RATHER THAN AN OVERSIGHT. It was asked as *"if one is missing,
+       * disabled xfade?"*, answered yes, and reversed by the fact that decides
+       * it: *"remote can come and go ... or perhaps just always enabled. just
+       * goes into silece when no source"*. A control whose enabled state
+       * follows a socket dies under your finger, and the pane beside it already
+       * says the far end is gone, so fading into silence is the truthful output
+       * rather than a control lying.
+       */
+
+      // ── the phone arrangement, at a phone's width ────────────────────────
+      stack.add(el('p', 'kit-cap', 'the same component at 375 px'));
+      const frame = el('div');
+      frame.style.width = '375px'; frame.style.maxWidth = '100%';
+      lrPhone = createLocalRemote({
+        local: { label: 'this page', kind: 'video', media: picture() },
+        remote: { label: 'the board', kind: 'missing', of: 'the Raspberry Pi',
+          say: 'the board has not answered since you opened this page' },
+      });
+      /**
+       * ⚠️ PINNED RATHER THAN LEFT TO ITS OBSERVER, AND ONLY FOR THE SPECIMEN.
+       * A `ResizeObserver` answers on the frame AFTER the box exists, and the
+       * checks at the foot of this file run in the same task as the build, so a
+       * specimen relying on the observer would be graded while it was still
+       * wide. That the observer works at all is a separate claim and is
+       * measured on its own throwaway, with the frames waited for.
+       */
+      lrPhone.arrange('narrow');
+      frame.append(lrPhone.el);
+      stack.add(frame);
+
+      box.append(stack.el);
+    });
+
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A control grid, as of
    * 2026-09-22, asked for as *"make component for know etc grid where centers
@@ -7736,6 +7882,317 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
        and the assert went with it. **Nothing replaces it.** `verify.mjs` runs
        at 756 px, so every remaining panel assert passes without ever meeting a
        phone. See the note where the specimen was built. */
+  }
+
+  // ── local and remote ──────────────────────────────────────────────────────
+  //
+  // 🔴 EVERY CLAIM HERE IS A COMPARISON OR A LEVEL, WHICH IS WHAT ONLY THIS
+  // PAGE CAN MAKE. The three specimens differ in exactly one thing each, so a
+  // check reads one against another rather than against a number typed into it.
+  if (lrWide && lrMissing && lrPhone) {
+    const px = (n) => +n.toFixed(1);
+    const rect = (n) => n.getBoundingClientRect();
+
+    /**
+     * 🔴 ONE SURFACE, WHICH IS WHAT *"its 'glue' thing"* ASKED FOR. A box drawn
+     * round a child that already has one is the doubled edge `.pos-glue` and
+     * `.pos-report` both exist to avoid, and here it would be drawn three deep:
+     * the surface, then each panel, then each panel's own footer seam. So the
+     * claim is that the panels have given their edges up and that what is left
+     * between the two pictures is a hairline rather than a gap with the page
+     * showing through it.
+     */
+    {
+      const surf = getComputedStyle(lrWide.el);
+      const pane = getComputedStyle(lrWide.local.panel.el);
+      const a = rect(lrWide.local.el), b = rect(lrWide.remote.el);
+      const bar = rect(lrWide.bar);
+      const across = px(b.left - a.right), down = px(bar.top - a.bottom);
+      d.assert('the two panes and the row under them are one box with hairline seams, not three boxes',
+        surf.borderTopWidth === '1px' && pane.borderTopWidth === '0px'
+        && pane.borderTopLeftRadius === '0px' && across === 1 && down === 1,
+        `surface border ${surf.borderTopWidth}, a panel inside it ${pane.borderTopWidth} `
+        + `and radius ${pane.borderTopLeftRadius}, ${across} px between the two pictures `
+        + `and ${down} px between them and the row under them`);
+    }
+
+    /**
+     * 🔴 TWO ARRANGEMENTS, MEASURED AT ONE WIDTH, AND THAT IS THE POINT RATHER
+     * THAN A CONVENIENCE. `demo/verify.mjs` runs at 756 px with no viewport
+     * override, so every assert on every page in this repository passes without
+     * ever entering a media query: `.pos-pick`'s entire phone layout sat dead in
+     * `shell.css` for weeks with every line of it correct, and nothing could
+     * have caught it. This component decides its arrangement in JavaScript off
+     * its own box's width, so the phone one is a rect here rather than a
+     * reading of source order.
+     * ⚠️ AND BOTH HALVES ARE ASSERTED. Side by side means the tops AGREE and the
+     * lefts DIFFER; stacked means the opposite. A check on one of the two would
+     * pass on a component that had collapsed to a single column at both widths.
+     */
+    {
+      const w = [rect(lrWide.local.el), rect(lrWide.remote.el)];
+      const n = [rect(lrPhone.local.el), rect(lrPhone.remote.el)];
+      const sideBySide = px(w[0].top) === px(w[1].top) && w[1].left > w[0].right - 2;
+      const stacked = px(n[0].left) === px(n[1].left) && n[1].top > n[0].bottom - 2;
+      d.assert('side by side when there is room and stacked when there is not, both measured at this width',
+        lrWide.arrange() === 'wide' && lrPhone.arrange() === 'narrow'
+        && sideBySide && stacked,
+        `wide: tops ${px(w[0].top)} and ${px(w[1].top)}, lefts ${px(w[0].left)} and ${px(w[1].left)} `
+        + `over ${px(w[0].width)} px panes, narrow: lefts ${px(n[0].left)} and ${px(n[1].left)}, `
+        + `tops ${px(n[0].top)} and ${px(n[1].top)} over ${px(n[0].width)} px panes`);
+    }
+
+    /**
+     * 🔴 THE LABELS MOVE HOUSE, AND THERE IS STILL ONLY ONE OF EACH. Given as
+     * two drawings: wide is one footer holding two labels with the fader
+     * between them, narrow is a footer per pane with the fader as a band under
+     * both. The cheap way to build that is two label elements, one per
+     * arrangement, with the other hidden, and that is a readout living in two
+     * files: two rows that can disagree. `video-panel.mjs` settled the same
+     * question the same way with `under()`, which MOVES the page's own control
+     * row into the panel and puts it back.
+     * ⚠️ THE COUNT IS THE HALF THAT CATCHES THE COPY. A component that drew a
+     * second label in the pane's footer would place it in exactly the right
+     * spot and pass every geometric check here.
+     */
+    {
+      const homes = (lr) => ['local', 'remote'].map((k) =>
+        lr[k].labelEl.parentElement.className.split(' ').find((c) => c.startsWith('pos-')));
+      const counts = [lrWide, lrPhone].map((lr) => lr.el.querySelectorAll('.pos-lr-lab').length);
+      const wideHomes = homes(lrWide), narrowHomes = homes(lrPhone);
+      d.assert('a label is one element with two homes, and moving it never makes a second one',
+        wideHomes.every((h) => h === 'pos-lr-bar')
+        && narrowHomes.every((h) => h === 'pos-vp-slot')
+        && counts.every((c) => c === 2),
+        `wide puts both in ${wideHomes.join(' and ')}, narrow puts them in `
+        + `${narrowHomes.join(' and ')}, and each component holds ${counts.join(' and ')} labels`);
+    }
+
+    /**
+     * 🔴 `missing` IS THE STATE THIS COMPONENT WAS DESIGNED AROUND FIRST. A
+     * remote with nothing coming back is the ordinary case on this desk, and a
+     * pane that draws nothing and says nothing is indistinguishable from one
+     * that is broken. So the pane keeps the SIZE of the pane beside it, because
+     * two panes of one size say these are two views of one subject and a
+     * collapsed one says the page failed, and it carries the CALLER's sentence
+     * rather than a generic one.
+     * ⚠️ THE NEGATIVE CONTROL IS THE OTHER PANE. A component that drew its note
+     * over every well would pass everything above and cover a picture.
+     */
+    {
+      const mine = lrMissing.remote;
+      const note = rect(mine.sayEl);
+      const wells = [rect(lrMissing.local.panel.stage), rect(mine.panel.stage)];
+      const other = getComputedStyle(lrMissing.local.sayEl).display;
+      const words = mine.say();
+      d.assert('a pane with nothing coming back says so, in the caller’s words, and keeps its size',
+        mine.kind() === 'missing' && note.width > 0 && note.height > 0
+        && /has not answered/.test(words)
+        && px(wells[0].height) === px(wells[1].height) && other === 'none',
+        `it says "${words}" in a ${px(note.width)} by ${px(note.height)} px box, the two wells are `
+        + `${px(wells[0].height)} and ${px(wells[1].height)} px tall, and the pane with a picture in `
+        + `it draws its note at display ${other}`);
+    }
+
+    /**
+     * 🔴 THE FADER IS ENABLED WITH THE FAR END MISSING, AND THAT REVERSES THE
+     * FIRST ANSWER THIS COMPONENT WAS GIVEN. Asked as *"if one is missing,
+     * disabled xfade?"*, answered yes on the rule that a control which cannot
+     * do the thing it names is the defect, and then corrected: *"remote can
+     * come and go ... or perhaps just always enabled. just goes into silece
+     * when no source"*.
+     * ⚠️ IT IS READ AGAINST THE SPECIMEN WHOSE FAR END IS PRESENT, so the claim
+     * is that the two are the SAME rather than that one of them looks alive.
+     * A component with both faders dead would pass a check on one of them.
+     * 🔴 AND THE BILL THE OTHER ANSWER WOULD HAVE CARRIED IS THE REASON THIS IS
+     * CHECKED AT ALL: `disabled` is not a style, it is a `return` in front of
+     * the handler, and every harness here drives a page by clicking controls.
+     * Switching two buttons off took ten asserts out of `/mirror/` and six out
+     * of `/blocks/` in one day. The board is unreachable from a harness, so a
+     * fader disabled on a missing remote is disabled on EVERY run.
+     */
+    {
+      const lane = (lr) => lr.fade.el.querySelector('.sld-lane');
+      const live = lane(lrWide), gone = lane(lrMissing);
+      d.assert('the fader stays live with the far end missing, exactly as it is with the far end present',
+        !gone.hasAttribute('aria-disabled') && gone.getAttribute('tabindex') === '0'
+        && !live.hasAttribute('aria-disabled') && live.getAttribute('tabindex') === '0'
+        && lrMissing.remote.kind() === 'missing' && lrWide.remote.kind() === 'video',
+        `far end ${lrMissing.remote.kind()}: disabled ${gone.hasAttribute('aria-disabled')}, `
+        + `tab stop ${gone.getAttribute('tabindex')}. far end ${lrWide.remote.kind()}: `
+        + `disabled ${live.hasAttribute('aria-disabled')}, tab stop ${live.getAttribute('tabindex')}`);
+    }
+  }
+
+  /**
+   * 🔴 THE CROSSFADE MOVES REAL GAIN, AND THIS MEASURES THE LEVEL RATHER THAN
+   * THE NUMBER IN THE CONTROL. A fader that only redraws is the shape this
+   * project calls a lie, and reading `slider.get()` back would grade the slider
+   * against itself. So two constant sources go through the two gains the
+   * component is holding, one into each channel of a merger, and an offline
+   * render says what came out. The two ends are measured independently, which
+   * is what makes "the middle is BOTH" a measurement rather than a sum.
+   *
+   * ⚠️ OFFLINE, SILENT, 128 FRAMES, AND NO GESTURE. `AudioContext.resume()`
+   * waits on a user gesture and never rejects, which has cost this project two
+   * demos in one session; an `OfflineAudioContext` needs neither and renders in
+   * no time at all.
+   * ⚠️ ONE CONTEXT PER POSITION, because an offline context renders once and
+   * the component writes `gain.value` immediately rather than scheduling it.
+   * That is also why `gain()` is a setter rather than an option: a page's audio
+   * graph does not exist until somebody has pressed something.
+   *
+   * ⚠️ EVERYTHING IN HERE IS BEHIND `?selfcheck=1` because it drives a control
+   * and builds audio nodes. A visitor gets none of it, which is the standing
+   * rule rather than a judgement about how cheap this particular block is.
+   */
+  if (SELFCHECK && typeof OfflineAudioContext === 'function') {
+    settle();
+
+    const probe = el('div', '');
+    probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px';
+    document.body.append(probe);
+    const lines = [];
+    const spare = createLocalRemote({
+      local: { label: 'this page', kind: 'audio' },
+      remote: { label: 'the board', kind: 'missing', of: 'the board',
+        say: 'the board has not answered yet' },
+      onLog: (line) => lines.push(line),
+    });
+    probe.append(spare.el);
+
+    /** Render one position and hand back what each channel really carried. */
+    const levelAt = async (b) => {
+      const ctx = new OfflineAudioContext(2, 128, 44100);
+      const gl = ctx.createGain(), gr = ctx.createGain();
+      const sl = ctx.createConstantSource(), sr = ctx.createConstantSource();
+      sl.offset.value = 1; sr.offset.value = 1;
+      const merge = ctx.createChannelMerger(2);
+      sl.connect(gl); gl.connect(merge, 0, 0);
+      sr.connect(gr); gr.connect(merge, 0, 1);
+      merge.connect(ctx.destination);
+      spare.gain({ local: gl, remote: gr });
+      spare.value(b);
+      sl.start(); sr.start();
+      const out = await ctx.startRendering();
+      return { local: out.getChannelData(0)[64], remote: out.getChannelData(1)[64] };
+    };
+
+    const at0 = await levelAt(0), at5 = await levelAt(0.5), at1 = await levelAt(1);
+    const f = (x) => x.toFixed(4);
+    const near = (a, b, eps = 2e-4) => Math.abs(a - b) <= eps;
+
+    d.assert('driven to one end the near side is whole and the far side is silent, measured out of the graph',
+      near(at0.local, 1) && near(at0.remote, 0)
+      && near(at1.local, 0) && near(at1.remote, 1),
+      `at 0 the levels are ${f(at0.local)} and ${f(at0.remote)}, at 1 they are `
+      + `${f(at1.local)} and ${f(at1.remote)}`);
+
+    /**
+     * 🔴 EQUAL POWER, WHICH IS THE CLAIM A LINEAR FADE FAILS IN EXACTLY ONE
+     * PLACE. Two uncorrelated sources at 0.5 each carry half the power, which
+     * is 3.01 dB down, and the middle of the lane is the one position a
+     * listener stops at to compare the two ends. `/grains/` wrote this line
+     * first and it was lifted rather than rewritten.
+     * ⚠️ THE ARITHMETIC IS ALSO GRADED WITH NO BROWSER AT ALL: `node
+     * demo/shell/local-remote-test.mjs` is 13 checks, four of them negative
+     * controls, and one of those runs a linear pair through the same property.
+     */
+    {
+      const power = (g) => g.local * g.local + g.remote * g.remote;
+      const ps = [at0, at5, at1].map(power);
+      d.assert('the middle is both sides at once and the power is the same all the way across',
+        near(at5.local, at5.remote) && near(at5.local, Math.SQRT1_2)
+        && ps.every((p) => near(p, 1)),
+        `the middle measured ${f(at5.local)} and ${f(at5.remote)} against ${f(Math.SQRT1_2)}, `
+        + `and the power at 0, the middle and 1 is ${ps.map(f).join(', ')}`);
+    }
+
+    /**
+     * 🔴 AND WITH THE FAR END MISSING IT STILL MOVES, INTO SILENCE. That is the
+     * reversed answer doing its job: the fader is live, the near side really
+     * goes quiet, and the thing that stops it being a lie is the pane saying in
+     * words that there is nothing over there.
+     */
+    {
+      const far = await levelAt(1);
+      const lane = spare.fade.el.querySelector('.sld-lane');
+      d.assert('with nothing at the far end the fader still moves, and what it moves into is silence',
+        spare.remote.kind() === 'missing' && !lane.hasAttribute('aria-disabled')
+        && near(far.local, 0) && /has not answered/.test(spare.remote.say()),
+        `the far end is ${spare.remote.kind()} and says "${spare.remote.say()}", the lane is live, `
+        + `and the near side measured ${f(far.local)}`);
+    }
+
+    /**
+     * 🔴 THE SAME NODE CAME BACK. The two visitor-safe checks above read two
+     * different components in two arrangements, which cannot tell a move from
+     * two elements built the same way. This one holds the node and follows it.
+     */
+    {
+      const node = spare.local.labelEl;
+      spare.arrange('narrow');
+      const narrowHome = node.parentElement.className;
+      const sameAfterNarrow = spare.local.labelEl === node;
+      spare.arrange('wide');
+      const wideHome = node.parentElement.className;
+      d.assert('the label that went into the pane’s footer is the one that came back to the bar',
+        sameAfterNarrow && spare.local.labelEl === node
+        && /pos-vp-c/.test(narrowHome) && /pos-lr-bar/.test(wideHome)
+        && spare.el.querySelectorAll('.pos-lr-lab').length === 2,
+        `it went to "${narrowHome.trim()}" and came back to "${wideHome.trim()}", `
+        + `still one node, and the component holds `
+        + `${spare.el.querySelectorAll('.pos-lr-lab').length} labels`);
+    }
+
+    /**
+     * 🔴 IT WATCHES ITS OWN BOX, NOT THE WINDOW. A component in a half page
+     * column on a 1280 px screen has 600 px, and a viewport query would tell it
+     * it has room it does not have. This is measured by changing the HOLDER's
+     * width at a fixed window size, which is the thing a media query cannot be
+     * asked.
+     * ⚠️ THE SECOND HALF IS THE NEGATIVE CONTROL. A component that answered
+     * `narrow` to everything would pass the first reading perfectly.
+     */
+    {
+      const frames = (n) => new Promise((r) => {
+        const step = () => (--n <= 0 ? r() : requestAnimationFrame(step));
+        requestAnimationFrame(step);
+      });
+      spare.arrange(null);
+      probe.style.width = '320px';
+      await frames(3);
+      const small = spare.arrange();
+      probe.style.width = '900px';
+      await frames(3);
+      const large = spare.arrange();
+      d.assert('the arrangement follows the width of its own box rather than the window’s',
+        small === 'narrow' && large === 'wide' && window.innerWidth > NARROW_PX,
+        `in a 320 px holder it went ${small} and in a 900 px one it went ${large}, `
+        + `with the window at ${window.innerWidth} px throughout`);
+    }
+
+    /**
+     * 🔴 A CHANGE OF KIND IS A STATE CHANGE, SO IT GOES IN THE LOG WHEN IT
+     * CHANGES AND NEVER ON A TICK. This project's rule about where a fact
+     * lives: a figure goes in a readout cell, a claim goes in an assert, a
+     * state change goes in the log. The second half is the negative control:
+     * setting the same kind again says nothing, because a log that repeats
+     * itself is a log nobody reads.
+     */
+    {
+      const was = lines.length;
+      spare.remote.kind('video', { say: '' });
+      const after = lines.length;
+      spare.remote.kind('video');
+      d.assert('a side coming back is one line in the log, and saying it again is none',
+        after === was + 1 && lines.length === after
+        && /the board/.test(lines[after - 1]),
+        `it logged "${lines[after - 1]}" once, and a second call to the same kind logged nothing`);
+    }
+
+    probe.remove();
+    measure();
   }
 
   // ── the parts, and whether a reader can still find what is new ──────────
