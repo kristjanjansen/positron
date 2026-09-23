@@ -1565,6 +1565,23 @@ video[hidden] { display: none; }
   background: transparent; transition: background .06s linear;
 }
 .k.hint .kd { background: var(--dim2); }
+/* 🔴 A PROPOSAL SITS INSIDE THE DOT, SMALLER, SO BOTH FACTS ARE READABLE AT
+   ONCE. Asked as *"when fading, fade them also in keyboard so smaller are on
+   top of larger"*. It is a pseudo-element rather than a second colour on `.kd`,
+   because a key can be proposed AND under a finger, and a page that had to
+   choose between saying those two things would say the wrong one. */
+.k .kd { position: relative; }
+.k.ai .kd::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: calc(var(--k-dot, 6px) * .55); height: calc(var(--k-dot, 6px) * .55);
+  margin: calc(var(--k-dot, 6px) * -.275) 0 0 calc(var(--k-dot, 6px) * -.275);
+  border-radius: 50%; background: var(--ai);
+}
+/* ⚠️ AND A KEY THAT IS ONLY PROPOSED STILL NEEDS A DOT TO SIT IN, or the mark
+   has nothing to be inside and reads as a speck on an empty key. */
+.k.ai:not(.down):not(.hint):not(.remote) .kd {
+  background: color-mix(in srgb, var(--ai) 22%, transparent);
+}
 .k.remote .kd { background: var(--ok); }
 /* 🔴 LAST, SO A HELD KEY READS AS HELD WHATEVER ELSE IT IS. Same order the
    old background rules carried, and the same reason: you play along with a
