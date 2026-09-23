@@ -1,13 +1,13 @@
-# Handoff, 2026-09-23, session 46, OPEN WITH TWO AGENTS MID-EDIT
+# Handoff, 2026-09-23, session 46, OPEN WITH ONE AGENT MID-EDIT
 
-🔴 **READ THIS FIRST. THE WORKING TREE HOLDS UNFINISHED WORK FROM TWO BACKGROUND
-AGENTS THAT WERE STILL RUNNING WHEN THIS WAS WRITTEN, AND A THIRD SESSION'S
-FILES ON TOP OF THAT.** Nothing below is lost, but nothing in that set is graded
+🔴 **READ THIS FIRST. THE WORKING TREE HOLDS UNFINISHED WORK FROM ONE BACKGROUND
+AGENT THAT WAS STILL RUNNING WHEN THIS WAS WRITTEN, AND ANOTHER SESSION'S FILES
+ON TOP OF THAT.** Nothing below is lost, but nothing in that set is graded
 either, and the usual reflex of building and deploying would ship it.
 
 ```sh
 node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"   # 61 today, 59 built
-git log --oneline -1          # 401975f, and origin is level with it
+git log --oneline -1          # 24925ef, and origin is level with it
 git status --porcelain        # the in flight set, listed below
 ```
 
@@ -24,7 +24,7 @@ the edge is correct and simply older than `HEAD`.
 
 ## 🔴 THE IN FLIGHT SET, AND WHOSE EACH FILE IS
 
-**Three owners, and telling them apart is the whole point of this section.**
+**Two owners now, and telling them apart is the whole point of this section.**
 
 **Another session, do not touch, in none of these commits:**
 
@@ -32,26 +32,23 @@ the edge is correct and simply older than `HEAD`.
 LESSONS.md   demo/verify.mjs   demo/wish/index.html
 ```
 
-**Agent one, balanced wrapping and the `/kit/` specimens:**
+✅ **AGENT ONE FINISHED AND ITS WORK IS COMMITTED AND PUSHED**, `24925ef`.
+Balanced wrapping and the two `/kit/` specimens are in. Nothing of it is left in
+the tree.
+
+**Agent two, the `/nola/` learning mode, STILL RUNNING:**
 
 ```
-demo/shell/shell.css   demo/kit/index.html
-demo/click/index.html  demo/grains/index.html
-demo/making/index.html demo/mirror/index.html
-```
-
-**Agent two, the `/nola/` learning mode:**
-
-```
-demo/shell/name.mjs (new)   demo/shell/name-test.mjs (new)
+demo/shell/name.mjs (new)      demo/shell/name-test.mjs (new)
+demo/shell/suggest.mjs (new)   demo/shell/suggest-test.mjs (new)
 demo/shell/roll.mjs   demo/nola/index.html   demo/manifest.mjs
 ```
 
 🔴 **AND `workers/view/public/` IS DIRTY WITH ALL OF IT.** One of the agents ran
 `node build.mjs` to check that its imports resolve, which is the right thing to
 do and copies the working tree while doing it. **So the build output in this
-checkout currently contains ungraded, half finished work from two agents and one
-other session.** A deploy from here ships that. **Rebuild from a tree you have
+checkout currently contains ungraded, half finished work from the running agent
+and from another session.** A deploy from here ships that. **Rebuild from a tree you have
 decided about before deploying anything**, and read `git status` rather than
 assuming the build output is a function of the last commit.
 
@@ -69,7 +66,7 @@ IS NOT FINISHED** and `/nola/` has not been re-verified since the agent started.
 
 ## What landed and is pushed
 
-**43 commits ahead of `origin/main`, nothing unpushed.**
+**45 commits ahead of `origin/main`, nothing unpushed.**
 
 🔴 **EVERY CLAUDE ATTRIBUTION TRAILER IS GONE FROM THIS BRANCH'S HISTORY.** The
 new global rule says never to add one and to strip any that reached an unmerged
@@ -99,8 +96,8 @@ ratio**; centring still reads 0.401 and still goes red, so the check refuses wha
 it was written to refuse.
 
 **`demo/shell/local-remote.mjs`**, 494 lines, one component for a thing here and
-the same thing somewhere else. `/kit/` reads **200/200**, of which the block
-added 11. `local-remote-test.mjs` is 13 checks with 4 negative controls.
+the same thing somewhere else. `/kit/` reads **203/203**, of which this block
+added 11 and the two new specimens added 3. `local-remote-test.mjs` is 13 checks with 4 negative controls.
 
 Four decisions in it that are not what the obvious build would be, kept here
 because each was paid for:
