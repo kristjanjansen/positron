@@ -2404,6 +2404,21 @@ button.pos-pg-lab:hover { color: var(--fg); }
   height: auto; padding: 7px 9px; line-height: 1.5; resize: vertical;
   font-family: var(--sans); font-size: 13.5px;
 }
+/* `code: true` on createField. A program, not prose: the mono face comes back
+   and the line box tightens, because indentation only reads when the columns
+   line up. `tab-size: 2` so a pasted `.dsp` file does not arrive eight columns
+   deep on a phone. */
+/* ⚠️ `pre-wrap`, NOT `pre`, AND THAT IS A PHONE DECISION. `pre` is what a code
+   editor does and it put `tone = os.osc(freq) + 0.5 * os.osc(freq * 2) +` off
+   the right edge of a 390 px screen with the rest of the line reachable only by
+   dragging sideways inside the box. PHOTOGRAPHED. A visitor on a phone is here
+   to READ ten lines before they change one, and a line they have to drag into
+   view is a line they do not read. Wrapping keeps every character on screen and
+   keeps the indentation, which is the half of `pre` that matters here. */
+.pos-field.tall.code textarea {
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.45; tab-size: 2;
+  white-space: pre-wrap; overflow-wrap: break-word;
+}
 .pos-field input::placeholder, .pos-field textarea::placeholder { color: var(--dim2); }
 .pos-field input:disabled, .pos-field textarea:disabled { opacity: .4; }
 /* On a phone a field takes the whole width rather than sharing a row: a
