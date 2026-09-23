@@ -5940,3 +5940,161 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   padding: 8px 16px;
 }
 .pos-drop-note[hidden] { display: none; }
+
+/* ── local and remote: one thing here, the same thing somewhere else ────────
+   demo/shell/local-remote.mjs. Asked for 2026-09-23 as *"make general 'local
+   and remote' component that can be used for video and audio"*, with a drawing
+   of two pictures over a row reading `labelleftalign  x-fade-slider
+   labelrightalign`, and *"its 'glue' thing"*.
+
+   🔴 ONE SURFACE, WHICH IS WHAT THE WORD GLUE IN THE ASK MEANS. The two wells
+   and the row under them are one box with one border and hairline seams between
+   the parts, exactly as `.pos-glue` does it, and the children give up their own
+   border and radius to the box. It is not `.pos-glue` itself because that
+   stacks blocks vertically and this puts two of them SIDE BY SIDE, which is a
+   claim a vertical stack cannot make.
+
+   🔴 AND THERE IS NO MEDIA QUERY IN THIS BLOCK, WHICH IS DELIBERATE AND IS THE
+   ONE THING TO READ BEFORE EDITING IT. Two reasons, and the second is the one
+   that bought it. A media query adds no specificity, so a plain rule written
+   later beats it at every width, which is how `.pos-pick`'s entire phone layout
+   sat dead in this file for weeks with every line of it correct. And no harness
+   in this repository can enter one: `demo/verify.mjs` runs at 756 px with no
+   viewport override, so a phone arrangement written as a media query is graded
+   by nothing. The arrangement is an attribute the module sets off the BOX's own
+   width, so both arrangements are reachable and measurable at any window size,
+   and `/kit/` grades the phone one at desktop width. The number lives once, in
+   `NARROW_PX` in the module. */
+.pos-lr {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  /* 🔴 THE SEAMS ARE THE SURFACE SHOWING THROUGH A ONE PIXEL GAP, NOT BORDERS
+     ON THE PARTS, AND THE FIRST VERSION HAD IT THE OTHER WAY. MEASURED: a
+     `border-left` on the second pane is INSIDE that pane's box, so the two
+     pictures were 327 and 326 px wide and their 16:9 wells came out 184.5 and
+     183.9 px tall. Two panes of the same size are the claim this component
+     makes about its subject, and an edge that eats a pixel from one of them
+     quietly breaks it. A gap over a coloured ground costs both sides nothing
+     and draws the same hairline, in one declaration instead of four. */
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  /* The seams and the corners are clipped to the box, the same way `.pos-vp`
+     does it, so nothing inside needs a second radius kept in step. */
+  overflow: hidden;
+}
+.pos-lr-pane { min-width: 0; background: var(--card); }
+/* 🔴 THE PANEL GIVES UP ITS OWN EDGE TO THE SURFACE. A box drawn round a child
+   that already has one is the doubled edge `.pos-glue` and `.pos-report` both
+   exist to avoid, and here it would be drawn twice over: an outer border, then
+   each panel's, then the panel's own footer seam. */
+.pos-lr .pos-vp { border: 0; border-radius: 0; }
+/* The row under both. `1fr` on the fader is what makes the track the width of
+   the thing it is blending: a `.sld` is `inline-flex`, so between two
+   `max-content` labels it sits at its standalone 96 px with the content width
+   empty either side, which was photographed on `/grains/` and reads as a
+   control that failed to lay out rather than one that is small. */
+.pos-lr-bar {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 12px;
+  /* No border of its own: the grid's own one pixel row gap over the surface's
+     ground is the line above it, the same hairline that separates the two
+     pictures. One mechanism, so the three seams cannot disagree. */
+  background: var(--card);
+  min-width: 0;
+}
+.pos-lr-fade { flex: 1 1 auto; min-width: 0; display: flex; }
+.pos-lr-fade > .sld { flex: 1 1 auto; min-width: 0; }
+.pos-lr-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
+/* With no label there is no head worth showing, and an empty one still takes
+   its gap. Lifted from `/grains/`, which found it. */
+.pos-lr-fade > .sld > .sld-head:empty,
+.pos-lr-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
+
+/* 🔴 THE TWO ENDS ARE LABELLED WHERE THEY POINT. `max-content` and `nowrap`,
+   because a label that wraps is the row reporting that it does not fit, and it
+   reports it in the one place a reader cannot act on. */
+.pos-lr-lab {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap; flex: 0 0 auto;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+
+/* 🔴 THE SENTENCE A MISSING PANE SHOWS, AND IT IS DRAWN OVER THE WELL RATHER
+   THAN INSTEAD OF IT. A pane that draws nothing and says nothing is
+   indistinguishable from one that is broken, and that is the ordinary state of
+   a board in another building. It sits on top so a frozen last frame is still
+   there underneath: clearing the picture would throw away the only record of
+   what the far end looked like while it was answering, and leaving it alone
+   with no words on it is a picture that lies about now.
+   ⚠️ NO POINTER. The well underneath is what a page may have made draggable,
+   and a note floating over it must not eat a gesture aimed at the picture. */
+.pos-lr-say {
+  position: absolute; inset: 0; margin: 0;
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 10px 14px;
+  text-align: center;
+  font: 400 11.5px/1.5 var(--mono); color: var(--dim);
+  pointer-events: none;
+}
+/* 🔴 SHOWN ONLY WHEN THERE IS SOMETHING TO SAY, AND BOTH HALVES ARE ATTRIBUTE
+   PRESENCE RATHER THAN A VALUE. `[data-kind="missing"]` is an exact match and
+   `[data-say]` is the module's own flag, deleted rather than emptied, because
+   `[data-thing]` matches an attribute whose value is the empty string and this
+   repository has already shipped that bug once in `video-panel.mjs`. */
+.pos-lr-pane[data-kind="missing"][data-say] .pos-lr-say { display: flex; }
+/* ⚠️ A WELL WITH NOTHING IN IT IS STILL A PICTURE SHAPED HOLE, never a
+   collapsed line. `.pos-vp-stage` already carries the aspect ratio that makes
+   that true, so there is nothing to add here and this line is the note saying
+   so rather than a rule.
+   🔴 AND A MISSING PANE DIMS ITS WELL RATHER THAN HIDING IT, because the shape
+   of the thing that is not there is a fact worth keeping on screen: two panes
+   the same size say these are two views of one subject, and a collapsed one
+   would say the page is broken. */
+.pos-lr-pane[data-kind="missing"] .pos-vp-stage { background: var(--card2); }
+
+/* 🔴 A WAVEFORM IS NOT A VIDEO, AND THE PANEL ONLY KNOWS ABOUT THREE THINGS.
+   `.pos-vp-stage > video, canvas, img` is what sizes a picture to its well, and
+   a wave view is a `div` holding a canvas, so it landed at the TOP of a 16:9
+   well with the empty field showing under it and its own border drawn inside
+   the surface. Centred, full bleed and with its edge given up to the box, it
+   reads as the picture rather than as something that failed to fill.
+   ⚠️ THIS IS THE COMPONENT'S RULE ABOUT ITS OWN WELL, not an edit to
+   `wave-view.mjs`. That module is used standalone on four pages where its
+   border is exactly right, and a component that changed it for everybody to
+   suit one arrangement would be the shared-measurement defect from the other
+   end. */
+.pos-lr .pos-vp-stage > .pos-wave {
+  position: absolute; inset: 0;
+  display: flex; align-items: center;
+  border: 0; border-radius: 0; background: transparent;
+}
+.pos-lr .pos-vp-stage > .pos-wave > .pos-wave-c { width: 100%; }
+
+/* ── the narrow arrangement, and it is a different structure ───────────────
+   Given as a second drawing rather than as a reflow of the first: each pane
+   carries its own footer, the label goes into it, and the fader is a full width
+   band under both. The module MOVES the label element into the pane's footer,
+   so there is one label on the page in both arrangements rather than two that
+   can disagree.
+   🔴 THESE RULES COME AFTER THE ONES THEY OVERRIDE, which is the ordering this
+   repository pays for when it is got wrong, even though an attribute selector
+   would win on specificity anyway. Reading order and cascade order agreeing is
+   what makes the next edit safe. */
+/* ⚠️ ONE COLUMN IS THE WHOLE OF IT, AND THAT IS WHAT THE SEAM BEING A GAP
+   BOUGHT. The same `gap: 1px` that drew the vertical hairline between the two
+   pictures draws the horizontal one between them here, with nothing to switch
+   off and no second rule that could be left behind. */
+.pos-lr[data-arrange="narrow"] { grid-template-columns: 1fr; }
+/* ⚠️ THE BAR NEEDS NOTHING HERE AND THAT IS THE POINT. In this arrangement the
+   two labels have moved into their own panes' footers, so the bar is holding
+   one flexible child and the rules above already give it the whole row. A rule
+   restating the padding it already has would be the sixth dead rule this
+   repository has measured, so the note is written instead of one.
+   ⚠️ AND THE LABEL SITS IN THE PANEL'S CENTRE SLOT, which is empty by default
+   on both sides. The left slot holds the presence dot on the far pane and
+   nothing on the near one, so a label put there would sit beside a dot on one
+   and against the wall on the other, and the two panes would not line up. */
