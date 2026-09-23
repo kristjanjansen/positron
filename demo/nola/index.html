@@ -3093,13 +3093,19 @@
            perfect through the api. */
         const b0 = d.tap();
         const loopEl = keys.loop.el;
+        keys.loops.forget();
         loopEl.click(); keys.loops.settle(0);
         for (const n of [60, 64, 67]) midiDown(n, 96, 0, performance.now());
         await sleep(60);
         for (const n of [60, 64, 67]) midiUp(n);
         const movements = keys.taped();
         loopEl.click(); keys.loops.settle(0);
-        await sleep(600);
+        /* ⚠️ ONE LAP AND A MARGIN, NOT THREE. `verify.mjs` stops growing about two
+           seconds after the last NEW assert, so a long wait inside a check does
+           not fail, it TRUNCATES the run and reports what it got as green. This
+           block cost 17 asserts that way before the sleeps were cut. The lap here
+           is the 250 ms floor, so 350 ms is a whole turn. */
+        await sleep(350);
         const b1 = d.tap();
         loopEl.click(); keys.loops.settle(0);
         await quiet();
@@ -3109,6 +3115,39 @@
           + `round the wire had still sent only ${b1.on - b0.on} note on(s) while the `
           + `instrument made ${b1.voiced - b0.voiced} voice(s)`);
 
+        /* 🔴 A LOOP MUST NOT LET GO OF A NOTE YOUR FINGER IS ON, AND THIS PAGE'S
+           OWN TAP IS WHAT REPORTED IT. Said as *"pressing loop, just repssing is
+           cutting off sound, does not held note"*, with the tap line reading *"the
+           wire says 57,61 and the page says nothing"*.
+           🔴 A NOTE CAN BE HELD BY A FINGER AND BY A LOOP AT ONCE AND A SET
+           CANNOT COUNT. When the loop replayed a note somebody was also holding,
+           its note-off reached this page and this page let go of the FINGER'S
+           note: the wire still had the key down, the page had nothing, and the
+           sound stopped under a hand that had not moved.
+           ⚠️ GRADED ON THE TWO SIDES THE TAP ALREADY COMPARES, the wire against
+           the page, because that is the disagreement that was reported. */
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        const loopEl2 = keys.loop.el;
+        loopEl2.click(); keys.loops.settle(0);
+        midiDown(60, 96, 0, performance.now());
+        await sleep(40);
+        midiUp(60);
+        loopEl2.click(); keys.loops.settle(0);       // going round, holding note 60
+        await sleep(60);
+        midiDown(60, 96, 0, performance.now());      // and now a finger takes it
+        await sleep(350);                            // a full lap of the loop
+        const stillWire = [...d.tap().down];
+        const stillPage = d.tap().held;
+        midiUp(60);
+        loopEl2.click(); keys.loops.settle(0);
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        d.assert('a loop replaying a note does not let go of the one under your finger',
+          stillWire.includes(60) && stillPage.includes(60),
+          `after several laps the wire held ${stillWire.join(',') || 'nothing'} and `
+          + `the page held ${stillPage.join(',') || 'nothing'}`);
+
         /* 🔴 AND THE NUMBER PAD REACHES THOSE TAKES. Asked *"num works. how come
            you can not add it to keyboard"*. Driven through `midiProgram`, which
            is the function a real program change lands on, so this grades the
@@ -3117,6 +3156,7 @@
            pad sends the number printed on the key, so program 2 is the second
            take and the pad's `0` is program 0 and the tenth. */
         for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
         midiProgram(2); keys.loops.settle(1);
         midiProgram(0); keys.loops.settle(9);
         const two = keys.loops.state(1), ten = keys.loops.state(9);
