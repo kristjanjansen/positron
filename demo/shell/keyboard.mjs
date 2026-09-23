@@ -936,6 +936,28 @@ export function createKeyboard(host, {
      which is exactly the test that stops working when a second slot exists. */
   let replaying = 0;
 
+  /**
+   * 🔴 WHAT YOUR FINGERS ARE HOLDING, WHICH IS NOT WHAT THE LOOP IS HOLDING, AND
+   * CONFUSING THE TWO MADE THE PAGE FORGET REAL NOTES. Reported 2026-09-23:
+   * *"pressing loop, just repssing is cutting off sound, does not held note"*,
+   * and `/nola/`'s own tap said it exactly: *"the wire says 57,61 and the page
+   * says nothing"*.
+   * 🔴 A NOTE CAN BE HELD BY A FINGER AND BY A LOOP AT ONCE, AND A SET CANNOT
+   * COUNT. When a loop replayed a note somebody was also holding, the loop's
+   * note-off went to the page and the page let go of the FINGER'S note: the wire
+   * still had the key down, the page had nothing, and the sound stopped under
+   * your hand. Stopping a loop did the same thing in one go, which is the *"just
+   * pressing is cutting off sound"* half.
+   * ⚠️ AND THE KEY PATH WAS WORSE THAN THE NOTE PATH. Replay did `held.delete(k)`
+   * before pressing, to force a retrigger, which ERASES a finger's hold outright
+   * rather than shadowing it.
+   * ✅ SO A LOOP NEVER TOUCHES A NOTE A FINGER IS ON. It does not press one that
+   * is already sounding under a hand and it never releases one, which leaves the
+   * player in charge of their own notes and costs the loop a doubled attack it
+   * could not have made audible anyway.
+   */
+  const fingerNotes = new Set();
+
   /* 🔴 THE TAKE STARTS AT THE FIRST NOTE, NOT AT THE BUTTON. Reported as *"still
      no looping"* with the machinery correct and graded on both paths, then said
      plainly: *"arm should as long as it takes when i start to play"*. The clock
@@ -946,14 +968,60 @@ export function createKeyboard(host, {
      ⚠️ THE TRAILING SILENCE IS KEPT AND ONLY THE LEAD-IN IS DROPPED. Where you
      stop is a decision and a rest at the end of a phrase should survive. Where
      you START is not a decision, it is how long it took to get ready. */
-  const startClock = (t) => { if (!t.at) t.at = performance.now(); };
+  const startClock = (t, at) => { if (!t.at) t.at = at; };
+
+  /**
+   * 🔴 A LOOP BUTTON ALWAYS LANDS LATE, SO THE TAKE REACHES BACK. Asked
+   * 2026-09-23: *"when loop button lands bit later, do consider earlier played
+   * keys"*. You play the phrase and then press, because pressing first and
+   * playing into silence is not how anybody plays. Without this the first chord
+   * of every take is the one you lose, and the loop comes round a beat short of
+   * what you meant.
+   * ⚠️ IT REACHES BACK TO THE START OF THE PHRASE, NOT BY A FIXED TIME. A window
+   * would cut a long chord in half and keep half of the one before it. A phrase
+   * here is simply *from when nothing was sounding*, which is a boundary the
+   * movements already carry and needs no clock and no tempo.
+   * ⚠️ AND IT IS 1200 ms OF REACH, WHICH IS A JUDGEMENT. If the last thing you
+   * played was longer ago than that, arming means arming and the take starts
+   * empty, or every loop would open with whatever happened to be lying around.
+   * ⚠️ THE BUFFER IS PRUNED TO 4 s AND HOLDS MOVEMENTS, NOT AUDIO. It costs a few
+   * small objects and exists whether or not anything is armed, because the whole
+   * point is to have kept what you did before you decided to keep it.
+   */
+  const PRE_ROLL = 4000, REACH_BACK = 1200;
+  const recent = [];
+
+  /* 🔴 THE BUFFER ONLY HOLDS WHAT NO TAKE HAS CLAIMED. Found by the two slot
+     check: a phrase recorded LIVE into take 1 was still sitting in the buffer, so
+     arming take 2 a moment later reached back and took the same performance
+     again, and the player would have heard it twice with nothing on screen
+     saying why. A movement that went into a take is committed; the buffer is for
+     what nobody has kept yet, which is the whole idea of a pre-roll. */
+  const remember = (mv) => {
+    if (takes.some((t) => t.rec)) return;
+    recent.push(mv);
+    while (recent.length && mv.at - recent[0].at > PRE_ROLL) recent.shift();
+  };
+
+  /** where the phrase still in the buffer began, or 0 if it is too old to want */
+  const phraseStart = (by) => {
+    let downs = 0, startAt = 0;
+    for (const m of recent) {
+      if (m.down) { if (downs === 0) startAt = m.at; downs++; } else downs = Math.max(0, downs - 1);
+    }
+    if (!startAt) return 0;
+    const lastAt = recent[recent.length - 1].at;
+    return lastAt > by - REACH_BACK ? startAt : 0;
+  };
 
   const onTape = (k, down) => {
     if (replaying) return;
+    const at = performance.now();
+    remember({ k, down, at });
     for (const t of takes) {
       if (!t.rec) continue;
-      startClock(t);
-      t.tape.push({ k, down, t: Math.round(performance.now() - t.at) });
+      startClock(t, at);
+      t.tape.push({ k, down, t: Math.round(at - t.at) });
     }
   };
 
@@ -983,11 +1051,13 @@ export function createKeyboard(host, {
    */
   const tapeNote = (note, down) => {
     if (replaying) return;
+    const at = performance.now();
+    remember({ note, down, at });
     for (const t of takes) {
       if (!t.rec) continue;
-      startClock(t);
+      startClock(t, at);
       t.outside++;
-      t.tape.push({ note, down, t: Math.round(performance.now() - t.at) });
+      t.tape.push({ note, down, t: Math.round(at - t.at) });
     }
   };
 
@@ -1001,9 +1071,12 @@ export function createKeyboard(host, {
     t.timers = [];
     t.going = false;
     t.rec = false;
+    /* ⚠️ AND STOPPING LETS GO OF WHAT THE LOOP HAD DOWN AND NOTHING ELSE. A note
+       a finger is on stays down, which is the other half of *"pressing loop is
+       cutting off sound"*. */
     for (const k of t.keys) release(k, 'loop');
     t.keys.clear();
-    for (const n of t.notes) onUp(n, 'loop');
+    for (const n of t.notes) { if (!fingerNotes.has(n)) onUp(n, 'loop'); }
     t.notes.clear();
   };
 
@@ -1021,10 +1094,19 @@ export function createKeyboard(host, {
                like a finger. A note played past the keys has no key to press, so
                it is handed to the page directly, marked `loop` the same way. */
             if (e.k !== undefined) {
-              if (e.down) { held.delete(e.k); press(e.k, 'loop'); t.keys.add(e.k); }
-              else { release(e.k, 'loop'); t.keys.delete(e.k); }
-            } else if (e.down) { onDown(e.note, 'loop'); t.notes.add(e.note); }
-            else { onUp(e.note, 'loop'); t.notes.delete(e.note); }
+              /* ⚠️ A KEY A FINGER IS ON IS LEFT ALONE, BOTH WAYS. `held` holds
+                 fingers and loops together, so `t.keys` is what says this loop
+                 pressed it and a key held by anything else is not ours to move. */
+              if (e.down) {
+                if (!held.has(e.k) || t.keys.has(e.k)) {
+                  held.delete(e.k); press(e.k, 'loop'); t.keys.add(e.k);
+                }
+              } else if (t.keys.has(e.k)) { release(e.k, 'loop'); t.keys.delete(e.k); }
+            } else if (e.down) {
+              if (!fingerNotes.has(e.note)) { onDown(e.note, 'loop'); t.notes.add(e.note); }
+            } else if (t.notes.has(e.note) && !fingerNotes.has(e.note)) {
+              onUp(e.note, 'loop'); t.notes.delete(e.note);
+            }
           } finally { replaying--; }
         }, e.t));
       }
@@ -1055,7 +1137,30 @@ export function createKeyboard(host, {
     const n = SLOTS > 1 ? `loop ${i + 1}` : 'loop';
     if (to === 'recording') {
       t.tape = []; t.at = 0; t.outside = 0; t.going = false; t.rec = true;
-      log?.(`${n} armed. The take starts at your first note, so take your time, `
+      /* 🔴 THE PHRASE YOU HAD ALREADY PLAYED GOES IN FIRST. See `phraseStart`.
+         It also means the 250 ms a press waits to find out whether it is half of
+         a double one costs no notes: anything played inside that window is in the
+         buffer and arrives here. */
+      const from = phraseStart(t.pressedAt);
+      if (from) {
+        t.at = from;
+        for (const m of recent) {
+          if (m.at < from) continue;
+          const e = { down: m.down, t: Math.round(m.at - from) };
+          if (m.k !== undefined) e.k = m.k; else { e.note = m.note; t.outside++; }
+          t.tape.push(e);
+        }
+        /* 🔴 A PHRASE IS CLAIMED ONCE. Found by the two slot check, which armed a
+           second take 120 ms after the first had captured a phrase and got the
+           SAME phrase again: the buffer still held it, so both takes opened with
+           one performance and the player would hear it twice with no way to see
+           why. Arming consumes what it reached back for. */
+        recent.length = 0;
+      }
+      log?.(t.tape.length
+        ? `${n} armed, and it caught the ${t.tape.length} movement(s) you had `
+          + 'already played. Press again to send it round'
+        : `${n} armed. The take starts at your first note, so take your time, `
           + 'then press again to send it round');
     } else if (to === 'looping') {
       if (was === 'recording') {
@@ -1213,6 +1318,15 @@ export function createKeyboard(host, {
       press: (i) => machine.press(i),
       settle: (i) => machine.settle(i),
       clear: (i) => machine.clear(i),
+      /**
+       * Throw away the movements an arm would otherwise reach back for.
+       * ⚠️ IT IS NOT A SECOND `clear`. That empties a TAKE; this empties the
+       * rolling buffer behind `phraseStart`, so the next arm starts from silence
+       * whatever was played a moment ago. A check needs it because its blocks run
+       * back to back in milliseconds, which is a gesture no player can make, and
+       * a page wanting a deliberately empty arm can use it too.
+       */
+      forget: () => { recent.length = 0; },
       state: (i) => machine.state(i),
       states: () => machine.states(),
       slots: SLOTS,
@@ -1320,6 +1434,9 @@ export function createKeyboard(host, {
          somebody else's notes or a suggestion nobody played, and looping those
          would record a proposal as a performance. `viaKey` excludes this
          component's own notes coming back through the page's callback. */
+      if (who === 'self' && !viaKey && !replaying) {
+        if (on) fingerNotes.add(note); else fingerNotes.delete(note);
+      }
       if (who === 'self' && !viaKey) tapeNote(note, !!on);
       if (!k) return;
       /* 🔴 `ai` IS A FOURTH LAMP AND NOT A FOURTH COLOUR OF THE SAME ONE. Asked
