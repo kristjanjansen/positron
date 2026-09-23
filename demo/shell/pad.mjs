@@ -54,6 +54,13 @@
  * @param {(on:boolean, pad:object)=>void} [o.onPress]
  * @param {boolean} [o.latch]  default true: a press toggles and stays. `false`
  *                             makes it momentary, which is what a trigger pad is.
+ * @param {boolean} [o.small]  THREE QUARTERS OF A PAD, in every shape. Asked for
+ *   2026-09-23 on `/evo/`: *"do you have small version of pad buttons?"* and
+ *   *"also smaller versions of +- circlar ones"*. A panel MIRROR draws buttons
+ *   at the size the real ones are relative to everything around them, and the
+ *   standard `--ctl-w` is sized for a control somebody presses with a finger.
+ *   ⚠️ IT SCALES THE BOX AND NOT THE TYPE. A face at three quarters would be
+ *   unreadable, and the whole reason a face exists is to be read.
  * @param {boolean} [o.round]  A CIRCLE, 10 per cent smaller than a square pad.
  *   Asked for 2026-09-21: *"add circular buttons too (based on pads buttons,
  *   10% smaller) top on-button bottom labels"*.
@@ -80,7 +87,8 @@
  */
 export function createPad({
   label = '', top = '', bottom = '', tint = '', on = false, title = '', aria = '',
-  onPress = () => {}, latch = true, half = false, round = false, disabled = false,
+  onPress = () => {}, latch = true, half = false, round = false, small = false,
+  disabled = false,
 } = {}) {
   // ⚠️ SAID OUT LOUD RATHER THAN SILENTLY PREFERRED. A half height circle is an
   // ellipse; a caller asking for both has a wrong idea of one of them.
@@ -89,8 +97,9 @@ export function createPad({
 
   const el = document.createElement('button');
   el.type = 'button';
-  el.className = round ? 'pos-pad pos-pad-round'
-    : half ? 'pos-pad pos-pad-half' : 'pos-pad';
+  el.className = (round ? 'pos-pad pos-pad-round'
+    : half ? 'pos-pad pos-pad-half' : 'pos-pad')
+    + (small ? ' pos-pad-small' : '');
   el.disabled = !!disabled;
   if (title) el.title = title;
   el.setAttribute('aria-label', aria || label || title || 'pad');
