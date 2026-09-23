@@ -668,10 +668,18 @@ export const DEMOS = [
    * which is arithmetic rather than a recording, is still in nothing.
    * ⚠️ NO `settleMs`. The page has no control row at all, so its checks run at
    * load behind `SELFCHECK` and `verify.mjs` waits on the assert count.
+   * 🔴 AND THE ROLL LEARNS SINCE 2026-09-23. Asked as *"implement nola learning
+   * mode"*, after *"idea is to have alt mode in nola where i play chords and the
+   * ones i keep returning to add them to piano roll. then when have at least 2,
+   * suggest 3rd and 4th somehow"*, and specified at 1,174 lines in
+   * `research/chord-learning-2026-09-23.md`. `demo/shell/name.mjs` names what is
+   * held, and `name-test.mjs` grades it with 648 generated voicings and no
+   * browser at all, on one claim the whole thing rests on: at a margin of 1.0 it
+   * is never wrong.
    */
   { name: 'nola', group: 'hardware', act: 4, created: '2026-09-22', built: true,
-    one: 'a piano and a 1977 Rhodes you play from one MIDI keyboard, '
-       + 'with a line of chords drawn out above the keys',
+    one: 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
+       + 'of chords you either type in or teach it by playing',
     tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },
 
   /**
