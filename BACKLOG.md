@@ -1,5 +1,45 @@
 ## Open
 
+### Asked 2026-09-23, DONE 2026-09-23: the proposal is quieter than your playing, and the voicing control is put away
+
+🔴 **ASKED IN THESE WORDS, ACROSS FOUR MESSAGES WHILE PLAYING:** *"make suggested
+notes appear subtly and be smaller that real ones. they fade and get bigger then
+actually played. when fading, fade them also in keyboard so smaller are on top of
+larger. what about smooth suggestion so i have not to travel? it feels 'exact'
+does not have role in played mode except savign my position. i am lost in this
+setting."*, then *"in written its another thing"*, then *"can we archive it and
+pick one for now so i can enjoy playing without travelline too much"*.
+
+✅ **SIZE CARRIES THE SAME MEANING AS THE COLOUR, ONE CHANNEL LOUDER.** A
+proposal's dots are drawn at 0.62 and grow to full when the chord is under the
+hands. It is a `transform` and not a width, because `positron-ui` forbids an
+animation that changes how much room a thing takes and a dot that resized its
+cell would move the columns under a reader.
+✅ **AND IT IS ON THE KEYS AS WELL AS IN THE ROLL**, which is the half that
+answers *"so i have not to travel"*: the roll says WHAT and the keyboard says
+WHERE, and a proposal you read in one picture and hunt for in another is a
+proposal you travel to. `keyboard.mjs` gained a fourth lamp rather than a fourth
+colour of the same one, because a key can be proposed AND under a finger and a
+page that had to choose between those two facts would say the wrong one. It is a
+mark INSIDE the dot, measured at 3.3 px against the dot's 6.
+
+🔴 **AND THE VOICING PICKER IS PUT AWAY, WHICH IS A CONTROL BEING REMOVED ON THE
+STRENGTH OF SOMEBODY BEING LOST IN IT.** *"i am lost in this setting"* is the
+report and it is the right one: a learned row is drawn where the hands were, so
+`Exact` only ever meant *leave my playing alone*, and the other two were a way to
+scramble a record of what somebody did.
+⚠️ **IT IS BUILT AND NOT DRAWN, RATHER THAN DELETED.** Everything it does still
+works, `chords.mjs` still grades all three modes with no browser in it, and
+bringing it back is one line. What is gone is the control, not the capability.
+✅ **AND THE SETTING IT IS FIXED AT IS MEASURED RATHER THAN CHOSEN:**
+`chords-test.mjs` reads **27 semitones of hand movement over seven chords for
+`lead`, against 57 for close and 46 for root**. *"without travelline too much"* is
+exactly what that number is.
+⚠️ **WHAT IS NOT DONE IS THE TYPED HALF.** *"in written its another thing"* says
+the control still means something where a line of chords is typed in, and it is
+hidden in both modes today. Bringing it back for `Typed` only is the open half of
+this entry.
+
 ### Asked 2026-09-23, NOT STARTED: five from the stream while playing it
 
 🔴 **ASKED IN THESE WORDS, AND NONE OF THESE IS DONE:**
