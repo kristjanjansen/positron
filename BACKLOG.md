@@ -1,5 +1,32 @@
 ## Open
 
+### Found 2026-09-23, not fixed: `/grains/` draws a childless Cloudflare container too
+
+🔴 **`node demo/verify.mjs grains` READS 25/26, AND IT HAS NOTHING TO DO WITH
+TODAY.** The red one is `nothing in the picture was cut, shortened or left
+undrawn`, reporting `cf: EMPTY: a container holds at least one box. Name the
+thing that runs on this machine, or drop the kind and draw it as one box`.
+MEASURED with the page re-run alone, which is what the harness asks for.
+⚠️ **IT IS PRE-EXISTING.** `demo/grains/index.html` was last committed in session
+38, and today's change to it is one `text-wrap: balance` declaration on `.none b`
+plus its comment. The failure was in the baseline taken before that edit.
+
+**The node is `demo/grains/index.html:250`:** `{ id: 'cf', label: 'Cloudflare',
+sub: 'passes it all on', kind: 'cloud', note: ... }`, with a note and no
+`children`.
+✅ **`positron-diagram` ALREADY DECIDES THIS CASE AND GIVES TWO WAYS OUT.** Either
+name the thing that runs (`workers/relay`, the Durable Object) and put it inside,
+because a container holds the program rather than the service, or **drop the kind
+and draw it as one ordinary box with a name, a `sub` and a `note`**, which is
+what a single thing has always been. ⚠️ A container also takes NO `note`, and
+this one has a two sentence note, so the second way out is probably the right one
+here: nothing runs on that machine in this picture, it is a pipe.
+
+⚠️ **THIS IS THE SECOND INSTANCE AND `/items/` IS THE FIRST**, which is recorded
+separately above with two containers. Two pages is a pattern rather than a
+one-off, so it is worth one grep of every `kind: 'cloud'` with no `children` on
+the day somebody fixes either.
+
 ### Asked 2026-09-23, doing now: benchmark the suggester, and a style dial, and no cliches
 
 🔴 **ASKED IN THESE WORDS, THREE MESSAGES IN A ROW:** *"can you benchmark yr
@@ -48,7 +75,7 @@ beside the recipe, never ask again, and carry the licence. That is the shape
 2,744 cells against 110,592 over absolute names, which the research measured.
 Work key-relative and transpose at display.
 
-### Asked 2026-09-23, doing now: balanced wrapping on every centred text
+### Asked 2026-09-23, DONE 2026-09-23: balanced wrapping on every centred text
 
 🔴 **ASKED IN THESE WORDS:** *"the board has not answered since you opened this
 page - add balanced text wrapping on all similar cenered h w texts"*. The
@@ -79,7 +106,7 @@ no-WebGL2 sentence), `demo/grains/index.html:47` (`.none`),
 ⚠️ **`/mirror/` IS `gl: true`** and is graded by `verify-gl.mjs`, not
 `verify.mjs`.
 
-### Asked 2026-09-23, doing now: `/kit/` shows a waveform pair and a pane with no picture at all
+### Asked 2026-09-23, DONE 2026-09-23: `/kit/` shows a waveform pair and a pane with no picture at all
 
 🔴 **ASKED IN THESE WORDS:** *"add waveform examples and no viz/wave examples"*.
 

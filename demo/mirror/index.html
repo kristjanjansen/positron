@@ -10,8 +10,16 @@
   /* The line a pane shows while it has no picture in it. It goes INSIDE the
      panel's own picture area, which the kit already makes `position:
      relative`, so it covers the picture and never the row of facts under it. */
+  /* ⚠️ BALANCED, WHICH IS THE SHELL'S RULE FOR SHORT CENTRED PROSE ARRIVING
+     HERE. `shell.css` carries the argument in full at `.pos-lr-say`. MEASURED
+     on this sentence 2026-09-23, in the one state that ever shows it, a browser
+     with no WebGL2: greedy wrapping laid it out at **281.8 px over 245.6 px**
+     in a 336 px box and **310.7 over 216.8** at 390 px, and it is 260.1 and
+     267.3 at both widths now, because balancing makes the break the same one
+     at every size the pane takes. */
   .none {
     position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    text-wrap: balance;
     font: 400 12px/1.7 var(--mono); color: var(--dim); padding: 18px;
   }
   /* 🔴 THE FOOTER IS A ROW OF CELLS, AND IT USED TO BE ONE GLUED STRING.
