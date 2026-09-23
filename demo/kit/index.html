@@ -8751,6 +8751,34 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         kb.looping() === false && kb.taped() === 0 && kb.loop.get() === false,
         `looping ${kb.looping()}, ${kb.taped()} taped, button ${kb.loop.get() ? 'on' : 'off'}`);
 
+      /* 🔴 WAITING BEFORE YOU PLAY DOES NOT BUY YOU SILENCE AT THE FRONT OF THE
+         LOOP. Reported as *"still no looping"* when every other check here was
+         green: the clock used to start at the button, so a lead-in of a few
+         seconds went into the take and the loop came round and did nothing until
+         it had elapsed again.
+         ⚠️ MEASURED AS TIME UNTIL THE NOTE COMES BACK, which is the quantity the
+         report was about. Reading the first event's own timestamp would grade the
+         bookkeeping; a player is complaining about a wait, so the check waits. */
+      {
+        const was = kitHeard.length;
+        kb.loop.set(true);
+        await new Promise((r) => setTimeout(r, 350));   // getting your hands down
+        kb.press('a'); kb.release('a');
+        const closed = performance.now();
+        kb.loop.set(false);
+        let cameBack = 0;
+        for (let i = 0; i < 40 && !cameBack; i++) {
+          await new Promise((r) => setTimeout(r, 10));
+          if (kitHeard.slice(was).some((e) => e.how === 'loop')) cameBack = performance.now();
+        }
+        kb.loop.set(false);
+        const waited = cameBack ? Math.round(cameBack - closed) : -1;
+        d.assert('a loop armed long before the first note comes back at once, not after the wait',
+          waited >= 0 && waited < 200,
+          `the note came back ${waited} ms after the take closed, against the 350 ms `
+          + 'spent getting ready before it was played');
+      }
+
       /* 🔴 THE FOOTER ROW READS `Loop`, `Sustain`, `Notes off`, AND THE CLAIM IS
          THE GAP AS MUCH AS THE ORDER. Settled 2026-09-23 as *"buttons: Loop
          Sustain Notes off"* after two reports that read as position and were

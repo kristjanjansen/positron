@@ -3047,6 +3047,42 @@
         + `${midiUpped.voiced - tap0.voiced} voice(s), `
         + `with ${midiUpped.late - tap0.late} arriving after the key came up`);
 
+      /* 🔴 AND A CHORD PLAYED OVER MIDI COMES BACK AROUND, WHICH IS THE CLAIM
+         THAT WAS WRONG TWICE. Reported as *"can not hear looping"* and then
+         *"still no looping"*. `/kit/` grades the component and was green through
+         both reports, because it drives the keyboard directly; what neither of us
+         had measured is THIS page's own MIDI path, which is the one a person
+         actually plays.
+         ⚠️ THE TWO SIDES ARE INDEPENDENT ON PURPOSE. `on` counts what arrived on
+         the wire and `voiced` counts what the instrument made, so a loop that is
+         working shows the wire standing still while the voices go up. Comparing
+         the loop's own counter against itself would agree with itself whatever
+         happened, which is the trap this project has already paid for. */
+      {
+        /* ⚠️ PRESSED, NOT CALLED. `keys.loop.set(true)` is the api and a person
+           has a button, and those are two paths: this project's own rule is that
+           a harness presses the control. It also means a toggle that stopped
+           reporting its own clicks would be caught here rather than looking
+           perfect through the api. */
+        const b0 = d.tap();
+        const loopEl = keys.loop.el;
+        loopEl.click();
+        for (const n of [60, 64, 67]) midiDown(n, 96, 0, performance.now());
+        await sleep(60);
+        for (const n of [60, 64, 67]) midiUp(n);
+        const movements = keys.taped();
+        loopEl.click();
+        await sleep(600);
+        const b1 = d.tap();
+        loopEl.click();
+        await quiet();
+        d.assert('a chord played over MIDI comes back around while the keyboard is looping',
+          movements === 6 && b1.on - b0.on === 3 && b1.voiced - b0.voiced >= 6,
+          `${movements} movement(s) taped from 3 MIDI notes, and after the loop went `
+          + `round the wire had still sent only ${b1.on - b0.on} note on(s) while the `
+          + `instrument made ${b1.voiced - b0.voiced} voice(s)`);
+      }
+
       /* 🔴 AND THE WARM UP IS WHAT KEEPS A NOTE FROM BEING LATE IN THE FIRST
          PLACE. Reported twice: the Rhodes could not be heard from a MIDI
          keyboard even after a late note was made to sound. Almost every Rhodes
