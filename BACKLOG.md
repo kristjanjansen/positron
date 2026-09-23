@@ -1,5 +1,222 @@
 ## Open
 
+### Asked 2026-09-23, not started: `/fau/` and `/nola/` move to the hardware group
+
+🔴 **ASKED IN THESE WORDS:** *"index: move fau/nola to hardware"*.
+
+**The file is `demo/manifest.mjs`, one word on each of two rows**, `group:
+'instruments'` becoming `group: 'hardware'`. Nothing else moves: `group` is read
+in exactly one place, `byGroup()`, which is what the index sections by, and both
+rows are already `act: 4` like the hardware rows. The slug, the URL and the
+position in `DEMOS` are untouched.
+
+⚠️ **THE COUNTS GO 8 AND 10 TO 6 AND 12**, read today: `instruments` holds
+looper, instrument, jam, nola, fau, able, grains, knobs; `hardware` holds
+circuit, wish, bay, shape, pack, tom, evo, twelve, muta, dump.
+⚠️ **AND IT CHANGES WHAT THE GROUP NAME MEANS, WHICH IS WORTH SAYING ONCE AND
+NOT ARGUING.** Every page in `hardware` today is ABOUT a device on this desk, and
+neither of these two is: `/nola/` is thirty recordings and Web MIDI, `/fau/` is a
+compiler in the tab. What they share with that group is that **you play them
+from the keyboard on this desk**, which is a real thing to sort by. The name
+`instruments` then covers what is left, which is mostly engines and toys.
+⚠️ **`GROUPS` REFUSES AN UNKNOWN GROUP AT RENDER TIME** and names the row, so a
+typo here cannot ship quietly.
+
+### Asked 2026-09-23, not started: the keyboard is a wrapper, and a piano roll glues on top
+
+🔴 **ASKED IN THESE WORDS:** *"keyboard: make it into wrapper, gluable, use same
+colors as in pad grid."* and *"add component that can be glued top of it that is
+vertical piano roll that supports dots (simular to dots on active keyboard keys)
+and vertical (auto)scrolling like piano rythm games. keep it simple and Cmaj/6
+etc labels next to dots. intially no autoscroll, just allow multiple dot rows"*.
+
+**The files are `demo/shell/keyboard.mjs` (698 lines), `demo/shell/glue.mjs` and
+a new component.** It depends on the entry below about dots, because the roll's
+dots are said to be the same dots.
+
+🔴 **`gluable` AMENDS A STATED RULE, THE WAY `pad: false` ALREADY DID.**
+`glue.mjs`'s own header says separate is the default on both pairs it serves and
+that gluing is *"a CLAIM that they are one object, which is true of a strip
+sitting on the transport bar that drives it and false of"* the rest;
+`positron-ui` repeats it as *"`createGlue` IS FOR THE ONE PAIR IT WAS WRITTEN
+FOR"*. **A roll sitting on the keyboard it names is exactly the same claim as a
+strip on the transport bar that drives it**, so this is the second true case
+rather than a widening, and the reasoning goes beside it when it is written.
+⚠️ **AND A GLUED CHILD GIVES UP ITS OWN BORDER AND RADIUS**, which is what makes
+a glue one surface. A keyboard drawn inside one has nothing to say where it ends,
+so the wrapper is what carries the edge.
+
+⚠️ **`use same colors as in pad grid` HAS TWO READINGS AND THEY WANT DIFFERENT
+WORK.** Read today: a pad is `--pad-tint` over `var(--card)`, `[data-on]` mixing
+the tint at **40 per cent** and `[data-hit]` at **80 per cent plus 10 per cent
+white**, with the border taking the tint. A key is `var(--card2)` with
+`.k.down` painting `var(--hi)` and `.k.remote` painting `var(--ok)`.
+- **the WRAPPER matching a pad grid's surface** is a box colour and is cheap.
+- **the KEYS taking the pad tints** contradicts the entry below, which says *"do
+  not change bg colors"* in the same stream. **Do the wrapper, leave the key
+  backgrounds, and let the dots carry the colour**, unless told otherwise.
+
+🔴 **THE HARD PART OF THE ROLL IS THAT ITS COLUMNS MUST LINE UP WITH THE KEYS,
+AND THIS PROJECT HAS ALREADY PAID FOR THAT ONCE.** `/nola/`'s chord charts
+shipped the same width and the same key size as the instrument under them and
+still did not line up, because they had a different BASE, so a shape could not be
+carried down the page, which is the only thing a chart is for. **They share the
+instrument's window now and move with the octave pad, and the assert is a COLUMN
+POSITION IN PIXELS rather than a base number.** The roll gets the same treatment
+and the same assert, or it will be wrong in the same way.
+⚠️ **`keyboard.mjs` ALREADY DRAWS A KEYBOARD AS A PICTURE**: `pad: false` gives a
+chart rather than an instrument, and `letters` takes a Set. The roll is a third
+thing again, so what it shares with those is the COLUMN GEOMETRY and nothing
+else.
+
+⚠️ **IT IS NOT `note-grid.mjs` AND THAT FILE SAYS WHY IN ITS OWN HEADER.** That
+one draws a Circuit pattern, sixteen steps, one row per pattern, pitch on the y
+axis, *"NOT A PIANO ROLL OF THE WHOLE SESSION"*, because a session's patterns are
+alternatives rather than a timeline. This is the other axis and another subject.
+**Neither is a reason to hand-roll a third grid**: read that file's pitch scale
+and its empty-row rule before writing this one.
+⚠️ **AND `demo/shell/chords.mjs` ALREADY MAKES THE LABELS.** `Cmaj`, `C9`, `F/C`
+and the roman numerals are parsed and named there, with 36 checks and no browser,
+so the roll asks it rather than formatting its own.
+✅ **`intially no autoscroll, just allow multiple dot rows` IS THE WHOLE FIRST
+VERSION**, and it is the right size: a static stack of rows is gradable with no
+clock in it at all. ⚠️ When the autoscroll does land, `positron-ui`'s rule is
+that **nothing which redraws every frame may change how much room it takes**, and
+`strip.mjs`'s `followTarget` already owns the question of what a moving picture
+follows when there is no playhead.
+
+### Asked 2026-09-23, not started: `/fau/` becomes an instrument panel
+
+🔴 **ASKED IN THESE WORDS:** *"rm slounding / pedal holds"*, then *"create
+instument panel, fau on top right, below the textarea (edge to edge), below it
+footer with on/off (turning on compiles first patch and enables midi. patch
+selector holds organ and rhodes (add more). when you edit, patch selector turns
+'custom'. autocompile on cerain interval / inactivity."*, then *"rm sounding /
+pedal holds from readings"*, which is the first line said twice.
+
+**The file is `demo/fau/index.html`**, and the kit pieces are
+`demo/shell/panel.mjs` (212 lines) and `demo/shell/panel-layout.mjs`.
+
+⚠️ **THE READOUT GOES FROM SIX CELLS TO FOUR AND THAT IS STILL LEGAL.**
+`compile`, `source`, `machine code` and `per voice` are left, which is EVEN, and
+`mount()` throws on an odd count. Both cells being removed are the only two that
+a visitor can move without compiling anything, so what goes with them is the
+page's only live reading of the pedal: `demo/shell/pedal.mjs`'s `held()` is the
+number nobody can otherwise see. **Four asserts read those two cells today** and
+they read `pedal.held()` directly rather than the cell, so they survive the
+removal. Check that rather than trusting it.
+
+⚠️ **`on/off` MAKES THE FIRST PRESS DO THREE THINGS AT ONCE**: fetch 1.4 MB of
+compiler over the wire, compile a preset, and ask for Web MIDI. Today those are
+three separate presses and the page says in its log what the first one will
+cost. Whatever the switch does, **a visit must still fetch nothing**, which is
+the assert `a visit fetches no compiler at all` and the `/reel/` rule behind it.
+
+🔴 **`autocompile on certain interval / inactivity` IS THE ONE WITH A TRAP IN
+IT.** A compile blocks the thread it runs on (libfaust is synchronous inside its
+own wasm) and builds a whole new `AudioWorkletNode`, and the page already
+rebuilds the node on every compile and calls `pedal.forgetKeys()` when it does.
+**An autocompile that fires while a note is held takes the note away**, and one
+that fires on a keystroke timer fires in the middle of typing a word. Inactivity
+is the safer half of the ask. There is already a compile QUEUE to hang it on,
+and the page's check block is one task on that queue for exactly this reason.
+⚠️ **AND IT HAS TO BE OFF UNDER `SELFCHECK`, or the harness gets compiles it did
+not ask for** landing between an assert and the reading it is about.
+
+⚠️ **`patch selector turns 'custom'` IS WHY THE PRESETS ARE BUTTONS TODAY.** The
+page's own comment argues it: a picker shows which one is SELECTED and the first
+thing anybody does is edit the text, at which point a lit `Organ` reads as a
+control describing something that no longer exists. **`custom` is the answer to
+that objection** rather than a contradiction of it, so this is a change of mind
+with a mechanism, and the selector becomes a picker with a fourth state.
+
+### Asked 2026-09-23, not started: the keyboard component, seven changes at once
+
+🔴 **ASKED IN THESE WORDS:** *"in desktop make them 25% higher. integrate sustain
+to footer, create toggle button, big and small, use small below keyboard, left
+from notes off. rm switch button from all uis / kit. show -1 +1 etc to the right
+on +- on keyboard. shift +- should transpose with semitones. do not change bg
+colors. do colored dots istead. rm wasd hints, dots will be there. lightlightgray
+dots for hints, yellow for actual presses."*
+
+**The file is `demo/shell/keyboard.mjs` (698 lines) and the rules are in
+`shell.css` around line 1429.** Every page with a keyboard moves: `/fau/`,
+`/nola/`, `/instrument/`, `/keys/`, `/muta/` and the chord charts.
+
+**What the handles actually are, read today rather than guessed:**
+- `.k { height: 74px }` and `.k.sharp { height: 46px }`. 25 per cent is **92.5
+  and 57.5 px**, and it is a DESKTOP change, so it needs a width query.
+  ⚠️ **A MEDIA QUERY ADDS NO SPECIFICITY**, so a plain `.k` rule written after
+  it wins at every width. `positron-ui` records that exact defect killing
+  `.pos-pick`'s entire phone layout, which had never run in its life. Put the
+  block after the rules it overrides, or make the height a custom property.
+- `.k.down { background: var(--hi) }` and `.k.remote { background: var(--ok) }`
+  are the background colours the ask says to leave alone. **A dot is a new
+  element in the key**, and `.k` is a three row grid (`auto 1fr auto`) with the
+  note name on row 1 and the letter on row 3.
+- `.kk` IS the `wasd` hint and `.kn` is the note name. **Removing `.kk` empties
+  grid row 3**, which is where `BACKLOG.md`'s open entry about the keyboard
+  clipping its own note names says the NOTE NAME should go. The two asks meet
+  there and should be done together.
+- **`lightlightgray` for a hint and yellow for a press** is two states of one
+  mark. `--hi` is this project's yellow and is already what a pressed key uses,
+  so the dot inherits the page's ink rather than introducing a colour.
+  ⚠️ **`.k.hint` ALREADY EXISTS** and colours the TEXT, for `/nola/`'s chord
+  charts. That is the third state and it has to survive.
+- The octave pad is `- +` plus `Notes off`. **`-1 +1` beside them is a readout
+  of the current offset**, and `minBase`/`maxBase` already stop the pad at the
+  ends rather than wrapping.
+- **`shift +-` transposing by semitones is a new capability**, not a relabelling:
+  `base` moves in twelves today.
+
+🔴 **AND `shift +-` HAS TWO READINGS, ONLY ONE OF WHICH IS CHEAP. ASKED
+2026-09-23** whether `/nola/`'s separate transpose means *"use callbacks special
+cases?"*, and the answer is that no special case is needed, because the two are
+not the same feature. What has to be settled is which of these the ask means:
+- **MOVE THE WINDOW**, `base + 1`. The leftmost key becomes a C#, and **the
+  drawn black and white pattern stops matching the notes it plays**:
+  `keyboard.mjs` decides which keys are sharps from the key INDEX, and both
+  `/nola/` and `/fau/` build that set as `BLACK.has(i % 12)`, which assumes the
+  base is a C. Making it honest means recomputing the layout from the NOTE,
+  including `SHARP_OFF`, the straddling and `--k-off`. That is the expensive
+  reading and it is probably not what was asked for.
+- **TRANSPOSE WHAT THE KEYS PLAY**, picture unchanged: `noteOf(k) = base +
+  map[k] + transpose`, the drawing stays a C-to-C keyboard, and the printed note
+  names move with it so a key still plays what it says. This is what TRANSPOSE
+  means on a hardware keyboard, including the MK-425C on this desk, and it is
+  about six lines.
+✅ **RECOMMENDED: the second**, and it is a recommendation rather than a decision.
+It keeps `/nola/`'s rule that the key that lights is the key that sounds.
+
+🔴 **AND NO CALLBACK OR SPECIAL CASE IS NEEDED FOR `/nola/`, WHICH IS THE WHOLE
+POINT OF THE SEPARATION.** That page's `transpose` moves **what arrives over the
+wire**, because it corrects an instrument that sends the wrong note number, and
+it deliberately leaves the screen keys alone. A component transpose moves **what
+its own keys play**. Different things, different layers, and the page already
+applies its correction before it calls the component at all. **A callback
+carrying one into the other would put a page's hardware fault inside the shared
+kit**, which is the `moq.mjs` defect this repository already records: a shared
+module holding a per-page fact.
+⚠️ **THE ONE API QUESTION THAT IS REAL IS THE CALLBACK'S NAME.** `onOctave(base)`
+fires on every move and would now fire for a semitone, so the payload stays
+right and the NAME goes wrong. `/fau/` and `/nola/` both log a sentence from it.
+Rename it and grep the old form, which is this project's rule for a rename.
+
+🔴 **`rm switch button from all uis / kit` IS A THREE PAGE SWEEP AND ONE OF THEM
+IS THE GALLERY.** `createSwitch` is called from `demo/fau/index.html`,
+`demo/nola/index.html` and `demo/kit/index.html`, and there is a
+`demo/shell/switch-test.mjs` beside `demo/shell/switch.mjs` (146 lines).
+⚠️ **`/kit/` IS MACHINE GRADED, 177 ASSERTS**, so deleting its switch block takes
+its asserts with it. Diff the count either side, which is the rule after any
+change to what a control does.
+⚠️ **AND `/nola/`'s SUSTAIN IS A `createSwitch`** with two asserts about it,
+including one that proves the lamp follows a REAL pedal and not only its own
+press. The replacement has to keep `set(on, quiet)` or that check goes with it.
+⚠️ **THE VOCABULARY IS ALREADY DECIDED**: `switch.mjs` borrowed `checked`,
+`get()`, `set(on, quiet)`, `disabled(v)` and `onChange(on)` from
+`demo/shell/check.mjs` on purpose, so the new toggle keeps those names or three
+pages get a second word for one idea.
+
 ### Asked 2026-09-23, doing now: the roman numeral under each chord
 
 🔴 **ASKED WITH FOUR FRAMES OF A PIANO VIDEO**, no words, showing exactly the
