@@ -247,7 +247,18 @@
      They are the only round buttons and the only coloured ones on the panel. */
   .evo-oct { display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .evo-oct-row { position: relative; display: flex; gap: 12px; padding-bottom: 16px; }
-  .evo-oct .pos-pad { --pad-tint: #7fb2ff; }
+  /* 🔴 ONE INK FOR EVERY CONTROL ON THE PANEL, DECLARED ONCE. Asked 2026-09-23:
+     *"use lightgray brand color on all controls on evo"*. It was `#7fb2ff`, a
+     blue, typed in two places: once here for the octave pair and once in the
+     keypad's JavaScript. Two copies of one colour is a colour that will
+     disagree with itself, and this page is a MIRROR of a grey instrument, where
+     a blue lamp is a claim about hardware that has none.
+     ⚠️ IT IS `--fg`, THE PROJECT'S OWN LIGHT GREY, rather than a fourth grey
+     invented here. `CLAUDE.md` keeps one meaning for colour across every demo,
+     and a panel drawing has no state to encode in hue: what a control says is
+     said by the dot, the flash and the readout. */
+  .evo { --evo-ink: var(--fg); }
+  .evo-oct .pos-pad { --pad-tint: var(--evo-ink); }
   /* Coloured at rest, which is a fact about the object rather than a state this
      page is claiming: `--pad-tint` is the component's own published knob, so
      this is not a page writing a colour the component cannot override. */
@@ -316,6 +327,16 @@
      which is where the growth has to reach and which no panel can know about. */
   .evo-keys .kbd, .evo-keys .keys { flex: 1 1 auto; min-height: 0; }
   .evo-keys .keys { margin-bottom: 0; }
+  /* 🔴 NO BOX ROUND THESE KEYS. Asked 2026-09-23: *"rm extra wrapper bordered
+     around keyboard"*. `.kbd` is the keyboard's own surface, and it earned that
+     box on `/nola/`, where the keys are an instrument you play and the box is
+     what a roll glues onto. Here the keys are part of a PANEL that is already a
+     box, so the wrapper drew a second edge a few pixels inside the first, which
+     is the shape this project calls furniture.
+     ⚠️ THE PADDING GOES WITH IT, and `--kbd-pad` goes to 0 rather than being
+     left declared, because anything glued to this keyboard reads that property
+     to bleed to the edges and a stale 9 px would put it in the wrong place. */
+  .evo-keys .kbd { --kbd-pad: 0px; background: none; border: 0; border-radius: 0; }
   .evo-keys .k { height: auto; }
   .evo-keys .k.sharp { height: 62%; }
   /* 🔴 A KEY ON THIS KEYBOARD DOES NOT GROW SIDEWAYS, BECAUSE IT IS A DRAWING AT
@@ -707,7 +728,7 @@
            and a keypad digit is nothing else. */
         label: face, half: true,
         aria: digit ? `assignable button ${face}` : `${face} button`,
-        tint: '#7fb2ff', latch: false, disabled: true,
+        tint: 'var(--evo-ink)', latch: false, disabled: true,
         title: digit
           ? `program ${face}, sent with a bank select pair in front of it. `
             + `In edit mode this is the keypad digit ${face}`
@@ -1228,6 +1249,33 @@
     const held = () => keysBox.querySelectorAll('.down').length;
     d.assert('a note on at velocity 0 releases the key it lit',
       held() === 1, `${held()} keys held after two on and one release`);
+
+    /* 🔴 A KEY THAT IS PLAYED SHOWS THE SAME DOT `/nola/` SHOWS, from the same
+       component and the same rule. Asked 2026-09-23: *"reuse keyboard compoend
+       and the active dots we developed for nino"*. This page already builds
+       `createKeyboard`, so what was worth checking is that its ACTIVE state
+       survives the overrides this page puts on those keys: `height: auto`, a 62
+       per cent black key and pinned columns, none of which should reach the dot.
+       ⚠️ MEASURED AS A COMPUTED BACKGROUND rather than as a class, because a
+       class says the page asked and a colour says a reader sees it.
+       🔴 AND IT IS READ AFTER A FRAME, WHICH COST ONE RUN. `.k .kd` carries a
+       60 ms background transition, and `getComputedStyle` taken in the same tick
+       as the class change returns the value the transition is STARTING FROM, so
+       a working dot read as fully transparent. A transition makes an instant
+       reading a reading of the moment before. */
+    {
+      const note = kbd.notes()[0];
+      const anyKey = keysBox.querySelector('.k');
+      const offBg = getComputedStyle(anyKey.querySelector('.kd')).backgroundColor;
+      kbd.lightNote(note, true);
+      await new Promise((r) => setTimeout(r, 120));
+      const lit = keysBox.querySelector('.k.down .kd');
+      const litBg = lit ? getComputedStyle(lit).backgroundColor : '';
+      kbd.lightNote(note, false);
+      d.assert('a played key shows the kit keyboard’s own dot, not a changed key colour',
+        !!lit && litBg !== offBg && litBg !== 'rgba(0, 0, 0, 0)',
+        `the dot reads ${litBg} lit against ${offBg} at rest`);
+    }
 
     d.assert('the lowest key is a semitone below where a 25 key controller sits',
       KEY_LO === 47 && flatSaid, `base ${KEY_LO}, said ${flatSaid}`);
