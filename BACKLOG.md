@@ -1,5 +1,32 @@
 ## Open
 
+### Asked 2026-09-23, NOT STARTED: five from the stream while playing it
+
+🔴 **ASKED IN THESE WORDS, AND NONE OF THESE IS DONE:**
+- *"move played to left and make it default"*. The CHORDS picker is
+  `Typed, Played`; it becomes `Played, Typed` with `Played` opening. ⚠️ THE ORDER
+  OF A `createChoice` IS ITS BUTTON ORDER, and `/nola/`'s own checks press
+  `modePick.buttons[0]` and `[1]` by index, so every one of them moves.
+- *"i can held way less, go for mode repetitions"* then *"3?"*. `LEARN_TIMES`
+  goes 2 to 3. ⚠️ AND THE CHECKS PLAY EACH CHORD TWICE TODAY, so each one grows a
+  third arrival, which lengthens a block that already has to stay under the
+  harness's two second give-up.
+- *"do not push ai suggestion downwards, keep the order even when new user chord
+  comes"*. The proposal is appended after the learned rows, so a new chord moves
+  it down a row. It should hold its place. ✅ **THE ROLL IS ALREADY FIVE ROWS
+  TALL WHATEVER IS IN IT**, so the proposal can simply live on the LAST of the
+  five and never move, which is what the fixed height was for.
+- *"lighten up dot (+small size anim?) no matter its color (user/ai,..) when
+  hit"*. A dot brightens and grows slightly when its note is struck, whatever
+  colour that row uses. ⚠️ ONE RULE ON THE DOT rather than one per row kind, or
+  it is three rules that will drift. ⚠️ AND `positron-ui` FORBIDS AN ANIMATION
+  THAT CHANGES HOW MUCH ROOM A THING TAKES: grow a `transform`, never a width.
+- *"make keyboard to have hold button that disables noteoff (for testing,
+  screenshots etc)"*. A latch on the keyboard component so pressed keys stay
+  down. ⚠️ IT IS `keyboard.mjs` AND THEREFORE EVERY PAGE WITH KEYS, so it is one
+  agent's work and `/kit/` gains a specimen. ⚠️ AND IT IS NOT THE SUSTAIN PEDAL:
+  the pedal holds the SOUND and lets the key up, this holds the KEY down.
+
 ### Found 2026-09-23, NOT FIXED, reported from the deploy: Rhodes does not sound from MIDI
 
 🔴 **REPORTED IN THESE WORDS:** *"turing rjodes on and pressing midi does not
