@@ -29,8 +29,11 @@
 // capitals that it is deliberately NOT a piano roll of a session. This is the
 // other axis and another subject: pitch across, time down, one row per chord.
 // ⚠️ AND IT DOES NOT PARSE ANYTHING. `demo/shell/chords.mjs` turns `Cmaj`,
-// `C9`, `F/C` and `Fm6/C` into notes and numerals, with 36 checks and no
-// browser in them. A caller hands over rows of notes and a label; this file
+// `C9`, `F/C` and `Fm6/C` into notes and numerals, and `chords-test.mjs`
+// grades that with no browser in it. ⚠️ THE COUNT IS NOT WRITTEN HERE ON
+// PURPOSE: three comments in two files carried three different counts for that
+// one command on 2026-09-23, 36 and 27 and 49, and all three were true when
+// they were written. Run it. A caller hands over rows of notes and a label; this file
 // decides where a dot goes and nothing else.
 // ⚠️ NO AUTOSCROLL YET, WHICH IS WHAT WAS ASKED FOR AND IS THE RIGHT SIZE.
 // A static stack of rows is gradable with no clock in it at all. When it does
