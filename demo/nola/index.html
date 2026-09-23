@@ -856,6 +856,15 @@
   /** How far the computer keyboard reaches, in semitones above the leftmost
    *  key. Read off the map, never typed: `QWERTY_CHROMATIC`'s highest value. */
   const REACH = Math.max(...Object.values(QWERTY_CHROMATIC));
+  /**
+   * 🔴 HOW FAR THE KEYBOARD ON SCREEN REACHES, WHICH IS NOT `REACH`. `REACH` is
+   * the LETTER keys, fourteen semitones, and it is the right window for putting
+   * a chord somewhere a laptop can play it. It is the wrong window for asking
+   * whether a chord you PLAYED fits the picture: MEASURED 2026-09-23, a chord
+   * played at A3 C#4 E4 has notes above 62 and would be re-voiced as not
+   * fitting, on a keyboard that is drawing those very keys.
+   */
+  const SHOWN = () => Math.max(...Object.values(KEY_MAP));
   const { KEY_MAP, KEY_ORDER, KEY_SHARPS, KEY_LETTERS } = (() => {
     const map = {}, order = [], sharps = new Set(), lettered = new Set();
     const BLACK = new Set([1, 3, 6, 8, 10]);
@@ -1035,7 +1044,15 @@
    * mode that makes one playable: MEASURED in `chords-test.mjs` over seven
    * chords, 27 semitones of hand movement against 57 for close and 46 for root.
    */
-  let voicing = 'lead';
+  /* 🔴 `Exact` OPENS SINCE 2026-09-23, ASKED AS *"exact should default"*, and
+     that reverses what the block below argues. `lead` opened because a typed
+     line is a progression and that is the mode that makes one playable, which
+     is still true and is still measured. What changed is what this page is
+     mostly FOR: it opens on `Played` now, where the rows are a record of chords
+     somebody really put their hands on, and the honest drawing of those is the
+     one that matches the hands. A learned row is drawn as played whatever this
+     is set to; this decides the typed line and the proposal. */
+  let voicing = 'root';
   /* 🔴 THE LABELS SAY WHAT EACH ONE DOES, NOT WHAT IT IS CALLED. They read
      `SPELLED`, `CLOSE` and `LEADING` for ten minutes and the report was *"i do
      not know what spelled close leading means"*, which is fair: those are the
@@ -1059,8 +1076,12 @@
        ordinary words look like an abbreviation. */
     label: 'VOICING',
     options: [['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead']],
-    at: VOICINGS.indexOf('lead'),
-    onPick: (id) => { voicing = id; d.log(VOICE_SAYS[id]); redrawCharts(); },
+    at: VOICINGS.indexOf('root'),
+    /* 🔴 A VOICING PRESS RE-VOICES EVERYTHING, LEARNED ROWS INCLUDED, AND THAT
+       IS THE ANSWER TO *"you can revoice if i choose so?"*. A row lands where
+       your hands were, because that is a record of what you did; pressing one of
+       these is you asking for it to be moved, so it moves. */
+    onPick: (id) => { voicing = id; d.log(VOICE_SAYS[id]); redrawCharts({ revoice: true }); },
     title: (id) => VOICE_SAYS[id],
   });
 
@@ -1352,8 +1373,8 @@
      DELETE EVERYTHING THE PAGE HAD LEARNED. `drawChords` ends in
      `roll.setRows(rows)` built from the typed line, so in `Played` that is not
      a re-voicing, it is the roll being replaced by an empty one. */
-  const redrawCharts = () => (mode === 'learn'
-    ? rebuildLearnRoll()
+  const redrawCharts = (o) => (mode === 'learn'
+    ? rebuildLearnRoll(o)
     : drawChords(chordField.value()));
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -1588,9 +1609,15 @@
     return tablesJob;
   }
 
-  let mode = q.get('learn') === '1' ? 'learn' : 'type';
+  /* 🔴 `Played` IS WHERE THE PAGE OPENS. Asked *"move played to left and make it
+     default"*. `?learn=0` is the way back to the typed line, which is the shape
+     `?flip=1` and `?pedal=` already have on this page: a query names the setting
+     that is NOT the default. */
+  let mode = q.get('learn') === '0' ? 'type' : 'learn';
   const settler = createSettler({ windowMs: LEARN_WINDOW, minNotes: 3 });
   const tally = createTally({ times: LEARN_TIMES, minHoldMs: LEARN_GATE, slots: LEARN_SLOTS });
+  /** chord key -> the notes that were actually under the fingers, last time. */
+  const playedAs = new Map();
   /** what has been admitted, in admission order. A row never moves and never
    *  leaves, which is `positron-ui`'s rule arriving as a data structure. */
   const learned = [];
@@ -1680,8 +1707,16 @@
     /* The proposals come off the bottom first, so the learned rows stay a block
        and the new one lands under the one before it rather than under a guess. */
     roll.trimRows(learned.length);
+    /* ✅ AS PLAYED, IF IT FITS THE KEYS ON SCREEN. A chord somebody really
+       played is a fact about their hands and the roll should agree with it. The
+       voicing control still governs the typed line and the proposal, because
+       nobody played those and something has to decide where they go. */
     const near = learned.length ? learned[learned.length - 1].notes : [];
-    const { notes, outside } = voiceRow(notesOf(key), near);
+    const asPlayed = playedAs.get(key);
+    const fits = asPlayed && asPlayed.every((n) => n >= keys.base && n <= keys.base + SHOWN());
+    const { notes, outside } = fits
+      ? { notes: asPlayed, outside: false }
+      : voiceRow(notesOf(key), near);
     learned.push({ key, name, root, quality, notes });
     /* 🔴 NO NUMERAL ON A LEARNED ROW, AND THAT IS THE FLICKER RULE RATHER THAN
        AN OMISSION. A numeral needs a key, a key needs two chords, and the key
@@ -1733,6 +1768,16 @@
       return;
     }
     const key = chordKey(r.root, r.quality);
+    /* 🔴 REMEMBER WHERE THE HANDS WERE, NOT ONLY WHAT THEY SPELLED. Reported
+       2026-09-23 with a screenshot: A major was played as A3 C#4 E4 and drawn as
+       C#3 E3 A3, and the question was *"why it suggest someting i do not play"*.
+       It was not suggesting anything, it was the same chord re-voiced, and a
+       roll that disagrees with the fingers that fed it reads as the page making
+       something up. `chordKey` throws voicing away on purpose, which is what
+       naming is FOR, so the voicing has to be kept beside it rather than
+       recovered from it. The LAST way a chord was played is the one kept: come
+       back to it in a better place and the roll follows you. */
+    playedAs.set(key, [...got.notes].sort((a, b) => a - b));
     tally.hold(key, at);
     const due = tally.dueAt(at);
     if (due !== null) {
@@ -1764,13 +1809,32 @@
     settleTimer = setTimeout(() => settleNow(performance.now()), Math.max(0, due - now));
   }
 
-  /** Re-voice every learned row, for a voicing change or an octave press. */
-  function rebuildLearnRoll() {
+  /**
+   * Re-voice every learned row, for a voicing change or an octave press.
+   *
+   * 🔴 `revoice` IS THE DIFFERENCE BETWEEN THE TWO CALLERS AND IT IS NOT A
+   * TIDINESS FLAG. Reported 2026-09-23 with a screenshot: A major played as
+   * A3 C#4 E4 was drawn as C#3 E3 A3 and read as the page proposing something
+   * nobody played. A learned row is a record of what your hands did, so it
+   * lands where they were. But a VOICING press is somebody ASKING for the
+   * chords to be moved, and a control that leaves them where they are is the
+   * inert control this project keeps finding. So an octave press keeps the
+   * playing and a voicing press overrides it.
+   */
+  function rebuildLearnRoll({ revoice = false } = {}) {
     const was = roll.picked();
     const rows = [];
     for (const l of learned) {
-      const { notes, outside } = voiceRow(notesOf(l.key),
-        rows.length ? rows[rows.length - 1].notes : []);
+      /* ⚠️ AS PLAYED FIRST HERE TOO, or a voicing press would scramble the rows
+         that are a record of what somebody did. An octave press can move the
+         window out from under them, which is the one case where the played
+         voicing no longer fits and the chord has to be put somewhere. */
+      const asPlayed = playedAs.get(l.key);
+      const fits = !revoice && asPlayed
+        && asPlayed.every((n) => n >= keys.base && n <= keys.base + SHOWN());
+      const { notes, outside } = fits
+        ? { notes: asPlayed, outside: false }
+        : voiceRow(notesOf(l.key), rows.length ? rows[rows.length - 1].notes : []);
       l.notes = notes;
       rows.push({ kind: 'learned', notes, label: rowLabel(l.name, outside) });
     }
@@ -1844,12 +1908,17 @@
    */
   const modePick = createChoice({
     label: 'ROLL',
-    options: [['Typed', 'type'], ['Played', 'learn']],
-    at: mode === 'learn' ? 1 : 0,
+    /* 🔴 `Played` FIRST AND OPENING, ASKED FOR IN THOSE WORDS: *"move played to
+       left and make it default"*. It is what the page is about now, and the
+       typed line is the thing you reach for when you already know what you
+       want. ⚠️ AND IT MOVES EVERY CHECK THAT PRESSES THIS BY INDEX, because
+       `buttons[0]` was `Typed` and is `Played`. */
+    options: [['Played', 'learn'], ['Typed', 'type']],
+    at: mode === 'learn' ? 0 : 1,
     onPick: (id) => setMode(id),
     title: (id) => (id === 'learn'
-      ? 'the chords you keep coming back to go into the roll by themselves, and two more '
-        + 'are proposed under them'
+      ? 'the chords you keep coming back to go into the roll by themselves, and one more '
+        + 'is proposed under them'
       : 'the roll is the line of chords typed in the field beside this'),
   });
   topRow.prepend(modePick.el);
@@ -2004,7 +2073,7 @@
        harness that measures different things depending on how it was opened is
        a harness whose count means nothing. */
     const openedIn = mode;
-    modePick.buttons[0].click();
+    modePick.buttons[1].click();   // TYPED, where the typed-line checks belong
 
     /**
      * 🔴 THE CHEAP ONES GO FIRST, AND THAT IS ABOUT THE HARNESS RATHER THAN
@@ -2719,7 +2788,7 @@
       const hold = (ns) => { for (const n of ns) keys.press(keys.keyOf(n)); };
       const drop = (ns) => { for (const n of ns) keys.release(keys.keyOf(n)); };
 
-      modePick.buttons[1].click();                            // PLAYED
+      modePick.buttons[0].click();                            // PLAYED
       d.assert('switching the roll to what you play empties it and turns the typed line off',
         mode === 'learn' && rows() === 0 && readLine.hidden === false
         && chordField.input.disabled === true,
@@ -2798,11 +2867,33 @@
         hold([60, 64, 67]);
         await sleep(LEARN_GATE + 200);
       }
-      d.assert('and coming back to it puts it in the roll, voiced onto these keys',
+      /* 🔴 AND IT IS DRAWN WHERE THE HANDS WERE, NOT WHERE A VOICING WOULD PUT
+         IT. Reported 2026-09-23 with a screenshot: A major played as A3 C#4 E4
+         came out as C#3 E3 A3 and the question was *"why it suggest someting i
+         do not play"*. It was the same chord re-voiced, and a roll that
+         disagrees with the fingers that fed it reads as the page inventing
+         something. */
+      d.assert('and coming back to it puts it in the roll exactly where you played it',
         rows() === 1 && learned.length === 1 && labels()[0] === 'Cmaj'
-        && learned[0].notes.every((n) => n >= keys.base && n <= keys.base + REACH),
-        `${labels().join(', ')} at notes ${learned[0].notes.join(',')}, inside the `
-        + `${keys.base} to ${keys.base + REACH} the letter keys reach`);
+        && learned[0].notes.join(',') === '60,64,67',
+        `${labels().join(', ')} at notes ${learned[0].notes.join(',')}, against the `
+        + '60,64,67 that were under the fingers');
+
+      /* 🔴 AND A VOICING PRESS REALLY MOVES IT, which is the other half and the
+         answer to *"you can revoice if i choose so?"*. A control that leaves the
+         rows where they are is the inert control this project keeps finding. */
+      const wasAt = learned[0].notes.join(',');
+      voicePick.buttons[2].click();                           // Smooth
+      const ledTo = learned[0].notes.join(',');
+      voicePick.buttons[0].click();                           // back to Exact
+      /* ⚠️ THE CLAIM IS THAT THE PRESS MOVED IT OFF THE PLAYING, NOT THAT EVERY
+         VOICING DIFFERS FROM EVERY OTHER. With one chord and nothing before it,
+         `Exact` and `Smooth` land a C major triad in the same place, and
+         asserting otherwise was a check about arithmetic that `chords-test.mjs`
+         already owns. */
+      d.assert('and pressing a voicing moves a learned row, because that is you asking it to',
+        ledTo !== wasAt && ledTo === '48,52,55',
+        `played at ${wasAt} and drawn at ${ledTo} once a voicing was pressed`);
 
       /* 🔴 A CHORD YOU ARE HALF WAY INTO MARKS ITS OWN DOTS, asked for as *"when
          partial match with piano roll chord use faint yellow on dots"*. The row
@@ -2997,7 +3088,7 @@
 
       /* ── and none of it happens when the roll is the typed line ────────── */
       const scoredBeforeTyped = tally.scores(performance.now()).length;
-      modePick.buttons[0].click();                            // TYPED
+      modePick.buttons[1].click();                            // TYPED
       hold([60, 64, 67]);
       await sleep(LEARN_WINDOW + 200);
       const typedRows = rows();
@@ -3025,7 +3116,7 @@
 
       /* And back to whatever the visitor asked for, since `?learn=1` is a
          person saying which mode they came for. */
-      if (openedIn === 'learn') modePick.buttons[1].click();
+      if (openedIn === 'learn') modePick.buttons[0].click();
     }
 
     d.assert('the page measured its own press to sound', presses === 0 || worstMs > 0,
