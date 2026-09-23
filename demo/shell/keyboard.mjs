@@ -140,6 +140,37 @@ export const NUDGE_PX = 5;
 export const SHARP_OFF = { 1: -1 / 6, 3: 1 / 6, 6: -1 / 4, 8: 0, 10: 1 / 4 };
 
 /**
+ * 🔴 HOW MUCH OF THAT OFFSET TO ACTUALLY TAKE, AND IT IS HALF. Asked
+ * 2026-09-23 with a crop of `F♯3` sitting off the line above it: *"black keys
+ * should be centered to verical line / white key gap"*, then *"or bit in
+ * between current and ideal..."*.
+ * ⚠️ THE TWO ENDS ARE BOTH DEFENSIBLE AND NEITHER IS FREE. At 0 every black key
+ * centres on the join it straddles, which is what the piano roll's rules point
+ * at and what the eye expects when a line runs down the picture; the cost is
+ * that the white keys BEHIND them stop being equal, because seven whites
+ * sharing five blacks cannot have both. At 1 the whites are within a few per
+ * cent of each other, which is what a real piano does and what
+ * `research/piano-key-proportions-2026-09.md` measured, and the cost is that a
+ * black key never lines up with anything above it.
+ * ✅ 0.5 IS THE ASK TAKEN LITERALLY, AND ALL THREE SETTINGS WERE MEASURED ON
+ * `/nola/` AT 42.7 px A WHITE KEY RATHER THAN ARGUED ABOUT:
+ *
+ *   nudge 0    narrowest white strip 16.51 px, black centre 1.00 px off its join
+ *   nudge 0.5  narrowest white strip 19.78 px, black centre 2.27 px off its join
+ *   nudge 1    narrowest white strip 23.04 px, black centre 5.54 px off its join
+ *
+ * ⚠️ SO THE TRADE IS 3.3 px OF THE NARROWEST WHITE KEY FOR 3.3 px OF
+ * ALIGNMENT, almost exactly one for one, and neither end is free. Half gives
+ * back most of the alignment a reader notices while leaving the narrowest strip
+ * 3 px wider than centring would.
+ * ⚠️ AND 1.00 px IS NOT ZERO AT NUDGE 0, which is the measurement saying
+ * something the arithmetic does not: a black key is 66 per cent of a white and
+ * the column gap is taken off its width, so a `translateX(-50%)` lands it half
+ * a gap off the join by construction.
+ */
+export const SHARP_NUDGE = 0.5;
+
+/**
  * Put one key in the grid, and hand back the running white count.
  *
  * 🔴 EXPORTED BECAUSE A SECOND DRAWING OF THE SAME KEYBOARD EXISTS NOW.
@@ -158,7 +189,7 @@ export const SHARP_OFF = { 1: -1 / 6, 3: 1 / 6, 6: -1 / 4, 8: 0, 10: 1 / 4 };
 export function placeKey(node, { sharp, whites, pitchClass }) {
   node.style.gridColumn = String(whites + 1);
   if (sharp) {
-    const off = SHARP_OFF[pitchClass];
+    const off = SHARP_OFF[pitchClass] * SHARP_NUDGE;
     if (off) node.style.setProperty('--k-off', String(off));
     // ⚠️ A KEYBOARD THAT OPENS ON A SHARP KEEPS IT ON THE EDGE. With no white
     // key before it there is no join to straddle, so the pull-back comes off
