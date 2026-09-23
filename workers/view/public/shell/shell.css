@@ -1573,15 +1573,21 @@ video[hidden] { display: none; }
 .k .kd { position: relative; }
 .k.ai .kd::after {
   content: ''; position: absolute; left: 50%; top: 50%;
-  width: calc(var(--k-dot, 6px) * .55); height: calc(var(--k-dot, 6px) * .55);
-  margin: calc(var(--k-dot, 6px) * -.275) 0 0 calc(var(--k-dot, 6px) * -.275);
-  border-radius: 50%; background: var(--ai);
+  width: calc(var(--k-dot, 6px) * 1.9); height: calc(var(--k-dot, 6px) * 1.9);
+  margin: calc(var(--k-dot, 6px) * -.95) 0 0 calc(var(--k-dot, 6px) * -.95);
+  border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ai);
 }
-/* ⚠️ AND A KEY THAT IS ONLY PROPOSED STILL NEEDS A DOT TO SIT IN, or the mark
-   has nothing to be inside and reads as a speck on an empty key. */
-.k.ai:not(.down):not(.hint):not(.remote) .kd {
-  background: color-mix(in srgb, var(--ai) 22%, transparent);
-}
+/* 🔴 A RING AROUND THE DOT RATHER THAN A SMALLER DOT INSIDE IT. The small mark
+   was tried first and reported as *"not small dots, do not work"*, which is
+   fair: a small dot says QUIETER and a reader has to compare it with a
+   neighbour to see that, and on a key with nothing beside it there is nothing
+   to compare with. A ring says EMPTY on its own, and it is bigger than the dot
+   rather than smaller, so a proposed key is the most visible thing on the
+   keyboard until somebody fills it. Asked as *"try large circles with only
+   outine"* and *"make it radiobutton"*.
+   ⚠️ AND IT SURROUNDS `down` RATHER THAN FIGHTING IT: playing a proposed key
+   leaves the yellow dot in the middle of its own ring, which is the two facts
+   at once that the fourth lamp exists for. */
 .k.remote .kd { background: var(--ok); }
 /* 🔴 LAST, SO A HELD KEY READS AS HELD WHATEVER ELSE IT IS. Same order the
    old background rules carried, and the same reason: you play along with a
@@ -3535,15 +3541,21 @@ button.pos-pg-lab:hover { color: var(--fg); }
   width: calc(var(--roll-w, 100%) + var(--kbd-pad, 0px) * 2);
   border-radius: 3px; background: transparent; pointer-events: none;
 }
-/* 🔴 A LINE THROUGH THE DOTS, NOT A BAND BEHIND THEM. Asked 2026-09-23:
-   *"instead on hover bg, make a line that crosses dots from center. make it
-   faint"*. A filled row competes with the dots that are the picture; a rule
-   through their centres points at them instead, and it is the same shape as
-   the white key rules crossing the other way. */
-.roll-row:hover::before {
-  top: 50%; bottom: auto; height: 1px;
-  background: color-mix(in srgb, var(--fg) 14%, transparent);
-}
+/* 🔴 NOTHING IS DRAWN ON HOVER. THE ROW BRIGHTENS INSTEAD, AND THAT REVERSES A
+   DECISION TAKEN THE SAME DAY. It was a band behind the row, then *"instead on
+   hover bg, make a line that crosses dots from center. make it faint"*, and the
+   line was built. Then, looking at it: *"rm horiz line cursor, jus lighen up
+   dots+label bit on hiver"*.
+   ⚠️ THE ARGUMENT FOR THE LINE WAS RIGHT AND STILL LOST. A filled row competes
+   with the dots that are the picture, and a rule through their centres points at
+   them instead. What it missed is that the line is ANOTHER MARK: it arrives
+   under the pointer, it crosses the whole row including every empty column, and
+   a picture whose subject is a few dots does not want a second thing in it that
+   is bigger than they are.
+   ✅ BRIGHTENING WHAT IS ALREADY THERE ADDS NOTHING TO THE PICTURE. The dots and
+   the name are what a reader is pointing at, so they are what answers. */
+.roll-row:hover .roll-cell.on::after { filter: brightness(1.45); }
+.roll-row:hover .roll-label { color: var(--fg); }
 .roll-row:focus-visible { outline: 1px solid var(--hi); outline-offset: -2px; }
 /* 🔴 NO GROUND ON A PICKED ROW. THE DOTS AND THE NAME CARRY BOTH STATES, AND
    THIS REVERSES WHAT WAS WRITTEN HERE AN HOUR AGO. The rule said the dots say
