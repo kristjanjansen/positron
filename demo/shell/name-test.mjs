@@ -94,10 +94,33 @@ ok('NEGATIVE CONTROL: no sixth and no diminished seventh is in the vocabulary at
   ok('a minor seventh with no fifth reads as min7 rather than min7b5',
     r.name === 'Cmin7' && qs.indexOf('min7') < qs.indexOf('min7b5'),
     `${r.name}, with min7 at ${qs.indexOf('min7')} and min7b5 at ${qs.indexOf('min7b5')}`);
-  // and the honest half: the two really are tied, so it must not sound sure
-  ok('and it is still a tie, so the page does not claim to be sure of it',
-    r.sure === false && r.margin === 0,
+  /* 🔴 AND SINCE 2026-09-23 IT IS SURE OF IT, WHICH REVERSES WHAT THIS CHECK
+     USED TO ASSERT. It read `still a tie, so the page does not claim to be sure`
+     and that was the honest answer while the only way to break the tie was the
+     order of a table. MEASURED on 63 seconds of real playing recorded off the
+     keyboard on this desk: 108 of 236 readings came back unnameable and **51 of
+     them were this exact shape**, `Emin7` against `Emin7b5` thirty times over,
+     where the B and the B flat that separate the two were never played.
+     ✅ A RIVAL THAT DIFFERS ONLY IN NOTES NOBODY PLAYED IS NOT A RIVAL. You
+     cannot hear a flat five that is not there, and going quiet about it is not
+     honesty, it is a page refusing to name something perfectly ordinary.
+     ⚠️ THE TWO GUARDS THAT KEEP THIS FROM BECOMING A LIE ARE BOTH IN
+     `name.mjs` AND BOTH WERE FOUND BY THIS FILE GOING RED: the rival must be
+     the SAME SIZE, or two notes read as a confident bare fifth, and three of
+     the winner's own tones must be held, or `C E` reads as a confident `Cmaj`
+     when it is equally `Cmaj7`, `C6`, `Caug` or `Amin`. */
+  ok('and it is sure of it now, because nothing that was played tells the two apart',
+    r.sure === true && r.margin > 0,
     `margin ${r.margin.toFixed(1)}, alts ${r.alts.map((a) => a.name).join(' or ')}`);
+
+  // 5b. NEGATIVE CONTROL: and the ambiguity that is REAL still refuses.
+  const aug = nameChord([60, 64, 68]);
+  const twoNotes = nameChord([60, 64]);
+  ok('NEGATIVE CONTROL: an augmented triad and a bare third are still two names and no verdict',
+    aug.sure === false && twoNotes.sure === false,
+    `C E G# reads ${aug.alts.map((a) => a.name).join(' or ')} at margin ${aug.margin.toFixed(1)}, `
+    + `and C E reads ${twoNotes.alts.map((a) => a.name).join(' or ')} at `
+    + `margin ${twoNotes.margin.toFixed(1)}`);
 }
 
 // ── the margin walks a rolled chord, which the research measured note by note ─
