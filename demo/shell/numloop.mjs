@@ -12,7 +12,8 @@
 //   2nd     rec     ->  LOOPING
 //   3rd     loop    ->  STOPPED
 //   4th     stop    ->  LOOPING      and so on, stop and play for ever
-//   double  any     ->  empty
+//   double  has one ->  empty
+//   double  empty   ->  RECORDING, and every other LOOPING slot goes to stopped
 //
 // ⚠️ TEN OF THEM, INDEPENDENT. Pressing 3 while 1 is looping does not touch 1.
 // That is what makes this a looper rather than a transport, and it is why the
@@ -106,7 +107,27 @@ export function createNumLoop({
       if (waiting[i]) {
         clearTimeout(waiting[i]);
         waiting[i] = 0;
-        enter(i, 'empty');
+        /**
+         * 🔴 A DOUBLE PRESS MEANS TWO DIFFERENT THINGS AND THE SLOT DECIDES
+         * WHICH. Asked 2026-09-23: *"when doubleclick on empty slot, it stops
+         * others possible loops playing and starts rec"*.
+         * On a slot with something in it, a double press is *throw this away*.
+         * On an EMPTY one there is nothing to throw away, so the gesture was
+         * doing nothing at all, and what a player wants from a blank key is to
+         * start over: silence whatever is running and record the next idea
+         * against nothing.
+         * ⚠️ IT STOPS THEM RATHER THAN CLEARING THEM. The loops are still there
+         * and one press each brings any of them back, because *start over* is
+         * about what you can HEAR and not about throwing away work somebody
+         * recorded. Clearing all ten on a double press would be an undo nobody
+         * asked for with no way back.
+         */
+        if (state[i] === 'empty') {
+          for (let k = 0; k < slots; k++) if (k !== i && state[k] === 'looping') enter(k, 'stopped');
+          enter(i, 'recording');
+        } else {
+          enter(i, 'empty');
+        }
         onTouch(i);
         return;
       }
