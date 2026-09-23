@@ -215,7 +215,22 @@ reading the tree meets it.
 comment as having been imported by the service at one time. Decide both at once
 or the second one gets moved on its own in a month.
 
-### Asked 2026-09-23, not started: one component for a local thing and a remote thing
+### Asked 2026-09-23, the COMPONENT IS DONE 2026-09-23, the ADOPTIONS ARE NOT
+
+`demo/shell/local-remote.mjs` is in the kit, its rules are in `shell.css`, it is
+the topmost block in `/kit/` under `LOCAL AND REMOTE`, and
+`node demo/shell/local-remote-test.mjs` is 13 checks with no browser. `/kit/`
+went **189 to 200**, which is the eleven asserts the block added and nothing
+else moved. **What is still open is every row of the table below**: not one
+page adopts it yet, deliberately, because `/mirror/` is `gl: true` and moving a
+graded page is a separate reviewed step. The costs are measured at the bottom
+of this entry.
+
+🔴 **AND TWO CLAIMS IN WHAT FOLLOWS WERE WRONG AND ARE CORRECTED AT THE END.**
+`shareLabelColumn` is not in the kit, and `/mirror/`'s 560 px rule is about its
+control grid rather than about its pane labels.
+
+### The ask, as it was written: one component for a local thing and a remote thing
 
 🔴 **ASKED IN THESE WORDS:** *"make general 'local and remote' component that can
 be used for video and audio"*, with a drawing:
@@ -402,6 +417,115 @@ no specificity, so a plain rule written later wins at every width. That is the
 defect that left `.pos-pick`'s entire phone layout dead in its own stylesheet,
 never having run once, and it is invisible in the source because the source says
 what the author meant.
+
+🔴 **WHAT LANDED, AND THE SHAPE OF IT.** `createLocalRemote({ local, remote,
+value, aria, fullMode, aspect, onFade, onLog })`, each side
+`{ label, of, kind, media, say, presence }` with `kind` one of `video`, `audio`
+or `missing`. It returns `{ el, local, remote, fade, bar, value(), gains(),
+gain({local, remote}), arrange(), narrowPx, destroy() }`, and a side returns
+`{ which, el, panel, presence, labelEl, stage, media, label(), kind(), say(),
+sayEl }`.
+
+- 🔴 **`gain()` IS A SETTER RATHER THAN AN OPTION, AND THAT IS NOT A TEST
+  AFFORDANCE.** An AudioContext does not exist until somebody has pressed
+  something, and this component is built at page load. A constructor option
+  would have forced every page to build its graph on a VISIT, which is the
+  `/reel/` defect this repository has now paid for on four pages. It takes a
+  `GainNode` or a bare `AudioParam` and throws on anything else, because a fader
+  wired to something with no level is a fader that lies.
+- 🔴 **THE ARRANGEMENT IS AN ATTRIBUTE THE MODULE SETS OFF ITS OWN BOX'S WIDTH,
+  NOT A MEDIA QUERY, AND THAT IS THE ONE DELIBERATE DEPARTURE FROM THE ENTRY
+  ABOVE.** Two reasons and the second bought it. A media query adds no
+  specificity. And **no harness here can enter one**: `demo/verify.mjs` runs at
+  756 px with no viewport override, so a phone arrangement written as a media
+  query is graded by nothing, which is exactly how `.pos-pick`'s phone layout
+  sat dead in `shell.css` for weeks. `/kit/` now MEASURES the phone arrangement
+  at desktop width, both halves, side by side against the wide one. The 560 is
+  `NARROW_PX` in the module and appears nowhere else.
+  ⚠️ **AND IT WATCHES THE BOX RATHER THAN THE WINDOW**, which a media query
+  cannot: a component in a half page column on a 1280 px screen has 600 px.
+- 🔴 **THE LABEL IS ONE ELEMENT WITH TWO HOMES**, moved into that pane's own
+  footer centre slot when narrow and back into the bar when wide. Two elements
+  with one string is a readout living in two files. `video-panel.mjs`'s
+  `under()` settled the same question the same way.
+- 🔴 **THE SEAM IS A ONE PIXEL GRID GAP OVER A COLOURED GROUND, NOT A BORDER ON
+  THE SECOND PANE, AND THE FIRST VERSION HAD IT THE OTHER WAY.** MEASURED: a
+  `border-left` sits INSIDE that pane's box, so the two pictures came out 327.5
+  and 326.5 px wide and their 16:9 wells 184.5 and 183.9 px tall. **Two panes of
+  one size is the claim this component makes about its subject**, and an edge
+  that eats a pixel from one of them breaks it quietly. Caught by an assert, not
+  by looking.
+
+🔴 **WHAT THE THREE BROWSER SABOTAGES TOOK RED**, because a green assert that
+stays green when you break the thing it names was never measuring anything.
+- A **linear** crossfade: the equal power assert goes red at `0.5000 and 0.5000
+  against 0.7071`, and **the two-ends assert stays green**, which is the whole
+  point of having both. The no-browser test takes 3 of 13 red on the same edit.
+- The label **copied** into the footer instead of moved: 2 red, `each component
+  holds 2 and 4 labels`.
+- A missing pane's note set to `display: none`: 1 red, `in a 0 by 0 px box`.
+- The arrangement ignoring the box's width: 1 red. ⚠️ The side-by-side assert
+  stayed GREEN, correctly, because the phone specimen is PINNED with
+  `arrange('narrow')` and a pin is not the observer.
+
+🔴 **WHAT ADOPTING `/grains/` WOULD COST, READ RATHER THAN RECALLED.** 21
+asserts today.
+- **What it gains**: the layout, the phone arrangement, the panel footers, the
+  presence dot, full screen on either picture, and the `missing` state, which it
+  has none of. Its two panes are hand-rolled `.pane` boxes at `--card2` with
+  their own heading, and its phone rule is **720 px** rather than 560.
+- **What is lifted rather than rewritten**: nothing. `fadeGains` is ALREADY
+  lifted from `demo/grains/index.html:468` into the module, so the page deletes
+  its copy and keeps the numbers.
+- **What moves**: `const fadeBar = el('div', 'pos-controls fade')` at line 1177
+  is a `.pos-controls` row holding two `span.end` labels and the slider. It has
+  **no buttons in it**, so no harness press shifts. Its `.fade` CSS block, lines
+  61 to 75, is seven rules that all become the component's.
+- **What has to be decided**: the two `createGrainScope` pictures go in the
+  wells as `kind: 'audio'`, and the pane HEADINGS (`in this page` /
+  `SuperCollider in a tab`) are two lines where the component offers one label.
+  The sub line has to move to the footer's centre slot or go.
+- ⚠️ **AND ITS HEADING SUB CARRIES A MIDDOT TODAY** (`SuperCollider in a tab
+  <middot> every grain reported`), so adopting is also the occasion that rule
+  names.
+
+🔴 **WHAT ADOPTING `/mirror/` WOULD COST.** 35 asserts today, and it is
+`gl: true`, so it is graded by `node demo/verify-gl.mjs` and NOT by
+`verify.mjs`.
+- **What it gains**: the fader, which it has none of, and one `missing` state
+  for the far pane.
+- **What is lifted rather than rewritten**: the component ALREADY uses
+  `createVideoPanel` the way `/mirror/` does, with the far pane alone carrying a
+  presence dot, which is `/mirror/`'s own settled reasoning and is quoted in the
+  module.
+- **Two asserts would have to move**: `nothing in a panel footer is drawn on top
+  of anything else` (line 2088) reads the dot, the centre and the ⛶ of each
+  panel and would need the component's slot objects; `the four control rows
+  start their options at one place` (line 2111) is about `.knobs` and is
+  untouched.
+- 🔴 **AND ITS `.facts` ROW IS A HAND-ROLLED `createPanelValues`**, lines 82 to
+  90 of its stylesheet plus `FIELDS`/`FMT` at 236. That component exists in
+  `video-panel.mjs` now as the `values:` option. **That is a separate win
+  available today with no local-remote in it.**
+- ⚠️ **A COMPONENT SHARED BETWEEN A GL PAGE AND A PLAIN ONE HAS TO BE GREEN
+  UNDER BOTH HARNESSES**, and nobody has had to think about that before.
+  Nothing in `local-remote.mjs` is GL, but `verify-gl.mjs` has only appended
+  `selfcheck=1` since the 2026-09-18 sweep.
+
+🔴 **TWO CORRECTIONS TO THIS ENTRY, MEASURED 2026-09-23.**
+- **`shareLabelColumn` IS NOT IN THE KIT.** It is hand-rolled twice, at
+  `demo/shape/index.html:700` and `demo/radio/index.html:4618`, which is the
+  *a control living in one page is a component nobody has noticed yet* pattern,
+  doubled. `--sld-col` IS real and is in `shell.css`. **The component uses
+  neither**: its two labels are the two ends of one fader in a flex row, not two
+  rows sharing a column, so there was nothing for a shared column to do and a
+  third copy was not made.
+- **`/mirror/` HAS NOT ALREADY BUILT THE PHONE ARRANGEMENT.** Its
+  `@media (max-width: 560px)` block is about `.knobs`, its four control rows.
+  Its `.panes` grid collapses at **720 px**, and its panes carry **no label at
+  all**: the footer holds a dot, a `.facts` row in the centre and the ⛶. So the
+  narrow arrangement was new work rather than work to be lifted.
+- **560 px appears 11 times in `shell.css`**, not seven. Still the right number.
 
 ### Asked 2026-09-23, DONE 2026-09-23: `/fau/` and `/nola/` move to the hardware group
 
