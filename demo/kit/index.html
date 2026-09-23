@@ -8751,17 +8751,18 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         kb.looping() === false && kb.taped() === 0 && kb.loop.get() === false,
         `looping ${kb.looping()}, ${kb.taped()} taped, button ${kb.loop.get() ? 'on' : 'off'}`);
 
-      /* 🔴 THE FOOTER ROW READS `Sustain`, `Loop`, `Notes off`, AND IT IS
-         MEASURED RATHER THAN READ OFF THE SOURCE. Asked 2026-09-23: *"move loop
-         button to right"*. The append order in `keyboard.mjs` says what the
-         author meant and the COMPUTED left edge says what happened, and those
-         two came apart the moment this keyboard carried two toggles: a flex line
-         hands its free space to every `margin-left: auto` on it EQUALLY, so the
-         rule that pushed one toggle to the right spread two of them across the
-         row with `Loop` stranded in the middle.
-         ⚠️ SO THE CLAIM IS THE GAP AND NOT ONLY THE ORDER. Reordering the appends
-         alone would have satisfied a left-to-right check while leaving the two
-         controls half a keyboard apart, which is the defect somebody would see. */
+      /* 🔴 THE FOOTER ROW READS `Loop`, `Sustain`, `Notes off`, AND THE CLAIM IS
+         THE GAP AS MUCH AS THE ORDER. Settled 2026-09-23 as *"buttons: Loop
+         Sustain Notes off"* after two reports that read as position and were
+         about spacing: *"move loop button to right"*, then *"loop is leftmost of
+         3 in riht"*. A flex line hands its free space to every `margin-left:
+         auto` on it EQUALLY, so the rule that pushed one toggle right spread two
+         of them across the row and `Loop` sat out on its own.
+         ⚠️ AN ORDER-ONLY CHECK WOULD HAVE STAYED GREEN THROUGH ALL OF IT, which
+         is why this measures the distance between neighbours as well. The append
+         order says what the author meant and the computed left edge says what
+         happened, and those two came apart the moment the row carried a third
+         control. */
       /* 🔴 A NOTE PLAYED PAST THE KEYS IS STILL LOOPED, AND THIS IS THE CHECK
          THE FIRST BUILD NEEDED. Reported 2026-09-23: *"can not hear looping"*.
          The tape sat on `press`/`release`, which is every note the COMPONENT
@@ -8815,12 +8816,14 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
          story. A check that names a control has to name the control. */
       const off = [...kpad.querySelectorAll('button')]
         .find((e) => /notes off/i.test(e.textContent))?.getBoundingClientRect();
-      const gap = lp && off ? Math.round(lp.left - off.right) : -1;
-      d.assert('Sustain, Notes off and Loop sit in that order, tight against each other',
-        !!(sus && lp && off) && sus.left < off.left && off.left < lp.left
-          && Math.abs(sus.top - lp.top) < 1 && gap >= 0 && gap <= 12,
-        `left edges ${Math.round(sus?.left)}, ${Math.round(off?.left)}, `
-        + `${Math.round(lp?.left)}, and ${gap} px between Notes off and Loop`);
+      const gap = lp && sus ? Math.round(sus.left - lp.right) : -1;
+      const gap2 = sus && off ? Math.round(off.left - sus.right) : -1;
+      d.assert('Loop, Sustain and Notes off sit in that order, tight against each other',
+        !!(sus && lp && off) && lp.left < sus.left && sus.left < off.left
+          && Math.abs(sus.top - lp.top) < 1
+          && gap >= 0 && gap <= 12 && gap2 >= 0 && gap2 <= 12,
+        `left edges ${Math.round(lp?.left)}, ${Math.round(sus?.left)}, `
+        + `${Math.round(off?.left)}, with ${gap} px and ${gap2} px between them`);
     }
 
     d.assert('every focus ring in the shell is 1 px, and not one of them paints on a mouse press',
