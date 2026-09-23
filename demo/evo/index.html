@@ -263,6 +263,19 @@
      and a panel drawing has no state to encode in hue: what a control says is
      said by the dot, the flash and the readout. */
   .evo { --evo-ink: var(--fg); }
+  /* 🔴 THE CIRCLES LINE UP WITH THE DIALS, AND THE NUMBER IS THE KIT'S OWN.
+     Asked 2026-09-23 off a crop: *"(small/big) padd buttons shoudl align to
+     knobs by center"*. A knob reserves `--ctl-head` above its dial and
+     `--ctl-foot` below for its name; a pad reserves the head and takes the foot
+     only when it carries a bottom label, which these two do not. So in a row
+     centred on its boxes the pads' working surface sat half a foot lower than
+     the dials', which is what the crop shows.
+     ⚠️ RESERVING THE FOOT IS USING THE COMPONENT'S PUBLISHED MEASUREMENT RATHER
+     THAN NUDGING BY AN EYEBALLED NUMBER. `shell.css` says what those two are
+     for in as many words: a fader lane and a pad button start on the same line
+     because both take the same head, and their names end on the same line
+     because both take the same foot. */
+  .evo-oct .pos-pad-wrap { padding-bottom: var(--ctl-foot); }
   .evo-oct .pos-pad { --pad-tint: var(--evo-ink); }
   /* Coloured at rest, which is a fact about the object rather than a state this
      page is claiming: `--pad-tint` is the component's own published knob, so
@@ -2083,6 +2096,20 @@
          worth an assert because *"make evo roghly made of stadard pieces"* is
          only true if it stays true. A page that quietly grows a second copy of a
          component is this project's most repeated defect. */
+      /* 🔴 THE OCTAVE CIRCLES AND THE DIALS SIT ON ONE LINE, MEASURED AS TWO
+         CENTRES RATHER THAN AS THE PADDING THAT PRODUCES THEM. Asked as
+         *"(small/big) padd buttons shoudl align to knobs by center"*, and the
+         padding is the cause while this is the claim. */
+      {
+        const padEl = oct.querySelector('.pos-pad');
+        const dialEl = rot.querySelector('.pos-knob-dial') || rot.querySelector('svg');
+        const pb = padEl.getBoundingClientRect(), db = dialEl.getBoundingClientRect();
+        const apart = Math.abs((pb.top + pb.height / 2) - (db.top + db.height / 2));
+        d.assert('the octave circles sit on the same line as the rotary dials',
+          apart <= 2,
+          `their centres are ${apart.toFixed(1)} px apart`);
+      }
+
       d.assert('the rotaries are the kit’s knob bank, with one hairline at the four four split',
         rot.classList.contains('pos-knob-bank')
           && rot.querySelectorAll('.pos-knob-div').length === 1
