@@ -4900,6 +4900,12 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   display: flex; gap: var(--ctl-gap); overflow-x: auto; min-width: 0;
   padding-bottom: 2px;
 }
+/* 🔴 A HAIRLINE INSIDE ONE ROW, NOT A GAP BETWEEN TWO. `split` draws this, and
+   it is `align-self: stretch` with no width so it takes the row's own height and
+   none of its space: a divider that changed the spacing would be making the
+   grouping true rather than saying it. Lifted from `/evo/`, which hand rolled
+   both the row and this line before the bank could do either. */
+.pos-knob-div { align-self: stretch; width: 0; border-left: 1px solid var(--line2); }
 
 /* ── pad: a square button that can be lit — shell/pad.mjs ───────────────────
    ⚠️ THE TINT IS A CUSTOM PROPERTY WITH A FALLBACK, never a colour written by
