@@ -9,7 +9,8 @@
 
 <script type="module">
   /**
-   * nola. A piano you play from a MIDI keyboard, and the pedal works.
+   * nola. A piano and a Rhodes you play from a MIDI keyboard, and the pedal
+   * works.
    *
    * `plans/plan-nola.md` argued the whole of this and answered *"what drives
    * it, sc? plain webmidi?"* with: plain Web Audio, one `AudioBufferSourceNode`
@@ -24,21 +25,42 @@
    * manager, the damper, the readout and every assert working against a REAL
    * sound before anything is encoded, *"and only then build the Salamander
    * pack"*. Everything on this page is the shipping machinery. What is phase
-   * zero is the RECORDINGS: 30 notes at ONE velocity layer out of FluidR3,
-   * where the pack will be 30 notes at THREE with key-off releases beside them.
+   * zero is the PIANO's RECORDINGS: 30 notes at ONE velocity layer out of
+   * FluidR3, where the pack will be 30 notes at THREE with key-off releases
+   * beside them.
    *
-   * ⚠️ SO VELOCITY IS VOLUME HERE AND THE PAGE SAYS SO. A piano played hard is
-   * not a piano played softly and turned up: the hammer hits harder, the string
-   * goes brighter, and one recording cannot know that. That is the single
-   * biggest thing the pack buys and it is worth naming rather than hiding.
+   * 🔴 THE RHODES IS NOT PHASE ZERO AND IS THE FIRST REAL PACK ON THIS PAGE.
+   * Asked 2026-09-23 as *"get that rhodes"*. It is Jeff Learman's jRhodes3d,
+   * the mono set, 15 notes and five velocity layers of his own 1977 Rhodes Mark
+   * I Stage 73, 65 files and 3,153,007 bytes committed beside this page.
+   * `research/rhodes-packs-2026-09-23.md` surveyed every free Rhodes there is
+   * and found this to be the only real instrument among them;
+   * `demo/resources/fetch-jrhodes3d.mjs` fetched and encoded it and
+   * `demo/nola/PROVENANCE-rhodes.json` carries a peak, an RMS and a duration
+   * per file along with the author's own velocity crossfade table.
+   * 🔴 THE LICENCE IS CC BY-NC-SA 4.0 AND ATTRIBUTION IS A REQUIREMENT RATHER
+   * THAN A COURTESY. His name, the source repository and the licence are on the
+   * face of the page under the keys, not only in `LICENSE-jrhodes3d`.
    *
-   * 🔴 AND THERE IS NO SECOND ENGINE ON THIS PAGE YET, WHICH THE PLAN'S §6.1
-   * ITEM 6 ASKS FOR. `demo/shell/rhodes.mjs` is 60 lines of per-sample
-   * arithmetic already in the kit, and the reason to put it opposite the
-   * samples is the NUMBER: megabytes of recording against kilobytes of
-   * arithmetic, both audible from one keyboard. Three things stopped it landing
-   * today and all three are recorded in `BACKLOG.md` rather than discovered
-   * again:
+   * ⚠️ SO VELOCITY IS VOLUME ON THE PIANO AND IS TIMBRE AS WELL ON THE RHODES,
+   * WHICH IS THE WHOLE POINT OF A LAYERED PACK. A piano played hard is not a
+   * piano played softly and turned up: the hammer hits harder, the string goes
+   * brighter, and one recording cannot know that. The Rhodes has five
+   * recordings of every note and MEASURED, from the survey, its hardest layer
+   * carries 19 dB more high frequency content relative to its own level than
+   * its softest. That difference is the thing the piano's pack will buy.
+   *
+   * 🔴 AND A SECOND INSTRUMENT IS NOT A SECOND ENGINE. THE PLAN'S §6.1 ITEM 6
+   * IS STILL OPEN AND NOTHING BELOW HAS BEEN ANSWERED BY THE RHODES LANDING.
+   * What it asks for is ARITHMETIC opposite RECORDINGS, and both instruments on
+   * this page are recordings played by one sampler. `demo/shell/rhodes.mjs` is
+   * 60 lines of per-sample arithmetic already in the kit, and the reason to put
+   * it opposite the samples is the NUMBER: megabytes of recording against
+   * kilobytes of arithmetic, both audible from one keyboard. ⚠️ AND THE NAME
+   * COLLISION IS REAL AND IS WORTH READING TWICE: `rhodes.mjs` is the SYNTHESISED
+   * Rhodes and the files beside this page are a RECORDED one. Three things
+   * stopped the synthesised one landing and all three are recorded in
+   * `BACKLOG.md` rather than discovered again:
    *   - MEASURED here: rendering one `rhodesVoice` to its own end costs
    *     **38.3 ms at note 21**, 25.8 at note 60 and 11.3 at note 108. This page
    *     REPORTS press to sound, so a 38 ms render at press time would be the
@@ -49,9 +71,11 @@
    *     `AudioWorkletGlobalScope` has no module loader at all, so a worklet
    *     cannot import the kit's copy of the arithmetic. A second copy of it is
    *     the drift `/kit/` exists to catch.
-   *   - And the number it is FOR is not available yet: the recording side of
-   *     the comparison is today 656 KB of phase zero soundfont rather than the
-   *     3.80 MiB pack the plan sizes. The comparison lands with the pack.
+   *   - And the number it is FOR is only half available: the recording side of
+   *     the comparison is now 3,153,007 bytes of a real Rhodes, which is the
+   *     right order of magnitude to argue with, but it is a DIFFERENT Rhodes
+   *     from the one the arithmetic makes and nobody here has heard them
+   *     against each other.
    *
    * ── WHAT THE KEYBOARD ON THIS DESK SENDS, MEASURED 2026-09-23 ──────────────
    *
@@ -90,8 +114,9 @@
   import { createKeyboard, QWERTY_CHROMATIC } from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC, damperSec } from '/shell/pedal.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createField } from '/shell/field.mjs';
-  import { parseChords } from '/shell/chords.mjs';
+  import { parseChords, voiceChord, VOICINGS } from '/shell/chords.mjs';
   import { createRoll } from '/shell/roll.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
@@ -108,12 +133,31 @@
    * shift assert true by construction, which proves less machinery rather than
    * more. `demo/resources/fetch-fluidr3-piano.mjs` has the argument.
    */
-  const SAMPLED = Array.from({ length: 30 }, (_, i) => 21 + i * 3);
-  const LOW = SAMPLED[0], HIGH = SAMPLED[SAMPLED.length - 1];
+  const PIANO_NOTES = Array.from({ length: 30 }, (_, i) => 21 + i * 3);
 
-  /** The recording a note is played from, and how far it has to be bent. */
-  const nearestOf = (note) => Math.min(HIGH, Math.max(LOW, LOW + Math.round((note - LOW) / 3) * 3));
-  const shiftOf = (note) => note - nearestOf(note);
+  /**
+   * 🔴 THE RHODES IS FIFTEEN NOTES AT UNEVEN STEPS, AND THAT IS WHY THE MAP
+   * BECAME A SEARCH. The piano's thirty sit exactly three apart, so the
+   * recording a key plays was arithmetic: round to the nearest multiple of
+   * three. MEASURED off `PROVENANCE-rhodes.json`, the Rhodes gaps are 6, 5, 5,
+   * 5, 5, 4, 3, 3, 6, 5, 5, 5, 5 and 5, so nothing rounds and the worst bend
+   * inside the set is THREE semitones rather than one.
+   * ⚠️ AND A TIE GOES DOWN, WHICH IS NOT A COIN TOSS. Three keys sit exactly
+   * between two recordings (32, 57 and 68), and the author's own SFZ answers
+   * all three: his `hikey` for F1 is Ab1, for G3 is A3 and for F4 is Ab4, so
+   * each of them plays the recording BELOW it. The check below grades this
+   * search against his fifteen key regions on all 88 keys, which is two
+   * independent sources rather than the page reading its own arithmetic back.
+   */
+  const RHODES_NOTES = [29, 35, 40, 45, 50, 55, 59, 62, 65, 71, 76, 81, 86, 91, 96];
+
+  /** His `lokey` and `hikey` per region, in the same order, for the check. */
+  const RHODES_KEYS = [[21, 32], [33, 37], [38, 42], [43, 47], [48, 52], [53, 57],
+    [58, 60], [61, 63], [64, 68], [69, 73], [74, 78], [79, 83], [84, 88], [89, 93], [94, 108]];
+
+  /** The recording a note is played from. A tie goes to the lower one. */
+  const nearestIn = (notes, note) => notes.reduce(
+    (best, n) => (Math.abs(n - note) < Math.abs(best - note) ? n : best), notes[0]);
 
   /**
    * ⚠️ 64 VOICES, AND THE NUMBER IS A GUESS WITH A REASON RATHER THAN A
@@ -144,20 +188,147 @@
    * Salamander pack is encoded, which is the right place for it. This is one
    * number standing in for that, measured rather than guessed.
    */
-  const SAMPLE_PEAK = 0.097;         // the loudest of the thirty, measured
+  const PIANO_PEAK = 0.097;          // the loudest of the thirty, measured
   const LOUDEST = 0.30;              // where one note played as hard as possible lands
-  const LEVEL = LOUDEST / SAMPLE_PEAK;
 
-  /** What one press is worth, before the damper. One layer, so this is the only
-   *  thing velocity can do here, which is the phase zero limitation named above. */
-  const velGain = (vel) => LEVEL * Math.pow(Math.max(1, Math.min(127, vel)) / 127, 1.5);
+  /**
+   * 🔴 AND THE RHODES IS THE OTHER WAY UP, WHICH IS A 20 dB MISTAKE WAITING FOR
+   * ANYBODY WHO INHERITS THE PIANO'S NUMBER. MEASURED across all 65 files and
+   * written into `PROVENANCE-rhodes.json`: they peak between **0.2744 and
+   * 0.9981**, median 0.8186, with 18 of the 65 inside 1 dB of full scale. The
+   * piano's constant is 0.097 and the Rhodes' is ten times that, so two engines
+   * on one page means TWO constants rather than one that changes meaning.
+   * Taking the piano's here would multiply an already loud file by 3.09 and
+   * clip every chord.
+   * ⚠️ IT IS THE LOUDEST FILE AND NOT THE MEDIAN, AND THE SPREAD IS LEFT IN ON
+   * PURPOSE. MEASURED: the top four sampled notes peak at 0.27 to 0.58 while
+   * everything below note 81 sits between 0.60 and 1.00, which is a real Rhodes
+   * getting quieter at the top rather than a mastering error. Normalising per
+   * file would flatten the instrument's own top octave, so one number is used
+   * and the falloff survives.
+   */
+  const RHODES_PEAK = 0.9981;
 
-  /* 🔴 REWRITTEN WHEN THE PAGE GREW ITS CHORDS, IN THE SAME CHANGE. The old
-     line said *play a piano from a MIDI keyboard, with the sustain pedal
-     working*, which was true and had stopped being the whole of it: the first
-     thing on the page is now a line of chord symbols. A description that has
-     drifted is worse than a missing one, because a visitor believes it. */
-  const ONE = 'a piano you play from a MIDI keyboard, with a line of chords drawn out above it';
+  /**
+   * What one press is worth, before the damper.
+   *
+   * 🔴 THE PLAYER SUPPLIES THE LEVEL AND THE FILES SUPPLY THE TIMBRE, AND THE
+   * AUTHOR'S OWN SFZ SAYS THE SAME THING BY CARRYING NO LEVEL OPCODE AT ALL.
+   * MEASURED and recorded in the provenance: the Rhodes files are roughly PEAK
+   * normalised, so their RMS runs BACKWARDS against velocity. The step from one
+   * layer to the next harder one has a median of **-1.53 dB** and reaches
+   * **-4.4 dB**, and 38 of 44 steps are negative. A page that switched buffer on
+   * velocity and trusted the harder file to be louder would ship a keyboard
+   * that goes quieter when you hit it harder.
+   * ⚠️ SO THIS CURVE STAYS EXACTLY AS IT WAS AND LAYER CHOICE SITS ON TOP OF
+   * IT. Over the whole velocity range this is 18.8 dB, against 5.5 dB of layer
+   * to layer RMS wander, so the foot of the curve never loses to the files.
+   */
+  const velGain = (ins, vel) =>
+    (LOUDEST / ins.peak) * Math.pow(Math.max(1, Math.min(127, vel)) / 127, 1.5);
+
+  /**
+   * 🔴 LAYER 1 IS THE HARDEST HIT AND LAYER 5 IS THE SOFTEST, WHICH IS THE
+   * OPPOSITE OF WHAT THE FILE NAMES SUGGEST TO ANYBODY READING 5 AS MOST.
+   * MEASURED in the survey: layer 1 carries 19 dB more high frequency content
+   * relative to its own level than layer 5, and the author's own crossfade
+   * table below says the same thing from the other side, because it is layer 5
+   * that owns velocity 1.
+   *
+   * This is that table, parsed out of `jRhodes3d-mono.sfz` and copied into
+   * `PROVENANCE-rhodes.json` under `velocity.groups`. `in` is his
+   * `xfin_lovel`/`xfin_hivel` and `out` is his `xfout_lovel`/`xfout_hivel`.
+   * ⚠️ IT IS HIS ANSWER RATHER THAN A SET OF RANGES INVENTED HERE. The page
+   * plays one layer at a time rather than crossfading two, so what it needs out
+   * of the table is which layer is LOUDEST at a velocity, and that is computed
+   * from his numbers rather than typed as five bands somebody eyeballed.
+   */
+  const RHODES_XF = [
+    { layer: 5, lo: 1, hi: 60, in: null, out: [25, 60] },
+    { layer: 4, lo: 25, hi: 84, in: [25, 60], out: [61, 84] },
+    { layer: 3, lo: 61, hi: 103, in: [61, 84], out: [85, 103] },
+    { layer: 2, lo: 85, hi: 119, in: [85, 103], out: [104, 119] },
+    { layer: 1, lo: 104, hi: 127, in: [104, 119], out: null },
+  ];
+
+  /** How loud his crossfade has one layer at a velocity, 0 to 1. */
+  function xfGain(g, vel) {
+    if (vel < g.lo || vel > g.hi) return 0;
+    if (g.in && vel <= g.in[1]) return (vel - g.in[0]) / (g.in[1] - g.in[0]);
+    if (g.out && vel >= g.out[0]) return (g.out[1] - vel) / (g.out[1] - g.out[0]);
+    return 1;
+  }
+
+  /* ⚠️ THE TABLE IS READ SOFTEST FIRST AND A TIE GOES TO THE SOFTER LAYER, so
+     the answer at the exact middle of a crossfade is decided rather than left
+     to whichever way the comparison happens to be written. */
+  function layerFor(vel) {
+    let best = RHODES_XF[0], top = -1;
+    for (const g of RHODES_XF) { const v = xfGain(g, vel); if (v > top) { top = v; best = g; } }
+    return best.layer;
+  }
+
+  /**
+   * 🔴 TWO OF THE FIVE LAYERS HAVE HOLES IN THEM, AND THE AUTHOR ALREADY SAID
+   * WHAT TO PLAY INSTEAD. MEASURED: layer 3 stops at note 71 and layer 1 at 76,
+   * while layers 2, 4 and 5 exist on all fifteen notes, which is 65 files where
+   * a full set would be 75. Above those points his own regions name the nearest
+   * layer that IS there: his layer 1 group plays the `_2` file from A5 up and
+   * his layer 3 group plays the `_4` file from B4 up.
+   * ⚠️ SO THE FALLBACK IS HIS AND NOT A RULE INVENTED HERE. Guessing would have
+   * meant picking between a softer file and a harder one on a keyboard where
+   * the numbering already runs backwards, which is exactly the place to use
+   * somebody else's answer.
+   */
+  const RHODES_ABSENT = new Set(['81-1', '86-1', '91-1', '96-1',
+    '71-3', '76-3', '81-3', '86-3', '91-3', '96-3']);
+  const RHODES_FALLBACK = { 1: 2, 3: 4 };
+  function rhodesLayerAt(note, layer) {
+    let l = layer;
+    while (RHODES_ABSENT.has(`${note}-${l}`)) {
+      const next = RHODES_FALLBACK[l];
+      if (!next || next === l) return null;
+      l = next;
+    }
+    return l;
+  }
+
+  /**
+   * 🔴 TWO INSTRUMENTS, AND EVERYTHING THAT DIFFERS BETWEEN THEM IS IN ONE
+   * OBJECT EACH. A note table, a level constant, a file name and a layer: those
+   * four are the whole of the difference, and holding them apart is what stops
+   * the piano's 21 dB correction reaching a set of files that are already at
+   * full scale. Everything downstream of `press` is shared, so a voice, a
+   * damper, a pedal and a steal cannot tell the two apart.
+   */
+  const PIANO = {
+    id: 'piano', name: 'PIANO', say: 'piano',
+    notes: PIANO_NOTES, peak: PIANO_PEAK,
+    file: (note) => `/nola/${note}.mp3`,
+    layerAt: () => null,
+  };
+  const RHODES = {
+    id: 'rhodes', name: 'RHODES', say: 'Rhodes',
+    notes: RHODES_NOTES, peak: RHODES_PEAK,
+    file: (note, layer) => `/nola/rhodes-${String(note).padStart(3, '0')}-${layer}.m4a`,
+    layerAt: rhodesLayerAt,
+  };
+  const INSTRUMENTS = [PIANO, RHODES];
+
+  /* Which one the keys play. It is read at the moment a key goes DOWN and never
+     after, so a switch under a finger cannot change what that finger started. */
+  let inst = PIANO;
+
+  /* 🔴 REWRITTEN AGAIN WHEN THE PAGE GREW A SECOND INSTRUMENT, IN THE SAME
+     CHANGE. It said *a piano you play from a MIDI keyboard*, which stopped
+     being true the moment a control appeared saying which of two is playing.
+     A description that has drifted is worse than a missing one, because a
+     visitor believes it.
+     ⚠️ AND IT IS STILL ONE SENTENCE. `and a 1977 Rhodes` names the second half
+     of one instrument row rather than bolting a second fact on, and the chord
+     line stays because it is the first thing on the page. */
+  const ONE = 'a piano and a 1977 Rhodes you play from one MIDI keyboard, '
+    + 'with a line of chords drawn out above the keys';
 
   const d = mount({
     name: 'nola',
@@ -206,20 +377,31 @@
   // about a file. That is the `/reel/` repair: six of that page's nine outward
   // requests were media source assignments rather than `fetch`, so a grep would
   // have missed them.
+  /* ⚠️ THE URLS ARE KEPT, NOT JUST COUNTED, AND THAT IS WHAT MAKES THE LAYER
+     CHECK WORTH ANYTHING. A check reading the layer this page just computed
+     would be the page grading its own arithmetic, which is the trap that let a
+     `playbackRate` of 1 read green on this page once already. What was really
+     asked for is the only evidence there is. */
   let gotBytes = 0, gotFiles = 0;
+  const gotUrls = [];
   async function pull(url) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`${url} answered ${res.status}`);
     const buf = await res.arrayBuffer();
     gotBytes += buf.byteLength;
     gotFiles++;
+    gotUrls.push(url);
     return buf;
   }
 
   let ctx = null, master = null, ana = null, anaBuf = null, fine = null, fineBuf = null;
-  const buffers = new Map();      // sampled note -> AudioBuffer
-  const wanted = new Map();       // octave -> promise, so one press fetches once
-  const voices = [];              // {note, src, gain, at, damped}
+  /* ⚠️ KEYED BY URL RATHER THAN BY NOTE, SINCE THE RHODES HAS FIVE RECORDINGS
+     OF EVERY NOTE AND THE PIANO HAS ONE. A note number was the key while a note
+     number identified a file, and it stopped doing that the day a second
+     instrument landed. */
+  const buffers = new Map();      // url -> AudioBuffer
+  const wanted = new Map();       // batch key -> promise, so one chord fetches once
+  const voices = [];              // {note, src, gain, at, damped, inst}
 
   async function ensureAudio() {
     if (ctx) return ctx;
@@ -287,31 +469,47 @@
    * who pressed one key. The promise is kept in `wanted` so a chord in one
    * octave fetches it once rather than four times.
    */
-  function octaveOf(note) { return Math.floor(nearestOf(note) / 12); }
-  function fetchOctave(note) {
-    const oct = octaveOf(note);
-    if (wanted.has(oct)) return wanted.get(oct);
-    const need = SAMPLED.filter((n) => Math.floor(n / 12) === oct && !buffers.has(n));
+  /**
+   * What one press has to have in hand, and how much else is worth taking while
+   * the connection is open.
+   *
+   * 🔴 THE TWO INSTRUMENTS BATCH DIFFERENTLY AND NEITHER IS AN OVERSIGHT. The
+   * piano has one recording a note, so an octave is two to four files and about
+   * 60 KB and the next key in it costs nothing. The Rhodes has FIVE recordings
+   * a note, so the same octave would be up to fifteen files and 750 KB, and
+   * four in five of them are a press nobody made. It takes the one file the
+   * velocity asked for, 50 KB, and asks again if the next press is harder.
+   */
+  function planFor(ins, near, layer) {
+    if (ins === PIANO) {
+      const oct = Math.floor(near / 12);
+      return { key: `piano ${oct}`, says: 'this octave',
+        urls: PIANO.notes.filter((n) => Math.floor(n / 12) === oct).map((n) => PIANO.file(n)) };
+    }
+    return { key: `rhodes ${near} ${layer}`, says: 'this note at this velocity',
+      urls: [RHODES.file(near, layer)] };
+  }
+
+  function fetchPlan(p) {
+    if (wanted.has(p.key)) return wanted.get(p.key);
+    const need = p.urls.filter((u) => !buffers.has(u));
     const t0 = performance.now();
-    const p = (async () => {
+    const job = (async () => {
       await ensureAudio();
-      for (const n of need) {
-        const raw = await pull(`/nola/${n}.mp3`);
-        buffers.set(n, await ctx.decodeAudioData(raw));
-      }
+      for (const u of need) buffers.set(u, await ctx.decodeAudioData(await pull(u)));
       if (need.length) {
-        d.log(`${need.length} recording${need.length === 1 ? '' : 's'} arrived for this octave `
+        d.log(`${need.length} recording${need.length === 1 ? '' : 's'} arrived for ${p.says} `
             + `in ${Math.round(performance.now() - t0)} ms, and nothing was asked for before `
             + 'the first key was pressed');
       }
     })();
-    wanted.set(oct, p);
-    return p;
+    wanted.set(p.key, job);
+    return job;
   }
 
   // ── one note ──────────────────────────────────────────────────────────────
 
-  let lastShift = null, presses = 0, sumMs = 0, worstMs = 0, medians = [];
+  let lastShift = null, lastPlayed = null, presses = 0, sumMs = 0, worstMs = 0, medians = [];
 
   /* ⚠️ IT STILL RUNS WITH NO READOUT TO WRITE TO. The counts are what the
      checks read, and `voices` and the pedal's own sets are where they live, so
@@ -373,14 +571,23 @@
     tellRoll();
     keys.lightNote(note, true);
     await ensureAudio();
-    const near = nearestOf(note);
+    /* 🔴 THE INSTRUMENT IS READ ONCE, HERE, AND IS CARRIED THROUGH THE REST OF
+       THIS FUNCTION AS A LOCAL. There is an await under this line, so reading
+       `inst` again afterwards would let a switch that happened during a fetch
+       decide the level of a note that started before it. */
+    const ins = inst;
+    const near = nearestIn(ins.notes, note);
+    /* The velocity picks a layer and the layer may be one the author never
+       recorded, in which case `layerAt` hands back the one he plays instead. */
+    const layer = ins.layerAt(near, layerFor(vel));
+    const url = ins.file(near, layer);
     /* ⚠️ A LOCAL, NOT A FLAG ON THE MODULE. Two keys pressed in the same
        millisecond are two overlapping runs of this function, and one shared
        boolean between them means whichever finishes second reads the other's
        answer. A chord is the ordinary case here, not the edge one. */
     let waitedForFiles = false;
-    if (!buffers.has(near)) { waitedForFiles = true; await fetchOctave(note); }
-    const buf = buffers.get(near);
+    if (!buffers.has(url)) { waitedForFiles = true; await fetchPlan(planFor(ins, near, layer)); }
+    const buf = buffers.get(url);
     if (!buf) return;
 
     /* 🔴 A KEY STRUCK AGAIN DAMPS THE STRING IT IS ABOUT TO STRIKE. One key is
@@ -404,14 +611,15 @@
     const shift = note - near;
     src.playbackRate.value = Math.pow(2, shift / 12);
     const g = ctx.createGain();
-    g.gain.value = velGain(vel);
+    g.gain.value = velGain(ins, vel);
     src.connect(g).connect(master);
-    const v = { note, src, gain: g, at: ctx.currentTime, damped: false };
+    const v = { note, src, gain: g, at: ctx.currentTime, damped: false, inst: ins.id };
     src.onended = () => endVoice(v);
     src.start();
     voices.push(v);
 
     lastShift = shift;
+    lastPlayed = { inst: ins.id, note: near, layer, url };
     showVoices();
 
     /* 🔴 MEASURED FROM THE MESSAGE, NOT FROM THIS FUNCTION, AND ONLY WHEN THE
@@ -442,6 +650,30 @@
   function release(note, sec) {
     for (const v of [...voices]) if (v.note === note && !v.damped) damp(v, sec);
     showVoices();
+  }
+
+  /**
+   * 🔴 SWITCHING INSTRUMENT DAMPS EVERYTHING THAT IS SOUNDING, AND THE REASON
+   * IS THAT THE CONTROL SAYS WHICH ONE IS PLAYING. A pedalled chord left ringing
+   * across a switch would mean a page reading RHODES with a piano in it, and
+   * a note whose key is still down when the switch happens is the shape that
+   * strands a voice: its release goes through `pedal`, which knows a note number
+   * and nothing about which instrument made it.
+   * ✅ ONE VOICE LIST FOR BOTH IS WHAT MAKES THAT SAFE. `damp`, `release` and
+   * `panic` reach every voice whatever made it, so nothing can be orphaned by
+   * being the wrong instrument's.
+   * ⚠️ AND THE FOOT IS LEFT ALONE. The pedal is where somebody's foot is, which
+   * a change of instrument does not move, so this is not a `panic`.
+   */
+  function setInstrument(id) {
+    const next = INSTRUMENTS.find((x) => x.id === id);
+    if (!next || next === inst) return;
+    inst = next;
+    const stopped = voices.length;
+    for (const v of [...voices]) { damp(v, 0.06); endVoice(v); }
+    d.log(`the keys play the ${next.say} now`
+        + (stopped ? `, and the ${stopped} note${stopped === 1 ? '' : 's'} still sounding `
+                   + 'went with the instrument that made them' : ''));
   }
 
   // ── the foot ──────────────────────────────────────────────────────────────
@@ -536,6 +768,9 @@
    * WHICH octave has them, not how many.
    */
   const LOW_KEYS = 12;
+  /** How far the computer keyboard reaches, in semitones above the leftmost
+   *  key. Read off the map, never typed: `QWERTY_CHROMATIC`'s highest value. */
+  const REACH = Math.max(...Object.values(QWERTY_CHROMATIC));
   const { KEY_MAP, KEY_ORDER, KEY_SHARPS, KEY_LETTERS } = (() => {
     const map = {}, order = [], sharps = new Set(), lettered = new Set();
     const BLACK = new Set([1, 3, 6, 8, 10]);
@@ -675,7 +910,99 @@
    * produced, and the keyboard is where you go to hear any of it. Reading down
    * the page is reading the sentence.
    */
-  d.stack.add(chordField.el, chordList, keysHost);
+  /**
+   * 🔴 WHICH INSTRUMENT THE KEYS PLAY, AS ONE CONTROL FROM THE KIT. Two
+   * mutually exclusive named options is `createChoice` and nothing else:
+   * `picker.mjs` is a stepper for a list too long to show, and a toggle would
+   * make one of the two instruments the absence of the other.
+   * 🔴 IT IS NOT IN `.pos-controls`, AND THAT IS ABOUT THE HARNESS RATHER THAN
+   * ABOUT TASTE. `demo/verify.mjs` clicks every button in that row, 650 ms
+   * apart, while this page's own checks are already running at load, so a
+   * picker there would switch instrument in the middle of the damper check and
+   * the level check with nothing in either of them expecting it. The page's own
+   * check presses it instead, which grades more than a harness click would.
+   * ⚠️ AND IT SITS WITH THE KEYS RATHER THAN A STACK GAP AWAY. `stack.mjs`:
+   * a pair that belongs tight is one block. What the keys play and the keys are
+   * one thing, the way the sustain button under them already is.
+   */
+  const instPick = createChoice({
+    label: 'INSTRUMENT',
+    options: [['Piano', 'piano'], ['Rhodes', 'rhodes']],
+    at: 0,
+    onPick: (id) => setInstrument(id),
+    title: (id) => (id === 'rhodes'
+      ? 'a 1977 Rhodes Mark I Stage 73, recorded at five velocities'
+      : 'a sampled grand, recorded at one velocity'),
+  });
+
+  /**
+   * 🔴 WHERE THE CHORD IS PUT, WHICH IS A DIFFERENT QUESTION FROM WHAT IT IS.
+   * Asked three times, and the last time with the reason: *"can there be
+   * voicing selector to make it easier to play on 25 keys"*.
+   * ⚠️ `root` IS FIRST AND IS NOT THE DEFAULT. The spelling is what the SYMBOL
+   * says, so it has to be available or the chart is lying about `Fm6/C`; it is
+   * also the hardest of the three to play, spanning up to fourteen semitones.
+   * `lead` opens, because a line of chords is a progression and that is the
+   * mode that makes one playable: MEASURED in `chords-test.mjs` over seven
+   * chords, 27 semitones of hand movement against 57 for close and 46 for root.
+   */
+  let voicing = 'lead';
+  /* 🔴 THE LABELS SAY WHAT EACH ONE DOES, NOT WHAT IT IS CALLED. They read
+     `SPELLED`, `CLOSE` and `LEADING` for ten minutes and the report was *"i do
+     not know what spelled close leading means"*, which is fair: those are the
+     words a musician uses about voicings and `positron-ui` bans exactly that,
+     a private vocabulary on a control a visitor has to be told about. What is
+     left is three plain words and a sentence on hover. */
+  const VOICE_SAYS = {
+    root: 'the notes exactly as the chord symbol spells them, stacked upward from the root',
+    close: 'the same notes packed as close together as they go, so one hand can hold them',
+    lead: 'each chord put where it moves your hand least from the one before it',
+  };
+  const voicePick = createChoice({
+    /* ⚠️ `VOICING` IS THE TERM AND A TERM IS NOT JARGON. It was `CHORDS` for
+       an hour, to avoid a word a visitor might not know, and the name of a
+       thing is exactly what this project's rule says to keep: `Yoshimi`,
+       `SuperCollider` and `Pappus` are all on these pages. What the rule bans
+       is a PRIVATE vocabulary, and what a visitor needed was for the three
+       OPTIONS to say what they do, which they now do.
+       ⚠️ AND THE OPTIONS ARE NOT SHOUTED. `.pos-choice button` never uppercased
+       anything: these were literal capitals typed into the page, which made two
+       ordinary words look like an abbreviation. */
+    label: 'VOICING',
+    options: [['As written', 'root'], ['Tight', 'close'], ['Smooth', 'lead']],
+    at: VOICINGS.indexOf('lead'),
+    onPick: (id) => { voicing = id; d.log(VOICE_SAYS[id]); redrawCharts(); },
+    title: (id) => VOICE_SAYS[id],
+  });
+
+  /**
+   * 🔴 THE CREDIT IS ON THE FACE OF THE PAGE BECAUSE THE LICENCE REQUIRES IT,
+   * NOT BECAUSE IT IS POLITE. The Rhodes is CC BY-NC-SA 4.0, the BY term is
+   * attribution, and a name in a file beside the recordings is not attribution
+   * to anybody who opens the page. `LICENSE-jrhodes3d` carries the whole of it
+   * including the three things the upstream licence says; this is the line a
+   * visitor reads.
+   * ⚠️ IT NAMES BOTH INSTRUMENTS, because a page that credits one recording and
+   * not the other reads as though the other one came from nowhere.
+   */
+  const credit = el('div', 'nola-credit');
+  credit.append(
+    'The piano is FluidR3 GM and the Rhodes is ',
+    el('a', '', "Jeff Learman's", { href: 'https://github.com/sfzinstruments/jlearman.jRhodes3d',
+      target: '_blank', rel: 'noopener' }),
+    " own 1977 Rhodes Mark I Stage 73, sampled as jRhodes3d and used here under ",
+    el('a', '', 'CC BY-NC-SA 4.0', { href: 'https://creativecommons.org/licenses/by-nc-sa/4.0/',
+      target: '_blank', rel: 'noopener' }),
+    '.');
+
+  const instrument = el('div', 'nola-inst');
+  /* ⚠️ THE TWO PICKERS ARE ONE ROW: what is playing and where the chords are
+     put are both about the instrument under them, and two labelled choices on
+     two lines would read as two unrelated settings. */
+  const picks = el('div', 'nola-picks');
+  picks.append(instPick.el, voicePick.el);
+  instrument.append(picks, keysHost, credit);
+  d.stack.add(chordField.el, chordList, instrument);
 
   // ── the MIDI keyboard ─────────────────────────────────────────────────────
 
@@ -829,16 +1156,38 @@
        * shifting it by octaves to land under the keys is free and moving the
        * window is not.
        */
+      /**
+       * 🔴 THE VOICING IS `chords.mjs`'s ARITHMETIC, NOT THIS PAGE'S. What was
+       * here was four lines that moved a chord by whole octaves until its
+       * lowest note was in the window, which is a placement and not a voicing:
+       * it never changed the SHAPE, so `Fm6/C` stayed fourteen semitones wide
+       * and every chord in a line started wherever its own root happened to
+       * fall. The module does it now, with 49 checks and no browser, and three
+       * modes rather than one.
+       * ⚠️ `near` IS THE CHORD BEFORE IT, which is the whole of what leading
+       * means, and it is the row already voiced rather than the one parsed.
+       */
       const base = keys.base;
-      let shifted = c.notes;
-      let lo = Math.min(...shifted);
-      while (lo < base) { shifted = shifted.map((n) => n + 12); lo += 12; }
-      while (lo >= base + 12) { shifted = shifted.map((n) => n - 12); lo -= 12; }
-      /* ⚠️ A NOTE ABOVE THE WINDOW IS SAID, NOT SWALLOWED. A dot that cannot be
-         drawn returns quietly, which is right for the component and wrong for a
-         reader: a chord shown with one note missing and nothing said is the
-         silent kind of wrong. */
-      const outside = shifted.filter((n) => n < base || n > base + 24);
+      /**
+       * 🔴 THE WINDOW IS WHAT THE COMPUTER KEYBOARD CAN REACH, NOT WHAT THE
+       * SCREEN DRAWS. Asked 2026-09-23: *"any good voicing for ads keyboard?"*.
+       * The keys on screen are two octaves and the letter row is fifteen
+       * semitones of them, so a chord voiced into the whole picture can be one
+       * nobody without a MIDI keyboard can play. MEASURED across seven real
+       * chords: every one of them fits inside the letter row in all three
+       * modes, the widest being `F/C` and `Fm6/C` at twelve semitones.
+       * ⚠️ AND THE REACH IS READ OFF THE LETTER MAP rather than typed, so
+       * adding a letter to `QWERTY_CHROMATIC` widens it by itself. `l` was
+       * added this afternoon and moved it from twelve to fourteen.
+       * ⚠️ IT COSTS THE TOP OCTAVE, ON PURPOSE. Chords sit in the lower half
+       * and the keys above them are where a melody goes, which is the hand
+       * position anybody playing chords and a tune already uses.
+       */
+      const { notes: shifted, outside } = voiceChord(c.notes, {
+        mode: voicing, lo: base, hi: base + REACH,
+        near: rows.length ? rows[rows.length - 1].notes : [],
+        bass: c.bass !== null,
+      });
       const label = [c.name, c.roman, outside.length
         ? `${outside.length} above` : ''].filter(Boolean).join(' ');
       rows.push({ label, notes: shifted });
@@ -868,15 +1217,15 @@
 
   // ── what only this page can say ───────────────────────────────────────────
   //
-  // 🔴 THESE FOUR RUN FOR EVERYBODY, because they are gradable from data
-  // already in hand and cost a visitor nothing. `selfcheck.mjs`: a visit
-  // asserts a STRICT SUBSET, and what moves behind the gate is anything that
-  // opens a file, makes a sound, presses a control or moves the picture.
+  // 🔴 THESE RUN FOR EVERYBODY, because they are gradable from data already in
+  // hand and cost a visitor nothing. `selfcheck.mjs`: a visit asserts a STRICT
+  // SUBSET, and what moves behind the gate is anything that opens a file, makes
+  // a sound, presses a control or moves the picture.
 
   d.assert('one recording every minor third, from the bottom of a piano to the top',
-    SAMPLED.length === 30 && LOW === 21 && HIGH === 108
-    && SAMPLED.every((n, i) => i === 0 || n - SAMPLED[i - 1] === 3),
-    `${SAMPLED.length} notes, ${LOW} to ${HIGH}, three apart`);
+    PIANO.notes.length === 30 && PIANO.notes[0] === 21 && PIANO.notes[29] === 108
+    && PIANO.notes.every((n, i) => i === 0 || n - PIANO.notes[i - 1] === 3),
+    `${PIANO.notes.length} notes, ${PIANO.notes[0]} to ${PIANO.notes[29]}, three apart`);
 
   /* 🔴 THE SHIFT ASSERT, AND IT IS ONLY WORTH ANYTHING BECAUSE THE SET IS
      SPARSE. Against a chromatic soundfont every note is its own recording and
@@ -885,7 +1234,7 @@
   {
     let worstShift = 0, bent = 0;
     for (let n = 21; n <= 108; n++) {
-      const s = Math.abs(shiftOf(n));
+      const s = Math.abs(n - nearestIn(PIANO.notes, n));
       if (s > worstShift) worstShift = s;
       if (s) bent++;
     }
@@ -893,6 +1242,73 @@
       worstShift <= 1 && bent === 58,
       `worst bend ${worstShift} semitone across notes 21 to 108, and ${bent} of 88 keys are bent at all`);
   }
+
+  /* 🔴 AND THE RHODES IS THREE TIMES WORSE INSIDE ITS OWN RANGE, WHICH IS A
+     FACT ABOUT THE PACK RATHER THAN A FAULT IN IT. Fifteen notes at gaps of 3
+     to 6 semitones cannot do better, and the survey priced the length and
+     formant error at 18.9 per cent at the worst of it. ⚠️ ABOVE NOTE 96 IT IS
+     WORSE STILL and the assert says so in its own detail rather than quietly
+     measuring the easy part: a Rhodes Mark I Stage 73 has 73 keys and stops at
+     MIDI 100, so everything above that is a key the real instrument never had. */
+  {
+    let worst = 0, bent = 0, top = 0;
+    for (let n = 29; n <= 96; n++) {
+      const s = Math.abs(n - nearestIn(RHODES.notes, n));
+      if (s > worst) worst = s;
+      if (s) bent++;
+    }
+    for (let n = 97; n <= 108; n++) top = Math.max(top, n - nearestIn(RHODES.notes, n));
+    d.assert('every key the Rhodes covers is within three semitones of a recording',
+      worst === 3 && bent === 53 && top === 12,
+      `worst bend ${worst} semitones over notes 29 to 96, ${bent} of those 68 keys bent, `
+      + `and ${top} semitones at note 108, which is above the real instrument`);
+  }
+
+  /* 🔴 TWO INDEPENDENT SOURCES, WHICH IS THE ONLY KIND OF AGREEMENT WORTH
+     ASSERTING. The search is this page's arithmetic and `RHODES_KEYS` is the
+     author's own `lokey`/`hikey` out of his SFZ, so the two can disagree, and
+     they would have on the three keys that sit exactly between two recordings
+     if the tie had gone the other way. Comparing the search against itself is
+     the trap this project has paid for twice. */
+  {
+    let same = 0, off = [];
+    for (let n = 21; n <= 108; n++) {
+      const mine = nearestIn(RHODES.notes, n);
+      const his = RHODES.notes[RHODES_KEYS.findIndex(([lo, hi]) => n >= lo && n <= hi)];
+      if (mine === his) same++; else off.push(`${n}: ${mine} not ${his}`);
+    }
+    d.assert('the recording the Rhodes reaches for is the one its author\'s own key map names',
+      same === 88 && off.length === 0,
+      off.length ? off.slice(0, 3).join(', ') : `all 88 keys agree, including 32, 57 and 68 `
+        + 'where two recordings are the same distance away');
+  }
+
+  /* 🔴 THE LAYER TABLE, GRADED WITH NO SOUND IN IT. What this catches is the
+     numbering running backwards: layer 1 is the HARDEST file and layer 5 the
+     softest, so a page that read 5 as most would have velocity 1 playing the
+     hardest recording there is and nothing about it would look wrong. */
+  {
+    const seq = [];
+    for (let v = 1; v <= 127; v++) seq.push(layerFor(v));
+    const falls = seq.every((l, i) => i === 0 || l <= seq[i - 1]);
+    const bands = [...new Set(seq)];
+    d.assert('the softest press picks the softest recording and the hardest picks the hardest',
+      layerFor(1) === 5 && layerFor(127) === 1 && falls && bands.length === 5,
+      `velocity 1 to 127 runs through layers ${bands.join(' then ')}, `
+      + `crossing at ${seq.map((l, i) => (i && l !== seq[i - 1] ? i + 1 : 0)).filter(Boolean).join(', ')}`);
+  }
+
+  /* 🔴 THE HOLES, AND THE FALLBACK IS HIS. Layer 3 stops at note 71 and layer 1
+     at 76. Without this the top four notes of a hard press would ask for a file
+     that is not there, which is a 404 on a page whose own check says nothing
+     failed. */
+  d.assert('a layer that stops short falls back to the one its author plays instead',
+    RHODES.layerAt(81, 1) === 2 && RHODES.layerAt(91, 3) === 4
+    && RHODES.layerAt(76, 1) === 1 && RHODES.layerAt(65, 3) === 3
+    && RHODES.notes.every((n) => [1, 2, 3, 4, 5].every((l) => RHODES.layerAt(n, l) !== null)),
+    `note 81 at the hardest layer plays his layer ${RHODES.layerAt(81, 1)} file and note 91 `
+    + `at layer 3 plays his layer ${RHODES.layerAt(91, 3)}, and every one of the 75 `
+    + 'note and layer pairs resolves to a file that exists');
 
   d.assert('a visit asks for no audio at all, counted rather than read off the page',
     gotFiles === 0 && gotBytes === 0,
@@ -1064,6 +1480,35 @@
         keysHost.querySelectorAll('.k.hint').length === 0 && roll.picked() === -1,
         `${keysHost.querySelectorAll('.k.hint').length} keys still lit`);
 
+      /* 🔴 THE VOICING CONTROL REALLY RE-VOICES, AND THE DOTS ARE READ OFF THE
+         PICTURE RATHER THAN OFF THE ARRAY THE PAGE JUST BUILT. `chords.mjs`
+         grades the arithmetic with 49 checks and no browser; what only this
+         page can say is that pressing the control changes what is DRAWN.
+         ⚠️ AND THE NEGATIVE CONTROL IS THE HALF THAT MATTERS: a picker wired to
+         nothing would leave the dots where they were, which is exactly what the
+         four lines this replaced used to do. */
+      {
+        const dotsNow = () => [...keys.el.querySelectorAll('.roll-row')]
+          .map((r) => [...r.querySelectorAll('.roll-cell.on')].length).join(',');
+        const spanNow = () => charts.map((c) => Math.max(...c.notes) - Math.min(...c.notes));
+        /* ⚠️ `set(index)`, WHICH IS THE COMPONENT'S OWN WORD. The first version
+           called `pick(id)` and threw, because that is `roll.mjs`'s vocabulary
+           and this is `choice.mjs`: two components, two names for choosing, and
+           the one that is right is the one the control being driven uses. */
+        voicePick.set(VOICINGS.indexOf('root'));
+        const spelled = spanNow(), spelledDots = dotsNow();
+        voicePick.set(VOICINGS.indexOf('lead'));
+        const led = spanNow();
+        d.assert('the voicing control really moves the chords rather than relabelling them',
+          spelled.join(',') !== led.join(',') && dotsNow() === spelledDots,
+          `spelled spans ${spelled.join(',')} against ${led.join(',')} when led, `
+          + `and the same ${spelledDots} dots either way`);
+        d.assert('and every note of every chord lands on the keys under it',
+          charts.every((c) => c.outside.length === 0)
+          && charts.every((c) => c.notes.every((n) => n >= keys.base && n <= keys.base + 24)),
+          charts.map((c) => `${c.label} ${Math.min(...c.notes)}-${Math.max(...c.notes)}`).join(', '));
+      }
+
       const refused = drawChords('Cmaj wibble');
       d.assert('a token that is not a chord is shown back rather than dropped',
         refused.bad.length === 1 && chordList.querySelector('.nola-bad')?.textContent.includes('wibble'),
@@ -1126,7 +1571,10 @@
      * is a check nobody can trust the count of.
      */
     await ensureAudio();
-    await Promise.all([fetchOctave(60), fetchOctave(72)]);
+    await Promise.all([
+      fetchPlan(planFor(PIANO, 60)),
+      fetchPlan(planFor(PIANO, 72)),
+    ]);
 
     /* ── the pedal, and the control beside it ────────────────────────────── */
     //
@@ -1249,8 +1697,8 @@
     const ratio = hzFlat ? hzBent / hzFlat : 0;
     d.assert('a note with no recording really sounds a semitone above the one it came from',
       bent === 1 && flat === 0 && Math.abs(ratio - Math.pow(2, 1 / 12)) < 0.03,
-      `note 63 came from ${nearestOf(63)} at ${flat} and its loudest partial is `
-      + `${hzFlat.toFixed(1)} Hz, note 64 came from ${nearestOf(64)} at ${bent} and its is `
+      `note 63 came from ${nearestIn(PIANO.notes, 63)} at ${flat} and its loudest partial is `
+      + `${hzFlat.toFixed(1)} Hz, note 64 came from ${nearestIn(PIANO.notes, 64)} at ${bent} and its is `
       + `${hzBent.toFixed(1)} Hz, a ratio of ${ratio.toFixed(4)} against 1.0595`);
 
     /* ── transpose, and the half of the keyboard it must not touch ───────── */
@@ -1312,10 +1760,160 @@
       + `${pedal.down() ? 'still down' : 'up'}`);
 
     /* ── the fetch really only took the octaves that were played ─────────── */
+    //
+    // ⚠️ THE PIANO'S OWN FILES, COUNTED BEFORE THE RHODES BLOCK RUNS. Nothing
+    // has asked for a Rhodes file at this point, so `gotFiles` is still the
+    // piano's, and the Rhodes' own fetching is graded below on the URLs rather
+    // than on this count.
     d.assert('only the octaves somebody played were asked for',
-      gotFiles > 0 && gotFiles < SAMPLED.length && buffers.size === gotFiles,
-      `${gotFiles} of ${SAMPLED.length} recordings, ${Math.round(gotBytes / 1024)} KB, `
+      gotFiles > 0 && gotFiles < PIANO.notes.length && buffers.size === gotFiles
+      && gotUrls.every((u) => u.endsWith('.mp3')),
+      `${gotFiles} of ${PIANO.notes.length} recordings, ${Math.round(gotBytes / 1024)} KB, `
       + `for ${wanted.size} octave${wanted.size === 1 ? '' : 's'}`);
+
+    /* ── the Rhodes, driven through the control a visitor presses ────────── */
+    //
+    // 🔴 EVERY ONE OF THESE GOES THROUGH `instPick.buttons[n].click()` RATHER
+    // THAN THROUGH `setInstrument`. The picker is outside `.pos-controls`, so
+    // no harness will ever press it, and a check that reached past it would
+    // leave the one control this change adds graded by nothing. That is the
+    // loss `positron-verify` records on `/mirror/` and `/blocks/`, where ten
+    // and six asserts went silent behind a control nobody could press.
+    {
+      /* 🔴 THE FETCHING PART COMES FIRST AND IS READ OFF THE WIRE. What is
+         being graded is which file the page ASKED FOR, not which layer it
+         worked out a line earlier: reading `lastPlayed.layer` would be the page
+         grading its own arithmetic, which is how a `playbackRate` forced to 1
+         read green on this page once already. */
+      const before = gotUrls.length;
+      instPick.buttons[1].click();                            // RHODES
+      await press(60, 20, performance.now());                 // barely touched
+      await sleep(40);
+      await press(60, 120, performance.now());                // and leaned on
+      await sleep(40);
+      await press(81, 127, performance.now());                // above where layer 1 stops
+      await sleep(40);
+      const asked = gotUrls.slice(before).map((u) => u.split('/').pop());
+      const soft = asked.find((f) => f.startsWith('rhodes-059'));
+      const hard = asked.filter((f) => f.startsWith('rhodes-059')).pop();
+      keys.panic();
+
+      d.assert('a soft press and a hard one really fetch two different recordings of one note',
+        asked.length === 3 && soft !== hard && soft === 'rhodes-059-5.m4a'
+        && hard === 'rhodes-059-1.m4a',
+        `note 60 came from ${soft} at velocity 20 and from ${hard} at 120, `
+        + `and layer 1 is the harder of the two`);
+
+      /* 🔴 AND THE HOLE IS CROSSED FOR REAL, NOT IN ARITHMETIC. Note 81 has no
+         layer 1 file at all, so a page that trusted the layer it computed would
+         have asked for `rhodes-081-1.m4a` and got a 404 on a run whose own
+         `no failed requests` line would then be the only thing that said so. */
+      d.assert('a note above the top of a layer asks for the file its author plays instead',
+        asked[2] === 'rhodes-081-2.m4a',
+        `note 81 at velocity 127 asked for ${asked[2]}, and there is no rhodes-081-1.m4a `
+        + 'in the pack at all');
+
+      /* ⚠️ WHAT THE TIMED READINGS NEED, FETCHED BEFORE ANY OF THEM. Same
+         reason as the piano's octaves above: a fetch in the middle of a
+         measurement is both a distorted reading and a silence the harness may
+         walk out during. */
+      await Promise.all([fetchPlan(planFor(RHODES, 59, 2)), fetchPlan(planFor(RHODES, 65, 2))]);
+
+      /* ── it really sounds, with the silence before it as the control ───── */
+      await quiet();
+      const hush = peak();
+      await press(60, 100, performance.now());
+      await sleep(150);
+      const rhodesLoud = peak();
+      lift(60);
+      d.assert('a Rhodes note really sounds, against the silence a moment before it',
+        hush < 0.002 && rhodesLoud > 0.02,
+        `the analyser read ${hush.toFixed(4)} with nothing playing and `
+        + `${rhodesLoud.toFixed(4)} 150 ms into a Rhodes note at velocity 100`);
+
+      /* 🔴 AND THE LEVEL IS THE WHOLE REASON THERE ARE TWO CONSTANTS. The piano
+         files are 21 dB down and the Rhodes files are at full scale, so an
+         instrument switch that reused one number would be about 20 dB out in
+         one direction or the other. The same key at the same velocity on both
+         is the only reading that says whether that was got right. */
+      await quiet();
+      instPick.buttons[0].click();                            // PIANO
+      await press(60, 100, performance.now());
+      await sleep(150);
+      const pianoLoud = peak();
+      lift(60);
+      const apart = 20 * Math.log10(rhodesLoud / (pianoLoud || 1e-9));
+      d.assert('the two instruments land within a few dB of each other at one velocity',
+        Math.abs(apart) < 6 && pianoLoud > 0.02,
+        `at velocity 100 the Rhodes reads ${rhodesLoud.toFixed(4)} and the piano `
+        + `${pianoLoud.toFixed(4)}, which is ${apart >= 0 ? '+' : ''}${apart.toFixed(1)} dB apart`);
+
+      /* 🔴 AND THE READING THAT DECIDES A LEVEL IS A CHORD, NOT A NOTE. One
+         note at the wrong level is quiet or loud; six at the wrong level is a
+         page that clips, which is the harm the constant above exists to avoid.
+         The piano's own three note chord is already measured by the notes off
+         check at the same velocity and the same age, so `loud` is the
+         comparison and nothing new has to be played to get it.
+         🔴 AND THE TWO DO NOT AGREE, WHICH IS THE SPARSE NOTE MAP ARRIVING
+         SOMEWHERE NOBODY WAS LOOKING. MEASURED here: one Rhodes note sits 2.6 dB
+         from one piano note, and three Rhodes notes sit about 8 dB above three
+         piano ones. Notes 64 and 67 come from the SAME Rhodes recording at two
+         rates, so they start in phase and add almost coherently, while the
+         piano's three notes come from three different recordings and add like
+         noise. The first version of this check asserted the two chords were
+         within a few dB of each other and went red on a page doing exactly what
+         it promises.
+         ⚠️ THE LEVEL IS STILL RIGHT AND THE HEADROOM IS STILL THERE. A triad
+         reads about 0.32 against full scale at 1.0, which is the same order as
+         the piano's own worst case, and `LOUDEST` is already a third of full
+         scale for exactly this reason. */
+      await quiet();
+      instPick.buttons[1].click();                            // RHODES
+      for (const n of [60, 64, 67]) await press(n, 100, performance.now());
+      await sleep(150);
+      const chord = peak();
+      keys.panic();
+      await sleep(300);
+      const chordFrom = new Set([60, 64, 67].map((n) => nearestIn(RHODES.notes, n))).size;
+      const pianoFrom = new Set([60, 64, 67].map((n) => nearestIn(PIANO.notes, n))).size;
+      d.assert('a Rhodes chord stacks higher than a piano one, because fewer recordings cover more keys',
+        chord < 1 && chord > loud && chordFrom === 2 && pianoFrom === 3,
+        `notes 60, 64 and 67 come from ${chordFrom} Rhodes recordings and ${pianoFrom} piano ones, `
+        + `and at velocity 100 they peak at ${chord.toFixed(4)} against ${loud.toFixed(4)}, `
+        + 'both inside full scale at 1.0000');
+
+      /* ── switching under a held note, and the control beside it ────────── */
+      //
+      // 🔴 A KEY THAT IS STILL DOWN IS THE SHAPE THAT STRANDS A VOICE. Its
+      // release goes through `pedal`, which knows a note number and nothing
+      // about which instrument made the sound, so a page holding a voice list
+      // per instrument would leave this one ringing until the tab closed.
+      // ⚠️ The picker is still on RHODES from the chord above, which is why
+      // there is no click here and the first press already lands on it.
+      await quiet();
+      await press(64, 100, performance.now());                // and never let go
+      await sleep(150);
+      const underFinger = peak();
+      instPick.buttons[0].click();                            // PIANO, key still down
+      await sleep(250);
+      const afterSwitch = peak(), stranded = voices.length;
+      lift(64);
+      await quiet();
+      /* ⚠️ THE CONTROL IS THE SAME NOTE HELD THE SAME WAY WITH NOBODY
+         SWITCHING. Without it all that is measured is that a Rhodes note gets
+         quieter on its own, which it does. */
+      instPick.buttons[1].click();
+      await press(64, 100, performance.now());
+      await sleep(400);
+      const unswitched = peak();
+      d.assert('changing instrument under a held key ends its note rather than stranding it',
+        underFinger > 0.02 && afterSwitch < 0.01 && stranded === 0 && unswitched > 0.01,
+        `held at ${underFinger.toFixed(4)}, then ${afterSwitch.toFixed(4)} and ${stranded} voices `
+        + `250 ms after the switch, against ${unswitched.toFixed(4)} at 400 ms with no switch`);
+      lift(64);
+      keys.panic();
+      instPick.buttons[0].click();                            // back where a visitor finds it
+    }
 
     d.assert('the page measured its own press to sound', presses === 0 || worstMs > 0,
       presses ? `${presses} presses timed, median ${medians[medians.length >> 1].toFixed(1)} ms, `
@@ -1347,9 +1945,10 @@
   // the size is the real one. A picture of next week's architecture is the same
   // defect as a note about how the picture was made.
   const dg = createDiagram(d.el, {
-    caption: 'Two ways in and one instrument: a key on screen, a key on a chord chart and a '
+    caption: 'Two ways in and one sampler: a key on screen, a key on a chord chart and a '
       + 'key on a MIDI keyboard all call the same two functions, so nothing downstream can '
-      + 'tell them apart.',
+      + 'tell them apart. Which set of recordings that sampler reaches for is the only thing '
+      + 'the instrument control changes.',
     nodes: [
       /* 🔴 THE KEYBOARD IS DRAWN AS A MACHINE WITH TWO PARTS, AND THE FOOTSWITCH
          IS ONE OF THEM. Half of a keyboard is under the player's foot, and a
@@ -1386,10 +1985,10 @@
           { id: 'damp', label: 'damper', sub: 'CC64, 63/64', tech: 'sound',
             note: 'The pedal is the ABSENCE of the damper rather than a sustain, so nothing is '
                 + 'added to a note. A value of 63 is off and 64 is on.' },
-          { id: 'smp', label: 'sampler', sub: '30 notes', tech: 'sound',
-            note: 'A key plays the nearest recording at a changed **playbackRate**, never more '
-                + 'than one semitone away. Up to 64 **AudioBufferSourceNode**s sound at once, '
-                + 'each into its own gain.' },
+          { id: 'smp', label: 'sampler', sub: 'piano or Rhodes', tech: 'sound',
+            note: 'A key plays the nearest recording at a changed **playbackRate**, one semitone '
+                + 'away on the piano and up to three on the Rhodes. Up to 64 '
+                + '**AudioBufferSourceNode**s sound at once, each into its own gain.' },
         ] },
       { id: 'cf', label: 'Cloudflare', sub: 'the site itself', kind: 'cloud', tech: 'cloudflare',
         children: [
@@ -1397,9 +1996,10 @@
              READS the recordings and serves them, so an arrow from the worker
              into the files would draw the flow backwards, which a reader
              following the picture would believe. */
-          { id: 'files', label: 'recordings', sub: '30 mp3, 656KB', tech: 'file',
-            note: 'One every minor third from A0 to C8, at one velocity layer. Flat files beside '
-                + 'the page rather than a bucket, which is what makes this phase zero.' },
+          { id: 'files', label: 'recordings', sub: '95 files, 3.6MB', tech: 'file',
+            note: 'The piano is 30 notes a minor third apart at one velocity layer. The Rhodes '
+                + 'is 15 notes at five layers each, recorded by Jeff Learman and used under '
+                + 'CC BY-NC-SA 4.0.' },
           { id: 'wrk', label: 'Worker', sub: 'workers/view', tech: 'cloudflare',
             note: 'The same worker that serves the page serves the recordings beside it. '
                 + 'Nothing here is a bucket yet, and the Salamander pack the plan sizes will '
@@ -1429,10 +2029,10 @@
       { from: 'files', to: 'wrk',
         note: 'No build pipeline exists yet and none is needed to play the thing, which is the '
             + 'whole argument for starting here rather than with an encoder.' },
-      { from: 'wrk', to: 'smp', label: '30 mp3',
-        note: 'One octave at a time, on the first press of a key in it, decoded into memory '
-            + 'once each. A release is a **setTargetAtTime** over about 0.12 s rather than a '
-            + 'stop, because a stop is a click.' },
+      { from: 'wrk', to: 'smp', label: 'mp3 and m4a',
+        note: 'A piano octave at a time and a single Rhodes file per note and velocity layer, '
+            + 'on the first press that needs one. A release is a **setTargetAtTime** over about '
+            + '0.12 s rather than a stop, because a stop is a click.' },
     ],
   }, { how: true, atEnd: true });
 
@@ -1468,6 +2068,7 @@
 </script>
 
 <style>
+  .nola-picks { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
   /* 🔴 THE SUSTAIN BUTTON SITS WITH THE OCTAVE PAD, NOT IN `.pos-controls`.
      `keyboard.mjs` already argues this about the pad itself: an octave pair and
      a `Notes off` are controls ABOUT the keys, and a hand's width away at the
@@ -1535,5 +2136,22 @@
      defect this page has now had twice. */
   .nola-keys { --k-gap: 2px; }
   .nola-keys { display: block; }
+
+  /* 🔴 THE INSTRUMENT PICKER, THE KEYS AND THE CREDIT ARE ONE BLOCK. `stack.mjs`
+     says it in its own header: a pair that belongs tight is one block, not a
+     smaller gap, and the inside of a block is the block's own business. Which
+     instrument the keys play and the keys themselves are not two things a
+     reader should have to associate across 40 px of air. */
+  .nola-inst { display: flex; flex-direction: column; gap: 12px; }
+
+  /* 🔴 THE CREDIT IS REQUIRED BY THE RHODES' LICENCE AND IS NOT DECORATION.
+     CC BY-NC-SA means attribution, and attribution nobody can see is not
+     attribution. It is a STANDING STATEMENT about what the keys play, so it
+     sits with them rather than in `.pos-log`, which is for things that
+     happened. Same argument as `.nola-bad` one element along. */
+  .nola-credit { font: 500 11px/1.5 var(--mono); color: var(--dim); }
+  .nola-credit a { color: var(--dim); text-decoration: underline;
+                   text-underline-offset: 2px; }
+  .nola-credit a:hover, .nola-credit a:focus-visible { color: var(--fg); }
 </style>
 </html>
