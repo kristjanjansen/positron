@@ -316,8 +316,15 @@ export function layout(value, opts = {}) {
  * the same shape stood up. The mitres are what make a corner read as two parts
  * rather than one bent one, and `J` is the notch between them.
  */
-function bars() {
-  const { W, H, T, J } = GEO;
+function bars(thick) {
+  const { W, H, J } = GEO;
+  /* 🔴 THICKNESS IS A PARAMETER SINCE 2026-09-23, ASKED ON `/evo/` AS
+     *"segmented should be skinnier numbers"*. Everything else in `GEO` is the
+     GLYPH, which every display on the site shares so that two fields side by
+     side are the same typeface; the bar's weight is the only part of it that is
+     a look rather than a shape, and a panel mirror wants a lighter one than a
+     meter does. It defaults to `GEO.T`, so every existing caller is untouched. */
+  const T = thick ?? GEO.T;
   const h = T / 2;
   const mid = H / 2;
   const n = (v) => Number(v.toFixed(2));
@@ -412,6 +419,10 @@ export function schemeFor(name) {
  * @param {number} [o.size]         glyph height in px, as `--disp-h`
  * @param {string} [o.ink]          lit colour, as `--disp-ink`
  * @param {string} [o.back]         backlight, as `--disp-back`
+ * @param {number} [o.thick]        how heavy a bar is, in the glyph's own units
+ *   against `GEO.T`'s 2.6. The GLYPH is shared by every display on the site so
+ *   two fields read as one typeface; the bar's weight is the one part of it
+ *   that is a look rather than a shape.
  * @param {number} [o.ghost]        how visible an unlit bar is, as `--disp-ghost`
  * @param {'backlit'|'reflective'} [o.scheme='backlit']  which kind of display
  *   this is a picture of. `reflective` is the inverted grey green one with no
@@ -427,7 +438,7 @@ export function schemeFor(name) {
  *            lit:()=>number}}
  */
 export function createSegment({
-  digits = 3, decimals = 0, dot, value = '', size, ink, back, ghost, scheme,
+  digits = 3, decimals = 0, dot, value = '', size, ink, back, ghost, scheme, thick,
   frame = true, title, cls = '',
 } = {}) {
   const n = Math.max(1, Math.trunc(digits));
@@ -464,7 +475,7 @@ export function createSegment({
   if (back) root.style.setProperty('--disp-back', back);
   if (ghost != null) root.style.setProperty('--disp-ghost', String(ghost));
 
-  const B = bars();
+  const B = bars(thick);
   const adv = advance(hasDot);
   const w = fieldW(n, hasDot);
   let inner = '';
