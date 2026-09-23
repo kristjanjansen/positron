@@ -974,7 +974,13 @@ export function createKeyboard(host, {
     lightNote(note, on, who = 'self') {
       const k = keyOf(note);
       if (!k) return;
-      const cls = who === 'remote' ? 'remote' : who === 'hint' ? 'hint' : 'down';
+      /* 🔴 `ai` IS A FOURTH LAMP AND NOT A FOURTH COLOUR OF THE SAME ONE. Asked
+         2026-09-23: *"when fading, fade them also in keyboard so smaller are on
+         top of larger"*. A proposal and a key under a finger are two different
+         facts about one key and a player needs to see both at once, so this one
+         paints a smaller mark INSIDE the dot rather than recolouring it. */
+      const cls = who === 'remote' ? 'remote' : who === 'hint' ? 'hint'
+        : who === 'ai' ? 'ai' : 'down';
       els.get(k)?.classList.toggle(cls, !!on);
     },
     /** every note this keyboard can produce, for a caller that needs the range */
