@@ -1807,7 +1807,7 @@
         arriveTimer = setTimeout(() => {
           delete rowEl.dataset.new;
           delete keysHost.dataset.aiNew;
-        }, 1000);
+        }, 3200);
       }
       /* 🔴 AND IT IS ON THE KEYS AS WELL AS IN THE ROLL, asked for as *"fade
          them also in keyboard so smaller are on top of larger"*. The roll says
@@ -2003,6 +2003,27 @@
      * repair is a second threshold rather than deleting this.
      */
     if (proposed.has(key)) { showReading(r); return; }
+    /**
+     * 🔴 AND NEITHER IS WHAT YOU PLAY ON THE WAY TO IT. Reported twice, the
+     * second time with a screenshot of three learned rows: *"recording my
+     * learning again..."*.
+     * Matching the exact chord was not enough, because practising a proposal is
+     * not playing it correctly. Reaching for a suggested `Gmaj7` produces `Gmaj`,
+     * then `G5`, then `Gmaj7` with a wrong finger, and every one of those is a
+     * DIFFERENT chord that sailed past a guard looking for the right one. The
+     * roll then filled with the shape of somebody practising rather than the
+     * shape of their playing, which is the exact opposite of what it is for.
+     * ✅ SO WHILE A PROPOSAL IS UP AND UNPLAYED, NOTHING SHARING ITS ROOT IS
+     * LEARNED. A root is the thing that does not change while a hand hunts for
+     * the rest of a chord, so it is what separates hunting from playing.
+     * ⚠️ AND IT IS ONLY WHILE THAT PROPOSAL IS WAITING. Once it has been played
+     * or has gone stale, its root is ordinary again and chords built on it are
+     * learned like any other, so a key centre is not blocked for the session.
+     */
+    if (guesses.length && !guessPlayed) {
+      const g = parseChord(guesses[guesses.length - 1].name);
+      if (g.ok && g.root === r.root) { showReading(r); return; }
+    }
     playedAs.set(key, [...got.notes].sort((a, b) => a - b));
     tally.hold(key, at);
     const due = tally.dueAt(at);
@@ -3783,21 +3804,34 @@
      at two speeds read as two things happening rather than one. A shared
      measurement typed in two places is a measurement that will disagree, which
      is why it is a custom property rather than a number in each rule. */
-  :root { --nola-arrive: 900ms; }
+  /* 🔴 IT WAITS, THEN BREATHES IN. Asked as *"make suggestion arrive later and
+     make looong fadein / breathe"*, after *"waaaaait when new suggetion, i want
+     to feel it"*. The first version was 900 ms starting the instant the chord
+     was computed, which lands on top of the chord you have just finished playing
+     and reads as the page interrupting rather than answering.
+     ⚠️ THE DELAY IS THE HALF THAT MAKES IT AN ANSWER. Nothing appears while your
+     hands are still settling, and `backwards` holds it invisible through the
+     wait rather than letting it flash at full strength first.
+     ⚠️ AND BOTH PICTURES STILL SHARE ONE DECLARATION, because the roll and the
+     keys are two drawings of one proposal and two speeds read as two events. */
+  :root { --nola-arrive: 2200ms; --nola-wait: 700ms; }
   @keyframes nola-arrive {
-    0%   { transform: scale(.55); opacity: 0; }
+    0%   { transform: scale(.35); opacity: 0; }
+    45%  { transform: scale(1.14); opacity: .8; }
     100% { transform: scale(1); opacity: 1; }
   }
-  @keyframes nola-arrive-label { 0% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes nola-arrive-label { 0% { opacity: 0; } 55% { opacity: .6; } 100% { opacity: 1; } }
   .roll-row[data-new] .roll-cell.on::after {
-    animation: nola-arrive var(--nola-arrive) cubic-bezier(.22, 1, .36, 1);
+    animation: nola-arrive var(--nola-arrive) var(--nola-wait)
+               cubic-bezier(.16, 1, .3, 1) backwards;
   }
   .roll-row[data-new] .roll-label {
-    animation: nola-arrive-label var(--nola-arrive) ease-out;
+    animation: nola-arrive-label var(--nola-arrive) var(--nola-wait) ease-out backwards;
   }
   /* the same arrival on the keys, so the hand is told where as well as what */
   .nola-keys[data-ai-new] .k.ai .kd::after {
-    animation: nola-arrive var(--nola-arrive) cubic-bezier(.22, 1, .36, 1);
+    animation: nola-arrive var(--nola-arrive) var(--nola-wait)
+               cubic-bezier(.16, 1, .3, 1) backwards;
   }
   /* ⚠️ AND NOTHING MOVES FOR SOMEBODY WHO ASKED FOR THAT. The mark is still
      drawn, it simply does not travel to get there. */
