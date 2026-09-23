@@ -147,6 +147,8 @@
   .evo-keypad { display: flex; flex-direction: column;
                 background: none; border: 0; border-radius: 0; padding: 0; }
   .evo-snapbox { margin-top: 6px; }
+  .evo-rec { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .evo-rec-say { color: var(--dim); font: 400 11px/1.4 var(--mono); }
 
   /* ── the wheels ────────────────────────────────────────────────────────── */
   .evo-wheelrow { display: flex; align-items: flex-start; gap: 6px; }
@@ -606,6 +608,44 @@
   const { fixed, strip, flow } = panel;
   d.el.append(card);
 
+  /* 🔴 DECLARED ABOVE EVERYTHING THAT FILLS IT, because the SAVE control is built
+     before `take()` ever runs and a `const` shadows its whole block from the
+     top. `/nola/` hit exactly this an hour earlier and read `Cannot access
+     RECORDING before initialization` at 0/1. */
+  const RECORDING = new URLSearchParams(location.search).get('rec') === '1';
+  const tape = [];
+  if (RECORDING) {
+    const bar = el('div', 'evo-rec');
+    const said = el('span', 'evo-rec-say', 'recording every control message');
+    const save = el('button', 'pos-btn', 'SAVE TAKE', { type: 'button' });
+    save.onclick = () => {
+      const doc = {
+        what: 'every control message off the MK-425C, raw, for measuring whether '
+            + 'its rotaries are smoothed',
+        when: new Date().toISOString(),
+        build: (document.querySelector('.pos-build') || {}).textContent || '',
+        events: tape,
+      };
+      const blob = new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' });
+      const a = el('a', '', '', { href: URL.createObjectURL(blob),
+        download: `evo-take-${Date.now()}.json` });
+      document.body.append(a); a.click(); a.remove();
+      d.log(`wrote a take of ${tape.length} control messages`);
+    };
+    setInterval(() => {
+      const ccs = new Set(tape.map((e) => e.cc));
+      said.textContent = tape.length
+        ? `${tape.length} messages on ${ccs.size} controller(s) over `
+          + `${((tape[tape.length - 1].t - tape[0].t) / 1000).toFixed(1)} s. Turn a knob, then save.`
+        : 'recording every control message. Nothing yet.';
+    }, 500);
+    bar.append(said, save);
+    d.el.append(bar);
+    d.log('this page is recording every control message, because it was opened '
+        + 'with ?rec=1. Turn C1 to C8 slowly and then fast, press SAVE TAKE, and '
+        + 'the file lands in your downloads');
+  }
+
   // ── the display, topmost in the left column ─────────────────────────────
 
   /**
@@ -1064,7 +1104,27 @@
         + `${GLOBAL_CH}`, n === GLOBAL_CH ? undefined : 'warn');
   }
 
+  /**
+   * 🔴 THE TAP, AND IT ANSWERS A QUESTION NOTHING ELSE ON THIS PAGE CAN. Asked
+   * 2026-09-23: *"can you detect cc smoothinng. tap and measure when i turn
+   * c1-c8 on evi"*.
+   * Whether a rotary is smoothed is a fact about the INSTRUMENT, not about this
+   * code, and no manual says: the Advanced Guide describes what the knobs send
+   * and never how they are read. It is measurable off the wire, and only off the
+   * wire, because everything downstream of `take()` has already thrown away the
+   * timing.
+   * ⚠️ IT RECORDS EVERY CONTROL MESSAGE AND NOT ONLY THE EIGHT, because what
+   * separates a smoothed knob from a coarse one is partly what ELSE arrives
+   * while it is moving, and a filter applied at the tap is a filter the analysis
+   * cannot undo.
+   * ⚠️ AND IT IS BEHIND `?rec=1`, so no control appears for anybody else, no
+   * harness press moves, and nothing is recorded, offered or sent unless
+   * somebody opened the page asking for it.
+   */
   function take(b) {
+    if (RECORDING && (b[0] & 0xf0) === 0xb0) {
+      tape.push({ t: Math.round(performance.now()), cc: b[1], v: b[2], ch: b[0] & 0x0f });
+    }
     const m = decode(b);
     /* The log refuses a flood itself and says so by returning false, which
        is the one place that policy lives. */
