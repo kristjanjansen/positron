@@ -1571,10 +1571,21 @@ video[hidden] { display: none; }
    because a key can be proposed AND under a finger, and a page that had to
    choose between saying those two things would say the wrong one. */
 .k .kd { position: relative; }
+/* 🔴 ONE SIZE SYSTEM, DECLARED ONCE, AND BOTH PICTURES READ IT. Asked
+   2026-09-23: *"circles are bigger than dots. dots need to fit in and have 1px
+   gap from circle. i meant that take keybioard dot / circle sise and applu to
+   piano roll too"*. The ring was a dot wide for a while, which put its border
+   exactly where the dot's edge is, so a played proposal had its own outline
+   sitting on top of it rather than around it.
+   ⚠️ THE ARITHMETIC IS THE WHOLE POINT AND IS WRITTEN OUT RATHER THAN TUNED. A
+   1 px border and a 1 px gap on each side is four pixels more than the dot, so
+   the ring's inner edge clears a `--k-dot` dot by exactly one pixel on every
+   side. Change `--k-dot` and both follow. */
+:root { --k-ring: calc(var(--k-dot, 6px) + 4px); }
 .k.ai .kd::after {
   content: ''; position: absolute; left: 50%; top: 50%;
-  width: var(--k-dot, 6px); height: var(--k-dot, 6px);
-  margin: calc(var(--k-dot, 6px) / -2) 0 0 calc(var(--k-dot, 6px) / -2);
+  width: var(--k-ring); height: var(--k-ring);
+  margin: calc(var(--k-ring) / -2) 0 0 calc(var(--k-ring) / -2);
   border-radius: 50%; box-shadow: inset 0 0 0 1px var(--ai);
 }
 /* 🔴 A RING AROUND THE DOT RATHER THAN A SMALLER DOT INSIDE IT. The small mark

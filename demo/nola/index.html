@@ -2354,16 +2354,44 @@
          they agreed by being the same component; the roll is a different
          drawing and shares only `placeKey`, which is exactly the kind of
          agreement that rots in silence. */
-      const colsOf = (root) => {
+      const colsOf = (root, pick) => {
         const box = root.getBoundingClientRect();
-        return [...root.children].slice(0, 5)
+        return [...root.children].filter(pick).slice(0, 5)
           .map((k) => Math.round(k.getBoundingClientRect().left - box.left));
       };
-      const onRoll = colsOf(keys.el.querySelector('.roll-lane'));
-      const onKeys = colsOf(keysHost.querySelector('.keys'));
-      d.assert('the roll lines up with the keys under it, column for column',
+      const white = (el) => !el.classList.contains('sharp');
+      const onRoll = colsOf(keys.el.querySelector('.roll-lane'), white);
+      const onKeys = colsOf(keysHost.querySelector('.keys'), white);
+      d.assert('the roll lines up with the white keys under it, column for column',
         onRoll.join(',') === onKeys.join(','),
         `roll at ${onRoll.join(',')} px against ${onKeys.join(',')} px on the instrument`);
+
+      /* 🔴 AND THE BLACK ONES DELIBERATELY DO NOT, WHICH IS A CLAIM AND NOT A
+         LOOSENED CHECK. Asked as *"move piano roll dots to cross the divider from
+         the middle"* and then *"lines stay. black key dots move"*. A real black
+         key is not centred between its neighbours and the KEYBOARD should look
+         like a keyboard, so `placeKey` gives it the piano's offset. A roll is not
+         a keyboard: it is a grid of marks read downward, and a mark sitting
+         slightly off the rule under it reads as a mistake rather than as
+         lutherie. So the roll's black cells keep their column and lose the
+         nudge, which puts the dot on the line the eye is already following.
+         ⚠️ MEASURED AS A DISTANCE FROM THE JOIN rather than as a difference from
+         the keyboard, because what is claimed is where the dot IS, not that it
+         moved. */
+      const laneBox = keys.el.querySelector('.roll-lane').getBoundingClientRect();
+      const firstSharp = [...keys.el.querySelector('.roll-lane').children]
+        .find((el) => el.classList.contains('sharp'));
+      const sharpMid = firstSharp
+        ? firstSharp.getBoundingClientRect().left + firstSharp.getBoundingClientRect().width / 2
+          - laneBox.left
+        : 0;
+      const joins = colsOf(keys.el.querySelector('.roll-lane'), white);
+      const nearestJoin = joins.reduce((b, j) => (Math.abs(j - sharpMid) < Math.abs(b - sharpMid) ? j : b),
+        joins[0]);
+      d.assert('and a black dot sits on the join between two white keys, not beside it',
+        Math.abs(sharpMid - nearestJoin) <= 2,
+        `the first black dot's centre is ${sharpMid.toFixed(1)} px and the join it `
+        + `straddles is at ${nearestJoin} px, ${Math.abs(sharpMid - nearestJoin).toFixed(1)} px apart`);
 
       /* ⚠️ THE ROLL'S ONLY CONTROLS ARE ITS OWN ROWS, ONE EACH, AND THIS ASSERT
          SAID `no controls at all` UNTIL THE ROWS BECAME SELECTABLE AN HOUR
@@ -3717,11 +3745,24 @@
      deleted rather than left behind a flag: a page that keeps every option
      somebody tried is a page nobody can read. */
   .roll-row[data-kind="guess"] .roll-label { color: var(--ai); }
+  /* 🔴 THE SAME RING AND THE SAME DOT AS THE KEYBOARD, FROM THE SAME PROPERTY.
+     Asked as *"take keybioard dot / circle sise and applu to piano roll too"*.
+     `--k-ring` is four pixels more than `--k-dot`, which is one pixel of border
+     and one of gap on each side, so a dot drawn inside this ring clears it by
+     exactly a pixel. Both pictures read the one declaration in `shell.css`.
+     ⚠️ AND A PLAYED PROPOSAL IS A DOT INSIDE ITS RING, NOT A FILLED RING, which
+     is the radio button finished: the ring is the slot and the dot is the answer
+     in it. One element does both, because the dot is a radial gradient in the
+     middle of the same box the ring is drawn round. */
   .roll-row[data-kind="guess"] .roll-cell.on::after {
-    background: transparent; box-shadow: inset 0 0 0 1px var(--ai);
+    width: var(--k-ring); height: var(--k-ring);
+    background: none; box-shadow: inset 0 0 0 1px var(--ai);
     transition: background 120ms linear;
   }
-  .roll-row[data-kind="guess"][data-held] .roll-cell.on::after { background: var(--ai); }
+  .roll-row[data-kind="guess"][data-held] .roll-cell.on::after {
+    background: radial-gradient(circle at 50% 50%,
+      var(--ai) 0 calc(var(--k-dot, 6px) / 2), transparent calc(var(--k-dot, 6px) / 2));
+  }
 
   /* 🔴 A NEW PROPOSAL ARRIVES RATHER THAN APPEARING. Asked 2026-09-23:
      *"waaaaait when new suggetion, i want to feel it"*. A row that is simply

@@ -163,6 +163,20 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
         const cell = document.createElement('div');
         cell.className = `roll-cell${sharp ? ' sharp' : ''}${notes.has(note) ? ' on' : ''}`;
         whites = placeKey(cell, { sharp, whites, pitchClass: ((map[k] % 12) + 12) % 12 });
+        /* 🔴 A BLACK DOT SITS ON THE JOIN, WHERE THE KEY BELOW IT DOES NOT.
+           Asked 2026-09-23 as *"move piano roll dots to cross the divider from
+           the middle"*, and then, when asked which of the two readings:
+           *"lines stay. black key dots move"*.
+           ⚠️ `placeKey` gives a sharp the piano's own offset, scaled by
+           `SHARP_NUDGE`, because a real black key is NOT centred between its
+           neighbours and the KEYBOARD should look like a keyboard. A roll is not
+           a keyboard: it is a grid of marks read downward, and a mark that sits
+           slightly off the rule under it reads as a mistake rather than as
+           lutherie. MEASURED when the nudge landed: a black key centre is 2.27 px
+           off its join at 0.5 and 1.00 px off at 0, on a 42.7 px white key.
+           ✅ SO THE CELL KEEPS ITS COLUMN AND LOSES ITS NUDGE, which puts the dot
+           on the line the eye is already following down to the key. */
+        if (sharp) cell.style.setProperty('--k-off', '0');
         if (notes.has(note)) noteOfDot.set(cell, note);
         lane.append(cell);
       }
@@ -217,6 +231,7 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
         const cell = document.createElement('div');
         cell.className = `roll-cell${sharp ? ' sharp' : ''}`;
         whites = placeKey(cell, { sharp, whites, pitchClass: ((map[k] % 12) + 12) % 12 });
+        if (sharp) cell.style.setProperty('--k-off', '0');
         lane.append(cell);
       }
       lane.style.setProperty('--k-cols', String(Math.max(1, whites)));
