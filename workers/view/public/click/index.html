@@ -72,6 +72,14 @@
      changes size inside a fixed-height flex row moves nothing around it. */
   .cl-lamp { border-radius: 50%; border: 1px solid var(--cl-rim); width: 22px;
              height: 22px; transition: none; }
+  /* ⚠️ NO `text-wrap: balance` HERE, AND IT WAS CONSIDERED AND MEASURED ON
+     2026-09-23 RATHER THAN MISSED. `shell.css` carries the argument at
+     `.pos-lr-say`: the property is for a centred SENTENCE that wraps. Every
+     cue in both scores on this page is ONE WORD, which the score's own
+     `notification` rows decide: `READY`, `Go!`, `Ritenuto`, `Complex`,
+     `2+3+2/8`, `5/16`, `Start`. MEASURED at 320 px, the longest of them is
+     62.9 px inside a 288 px band, so nothing here can wrap. A declaration that
+     reads as done and moves nothing is worse than none. */
   .cl-note { position: absolute; left: 0; right: 0; bottom: 0;
              background: var(--cl-note-bg); color: var(--cl-note-fg);
              text-align: center;

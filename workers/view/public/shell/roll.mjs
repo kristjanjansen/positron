@@ -62,7 +62,7 @@ import { placeKey } from './keyboard.mjs';
  */
 export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new Set(),
                                    rows = [], prepend = false, scroller = null,
-                                   onPick = null, lines = true } = {}) {
+                                   onPick = null, lines = true, minRows = 0 } = {}) {
   const el = document.createElement('div');
   el.className = 'roll';
   /**
@@ -109,8 +109,18 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
     /* 🔴 AN EMPTY ROLL DRAWS NOTHING AT ALL, NOT AN EMPTY BOX. `.roll` carries
        its own gap and a page puts it in a stack, so a childless one would paint
        a band nobody wrote. That is `an empty box is a line`, which this project
-       has already paid for on `/typist/` and in `.pos-controls`. */
-    el.hidden = current.length === 0;
+       has already paid for on `/typist/` and in `.pos-controls`.
+       🔴 UNLESS THE CALLER ASKED FOR A FIXED HEIGHT, WHICH IS THE OPPOSITE CASE
+       AND ARRIVED 2026-09-23 AS *"make piano roll h fixed to 5 items even when
+       no data"*. A roll that LEARNS opens empty on purpose and fills one row at
+       a time, so with no floor the page jumps when the first chord lands and
+       again on every row after it. `positron-diagram` already carries this rule
+       for a picture that repaints on a press, and it is the same rule: reserve
+       the room before anything is in it.
+       ⚠️ AND THE TWO CASES ARE BOTH RIGHT. A typed line is a function of what
+       somebody typed, so nothing is coming and an empty box really is a band
+       nobody wrote. `minRows` is opt in for that reason and defaults to 0. */
+    el.hidden = current.length === 0 && minRows === 0;
     if (seam) seam.hidden = el.hidden;
     current.forEach((row, i) => {
       /**
@@ -128,6 +138,15 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
       const r = document.createElement('button');
       r.type = 'button';
       r.className = 'roll-row';
+      /* ⚠️ A ROW MAY SAY WHAT KIND OF ROW IT IS, AND THIS FILE DOES NOT KNOW
+         WHAT THE KINDS ARE. `/nola/` has a chord it learned off the keys and a
+         chord it is proposing, and those must not look the same; what they look
+         like is that page's business and lives in that page's stylesheet.
+         ⚠️ SET ONLY WHEN THERE IS ONE, because `[data-kind]` matches an EMPTY
+         attribute and a row that was once a guess would keep matching for the
+         rest of the page's life. That is already recorded in `positron-ui`
+         about `video-panel.mjs`, measured. */
+      if (row.kind) r.dataset.kind = row.kind;
       /* 🔴 ONE TAB STOP FOR THE WHOLE ROLL, NOT ONE PER ROW. `table.mjs`
          already refuses the alternative for a sixty-three row list, where
          tabbing past it costs sixty-three presses, and a line of chords is only
@@ -172,13 +191,49 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
       };
       el.append(r);
     });
+    /* 🔴 THE ROWS THAT HOLD THE ROOM OPEN, AND THEY ARE NOT ROWS. They carry
+       the same lane so the height and the columns are identical to a real row
+       rather than approximately it, and an approximate reservation is the
+       `min-height` that never applied wearing different clothes.
+       ⚠️ THEY ARE OUT OF EVERY READER'S WAY: no `button`, so nothing to press
+       and nothing in the tab order, and `aria-hidden` so a screen reader is not
+       told about five chords that do not exist. `rows`, `picked` and the arrow
+       keys all count `current`, which does not include these. */
+    for (let i = current.length; i < minRows; i++) {
+      /* ⚠️ NOT `.roll-row`, AND THAT IS THE WHOLE POINT. Every check on
+         `/nola/` and `/kit/` counts rows by querying `.roll-row`, so a
+         placeholder wearing that class is a row as far as nine asserts are
+         concerned. MEASURED the moment it was tried: nine red, each reporting
+         5 rows where the page had 4 chords. It takes the height from the same
+         custom property and nothing else. */
+      const r = document.createElement('div');
+      r.className = 'roll-rest';
+      r.setAttribute('aria-hidden', 'true');
+      const lane = document.createElement('div');
+      lane.className = 'roll-lane';
+      let whites = 0;
+      for (const k of keys) {
+        const sharp = sharps.has(k);
+        const cell = document.createElement('div');
+        cell.className = `roll-cell${sharp ? ' sharp' : ''}`;
+        whites = placeKey(cell, { sharp, whites, pitchClass: ((map[k] % 12) + 12) % 12 });
+        lane.append(cell);
+      }
+      lane.style.setProperty('--k-cols', String(Math.max(1, whites)));
+      r.append(lane);
+      el.append(r);
+    }
     paintPicked();
   };
 
   /** ⚠️ `aria-pressed` AS WELL AS THE ATTRIBUTE THE STYLE READS, because a row
    *  that looks selected and does not say so is selected for one reader only. */
   const paintPicked = () => {
-    [...el.children].forEach((r, i) => {
+    /* ⚠️ REAL ROWS ONLY. The children may end with placeholders holding the
+       roll's height open, and those are not selectable, so telling one it is
+       `aria-pressed="false"` announces a chord that is not there. `current` is
+       the list of rows that exist. */
+    [...el.children].slice(0, current.length).forEach((r, i) => {
       if (i === picked) r.dataset.on = '1'; else delete r.dataset.on;
       r.setAttribute('aria-pressed', i === picked ? 'true' : 'false');
     });
@@ -293,6 +348,51 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
       follow?.();
     },
     /**
+     * Add a row at the bottom, KEEPING the selection and the landing row.
+     *
+     * 🔴 `setRows` CANNOT DO THIS AND IT IS RIGHT NOT TO. It resets `picked` to
+     * -1 and `focused` to 0 because in the typed-chords mode the rows really
+     * are new rows and a remembered index would point at a chord nobody typed.
+     * ⚠️ IN A LEARNING MODE THE ROWS ARE THE OLD ROWS PLUS ONE, so the same
+     * call would throw away the player's selection every time they held a new
+     * chord long enough, which is the moment they are least expecting anything
+     * to move. `research/chord-learning-2026-09-23.md` found this by reading
+     * this file before anything was built.
+     * ⚠️ AND AN APPEND IS THE ONLY CHANGE THAT MOVES NOTHING ALREADY ON SCREEN,
+     * which is the other half of the same finding: MEASURED over 100 chords, a
+     * list re-sorted on every chord changed 29 times with 22 of those being
+     * pure re-sorts of the same four rows, and a list admitted and pinned
+     * changed 4 times, every one of them an append.
+     *
+     * @returns {number} the new row's index
+     */
+    addRow(row) {
+      current = [...current, row];
+      draw();
+      follow?.();
+      return current.length - 1;
+    },
+    /**
+     * Keep the first `n` rows and drop the rest.
+     *
+     * ⚠️ IT IS FOR A TAIL THE PAGE OWNS RATHER THAN FOR EDITING HISTORY.
+     * `/nola/` keeps what it has learned at the top and two chords it is
+     * proposing underneath, and the proposals are replaced whenever the line
+     * grows. The kept rows do not move, so a selection inside them survives;
+     * a selection inside the part being dropped cannot, and is cleared rather
+     * than left pointing at a row that is gone.
+     */
+    trimRows(n) {
+      const keep = Math.max(0, Math.min(n, current.length));
+      if (keep === current.length) return keep;
+      current = current.slice(0, keep);
+      if (picked >= keep) picked = -1;
+      if (focused >= keep) focused = Math.max(0, keep - 1);
+      draw();
+      follow?.();
+      return keep;
+    },
+    /**
      * Pick a row from the page, or -1 for none.
      *
      * 🔴 IT TOGGLES, BECAUSE A PRESS TOGGLES. The first version set the index
@@ -329,14 +429,41 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
      * ⚠️ AND IT IS A THIRD STATE, NOT A SECOND PICK. What you chose and what
      * you are playing are different facts and a row can be both, so they are
      * two attributes and the style shows both at once.
+     *
+     * 🔴 AND A CHORD YOU ARE HALF WAY INTO MARKS ITS OWN DOTS, ASKED FOR
+     * 2026-09-23: *"when partial match with piano roll chord use faint yellow
+     * on dots"*. The exact-set rule above is right about the ROW and leaves the
+     * roll silent at the one moment somebody is reaching for a chord, which is
+     * the least useful time for it to say nothing.
+     * ⚠️ THE FLOOR IS TWO NOTES AND EVERY NOTE YOU HOLD BEING IN THAT CHORD,
+     * and both halves are load bearing. One note in common is not reaching for
+     * a chord, it is the note happening to be in it, and a root would light
+     * every row that shares it. Allowing a note that is NOT in the chord would
+     * light rows you are audibly not playing: holding a full `Cmaj` would part
+     * match `Cmaj7` and `Amin7` and anything else containing a C, so a cluster
+     * would light the whole roll. Inside the chord and at least two of it is
+     * the smallest rule that means *on the way to this one*.
+     * ⚠️ AND A FULL MATCH MARKS NO DOTS, because the row itself has lit and two
+     * signals for one fact is the middot rule wearing a colour.
      */
     setHeld(notes) {
       const held = new Set(notes || []);
-      [...el.children].forEach((r, i) => {
+      [...el.children].slice(0, current.length).forEach((r, i) => {
         const want = current[i]?.notes || [];
         const same = want.length > 0 && want.length === held.size
           && want.every((n) => held.has(n));
         if (same) r.dataset.held = '1'; else delete r.dataset.held;
+        /* Inside the chord, at least two of it, and not the whole of it. */
+        const inside = held.size > 0 && [...held].every((n) => want.includes(n));
+        const part = !same && inside && held.size >= 2;
+        for (const cell of r.querySelectorAll('.roll-cell.on')) {
+          const note = noteOfDot.get(cell);
+          /* ⚠️ `delete`, NEVER `= ''`: `[data-part]` matches an EMPTY attribute,
+             so a dot that was once half held would stay half held for the rest
+             of the page's life. Measured once already in `video-panel.mjs`. */
+          if (part && held.has(note)) cell.dataset.part = '1';
+          else delete cell.dataset.part;
+        }
       });
     },
     /** Move the keyboard's landing row, for a page's own check. */
