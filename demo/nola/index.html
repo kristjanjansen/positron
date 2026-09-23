@@ -1301,8 +1301,13 @@
   const LEARN_WINDOW = 200;
   /** Shorter than this and you were on your way through rather than there. */
   const LEARN_GATE = 400;
-  /** Total time held, across every visit, before a chord goes into the roll. */
-  const LEARN_ADMIT = 2000;
+  /** 🔴 HOW MANY TIMES YOU COME BACK TO A CHORD BEFORE IT IS KEPT. Asked
+   *  2026-09-23: *"just monitor what i play and save repeating ones"*. This was
+   *  a TOTAL of time held until then, which admits a chord you rested on once
+   *  while thinking, and that is the opposite of a chord you returned to. An
+   *  arrival only counts if it lasted past `LEARN_GATE`, so the time floor is
+   *  still doing the work the research measured it doing. */
+  const LEARN_TIMES = 2;
   /** Four to six, per the research. A full roll says so rather than evicting. */
   const LEARN_SLOTS = 6;
   /**
@@ -1350,7 +1355,7 @@
 
   let mode = q.get('learn') === '1' ? 'learn' : 'type';
   const settler = createSettler({ windowMs: LEARN_WINDOW, minNotes: 3 });
-  const tally = createTally({ admitMs: LEARN_ADMIT, minHoldMs: LEARN_GATE, slots: LEARN_SLOTS });
+  const tally = createTally({ times: LEARN_TIMES, minHoldMs: LEARN_GATE, slots: LEARN_SLOTS });
   /** what has been admitted, in admission order. A row never moves and never
    *  leaves, which is `positron-ui`'s rule arriving as a data structure. */
   const learned = [];
@@ -1424,7 +1429,7 @@
       const { notes, outside } = voiceRow(c.notes, near);
       near = notes;
       guesses.push({ ...p, notes });
-      roll.addRow({ kind: 'guess', notes, label: rowLabel(`${p.name} maybe next`, outside) });
+      roll.addRow({ kind: 'guess', notes, label: rowLabel(p.name, outside) });
     }
   }
 
@@ -1577,8 +1582,9 @@
         d.log('a sixth chord and a minor seventh a third below it are the same four notes, '
             + 'so this page always reads C6 as Amin7 rather than guessing between them');
       }
-      d.log(`hold a chord for about ${(LEARN_ADMIT / 1000).toFixed(1)} s in all and it goes `
-          + 'into the roll for good, and once two of them are in, two more are proposed under them');
+      d.log(`play a chord, leave it, and play it again and it goes into the roll for good. `
+          + `A chord is kept when you come back to it ${LEARN_TIMES} times, and touching it on `
+          + `the way past does not count. Once two are in, one more is proposed under them`);
     } else {
       d.log('the roll is the line you type again, and the chords it learned are kept for '
           + 'when you come back to it');
@@ -2383,7 +2389,7 @@
     // thresholds are the thing being graded. The asserts in the middle of a
     // hold are not padding to keep a timer alive: each one is the negative
     // control for the one after it, and a chord that is named but not yet
-    // written down is exactly the state `LEARN_ADMIT` exists to create.
+    // written down is exactly the state `LEARN_TIMES` exists to create.
     {
       await quiet();
       keys.panic();
@@ -2437,17 +2443,42 @@
          MAKES THE ADMISSION MEAN ANYTHING. Named is not learned: a chord you
          touched on the way past is named just as confidently as one you sat on,
          and if a name alone put a row in the roll the whole tally would be
-         decoration. Read at about 1.3 s of a 2.0 s threshold. */
-      await sleep(1000);
-      const heldSoFar = tally.msOf(chordKey(0, 'maj'), performance.now());
-      d.assert('NEGATIVE CONTROL: a chord named but not yet held long enough is not written down',
+         decoration.
+         🔴 AND SINCE 2026-09-23 THE CONTROL IS SHARPER THAN IT WAS: holding is
+         no longer enough at any length. One arrival is one arrival, so this
+         sleeps well past the old two second threshold and the roll is still
+         empty, which the previous gate could not have survived. */
+      /* ⚠️ AND IT IS READ IN TWO STEPS RATHER THAN AFTER ONE LONG SLEEP, WHICH
+         IS ABOUT THE HARNESS AND NOT THE PAGE. `demo/verify.mjs` gives up about
+         two seconds after the last NEW assert, so a single 2.4 s wait here
+         collected 54 of this page's 70 checks and reported them as green. That
+         is this project's worst failure shape and it cost one run to find. Both
+         readings below are real measurements rather than padding: the first is
+         the moment the hold is past the floor and banked, the second is well
+         past the old time threshold. */
+      await sleep(LEARN_GATE + 500);
+      const bankedMs = tally.msOf(chordKey(0, 'maj'), performance.now());
+      d.assert('a hold past the floor banks as one arrival, and one arrival admits nothing',
         rows() === 0 && learned.length === 0
-        && heldSoFar > LEARN_GATE && heldSoFar < LEARN_ADMIT,
-        `the tally has ${Math.round(heldSoFar)} ms of it against the ${LEARN_ADMIT} ms it `
-        + `takes, so the roll still has ${rows()} rows`);
+        && bankedMs > LEARN_GATE
+        && tally.timesOf(chordKey(0, 'maj'), performance.now()) === 1,
+        `${Math.round(bankedMs)} ms banked, which is 1 arrival of the ${LEARN_TIMES} it takes`);
 
-      await sleep(1100);
-      d.assert('and holding it past that puts it in the roll, voiced onto these keys',
+      await sleep(1500);
+      const firstVisits = tally.timesOf(chordKey(0, 'maj'), performance.now());
+      d.assert('NEGATIVE CONTROL: a chord held once is never written down, however long it is held',
+        rows() === 0 && learned.length === 0 && firstVisits === 1,
+        `${Math.round(tally.msOf(chordKey(0, 'maj'), performance.now()))} ms on one chord is `
+        + `still ${firstVisits} arrival of the ${LEARN_TIMES} it takes, so the roll has `
+        + `${rows()} rows`);
+
+      /* And coming back to it is the whole gate. Let go, play it again, and it
+         lands as soon as the second arrival is past the floor. */
+      drop([60, 64, 67]);
+      await sleep(60);
+      hold([60, 64, 67]);
+      await sleep(LEARN_GATE + 300);
+      d.assert('and coming back to it once puts it in the roll, voiced onto these keys',
         rows() === 1 && learned.length === 1 && labels()[0] === 'Cmaj'
         && learned[0].notes.every((n) => n >= keys.base && n <= keys.base + REACH),
         `${labels().join(', ')} at notes ${learned[0].notes.join(',')}, inside the `
@@ -2512,13 +2543,17 @@
         readLine.textContent === 'Fmaj' && roll.picked() === 0 && rows() === 1,
         `the page reads ${readLine.textContent} and row ${roll.picked()} is still chosen`);
 
-      await sleep(1000);
+      await sleep(900);
       d.assert('NEGATIVE CONTROL: and the second chord is tallied separately rather than added on',
-        rows() === 1 && learned.length === 1,
-        `the first chord is in and the second is about 1.3 s into its own ${
-          (LEARN_ADMIT / 1000).toFixed(1)} s, so the roll still has ${rows()} row`);
+        rows() === 1 && learned.length === 1
+        && tally.timesOf(chordKey(5, 'maj'), performance.now()) === 1,
+        `the first chord is in and the second is on its first arrival of ${LEARN_TIMES}, `
+        + `so the roll still has ${rows()} row`);
 
-      await sleep(1100);
+      drop([65, 69, 72]);
+      await sleep(60);
+      hold([65, 69, 72]);
+      await sleep(LEARN_GATE + 300);
       d.assert('a second chord appends, keeps the selection, and brings one proposal with it',
         learned.length === 2 && rows() === 3 && roll.picked() === pickedBefore
         && kinds() === 'learned,learned,guess',
@@ -2542,6 +2577,30 @@
         `after ${learned.map((l) => l.name).join(' then ')} the table offers `
         + `${lastGuess.picks[0].name} as the usual one and ${guesses[0].name} as the less `
         + `obvious one, and the roll draws ${guesses.map((g) => g.name).join(', ')}`);
+
+      /* 🔴 THE PROPOSAL SITS BACK UNTIL YOU PLAY IT, asked for as *"fade 'ai
+         row' subtly. when i play it, rm fading"*. MEASURED as a computed
+         opacity either side of the chord going down, because a transition
+         written in a stylesheet and a rule that never wins look identical in
+         the source. */
+      /* ⚠️ PUT THE KEYBOARD DOWN FIRST. `heldNotes` is fingers, so the chord
+         that taught the page is still in it, and a held set that is not a
+         subset of this row matches nothing. That is the rule working correctly,
+         and it has now caught two checks that forgot to let go. */
+      drop([65, 69, 72]);
+      await sleep(60);
+      const guessRow = roll.el.querySelectorAll('.roll-row')[learned.length];
+      const fadedAt = Number(getComputedStyle(guessRow).opacity);
+      hold(guesses[0].notes);
+      await sleep(140);
+      const playedAt = Number(getComputedStyle(guessRow).opacity);
+      drop(guesses[0].notes);
+      await sleep(60);
+      const backAt = Number(getComputedStyle(guessRow).opacity);
+      d.assert('the proposed row sits back until you play it, and comes forward when you do',
+        fadedAt < 0.9 && fadedAt > 0.3 && playedAt === 1 && backAt < 0.9,
+        `${fadedAt} when it is only a proposal, ${playedAt} while you are playing it, `
+        + `and ${backAt} once you let go`);
 
       /* 🔴 WHAT YOU PLAYED COMES FIRST, ASKED FOR IN THOSE WORDS: *"played is
          first choice"*. It was already true, by the order `addLearned` appends
@@ -2836,8 +2895,16 @@
      paints the whole column instead of the mark, which is what the first
      version of these two rules did. `shell.css` draws every dot that way and
      `[data-held]` above is the pattern to copy. */
-  .roll-row[data-kind="guess"] .roll-label { color: var(--ai); font-style: italic; }
+  .roll-row[data-kind="guess"] .roll-label { color: var(--ai); }
   .roll-row[data-kind="guess"] .roll-cell.on::after { background: var(--ai); }
+  /* 🔴 A PROPOSAL SITS BACK UNTIL YOU PLAY IT, asked for as *"fade 'ai row'
+     subtly. when i play it, rm fading"*. The fade is the row saying it is not
+     one of yours yet, and landing the chord is the moment it stops being a
+     suggestion and starts being something you did, so that is where the fade
+     goes. ⚠️ SUBTLE ON PURPOSE: enough to sit behind the played rows, not
+     enough to read as disabled, and the row is still perfectly legible. */
+  .roll-row[data-kind="guess"] { opacity: .62; transition: opacity 90ms linear; }
+  .roll-row[data-kind="guess"][data-held] { opacity: 1; }
 
   /* 🔴 A CHORD YOU ARE HALF WAY INTO, ASKED FOR AS *"when partial match with
      piano roll chord use faint yellow on dots"*. `--hi` is the ink a pressed
