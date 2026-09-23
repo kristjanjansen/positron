@@ -1052,8 +1052,9 @@
     at: 0,
     onPick: (id) => setInstrument(id),
     title: (id) => (id === 'rhodes'
-      ? 'a 1977 Rhodes Mark I Stage 73, recorded at five velocities'
-      : 'a sampled grand, recorded at one velocity'),
+      ? 'Jeff Learman’s own 1977 Rhodes Mark I Stage 73, sampled as jRhodes3d at '
+        + 'five velocities and used here under CC BY-NC-SA 4.0'
+      : 'a sampled grand, FluidR3 GM, recorded at one velocity'),
   });
 
   /**
@@ -1118,6 +1119,12 @@
    * ⚠️ IT NAMES BOTH INSTRUMENTS, because a page that credits one recording and
    * not the other reads as though the other one came from nowhere.
    */
+  /* ⚠️ BUILT AND NOT DRAWN, which is deliberate rather than dead code: the
+     sentence is the licence's own wording and the hover above quotes it, so the
+     two must not drift. Appending it is one line if the face ever wants it back.
+     ⚠️ AND THE ATTRIBUTION IS CHECKED WHERE IT NOW LIVES, on the picker's hover,
+     because that is the thing the licence needs and the thing a reader can
+     reach. */
   const credit = el('div', 'nola-credit');
   credit.append(
     'The piano is FluidR3 GM and the Rhodes is ',
@@ -1157,7 +1164,17 @@
      movement over seven chords for `lead` against 57 for close and 46 for root.
      *"without travelline too much"* is exactly what that number is. */
   picks.append(instPick.el);
-  instrument.append(picks, keysHost, credit);
+  /* 🔴 THE CREDIT COMES OFF THE FACE AND DOES NOT LEAVE THE PAGE, because the
+     licence is not a preference. Asked 2026-09-23 to remove the sentence, and
+     CC BY-NC-SA 4.0 requires attribution to travel with the work: what it does
+     NOT require is a paragraph under the keys. It is on the instrument picker's
+     hover, where this page already keeps a fact a reader may want and does not
+     need on the face, and in the log when the Rhodes is first chosen.
+     ⚠️ AND THE SHIPPED FILES ARE THE OTHER HALF: `demo/nola/LICENSE-jrhodes3d`
+     and `PROVENANCE-rhodes.json` go out with the recordings and `build.mjs`
+     carries the line that keeps them there. Deleting the sentence outright would
+     have left the attribution in nothing a visitor can reach. */
+  instrument.append(picks, keysHost);
 
   /* 🔴 THE ONE CONTROL THAT ONLY EXISTS UNDER `?rec=1`, so no visitor meets it
      and no harness press moves. It writes the take to a file and says how much
@@ -1222,9 +1239,19 @@
    * here and a page that spliced a row in afterwards would be deciding its own
    * reading order twice.
    */
+  /* 🔴 THE READING SITS ON THE ROLL RATHER THAN ON A LINE OF ITS OWN. Asked
+     2026-09-23: *"rm nothign held and the whole element ith chord names"*, then
+     *"add played chord to top left of pianoroll, grayer than right side chord
+     names"*.
+     It was a block in the page stack, which meant a row of its own height
+     reserved for one or two words, and `nothing held` printed there whenever
+     hands were off the keys. What you are playing belongs ON the picture of what
+     you are playing, opposite the names of the chords already in it.
+     ⚠️ GREYER THAN THOSE NAMES ON PURPOSE: the labels on the right are a record
+     and this is a reading of the moment, so it must not compete with them. */
   const readLine = el('div', 'nola-read');
   readLine.hidden = true;
-  d.stack.add(topRow, chordList, readLine, instrument);
+  d.stack.add(topRow, chordList, instrument);
 
   // ── the MIDI keyboard ─────────────────────────────────────────────────────
 
@@ -1458,6 +1485,7 @@
      and draws a proposal under them, so five meant the roll still grew while
      somebody played, which is the one thing reserving the room exists to
      prevent. */
+  keysHost.append(readLine);
   const roll = createRoll(keys.el, {
     base: keys.base, keys: KEY_ORDER, map: KEY_MAP, sharps: KEY_SHARPS, prepend: true,
     scroller: keys.keysEl,
@@ -1693,7 +1721,9 @@
   function showReading(r) {
     /* 🔴 ONE NAME, ALWAYS. *"just forget about or...rec it, interpet it"*. The
        margin decides the ink rather than the words. */
-    readLine.textContent = !r ? 'nothing held' : r.label;
+    /* ⚠️ EMPTY RATHER THAN `nothing held`. A cell does not have to say it is a
+       cell, and the roll under it already says what this is about. */
+    readLine.textContent = r ? r.label : '';
     /* ⚠️ DELETED RATHER THAN SET EMPTY. `[data-sure]` matches on PRESENCE, so
        an empty string would leave a guess wearing the confident ink for the
        rest of the page's life. Measured elsewhere in this project as exactly
@@ -2136,6 +2166,13 @@
     settler.reset();
     tally.release(performance.now());
     readLine.hidden = mode !== 'learn';
+    /* 🔴 HIDDEN IN `Played`, NOT GREYED. Asked 2026-09-23: *"when played, hide
+       chords input"*. A disabled field is a control saying *you could type here
+       but not now*, and in this mode you never can: the roll's rows come from
+       your hands and the field has nothing to do with them. It was disabled
+       rather than hidden because disabling was the smaller change at the time,
+       and a greyed box holding four chords you cannot reach is furniture. */
+    chordField.el.hidden = mode === 'learn';
     chordField.disabled(mode === 'learn');
     if (mode === 'learn') {
       showReading(null);
@@ -2188,7 +2225,10 @@
        typed line is the thing you reach for when you already know what you
        want. ⚠️ AND IT MOVES EVERY CHECK THAT PRESSES THIS BY INDEX, because
        `buttons[0]` was `Typed` and is `Played`. */
-    options: [['Played', 'learn'], ['Typed', 'type']],
+    /* ⚠️ `Suggested`, ASKED 2026-09-23 AS *"played: Suggested"*, in the same
+       shape as *"As written: Exact"* earlier the same day. The value stays
+       `learn`, which is what every check and every query presses. */
+    options: [['Suggested', 'learn'], ['Typed', 'type']],
     at: mode === 'learn' ? 0 : 1,
     onPick: (id) => setMode(id),
     title: (id) => (id === 'learn'
@@ -2941,6 +2981,17 @@
       const pianoLoud = peak();
       lift(60);
       const apart = 20 * Math.log10(rhodesLoud / (pianoLoud || 1e-9));
+      /* 🔴 THE ATTRIBUTION IS A LICENCE TERM, NOT A COURTESY, AND IT MOVED OFF
+         THE FACE ON 2026-09-23. Asked to remove the sentence under the keys, and
+         CC BY-NC-SA 4.0 requires attribution to travel with the work; what it
+         does not require is a paragraph on the page. It is on the instrument
+         picker's hover now, so this asserts the words a reader can still reach
+         rather than the element that used to carry them. */
+      d.assert('the Rhodes is still credited where a reader can reach it, as the licence requires',
+        /Learman/.test(instPick.buttons[1].title)
+          && /CC BY-NC-SA 4\.0/.test(instPick.buttons[1].title),
+        `the Rhodes hover reads "${instPick.buttons[1].title.slice(0, 60)}..."`);
+
       d.assert('the two instruments land within a few dB of each other at one velocity',
         Math.abs(apart) < 6 && pianoLoud > 0.02,
         `at velocity 100 the Rhodes reads ${rhodesLoud.toFixed(4)} and the piano `
@@ -3787,14 +3838,23 @@
      ⚠️ `[hidden]` HAS TO BE SAID OUT LOUD HERE because a `display` rule beats
      the attribute's own default, which is how a hidden element goes on being
      drawn with nothing in it. */
-  .nola-read { font: 600 13px/1.5 var(--mono); letter-spacing: .04em; color: var(--dim);
-               min-height: 20px; white-space: nowrap; overflow: hidden;
-               text-overflow: ellipsis; }
+  /* 🔴 ON THE ROLL'S TOP LEFT, OPPOSITE THE NAMES ON ITS RIGHT. Asked as *"add
+     played chord to top left of pianoroll, grayer than right side chord names"*.
+     It is absolute so it costs the picture no height and moves no column: the
+     roll's first row already reserves a whole row of space above its dots, which
+     is where this sits.
+     ⚠️ GREYER THAN THE ROW LABELS ON PURPOSE, and `--dim2` against their
+     `--dim`. Those are a record of chords that are IN the roll; this is a
+     reading of the moment and must not compete with them. */
+  .nola-keys { position: relative; }
+  .nola-read { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none;
+               font: 500 11px/1.5 var(--mono); letter-spacing: .04em; color: var(--dim2);
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* ⚠️ A SECOND INK FOR A SECOND KIND OF FACT, which is the rule `.nola-chord-r`
      already follows one element along. A name the page is sure of and two names
      it cannot choose between are not the same statement, and reading them in
      the same colour would make the interesting one look like the ordinary one. */
-  .nola-read[data-sure] { color: var(--fg); }
+  .nola-read[data-sure] { color: var(--dim); }
   .nola-read[hidden] { display: none; }
 
   /* 🔴 A CHORD THE PAGE IS PROPOSING IS NOT A CHORD THE PAGE HEARD YOU PLAY,
