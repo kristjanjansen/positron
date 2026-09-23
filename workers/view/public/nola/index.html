@@ -726,6 +726,39 @@
     d.log(`the keys play the ${next.say} now`
         + (stopped ? `, and the ${stopped} note${stopped === 1 ? '' : 's'} still sounding `
                    + 'went with the instrument that made them' : ''));
+    warmUp(next);
+  }
+
+  /**
+   * 🔴 AN INSTRUMENT YOU SWITCHED TO SHOULD BE READY BEFORE YOU PLAY IT, AND
+   * THIS IS THE REAL REPAIR FOR THE RHODES. Reported twice off the deploy:
+   * *"turing rjodes on and pressing midi does not enable rhodes sound"*, then
+   * *"could not head rhodes with midi presses"* after the first repair.
+   *
+   * ⚠️ THE FIRST REPAIR WAS RIGHT AND WAS NOT ENOUGH. A note let go before its
+   * recording arrives now sounds and is damped, so it is a 120 ms note rather
+   * than a missing one or an endless one. On the Rhodes that made almost every
+   * note a 120 ms note, because almost every note was a cold fetch: the pack is
+   * 65 files against the piano's 30, and it is indexed by velocity as well as
+   * by pitch, so a real keyboard asks for something new nearly every time.
+   * ✅ SO THE FETCH MOVES TO THE PRESS THAT SWITCHED INSTRUMENT. That press is a
+   * deliberate gesture, it is the moment a player is not yet playing, and it is
+   * the only moment where waiting costs nothing.
+   * ⚠️ IT IS STILL NOT A VISIT. Nothing here runs on load: the page opens on the
+   * piano and `warmUp` is reached only from `setInstrument`, which only a press
+   * calls.
+   * ⚠️ AND IT WARMS WHAT THE KEYS CAN REACH, not the whole pack. The window is
+   * 25 keys, which is six of the Rhodes's fifteen recorded notes.
+   */
+  function warmUp(ins) {
+    if (ins === PIANO) return;
+    const want = new Set();
+    for (let n = keys.base; n <= keys.base + REACH; n++) want.add(nearestIn(ins.notes, n));
+    const plans = [...want].map((near) => planFor(ins, near, 1));
+    const files = plans.reduce((n, p) => n + p.urls.length, 0);
+    d.log(`fetching the ${files} recordings the ${ins.say} needs for the keys on screen, `
+        + 'so the first note you play is not waiting on a download');
+    Promise.all(plans.map(fetchPlan)).then(() => d.log(`the ${ins.say} is ready`));
   }
 
   // ── the foot ──────────────────────────────────────────────────────────────
@@ -1469,16 +1502,47 @@
   /** How long after the last finger moves before the page decides what it heard.
    *  A rolled chord is said to spread over 30 to 120 ms and a chord change at
    *  100 beats a minute is 600 ms apart. Both ends of that are guesses. */
-  const LEARN_WINDOW = 200;
-  /** Shorter than this and you were on your way through rather than there. */
-  const LEARN_GATE = 400;
+  /* 🔴 MEASURED 2026-09-23 ON A REAL TAKE, AND IT WAS 200. Asked *"should i
+     play and you measure?"*, and 894 messages over 63.1 s answered it.
+     `demo/resources/read-nola-take.mjs` on that take: the gaps between one note
+     on and the next are two clean populations with an EMPTY VALLEY between
+     them. Inside a chord, 239 of 246 gaps are under 60 ms. Between chords, the
+     next gap is 120 ms and there are 206 of them above it. One single gap in
+     the whole minute lands between 60 and 120.
+     ✅ SO 90 ms IS THE MIDDLE OF AN EMPTY VALLEY, not a compromise, and it is
+     the one number in this file that is now measured rather than guessed.
+     🔴 AND 200 WAS NOT A ROUNDING ERROR, IT WAS DESTROYING THE FEATURE.
+     Replayed through the real recogniser by `replay-nola-take.mjs`, the same
+     take yields 32 confident readings at 200 ms and 128 at 90. It was merging
+     chords played 120 to 200 ms apart into one unreadable set, which is a page
+     losing three quarters of what somebody played. */
+  const LEARN_WINDOW = 90;
+  /**
+   * 🔴 AND THIS ONE IS A RETREAT, NOT A TUNING. 400 ms LEARNED NOTHING AT ALL.
+   * The research assumed a factor of TEN between a chord meant and a chord
+   * passed through, said so, and swept 200 to 800 ms finding every value
+   * working. MEASURED on a real take: the quartiles are 269 and 506 ms, a
+   * spread of **1.9x**, and the hold time distribution is one broad hump with
+   * no valley in it anywhere. **There is no floor that separates the two,
+   * because on a real keyboard they are not two populations.**
+   * ⚠️ 400 ms DISCARDED 55 PER CENT OF EVERY NOTE PLAYED and admitted **zero**
+   * chords in a 63 second take. 120 ms keeps about 95 per cent.
+   * ✅ SO THE FLOOR STOPS PRETENDING TO DO THE WORK AND ONLY REJECTS AN
+   * ACCIDENTAL BRUSH, AND REPETITION DOES THE REST. Which is what was asked for
+   * in the same breath: *"i can held way less, go for mode repetitions"*.
+   */
+  const LEARN_GATE = 120;
   /** 🔴 HOW MANY TIMES YOU COME BACK TO A CHORD BEFORE IT IS KEPT. Asked
-   *  2026-09-23: *"just monitor what i play and save repeating ones"*. This was
-   *  a TOTAL of time held until then, which admits a chord you rested on once
-   *  while thinking, and that is the opposite of a chord you returned to. An
-   *  arrival only counts if it lasted past `LEARN_GATE`, so the time floor is
-   *  still doing the work the research measured it doing. */
-  const LEARN_TIMES = 2;
+   *  2026-09-23: *"just monitor what i play and save repeating ones"*, then
+   *  *"i can held way less, go for mode repetitions"* and *"3?"*. This was a
+   *  TOTAL of time held until then, which admits a chord you rested on once
+   *  while thinking, and that is the opposite of a chord you returned to.
+   *  ✅ THREE IS MEASURED RATHER THAN CHOSEN. Replayed against a real 63 second
+   *  take at the measured window and floor, two arrivals learn `Dmaj Cmaj
+   *  Emin7` and three learn `Dmaj Cmaj`, which are the two chords that take
+   *  2,698 and 2,521 ms of that minute between them. The third was an
+   *  eight-note-long passing chord. */
+  const LEARN_TIMES = 3;
   /** Four to six, per the research. A full roll says so rather than evicting. */
   const LEARN_SLOTS = 6;
   /**
@@ -2519,6 +2583,24 @@
         + `${midiUpped.voiced - tap0.voiced} voice(s), `
         + `with ${midiUpped.late - tap0.late} arriving after the key came up`);
 
+      /* 🔴 AND THE WARM UP IS WHAT KEEPS A NOTE FROM BEING LATE IN THE FIRST
+         PLACE. Reported twice: the Rhodes could not be heard from a MIDI
+         keyboard even after a late note was made to sound. Almost every Rhodes
+         note was a cold fetch, so almost every note was a 120 ms one. Pressing
+         the instrument warms what the keys can reach, and this measures that a
+         note played afterwards is an ordinary note rather than a late one. */
+      await sleep(900);
+      const warm0 = d.tap();
+      midiDown(62 - transpose, 88, 0, performance.now());
+      await sleep(120);
+      const warm1 = d.tap();
+      midiUp(62 - transpose);
+      d.assert('after switching instrument the keys are warm, so a note is not a late one',
+        warm1.voiced - warm0.voiced === 1 && warm1.late === warm0.late,
+        `${warm1.voiced - warm0.voiced} voice(s) from one press, `
+        + `${warm1.late - warm0.late} of them arriving after the key came up`);
+      await quiet();
+
       /* 🔴 THE ONE THAT WAS REALLY LOSING NOTES, AND IT NEEDS AN UNFETCHED
          RECORDING TO SHOW AT ALL. `press` has two awaits in it and one is a
          network fetch, so a note let go before its sample arrives used to reach
@@ -2708,13 +2790,15 @@
         + `still ${firstVisits} arrival of the ${LEARN_TIMES} it takes, so the roll has `
         + `${rows()} rows`);
 
-      /* And coming back to it is the whole gate. Let go, play it again, and it
-         lands as soon as the second arrival is past the floor. */
-      drop([60, 64, 67]);
-      await sleep(60);
-      hold([60, 64, 67]);
-      await sleep(LEARN_GATE + 300);
-      d.assert('and coming back to it once puts it in the roll, voiced onto these keys',
+      /* And coming back to it is the whole gate. Let go, play it again, and
+         again, and it lands as soon as the last arrival is past the floor. */
+      for (let i = 1; i < LEARN_TIMES; i++) {
+        drop([60, 64, 67]);
+        await sleep(60);
+        hold([60, 64, 67]);
+        await sleep(LEARN_GATE + 200);
+      }
+      d.assert('and coming back to it puts it in the roll, voiced onto these keys',
         rows() === 1 && learned.length === 1 && labels()[0] === 'Cmaj'
         && learned[0].notes.every((n) => n >= keys.base && n <= keys.base + REACH),
         `${labels().join(', ')} at notes ${learned[0].notes.join(',')}, inside the `
@@ -2786,10 +2870,12 @@
         `the first chord is in and the second is on its first arrival of ${LEARN_TIMES}, `
         + `so the roll still has ${rows()} row`);
 
-      drop([65, 69, 72]);
-      await sleep(60);
-      hold([65, 69, 72]);
-      await sleep(LEARN_GATE + 300);
+      for (let i = 1; i < LEARN_TIMES; i++) {
+        drop([65, 69, 72]);
+        await sleep(60);
+        hold([65, 69, 72]);
+        await sleep(LEARN_GATE + 200);
+      }
       d.assert('a second chord appends, keeps the selection, and brings one proposal with it',
         learned.length === 2 && rows() === 3 && roll.picked() === pickedBefore
         && kinds() === 'learned,learned,guess',
@@ -2910,6 +2996,7 @@
         + `${unsureRows} rows, and the tally is holding ${unsureTallied ?? 'nothing'}`);
 
       /* ── and none of it happens when the roll is the typed line ────────── */
+      const scoredBeforeTyped = tally.scores(performance.now()).length;
       modePick.buttons[0].click();                            // TYPED
       hold([60, 64, 67]);
       await sleep(LEARN_WINDOW + 200);
@@ -2922,13 +3009,19 @@
       const typedTallied = tally.held(), everScored = tally.scores(performance.now()).length;
       drop([60, 64, 67]);
       keys.panic();
+      /* ⚠️ A DELTA, NOT A TOTAL. This pinned the lifetime count at 2 and went red
+         the moment the measured settle window let one more chord be named
+         earlier in the run, which is a check about THIS mode failing because of
+         something that happened in another one. What it is actually claiming is
+         that playing in the typed mode adds nothing, so it compares against what
+         had been scored before the mode changed. */
       d.assert('NEGATIVE CONTROL: playing a chord in the typed mode teaches the page nothing',
         mode === 'type' && learned.length === 2 && typedRows === 4
-        && typedTallied === null && everScored === 2
+        && typedTallied === null && everScored === scoredBeforeTyped
         && labels()[0] === 'Cmaj I' && readLine.hidden === true,
         `the roll is the typed line again at ${typedRows} rows reading `
-        + `${labels().join(', ')}, and the tally has scored ${everScored} chords in the `
-        + 'whole run, which is the two it learned and nothing since');
+        + `${labels().join(', ')}, and the tally scored ${everScored} chords against the `
+        + `${scoredBeforeTyped} it had before the mode changed`);
 
       /* And back to whatever the visitor asked for, since `?learn=1` is a
          person saying which mode they came for. */
