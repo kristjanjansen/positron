@@ -269,6 +269,25 @@ const FILES = [
   // LICENCE: MIT, Copyright (c) 2019 Amazon —
   // `@webxr-input-profiles/assets@1.0.20`, `immersive-web/webxr-input-profiles`.
   // 217,984 + 213,868 bytes. The text and the provenance ship beside them.
+  // ── three accidentals from Bravura Text, for every keyboard ───────────────
+  //
+  // 🔴 UNDER `demo/shell/`, NOT UNDER A DEMO, AND FOR THE REASON THE CONTROLLER
+  // MESHES ABOVE ARE: the consumer is `demo/shell/keyboard.mjs`, which eight
+  // pages draw. A font under `demo/nola/vendor/` would be served out of a
+  // directory named after one page and read by all of them, which is the
+  // `moq.mjs` failure this file warns about twice. Said in one line when it was
+  // nearly put there: *"demo/nola/vendor/ - keyboad is global component"*.
+  //
+  // ✅ 4,508 BYTES, SUBSET FROM 457,872. `demo/resources/subset-bravura.mjs`
+  // rebuilds it and prints both numbers. `shell.css` binds it to
+  // `unicode-range: U+266D-266F`, so it carries `♭ ♮ ♯` and nothing else and
+  // every letter beside them stays in the mono face.
+  //
+  // LICENCE: SIL Open Font License 1.1, Steinberg Media Technologies, reserved
+  // font name "Bravura". Ships beside the binary.
+  ['demo/shell/vendor/bravura-text-accidentals.woff2', 'shell/vendor/bravura-text-accidentals.woff2'],
+  ['demo/shell/vendor/LICENSE-bravura', 'shell/vendor/LICENSE-bravura'],
+
   ['demo/shell/vendor/meta-quest-touch-plus-left.glb', 'shell/vendor/meta-quest-touch-plus-left.glb'],
   ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
   ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
@@ -381,6 +400,20 @@ const FILES = [
   ['demo/fau/vendor/libfaust-wasm.js', 'fau/vendor/libfaust-wasm.js'],
   ['demo/fau/vendor/faustwasm.mjs', 'fau/vendor/faustwasm.mjs'],
   ['demo/fau/vendor/LICENSE-faustwasm', 'fau/vendor/LICENSE-faustwasm'],
+
+  // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
+  //
+  // ⚠️ LISTED BY NAME FOR THE FIFTH TIME AND FOR THE SAME REASON: `demoFiles()`
+  // filters to web extensions and a licence file has none. The 65 `rhodes-*.m4a`
+  // it names ARE enumerated, because `.m4a` is on that list and they are flat in
+  // `demo/nola/` rather than in a subdirectory, which is the whole reason they
+  // are flat. `PROVENANCE-rhodes.json` rides along the same way.
+  //
+  // 🔴 AND IT IS NOT OPTIONAL PAPERWORK. The samples are Jeff Learman's 1977
+  // Rhodes under CC BY-NC-SA 4.0, and attribution is a condition of serving them
+  // at all. A deploy that shipped the audio and declined the credit would be
+  // shipping the one file that makes the other 65 allowed.
+  ['demo/nola/LICENSE-jrhodes3d', 'nola/LICENSE-jrhodes3d'],
 
   ...extraPages(),
   ...demoFiles(),
