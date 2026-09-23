@@ -1,5 +1,340 @@
 ## Open
 
+### Asked 2026-09-23, not started: `/nola/` loses its chord keyboards for the piano roll
+
+🔴 **ASKED IN THESE WORDS:** *"rm exta keyboards from nola, replace with vert
+pianoroll"*. The extra keyboards are the chord charts, one `createKeyboard` per
+chord with that chord lit on it, drawn above the instrument. **The replacement is
+the vertical piano roll from the entry above**, so this lands after it and not
+before.
+
+🔴 **FOUR OPEN ENTRIES IN THIS FILE DESCRIBE THE THING BEING REMOVED, AND THEY
+HAVE TO BE CLOSED IN WRITING RATHER THAN LEFT TO ROT.** All four are from the
+same 2026-09-23 stream, hours before this one: *the roman numeral under each
+chord*, *the chord charts are as wide as the keyboard*, *the chord examples*, and
+*a chord parser and a list of chord keyboards on `/nola/`*. **The parser
+survives and the drawing does not**: `demo/shell/chords.mjs` is 36 checks with no
+browser and the roll needs exactly what it produces, so what dies is the
+KEYBOARD per chord, not the reading of `Cmaj`, `C9`, `F/C` or the numerals.
+
+🔴 **AND SIX ASSERTS ON `/nola/` ARE ABOUT THOSE CHARTS**, counted today. Three
+of them move to the roll unchanged in meaning: every note of every chord is
+painted and nothing else is, a token that is not a chord is shown back rather
+than dropped, and each chord carries its numeral. **One of them is the reason
+this is not a small change**: *a chord chart lines up with the keys under it, key
+for key*, asserted as a COLUMN POSITION IN PIXELS, which is the defect the charts
+shipped with and were corrected for. The roll inherits that assert or it will be
+wrong in the same way. ⚠️ And *a chord chart is a picture, so it has no octave
+pad under it* dies with the charts.
+
+⚠️ **`pad: false` IN `keyboard.mjs` HAS EXACTLY ONE CALLER AND IT IS THIS**,
+MEASURED today: `demo/nola/index.html:769`. That option AMENDS A STATED RULE and
+carries its reasoning beside it, *a picture of a chord and an instrument you play
+really are two things*. **When the charts go, the option has no reader**, and
+this project's own rule is that such a thing is deleted rather than left for
+somebody to wonder about. ⚠️ Unless the roll wants it, which is worth deciding in
+the same change rather than a month later.
+
+⚠️ **AND THE OPEN QUESTION ABOUT VOICING GOES WITH THEM OR MOVES.** The charts
+draw ROOT POSITION, which is a spelling rather than a voicing, and the four
+frames that bought the feature showed a pedal point on C with the hands a long
+way apart. A voicing option was offered and not asked for. **A vertical roll has
+a y axis for it**, which the charts never did, so the question gets easier rather
+than disappearing.
+
+✅ **WHAT THE PAGE LOOKS LIKE AFTER THIS IS SIMPLER, WHICH IS THE POINT.** The
+order asked for on 2026-09-23 was `desc` / `textield` / `example keyboar rows` /
+`play keyboard`, and the middle band becomes one roll instead of a stack of
+keyboards. `redrawCharts()` and its `onOctave` hook go with them, and the roll
+takes over the job of moving with the octave pad.
+
+### Asked 2026-09-23, not started: the Raspberry Pi half of `/muta/`, `/fau/` and `/nola/`
+
+🔴 **ASKED IN THESE WORDS:** *"the pi part of muta, fau and nola."*
+
+**Three pages, three different distances from the board, and they are not one
+piece of work.** What is already known, read today rather than recalled:
+
+- **`/fau/` is blocked on one command and it is already an entry below**:
+  `faust --version` on the board. `faust2rpialsaconsole` is a real tool and
+  Debian bookworm ships **2.54.9** against the tab's **2.89.2**, so the bridge
+  is `expandDSP`, which stamps the compiler version and every library it touched
+  into the source itself. `plans/plan-fau.md` §3 is all of it, and §11 item 9
+  names the measurement that makes the claim real: **ten seconds of one DSP
+  rendered to a WAV at both ends, compared sample by sample**, with the two
+  expansion hashes printed beside them.
+- **`/muta/` is Plaits and Warps as WebAssembly in the tab**, and nothing on the
+  board runs them today. The board half means building the same two modules for
+  ARM and driving them from `rig/board/`, which is a different exercise from
+  Faust's: those are fixed binaries somebody made earlier, so the two ends agree
+  by being the same SOURCE compiled twice with the digests already baked in
+  (`plai_build()`, `warp_build()`), which `/muta/` reads out of the wasm itself.
+- **`/nola/` is thirty recordings and a sampler.** Its board half is the least
+  defined of the three and the question to settle first is what it would even
+  claim: the same RECORDINGS played by the board is a file server, not an
+  instrument, so the interesting version is the pedal and the voice manager
+  running there. `plans/plan-nola.md` has none of this.
+
+🔴 **AND THE KIT PIECE ALREADY EXISTS, WITH ONE CALLER LEFT.** MEASURED today:
+`demo/shell/board.mjs` is imported by **exactly one page, `/knobs/`**. It owns
+the socket, the reconnect, the presence, the 12 byte frame header, the float
+conversion, the `pcm-playout` worklet, the cushion and its counters, and the
+check that a frame is the shape the board publishes. ⚠️ `positron-ui` says both
+board pages use it and names `/keys/`, which **no longer exists** as a directory;
+whatever it became does not import `createBoard` today. Check that before
+quoting the skill.
+⚠️ **AND A PAGE THAT PLAYS THE BOARD IS A `positron-hardware` TASK**: the board
+answers verbs over the relay from any network, so *"I cannot ssh to it"* is
+never *"it is down"*, and `node rig/board/ask.mjs --room studio-1 audio.status`
+is the first thing to try rather than the last.
+
+### Asked 2026-09-23, not started: a Rhodes sample pack for `/nola/`, researched in the background
+
+🔴 **ASKED IN THESE WORDS:** *"nola: can you get similar good sample pack for
+rhodes? investigate in bg"*. *Similar* is to the Salamander piano pack
+`plans/plan-nola.md` sized: **641 files, 748,397,030 bytes, 48 kHz, 24 bit,
+stereo, 30 notes exactly three semitones apart, 16 velocity layers, 88 release
+samples**, licence genuinely open, and a **3.80 MiB** browser budget worked out
+from minor thirds capping the worst pitch shift at one semitone.
+
+🔴 **THE LICENCE WORK IS HALF DONE ALREADY AND MUST NOT BE REDONE FROM SCRATCH.**
+That plan measured five packs that FORBID what a browser demo does, and one of
+them is the obvious Rhodes: **jRhodes3c is NC**, Keppy's is **ND**, Pianobook
+forbids redistribution in as many words, Maestro is all rights reserved behind a
+`Custom` label, and Piano in 162 has no licence at all. **Iowa does not call its
+own recordings public domain.** Start from that list.
+⚠️ **AND THE CODEC FOLKLORE IS ALREADY MEASURED**: neither codec smears an
+attack, what happens is PRE-ECHO, **Opus is about 18 dB worse than AAC** at the
+same bitrate, and pre-echo lives BEFORE the onset, so trimming to just before it
+discards exactly that region.
+⚠️ **THE PHASE ZERO SET IS 30 FluidR3 NOTES AT ONE VELOCITY LAYER, 656 KB**, and
+the page says on its own face that velocity is only volume until a real pack
+lands. A Rhodes pack is the same shape of work as the Salamander one, so the
+voice manager does not change.
+⚠️ **THIS IS RESEARCH AND IT REPORTS IN FULL**, into `research/` with a date, not
+as a filename in a reply.
+
+### Asked 2026-09-23, not started: the custom Rhodes goes to `archive/`
+
+🔴 **ASKED IN THESE WORDS:** *"general: move our custom rhodes into archvie, it
+makes too much agent noise"*.
+
+🔴 **IT IS THE RASPBERRY PI'S OWN SYNTH, AND THAT IS THE THING TO KNOW BEFORE
+MOVING IT.** MEASURED today, the three real importers of
+`demo/shell/rhodes.mjs`:
+
+| file | what it is |
+| --- | --- |
+| `rig/board/synth.mjs:17` | **the board's synth**, whose own header says *"The synth is `demo/shell/rhodes.mjs`, IMPORTED, not ported"* |
+| `rig/m1/rhodes-render.mjs:12` | the studio Mac's renderer |
+| `demo/shell/worklet-test.mjs:45` | the kit test, which compares a stringified copy against the original sample for sample |
+
+⚠️ **`rig/board/setup.sh` MENTIONS IT TOO**, in the provisioning that puts the
+service on the board. So this is not a file with no readers; it is a file whose
+readers are all outside `demo/`. **Moving it to `archive/` without repointing
+those three breaks the board's synth**, and `archive/` is deliberately left
+alone by path sweeps, which is exactly what would make that silent.
+⚠️ **AND IT TAKES `demo/shell/worklet.mjs`'s ONLY NAMED CALLER WITH IT.** That
+module was written for one purpose, carrying `rhodes.mjs` into a worklet on
+`/nola/`, and the entry below already says it is DELETED rather than left unused
+if that lands another way. **This is that lands another way.** Its test would
+then need another function to carry, which is a two line change and is worth
+doing rather than losing 32 checks of a technique `/fau/` uses in production.
+✅ **THE NOISE IS REAL AND IS NOT A REASON TO DOUBT THE ASK**: `rhodes` is named
+in five plans, two rig files, a page comment and this backlog, so every agent
+reading the tree meets it.
+⚠️ **AND `demo/shell/moog.mjs` SITS BESIDE IT**, named in the same board setup
+comment as having been imported by the service at one time. Decide both at once
+or the second one gets moved on its own in a month.
+
+### Asked 2026-09-23, not started: one component for a local thing and a remote thing
+
+🔴 **ASKED IN THESE WORDS:** *"make general 'local and remote' component that can
+be used for video and audio"*, with a drawing:
+
+```
+---------------------------------------------
+                     |
+local viz            | remove viz
+                     |
+----------------------------------------------
+labelleftalign  x-fade-slider  labelrightalign
+----------------------------------------------
+```
+
+and *"some kind of scope?"*, and *"viz can be audio (waveforms), video or
+missing."*
+
+**What it would compose, all of it already in the kit:**
+- `demo/shell/video-panel.mjs`, which is already *"a picture, and a row of three
+  slots under it"*, and already has full screen, an aspect custom property and
+  the `[data-full]` state.
+- `demo/shell/wave-view.mjs` and `demo/shell/grain-scope.mjs` for the audio case.
+- `demo/shell/slider.mjs` or `range-slider.mjs` for the fader, and
+  `shareLabelColumn()` with `--sld-col` for the two labels, because **a shared
+  measurement typed into two files is a measurement that will disagree** and
+  that row is two labels and a control between them.
+- `demo/shell/glue.mjs` if the three bands are one surface, which is the same
+  claim the entry above makes about a piano roll on a keyboard.
+- `demo/shell/presence.mjs` for the remote side's badge, since the fact worth
+  having about a machine in another building is whether it is answering.
+
+🔴 **WHERE IT WOULD GO, ASKED FOR 2026-09-23:** *"also plan all the places where
+we could use it: grains, mirror, muta (fau etc in future)"*. **Two pages already
+hand-roll it and they each got a different half right**, which is not a reason to
+be careful, it is the whole argument: `/kit/`'s own rule is that a control
+living in one page is a component nobody has noticed yet, and this one lives in
+two.
+
+| page | what it has today, read rather than recalled | what it brings |
+| --- | --- | --- |
+| `/grains/` | *"one granulator, running in this page and on a Raspberry Pi at once, **with a blend between them**"*. `blend` is 0 to 1, 0 is all this page and 1 is all the board | **the fader, and its arithmetic** |
+| `/mirror/` | *"the same shader drawn by your browser and by a Raspberry Pi, **side by side**"*, two `createVideoPanel`s, each label in **its own picture's footer**, and a 560 px rule already | **the layout, including the phone one** |
+| `/instrument/` | *"play an instrument that is somewhere else, and hear how late it is"* | the third live case |
+| `/able/`, `/knobs/` | remote only: Ableton Live on the studio Mac, and a synth in another building | the `missing` local side |
+| `/muta/`, `/fau/` | no board half yet, both blocked on the entry above | later, and they are why this is general |
+
+🔴 **THE FADER IS EQUAL POWER AND `/grains/` ALREADY WROTE IT: `cos(blend *
+PI / 2)` AND `sin(blend * PI / 2)`.** A linear crossfade drops about 3 dB in the
+middle, so the one place a listener is comparing the two ends is the one place
+both are quiet. **Lift that line rather than writing a new one**, and the same
+number drives the opacity above it.
+🔴 **AND `/mirror/` HAS ALREADY BUILT THE PHONE ARRANGEMENT IN THE DRAWING
+ABOVE**: its label *"goes in that picture's own footer rather than in a row above
+both"*, and under 560 px both labels go `display: block` on their own line. So
+the narrow case is not new work, it is work to be lifted, which is the second
+half of the same rule.
+⚠️ **TAKE THE BETTER HALF OF EACH, NEVER THE AVERAGE.** That is exactly how
+`board.mjs` was made out of `/keys/` and `/knobs/`, where the page that had less
+gained three things rather than the two meeting in the middle.
+🔴 **AND BOTH DONOR PAGES ARE GRADED, SO LIFTING THEIR CONTROL MOVES THEIR
+ASSERT COUNTS.** Diff the per page counts either side, which is the standing
+rule after any change to what a control does. ⚠️ **`/mirror/` IS `gl: true`**, so
+it is graded by `node demo/verify-gl.mjs` and NOT by `verify.mjs`, and that
+harness only started appending `selfcheck=1` in the 2026-09-18 sweep. A
+component shared between a GL page and a plain one has to be green under both
+harnesses, and nobody has had to think about that before.
+🔴 **`missing` IS THE STATE TO DESIGN FIRST, NOT LAST.** A remote side with
+nothing coming back is the ordinary case on this desk, and this project's own
+rule is that a probe which could not answer returns `unknown`, which never reads
+as absent. A pane that draws nothing and says nothing is indistinguishable from
+one that is broken.
+🔴 **AND A CROSSFADE IS AN AUDIO CLAIM, SO IT HAS TO MOVE REAL GAIN.** A fader
+that only redraws is the shape this project calls a lie, and a check has to DRIVE
+it and measure both ends: level at 0, level at 1, and the middle being both.
+⚠️ **ONE MEANING FOR COLOUR ACROSS THE TWO PANES**, and the existing rule is that
+colour says how a thing landed rather than which lane it is in, so local and
+remote are told apart by their labels and their position, never by hue.
+
+🔴 **THE PICTURE DOES NOT FADE WITH THE SOUND, AND THAT IS A DECISION TAKEN AND
+REVERSED WITHIN THE HOUR. BOTH HALVES ARE HERE BECAUSE THE SECOND ONE IS THE
+INTERESTING ONE.**
+
+**Asked first, 2026-09-23:** *"when x-fading, make the other side more tansparent
+as long as i go with slider to other side. its optional mode, default"*.
+**Withdrawn in the next message:** *"rm fadeout on xfade for not. too flickery on
+online/offline cases"*.
+
+✅ **SO THE FIRST VERSION HAS NO OPACITY IN IT AT ALL.** The fader moves gain and
+nothing else, and this line is why, rather than the feature being quietly absent.
+
+🔴 **AND THE REASON IS THE SAME COLLISION THIS ENTRY ALREADY NAMED FROM THE
+OTHER END.** It was written here that a floor would be needed *because zero
+collides with `missing`*: a pane faded to nothing by the slider looks exactly
+like a pane with nothing coming back. **The flicker is that collision in
+motion.** A remote that comes and goes is already changing what its pane draws,
+and a second channel changing the same pane's opacity gives two visual events
+per drop where there should be one, on a page whose subject is somewhere else.
+⚠️ **AND IT IS NOT A CASE ANYBODY WOULD HAVE FOUND BY DESIGNING IT.** It needs a
+flapping socket, which is what the board on this desk actually does.
+
+⚠️ **WHAT WOULD MAKE IT SAFE, IF IT COMES BACK**, kept so the next attempt starts
+past the first one: opacity is the right channel and does not reflow, `/kit/`
+already grades an animation on exactly that basis, and the value has to be
+**driven by the fader alone**, with a floor, with the pane's own frame and its
+presence badge at full strength whatever the slider says. Two channels off one
+number, or the page will eventually show a bright pane that is silent.
+
+🔴 **THE FADER IS ALWAYS ENABLED AND GOES INTO SILENCE, AND THAT REVERSES THE
+FIRST ANSWER ON THIS PAGE.** Asked 2026-09-23 as *"if one is missing, disabled
+xfade?"* and answered here with **yes, disable it**, on the rule that a control
+which cannot do the thing it names is the defect. Then the fact that changes it,
+said in the next message: *"remote can come and go, it has online status hence
+the xfade disable. or perhaps just always enabled. just goes into silece when no
+source"*. **Always enabled, and here is why the first answer was wrong.**
+
+- 🔴 **A CONTROL WHOSE ENABLED STATE FOLLOWS A SOCKET IS A CONTROL THAT DIES
+  UNDER YOUR FINGER.** The remote comes and goes, so disabling makes the fader
+  go dead mid-drag and come back a second later. That is worse than either fixed
+  answer, and it is this project's *nothing changes under the person using it*
+  rule arriving through a different property from the usual one.
+- 🔴 **AND THE LIE THE FIRST ANSWER WAS PROTECTING AGAINST DOES NOT EXIST, BECAUSE
+  THE PAGE ALREADY SAYS SO.** `demo/shell/presence.mjs` is on the page and the
+  online status is the whole reason this component has two sides. Fading toward
+  a far end that is honestly reported as absent and getting silence is not a
+  control lying; **silence is the truthful output of there being no sound
+  there**. The lie only exists when nothing on screen says the far end is gone.
+- ✅ **AND IT KEEPS THE CHECKS ALIVE**, which is the bill below and is the
+  strongest practical reason: the board is unreachable from the harness, so a
+  fader disabled on a missing remote is a fader disabled on EVERY run.
+- ⚠️ **WHAT IT COSTS IS ONE CASE THAT HAS TO BE HANDLED IN WORDS.** Fader parked
+  at the far end, remote absent: the page is silent, the slider is somewhere
+  deliberate, and nothing is wrong. **The missing pane has to say that**, or a
+  visitor reads a working page as a broken one. That is the `missing` state
+  above, doing the job the disabled control was going to do, in the place where
+  there is room for a sentence.
+- ⚠️ **AND A REMOTE COMING BACK WITH THE FADER ALREADY OVER THERE STARTS MAKING
+  SOUND WITHOUT ANYBODY TOUCHING ANYTHING.** That is correct for a mixer and it
+  is a state change, so it gets a log line when it happens rather than a
+  sentence that sits there.
+
+🔴 **THE BILL THE FIRST ANSWER WOULD HAVE CARRIED, KEPT BECAUSE IT DECIDES THE
+NEXT CONTROL SOMEBODY WANTS TO GREY OUT. `positron-verify` HAS ALREADY PAID IT
+TWICE IN ONE DAY, ON TWO PAGES INDEPENDENTLY.** `disabled` is not a style, it is a
+`return` in front of the handler, and every harness here drives a page by
+clicking its controls: switching the VR and AR buttons off when no headset was
+reported would have taken **ten** asserts out of `/mirror/` silently, and the
+same change took **six** out of `/blocks/` and those were shipped before anybody
+noticed. **The board is not reachable from the harness**, so a fader disabled on
+a missing remote is disabled on every run, and every crossfade check goes quiet
+while the suite stays green. **The checks have to be reachable another way**
+before anything here is disabled: a stand-in remote, or the page driving the
+control itself behind `SELFCHECK`, which is what `/mirror/` does now.
+⚠️ **THIS WAS NEVER A REASON TO LEAVE A LYING CONTROL ENABLED**, and it is not
+why the answer changed. The answer changed because the control is not lying.
+
+🔴 **AND THE PHONE LAYOUT IS A DIFFERENT ARRANGEMENT, NOT A REFLOW. GIVEN AS A
+DRAWING:**
+
+```
+---
+vis1
+footer1
+---
+vis2
+footer2
+---
+xfade
+---
+```
+
+⚠️ **THE LABELS MOVE HOUSE BETWEEN THE TWO.** Wide, there is ONE footer holding
+two labels with the fader between them; narrow, each pane carries **its own**
+footer and the fader is a full width band under both. That is two structures,
+not one structure at two sizes, so the component builds the footer per pane and
+the wide case is what joins them.
+✅ **AND THE NARROW ONE IS `video-panel.mjs`'s NATIVE SHAPE**, which already is
+*"a picture, and a row of three slots under it"*. So the phone arrangement is the
+component it already has, and the wide arrangement is the special case, which is
+the opposite of how it would be written by default.
+⚠️ **560 px IS THE BREAKPOINT THIS PROJECT ALREADY USES**, seven times in
+`shell.css`. Do not invent a third number.
+🔴 **AND THE MEDIA BLOCK GOES AFTER THE RULES IT OVERRIDES.** A media query adds
+no specificity, so a plain rule written later wins at every width. That is the
+defect that left `.pos-pick`'s entire phone layout dead in its own stylesheet,
+never having run once, and it is invisible in the source because the source says
+what the author meant.
+
 ### Asked 2026-09-23, not started: `/fau/` and `/nola/` move to the hardware group
 
 🔴 **ASKED IN THESE WORDS:** *"index: move fau/nola to hardware"*.
