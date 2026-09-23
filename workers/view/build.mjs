@@ -355,11 +355,16 @@ const FILES = [
   // of Emscripten glue. The page fetches none of it on a visit — the first
   // press does — and says in its own log what pressing will cost.
   //
-  // ⚠️ WHETHER THE EDGE COMPRESSES `libfaust-wasm.data` IS UNVERIFIED and it is
-  // the difference between 1.0 MB and 2.9 MB over the wire. It has no extension
-  // Cloudflare recognises. One `curl -I -H 'Accept-Encoding: br'` against the
-  // deployed copy settles it, and this list is where the rename would go if the
-  // answer is no. `plans/plan-fau.md` §11 item 3.
+  // 🔴 THE EDGE DOES NOT COMPRESS AN EXTENSION IT HAS NEVER HEARD OF, MEASURED
+  // 2026-09-23 AGAINST THE DEPLOY, which is what `plans/plan-fau.md` §11 item 3
+  // asked somebody to check. Shipped as `libfaust-wasm.data` it came back with
+  // NO content-type and NO content-encoding, 2,407,445 bytes whole, while the
+  // `.wasm`, the `.js` and the `.mjs` beside it were all brotli. That is 2 MB of
+  // a visitor's bandwidth on the one file in the set that compresses best.
+  // ✅ SO IT IS SERVED AS `.txt` AND IT IS HONESTLY ONE: 99.95 per cent of its
+  // bytes are printable, because it is 53 Faust library sources concatenated by
+  // Emscripten's `file_packager`. The page names this path explicitly, and the
+  // package name baked INSIDE the compiler is untouched by the rename.
   //
   // LICENCE: LGPL 2.1 or later. The text shipped in the package is the FAUST
   // wasm copyright header (GRAME, 2021-2024) over the full LGPL 2.1, and it is
@@ -372,7 +377,7 @@ const FILES = [
   // `STK-4.3`, two declare `LGPL with exception`, one `LGPL-2.1-or-later`, and
   // 42 declare nothing at all. `plans/plan-fau.md` §7.2 lists them.
   ['demo/fau/vendor/libfaust-wasm.wasm', 'fau/vendor/libfaust-wasm.wasm'],
-  ['demo/fau/vendor/libfaust-wasm.data', 'fau/vendor/libfaust-wasm.data'],
+  ['demo/fau/vendor/libfaust-wasm.data.txt', 'fau/vendor/libfaust-wasm.data.txt'],
   ['demo/fau/vendor/libfaust-wasm.js', 'fau/vendor/libfaust-wasm.js'],
   ['demo/fau/vendor/faustwasm.mjs', 'fau/vendor/faustwasm.mjs'],
   ['demo/fau/vendor/LICENSE-faustwasm', 'fau/vendor/LICENSE-faustwasm'],

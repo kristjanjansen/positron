@@ -137,7 +137,25 @@
    */
   const VENDOR = {
     js: '/fau/vendor/libfaust-wasm.js',
-    data: '/fau/vendor/libfaust-wasm.data',
+    /**
+     * 🔴 `.txt`, AND THE EXTENSION IS WORTH 2 MB OF SOMEBODY'S BANDWIDTH.
+     * MEASURED against the deploy 2026-09-23, which is what `plan-fau.md` §11
+     * item 3 asked for and could not do: with its own `.data` name this file
+     * came back with **no content-type at all and no content-encoding**,
+     * 2,407,445 bytes raw, while the `.wasm` and the `.js` beside it were both
+     * brotli. Cloudflare compresses by content type and has no opinion about an
+     * extension it has never heard of, so the one file that compresses BEST was
+     * the one going out whole.
+     * ⚠️ AND IT REALLY IS TEXT: 99.95 per cent of its bytes are printable,
+     * because it is 53 Faust library sources concatenated by Emscripten's
+     * `file_packager`. It opens with a small WebAssembly module, which is the
+     * 0.05 per cent.
+     * ⚠️ THE NAME INSIDE THE COMPILER DOES NOT MOVE WITH IT. The glue asks its
+     * host for a package called `libfaust-wasm.data` and `faustwasm` answers
+     * with whatever bytes it fetched from the path below, so renaming the file
+     * on the wire cannot desynchronise anything.
+     */
+    data: '/fau/vendor/libfaust-wasm.data.txt',
     wasm: '/fau/vendor/libfaust-wasm.wasm',
     mjs: '/fau/vendor/faustwasm.mjs',
   };
