@@ -1747,15 +1747,15 @@
        the rows back to the learned ones by the time this runs. */
     const keep = !force && guesses.length && !guessPlayed
       && performance.now() - guessAt < GUESS_HOLD;
-    if (keep) {
-      roll.trimRows(learned.length);
-      for (const g of guesses) {
-        roll.addRow({ kind: 'guess', notes: g.notes, label: rowLabel(g.name, g.outside) });
-      }
-      lightGuess(guesses[guesses.length - 1].notes);
-      return;
+    /* ✅ KEEPING IS NOW DOING NOTHING AT ALL, which is the log model paying for
+       itself. The row is already on screen at the moment it was offered, so
+       there is nothing to re-add and nothing to put back in order. */
+    if (keep) return;
+    /* Out with the old proposal, wherever it sits, and every row under it stays
+       exactly where it is. */
+    for (let i = roll.rows().length - 1; i >= 0; i--) {
+      if (roll.rows()[i].kind === 'guess') roll.dropRow(i);
     }
-    roll.trimRows(learned.length);
     guessRedraws++;
     guesses = [];
     lastGuess = null;
@@ -1826,9 +1826,16 @@
        then and no row is relabelled under the reader. */
     ensureTables().then(() => { if (mode === 'learn' && learned.length >= 2) drawGuesses(); });
     const { name, root, quality } = fromKey(key);
-    /* The proposals come off the bottom first, so the learned rows stay a block
-       and the new one lands under the one before it rather than under a guess. */
-    roll.trimRows(learned.length);
+    /* 🔴 THE ROLL IS A LOG READ DOWNWARD, SO A NEW CHORD LANDS AT THE BOTTOM AND
+       MOVES NOTHING. Asked 2026-09-23: *"do not push suggested row down when new
+       recoded one appears, rec one apears below suggestion (timeline loging
+       downwards)"*. It used to trim the proposal off, add the chord, and put the
+       proposal back underneath, so every chord you played shoved the thing you
+       were reaching for one row further down the picture.
+       ⚠️ AND THIS REVERSES *"played is first choice"* FROM EARLIER THE SAME DAY,
+       which put every learned row above every proposal. That was an ordering
+       rule; this is a TIME rule, and time is the stronger one: a proposal was
+       offered at a moment, and what you played after it comes after it. */
     /* ✅ AS PLAYED, IF IT FITS THE KEYS ON SCREEN. A chord somebody really
        played is a fact about their hands and the roll should agree with it. The
        voicing control still governs the typed line and the proposal, because
@@ -3815,23 +3822,33 @@
      ⚠️ AND BOTH PICTURES STILL SHARE ONE DECLARATION, because the roll and the
      keys are two drawings of one proposal and two speeds read as two events. */
   :root { --nola-arrive: 2200ms; --nola-wait: 700ms; }
+  /* 🔴 AND THE CURVE IS WHY IT LOOKED FAST WHEN IT WAS NOT. Reported as *"still
+     soooo fast suggeston appreance. bug?"*, and MEASURED before changing
+     anything: the computed animation really was `2.2s` at `0.7s` delay. The
+     fault was `cubic-bezier(.16, 1, .3, 1)`, an expo-out curve that covers about
+     ninety per cent of its distance in the first fifth of the time, so a 2.2 s
+     fade is over in perhaps 0.3 s and then creeps invisibly for two seconds.
+     ⚠️ A DURATION IS NOT A SPEED. What a reader perceives is where the curve
+     spends its time, and every ease-OUT spends it at the start. A slow arrival
+     needs a curve that is slow in the MIDDLE, which is what ease-in-out is, and
+     opacity is left almost linear because the eye reads brightness directly. */
   @keyframes nola-arrive {
-    0%   { transform: scale(.35); opacity: 0; }
-    45%  { transform: scale(1.14); opacity: .8; }
+    0%   { transform: scale(.45); opacity: 0; }
+    50%  { transform: scale(1.08); opacity: .45; }
     100% { transform: scale(1); opacity: 1; }
   }
-  @keyframes nola-arrive-label { 0% { opacity: 0; } 55% { opacity: .6; } 100% { opacity: 1; } }
+  @keyframes nola-arrive-label { 0% { opacity: 0; } 50% { opacity: .35; } 100% { opacity: 1; } }
   .roll-row[data-new] .roll-cell.on::after {
     animation: nola-arrive var(--nola-arrive) var(--nola-wait)
-               cubic-bezier(.16, 1, .3, 1) backwards;
+               cubic-bezier(.37, 0, .63, 1) backwards;
   }
   .roll-row[data-new] .roll-label {
-    animation: nola-arrive-label var(--nola-arrive) var(--nola-wait) ease-out backwards;
+    animation: nola-arrive-label var(--nola-arrive) var(--nola-wait) linear backwards;
   }
   /* the same arrival on the keys, so the hand is told where as well as what */
   .nola-keys[data-ai-new] .k.ai .kd::after {
     animation: nola-arrive var(--nola-arrive) var(--nola-wait)
-               cubic-bezier(.16, 1, .3, 1) backwards;
+               cubic-bezier(.37, 0, .63, 1) backwards;
   }
   /* ⚠️ AND NOTHING MOVES FOR SOMEBODY WHO ASKED FOR THAT. The mark is still
      drawn, it simply does not travel to get there. */
