@@ -1,5 +1,84 @@
 ## Open
 
+### Asked 2026-09-23, doing now: a half played chord shows faint yellow dots
+
+🔴 **ASKED IN THESE WORDS:** *"when partial match with piano roll chord use faint
+yellow on dots"*.
+
+**What exists today.** `roll.mjs` has `setHeld`, and `/nola/` lights a roll row
+when the notes held are that row's chord. It is all or nothing: play three of the
+four and the roll says nothing at all, which is the least helpful moment for it
+to go quiet, because that is exactly when somebody is reaching for the chord.
+✅ **AND THE INK IS ALREADY DECIDED.** `--hi` is this project's yellow and is what
+a pressed key uses, so a partial match is the same ink at lower strength rather
+than a new colour. That keeps the meaning: yellow is *you are playing this*.
+⚠️ **IT IS A THIRD STATE ON A DOT, NOT A SECOND STATE ON A ROW**, so it goes
+where the dot is drawn and the row's own highlight is untouched.
+⚠️ **AND A PARTIAL MATCH NEEDS A FLOOR OR EVERY ROW LIGHTS.** One note in common
+is not reaching for a chord, it is the note happening to be in it. Where that
+floor sits is a judgement to make and then write down.
+
+### Asked 2026-09-23, doing now: the voicing called `As written` is called `Exact`
+
+🔴 **ASKED IN THESE WORDS:** *"As written: Exact"*. `demo/nola/index.html:989`
+reads `options: [['As written', 'root'], ['Tight', 'close'], ['Smooth',
+'lead']]`. One word, and only the LABEL moves: the value stays `root`, which is
+what `voiceChord` takes and what the asserts name.
+⚠️ **THOSE THREE LABELS WERE ALREADY CHANGED ONCE**, from `Spelled`, `Close` and
+`Leading`, after *"i do not know what spelled close leading means"*. So this is
+the same rule being applied again rather than a new one, and it is worth checking
+the other two still earn their names on the same test.
+
+### Asked 2026-09-23, doing now: one suggestion, in its own colour, under the chords you played
+
+🔴 **ASKED IN THESE WORDS, THREE MESSAGES:** *"add suggestions to piano roll.
+just one. add my chords (repeading enogh first, wait for 2). suggesions 'ai
+color' in nola"*, then *"played is first choice"*, then *"make piano roll h fixed
+to 5 items even when no data"*.
+
+**Three changes to what shipped an hour ago.**
+
+🔴 **ONE PROPOSAL, NOT TWO, AND WHICH ONE IS A REAL DECISION.**
+`demo/nola/index.html:1412` draws every pick `suggest.mjs` returns, and there are
+two: `usual` ranked by probability and `other` ranked by pointwise mutual
+information. **`other` is the one that ships**, because the standing instruction
+is *"no cliches"* and the benchmark measured exactly that distinction: `usual`
+names the global maximum **16.2 per cent** of the time, `other` **1.0 per cent**,
+while still being **90.7 per cent attested**. So `other` is idiomatic without
+being the obvious move, which is the same sentence as the *"openstudiojazz
+quality"* ask.
+⚠️ **IT IS ONE LINE TO FLIP** if playing it says otherwise, and nobody has played
+it, so this is a decision taken on measurement and open to being overruled by an
+ear.
+
+🔴 **`played is first choice` IS THE ORDER, AND THE CODE ALREADY DOES IT.**
+`addLearned` calls `roll.trimRows(learned.length)` before appending, so the
+learned rows are a block and the guess lands under them. That was true by
+accident of construction rather than by assertion, so **it gets an assert now**,
+because a rule nothing grades is a rule that drifts.
+
+🔴 **AN `ai color` IS A NEW MEANING FOR COLOUR AND THEREFORE A SHARED DECISION.**
+`CLAUDE.md` says one meaning for colour across every demo. Today the guess row is
+`var(--dim)` plus italics plus `opacity: .55` at `demo/nola/index.html:2744`,
+which says *quieter* rather than *not measured*. The palette is `--hi` yellow for
+a press, `--ok` green, `--warn` amber, `--bad` red, `--rec` for the one control
+that writes. **A suggestion needs its own token in `shell.css`** so the second
+page that proposes something cannot invent a different one.
+⚠️ **AND THE DOTS STAY WHERE THE NOTES ARE.** The existing comment is right that
+a guess wearing the same ink as a measurement is this project's oldest mistake;
+the colour change is about which ink, not about hiding the row.
+
+🔴 **A ROLL WITH NOTHING IN IT MUST STILL BE FIVE ROWS TALL.** Learning mode opens
+empty by design, so the roll is zero pixels and the whole page jumps the first
+time a chord lands, and again on every row after that. **This is the reserve-its-
+room rule `positron-diagram` already carries** for a picture that repaints on a
+press, arriving in a component instead of a figure: an empty box is shorter than
+a full one, so reserving the wrong height is the `min-height` that never applied
+wearing different clothes.
+⚠️ **IT BELONGS IN `roll.mjs`, NOT IN `/nola/`**, because `/kit/` draws the roll
+standalone too and a component that changes height under the reader is wrong on
+both pages.
+
 ### Found 2026-09-23, not fixed: `/grains/` draws a childless Cloudflare container too
 
 🔴 **`node demo/verify.mjs grains` READS 25/26, AND IT HAS NOTHING TO DO WITH

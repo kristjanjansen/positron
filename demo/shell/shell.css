@@ -221,6 +221,15 @@
   --disp-ghost: 0.32;
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
   --rec: #e5484d;        /* record: the one control that starts writing */
+  /* 🔴 THE ONE COLOUR THAT MEANS `NOBODY PLAYED THIS, A TABLE PROPOSED IT`.
+     Asked for 2026-09-23 as *"suggesions 'ai color' in nola"*. It is here rather
+     than in a page because colour carries ONE meaning across every demo, and a
+     second page that proposes something must not invent a second violet.
+     ⚠️ IT IS DELIBERATELY NOT `--hi`, `--ok`, `--warn` OR `--bad`, all of which
+     already say how a real thing turned out. A proposal has not turned out at
+     all yet, and colouring an unmeasured thing as though it passed is an
+     assertion nothing made, which is the transport bar's oldest rule. */
+  --ai: #b39ae8;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif;
 }
@@ -3556,6 +3565,14 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .roll-lane { position: relative; }
 .roll-cell { grid-row: 1; min-width: 0; height: var(--roll-row-h, 26px);
               display: grid; place-items: center; }
+/* 🔴 A ROW OF ROOM AND NOT A ROW. `minRows` draws these under the real rows so a
+   roll that fills up one chord at a time does not grow the page under the
+   reader, which is the reserve-its-room rule arriving in a component. It takes
+   its height from the same property as a real row, so the reservation is the
+   real height rather than close to it. It is not a `button`, carries no class
+   any check counts, and is `aria-hidden`. */
+.roll-rest { position: relative; display: block; width: 100%;
+             height: var(--roll-row-h, 26px); pointer-events: none; }
 /* 🔴 A RULE WHERE EACH WHITE KEY BEGINS, RUNNING THE WHOLE HEIGHT OF THE ROLL.
    Asked for, then reported as not continuous, then removed on a misreading of
    that report, then asked for again in four words. They are drawn on the CELL

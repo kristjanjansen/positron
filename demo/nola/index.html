@@ -116,7 +116,10 @@
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC, damperSec } from '/shell/pedal.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createField } from '/shell/field.mjs';
-  import { parseChords, voiceChord, VOICINGS } from '/shell/chords.mjs';
+  import { parseChord, parseChords, voiceChord, VOICINGS } from '/shell/chords.mjs';
+  import { nameChord, createSettler, createTally, chordKey, fromKey, notesOf }
+    from '/shell/name.mjs';
+  import { suggest, useTables, tablesIn } from '/shell/suggest.mjs';
   import { createRoll } from '/shell/roll.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
@@ -326,9 +329,16 @@
      visitor believes it.
      ⚠️ AND IT IS STILL ONE SENTENCE. `and a 1977 Rhodes` names the second half
      of one instrument row rather than bolting a second fact on, and the chord
-     line stays because it is the first thing on the page. */
-  const ONE = 'a piano and a 1977 Rhodes you play from one MIDI keyboard, '
-    + 'with a line of chords drawn out above the keys';
+     line stays because it is the first thing on the page.
+     🔴 REWRITTEN A THIRD TIME FOR THE LEARNING MODE, because a control appeared
+     that changes where the roll's rows come from, and that is the trigger: not
+     *did I rewrite the page* but *did a control appear and did the way you work
+     it change*. `you either type in or teach it by playing` is ONE clause about
+     ONE thing, the roll, rather than a second fact bolted on with an `and`.
+     ⚠️ AND IT IS WHAT DEFINES THE WORD `roll` ON THE PAGE, which is what lets
+     the control above the keys be labelled with it. */
+  const ONE = 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
+    + 'of chords you either type in or teach it by playing';
 
   const d = mount({
     name: 'nola',
@@ -562,7 +572,10 @@
    * player they are still holding something they let go of.
    */
   const heldNotes = new Set();
-  const tellRoll = () => roll.setHeld([...heldNotes]);
+  /* ⚠️ AND THE LEARNING MODE HANGS OFF THE SAME LINE, so there is one place
+     that knows what is under a finger rather than two that have to agree.
+     `heardChange` does nothing at all unless the roll is in `Played`. */
+  const tellRoll = () => { roll.setHeld([...heldNotes]); heardChange(); };
 
   async function press(note, vel, at) {
     if (note < 0 || note > 127) return;
@@ -973,7 +986,7 @@
        anything: these were literal capitals typed into the page, which made two
        ordinary words look like an abbreviation. */
     label: 'VOICING',
-    options: [['As written', 'root'], ['Tight', 'close'], ['Smooth', 'lead']],
+    options: [['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead']],
     at: VOICINGS.indexOf('lead'),
     onPick: (id) => { voicing = id; d.log(VOICE_SAYS[id]); redrawCharts(); },
     title: (id) => VOICE_SAYS[id],
@@ -1006,7 +1019,35 @@
   const picks = el('div', 'nola-picks');
   picks.append(instPick.el, voicePick.el);
   instrument.append(picks, keysHost, credit);
-  d.stack.add(chordField.el, chordList, instrument);
+  /* 🔴 THE MODE SITS BESIDE THE FIELD IT TURNS OFF, not down with the keys.
+     `Played` disables the CHORDS field, and a control that greys out something
+     three blocks away is a page asking a reader to work out what happened. The
+     two pickers under the keys are about the instrument; this one is about
+     where the roll's rows come from, which is what the field is. */
+  const topRow = el('div', 'nola-top');
+  topRow.append(chordField.el);
+  /**
+   * 🔴 WHAT THE PAGE THINKS IT IS HEARING, IN A BOX THAT CANNOT CHANGE ITS OWN
+   * HEIGHT. `positron-ui` bans a live sentence under a picture because it
+   * rewraps between two and three lines while somebody reads it, and it bans a
+   * page narrating its own state in prose. This is neither: one line, `nowrap`,
+   * a reserved height, and it changes when a chord settles rather than on a
+   * clock. It is a readout cell's shape without being a readout, which this
+   * page has declared it has none of.
+   * 🔴 AND WHAT IT IS FOR IS THE UNSURE CASE, WHICH IS THE INTERESTING ONE.
+   * `C E G#` is `Caug` and `Eaug` and `G#aug`, three names for one set of
+   * notes, and the page saying so is a real property of music rather than a
+   * failure state. A single confident wrong answer would be worse, and this
+   * page has a particularly bad version of that available to it: the roll
+   * lights a row when you play it, so a wrong name written in gets CONFIRMED
+   * back to somebody who trusted it.
+   * ⚠️ DECLARED HERE RATHER THAN WHERE IT IS FILLED, because the stack is built
+   * here and a page that spliced a row in afterwards would be deciding its own
+   * reading order twice.
+   */
+  const readLine = el('div', 'nola-read');
+  readLine.hidden = true;
+  d.stack.add(topRow, chordList, readLine, instrument);
 
   // ── the MIDI keyboard ─────────────────────────────────────────────────────
 
@@ -1102,8 +1143,14 @@
   let saidKey = null;
   /* Declared here so `onOctave` above can reach it before `drawChords` is
      defined. A function declaration would hoist; this is a page saying the
-     order of its own definitions out loud. */
-  const redrawCharts = () => drawChords(chordField.value());
+     order of its own definitions out loud.
+     🔴 AND IT HAS TO ASK WHICH MODE THE ROLL IS IN, OR A VOICING PRESS WOULD
+     DELETE EVERYTHING THE PAGE HAD LEARNED. `drawChords` ends in
+     `roll.setRows(rows)` built from the typed line, so in `Played` that is not
+     a re-voicing, it is the roll being replaced by an empty one. */
+  const redrawCharts = () => (mode === 'learn'
+    ? rebuildLearnRoll()
+    : drawChords(chordField.value()));
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
   /**
@@ -1138,9 +1185,18 @@
     hinted = row ? row.notes : [];
     for (const n of hinted) keys.lightNote(n, true, 'hint');
   };
+  /* 🔴 FIVE ROWS OF ROOM WHETHER OR NOT THERE IS ANYTHING IN THEM. Asked
+     2026-09-23: *"make piano roll h fixed to 5 items even when no data"*. The
+     learning mode opens on an empty roll by design, so with no floor this page
+     grows the first time a chord lands and again on every row after it, which
+     is the thing that must not happen while somebody is looking at it.
+     ⚠️ FIVE IS THE SHAPE OF THE FEATURE RATHER THAN A ROUND NUMBER: the typed
+     line ships four chords, and the learning mode admits chords and draws one
+     proposal under them, so five is a full picture either way. */
   const roll = createRoll(keys.el, {
     base: keys.base, keys: KEY_ORDER, map: KEY_MAP, sharps: KEY_SHARPS, prepend: true,
     scroller: keys.keysEl,
+    minRows: 5,
     onPick: (row) => showChord(row),
   });
 
@@ -1218,6 +1274,344 @@
     }
     return { chords, bad, key };
   }
+
+  // ── the roll listening instead of reading ─────────────────────────────────
+  //
+  // 🔴 ASKED FOR 2026-09-23: *"implement nola learning mode"*, after *"idea is
+  // to have alt mode in nola where i play chords and the ones i keep returning
+  // to add them to piano roll. then when have at least 2, suggest 3rd and 4th
+  // somehow"*. `research/chord-learning-2026-09-23.md` is 1,174 lines of
+  // specification for exactly this and it settles the questions that would
+  // otherwise be guessed at. `demo/shell/name.mjs` is the arithmetic and
+  // `name-test.mjs` grades it with no browser in it.
+  //
+  // 🔴 EVERY NUMBER BELOW IS A GUESS AND NOT ONE OF THEM HAS BEEN PLAYED. The
+  // research's own section 8 says so in capitals: its timing numbers come off a
+  // synthetic session it generated with a factor of ten between a passing chord
+  // and a held one BY CONSTRUCTION, so every gate between them worked. What has
+  // to be measured, with hands on the MK-425C, is the spread between the first
+  // and last note of a rolled chord and the histogram of how long a chord is
+  // held when it is meant against when it is passed through. **If the real gap
+  // is a factor of two rather than ten, `LEARN_GATE` is a much harder choice and
+  // might not exist at all.**
+
+  /** How long after the last finger moves before the page decides what it heard.
+   *  A rolled chord is said to spread over 30 to 120 ms and a chord change at
+   *  100 beats a minute is 600 ms apart. Both ends of that are guesses. */
+  const LEARN_WINDOW = 200;
+  /** Shorter than this and you were on your way through rather than there. */
+  const LEARN_GATE = 400;
+  /** Total time held, across every visit, before a chord goes into the roll. */
+  const LEARN_ADMIT = 2000;
+  /** Four to six, per the research. A full roll says so rather than evicting. */
+  const LEARN_SLOTS = 6;
+  /**
+   * 🔴 WHICH COUNTED TABLE THE SUGGESTER READS. Asked 2026-09-23, after the
+   * research: *"can you benchmark yr suggestions. want them to be
+   * openstudiojazz quality stuff"*, *"no cliches"*, *"perhaps a setting to
+   * toggle jazzyness / style?"*. It is `?style=pop` today and not a control,
+   * because a control in `.pos-controls` would move every other page's harness
+   * press and a control anywhere else is a decision about layout nobody has
+   * asked for yet. The dial is real: MEASURED, the two tables disagree on the
+   * first suggestion for 71.2 per cent of shared contexts AND spell 59 of 75
+   * shared symbols differently.
+   * ⚠️ NOTHING ON THIS PAGE READS A TABLE. It asks `suggest()` for a pair and
+   * draws what comes back, so a third style is one more string here.
+   */
+  const LEARN_STYLE = q.get('style') === 'pop' ? 'pop' : 'jazz';
+  /**
+   * 🔴 THE TABLE IS FETCHED, SO IT IS FETCHED ON A PRESS AND NEVER ON A VISIT.
+   * 12,746 bytes against the 3,824,981 this page already ships in recordings,
+   * which is 0.33 per cent, and it is still not loaded until somebody asks the
+   * roll to listen. It goes through `pull` like every other URL that leaves
+   * here, so `a visit fetches nothing` stays an assert over a counter.
+   * ⚠️ AND THE PAGE WORKS WITHOUT IT. `suggest` falls back to the 173 byte
+   * diatonic rule, which MEASURED **1.4 per cent top 1 on held-out jazz against
+   * the table's 48.5**, so the fallback is a page that still answers rather
+   * than a page that is as good.
+   */
+  let tablesJob = null;
+  function ensureTables() {
+    if (tablesJob) return tablesJob;
+    tablesJob = (async () => {
+      try {
+        const buf = await pull('/resources/chord-tables.json');
+        const got = useTables(JSON.parse(new TextDecoder().decode(buf)));
+        d.log(`the ${got.join(' and ')} chord tables arrived, ${Math.round(buf.byteLength / 1024)} KB `
+            + 'counted off 1,182 jazz standards and 890 pop chart entries, and this page reads the '
+            + `${LEARN_STYLE} one`);
+      } catch (e) {
+        d.log(`the counted chord tables did not arrive, because ${e.message}, so the `
+            + 'suggestions come from a diatonic rule that is much worse and says so', 'warn');
+      }
+    })();
+    return tablesJob;
+  }
+
+  let mode = q.get('learn') === '1' ? 'learn' : 'type';
+  const settler = createSettler({ windowMs: LEARN_WINDOW, minNotes: 3 });
+  const tally = createTally({ admitMs: LEARN_ADMIT, minHoldMs: LEARN_GATE, slots: LEARN_SLOTS });
+  /** what has been admitted, in admission order. A row never moves and never
+   *  leaves, which is `positron-ui`'s rule arriving as a data structure. */
+  const learned = [];
+  /** the two chords being proposed. The only rows that ever go away. */
+  let guesses = [];
+  let settleTimer = 0, admitTimer = 0, saidKeyLine = '', saidFiat = false, lastGuess = null;
+  const saidUnsure = new Set();
+
+  const rowLabel = (name, outside) =>
+    [name, outside.length ? `${outside.length} above` : ''].filter(Boolean).join(' ');
+
+  /** Put a learned or proposed chord where this keyboard's hands can reach it,
+   *  which is the same arithmetic `drawChords` already uses. A row voiced any
+   *  other way is the one row on the page the player cannot play. */
+  const voiceRow = (notes, near) => voiceChord(notes, {
+    mode: voicing, lo: keys.base, hi: keys.base + REACH, near, bass: false });
+
+  function showReading(r) {
+    readLine.textContent = !r ? 'nothing held'
+      : r.sure ? r.label
+      : r.alts.map((a) => a.name).join(' or ');
+    /* ⚠️ DELETED RATHER THAN SET EMPTY. `[data-sure]` matches on PRESENCE, so
+       an empty string would leave a guess wearing the confident ink for the
+       rest of the page's life. Measured elsewhere in this project as exactly
+       that defect on a full screen panel. */
+    if (r?.sure) readLine.dataset.sure = '1'; else delete readLine.dataset.sure;
+  }
+
+  /**
+   * 🔴 THE TWO CHORDS THE PAGE PROPOSES ARE TWO DIFFERENT JOBS, NOT A RANKED
+   * PAIR OF ONE. The first is what usually follows where you are, which is what
+   * a functional rule is for. The second is the best candidate this line has
+   * not used yet, because a suggester whose two offers are both chords you have
+   * already played has told you nothing.
+   * ⚠️ AND OFFERING TWO IS WORTH MORE THAN ANY CLEVERNESS ABOUT WHICH ONE.
+   * MEASURED over 24 four chord loops: the rule names the real third chord at
+   * top 1 nine times in 24 and at top 2 fifteen times.
+   */
+  function drawGuesses() {
+    roll.trimRows(learned.length);
+    guesses = [];
+    lastGuess = null;
+    if (mode !== 'learn' || learned.length < 2) return;
+    const r = suggest({ chords: learned }, { style: LEARN_STYLE });
+    if (!r.ok) return;
+    lastGuess = r;
+    /* 🔴 WHERE THE KEY CAME FROM, SAID OUT LOUD, WHICH IS THE DECISION THIS
+       REPOSITORY HAS ALREADY MADE ONCE. MEASURED: two chords fit 3.33 keys of
+       24 on average and never fewer than 2, and three chords never fit exactly
+       one, because a major key and its relative minor hold the same seven
+       chords and can never be told apart by which chords were played. So the
+       key is a fiat and `parseChords` already carries the sentence for it. */
+    if (r.says !== saidKeyLine) { saidKeyLine = r.says; d.log(r.says); }
+    let near = learned.length ? learned[learned.length - 1].notes : [];
+    /* 🔴 ONE PROPOSAL, AND WHICH ONE IS A DECISION TAKEN ON A MEASUREMENT.
+       Asked 2026-09-23: *"add suggestions to piano roll. just one"*, against a
+       standing *"no cliches"*. `suggest.mjs` returns two, ranked two ways, and
+       the benchmark measured exactly the difference between them on 251
+       held-out jazz standards: the probability pick names the globally
+       commonest chord **16.2 per cent** of the time, the pointwise mutual
+       information pick **1.0 per cent**, and the second is still **90.7 per
+       cent attested**. So `other` is idiomatic without being the obvious move,
+       which is the same sentence as the *"openstudiojazz quality"* ask, and it
+       is the one that ships.
+       ⚠️ NOBODY HAS PLAYED IT. This is a reading, not an ear, and the line
+       below is the whole of changing its mind. */
+    const show = r.picks.filter((p) => p.role === 'other').slice(0, 1);
+    for (const p of (show.length ? show : r.picks.slice(0, 1))) {
+      const c = parseChord(p.name);
+      if (!c.ok) continue;
+      const { notes, outside } = voiceRow(c.notes, near);
+      near = notes;
+      guesses.push({ ...p, notes });
+      roll.addRow({ kind: 'guess', notes, label: rowLabel(`${p.name} maybe next`, outside) });
+    }
+  }
+
+  function addLearned(key) {
+    /* 🔴 THE ONE THING THIS MODE FETCHES, AND IT IS BEHIND A CHORD SOMEBODY
+       REALLY PLAYED RATHER THAN BEHIND THE MODE BUTTON. `?learn=1` is still a
+       visit, and a visit opens nothing; a chord held for two seconds is not.
+       It also lands a whole chord before the second one is admitted, which is
+       when the first suggestion is drawn, so the counted table is in hand by
+       then and no row is relabelled under the reader. */
+    ensureTables().then(() => { if (mode === 'learn' && learned.length >= 2) drawGuesses(); });
+    const { name, root, quality } = fromKey(key);
+    /* The proposals come off the bottom first, so the learned rows stay a block
+       and the new one lands under the one before it rather than under a guess. */
+    roll.trimRows(learned.length);
+    const near = learned.length ? learned[learned.length - 1].notes : [];
+    const { notes, outside } = voiceRow(notesOf(key), near);
+    learned.push({ key, name, root, quality, notes });
+    /* 🔴 NO NUMERAL ON A LEARNED ROW, AND THAT IS THE FLICKER RULE RATHER THAN
+       AN OMISSION. A numeral needs a key, a key needs two chords, and the key
+       can change when a third arrives, so a numeral here would be a label that
+       gets rewritten under the reader. The key is in the log instead, where a
+       thing that changed belongs. */
+    roll.addRow({ kind: 'learned', notes, label: rowLabel(name, outside) });
+    d.log(`${name} is in the roll now, after `
+        + `${(tally.msOf(key, performance.now()) / 1000).toFixed(1)} s of holding it`);
+    drawGuesses();
+  }
+
+  function admitNow(at) {
+    const { admitted, sayFull } = tally.check(at);
+    if (sayFull) {
+      d.log(`the roll is holding ${LEARN_SLOTS} chords already, so it has stopped learning `
+          + 'rather than dropping one you played earlier', 'warn');
+    }
+    for (const key of admitted) addLearned(key);
+  }
+
+  function settleNow(at) {
+    const got = settler.settle(at);
+    if (!got) return;
+    const r = nameChord(got.notes);
+    if (!r.ok) { showReading(null); return; }
+    /* 🔴 TWO NOTES DO NOT NAME A CHORD AND THE ONE EXCEPTION IS A BARE FIFTH,
+       which the recogniser reaches on its own rather than by a special case:
+       MEASURED over the 132 chords it can spell, a perfect fifth is in 13 of
+       them and a major third is in 10, so nothing but a fifth pins anything
+       down and nothing but a fifth comes back sure from two notes. That is why
+       the note count gates the COMPLAINT and the margin gates the answer. A
+       page that said `C5 or F5` every time somebody rested a finger on a key
+       would be chattering about nothing. */
+    showReading(got.enough || r.sure ? r : null);
+    /* 🔴 BELOW THE MARGIN, TWO NAMES AND NOTHING WRITTEN DOWN. MEASURED: at a
+       margin of 1.0 the recogniser is never wrong about the 66.7 per cent of
+       voicings it speaks about, and what is left is augmented triads, sus2
+       against sus4, and a seventh missing its fifth. Those are facts about
+       music rather than bugs, and naming one of them confidently is a coin toss
+       with a name on it. */
+    if (!r.sure) {
+      if (!got.enough) return;
+      const pair = r.alts.map((a) => a.name).join(' or ');
+      if (!saidUnsure.has(pair)) {
+        saidUnsure.add(pair);
+        d.log(`those notes are ${pair} and nothing can tell which, so the roll was left alone`);
+      }
+      return;
+    }
+    const key = chordKey(r.root, r.quality);
+    tally.hold(key, at);
+    const due = tally.dueAt(at);
+    if (due !== null) {
+      admitTimer = setTimeout(() => admitNow(performance.now()), Math.max(0, due - at));
+    }
+  }
+
+  /**
+   * 🔴 CALLED FROM `tellRoll`, WHICH IS THE ONE PLACE THAT ALREADY KNOWS WHAT
+   * IS UNDER A FINGER. `heldNotes` is FINGERS rather than voices, and its own
+   * comment says why: a pedalled chord goes on sounding long after the hands
+   * moved on. The learning mode reads that set and nothing else, so the pedal
+   * cannot teach the page a chord nobody is holding.
+   * ⚠️ AND IT IS A FUNCTION DECLARATION REACHED FROM A CONST ARROW DEFINED
+   * HUNDREDS OF LINES ABOVE IT, the same arrangement `redrawCharts` already
+   * has. Nothing calls either until a key is pressed, which is after the whole
+   * module has run.
+   */
+  function heardChange() {
+    if (mode !== 'learn') return;
+    clearTimeout(settleTimer);
+    clearTimeout(admitTimer);
+    const now = performance.now();
+    /* The fingers moved, so whatever was being held is no longer being held.
+       The tally banks it and the next settle starts a new one. */
+    tally.release(now);
+    const due = settler.held([...heldNotes], now);
+    if (due === null) { showReading(null); return; }
+    settleTimer = setTimeout(() => settleNow(performance.now()), Math.max(0, due - now));
+  }
+
+  /** Re-voice every learned row, for a voicing change or an octave press. */
+  function rebuildLearnRoll() {
+    const was = roll.picked();
+    const rows = [];
+    for (const l of learned) {
+      const { notes, outside } = voiceRow(notesOf(l.key),
+        rows.length ? rows[rows.length - 1].notes : []);
+      l.notes = notes;
+      rows.push({ kind: 'learned', notes, label: rowLabel(l.name, outside) });
+    }
+    showChord(null);
+    roll.setRows(rows);
+    /* ⚠️ `setRows` IS RIGHT TO CANCEL THE SELECTION AND THIS PUTS IT BACK,
+       because a re-voicing really does replace every row and the player still
+       chose one of them. `pick` TOGGLES, so it is only called when there was
+       something picked and the list is still that long. */
+    if (was >= 0 && was < rows.length) roll.pick(was);
+    drawGuesses();
+  }
+
+  /**
+   * ⚠️ `say` IS FALSE ON A TYPED LOAD AND TRUE EVERYWHERE ELSE, which is one
+   * flag rather than two functions. A page opened at `?learn=1` has to explain
+   * itself exactly as much as one somebody switched by hand, and a page opened
+   * in the typed mode has nothing to announce because that is where it has
+   * always started.
+   */
+  function applyMode(say) {
+    clearTimeout(settleTimer);
+    clearTimeout(admitTimer);
+    settler.reset();
+    tally.release(performance.now());
+    readLine.hidden = mode !== 'learn';
+    chordField.disabled(mode === 'learn');
+    if (mode === 'learn') {
+      showReading(null);
+      rebuildLearnRoll();
+    } else {
+      drawChords(chordField.value());
+    }
+    if (!say) return;
+    if (mode === 'learn') {
+      /* 🔴 THE ONE ARBITRARY CHOICE, SAID OUT LOUD ONCE. `C6` and `Am7` are the
+         same four notes and no weighting separates them: MEASURED, a bass heavy
+         enough to force it turns every first inversion minor triad into a sixth
+         chord. Dropping the sixths entirely takes the confident answer rate
+         from 32.8 per cent to 72.0, and a page quiet two thirds of the time to
+         avoid one arbitrary choice has made a worse choice. */
+      if (!saidFiat) {
+        saidFiat = true;
+        d.log('a sixth chord and a minor seventh a third below it are the same four notes, '
+            + 'so this page always reads C6 as Amin7 rather than guessing between them');
+      }
+      d.log(`hold a chord for about ${(LEARN_ADMIT / 1000).toFixed(1)} s in all and it goes `
+          + 'into the roll for good, and once two of them are in, two more are proposed under them');
+    } else {
+      d.log('the roll is the line you type again, and the chords it learned are kept for '
+          + 'when you come back to it');
+    }
+  }
+
+  function setMode(id) {
+    if (id === mode) return;
+    mode = id;
+    applyMode(true);
+  }
+
+  /**
+   * 🔴 IT IS NOT IN `.pos-controls`, FOR THE REASON THIS PAGE ALREADY GIVES
+   * ABOUT THE INSTRUMENT PICKER. `demo/verify.mjs` clicks every button in that
+   * row 650 ms apart while this page's own checks are already running at load,
+   * so a mode switch there would change what the roll holds in the middle of
+   * the damper check. The page's own check presses it instead, which grades
+   * more than a harness click would.
+   * ⚠️ TWO NAMED MODES IS `createChoice` AND NOTHING ELSE, which is what this
+   * page already decided about the instrument row.
+   */
+  const modePick = createChoice({
+    label: 'ROLL',
+    options: [['Typed', 'type'], ['Played', 'learn']],
+    at: mode === 'learn' ? 1 : 0,
+    onPick: (id) => setMode(id),
+    title: (id) => (id === 'learn'
+      ? 'the chords you keep coming back to go into the roll by themselves, and two more '
+        + 'are proposed under them'
+      : 'the roll is the line of chords typed in the field beside this'),
+  });
+  topRow.prepend(modePick.el);
 
   // ── what only this page can say ───────────────────────────────────────────
   //
@@ -1356,6 +1750,20 @@
      * nothing about the keyboard.
      */
     const quiet = async () => { keys.panic(); await sleep(350); };
+
+    /* 🔴 THE CHECKS START FROM THE MODE A VISITOR ARRIVES IN, AND `?learn=1`
+       IS NOT IT. MEASURED the moment the query landed: `DEMO_QUERY=learn=1 node
+       demo/verify.mjs nola` took **two asserts red** on a page doing exactly
+       what it promises, because the whole chord-line block grades the roll and
+       the roll was empty by design. Both read as nonsense (`the same  dots
+       either way`, an empty tab index list), which is what an assert about
+       something that is not there looks like.
+       ⚠️ SO THE BLOCK PUTS THE PAGE WHERE IT EXPECTS IT AND PUTS IT BACK AFTER,
+       rather than the query deciding which half of the page is graded. A
+       harness that measures different things depending on how it was opened is
+       a harness whose count means nothing. */
+    const openedIn = mode;
+    modePick.buttons[0].click();
 
     /**
      * 🔴 THE CHEAP ONES GO FIRST, AND THAT IS ABOUT THE HARNESS RATHER THAN
@@ -1613,6 +2021,23 @@
     lift(60);
     await sleep(700);
     const noPedal = peak();
+    /* 🔴 THE CONTROL ARM ON ITS OWN, AND IT IS TWO THINGS AT ONCE. The assert
+       below is a RATIO, `onPedal > noPedal * 2`, which would pass perfectly
+       well with both readings large: a page whose damper had stopped working
+       entirely would still ring twice as loud under a foot. Two numbers from
+       two places is this repository's rule and two derived from one comparison
+       is the defect it has already paid for twice.
+       ⚠️ AND IT IS ALSO THE REPAIR FOR A HARNESS SILENCE RECORDED IN
+       `BACKLOG.md`. This pedal block ran **3.09 s with no assert in it** and
+       `demo/verify.mjs` gives up about two seconds after the last NEW assert,
+       so every check after it was green by luck rather than headroom. The
+       sleeps are the measurement and must not be shortened; what was missing
+       was an honest claim in the middle of them. This splits 3.09 s into 1.2
+       and 1.8. */
+    d.assert('a key let go with no pedal under it really is silent 700 ms later',
+      noPedal < 0.002,
+      `the analyser reads ${noPedal.toFixed(4)} at the age the pedalled reading below is `
+      + 'taken, which is what stops that one being a ratio between two loud numbers');
 
     await quiet();
     pedal.control(PEDAL_CC, pedal.wire(true));
@@ -1941,6 +2366,280 @@
       instPick.buttons[0].click();                            // back where a visitor finds it
     }
 
+    /* ── the roll learning what is played, driven by real key presses ────── */
+    //
+    // 🔴 THROUGH THE KEYS AND THROUGH THE CONTROL, NEVER THROUGH THE
+    // RECOGNISER. `node demo/shell/name-test.mjs` grades the arithmetic over
+    // 648 generated voicings with no browser in it, including the one claim the
+    // whole feature rests on. What only this page can say is that a finger on a
+    // key reaches any of it, that the two timers are wired to the two
+    // thresholds, and that the roll keeps the player's selection while it
+    // grows. A check that called `nameChord` here would grade a module twice
+    // and this page not at all.
+    //
+    // ⚠️ AND EVERY SLEEP IS UNDER 1.2 s, WHICH IS THE HARNESS RATHER THAN THE
+    // PAGE. `verify.mjs` gives up about two seconds after the last NEW assert
+    // and this block holds chords for whole seconds on purpose, because the
+    // thresholds are the thing being graded. The asserts in the middle of a
+    // hold are not padding to keep a timer alive: each one is the negative
+    // control for the one after it, and a chord that is named but not yet
+    // written down is exactly the state `LEARN_ADMIT` exists to create.
+    {
+      await quiet();
+      keys.panic();
+      const rows = () => roll.el.querySelectorAll('.roll-row').length;
+      const kinds = () => [...roll.el.querySelectorAll('.roll-row')]
+        .map((r) => r.dataset.kind || 'plain').join(',');
+      const labels = () => [...roll.el.querySelectorAll('.roll-label')]
+        .map((t) => t.textContent);
+      const hold = (ns) => { for (const n of ns) keys.press(keys.keyOf(n)); };
+      const drop = (ns) => { for (const n of ns) keys.release(keys.keyOf(n)); };
+
+      modePick.buttons[1].click();                            // PLAYED
+      d.assert('switching the roll to what you play empties it and turns the typed line off',
+        mode === 'learn' && rows() === 0 && readLine.hidden === false
+        && chordField.input.disabled === true,
+        `${rows()} rows, and the typed field is `
+        + `${chordField.input.disabled ? 'off' : 'still live'}`);
+
+      /* 🔴 AND IT IS EXACTLY AS TALL EMPTY AS IT IS FULL, WHICH IS THE WHOLE
+         POINT OF ASKING FOR IT. *"make piano roll h fixed to 5 items even when
+         no data"*. An empty learning roll is the one state where a component
+         that sizes itself to its contents would be zero pixels, so the page
+         would grow under the reader on the first chord and on every chord
+         after it. MEASURED as a height in pixels rather than as a row count,
+         because a count is what the component believes and a height is what
+         somebody sees. */
+      const emptyH = roll.el.getBoundingClientRect().height;
+      d.assert('an empty roll still reserves its five rows, measured in pixels',
+        rows() === 0 && roll.el.querySelectorAll('.roll-rest').length === 5
+        && emptyH > 100,
+        `${emptyH.toFixed(1)} px of roll with nothing in it, across `
+        + `${roll.el.querySelectorAll('.roll-rest').length} rows of reserved room`);
+      /* ⚠️ AND THE ROOM IS NOT IN ANYBODY'S WAY: it is not a button, nothing in
+         it can be tabbed to, and a reader using a screen reader is not told
+         about five chords that are not there. */
+      d.assert('NEGATIVE CONTROL: the reserved rows are not rows, and nothing can reach them',
+        roll.el.querySelectorAll('.roll-row').length === 0
+        && [...roll.el.querySelectorAll('.roll-rest')]
+             .every((r) => r.tagName !== 'BUTTON' && r.getAttribute('aria-hidden') === 'true'),
+        `${roll.el.querySelectorAll('.roll-row').length} real row(s) against `
+        + `${roll.el.querySelectorAll('.roll-rest').length} of reserved room`);
+
+      /* ── a confident reading, off three real key presses ───────────────── */
+      hold([60, 64, 67]);
+      await sleep(LEARN_WINDOW + 120);
+      d.assert('holding three keys names the chord they make, and says so where it can be read',
+        readLine.textContent === 'Cmaj' && readLine.dataset.sure === '1',
+        `the page reads ${readLine.textContent} off notes 60, 64 and 67`);
+
+      /* 🔴 THE NEGATIVE CONTROL FOR THE THRESHOLD, AND IT IS THE HALF THAT
+         MAKES THE ADMISSION MEAN ANYTHING. Named is not learned: a chord you
+         touched on the way past is named just as confidently as one you sat on,
+         and if a name alone put a row in the roll the whole tally would be
+         decoration. Read at about 1.3 s of a 2.0 s threshold. */
+      await sleep(1000);
+      const heldSoFar = tally.msOf(chordKey(0, 'maj'), performance.now());
+      d.assert('NEGATIVE CONTROL: a chord named but not yet held long enough is not written down',
+        rows() === 0 && learned.length === 0
+        && heldSoFar > LEARN_GATE && heldSoFar < LEARN_ADMIT,
+        `the tally has ${Math.round(heldSoFar)} ms of it against the ${LEARN_ADMIT} ms it `
+        + `takes, so the roll still has ${rows()} rows`);
+
+      await sleep(1100);
+      d.assert('and holding it past that puts it in the roll, voiced onto these keys',
+        rows() === 1 && learned.length === 1 && labels()[0] === 'Cmaj'
+        && learned[0].notes.every((n) => n >= keys.base && n <= keys.base + REACH),
+        `${labels().join(', ')} at notes ${learned[0].notes.join(',')}, inside the `
+        + `${keys.base} to ${keys.base + REACH} the letter keys reach`);
+
+      /* 🔴 A CHORD YOU ARE HALF WAY INTO MARKS ITS OWN DOTS, asked for as *"when
+         partial match with piano roll chord use faint yellow on dots"*. The row
+         highlight is an exact set on purpose, and that left the roll silent at
+         the one moment somebody is reaching for a chord.
+         ⚠️ GRADED THROUGH REAL KEY PRESSES, not by calling `setHeld`, so what is
+         measured is the path a finger takes. */
+      const parts = () => roll.el.querySelectorAll('.roll-cell.on[data-part]').length;
+      const row0 = learned[0].notes;
+      /* ⚠️ THE CHORD THAT TAUGHT THE PAGE IS STILL UNDER A FINGER, and finding
+         that out cost a run. `heldNotes` is fingers, so it read 60/64/67/48/52
+         and nothing matched anything, which is the rule working correctly on a
+         check that had not put the keyboard down. */
+      drop([60, 64, 67]);
+      await sleep(40);
+      hold(row0.slice(0, 2));
+      await sleep(40);
+      const halfParts = parts();
+      const halfHeld = roll.el.querySelectorAll('.roll-row[data-held]').length;
+      hold(row0.slice(2));
+      await sleep(40);
+      const fullParts = parts();
+      const fullHeld = roll.el.querySelectorAll('.roll-row[data-held]').length;
+      drop(row0);
+      await sleep(40);
+      const goneParts = parts();
+      d.assert('two notes of a three note chord mark those two dots, and the third finger clears them',
+        halfParts === 2 && halfHeld === 0 && fullParts === 0 && fullHeld === 1 && goneParts === 0,
+        `two of ${row0.length} notes down marks ${halfParts} dot(s) with the row unlit, `
+        + `the whole chord marks ${fullParts} and lights ${fullHeld} row, and letting go `
+        + `leaves ${goneParts}`);
+      /* ⚠️ AND ONE NOTE IS NOT REACHING FOR A CHORD, IT IS THE NOTE HAPPENING TO
+         BE IN IT. Without a floor a root would mark a dot on every row that
+         shares it, which is the highlight meaning nothing at all. */
+      hold(row0.slice(0, 1));
+      await sleep(40);
+      const oneParts = parts();
+      drop(row0.slice(0, 1));
+      await sleep(40);
+      d.assert('NEGATIVE CONTROL: one note on its own marks nothing',
+        oneParts === 0,
+        `one note down marks ${oneParts} dot(s)`);
+
+      /* 🔴 THE SELECTION, WHICH IS THE ONE THING THE COMPONENT HAD TO GROW A
+         METHOD FOR. `setRows` cancels it, correctly, because in the typed mode
+         the rows really are new rows. Here they are the old rows plus one, so
+         the player would lose their selection every time they held a new chord
+         long enough, which is the moment they are least expecting anything to
+         move. */
+      roll.pick(0);
+      const pickedBefore = roll.picked();
+
+      /* ── a second chord, which is what turns the suggester on ──────────── */
+      drop([60, 64, 67]);
+      hold([65, 69, 72]);
+      await sleep(LEARN_WINDOW + 120);
+      d.assert('a second chord is named while the first stays picked',
+        readLine.textContent === 'Fmaj' && roll.picked() === 0 && rows() === 1,
+        `the page reads ${readLine.textContent} and row ${roll.picked()} is still chosen`);
+
+      await sleep(1000);
+      d.assert('NEGATIVE CONTROL: and the second chord is tallied separately rather than added on',
+        rows() === 1 && learned.length === 1,
+        `the first chord is in and the second is about 1.3 s into its own ${
+          (LEARN_ADMIT / 1000).toFixed(1)} s, so the roll still has ${rows()} row`);
+
+      await sleep(1100);
+      d.assert('a second chord appends, keeps the selection, and brings one proposal with it',
+        learned.length === 2 && rows() === 3 && roll.picked() === pickedBefore
+        && kinds() === 'learned,learned,guess',
+        `${rows()} rows reading ${labels().join(', ')}, and row ${roll.picked()} is `
+        + 'still the one that was chosen before the append');
+
+      /* 🔴 THE TWO PROPOSALS ARE TWO DIFFERENT JOBS, NOT A RANKED PAIR OF ONE.
+         MEASURED on 251 held-out jazz standards: slot A names the real next
+         chord 48.7 per cent of the time and is the globally commonest chord
+         16.2 per cent of the time, while slot B names it 9.9 per cent and is
+         the global maximum 1.0 per cent with 90.7 per cent of what it offers
+         still attested. A single ranked list scored on accuracy is the shape
+         that makes *be right* and *no cliches* fight over one cell, and the
+         constant baseline is the proof: two distinct answers in eleven thousand
+         contexts. */
+      d.assert('the one proposal is the less obvious of the two the table offers, not the commonest',
+        guesses.length === 1 && guesses[0].role === 'other'
+        && lastGuess.picks.length === 2 && lastGuess.picks[0].role === 'usual'
+        && guesses[0].name !== lastGuess.picks[0].name
+        && guesses.every((g) => g.notes.every((n) => n >= keys.base && n <= keys.base + REACH)),
+        `after ${learned.map((l) => l.name).join(' then ')} the table offers `
+        + `${lastGuess.picks[0].name} as the usual one and ${guesses[0].name} as the less `
+        + `obvious one, and the roll draws ${guesses.map((g) => g.name).join(', ')}`);
+
+      /* 🔴 WHAT YOU PLAYED COMES FIRST, ASKED FOR IN THOSE WORDS: *"played is
+         first choice"*. It was already true, by the order `addLearned` appends
+         in rather than by anything saying so, and a rule nothing grades is a
+         rule that drifts. */
+      d.assert('every chord you played is above everything the page is proposing',
+        kinds().split(',').indexOf('guess') === learned.length
+        && !kinds().split(',').slice(0, learned.length).includes('guess'),
+        `the rows read ${kinds()} for ${learned.length} chord(s) played`);
+
+      /* 🔴 AND IT CAME OUT OF THE COUNTED TABLE RATHER THAN THE RULE THAT USED
+         TO BE THE WHOLE SUGGESTER, WHICH IS THE HALF THAT SAYS THE NUMBERS
+         ABOVE ARE ABOUT THIS PAGE. MEASURED on held-out songs: the 173 byte
+         diatonic rule reads 1.4 per cent top 1 on jazz and is silent on 65.3
+         per cent of cases, and the table reads 48.5 and 67.4 at top 3. A page
+         that silently backed off to the rule would look identical and mean
+         something else entirely. ⚠️ AND THE TABLE IS FETCHED, so this also
+         grades that it was asked for on a chord somebody played rather than on
+         a visit: the counter above already asserted zero files before any key
+         was pressed. */
+      d.assert('the proposals are read out of the counted table, fetched on a chord you played',
+        tablesIn() === true && lastGuess?.source === 'corpus'
+        && lastGuess.style === LEARN_STYLE
+        && gotUrls.filter((u) => u.endsWith('.json')).length === 1,
+        `${lastGuess?.source} in the ${lastGuess?.style} table, `
+        + `${gotUrls.filter((u) => u.endsWith('.json')).length} table fetched, and the key it `
+        + `read them in is ${lastGuess?.keyName}`);
+
+      /* 🔴 WHERE THE KEY CAME FROM, SAID OUT LOUD, BECAUSE IT CANNOT BE
+         DEDUCED. MEASURED: two chords fit 3.33 keys of 24 on average and never
+         fewer than 2, and three chords never fit exactly one, since a major key
+         and its relative minor hold the same seven chords. */
+      d.assert('and the page says which key it read them in, because a key is a guess',
+        window.__demo.logs.some((l) => l.msg.includes('as the key')),
+        window.__demo.logs.filter((l) => l.msg.includes('as the key')).pop()?.msg || 'nothing said');
+
+      /* ── the chord nothing can name, which is the interesting one ──────── */
+      //
+      // 🔴 `C E G#` IS `Caug` AND `Eaug` AND `G#aug`, three names for one set of
+      // notes, because an augmented triad divides the octave into three equal
+      // major thirds and is its own inversion three times over. Naming one of
+      // them is a coin toss with a name on it, and this page has the worst
+      // available version of that failure: `setHeld` lights a row when the
+      // player plays it, so a wrong name in the roll gets confirmed straight
+      // back to somebody who trusted it.
+      drop([65, 69, 72]);
+      hold([60, 64, 68]);
+      await sleep(LEARN_WINDOW + 120);
+      /* ⚠️ READ WHILE THE KEYS ARE STILL DOWN. The first version of this check
+         let go first and read the line inside the assert expression, which runs
+         after every line above it, so it graded an empty keyboard and reported
+         `nothing held` about a page doing exactly the right thing. Same shape as
+         `positron-verify`'s counter-beats-a-state rule, one step along: a
+         reading taken next to the event that clears it is a reading of the
+         clearing. */
+      const unsureRead = readLine.textContent, unsureSure = readLine.dataset.sure;
+      const unsureRows = rows();
+      /* 🔴 READ THE TALLY, NOT THE ROLL, AND THIS WAS FOUND BY SABOTAGE. The
+         first version of this check asserted the ROW COUNT had not moved, and
+         it stayed green with the margin test replaced by `if (false)`, because
+         a chord written into the tally takes two whole seconds to reach the
+         roll and this check reads it 320 ms in. It was measuring a threshold it
+         had not waited for. `tally.held()` is the quantity in question: an
+         unsure chord must never start accruing at all. */
+      const unsureTallied = tally.held();
+      drop([60, 64, 68]);
+      d.assert('a chord with more than one name shows both of them and starts no tally at all',
+        unsureRead === 'Caug or Eaug' && unsureSure === undefined
+        && unsureTallied === null && unsureRows === 3 && learned.length === 2,
+        `the page read ${unsureRead} while the keys were down, the roll stayed at `
+        + `${unsureRows} rows, and the tally is holding ${unsureTallied ?? 'nothing'}`);
+
+      /* ── and none of it happens when the roll is the typed line ────────── */
+      modePick.buttons[0].click();                            // TYPED
+      hold([60, 64, 67]);
+      await sleep(LEARN_WINDOW + 200);
+      const typedRows = rows();
+      /* 🔴 THE TALLY AGAIN, FOR THE SAME REASON AND FOUND THE SAME WAY. With
+         the mode test taken out of `heardChange` entirely, a row count 400 ms
+         after a press cannot tell: admission is two seconds away. What CAN tell
+         is that nothing began accruing and that no chord beyond the two learned
+         ones was ever scored. */
+      const typedTallied = tally.held(), everScored = tally.scores(performance.now()).length;
+      drop([60, 64, 67]);
+      keys.panic();
+      d.assert('NEGATIVE CONTROL: playing a chord in the typed mode teaches the page nothing',
+        mode === 'type' && learned.length === 2 && typedRows === 4
+        && typedTallied === null && everScored === 2
+        && labels()[0] === 'Cmaj I' && readLine.hidden === true,
+        `the roll is the typed line again at ${typedRows} rows reading `
+        + `${labels().join(', ')}, and the tally has scored ${everScored} chords in the `
+        + 'whole run, which is the two it learned and nothing since');
+
+      /* And back to whatever the visitor asked for, since `?learn=1` is a
+         person saying which mode they came for. */
+      if (openedIn === 'learn') modePick.buttons[1].click();
+    }
+
     d.assert('the page measured its own press to sound', presses === 0 || worstMs > 0,
       presses ? `${presses} presses timed, median ${medians[medians.length >> 1].toFixed(1)} ms, `
               + `worst ${worstMs.toFixed(1)} ms`
@@ -2063,8 +2762,12 @@
   }, { how: true, atEnd: true });
 
   /* The chords the field opens with, drawn before anybody types. It fetches
-     nothing and sounds nothing: a chart is a picture until a key is pressed. */
-  drawChords(chordField.value());
+     nothing and sounds nothing: a chart is a picture until a key is pressed.
+     ⚠️ THROUGH `applyMode` RATHER THAN STRAIGHT INTO `drawChords`, so that
+     `?learn=1` opens on an empty roll listening for chords instead of drawing a
+     line the field is about to be disabled from feeding. In `Typed`, which is
+     the default, this is the same call it always was. */
+  applyMode(mode === 'learn');
   setTranspose(Number(q.get('transpose')) || 0);
 
   /**
@@ -2095,6 +2798,59 @@
 
 <style>
   .nola-picks { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+
+  /* 🔴 THE MODE AND THE FIELD IT TURNS OFF ARE ONE ROW. `Played` disables the
+     CHORDS field, and a control that greys out something a block away is a page
+     asking a reader to work out what happened. Same arrangement as `.nola-picks`
+     below, and the same reason: a pair that belongs tight is one block. */
+  .nola-top { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .nola-top .pos-field { flex: 1 1 220px; min-width: 0; }
+
+  /* 🔴 ONE LINE THAT CANNOT CHANGE ITS OWN HEIGHT, WHICH IS THE WHOLE OF WHY
+     IT IS ALLOWED TO EXIST. `positron-ui` bans a live sentence under a picture
+     because it rewraps between two and three lines while somebody reads it, and
+     the test it gives is not *is it short*, it is *can this change its own
+     height while somebody is looking at it*. `nowrap`, one `min-height` in the
+     same units as the text, and an ellipsis rather than a second line.
+     ⚠️ AND IT CHANGES WHEN A CHORD SETTLES, which is a few times a second at
+     most and is an event rather than a clock.
+     ⚠️ `[hidden]` HAS TO BE SAID OUT LOUD HERE because a `display` rule beats
+     the attribute's own default, which is how a hidden element goes on being
+     drawn with nothing in it. */
+  .nola-read { font: 600 13px/1.5 var(--mono); letter-spacing: .04em; color: var(--dim);
+               min-height: 20px; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; }
+  /* ⚠️ A SECOND INK FOR A SECOND KIND OF FACT, which is the rule `.nola-chord-r`
+     already follows one element along. A name the page is sure of and two names
+     it cannot choose between are not the same statement, and reading them in
+     the same colour would make the interesting one look like the ordinary one. */
+  .nola-read[data-sure] { color: var(--fg); }
+  .nola-read[hidden] { display: none; }
+
+  /* 🔴 A CHORD THE PAGE IS PROPOSING IS NOT A CHORD THE PAGE HEARD YOU PLAY,
+     AND THE ROLL MUST NOT DRAW THEM THE SAME. What it learned is a record of
+     what you did; what it offers is a guess, and a guess wearing the same ink
+     as a measurement is this project's oldest mistake in a new place. The dots
+     keep their own colour, because they are still where the notes are. */
+  /* ⚠️ THE DOT IS AN `::after`, NOT THE CELL. Setting a background on the cell
+     paints the whole column instead of the mark, which is what the first
+     version of these two rules did. `shell.css` draws every dot that way and
+     `[data-held]` above is the pattern to copy. */
+  .roll-row[data-kind="guess"] .roll-label { color: var(--ai); font-style: italic; }
+  .roll-row[data-kind="guess"] .roll-cell.on::after { background: var(--ai); }
+
+  /* 🔴 A CHORD YOU ARE HALF WAY INTO, ASKED FOR AS *"when partial match with
+     piano roll chord use faint yellow on dots"*. `--hi` is the ink a pressed
+     key already uses, so this is the same meaning at lower strength rather than
+     a sixth colour: yellow says *you are playing this*. The row's own full
+     match highlight is untouched, and `roll.mjs` marks no dots once the whole
+     chord is down, because the row has lit by then and two signals for one fact
+     is the middot rule wearing a colour.
+     ⚠️ IT NEEDS (0,3,0) TO BEAT `.roll-row[data-on] .roll-cell.on::after`, which
+     is the selected row repainting its dots and is written later in the file. */
+  .roll .roll-cell.on[data-part]::after {
+    background: color-mix(in srgb, var(--hi) 45%, transparent);
+  }
   /* 🔴 THE SUSTAIN BUTTON SITS WITH THE OCTAVE PAD, NOT IN `.pos-controls`.
      `keyboard.mjs` already argues this about the pad itself: an octave pair and
      a `Notes off` are controls ABOUT the keys, and a hand's width away at the
