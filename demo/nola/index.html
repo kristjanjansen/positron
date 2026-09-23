@@ -1969,12 +1969,28 @@
     /* 🔴 PLAYING THE PROPOSAL IS WHAT ENDS ITS HOLD, and it is read off the
        chord KEY rather than off the exact notes, because taking up an offer in
        your own voicing is still taking it up. */
-    if (guesses.length && !guessPlayed) {
+    /**
+     * 🔴 AND TRYING THE PROPOSAL DOES NOT TEACH IT. Asked 2026-09-23: *"when i
+     * trying to get suggestion right do not store"*.
+     * A chord you played because this page put it in front of you is not a chord
+     * you keep coming back to, and counting it would make the suggester feed
+     * itself: offer a chord, watch somebody try it three times to hear whether
+     * they like it, admit it as one of theirs, and then propose from a line that
+     * the page wrote. The roll is supposed to be a record of what a player does.
+     * ⚠️ IT IS ONLY WHILE THE PROPOSAL IS ON SCREEN. Once it has been replaced,
+     * the same chord counts like any other, because by then it is a chord
+     * somebody chose to go on playing rather than one they were handed.
+     */
+    if (guesses.length) {
       const c = parseChord(guesses[guesses.length - 1].name);
       if (c.ok && chordKey(c.root, c.quality) === key) {
-        guessPlayed = true;
-        d.log(`you played ${guesses[guesses.length - 1].name}, so the next chord you `
-            + 'keep coming back to will bring a new proposal with it');
+        if (!guessPlayed) {
+          guessPlayed = true;
+          d.log(`you are trying ${guesses[guesses.length - 1].name}, which this page `
+              + 'proposed, so it is not being counted as a chord of yours');
+        }
+        showReading(r);
+        return;
       }
     }
     playedAs.set(key, [...got.notes].sort((a, b) => a - b));
@@ -3299,6 +3315,16 @@
       drop(guesses[0].notes);
       await sleep(80);
       const freedAfter = guessPlayed;
+      /* 🔴 AND IT WAS NOT COUNTED WHILE IT WAS BEING TRIED. Asked as *"when i
+         trying to get suggestion right do not store"*: a chord this page put in
+         front of somebody is not a chord they keep coming back to, and counting
+         it would let the suggester feed itself a line it wrote. */
+      const tried = parseChord(guesses[0].name);
+      const triedKey = tried.ok ? chordKey(tried.root, tried.quality) : '';
+      d.assert('NEGATIVE CONTROL: trying the proposal does not teach it to the page',
+        freedAfter === true && tally.msOf(triedKey, performance.now()) === 0,
+        `${guesses[0].name} was played and the tally has `
+        + `${Math.round(tally.msOf(triedKey, performance.now()))} ms of it`);
       drawGuesses();
       d.assert('and playing it releases the hold, so the next redraw may offer something else',
         held0 === false && freedAfter === true && guessRedraws > redrawsWas,
