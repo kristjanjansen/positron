@@ -1,6 +1,74 @@
 ## Open
 
-### Asked 2026-09-23, not started: `/nola/` loses its chord keyboards for the piano roll
+### Found 2026-09-23, not fixed: `/fau/`'s visit assert cannot see a fetch that was made
+
+🔴 **IT STAYED GREEN UNDER A 6 MB SABOTAGE.** `demo/fau/index.html:1080` asserts
+*a visit fetches no compiler at all, counted off what the browser really loaded*
+over `performance.getEntriesByType('resource')`, and the comment above it
+(`:415`) is right about why a browser counter beats a page's own. What it counts
+is still the wrong quantity: a resource entry is written when a response
+FINISHES, so **the assert measures "nothing has arrived", not "nothing was
+asked for"**. Starting the compiler fetch on the load path leaves it green,
+because 6 MB is nowhere near done when the check block runs.
+⚠️ **AND THIS IS THE `/reel/` DEFECT'S EXACT SHAPE.** That page's `armed` flag
+suppressed `.play()` and never suppressed the FETCH, and `positron-verify`
+records the repair: **one counted wrapper every URL leaves through**, so the
+claim is an assert over a counter rather than a reading of a file. Six of
+`/reel/`'s nine were media source assignments, which a grep for `fetch` misses.
+⚠️ **THE NEGATIVE CONTROL BESIDE IT IS SOUND AND IS NOT THIS.** `runs === 0 &&
+node === null && ctx === null && midi === null` is instantaneous state and
+catches a page that compiled or opened a device. Neither assert catches a page
+that ASKED for the compiler and was still waiting.
+✅ **THE FIX IS CHEAP**: count the request at the call, not the arrival, and keep
+the `performance` count alongside it as the second independent source. Two
+numbers from two places is the rule; two from one field is the defect this
+repository has already paid for twice.
+
+### Found 2026-09-23, not fixed: `/nola/`'s pedal check outruns the harness's patience
+
+🔴 **THREE SECONDS OF SILENCE AGAINST A TWO SECOND GIVE-UP.** `demo/verify.mjs`
+stops about two seconds after the last NEW assert. `demo/nola/index.html:1601`
+to `:1625` is one block with no assert in it: `quiet()` 350, press, 150, lift,
+700, `quiet()` 350, press, 150, lift, 700, pedal up, 600. **3.0 s of arithmetic
+and 3.09 s measured**, and every millisecond of it is load bearing, because the
+whole point is that the note is still sounding at an age where an unpedalled one
+is not.
+⚠️ **IT IS GREEN TODAY AND THAT IS LUCK, NOT HEADROOM.** The gap sits inside a
+run whose other asserts keep the timer alive either side of it; a slower machine
+or one more sleep in that block takes the rest of the page's checks out of the
+run, and the suite reports the SMALLER count as green. `BACKLOG.md` already
+records that shape costing 18 of 25 checks while the summary read 13/13.
+✅ **TWO REPAIRS AND THEY ARE NOT THE SAME.** Either the page keeps the timer
+alive (an assert on something true mid-way, which is honest work rather than a
+decoration), or `manifest.mjs` gives `nola` a `settleMs`, which the page next
+door already does for the same reason. **Do not shorten the sleeps**: they are
+the measurement.
+
+### Found 2026-09-23, not fixed: `demo/wish/index.html` carries the last 2 px focus ring
+
+🔴 **ONE LINE SURVIVED THE SWEEP, AND ON PURPOSE.** `demo/wish/index.html:245`
+reads `.wish-conn.pick:focus-visible { outline: 2px solid var(--hi);
+outline-offset: -2px; }`, against the 1 px every other ring moved to on
+2026-09-23 (*"make focus styles appear only on keyb nav not mouse and make it
+1px. change everywhere"*).
+⚠️ **IT WAS LEFT BECAUSE THAT FILE IS ANOTHER SESSION'S IN-FLIGHT WORK**, which
+is the same reason it is excluded from every commit this session makes. It is a
+one character edit whenever that file is free.
+
+### Found 2026-09-23, not fixed: `demo/shell/midi.mjs` puts a middot in every page's log
+
+🔴 **A SHARED MODULE, SO IT IS NOT A PER-DEMO SWEEP.** `demo/shell/midi.mjs:72`
+logs `` `${ports} MIDI input${ports === 1 ? '' : 's'} · play it` ``, and every
+page that asks for a MIDI keyboard prints it: `/fau/`, `/nola/`, `/muta/`,
+`/keys/`, `/instrument/`, `/knobs/`, `/evo/` and the rest.
+⚠️ **`CLAUDE.md` ALREADY DECIDES THIS CASE.** The middot rule is per demo, and
+the exception written into it is the shared ones, *"decided once"*, which is
+exactly what this is. The repair is the one that rule names: **stop gluing**.
+Two facts joined by a middot is a row of cells pretending to be a sentence, and
+here the second half is an instruction rather than a fact, so it is two log
+lines or one sentence with a full stop in it.
+
+### Asked 2026-09-23, DONE 2026-09-23: `/nola/` loses its chord keyboards for the piano roll
 
 🔴 **ASKED IN THESE WORDS:** *"rm exta keyboards from nola, replace with vert
 pianoroll"*. The extra keyboards are the chord charts, one `createKeyboard` per
@@ -88,7 +156,7 @@ answers verbs over the relay from any network, so *"I cannot ssh to it"* is
 never *"it is down"*, and `node rig/board/ask.mjs --room studio-1 audio.status`
 is the first thing to try rather than the last.
 
-### Asked 2026-09-23, not started: a Rhodes sample pack for `/nola/`, researched in the background
+### Asked 2026-09-23, DONE 2026-09-23: a Rhodes sample pack for `/nola/`, researched in the background
 
 🔴 **ASKED IN THESE WORDS:** *"nola: can you get similar good sample pack for
 rhodes? investigate in bg"*. *Similar* is to the Salamander piano pack
@@ -335,7 +403,7 @@ defect that left `.pos-pick`'s entire phone layout dead in its own stylesheet,
 never having run once, and it is invisible in the source because the source says
 what the author meant.
 
-### Asked 2026-09-23, not started: `/fau/` and `/nola/` move to the hardware group
+### Asked 2026-09-23, DONE 2026-09-23: `/fau/` and `/nola/` move to the hardware group
 
 🔴 **ASKED IN THESE WORDS:** *"index: move fau/nola to hardware"*.
 
@@ -357,7 +425,7 @@ from the keyboard on this desk**, which is a real thing to sort by. The name
 ⚠️ **`GROUPS` REFUSES AN UNKNOWN GROUP AT RENDER TIME** and names the row, so a
 typo here cannot ship quietly.
 
-### Asked 2026-09-23, not started: the keyboard is a wrapper, and a piano roll glues on top
+### Asked 2026-09-23, DONE 2026-09-23: the keyboard is a wrapper, and a piano roll glues on top
 
 🔴 **ASKED IN THESE WORDS:** *"keyboard: make it into wrapper, gluable, use same
 colors as in pad grid."* and *"add component that can be glued top of it that is
@@ -420,7 +488,7 @@ that **nothing which redraws every frame may change how much room it takes**, an
 `strip.mjs`'s `followTarget` already owns the question of what a moving picture
 follows when there is no playhead.
 
-### Asked 2026-09-23, not started: `/fau/` becomes an instrument panel
+### Asked 2026-09-23, DONE 2026-09-23: `/fau/` becomes an instrument panel
 
 🔴 **ASKED IN THESE WORDS:** *"rm slounding / pedal holds"*, then *"create
 instument panel, fau on top right, below the textarea (edge to edge), below it
@@ -465,7 +533,7 @@ control describing something that no longer exists. **`custom` is the answer to
 that objection** rather than a contradiction of it, so this is a change of mind
 with a mechanism, and the selector becomes a picker with a fourth state.
 
-### Asked 2026-09-23, not started: the keyboard component, seven changes at once
+### Asked 2026-09-23, DONE 2026-09-23: the keyboard component, seven changes at once
 
 🔴 **ASKED IN THESE WORDS:** *"in desktop make them 25% higher. integrate sustain
 to footer, create toggle button, big and small, use small below keyboard, left
