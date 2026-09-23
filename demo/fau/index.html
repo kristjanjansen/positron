@@ -111,7 +111,6 @@
   import { createMidi } from '/shell/midi.mjs';
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC } from '/shell/pedal.mjs';
   import { createField } from '/shell/field.mjs';
-  import { createSwitch } from '/shell/switch.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -544,17 +543,35 @@ effect  = _, _;
      at 49 px do not fit the page. The component reads the property. */
   keysHost.style.setProperty('--k-min', '44px');
 
-  const KEY_LO = 12;            // twelve keys below the lettered octave
+  /**
+   * 🔴 THE LETTERS ARE ON THE BOTTOM OCTAVE, WHICH IS C3 HERE. Asked
+   * 2026-09-23: *"default asd keyboard to c3"*. They sat on the middle octave,
+   * so `a` played C4 while the keyboard started at C3 and the two octaves below
+   * your fingers were reachable only with a mouse.
+   * ⚠️ AND THERE ARE STILL ONLY THIRTEEN OF THEM, which is the component's own
+   * rule rather than a choice: `QWERTY_CHROMATIC` is one octave plus its top C,
+   * `z` and `x` are already the octave pair, and a key labelled with a letter
+   * that does nothing is worse than a key with no letter on it. What moved is
+   * WHICH octave has them, not how many.
+   */
+  const KEY_LO = 12;            // the lettered octave is the first thirteen keys
   const { KEY_MAP, KEY_ORDER, KEY_SHARPS, KEY_LETTERS } = (() => {
     const map = {}, order = [], sharps = new Set(), lettered = new Set();
     const BLACK = new Set([1, 3, 6, 8, 10]);
-    const qwerty = Object.keys(QWERTY_CHROMATIC);
+    /* 🔴 READ OFF THE CONSTANT'S VALUES, NOT ITS ORDER, AND THAT MATTERS
+       SINCE `l` LANDED. This took `Object.keys()` and handed the nth letter to
+       the nth semitone, which was right only while the map had no gaps in it.
+       `l` is a D and sits at 14, with the C sharp at 13 belonging to a letter
+       nobody has asked for, so a positional read would have put `l` on the
+       black key and moved every shape a hand knows one key out. */
+    const letterAt = Object.fromEntries(
+      Object.entries(QWERTY_CHROMATIC).map(([k, v]) => [v, k]));
     for (let i = 0; i <= 24; i++) {
-      const id = i < KEY_LO ? `lo${i}` : qwerty[i - KEY_LO];
+      const id = letterAt[i] ?? `hi${i}`;
       map[id] = i;
       order.push(id);
       if (BLACK.has(i % 12)) sharps.add(id);
-      if (i >= KEY_LO) lettered.add(id);
+      if (letterAt[i]) lettered.add(id);
     }
     return { KEY_MAP: map, KEY_ORDER: order, KEY_SHARPS: sharps, KEY_LETTERS: lettered };
   })();
@@ -568,8 +585,16 @@ effect  = _, _;
     onOctave: (b) => d.log(`the keys on screen now start at ${b}`),
     onPanic: () => {
       allOff();
-      sustainBtn.set(false, true);
+      keys.sustain.set(false, true);
     },
+    /* 🔴 THE DAMPER IS THE KEYBOARD'S OWN CONTROL NOW, in its footer, where
+       every control about the keys belongs. This page drew its own switch in a
+       row underneath until 2026-09-23, and so did `/nola/`, which is one
+       problem solved twice. What the page still owns is what a foot MEANS:
+       `demo/shell/pedal.mjs` holds the note off and the component knows none of
+       that. */
+    sustain: true,
+    onSustain: (on) => pedal.set(on),
   });
 
   // ── the foot ───────────────────────────────────────────────────────────────
@@ -593,11 +618,6 @@ effect  = _, _;
     },
   });
 
-  const sustainBtn = createSwitch({
-    label: 'SUSTAIN',
-    title: 'hold the notes on after the keys come up, the way a pedal does',
-    onChange: (on) => pedal.set(on),
-  });
 
   function press(note, vel = 100) {
     if (!node) { d.log('nothing is compiled yet, so press a preset or COMPILE'); return; }
@@ -629,7 +649,7 @@ effect  = _, _;
     onUp: (note) => lift(note),
     onControl: (cc, value) => {
       if (!pedal.control(cc, value)) return;
-      sustainBtn.set(pedal.down(), true);
+      keys.sustain.set(pedal.down(), true);
     },
     log: d.log,
   });
@@ -639,12 +659,7 @@ effect  = _, _;
   row.append(source.el);
   d.el.append(row);
 
-  const kbBlock = el('div', 'fau-kb');
-  kbBlock.append(keysHost);
-  const footRow = el('div', 'fau-foot');
-  footRow.append(sustainBtn.el);
-  kbBlock.append(footRow);
-  d.el.append(kbBlock);
+  d.el.append(keysHost);
 
   d.on('compile', () => serial(async () => {
     const r = await build(source.value(), 'your source');
@@ -944,11 +959,6 @@ effect  = _, _;
   .fau-row { display: flex; }
   .fau-row .pos-field { flex: 1 1 100%; }
 
-  /* The keyboard and the switch under it, which is where a control ABOUT the
-     keys belongs rather than a hand's width away in the control row. Same
-     argument `keyboard.mjs` makes about its own octave pad. */
-  .fau-kb { display: flex; flex-direction: column; gap: 10px; }
-  .fau-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
   /* A row of keys wider than the page scrolls itself rather than dragging the
      page sideways. `min-width: 0` is what lets a flex child shrink below its

@@ -114,6 +114,60 @@
  * than 49 px in any container over about 413 px, so the floor only ever binds
  * on a narrow one and the two queries were inert. One rule, no breakpoint.
  */
+import { createToggle } from './toggle.mjs';
+
+/**
+ * 🔴 WHERE A BLACK KEY SITS, AS FRACTIONS OF ITS OWN WIDTH, FROM
+ * `research/piano-key-proportions-2026-09.md`. Seven white keys have to share
+ * five black ones, so the two groups cannot both sit on their joins and leave
+ * the whites equal: centring makes D, G and A **59 per cent** of C's back
+ * width, where a piano keeps every white within 8 per cent of every other.
+ * C# and D# move by a sixth, F# and A# by a quarter, G# not at all, outward
+ * from the middle of the group.
+ * ⚠️ IT IS READ OFF THE PITCH CLASS, NOT THE LETTER, because a caller may pass
+ * its own `map` and keying this on `w`/`e`/`t`/`y`/`u` would break the promise
+ * that a keyboard can be built from any letters.
+ */
+/**
+ * 🔴 5 px, WHICH IS ABOUT AN EIGHTH OF A KEY AND IS ALL THERE IS TO SPEND. A
+ * sharp is 66 per cent of a white and straddles the join, so it eats about a
+ * third of the white on that side. Moving a name a third of a key would put it
+ * against the far edge; 5 px clears the overlap that was photographed while
+ * leaving the name visibly ON its key.
+ */
+export const NUDGE_PX = 5;
+
+export const SHARP_OFF = { 1: -1 / 6, 3: 1 / 6, 6: -1 / 4, 8: 0, 10: 1 / 4 };
+
+/**
+ * Put one key in the grid, and hand back the running white count.
+ *
+ * 🔴 EXPORTED BECAUSE A SECOND DRAWING OF THE SAME KEYBOARD EXISTS NOW.
+ * `demo/shell/roll.mjs` draws a dot per key ABOVE an instrument, and the one
+ * thing a roll must do is line up with the keys under it. `/nola/`'s chord
+ * charts already failed at exactly that and were corrected: same width, same
+ * key size, different base, so a shape could not be carried down the page,
+ * which is the only thing a chart is for. **Two copies of this arithmetic is
+ * that defect waiting to happen again**, so there is one copy and both
+ * drawings call it.
+ *
+ * @param {HTMLElement} node   the element to place
+ * @param {{sharp:boolean, whites:number, pitchClass:number}} o
+ * @returns {number} the white count after this key
+ */
+export function placeKey(node, { sharp, whites, pitchClass }) {
+  node.style.gridColumn = String(whites + 1);
+  if (sharp) {
+    const off = SHARP_OFF[pitchClass];
+    if (off) node.style.setProperty('--k-off', String(off));
+    // ⚠️ A KEYBOARD THAT OPENS ON A SHARP KEEPS IT ON THE EDGE. With no white
+    // key before it there is no join to straddle, so the pull-back comes off
+    // and it sits flush at the left instead of hanging half outside the row.
+    if (whites === 0) node.style.transform = 'none';
+  }
+  return sharp ? whites : whites + 1;
+}
+
 export const KEY_MIN_PX = 49;
 
 /**
@@ -181,7 +235,19 @@ export const SWIPE_PX = 10;
 export const SWIPE_FRAMES = 2;
 
 /** QWERTY as a piano octave: the home row is white, the row above holds sharps. */
-export const QWERTY_CHROMATIC = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12 };
+/**
+ * 🔴 `l` IS THE FOURTEENTH AND IT IS A D, NOT A C SHARP. Asked 2026-09-23:
+ * *"l dhould work in asd keyboard"*. This ran `a` to `k`, one octave and its
+ * top C, so the finger sitting on `l` played nothing at all.
+ * ⚠️ IT IS 14 BECAUSE THE LAYOUT IS A PIANO AND NOT A ROW. The white keys are
+ * `a s d f g h j k l` and the blacks sit above them on `w e t y u`, so the
+ * letter after the top C is the D ABOVE it and the C sharp between them belongs
+ * to `o`. Numbering `l` as 13 would put a white letter on a black key and every
+ * shape a hand knows would be one key out.
+ * ⚠️ AND `o` AND `p` ARE DELIBERATELY NOT HERE. One letter was asked for; the
+ * pair that completes that octave is two more lines and nobody has asked.
+ */
+export const QWERTY_CHROMATIC = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, l: 14 };
 export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
 
 /**
@@ -217,7 +283,8 @@ export function createKeyboard(host, {
   base = 60, map = QWERTY_CHROMATIC, sharps = SHARP_KEYS,
   onDown = () => {}, onUp = () => {}, keys: keyOpts = null,
   onPanic = null, onOctave = null, minBase = 24, maxBase = 96, letters = true,
-  pad: wantPad = true,
+  pad: wantPad = true, sustain: wantSustain = false, onSustain = null,
+  names: wantNames = true,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
   /**
@@ -233,25 +300,68 @@ export function createKeyboard(host, {
    * listeners on `window` and they already refuse a key that is not in the map,
    * so a Set changes what is DRAWN and nothing about what is heard.
    */
-  const hasLetter = (k) => (letters instanceof Set ? letters.has(k) : !!letters);
   const keys = keyOpts || Object.keys(map);
   const noteOf = (k) => base + map[k];
   // A key carries two names: the note it plays and the letter that plays it.
   // The note goes on TOP because it is the one that changes — an octave shift
   // moves every note name and no letter — and because a player reading a
   // keyboard is looking for a pitch, not for a keystroke.
-  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const noteName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
+  /* 🔴 `♯` U+266F, NOT `#`. The number sign is a transcription of the sharp
+     that a typewriter could reach, and `shell.css` now binds U+266D to U+266F
+     to a subset of Bravura Text so it is drawn as notation rather than as
+     punctuation. The letters beside it stay in the mono face, which is what the
+     `unicode-range` is for. */
+  const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  /**
+   * 🔴 THE OTHER WAY OF NAMING A KEY, ASKED FOR 2026-09-23: *"add small
+   * radiobutton [C | 1th] (correc?) to swich CDE 123 markup (not sure on this
+   * theouri)"*. The uncertainty in the ask is fair and the answer is that both
+   * namings are real and neither is a nickname for the other: `C` is the note,
+   * an absolute pitch; `1` is the DEGREE, which says what that note does in a
+   * key and is the same language the roman numerals over a chord are in.
+   * ⚠️ SO A DEGREE NEEDS A TONIC AND A LETTER DOES NOT. Without one there is
+   * nothing to be the first of, and the default is the keyboard's own leftmost
+   * pitch class, which on every page here is a C.
+   * ⚠️ AND IT CARRIES NO OCTAVE NUMBER. `1` is a role rather than a place, and
+   * `1₃` would be two answers to one question in five characters.
+   */
+  /* ⚠️ `♭`, NOT `b`. The flat sign is the notation and the letter is a
+     transcription of it that a keyboard happens to have; the mono face has it,
+     and `b2` beside a row of note names containing a B is genuinely ambiguous. */
+  const DEGREES = ['1', '♭2', '2', '♭3', '3', '4', '♭5', '5', '♭6', '6', '♭7', '7'];
+  let tonic = ((base % 12) + 12) % 12;
+  let naming = 'letter';
+  const noteName = (n) => (naming === 'degree'
+    ? DEGREES[(((n - tonic) % 12) + 12) % 12]
+    : `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`);
+  /**
+   * 🔴 A DOT WHERE THE LETTER USED TO BE, AND THE KEY'S BACKGROUND NO LONGER
+   * MOVES AT ALL. Asked 2026-09-23: *"do not change bg colors. do colored dots
+   * istead. rm wasd hints, dots will be there. lightlightgray dots for hints,
+   * yellow for actual presses."*
+   *
+   * ⚠️ AND A KEY AT REST DRAWS NO DOT AT ALL. Asked 2026-09-23: *"rm dots from
+   * keyboard by defualt"*. The first version marked every key the computer
+   * keyboard can reach with a faint one, which is what the drawn letter used to
+   * mean, and thirteen permanent dots under a row of keys is a picture of the
+   * bindings rather than of the instrument. The dot now says only what is
+   * HAPPENING: held here, held elsewhere, or part of a chord somebody picked.
+   * ⚠️ `letters` THEREFORE ONLY DECIDES WHETHER THE COMPUTER KEYBOARD IS BOUND,
+   * and a Set passed to it no longer changes what is drawn, because nothing is.
+   * The binding was always all or nothing.
+   *
+   * ⚠️ AND THE DOT IS ALWAYS IN THE DOM, EVEN WHEN IT SAYS NOTHING. `.k` is a
+   * three row grid and the bottom row used to be reserved by a letter that only
+   * some keys had; an element that appears and disappears would change a key's
+   * inner layout per key. It is drawn transparent and painted by class.
+   */
   const label = (b, k) => {
     b.textContent = '';
     const nn = document.createElement('span'); nn.className = 'kn'; nn.textContent = noteName(noteOf(k));
     b.append(nn);
-    // ⚠️ THE LETTER IS ONLY DRAWN IF IT DOES SOMETHING. A key labelled `a` that
-    // does nothing when you press `a` is worse than a key with no letter on it.
-    if (hasLetter(k)) {
-      const kk = document.createElement('span'); kk.className = 'kk'; kk.textContent = k;
-      b.append(kk);
-    }
+    const kd = document.createElement('span');
+    kd.className = 'kd';
+    b.append(kd);
   };
   const keyOf = (note) => keys.find((k) => noteOf(k) === note) ?? null;
   const make = (tag, cls, text, attrs) => {
@@ -309,21 +419,39 @@ export function createKeyboard(host, {
    * here. The pair is kept rather than a constant because a constant gives
    * 24.56 px of narrowest strip against 27.00, at identical cost.
    */
-  const SHARP_OFF = { 1: -1 / 6, 3: 1 / 6, 6: -1 / 4, 8: 0, 10: 1 / 4 };
+  /**
+   * 🔴 WHICH SHOULDER OF A WHITE KEY HAS A BLACK KEY ON IT, WHICH IS WHAT
+   * DECIDES WHERE ITS NAME CAN SIT. A raised sharp covers the top corner of the
+   * white it straddles, and `BACKLOG.md` photographed the result on two pages:
+   * `F4` with its `4` under `F#4`, `B4` reading as `34` under `A#4`.
+   * ⚠️ IT IS ASKED OF THIS KEYBOARD'S OWN MAP rather than assumed from the
+   * pitch class, because a caller may hand over any set of keys: the two
+   * outermost keys of a two octave layout have a neighbour in theory and none
+   * on screen, and a name nudged away from a key that is not there is a name
+   * pushed off centre for nothing.
+   */
+  const semitones = new Set(keys.map((k) => map[k]));
+  const blackAt = (semi) => {
+    for (const k of keys) if (map[k] === semi && sharps.has(k)) return true;
+    return false;
+  };
 
   let whites = 0;
   for (const k of keys) {
     const sharp = sharps.has(k);
     const b = make('div', `k${sharp ? ' sharp' : ''}`);
     label(b, k);
-    b.style.gridColumn = String(whites + 1);
-    if (sharp) {
-      const pc = ((map[k] % 12) + 12) % 12;
-      const off = SHARP_OFF[pc];
-      if (off) b.style.setProperty('--k-off', String(off));
+    if (!sharp) {
+      const left = semitones.has(map[k] - 1) && blackAt(map[k] - 1);
+      const right = semitones.has(map[k] + 1) && blackAt(map[k] + 1);
+      /* Away from one, centred between two or none. `NUDGE_PX` is a length
+         rather than a percentage because `translateX` on a percentage is a
+         fraction of the LABEL, which is two or three characters wide and would
+         move `C3` and `D#3` by different amounts. */
+      if (right && !left) b.style.setProperty('--kn-x', `${-NUDGE_PX}px`);
+      else if (left && !right) b.style.setProperty('--kn-x', `${NUDGE_PX}px`);
     }
-    if (sharp && whites === 0) b.style.transform = 'none';
-    if (!sharp) whites++;
+    whites = placeKey(b, { sharp, whites, pitchClass: ((map[k] % 12) + 12) % 12 });
     els.set(k, b);
     letterOf.set(b, k);
     keysEl.append(b);
@@ -508,20 +636,122 @@ export function createKeyboard(host, {
   // (see stepper.mjs). Copying those four rules at a new height is how two
   // controls drift into looking like two kinds of thing; shell.css only
   // changes the SIZE here.
+  /**
+   * 🔴 TWO SEGMENTS RATHER THAN A SWITCH, because neither naming is the
+   * absence of the other. A switch says on or off, and `C` is not `1` turned
+   * off. It wears `.step`, which is the stepper's segmented geometry, for the
+   * reason the octave pair beside it does: copying four rules at a new height
+   * is how two controls drift into looking like two kinds of thing.
+   * ⚠️ IT IS DRAWN ONLY WITH THE PAD, so a chord chart does not grow a control
+   * nobody can use, which is the same rule the pad itself follows.
+   */
+  const nameSeg = make('span', 'step pos-seg kpad-names');
+  const mkName = (text, mode, title) => {
+    const b = make('button', '', text, { type: 'button', title });
+    b.onclick = () => api.setNaming(mode);
+    nameSeg.append(b);
+    return b;
+  };
+  /* 🔴 THE TWO STANDARD TERMS, ASKED FOR IN THIS ORDER: *"c | 1 - someting more
+     descriptive?"*, then `C D E | 1 2 3`, then *"Notes | Degrees"*, 2026-09-23.
+     These are what the two namings are CALLED: note names are absolute, a C is
+     a C in any key, and scale degrees are relative, so `1` moves when the key
+     does. The glyphs showed which was which and named neither, and a word a
+     reader can look up beats a demonstration they have to decode. */
+  const letterBtn = mkName('Notes', 'letter', 'name the keys as notes, which do not move');
+  const degreeBtn = mkName('Degrees', 'degree',
+    'name the keys as scale degrees, which move with the key');
+  const paintNaming = () => {
+    for (const [b, mode] of [[letterBtn, 'letter'], [degreeBtn, 'degree']]) {
+      if (naming === mode) b.dataset.on = '1'; else delete b.dataset.on;
+      b.setAttribute('aria-pressed', naming === mode ? 'true' : 'false');
+    }
+  };
+  paintNaming();
+
   const octPair = make('span', 'step pos-seg kpad-oct');
-  const mkOct = (text, title, delta) => {
+  /* 🔴 SHIFT MOVES ONE SEMITONE, AND THE PICTURE DOES NOT CHANGE SHAPE.
+     Asked 2026-09-23: *"shift +- should transpose with semitones"*. There were
+     two readings of that and only one is cheap. Moving the WINDOW by a semitone
+     makes the leftmost key a C#, and every caller decides which keys are sharps
+     from the key INDEX (`BLACK.has(i % 12)`), which assumes the base is a C, so
+     the drawn black and white pattern would stop matching the notes it plays
+     and the whole layout would have to be recomputed from the note.
+     ✅ WHAT HAPPENS INSTEAD IS WHAT TRANSPOSE MEANS ON A HARDWARE KEYBOARD: the
+     keyboard keeps its shape, every key's printed note name moves with it, and
+     a key still plays exactly what it says. The MK-425C on this desk does the
+     same thing. */
+  const mkOct = (text, title, steps) => {
     const b = make('button', 'ico', text, { type: 'button', title });
-    b.onclick = () => api.shiftOctave(delta);
+    b.onclick = (e) => api.shiftBy(e.shiftKey ? Math.sign(steps) : steps);
     octPair.append(b);
     return b;
   };
-  const downBtn = mkOct('−', 'down one octave (z)', -1);
-  const upBtn = mkOct('+', 'up one octave (x)', 1);
+  const downBtn = mkOct('−', 'down one octave (z), or one semitone with shift', -12);
+  const upBtn = mkOct('+', 'up one octave (x), or one semitone with shift', 12);
+  /* ⚠️ THE NAMING COMES FIRST: *"change order of c|1 and +-"*, 2026-09-23. It
+     says what the keys are CALLED, and the pair after it says where they are,
+     so the row reads in the order somebody needs it.
+     🔴 AND IT IS BUILT ABOVE, NOT HERE. Appending it before its own `const` was
+     a temporal dead zone that threw on every keyboard page at once, reported in
+     four words: *"Cannot access 'nameSeg' before initialization"*. Third one
+     today, and the shape is always the same: a declaration shadows its whole
+     block from the top, and moving an APPEND is enough to open one. */
+  if (wantNames) pad.append(nameSeg);
   pad.append(octPair);
+  /**
+   * 🔴 HOW FAR FROM HOME, WHICH AMENDS THIS FILE'S OWN RULE AND IS NOT THE
+   * THING THAT RULE REFUSED. The header says there is no octave number on the
+   * pad, because every key already prints its own note name and *"a fourteenth,
+   * in a different place, is a second copy that can disagree"*. That is true of
+   * the octave a key is IN, and this is not that: it is the DISPLACEMENT from
+   * where this keyboard started, which no key shows and nothing else can say.
+   * Asked 2026-09-23 as *"show -1 +1 etc to the right on +- on keyboard"*.
+   * ⚠️ TWO FORMATS, AND EACH ONE IS UNAMBIGUOUS BECAUSE ONLY ONE CARRIES A
+   * UNIT. Whole octaves read `+1` and `-2`, which is what the ask asked for and
+   * what the buttons do on their own. Anything else is a semitone count and
+   * says so, `+7st`, because `+7` alone would be read as seven octaves by
+   * somebody who had just pressed the button seven times.
+   */
+  const atEl = make('span', 'kpad-at', '');
+  const HOME = base;
+  const paintAt = () => {
+    const d = base - HOME;
+    atEl.textContent = d === 0 ? '0'
+      : d % 12 === 0 ? `${d > 0 ? '+' : '−'}${Math.abs(d) / 12}`
+      : `${d > 0 ? '+' : '−'}${Math.abs(d)}st`;
+    /* ⚠️ DELETED, NEVER SET TO THE EMPTY STRING. `[data-home]` matches on
+       PRESENCE, so `= ''` would leave every keyboard that has ever been at home
+       looking like it still is. That is a defect this project has already
+       measured once, in `video-panel.mjs`'s full screen state. */
+    if (d === 0) atEl.dataset.home = '1'; else delete atEl.dataset.home;
+  };
+  pad.append(atEl);
   const panicBtn = make('button', 'kpad-right', 'Notes off', {
     type: 'button', title: 'stop every note that is still sounding',
   });
   panicBtn.onclick = () => api.panic();
+  /**
+   * 🔴 THE SUSTAIN LIVES IN THE KEYBOARD'S OWN FOOTER NOW. Asked 2026-09-23:
+   * *"integrate sustain to footer, create toggle button, big and small, use
+   * small below keyboard, left from notes off"*. It is the same argument the
+   * pad itself was built on: an octave pair, a `Notes off` and a damper are all
+   * controls ABOUT the keys, and a hand's width away at the top of the page is
+   * the wrong place for any of them. `/nola/` and `/fau/` each drew their own
+   * switch in their own row, which is two pages solving one problem twice.
+   * ⚠️ THE COMPONENT DRAWS IT AND THE PAGE OWNS WHAT IT MEANS. Nothing here
+   * knows about `demo/shell/pedal.mjs`, two sets of notes or a damper time: it
+   * reports that a foot went down, and the page decides what that does to its
+   * own graph. That is the same division `pedal.mjs` already states.
+   * ⚠️ AND IT IS OFF BY DEFAULT, because a chord chart and a keyboard nobody
+   * sustains should not grow a control they cannot use.
+   */
+  const sustainBtn = wantSustain
+    ? createToggle({ label: 'Sustain', size: 'small',
+                     title: 'hold the notes on after the keys come up, the way a pedal does',
+                     onChange: (on) => onSustain?.(on) })
+    : null;
+  if (sustainBtn) pad.append(sustainBtn.el);
   pad.append(panicBtn);
   if (wantPad) el.append(pad);
 
@@ -551,6 +781,7 @@ export function createKeyboard(host, {
   function paintPad() {
     downBtn.disabled = base <= minBase;
     upBtn.disabled = base >= maxBase;
+    paintAt();
   }
   paintPad();
 
@@ -577,7 +808,9 @@ export function createKeyboard(host, {
     const k = e.key.toLowerCase();
     if (k in OCT_KEYS && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
-      api.shiftOctave(OCT_KEYS[k]);
+      // Shift is a semitone here for the same reason it is on the buttons, and
+      // `z`/`x` are the only two keys this component takes from the page.
+      api.shiftBy(OCT_KEYS[k] * (e.shiftKey ? 1 : 12));
       return;
     }
     if (k in map) { e.preventDefault(); press(k, 'key'); }
@@ -604,6 +837,43 @@ export function createKeyboard(host, {
     el, keysEl, pad,
     /** the three pad buttons, in the order they are drawn — for a page's own check */
     padButtons: [downBtn, upBtn, panicBtn],
+    /** the displacement readout, so a check reads what a player reads */
+    atEl,
+    /**
+     * The damper control, or `null` on a keyboard that did not ask for one.
+     * ⚠️ IT KEEPS `set(on, quiet)`, WHICH IS WHAT A PAGE NEEDS RATHER THAN A
+     * PREFERENCE. A real pedal moving has to move the lamp WITHOUT calling back
+     * into the page that is already handling the pedal, or the page answers its
+     * own message. `/nola/` asserts exactly that and the assert would go with
+     * this method.
+     */
+    sustain: sustainBtn,
+    /** how far this keyboard has moved from where it was built, in semitones */
+    displacement: () => base - HOME,
+    /** the naming control's two buttons, in the order they are drawn */
+    nameButtons: [letterBtn, degreeBtn],
+    /** `letter` or `degree`. Relabels every key; nothing else moves. */
+    setNaming(mode) {
+      naming = mode === 'degree' ? 'degree' : 'letter';
+      paintNaming();
+      for (const k of keys) label(els.get(k), k);
+      return naming;
+    },
+    naming: () => naming,
+    /**
+     * Which pitch class is `1`.
+     *
+     * ⚠️ A PAGE THAT KNOWS THE KEY SHOULD SAY SO. `/nola/` reads one off the
+     * first chord in its line and prints it in the log; a keyboard left to
+     * guess calls its own leftmost key the tonic, which is right until somebody
+     * plays in anything but C.
+     */
+    setTonic(pc) {
+      tonic = (((pc | 0) % 12) + 12) % 12;
+      for (const k of keys) label(els.get(k), k);
+      return tonic;
+    },
+    tonic: () => tonic,
     noteOf, keyOf, press, release,
     get base() { return base; },
     /**
@@ -612,10 +882,16 @@ export function createKeyboard(host, {
      * note-off for a note that was never started, and leave the real one
      * sounding forever.
      */
-    shiftOctave(delta, { min = minBase, max = maxBase } = {}) {
+    shiftOctave(delta, opts) { return api.shiftBy(delta * 12, opts); },
+    /**
+     * Move the whole keyboard by SEMITONES. `shiftOctave` is this with a
+     * multiplication in front of it, so there is one clamp, one release and one
+     * relabel rather than two of each.
+     */
+    shiftBy(steps, { min = minBase, max = maxBase } = {}) {
       for (const k of [...held]) release(k, 'key');
       const was = base;
-      base = Math.max(min, Math.min(max, base + (delta * 12)));
+      base = Math.max(min, Math.min(max, base + steps));
       for (const k of keys) label(els.get(k), k);      // every note name moved
       paintPad();
       // Only on a real move: at the end of the range the press did nothing,

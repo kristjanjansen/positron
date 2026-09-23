@@ -90,9 +90,9 @@
   import { createKeyboard, QWERTY_CHROMATIC } from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC, damperSec } from '/shell/pedal.mjs';
-  import { createSwitch } from '/shell/switch.mjs';
   import { createField } from '/shell/field.mjs';
   import { parseChords } from '/shell/chords.mjs';
+  import { createRoll } from '/shell/roll.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -353,9 +353,24 @@
    * and a page that grows a second route for MIDI has two things to keep in
    * step for ever.
    */
+  /**
+   * 🔴 WHAT IS UNDER A FINGER, KEPT HERE BECAUSE THE ROLL ASKS. Playing the
+   * notes of a chord lights that chord's row, which is the chord charts' job
+   * read backwards. `pedal.mjs` has two sets of its own and publishes only
+   * their SIZES, and the notes still ringing under a foot are not what is being
+   * PLAYED, so neither answers this.
+   * ⚠️ IT IS FINGERS, NOT VOICES. A pedalled chord goes on sounding long after
+   * the hands moved on, and a row that stayed lit through it would be telling a
+   * player they are still holding something they let go of.
+   */
+  const heldNotes = new Set();
+  const tellRoll = () => roll.setHeld([...heldNotes]);
+
   async function press(note, vel, at) {
     if (note < 0 || note > 127) return;
     pedal.keyDown(note);
+    heldNotes.add(note);
+    tellRoll();
     keys.lightNote(note, true);
     await ensureAudio();
     const near = nearestOf(note);
@@ -417,6 +432,8 @@
   /** A key came up, by any route. The pedal decides whether anything happens. */
   function lift(note) {
     keys.lightNote(note, false);
+    heldNotes.delete(note);
+    tellRoll();
     pedal.keyUp(note);
     showVoices();
   }
@@ -458,7 +475,7 @@
         saidKind = kind;
         d.log(kind ? PEDAL_SAYS.switchy : PEDAL_SAYS.continuous);
       }
-      sustainBtn.set(down, true);
+      keys.sustain.set(down, true);
       showVoices();
     },
   });
@@ -483,7 +500,20 @@
    * hands the gesture to the platform with `touch-action: pan-x`, and a swipe
    * scrolls while a drag plays.
    */
-  const KEY_MIN = 44;
+  /**
+   * 🔴 42 px, SO ALL TWENTY FIVE KEYS ARE ON SCREEN AT ONCE. Asked 2026-09-23
+   * with a picture of the row cut off at C5: *"make keyboard 25 keys shown by
+   * default (biit narrower)"*. The arithmetic, MEASURED: the keyboard's box
+   * gives 668 px of content, fourteen 2 px gaps take 28, and 640 over fifteen
+   * white keys is 42.7.
+   * ⚠️ IT IS UNDER THE 44 px TOUCH FLOOR `keyboard.mjs` ARGUES FOR, AND THAT IS
+   * A DECISION RATHER THAN AN OVERSIGHT. That floor is Apple's 44 pt minimum,
+   * and the trade here is the one this page exists for: a chord chart above a
+   * keyboard is useless if the keyboard it names does not fit beside it, and
+   * two octaves is what the charts are voiced into. On a phone the row scrolls
+   * either way, which is where the floor actually protects a finger.
+   */
+  const KEY_MIN = 42;
 
   /**
    * 🔴 THE LETTERS COVER THE MIDDLE OCTAVE AND NOTHING ELSE, BECAUSE THERE ARE
@@ -494,17 +524,35 @@
    * rule applied per key: a key labelled `a` that does nothing when you press
    * `a` is worse than a key with no letter on it.
    */
+  /**
+   * 🔴 THE LETTERS ARE ON THE BOTTOM OCTAVE, WHICH IS C3 HERE. Asked
+   * 2026-09-23: *"default asd keyboard to c3"*. They sat on the middle octave,
+   * so `a` played C4 while the keyboard started at C3 and the two octaves below
+   * your fingers were reachable only with a mouse.
+   * ⚠️ AND THERE ARE STILL ONLY THIRTEEN OF THEM, which is the component's own
+   * rule rather than a choice: `QWERTY_CHROMATIC` is one octave plus its top C,
+   * `z` and `x` are already the octave pair, and a key labelled with a letter
+   * that does nothing is worse than a key with no letter on it. What moved is
+   * WHICH octave has them, not how many.
+   */
   const LOW_KEYS = 12;
   const { KEY_MAP, KEY_ORDER, KEY_SHARPS, KEY_LETTERS } = (() => {
     const map = {}, order = [], sharps = new Set(), lettered = new Set();
     const BLACK = new Set([1, 3, 6, 8, 10]);
-    const qwerty = Object.keys(QWERTY_CHROMATIC);
+    /* 🔴 READ OFF THE CONSTANT'S VALUES, NOT ITS ORDER, AND THAT MATTERS
+       SINCE `l` LANDED. This took `Object.keys()` and handed the nth letter to
+       the nth semitone, which was right only while the map had no gaps in it.
+       `l` is a D and sits at 14, with the C sharp at 13 belonging to a letter
+       nobody has asked for, so a positional read would have put `l` on the
+       black key and moved every shape a hand knows one key out. */
+    const letterAt = Object.fromEntries(
+      Object.entries(QWERTY_CHROMATIC).map(([k, v]) => [v, k]));
     for (let i = 0; i <= 24; i++) {
-      const id = i < LOW_KEYS ? `lo${i}` : qwerty[i - LOW_KEYS];
+      const id = letterAt[i] ?? `hi${i}`;
       map[id] = i;
       order.push(id);
       if (BLACK.has(i % 12)) sharps.add(id);
-      if (i >= LOW_KEYS) lettered.add(id);
+      if (letterAt[i]) lettered.add(id);
     }
     return { KEY_MAP: map, KEY_ORDER: order, KEY_SHARPS: sharps, KEY_LETTERS: lettered };
   })();
@@ -522,13 +570,27 @@
     /* 🔴 AND THE CHARTS MOVE WITH IT. They are drawn in the instrument's window
        so a shape can be carried down the page; an octave press that moved the
        keys and left the charts behind would break exactly that. */
-    onOctave: (base) => { d.log(`the keys on screen now start at ${base}`); redrawCharts(); },
+    onOctave: (b) => { d.log(`the keys on screen now start at ${b}`); roll.setBase(b); redrawCharts(); },
     onPanic: () => {
       for (const v of [...voices]) { damp(v, 0.02); endVoice(v); }
       pedal.panic();
-      sustainBtn.set(false, true);
+      heldNotes.clear();
+      tellRoll();
+      keys.sustain.set(false, true);
       showVoices();
     },
+    /* 🔴 THE DAMPER IS PART OF THE KEYBOARD SINCE 2026-09-23, asked for as
+       *"integrate sustain to footer"*. It was a `createSwitch` in a row of its
+       own under the keys, which is where this page had already decided a pedal
+       belongs; the component draws it now, so `/fau/` gets the same control
+       without a second page inventing it.
+       ⚠️ WHAT STAYS HERE IS WHAT A FOOT MEANS, and `set` rather than `control`
+       is still the whole of it: this button is somebody saying the dampers are
+       up, not a keyboard with a backwards footswitch, so `?flip=1` must not
+       reverse it. MEASURED when it was routed through `control`: four asserts
+       red under that flag, and a SUSTAIN button that turned sustain off. */
+    sustain: true,
+    onSustain: (on) => pedal.set(on),
   });
 
   /**
@@ -585,21 +647,6 @@
    * routing it through `control` took four asserts red under `?flip=1` and
    * would have shipped a SUSTAIN button that turns sustain off.
    */
-  /**
-   * ⚠️ AND IT IS A SWITCH RATHER THAN A PRESENCE BUTTON, WHICH IS WHAT `rm
-   * sustain up / down` LEAVES. A presence badge is a dot and a STATE WORD, and
-   * its reserved width is measured on the longest word it can say, so emptying
-   * the words leaves a reserved empty box, which is the `an empty box is a
-   * line` rule one component along. `createPad` was the other candidate and is
-   * a fixed square of `--ctl-w` with a 10 px face; `SUSTAIN` is seven letters
-   * and would ellipsise. A switch carries a name, no state word, and puts the
-   * state in the knob.
-   */
-  const sustainBtn = createSwitch({
-    label: 'SUSTAIN',
-    title: 'hold the dampers off the strings, the way a pedal does',
-    onChange: (on) => pedal.set(on),
-  });
 
   /**
    * 🔴 A LINE OF CHORDS, AND A PICTURE OF EACH ONE UNDER IT. Asked for as
@@ -619,8 +666,6 @@
     onInput: (v) => drawChords(v),
   });
   const chordList = el('div', 'nola-chords');
-  const padRow = el('div', 'nola-pad');
-  padRow.append(sustainBtn.el);
 
   /**
    * 🔴 THE ORDER OF THE PAGE, GIVEN AS FOUR LINES: `desc / textield / exaple
@@ -630,7 +675,7 @@
    * produced, and the keyboard is where you go to hear any of it. Reading down
    * the page is reading the sentence.
    */
-  d.stack.add(chordField.el, chordList, keysHost, padRow);
+  d.stack.add(chordField.el, chordList, keysHost);
 
   // ── the MIDI keyboard ─────────────────────────────────────────────────────
 
@@ -729,31 +774,57 @@
      order of its own definitions out loud. */
   const redrawCharts = () => drawChords(chordField.value());
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  /**
+   * 🔴 ONE ROLL, NOT A KEYBOARD PER CHORD. Asked 2026-09-23 as *"rm these
+   * keyboards"* with the four chart headings quoted back, after *"rm exta
+   * keyboards from nola, replace with vert pianoroll"*. Four keyboards drawn to
+   * say four chords is four instruments on a page that has one, and every one
+   * of them carried the octave pad argument, the letters argument and the
+   * lining-up argument again.
+   * ⚠️ WHAT SURVIVES IS THE PARSER AND THE VOICING. `chords.mjs` still reads
+   * the line and the chord is still moved into the instrument's own window
+   * rather than the window being moved to the chord, which is the correction a
+   * screenshot forced the first time.
+   */
+  /* ⚠️ THE HOST IS THE KEYBOARD ITSELF, first inside its own box. See
+     `roll.mjs`: a roll drawn beside the instrument had neither its width nor
+     its `--k-min` and missed every column by a few pixels. */
+  /**
+   * 🔴 PICKING A ROW PUTS THE CHORD ON THE KEYS. Asked 2026-09-23: *"make
+   * pianoroll rows selectable. selecting puttign gray dots on the keyboard"*.
+   * That is the chord charts' whole function arriving in one line: a shape you
+   * read above, shown on the instrument you play.
+   * ⚠️ THE COMPONENT REPORTS AND THIS PAGE PAINTS. `roll.mjs` knows nothing
+   * about a keyboard, which is why the same roll can sit over anything.
+   * ⚠️ AND THE OLD HINT IS CLEARED FIRST, EVERY TIME. A hint is a class on a
+   * key rather than a property of the roll, so a second pick with the first
+   * one's notes still lit would draw a chord nobody chose.
+   */
+  let hinted = [];
+  const showChord = (row) => {
+    for (const n of hinted) keys.lightNote(n, false, 'hint');
+    hinted = row ? row.notes : [];
+    for (const n of hinted) keys.lightNote(n, true, 'hint');
+  };
+  const roll = createRoll(keys.el, {
+    base: keys.base, keys: KEY_ORDER, map: KEY_MAP, sharps: KEY_SHARPS, prepend: true,
+    scroller: keys.keysEl,
+    onPick: (row) => showChord(row),
+  });
+
   function drawChords(line) {
-    for (const c of charts) c.kb.destroy();
     charts.length = 0;
-    chordList.textContent = '';
     const { chords, bad, key } = parseChords(line);
+    const rows = [];
     for (const c of chords) {
-      const item = el('div', 'nola-chord');
-      const head = el('div', 'nola-chord-h');
-      head.append(el('span', 'nola-chord-n', c.name));
-      /* 🔴 THE NUMERAL, WHICH IS WHAT THE FOUR FRAMES WERE ABOUT. `F` is IV and
-         `Fm6` is iv on the same root in the same key, so the case says
-         something the name cannot. */
-      if (c.roman) head.append(el('span', 'nola-chord-r', c.roman));
-      item.append(head);
-      const host = el('div', 'nola-chord-k');
-      host.style.setProperty('--k-min', `${KEY_MIN}px`);
       /**
-       * 🔴 EVERY CHART IS THE INSTRUMENT'S OWN WINDOW, AND IT WAS NOT UNTIL A
-       * SCREENSHOT SAID SO. The charts were based at the C below each chord and
-       * the keyboard below them at C3, so the same key was in a different
-       * COLUMN on the chart and on the instrument. Same width, same key size,
-       * different base: the one thing a chord chart is for is carrying a shape
-       * down the page to your hands, and it could not be carried.
-       * ⚠️ SO THE CHORD IS VOICED INTO THE WINDOW RATHER THAN THE WINDOW MOVED
-       * TO THE CHORD. `chords.mjs` voices from middle C because it has to pick
+       * 🔴 THE CHORD IS VOICED INTO THE INSTRUMENT'S WINDOW, AND THIS IS THE
+       * ARITHMETIC A SCREENSHOT BOUGHT. The charts were based at the C below
+       * each chord and the keyboard below them at C3, so the same key sat in a
+       * different COLUMN above and below: the one thing a chart is for is
+       * carrying a shape down the page to your hands, and it could not be
+       * carried. `chords.mjs` voices from middle C because it has to pick
        * something; which octave a chord is played in is the player's, so
        * shifting it by octaves to land under the keys is free and moving the
        * window is not.
@@ -763,34 +834,25 @@
       let lo = Math.min(...shifted);
       while (lo < base) { shifted = shifted.map((n) => n + 12); lo += 12; }
       while (lo >= base + 12) { shifted = shifted.map((n) => n - 12); lo -= 12; }
-      const kb = createKeyboard(host, {
-        base,
-        map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: false,
-        pad: false,
-        onDown: (note) => press(note, 100, performance.now()),
-        onUp: (note) => lift(note),
-      });
-      for (const n of shifted) kb.lightNote(n, true, 'hint');
-      item.append(host);
-      chordList.append(item);
-      /* ⚠️ A NOTE ABOVE THE WINDOW IS SAID, NOT SWALLOWED. `lightNote` on a
-         note this keyboard cannot draw returns quietly, which is right for the
-         component and wrong for a reader: a chord drawn with one key missing
-         and nothing said is the silent kind of wrong. */
+      /* ⚠️ A NOTE ABOVE THE WINDOW IS SAID, NOT SWALLOWED. A dot that cannot be
+         drawn returns quietly, which is right for the component and wrong for a
+         reader: a chord shown with one note missing and nothing said is the
+         silent kind of wrong. */
       const outside = shifted.filter((n) => n < base || n > base + 24);
-      if (outside.length) {
-        head.append(el('span', 'nola-chord-o',
-          `${outside.length} note${outside.length === 1 ? '' : 's'} above these keys`));
-      }
-      charts.push({ chord: c, kb, notes: shifted, outside });
+      const label = [c.name, c.roman, outside.length
+        ? `${outside.length} above` : ''].filter(Boolean).join(' ');
+      rows.push({ label, notes: shifted });
+      charts.push({ chord: c, notes: shifted, outside, label });
     }
+    showChord(null);
+    roll.setRows(rows);
     /* 🔴 A TOKEN THAT DID NOT PARSE IS SHOWN BACK, NEVER DROPPED. A line with
-       four words and three keyboards under it, and nothing saying which word
-       went missing, is the shape `createDiagram`'s `cuts` already refuses. */
+       four words and three rows under it, and nothing saying which word went
+       missing, is the shape `createDiagram`'s `cuts` already refuses. */
+    chordList.querySelector('.nola-bad')?.remove();
     if (bad.length) {
-      const why = el('div', 'nola-bad',
-        bad.map((b) => `${b.text} is not a chord, because ${b.why}`).join('. '));
-      chordList.append(why);
+      chordList.append(el('div', 'nola-bad',
+        bad.map((b) => `${b.text} is not a chord, because ${b.why}`).join('. ')));
     }
     /* 🔴 WHERE THE KEY CAME FROM, SAID OUT LOUD. Nothing in a line of chord
        symbols declares one, so the numerals are read against the FIRST chord's
@@ -890,10 +952,10 @@
      */
     {
       const { chords, bad } = drawChords('Cmaj C9 F/C Fm6/C');
-      d.assert('the chord line draws one keyboard per chord, with the chord lit on it',
+      d.assert('the chord line draws one row per chord, with the chord as dots on it',
         chords.length === 4 && bad.length === 0 && charts.length === 4
-        && chordList.querySelectorAll('.kbd').length === 4,
-        `${chords.length} chords, ${chordList.querySelectorAll('.kbd').length} keyboards, `
+        && keys.el.querySelectorAll('.roll-row').length === 4,
+        `${chords.length} chords, ${keys.el.querySelectorAll('.roll-row').length} rows, `
         + `${bad.length} refused`);
 
       /* 🔴 THE FOUR FRAMES, READ BACK OFF THE PAGE RATHER THAN OFF THE PARSER.
@@ -901,49 +963,106 @@
          what only this page can say is that the numeral it computed is the
          numeral on screen, and that `Fm6/C` came out lower case where `F/C`
          did not. That difference is the whole reason a numeral is drawn. */
-      const drawn = [...chordList.querySelectorAll('.nola-chord-h')]
-        .map((h) => `${h.querySelector('.nola-chord-n').textContent} `
-                  + `${h.querySelector('.nola-chord-r')?.textContent ?? ''}`.trim());
+      const drawn = [...keys.el.querySelectorAll('.roll-label')].map((t) => t.textContent);
       d.assert('each chord is drawn with its numeral, and the case says which third it has',
         drawn.join(', ') === 'Cmaj I, C9 I, F/C IV, Fmin6/C iv',
         drawn.join(', '));
 
-      /* 🔴 THE LIT KEYS ARE COUNTED OFF THE PAINTED PICTURE, not off the array
-         the page just handed itself. Asserting `c.notes.length` here would be
-         the page grading its own arithmetic, which is the trap that let a
+      /* 🔴 THE DOTS ARE COUNTED OFF THE PAINTED PICTURE, not off the array the
+         page just handed itself. Asserting `c.notes.length` here would be the
+         page grading its own arithmetic, which is the trap that let a
          `playbackRate` of 1 read green earlier today. */
-      const lit = charts.map((c) => c.kb.el.querySelectorAll('.k.hint').length);
+      const lit = [...keys.el.querySelectorAll('.roll-row')]
+        .map((r) => r.querySelectorAll('.roll-cell.on').length);
       const want = charts.map((c) => c.chord.notes.length);
-      d.assert('every note of every chord is painted, and nothing else is',
-        lit.join(',') === want.join(',')
-        && chordList.querySelectorAll('.k.down, .k.remote').length === 0
-        && charts.every((c) => c.outside.length === 0),
-        `painted ${lit.join(',')} against ${want.join(',')} notes`);
+      d.assert('every note of every chord is a dot, and nothing else is',
+        lit.join(',') === want.join(',') && charts.every((c) => c.outside.length === 0),
+        `${lit.join(',')} dots against ${want.join(',')} notes`);
 
-      /* 🔴 THE CHARTS AND THE INSTRUMENT ARE THE SAME WINDOW, MEASURED AS A
-         COLUMN POSITION RATHER THAN AS A BASE NUMBER. Comparing the two `base`
-         values would grade the page's own arithmetic; comparing where a key
-         LANDS grades the picture, and the picture is the thing that has to
-         carry a shape from a chart down to the keys. */
-      const colOf = (root) => {
-        const ks = [...root.querySelectorAll('.k')];
+      /* 🔴 THE ROLL AND THE INSTRUMENT ARE ONE WINDOW, MEASURED AS A COLUMN
+         POSITION IN PIXELS RATHER THAN AS A BASE NUMBER. This is the assert the
+         chord charts were corrected into and it is inherited whole: comparing
+         two `base` values grades the page's own arithmetic, and comparing where
+         a column LANDS grades the picture, which is the thing that has to carry
+         a shape down the page to your hands.
+         ⚠️ AND IT IS WORTH MORE NOW THAN IT WAS. The charts were keyboards, so
+         they agreed by being the same component; the roll is a different
+         drawing and shares only `placeKey`, which is exactly the kind of
+         agreement that rots in silence. */
+      const colsOf = (root) => {
         const box = root.getBoundingClientRect();
-        return ks.slice(0, 3).map((k) => Math.round(k.getBoundingClientRect().left - box.left));
+        return [...root.children].slice(0, 5)
+          .map((k) => Math.round(k.getBoundingClientRect().left - box.left));
       };
-      const onChart = colOf(charts[0].kb.el.querySelector('.keys'));
-      const onKeys = colOf(keysHost.querySelector('.keys'));
-      d.assert('a chord chart lines up with the keys under it, key for key',
-        charts.every((c) => c.kb.base === keys.base) && onChart.join(',') === onKeys.join(','),
-        `chart columns at ${onChart.join(',')} px against ${onKeys.join(',')} px on the instrument`);
+      const onRoll = colsOf(keys.el.querySelector('.roll-lane'));
+      const onKeys = colsOf(keysHost.querySelector('.keys'));
+      d.assert('the roll lines up with the keys under it, column for column',
+        onRoll.join(',') === onKeys.join(','),
+        `roll at ${onRoll.join(',')} px against ${onKeys.join(',')} px on the instrument`);
 
-      /* ⚠️ AND A CHART CARRIES NO PAD, which is the option this page bought
-         from `keyboard.mjs` today. Twelve octave pairs and twelve `Notes off`
-         under twelve chords is a screen of controls belonging to nothing. */
-      d.assert('a chord chart is a picture, so it has no octave pad under it',
-        chordList.querySelectorAll('.kpad').length === 0
+      /* ⚠️ THE ROLL'S ONLY CONTROLS ARE ITS OWN ROWS, ONE EACH, AND THIS ASSERT
+         SAID `no controls at all` UNTIL THE ROWS BECAME SELECTABLE AN HOUR
+         LATER. What it was protecting is still protected: the keyboards this
+         replaced brought an octave pair and a `Notes off` EACH, four chords
+         deep, which is a screen of controls belonging to nothing. A row that
+         picks itself is the picture answering, not a control row. */
+      d.assert('the roll carries one control per chord and no pad of its own',
+        roll.el.querySelectorAll('button').length === 4
+        && roll.el.querySelectorAll('.kpad').length === 0
         && keysHost.querySelectorAll('.kpad').length === 1,
-        `${chordList.querySelectorAll('.kpad').length} pads in the list, `
-        + `${keysHost.querySelectorAll('.kpad').length} under the instrument`);
+        `${roll.el.querySelectorAll('button').length} rows, `
+        + `${roll.el.querySelectorAll('.kpad').length} pads in the roll`);
+
+      /* 🔴 PICKING A ROW PUTS THAT CHORD ON THE KEYS, WHICH IS THE WHOLE REASON
+         THE ROLL IS SELECTABLE. Driven through the component's own `pick` so
+         the check takes the same road a finger does, and read off the PAINTED
+         keys rather than off the array the page just handed itself. */
+      roll.pick(2);                                   // F/C IV
+      const litKeys = keysHost.querySelectorAll('.k.hint').length;
+      const wantKeys = charts[2].notes.filter((n) => n >= keys.base && n <= keys.base + 24).length;
+      d.assert('picking a row puts that chord on the keys under it',
+        litKeys === wantKeys && litKeys > 0 && roll.picked() === 2,
+        `${litKeys} keys lit against ${wantKeys} notes in ${charts[2].label}`);
+      /* 🔴 AND THE ROW IS PAINTED TO THE BOX'S EDGES WHILE ITS LANE STAYS WITH
+         THE KEYS, WHICH WAS REPORTED TWICE AND FIXED ONCE. The first repair was
+         a negative offset on a pseudo-element INSIDE A SCROLLER, which clips
+         it: the rule was drawn and then cut off at the very edge it was trying
+         to escape, so nothing moved and the picture looked identical.
+         ⚠️ IT IS MEASURED ON THE ROLL'S OWN BOX, because a `::before` has no
+         rect to ask for. The first version of this assert read the ROW element
+         instead and reported `10.0 px` twice, which is the lane's inset said
+         two ways: it could not have caught anything. */
+      {
+        const box = keys.el.getBoundingClientRect();
+        const lane = roll.el.querySelector('.roll-lane').getBoundingClientRect();
+        const ground = roll.el.getBoundingClientRect();
+        d.assert('a picked row is painted to the box edges while its lane stays with the keys',
+          ground.left - box.left <= 2 && lane.left - box.left >= 8,
+          `the roll spans from ${(ground.left - box.left).toFixed(1)} px inside the box `
+          + `and its lane sits at ${(lane.left - box.left).toFixed(1)} px, with the keys`);
+      }
+
+      /* ⚠️ AND THE NEGATIVE CONTROL IS THE HALF THAT MATTERS: a second press
+         takes it off again, or the keyboard accumulates every chord anybody
+         ever looked at. */
+      /* 🔴 AND THE OTHER DIRECTION, WHICH IS THE ONE A PLAYER MEETS FIRST:
+         play the notes and the row answers. Driven by pressing keys rather than
+         by calling `setHeld`, so what is graded is the path a finger takes. */
+      for (const n of charts[2].notes) keys.press(keys.keyOf(n));
+      await sleep(40);
+      const litRow = roll.el.querySelectorAll('.roll-row[data-held]').length;
+      const rightRow = roll.el.children[2]?.dataset.held === '1';
+      for (const n of charts[2].notes) keys.release(keys.keyOf(n));
+      await sleep(40);
+      d.assert('playing a chord lights its own row and no other',
+        litRow === 1 && rightRow
+        && roll.el.querySelectorAll('.roll-row[data-held]').length === 0,
+        `${litRow} row lit while held, ${roll.el.querySelectorAll('.roll-row[data-held]').length} after`);
+
+      roll.pick(2);
+      d.assert('and picking it again takes the chord back off them',
+        keysHost.querySelectorAll('.k.hint').length === 0 && roll.picked() === -1,
+        `${keysHost.querySelectorAll('.k.hint').length} keys still lit`);
 
       const refused = drawChords('Cmaj wibble');
       d.assert('a token that is not a chord is shown back rather than dropped',
@@ -952,24 +1071,44 @@
       drawChords(chordField.value());
     }
 
-    /* 🔴 TWENTY FIVE KEYS, FIFTEEN OF THEM WHITE, AND THE ROW REALLY FITS.
-       A floor of 44 px is the claim; the measurement is that the row is not
-       scrolling at this width, which is the only thing a reader would notice. */
+    /* 🔴 TWENTY FIVE KEYS, FIFTEEN OF THEM WHITE, AND NONE OF THEM UNDER THE
+       TOUCH FLOOR. This asserted that the row does not scroll at this width,
+       and it was true while the keyboard had no box around it: the fifteen
+       whites filled 688 px with nothing to spare. `demo/shell/keyboard.mjs`
+       gained a wrapper on 2026-09-23 and then padding on all four sides, which
+       is 18 px the keys no longer have, so the row scrolls by about that much
+       here.
+       ⚠️ THE CLAIM THAT SURVIVES IS THE ONE WORTH MAKING. What the 44 px floor
+       is FOR is that a key never squeezes under a fingertip: a row that scrolls
+       is the component obeying that floor, and a row that fitted by shrinking
+       its keys to 41 px would be the failure. So this measures the KEY, which
+       is the thing a player touches, and reports the scroll beside it. */
     {
       const row = keysHost.querySelector('.keys');
       const whites = keysHost.querySelectorAll('.k:not(.sharp)').length;
-      d.assert('the keyboard is two octaves and every key of it fits the page',
-        keys.notes().length === 25 && whites === 15
-        && row.scrollWidth <= row.clientWidth + 1,
-        `${keys.notes().length} keys, ${whites} white, row ${row.scrollWidth} px `
-        + `in ${row.clientWidth} px`);
+      const w = row.querySelector('.k:not(.sharp)').getBoundingClientRect().width;
+      d.assert('the keyboard is two octaves and no key is under the touch floor',
+        keys.notes().length === 25 && whites === 15 && w >= KEY_MIN - 0.5,
+        `${keys.notes().length} keys, ${whites} white, ${w.toFixed(1)} px each, row `
+        + `${row.scrollWidth} px in ${row.clientWidth} px`);
 
-      /* ⚠️ AND THE LETTERS ARE ON THE MIDDLE OCTAVE ONLY, because there are not
-         twenty five of them to give. A letter on a key that does nothing is
-         worse than no letter, which is the component's own rule. */
-      const lettered = keysHost.querySelectorAll('.k .kk').length;
-      d.assert('only the octave the computer keyboard can reach carries letters',
-        lettered === 13, `${lettered} keys of 25 carry a letter`);
+      /* ⚠️ AND ONLY THE MIDDLE OCTAVE IS REACHABLE FROM THE COMPUTER KEYBOARD,
+         because there are not twenty five letters to give. It used to be
+         asserted on the drawn LETTER; `keyboard.mjs` draws a dot now, faint on
+         a key that has a letter behind it, and the claim is the same one: a
+         mark on a key that does nothing when you press it is worse than no
+         mark. */
+      /* 🔴 THE COMPUTER KEYBOARD REACHES THE BOTTOM OCTAVE, AND THIS IS THE
+         CLAIM RATHER THAN A COUNT OF MARKS. It used to count drawn letters,
+         then faint dots; both are gone, because a keyboard at rest draws
+         nothing. What is still true and still worth grading is WHERE `a` lands:
+         C3, the leftmost key, since 2026-09-23. */
+      d.assert('the computer keyboard plays from the leftmost key on screen',
+        keys.noteOf('a') === keys.base && keys.base === 48,
+        `a is note ${keys.noteOf('a')}, the keyboard starts at ${keys.base}`);
+      d.assert('and nothing on a resting keyboard is painted at all',
+        keysHost.querySelectorAll('.k.down, .k.remote, .k.hint').length === 0,
+        `${keysHost.querySelectorAll('.k.down, .k.remote, .k.hint').length} keys lit`);
     }
 
     /**
@@ -1061,14 +1200,14 @@
 
     /* ── the switch takes the pedal's own road ───────────────────────────── */
     await quiet();
-    sustainBtn.input.click();
+    keys.sustain.button.click();
     const switchDown = pedal.down();
-    const litDown = sustainBtn.get();
+    const litDown = keys.sustain.get();
     await press(67, 100, performance.now());
     await sleep(120);
     lift(67);
     const switchHeld = pedal.held();
-    sustainBtn.input.click();
+    keys.sustain.button.click();
     await sleep(500);
     d.assert('the sustain button goes down the same road a real pedal does',
       switchDown === true && switchHeld === 1 && pedal.down() === false && pedal.held() === 0,
@@ -1080,11 +1219,11 @@
        both states??"*. A real pedal moves this button without anybody touching
        it, so the state has to come from the pedal. */
     pedal.control(PEDAL_CC, pedal.wire(true));
-    const litByPedal = sustainBtn.get();
+    const litByPedal = keys.sustain.get();
     pedal.control(PEDAL_CC, pedal.wire(false));
     d.assert('the button follows a real pedal, not only its own press',
-      litDown === true && litByPedal === true && sustainBtn.get() === false,
-      `pressed ${litDown}, pedal ${litByPedal}, released ${sustainBtn.get()}`);
+      litDown === true && litByPedal === true && keys.sustain.get() === false,
+      `pressed ${litDown}, pedal ${litByPedal}, released ${keys.sustain.get()}`);
 
     /* ── the pitch shift is real, not a claim ────────────────────────────── */
     //
@@ -1127,14 +1266,14 @@
     const soundedFromMidi = voices.length ? voices[voices.length - 1].note : null;
     midiUp(60);
     await quiet();
-    keys.press('a');                            // the screen's own middle C, still at +1
+    keys.press('a');                            // the screen's own leftmost C, still at +1
     await sleep(80);
     const fromScreenNote = voices.length ? voices[voices.length - 1].note : null;
     keys.release('a');
     setTranspose(0);
     await quiet();
     d.assert('transpose moves a MIDI keyboard and leaves the keys on screen where they are',
-      soundedFromMidi === 61 && fromScreenNote === 60 && transpose === 0,
+      soundedFromMidi === 61 && fromScreenNote === 48 && transpose === 0,
       `at +1 a keyboard sending 60 sounded ${soundedFromMidi}, and the screen's own C sounded `
       + `${fromScreenNote} at the same setting`);
 
@@ -1389,7 +1528,12 @@
      so the gap gives way. 15 x 44 + 14 x 2 = 688.
      ⚠️ IT IS ON THIS PAGE'S KEYBOARDS ONLY. Every other keyboard on the site
      draws eight white keys and has room to spare. */
-  .nola-keys .keys, .nola-chord-k .keys { column-gap: 2px; }
+  /* ⚠️ THE GAP IS A PROPERTY NOW, NOT A RULE ON `.keys`, because the piano
+     roll above the instrument is a second grid built to the same template and
+     it has to read the same number. Setting `column-gap` here reached one of
+     them and left the roll a pixel wider per column, which is the alignment
+     defect this page has now had twice. */
+  .nola-keys { --k-gap: 2px; }
   .nola-keys { display: block; }
 </style>
 </html>
