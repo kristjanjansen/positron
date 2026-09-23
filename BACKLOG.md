@@ -1,43 +1,5 @@
 ## Open
 
-### Asked 2026-09-23, doing now: a `Looped` mode on `/nola/`, driven by `/evo/`'s numpad
-
-🔴 **ASKED IN THESE WORDS:** *"Add second mode 'Looped' (move typed to third)"* and
-*"use numpad from evo: when i press a number the loop rec stars until i prss same
-number again it starts looping. third click stops, fourth plays again erc.
-dubleclick clrears. can make a separate tmp demo too get it right 'num'"*.
-
-**The state machine, read off that sentence and written down before anything is
-built, because it is the whole feature:**
-
-| press | from | to |
-| --- | --- | --- |
-| 1st | empty | RECORDING |
-| 2nd | recording | LOOPING |
-| 3rd | looping | STOPPED |
-| 4th | stopped | LOOPING |
-| double | any | empty |
-
-⚠️ **AND IT IS ONE MACHINE PER NUMBER**, ten of them, independent. That is what
-makes it a looper rather than a transport: pressing 3 while 1 is looping does not
-stop 1.
-🔴 **A DOUBLE PRESS IS TWO SINGLE PRESSES PLUS A CLEAR, AND THAT IS THE TRAP.**
-The browser fires `click` twice before `dblclick`, so a naive wiring runs the
-state machine twice on the way to clearing and a double press on an empty slot
-would start recording and then stop it. The machine has to hold a press until the
-double press window has passed, which makes every single press LATE by that
-window, and on a looper that is the one thing you can feel. Whether that is
-acceptable is the first thing `/num/` exists to find out.
-
-✅ **BUILT AS `/num/` FIRST, ASKED FOR IN THOSE WORDS.** A page with the numpad and
-nothing else: no audio, no roll, no chords. The arithmetic goes in a module graded
-with no browser at all, the way `looper.mjs` and `name.mjs` already are, because a
-transport with four states and ten instances is exactly the shape that is cheap to
-grade and expensive to debug through a page.
-⚠️ **AND `/nola/`'s PICKER GAINS A THIRD OPTION, WHICH MOVES EVERY CHECK THAT
-PRESSES IT BY INDEX.** `Suggested, Looped, Typed`, and `modePick.buttons[1]` stops
-meaning `Typed`.
-
 ### Found 2026-09-23, not fixed: `/circuit/`'s printed names sit 20 px lower than their sides
 
 🔴 **`node demo/verify.mjs circuit` READS 33/34**, red on `the printed names sit the
@@ -10128,6 +10090,51 @@ versus +Z reading and the comment above `wallYaw` names it.
   guard is what the rest of this sweep has been doing by hand.
 
 ## Done, with what it was measured at
+
+### Done 2026-09-23: the numpad looper, and the `Loop` that ended up on the KEYBOARD instead
+
+🔴 **THE STATE MACHINE SHIPPED AND THE `/nola/` MODE DID NOT, AND BOTH WERE
+INSTRUCTED.** Asked as *"Add second mode 'Looped' (move typed to third)"* with
+`/evo/`'s numpad driving it, then *"forget about looped button for now"* and
+*"lets get num right"*, and finally *"wait make it a keyboard funcion, a button in
+bottom rihjt (left from sustain) called 'Loop'"*, closed with *"do not wire nola,
+its gloabl keyboard fn. nola gets just chords as if i played htem"*.
+
+✅ **`demo/shell/numloop.mjs` IS THE MACHINE, GRADED WITH NO BROWSER**, 15 checks
+in `numloop-test.mjs`. `/num/` is the bench, 19/19, with the telephone keypad, MIDI
+in and program change mapping so `/evo/`'s own number keys drive it.
+⚠️ **ONE RULE CHANGED WHILE IT WAS BEING BUILT**, asked as *"when doubleclick on
+empty slot, it stops others possible loops playing and starts rec"*, so the table
+above is wrong in its last row: a double press on an EMPTY slot silences every
+other looping slot and records, and only a slot with something in it is cleared.
+It stops them rather than clearing them, because *start over* is about what you
+can hear.
+✅ **`/num/` EARNED ITS KEEP ON THE FIRST RUN** by catching that `onTouch` fired
+BEFORE the press was booked, so a page painting its lamp from `pending()` read
+false and the key never lit. The arithmetic was right and the handover was not,
+which is not a thing grading the state machine would ever have shown.
+
+✅ **AND THE LOOP IS A KEYBOARD FUNCTION, NOT A `/nola/` MODE.** `createKeyboard`
+takes `loop: true` and puts a `Loop` toggle left of `Sustain`; the tape attaches at
+the `press`/`release` funnel, whose own comment had already named that spot as
+where a recorder would go. Playback calls `press(k, 'loop')`, so a looped note
+reaches every page's `onDown`/`onUp` exactly as a finger does and `/nola/` hears
+chords without knowing a loop exists.
+⚠️ **`createToggle` IS TWO STATE AND THIS IS A THREE PRESS CYCLE.** Press two turns
+the button off, which is what closes the take, and then quietly puts it back on
+with `set(true, true)`. The first version called `set(true)` twice, which fires no
+`onChange`, so four movements taped and ZERO notes ever came back.
+🔴 **A LAP HAS A FLOOR OF 250 ms AND `/kit/` IS WHAT FOUND IT.** That check presses
+four keys with no waiting between them, so the take was a few milliseconds long
+and the loop turned **118 times in 260 ms**, which is a stuck note with extra
+steps. A person cannot play a take that short but CAN arm the button and press it
+again straight away, which is the same take. The floor is on the lap and never on
+the events, so two quick notes still play where they fell.
+⚠️ **THE `/nola/` PICKER KEPT ITS TWO OPTIONS**, so `modePick.buttons[1]` still
+means `Typed` and no check moved by an index.
+
+MEASURED: kit 205/205, nola 89/89, knobs and pack 79/79, num 19/19, numloop 15 ok.
+Transport `LOOP` is `Loop` on the bar and in both pages that assert on it.
 
 - ✅ **BOTH PAGES ASSERT THE REFUSAL BOUNDARY NOW, AND THE SABOTAGE IS THE
   PROOF.** 2026-09-18. `/flipper/` 8 page asserts to 11, `/now/` 20 to 23. With
