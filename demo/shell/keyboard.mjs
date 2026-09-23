@@ -894,8 +894,24 @@ export function createKeyboard(host, {
   const loopKeys = new Set(), loopNotes = new Set();
   let outside = 0;          // how many taped movements came in around the keys
 
+  /* 🔴 THE TAKE STARTS AT THE FIRST NOTE, NOT AT THE BUTTON, AND THIS IS WHAT
+     MADE A WORKING LOOP FEEL DEAD. Reported as *"still no looping"* with the
+     machinery already correct and graded on both paths. The clock used to start
+     when the button was armed, so arming, getting your hands down, and then
+     playing put every one of those seconds INSIDE the take: the loop came round
+     and did nothing at all until that lead-in had elapsed again. Four seconds of
+     silence after pressing a loop button is indistinguishable from a loop button
+     that does not work, and the natural thing to do about it is press it again,
+     which stops the loop for good.
+     ⚠️ THE TRAILING SILENCE IS KEPT AND ONLY THE LEAD-IN IS DROPPED. Where you
+     stop is a decision, so a lap runs first note to closing press and a rest at
+     the end of a phrase survives. Where you START is not a decision, it is how
+     long it took to get ready. */
+  const startClock = () => { if (!tapeAt) tapeAt = performance.now(); };
+
   const onTape = (k, down) => {
     if (tape === null || looping) return;
+    startClock();
     tape.push({ k, down, t: Math.round(performance.now() - tapeAt) });
   };
 
@@ -925,6 +941,7 @@ export function createKeyboard(host, {
    */
   const tapeNote = (note, down) => {
     if (tape === null || looping) return;
+    startClock();
     outside++;
     tape.push({ note, down, t: Math.round(performance.now() - tapeAt) });
   };
@@ -969,12 +986,12 @@ export function createKeyboard(host, {
     if (on) {
       /* Turned on with nothing in hand: start a take. */
       tape = [];
-      tapeAt = performance.now();
+      tapeAt = 0;                 // the first note starts the clock. See `startClock`.
       looping = false;
       outside = 0;
       loopBtn?.el.setAttribute('data-loop', 'recording');
-      log?.('loop armed and recording. Play something, then press Loop again to '
-          + 'send it round');
+      log?.('loop armed. The take starts at your first note, so take your time, '
+          + 'then press Loop again to send it round');
       onLoop?.(true, { state: 'recording' });
       return;
     }
@@ -1001,7 +1018,7 @@ export function createKeyboard(host, {
        on the events, so a take of two quick notes still plays them where they
        fell and simply waits before coming round. */
     const MIN_LAP = 250;
-    const raw = Math.round(performance.now() - tapeAt);
+    const raw = tapeAt ? Math.round(performance.now() - tapeAt) : 0;
     const lap = Math.max(MIN_LAP, raw);
     if (tape === null || !tape.length) {
       /* ⚠️ NOTHING PLAYED IS NOT A LOOP, and the button stays off rather than
