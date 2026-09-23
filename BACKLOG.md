@@ -1,5 +1,91 @@
 ## Open
 
+### Asked 2026-09-23, doing now: balanced wrapping on every centred text
+
+🔴 **ASKED IN THESE WORDS:** *"the board has not answered since you opened this
+page - add balanced text wrapping on all similar cenered h w texts"*. The
+sentence quoted is the `missing` pane's note in the LOCAL AND REMOTE block,
+`demo/kit/index.html:1170` and `:1194`, drawn by `.pos-lr-say`
+(`demo/shell/shell.css:6034`).
+
+**What `text-wrap: balance` is for, and it is exactly this case.** A centred
+sentence that wraps leaves a long first line and a short second one, and centring
+makes the ragged edge the thing you look at. `balance` evens the lines out. It
+needs no fallback: a browser that does not know it wraps the old way.
+⚠️ **IT IS FOR SHORT CENTRED PROSE AND NOTHING ELSE.** Chrome stops balancing
+past a handful of lines, so it is wasted on a paragraph, and it does nothing at
+all on anything carrying `white-space: nowrap`.
+
+**The centred rules in `shell.css`, read today rather than recalled.** Thirteen
+carry `text-align: center` and most are NOT candidates: `.pos-knob-num` is a
+number, `.pos-knob-lab`, `.pos-fdr-lab` and the two control captions at `:4932`
+and `:4937` all carry `nowrap` and an ellipsis, and `.tbar-live` is one word in
+52 px. The candidates are the ones holding a sentence: `.pos-lr-say`,
+`.pos-drop-say`, `.panel-sub`, `.pos-knob-sub`, `.pos-fdr-sub`.
+
+**And five pages hand-roll the same shape**, which is the usual finding: a
+centred empty-state message in a well. `demo/mirror/index.html:12` (`.none`, the
+no-WebGL2 sentence), `demo/grains/index.html:47` (`.none`),
+`demo/making/index.html:77` (`.mk-hint`), `demo/click/index.html:75`
+(`.cl-note`), and `demo/kit/index.html:157` and `:241` (`.kit-blk`, `.kit-mid`).
+⚠️ **`/mirror/` IS `gl: true`** and is graded by `verify-gl.mjs`, not
+`verify.mjs`.
+
+### Asked 2026-09-23, doing now: `/kit/` shows a waveform pair and a pane with no picture at all
+
+🔴 **ASKED IN THESE WORDS:** *"add waveform examples and no viz/wave examples"*.
+
+**What the block demonstrates today, read rather than recalled.** Three
+specimens at `demo/kit/index.html:1157`, `:1167` and `:1191`: wide is audio
+against video, and both the missing specimen and the phone one are video against
+missing. So **two of the three kinds are only ever shown on one side**, there is
+no waveform against a waveform, and `missing` has never been shown next to a
+waveform.
+⚠️ **`KINDS` IS `['video', 'audio', 'missing']`** and the block is what a reader
+checks the component against, so a kind that is never drawn on the left is a kind
+nobody can see the shape of.
+⚠️ **THE PICTURE IS DRAWN ONCE RATHER THAN ANIMATED**, deliberately, and a
+waveform specimen must not introduce a frame loop for the same reason: this
+block is about the arrangement and the fader.
+
+### Asked 2026-09-23, doing now: `/nola/` learns the chords you keep playing
+
+🔴 **ASKED IN THESE WORDS:** *"implement nola learning mode"*, after
+*"do bg research of learn/suggest chords. idea is to have alt mode in nola where
+i play chords and the ones i keep returning to add them to piano roll. then when
+have at least 2, suggest 3rd and 4th somehow"*.
+
+🔴 **THE RESEARCH IS DONE AND IS 1,174 LINES:
+`research/chord-learning-2026-09-23.md`.** It is not background reading, it is
+the specification, and it settles the questions that would otherwise be guessed
+at. The headline numbers: the obvious recogniser (lowest note is the root) scores
+**33.8 per cent and exactly zero on every inversion**; template matching with the
+bass worth 0.5 scores **82.4**; **eleven qualities beat all twenty-four**, 88.0
+against 82.0, and take the confident-answer rate from 46 to 72 per cent; the
+tally must count **time held** rather than events, because on a synthetic session
+raw count put a passing chord in the top four and time held put all four loop
+chords there; **admit and pin** takes the list from 29 changes to 4, of which 22
+were pure re-sorts; and the suggester is **173 bytes** getting the third chord
+right 9 times in 24 at top 1 and 19 at top 3.
+
+✅ **THE SMALLEST THING THAT PROVES OR KILLS IT, AND IT IS WHERE TO START:**
+`demo/shell/name.mjs` with `demo/shell/name-test.mjs` beside it, no page changes
+and no browser, with **one assert that decides everything: at a margin of 1.0 the
+recogniser is never wrong.** If that goes red the idea is dead.
+
+⚠️ **AND `setRows` CANCELS THE SELECTION, WHICH IS CORRECT FOR TYPED CHORDS AND
+WRONG HERE.** `demo/shell/roll.mjs`'s `setRows` does `picked = -1; focused = 0`.
+In a learning mode the rows are the old rows plus one, so it would throw away the
+player's selection every time they held a new chord long enough. The roll needs
+an append that keeps the selection.
+⚠️ **A LEARNED ROW HAS TO BE VOICED OR IT WILL NOT FIT.** `voiceChord` into
+`lo: base, hi: base + REACH`, or the roll shows a row the player cannot reach.
+⚠️ **THE KEY IS A FIAT AND MUST BE SAID.** Two chords fit 3.33 keys of 24 on
+average and never fewer than 2, so it cannot be deduced. `parseChords` already
+makes this exact decision once with the right sentence on it.
+⚠️ **DROP THE SIXTHS.** `C6` and `Am7` are the same four notes and no weighting
+separates them. Say once in the log that `C6` reports as `Am7`.
+
 ### Found 2026-09-23, not fixed: `/fau/`'s visit assert cannot see a fetch that was made
 
 🔴 **IT STAYED GREEN UNDER A 6 MB SABOTAGE.** `demo/fau/index.html:1080` asserts
