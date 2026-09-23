@@ -263,6 +263,19 @@
      and a panel drawing has no state to encode in hue: what a control says is
      said by the dot, the flash and the readout. */
   .evo { --evo-ink: var(--fg); }
+  /* 🔴 THE CIRCLES LINE UP WITH THE DIALS, AND THE NUMBER IS THE KIT'S OWN.
+     Asked 2026-09-23 off a crop: *"(small/big) padd buttons shoudl align to
+     knobs by center"*. A knob reserves `--ctl-head` above its dial and
+     `--ctl-foot` below for its name; a pad reserves the head and takes the foot
+     only when it carries a bottom label, which these two do not. So in a row
+     centred on its boxes the pads' working surface sat half a foot lower than
+     the dials', which is what the crop shows.
+     ⚠️ RESERVING THE FOOT IS USING THE COMPONENT'S PUBLISHED MEASUREMENT RATHER
+     THAN NUDGING BY AN EYEBALLED NUMBER. `shell.css` says what those two are
+     for in as many words: a fader lane and a pad button start on the same line
+     because both take the same head, and their names end on the same line
+     because both take the same foot. */
+  .evo-oct .pos-pad-wrap { padding-bottom: var(--ctl-foot); }
   .evo-oct .pos-pad { --pad-tint: var(--evo-ink); }
   /* Coloured at rest, which is a fact about the object rather than a state this
      page is claiming: `--pad-tint` is the component's own published knob, so
@@ -471,7 +484,20 @@
    * and playing the bottom key says whether this minus one is a live transpose
    * somebody left set or the instrument's own base.
    */
-  const KEY_LO = 47, KEYS = 25;
+  /* 🔴 48, NOT 47, SINCE THE INSTRUMENT ITSELF WAS FIXED. Reported 2026-09-23:
+     *"evo kyes should start and c2"*, which is the urgent `BACKLOG.md` entry
+     arriving from the desk rather than from the file. The keyboard was measured
+     on 2026-09-20 sending notes **47 to 71** where a 25 key controller sits at
+     **48 to 72**, and that minus one was a live transpose somebody had left set,
+     not the instrument's base. It has been fixed on the device.
+     🔴 AND THE OLD VALUE WOULD HAVE DRAWN THE WRONG PICTURE IN SILENCE, which is
+     why that entry is marked urgent. `const idx = m.note - KEY_LO` indexes a 25
+     entry array, so every key would have lit ONE POSITION TOO HIGH and note 72
+     would have indexed 25 and lit nothing at all.
+     ⚠️ SEVEN OTHER FILES STILL SAY THE INSTRUMENT IS FLAT, listed in that entry,
+     including `demo/wish/index.html` where a VISITOR reads it. This page is the
+     one that drew a wrong picture; the rest are prose and are not fixed here. */
+  const KEY_LO = 48, KEYS = 25;
 
   /**
    * 🔴 THE KEYBOARD IS 15 WHITE AND 10 BLACK, THE BLACKS IN GROUPS OF 2, 3, 2,
@@ -1141,7 +1167,23 @@
        */
       const idx = m.note - KEY_LO;
       if (idx < 0 || idx >= KEYS) {
-        if (!offGrid.has(m.note)) {
+        /* 🔴 A NOTE JUST BELOW THE BOTTOM KEY IS A TRANSPOSE, AND SAYING SO HERE
+           IS THE REPAIR FOR A WARNING THAT HAD BECOME UNREACHABLE. It used to
+           live further down, after this guard, and fire on `m.note < 48`. Moving
+           the base to 48 when the instrument's own transpose was fixed made that
+           test `m.note < KEY_LO`, which is the same condition this guard already
+           returns on, so the warning could never run again.
+           ⚠️ AND IT IS A DIFFERENT SENTENCE FROM `outside the 25 keys`, because
+           the two facts are different: an F7 from some other device is off grid
+           and means nothing, while a B2 arriving one semitone under the bottom
+           key is this instrument shifted. Within an octave below is the band
+           where that is the likely reading. */
+        if (!flatSaid && idx < 0 && idx >= -12) {
+          flatSaid = true;
+          d.log(`${noteName(m.note)} arrived ${-idx} semitone(s) below the bottom key, `
+              + 'which is a transpose set on the keyboard rather than anything on this '
+              + 'page. The panel draws where the notes really are', 'warn');
+        } else if (!offGrid.has(m.note)) {
           offGrid.add(m.note);
           d.log(`${noteName(m.note)}, note ${m.note}, is outside the 25 keys this `
               + 'panel draws, so it is listed and not lit', 'warn');
@@ -1158,12 +1200,6 @@
            slot a KEY is, and a key is not an assignable control, so the small
            field has nothing to say about it. */
         show(m.d2, '');
-        if (!flatSaid && m.note < 48) {
-          flatSaid = true;
-          d.log('this keyboard is playing a semitone below where a 25 key '
-              + 'controller sits, which is a transpose on the device rather '
-              + 'than anything on this page', 'warn');
-        }
       } else {
         kbd.lightNote(m.note, false);
       }
@@ -1323,9 +1359,16 @@
 
   d.on('check', async () => {
     const ch = GLOBAL_CH - 1;
-    take([0x90 | ch, 47, 96]);                       // lowest key, measured range
-    take([0x90 | ch, 71, 45]);                       // highest key
-    take([0x90 | ch, 71, 0]);                        // a release, as this keyboard sends one
+    /* 🔴 THE RANGE MOVED WITH THE INSTRUMENT: 48 to 72 since the transpose was
+       fixed on the desk, where this read 47 to 71. ⚠️ AND 47 IS STILL SENT, ON
+       PURPOSE: a note below the bottom key is what the page has to NOTICE, so
+       the check feeds it one rather than asserting a flag the page set for
+       itself. That is the half the old check could not see. */
+    take([0x90 | ch, 48, 96]);                       // lowest key
+    take([0x90 | ch, 72, 45]);                       // highest key
+    take([0x90 | ch, 72, 0]);                        // a release, as this keyboard sends one
+    take([0x90 | ch, 47, 80]);                       // a semitone below the keyboard
+    take([0x90 | ch, 47, 0]);
     take([0xe0 | ch, 0x00, 0x40]);                   // bend, LSB 0 as measured
     take([0xb0 | ch, 1, 100]);                       // mod wheel
 
@@ -1415,8 +1458,27 @@
         `the dot reads ${litBg} lit against ${offBg} at rest`);
     }
 
-    d.assert('the lowest key is a semitone below where a 25 key controller sits',
-      KEY_LO === 47 && flatSaid, `base ${KEY_LO}, said ${flatSaid}`);
+    /* 🔴 THIS CHECK GRADED THE PAGE'S OWN ARITHMETIC AND COULD NOT SEE THE
+       INSTRUMENT MOVE, WHICH IS WHY IT NEEDED REPLACING RATHER THAN RETUNING.
+       It read `KEY_LO === 47 && flatSaid`, and both halves are the page's own:
+       `KEY_LO` is a constant this file typed, and `flatSaid` is set by a
+       SYNTHETIC message the check feeds itself. `BACKLOG.md` names it as a green
+       suite meaning zero coverage on the one page whose whole job is to report
+       what the wire says, and it was right: the transpose was fixed on the desk
+       and nothing here went red.
+       ✅ WHAT IS CHECKED NOW IS THE PICTURE AND THE WARNING, which are the two
+       things this page owes a reader. The drawing has to start on a C, because a
+       25 key controller does and this instrument is one; and a note arriving
+       below the bottom key has to be SAID, because that is the page noticing a
+       transpose rather than silently lighting the wrong key. */
+    const lowName = keysBox.querySelector('.k .kn');
+    d.assert('the keyboard starts on a C, where a 25 key controller starts',
+      KEY_LO % 12 === 0 && kbd.notes().length === KEYS
+        && /^C/.test((lowName && lowName.textContent) || ''),
+      `base ${KEY_LO}, drawn as ${(lowName && lowName.textContent) || 'nothing'}, `
+      + `${kbd.notes().length} keys`);
+    d.assert('and a note below the bottom key is reported rather than lighting the wrong one',
+      flatSaid, `said ${flatSaid}`);
 
     d.assert('the bend is read little endian and fourteen bit',
       bendRaw === 8192, String(bendRaw));
@@ -2083,6 +2145,20 @@
          worth an assert because *"make evo roghly made of stadard pieces"* is
          only true if it stays true. A page that quietly grows a second copy of a
          component is this project's most repeated defect. */
+      /* 🔴 THE OCTAVE CIRCLES AND THE DIALS SIT ON ONE LINE, MEASURED AS TWO
+         CENTRES RATHER THAN AS THE PADDING THAT PRODUCES THEM. Asked as
+         *"(small/big) padd buttons shoudl align to knobs by center"*, and the
+         padding is the cause while this is the claim. */
+      {
+        const padEl = oct.querySelector('.pos-pad');
+        const dialEl = rot.querySelector('.pos-knob-dial') || rot.querySelector('svg');
+        const pb = padEl.getBoundingClientRect(), db = dialEl.getBoundingClientRect();
+        const apart = Math.abs((pb.top + pb.height / 2) - (db.top + db.height / 2));
+        d.assert('the octave circles sit on the same line as the rotary dials',
+          apart <= 2,
+          `their centres are ${apart.toFixed(1)} px apart`);
+      }
+
       d.assert('the rotaries are the kit’s knob bank, with one hairline at the four four split',
         rot.classList.contains('pos-knob-bank')
           && rot.querySelectorAll('.pos-knob-div').length === 1
