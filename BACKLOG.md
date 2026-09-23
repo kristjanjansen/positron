@@ -1,5 +1,24 @@
 ## Open
 
+### Found 2026-09-23, not fixed: `/circuit/`'s printed names sit 20 px lower than their sides
+
+🔴 **`node demo/verify.mjs circuit` READS 33/34**, red on `the printed names sit the
+same distance from the top and both sides`, reporting **left 21.0, right 21.0, top
+41.0**. The check allows a spread of 1.5 px and this is 20.
+⚠️ **IT IS PRE-EXISTING AND WAS PROVED SO RATHER THAN ASSUMED.** It surfaced while
+`shell.css` was being changed for `/evo/`'s scroller, so the obvious reading was
+that the change caused it. MEASURED with that change stashed: the same three
+numbers to the decimal. `.circ-brands` is a sibling of the panel, appended straight
+to the card, so nothing about `.panel-strip` can move it.
+⚠️ **AND THE CHECK IS THE GOOD KIND**, which is why it is worth fixing rather than
+relaxing: its own comment says the defect that bought it was a padding that was
+right in the source and wrong on the screen, a centred grid adding its leftover
+width in front of the first column. A 20 px discrepancy on one edge is exactly that
+shape again.
+✅ **THE CHEAP FIRST MOVE** is to read the computed padding of the card against the
+nameplate's own box, because 41 is 21 plus 20 and the question is which box
+contributes the 20.
+
 ### Found 2026-09-23, NOT ASSERTED: the roll's timeline order has no check on it
 
 🔴 **THE CLAIM IS NEW AND NOTHING GRADES IT.** Asked as *"do not push suggested row
