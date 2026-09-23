@@ -1571,6 +1571,13 @@ video[hidden] { display: none; }
    because a key can be proposed AND under a finger, and a page that had to
    choose between saying those two things would say the wrong one. */
 .k .kd { position: relative; }
+/* 🔴 A WHITE KEY'S DOT SITS HIGHER THAN THE BOTTOM OF THE KEY. Asked 2026-09-23:
+   *"move dots/circles on whites a bit more up"*. The dot is the last row of the
+   key's grid, which puts it against the bottom edge on every key, and a white
+   key is about sixty per cent taller than a black one, so the same rule reads as
+   two different distances from the thing a player is looking at. Lifting it
+   leaves the black keys alone and brings the two marks nearer one line. */
+.k:not(.sharp) .kd { transform: translateY(-7px); }
 /* 🔴 ONE SIZE SYSTEM, DECLARED ONCE, AND BOTH PICTURES READ IT. Asked
    2026-09-23: *"circles are bigger than dots. dots need to fit in and have 1px
    gap from circle. i meant that take keybioard dot / circle sise and applu to
