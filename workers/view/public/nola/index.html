@@ -496,8 +496,21 @@
       return { key: `piano ${oct}`, says: 'this octave',
         urls: PIANO.notes.filter((n) => Math.floor(n / 12) === oct).map((n) => PIANO.file(n)) };
     }
-    return { key: `rhodes ${near} ${layer}`, says: 'this note at this velocity',
-      urls: [RHODES.file(near, layer)] };
+    /* 🔴 EVERY LAYER OF THIS NOTE, NOT THE ONE VELOCITY THAT ASKED. This used to
+       fetch a single file, and that is the asymmetry that made the Rhodes feel
+       broken while the piano felt fine: the piano's plan above takes a whole
+       OCTAVE, so one press warms its neighbours, and the Rhodes took one file,
+       so the SAME KEY at a different velocity was another cold fetch. A real
+       keyboard sends a different velocity on almost every note, so almost every
+       note a player struck was a first fetch, and a first fetch is the thing
+       that arrives after the key is already up.
+       ⚠️ MEASURED: 65 files over 15 notes, about 47 KB each, so this is roughly
+       200 KB for a note and everything you can play it with, against 3.1 MB for
+       the pack. The piano already spends an octave this way.
+       ⚠️ AND IT IS STILL BEHIND A PRESS. Nothing here is fetched on a visit. */
+    const layers = [1, 2, 3, 4, 5].filter((l) => !RHODES_ABSENT.has(`${near}-${l}`));
+    return { key: `rhodes ${near}`, says: 'this note at every velocity',
+      urls: layers.map((l) => RHODES.file(near, l)) };
   }
 
   function fetchPlan(p) {
@@ -578,7 +591,8 @@
   const tellRoll = () => { roll.setHeld([...heldNotes]); heardChange(); };
 
   async function press(note, vel, at) {
-    if (note < 0 || note > 127) return;
+    if (note < 0 || note > 127) { tapDrop('outside the 0 to 127 a note can be', note); return; }
+    tap.pressed++;
     pedal.keyDown(note);
     heldNotes.add(note);
     tellRoll();
@@ -601,7 +615,27 @@
     let waitedForFiles = false;
     if (!buffers.has(url)) { waitedForFiles = true; await fetchPlan(planFor(ins, near, layer)); }
     const buf = buffers.get(url);
-    if (!buf) return;
+    /* 🔴 THIS WAS A SILENT `return` AND IT IS THE SHAPE THE TAP WAS BUILT TO
+       FIND. A recording that did not arrive drops the note with no sound, no
+       log line and nothing in any counter, which from the keys is
+       indistinguishable from a key that was never pressed. */
+    if (!buf) { tapDrop(`no recording arrived for ${url.split('/').pop()}`, note); return; }
+    /* 🔴 THE KEY MAY ALREADY BE UP BY NOW, AND THIS IS THE FAULT THE TAP WAS
+       BUILT TO FIND. Reported from the deploy as *"you seem to lose keys i
+       play"*. There are two awaits above this line and one is a network fetch,
+       so a quick note is routinely released before its sample exists. `release`
+       damps the voices it can find and at that moment there were none, so the
+       voice started afterwards with nothing left to stop it: a note that begins
+       AFTER the key is up and runs to the end of the recording. On a quick
+       passage that is heard as the page losing what you played and inventing
+       what you did not, which is exactly the report.
+       ⚠️ AND REFUSING IT IS THE WRONG REPAIR, WHICH WAS BUILT AND MEASURED
+       FIRST. The harness dropped FOUR real notes that way in one run. A key you
+       pressed made a sound on every instrument ever built, and a page that
+       silently declines it is losing your playing for a second reason.
+       ✅ SO IT SOUNDS, AND IT STOPS. The voice is built and the damper is put on
+       it straight away, which is what a real quick note is. */
+    const alreadyUp = !heldNotes.has(note) && !pedal.down();
 
     /* 🔴 A KEY STRUCK AGAIN DAMPS THE STRING IT IS ABOUT TO STRIKE. One key is
        one string: re-pressing it does not add a second voice on a real piano,
@@ -626,10 +660,15 @@
     const g = ctx.createGain();
     g.gain.value = velGain(ins, vel);
     src.connect(g).connect(master);
+    tap.voiced++;
     const v = { note, src, gain: g, at: ctx.currentTime, damped: false, inst: ins.id };
     src.onended = () => endVoice(v);
     src.start();
     voices.push(v);
+    /* The key came up while this was loading, so the note is already over. It
+       sounds, and the damper goes straight on, which is a short note rather
+       than a missing one or an endless one. */
+    if (alreadyUp) { tap.late++; damp(v, pedal.damper()); }
 
     lastShift = shift;
     lastPlayed = { inst: ins.id, note: near, layer, url };
@@ -1012,6 +1051,15 @@
       target: '_blank', rel: 'noopener' }),
     '.');
 
+  /* 🔴 DECLARED HERE AND NOT BESIDE THE HANDLERS THAT FILL IT, because the SAVE
+     control below is built before them and a `const` shadows its whole block
+     from the top. Written down there it read `Cannot access 'RECORDING' before
+     initialization` and took the page to 0/1. That is the fourth temporal dead
+     zone in this session and the symptom is never near the cause. */
+  const RECORDING = q.get('rec') === '1';
+  const tape = [];
+  const tapeAt = () => Math.round(performance.now());
+
   const instrument = el('div', 'nola-inst');
   /* ⚠️ THE TWO PICKERS ARE ONE ROW: what is playing and where the chords are
      put are both about the instrument under them, and two labelled choices on
@@ -1019,6 +1067,44 @@
   const picks = el('div', 'nola-picks');
   picks.append(instPick.el, voicePick.el);
   instrument.append(picks, keysHost, credit);
+
+  /* 🔴 THE ONE CONTROL THAT ONLY EXISTS UNDER `?rec=1`, so no visitor meets it
+     and no harness press moves. It writes the take to a file and says how much
+     is in it, because a recorder with no readout is a recorder nobody can tell
+     is running. */
+  if (RECORDING) {
+    const bar = el('div', 'nola-rec');
+    const said = el('span', 'nola-rec-say', 'recording every key from the MIDI keyboard');
+    const save = el('button', 'pos-btn', 'SAVE TAKE', { type: 'button' });
+    save.onclick = () => {
+      const doc = {
+        what: 'a take off the MIDI keyboard on this desk, raw note numbers before transpose',
+        when: new Date().toISOString(),
+        build: (document.querySelector('.pos-build') || {}).textContent || '',
+        transpose,
+        instrument: inst.id,
+        gate: { LEARN_WINDOW, LEARN_GATE, LEARN_TIMES, minNotes: 3 },
+        events: tape,
+      };
+      const blob = new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' });
+      const a = el('a', '', '', { href: URL.createObjectURL(blob),
+        download: `nola-take-${Date.now()}.json` });
+      document.body.append(a); a.click(); a.remove();
+      d.log(`wrote a take of ${tape.length} messages over `
+          + `${((tape.length ? tape[tape.length - 1].t - tape[0].t : 0) / 1000).toFixed(1)} s`);
+    };
+    const tick = () => {
+      said.textContent = tape.length
+        ? `${tape.length} messages over ${((tape[tape.length - 1].t - tape[0].t) / 1000)
+            .toFixed(1)} s. Play, then save.`
+        : 'recording every key from the MIDI keyboard. Nothing yet.';
+    };
+    setInterval(tick, 500);
+    bar.append(said, save);
+    instrument.append(bar);
+    d.log('this page is recording what you play, because it was opened with ?rec=1. '
+        + 'Play for a minute or two, press SAVE TAKE, and the file lands in your downloads');
+  }
   /* 🔴 THE MODE SITS BESIDE THE FIELD IT TURNS OFF, not down with the keys.
      `Played` disables the CHORDS field, and a control that greys out something
      three blocks away is a page asking a reader to work out what happened. The
@@ -1062,15 +1148,94 @@
    * written out a second time in the check, so a transpose that leaked into the
    * on-screen keys left the page 24/24 green.
    */
+  /**
+   * 🔴 THE TAP, AND IT EXISTS BECAUSE A PAGE CANNOT BE TRUSTED TO REPORT ON
+   * ITSELF. Asked 2026-09-23: *"do tap and compare what i play in midi and what
+   * you save. you seem to lose keys i play"*. Every check on this page presses
+   * SCREEN keys, so the whole MIDI path is graded by nothing, and the page was
+   * reading 72/72 green while a real keyboard was being lost somewhere.
+   *
+   * ⚠️ IT KEEPS ITS OWN MODEL OF WHAT IS DOWN, BUILT FROM THE RAW MESSAGES,
+   * and compares that against `heldNotes`, which is what the page believes. Two
+   * independent sources, which is this repository's rule after a build silently
+   * re-credited a recording because two numbers came off one field. A counter
+   * the page derives from its own state could only ever agree with itself.
+   * ⚠️ AND IT COMPARES THROUGH `transpose`, because the raw note and the note
+   * the page holds are deliberately different by that much. Comparing the two
+   * without it would report a divergence on every single key.
+   */
+  const tap = {
+    on: 0, off: 0, pressed: 0, voiced: 0, late: 0, drops: new Map(),
+    /** what the WIRE says is down, raw, before this page touches it */
+    down: new Set(),
+    splits: 0, worst: 0,
+  };
+  const TAP_LOUD = q.get('tap') === '1';
+  let saidLost = false;
+  const tapDrop = (why, note) => {
+    tap.drops.set(why, (tap.drops.get(why) || 0) + 1);
+    d.log(`a note was dropped: ${why} (note ${note})`, 'warn');
+  };
+  /**
+   * Does the page hold exactly what the wire says it holds? Called after every
+   * message, because a divergence that heals is still a divergence and the
+   * moment it appears is the only moment it names a cause.
+   */
+  const tapCheck = (what, note) => {
+    const wire = new Set([...tap.down].map((n) => n + transpose));
+    const missing = [...wire].filter((n) => !heldNotes.has(n));
+    const extra = [...heldNotes].filter((n) => !wire.has(n));
+    tap.worst = Math.max(tap.worst, missing.length + extra.length);
+    if (TAP_LOUD) {
+      d.log(`${what} ${note}: wire holds ${[...wire].join(',') || 'nothing'}, `
+          + `page holds ${[...heldNotes].join(',') || 'nothing'}`);
+    }
+    if ((missing.length || extra.length) && !saidLost) {
+      saidLost = true;
+      d.log(`the keyboard and this page disagree about what is down. The wire says `
+          + `${[...wire].join(',') || 'nothing'} and the page says `
+          + `${[...heldNotes].join(',') || 'nothing'}. `
+          + `${missing.length} key(s) the page never took, ${extra.length} it never let go of. `
+          + `Open this page with ?tap=1 for every message`, 'warn');
+    }
+    return { missing, extra };
+  };
+
+  /**
+   * 🔴 THE TAPE, AND IT EXISTS BECAUSE EVERY TIMING NUMBER ON THIS PAGE IS A
+   * GUESS. Asked 2026-09-23: *"should i play and you measure?"*, *"save sample
+   * for testing?"*, *"real human data"*.
+   * `research/chord-learning-2026-09-23.md` says it in its own words: nobody
+   * played any of it, its session was synthetic, and it put a factor of ten
+   * between a chord held and a chord passed through BY CONSTRUCTION. So
+   * `LEARN_GATE`, `LEARN_WINDOW` and `LEARN_TIMES` are three numbers nothing has
+   * ever checked against a pair of hands.
+   * ⚠️ IT RECORDS THE WIRE, NOT THIS PAGE'S READING OF IT. What is wanted is the
+   * playing, so that a different gate can be tried against the same take without
+   * anybody playing it twice. Raw note numbers, before transpose.
+   * ⚠️ AND IT IS BEHIND `?rec=1`, so no control appears for anybody else and no
+   * harness press moves. Nothing is recorded, offered or sent unless somebody
+   * opened the page asking for it.
+   */
   function midiDown(note, vel, ch, at) {
+    if (RECORDING) tape.push({ t: tapeAt(), on: note, vel });
+    tap.on++;
+    tap.down.add(note);
     if (note < 48 && !flatSaid) {
       flatSaid = true;
       d.log(`this keyboard sent note ${note}, below the 48 a C to C controller starts at, `
           + 'so it may be transposed down a semitone like the one on this desk', 'warn');
     }
     press(note + transpose, vel, at);
+    tapCheck('down', note);
   }
-  function midiUp(note) { lift(note + transpose); }
+  function midiUp(note) {
+    if (RECORDING) tape.push({ t: tapeAt(), off: note });
+    tap.off++;
+    tap.down.delete(note);
+    lift(note + transpose);
+    tapCheck('up', note);
+  }
   function midiControl(cc, value) {
     if (pedal.control(cc, value) || cc === PEDAL_CC || ccSaid.has(cc)) return;
     ccSaid.add(cc);
@@ -1086,6 +1251,12 @@
     onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
                             : 'no MIDI keyboard is plugged in, and the keys on screen still play'),
   });
+  /* 🔴 THE TAP IS READABLE FROM OUTSIDE THE PAGE, so a check can compare the two
+     sides without the page summarising itself first, and so a person can read it
+     in the console after playing. `drops` is a Map, which does not survive
+     being copied out of the page, so it goes as an object. */
+  d.tap = () => ({ ...tap, down: [...tap.down], held: [...heldNotes],
+                   drops: Object.fromEntries(tap.drops) });
   const ccSaid = new Set();
   d.log(`the sustain pedal is read on controller ${PEDAL_CC}`
       + (PEDAL_FLIP ? ', upside down, so 0 is the foot going down' : ''));
@@ -2246,28 +2417,33 @@
       instPick.buttons[1].click();                            // RHODES
       await press(60, 20, performance.now());                 // barely touched
       await sleep(40);
+      const playedSoft = lastPlayed && lastPlayed.url.split('/').pop();
       await press(60, 120, performance.now());                // and leaned on
       await sleep(40);
+      const playedHard = lastPlayed && lastPlayed.url.split('/').pop();
       await press(81, 127, performance.now());                // above where layer 1 stops
       await sleep(40);
-      const asked = gotUrls.slice(before).map((u) => u.split('/').pop());
-      const soft = asked.find((f) => f.startsWith('rhodes-059'));
-      const hard = asked.filter((f) => f.startsWith('rhodes-059')).pop();
+      const playedTop = lastPlayed && lastPlayed.url.split('/').pop();
       keys.panic();
 
-      d.assert('a soft press and a hard one really fetch two different recordings of one note',
-        asked.length === 3 && soft !== hard && soft === 'rhodes-059-5.m4a'
-        && hard === 'rhodes-059-1.m4a',
-        `note 60 came from ${soft} at velocity 20 and from ${hard} at 120, `
+      /* 🔴 READ OFF WHAT PLAYED, NOT OFF WHAT WAS FETCHED, AND THE DIFFERENCE
+         MATTERS SINCE 2026-09-23. A Rhodes press now pulls every layer of that
+         note in one plan, the way the piano already pulls an octave, so the
+         fetch list no longer says which recording a velocity chose. `lastPlayed`
+         is what actually sounded, which is the quantity these two checks were
+         always about. */
+      d.assert('a soft press and a hard one really play two different recordings of one note',
+        playedSoft === 'rhodes-059-5.m4a' && playedHard === 'rhodes-059-1.m4a',
+        `note 60 played ${playedSoft} at velocity 20 and ${playedHard} at 120, `
         + `and layer 1 is the harder of the two`);
 
       /* 🔴 AND THE HOLE IS CROSSED FOR REAL, NOT IN ARITHMETIC. Note 81 has no
          layer 1 file at all, so a page that trusted the layer it computed would
          have asked for `rhodes-081-1.m4a` and got a 404 on a run whose own
          `no failed requests` line would then be the only thing that said so. */
-      d.assert('a note above the top of a layer asks for the file its author plays instead',
-        asked[2] === 'rhodes-081-2.m4a',
-        `note 81 at velocity 127 asked for ${asked[2]}, and there is no rhodes-081-1.m4a `
+      d.assert('a note above the top of a layer plays the file its author plays instead',
+        playedTop === 'rhodes-081-2.m4a',
+        `note 81 at velocity 127 played ${playedTop}, and there is no rhodes-081-1.m4a `
         + 'in the pack at all');
 
       /* ⚠️ WHAT THE TIMED READINGS NEED, FETCHED BEFORE ANY OF THEM. Same
@@ -2304,6 +2480,66 @@
         Math.abs(apart) < 6 && pianoLoud > 0.02,
         `at velocity 100 the Rhodes reads ${rhodesLoud.toFixed(4)} and the piano `
         + `${pianoLoud.toFixed(4)}, which is ${apart >= 0 ? '+' : ''}${apart.toFixed(1)} dB apart`);
+
+      /* ── the MIDI path, which nothing here had ever driven ─────────────── */
+      /* 🔴 EVERY CHECK ON THIS PAGE PRESSES SCREEN KEYS, AND A MIDI KEYBOARD
+         ENTERS SOMEWHERE ELSE ENTIRELY. `midiDown` and `midiUp` apply the
+         transpose correction and are the only door a real keyboard comes
+         through, so until now this page could read 72/72 green with that door
+         broken. Reported from the deploy: *"you seem to lose keys i play"*.
+         ⚠️ THESE CALL THE HANDLERS DIRECTLY, which is as close to the wire as a
+         headless check can get: Web MIDI cannot be driven without a device. */
+      await quiet();
+      instPick.buttons[1].click();                            // RHODES
+      const tap0 = d.tap();
+      for (const n of [60, 64, 67]) midiDown(n - transpose, 96, 0, performance.now());
+      await sleep(80);
+      const midiHeld = d.tap();
+      for (const n of [60, 64, 67]) midiUp(n - transpose);
+      await sleep(80);
+      const midiUpped = d.tap();
+      d.assert('a chord played over MIDI leaves the keyboard and this page holding the same notes',
+        midiHeld.down.length === 3 && midiHeld.held.length === 3
+        && midiHeld.held.slice().sort((a, b) => a - b).join(',') === '60,64,67'
+        && midiUpped.down.length === 0 && midiUpped.held.length === 0,
+        `the wire held ${midiHeld.down.length} and the page held `
+        + `${midiHeld.held.join(',')}, and after the note offs the wire holds `
+        + `${midiUpped.down.length} and the page ${midiUpped.held.length}`);
+
+      /* 🔴 AND THE COUNTS HAVE TO BALANCE, which is the half a held-set
+         comparison cannot see: a note that went down and came up leaves both
+         sides empty whether or not it ever reached an instrument. */
+      d.assert('every MIDI note on reached the instrument, and none was dropped on the way',
+        midiUpped.on - tap0.on === 3 && midiUpped.off - tap0.off === 3
+        && midiUpped.pressed - tap0.pressed === 3
+        && midiUpped.voiced - tap0.voiced === 3
+        && midiUpped.late === tap0.late,
+        `${midiUpped.on - tap0.on} note on(s) became `
+        + `${midiUpped.pressed - tap0.pressed} press(es) and `
+        + `${midiUpped.voiced - tap0.voiced} voice(s), `
+        + `with ${midiUpped.late - tap0.late} arriving after the key came up`);
+
+      /* 🔴 THE ONE THAT WAS REALLY LOSING NOTES, AND IT NEEDS AN UNFETCHED
+         RECORDING TO SHOW AT ALL. `press` has two awaits in it and one is a
+         network fetch, so a note let go before its sample arrives used to reach
+         `src.start()` with nothing left to stop it: `release` had already run
+         and found no voice to damp. That is a note that sounds AFTER the key is
+         up and plays to the end of the sample, and on a quick passage it is
+         heard as the page losing what you played and inventing what you did
+         not. It is counted and refused now. */
+      await quiet();
+      const tapWas = d.tap();
+      midiDown(96 - transpose, 30, 0, performance.now());      // a note never fetched
+      midiUp(96 - transpose);                                  // let go in the same tick
+      await sleep(700);
+      const after = d.tap();
+      d.assert('a note let go before its recording arrives still sounds, and the damper goes on it',
+        after.voiced - tapWas.voiced === 1 && after.late - tapWas.late === 1
+        && after.held.length === 0 && voices.every((v) => v.damped),
+        `${after.voiced - tapWas.voiced} voice(s) started from a key that was already up, `
+        + `${after.late - tapWas.late} of them damped on arrival, and `
+        + `${voices.filter((v) => !v.damped).length} left ringing with nothing to stop them`);
+      instPick.buttons[0].click();                            // back to PIANO
 
       /* 🔴 AND THE READING THAT DECIDES A LEVEL IS A CHORD, NOT A NOTE. One
          note at the wrong level is quiet or loud; six at the wrong level is a
@@ -2895,6 +3131,9 @@
      paints the whole column instead of the mark, which is what the first
      version of these two rules did. `shell.css` draws every dot that way and
      `[data-held]` above is the pattern to copy. */
+  .nola-rec { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .nola-rec-say { color: var(--dim); font: 400 11px/1.4 var(--mono); }
+
   .roll-row[data-kind="guess"] .roll-label { color: var(--ai); }
   .roll-row[data-kind="guess"] .roll-cell.on::after { background: var(--ai); }
   /* 🔴 A PROPOSAL SITS BACK UNTIL YOU PLAY IT, asked for as *"fade 'ai row'
