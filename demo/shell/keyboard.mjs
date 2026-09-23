@@ -1049,15 +1049,26 @@ export function createKeyboard(host, {
    * right: what arrived was a note number somebody played, and the pad moves
    * which keys are on screen rather than what a MIDI keyboard sent.
    */
-  const tapeNote = (note, down) => {
+  /**
+   * 🔴 AND IT CARRIES VELOCITY, BECAUSE A LOOP THAT DOES NOT IS PLAYING SOMETHING
+   * ELSE. Asked 2026-09-23: *"do y preserve velocity at all?"*, and the answer
+   * was no: every looped note came back at a flat 100 whatever was played. On a
+   * page with velocity LAYERS that is not a loudness error, it is the wrong
+   * RECORDING: `/nola/` picks a different sample for a soft note and a hard one,
+   * so a quiet phrase came back as a different instrument played hard.
+   * ⚠️ ONLY THE NOTE PATH HAS ONE. A key on screen is a click and has no
+   * velocity to preserve, which is why a page gives those a flat value of its
+   * own. `null` here means *nobody said*, and the page's default stands.
+   */
+  const tapeNote = (note, down, vel) => {
     if (replaying) return;
     const at = performance.now();
-    remember({ note, down, at });
+    remember({ note, down, at, vel });
     for (const t of takes) {
       if (!t.rec) continue;
       startClock(t, at);
       t.outside++;
-      t.tape.push({ note, down, t: Math.round(at - t.at) });
+      t.tape.push({ note, down, v: vel, t: Math.round(at - t.at) });
     }
   };
 
@@ -1080,10 +1091,33 @@ export function createKeyboard(host, {
     t.notes.clear();
   };
 
+  /**
+   * 🔴 EVERY EVENT IS SCHEDULED AGAINST AN ABSOLUTE GRID, NOT AGAINST THE ROUND
+   * BEFORE IT, AND THE DIFFERENCE IS WHETHER A LOOP KEEPS TIME. Reported
+   * 2026-09-23: *"loops do not sound right (timings)"*.
+   * A round used to end with `setTimeout(round, lap)`, so the next round began
+   * whenever that timer actually fired. A timer is never early and is routinely a
+   * few milliseconds late, and the lateness was then the ORIGIN for that round's
+   * own events, so every lap inherited the drift of every lap before it. A loop
+   * does not drift a little, it drifts CUMULATIVELY: ten laps of 4 ms late is 40
+   * ms, a hundred is nearly half a beat, and the phrase walks away from itself
+   * while each individual timer looks fine.
+   * ✅ THE ANCHOR IS THE MOMENT THE LOOP STARTED AND NOTHING MOVES IT. Round `n`
+   * is `anchor + n * lap`, so a round that fires late schedules its events at the
+   * times they were always due and simply has less notice. Error stops
+   * accumulating and becomes the jitter of one timer, which is the floor a page
+   * cannot get under.
+   * ⚠️ AND A DUE TIME IN THE PAST IS FIRED AT ONCE RATHER THAN SKIPPED. A note
+   * that is a few milliseconds late is a note; a note that is dropped is a hole
+   * in the phrase, and the hole is far easier to hear.
+   */
   const runTake = (i) => {
     const t = takes[i];
+    t.anchor = performance.now();
+    let lapNo = 0;
     const round = () => {
       if (!t.going) return;
+      const base = t.anchor + lapNo * t.lap;
       for (const e of t.tape) {
         t.timers.push(setTimeout(() => {
           if (!t.going) return;
@@ -1103,14 +1137,16 @@ export function createKeyboard(host, {
                 }
               } else if (t.keys.has(e.k)) { release(e.k, 'loop'); t.keys.delete(e.k); }
             } else if (e.down) {
-              if (!fingerNotes.has(e.note)) { onDown(e.note, 'loop'); t.notes.add(e.note); }
+              if (!fingerNotes.has(e.note)) { onDown(e.note, 'loop', e.v); t.notes.add(e.note); }
             } else if (t.notes.has(e.note) && !fingerNotes.has(e.note)) {
               onUp(e.note, 'loop'); t.notes.delete(e.note);
             }
           } finally { replaying--; }
-        }, e.t));
+        }, Math.max(0, base + e.t - performance.now())));
       }
-      t.timers.push(setTimeout(round, t.lap));
+      lapNo++;
+      t.timers.push(setTimeout(round,
+        Math.max(0, t.anchor + lapNo * t.lap - performance.now())));
     };
     round();
   };
@@ -1147,7 +1183,7 @@ export function createKeyboard(host, {
         for (const m of recent) {
           if (m.at < from) continue;
           const e = { down: m.down, t: Math.round(m.at - from) };
-          if (m.k !== undefined) e.k = m.k; else { e.note = m.note; t.outside++; }
+          if (m.k !== undefined) e.k = m.k; else { e.note = m.note; e.v = m.vel; t.outside++; }
           t.tape.push(e);
         }
         /* 🔴 A PHRASE IS CLAIMED ONCE. Found by the two slot check, which armed a
@@ -1327,6 +1363,10 @@ export function createKeyboard(host, {
        * a page wanting a deliberately empty arm can use it too.
        */
       forget: () => { recent.length = 0; },
+      /** one turn of a take in ms, for a page reporting on its own timing */
+      lap: (i) => takes[i]?.lap || 0,
+      /** what is on a take, so a tap can compare it against what was heard */
+      tape: (i) => (takes[i]?.tape ? takes[i].tape.map((e) => ({ ...e })) : []),
       state: (i) => machine.state(i),
       states: () => machine.states(),
       slots: SLOTS,
@@ -1427,7 +1467,7 @@ export function createKeyboard(host, {
      * be hinted AND held at once, which is exactly what happens when somebody
      * plays along with a chord on screen.
      */
-    lightNote(note, on, who = 'self') {
+    lightNote(note, on, who = 'self', vel = null) {
       const k = keyOf(note);
       /* 🔴 AND THIS IS WHERE A NOTE PLAYED PAST THE KEYS REACHES THE LOOP. See
          `tapeNote`. Only the plain lamp counts: `hint`, `ai` and `remote` are
@@ -1437,7 +1477,7 @@ export function createKeyboard(host, {
       if (who === 'self' && !viaKey && !replaying) {
         if (on) fingerNotes.add(note); else fingerNotes.delete(note);
       }
-      if (who === 'self' && !viaKey) tapeNote(note, !!on);
+      if (who === 'self' && !viaKey) tapeNote(note, !!on, vel);
       if (!k) return;
       /* 🔴 `ai` IS A FOURTH LAMP AND NOT A FOURTH COLOUR OF THE SAME ONE. Asked
          2026-09-23: *"when fading, fade them also in keyboard so smaller are on

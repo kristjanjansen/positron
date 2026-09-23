@@ -590,13 +590,21 @@
      `heardChange` does nothing at all unless the roll is in `Played`. */
   const tellRoll = () => { roll.setHeld([...heldNotes]); heardChange(); };
 
-  async function press(note, vel, at) {
+  async function press(note, vel, at, how = 'midi') {
+    /* 🔴 EVERY NOTE THIS PAGE SOUNDS, WITH WHERE IT CAME FROM, UNDER `?rec=1`.
+       Asked 2026-09-23: *"tap. loops do not sound right (timings)"*. The take
+       recorder beside this one records the WIRE, which is the right stream for a
+       chord question and the wrong one for a timing question: a looped note never
+       touches the wire, so a recording of what arrived says nothing at all about
+       what came back. This records what SOUNDED, and `how` is what separates a
+       finger from a lap. */
+    if (RECORDING) plays.push({ t: tapeAt(), n: note, down: true, how });
     if (note < 0 || note > 127) { tapDrop('outside the 0 to 127 a note can be', note); return; }
     tap.pressed++;
     pedal.keyDown(note);
     heldNotes.add(note);
     tellRoll();
-    keys.lightNote(note, true);
+    keys.lightNote(note, true, 'self', vel);
     await ensureAudio();
     /* 🔴 THE INSTRUMENT IS READ ONCE, HERE, AND IS CARRIED THROUGH THE REST OF
        THIS FUNCTION AS A LOCAL. There is an await under this line, so reading
@@ -690,7 +698,8 @@
   }
 
   /** A key came up, by any route. The pedal decides whether anything happens. */
-  function lift(note) {
+  function lift(note, how = 'midi') {
+    if (RECORDING) plays.push({ t: tapeAt(), n: note, down: false, how });
     keys.lightNote(note, false);
     heldNotes.delete(note);
     tellRoll();
@@ -917,8 +926,11 @@
     base: 48,
     map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
     minBase: 24, maxBase: 84,
-    onDown: (note) => press(note, 100, performance.now()),
-    onUp: (note) => lift(note),
+    /* ⚠️ `vel` IS WHAT THE LOOP GIVES BACK AND `100` IS WHAT A CLICK IS WORTH. A
+       key on screen has no velocity, so the flat value stands for it; a looped
+       note carries the one it was played with. */
+    onDown: (note, how, vel) => press(note, vel ?? 100, performance.now(), how),
+    onUp: (note, how) => lift(note, how),
     /* 🔴 AND THE CHARTS MOVE WITH IT. They are drawn in the instrument's window
        so a shape can be carried down the page; an octave press that moved the
        keys and left the charts behind would break exactly that. */
@@ -1158,6 +1170,8 @@
      initialization` and took the page to 0/1. That is the fourth temporal dead
      zone in this session and the symptom is never near the cause. */
   const RECORDING = q.get('rec') === '1';
+  /** every note this page sounded, with where it came from. See `press`. */
+  const plays = [];
   const tape = [];
   const tapeAt = () => Math.round(performance.now());
 
@@ -1208,6 +1222,12 @@
         build: (document.querySelector('.pos-build') || {}).textContent || '',
         transpose,
         instrument: inst.id,
+        /* what SOUNDED, against `events` which is what ARRIVED. A timing question
+           about a loop can only be answered from this one. */
+        plays,
+        loops: keys.loops.states().map((state, i) => ({
+          slot: i + 1, state, lap: keys.loops.lap(i), tape: keys.loops.tape(i),
+        })).filter((l) => l.state !== 'empty' || l.tape.length),
         gate: { LEARN_WINDOW, LEARN_GATE, LEARN_TIMES, minNotes: 3 },
         events: tape,
       };
@@ -1215,7 +1235,8 @@
       const a = el('a', '', '', { href: URL.createObjectURL(blob),
         download: `nola-take-${Date.now()}.json` });
       document.body.append(a); a.click(); a.remove();
-      d.log(`wrote a take of ${tape.length} messages over `
+      d.log(`wrote a take of ${tape.length} messages and ${plays.length} sounded `
+          + `note(s) over `
           + `${((tape.length ? tape[tape.length - 1].t - tape[0].t : 0) / 1000).toFixed(1)} s`);
     };
     const tick = () => {
@@ -3147,6 +3168,33 @@
           stillWire.includes(60) && stillPage.includes(60),
           `after several laps the wire held ${stillWire.join(',') || 'nothing'} and `
           + `the page held ${stillPage.join(',') || 'nothing'}`);
+
+        /* 🔴 A LOOPED NOTE COMES BACK AT THE VELOCITY IT WAS PLAYED WITH, AND ON
+           THIS PAGE THAT IS NOT A LOUDNESS QUESTION. Asked 2026-09-23: *"do y
+           preserve velocity at all?"*, and the answer was no: every looped note
+           came back at a flat 100. The Rhodes picks a different RECORDING per
+           velocity layer, so a quiet phrase was looping back as a different
+           sample played hard, which is most of *"loops do not sound right"*.
+           ⚠️ GRADED ON WHICH FILE SOUNDED, not on a number the page carries. The
+           two checks above already establish that velocity 20 and velocity 120
+           choose different recordings of note 60, so the file name is an
+           independent witness to the velocity that arrived. */
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        loopEl2.click(); keys.loops.settle(0);
+        midiDown(60, 20, 0, performance.now());      // soft, which is layer 5
+        await sleep(40);
+        midiUp(60);
+        loopEl2.click(); keys.loops.settle(0);
+        await sleep(320);                            // one turn of the loop
+        const loopedFile = lastPlayed && lastPlayed.url.split('/').pop();
+        loopEl2.click(); keys.loops.settle(0);
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        d.assert('a loop gives a note back at the velocity it was played with',
+          loopedFile === 'rhodes-059-5.m4a',
+          `a note played at velocity 20 came back as ${loopedFile}, against the `
+          + 'rhodes-059-1.m4a a flat 100 would have chosen');
 
         /* 🔴 AND THE NUMBER PAD REACHES THOSE TAKES. Asked *"num works. how come
            you can not add it to keyboard"*. Driven through `midiProgram`, which

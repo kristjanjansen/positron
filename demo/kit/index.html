@@ -3885,7 +3885,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
       const kb = createKeyboard(holder, {
         base: 60, loop: true, loops: 10, sustain: true,
         onDown: (n, how) => {
-          kb.lightNote(n, true); kitHeard.push({ n, how });
+          kb.lightNote(n, true); kitHeard.push({ n, how, t: performance.now() });
           o.textContent = `note ${n} down${how === 'loop' ? ', from the loop' : ''}`;
         },
         onUp: (n) => { kb.lightNote(n, false); o.textContent = `note ${n} up`; },
@@ -8851,6 +8851,57 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
           `the second take holds ${inTwo} movement(s), which is the one key played `
           + `into it and not the ${back.length} note(s) the first was replaying, and `
           + `both notes came back`);
+      }
+
+      /* 🔴 A LOOP KEEPS TIME, AND DRIFT IS A DIFFERENT FAULT FROM JITTER.
+         Reported 2026-09-23: *"loops do not sound right (timings)"*. A round used
+         to end with `setTimeout(round, lap)`, so the next round began whenever
+         that timer fired, and that lateness became the ORIGIN for the round's own
+         events. A timer is never early and is routinely a few ms late, so every
+         lap inherited the drift of every lap before it and the phrase walked away
+         from itself while each individual timer looked fine.
+         ⚠️ THE CLAIM IS THAT THE ERROR DOES NOT GROW, NOT THAT IT IS ZERO. Timer
+         accuracy has a floor no page gets under, and a check demanding zero would
+         be measuring the machine's mood. What separates the bug from the floor is
+         whether the last turn is further out than the first. */
+      {
+        kb.loops.forget(); kb.loops.clear(0);
+        const was = kitHeard.length;
+        kb.loops.press(0); kb.loops.settle(0);
+        kb.press('a'); kb.release('a');
+        kb.loops.press(0); kb.loops.settle(0);      // lap is the 250 ms floor
+        await new Promise((r) => setTimeout(r, 1150));   // four turns and a margin
+        const lap = kb.loops.lap(0);
+        const hits = kitHeard.slice(was).filter((e) => e.how === 'loop' && e.n === kb.noteOf('a'));
+        kb.loops.clear(0);
+        const gaps = hits.slice(1).map((e, i) => Math.round(e.t - hits[i].t));
+        /* where each turn landed against a perfect grid laid from the first one */
+        const errs = hits.map((e, i) => Math.round(e.t - (hits[0].t + i * lap)));
+        /* 🔴 THE TEST IS GROWTH, NOT MAGNITUDE, AND THE FIRST VERSION OF THIS
+           CHECK GOT THAT WRONG AND STAYED GREEN UNDER SABOTAGE. Chained
+           scheduling put back on purpose produced 0, 1, 3, 7, 8 ms against the
+           anchored 0, 2, 2, 1, 1, and a threshold on the LARGEST error passed
+           both. Drift is small early by construction: it is the slope that says
+           the laps are inheriting each other, so the halves are compared.
+           🔴 AND THIS CHECK IS COARSE, WHICH IS MEASURED RATHER THAN SUSPECTED.
+           The SAME sabotage run twice gave 8 ms of growth over five turns and
+           then 1.5 ms, because how late a timer fires depends on what else the
+           machine is doing. 1.5 passes. So this catches GROSS drift and cannot
+           be read as proof that the scheduling is anchored; separating them
+           properly needs about twenty turns, which is five seconds, and
+           `verify.mjs` stops growing about two seconds after the last new assert.
+           ⚠️ THE REAL INSTRUMENT IS `demo/resources/read-loop-take.mjs`, on a
+           take recorded through `/nola/?rec=1` while a loop is turning. It reads
+           as many turns as somebody cares to play and separates drift from jitter
+           with the halves of a long run rather than of four intervals. */
+        const half = Math.floor(errs.length / 2);
+        const mean = (xs) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
+        const growth = mean(errs.slice(half)) - mean(errs.slice(0, half));
+        d.assert('a loop keeps its place over several turns rather than walking away',
+          hits.length >= 4 && gaps.every((g) => Math.abs(g - lap) < 60) && growth < 3,
+          `${hits.length} turn(s) at ${gaps.join(', ')} ms against a ${lap} ms lap, error `
+          + `against a perfect grid ${errs.join(', ')} ms, and the last turns average `
+          + `${growth.toFixed(1)} ms further out than the first`);
       }
 
       /* 🔴 THE FOOTER ROW READS `Loop`, `Sustain`, `Notes off`, AND THE CLAIM IS
