@@ -1133,8 +1133,6 @@
      from the top. Written down there it read `Cannot access 'RECORDING' before
      initialization` and took the page to 0/1. That is the fourth temporal dead
      zone in this session and the symptom is never near the cause. */
-  /** `?ai=blur` draws the proposal as a soft filled circle instead of a ring. */
-  document.documentElement.dataset.aiLook = q.get('ai') === 'blur' ? 'blur' : 'ring';
   const RECORDING = q.get('rec') === '1';
   const tape = [];
   const tapeAt = () => Math.round(performance.now());
@@ -1723,6 +1721,8 @@
 
   /** when the proposal on screen was offered, and whether it has been played */
   let guessAt = 0, guessPlayed = false, guessRedraws = 0, arriveTimer = 0;
+  /** every chord this page has ever proposed, so none of them is ever learned */
+  const proposed = new Set();
   /**
    * 🔴 HOW LONG A PROPOSAL IS LEFT ALONE. Asked 2026-09-23: *"do not offer new
    * when i hae not played old suggestion for a while"*. A proposal is a thing to
@@ -1793,6 +1793,7 @@
       const { notes, outside } = voiceRow(c.notes, near, { wide: true });
       near = notes;
       guesses.push({ ...p, notes, outside });
+      { const pc = parseChord(p.name); if (pc.ok) proposed.add(chordKey(pc.root, pc.quality)); }
       const at = roll.addRow({ kind: 'guess', notes, label: rowLabel(p.name, outside) });
       /* 🔴 MARKED AS NEW HERE AND NOWHERE ELSE, because this is the one path
          that computed a proposal rather than re-drawing the one already on
@@ -1806,7 +1807,7 @@
         arriveTimer = setTimeout(() => {
           delete rowEl.dataset.new;
           delete keysHost.dataset.aiNew;
-        }, 500);
+        }, 1000);
       }
       /* 🔴 AND IT IS ON THE KEYS AS WELL AS IN THE ROLL, asked for as *"fade
          them also in keyboard so smaller are on top of larger"*. The roll says
@@ -1983,16 +1984,25 @@
      */
     if (guesses.length) {
       const c = parseChord(guesses[guesses.length - 1].name);
-      if (c.ok && chordKey(c.root, c.quality) === key) {
-        if (!guessPlayed) {
-          guessPlayed = true;
-          d.log(`you are trying ${guesses[guesses.length - 1].name}, which this page `
-              + 'proposed, so it is not being counted as a chord of yours');
-        }
-        showReading(r);
-        return;
-      }
+      if (c.ok && chordKey(c.root, c.quality) === key && !guessPlayed) guessPlayed = true;
     }
+    /**
+     * 🔴 AND IT IS EVERY CHORD THIS PAGE HAS EVER PROPOSED, NOT ONLY THE ONE ON
+     * SCREEN. The first version of this guarded the CURRENT proposal, on the
+     * reasoning that once it had been replaced, going on playing the chord was
+     * somebody choosing it rather than being handed it. Reported with a
+     * screenshot an hour later: *"you recorded a suggestion. why>"*, with a
+     * learned row holding a chord the page had put in front of them earlier.
+     * ⚠️ THE REASONING WAS TOO CLEVER AND THE ANSWER IS SIMPLER. A player cannot
+     * see when a proposal stopped being protected, so from their side the rule
+     * was *sometimes it records my practising and sometimes it does not*, which
+     * is worse than either rule on its own. The roll is a record of chords
+     * somebody arrived at, and a chord this page named first is not one of them.
+     * ⚠️ AND IT COSTS SOMETHING REAL, SAID HERE RATHER THAN HIDDEN: a suggestion
+     * you genuinely adopt can never be learned. If that turns out to matter, the
+     * repair is a second threshold rather than deleting this.
+     */
+    if (proposed.has(key)) { showReading(r); return; }
     playedAs.set(key, [...got.notes].sort((a, b) => a - b));
     tally.hold(key, at);
     const due = tally.dueAt(at);
@@ -3322,8 +3332,24 @@
       const tried = parseChord(guesses[0].name);
       const triedKey = tried.ok ? chordKey(tried.root, tried.quality) : '';
       d.assert('NEGATIVE CONTROL: trying the proposal does not teach it to the page',
-        freedAfter === true && tally.msOf(triedKey, performance.now()) === 0,
+        freedAfter === true && tally.msOf(triedKey, performance.now()) === 0
+        && proposed.has(triedKey),
         `${guesses[0].name} was played and the tally has `
+        + `${Math.round(tally.msOf(triedKey, performance.now()))} ms of it`);
+
+      /* 🔴 AND IT STAYS UNLEARNABLE AFTER THE PROPOSAL HAS MOVED ON, which is the
+         half a screenshot had to point out: *"you recorded a suggestion. why>"*.
+         The first rule protected only the proposal on screen, so a chord the page
+         had handed somebody earlier could still be learned, and from a player's
+         side that reads as *sometimes it records my practising*. */
+      const afterMoveOn = tally.msOf(triedKey, performance.now());
+      hold(guesses[0].notes);
+      await sleep(LEARN_GATE + 200);
+      drop(guesses[0].notes);
+      await sleep(80);
+      d.assert('NEGATIVE CONTROL: and a chord this page proposed is never learned, ever',
+        tally.msOf(triedKey, performance.now()) === afterMoveOn,
+        `after playing ${guesses[0].name} again the tally still has `
         + `${Math.round(tally.msOf(triedKey, performance.now()))} ms of it`);
       drawGuesses();
       d.assert('and playing it releases the hold, so the next redraw may offer something else',
@@ -3684,39 +3710,18 @@
      that fills when you take it.
      ⚠️ AND IT FILLS WHEN YOU PLAY IT, which is the same fact the row's opacity
      already carries, said in the one channel a player is actually looking at. */
-  /* 🔴 TWO TREATMENTS, AND WHICH ONE IS NOT MINE TO DECIDE. Asked across four
-     messages: *"try large circles with only outine or filled cicrcles
-     bluerrd"*, *"make it radiobutton"*, *"i mean blur optop"*, *"circles vs
-     blur"*, and, plainly, *"do not know what works"*. Both are drawn and
-     `?ai=blur` picks the other one, because a question about how something LOOKS
-     is answered by looking at it rather than by me arguing for one in a comment.
-     ⚠️ THIS IS A SWITCH FOR CHOOSING, NOT A SETTING TO SHIP. When one of them
-     wins, the loser goes and this comment goes with it. A page that keeps every
-     option somebody tried is a page nobody can read. */
+  /* 🔴 THE CIRCLE WON AND THE BLUR IS DELETED, WHICH IS WHAT THE SWITCH WAS FOR.
+     Both were drawn for a while behind `?ai=`, because *"do not know what
+     works"* is answered by looking rather than by me arguing for one in a
+     comment, and the answer came back as *"keep circles not blur"*. The loser is
+     deleted rather than left behind a flag: a page that keeps every option
+     somebody tried is a page nobody can read. */
   .roll-row[data-kind="guess"] .roll-label { color: var(--ai); }
   .roll-row[data-kind="guess"] .roll-cell.on::after {
-    background: transparent; box-shadow: inset 0 0 0 1.5px var(--ai);
+    background: transparent; box-shadow: inset 0 0 0 1px var(--ai);
     transition: background 120ms linear;
   }
   .roll-row[data-kind="guess"][data-held] .roll-cell.on::after { background: var(--ai); }
-
-  /* THE BLUR: a filled circle, bigger and soft, so it reads as a glow where a
-     note could go rather than as a mark that is already there. It sharpens and
-     shrinks to an ordinary dot when the chord is played. */
-  :root[data-ai-look="blur"] .roll-row[data-kind="guess"] .roll-cell.on::after {
-    background: var(--ai); box-shadow: none;
-    transform: scale(1.7); filter: blur(2.2px);
-    transition: filter 140ms linear, transform 140ms ease-out;
-  }
-  :root[data-ai-look="blur"] .roll-row[data-kind="guess"][data-held] .roll-cell.on::after {
-    transform: scale(1); filter: blur(0);
-  }
-  :root[data-ai-look="blur"] .k.ai .kd::after {
-    box-shadow: none; background: var(--ai);
-    width: calc(var(--k-dot, 6px) * 1.7); height: calc(var(--k-dot, 6px) * 1.7);
-    margin: calc(var(--k-dot, 6px) * -.85) 0 0 calc(var(--k-dot, 6px) * -.85);
-    filter: blur(2.2px);
-  }
 
   /* 🔴 A NEW PROPOSAL ARRIVES RATHER THAN APPEARING. Asked 2026-09-23:
      *"waaaaait when new suggetion, i want to feel it"*. A row that is simply
@@ -3731,19 +3736,28 @@
      ⚠️ AND IT MOVES NOTHING. `transform` and `opacity` only, because an
      animation that changes how much room a thing takes moves the columns under a
      reader, which is the rule this roll already keeps for its own rows. */
+  /* 🔴 ONE DURATION, DECLARED ONCE, BECAUSE THE TWO PICTURES ARRIVE TOGETHER.
+     Asked as *"make them appear sloow on pianorooll and keyboard (same rate)"*.
+     The roll and the keys are two drawings of one proposal, and two animations
+     at two speeds read as two things happening rather than one. A shared
+     measurement typed in two places is a measurement that will disagree, which
+     is why it is a custom property rather than a number in each rule. */
+  :root { --nola-arrive: 900ms; }
   @keyframes nola-arrive {
-    0%   { transform: scale(.3); opacity: 0; }
-    55%  { transform: scale(1.5); opacity: 1; }
+    0%   { transform: scale(.55); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
   }
-  @keyframes nola-arrive-label {
-    0%   { opacity: 0; transform: translateX(4px); }
-    100% { opacity: 1; transform: translateX(0); }
+  @keyframes nola-arrive-label { 0% { opacity: 0; } 100% { opacity: 1; } }
+  .roll-row[data-new] .roll-cell.on::after {
+    animation: nola-arrive var(--nola-arrive) cubic-bezier(.22, 1, .36, 1);
   }
-  .roll-row[data-new] .roll-cell.on::after { animation: nola-arrive 460ms ease-out; }
-  .roll-row[data-new] .roll-label { animation: nola-arrive-label 460ms ease-out; }
+  .roll-row[data-new] .roll-label {
+    animation: nola-arrive-label var(--nola-arrive) ease-out;
+  }
   /* the same arrival on the keys, so the hand is told where as well as what */
-  .nola-keys[data-ai-new] .k.ai .kd::after { animation: nola-arrive 460ms ease-out; }
+  .nola-keys[data-ai-new] .k.ai .kd::after {
+    animation: nola-arrive var(--nola-arrive) cubic-bezier(.22, 1, .36, 1);
+  }
   /* ⚠️ AND NOTHING MOVES FOR SOMEBODY WHO ASKED FOR THAT. The mark is still
      drawn, it simply does not travel to get there. */
   @media (prefers-reduced-motion: reduce) {

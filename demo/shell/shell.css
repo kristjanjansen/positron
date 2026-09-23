@@ -1573,9 +1573,9 @@ video[hidden] { display: none; }
 .k .kd { position: relative; }
 .k.ai .kd::after {
   content: ''; position: absolute; left: 50%; top: 50%;
-  width: calc(var(--k-dot, 6px) * 1.9); height: calc(var(--k-dot, 6px) * 1.9);
-  margin: calc(var(--k-dot, 6px) * -.95) 0 0 calc(var(--k-dot, 6px) * -.95);
-  border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ai);
+  width: var(--k-dot, 6px); height: var(--k-dot, 6px);
+  margin: calc(var(--k-dot, 6px) / -2) 0 0 calc(var(--k-dot, 6px) / -2);
+  border-radius: 50%; box-shadow: inset 0 0 0 1px var(--ai);
 }
 /* 🔴 A RING AROUND THE DOT RATHER THAN A SMALLER DOT INSIDE IT. The small mark
    was tried first and reported as *"not small dots, do not work"*, which is
@@ -1585,9 +1585,12 @@ video[hidden] { display: none; }
    rather than smaller, so a proposed key is the most visible thing on the
    keyboard until somebody fills it. Asked as *"try large circles with only
    outine"* and *"make it radiobutton"*.
-   ⚠️ AND IT SURROUNDS `down` RATHER THAN FIGHTING IT: playing a proposed key
-   leaves the yellow dot in the middle of its own ring, which is the two facts
-   at once that the fourth lamp exists for. */
+   ⚠️ AND IT IS EXACTLY A DOT'S SIZE, asked as *"make same size dots and circles
+   everywhere"*. It was 1.9 times a dot here and one dot wide in the roll, which
+   is one mark at two sizes in two pictures of the same thing. At the same size
+   it is literally the OUTLINE of the dot that would be there, so playing a
+   proposed key fills its own ring, which is the two facts at once that the
+   fourth lamp exists for. */
 .k.remote .kd { background: var(--ok); }
 /* 🔴 LAST, SO A HELD KEY READS AS HELD WHATEVER ELSE IT IS. Same order the
    old background rules carried, and the same reason: you play along with a
