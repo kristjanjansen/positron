@@ -29,6 +29,7 @@ That accounts for everything that executes. What remains is writing:
 | `plans/` | **72** documents that PROPOSE and argue. They moved out of the root on 2026-09-20 on instruction, with `git mv`, and 129 files referencing one by name were rewritten |
 | `research/` | **59** documents that REPORT what is out there or what was measured. Two of them arrived from the root on 2026-09-24 and the section below says which |
 | `results/`, `studio/`, `archive/` | measurements and captures, mostly untracked |
+| `evals/` | scenario cases for the skills, in the layout `claude plugin eval` expects. Its README carries the four rules that make one tell the truth |
 | `CLAUDE.md` `LESSONS.md` `PROGRESS.md` `HANDOFF.md` `BACKLOG.md` `LAYOUT.md` `SUMMARY.md` | the standing rules, why they exist, what was measured when, what is asked for, where a file goes, and where we are. They stay at the root and the next section says why |
 
 ⚠️ **Counts measured 2026-09-24**, not remembered. `ls plans/*.md | wc -l` and
