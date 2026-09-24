@@ -1,5 +1,125 @@
 ## Open
 
+### Open 2026-09-24: the remote looper, and the distributed instrument behind it
+
+🔴 **ASKED, VERBATIM:** *"in bg, plan the "remote looper" feature. I am in
+desktop browser, midi keyb connected but i want mobile browser on same webpage
+have 3x3 grid buttons to toggle the looper"*, and a message later *"think wider
+of distributed instument (parts) like this"*.
+
+**The shape.** The desktop browser holds the MIDI keyboard and the sound. The
+phone, on the SAME page, shows a 3x3 grid that toggles the looper's slots. So
+one instrument, two devices, and the phone is a control surface carrying no
+audio.
+
+**What already exists and is not to be rebuilt.**
+- `demo/shell/numloop.mjs` is the state machine, 15 checks in `numloop-test.mjs`,
+  no browser needed.
+- `createKeyboard` in `demo/shell/keyboard.mjs` holds the ten takes and puts
+  `Loop` left of `Sustain`. Playback calls `press(k, 'loop')`, so a looped note
+  reaches a page's `onDown` exactly as a finger does.
+- `/num/` is the bench with the telephone keypad, MIDI in and program change
+  mapping. Ten slots exist; a 3x3 grid is nine of them, and which nine is a
+  decision the plan has to make rather than assume.
+- `workers/items` already gives every room its own Durable Object by
+  `idFromName(room)`.
+
+**What is open in it.** Whether the phone drives the desktop's `numloop` over a
+relay or runs its own copy, what happens when the two disagree, what a press
+costs in latency against a lap of 250 ms minimum, and whether the page is one
+URL that decides its role or two.
+
+⚠️ **AND THE SECOND ASK IS THE LARGER ONE.** *"think wider of distributed
+instrument (parts)"* is not this one feature, it is the pattern: an instrument
+split across devices, each part carrying what that device is good at. The plan
+covers the pattern and this feature is its first instance.
+
+**Planned in background 2026-09-24. Written to `plans/plan-remote-looper.md`.**
+
+### Open, carried in from HANDOFF.md on 2026-09-24
+
+🔴 **THESE SIX LIVED IN `HANDOFF.md` UNDER `Still open` AND NOT IN THIS FILE,
+WHICH IS THE WRONG FILE BY THIS PROJECT'S OWN RULE.** `## Open` here held
+nothing unfinished at all: every bullet above the 2026-09-18 audit divider is
+struck. So a background agent reading the backlog to find out what was wanted
+would have found an empty list and a wall of finished work, and the four live
+asks were invisible to it. Moved rather than copied, and `HANDOFF.md` points
+here now.
+
+- 🔴 **`/fau/`: *"rm compile button next to fau on"*.** `demo/fau/index.html`
+  around line 396, `{ id: 'compile', label: 'Compile', primary: true }`, the only
+  entry left in `.pos-controls` after the presets moved to the panel footer on
+  2026-09-23. ⚠️ **AND THE PAGE'S OWN COMMENT SAYS WHY IT IS SAFE TO GO**: the
+  check block compiles by calling `build()` itself, so nothing behind the button
+  is graded only by a press. A removed control still moves every other control's
+  harness press, so this is a `positron-verify` task as well as a `positron-ui`
+  one.
+
+- ⚠️ **`/fau/`: *"secondary. should shimmer"*, and it names no subject.** There is
+  no shimmer anywhere in `demo/fau/index.html`, MEASURED by grep on 2026-09-24,
+  so there is nothing to change and nothing to point at. It needs one word from
+  the person who asked: WHAT should shimmer. Blocked on that and not on work.
+
+- ⚠️ **"move instrument to patch seletor below instrument on right, no
+  randomizer"**, asked with no page named, and asking got no answer. Candidates
+  are the pages that have both an instrument and a patch selector. Blocked.
+
+- 🔴 **THE MK-425C IS DESCRIBED AS A SEMITONE FLAT IN 11 FILES, AND THE CLAIM IS
+  NOT WRONG SO MUCH AS UNQUALIFIED.** MEASURED by grep 2026-09-24, excluding
+  `archive/` and build output: `demo/evo/index.html`, `demo/bay/index.html` (2
+  places), `demo/nola/index.html` (3), `demo/wish/index.html` (2),
+  `demo/shell/bay.mjs`, `demo/shell/bay-test.mjs`, plus `PROGRESS.md`,
+  `HANDOFF.md`, `measured-devices-2026-09-20.md`, `plans/plan-nola.md` and
+  `plans/plan-patchbay.md`.
+  ✅ **AND ONLY TWO OF THE 11 ARE TEXT A VISITOR READS**, which is the number
+  that matters and which the handoff's "seven files" did not separate:
+  `demo/wish/index.html:1354`, the `CHANNELS` entry reading *"Sends on channel 2,
+  one semitone flat."*, and `demo/nola/index.html:3923`, a diagram box note
+  reading *"The one on this desk also arrives a semitone flat, which is what the
+  TRANSPOSE control is for."* The other nine are comments and documents.
+  🔴 **THE FACT IS THAT THIS UNIT MEASURED 47 TO 71, NOT THAT THE MODEL IS
+  FLAT.** `research/evo-mk425c-face-2026-09-21.md` looked for a starting note in
+  all three manual PDFs and it is not there; the MIDI Implementation Chart leaves
+  `True Voice` as asterisks, which is the chart declining to answer. **47 to 71
+  is consistent with a factory 48 to 72 plus a stored transpose of minus one**,
+  and the instrument has a transpose function with exactly that resolution.
+  ✅ **AND IT IS TESTABLE FOR FREE, WHICH IS WHY THIS IS NOT A WORDING TASK
+  YET.** The manual's non-volatile memory list names controller and channel
+  assignments, drawbar mode, DATA LSB and MSB, global channel and last used
+  preset. **Octave and transpose are absent from it.** So switch the keyboard off
+  and on and play the bottom key. **48 means somebody left a live transpose set
+  and the instrument is ordinary. 47 means transpose survives a power cycle and
+  the manual's list is incomplete.** Either answer decides how those 11 files get
+  worded, and neither costs anything.
+  ⚠️ **A FACTORY RESET IS NOT THE FREE TEST.** It is hold `+/-` while switching
+  on and it *"will erase all setups stored to memory"*.
+  ⚠️ **AND NOBODY IS TO "FIX" THE DRAWING.** `createKeyboard` picks black or
+  white from the OFFSET off the base note, so `/evo/`'s `base: 47` draws the
+  right C-to-C shaped 25 key picture and only the printed NAMES carry the minus
+  one. Changing the key pattern would draw an instrument that does not exist.
+
+- ⚠️ **`/circuit/` reads 33/34 on a printed-names inset.** Pre-existing, and
+  proved to be so rather than assumed.
+
+- ⚠️ **`/nola/` timeline order has no assert.**
+
+- 🔴 **NOT SETTLED: WHETHER THE LOOP REALLY KEEPS TIME, AND ONLY A PERSON CAN
+  SETTLE IT.** The `/kit/` drift check is COARSE, measured rather than suspected:
+  the same sabotage run twice gave **8 ms** of growth over five turns and then
+  **1.5 ms**, and 1.5 passes. Separating drift from jitter properly needs about
+  twenty turns, which is five seconds, and `verify.mjs` stops growing about two
+  seconds after the last new assert. The instrument exists and is committed at
+  `demo/resources/read-loop-take.mjs`:
+
+  ```sh
+  # open https://positron.studio/nola/?rec=1 , play, loop something, let it turn,
+  # press SAVE TAKE, then
+  node demo/resources/read-loop-take.mjs ~/Downloads/nola-take-*.json
+  ```
+
+  It reads `plays`, which is what SOUNDED with `how` saying finger or lap, and
+  not `events`, which is the wire and can say nothing about a loop.
+
 ### Done 2026-09-23: the numpad looper, and the `Loop` that ended up on the KEYBOARD instead
 
 🔴 **THE STATE MACHINE SHIPPED AND THE `/nola/` MODE DID NOT, AND BOTH WERE
