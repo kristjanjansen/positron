@@ -153,7 +153,7 @@ whether a recording is damaged.
 
 - **The Circuit has no USB audio.** 📄 Its user guide, quoted in
   `plans/plan-circuit-model12.md` §3.10, and corroborated on this machine:
-  `measured-devices-2026-09-20.md` lists the Circuit as **MIDI only over USB**.
+  `research/measured-devices-2026-09-20.md` lists the Circuit as **MIDI only over USB**.
   There is no route that avoids a cable and a converter.
 - **The Model 12 would be a better converter and is already here.** 24 bit,
   48 kHz, 12 in and 10 out, one duplex CoreAudio device, against 16 bit, 2 in.

@@ -185,7 +185,7 @@ const OPS = {
   },
   /**
    * 🔴 ONE VELOCITY FOR EVERY NOTE, WHICH THIS DESK'S OWN DRUMS ALREADY DO.
-   * ✅ MEASURED and written in `measured-devices-2026-09-20.md`: the Circuit's
+   * ✅ MEASURED and written in `research/measured-devices-2026-09-20.md`: the Circuit's
    * drum pads send notes 60, 62 and 64 at **velocity 96, fixed**. So this is
    * not an effect, it is how one instrument here behaves, and a link that wants
    * to feed it from a touch sensitive keyboard needs to say so.

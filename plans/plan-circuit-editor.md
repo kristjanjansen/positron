@@ -254,5 +254,5 @@ as well as on disk, and step 3 is unblocked.
   <https://fael-downloads-prod.focusrite.com/customer/prod/s3fs-public/downloads/Circuit%20Programmers%20Reference%20Guide%20v1-1_0.pdf>
   Read as text with `pdftotext -layout`; parameter counts are from parsing that
   text rather than from reading the tables by eye.
-- 📁 `plans/plan-circuit-model12.md` §3.5, `measured-devices-2026-09-20.md`,
+- 📁 `plans/plan-circuit-model12.md` §3.5, `research/measured-devices-2026-09-20.md`,
   `demo/shell/midi-decode.mjs`, `demo/circuit/index.html`.

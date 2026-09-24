@@ -49,7 +49,7 @@ what to point `/dump/` at.
 ## 1. The headline, so nobody has to read §2 to get it
 
 🔴 **THE FAST TRACK PRO WORKS AND THE DRIVER PROBLEM DOES NOT EXIST.**
-`measured-devices-2026-09-20.md` established that. This plan does not re-open
+`research/measured-devices-2026-09-20.md` established that. This plan does not re-open
 it.
 
 🔴 **THE SAMPLE RATE SPLIT IS NOT A CONFLICT. IT IS ONE HALF SET WRONG, AND IT
@@ -168,7 +168,7 @@ Three things in there that nothing else said.
 **interfaces 2 and 3**, and `:2111300:4` is **interface 4**. So macOS grouped
 the two playback AudioStreaming interfaces into one device with two streams of
 two channels each, and left the third, the capture one, as a device of its own.
-The `4 channels out` in `measured-devices-2026-09-20.md` is analogue 1 and 2 on
+The `4 channels out` in `research/measured-devices-2026-09-20.md` is analogue 1 and 2 on
 one stream plus S/PDIF on the other.
 
 🔴 **`kAudioDevicePropertyRelatedDevices` RETURNS BOTH ON BOTH.** CoreAudio
@@ -330,7 +330,7 @@ Configurations section is the whole capability table:
 | 24 bit | 2 in **or** 2 out | 88.2 and 96 kHz |
 
 🔴 **THAT PANEL IS A SYSTEM PREFERENCES PANE FROM 2006 AND IT IS GONE.**
-`measured-devices-2026-09-20.md` measured that no M-Audio software is installed
+`research/measured-devices-2026-09-20.md` measured that no M-Audio software is installed
 and that the device binds `com.apple.driver.AppleUSBAudio`. 🔴 MEASURED here:
 `m-audio.com/fast-track-pro` answers **404**, and
 `m-audio.com/support/downloads` answers **200** and contains **no occurrence of
@@ -487,7 +487,7 @@ show five instruments that are not in the building. Web MIDI only exposes
 online ports, so `/dump/` is safe by construction, and this is written down so
 that a future tool built on CoreMIDI does not have to learn it twice.
 
-🔴 **AND CHROME IS ALREADY TALKING TO IT.** `measured-devices-2026-09-20.md`
+🔴 **AND CHROME IS ALREADY TALKING TO IT.** `research/measured-devices-2026-09-20.md`
 counted nine `AppleUSBHostDeviceUserClient` handles owned by Google Chrome on
 this device. The Web MIDI path is live rather than theoretical.
 ⚠️ **The exact string Web MIDI reports for `port.name` is NOT measured here.**
@@ -902,7 +902,7 @@ doing it**, and have been through every measurement in this document.
 
 ⚠️ **THE FAST TRACK PRO IS A FULL SPEED DEVICE ON A CHAIN OF HIGH SPEED HUBS**,
 12 Mbit/s, carrying 4 channels out and 2 in through two nested hubs beside two
-other devices. `measured-devices-2026-09-20.md` already flags this as the first
+other devices. `research/measured-devices-2026-09-20.md` already flags this as the first
 thing to change if a dropout appears. At 16 bit and 44.1 kHz its whole stream is
 about 4.2 Mbit/s, which is a third of what the wire has, so the arithmetic says
 it is fine and the arithmetic is not the part that usually fails.
@@ -1389,7 +1389,7 @@ Nothing here is destructive and three of the five are machine wide.
 - USB descriptors, interface classes, configuration counts and power
   allocations: `ioreg -c IOUSBHostDevice -w0 -r -l`, parsed.
   ⚠️ `system_profiler SPUSBDataType` returns nothing and exits 0 on this
-  machine, which `measured-devices-2026-09-20.md` records; `ioreg` is the second
+  machine, which `research/measured-devices-2026-09-20.md` records; `ioreg` is the second
   opinion that works.
 - CoreAudio device properties, available rates, stream formats, latency, safety
   offset, clock domain and related devices: `AudioObjectGetPropertyData` through
@@ -1457,5 +1457,5 @@ more.**
 
 - `demo/shell/midi.mjs`, `demo/shell/cc-adapter.mjs`, `demo/shell/board.mjs`,
   `demo/shell/keyboard.mjs`, `demo/able/index.html`, `demo/grains/index.html`
-- `measured-devices-2026-09-20.md`, `plans/plan-circuit-model12.md`,
+- `research/measured-devices-2026-09-20.md`, `plans/plan-circuit-model12.md`,
   `plans/plan-device-layouts.md`, `CLAUDE.md`

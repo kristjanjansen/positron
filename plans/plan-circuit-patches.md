@@ -355,7 +355,7 @@ network.
    application for macOS and Windows, and 📄 DOC names it as the fix when the web
    version misbehaves with a Circuit specifically.
 3. **Plug the Circuit straight into the Mac if you can.** On this desk it
-   currently sits behind two nested hubs (`measured-devices-2026-09-20.md`).
+   currently sits behind two nested hubs (`research/measured-devices-2026-09-20.md`).
    Nothing says that is a problem. It is one variable fewer on the one transfer
    that matters.
 4. 🔴 **IF COMPONENTS OFFERS A FIRMWARE UPDATE, DECLINE IT FOR NOW.** §7 and §9.

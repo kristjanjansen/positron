@@ -96,3 +96,13 @@ tmp/
 # the commit's. An untracked file nobody put there is exactly the shape that
 # rides along. Ignored so it cannot.
 .DS_Store
+
+# 🔴 SOMEBODY ELSE'S PACKS NEVER REACH A PUBLIC REPOSITORY. These three sit at
+# the root, empty today, and were found there on 2026-09-24 while tidying for the
+# repository going public. The day one of them is not empty is the day a git add
+# publishes an instrument owner's sessions, which is the exact thing that cost a
+# history rewrite the same afternoon. Ignored before it can happen rather than
+# after.
+Circuit_pack/
+Sampler_pack/
+OG/ASMR_pack/

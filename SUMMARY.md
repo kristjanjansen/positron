@@ -219,7 +219,7 @@ deployed end-to-end (registry worker, host/player pages, session-as-timeline-log
 50× slower); OBS in Docker and in a CF Container both proven, obs-moq publishes on d14 and d16
 (149 ms — fastest chain measured); dual MoQ+RTMP from one OBS.
 
-**Open**: 4 secret rotations (SECRETS-ROTATION.md), positron.studio purchase, iPhone capture
+**Open**: 4 secret rotations (research/SECRETS-ROTATION.md), positron.studio purchase, iPhone capture
 probe, Web MIDI precision (needs IAC toggle), hardware jam/instrument run.
 
 ## Session 6 continued (2026-08-28/30) — the library became a platform
