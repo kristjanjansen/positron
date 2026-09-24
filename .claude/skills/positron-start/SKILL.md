@@ -41,6 +41,17 @@ it. The same two facts, in sentences they can act on:
 > *"Now setting up the tool that publishes it, and doing a practice run that
 > puts nothing online."*
 
+🔴 **AND IT INCLUDES THE REASON YOU GIVE WHEN ASKING PERMISSION TO RUN A
+COMMAND**, which is the sentence read under the most pressure and the one most
+often left technical. Observed in the same run: *"May I query npm's advisory
+database to verify whether ruhr has any production dependency vulnerabilities?"*
+against a prompt with a Yes button under it. Say *"Can I check whether anything
+this project installs has a known security problem?"* and they can answer
+without pretending to understand. **An approval they did not understand is not
+an approval**, it is a habit of pressing yes, and the whole reason this skill
+stops at anything that costs money is that the habit has to be worth something
+when it matters.
+
 ⚠️ **THE TEST IS NOT SENTENCE LENGTH, IT IS WHETHER A WORD IS THEIRS TO LEARN.**
 `Durable Object`, `hibernation`, `binding types`, `dry run` and `toolchain` are
 all fine in your own head, in the code, and in a comment. In a line addressed to
