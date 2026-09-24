@@ -7,7 +7,7 @@ the machinery.
 
 ```sh
 node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"   # 62 today, 60 built
-git log --oneline -1          # 1141c18, and origin is level with it
+git log --oneline -1          # 77501d0 on 2026-09-24, and origin/main is 120 behind
 node demo/verify.mjs kit nola num     # 325/325
 ```
 
@@ -21,15 +21,30 @@ it. Everything below is live.
 - **https://positron.studio/num/** is the bench the state machine came from, and
   it now prints every MIDI message it receives.
 
-## 🔴 THE IN FLIGHT SET, AND WHOSE EACH FILE IS
+## THE IN FLIGHT SET IS EMPTY, AND IT WAS NOT EMPTIED BY BEING FINISHED
 
-**Another session, do not touch, in none of these commits:**
-`LESSONS.md`, `demo/verify.mjs`, `demo/wish/index.html`.
-⚠️ **AND A DEPLOY SHIPS THEM**, because `build.mjs` copies the working tree.
-`demo/wish/index.html` is a built page, so whatever state it is in has gone to
-the edge several times today. That was flagged each time and is not an accident.
+🔴 **`LESSONS.md`, `demo/verify.mjs` AND `demo/wish/index.html` SAT UNCOMMITTED
+FOR TWO DAYS AFTER THE SESSION THAT OWNED THEM ENDED.** This section listed them
+as another session's in flight work, which was true when it was written and
+stopped being true when that session went away, and nothing says so at the
+moment it happens. MEASURED 2026-09-24: no positron peer session existed, and the
+three files had not been touched since 2026-09-22. **199 lines of finished work,
+including the harness repair that stops a check block being cut off, one deploy
+away from shipping and one `git checkout` away from being lost.**
+✅ Committed as `875132f` and `77501d0` after `wish` re-read **70/70 with 64 page
+asserts**, exactly what it read when the repair was made, and `muta` **51/51 with
+45**.
+⚠️ **THE HANDOVER IS THE THING TO FIX, NOT THIS TREE.** A file handed over as
+somebody else's is handed over with no owner the moment that session stops, so
+the next session finds work it has been told not to touch and no one to ask.
+**Say what it is FOR, not only whose it is**, so the next reader can judge it.
 
-Everything under `workers/view/public/` is build output and is not source.
+⚠️ **AND A DEPLOY SHIPS THE WORKING TREE**, because `build.mjs` copies it. That
+is why an orphaned dirty file is not a quiet problem.
+
+Everything under `workers/view/public/` is build output and is not source. It is
+currently regenerated and uncommitted, and MEASURED byte identical to source on
+`shell/keyboard.mjs`, so it is noise rather than pending work.
 
 ## What the loop does, in the order the presses happen
 
@@ -120,16 +135,20 @@ partial twice at independent phase. The bank costs 0.7 to 0.9 per cent of one
 core, flat in polyphony, and zero bytes. **Nobody has asked for the bank and it
 is not in Open.**
 
-## Still open, from before today
+## Still open, and it lives in `BACKLOG.md` now
 
-- `/fau/`: *"rm compile button next to fau on"*, and *"secondary. should
-  shimmer"* which needs a word on WHAT should shimmer.
-- *"move instrument to patch seletor below instrument on right, no randomizer"*
-  was asked, the page was never named, and asking got no answer.
-- **Seven files still say the MK-425C is a semitone flat**, `demo/wish/index.html`
-  among them, which a visitor reads.
-- `/circuit/` reads 33/34 on a printed-names inset, pre-existing and proved so.
-- `/nola/` timeline order has no assert.
+🔴 **THE SIX ITEMS THAT WERE LISTED HERE ARE IN `BACKLOG.md` UNDER `## Open`,
+MOVED 2026-09-24.** They were in this file and not that one, and `## Open` there
+held nothing unfinished, so anything reading the backlog to find out what was
+wanted found an empty list. `HANDOFF.md` answers what state this is in. It is
+not the place an unfinished ask lives.
+
+⚠️ **ONE OF THEM SHARPENED ON THE WAY AND THE NUMBER HERE WAS WRONG.** This
+section said seven files call the MK-425C a semitone flat. MEASURED 2026-09-24:
+**11 files**, of which **only two are text a visitor reads**,
+`demo/wish/index.html:1354` and `demo/nola/index.html:3923`. The other nine are
+comments and documents. And the item is not a wording sweep yet, because a power
+cycle settles what the wording should say for free.
 
 ## The constraints that do not change
 
