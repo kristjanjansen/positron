@@ -658,6 +658,12 @@ effect  = _, _;
      so without this the editor is an unnamed text box. A caption is furniture
      here and a name is not. */
   source.input.setAttribute('aria-label', 'the Faust program this page compiles');
+  /* 🔴 ITS OWN CLASS, BECAUSE IT MOVED OUT OF THE CASE ON 2026-09-24 AND EVERY
+     RULE ABOUT IT WAS WRITTEN `.fau-panel .pos-field`. A selector naming an
+     ancestor is a selector that dies silently when the element moves, which is
+     the dead rule this stylesheet has now measured five times. `createField`
+     takes no `cls`, so the page adds one. */
+  source.el.classList.add('fau-src');
 
   function showSource() {
     setCell('source', new TextEncoder().encode(source.value()).length);
@@ -988,9 +994,29 @@ effect  = _, _;
       online: { of: 'FAU', state: 'offline', press: () => togglePower() },
       patch: patch.el,
     },
+    /* 🔴 THE TEXT IS A GLUE PART AND NOT CASE CONTENTS, CHANGED 2026-09-24.
+       Asked as *"input edge to edge of container w, add paddign on top, add line
+       in top. glued instrument feel like waveforms on muta"*, and the last
+       clause is the whole answer: `/muta/` passes its wave shape as
+       `parts: [scope.el]` and this page was calling `inst.add()`.
+       ⚠️ **THEY ARE TWO DIFFERENT SLOTS AND `instrument.mjs` SAYS SO IN ITS OWN
+       WORDS**: `add()` puts something INSIDE the case, where it scrolls with the
+       panel and sits within the case's inset, and a part is its own surface with
+       the glue's seam either side of it, *"the same edge the bar has, at the same
+       width"*. So three of the four asks are one move rather than three rules.
+       🔴 **AND THIS IS WHY `edge to edge` WAS ASKED TWICE.** It was answered on
+       2026-09-23 by zeroing `.panel-strip`'s padding on both axes, and the
+       comment below counted THREE boxes doing the insetting. There were four:
+       `.panel-case` carries `padding: 0 var(--panel-pad)` with `--panel-pad:
+       20px`, on the case itself, which no page rule touched. A child cannot
+       reach its way out of a parent's padding, so the text was 20 px short at
+       both ends for a day while every rule about it read as correct.
+       ⚠️ THE CASE KEEPS THE PLATE AND IS NOT LEFT EMPTY: `plate: false` on the
+       header is what holds `FAU` in the case's top inset, which is the same
+       place `/muta/` keeps its own. */
+    parts: [source.el],
     panel: { side: null, flow: false, cls: { panel: 'fau-panel' } },
   });
-  inst.add(source.el);
 
   d.el.append(keysHost);
 
@@ -1489,6 +1515,11 @@ effect  = _, _;
      case instead. A program in a box that fits about twenty characters is less
      than one line of Faust, which is why the plain row this replaced carried
      the same single line. */
+  /* ⚠️ AND THIS ONE IS KEPT DELIBERATELY THOUGH THE STRIP IS EMPTY TODAY.
+     `.panel-strip` is a flex row whose children keep their own width, because
+     the panels this component was written for are as wide as the instrument
+     they draw. Anything this page ever puts IN the case wants growing the same
+     way, and the rule costs nothing while there is nothing to match. */
   .fau-panel .panel-strip > .pos-field { flex: 1 1 100%; min-width: 0; }
 
   /* 🔴 EDGE TO EDGE MEANS THE BOX'S OWN EDGES, AND IT WAS ONLY HALF TRUE. Asked
@@ -1508,13 +1539,49 @@ effect  = _, _;
      assumed: there is no `aria-label`, no `for` and no `labelledby` in that
      module, so hiding the span would have left the textarea with no name at all.
      The page sets it below. */
-  .fau-panel .panel-strip { padding-block: 0; padding-left: 0; padding-right: 0; }
-  .fau-panel .pos-field { gap: 0; }
-  .fau-panel .pos-field-l { display: none; }
-  /* The resize grip is the textarea's own and sits on its corner; with the box
-     at the case's edge it would sit on the case's corner, which reads as the
-     PANEL being resizable. */
-  .fau-panel .pos-field textarea { border-radius: 0; border-width: 0 0 1px 0; resize: vertical; }
+  /* 🔴 AND THE FOURTH BOX WAS `.panel-case` ITSELF, FOUND 2026-09-24 WHEN
+     `edge to edge` WAS ASKED A SECOND TIME. `padding: 0 var(--panel-pad)` with
+     `--panel-pad: 20px` sits on the case, and a child cannot reach its way out
+     of its parent's padding however many of its own rules say 0. Every rule
+     above was correct and the text was still 20 px short at both ends.
+     ✅ **SO IT IS NOT A FIFTH OVERRIDE, IT IS A DIFFERENT SLOT.** The text is a
+     glue part now, a sibling of the case rather than a child of it, so it takes
+     the glue's full width the way the footer bar does and there is no padding
+     left to fight. The rules that follow are about the part, keyed on its own
+     class, because the ones they replace all named `.fau-panel` as an ancestor
+     the field no longer has. */
+  .fau-src { gap: 0; }
+  .fau-src .pos-field-l { display: none; }
+
+  /* 🔴 AND THE CASE'S OWN STRIP IS EMPTY NOW, SO IT MUST NOT KEEP ITS HEIGHT.
+     MEASURED 2026-09-24 the moment the text moved out: the case was a **71 px**
+     band holding one word, with an empty **40 px** strip inside it whose whole
+     height was `padding-block: var(--panel-pad)` at 20 px each way. That is this
+     project's empty box rule, which `/typist/` paid for as a 2 px line nobody
+     wrote and `.pos-controls[hidden]` already exists for: **a container with
+     nothing in it must not paint its edges or hold its height.**
+     ⚠️ THE PLATE IS NOT IN THE STRIP AND SURVIVES THIS, which was measured
+     rather than hoped: it sits in the case's top inset at 748.5 px, and the case
+     keeps `FAU` at the top right where the 2026-09-23 ask put it.
+     ⚠️ **AND IT IS PAGE SCOPED RATHER THAN A RULE IN `shell.css`, ON PURPOSE.**
+     Any case with a plate and no controls has this, so it looks like a component
+     fix, and making it one would change every instrument page from inside a task
+     about one. It is written here the way the middot rule is written per demo,
+     and it is the candidate to lift if a second page ever empties a strip. */
+  .fau-panel .panel-strip:empty { display: none; }
+  /* 🔴 PADDING ON TOP AND NOTHING ANYWHERE ELSE, ASKED FOR IN THOSE WORDS.
+     Inside a glue the seam above this part is the line, so what the text needed
+     was air between that line and its first row, and it needed it only there:
+     the sides are the ask that took two goes and the foot is the next seam. */
+  .fau-src { padding-top: 10px; background: var(--card); }
+  /* The resize grip is the textarea's own and sits on its corner; at the glue's
+     edge it would sit on the glue's corner, which reads as the whole instrument
+     being resizable.
+     ⚠️ AND THE BOTTOM BORDER WENT WITH THE MOVE. It was the line between the
+     text and the footer while both were inside one case; as a glue part the
+     seam already draws that line, and keeping the border would have drawn it
+     twice at 2 px. */
+  .fau-src textarea { border-radius: 0; border-width: 0; resize: vertical; }
 
   /* A row of keys wider than the page scrolls itself rather than dragging the
      page sideways. `min-width: 0` is what lets a flex child shrink below its

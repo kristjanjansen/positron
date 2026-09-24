@@ -1,5 +1,58 @@
 ## Open
 
+### Open 2026-09-24: `/fau/`'s panel, four asks and one of them is a repeat
+
+🔴 **ASKED, VERBATIM:** *"fau: as i told you: input edge to edge of container w,
+add paddign on top, add line in top. glued instrument feel like waveforms on
+muta"*.
+
+⚠️ **AND *"AS I TOLD YOU"* IS THE PART TO READ FIRST.** Edge to edge was already
+asked on 2026-09-23, quoted in the page's own comment as *"create instument
+panel, fau on top right, below the textarea (edge to edge), below it footer with
+on/off"*. It was built and it is not edge to edge, so this is the second time of
+asking and the first answer was wrong.
+
+✅ **ALL FOUR DONE 2026-09-24, AND THEY WERE ONE CHANGE RATHER THAN FOUR.**
+The last clause is the answer to the other three: `/muta/` passes its wave shape
+as **`parts: [scope.el]`** and this page was calling **`inst.add(source.el)`**.
+`instrument.mjs` already spells out the difference in its own words: `add()` puts
+something INSIDE the case, where it scrolls with the panel and sits within the
+case's inset, and a part is its own surface with the glue's seam either side of
+it, *"the same edge the bar has, at the same width"*. So moving one line gave
+edge to edge and the top line at once, and only the top padding was a rule.
+
+🔴 **WHY `edge to edge` HAD TO BE ASKED TWICE: THERE WERE FOUR BOXES INSETTING
+IT AND THE PAGE'S COMMENT COUNTED THREE.** The 2026-09-23 answer zeroed
+`.panel-strip`'s padding on both axes and named the strip's gap, the strip's pad
+and the field's label. The fourth is **`.panel-case` itself**, `padding: 0
+var(--panel-pad)` with `--panel-pad: 20px`, on the case. **A child cannot reach
+its way out of its parent's padding however many of its own rules say 0**, so the
+text was 20 px short at both ends while every rule about it read as correct.
+⚠️ AND THE REPAIR IS NOT A FIFTH OVERRIDE. It is a different slot: as a glue part
+the text is a sibling of the case rather than a child, so there is no padding
+left to fight.
+
+✅ **MEASURED, NOT EYEBALLED.** Case, text and footer bar all span **107 to 793**
+inside a glue of 106 to 794, which is the glue's own 1 px border. The field
+carries `padding-top: 10px` and the glue's 1 px seam is the line above it.
+
+🔴 **AND THE MOVE EXPOSED AN EMPTY BOX, WHICH IS WHY THIS IS FIVE THINGS AND NOT
+FOUR.** With the text gone the case was a **71 px band holding one word**, with
+an empty **40 px strip** inside it whose whole height was `padding-block:
+var(--panel-pad)`. `.fau-panel .panel-strip:empty` collapses it and the case is
+**31 px** now. The plate was measured rather than hoped for: it sits in the
+case's top inset at 748.5 px and `FAU` is still top right, where the 2026-09-23
+ask put it.
+⚠️ **PAGE SCOPED ON PURPOSE.** Any case with a plate and no controls has this, so
+it looks like a `shell.css` fix, and making it one would change every instrument
+page from inside a task about one.
+⚠️ **AND EVERY RULE ABOUT THE FIELD WAS RE-KEYED OFF ITS OWN CLASS**, `.fau-src`,
+because they all named `.fau-panel` as an ancestor it no longer has. That is the
+dead selector this stylesheet has now measured five times.
+
+MEASURED: **45/45 with 39 page asserts, identical either side of the change**, so
+nothing went silent.
+
 ### Open 2026-09-24: the remote looper, and the distributed instrument behind it
 
 🔴 **ASKED, VERBATIM:** *"in bg, plan the "remote looper" feature. I am in
