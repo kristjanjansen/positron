@@ -1569,11 +1569,19 @@ effect  = _, _;
      about one. It is written here the way the middot rule is written per demo,
      and it is the candidate to lift if a second page ever empties a strip. */
   .fau-panel .panel-strip:empty { display: none; }
-  /* 🔴 PADDING ON TOP AND NOTHING ANYWHERE ELSE, ASKED FOR IN THOSE WORDS.
-     Inside a glue the seam above this part is the line, so what the text needed
-     was air between that line and its first row, and it needed it only there:
-     the sides are the ask that took two goes and the foot is the next seam. */
-  .fau-src { padding-top: 10px; background: var(--card); }
+  /* 🔴 THE TOP PADDING IS ON THE TEXTAREA AND NOT ON THE PART, CORRECTED
+     2026-09-24 AFTER SHIPPING IT THE OTHER WAY AND BEING SHOWN A CROP OF IT.
+     On the part it was 10 px of `--card` sitting above a well painted
+     `--card-2`, so the page drew **case, seam, a second band of the same dark,
+     then the well** and read as *"a mess"*, which it was. Two bands of one
+     colour with a line between them is not air above the text, it is a strip of
+     furniture nobody asked for.
+     ✅ **AIR INSIDE A BOX BELONGS TO THE BOX.** The padding is the textarea's
+     own, so the input is one unbroken surface from the seam down and the first
+     row of code sits away from the line. That is what *"add paddign on top"*
+     asks for once *"add line in top"* is the seam.
+     ⚠️ AND THE PART KEEPS NO BACKGROUND OF ITS OWN, so there is no third tone
+     left to stack. The glue paints the seam and the textarea paints the well. */
   /* The resize grip is the textarea's own and sits on its corner; at the glue's
      edge it would sit on the glue's corner, which reads as the whole instrument
      being resizable.
@@ -1582,6 +1590,19 @@ effect  = _, _;
      seam already draws that line, and keeping the border would have drawn it
      twice at 2 px. */
   .fau-src textarea { border-radius: 0; border-width: 0; resize: vertical; }
+  /* 🔴 `(0,2,1)`, WHICH IS A TIE AND NOT AN ESCALATION, AND IT WAS MEASURED
+     LOSING FIRST. The padding was written on `.fau-src textarea`, which is
+     `(0,1,1)`, against `shell.css`'s `.pos-field.tall textarea` at `(0,2,1)`
+     setting `padding: 7px 9px` as a SHORTHAND. Weight decides before order does,
+     so the shorthand put the top back to 7 px and the computed value said so
+     while the source read as correct. The border on the same element DID win,
+     because the rule it beats is `(0,1,1)` and a tie goes to the later sheet.
+     ⚠️ **THE FIX IS TO MATCH THE COMPONENT'S WEIGHT, NEVER TO OUTRUN IT.** This
+     stylesheet records `.pos-faux` needing `(0,2,0)` to beat a page, and the
+     rule that came out of it is that raising specificity to win a fight with
+     your own stylesheet is how the next fight starts one step higher. A tie
+     plus source order is the smallest thing that can win. */
+  .pos-field.fau-src textarea { padding-top: 14px; }
 
   /* A row of keys wider than the page scrolls itself rather than dragging the
      page sideways. `min-width: 0` is what lets a flex child shrink below its
