@@ -140,3 +140,24 @@ only fiddly step.
 
 Run it locally with `node demo/server.mjs` and open the address it prints.
 There is no install step and no dependencies to fetch.
+
+---
+
+## Licence
+
+**MIT** for the code written here, in `LICENSE`.
+
+Two things it does not cover, and `NOTICE.md` is the index of them with a
+pointer to each licence text in the tree:
+
+- **`demo/grains/` and `demo/patch/` are AGPL-3.0-or-later**, because they run
+  scsynth on Sam Aaron's SuperSonic clockwork. AGPL is the licence where serving
+  something over a network counts as distributing it, which is why this
+  repository being public is what satisfies the obligation rather than what
+  creates it.
+- **The recordings, films and archive material are not mine to licence.** Every
+  row carries its holder in `demo/resources/corpus.json`. Reuse is a question
+  for the holder.
+
+Every vendored thing already arrived with its own `LICENSE-*` file beside it.
+Those files are the authority; `NOTICE.md` is a table of contents.
