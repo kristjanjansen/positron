@@ -70,36 +70,61 @@ npx wrangler --version
   demand, and this repo never pins it in a `package.json` because there is no
   `package.json`.
 
-🔴 **AND DO NOT ASSUME GIT. THEY REACHED THIS FILE OVER THE WEB.** The prompt in
-the README asks an agent to read one public URL, deliberately, so that somebody
-with no git and no GitHub account can still start. Check before you use it:
+🔴 **THEY DO NOT NEED THIS REPOSITORY, AND THE DEFAULT IS NOT TO TAKE IT.** They
+reached this file over the web on purpose. **Build them a NEW, SMALL project in
+their own idiom**, and read a file from here over a raw URL when a specific
+question comes up.
+
+🔴 **MEASURED, BECAUSE THE OPPOSITE ADVICE LOOKS SO REASONABLE:**
+`demo/stage/index.html` imports **20 modules**, **18 of them from `/shell/`**:
+`card`, `choice`, `diagram`, `field`, `glue`, `ingest`, `live`, `media`,
+`pattern`, `presence`, `selfcheck`, `shell`, `strip`, `symbol`, `tabs`,
+`transport-bar`, `video-panel`, `wire`. There is **no `package.json` anywhere**
+and those are root-relative paths that resolve only because `demo/server.mjs`
+serves the repository root. So "copy the stage demo" means dragging twenty files
+plus everything they import, and reproducing the path layout, to get a page that
+looks like this site.
+🔴 **AND 18 OF THE 20 ARE THIS SITE'S TASTE, NOT ITS SUBSTANCE.** Somebody else
+will want different controls, different spacing, different words, a framework
+this repo does not use. **That is not a compromise to talk them out of, it is
+the correct outcome.** Handing them this kit makes their project a copy of one
+person's aesthetic with none of the reasons behind it.
+
+✅ **WHAT IS ACTUALLY WORTH READING IS SMALL, AND IT IS THE TWO TIMELINE FILES.**
+`timeline/transport.mjs` and `timeline/media-master.mjs` are where the hard part
+lives: a position domain, a transport that seeks without replaying its backlog,
+and media sync that survives a seek on a paused element. That is worth reading
+before reinventing. Everything else here is either furniture or this project's
+own subject matter.
+
+⚠️ **SO GET THE FILES ONLY WHEN THERE IS A REASON**, and say which reason. Good
+ones: they want to run this site locally to see what they are aiming at; they
+want to read several pages rather than one. Bad one: it seemed like the first
+step.
 
 ```sh
-git --version
+git --version      # check before you use it, it may not be there
 ```
 
-- **Git is there**: `git clone https://github.com/kristjanjansen/positron` and
-  work from that.
-- **Git is missing, macOS**: `xcode-select --install` opens a GUI installer that
-  the person has to click. **Ask first**, and offer the zip instead, which needs
-  nothing:
+- **Git is there**: `git clone https://github.com/kristjanjansen/positron`.
+- **Git is missing, macOS**: `xcode-select --install` opens a GUI installer the
+  person has to click. **Ask first**, and offer the zip instead, which installs
+  nothing at all since `curl` and `unzip` ship with the system:
 
 ```sh
 curl -L -o positron.zip https://github.com/kristjanjansen/positron/archive/refs/heads/main.zip
 unzip -q positron.zip     # unpacks as positron-main/
 ```
 
-  `curl` and `unzip` both ship with macOS, so this route installs nothing at all.
-⚠️ **AND SAY WHICH ONE YOU USED**, because it decides whether they can ever
+⚠️ **SAY WHICH ROUTE YOU USED**, because it decides whether they can ever
 `git pull` an update or have to download the zip again.
-⚠️ **THEY MAY NOT NEED THE REPOSITORY AT ALL.** If what they want is their own
-small site, this one is a REFERENCE: read the page that does the thing they
-described, and build theirs beside it rather than inside it. A copy of somebody
-else's whole site is a worse starting point than one page that works.
+⚠️ **AND BUILD BESIDE IT, NEVER INSIDE IT.** A checkout of somebody else's
+research is a reference, not a starting point.
 
-⚠️ **THERE IS NO BUILD STEP AND NOTHING TO `npm install`.** If you find yourself
-reaching for a bundler, a framework or a lockfile, you have misread the repo.
-Every page is one HTML file with ES modules. `node demo/server.mjs` serves it.
+⚠️ **THERE IS NO BUILD STEP AND NOTHING TO `npm install`** in THIS repository, and
+that is a fact about this one rather than advice for theirs. Every page here is
+one HTML file with ES modules, served by `node demo/server.mjs`. If their own
+project wants a framework, let it have one.
 
 ---
 
@@ -172,20 +197,59 @@ and let them choose, rather than quietly building the half that needs a card.
 
 ---
 
-## Step 4. A domain, which is optional and preferred
+## Step 3b. What YOU run, and what THEY have to click
 
-Ask whether they have a domain. If they do not, `workers.dev` genuinely works
-and they can move later. **Explain why a domain is better rather than asserting
-it**, because a non-developer has no way to weigh this otherwise:
+🔴 **A NON-DEVELOPER NEEDS TO KNOW WHICH HALF IS THEIRS BEFORE THEY START.**
+Almost everything is yours. The exceptions are money, identity and nameservers,
+and there is no CLI for any of them. **Say this list out loud early**, so nobody
+waits on the other.
 
-1. **A worker's free hostname contains its script name.** Renaming a Worker
-   creates a new one and abandons the Durable Object holding its state, so the
-   script name tends to be permanent. This site's worker is STILL called
-   `elektron-view`, two project renames later, and on `workers.dev` that fossil
-   would be the address everybody types.
+| the thing | who does it | how |
+| --- | --- | --- |
+| a Cloudflare account | **them** | `dash.cloudflare.com/sign-up`. Needs their email and a password they choose. |
+| logging wrangler in | **you run it, they click once** | `npx wrangler login` opens a browser and comes back |
+| upgrading to Workers Paid, $5/month | **them** | dashboard billing. **There is no wrangler command for this.** |
+| buying Stream minutes | **them** | dashboard, Stream page. Prepaid, and nothing works until it is bought. |
+| choosing the `workers.dev` subdomain | **them, once** | dashboard, Workers & Pages, **Change** next to **Your subdomain** |
+| registering a domain | **them** | easiest path: the Worker's **Domains** tab buys through Cloudflare Registrar and connects it automatically |
+| bringing an existing domain | **them** | dashboard **Add a site**, then change nameservers at their current registrar. Takes hours to propagate. |
+| attaching that domain to the Worker | **you** | one line of `wrangler.jsonc`, below, then `npx wrangler deploy` |
+| creating an R2 bucket | **you** | `npx wrangler r2 bucket create <name>` |
+| creating a Durable Object | **you** | declare it in `wrangler.jsonc` and deploy; there is nothing to create by hand |
+| setting a secret | **you run it, they paste the value** | `npx wrangler secret put <NAME>` |
+| deploying | **you** | `npx wrangler deploy` |
+
+⚠️ **AND RUN IT FROM A DIRECTORY WITH NO `.env` IN IT**, or unset the two
+variables, for the reason in Step 2.
+
+---
+
+## Step 4. A domain, which is optional and recommended
+
+Ask whether they have one. If they do not, `workers.dev` genuinely works and
+they can move later, so this is not a gate. **But do recommend it, and give the
+reasons rather than asserting it**, because a non-developer cannot weigh this
+otherwise.
+
+🔴 **CLOUDFLARE RECOMMENDS IT THEMSELVES, AND THAT IS THE FIRST THING TO SAY.**
+Their `workers.dev` page: *"It's recommended to run production Workers on a
+Workers route or custom domain, rather than on your workers.dev subdomain. Your
+workers.dev subdomain is treated as a Free website and is intended for personal
+or hobby projects that aren't business-critical."* So this is not one project's
+preference.
+
+Then the four that this repository actually paid for:
+
+1. **A Worker's free hostname contains its script name**, as
+   `<worker>.<subdomain>.workers.dev`. Renaming a Worker creates a NEW one and
+   abandons the Durable Object holding its state, so the script name tends to be
+   permanent. This site's worker is STILL called `elektron-view`, two project
+   renames later, and on `workers.dev` that fossil would be the address
+   everybody types. On a domain it is an internal handle nobody sees.
 2. **Related services want to live together.** This site runs the pages, a
    device log at `pub.`, a signalling relay at `rtc.` and a recorder at
-   `selfrec.` on one domain. On `workers.dev` those are four unrelated strings.
+   `selfrec.`, all on one domain. On `workers.dev` those are four unrelated
+   strings that happen to share an account.
 3. **`workers.dev` is on the Public Suffix List**, so browsers treat every
    subdomain under it as a separate site.
 4. **A link is a thing you hand to a person.** `positron.studio/stage/` can be
@@ -195,39 +259,121 @@ it**, because a non-developer has no way to weigh this otherwise:
 `*.workers.dev` as shared hosting. **That is reported and not measured here.**
 Say so if you repeat it.
 
-Cloudflare's registrar sells at cost and a domain bought there is already on the
-account you are deploying to, which removes the only fiddly step. Adding a
-custom domain to a Worker is one dashboard action or one line of
-`wrangler.jsonc`.
+✅ **THE CHEAPEST PATH FOR SOMEBODY WITH NO DOMAIN** is the Worker's **Domains**
+tab in the dashboard: it buys through Cloudflare Registrar, which sells at cost,
+and connects it to the Worker in the same step. No nameserver change, no waiting.
+
+Once the domain is an active zone on their account, attaching it is yours and it
+is one line:
+
+```jsonc
+{ "routes": [ { "pattern": "their-domain.com", "custom_domain": true } ] }
+```
+
+then `npx wrangler deploy`. Cloudflare creates the DNS record and issues the
+certificate itself.
+⚠️ **TWO REFUSALS TO EXPECT**: a Custom Domain cannot be created on a hostname
+that already has a CNAME record, and not on a zone they do not own. Both are
+dashboard problems, not config problems.
+
+---
+
+## Step 4b. If there is live video in it, read this before promising anything
+
+🔴 **THE STREAMING KNOWLEDGE IS IN A SKILL OF ITS OWN AND IS NOT REPEATED HERE.**
+Read it when the answer turns on a detail:
+`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-streaming/SKILL.md`
+It carries the LL-HLS and `hls.js` tuning, what each knob actually changed, the
+relay, and the traps. Tuned values live beside the pages that use them, for
+example `liveSyncDurationCount: 3` with `maxBufferLength: 12` and
+`backBufferLength: 4` on the multi-channel page. **Do not re-derive those from
+memory.**
+
+What belongs HERE is the three facts that change what you promise somebody:
+
+🔴 **1. CLOUDFLARE STREAM'S WebRTC CANNOT BE RECORDED. THIS IS THE ONE PEOPLE
+GET WRONG.** Cloudflare's own WebRTC page: *"Recording and live HLS playback are
+not yet supported"*, and the pricing page says the same from the other side,
+*"WebRTC broadcasts cannot currently be recorded, thus no storage is consumed"*.
+WHIP in and WHEP out must be used **together**: an RTMP or SRT input cannot be
+played over WHEP, and a WHIP input cannot be recorded or played as HLS.
+⚠️ It is marked as not supported **yet**, so re-check it rather than repeating
+this line in a year.
+✅ **SO IF THEY NEED BOTH LOW LATENCY AND A RECORDING**, say the choice out loud:
+RTMP or SRT ingest, which records and plays as HLS at a few seconds of latency;
+or WebRTC, which is sub-second and leaves nothing behind.
+
+✅ **2. THERE IS A THIRD OPTION AND IT IS R2, WHICH THIS REPOSITORY USES.**
+Record in the browser with `MediaRecorder`, ship the pieces to an R2 bucket as
+they are made, and play them back yourself. It stays on the **free** tier at
+10 GB with no egress charge, it is yours rather than a product's, and it gives a
+recording of a WebRTC session that Stream will not give you. `demo/record/`
+ships segments as they are cut, `demo/capture/` does camera in and segments out,
+and `demo/crate/` puts a long file up in 16 MiB pieces and scrubs it back.
+⚠️ It is more work than pressing record on Stream, and it is the honest answer
+when somebody wants the recording and does not want the bill.
+
+⚠️ **3. DELIVERY IS BILLED PER MINUTE WATCHED, WHICH IS THE COST THAT SURPRISES
+PEOPLE.** $1 per 1,000 minutes delivered, counted from segment requests, and
+**client-side preloading and buffering count**. Do the arithmetic out loud for
+what they are actually building: an installation playing eight hours a day to
+one screen is 480 minutes a day, about 14,400 a month, so about **$14 a month in
+delivery alone** before storage. A page that only plays when somebody presses
+something costs a fraction of that. **This is the single strongest reason to
+make a stream open on a press rather than on a visit.**
+
+---
+
+## Step 4c. If there is a model in it
+
+Workers AI is on **both** plans: **10,000 Neurons per day free**, then
+**$0.011 per 1,000 Neurons** on Workers Paid, and the free allowance resets at
+00:00 UTC. Exceeding it fails the request rather than billing silently.
+⚠️ **SOME MODELS ARE PAID-ONLY** and answer `403` on the free plan, so check the
+model catalog rather than assuming a name works. Many remain free.
+⚠️ **AND THE SAME LOAD-ON-A-VISIT RULE APPLIES.** A model called on page load is
+a model called by every visitor and every crawler. Call it on a press.
 
 ---
 
 ## Step 5. Now ask what they actually want
 
-They already said something, and it is probably the name of a demo. **Open that
-demo and read it before you plan anything.** Every page here is one file and it
-explains itself.
+They already said something, and it is probably the name of a demo. **Open the
+LIVE PAGE first**, at `https://positron.studio/<slug>/`, because what they saw
+is what they are asking for. Read the source after, and read it as ONE ANSWER
+rather than as the answer.
+
+🔴 **ASK WHAT THEY WANT IT TO LOOK LIKE BEFORE YOU WRITE ANY INTERFACE.** They
+may want a framework, a component library, a house style, or nothing at all.
+**Take their preference over this repository's every time.** What is transferable
+here is the ARRANGEMENT of the parts, not the controls, and a page built in
+somebody else's taste with none of the reasons behind it is a page they cannot
+maintain.
 
 **Worked example, the one the README ships with: *"I want to build something
-like that stage demo."***
+like the stage demo."***
 
 `/stage/` puts a recorded performance in front of a room of people, asks them
-something, and keeps every answer on the recording's own timeline. What that
-actually needs, in the order it has to exist:
+something, and keeps every answer on the recording's own timeline. Decomposed
+into what has to exist, what it costs, and **how much of this repository is
+worth reading for it**:
 
-| part | where it is here | free? |
-| --- | --- | --- |
-| a page with a transport bar and a timeline strip | `demo/shell/`, `timeline/` | yes |
-| a film to play | `demo/resources/`, or R2 for anything large | yes |
-| a second screen for the audience, on their phones | `workers/` relay over WebSockets and a Durable Object | yes |
-| answers landing on the recording's timeline | the same Durable Object | yes |
-| a live camera instead of a recording | Cloudflare Stream | **no, paid** |
+| the part | what it really is | free? | read here? |
+| --- | --- | --- | --- |
+| something that plays a film and can be scrubbed | a `<video>` and a position control, in whatever UI they like | yes | no, build it their way |
+| a position domain that survives seeking | the genuinely hard bit | yes | **yes: `timeline/transport.mjs`, `timeline/media-master.mjs`** |
+| a film to play | a file, in R2 once it is large | yes | no |
+| a second screen for the audience, on their phones | a Worker with a WebSocket and one Durable Object per room | yes | Cloudflare's own docs are better than this repo's version |
+| answers landing on the recording's timeline | the same object, storing a position with each answer | yes | the idea, not the code |
+| a live camera instead of a recording | Cloudflare Stream | **no, paid** | no |
 
-So the honest plan is: **build the whole of it on the free plan**, and leave the
-live-camera variant as a later step they can pay for if they ever want it.
+✅ **SO THE HONEST PLAN IS: BUILD ALL OF IT ON THE FREE PLAN, IN THEIR OWN
+IDIOM**, read two files from here for the timing, and leave the live-camera
+variant as a later step they can pay for if they ever want it.
 ✅ **THAT DECOMPOSITION IS THE POINT OF THIS STEP.** Do it out loud for whatever
-they asked for, before writing a line, so they can see what they are getting and
-what it costs.
+they asked for, before writing a line, including the last column. Somebody who
+is told which one part is worth borrowing gets a project they own; somebody
+handed a copy gets a project they are stuck with.
 
 ---
 
@@ -237,25 +383,35 @@ what it costs.
 not yet seen their own URL has no idea whether any of this is working, and every
 minute after that is spent debugging two things at once.
 
+Their project, whatever shape it has, deploys the same way:
+
 ```sh
-node demo/server.mjs                    # the whole repo, locally
-cd workers/view && node build.mjs       # ALWAYS build before deploying
-npx wrangler deploy
+npx wrangler deploy          # from their project, with their wrangler.jsonc
 ```
 
+⚠️ **AND IF THEY ARE ALSO RUNNING THIS REPOSITORY TO LOOK AT**, that is a
+separate thing in a separate directory: `node demo/server.mjs` serves it locally,
+and `node workers/view/deploy.mjs` is how THIS site ships. Do not mix the two
+trees.
+
 Then **give them the URL**, and open it yourself to check it answers before you
-do. A path is not an answer to "where is it": `demo/stage/index.html` is the
-file you edited and `https://<their site>/stage/` is the thing they asked for.
+do. A path is not an answer to "where is it": the file you edited is not the
+thing they asked for, `https://<their site>/<page>/` is.
 
 ---
 
 ## What to copy, and what not to
 
-✅ **COPY THE SHAPE.** One page per idea, one file each. One manifest that both
-index renderers read. A kit of controls in `demo/shell/` rather than a control
-hand-rolled per page. A harness that drives the real page through a real browser
-and asserts on what it publishes. Read `CLAUDE.md` and the other skills in
-`.claude/skills/` for the rules and, more usefully, for what each one cost.
+✅ **COPY THE SHAPE, NOT THE SURFACE.** One page per idea, one file each. One
+list that every renderer reads, so there is no second place to forget a row. A
+harness that drives the real page in a real browser and asserts on what the page
+publishes. Read `CLAUDE.md` and the other skills in `.claude/skills/` for the
+rules and, more usefully, for what each one cost.
+🔴 **THE CONTROLS ARE NOT PART OF THE SHAPE.** `demo/shell/` is one project's
+taste in buttons, spacing and words, and 18 of the 20 modules `/stage/` imports
+are that. **Their project should have its own**, in whatever framework or none
+they prefer. The transferable idea is *a kit rather than a control hand-rolled
+per page*, not *this kit*.
 
 🔴 **DO NOT COPY THE THINGS THAT POINT AT SOMEBODY ELSE'S SERVER.** Several
 pages here play a public broadcaster's live streams, and every connection this
