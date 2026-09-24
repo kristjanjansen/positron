@@ -277,17 +277,20 @@
       id: 'organ',
       label: 'Organ',
       what: 'three partials and an envelope, which is the one to edit first',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
-freq = hslider("freq", 440, 40, 8000, 0.01);
-gain = hslider("gain", 0.5, 0, 1, 0.01);
-gate = button("gate");
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
 
+// attack, decay, sustain, release. Seconds, except the 0.7 which is a level
 env  = en.adsr(0.005, 0.12, 0.7, 0.35, gate);
+// three sine partials: the note, its octave, and its twelfth, each quieter
 tone = os.osc(freq) + 0.5 * os.osc(freq * 2) + 0.25 * os.osc(freq * 3);
 
+// what you hear. <: splits one signal into the two the speakers want
 process = tone * env * gain * 0.2 <: _, _;
-effect  = _, _;
+effect  = _, _;   // runs once after the mixer. _ is a wire that changes nothing
 `,
     },
     {
@@ -300,16 +303,20 @@ effect  = _, _;
       id: 'rhodes',
       label: 'Rhodes',
       what: 'a tine, a body and a carrier they both bend, which is the DX7 electric piano',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
-freq = hslider("freq", 440, 40, 8000, 0.01);
-gain = hslider("gain", 0.5, 0, 1, 0.01);
-gate = button("gate");
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
 
+// the tine: 14 times the note, gone in 20 ms. This is the hammer hitting it
 knock = os.osc(freq * 14) * en.ar(0.001, 0.02, gate) * 3.2 * gain;
+// the body: the note itself, ringing on for about a second
 body  = os.osc(freq) * en.ar(0.001, 0.9, gate) * 1.1;
-env   = en.adsr(0.002, 1.4, 0.0, 0.4, gate);
+env   = en.adsr(0.002, 1.4, 0.0, 0.4, gate);   // 0.0 sustain, so it dies away
 
+// both of them bend the carrier's pitch instead of being added to it,
+// which is FM, and it is what makes this a Rhodes and not three oscillators
 process = os.osc(freq + (knock + body) * freq * 0.02) * env * gain * 0.3 <: _, _;
 effect  = _, _;
 `,
@@ -318,8 +325,10 @@ effect  = _, _;
       id: 'djembe',
       label: 'Djembe',
       what: 'a drum somebody else modelled, named in one line',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
+// a physical model somebody else wrote, taken whole out of the library.
+// pm is physmodels. It builds its own controls, which is what _ui_ means
 process = pm.djembe_ui_MIDI <: _, _;
 effect  = _, _;
 `,
@@ -334,14 +343,16 @@ effect  = _, _;
       id: 'bell',
       label: 'Bell',
       what: 'the same three lines as the Rhodes at a ratio that is not a whole number',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
-freq = hslider("freq", 440, 40, 8000, 0.01);
-gain = hslider("gain", 0.5, 0, 1, 0.01);
-gate = button("gate");
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
 
+// 3.51 is the whole patch. It is not a whole multiple of the note, so the
+// partials it adds belong to no harmonic series and the ear hears metal
 strike = os.osc(freq * 3.51) * en.ar(0.001, 0.35, gate) * 2.0;
-env    = en.ar(0.002, 2.2, gate);
+env    = en.ar(0.002, 2.2, gate);   // attack and release only, no sustain
 
 process = os.osc(freq + strike * freq * 0.03) * env * gain * 0.25 <: _, _;
 effect  = _, _;
@@ -381,20 +392,27 @@ effect  = _, _;
       'per voice': 'KB',
     },
     /**
-     * 🔴 ONE CONTROL, AND IT IS DISABLED UNTIL THE INSTRUMENT IS SWITCHED ON.
-     * The presets were four buttons in this row until 2026-09-23 and they are
-     * the patch selector in the panel's footer now, which is where the ask put
-     * them. What is left in `.pos-controls` is the one verb that is neither a
-     * patch nor a power state.
-     * ⚠️ AND A DISABLED CONTROL IS A CHECK THE HARNESS CANNOT REACH, which
-     * `positron-verify` measured on two pages in one day. It is accounted for
-     * here: the check block compiles by calling `build()` itself, so nothing
-     * behind this button is graded only by a press, and the switch it depends
-     * on is pressed for real rather than called.
+     * 🔴 NO CONTROL ROW AT ALL SINCE 2026-09-24, ASKED AS *"rm compile button
+     * next to fau on"*. The presets left this row on 2026-09-23 for the patch
+     * selector in the panel's footer, COMPILE was the one verb left in it, and
+     * now there is no `controls` key on this page. `shell.mjs` hides an empty
+     * `.pos-controls`, which it has to, because that row carries 14 px under it
+     * and a band of dead space reads as something that failed to render.
+     * `lanes` and `draw` were already in that shape.
+     * ✅ **AND THE PRESS IT REPLACED IS NOT MISSING, IT IS THE PAGE'S OWN
+     * SUBJECT.** This page compiles `AUTO_IDLE_MS` after typing stops, which is
+     * what `ONE` says in the words a visitor reads, and the switch compiles what
+     * is in the box the moment it goes on. A button that forces a compile
+     * NOW was a fifth road to the same place, and the three that are left are
+     * the ones somebody asked for.
+     * 🔴 **WHAT IT COST IS THREE ASSERTS THAT READ ITS `disabled` ATTRIBUTE AS
+     * EVIDENCE OF POWER STATE.** That clause is gone from all three, and the
+     * claim it was making, that nothing can start a compile on a page nobody
+     * switched on, is asserted on the autocompile instead, where it now has
+     * teeth: the check arms one with the instrument off and measures `autos`.
+     * A conjunct deleted without being rehomed is coverage lost at a count that
+     * does not move, which is this project's quietest kind of defect.
      */
-    controls: [
-      { id: 'compile', label: 'Compile', primary: true },
-    ],
   });
   guard(d);
 
@@ -641,7 +659,14 @@ effect  = _, _;
   const source = createField({
     label: 'FAUST',
     grow: 'wide',
-    rows: 12,
+    /* 🔴 SIXTEEN SINCE 2026-09-24, BECAUSE THE PATCHES GREW COMMENTS.
+       Asked as *"can you have comments in fau file what lines do?"*, and at 12
+       rows the longest preset was cut through the middle of `process`, which is
+       the one line a reader most needs to see. A box sized to the content it
+       used to hold is a box that hides the content it holds now. MEASURED: the
+       four presets are 14, 16, 6 and 13 lines with their comments, so 16 is
+       the longest of them rather than a number that looked about right. */
+    rows: 16,
     code: true,
     value: PRESETS[0].code,
     onInput: onType,
@@ -651,6 +676,12 @@ effect  = _, _;
      so without this the editor is an unnamed text box. A caption is furniture
      here and a name is not. */
   source.input.setAttribute('aria-label', 'the Faust program this page compiles');
+  /* 🔴 ITS OWN CLASS, BECAUSE IT MOVED OUT OF THE CASE ON 2026-09-24 AND EVERY
+     RULE ABOUT IT WAS WRITTEN `.fau-panel .pos-field`. A selector naming an
+     ancestor is a selector that dies silently when the element moves, which is
+     the dead rule this stylesheet has now measured five times. `createField`
+     takes no `cls`, so the page adds one. */
+  source.el.classList.add('fau-src');
 
   function showSource() {
     setCell('source', new TextEncoder().encode(source.value()).length);
@@ -882,7 +913,20 @@ effect  = _, _;
     /* A compile builds a new node and forgets every key, so one that fires
        under a chord takes the chord away. It waits instead. */
     if (holding()) { autoTimer = setTimeout(fireAuto, AUTO_HOLD_MS); return; }
-    serial(async () => { autos++; return build(source.value(), 'typing'); });
+    /* 🔴 THE GUARD IS INSIDE THE QUEUED TASK AND NOT ONLY IN FRONT OF IT, AND
+       IT CAME OFF THE DELETED COMPILE BUTTON ON 2026-09-24. The two tests above
+       stop a compile being STARTED while the instrument is off; neither says
+       anything about one already sitting on the queue when the switch goes off
+       underneath it, which is exactly the order a check runs in. A compile that
+       built a node onto a page saying it was off would be the lying control
+       this project keeps writing rules about.
+       ⚠️ AND IT SITS BEFORE `autos++`, so a refused task does not move the
+       counter every autocompile assert on this page is written against. */
+    serial(async () => {
+      if (!powered) { d.log('FAU went off before the typing settled, so nothing was compiled'); return null; }
+      autos++;
+      return build(source.value(), 'typing');
+    });
   }
 
   // ── the switch ─────────────────────────────────────────────────────────────
@@ -942,8 +986,6 @@ effect  = _, _;
 
   function paintPower(on) {
     inst.online.set(on ? 'online' : 'offline');
-    const b = d.button('compile');
-    if (b) b.disabled = !on;
   }
 
   // ── the page ───────────────────────────────────────────────────────────────
@@ -970,24 +1012,31 @@ effect  = _, _;
       online: { of: 'FAU', state: 'offline', press: () => togglePower() },
       patch: patch.el,
     },
+    /* 🔴 THE TEXT IS A GLUE PART AND NOT CASE CONTENTS, CHANGED 2026-09-24.
+       Asked as *"input edge to edge of container w, add paddign on top, add line
+       in top. glued instrument feel like waveforms on muta"*, and the last
+       clause is the whole answer: `/muta/` passes its wave shape as
+       `parts: [scope.el]` and this page was calling `inst.add()`.
+       ⚠️ **THEY ARE TWO DIFFERENT SLOTS AND `instrument.mjs` SAYS SO IN ITS OWN
+       WORDS**: `add()` puts something INSIDE the case, where it scrolls with the
+       panel and sits within the case's inset, and a part is its own surface with
+       the glue's seam either side of it, *"the same edge the bar has, at the same
+       width"*. So three of the four asks are one move rather than three rules.
+       🔴 **AND THIS IS WHY `edge to edge` WAS ASKED TWICE.** It was answered on
+       2026-09-23 by zeroing `.panel-strip`'s padding on both axes, and the
+       comment below counted THREE boxes doing the insetting. There were four:
+       `.panel-case` carries `padding: 0 var(--panel-pad)` with `--panel-pad:
+       20px`, on the case itself, which no page rule touched. A child cannot
+       reach its way out of a parent's padding, so the text was 20 px short at
+       both ends for a day while every rule about it read as correct.
+       ⚠️ THE CASE KEEPS THE PLATE AND IS NOT LEFT EMPTY: `plate: false` on the
+       header is what holds `FAU` in the case's top inset, which is the same
+       place `/muta/` keeps its own. */
+    parts: [source.el],
     panel: { side: null, flow: false, cls: { panel: 'fau-panel' } },
   });
-  inst.add(source.el);
 
   d.el.append(keysHost);
-
-  /* 🔴 THE GUARD IS INSIDE THE QUEUED TASK, NOT ON THE BUTTON. Disabling the
-     control stops a press being MADE while the instrument is off; it does
-     nothing about a press already queued behind a compile when the switch goes
-     off underneath it, which is exactly the order a check runs in. A compile
-     that built a node onto a page saying it was off would be the lying control
-     this project keeps writing rules about, arriving from the one direction a
-     `disabled` attribute cannot see. */
-  d.on('compile', () => serial(async () => {
-    if (!powered) { d.log('FAU is off, so there is nothing to compile onto'); return null; }
-    const r = await build(source.value(), 'your source');
-    return r;
-  }));
 
   showSource();
   paintPower(false);
@@ -1085,17 +1134,22 @@ effect  = _, _;
        nothing, which is what `/nola/` measured on 2026-09-23. */
     d.assert('a visit fetches no compiler at all, counted off what the browser really loaded',
       vendorLoads().length === 0, `${vendorLoads().length} files from the vendor directory`);
-    /* 🔴 THE NEGATIVE CONTROL BESIDE IT, AND IT IS FOUR SEPARATE COSTS. Nothing
-       is compiled, no sound device is open, nobody has been asked about a MIDI
-       keyboard, and the one control that could start any of it refuses to be
-       pressed. A page that fetched nothing while quietly doing the other three
-       would pass the assert above. */
+    /* 🔴 THE NEGATIVE CONTROL BESIDE IT, AND IT IS THREE SEPARATE COSTS.
+       Nothing is compiled, no sound device is open, and nobody has been asked
+       about a MIDI keyboard. A page that fetched nothing while quietly doing
+       the other three would pass the assert above.
+       ⚠️ IT WAS FOUR UNTIL 2026-09-24, and the fourth read
+       `d.button('compile').disabled === true`, which is gone with the button.
+       **The claim it was making is not gone**: that nothing can start a compile
+       on a page nobody switched on is asserted further down, on the autocompile,
+       with the instrument off and `autos` as the witness. It is a better check
+       than the one it replaces, because a `disabled` attribute is a statement
+       about a control and that one is a statement about the road. */
     d.assert('and a page nobody has switched on compiles nothing, opens no sound device and '
            + 'asks for no MIDI',
-      runs === 0 && node === null && ctx === null && midi === null
-        && d.button('compile').disabled === true,
+      runs === 0 && node === null && ctx === null && midi === null,
       `${runs} compiles, node ${node ? 'built' : 'none'}, audio ${ctx ? 'open' : 'none'}, `
-      + `MIDI ${midi ? 'asked' : 'not asked'}, COMPILE ${d.button('compile').disabled ? 'off' : 'on'}`);
+      + `MIDI ${midi ? 'asked' : 'not asked'}`);
     d.assert('the box opens with a whole instrument in it, and the readout counts its bytes',
       Number(d.api.readout.source) === new TextEncoder().encode(PRESETS[0].code).length,
       `${d.api.readout.source} B`);
@@ -1168,10 +1222,9 @@ effect  = _, _;
     d.assert('the switch is the one press that fetches the compiler, compiles the patch in the '
            + 'box and reaches for MIDI',
       inst.online.state() === 'online' && node !== null && runs === beforeOn + 1
-        && midi !== null && vendorLoads().length === 4
-        && d.button('compile').disabled === false,
+        && midi !== null && vendorLoads().length === 4,
       `${inst.online.state()}, ${runs - beforeOn} compile, MIDI ${midi?.state()}, `
-      + `${vendorLoads().length} vendor files, COMPILE ${d.button('compile').disabled ? 'off' : 'on'}`);
+      + `${vendorLoads().length} vendor files`);
 
     /* ── the autocompile, and the two things it must never do ──────────────
        🔴 IT IS SWITCHED ON HERE AND OFF AGAIN, because the default under
@@ -1180,9 +1233,14 @@ effect  = _, _;
        is not the one on screen. This window is the only time it runs in a
        harness, and it is the only reason the feature is graded at all.
        ⚠️ MEASURED ON `autos`, WHICH ONLY AN AUTOCOMPILE MOVES. `runs` counts
-       every compile from every road, so a COMPILE press arriving from the
-       harness in the middle of this would break an assert about a feature it
-       has nothing to do with. */
+       every compile from every road, so a compile arriving in the middle of
+       this from somewhere else would break an assert about a feature it has
+       nothing to do with.
+       ⚠️ THE ROAD THAT USED TO DO THAT WAS A COMPILE PRESS FROM THE HARNESS,
+       AND IT IS GONE SINCE 2026-09-24 WITH THE BUTTON. The separate counter
+       stays: the switch is still a compile `runs` counts, this block still
+       calls `build()` directly, and a counter that is right for one reason and
+       kept for another is cheaper than one that has to be reintroduced. */
     autoOn = true;
     const autoBefore = autos;
     /* Three keystrokes 500 ms apart is 1.2 s of typing, which is longer than
@@ -1225,13 +1283,17 @@ effect  = _, _;
 
     /* ── from here on it costs the compiler, and it is ONE task on the queue ──
        🔴 EVERYTHING BELOW RUNS INSIDE `serial`, AND NOT ONE `serial` PER
-       COMPILE, WHICH IS HOW IT WAS FIRST WRITTEN. `demo/verify.mjs` presses
-       every control in the row 650 ms apart while this block is running, and
-       each preset press is a compile that builds a new node and calls
-       `pedal.forgetKeys()`. Per-compile queueing left every `await sleep` in
-       here as a hole a press could fall through: MEASURED as `0 on the foot`
-       where the check had just put one note there, on a page where the pedal
-       was working. The first run passed, which is worse than failing.
+       COMPILE, WHICH IS HOW IT WAS FIRST WRITTEN. Per-compile queueing left
+       every `await sleep` in here as a hole another compile could fall through:
+       MEASURED as `0 on the foot` where the check had just put one note there,
+       on a page where the pedal was working. The first run passed, which is
+       worse than failing.
+       ⚠️ WHAT FELL THROUGH IT THEN WAS `demo/verify.mjs` PRESSING EVERY CONTROL
+       IN THE ROW 650 ms APART, each preset press a compile that builds a new
+       node and calls `pedal.forgetKeys()`. **That row is empty since 2026-09-24
+       and the harness presses nothing here now.** The arrangement stays, because
+       what makes a hole dangerous is that anything at all can compile while this
+       block sleeps, and the autocompile still can.
        ⚠️ SO `build()` IS CALLED DIRECTLY IN HERE, NEVER THROUGH `serial`. A
        task that waits on another task in the same queue is a deadlock, and the
        symptom would be a page that never becomes ready.
@@ -1388,20 +1450,52 @@ effect  = _, _;
 
     /* ── switching it off, which is the negative control for switching it on ──
        🔴 OUTSIDE THE QUEUE, because `powerOff` is not a queued task and a check
-       that waited for one from inside another would deadlock. What makes this
-       safe against the harness's own COMPILE press is the guard inside that
-       handler rather than the `disabled` attribute on the button: a press
-       queued while the instrument was on arrives after this and finds it off. */
+       that waited for one from inside another would deadlock.
+       ⚠️ THIS PARAGRAPH USED TO SAY WHAT KEPT IT SAFE FROM THE HARNESS'S OWN
+       COMPILE PRESS, and since 2026-09-24 there is no such press: the row is
+       empty and the page has no controls. What is left of that argument is the
+       part that was always the real one, which is that the guard lives inside
+       the queued task rather than on any control. */
     inst.online.el.click();
     await powerJob;
     press(60, 100);
     await sleep(400);
     d.assert('switching it off takes the instrument off the audio thread, and then a key does '
            + 'nothing at all',
-      inst.online.state() === 'offline' && node === null && midi === null && level() < 0.002
-        && d.button('compile').disabled === true,
+      inst.online.state() === 'offline' && node === null && midi === null && level() < 0.002,
       `${inst.online.state()}, node ${node ? 'still built' : 'gone'}, `
       + `${level().toFixed(5)} after pressing a key`);
+
+    /* 🔴 AND TYPING INTO AN INSTRUMENT THAT IS OFF COMPILES NOTHING, WHICH IS
+       THE CLAIM THE DELETED COMPILE BUTTON USED TO CARRY. Three asserts read
+       that button's `disabled` attribute as evidence that nothing could start a
+       compile on a page nobody had switched on. A `disabled` attribute is a
+       statement about one control; this is a statement about the only road that
+       is left, measured on the far side of every guard on it.
+       ⚠️ TWO ASSERTS RATHER THAN ONE, AND THE REASON IS THE HARNESS. A check
+       block that waits longer than three quiet polls without asserting is cut
+       off and everything after it is lost while the run stays green, which is
+       LESSONS #113 and cost /muta/ two checks. The full idle wait plus a margin
+       is longer than that, so it is split at 500 ms and each half says
+       something true on its own: first that the timer has not fired early, then
+       that it never fires at all. */
+    const offBefore = { autos, runs };
+    autoOn = true;
+    typeInto(`${PRESETS[0].code}\n// typed with the instrument off\n`);
+    await sleep(500);
+    d.assert('typing on an instrument that is off does not compile inside the idle wait',
+      autos === offBefore.autos && runs === offBefore.runs,
+      `${autos - offBefore.autos} autocompiles and ${runs - offBefore.runs} compiles `
+      + `${AUTO_IDLE_MS - 500} ms before the wait is even up`);
+    await sleep(AUTO_IDLE_MS - 200);
+    d.assert('and the wait passes with nothing compiled, because an autocompile on an instrument '
+           + 'that is off has nowhere to land',
+      autos === offBefore.autos && runs === offBefore.runs && node === null,
+      `${autos - offBefore.autos} autocompiles, ${runs - offBefore.runs} compiles and `
+      + `${node ? 'a node on the thread' : 'nothing on the audio thread'} past a `
+      + `${AUTO_IDLE_MS} ms wait`);
+    autoOn = false;
+    clearTimeout(autoTimer);
 
     /* 🔴 EVERY CELL HAS MOVED BY NOW OR ONE OF THEM IS A CONSTANT. This is the
        only assert on the page that can say a readout row is worth looking at,
@@ -1439,6 +1533,11 @@ effect  = _, _;
      case instead. A program in a box that fits about twenty characters is less
      than one line of Faust, which is why the plain row this replaced carried
      the same single line. */
+  /* ⚠️ AND THIS ONE IS KEPT DELIBERATELY THOUGH THE STRIP IS EMPTY TODAY.
+     `.panel-strip` is a flex row whose children keep their own width, because
+     the panels this component was written for are as wide as the instrument
+     they draw. Anything this page ever puts IN the case wants growing the same
+     way, and the rule costs nothing while there is nothing to match. */
   .fau-panel .panel-strip > .pos-field { flex: 1 1 100%; min-width: 0; }
 
   /* 🔴 EDGE TO EDGE MEANS THE BOX'S OWN EDGES, AND IT WAS ONLY HALF TRUE. Asked
@@ -1458,13 +1557,92 @@ effect  = _, _;
      assumed: there is no `aria-label`, no `for` and no `labelledby` in that
      module, so hiding the span would have left the textarea with no name at all.
      The page sets it below. */
-  .fau-panel .panel-strip { padding-block: 0; padding-left: 0; padding-right: 0; }
-  .fau-panel .pos-field { gap: 0; }
-  .fau-panel .pos-field-l { display: none; }
-  /* The resize grip is the textarea's own and sits on its corner; with the box
-     at the case's edge it would sit on the case's corner, which reads as the
-     PANEL being resizable. */
-  .fau-panel .pos-field textarea { border-radius: 0; border-width: 0 0 1px 0; resize: vertical; }
+  /* 🔴 AND THE FOURTH BOX WAS `.panel-case` ITSELF, FOUND 2026-09-24 WHEN
+     `edge to edge` WAS ASKED A SECOND TIME. `padding: 0 var(--panel-pad)` with
+     `--panel-pad: 20px` sits on the case, and a child cannot reach its way out
+     of its parent's padding however many of its own rules say 0. Every rule
+     above was correct and the text was still 20 px short at both ends.
+     ✅ **SO IT IS NOT A FIFTH OVERRIDE, IT IS A DIFFERENT SLOT.** The text is a
+     glue part now, a sibling of the case rather than a child of it, so it takes
+     the glue's full width the way the footer bar does and there is no padding
+     left to fight. The rules that follow are about the part, keyed on its own
+     class, because the ones they replace all named `.fau-panel` as an ancestor
+     the field no longer has. */
+  .fau-src { gap: 0; }
+  .fau-src .pos-field-l { display: none; }
+
+  /* 🔴 AND THE CASE'S OWN STRIP IS EMPTY NOW, SO IT MUST NOT KEEP ITS HEIGHT.
+     MEASURED 2026-09-24 the moment the text moved out: the case was a **71 px**
+     band holding one word, with an empty **40 px** strip inside it whose whole
+     height was `padding-block: var(--panel-pad)` at 20 px each way. That is this
+     project's empty box rule, which `/typist/` paid for as a 2 px line nobody
+     wrote and `.pos-controls[hidden]` already exists for: **a container with
+     nothing in it must not paint its edges or hold its height.**
+     ⚠️ THE PLATE IS NOT IN THE STRIP AND SURVIVES THIS, which was measured
+     rather than hoped: it sits in the case's top inset at 748.5 px, and the case
+     keeps `FAU` at the top right where the 2026-09-23 ask put it.
+     🔴 **AND IT MOVED INTO `shell.css` ON 2026-09-24, WHICH IS WHERE IT SHOULD
+     HAVE GONE FIRST.** It was written here, page scoped, on the argument that
+     making it a component rule would change every instrument page. That argument
+     is wrong twice over: the condition `:has(> .panel-strip:empty)` matches only
+     a case with nothing in its strip, and MEASURED across the three pages that
+     build an instrument, `/kit/` adds 62 blocks, `/fau/` 5 and `/muta/` 4, so
+     exactly one case in the repository is empty. And `shell.css`'s own note on
+     the plate records `/tom/` making exactly this mistake about exactly this
+     component: a private fix, every later page inheriting the defect and not the
+     fix, and the same report arriving again on `/plai/`. The rule and the plate's
+     missing bottom padding are both there now. */
+  /* 🔴 THE TOP PADDING IS ON THE TEXTAREA AND NOT ON THE PART, CORRECTED
+     2026-09-24 AFTER SHIPPING IT THE OTHER WAY AND BEING SHOWN A CROP OF IT.
+     On the part it was 10 px of `--card` sitting above a well painted
+     `--card-2`, so the page drew **case, seam, a second band of the same dark,
+     then the well** and read as *"a mess"*, which it was. Two bands of one
+     colour with a line between them is not air above the text, it is a strip of
+     furniture nobody asked for.
+     ✅ **AIR INSIDE A BOX BELONGS TO THE BOX.** The padding is the textarea's
+     own, so the input is one unbroken surface from the seam down and the first
+     row of code sits away from the line. That is what *"add paddign on top"*
+     asks for once *"add line in top"* is the seam.
+     ⚠️ AND THE PART KEEPS NO BACKGROUND OF ITS OWN, so there is no third tone
+     left to stack. The glue paints the seam and the textarea paints the well. */
+  /* The resize grip is the textarea's own and sits on its corner; at the glue's
+     edge it would sit on the glue's corner, which reads as the whole instrument
+     being resizable.
+     ⚠️ AND THE BOTTOM BORDER WENT WITH THE MOVE. It was the line between the
+     text and the footer while both were inside one case; as a glue part the
+     seam already draws that line, and keeping the border would have drawn it
+     twice at 2 px. */
+  .fau-src textarea { border-radius: 0; border-width: 0; resize: vertical; }
+  /* 🔴 `(0,2,1)`, WHICH IS A TIE AND NOT AN ESCALATION, AND IT WAS MEASURED
+     LOSING FIRST. The padding was written on `.fau-src textarea`, which is
+     `(0,1,1)`, against `shell.css`'s `.pos-field.tall textarea` at `(0,2,1)`
+     setting `padding: 7px 9px` as a SHORTHAND. Weight decides before order does,
+     so the shorthand put the top back to 7 px and the computed value said so
+     while the source read as correct. The border on the same element DID win,
+     because the rule it beats is `(0,1,1)` and a tie goes to the later sheet.
+     ⚠️ **THE FIX IS TO MATCH THE COMPONENT'S WEIGHT, NEVER TO OUTRUN IT.** This
+     stylesheet records `.pos-faux` needing `(0,2,0)` to beat a page, and the
+     rule that came out of it is that raising specificity to win a fight with
+     your own stylesheet is how the next fight starts one step higher. A tie
+     plus source order is the smallest thing that can win. */
+  .pos-field.fau-src textarea { padding: 14px 14px 14px 16px; }
+  /* 🔴 `display: block`, AND IT IS THE DOUBLE BOTTOM BORDER. Reported twice,
+     the second time precisely as *"still double bottom border on fau textarea"*,
+     and MEASURED rather than found by looking: the field wrapper's bottom sat at
+     **557.5** and the textarea's at **556.0**. A textarea is `inline-block` and
+     sits on a TEXT BASELINE, so its block parent reserves the descender space
+     under it. That 1.5 px strip belongs to the wrapper, the wrapper is
+     transparent, and a glue paints `--line` behind its children as the seam. So
+     the page drew a 1.5 px line of seam colour, then the real 1 px seam, and the
+     two together read as a doubled border.
+     ⚠️ **NOTHING IN EITHER ELEMENT'S BORDERS WAS WRONG**, which is why reading
+     the CSS found nothing: both measured `0/0/0/0` throughout. The line was a
+     BACKGROUND showing through a gap that layout left, and the only instrument
+     that says so is the pair of rects.
+     ⚠️ AND THIS IS WHY A GLUE IS WHERE IT SHOWS UP. Anywhere else the strip is
+     the page's own background and invisible; inside a glue the ground behind a
+     child is deliberately `--line`, so every stray pixel of it is a line. */
+  .fau-src textarea { display: block; }
 
   /* A row of keys wider than the page scrolls itself rather than dragging the
      page sideways. `min-width: 0` is what lets a flex child shrink below its

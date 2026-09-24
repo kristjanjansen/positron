@@ -590,13 +590,21 @@
      `heardChange` does nothing at all unless the roll is in `Played`. */
   const tellRoll = () => { roll.setHeld([...heldNotes]); heardChange(); };
 
-  async function press(note, vel, at) {
+  async function press(note, vel, at, how = 'midi') {
+    /* 🔴 EVERY NOTE THIS PAGE SOUNDS, WITH WHERE IT CAME FROM, UNDER `?rec=1`.
+       Asked 2026-09-23: *"tap. loops do not sound right (timings)"*. The take
+       recorder beside this one records the WIRE, which is the right stream for a
+       chord question and the wrong one for a timing question: a looped note never
+       touches the wire, so a recording of what arrived says nothing at all about
+       what came back. This records what SOUNDED, and `how` is what separates a
+       finger from a lap. */
+    if (RECORDING) plays.push({ t: tapeAt(), n: note, down: true, how });
     if (note < 0 || note > 127) { tapDrop('outside the 0 to 127 a note can be', note); return; }
     tap.pressed++;
     pedal.keyDown(note);
     heldNotes.add(note);
     tellRoll();
-    keys.lightNote(note, true);
+    keys.lightNote(note, true, 'self', vel);
     await ensureAudio();
     /* 🔴 THE INSTRUMENT IS READ ONCE, HERE, AND IS CARRIED THROUGH THE REST OF
        THIS FUNCTION AS A LOCAL. There is an await under this line, so reading
@@ -690,7 +698,8 @@
   }
 
   /** A key came up, by any route. The pedal decides whether anything happens. */
-  function lift(note) {
+  function lift(note, how = 'midi') {
+    if (RECORDING) plays.push({ t: tapeAt(), n: note, down: false, how });
     keys.lightNote(note, false);
     heldNotes.delete(note);
     tellRoll();
@@ -917,8 +926,11 @@
     base: 48,
     map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
     minBase: 24, maxBase: 84,
-    onDown: (note) => press(note, 100, performance.now()),
-    onUp: (note) => lift(note),
+    /* ⚠️ `vel` IS WHAT THE LOOP GIVES BACK AND `100` IS WHAT A CLICK IS WORTH. A
+       key on screen has no velocity, so the flat value stands for it; a looped
+       note carries the one it was played with. */
+    onDown: (note, how, vel) => press(note, vel ?? 100, performance.now(), how),
+    onUp: (note, how) => lift(note, how),
     /* 🔴 AND THE CHARTS MOVE WITH IT. They are drawn in the instrument's window
        so a shape can be carried down the page; an octave press that moved the
        keys and left the charts behind would break exactly that. */
@@ -943,6 +955,23 @@
        red under that flag, and a SUSTAIN button that turned sustain off. */
     sustain: true,
     onSustain: (on) => pedal.set(on),
+    /* 🔴 THE KEYBOARD'S OWN `Loop`, AND THE COMPONENT DOES THE LOOPING. Asked
+       2026-09-23: *"do not wire nola, its gloabl keyboard fn. nola gets just
+       chords as if i played htem"*. The first build put a tape on this page, and
+       that is one page solving a problem every page with keys has. The keyboard
+       records what it emits and replays it through its own press path, so this
+       page sees looped notes as ordinary ones and needs no code at all.
+       ⚠️ `log` IS THE ONE LINE THIS PAGE DOES OWE IT, asked for as *"can you tell
+       in log what is goin on with loopr"* after a take recorded over MIDI came
+       back silent. The component knows what its loop is doing and this page owns
+       the log, so it lends it one rather than reporting on the loop itself. */
+    loop: true,
+    /* 🔴 TEN TAKES, DRIVEN BY THE NUMBER PAD ON THE MIDI KEYBOARD. Asked
+       2026-09-23: *"num works. how come you can not add it to keyboard"*. The
+       button is slot 1 and the pad reaches the other nine, so a take per number
+       is the same gesture `/num/` was built to get right. */
+    loops: 10,
+    log: d.log,
   });
 
   /**
@@ -1141,6 +1170,8 @@
      initialization` and took the page to 0/1. That is the fourth temporal dead
      zone in this session and the symptom is never near the cause. */
   const RECORDING = q.get('rec') === '1';
+  /** every note this page sounded, with where it came from. See `press`. */
+  const plays = [];
   const tape = [];
   const tapeAt = () => Math.round(performance.now());
 
@@ -1191,6 +1222,12 @@
         build: (document.querySelector('.pos-build') || {}).textContent || '',
         transpose,
         instrument: inst.id,
+        /* what SOUNDED, against `events` which is what ARRIVED. A timing question
+           about a loop can only be answered from this one. */
+        plays,
+        loops: keys.loops.states().map((state, i) => ({
+          slot: i + 1, state, lap: keys.loops.lap(i), tape: keys.loops.tape(i),
+        })).filter((l) => l.state !== 'empty' || l.tape.length),
         gate: { LEARN_WINDOW, LEARN_GATE, LEARN_TIMES, minNotes: 3 },
         events: tape,
       };
@@ -1198,7 +1235,8 @@
       const a = el('a', '', '', { href: URL.createObjectURL(blob),
         download: `nola-take-${Date.now()}.json` });
       document.body.append(a); a.click(); a.remove();
-      d.log(`wrote a take of ${tape.length} messages over `
+      d.log(`wrote a take of ${tape.length} messages and ${plays.length} sounded `
+          + `note(s) over `
           + `${((tape.length ? tape[tape.length - 1].t - tape[0].t : 0) / 1000).toFixed(1)} s`);
     };
     const tick = () => {
@@ -1361,10 +1399,32 @@
         + `so open it with ?pedal=${cc} if that is the foot`);
   }
 
+  /**
+   * 🔴 THE NUMBER PAD DRIVES THE KEYBOARD'S OWN LOOPS, AND THAT IS THE WHOLE OF
+   * WHAT THIS PAGE OWES THEM. Asked 2026-09-23: *"num works. how come you can not
+   * add it to keyboard"*. A page owns MIDI, by `midi.mjs`'s one path rule, and
+   * the keyboard owns looping, so the wiring is a program number becoming a slot
+   * number and nothing else. No tape, no lap and no scheduling on this page,
+   * which is what *"do not wire nola, its gloabl keyboard fn"* asks for.
+   * 🔴 MEASURED OFF THE WIRE 2026-09-23, not read from a manual. One press of a
+   * pad button on the MK-425C is three messages on MIDI CHANNEL 2: bank select
+   * LSB, bank select MSB, both zero every time, then a program change carrying
+   * the number printed on the key. All ten were pressed and all ten arrived.
+   * ⚠️ AND THE PAD'S `0` IS PROGRAM 0, WHICH IS SLOT 10. The printed number is
+   * the program number, so the mapping is the panel's own printing rather than an
+   * order this page invented.
+   */
+  function midiProgram(program) {
+    const slot = program === 0 ? 9 : program - 1;
+    if (slot < 0 || slot >= keys.loops.slots) return;
+    keys.loops.press(slot);
+  }
+
   const midi = createMidi({
     onDown: midiDown,
     onUp: midiUp,
     onControl: midiControl,
+    onProgram: midiProgram,
     log: d.log,
     onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
                             : 'no MIDI keyboard is plugged in, and the keys on screen still play'),
@@ -3035,6 +3095,128 @@
         + `${midiUpped.voiced - tap0.voiced} voice(s), `
         + `with ${midiUpped.late - tap0.late} arriving after the key came up`);
 
+      /* 🔴 AND A CHORD PLAYED OVER MIDI COMES BACK AROUND, WHICH IS THE CLAIM
+         THAT WAS WRONG TWICE. Reported as *"can not hear looping"* and then
+         *"still no looping"*. `/kit/` grades the component and was green through
+         both reports, because it drives the keyboard directly; what neither of us
+         had measured is THIS page's own MIDI path, which is the one a person
+         actually plays.
+         ⚠️ THE TWO SIDES ARE INDEPENDENT ON PURPOSE. `on` counts what arrived on
+         the wire and `voiced` counts what the instrument made, so a loop that is
+         working shows the wire standing still while the voices go up. Comparing
+         the loop's own counter against itself would agree with itself whatever
+         happened, which is the trap this project has already paid for. */
+      {
+        /* ⚠️ PRESSED, NOT CALLED. `keys.loop.set(true)` is the api and a person
+           has a button, and those are two paths: this project's own rule is that
+           a harness presses the control. It also means a toggle that stopped
+           reporting its own clicks would be caught here rather than looking
+           perfect through the api. */
+        const b0 = d.tap();
+        const loopEl = keys.loop.el;
+        keys.loops.forget();
+        loopEl.click(); keys.loops.settle(0);
+        for (const n of [60, 64, 67]) midiDown(n, 96, 0, performance.now());
+        await sleep(60);
+        for (const n of [60, 64, 67]) midiUp(n);
+        const movements = keys.taped();
+        loopEl.click(); keys.loops.settle(0);
+        /* ⚠️ ONE LAP AND A MARGIN, NOT THREE. `verify.mjs` stops growing about two
+           seconds after the last NEW assert, so a long wait inside a check does
+           not fail, it TRUNCATES the run and reports what it got as green. This
+           block cost 17 asserts that way before the sleeps were cut. The lap here
+           is the 250 ms floor, so 350 ms is a whole turn. */
+        await sleep(350);
+        const b1 = d.tap();
+        loopEl.click(); keys.loops.settle(0);
+        await quiet();
+        d.assert('a chord played over MIDI comes back around while the keyboard is looping',
+          movements === 6 && b1.on - b0.on === 3 && b1.voiced - b0.voiced >= 6,
+          `${movements} movement(s) taped from 3 MIDI notes, and after the loop went `
+          + `round the wire had still sent only ${b1.on - b0.on} note on(s) while the `
+          + `instrument made ${b1.voiced - b0.voiced} voice(s)`);
+
+        /* 🔴 A LOOP MUST NOT LET GO OF A NOTE YOUR FINGER IS ON, AND THIS PAGE'S
+           OWN TAP IS WHAT REPORTED IT. Said as *"pressing loop, just repssing is
+           cutting off sound, does not held note"*, with the tap line reading *"the
+           wire says 57,61 and the page says nothing"*.
+           🔴 A NOTE CAN BE HELD BY A FINGER AND BY A LOOP AT ONCE AND A SET
+           CANNOT COUNT. When the loop replayed a note somebody was also holding,
+           its note-off reached this page and this page let go of the FINGER'S
+           note: the wire still had the key down, the page had nothing, and the
+           sound stopped under a hand that had not moved.
+           ⚠️ GRADED ON THE TWO SIDES THE TAP ALREADY COMPARES, the wire against
+           the page, because that is the disagreement that was reported. */
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        const loopEl2 = keys.loop.el;
+        loopEl2.click(); keys.loops.settle(0);
+        midiDown(60, 96, 0, performance.now());
+        await sleep(40);
+        midiUp(60);
+        loopEl2.click(); keys.loops.settle(0);       // going round, holding note 60
+        await sleep(60);
+        midiDown(60, 96, 0, performance.now());      // and now a finger takes it
+        await sleep(350);                            // a full lap of the loop
+        const stillWire = [...d.tap().down];
+        const stillPage = d.tap().held;
+        midiUp(60);
+        loopEl2.click(); keys.loops.settle(0);
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        d.assert('a loop replaying a note does not let go of the one under your finger',
+          stillWire.includes(60) && stillPage.includes(60),
+          `after several laps the wire held ${stillWire.join(',') || 'nothing'} and `
+          + `the page held ${stillPage.join(',') || 'nothing'}`);
+
+        /* 🔴 A LOOPED NOTE COMES BACK AT THE VELOCITY IT WAS PLAYED WITH, AND ON
+           THIS PAGE THAT IS NOT A LOUDNESS QUESTION. Asked 2026-09-23: *"do y
+           preserve velocity at all?"*, and the answer was no: every looped note
+           came back at a flat 100. The Rhodes picks a different RECORDING per
+           velocity layer, so a quiet phrase was looping back as a different
+           sample played hard, which is most of *"loops do not sound right"*.
+           ⚠️ GRADED ON WHICH FILE SOUNDED, not on a number the page carries. The
+           two checks above already establish that velocity 20 and velocity 120
+           choose different recordings of note 60, so the file name is an
+           independent witness to the velocity that arrived. */
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        loopEl2.click(); keys.loops.settle(0);
+        midiDown(60, 20, 0, performance.now());      // soft, which is layer 5
+        await sleep(40);
+        midiUp(60);
+        loopEl2.click(); keys.loops.settle(0);
+        await sleep(320);                            // one turn of the loop
+        const loopedFile = lastPlayed && lastPlayed.url.split('/').pop();
+        loopEl2.click(); keys.loops.settle(0);
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        d.assert('a loop gives a note back at the velocity it was played with',
+          loopedFile === 'rhodes-059-5.m4a',
+          `a note played at velocity 20 came back as ${loopedFile}, against the `
+          + 'rhodes-059-1.m4a a flat 100 would have chosen');
+
+        /* 🔴 AND THE NUMBER PAD REACHES THOSE TAKES. Asked *"num works. how come
+           you can not add it to keyboard"*. Driven through `midiProgram`, which
+           is the function a real program change lands on, so this grades the
+           mapping rather than a restatement of it.
+           ⚠️ THE NUMBERS ARE THE PANEL'S OWN PRINTING, measured off the wire: the
+           pad sends the number printed on the key, so program 2 is the second
+           take and the pad's `0` is program 0 and the tenth. */
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        keys.loops.forget();
+        midiProgram(2); keys.loops.settle(1);
+        midiProgram(0); keys.loops.settle(9);
+        const two = keys.loops.state(1), ten = keys.loops.state(9);
+        const rest = keys.loops.states().filter((s) => s !== 'empty').length;
+        for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) keys.loops.clear(i);
+        d.assert('the number pad on the keyboard arms the take its key is printed with',
+          two === 'recording' && ten === 'recording' && rest === 2
+            && keys.loops.slots === 10,
+          `program 2 left take 2 ${two} and the pad’s 0 left take 10 ${ten}, `
+          + `with ${rest} of ${keys.loops.slots} armed and the rest untouched`);
+      }
+
       /* 🔴 AND THE WARM UP IS WHAT KEEPS A NOTE FROM BEING LATE IN THE FIRST
          PLACE. Reported twice: the Rhodes could not be heard from a MIDI
          keyboard even after a late note was made to sound. Almost every Rhodes
@@ -3364,6 +3546,29 @@
       d.assert('a second chord is named while the first stays picked',
         readLine.textContent === 'Fmaj' && roll.picked() === 0 && rows() === 1,
         `the page reads ${readLine.textContent} and row ${roll.picked()} is still chosen`);
+
+      /* 🔴 AND THE READING IS NOT FLUSH WITH THE CORNER IT SITS IN. Asked
+         2026-09-23: *"add top and left padding on chord name on pianoroll"*.
+         ⚠️ MEASURED AGAINST THE ROLL RATHER THAN AGAINST THE DECLARATION. Reading
+         the padding back off `getComputedStyle` would only prove the stylesheet
+         says what it says; what the ask is about is the gap between the first
+         letter and the roll's own edge, so this compares where the TEXT starts
+         with where the roll starts. A range walker put the box around the text
+         itself, because the element is absolute and its own rect never moves
+         when padding is what changed. */
+      const readBox = readLine.getBoundingClientRect();
+      const rollBox = roll.el.getBoundingClientRect();
+      const rng = document.createRange();
+      rng.selectNodeContents(readLine);
+      const inkBox = rng.getBoundingClientRect();
+      rng.detach?.();
+      const inL = Math.round(inkBox.left - readBox.left);
+      const inT = Math.round(inkBox.top - readBox.top);
+      d.assert('the played reading sits in from the roll’s corner rather than against it',
+        inL >= 4 && inL <= 12 && inT >= 2 && inT <= 10
+          && readBox.left >= rollBox.left - 1 && readBox.top >= rollBox.top - 1,
+        `its first letter is ${inL} px in and ${inT} px down from the corner of a `
+        + `box that starts ${Math.round(readBox.left - rollBox.left)} px from the roll`);
 
       await sleep(900);
       d.assert('NEGATIVE CONTROL: and the second chord is tallied separately rather than added on',
@@ -3847,7 +4052,19 @@
      `--dim`. Those are a record of chords that are IN the roll; this is a
      reading of the moment and must not compete with them. */
   .nola-keys { position: relative; }
+  /* 🔴 AND IT IS NOT FLUSH WITH THE CORNER. Asked 2026-09-23: *"add top and left
+     padding on chord name on pianoroll"*. It was pinned at `left: 0; top: 0`,
+     which put the first letter hard against the roll's own left rule and the top
+     of the picture, so it read as a label stuck to the frame rather than as a
+     reading sitting in the room the roll already reserves above its first row.
+     ⚠️ THE NUMBERS ARE A JUDGEMENT AND NOT A DERIVATION, which is worth saying
+     because most measurements on this page are tied to something. 6 px left
+     clears the lane rule without reaching the first dot column, and 3 px top
+     keeps it inside `--roll-top`, the half row the roll already holds back.
+     ⚠️ PADDING RATHER THAN A MOVED CORNER, so the box stays anchored and its
+     `text-overflow` still clips against the same edge when a name is long. */
   .nola-read { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none;
+               padding: 3px 0 0 6px;
                font: 500 11px/1.5 var(--mono); letter-spacing: .04em; color: var(--dim2);
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* ⚠️ A SECOND INK FOR A SECOND KIND OF FACT, which is the rule `.nola-chord-r`

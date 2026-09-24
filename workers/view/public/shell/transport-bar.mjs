@@ -422,7 +422,7 @@ export function createTransportBar(host, deck, {
      * `--tbar-btn` wide, and the only thing that has ever gone in one is
      * `/videoradio/`'s ⛶, which is why nobody met this.
      * ⚠️ AND THE SLOT'S WHOLE PURPOSE IS TO TAKE THE LOOP BUTTON'S PLACE, which
-     * is `tbar-loop tbar-word` reading `LOOP`. A slot that could not wear a
+     * is `tbar-loop tbar-word` reading `Loop`. A slot that could not wear a
      * word could not replace the thing it is named after.
      */
     const b = el('button', `tbar-slot${x.word ? ' tbar-word' : ''}`, x.label,
@@ -512,7 +512,11 @@ export function createTransportBar(host, deck, {
    * false of the page: what a live loop plays is a window this bar opens and
    * the page fills. See the live-window block further down.
    */
-  const loopBtn = el('button', 'tbar-loop tbar-word', 'LOOP',
+  /* 🔴 `Loop`, NOT `LOOP`, ASKED 2026-09-23: *"rename LOOP in transport to
+     Loop"*. Every other word on this bar is a name rather than a shout, and the
+     keyboard's own `Loop` toggle landed the same day, so two controls doing
+     related things would otherwise have been spelled two ways on one page. */
+  const loopBtn = el('button', 'tbar-loop tbar-word', 'Loop',
     { type: 'button', 'aria-label': 'loop' });
   loopBtn.dataset.loop = 'off';
   loopBtn.title = live
