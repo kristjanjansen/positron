@@ -212,6 +212,34 @@ dashboard job the person has to do themselves.
 npx wrangler deploy --dry-run    # proves the toolchain without creating anything
 ```
 
+🔴 **FREE IS THE DEFAULT. IT IS NOT THE GOAL. THEY CAME TO MAKE A THING THAT
+WORKS.** Read this before the rest of the step, because everything below is
+useless if you get this backwards, and an agent following an earlier draft of
+this file DID get it backwards.
+🔴 **THE RULE IS NO SURPRISE SPENDING, NOT NEVER SPEND.** Somebody who is
+delighted to pay five pounds a month for the thing to work is not served by
+being steered into three weekends of engineering to avoid it. Observed: asked
+how to get a film onto the audience's phones, an agent called the R2 route *"the
+recommended free-first option"* and listed the paid one below it, when the paid
+one is the EASIEST of the three and the free one is the hardest thing in this
+entire repository.
+
+✅ **SO RECOMMEND WHAT WORKS BEST, THEN SAY WHAT IT COSTS, AND LET THEM CHOOSE.**
+In that order, in one breath, out loud:
+
+> *"The easy way to do this is X, and it costs about Y a month. There is a free
+> way, and it is a lot more work because Z. Which do you want?"*
+
+⚠️ **AND WHEN THE FREE ROUTE IS MORE WORK, SAY SO IN THE SAME SENTENCE AS THE
+WORD FREE.** "Free" with the effort left out is not a cheaper option, it is a
+bill arriving as somebody's evenings. **Most people would rather pay.**
+⚠️ **THE FAILURE TO AVOID IS SOMEBODY FINDING OUT LATER** that the free path they
+agreed to was a research project. That is worse than any bill, because it costs
+them the thing they actually wanted, which was for it to work.
+✅ **THE DEFAULT STAYS FREE** because starting free is genuinely right: it proves
+the idea, it fails closed rather than billing, and most of this needs nothing
+else. Default, not doctrine.
+
 🔴 **SAY WHAT FREE MEANS BEFORE THEY ASK, AND SAY IT IN ONE BREATH.** "Free"
 sounds like a catch and people either distrust it or assume it is unlimited, and
 both are wrong in ways that bite later. Something close to this, early, before
@@ -482,14 +510,18 @@ room, and their phones are for answering, not for watching."**
 ⚠️ **AND IF THEY WANT IT ON THE PHONES, PRICE IT HONESTLY, BECAUSE THE FREE
 OPTION IS THE HARD ONE.** Three ways, and they are not equally difficult:
 
-1. **One screen in the room.** Free, simplest, and what the demo does.
-2. **Live picture to phones** with Cloudflare Stream. Costs money, and it is the
-   EASIEST of the three, because the provider solves the synchronising.
-3. **A recorded film to every phone** from R2. Free to store and serve, and
-   **by far the most work**, because "synchronised playback" is not a feature you
+1. **One screen in the room.** Free, simplest, and what the demo does. Offer it
+   first, because it is often what they meant anyway.
+2. **Live picture to phones** with Cloudflare Stream. **Costs money and is the
+   EASIEST of the three**, because the provider solves the synchronising. If
+   they want everyone watching on their own phone, this is the honest
+   recommendation, and the price is small next to the alternative.
+3. **A recorded film to every phone** from R2. Free to store and serve, and **by
+   far the most work**, because "synchronised playback" is not a feature you
    switch on. Every phone has its own clock, its own buffering and its own start
-   delay, and this repository has whole pages about that one problem. Do not
-   offer it as the easy free answer.
+   delay, and this repository has whole pages about that one problem.
+   🔴 **NEVER OFFER THIS AS THE EASY FREE ANSWER.** Offer it as what it is: free
+   in money and expensive in evenings.
 
 | the part | what it really is | free? | read here? |
 | --- | --- | --- | --- |
