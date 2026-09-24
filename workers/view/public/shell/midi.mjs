@@ -29,6 +29,18 @@
  */
 export function createMidi({
   onDown, onUp, onControl, onProgram, log = () => {}, onPorts = () => {},
+  /**
+   * 🔴 EVERY MESSAGE, BEFORE ANYTHING IS DECIDED ABOUT IT, AND IT EXISTS BECAUSE
+   * SILENCE IS THE ONE ANSWER THIS FILE COULD NOT GIVE. Reported 2026-09-23:
+   * *"there is no events when i press numpad"*. The dispatch below handles four
+   * kinds and drops the rest on the floor with no log line, so a device sending
+   * aftertouch, pitch bend, SysEx, a bank select this page ignores, or anything
+   * on a channel nobody is reading looks EXACTLY like a cable that is not
+   * plugged in. Those are opposite problems with one symptom.
+   * ⚠️ IT IS A DIAGNOSTIC AND NOT A ROUTE. Nothing should play notes from here:
+   * it is for a page to say what arrived when what arrived was nothing it knows.
+   */
+  onAny = null,
 } = {}) {
   let ports = 0, state = 'asking', access = null;
 
@@ -36,6 +48,7 @@ export function createMidi({
     port.onmidimessage = (e) => {
       const [st, a, b] = e.data;
       const kind = st & 0xf0, ch = st & 0x0f;
+      onAny?.(e.data, ch, e.timeStamp);
       /* 🔴 THE TIMESTAMP IS THE MESSAGE'S, NOT THIS HANDLER'S, AND THEY ARE NOT
          THE SAME NUMBER. `e.timeStamp` is a `DOMHighResTimeStamp` on the same
          clock as `performance.now()`, taken when the browser received the

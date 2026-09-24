@@ -1227,7 +1227,7 @@
       `${kids.join(' -> ')} · heading "${document.querySelector('.pos-how')?.textContent || 'none'}"`);
     d.assert('the transport offers no position and no loop, because a held note has neither',
       !d.el.querySelector('.tbar-loop') && bar.el.dataset.scrub !== '1',
-      `${d.el.querySelector('.tbar-loop') ? 'a LOOP button is on the bar' : 'no loop'} · scrub ${bar.el.dataset.scrub}`);
+      `${d.el.querySelector('.tbar-loop') ? 'a Loop button is on the bar' : 'no loop'} · scrub ${bar.el.dataset.scrub}`);
     // ⚠️ THIS READ THE `LIVE` CHIP UNTIL THE BADGE REPLACED IT. The claim has not
     // weakened: there is still no clock, because a held note has no position to
     // count towards, and the slot now carries the fact actually worth having.

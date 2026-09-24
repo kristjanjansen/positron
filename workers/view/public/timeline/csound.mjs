@@ -803,7 +803,7 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
  * and neither has to see the notes.
  *
  * In MILLISECONDS, because `score()` is an arrangement and an arrangement runs
- * in ms — `scoreDoc()` is the one that is in beats, and vclick builds its
+ * in ms — `scoreDoc()` is the one that is in beats, and sound builds its
  * `uses` from `repeats[].inBeat/outBeat/atBeat` for that reason.
  *
  * Takes the quotation constructor rather than importing score.mjs, so this
