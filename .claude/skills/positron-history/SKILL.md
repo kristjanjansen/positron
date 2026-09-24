@@ -11,9 +11,16 @@ an archive records what was there.
 
 # positron
 
-Live at **https://positron.studio**. 54 shelled demos of 56 rows
-(2026-09-21, counted from `DEMOS` rather than remembered). **Five arrived on
-2026-09-21**: `evo`, `bay`, `wish`, `shape` and `circuit`.
+Live at **https://positron.studio**. 57 shelled demos of 59 rows
+(2026-09-24, counted from `DEMOS` rather than remembered). 🔴 **AND THE COUNT
+WENT DOWN FOR THE FIRST TIME**: `memento`, `blocks` and `num` were archived
+2026-09-24 on *"arvhice memento blocks and num demo"*, so `/memento/`,
+`/blocks/` and `/num/` are 404s and the files are at
+`archive/demos/<slug>-index.html` with a section each in that directory's
+README. ⚠️ `/blocks/` is the load-bearing one: `xr-quit.mjs`, `xr-panel.mjs`,
+`xr-hands.mjs` and `seed.mjs` all still name it, because it wrote them, and
+`demo/weight/index.html` had a live claim that `/blocks/` graded the quit badge
+on load which had to be repaired when it went.
 ⚠️ **THIS READ `47 of 49` IN THE MORNING AND `51 of 53` BY THE AFTERNOON, AND
 BOTH WERE TRUE WHEN WRITTEN.** The second one was corrected three demos before
 this one, which is the point: on a day when pages are being added this line goes
@@ -57,6 +64,18 @@ invites `built: true`, which puts a shared Raspberry Pi in another building into
 every run of the suite. Found 2026-09-18 by auditing the backlog, which is the
 second time in one day that a confident sentence in a file like this outlived
 the thing it described.
+🔴 **AND `vclick` IS NOW `sound`, RENAMED 2026-09-24 ON INSTRUCTION**
+(*"rname cvlick demo do ound"*, the letters confirmed by asking rather than
+guessed). The deployed `/vclick/` is GONE with no redirect, the same as
+`/radio1965/` and `/box/`. ⚠️ **`tarmoj/vclick` IS SOMEBODY ELSE'S REPOSITORY
+AND DID NOT MOVE**: it is U:'s own QML click track, named in `demo/click/`,
+`timeline/csound.mjs`, `plans/plan-uuu-local.md` and
+`research/uuu-integration-2026-09.md`, and renaming it would have made four
+files point at a repository that does not exist. **The sweep matched our slug
+and the URL form, never the word**, which is the `rig/board/` rule again.
+⚠️ `PROGRESS.md` and `SUMMARY.md` keep `28 vclick` and `05 vclick`: those are
+dated records from the numbered era, and rewriting them would date-stamp a name
+onto a day it did not have.
 🔴 **AND `held` IS NOW `weight`, RENAMED 2026-09-19 ON INSTRUCTION, AND THIS ONE
 IS NOT LIKE THE OTHER TWO.** *"name the demo held, rename old held to weight"*,
 because the NAME is being given to a different demo. So the old URL is not a
