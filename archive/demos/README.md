@@ -10,6 +10,100 @@ somebody may ask again. It is not a fallback and must not be wired back in: a
 page here has no row in `demo/manifest.mjs`, so no harness opens it and nothing
 grades it any more.
 
+## `blocks-index.html`, `memento-index.html`, `num-index.html`, retired 2026-09-24
+
+All three on one instruction: *"arvhice memento blocks and num demo"*. No fault
+was reported on any of them and none was found. Their rows are out of
+`demo/manifest.mjs`, so `/blocks/`, `/memento/` and `/num/` 404 on
+positron.studio and no harness opens them any more.
+
+### `blocks`, the first WebXR page here
+
+`/blocks/`, act 0, headset group, created 2026-09-11, `gl: true`, `xr: true`,
+`settleMs: 6000`, tags `WebXR` `WebGL2` `relay` `seeded`. Its line read *"square
+bricks on a dotted floor you drag to look around, and in a headset a ray from
+your hand picks one up and snaps it to the grid where you let it go"*.
+
+A room built from ONE 32-bit number, so two people who agree on the seed are
+standing in the same room with nothing sent between them. `readout: null` and an
+empty control row, both asked for: *"blocks: rm readout"*. Four cells went and
+nothing they said was dropped, because frame timing, the view state and the
+count of what your hands had done all still reached `__demo` and the log.
+
+🔴 **WHAT IT WROTE IS STILL IN THE KIT, WHICH IS WHY THE PAGE CAN GO.**
+`demo/shell/xr-quit.mjs` says *"`/blocks/` wrote two of the three"* and carries
+the way out of a headset page that this page got WRONG first: it built the
+badge, drew it every frame and never advanced it, so there was no way out of it
+at all. `xr-panel.mjs`, `xr-hands.mjs` and `seed.mjs`'s `PLATE` all came through
+it as well. Those comments still name the page because they are recording who
+paid for the lesson, not telling anybody where to look.
+
+⚠️ **AND IT TOOK ONE CLAIM WITH IT**, repaired in the same commit:
+`demo/weight/index.html` said `/blocks/` already graded the quit badge the same
+way on load, which made weight's own check a second opinion. `/floor/` mounts
+the module only INSIDE a session, so weight is the only one left and now says
+so. `demo/tom/index.html` named it as the other `readout: null` page; twenty
+pages do that, so it names a live one.
+
+⚠️ Two of its asserts could not be reached by any desktop browser: that an
+immersive session started, and that a floor-relative space resolved. They are
+the reason `demo/verify-quest.mjs` exists, and its usage example named this slug
+until today.
+
+### `memento`, the 2025 automation-lane experiment finished
+
+`/memento/`, act 3, capture group, created 2026-09-13, `settleMs: 13000`, tags
+`MediaRecorder` `timeline` `canvas` `local only`. Its line read *"move a knob
+while a clip plays; it lands on the same line and comes back in the right
+place"*.
+
+The 2025 experiment was an automation lane bound to a media clip, and it died at
+one missing mapping: an absolute stamp had to reach a foreign media element's
+own position and then a pixel, and nothing converted. This page finished it by
+generating the clip IN THE PAGE. It was 1280x720, 25 fps, 3500 ms of the
+project's test picture with the moment burned into it, so the clock in the
+picture could be read back out and compared against the playhead. That is the check the
+prototype could not make: it had proved its four mappings against its own
+arithmetic.
+
+Its four cells were `kept`, `thinned`, `off by` and `worst`, the last two in
+milliseconds and both read out of the pixels. It had NO controls on purpose:
+the page's one input is a drag, reached through `[data-gesture]`, and a button
+that made a pass for you would be the page answering its own question.
+
+🔴 **ITS ONE HARD MEASUREMENT IS IN THE KIT AND IS STILL LOAD-BEARING.**
+`timeline/media-master.mjs` records it: `playbackRate` reads 1 on a PAUSED
+element, so carrying a frame sample forward by it extrapolates a stationary
+picture. MEASURED here 2026-09-13, after a seek with the element paused the
+playhead crept +180 ms over 250 ms while `currentTime` sat still, reading
+`2437 ~ 2225` on the shared `keyboard seek lands` check. Paused, ended or seeking, the carry
+rate is 0. `demo/shell/cc-adapter.mjs` still names this page as the one that
+exercised it.
+
+### `num`, a bench that was asked for as a temporary one
+
+`/num/`, act 4, instruments group, created 2026-09-23, tags `transport`. Its
+line read *"ten numbers, each one a loop you record, play, stop and throw away
+with the same key"*.
+
+Asked for in those words on 2026-09-23: *"can make a separate tmp demo too get
+it right 'num'"*, about a looper driven from `/evo/`'s numpad meant to land on
+`/nola/` as a third mode. Deliberately not an instrument: no audio, no roll, no
+chords. What was being got right is a four-state machine with ten instances and
+a double-press window, on `/evo/`'s own keypad layout (`1 2 3` on top, `0` at
+the bottom), with the window on `?double=` and 250 ms by default. Its four cells
+were `live`, `empty`, `waiting` and `window`. `waiting` is the thing the page
+existed to make visible, and it started blank rather than printing `0` before
+any press had been judged.
+
+✅ **IT WENT BECAUSE IT SUCCEEDED, AND ITS OWN ROW SAID THIS WOULD HAPPEN**:
+*"it was asked for as a temporary one, so when the mode lands this row is a
+candidate for `built: false` or for going altogether, and the module it proved
+is the part that stays"*. The mode landed. `demo/shell/keyboard.mjs` carries the
+machine *"press for press"*, `demo/shell/numloop.mjs` holds it and
+`demo/shell/numloop-test.mjs` grades it in no browser at all, which is a harder
+check than the page was.
+
 ## `seek-index.html`, removed 2026-09-16
 
 Removed on instruction: *"rm seek demo"*. No fault was reported and none was

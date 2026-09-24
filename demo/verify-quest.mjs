@@ -4,7 +4,7 @@
 //   node demo/verify-quest.mjs                # every built demo tagged `WebXR`
 //                                             # in demo/manifest.mjs — the tag
 //                                             # IS the list; there is no second one
-//   node demo/verify-quest.mjs blocks         # just this one, by slug
+//   node demo/verify-quest.mjs weight         # just this one, by slug
 //   node demo/verify-quest.mjs --all          # every built demo, on the headset
 //   node demo/verify-quest.mjs --self-test    # the negative control; NO DEVICE NEEDED
 //   DEMO_BASE=https://positron.studio node demo/verify-quest.mjs

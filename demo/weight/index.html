@@ -2781,8 +2781,12 @@ void main() {
      * the cost. A visit runs everything gradable from what the page already
      * has, and stops at anything that opens a file, makes a sound, presses a
      * control or moves the picture. A shader compile and some arithmetic are
-     * none of those, they draw nothing, and `/blocks/` already grades the same
-     * module the same way on load.
+     * none of those, they draw nothing, and this page grades the module on
+     * load because nothing else does any more.
+     * ⚠️ IT SAID `/blocks/` ALREADY GRADED IT THE SAME WAY, AND THAT PAGE WAS
+     * ARCHIVED 2026-09-24 (`archive/demos/blocks-index.html`). `/floor/` mounts
+     * the same module but only INSIDE a session, so on load this is the only
+     * one left and the check is no longer a second opinion.
      */
     {
       /**
