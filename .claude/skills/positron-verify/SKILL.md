@@ -388,7 +388,7 @@ every run.
 both wait on a user gesture in a real browser, and neither REJECTS — awaiting
 one before doing the real work is a hang, not an error. It cost two demos in one
 session: shout spent five seconds buffering an element before its measurement
-opened, pushing the whole run past the harness's settle, and vclick awaited a
+opened, pushing the whole run past the harness's settle, and sound awaited a
 suspended context and never compiled, never built its deck, never raised its
 transport bar — while looking fine, because the readout had been filled at load.
 Headless hides it: `--autoplay-policy=no-user-gesture-required` resolves both.

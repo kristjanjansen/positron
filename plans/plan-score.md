@@ -48,7 +48,7 @@ in the payload, not the envelope.
 ```jsonc
 {
   "v": 1,
-  "id": "vclick-demo",
+  "id": "sound-demo",
   "unit": "beat",                        // the time unit of every `at`/`dur` below
   "tempo": [[0, 120], [30, 90]],         // beat→bpm MAP, not a scalar
   "parts": {
@@ -171,8 +171,8 @@ work already done at load, so **every assert fires twice** — `16/16` is really
 
 ### P4 — what it unlocks, and what it does not
 
-`05 vclick` (numbered `28` until 2026-09-07) is now a client of the container
-rather than a parallel implementation — P4 is DONE. **Do not assume it collapses into `04`** — vclick's subject is
+`sound` (`05 vclick` until 2026-09-24, numbered `28` until 2026-09-07) is now a client of the container
+rather than a parallel implementation — P4 is DONE. **Do not assume it collapses into `04`** — its subject is
 the tempo integral and seeking into a written score, which is a different claim
 from "one container, three languages". Two demos, one substrate.
 

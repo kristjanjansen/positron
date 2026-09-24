@@ -1549,7 +1549,7 @@ export function createStrip(canvas, deck, opts = {}) {
   // ⚠️ IT COSTS PLOT AND THAT IS THE TRADE. `gutterWidthFor` sizes from
   // `TEXT_X + widest line`, so a page whose widest line is a NUMBER now pays up
   // to 7 px more gutter. MEASURED across the sixteen strip pages at 1200 px:
-  // four moved — strip 118->125, now 101->107, score 150->155, vclick 172->179
+  // four moved — strip 118->125, now 101->107, score 150->155, sound 172->179
   // — and the other twelve did not, because they declare a base gutter wider
   // than anything they carry.
   const GUT_TEXT_X = 18, GUT_SWATCH_X = 8, GUT_PAD = 10;

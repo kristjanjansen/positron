@@ -170,7 +170,7 @@ already true."*
 | §6 "`t` is SECTION-LOCAL — KNOWN OPEN … ours carries one global map" | ✅ **fixed.** Measured: `t 0 120` / two beats / `s` / two beats puts section 1 at 60 bpm — 0, 2000, 2500, 6500 ms, no warnings |
 | §4 "A local relay does not exist" | ✅ **it does, as the real worker run locally** — `cd workers/relay && npx wrangler dev --local --ip 0.0.0.0 --port 8892`, per `proto/looper/server.mjs`. A hand-written stand-in was built, A/B'd against the real worker, matched on every check and **deliberately deleted**; it survives at `archive/plans/looper-local-relay.mjs` |
 | §4 "Discovery does not exist … theirs to lend" | 📄 still true here, and **theirs is 25 lines of header**: `ServerBroadcaster` / `ServerDiscovery`, UDP broadcast on **port 16006**, in `tarmoj/vclick` |
-| P2 — the offline claim asserted rather than assumed | ✅ still unasserted, and still true: `demo/vclick/index.html` greps clean for `fetch`, `WebSocket`, `XMLHttpRequest`, `EventSource`, `sendBeacon` |
+| P2 — the offline claim asserted rather than assumed | ✅ still unasserted, and still true: `demo/sound/index.html` greps clean for `fetch`, `WebSocket`, `XMLHttpRequest`, `EventSource`, `sendBeacon` |
 | P3 — two devices on a LAN, a measured number | ⚠️ still the one unmeasured number. Everything so far is loopback |
 
 🔴 **So the status line is wrong in both directions at once**, which is the worst

@@ -1,6 +1,6 @@
 # plan-take — a recording you can scrub, with nothing on the wire
 
-Status: **not started.** Written 2026-09-07, out of the `transport`–`vclick`
+Status: **not started.** Written 2026-09-07, out of the `transport`–`sound`
 rework. Proposed slug **`take`**, Act 3 (*capture and return*), first row.
 
 Read `plans/plan-glass.md` §2 before quoting any number this demo produces, and
@@ -368,7 +368,7 @@ It will be the **only network-free row in Act 3**, and that belongs in its
 one-line rather than being left for a reader to notice.
 
 *(The alternative placement is Act 0, since the user asked for the `transport`–
-`vclick` style and those touch nothing outside the page. `lanes` already touches
+`sound` style and those touch nothing outside the page. `lanes` already touches
 the sound card and a MIDI port, so hardware alone does not disqualify a demo
 from Act 0 — but Act 0 is the library's own substrate, and a camera is not
 substrate. Act 3 is the better home.)*

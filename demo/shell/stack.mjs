@@ -30,7 +30,7 @@
 //     and (0,3,0), so a component's own single-class margin loses on
 //     SPECIFICITY rather than on where its rule happens to sit in the file.
 //   • The gap is EXACTLY the gap. Under the old rule a neighbour's larger
-//     bottom margin collapsed through and won: `/vclick/` measured 53.5 px
+//     bottom margin collapsed through and won: `/sound/` measured 53.5 px
 //     between its field and its transport bar, and nothing on the page said so.
 //
 // `mount()` makes two stacks: the page's whole column (`document.body`) and the
