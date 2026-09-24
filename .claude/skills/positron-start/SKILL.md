@@ -280,6 +280,32 @@ or by fetching the pages, and give the person TODAY'S number:
 this repository, and here it decides whether somebody spends money. Say where
 you read it and when.
 
+🔴 **AND SAY WHAT EACH THING IS, BECAUSE THE NAMES ARE MEANINGLESS AND YOU WILL
+USE THEM ANYWAY.** "R2" and "Durable Object" tell a newcomer nothing, and they
+WILL see both words in their dashboard and in their own config file, so hiding
+them is not an option either. **Name it once, then say what it does in a
+sentence they can repeat to somebody else.**
+
+| what they will see | what to say the first time it comes up |
+| --- | --- |
+| **Cloudflare Workers** | *"Your code and your pages, running on Cloudflare's machines all over the world instead of on a server you rent and look after. There is nothing to keep switched on."* |
+| **static assets** | *"Your actual page: the HTML, the pictures, the stylesheet. Serving these is free and unlimited, on any plan."* |
+| **Durable Object** | *"One small always-there box, and you get a separate one per show or per room. Everybody's phone connects to the same box, it remembers what happened, and it is both the meeting point and the notebook."* |
+| **SQLite storage** (inside one) | *"The notebook is a real database, so every answer is a row you can read back or export later."* |
+| **WebSocket** | *"An open line between a phone and that box, so things arrive the instant they happen instead of the phone having to keep asking."* |
+| **hibernation** | *"While nobody is doing anything, the box goes to sleep and stops costing anything, without dropping anybody's connection."* |
+| **R2** | *"A bucket for big files: video, audio, images. You pay for what you keep, and nothing at all for sending it out, which is unusual and is why it is here."* |
+| **Cloudflare Stream** | *"Video hosting that does the hard parts of live broadcast and playback for you. This is the paid one."* |
+| **Workers AI** | *"Run an AI model without owning a graphics card. There is a small allowance every day."* |
+| **Containers** | *"Run an ordinary Linux program, like ffmpeg, next to your code. Paid plan only."* |
+| **wrangler** | *"The command that publishes it. I run it, you do not have to."* |
+| **compatibility date** | *"A date that pins which version of Cloudflare's runtime your project expects, so an update on their side cannot change your project's behaviour."* |
+
+⚠️ **ONE SENTENCE EACH, WHEN IT FIRST COMES UP, AND THEN USE THE NAME.** Do not
+read them the whole table, and do not re-explain a thing they have already been
+told. The point is that the first time they meet a word it arrives with a
+meaning attached.
+
 What is below is the SHAPE, which moves much more slowly than the prices.
 **Checked 2026-09-24; check it again rather than trusting it.**
 
