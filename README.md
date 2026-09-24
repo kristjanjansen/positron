@@ -16,11 +16,20 @@ Paste this into **Claude Code** or **Codex** (or any coding agent that can run
 commands on your machine):
 
 ```
-Read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md
+Fetch and execute the appropriate instructions to set me up for Cloudflare from
+https://developers.cloudflare.com/agent-setup/prompt.md
+
+Then read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md
 and follow it exactly. Run every command yourself rather than asking me to.
 
 I want to build something like the stage demo at https://positron.studio/stage/.
 ```
+
+The first line is Cloudflare's own, from their setup page. It is in the prompt
+rather than buried in the file below it because it installs the Cloudflare
+tooling into your agent, and an instruction two hops deep is one that gets
+skipped. The file below asks for it again and moves on if it has already
+happened.
 
 **Nothing is installed to read that.** It is one public file over the web, so the
 agent can open it whether or not you have git, and the file itself works out

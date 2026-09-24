@@ -36,6 +36,13 @@ rather than against your memory of them.
 ⚠️ **IT IS A LIVE DOCUMENT AND THIS ONE IS NOT.** If it contradicts anything
 below about how to install or authenticate, it wins.
 
+⚠️ **AND THE README'S PROMPT ASKS FOR IT TOO, ON PURPOSE.** The same URL is the
+first line of the block a person pastes, because an instruction two hops deep
+(their prompt, then this file, then Cloudflare's) is one that gets skipped, and
+this step is what puts the Cloudflare docs in front of you instead of your
+memory of them. **If it has already run, say so in one line and move on.**
+Running it twice is harmless; skipping it silently is not.
+
 ---
 
 ## Step 1. The machine
