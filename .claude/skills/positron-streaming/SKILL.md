@@ -110,6 +110,49 @@ here is worth re-checking before a plan is built on it.
   connection, never for the account. Recording and HLS interop for WHIP are
   announced "in the coming months" and are NOT shipped — re-test before
   planning either way.
+
+- **ARCHIVING A LIVE RECORDING OFF STREAM, AND THE CAPS THAT DECIDE IT.**
+  ⚠️ **READ OFF CLOUDFLARE'S DOCS 2026-09-24, NOT MEASURED HERE**, which is the
+  opposite of every bullet above it. Re-check before building on any of it; the
+  measured line about the 1000-minute account cap is the one that has actually
+  been tested.
+  - **A live video longer than SEVEN DAYS is truncated to seven days.** Only the
+    first seven days are recorded. That is the hard archive cap, and it is a
+    property of one continuous video rather than of the account.
+  - **`timeoutSeconds` decides how many videos one show becomes.** It is how
+    long the feed may be disconnected before a NEW video is created, default 0.
+    So a flaky encoder turns one performance into a pile of assets, and anything
+    archiving them has to stitch by time rather than assume one file.
+  - **`deleteRecordingAfterDays` is minimum 30 and maximum 1096**, sets a
+    `scheduledDeletion` when the stream ends, counts from when the recording is
+    ready, and **applies only to FUTURE streams if it is set while one is
+    live**. The minimum being 30 is already recorded above as too coarse to
+    manage the storage cap with.
+  - **The recording exists about 60 seconds after the stream ends**, and while
+    it is generating the video reports `not-found` or `not-started`. **A cron
+    that fetches the moment the input goes idle gets nothing** and will look
+    like a broken job rather than an early one.
+  - **`GET https://customer-<CODE>.cloudflarestream.com/<INPUT_ID>/lifecycle`
+    is the cheap thing to poll**: it answers `live` and the current `videoUID`.
+    That is the handle an archiver wants, rather than listing videos.
+  - 🔴 **THE COPY ITSELF IS AN MP4 DOWNLOAD, AND IT IS BILLED AS DELIVERY.**
+    Stream's own pricing says MP4 downloads are billed by percentage of the file
+    delivered. So "archive it to R2" is not free even though R2 charges no
+    egress: you pay Stream to hand you the bytes once, then R2 storage. Put the
+    number on it from the pricing page before promising a nightly job.
+  - ✅ **WHICH IS STILL THE RIGHT MOVE ON THE RTMPS PATH, FOR THE REASON
+    MEASURED ABOVE**: recording cannot be turned off there, the account cap is
+    1000 storage-minutes, and this account fills it in about 4.4 days of
+    testing. **Copy to R2, then DELETE from Stream**, and the outage that cap
+    causes stops being the failure mode. Deleting a recording releases its
+    storage.
+  - **Cron Triggers are per ACCOUNT, not per Worker**: 5 on Workers Free, 250 on
+    Workers Paid (read 2026-09-24). Two other free-plan limits bite a copy job
+    before the cron count does: **50 subrequests per request** against 10,000 on
+    paid, and 100,000 requests a day.
+  - ⚠️ **AND NONE OF THIS APPLIES TO WHIP**, which records nothing at all. An
+    archiver for a WebRTC source has to record client-side and ship the pieces
+    itself, which is what `record`, `capture` and `crate` do into R2.
 - **A Durable Object's OUTBOUND client WebSocket hands binary over as a
   `Blob`**, not an `ArrayBuffer` — measured `Blob`, `size` 9, `byteLength`
   undefined — and a `Uint8Array` binds to a SQLite `BLOB` column as an EMPTY
