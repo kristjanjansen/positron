@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. R&D, not a product. 61 demo rows of which
-59 are shelled, a Raspberry Pi in another building, a Novation Circuit on the
+Live at **https://positron.studio**. R&D, not a product. 59 demo rows of which
+57 are shelled, a Raspberry Pi in another building, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
@@ -85,20 +85,37 @@ this dance.
 `Kristjan.Jansen@enefit.ee`, on a personal repository. Nothing was changed about
 that, because attribution is not a thing to alter without being asked.
 
-## `New Pack.circuitpack` IS SOMEBODY'S ONLY COPY. DO NOT DELETE IT
+## The Circuit pack lives in `kristjanjansen/packs`, NOT in this repository
 
-🔴 **IT LIVES AT `tmp/personal/New Pack.circuitpack` SINCE 2026-09-21 AND `tmp/`
-IS GITIGNORED, SO GIT IS NO LONGER ITS BACKUP.** It was in the repository root,
-tracked, from *"put .circuitpack to project root"*, and it was moved on
-instruction: *"move to ~/personal/positron/tmp/personal"*.
-🔴 **WHICH MEANS THE ONLY COPY IS NOW ONE DIRECTORY ON ONE DISK.** While it was
-tracked, every clone carried it. That is over: a fresh clone of this repository
-has no pack in it, and a `git clean` cannot touch `tmp/` but nothing else is
-holding a second copy either.
-✅ **THE OLD BLOB IS STILL IN HISTORY AND IS RECOVERABLE**, verified at the
-move: commit `419ec5c`, **3,506,555 bytes**, the same size as the file on disk.
-`git show 419ec5c:'New Pack.circuitpack' > recovered.circuitpack` brings it
-back. ⚠️ That is a 2026-09-20 export, so it is only as fresh as that day.
+🔴 **IT IS `circuit/2026-09-20-circuit.circuitpack` IN THE PRIVATE REPOSITORY
+`kristjanjansen/packs`, AND IT IS OUT OF THIS ONE ENTIRELY SINCE 2026-09-24.**
+Instructed: *"rm new pack, is in separate repo"*. MEASURED through the GitHub API
+BEFORE anything was removed: that repository holds two blobs and one of them is
+the pack at **3,506,555 bytes**, which is the size of the copy that was on this
+disk and of the blob that was in this history. Three numbers, one value.
+🔴 **BOTH OF THIS REPOSITORY'S COPIES ARE GONE, IN ONE PASS AND ON PURPOSE.**
+`tmp/personal/New Pack.circuitpack` was deleted and the blob at `419ec5c` was
+dropped from history with `git filter-repo`, while preparing this repository to
+be made public.
+⚠️ **SO `git show 419ec5c:'New Pack.circuitpack'` NO LONGER WORKS, AND THAT
+COMMIT HASH NO LONGER EXISTS.** This file named it as the recovery path for
+three days, and every hash in the history moved when the rewrite ran. **The
+recovery path is `kristjanjansen/packs`.**
+🔴 **WHY IT HAD TO LEAVE, AND IT IS NOT TIDINESS: A PUBLIC CLONE CANNOT BE
+RECALLED.** History is what a clone gets, the file is somebody else's work, and
+the owner's words about it are *"user sessions are mine. very important"*. A
+private repository of its own is the right home for it; this one was about to
+stop being private.
+⚠️ **AND TWO PAGES WERE FETCHING IT, SO THEY MOVED IN THE SAME BREATH.**
+`/pack/` and `/tom/` decided from the ORIGIN that a pack was present on a
+checkout, which stopped being true the moment the file went. Both now fetch
+NOTHING by default on any origin and take an explicit `?pack=<url>` instead, so
+the reading checks stay reachable for anybody holding a pack of their own while
+nothing is asked of anybody by default. MEASURED after: `pack` and `tom`
+**59/59 green, 0 requests, 0 failed**.
+
+⚠️ **EVERYTHING BELOW IS UNCHANGED, AND IS WHY THAT OTHER REPOSITORY MATTERS.**
+
 🔴 **A COMPLETE BACKUP OF THE NOVATION CIRCUIT ON THIS DESK**, taken 2026-09-20
 through Novation Components.
 🔴 **THE CIRCUIT HAS NO FACTORY RESET AND THEREFORE NO UNDO.** Three things
