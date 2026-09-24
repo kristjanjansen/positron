@@ -70,29 +70,40 @@ does not create anything until you have said yes to what it costs.
 
 ## What it costs
 
-Checked against Cloudflare's own pricing pages on 2026-09-24, and they do change.
+🔴 **NO PRICES ARE WRITTEN DOWN HERE, ON PURPOSE.** Cloudflare's change, this
+file does not, and a stale price in a page somebody makes a spending decision
+from is worse than no price at all. **The agent reads the current numbers off
+Cloudflare's own pricing pages and tells you what today's answer is**, before it
+creates anything that costs money. What is below is the SHAPE, which moves much
+more slowly, and even that was last checked on **2026-09-24**.
 
-**Free, and enough for most of this site:**
+**On the free plan, and enough for most of this site:**
 
-- **Workers** with static assets. Serving the pages costs nothing and static
-  asset requests are unlimited on both plans.
+- **Workers** with static assets. Serving the pages costs nothing, and static
+  asset requests are free and unlimited on both plans.
 - **Durable Objects**, which is what makes the shared rooms, the cue firing and
-  the message history work. These are on the free plan as long as they use the
-  SQLite storage backend, which is the only kind you can create new anyway.
-- **R2** object storage, for recordings and archives: 10 GB stored per month,
-  1 million writes, 10 million reads, and **no charge for bandwidth out**.
+  the message history work. Free plan, with the SQLite storage backend, which is
+  the only kind you can create new anyway.
+- **R2** object storage, for recordings and archives. It has a monthly free
+  allowance and, notably, **no charge for bandwidth out at all**.
 
-**Costs money, and the agent will say so before it touches either:**
+**Costs money, and the agent says the current number before it touches either:**
 
-- **Cloudflare Stream**, for the live video demos. It is prepaid at **$5 per
-  month per 1,000 minutes stored**, plus **$1 per 1,000 minutes delivered**.
-  There is no free tier. If you skip this, the live pages are the only ones that
-  do not work.
+- **Cloudflare Stream**, for the live video demos. Prepaid storage plus a
+  per-minute-delivered charge, and **no free tier**. Skip it and the live pages
+  are the only ones that do not work.
 - **Containers**, which this repo uses to run ffmpeg next to a Worker. Included
-  in the **$5 per month Workers Paid plan**, and not available at all on free.
+  in the Workers Paid plan and **not available on free at all**.
 
-So: a working site of your own for nothing, or roughly **$5 to $10 a month** if
-you want live video in it too. Nothing here needs a server.
+So: a working site of your own for nothing, or a small monthly bill if you want
+live video in it too. Nothing here needs a server.
+
+The pages the agent reads, and you can too:
+
+- [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), which also covers Containers
+- [R2 pricing](https://developers.cloudflare.com/r2/pricing/)
+- [Stream pricing](https://developers.cloudflare.com/stream/pricing/)
+- [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
 
 ---
 
