@@ -21,9 +21,18 @@ https://developers.cloudflare.com/agent-setup/prompt.md
 
 Then read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md
 and follow it exactly. Run every command yourself rather than asking me to.
+If you cannot read that file, stop and tell me. Do not guess what it says.
 
 I want to build something like the stage demo at https://positron.studio/stage/.
 ```
+
+🔴 **THE THIRD LINE IS NOT POLITENESS, IT IS THE ONE THAT WAS EARNED BY A TEST.**
+An agent that cannot reach the file does not always say so. Run in a sandbox
+with no DNS, Codex searched instead, found a different product that happens to
+share the name, and produced a confident 181-line plan for somebody else's
+software, with the admission that it never read the skill buried in the last
+sentence. With that line it stops and says it cannot reach the file, which you
+can fix in one message.
 
 The first line is Cloudflare's own, from their setup page. It is in the prompt
 rather than buried in the file below it because it installs the Cloudflare
