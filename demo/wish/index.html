@@ -56,7 +56,15 @@
      `printLink` off the same object. A seam between them would say they are two
      answers. Under it, with no seam, they are the answer and what this desk
      makes of it. */
-  .wish-dump { display: flex; flex-direction: column; gap: 8px; }
+  /* 🔴 ITS OWN BORDER SINCE IT LEFT THE GLUE, 2026-09-22: *"json dump border
+     should have border"*. Inside a glue every child gives up its border because
+     the glue draws one round the lot; a part that moves out and keeps that up
+     is a surface with no edge, which on this ground reads as text floating on
+     the page rather than as a block. */
+  .wish-dump {
+    display: flex; flex-direction: column; gap: 8px;
+    border: 1px solid var(--line); border-radius: 4px;
+  }
   /* 🔴 THE TRANSCRIPTION IS EDITABLE AND ITS HEIGHT IS FIXED. A textarea that
      grows with its content is the one thing this project has a rule against,
      so it scrolls instead. `resize: none` for the same reason: a corner a
@@ -258,11 +266,21 @@
      with all the air under it. The flex children are the two lines, which are
      blocks either way, so the column direction changes nothing about how they
      read. */
+  /* 🔴 NO RESERVED BOX, SINCE 2026-09-22: *"rm wish-hy"*, against an inspector
+     shot of `div.wish-why 582 x 40` sitting empty under every row. It reserved
+     40 px for a sentence that MOVED INTO THE FIGURE'S CAPTION hours earlier, so
+     what it held was air, and that air is the *"extra huge padding below
+     diagram"* reported three times.
+     ⚠️ **IT STILL EXISTS FOR THE ONE ROW THAT HAS NO PICTURE**, a link that
+     begins and ends at one instrument, which draws no arrow and so has no
+     caption to write into. It takes the room it needs and none when it is
+     empty, which is the empty box rule: a container with nothing in it must not
+     paint its edges or hold its height. */
   .wish-why {
     grid-column: 1; grid-row: 2; min-width: 0;
-    min-height: 40px; display: flex; flex-direction: column; justify-content: center;
     font-size: 13px; color: var(--dim);
   }
+  .wish-why:empty { display: none; }
   /* 🔴 THE SENTENCE IS THERE WHEN NOBODY IS READING THE PICTURE. Asked as
      *"allowed: Mk... (show when no iteraction with diagram)"*. `createDiagram`
      writes the box's or the arrow's own note into its caption on hover and
@@ -336,6 +354,13 @@
     grid-column: 1; grid-row: 1; min-width: 0;
     min-height: 120px; display: flex; flex-direction: column; justify-content: center;
   }
+  /* 🔴 ONE PADDING ON BOTH AXES, ASKED FOR AS *"just have unified x y
+     padding"*. The row was `6px 10px`, so the air above a picture was not the
+     air beside it, and the figure carried its own band on top of that. 10 is
+     the horizontal number that was already there, and `.tbar` makes the same
+     argument for its own 8: one number, both ways, and the three that follow
+     from it are one sum rather than three typed figures. */
+  .wish-conn { padding: 10px; }
   /* 🔴 NO MARGIN AT ALL, AND IT USED TO BE `margin-top` ONLY. Not
      `.pos-body > .pos-dg`: that 44 px belongs to the standing `How it works`
      picture, which opens a section at the end of a page. This one is a result
@@ -1676,8 +1701,13 @@
    * nothing on this desk, so it is shown in a box that paints its edges like
    * any other answer. There is an assert on it.
    */
-  const EMPTY_PATCH = '# the model proposed nothing, which is the right answer to an instruction\n'
-    + '# that names nothing on this desk';
+  /* 🔴 NOTHING, SINCE 2026-09-22: *"rm # the model proposed nothing, which is
+     the right answer to an instruction / # that names nothing on this desk"*.
+     ⚠️ **IT WAS A REPORT RATHER THAN FURNITURE AND IT IS STILL SAID**, in the
+     log, where a sentence about one run belongs. What it could not go on doing
+     is sitting inside a box whose whole subject is the model's own object: a
+     comment in a JSON box is a thing a reader tries to parse. */
+  const EMPTY_PATCH = '';
 
   /**
    * 🔴 THE PATCH BOX IS JSON, ONE OBJECT PER LINE. Asked 2026-09-21: *"can it
@@ -1857,6 +1887,14 @@
        reads the picture in the same tick would be reading a layout no reader
        ever sees. */
     conns = built.map((c) => ({ ...c, ...drawOne(c.fig, c.row) }));
+    /* 🔴 THE REPORT IS A LOG LINE SINCE 2026-09-22, not a comment inside the
+       object box: *"rm # the model proposed nothing..."*. It is still made,
+       because an empty reply is an ANSWER and a blank box alone cannot say
+       which of the two empty states it is in. */
+    if (!g.rows.length) {
+      d.log('the model proposed nothing, which is the right answer to an instruction '
+          + 'that names nothing on this desk');
+    }
     /**
      * 🔴 THE ONE ROW THAT HAS NO PICTURE TO CAPTION STILL HAS TO SAY
      * SOMETHING. A link that begins and ends at one instrument draws no arrow,
@@ -2770,11 +2808,21 @@
        a glue no child has an edge of its own, so the fact moved to the assert on
        the component's seams and edges, where it is now measured for all three
        parts at once instead of for this one. */
+    /* 🔴 THE REPORT MOVED TO THE LOG ON 2026-09-22: *"rm # the model proposed
+       nothing..."*. It was a REPORT rather than furniture and is still made, in
+       the place a sentence about one run belongs. What it could not go on doing
+       is sitting inside a box whose subject is the model's own object, where a
+       comment is a thing a reader tries to parse.
+       ⚠️ SO WHAT IS GRADED IS THE SAYING, NOT WHERE IT IS SAID: an empty reply
+       still produces a line naming it, and the object box is blank rather than
+       holding prose. */
     const EMPTY = show([]);
-    d.assert('a proposal of nothing says so rather than showing an empty box',
-      EMPTY.ok === 0 && patch.textContent.includes('proposed nothing')
-      && patch.dataset.shown === '1',
-      `${patch.textContent.split('\n')[0]}, shown ${patch.dataset.shown === '1'}`);
+    d.assert('a proposal of nothing is reported in words, and the object box stays blank',
+      EMPTY.ok === 0 && patch.textContent.trim() === ''
+      && /proposed nothing/.test(document.querySelector('.pos-log')?.textContent || ''),
+      `the box holds ${JSON.stringify(patch.textContent.trim())} and the log `
+      + `${/proposed nothing/.test(document.querySelector('.pos-log')?.textContent || '')
+        ? 'says it' : 'does not say it'}`);
 
     /**
      * 🔴 AND THE OTHER EMPTY STATE IS THE ONE THAT SAYS NOTHING, WHICH IS WHAT
