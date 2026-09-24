@@ -613,6 +613,25 @@ you need.
 not yet seen their own URL has no idea whether any of this is working, and every
 minute after that is spent debugging two things at once.
 
+🔴 **CHECK THE NAME IS NOT ALREADY TAKEN BEFORE THE FIRST DEPLOY, BECAUSE A
+COLLISION OVERWRITES SOMEBODY'S WORKER.** `wrangler deploy` does not ask. If the
+name they chose already exists on their account, whatever is there is replaced,
+and on an account with other things on it that is somebody's live site.
+
+```sh
+npx wrangler deployments list --name <their-project-name>
+```
+
+Nothing there means the name is free. Something there means **stop and tell
+them**, in those words: *"there is already something called that on your
+account, and publishing would replace it. Pick another name?"* Never resolve it
+yourself by appending a number.
+⚠️ **THIS IS NOT IN THE SKILL BECAUSE I THOUGHT OF IT.** An agent following this
+file did it unprompted and said *"'co' is unused in your Cloudflare account, so
+publishing it won't overwrite anything"*, which is a better instinct than the
+instructions it was given. It is written down now so the next one does not have
+to be clever.
+
 Their project, whatever shape it has, deploys the same way:
 
 ```sh
