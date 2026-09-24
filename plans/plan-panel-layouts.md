@@ -26,7 +26,7 @@
 | 📁 **REPO** | read out of this checkout. |
 | ⚖️ **INFERRED** | reasoned from something above. Nobody wrote it down. |
 | 🔌 **NEEDS THE HARDWARE** | cannot be settled without the thing in front of you. |
-| 🔴 **MEASURED** | off the wire, from `measured-devices-2026-09-20.md`. |
+| 🔴 **MEASURED** | off the wire, from `research/measured-devices-2026-09-20.md`. |
 
 🔴 **THE WARNING IN THE BRIEF WAS RIGHT AND THERE IS A WAY PAST IT.** A panel
 diagram is a picture and `pdftotext` loses its geometry: on Model 12 owner's
@@ -328,7 +328,7 @@ the front:
   the two `R` jacks above, `CLICK`, `FOOTSWITCH`, `MIDI OUT`, `MIDI IN`, and
   two `INSERT` jacks for channels 1 and 2 only
 
-📄 DOC, the ATTENTION already in `measured-devices-2026-09-20.md`: *"The unit
+📄 DOC, the ATTENTION already in `research/measured-devices-2026-09-20.md`: *"The unit
 should be connected directly to the computer, not through a USB hub."*
 
 ## 1.8 What is NOT established about the Model 12
@@ -456,7 +456,7 @@ top right corner.
 
 ## 2.2 Where the measured MIDI lands on that panel
 
-🔴 MEASURED, from `measured-devices-2026-09-20.md`, placed:
+🔴 MEASURED, from `research/measured-devices-2026-09-20.md`, placed:
 
 | panel control | position | message |
 |---|---|---|

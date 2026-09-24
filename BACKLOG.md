@@ -22,14 +22,22 @@ GUESSING.** Two halves:
    rule for moving one is already written in `CLAUDE.md`: move it VERBATIM, and
    leave its trigger behind in the table, because a rule nobody knows to load is
    a rule that is gone.
-2. **The root `.md` files.** The repository is public now and a stranger sees
-   twelve of them at the top level. `README.md`, `AGENTS.md`, `LICENSE`,
-   `NOTICE.md` and `CLAUDE.md` are the front door. `HANDOFF.md`, `BACKLOG.md`,
-   `LESSONS.md`, `PROGRESS.md`, `LAYOUT.md` and `SUMMARY.md` are working files
-   that a visitor reads as clutter and a returning agent needs.
-   `measured-devices-2026-09-20.md` is a dated measurement that belongs with the
-   research, and `SECRETS-ROTATION.md` should not be public at all while it
-   names an unrotated key.
+2. ✅ **The root `.md` files. DONE 2026-09-24.** The repository is public now and
+   a stranger saw twelve of them at the top level. `README.md`, `AGENTS.md`,
+   `LICENSE`, `NOTICE.md` and `CLAUDE.md` are the front door, and `HANDOFF.md`,
+   `BACKLOG.md`, `LESSONS.md`, `PROGRESS.md`, `LAYOUT.md` and `SUMMARY.md` stay
+   at the root with them, because they are named in `CLAUDE.md`'s own table and
+   carry **291 references** between them. Two files moved with `git mv`:
+   `research/measured-devices-2026-09-20.md`, a dated measurement that belongs
+   with the research, **27** references rewritten in **17** files, and
+   `research/SECRETS-ROTATION.md`, **7** in **6**. `LAYOUT.md` now records both
+   moves and the reasoning.
+   🔴 **AND THE MOVE IS NOT THE FIX FOR THE KEY.** The repository is public and
+   the file is already in git history, so it is still readable at its old path
+   by anyone who clones. `positron-demo`'s RTMPS stream key is STILL UNROTATED,
+   and the only thing that closes it is a human rotating it in the Cloudflare
+   dashboard, which for a live input means delete and recreate and a new UID
+   through `demo/shell/live.mjs`, `workers/pub` and every demo that plays it.
 ⚠️ **NOTHING HERE IS A DELETION.** `LAYOUT.md` decides where a file goes and
 this is a `LAYOUT.md` question; the plans move of 2026-09-20 is the precedent,
 and it cost 129 files holding a path by name.
@@ -88,7 +96,7 @@ most of the repository's **191 MB**.
 ⚠️ Smaller findings, none of them a stop: `rig/moq/mtx/moq-key.pem` is a
 committed PRIVATE KEY (a self-signed local cert for `moq-mtx-local`, so the
 exposure is nil, but a scanner will flag it and it should not be in a public
-tree); `SECRETS-ROTATION.md` publishes a map of past exposures including one it
+tree); `research/SECRETS-ROTATION.md` publishes a map of past exposures including one it
 says is **still unrotated** (`positron-demo`'s RTMPS key) and one in another
 repo it calls *"still public"*; there is **no LICENSE file**, so publishing
 leaves everything all rights reserved by default; and the commits carry a WORK
@@ -513,7 +521,7 @@ here now.
   `archive/` and build output: `demo/evo/index.html`, `demo/bay/index.html` (2
   places), `demo/nola/index.html` (3), `demo/wish/index.html` (2),
   `demo/shell/bay.mjs`, `demo/shell/bay-test.mjs`, plus `PROGRESS.md`,
-  `HANDOFF.md`, `measured-devices-2026-09-20.md`, `plans/plan-nola.md` and
+  `HANDOFF.md`, `research/measured-devices-2026-09-20.md`, `plans/plan-nola.md` and
   `plans/plan-patchbay.md`.
   ✅ **AND ONLY TWO OF THE 11 ARE TEXT A VISITOR READS**, which is the number
   that matters and which the handoff's "seven files" did not separate:

@@ -191,7 +191,7 @@ called `port.open()`. The specification says assigning `onmidimessage` opens a
 port implicitly and that is not reliable, so four plugged-in devices reported
 nothing, silently, with no error anywhere. `await p.open()` per port.
 
-**WHAT THE DEVICES ACTUALLY SEND**, in `measured-devices-2026-09-20.md`, which
+**WHAT THE DEVICES ACTUALLY SEND**, in `research/measured-devices-2026-09-20.md`, which
 outranks the plan documents wherever they disagree:
 - **The Circuit's filter is CC 74 on CHANNEL 16.** The macros are CC 80-87 on
   channel 1. No manual says the sixteen.
@@ -3025,7 +3025,7 @@ image, `rig/obs-docker/clock.html`, and now this player.
 
 A raw `GetStreamServiceSettings` call printed `positron-demo`'s RTMPS key. The
 purpose-built driver redacts (`key set, not printed`); the ad-hoc call did not.
-**Treat it as exposed and rotate it** — added to `SECRETS-ROTATION.md`. The
+**Treat it as exposed and rotate it** — added to `research/SECRETS-ROTATION.md`. The
 lesson is the one `src/publish.sh` already learned: redaction has to live at the
 point of capture, because any convenience call around it will print the raw
 object.

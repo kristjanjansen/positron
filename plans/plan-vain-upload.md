@@ -194,7 +194,7 @@ It is rejected on three grounds:
 
 1. **It needs an S3 credential to exist.** A presigned URL is signed with an
    account access key pair held as a Worker secret. The binding path needs no
-   such credential at all. This repo has a `SECRETS-ROTATION.md`; the best
+   such credential at all. This repo has a `research/SECRETS-ROTATION.md`; the best
    secret is the one that was never created.
 2. 🔴 **R2 sends no CORS headers on an expired presigned URL.** READ,
    <https://developers.cloudflare.com/r2/buckets/cors/>: an expired URL returns

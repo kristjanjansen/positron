@@ -26,10 +26,75 @@ That accounts for everything that executes. What remains is writing:
 
 | | |
 |---|---|
-| `plans/` | **61** documents that PROPOSE and argue. They moved out of the root on 2026-09-20 on instruction, with `git mv`, and 129 files referencing one by name were rewritten |
-| `research/` | **41** documents that REPORT what is out there or what was measured |
+| `plans/` | **72** documents that PROPOSE and argue. They moved out of the root on 2026-09-20 on instruction, with `git mv`, and 129 files referencing one by name were rewritten |
+| `research/` | **59** documents that REPORT what is out there or what was measured. Two of them arrived from the root on 2026-09-24 and the section below says which |
 | `results/`, `studio/`, `archive/` | measurements and captures, mostly untracked |
-| `CLAUDE.md` `LESSONS.md` `PROGRESS.md` `HANDOFF.md` | the standing rules, why they exist, what was measured when, and where we are |
+| `CLAUDE.md` `LESSONS.md` `PROGRESS.md` `HANDOFF.md` `BACKLOG.md` `LAYOUT.md` `SUMMARY.md` | the standing rules, why they exist, what was measured when, what is asked for, where a file goes, and where we are. They stay at the root and the next section says why |
+
+⚠️ **Counts measured 2026-09-24**, not remembered. `ls plans/*.md | wc -l` and
+`ls research/*.md | wc -l` are the only honest source for those two numbers, and
+this file has carried a stale pair before.
+
+---
+
+## The root `.md` files, and the two that left on 2026-09-24
+
+🔴 **THE REPOSITORY WENT PUBLIC ON 2026-09-24, WHICH CHANGED WHO THE TOP LEVEL
+IS WRITTEN FOR.** Twelve `.md` files sat there, and a stranger cannot tell the
+front door from a working file. Two of the twelve were in the wrong place by
+this file's own rule 5 and moved. **Ten stayed, and staying was a decision
+rather than an omission.**
+
+**The front door, and it is the whole reason the rest can look busy:**
+`README.md`, `AGENTS.md`, `LICENSE`, `NOTICE.md`, `CLAUDE.md`. A visitor reads
+the first one, a coding agent reads the second and the fifth, and the third and
+fourth are what makes the code usable by anyone.
+
+**The six working files stay at the root because they are NAMED IN `CLAUDE.md`'s
+OWN TABLE**, which is loaded on every turn of every session and every background
+agent this project spawns. MEASURED 2026-09-24, references across the tree:
+`BACKLOG.md` **97**, `LAYOUT.md` **59**, `HANDOFF.md` **52**, `PROGRESS.md`
+**45**, `LESSONS.md` **27**, `SUMMARY.md` **11**. That is **291 references** to
+move for a tidier `ls`, against the plans move of 2026-09-20 which cost 129, and
+unlike the plans move nobody asked for it. ⚠️ **A returning agent needs these
+six and a visitor is not harmed by them**, which is the trade the root is
+making. It is not open for re-litigation on aesthetic grounds.
+
+**What moved, both with `git mv` so the history follows:**
+
+| from | to | why | references rewritten |
+| --- | --- | --- | --- |
+| `measured-devices-2026-09-20.md` | `research/measured-devices-2026-09-20.md` | it is a dated measurement, and rule 5 above sends `research/<thing>-<date>.md` there. The name was already in the convention; only the directory was wrong | **27** in **17** files |
+| `SECRETS-ROTATION.md` | `research/SECRETS-ROTATION.md` | it REPORTS what was found and what is owed, which is research, and it is not a document a stranger should meet on the front page of a public repository | **7** in **6** files |
+
+⚠️ **The build output under `workers/view/public/` was deliberately left alone**,
+as was `archive/`. The first regenerates from `demo/` on the next
+`cd workers/view && node build.mjs`; the second records what was there, by the
+same rule that keeps `box` and `radio1965` spelled the old way inside it. The
+raw grep count of **36** for the devices file is the live **27** plus **9** in
+build output.
+⚠️ **AND THE FIRST COUNT SAID 35, BECAUSE THE TREE MOVED UNDERNEATH IT.** A peer
+session was writing `.claude/skills/positron-verify/SKILL.md` in the same
+checkout while the rewrite ran, and the 880 line block it added carried a 36th
+reference that no earlier grep could have seen. It was caught by re-running the
+sweep at the END instead of trusting the count taken at the start, and it would
+otherwise have been the one broken path left. **A reference count is only true
+of the moment it was taken**, which is the standing-file staleness rule arriving
+inside a single task.
+
+🔴 **AND MOVING `research/SECRETS-ROTATION.md` DOES NOT UNPUBLISH IT. NOBODY SHOULD READ
+THE MOVE AS A FIX.** The repository is public and the file is in git history, so
+it is fetchable from a clone at its old path forever. It names one credential
+that is **still unrotated**: `positron-demo`'s RTMPS stream key, exposed to a
+session transcript on 2026-09-10 by a bare `GetStreamServiceSettings`. **The
+only thing that closes it is a human rotating it in the Cloudflare dashboard**,
+and for a live input that means DELETE AND RECREATE, which mints a new UID and
+ripples into `demo/shell/live.mjs`, `workers/pub`'s container and every demo
+that plays it. The file says so itself. ⚠️ **A history rewrite is not the fix
+either** and was not attempted: the file's own §3 already makes that argument
+about the `kristjanjansen/studio` exposure, in its own words, that rotating is
+what actually fixes an exposure and that rewriting history is optional cleanup
+rather than the fix.
 
 ---
 

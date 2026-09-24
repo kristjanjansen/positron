@@ -470,7 +470,7 @@ export const DEMOS = [
    * says no. Nothing points at `/rack/` any more.
    * ⚠️ AND EVERY NUMBER IN IT IS MEASURED. TASCAM publishes no note numbers and
    * no controller numbers for Mackie Control at any firmware revision, so the
-   * page is built on `measured-devices-2026-09-20.md` and would otherwise be
+   * page is built on `research/measured-devices-2026-09-20.md` and would otherwise be
    * guesswork.
    */
   /**

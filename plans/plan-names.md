@@ -349,7 +349,7 @@ harnesses `verify.mjs` cannot cover, so nothing goes red when they rot.
   still has that name. The service is renamed; the technique is not. Same
   reasoning that kept `research/elektron-participation-2026-08.md`.
 - `SELFREC_TOKEN`. Renaming a secret means re-minting it, and it is on
-  `SECRETS-ROTATION.md` already. Do it there, once.
+  `research/SECRETS-ROTATION.md` already. Do it there, once.
 
 ---
 

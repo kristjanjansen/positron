@@ -161,7 +161,7 @@ try {
   console.error('pass --key <path>, or set $POSITRON_SA');
   process.exit(1);
 }
-// ⚠️ NEVER PRINT THE KEY. This project has a SECRETS-ROTATION.md from the last
+// ⚠️ NEVER PRINT THE KEY. This project has a research/SECRETS-ROTATION.md from the last
 // time one reached a log, and the publisher redacts at the point of capture for
 // the same reason. The identity is safe to show; the private half is not.
 if (!sa.private_key || !sa.client_email) {

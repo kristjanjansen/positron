@@ -25,7 +25,7 @@ here?*; `DEMOS` is the story order and answers *where do I start?*, and
 | `LESSONS.md` | why the rules exist, at length |
 | `PROGRESS.md` | what was measured, when |
 | `LAYOUT.md` | where a new file goes, and the two renames that were priced and rejected |
-| `plans/` | every plan, 62 of them today. A new one goes here and nowhere else |
+| `plans/` | every plan, 72 of them today (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
 
 ## The skills, and when to load one
 
