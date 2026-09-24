@@ -469,6 +469,28 @@ something, and keeps every answer on the recording's own timeline. Decomposed
 into what has to exist, what it costs, and **how much of this repository is
 worth reading for it**:
 
+🔴 **SAY WHERE THE FILM IS BEFORE YOU BUILD ANYTHING, BECAUSE IT IS THE WHOLE
+DESIGN AND IT LOOKS LIKE A DETAIL.** In `/stage/` the film is in the ROOM, on a
+projector or one screen everybody can see, and the phones are RESPONSE DEVICES
+that never show it. That is a deliberate choice and not a limitation.
+⚠️ **AND IT WILL BE READ AS A BUG IF YOU DO NOT SAY IT.** Observed: an agent
+built exactly this, correctly, and the first thing its owner said was *"i can not
+see movie in audience. by design?"*. Everything worked. Nobody had told them.
+**One sentence up front costs nothing: "the film plays on your screen in the
+room, and their phones are for answering, not for watching."**
+
+⚠️ **AND IF THEY WANT IT ON THE PHONES, PRICE IT HONESTLY, BECAUSE THE FREE
+OPTION IS THE HARD ONE.** Three ways, and they are not equally difficult:
+
+1. **One screen in the room.** Free, simplest, and what the demo does.
+2. **Live picture to phones** with Cloudflare Stream. Costs money, and it is the
+   EASIEST of the three, because the provider solves the synchronising.
+3. **A recorded film to every phone** from R2. Free to store and serve, and
+   **by far the most work**, because "synchronised playback" is not a feature you
+   switch on. Every phone has its own clock, its own buffering and its own start
+   delay, and this repository has whole pages about that one problem. Do not
+   offer it as the easy free answer.
+
 | the part | what it really is | free? | read here? |
 | --- | --- | --- | --- |
 | something that plays a film and can be scrubbed | a `<video>` and a position control, in whatever UI they like | yes | no, build it their way |
@@ -641,3 +663,16 @@ desk. They are worth reading and they will not run for anybody else.
 repository is a measurement of this machine, this network and this account on a
 stated day. Yours will differ. Re-measure rather than quoting, which is the
 house rule here and the reason most of these files are trustworthy at all.
+
+🔴 **NOR ANYTHING YOU LEARN ABOUT THE MACHINE YOU HAPPEN TO BE STANDING ON.**
+Observed: an agent building a fresh project pinned wrangler to an old version
+and froze the compatibility date to match, because the laptop it was running on
+has security software that only allows a particular `workerd` binary. Correct
+for that laptop. **Wrong for the person it was building for**, who has no such
+software and would inherit an old runtime and an old compatibility date without
+ever being told why.
+⚠️ **A CONSTRAINT IS PART OF AN ENVIRONMENT, NOT PART OF A PROJECT.** Version
+pins, blocked binaries, corporate proxies, a managed laptop's rules: note them,
+work around them here, and **do not write them into what somebody else will
+run**. If a pin is genuinely needed, say in one line whose machine needs it and
+why, so the next person can delete it.
