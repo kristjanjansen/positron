@@ -561,3 +561,883 @@ counts against the last known total after any change.
   identically to delivery — while every note was being scheduled fifty-six
   years out. Ask which side of the wire a counter is counted on before quoting
   it.
+
+## Before the harness opens a page at all: `demo/verify.mjs`
+
+🔴 **COUNT THE OTHER BROWSERS BEFORE BLAMING THE CODE, AND MAKE THE HARNESS SAY
+IT RATHER THAN A DOCUMENT.** Three runs in one session read broken because of
+processes of the session's own: a full suite went 429/429, then 420/429 with
+nine failures, then 429/429 again with no code in between, and all nine were in
+the demos that need something off this machine. The same thing later took the
+suite out entirely with a `cdp timeout` on `replay`, which is 16/16 when run
+alone. This was carried as a rule to remember since session 18, and **a rule to
+remember is the weakest kind of guard: it only fires if the person reading the
+red output happens to recall it.** `verify.mjs` now prints the count at the
+start, and AGAIN AT THE END when something failed, because a browser that
+appeared halfway through is the one most likely to have caused the failure being
+read and would not have been in the opening count.
+⚠️ **`-f` IS REQUIRED FOR THAT COUNT AND IT IS THE TRAP.** The flags being
+looked for are on the command line, so an exact-name match cannot see them, and
+a `-f` pattern also matches the process doing the asking. That is LESSONS #39's
+shape (`pgrep -f h264_v4l2m2m` answering "still held" about itself), so the
+harness's own pid is excluded explicitly and its own debugging port after
+launch.
+⚠️ **ONE BROWSER IS ABOUT TEN PROCESSES.** Chrome's renderer, GPU and utility
+helpers inherit the whole command line, `--user-data-dir` and
+`--remote-debugging-port` included, so a naive count of matching processes
+reported **19 other headless Chromes for two**. A warning that overstates by 10x
+is worse than no warning, because the next reader learns to ignore it. The
+browser process is the one with no `--type=`; every helper has one, and a
+browser is its PORT, so a relaunch on the same port is still one.
+⚠️ **INFORMATIONAL, NEVER FATAL.** A harness that refuses to run because
+something else is open is worse than the problem it is guarding against. `ps` is
+not the subject either: the counter returns an empty list rather than failing on
+it.
+
+🔴 **TWO HARNESSES STARTED AT ONCE DID NOT COLLIDE LOUDLY, THEY DROVE EACH
+OTHER'S TABS.** `verify.mjs` still held two fixed ports after the
+shared-mutable-global rule had been applied to its HTTP port. The second run
+found 9333 already answering, attached to the FIRST run's browser, and **drove
+someone else's tabs while reporting its own slugs**. With agents running in
+parallel that is not a rare race, it is the normal case, and it is the likeliest
+explanation for the `cdp timeout` above.
+⚠️ **THE PROFILE HAS TO BECOME PER-RUN IN THE SAME CHANGE, NOT AS TIDINESS.**
+Chrome writes the port it actually got into `DevToolsActivePort` INSIDE the
+profile, so reading it back from a SHARED directory finds whichever browser
+wrote there last: **a per-run port with a shared profile still lands on somebody
+else's browser.**
+
+⚠️ **A `gl: true` DEMO IS NOT THIS HARNESS'S SUBJECT, AND FAILING IT HERE WOULD
+BE A LIE.** `verify.mjs` launches Chrome with `--disable-gpu`, where
+`getContext('webgl2')` returns null, so a visual demo reports `__demo.ready`
+false and the suite goes red for a page that is perfectly fine. Those pages are
+handed to `demo/verify-gl.mjs` and the handoff is PRINTED, rather than counting
+a subject this harness cannot reach as a failure.
+
+🔴 **THE STAND-INS ARE WIRED UP BY THE HARNESS BECAUSE THE ALTERNATIVE IS A RULE
+SOMEBODY HAS TO REMEMBER**, and a rule that is only in a document is a rule that
+gets broken on the day somebody is in a hurry. ⚠️ `DEMO_QUERY` still wins, and
+the mechanism is worth knowing: **`URLSearchParams.get` returns the FIRST
+occurrence**, and `DEMO_QUERY` is put first in the query string.
+
+🔴 **A FIXED ROOM NAME IS A SHARED MUTABLE GLOBAL, AND THIS REPO LEARNED THAT
+ABOUT PORTS AND NEVER APPLIED IT TO ROOMS.** Every demo defaults to a NAMED room
+(`cues-demo`, `jam-demo`, `scene-demo`, `room-demo`), so two runs of the suite,
+or a run and a visitor, land in the same one and see each other's traffic. That
+is the same bug in the WebSocket layer, and this project has paid for it twice:
+nine orphaned Chromes filled `studio-1` and took a live demo down (LESSONS #56),
+and a full run went 429 to 420 to 429 with no code between. A harness run now
+gets a room of its own, per demo, per run.
+⚠️ **`<demo>-test-<hash>`, NOT `v-<demo>-<hash>`.** The `v` stood for verify and
+was obvious to nobody, asked in those words: *"What is v- prefix?"*. A room name
+is read by somebody looking at a store wondering what all these rows are, and
+`items-test-4f2a` answers that where `v-items-4f2a` needs a footnote. It also
+cannot be mistaken for the real room by a rule that has to tell them apart:
+`workers/items` will only announce from the room named `items`, and **a harness
+room that reached real phones is exactly how that came up.**
+⚠️ **TWO ROOMS ARE NOT LIKE THAT AND MUST NOT BE OVERRIDDEN.** `room: 'fixed'`
+in the manifest means the name is not a rendezvous the page invented, it is the
+ADDRESS OF A MACHINE: `studio-1` is where the Raspberry Pi is and `m1-1` is
+where the studio Mac's agent is. Renaming those does not isolate a run, it
+points it at nothing.
+⚠️ **AND A DEVICE IS STILL EXCLUSIVE.** A private room does not give a second
+client its own Raspberry Pi. There is one JACK graph and one instrument, so
+board-bound demos still have to take turns. Rooms were never that problem.
+
+🔴 **`DEMO_HOSTS=1` IS THE INSTRUMENT FOR THE STANDING EXTERNAL-SOURCE RULE, AND
+UNTIL IT EXISTED THERE WAS NO WAY TO CHECK IT: a page pointed at a stand-in and
+a page pointed at the real thing produce identical output.** It counts
+`Network.requestWillBeSent`, **which fires for every request the renderer makes
+rather than for the ones a page remembered to log**.
+
+    DEMO_HOSTS=1 node demo/verify.mjs tapes
+
+⚠️ Off by default and printed per demo, because most demos here legitimately
+talk to the relay, to Cloudflare or to ERR, so a line on every run would be
+noise around the one run where it is the answer. `data:` and `blob:` have no
+host and are this machine's own memory.
+
+## What counts as an error and what is merely expected: `demo/verify.mjs`
+
+🔴 **A RIGHTS REFUSAL IS RECOGNISED BY WHERE IT CAME FROM, AND THE DAY THE
+HARNESS STOPPED POINTING THOSE PAGES AT ERR, TWO WORKING PAGES READ RED.** Both
+classifiers tested the URL for `live.err.ee`, which was the whole address of the
+only thing that sent one. `fake-err.mjs` sends the same 403 with the same
+missing `access-control-allow-origin` from `127.0.0.1`, so every deliberate
+refusal became an unexplained console error.
+⚠️ **IT IS THE STAND-IN'S OWN ADDRESS PLUS THE SEGMENT PATH, NOT A LOOPBACK
+TEST.** Anything looser would swallow a real failure from the dev server, and
+the whole value of this bucket is that it is narrow enough to be trusted.
+⚠️ **AND THE CLASSIFIER IS GIVEN THE WHOLE LOG LINE, NOT ONLY `entry.url`.**
+Chrome files a CORS violation with an EMPTY url and the address inside the
+message text, so a version that only read the url classified the
+`loadingFailed` events correctly and left the console entries for the same
+segments sitting in `errors`. **MEASURED: 22 refusals recognised and `no console
+errors` still red, which reads as one bug and was two.**
+
+🔴 **EVERY ALLOWANCE IS RECORDED AND CAPPED, NEVER IGNORED, AND THE LINE HAS TO
+NAME WHICH KIND IT IS** or the next reader believes a refusal was a radio
+station. Past the ceiling each one stops being the small explained thing and
+becomes the opposite diagnosis, which is the one a reader of the suite most
+needs told apart. The buckets, with what each was measured to be:
+- **LL-HLS live-edge part 404s.** Normal at the live edge: players request parts
+  as they are born and hls.js retries. `EDGE_CEILING = 25`.
+- **409 on a WHEP play URL** means nothing is publishing to that input, which is
+  a fact about the rig being off rather than about the page. MEASURED
+  2026-09-15 against Cloudflare directly, outside any browser: a bare POST to
+  that play URL answered 409 while `keep` read 13/14 run after run on an
+  otherwise clear machine. Silence here would turn "the studio rig is not
+  running" into a green run.
+- **400 on a WHEP play URL.** Cloudflare refuses a single-track offer with a
+  400, both ways. `tracks` used to assert on that refusal and is gone, so
+  nothing sends one today; the allowance stays correct for whatever asks next.
+- **502 or 500 from `shout`** is the relay saying an origin is down. MEASURED
+  repeatedly in one day: **four of eight mounts 502 while the other four
+  answered 200 through the identical worker**, and this laptop reached every one
+  of them directly at `icecast.err.ee`. Past the ceiling this stops being one
+  flapping mount and becomes OUR relay being down.
+- **404, 413 and 415 from `vain`.** That page asks its own archive to refuse
+  three times on purpose: a file over the cap (413), a JPEG named `.mp3` (415),
+  and the sidecar before it exists (404). ⚠️ **NO PAGE-SIDE CHANGE CAN REMOVE
+  THESE.** Chrome logs a resource error for any 4xx and does it identically for
+  `fetch` and `XMLHttpRequest`, MEASURED both ways rather than reasoned about.
+  **A check that cannot be made without a console error is exactly what an
+  allowance is for.**
+- **archive.org 5xx on a metadata probe is their server, not this page.**
+  `/tapes/` asks all 24 recordings how long they are, four at a time, straight
+  at whichever node archive.org hands out. MEASURED across ten runs: **two of
+  them drew a 500 from `dn720304.ca.archive.org` on one probe, and the other
+  eight drew none, with no code between them.**
+- **ERR's 403 with no ACAO**, which the browser reports as CORS.
+  `PROBE_CEILING = 60`, and the number is derived rather than picked: `flipper`
+  sweeps 8 points per probe twice, `now` sweeps 13 points across the window once
+  and is capped at 30 in-page, plus hls.js's own retries on whatever comes back
+  refused.
+- **`net::ERR_ABORTED` is what a media element's in-flight segment requests do
+  when the page unloads.** It means WE navigated, not that the page failed.
+  Every page that plays media produces these on teardown, so counting them made
+  a working demo look broken. Recorded separately rather than ignored.
+
+⚠️ **THE CEILINGS ARE FOLDED INTO THE EXISTING `no console errors` ASSERT RATHER
+THAN ADDED AS NEW ONES**, because a conditional assert would make the suite
+total vary run to run, **and a shrinking total is exactly how four asserts went
+missing unnoticed earlier.**
+
+## Driving a page: presses, drags and typing, in `demo/verify.mjs`
+
+**`.pos-controls button, .tbar-x`, in order.** A multi-step demo (arm, then
+measure) does not put its asserts behind the first button, and a page may put a
+control INSIDE the transport bar when it is a transport verb rather than a side
+action (`take` puts Record there). **A control the harness cannot press is a
+subject the suite cannot reach, which is how three pages stayed green while
+never playing a frame.**
+
+🔴 **`element.click()` FIRES NO POINTER EVENTS, so a page that is drawn on
+rather than pressed was a subject this harness could not reach at all.** `draw`
+carried a `Draw one for me` button purely so that something here had something
+to press: a page answering its own question, and the line it graded was not the
+line the page is about. Any element marked `data-gesture` gets a real CDP drag
+instead, which Chrome turns into genuine pointerdown/move/up with
+`getCoalescedEvents` and all.
+⚠️ **THE PATH IS A LISSAJOUS, NOT A STRAIGHT LINE, AND THE REASON IS
+MEASUREMENT.** A straight drag is reconstructed exactly by every interpolator,
+so a page comparing hold against linear against a spline would grade all three
+as perfect **and its whole subject would vanish into a tie.** A curve separates
+them.
+⚠️ **TIMESTAMPS ARE SUPPLIED**, 200 samples 16 ms apart.
+`Input.dispatchMouseEvent` takes one, and without it every sample would be
+stamped when the round trip happened, so **the gesture's input rate would be a
+measurement of this harness's latency rather than of anything on the page.**
+`ev.timeStamp` in the page is what a capture gate reads, so it has to be the
+honest one.
+⚠️ **SCROLL IT INTO VIEW FIRST, AND RE-READ THE RECTANGLE AFTER.** Headless
+Chrome's default viewport is **800x600** and these pages are taller than that,
+so a canvas half way down the page has a bounding rectangle whose lower half is
+BELOW THE VIEWPORT, **and an input event dispatched at a y past the viewport
+lands on nothing at all, silently.** The first run of that helper read
+`page asserted something` with a count of 0 for exactly that, while the
+identical drag in a 900px window produced 200 moves and 5 asserts.
+
+**A page whose subject is TYPING was a subject this harness could not reach
+either**, because a click produces no `input` event and a drag produces no text.
+`typist` found two real bugs the first time it was driven with real key events:
+a fold at position 0 emptying the box the first letter had just gone into, and a
+strip that fits itself once and so drew six of seventy-one edits.
+⚠️ **THE SEQUENCE IS NOT A WORD, IT IS THE THREE THINGS FIVE PREVIOUS TEXT
+ADAPTERS GOT WRONG**: characters, a BACKSPACE (which never says what it
+removed), and an ARROW KEY (which moves the caret with no input event at all). A
+page that only ever sees appended characters is a page whose whole argument goes
+untested. A named key needs `windowsVirtualKeyCode`, which is what makes
+Backspace and the arrows act rather than merely arrive.
+⚠️ **UNLIKE THE DRAG, THE TIMING THERE IS REAL.** `Input.insertText` takes no
+timestamp, so the recorded intervals are the harness's round trips. That is
+acceptable because no claim on that page is about input RATE. It would not be on
+a page that measured one, and the difference is worth knowing before reusing it.
+🔴 **AND THE COUNT REPORTED IS THE NUMBER ACTUALLY TYPED INTO, NOT THE NUMBER
+FOUND.** The first version returned the number of elements and printed "typed
+into 1 field" about a read-only box it had skipped: **a harness reporting work it
+did not do, which is worse than reporting none.**
+⚠️ **A PAGE MAY HAVE TO BE ARMED BEFORE IT CAN BE TYPED INTO**, so if every
+field refuses focus the harness presses the PRIMARY control once and asks again.
+
+🔴 **INPUT COMES AFTER THE CONTROLS, BOTH KINDS.** A page that has to be ARMED
+before it will record has to be armed before it is drawn on. `draw` grew a
+record button and immediately reported `page asserted something` with a count of
+0, because the drag was still running first and the page dutifully recorded
+nothing.
+
+🔴 **A PAGE WHOSE CONTROL IS STILL RUNNING HAS NOT FINISHED, AND THE HARNESS
+USED TO WALK OFF ANYWAY.** The press loop sleeps a fixed 650 ms after each button
+and does not await the handler. The case that found it was the retired `seek`
+page, whose sweep was five jumps at 700 ms apiece. **It did not show up before
+because every such page carried a "Run the checks" BUTTON, which gave the checks
+a slot of their own; taking those buttons off the pages took the slot with them
+and eleven pages quietly lost their asserts.** The answer was on the page the
+whole time: `shell.mjs` already marks a running control `data-busy="1"`, which is
+what draws the sweep across the button. ⚠️ CAPPED: a handler that never settles
+must cost one demo a wait, not the run.
+
+## Deciding that a page has finished, and every wrong answer so far: `demo/verify.mjs`
+
+🔴 **THE WAIT IS ARMED BY THE PAGE'S OWN `ready`, NOT BY THE COUNT BEING ZERO,
+AND THAT DISTINCTION BLINDED THE SUITE.** The first-assert loop ran
+`while (n === 0)`, on the reasoning that once anything has landed the cheap
+growth loop can take over. **The moment the SHELL gained two asserts of its own,
+every page in the suite had a non-zero count at t+0**, that phase fell through on
+its first test, and a page was left with 12 tries at 400 ms to produce everything
+it had. **MEASURED the day it landed: `/radio/` makes 34 asserts and the suite
+collected 2, then reported 13/13 green.** That is this project's worst failure
+shape, a green suite with no coverage, **and it hit 28 demos at once because 28
+declare `settleMs`.**
+⚠️ **"THE PAGE HAS NOT ASSERTED YET" IS NOT "THE COUNT IS ZERO".**
+`__demo.shellAsserts` is the shell saying how many of the rows are its, which is
+the only thing that separates a page that has barely started from one that is
+finished.
+
+🔴 **`isReady` WAS DECLARED AND NEVER CALLED, FOR AS LONG AS IT HAD EXISTED,
+WHICH MADE THE COMMENT ABOVE IT A DESCRIPTION OF CODE NOBODY WROTE.** It said in
+capitals that a page is done when it says it is ready AND its count has stopped
+moving, `Both conditions`, and only one of them was ever tested. **A dead guard
+reads as finished work, which is this project's most expensive kind of defect.**
+
+🔴 **AND THE HALF THAT ACTUALLY COST SOMETHING IS THE PATIENCE, NOT THE READY.** A
+check block that waited longer than ONE 400 ms poll without asserting was cut off,
+and everything after it was lost in silence. **MEASURED 2026-09-22 on `/muta/`,
+which grew a sustain check holding a note for 700 ms and its release for 900 ms:
+the count stood still across one poll, the loop exited, and two asserts stopped
+running, one of them a voice stealing check that had been there for a day. The
+suite read 40/40 green before and after, because an assert that never runs cannot
+fail. Raising `settleMs` from 8 s to 14 s changed nothing, which is what said the
+settle window was not the cause.**
+⚠️ **FIVE QUIET POLLS AND NOT ONE, WHICH IS 2.0 s OF SILENCE TOLERATED AND COSTS
+1.6 s A PAGE.** A DSP page that holds a note, lets it go and measures the
+difference is quiet for over a second BY DESIGN, and that is the check rather
+than a delay in it. **`/muta/` lost four asserts to a patience of one and two
+more to a patience of three, every time silently and every time still green.**
+⚠️ **60 TRIES IS A 24 s CEILING AND COSTS A FAST PAGE NOTHING**, because the loop
+leaves the moment a page is quiet and ready. **30 was reached by `/muta/`**,
+whose DSP checks hold notes, release them and wait for envelopes for about twelve
+seconds in total, and reaching the ceiling drops whatever has not asserted yet
+without a word: the same silent truncation as a patience of one, arriving from
+the other end of the same loop.
+⚠️ **`ready` ALONE WOULD NOT HAVE SAVED IT, WHICH IS WHY BOTH ARE HERE.**
+`/muta/` calls `ifSelfcheck(...)` WITHOUT awaiting it and then `d.ready()` on the
+next line, so `ready` is true a few milliseconds in and stays true through every
+check the page makes. `/radio/` does the same from inside the granulator's boot.
+**A page's own claim to be finished is worth reading and is not worth trusting
+alone.** ⚠️ And moving `d.ready()` to the END of a page's checks was TRIED: it
+made that page fail the 7.4 s boot wait and be graded not at all, because the
+same flag answers two questions, *is this page up* and *has it finished*.
+Splitting them is a change to the shell contract and to four harnesses, and is in
+`BACKLOG.md`.
+⚠️ **`__demo.ready` IS A REAL BOOLEAN, WHICH WAS CHECKED AFTER GETTING IT
+WRONG.** It was read as *the method a page calls*, on the strength of `ready:`
+appearing twice in `shell.mjs`, and `shell.mjs` was changed to publish a separate
+flag. **The two `ready` keys are on two different objects**: `api`, which is what
+`window.__demo` is, carries the boolean, and the page-facing object returned by
+`mount()` carries the method that sets it. The change was reverted. **A key name
+appearing twice in a file is not two declarations of one thing.**
+⚠️ **THE FIRST-ASSERT CEILING IS ITS OWN NUMBER AND NOT `settleMs`.**
+`FIRST_ASSERT_CEIL = 30000`. `settleMs` sizes a COLD CONTAINER (`tracks` declares
+125 s) and is a control-0 concern that has already been waited out; reusing it
+here makes a page that will never assert, because its live leg is down, burn the
+whole budget a SECOND time, turning one demo into four minutes of a run.
+
+🔴 **SAY WHETHER `__demo` IS THERE AT ALL, BECAUSE THE TWO CAUSES LOOK IDENTICAL
+FROM THE HARNESS.** `__demo` missing means the module never finished; `__demo`
+present with `ready` falsy means the shell mounted and the page did not get to
+the end. Both printed `failed: null` and `console: nothing`, **and 2026-09-22 was
+spent bisecting the difference by hand.**
+🔴 **AND PRINT WHAT THE CONSOLE SAID, BECAUSE THIS IS EXACTLY WHEN IT MATTERS.**
+The `no console errors` check runs much later and the `continue` skips it, so a
+page that dies before `ready` reported ONE line, `failed: null`, and threw its
+actual reason away. **MEASURED 2026-09-17: two separate dangling references on
+`/stage/`, each an ordinary ReferenceError sitting in the console, each taking a
+round of manual bisecting to find, because the harness knew and did not say.** A
+page that never becomes ready is the one case where the console is the whole
+story. With no errors at all the harness says `console: nothing, so it is hanging
+rather than throwing`.
+
+## The contract asserts, and the options that must announce themselves: `demo/verify.mjs`, `demo/verify-quest.mjs`
+
+⚠️ **A PAGE MAY DECLARE THAT IT HAS NOTHING TO PUT IN A READOUT, BUT IT HAS TO
+SAY SO**: `readout: null` rather than an omitted field, so "this page's subject
+is visible rather than numeric" cannot be confused with "somebody forgot".
+`typist` is the case: the document IS the readout, and a row of cells repeating
+the letters and the cursor position was the same facts twice. **An absent field
+is still a failure.**
+🔴 **AND THE SECOND HARNESS DID NOT GROW THAT FLAG, WHICH IS THE DEFECT.**
+`verify.mjs` has read `readoutOptOut` since `/typist/` shipped;
+`demo/verify-quest.mjs` went on asserting a readout, **so `/floor/` dropping its
+four cells on 2026-09-19 would have taken that file red on a page where nothing
+is wrong. Two harnesses grading one rule two ways is the defect, not the page.**
+
+🔴 **A BAR MAY HAVE NO PLAY BUTTON, AND THAT OPTION HAD TO ANNOUNCE ITSELF.**
+`transport-bar.mjs` takes `toggle: false` for a page whose sound has no position
+to start or resume: `/keys/` holds a note while a key is down and has nothing to
+play. Clicking a `.tbar-toggle` that was never appended throws on `null`, and
+asserting that the position advanced would fail on a page where nothing is wrong.
+⚠️ **`!== false` RATHER THAN A TRUTH TEST**, so a bar built before the option
+existed, where the getter is `undefined`, still gets the drill. **A new property
+must not silently switch checks off on every page that predates it, which is the
+shape of loss this suite has already had once: 27 asserts became 17, every one of
+them green.**
+🔴 **AND THE DRILL PRESSES THE TOGGLE OF THE BAR IT IS GRADING, NOT THE FIRST ONE
+IN THE DOCUMENT.** It read `document.querySelector(".tbar-toggle")` while every
+assert around it reads `__demo.transport`, which is the same element only while a
+page has exactly ONE bar. **`/stage/` grew a second on 2026-09-18, and the two
+disagree by construction**: the DOM query takes whichever comes first in document
+order, and `__demo.transport` is whichever was BUILT last. The drill would have
+pressed one control and asserted about another, **which fails while nothing is
+wrong and passes for the wrong reason just as easily.**
+
+**SAMPLE A CANVAS AFTER A FRAME, AND MORE THAN ONCE.** `resize()` in `strip.mjs`
+assigns `canvas.width`, which CLEARS the canvas, and only then schedules a
+redraw, **so there is a real window in which a working strip is blank**, and a
+ResizeObserver can open it at any time (a readout value getting wider, a log line
+wrapping). Sampling one instant caught that window **about one run in ten and
+reported `0 lit samples`, which reads as a dead page.** ⚠️ **It is a retry, not a
+tolerance**: a strip that never draws still fails, because every try lands after a
+fresh frame, and the try count is printed in the detail so a strip that needs
+several is visible rather than silently passing.
+
+🔴 **THE HARNESS SAYS `selfcheck=1` SO A PAGE CAN KEEP ITS DESTRUCTIVE CHECKS OUT
+OF A VISIT.** `radio` proves a station button works by pressing another station
+and pressing back, and proves the transport stops by stopping it. **On the
+decoded path both are a decoder teardown and rebuild, so both are a hole in the
+sound. They ran for every listener, three times, in the first seconds of a visit,
+and were REPORTED as such twice.** A page that can only check itself by breaking
+itself needs to know whether anybody is collecting the answer. ⚠️ Every demo gets
+the flag and almost none read it, which is the point: **the flag is a fact about
+the run, not a per-demo setting to keep in step.**
+
+⚠️ **THE MIDDOT IN A SUITE'S OWN OUTPUT COMES FROM THE HARNESS PRINTER, WHICH IS
+WHY A SWEEP OF THE PAGES CANNOT REACH IT.** A sweep of 418 strings across 62 files
+missed it because the separator is not in any page: it is added in `ok()`, to
+every line, as it is printed. The rule is about anything a reader looks at, **and
+a suite run is read more often than most pages.**
+
+⚠️ **THE STAND-INS GO WITH THE RUN.** A server left listening on a port is the
+small version of the thing the harness exists to avoid.
+
+## Refusing to grade, rather than failing: `demo/verify-gl.mjs` and `demo/verify-quest.mjs`
+
+🔴 **THE OBVIOUS FIX FOR "NO GPU IN HEADLESS" IS WORSE THAN THE BUG, AND THE
+NUMBERS ARE THE ARGUMENT.** Adding `--enable-unsafe-swiftshader` turns the suite
+green against a CPU rasteriser. Measured, same shader, same page:
+
+    --disable-gpu                      no context at all
+    --enable-unsafe-swiftshader        SwiftShader   170.7 Mpix/s
+    GPU allowed                        ANGLE Metal  1392.1 Mpix/s
+    (and the real Raspberry Pi GPU)                   50.3 Mpix/s
+
+**The CPU rasteriser on a laptop is 3.4x faster than the real Pi GPU and 8.2x
+slower than the real laptop GPU.** A harness "fixed" that way prints plausible
+numbers about a machine that does not exist: **it would pass a page that crawls
+on a phone and fail one that flies on a laptop.** So `verify-gl.mjs` REFUSES to
+grade a run on a software rasteriser, and that refusal is its FIRST assert, the
+same rule as the BUILD stamp and for the same reason. Without it every number
+below it is unattributable.
+⚠️ **REFUSE, DO NOT CARRY ON.** Reporting a software rasteriser as a pass is the
+failure the file exists to prevent, **and reporting it as "1 failure among 40
+passes" buries it.** `verify-quest.mjs` refuses the same way on four separate
+grounds: not Quest hardware, no `com.oculus.browser`, no devtools socket, and no
+genuine headset behind a genuine `navigator.xr`.
+⚠️ **A GOLDEN IMAGE CANNOT BE THE ANSWER EITHER.** The same shader with identical
+fixed inputs **summed 48,147,330 of red on ANGLE Metal and 68,001,881 on
+SwiftShader, a 41% difference**, because `fract(sin(dot(p,k)) * 43758.5453)`, the
+standard GLSL hash, amplifies last-bit float differences into unrelated noise. So
+"the picture is right" is asserted STRUCTURALLY by the page (it drew, it moved,
+it is not a flat field), **never by comparing pixels across machines.**
+
+⚠️ **THE TARGET LIST IS CHECKED AFTER THE INSTRUMENT, NOT BEFORE IT.** Exiting
+early on "no visual demos yet" meant the file could not answer the question it
+exists for, CAN this machine grade a picture, **and it read `0 green` on a box
+with no GPU at all, which is the same thing it reads on a box with one.**
+`verify-quest.mjs` orders itself the same way for the same reason.
+
+**THE PAGE MUST REPORT ITS OWN RENDERER, ALWAYS, AND IT MUST AGREE WITH THE
+HARNESS**, or one of them is describing a different context. A visitor on a
+software rasteriser is a real visitor and the page should say so rather than
+quietly being slow.
+⚠️ **AND WHERE THERE IS NO GPU TIMER, A PAGE MUST SAY "CANNOT MEASURE" RATHER
+THAN PRINT A ZERO.** `verify-gl.mjs` prints which timing extension this run has,
+because a zero and an absence are different findings.
+
+⚠️ **A PAGE WITH NO CONTROLS MUST STILL BE WAITED FOR.** `mirror` starts itself
+and runs its own checks, so there is nothing to press, **and pressing zero buttons
+and reading immediately would report "asserted nothing" about a page that was
+mid-check.**
+
+🔴 **A GUARD TESTED BY A PARAPHRASE OF ITSELF IS NOT TESTED.**
+`verify-quest.mjs`'s `NATIVE_PROBE` is defined ONCE and parameterised over the
+property name, so `--self-test` runs the very same source against a property
+whose nativeness is already known, and against the same `nativeVerdict` and
+`headsetVerdict` the real run uses.
+⚠️ **IT READS DESCRIPTORS RATHER THAN VALUES.** Touching an accessor on a
+prototype with the prototype as receiver throws "Illegal invocation" in Chromium,
+**and a probe that throws reports "absent" about something that is present.**
+⚠️ **A1 IS A POSITIVE CONTROL ON THE PROPERTY ACTUALLY IN QUESTION**, not a
+stand-in: **a guard that refuses everything would pass A2 and B and be
+worthless.**
+⚠️ **TWO ASSERTS, NEVER ONE, WHEN TWO CAUSES HAVE DIFFERENT FIXES.** "The XR
+object is fake" and "the XR object is real and there is no headset behind it" are
+different findings, and `headsetVerdict` names WHICH gate refused, because **a
+single boolean collapses them into one message that is wrong half the time.**
+
+⚠️ **ONE `getprop` WITH NO ARGUMENT RETURNS THE ENTIRE TABLE, SO THERE IS NO
+GUESSING WHICH PROPERTY NAME THIS BUILD HAPPENS TO CARRY.** A guessed name that is
+absent reads as "not a Quest", **which is a broken instrument reported as a
+finding.**
+⚠️ **MORE THAN ONE DEVICE ATTACHED IS A REFUSAL, NOT A SKIP.** There IS hardware
+here, and grading the wrong one silently is the same class of mistake as
+attaching to a leftover browser on a fixed port. Name the ambiguity and stop.
+⚠️ **THE MODEL IS PRINTED AND NEVER ASSERTED ON.** A Quest 3S reports the
+user-agent device token `Quest 3`, the same as a Quest 3 and the same as the Xbox
+Edition, so nothing may say which one this is on the strength of a string.
+⚠️ **THE DEVTOOLS SOCKET NAME IS NOT STABLE: three are in the wild**
+(`com.oculus.browser_devtools_remote`, `chrome_devtools_remote`,
+`weblayer_devtools_remote_<pid>`). Discover it from `/proc/net/unix`, prefer the
+Browser's, and SAY which one was used. ⚠️ The matching is done on this machine
+rather than on the device, because **BusyBox's `grep -o` is not the same tool
+everywhere and shell quoting through `adb shell` is one more thing that can
+silently return nothing**, which is "a partial result that is too tidy is a
+broken collector".
+⚠️ **A LANE WITH NOTHING TO SAY MUST SAY SO IN WORDS.** A page that does not
+publish `__demo.xr` gets a sentence, not a zero: **a blank cell collapses "we did
+not look" and "we looked and it was fine", and a zero here would look like a
+dropped-frame finding.** Where both numbers exist, the page's frame count and the
+compositor's are printed side by side to be **compared, not averaged.**
+⚠️ **AND THE FILE ENDS WITH A LIST OF WHAT IS UNCONFIRMED IN IT**, written when
+no headset was attached (2026-09-11): nine specific claims that are reasoned or
+read out of research rather than run against hardware, each with the sentence
+that says what would flip it. A harness written from documentation says so.
+
+## Harness plumbing that has read as broken code: `demo/verify-gl.mjs`, `demo/verify-native.mjs`, `demo/harness-profile.mjs`, `demo/verify-quest.mjs`
+
+⚠️ **CLEAR `DevToolsActivePort` BEFORE THE SPAWN, NEVER AFTER IT.** Chrome writes
+that file as it starts, so removing it afterwards **deletes the very thing being
+waited for.** (`demo/verify-gl.mjs`, `demo/verify-quest.mjs`.)
+
+⚠️ **THERE USED TO BE A `pkill` IN `verify-gl.mjs` AND IT IS GONE ON PURPOSE.**
+Chrome refuses to start on a LOCKED profile and simply exits, so a leftover
+browser from the previous run made the harness sit out its whole poll and report
+"chrome did not come up": **a Chrome problem in appearance, a stale process in
+fact.** The kill fixed that and introduced a worse one: matched on a path that was
+the same for everybody, **it reached the OTHER AGENT'S run as readily as the
+previous one.** A per-process profile cannot be locked by anything but this
+process, so the problem the kill solved no longer exists. A recovery action is not
+free.
+
+⚠️ **THE BROWSER ENDPOINT HAS NO `Page` DOMAIN.** `/json/version`'s socket talks
+to the BROWSER; `Page.navigate` and `Runtime.evaluate` live on a page target, so
+one has to be created and attached to first. Without it the very first call comes
+back `'Page.enable' wasn't found`, **which reads like a Chrome version problem and
+is not one.** (`demo/verify-gl.mjs`.)
+
+🔴 **CHROME CREATES WHATEVER PATH IT IS HANDED, SO A WRONG PROFILE PATH NEVER
+ANNOUNCES ITSELF.** `demo/verify-native.mjs` pointed its `--user-data-dir` at a
+dead session's scratchpad **under the repo's PRE-RENAME name** for long enough to
+become "the third surviving artifact of elektron to positron, on the one harness
+that reaches the iPhone code path". Two agents running it at once shared one
+profile and one lock.
+
+⚠️ **`rmSync`, NOT THE PROMISE API, IN AN `exit` HANDLER.** `process.on('exit')`
+runs synchronously and an async unlink scheduled there never completes: **the
+handler would look correct and delete nothing**, which is the shape of leak
+`demo/harness-profile.mjs` exists to close. ⚠️ **`exit` COVERS AN UNCAUGHT
+THROW** (node emits it after printing the stack), so only a signal needs its own
+listener. ⚠️ And in the sweep, **`EPERM` from `process.kill(pid, 0)` means alive
+and not ours, so leave it.**
+
+⚠️ **LET THE FAR END CHOOSE A PORT TOO, AND PARSE WHAT IT ANSWERS.**
+`adb forward tcp:0` prints the port it took; for `adb reverse` that is
+UNCONFIRMED, so `verify-quest.mjs` parses the answer and falls back to picking a
+free port. ⚠️ The `freePort()` helper both it and `verify-safari.mjs` use is
+honest about itself: **there is a race between the close and the other process's
+bind, and it is still better than a constant.**
+
+## The second browser is not always Chrome: `demo/verify-safari.mjs`
+
+**WHY IT EXISTS.** `verify.mjs` speaks CDP, which Safari does not, so the whole
+WebKit family was untested. **macOS Safari is the ONE platform with both a plain
+MediaSource AND native HLS, which makes it the only place the choice between the
+two engines is a real judgement rather than forced**, and it shares an engine
+family with the iPhone, so it catches WebKit-specific breakage without a phone in
+hand. WebDriver is plain HTTP and JSON, so there are no dependencies; Safari needs
+"Develop > Allow Remote Automation" once, and `safaridriver` answers `/status`
+with `{ready:true}` when it is on.
+
+🔴 **THE PORT WAS NEVER THE REAL LIMIT HERE, AND FIXING IT DOES NOT MAKE THIS
+CONCURRENT.** `safaridriver` drives the one Safari on this machine, and Remote
+Automation is a single global switch, **so two of these at once is still two
+harnesses fighting over one browser. It will just now fail somewhere honest
+instead of on a port collision that looked like a code fault.**
+
+🔴 **UNDER NATIVE HLS, `currentTime` DOES NOT SHARE A TIMELINE WITH `buffered`.**
+MEASURED in Safari: **currentTime 58.44 against buffered [[20,30]] while playing
+at 0.961x.** So the buffer report deliberately answers null, which is **"cannot
+tell", not "empty"**, and the harness skips that assert on the native engine:
+**demanding a number there would fail a healthy player.**
+
+⚠️ **ASK THE ELEMENT DIRECTLY, AND DUMP THE WHOLE PAGE LOG.** The first run
+reported an empty readout with no explanation, **because the native telemetry
+loop gated EVERYTHING behind `getStartDate()` being available**, and only the
+`bad` log lines were being printed, which hid WHY. It now prints `paused`,
+`readyState`, `networkState`, `currentTime`, `duration`, `buffered`,
+`seekableEnd`, `videoWidth`, `getStartDate` and any media error, plus the last 18
+log lines, before it asserts anything.
+
+## Parsing is not running, and it is the cheap check: `demo/check-html.mjs`
+
+🔴 **IT EXISTS BECAUSE A BACKTICK INSIDE A GLSL COMMENT CLOSES THE TEMPLATE
+LITERAL AROUND IT.** That happened **seven times in one session on
+`/videoradio/`**, whose shaders are template literals with prose in them, and
+every time **the page died at parse: no log line, no assert, no picture, and an
+error in devtools pointing at a line hundreds below the one that broke it.**
+`node --check` finds it in about forty milliseconds and says where.
+⚠️ **IT IS NOT A HARNESS AND IT OPENS NOTHING.** No Chrome, no profile, no relay,
+no stream off anybody else's server, **which is what makes it the right check to
+run after editing a page this repo has asked not to be re-verified.** It answers
+one question, "will this parse", and says nothing at all about whether the page
+works.
+⚠️ **THE REPORTED LINE IS A LINE IN THE PAGE.** Each block is written to a
+temporary `.mjs` and the block's start line is added back, because **a number that
+is right about a temporary file and wrong about the file being edited is worse
+than no number.** Piping into `--check` reports `[stdin]` and page-relative
+numbers are lost.
+⚠️ **SAY THE BLOCK COUNT.** A page whose script tag was renamed would check zero
+blocks and pass, **which is the shape of green this repo minds most.** Only
+`type="module"` blocks are parsed; a classic `<script>` is not parsed as one and
+this repo has none in a page.
+
+## What a stand-in has to get right, or it grades itself: `demo/fake-station.mjs`, `demo/fake-tapes.mjs`, `demo/fake-err.mjs`
+
+🔴 **NOT SILENCE AND NOT WHITE NOISE.** All three stand-ins generate two tones a
+fifth apart with one of them pulsing at 2 Hz. **A loop over silence passes every
+check that counts frames and none that measure a level, which is the vacuous pass
+this repo has already shipped twice.** A tone has a peak a meter can read, **and a
+PULSE means a check can tell a loop playing backwards from one playing forwards by
+looking at where the loud part landed.** (`demo/fake-station.mjs`, repeated in
+`demo/fake-tapes.mjs` and `demo/fake-err.mjs`.)
+
+🔴 **PACE AGAINST THE CLOCK, NOT AGAINST THE TIMER, AND THE DIFFERENCE WAS
+MEASURABLE FROM INSIDE THE PAGE.** Sending a fixed chunk per `setInterval` tick
+sends at the rate the timer actually fires, and node's timers run a millisecond or
+two late: **MEASURED through `/radio/`'s own settled-rate readout, 125 kbit/s
+against the 128 declared, which is 2.3% slow. A listener then loses about 23 ms of
+cushion every second, so the page's 600 ms floor drained to 32 ms over half a
+minute and its `the cushion outlasts the worst gap in it` check went red about a
+page that was working perfectly.** A real Icecast paces against its own audio
+clock, so the stand-in sends however many bytes are OWED since the connection
+opened. (`demo/fake-station.mjs`, and `demo/fake-err.mjs`'s radio mounts do the
+same.)
+
+🔴 **IT BURSTS AT CONNECT, BECAUSE ICECAST DOES, AND A PAGE THAT MEASURES ITS OWN
+CUSHION CAN TELL.** `burst-size` defaults to 65536 bytes on a real mount: four
+seconds of 128 kbit/s audio arrive at once. **MEASURED without it: the page's
+cushion sat at 199 ms against a 104 ms worst gap, which is 95 ms of headroom and a
+red `the cushion outlasts the worst gap in it` at a threshold of 100. That assert
+was reading a property of this file rather than of the page, which is the whole
+failure mode a stand-in has.**
+
+🔴 **IT STARTS ON A RANDOM FRAME BOUNDARY, WHICH IS THE WHOLE POINT OF A STAND-IN
+THAT IS HONEST.** A real mount joins a listener mid-frame and the splitter has to
+resynchronise; **starting at byte 0 of the file would let a scanner that can only
+find frames at the head pass.** `sinceMeta` carries across the loop for the same
+reason: the text channel does not restart when the audio does.
+
+🔴 **THE HEALTH ROUTE ANSWERS THE SAME SHAPE `shout` DOES, because the page asks
+it BEFORE it plays anything and disables its play button when nothing is up.** A
+stand-in that answered a different shape would take the page down the "neither
+station is answering" path, **where it makes one assert and none of the thirty-four
+that matter.**
+
+⚠️ **ANSWER THE PREFLIGHT.** A browser asking for `Icy-MetaData` sends a
+non-simple header, so it preflights first, and **refusing OPTIONS looks exactly
+like a CORS bug in the page.**
+
+⚠️ **A STAND-IN THAT CANNOT BE BUILT SAYS WHY AND RETURNS `null`, RATHER THAN
+EXITING OR SERVING SILENCE.** A harness importing it has to be able to report
+"the stand-in could not be built" as the reason a page was not graded, **which is
+a different sentence from a page that failed.**
+
+🔴 **THE LENGTHS ARE THE WHOLE POINT, NOT A DETAIL.** `/tapes/` lays every
+recording end to end as one long tape and its checks grade that geometry, **so a
+stand-in whose lengths were invented would leave every one of those asserts
+grading the stand-in instead of the page.** MEASURED off the wire with ffprobe
+against what the corpus says: **the MP4 rows land EXACTLY (626335 asked, 626.335000
+read), and the MP3 rows land inside one frame, which is 24 ms and is the smallest
+thing a stream of whole frames can be cut to (829832 asked, 829824 read; 73169
+asked, 73176 read).**
+
+🔴 **NO Xing HEADER AND NO ID3, WHICH IS THE TRAP IN TILING AN MP3.** libmp3lame
+writes a Xing/LAME frame at the head declaring the frame COUNT of the file it
+encoded. **Tile that and the browser reports the tile's eight seconds for a
+thirteen minute recording: a stand-in that lies about exactly the quantity it
+exists to get right.**
+🔴 **AND IT REFUSES A TILE THAT IS NOT WHOLE FRAMES RATHER THAN SERVING IT.** An
+ID3 or Xing block at the head shifts every frame off the 192-byte grid, so the
+wrap in the middle of a long recording lands inside a frame and the decoder hears
+a click every eight seconds. **It would still play, and the page would still be
+green, which is why this is a throw and not a log.**
+
+🔴 **EVERY `.mp4` ROW IS A REAL MP4.** MP3 bytes under an `.mp4` name would be a
+stand-in answering a different shape from the thing it stands in for, **so
+whatever a browser then did with it would be a fact about Chrome's container
+sniffing rather than about this page.**
+
+⚠️ **A STAND-IN SAYS WHAT IT DOES NOT HAVE.** A bare 404 reads as the recording
+being gone or the channel being off air, **which is a claim a stand-in is not
+entitled to make about anybody's archive or broadcaster.** In `fake-err.mjs` the
+404 body matters twice over: **a refusal there is a 403 with no CORS, and
+answering a typo the same way would make a wrong URL indistinguishable from
+rights.**
+
+⚠️ **INDEX BOTH SPELLINGS OF A PERCENT-ENCODED PATH.** The corpus names carry
+spaces, brackets and Finnish vowels, and the encoding that comes back on the wire
+is the browser's rather than the corpus's, **so a difference of one escape is a
+recording that plays rather than a 404 that reads as a file having been taken
+down.**
+
+🔴 **403 AND NOT ONE CORS HEADER, WHICH IS THE WHOLE POINT OF THE REFUSAL.** In a
+browser it is not a status code at all: the fetch rejects and hls.js reports a
+fragment load error with nothing in it that names a 403. **A 403 that DID carry
+`access-control-allow-origin` would be readable, `r.ok` would be false, and the
+page would take the other of its two paths.** ⚠️ No ACAO means no preflight answer
+either: **answering OPTIONS for a segment that is then refused would let a page
+learn something about the refusal that ERR does not tell it.**
+
+⚠️ **THE BOUNDARY SLIDES IN THE STAND-IN AND JUMPS AT ERR, AND THAT IS
+DELIBERATE.** Theirs is a programme edge, so it sits still for half an hour and
+then moves by however long that programme was. The stand-in's is a fixed distance
+from the live edge, which is deterministic and therefore gradeable. It is the one
+behaviour in the file deliberately unlike the thing it stands in for, **and the
+trade is the usual one: a harness cannot assert against a quantity that moves for
+reasons it cannot see.**
+
+🔴 **REFUSE A SHORT POOL RATHER THAN SERVING IT.** ffmpeg exiting 0 having written
+fewer segments than asked **would give a window with a hole in it that answers
+exactly like a rights refusal, which is the one thing that file exists to be able
+to tell apart.**
+🔴 **AND IT IS BUILT INTO A TEMPORARY DIRECTORY AND RENAMED INTO PLACE.** A run
+that is Ctrl-C'd halfway leaves a partial pool, **and a partial pool is a stand-in
+that 403s a random stretch of the window for a reason nobody wrote down. The
+rename is the commit.**
+
+⚠️ **A STAND-IN MUST NOT BE MORE GENEROUS THAN THE THING IT STANDS IN FOR.** One
+`#EXT-X-PROGRAM-DATE-TIME`, on the first segment, which is what ERR sends: **a PDT
+on every segment would let a page be sloppy about accumulating `EXTINF` and still
+look correct here.** The schedule is contiguous across midnight for the same
+reason: **a grid that stopped at 23:30 and started again at 00:30 would fail
+`/now/`'s "every programme starts where the previous one ended" on a page that is
+working.** And the segment duration is read off ERR rather than chosen: **at 2 s a
+two hour window is 3600 segments and about a 218 KB playlist, where a stand-in at
+6 s would hand the page a 73 KB playlist and quietly remove two thirds of the
+parsing work it is supposed to be grading.**
+
+⚠️ **THE BUILD NOTICE IGNORES `quiet`, AND THAT IS NOT AN OVERSIGHT.** Making the
+pool blocks for about a minute the first time on a machine, **and a harness that
+goes silent for a minute before Chrome even starts is indistinguishable from a
+harness that has hung.**
+
+⚠️ **NAME WHAT WAS NOT CHECKED, AND WHY NOT.** `fake-err.mjs` exposes the `date`
+response header because `readPlaylist` uses it as the server's own clock, and says
+in the same comment: **whether ERR exposes it is NOT KNOWN here and was not
+checked, because checking means asking them. Nothing on either page asserts
+against `serverDate`, so the difference cannot make a check pass here that would
+fail there; if one is ever written, that is the first thing to confirm.**
+
+⚠️ **BUILDING FIXTURES BESIDE A HEADLESS CHROME IS "A SECOND BROWSER OF YOUR OWN"
+IN A NEW COSTUME.** `fake-tapes.mjs` builds its video rows on demand under a
+harness and in the background when run standalone, because **eleven seconds of
+ffmpeg alongside a headless Chrome is the same contention**, and the harness never
+opens a video row: it walks the first two recordings and both are MP3.
+
+## The pure-module tests in `demo/shell/*-test.mjs`, and the shapes that pass a naive suite
+
+🔴 **A VALIDATOR, A LOOKUP TABLE, A SEGMENT MAP AND A PARSER ARE THE SHAPES OF
+CODE THAT PASS A NAIVE TEST SUITE BY ACCIDENT.** Write only valid patches and a
+function that returns `{ok: true}` unconditionally scores full marks
+(`bay-test.mjs`); a `describe()` that returned the raw name for everything
+satisfies any check that only asks whether something came back
+(`instruments-test.mjs`); a table returning "every bar on" for every character
+draws a field full of `8`s and satisfies any check that only asks whether
+something lit up (`segment-test.mjs`); a reader that returned an empty array for
+everything passes a suite that only counts entries (`unzip-test.mjs`). **So the
+convention in this directory is that a named proportion of every file is NEGATIVE
+CONTROLS: written so that the bug they name would fail them, rather than so that
+today's code passes.** The counts are stated in each header (20 in
+`chords-test.mjs`, 19 in `pedal-test.mjs`, 13 in `diagram-test.mjs`, 10 in
+`name-test.mjs`, 6 in `presence-test.mjs` and `suggest-test.mjs`, 5 in
+`xr-glb-test.mjs`, 4 in several), and **a validator that refuses everything is the
+same bug from the other side, so `bay-test.mjs` asserts the REASON as well as the
+refusal.**
+
+🔴 **AND THE SABOTAGE COUNTS ARE MEASURED RATHER THAN CLAIMED, WHICH IS THE ONLY
+REASON TO BELIEVE ANY OF IT GRADES ANYTHING.**
+- `pedal-test.mjs`: **seven deliberate sabotages take between 1 and 4 of them red,
+  MEASURED 2026-09-22.** A threshold of `=== 127` costs 2, a `keyDown` that does
+  not take a note off the foot costs 3, no change filter costs 1, a panic that
+  keeps the foot costs 2, a `keyUp` reading only `was` costs 2, a constant damper
+  time costs 4, and a `forgetKeys` that leaves the keys alone costs 1.
+- `worklet-test.mjs`: **five sabotages, MEASURED 2026-09-23**, dropping the value
+  guard 9 red, dropping the name check 4 red, dropping the `[native code]` guard
+  2 red, `let` instead of `const` 2 red, **emitting the values in REVERSE 0 red**.
+- `presence-test.mjs`: the `coming` check moved above the `online` check
+  **MEASURED 28/28 to 27/28, and the one that went red is the one written for
+  it**; the "never heard, nobody listening" case answering `offline` instead of
+  `unknown` **MEASURED 28/28 to 25/28, and the third failure is the good one: the
+  walk at the bottom stops reaching all four states at all.**
+- `circuit-sample-test.mjs`: a real sample is broken five ways **and one of them
+  takes only 2 of 12 red, and all ten survivors are RIGHT to survive, which is
+  reported rather than tuned away.**
+- `circuit-session-test.mjs`: the round trip is sabotaged four ways and **one of
+  those sabotages leaves the round trip GREEN, which is the honest answer to what
+  it can and cannot prove, and it is reported rather than hidden.**
+
+⚠️ **A ZERO IN THAT TABLE IS KEPT RATHER THAN ENGINEERED AWAY.** Reversing the
+order `worklet.mjs` emits its values changes nothing, because a name inside a
+function body is read when the function runs and every `const` has landed by then.
+**The first version of that file asserted the opposite and went red on working
+code**, so the order is explicitly NOT a rule and the module says so.
+
+🔴 **A SABOTAGE THAT COMES BACK GREEN CAN BE A REAL DEFECT RATHER THAN A WEAK
+TEST.** `if (!keysDown.has(n))` at the pedal lift, copied over from `/muta/`, was
+**UNREACHABLE: the two sets are disjoint by construction, so the test could never
+be false. Removing it changed nothing, which is this project's own signal for a
+dead guard.** The hunt for a reachable path then turned up a duplicate note off
+releasing a note twice, **which was a live bug in `/muta/` and is fixed in both.**
+
+🔴 **AN ABSENCE ASSERTED OVER A FILE'S RAW SOURCE GRADES THE PROSE, AND TWO
+ASSERTS WERE GREEN WHILE MATCHING COMMENT TEXT. MEASURED 2026-09-22 in
+`instrument-test.mjs`.** `it calls the two components that already exist` tested
+`/createNameplate\(/` against the raw source, **and `createNameplate` was IMPORTED
+AND NEVER CALLED: the only occurrence was the worked example in that module's own
+header.** `the plate is prepended to the case` tested
+`/panel\.el\.prepend\(plate\.el\)/`, **and that line had not existed in the code
+since `createPanelLayout` took a `plate` option; the only occurrence was inside the
+comment explaining why it had been removed.** Both matched, both passed, **and one
+of them was grading a prohibition against the sentence describing it.**
+✅ **THE REPAIR IS TO STRIP THE COMMENTS FIRST**: an absence is asserted over
+`code` and a presence over `code` too, **and only a claim about the PROSE may read
+the raw source.** `knob-test.mjs` went red on its first run for the best possible
+reason, on its own module's sentence *"Writing `num.style.minWidth` from here
+would be a rule nothing can override"*; `check-test.mjs` and `step-grid-test.mjs`
+carry the same stripper for the same reason. This is the substring rule in its
+cheapest form.
+
+🔴 **AND THE SUBSTRING RULE BIT INSIDE A FILE WRITTEN TO CATCH IT.**
+`midi-decode-test.mjs` asserted `.includes('velocity 0')` for a note on at
+velocity 0, **and it passed vacuously under the sabotage, because a decoder that
+wrongly calls it a note ON also writes `velocity 0` in its reading. Assert the
+word that only the CORRECT branch produces.**
+
+🔴 **GRADE AGAINST A DIFFERENT SOURCE FROM THE ONE THE CODE CAME FROM.** This is
+the `timeline/csound.mjs` lesson applied in advance, and three files here do it
+deliberately: `circuit-cc-test.mjs` compares a table parsed out of Novation's
+Programmer's Reference Guide **against what this desk measured through `/dump/`
+and wrote into `research/measured-devices-2026-09-20.md`**; `circuit-patch-test.mjs` and
+`circuit-session-test.mjs` reproduce **figures published before those modules
+existed, computed by a decoder that lived in a scratchpad and is gone**, so
+reproducing one is **two independent implementations agreeing about one real
+artefact.** ⚠️ **Where they DISAGREE the disagreement is kept and named rather
+than tuned away**, and there is one: the 49 block map is true of `session_0` and
+of 21 of the 32 sessions, not of all of them.
+
+🔴 **A FLOOR PROVES AN INSTRUMENT DOES NOT INVENT MOVEMENT. ONLY A KNOWN SIGNAL
+PROVES IT CAN SEE ANY.** `circuit-syx-test.mjs` decodes a synthetic group whose
+answer is written out by hand BEFORE it is pointed at a real file, because **two
+builds of `wobble-test.mjs` measured the wrong quantity and passed their floor
+perfectly.** The same argument runs the other way in `midi-decode-test.mjs`: four
+real devices are plugged into this machine and **not one of them can test that
+file, because what a device happens to send today is not a known answer.**
+🔴 **AND THE REAL CORPUS CANNOT ALWAYS GRADE THE WALKER.** In
+`circuit-sample-test.mjs`, **all 64 samples are `fmt ` then `data` and nothing
+else, so the audio starts at offset 44 in 64 of 64 and a reader that skipped 44
+bytes and called it a header would be green on every one of them.** The synthetic
+fixtures with a `LIST` chunk of odd length are **the only thing in this repository
+that can tell the two readers apart.**
+
+⚠️ **SAY WHAT IS NOT GRADED HERE, AT THE TOP, BECAUSE A GREEN SUITE CAN MEAN ZERO
+COVERAGE.** `knob-test.mjs`, `range-slider-test.mjs`, `step-grid-test.mjs`,
+`synth-view-test.mjs`, `wave-view-test.mjs`, `note-grid-test.mjs`,
+`instrument-test.mjs`, `control-grid-test.mjs` and `check-test.mjs` each open with
+a list of the claims that need a document and are asserted on `/kit/`, `/tom/` or
+`/pack/` instead, **and each names the constructor it never calls.**
+⚠️ **A SKIP NAMES WHAT GOES UNMEASURED RATHER THAN PASSING QUIETLY**, the way
+`timeline/lab/csound-oracle.mjs` skips where Csound is not installed, because **a
+check nobody can run is a check nobody runs.** `mp3-frames-test.mjs`'s live arm
+against the relay, and every section that reads `New Pack.circuitpack` out of
+gitignored `tmp/`, skip that way.
+⚠️ **AND THE MADE-UP RULER IS THE POINT, NOT A COMPROMISE.** `diagram-test.mjs`
+uses a fixed width per character because `getComputedTextLength` needs a live
+document, **which makes every expected number in the file exact rather than
+approximate.** What it cannot check is the real font, and it says so.
+
+🔴 **A CHECK ABOUT A LINE THAT CANNOT BE FORGOTTEN IS A CHECK THAT CANNOT FAIL.**
+`xr-quit-test.mjs` exists because of a report, 2026-09-19: *"i was not able to get
+out"*. `/blocks/` called `createXRQuit` and `draw` every frame and **never once
+called `update`, so the hold could not advance, the ring could not fill and the
+session could not end.** ⚠️ **IT LOOKED CORRECT FROM EVERY ANGLE THAT CAN BE
+LOOKED FROM**: the object was built, its shader compiled, the badge was drawn at
+both hands every frame, and the page reported a way out as present. `/weight/`,
+`/floor/` and `xr-panel.mjs` all had the missing line, **so no shared code was
+wrong and nothing in the repo could disagree with anything.** The old check was a
+grep matched on the ARGUMENT (`inputSources`) rather than the method name, because
+a name match stayed green with the quit's own call deleted. When the design
+changed so that the line cannot be forgotten, **the grep became a check that
+cannot fail and was replaced**: the shared path is now RUN, by a fake session
+driving the real `mountXRQuit` on a laptop with no browser, no GL and no headset.
+⚠️ **A STATIC CHECK IS A WEAK CHECK AND IT IS SAID THERE RATHER THAN DISCOVERED
+LATER**: the source half proves the call exists, not that the page reached it.
+
+⚠️ **THE CORNER CASE EARNS ITS PLACE AND THE CENTRE DOES NOT.** `xr-pick-test.mjs`
+tests the top-left of the quad because **the centre hits at 0.5, 0.5 under EVERY
+mirror, transpose and axis swap you could make**, which is a statistic that is
+constant by construction over the defects it is meant to catch. The top-left is
+what distinguishes `0,0` from `1,1`, `1,0` and `0,1`.
+⚠️ **AND WHERE A MODULE DERIVES ITS LAYOUT AT LOAD, THE ONLY HONEST WAY TO ASK IT
+ABOUT A DIFFERENT LIST IS TO REWRITE THE SOURCE AND IMPORT IT.** Pushing onto
+`DEFAULT_CONTROLS` afterwards changes the list and not the canvas, **so the rows
+would be laid out for a shorter tablet and the hit test would answer about a row
+that is off the bottom.**
+
+⚠️ **WRITING THE EXPECTED STATE OUT BY HAND IS DOING THE MACHINE'S ARITHMETIC A
+SECOND TIME AND GETTING IT WRONG.** `numloop-test.mjs`'s first version asserted
+`looping` at nine presses and went red: the walk is recording, looping, stopped
+and then an alternation, **so an odd press after the first two is a STOP. What is
+actually promised is that it never falls out of the pair**, and that is what the
+check asserts.
+
+⚠️ **AND A PICTURE IS THE EASIEST THING IN THE WORLD TO WRITE GREEN.** Any curve
+that goes down looks like a low pass, any line with a peak in it looks like an
+envelope, and a sine looks like a sine whatever produced it, so
+`synth-view-test.mjs` asserts COMPARISONS rather than shapes: a low pass and a
+high pass have to disagree at both ends, four poles have to fall faster than two,
+raising the resonance has to lift the corner and nothing else.
+`wave-view-test.mjs` proves its picture is a min/max envelope and not a
+decimation **by building four broken drawers and measuring which named claims each
+one takes red, because a sine drawn either way looks like a sine and the
+difference only shows on a transient one sample wide, which is exactly what a drum
+sample is made of.**
