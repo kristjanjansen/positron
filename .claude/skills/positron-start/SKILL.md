@@ -22,6 +22,37 @@ gate below that costs something stops and asks in words, with the number.
 path. Nothing here may depend on a feature only one of them has. No tool names,
 no slash commands, just commands and decisions.
 
+🔴 **EVERY SENTENCE THEY READ IS PLAIN, NOT ONLY THE QUESTIONS. THIS FILE IS
+WRITTEN FOR YOU AND YOU MUST NOT WRITE BACK IN ITS REGISTER.** Reported from a
+watched run, where the running commentary read:
+
+> *"Cloudflare's skills influenced two material choices: room state is
+> partitioned by room name into separate Durable Objects, and WebSockets use
+> hibernation so an idle audience does not keep accruing compute duration. I'm
+> installing the project-local Wrangler toolchain, generating binding types from
+> the actual config, and running the required dry run."*
+
+Every word of that is TRUE and the person it was written for cannot use any of
+it. The same two facts, in sentences they can act on:
+
+> *"Each show gets its own little server, so two audiences never see each
+> other's answers. And while nobody is doing anything it goes to sleep, which is
+> the thing that keeps this free."*
+> *"Now setting up the tool that publishes it, and doing a practice run that
+> puts nothing online."*
+
+⚠️ **THE TEST IS NOT SENTENCE LENGTH, IT IS WHETHER A WORD IS THEIRS TO LEARN.**
+`Durable Object`, `hibernation`, `binding types`, `dry run` and `toolchain` are
+all fine in your own head, in the code, and in a comment. In a line addressed to
+somebody who wanted to make a thing, each one is a small tax they did not agree
+to pay. **Name the product when it is the product's real name and they will see
+it in their dashboard** (Cloudflare, Workers, Stream). Otherwise say what it
+does.
+⚠️ **AND THE DENSITY OF THIS FILE IS NOT A STYLE TO COPY.** It is written in
+capitals and measurements because it is arguing with a future agent that thinks
+it knows better. That is the wrong voice for somebody who asked you to build
+them something.
+
 ---
 
 ## Step 0. Cloudflare's own setup, first
@@ -169,6 +200,28 @@ dashboard job the person has to do themselves.
 ```sh
 npx wrangler deploy --dry-run    # proves the toolchain without creating anything
 ```
+
+🔴 **SAY WHAT FREE MEANS BEFORE THEY ASK, AND SAY IT IN ONE BREATH.** "Free"
+sounds like a catch and people either distrust it or assume it is unlimited, and
+both are wrong in ways that bite later. Something close to this, early, before
+any plan:
+
+> *"Free here does not mean unlimited. It means you get an allowance each day,
+> and if your thing ever gets busy enough to use it up, it stops answering until
+> the next day rather than sending you a bill. There is no card on file and no
+> surprise. For something you are showing to a room of people you will not come
+> close to the limit."*
+>
+> *"Two things are not free at all: live video from a camera, and one background
+> tool we probably will not need. I will tell you before either one comes up."*
+
+✅ **THAT IS THE WHOLE TRUTH AND IT IS THE REASSURING VERSION, WHICH IS UNUSUAL
+AND WORTH LEANING ON.** A free Cloudflare plan fails CLOSED. It is the paid plan
+that can surprise somebody with a bill, so a person who is nervous about cost is
+safest exactly where they already are.
+⚠️ **DO NOT QUOTE THE DAILY NUMBER FROM THIS FILE, BECAUSE IT IS NOT IN IT.**
+Read it off the limits page with the rest of the pricing below, and only if they
+ask what the allowance actually is.
 
 There is no reliable command that prints the plan, so **ask them**, and tell
 them what the answer decides.
