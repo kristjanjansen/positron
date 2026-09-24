@@ -34,7 +34,24 @@ instrument (parts)"* is not this one feature, it is the pattern: an instrument
 split across devices, each part carrying what that device is good at. The plan
 covers the pattern and this feature is its first instance.
 
-**Planned in background 2026-09-24. Written to `plans/plan-remote-looper.md`.**
+✅ **PLANNED 2026-09-24, `plans/plan-remote-looper.md`, 1,055 lines. THE PLAN IS
+DONE AND THE FEATURE IS NOT, SO THIS STAYS OPEN.** The recommendation, so the
+decision is in this file and not only in that one: **one URL with
+`?role=controls`**, following `/moq/`'s existing `?role=` rather than inventing a
+spelling; **the phone sends a PRESS and never a state** and holds no copy of the
+machine; the desktop **broadcasts all ten states on every change and every 2 s**;
+the grid is **3x3 of slots 1 to 9 with slot 10 in a fourth row**, which is
+`/num/`'s existing `createPadGrid` call with two disabled blanks; and the new
+code is **one kit module, `demo/shell/part.mjs`**, which owns the seam and knows
+nothing about loops.
+🔴 **THE RULE THE WIDER ASK PRODUCED: NEVER SPLIT THE CLOCK.** The part that
+makes the sound owns time and everything else sends gestures and receives
+pictures. A seam is cheap in proportion to how much lateness it can absorb, and
+a clock can absorb none because lateness IS the product.
+⚠️ **AND THE NUMBER NOBODY HAS: no measurement in this repository describes a
+phone's leg to the relay.** Every figure quoted is a laptop on this desk, and the
+two recorded relay runs disagree six-fold on the hop. Section 3 of the plan is
+inference until a phone posts its own round trip to the device log.
 
 ### Open, carried in from HANDOFF.md on 2026-09-24
 
