@@ -1,5 +1,242 @@
 ## Open
 
+### Open 2026-09-24: the repo goes public, and a README somebody can paste
+
+🔴 **ASKED, VERBATIM, ACROSS FIVE MESSAGES:** *"make repo public. add to
+readme a prompt how one can replicate similar setup with cf
+https://developers.cloudflare.com/agent-setup/prompt.md etc. they should be able
+to just paste repo url. a (meta?) skill next to it?"*, *"example: i want build
+something like that stage demo"*, *"add gates: cf account? wranger? node? detect
+envitonment. osx mostly. cf auth / tokens? paid nonpaid?"*, *"nondeveloper might
+use it"*, *"explain why havin domain is prefeered"*, *"do it now"*
+
+1. **A `README.md`, which this repo has never had.** `ls README*` finds nothing
+   at the root. It is the file a stranger opens first and the only one written
+   for somebody who does not work here.
+2. **A prompt in it that a person can paste**, with nothing but this repo's URL,
+   into Claude Code or another agent, and get a positron-shaped site of their
+   own on Cloudflare. It hands off to Cloudflare's own
+   `https://developers.cloudflare.com/agent-setup/prompt.md`, which is a system
+   prompt that tells an agent to install the Cloudflare plugin and MCP servers
+   ITSELF rather than asking the reader to run anything.
+3. **A skill beside it**, so the instructions travel with the checkout:
+   `.claude/skills/` is picked up by Claude Code in any clone.
+4. **Gates, checked before anything is created**: an operating system (macOS
+   mostly), node, wrangler, a Cloudflare account, whether that account is
+   authenticated, and **whether it is a paid plan**, because some of what this
+   repo uses is not on the free one.
+5. **Written for a non-developer.** That is the constraint that decides the
+   whole shape: every gate says what to do when the answer is no, and nothing
+   assumes a terminal habit.
+6. **Why a custom domain is preferred**, explained rather than asserted.
+
+🔴 **AND THE AUDIT FOUND ONE THING THAT MUST NOT BE PUBLISHED, SO THE REPO IS
+NOT FLIPPED IN THE SAME BREATH AS THE REST.** `New Pack.circuitpack` is
+**reachable in history at `419ec5c`, 3,506,555 bytes**, verified with
+`git cat-file -s`. CLAUDE.md says what it is in red: a complete backup of the
+Novation Circuit on this desk, **29 sessions of somebody's real work**, their
+ONLY copy since `tmp/` stopped being tracked, and the owner's words about it are
+*"user sessions are mine. very important"*. A public repository hands that file
+to anyone who clones it, and a clone cannot be recalled.
+⚠️ **AND THE SAME BLOB IS CURRENTLY A BACKUP**, which is the bind. CLAUDE.md
+names `git show 419ec5c:'New Pack.circuitpack'` as the recovery path, so a
+history rewrite that drops it destroys the second copy at the same moment it
+protects it. **The order is: copy the blob out to disk, verify 3,506,555 bytes,
+THEN rewrite.**
+🔴 **AND A SECOND ONE THE AUDIT FOUND THAT NOBODY WAS LOOKING FOR: TWO CHROME
+USER PROFILES ARE IN HISTORY.** **857 files** under
+`rig/moq/spike/logs/moq-4k-probe-udd/` and `.../moq-safari-pub-udd/`, added by
+three commits (`469d237`, `880ceb8`, `d3f0cd0`), including `Default/Cookies`,
+`Default/Login Data`, `Default/History`, `Default/Web Data`, `Default/Trust
+Tokens` and `Local State`. **None of them is at HEAD** (`*-udd/` is gitignored
+now), so this is history only, and history is what a clone gets. They are also
+most of the repository's **191 MB**.
+⚠️ Smaller findings, none of them a stop: `rig/moq/mtx/moq-key.pem` is a
+committed PRIVATE KEY (a self-signed local cert for `moq-mtx-local`, so the
+exposure is nil, but a scanner will flag it and it should not be in a public
+tree); `SECRETS-ROTATION.md` publishes a map of past exposures including one it
+says is **still unrotated** (`positron-demo`'s RTMPS key) and one in another
+repo it calls *"still public"*; there is **no LICENSE file**, so publishing
+leaves everything all rights reserved by default; and the commits carry a WORK
+email address on a personal repository.
+
+✅ **EVERYTHING EXCEPT THE FLIP IS DONE 2026-09-24.**
+- **`README.md`**, 142 lines, the first one this repo has had. It carries the
+  paste block, the gate table in plain words, what is free and what is not with
+  the numbers, why a domain is preferred in four reasons, and a map of the
+  directories.
+- **`.claude/skills/positron-start/SKILL.md`**, 240 lines, six gates and a
+  worked decomposition of `/stage/` into the parts that are free and the one
+  part that is not. Claude Code registered it on write, which is the proof it is
+  discoverable in a clone.
+- 🔴 **IT WORKS FOR CODEX TOO BECAUSE THE PASTE BLOCK NAMES THE PATH.** Asked
+  as *"should work in claude and codex"*. Claude Code discovers
+  `.claude/skills/` by itself; every other agent is told to read
+  `positron/.claude/skills/positron-start/SKILL.md`. **One file, two doors**, so
+  the two cannot drift apart, and the skill carries a line forbidding anything
+  in it that depends on one agent's features.
+- **The plan facts were re-read rather than remembered**, off Cloudflare's own
+  pricing pages on 2026-09-24: Durable Objects ARE on the free plan (SQLite
+  backend only), R2 free tier is 10 GB with free egress, **Stream has no free
+  tier** ($5/1,000 minutes stored prepaid, $1/1,000 delivered) and
+  **Containers are Workers Paid only**. So the honest answer to *"do I have to
+  pay"* is no for most of the site and yes for live video.
+
+### Done 2026-09-24: the title counts itself, and `instruments` changes hands
+
+🔴 **ASKED, VERBATIM, TWO MESSAGES:** *"convert title to // positron: x media
+art experiments // where x is num of demos in frontpage. html <title> stays
+positron. deploy"*, then *"rename hardware to instruments, move knobs able
+grains there. looper instrument  jam moves to ithers (timeline or messfgs or )"*
+
+1. **The front page's `h1` carries the count.** `indexTitle()` in
+   `demo/manifest.mjs`, counted off `byGroup()` rather than `DEMOS.length`,
+   because the question is how many rows the PAGE shows: 58 against 59 in the
+   array, `feedback` being `unlisted`. Baked by `workers/view/build.mjs` into a
+   `<!--TITLE-->` marker in `menu.html` and set at load by `demo/index.html`,
+   which is the same one-renderer-two-callers arrangement the rows already use.
+2. **The tab stays `positron`.** Both index pages carried
+   `<title>positron: media art experiments</title>`, so this is a change and not
+   a no-op, and it is what the instruction says in words.
+3. **`hardware` becomes `instruments`** and takes `knobs`, `able` and `grains`.
+   ⚠️ That reverses the last line of the comment that created `hardware` on
+   2026-09-21, which named those three as arguable and said they *"stay where
+   they are rather than being swept in on an inference"*. This is not an
+   inference, so the comment records the instruction instead.
+4. **`looper`, `instrument` and `jam` leave**, which empties the old
+   `instruments` group and frees the name for 3.
+
+✅ **ALL FOUR DONE AND DEPLOYED 2026-09-24**, BUILD `e0158ba-130642-c980`,
+version `069d9872-2d9c-422e-ac55-4f4cad16feff`. Read back off the live page
+rather than off the build: `<title>positron</title>`, the `h1` reads
+`positron: 58 media art experiments`, **58 cards**, **11 sections**
+(`TH` `err` `instruments` `u:` `kurenniemi` `capture` `timeline` `streaming`
+`messages` `technologies` `kit`).
+
+✅ **MEASURED AT THREE WIDTHS BEFORE DEPLOYING**, because a longer name sits in
+a flex row beside the Feedback button: 390 px wraps the name to TWO lines (h1
+270 px, the button at x=296) and 756 and 1280 keep it on one. **Page overflow
+0 px at all three**, which is the number that would have said this was a fault.
+
+✅ **WHERE THE THREE WENT, AND ONE OF THEM IS ARGUABLE.** `jam` and `instrument`
+to `messages`, `looper` to `technologies`. ⚠️ `instrument` breaks the wording
+this file shipped an hour earlier, *"a relay carrying messages with no media in
+it at all"*: the far machine's audio comes back over the same connection. It is
+in `messages` because its readout is two LATENCIES and the audio is what makes a
+late message audible, and `manifest.mjs` names it as the arguable row rather
+than hiding it.
+
+✅ **AND `stage` JOINED `TH` 2026-09-24** on *"move stage to th"*, out of
+`capture`: it puts a church scene from a 2011 MIMproject performance in front of
+an audience, so it sits beside `making`, that project's archive. 🔴 **THE GROUP
+ID WENT `xr` -> `th` WITH IT**, because three of its six rows now have nothing to
+do with a headset and the key was about to teach the next reader something
+false. ⚠️ The `xr: true` FLAG on a row is a different thing and did not move:
+`caps.mjs` reads it to offer a headset page, and `mirror`, `weight` and `floor`
+still carry it, `floor` from another section entirely. Built at
+`e0158ba-132955-eba3`, NOT deployed.
+
+✅ **`workers/view/verify.mjs`'s TITLE ASSERT WAS ALREADY RED AND NOW IS NOT.**
+It expected `POSITRON` while the tab read `positron: media art experiments`.
+⚠️ **THAT FILE HAS OTHER STALE ASSERTS AND THEY WERE LEFT ALONE**: it counts
+`li.pos-row` against `DEMOS.length + NOTES.length`, and the front page has drawn
+`.pos-card` for weeks. It needs a real look rather than a line.
+
+### Done 2026-09-24: the front page regrouped, and three demos retired
+
+🔴 **ASKED, VERBATIM, IN ONE MESSAGE:** *"arvhice memento blocks and num demo.
+move headset group first in index. rename to "TH". second group err, move floor
+to err and the one what had err audio and video side by side. move making to TH.
+rename vain to u:, move clic and vclick there. rname cvlick demo do ound. move
+typist to th. timeline: leave ones who have timeline component. the rest merge
+with technologies and split onto streamig (who steam smth) and messages (relyng
+messages etc but not streaming) and rest is techologeis. show dev link asap"*
+
+Every line below is one line of that, and almost all of it lands in ONE file,
+`demo/manifest.mjs`: the `DEMOS` rows' `group`, and the `GROUPS` map that
+decides both the order of the sections and what they are called. Two index
+renderers read it (`demo/index.html` and `workers/view/build.mjs`), so there is
+nothing to change in either.
+
+1. **Archive `memento`, `blocks` and `num`.** `archive/demos/README.md` has the
+   procedure: `git mv demo/<slug>/index.html archive/demos/<slug>-index.html`,
+   drop the row from `demo/manifest.mjs`, write the section saying what it was.
+   Each of the three is a single `index.html` with no other file beside it.
+   ⚠️ All three are quoted by live code as the page that proved something:
+   `/blocks/` by `xr-quit.mjs`, `xr-panel.mjs`, `xr-hands.mjs`, `seed.mjs`,
+   `weight` and `tom`; `/num/` by `keyboard.mjs`, `numloop.mjs` and `nola`;
+   `/memento/` by `cc-adapter.mjs` and `timeline/media-master.mjs`. Those are
+   HISTORY and stay, but a live `href` to any of the three would now 404 the way
+   `/kit/`'s card did after the `held` rename.
+2. **Headset group first, renamed `TH`.** `GROUPS` order, `['xr', 'headset']`.
+3. **A second group, `err`**, holding `floor` and `reel`.
+   🔴 **THE FIRST ANSWER WAS `flipper` AND IT WAS WRONG.** `flipper` is the
+   only page in the repository that holds ERR television and ERR radio at once,
+   so a grep for `icecast.err.ee` beside a `<video>` finds exactly it and nothing
+   else, and that is what I reported. Corrected in one line: *"it was not
+   flipper"*, then *"what is demo where we had err video + radio (synced on not)
+   and timeline?"*. It is `reel`, and the page says so at the top of its own
+   stylesheet: *"ONE COLUMN PER MEDIUM: the newsreel on the left, the radio on
+   the right"*, two lanes on one line, a day usually bringing a newsreel AND a
+   radio programme. ⚠️ The lesson is that the search was for the SOURCE
+   (a live ERR mount) when the ask was about the LAYOUT (two media side by side),
+   and `reel` plays the archive rather than the live mounts, so it could not
+   match. `flipper` stays where it is, `now` was not named either.
+   🔴 **AND THIS REVERSES A 2026-09-16 INSTRUCTION THAT IS WRITTEN INTO
+   `manifest.mjs` IN RED**: *"hide the ERR archive from frontpage"* and *"no err
+   refs"*, said the evening ERR reported our connections corrupting their
+   listener statistics. The pages never moved; the SECTION NAME did. Putting the
+   name back is the thing that was deliberately removed, so the comment block
+   above `GROUPS` has to record the reversal rather than be deleted.
+4. **`making` to `TH`**, which empties the `mim` group.
+5. **`vain` renamed `u:`**, with `click` and `vclick` moved into it.
+6. **`vclick` renamed.** Slug rename, so directory + URL + every reference, the
+   `radio1965` -> `radio` shape. The target name was not legible in the message.
+7. **`typist` to `TH`.**
+8. **`timeline` keeps the rows that have a timeline component; the rest merge
+   into `technologies`, which then splits three ways**: `streaming` (streams
+   something), `messages` (relays messages but does not stream), `technologies`
+   (the rest).
+   ⚠️ MEASURED before assuming: ALL NINE rows now in `timeline` call
+   `createStripView` from `demo/shell/strip.mjs`, and after `click`, `vclick`
+   and `typist` leave, the six that remain (`transport`, `lanes`, `loops`,
+   `score`, `strip`, `draw`) all still do. So on the component test nothing
+   merges, and the split of `transports` is the only part that moves.
+9. **Dev link first.**
+
+✅ **ALL NINE DONE 2026-09-24.** The front page is **12 sections over 58 listed
+rows** (59 in `DEMOS`, `feedback` is `unlisted`), in the asked order:
+`TH` `err` `hardware` `u:` `kurenniemi` `instruments` `capture` `timeline`
+`streaming` `messages` `technologies` `kit`.
+
+✅ **THE TWO AMBIGUOUS ASKS WERE ASKED ABOUT RATHER THAN GUESSED.** *"do ound"*
+is `sound`, and the timeline split is the four pages whose SUBJECT is the
+timeline. The measurement is why the second one had to be asked: the component
+test separated nothing, because all nine rows mounted a strip.
+
+✅ **`vclick` -> `sound`**, directory and URL and identity strings, plus
+`manifest.mjs`, `shell/stack.mjs`, `shell.css`, `timeline/strip.mjs`,
+`timeline/csound.mjs`, `timeline/lab/csound-test.mjs`, `workers/view/build.mjs`,
+five plans, one research note and `positron-verify`. **`tarmoj/vclick` did NOT
+move**: it is U:'s own repository, named in four files, and renaming it would
+have pointed all four at nothing. MEASURED after: `node demo/verify.mjs sound`
+is **23/23 with 11 page asserts**.
+
+✅ **THREE PAGES ARCHIVED** to `archive/demos/<slug>-index.html` with a section
+each in that README, and two claims they were carrying were repaired rather than
+left to rot: `demo/weight/index.html` said `/blocks/` already graded the quit
+badge the same way on load (it was weight's second opinion and is now its only
+one), and `demo/tom/index.html` named `/blocks/` as the other `readout: null`
+page, where twenty pages do that. `demo/verify-quest.mjs`'s usage example named
+the slug too.
+
+✅ **`CLAUDE.md` RECOUNTED** rather than remembered: **59 rows, 57 shelled**, and
+`positron-history` had drifted to `54 of 56` and carries the rename now.
+
+⚠️ **WHAT WAS NOT DONE, AND IT IS NOT FORGOTTEN:** nothing is deployed. The
+build ran (`stamp e0158ba-120343-75bb`) so `workers/view/public/` matches, and
+`positron.studio` still serves the old front page until somebody deploys.
+
 ### Open 2026-09-24: `/fau/`'s second round, and four wrong answers before the right one
 
 🔴 **ASKED, VERBATIM, ACROSS SIX MESSAGES:** *"double border, rm"* with a crop,
