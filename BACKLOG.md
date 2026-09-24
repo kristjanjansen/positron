@@ -50,8 +50,24 @@ page from inside a task about one.
 because they all named `.fau-panel` as an ancestor it no longer has. That is the
 dead selector this stylesheet has now measured five times.
 
-MEASURED: **45/45 with 39 page asserts, identical either side of the change**, so
-nothing went silent.
+🔴 **AND IT SHIPPED WRONG ONCE, REPORTED AS *"its a mess"* WITH A CROP.** The top
+padding was put on the PART, which also carried `background: var(--card)`, so the
+page drew **case, seam, a second band of the same dark, then the well**: two
+bands of one colour with a line between them, which is furniture rather than air
+above the text. **Air inside a box belongs to the box.** The padding is the
+textarea's own now and the part carries no background, so the input is one
+unbroken surface from the seam down.
+🔴 **AND THE CORRECTED RULE LOST ITS FIRST FIGHT, MEASURED RATHER THAN
+REVIEWED.** `.fau-src textarea` is `(0,1,1)` against `shell.css`'s
+`.pos-field.tall textarea` at `(0,2,1)` setting `padding: 7px 9px` as a
+SHORTHAND. Weight decides before order does, so the computed value read **7 px**
+while the source read as correct. The border on the same element DID win, because
+the rule it beats is `(0,1,1)` and a tie goes to the later sheet.
+✅ **`.pos-field.fau-src textarea` IS A TIE AND NOT AN ESCALATION**, which is the
+smallest thing that can win. MEASURED after: `padding-top: 14px`.
+
+MEASURED: **45/45 with 39 page asserts, identical across all three states of this
+change**, so nothing went silent.
 
 ### Open 2026-09-24: the remote looper, and the distributed instrument behind it
 
