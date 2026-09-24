@@ -2666,3 +2666,61 @@ what `and was given nothing` says plainly.
 
 It is #82 in prose: a message that measures something NEXT TO the quantity in
 question.
+
+## 113. A check block that goes quiet is cut off where it went quiet, and the run stays green
+
+**2026-09-22, on `/muta/`.** A sustain check was added: hold a note, wait 700 ms,
+let it go, wait 900 ms, then assert. **Both the new assert and a voice stealing
+check that had been there a day stopped running**, and `node demo/verify.mjs
+muta` read **40/40 green** before and after. An assert that never runs cannot
+fail, so the count was the only witness and 40 is 40.
+
+🔴 **THE CAUSE WAS A LOOP IN `verify.mjs` THAT STOPS COLLECTING AFTER ONE 400 ms
+POLL WITH NO NEW ASSERT.** Twelve tries, exit the moment the count holds still.
+1.6 s of measuring with nothing to report looks exactly like a page that has
+finished.
+
+⚠️ **RAISING `settleMs` FROM 8 s TO 14 s CHANGED NOTHING, WHICH IS WHAT SAID THE
+SETTLE WINDOW WAS NOT THE CAUSE.** That number sizes the wait before the FIRST
+assert. It has no bearing on a gap in the middle.
+
+⚠️ **AND THE GUARD THAT WOULD HAVE CAUGHT IT WAS DECLARED AND NEVER CALLED.**
+`const isReady = () => ev('!!(window.__demo && window.__demo.ready)')` sat three
+lines above a comment saying in capitals that a page is done when it says it is
+ready AND its count has stopped moving, **`Both conditions`**, with only one of
+them in the code. A dead guard reads as finished work. This is the fourth
+measured instance in this project and the first in the harness itself.
+
+🔴 **AND `ready` ALONE WOULD NOT HAVE SAVED IT EITHER.** `/muta/` calls
+`ifSelfcheck(...)` **without awaiting it** and then `d.ready()` on the next
+line, so `ready` is true a few milliseconds in and stays true through every
+check the page makes. `/radio/` does the same from inside the granulator's boot.
+**A page's own claim to be finished is worth reading and is not worth trusting
+alone.**
+
+✅ **THE REPAIR IS BOTH ENDS.** The loop now needs three consecutive quiet polls
+AND `ready`, over a ceiling of 30 tries; the page's one assert became two, so its
+longest silence is 900 ms. MEASURED after: **43/43 with 37 page asserts**, and
+`tom` 44/44 and `wish` 70/70 unchanged, which says no other page was being
+truncated.
+
+⚠️ **AND A WRONG FIRST DIAGNOSIS IS PART OF THIS LESSON.** `shell.mjs` has
+`ready:` twice, once as `false` and once as a method, and that was read as one
+object literal re-declaring a key, so the boolean was called an illusion and the
+shell was changed to publish a separate `done`. **The two keys are on two
+different objects**: `api`, which is what `window.__demo` is, carries the
+boolean, and the object `mount()` returns carries the method that sets it. The
+change made every page fail at `__demo.ready` and was reverted. **A key name
+appearing twice in a file is not two declarations of one thing.**
+
+⚠️ **AND THE THING THAT FOUND IT WAS ONE PRINTED LINE.** The failure branch said
+`failed: null` and `console: nothing` for two different causes, a module that
+never finished and a page that finished without becoming ready. It prints
+`typeof window.__demo`, the type of `ready` and the assert count now, and that
+line named the fault in one run after an hour of bisecting by hand.
+
+⚠️ **AND TWO STRAY HEADLESS CHROMES FROM THIS SESSION'S OWN PROBES MADE ONE
+ISOLATION RUN LIE.** The run that appeared to clear the shell change was the run
+in which they had just been killed. The harness prints that warning for exactly
+this reason and it was read past. **Kill your own probes before believing a
+bisect.**
