@@ -430,10 +430,73 @@ thing they asked for, `https://<their site>/<page>/` is.
 
 ## What to copy, and what not to
 
-✅ **COPY THE SHAPE, NOT THE SURFACE.** One page per idea, one file each. One
-list that every renderer reads, so there is no second place to forget a row. A
-harness that drives the real page in a real browser and asserts on what the page
-publishes. Read `CLAUDE.md` and the other skills in `.claude/skills/` for the
+🔴 **WHAT TRANSFERS IS THE COMPOSITION, AND IT IS THE ONLY THING HERE WORTH
+COPYING WHOLESALE.** Not a page, not a control, not a measurement: the way the
+Cloudflare services are put together, which is the same in every part of this
+site and is what makes most of it free. Count it rather than taking my word:
+
+```sh
+ls workers/                                   # one directory per Worker
+grep -ho '"\(durable_objects\|r2_buckets\|containers\|ai\|assets\)"' workers/*/wrangler.* | sort | uniq -c
+```
+
+Nearly every Worker binds a **Durable Object**; several add **R2**; exactly one
+uses **Containers** and one uses **Workers AI**. That distribution is the design.
+
+1. **ONE WORKER PER CAPABILITY, NAMED FOR WHAT IT IS.** Not a monolith, not
+   microservices with a service mesh: `view` serves the pages, `items` holds
+   items, `mail` reads mail, `pub` runs ffmpeg. A reader can guess which one to
+   open, and any of them can be deployed without the others.
+2. **A DURABLE OBJECT IS A ROOM, AND THE ROOM IS ALSO THE DATABASE.**
+   `idFromName(room)` per room, SQLite inside it, and therefore **no second
+   database to keep in step**. Presence, history and the state a decision is
+   made from all live in the one object the sockets are already attached to.
+   🔴 **AND PARTITION EVERYTHING BY ROOM, INCLUDING TEST RUNS.** Every run of the
+   harness here invents its own room. The one resource that was NOT partitioned
+   sent two real notifications to every real subscriber, for a day, before
+   anybody outside noticed. **When everything around a resource is partitioned,
+   ask who owns the sharing.** Make anything that reaches real people an
+   allowlist of one, never a prefix test, because refusing rooms that LOOK like
+   test rooms lets the next real-looking one through and the default has to be
+   silence.
+3. **R2 IS THE ARCHIVE TIER AND STREAM IS THE LIVE TIER, AND THE SEAM IS SAID
+   OUT LOUD.** What is live costs minutes; what persists costs storage and
+   nothing to serve. Deciding which tier a thing is in is a design decision, not
+   an implementation detail, and it is most of the bill.
+4. **THE BROWSER DOES THE WORK THE PLATFORM SHOULD NOT.** `MediaRecorder`,
+   WebAudio, WebGL, WebMIDI, WebCodecs, WebXR all run in the page. The platform
+   carries bytes and holds state. **That is why almost all of this runs on the
+   free plan**, and it is the first thing to reach for before paying for compute.
+5. **NOTHING OPENS ON A VISIT.** No stream, no model, no camera, no fetch of
+   somebody else's server. A visit, a step and a scrub cost nothing. Both the
+   bill and the harm to other people's servers are consequences of that one rule.
+6. **ONE LIST, READ BY EVERY RENDERER.** There is no second place to forget a
+   row, and the renderer refuses a row it cannot place rather than quietly
+   dropping it. A page that still looks complete while something is missing is
+   the worst shape a failure can take.
+7. **THE BUILD ENUMERATES, IT DOES NOT KEEP A LIST.** It walks the directory,
+   and it refuses to build when an import has no deployed file behind it. An
+   allowlist is a thing somebody forgets to add to.
+8. **DEPLOY IS INTERLOCKED WITH VERIFICATION, NOT FOLLOWED BY IT.** Build,
+   fingerprint the output, refuse to upload if a byte moved in between, then
+   poll the edge until the new build stamp is actually being served. Two agents
+   in one checkout is all it takes for `build` and `deploy` to be about
+   different trees.
+9. **EVERY PAGE PUBLISHES A HANDLE**, so the same page a person opens is the one
+   a harness drives. No test-only build, no second rendering path, and the thing
+   that is graded is the thing that ships.
+10. **A BUILD STAMP IN THE FIRST LINE OF EVERY DEVICE LOG**, so a report from
+    somebody's phone can be attributed to a build instead of argued about.
+11. **AN ALARM RATHER THAN A POLL** when something must happen at a time. The
+    object that holds the state wakes itself; nothing runs in between.
+
+✅ **ONE IDEA PER THING, HOWEVER THEIR PROJECT IS ARRANGED.** This repository
+does that as one page per idea in one file each, and **that part is not a
+recommendation**: their setup may take twenty files and a framework to draw one
+page, and it is still right as long as the thing does ONE idea and can be
+understood on its own. What transfers is the single idea, not the single file.
+✅ **AND A HARNESS THAT DRIVES THE REAL PAGE IN A REAL BROWSER**, whatever it is
+built out of. Read `CLAUDE.md` and the other skills in `.claude/skills/` for the
 rules and, more usefully, for what each one cost.
 🔴 **THE CONTROLS ARE NOT PART OF THE SHAPE.** `demo/shell/` is one project's
 taste in buttons, spacing and words, and nearly everything `/stage/` imports is

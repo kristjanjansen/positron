@@ -1,5 +1,39 @@
 ## Open
 
+### Open 2026-09-24: more embedded knowledge into skills, and the .md files tidied
+
+🔴 **ASKED:** *"add more of this embedded knowledge to skills. clean up .md
+files"*, after *"the key is to use cf services in coherent composing way as
+positron does"*.
+
+✅ **THE COMPOSITION ITSELF IS DONE** and is in `positron-start` as eleven
+numbered rules, measured rather than asserted: one Worker per capability, a
+Durable Object that is both the room and the database, R2 as the archive tier
+against Stream as the live tier, the browser doing the work the platform should
+not, nothing opening on a visit, one list read by every renderer, a build that
+enumerates, a deploy interlocked with verification, a handle on every page, a
+build stamp in every device log, and an alarm rather than a poll.
+
+⚠️ **WHAT IS STILL OPEN IS THE SWEEP, AND IT NEEDS SCOPING RATHER THAN
+GUESSING.** Two halves:
+1. **More embedded knowledge out of the pages and into the skills.** The
+   candidates are the long red comment blocks in `demo/*/index.html` and
+   `demo/shell/*.mjs` that are true of every task rather than of one page. The
+   rule for moving one is already written in `CLAUDE.md`: move it VERBATIM, and
+   leave its trigger behind in the table, because a rule nobody knows to load is
+   a rule that is gone.
+2. **The root `.md` files.** The repository is public now and a stranger sees
+   twelve of them at the top level. `README.md`, `AGENTS.md`, `LICENSE`,
+   `NOTICE.md` and `CLAUDE.md` are the front door. `HANDOFF.md`, `BACKLOG.md`,
+   `LESSONS.md`, `PROGRESS.md`, `LAYOUT.md` and `SUMMARY.md` are working files
+   that a visitor reads as clutter and a returning agent needs.
+   `measured-devices-2026-09-20.md` is a dated measurement that belongs with the
+   research, and `SECRETS-ROTATION.md` should not be public at all while it
+   names an unrotated key.
+⚠️ **NOTHING HERE IS A DELETION.** `LAYOUT.md` decides where a file goes and
+this is a `LAYOUT.md` question; the plans move of 2026-09-20 is the precedent,
+and it cost 129 files holding a path by name.
+
 ### Open 2026-09-24: the repo goes public, and a README somebody can paste
 
 🔴 **ASKED, VERBATIM, ACROSS FIVE MESSAGES:** *"make repo public. add to

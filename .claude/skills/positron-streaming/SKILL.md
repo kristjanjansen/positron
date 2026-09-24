@@ -150,9 +150,15 @@ here is worth re-checking before a plan is built on it.
     Workers Paid (read 2026-09-24). Two other free-plan limits bite a copy job
     before the cron count does: **50 subrequests per request** against 10,000 on
     paid, and 100,000 requests a day.
-  - ⚠️ **AND NONE OF THIS APPLIES TO WHIP**, which records nothing at all. An
-    archiver for a WebRTC source has to record client-side and ship the pieces
-    itself, which is what `record`, `capture` and `crate` do into R2.
+  - ⚠️ **AND NONE OF THIS APPLIES TO WHIP, WHICH RECORDS NOTHING SO FAR.** Write
+    the "so far" every time: Cloudflare has announced recording and HLS interop
+    for WHIP and they are not shipped, so this is a fact with an expiry date on
+    it and the bullet above already says to re-test rather than to plan either
+    way. **A sentence that drops the qualifier outlives the thing it describes**,
+    which is the failure this file exists to stop.
+    Until it ships, an archiver for a WebRTC source has to record client-side and
+    ship the pieces itself, which is what `record`, `capture` and `crate` do into
+    R2.
 - **A Durable Object's OUTBOUND client WebSocket hands binary over as a
   `Blob`**, not an `ArrayBuffer` — measured `Blob`, `size` 9, `byteLength`
   undefined — and a `Uint8Array` binds to a SQLite `BLOB` column as an EMPTY
