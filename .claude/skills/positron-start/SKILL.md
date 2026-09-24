@@ -424,6 +424,45 @@ handed a copy gets a project they are stuck with.
 
 ---
 
+## Step 5b. Ask two things, decide the rest yourself, and say which is which
+
+🔴 **THIS STEP EXISTS BECAUSE A REAL RUN ASKED FOUR QUESTIONS AND EXPLAINED
+NONE OF THEM.** Watched end to end, an agent following this skill opened with
+*"the required workflow needs your choices"*, asked the person to pick a design
+direction, name the project, answer about a domain, and then **confirm a default
+it had just finished explaining**. Every question was reasonable. Together they
+were a form to fill in, with no hint of which answer was hard to change and
+which was free to change later.
+
+✅ **TWO THINGS ARE DECIDED NOW, AND EACH ONE GETS ITS REASON IN THE SAME
+BREATH**, because a question without a reason is a question somebody guesses at:
+
+| ask | say why, roughly like this |
+| --- | --- |
+| **What should it be called?** | *"It goes in the web address, and the address is awkward to change once people have it."* |
+| **What should it look like?** | *"Everything I build after this follows that, so it is cheaper to decide now than to redo."* |
+
+⚠️ **AND SAY WHAT YOU ARE GOING TO DO ABOUT THE REST, RATHER THAN ASKING.** These
+are reversible, so they are announcements with a door left open, not questions:
+
+| tell them | and why it can wait |
+| --- | --- |
+| *"I will put it on a free Cloudflare address first."* | it moves to a domain of theirs any time, and it is one line of config |
+| *"I will build the free version, with a recorded film rather than a live camera."* | live video is the only part that costs, and it can be added the day they want it |
+
+🔴 **NEVER ASK SOMEBODY TO CONFIRM A DEFAULT YOU HAVE ALREADY JUSTIFIED.** It
+reads as a consent form and it teaches them to say yes without reading, which is
+exactly the habit you do not want when a later question is about money. State it
+and let them stop you.
+⚠️ **AND NO JARGON IN THE QUESTION ITSELF.** *"This becomes part of its initially
+permanent workers.dev identity"* is true and it is not English anybody asked to
+learn. *"It goes in the web address"* is the same fact in words they can act on.
+⚠️ **IF THEY ANSWER ONE AND IGNORE THE OTHER, TAKE THE DEFAULT AND GET ON.** A
+person who says *"just invent something, call it ruhr"* has told you everything
+you need.
+
+---
+
 ## Step 6. Build the smallest thing and deploy it
 
 🔴 **GET ONE PAGE LIVE BEFORE BUILDING ANYTHING GOOD.** A non-developer who has
