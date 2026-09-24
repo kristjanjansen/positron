@@ -671,6 +671,14 @@ for (const t of targets) {
   }
   ok('__demo.ready', ready);
   if (!ready) {
+    /* 🔴 SAY WHETHER THE OBJECT IS THERE AT ALL, BECAUSE THE TWO CAUSES LOOK
+       IDENTICAL FROM HERE. `__demo` missing means the module never finished;
+       `__demo` present with `ready` falsy means the shell mounted and the page
+       did not get to the end. Both printed `failed: null` and `console:
+       nothing`, and 2026-09-22 was spent bisecting the difference by hand. */
+    console.log(`        __demo: ${await ev('typeof window.__demo')}`
+      + `, ready ${await ev('window.__demo ? typeof window.__demo.ready : "n/a"')}`
+      + `, asserts ${await ev('(window.__demo && window.__demo.asserts && window.__demo.asserts.length) ?? "n/a"')}`);
     console.log(`        failed: ${await ev('window.__demo && window.__demo.failed')}`);
     /**
      * 🔴 AND WHAT THE CONSOLE SAID, BECAUSE THIS IS EXACTLY WHEN IT MATTERS.
@@ -921,12 +929,75 @@ for (const t of targets) {
     await sleep(400);
     n = await countAsserts();
   }
-  // Then the cheap one: stop when it stops growing.
-  let prev = -1;
-  for (let i = 0; i < 12 && n !== prev; i++) {
+  /**
+   * Then the cheap one: stop when it has stopped growing AND the page says it
+   * is ready.
+   *
+   * 🔴 `isReady` WAS DECLARED HERE AND NEVER CALLED, FOR AS LONG AS IT HAD
+   * EXISTED, WHICH MADE THE PARAGRAPH ABOVE A DESCRIPTION OF CODE NOBODY
+   * WROTE. It says in capitals that a page is done when it says it is ready
+   * AND its count has stopped moving, `Both conditions`, and only one of them
+   * was ever tested. A dead guard reads as finished work, which is this
+   * project's most expensive kind of defect.
+   *
+   * 🔴 AND THE HALF THAT ACTUALLY COST SOMETHING IS THE PATIENCE, NOT THE
+   * READY. A check block that waited longer than ONE 400 ms poll without
+   * asserting was cut off, and everything after it was lost in silence.
+   * MEASURED 2026-09-22 on `/muta/`, which grew a sustain check holding a note
+   * for 700 ms and its release for 900 ms: the count stood still across one
+   * poll, this loop exited, and **two asserts stopped running**, one of them a
+   * voice stealing check that had been there for a day. The suite read
+   * **40/40 green** before and after, because an assert that never runs cannot
+   * fail. Raising `settleMs` from 8 s to 14 s changed nothing, which is what
+   * said the settle window was not the cause.
+   *
+   * ⚠️ AND `ready` ALONE WOULD NOT HAVE SAVED IT, WHICH IS WHY BOTH ARE HERE.
+   * `/muta/` calls `ifSelfcheck(...)` WITHOUT awaiting it and then `d.ready()`
+   * on the next line, so `ready` is true a few milliseconds in and stays true
+   * through every check the page makes. The paragraph above already knew
+   * `/radio/` does the same from inside the granulator's boot. A page's own
+   * claim to be finished is worth reading and is not worth trusting alone.
+   *
+   * ⚠️ AND `__demo.ready` IS A REAL BOOLEAN, WHICH WAS CHECKED AFTER GETTING IT
+   * WRONG. It was read here as *the method a page calls*, on the strength of
+   * `ready:` appearing twice in `shell.mjs`, and `shell.mjs` was changed to
+   * publish a separate flag. **The two `ready` keys are on two different
+   * objects**: `api`, which is what `window.__demo` is, carries the boolean,
+   * and the page-facing object returned by `mount()` carries the method that
+   * sets it. The change was reverted. A key name appearing twice in a file is
+   * not two declarations of one thing.
+   *
+   * ⚠️ IT COSTS TWO EXTRA POLLS ON A PAGE THAT REALLY HAS FINISHED, which is
+   * 800 ms a page and about 48 s across a full suite. That is the price of not
+   * silently dropping the tail of a check block, and this project's own rules
+   * already rank a green run with no coverage as the worse of the two.
+   */
+  // Three quiet polls, not one: a page may legitimately take a second between
+  // asserts, and 12 tries only ever allowed 4.8 s in total.
+  // ⚠️ FIVE AND NOT ONE, WHICH IS 2.0 s OF SILENCE TOLERATED AND COSTS 1.6 s A
+  // PAGE. A DSP page that holds a note, lets it go and measures the difference
+  // is quiet for over a second BY DESIGN, and that is the check rather than a
+  // delay in it. `/muta/` lost four asserts to a patience of one and two more
+  // to a patience of three, every time silently and every time still green.
+  // ⚠️ AND `ready` CANNOT REPLACE IT, WHICH WAS TRIED. Moving that page's
+  // `d.ready()` to the end of its checks made it fail the 7.4 s boot wait above
+  // and be graded not at all, because the same flag answers two questions: *is
+  // this page up* and *has it finished*. Splitting them is a change to the
+  // shell contract and to four harnesses, and is in BACKLOG.md.
+  // ⚠️ 60 TRIES IS A 24 s CEILING AND COSTS A FAST PAGE NOTHING, because the
+  // loop leaves the moment a page is quiet and ready. 30 was reached by
+  // `/muta/`, whose DSP checks hold notes, release them and wait for envelopes
+  // for about twelve seconds in total, and reaching the ceiling drops whatever
+  // has not asserted yet without a word. That is the same silent truncation as
+  // a patience of one, arriving from the other end of the same loop.
+  const GROWTH_PATIENCE = 5, GROWTH_TRIES = 60;
+  let prev = -1, quiet = 0, done = await isReady();
+  for (let i = 0; i < GROWTH_TRIES && (quiet < GROWTH_PATIENCE || !done); i++) {
     prev = n;
     await sleep(400);
     n = await countAsserts();
+    quiet = n === prev ? quiet + 1 : 0;
+    done = await isReady();
   }
 
   const asserts = await ev('__demo.asserts');
