@@ -46,14 +46,42 @@ would have found an empty list and a wall of finished work, and the four live
 asks were invisible to it. Moved rather than copied, and `HANDOFF.md` points
 here now.
 
-- 🔴 **`/fau/`: *"rm compile button next to fau on"*.** `demo/fau/index.html`
-  around line 396, `{ id: 'compile', label: 'Compile', primary: true }`, the only
-  entry left in `.pos-controls` after the presets moved to the panel footer on
-  2026-09-23. ⚠️ **AND THE PAGE'S OWN COMMENT SAYS WHY IT IS SAFE TO GO**: the
-  check block compiles by calling `build()` itself, so nothing behind the button
-  is graded only by a press. A removed control still moves every other control's
-  harness press, so this is a `positron-verify` task as well as a `positron-ui`
-  one.
+- ✅ **DONE 2026-09-24. `/fau/`: *"rm compile button next to fau on"*.** It was
+  the only entry left in `.pos-controls` after the presets moved to the panel
+  footer on 2026-09-23, so the page now declares no `controls` key at all and
+  `shell.mjs` hides the empty row, which it has to: that row carries 14 px under
+  it and a band of dead space reads as something that failed to render. `lanes`
+  and `draw` were already in that shape.
+  ✅ **THE PRESS IT REPLACED WAS NOT MISSING TO BEGIN WITH.** The page compiles
+  `AUTO_IDLE_MS` after typing stops, which is what `ONE` and the index line both
+  already said in the words a visitor reads, and the switch compiles what is in
+  the box the moment it goes on. Neither string needed a word changed, which is
+  the tell that the button was a fifth road to the same place.
+  🔴 **WHAT IT COST WAS THREE ASSERTS READING `d.button('compile').disabled` AS
+  EVIDENCE OF POWER STATE, AND DELETING A CONJUNCT IS COVERAGE LOST AT A COUNT
+  THAT DOES NOT MOVE.** The claim those clauses carried, that nothing can start a
+  compile on a page nobody switched on, is asserted on the autocompile now: the
+  check arms one with the instrument off and measures `autos`, `runs` and
+  `node`. It is the better instrument, because a `disabled` attribute is a
+  statement about one control and this is a statement about the only road left.
+  ⚠️ **AND IT IS TWO ASSERTS RATHER THAN ONE BECAUSE OF LESSONS #113**: the full
+  idle wait plus a margin is longer than three quiet polls, so it is split at
+  500 ms and each half says something true on its own.
+  ✅ **A REAL GUARD MOVED WITH IT.** The deleted handler's own comment recorded
+  that the guard belongs INSIDE the queued task and not on the button, because a
+  press already on the queue when the switch goes off underneath it is exactly
+  the order a check runs in. The autocompile had that hole: `fireAuto` tested
+  `powered` before queueing and the queued task never tested it again. It does
+  now, before `autos++` so a refused task does not move the counter every
+  autocompile assert is written against.
+  ⚠️ **TWO COMMENTS WENT STALE THE MOMENT THE ROW EMPTIED** and were rewritten
+  rather than deleted: one explaining why `autos` is separate from `runs`, one
+  explaining why the whole block is a single `serial`. Both named a harness
+  COMPILE press that no longer happens, and both arrangements are still right
+  for a reason that outlived it.
+  MEASURED: baseline **43/43 with 37 page asserts**, after **45/45 with 39**,
+  which is exactly the two added and nothing gone silent, stable across two runs,
+  and the page's last assert still runs so nothing was truncated.
 
 - ⚠️ **`/fau/`: *"secondary. should shimmer"*, and it names no subject.** There is
   no shimmer anywhere in `demo/fau/index.html`, MEASURED by grep on 2026-09-24,
