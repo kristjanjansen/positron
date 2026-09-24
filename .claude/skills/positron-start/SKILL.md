@@ -75,16 +75,20 @@ reached this file over the web on purpose. **Build them a NEW, SMALL project in
 their own idiom**, and read a file from here over a raw URL when a specific
 question comes up.
 
-🔴 **MEASURED, BECAUSE THE OPPOSITE ADVICE LOOKS SO REASONABLE:**
-`demo/stage/index.html` imports **20 modules**, **18 of them from `/shell/`**:
-`card`, `choice`, `diagram`, `field`, `glue`, `ingest`, `live`, `media`,
-`pattern`, `presence`, `selfcheck`, `shell`, `strip`, `symbol`, `tabs`,
-`transport-bar`, `video-panel`, `wire`. There is **no `package.json` anywhere**
-and those are root-relative paths that resolve only because `demo/server.mjs`
-serves the repository root. So "copy the stage demo" means dragging twenty files
-plus everything they import, and reproducing the path layout, to get a page that
-looks like this site.
-🔴 **AND 18 OF THE 20 ARE THIS SITE'S TASTE, NOT ITS SUBSTANCE.** Somebody else
+🔴 **MEASURE IT RATHER THAN TAKING MY WORD, BECAUSE THE OPPOSITE ADVICE LOOKS SO
+REASONABLE.** Count what any page here actually pulls in:
+
+```sh
+grep -o "from '/[a-z-]*/" demo/stage/index.html | sort | uniq -c
+```
+
+Almost all of it is `/shell/`, which is this site's kit, and the rest is
+`/timeline/`. There is **no `package.json` anywhere** and those are root-relative
+paths that resolve only because `demo/server.mjs` serves the repository root. So
+"copy the stage demo" means dragging every one of those files plus everything
+they import, and reproducing the path layout, to get a page that looks like this
+site.
+🔴 **AND NEARLY ALL OF THEM ARE THIS SITE'S TASTE, NOT ITS SUBSTANCE.** Somebody else
 will want different controls, different spacing, different words, a framework
 this repo does not use. **That is not a compromise to talk them out of, it is
 the correct outcome.** Handing them this kit makes their project a copy of one
@@ -167,9 +171,25 @@ npx wrangler deploy --dry-run    # proves the toolchain without creating anythin
 ```
 
 There is no reliable command that prints the plan, so **ask them**, and tell
-them what the answer decides. Checked against Cloudflare's pricing pages
-**2026-09-24**; they change, and the Cloudflare docs MCP from step 0 can
-re-check any line of it.
+them what the answer decides.
+
+🔴 **DO NOT QUOTE A PRICE FROM MEMORY, AND DO NOT QUOTE ONE FROM THIS FILE
+EITHER, BECAUSE THERE ARE NONE IN IT.** Cloudflare's prices change and this file
+does not. **Read them now**, with the Cloudflare docs MCP that Step 0 installed
+or by fetching the pages, and give the person TODAY'S number:
+
+- `https://developers.cloudflare.com/workers/platform/pricing/` (Workers, and Containers)
+- `https://developers.cloudflare.com/r2/pricing/`
+- `https://developers.cloudflare.com/stream/pricing/`
+- `https://developers.cloudflare.com/durable-objects/platform/pricing/`
+- `https://developers.cloudflare.com/workers-ai/platform/pricing/`
+
+⚠️ **A NUMBER NOBODY RE-MEASURES READS AS A FACT**, which is the oldest rule in
+this repository, and here it decides whether somebody spends money. Say where
+you read it and when.
+
+What is below is the SHAPE, which moves much more slowly than the prices.
+**Checked 2026-09-24; check it again rather than trusting it.**
 
 **On the free plan you can have:**
 
@@ -178,22 +198,22 @@ re-check any line of it.
 - **Durable Objects**, which is what a shared room, a fired cue and a message
   history are made of here. Free plan supports the **SQLite storage backend**,
   which is the only backend a new namespace can use anyway.
-- **R2**, for recordings and archives: **10 GB stored, 1 million writes, 10
-  million reads per month, and no egress charge at all.**
+- **R2**, for recordings and archives. There is a monthly free allowance for
+  storage and operations, and **no egress charge at all**, which is the part
+  that makes it unusual.
 
 **These cost money, and you stop and ask before touching either:**
 
-- **Cloudflare Stream**, for live video. **Prepaid, $5 per month per 1,000
-  minutes stored, plus $1 per 1,000 minutes delivered. No free tier.** It is
-  what `llhls` and `webrtc` play.
+- **Cloudflare Stream**, for live video. Prepaid storage plus a charge per
+  minute delivered, and **no free tier**. It is what `llhls` and `webrtc` play.
 - **Containers**, which run ffmpeg beside a Worker in `workers/pub/`. Included
-  in the **$5 per month Workers Paid plan** and **not available on free at
-  all**.
+  in the Workers Paid plan and **not available on free at all**.
 
 ✅ **SO THE HONEST ANSWER TO "DO I HAVE TO PAY?" IS NO, FOR MOST OF IT.** The
 front page, the timeline pages, the archive pages, the MIDI pages, the messaging
-pages and the recorder all run on the free plan. Live video does not. Say that,
-and let them choose, rather than quietly building the half that needs a card.
+pages and the recorder all run on the free plan. Live video does not. Say that
+with today's numbers beside it, and let them choose, rather than quietly
+building the half that needs a card.
 
 ---
 
@@ -305,32 +325,40 @@ or WebRTC, which is sub-second and leaves nothing behind.
 
 ✅ **2. THERE IS A THIRD OPTION AND IT IS R2, WHICH THIS REPOSITORY USES.**
 Record in the browser with `MediaRecorder`, ship the pieces to an R2 bucket as
-they are made, and play them back yourself. It stays on the **free** tier at
-10 GB with no egress charge, it is yours rather than a product's, and it gives a
-recording of a WebRTC session that Stream will not give you. `demo/record/`
-ships segments as they are cut, `demo/capture/` does camera in and segments out,
-and `demo/crate/` puts a long file up in 16 MiB pieces and scrubs it back.
+they are made, and play them back yourself. It stays inside R2's free allowance
+for a long while and carries no egress charge, it is yours rather than a
+product's, and it gives a recording of a WebRTC session that Stream will not
+give you. `demo/record/` ships segments as they are cut, `demo/capture/` does
+camera in and segments out, and `demo/crate/` puts a long file up in pieces and
+scrubs it back.
 ⚠️ It is more work than pressing record on Stream, and it is the honest answer
 when somebody wants the recording and does not want the bill.
 
 ⚠️ **3. DELIVERY IS BILLED PER MINUTE WATCHED, WHICH IS THE COST THAT SURPRISES
-PEOPLE.** $1 per 1,000 minutes delivered, counted from segment requests, and
-**client-side preloading and buffering count**. Do the arithmetic out loud for
-what they are actually building: an installation playing eight hours a day to
-one screen is 480 minutes a day, about 14,400 a month, so about **$14 a month in
-delivery alone** before storage. A page that only plays when somebody presses
-something costs a fraction of that. **This is the single strongest reason to
-make a stream open on a press rather than on a visit.**
+PEOPLE.** It is counted from segment requests, and **client-side preloading and
+buffering count**, so a page that starts a stream on load bills for viewers who
+never looked.
+🔴 **DO THE ARITHMETIC OUT LOUD, WITH THE RATE YOU JUST READ OFF THE PRICING
+PAGE**, for what they are actually building. An installation playing eight hours
+a day to one screen is 480 minutes a day and roughly 14,400 a month: multiply
+that by today's per-minute-delivered rate and say the monthly figure before
+anybody builds it. A page that only plays when somebody presses something costs
+a fraction of the same thing. **This is the single strongest reason to make a
+stream open on a press rather than on a visit.**
 
 ---
 
 ## Step 4c. If there is a model in it
 
-Workers AI is on **both** plans: **10,000 Neurons per day free**, then
-**$0.011 per 1,000 Neurons** on Workers Paid, and the free allowance resets at
-00:00 UTC. Exceeding it fails the request rather than billing silently.
+Workers AI is on **both** plans. There is a **daily free allowance measured in
+Neurons**, the same on free and paid, which resets at 00:00 UTC; beyond it, free
+plans fail the request rather than billing silently, and paid plans are charged
+per Neuron. **Read the allowance and the rate off
+`https://developers.cloudflare.com/workers-ai/platform/pricing/` and say today's
+numbers**, for the reason in Step 3.
 ⚠️ **SOME MODELS ARE PAID-ONLY** and answer `403` on the free plan, so check the
-model catalog rather than assuming a name works. Many remain free.
+model catalog rather than assuming a name works. Many remain free, and which
+ones are in which group changes.
 ⚠️ **AND THE SAME LOAD-ON-A-VISIT RULE APPLIES.** A model called on page load is
 a model called by every visitor and every crawler. Call it on a press.
 
@@ -408,8 +436,8 @@ harness that drives the real page in a real browser and asserts on what the page
 publishes. Read `CLAUDE.md` and the other skills in `.claude/skills/` for the
 rules and, more usefully, for what each one cost.
 🔴 **THE CONTROLS ARE NOT PART OF THE SHAPE.** `demo/shell/` is one project's
-taste in buttons, spacing and words, and 18 of the 20 modules `/stage/` imports
-are that. **Their project should have its own**, in whatever framework or none
+taste in buttons, spacing and words, and nearly everything `/stage/` imports is
+that. **Their project should have its own**, in whatever framework or none
 they prefer. The transferable idea is *a kit rather than a control hand-rolled
 per page*, not *this kit*.
 
