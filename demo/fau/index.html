@@ -277,17 +277,20 @@
       id: 'organ',
       label: 'Organ',
       what: 'three partials and an envelope, which is the one to edit first',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
-freq = hslider("freq", 440, 40, 8000, 0.01);
-gain = hslider("gain", 0.5, 0, 1, 0.01);
-gate = button("gate");
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
 
+// attack, decay, sustain, release. Seconds, except the 0.7 which is a level
 env  = en.adsr(0.005, 0.12, 0.7, 0.35, gate);
+// three sine partials: the note, its octave, and its twelfth, each quieter
 tone = os.osc(freq) + 0.5 * os.osc(freq * 2) + 0.25 * os.osc(freq * 3);
 
+// what you hear. <: splits one signal into the two the speakers want
 process = tone * env * gain * 0.2 <: _, _;
-effect  = _, _;
+effect  = _, _;   // runs once after the mixer. _ is a wire that changes nothing
 `,
     },
     {
@@ -300,16 +303,20 @@ effect  = _, _;
       id: 'rhodes',
       label: 'Rhodes',
       what: 'a tine, a body and a carrier they both bend, which is the DX7 electric piano',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
-freq = hslider("freq", 440, 40, 8000, 0.01);
-gain = hslider("gain", 0.5, 0, 1, 0.01);
-gate = button("gate");
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
 
+// the tine: 14 times the note, gone in 20 ms. This is the hammer hitting it
 knock = os.osc(freq * 14) * en.ar(0.001, 0.02, gate) * 3.2 * gain;
+// the body: the note itself, ringing on for about a second
 body  = os.osc(freq) * en.ar(0.001, 0.9, gate) * 1.1;
-env   = en.adsr(0.002, 1.4, 0.0, 0.4, gate);
+env   = en.adsr(0.002, 1.4, 0.0, 0.4, gate);   // 0.0 sustain, so it dies away
 
+// both of them bend the carrier's pitch instead of being added to it,
+// which is FM, and it is what makes this a Rhodes and not three oscillators
 process = os.osc(freq + (knock + body) * freq * 0.02) * env * gain * 0.3 <: _, _;
 effect  = _, _;
 `,
@@ -318,8 +325,10 @@ effect  = _, _;
       id: 'djembe',
       label: 'Djembe',
       what: 'a drum somebody else modelled, named in one line',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
+// a physical model somebody else wrote, taken whole out of the library.
+// pm is physmodels. It builds its own controls, which is what _ui_ means
 process = pm.djembe_ui_MIDI <: _, _;
 effect  = _, _;
 `,
@@ -334,14 +343,16 @@ effect  = _, _;
       id: 'bell',
       label: 'Bell',
       what: 'the same three lines as the Rhodes at a ratio that is not a whole number',
-      code: `import("stdfaust.lib");
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
 
-freq = hslider("freq", 440, 40, 8000, 0.01);
-gain = hslider("gain", 0.5, 0, 1, 0.01);
-gate = button("gate");
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
 
+// 3.51 is the whole patch. It is not a whole multiple of the note, so the
+// partials it adds belong to no harmonic series and the ear hears metal
 strike = os.osc(freq * 3.51) * en.ar(0.001, 0.35, gate) * 2.0;
-env    = en.ar(0.002, 2.2, gate);
+env    = en.ar(0.002, 2.2, gate);   // attack and release only, no sustain
 
 process = os.osc(freq + strike * freq * 0.03) * env * gain * 0.25 <: _, _;
 effect  = _, _;
@@ -648,7 +659,14 @@ effect  = _, _;
   const source = createField({
     label: 'FAUST',
     grow: 'wide',
-    rows: 12,
+    /* 🔴 SIXTEEN SINCE 2026-09-24, BECAUSE THE PATCHES GREW COMMENTS.
+       Asked as *"can you have comments in fau file what lines do?"*, and at 12
+       rows the longest preset was cut through the middle of `process`, which is
+       the one line a reader most needs to see. A box sized to the content it
+       used to hold is a box that hides the content it holds now. MEASURED: the
+       four presets are 14, 16, 6 and 13 lines with their comments, so 16 is
+       the longest of them rather than a number that looked about right. */
+    rows: 16,
     code: true,
     value: PRESETS[0].code,
     onInput: onType,
@@ -1563,12 +1581,17 @@ effect  = _, _;
      ⚠️ THE PLATE IS NOT IN THE STRIP AND SURVIVES THIS, which was measured
      rather than hoped: it sits in the case's top inset at 748.5 px, and the case
      keeps `FAU` at the top right where the 2026-09-23 ask put it.
-     ⚠️ **AND IT IS PAGE SCOPED RATHER THAN A RULE IN `shell.css`, ON PURPOSE.**
-     Any case with a plate and no controls has this, so it looks like a component
-     fix, and making it one would change every instrument page from inside a task
-     about one. It is written here the way the middot rule is written per demo,
-     and it is the candidate to lift if a second page ever empties a strip. */
-  .fau-panel .panel-strip:empty { display: none; }
+     🔴 **AND IT MOVED INTO `shell.css` ON 2026-09-24, WHICH IS WHERE IT SHOULD
+     HAVE GONE FIRST.** It was written here, page scoped, on the argument that
+     making it a component rule would change every instrument page. That argument
+     is wrong twice over: the condition `:has(> .panel-strip:empty)` matches only
+     a case with nothing in its strip, and MEASURED across the three pages that
+     build an instrument, `/kit/` adds 62 blocks, `/fau/` 5 and `/muta/` 4, so
+     exactly one case in the repository is empty. And `shell.css`'s own note on
+     the plate records `/tom/` making exactly this mistake about exactly this
+     component: a private fix, every later page inheriting the defect and not the
+     fix, and the same report arriving again on `/plai/`. The rule and the plate's
+     missing bottom padding are both there now. */
   /* 🔴 THE TOP PADDING IS ON THE TEXTAREA AND NOT ON THE PART, CORRECTED
      2026-09-24 AFTER SHIPPING IT THE OTHER WAY AND BEING SHOWN A CROP OF IT.
      On the part it was 10 px of `--card` sitting above a well painted
@@ -1602,7 +1625,24 @@ effect  = _, _;
      rule that came out of it is that raising specificity to win a fight with
      your own stylesheet is how the next fight starts one step higher. A tie
      plus source order is the smallest thing that can win. */
-  .pos-field.fau-src textarea { padding-top: 14px; }
+  .pos-field.fau-src textarea { padding: 14px 14px 14px 16px; }
+  /* 🔴 `display: block`, AND IT IS THE DOUBLE BOTTOM BORDER. Reported twice,
+     the second time precisely as *"still double bottom border on fau textarea"*,
+     and MEASURED rather than found by looking: the field wrapper's bottom sat at
+     **557.5** and the textarea's at **556.0**. A textarea is `inline-block` and
+     sits on a TEXT BASELINE, so its block parent reserves the descender space
+     under it. That 1.5 px strip belongs to the wrapper, the wrapper is
+     transparent, and a glue paints `--line` behind its children as the seam. So
+     the page drew a 1.5 px line of seam colour, then the real 1 px seam, and the
+     two together read as a doubled border.
+     ⚠️ **NOTHING IN EITHER ELEMENT'S BORDERS WAS WRONG**, which is why reading
+     the CSS found nothing: both measured `0/0/0/0` throughout. The line was a
+     BACKGROUND showing through a gap that layout left, and the only instrument
+     that says so is the pair of rects.
+     ⚠️ AND THIS IS WHY A GLUE IS WHERE IT SHOWS UP. Anywhere else the strip is
+     the page's own background and invisible; inside a glue the ground behind a
+     child is deliberately `--line`, so every stray pixel of it is a line. */
+  .fau-src textarea { display: block; }
 
   /* A row of keys wider than the page scrolls itself rather than dragging the
      page sideways. `min-width: 0` is what lets a flex child shrink below its

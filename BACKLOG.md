@@ -1,5 +1,64 @@
 ## Open
 
+### Open 2026-09-24: `/fau/`'s second round, and four wrong answers before the right one
+
+🔴 **ASKED, VERBATIM, ACROSS SIX MESSAGES:** *"double border, rm"* with a crop,
+*"add padding under nameplate"*, *"you ui skills are pathetic"*, *"its just
+nonrounded bonbordered texateea between 2 glues"*, *"fau on off is missing
+border"*, *"still double bottom border on fau textarea"*, *"add more left padding
+to textarea in fau"*, *"can you have comments in fau file what lines do?"*
+
+✅ **ALL DONE 2026-09-24. The record of the wrong answers is the useful half.**
+
+🔴 **THE DOUBLE BORDER WAS NOT A BORDER AND IT TOOK THREE GUESSES.** Every
+element in that subtree measured `0/0/0/0` or a control's own legitimate box, so
+reading the CSS found nothing and I twice fixed something that was not broken:
+first I removed the presence button's border, which is a real affordance and
+came straight back as *"fau on off is missing border"*.
+✅ **THE RECTS SAID IT IN ONE LINE ONCE I ASKED THE RIGHT PAIR.** The field
+wrapper's bottom was **557.5** and the textarea's was **556.0**. A textarea is
+`inline-block` and sits on a TEXT BASELINE, so its block parent reserves
+descender space under it. That 1.5 px strip belongs to the wrapper, the wrapper
+is transparent, and **a glue paints `--line` behind its children as the seam**,
+so the page drew 1.5 px of seam colour, then the real 1 px seam. `display: block`
+on the textarea. MEASURED after: both bottoms **563.0**.
+⚠️ **AND THIS IS WHY IT SHOWED UP HERE AND NOWHERE ELSE.** Anywhere but a glue
+the ground behind a child is the page's own background and invisible. Inside a
+glue the ground is deliberately a line colour, so **every stray pixel of layout
+becomes a visible line**.
+
+✅ **THE NAMEPLATE, AND IT IS THE THIRD TIME THIS COMPONENT HAS BEEN REPORTED FOR
+IT.** `shell.css` gives the plate `padding-block: var(--panel-pad) 0`, zero at
+the bottom, which is correct while something FOLLOWS it because `.panel-strip`
+brings its own. Emptying the strip exposed the zero: MEASURED `gap under plate
+0.0px`. `/tom/` fixed the TOP half of this privately once, every later page
+inherited the defect and not the fix, and it was re-reported on `/plai/` as
+*"you failed afain on nameplate padding"*.
+🔴 **SO BOTH FIXES WENT IN THE COMPONENT, NOT THE PAGE**, and the page-local
+`:empty` rule written an hour earlier was deleted. `:has(> .panel-strip:empty)`
+makes it provably narrow: MEASURED, the three pages that build an instrument add
+**62** (`/kit/`), **5** (`/fau/`) and **4** (`/muta/`) blocks, so exactly one case
+in the repository is empty and exactly one page changes. `/muta/` re-run to prove
+it: **51/51 with 45 page asserts, unchanged**.
+
+✅ **LEFT PADDING 16 px, TOP 14**, on `.pos-field.fau-src textarea`, which is a
+`(0,2,1)` TIE with `shell.css`'s `.pos-field.tall textarea` and not an
+escalation. The first attempt at `(0,1,1)` lost to that rule's `padding: 7px 9px`
+shorthand and the computed value read 7 px while the source read as correct.
+
+✅ **THE PATCHES CARRY COMMENTS NOW**, one per line that does something a reader
+cannot guess: what `<:` splits, what `_` is, that `en.adsr`'s third number is a
+level and not a time, that FM is the carrier being BENT rather than added to, and
+that `3.51` is the whole bell.
+⚠️ **AND THE BOX WAS RESIZED TO WHAT IT NOW HOLDS.** At `rows: 12` the longest
+preset was cut through the middle of `process`, which is the one line a reader
+most needs. MEASURED: the four presets are **14, 16, 6 and 13** lines with their
+comments, so `rows: 16` is the longest of them rather than a number that looked
+about right.
+
+MEASURED throughout: `/fau/` **45/45 with 39 page asserts**, unchanged across
+every state of this.
+
 ### Open 2026-09-24: `/fau/`'s panel, four asks and one of them is a repeat
 
 🔴 **ASKED, VERBATIM:** *"fau: as i told you: input edge to edge of container w,

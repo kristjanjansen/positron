@@ -9,6 +9,95 @@ description: Demo page furniture: the kit in demo/shell/, controls, readouts, ta
 hand-rolled a control that was already in `demo/shell/`, or wrote a rule that
 lost to another rule and read as correct for weeks.
 
+## When somebody reports a line, a gap or a doubled edge
+
+🔴 **THIS SECTION EXISTS BECAUSE OF ONE SESSION, 2026-09-24, IN WHICH THE SAME
+`/fau/` PANEL WAS REPORTED FIVE TIMES AND FIXED WRONG THREE TIMES.** The verdict
+was *"you ui skills are pathetic"*, and it was earned. Every wrong answer came
+from READING the stylesheet and reasoning about it. Every right answer came from
+measuring two rectangles. What follows is the order to do things in.
+
+🔴 **1. A REPORTED LINE IS NOT NECESSARILY A BORDER, AND CHECKING THE BORDERS
+FIRST IS THE TRAP.** Reported as *"double border, rm"* with a crop. Every element
+in that subtree measured `0/0/0/0` or was a control's own legitimate box, so the
+stylesheet had nothing to find and I removed a presence button's border on
+suspicion. That came straight back as *"fau on off is missing border"*: a real
+affordance, deleted, on a guess.
+✅ **WHAT SAID IT, IN ONE LINE, WAS THE RECT PAIR OF THE ELEMENT AND ITS
+PARENT.** The field wrapper's bottom was **557.5** and the textarea's was
+**556.0**. **A `<textarea>` is `inline-block` and sits on a TEXT BASELINE**, so
+its block parent reserves descender space under it. That 1.5 px strip belongs to
+the wrapper, the wrapper was transparent, and **`.pos-glue` paints `--line`
+behind its children on purpose, because that is how the seam is drawn**. So the
+page rendered 1.5 px of seam colour, then the real 1 px seam, and a reader sees
+two lines. `display: block` on the textarea. MEASURED after: both bottoms
+**563.0**.
+🔴 **SO THE RULE IS: INSIDE A GLUE, EVERY STRAY PIXEL OF LAYOUT BECOMES A VISIBLE
+LINE.** Anywhere else the ground behind a child is the page's own background and
+a 1.5 px gap is invisible. Inside a glue the ground is a line colour by design.
+**A replaced element in a glue (`textarea`, `input`, `img`, `video`, `canvas`,
+`iframe`, `select`) is the shape to check first**, because every one of them is
+inline by default and every one of them will leave that strip.
+⚠️ **AND A CROP IS EVIDENCE OF WHAT IS ON SCREEN, NEVER OF WHAT CAUSED IT.**
+Three readings of the same crop produced three different culprits. Ask the DOM
+for the rects; do not ask yourself what the picture looks like.
+
+🔴 **2. COUNT THE BOXES BY WALKING THE ANCESTORS, NOT BY READING THE RULES YOU
+WROTE.** *"edge to edge"* was asked on 2026-09-23, answered by zeroing three
+insets, and asked again on 2026-09-24 because there were **four**. The fourth was
+`.panel-case`'s own `padding: 0 var(--panel-pad)` at 20 px, on the case, which no
+page rule touched. **A child cannot reach its way out of its parent's padding
+however many of its own rules say 0**, so the text was 20 px short at both ends
+for a day while every rule about it read as correct.
+✅ **THE FIX WAS NOT A FOURTH OVERRIDE, IT WAS A DIFFERENT SLOT.** `add()` puts a
+block INSIDE the case, within its inset; `parts: [el]` makes it a glue member,
+a sibling of the case, with no padding left to fight. **When you are writing a
+third override to escape a parent, you are in the wrong container.**
+⚠️ Walk from the element to the surface and print every ancestor's padding,
+border and rect. It is one loop and it ends the argument.
+
+🔴 **3. A COMPONENT'S SHORTHAND BEATS YOUR LONGHAND, AND WEIGHT DECIDES BEFORE
+ORDER DOES.** `.fau-src textarea` is `(0,1,1)`. `shell.css`'s `.pos-field.tall
+textarea` is `(0,2,1)` and sets `padding: 7px 9px` as a SHORTHAND. The page sheet
+loads later and still lost, so `padding-top` computed **7 px** while the source
+read as correct. The `border-width` on the same element DID win, because the rule
+it beats is `(0,1,1)` and a tie goes to the later sheet. **Two declarations in one
+rule, one winning and one losing, is normal and is invisible in the source.**
+✅ **MATCH THE COMPONENT'S WEIGHT, NEVER OUTRUN IT.** `.pos-field.fau-src
+textarea` is a tie, which is the smallest thing that can win. This stylesheet
+already records `.pos-faux` needing `(0,2,0)` to beat a page; outrunning your own
+stylesheet is how the next fight starts one step higher.
+⚠️ **ALWAYS READ BACK THE COMPUTED VALUE OF THE PROPERTY YOU SET.** Not the
+element, not the rule. The property.
+
+🔴 **4. AIR INSIDE A BOX BELONGS TO THE BOX.** Asked for *"padding on top"*, I
+put it on the wrapper, which also carried a background. The page then drew the
+case, a seam, **a second band of the same dark**, then the well: two bands of one
+colour with a line between them, reported as *"its a mess"*. Padding on a
+container with its own background is a STRIPE, not air. Put it on the thing the
+reader is looking at, and let the container carry no background at all.
+
+🔴 **5. A PAGE-LOCAL REPAIR TO A SHARED COMPONENT IS HOW A DEFECT GETS PAID FOR
+TWICE.** `shell.css` already records this about the nameplate: `/tom/` fixed the
+plate's top padding privately, *"every page after it inherited the defect and not
+the fix"*, and it was re-reported on `/plai/` as *"you failed afain on nameplate
+padding"*. On 2026-09-24 I wrote an empty-strip rule page-locally with a comment
+arguing that a component rule would change every instrument page, and deleted it
+an hour later. **The argument was wrong because a CONDITION can make a component
+rule provably narrow**: `:has(> .panel-strip:empty)` matches only a case with
+nothing in its strip, and MEASURED across the three pages that build one, `/kit/`
+adds 62 blocks, `/fau/` 5 and `/muta/` 4, so exactly one case in the repository
+was empty and exactly one page changed.
+⚠️ **AND THEN RE-RUN THE OTHER PAGES.** `/muta/` came back 51/51 with 45 page
+asserts, unchanged, which is the only thing that makes "provably narrow" a fact
+rather than an argument.
+
+⚠️ **AND A BOX SIZED TO THE CONTENT IT USED TO HOLD HIDES THE CONTENT IT HOLDS
+NOW.** The Faust presets grew comments and `rows: 12` cut the longest one through
+the middle of `process`, which is the one line a reader most needs. MEASURED: the
+four are 14, 16, 6 and 13 lines, so `rows: 16` is the longest of them rather than
+a number that looked about right.
+
 ## Full screen, CSS and touch
 
 - **iPhone Safari has NO element Fullscreen API.** Not `requestFullscreen`,
