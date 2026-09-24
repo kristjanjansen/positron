@@ -89,7 +89,7 @@
   ].join('\n');
 
   const d = mount({
-    name: 'vclick',
+    name: 'sound',
     what: 'A Csound score, compiled as you type. Csound counts in beats, not '
       + 'seconds, so a slowing tempo spaces evenly numbered beats unevenly in '
       + 'time; part 2 is part 1 again played slower, and dropping the playhead '
@@ -348,7 +348,7 @@
     compiled = exp; structural = str;
     part = cp.part;
     const lastBeat = Math.max(...cp.part.rows.map((r) => r.at + Math.max(0, r.dur)), 1);
-    doc = scoreDoc({ id: 'vclick', tempo: cp.tempo.length ? cp.tempo : [[0, 60]],
+    doc = scoreDoc({ id: 'sound', tempo: cp.tempo.length ? cp.tempo : [[0, 60]],
       parts: { theme: cp.part }, uses: usesFor(cp, lastBeat) });
     tm = tempoMap(doc.tempo);
 

@@ -228,10 +228,10 @@ console.log('\ncsound compiler');
 // ── 7. a repeat becomes a QUOTATION VALUE that round-trips ─────────────────
 {
   const c = compileCsound('m theme\ni 1 0 1\ni 1 1 1\nn theme', { expand: false });
-  const qs = repeatsAsQuotations(c, { ref: 'vclick-piece-1', quotation });
+  const qs = repeatsAsQuotations(c, { ref: 'sound-piece-1', quotation });
   const s = score({ id: 'piece-1', quotations: qs });
   const back = parseScore(scoreToJSON(s));
-  ok('the repeat survives as a quotation', qs.length === 1 && qs[0].ref === 'vclick-piece-1',
+  ok('the repeat survives as a quotation', qs.length === 1 && qs[0].ref === 'sound-piece-1',
     JSON.stringify({ at: qs[0].at, in: qs[0].in, out: qs[0].out }));
   ok('and the score round-trips byte-identically',
     scoreToJSON(back) === scoreToJSON(s), `${scoreToJSON(s).length} bytes`);

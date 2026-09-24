@@ -62,7 +62,7 @@ Which names the real hard problem, and it is not bandwidth or latency:
 **clock agreement between devices.** HANDOFF still lists min-RTT skew over a
 real link as the one unmeasured number; everything so far is loopback.
 
-A single device needs no network at all, and `demo/vclick/` already is one — it
+A single device needs no network at all, and `demo/sound/` already is one — it
 imports nothing but `/shell/` and `/timeline/` and makes no `fetch`, no
 `WebSocket`, no HTTP request of any kind. That is the existence proof for the
 derivation, not a proposal to play alone.
@@ -187,7 +187,7 @@ that at every cue boundary ±1 ms — **24 probes, 0 wrong**.
 
 ### One device: zero network
 
-`demo/vclick/` is the existence proof. It imports `/shell/` and `/timeline/`
+`demo/sound/` is the existence proof. It imports `/shell/` and `/timeline/`
 only, and makes no network call. A conductor with a laptop and a compiled score
 needs nothing else — no wifi, no server, no uplink.
 
@@ -245,7 +245,7 @@ that real scores do not use them.
 
 ### P2 — the offline claim, asserted rather than assumed
 
-`demo/vclick/` makes no network call today. Nothing enforces that, so it is one
+`demo/sound/` makes no network call today. Nothing enforces that, so it is one
 careless import from being untrue.
 
 **Done when** the page's offline-ness is a check rather than a property — a
@@ -284,7 +284,7 @@ positron does not address. This is a borrowing, not a build.
   a multi-section score with a tempo is wrong by 2 s in the oracle's case. The
   oracle reports it rather than omitting it.
 - **A repeat under a changing tempo is not the same material in time.** Found
-  and fixed in `demo/vclick/` this session: the document keeps the repeat as one
+  and fixed in `demo/sound/` this session: the document keeps the repeat as one
   line (authoring) while the deck is built from the expanded compile (trace),
   per `plan-timeline` C10. The last note had been **578 ms** early. A quotation
   replayed at `rate: 1` reproduces the stored spacing, not the stretched one,
@@ -293,7 +293,7 @@ positron does not address. This is a borrowing, not a build.
 - **Do not normalize the payload.** `p5` is not velocity. A demo that draws a
   p-field as anything is claiming to know what it means.
 - **A tolerant assert is how a subject goes missing.** `loops` was not looping
-  for its whole life behind `wraps > 0 || !reached`; `vclick` had five transport
+  for its whole life behind `wraps > 0 || !reached`; `sound` had five transport
   asserts silently SKIPPED because its deck was built inside a button handler.
   Assert the mechanism, not a downstream effect that has to be waited for.
 - **Loopback is not a LAN.** The note says so explicitly about its own fastest

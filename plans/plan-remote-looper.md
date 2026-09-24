@@ -115,7 +115,7 @@ phone grid an instance rather than a one-off.
 | **display** | a picture derived from state it does not own | a phone on a stand, a second monitor, a headset | `/mirror/`, `/circuit/`, `/evo/` |
 | **recorder** | a tape of movements, or of audio | wherever the movements originate | `createKeyboard`'s ten takes, `/record/`, `/capture/` |
 | **clock** | when things happen | **always the device making the sound** | `runTake`'s absolute anchor, the board's own graph |
-| **score** | what is supposed to happen | anywhere. It is a document | `/vclick/`, `/held/`, `/nola/`'s chord line |
+| **score** | what is supposed to happen | anywhere. It is a document | `/sound/`, `/held/`, `/nola/`'s chord line |
 
 ⚠️ **A PART IS NOT A FILE AND NOT A COMPONENT.** `createKeyboard` is three parts
 in one object: a control surface (the keys), a recorder (the takes) and a clock

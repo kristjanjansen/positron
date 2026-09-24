@@ -887,7 +887,7 @@ there, stop and ask.** Surveyed:
 | log | ✅ free | `mount()` returns `log` / `clearLog` |
 | raw-document list | ⚠️ partial | `messages.mjs` → `createMessageList` — a flat four-column list, **not cards** |
 | text input | 🔴 **no** | nothing in the kit creates an `<input>`; page-local precedent at `demo/wire/index.html:92` and its `.compose` CSS at `:16-19` |
-| textarea | 🔴 **no** | page-local: `demo/vclick/index.html:117` |
+| textarea | 🔴 **no** | page-local: `demo/sound/index.html:117` |
 | date / time input | 🔴 **no** | **nothing in the whole repo** — no `datetime-local` anywhere |
 | tag input with suggestions | 🔴 **no** | no `<datalist>` anywhere |
 | checkbox / toggle | 🔴 **no** | substitute: a two-option `createChoice`, or an `aria-pressed` button |
