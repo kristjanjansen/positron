@@ -67,7 +67,8 @@ const SCRATCH = OUT !== DEPLOY_OUT;
 // the demo story order, single-sourced from demo/manifest.mjs
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
 // AND in demo/index.html, so fixing one left the other printing `undefined`.
-const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byGroup, groupHTML, noteHTML, extraPages } =
+const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byGroup, groupHTML, noteHTML, extraPages,
+        indexTitle } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
@@ -106,7 +107,7 @@ const FILES = [
   // and the failure mode is a silent ear that detects nothing.
   ['timeline/nested.mjs', 'timeline/nested.mjs'],
   ['timeline/score.mjs', 'timeline/score.mjs'],
-  ['timeline/csound.mjs', 'timeline/csound.mjs'],         // 05 vclick compiles a score in the page
+  ['timeline/csound.mjs', 'timeline/csound.mjs'],         // sound compiles a score in the page
   ['timeline/logdeck.mjs', 'timeline/logdeck.mjs'],       // nested.mjs imports pstats
   ['proto/looper/index.html', 'proto/looper/index.html'],
   ['proto/looper/looper.mjs', 'proto/looper/looper.mjs'],
@@ -759,8 +760,13 @@ await mkdir(OUT, { recursive: true });
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
   if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');
   if (!menu.includes('<!--NOTES-->')) throw new Error('menu.html lost its <!--NOTES--> marker');
+  // ⚠️ THE NAME CARRIES A COUNT, SO IT IS A MARKER LIKE THE OTHER TWO AND IS
+  // CHECKED LIKE THEM. A build that silently shipped the template's empty
+  // heading would put a nameless page on the domain and pass.
+  if (!menu.includes('<!--TITLE-->')) throw new Error('menu.html lost its <!--TITLE--> marker');
   await writeFile(join(OUT, 'index.html'),
-    menu.replace('<!--DEMOS-->', rows).replace('<!--NOTES-->', notes));
+    menu.replace('<!--DEMOS-->', rows).replace('<!--NOTES-->', notes)
+        .replace('<!--TITLE-->', indexTitle(DEMO_MANIFEST)));
 }
 
 // favicon.ico — generated, not committed. Browsers request /favicon.ico for

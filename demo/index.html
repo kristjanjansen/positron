@@ -5,7 +5,13 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>positron: media art experiments</title>
+<!-- 🔴 THE TAB SAYS `positron` AND THE PAGE SAYS MORE, ON INSTRUCTION
+     2026-09-24: *"convert title to positron: x media art experiments ... html
+     <title> stays positron"*. The visible name is built by `indexTitle()` in
+     `demo/manifest.mjs`, which COUNTS the rows it is about to draw; a tab
+     carrying a number would be one more copy of it to go stale, in the one
+     place a reader cannot see it change. -->
+<title>positron</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="icon" href="/favicon.ico">
 
@@ -16,7 +22,7 @@
 <div id="rows"></div>
 
 <script type="module">
-  import { NOTES, byGroup, groupHTML, noteHTML } from '/manifest.mjs';
+  import { NOTES, byGroup, groupHTML, noteHTML, indexTitle } from '/manifest.mjs';
   import { markIndex } from '/shell/caps.mjs';
 
   /**
@@ -69,6 +75,11 @@
   // scripted, and they have printed different things before — `rowHTML` lived
   // in two places and one copy went on printing `undefined` over every demo
   // name for an afternoon after the other was fixed. One renderer, two callers.
+  // ⚠️ THE NAME IS WRITTEN HERE AND BAKED IN THE DEPLOYED COPY, from the same
+  // function, because this page renders its own rows and the build renders its.
+  // The static `positron` in the markup above is what a reader sees for the one
+  // frame before this runs, which is the page's name and not a wrong number.
+  document.querySelector('.pos-name').textContent = indexTitle();
   document.getElementById('rows').innerHTML = byGroup().map(groupHTML).join('');
   // Nothing at all when there are no notes. `NOTES` is empty and this wrote the
   // heading over an empty list on every load; the build does the same test for
