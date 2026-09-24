@@ -5784,6 +5784,29 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    INSIDE a card and `/evo/` puts one in the flow, and neither wants a case's
    inset applied to it. */
 .panel-case > .panel-plate { padding-block: var(--panel-pad) 0; }
+/* 🔴 AND A CASE WITH NOTHING UNDER THE PLATE HAS TO SUPPLY THE AIR ITSELF,
+   ADDED 2026-09-24. The zero above is correct while something FOLLOWS the
+   plate, because `.panel-strip` brings its own `padding-block` and that is the
+   gap you see. Empty the strip and the zero is exposed: MEASURED on `/fau/` the
+   moment its text moved out to a glue part, `gap under plate 0.0px`, with `FAU`
+   sitting on the seam. Reported as *"add padding under nameplate"*.
+   ⚠️ **AND THE STRIP MUST NOT KEEP ITS HEIGHT EITHER**, which is the same
+   defect one element along: an empty strip measured **40 px** of pure
+   `padding-block`, so the case was a 71 px band holding one word. That is this
+   project's empty box rule, the one `.pos-controls[hidden]` and the hidden empty
+   readout already exist for.
+   🔴 **BOTH ARE IN THE COMPONENT RATHER THAN IN THE PAGE, AND THIS FILE ALREADY
+   SAYS WHY.** The note above records `/tom/` fixing the plate's TOP padding
+   privately, every page after it inheriting the defect and not the fix, and the
+   same thing being reported again on `/plai/` as *"you failed afain on nameplate
+   padding"*. A page-local repair to a shared component is how a defect gets paid
+   for twice.
+   ✅ **AND THE CONDITION MAKES IT PROVABLY NARROW**: `:has(> .panel-strip:empty)`
+   matches only a case with nothing in its strip. MEASURED today, the three pages
+   building an instrument add 62 (`/kit/`), 5 (`/fau/`) and 4 (`/muta/`) blocks,
+   so exactly one case in the repository is empty and exactly one page changes. */
+.panel-case > .panel-strip:empty { display: none; }
+.panel-case:has(> .panel-strip:empty) > .panel-plate { padding-block: var(--panel-pad); }
 /* ⚠️ NOT BALANCED, AND THAT IS A DECISION RATHER THAN A ROW THAT WAS MISSED
    IN THE 2026-09-23 SWEEP. A plate's line is a MAKER or a MODEL, which is a
    name and not a sentence, it is set at `line-height: 1` so a second line would
