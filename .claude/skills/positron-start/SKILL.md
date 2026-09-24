@@ -246,10 +246,29 @@ variables, for the reason in Step 2.
 
 ## Step 4. A domain, which is optional and recommended
 
-Ask whether they have one. If they do not, `workers.dev` genuinely works and
-they can move later, so this is not a gate. **But do recommend it, and give the
-reasons rather than asserting it**, because a non-developer cannot weigh this
-otherwise.
+🔴 **ASK THEM ONE PLAIN QUESTION AND HANDLE THE REST YOURSELF.** Everything below
+about hostnames, zones and routes is YOUR problem, not theirs. A person who
+wanted to make a thing is not helped by learning what a Worker script name is.
+The whole of what they need to decide is:
+
+> *"Do you own a web address you want this on, like yourname.com? If not, I will
+> put it on a free Cloudflare address to start with and we can move it to your
+> own any time."*
+
+✅ **AND THE ANSWER IS THE SAME EITHER WAY: SHIP IT ON THE FREE ADDRESS FIRST.**
+Get it live in minutes so they see their own work, and move it to a domain
+**before they hand the link to anybody**. That is not a compromise between the
+two arguments, it is the strongest version of both, and the reason is in point 1
+below: the free hostname contains the Worker's script name, and the script name
+is effectively permanent, so the address a stranger first receives is the one
+you are stuck with.
+⚠️ **DO NOT MAKE THEM READ THE REASONS.** They are here so YOU get the sequence
+right and can answer if asked. If they do not ask, say one sentence: a domain of
+their own is worth it before anyone else sees the link, and it can be bought
+through Cloudflare in the same place you are already working.
+
+If they do not have one, `workers.dev` genuinely works and they can move later,
+so this is never a gate. The reasons, for you:
 
 🔴 **CLOUDFLARE RECOMMENDS IT THEMSELVES, AND THAT IS THE FIRST THING TO SAY.**
 Their `workers.dev` page: *"It's recommended to run production Workers on a
