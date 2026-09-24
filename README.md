@@ -16,17 +16,20 @@ Paste this into **Claude Code** or **Codex** (or any coding agent that can run
 commands on your machine):
 
 ```
-Clone https://github.com/kristjanjansen/positron, then read
-positron/.claude/skills/positron-start/SKILL.md and follow it exactly.
-Run the commands yourself rather than asking me to.
+Read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md
+and follow it exactly. Run every command yourself rather than asking me to.
 
-I want to build something like its stage demo.
+I want to build something like the stage demo at https://positron.studio/stage/.
 ```
+
+**Nothing is installed to read that.** It is one public file over the web, so the
+agent can open it whether or not you have git, and the file itself works out
+what your machine is missing before anything is created.
 
 Change the last line to whatever you want. Some examples that work:
 
 ```
-I want to build something like its stage demo.
+I want to build something like the stage demo.
 I want a page that plays my own archive recordings on a timeline.
 I want the radio one, but pointed at a different station.
 I want to start with nothing and just get one page deployed.

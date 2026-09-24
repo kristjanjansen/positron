@@ -63,6 +63,33 @@ npx wrangler --version
   demand, and this repo never pins it in a `package.json` because there is no
   `package.json`.
 
+🔴 **AND DO NOT ASSUME GIT. THEY REACHED THIS FILE OVER THE WEB.** The prompt in
+the README asks an agent to read one public URL, deliberately, so that somebody
+with no git and no GitHub account can still start. Check before you use it:
+
+```sh
+git --version
+```
+
+- **Git is there**: `git clone https://github.com/kristjanjansen/positron` and
+  work from that.
+- **Git is missing, macOS**: `xcode-select --install` opens a GUI installer that
+  the person has to click. **Ask first**, and offer the zip instead, which needs
+  nothing:
+
+```sh
+curl -L -o positron.zip https://github.com/kristjanjansen/positron/archive/refs/heads/main.zip
+unzip -q positron.zip     # unpacks as positron-main/
+```
+
+  `curl` and `unzip` both ship with macOS, so this route installs nothing at all.
+⚠️ **AND SAY WHICH ONE YOU USED**, because it decides whether they can ever
+`git pull` an update or have to download the zip again.
+⚠️ **THEY MAY NOT NEED THE REPOSITORY AT ALL.** If what they want is their own
+small site, this one is a REFERENCE: read the page that does the thing they
+described, and build theirs beside it rather than inside it. A copy of somebody
+else's whole site is a worse starting point than one page that works.
+
 ⚠️ **THERE IS NO BUILD STEP AND NOTHING TO `npm install`.** If you find yourself
 reaching for a bundler, a framework or a lockfile, you have misread the repo.
 Every page is one HTML file with ES modules. `node demo/server.mjs` serves it.
