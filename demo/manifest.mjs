@@ -75,31 +75,31 @@ export const DEMOS = [
   { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'a score round-trips byte-identically and refuses mutation',
     tags: ['timeline'] },
-  { name: 'vclick', group: 'timeline', act: 0, created: '2026-09-07', built: true,
+  { name: 'sound', group: 'vain', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score compiled to a timeline. The tempo map is an integral and the repeat is a quotation',
     tags: ['timeline', 'Csound', 'WebAudio'] },
-  { name: 'click', group: 'timeline', act: 0, created: '2026-09-14', built: true,
+  { name: 'click', group: 'vain', act: 0, created: '2026-09-14', built: true,
     one: 'U:’s wireless click track, playing their own score with nothing on the wire',
     tags: ['timeline', 'Csound'] },
 
-  { name: 'llhls', group: 'transports', act: 1, created: '2026-09-04', built: true,
+  { name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true,
     one: 'the tuned v6 player on a live input this page starts and stops',
     tags: ['LL-HLS', 'Stream', 'container'],
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
     settleMs: 75000 },
-  { name: 'webrtc', group: 'transports', act: 1, created: '2026-09-04', built: true,
+  { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true,
     one: 'the same live input over WHEP; same burned-in clock as 06',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
-  { name: 'moq', group: 'transports', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
+  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
-  { name: 'room', group: 'transports', act: 2, created: '2026-09-04', built: true,
+  { name: 'room', group: 'streaming', act: 2, created: '2026-09-04', built: true,
     one: 'join a room and see the others; peer to peer, the relay only signals',
     tags: ['getUserMedia', 'WebRTC', 'relay'] },
-  { name: 'cues', group: 'transports', act: 2, created: '2026-09-04', built: true,
+  { name: 'cues', group: 'messages', act: 2, created: '2026-09-04', built: true,
     one: 'fire one cue; every open copy of the page acts on it, tokenless',
     tags: ['DO', 'WS', 'relay'] },
   // Act 2 with `cues` and for the same reason — one act reaching everybody —
@@ -129,26 +129,10 @@ export const DEMOS = [
   // rather than demo/verify.mjs — the ordinary harness runs Chrome with
   // --disable-gpu, where getContext('webgl2') returns null and every assert
   // here would be unreachable.
-  { name: 'mirror', group: 'xr', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
+  { name: 'mirror', group: 'th', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
-  // A room from one 32-bit number, and the first WebXR page here. `gl: true`
-  // for the same reason `mirror` has it — demo/verify.mjs runs Chrome with
-  // --disable-gpu, where getContext('webgl2') is null and every assert on this
-  // page would be unreachable.
-  //
-  // ⚠️ TWO OF ITS ASSERTS CANNOT BE REACHED BY ANY DESKTOP BROWSER — that an
-  // immersive session started, and that a floor-relative space resolved. They
-  // are the Quest-only branch, and they are why demo/verify-quest.mjs has to
-  // exist before this page's green means anything about a headset. Until it
-  // does, the headset half is HUMAN-VERIFIED and the page says so on its face.
-  // The Immersive Web Emulator satisfies both on a laptop, which makes it
-  // useful for writing the page and worthless as evidence about a device —
-  // research/quest-xr calls that "the iPhone mistake in a new accent".
-  { name: 'blocks', group: 'xr', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 6000,
-    one: 'square bricks on a dotted floor you drag to look around, and in a headset a ray from your hand picks one up and snaps it to the grid where you let it go',
-    tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
 
   // Typography with a position rather than a place on a page. `gl: true` and
   // `xr: true` for the reason mirror, blocks and floor carry them: verify.mjs
@@ -157,7 +141,7 @@ export const DEMOS = [
   // Six fields are computed in JavaScript at load, measured around 25 ms each
   // on this machine, and the asserts then draw every word off-screen twice to
   // read its size out of the pixels. The first assert sits behind all of it.
-  { name: 'weight', group: 'xr', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
+  { name: 'weight', group: 'th', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
     one: 'one sentence broken across four walls, each word as big as it is short and none of them turning to face you, and any word retyped where it stands',
     tags: ['WebXR', 'WebGL2', 'fonts'] },
 
@@ -203,7 +187,7 @@ export const DEMOS = [
    * no third-party mount: it decoded from our own station Worker.
    */
 
-  { name: 'wire', group: 'transports', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
+  { name: 'wire', group: 'messages', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },
 
@@ -221,22 +205,6 @@ export const DEMOS = [
   { name: 'take', group: 'capture', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
     one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
     tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
-  // The 2025 experiment finished: an automation lane bound to a media clip,
-  // which died at one missing mapping — an absolute stamp had to reach a
-  // foreign media element's own position and then a pixel, and nothing
-  // converted. The clip is generated IN THE PAGE so the clock burned into the
-  // picture can be read back and compared with the playhead, which is the check
-  // the prototype could not make: it proved its four mappings against its own
-  // arithmetic.
-  //
-  // settleMs does the same two jobs it does on `take`. Control 0 does not exist
-  // here, so only the second one counts: it sizes the wait for the FIRST
-  // assert, and every assert sits behind a recorded clip, a drawn pass and a
-  // five-point seek sweep. Shrink it and the suite reads zero asserts and calls
-  // a working page broken.
-  { name: 'memento', group: 'capture', act: 3, created: '2026-09-13', built: true, settleMs: 13000,
-    one: 'move a knob while a clip plays; it lands on the same line and comes back in the right place',
-    tags: ['MediaRecorder', 'timeline', 'canvas', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
@@ -264,23 +232,23 @@ export const DEMOS = [
   // its own moment as a retroactive burst. The loop button it graded is still
   // graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
 
-  { name: 'looper', group: 'instruments', act: 4, created: '2026-09-04', built: true,
+  { name: 'looper', group: 'technologies', act: 4, created: '2026-09-04', built: true,
     one: 'a keyboard into a WebAudio synth, then loop what you played',
     tags: ['WebAudio', 'AudioWorklet'] },
-  { name: 'instrument', group: 'instruments', act: 4, created: '2026-09-04', built: true,
+  { name: 'instrument', group: 'messages', act: 4, created: '2026-09-04', built: true,
     one: 'play an instrument that is somewhere else, and hear how late it is',
     tags: ['WebMIDI', 'relay', 'WebAudio', 'WebRTC'] },
-  { name: 'jam', group: 'instruments', act: 4, created: '2026-09-04', built: true,
+  { name: 'jam', group: 'messages', act: 4, created: '2026-09-04', built: true,
     one: 'two browsers on one pulse, on a peer-corrected clock',
     tags: ['WS', 'relay', 'WebAudio'] },
 
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
   // committed; the media streams from ERR and nothing is stored here.
-  { name: 'reel', group: 'xr', act: 5, created: '2026-09-08', built: true,
+  { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
     one: 'every 1965 newsreel on one line, at the day it was broadcast',
     tags: ['archive', 'timeline'] },
-  { name: 'now', group: 'transports', act: 5, created: '2026-09-08', built: true,
+  { name: 'now', group: 'streaming', act: 5, created: '2026-09-08', built: true,
     one: 'one live television channel on a line whose right-hand end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
@@ -290,13 +258,13 @@ export const DEMOS = [
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
   // `node demo/verify-gl.mjs` is the grader.
-  { name: 'floor', group: 'xr', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
+  { name: 'floor', group: 'err', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
     one: 'every 1965 newsreel face up on a floor you walk over, and any of them plays where it lies',
     tags: ['WebGL2', 'WebXR', 'archive', 'HLS'],
     // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
     // of fetching before there is much to see
     settleMs: 4000 },
-  { name: 'flipper', group: 'transports', act: 5, created: '2026-09-04', built: true,
+  { name: 'flipper', group: 'streaming', act: 5, created: '2026-09-04', built: true,
     one: 'eight live television channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
@@ -321,7 +289,7 @@ export const DEMOS = [
   // files WE hold, because mimproject.org has been down long enough that two
   // video sites were the last copies anybody could reach. Its corpus is a
   // separate file for exactly that reason — see `build-mimproject.mjs`.
-  { name: 'making', group: 'mim', act: 5, created: '2026-09-19', built: true,
+  { name: 'making', group: 'th', act: 5, created: '2026-09-19', built: true,
     one: 'the recordings and the pictures that outlived MIMproject\'s own website, shown from the table under whichever one you are looking at',
     tags: ['archive', 'provenance', 'R2'] },
   // 🔴 THE FIRST ROW IN ACT 6, `composition`, AND IT SITS HERE IN THE ARRAY
@@ -346,7 +314,7 @@ export const DEMOS = [
   // line. ⚠️ THE DEPLOYED `/veil/` DIES WITH THE ROW and no redirect has been
   // written, the same as `radio1965`, `box` and `keys` before it. It was live
   // for less than a day.
-  { name: 'held', group: 'xr', act: 6, created: '2026-09-19', built: true,
+  { name: 'held', group: 'th', act: 6, created: '2026-09-19', built: true,
     // sizes the wait for the page's first assert, which sits behind one local
     // read of a 99 KB file. Nothing here has a control to press.
     settleMs: 4000,
@@ -372,7 +340,7 @@ export const DEMOS = [
   // a second, larger step — four entries out of the build's allowlist and a URL
   // that starts 404ing — and it is decided on purpose rather than as a side
   // effect of tidying the front page.
-  { name: 'remixer', group: 'transports', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
+  { name: 'remixer', group: 'streaming', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
     one: 'stack archive recordings from any year on one playhead',
     tags: ['HLS', 'timeline', 'not shelled'] },
 
@@ -479,7 +447,7 @@ export const DEMOS = [
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
-  { name: 'strip', group: 'timeline', act: 0, created: '2026-09-04', built: true,
+  { name: 'strip', group: 'technologies', act: 0, created: '2026-09-04', built: true,
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
   // The studio Mac as an instrument: the same page as /keys/, pointed at a
@@ -514,7 +482,7 @@ export const DEMOS = [
    * buttons have never sent a byte anybody has captured, so they are drawn and
    * marked rather than wired by guess.
    */
-  { name: 'circuit', group: 'hardware', act: 4, created: '2026-09-21', built: true,
+  { name: 'circuit', group: 'instruments', act: 4, created: '2026-09-21', built: true,
     one: 'a Novation Circuit on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -532,7 +500,7 @@ export const DEMOS = [
    * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
    * the harness.
    */
-  { name: 'wish', group: 'hardware', act: 4, created: '2026-09-21', built: true,
+  { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
     one: 'say which instrument should play which, and a language model proposes the connection',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
 
@@ -549,7 +517,7 @@ export const DEMOS = [
    * browser, most of them negative controls, because a validator passes a naive
    * suite by returning yes to everything.
    */
-  { name: 'bay', group: 'hardware', act: 4, created: '2026-09-21', built: true,
+  { name: 'bay', group: 'instruments', act: 4, created: '2026-09-21', built: true,
     one: 'route one instrument to another, with the connections it refuses explained in words',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -576,7 +544,7 @@ export const DEMOS = [
    * curve, so the first step of a 127 step lane lands about half a second in,
    * and that measurement is the first thing the checks make.
    */
-  { name: 'shape', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
+  { name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
     one: "edit a Novation Circuit's sound while it is playing, with sliders that can move themselves",
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -597,7 +565,7 @@ export const DEMOS = [
    * ⚠️ `settleMs` IS FOR THE READING. 3.3 MiB unzipped, 64 patches decoded and
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
-  { name: 'pack', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
+  { name: 'pack', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
     one: 'open a Circuit pack or a loose sample set and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
   /**
@@ -612,7 +580,7 @@ export const DEMOS = [
    * the transport, and this page is ready 770 ms after load with the whole pack
    * unzipped, all 64 samples decoded and every check run.
    */
-  { name: 'tom', group: 'hardware', act: 4, created: '2026-09-21', built: true,
+  { name: 'tom', group: 'instruments', act: 4, created: '2026-09-21', built: true,
     one: 'tap a grid of 16 steps whose rows become the samples out of a Circuit pack or sample set you open here',
     tags: ['WebAudio', 'timeline', 'zip', 'sysex'] },
 
@@ -628,23 +596,8 @@ export const DEMOS = [
    * flat), every release a note on at velocity 0, a seven bit pitch wheel in a
    * fourteen bit message, and six controller numbers for eight knobs.
    */
-  /**
-   * 🔴 A BENCH FOR ONE INTERACTION, ASKED FOR IN THOSE WORDS. 2026-09-23: *"can
-   * make a separate tmp demo too get it right 'num'"*, about a looper driven
-   * from `/evo/`'s numpad that is meant to land on `/nola/` as a third mode.
-   * ⚠️ SO IT IS DELIBERATELY NOT AN INSTRUMENT. No audio, no roll, no chords:
-   * what is being got right is a four state machine with ten instances and a
-   * timing window, and `demo/shell/numloop.mjs` holds that with
-   * `numloop-test.mjs` grading it in no browser at all.
-   * ⚠️ AND IT MAY NOT SURVIVE. It was asked for as a temporary one, so when the
-   * mode lands this row is a candidate for `built: false` or for going
-   * altogether, and the module it proved is the part that stays.
-   */
-  { name: 'num', group: 'instruments', act: 4, created: '2026-09-23', built: true,
-    one: 'ten numbers, each one a loop you record, play, stop and throw away with the same key',
-    tags: ['transport'] },
 
-  { name: 'evo', group: 'hardware', act: 4, created: '2026-09-21', built: true,
+  { name: 'evo', group: 'instruments', act: 4, created: '2026-09-21', built: true,
     one: 'an Evolution MK-425C on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -659,7 +612,7 @@ export const DEMOS = [
    * `bay.mjs`'s prose, `xr-room.mjs`'s controller models and `/wish/`'s model
    * pickers are all untouched.
    */
-  { name: 'twelve', group: 'hardware', act: 4, created: '2026-09-20', built: true,
+  { name: 'twelve', group: 'instruments', act: 4, created: '2026-09-20', built: true,
     one: 'a TASCAM Model 12 on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
 
@@ -693,7 +646,7 @@ export const DEMOS = [
    * browser at all, on one claim the whole thing rests on: at a margin of 1.0 it
    * is never wrong.
    */
-  { name: 'nola', group: 'hardware', act: 4, created: '2026-09-22', built: true,
+  { name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true,
     one: 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
        + 'of chords you either type in or teach it by playing',
     tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },
@@ -713,7 +666,7 @@ export const DEMOS = [
    * ⚠️ NO `settleMs`. Every control is an async handler, so `verify.mjs` waits
    * for `data-busy` to clear rather than for a number somebody guessed.
    */
-  { name: 'fau', group: 'hardware', act: 4, created: '2026-09-23', built: true,
+  { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
     one: 'a synthesiser you type in, compiled to machine code in this tab '
        + 'a moment after you stop typing',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
@@ -736,7 +689,7 @@ export const DEMOS = [
   // been given a page — hold 24.19 px against Catmull-Rom 0.036, and 93.4% of
   // the drawn line invented. The adapter was the asset; its hand-rolled UI is
   // what the kit replaces.
-  { name: 'draw', group: 'timeline', act: 0, created: '2026-09-13', built: true,
+  { name: 'draw', group: 'technologies', act: 0, created: '2026-09-13', built: true,
     one: 'record a gesture, play it back, and see how much of the line was never recorded',
     tags: ['pointer', 'timeline', 'canvas'] },
   // The last of the protos to be given a page, promoted from proto/text/: the
@@ -746,7 +699,7 @@ export const DEMOS = [
   // each change DID to the document, which is what makes a seek a fold rather
   // than a replay — 73 edits captured through a real browser, rebuilt to the
   // browser's own text character for character.
-  { name: 'typist', group: 'timeline', act: 0, created: '2026-09-13', built: true,
+  { name: 'typist', group: 'th', act: 0, created: '2026-09-13', built: true,
     one: 'type, and it types itself back. Drag to any moment and the words and the cursor come back',
     tags: ['timeline', 'text', 'local only'] },
   // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
@@ -798,7 +751,7 @@ export const DEMOS = [
   // assert until that is done, because `verify.mjs` stops collecting the moment
   // the count is unchanged for one 400 ms tick. 25 s measured against a drill
   // that takes about twelve.
-  { name: 'stage', group: 'capture', act: 4, created: '2026-09-17', built: true, settleMs: 25000,
+  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 25000,
     one: 'two presses, one for the picture and one for the show, put a church scene from '
       + 'a 2011 MIMproject performance in front of an audience, ask them something, and '
       + 'keep every answer on the recording\u2019s own timeline',
@@ -849,7 +802,7 @@ export const DEMOS = [
    * rather than pages that make a sound of their own, and that is the company
    * this one keeps.
    */
-  { name: 'muta', group: 'hardware', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
+  { name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
     one: 'two of Emilie Gillet’s firmwares, an oscillator and an effect, compiled from their own C++ to WebAssembly and chained in one audio graph',
     /* ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so a browser with no MIDI
        keeps this row linked and the page says why rather than the row vanishing,
@@ -870,7 +823,7 @@ export const DEMOS = [
    * a browser with no MIDI at all. It has a known stream written into it and
    * every check runs off that, so the page is worth opening on a phone.
    */
-  { name: 'dump', group: 'hardware', act: 4, created: '2026-09-20', built: true,
+  { name: 'dump', group: 'instruments', act: 4, created: '2026-09-20', built: true,
     one: 'every message a plugged-in instrument sends, as raw bytes beside a reading of them',
     tags: ['WebMIDI', 'CoreMIDI', 'SysEx'] },
 
@@ -1114,58 +1067,143 @@ export function shortDate(iso) {
  * headset group because that is where you would go looking for it.
  */
 /**
- * 🔴 THERE IS NO SECTION NAMED AFTER A BROADCASTER ANY MORE, AND THAT IS NOT
- * TIDINESS. Asked 2026-09-16, *"hide the ERR archive from frontpage"* and
- * *"no err refs"*, the same evening they told us our connections were
- * corrupting their listener statistics (CLAUDE.md). A heading advertising whose
- * streams this site pulls is the one thing on the front page they would be
- * shown first. The pages are unchanged and still reachable; what has gone is
- * the section, the name in three one-line descriptions, and the `ERR` tag on
- * two cards. `reel` joins the newsreels that are already in a headset, and the
- * two live channel pages go to `technologies`, which is what they demonstrate.
+ * 🔴 A SECTION NAMED AFTER A BROADCASTER IS BACK, AND THE INSTRUCTION IT
+ * REVERSES IS KEPT HERE RATHER THAN DELETED. What stood in this place from
+ * 2026-09-16 was *"hide the ERR archive from frontpage"* and *"no err refs"*,
+ * asked the same evening they told us our connections were corrupting their
+ * listener statistics (CLAUDE.md), on the argument that a heading advertising
+ * whose streams this site pulls is the first thing they would be shown. Asked
+ * again 2026-09-24: *"second group err, move floor to err and the one what had
+ * err audio and video side by side"*. So `err` is the second section.
+ * ⚠️ WHAT THAT DECISION WAS ABOUT IS UNCHANGED AND IS NOT WEAKENED BY THIS
+ * ONE. The rule in CLAUDE.md is about CONNECTIONS rather than about a heading:
+ * every connection this repository opens to an ERR mount appears in a public
+ * broadcaster's audience measurement, and naming a section opens none. Neither
+ * page in it fetches anything until somebody presses something.
+ * ⚠️ AND IT IS TWO PAGES, NOT EVERY ERR PAGE. `floor` and `reel` were
+ * named; `now` and `flipper` were not, and both stay in `streaming` where a
+ * live channel belongs.
+ * 🔴 THE FIRST ANSWER TO *"the one what had err audio and video side by
+ * side"* WAS `flipper` AND IT WAS WRONG. `flipper` is the only page here
+ * holding ERR television and ERR radio at once, so a search for the SOURCE
+ * finds it and nothing else. The ask was about the LAYOUT: `reel` draws one
+ * column per medium, the newsreel on the left and the same day's radio on the
+ * right, and it plays the ARCHIVE rather than the live mounts, so no search for
+ * a live mount could ever have reached it.
  *
- * ⚠️ AND NO ARTICLES. Asked in the same breath, *"rm 'the' from the titles"*.
+ * ⚠️ AND NO ARTICLES. Asked 2026-09-16, *"rm 'the' from the titles"*.
  * Five of these were bare and three were not, so the column read `the timeline`
  * over `instruments` over `capture`: a list where some members are names and
  * some are phrases. Same rule as the diagram labels in CLAUDE.md.
  */
 export const GROUPS = new Map([
   /**
-   * 🔴 `hardware` IS FIRST AND IS THE OBJECTS ON THE DESK. Asked 2026-09-21:
-   * *"make new group hardware on top if index, move all latest demos strting
-   * from dump there"*. Seven rows moved out of `instruments`: the three panel
-   * replicas, the patch bay, the editor, the speech front end and the dump.
-   * ⚠️ **WHAT SEPARATES THE TWO GROUPS IS WHETHER A REAL OBJECT IS IN THE
-   * ROOM**, not whether the page makes a sound. `instruments` keeps the pages
-   * that ARE an instrument in a browser (a looper, a granulator, a jam) plus
-   * the two that drive something over a relay. `hardware` is the pages about a
-   * thing you can put your hand on: a Novation Circuit, a TASCAM Model 12, an
-   * Evolution MK-425C, and the four pages that route, edit, describe or dump
-   * them.
-   * ⚠️ **THE CUT IS AT `dump` BECAUSE THAT IS WHERE IT WAS ASKED FOR.** `knobs`
-   * and `able` are arguable: one drives a Raspberry Pi in another building and
-   * the other plays Ableton Live on a Mac, so both have real hardware behind
-   * them. They stay where they are rather than being swept in on an inference.
+   * 🔴 `TH` IS FIRST, ASKED 2026-09-24: *"move headset group first in
+   * index. rename to 'TH'"*, with *"move making to TH"* and *"move typist to
+   * th"* in the same message. The title is the two letters as they were quoted.
+   * ⚠️ IT IS NO LONGER A GROUP ABOUT A DEVICE, WHICH IS WHAT LETS THE NAME
+   * CHANGE AT ALL. It read `headset` (and `in a headset` before that, changed
+   * 2026-09-21 on *"in a headset -> headset"*) while every row in it was a page
+   * you put a headset on for. `making` is an archive on two tabs and `typist`
+   * is text on a line, so a name describing the hardware would now be wrong
+   * about two of its five rows.
+   * ⚠️ AND IT LOST `reel` AND `floor` TO `err` IN THE SAME MESSAGE, which
+   * is the two 1965 newsreel pages leaving together.
+   * ⚠️ `stage` JOINED 2026-09-24 ON *"move stage to th"*, out of `capture`.
+   * It puts a church scene from a 2011 MIMproject performance in front of an
+   * audience, so it lands beside `making`, which is that project's archive.
+   * 🔴 AND THE ID IS `th` NOW, NOT `xr`. It was `xr` from the day this was
+   * the headset group, and three of its six rows have nothing to do with a
+   * headset, so the key was about to teach the next reader something false.
+   * The `xr: true` FLAG on a row is a different thing and did not move: it is
+   * what `caps.mjs` reads to offer a headset page, and `mirror`, `weight` and
+   * `floor` still carry it, one of them from another section entirely.
    */
-  ['hardware', 'hardware'],
+  ['th', 'TH'],
+  ['err', 'err'],
   /**
-   * ⚠️ `headset`, NOT `in a headset`, CHANGED 2026-09-21 ON INSTRUCTION
-   * (*"in a headset -> headset"*), AND IT FINISHES THE RULE WRITTEN BELOW.
-   * That rule took the articles out of these titles because a column reading
-   * `the timeline` over `instruments` over `capture` is a list where some
-   * members are names and some are phrases. `in a headset` was the last phrase
-   * standing: it carried both an article and a preposition, so it was the
-   * furthest from a name of any row here and it survived the sweep that was
-   * written about exactly that.
+   * 🔴 `instruments` IS EVERY PAGE THAT PLAYS A REAL THING, AND THE NAME
+   * CHANGED HANDS 2026-09-24: *"rename hardware to instruments, move knobs able
+   * grains there. looper instrument jam moves to ithers"*. The ID moved with the
+   * title, so there is one `instruments` rather than an id reading `hardware`
+   * under a heading that does not.
+   * ⚠️ IT REVERSES THE LAST LINE OF THE COMMENT THAT MADE THIS GROUP, kept
+   * here because that line was right about its own reasoning. `hardware` was
+   * created 2026-09-21 on *"make new group hardware on top if index, move all
+   * latest demos strting from dump there"*, and what separated it from the old
+   * `instruments` was whether a REAL OBJECT IS IN THE ROOM: a Novation Circuit,
+   * a TASCAM Model 12, an Evolution MK-425C, and the pages that route, edit,
+   * describe or dump them. `knobs`, `able` and `grains` were named there as
+   * arguable (a Raspberry Pi in another building, Ableton Live on a studio Mac,
+   * a granulator running in both at once) and left out because sweeping them in
+   * would have been an INFERENCE. An instruction is the thing an inference was
+   * not, so all three moved.
+   * ⚠️ AND THE OLD `instruments` GROUP IS GONE RATHER THAN RENAMED. `looper`,
+   * `instrument` and `jam` were asked out in the same breath, which emptied it
+   * and freed the name for this one.
    */
-  ['xr', 'headset'],
-  ['vain', 'väin'],
-  ['kurenniemi', 'kurenniemi'],
-  ['mim', 'mim'],
   ['instruments', 'instruments'],
+  /**
+   * 🔴 `u:`, NOT `väin`, ASKED 2026-09-24: *"rename vain to u:, move clic
+   * and vclick there"*.
+   * ⚠️ THE ID STAYS `vain` AND ONLY THE TITLE MOVED. An id is an address
+   * every row in the array carries; the title is the word a visitor reads, and
+   * this file has already run an id and a title apart on purpose (`transports`
+   * was titled `technologies` for a week).
+   * ⚠️ AND IT GAINED THE TWO CSOUND PAGES. `click` is U:'s wireless click
+   * track and `sound` (`vclick` until 2026-09-24) is a score compiled to a
+   * timeline, so both sat in `timeline` on a technical reading while their
+   * subject is the ensemble the rest of this group is about.
+   */
+  ['vain', 'u:'],
+  ['kurenniemi', 'kurenniemi'],
+  // `mim` IS GONE, EMPTIED 2026-09-24 BY *"move making to TH"*: `making` was its
+  // only row. `byGroup` drops a section with no rows, so leaving the id here
+  // would have rendered nothing and been invisible. It is removed because a
+  // group nothing is in is a name waiting to catch a typo in a row.
   ['capture', 'capture'],
+  /**
+   * 🔴 `timeline` IS THE FOUR PAGES THAT ARE THE TIMELINE ITSELF. Asked
+   * 2026-09-24: *"timeline: leave ones who have timeline component. the rest
+   * merge with technologies"*.
+   * ⚠️ THE COMPONENT TEST WAS MEASURED AND IT SEPARATED NOTHING. All nine
+   * rows here called `createStripView` from `demo/shell/strip.mjs`, and so did
+   * the six left after `click`, `sound` and `typist` moved out, so on that test
+   * the group does not shrink at all. Settled by asking rather than by picking
+   * a reading: the four that stay are the ones whose SUBJECT is the timeline,
+   * and `strip` and `draw` went to `technologies`.
+   */
   ['timeline', 'timeline'],
-  ['transports', 'technologies'],
+  /**
+   * 🔴 `transports` BECAME THREE SECTIONS, ASKED 2026-09-24: *"split onto
+   * streamig (who steam smth) and messages (relyng messages etc but not
+   * streaming) and rest is techologeis"*.
+   * ⚠️ THE CUT IS WHAT GOES OVER THE WIRE, NOT WHICH API IS IN THE PAGE.
+   * `streaming` is the pages that open a stream and play it: `llhls`, `webrtc`
+   * and `moq` on an input this site starts and stops, `room` on a camera peer
+   * to peer, `now` and `flipper` on a live channel, `remixer` on the archive.
+   * `messages` is a relay whose MESSAGES are the subject: `cues` fires one act
+   * to every open copy of the page, `wire` shows the exact bytes going and
+   * coming back, `jam` puts two browsers on one pulse with the sound made at
+   * each end, and `instrument` plays a keyboard on a machine somewhere else.
+   * Those ride the same Durable Object and the same socket as half of
+   * `streaming`, which is why the API cannot be the test.
+   * ⚠️ THIS READ `with no media in it at all` UNTIL 2026-09-24, AND
+   * `instrument` BROKE IT the moment it arrived: the far machine's audio comes
+   * back over the same connection, so it carries a stream too. It is here
+   * rather than in `streaming` because its readout is two LATENCIES, how late a
+   * note from the other player is and how long a press takes to come back as
+   * sound, and the audio is what makes a late message audible. It is the
+   * arguable row in this section and it is named rather than hidden.
+   * ⚠️ `technologies` KEPT THE NAME AND NONE OF ITS ORIGINAL ROWS. It is
+   * `strip` and `draw` out of the old `timeline` group, and since 2026-09-24
+   * `looper`, a keyboard into a WebAudio synth with a loop pedal on it and
+   * nothing on a wire at all, which had nowhere else to go when the old
+   * `instruments` group was emptied.
+   */
+  ['streaming', 'streaming'],
+  ['messages', 'messages'],
+  ['technologies', 'technologies'],
   ['kit', 'kit'],
 ]);
 
@@ -1199,6 +1237,30 @@ export function byGroup(list = DEMOS) {
     rows: byNewest(list.filter((d) => d.group === id))
       .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)),
   })).filter((g) => g.rows.length);
+}
+
+/**
+ * The front page's own name, with the number of demos on it COUNTED rather than
+ * written down.
+ *
+ * 🔴 IT COUNTS WHAT `byGroup()` IS ABOUT TO DRAW, NOT `DEMOS.length`. The
+ * question the title answers is how many experiments are ON THIS PAGE, and the
+ * two numbers are different: `byGroup` drops an `unlisted` row and refuses one
+ * with no group, so today it is 58 rows against 59 in the array. Deriving it
+ * from the array would put a number on the page that disagrees with the cards
+ * under it, and that is the disagreement nobody checks.
+ * ⚠️ AND IT IS NEVER TYPED. CLAUDE.md opens with COUNT THE DEMOS, NEVER
+ * REMEMBER THEM, written after that line read `47 of 49` one morning and
+ * `51 of 53` the same afternoon, both true when written. A literal here would
+ * be the same defect on the one page everybody opens first.
+ * ⚠️ THE BROWSER TAB IS DELIBERATELY NOT THIS. Asked 2026-09-24: *"convert
+ * title to positron: x media art experiments ... html <title> stays positron"*.
+ * Both index pages carry `<title>positron</title>` by hand, and this string is
+ * the visible `h1` only.
+ */
+export function indexTitle(list = DEMOS) {
+  const n = byGroup(list).reduce((total, g) => total + g.rows.length, 0);
+  return `positron: ${n} media art experiments`;
 }
 
 /**

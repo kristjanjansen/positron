@@ -188,7 +188,12 @@ async function common(page) {
 // ── 0. index menu ───────────────────────────────────────────────────────────
 console.log('\n[0] index menu');
 await goto('/', { settle: 600 });
-ok('index', 'served 200 html', await evaluate(`document.title`) === 'POSITRON', await evaluate(`document.title`));
+// ⚠️ THE TAB IS `positron`, LOWER CASE, AND DELIBERATELY NOT THE NAME ON THE
+// PAGE. `menu.html` carries `<title>positron</title>` and the `h1` carries
+// `positron: <n> media art experiments`, counted at build time (2026-09-24).
+// This asserted `POSITRON` while the tab read `positron: media art
+// experiments`, so it was red on a correct page before this line was touched.
+ok('index', 'served 200 html', await evaluate(`document.title`) === 'positron', await evaluate(`document.title`));
 // The menu is the DEMO LIST, generated from demo/manifest.mjs. Assert what the
 // generator promises: one row per manifest entry, and every LINKED row pointing
 // at a real target. Deployed demos live at /<nn>-<name>/ — build.mjs strips the
