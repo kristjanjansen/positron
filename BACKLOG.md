@@ -1,5 +1,120 @@
 ## Open
 
+### Open 2026-09-25: `/knobs/` has a flaky pair of asserts, and the constant is 6.4x stale
+
+🔴 **TWO ASSERTS ON `/knobs/` ARE A COIN TOSS, PROVED ACROSS THREE RUNS:**
+`a wheel and an arrow key each take the dial back in one frame` and `and it picks
+the movement up again after the yield`. **Red in one run, green in the next, red
+in the third**, with no code change between them.
+
+🔴 **AND THE ARITHMETIC SAYS IT CANNOT BE RELIABLE, WHICH IS WHY THIS IS A
+DEFECT AND NOT A RERUN.** Both conditions hinge on whether the cutoff moved **one
+step of 127** during an `await wait(900)`. The sweep is `lapMs: 14000` on a
+beta(3,4) ease in with a 130 ms hold at each end and 12% timing jitter, **and the
+knob starts AT an end**. 900 ms is **6.4% of one reach**, most of it the hold and
+the slow part of the curve, so the expected travel is a fraction of one step.
+
+🔴 **THE CONSTANT WAS CHOSEN WHEN THE LAP WAS 2,200 ms. IT HAS SINCE GONE
+2,200 to 7,000 to 14,000, A FACTOR OF 6.4, AND THIS ONE WAS LEFT UNDERIVED.**
+⚠️ **AND THE SIBLING WAIT FIVE LINES BELOW IT IN THE SAME FUNCTION ALREADY
+CARRIES A COMMENT SAYING THIS EXACT THING HAPPENED TO IT AND WAS FIXED BY
+DERIVING IT FROM `lapMs`.** The fix was applied to one of a pair.
+
+⚠️ **THE ONE LINE VERSION DOES NOT WORK AND WAS CHECKED**: a tenth of a lap is
+still only about two steps. Reliability needs roughly a THIRD of a lap, about
+**4.9 s added** to a page that already leans on the harness’s patience, **or a
+different quantity to assert**. That is a design call, which is why it is written
+here rather than patched.
+
+### Open 2026-09-25: `full: true` reaches nothing on `/knobs/`, and it was hidden by a dead assert
+
+⚠️ **FOUND 2026-09-25 while repairing an assert that could never fail.**
+`.kbd.kbd-full` is `width: 100%` of a `max-content` host, **so the option has no
+effect on this page at all.** It was invisible because the assert that should
+have caught it compared the keyboard’s box against the very flow that box sizes.
+
+✅ **THE REPAIR WAS MEASURED AND NOT APPLIED, DELIBERATELY.** Banded, the box
+reads **582.0 px, the case’s own content width**, with the keys scrolling inside
+it, 777 px in 564 px. **The repair is the band**, so this waits on the band
+rhythm work rather than gaining a page local workaround.
+
+### Open 2026-09-25: a synth on/off says ON and OFF, not FAU ON and FAU OFF
+
+🔴 **REFINED IN THE SAME STREAM, VERBATIM:** *"just [() ON] and [() OFF]
+(same w)"*. Two things, and the second answers the open question below.
+
+✅ **THE DOT STAYS.** The control is the dot plus the word, so this is
+`showName: false` and NOT stripping the badge to a bare word. The leading dot is
+fixed to the text by the reserve, and `presence.mjs:345` records that moving it
+right failed once and was asked back.
+
+🔴 **AND `(same w)` IS A REQUIREMENT RATHER THAN A CHECK: BOTH STATES ARE
+THE SAME WIDTH.** `OFF` is one character wider than `ON`, so the reserve after
+the name is dropped is computed on the WIDER of the two, not on whichever one is
+showing. **The button may not change size when it is pressed.**
+✅ **THE PRECEDENT IS ALREADY HERE**: the transport bar reserves both words of a
+two state button so that *"the control cannot change size under the finger that
+pressed it"*. This is that rule on a different control.
+⚠️ **THE ASSERT IS EQUALITY, NOT A TOLERANCE.** Read the width in `online` and
+again in `offline` and require them EQUAL. A tolerance would hide exactly the
+defect being asked about, and it must be driven through a real toggle so it
+cannot pass vacuously.
+
+⚠️ **ASKED, VERBATIM:** *"on synth on offs do not add synt name to fau on /
+fau off: just ON OFF"*.
+
+✅ **TRACED RATHER THAN GUESSED.** `buildHeader` in `demo/shell/instrument.mjs`
+at `:169` reads `of = name`, so **the header’s status control defaults to the
+instrument’s own name**, and `presence.mjs:329` paints the name and the state as
+one string when a badge has an `of`. That is what makes it read `FAU ON`.
+
+✅ **THE OPTION ALREADY EXISTS AND NOTHING IS INVENTED**: `showName: false`.
+🔴 **AND `of` STAYS, WHICH IS THE PART THAT IS EASY TO GET WRONG.** The aria
+label at `:178` is `switch ${of} on and off`, and a screen reader has to know
+WHAT is being switched. *"switch on and off"* names nothing. **So this changes
+what is PAINTED, not what the control knows about itself.**
+
+✅ **AND THE ARGUMENT IS ALREADY IN THAT FILE FROM THE OTHER SIDE.** The header
+carries the nameplate on the same row, and `instrument.mjs` records refusing a
+plate beside a header because *"a plate beside it is the name twice on one row"*.
+A status button naming the instrument again is that a third time.
+
+**WHO IT REACHES**, MEASURED, pressable headers only: `/fau/:1194` (`FAU`),
+`/muta/:783` (`PLAITS`) and `:918` (`WARPS`), plus `/kit/`’s three specimens.
+`/knobs/` has `online: false` and is unaffected. **Three real pages, one kit
+change.**
+
+⚠️ **THE THING TO CHECK IS THE RESERVE, NOT THE WORD.** `presence.mjs`
+reserves the widest phrase the badge can say, and the dot is fixed to the text
+BECAUSE of that reserve. `:345` records that going the other way failed once and
+was asked back. **Dropping the name changes the widest phrase**, and a reserve
+computed on a phrase that no longer exists leaves the dot floating with a gap,
+which reads as a stray mark rather than part of a label.
+
+### Open 2026-09-25: the chord name moves about one character left in the keyboard
+
+⚠️ **ASKED, VERBATIM:** *"move chordname ca 1ch left in keyboar"*. A nudge,
+not a re-layout: *ca 1ch* is about one character width.
+
+**The subject** is `.kpad-chord` in `demo/shell/keyboard.mjs`, built at about
+`:913` as `make('span', 'kpad-chord', '')` with
+`chordEl.style.minWidth = `${CHORD_CH}ch``, sitting in the keyboard’s own footer
+to the right of the displacement readout.
+
+🔴 **IT IS SHARED, SO IT IS DONE ONCE.** `demo/shell/keyboard.mjs` is
+imported by **ten** pages (`able`, `fau`, `dump`, `evo`, `instrument`, `knobs`,
+`kit`, `looper`, `nola`, `radio`) plus `chords.mjs` and `roll.mjs`.
+
+🔴 **AND THE ONE THING NOT TO BREAK IS THE REASON THE CELL EXISTS.** It
+RESERVES the widest name it can ever hold, computed from `name.mjs`’s own
+tables rather than typed, so that a name going from `C` to `G#min7b5/D#` does
+not move everything beside it. The original ask was *"avoind text moving in x
+axis"*. **A nudge that makes the cell size to its content would answer this ask
+by reinstating the one it was built to fix.** Read the cell’s left edge with a
+one character name and again with a long one, and check both.
+⚠️ **EXPRESS IT IN `ch`.** `ch` on a mono face is exactly characters, which is
+what makes that arithmetic a measurement rather than an estimate.
+
 ### Done 2026-09-25: `/nola/`'s instrument choice becomes the standard patch selector
 
 ✅ **DONE 2026-09-25. MEASURED: 95/95 green before, 98/98 green after**, so the
@@ -219,7 +334,92 @@ or `shell.css` it is done ONCE, by one agent, before any page agent starts, and
 `/kit/` is re-run.
 
 
-### Open 2026-09-25: `/knobs/` always enables MIDI, and the plate stays vertical
+### Done 2026-09-25: `/knobs/` always enables MIDI, and the rail is gone
+
+✅ **DONE 2026-09-25. MEASURED: 31 green of 35 before (29 page asserts), 34 of
+38 after (32).** The plate assert became three and the MIDI visit assert gained a
+machine independent partner. Open it at **http://127.0.0.1:8890/knobs/**.
+
+✅ **"ALWAYS ENABLE MIDI" IS THE ALREADY GRANTED READING AND IT RAISES NO
+PROMPT.** `navigator.permissions.query({ name: 'midi' })` on load, and on
+`granted` the page opens MIDI itself so the footer button arrives reading `midi
+is listening` and disabled. On `prompt`, `denied`, `unavailable` or no answer,
+the visit is exactly what it was.
+🔴 **AND THE VACUOUS PASS WAS DESIGNED AROUND RATHER THAN WALKED INTO.**
+The old `midiAskedOnLoad` counter is read on the module’s last line and a
+permission answer arrives a tick later, **so on a granted browser it would have
+stayed 0 while the page really had opened MIDI on the visit.** There are two
+counters now and the checks await the permission answer before pressing.
+⚠️ **THE BRANCH THE HARNESS GRADES IS `prompt`, AND THE ASSERT PRINTS IT.**
+The other half is a named predicate run against all five answers with no
+permission, no prompt and no device, so the naive reading (always true) fails the
+`prompt` line and a page that never opens fails the `granted` line.
+
+✅ **THE `shown()` DEFECT IS FIXED** and the assert it lived in is gone anyway,
+replaced by `/shape/`’s two assert pattern reading `plate.lines[0]`, the ink.
+MEASURED: 20.0 px of a 20.0 px inset on both edges.
+
+✅ **TWO MORE REDS FIXED THAT WERE NOT IN THE BRIEF, AND BOTH WERE BAD CHECKS**:
+`each rotary drives its own controller` pressed `ArrowUp` on a dial already at
+**127, its ceiling**, so the key clamped and sent nothing and it read one
+controller of two, looking exactly like a dial wired to nothing. The arrow points
+away from the end now and the ceiling is read off `aria-valuemax`. Green at
+`CC 71, 74`. And `the keyboard is twenty-five keys and its box spans the case`
+**could never fail**: it compared the keyboard’s box against `.panel-flow`, which
+is `width: max-content` and is therefore sized BY that box, printing `992.0 px
+wide inside a flow 992.0 px wide` against a case of 686.0.
+
+🔴 **AND THE HANDOFF’S ATTRIBUTION OF THE REMAINING REDS TO THE RASPBERRY PI
+WAS WRONG, CHECKED 2026-09-25.** Both board shaped reds are **structurally
+unreachable under a default harness run whether the Pi answers or not**:
+`this page makes no sound of its own` needs `board.ctx()`, and `startAudio()` is
+only reached from a key press or `startNote()`, which `MAY_PLAY` deliberately
+blocks. `the relay delivered the control messages this page sent` needs
+`w.sent > 0` and the same guard held all 42 messages back. **Both need
+`?board=1`.** ⚠️ The Pi WAS answering minutes later, with the footer reading
+ONLINE and the log reading `yoshimi is playing on the board`, and was not during
+the verify run. Both are true and it comes and goes.
+
+⚠️ **THE SEAM IS REFUSED HERE TOO, WITH `/shape/`’S COLLAPSE REPRODUCED
+INDEPENDENTLY**: strip bottom to seam **0.0 px**, seam to keyboard **0.0**,
+keyboard to the case’s inner bottom **0.0**. ✅ What measured well and is worth
+keeping: the seam reached **x297.0 to x983.0**, the case’s own inner edges to the
+pixel. 🔴 **AND ONLY ONE OF THE SKETCH’S THREE RULES WAS EVER THIS PAGE’S TO
+DRAW**: `.panel-case` has a 1 px border and `createGlue` already puts 1 px of
+`--line` between the case and the footer, measured at case bottom 344.8 against
+footer top 345.8. **Three seams would have doubled two edges.**
+
+⚠️ **`place: 'side'` NOW HAS ZERO PAGE CALLERS.** Nothing was deleted.
+
+🔴 **CORRECTED 2026-09-25, AND IT REVERSES THE PLATE HALF OF THIS ENTRY.
+ASKED, VERBATIM, WITH A SCREENSHOT:** *"knobs: rm right panel. use regular
+nameplate. i do not usrstand what you are doing"*.
+
+⚠️ **THE READING ABOVE WAS WRONG AND IT WAS THIS SESSION’S OWN.**
+*"knobs nameplate vertically"* was read as *keep the plate vertical*, and the
+part B written under it argued for keeping `side` and the rail. **What was
+wanted is the rail GONE and a regular horizontal plate top right**, which is
+what `/shape/` was given in `54a1d02`. The screenshot shows the rail as an empty
+column down the right edge of the case carrying nothing but the turned word,
+with the seams stopping short of it.
+
+✅ **SO IT IS `/shape/`’S CALL, COPIED RATHER THAN INVENTED**: `place: 'end'`
+with `panel: { side: null, flow: false }`, and BOTH `side: 'left'` and
+`plateSide: 'right'` out, because `plateSide` is read only when the placement is
+`side`.
+
+🔴 **AND THIS STRANDS A KIT PLACEMENT, WHICH IS A THING TO DECIDE AND NOT
+TO TIDY AWAY.** `place: 'side'` had exactly two callers, `/shape/` and
+`/knobs/`, and after this it has **none**. `demo/shell/instrument-test.mjs`
+still grades `plateSpec('', 'shape', 'side')` with no browser and stays green,
+because it is about the function. ⚠️ **Nothing was deleted**, and the
+question of whether a placement no page uses should stay in the kit is left open
+here rather than answered by whoever happened to be editing.
+
+⚠️ **AND THE REPORTING WAS PART OF THE COMPLAINT.** *"i do not usrstand what
+you are doing"* arrived after two long reports about band rhythm and case
+children. **The plumbing is not the report.** What shipped, what it looks like
+and where to open it is.
 
 🔴 **ASKED, VERBATIM, WITH A SCREENSHOT AND A SKETCH:** *"knobs. always enable
 midi, knobs nameplate vertically"*, drawn as
