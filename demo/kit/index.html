@@ -1172,8 +1172,16 @@ inst.seam(); inst.band(el)    // the same two, forwarded by createInstrument`,
         p.flow.append(el('div', 'kit-blk', 'the strip, which is band one'));
         const seam = p.seam();
         const band = p.band(el('div', 'kit-blk', 'a band, across the whole case'));
+        /* 🔴 A SECOND BAND WITH NO SEAM BETWEEN THEM, BECAUSE THE TWO DISTANCES
+           ARE DIFFERENT AND ONLY ONE OF THEM WAS EVER IN QUESTION. Across a
+           seam it is the band's inset, the rule, and the next band's inset; band
+           to band it is two insets and nothing in the middle. `/shape/` measured
+           the second one at 1.0 px where the page it came from reads 40.0, so a
+           specimen with one band could not have shown the number that was
+           lost. */
+        const band2 = p.band(el('div', 'kit-blk', 'a second band, no seam between them'));
         box.append(p.el);
-        return { panel: p, seam, band };
+        return { panel: p, seam, band, band2 };
       };
 
       box.append(el('p', 'kit-cap', 'a side plate, so the case is a grid and the rule crosses the rail'));
@@ -5227,6 +5235,71 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       && was === 'online' && now === 'offline',
       `${was} became ${now} after ${headSpec.presses()} press`);
 
+    /**
+     * 🔴 THE SWITCH IS THE SAME WIDTH IN BOTH STATES, AND `(same w)` IS THE ASK
+     * RATHER THAN A CHECK SOMEBODY THOUGHT OF. Asked 2026-09-25: *"just [() ON]
+     * and [() OFF] (same w)"*. `off` is one character wider than `on`, so a
+     * control sized to whichever word is showing changes size under the finger
+     * that pressed it, which is the rule the transport bar already states about
+     * its own two state button.
+     * 🔴 AND IT IS EXACT, NOT CLOSE. A tolerance here would hide precisely the
+     * defect being asked about, because the two words differ by one character
+     * and one character is 6.62 px on this face.
+     * 🔴 **DRIVEN BY A REAL PRESS, FROM WHATEVER STATE THE ASSERT ABOVE LEFT
+     * IT IN.** Setting the state twice from one starting point would compare a
+     * badge against itself, which is this project's own rule about a statistic
+     * that is constant by construction over its subject.
+     * ⚠️ AND IT WAITS OUT THE SWAP. The word fades 90 ms out, changes at the
+     * trough and fades 90 ms back, so reading immediately would grade the word
+     * that is leaving.
+     * ⚠️ THE ARIA LABEL IS THE OTHER HALF AND IT KEEPS THE NAME. `of` was not
+     * removed, only hidden from the paint: the eye reads the nameplate on the
+     * same row and a screen reader reads this, and *"switch on and off"* would
+     * name nothing.
+     */
+    {
+      const btn = headSpec.acting.online.el;
+      /* ⚠️ THE MEASURING WINDOW IS SHUT ACROSS BOTH WAITS, which is the third
+         place it has to be. A word swaps at the trough of a 90 ms fade, so this
+         has to wait twice, and an `await` inside the window is a frame drawn
+         with all five parts open. The check at the foot of this file counts
+         those and its own comment records taking a `settle()` out reading
+         `3 frames`. */
+      const land = async () => {
+        settle();
+        await new Promise((r) => setTimeout(r, 260));
+        measure();
+      };
+      await land();                      // the press in the assert above is still fading
+      const before = headSpec.acting.online.state();
+      const wBefore = btn.getBoundingClientRect().width;
+      const sBefore = (btn.textContent || '').trim();
+      btn.click();                       // a REAL press, back the other way
+      await land();
+      const after = headSpec.acting.online.state();
+      const wAfter = btn.getBoundingClientRect().width;
+      const sAfter = (btn.textContent || '').trim();
+      const aria = btn.getAttribute('aria-label') || '';
+      /* 🔴 THE RESERVE IS THE EXACT HALF AND THE RENDERED WIDTH IS THE
+         SUB-PIXEL ONE, AND BOTH ARE HERE BECAUSE ONLY TOGETHER DO THEY SAY WHAT
+         WAS ASKED. `--pres-ch` is a CHARACTER COUNT computed off the words
+         themselves, so `3` is `off` and nothing else, and it cannot drift. The
+         rendered widths then differ by 0.02 px, which is text metrics inside a
+         box that does not move: the defect being asked about is one CHARACTER,
+         6.62 px on this face, and 0.1 px cannot hide 6.62. `/kit/`'s own
+         presence check reads a spread of 0.02 on the same component. */
+      const ch = btn.querySelector('.pos-pres-w')?.style.getPropertyValue('--pres-ch');
+      d.assert('the header switch is one width in both states, and says the state without the name',
+        before !== after && Math.abs(wBefore - wAfter) <= 0.1 && ch === '3'
+        && sBefore !== sAfter
+        && /^(on|off)$/.test(sBefore) && /^(on|off)$/.test(sAfter)
+        && !/PLAI/.test(sBefore) && !/PLAI/.test(sAfter)
+        && aria.includes('PLAI'),
+        `"${sBefore}" ${wBefore.toFixed(2)} px against "${sAfter}" ${wAfter.toFixed(2)} px, `
+        + `a reserve of ${ch} characters which is the longer word, `
+        + `pressed from ${before} to ${after}, and the label still reads "${aria}"`);
+    }
+
     /* 🔴 THE OTHER HALF, AS AN ABSENCE. A badge that was a button with the
        handler left off would satisfy the assert above by never being pressed.
        ⚠️ IT READS THE STATUS CELL AND NOT THE HEADER. My first version asked
@@ -8164,7 +8237,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       d.assert('the bands stack in order and the rail runs past every one of them',
         strip.bottom <= seam.top + 0.6 && seam.bottom <= band.top + 0.6
         && Math.abs(plate.top - top) <= 0.6 && Math.abs(plate.bottom - bottom) <= 0.6
-        && p.el.style.getPropertyValue('--panel-rows') === '3',
+        && p.el.style.getPropertyValue('--panel-rows') === '4',
         `strip ends ${strip.bottom.toFixed(1)}, seam ${seam.top.toFixed(1)}..${seam.bottom.toFixed(1)}, `
         + `band starts ${band.top.toFixed(1)}, the rail is `
         + `${(plate.bottom - plate.top).toFixed(1)} px against a case inside of `
@@ -8172,7 +8245,48 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         + `"${p.el.style.getPropertyValue('--panel-rows')}"`);
     }
 
-    /* 4. ⚠️ AND A PANEL WITH NO RAIL IS NOT A GRID AND IS NOT NUMBERED, which is
+    /**
+     * 4. 🔴 A CASE WITH BANDS HAS A VERTICAL RHYTHM, AND IT HAD NONE UNTIL
+     * 2026-09-25. FOUND by the `/shape/` agent, which is the second caller
+     * finding the hole the first one could not: nine sections lifted out of the
+     * strip read **1.0 px** of ink from one section's last lane to the next
+     * section's heading, against **40.0 px** on the page as it ships, with the
+     * last band **0.0 px** off the case's inner bottom.
+     * 🔴 THE CAUSE WAS `/held/`'s LESSON A THIRD TIME: `.pos-stack` owns the
+     * 40 px rhythm as a margin on its own children, a block lifted out of a
+     * stack stops being one, and `.panel-case` pads horizontally only.
+     * 🔴 **THREE DISTANCES, NOT ONE, BECAUSE THEY COME FROM THREE PLACES AND
+     * CAN BREAK SEPARATELY.** Across a seam it is the band's own inset either
+     * side of a 1 px rule; band to band it is two insets and nothing between;
+     * and under the last band it is one inset against the case's border, which
+     * is the job `.panel-strip`'s `padding-bottom` does on a case with no
+     * bands. `positron-ui` records `/twelve/` having two of three alignments
+     * line up while the third was 30 px out, which one bundled assert cannot
+     * report.
+     * ⚠️ AND EVERY NUMBER IS READ AGAINST THE CASE'S OWN `--panel-pad` RATHER
+     * THAN AGAINST A 20 TYPED HERE, so this cannot drift from the stylesheet.
+     */
+    {
+      const p = seamRail.panel;
+      const pad = parseFloat(getComputedStyle(p.el).getPropertyValue('--panel-pad'));
+      const c = getComputedStyle(p.el);
+      const bottom = p.el.getBoundingClientRect().bottom - parseFloat(c.borderBottomWidth);
+      const seam = seamRail.seam.getBoundingClientRect();
+      const a = seamRail.band.getBoundingClientRect();
+      const b = seamRail.band2.getBoundingClientRect();
+      const belowSeam = a.top - seam.bottom;
+      const between = b.top - a.bottom;
+      const under = bottom - b.bottom;
+      d.assert('a band brings its own inset, so a case with bands has a rhythm and a floor',
+        Math.abs(belowSeam - pad) <= 0.6
+        && Math.abs(between - 2 * pad) <= 0.6
+        && Math.abs(under - pad) <= 0.6,
+        `--panel-pad is ${pad} px, the seam stands ${belowSeam.toFixed(1)} px off the band under it, `
+        + `two bands with no seam sit ${between.toFixed(1)} px apart, `
+        + `and the last one is ${under.toFixed(1)} px off the case's inner bottom`);
+    }
+
+    /* 5. ⚠️ AND A PANEL WITH NO RAIL IS NOT A GRID AND IS NOT NUMBERED, which is
        the half that keeps this off the seven cased pages that asked for none.
        An inline style nothing reads is a thing somebody has to explain later. */
     {

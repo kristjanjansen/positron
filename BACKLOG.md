@@ -1,5 +1,110 @@
 ## Open
 
+### Open 2026-09-25: the keyboard looper detects a tempo and every later loop aligns to the first
+
+🔴 **ASKED, VERBATIM:** *"in keyboadd looper: do basic bmp detection / quant
+and when first loop set, all next ones align on it, either times shorter, same or
+longer"*.
+
+**The subject is `demo/shell/numloop.mjs`, NOT `looper.mjs`**, and that is worth
+establishing first because the two are easy to confuse. MEASURED: `keyboard.mjs`
+imports `createNumLoop` from `./numloop.mjs` at `:125`, and `looper.mjs`’s real
+importers are `transport-bar.mjs`, `/loops/`, `/looper/`, `/radio/` and
+`/tapes/`. **The keyboard’s loops are the numeric ones.** `keyboard.mjs:122`
+states the division: *"`numloop.mjs` owns WHICH slot is doing what; the keyboard
+owns what"*.
+
+✅ **THE TEMPO ARITHMETIC IS ALREADY IN THE KIT AND IS NOT BEING INVENTED.**
+`demo/shell/step-grid.mjs:184` exports `stepMsFor(bpm, perBeat = 4)` and `:729`
+carries a `bpm()` getter and a `setBpm()`. **Reuse it**, or the project has two
+tempos that will disagree.
+
+✅ **"EITHER TIMES SHORTER, SAME OR LONGER" IS AN INTEGER RATIO AND THAT IS THE
+WHOLE ALIGNMENT RULE.** The first loop set becomes the unit, and every later one
+is snapped to a power or a small integer multiple of it, so two loops can never
+drift apart. **The set of allowed ratios is a decision to make out loud**, not a
+default, because 1/4, 1/2, 1, 2, 4 and 1/3, 1, 3 are different instruments.
+
+🔴 **AND A DETECTED TEMPO IS AN INFERENCE, WHICH THIS PROJECT HAS PAID FOR
+REPEATEDLY.** *Basic* BPM detection off a take that is not metric returns a
+number, and a number shown without its confidence is read as a fact. **Say
+whether it was detected or assumed**, the same way `/knobs/` reports whether a
+key was guessed. ⚠️ And decide what happens when the first loop is one note or
+silence: there is no tempo in it, and the honest answer is not 120.
+
+🔴 **THE ASSERT TRAP IS ALREADY WRITTEN DOWN ON THE PAGE NEXT DOOR.**
+`/loops/` shipped *"quietly not looping"*: the page passed no `tickHost` and
+never called `servo()`, so a wrap *"was neither committed nor polled: it simply
+never happened"*, and **"the assert that should have caught it was tolerant of
+'not reached yet' and passed vacuously every run"**. ⚠️ **So every assert here
+asks what HAS HAPPENED, counted, never what is happening.** A second loop that
+aligned is a loop that WRAPPED at the expected moment, counted.
+
+✅ **`numloop-test.mjs` GRADES THIS WITH NO BROWSER AND IS THE CHEAP
+INSTRUMENT.** ⚠️ **AND IT CARRIES ITS OWN WARNING**: writing the expected state
+out by hand is doing the machine’s arithmetic a second time, so a test that
+recomputes the implementation proves nothing.
+
+⚠️ **IT IS SHARED: the keyboard reaches TEN pages.** The arithmetic is
+`numloop.mjs`’s and the control and the readout are `keyboard.mjs`’s, which is
+that file’s own stated division and is also how this can be worked while another
+agent holds `keyboard.mjs`.
+
+### Open 2026-09-25: the keyboard’s note naming pair reads N and D, not Nt and Dg
+
+⚠️ **ASKED, VERBATIM:** *"Nt | Dg to N | D in keyboard"*. The naming pair in
+the keyboard’s own footer.
+
+🔴 **IT IS `demo/shell/keyboard.mjs`, SO IT REACHES TEN PAGES AT ONCE** and
+is done by whoever holds that module, never per page.
+
+⚠️ **THE WIDTH RULE APPLIES HERE TOO.** It is a two state pair in a segmented
+control, and this round has already established that a control must not change
+size between its states. `Nt` and `Dg` are both two characters and `N` and `D`
+are both one, **so the pair stays balanced with itself**, but the group gets
+narrower and the row beside it must not reshuffle.
+⚠️ **AND A ONE LETTER CONTROL NEEDS ITS HOVER.** `N` and `D` alone are not
+self explanatory, so the `title` and the accessible name have to say note names
+and degrees in full. **A private vocabulary on a control a visitor has to be told
+about is exactly what `positron-ui` bans**, and `/nola/` already paid for it once
+with *"i do not know what spelled close leading means"*.
+
+### Open 2026-09-25: the keyboard footer rule is edge to edge, and it belongs to the kit
+
+🔴 **ASKED, VERBATIM, WITH A SCREENSHOT, AND IT IS A CRITICISM OF HOW THIS
+IS BEING WORKED RATHER THAN OF ONE BORDER:** *"the border on top of footer goes
+edge to edge. in the life of me i don ot understand why you do not see it and
+build a soliutiojn that stays (glued panels) not invent custom css with
+measurements each time"*. And immediately after: *"add space on left of nona to
+be same as top and bottob paddings"*.
+
+🔴 **AND IT LANDS ON WORK THIS ROUND SHIPPED, WHICH IS THE POINT.** While
+`seam()` was being built in the kit as an edge to edge rule owned by a component,
+`demo/nola/index.html:4397` hand rolled this:
+
+    .nola-foot { --foot-air: 10px; ... border-top: 1px solid var(--line); }
+
+That footer is appended to `keys.el`, INSIDE `.kbd`, and `.kbd` is
+`padding: var(--kbd-pad)` with `--kbd-pad: 9px` (`shell.css:3576`). **So the rule
+stops 9 px short of the box’s border on both sides.** A per page border with a
+per page number, reasoned about at length in that page’s comments instead of
+being put where it belongs.
+
+✅ **THE FIX IS THAT `keyboard.mjs` OWNS ITS FOOTER AND THAT FOOTER’S RULE
+BLEEDS THROUGH `--kbd-pad` TO THE BOX’S BORDER**, the same way `seam()` escapes
+`--panel-pad` to reach a case’s edges. Same idea, different box, **derived from
+the token rather than copied as a number so the two cannot drift**. One
+implementation reaching the **ten** pages that import that module, so no page
+writes this border again.
+⚠️ **AND THE CONTENT KEEPS A SYMMETRIC INSET**, which is the second ask: the
+`NOLA` plate sits at **0 px** from the row’s left while the row has 10 px above
+and below. Left, top and bottom read the same.
+
+⚠️ **THE PRECEDENT FOR WHY IT IS THE COMPONENT IS ALREADY PAID FOR TWICE.**
+`/tom/`’s nameplate, where a page local repair meant *"every page after it
+inherited the defect and not the fix"*, re-reported on `/plai/`. The `/shape/`
+agent refused a page local `padding-block` the same hour for the same reason.
+
 ### Open 2026-09-25: `/knobs/` has a flaky pair of asserts, and the constant is 6.4x stale
 
 🔴 **TWO ASSERTS ON `/knobs/` ARE A COIN TOSS, PROVED ACROSS THREE RUNS:**

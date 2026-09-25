@@ -398,6 +398,30 @@ export function createKeyboard(host, {
   names: wantNames = true,
   /** name the chord being held, in the footer. See the block beside it. */
   chord: wantChord = true,
+  /**
+   * 🔴 A ROW OF THE PAGE'S OWN UNDER THE COMPONENT'S, WITH A RULE ACROSS THE
+   * BOX ABOVE IT. `foot: true` and the row comes back as `api.foot`.
+   *
+   * 🔴 IT EXISTS BECAUSE A PAGE BUILT ONE BY HAND AND THE OWNER SAW THE JOIN.
+   * Reported 2026-09-25 against `/nola/`: *"the border on top of footer goes
+   * edge to edge. in the life of me i don ot understand why you do not see it
+   * and build a soliutiojn that stays (glued panels) not invent custom css with
+   * measurements each time"*. That page carried `.nola-foot` with a
+   * `--foot-air: 10px` of its own and a `border-top`, appended INSIDE `.kbd`,
+   * which is `padding: var(--kbd-pad)`. **So the rule stopped 9 px short of the
+   * box's border at both ends**, and the number it was drawn with was a second
+   * copy of a distance this stylesheet already publishes.
+   * ⚠️ AND THE COMPLAINT IS ABOUT WHERE IT WAS BUILT RATHER THAN ABOUT THE
+   * PIXELS. `/tom/` repaired the nameplate's padding in its own stylesheet and
+   * *"every page after it inherited the defect and not the fix"*, which was
+   * re-reported on `/plai/`. Ten pages import this module, so this is written
+   * once and no page writes that border again.
+   * ⚠️ IT IS NOT THE PAD ROW AND DOES NOT TOUCH IT. The octave pair, the
+   * displacement, the chord name, `Loop`, `Sustain` and `Notes off` are
+   * controls ABOUT THE KEYS and stay where they are; this is the row for what
+   * the keys PLAY, which is the page's business.
+   */
+  foot: wantFoot = false,
   /** 🔴 THE BOX SPANS ITS HOST INSTEAD OF SIZING TO THE KEYS. See `full` below. */
   full = false,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
@@ -776,8 +800,14 @@ export function createKeyboard(host, {
    * nobody can use, which is the same rule the pad itself follows.
    */
   const nameSeg = make('span', 'step pos-seg kpad-names');
-  const mkName = (text, mode, title) => {
+  /* ⚠️ THE ACCESSIBLE NAME IS THE FULL PHRASE AND THE VISIBLE ONE IS A LETTER.
+     `N` and `D` are not self explanatory, and `positron-ui` bans a control whose
+     label is this project's private vocabulary with nothing a reader can look
+     up. A `title` is a DESCRIPTION rather than a name, so a screen reader would
+     have announced *"N, pressed"*; `aria-label` makes the name the words. */
+  const mkName = (text, mode, title, aria) => {
     const b = make('button', '', text, { type: 'button', title });
+    b.setAttribute('aria-label', aria);
     b.onclick = () => api.setNaming(mode);
     nameSeg.append(b);
     return b;
@@ -786,7 +816,9 @@ export function createKeyboard(host, {
      BECAUSE THE ARGUMENT MOVED RATHER THAN BEING WON. Asked in this order:
      *"c | 1 - someting more descriptive?"*, then `C D E | 1 2 3`, then
      *"Notes | Degrees"* on 2026-09-23, then *"keyboard component: Notes |
-     Degreens -> Nt | Dg."* on 2026-09-25.
+     Degreens -> Nt | Dg."* on 2026-09-25, then *"Nt | Dg to N | D in
+     keyboard"* the same day. **FIVE spellings, and each one is kept because the
+     argument moved rather than being won.**
      🔴 AND THE COMMENT THAT STOOD HERE UNTIL TODAY ARGUED THE OPPOSITE IN
      WRITING, so it is replaced rather than left to contradict the code. It
      said *"a word a reader can look up beats a demonstration they have to
@@ -805,9 +837,10 @@ export function createKeyboard(host, {
      reader looks up when an abbreviation does not tell them enough, so it
      stays exactly as it was and carries the meaning the label gives up. That
      is the whole reason this is a shortening rather than a loss. */
-  const letterBtn = mkName('Nt', 'letter', 'name the keys as notes, which do not move');
-  const degreeBtn = mkName('Dg', 'degree',
-    'name the keys as scale degrees, which move with the key');
+  const letterBtn = mkName('N', 'letter',
+    'name the keys as notes, which do not move', 'note names');
+  const degreeBtn = mkName('D', 'degree',
+    'name the keys as scale degrees, which move with the key', 'scale degrees');
   const paintNaming = () => {
     for (const [b, mode] of [[letterBtn, 'letter'], [degreeBtn, 'degree']]) {
       if (naming === mode) b.dataset.on = '1'; else delete b.dataset.on;
@@ -983,6 +1016,12 @@ export function createKeyboard(host, {
     pad.append(node);
   });
   if (wantPad) el.append(pad);
+  /* 🔴 THE PAGE'S ROW GOES IN LAST, AND THE COMPONENT OWNS ITS EDGES. The rule
+     above it bleeds through `--kbd-pad` to the box's own border and the row's
+     content is inset by that same token, so the left, top and bottom air is one
+     number read once. See `.kbd-foot` in `shell.css` for the measurement. */
+  const footEl = wantFoot ? make('div', 'kbd-foot') : null;
+  if (footEl) el.append(footEl);
 
   host.append(el);
 
@@ -1517,6 +1556,12 @@ export function createKeyboard(host, {
 
   const api = {
     el, keysEl, pad,
+    /**
+     * The page's own row inside the keyboard's box, or `null` where the caller
+     * did not ask for one. `foot: true`. The rule above it and the air around
+     * its contents belong to this component. See the option's own block.
+     */
+    foot: footEl,
     /** the three pad buttons, in the order they are drawn — for a page's own check */
     padButtons: [downBtn, upBtn, panicBtn],
     /** the displacement readout, so a check reads what a player reads */
