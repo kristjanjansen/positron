@@ -1,6 +1,33 @@
 ## Open
 
-### Open 2026-09-25: `/nola/`'s instrument choice becomes the standard patch selector
+### Done 2026-09-25: `/nola/`'s instrument choice becomes the standard patch selector
+
+✅ **DONE 2026-09-25. MEASURED: 95/95 green before, 98/98 green after**, so the
+three new asserts are the whole of the change in the count and no existing one
+went silent. Open it at **http://127.0.0.1:8890/nola/**.
+
+**The licence survived, which was the one part that could have broken something
+outside the page.** The credit is written back onto the value cell after every
+draw through the single function that calls `show()`, so `picker.mjs` overwriting
+its own title no longer loses it. ⚠️ **AND THE ASSERT NOW HAS A NEGATIVE
+CONTROL IT DID NOT HAVE BEFORE**: it reads the title with the Rhodes chosen, then
+reads it again after switching to the piano and requires it to have CHANGED. A
+credit written once at build would have been wiped by the redraw, and the old
+shaped check would have stayed green on whatever was left.
+⚠️ **ONE THING GENUINELY CHANGED FOR A READER**: a choice gave every option
+its own button and so a hover that existed whatever was selected, and a selector
+shows one name at a time, so the credit now FOLLOWS the selection. It is
+reachable while the Rhodes is chosen and not while the piano is. The log line on
+the first Rhodes press is the second channel and is untouched, and
+`LICENSE-jrhodes3d` and `PROVENANCE-rhodes.json` still ship.
+⚠️ **AND THE TEN INDEX DRIVEN PRESSES ARE GONE**, eight of them replaced by a
+helper that presses the control until it reads the instrument NAMED. The tenth,
+the one whose meaning genuinely inverted, became an explicit press of `‹` WITH
+an assert on it, so the back arrow is no longer a button nothing in this
+repository has ever pressed.
+⚠️ **OPEN, AND SMALL**: the plate reads `NOLA` in upper case, which is the
+kit default. `/shape/` and `/knobs/` both take `caps: false` because their asks
+named a lower case word. Nothing was said about this one, so it took the rule.
 
 🔴 **ASKED, VERBATIM:** *"in nolda demo convert instrument radiobutton to std
 patch selector and add top border to that footer. add nola nameplace to the left
