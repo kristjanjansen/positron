@@ -3576,6 +3576,16 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .kbd {
   /* the box's own padding, published so a glued child can bleed to its edges */
   --kbd-pad: 9px;
+  /* 🔴 HOW FAR INSIDE ITS OWN BOX A CONTROL'S LETTER SITS ON THE PAD ROW, WHICH
+     IS THE INLINE PADDING OF A BUTTON IN IT. Published because the footer under
+     that row lines its TEXT up with a control's LETTER rather than with a
+     control's BOX, so this number is read in two places and typed in one.
+     ⚠️ IT IS DECLARED HERE AND NOT ON `.kpad`, WHICH IS WHERE IT BELONGS BY
+     SUBJECT AND WOULD NOT HAVE WORKED. A custom property inherits DOWNWARD and
+     never sideways, and `.kbd-foot` is that row's SIBLING: this stylesheet
+     already records `--fdr-foot` on `.pos-fdr` being invisible to the column
+     beside it, falling back silently while the source read as correct. */
+  --kpad-pad: 9px;
   margin: 0 0 10px; padding: var(--kbd-pad);
   background: var(--card); border: 1px solid var(--line); border-radius: 4px;
   /* 🔴 THE BOX IS AS WIDE AS THE INSTRUMENT, WHICH IS THE OTHER HALF OF NOT
@@ -3670,13 +3680,43 @@ button.pos-pg-lab:hover { color: var(--fg); }
    THAT SHORTHAND. The footer is the last thing in `.kbd`, so `.kbd`'s
    `padding-bottom` is already sitting under it: padding the row as well would
    make the air below the content twice the air above it and beside it, for a
-   reason nobody would find. Three sides from this row, the fourth from the box,
-   and all four read `--kbd-pad`. */
+   reason nobody would find.
+
+   🔴 **AND THE LEFT IS BIGGER THAN THE OTHER THREE SINCE 2026-09-25, WHICH
+   REVERSES THE SENTENCE THAT STOOD HERE AN HOUR AGO.** It said all four sides
+   read `--kbd-pad`, and that was correct as BOX geometry and wrong on the
+   screen. Reported with a crop: *"just add some padding to left of nola. i do
+   not understand how to do nameplate properly"*.
+   🔴 **MEASURED, from `.kbd`'s own inner edge, the pad row above against the
+   footer below:**
+
+     .kpad's first button, its BOX       +9.00
+     the same button's LETTER            +19.00     (1 px border, 9 px padding)
+     the footer's plate, its BOX          +9.00
+     the plate's LETTER                   +9.00
+
+   **The two boxes agreed to the pixel and the two letters were 10.00 px
+   apart**, so the name read under-indented under a row it was supposedly lined
+   up with. A reader sees ink, not boxes.
+   ⚠️ **SO THE INDENT IS DERIVED FROM THE CONTROL, NOT TYPED.** `--kpad-pad` is
+   that button's own inline padding, declared once on `.kbd` and read by the
+   button and by this rule, and the `1px` is the border every control in this
+   file draws. Typing `19px` here would be the second copy of a measurement that
+   this round was asked to stop inventing.
+   ⚠️ **ONLY THE LEFT, WHICH IS WHAT WAS ASKED.** The right stays `--kbd-pad`,
+   so the control at that end does not move.
+   ⚠️ **AND IT INDENTS WHATEVER IS AT THE LEFT END, WHICH IS RIGHT FOR A LABEL
+   AND WOULD BE WRONG FOR A CONTROL.** A button put there would carry its own
+   border and padding on top of this and its letter would land 10 px further in
+   than the row above. Today the footer has one caller and a nameplate at that
+   end; the day one starts with a control, this becomes a rule about the TEXT in
+   the row rather than about the row. Recorded rather than guessed at. */
 .kbd-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   margin-top: var(--kbd-pad);
   margin-inline: calc(-1 * var(--kbd-pad));
-  padding: var(--kbd-pad) var(--kbd-pad) 0;
+  padding: var(--kbd-pad) var(--kbd-pad) 0
+           calc(var(--kbd-pad) + var(--kpad-pad) + 1px);
   border-top: 1px solid var(--line);
 }
 /* `notes off` is not a third octave button — it undoes something rather than
@@ -4017,7 +4057,13 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .kpad-tight { margin-left: -4px; }
 
 /* the two note namings, `C` or `1`, in the pad's own segmented geometry */
-.kpad-names button { width: auto; padding: 0 8px; font-size: 10.5px;
+/* ⚠️ NO PADDING HERE, AND THERE WAS ONE UNTIL 2026-09-25 THAT HAD NEVER
+   APPLIED. It read `padding: 0 8px`, and `.kpad button` sixty lines below is the
+   same weight, (0,1,1) against (0,1,1), so the later rule won every time and the
+   computed value has always been 9 px. MEASURED before removing it: 9px, and the
+   buttons 26.63 px each either way. A dead declaration beside a token saying the
+   same thing is the drift this round was asked to stop. */
+.kpad-names button { width: auto; font-size: 10.5px;
                      font-family: 'positron-accidentals', var(--mono); }
 .kpad-names button[data-on] { color: var(--fg); background: var(--line); }
 
@@ -4083,7 +4129,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
   color: var(--dim2); white-space: nowrap;
 }
 .kpad button {
-  height: var(--kpad-h); padding: 0 9px;
+  height: var(--kpad-h); padding: 0 var(--kpad-pad);
   font: 500 11px/1 var(--mono); color: var(--dim);
   background: var(--card); border-color: var(--line);
 }

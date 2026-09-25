@@ -2837,28 +2837,44 @@
          `novation` with a check that graded the source and stayed green either
          way. This plate is upper case by the project's own rule, and this is the
          half that says the rule really reached it. */
-      /* 🔴 AND ITS LEFT INSET IS THE ROW'S TOP AND BOTTOM INSET, ASKED
-         2026-09-25 AS *"add space on left of nona to be same as top and bottob
-         paddings"*. It sat at 0.0 px from the row's left edge while the row had
-         air above and below it, because the row now bleeds to the box's border
-         and something has to put the content back. All three read `--kbd-pad`,
-         and the check reads all three rather than one: a repair that fixed the
-         left and lost the air would pass a check that only looked left. */
+      /* 🔴 AND THE INSET IS MEASURED INK AGAINST INK, NOT PADDING AGAINST A
+         TOKEN. ASKED TWICE. First 2026-09-25 as *"add space on left of nona to be
+         same as top and bottob paddings"*, which was answered by giving all three
+         sides `--kbd-pad`, and then again the same evening, with a crop: *"just
+         add some padding to left of nola. i do not understand how to do nameplate
+         properly"*.
+         🔴 THE FIRST ANSWER WAS RIGHT ABOUT THE BOXES AND WRONG ABOUT THE
+         LETTERS, WHICH IS THE WHOLE LESSON HERE. MEASURED from `.kbd`'s inner
+         edge: the pad row's first button and this plate both had their BOX at
+         +9.00, agreeing to the pixel, while that button's LETTER sat at +19.00
+         against the plate's at +9.00. A button carries its own border and inline
+         padding, so two boxes agreeing is not two letters agreeing, and the plate
+         read under-indented against the row above it while every number matched.
+         ⚠️ SO THE OLD CHECK WAS GREEN WHILE THE PAGE LOOKED WRONG, and it is
+         kept here as the reason this one reads a `Range` instead. It compared the
+         row's three paddings to `--kbd-pad` and could never have seen the fault
+         it was standing next to. That is the second assert this round that passed
+         while the render was off, and both were caught by looking rather than by
+         counting.
+         ✅ THE 10 px IS DERIVED AND NOT TYPED. `shell.css` publishes
+         `--kpad-pad` on `.kbd` now, the pad row's buttons read it, and the
+         footer's left inset is `calc(var(--kbd-pad) + var(--kpad-pad) + 1px)`,
+         the 1 px being the border every control in that file draws. */
+      const inkLeft = (e) => {
+        const r = document.createRange(); r.selectNodeContents(e);
+        return r.getBoundingClientRect().left;
+      };
       const plateBox = plate.el.getBoundingClientRect();
-      const footCs = getComputedStyle(instFoot);
-      const offLeft = Math.round((plateBox.left - footBox.left) * 10) / 10;
-      const inset = [footCs.paddingLeft, footCs.paddingTop, footCs.marginTop]
-        .map((v) => parseFloat(v));
+      const ctlInk = inkLeft(keys.el.querySelector('.kpad-names button'));
+      const nameInk = inkLeft(plate.el.querySelector('.panel-plate-l'));
       const between = Math.round(pickBox.left - plateBox.right);
-      d.assert('the page’s own nameplate is at the left end of that footer, inset the way the row is',
+      d.assert('the page’s own nameplate is at the left end of that footer, its letter under the row above',
         plate.el.parentElement === instFoot && between > 0
         && plate.shown().join(' ') === 'NOLA'
-        && Math.abs(offLeft - kbdPad) < 1
-        && inset.every((v) => Math.abs(v - kbdPad) < 0.01),
-        `it reads ${plate.shown().join(' ')}, ${offLeft} px in from the row’s left edge, `
-        + `with left ${inset[0]}, top ${inset[1]} and the air above the line ${inset[2]} `
-        + `all reading the box’s own ${kbdPad} px, and ${between} px of row `
-        + `between it and the control`);
+        && Math.abs(nameInk - ctlInk) < 0.6,
+        `it reads ${plate.shown().join(' ')}, its letter at x${nameInk.toFixed(2)} against `
+        + `x${ctlInk.toFixed(2)} for the first control on the row above, `
+        + `and ${between} px of row between it and the control`);
 
       /* 🔴 AND THE TWO ROWS ARE SEPARATED BY A LINE RATHER THAN BY A GAP, WHICH
          REVERSES THIS PROJECT'S STANDING RULE FOR THIS ONE ROW AND WAS ASKED FOR
