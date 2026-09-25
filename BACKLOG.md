@@ -87,6 +87,45 @@ limit on WHO and HOW LONG. The harness is the easy half, because `SELFCHECK` is 
 flag a person never has. The visitor half is the real question and it is not
 answered here.
 
+### Open 2026-09-25: `/stage/` is DEPLOYED AT 37/49 and its WebRTC start fails cold
+
+🔴 **THE LIVE PAGE IS NOT GREEN AND I REPORTED THAT IT WAS.** MEASURED cold on
+2026-09-25 against the deployed commit: **37/49**, the show never reaches
+`live`, and twelve asserts downstream of a running show are red.
+
+🔴 **THE 49/49 I SHIPPED IT ON WAS A MEASUREMENT OF A WARM CONTAINER.** The
+pure-receiver change was verified minutes after runs that had already woken
+`positron-pub`, so its WHIP leg was publishing before the page ever asked.
+**A green run against a warm dependency is a measurement of the warmth**, which
+is this repository's own A/B rule arriving through STATE rather than through
+code, and nothing in the output said which it was.
+
+**WHAT IS ACTUALLY WRONG, as far as it was narrowed:**
+1. **A receiver has no wait.** Holding the socket only ASKS the container to
+   wake; its WHIP leg takes seconds to reach Cloudflare and a WHEP subscribe
+   against an idle input answers 409. Adding a short retry did NOT fix it.
+2. **`dropTransport()` closed the publisher hold**, dropping the container's
+   viewer count to zero and stopping its legs, immediately before asking it to
+   wake again. Keeping the hold across a switch did NOT fix it either.
+⚠️ **BOTH WERE TRIED AND REVERTED**, because neither moved 37/49. So the cause
+is a third thing and is not yet known.
+
+⚠️ **AND THE CONSOLIDATION IS STILL NOT DONE** (one bar, starts left, timers and
+PLAY RECORDING right, no play glyph, one timeline, one diagram, no
+`Nothing recorded yet` card). Five attempts, five distinct causes:
+`paintPlayRec` in a temporal dead zone; `toggleTransport` lost to an earlier
+revert; **`right` takes DOM ELEMENTS and `extras` takes descriptors**
+(`transport-bar.mjs:594` does `right[0].dataset.end = '1'`); `settleMs` landing
+only on the FIRST PRESSED control; and a latch held across the container wake.
+🔴 **THE ONE WORTH KEEPING IS HOW THE FAILURES HID.** `checks()` HOLDS its
+asserts and flushes them at the end, and it is async and called WITHOUT `await`
+(`const warm = () => { if (++warmed >= 6) checks(); ... }`). **So any throw
+anywhere inside it loses all 37 silently, as an unhandled rejection the harness
+does not classify as a console error**, and the suite reports a confident
+**12/12 green**. That is the worst shape this project names, and it is built
+into the page.
+✅ **THE COUNT IS THE ONLY THING THAT CAUGHT IT**, every time.
+
 ### Open 2026-09-25: `/stage/`'s control room has two ways to start and it confuses
 
 🔴 **ASKED, VERBATIM:** *"double play and start in stage control room is
