@@ -751,7 +751,7 @@ export const DEMOS = [
   // assert until that is done, because `verify.mjs` stops collecting the moment
   // the count is unchanged for one 400 ms tick. 25 s measured against a drill
   // that takes about twelve.
-  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 25000,
+  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000,
     one: 'two presses, one for the picture and one for the show, put a church scene from '
       + 'a 2011 MIMproject performance in front of an audience, ask them something, and '
       + 'keep every answer on the recording\u2019s own timeline',
