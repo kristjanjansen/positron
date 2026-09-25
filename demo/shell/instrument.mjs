@@ -209,7 +209,7 @@ function buildHeader({ name, maker, header }) {
  *   already records a wrapper shipping a defect to a new page on the day it was
  *   written to prevent one. **With a header the plate moves into it; without
  *   one nothing about any existing case changes.**
- * @returns {{el, panel, plate, fixed, strip, flow, head, online, add, shown}}
+ * @returns {{el, panel, plate, fixed, strip, flow, head, online, add, band, seam, shown}}
  */
 export function createInstrument(o = {}) {
   const {
@@ -352,6 +352,18 @@ export function createInstrument(o = {}) {
       for (const b of blocks) if (b) into.append(b.el || b);
       return this;
     },
+    /**
+     * Stack a block across the case, under whatever is already there, and the
+     * rule between two of them.
+     *
+     * 🔴 FORWARDED RATHER THAN WRAPPED, the way `fixed`, `strip` and `flow`
+     * already are, so everything `panel-layout.mjs` documents about where a
+     * seam may live stays true here. **A band is not `add()`**: `add()` puts a
+     * block in the SCROLLER, where it is as wide as the widest row and scrolls
+     * with it, and a band is a child of the case, across the whole of it.
+     */
+    band: (block) => panel.band(block),
+    seam: () => panel.seam(),
     /** What the plate RENDERS, uppercase transform included. See the plate. */
     shown: () => plate.shown(),
   };

@@ -901,6 +901,8 @@
   let panelWith = null;       // { panel, reading }  the absorber is on the block
   let panelWithout = null;    // { panel, reading }  NEGATIVE CONTROL: no absorber
   let panelGrowBlk = null;    // the dashed block that absorbs the slack
+  let seamRail = null;        // { panel, seam, band }  a seam crossing a side plate's rail
+  let seamPlain = null;       // { panel, seam, band }  the same seam on a case with no rail
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A segment display, as
@@ -1129,6 +1131,57 @@
    * about is the arrangement and the fader, and a second frame loop on a page
    * that already runs several would cost a reader something for nothing.
    */
+  /**
+   * 🔴 THE NEWEST BLOCK, AND IT IS FIRST IN THE FILE FOR THE REASON THIS PAGE
+   * ALREADY ASSERTS ONE ROW DOWN: *"in kit move online stuff to topmost item
+   * (all new should land top, make rule)"*. What a reader does not know about
+   * is what arrived since they last looked.
+   *
+   * 🔴 TWO SPECIMENS, AND THE SECOND IS NOT A REPEAT. A seam reaches the case's
+   * inner edges the same way on every panel, but only a case with a SIDE PLATE
+   * is a grid, and only on a grid does it have a rail to cross and a row count
+   * to be placed by. One of each is the smallest pair that can show both, and
+   * the asserts at the foot of this file measure the two against their OWN
+   * cases rather than against each other.
+   * ⚠️ THE BAND UNDER THE SEAM IS A DASHED BLOCK RATHER THAN A CONTROL, because
+   * what these two show is where a rule lands and not what a band holds. The
+   * PANEL block further down already shows a case full of real controls.
+   */
+  section('hardware', 'PANEL SEAM',
+    'A rule across a panel from one inner edge of its case to the other.',
+    `const p = createPanelLayout({ side: null, plate: { lines: ['SEAM'], place: 'side' } });
+p.seam()                      // a rule, edge to edge of the case
+p.band(keysBox)               // a block stacked across the case, under the strip
+inst.seam(); inst.band(el)    // the same two, forwarded by createInstrument`,
+    (box) => {
+      box.classList.add('kit-wide');
+
+      /**
+       * One panel built twice, the only difference being whether it carries a
+       * side plate. A specimen built from a shared function rather than typed
+       * twice is the only version where the two can be COMPARED, which is the
+       * argument the PANEL block below already makes about its own pair.
+       */
+      const build = (rail) => {
+        const p = createPanelLayout({
+          side: null,
+          plateSide: 'left',
+          plate: rail ? { lines: ['SEAM'], place: 'side' } : { lines: ['SEAM'], place: 'end' },
+          strip: { tabindex: 0, role: 'group', label: 'the panel’s strip' },
+        });
+        p.flow.append(el('div', 'kit-blk', 'the strip, which is band one'));
+        const seam = p.seam();
+        const band = p.band(el('div', 'kit-blk', 'a band, across the whole case'));
+        box.append(p.el);
+        return { panel: p, seam, band };
+      };
+
+      box.append(el('p', 'kit-cap', 'a side plate, so the case is a grid and the rule crosses the rail'));
+      seamRail = build(true);
+      box.append(el('p', 'kit-cap', 'no side plate, which is a flex case and needs no row count'));
+      seamPlain = build(false);
+    });
+
   section('timeline', 'LOCAL AND REMOTE',
     'One thing running here and the same thing running somewhere else, side by '
     + 'side, with one fader between them.',
@@ -8025,6 +8078,114 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
        and the assert went with it. **Nothing replaces it.** `verify.mjs` runs
        at 756 px, so every remaining panel assert passes without ever meeting a
        phone. See the note where the specimen was built. */
+  }
+
+  // ── the panel seam ────────────────────────────────────────────────────────
+  //
+  // 🔴 EVERY CLAIM HERE IS MEASURED AGAINST THE SEAM'S OWN CASE, never against
+  // a number typed in. *"Edge to edge"* is a relationship between two
+  // rectangles, and this page has already been corrected twelve times in one
+  // evening for reasoning about one of them instead of reading both.
+  if (seamRail && seamPlain) {
+    /**
+     * 🔴 THE CASE'S INNER EDGE IS ITS BORDER BOX LESS ITS OWN BORDER, AND
+     * READING THE BORDER BOX WOULD HAVE BEEN WRONG BY 1 px AT EACH END. That is
+     * the whole width of the thing being measured, so a check that took the
+     * outer rectangle would grade a correct seam as 2 px short and an
+     * overhanging one as perfect.
+     */
+    const inner = (panel) => {
+      const c = getComputedStyle(panel.el);
+      const r = panel.el.getBoundingClientRect();
+      return { l: r.left + parseFloat(c.borderLeftWidth), r: r.right - parseFloat(c.borderRightWidth) };
+    };
+
+    /* 1. 🔴 EDGE TO EDGE, ON BOTH ARRANGEMENTS, WHICH IS THE ASK IN ONE LINE:
+       *"on each button group have horizontal panel separator edge to edge"*.
+       BOTH ends of BOTH seams, because a rule can be right on one edge and
+       20 px short on the other, and `.panel-case`'s `padding: 0 var(--panel-pad)`
+       is the one inset that would do exactly that. */
+    {
+      const rails = [['a side plate', seamRail], ['no side plate', seamPlain]];
+      const read = rails.map(([what, s]) => {
+        const i = inner(s.panel), r = s.seam.getBoundingClientRect();
+        return { what, dl: r.left - i.l, dr: r.right - i.r, h: r.height, w: r.width };
+      });
+      d.assert('a seam reaches both inner edges of its case, on a panel with a rail and on one without',
+        read.every((x) => Math.abs(x.dl) <= 0.6 && Math.abs(x.dr) <= 0.6 && Math.abs(x.h - 1) <= 0.1),
+        read.map((x) => `${x.what}: ${x.w.toFixed(1)} px wide, `
+          + `${x.dl.toFixed(1)} px off the left inner edge and ${x.dr.toFixed(1)} off the right, `
+          + `${x.h.toFixed(1)} px tall`).join('; '));
+    }
+
+    /* 2. 🔴 IT CROSSES THE RAIL, AND THE NAME SURVIVES THE CROSSING. Two
+       separate facts, because a seam that stopped at the plate would pass a
+       width check on the other edge alone, and a seam drawn THROUGH the letters
+       would pass this one. The plate carries a `z-index` so its ink paints over
+       the rule, and the ground is on the LINE rather than on the plate, or the
+       whole rail would mask the seam and edge to edge would stop being true. */
+    {
+      const plate = seamRail.panel.plate.el;
+      const pr = plate.getBoundingClientRect();
+      const sr = seamRail.seam.getBoundingClientRect();
+      const line = plate.querySelector('.panel-plate-l');
+      const ink = getComputedStyle(line).backgroundColor;
+      const ground = getComputedStyle(seamRail.panel.el).backgroundColor;
+      const pcs = getComputedStyle(plate);
+      const railGround = pcs.backgroundColor;
+      d.assert('the seam crosses the plate’s rail, and the name is painted over it rather than cut by it',
+        sr.left < pr.left - 0.6 && sr.right > pr.right + 0.6
+        && pcs.zIndex === '1' && ink === ground
+        && /^rgba\(0, 0, 0, 0\)$|^transparent$/.test(railGround),
+        `seam x${sr.left.toFixed(1)}..${sr.right.toFixed(1)} across a rail at `
+        + `x${pr.left.toFixed(1)}..${pr.right.toFixed(1)}, the plate at z-index ${pcs.zIndex}, `
+        + `its line painted ${ink} on a case of ${ground}, `
+        + `and the rail itself ${railGround} so it masks none of the rule`);
+    }
+
+    /* 3. 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THAT SAYS THE ROW COUNT IS DOING
+       ANYTHING. A grid case with no count lays every child into row 1, so the
+       band would sit ON TOP of the strip rather than under it and the plate
+       would stop under the first row. So: the bands stack in source order, and
+       the rail runs the case's whole height. MEASURED before the count existed,
+       a four child case came out `1721.5px 70.5px 0px 0px 1px 70.5px`, six
+       tracks for four bands, with two the plate had blocked. */
+    {
+      const p = seamRail.panel;
+      const strip = p.strip.getBoundingClientRect();
+      const seam = seamRail.seam.getBoundingClientRect();
+      const band = seamRail.band.getBoundingClientRect();
+      const plate = p.plate.el.getBoundingClientRect();
+      const i = inner(p);
+      const c = getComputedStyle(p.el);
+      const cr = p.el.getBoundingClientRect();
+      const bottom = cr.bottom - parseFloat(c.borderBottomWidth);
+      const top = cr.top + parseFloat(c.borderTopWidth);
+      d.assert('the bands stack in order and the rail runs past every one of them',
+        strip.bottom <= seam.top + 0.6 && seam.bottom <= band.top + 0.6
+        && Math.abs(plate.top - top) <= 0.6 && Math.abs(plate.bottom - bottom) <= 0.6
+        && p.el.style.getPropertyValue('--panel-rows') === '3',
+        `strip ends ${strip.bottom.toFixed(1)}, seam ${seam.top.toFixed(1)}..${seam.bottom.toFixed(1)}, `
+        + `band starts ${band.top.toFixed(1)}, the rail is `
+        + `${(plate.bottom - plate.top).toFixed(1)} px against a case inside of `
+        + `${(bottom - top).toFixed(1)}, and --panel-rows is `
+        + `"${p.el.style.getPropertyValue('--panel-rows')}"`);
+    }
+
+    /* 4. ⚠️ AND A PANEL WITH NO RAIL IS NOT A GRID AND IS NOT NUMBERED, which is
+       the half that keeps this off the seven cased pages that asked for none.
+       An inline style nothing reads is a thing somebody has to explain later. */
+    {
+      const p = seamPlain.panel;
+      const cs = getComputedStyle(p.el);
+      d.assert('NEGATIVE CONTROL: a case with no side plate is a flex column and carries no row count',
+        cs.display === 'flex' && !p.el.dataset.plateSide
+        && p.el.style.getPropertyValue('--panel-rows') === ''
+        && seamPlain.band.style.getPropertyValue('--panel-row') === '',
+        `display ${cs.display}, plateSide ${p.el.dataset.plateSide || 'unset'}, `
+        + `--panel-rows "${p.el.style.getPropertyValue('--panel-rows')}", `
+        + `--panel-row on the band "${seamPlain.band.style.getPropertyValue('--panel-row')}"`);
+    }
   }
 
   // ── local and remote ──────────────────────────────────────────────────────

@@ -7,6 +7,8 @@
 //   p.strip                   the scroller
 //   p.flow                    the column inside the scroller
 //   p.grow(keysBox)           this child of the flow absorbs the slack
+//   p.band(keysBox)           a block stacked under the strip, across the case
+//   p.seam()                  a rule between two bands, edge to edge of the case
 //   p.check()                 measure it, and report a flow with slack and no absorber
 //   p.cuts                    what check() found, the way createDiagram reports a cut label
 //
@@ -214,6 +216,90 @@ export function createPanelLayout(o = {}) {
   const flowEl = wantFlow ? el('div', add('panel-flow', cls.flow)) : null;
   if (flowEl) strip.append(flowEl);
 
+  /**
+   * A band is a block stacked across the case, and a seam is the rule between
+   * two of them.
+   *
+   * 🔴 ASKED FOR 2026-09-25: *"on each button group have horizontal panel
+   * separator edge to edge"*, with a sketch of `/knobs/` drawing rules between
+   * the rotaries, the keyboard and the footer. **EDGE TO EDGE IS THE WHOLE
+   * DIFFICULTY AND IT DECIDES WHERE A SEAM MAY LIVE.**
+   *
+   * 🔴 **A SEAM IS A CHILD OF THE CASE. INSIDE THE SCROLLER IT IS NOT MERELY
+   * HARD, IT IS IMPOSSIBLE, AND THAT WAS MEASURED RATHER THAN ARGUED.** A rule
+   * put in `/knobs/`'s `.panel-flow` laid out at **992 px against a 686 px
+   * case**, because the flow is `width: max-content` and holds a keyboard wider
+   * than the panel, and 306 px of it sat behind `.panel-strip`'s
+   * `overflow-x: auto`. Pulling it left with a negative margin made it wider
+   * still and bought nothing: `scrollLeft` clamps at **0**, so inline-start
+   * overflow inside a scroller is clipped and can never be reached. **A seam
+   * between two rows of the flow is as wide as the widest row and scrolls with
+   * it, which is not a separator, it is a line inside a picture.**
+   *
+   * ✅ **AS A CASE CHILD IT IS ONE NEGATIVE MARGIN AND NOTHING ELSE.** The
+   * ancestor walk says why: `.panel-case` is `padding: 0 var(--panel-pad)`,
+   * horizontal only, so between a case child and the case's inner edge there is
+   * exactly ONE inset. MEASURED at 1280 px on the four cased pages, against
+   * each case's own inner edges: `/shape/` **x297.0..983.0**, `/knobs/`
+   * **x297.0..983.0**, `/evo/` **x297.0..983.0**, `/tom/` **x297.0..983.0**.
+   * Two of those carry a side plate, one on each edge, and a rule 1 px tall.
+   * ⚠️ **AND THAT IS `positron-ui`'S OWN RULE ABOUT THIS EXACT SHAPE**: *"when
+   * you are writing a third override to escape a parent, you are in the wrong
+   * container"*. The wrong container here is the scroller.
+   *
+   * 🔴 **THE NUMBERS BELOW ARE A ROW COUNT, WHICH IS NOT A MEASUREMENT.** A
+   * case with a side plate is a GRID, and its plate has to span every band or
+   * the rail stops under the first one. `grid-row: 1 / -1` cannot do it: with
+   * no explicit rows the end line `-1` IS line 1, which this stylesheet already
+   * records, so the plate spans one row and a full width seam is then pushed
+   * past it by auto placement. MEASURED before the count existed: a four child
+   * case laid out `1721.5px 70.5px 0px 0px 1px 70.5px`, six tracks for four
+   * bands, with two empty ones the plate had blocked. With the count it is
+   * `repeat(4, auto)`, the plate runs to the case's bottom on both pages, and
+   * the seam crosses the rail.
+   * ⚠️ **A CUSTOM PROPERTY, NEVER THE PROPERTY**, which is this file's standing
+   * rule one line down from the one about heights. `--panel-row` and
+   * `--panel-rows` are counts a stylesheet reads, so every rule about placement
+   * stays in `shell.css` where it can be overridden and read.
+   * ⚠️ **AND THEY ARE WRITTEN ONLY ON A GRID CASE.** A panel with no side plate
+   * is a flex column, its bands stack by themselves, and an inline style nothing
+   * reads on seven pages is a thing to explain later for no reason.
+   */
+  function layBands() {
+    if (!root.dataset.plateSide) return 0;
+    let n = 0;
+    for (const kid of root.children) {
+      if (plate && kid === plate.el) continue;
+      kid.style.setProperty('--panel-row', String(++n));
+    }
+    root.style.setProperty('--panel-rows', String(n));
+    return n;
+  }
+
+  /**
+   * Stack a block across the case, under whatever is already there.
+   *
+   * ⚠️ IT APPENDS, AND THE SCROLLER IS THEREFORE ALWAYS THE FIRST BAND, because
+   * `strip` is the one part of this component that is not optional and is built
+   * before any caller can speak. A page that needs a band ABOVE it is one
+   * argument away and nobody has asked for one.
+   */
+  function band(block) {
+    if (!block) return null;
+    const e = block.el || block;
+    root.append(e);
+    layBands();
+    return e;
+  }
+
+  /** A rule between two bands, from one inner edge of the case to the other. */
+  function seam() {
+    const s = createPanelSeam();
+    root.append(s);
+    layBands();
+    return s;
+  }
+
   /** @type {string[]} what check() found, the way createDiagram reports a cut. */
   const cuts = [];
   /** The flow child that absorbs the slack. */
@@ -279,7 +365,26 @@ export function createPanelLayout(o = {}) {
     return { flowH, kidsH, gap, slack, growing, cuts, measured };
   }
 
-  return { el: root, wrap, fixed, strip, flow: flowEl, plate, cased, side, grow, check, cuts };
+  // The strip is band one, and the count has to exist before a caller adds a
+  // second. On a panel with no side plate this returns 0 and writes nothing.
+  layBands();
+
+  return {
+    el: root, wrap, fixed, strip, flow: flowEl, plate, cased, side,
+    grow, band, seam, check, cuts,
+  };
+}
+
+/**
+ * A rule across a panel, 1 px of `--line`.
+ *
+ * 🔴 IT IS ONLY EDGE TO EDGE AS A CHILD OF THE CASE, AND `createPanelLayout`'s
+ * `seam()` IS HOW A PAGE GETS ONE THERE. Exported for a caller assembling a
+ * case by hand, which `/kit/` does; everything about where it may live and what
+ * was measured is beside `layBands` above.
+ */
+export function createPanelSeam() {
+  return el('div', 'panel-seam');
 }
 
 /**
