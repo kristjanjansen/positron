@@ -1,6 +1,42 @@
 ## Open
 
-### Open 2026-09-26: the take adaptation is built and idle, and the deploy holds the old table
+### Done 2026-09-26: the take adaptation is wired, and the deploy holds the new table
+
+✅ **BOTH DONE. MEASURED: `/nola/` 103/103 to 106/106**, exactly +3 page asserts
+and nothing else moved. The artefact was rebuilt in `d27cbe1` and
+`workers/view/public/resources/chord-tables.json` now reads **18,237 bytes**.
+
+✅ **`heard` IS CALLED IN `settleNow`, NOT IN `addLearned`, AND THE DIFFERENCE IS
+A NUMBER ON THE PAGE RATHER THAN AN ARGUMENT.** It sits straight after
+`chordKey(...)` and ABOVE every early return under it, so a chord the learning
+rules refuse to write into the roll is still a chord somebody played. MEASURED:
+the harness’s scripted take puts **7 chord events into the take while the roll
+holds 2 rows**. Fed from `addLearned` it reads 2.
+
+✅ **THE NEGATIVE CONTROL IS DRIVEN, NOT DECLARED**, which is the whole point.
+The block already plays this page’s own proposal twice, so the counts are
+snapshotted either side and the deltas asserted. Read on the green run: **7
+chords played into the take and 3 of the page’s own refused**, the third being
+the earlier fade check. **So `refused` has a real source and cannot be 0 for want
+of anything ever being offered.**
+
+✅ **FOUR SABOTAGES, EACH RUN AND REVERTED.** No provenance test reads
+`10 chord(s) played and 0 refused` against the true 7. The take built and never
+passed reads `0 time(s)`, **and every other assert on the page stayed green,**
+which is exactly the hole that one exists for. Fed from `addLearned`, 2 red.
+Passing it to `suggest` but not `routeTo` reads `1 time(s)`, so it cannot be
+satisfied by half a wiring.
+
+⚠️ **AND TWO THINGS ARE LEFT THAT ONLY PLAYING CAN SETTLE.** A very short take
+leans hard: on a 7 event take of two distinct chords one way home came out
+`Fmaj7 IV, Fmaj7 IV, Fmaj7 IV, Cmaj7 I`. It is not stuck, and the 12 draw check
+found **7 distinct ways home against 5 before the wiring**, but a take of two
+chords repeated is not the 30 to 80 chord chart the +6.32 was measured on.
+⚠️ **AND THE HUNTING CHORDS COUNT AS PLAYED.** Reaching for a suggested
+`Gmaj7` makes `Gmaj` then `G5`, which the roll refuses by its root guard but
+which are not in `proposed` and so reach the take as played. That follows the
+rule exactly and they are chords the hands really made. **If it should be the
+roll’s rule instead, it is one line at the same site.**
 
 🔴 **TWO THINGS ARE OWED AFTER `b0a0b06` AND THE KEEP WORK, AND NEITHER IS A
 DEFECT. THEY ARE UNFINISHED WIRING.**
