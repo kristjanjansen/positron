@@ -3635,6 +3635,50 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 
 .kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 🔴 THE PAGE'S OWN ROW INSIDE THE KEYBOARD'S BOX, AND ITS RULE REACHES THE
+   BOX'S BORDER. Reported 2026-09-25 off a crop of `/nola/`: *"the border on top
+   of footer goes edge to edge. in the life of me i don ot understand why you do
+   not see it and build a soliutiojn that stays (glued panels) not invent custom
+   css with measurements each time"*.
+
+   🔴 **THE PAGE HAD BUILT ITS OWN AND THE JOIN WAS VISIBLE.** `.nola-foot`
+   carried `--foot-air: 10px`, a `margin-top`, a `padding-top` and a
+   `border-top`, appended INSIDE `.kbd`, which is `padding: var(--kbd-pad)`.
+   **MEASURED: the rule stopped 9.0 px short of the box's border at BOTH ends**,
+   and 10 was a second copy of a distance this file already publishes.
+   ⚠️ AND THE OBJECTION IS TO WHERE IT WAS BUILT, NOT TO THE NUMBER. `/tom/`
+   fixed the nameplate's padding in its own stylesheet and *"every page after it
+   inherited the defect and not the fix"*, re-reported on `/plai/`. Ten pages
+   import `keyboard.mjs`.
+
+   ✅ **THE BLEED IS DERIVED, NEVER TYPED.** `--kbd-pad` is declared on `.kbd`
+   with a comment that already says it is published *"so a glued child can bleed
+   to its edges"*, so this is that sentence finally having a caller. A `-9px`
+   written here would be the `--sld-col` defect, a shared measurement in two
+   files that will disagree.
+   ⚠️ IT IS THE SAME IDEA AS `.panel-seam` ONE BOX OVER: a rule owned by the
+   component that escapes exactly one inset to reach the box's own edge, rather
+   than a page reasoning about a parent's padding.
+
+   ✅ **AND THE CONTENT COMES BACK IN BY THE SAME TOKEN, WHICH IS THE SECOND
+   ASK**: *"add space on left of nona to be same as top and bottob paddings"*.
+   The plate sat at 0 px from the row's left edge while the row had air above
+   and below it. Padding the row by `--kbd-pad` after bleeding it by `--kbd-pad`
+   puts the left, the top and the bottom on one number, and lines the content up
+   with the keys above it rather than with an edge nothing else uses.
+   ⚠️ AND THE BOTTOM INSET IS THE BOX'S OWN, WHICH IS WHY THERE IS A ZERO IN
+   THAT SHORTHAND. The footer is the last thing in `.kbd`, so `.kbd`'s
+   `padding-bottom` is already sitting under it: padding the row as well would
+   make the air below the content twice the air above it and beside it, for a
+   reason nobody would find. Three sides from this row, the fourth from the box,
+   and all four read `--kbd-pad`. */
+.kbd-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: var(--kbd-pad);
+  margin-inline: calc(-1 * var(--kbd-pad));
+  padding: var(--kbd-pad) var(--kbd-pad) 0;
+  border-top: 1px solid var(--line);
+}
 /* `notes off` is not a third octave button — it undoes something rather than
    moving somewhere, so it sits apart from the pair instead of beside it. */
 /* 🔴 HOW FAR FROM HOME, BESIDE THE PAIR THAT MOVES IT. `keyboard.mjs` argues
@@ -4000,9 +4044,27 @@ button.pos-pg-lab:hover { color: var(--fg); }
    ⚠️ NO SEPARATOR BEFORE IT. The row's own `gap` is what stands between this
    and the displacement beside it: two facts, two cells, and the standing rule
    about a row of facts not being one string with glue in it. */
+/* 🔴 AND IT SITS ONE CHARACTER FURTHER LEFT SINCE 2026-09-25, ASKED AS *"move
+   chordname ca 1ch left in keyboar"*.
+   ⚠️ `ch` BECAUSE THE RESERVE BESIDE IT IS IN `ch`. The cell's width is a
+   character count computed from `name.mjs`'s tables, so a nudge typed in pixels
+   would be the one number in this control that stops meaning characters the
+   day the face or the size changes.
+   🔴 **A NEGATIVE MARGIN, WHICH MOVES THIS CELL AND NOTHING ELSE IN THE ROW.**
+   The row is the displacement, this, and then a right hand group whose first
+   member carries `margin-left: auto`. That auto margin absorbs whatever is
+   freed, so the controls on the right do not follow this left and the
+   displacement on the left does not move at all.
+   ⚠️ **AND IT DOES NOT TOUCH THE RESERVE, WHICH IS THE ONE THING NOT TO
+   BREAK.** `min-width` is still the widest name this cell can ever hold, so the
+   box is the same width whatever is in it and nothing beside it moves when a
+   name goes from `C` to `G#min7b5/D#`. A `padding-right` or a narrower reserve
+   would have moved the ink by the same amount and reintroduced exactly the
+   movement the cell exists to prevent. */
 .kpad-chord {
   font: 500 11px/1 'positron-accidentals', var(--mono); color: var(--dim2);
   font-variant-numeric: tabular-nums; white-space: nowrap;
+  margin-left: -1ch;
 }
 /* 🔴 TWO INKS FOR TWO KINDS OF STATEMENT, AND THEY ARE `/nola/`'s TWO. That
    page draws this same reading in its own corner today and is handing it over
@@ -6429,6 +6491,50 @@ button[data-glyph="1"] {
   height: 1px; flex: 0 0 auto; background: var(--line);
   margin-inline: calc(-1 * var(--panel-pad));
 }
+/* 🔴 A BAND BRINGS ITS OWN BLOCK INSET, WHICH IS WHAT `.panel-fixed` AND
+   `.panel-strip` ALREADY DO AND IS THE WHOLE REASON THE CASE PADS HORIZONTALLY
+   ONLY. FOUND 2026-09-25 BY THE AGENT THAT FIRST TRIED TO USE `band()`, which
+   is the second caller finding the hole the first one could not.
+
+   🔴 **MEASURED ON `/shape/`, nine sections lifted out of the strip and
+   appended to the case with a seam between them. INK, not boxes, because the
+   element boxes read 0 on the working page too:**
+
+     one section's last lane to the next section's heading
+       in the strip, as it ships        40.0 px
+       as bands, before this rule        1.0 px
+     last lane to the seam 0.0, seam to the next heading 0.0
+     and the last band 0.0 px off the case's inner bottom
+
+   Nine of those is 52 sliders and nine headings in one unbroken block with
+   hairlines through it, the bottom one flush against the case's border.
+   🔴 **THE CAUSE IS `/held/`'s LESSON A THIRD TIME.** `.pos-stack` owns the
+   40 px rhythm as a margin on its own children, a section lifted out of a stack
+   stops being one of them, `.panel-case` computes `row-gap: normal`, and its
+   padding is `0 var(--panel-pad)`. **Nothing replaced it, and nothing threw.**
+
+   ✅ **IT IS A RULE ON THE BAND AND NOT A CONDITIONED RULE ON THE CASE, WHICH
+   IS STRICTLY NARROWER.** A `.panel-case[data-bands] { row-gap }` would have
+   been the obvious shape and it is wrong twice: in a FLEX case that gap lands
+   between the plate and the strip as well, pushing `/shape/`'s strip down by a
+   number nobody asked for, and it would add to the strip's OWN
+   `padding-block` on one side of a seam while the band paid nothing on the
+   other. A class that only exists on a band cannot reach a case that has none.
+   ⚠️ **MARGIN, NOT PADDING, AND THAT IS THE ONE PLACE THIS DEPARTS FROM
+   `.panel-strip`.** A band may paint its own ground, `.panel-group` is
+   `background: var(--card2)`, and padding inside a box with a background is a
+   STRIPE rather than air, which `positron-ui` records from `/fau/`. The strip
+   paints nothing, so padding is right there and margin is right here.
+   ⚠️ **AND THE LAST BAND KEEPS ITS MARGIN, WHICH IS WHERE THIS DIFFERS FROM
+   `.pos-stack`.** A stack drops the last child's margin because a stack has no
+   box of its own; a CASE has one, and the last band's margin is the inset
+   between it and the border, exactly the job `.panel-strip`'s `padding-bottom`
+   does on every page that has no bands.
+   ⚠️ `--panel-pad` RATHER THAN `--panel-gap`, so the number is the inset the
+   case already keeps around its controls. Two bands are then 40 px apart, which
+   is that inset twice rather than a `--pos-gap` typed here to match the page
+   rhythm, and across a seam it is 20 px, 1 px and 20 px. */
+.panel-band { margin-block: var(--panel-pad); }
 .panel[data-plate-side] > .panel-seam { grid-column: 1 / -1; }
 /* 🔴 AND THE NAME SURVIVES THE CROSSING, WHICH IS THE HALF THAT HAD TO BE
    DESIGNED RATHER THAN LEFT TO LUCK. A side plate is `justify-content:

@@ -167,11 +167,36 @@ function buildHeader({ name, maker, header }) {
   let status = null;
   if (online !== false) {
     const { press = null, state = 'online', says = {}, of = name, ...rest } = online;
+    /**
+     * 🔴 THE CONTROL SAYS `on` AND `off`, NEVER `FAU ON`. Asked 2026-09-25:
+     * *"on synth on offs do not add synt name to fau on / fau off: just ON
+     * OFF"*. `presence.mjs` paints the name and the state as ONE phrase when it
+     * has an `of`, which is right on `/keys/` where a badge in a transport bar
+     * is the only thing naming a Raspberry Pi in another building, and wrong
+     * here: **a header carries the nameplate on the same row.**
+     * ⚠️ AND THAT IS THIS FILE'S OWN ARGUMENT A THIRD TIME. `plate: false`
+     * exists because *"a plate beside it is the name twice on one row"*, and a
+     * status control naming the instrument again is the same doubled channel
+     * from the other side.
+     * 🔴 **IT CHANGES WHAT IS PAINTED, NOT WHAT THE CONTROL KNOWS ABOUT
+     * ITSELF.** `of` stays, and it has to: the aria label below is
+     * `switch ${of} on and off`, and *"switch on and off"* names nothing to
+     * somebody who cannot see the plate. **The eye reads the plate, a screen
+     * reader reads the label, and both are told which instrument this is.**
+     * ⚠️ IT COVERS THE BADGE AS WELL AS THE BUTTON, WHICH WAS CHECKED RATHER
+     * THAN ASSUMED. A header always sits on a case that names itself: with
+     * `plate: false` the bar gives its plate up and `barHasPlate` hands it back
+     * to the CASE, so there is no configuration where this drops the last thing
+     * saying which instrument a reader is looking at.
+     * ⚠️ AND IT IS BEFORE `...rest`, so a caller that really wants the name in
+     * the phrase passes `showName: true` and gets it.
+     */
     const opts = {
       of,
       can: HEADER_STATES,
       says: { ...HEADER_SAYS, ...says },
       state,
+      showName: false,
       ...rest,
     };
     status = press
@@ -209,7 +234,7 @@ function buildHeader({ name, maker, header }) {
  *   already records a wrapper shipping a defect to a new page on the day it was
  *   written to prevent one. **With a header the plate moves into it; without
  *   one nothing about any existing case changes.**
- * @returns {{el, panel, plate, fixed, strip, flow, head, online, add, band, seam, shown}}
+ * @returns {{el, panel, plate, fixed, strip, flow, head, online, add, band, unband, seam, shown}}
  */
 export function createInstrument(o = {}) {
   const {
@@ -363,6 +388,7 @@ export function createInstrument(o = {}) {
      * with it, and a band is a child of the case, across the whole of it.
      */
     band: (block) => panel.band(block),
+    unband: (block) => panel.unband(block),
     seam: () => panel.seam(),
     /** What the plate RENDERS, uppercase transform included. See the plate. */
     shown: () => plate.shown(),

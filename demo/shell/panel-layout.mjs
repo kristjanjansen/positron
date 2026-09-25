@@ -8,6 +8,7 @@
 //   p.flow                    the column inside the scroller
 //   p.grow(keysBox)           this child of the flow absorbs the slack
 //   p.band(keysBox)           a block stacked under the strip, across the case
+//   p.unband(keysBox)         take one back out, and renumber what is left
 //   p.seam()                  a rule between two bands, edge to edge of the case
 //   p.check()                 measure it, and report a flow with slack and no absorber
 //   p.cuts                    what check() found, the way createDiagram reports a cut label
@@ -283,11 +284,57 @@ export function createPanelLayout(o = {}) {
    * `strip` is the one part of this component that is not optional and is built
    * before any caller can speak. A page that needs a band ABOVE it is one
    * argument away and nobody has asked for one.
+   *
+   * 🔴 THE CLASS IS APPLIED HERE RATHER THAN TYPED ON A PAGE, which is the
+   * argument `grow()` already makes eight lines up and which this one needs
+   * more: `.panel-band` carries the band's whole block inset, so a page that
+   * forgot it would get a case with no vertical rhythm at all and nothing would
+   * throw. **MEASURED on `/shape/` by the agent that tried to use this, nine
+   * sections lifted out of the strip: ink from one section's last lane to the
+   * next section's heading went from 40.0 px to 1.0 px, with the last band
+   * 0.0 px off the case's inner bottom.** Fifty-two sliders in one unbroken
+   * block with hairlines through it.
+   * 🔴 AND THE CAUSE IS `/held/`'s LESSON A THIRD TIME: `.pos-stack` owns the
+   * 40 px page rhythm as a margin on its own children, a block lifted out of a
+   * stack stops being one of them, and `.panel-case` pads horizontally only, so
+   * nothing replaced it. **A page with no siblings gets no rhythm, and a band
+   * is exactly that.**
    */
   function band(block) {
     if (!block) return null;
     const e = block.el || block;
+    e.classList.add('panel-band');
     root.append(e);
+    layBands();
+    return e;
+  }
+
+  /**
+   * Take a band back out, and renumber what is left.
+   *
+   * 🔴 IT EXISTS BECAUSE THE ALTERNATIVE IS A PAGE SPLICING `case.children`,
+   * AND THAT WOULD BREAK SILENTLY RATHER THAN VISIBLY. `band()` owns two things
+   * a caller cannot see: the class that carries the inset, and the row numbers
+   * a grid case is placed by. A page removing a band itself would leave
+   * `--panel-rows` counting a child that has gone and `--panel-row` with a hole
+   * in it, so the plate's rail would run past the end of the case and the band
+   * after the hole would land in an empty track. Nothing throws and nothing
+   * looks wrong until somebody opens the page, which is the `/blocks/` shape
+   * this component already refuses once, for `grow`.
+   * ⚠️ IT TAKES THE CLASS OFF AS WELL AS THE ELEMENT, so a block a page keeps
+   * and puts back somewhere else does not carry a panel's inset with it into a
+   * stack that already has its own.
+   * ⚠️ AND IT IS A NO-OP ON ANYTHING THAT IS NOT A BAND OF THIS CASE, rather
+   * than a throw, because a page swapping parts calls this on whatever it is
+   * holding and half of those have already gone.
+   */
+  function unband(block) {
+    if (!block) return null;
+    const e = block.el || block;
+    if (e.parentNode !== root || !e.classList.contains('panel-band')) return null;
+    e.classList.remove('panel-band');
+    e.style.removeProperty('--panel-row');
+    e.remove();
     layBands();
     return e;
   }
@@ -371,7 +418,7 @@ export function createPanelLayout(o = {}) {
 
   return {
     el: root, wrap, fixed, strip, flow: flowEl, plate, cased, side,
-    grow, band, seam, check, cuts,
+    grow, band, unband, seam, check, cuts,
   };
 }
 
