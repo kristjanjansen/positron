@@ -1213,6 +1213,7 @@
     root: 'the notes exactly as the chord symbol spells them, stacked upward from the root',
     close: 'the same notes packed as close together as they go, so one hand can hold them',
     lead: 'each chord put where it moves your hand least from the one before it',
+    split: 'the root on its own for your left hand and the rest of the chord above it for your right',
   };
   const voicePick = createChoice({
     /* ⚠️ `VOICING` IS THE TERM AND A TERM IS NOT JARGON. It was `CHORDS` for
@@ -1225,7 +1226,18 @@
        anything: these were literal capitals typed into the page, which made two
        ordinary words look like an abbreviation. */
     label: 'VOICING',
-    options: [['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead']],
+    /* \u{1F534} `Split` IS A FOURTH OPTION SINCE 2026-09-25, ASKED FOR WITH A PICTURE
+       RATHER THAN A WORD: *"what voicing? wanna this"*, beside a piano tutorial
+       of `Cmaj7 Dm7 Em7 Fmaj7` on two staves with one bass note per chord in the
+       left hand and three notes in the right that barely move.
+       \u{1F534} AND THE LABEL IS A PLAIN WORD BECAUSE THIS EXACT CONTROL HAS ALREADY
+       PAID FOR THE OTHER KIND. These read `SPELLED`, `CLOSE` and `LEADING` for
+       ten minutes and the report was *"i do not know what spelled close leading
+       means"*. A musician calls this one a rootless voicing over a bass root,
+       and `chords.mjs` writes that name down once for a reader who knows it.
+       `Split` is what a visitor SEES: the chord split into a note underneath
+       and a handful above it. */
+    options: [['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead'], ['Split', 'split']],
     at: VOICINGS.indexOf('lead'),
     /* 🔴 A VOICING PRESS RE-VOICES EVERYTHING, LEARNED ROWS INCLUDED, AND THAT
        IS THE ANSWER TO *"you can revoice if i choose so?"*. A row lands where
@@ -1752,8 +1764,23 @@
        * and the keys above them are where a melody goes, which is the hand
        * position anybody playing chords and a tune already uses.
        */
+      /**
+       * \u{1F534} `split` GETS THE WHOLE DRAWN KEYBOARD AND NOT THE LETTER ROW, AND
+       * THAT IS ARITHMETIC RATHER THAN A PREFERENCE. The letter row is fourteen
+       * semitones, which is one hand, and this voicing is two: a note
+       * underneath plus three above it needs more room than a hand has.
+       * MEASURED on the four chords that asked for it, into 48 to 62: three of
+       * them fit and `Fmaj7` comes out F3 A3 C4 E4, whose E4 is 64, TWO
+       * SEMITONES ABOVE the top letter key. One chord of four would have been
+       * drawn with a note nobody can reach and `outside` would have said so on
+       * every redraw.
+       * \u26a0\ufe0f AND THE PROMISE THE LETTER ROW MAKES IS NOT BEING BROKEN, it is
+       * being declined by a mode that never made it. The three other voicings
+       * still fit under the letters, which is what the control was asked for;
+       * this one is for two hands and says so in its own hover.
+       */
       const { notes: shifted, outside } = voiceChord(c.notes, {
-        mode: voicing, lo: base, hi: base + REACH,
+        mode: voicing, lo: base, hi: base + (voicing === 'split' ? SHOWN() : REACH),
         near: rows.length ? rows[rows.length - 1].notes : [],
         bass: c.bass !== null,
       });
@@ -1947,8 +1974,12 @@
    * the whole keyboard to work in, `near` can put it beside the last chord
    * instead of at the bottom of the picture.
    */
+  /* \u26a0\ufe0f AND `split` IS WIDE WHEREVER IT IS ASKED FOR, for the reason written
+     over `drawChords`: a voicing with a hand either side of it does not fit
+     inside one hand's letter row, and a learned row or a proposal drawn in it
+     would carry a note above the letters exactly as a typed one would. */
   const voiceRow = (notes, near, { wide = false } = {}) => voiceChord(notes, {
-    mode: voicing, lo: keys.base, hi: keys.base + (wide ? SHOWN() : REACH),
+    mode: voicing, lo: keys.base, hi: keys.base + (wide || voicing === 'split' ? SHOWN() : REACH),
     near, bass: false });
 
   /**
@@ -3063,6 +3094,29 @@
           charts.every((c) => c.outside.length === 0)
           && charts.every((c) => c.notes.every((n) => n >= keys.base && n <= keys.base + 24)),
           charts.map((c) => `${c.label} ${Math.min(...c.notes)}-${Math.max(...c.notes)}`).join(', '));
+
+        /* \u{1F534} THE SPLIT VOICING IS DRAWN, WHICH IS THE ONE THING `chords.mjs`
+           CANNOT SAY ABOUT IT. That module grades the note numbers with ten
+           checks and no browser; what only this page can answer is whether the
+           ROLL survived a voicing that is wider than the others, because a note
+           under the body could have landed off the bottom of the keys and a roll
+           has no column for a note the keyboard does not draw. It reads the
+           dots back off the picture rather than off `charts`.
+           \u26a0\ufe0f AND IT PUTS THE CONTROL BACK, so the checks after this one see
+           the page in the state they were written against. */
+        voicePick.set(VOICINGS.indexOf('split'));
+        const splitDots = dotsNow(), splitSpans = spanNow();
+        const under = charts.every((c) =>
+          c.notes[0] === Math.min(...c.notes) && c.notes[1] - c.notes[0] >= 1);
+        d.assert('the split voicing puts a note under every chord and the roll draws every one of them',
+          under && charts.every((c) => c.outside.length === 0)
+          && charts.every((c) => c.notes.every((n) => n >= keys.base && n <= keys.base + SHOWN()))
+          && splitDots === spelledDots,
+          `${charts.map((c) => `${c.label} ${c.notes.join(',')}`).join(', ')}, `
+          + `spanning ${splitSpans.join(',')} against ${spelled.join(',')} spelled, `
+          + `the same ${splitDots} dots, and all of it inside `
+          + `${keys.base} to ${keys.base + SHOWN()}`);
+        voicePick.set(VOICINGS.indexOf('lead'));
       }
 
       /* 🔴 THE ROLL IS ONE TAB STOP AND THE ARROWS MOVE INSIDE IT, WHICH IS THE
