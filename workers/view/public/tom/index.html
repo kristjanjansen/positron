@@ -117,18 +117,23 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = (...a) => { fetched++; return realFetch(...a); };
 
-  // 🔴 THE PACK IN THIS REPOSITORY IS NOT PUBLISHED AND MUST NOT BE.
-  // `workers/view/build.mjs` copies an explicit allowlist and this file is not
-  // on it, deliberately: it holds 32 of somebody's sessions. Whether it is here
-  // is decided from the ORIGIN rather than discovered by fetching, because a
-  // build that discovers it with a 404 takes the deploy run red on `no console
-  // errors`, and a red that is expected is a red everybody skips. Copied from
-  // `/pack/` on purpose: two pages deciding this two ways is one page deciding
-  // it wrong.
-  const PACK = '/tmp/personal/New%20Pack.circuitpack';
-  const PACK_HERE = location.protocol === 'file:'
-    || /^(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/
-      .test(location.hostname);
+  // 🔴 THE PACK IS NOT IN THIS REPOSITORY ANY MORE, ON ANY ORIGIN. It moved to
+  // the private `kristjanjansen/packs` on 2026-09-24 (*"rm new pack, is in
+  // separate repo"*), before this repository was prepared to go public, and the
+  // blob it had been sitting on in history went with it.
+  // 🔴 SO THE DEFAULT IS TO FETCH NOTHING, AND THE SECOND WAY IN IS AN EXPLICIT
+  // `?pack=<url>`. This used to be an ORIGIN TEST: present on a checkout, absent
+  // on the deploy, decided from `location.hostname` rather than by fetching,
+  // because a build that discovered the file with a 404 took the deploy run red
+  // on `no console errors` and a red that is expected is a red everybody skips.
+  // That reasoning is intact and is exactly why the default is EMPTY rather than
+  // a path that used to be there: with no `?pack=` this page asks nobody for
+  // anything on any origin, and the reading checks below say they did not run
+  // rather than going red.
+  // ⚠️ AND EVERY ONE OF THOSE CHECKS IS STILL REACHABLE by anybody holding a
+  // pack of their own:   /tom/?pack=/tmp/personal/mine.circuitpack
+  const PACK = new URLSearchParams(location.search).get('pack') || '';
+  const PACK_HERE = !!PACK;
 
   /**
    * 🔴 SIXTY FOUR STEPS ACROSS AND EIGHT ROWS DOWN UNTIL A PACK LANDS, WHICH IS
