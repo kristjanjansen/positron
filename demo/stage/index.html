@@ -116,7 +116,14 @@
     // whole word's width of a phone's screen on a space, and the three names
     // here are the page's navigation rather than its prose.
     { id: 'controlroom', label: 'Controlroom' },
-    { id: 'archive', label: 'Archive' },
+    /**
+     * 🔴 NO ARCHIVE TAB SINCE 2026-09-25: *"rm archive for now. add play
+     * recording button to transport what is enabled when shows have ended and
+     * control room should be able to play everything back"*. A third tab for a
+     * thing you only ever want AFTER a show is a place to go rather than a
+     * thing to do, and the control room is where somebody already is when the
+     * show ends. Everything the tab held is in the control room now.
+     */
   ];
 
   const d = mount({
@@ -923,7 +930,7 @@
    * a measurement that will disagree.
    */
   const maxSpanMs = () => Math.max(ARCHIVE_WINDOW_MS * ZOOM_OUT, (recordedMs ?? SHOW_MS) * 1.05);
-  const archive = byId.get('archive');
+  const archive = byId.get('controlroom');
   const archiveDeck = createDeck({
     range: [0, SHOW_MS],
     // One item and one adapter, so the bar has a kind to read rates off. The
@@ -1036,10 +1043,35 @@
     },
   };
 
-  const bar = createTransportBar(tabs.panel('archive'), archiveDeck, {
+  const bar = createTransportBar(tabs.panel('controlroom'), archiveDeck, {
     live: false, scrub: false, absolute: false, time: false, loop: false,
     command: archiveCommand,
+    /**
+     * 🔴 PLAY RECORDING IS DISABLED UNTIL THERE IS A RECORDING, AND THAT IS THE
+     * WHOLE POINT OF IT. Asked 2026-09-25: *"add play recording button to
+     * transport what is enabled when shows have ended"*. A control that plays
+     * nothing is the shape this project calls a lie, and the previous answer to
+     * "there is nothing to play yet" was a whole tab that sat there empty.
+     * ⚠️ **IT IS `disabled`, WHICH THE HARNESS CANNOT PRESS, AND THAT IS
+     * DELIBERATE AND ACCOUNTED FOR.** A disabled control is a check the suite
+     * can no longer reach, so nothing is asserted THROUGH this button: the
+     * playback checks below drive `archiveCommand` and the recording's own
+     * element, which is the road that exists whether or not a button does.
+     * What IS asserted about the button is the thing only it can say, that it
+     * refuses before a show has ended and offers itself after.
+     */
+    extras: [
+      { id: 'playrec', label: 'PLAY RECORDING', word: true,
+        aria: 'play the recording this show made',
+        onPress: () => archiveCommand.play() },
+    ],
   });
+  /** Off until a show has ended and left something behind. */
+  function paintPlayRec() {
+    const b = bar.extra('playrec');
+    if (b) b.disabled = !archiveMedia;
+  }
+  paintPlayRec();
 
   const VIDEO_LANE = {
       /**
@@ -1078,7 +1110,7 @@
    * they get it. Below the floor the space under the last lane is empty, and
    * that was explicitly accepted rather than packed out with something.
    */
-  const strip = createStripView(tabs.panel('archive'), archiveDeck, {
+  const strip = createStripView(tabs.panel('controlroom'), archiveDeck, {
     size: 'auto', gutter: 110, lanes: [VIDEO_LANE], minHeight: STRIP_MIN_H,
     onSeek: (ms) => archiveCommand.seek(ms),
     // A FUNCTION, not a number: the widest useful view changes the moment a
@@ -1197,7 +1229,7 @@
    * ⚠️ The order is the order they were already in, bar then strip, so gluing
    * them changes what they look like and not where they are.
    */
-  tabs.panel('archive').append(createGlue(bar.el, strip.el));
+  tabs.panel('controlroom').append(createGlue(bar.el, strip.el));
 
   /**
    * 🔴 THE QUESTION GOES TO THE AUDIENCE AND BACK TO THE CONTROL ROOM. Asked
@@ -1794,6 +1826,7 @@
     archiveMaster = null;
     if (archiveMedia) { try { archiveMedia.pause(); } catch { /* already gone */ } }
     archiveMedia = null;
+    paintPlayRec();
     if (archiveUrl) { URL.revokeObjectURL(archiveUrl); archiveUrl = null; }
     playingBack = false;
     // The card comes back, which is the same swap `openArchive` does in reverse:
@@ -1811,6 +1844,7 @@
     for (const id of SHOWN_ON) byId.get(id).panel.slots.centre.textContent = '';
     T0 = null; recordedMs = null; stored = null; landed = null;
     recTrack = null; askedBps = null; recSource = 'received';
+    paintPlayRec();
     archiveDeck.setRange([0, SHOW_MS]);
     archiveDeck.seek(0);
     showDeck.seek(0);
@@ -2107,6 +2141,7 @@
      */
     archiveMaster = mediaMaster(archiveDeck, v, { stallPolicy: 'hold' });
     archiveMedia = v;           // from here the bar and the strip drive the file
+    paintPlayRec();
     d.log(`the archive is playing ${(recordedMs / 1000).toFixed(1)}s back${USE_R2 ? ' from R2' : ''}`, 'hi');
     return { video: v, mime, ms: recordedMs };
   }
@@ -2412,7 +2447,15 @@
   async function checks() {
     if (q.get('selfcheck') !== '1') return;
 
-    A('three panels, one for each tab', panels.length === 3 && tabs.el.querySelectorAll('.pos-vp').length === 3,
+    /**
+     * ⚠️ IT COUNTS AGAINST `TABS`, NOT AGAINST A TYPED NUMBER. It said `three`
+     * in the name and `=== 3` twice in the body, so removing the Archive tab on
+     * 2026-09-25 took it red on a page that was doing exactly what it promises.
+     * A count of a thing the page declares belongs to the declaration.
+     */
+    A('one panel for each tab, and no spare',
+      panels.length === TABS.length
+      && tabs.el.querySelectorAll('.pos-vp').length === TABS.length,
       `${tabs.el.querySelectorAll('.pos-vp').length} panels in ${TABS.length} tabs`);
 
     /**
@@ -3746,7 +3789,7 @@
    * page instead, looking exactly like the thing that was just moved.
    */
   const dgRoom = createDiagram(tabs.panel('controlroom'), DIAGRAM_SPEC, { how: true });
-  const dgArchive = createDiagram(tabs.panel('archive'), DIAGRAM_SPEC, { how: true });
+  const dgArchive = createDiagram(tabs.panel('controlroom'), DIAGRAM_SPEC, { how: true });
   const DIAGRAMS = [['controlroom', dgRoom], ['archive', dgArchive]];
   const cutLines = DIAGRAMS.flatMap(([where, dg]) =>
     (dg?.cuts ?? []).map((c) => `${where}/${c.id}: its ${c.where} was cut to "${c.shown}"`));
