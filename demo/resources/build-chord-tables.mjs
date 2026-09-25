@@ -98,6 +98,35 @@ const ranked = (m) => [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1
  */
 const MIN_CTX = 8, MIN_ROW = 3, KEEP = 3;
 
+/**
+ * 🔴 THE TEMPERATURE THE PAGE DRAWS WITH, ONE NUMBER PER STYLE, AND IT IS IN THE
+ * TABLE BECAUSE IT IS A FACT ABOUT THE STYLE RATHER THAN ABOUT THE CODE.
+ * `plans/plan-better-chords-2026-09-25.md` measured that taking the most likely
+ * chord ten times in a row falls into a repeating cycle **99.1 per cent** of the
+ * time on jazz and **99.8** on pop, against **52.7** and **89.0** for the real
+ * songs, and that sampling instead reproduces the real statistics.
+ *
+ * 🔴 AND THESE TWO NUMBERS ARE NOT THE PLAN'S TWO NUMBERS, WHICH IS THE
+ * INTERESTING RESULT RATHER THAN A DISAGREEMENT. The plan swept temperatures
+ * over EVERY row a context had and landed on 1.0 for jazz and 0.5 to 0.8 for
+ * pop. **This table keeps three rows**, which is already a sharpening, so the
+ * same variety costs a much flatter dial. MEASURED 2026-09-25 by
+ * `demo/resources/chord-e4-generators.mjs`, which builds this exact shape from
+ * the training split and walks ten steps through `suggest.mjs`'s own sampler:
+ *
+ *   jazz  T 1.0  81.6% cycle  5.92 distinct   T 3.5  53.1%  7.13   real 52.7%  7.42
+ *   pop   T 1.0  92.1% cycle  4.30 distinct   T 1.4  87.3%  4.67   real 89.0%  4.65
+ *
+ * ⚠️ AND THE CEILING IS THE PRUNE, NOT THE DIAL. Uniform over the three kept
+ * rows reads 40.5 per cent and 7.53 distinct on jazz, so no temperature reaches
+ * the real songs' 7.42 with the cycle rate as well; 3.5 is the closest point on
+ * both axes at once. Raising `KEEP` is the only thing that would move it, and it
+ * costs bytes rather than accuracy.
+ * ⚠️ ATTESTATION IS THE FLOOR AND IT IS NOWHERE NEAR IT: 97.2 per cent on jazz
+ * at 3.5 and 98.3 on pop at 1.4, against the 94 nothing ships below.
+ */
+const TEMP = { jazz: 3.5, pop: 1.4 };
+
 const styles = {};
 for (const which of ['jazz', 'pop']) {
   const seqs = load(which);
@@ -155,6 +184,7 @@ const table = { v: 1, alpha: ALPHA, keep: KEEP, syms: SYMS };
 for (const which of ['jazz', 'pop']) {
   const { c } = styles[which];
   table[which] = {
+    temp: TEMP[which],
     bi: pack(c.bi, 1),
     tri: pack(c.tri, 2),
     uni: SYMS.map((s) => pch((c.uni.get(s) || 0) / c.total)).join(''),

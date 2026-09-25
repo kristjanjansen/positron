@@ -14,14 +14,23 @@
 // tonic, the two slots, the spelling, and whether the name that comes out can
 // be turned back into notes at all.
 //
-// ⚠️ SIX OF THESE ARE NEGATIVE CONTROLS, including a truncated table, a
-// sabotaged unigram and a style that does not exist.
+// ⚠️ NINE OF THESE ARE NEGATIVE CONTROLS, including a truncated table, a
+// sabotaged unigram, a style that does not exist, a sampler held at the argmax
+// and a way home to a chord nothing reaches.
+//
+// 🔴 AND THE SAMPLER'S CHECK IS TWO HALVES OR IT IS NOTHING. `suggest.mjs` draws
+// slot A rather than taking the maximum since 2026-09-25, so every number in
+// `plans/plan-better-chords-2026-09-25.md` rests on a generator that can be made
+// to repeat itself. A check that only asserted *the same seed gives the same
+// line* passes on a sampler that always returns the same thing, and a check that
+// only asserted *two seeds differ* passes on one nothing can reproduce. Both are
+// below, next to each other, for that reason.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { suggest, useTables, tablesIn, styleNames, STYLES, keysFitting, pickKey, numeralIn }
-  from './suggest.mjs';
+import { suggest, useTables, tablesIn, styleNames, STYLES, keysFitting, pickKey, numeralIn,
+  mkRandom, routeTo, rowsFor } from './suggest.mjs';
 import { parseChord } from './chords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -158,7 +167,7 @@ const DEVICES = [
 {
   const missed = [], atA = [];
   for (const [label, chords, wantRoot] of DEVICES) {
-    const r = suggest({ chords }, { style: 'jazz' });
+    const r = suggest({ chords }, { style: 'jazz', temp: 0 });
     const roots = r.picks.map((p) => p.root);
     if (roots[0] === wantRoot) atA.push(label);
     else if (!roots.includes(wantRoot)) missed.push(`${label} gave ${names(r)}`);
@@ -174,8 +183,9 @@ const DEVICES = [
 //     table. A suggester silently backing off would score the same and mean
 //     something else entirely.
 ok('and every one of them came out of the counted table, not out of the fallback',
-  DEVICES.every(([, chords]) => suggest({ chords }, { style: 'jazz' }).source === 'corpus'),
-  DEVICES.map(([l, ch]) => `${l} ${suggest({ chords: ch }, { style: 'jazz' }).source}`).join(', '));
+  DEVICES.every(([, chords]) => suggest({ chords }, { style: 'jazz', temp: 0 }).source === 'corpus'),
+  DEVICES.map(([l, ch]) => `${l} ${suggest({ chords: ch }, { style: 'jazz', temp: 0 }).source}`)
+    .join(', '));
 
 // 11. 🔴 TWO SLOTS, TWO JOBS, AND SLOT B IS NOT SLOT A'S RUNNER UP BY
 //     PROBABILITY. It is the continuation most SPECIFIC to this context, which
@@ -185,7 +195,8 @@ ok('and every one of them came out of the counted table, not out of the fallback
 //     the time; slot B names it 9.9 per cent and is the global maximum 1.0 per
 //     cent, with 90.7 per cent of what it offers still attested.
 {
-  const rs = DEVICES.map(([, chords]) => suggest({ chords }, { style: 'jazz' }));
+  const rs = DEVICES.map(([, chords]) =>
+    suggest({ chords }, { style: 'jazz', rnd: mkRandom(11) }));
   const two = rs.filter((r) => r.picks.length === 2);
   const differ = two.filter((r) => r.picks[0].name !== r.picks[1].name).length;
   ok('the two slots are two different chords and two different reasons',
@@ -200,10 +211,16 @@ ok('and every one of them came out of the counted table, not out of the fallback
 //     change it. A slot B that never moved would be the second most probable
 //     row wearing a different name.
 {
-  const before = DEVICES.map(([, ch]) => suggest({ chords: ch }, { style: 'jazz' }).picks[1]?.name);
+  /* ⚠️ AT THE ARGMAX ON BOTH SIDES, WHICH IS WHAT MAKES THIS A TEST OF THE PMI
+     AND NOT OF THE DRAW. Slot B is chosen from the rows slot A did not take, so
+     a sampled A moving would move B for a reason that has nothing to do with
+     what is common everywhere. Hold A still and only the unigram can move it. */
+  const before = DEVICES.map(([, ch]) =>
+    suggest({ chords: ch }, { style: 'jazz', temp: 0 }).picks[1]?.name);
   const real = STYLES.jazz.uni;
   STYLES.jazz.uni = new Map([...real.keys()].map((k) => [k, 1 / real.size]));
-  const after = DEVICES.map(([, ch]) => suggest({ chords: ch }, { style: 'jazz' }).picks[1]?.name);
+  const after = DEVICES.map(([, ch]) =>
+    suggest({ chords: ch }, { style: 'jazz', temp: 0 }).picks[1]?.name);
   STYLES.jazz.uni = real;
   const moved = before.filter((n, i) => n !== after[i]).length;
   ok('NEGATIVE CONTROL: flattening what is common everywhere moves what slot B offers',
@@ -221,8 +238,8 @@ ok('and every one of them came out of the counted table, not out of the fallback
 {
   const ctxs = [[C(2, 'min7'), C(7, '7')], [C(0, 'maj7'), C(5, 'maj7')],
     [C(9, 'min7'), C(2, 'min7')], [C(0, 'maj'), C(7, 'maj')], [C(5, 'maj'), C(0, 'maj')]];
-  const j = ctxs.map((ch) => names(suggest({ chords: ch }, { style: 'jazz' })));
-  const p = ctxs.map((ch) => names(suggest({ chords: ch }, { style: 'pop' })));
+  const j = ctxs.map((ch) => names(suggest({ chords: ch }, { style: 'jazz', temp: 0 })));
+  const p = ctxs.map((ch) => names(suggest({ chords: ch }, { style: 'pop', temp: 0 })));
   const differ = j.filter((s, i) => s !== p[i]).length;
   ok('the two styles answer differently, in the chord and in how it is spelled',
     differ >= 4 && j.some((s) => /min7|maj7/.test(s)),
@@ -237,11 +254,16 @@ ok('and every one of them came out of the counted table, not out of the fallback
 //     that are not it.
 {
   const bad = [];
+  /* ⚠️ SEEDED, AND ONE STREAM ACROSS ALL 1,080, so the sweep covers the second
+     and third rows of every context it touches rather than only the first. The
+     argmax version of this check could never have reached them. */
+  const roundTrip = mkRandom(4242);
   for (const style of ['jazz', 'pop']) {
     for (let root = 0; root < 12; root++) {
       for (const q of ['maj', 'min', 'maj7', 'min7', '7', 'min7b5', 'dim', 'sus4', 'aug']) {
         for (const second of [0, 2, 5, 7, 9]) {
-          const r = suggest({ chords: [C(root, q), C((root + second) % 12, 'maj')] }, { style });
+          const r = suggest({ chords: [C(root, q), C((root + second) % 12, 'maj')] },
+            { style, rnd: roundTrip });
           for (const p of r.picks) {
             const back = parseChord(p.name);
             if (!back.ok || back.root !== p.root) bad.push(`${style} ${p.name}`);
@@ -264,7 +286,167 @@ ok('and every one of them came out of the counted table, not out of the fallback
     r.ok === true && r.source === 'plain', `${r.source}, ${names(r)}`);
 }
 
-// 16. 🔴 THE SABOTAGE, BECAUSE A DECODER THAT READ GARBAGE WOULD STILL ANSWER.
+console.log('\n== the draw, which is what stopped it being the argmax ==');
+
+const symOf = (r) => r.picks.map((p) => p.name).join('/');
+
+// 16. 🔴 THE TEMPERATURE IS A STYLE FACT AND IT TRAVELS IN THE TABLE. MEASURED
+//     by `demo/resources/chord-e4-generators.mjs` against this exact shape:
+//     jazz at 3.5 walks ten steps with 53.1 per cent of walks cycling and 7.13
+//     distinct chords, against the real songs' 52.7 and 7.42, and pop at 1.4
+//     reads 87.3 and 4.67 against 89.0 and 4.65. **The same dial that makes jazz
+//     right makes pop wrong**, so a single constant in the module would be the
+//     defect rather than the fix.
+ok('each style carries its own temperature, and they are not the same number',
+  STYLES.jazz.temp > 0 && STYLES.pop.temp > 0 && STYLES.jazz.temp !== STYLES.pop.temp,
+  `jazz draws at ${STYLES.jazz.temp} and pop at ${STYLES.pop.temp}`);
+
+// 17. 🔴 THE HALF THAT MAKES EVERY OTHER NUMBER REPEATABLE. Two runs on one
+//     seed have to be the same line.
+{
+  const line = (seed) => {
+    const rnd = mkRandom(seed);
+    return DEVICES.map(([, ch]) => symOf(suggest({ chords: ch }, { style: 'jazz', rnd })))
+      .join(' | ');
+  };
+  const a = line(1), b = line(1), c = line(2);
+  ok('one seed twice is one line, and it is the same line',
+    a === b, `${a.slice(0, 60)}…`);
+  // 18. NEGATIVE CONTROL for the check above, and it is not optional: a sampler
+  //     that always returned the same thing would pass it perfectly.
+  ok('NEGATIVE CONTROL: two seeds are two lines, so the one above is not a constant',
+    a !== c, `seed 1 gives ${a.slice(0, 40)}… and seed 2 gives ${c.slice(0, 40)}…`);
+}
+
+// 19. 🔴 AND THE ARGMAX IS STILL REACHABLE, WHICH IS THE CONTROL THE WHOLE PLAN
+//     IS SCORED AGAINST. `temp: 0` is what this file did before 2026-09-25: one
+//     context, one answer, two hundred draws.
+{
+  const ctx = [C(2, 'min7'), C(7, '7')];
+  const hot = new Set(), cold = new Set();
+  const rnd = mkRandom(99);
+  for (let i = 0; i < 200; i++) {
+    hot.add(suggest({ chords: ctx }, { style: 'jazz', rnd }).picks[0].name);
+    cold.add(suggest({ chords: ctx }, { style: 'jazz', temp: 0 }).picks[0].name);
+  }
+  ok('NEGATIVE CONTROL: held at the argmax one context answers one chord, and drawn it answers several',
+    cold.size === 1 && hot.size > 1,
+    `after Dm7 G7 the argmax says ${[...cold].join('')} every time and the draw says `
+    + `${[...hot].join(', ')}`);
+}
+
+// 20. 🔴 WHAT THE PAGE ACTUALLY DRAWS IS SLOT B, SO THE FIX HAS TO REACH IT.
+//     `/nola/` shows the pointwise-mutual-information pick and not the likeliest
+//     chord, and slot B is chosen from the rows slot A did not take, so a drawn
+//     A moves it. MEASURED over every trigram context in the shipped jazz table:
+//     slot B answers 1.69 different chords a context and moves at all in 68.7
+//     per cent of them, where before it was one chord, always.
+{
+  const ctx = [C(0, 'maj7'), C(5, 'maj7')];
+  const seen = new Set();
+  const rnd = mkRandom(5);
+  for (let i = 0; i < 200; i++) {
+    const r = suggest({ chords: ctx }, { style: 'jazz', rnd });
+    if (r.picks[1]) seen.add(r.picks[1].name);
+  }
+  ok('the chord the page shows moves too, because slot B reads the rows slot A left',
+    seen.size > 1, `after Cmaj7 Fmaj7 the second slot offers ${[...seen].join(', ')}`);
+}
+
+// 21. 🔴 THE COUNT FLOOR IS WHAT HOLDS ATTESTATION AT 96.6 PER CENT AND IT IS IN
+//     THE TABLE RATHER THAN IN THE SAMPLER. `build-chord-tables.mjs` prunes at
+//     `row>=3` and keeps three rows, so there is no tail here to draw from.
+//     MEASURED in the plan: sampling without a floor costs 9.5 points of
+//     attestation for 1.8 bits, which is the same trade pure PMI was refused for.
+{
+  let widest = 0, n = 0;
+  for (const st of [STYLES.jazz, STYLES.pop]) {
+    for (const m of [st.tri, st.bi]) for (const rows of m.values()) {
+      widest = Math.max(widest, rows.length); n++;
+    }
+  }
+  ok('there is no tail in this table to draw from, because the build already cut it',
+    widest <= 3 && n > 1000,
+    `${n} contexts across both styles and the widest holds ${widest} rows`);
+}
+
+console.log('\n== a four chord way home ==');
+
+// 22. 🔴 THE THIRD WORD OF THE COMPLAINT WAS *"not moving anywhere"*, AND THIS
+//     IS THE ONLY PART OF THE ANSWER THAT CHANGES WHAT IS OFFERED RATHER THAN
+//     HOW IT RANKS. MEASURED over 4,000 held-out jazz contexts against this
+//     table's shape: a route exists on 92.7 per cent of them and its transitions
+//     are attested in held-out songs 98.3 per cent of the time.
+{
+  const r = routeTo({ chords: [C(2, 'min7'), C(7, '7')] }, { style: 'jazz', rnd: mkRandom(3) });
+  const last = r.steps[r.steps.length - 1];
+  ok('a way home is four chords long and the last one is the tonic',
+    r.ok && r.steps.length === 4 && last.root === r.tonic
+    && r.target === '0maj' && r.targetName === last.name,
+    `${r.steps.map((c) => c.name).join(' ')} in ${r.keyName}, home to ${r.targetName}`);
+
+  // 23. 🔴 AND EVERY STEP OF IT IS A ROW THE TABLE HOLDS, which is the half that
+  //     says the route is read rather than invented. A beam search over a table
+  //     it did not actually consult would look identical from outside.
+  {
+    const st = STYLES.jazz;
+    const deg = (root) => (((root - r.tonic) % 12) + 12) % 12;
+    const CLS = { maj: 'maj', maj7: 'maj', min: 'min', min7: 'min', 7: 'dom',
+      dim: 'dim', min7b5: 'hdim', sus4: 'sus', sus2: 'sus', aug: 'aug' };
+    let ctx = ['2min', '7dom'];
+    let off = 0;
+    for (const step of r.steps) {
+      const want = `${deg(step.root)}${CLS[step.quality] || 'maj'}`;
+      const { rows } = rowsFor(st, ctx);
+      if (!rows.some(([sym]) => sym === want)) off++;
+      ctx = [ctx[ctx.length - 1], want];
+    }
+    ok('and every chord in it is a row the table holds after the one before it',
+      off === 0,
+      `${r.steps.length} steps and ${off} of them off the table`);
+  }
+}
+
+// 24. 🔴 THE ARGMAX PROBLEM RETURNS ONE LEVEL UP, WHICH IS THE PROOF THE LESSON
+//     IS GENERAL RATHER THAN A PATCH. MEASURED on the shipped shape: the best
+//     path alone puts **72.6 per cent** of its six commonest routes into ii V I
+//     and finds 76 distinct routes, and sampling the path per step drops that to
+//     **18.5 per cent** over 151 routes with attestation unmoved at 98.3.
+{
+  const ctx = { chords: [C(2, 'min7'), C(7, '7')] };
+  const many = new Set(), one = new Set();
+  const rnd = mkRandom(17);
+  for (let i = 0; i < 100; i++) {
+    many.add(routeTo(ctx, { style: 'jazz', rnd }).steps.map((c) => c.name).join(' '));
+    one.add(routeTo(ctx, { style: 'jazz', temp: 0 }).steps.map((c) => c.name).join(' '));
+  }
+  ok('NEGATIVE CONTROL: the best path alone is one route forever, and the drawn one is several',
+    one.size === 1 && many.size > 1,
+    `the best path is always ${[...one][0]}, and drawing gives ${many.size} different ways home`);
+}
+
+// 25. NEGATIVE CONTROL: a way home nothing in the table reaches answers with a
+//     sentence rather than a throw or a route that does not arrive.
+{
+  const r = routeTo({ chords: [C(2, 'min7'), C(7, '7')] },
+    { style: 'jazz', target: '6aug', rnd: mkRandom(1) });
+  ok('NEGATIVE CONTROL: a destination nothing reaches is said in words, not thrown',
+    r.ok === false && r.steps.length === 0 && r.says.includes('nothing'), r.says);
+}
+
+// 26. NEGATIVE CONTROL: the same two boundaries `suggest` has. One chord is not
+//     a line, and a style with no counted table cannot know where a line is
+//     going, which is a different sentence from not knowing what comes next.
+{
+  const a = routeTo({ chords: [C(0, 'maj')] }, { style: 'jazz' });
+  const b = routeTo({ chords: [C(0, 'maj'), C(7, 'maj')] }, { style: 'plain' });
+  ok('NEGATIVE CONTROL: one chord and a style with no table are both refused in words',
+    a.ok === false && b.ok === false && a.says !== b.says
+    && b.says.includes('where a line is going'),
+    `${a.says} / ${b.says}`);
+}
+
+// 27. 🔴 THE SABOTAGE, BECAUSE A DECODER THAT READ GARBAGE WOULD STILL ANSWER.
 //     A table truncated to one record must take the device check red. If it
 //     does not, this whole file is decoration, which is the finding this
 //     repository has recorded four times about its own instruments.
@@ -274,7 +456,7 @@ ok('and every one of them came out of the counted table, not out of the fallback
     jazz: { ...json.jazz, bi: json.jazz.bi.slice(0, 1 + 2 * json.keep),
       tri: json.jazz.tri.slice(0, 2 + 2 * json.keep) } });
   const still = DEVICES.filter(([, chords]) =>
-    suggest({ chords }, { style: 'jazz' }).source === 'corpus').length;
+    suggest({ chords }, { style: 'jazz', temp: 0 }).source === 'corpus').length;
   STYLES.jazz = keep.jazz; STYLES.pop = keep.pop;
   ok('SABOTAGE: a table truncated to one record answers from the table almost never',
     still <= 1,
@@ -282,10 +464,10 @@ ok('and every one of them came out of the counted table, not out of the fallback
     + `${DEVICES.length} with the real one`);
 }
 
-// 17. And the real table is back, so the sabotage above cannot leak into a
+// 28. And the real table is back, so the sabotage above cannot leak into a
 //     number anybody quotes.
 ok('and the real table is back in place after the sabotage',
-  DEVICES.every(([, chords]) => suggest({ chords }, { style: 'jazz' }).source === 'corpus'),
+  DEVICES.every(([, chords]) => suggest({ chords }, { style: 'jazz', temp: 0 }).source === 'corpus'),
   `${DEVICES.length} of ${DEVICES.length} reading the table again`);
 
 console.log(`\n${pass} ok, ${fail} failed`);

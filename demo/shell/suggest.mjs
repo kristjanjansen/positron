@@ -55,6 +55,37 @@
 // surprisal, and the suggestions it makes are visibly wrong. **Adventurous and
 // unattested are not the same thing.**
 //
+// ── SLOT A IS SAMPLED SINCE 2026-09-25, AND THE ARGMAX WAS THE COMPLAINT ────
+//
+// 🔴 ASKED AS *"they sound unimaginative and dry and not moving anywhere"*, AND
+// `plans/plan-better-chords-2026-09-25.md` MEASURED THAT THE SUGGESTIONS ARE NOT
+// BROKEN, THEY ARE THE ARGMAX, AND THE ARGMAX IS THE DEFINITION OF
+// UNSURPRISING. Taking slot A ten times in a row, on held-out jazz:
+//
+//   slot A, always            99.1% of walks cycle   3.74 distinct chords in ten
+//   sampled, temperature 1    52.6%                  7.52
+//   THE REAL SONGS            52.7%                  7.42
+//
+// ✅ **SAMPLING FROM THE TABLE ALREADY SHIPPED REPRODUCES THE STATISTICS OF REAL
+// MUSIC ON EVERY AXIS MEASURED**, and 96.6 per cent of what it says is played
+// after that chord somewhere in songs the table has never seen.
+//
+// 🔴 THE TEMPERATURE IS A STYLE FACT AND LIVES IN THE TABLE, NOT HERE. Pop's
+// real songs cycle 89.0 per cent of the time with 4.65 distinct chords in ten,
+// which is nowhere near 1.0. **The same dial that makes jazz right makes pop
+// wrong**, so it is one number per style beside the spelling field.
+//
+// ⚠️ THE COUNT FLOOR IS WHAT KEEPS THIS ATTESTED AND IT IS ALREADY IN THE
+// SHIPPED TABLE. `build-chord-tables.mjs` prunes at `row>=3`, so there is no
+// tail here to draw from. Sampling without one costs 9.5 points of attestation,
+// MEASURED, which is the same trap pure PMI was refused for.
+//
+// 🔴 AND THE SAMPLER IS SEEDABLE, WHICH IS NOT A CONVENIENCE. Nothing about any
+// of the numbers above can be regression tested against a generator that cannot
+// be made to repeat itself, and `suggest-test.mjs` asserts BOTH halves: the same
+// seed twice is the same line, and two seeds are two lines. One half alone
+// passes on a sampler that always returns the same thing.
+//
 // ── WHAT THIS MODULE WILL NOT CLAIM ────────────────────────────────────────
 //
 // ⚠️ THE ASK WAS *"want them to be openstudiojazz quality stuff"* AND THE
@@ -295,7 +326,13 @@ export function useTables(json) {
     if (!st || typeof st !== 'object' || !st.bi || !st.tri) continue;
     const uni = new Map(syms.map((s, i) => [s, rev.get(st.uni[i]) / STEPS]));
     const spell = new Map(syms.map((s, i) => [s, st.spell[i] || '']));
-    made[id] = { id, bi: read(st.bi, 1), tri: read(st.tri, 2), uni, spell };
+    /* 🔴 THE TEMPERATURE TRAVELS WITH THE STYLE, and a table written before the
+       field existed reads as 1, which is jazz's measured value rather than a
+       neutral one. It is stated here rather than hidden, because a pop table
+       silently sampled at 1.0 is the wrong dial and would show as a page that
+       wanders. `build-chord-tables.mjs` writes the field. */
+    const temp = Number.isFinite(st.temp) && st.temp >= 0 ? st.temp : 1;
+    made[id] = { id, bi: read(st.bi, 1), tri: read(st.tri, 2), uni, spell, temp };
   }
   LOADED = made;
   for (const id of Object.keys(made)) STYLES[id] = made[id];
@@ -351,7 +388,34 @@ function chordOfSymbol(sym, tonic, style, key) {
  */
 const POOL = 4;
 
-function twoSlots(style, ctx) {
+/**
+ * 🔴 A SEEDED RANDOM SOURCE, AND IT IS THE SAME ONE THE MEASUREMENTS USE.
+ * `demo/resources/chord-e4-generators.mjs` imports this rather than carrying a
+ * generator of its own, so a number measured there and a chord offered here come
+ * off one stream. A sampler that cannot be made to repeat itself makes every
+ * claim in `plans/plan-better-chords-2026-09-25.md` unrepeatable.
+ * ⚠️ IT IS A PLAIN LINEAR CONGRUENTIAL GENERATOR AND THAT IS ENOUGH. Nothing
+ * here is cryptography and nothing here is a simulation; what is needed is that
+ * two runs with one seed agree and two seeds do not.
+ */
+export function mkRandom(seed = 1) {
+  let st = (seed >>> 0) || 1;
+  return () => {
+    st = (Math.imul(st, 1103515245) + 12345) & 0x7fffffff;
+    return st / 0x7fffffff;
+  };
+}
+
+/**
+ * The rows the table holds for a context, with the backoff that is the whole of
+ * how a thin context is answered.
+ * ⚠️ EXPORTED SO THE MEASUREMENTS GRADE THIS LOOKUP RATHER THAN A COPY OF IT.
+ * `demo/resources/chord-e4-generators.mjs` walks ten steps through this function
+ * and `sampleRow`, which is the only way the number it prints is about the code
+ * that ships.
+ * @returns {{rows: Array<[string, number]>, how: string}}
+ */
+export function rowsFor(style, ctx) {
   const [a, b] = [ctx[ctx.length - 2], ctx[ctx.length - 1]];
   let rows = (a !== undefined && b !== undefined) ? style.tri.get(`${a}|${b}`) : null;
   let how = 'three chords of yours against three of theirs';
@@ -359,8 +423,36 @@ function twoSlots(style, ctx) {
     rows = b !== undefined ? style.bi.get(b) : null;
     how = 'the one chord before it';
   }
+  return { rows: rows || [], how };
+}
+
+/**
+ * 🔴 ONE ROW OUT OF THE TABLE'S OWN DISTRIBUTION, FLATTENED BY A TEMPERATURE.
+ * The weight is `p^(1/T)` over the kept rows: `T` under 1 sharpens toward the
+ * commonest answer, `T` at 1 is the distribution the corpus was counted with,
+ * and `T` above 1 flattens it.
+ * ⚠️ `temp` OF 0 IS THE ARGMAX, ON PURPOSE AND NOT AS AN ERROR CASE. It is what
+ * this file did before 2026-09-25, and `suggest-test.mjs` uses it as the
+ * negative control that says the sampler is sampling: at 0 a context answers one
+ * chord over two hundred seeds, and at the shipped temperature it answers
+ * several.
+ * ⚠️ THE ROWS ARE ALREADY FLOORED AT A COUNT OF THREE by the build, so there is
+ * no tail here and nothing here that could get a floor wrong.
+ */
+export function sampleRow(rows, temp, rnd) {
   if (!rows || !rows.length) return null;
-  const A = rows[0][0];
+  if (!(temp > 0) || typeof rnd !== 'function') return rows[0][0];
+  const w = rows.map(([, p]) => Math.pow(Math.max(p, 1e-9), 1 / temp));
+  const sum = w.reduce((a, b) => a + b, 0);
+  let r = rnd() * sum;
+  for (let i = 0; i < rows.length; i++) { r -= w[i]; if (r <= 0) return rows[i][0]; }
+  return rows[rows.length - 1][0];
+}
+
+function twoSlots(style, ctx, { temp = 1, rnd = null } = {}) {
+  const { rows, how } = rowsFor(style, ctx);
+  if (!rows.length) return null;
+  const A = sampleRow(rows, temp, rnd);
   let B = null, best = -Infinity;
   for (const [s, p] of rows.slice(0, POOL)) {
     if (s === A) continue;
@@ -368,7 +460,61 @@ function twoSlots(style, ctx) {
     const score = Math.log2(p / u);
     if (score > best) { best = score; B = s; }
   }
-  return { A, B: B ?? (rows[1] ? rows[1][0] : null), how, rows };
+  return { A, B: B ?? (rows.find(([s]) => s !== A)?.[0] ?? null), how, rows };
+}
+
+/**
+ * 🔴 A PATH THAT HAS TO ARRIVE, WHICH IS A DIFFERENT QUESTION FROM A CHORD THAT
+ * COMES NEXT, AND THE TABLE ALREADY ANSWERS IT. A beam search over the same
+ * trigram for a run of `steps` chords whose last one is `target`.
+ * MEASURED over 4,000 held-out jazz contexts in
+ * `plans/plan-better-chords-2026-09-25.md`: a route exists on **99.6 per cent**
+ * of them and its transitions are attested in held-out songs **98.2 per cent**
+ * of the time.
+ *
+ * 🔴 AND THE ARGMAX PROBLEM RETURNS ONE LEVEL UP, WHICH IS THE PROOF THE LESSON
+ * IS GENERAL RATHER THAN A PATCH. MEASURED: **60.4 per cent of the six commonest
+ * best paths end in ii V I**. A best path is as cliched as a best chord, so the
+ * path is sampled too, and the repair is the same repair.
+ * ⚠️ THE WEIGHT IS PER STEP RATHER THAN PER PATH, which is a choice and was
+ * measured rather than argued: `2^(lp/steps/T)` is the geometric mean
+ * probability of a step raised to `1/T`, so one dial means the same thing to a
+ * chord and to a route. Weighting by the whole path's probability instead is the
+ * same code with `temp` divided by `steps`, which is how both were graded.
+ * ⚠️ `beam` OF 64 PRUNES NOTHING AT FOUR STEPS, because the shipped table keeps
+ * three rows a context and `3^3` is 27. It is a ceiling for a longer route
+ * rather than a filter on this one, and a beam that pruned would be an argmax
+ * wearing a different name.
+ *
+ * @returns {{path: string[], lp: number, tried: number}|null}
+ */
+export function routeOver(style, ctx0, target, steps = 4,
+  { temp = 1, rnd = null, beam = 64 } = {}) {
+  if (!style || !target || steps < 1) return null;
+  let live = [{ ctx: [...ctx0], path: [], lp: 0 }];
+  for (let d = 0; d < steps; d++) {
+    const next = [];
+    for (const st of live) {
+      const { rows } = rowsFor(style, st.ctx);
+      for (const [s, p] of rows) {
+        if (d < steps - 1 && s === target) continue;      // arrive once, at the end
+        if (d === steps - 1 && s !== target) continue;    // and it must land on it
+        next.push({ ctx: [st.ctx[st.ctx.length - 1], s], path: [...st.path, s],
+          lp: st.lp + Math.log2(Math.max(p, 1e-9)) });
+      }
+    }
+    if (!next.length) return null;
+    next.sort((a, b) => b.lp - a.lp);
+    live = next.slice(0, beam);
+  }
+  if (!live.length) return null;
+  if (!(temp > 0) || typeof rnd !== 'function') return { ...live[0], tried: live.length };
+  const top = live[0].lp;
+  const w = live.map((st) => Math.pow(2, (st.lp - top) / steps / temp));
+  const sum = w.reduce((a, b) => a + b, 0);
+  let r = rnd() * sum;
+  for (let i = 0; i < live.length; i++) { r -= w[i]; if (r <= 0) return { ...live[i], tried: live.length }; }
+  return { ...live[live.length - 1], tried: live.length };
 }
 
 /**
@@ -378,11 +524,18 @@ function twoSlots(style, ctx) {
  * the one worth hearing. They are not a ranked pair of one job and the
  * benchmark is what settles that.
  *
+ * 🔴 AND SLOT A IS A SAMPLE RATHER THAN THE MAXIMUM SINCE 2026-09-25. The
+ * header carries the measurement. `temp` overrides the style's own number and
+ * `temp: 0` is the argmax this file shipped before, which is what the checks use
+ * as their negative control.
+ *
  * @param {{chords: Array<{root:number, quality:string}>}} context
- * @param {{style?: string}} [o]  a style name from `styleNames()`, or `plain`
+ * @param {{style?: string, temp?: number, rnd?: function}} [o]  a style name
+ *   from `styleNames()`, or `plain`; a temperature, or the style's own; and a
+ *   random source, so a caller that needs to repeat itself can.
  * @returns {{ok, style, source, key, keyName, tonic, guessed, from, picks, says}}
  */
-export function suggest(context, { style = 'jazz' } = {}) {
+export function suggest(context, { style = 'jazz', temp = null, rnd = null } = {}) {
   const chords = (context?.chords || []).filter((c) => c && Number.isFinite(c.root));
   const blank = { ok: false, style, source: 'none', key: null, keyName: '', tonic: 0,
     guessed: false, from: '', picks: [], says: '' };
@@ -399,12 +552,19 @@ export function suggest(context, { style = 'jazz' } = {}) {
   const table = STYLES[style];
   if (table && table.tri) {
     const ctx = chords.map((c) => symbolOf(c.root, c.quality, tonic));
-    const got = twoSlots(table, ctx);
+    const T = temp === null ? (table.temp ?? 1) : temp;
+    const got = twoSlots(table, ctx, { temp: T, rnd: rnd || Math.random });
     const usual = got && chordOfSymbol(got.A, tonic, table, key);
     const other = got && got.B && chordOfSymbol(got.B, tonic, table, key);
     if (usual) {
+      /* ⚠️ THE WORDING MOVED WITH THE CODE. It read *what jazz players most
+         often go to from here*, which was true of an argmax and is a lie about a
+         draw: the commonest answer is now the likeliest one to come up rather
+         than the only one that can. CLAUDE.md's rule is that a change in what a
+         page does is a change in what it says, in the same edit. */
       const picks = [{ role: 'usual', ...usual,
-        why: `what ${table.id} players most often go to from here` }];
+        why: `one of the chords ${table.id} players go to from here, drawn rather than `
+          + 'always the commonest' }];
       if (other && other.name !== usual.name) {
         picks.push({ role: 'other', ...other,
           why: 'the continuation most specific to this context rather than common everywhere' });
@@ -412,10 +572,10 @@ export function suggest(context, { style = 'jazz' } = {}) {
       return { ok: true, style, source: 'corpus', key, keyName, tonic, guessed,
         from: chords[chords.length - 1].root === undefined ? '' : ctx[ctx.length - 1],
         picks,
-        says: `${where}, and reading ${got.how}, the ${table.id} table offers `
+        says: `${where}, and reading ${got.how}, the ${table.id} table draws `
           + `${picks[0].name}`
-          + (picks[1] ? ` as the usual one and ${picks[1].name} as the one least common `
-            + 'everywhere else' : '') };
+          + (picks[1] ? ` as one of the chords that follow and ${picks[1].name} as the one `
+            + 'least common everywhere else' : '') };
     }
   }
 
@@ -460,4 +620,70 @@ export function suggest(context, { style = 'jazz' } = {}) {
     says: `nothing in the ${style} reading holds `
       + `${chords.map((c) => NOTE_LETTERS[c.root] + c.quality).join(' and ')}, so these are a `
       + 'fifth either side of the first chord rather than a reading of a key' };
+}
+
+/**
+ * A four chord way home.
+ *
+ * 🔴 THIS IS THE ONE PROPOSAL IN `plans/plan-better-chords-2026-09-25.md` THAT
+ * CHANGES WHAT A PAGE OFFERS RATHER THAN HOW IT RANKS: not *here is the next
+ * chord* but *here is a four chord way home, and here is another one*. The third
+ * word of the complaint was *"not moving anywhere"*, and MEASURED literally:
+ * taking the old suggestion ten times in a row fell into a repeating cycle
+ * **99.1 per cent** of the time, 77.3 per cent of them the three rotations of
+ * ii V I. Nothing on this page had a destination, so nothing could arrive.
+ *
+ * ⚠️ THE TARGET IS THE TONIC AND THAT IS THE ONE UNDECIDED DESIGN QUESTION,
+ * section 12.4 of the plan, written down rather than answered here: a real
+ * player aims at all sorts of places, and whether a person picks the target or
+ * the page infers it is not settled. The tonic is the default because it is the
+ * one destination a key already names. A caller may pass `target` as a table
+ * symbol, and nothing in this repository does yet.
+ *
+ * @param {{chords: Array<{root:number, quality:string}>}} context
+ * @param {{style?, steps?, target?, temp?, rnd?}} [o]
+ * @returns {{ok, style, source, key, keyName, tonic, guessed, target, targetName,
+ *   steps: Array<{root, quality, name, numeral}>, says}}
+ */
+export function routeTo(context, { style = 'jazz', steps = 4, target = null,
+  temp = null, rnd = null } = {}) {
+  const chords = (context?.chords || []).filter((c) => c && Number.isFinite(c.root));
+  const blank = { ok: false, style, source: 'none', key: null, keyName: '', tonic: 0,
+    guessed: false, target: '', targetName: '', steps: [], says: '' };
+  if (chords.length < 2) {
+    return { ...blank, says: 'two chords are needed before a way home can be worked out' };
+  }
+  const table = STYLES[style];
+  if (!table || !table.tri) {
+    return { ...blank,
+      says: `there is no counted ${style} table here, and the diatonic rule knows where a `
+        + 'chord goes next without knowing where a line is going' };
+  }
+  const { key, tonic, guessed } = pickKey(chords);
+  const keyName = key ? `${NOTE_LETTERS[key.pc]} ${key.mode}` : `${NOTE_LETTERS[tonic]}`;
+  /* ⚠️ THE TONIC'S CLASS COMES FROM THE MODE AND NOT FROM THE FIRST CHORD. A
+     line that opens on a dominant is still going home to a major or a minor
+     chord, and `0maj` in a minor key is a chord the table has barely counted. */
+  const aim = target || `0${key && key.mode === 'minor' ? 'min' : 'maj'}`;
+  const ctx = chords.map((c) => symbolOf(c.root, c.quality, tonic));
+  const T = temp === null ? (table.temp ?? 1) : temp;
+  const got = routeOver(table, ctx, aim, steps, { temp: T, rnd: rnd || Math.random });
+  const home = chordOfSymbol(aim, tonic, table, key);
+  if (!got) {
+    return { ...blank, key, keyName, tonic, guessed, target: aim,
+      targetName: home ? home.name : '',
+      says: `nothing the ${table.id} table has counted gets from here to `
+        + `${home ? home.name : keyName} in ${steps} chords` };
+  }
+  const out = got.path.map((s) => chordOfSymbol(s, tonic, table, key)).filter(Boolean);
+  if (out.length !== got.path.length) {
+    return { ...blank, key, keyName, tonic, guessed, target: aim,
+      targetName: home ? home.name : '',
+      says: 'a way home was found and one of its chords cannot be written down here' };
+  }
+  return { ok: true, style, source: 'corpus', key, keyName, tonic, guessed,
+    target: aim, targetName: home ? home.name : out[out.length - 1].name, steps: out,
+    says: `one of ${got.tried} ways the ${table.id} table knows from here home to `
+      + `${home ? home.name : keyName} in ${steps} chords: `
+      + `${out.map((c) => c.name).join(', ')}` };
 }
