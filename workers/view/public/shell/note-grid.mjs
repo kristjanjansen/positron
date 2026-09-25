@@ -62,7 +62,7 @@ const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
  * MIDI note number to the name a musician would say.
  * ⚠️ MIDDLE C IS C3 HERE, WHICH IS WHAT THE CIRCUIT ITSELF SAYS. The octave
  * numbering of note 60 is not standardised: Yamaha calls it C3, Roland C4, and
- * the MIDI specification does not say. `measured-devices-2026-09-20.md` records
+ * the MIDI specification does not say. `research/measured-devices-2026-09-20.md` records
  * the Circuit's own drum pads at notes 60, 62, 64 and 65, and the instrument
  * labels that octave 3, so a page about Circuit sessions uses the Circuit's
  * numbering and says so rather than picking the commoner one.

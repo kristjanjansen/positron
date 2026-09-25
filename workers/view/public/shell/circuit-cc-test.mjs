@@ -6,7 +6,7 @@
 // SOURCE FROM THE ONE IT CAME FROM. `circuit-cc.mjs` was parsed out of
 // Novation's Programmer's Reference Guide. Every assertion below that names a
 // number compares it against something THIS DESK measured through `/dump/` and
-// wrote into `measured-devices-2026-09-20.md`. A test that re-derived the
+// wrote into `research/measured-devices-2026-09-20.md`. A test that re-derived the
 // numbers from the same document would catch a typo and could never catch a
 // misreading, which is exactly what `timeline/csound.mjs` was 22/22 green
 // about for months.
@@ -77,7 +77,7 @@ ok('they split 52 synth, 28 drum, 18 session',
      section forward was still holding the foot of page 9.
      ⚠️ AND THIS ASSERT IS A DOCUMENT CLAIM RATHER THAN A MEASUREMENT, which is
      unlike every assert above it and is worth saying out loud. This desk has
-     never measured a drum control change at all: `measured-devices-2026-09-20.md`
+     never measured a drum control change at all: `research/measured-devices-2026-09-20.md`
      has channel 10 as notes 60, 62 and 64 at a fixed velocity of 96 and nothing
      more, so there is no second source to hold the drums' section against. */
   const secs = sections('10');
