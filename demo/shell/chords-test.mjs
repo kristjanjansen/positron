@@ -90,6 +90,86 @@ ok('the longest matching quality wins',
   notes('Cmaj7') === '60,64,67,71' && notes('Cm7b5') === '60,63,66,70',
   `Cmaj7 ${spell('Cmaj7')}, Cm7b5 ${spell('Cm7b5')}`);
 
+// ── `C2/E`, the chord this table refused ────────────────────────────────────
+//
+// Reported 2026-09-26 as *"chord or no chord"*, with `/nola/` refusing the
+// typed line `Cmaj7 C2/E` beside an Open Studio lesson playing that exact
+// chord with that exact caption. `demo/resources/chord-refused.mjs` measured
+// what else was being refused, over 2,076 charts and 159,644 written chords.
+
+// 7a. 🔴 THE NOTE NUMBERS ARE WRITTEN OUT RATHER THAN DERIVED, so this can be
+//     checked against the video by ear rather than against a rule. E3 under
+//     C4 D4 G4: the second and the fifth, and the third underneath.
+ok('C2/E is E3 C4 D4 G4, note numbers 52 60 62 67',
+  notes('C2/E') === '52,60,62,67' && spell('C2/E') === 'E3 C4 D4 G4',
+  `${parseChord('C2/E').name}   ${spell('C2/E')}   ${notes('C2/E')}`);
+
+// 7b. NEGATIVE CONTROL, AND IT IS THE WHOLE INTERVAL DECISION. `[0, 2, 4, 7]`
+//     is the other defensible reading of the symbol and it makes the slash say
+//     nothing, because the third would already be in the stack. Give `2` a
+//     third and this goes red.
+ok('a 2 chord has no third in it, which is what leaves the slash something to do',
+  parseChord('C2').notes.every((n) => (n - 60) % 12 !== 4)
+  && parseChord('C2/E').notes.filter((n) => ((n % 12) + 12) % 12 === 4).length === 1,
+  spell('C2'));
+
+// 7c. And the name that comes back is the name that was typed, which is why
+//     `2` is the one row of 2026-09-26 with no `QUALITY_SAYS` entry.
+ok('C2 reads back as C2 rather than as Csus2',
+  parseChord('C2').name === 'C2' && parseChord('C2/E').name === 'C2/E',
+  `${parseChord('C2').name} and ${parseChord('C2/E').name}`);
+
+// 7d. 🔴 AND THE DUPLICATE IS ASSERTED RATHER THAN HIDDEN. `2` and `sus2` are
+//     the same three notes under two real names, and a check that pretended
+//     otherwise would be the file lying about its own table.
+ok('2 and sus2 are the same three notes under two names',
+  notes('C2') === notes('Csus2') && parseChord('C2').name !== parseChord('Csus2').name,
+  `${parseChord('C2').name} ${spell('C2')} against ${parseChord('Csus2').name} ${spell('Csus2')}`);
+
+// 7e. The five counted spellings, each reaching the table and each coming back
+//     under the name the page already shows. MEASURED occurrences across both
+//     corpora: h7 1,754, o7 882, hdim7 200, h 105, o 85.
+{
+  const want = { Ch7: 'Cmin7b5', Ch: 'Cmin7b5', Chdim7: 'Cmin7b5', Co7: 'Cdim7', Co: 'Cdim' };
+  const wrong = Object.entries(want).filter(([typed, says]) => {
+    const c = parseChord(typed);
+    return !c.ok || c.name !== says || notes(typed) !== notes(says);
+  });
+  ok('every spelling added in 2026-09-26 is reachable and says an existing name',
+    wrong.length === 0,
+    wrong.map(([t]) => t).join(', ') || Object.keys(want).join(' '));
+}
+
+// 7f. 🔴 NEGATIVE CONTROL, AND IT IS ABOUT THREE ROWS THAT ARE NOT THERE. `^`,
+//     `^9` and `+` were counted too (62, 60 and 48 occurrences) and were left
+//     out, because `parseChords` splits a line on everything that is not a
+//     chord character and those three ARE the separator. So a row for one of
+//     them could never be reached from a typed line, which is the same defect
+//     as the `M` row `chords.mjs` removed: a row that cannot be reached reads
+//     as the thing handling the case. This walks the table against the
+//     splitter's own character class rather than against a list, so it refuses
+//     the next unreachable row too.
+{
+  const CHORD_CHARS = /^[A-Za-z0-9#/♯♭]*$/;
+  const unreachable = QUALITIES.map(([n]) => n).filter((n) => !CHORD_CHARS.test(n));
+  ok('no row is spelled with a character the line splitter throws away',
+    unreachable.length === 0,
+    unreachable.map((n) => JSON.stringify(n)).join(', ') || `${QUALITIES.length} rows`);
+}
+
+// 7g. And the measured behaviour the rule above rests on: the plus really is
+//     eaten, so `C+` is C major with NO bad token rather than a refusal a
+//     visitor could see. It is a defect in its own right and it was reported
+//     as one; this asserts what is true today so that widening the splitter
+//     cannot happen quietly.
+{
+  const r = parseChords('C+ C^');
+  ok('a glyph quality is eaten by the splitter and read as a plain triad',
+    r.bad.length === 0 && r.chords.length === 2
+    && r.chords.every((c) => c.quality === 'maj' && c.notes.join() === '60,64,67'),
+    `${r.chords.map((c) => c.name).join(' ')}, ${r.bad.length} refused`);
+}
+
 // ── a slash is a bass, not a chord tone ─────────────────────────────────────
 
 // 8. NEGATIVE CONTROL, AND IT IS WHY THE BASS IS NOT FOLDED INTO THE STACK.

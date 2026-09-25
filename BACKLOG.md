@@ -1,5 +1,107 @@
 ## Open
 
+### Open 2026-09-26: `C+` reads as C major instead of being refused
+
+🔴 **FOUND 2026-09-26 WHILE ADDING `2`, AND IT IS WORSE THAN A MISSING ROW:
+A VISITOR GETS A WRONG CHORD RATHER THAN A REFUSAL.** MEASURED:
+`parseChords('C+')` returns **C major with no bad token**.
+
+✅ **THE CAUSE IS THE GRAMMAR, NOT THE TABLE.** `parseChords` splits a typed
+line on everything outside `[A-Za-z0-9#/♯♭]`, **so `+`, `^` and `°` ARE the
+separator** and are eaten before `QUALITIES` is consulted. ⚠️ **So adding rows
+for them would be unreachable**, which is the `M` row mistake again, and a test
+now walks the table against the splitter’s own character class so the next
+unreachable row goes red.
+⚠️ MEASURED in the corpora: `^` 62, `^9` 60, `+` 48. **Small, and `aug` already
+exists**, so this is about not lying rather than about coverage.
+
+### Open 2026-09-26: `CLASS_OF` files 14 of 26 qualities as major, `dim7` included
+
+🔴 **MEASURED 2026-09-26: 14 of the 26 qualities `parseChord` can return fall
+back to `maj` in `suggest.mjs` today**, namely `6 9 11 13 add9 dim7 maj6 maj9
+maj11 maj13 min6 min9 min11 min13`. **`dim7` is classed major**, and so is every
+bare extension. `2` makes 15.
+⚠️ **IT IS PRE-EXISTING AND WAS FOUND RATHER THAN CAUSED**, and it is why the
+**37 missing qualities, 5,373 occurrences, `7b9` at the top with 2,003**, were
+DELIBERATELY NOT ADDED: every one returns a new quality string and `CLASS_OF`
+would silently class them all `maj`. **Dominants are 40.6 per cent of jazz**, so
+`C7b9` would become typeable and functionally misfiled in one step.
+✅ **It is one line per row once the classes are right**, and that is the next
+thing, not a reason the rows are wrong.
+
+### Open 2026-09-26: `2` can be typed and will never be suggested
+
+⚠️ **MEASURED: `2` is written 0 times in 159,644 corpus chords**, so a table’s
+`spell` map has nothing to offer it. The SOUND is still reachable under the name
+`sus2`, written 264 times. **This is a fact to know rather than a defect**, and it
+is written down so nobody reports it later as one.
+
+### Done 2026-09-26: `C2` is a chord, and the parser was measured rather than patched
+
+✅ **DONE. `C2/E` PARSES AS `C2/E`, NOTES 52 60 62 67, WHICH IS E3 C4 D4 G4.**
+The E is underneath and the chord above it is C D G. MEASURED: `chords-test` 60
+ok to **67 ok**, `name-test` 30 and `suggest-test` 44 both unmoved, `/nola/`
+**106/106** and unchanged, exactly as it should be with no control added.
+
+✅ **`2` IS `[0, 2, 7]`, NO THIRD, AND THE ASKED SYMBOL IS THE ARGUMENT.**
+`C2/E` puts the third in the bass, **which is only a thing to do if the third is
+not already in the stack.** With `[0, 2, 4, 7]` the slash would say nothing and
+`C2` and `C2/E` would hold the same pitch classes.
+⚠️ **AND IT IS THE SAME THREE NOTES AS `sus2`, SAID PLAINLY IN THE FILE RATHER
+THAN HIDDEN.** Two real names for one sound: `sus2` claims a suspension, which is
+a claim about what happens next, and `2` claims a colour. The name is not folded,
+so somebody who typed `C2` reads `C2`.
+
+🔴 **AND THE MEASUREMENT FOUND THREE KINDS OF REFUSAL, NOT THE TWO THE BRIEF
+ASKED FOR.** `demo/resources/chord-refused.mjs`, **159,644 written chords** across
+1,186 iRb and 890 Billboard charts, 0 requests:
+
+    notation  8,956 (51.1%)  386 forms   a corpus file format, nobody types it
+    missing   5,373 (30.7%)   37 forms   a quality the table genuinely lacks
+    spelling  3,196 (18.2%)    8 forms   another way of writing one it has
+
+**Separating the third is what stopped the list inflating.**
+
+**COVERAGE, quality level:** jazz **80.63% to 86.60%**, pop 92.56 to 92.74, both
+89.02 to 90.92. Six rows added for 3,026 measured occurrences: `2`, plus
+`hdim7`, `h7`, `h` to `min7b5`, `o7` to `dim7` and `o` to `dim`. **The spelling
+bucket drops from 3,196 to 170.**
+
+🔴 **AND POP SLASH CHORDS ARE 0 OF 10,189 FOR A REASON THAT IS SPELLING AND
+NOT MUSIC**: Billboard writes its bass as a DEGREE, `C:maj/3`, not as a note.
+
+🔴 **ASKED, VERBATIM, WITH TWO SCREENSHOTS:** *"chord or no chord"*. One is
+`/nola/` refusing the typed line `Cmaj7 C2/E` with **"C2/E is not a chord,
+because 2 is not a chord quality"**. The other is an Open Studio lesson,
+*Getting From I to IV*, with **`C2/E` captioned over the keys while it is being
+played.**
+
+✅ **IT IS A CHORD AND THE PAGE IS WRONG.** A `2` chord is the root with its
+SECOND and fifth, usually with no third, and the slash puts the third in the bass
+underneath it. It is ordinary vocabulary in exactly the teaching this project
+keeps taking its examples from.
+
+⚠️ **AND THE TABLE ALREADY HOLDS ITS NEIGHBOURS**, which is what makes the
+absence an oversight rather than a decision. `demo/shell/chords.mjs:45`
+`QUALITIES` carries `sus2` at `[0, 2, 7]`, `add9` at `[0, 4, 7, 14]`, `5` at
+`[0, 7]`, and bare `6`, `9`, `11` and `13`. **There is no `2`.**
+
+🔴 **DO NOT ADD ONE ROW AND CALL IT DONE. MEASURE WHAT ELSE IS REJECTED,
+BECAUSE THE EVIDENCE IS ALREADY ON THIS DISK.** Both corpora are cached in
+gitignored `tmp/chord-corpora/` and `fetch-chord-corpora.mjs --check` reports
+**0 requests**, so every chord symbol in 1,186 jazz charts and the Billboard set
+can be run through `parseChord` with no network. **A list of what real music
+writes and this parser refuses is a measurement, and guessing at a second row
+is not.**
+
+⚠️ **THE CHORD NAME CELL RESERVES ITS WIDTH FROM `RECOGNISED`**, computed in
+`keyboard.mjs` as the longest quality the recogniser can return. **A new quality
+can widen that cell on ten pages**, and the cell exists precisely so it cannot
+change width under a player’s hands.
+⚠️ **AND `suggest.mjs`’s ALPHABET IS `(degree, class)`**, so a quality the
+table has never seen still has to map to a class the suggester knows, or a chord
+becomes typeable and unsuggestable at the same time.
+
 ### Done 2026-09-26: the take adaptation is wired, and the deploy holds the new table
 
 ✅ **BOTH DONE. MEASURED: `/nola/` 103/103 to 106/106**, exactly +3 page asserts
