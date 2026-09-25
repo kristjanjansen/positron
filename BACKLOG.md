@@ -1,5 +1,1773 @@
 ## Open
 
+### Open 2026-09-25: `/nola/`'s instrument choice becomes the standard patch selector
+
+🔴 **ASKED, VERBATIM:** *"in nolda demo convert instrument radiobutton to std
+patch selector and add top border to that footer. add nola nameplace to the left
+of footer"*. `nolda` is `nola`, `nameplace` is nameplate. Three changes to one
+row: the control, a border above it, and a plate at its other end.
+
+**Where it is today.** `createChoice` at `demo/nola/index.html:1070`, `label:
+'INSTRUMENT'`, `options: [['Piano', 'piano'], ['Rhodes', 'rhodes']]`, mounted at
+`:1205-1207` into `.nola-foot`, which is appended to `keys.el` and so lives
+INSIDE the keyboard's own box. The standard patch selector is
+`createPicker({ what: 'patch', prev, next })` from `demo/shell/picker.mjs:171`,
+as `demo/kit/index.html:1478` and `demo/fau/index.html:1195` already call it.
+
+🔴 **THE PAGE'S OWN CHECKS DRIVE THIS CONTROL BY INDEX, AND THE TWO COMPONENTS
+INDEX DIFFERENTLY, SO A BLIND SWAP STAYS GREEN AND DRIVES THE WRONG THING.**
+`createChoice` gives one button PER OPTION, so `instPick.buttons[0]` is Piano and
+`buttons[1]` is Rhodes. `createPicker` returns `buttons = [back, fwd]`
+(`picker.mjs:213`), so `buttons[0]` becomes *previous* and `buttons[1]` becomes
+*next*. MEASURED 2026-09-25: **ten call sites** in this page click one of the
+two, at `:3023`, `:3079`, `:3110`, `:3309`, `:3331`, `:3357`, `:3365` and
+`:3375`, plus a title read at `:3092` and a box read at `:2546`.
+⚠️ **AND THE FAILURE IS SILENT IN THE ONE DIRECTION THAT MATTERS.**
+`buttons[1].click()` meaning *Rhodes* happens to still land on Rhodes, because
+*next* from Piano is Rhodes. `buttons[0].click()` meaning *back to Piano* becomes
+*previous*, which from Piano either wraps or does nothing. **Every one of those
+ten is rewritten to name the instrument, not an index.**
+
+🔴 **AND THE LICENCE HOVER HAS NO HOME ON A PICKER, WHICH IS THE ONLY PART OF
+THIS ASK THAT CAN BREAK SOMETHING OUTSIDE THE PAGE.** The Rhodes is used under
+CC BY-NC-SA 4.0, attribution has to travel with the work, and since 2026-09-23
+the attribution IS this control's hover: `title: (id) => ...` at `:1075`,
+asserted at `:3092-3094` against `/Learman/` and `/CC BY-NC-SA 4\.0/`. A picker's
+arrows carry `the patch before this one` and `the patch after this one`, and its
+value cell **overwrites its own title on every draw**: `cell.title = label_` at
+`picker.mjs:103` and again at `:160`. So anything written there is gone the next
+time the name is drawn. **Decide where the attribution lands before converting
+the control.** It is not a paragraph under the keys, which was already removed on
+instruction.
+
+⚠️ **THE COMMENT ABOVE THE CONTROL ARGUES AGAINST THIS ASK IN WRITING.**
+`:1056-1058`: *"Two mutually exclusive named options is `createChoice` and
+nothing else: `picker.mjs` is a stepper for a list too long to show"*. An
+instruction supersedes a rule and `LAYOUT.md` already says so. What it must not
+do is stay there contradicting the page.
+
+⚠️ **THE TWO CSS HALVES FIGHT EACH OTHER TODAY.** `.nola-foot` at `:4133` is
+`display: flex; align-items: flex-end; margin-top: 10px`, and `:4134` is
+`.nola-foot > * { margin-left: auto }`, which parks its one child hard right. A
+plate on the LEFT and the picker on the right is `space-between` with that
+blanket `margin-left: auto` removed, or both children end up right.
+
+✅ **THE PLATE IS A KIT COMPONENT AND THIS PAGE HAS NONE TODAY**, measured: zero
+occurrences of `nameplate` or `pos-plate` in `demo/nola/index.html`.
+`createNameplate` is `demo/shell/panel-layout.mjs:355` and `plateSpec(maker,
+name, place)` is `demo/shell/instrument.mjs:102`.
+⚠️ **AND `plateSpec` DOWNGRADES A ONE LINE PLATE, WHICH IS THE OPPOSITE OF THE
+INTUITIVE ANSWER.** `plateSpec('', 'nola')` returns place `end`, not `ends`,
+because `ends` is `space-between` and parks a lone child on the LEFT, which is
+exactly the placement this ask wants. Read the block at `instrument.mjs:82-99`
+before choosing a placement.
+
+⚠️ **THE FOOTER IS INSIDE `keys.el`, NOT UNDER IT, AND THAT WAS DELIBERATE ON
+2026-09-25.** The keyboard's box is `width: fit-content`, so a sibling below it
+would be a different width or force the box to stretch, and stretching it is the
+one thing that box refuses. **A top border is therefore the first line drawn
+across the inside of the keyboard's box**, so it is checked against that box's
+own border rather than eyeballed.
+⚠️ `positron-ui` loads before a line of this is written. If a picker variant or
+the plate change lands in `demo/shell/`, it is SHARED, done once, `/kit/` re-run.
+
+
+### Open 2026-09-25: `/shape/` loses its left rail and the plate moves to the top right
+
+🔴 **ASKED, VERBATIM, WITH A SCREENSHOT:** *"rm left panel / section. use
+nameplate on top right. shape demo"*. The crop shows the rack's `VOICE` section,
+four sliders, and a narrow column down the left holding `shape` turned ninety
+degrees.
+
+🔴 **THIS REVERSES AN ASK FROM THE SAME DAY AND THE OLD ONE IS QUOTED IN THE
+FILE.** `demo/shape/index.html:576`: *"into isntrument box. nameplate is
+\"shape\" vertical glued section"*. The vertical plate IS that instruction. So
+this is a reversal, not a repair, and the reasoning around it comes out with it
+rather than being left to contradict the page.
+
+🔴 **AND IT DOES NOT STRAND THE KIT PLACEMENT, WHICH WAS WORTH CHECKING BEFORE
+ASSUMING IT DID.** `place: 'side'` was created for this page and
+`instrument.mjs:97` says so: *"`/shape/` is exactly that, `shape` with no maker.
+Sending it to `end` would put the one page that asked for a vertical plate back
+on a horizontal one"*. MEASURED 2026-09-25: `side` has exactly **two** callers,
+`demo/shape/index.html:608` and `demo/knobs/index.html:730`. ⚠️ **`/knobs/` keeps
+it, so `side` and `KEEPS_ONE_LINE` stay.** Deleting either would break the other
+page.
+
+⚠️ **THREE CHECKS READ THE THING BEING REMOVED.** `demo/shape/index.html:1373-1377`
+measures the plate's height against the case's inner height and asserts
+`place === 'side'`. `demo/shell/instrument-test.mjs:80-87` grades
+`plateSpec('', 'shape', 'side')` with no browser at all. **The page assert moves
+to the new placement; the kit test stays**, because it is about the function and
+`/knobs/` still calls it that way. Rewriting the kit test to match this page
+would delete `/knobs/`'s only no-browser coverage of that path.
+
+⚠️ **`panel: { side: null, flow: false, plateSide: 'left' }` AT `:609` IS THE
+LEFT RAIL**, and `panel-layout.mjs:187` only sets `plateSide` when the place is
+`side`. *"rm left panel / section"* is that rail. **Check what else is in it
+before the column goes.**
+⚠️ **TOP RIGHT IS A HEADER AND THIS PAGE HAS NO HEADER**, stated at `:584`:
+*"This page has no header, this plate is not on that row"*. So this either builds
+that header row or puts the plate in the rack's first row. `instrument.mjs:108`
+is the header and its right cell is the plate's home, at `end` and never `ends`.
+
+
+### Open 2026-09-25: an edge to edge horizontal separator on every button group
+
+⚠️ **ASKED, VERBATIM:** *"on each button group have horizontal panel separator
+edge to edge"*.
+
+🔴 **THE SUBJECT IS AMBIGUOUS AND THE TWO READINGS ARE DIFFERENT WORK, SO IT IS
+WRITTEN DOWN RATHER THAN GUESSED AT SILENTLY.** It arrived directly after the
+`/shape/` screenshot, and **`/shape/` has no button group**: it has nine SLIDER
+sections, read at `:1491` as `VOICE OSC 1 OSC 2 MIXER FILTER ENVELOPE 1
+DISTORTION CHORUS MACRO KNOBS`, drawn as `.sld-group`. The kit's
+`createButtonGroup` is `demo/shell/button-group.mjs:75` and has **four** page
+callers plus `pad.mjs`: `kit`, `mirror`, `twelve`, `weight`.
+✅ **THE `/knobs/` SKETCH THAT ARRIVED NEXT SETTLES IT AS A SECTION SEPARATOR**,
+because it draws the rules between the rotaries, the keyboard and the footer and
+none of those three is a button group. **Built as a panel section separator,
+applied where a section boundary exists, and NOT swept across four pages on the
+strength of a component name.**
+
+⚠️ **EDGE TO EDGE IS THE WHOLE DIFFICULTY AND IS WHY THIS IS NOT A
+`border-top`.** `.panel-case` is `padding: 0 var(--panel-pad)`, so a rule drawn
+on the group itself stops short of the case on both sides. A separator that
+reaches the case's own edges has to escape that padding.
+⚠️ **AND `panel-layout.mjs:362` ALREADY RECORDS A HORIZONTAL RULE SHIPPING TWICE
+BY ACCIDENT**, *"this project has already shipped twice as a horizontal rule
+nobody wrote"*. Read that before drawing a third.
+🔴 **IT IS SHARED WORK.** If it lands in `panel-layout.mjs`, `button-group.mjs`
+or `shell.css` it is done ONCE, by one agent, before any page agent starts, and
+`/kit/` is re-run.
+
+
+### Open 2026-09-25: `/knobs/` always enables MIDI, and the plate stays vertical
+
+🔴 **ASKED, VERBATIM, WITH A SCREENSHOT AND A SKETCH:** *"knobs. always enable
+midi, knobs nameplate vertically"*, drawn as
+
+    -----------
+    ()()  KNOBS
+    -----------
+    |||||||||||
+    -----------
+    footer
+
+The crop shows the case's right rail carrying `knobs` turned ninety degrees, the
+keyboard, and an `enable midi` button alone in the footer.
+
+**A. 🔴 "ALWAYS ENABLE MIDI" RUNS STRAIGHT INTO AN ASSERT AND A STANDING RULE,
+AND THE NAIVE READING SHIPS A PERMISSION PROMPT TO EVERY VISITOR.**
+`demo/knobs/index.html:1482` asserts `midiAskedOnLoad === 0`, and `:1470` records
+why: *"`requestMIDIAccess` raises a permission prompt"*. `CLAUDE.md`'s rule is
+that a visit opens nothing and asks nothing. **Calling `requestMIDIAccess` on
+load would put a browser permission dialog in front of somebody who came to
+read.**
+✅ **THE READING THAT SATISFIES THE ASK WITHOUT BREAKING THE RULE IS THE ALREADY
+GRANTED ONE.** `navigator.permissions.query({ name: 'midi' })` answers `granted`
+on a browser that has already said yes, and opening on that answer asks a first
+time visitor nothing while removing the press on the desk where this page is
+actually used. **That is what will be built unless corrected.**
+⚠️ **AND THE ASSERT MUST NOT BECOME ONE THAT PASSES VACUOUSLY**, which is this
+project's most repeated harness defect. *"zero asks on a visit"* conditioned on
+*"unless already granted"* is exactly the shape that passes on a machine where
+the condition never holds. **Grade both branches, or grade the branch the harness
+is actually in and say which.**
+⚠️ `midiAsked` at `:54-57` wraps `requestMIDIAccess` before any page code runs,
+and `:1506` asserts `midiAsked === 1` after a press. An auto-open changes both
+counts.
+
+**B. ⚠️ THE PLATE IS ALREADY VERTICAL, SO THE INSTRUCTION IS ABOUT WHAT THE NEW
+SEPARATORS DO TO IT.** `demo/knobs/index.html:730` is `place: 'side'` with
+`panel: { side: 'left', plateSide: 'right' }` and `caps: false`, and `:1447`
+asserts `inst.plate.el.dataset.place === 'side'`. The sketch's three rules run
+edge to edge across a case whose right edge is that rail. **So the question the
+sketch answers is whether a separator crosses the plate rail or stops at it**,
+and the answer the sketch gives is that it crosses: the rules span the full
+width. Keep the plate vertical, keep `side`, and check the plate still reads
+after a rule is drawn through its track.
+⚠️ **THE FOOTER IS A HEADER AT THE BOTTOM**, `header: { at: 'foot', plate:
+false, online: false, patch: midiBtn }` at `:732`, so the `enable midi` button is
+in the header's PATCH slot. If the press goes away, that slot needs an answer
+rather than a hole.
+
+### Open 2026-09-25: `/wish/`'s diagram should gently grey what is not plugged in
+
+🔴 **ASKED, VERBATIM, ACROSS THREE MESSAGES:** *"make diagram parts grayed out
+when no hardware conneted. ping hw"*, then *"gently"*, then *"wish demo"*.
+
+So the subject is `demo/wish/index.html`, the treatment is SUBTLE rather than a
+hard off state, and the page is expected to find out rather than assume.
+
+✅ **THE DIAGRAM ALREADY HAS THE RIGHT THREE BOXES AND THE PORT LIST ALREADY
+NAMES THEM.** `PORTS` at `demo/wish/index.html:536` carries a `box` on every
+entry, and there are exactly three: **`keys` (MK-425C USB MIDI Keyboard),
+`circuit` (Circuit) and `model12` (Model 12, four ports across two pairs)**. So
+*is this box connected* is already answerable as *did any of its declared ports
+resolve to a real one*, with nothing new to model.
+
+🔴 **AND HERE IS THE HARD PART, WHICH IS NOT THE COLOUR. THIS PAGE MAY NOT ASK
+THE BROWSER FOR MIDI ON A VISIT, AND IT ASSERTS THAT TODAY.** `midiAsked` wraps
+`navigator.requestMIDIAccess` before any of the page's own code runs and the
+assert reads **`the visit asked 0 time(s)`**. `requestMIDIAccess` is the only
+thing that can enumerate ports, so **on first paint the page genuinely does not
+know what is plugged in, and it is not allowed to find out.**
+
+🔴 **SO GREY MUST NOT MEAN TWO THINGS, AND THIS PROJECT HAS ALREADY PAID FOR
+THAT EXACT MISTAKE.** `positron-verify`: *"a blank cell collapses we did not look
+and we looked and it was fine"*. **`not asked yet` and `asked, and it is not
+there` are two states**, and one dimming for both would tell a reader their
+Circuit is unplugged when nothing has looked. Three states, named:
+- **not asked yet**, which is every visit until somebody presses
+- **asked, and the port answered**
+- **asked, and it did not**
+⚠️ Only the third earns the grey. What the first should look like is a design
+question worth one sentence from the owner, and the honest default is *the
+picture as it is today, with a word saying nothing has been asked*.
+
+⚠️ **"GENTLY" HAS AN EXISTING TOKEN AND A MEASURED PRECEDENT, SO NOTHING IS
+INVENTED.** `--ctl-off` is the switched-off ink this stylesheet already uses, and
+`/evo/` is the page it was measured on. ⚠️ **BUT `/evo/` STOPPED BEING THAT
+SUBJECT ON 2026-09-25** (*"make all buttons interactive"*, 0 of 24 controls off),
+so the citation beside that rule is already being corrected. **Check the
+contrast that is actually left** rather than copying a number: `/evo/`'s own
+readability assert moved from a CEILING at 3.0 to a FLOOR at 3.0 and now reads
+**5.91:1**, which is the opposite requirement. A greyed diagram box still has to
+be readable.
+⚠️ **AND IT IS A DIAGRAM, SO `positron-diagram` IS LOADED BEFORE A LINE IS
+DRAWN.** `diagram.mjs` owns what a box, a label, a sub and a note are, and a
+greyed state is a new thing for it to carry. **If it lands in `diagram.mjs` it is
+SHARED** and reaches the sixteen pages that draw one, nine of which touch
+hardware. Done once, `/kit/` re-run.
+
+🔴 **"PING HW" HAS NO COMMAND LINE ANSWER ON THIS MACHINE, MEASURED
+2026-09-25.** There is no CLI that can enumerate this desk's USB MIDI ports:
+`rig/m1/midilisten.c` is C, and this laptop SIGKILLs locally compiled binaries,
+which is a standing rule and not a thing to work around. **The only thing that
+can see a Web MIDI port is a browser, behind a press.** So the ping is a press on
+the page, and the diagram updates from what it gets back.
+🔴 **THE OTHER HARDWARE WAS PINGED AND IT IS NOT ANSWERING. MEASURED
+2026-09-25:** `node rig/board/ask.mjs --room studio-1 audio.status` answers
+**`no reply in 5 s`**. That is the Raspberry Pi rather than this desk's USB MIDI,
+so it is not `/wish/`'s subject, and it matters here for two reasons. It
+independently explains three of `/knobs/`'s four red asserts, which need the
+board. And **the `/knobs/` screenshot sent the same hour reads `RASPBERRY PI
+ONLINE`**. The two observations are minutes apart and a board can come and go, so
+this is NOT yet a finding that the badge lies. ⚠️ **It is a thing to check
+deliberately while building a greyed diagram**, because a picture that greys on
+presence is only as honest as the presence it reads, and this is the one page
+whose whole subject is what is plugged in.
+
+✅ **`access.onstatechange` IS THE HALF THAT MAKES IT LIVE**, and `/wish/` already
+listens to it for the re-adopt. A box that greys when an instrument is unplugged
+WHILE somebody watches is the version of this worth having.
+⚠️ **AND THE KNOWN WEAKNESS IS NAMED IN THAT PAGE ALREADY**: the binding matches
+a DECLARED LABEL against a port name, and CoreMIDI really does rename a held port
+to `Circuit 2`. **So an instrument that comes back under another name will grey
+even though it is plugged in.** That is a false negative in the one direction
+that matters, and whatever ships says so in the log rather than silently lying in
+the picture.
+
+
+### Open 2026-09-25: a closed page leaves the show running, and it is billed
+
+🔴 **ASKED, VERBATIM, WITH A SCREENSHOT OF THE CONTROL ROOM ON AIR:** *"i see
+mix of old hls. you need to stop streaming immediately when pae closes"*, then
+*"some sort of \"keep alive\" signals?"*.
+
+**What the screenshot shows**: `ON AIR`, colour bars from the container, the
+burned in clock reading `18:45:06` and absolute `1790361905.741`, a show clock at
+`0:08.461` and the HLS button reading `STOP HLS`. The complaint is that what
+arrives is a MIX of an older run's output, which is what a publisher nobody
+stopped looks like from the outside.
+
+🔴 **THIS IS THE MOST EXPENSIVE ITEM IN THIS FILE AND IT IS NOT A UI BUG.** A
+publisher left running is a container left running and a Cloudflare input left
+open, billed by the minute, with nobody watching. `CLAUDE.md` already carries the
+rule about what costs real money and somebody else's server; this is our own
+money and our own server, and the same rule applies harder because nothing stops
+it by itself.
+
+⚠️ **AND THE PAGE CANNOT DO IT WITH AN UNLOAD HANDLER, WHICH IS THE OBVIOUS
+ANSWER AND THE WRONG ONE.** `beforeunload` and `unload` are not delivered
+reliably on a closed tab, a killed browser, a crashed machine or a phone going to
+sleep, and `navigator.sendBeacon` is best effort. **A stop that depends on the
+page being alive to send it cannot cover the case where the page is gone**, which
+is precisely the reported case.
+✅ **SO THE ASK'S OWN SECOND MESSAGE IS THE RIGHT SHAPE: A KEEP ALIVE.** The
+publisher stops itself when nobody has said *I am still here* for N seconds.
+That is a liveness lease rather than a farewell message, it survives a crash, and
+it is the same reasoning `workers/items` already uses for an alarm that fires
+with no request. **Decide N out loud**, because N is how long a forgotten show
+runs.
+⚠️ **THE CONTAINER ALREADY HAS A COLD START THAT BLOCKS `GET /status`**, so
+whatever is built must not mistake a waking container for a dead one.
+⚠️ **AND "A MIX OF OLD HLS" IS A SECOND CLAIM WORTH SEPARATING**: a stale
+playlist being served is not the same fault as a publisher left running, and one
+can be true without the other. **Check which before fixing either.**
+
+### Open 2026-09-25: `/stage/`'s transport buttons are hand rolled, so they lost the shimmer
+
+**ASKED, VERBATIM:** *"when i start start hls / webrtc, there is no shimmer. you
+lost std buttons"*.
+
+✅ **THE SHIMMER IS THE SHELL'S BUSY SWEEP AND IT IS REAL**: `shell.mjs` marks a
+running control `data-busy="1"` and draws the sweep across it. `positron-verify`
+records it as load bearing for a different reason too, that the press loop
+**awaits `data-busy` before walking on**, and the case that found it was a page
+whose checks were lost because a handler was still running.
+🔴 **SO A HAND ROLLED BUTTON COSTS TWICE: THE VISITOR LOSES THE FEEDBACK AND
+THE HARNESS LOSES THE WAIT.** A start that takes 4 to 22 seconds to come on air
+with no shimmer is a page that looks broken for twenty seconds.
+⚠️ **IT IS THE SAME THREE CONTROLS AS THE UPPERCASE AND THE CLIPPED BUTTON
+ASKS**, so all three are one pass on `demo/stage/index.html`, and the answer to
+all three is the same: **stop building these by hand.**
+
+### Open 2026-09-25: `/wish/`'s remove button should be a small kit variant
+
+**ASKED, VERBATIM, WITH A CROP:** *"just [x] button, use small variant (create in
+kit if not exists)"*. The crop shows the `on` checkbox and a large square `×`
+under it in the row's action column.
+
+✅ **THE PARENTHESIS IS THE INSTRUCTION AND IT IS THE RIGHT ONE.** A small square
+glyph button does not exist in the kit today, and `/wish/` has already been
+measured needing one: its two controls are **37.3 px and 34.0 px across against a
+72 px column**, which is why they stack. A smaller variant may let them sit side
+by side.
+⚠️ **AND IT IS A KIT CHANGE, SO IT IS DONE ONCE**, with `/kit/` re-run and a
+specimen on that page. `shell.css` gained `button[data-glyph="1"]` at 34 by 34 on
+2026-09-25 and the small variant belongs beside it, not in a page.
+
+
+### Open 2026-09-25: `PLAY RECORDING` is clipped to `PL RECOR`
+
+**ASKED, VERBATIM, WITH A CROP:** *"fix button, use regular button"*. The crop
+shows the control room bar's right hand control wrapping to two lines and being
+cut off on both, reading `PL` over `RECOR` inside a box too small for either.
+
+⚠️ **IT IS THE SAME BUTTON AS THE UPPERCASE ASK**, `playRecBtn`, so the two are
+done in one pass or the second undoes the first.
+⚠️ **AND "REGULAR BUTTON" IS THE INSTRUCTION, WHICH MEANS THE PAGE SHOULD STOP
+BUILDING ITS OWN.** `transport-bar.mjs` takes `right: [playRecBtn]` and this
+page hands it a hand-made element. A kit button in a kit slot is what stops a
+page inventing a width.
+⚠️ **THE ASSERT TO WRITE IS THE INK AGAINST THE BOX**, which is the measurement
+`/tom/` used on the same day to catch 64 clipped numbers in a zero width column:
+read the label's ink through `measureText` against its content box, and
+`scrollWidth > clientWidth`. A button that fits reads 0 clipped.
+
+
+### Open 2026-09-25: the control room timeline does not move
+
+**ASKED, VERBATIM:** *"timeline does not move on controlroom"*.
+
+🔴 **READ THIS TOGETHER WITH THE CLOCK REPORT ABOVE, BECAUSE THE TWO ARE
+PROBABLY ONE BUG AND THEY POINT OPPOSITE WAYS.** One says a counter keeps
+running after stop, the other says the strip never moves at all. A page where
+the clock advances and the strip does not is a page where the two have come
+apart, and `/stage/` has exactly the machinery for that: `roomStrip.setFollow(true)`
+is called next to `showDeck.play()` and `phase = 'live'`.
+
+✅ **MEASURED 2026-09-25 AND IT NARROWS THE SEARCH**: `stopShow()` at
+`demo/stage/index.html:2433` DOES call `showDeck.pause()` on its next line. So
+the deck is being stopped and something downstream of it is not, which makes a
+display reading its own timer rather than the deck the first place to look, not
+the stop path.
+⚠️ **AND THE STRIP HAS A MEASURED HISTORY OF BEING FITTED WHILE HIDDEN.** Same
+page, same day: the control room strip read **90,947 ms wide when it should have
+read 30,000**, because `fit` ran while the tab panel was still its hidden width.
+The repair was a refit two frames later. A strip that does not move is the same
+family of defect and the same tab is involved.
+⚠️ **THE HARNESS CANNOT SEE EITHER OF THESE TODAY.** It never opens that tab
+unless a check selects it, and the page's own strip assert had to start doing
+that explicitly. Any new assert here selects the control room, waits two frames,
+and reads the strip twice.
+
+
+### Open 2026-09-25: two more on `/stage/`, one of them a live defect
+
+**ASKED, VERBATIM, WITH A CROP OF THE TWO TRANSPORT BUTTONS:** *"rm uppercase,
+regular buttons. when i stop ils, timer couner still run"*.
+
+**A. THE BUTTONS ARE SHOUTING, AND IT IS THE PAGE'S OWN DOING.** MEASURED
+2026-09-25: `demo/stage/index.html:1519` and `:1522` read `label: 'START HLS'`
+and `label: 'START WEBRTC'`, typed in capitals. ✅ **SO IT IS A PAGE FIX AND NOT
+A KIT FIX**, which was worth establishing first: a peer already deployed a
+site-wide *"no uppercase on buttons"* rule in the `shell.css` that `e5ae793`
+recovered, and a page that shouts through it would have meant the rule was
+losing. It is not losing. The strings are shouting.
+⚠️ **THE LABEL IS ALSO THE STOP LABEL.** Each button relabels to `STOP ...`
+when the show is running, so both halves move together or the page reads
+`Start HLS` and then `STOP HLS`.
+
+**B. 🔴 A LIVE DEFECT: STOPPING THE SHOW DOES NOT STOP THE CLOCK.** *"when i
+stop ils, timer couner still run"*. `ils` is `HLS`.
+⚠️ **THIS IS THE EXACT MIRROR OF A BUG FIXED ON THE OTHER SIDE THE SAME DAY.**
+The clock used to START on the press rather than on air, MEASURED reading
+`0:02.191, then 0:06.291, then 0:19.089 while both badges said OFF AIR`. The
+repair moved `showDeck.play()` next to `phase = 'live'`. **Nobody moved the
+other end.**
+✅ **THERE IS ALREADY AN ASSERT FOR THE OPENING HALF AND NONE FOR THE CLOSING
+HALF**: `the show's clock does not start until it is on air` samples
+`showDeck.playing()` on every tick of the wait. **The closing assert is its
+mirror and must not be able to pass vacuously**: press stop, then read that the
+position does not move across two samples.
+
+
+### Open 2026-09-25: the control room's time footer, ASKED THREE TIMES
+
+🔴 **ASKED, VERBATIM, WITH A CROP, AND THE WORDS ARE A COMPLAINT ABOUT THIS
+FILE:** *"rm this footer from controlroom. asked 3x"*.
+
+The block under the control room's video panel showing **`0:00.000` over
+`22:11.850`**, a current position over a total. The crop shows it directly below
+the `OFF AIR` badge row that carries the two glyph buttons.
+
+🔴 **THREE ASKS AND NO CHANGE IS THIS FILE FAILING AT ITS ONE JOB.** The
+2026-09-19 rule exists for exactly this: *"do you have it in yr backlog or you
+keep losing them"*. A request that is worked from memory is a request that
+looks, when dropped, exactly like one nobody made. It is written here now and
+leaves this file by being FINISHED or by being refused in writing.
+
+⚠️ **IT IS A READOUT OF A TRANSPORT, SO CHECK WHAT READS IT BEFORE DELETING.**
+`/stage/` carries asserts about the show clock, including `the show's clock does
+not start until it is on air`, and `demo/verify.mjs`'s shell drill seeks the
+published transport. **Deleting the display must not delete the quantity**,
+which is `positron-ui`'s rule about removing a block: rehome what it said. The
+clock stays, its picture goes.
+
+
+### Open 2026-09-25: three asks on `/knobs/` and the shared keyboard, reported against a broken page
+
+🔴 **`/knobs/` WAS LEFT BROKEN AND IT WAS REPORTED WITH A SCREENSHOT:**
+*"you broke knobs"*. The agent that edited it on 2026-09-25 **never ran a single
+verify** before the session limit killed it. MEASURED after, run alone:
+**31/35, four failed.**
+
+**1. THE LAYOUT, ASKED WITH A DRAWING:**
+
+```
+------------------
+()()     nameplate
+------------------
+|||keyboard|||||||
+------------------
+footer
+------------------
+```
+
+So the rotaries and the nameplate share the TOP row, the keyboard gets a row of
+its OWN at full width under them, and the footer is under that. What is on the
+page today is a three column case, rotaries then keyboard then a vertical plate,
+and **the keyboard is cut off at B3** because it is sharing a row with the
+rotaries.
+
+**2. ASKED, VERBATIM:** *"enable -> Enable"*. The footer button reads `enable
+midi` and should read `Enable midi`. ⚠️ A peer deployed a *"no uppercase on
+buttons, site wide"* rule, so this is sentence case and NOT a return to caps.
+
+**3. ASKED, VERBATIM:** *"Nt|Dg -> N|D"*. 🔴 **THIS IS
+`demo/shell/keyboard.mjs` AND IT REACHES TEN PAGES**: `fau`, `dump`, `evo`,
+`instrument`, `knobs`, `kit`, `looper`, `nola`, `radio`, plus `chords.mjs` and
+`roll.mjs`. **It is the FIFTH spelling of that label** and the file records the
+other four: `c | 1`, `C D E | 1 2 3`, `Notes | Degrees`, `Nt | Dg`. The comment
+argues in writing for each, so **the comment moves with the code** rather than
+being left to contradict it. ⚠️ The `title` on each button carries the meaning
+and is not what is being shortened.
+⚠️ **`/kit/` IS RE-RUN**, because this is shared. MEASURED by the agent that
+made it `Nt | Dg`: the segmented row was **118.48 px as words and 65.50 px
+shortened**, so a third spelling moves that measurement again.
+
+**4. ASKED, VERBATIM, WITH A CROP OF THE CUTOFF DIAL:** *"rm border aroind
+inivible-hand-butotn"*. The `⇄` button that starts an invisible hand sits
+inside the rotary's dial and wears a ring. ⚠️ **CHECK WHETHER THAT RING IS THE
+COMPONENT'S OR THE PAGE'S** before removing it, because `knob.mjs` reaches
+`/kit/`, `/tom/` and every other rotary. A border removed in the kit is a border
+removed everywhere.
+
+**5. ASKED, VERBATIM, AND IT REVERSES ASK 2 BEFORE ASK 2 WAS BUILT:** *"rm
+enable midi, just listen midi"*, then *"(just make all keyboards instances
+support midi)"*.
+
+🔴 **SO ASK 2 IS DEAD. DO NOT BUILD `Enable midi`.** The button goes
+entirely and the page listens, which is exactly what `/muta/` was asked for on
+the same day (*"its should be listening"*) and did.
+🔴 **AND THE SECOND SENTENCE MOVES IT INTO THE KIT.** `demo/shell/keyboard.mjs`
+would open MIDI for EVERY instance, which reaches **ten pages**. That is a
+shared change, done once, by one agent, before any page agent starts, with
+`/kit/` re-run.
+
+🔴 **THE ONE RULE THIS MUST NOT BREAK, AND IT IS ASSERTED ON TODAY: A VISIT
+ASKS THE BROWSER FOR NOTHING.** `/knobs/` reads `the visit asked 0 time(s)` and
+`/muta/` reads `the keyboard is opened by a press and never by a visit, and it
+is asked for once`. Taking the button away removes the gesture that was carrying
+`requestMIDIAccess`, so the component needs another one. ⚠️ **`/muta/` already
+solved this and is the precedent to copy**: `ensureMidi()` is idempotent and is
+called from the top of the control that turns the instrument on, BEFORE
+`await ensureAudio()`, because a permission prompt has to be reachable from the
+gesture. On `/knobs/` the equivalent gesture is the first key press, which that
+page's own comment already calls *"the only way in now"*.
+⚠️ **AND A PERMISSION PROMPT ON TEN PAGES IS A PRODUCT DECISION, NOT A REFACTOR.**
+A keyboard that asks for MIDI the first time anybody touches it will prompt on
+`/fau/`, `/dump/`, `/evo/`, `/radio/` and five more. Whether every one of those
+should ask is worth one sentence from the owner before it is built.
+
+
+### Open 2026-09-25: better sounding chords, and the session died before the research started
+
+🔴 **ASKED, VERBATIM, WITH THREE SCREENSHOTS OF `/nola/`'s SUGGESTION LANES:**
+*"better soudning chords. labme soundin susggestion, recording my played
+suggestions. they sound unimaginative and dry and not moving anywhere. do
+resraerch, perhaps you let me just play some, you record and hand it over to llm
+and chord dbs and figure out my playing pattern and creativity inputs to move on
+with in my vibe"*
+
+🔴 **NOTHING WAS DONE. A RESEARCH AGENT WAS DISPATCHED AND KILLED BY THE
+SESSION LIMIT BEFORE ITS FIRST TOOL CALL**, at 20:31, its transcript twelve
+lines long and ending `You've hit your session limit, resets 9:30pm`. The brief
+it was given is reconstructed here so the work does not have to be specified
+twice.
+
+**The three progressions that were uploaded as the complaint**: `Dmaj / Emin7 /
+Fdim7 / Ddim`, `Dmin7 / Gmin / C7`, `D#maj7 / Amin7b5 / D7`. ⚠️ **The second is a
+plain ii V i and the third a plain minor ii V**, which is the complaint stated
+in its own evidence: correct, common, and going nowhere.
+
+🔴 **THREE COMPLAINTS IN ONE SENTENCE AND THEY HAVE THREE DIFFERENT FIXES.
+SEPARATE THEM BEFORE BUILDING ANYTHING**, because two of them are not chord
+choice at all and no amount of better prediction reaches them.
+- **unimaginative** is the CHOICE. `demo/shell/suggest.mjs`'s slot A is the
+  modal continuation by construction, MEASURED at **16.2 per cent global max**
+  on held-out jazz, which is a cliche rate rather than a bug.
+- **dry** is the SOUND. What `/nola/` plays is `voiceChord(... near, bass:
+  false)` into a sampled piano: close position, no bass, no inner voice motion,
+  no rhythm. **The table has no voicing in it at all.**
+- **not moving anywhere** is the SHAPE. A trigram is two chords of memory and no
+  destination. `research/chord-suggester-benchmark-2026-09-23.md` §10.9 already
+  says it: *"NOTHING HERE MEASURES RHYTHM, PHRASE LENGTH OR CADENCE POSITION ...
+  the table has no idea which chord it is looking at."*
+
+✅ **THE PRIOR RESEARCH IS EXTENSIVE AND MUST BE READ BEFORE A LINE IS WRITTEN,
+BECAUSE IT ALREADY REFUSED FOUR OF THE OBVIOUS ANSWERS.**
+`research/chord-suggester-benchmark-2026-09-23.md` (672 lines) and
+`research/chord-learning-2026-09-23.md` (1,174 lines). Its §8 refuses a single
+ranked list scored on accuracy, refuses slot B ranked by PMI with no pool
+(**9.5 points of attestation for 1.8 bits of surprisal, visibly wrong
+suggestions**), refuses a hand written tritone substitution rule on top of the
+table until somebody plays it, and refuses shipping the corpora.
+
+🔴 **AND §10.1 ALREADY NAMES THIS EXACT EXPERIMENT, WHICH IS WHY THE ASK IS
+THE RIGHT ONE:** *"WHETHER SLOT B IS DELIGHTFUL OR ANNOYING ... Neither number
+is a feeling. To settle it: put both slots behind `?learn=1` on `/nola/`, play
+twenty progressions, and record which suggestion was taken. One session, one log
+line."* **Nobody has played any of it.** Every number in that document is a fact
+about written chord symbols.
+
+✅ **BOTH CORPORA ARE ALREADY ON THIS DISK AND NOTHING NEEDS FETCHING.** MEASURED
+2026-09-25 with `node demo/resources/fetch-chord-corpora.mjs --check`, which
+contacts nobody: `tmp/chord-corpora/irb.zip` **530,984 bytes** and
+`billboard-salami-chords.tar.gz` **219,100 bytes**, both gitignored, plus the
+unpacked `tmp/chord-corpora/x`. **So every re-count, every sweep and every new
+table is runnable today with zero requests to anybody.** ⚠️ The standing rule
+still holds for anything NEW: *"super careful with external sources, better
+avoid"*, and it is about whose server it is.
+
+⚠️ **ONE CHEAP THING IS ALREADY IDENTIFIED AND IS NOT THE WHOLE ANSWER.** The
+shipped table is `keep: 3`, so **slot B chooses from at most two candidates**,
+while the benchmark that chose the design swept `pool 4`. `suggest.mjs` says so
+itself: *"THE POOL THE BENCHMARK SWEPT WAS FOUR WHILE THE SHIPPED TABLE KEEPS
+THREE ROWS A CONTEXT, so the pool here can never exceed three."* `MIN_CTX = 8,
+MIN_ROW = 3, KEEP = 3` at `demo/resources/build-chord-tables.mjs:99`, and the
+whole table is **12,746 bytes** today.
+
+⚠️ **THE LLM HALF HAS A MEASURED PRECEDENT ON THIS DESK AND IT IS NOT
+ENCOURAGING ABOUT PUTTING ONE IN THE LOOP.** `positron-verify` records Workers
+AI `llama-3.3-70b` returning a schema-valid patch with the WRONG argument name
+on every run, a tighter schema making it **1.6 s to 10.2 s** and worse, and well
+formed patches **aimed at the wrong instrument**. The rules that came out of it
+apply directly here: **validate meaning in ordinary code, never in the schema**,
+and **a model proposes and a person presses**.
+
+⚠️ **AND A PREFERENCE TEST THE PLAYER CAN SEE THROUGH IS NOT A MEASUREMENT.**
+Whatever is built, the arm that produced a suggestion must be hidden from the
+person judging it, and there has to be a control arm that can lose. This
+repository has already shipped a green page with zero coverage more than once.
+
+**Files this will touch**: `demo/shell/suggest.mjs` (SHARED, and
+`suggest-test.mjs` beside it carries 6 negative controls),
+`demo/resources/build-chord-tables.mjs`, `demo/resources/chord-tables.json`,
+`demo/nola/index.html`, and a new document in `plans/`.
+⚠️ **`demo/shell/` IS SHARED, SO ANY CHANGE THERE IS DONE ONCE, BY ONE AGENT,
+WITH `/kit/` RE-RUN.**
+
+
+### Open 2026-09-25: `.panel-head-mid` overflows its own grid track at every width
+
+🔴 **FOUND BY MEASURING, NOT REPORTED BY ANYBODY**, while `/muta/` tried
+to put a `Test tone` button in a header. `demo/shell/shell.css`'s
+`.panel-head-mid` carries `min-width: 0` with `justify-self: end`, so it is laid
+out from its right edge and **spills left across the plate cell**.
+MEASURED on `/muta/`: the model picker is **315.5 px of content in a 266.8 px
+track at 1280 px**, and a button placed in that cell was overlapped by **34.7 px
+at 1280 and 114.2 px at 561**.
+
+✅ **IT IS INVISIBLE TODAY AND THAT IS WHY NOBODY HAS SEEN IT.** The three
+pages that build a header all pass `plate: false`, so the cell it spills into is
+empty. **The cost is that a third control cannot go in that row**, which is a
+real constraint the next person to try will spend an hour on.
+⚠️ `/muta/` did NOT work around it by changing the kit. It put its
+button in column 1 with `justify-self: end` and two page media queries below
+700 px and 560 px, and asserted the rects. That page is fine; the component is
+not.
+
+
+### Open 2026-09-25: a stream of per-demo requests, COLLECTED WHILE IT IS STILL ARRIVING
+
+🔴 **THE STREAM IS NOT FINISHED.** Said in the same message: *"i will
+give moer requests nor per demo"* and *"...more coming..."*. Nothing below is
+being worked yet, by the 2026-09-19 rule: *"lets work demo by demo. i will give
+steam of request, you collect theb to backlog in detail and when done, do a
+parallelized effort to fix it all"*. **Write now, fan out when the stream ends.**
+
+🔴 **AND THE KEYBOARD IS SHARED, SO IT IS DONE ONCE AND FIRST.**
+`demo/shell/keyboard.mjs` is imported by **ten** pages: `able`, `fau`, `dump`,
+`evo`, `instrument`, `knobs`, `kit`, `looper`, `nola`, `radio`, plus
+`demo/shell/chords.mjs` and `demo/shell/roll.mjs`. One agent does the component
+BEFORE any page agent starts, or four agents write four versions of it in one
+checkout.
+
+#### `typist`: add the loop modes
+
+⚠️ **ASKED, VERBATIM:** *"add loop modes to typist"*
+
+`demo/manifest.mjs:709`, `group: 'th'`, one line *"type, and it types itself
+back. Drag to any moment and the words and the cursor come back"*.
+
+✅ **IT ALREADY HAS A TRANSPORT AND A DECK**, `createTransportBar(barHost,
+deck, { scrub: false })` at `demo/typist/index.html:540`, so the modes have
+something to run on. Same ask as `/loops/`, one page along, **so decide the two
+together**: three directions or five, and whatever is chosen is chosen once.
+⚠️ The kit's `LOOP_TURN = [0, 1, 4]` deliberately cycles only the three
+DIRECTIONS, because `half` is a rate and `chop` is a length with no control.
+
+🔴 **AND THIS PAGE IS WHERE "BACKWARDS" ACTUALLY MEANS SOMETHING NEW,
+WHICH IS WHY IT IS WORTH ASKING WHAT IT MEANS BEFORE BUILDING IT.** The subject
+is an edit history, not audio. Playing it `round` is retyping. Playing it `back`
+is UNTYPING, and there-and-back is typing and untyping. **A backspace played
+backwards is a character appearing**, which is a real behaviour to define rather
+than a rate to flip. Nothing here follows from the audio meaning of the word.
+⚠️ **THE PAGE'S OWN CHECKS ALREADY KNOW THE HARD CASES.** Driving it
+with real key events found two bugs the first time: a fold at position 0
+emptying the box the first letter had just gone into, and a strip that fits
+itself once and so drew six of seventy-one edits. The harness sends characters,
+a BACKSPACE, *"which never says what it removed"*, and an ARROW KEY, *"which
+moves the caret with no input event at all"*. **Those three are exactly the
+cases a reverse mode has to get right.**
+⚠️ **`readout: null` at `:209` IS DELIBERATE AND ANNOUNCED**: the
+document IS the readout here, and a row of cells repeating the letters and the
+cursor position would be the same facts twice. **A loop mode does not earn a
+readout cell on this page.** Both `verify.mjs` and `verify-quest.mjs` read
+`readoutOptOut`, so do not add one casually.
+⚠️ **IF ANY OF IT LANDS IN `demo/shell/looper.mjs` OR
+`transport-bar.mjs` IT IS SHARED**, done once, `/kit/` re-run.
+
+#### The four `timeline` demos: glue the transport to the timeline
+
+⚠️ **ASKED, VERBATIM:** *"timeline demos: glue transport and
+timelines"*
+
+✅ **THE GROUP IS EXACTLY FOUR AND NONE OF THEM GLUES TODAY**, MEASURED
+2026-09-25: `transport`, `lanes`, `loops`, `score`, and `grep -c createGlue`
+answers **0** in all four.
+✅ **NINE OTHER PAGES ALREADY DO IT**: `held`, `kit`, `pack`, `reel`,
+`radio`, `stage`, `replay`, `tapes`, `wish`. So this is four pages joining a
+convention the rest of the site already has, and `demo/shell/glue.mjs:44`
+exports `createGlue(...blocks)` for it. **Nothing is being invented and no kit
+change should be needed.** If one is, report it and stop, because another agent
+owns `demo/shell/`.
+
+🔴 **READ THE ONE THING THIS PROJECT HAS ALREADY PAID FOR ABOUT GLUE,
+BEFORE WRITING A LINE.** From `/stage/`, 2026-09-25: **`createTransportBar(parent, ...)`
+APPENDS TO THAT PARENT**, so deleting a `createGlue` line removed nothing and a
+doubled bar survived TWO reports because of it. *"The first argument is a mount
+point, not a hint."* A glue that repoints a container is not a glue that merges
+its contents, which is the same page's other lesson (`LESSONS.md` #116). **After
+gluing, count the bars and the strips on each page rather than looking at it.**
+
+#### `loops`: add the loop modes
+
+⚠️ **ASKED, VERBATIM:** *"add loop modes to loops"*
+
+`demo/manifest.mjs:77`, `group: 'timeline'`, one line *"one recording placed
+three times: a slice, the same slice faster, and a loop"*.
+
+✅ **THE MODES ALREADY EXIST IN THE KIT AND ARE NOT BEING INVENTED.**
+`demo/shell/looper.mjs:54` is `LOOP_WAYS = [['round'], ['back'], ['half'],
+['chop'], ['pingpong']]`, with `WAY_GLYPH` and `WAY_SAYS` beside it.
+🔴 **BUT ONLY THREE OF THE FIVE ARE ON THE BUTTON, AND THE REASON IS
+WRITTEN DOWN.** `LOOP_TURN = [0, 1, 4]` at `:66`, and the comment above it:
+*"THE THREE THE BUTTON CYCLES, IN THE ORDER IT CYCLES THEM. Directions, and only
+directions: `half` is what a rate row beside it is for and `chop` is a length
+with no control today. Both are still reachable and both are still driven by the
+checks, which is a loose end written down rather than left to be found."*
+⚠️ **SO "ALL THE MODES" IS A DECISION, NOT A DEFAULT.** Three
+directions, or five including a rate and a length that the existing button
+deliberately excludes. **Settle it before building the control**, and if it is
+five here and three elsewhere, say why in the file.
+⚠️ **AND `WAY_GLYPH` IS AMBIGUOUS ACROSS FIVE**: `round`, `half` and
+`chop` all carry `→`. A five-way control cannot use the glyph alone to say
+which state it is in, and `:75-80` records that the glyph IS the state rather
+than the next press. **Three faces for three states works; five states need
+something else.**
+
+🔴 **THIS PAGE HAS ALREADY SHIPPED "QUIETLY NOT LOOPING", AND THE
+RECORD OF IT IS THE THING TO READ FIRST.** `demo/loops/index.html:88-98`: the
+page passed no `tickHost` and never called `servo()`, so a wrap *"was neither
+committed nor polled: it simply never happened. Three passes, zero wraps, and a
+page whose whole subject is looping quietly not looping."* And: **"The assert
+that should have caught it was tolerant of 'not reached yet' and passed
+vacuously every run."**
+⚠️ **SO EVERY MODE ADDED HERE NEEDS AN ASSERT THAT CANNOT PASS
+VACUOUSLY.** A check that tolerates *not reached yet* is the exact shape that
+failed on this page once. Ask what has HAPPENED, counted, rather than what is
+happening.
+
+⚠️ **THE PAGE IS A NEST, NOT A LOOPER.** It draws with `createNest` and
+quotations, and `:138-149` records that a 3-pass loop is ONE span carrying
+`repeat: 3` until it is split, *"so the strip drew one long bar and the looping,
+the entire subject of this page"*, was invisible. **Backwards and there-and-back
+have to be visible in that drawing or the modes are a control with no readout.**
+⚠️ **`demo/shell/looper-test.mjs` AND `numloop-test.mjs` GRADE THIS
+ARITHMETIC WITH NO BROWSER** and are the cheap instrument here. `numloop-test.mjs`
+also carries the warning about writing the expected state out by hand and doing
+the machine's arithmetic a second time.
+⚠️ **IF ANY OF IT LANDS IN `demo/shell/looper.mjs` IT IS SHARED**, and
+that module reaches the transport bar, `/tapes/` and every page with a looper.
+Done once, by one agent, with `/kit/` re-run.
+
+#### Merge the `capture` group into `streaming`
+
+⚠️ **ASKED, VERBATIM:** *"merge capture and streaming into streaming"*
+
+MEASURED 2026-09-25, so the size of it is known rather than guessed:
+- **`capture` holds 6**: `take`, `keep`, `record`, `replay`, `capture`, `show`.
+- **`streaming` holds 7**: `llhls`, `webrtc`, `moq`, `room`, `now`, `flipper`,
+  `remixer`.
+- **The merged group is 13**, which would make it the second largest after
+  `instruments` at 13. There are 11 groups today and there would be 10.
+
+⚠️ **THERE IS A DEMO CALLED `capture` INSIDE THE GROUP CALLED
+`capture`.** The row survives the merge and only its `group` changes, but
+anything matching on the string has to tell the page from the group. **That is
+the substring rule again**, one stream after the `click` and `sound` renames.
+
+⚠️ **THE GROUP TABLE CARRIES ITS OWN LABELS AND ITS OWN ORDER.**
+`demo/manifest.mjs:1186` is `['capture', 'capture']` and `:1226` is
+`['streaming', 'streaming']`, and they sit far apart in that table: `capture` is
+7th in the list and `streaming` 47 lines later. **The merged group inherits
+`streaming`'s position unless told otherwise**, which moves six demos a long way
+up or down the index. Worth one look at the result before it is called done.
+⚠️ **AND THE TABLE HOLDS PROSE BETWEEN THE ROWS.** The entries are
+separated by long comments recording why each group is what it is, including
+`timeline`'s 2026-09-24 instruction *"timeline: leave ones who have timeline
+component. the rest ..."* and `stage` moving to `th` on *"move stage to th"*.
+**Deleting the `capture` row must not delete the reasoning around it**; where a
+comment explains a group that no longer exists, it moves into `streaming`'s or
+into `LESSONS.md`, rather than vanishing.
+
+⚠️ **THIS IS A `demo/manifest.mjs` EDIT AND THAT FILE HAS ONE OWNER PER
+ROUND.** It collides with the archive work (`bay` and `able` rows leaving) and
+with all four renames. **Sequence it with them, not against them.**
+⚠️ **COUNT THE DEMOS AND THE GROUPS AFTER, NEVER REMEMBER THEM.**
+
+#### The lane jumps sideways when play starts, and it is `/transport/`, not `mars`
+
+⚠️ **ASKED, VERBATIM, WITH TWO SCREENSHOTS:** *"mars: lane is jumping
+position when start playing"*
+
+🔴 **THERE IS NO `mars` DEMO AND THE SUBJECT WAS IDENTIFIED FROM THE
+PICTURES RATHER THAN THE NAME.** `demo/mars/` does not exist and `mars` is in no
+manifest row. The readout in both crops reads `0.38 20s, 20 marks, speeds
+0.25/0.5/1/2/`, and **`demo/transport/index.html:162` logs exactly that string**:
+`` d.log(`${DURATION / 1000}s, 20 marks, speeds ${adapter.caps.rates.join('/')}x`) ``.
+The lane in the picture is labelled `marks`. **So the page is `/transport/` and
+`mars` is a typo for `marks`, the lane.** Confirm in passing, do not re-derive.
+
+🔴 **AND THE MECHANISM BELOW IS WRONG, MEASURED 2026-09-25 AFTER IT WAS
+WRITTEN.** This entry said *"The gutter grows, the plot beside it is pushed"*.
+MEASURED at 1280 px one press apart: the gutter is **132 px before and 132
+after** and the canvas does not move at all. What moves is the lane's NAME AND
+SWATCH, **29 px upward**, because `timeline/strip.mjs`'s `nameOnly` branch
+centres a lane with no lines under its name on its own swatch (asked for
+2026-09-16), and a lane that GAINS lines while somebody is watching gets both
+arrangements one after the other. **The fix asked for below is still the right
+one. The reason given for it was not.** Widest ordinary line asks 124.33 px
+against a declared gutter of 132, so only a lateness over 100 ms could ever
+widen it.
+
+✅ **THE TRIGGER IS ONE LINE AND IT IS WHAT THE SCREENSHOTS SHOW.**
+`demo/transport/index.html:95`:
+
+    L.subLabel = [`typical +${typical.toFixed(2)} ms`, `worst +${worst.toFixed(2)} ms`];
+
+Before play the gutter holds ONE line, `marks`. The moment marks land it holds
+THREE. The gutter grows, the plot beside it is pushed, and the whole lane
+appears to jump. The first crop has the playhead hard against the left edge of
+the plot; the second has the plot starting further right with the same playhead.
+
+⚠️ **RESERVE THE SPACE, DO NOT SHRINK THE TEXT.** The sub-labels are
+real measurements and are worth showing. What must not happen is the box
+changing size when they arrive, so the two sub-label rows are reserved from the
+first frame, empty, exactly as the transport bar reserves both words of a
+two-state button so *"the control cannot change size under the finger that
+pressed it"*.
+
+🔴 **AND THIS IS THE FOURTH ASK IN ONE STREAM WITH THE SAME DEFECT
+UNDERNEATH IT, WHICH IS WORTH DECIDING ONCE.**
+- **here**: a lane gutter grows from one line to three when values arrive.
+- **`keyboard`**: *"add chord name to the footer ... avoind text moving in x
+  axis"*, a name that is `C` or `F#m7b5`.
+- **`dump`**: *"show empthy tables ... with fixed heigh"*, a table that is a
+  caption until rows arrive.
+- **`wish`**, already fixed on that page and recorded at `:96-98`: a box that
+  was *"7 lines for one connection and 16 for the next"* and therefore *"would
+  move the log and the end of the page on every press"*.
+✅ **SO ASK WHETHER THE ANSWER BELONGS IN `demo/shell/strip.mjs` RATHER
+THAN IN THIS PAGE.** A lane that reserves its sub-label rows would fix this one
+and any other page whose lanes gain labels later. **If it is the strip's, it is
+shared work done once**, and `/kit/` grades it.
+
+#### `resources` renames to `niemi`, and it is a FOURTH rename of a different kind
+
+🔴 **AND IT WAS ASKED A SECOND TIME ON 2026-09-25, AS *"rename resources
+demo to niemi"*, WHILE THIS ENTRY WAS ALREADY SITTING IN THIS FILE UNWORKED.**
+A repeat is this file failing at its one job, the same way the control room
+footer reached three asks. It leaves this file by being FINISHED or by being
+refused in writing, and nothing below changes: it still runs LAST, alone, after
+the corpus edit, because `demo/resources/corpus.json` is edited by the `tapes`
+work and `demo/manifest.mjs` by the archive work.
+
+⚠️ **ASKED, VERBATIM:** *"resources: rename to niemi"*
+
+⚠️ **THIS ONE IS NOT THE LETTER-DROP SCHEME AND MUST NOT BE
+"CORRECTED" INTO IT.** `grains` to `rains`, `click` to `lick` and `sound` to
+`ound` each drop a first letter. `resources` to `niemi` is a different thing
+entirely and it reads as deliberate: **the row's group is `kurenniemi`**, so
+`niemi` is the tail of the name this whole act is about.
+
+🔴 **AND IT IS NOT LIKE THE OTHER THREE IN A SECOND WAY: IT IS A DEMO
+ROW *AND* A WORKING DIRECTORY OF BUILD SCRIPTS.** `demo/manifest.mjs:282`,
+`group: 'kurenniemi'`, `built: true`, so `/resources/` is a page. And
+`demo/resources/` holds **28 entries**, among them `build-corpus.mjs`,
+`corpus.json`, `durations.json`, `measure-durations.mjs`,
+`build-mimproject-images.mjs`, `fetch-jrhodes3d.mjs` and `chord-tables.json`.
+**A slug rename and a tooling directory move at the same time.**
+
+⚠️ **PRICED 2026-09-25: 55 live files hold the path `demo/resources`**,
+plus **1** under `archive/` which stays by the standing rule.
+🔴 **TWO OF THEM ARE IN `CLAUDE.md`'S OWN "Run and check" BLOCK**, lines
+214 and 215: `node demo/resources/measure-durations.mjs` and `node
+demo/resources/build-mimproject-images.mjs --check`. **A command in that block
+that no longer runs is the worst kind of stale line in this repository**, so
+they move in the same commit.
+✅ **AND AN INSTRUCTION SUPERSEDES A PRICING, WHICH `LAYOUT.md` ALREADY
+SAYS**: the `plans/` move was priced at 421 references and rejected, then done
+on instruction, *"the same way `radio1965`, `box` and `rig/box/` superseded
+their own rules"*. This is that again. ⚠️ The same entry carries the
+lesson to work to: *"a rename moves URLs that live in modules, harnesses and
+comments, none of which are type-checked"*, and on the `plans/` move the repair
+was to rewrite **the 129 files holding a real path** and leave bare prose
+citations as citations.
+
+🔴 **ORDERING CONFLICT WITH THE `tapes` WORK, AND IT IS REAL.**
+`demo/resources/corpus.json` is where the `Saharan uni I` row is deleted, and
+`demo/fake-tapes.mjs` reads its paths out of that same file. **The corpus edit
+and this directory move must not run at once.** Do the corpus edit first, then
+the rename, or the two collide on one file.
+
+⚠️ **SO THE RENAME BATCH IS FOUR, NOT THREE**, it runs LAST with
+nothing else in flight, and `positron-history` loads before it and gains a line
+after it.
+
+#### `tapes`: a proxy for unreadable sound, inertia in two more places, and one row out
+
+⚠️ **ASKED, VERBATIM:** *"this recordin wil noot allow read its sound:
+make proxy. tapes demo. use varispeed/inertia on rate change and also
+varispeed/inertia on switching looping modes / rm 6/24 Saharan uni I 1967 line"*
+
+1. 🔴 **A PROXY SO A RECORDING'S SOUND CAN BE READ, AND IT RUNS STRAIGHT
+   INTO THE STANDING EXTERNAL-SOURCE RULE.** Reading a recording's samples needs
+   CORS headers the archive may not send, and a proxy is the ordinary answer.
+   **But a proxy does not remove the fetch, it MOVES it from the browser to our
+   worker**, and the rule is explicit that it is about whose server it is:
+   *"stil: super careful with external sources, better avoid"*, said in reply to
+   *"it uses archive.org, not ERR, so it is safe to run"*, and **that reasoning
+   was named as the mistake.**
+   ⚠️ **SO THE PROXY HAS TO CACHE**, or it is the same load with an
+   extra hop. Say what the cache is and how long it holds.
+   ⚠️ **AND THE HARNESS MUST NOT GO NEAR IT.** `demo/fake-tapes.mjs`
+   exists so `node demo/verify.mjs tapes` reads **38/38 with the only hosts
+   contacted being the dev server and the stand-in**. Nothing about a proxy may
+   change that, and `DEMO_HOSTS=1 node demo/verify.mjs tapes` is the instrument
+   that proves it.
+   🔴 **WHICH RECORDING PROMPTED THIS IS NOT KNOWN.** *"this recordin"*
+   points at something the owner had on screen. **Ask, or make the proxy general
+   and say that is what was built.** A proxy for one file and a proxy for the
+   corpus are different amounts of work.
+
+2. ⚠️ **VARISPEED WITH INERTIA ON RATE CHANGES AND ON LOOP MODE
+   SWITCHES.** ✅ **THE MECHANISM ALREADY EXISTS ON THIS PAGE AND IS NOT
+   BEING INVENTED**: `demo/tapes/index.html:1396` is *"VARISPEED WITH INERTIA ON
+   ‹ AND ›: THE TAPE WINDS DOWN AND COMES BACK UP"*, and `:1405`
+   warns that the difference between inertia and *"a stall wearing its
+   clothes"* is the whole point. `:565` records that pitch follows speed,
+   which is what varispeed means. **Extend what is there to two more triggers
+   rather than writing a second one.**
+   ⚠️ **THE LOOP MODES ARE THE KIT'S**, `createLooper` from
+   `demo/shell/looper.mjs` at `:48`, and `demo/shell/looper-test.mjs` grades the
+   looper's arithmetic with no browser. If the inertia belongs in the looper it
+   is SHARED and done once; if it belongs in this page's rate handling it is
+   local. **Establish which before writing it.**
+
+3. 🔴 **REMOVE THE `Saharan uni I 1967` ROW, AND IT MOVES MORE NUMBERS
+   THAN IT LOOKS.** It is in `demo/resources/corpus.json`, `"title": "Saharan uni
+   I"`, id `ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64
+   kbps).mp3`. **`Saharan uni II` is a separate row and is NOT being removed**,
+   so an anchored edit is needed here too, for the same reason as the renames.
+   ⚠️ **THE CORPUS IS 24 ROWS AND EVERY MEASURED FIGURE DERIVED FROM IT
+   MOVES.** ✅ **DONE 2026-09-25: IT IS 23 ROWS, 2 h 15 m AND 65 MB.** MEASURED after
+   the removal: 8,096 s against 8,541 s. The line here said 2 h 22 m and 68 MB
+   for 24 rows, which was true when written. `/tapes/` lays every recording end to end as ONE LONG TAPE and **its
+   checks grade that geometry**, so the total length, the bar positions and any
+   prose quoting either are all downstream of this one deletion.
+   ✅ **THE STAND-IN FOLLOWS AUTOMATICALLY AND THAT IS BY DESIGN.**
+   `demo/fake-tapes.mjs` *"reads its paths off `corpus.json` rather than a list,
+   so it cannot drift from the page"*. One less row there is one less row
+   everywhere.
+   ⚠️ **AND THE STAND-IN HAS KNOWN HOLES**: a stand-in serving every
+   recording at HALF its corpus length still reads 38/38, and one serving
+   SILENCE reads 38/38 too. Both are already in this file. **So a green run after
+   this change is weaker evidence than it looks**, and the assert count is what
+   to read.
+
+#### THREE RENAMES, ONE SCHEME, AND A SUBSTRING TRAP THAT WOULD WRECK THE REPOSITORY
+
+⚠️ **ASKED, VERBATIM, ACROSS TWO MESSAGES:** *"grains -> rename to
+rains"*, then *"click: rename to lick, move to the last item in index groupd"*
+and *"sound: rename to ound"*.
+
+✅ **IT IS A SCHEME AND NOT THREE TYPOS: EVERY ONE DROPS ITS FIRST LETTER.**
+`grains` to `rains`, `click` to `lick`, `sound` to `ound`. The `grains` one was
+put to the owner as a possible typo and CONFIRMED on 2026-09-25, and the two
+that followed establish the pattern beyond doubt. **No further confirmation is
+needed for the other two.**
+
+🔴 **AND THIS IS THE MOST DANGEROUS TASK IN THE WHOLE STREAM, FOR A
+REASON THAT IS ALREADY WRITTEN DOWN IN THIS REPOSITORY: NEVER GUARD A PATCH ON
+`s.includes(<substring>)`.** The standing rule records three bugs in one day
+from it, `BUILD` matching inside `REBUILD` among them. **These three slugs are
+all substrings of ordinary words this repository is full of.** MEASURED
+2026-09-25:
+
+| slug | files with ANY occurrence | files with a SLUG-SHAPED reference |
+| --- | --- | --- |
+| `click` | 173 | 44 |
+| `sound` | 264 | 24 |
+| `grains` | 82 | 60 |
+
+🔴 **THE GAP BETWEEN THOSE TWO COLUMNS IS THE BUG WAITING TO HAPPEN.**
+MEASURED the same day: **`Csound` appears 69 times** and contains `sound`, so a
+naive rewrite turns it into `Cound` and silently breaks every reference to the
+audio language this project compiles scores with. **`onclick` and `.click(`
+appear 156 times** and both contain `click`, so the same rewrite would turn
+`element.click()` into `element.lick()` and take `demo/verify.mjs`'s entire
+press loop with it. `soundbank`, `sounds` and the ordinary English verb *click*
+are all in the same trap.
+✅ **SO THE RENAME IS SCOPED TO THE SLUG AND NOTHING ELSE**: the directory
+`demo/<slug>/`, the URL `/<slug>/`, and `name: '<slug>'` in `demo/manifest.mjs`.
+**Never the bare word.** Every replacement is anchored, and the counts above are
+the check: a rewrite that touches 173 files for `click` is wrong by 129 files.
+
+⚠️ **RUN IT ALONE, WITH NOTHING ELSE IN FLIGHT.** Seven agents held
+files in this checkout when these arrived. A repository-wide path rewrite while
+another agent has a file open is the `git add -A` hazard at full width, and this
+project has already had one agent's work swept into an unrelated commit twice in
+one session. **This is the LAST task of the batch.**
+
+⚠️ **`archive/` IS NOT REWRITTEN**, by the standing rule: an archive
+records what was there, which is why `box` and `radio1965` are still spelled the
+old way inside it. It holds **13** files naming `click`, **29** naming `sound`
+and **8** naming `grains`. All stay.
+
+⚠️ **`positron-history` LOADS BEFORE ANY OF IT**, and gains a line
+after, because a slug that stops resolving is this project's most repeated
+defect in its cheapest form.
+
+##### `click` also moves in the index
+
+⚠️ **ASKED:** *"move to the last item in index groupd"*.
+`demo/manifest.mjs:81` is `{ name: 'click', group: 'vain', act: 0, created:
+'2026-09-14', built: true }`, sitting directly after `sound` at `:78`, which is
+in the same `vain` group.
+✅ **THIS IS ONE LINE MOVING IN AN ARRAY AND NOTHING ELSE**, by CLAUDE.md's
+own rule: a demo's identity is its slug and its ORDER is its position in
+`DEMOS`. There is no number in the directory, the URL or the page, and there
+used to be, in five places at once.
+⚠️ **BUT CHECK WHICH ORDER IS MEANT.** The front page is ordered
+NEWEST FIRST and `byNewest()` copies `DEMOS`; `DEMOS` itself is the STORY order.
+Last in the group as the index draws it and last in the array are not
+necessarily the same position. **Establish which one puts it where the owner
+means before moving the line.**
+
+#### `grains`: a RENAME, the instrument panel, and `createLocalRemote`
+
+⚠️ **ASKED, VERBATIM:** *"grains -> rename to rains / wrap to isntument
+panel. use createLocalRemote"*
+
+✅ **CONFIRMED 2026-09-25, ASKED AND ANSWERED: `rains` IS CORRECT.** It
+was put to the owner precisely because `rains` differs from `grains` by ONE
+CHARACTER and the stream carried many typos (*"isntument"*, *"conrtol"*,
+*"arhcive"*, *"reseonance"*), so acting on a misreading would have been
+expensive to undo. It is not a typo. **Proceed.**
+**`demo/shell/roll.mjs:77-79` is the precedent and it is exact**: *"A report
+with no verb is ambiguous, and the reading that DESTROYS work is the one to
+check before acting on it. Asking would have cost one line."*
+⚠️ **MEASURED 2026-09-25: `grains` is named in 82 live files**, plus 8
+under `archive/`. A rename is the slug, the directory, the URL, the manifest row
+and every one of those references.
+⚠️ **AND `archive/` IS NOT REWRITTEN**, by the standing rule: an
+archive records what was there, which is why `box` and `radio1965` are still
+spelled the old way inside it. Those 8 files stay as they are.
+⚠️ **`positron-history` LOADS BEFORE THE MOVE** and a line goes into it
+after, because a slug that stops resolving is this project's most repeated
+defect in its cheapest form.
+⚠️ **`LAYOUT.md` ALREADY PRICES TWO RENAMES THAT WERE REJECTED.** Read
+what it says about cost before adding a third.
+
+⚠️ **WRAP IT IN THE INSTRUMENT PANEL**, which is now the THIRD page
+asking for this in one stream, with `/shape/` and `/knobs/`. **One piece of
+component work, done once, before any of the three page agents start.**
+
+✅ **`createLocalRemote` EXISTS AND IS BARELY USED**, which is the point of
+the ask. `demo/shell/local-remote.mjs:117` exports it and **`demo/kit/index.html`
+is the only page that calls it today**. `/grains/`'s one line is *"one
+granulator, running in this page and on a Raspberry Pi at once, with a blend
+between them"*, which is exactly what that component is for, so this is a
+hand-rolled control being replaced by the kit's own. **Read what the page does
+today before swapping**, because the blend is the demo.
+🔴 **AND IT IS A BOARD PAGE**: `room: 'fixed'`, `studio-1`, `settleMs:
+60000`, SuperCollider on the Raspberry Pi. **`positron-hardware` loads first**,
+and the same rule as `/shape/` applies to anything that reaches the board.
+
+#### `knobs`: the instrument panel, real rotaries, a 25 key keyboard and a footer
+
+⚠️ **ASKED, VERBATIM:** *"knobs: / wrap into instument panel. left to
+rotaries cutoff reseonance, right is 'knobs' namepate. make keyboard 25 full w.
+/ add footer with rasperry pi online padge. on right add enable midi button +
+add midi support"*
+
+🔴 **LOAD `positron-hardware` BEFORE ANY OF IT.** `demo/knobs/index.html:35-37`:
+*"`studio-1` is the ADDRESS OF THE RASPBERRY PI, not a rendezvous this page"*
+invented, and `room: 'fixed'` in the manifest exists so no harness renames it.
+**This page plays a real Yoshimi on a board in another building.** `settleMs:
+20000`.
+
+1. ⚠️ **WRAP IT IN THE INSTRUMENT PANEL**, which is the same shared
+   work as `/shape/`'s ask. `demo/shell/instrument.mjs` over
+   `demo/shell/panel-layout.mjs`, seven pages already wear it, `/kit/` grades
+   it. **Do `/shape/` and `/knobs/` as ONE piece of component work**, not twice.
+2. ✅ **THE PAGE CALLED `knobs` HAS NO KNOBS IN IT.** `:354-367` builds
+   `cutoff` and `resonance` with `createSlider` and pairs them with
+   `createSliderGroup([cutoff, reso], { pair: true })`. The ask is for
+   ROTARIES on the left with the nameplate on the right, which is the panel
+   header's own `place: 'end'` shape.
+   ✅ **AND THE INVISIBLE HAND SURVIVES THE SWAP, CHECKED 2026-09-25 RATHER
+   THAN ASSUMED.** `demo/shell/knob.mjs:58-61` imports `createHandDrive` from
+   `hand-drive.mjs` and says in as many words that it is *"shared with
+   `slider.mjs`"*. Both sliders here carry `hand: true` and `onHand:
+   handSaid(...)`, and that is the page's subject, so losing it would have been
+   the whole demo. **It does not get lost.**
+   ⚠️ `knob.mjs:67` warns that `set(v, { from: 'hand' })` has meant A
+   PERSON since the knob was written while `handMoves()` counts the invisible
+   one. Two senses of one word in the module being adopted. Read it before
+   wiring `onHand`.
+3. ⚠️ **25 KEYS, FULL WIDTH.** `createKeyboard` at `:694`, shared with
+   nine other pages, so a width change is checked against them rather than
+   tuned here.
+4. ⚠️ **A FOOTER WITH A RASPBERRY PI ONLINE BADGE.** `presence.mjs`
+   already supplies the badge and this page already knows the board's address.
+5. 🔴 **AN `enable midi` BUTTON, AND IT POINTS THE OPPOSITE WAY TO THE
+   `muta` ASK IN THE SAME STREAM.** `/muta/` is being asked to DELETE its MIDI
+   on button because *"its should be listening"*, with permission set up when an
+   instrument is turned on. `/knobs/` is being asked to ADD one. **Both are
+   reasonable and they are not the same page**: `muta` is a local instrument in
+   the browser, `knobs` reaches a board in another building, so an explicit
+   enable is a different promise there. **But they are one decision about how
+   this project asks for MIDI, and deciding them apart is how two pages end up
+   disagreeing.** Settle the pair together and write down why they differ.
+
+#### `able`: move the demo to the archive, out of the index
+
+⚠️ **ASKED, VERBATIM:** *"arhcive able demo and rm from index"*
+
+Same shape as the `bay` ask above and the same two halves: a real move into
+`archive/` AND out of the index, not `built: false` alone.
+`demo/manifest.mjs:674-676`, `settleMs: 12000`, `room: 'fixed'`, one line
+reading *"play Ableton Live on a studio Mac from here, with no virtual audio
+cable"*.
+
+🔴 **AND THIS ONE HAS A RIG BEHIND IT, WHICH `bay` DID NOT.** Four files
+under `rig/` name it: `rig/m1/pace-agent.mjs`, `rig/m1/live-agent.mjs`,
+`rig/m1/README.md` and `rig/board/board.mjs`. `room: 'fixed'` means `m1-1` is
+**the address of the studio Mac's agent**, not a name this page chose.
+**Archiving the page does not archive the agent**, and nothing in the ask says
+to touch `rig/`. Load `positron-hardware` before deciding what, if anything,
+moves there.
+⚠️ **THREE LIVE PAGES AND TWO KIT MODULES ALSO NAME IT**:
+`demo/kit/index.html`, `demo/knobs/index.html`, `demo/grains/index.html`,
+`demo/shell/board.mjs` and `demo/shell/presence.mjs`. **Separate a page LINKING
+to `/able/` from a module that merely shares its vocabulary** before moving
+anything, which is the same separation the `bay` entry asks for.
+⚠️ `positron-history` loads before the move, and the demo count in
+CLAUDE.md is recounted after it and never remembered.
+
+#### `dump`: empty tables at a fixed height instead of two placeholder sentences
+
+⚠️ **ASKED, VERBATIM:** *"dump: nothing asked yet / press Listen, then
+play something / show empthy tables / miditables immidately with fixed heigh. no
+texdt in them until dumps arrive"*
+
+The two quoted strings are the `empty` captions on this page's two tables:
+`demo/dump/index.html:117` `empty: 'nothing asked yet'` on the `ports` table at
+`:109`, and `:140` `empty: 'press Listen, then play something'` on the `traffic`
+table at `:122`. Both are `createTable` from `demo/shell/table.mjs`.
+
+⚠️ **WHAT IS BEING ASKED FOR IS THE TABLE ITSELF AS THE EMPTY STATE.**
+Draw the table immediately, at a fixed height, with no text in it until dumps
+arrive, rather than a sentence standing where the table will be.
+
+🔴 **THE FIXED HEIGHT IS THE LOAD-BEARING HALF AND THIS PROJECT HAS
+PAID FOR IT BEFORE.** `demo/wish/index.html:96-98` records a box that was *"7
+lines for one connection and 16 for the next"* and therefore *"would move the
+log and the end of the page on every press"*. A table that grows as rows land
+does the same thing to everything under it. **So the height is chosen and
+asserted, not left to the content.**
+⚠️ **AND IT BUMPS INTO A RULE THAT POINTS THE OTHER WAY**, which is
+worth naming rather than discovering halfway: `demo/shell/roll.mjs:111` records
+*"an empty box is a line"*, the argument for a caption in an empty container.
+**These are not in conflict here**: the ask is for a table with its own header
+and ruled rows visible, which is structure a reader can see, not a blank
+rectangle. Say that in the comment so nobody reverts it to a caption later.
+
+⚠️ **IT IS A CHANGE TO `table.mjs` IF THE OPTION DOES NOT EXIST**, and
+that module is shared across many pages. Check whether `createTable` can already
+render its frame with zero rows before adding an option, and if it cannot, that
+is kit work done once by one agent, with `/kit/` re-run after it.
+⚠️ **A READOUT CELL IS NOT AN ASSERT**, so if the fixed height matters
+it gets an assert that reads the rendered height before and after rows arrive.
+`/dump/` is one of the pages where the harness drives real MIDI, so check what
+its checks already do before adding to them.
+
+#### `tom`: the gutter lost the second digit of every number
+
+⚠️ **ASKED, VERBATIM, WITH A SCREENSHOT:** *"you lost 2-digin numbers
+from tom demo"*
+
+The crop shows the grid's left gutter reading `5 5 5 5 5 5 5 5 6 6 6 6` down
+twelve rows. **Those are two-digit numbers with the second digit gone**, eight
+in the fifties and four in the sixties, which is a run of consecutive values
+rendered one character wide.
+
+🔴 **AND THE SAME SCREENSHOT SHOWS `0.24 ready, 14/14 checks`.** The page
+is FULLY GREEN while a person can see the defect in the same picture. That is
+this project's own worst shape arriving in the cheapest possible form, and it
+means **no assert on that page reads the gutter's text**. Whatever fixes the
+digits adds the assert that would have caught it, or the next one goes the same
+way.
+⚠️ **SUSPECT THE WIDTH BEFORE THE FORMATTER.** A clip is a box too
+narrow; a truncation is a `slice`. They look identical in a screenshot and have
+different fixes, so measure the rendered rect against the text before changing
+either. `demo/shell/knob-test.mjs` already records that writing a `minWidth`
+from inside a component is *"a rule nothing can override"*, so a width forced
+somewhere upstream is a live candidate.
+⚠️ **AND `tom` CARRIES MIDDOTS**, at least at `:1619`, which the
+standing rule removes when this page is worked on.
+
+#### The play button is MOJIBAKE, and the page it is on takes a pack upload
+
+⚠️ **ASKED, VERBATIM, WITH A SCREENSHOT:** *"what happened to play
+button? autoplay when i upload saple pack"*
+
+The crop shows a transport bar: a glyph button reading **`â—¶`**
+and a two-line clock, `0:00.0` over `0:02.0`. **That is a multi-byte character
+being decoded one byte at a time**, the classic UTF-8 read as Latin-1, so the
+play glyph has become three characters.
+
+🔴 **IF IT IS THE SHARED BAR, IT IS NOT A `tom` BUG, IT IS EVERY PAGE
+WITH A TRANSPORT BAR.** The glyph comes from `demo/shell/transport-bar.mjs`,
+which is the ONE transport control in this project and says so in its first
+line. **Establish the blast radius before fixing anything.**
+✅ **ANSWERED 2026-09-25: THE SCREENSHOT IS FROM `https://positron.studio`,
+NOT FROM LOCALHOST.** So this is a DEPLOY fault and local is clean, which is the
+worst shape for it: **every page with a transport bar is affected for every
+visitor while every harness run on this machine stays green.** The deployed
+response headers are the first thing to read.
+⚠️ **WHAT WAS CHECKED TODAY AND WHAT WAS NOT.** CHECKED: `demo/server.mjs`
+sends `charset=utf-8` for `.html`, `.mjs`, `.js`, `.css` and `.json`, and
+`demo/tom/index.html` and `demo/pack/index.html` both carry
+`<meta charset="utf-8">`. A grep for the mojibake byte sequences across `demo/`
+found **nothing**, so it is not sitting in the source. NOT CHECKED: **whether
+the DEPLOYED site serves a charset**, which is the obvious remaining suspect and
+would make this local-clean and live-broken. `workers/view/src/index.js` sets
+`charset=utf-8` on its JSON and plain-text answers and the static pages do not
+go through those paths. **Reproduce it and say WHICH origin it was seen on
+before touching a line**, because local and deployed have different answers here.
+⚠️ **WHICH PAGE IS NOT SETTLED EITHER.** Five pages take a file:
+`crate`, `kit`, `pack`, `shape` and `tom`.
+
+✅ **ANSWERED 2026-09-25: IT IS A REQUEST.** Play as soon as a pack is
+uploaded. It was put to the owner because it read equally as a report that the
+page ALREADY autoplays and should not.
+⚠️ **AND IT IS INSIDE THE STANDING RULE RATHER THAN AN EXCEPTION TO
+IT.** *"A visit, a step and a scrub must open nothing"* is about a VISIT. An
+upload is a gesture a person made, so playing what they just handed the page is
+a consequence of that gesture. **A visit must still open nothing**, and that is
+the line to hold while building this.
+
+#### `evo`: make all buttons interactive
+
+⚠️ **ASKED, VERBATIM:** *"evo: / make all buttons interactive"*
+
+⚠️ **"ALL" IS THE WORD TO PIN DOWN FIRST.** It reads as: buttons on
+that page are drawn but do nothing, or are disabled, and should work. **Find out
+which ones and why they are inert before building anything**, because a button
+that is disabled for a reason is different from one that was never wired, and
+this session has already found one page where every transport button was wired
+to a dead option name.
+🔴 **AND A BUTTON THAT GAINS A HANDLER IS A BUTTON THE HARNESS NOW
+PRESSES.** `demo/verify.mjs` clicks every button in `.pos-controls` on every
+run, so making inert buttons live changes what the suite DOES to this page.
+`/evo/` imports the instrument box and names `bay`, so check what those presses
+would reach before enabling them. **The `/shape/` rule applies wherever it
+fits: nothing that writes to somebody's instrument belongs in that row.**
+
+#### `shape`: three controls on one line, and the third one is the DANGEROUS one
+
+⚠️ **ASKED, VERBATIM:** *"shape: but butotns in one line"*, with a
+sketch: *"[circuit connected] [Synth1|Synths] [⇄] <- square button, makes
+all buttons \"invisible hand\" staeting from random positions"*
+
+🔴 **THE `⇄` BUTTON IS THE EXACT CONTROL THIS PAGE REFUSES TO PUT IN
+`.pos-controls`, IN WRITING, AND THE REASON IS SOMEBODY'S REAL INSTRUMENT.**
+`demo/shape/index.html:9-13`: *"EVERYTHING THAT CAN REACH THE INSTRUMENT, AND
+NOTHING ELSE. The part chooser and the two buttons live here rather than in
+`.pos-controls`, because `demo/verify.mjs` clicks every button in that row on
+every run: a `move everything` in there would be the suite putting a random
+patch on somebody's synth dozens of times a day."* And `:180-184`: *"NOTHING
+THAT SENDS IS IN THAT ROW ... a hand button or a `put back` in there would be
+the suite writing to an instrument on this desk. `slider.mjs` refuses a hand
+inside that row on its own, and there is an assert on it below."*
+✅ **SO THE BUTTON IS FINE AND ITS PLACE IS NOT.** It goes in the page's own
+row beside the others, never in `.pos-controls`, `slider.mjs`'s refusal stays,
+and the assert on that refusal stays. **This is the Novation Circuit on this
+desk, which has no factory reset.**
+
+⚠️ **AND THE STATUS CONTROL PULLS THE OTHER WAY, WHICH IS WHY THE ROW
+IS SHAPED AS IT IS.** `:176-179` records that `.pos-controls` is what
+`demo/verify.mjs` presses and control 0 is what gets `settleMs`, so *"a status
+control outside that row is a control no harness drives, and every check behind
+it would go silent while the suite stayed green"*. `controls: []` at `:186`.
+**`[circuit connected]` joining a page-owned row is therefore a coverage
+question, not a layout one**: say what drives it after the move, or say what
+went silent.
+
+✅ **THE WIDTH IS ALREADY MEASURED AND THE ANSWER IS THREE.** `:14-20`
+records four controls at **784 px in a 688 px column**, which always wrapped,
+and that loose they broke 3 and 1 with `put back` alone on a line. Three were
+then **RE-MEASURED off real rects at 390, 560, 756 and 1280 px**. The sketch is
+three, so one line is achievable, and **a square glyph button is narrower than
+what it replaces**. Re-measure at those four widths rather than trusting this.
+⚠️ **AND `⇄` IS A GLYPH, SO IT IS NOT A NAME.** It needs an `aria`
+label or the control is announced as a symbol, which is the rule
+`transport-bar.mjs` already carries for its own glyph buttons.
+
+⚠️ **"STARTING FROM RANDOM POSITIONS" IS A SECOND BEHAVIOUR, NOT A
+RESTATEMENT.** The hand moves things; this also SETS them somewhere random
+first. `/shell/hand.mjs` supplies `MOVES` and `minSteps`, and `HAND_STEPS =
+minSteps(MOVES[0][1])` at `:158` exists so that a lane too coarse to show a hand
+is not drawn. `HAND_CEILING = 600` control changes a second at `:322`, and
+`:301-305` records that **forty hands are not one hand forty times**. A jump to a
+random position on every control at once is the worst case that pacing exists
+for, so measure what leaves rather than assuming the coalescer holds.
+
+#### `shape`: drop the MIDI log's empty caption
+
+⚠️ **ASKED, VERBATIM:** *"rm move a slider and what it sends is listed
+here"*
+
+`demo/shape/index.html:470`:
+`const traffic = createMidiLog({ empty: 'move a slider and what it sends is listed here' });`
+⚠️ **CHECK WHAT `createMidiLog` DOES WITH NO `empty`** before deleting
+the option. An empty box with no caption at all may be the thing this project
+calls *"an empty box is a line"*, which `roll.mjs:111` names. If the component
+needs a placeholder, this is a shorter one rather than none.
+
+#### `shape`: wrap it in the instrument box, with a vertical nameplate
+
+⚠️ **ASKED, VERBATIM:** *"shape: / wrap into isntrument box. nameplate
+is \"shape\" vertical glued section"*
+
+`demo/shape/index.html`, 1,450 lines, `settleMs: 4000`, one line reading *"edit
+a Novation Circuit's sound while it is playing, with sliders that can move
+themselves"*. **It does not use the instrument box today.**
+
+✅ **THE BOX EXISTS AND SEVEN PAGES ALREADY WEAR IT**: `demo/shell/instrument.mjs`
+over `demo/shell/panel-layout.mjs`, used by `circuit`, `fau`, `evo`, `kit`,
+`muta`, `tom` and `twelve`. So this is `/shape/` joining a convention rather
+than anything being invented, and `demo/kit/index.html` is where the convention
+is graded.
+
+🔴 **"VERTICAL" MAY NOT EXIST YET, AND THAT IS THE PART TO ESTABLISH
+FIRST.** `instrument.mjs:9-13` records the placements in use, and they are all
+horizontal: `/tom/` is `createNameplate({ lines: ['POSITRON', 'TOM'], place:
+'ends' })`, `/twelve/` is `place: 'end'`, `/circuit/` does its own placing.
+`plateSpec(maker, name, place = 'ends')` at `:93` is the whole vocabulary.
+**If a vertical plate glued down the side of the case is a new mode, it is a
+change to SHARED kit that reaches all seven pages plus `/kit/`**, so it is done
+once by one agent before any page agent starts, and `/kit/` is re-run.
+
+🔴 **AND DO NOT READ THIS AS UNDOING *"rm nameplates"*.**
+`instrument.mjs:144-146` records `plate: false`, added 2026-09-22 on that ask,
+and the reason it gives is specific: **the status control already prints the
+instrument's name in front of its state, so a plate BESIDE IT is the name
+twice.** A plate glued vertically down the side of the case is a different
+object in a different place and does not put the name next to the status. **Both
+decisions can stand**, and whoever builds this says so in the comment rather
+than leaving the two looking contradictory.
+
+⚠️ **THE NAME IS `shape`, LOWER CASE, AS ASKED.** Every existing plate
+is upper case (`POSITRON TOM`, `MODEL 12`, `PLAITS`, `WARPS`). Follow the ask
+and note the departure, rather than quietly title-casing it.
+
+⚠️ **THIS IS UI AND TOUCHES NOTHING THE PAGE SENDS.** `/shape/` edits a
+real Novation Circuit's sound over SysEx, and the standing Circuit rules in
+CLAUDE.md are about what gets WRITTEN to that instrument. Wrapping the page in a
+box changes none of it, and nobody wandering into this task has a reason to send
+anything to the Circuit.
+
+#### `wish`: enable the connections, and a remove button in the column that was reserved for it
+
+⚠️ **ASKED, VERBATIM:** *"wish: when connections (diagram rows) are
+there, enable them. add small remove button on each to the right of the row"*
+
+✅ **THE COLUMN ALREADY EXISTS AND WAS RESERVED FOR EXACTLY THIS, WHICH
+MAKES THE SECOND HALF CHEAP.** `demo/wish/index.html:205-207` reads *"THE RIGHT
+OF EVERY ROW IS FOR ACTIONS AND IT IS EMPTY TODAY"*, asked for on 2026-09-22 as
+*"reserve right side of diagram+allowed to action buttons etc. align diagram to
+left?"*, and `:229` is `grid-column: 2; grid-row: 1 / 3`. **This is the first
+thing to land in it**, so nothing about the layout is being invented.
+🔴 **AND THE WIDTH IS A MEASUREMENT, NOT A TASTE.** `:220-227` records
+that `diagram.mjs` draws a row of boxes while its host is at least 560 px wide
+and STACKS them below that, so the action column's 72 px comes off the picture.
+**A button that does not fit inside it collapses the diagram into a stack**, and
+the file already says the page reports which number broke it. Measure the button
+against 72 px rather than styling it and looking.
+
+✅ **SETTLED THE SAME DAY, ASKED AS:** *"arhive bay demo and rm from
+index. use the connecting code in wish"*. **It is the first reading below.** The
+rows become LIVE connections, and the code that makes them live is `bay`'s,
+moved into service here rather than rewritten. The second reading is recorded
+only so nobody re-opens the question.
+
+🔴 **"ENABLE THEM" IS THE HALF WITH THE WORK IN IT AND IT HAD TWO
+READINGS.** `/wish/`'s one line is *"say which instrument should play which, and
+a language model proposes the connection"*, so today a row is a PROPOSAL.
+- **The reading that fits the page:** when the rows are there, make them LIVE,
+  so a proposed link actually routes one instrument into another. That is
+  `demo/shell/bay.mjs`'s subject, and it is a feature rather than a style
+  change.
+- **The other reading:** the rows are drawn inert or disabled-looking today and
+  should simply become interactive when connections exist.
+✅ **THE FIRST ONE IS THE ANSWER.** No confirmation is outstanding.
+
+🔴 **AND THE VALIDATOR IS NOT OPTIONAL.**
+`bay.mjs` splits refusals into two lists on purpose and this repository has the
+story in writing: one merged `accepts` list meant **every real link on the desk
+was refused**. A class a destination does not handle is DROPPED at the boundary
+and reported; a class on `never` REFUSES the link. **A model proposes and a
+person presses**, which is already this project's rule for anything turning
+words into actions, and it is why the rows show the connection as text first.
+⚠️ **A remove button is a control per row**, so `/wish/`'s per-page
+assert count moves and the harness will now press however many rows exist.
+`demo/verify.mjs` presses `.pos-controls button, .tbar-x`, so whether these
+buttons are inside that selector is a decision, not an accident: pressing every
+remove button in order would empty the page mid-check.
+
+#### `bay`: move the demo to the archive
+
+⚠️ **ASKED, VERBATIM:** *"move bay demo to archive"*
+
+`demo/bay/index.html`, `demo/manifest.mjs:520-522`, `group: 'instruments'`,
+`built: true`, one line reading *"route one instrument to another, with the
+connections it refuses explained in words"*.
+
+🔴 **THE DEMO AND THE KIT MODULE ARE TWO DIFFERENT THINGS AND ONLY ONE
+OF THEM WAS ASKED ABOUT.** `demo/shell/bay.mjs` is a KIT MODULE with its own
+`demo/shell/bay-test.mjs` beside it, and this repository's own verify notes cite
+it as a worked example of a validator that must assert the REASON as well as the
+refusal. **Archiving the page does not archive the module**, and nothing in the
+ask says to touch it.
+
+⚠️ **NINE LIVE FILES NAME `bay` AND THEY ARE NOT ALL THE SAME KIND OF
+REFERENCE.** `demo/shape/index.html`, `demo/evo/index.html`, `demo/wish/index.html`,
+`demo/kit/index.html`, `demo/shell/presence.mjs`, `demo/shell/instruments.mjs`,
+`demo/shell/instruments-test.mjs`, `demo/shell/bay.mjs` and
+`workers/wish/src/wish.mjs`. **Separate the page references from the module
+references before moving anything**, because a page importing `bay.mjs` is
+untouched by this and a page LINKING to `/bay/` is not.
+⚠️ `workers/view/public/` copies are BUILD OUTPUT and regenerate from
+`cd workers/view && node build.mjs`. They are not files to edit.
+
+✅ **SETTLED THE SAME DAY, ASKED AS:** *"arhive bay demo and rm from
+index. use the connecting code in wish"*. **Both halves: a real move into
+`archive/` AND out of the index.** The cheap reading, `built: false` alone, is
+not what was asked for.
+🔴 **AND THE MODULE IS NOT RETIRED, IT IS REHOMED.** *"use the connecting
+code in wish"* is the other half of the same sentence, so `bay.mjs`'s connecting
+code goes into service on `/wish/` in the same effort. **The page is archived;
+what it demonstrated is not.** See the `/wish/` entry above, which this settles.
+⚠️ **`positron-history` LOADS BEFORE THE MOVE**, since that skill
+exists for exactly the links, slugs and paths a retirement leaves behind, and a
+move into `archive/` makes every link to `/bay/` a dangling slug.
+⚠️ **AND `archive/` IS DELIBERATELY NOT REWRITTEN.** CLAUDE.md records
+that the 129-file path sweep left it alone on purpose, because an archive
+records what was there, which is why `box` and `radio1965` are still spelled the
+old way inside it.
+
+⚠️ **COUNT THE DEMOS AFTER, NEVER REMEMBER THEM.** The row count in
+CLAUDE.md moves with this and has been wrong twice in one day before.
+
+#### `muta`: four, and THREE OF THEM REVERSE AN EARLIER EXPLICIT ASK
+
+🔴 **ASKED, VERBATIM:** *"muta / fix sound routing. / rm midi on button.
+its should be listening. set up midi listening / permission when i turn either
+on at start. / no automatic drone. make a Test tone button in the right of
+plaits. when midi notes arrive, they turn off test tone and vice versa / when
+plaits is off and warps in on from plaits - how it can play at all?"*
+
+🔴 **THE REVERSALS ARE THE THING TO WRITE DOWN, BECAUSE THE PAGE ARGUES
+FOR THE OLD BEHAVIOUR IN ITS OWN COMMENTS AND THE NEXT READER WILL BELIEVE
+THEM.** Each one is the owner's to make. What costs money is a comment left
+standing that says the opposite, so **every comment named below moves in the
+same commit as the code.**
+
+1. ⚠️ **FIX SOUND ROUTING.** Said with no detail, and item 4 below may
+   BE the detail rather than a separate question. **Confirm that reading before
+   working it**, because "fix routing" with a wrong guess attached is a change
+   nobody can find later.
+   What the graph does today, `demo/muta/index.html:1261-1266`:
+   `node.connect(warpNode)`, `warpNode.connect(wetGain)`,
+   `wetGain.connect(ctx.destination)`, and separately `node.connect(drySplit)`,
+   `drySplit.connect(dryGain, 0)`, `dryGain.connect(ctx.destination)`. So PLAITS
+   reaches the output by two roads at once, through WARPS and around it.
+2. 🔴 **REMOVE THE MIDI ON BUTTON, IT SHOULD JUST BE LISTENING, AND SET
+   UP LISTENING AND PERMISSION WHEN EITHER INSTRUMENT IS TURNED ON. THIS
+   REVERSES TWO EARLIER ASKS AND THE PAGE QUOTES BOTH.** `:921-922` records
+   *"add webmidi support (online button midi off)"* and then *"add a button
+   (online status one) to turn midi on and off. when on, listem webmidi"*, and
+   `:1950` records *"plaits on should not turn midi on and should..."*, which is
+   the exact behaviour now being asked for.
+   ⚠️ **AND `:929` IS A DELIBERATE DECISION, NOT AN OVERSIGHT**:
+   *"NOTHING IS OPENED UNTIL IT IS PRESSED. `requestMIDIAccess` is a..."*.
+   Moving the request onto instrument power-up means a browser permission prompt
+   fires from that press.
+   ✅ **THAT IS STILL INSIDE THIS PROJECT'S RULE, WHICH WAS CHECKED RATHER
+   THAN ASSUMED.** The standing rule is that a VISIT opens nothing; turning an
+   instrument on is a press a person made, so the prompt is a consequence of a
+   gesture and not of a page load. **A visit must still open nothing**, which is
+   the line to hold while doing this.
+   🔴 **AND IT TAKES AN ASSERT WITH IT.** `:2605` reads
+   `midiBtn.el.tagName === 'BUTTON' && midiWas === false && !!midi`, so deleting
+   the button deletes evidence. Find what that assert was standing in for and
+   replace it rather than let the count drop, which is the `/fau/` compile
+   button lesson of 2026-09-24.
+3. 🔴 **NO AUTOMATIC DRONE, AND A `Test tone` BUTTON TO THE RIGHT OF
+   PLAITS INSTEAD. THIS ALSO REVERSES AN ASK THE PAGE ARGUES FOR AT LENGTH.**
+   `:383-396` records *"rm all top buttons, automatically go for drone"* from
+   2026-09-22 and then defends it: *"THE PAGE PLAYS ITSELF NOW"*, *"the first
+   thing a visitor does produces a continuous sound they can then take a knob
+   to, which is what every knob on this panel is FOR"*.
+   ⚠️ **MIDI NOTES AND THE TEST TONE ARE MUTUALLY EXCLUSIVE, BOTH
+   WAYS**: *"when midi notes arrive, they turn off test tone and vice versa"*.
+   🔴 **AND THIS PAGE HAS NO CONTROL ROW AT ALL**, `controls: []` at
+   `:402`, which the file says at `:394` costs the harness nothing precisely
+   because there is nothing to press. **Adding the first control back changes
+   that**: `settleMs` only ever lands on control 0, and `:378-381` records that
+   this page has already paid for exactly that once, when control 0 changed and
+   the wait that covered a wasm fetch and two handshakes had to move. `muta`
+   carries `settleMs: 8000`.
+   ⚠️ **AND `/muta/` IS THE PAGE THIS REPOSITORY LOST ASSERTS ON
+   SILENTLY**, twice, to the harness's patience while its DSP checks held notes.
+   Diff the per-page assert count before against after and account for every row
+   that moves.
+4. 🔴 **THE QUESTION, AND IT LOOKS LIKE A REAL DEFECT RATHER THAN A
+   MISREADING:** *"when plaits is off and warps in on from plaits - how it can
+   play at all?"* `CARRIERS` at `:308` is
+   `['from PLAITS', 'sine', 'triangle', 'saw']`, and `:1137` reads *"the second
+   input comes from PLAITS, so the whole sound is the chain"*. **So with PLAITS
+   offline and WARPS carrying `from PLAITS`, WARPS has no input and should be
+   silent.** If it makes a sound anyway, either the offline state does not stop
+   the node or the carrier selection is not doing what the label says.
+   ⚠️ **ANSWER IT BY MEASURING, NOT BY READING THE GRAPH**, because
+   both explanations are consistent with the source. This is very likely the
+   whole of item 1.
+
+#### `nola`: five, and the first one DEPENDS on the keyboard work above
+
+🔴 **ASKED, VERBATIM, WITH A SCREENSHOT:** *"nola / rm chord from top
+left (as it moves to keyb compoentn) / rm gap in piano roll vert lines /
+recoridng in diagram is unclear. samples? / only show chords textfield when
+typed is selected / add piano / rhodes into a isntrument footer to the right
+glued under keyboaed"*
+
+The screenshot shows `/nola/`'s roll: dot rows, faint vertical rules, and the
+chord names `C#aug`, `Gmaj`, `Fmaj` stacked at the RIGHT of each row, with the
+vertical rules visibly broken by a horizontal gap between rows.
+
+1. ⚠️ **REMOVE THE CHORD FROM THE TOP LEFT.** The reason is in the ask
+   and it is an ORDERING CONSTRAINT, not a detail: *"as it moves to keyb
+   compoentn"*. **So the keyboard footer has to gain the chord name before
+   `/nola/` gives it up**, or the page loses a readout and gains nothing. One
+   agent, keyboard first, `/nola/` second.
+2. 🔴 **REMOVE THE GAP IN THE PIANO ROLL'S VERTICAL LINES, AND THIS IS
+   THE FIFTH REQUEST ABOUT THOSE LINES.** `demo/shell/roll.mjs:68-83` records
+   the other four verbatim: *"add faint vertical lines ... (not sure how good
+   idea)"*, then *"make vertical lines on pianoroll continuous"* which was done
+   by closing the row gap, then *"no continous vertical bars on pianoroll!"*
+   which **was read as `remove them` and meant `they are still not
+   continuous`**, so they were deleted, then *"you lost vertical lines on piano
+   roll"*.
+   ⚠️ **READ THAT COMMENT BEFORE TOUCHING THIS.** The file's own lesson
+   is that the reading which DESTROYS work is the one to check first, and this
+   ask is the same complaint a fifth time: the gap that was closed once is open
+   again. **The verb here is unambiguous, `rm gap`, so the lines stay and the
+   gap goes.**
+   🔴 **AND `roll.mjs` IS SHARED**: `demo/kit/index.html` and
+   `demo/nola/index.html` use it, and `demo/shell/keyboard.mjs` and
+   `demo/shell/numloop.mjs` build on it. `/kit/` grades the kit, so it moves and
+   has to be re-run. Done once, by one agent, before the page agents start.
+3. ⚠️ **THE `recording` NODE IN THE DIAGRAM IS UNCLEAR**, with a
+   proposed replacement in the ask as a question: *"samples?"*. This is a
+   `positron-diagram` task and that skill loads before the box is edited.
+   ⚠️ **AND THE WORD MATTERS ON THIS PAGE MORE THAN MOST**, because
+   `/nola/` already carries a collision it warns about twice in its own header:
+   `demo/shell/rhodes.mjs` is a SYNTHESISED Rhodes and the files beside the page
+   are a RECORDED one. A box reading `recording` sits exactly on that seam, so
+   whatever replaces it has to be right about which of the two it names.
+4. ⚠️ **ONLY SHOW THE CHORDS TEXT FIELD WHEN `typed` IS SELECTED.** A
+   field that does nothing in the other mode is furniture that reads as broken.
+   ⚠️ **AND IT IS A CONTROL DISAPPEARING, WHICH THE HARNESS FEELS.**
+   `demo/verify.mjs` presses `.pos-controls button, .tbar-x` in order and types
+   into the fields it finds, so hiding one moves every later control's press and
+   may take asserts with it. Diff `/nola/`'s per-page assert count before
+   against after and account for every one that moved.
+5. ⚠️ **PIANO AND RHODES INTO AN INSTRUMENT FOOTER, TO THE RIGHT,
+   GLUED UNDER THE KEYBOARD.** Both instruments already exist on the page: the
+   piano is the recorded pack and the Rhodes is Jeff Learman's jRhodes3d, five
+   velocity layers, with `demo/nola/PROVENANCE-rhodes.json` and
+   `LICENSE-jrhodes3d` beside it.
+   ⚠️ **THE ATTRIBUTION IS ON THE FACE OF THE PAGE ON PURPOSE** and the
+   header says so, so a footer that re-homes the instrument switch must not
+   quietly re-home the credit with it.
+   ⚠️ **`glued under keyboard` IS A LAYOUT CONTRACT AND THE KEYBOARD
+   ALREADY HAS ONE**: `roll.mjs:259` records that the roll *"goes inside the
+   keyboard's own box, and that is what makes it line"* up. A second footer
+   hanging off the same box is the same constraint again, so it is a
+   `positron-ui` task and the component may be where it belongs rather than the
+   page.
+
+#### `keyboard` component, shared: the naming toggle loses its words
+
+⚠️ **ASKED, VERBATIM:** *"keyboard component: Notes | Degreens -> Nt |
+Dg."*
+
+`demo/shell/keyboard.mjs:706-708` holds `mkName('Notes', 'letter', ...)` and
+`mkName('Degrees', 'degree', ...)`.
+🔴 **THIS IS THE FOURTH SPELLING OF ONE LABEL AND THE FILE RECORDS THE
+OTHER THREE**, at `:700-705`: *"c | 1 - someting more descriptive?"*, then
+`C D E | 1 2 3`, then *"Notes | Degrees"* on 2026-09-23. The comment there
+argues IN WRITING for the words over the glyphs, *"a word a reader can look up
+beats a demonstration they have to decode"*, so **that comment is now wrong and
+moves in the same commit**, rather than being left to contradict the code.
+⚠️ The `title` on each button is the sentence a reader looks up and it
+is not what is being shortened, so it stays and carries the meaning the label
+just gave up.
+
+#### `keyboard` component, shared: a chord name in the footer
+
+⚠️ **ASKED, VERBATIM:** *"add chord name to the footer, right from the
+transpose message. avoind text moving in x axis"*
+
+The footer is the keyboard's own, the one the sustain moved into on 2026-09-23
+(*"integrate sustain to footer, create toggle button, big and small"*,
+`:780-781`). The chord name goes to the RIGHT of the transpose message.
+🔴 **AND THE SECOND SENTENCE IS THE HARD HALF.** A chord name changes
+width as it changes (`C` against `Cmaj7` against `F#m7b5`), and a label to the
+left of it would be shoved about by every chord played. Nothing may move in x.
+That is a fixed slot or tabular figures, not a join.
+⚠️ **AND IT IS CELLS, NOT ONE STRING WITH GLUE IN IT.** The standing
+rule about middots applies before the code is written: a transpose message and a
+chord name are two facts and therefore two cells.
+⚠️ `demo/shell/chords.mjs` and `demo/shell/chords-test.mjs` already
+exist and already name chords. **Find out what they answer before writing a
+namer**, because a hand-rolled second one is this project's named defect.
+
+#### `fau`: all sizes in kB
+
+⚠️ **ASKED, VERBATIM:** *"faust all sizes in kb"*
+
+`demo/fau/index.html` prints sizes in at least three units today: raw bytes
+(`COMPILER_BYTES = 3598106 + 2407445 + 156922` at `:211`, `PAGE_BYTES` at
+`:213`, `PINNED = { name: 'fau_pin', bytes: 7266 }` at `:235`), and one cell
+already carries `'per voice': 'KB'` at `:392`. **Every size a reader sees goes
+to kB**, which is a sweep of that page's readout keys and its prose, not one
+cell.
+⚠️ **THE PROSE CARRIES NUMBERS TOO** and goes stale silently: `:132`,
+`:181`, `:193`, `:268` and `:272` all quote byte counts in comments and in
+`what`. A changed unit that leaves those behind is the drift rule arriving in a
+sentence.
+⚠️ **DECIDE kB ONCE AND WRITE IT DOWN**: 1000 or 1024, and one decimal
+or none. Two conventions on one page is worse than bytes.
+
+#### `fau`: more patches
+
+⚠️ **ASKED, VERBATIM:** *"add more patches if you have"*
+
+⚠️ **"IF YOU HAVE" IS A REAL CONDITION AND NOT A POLITENESS.** Look for
+Faust sources already in this repository or already measured, and prefer those
+to invented ones. This page's own comments name real ones, the STK waveguide
+piano at `:272` among them.
+⚠️ **AND A PATCH IS A CONTROL.** Adding one moves every other control's
+harness press, so the thing to look at is `/fau/`'s per-page assert count before
+against after, and `/fau/` has already lost coverage to a control change once:
+its compile button took three asserts' meaning with it on 2026-09-24.
+
+#### A BLANK LINE AFTER EVERY COMMENT, AND THE FORMAT IS NOW EXACT
+
+⚠️ **ASKED, VERBATIM:** *"add nl after comments"*, then clarified with a
+worked example rather than a description:
+
+    from                      to
+
+    // comment                // comment
+    some-code-here
+                              some-code-here
+
+✅ **SO THE FORMAT IS SETTLED**: a comment is followed by a blank line before
+the code it introduces.
+⚠️ **THE SCOPE IS THE ONLY OPEN HALF, AND THE THREE READINGS COST
+WILDLY DIFFERENT AMOUNTS.** The example is JavaScript-shaped (`// comment`), not
+Faust, although the ask arrived inside the `fau` block:
+  1. **New and edited code only**, a convention from here on. Cheap, and it is
+     what a style note normally means.
+  2. **Every source file in this repository.** Enormous, and it touches every
+     file an agent is holding, which is the `git add -A` hazard at full width.
+  3. **The Faust listing shown on `/fau/`**, which is where the ask arrived.
+✅ **ANSWERED 2026-09-25: READING 3. THE FAUST LISTING ON `/fau/` ONLY.**
+Not a repository-wide sweep and not a convention for new code. **It is a
+`/fau/` task and it belongs to that page's agent.**
+
+
+### Open 2026-09-25: four reports on `/stage/` from looking at the working tree
+
+🔴 **ASKED, VERBATIM, ALL FOUR IN ONE MESSAGE:** *"no hls video on
+conrtol room. is it tab swithcing? zoom out transport a lot its frntic. it
+should not start unti on aor. still that asked ghost lane"*
+
+Reported against the UNCOMMITTED working tree, minutes after the `onClick` fix
+took the page from 31/47 to 46/48. **So a suite reading 46/48 did not see any of
+these**, which is the assert-count lesson from the other side: the count went up
+and four things a person can see are still wrong.
+
+1. ⚠️ **NO HLS PICTURE IN THE CONTROL ROOM**, and the reporter's own
+   guess is in the ask: *"is it tab swithcing?"*. `demo/stage/index.html:390-412`
+   builds the audience `<video>` into `byId.get('audience')`, and the control
+   room is a different panel. `demo/shell/tabs.mjs` builds panels off-page. So
+   the picture may be landing in the audience tab only, or landing in a panel
+   that is not attached when the frame arrives. **The guess is worth testing
+   first and is not worth trusting**, because `/stage/` has already had one
+   bug that looked like tab switching and was a container being repointed.
+2. ⚠️ **THE TRANSPORT IS ZOOMED IN FAR TOO FAR AND READS AS FRANTIC.**
+   `ARCHIVE_WINDOW_MS = 30 * 1000` at `:956`, and the control room's timeline
+   opens on the same window from zero (`:1733`, `:2898`). Asked for *"a lot"* of
+   zoom out. ⚠️ **AND THE PAGE ASSERTS THE CURRENT NUMBER**: `:2915`
+   checks the room's span against `ARCHIVE_WINDOW_MS` within 5 per cent, so this
+   is a change to a constant AND to the assert that grades it, in one commit.
+   ⚠️ The archive window was itself asked for on 2026-09-18 as *"zoom
+   arhvie to 15s and allow to zoom out 4x more"* and tuned to *"zoom around this
+   level"*, so **check whether this ask is about the control room only** before
+   moving the archive's.
+3. ⚠️ **IT SHOULD NOT START UNTIL ON AIR.** Read as: the timeline, the
+   write head and the film should not be running while the badge still says
+   `OFF AIR`. `armWall(0)` fires when recording starts (`:1240`), and the film
+   was made to start with the show on 2026-09-25 when its own play button was
+   removed, which `HANDOFF.md` already flags as a reversal to revisit. Whatever
+   moves before `phase === 'live'` is the subject.
+4. 🔴 **THE `asked` GHOST IS STILL THERE**, in the reporter's words
+   *"still that asked ghost lane"*, AFTER the fix measured clean in three tabs.
+   The earlier repair made the SENDER drop `asked` unless its phase is `live`
+   and the RECEIVER take a question only from a live state, and it was verified
+   across tabs in a private room. **So either there is a third path that paints
+   a question, or the ghost is in the LANE rather than in the question**, and
+   `:795-796` already records a lane assert that *"quietly stopped"* once
+   before. A cross-tab measurement passing while the thing is still on screen
+   means the measurement was not of the reported symptom.
+
+⚠️ **NOTHING HERE IS COMMITTED.** The `onClick` fix, the question fix
+and these four sit in one dirty working tree.
+
+
+### Open 2026-09-25: a stale question appears on `/stage/` while the page is OFF AIR
+
+🔴 **REPORTED WITH A SCREENSHOT AND NEVER WRITTEN DOWN UNTIL NOW**, which
+is the defect this file exists to prevent. It lived in `HANDOFF.md` only, so it
+was one session away from being lost. The exact words of the report are not
+recorded; what is recorded is the picture: `KAS SA OLED TEINUD ÖKOPATTU?` on
+screen on a page whose badge reads `OFF AIR`.
+
+⚠️ **WHAT IS KNOWN.** `demo/stage/index.html:67` reads
+`const ROOM = Q.get('room') || 'stage-demo'`, a FIXED default, so every manual
+probe and every headful open of the page lands in the room a visitor lands in,
+and a question asked in one of those probes outlives it.
+
+🔴 **AND THE FIRST EXPLANATION WRITTEN DOWN WAS WRONG, CHECKED
+2026-09-25.** `HANDOFF.md` said *"`demo/verify.mjs` gives every other page its
+own room per run and this page's default is shared with the public"*, pointing
+the next reader at the harness. **The harness is innocent**: `demo/verify.mjs:648`
+is `const own = t.room === 'fixed' ? '' : 'room=<name>-test-<hash>'` and `stage`
+is not `room: 'fixed'` in `demo/manifest.mjs`, so every suite run has had
+`stage-test-<hash>` of its own and has never touched `stage-demo`. The probes did
+it. Corrected in `HANDOFF.md` the same day.
+
+⚠️ **THE SHAPE OF THE FIX IS NOT THE ROOM NAME.** A question belongs to
+a show and an off-air page has no show, so a visitor arriving at a dead page
+should not be shown somebody else's question from hours ago whatever the room is
+called. Where the question is persisted and served from is the thing to find.
+
+### Open 2026-09-25: the active tab on `/stage/` has a vertical rule down each side
+
+⚠️ **ASKED WITH A CROP** of `CONTROLROOM` showing a border on the left
+and the right of the active tab. The exact words are not recorded and the ask was
+never written here until now. Nobody has looked at it.
+
+⚠️ **IT MAY NOT BE THIS PAGE'S TO FIX.** If the rule comes from
+`demo/shell/tabs.mjs` or `demo/shell/shell.css` it is shared, it moves every
+tabbed page, and it is decided ONCE by the session rather than by whoever is
+working `/stage/`. Diagnose, name the file and the rule, say which pages move,
+and stop there.
+
+
 ### Done 2026-09-25: `/llhls/` was dark, and the key rotation is what did it
 
 🔴 **ASKED, VERBATIM:** *"lets focus on get llmhls demo properly working. what

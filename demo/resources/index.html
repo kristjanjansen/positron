@@ -13,7 +13,7 @@
      count never changes, so there is nothing for that ceiling to hold back.
      Tall enough for a long look on a laptop, and it still scrolls inside its
      own box on a phone, where a long title wraps to two or three lines. */
-  /* Taller than the component's default: this is a list of 334 records and the
+  /* Taller than the component's default: this is a list of 333 records and the
      page has nothing else on it, so the box is the page. `--tbl-h` is the
      component's own knob rather than an override of its rule. */
   /* 🔴 AS TALL AS THE SCREEN, NOT A NUMBER I PICKED. 620 px showed
@@ -280,7 +280,7 @@
    * cell carries `licenceFull` as its `title` and `corpus.json` keeps
    * `licenceRef` verbatim — this is a display, never the record.
    *
-   * ⚠️ AND `not stated` / `unknown` PRINT NOTHING. 173 of 334 rows say one or
+   * ⚠️ AND `not stated` / `unknown` PRINT NOTHING. 173 of 333 rows say one or
    * the other, which is a third of the table shouting a non-answer; nothing
    * unmeasured prints as a value here, the same rule the readout cells follow.
    * The blank IS the fact, and the column heading says what the blank means.
@@ -357,8 +357,27 @@
     if (!res.ok) throw new Error(`${CORPUS} answered ${res.status}`);
     corpus = await res.json();
     items = corpus.items || [];
+    /**
+     * 🔴 A ROW TAKEN OUT ON PURPOSE IS NOT A ROW THAT DRIFTED, AND THE TWO ARE
+     * IDENTICAL TO EVERY CHECK BELOW: both leave an id that something else
+     * names and this list does not hold. MEASURED 2026-09-25, when `Saharan uni
+     * I` was removed on instruction and THREE asserts went red for it, two of
+     * them reporting a gathering that had silently lost a row.
+     *
+     * `corpus.removed` is the ledger that tells them apart, written by whoever
+     * takes a row out, and it is consulted rather than trusted: a row is only
+     * excused if it is NAMED there. An unexplained absence still reads red,
+     * which is the whole value of those two checks.
+     *
+     * ⚠️ AND IT IS SAID OUT LOUD IN THE LOG. A removal nobody is told about
+     * cannot be told apart from a leak, which is this repository's own rule
+     * about a sweep that reports nothing.
+     */
+    const gone = new Set((corpus.removed?.rows || []).map((r) => r.id));
     d.log(`${items.length} rows from ${corpus.sources.length} places, `
-      + `gathered ${String(corpus.generated).slice(0, 10)}`, 'hi');
+      + `gathered ${String(corpus.generated).slice(0, 10)}`
+      + `${gone.size ? `. ${gone.size} row(s) removed by hand since: `
+        + `${(corpus.removed.rows || []).map((r) => r.title).join(', ')}` : ''}`, 'hi');
     draw();
 
     d.assert('the list loaded', items.length > 0, `${items.length} rows`);
@@ -434,12 +453,15 @@
       const deckRes = await fetch(DECK);
       const deck = deckRes.ok ? await deckRes.json() : null;
       const have = new Set(items.map((it) => it.id));
-      const lost = (deck?.items || []).filter((it) => !have.has(it.id));
-      d.assert('everything the deck plays is in this list',
+      // ⚠️ A ROW THE LEDGER NAMES IS NOT A DRIFT. See `gone` above.
+      const lost = (deck?.items || []).filter((it) => !have.has(it.id) && !gone.has(it.id));
+      const cut = (deck?.items || []).filter((it) => gone.has(it.id)).length;
+      d.assert('everything the deck plays is in this list, bar what was removed by hand',
         deck !== null && lost.length === 0,
         deck === null ? `${DECK} answered ${deckRes.status}`
           : lost.length ? `${lost.length} of ${deck.items.length} missing — first ${lost[0].id}`
-          : `all ${deck.items.length} of the deck's rows are here`);
+          : `all ${deck.items.length} of the deck's rows are here`
+            + (cut ? `, bar ${cut} the ledger says was removed by hand` : ''));
     }
 
     // 🔴 FOURTEEN DATES HERE REST ON A BOOK, AND THEY WERE ONE BUILD AWAY FROM
@@ -450,7 +472,12 @@
     // `proto/deck/ingest.mjs` and two in `build-corpus.mjs`, and this is the
     // check that was missing: a rebuild that loses them reads red here.
     const rows = corpus.amended?.rows || [];
+    // ⚠️ AND A ROW REMOVED BY HAND IS EXCUSED HERE TOO, BY NAME. `rows.length`
+    // is still 14 because the ledger of READINGS is a record of work that was
+    // done, and deleting an entry from it to make a count come out would be
+    // falsifying the thing this check exists to protect.
     const brackets = rows.filter((r) => {
+      if (gone.has(r.id)) return false;
       const it = items.find((x) => x.id === r.id);
       return !it || it.when.edtf !== r.edtf || !it.when.note;
     });
@@ -466,7 +493,9 @@
       !rows.length ? 'the corpus names no amended rows at all, so a rebuild dropped the readings'
         : brackets.length ? `${brackets.length} of ${rows.length} lost their bracket, first ${brackets[0].id}`
         : onOff?.when.edtf !== WIDENED ? `On-Off reads ${onOff?.when.edtf || 'nothing'}, not ${WIDENED}`
-        : `${rows.length} rows, every one with its reason; On-Off ${onOff.when.edtf}`);
+        : `${rows.length} rows, every one with its reason; On-Off ${onOff.when.edtf}`
+          + (gone.size ? `; ${rows.filter((r) => gone.has(r.id)).length} of them name a row `
+            + 'the ledger says was removed by hand' : ''));
 
     d.ready();
   } catch (e) {

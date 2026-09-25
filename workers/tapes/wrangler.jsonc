@@ -1,0 +1,23 @@
+{
+  // positron-tapes: the read-through proxy `/tapes/` reaches for when a
+  // recording's host will not let a page READ its sound. Its own worker for the
+  // same reason `positron-shout` is: it is the only thing here that fetches
+  // somebody else's archive, and it should be able to fall over without taking
+  // a route the rest of the site depends on with it.
+  //
+  // 🔴 IT IS NOT DEPLOYED YET, and `worker.mjs` says why that is safe: the page
+  // reaches for this only AFTER a recording has refused, and if the proxy
+  // answers anything but a playable body the page falls back to what it did
+  // before, which is to reopen the element without the crossing. So the route
+  // being absent costs a waveform on a refusing recording and nothing else.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "positron-tapes",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-01",
+  "routes": [{ "pattern": "tapes.positron.studio", "custom_domain": true }],
+  // Where `corpus.json` is read from, so this cannot drift from the page.
+  // Point it at a development server to work against an unpublished corpus.
+  "vars": { "CORPUS": "https://positron.studio/resources/corpus.json" },
+  "workers_dev": true,
+  "observability": { "enabled": true }
+}

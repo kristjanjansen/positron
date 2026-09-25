@@ -81,6 +81,38 @@
     try { return BASE + new URL(it.file).pathname; } catch { return it.file; }
   };
 
+  /**
+   * 🔴 THE SECOND ADDRESS FOR A RECORDING WHOSE SOUND CANNOT BE READ, ASKED FOR
+   * AS *"this recordin wil noot allow read its sound: make proxy"*.
+   *
+   * archive.org redirects a download to a storage node and that node does not
+   * always send `access-control-allow-origin`. Without it `crossOrigin =
+   * 'anonymous'` is refused outright, and the only thing this page could do was
+   * reopen the element WITHOUT the crossing: the tape plays and the graph is
+   * TAINTED, so the analyser runs and is not allowed to return real numbers.
+   * `retryOpen` below now tries a same-origin-shaped hop first, because "may I
+   * display this" and "may I read its samples" are different permissions and
+   * only the second one was missing. `workers/tapes/worker.mjs` is the hop.
+   *
+   * 🔴 IT IS EMPTY UNDER A `base`, WHICH IS AN INVARIANT RATHER THAN A HOPE.
+   * `node demo/verify.mjs tapes` points this page at `demo/fake-tapes.mjs` with
+   * its own `?base=`, and `DEMO_HOSTS=1` proves that the only hosts a run
+   * contacts are the development server and that stand-in. A page pointed at a
+   * stand-in must not be able to reach PAST it, whatever a recording does, so
+   * the proxy is switched off by the presence of `base` rather than by the
+   * stand-in happening never to fail.
+   *
+   * ⚠️ AND IT IS NOT DEPLOYED YET. The ladder in `retryOpen` falls through to
+   * exactly what this page did before if the proxy answers anything unplayable,
+   * so the route being absent costs a waveform on a refusing recording and
+   * nothing else. `?proxy=` points it somewhere else and `?proxy=` with no
+   * value switches it off.
+   */
+  const PROXY = BASE ? ''
+    : (new URLSearchParams(location.search).get('proxy') ?? 'https://tapes.positron.studio')
+      .replace(/\/+$/, '');
+  const proxiedOf = (it) => `${PROXY}/tape?id=${encodeURIComponent(it.id)}`;
+
   const d = mount({
     name: 'tapes',
     // ⚠️ REWRITTEN WITH THE AXIS. It described a picture of DATES: "as wide as
@@ -125,7 +157,7 @@
    *
    * So it is spent on the thing that was asked for and has no other channel:
    * WHERE ONE TAPE ENDS AND THE NEXT BEGINS. Laid end to end with a two pixel
-   * gap, twenty-four identical bars read as one long bar with scratches in it.
+   * gap, twenty-three identical bars read as one long bar with scratches in it.
    *
    * ⚠️ GREYISH AND BROWNISH, WHICH IS NOT DECORATION EITHER. These are the
    * colours of the thing being drawn: oxide, leader tape, a splice. They cycle
@@ -449,7 +481,7 @@
    * it was read the way a playhead is read everywhere else. The report was
    * *"tapes timeline makes no sense. am i listening all tapes on same day
    * together?"*. A sweeping line over eleven parallel bars says those bars play
-   * together, and this page's bars are twenty-four separate recordings of
+   * together, and this page's bars are twenty-three separate recordings of
    * which exactly one is loaded.
    *
    * 🔴 AND THE PLAYHEAD IS BACK, BECAUSE THE AXIS CHANGED UNDER IT. It was
@@ -458,7 +490,7 @@
    * END TO END there is one thing playing and one place it has got to, which is
    * exactly what a playhead means everywhere else. The loaded tape is still
    * ringed, because a playhead says where you are and the ring says which of
-   * the twenty-four you are in.
+   * the twenty-three you are in.
    *
    * ⚠️ `absolute: false` NOW, AND IT IS STILL DECLARED RATHER THAN INFERRED.
    * The strip guesses an absolute wall-clock domain from `range[0] > 1e12`, and
@@ -694,7 +726,7 @@
     },
     // ⚠️ THE REST ARE DIMMED LESS THAN THE LIBRARY'S DEFAULT. 0.5 is right on a
     // lane where the dimmed bars are context; here they are the subject, and
-    // only one of twenty-four is ever current.
+    // only one of twenty-three is ever current.
     dimTo: 0.8,
     dimLabelTo: 0.85,
     describeRow: (r) => {
@@ -721,9 +753,9 @@
    * screen.
    *
    * ⚠️ AND IT IS SHORT, BECAUSE A GUTTER IS PAID FOR IN PLOT. `gutterWidthFor`
-   * grows the label column to fit the longest sub-label, so `24 tapes, 2h 22m
+   * grows the label column to fit the longest sub-label, so `23 tapes, 2h 15m
    * in all` would take about 140 px off a picture that breaks out of the page's
-   * own width to get room for the tapes. `2h 22m` says the same thing in six
+   * own width to get room for the tapes. `2h 15m` says the same thing in six
    * characters and fits the 78 px the gutter already has, which is the same
    * rule a diagram's `sub` follows.
    */
@@ -751,13 +783,13 @@
     playhead: true,
     /**
      * 🔴 A SEEK ON THIS AXIS IS TWO THINGS: WHICH TAPE, AND HOW FAR INTO IT.
-     * The run is a line through twenty-four files, so a position on it names
+     * The run is a line through twenty-three files, so a position on it names
      * one of them and an offset inside it. Loading the right tape and NOT
      * seeking into it would put the playhead somewhere the sound is not.
      */
     /**
      * 🔴 A SEEK ON THIS AXIS IS TWO THINGS: WHICH TAPE, AND HOW FAR INTO IT.
-     * The run is a line through twenty-four files, so a position on it names
+     * The run is a line through twenty-three files, so a position on it names
      * one of them and an offset inside it. Loading the right tape and NOT
      * seeking into it would put the playhead somewhere the sound is not.
      *
@@ -1371,7 +1403,7 @@
     // a tape on the way somewhere is not one of them, and the strip is already
     // saying where you are far better than a line of text can.
     if (!quiet) d.log(`${it.title}, ${it.when.edtf || 'no date'}`, 'hi');
-    retried = false;                   // a new tape gets its own one chance
+    rung = 0;                          // a new tape starts at the bottom of the ladder
     if (play) start();
     return it;
   }
@@ -1401,6 +1433,29 @@
    * the reel is changed at the bottom of it, and the new one is pulled back up
    * to speed over `SPIN_UP_MS`.
    *
+   * 🔴 AND SINCE 2026-09-25 IT IS THE MECHANISM FOR THREE TRIGGERS RATHER THAN
+   * ONE, ASKED FOR AS *"use varispeed/inertia on rate change and also
+   * varispeed/inertia on switching looping modes"*. The same curve, the same
+   * floor, the same landing, driven from the same `frame()`:
+   *
+   *   ‹ ›          wind down, CHANGE THE REEL at the bottom, wind back up
+   *   the way →←⇆  wind down, TURN THE LAP ROUND at the bottom, wind back up
+   *   a speed      GLIDE from where the machine is to the speed that was armed
+   *
+   * ⚠️ A SPEED IS A GLIDE AND NOT AN ARC, AND THAT IS NOT A SHORTCUT. The other
+   * two have a DISCONTINUITY in the middle: a different file, a different
+   * buffer. The bottom of the arc is where that discontinuity is hidden, which
+   * is what a wind-down is FOR. Nothing is discontinuous about asking a tape to
+   * run at 2x, so a machine that stopped on the way there would be an effect
+   * rather than an instrument. One span, one direction, no floor.
+   *
+   * 🔴 AND THE ARC RIDES THE LOOP AS WELL AS THE TAPE, WHICH IS THE HALF THAT
+   * MADE THE MODE TRIGGER POSSIBLE AT ALL. While a loop plays the tape is down
+   * and what you are hearing is the ring, so an arc that only moved
+   * `audio.playbackRate` would be a wind-down nobody could hear on exactly the
+   * press it was asked for. `looper.setRate` is the looper's own published way
+   * in, and `onRate` below has always used it for the same reason.
+   *
    * 🔴 THE ARC RUNS ON THIS PAGE'S OWN CLOCK AND NEVER WAITS FOR A FILE, WHICH
    * IS THE WHOLE DIFFERENCE BETWEEN INERTIA AND A STALL WEARING ITS CLOTHES. A
    * wind-down whose length is however long archive.org takes is not a machine
@@ -1418,6 +1473,11 @@
    * while costing two thirds of a second before the recording somebody asked
    * for arrives. Stopped, ‹ and › cut straight through, which is also what a
    * stopped machine does when you change its reels.
+   * ⚠️ AND THE SAME TEST DECIDES THE OTHER TWO, ASKED OF THE RIGHT THING EACH
+   * TIME. A speed glides when the TAPE or the LOOP is running. The way button
+   * rides an arc only when a lap is actually being PLAYED: with no loop it is a
+   * control that says what the next press of LOOP will do, nothing is moving,
+   * and half a second of ramp would be an effect played over silence.
    *
    * ⚠️ A SECOND PRESS RETARGETS, IT DOES NOT RESTART. Two quick presses of ›
    * go two tapes on in ONE arc: the target moves and the curve carries on from
@@ -1428,6 +1488,27 @@
    */
   const SPIN_DOWN_MS = 260;          // the reel coasting to a stop
   const SPIN_UP_MS = 420;            // and the motor pulling it back up
+  /**
+   * 🔴 THE WAY BUTTON'S ARC IS SHORTER THAN THE REEL'S, AND THE REASON IS THE
+   * LENGTH OF THE THING IT IS RIDING. A reel change is a whole recording going
+   * away and another arriving; a way change turns a lap that is typically under
+   * a second round on itself. MEASURED under the harness: the lap that gets
+   * kept is 0.51 s, so the reel's 260 ms wind-down would be half of it and the
+   * whole climb longer than the lap. 150 and 230 keep the same shape at the
+   * scale of the thing being turned.
+   * ⚠️ IT IS TWO NUMBERS, NOT A SECOND MECHANISM. Same curve, same floor, same
+   * landing, same tick; only the spans differ, and they are per arc rather than
+   * per file so a press of one inside the other cannot stretch it.
+   */
+  const MODE_DOWN_MS = 150;
+  const MODE_UP_MS = 230;
+  /**
+   * 🔴 A GLIDE HAS ONE SPAN BECAUSE IT HAS NO BOTTOM. 320 ms is about what the
+   * reel arc takes to reach its floor and start back, so a speed change feels
+   * like the same machine without pretending to hide a discontinuity that is
+   * not there.
+   */
+  const GLIDE_MS = 320;
   /**
    * 🔴 THE FLOOR IS NOT NOUGHT. A media element at rate 0 is a PAUSED element,
    * so an arc that reached it would stop the transport rather than slow it, and
@@ -1453,53 +1534,137 @@
     try { audio.playbackRate = Math.max(SPIN_FLOOR, Math.min(4, r)); }
     catch { /* a rate a browser will not take is not worth taking the page for */ }
   };
+  /**
+   * 🔴 ONE WRITE FOR THE WHOLE MACHINE, BECAUSE THE TAPE IS NOT ALWAYS THE
+   * THING BEING HEARD. While a loop plays the tape is down and the ring is up,
+   * so an arc that moved only the element would be inaudible on exactly the
+   * press it was asked for, and one that moved only the loop would be silent
+   * everywhere else. `looper.setRate` is the looper's own way in and
+   * multiplies with `half` rather than fighting it.
+   */
+  const setSpinRate = (r) => { setMediaRate(r); looper.setRate(r); };
 
   let spin = null;                   // the arc in flight, or nothing
   let lastSpin = null;               // what the last climb actually moved
+
+  /**
+   * Is there anything with momentum in it? The tape, or a lap coming off the ring.
+   * ⚠️ NOT CALLED `rolling`: the loop check below declares a `let rolling` of its
+   * own for a measurement of the element, and a helper shadowed inside the one
+   * block that talks about the same idea is a trap rather than a name.
+   */
+  const moving = () => !audio.paused || looper.playing();
+  /** Where the machine is right now, which is the arc's own value while one runs. */
+  const nowRate = () => (spin ? spin.rate : audio.playbackRate) || 1;
+
+  /**
+   * Start the arc, or fold a second press into the one already running.
+   *
+   * `dir` steps the reel, `ways` presses the way button, and both are counted
+   * rather than held as callbacks so that two presses inside one arc compose
+   * into one bottom instead of two arcs.
+   *
+   * ⚠️ A PRESS DURING THE CLIMB TURNS IT BACK DOWN from the speed it has
+   * reached, which is what a reel does, and it is also what takes a GLIDE and
+   * makes it a wind-down: the glide is abandoned, and the climb comes home to
+   * `armedRate()` read fresh, which is the speed the glide was heading for.
+   */
+  function ride({ dir = 0, ways = 0, downMs, upMs }) {
+    if (spin) {
+      if (dir) spin.want = (spin.want == null ? cur : spin.want) + dir;
+      spin.ways += ways;
+      // ⚠️ THE LONGER PAIR WINS. A way press inside a reel arc must not shorten
+      // the reel's wind-down, and a reel press inside a way arc must lengthen
+      // it, because what is about to happen at the bottom is the bigger event.
+      spin.downMs = Math.max(spin.downMs, downMs);
+      spin.upMs = Math.max(spin.upMs, upMs);
+      if (spin.phase !== 'down') {
+        spin.phase = 'down'; spin.t0 = performance.now(); spin.from = spin.rate;
+      }
+      return;
+    }
+    const r = nowRate();
+    spin = { phase: 'down', t0: performance.now(), from: r, rate: r, mediaAt: 0,
+             want: dir ? cur + dir : null, ways, downMs, upMs, glideMs: 0 };
+    setSpinRate(r);
+  }
 
   /** ‹ and ›. `dir` is -1 or +1. */
   function walk(dir) {
     if (!tapes.length) return;
     // Stopped: there is no momentum to spend, so go straight there.
     if (audio.paused) { select(cur + dir, { play: false, quiet: checking }); return; }
-    if (spin) {
-      spin.want += dir;
-      if (spin.phase === 'up') {
-        spin.phase = 'down'; spin.t0 = performance.now(); spin.from = spin.rate;
-      }
-      return;
-    }
+    ride({ dir, downMs: SPIN_DOWN_MS, upMs: SPIN_UP_MS });
+  }
+
+  /**
+   * The button glued to LOOP, which cycles → ← ⇆.
+   *
+   * ⚠️ IT WRAPS THE LOOPER'S OWN ENTRY RATHER THAN REPLACING IT. `wayExtra()`
+   * comes with `onPress` already pointed at `looper.cycle`, and the looper is
+   * the one thing that writes the button's face, so a way reached from the
+   * code and a way reached by pressing cannot disagree about what is showing.
+   * All this does is decide WHEN that press lands.
+   * ⚠️ NOTHING PLAYING, NOTHING TO WIND DOWN. With no lap running the button
+   * only says what the next press of LOOP will do.
+   */
+  function turnWay(press) {
+    if (!looper.playing()) { press(); return; }
+    ride({ ways: 1, downMs: MODE_DOWN_MS, upMs: MODE_UP_MS });
+  }
+
+  /**
+   * A speed was armed on the picker. Glide to it.
+   *
+   * ⚠️ AN ARC ALREADY IN FLIGHT IS LEFT ALONE, and that is the behaviour this
+   * page already had: the climb reads `armedRate()` fresh on every frame, so it
+   * comes home to the NEW speed with no second curve and no step in the middle
+   * of the first one.
+   */
+  function glide() {
     const r = armedRate();
-    spin = { want: cur + dir, phase: 'down', t0: performance.now(), from: r, rate: r, mediaAt: 0 };
-    setMediaRate(r);
+    if (spin) return;
+    if (!moving()) { setSpinRate(r); return; }
+    spin = { phase: 'glide', t0: performance.now(), from: nowRate(), rate: nowRate(),
+             mediaAt: 0, want: null, ways: 0, downMs: 0, upMs: 0, glideMs: GLIDE_MS };
   }
 
   /** One step of the arc. Driven from `frame()`, because this page runs ONE loop. */
   function spinTick(now) {
     if (!spin) return;
-    const span = spin.phase === 'down' ? SPIN_DOWN_MS : SPIN_UP_MS;
+    const span = spin.phase === 'down' ? spin.downMs
+      : spin.phase === 'glide' ? spin.glideMs : spin.upMs;
     const to = spin.phase === 'down' ? SPIN_FLOOR : armedRate();
-    const f = Math.min(1, (now - spin.t0) / span);
+    const f = span > 0 ? Math.min(1, (now - spin.t0) / span) : 1;
     spin.rate = spin.from + (to - spin.from) * ease(f);
-    setMediaRate(spin.rate);
+    setSpinRate(spin.rate);
     if (f < 1) return;
     if (spin.phase === 'down') {
-      // The bottom of the arc: change the reel.
+      // The bottom of the arc, where everything discontinuous happens.
       // ⚠️ `play` FOLLOWS WHAT THE PAGE IS DOING NOW, not what it was doing
       // when the button was pressed. Somebody who pressed PAUSE during the
       // wind-down has stopped the machine, and starting it again underneath
       // them because of a press two hundred milliseconds old is the page
       // overruling the newer instruction.
-      const next = ((spin.want % tapes.length) + tapes.length) % tapes.length;
-      // ⚠️ A WALK THAT CAME BACK TO WHERE IT STARTED CHANGES NO REEL. › then ‹
-      // inside one arc is a cancelled walk, and re-pointing the element at the
-      // file it is already holding would throw away everything buffered and
-      // fetch it again to arrive where it already is.
-      if (next !== cur) select(next, { play: !audio.paused, quiet: checking });
+      if (spin.want != null) {
+        const next = ((spin.want % tapes.length) + tapes.length) % tapes.length;
+        // ⚠️ A WALK THAT CAME BACK TO WHERE IT STARTED CHANGES NO REEL. › then ‹
+        // inside one arc is a cancelled walk, and re-pointing the element at the
+        // file it is already holding would throw away everything buffered and
+        // fetch it again to arrive where it already is.
+        if (next !== cur) select(next, { play: !audio.paused, quiet: checking });
+      }
+      // ⚠️ AND THE WAY PRESSES LAND HERE FOR THE SAME REASON THE REEL DOES:
+      // `setWay` builds a NEW voice, which is the discontinuity a wind-down
+      // exists to put out of earshot. Three presses inside one arc are three
+      // cycles at the bottom and one arc, so → ← ⇆ → still comes back to →.
+      for (let i = 0; i < spin.ways; i++) looper.cycle();
+      spin.ways = 0;
       // ⚠️ A NEW SOURCE RESETS `playbackRate` TO `defaultPlaybackRate`, which
-      // is the armed speed. Without this line the tape would snap to full speed
-      // at the exact moment it is meant to be slowest.
-      setMediaRate(spin.rate);
+      // is the armed speed, and a new loop voice starts at whatever rate the
+      // looper was last told. Without this line the machine would snap to full
+      // speed at the exact moment it is meant to be slowest.
+      setSpinRate(spin.rate);
       spin.phase = 'up';
       spin.t0 = now;
       spin.from = spin.rate;
@@ -1521,7 +1686,14 @@
     const r = armedRate();
     audio.defaultPlaybackRate = r;
     audio.playbackRate = r;
-    if (s) spinReport(s, r);
+    // ⚠️ THE LOOP LANDS TOO, and it is the half that would go unnoticed: the
+    // tape's speed is under a button somebody is reading, and a lap left
+    // running at 0.997 is only audible.
+    looper.setRate(r);
+    // ⚠️ ONLY A CLIMB IS WORTH REPORTING. A glide has no bottom, so it has no
+    // `mediaAt` to measure a climb against, and a report over one would compare
+    // the tape against a curve that was never run.
+    if (s && s.phase === 'up') spinReport(s, r);
   }
 
   /**
@@ -1532,7 +1704,10 @@
    * actually went past is read off the element.
    */
   function spinReport(s, armed) {
-    const want = SPIN_UP_MS * (SPIN_FLOOR + (armed - SPIN_FLOOR) * 2 / 3);
+    // ⚠️ THE ARC'S OWN SPAN, NOT THE REEL'S. The way button climbs over
+    // `MODE_UP_MS` and grading it against `SPIN_UP_MS` would expect nearly
+    // twice the tape and call a working climb a stall.
+    const want = s.upMs * (SPIN_FLOOR + (armed - SPIN_FLOOR) * 2 / 3);
     const got = Math.max(0, audio.currentTime * 1000 - s.mediaAt);
     lastSpin = { want: Math.round(want), got: Math.round(got), rate: audio.playbackRate };
     // A log line, because this is a thing that HAPPENED rather than a number on
@@ -1542,6 +1717,21 @@
       d.log(`${tapes[cur]?.title} had not arrived, so the tape came back up on silence`, 'bad');
     }
   }
+
+  /**
+   * The way button, with this page's arc in front of the looper's own press.
+   *
+   * ⚠️ THE LOOPER'S ENTRY IS KEPT AND CALLED, NEVER REIMPLEMENTED. `wayExtra()`
+   * carries the id, the face, the label and the title the looper paints, and
+   * `onPress` pointed at `looper.cycle`. Taking that function and handing it to
+   * `turnWay` is the smallest possible change: the looper goes on owning what a
+   * press does and this page decides only when it happens.
+   */
+  const wayPress = (() => {
+    const e = looper.wayExtra();
+    const press = e.onPress;
+    return { ...e, onPress: () => turnWay(press) };
+  })();
 
   // The bar owns play, pause, the speeds and the two walk buttons. Nothing on
   // this page duplicates them.
@@ -1582,8 +1772,18 @@
      * ONE `/radio/` HAS. It is on the bar with no loop running, because a
      * direction is a choice you can make BEFORE pressing LOOP: it says what the
      * next lap will do.
+     *
+     * 🔴 AND ITS PRESS RIDES THE ARC ON THIS PAGE, WHICH IS WHERE THAT BELONGS.
+     * The inertia is not the looper's: `setWay` already dips the gain over
+     * 12 ms so a voice swap is not a click, and that is the kit's job and is
+     * right for every page that has one. A tape that winds down and comes back
+     * up is a fact about THIS machine, it has to move the media element as well
+     * as the ring, and putting it in `demo/shell/looper.mjs` would give it to
+     * `/radio/`'s transport bar and every other looper page uninvited. So the
+     * page decides WHEN the looper's own press lands and the looper still owns
+     * what the press DOES.
      */
-    loopExtras: [looper.wayExtra()],
+    loopExtras: [wayPress],
     /**
      * 🔴 THE RATE HAS TO REACH THE TAPE, AND NOTHING WAS CARRYING IT.
      *
@@ -1603,8 +1803,8 @@
     /**
      * ⚠️ AND IT KEEPS ITS HANDS OFF A RUNNING ARC. The wind-down owns
      * `playbackRate` until it comes home, and it reads the armed speed fresh on
-     * every frame — so pressing a speed mid-spin makes the tape come up to the
-     * NEW one. Writing the rate here as well would put a step in the middle of
+     * every frame. Pressing a speed mid-spin makes the tape come up to the NEW
+     * one, and writing the rate here as well would put a step in the middle of
      * the curve and then be overwritten a frame later anyway.
      */
     /**
@@ -1613,10 +1813,20 @@
      * would be a control that visibly does nothing. `half` in the way table
      * multiplies with this rather than replacing it.
      */
-    onRate: (r) => {
-      audio.defaultPlaybackRate = r;
-      if (!spin) audio.playbackRate = r;
-      looper.setRate(r);
+    /**
+     * 🔴 IT GLIDES NOW RATHER THAN SNAPPING, ASKED FOR AS *"use
+     * varispeed/inertia on rate change"*. `glide()` owns both writes, which is
+     * why neither is made here any more: a rate set here AND ramped from
+     * `frame()` is two things writing one property, and the loser is whichever
+     * ran second.
+     * ⚠️ `defaultPlaybackRate` STILL MOVES AT ONCE, because it is not a speed,
+     * it is what the element will come back to when a new source is loaded. The
+     * arc's landing and a reel change both read it, and a glide that left it
+     * behind would put the OLD speed back on the next press of ‹ or ›.
+     */
+    onRate: () => {
+      audio.defaultPlaybackRate = armedRate();
+      glide();
     },
     extras: [
       { id: 'prev', label: '‹', aria: 'the tape before this one', onClick: () => walk(-1) },
@@ -1678,19 +1888,44 @@
     if (ms > 0) tapeDeck.setRange([0, ms]);
   });
   /**
-   * 🔴 A TAPE THAT WILL NOT LOAD CROSS-ORIGIN IS RETRIED WITHOUT THE CROSSING.
-   * Dropping `crossOrigin` taints the graph, so the waveform goes blank for that
-   * one — and a blank picture beside a playing tape is a far better trade than a
-   * silent one beside a picture that could not have been drawn anyway. Said in
-   * words, because a viz that is empty for a reason and a viz that is broken
-   * look identical.
+   * 🔴 A TAPE THAT WILL NOT LOAD CROSS-ORIGIN GETS A SECOND ADDRESS BEFORE IT
+   * GETS A BLANK WAVEFORM, AND THE ORDER OF THE LADDER IS THE WHOLE REPAIR.
+   *
+   *   1. the file itself, with the crossing. What every tape gets first.
+   *   2. THE PROXY, still with the crossing. `workers/tapes/worker.mjs` fetches
+   *      the same recording and puts the header on it that the storage node
+   *      left off, so the sound can be READ and there is a waveform.
+   *   3. the file itself, without the crossing. What this page did before, and
+   *      what it still does when there is no proxy or the proxy cannot help:
+   *      the tape plays, the graph is tainted and the picture says why.
+   *
+   * ⚠️ EACH RUNG IS TRIED ONCE PER TAPE, counted rather than flagged, because a
+   * boolean could only ever say "something was already tried" and the two
+   * retries want different answers. `select()` resets the count.
+   *
+   * ⚠️ AND STEP 3 IS NOT A FALLBACK THAT CAN BE DROPPED. A blank picture beside
+   * a playing tape is a far better trade than a silent one beside a picture
+   * that could not have been drawn anyway, which is why it was the answer for
+   * as long as there was no proxy.
    */
-  let retried = false;
+  let rung = 0;
   function retryOpen() {
-    if (retried || !audio.crossOrigin || !tapes[cur]) return false;
-    retried = true;
+    const it = tapes[cur];
+    if (!it || !audio.crossOrigin) return false;
+    if (rung === 0 && PROXY) {
+      rung = 1;
+      // ⚠️ THE CROSSING STAYS ON. The whole point of the hop is a response that
+      // carries `access-control-allow-origin`, and asking for it without
+      // `crossOrigin` would taint the graph anyway and waste the fetch.
+      audio.src = proxiedOf(it);
+      d.log(`${it.title}: its host would not let this page read the sound, so it is being `
+        + 'asked for again through the proxy');
+      return true;
+    }
+    if (rung >= 2) return false;
+    rung = 2;
     audio.crossOrigin = null;
-    audio.src = srcOf(tapes[cur]);
+    audio.src = srcOf(it);
     /**
      * 🔴 SAID IN THE PICTURE AND NOT ONLY IN THE LOG, AND NOT IN THE FAULT
      * COLOUR. Reported 2026-09-16: *"what does it mean. many kureniemis do not
@@ -1707,10 +1942,14 @@
      * `crossOrigin = 'anonymous'` is refused outright, so the element is
      * reopened without it. That plays, and it TAINTS the audio graph: the
      * analyser is allowed to run and is not allowed to return real numbers.
+     *
+     * ⚠️ AND THE LINE NAMES THE PROXY WHEN THERE WAS ONE, because "no proxy was
+     * tried" and "the proxy was tried and did not help" are different findings
+     * and only one of them is a thing anybody can fix.
      */
     scope.source('this recording will not let a page read its sound, so there is no wave');
-    d.log(`${tapes[cur].title}: the sound is playing. Its host will not let this page READ it, `
-      + 'so there is no waveform for this one');
+    d.log(`${it.title}: the sound is playing. Its host will not let this page READ it, `
+      + `so there is no waveform for this one${PROXY ? ', and the proxy could not either' : ''}`);
     return true;
   }
   audio.addEventListener('error', () => {
@@ -1855,8 +2094,8 @@
     // ⚠️ THE UNDATED COUNT LIVES HERE NOW. It was in the lane's gutter and the
     // gutter had to be as wide as it; saying it once in the log costs no width
     // and is the honest home for a fact about the corpus rather than about the
-    // lane. A record with no date cannot be on an axis, and a page that drew 13
-    // marks for 24 tapes without saying so would be claiming eleven do not exist.
+    // lane. A record with no date cannot be on an axis, and a page that drew 12
+    // marks for 23 tapes without saying so would be claiming eleven do not exist.
     const undated = items.filter((it) => playable(it) && it.when?.earliest == null).length;
     d.log(`${items.length} records, ${tapes.length} of them playable`
       + `${undated ? `. ${undated} of those have no date and cannot be on the axis` : ''}`, 'hi');
@@ -1937,6 +2176,8 @@
     const [r0, r1] = tapeDeck.range;
     let kept = null, keepingStats = null, during = null, after = null, before = null;
     let mutedWhile = null, backOk = null, faces = '', rolling = false;
+    // What the wind-down on a way press actually did, sampled on the LOOP's rate.
+    const wayArc = []; let wayLanded = null;
     if (api && r1 > r0) {
       // ⚠️ THE GRAPH HAS TO EXIST BEFORE THE RING CAN KEEP ANYTHING. Nothing has
       // pressed play at this point, so without this there is no analyser to read
@@ -2007,11 +2248,36 @@
        * points are compared against the kept seconds at the mirrored index,
        * exactly, which costs nothing and cannot pass by accident.
        */
+      /**
+       * 🔴 AND THE PRESS RIDES AN ARC NOW, SO WHAT IS WAITED FOR IS THE ARC AND
+       * NOT A NUMBER OF MILLISECONDS. The way changes at the BOTTOM of the
+       * wind-down and the face is painted there, so the 90 ms sleep this
+       * replaced would have read the OLD face and the OLD buffer on every
+       * press: three asserts about a mirror that had not been swapped in yet.
+       * A fixed sleep would also be grading `MODE_DOWN_MS` rather than asking
+       * whether the machine came home.
+       */
+      const landed = async () => {
+        for (let i = 0; i < 40 && spin; i++) await new Promise((r) => setTimeout(r, 25));
+        await new Promise((r) => setTimeout(r, 40));
+      };
       if (looper.playing()) {
         const wayBtn = bar.loopExtra('way');
         faces = wayBtn ? wayBtn.textContent : '';
+        // 🔴 THE ARC IS SAMPLED ON THE LOOP'S OWN RATE, NOT THE ELEMENT'S, AND
+        // THAT IS THE WHOLE POINT OF THE TRIGGER. While a lap plays the tape is
+        // down: a wind-down that moved only `audio.playbackRate` would be
+        // inaudible here and would still satisfy a check that read the element.
+        const armed = armedRate();
         wayBtn?.click();                      // → becomes ←
-        await new Promise((r) => setTimeout(r, 90));
+        for (let i = 0; i < 60 && spin; i++) {
+          await new Promise((r) => requestAnimationFrame(r));
+          wayArc.push(looper.rate());
+        }
+        await landed();
+        wayArc.push(looper.rate());
+        wayLanded = { armed, low: wayArc.length ? Math.min(...wayArc) : null,
+                      home: looper.rate() };
         faces += wayBtn ? wayBtn.textContent : '';
         const a = looper.buffer()?.getChannelData(0);
         const b = looper.mirror()?.getChannelData(0);
@@ -2025,10 +2291,10 @@
         }
         backOk = { reads, same, way: looper.wayName() };
         wayBtn?.click();                      // ← becomes ⇆
-        await new Promise((r) => setTimeout(r, 90));
+        await landed();
         faces += wayBtn ? wayBtn.textContent : '';
         wayBtn?.click();                      // and back to →, where it started
-        await new Promise((r) => setTimeout(r, 60));
+        await landed();
       }
       api.pressLoop();                        // off
       await new Promise((r) => setTimeout(r, 140));
@@ -2066,6 +2332,34 @@
         : `the faces went ${faces.split('').join(' ')} · the voice reads `
           + `${backOk.reads ? 'the mirror' : 'THE ORIGINAL'} · `
           + `${backOk.same} of 4 sample(s) match the kept seconds reversed`);
+
+    /**
+     * 🔴 A MODE CHANGE WINDS THE LAP DOWN AND BRINGS IT BACK, ASKED FOR AS
+     * *"varispeed/inertia on switching looping modes"*. Both halves, and the
+     * second is worth the most: an arc that ramped and forgot to land would
+     * leave the lap running at 0.997 under a rate button reading 1, which is
+     * the shape this page has already paid for once on the tape's own speed.
+     *
+     * ⚠️ IT IS MEASURED ON `looper.rate()`, NOT ON `audio.playbackRate`, AND
+     * THAT IS THE CLAIM RATHER THAN A DETAIL. While a lap plays the tape is
+     * down and the ring is up, so a wind-down that reached only the element
+     * would be inaudible on exactly this press and would still pass a check
+     * that read the element. The floor has to arrive at the thing being heard.
+     *
+     * ⚠️ AND IT CANNOT FAIL ON THE AUTOPLAY RULE. A browser that will not start
+     * a tape without a press keeps nothing, plays no lap, and has no momentum
+     * to spend: that is reported in words, the way every other check in this
+     * block reports it, rather than graded.
+     */
+    d.assert('a mode change winds the lap down and brings it back to the speed on the picker',
+      !rolling ? true
+        : !!wayLanded && wayLanded.low < wayLanded.armed * 0.5
+          && wayLanded.home === wayLanded.armed,
+      !rolling ? 'nothing was playing to turn round, so there was nothing to wind down'
+        : !wayLanded ? 'a lap went past and the ring kept none of it'
+        : `pressed the way button at ${wayLanded.armed}x: the lap went down to `
+          + `${wayLanded.low?.toFixed(3)}x over ${wayArc.length} frames and came home to `
+          + `${wayLanded.home}x`);
   }
 
   /**
@@ -2448,19 +2742,59 @@
    * fault being guarded against is exactly the wiring between the bar and the
    * page: for two sessions the bar told the deck, the deck followed the media,
    * and the media never heard about it.
+   *
+   * 🔴 AND IT GLIDES THERE RATHER THAN SNAPPING, ASKED FOR AS *"use
+   * varispeed/inertia on rate change"*. The claim is now two claims and the
+   * first one is unchanged: whatever the curve does on the way, the tape ends
+   * on exactly the speed the picker is showing.
+   *
+   * ⚠️ IT STARTS THE TAPE, WHICH THE OLD VERSION DID NOT HAVE TO. A glide only
+   * exists where there is something moving to glide, so pressing a speed on a
+   * stopped page lands at once and a check written against a stopped page would
+   * have graded the snap and reported the glide, which is the vacuous pass this
+   * repository has shipped before. The tape is paused again afterwards, the way
+   * the walk check below already does.
+   *
+   * ⚠️ AND IT SAMPLES EVERY FRAME RATHER THAN SLEEPING TO THE MIDDLE. A fixed
+   * sleep of `GLIDE_MS * 0.4` measures this machine's frame rate as much as the
+   * curve: on a slow first frame the rate would still read 1 and a working
+   * glide would be called a snap.
    */
   // 🔴 BEHIND THE GATE: a rate is a fact about a tape that is running.
   if (SELFCHECK) {
-    const press = (r) => {
-      const b = bar.el.querySelector(`[data-rate="${r}"]`);
-      b?.click();
-      return { pressed: !!b, rate: audio.playbackRate };
+    const btn = (r) => bar.el.querySelector(`[data-rate="${r}"]`);
+    // ⚠️ NOT CALLED `ride`: that is the name of the arc's own entry point a
+    // thousand lines up, and a local shadowing it inside the one block that
+    // drives it is a trap rather than a name.
+    const settle = async (seen) => {
+      for (let i = 0; i < 60 && spin; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+        seen?.push(audio.playbackRate);
+      }
+      return audio.playbackRate;
     };
-    const fast = press(2), back = press(1);
-    d.assert('the rate buttons change the speed the tape plays at',
-      fast.pressed && back.pressed && fast.rate === 2 && back.rate === 1,
-      fast.pressed ? `pressing 2 ran the tape at ${fast.rate}x, pressing 1 at ${back.rate}x`
-                   : 'the bar drew no rate buttons to press');
+    let rolled = false, fast = null, slow = null;
+    const seen = [];
+    if (btn(2) && btn(1)) {
+      await start();
+      rolled = !audio.paused;
+      btn(2).click();
+      fast = await settle(seen);
+      btn(1).click();
+      slow = await settle(null);
+      audio.pause();
+    }
+    const between = seen.filter((v) => v > 1.001 && v < 1.999).length;
+    d.assert('the rate buttons change the speed the tape plays at, and it glides there',
+      !!btn(2) && fast === 2 && slow === 1 && (!rolled || between > 0),
+      !btn(2) ? 'the bar drew no rate buttons to press'
+      : !rolled ? 'this browser would not start the tape without a press, so nothing was '
+                  + `moving and a speed is a cut: pressing 2 ran the tape at ${fast}x, `
+                  + `pressing 1 at ${slow}x`
+      : `pressing 2 ran the tape at ${fast}x and pressing 1 at ${slow}x · `
+        + `${between} of ${seen.length} frames on the way up sat between the two speeds, `
+        + `the first at ${seen[0]?.toFixed(3)} and the last before landing at `
+        + `${seen[seen.length - 1]?.toFixed(3)}`);
   }
 
   // 🔴 EXACTLY ONE MARK IS RINGED AND IT IS THE ONE THE TRANSPORT IS PLAYING.

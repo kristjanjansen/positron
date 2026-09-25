@@ -40,6 +40,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createDeck, workerTickHost } from '/timeline/transport.mjs';
   import {
     scoreDoc, quotation, refDeck, partItems, partRangeMs, loadScoreDoc,
@@ -185,7 +186,7 @@
   const plays = new Map();              // `${part}#${rowId}` -> times fired
   let playCount = 0;
 
-  createTransportBar(d.el, parent, { scrub: false });
+  const bar = createTransportBar(d.el, parent, { scrub: false });
 
   const pre = el('pre', 'sc');
 
@@ -249,7 +250,7 @@
           }
           return out;
         },
-        // hue = which part · lightness = whether it has played
+        // hue = which part, lightness = whether it has played
         colorOfRow: (r) => {
           const p = r.payload || {};
           const ink = inkOf[p.part] || INK[0];
@@ -259,7 +260,7 @@
           const p = r.payload || {};
           const line = lineOfRow.get(`${p.part}#${p.row}`);
           const n = plays.get(`${p.part}#${p.row}`) || 0;
-          return [`line ${line} · ${p.part}`, n ? `played ${n}x` : 'not played yet'];
+          return [`line ${line}, ${p.part}`, n ? `played ${n}x` : 'not played yet'];
         } },
       // THE TEMPO, AND IT IS DERIVED. The map is a function; sampling it into
       // rows to draw it is deriving a picture, not observing one — so it takes
@@ -287,6 +288,38 @@
         describeRow: (r) => [`${Math.round(r.payload?.bpm ?? 0)} bpm`, 'read off the score'] },
     ],
   });
+
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-25: *"timeline
+   * demos: glue transport and timelines"*. The bar passes `scrub: false`
+   * BECAUSE the strip is this page's position surface, and two horizontal time
+   * axes at different scales with page rhythm between them read as two things
+   * rather than one control.
+   *
+   * ⚠️ `createTransportBar(d.el, ...)` HAS ALREADY APPENDED THE BAR, because its
+   * first argument is a mount point rather than a hint. This moves two existing
+   * children into one box.
+   * ⚠️ THE SCORE GOES IN AFTER THE GLUE, not before it. At this point the strip
+   * is the last child of `d.el`, so the anchor is `null` and the glue is
+   * appended; appending `pre` next keeps the score under the pair, which is
+   * where it was.
+   */
+  const afterStrip = view.surface.nextSibling;
+  d.el.insertBefore(createGlue(bar.el, view.surface), afterStrip);
+
+  // 🔴 ONE BAR AND ONE STRIP, COUNTED FROM THE DOM RATHER THAN LOOKED AT.
+  // `/stage/` carried a DOUBLED transport bar through two reports in 2026-09-25,
+  // because `createTransportBar(parent, ...)` appends to the parent it is given:
+  // deleting the `createGlue` line removed nothing, and a screenshot cannot tell
+  // one bar from two when they are stacked. A count can.
+  d.assert('one bar and one strip, and they are one surface',
+    d.el.querySelectorAll('.tbar').length === 1
+      && d.el.querySelectorAll('canvas.pos-strip').length === 1
+      && bar.el.parentElement === view.surface.parentElement
+      && !!bar.el.parentElement?.classList.contains('pos-glue'),
+    `${d.el.querySelectorAll('.tbar').length} bar(s), `
+    + `${d.el.querySelectorAll('canvas.pos-strip').length} strip(s), `
+    + `in .${bar.el.parentElement?.className}`);
 
   d.el.append(pre);
 
@@ -505,7 +538,7 @@
     DOCS.every((doc0) => doc0.uses.every((u) => !!doc0.parts[u.ref])),
     `${DOCS.reduce((n, x) => n + x.uses.length, 0)} uses`);
 
-  d.log(`${SCORES.length} scores · pick one above`);
+  d.log(`${SCORES.length} scores, pick one above`);
   d.ready();
 </script>
 </html>

@@ -836,7 +836,10 @@ phone rules.**
 🔴 **HOW FAR A SWITCHED-OFF CONTROL'S FURNITURE DIMS, AND IT IS PUBLISHED
 FOR THE SAME REASON THE HEAD AND FOOT ARE: a caller that has to guess a
 component's own number is a caller that guesses it wrong.
-MEASURED 2026-09-21 on `/evo/`, whose whole panel is switched off. Its
+MEASURED 2026-09-21 on `/evo/`, whose whole panel was switched off THEN and
+is fully live SINCE 2026-09-25 (*"make all buttons interactive"*), so read
+this as a dated measurement rather than a description of that page today.
+The contrast ratios below are the finding and they still stand. Its
 function button names are wider than the buttons, so the page draws them
 itself rather than using the pad's own label slots, and it had no number to
 match: they rendered at FULL strength, 5.91:1 against the card, over
@@ -1076,12 +1079,19 @@ every one of them is a picture of a control that is bound to nothing.**
 ⚠️ **CHECKED BEFORE SWEEPING, because a rule on `:disabled` reaches every page
 and one of them might have had a control that really was refusing a press.
 MEASURED 2026-09-21, all four pages that disable a pad, knob or fader:
-`/evo/` is a replica whose whole panel is switched off (20 pads of 20, 8
+`/evo/` was a replica whose whole panel was switched off (20 pads of 20, 8
 knobs of 8, 2 faders of 2), `/circuit/`'s master volume is *"a pot. Whether
 it sends anything has not been measured"*, `/twelve/`'s SUB and MAIN are the
 analogue outputs with *"nothing on MIDI"*, and `/kit/`'s are specimens of
 this state. Not one is a refusal, so this is a change rather than an
-option. If a control ever genuinely does refuse a press, it needs its own
+option.
+🔴 **AND `/evo/` LEFT THAT LIST ON 2026-09-25**, on *"make all buttons
+interactive"*: **14 pads, 8 rotaries and 2 wheels, 0 switched off**, and the pad
+count in the line above was wrong as well, because the six function buttons went
+on 2026-09-23. **The rule is unchanged and `/circuit/`, `/twelve/` and `/kit/`
+still give it subjects.** What is gone is its exemplar, and a rule whose only
+named example has stopped being an example is how a reader concludes the rule
+itself lapsed. If a control ever genuinely does refuse a press, it needs its own
 class and its own cursor rather than this one back.**
 ⚠️ **`default`, NOT `auto`. Over a `<button>` the initial value already
 resolves to the arrow, but `auto` on text-bearing furniture resolves to the

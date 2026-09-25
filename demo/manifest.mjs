@@ -27,9 +27,14 @@
 //           a fixed one is a shared mutable global in the WebSocket layer —
 //           two runs of the suite land in the same room and watch each other's
 //           traffic. These four are different: `studio-1` is the ADDRESS OF
-//           THE RASPBERRY PI, `m1-1` is the studio Mac's agent, and `wire`'s
-//           whole subject is the history its room already holds. Renaming
-//           those does not isolate a run, it points it at nothing.
+//           THE RASPBERRY PI, which `mirror`, `grains` and `knobs` all name,
+//           and `wire`'s whole subject is the history its room already holds.
+//           Renaming those does not isolate a run, it points it at nothing.
+//           ⚠️ AND `m1-1`, THE STUDIO MAC'S AGENT, IS NAMED BY NO ROW HERE
+//           SINCE 2026-09-25, because `able` was the only page that addressed
+//           it and it is archived. `demo/verify.mjs` and `rig/m1/` both still
+//           explain that name, and the rule about a fixed room being an
+//           address rather than a rendezvous is unchanged.
 //           ⚠️ It does not make them safe to run in parallel either — there is
 //           one Pi with one JACK graph. A room was never that constraint.
 //
@@ -70,7 +75,7 @@ export const DEMOS = [
     one: 'an audio lane and a data lane on one transport',
     tags: ['timeline', 'WebAudio'] },
   { name: 'loops', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one recording placed three times: a slice, the same slice faster, and a loop',
+    one: 'one recording placed three times, the last of them looping in whichever direction the button shows',
     tags: ['timeline'] },
   { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'a score round-trips byte-identically and refuses mutation',
@@ -491,35 +496,35 @@ export const DEMOS = [
    * *"Can we have a demo called Wish? Where I can input voice uh, commands and
    * you are translating them to a batch pay via the models from Cloudflare,
    * maybe even try out different models."*
-   * 🔴 **IT PROPOSES AND NEVER CONNECTS, AND THAT IS A MEASUREMENT RATHER THAN
-   * CAUTION.** Run against the real models on the day it was built: asked to put
-   * the mod wheel on the master filter, the 70B returned a perfectly valid patch
-   * pointed at the WRONG INSTRUMENT. No validator can catch that. A person
-   * reading one line can.
+   * 🔴 **IT PROPOSES AND A PERSON CONNECTS, AND THE SECOND HALF IS A
+   * MEASUREMENT RATHER THAN CAUTION.** Run against the real models on the day it
+   * was built: asked to put the mod wheel on the master filter, the 70B returned
+   * a perfectly valid patch pointed at the WRONG INSTRUMENT. No validator can
+   * catch that. A person reading one line can.
+   * 🔴 **AND THIS LINE READ `IT PROPOSES AND NEVER CONNECTS` UNTIL
+   * 2026-09-25**, when the rows were made live on the ask *"when connections
+   * (diagram rows) are there, enable them"*. **The proposing half is unchanged
+   * and so is the reason for it**: a switch appears only on an ALLOWED row,
+   * nothing crosses until somebody presses it, and `requestMIDIAccess` is behind
+   * that press and is never reached under `?selfcheck=1`. What changed is that
+   * the press now exists.
    * ⚠️ IT NEEDS `node demo/wish-local.mjs` RUNNING, because a browser cannot
    * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
    * the harness.
    */
   { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
-    one: 'say which instrument should play which, and a language model proposes the connection',
+    one: 'say which instrument should play which, and a language model proposes a connection you can switch on',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
 
-  /**
-   * 🔴 THE PATCH BAY, AND IT IS THE FIRST PAGE HERE THAT SENDS TO AN
-   * INSTRUMENT. Asked 2026-09-21: *"Can you do patchbay deno called bay"*,
-   * straight after `plans/plan-patchbay.md`. The three panels before it all
-   * listen; this one routes one instrument into another and can therefore do
-   * damage, which is why the model carries an `accepts` list per port and why
-   * there is no code on the page that turns a SysEx, a program change or a
-   * clock byte into bytes.
-   * ⚠️ THE MODEL AND THE VALIDATOR ARE NOT IN THE PAGE. `demo/shell/bay.mjs` is
-   * pure and `node demo/shell/bay-test.mjs` grades it at 30 asserts with no
-   * browser, most of them negative controls, because a validator passes a naive
-   * suite by returning yes to everything.
-   */
-  { name: 'bay', group: 'instruments', act: 4, created: '2026-09-21', built: true,
-    one: 'route one instrument to another, with the connections it refuses explained in words',
-    tags: ['WebMIDI', 'CoreMIDI'] },
+  // `bay` was a demo and is archived at archive/demos/bay-index.html, removed
+  // 2026-09-25 on instruction. It was the first page here that SENT to an
+  // instrument rather than listening, and the one line worth keeping is why it
+  // could: the Circuit's input refuses SysEx, because that device has no
+  // factory reset and one byte inside a SysEx message overwrites a patch.
+  // 🔴 THE MODEL AND THE VALIDATOR WERE NEVER IN THE PAGE AND DID NOT GO WITH
+  // IT. `demo/shell/bay.mjs` is pure, `node demo/shell/bay-test.mjs` grades it
+  // in no browser at all, and `/wish/` and `workers/wish/src/wish.mjs` both
+  // import it. The page is archived; what it demonstrated is in service.
 
   /**
    * 🔴 THE FIRST EDITOR, AND THE ANSWER TO *"can it play back real time on
@@ -598,7 +603,7 @@ export const DEMOS = [
    */
 
   { name: 'evo', group: 'instruments', act: 4, created: '2026-09-21', built: true,
-    one: 'an Evolution MK-425C on screen, moving when the real one moves',
+    one: 'an Evolution MK-425C you can work on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
   /**
@@ -671,9 +676,18 @@ export const DEMOS = [
        + 'a moment after you stop typing',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
 
-  { name: 'able', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
-    one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
-    tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
+  // `able` was a demo and is archived at archive/demos/able-index.html, removed
+  // 2026-09-25 on instruction. It played Ableton Live on a studio Mac from a
+  // browser with no virtual audio cable, and it held the slug `rack` gave up on
+  // 2026-09-20, so archive/demos/ now has two files that were both `/able/`:
+  // rack-index.html is the page BEFORE this one.
+  // 🔴 THE AGENT ON THAT MAC IS NOT ARCHIVED AND NOTHING HERE TOUCHED IT.
+  // `room: 'fixed'` meant `m1-1` is the ADDRESS of the studio Mac's agent
+  // rather than a rendezvous the page invented, and rig/m1/ still holds
+  // live-agent.mjs, pace-agent.mjs and the README that runs them. What left is
+  // the page, so there is no longer a positron URL that drives that agent and
+  // rig/m1/README.md still prints one.
+
 
   // 🔴 THE GRANULATOR, ON ITS OWN PAGE, and the split is the point. It used to
   // be an INSERT on /keys/ wrapping the instruments — and a grain cloud has no
@@ -745,16 +759,27 @@ export const DEMOS = [
   // rather than quietly dropping the row, which is the whole reason that check
   // exists: an ungrouped demo still renders a complete-looking front page and
   // the only way to notice is to count. Caught by the build on the first run.
-  // ⚠️ `settleMs` SIZES THE WAIT FOR THIS PAGE'S FIRST ASSERT, not a control-0
-  // press: it has no controls row on purpose. Its checks drive the whole live
-  // pipeline (publish, record, stop, store, play back, seek) and hold every
-  // assert until that is done, because `verify.mjs` stops collecting the moment
-  // the count is unchanged for one 400 ms tick. 25 s measured against a drill
-  // that takes about twelve.
+  // 🔴 `settleMs` DOES LAND ON A CONTROL HERE, AND THIS COMMENT SAID IT COULD
+  // NOT. It read *"not a control-0 press: it has no controls row on purpose"*,
+  // which is true of `.pos-controls` and false of the selector the harness
+  // actually uses: `.pos-controls button, .tbar-x`, and this page's two
+  // transport buttons are `.tbar-x` on the control room's bar. So control 0 is
+  // START HLS, and these 75 s are slept by `demo/verify.mjs` between that press
+  // and START WEBRTC, before it collects anything.
+  // ⚠️ WHICH IS THE BUDGET THE PAGE'S OWN DRILL RUNS INSIDE. It drives the whole
+  // live pipeline (subscribe, record, stop, store, play back, seek) off the HLS
+  // leg, and a cold container wake was probed at about 22 s, so the wait is for
+  // Cloudflare rather than for this page. Every assert is reported where it is
+  // made now, so a drill that overruns costs the asserts after the cut and no
+  // longer costs the ones before it.
   { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000,
-    one: 'two presses, one for the picture and one for the show, put a church scene from '
-      + 'a 2011 MIMproject performance in front of an audience, ask them something, and '
-      + 'keep every answer on the recording\u2019s own timeline',
+    // ⚠️ THE SAME STRING AS THE PAGE'S `what`, AND IT SAID SOMETHING ELSE UNTIL
+    // 2026-09-25: *"two presses, one for the picture and one for the show"*.
+    // The film lost its own play button on 2026-09-25 and starts with the show
+    // now, so there is one press, and what the two buttons decide is which
+    // transport carries it.
+    one: 'pick how the show reaches its audience, over WebRTC or over low latency HLS, '
+      + 'ask them something, and keep every answer on the recording\u2019s own timeline',
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
@@ -806,8 +831,12 @@ export const DEMOS = [
     one: 'two of Emilie Gillet’s firmwares, an oscillator and an effect, compiled from their own C++ to WebAssembly and chained in one audio graph',
     /* ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so a browser with no MIDI
        keeps this row linked and the page says why rather than the row vanishing,
-       which would read as the demo not existing. The page plays perfectly from
-       its own knobs without a keyboard. */
+       which would read as the demo not existing. The page plays from its own
+       Test tone button and knobs without a keyboard.
+       ⚠️ IT READ *"plays perfectly from its own knobs"* UNTIL 2026-09-25,
+       when the automatic drone went on the ask *"no automatic drone"*. A knob
+       alone makes no sound now, because a knob shapes a voice and nothing was
+       asking for one. */
     tags: ['WebAssembly', 'AudioWorklet', 'WebAudio', 'WebMIDI'] },
 
   /**
@@ -943,6 +972,10 @@ export const DEMOS = [
   // silence baseline, 61.9 dB of separation, and its checkup found the output
   // clipping at full scale when nothing else had. rig/m1/ and plans/plan-rack.md hold
   // the rest.
+  // ⚠️ AND THE PAGE THAT TOOK THAT SLUG IS ALSO ARCHIVED, SINCE 2026-09-25.
+  // Reading this note on its own would put a reader on `/able/`, which is a
+  // 404. Both files are in archive/demos/: rack-index.html is the checkup
+  // described above and able-index.html is the player that replaced it.
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */
@@ -1246,7 +1279,9 @@ export function byGroup(list = DEMOS) {
  * 🔴 IT COUNTS WHAT `byGroup()` IS ABOUT TO DRAW, NOT `DEMOS.length`. The
  * question the title answers is how many experiments are ON THIS PAGE, and the
  * two numbers are different: `byGroup` drops an `unlisted` row and refuses one
- * with no group, so today it is 58 rows against 59 in the array. Deriving it
+ * with no group, so it runs short of the array. MEASURED 2026-09-25, after
+ * `bay` and `able` were archived: **56 drawn against 57 in the array**, one
+ * apart, where the same pair read 58 against 59 the day before. Deriving it
  * from the array would put a number on the page that disagrees with the cards
  * under it, and that is the disagreement nobody checks.
  * ⚠️ AND IT IS NEVER TYPED. CLAUDE.md opens with COUNT THE DEMOS, NEVER

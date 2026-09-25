@@ -2,8 +2,8 @@
 //
 // 🔴 THIS IS A COMPOSITION, NOT A LAYOUT ENGINE, AND THAT IS THE WHOLE POINT.
 // `createPanelLayout` already owns the case, the fixed column and the one
-// scrolling strip; `createNameplate` already owns the plate and its three
-// placements. What did not exist was the sentence that joins them, and five
+// scrolling strip; `createNameplate` already owns the plate and its four
+// placements (three horizontal, and `side` since 2026-09-25). What did not exist was the sentence that joins them, and five
 // pages had each written it themselves:
 //
 //   /tom/      createNameplate({ lines: ['POSITRON', 'TOM'], place: 'ends' })
@@ -90,9 +90,18 @@ export const HEADER_STATES = ['online', 'offline'];
  * reason `end` exists, so choosing it here rather than leaving it to a caller
  * is this function agreeing with that file.
  */
+/* 🔴 AND `side` SURVIVES A SINGLE LINE, WHICH THE RULE ABOVE WOULD OTHERWISE
+   HAVE THROWN AWAY. The downgrade exists because `ends` is `space-between` and
+   parks a lone child on the left, which is a horizontal argument about a
+   horizontal placement. A plate glued down the edge of the case has no such
+   problem: one line is the ordinary case for it, and `/shape/` is exactly that,
+   `shape` with no maker. Sending it to `end` would put the one page that asked
+   for a vertical plate back on a horizontal one, silently. */
+const KEEPS_ONE_LINE = new Set(['side']);
+
 export function plateSpec(maker, name, place = 'ends') {
   const lines = maker ? [maker, name] : [name];
-  return { lines, place: lines.length === 1 ? 'end' : place };
+  return { lines, place: lines.length === 1 && !KEEPS_ONE_LINE.has(place) ? 'end' : place };
 }
 
 /**
@@ -207,6 +216,15 @@ export function createInstrument(o = {}) {
     name, maker = MAKER, host, place = 'ends', panel: panelOpts = {},
     header = false,
     parts = null,
+    /**
+     * 🔴 `caps: false` KEEPS THE NAME AS TYPED, ASKED FOR ON `/shape/`
+     * 2026-09-25 AS A LOWER CASE `shape`. `panel-layout.mjs` carries the whole
+     * argument beside the option: the uppercase rule is about a shelf of
+     * REPLICAS reading as one shelf, and this page is a replica of nothing. It
+     * is a DEPARTURE from every plate in the project today and it is written
+     * down as one rather than slipped in.
+     */
+    caps = true,
   } = o;
   /**
    * 🔴 REFUSED WITHOUT A NAME, FOR THE REASON `knob.mjs` REFUSES WITHOUT A
@@ -223,7 +241,7 @@ export function createInstrument(o = {}) {
 
   /* The lines and the placement are decided by `plateSpec`, which is pure and
      is graded without a browser. */
-  const spec = plateSpec(maker, name, place);
+  const spec = { ...plateSpec(maker, name, place), caps };
   /* 🔴 THE HEADER OWNS THE PLATE WHEN THERE IS ONE, AND THE PANEL OWNS IT WHEN
      THERE IS NOT. Two plates would be two names on one case, and handing the
      panel a plate it then places in the top inset while the header holds

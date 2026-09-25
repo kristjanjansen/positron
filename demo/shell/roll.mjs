@@ -79,6 +79,23 @@ export function createRoll(host, { base = 60, keys = [], map = {}, sharps = new 
    * acting on it. Asking would have cost one line.
    * ✅ AND THE ROLLBACK SWITCH STAYS, because it is what made the round trip
    * cost one attribute both ways. `lines: false` turns them off.
+   *
+   * 🔴 FIFTH, 2026-09-25, AND THIS ONE CARRIES ITS VERB: *"rm gap in piano roll
+   * vert lines"*, with a screenshot of `/nola/`. So the lines stay, the gap
+   * goes, and the switch above stays. Nothing in this file changed.
+   * 🔴 AND THE REASON FOUR REPORTS COULD EACH LOOK LIKE THE LAST ONE COMING
+   * BACK IS THAT THE GAP WAS NEVER WHERE ANY OF THEM SAID. MEASURED at 1280 px
+   * before anything was touched, cell bottom to the next cell's top all the way
+   * down: **6.5, 0, 0, 0, 0, 0, 0**. One gap, under the FIRST row, and every
+   * other join already exact. `shell.css` carries the cause and the repair: the
+   * first row is half a row taller so the top dot is not crowded against the
+   * box, the room was meant to go inside the first CELL, and the lane it sits
+   * in kept a flat 26 px height, so `height: 100%` resolved against the lane
+   * rather than the row and the rules stopped 6.5 px short at each end.
+   * ⚠️ WHICH IS THIS PROJECT'S OWN RULE ARRIVING AGAIN, one component along:
+   * *"the reported thing is not necessarily the thing to change, and the cause
+   * is usually one layer under it"*. Four sessions read a stylesheet and
+   * argued; one pair of rects ended it.
    */
   if (lines) el.dataset.lines = '1';
 

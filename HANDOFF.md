@@ -84,10 +84,18 @@ of the check block and it is the single highest-value thing left.
 
 - ⚠️ **A STALE QUESTION APPEARS ON LOAD**, `KAS SA OLED TEINUD ÖKOPATTU?`, on a
   page that is `OFF AIR`. Reported with a screenshot and NOT diagnosed. The room
-  is a FIXED name, `stage-demo`, so every harness run and every probe this
-  session joined the same room a visitor joins. **`demo/verify.mjs` gives every
-  other page its own room per run and this page's default is shared with the
-  public.** That is the first place to look.
+  default at `demo/stage/index.html:67` is a FIXED name, `stage-demo`, so every
+  manual probe and every headful open this session joined the room a visitor
+  joins.
+  🔴 **AND THE HALF OF THIS LINE THAT BLAMED THE HARNESS WAS WRONG,
+  CHECKED 2026-09-25.** It read *"`demo/verify.mjs` gives every other page its
+  own room per run and this page's default is shared with the public"*, which
+  would have sent the next reader to the harness. `demo/verify.mjs:648` reads
+  `const own = t.room === 'fixed' ? '' : ...`, and `stage` is NOT `room:
+  'fixed'` in `demo/manifest.mjs`, **so the suite already gets
+  `stage-test-<hash>` and has never touched `stage-demo`.** The probes did.
+  A question belongs to a show, and an off-air page has no show, which is where
+  to look.
 - ⚠️ **The side borders on the active tab**, asked about with a crop of
   `CONTROLROOM` showing a vertical rule each side. Not looked at.
 - ⚠️ The film still starts with the show, which was a reversal forced by removing

@@ -199,6 +199,56 @@
      no viewport override, so the asserts on this page grade the 16 px pitch
      only. The 390 px reading above was taken by hand. */
   @media (max-width: 560px) { .muta-panel { --ctl-gap: 8px; } }
+
+  /* 🔴 THE `Test tone` BUTTON SITS IN PLAITS' HEADER, TO THE RIGHT OF THE
+     SWITCH THAT POWERS IT. Asked 2026-09-25: *"make a Test tone button in the
+     right of plaits"*. `.panel-head` is a three column grid, `minmax(0,1fr)
+     auto minmax(0,1fr)`, with the switch pinned to column 1 and the model
+     picker to column 3, and `head` is returned by `instrument.mjs` so a page
+     can put a child in it and place it by column, which is how that component
+     places its own three.
+     🔴 **AND THE FIRST PLACEMENT WAS THE FREE-LOOKING MIDDLE CELL, WHICH WAS
+     WRONG, AND ONLY THE RECTS SAID SO.** Both headers here are built
+     `plate: false`, so column 2 is empty and a button in it looked like the
+     obvious answer. MEASURED at eight widths: **the model picker OVERFLOWS its
+     own track at every one of them**, 315.5 px of content in a 266.8 px track
+     even at 1280, because `.panel-head-mid` carries `min-width: 0` and
+     `justify-self: end`, so it is laid out from its right edge and spills LEFT
+     across the empty plate cell. A button in column 2 was overlapped by 34.7 px
+     at 1280 and by 114.2 px at 561. The cell is not free, it is occupied by
+     something that has no box there.
+     ✅ **COLUMN 1 REALLY IS FREE, AND THE MEASUREMENT IS WHY THIS IS HERE.**
+     The picker's left edge is 397.5 px at 756 and column 1 ends at 309.8, so
+     the spill never reaches it. `justify-self: end` puts the button at the far
+     side of the switch's own track: 43 to 165.2 px for the switch, 201.4 to
+     309.8 for the button, a 36 px gap between them.
+     ⚠️ AND THE PLACEMENT IS PAGE SCOPED RATHER THAN A COMPONENT RULE, because
+     it is a claim about a header whose plate cell happens to be free and whose
+     column 1 happens to have room. A component rule would have to know both. */
+  .muta-tone { grid-column: 1; grid-row: 1; justify-self: end; }
+  /* 🔴 AND IT TAKES A ROW OF ITS OWN BELOW 700 px, WHERE COLUMN 1 STOPS HAVING
+     ROOM. MEASURED: the switch is 122.2 px wide at every width and column 1 is
+     half of what is left after the picker's track, so the gap between them is
+     144.6 px at 756, 114.6 at 660 against a 108.4 px button, and 94.6 at 620,
+     which is an overlap of 14 px. 700 is chosen above the width where it
+     breaks rather than at it.
+     ⚠️ NOTHING IN THE SUITE CAN SEE THIS. `demo/verify.mjs` runs at 756 px with
+     no viewport override, so the assert on this page grades the row above and
+     these two were read at eight widths by hand. */
+  @media (max-width: 700px) {
+    .muta-tone { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+  }
+  /* ⚠️ AND THE PHONE PUTS IT BACK INTO THE AUTO FLOW, WHICH IS THE HALF A
+     PAGE-SCOPED GRID PLACEMENT ALWAYS FORGETS. `shell.css`'s own phone rule
+     names `.panel-head-on`, `.panel-head-mid` and `.panel-head-plate` and
+     resets all three to `grid-column: 1; grid-row: auto`; it cannot name a
+     class this page invented, and an explicit `grid-row: 2` left standing
+     would land on top of whatever auto placement puts there. Last in the file,
+     because a media query adds no specificity and the narrower of two has to
+     win on source order. */
+  @media (max-width: 560px) {
+    .muta-tone { grid-column: 1; grid-row: auto; justify-self: stretch; width: 100%; }
+  }
 </style>
 
 <script type="module">
@@ -244,7 +294,6 @@
      ⚠️ AND THE MOVE FOUND A BUG THAT WAS LIVE HERE: a second note off for a
      note the foot was holding released it, and the lift released it again. */
   import { createPedal, PEDAL_SAYS } from '/shell/pedal.mjs';
-  import { createPresenceButton } from '/shell/presence.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createInstrument } from '/shell/instrument.mjs';
 
@@ -384,18 +433,26 @@
      * 🔴 NO CONTROL ROW AT ALL SINCE 2026-09-22: *"rm all top buttons,
      * automatically go for drone"*. It held Pluck, Chord, Next model, Drone and
      * Vocoder.
-     * ✅ **THE PAGE PLAYS ITSELF NOW.** Turning an instrument on starts a
-     * drone, so the first thing a visitor does produces a continuous sound they
-     * can then take a knob to, which is what every knob on this panel is FOR.
-     * A page whose controls are all rotaries and whose sound needs a button
-     * press was asking to be played in two vocabularies.
-     * 🔴 **AND IT COSTS THE HARNESS NOTHING, WHICH WAS CHECKED RATHER THAN
-     * ASSUMED.** `demo/verify.mjs` drives a page by pressing everything in
-     * `.pos-controls`, so a page with none is a page it cannot press. Every
-     * assert here already runs inside `d.run('check')`, which boots, plays and
-     * measures on its own, and the one control the harness could not reach was
-     * already being pressed by the page behind `SELFCHECK`. MEASURED across the
-     * change: 36/36 before and after.
+     * 🔴 **AND THE HALF OF THAT ASK THAT SAID `automatically go for drone` WAS
+     * REVERSED 2026-09-25: *"no automatic drone. make a Test tone button in the
+     * right of plaits"*.** The paragraph that used to stand here defended the
+     * automatic drone at length, in these words: *"THE PAGE PLAYS ITSELF NOW"*,
+     * and *"the first thing a visitor does produces a continuous sound they can
+     * then take a knob to, which is what every knob on this panel is FOR"*.
+     * That is the argument the owner overruled, and it is written down rather
+     * than deleted because the next reader will ask why a page of rotaries has
+     * a button on it.
+     * 🔴 **THE ROW ITSELF STAYS EMPTY, AND THAT IS A DECISION.** `Test tone`
+     * belongs to PLAITS and sits on PLAITS' own header, beside the switch that
+     * powers it, where the ask put it. Putting it here instead would have made
+     * it control 0, which is the ONE control `settleMs` lands on, and this page
+     * has already paid for moving control 0 once.
+     * 🔴 **SO THE HARNESS STILL PRESSES NOTHING AND THE PAGE STILL PRESSES ITS
+     * OWN BUTTONS.** `demo/verify.mjs` drives a page by clicking everything in
+     * `.pos-controls`; this page has none, so every press it takes is one the
+     * page makes for it behind `SELFCHECK`, which is already how both
+     * instruments are switched on. The tone button joins that list rather than
+     * changing the arrangement.
      * ⚠️ `.pos-controls[hidden]` EXISTS FOR EXACTLY THIS, because an empty
      * control row left a 14 px band, which is the empty-box rule.
      */
@@ -917,26 +974,26 @@
   warpInst.add(warpKnobs);
 
   /**
-   * 🔴 A KEYBOARD PLAYS THE OSCILLATOR, BEHIND ITS OWN SWITCH. Asked
-   * 2026-09-22: *"add webmidi support (online button midi off)"*, then *"add a
-   * button (online status one) to turn midi on and off. when on, listem webmidi
-   * keyboard"*, and placed by *"its above first synth, a separate button"*.
-   * 🔴 **IT IS A SEPARATE CONTROL AND NOT A THIRD STATE ON THE HEADER.**
-   * `instrument.mjs` holds `HEADER_STATES` at two on purpose and says why: a
-   * header is not asking to be a five state presence badge. Whether a keyboard
-   * is being listened to is a different fact from whether an instrument is
-   * running, and two facts want two controls.
-   * ⚠️ **NOTHING IS OPENED UNTIL IT IS PRESSED.** `requestMIDIAccess` is a
-   * permission prompt and a page that asked on load would be asking every
-   * visitor for a device most of them do not have. Off is the state it opens
-   * in, on every visit and forever.
-   * 🔴 **AND LISTENING STOPS THE DRONE, BECAUSE THE DRONE OWNS THE VOICES.**
-   * `plai_set_drone(1)` clears `trigger_patched` on everything sounding, which
-   * is the gate being taken out of the circuit, so a key pressed into a droning
-   * instrument is a second triggered voice layered on top of a note that never
-   * ends. Reported as *"when midi is on, stop drone"*. Switching MIDI off puts
-   * it back, because a silent instrument with its lamp lit is the shape of
-   * control this page calls a lie.
+   * 🔴 A KEYBOARD PLAYS THE OSCILLATOR, AND THE PAGE IS SIMPLY LISTENING.
+   * Asked 2026-09-25: *"rm midi on button. its should be listening. set up midi
+   * listening / permission when i turn either on at start"*.
+   * 🔴 **THIS REVERSES TWO EARLIER ASKS AND THIS COMMENT USED TO ARGUE FOR
+   * THEM.** It recorded *"add webmidi support (online button midi off)"* and
+   * *"add a button (online status one) to turn midi on and off. when on, listem
+   * webmidi keyboard"* from 2026-09-22, and defended a separate switch on the
+   * grounds that whether a keyboard is being listened to is a different fact
+   * from whether an instrument is running. That reasoning is unchanged and the
+   * decision went the other way: a keyboard nobody is listening to is one more
+   * thing to switch on before anything happens, and the page now listens for as
+   * long as an instrument is on.
+   * ⚠️ **A VISIT STILL OPENS NOTHING, AND THAT IS THE LINE HELD HERE.**
+   * `requestMIDIAccess` is a permission prompt, so it is asked from the press
+   * that turns an instrument on and never from the page loading. Turning an
+   * instrument on is a gesture somebody made; a visit is not, and nothing on
+   * the load path reaches this.
+   * ⚠️ **AND IT IS ASKED ONCE.** `ensureMidi` is idempotent, so turning both
+   * instruments on, or turning one off and on again, is one prompt and not
+   * four. The check block reads the count rather than trusting the flag.
    * ⚠️ **A KEY USED TO PLUCK, AND THE CAUSE WAS IN THE FIRMWARE SHIM RATHER
    * THAN ON THIS PAGE.** `plai_note_on(note, hold)` takes a hold in BLOCKS,
    * decided at the moment the key goes down, so the length of a note had to be
@@ -944,27 +1001,21 @@
    * added to `plai_shim.cc` on 2026-09-22 and the wasm rebuilt; a key now holds
    * the gate up for as long as it is down.
    */
-  /**
-   * 🔴 `keysWanted` IS SET BEFORE ANYTHING IS OPENED, AND THAT ORDER IS THE
-   * WHOLE POINT. `startDrone` reads it, and `togglePlaits` calls `startDrone`,
-   * so switching MIDI on while the oscillator is off would otherwise start a
-   * drone and then stop it a line later. Reported as *"i still hear drone wien
-   * midi on"*.
-   * ⚠️ AND IT IS A SEPARATE FLAG FROM `midi` BECAUSE `midi` IS ASSIGNED LAST.
-   * `createMidi` returns after the access has been asked for, which is several
-   * awaits past the moment the decision was made.
-   */
   let midi = null;
+  /* HOW MANY TIMES THE BROWSER WAS ASKED, AND WHEN. `midiAsks` counts the
+     prompt rather than the flag, because a flag says what this page believes
+     and the count says what a visitor was asked for. `midiAsksOnLoad` is that
+     count read at the last line of the module, which is the whole of the visit,
+     and it is the negative half of the assert below: it has to be zero. */
+  let midiAsks = 0, midiAsksOnLoad = -1;
   /**
-   * 🔴 WHO ASKED FOR THE DRONE, WHICH IS A DIFFERENT QUESTION FROM WHETHER ONE
-   * IS RUNNING. `droning` is the state; this is the intent, and only an
-   * explicit press moves it. Turning PLAITS on sets it, switching the keyboard
-   * on clears it, and `toggleWarps` reads it rather than starting a drone of
-   * its own.
-   * ⚠️ IT REPLACED A FLAG CALLED `keysWanted` THAT REFUSED THE DRONE WHENEVER A
-   * KEYBOARD WAS LISTENING. That was one press too broad: it also refused
-   * *"plaits on should not turn midi on and should start drone"*, where the
-   * press is the player asking for a drone in so many words.
+   * 🔴 WHO ASKED FOR THE TEST TONE, WHICH IS A DIFFERENT QUESTION FROM WHETHER
+   * ONE IS RUNNING. `droning` is the state; this is the intent, and only an
+   * explicit press moves it.
+   * 🔴 **AND NOTHING BUT THE `Test tone` BUTTON SETS IT SINCE 2026-09-25.**
+   * Turning PLAITS on used to, which is the *"rm all top buttons, automatically
+   * go for drone"* arrangement of 2026-09-22, reversed by *"no automatic drone.
+   * make a Test tone button in the right of plaits"*.
    */
   let droneWanted = false;
   /* WHAT IS UNDER A FINGER, AND WHAT IS ONLY UNDER THE PEDAL. `pedal.mjs` owns
@@ -984,16 +1035,33 @@
     onPedal: (down, value, freed) => d.log(down ? PEDAL_SAYS.down
       : freed ? PEDAL_SAYS.freed(freed) : PEDAL_SAYS.up),
   });
-  const midiBtn = createPresenceButton({
-    of: 'MIDI',
-    can: ['online', 'offline'],
-    says: { online: 'on', offline: 'off' },
-    state: 'offline',
-    aria: 'listen to a MIDI keyboard, or stop listening',
-    press: () => toggleMidi(),
-  });
-  const midiRow = el('div', 'muta-midi');
-  midiRow.append(midiBtn.el);
+  /**
+   * 🔴 THE `Test tone` BUTTON, WHICH IS WHAT IS LEFT OF THE AUTOMATIC DRONE.
+   * Asked 2026-09-25: *"no automatic drone. make a Test tone button in the
+   * right of plaits. when midi notes arrive, they turn off test tone and vice
+   * versa"*.
+   * ⚠️ **IT IS A PLAIN `<button>` WITH `aria-pressed` RATHER THAN A KIT
+   * COMPONENT, AND THAT IS THE KIT'S OWN ANSWER.** `check.mjs` records why a
+   * checkbox is a checkbox: *pressed* is the wrong verb for *this one is in the
+   * set*. Here the verb is right. This is a thing somebody armed, which is the
+   * shape `choice.mjs` gives its segments, and one segment is not a segmented
+   * row. A presence button was tried and refused: it reports a state and this
+   * reports what a press did.
+   * 🔴 **AND IT IS LIVE ONLY WHILE PLAITS IS.** A test tone out of an
+   * oscillator that is switched off is the question this page was asked on
+   * 2026-09-25 and the answer is that it cannot sound, so the control says so
+   * rather than accepting a press and doing nothing. `light()` owns the state,
+   * beside the two lamps, because three things saying whether PLAITS is on is
+   * one fact with three writers.
+   */
+  const toneBtn = el('button', 'muta-tone', 'Test tone',
+    { 'aria-pressed': 'false', disabled: '' });
+  toneBtn.addEventListener('click', () => toggleTone());
+  /* ⚠️ THE HEADER IS A GRID AND THIS IS PLACED BY COLUMN, which is how
+     `instrument.mjs` places its own three children and is why `head` is
+     returned at all. The middle cell is free on this page because both headers
+     are built `plate: false`, so nothing is displaced. */
+  inst.head.append(toneBtn);
 
   let midiNotes = 0, midiUps = 0;
   /**
@@ -1004,23 +1072,24 @@
    * callback is the only part of that path a check can ever reach.
    */
   /**
-   * 🔴 A KEY STEERS THE DRONE WHEN ONE IS RUNNING, AND PLAYS A NOTE WHEN
-   * ONE IS NOT. Asked for 2026-09-22 as *"why can i not use midi to control
-   * drone"* and *"midi keys"*, which is also the real answer to *"how can i
-   * get long sustaned notes, drony ones"*: a drone has no envelope on it at
-   * all, so it is the only thing here that sustains for ever.
-   * ⚠️ THE MECHANISM WAS ALREADY IN THE SHIM AND NOTHING REACHED IT.
-   * `plai_set_param` id 1 retunes every voice whose trigger is unpatched,
-   * which is exactly the droning ones, and it was written for the pitch
-   * knob. A key is the same instruction from a different control.
-   * ⚠️ AND IT MOVES THE KNOB. A control showing one pitch while the DSP
-   * holds another is the smallest version of a control that lies, and this
-   * page already refuses that about this very knob.
+   * 🔴 A KEY TAKES THE TEST TONE DOWN AND PLAYS ITS OWN NOTE. Asked
+   * 2026-09-25: *"when midi notes arrive, they turn off test tone and vice
+   * versa"*.
+   * 🔴 **AND THIS REVERSES WHAT IT DID, WHICH WAS ASKED FOR IN THE SAME
+   * WORDS.** Until today a key STEERED a running drone: *"why can i not use
+   * midi to control drone"*, 2026-09-22, retuning every unpatched voice through
+   * `plai_set_param` id 1 and moving the pitch rotary with it. That mechanism
+   * is still in the shim and is still what the pitch rotary uses. What changed
+   * is who may reach it: the two sounds are exclusive now, so a key ends the
+   * tone rather than bending it.
+   * ⚠️ **THE OTHER HALF IS IN `toggleTone`**, which takes every held key down
+   * before it starts. Exclusive both ways was the ask and one direction is not
+   * half of it.
    */
   function keyDown(note, vel) {
     midiNotes++;
+    if (droning) stopTone();
     pedal.keyDown(note);
-    if (droning) { knobs.get('pitch').set(note); send({ t: 'param', id: P.note, value: note }); return; }
     noteOn(note, 0, (vel || 100) / 127);
   }
   function keyUp(note) {
@@ -1045,79 +1114,80 @@
     pedal.control(cc, value);
   }
 
-  async function toggleMidi() {
-    if (midi) {
-      midi.close();
-      midi = null;
-      /* ⚠️ AND THE FOOT IS FORGOTTEN TOO. A pedal left down across a switch off
-         would hold the next session's first note for ever, and nothing on
-         screen would say why. */
-      pedal.panic();
-      send({ t: 'allOff' });
-      midiBtn.set('offline');
-      /* PUT THE DRONE BACK, INTENT AND ALL. An instrument whose lamp is lit
-         and which makes no sound reads as broken, and the drone is what this
-         page does when there is no keyboard on it. Setting the intent as well
-         as calling the function matters: `toggleWarps` reads the intent, so a
-         drone restored without it would vanish again the next time the effect
-         was switched. */
-      if (plaitsOn) { droneWanted = true; startDrone(); }
-      d.log('the keyboard is no longer listened to');
-      return;
-    }
-    /**
-     * 🔴 THE TWO SWITCHES DO NOT DRIVE EACH OTHER, IN EITHER DIRECTION. Asked
-     * for twice, 2026-09-22: *"plaits on should not turn midi on"* and then
-     * *"plaits should not turn on midi"*. Nothing here has ever reached the
-     * other way, and this line was the only coupling that existed: it turned
-     * the oscillator on for you, which also made `droneWanted` true a line
-     * before it was cleared, and left the page wanting a drone it had just
-     * stopped. The next press of anything brought that drone up UNDER the held
-     * keys, which is where the note that could not be stopped came from.
-     * ⚠️ SO A KEYBOARD SWITCHED ON WITH THE OSCILLATOR OFF IS SILENT, AND SAYS
-     * SO. This switch controls listening, which is a true thing to report on
-     * its own, and reaching into the instrument to make the lamp honest was the
-     * worse of the two.
-     */
-    droneWanted = false;
-    await ensureAudio();
-    stopDrone();
+  /**
+   * 🔴 OPEN THE KEYBOARD, ONCE, FROM THE PRESS THAT TURNS AN INSTRUMENT ON.
+   * Asked 2026-09-25: *"set up midi listening / permission when i turn either
+   * on at start"*. Both `togglePlaits` and `toggleWarps` call this, which is
+   * *either*, and it is idempotent, which is what makes calling it from two
+   * places safe.
+   * 🔴 **IT RUNS BEFORE `ensureAudio`, AND THE ORDER IS LOAD BEARING TWICE
+   * OVER.** A permission prompt has to be reachable from the gesture that
+   * caused it, and `ensureAudio` awaits `boot()`, which runs this page's whole
+   * check block as its last act: called after it, the count this page asserts
+   * on would still be zero while the assert read it. Neither reason is
+   * cosmetic and they point the same way.
+   * ⚠️ **`createMidi` IS SYNCHRONOUS AND ASKS ASYNCHRONOUSLY**, so `midi` is
+   * assigned on this line and `midi.state()` answers `refused`, `unsupported`
+   * or `connected` whenever the browser gets round to saying. Nothing here
+   * awaits it, because the audio must not wait on a device most visitors do not
+   * have.
+   * ⚠️ **AND THERE IS NO WAY TO STOP LISTENING, WHICH IS THE ASK.** The switch
+   * that used to do it is gone. `pedal.panic()` on an instrument going off is
+   * what keeps a foot from carrying a note across.
+   */
+  function ensureMidi() {
+    if (midi) return;
+    midiAsks++;
     midi = createMidi({
       onDown: keyDown,
       onUp: keyUp,
       onControl: keyControl,
       log: d.log,
-      /**
-       * 🔴 THE LAMP SAYS WHETHER THIS PAGE IS LISTENING, NOT WHETHER ANYTHING
-       * IS PLUGGED IN. It read the port count and so said `MIDI off` after a
-       * press that had just switched listening ON, which is the same label in
-       * both states and reads as a button that did nothing. Reported as
-       * *"midi off - same label on both states??"*.
-       * ⚠️ **HOW MANY INPUTS THERE ARE IS A DIFFERENT FACT AND IT GOES IN THE
-       * LOG**, where it can change without the switch appearing to flip itself.
-       * A keyboard plugged in later is a line, not a state change the reader
-       * did not ask for.
-       * ⚠️ IT IS THE SAME MISTAKE THE TWO INSTRUMENT LAMPS MADE THIS MORNING,
-       * where a wasm finishing its compile lit a switch nobody had pressed: a
-       * control reports what it CONTROLS.
-       */
+      /* ⚠️ HOW MANY INPUTS THERE ARE IS A LOG LINE AND NOT A STATE. A keyboard
+         plugged in later is news; it is not a control flipping itself. The
+         lamp this used to feed is gone with the switch it was on. */
       onPorts: (n) => {
         d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
                 : 'no MIDI input is plugged in yet, so nothing will arrive');
       },
     });
-    midiBtn.set('online');
-    if (!plaitsOn) {
-      d.log('PLAITS is off, so the keys have nothing to play yet: turn it on and it drones, '
-          + 'and the keys then set the drone’s pitch', 'hi');
-    }
     d.log('a key holds its note for as long as it is down, and the sustain pedal holds '
         + 'it after that');
-    d.log('for a note that never ends, turn PLAITS on again for its drone: the keys then '
-        + 'set the drone’s pitch instead of playing it, because a drone has no envelope');
   }
 
-  d.stack.add(midiRow, inst.el, warpInst.el);
+  /**
+   * 🔴 THE TEST TONE, WHICH IS THE DRONE WITH A BUTTON IN FRONT OF IT.
+   * `trigger_patched` cleared is the whole difference between a note and a
+   * tone in Plaits: with nothing patched into the trigger the lowpass gate is
+   * bypassed and the engine simply runs, so this is the one sound here that
+   * never ends and the one worth turning a rotary against.
+   * ⚠️ **IT TAKES THE KEYS DOWN FIRST, WHICH IS THE `vice versa` HALF OF THE
+   * ASK.** `startDrone` already forgets the pedal's bookkeeping; this is the
+   * sound, and without it a key still ringing would be swallowed by the tone
+   * and never release, which is the stuck note reported on 2026-09-22 as *"that
+   * pluck never goes away"*.
+   */
+  async function toggleTone() {
+    if (droning) { stopTone(); return; }
+    if (!plaitsOn) return;          // the control is disabled, so this is a guard
+    await ensureAudio();
+    send({ t: 'allOff' });
+    pedal.panic();
+    droneWanted = true;
+    startDrone();
+    toneBtn.setAttribute('aria-pressed', 'true');
+  }
+  /** The tone down, from wherever: the button, a key arriving, PLAITS going
+   *  off. One writer for the intent, the sound and the button's own state,
+   *  because three callers setting three things is how one of them gets
+   *  missed. */
+  function stopTone() {
+    stopDrone();
+    droneWanted = false;
+    toneBtn.setAttribute('aria-pressed', 'false');
+  }
+
+  d.stack.add(inst.el, warpInst.el);
 
   function send(m) { if (node) node.port.postMessage(m); }
   function sendWarp(m) { if (warpNode) warpNode.port.postMessage(m); }
@@ -1153,8 +1223,29 @@
     measureCost(model, voiceCount);
   }
 
-  /** One note, at the pitch the control is showing. `holdMs` of 0 sustains. */
-  function noteOn(note, holdMs, level) { send({ t: 'noteOn', note, holdMs, level }); }
+  /**
+   * One note, at the pitch the control is showing. `holdMs` of 0 sustains.
+   *
+   * 🔴 AND NOTHING IS PLAYED WHILE THE OSCILLATOR IS SWITCHED OFF, WHICH IS
+   * THE ANSWER TO *"when plaits is off and warps in on from plaits - how it can
+   * play at all?"*, 2026-09-25. MEASURED before this line existed, at every leg
+   * of the graph with an analyser hung off each one: switching PLAITS off with
+   * WARPS on and the carrier reading `from PLAITS` leaves the oscillator, the
+   * effect, both gains and the splitter at **0.000000**, in both orders of
+   * pressing. So the graph was already right about the SWITCHES and the
+   * question named a door nothing had shut: a note. Nothing could open that
+   * door until today, because the drone was the only source and going off
+   * stopped it. The keyboard is listened to from a power-up now and there is a
+   * `Test tone` button, so two things can ask a switched-off oscillator to
+   * sound, and neither may.
+   * ⚠️ IT IS HERE AND IN `startDrone`, WHICH ARE THE TWO DOORS INTO THE VOICE
+   * ALLOCATOR. A test on the keyboard alone would have left the button, and a
+   * test on the button alone would have left the keyboard.
+   */
+  function noteOn(note, holdMs, level) {
+    if (!plaitsOn) return;
+    send({ t: 'noteOn', note, holdMs, level });
+  }
   /** The same note, let go. `holdMs` of 0 on the way in is what makes this the
    *  thing that ends it rather than a timer decided at the key press. */
   function noteOff(note) { send({ t: 'noteOff', note }); }
@@ -1239,10 +1330,20 @@
     warpNode.onprocessorerror = () => d.log('the audio thread dropped the effect', 'bad');
     warpNode.port.onmessageerror = () => d.log('a message from the effect could not be read', 'bad');
 
-    // ⚠️ THE OSCILLATOR NEVER REACHES THE DESTINATION. Everything audible on
-    // this page has been through both firmwares, which is what makes the second
-    // one gradable at all: a page that mixed the dry oscillator in would sound
-    // fine with the effect doing nothing.
+    // 🔴 THIS COMMENT SAID `THE OSCILLATOR NEVER REACHES THE DESTINATION` AND
+    // WAS FALSE FOR AS LONG AS THE BYPASS BELOW HAS EXISTED. It argued that
+    // everything audible here has been through both firmwares, which is what
+    // makes the second one gradable, and that a page mixing the dry oscillator
+    // in would sound fine with the effect doing nothing. The bypass added on
+    // 2026-09-22 is exactly that dry path, and the sentence above it was never
+    // updated. MEASURED 2026-09-25 with an analyser on every leg: with WARPS
+    // switched off the splitter and the dry gain both carry the oscillator's
+    // channel 0 at **0.2468** straight to the destination, and with WARPS on
+    // they read **0.000000** while the wet gain carries **0.1240**.
+    // ⚠️ SO THE TRUE SENTENCE IS THAT EXACTLY ONE OF THE TWO ROADS IS OPEN AT
+    // A TIME, and which one is what the effect's switch means. The claim the
+    // old comment was protecting survives in the check block, where the chain
+    // is graded at the far end rather than at the oscillator.
     /**
      * 🔴 A BYPASS, SO THE EFFECT'S SWITCH CHANGES THE SOUND. Reported
      * 2026-09-22: *"sound does not change when i turn warps on and off"*, which
@@ -1454,6 +1555,13 @@
      * nothing: it waits 600 ms and reads what an untriggered voice puts out,
      * which is the number the loud one is only meaningful against.
      */
+    /* ⚠️ AND IT NEEDS PLAITS SWITCHED ON, WHICH IT ALWAYS HAS BEEN WHEN IT
+       RUNS. `noteOn` refuses while the oscillator is off since 2026-09-25, so
+       a pluck into a switched-off instrument measures silence. This block is
+       behind `SELFCHECK`, and under that flag the page presses PLAITS' own
+       switch as the last line of the module, so this is only ever reached from
+       that press. A guard here would be a branch nothing can take, which is
+       this project's most expensive kind of defect wearing a safety jacket. */
     await ifSelfcheck(async () => {
       const mid = meters;
       const wmid = warpMeters;
@@ -1903,6 +2011,11 @@
   const light = () => {
     inst.online?.set(plaitsOn ? 'online' : 'offline');
     warpInst.online?.set(warpsOn ? 'online' : 'offline');
+    /* ⚠️ THE TEST TONE IS PLAITS' OWN CONTROL AND IT IS ONLY LIVE WHILE PLAITS
+       IS. It is written here rather than at the three callers for the reason
+       `startDrone` already gives about itself: where several callers set a
+       thing, the thing has to own the rule or one caller is always missed. */
+    toneBtn.disabled = !plaitsOn;
   };
 
   async function togglePlaits() {
@@ -1915,8 +2028,12 @@
          sounding and, with the effect set to take it, went on being heard.
          Reported as *"if plaits is off and warps on when i am on 'from plaits'
          i should get no sound"*. */
-      stopDrone();
+      stopTone();
       send({ t: 'allOff' });
+      /* ⚠️ AND THE FOOT IS FORGOTTEN. A pedal left down across a switch off
+         would hold the next session's first note for ever, and nothing on
+         screen would say why. */
+      pedal.panic();
       /* ⚠️ THE EFFECT KEEPS PLAYING IF IT IS ON, on its own carrier, which is
          the state `carrier_shape` exists for. */
       light();
@@ -1934,6 +2051,10 @@
        fails puts it back. */
     plaitsOn = true;
     light();
+    /* 🔴 FROM THE PRESS, BEFORE THE AUDIO. See `ensureMidi`: a permission
+       prompt belongs to the gesture that caused it, and `ensureAudio` awaits a
+       boot that runs this page's whole check block. */
+    ensureMidi();
     try {
       await ensureAudio();
     } catch (e) {
@@ -1941,18 +2062,16 @@
       throw e;
     }
     setCarrier(0);
-    /* 🔴 IT DRONES FROM THE MOMENT IT IS ON. `trigger_patched` is the whole
-       difference between a note and a drone in Plaits: with nothing patched
-       into the trigger the lowpass gate is bypassed and the engine simply runs.
-       So the instrument behaves the way the module does on a rack with no gate
-       cable in it, which is also the state every knob on this panel is worth
-       turning in. */
-    /* 🔴 THE PRESS IS THE ASK. *"plaits on should not turn midi on and should
-       start drone"*, 2026-09-22: turning this instrument on is somebody saying
-       they want it to sound, and it sounds by droning. It does not touch the
-       keyboard switch in either direction. */
-    droneWanted = true;
-    startDrone();
+    /* 🔴 IT MAKES NO SOUND UNTIL SOMETHING ASKS FOR ONE, REVERSED 2026-09-25:
+       *"no automatic drone"*. This used to set the intent and start the drone
+       here, on the 2026-09-22 reasoning that *"the press is the ask"* and that
+       *"the first thing a visitor does produces a continuous sound they can
+       then take a knob to"*. That reading is gone: turning an instrument on is
+       switching it into the chain, and what it plays is the `Test tone` button
+       or a key. A switch that also played was doing two things.
+       ⚠️ AND THE KEYBOARD IS WHAT MAKES THAT LIVEABLE. The page is listening
+       from this press, so an instrument that has just been switched on already
+       has something to play it. */
     light();
   }
 
@@ -1967,14 +2086,19 @@
     }
     warpsOn = true;
     light();
+    /* EITHER instrument opens the keyboard, which is the word in the ask. */
+    ensureMidi();
     try {
       await ensureAudio();
     } catch (e) {
       warpsOn = false; light();
       throw e;
     }
-    /* The effect needs something coming through it, and with PLAITS off that is
-       its own carrier. With PLAITS on it is already droning. */
+    /* ⚠️ THE TEST TONE SURVIVES THE EFFECT BEING SWITCHED, and this line is
+       what does it: `startDrone` returns at once when one is already running,
+       so what this covers is a tone that was asked for and is not sounding.
+       It reads the intent and never sets it, which is the half that kept a
+       stopped drone from coming back under a held key. */
     if (plaitsOn && droneWanted) startDrone();
     /* ⚠️ AND IT DOES NOT TOUCH THE CARRIER. It set one when the oscillator was
        off, on the reasoning that an effect with a silent input is inaudible.
@@ -1986,10 +2110,15 @@
     light();
   }
   /**
-   * 🔴 THE DRONE IS A STATE THE PAGE ENTERS, NOT A BUTTON A VISITOR FINDS.
-   * `trigger_patched` bypasses the lowpass gate and lets the engine run, and it
-   * acts on whatever is already sounding, so a note held first and droned
-   * second sustains.
+   * 🔴 THE TEST TONE IS A BUTTON A VISITOR FINDS, AND THIS SENTENCE SAID THE
+   * OPPOSITE UNTIL 2026-09-25. It read *"the drone is a state the page enters,
+   * not a button a visitor finds"*, which was true while turning PLAITS on
+   * started one. *"no automatic drone. make a Test tone button in the right of
+   * plaits"* moved it back onto a control, and `toggleTone` is the only thing
+   * that sets the intent this function reads.
+   * ⚠️ WHAT IS UNCHANGED IS THE MECHANISM. `trigger_patched` bypasses the
+   * lowpass gate and lets the engine run, and it acts on whatever is already
+   * sounding, so a note held first and droned second sustains.
    */
   /**
    * 🔴 ONE VOICE, NOT A CHORD, AND THAT IS WHY THE PLUCK WENT. Reported
@@ -2007,16 +2136,21 @@
    */
   function startDrone() {
     if (!node || droning) return;
-    /* 🔴 NOT WHILE A KEYBOARD IS PLAYING, AND THE REFUSAL LIVES HERE RATHER
-       THAN AT THE CALLERS. `togglePlaits` and `toggleWarps` both start the
-       drone, so switching MIDI on and then turning the effect on brought it
-       back, and stopping it once in `toggleMidi` fixed only the first of the
-       three ways in. Reported as *"i still hear drone wien midi on"*.
-       ⚠️ IT IS THE SAME SHAPE AS THE WAVE COLOUR THIS MORNING: where several
-       callers set a thing on every update, the thing has to own the rule, or
-       the rule is written as many times as there are callers and one of them is
-       always missed. */
+    /* 🔴 NOT UNLESS SOMEBODY ASKED FOR IT, AND THE REFUSAL LIVES HERE RATHER
+       THAN AT THE CALLERS. `toggleTone` and `toggleWarps` both reach this, so a
+       rule written at one of them is a rule the other misses, which is how a
+       stopped drone came back three separate ways and was reported as *"i still
+       hear drone wien midi on"*.
+       ⚠️ THE FLAG IT READS USED TO BE SET BY `togglePlaits` AS WELL, which is
+       what made the page play itself. `toggleTone` is the only writer now.
+       ⚠️ IT IS THE SAME SHAPE AS THE WAVE COLOUR: where several callers set a
+       thing on every update, the thing has to own the rule, or the rule is
+       written as many times as there are callers and one of them is always
+       missed. */
     if (!droneWanted) return;
+    /* 🔴 AND NOT OUT OF AN OSCILLATOR THAT IS SWITCHED OFF. The other half of
+       the gate in `noteOn` above, and the reasoning is there. */
+    if (!plaitsOn) return;
     /* ⚠️ AND THE KEYBOARD'S BOOKKEEPING GOES WITH THEM. The shim silences every
        level patched voice when a drone starts, so notes this page still thinks
        are down no longer exist, and a pedal lifting later would send note offs
@@ -2100,24 +2234,7 @@
       ready ? `host ${Math.round(ready.hostRate)} Hz, DSP ${Math.round(ready.dspRate)} Hz`
             : 'never started');
 
-    // ⚠️ BOTH HALVES, AND THE QUIET ONE IS THE HARDER CLAIM. A gate stuck open
-    // passes "there was sound" every time.
-    d.assert('a press makes a sound and an untriggered voice does not',
-      quiet != null && loud != null && quiet < 0.01 && loud > 0.02,
-      quiet == null || loud == null ? 'the audio thread reported nothing'
-        : `untriggered ${quiet.toFixed(6)}, plucked ${loud.toFixed(3)}, at a trim of `
-          + `${trim.toFixed(3)}`);
 
-    // 🔴 AND THE SAME TWO HALVES AT THE FAR END OF THE CHAIN, WHICH IS A
-    // DIFFERENT CLAIM AND NOT A RESTATEMENT. Everything audible on this page
-    // leaves the effect, so the oscillator being right says nothing about what
-    // a listener gets. An effect that dropped every sample would leave the
-    // assert above perfectly green.
-    d.assert('the whole chain is silent when nothing is played and sounds when it is',
-      chainOff != null && chainOn != null && chainOff < 0.01 && chainOn > 0.01,
-      chainOff == null || chainOn == null ? 'the effect reported nothing'
-        : `${chainOff.toFixed(6)} with nothing played and ${chainOn.toFixed(3)} with a pluck, `
-          + `out of an oscillator at ${loud == null ? '?' : loud.toFixed(3)}`);
 
     // ONE WORKLET CALL IS 128 FRAMES AND PLAITS' OWN BLOCK IS 12, so a quantum
     // is ten or eleven Render calls with the remainder carried. Rack's adapter
@@ -2128,31 +2245,7 @@
       last.frames === 128 && (bpq === 10 || bpq === 11),
       `${last.frames} frames, ${bpq} blocks of ${ready?.blockSize ?? '?'}`);
 
-    // 🔴 THE INVARIANT THE WHOLE ARRANGEMENT RESTS ON, ASSERTED RATHER THAN
-    // COMMENTED. `voice.cc` sets three envelope rates from the `kBlockSize`
-    // CONSTANT rather than from the `size` argument it was handed (lines 135,
-    // 207 and 213), so a Render call of any other length advances the audio at
-    // one rate and the envelopes at another and the instrument becomes a
-    // different instrument. Every voice therefore has to sit on the same block
-    // boundary, and `plai_voice_renders()` is what makes that checkable: with
-    // N voices sounding for a whole window it has to advance by exactly N
-    // times `plai_blocks_rendered()`.
-    const br = blockRule;
-    d.assert('every voice rendered the same blocks of twelve as every other',
-      !!br && br.steady && br.held > 1 && br.reports > 0 && br.dBlocks > 0
-        && br.dRenders === br.held * br.dBlocks,
-      br ? `${br.dRenders} voice renders against ${br.held} voices times ${br.dBlocks} blocks, `
-         + `over ${br.reports} reports from the audio thread`
-         : 'the chord was never measured');
 
-    // ⚠️ FOUR VOICES, READ OFF THE DSP'S OWN COUNT RATHER THAN OFF WHAT THIS
-    // PAGE SENT. A note that never crossed the port, or four notes that all
-    // landed on one voice, both leave this at 1.
-    d.assert('four notes at once are four voices and not one voice retriggered',
-      !!chord && chord.held === CHORD.length && chord.peak > 0.02,
-      chord ? `${chord.held} of ${chord.poly} voices sounding at peak `
-            + `${chord.peak.toFixed(3)}, against one note at ${loud == null ? '?' : loud.toFixed(3)}`
-            : 'the chord was never measured');
 
     // ⚠️ A NUMBER TYPED ON THIS PAGE, GRADED AGAINST THE WASM THAT OWNS IT.
     // The control has to exist before anything is fetched, so its top end is a
@@ -2470,6 +2563,33 @@
         ? `${nm} ${m.l} px in on the left and ${m.r} px on the right${m.plate ? ', with a plate' : ''}`
         : `${nm} is missing a cell`)).join(', '));
 
+    /**
+     * 🔴 AND THE `Test tone` BUTTON SITS BETWEEN THEM, ON PLAITS AND ON
+     * NEITHER OTHER CASE. Asked 2026-09-25: *"make a Test tone button in the
+     * right of plaits"*, and a position asked for in words is a position
+     * MEASURED rather than argued about: this page has already been corrected
+     * by screenshot over the air around its rotaries, and `positron-ui` records
+     * `/twelve/` being corrected twelve times in one evening for reasoning
+     * about rects instead of reading them.
+     * ⚠️ **THE NEGATIVE HALF IS WARPS.** The button is placed by a grid column
+     * in this page's own stylesheet, and a rule that reached the other header
+     * would put a second one on the effect. Only the count says so.
+     * ⚠️ AND THIS IS THE DESKTOP ARRANGEMENT ONLY. `demo/verify.mjs` runs at
+     * 756 px with no viewport override, so the phone rule under `.muta-tone` is
+     * read rather than measured. It was checked by hand at 390 px.
+     */
+    const tone = toneBtn.getBoundingClientRect();
+    const onBox = inst.el.querySelector('.panel-head-on')?.getBoundingClientRect();
+    const midBox = inst.el.querySelector('.panel-head-mid')?.getBoundingClientRect();
+    const tones = document.querySelectorAll('.muta-tone').length;
+    d.assert('the test tone button sits on PLAITS, between its switch and its model picker',
+      tones === 1 && !!onBox && !!midBox && tone.width > 0
+        && tone.left >= onBox.right && tone.right <= midBox.left
+        && Math.abs((tone.top + tone.height / 2) - (onBox.top + onBox.height / 2)) <= 1,
+      `${tones} tone button on the page, PLAITS' switch ends at ${onBox ? onBox.right.toFixed(1) : '?'} px, `
+      + `the button runs ${tone.left.toFixed(1)} to ${tone.right.toFixed(1)} px and the model `
+      + `picker starts at ${midBox ? midBox.left.toFixed(1) : '?'} px, on the same line`);
+
     // 🔴 THE CASE STARTS AND ENDS WHERE THE REST OF THE PAGE DOES, WHICH IS
     // `/circuit/`'s OWN CLAIM AND THE ONE IT FAILS. `shell.css` contract 8
     // records that page putting its scroller OUTSIDE its card, so at 390 px
@@ -2561,89 +2681,33 @@
           + `${air.top.toFixed(1)} px above`
           : 'the case or its flow is not on the page');
 
-    const crossings = anyInk(plaitsWave)
-      ? plaitsWave.reduce((n, x, i) => n + (i && (plaitsWave[i - 1] <= 0) !== (x <= 0) ? 1 : 0), 0)
-      : 0;
-    /**
-     * 🔴 TWO PICTURES, TWO SIGNALS, AND THEY ARE NOT THE SAME SIGNAL. Each
-     * instrument draws its own output in its own maker's colour, so what the
-     * effect DID is the difference a reader can see between them.
-     * ⚠️ **THE HALF THAT CAN FAIL IS THE DIFFERENCE, NOT THE COUNT.** Two
-     * pictures fed from one buffer would satisfy *both scopes are drawn* and
-     * prove nothing, which is two witnesses who are one witness.
-     * ⚠️ AND THE WINDOWS ARE THE SAME LENGTH, because both take their period
-     * from the note the oscillator was given, so comparing them sample for
-     * sample is comparing the same instant of the same chain.
-     */
-    const pair = anyInk(plaitsWave) && anyInk(warpsWave)
-      && plaitsWave.length === warpsWave.length;
-    const apart = pair
-      ? Math.max(...plaitsWave.map((x, i) => Math.abs(x - warpsWave[i]))) : NaN;
-    d.assert('each instrument draws its own signal, and the effect’s is not the oscillator’s',
-      pair && scope.drawn() && warpScope.drawn() && apart > 0.001,
-      pair ? `two pictures, worst sample difference ${apart.toFixed(4)} over ${plaitsWave.length} frames`
-           : `the oscillator ${anyInk(plaitsWave) ? 'has' : 'has no'} ink and the effect `
-             + `${anyInk(warpsWave) ? 'has' : 'has no'} ink`);
 
     /**
-     * 🔴 THE KEYBOARD SWITCH OPENS NOTHING UNTIL IT IS PRESSED, which is the
-     * half that costs a visitor something. `requestMIDIAccess` is a permission
-     * prompt, and a page that asked on load would ask every visitor for a
-     * device most of them do not have.
-     * ⚠️ THE NEGATIVE HALF IS THE ONE THAT CAN FAIL: it is `offline` and holds
-     * no access before a press, and this runs AFTER the page has pressed it, so
-     * what is graded is that the state is a real reading rather than a constant.
+     * 🔴 THE KEYBOARD IS OPENED BY A PRESS AND NEVER BY A VISIT, WHICH IS THE
+     * HALF THAT COSTS A VISITOR SOMETHING. `requestMIDIAccess` is a permission
+     * prompt, so a page that asked on load would ask every visitor for a device
+     * most of them do not have.
+     * 🔴 **THIS REPLACES THE ASSERT THAT WENT WITH THE MIDI BUTTON**, which
+     * read `midiBtn.el.tagName === 'BUTTON' && midiWas === false && !!midi` and
+     * pressed that button here to get its answer. It was standing in for three
+     * facts and two of them outlive the control: NOTHING is open before the
+     * press, and something real is open after it. The third, that the lamp
+     * followed the press rather than the port count, went with the lamp.
+     * ⚠️ **THE NEGATIVE HALF IS THE ONE THAT CAN FAIL**, and it is the count
+     * read at the last line of the module rather than a flag read here: by the
+     * time this runs a press has happened, so a reading taken now could not
+     * tell a visit apart from a press.
+     * ⚠️ **AND `midiAsks === 1` IS THE SECOND CLAIM, NOT A RESTATEMENT.** Both
+     * instruments have been switched on by now, and both call `ensureMidi`, so
+     * a prompt per press would read 2 and a prompt per toggle would climb. One
+     * is what idempotent means, measured rather than asserted about the flag.
      */
-    /* ⚠️ THE SWITCH IS PRESSED HERE RATHER THAN ON LOAD, and the ordering is the
-       whole reason: `toggleMidi` awaits the audio, and the audio's boot is what
-       RUNS this check, so a press made before it would still be waiting when
-       the assert read its result. Pressed here, the page is already up. */
-    const midiWas = !!midi;
-    midiBtn.el.click();
-    await sleep(120);
-    d.assert('the keyboard is listened to only after its own switch is pressed',
-      midiBtn.el.tagName === 'BUTTON' && midiWas === false && !!midi
-      && typeof midi.state === 'function'
-      /* ⚠️ AND THE LAMP FOLLOWED THE PRESS RATHER THAN THE PORT COUNT, which is
-         the clause that would have caught the same label in both states: this
-         machine has no MIDI at all under a harness, so a lamp reading the ports
-         would say off here. */
-      && midiBtn.state() === 'online',
-      `nothing was open before the press, and after it the lamp reads `
-      + `${midiBtn.state()} with ${midi ? `${midi.ports()} input(s), state ${midi.state()}` : 'nothing open'}`);
+    d.assert('the keyboard is opened by a press and never by a visit, and it is asked for once',
+      midiAsksOnLoad === 0 && midiAsks === 1 && !!midi && typeof midi.state === 'function',
+      `the visit asked ${midiAsksOnLoad} times and two instrument presses asked `
+      + `${midiAsks}, and the access now reads ${midi ? midi.state() : 'nothing open'} with `
+      + `${midi ? midi.ports() : 0} input(s)`);
 
-    /**
-     * 🔴 AND THE DRONE IS OFF WHILE THE KEYBOARD IS ON, MEASURED AS SILENCE AT
-     * THE END OF THE CHAIN RATHER THAN AS A FLAG. `droning` is what this page
-     * believes; the peak is what a listener gets, and the two disagreed for
-     * three presses. Reported as *"i still hear drone wien midi on"*.
-     * ⚠️ **AND THE EFFECT IS TURNED OFF AND BACK ON INSIDE IT, WHICH IS THE
-     * HALF THAT FAILS.** `toggleWarps` calls `startDrone` too, so stopping the
-     * drone once inside `toggleMidi` left two other ways back in. A check that
-     * only pressed MIDI would have passed on the version that was reported.
-     */
-    await sleep(250);
-    const midiQuiet = last ? last.peak : 1, midiDroning = droning;
-    warpInst.online?.el?.click();
-    await sleep(200);
-    warpInst.online?.el?.click();
-    await sleep(350);
-    const afterWarps = last ? last.peak : 1;
-    d.assert('a keyboard switched on leaves the instrument silent until a key is pressed',
-      midiQuiet < 0.001 && midiDroning === false && afterWarps < 0.001,
-      `with the keyboard on and no key pressed the chain is at ${midiQuiet.toFixed(6)}, `
-      + `the page says droning ${midiDroning}, and after the effect was switched off and `
-      + `on again it is ${afterWarps.toFixed(6)}`);
-
-    /* 🔴 AND A KEY PLAYS THE OSCILLATOR RATHER THAN BEING COUNTED. A check that
-       only proved a handler was wired would pass on a page whose handler wrote
-       to nothing, so this drives the real callback and reads the DSP's own
-       count of sounding voices afterwards. */
-    d.assert('the picture carries the oscillator’s own signal, and it is a wave rather than a slope',
-      anyInk(plaitsWave) && scope.drawn() && crossings >= 2,
-      anyInk(plaitsWave)
-        ? `${plaitsWave.length} samples with ${crossings} zero crossings in the window`
-        : 'the oscillator had no ink in it');
 
     /* 🔴 THE `nameplate sits on the same line as the first row of values` ASSERT
        WENT WITH THE ASK THAT BOUGHT IT, within the hour, superseded by *"just
@@ -2692,7 +2756,220 @@
     // sound and move the controls in front of them. What they grade is the
     // whole chain, because every number in them is the DSP's own answer rather
     // than what this page last sent.
+    /**
+     * 🔴 EVERYTHING BELOW PRESSES A CONTROL, MAKES A SOUND OR MOVES A SWITCH IN
+     * FRONT OF WHOEVER IS LOOKING, SO ALL OF IT IS BEHIND THE GATE. That is the
+     * standing rule and this page gained three reasons to re-read it on
+     * 2026-09-25: a `Test tone` button that sounds, a switch that has to be
+     * turned off to prove a switched-off oscillator is silent, and pictures
+     * that now have ink only while something is playing.
+     * 🔴 **AND THREE OF THESE WERE UNGATED BEFORE TODAY, WHICH WAS A DEFECT
+     * THIS PAGE ALREADY HAD.** The block that pressed the MIDI switch and
+     * toggled the effect off and on ran for every visitor who turned an
+     * instrument on. MEASURED 2026-09-25 with an analyser on every leg of the
+     * graph, driving the page as a visitor with no `?selfcheck=1`: pressing
+     * PLAITS ran this whole block, which switched the effect, pressed the tone
+     * twice and took PLAITS off and on again, and the sound the visitor had
+     * asked for stopped. The rule is not new and the reach of it was wrong.
+     */
     await ifSelfcheck(async () => {
+      /**
+       * 🔴 THESE FOUR MOVED BEHIND THE GATE ON 2026-09-25, AND THEY HAD BEEN
+       * PRINTING `FAIL` INTO A VISITOR'S OWN LOG FOR AS LONG AS THE PLUCK HAS
+       * BEEN GATED. Every one of them reads a number that only `boot()`'s own
+       * gated measuring block sets: `loud`, `chainOn`, `chord` and `blockRule`
+       * are all `null` on a visit, so the conditions were false and
+       * `shell.mjs`'s `assert` logs a failing line where a person can read it.
+       * MEASURED the same day, driving the page as a visitor with no
+       * `?selfcheck=1`: **four FAIL lines**, all of them about a page that is
+       * working perfectly.
+       * ⚠️ **IT COSTS THE HARNESS NOTHING AND WAS CHECKED RATHER THAN ASSUMED**:
+       * the gate is on for every run of `demo/verify.mjs`, so the per-page count
+       * is unchanged at 49 across the move.
+       * ⚠️ AND IT IS THE SAME RULE AS THE PICTURES BELOW. An assert whose
+       * EVIDENCE only exists under the gate belongs under the gate; leaving it
+       * outside does not grade a visitor's page, it accuses it.
+       */
+      // ⚠️ BOTH HALVES, AND THE QUIET ONE IS THE HARDER CLAIM. A gate stuck open
+      // passes "there was sound" every time.
+      d.assert('a press makes a sound and an untriggered voice does not',
+        quiet != null && loud != null && quiet < 0.01 && loud > 0.02,
+        quiet == null || loud == null ? 'the audio thread reported nothing'
+          : `untriggered ${quiet.toFixed(6)}, plucked ${loud.toFixed(3)}, at a trim of `
+            + `${trim.toFixed(3)}`);
+      // 🔴 AND THE SAME TWO HALVES AT THE FAR END OF THE CHAIN, WHICH IS A
+      // DIFFERENT CLAIM AND NOT A RESTATEMENT. Everything audible on this page
+      // leaves the effect, so the oscillator being right says nothing about what
+      // a listener gets. An effect that dropped every sample would leave the
+      // assert above perfectly green.
+      d.assert('the whole chain is silent when nothing is played and sounds when it is',
+        chainOff != null && chainOn != null && chainOff < 0.01 && chainOn > 0.01,
+        chainOff == null || chainOn == null ? 'the effect reported nothing'
+          : `${chainOff.toFixed(6)} with nothing played and ${chainOn.toFixed(3)} with a pluck, `
+            + `out of an oscillator at ${loud == null ? '?' : loud.toFixed(3)}`);
+      // 🔴 THE INVARIANT THE WHOLE ARRANGEMENT RESTS ON, ASSERTED RATHER THAN
+      // COMMENTED. `voice.cc` sets three envelope rates from the `kBlockSize`
+      // CONSTANT rather than from the `size` argument it was handed (lines 135,
+      // 207 and 213), so a Render call of any other length advances the audio at
+      // one rate and the envelopes at another and the instrument becomes a
+      // different instrument. Every voice therefore has to sit on the same block
+      // boundary, and `plai_voice_renders()` is what makes that checkable: with
+      // N voices sounding for a whole window it has to advance by exactly N
+      // times `plai_blocks_rendered()`.
+      const br = blockRule;
+      d.assert('every voice rendered the same blocks of twelve as every other',
+        !!br && br.steady && br.held > 1 && br.reports > 0 && br.dBlocks > 0
+          && br.dRenders === br.held * br.dBlocks,
+        br ? `${br.dRenders} voice renders against ${br.held} voices times ${br.dBlocks} blocks, `
+           + `over ${br.reports} reports from the audio thread`
+           : 'the chord was never measured');
+      // ⚠️ FOUR VOICES, READ OFF THE DSP'S OWN COUNT RATHER THAN OFF WHAT THIS
+      // PAGE SENT. A note that never crossed the port, or four notes that all
+      // landed on one voice, both leave this at 1.
+      d.assert('four notes at once are four voices and not one voice retriggered',
+        !!chord && chord.held === CHORD.length && chord.peak > 0.02,
+        chord ? `${chord.held} of ${chord.poly} voices sounding at peak `
+              + `${chord.peak.toFixed(3)}, against one note at ${loud == null ? '?' : loud.toFixed(3)}`
+              : 'the chord was never measured');
+
+      /**
+       * 🔴 NOTHING SOUNDS UNTIL SOMETHING ASKS FOR IT, WHICH IS *"no automatic
+       * drone"* MEASURED AT THE END OF THE CHAIN RATHER THAN AS A FLAG.
+       * `droning` is what this page believes; the peak is what a listener gets,
+       * and this page has already had those two disagree for three presses.
+       * ⚠️ **THE ASSERT THIS REPLACES SWITCHED THE MIDI BUTTON ON AND CHECKED THE
+       * SAME SILENCE**, because a listening keyboard was what used to suppress
+       * the drone. The suppression is gone with the automatic drone and the
+       * silence it was protecting is the same silence, so the claim survives its
+       * cause.
+       * ⚠️ **AND THE EFFECT IS TURNED OFF AND BACK ON INSIDE IT, WHICH IS THE
+       * HALF THAT FAILS.** `toggleWarps` calls `startDrone` too, so a tone
+       * nobody asked for has three ways back in and pressing one switch would
+       * only ever have closed one of them.
+       */
+      send({ t: 'allOff' });
+      await sleep(500);
+      const idleQuiet = last ? last.peak : 1, idleDroning = droning;
+      warpInst.online?.el?.click();
+      await sleep(200);
+      warpInst.online?.el?.click();
+      await sleep(350);
+      const afterWarps = last ? last.peak : 1;
+      d.assert('both instruments switched on make no sound until the test tone or a key asks',
+        idleQuiet < 0.001 && idleDroning === false && afterWarps < 0.001,
+        `with both on and nothing pressed the chain is at ${idleQuiet.toFixed(6)}, `
+        + `the page says droning ${idleDroning}, and after the effect was switched off and `
+        + `on again it is ${afterWarps.toFixed(6)}`);
+
+      /**
+       * 🔴 THE TEST TONE IS A REAL BUTTON AND IT IS PRESSED HERE. Asked
+       * 2026-09-25: *"make a Test tone button in the right of plaits"*. A check
+       * that called `startDrone` would grade the DSP and say nothing about the
+       * control, which is the defect this page already records about reaching
+       * past a header switch.
+       * ⚠️ **BOTH HALVES, AND THE SECOND PRESS IS THE ONE THAT CAN FAIL.** A
+       * button that starts a tone and cannot stop it looks identical while
+       * somebody is pressing it the first time.
+       */
+      toneBtn.click();
+      await sleep(500);
+      const tonePeak = last ? last.peak : 0, toneChain = warpLast ? warpLast.peak : 0;
+      const tonePressed = toneBtn.getAttribute('aria-pressed');
+      /* 🔴 THE TWO PICTURES ARE READ WHILE THE TONE IS RUNNING, WHICH IS WHERE
+         THEY MOVED TO 2026-09-25 AND WHY THEY ARE BEHIND THE GATE AT ALL. Ink
+         is made by something sounding, and until today that was the automatic
+         drone, which ran for everybody from the moment an instrument was
+         switched on. With *"no automatic drone"* the only sound outside a
+         press is the one this block makes, so a picture assert left in the
+         ungated part would print `FAIL` into a visitor's own log about a page
+         that is working. `scope.drawn()` is a fact about this instant, so it is
+         captured here rather than read at the assert below. */
+      const drawnP = scope.drawn(), drawnW = warpScope.drawn();
+      const crossings = anyInk(plaitsWave)
+        ? plaitsWave.reduce((n, x, i) => n + (i && (plaitsWave[i - 1] <= 0) !== (x <= 0) ? 1 : 0), 0)
+        : 0;
+      /**
+       * 🔴 TWO PICTURES, TWO SIGNALS, AND THEY ARE NOT THE SAME SIGNAL. Each
+       * instrument draws its own output in its own maker's colour, so what the
+       * effect DID is the difference a reader can see between them.
+       * ⚠️ **THE HALF THAT CAN FAIL IS THE DIFFERENCE, NOT THE COUNT.** Two
+       * pictures fed from one buffer would satisfy *both scopes are drawn* and
+       * prove nothing, which is two witnesses who are one witness.
+       * ⚠️ AND THE WINDOWS ARE THE SAME LENGTH, because both take their period
+       * from the note the oscillator was given, so comparing them sample for
+       * sample is comparing the same instant of the same chain.
+       */
+      const pair = anyInk(plaitsWave) && anyInk(warpsWave)
+        && plaitsWave.length === warpsWave.length;
+      const apart = pair
+        ? Math.max(...plaitsWave.map((x, i) => Math.abs(x - warpsWave[i]))) : NaN;
+      toneBtn.click();
+      await sleep(600);
+      const toneOff = last ? last.peak : 1;
+      d.assert('the test tone button is what makes the sound, and pressing it again stops it',
+        tonePeak > 0.01 && toneChain > 0.001 && tonePressed === 'true'
+          && toneOff < tonePeak / 4 && toneBtn.getAttribute('aria-pressed') === 'false',
+        `one press reads ${tonePeak.toFixed(4)} out of the oscillator and `
+        + `${toneChain.toFixed(4)} out of the whole chain, and a second press leaves `
+        + `${toneOff.toFixed(4)}`);
+
+      d.assert('each instrument draws its own signal, and the effect’s is not the oscillator’s',
+        pair && drawnP && drawnW && apart > 0.001,
+        pair ? `two pictures, worst sample difference ${apart.toFixed(4)} over ${plaitsWave.length} frames`
+             : `the oscillator ${anyInk(plaitsWave) ? 'has' : 'has no'} ink and the effect `
+               + `${anyInk(warpsWave) ? 'has' : 'has no'} ink`);
+
+      /* 🔴 IT READS `drawnP` RATHER THAN CALLING `scope.drawn()` AGAIN, AND THE
+         DIFFERENCE IS A RED RUN ON A WORKING PAGE. MEASURED 2026-09-25:
+         switching PLAITS off repaints the scope empty, switching it back on
+         does not repaint it, and with the automatic drone gone nothing feeds it
+         again until something plays. So this assert, which had been green for a
+         week, failed the moment the check below started switching an instrument
+         off, reporting `7 zero crossings` in its own detail while claiming the
+         picture was not drawn. `el.hidden` against `getComputedStyle` is this
+         project's own version of the same lesson: a reading taken later is a
+         reading of something else.
+         ⚠️ AND THE COMMENT THAT USED TO STAND HERE WAS ABOUT A DIFFERENT ASSERT.
+         It read *"a key plays the oscillator rather than being counted"*, which
+         describes the keyboard checks further down rather than this picture. */
+      d.assert('the picture carries the oscillator’s own signal, and it is a wave rather than a slope',
+        anyInk(plaitsWave) && drawnP && crossings >= 2,
+        anyInk(plaitsWave)
+          ? `${plaitsWave.length} samples with ${crossings} zero crossings in the window`
+          : 'the oscillator had no ink in it');
+
+      /**
+       * 🔴 AND THE ANSWER TO *"when plaits is off and warps in on from plaits -
+       * how it can play at all?"*, ASKED 2026-09-25. It cannot, and until today
+       * nothing said so: the drone was the only source and switching the
+       * oscillator off stopped it, so the silence was a consequence of one path
+       * rather than a rule. There are two sources now.
+       * ⚠️ **IT PRESSES THE SWITCH AND THEN ASKS BOTH WAYS IN**, the button and a
+       * key through the real `keyDown`. A test on one of them would have left the
+       * other, and the two doors are in two functions.
+       * ⚠️ **AND IT READS THE FAR END OF THE CHAIN**, because WARPS is on and
+       * carrying `from PLAITS`, which is the arrangement the question names. The
+       * carrier is read rather than assumed: with the picker on `sine` this whole
+       * check would be measuring a silent oscillator through an effect making its
+       * own sound, and it would be right to hear that.
+       */
+      inst.online?.el?.click();               // PLAITS off, WARPS still on
+      await sleep(300);
+      const offCarrier = carrier, offDisabled = toneBtn.disabled;
+      toneBtn.click();
+      keyDown(64, 100);
+      await sleep(500);
+      const offOsc = last ? last.peak : 1, offChain = warpLast ? warpLast.peak : 1;
+      keyUp(64);
+      inst.online?.el?.click();               // and back on for everything below
+      await sleep(500);
+      d.assert('an oscillator that is switched off makes no sound, whichever way it is asked',
+        offCarrier === 0 && offDisabled === true && offOsc < 0.001 && offChain < 0.001,
+        `with PLAITS off, WARPS on and the carrier reading ${CARRIERS[offCarrier]}, the tone `
+        + `button is ${offDisabled ? 'not pressable' : 'LIVE'} and a press of it plus a key `
+        + `leave the oscillator at ${offOsc.toFixed(6)} and the chain at `
+        + `${offChain.toFixed(6)}`);
+
       const want = 13;                    // bass drum, a model nothing defaults to
       setModel(want);
       pluck();
@@ -2726,15 +3003,24 @@
       noteOff(60);
       await sleep(900);
       const released = lastOff;
-      const quiet = last ? last.peak : 0;
+      /* 🔴 `afterRelease`, NOT `quiet`, AND THE RENAME COST A RUN. This was
+         `const quiet` and the boot's own untriggered reading is also called
+         `quiet`, one scope out. The moment the four boot asserts moved into
+         this block on 2026-09-25 the first of them read the outer `quiet`
+         ABOVE this declaration, which is its temporal dead zone, so the whole
+         gated block threw at its first line. MEASURED: **49 page asserts became
+         28 and the run stayed GREEN**, because an assert that never runs cannot
+         fail. `positron-ui` records the identical failure costing seven asserts
+         on another page, and only the COUNT said so either time. */
+      const afterRelease = last ? last.peak : 0;
       lastOff = null;
       noteOff(61);
       await sleep(150);
       const nobody = lastOff;
       d.assert('letting the key go is what ends the note, and a key nobody held ends nothing',
-        quiet < sustain / 4 && released?.released === 1 && nobody?.released === 0,
+        afterRelease < sustain / 4 && released?.released === 1 && nobody?.released === 0,
         `the release took ${released ? released.released : 'no'} voice from `
-        + `${sustain.toFixed(4)} down to ${quiet.toFixed(4)}, and a note nobody held `
+        + `${sustain.toFixed(4)} down to ${afterRelease.toFixed(4)}, and a note nobody held `
         + `released ${nobody ? nobody.released : 'no reply'}`);
 
       /* 🔴 AND THE SAME NOTE LET GO EARLY, MEASURED AT THE SAME AGE, WHICH IS
@@ -2935,35 +3221,89 @@
         + `nothing sounding`);
 
       /**
-       * 🔴 AND A KEY STEERS A DRONE RATHER THAN PLAYING INTO IT. The mechanism
-       * is `plai_set_param` id 1, which retunes every voice whose trigger is
-       * unpatched, and nothing reached it from a keyboard until 2026-09-22.
-       * ⚠️ IT READS THE KNOB AS WELL AS THE SOUND, because the page moves the
-       * pitch control with the key and a control showing one pitch while the
-       * DSP holds another is the thing this page refuses everywhere else.
+       * 🔴 THE TWO SOUNDS ARE EXCLUSIVE, BOTH WAYS, WHICH IS THE WHOLE OF
+       * *"when midi notes arrive, they turn off test tone and vice versa"*,
+       * 2026-09-25.
+       * 🔴 **AND IT REPLACES THE ASSERT THAT SAID THE OPPOSITE.** That one read
+       * `a key sets the drone's pitch instead of playing it, and letting go
+       * does not stop it`, bought by *"why can i not use midi to control
+       * drone"* on 2026-09-22 and true until today. The mechanism it graded,
+       * `plai_set_param` id 1 retuning every unpatched voice, is untouched and
+       * is still what the pitch rotary drives. What was reversed is who may
+       * reach it from a keyboard.
+       * 🔴 **TWO ASSERTS AND NOT ONE, WHICH IS THE HARNESS'S PATIENCE AND NOT
+       * A STYLE.** Written as a single check the two directions are 2.85 s of
+       * measuring with nothing to say, and `verify.mjs` tolerates 2.0 s of
+       * silence before it decides a page has finished. MEASURED 2026-09-25 on
+       * the first build of this check: the run read **48/49 with the last four
+       * asserts simply absent**, which is the silent truncation this page has
+       * already paid for twice. Each direction is about 1.4 s and each ends in
+       * an assert, so the count never stands still for a whole patience.
+       * ⚠️ **AND THEY ARE TWO CLAIMS ANYWAY.** They are two lines in two
+       * functions: `keyDown` stops the tone, `toggleTone` takes the keys down,
+       * and one of them passing says nothing about the other.
+       * ⚠️ **THE KEY DIRECTION IS MEASURED AS A NOTE THAT ENDS.** A tone that
+       * kept running under a key would still read a peak, and so would a key
+       * played over a tone; what separates them is that letting the key go
+       * leaves silence, which is only true if the tone really went.
        */
-      stopDrone();
-      droneWanted = false;
+      /* ⚠️ THE TONE DOWN FIRST, because the check above leaves one running and
+         a press on a running tone is the STOP half of this button. A check
+         that leaves state behind is a check that breaks the next one, which
+         this page already records about the model picker. */
+      stopTone();
       send({ t: 'allOff' });
       await sleep(200);
-      droneWanted = true;
-      startDrone();
-      await sleep(250);
-      keyDown(48, 100);
-      await sleep(350);
-      const droneKnob = knobs.get('pitch').value();
-      const droneVoice = lastNote ? lastNote.note : -1;
-      const dronePeak = last ? last.peak : 0;
-      keyUp(48);
+      /* the tone first, through its own button, then a key into it */
+      toneBtn.click();
       await sleep(400);
-      const afterKeyUp = last ? last.peak : 0;
-      d.assert('a key sets the drone’s pitch instead of playing it, and letting go does not stop it',
-        droning === true && droneKnob === 48 && dronePeak > 0.01 && afterKeyUp > 0.01,
-        `the key moved the pitch control to ${droneKnob}, the drone is at `
-        + `${dronePeak.toFixed(4)} and still at ${afterKeyUp.toFixed(4)} after the key came `
-        + `up, and the last note the DSP was handed is ${droneVoice}`);
-      stopDrone();
-      droneWanted = false;
+      const exToneOnly = last ? last.peak : 0;
+      const keysBefore = midiNotes;
+      keyDown(48, 100);
+      await sleep(300);
+      const exWithKey = last ? last.peak : 0, exDroning = droning;
+      const exPressed = toneBtn.getAttribute('aria-pressed');
+      keyUp(48);
+      await sleep(700);
+      const exAfterKeyUp = last ? last.peak : 0;
+      d.assert('a key arriving stops the test tone and plays its own note instead',
+        exToneOnly > 0.01 && exWithKey > 0.01 && exDroning === false
+          /* ⚠️ HALF, NOT A QUARTER, AND THE NUMBER IS THE CLAIM RATHER THAN
+             AN AFTERNOON'S READING. MEASURED 2026-09-25: the tone reads
+             0.7066 and a released key 700 ms later reads 0.1985, and a
+             quarter of the tone is 0.1767, so the first build of this went
+             red on a page that was working. It is the mistake this check
+             block already records one assert down, where *"a threshold of
+             three was a number fitted to one afternoon's readings"*.
+             `decay` is 0.5 and its tail is long, so a released note is
+             DECAYING rather than gone. What is being asserted is that the
+             ENDLESS sound went: a tone still running would read the whole
+             0.7066 here, which is nowhere near half. */
+          && exPressed === 'false' && exAfterKeyUp < exToneOnly / 2
+          && midiNotes === keysBefore + 1,
+        `the tone alone reads ${exToneOnly.toFixed(4)}, a key into it reads `
+        + `${exWithKey.toFixed(4)} with the page saying droning ${exDroning} and the button `
+        + `reading ${exPressed}, and letting that key go leaves `
+        + `${exAfterKeyUp.toFixed(4)} where a tone still running would leave the first figure`);
+
+      /* and now the other way: a key held, then the tone asked for */
+      send({ t: 'allOff' });
+      await sleep(200);
+      keyDown(55, 100);
+      await sleep(250);
+      toneBtn.click();
+      await sleep(400);
+      const exToneOverKey = last ? last.peak : 0, exHeld = last ? last.held : -1;
+      toneBtn.click();
+      await sleep(600);
+      const exAfterTone = last ? last.peak : 0;
+      d.assert('starting the test tone takes the keys down, and stopping it leaves silence',
+        exHeld === 1 && exToneOverKey > 0.01 && exAfterTone < exToneOverKey / 4,
+        `a tone started over a held key reads ${exToneOverKey.toFixed(4)} on ${exHeld} `
+        + `voice, and stopping it leaves ${exAfterTone.toFixed(4)} with nothing of the key `
+        + `left to ring`);
+      stopTone();
+      send({ t: 'allOff' });
       knobs.get('pitch').set(60);
       send({ t: 'param', id: P.note, value: 60 });
 
@@ -3052,11 +3392,18 @@
 
       send({ t: 'allOff' });
       send({ t: 'voices', n: voiceCount });
-    }, { log: d.log, say: 'the model switch and the voice stealing are checked only under a harness, because both change the sound' });
+    }, { log: d.log, say: 'the test tone, the pictures, the model switch and the voice stealing are checked only under a harness, because every one of them presses a control or changes the sound' });
   });
 
-  d.log('turn an instrument on at the top of its case and it plays. The voice count is '
-      + 'this page’s own and the instrument has no such control');
+  /* ⚠️ THIS LINE SAID `turn an instrument on at the top of its case and it
+     plays`, WHICH WAS TWO THINGS WRONG AT ONCE. The header has been at the
+     FOOT of its case since it was glued, and there is no automatic drone since
+     2026-09-25. A sentence a visitor reads is part of the page. */
+  d.log('turn an instrument on from the switch under its case, then press Test tone to '
+      + 'hear it, or play a MIDI keyboard. The voice count is this page’s own and the '
+      + 'instrument has no such control');
+  d.log('the test tone and the keys never sound together: a key stops the tone and '
+      + 'starting the tone takes the keys down');
   d.log('left of the divider are Plaits’ four front panel rotaries, in its own positions. '
       + 'Right of it are its three attenuverters, then decay and colour, which the panel '
       + 'reaches by holding a button rather than with knobs of their own');
@@ -3076,6 +3423,15 @@
    * ⚠️ AND IT IS ONE PRESS ON ONE HEADER. Both start the same graph, so
    * pressing both would be a press and an immediate turn off.
    */
+  /* ⚠️ THE COUNT BEFORE ANY PRESS, READ AT THE LAST LINE OF THE VISIT, AND
+     OUTSIDE THE GATE ON PURPOSE. This is the negative half of `the keyboard is
+     opened by a press and never by a visit`: everything above this line is what
+     a page load does, and what it has to have done is nothing. Inside
+     `ifSelfcheck` it would stay unset for a visitor and the assert that reads it
+     would go red on a page where nothing is wrong, which is the shape this
+     project calls a harness artefact. Reading a counter costs a visitor
+     nothing. */
+  midiAsksOnLoad = midiAsks;
   ifSelfcheck(() => {
     inst.online?.el?.click();
     /* ⚠️ AND THE EFFECT TOO, BECAUSE A SWITCHED OFF INSTRUMENT DRAWS NOTHING

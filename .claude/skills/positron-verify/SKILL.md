@@ -62,10 +62,15 @@ archive: it reads its paths off `corpus.json` rather than a list, so it cannot
 drift from the page, and it tiles one 8 s MP3 BY THE BYTE to any length (48 kHz
 at 64 kbit/s makes `144*bitrate/rate` whole, 24.000 ms and 192 bytes a frame, so
 every wrap lands on a frame boundary and a Range reply needs no frame table).
-The 24 rows are 2 h 22 m and 68 MB, never allocated. `node demo/verify.mjs
+The 23 rows are 2 h 15 m and 65 MB, never allocated. ⚠️ THIS READ
+**24 rows, 2 h 22 m and 68 MB** UNTIL 2026-09-25, when `Saharan uni I` was
+removed on *"rm 6/24 Saharan uni I 1967 line"*. MEASURED after: 8,096 s
+against 8,541 s. `node demo/verify.mjs
 tapes` starts it and points the page at it with its own `?base=`:
-**MEASURED 38/38 with the only hosts contacted being the dev server and the
-stand-in.** The instrument is not blind, which is the half that makes the claim
+**MEASURED 39/39 with the only hosts contacted being the dev server and the
+stand-in**, 38/38 until 2026-09-25 when the varispeed arc gained an assert.
+⚠️ **THE TWO SABOTAGE FINDINGS BELOW KEEP THEIR 38/38**, because they
+are dated measurements of the holes and nobody has re-run them. The instrument is not blind, which is the half that makes the claim
 worth anything: pointed at a dead port the same run names that port and takes 5
 asserts red.
 ⚠️ It grades OUR code, exactly as `fake-station.mjs` does. A stand-in cannot

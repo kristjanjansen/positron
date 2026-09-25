@@ -81,8 +81,61 @@ import { el } from './shell.mjs';
  * win at random. Focus inside the body means a person is steering, and steering
  * outranks following.
  */
+/**
+ * 🔴 `minRows`: THE TABLE ITSELF IS THE EMPTY STATE, AT A HEIGHT THAT IS
+ * CHOSEN RATHER THAN LEFT TO THE CONTENT. Asked for on `/dump/` 2026-09-25:
+ * *"show empthy tables / miditables immidately with fixed heigh. no texdt in
+ * them until dumps arrive"*, replacing two captions, `nothing asked yet` and
+ * `press Listen, then play something`.
+ *
+ * 🔴 IT IS A REVERSAL AND THE THING IT REVERSES IS FOUR DAYS OLD ON THE SAME
+ * PAGE, so it is written down here rather than left for somebody to undo.
+ * `shell.css`'s `.pos-midilog[data-reserve]` records *"press the status
+ * button, then play something - rm just leave room for midi table"*, from
+ * 2026-09-21, and its own note says **NO ROW, NO HEADING, NO TEXT. Just the
+ * space**. That was right about the ROOM and this is the same request one step
+ * further: the room stops being a blank rectangle and becomes the table, drawn
+ * empty. Both asks are about a box that does not rearrange the page when the
+ * first message lands; they disagree only about what stands in the box until
+ * it does.
+ *
+ * ⚠️ AND IT BUMPS INTO `an empty box is a line`, WHICH POINTS THE OTHER WAY
+ * AND IS NOT IN CONFLICT HERE. `roll.mjs:111` argues for a caption because a
+ * container with nothing in it must not paint its own edges, and this project
+ * has paid for that three times (`/typist/`'s 2 px band, `.pos-controls`'s
+ * 14 px one, `drop.mjs`'s footer). **A framed table is not an empty box.** Its
+ * heading names its columns and its ruled rows show how many records will fit,
+ * which is structure a reader can see and read meaning off. What that rule
+ * refuses is a rectangle saying nothing, and this is the opposite of one.
+ * ⚠️ SO THE CAPTION GOES AWAY ENTIRELY WHEN `minRows` IS SET, INCLUDING ONE
+ * PASSED TO `clear(msg)`. A sentence inside a framed table lands in the first
+ * ruled row and reads as a record, which is worse than either answer on its
+ * own. A table wants one empty state, not two that can both be on screen.
+ *
+ * 🔴 AND THE HEIGHT IS FLOOR AND CEILING AT ONE NUMBER, WHICH IS THE HALF
+ * THIS PROJECT HAS ALREADY PAID FOR. `demo/wish/index.html` records a box that
+ * was *"7 lines for one connection and 16 for the next"* and therefore moved
+ * the log and the end of the page on every press. A table that grows as rows
+ * land does that to everything under it, and on `/dump/` rows land in
+ * hundreds. So `minRows` sizes the scrolling body exactly and it does not
+ * grow: past that many records the box scrolls, the way `/wish/`'s does.
+ * ⚠️ WHICH IS WHY IT IS NOT `--tbl-h`. That is a MAX and a table under it is
+ * whatever height its rows make it, which is the right answer for every table
+ * that is filled once from a corpus and the wrong one for a box being written
+ * into while somebody watches.
+ * ⚠️ THE ROW HEIGHT IS `--tbl-row-h` AND IS NOT COMPUTED HERE. `shell.css`
+ * declares it beside the padding it is made of and already reserves rooms with
+ * it, so a change to a row's padding moves the reservation with it rather than
+ * leaving a second number behind. A measurement in two files is a measurement
+ * that will disagree.
+ * ⚠️ AND A PLACEHOLDER IS NOT A ROW. `.pos-tbl-rest` carries no `.pos-tbl-row`
+ * class, is `aria-hidden`, takes no focus and is not counted by `count()`.
+ * `roll.mjs` learned this the expensive way: a placeholder wearing the row's
+ * class took nine asserts red at once, each reporting five rows on a page with
+ * four chords.
+ */
 export function createTable({ columns, cap = 1000, empty = 'nothing yet', note = '', stick = false,
-                              onPick = null } = {}) {
+                              minRows = 0, onPick = null } = {}) {
   if (!Array.isArray(columns) || !columns.length) {
     throw new Error('createTable: columns are the whole point, so declare some');
   }
@@ -140,6 +193,27 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
   const body = el('div', 'pos-tbl-body');
   wrap.append(body);
   let n = 0;
+
+  /* The frame's own two numbers, both read by `shell.css` and neither typed
+     there: how many rows the box holds open, and therefore how tall it is. The
+     attribute is what arms the rule, so a table with no `minRows` is byte for
+     byte the table that was here before. */
+  if (minRows > 0) {
+    wrap.dataset.rows = '1';
+    wrap.style.setProperty('--tbl-rows', String(minRows));
+  }
+  /** the placeholders holding the box open, newest last, real rows above them */
+  const rests = [];
+  const holdRoom = () => {
+    const want = Math.max(0, minRows - n);
+    while (rests.length > want) rests.pop().remove();
+    while (rests.length < want) {
+      const r = el('div', 'pos-tbl-rest');
+      r.setAttribute('aria-hidden', 'true');
+      body.append(r);
+      rests.push(r);
+    }
+  };
 
   // Every row element now on screen, and the data it was built from, so a
   // caller can light one after a repaint. See `mark`.
@@ -209,21 +283,31 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
   }
   const blank = (msg) => {
     body.textContent = '';
+    rests.length = 0;
     // 🔴 AN EMPTY STRING MEANS SAY NOTHING, AND SAYING NOTHING MEANS NO
     // ELEMENT. `.pos-tbl-empty` carries `padding: 8px 10px`, so appending it
     // with no text leaves a padded band with nothing in it: a container
     // painting its own space, which is the same fault as the empty readout
     // that drew a 2 px rule nobody wrote. A caller that passes '' wants the
     // table silent, not quietly tall.
-    const said = msg ?? empty;
+    /* ⚠️ AND A FRAMED TABLE SAYS NOTHING AT ALL, WHICH IS THE WHOLE OF
+       `minRows`. The frame IS the empty state, so a caption here would be a
+       second one sitting inside it. See the block above the factory. */
+    const said = minRows ? '' : (msg ?? empty);
     if (said) body.append(el('div', 'pos-tbl-empty', said));
     n = 0;
-    if (head) head.hidden = true;
+    /* 🔴 THE HEADING STANDS WHEN THERE IS A FRAME UNDER IT, AND ONLY THEN.
+       `a column name over nothing labels air` is the rule and it is unchanged:
+       what `minRows` puts under the names is ruled rows, so they are naming
+       something a reader can see. With no frame this hides exactly as it
+       always did, which is what keeps `/pack/`'s assert on it true. */
+    if (head) head.hidden = !minRows;
+    holdRoom();
   };
   blank();
 
   function add(r) {
-    if (!n) { body.textContent = ''; if (head) head.hidden = false; }
+    if (!n) { if (!minRows) body.textContent = ''; if (head) head.hidden = false; }
     const row = el('div', 'pos-tbl-row');
     if (note && r[note]) row.title = String(r[note]);
     /**
@@ -310,9 +394,13 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
       }
       row.append(cell);
     }
-    body.append(row);
+    /* ⚠️ ABOVE THE PLACEHOLDERS, NOT AFTER THEM. A frame holds its room open
+       with elements, so a plain `append` would put the first real record
+       underneath the empty rows that were standing in for it. */
+    if (rests.length) body.insertBefore(row, rests[0]); else body.append(row);
     n++;
     while (n > cap) { body.firstChild.remove(); n--; }
+    holdRoom();
     // ⚠️ `scrollHeight` IS READ AFTER THE APPEND AND AFTER THE CAP TRIM, or it
     // is the height of the table one row ago and the view lands one row short
     // for as long as rows keep arriving.
@@ -323,8 +411,9 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     el: wrap,
     add,
     set(rows) {
-      body.textContent = ''; n = 0; els.length = 0; shown.length = 0;
+      body.textContent = ''; n = 0; els.length = 0; shown.length = 0; rests.length = 0;
       if (!rows?.length) { blank(); return; }
+      if (head) head.hidden = false;
       for (const r of rows) add(r);
     },
     /**

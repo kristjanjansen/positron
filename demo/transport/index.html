@@ -9,8 +9,10 @@
 
 <script type="module">
   import { mount, guard } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { markAdapter, marks } from '/shell/fixture.mjs';
 
@@ -101,13 +103,24 @@
       asserted = true;
       d.assert('every mark reports a real lateness', xs.every(Number.isFinite), `n=${xs.length} typical=${xs[xs.length >> 1]}`);
       d.assert('fire count <= item count', fired.length <= 20, `${fired.length}/20`);
+      // 🔴 THE REPORTED JUMP, GRADED AGAINST THE PICTURE. Two frames, because
+      // `invalidate()` schedules a draw rather than making one, and reading the
+      // canvas in the same turn would measure the frame before the numbers.
+      // Both readings come from the same function for the same reason a lane
+      // may only be coloured by evidence it produced.
+      if (SELFCHECK) requestAnimationFrame(() => requestAnimationFrame(() => {
+        const after = gutterTop();
+        d.assert('the lane does not move when the numbers arrive',
+          topAtRest !== null && after !== null && Math.abs(after - topAtRest) <= 1,
+          `top ${topAtRest} px before, ${after} px after (51 then 22 when this was reported)`);
+      }));
     }
   }
   let asserted = false;
 
 
   // No slider: the strip below IS the position surface. Click or drag it.
-  createTransportBar(d.el, deck, { scrub: false });
+  const bar = createTransportBar(d.el, deck, { scrub: false });
   // Grey until the playhead reaches it, yellow after — `latch` recolours from
   // the position every frame, so rewinding un-fires them. Without a colour the
   // lane falls back to a hash of the kind name, which lands wherever it lands
@@ -128,6 +141,32 @@
       // the picture only ever changes when something new is measured.
       id: 'mark', kind: 'mark', label: 'marks', height: 72, width: 2,
       color: '#6a7280',
+      /**
+       * 🔴 THE LANE HAS A LINE UNDER ITS NAME FROM THE FIRST FRAME, AND THAT IS
+       * WHAT STOPS IT JUMPING. Reported 2026-09-25 with two screenshots as
+       * *"lane is jumping position when start playing"*.
+       *
+       * MEASURED before the line existed, headless Chrome at 1280 px, the ink
+       * inside the gutter: the name and its swatch occupied y 51 to 60 before
+       * play and y 22 to 54 after the first measurement landed. A jump of 29
+       * pixels, up, the moment `report()` wrote its two numbers.
+       *
+       * ⚠️ AND IT IS NOT THE GUTTER GETTING WIDER, WHICH IS WHAT IT LOOKS LIKE.
+       * MEASURED in the same run: `readout().gutter` is 132 before and 132
+       * after, and the canvas does not move, so the plot beside it is exactly
+       * where it was. This page declares `gutter: 132` and the widest line it
+       * writes is `typical +1.20 ms` at 96.33 px, which needs 124.33 with the
+       * strip's own inset and padding. Only a lateness of 100 ms or more would
+       * push past 132.
+       *
+       * WHAT MOVES IS THE LABEL BLOCK. `timeline/strip.mjs` draws a lane with
+       * no lines under its name centred on its own swatch, which was asked for
+       * and is right for a lane that will never have any. A lane that gains
+       * them while somebody is looking gets both arrangements, one after the
+       * other. So the lane says what it knows from the first frame and the
+       * numbers replace that sentence in place.
+       */
+      subLabel: 'no marks measured yet',
       terse: true,        // no id/kind/attested lines: nothing here is restored
       colorOfRow: (r) => {
         const m = measured.get(r.id);
@@ -140,9 +179,13 @@
         const m = measured.get(r.id);
         if (!m) return 'not played yet';   // no measurement, not "behind the playhead"
         const [, , verdict] = bandFor(m);
+        // Three short lines, not two with joins in them. A middot lets a line
+        // bolt a third fact on instead of ending, which is the habit the em
+        // dash rule is about wearing a different character.
         return [
-          `${Math.abs(m.deltaMs).toFixed(2)} ms ${m.deltaMs < 0 ? 'early' : 'late'} · ${verdict}`,
-          m.origin === 'tick-late' ? `no timer · ${TICK} ms check caught it` : 'timer set ahead',
+          `${Math.abs(m.deltaMs).toFixed(2)} ms ${m.deltaMs < 0 ? 'early' : 'late'}`,
+          verdict,
+          m.origin === 'tick-late' ? `no timer, the ${TICK} ms check caught it` : 'timer set ahead',
         ];
       },
       // NO WIDTH CHANNEL. A thicker bar marked "no timer was set", which is
@@ -153,6 +196,77 @@
       // fact survives where it is actually asked for: the tooltip.
     }],
   });
+
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-25: *"timeline
+   * demos: glue transport and timelines"*. The bar already passes
+   * `scrub: false` BECAUSE the strip below it is this page's position surface,
+   * so the two have been one control since the page was written with the page
+   * rhythm drawing ground through the middle of it.
+   *
+   * ⚠️ `createTransportBar(d.el, ...)` APPENDED THE BAR TO `d.el` ALREADY, and
+   * the first argument is a mount point rather than a hint. `createGlue`
+   * re-parents both, so this moves two existing children rather than making a
+   * third copy of either.
+   * ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, never after, because a node captured
+   * afterwards points at something that is no longer in the page. `null` is an
+   * append, which is what a pair at the end of the page wants.
+   */
+  const afterStrip = view.surface.nextSibling;
+  d.el.insertBefore(createGlue(bar.el, view.surface), afterStrip);
+
+  // 🔴 ONE BAR AND ONE STRIP, COUNTED FROM THE DOM RATHER THAN LOOKED AT.
+  // `/stage/` carried a DOUBLED transport bar through two reports in 2026-09-25,
+  // because `createTransportBar(parent, ...)` appends to the parent it is given:
+  // deleting the `createGlue` line removed nothing, and a screenshot cannot tell
+  // one bar from two when they are stacked. A count can.
+  d.assert('one bar and one strip, and they are one surface',
+    d.el.querySelectorAll('.tbar').length === 1
+      && d.el.querySelectorAll('canvas.pos-strip').length === 1
+      && bar.el.parentElement === view.surface.parentElement
+      && !!bar.el.parentElement?.classList.contains('pos-glue'),
+    `${d.el.querySelectorAll('.tbar').length} bar(s), `
+    + `${d.el.querySelectorAll('canvas.pos-strip').length} strip(s), `
+    + `in .${bar.el.parentElement?.className}`);
+
+  /**
+   * WHERE THE LANE'S LABEL BLOCK SITS, in canvas pixels, read off the picture
+   * rather than reasoned about. A layout claim on this site is a measurement:
+   * the gutter is filled flat before anything is drawn on it, so the first row
+   * holding a pixel that is not that fill is the top of the name and its
+   * swatch.
+   */
+  function gutterTop() {
+    const cv = view.el;
+    const box = cv.getBoundingClientRect();
+    if (!box.width || !cv.width) return null;
+    const g = Math.max(1, Math.round(view.strip.readout().gutter * (cv.width / box.width)));
+    const im = cv.getContext('2d').getImageData(0, 0, g, cv.height).data;
+    const ground = [im[0], im[1], im[2]];
+    for (let y = 0; y < cv.height; y++) {
+      for (let x = 0; x < g; x++) {
+        const i = (y * g + x) * 4;
+        if (Math.abs(im[i] - ground[0]) + Math.abs(im[i + 1] - ground[1])
+            + Math.abs(im[i + 2] - ground[2]) >= 24) return y;
+      }
+    }
+    return null;
+  }
+  /**
+   * The at-rest reading, kept fresh until the first mark is measured, so it is
+   * the last picture that existed while the lane had nothing to say rather than
+   * a guess about which frame that was.
+   * ⚠️ BEHIND THE GATE. Reading the canvas back every frame is real work and no
+   * visitor asked for it, and this project's standing rule is that a self-check
+   * never runs for a visitor.
+   */
+  let topAtRest = null;
+  if (SELFCHECK) (function sampleAtRest() {
+    if (measured.size) return;                    // something has landed; stop looking
+    const t = gutterTop();
+    if (t !== null) topAtRest = t;
+    requestAnimationFrame(sampleAtRest);
+  })();
 
   setInterval(() => {
     d.set('pos', deck.position());
