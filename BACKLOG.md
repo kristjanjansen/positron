@@ -87,6 +87,45 @@ limit on WHO and HOW LONG. The harness is the easy half, because `SELFCHECK` is 
 flag a person never has. The visitor half is the real question and it is not
 answered here.
 
+### Open 2026-09-25: `/webrtc/` has been GREEN WITH ZERO COVERAGE, and WHEP does not connect here at all
+
+🔴 **`node demo/verify.mjs webrtc` READS 8/8 GREEN AND THE PAGE'S OWN CHECKS
+HAVE NEVER RUN.** MEASURED 2026-09-25: `page asserted something · 2`, and those
+two are the SHELL's feedback-button asserts. Every claim that page makes about
+WebRTC sits behind `await d.run('check')`, which is the last line of a `for`
+loop that `return`s on success, so it is reached only after a connection that
+never happens. **Six of its eight greens are the shell's, and the page
+contributes none.**
+
+🔴 **BECAUSE WHEP DOES NOT CONNECT IN THIS HEADLESS CHROME, FOR ANY PAGE.**
+Probed directly on `/stage/` with the page's own log: the WHIP leg confirmed
+publishing in 0.1 s, `pc connecting` at 2.2 s, and the connection then sits in
+`connecting` until it times out, `pc failed` at about 17 s. Four attempts with
+the connection state judged explicitly, rather than on whether `whepPlay` threw:
+all four reached `connecting` and none reached `connected`.
+⚠️ **SO NINE OF `/stage/`'s TWELVE FAILURES ARE THE ENVIRONMENT, NOT THE PAGE**,
+and every hour spent "fixing" the page against them was spent against a wall.
+
+🔴 **AND THE COMPARISON THAT SENT ME THERE WAS THE FAULT.** `/webrtc/` was used
+all afternoon as the control, on the reasoning that it reads 8/8 against the
+SAME input in the SAME browser, so WHEP must work and `/stage/` must be doing
+something different. **A green page with no coverage is the worst possible
+control**, and this project already knows the shape: a green suite can mean zero
+coverage, and only the assert COUNT says so. The count was there to read the
+whole time.
+
+**WHAT IS ACTUALLY OWED:**
+1. **`/webrtc/` has to report that it could not connect** rather than passing.
+   A page that cannot reach its subject says so, the way `caps.mjs` un-links a
+   row WITH THE REASON IN WORDS.
+2. **`/stage/`'s show-dependent asserts need a leg the harness can carry.**
+   LL-HLS works headless (`llhls` is 12/12), so the checks should drive the HLS
+   transport and grade the same recorder, archive and strip behaviour through
+   it. That is a restructure of the check block, not a patch.
+3. **Whether WHEP connects from a REAL browser here is unmeasured.** Nothing in
+   this session opened one. It may well be fine for a visitor, and that is the
+   first thing to establish before anybody treats `/stage/` as broken.
+
 ### Open 2026-09-25: `/stage/` is DEPLOYED AT 37/49 and its WebRTC start fails cold
 
 🔴 **THE LIVE PAGE IS NOT GREEN AND I REPORTED THAT IT WAS.** MEASURED cold on
