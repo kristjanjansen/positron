@@ -87,6 +87,39 @@ limit on WHO and HOW LONG. The harness is the easy half, because `SELFCHECK` is 
 flag a person never has. The visitor half is the real question and it is not
 answered here.
 
+### Open 2026-09-25: WHEP MEDIA DOES NOT FLOW FROM THIS MACHINE, AND IT IS NOT THE CODE
+
+🔴 **MEASURED WITH NO POSITRON PAGE INVOLVED, IN A REAL HEADFUL CHROME, AGAINST
+THE LIVE INPUT.** A bare `RTCPeerConnection`, two recvonly transceivers, the
+WHEP POST, nothing else:
+
+    status         201        Cloudflare accepted the offer and answered
+    connection     failed
+    ice            disconnected
+    states         connecting -> failed
+    framesDecoded  0
+    bytesReceived  0
+
+**The signalling works and the media path does not.** This is a fact about the
+network this machine is on, not about `/stage/`, not about the harness, and not
+about headless Chrome, all three of which were blamed in turn today.
+
+⚠️ **SO EVERY WebRTC FAILURE ON `/stage/` IS DOWNSTREAM OF THIS**, and no amount
+of page work will move them from here. The same is true of `/webrtc/`, whose own
+checks have therefore never run on this desk.
+✅ **AND LL-HLS IS UNAFFECTED**, which is measured: `llhls` reads 12/12 against
+the deploy. The HLS transport is the one that works from anywhere, which is an
+argument for it beyond latency.
+🔴 **WHAT IS NOT KNOWN IS WHETHER IT WORKS FOR A VISITOR ELSEWHERE**, and
+nothing here can answer that. **Do not report `/stage/` as working or as broken
+on the strength of a run from this laptop.** The cheap test is somebody on
+another network opening it, or a phone on mobile data.
+⚠️ **AND THE DAY'S REAL LESSON IS ABOUT THE CONTROL, NOT THE NETWORK.**
+`/webrtc/` was used for hours as proof that WHEP worked, on the strength of an
+8/8 that contained **two** page asserts, both of them the shell's. A green page
+with no coverage is the worst possible control, and the assert count said so the
+whole time.
+
 ### Open 2026-09-25: `/webrtc/` has been GREEN WITH ZERO COVERAGE, and WHEP does not connect here at all
 
 🔴 **`node demo/verify.mjs webrtc` READS 8/8 GREEN AND THE PAGE'S OWN CHECKS
