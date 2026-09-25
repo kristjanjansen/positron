@@ -54,6 +54,68 @@ the path to blame. The thing that settled it in one run was having a SECOND leg
 on the same container with a different credential, which is a comparison that
 existed for an unrelated reason.
 
+### Open 2026-09-25: `/stage/` lost its loopback, and the gate that replaces it is owed
+
+🔴 **ASKED:** *"go both real leg. we build gate later. taavet (that my friend)
+wants demo"*, then *"jusr rm loopback and add note about it somewhere"*. This is
+the note.
+
+**WHAT WENT.** `loopback(stream)` built two `RTCPeerConnection`s in the same tab,
+wired them to each other, and handed the audience panel the track that came back
+out of the second one. It was the DEFAULT, and the real Cloudflare leg was
+behind `?live=1`.
+✅ **WHY IT WAS RIGHT AND WHY IT HAD TO GO.** It kept the shape of the thing
+being tested, a real encode, a real offer and answer, a real `ontrack`, so the
+recorder could still take the returned track rather than the canvas. What it
+could not do is be the thing somebody was sent a link to see. **A person opening
+the page got two peer connections talking to themselves and no Cloudflare at
+all**, which is the right default for a harness and the wrong one for a demo.
+
+🔴 **WHAT IT COSTS NOW, AND IT IS OWED RATHER THAN DECIDED AWAY.** `/stage/` is
+`built: true`, so it is in every full suite, and every pass now holds a real
+Cloudflare live input open. **Stream bills by the minute DELIVERED and buffering
+counts.** This was accepted knowingly in the words *"we build gate later"*, so
+the debt is recorded here rather than argued about.
+⚠️ **AND TWO DEAD BRANCHES WENT WITH IT.** `LIVE` is `const LIVE = true` now, so
+`if (!LIVE)` was a guard that could never fire, in two places. A dead guard reads
+as finished work and is this project's most expensive defect, so they were
+deleted rather than left looking like a fallback.
+
+⚠️ **WHAT THE GATE HAS TO BE, WHEN IT IS BUILT.** Not a return to loopback as the
+default: the lesson above is that the default is what a visitor meets. It is a
+limit on WHO and HOW LONG. The harness is the easy half, because `SELFCHECK` is a
+flag a person never has. The visitor half is the real question and it is not
+answered here.
+
+### Open 2026-09-25: `/stage/`'s control room has two ways to start and it confuses
+
+🔴 **ASKED, VERBATIM:** *"double play and start in stage control room is
+confusing. make just start primary button (or Start HLS | Start WebRTC?) and rm
+play button under video. measure"*
+
+Two controls that both look like "begin": the page's own start, and a `play`
+button under the video. Proposed shape is ONE primary control, and the
+parenthesis in the ask is the real question: a single `Start`, or a choice of
+`Start HLS` / `Start WebRTC`. ⚠️ **THE CHOICE READING IS THE ONE THAT FITS
+WHERE THIS IS GOING**, because the transport decision was settled the same day
+as ONE per show (*"no 2 transports in same time"*), and a control that names the
+transport is that decision made visible instead of hidden in a query parameter.
+
+🔴 **AND "measure" IS THE HALF THAT MAKES THIS NOT A COSMETIC CHANGE.**
+`CLAUDE.md`'s rule: adding or removing a control moves every other control's
+harness press, so the thing to look at is the per-page assert count before
+against after. `/stage/` carries `settleMs: 25000` in `demo/manifest.mjs`, so it
+is one of the slower pages to verify and the run should be `node demo/verify.mjs
+stage` alone rather than any suite.
+⚠️ **AND A DELETED CONTROL CAN TAKE AN ASSERT'S MEANING WITH IT.** The `/fau/`
+compile button did exactly that on 2026-09-24: three asserts were reading
+`d.button('compile').disabled` as evidence of power state, and deleting the
+conjunct was coverage lost at a count that did not move. Check what the `play`
+button's presses were standing in for before removing it.
+⚠️ **AND THE PROSE MOVES IN THE SAME COMMIT.** `what` on the page and `one` in
+`demo/manifest.mjs` both describe *"two presses, one for the picture and one for
+the show"*, which is exactly the thing being removed.
+
 ### Open 2026-09-25: the native reload rate limit does not exist, and two files say it does
 
 🔴 **FOUND while answering the config question, not looked for.**
