@@ -1,3 +1,58 @@
+# Handoff, 2026-09-25, session 50, a carry-over commit and a five ask round
+
+🔴 **THE SESSION BEFORE THIS ONE WAS CLOSED BY ACCIDENT WITH 8,285
+INSERTIONS UNCOMMITTED, AND THAT IS THE FIRST THING THIS SESSION DEALT WITH.**
+35 files across the demo pages, the kit and three skills, plus a new plan and
+`workers/tapes`, were sitting loose in the checkout. They are commit
+`22294ed` now.
+
+⚠️ **IT WAS COMMITTED WITHOUT A BROWSER RUN, AND THAT IS SAID PLAINLY
+RATHER THAN IMPLIED.** What was checked before staging: 18 demo pages parse
+under `check-html`, and the four no-browser kit tests read `instrument-test`
+17 ok, `looper-test` 18 ok, `chords-test` 49 ok, `diagram-test` 93 ok, all
+0 failed. **That is not a claim that any page is green.** `/stage/`'s 33/47
+from session 49 still stands and nothing below revisits it.
+
+✅ **A PEER SESSION IS LIVE IN THIS CHECKOUT AND WAS ASKED BEFORE THE INDEX
+WAS TOUCHED.** MEASURED first: every dirty file was last written between 20:30
+and 21:52 and the peer started about 21:58, so none of it was its work. It
+confirmed in writing that it holds nothing here. Staged by name, never
+`git add -A`, which the repository's own hook refuses anyway.
+
+## The five asks that arrived this session, all collected before any was worked
+
+They are in `BACKLOG.md` under `## Open`, newest first, written the way the
+2026-09-19 rule asks: verbatim, with the slug, the file and what is already
+known that makes each one non-obvious.
+
+1. **`/nola/`**: the instrument choice becomes the standard patch selector, the
+   footer gains a top border and a plate on its left.
+2. **`/shape/`**: the left rail goes and the plate moves to the top right.
+3. **An edge to edge horizontal separator** on each panel section.
+4. **`/knobs/`**: MIDI is always enabled and the plate stays vertical.
+5. **`resources` renames to `niemi`**, ASKED A SECOND TIME while the first ask
+   sat in this file unworked.
+
+🔴 **AND A DEFECT WAS FOUND IN THE CARRY-OVER WHILE BASELINING, WHICH IS
+THE KIND THAT STAYS RED FOREVER WITHOUT ANYBODY READING IT.**
+`demo/knobs/index.html:1447` asserts `inst.shown() === 'knobs'`, and
+`shown()` returns an **ARRAY** (`demo/shell/panel-layout.mjs:391`). An array is
+never equal to a string, **so that assert cannot pass in any circumstance.**
+`/shape/index.html:1375` does the same comparison correctly with
+`.join(' ')`. ⚠️ **AND ITS FAILURE MESSAGE READS PERFECTLY**, because
+`${inst.shown()}` stringifies a one element array to `knobs`, so the line says
+*the plate starts at 653.0 and reads “knobs”* while failing. A red
+that describes a healthy page is how a real regression gets lost in the noise.
+
+**BASELINE MEASURED before any edit of this round**, `nola shape knobs`
+together: **173/179 green, 6 failed**. ⚠️ One other headless Chrome was
+running alongside that suite, which the harness reported itself, so it is a
+baseline rather than evidence of a regression. Of the six, the relay ones and
+`this page makes no sound of its own` are the board being offline, measured
+the same day as `no reply in 5 s`, and not code.
+
+---
+
 # Handoff, 2026-09-25, session 49, a bad session with a few real fixes in it
 
 🔴 **READ THIS FIRST: THIS SESSION WASTED MOST OF A DAY AND REAL MONEY, AND THE
