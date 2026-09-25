@@ -9,8 +9,12 @@
 // needs a browser and none of them looks wrong from the outside, because every
 // one of them returns a perfectly good chord that is the wrong chord.
 //
-// TWENTY OF THESE ARE NEGATIVE CONTROLS: written so that the bug they name
-// would fail them, rather than so that today's code passes.
+// THESE ARE MOSTLY NEGATIVE CONTROLS: written so that the bug they name would
+// fail them, rather than so that today's code passes. The count is not written
+// down here, because three comments in two files carried three different counts
+// for one command on 2026-09-23 and all three were true when written. Count it:
+//
+//   grep -c 'NEGATIVE CONTROL' demo/shell/chords-test.mjs
 
 import { parseChord, parseChords, roman, voiceChord, VOICINGS, QUALITIES, QUALITY_SAYS, noteName, ROOT_OCTAVE }
   from './chords.mjs';
@@ -416,6 +420,145 @@ ok('an empty line has no key', parseChords('').key === null);
     })).filter(Boolean);
     ok('and every chord in every voicing lands on the two octaves this keyboard draws',
       outsideAny.length === 0, outsideAny.join(', ') || 'all of them inside 48 to 72');
+  }
+
+  /* 6. \u{1F534} THE SPLIT VOICING, AND THE ONLY EVIDENCE THAT EXISTS FOR IT IS FOUR
+        CHORDS IN A PICTURE. Asked 2026-09-25 as *"what voicing? wanna this"*
+        beside a piano tutorial of `Cmaj7 Dm7 Em7 Fmaj7` on two staves: one bass
+        note per chord in the left hand, C D E F, and three notes in the right
+        that barely move. So the note numbers are WRITTEN OUT here rather than
+        computed from the same rule the module uses, because a reader with the
+        picture in front of them can check these four lines by eye and cannot
+        check a formula. That is the `csound.mjs` lesson: a check derived from
+        the code it grades catches a typo and can never catch a misreading.
+        \u2705 AND THE SABOTAGE COUNTS ARE MEASURED RATHER THAN CLAIMED, 2026-09-25,
+        which is the only reason to believe any of this grades anything. Leaving
+        the root in the hand takes 4 red, dropping it from a slash chord as well
+        takes 2, placing the hand by span instead of leading it takes 1, and
+        dropping the fifth instead of the root takes 5. */
+  {
+    const splitOf = (line) => {
+      let prev = [], out = [];
+      for (const text of line) {
+        const parsed = parseChord(text);
+        const { notes } = voiceChord(parsed.notes,
+          { mode: 'split', lo: LO, hi: HI, near: prev, bass: parsed.bass !== null });
+        out.push(notes);
+        prev = notes;
+      }
+      return out;
+    };
+    const FOUR = ['Cmaj7', 'Dm7', 'Em7', 'Fmaj7'];
+    const got = splitOf(FOUR);
+    /* C3 / E3 G3 B3, D3 / F3 A3 C4, E3 / G3 B3 D4, F3 / A3 C4 E4. */
+    const WANT = [[48, 52, 55, 59], [50, 53, 57, 60], [52, 55, 59, 62], [53, 57, 60, 64]];
+    ok('the four chords in the picture come out as the picture has them',
+      got.map((n) => n.join(',')).join(' / ') === WANT.map((n) => n.join(',')).join(' / '),
+      got.map((n, i) => `${FOUR[i]} ${n.map(noteName).join(' ')}`).join(', '));
+    ok('and the left hand walks C D E F, one note a chord',
+      got.map((n) => noteName(n[0])).join(' ') === 'C3 D3 E3 F3',
+      got.map((n) => noteName(n[0])).join(' '));
+
+    /* \u{1F534} THE CLAIM IS ABOUT THE HAND ABOVE, SO THE HAND ABOVE IS WHAT IS
+       MEASURED. Every note of the right hand moves by a step and none of them
+       jumps, which is what *barely move* means on a stave and what a total in
+       semitones can say. */
+    const move = (a, b) => a.reduce((s, n) => s + Math.min(...b.map((m) => Math.abs(m - n))), 0);
+    const hand = got.slice(1).reduce((s, n, i) => s + move(n.slice(1), got[i].slice(1)), 0);
+    const worst = Math.max(...got.slice(1).map((n, i) =>
+      Math.max(...n.slice(1).map((x) => Math.min(...got[i].slice(1).map((y) => Math.abs(y - x)))))));
+    ok('and the hand above barely moves, no note of it further than a whole tone',
+      worst <= 2 && hand <= 16, `${hand} semitones over three changes, worst single move ${worst}`);
+
+    /* \u{1F534} ROOTLESS IS THE WHOLE POINT AND IT IS ASSERTED AS AN ABSENCE. A
+       mode that claimed to take the root out of the hand and left it there
+       would pass every structural check above: the notes would still be a
+       chord, still fit, still move little. */
+    const rootless = FOUR.every((text, i) => {
+      const r = parseChord(text).root;
+      return got[i].slice(1).every((n) => (((n % 12) + 12) % 12) !== r);
+    });
+    ok('the root is not in the right hand, which is the whole of what this mode is',
+      rootless, FOUR.map((t, i) =>
+        `${t} over ${noteName(got[i][0])} without ${noteName(parseChord(t).root + 60)[0]}`).join(', '));
+    ok('NEGATIVE CONTROL: and in the other three modes it is right there in the hand',
+      ['root', 'close', 'lead'].every((mode) => {
+        const c = parseChord('Cmaj7');
+        const { notes } = voiceChord(c.notes, { mode, lo: LO, hi: HI });
+        return notes.some((n) => (((n % 12) + 12) % 12) === c.root);
+      }), 'Cmaj7 keeps its C in root, close and lead');
+
+    /* \u{1F534} NOTHING IS LOST, WHICH IS WHY DROPPING A NOTE IS SAFE AT ALL. The
+       note that left the hand arrived underneath, so a split voicing holds
+       exactly the pitch classes of the spelling. This is the claim that has to
+       survive a triad, a power chord and a slash chord, and it is the one that
+       caught the first reading of what a slash chord should do. */
+    {
+      const pcs = (ns) => [...new Set(ns.map((n) => ((n % 12) + 12) % 12))].sort((a, b) => a - b).join(',');
+      const EVERY = ['Cmaj7', 'Dm7', 'Em7', 'Fmaj7', 'Cmaj', 'c5', 'Csus2', 'C13', 'F/C', 'Fm6/C'];
+      const lost = EVERY.filter((text) => {
+        const parsed = parseChord(text);
+        const { notes } = voiceChord(parsed.notes,
+          { mode: 'split', lo: LO, hi: HI, bass: parsed.bass !== null });
+        return pcs(notes) !== pcs(parsed.notes);
+      });
+      ok('a split voicing holds every note the symbol names, triads and slash chords included',
+        lost.length === 0, lost.length ? `lost a note in ${lost.join(', ')}` : `all ${EVERY.length} of them`);
+    }
+
+    /* \u{1F534} A TRIAD HAS NOTHING TO SPARE AND STILL LOSES ITS ROOT, WHICH IS A
+       DECISION RATHER THAN A CONSEQUENCE. Two notes in the right hand is the
+       answer: the alternative, dropping the fifth so that three are left, puts
+       the root back above a bass that already has it, which is the one thing
+       this mode exists to take away. The screenshots are all seventh chords, so
+       this case was unasked and is decided here. */
+    {
+      const { notes } = voiceChord(parseChord('Cmaj').notes, { mode: 'split', lo: LO, hi: HI });
+      ok('a triad is two notes in the right hand over its root, not three with the fifth gone',
+        notes.length === 3 && noteName(notes[0]) === 'C3'
+        && notes.slice(1).map(noteName).join(' ') === 'E3 G3',
+        notes.map(noteName).join(' '));
+      const five = voiceChord(parseChord('c5').notes, { mode: 'split', lo: LO, hi: HI }).notes;
+      ok('and a power chord is one note over its own root, which is still both of its notes',
+        five.map(noteName).join(' ') === 'C3 G3', five.map(noteName).join(' '));
+    }
+
+    /* \u{1F534} A SLASH CHORD KEEPS ITS ROOT, AND THE REASON IS THE PREMISE RATHER
+       THAN THE SHAPE. This mode's argument is that the note underneath already
+       has the root. `Fm6/C` names a different note underneath, the argument
+       stops being true about it, and taking the F out would delete a note the
+       symbol names. The first version of this dropped it and the check above
+       went red. */
+    {
+      const parsed = parseChord('Fm6/C');
+      const { notes } = voiceChord(parsed.notes, { mode: 'split', lo: LO, hi: HI, bass: true });
+      ok('a slash chord keeps its named bass underneath and its root in the hand',
+        (((notes[0] % 12) + 12) % 12) === parsed.bass
+        && notes[0] === Math.min(...notes)
+        && notes.slice(1).some((n) => (((n % 12) + 12) % 12) === parsed.root),
+        notes.map(noteName).join(' '));
+    }
+
+    /* \u{1F534} NEGATIVE CONTROL FOR THE PLACEMENT, WHICH IS THE HALF A STRUCTURAL
+       CHECK CANNOT SEE. Every assert above would pass on a mode that dropped the
+       root and then put the hand wherever it liked. What says the hand is being
+       LED is that it moves less over a line than the same mode with nothing to
+       lead from, which is the span rule this falls back to on a first chord. */
+    {
+      const LINE = ['Cmaj7', 'A7', 'Dm7', 'G7', 'Em7', 'A7', 'Dm7', 'G7'];
+      const led = splitOf(LINE);
+      let cold = [], total = 0, coldTotal = 0;
+      for (const text of LINE) {
+        const parsed = parseChord(text);
+        cold.push(voiceChord(parsed.notes, { mode: 'split', lo: LO, hi: HI, near: [] }).notes);
+      }
+      for (let i = 1; i < LINE.length; i++) {
+        total += move(led[i].slice(1), led[i - 1].slice(1));
+        coldTotal += move(cold[i].slice(1), cold[i - 1].slice(1));
+      }
+      ok('NEGATIVE CONTROL: the hand is led rather than placed, so a line moves less than the same chords placed alone',
+        total < coldTotal, `${total} semitones led against ${coldTotal} with nothing to lead from`);
+    }
   }
 }
 

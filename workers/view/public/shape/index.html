@@ -26,8 +26,55 @@
      existed to force, and a flat row lands it in the same place for nothing.
      ⚠️ NO SIDEWAYS DRAG AT ANY OF THE FOUR, measured as
      `scrollWidth - innerWidth` and 0 every time. The assert below re-checks it
-     at the one width the harness runs. */
+     at the one width the harness runs.
+
+     🔴 AND SINCE 2026-09-25 THE ROW IS THE WHOLE OF THIS PAGE'S CONTROLS, WHICH
+     IS A DIFFERENT ARRANGEMENT AND WAS RE-MEASURED RATHER THAN ARGUED FROM THE
+     NUMBERS ABOVE. Asked as a sketch of one line: *"[circuit connected]
+     [Synth1|Synths] [⇄] <- square button, makes all buttons `invisible hand`
+     staeting from random positions"*. Two things moved: the status control came
+     out of `.pos-controls`, where `demo/verify.mjs` presses, and
+     `move everything` became a 34 px square glyph.
+     ⚠️ THE SKETCH NAMES THREE AND THE ROW CARRIES FOUR, WHICH IS A DEPARTURE
+     AND IS NOT A SLIP. `put back` is the only way out of forty sliders moving
+     by themselves, and the page's own note on `move everything` says a button
+     that starts forty hands with no button that stops them is a page somebody
+     has to reload. It stays, on the end of the row, and it is reported.
+     🔴 MEASURED OFF REAL RECTS AT THE FOUR WIDTHS, 2026-09-25, with a
+     throwaway probe. The four controls are 195.1 (status), 288.4 (chooser on a
+     desktop, 215.1 in its phone layout with the label on top), 34.0 (the
+     glyph) and 100.6 (`put back`), with a 10 px gap between each:
+
+       390 px    column 358.0   three lines   status | chooser and glyph | put back
+       560 px    column 528.0   two lines     status, chooser and glyph | put back
+       756 px    column 688.0   ONE LINE      618.1 of content and 30 of gaps in 688
+      1280 px    column 688.0   ONE LINE      the same 648.1, the column is fixed
+
+     ⚠️ THE FOURTH CONTROL IS WHAT COSTS THE 560 px LINE, AND THAT IS THE PRICE
+     OF KEEPING `put back` RATHER THAN A FACT ABOUT THE SKETCH. Three would be
+     195.1 + 215.1 + 34 + 20 = 464.2 in a 528 px column, which is one line.
+     ⚠️ AND AT 390 NOTHING FITS HOWEVER MANY THERE ARE: three is the same 464.2
+     against a 358 px column. That is the picker's own phone layout, where the
+     status control and the chooser each grow a label on top, and it is the
+     break the two groups that used to be here existed to force. A row that
+     scrolled sideways instead is already recorded in this project as a thing
+     nobody reads.
+     ⚠️ AND NO SIDEWAYS DRAG AT ANY OF THE FOUR, re-measured the same way:
+     `documentElement.scrollWidth - innerWidth` is 0 at 390, 560, 756 and 1280,
+     and the case's own scroller is 0 past its box at all four as well. */
   .shape-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* 🔴 THE RACK IS THE PANEL'S SCROLLING REGION'S ONLY CHILD, AND IT NEEDS THE
+     TWO DECLARATIONS EVERY FLEX ITEM IN A SCROLLER NEEDS. `.panel-strip` is
+     `display: flex; overflow-x: auto`, and a flex item's automatic minimum size
+     is its CONTENT, so without `min-width: 0` a rack of 52 sliders sizes the
+     strip from its widest lane and the case drags sideways. `shell.css` writes
+     this down three times already, for `tabs.mjs` at 390 px, for `.pos-tbl-row`
+     and for the card grid.
+     ⚠️ AND `flex: 1 1 auto` IS THE OTHER HALF: the default `0 1 auto` leaves the
+     rack at its content width inside a strip that is as wide as the case, so
+     the two columns stop short of the right edge. */
+  .shape-rack { flex: 1 1 auto; min-width: 0; }
 
   /* 🔴 ONE LABEL COLUMN ACROSS EVERY SECTION, AND THIS IS WHY IT IS HERE AND
      NOT IN THE KIT. `.sld-group` sizes its label column `max-content`, so a
@@ -92,11 +139,13 @@
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createPresenceButton, WIRED } from '/shell/presence.mjs';
+  import { createInstrument } from '/shell/instrument.mjs';
+  import { centreSymbol } from '/shell/symbol.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { makeCcSend } from '/shell/cc-adapter.mjs';
-  import { MOVES, minSteps } from '/shell/hand.mjs';
-  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { MOVES, MOVE_GLYPH, minSteps } from '/shell/hand.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
   import { onChannel, param, ccBytes } from '/shell/circuit-cc.mjs';
 
   /**
@@ -171,14 +220,23 @@
      */
     readout: { 'cc out': '', rate: '/s', merged: '', changed: '' },
     /**
-     * 🔴 NO DECLARED CONTROL. The one control in `.pos-controls` is the
-     * presence button built below and spliced in, which is where
-     * `demo/verify.mjs` presses, and it is control 0 so it is the one that gets
-     * `settleMs`. A status control outside that row is a control no harness
-     * drives, and every check behind it would go silent while the suite stayed
-     * green.
-     * 🔴 AND NOTHING THAT SENDS IS IN THAT ROW. The harness presses every button
-     * in `.pos-controls` on every run, dozens of times a day; a hand button or a
+     * 🔴 NO CONTROL ROW AT ALL SINCE 2026-09-25, AND THIS BLOCK USED TO SAY THE
+     * OPPOSITE. It read *"the one control in `.pos-controls` is the presence
+     * button built below and spliced in, which is where `demo/verify.mjs`
+     * presses, and it is control 0 so it is the one that gets `settleMs`"*.
+     * The status control moved into the page's own row on the ask *"[circuit
+     * connected] [Synth1|Synths] [⇄]"*, so that row is now empty and
+     * `.pos-controls[hidden]` takes it off the page.
+     * 🔴 WHICH MEANS THE HARNESS PRESSES NOTHING AND THE PAGE PRESSES ITS OWN
+     * BUTTON. Everything behind `look`, `drive` included, runs because a press
+     * happens; with no press it would all go silent while the suite stayed
+     * green, which is the exact loss `positron-verify` records twice in one day
+     * on `/mirror/` and `/blocks/`. The press is made at the last line of this
+     * module, behind `SELFCHECK`, the way `/muta/` does it. See `bar.prepend`
+     * below.
+     * 🔴 AND NOTHING THAT SENDS WAS EVER IN THAT ROW, WHICH IS UNCHANGED AND IS
+     * THE HALF THAT MATTERS. The harness presses every button in
+     * `.pos-controls` on every run, dozens of times a day; a hand button or a
      * `put back` in there would be the suite writing to an instrument on this
      * desk. `slider.mjs` refuses a hand inside that row on its own, and there is
      * an assert on it below.
@@ -458,17 +516,124 @@
    * row on its own; nothing in the kit can refuse a BUTTON that starts forty of
    * them, so the page answers for it and asserts the placement below.
    */
-  const all = el('button', 'pos-btn', 'move everything', { type: 'button' });
-  all.title = 'put every slider on this part somewhere new, and let the ones with room to show it '
+  /**
+   * ⚠️ A GLYPH SINCE 2026-09-25, ASKED FOR AS A SQUARE: *"[circuit connected]
+   * [Synth1|Synths] [⇄] <- square button, makes all buttons `invisible hand`
+   * staeting from random positions"*. It read `move everything`.
+   * 🔴 A GLYPH IS NOT A NAME, SO THE NAME IS SAID TWICE OVER IN WORDS. Without
+   * `aria-label` this control is announced as the character `⇄`, and
+   * `shell.mjs` already does exactly this for every glyph control it builds
+   * itself. The `title` carries the whole sentence, which is what a reader with
+   * a pointer gets.
+   * ⚠️ `⇄` U+21C4 HAS NO EMOJI FORM, which is the rule this project keeps for
+   * its transport arrows: `⏪ ⏩ ⏹` default to a colour picture at the wrong
+   * size and baseline on some machines, and appending U+FE0E is honoured
+   * inconsistently. A character with no emoji presentation cannot be drawn as
+   * one anywhere.
+   * ⚠️ AND IT IS 34 px SQUARE BY `shell.css`'s OWN RULE, NOT BY A NUMBER TYPED
+   * HERE. `button[data-glyph="1"]` lost its `.pos-controls` scope on
+   * 2026-09-25 precisely so a glyph button outside that row is a square, and
+   * this page is the reason: everything that can reach the instrument is kept
+   * out of the harness row. A page drawing its own button still has to set the
+   * attribute, which is the seam that rule names.
+   * ⚠️ `centreSymbol` PUTS THE INK ON THE MIDDLE OF THE BOX rather than the
+   * advance and the baseline, which `place-items: center` would.
+   */
+  const hand = el('button', 'pos-btn', '⇄', { type: 'button', 'data-glyph': '1' });
+  hand.title = 'put every slider on this part somewhere new, and let the ones with room to show it '
     + 'go on moving by themselves';
-  all.onclick = () => moveEverything();
+  hand.setAttribute('aria-label', 'move everything');
+  centreSymbol(hand);
+  hand.onclick = () => moveEverything();
 
   const bar = el('div', 'shape-bar');
-  bar.append(parts.el, all, back);
+  bar.append(parts.el, hand, back);
 
   const rack = createStack(undefined, 'shape-rack');
-  const traffic = createMidiLog({ empty: 'move a slider and what it sends is listed here' });
-  d.stack.add(bar, rack.el, traffic.el);
+  /**
+   * 🔴 NO CAPTION, AND THE ROOM IS HELD ANYWAY. Asked 2026-09-25: *"rm move a
+   * slider and what it sends is listed here"*.
+   * 🔴 DROPPING THE OPTION WOULD NOT HAVE DONE IT, WHICH IS WHY THIS IS AN
+   * EMPTY STRING RATHER THAN AN OMISSION. `createMidiLog` defaults `empty` to
+   * `nothing has arrived yet`, so deleting the argument swaps one sentence for
+   * another. `empty: ''` is the component's own way of saying be silent, and
+   * `table.mjs` appends NO ELEMENT for it rather than an empty padded band.
+   * ⚠️ AND `reserve` IS THE HALF WORTH KEEPING, WHICH IS ALREADY WRITTEN DOWN
+   * ONE PAGE OVER. `shell.css` records the same ask on `/circuit/` 2026-09-21,
+   * *"press the status button, then play something - rm just leave room for
+   * midi table"*: the sentence was doing two jobs, telling a visitor what to
+   * press and holding the box open, and only the second is worth keeping. A box
+   * that collapses when the words go rearranges the page the moment the first
+   * message lands, which is this project's reflow rule.
+   * ⚠️ SO THIS IS JOINING A CONVENTION RATHER THAN INVENTING ONE: `/circuit/`,
+   * `/evo/` and `/twelve/` all read `{ empty: '', reserve: 6 }` and this page
+   * was the one outlier.
+   */
+  const traffic = createMidiLog({ empty: '', reserve: 6 });
+
+  /**
+   * 🔴 THE RACK IN THE INSTRUMENT BOX, 2026-09-25, ASKED FOR AS *"shape: / wrap
+   * into isntrument box. nameplate is \"shape\" vertical glued section"*. Seven
+   * pages already wear `createInstrument` over `createPanelLayout`, so this is
+   * `/shape/` joining them rather than anything being built here.
+   *
+   * 🔴 AND THE PLATE MOVED TO THE TOP RIGHT LATER THE SAME DAY, WHICH REVERSES
+   * THE SECOND HALF OF THAT ASK. Asked 2026-09-25 with a screenshot of the rack
+   * carrying a narrow column down its left edge: *"rm left panel / section. use
+   * nameplate on top right. shape demo"*. The left rail IS the vertical plate,
+   * so this is a reversal rather than a repair and the argument for the rail
+   * comes out with it instead of sitting here contradicting the page.
+   * 🔴 **`place: 'end'` AND NOT A HEADER, WHICH WAS CHECKED RATHER THAN
+   * ASSUMED.** `.panel-head-plate` is `grid-column: 2; justify-self: center`,
+   * so building a header row would put the plate in the CENTRE of the case.
+   * `end` is `/twelve/`'s placement exactly. MEASURED after the change on the
+   * live page at 1280 px: the case is `display: flex` again, the plate lands at
+   * x922.2..963.0 y359.5..370.5, its ink sits 20.0 px from the case's inner
+   * right edge and 20.0 px from its inner top, both of which are `--panel-pad`,
+   * and the strip takes the case's full inner width at x317..963.
+   * ⚠️ AND `plateSide` CAME OUT WITH IT RATHER THAN BEING LEFT SET.
+   * `panel-layout.mjs:189` reads it only when the placement is `side`, so a
+   * `plateSide: 'left'` under `place: 'end'` is an argument nothing reads,
+   * which is the dead-rule shape this project pays for most often.
+   * ⚠️ **AND `place: 'side'` STAYS IN THE KIT.** `/knobs/` is its other caller
+   * and keeps it, and `demo/shell/instrument-test.mjs` grades
+   * `plateSpec('', 'shape', 'side')` with no browser at all. That test is about
+   * the FUNCTION rather than about this page, so it is left alone: rewriting it
+   * to match this page would delete `/knobs/`'s only no-browser coverage of
+   * that path.
+   *
+   * 🔴 AND IT DOES NOT UNDO *"rm nameplates"*, WHICH HAS TO BE SAID BECAUSE THE
+   * TWO LOOK CONTRADICTORY. `instrument.mjs` records `plate: false`, added
+   * 2026-09-22 on that ask, and the reason it gives is specific: a HEADER's
+   * status control already prints the instrument's name in front of its state,
+   * so a plate beside it is the name twice on one row. This page has no header
+   * and no status control, so nothing else on this case says which instrument
+   * it is. **Both decisions stand.**
+   *
+   * ⚠️ `caps: false`, WHICH IS A DEPARTURE AND IS NAMED AS ONE. Every other
+   * plate in this project is upper case (`POSITRON TOM`, `MODEL 12`, `PLAITS`,
+   * `WARPS`) under a rule asked for 2026-09-21, *"replica names always in
+   * uppercase"*. That rule is about a shelf of REPLICAS reading as one shelf;
+   * this page is a replica of nothing, the name asked for is the page's own
+   * slug, and the ask spells it lower case.
+   *
+   * ⚠️ `side: null`, SO THERE IS NO FIXED COLUMN. `.panel-fixed-l` draws a
+   * border facing the scroller, so a case with an empty fixed column would
+   * paint a vertical rule with nothing beside it, which is the empty-box rule
+   * standing on its end. This instrument is one scrolling region and a plate.
+   * ⚠️ AND `flow: false`, WHICH IS MEASURED RATHER THAN PREFERRED.
+   * `.panel-flow` is `width: max-content`, so the rack's `minmax(0, 1fr)` lanes
+   * would size to their longest content and the strip would scroll sideways
+   * inside the case. With no flow the rack is the strip's own child and the
+   * page rule below gives it the `flex: 1 1 auto; min-width: 0` a scrolling
+   * flex row needs.
+   */
+  const inst = createInstrument({
+    name: 'shape', maker: '', place: 'end', caps: false,
+    panel: { side: null, flow: false },
+  });
+  inst.add(rack.el);
+  d.stack.add(bar, inst.el, traffic.el);
 
   /**
    * ⚠️ A PART'S RACK IS BUILT ONCE AND KEPT. Rebuilding on every press would
@@ -999,8 +1164,33 @@
     can: ['unknown', 'checking', 'online', 'offline'],
     press: () => { presses++; return d.run('look'); },
   });
-  d.controls.hidden = false;
-  d.controls.append(pres.el);
+  /**
+   * 🔴 THE STATUS CONTROL JOINED THE PAGE'S OWN ROW ON 2026-09-25 AND LEFT
+   * `.pos-controls` EMPTY, WHICH IS A COVERAGE CHANGE AND NOT A LAYOUT ONE.
+   * Asked as a sketch of one line: *"[circuit connected] [Synth1|Synths]
+   * [⇄]"*. It was spliced into `.pos-controls` before that, and the comment on
+   * `controls: []` above said why in as many words: `demo/verify.mjs` drives a
+   * page by clicking every button in that row, this was the only one in it, and
+   * **everything behind `look` runs because the harness presses it** including
+   * the whole of `drive`.
+   * 🔴 SO THE PAGE PRESSES ITS OWN BUTTON, BEHIND `SELFCHECK`, AT THE LAST LINE
+   * OF THE MODULE. That is `/muta/`'s arrangement exactly, written down there
+   * as *"a harness presses the row of controls under a page and this page has
+   * none, so every press it takes is one the page makes for it"*, and
+   * `/mirror/` does the same for headset buttons it can no longer reach.
+   * ⚠️ IT PRESSES THE REAL CONTROL RATHER THAN CALLING `d.run('look')`, because
+   * a check that reaches past the control would pass on a page whose button was
+   * wired to nothing, which is the defect this arrangement could introduce.
+   * ⚠️ AND `settleMs` GOES WITH IT. That number only ever lands on control 0,
+   * and there is no control 0 now; what covers the hand's 7000 ms sweep is
+   * `verify.mjs`'s own growth loop, which tolerates 2.0 s of silence for up to
+   * 24 s. The manifest row still declares 4000 and it is now inert on this
+   * page, which is reported rather than edited from here.
+   * ⚠️ `prepend` BECAUSE THE ROW IS BUILT BEFORE THIS CONTROL EXISTS, and the
+   * sketch puts the status first. The order is `[Circuit …] [sends to …] [⇄]
+   * [put back]` and there is an assert on it below.
+   */
+  bar.prepend(pres.el);
 
   d.on('look', async () => {
     pres.set('checking');
@@ -1060,6 +1250,32 @@
    * fails on the same defect the old one caught. ⚠️ Eleven rather than nine,
    * because two columns give a short-labelled section two wrong edges instead of
    * one.
+   *
+   * 🔴 AND FOUR MORE SABOTAGES ON 2026-09-25, WHEN THE PAGE GAINED THE
+   * INSTRUMENT BOX, THE GLYPH AND THE ROW. The page read **49/49 with 43 page
+   * asserts** that day (it was 45/45 with 39), and it reads **50/50 with 44**
+   * since the plate moved to the top right and its one assert became two.
+   * Three broken at once, each taking exactly its own assert red and nothing
+   * else, **49 to 46**:
+   *   `caps: true`     the plate reads `SHAPE`, and the placement half stays
+   *                    green, which is right: the placement was not what was
+   *                    broken. ⚠️ THAT SABOTAGE WAS RUN AGAINST THE OLD ASSERT,
+   *                    which measured the plate's HEIGHT against the case, and
+   *                    it has NOT been re-run against the two that replaced it
+   *                    when the plate moved to the top right later the same day.
+   *                    The name half is `shown()` either way, so the reading is
+   *                    expected to hold and is not a measurement
+   *   no `data-glyph`  **45.83 by 34.00**, which is the number `shell.css`
+   *                    records from `/wish/` for a glyph button outside
+   *                    `.pos-controls`, reproduced here on the page that
+   *                    prompted the rule losing its scope
+   *   a caption back   `a caption` where the assert wants none
+   * 🔴 AND THE FOURTH IS THE ONE WORTH THE WHOLE EXERCISE, BECAUSE NOTHING WENT
+   * RED. Taking out the `ifSelfcheck` press at the foot of this module left the
+   * page at **28/28 GREEN with 22 page asserts**: twenty-one checks stopped
+   * running, not one of them failed, and only the COUNT said so. That is the
+   * measured cost of moving the status control out of `.pos-controls`, and it
+   * is why that press is not a tidy-up.
    */
 
   /**
@@ -1104,25 +1320,165 @@
      * INSTRUMENT. `slider.mjs` refuses to run one from inside that row and says
      * so on its own face; this asserts the row is clean on this page, which is
      * the half a component cannot check for a page it does not know about.
+     * ⚠️ IT READ `=== 1` UNTIL 2026-09-25 AND THE ONE WAS THE STATUS CONTROL.
+     * That control is in the page's own row now, so the harness row is empty and
+     * the number is zero. The claim is the same claim: nothing the suite presses
+     * on this page can reach the Circuit.
      */
     d.assert('no control in the harness row can send, and no hand lives in it',
       document.querySelectorAll('.pos-controls .sld-hand').length === 0
-      && document.querySelectorAll('.pos-controls button').length === 1,
-      `${document.querySelectorAll('.pos-controls button').length} button in the row`);
+      && document.querySelectorAll('.pos-controls button').length === 0,
+      `${document.querySelectorAll('.pos-controls button').length} buttons in the row`);
 
     /**
      * 🔴 AND THE CONTROLS THAT CAN REACH AN INSTRUMENT ARE NAMED, NOT COUNTED.
-     * The assert above would still pass if `move everything` were in the harness
-     * row and the presence button were not, and that arrangement is the suite
-     * starting forty hands on somebody's synth on every run. Counting buttons
-     * cannot see which button; this names both of them.
-     * ⚠️ IT NAMED THREE UNTIL THE OUTPUT CHOOSER WAS REMOVED. The rule it
-     * protects is unchanged and is the one that matters: nothing that can send
-     * sits in the row `demo/verify.mjs` clicks.
+     * The assert above would still pass if `⇄` were in the harness row and the
+     * status control were not, and that arrangement is the suite starting forty
+     * hands on somebody's synth on every run. Counting buttons cannot see which
+     * button; this names all three.
+     * ⚠️ IT NAMED THREE, THEN TWO WHEN THE OUTPUT CHOOSER WENT, AND NAMES THREE
+     * AGAIN NOW THAT THE STATUS CONTROL HAS JOINED THEM. The rule it protects is
+     * unchanged and is the one that matters: nothing that can reach the
+     * instrument sits in the row `demo/verify.mjs` clicks.
      */
-    d.assert('move everything and put back both sit in the page row and neither is in the harness row',
-      [all, back].every((e) => bar.contains(e) && !e.closest('.pos-controls')),
-      `${[all, back].filter((e) => bar.contains(e)).length} of 2 in .shape-bar`);
+    const mine = [pres.el, hand, back];
+    d.assert('the status button, the hand and put back all sit in the page row and none is in the harness row',
+      mine.every((e) => bar.contains(e) && !e.closest('.pos-controls')),
+      `${mine.filter((e) => bar.contains(e)).length} of 3 in .shape-bar`);
+
+    /**
+     * 🔴 THE ROW IS ONE LINE AND IT IS IN THE ORDER THAT WAS ASKED FOR, WHICH IS
+     * TWO CLAIMS AND THEREFORE TWO HALVES OF ONE MEASUREMENT. Asked as a sketch:
+     * *"[circuit connected] [Synth1|Synths] [⇄]"*. Left edges in ascending order
+     * is the order; every top on one line is the line. A row that wrapped would
+     * still be in order, and a row in the wrong order would still be one line.
+     * ⚠️ IT IS THE RECTS AND NOT THE DOM. `.shape-bar` is `flex-wrap: wrap`, so
+     * source order tells you nothing about what a reader sees, and this project
+     * has paid four times for a layout claim read out of a stylesheet.
+     * ⚠️ AND IT IS TRUE AT THE ONE WIDTH THIS HARNESS RUNS, 756 px. The four
+     * widths in the note above the stylesheet were measured with a throwaway
+     * probe and are not this assert.
+     */
+    const row = [pres.el, parts.el, hand, back].map((e) => e.getBoundingClientRect());
+    d.assert('the four controls sit on one line, in the order the sketch put them',
+      row.every((r) => Math.abs(r.top - row[0].top) <= 1.5)
+      && row.every((r, i) => i === 0 || r.left > row[i - 1].left),
+      `${new Set(row.map((r) => Math.round(r.top))).size} line at ${Math.round(innerWidth)} px, `
+      + `left edges ${row.map((r) => Math.round(r.left)).join(', ')}`);
+
+    /**
+     * 🔴 A GLYPH IS A PICTURE, SO IT IS NOT A NAME, AND THE SQUARE IS READ OFF
+     * THE RENDERED BOX RATHER THAN OFF THE ATTRIBUTE. `shell.css` records
+     * exactly this trap on `/wish/`: `data-glyph` correctly set and the button
+     * **45.83 px wide against 34.00 tall**, because the rule was scoped to
+     * `.pos-controls` and this button is deliberately outside it. An assert on
+     * the attribute would have been green through all of that.
+     */
+    const g = hand.getBoundingClientRect();
+    d.assert('the hand button is a square and says its name in words rather than in a symbol',
+      Math.abs(g.width - g.height) <= 0.5 && Math.round(g.width) === 34
+      && (hand.getAttribute('aria-label') || '').trim().length > 1,
+      `${g.width.toFixed(2)} by ${g.height.toFixed(2)}, announced as "${hand.getAttribute('aria-label')}"`);
+
+    /**
+     * 🔴 THE PLATE IS IN THE CASE'S TOP RIGHT CORNER, ONE INSET IN FROM BOTH
+     * EDGES, 2026-09-25: *"rm left panel / section. use nameplate on top right.
+     * shape demo"*. This assert used to measure the plate's HEIGHT against the
+     * case's inner height, because the plate was a rail down the left edge. The
+     * rail is gone and so is that measurement.
+     * 🔴 **AND IT IS TWO ASSERTS BECAUSE `top right` IS TWO ALIGNMENTS THAT
+     * LOOK LIKE ONE.** They are set by two different rules in `shell.css` and
+     * can break separately: the right edge comes from
+     * `.panel-plate[data-place="end"]`, which is `justify-content: flex-end`
+     * plus `margin-left: auto`, and the top inset comes from
+     * `.panel-case > .panel-plate`, which is `padding-block: var(--panel-pad) 0`
+     * and reaches every cased page. `positron-ui` records `/twelve/` having two
+     * of three alignments line up while the third was 30 px out, which is the
+     * failure a single bundled assert cannot report.
+     * 🔴 **THE INK IS MEASURED, NOT THE PLATE.** `.panel-plate` is a flex box
+     * that spans the case's whole content width, so its own rect is right at
+     * both edges whatever the placement does to the name inside it: a check
+     * reading `plate.el` would pass under `ends`, under `mid` and under a
+     * placement that had stopped working. `plate.lines[0]` is the `shape` line
+     * itself, which is the thing a reader is looking at.
+     * ⚠️ **AND THE INSET IS READ ONCE, OFF THE CASE, RATHER THAN TYPED TWICE.**
+     * `.panel-case` is `padding: 0 var(--panel-pad)`, so its computed
+     * `padding-right` IS that token, and the plate's own `padding-block` is the
+     * same token again. A `20` typed here would be a shared measurement in two
+     * files, which is the defect `--sld-col` exists to stop.
+     * ⚠️ MEASURED AGAINST THE CASE'S INNER EDGES, NOT ITS BORDER BOX, which is
+     * what the old assert already did for the height: the case carries a 1 px
+     * border and comparing against the outer box reports a shortfall on a plate
+     * that is exactly right.
+     * ⚠️ AND THE NAME IS READ THROUGH `shown()`, WHICH ASKS THE BROWSER WHAT IT
+     * RENDERED. `/circuit/` typed `novation` and rendered `NOVATION` on
+     * `text-transform` alone, and a check reading `textContent` graded the
+     * source and stayed green either way. `caps: false` is a claim about the
+     * PICTURE, so it is read off the picture.
+     */
+    const caseBox = inst.case.getBoundingClientRect();
+    const cs = getComputedStyle(inst.case);
+    const pad = parseFloat(cs.paddingRight);
+    const innerRight = caseBox.right - parseFloat(cs.borderRightWidth);
+    const innerTop = caseBox.top + parseFloat(cs.borderTopWidth);
+    const ink = inst.plate.lines[0].getBoundingClientRect();
+    d.assert('the nameplate is at the right of the case, one inset in, and it reads shape in lower case',
+      inst.plate.place === 'end' && inst.shown().join(' ') === 'shape'
+      && Math.abs((innerRight - ink.right) - pad) <= 1,
+      `ink right ${ink.right.toFixed(1)} against inner right ${innerRight.toFixed(1)}, `
+      + `${(innerRight - ink.right).toFixed(1)} px of a ${pad.toFixed(1)} px inset, reading `
+      + `${inst.shown().join(' ')}`);
+
+    d.assert('and it sits at the top of the case, the same inset down',
+      Math.abs((ink.top - innerTop) - pad) <= 1,
+      `ink top ${ink.top.toFixed(1)} against inner top ${innerTop.toFixed(1)}, `
+      + `${(ink.top - innerTop).toFixed(1)} px of a ${pad.toFixed(1)} px inset`);
+
+    /**
+     * 🔴 AN EMPTY TABLE DRAWS NO HEADING AND SAYS NOTHING, AND IT STILL HOLDS
+     * ITS ROOM. Asked as *"rm move a slider and what it sends is listed here"*,
+     * and the caption was doing two jobs: a column name over no rows labels air,
+     * and a box that collapses when the words go moves the log and the end of
+     * the page the moment the first message lands.
+     * 🔴 READ THE COMPUTED `display`, NEVER `head.hidden`. `shell.css` records
+     * `/pack/` carrying this exact assert on the PROPERTY while three headings
+     * were on screen, because `.pos-tbl-row` sets `display: grid` and any author
+     * rule beats the browser's own `[hidden]`. Only the computed value knows
+     * which rule won.
+     */
+    /* ⚠️ AND THE SIX ROWS ARE MEASURED THROUGH THE BROWSER RATHER THAN PARSED.
+       `--tbl-row-h` is a custom property holding a `calc()`, so
+       `getComputedStyle(x).getPropertyValue('--tbl-row-h')` hands back the
+       TOKEN and `parseFloat` on it is `NaN`. This assert went red on its first
+       run for exactly that, on a box that was already the right height. One
+       throwaway element sized by the same property is the browser resolving it,
+       which is the only thing that knows. There is no real row to measure here
+       because the whole claim is about a table with nothing in it.
+       🔴 AND IT IS A `<span>` RATHER THAN A `<div>`, WHICH IS THE SECOND WAY
+       THIS READ ZERO AND COST TWO RUNS. `shell.css` carries `.pos-stack >
+       div:empty { display: none }` for the empty-box rule, a ruler is an empty
+       div by definition, and **`document.body` IS a `.pos-stack`**
+       (`shell.mjs` adopts it), so moving the ruler out of the page and onto the
+       body did not escape it. MEASURED both times: `getBoundingClientRect()`
+       **0.00 px** while `getComputedStyle().height` read **32.4px**, because a
+       computed height is a fact about the cascade and a rect is a fact about
+       the screen. That rule names six container tags one by one and `span` is
+       not among them.
+       ⚠️ ABSOLUTE AND HIDDEN, so it cannot move anything while it is there. */
+    const ruler = document.body.appendChild(el('span', '', '', {
+      style: 'position: absolute; visibility: hidden; display: block; height: var(--tbl-row-h)',
+    }));
+    const rowH = ruler.getBoundingClientRect().height;
+    ruler.remove();
+    const head = traffic.el.querySelector('.pos-tbl-head');
+    const box = traffic.el.getBoundingClientRect();
+    d.assert('the empty log carries no caption and no heading, and still holds six rows of room',
+      traffic.count() === 0
+      && !traffic.el.querySelector('.pos-tbl-empty')
+      && (!head || getComputedStyle(head).display === 'none')
+      && rowH > 0 && box.height >= 6 * rowH - 1,
+      `${box.height.toFixed(2)} px of box for six rows of ${rowH.toFixed(2)}, `
+      + `${traffic.el.querySelector('.pos-tbl-empty') ? 'a caption' : 'no caption'}`);
 
     /**
      * 🔴 A NAME IS A GUESS AND THIS IS THE WHOLE OF IT. Two lists and the
@@ -1365,7 +1721,7 @@
     const coarse = sliders.filter((s) => !s.sld.hand);
     const startsBefore = handStarts, linesBefore = handLines;
     sink.length = 0;
-    all.click();
+    hand.click();
     flushNow();
 
     d.assert('one press leaves every lane with room for a hand moving by itself, and the coarse ones alone',
@@ -1445,6 +1801,30 @@
   });
 
   grade();
+
+  /**
+   * 🔴 THE PRESS THE HARNESS NO LONGER MAKES, MADE HERE, BEHIND THE GATE.
+   * `.pos-controls` is empty since the status control joined the page's own
+   * row, and `demo/verify.mjs` drives a page by clicking that row, so without
+   * this line `look` never runs, `drive` never runs, and every assert behind
+   * them goes silent while the suite reads green. `/muta/` carries the same
+   * line for the same reason and `/mirror/` drives its headset buttons the same
+   * way.
+   * ⚠️ AFTER `grade()`, NOT BEFORE IT. `a visit opened nothing`, `a visit
+   * chooses no output and opens no port` and `the page knows how far it has
+   * moved the instrument` are all statements about a page nobody has pressed,
+   * so they are read while that is still true.
+   * ⚠️ AND BEFORE `d.ready()`, WHICH IS DELIBERATE AND WAS GOT WRONG ONCE ON
+   * `/muta/`. `verify.mjs` waits 7.4 s for `ready` before it grades anything,
+   * so a page that only says it is ready when its checks have FINISHED is never
+   * graded at all. The flag means this page is up.
+   */
+  ifSelfcheck(() => pres.el.click(), {
+    log: d.log,
+    say: 'the checks behind the status button move handles and produce bytes, so they run '
+      + 'under a harness and never for somebody who just opened this page',
+  });
+
   d.ready();
 </script>
 </html>

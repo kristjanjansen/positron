@@ -47,10 +47,42 @@
      and the line under the grid that says what was last heard. */
 
   /* ⚠️ THE LABEL COLUMN IS THE PANEL'S FIXED COLUMN, so it carries both the
-     component's class and the panel's. `.pos-pg-labs` already takes the border
-     off and sets the width; this one line is the gap the panel's flow would
-     normally carry and this page does not use the flow. */
-  .tom-fixed { gap: var(--pg-gap); }
+     component's class and the panel's. The gap is the one the panel's flow
+     would normally carry and this page does not use the flow.
+
+     🔴 AND THE GUTTER AND THE DIVIDER COME BACK OFF HERE, WHICH THEY DID NOT
+     FOR THREE DAYS. REPORTED 2026-09-25 AS *"you lost 2-digin numbers from tom
+     demo"* with a crop of the gutter reading `5 5 5 5 5 5 5 5 6 6 6 6` down the
+     last twelve rows, which is 52 to 63 with the second digit gone.
+     🔴 IT IS A CLIP AND NOT A TRUNCATION, WHICH WAS MEASURED BEFORE ANYTHING
+     WAS CHANGED, because the two look identical in a screenshot and have
+     different fixes. `label: (r) => String(r)` and every `textContent` in the
+     column was the whole number; what was wrong was the box. MEASURED at
+     1280 px: `.pos-pg-labs` computed `padding-right: 16px` and
+     `border-right-width: 1px` against `width: 22px` under `box-sizing:
+     border-box`, so a label's border box was **6.00 px** and its CONTENT box
+     **0.00 px**, against **12.04 px** of ink for `52`, `scrollWidth 18` in a
+     `clientWidth 6`. One character is what fits in six pixels.
+     🔴 THE CAUSE IS A RULE THAT LOST ON SOURCE ORDER, AND IT USED TO BE THIS
+     LINE. Before 2026-09-22 this page carried `.tom-fixed { border-right: 0;
+     padding-right: 0 }` with a comment reading *"NO DIVIDER"*. `2a8a450` moved
+     it into the component as `.pos-pg-labs { border-right: 0; padding-right: 0 }`
+     at `shell.css:2318`, and `.panel-fixed-l` at `shell.css:5636` sets both of
+     them back. **Both are (0,1,0) and the panel's is 3,300 lines later, so the
+     component's declarations have never once applied.** A page rule in this
+     block is in a `<style>` after the `<link>`, which is how it won before the
+     move and how it wins now.
+     ⚠️ `--pg-lab` IS NOT THE NUMBER TO CHANGE. 22 px holds `63` with room: the
+     label's own `padding: 0 6px 0 0` leaves 16 px for 12.04 px of ink, which is
+     what the assert below reads. Widening the column to pay for a gutter the
+     grid asked to have removed would put the divider back at 108 px of width.
+     ⚠️ AND IT IS A PAGE RULE UNDER PROTEST. The durable repair is in the
+     component and is one of two lines in `shell.css`, either moving `.pos-pg-labs`
+     after `.panel-fixed-l` or writing it `.panel-fixed.pos-pg-labs`. This page
+     is the only caller that puts a step grid's labels on a panel's fixed column
+     (`/kit/`'s three specimens hand it a bare `div`), so nothing else is
+     affected today and nothing else grades it either. */
+  .tom-fixed { gap: var(--pg-gap); border-right: 0; padding-right: 0; }
 
   /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
      prose allowed here at all. It says which sample was last heard and why, and
@@ -880,11 +912,51 @@
   }
 
   // ── opening a file ──────────────────────────────────────────────────────
+  /**
+   * 🔴 A PACK THAT ARRIVES STARTS THE TRANSPORT, ASKED FOR 2026-09-25 AS
+   * *"autoplay when i upload saple pack"* and confirmed as a REQUEST rather
+   * than a report that it already does this.
+   * 🔴 AND IT IS INSIDE THE STANDING RULE RATHER THAN AN EXCEPTION TO IT. *"A
+   * visit, a step and a scrub must open nothing"* is about a VISIT. This runs
+   * only from `drop.mjs`'s `onOpen`, which fires after a person has dragged a
+   * file onto the page or picked one out of the operating system's dialog, so
+   * what starts here is a consequence of a gesture somebody made. **A visit
+   * still opens nothing and still makes no sound**, and the assert that says so
+   * runs before any of this and is unchanged.
+   * 🔴 SO IT IS HERE AND NOT IN `openPack`, WHICH IS THE LOAD-BEARING HALF.
+   * `openPack` is also called by the reading checks with `?pack=<url>`, by
+   * `openZip` once per pack inside an archive, and by anything that reads bytes
+   * from somewhere other than a person's hand. Starting a transport in there
+   * would mean the page began playing because a HARNESS read a file, which is
+   * the load-on-a-visit defect arriving through the back door, and it would
+   * take the audition check red on its own `deck.playing() === false`.
+   * ⚠️ ONLY WHERE SOMETHING OPENED. `openPack`, `openStream` and `openZip` all
+   * answer `true` or `false`, so a file that was refused leaves the transport
+   * where it was: there is nothing to play, and a page that started running
+   * after saying *"holds no samples"* would be saying two things at once.
+   * ⚠️ AND IT SEEKS TO 0 FIRST, so the first thing heard is the first step of
+   * the pattern rather than wherever the playhead was left. That is the same
+   * move `rewindIfStopped` already makes on the toggle.
+   * ⚠️ WHAT PLAYS ON A GRID WITH NOTHING ON IT IS SILENCE, AND THAT IS THE
+   * INTENDED READING OF THE ASK. The pattern survives a pack arriving and an
+   * empty one stays empty, so this is the sequencer being put in motion rather
+   * than a sound being triggered: a reader who then taps a cell hears it on the
+   * next lap without having to find the play button first. `wrapAt` keeps it
+   * looping. Nothing is asked of anybody's server and no sound is made until a
+   * cell is on.
+   */
   async function openFiles(files) {
+    let opened = false;
     for (const f of files) {
-      if (f.name.toLowerCase().endsWith('.zip')) { await openZip(f.name, f.bytes); continue; }
-      await openPack(f.name, f.bytes);
+      const ok = f.name.toLowerCase().endsWith('.zip')
+        ? await openZip(f.name, f.bytes)
+        : await openPack(f.name, f.bytes);
+      opened = opened || ok === true;
     }
+    if (!opened) return false;
+    deck.seek(0);
+    if (!deck.transport.playing) deck.transport.play();
+    return true;
   }
 
   /**
@@ -1137,6 +1209,71 @@
     d.assert('and the last one still does, so the two columns share one pitch',
       Math.abs(nz.top - rz.top) < 1 && Math.abs(nz.bottom - rz.bottom) < 1,
       `top ${(nz.top - rz.top).toFixed(2)} px apart over ${grid.labels.length} rows`);
+  }
+
+  /**
+   * 🔴 THE GUTTER'S NUMBERS ARE READ, AND NOTHING READ THEM UNTIL 2026-09-25.
+   * Reported as *"you lost 2-digin numbers from tom demo"* against a screenshot
+   * that ALSO showed the page fully green, which is this project's worst shape
+   * arriving in its cheapest form: every row in the column existed, every one
+   * was at the right height, every `textContent` was the whole number, and all
+   * four of the asserts above were true while a reader could see `5` where `52`
+   * belongs. The three alignment checks measure where a label IS and none of
+   * them measures whether it can be READ.
+   * 🔴 SO IT IS THE RENDERED BOX AGAINST THE INK, WHICH IS WHAT TELLS A CLIP
+   * FROM A TRUNCATION. A `slice` shortens `textContent` and a narrow box does
+   * not, so a check reading only the text would have been green on the defect
+   * that was reported, and a check reading only the width would be green on the
+   * other one. Both are read here: the text is compared with what the column
+   * shows of it.
+   * ⚠️ THE INK IS MEASURED IN THE LABEL'S OWN FONT rather than counted in
+   * characters, because `tabular-nums` and the mono face are what make two
+   * digits 12.04 px wide and a rule that counted characters would be a
+   * different number on the next stylesheet.
+   * ⚠️ AND THE `font` SHORTHAND DOES NOT SERIALISE HERE. `getComputedStyle`
+   * returns `""` for it on an element carrying `font-variant-numeric`, MEASURED
+   * on this page, so `ctx.font` is built from the longhands. A canvas font
+   * string that fails to parse is IGNORED SILENTLY and measures the 10 px
+   * default instead, which is `xy-pad.mjs`'s own recorded trap and would make
+   * this assert pass on a clipped column.
+   * ⚠️ EVERY ROW, NOT THE WIDEST ONE. 0 to 9 fit a box that cuts 52 in half, so
+   * a check on one label grades whichever label it picked.
+   */
+  {
+    const labs = grid.labels;
+    const cs = getComputedStyle(labs[0]);
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const inner = (n) => n.clientWidth - parseFloat(getComputedStyle(n).paddingRight)
+      - parseFloat(getComputedStyle(n).paddingLeft);
+    const cut = labs.filter((n) => n.scrollWidth > n.clientWidth);
+    /* `>=`, so a tie keeps the LAST of them. Every label from 10 up is the same
+       width, and `63` is the one a reader goes looking for when a digit is
+       missing, so it is the one the detail should name. */
+    const widest = labs.reduce((a, b) =>
+      (ctx.measureText(b.textContent).width >= ctx.measureText(a.textContent).width ? b : a));
+    const ink = ctx.measureText(widest.textContent).width;
+    const room = inner(widest);
+    d.assert('every number in the gutter is rendered whole, second digit and all',
+      cut.length === 0 && room >= ink && labs.length === REST_ROWS
+      && labs.every((n) => n.textContent !== ''),
+      `the widest is "${widest.textContent}" at ${ink.toFixed(2)} px of ink in a `
+      + `${room.toFixed(2)} px box, ${cut.length} of ${labs.length} clipped`);
+
+    /**
+     * 🔴 AND THE RULE DOWN THE MIDDLE IS THE SAME REGRESSION'S OTHER HALF, SO
+     * IT IS ITS OWN ASSERT. Asked for once as *"rm divider vert line next to
+     * pads"*: the numbers and the pads are one grid rather than two panels, and
+     * a line between them says otherwise. The padding and the border arrive
+     * from the same losing rule, and they can be repaired one without the
+     * other, so a single check would report the divider being back as a digit
+     * problem or miss it entirely.
+     */
+    const col = getComputedStyle(fixedEl);
+    d.assert('the gutter gives up the panel’s own rule and gutter, because the numbers are part of the grid',
+      col.borderRightWidth === '0px' && col.paddingRight === '0px',
+      `border-right ${col.borderRightWidth}, padding-right ${col.paddingRight}, `
+      + `column ${fixedEl.getBoundingClientRect().width.toFixed(2)} px wide`);
   }
 
   /**
@@ -1615,9 +1752,13 @@
           && parkedBg === ownBg && liveBg === ownBg
           && /brightness/.test(parkedFx) && liveFx !== 'none'
           && /inset/.test(liveShadow) && !/inset/.test(parkedShadow),
-          `step ${want} of ${STEPS}, now=${rowsEl.dataset.now}; the pad keeps ${ownBg} in both states · parked ${parkedFx} with `
-          + `shadow ${parkedShadow.slice(0, 40)} · playing ${liveFx} with `
-          + `shadow ${liveShadow.slice(0, 40)}`);
+          /* No middots. This line glued four facts with two of them and each
+             one bolted another clause on, which is the whole complaint. Four
+             sentences instead. */
+          `step ${want} of ${STEPS}, now=${rowsEl.dataset.now}. `
+          + `The pad keeps ${ownBg} in both states. `
+          + `Parked ${parkedFx} with shadow ${parkedShadow.slice(0, 40)}. `
+          + `Playing ${liveFx} with shadow ${liveShadow.slice(0, 40)}`);
       }
 
       /**
@@ -1739,6 +1880,102 @@
       }
 
       d.log(`${voices} sound(s) started, worst step ${worstLate.toFixed(1)} ms late`);
+    }
+
+    /**
+     * 🔴 A PACK A PERSON HANDS THE PAGE STARTS THE TRANSPORT, AND A FILE THAT
+     * IS REFUSED LEAVES IT ALONE. Both halves, because a page that started
+     * playing whatever it was handed would pass the first on its own, and that
+     * is the loudest way to be wrong here: the reader is told the file was
+     * refused while the sequencer runs.
+     * 🔴 IT GOES IN THROUGH `drop.open`, WHICH IS THE PATH A DRAG TAKES. The
+     * component's own comment says that is what it is for, and it matters more
+     * than usual here: the whole design claim is that the transport starts from
+     * the GESTURE and not from `openPack`, so a check calling `openPack` would
+     * grade the opposite of what was built. The reading checks above call
+     * `openPack` directly and every one of them asserts the playhead did not
+     * move, which is the same claim from the other side.
+     * ⚠️ LAST, AND IT PUTS EVERYTHING BACK. `drop.opens` has to be 0 for the
+     * check above it, the rows have to be the ones the run was reading, and the
+     * deck has to be STOPPED at 0 or `verify.mjs`'s own play drill presses the
+     * toggle and pauses what this started. The harness waits for `__demo.ready`
+     * before it touches the transport, so this window closes first.
+     * ⚠️ THE FIXTURE IS BUILT HERE RATHER THAN FETCHED, because the pack is not
+     * in this repository and must not be, and a check that only runs where
+     * somebody happens to have one is a check nobody runs. It is a STORED zip
+     * of 64 tiny WAVs, which is the smallest thing `readZip` and `samplesIn`
+     * will both accept, and it keeps the grid at 64 rows so nothing downstream
+     * sees a different shape.
+     * ⚠️ WHAT IT DOES NOT GRADE: any claim about a REAL pack's audio. This
+     * fixture says a pack arriving by hand starts the transport and nothing
+     * else, and the reading checks above are where a real pack is measured.
+     */
+    {
+      const u16 = (n) => [n & 255, (n >>> 8) & 255];
+      const u32 = (n) => [...u16(n), ...u16(n >>> 16)];
+      const ascii = (s) => [...s].map((c) => c.charCodeAt(0));
+      /** 48 kHz, 16 bit, mono, `frames` long. */
+      const wav = (frames) => Uint8Array.from([
+        ...ascii('RIFF'), ...u32(36 + frames * 2), ...ascii('WAVE'),
+        ...ascii('fmt '), ...u32(16), ...u16(1), ...u16(1),
+        ...u32(48000), ...u32(96000), ...u16(2), ...u16(16),
+        ...ascii('data'), ...u32(frames * 2), ...new Uint8Array(frames * 2),
+      ]);
+      /* Stored, never deflated, so no compressor is needed and the crc can be
+         0: `unzip.mjs` reads the local header's own name and extra lengths and
+         checks no crc, which is measured in its own file rather than assumed. */
+      const zipOf = (files) => {
+        const body = [], cen = [];
+        let at = 0;
+        for (const [name, bytes] of files) {
+          const nm = ascii(name);
+          const loc = [0x50, 0x4b, 3, 4, ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+            ...u32(0), ...u32(bytes.length), ...u32(bytes.length),
+            ...u16(nm.length), ...u16(0), ...nm];
+          body.push(...loc, ...bytes);
+          cen.push(0x50, 0x4b, 1, 2, ...u16(20), ...u16(20), ...u16(0), ...u16(0),
+            ...u16(0), ...u16(0), ...u32(0), ...u32(bytes.length), ...u32(bytes.length),
+            ...u16(nm.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(at), ...nm);
+          at += loc.length + bytes.length;
+        }
+        return Uint8Array.from([...body, ...cen, 0x50, 0x4b, 5, 6,
+          ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length),
+          ...u32(cen.length), ...u32(at), ...u16(0)]);
+      };
+
+      const kept = rows.slice();
+      const wasOpens = drop.opens;
+      deck.pause();
+      deck.seek(0);
+
+      const bad = new File([new Uint8Array([0x50, 0x4b, 3, 4, 1, 2, 3, 4])],
+        'not-really.circuitpack');
+      await drop.open([bad]);
+      const ranOnBad = deck.transport.playing;
+      /* ⚠️ THE NAME IS IN THE PATTERN. The router check above leaves
+         `a truncated zip did not read as a pack` in that same line, so a test
+         for the phrase alone would pass without this file ever arriving, which
+         is this project's substring rule in its cheapest form. */
+      d.assert('NEGATIVE CONTROL: a file that is refused starts nothing, however it arrived',
+        ranOnBad === false && Math.abs(deck.position()) < 1 && rows.length === kept.length
+        && /^not-really\.circuitpack did not read as a pack/.test(drop.note.textContent),
+        `playing ${ranOnBad} at ${deck.position().toFixed(1)} ms, `
+        + `${rows.length} row(s) still there, the reader was told `
+        + `"${drop.note.textContent.slice(0, 48)}"`);
+
+      const pack = zipOf(Array.from({ length: 64 }, (_, i) =>
+        [`samples/sample_${i}.wav`, wav(480 + i)]));
+      await drop.open([new File([pack], 'a made up pack.circuitpack')]);
+      d.assert('a pack somebody hands the page starts playing it, because an upload is a gesture',
+        deck.transport.playing === true && rows.length === 64
+        && rows[63].name === 'sample_63.wav' && drop.opens === wasOpens + 2,
+        `${rows.length} row(s) from ${(pack.length / 1024).toFixed(1)} kB of pack, `
+        + `transport playing ${deck.transport.playing} at `
+        + `${deck.position().toFixed(0)} ms, after ${drop.opens - wasOpens} open(s)`);
+
+      deck.pause();
+      deck.seek(0);
+      setRows(kept);
     }
   }
 

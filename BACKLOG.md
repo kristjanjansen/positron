@@ -1,5 +1,28 @@
 ## Open
 
+### Open 2026-09-26: the take adaptation is built and idle, and the deploy holds the old table
+
+🔴 **TWO THINGS ARE OWED AFTER `b0a0b06` AND THE KEEP WORK, AND NEITHER IS A
+DEFECT. THEY ARE UNFINISHED WIRING.**
+
+**1. `mkTake()` IS BUILT, GRADED AND CALLED BY NOTHING.** The within take
+adaptation measures **+6.32 points of top 1** and it is idle until `/nola/` feeds
+it. The API is in the commit message and in the plan’s section 14.
+🔴 **AND `addLearned` IS THE WRONG SITE, WHICH WOULD WASTE MOST OF THE GAIN.**
+`learned[]` is the DISTINCT chords somebody kept returning to, capped at
+`LEARN_SLOTS = 6`. The take wants **the stream of chord events, repeats
+included**, once per event.
+⚠️ **AND THE PROVENANCE RULE IS ALREADY ON THAT PAGE**, from a report reading
+*"you recorded a suggestion. why>"*. `take.heard(chord, proposed.has(key) ?
+'suggested' : 'played')` makes it COUNTABLE, and `take.refused` is what the
+assert reads. **There is no default source**, so a call that forgets to say is
+refused rather than counted.
+
+**2. `workers/view/public/resources/chord-tables.json` IS THE OLD 12,746 BYTE
+TABLE.** `public/` is a committed deploy artefact and `cd workers/view && node
+build.mjs` does `rm -rf public/`. ⚠️ **So that build belongs to a moment when
+nothing is in flight**, which is why no agent ran it.
+
 ### Done 2026-09-25: a voicing with the root in the left hand and the rest rootless
 
 ✅ **DONE 2026-09-25 AS `Split`. MEASURED: chords-test 49 ok to 60 ok, `/nola/`
@@ -102,7 +125,40 @@ which is `positron-verify`’s standing rule. `chords.mjs` is imported by
 body widens the range `roll.mjs` draws, and this page already records a roll
 drawn beside the instrument having *"neither its width nor its range"*.
 
-### Open 2026-09-25: the keyboard looper detects a tempo and every later loop aligns to the first
+### Done 2026-09-26: the keyboard looper detects a tempo and every later loop aligns to the first
+
+✅ **DONE. Arithmetic `93acf28`, wiring `eb50054`. MEASURED: `numloop-test` 15
+ok to 36 ok, `/kit/` 223/223 (211 page asserts) to 227/227 (215).** Open it at
+**http://127.0.0.1:8890/kit/#keyboard**.
+
+A second take of 300 ms against a first loop of 500 ms comes back at **250 ms**,
+so it wraps exactly twice inside the first for ever instead of walking away.
+
+✅ **TWO CELLS, EACH WITH ITS ABSENCE.** `150 bpm heard` off the playing,
+`150 bpm set` when a page stated it, **empty** when there is none, never 0 and
+never 120. The ratio reads `first`, then `x1/2 x1 x2 x1/4 x4`, and **`as played`
+when the snap was refused. A refusal is a word, not a blank.**
+
+🔴 **THE BRIEF’S PAGE LIST WAS WRONG AND IT IS SEVEN, NOT NINE.** `radio`
+uses `looper.mjs` and `dump` only names `keyboard.mjs` in two comments. Measured
+by COUNTING ELEMENTS in a browser rather than by grepping.
+
+🔴 **AND ONE SABOTAGE CAME BACK FULLY GREEN, SO THAT CHECK WAS DECORATION.**
+With notes struck and released in the same millisecond, feeding all eight
+movements still answers four onsets, because `numloop.mjs` collapses anything
+inside 50 ms into one chord and a down and its own up were 0 ms apart. Holding
+each note 70 ms is what makes the wrong list answer eight.
+
+🔴 **AND `/kit/` IS NOW CLOSE TO A CLIFF WHERE THE WHOLE PAGE READS RED.**
+`verify.mjs` waits `1400 ms + 40 polls of 150 ms` for `d.ready()`. A first draft
+of this block spent 2.7 s and took `/kit/` to **0/1 with 207 asserts** and
+*"console: nothing, so it is hanging rather than throwing"*. The shipped block
+spends 1.33 s and the page is ready at 7.2 to 7.4 s against a budget of roughly
+7.8 to 8.6 s. **Under a second and a half is left in that file.**
+⚠️ **AND THE ONE WORD NO CHECK IN THIS REPOSITORY DRAWS IS `heard` ITSELF.** A
+tempo `numloop.mjs` will speak about needs three gaps of at least 375 ms, which
+does not fit in that budget, so detection off real playing is graded by its INPUT
+plus `numloop-test`’s 36 with no browser.
 
 🔴 **ASKED, VERBATIM:** *"in keyboadd looper: do basic bmp detection / quant
 and when first loop set, all next ones align on it, either times shorter, same or

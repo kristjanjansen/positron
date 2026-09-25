@@ -11,6 +11,7 @@
   import { mount, guard } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createHardware } from '/shell/hardware.mjs';
   import { createDeck, createAudioLane, createMidiLane } from '/timeline/transport.mjs';
   import { markAdapter, marks } from '/shell/fixture.mjs';
@@ -43,7 +44,7 @@
 
 
   // No slider: the strip below is the position surface.
-  createTransportBar(d.el, deck, { scrub: false });
+  const bar = createTransportBar(d.el, deck, { scrub: false });
 
   // ONE MEANING FOR COLOUR, ACROSS EVERY DEMO: a mark's colour says HOW IT
   // LANDED, never which lane it is in. Lane identity is the row you are in, its
@@ -145,12 +146,44 @@
         const m = metricOf(L.id, r);
         if (m !== undefined) { line(`${m >= 0 ? '+' : ''}${m.toFixed(2)} ms`); continue; }
         const rt = L.id === 'midi' ? loopOf.get(Math.round(r.at)) : undefined;
-        line(rt === undefined ? 'sent · no way to check' : `sent · at most ${sign(rt)} ms`);
+        line(rt === undefined ? 'sent, no way to check' : `sent, at most ${sign(rt)} ms`);
       }
       return lines;
     },
     lanes: [laneSpec(LANES[0])],          // the other two appear with their device
   });
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-25: *"timeline
+   * demos: glue transport and timelines"*. The bar passes `scrub: false`
+   * BECAUSE the strip below it is this page's position surface, which is the
+   * claim gluing makes, and the page rhythm was drawing ground through the
+   * middle of one control.
+   *
+   * ⚠️ `createTransportBar(d.el, ...)` HAS ALREADY APPENDED THE BAR. The first
+   * argument is a mount point rather than a hint, so this moves two children of
+   * `d.el` into one box rather than making a second bar.
+   * ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, because a node captured after it
+   * points at something no longer in the page. It is `null` here, which is an
+   * append, and the device rows `createHardware` adds below still land under
+   * the pair.
+   */
+  const afterStrip = view.surface.nextSibling;
+  d.el.insertBefore(createGlue(bar.el, view.surface), afterStrip);
+
+  // 🔴 ONE BAR AND ONE STRIP, COUNTED FROM THE DOM RATHER THAN LOOKED AT.
+  // `/stage/` carried a DOUBLED transport bar through two reports in 2026-09-25,
+  // because `createTransportBar(parent, ...)` appends to the parent it is given:
+  // deleting the `createGlue` line removed nothing, and a screenshot cannot tell
+  // one bar from two when they are stacked. A count can.
+  d.assert('one bar and one strip, and they are one surface',
+    d.el.querySelectorAll('.tbar').length === 1
+      && d.el.querySelectorAll('canvas.pos-strip').length === 1
+      && bar.el.parentElement === view.surface.parentElement
+      && !!bar.el.parentElement?.classList.contains('pos-glue'),
+    `${d.el.querySelectorAll('.tbar').length} bar(s), `
+    + `${d.el.querySelectorAll('canvas.pos-strip').length} strip(s), `
+    + `in .${bar.el.parentElement?.className}`);
+
   const showLane = (id) => {
     if (view.strip.lanes().some((l) => l.id === id)) return;
     const spec = laneSpec(LANES.find((L) => L.id === id));
@@ -224,7 +257,7 @@
         mute.gain.value = 0;                 // pulled by the graph, heard by nobody
         probe.connect(ear); ear.connect(mute); mute.connect(ctx.destination);
         d.log('ear listening on the audio thread');
-      }).catch((e) => d.log(`no ear: ${e.name} · sound card stays unmeasured`, 'bad'));
+      }).catch((e) => d.log(`no ear: ${e.name}, so the sound card stays unmeasured`, 'bad'));
 
       audio = createAudioLane(deck.transport, ctx, { horizonMs: AHEAD, makeNode: audibleClick });
       for (let at = 0; at < DURATION; at += BEAT) audio.schedule({ at, kind: 'click', id: `c${at}` });
@@ -317,7 +350,7 @@
       // external one cannot see the instant we asked for, only the instant the
       // note arrived. Note-ons only — every line doubled by its note-off is a
       // log you stop reading.
-      d.log(`◀ note ${e.data[1]} vel ${e.data[2]} · ${late >= 0 ? '+' : ''}${late.toFixed(2)} ms`);
+      d.log(`◀ note ${e.data[1]} vel ${e.data[2]}, ${late >= 0 ? '+' : ''}${late.toFixed(2)} ms`);
     };
   }
 

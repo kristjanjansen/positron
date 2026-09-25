@@ -96,17 +96,17 @@
   "how": "ffprobe version 9.0.1 Copyright (c) 2007-2026 the FFmpeg developers",
   "measured": "2026-09-16T00:43:37.305Z",
   "what": "How long each recording in corpus.json actually runs, read off the file itself. One request per file, once, at least two seconds apart, reading the header rather than the recording.",
-  "known": 26,
+  "known": 25,
   "refused": 0
  },
  "counts": {
-  "items": 334,
+  "items": 333,
   "sources": 17,
-  "dated": 275,
-  "withFile": 129,
-  "withDuration": 26,
+  "dated": 274,
+  "withFile": 128,
+  "withDuration": 25,
   "unreachable": 6,
-  "behind": 11685
+  "behind": 11684
  },
  "precisionConventions": {
   "Zenodo": "publication_date, always a full day — it dates the DEPOSIT, not always the object.",
@@ -175,7 +175,7 @@
    "note": "34 credits on 29 distinct releases, which is what the de-duplication is for: one record can appear as Appearance, TrackAppearance and UnofficialRelease at once. The artist id comes from Wikidata property P1953 rather than from a name search"
   },
   {
-   "items": 25,
+   "items": 24,
    "name": "archive.org",
    "host": "archive.org",
    "asked": "https://archive.org/advancedsearch.php?q=Kurenniemi&rows=100&output=json",
@@ -2162,37 +2162,6 @@
    "cors": false,
    "note": "section: Henkilökuvia Erkki Kurenniemestä · keywords: 1960-luku, erkki-kurenniemi, henkilökuvat, musiikkitieteen-laitos, valokuvat",
    "licenceRef": "not stated"
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
-   "title": "Saharan uni I",
-   "kind": "audio",
-   "source": "archive.org",
-   "holder": "uploaded by a member of the public, not deposited by an institution",
-   "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
-   "url": "https://archive.org/details/videoplayback-13_202304",
-   "file": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Saharan%20uni%20I%20(64%20kbps).mp3",
-   "fileType": "audio/mpeg",
-   "bytes": 3562195,
-   "count": 1,
-   "when": {
-    "edtf": "1967",
-    "earliest": -94694400000,
-    "latest": -63158400000,
-    "precision": "year",
-    "how": "ojanen-2020-thesis-p180",
-    "note": "the source dates the work 1967 and gives no month. The 9 February 1968 premiere is a playback of this tape, so it bounds the work from above rather than dating it"
-   },
-   "licence": "public domain mark",
-   "licenceBy": "uploader (self-asserted, unverified)",
-   "licenceConfidence": "LOW",
-   "http": 200,
-   "httpFrom": "listing",
-   "cors": true,
-   "note": "Ojanen 2020 (printed p. 180): \"the two-piece tape music work Saharan uni I & II (1967, realized with Kari Hakala)\" · recorded in the University Studio at Vironkatu and mixed in the Yle sound-control room at Kulttuuritalo · premiered 9 February 1968 at the Sähköshokki-ilta, Amos Anderson Art Museum, where the Integrated Synthesizer made its last known public appearance · a recording of the 8 February 1968 rehearsal survives (p. 100 n. 160)",
-   "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
-   "durationMs": 445257
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
@@ -9859,5 +9828,21 @@
    "note": "keys are free but need a Yle Tunnus registration, and the media behind them is geo-locked to Finland anyway",
    "licenceRef": "unknown"
   }
- ]
+ ],
+ "removed": {
+  "what": "Rows taken out of this corpus by hand, after the build, on instruction.",
+  "how": "matched on the full id with ===, never on a substring of the title",
+  "rows": [
+   {
+    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
+    "title": "Saharan uni I",
+    "edtf": "1967",
+    "durationMs": 445257,
+    "bytes": 3562195,
+    "on": "2026-09-25",
+    "why": "asked for, verbatim: \"rm 6/24 Saharan uni I 1967 line\"",
+    "note": "\"Saharan uni II\" is a separate row and stays. A rebuild of this file restores this row unless build-corpus.mjs is given a named drop rule."
+   }
+  ]
+ }
 }

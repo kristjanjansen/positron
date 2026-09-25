@@ -19,17 +19,43 @@
   //
   // 🔴 NO GRANULATOR ANYWHERE IN HERE. It came out of the board's signal path
   // on 2026-09-16 (archive/box-pappus/), and this page has never had one.
-  import { mount, guard } from '/shell/shell.mjs';
-  import { createSlider, createSliderGroup, HAND_YIELD_MS } from '/shell/slider.mjs';
-  import { createKeyboard } from '/shell/keyboard.mjs';
+  import { mount, guard, el } from '/shell/shell.mjs';
+  // 🔴 REAL ROTARIES SINCE 2026-09-25, AND THE PAGE CALLED `knobs` HAD NONE.
+  // Asked as *"left to rotaries cutoff reseonance"*. It built both with
+  // `createSlider` and paired them with `createSliderGroup`, so the one page in
+  // this project named after a control was the one page not using it.
+  // ⚠️ THE INVISIBLE HAND SURVIVES THE SWAP BECAUSE IT WAS NEVER THE SLIDER'S.
+  // `knob.mjs` and `slider.mjs` both import `createHandDrive` from
+  // `hand-drive.mjs`, so `hand: true` and `onHand:` mean the same thing on
+  // both, and this page's subject comes across untouched.
+  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createInstrument } from '/shell/instrument.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  // The hand's yield, from the module that owns it rather than from a
+  // re-export: this page no longer builds a slider.
+  import { HAND_YIELD_MS } from '/shell/hand-drive.mjs';
   // The sweep's own lap, so a check waiting for it cannot fall out of step with
   // it the next time somebody changes how fast a hand moves.
   import { MOVES } from '/shell/hand.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
-  import { createTransportBar } from '/shell/transport-bar.mjs';
-  import { createDeck } from '/timeline/transport.mjs';
   import { makeCcSend, SEND_GATE_MS, RESTATE_MS } from '/shell/cc-adapter.mjs';
   import { createBoard } from '/shell/board.mjs';
+
+  /**
+   * 🔴 HOW MANY TIMES THIS PAGE HAS ASKED THE BROWSER FOR MIDI, COUNTED AT THE
+   * TOP OF THE MODULE SO A VISIT CAN BE GRADED RATHER THAN DESCRIBED. Same
+   * wrapper `/tom/`, `/wish/` and `/muta/` all carry: `requestMIDIAccess` is a
+   * permission prompt, so *a visit opens nothing* has to be an assert over a
+   * counter and not a claim about a file.
+   * ⚠️ IT WRAPS BEFORE ANYTHING ELSE RUNS, because a counter installed after
+   * the first call is a counter that reads zero about a call that happened.
+   */
+  let midiAsked = 0, midiAskedOnLoad = -1;
+  if (navigator.requestMIDIAccess) {
+    const real = navigator.requestMIDIAccess.bind(navigator);
+    navigator.requestMIDIAccess = (...a) => { midiAsked++; return real(...a); };
+  }
 
   const q = new URLSearchParams(location.search);
   // `studio-1` is the ADDRESS OF THE RASPBERRY PI, not a rendezvous this page
@@ -310,11 +336,12 @@
     if (r?.sent) wireMsgs++;
   }
 
-  // ── the sliders ───────────────────────────────────────────────────────────
+  // ── the rotaries ──────────────────────────────────────────────────────────
   //
-  // Appended to the body rather than to the control row: they are the subject
-  // of the page, not furniture beside it, and the harness cannot press a slider
-  // anyway.
+  // They are the FIRST thing in the case and they sit at its left edge, which
+  // is the ask (*"left to rotaries cutoff reseonance"*). They were a fixed
+  // COLUMN beside the keyboard until 2026-09-25: see the block beside
+  // `createInstrument` for why that column left with the nameplate's rail.
   /**
    * 🔴 A HAND ON EACH, AND THE PAGE SAYS SO IN THREE PLACES WHENEVER ONE IS ON.
    * This page HAD something that moved its own sliders and it was taken out on
@@ -351,21 +378,36 @@
       d.log(`the ${what} slider is yours again${why}`);
     }
   };
-  const cutoff = createSlider({
-    label: 'cutoff', aria: 'filter cutoff', min: 0, max: 127, step: 1, value: CUTOFF_HOME,
-    hand: true, onHand: handSaid('cutoff'),
+  /**
+   * ⚠️ `hand: { onHand }` RATHER THAN A SEPARATE `onHand:` OPTION, WHICH IS THE
+   * ONE PLACE THE TWO COMPONENTS SPELL THIS DIFFERENTLY. `slider.mjs` takes
+   * `hand: true` beside `onHand:`; `knob.mjs` reads the callbacks off the
+   * `hand` object itself. The hand underneath is the same `createHandDrive`,
+   * and this is a call-site difference rather than two behaviours.
+   * ⚠️ AND `step: 1`, BECAUSE A CONTROLLER IS SEVEN BITS. Without it a rotary's
+   * travel is `span / 180` per pixel and it would send 74.4 to a board that can
+   * only carry integers. It also makes `knobPlaces` print no decimals.
+   * 🔴 `home:` IS WHERE A DOUBLE PRESS GOES, and it is each rotary's own
+   * opening position rather than the middle of the travel: the cutoff opens
+   * where the filter can be heard and the resonance opens where the patch's
+   * maker left it, which is the same pair `panic()` brings them back to.
+   */
+  const cutoff = createKnob({
+    label: 'cutoff', min: 0, max: 127, step: 1, value: CUTOFF_HOME, home: CUTOFF_HOME,
+    hand: { onHand: handSaid('cutoff') },
     onInput: (v) => move(CUTOFF, v),
     onChange: (v) => land(CUTOFF, v),
   });
-  const reso = createSlider({
-    label: 'resonance', aria: 'filter resonance', min: 0, max: 127, step: 1, value: NEUTRAL,
-    hand: true, onHand: handSaid('resonance'),
+  const reso = createKnob({
+    label: 'resonance', min: 0, max: 127, step: 1, value: NEUTRAL, home: NEUTRAL,
+    hand: { onHand: handSaid('resonance') },
     onInput: (v) => move(RESO, v),
     onChange: (v) => land(RESO, v),
   });
-  // Named, because it is moved below the transport once that exists. See there.
-  const knobs = createSliderGroup([cutoff, reso], { pair: true });
-  d.el.append(knobs.el);
+  // 🔴 A BANK, NOT A ROW THIS PAGE LAYS OUT. `createKnobBank` is what every
+  // other panel here puts rotaries in, and it already owns the row, the gap and
+  // the sideways scroll a narrow column needs.
+  const knobs = createKnobBank([cutoff, reso]);
 
   // ── audio ─────────────────────────────────────────────────────────────────
   /**
@@ -441,34 +483,22 @@
   });
 
   /**
-   * 🔴 THE ONLY ASSERT THIS PAGE EMITS IN A SUITE RUN, AND IT IS AT LOAD FOR A
-   * MEASURED REASON. Everything else here lives behind `startNote()`, which
-   * needs the board, and the board is the thing a check may not touch. So
-   * `node demo/verify.mjs knobs` reads **2 page asserts, both injected by the
-   * shell**: this page contributes NOTHING to the suite, while `BACKLOG.md`
-   * has claimed `14 asserts, 20/20` since it was built. That number was taken
-   * with `?board=1`.
-   *
-   * ⚠️ AN ASSERT AT LOAD IS NORMALLY A HAZARD HERE and this one is not.
-   * LESSONS #95 records two asserts at t+0 blinding a whole run, because the
-   * harness stops collecting 400 ms after the count stops growing. That
-   * argument is about an early assert followed by a LATE one; this page has no
-   * late ones to lose.
-   *
-   * 🔴 WHAT IT GRADES IS THE KIT, NOT THIS PAGE. `MAY_PLAY` below holds every
-   * message whether or not `board.mjs` guards anything: flipping
-   * `createBoard`'s `inSelfcheck` default to `'allow'` leaves this page fully
-   * green while a suite run drives a shared Raspberry Pi. `/draw/` and
-   * `/grains/` build their own control rows and carry no `MAY_PLAY` at all, so
-   * the page where that mistake gets made is never the page holding the
-   * assert. This is the only page that opens a board, so it is the only place
-   * the kit can be checked from.
+   * 🔴 THIS PAGE'S ONE ASSERT USED TO LIVE HERE, AT LOAD, AND IT MOVED INTO
+   * `checkAll` ON 2026-09-25. The note that stood here said an assert at t+0 is
+   * normally a hazard and *"this page has no late ones to lose"*, which was
+   * true while `startNote()` was the only route to every other check and
+   * `startNote()` was unreachable.
+   * 🔴 **IT IS REACHABLE AGAIN, WHICH IS WHAT FLIPS THE ARGUMENT.** `verify.mjs`
+   * waits `settleMs` for a page's FIRST assert and only 2.0 s between later
+   * ones, and the test for *this page has not asserted yet* is
+   * `n <= shellAsserts`. An assert at load fails that test on the first poll,
+   * hands the run to the 2.0 s loop, and this page is silent for about 3.8 s
+   * while the sweep and the hand run. So an assert here would take the whole
+   * check block with it, silently and green, which is exactly the shape
+   * `positron-verify` calls the worst one.
+   * ⚠️ WHAT IT GRADES IS UNCHANGED and is repeated where it now stands: the
+   * KIT, not this page.
    */
-  if (SELFCHECK && !MAY_PLAY) {
-    d.assert('the kit refuses to drive shared hardware under a check, so a page that forgets to guard itself is still safe',
-      board.driving() === false,
-      `createBoard says driving ${board.driving()}`);
-  }
   const pres = board.presence;
   const sendId = (m) => board.send(m);
   const ask = (m, type, ms) => board.ask(m, type, ms);
@@ -557,112 +587,261 @@
   }
   setInterval(measureRtt, 4000);
 
-  // ── the transport ─────────────────────────────────────────────────────────
+  // ── the instrument ────────────────────────────────────────────────────────
   //
-  // 🔴 THE SOUND HAS NO END, AND THE BAR SAYS SO RATHER THAN COUNTING DOWN TO
-  // ONE. Reported 2026-09-16 from a phone: *"Sound just ends. There shouldn't
-  // be a transport slider. It should go forever."*
+  // 🔴 A CASED PANEL SINCE 2026-09-25, ASKED FOR AS *"wrap into instument
+  // panel"* alongside `/shape/` and `/grains/`. Seven pages already wear
+  // `createInstrument` over `createPanelLayout`, and `/kit/` grades it, so this
+  // is a page joining a component rather than a component being invented.
   //
-  // The first shape of this page put the transport on a ten second deck with a
-  // scrub and a loop, and everything a visitor saw followed from that: a slider
-  // implying somewhere to be inside the sound, a clock counting to an end, and
-  // an end-stop that released the note while a hand was still on the filter.
-  // What is actually true here is that a note is held until somebody stops it,
-  // which is the one fact `live` carries: the chip says THIS SOURCE HAS NO END
-  // and there is no clock and no position to read.
+  // 🔴 ONE SCROLLING REGION AND A PLATE, SINCE 2026-09-25. The rotaries were a
+  // FIXED COLUMN beside the keyboard until *"knobs: rm right panel. use regular
+  // nameplate"*: the only thing that column drew was a `border-right` facing the
+  // rail that instruction removes, and with the rail gone it is a vertical line
+  // between two blocks that the sketch draws stacked. They are the flow's two
+  // children now, the rotaries first, which keeps *"left to rotaries cutoff
+  // reseonance"* true without a column to hold it.
   //
-  // ⚠️ `endStop: false` IS THE HALF THAT KEEPS THE NOTE. Without it the bar
-  // pauses at the end of the range, and pause here is a panic, so the sound
-  // stopped by itself after ten seconds.
-  // ⚠️ AND NO LOOP. Asked for in the same breath: *"For now, re remove the
-  // loops. Let's figure out recording and automation later."* What was there
-  // recorded a gesture and played it back, which moved the sliders with nobody
-  // touching them, and a page that moves its own controls while somebody is
-  // trying to learn what a control does is a page that cannot be learned. It is
-  // in the history at f2c9ab7 for whenever recording is taken up properly.
-  //
-  // The deck is a play/pause state and a clock nobody reads. It needs a range
-  // because every deck has one; nothing on this page shows it, and nothing
-  // stops when it ends.
-  const deck = createDeck({ items: [], adapters: {}, range: [0, 86400000] });
+  // ⚠️ `caps: false`, SO THE PLATE READS `knobs` AND NOT `KNOBS`. The ask names
+  // it in lower case and so does the slug; `/shape/` took the same option on
+  // the same day, and `panel-layout.mjs` carries the argument: the uppercase
+  // rule is about a shelf of REPLICAS reading as one shelf, and this page is a
+  // replica of nothing.
+  // ⚠️ `maker: ''` IS HOW A PAGE SAYS *this carries no brand*, which is what
+  // `/twelve/` means by `MODEL 12` alone, and `plateSpec` turns one line with no
+  // maker into `end` rather than `ends`, because `ends` is `space-between` and
+  // parks a lone child on the LEFT.
 
   /**
-   * 🔴 THE BADGE REPLACES THE LIVE CHIP. Asked 2026-09-16: *"use online badge on
-   * knobs"*, *"on knobs: replace live"*.
+   * 🔴 THE FOOTER'S RIGHT HAND CONTROL, AND IT POINTS THE OPPOSITE WAY TO
+   * `/muta/`, WHICH LANDED THE SAME DAY. Asked here as *"on right add enable
+   * midi button + add midi support"*; asked there as *"its should be
+   * listening"*, which DELETED that page's MIDI button and moved
+   * `requestMIDIAccess` onto the press that turns an instrument on.
    *
-   * That slot held a chip whose one fact was that this source has no end, which
-   * is true and is not the fact somebody watching this page needs. The
-   * instrument is in another building and the question is whether it is
-   * answering. The two would be two claims about one source in one position, so
-   * the bar refuses both.
-   *
-   * ⚠️ `everyMs` IS THE BOARD'S OWN HEARTBEAT, 5 s, and the component throws
-   * without it rather than guessing: a shorter guess would call a working board
-   * gone between beats and send somebody to look at hardware that is fine.
-   * ⚠️ `comingMs` IS 45 s BECAUSE THAT IS HOW LONG YOSHIMI TAKES on a cold
-   * board, ten to forty seconds, measured on this one.
+   * 🔴 BOTH ARE RIGHT AND THEY ARE NOT THE SAME CASE, AND THAT IS WRITTEN HERE
+   * SO THE TWO PAGES DO NOT READ AS DISAGREEING BY ACCIDENT. `/muta/` is an
+   * instrument INSIDE this browser: turning it on is already a gesture, the
+   * permission can ride on it, and a second switch is one more thing to press
+   * before anything happens. This page reaches a Raspberry Pi in another
+   * building over a socket somebody else may be using, so *listen to whatever
+   * is plugged in and send it there* is a bigger promise than *make a sound
+   * here*, and a promise that size gets its own press.
+   * ⚠️ WHAT IS IDENTICAL ON BOTH PAGES IS THE LINE THAT MATTERS: a VISIT ASKS
+   * FOR NOTHING. `requestMIDIAccess` is behind a press on both, the counter at
+   * the top of this module is how that is graded rather than described, and
+   * `midiAskedOnLoad` is read at the last line of the module, which is the
+   * whole of the visit.
+   * ⚠️ AND IT IS ASKED ONCE. `openMidi` is idempotent, so a second press is not
+   * a second prompt. The button says so by going to `midi is listening` and
+   * staying there.
    */
-  // 🔴 THE NAME IS WHAT THE THING IS CALLED. Asked 2026-09-16: *"'rasperry pi
-  // online'"*. `board` is this repo's own shorthand for it, which is the kind of
-  // private vocabulary CLAUDE.md keeps out of anything a visitor reads, and it
-  // is vaguer than the truth: the page already says a Raspberry Pi in another
-  // building, and the diagram on /keys/ calls the same machine by the same name.
-  // ⚠️ THE BADGE IS `board.mjs`'s, not one made here. It knows which socket in
-  // the room is actually the board, which is the thing a hand-rolled badge on
-  // this page got wrong: the relay is verbatim, so any other tab in the room
-  // used to paint it green.
+  let midi = null;
+  const midiBtn = el('button', '', 'enable midi', { type: 'button' });
+  function openMidi() {
+    if (midi) return midi;
+    midi = createMidi({
+      // 🔴 ONE PATH, NOT A SECOND ONE. A note from a real keyboard lights the
+      // same key and calls the same two functions the on-screen keys call, so
+      // there is nothing here that has to be kept in step with them.
+      onDown: (note, vel) => { kb.lightNote(note, true); ready().then(() => sendId({ type: 'note.on', note, vel, channel: 0 })); },
+      onUp: (note) => { kb.lightNote(note, false); sendId({ type: 'note.off', note, channel: 0 }); },
+      /**
+       * 🔴 A REAL CONTROLLER GOES THROUGH THE SAME GATE AS A FINGER, AND IT
+       * MOVES THE ROTARY IT BELONGS TO. `knob.set(v, { from: 'hardware' })` is
+       * what that option exists for and it counts separately, so *is this
+       * binding live* stays answerable after the fact. `quiet: false` is
+       * deliberate: the value has to reach `move`/`land` or a knob on a real
+       * desk would turn a dial on screen and send nothing.
+       * ⚠️ ONLY THE TWO CONTROLLERS THIS PAGE IS ABOUT. Anything else arriving
+       * is dropped rather than forwarded, because a page that relayed every CC
+       * to a shared instrument would be sending values nobody on this page
+       * chose.
+       */
+      onControl: (cc, value) => {
+        const k = cc === CUTOFF ? cutoff : cc === RESO ? reso : null;
+        if (!k) return;
+        k.set(value, { from: 'hardware' });
+      },
+      log: (line, kind) => d.log(line, kind),
+      onPorts: (n) => {
+        midiBtn.textContent = n ? 'midi is listening' : 'midi is on, nothing plugged in';
+        d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
+                : 'no MIDI keyboard is plugged in yet, so nothing will arrive');
+      },
+    });
+    midiBtn.textContent = 'midi is listening';
+    midiBtn.disabled = true;
+    return midi;
+  }
+  midiBtn.addEventListener('click', () => openMidi());
 
   /**
-   * 🔴 NO PLAY BUTTON AND NO TEST TONE. Instructed 2026-09-17: *"sound does not
-   * start with keyboar when i have not pressed play. remove thay button and test
-   * tone. i just ned to push keyboard to start sound"*.
+   * 🔴 A BROWSER THAT HAS ALREADY SAID YES IS LISTENING BEFORE ANYBODY PRESSES
+   * ANYTHING. Asked 2026-09-25 as *"always enable midi"*, and the naive reading
+   * of that is a permission dialog in front of every visitor who came to read:
+   * `requestMIDIAccess` is a PROMPT, and CLAUDE.md's standing rule is that a
+   * visit opens nothing and asks nothing.
+   * ✅ `navigator.permissions.query({ name: 'midi' })` ASKS THE BROWSER WHAT IT
+   * HAS ALREADY DECIDED AND RAISES NOTHING. On the desk this page is used at
+   * the answer is `granted` and the press is gone; on a first visit it is
+   * `prompt` and nothing happens, which is the same visit as yesterday's.
+   * ⚠️ IT MATCHES WHAT `createMidi` WILL ASK FOR. That is
+   * `requestMIDIAccess({ sysex: false })`, and a bare `{ name: 'midi' }`
+   * descriptor is the same request, so a `granted` here cannot be a grant for
+   * a different permission than the one about to be used.
+   * ⚠️ AND THE QUERY IS NOT EVERYWHERE. Safari has no Web MIDI at all and
+   * Firefox answers this descriptor with a throw, so it is wrapped and the
+   * answer is `unavailable`, which opens nothing. A probe that could not answer
+   * must never read as a yes.
    *
-   * Both were there for the same reason and it stopped being a good one the
-   * moment this page gained a keyboard. Play armed the page, woke the
-   * instrument and held one note so the sliders had something to act on; with
-   * keys on the page, the note you want is the one you press, and a control
-   * whose whole job is to make a sound BEFORE you play anything is a second way
-   * in that a visitor has to discover. Somebody who pressed a key first got
-   * silence and no explanation, which is exactly the report.
-   * ⚠️ THE BAR STAYS, because the presence badge lives in it. `toggle: false`
-   * disarms everything that depended on playing rather than leaving it to read
-   * false by luck: `api.playing` is forced false, the space bar stops being a
-   * play key, and `demo/verify.mjs` reads `api.toggles` before its play drill.
+   * 🔴 THE DECISION IS A NAMED FUNCTION AND NOT AN `if`, BECAUSE THE BRANCH
+   * THIS DESK TAKES IS NOT THE BRANCH THAT MATTERS. `demo/verify.mjs`'s Chrome
+   * answers `prompt` (MEASURED 2026-09-25), so a check written only against
+   * what happens here would grade the *nothing happened* side and say nothing
+   * at all about the side the ask is about. `checkAll` reads this function
+   * directly against all five answers, which is the half that cannot go vacuous
+   * on a machine where the condition never holds.
    */
-  const bar = createTransportBar(d.el, deck, {
-    toggle: false,
-    chip: pres.el,       // whether the board is answering, in the chip's place
-    scrub: false,        // there is no position in a held note to seek to
-    loop: false,         // asked for, and recording comes back as its own thing
-    endStop: false,      // the note is held until somebody stops it
-    command: {
-      play: () => { deck.play(); },
-      // 🔴 STOP IS A PANIC, ASKED FOR IN THOSE WORDS. It is not a pause that
-      // could be resumed: it releases every note the board is holding, which
-      // may include notes this page never pressed, and brings both sliders home
-      // to where the patch's own filter sits.
-      pause: () => { deck.pause(); panic(); },
-      seek: (pos) => deck.seek(pos),
-    },
+  const OPENS_ON_LOAD = (state) => state === 'granted';
+  /** What the browser answered, and whether the page opened MIDI by itself. */
+  let midiPermission = 'not asked', midiOpenedByPermission = false, midiAskedOnVisit = -1;
+  /**
+   * 🔴 AWAITED BY THE CHECKS BEFORE THEY PRESS ANYTHING, because this settles a
+   * tick after the module's last line and `midiAskedOnLoad` is read on that
+   * line. Without the wait, *a visit asked 0 times* would stay green on a
+   * browser where the page HAD opened MIDI on the visit, one tick later: the
+   * assert would be measuring the module body rather than the visit, which is
+   * this project's vacuous pass in its cheapest form.
+   */
+  const midiSettled = (async () => {
+    try {
+      const st = await navigator.permissions?.query({ name: 'midi' });
+      midiPermission = st ? st.state : 'unavailable';
+    } catch {
+      midiPermission = 'unavailable';
+    }
+    if (OPENS_ON_LOAD(midiPermission)) {
+      openMidi();
+      midiOpenedByPermission = true;
+      d.log('this browser has already allowed MIDI here, so it is listening without a press');
+    }
+    /* The whole cost of a visit, read after the decision and before any press.
+       ⚠️ AND IT IS A SECOND NUMBER RATHER THAN A REPLACEMENT FOR
+       `midiAskedOnLoad`: that one says the module body asks nothing, this one
+       says the visit asks nothing more than the browser has already agreed to,
+       and only both together cover a page that opens asynchronously. */
+    midiAskedOnVisit = midiAsked;
+    return midiPermission;
+  })();
+
+  /**
+   * 🔴 THE FOOTER IS THE INSTRUMENT HEADER AT THE FOOT, NOT A ROW THIS PAGE
+   * LAYS OUT. Asked as *"add footer with rasperry pi online padge. on right add
+   * enable midi button"*, and `instrument.mjs` already owns exactly that shape:
+   * `header: { at: 'foot' }` is a glued part with the same seam a transport bar
+   * has over the strip it drives, `.panel-head-on` is `grid-column: 1;
+   * justify-self: start` and `.panel-head-mid` is `grid-column: 3; justify-self:
+   * end`. Left and right, from the stylesheet, with nothing typed here.
+   *
+   * 🔴 `online: false`, AND THE BADGE IS PUT IN THAT CELL BY HAND, WHICH IS THE
+   * ONE THING IN THIS ASSEMBLY THAT REACHES INTO A COMPONENT. `buildHeader`
+   * BUILDS its own presence, two states, meaning *is this instrument switched
+   * into the chain*. The badge the ask names is a different object with five
+   * states: `board.mjs` already owns it, it knows which socket in the room IS
+   * the board, and it is fed by the board's own heartbeat. A second badge here
+   * would be two green dots about one Raspberry Pi, and a hand-rolled one is
+   * the defect `board.mjs` was written to end.
+   * ⚠️ SO THE EXISTING BADGE MOVES INTO THE PUBLISHED CELL rather than being
+   * copied, and it is `prepend`ed so the phone arrangement, which is one column
+   * in source order, reads badge then button.
+   *
+   * 🔴 AND THE TRANSPORT BAR IS GONE WITH IT, BECAUSE THE BADGE WAS ALL IT
+   * HELD. `toggle: false` took the play button on 2026-09-17 (*"remove thay
+   * button and test tone"*), `scrub: false`, `loop: false` and `endStop: false`
+   * took the rest, and the comment beside it said in as many words *"THE BAR
+   * STAYS, because the presence badge lives in it"*. With the badge in the
+   * footer that sentence is the whole argument for the bar and it no longer
+   * holds.
+   * ⚠️ NOTHING PRESSABLE WAS LOST, AND THAT WAS CHECKED RATHER THAN ASSUMED.
+   * `createTransportBar` appends its toggle only when `toggle` is true, so the
+   * bar rendered one child: the chip. The deck went with it, since the bar was
+   * its only reader.
+   * 🔴 **AND `panic()` WAS ALREADY UNREACHABLE, WHICH THIS CHANGE FIXES RATHER
+   * THAN CAUSES.** It was wired to the bar's `pause` command, and a bar with no
+   * toggle has nothing that calls `pause`: the one control that brings both
+   * rotaries home and stops every invisible hand could not be pressed by
+   * anybody. It hangs off the keyboard's own `notes off` now, which is the
+   * control a player reaches for when they want everything to stop.
+   */
+  /**
+   * 🔴 THE RIGHT RAIL IS GONE AND THE NAME SITS IN THE CASE'S TOP RIGHT CORNER,
+   * 2026-09-25: *"knobs: rm right panel. use regular nameplate. i do not
+   * usrstand what you are doing"*. The rail was a column down the right edge of
+   * the case running its full height with nothing in it but the turned word,
+   * and the seams stopped short of it.
+   * 🔴 THIS REVERSES A READING FROM THE SAME DAY AND THE OLD ONE IS QUOTED HERE
+   * SO THE PAGE DOES NOT READ AS DISAGREEING WITH ITSELF. *"knobs nameplate
+   * vertically"* was taken as *keep the vertical rail*, and it was wrong. The
+   * placement that is asked for is the one every other cased page here already
+   * uses.
+   * ⚠️ AND IT IS `/shape/`'s ANSWER RATHER THAN A SECOND ONE. That page was
+   * given the same instruction an hour earlier (*"rm left panel / section. use
+   * nameplate on top right"*) and is committed at `54a1d02`; copying it is what
+   * keeps two instrument panels one shelf rather than two pages.
+   *
+   * ⚠️ `plateSide` CAME OUT WITH THE PLACEMENT RATHER THAN BEING LEFT SET.
+   * `panel-layout.mjs` only reads it when the plate's placement is `side`, so
+   * `plateSide: 'right'` under `place: 'end'` is an argument nothing reads,
+   * which is a line that looks load bearing and is not.
+   * ⚠️ AND THE FIXED COLUMN CAME OUT TOO, BECAUSE ITS ONLY DIVIDER FACED THE
+   * RAIL THAT IS GONE. `.panel-fixed-l` draws a `border-right` against the
+   * scroller, which is the vertical line the owner's screenshot shows the seams
+   * stopping at. With one flow the rotaries sit above the keys, which is the
+   * order the sketch draws.
+   * ⚠️ `flow: false` IS `/shape/`'s AND NOT THIS PAGE'S. Nine slider sections
+   * are meant to sit side by side and scroll; two blocks that stack want the
+   * flow's flex COLUMN, which is what puts the rotaries over the keyboard
+   * instead of beside it.
+   *
+   * 🔴 NO SEAM HERE YET, AND IT IS A MEASURED REFUSAL RATHER THAN AN OVERSIGHT.
+   * *"on each button group have horizontal panel separator edge to edge"* was
+   * built on this page and taken back out the same day. A case with BANDS has
+   * no vertical rhythm of its own: `.pos-stack` owns the project's 40 px gap
+   * and a band is not one of its children, `.panel-case` computes
+   * `row-gap: normal`, and its padding is `0 var(--panel-pad)`, horizontal
+   * only. MEASURED here at 1280 px with the keyboard lifted into a band under a
+   * seam: **the strip's bottom to the seam 0.0 px, the seam to the keyboard
+   * 0.0 px, and the keyboard to the case's inner bottom 0.0 px**. The keys sat
+   * on the rule and on the case's own border. `/shape/` measured the identical
+   * zero the same hour across nine sections, so it is the component and not
+   * this page.
+   * ⚠️ AND THE REPAIR IS NOT A `padding-block` TYPED HERE. That is the `/tom/`
+   * nameplate mistake verbatim, where one page fixed a shared component in its
+   * own stylesheet and every page after it inherited the defect and not the
+   * fix, and it was re-reported on `/plai/`. `.panel-case` has to own the gap
+   * between its bands and the inset under the last one.
+   * ✅ WHAT DID MEASURE WELL WHILE IT WAS BUILT, so nobody has to find it
+   * again: the seam reached **x297.0 to x983.0**, which is this case's own
+   * inner edges to the pixel, and it crossed the plate's column as well as the
+   * content one.
+   * ⚠️ AND TWO OF THE SKETCH'S THREE RULES WERE NEVER THIS PAGE'S TO DRAW.
+   * `.panel-case` is `border: 1px solid var(--line)`, which is the first, and
+   * `createGlue` puts 1 px of `--line` between the case and the footer, which
+   * is the third: MEASURED, the case bottom is 344.8 and the footer top 345.8.
+   */
+  const inst = createInstrument({
+    name: 'knobs',
+    maker: '',
+    caps: false,
+    place: 'end',
+    panel: { side: null },
+    header: { at: 'foot', plate: false, online: false, patch: midiBtn },
   });
-
-  // 🔴 THE SLIDERS SIT UNDER THE TRANSPORT. Asked 2026-09-16: *"put sliders
-  // below transport"*. They were built before the bar and so were drawn above
-  // it, which put the instrument's controls before the thing that starts it:
-  // you met sliders that did nothing, and the reason they did nothing was
-  // further down the page. `append` MOVES a node already in the document, so
-  // this is a reordering rather than a second copy.
-  //
-  // 🔴 AND THE KEYBOARD SITS UNDER THE SLIDERS, 2026-09-17: *"bring keyboard to
-  // knobs and archive keys"*. `/keys/` is the page this came from and it is
-  // retired; what it did that this page did not is play notes, and the sliders
-  // are worth more with something to play them against. The order is the order
-  // you use it in: start the instrument, set the sound, play it.
-  //
-  // ⚠️ `d.stack.add`, NOT `append`. `demo/shell/stack.mjs` owns the gap between
-  // blocks on a page, and a node appended straight to `d.el` gets the rhythm
-  // because `d.el` IS the stack. Both forms work; this one says which.
-  d.stack.add(knobs.el);
+  inst.head.prepend(pres.el);
+  pres.el.classList.add('panel-head-on');
+  inst.add(knobs.el);
+  d.stack.add(inst.el);
 
   /**
    * 🔴 A KEY PRESSED WHILE THE PAGE HOLDS ITS OWN NOTE IS A SECOND VOICE, NOT A
@@ -691,8 +870,47 @@
   let readying = null;
   const ready = () => (readying ||= firstKey());
 
-  const kb = createKeyboard(d.el, {
-    base: 60,
+  /**
+   * 🔴 TWENTY-FIVE KEYS, FULL WIDTH, ASKED FOR AS *"make keyboard 25 full w."*.
+   * `keyRange()` is the kit's own answer and it was built for this ask:
+   * `/nola/` already laid twenty-five keys out inline and this page was about
+   * to write it a second time.
+   * ⚠️ 25 KEYS IS `span: 24`, WHICH IS THE DEFAULT, so nothing here does that
+   * subtraction: two octaves C to C is 24 semitones inclusive of both ends.
+   * ⚠️ AND THE LETTERS COME BACK AS A SET rather than as `true`. The computer
+   * keyboard has one octave's worth of letters and this layout has two, so a
+   * boolean could only say all or none. The Set decides which keys the letters
+   * are bound to and the bindings stay all or nothing, which is the component's
+   * own note beside `letters`.
+   * 🔴 `base: 48` IS C3, WHICH PUTS THE PAGE'S OWN HELD NOTE INSIDE THE
+   * PICTURE. The keyboard opened at 60 and held `NOTE 40` under the filter, so
+   * the one note this page sounds by itself was two octaves below the leftmost
+   * key and nothing on screen lit for it. At 48 the range is 48 to 72 and a
+   * player reaching for the sound the sliders are acting on can find it.
+   * 🔴 `full: true` MAKES THE BOX SPAN ITS HOST AND NEVER THE KEYS, AND ON THIS
+   * PAGE IT REACHES NOTHING, WHICH WAS MEASURED ON 2026-09-25 RATHER THAN READ.
+   * `.kbd.kbd-full` is `width: 100%` and the host is `.panel-flow`, which is
+   * `width: max-content`: a box asking for all of a box that is sized by that
+   * same box. MEASURED at 1280 px: **the keyboard 992.0 px, the flow 992.0 px
+   * and the case 686.0 px**, so `full` resolves to the keyboard's own width and
+   * the box hangs 306 px out of a 455.8 px scroller, which the strip then
+   * scrolls.
+   * ⚠️ IT IS RECORDED AND NOT REPAIRED, because the repair is the keyboard
+   * leaving the scroller for a band of its own and the case has no vertical
+   * rhythm between bands yet. MEASURED with it banded: the box became 582.0 px,
+   * which is the case's own content width, and the keys scrolled inside it on
+   * `.keys`' own `overflow-x: auto`, **777 px of keys in 564 px of box**. That
+   * is what the option was asked for. See the refusal beside `createInstrument`.
+   * ⚠️ `--k-max` pins a white key at 62 px either way, so nothing here stretches
+   * a key. *"do not stretch it ever"* stands.
+   */
+  /* ⚠️ THE HOST IS THE CASE'S FLOW, WHICH IS WHAT `inst.add` WOULD DO ONE LINE
+     LATER. `createKeyboard` appends to its host unconditionally, so there is no
+     detached form of it to hand over afterwards. */
+  const kb = createKeyboard(inst.flow, {
+    ...keyRange(),
+    base: 48,
+    full: true,
     onDown: (note) => {
       kb.lightNote(note, true);
       ready().then(() => sendId({ type: 'note.on', note, vel: VEL, channel: 0 }));
@@ -701,9 +919,21 @@
       kb.lightNote(note, false);
       sendId({ type: 'note.off', note, channel: 0 });
     },
-    onPanic: () => { sendId({ type: 'note.panic' }); d.log('every note released'); },
+    /* 🔴 `notes off` IS THIS PAGE'S PANIC NOW, AND IT WAS NOT REACHABLE AT ALL
+       BEFORE. `panic()` releases every note the board is holding, brings both
+       rotaries home and stops every invisible hand; it hung off a transport
+       command with no button in front of it. The keyboard's own `notes off` is
+       what a player presses when they want everything to stop, so that is where
+       it belongs.
+       🔴 AND `panic()` IS RE-ENTRY GUARDED, BECAUSE THIS PAIR IS A LOOP.
+       `kb.panic()` calls `onPanic` and `panic()` calls `kb.panic()`, so wiring
+       them together without the guard is unbounded recursion on the one control
+       whose whole job is to stop everything. Written down rather than solved by
+       taking one of the two calls out: `panic()` has to release the keys when a
+       check drives it directly, and the keyboard has to tell the page when its
+       own button is pressed. */
+    onPanic: () => { panic(); },
   });
-  d.stack.add(kb.el);
 
   /**
    * One note, and the moment it started, because the audio check below cannot
@@ -866,25 +1096,35 @@
     checkAll();
   }
 
+  /** See the keyboard's `onPanic`: these two call each other and this is why. */
+  let panicking = false;
   function panic() {
-    // 🔴 AND EVERY INVISIBLE HAND GOES OFF FIRST. A hand still running would
-    // fight the glide below within one frame, which is a page arguing with
-    // itself in front of somebody, and stop here means stop. It goes before the
-    // `set` calls so the homing glide is the last thing that touches a handle.
-    for (const k of [cutoff, reso]) k.hand?.stop('pause');
-    // The sliders come back to neutral, which is where the patch's own filter
-    // is, and the board is told to release every note. The board may be holding
-    // notes this page never pressed, so the message has to go out as well as
-    // the handles coming home.
-    if (MAY_PLAY && armed) sendId({ type: 'note.panic' });
-    releasedAt = performance.now();
-    // Home is where each slider opened, which is not the same number for the
-    // two of them: the cutoff opens where the filter can be heard and the
-    // resonance opens where its maker left it.
-    cutoff.set(CUTOFF_HOME, { glideMs: 240 });
-    reso.set(NEUTRAL, { glideMs: 240 });
-    kb.panic();
-    d.log(`stopped: every note released and both sliders back where they opened`);
+    if (panicking) return;
+    panicking = true;
+    try {
+      // 🔴 AND EVERY INVISIBLE HAND GOES OFF FIRST. A hand still running would
+      // fight the homing below within one frame, which is a page arguing with
+      // itself in front of somebody, and stop here means stop. It goes before
+      // the `set` calls so the homing is the last thing that touches a dial.
+      for (const k of [cutoff, reso]) k.hand?.stop('pause');
+      // The rotaries come back to where they opened, and the board is told to
+      // release every note. The board may be holding notes this page never
+      // pressed, so the message has to go out as well as the dials coming home.
+      if (MAY_PLAY && armed) sendId({ type: 'note.panic' });
+      releasedAt = performance.now();
+      // Home is where each rotary opened, which is not the same number for the
+      // two of them: the cutoff opens where the filter can be heard and the
+      // resonance opens where its maker left it.
+      // 🔴 NO GLIDE, AND THAT IS A REAL DIFFERENCE BETWEEN THE TWO COMPONENTS
+      // RATHER THAN SOMETHING DROPPED HERE. `slider.set` takes `glideMs` and
+      // animates the handle while the value lands at once; `knob.set` takes
+      // `{ from, quiet }` and nothing else, so a rotary jumps. It is in the
+      // report as a gap in `knob.mjs`, not patched around on this page.
+      cutoff.set(CUTOFF_HOME);
+      reso.set(NEUTRAL);
+      kb.panic();
+      d.log('stopped: every note released and both rotaries back where they opened');
+    } finally { panicking = false; }
   }
 
   // Reachable from a probe, the way `window.__hls` and `window.__strip` are on
@@ -940,53 +1180,84 @@
       both ? `${g3.stats.messages} message carrying ${both.set.length} values` : 'nothing went out');
 
     /**
-     * 🔴 EACH SLIDER DRIVES ITS OWN CONTROLLER, AND THIS IS THE CHECK THAT A
-     * COPIED SLIDER NEEDS. Two handles wired to one controller look completely
-     * normal: both move, both send, the counters rise, and the second one simply
-     * overwrites the first with no error anywhere. It costs nothing to ask,
-     * because the gate is the thing that knows, and a scratch gate needs no
-     * board.
+     * ⚠️ THE OPENING POSITIONS ARE READ BEFORE ANYTHING IS DRIVEN, WHICH IS A
+     * REORDERING THE SWAP FORCED. On sliders this assert came SECOND, because
+     * the check above it pressed each lane where the handle already was and so
+     * moved nothing. A rotary has no such gesture: a press starts a RELATIVE
+     * drag and changes nothing by itself, so the only way to reach `onInput`
+     * from outside is to change the value. Reading the homes first is what
+     * keeps this an assert about the page rather than about the check under it.
+     */
+    d.assert('each rotary opens at its own home, and the cutoff’s is where it can be heard',
+      cutoff.value() === CUTOFF_HOME && reso.value() === NEUTRAL,
+      `cutoff ${cutoff.value()} where the filter can be heard, resonance ${reso.value()} where its maker left it`);
+
+    /**
+     * 🔴 EACH ROTARY DRIVES ITS OWN CONTROLLER, AND THIS IS THE CHECK THAT A
+     * COPIED CONTROL NEEDS. Two dials wired to one controller look completely
+     * normal: both move, both send, the counters rise, and the second one
+     * simply overwrites the first with no error anywhere. It costs nothing to
+     * ask, because the gate is the thing that knows, and a scratch gate needs
+     * no board.
      * ⚠️ IT DRIVES THE REAL `onInput`, not `move()` with a number typed here.
      * Calling the constants back would assert this check against itself.
+     *
+     * 🔴 AN ARROW KEY ON THE DIAL, AND NOT A SYNTHETIC POINTER, FOR A REASON
+     * THAT IS A FINDING RATHER THAN A PREFERENCE. `knob.mjs`'s `pointerdown`
+     * calls `svg.setPointerCapture(e.pointerId)` UNGUARDED, and that raises
+     * `NotFoundError` for every pointer id a page dispatches at itself. The
+     * listener aborts, the throw reaches `guard(d)`, and the page is marked
+     * failed by its own check. `slider.mjs`, `range-slider.mjs`, `xy-pad.mjs`,
+     * `transport-bar.mjs` and `keyboard.mjs` all wrap that call in a `try`,
+     * each with the reason written out beside it; this one does not. It is in
+     * the report, and nothing here pretends the pointer path was driven.
+     * ⚠️ THE KEY PATH IS STILL THE REAL ONE. `keydown` on the dial runs
+     * `handApi.yield()` and then `set(v + one, { from: 'hand' })`, which is the
+     * same funnel a drag ends in.
      */
+    /* 🔴 THE ARROW POINTS AWAY FROM WHERE THE DIAL ALREADY IS, AND A FIXED
+       `ArrowUp` HAD THIS CHECK RED FOR AS LONG AS THE CUTOFF OPENED AT 127.
+       MEASURED 2026-09-25 before it was changed: the assert read `CC 71`, one
+       controller of two, because an up arrow on a rotary already AT ITS CEILING
+       clamps to the same number, sends nothing, and looks exactly like a dial
+       wired to nothing. The knob was right and the check was pressing a key
+       that could not move it.
+       ⚠️ AND THE CEILING IS READ OFF THE DIAL RATHER THAN TYPED. `knob.mjs`
+       publishes it as `aria-valuemax`, so a rotary whose range changes cannot
+       leave this check describing the old one, and a 127 typed here would be
+       the shared measurement in two files this project keeps repairing. */
     const g4 = makeCcSend();
+    const homes = [cutoff.value(), reso.value()];
     sendTo = g4;
-    /**
-     * A press ON THE KNOB and a lift, on each lane in turn. That is the real
-     * `onInput` path, reached the way a finger reaches it, and pressing where
-     * the handle already is leaves every value where it was: the check after
-     * this one asserts each slider is still at its own home, and it would be
-     * asserting this check's leftovers otherwise.
-     */
     for (const k of [cutoff, reso]) {
-      const lane = k.el.querySelector('.sld-lane');
-      const box = lane.getBoundingClientRect();
-      const knob = k.el.querySelector('.sld-knob').getBoundingClientRect();
-      const at = { pointerId: 7, bubbles: true, cancelable: true,
-                   clientX: knob.left + knob.width / 2, clientY: box.top + box.height / 2 };
-      lane.dispatchEvent(new PointerEvent('pointerdown', at));
-      lane.dispatchEvent(new PointerEvent('pointerup', at));
+      const dial = k.el.querySelector('.pos-knob-dial');
+      const ceiling = parseFloat(dial.getAttribute('aria-valuemax'));
+      const key = k.value() >= ceiling ? 'ArrowDown' : 'ArrowUp';
+      dial.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
     }
     sendTo = gate;
     const drove = g4.tick(0)?.set ?? [];
     const ctrls = [...new Set(drove.map(([c]) => c))];
-    d.assert('each slider drives its own controller',
+    // Back where the page opened them, quietly, so nothing downstream reads
+    // this check's leftovers.
+    cutoff.set(homes[0], { quiet: true });
+    reso.set(homes[1], { quiet: true });
+    d.assert('each rotary drives its own controller',
       ctrls.length === 2 && [CUTOFF, RESO].every((c) => ctrls.includes(c)),
       `CC ${ctrls.sort((a, b) => a - b).join(', ') || 'nothing'}`);
-
-    // ⚠️ THE NAME OF THIS CHECK WAS TRUE UNTIL THE CUTOFF MOVED. Both sliders
-    // used to open at the patch's own neutral; the cutoff now opens where the
-    // filter can actually be heard, so the claim is about each slider's own
-    // home rather than about one number.
-    d.assert('each slider opens at its own home, and the cutoff\u2019s is where it can be heard',
-      cutoff.get() === CUTOFF_HOME && reso.get() === NEUTRAL,
-      `cutoff ${cutoff.get()} where the filter can be heard, resonance ${reso.get()} where its maker left it`);
   }
 
   /**
-   * A drag, driven the way a finger drives one: the handle is painted and the
+   * A drag, driven the way a finger drives one: the dial is painted and the
    * page's own `onInput` handler runs for every position, then one `onChange`
    * for the release. Behind `?selfcheck=1`, because it moves the picture.
+   *
+   * ⚠️ IT SURVIVED THE SWAP TO ROTARIES UNCHANGED, which is worth saying: the
+   * sweep never touched a lane, it drove `set(v, { quiet: true })` beside the
+   * page's own `move()`, and `knob.set` takes the same `quiet` flag. What it
+   * grades is the SEND GATE, and the gate never knew what kind of control was
+   * in front of it.
    *
    * ⚠️ THE CEILING IS COMPUTED FROM THE TIME THE SWEEP ACTUALLY TOOK, not from
    * the time it was asked to take. A check that depends on when something
@@ -1007,7 +1278,7 @@
     const t = performance.now();
     for (let i = 0; i <= steps; i++) {
       const v = Math.round(NEUTRAL + (127 - NEUTRAL) * (i / steps));
-      cutoff.set(v, { quiet: true });      // the handle, painted, no callbacks
+      cutoff.set(v, { quiet: true });      // the dial, painted, no callbacks
       move(CUTOFF, v);                     // what a pointermove does
       await wait(ms / steps);
     }
@@ -1028,8 +1299,24 @@
    * DESCRIBED. Behind `?selfcheck=1`, because every line of it moves a control.
    *
    *   A  unmistakable while it runs, on three channels at once
-   *   B  per slider, so the one beside it is untouched
-   *   C  a hand takes it back in one frame, by any of three routes
+   *   B  per rotary, so the one beside it is untouched
+   *   C  a hand takes it back in one frame, by the routes a hand has
+   *
+   * 🔴 C IS TWO ROUTES ON A ROTARY AND WAS THREE ON A SLIDER, AND THE MISSING
+   * ONE IS A REAL DIFFERENCE BETWEEN THE COMPONENTS RATHER THAN A CHECK
+   * DROPPED IN THE SWAP. `slider.set()` opens with `handYield?.()`, so the PAGE
+   * calling `set()` takes the handle back for 1200 ms; `knob.set()` does not
+   * call `yield` at all, so a page setting a dial while a hand is running has
+   * its value overwritten on the hand's next frame. The wheel and the arrow key
+   * both yield on a rotary and both are driven below. **The third route is
+   * named as ungraded rather than asserted false**, because asserting the
+   * current behaviour would write a probable defect into the page as a
+   * promise. It is in the report.
+   * ⚠️ AND THE POINTER ROUTE IS DRIVEN AS A WHEEL. `knob.mjs`'s `pointerdown`
+   * calls `setPointerCapture` unguarded, which throws on any pointer a page
+   * dispatches at itself and takes the page down through `guard(d)`; see the
+   * long note in `freeChecks`. The wheel reaches the same `yield` one line
+   * later in the same file and is dispatchable.
    *
    * ⚠️ AND IT NEVER REACHES THE BOARD UNDER A CHECK. Everything the hand makes
    * goes through `move()` and so through `pump()`, which holds every value back
@@ -1040,52 +1327,51 @@
   async function handChecks() {
     const a = cutoff.hand, b = reso.hand;
     if (!a || !b) return;
-    const rowOf = (s) => s.el.querySelector('.sld-hand-row');
-    const glyphOf = (s) => getComputedStyle(s.el.querySelector('.sld-hand')).color;
-    const startedWith = reso.get();
+    /* ⚠️ THE HAND'S ROW IS THE KNOB ITSELF. `createKnob` passes `row: root` to
+       `createHandDrive` where `createSlider` passes its own `.sld-hand-row`, so
+       `dataset.hand` and `dataset.held` are on `.pos-knob` here. Same two
+       attributes, same file writing them, one element up. */
+    const rowOf = (s) => s.el;
+    const glyphOf = (s) => getComputedStyle(s.el.querySelector('.pos-knob-hand')).color;
+    const startedWith = reso.value();
     const startsBefore = handStarts;
 
     a.press();                                   // off -> sweep. One press, like a person's
     const lit = {
       mine: rowOf(cutoff).dataset.hand, other: rowOf(reso).dataset.hand,
-      // 🔴 THE GLYPH'S COLOUR, NOT THE HANDLE'S. Instructed 2026-09-16: *"do not
+      // 🔴 THE GLYPH'S COLOUR, NOT THE DIAL'S. Instructed 2026-09-16: *"do not
       // change slider playhead color when automated ... just color it yellow
-      // when enabled (the symbol)"*. The handle is the same yellow whoever is
-      // moving it, which is the point: a slider being driven should look like a
-      // slider, and the thing that says a page is driving it is the button.
+      // when enabled (the symbol)"*. The dial is the same yellow whoever is
+      // turning it, which is the point: a control being driven should look like
+      // that control, and the thing that says a page is driving it is the
+      // button.
       glyph: glyphOf(cutoff), otherGlyph: glyphOf(reso),
-      pressed: cutoff.el.querySelector('.sld-hand').getAttribute('aria-pressed'),
+      pressed: cutoff.el.querySelector('.pos-knob-hand').getAttribute('aria-pressed'),
       // ⚠️ A CEILING IS ONLY A CEILING IF IT IS RUNNING DOWN. Reading the
       // constant would assert the source rather than the behaviour.
       leftMs: a.leftMs,
       starts: handStarts - startsBefore,
     };
-    const from = cutoff.get();
+    const from = cutoff.value();
     await wait(900);
-    const movedTo = cutoff.get();
+    const movedTo = cutoff.value();
 
-    // ── C1. a pointer on the lane ──────────────────────────────────────────
-    const lane = cutoff.el.querySelector('.sld-lane');
-    const r = lane.getBoundingClientRect();
-    const kw = cutoff.el.querySelector('.sld-knob').getBoundingClientRect().width;
-    const y = r.top + r.height / 2;
-    const px = (f) => r.left + kw / 2 + (r.width - kw) * f;
-    const send = (type, x) => lane.dispatchEvent(new PointerEvent(type,
-      { pointerId: 1, bubbles: true, cancelable: true, clientX: x, clientY: y }));
-    send('pointerdown', px(0.25));
-    const heldByPointer = rowOf(cutoff).dataset.held === '1' && rowOf(cutoff).dataset.hand === 'on';
-    send('pointermove', px(0.40));
-    const atPointer = cutoff.get();
-    send('pointerup', px(0.40));
-    const onLift = cutoff.get();
+    // ── C1. a wheel over the dial ──────────────────────────────────────────
+    const dial = cutoff.el.querySelector('.pos-knob-dial');
+    const wheel = (dy) => dial.dispatchEvent(new WheelEvent('wheel',
+      { deltaY: dy, bubbles: true, cancelable: true }));
+    wheel(-120);
+    const heldByWheel = rowOf(cutoff).dataset.held === '1' && rowOf(cutoff).dataset.hand === 'on';
+    const atWheel = cutoff.value();
     /**
      * ⚠️ THE WAIT IS DERIVED, AND A CONSTANT HERE WENT RED THE HOUR THE LAP GOT
-     * SLOWER. It was 400 ms, chosen as about nine of this lane's 127 steps at a
-     * 2.2 s lap. The lap is 7 s now, on instruction, and 400 ms is two things at
-     * once: shorter than the hand's OWN 1200 ms yield, so the hand has not even
-     * taken the slider back yet, and too little travel to see if it had. Both
-     * numbers belong to the hand, so both are read from it: wait out the yield,
-     * then a tenth of a lap, which is about twelve steps at any speed.
+     * SLOWER. It was 400 ms, chosen as about nine of this control's 127 steps
+     * at a 2.2 s lap. The lap is 7 s now, on instruction, and 400 ms is two
+     * things at once: shorter than the hand's OWN 1200 ms yield, so the hand
+     * has not even taken the control back yet, and too little travel to see if
+     * it had. Both numbers belong to the hand, so both are read from it: wait
+     * out the yield, then a tenth of a lap, which is about twelve steps at any
+     * speed.
      */
     // ⚠️ `MOVES` IS A LIST OF PAIRS, NOT A MAP, and reading it as a map returned
     // undefined and fell through to a default that happened to work. A fallback
@@ -1094,22 +1380,16 @@
     if (!sweepLapMs) throw new Error('knobs: the sweep preset has no lapMs, so this check cannot size its wait');
     const resumeMs = HAND_YIELD_MS + sweepLapMs / 10;
     await wait(resumeMs);
-    const resumed = cutoff.get();
+    const resumed = cutoff.value();
 
-    // ── C2. the keyboard, which goes through set() ──────────────────────────
-    lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
-    const afterKey = cutoff.get();
+    // ── C2. the keyboard, which also goes through the dial ─────────────────
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    const afterKey = cutoff.value();
     const heldByKey = rowOf(cutoff).dataset.held === '1';
     await wait(400);
-    const keyStuck = cutoff.get();
+    const keyStuck = cutoff.value();
 
-    // ── C3. the page itself, which is what stop does with both handles ──────
-    cutoff.set(12, { quiet: true });
-    const heldByPage = rowOf(cutoff).dataset.held === '1';
-    await wait(400);
-    const pageStuck = cutoff.get();
-
-    const otherStill = reso.get();
+    const otherStill = reso.value();
     const otherRow = rowOf(reso).dataset.hand;
 
     // ── the guard that has no other way to be proved ────────────────────────
@@ -1127,11 +1407,11 @@
     }
     if (a.running) a.press();                    // sweep -> off, whatever happened
     handRun = {
-      lit, from, movedTo, heldByPointer, atPointer, onLift, resumed,
-      afterKey, heldByKey, keyStuck, heldByPage, pageStuck,
+      lit, from, movedTo, heldByWheel, atWheel, resumed,
+      afterKey, heldByKey, keyStuck,
       otherStill, otherRow, startedWith, wentOffHidden,
       offAfter: rowOf(cutoff).dataset.hand,
-      inControls: document.querySelectorAll('.pos-controls .sld-hand').length,
+      inControls: document.querySelectorAll('.pos-controls .pos-knob-hand').length,
     };
     cutoff.set(CUTOFF_HOME, { quiet: true });
   }
@@ -1155,6 +1435,28 @@
      */
     if (!SELFCHECK) return;
     // ── reachable with no board at all ───────────────────────────────────
+    /**
+     * 🔴 WHAT THIS GRADES IS THE KIT, NOT THIS PAGE, AND IT IS FIRST BECAUSE IT
+     * IS THE ONE CLAIM A RUN MUST NOT BE ABLE TO LOSE. `MAY_PLAY` holds every
+     * message whether or not `board.mjs` guards anything, so flipping
+     * `createBoard`'s `inSelfcheck` default to `'allow'` would leave this page
+     * fully green while a suite run drives a shared Raspberry Pi. `/draw/` and
+     * `/grains/` build their own control rows and carry no `MAY_PLAY` at all,
+     * so the page where that mistake gets made is never the page holding the
+     * assert. This is the only page that opens a board, so it is the only place
+     * the kit can be checked from.
+     * ⚠️ IT ONLY MEANS ANYTHING WHEN THE BOARD IS OFF LIMITS. With `?board=1`
+     * the page is DRIVING on purpose, so the claim is skipped in words rather
+     * than inverted: a check that cannot be answered and a check that answered
+     * badly must not look the same.
+     */
+    if (!MAY_PLAY) {
+      d.assert('the kit refuses to drive shared hardware under a check, so a page that forgets to guard itself is still safe',
+        board.driving() === false,
+        `createBoard says driving ${board.driving()}`);
+    } else {
+      d.log('?board=1 is set, so this run is allowed to drive the board and cannot grade the guard that stops it');
+    }
     d.assert('the page reached the relay', wire.state() === 1,
       wire.state() === 1 ? `open in ${ROOM}` : `readyState ${wire.state()}${wire.stats().refusal ? ` · ${wire.stats().refusal}` : ''}`);
     d.assert('the relay answered a round trip with nothing woken at the far end',
@@ -1225,17 +1527,230 @@
       fig === kids.length - 1 && kids[fig - 1] === 'pos-how'
         && document.querySelector('.pos-how')?.textContent === 'How it works',
       `${kids.join(' -> ')} · heading "${document.querySelector('.pos-how')?.textContent || 'none'}"`);
-    d.assert('the transport offers no position and no loop, because a held note has neither',
-      !d.el.querySelector('.tbar-loop') && bar.el.dataset.scrub !== '1',
-      `${d.el.querySelector('.tbar-loop') ? 'a Loop button is on the bar' : 'no loop'} · scrub ${bar.el.dataset.scrub}`);
-    // ⚠️ THIS READ THE `LIVE` CHIP UNTIL THE BADGE REPLACED IT. The claim has not
-    // weakened: there is still no clock, because a held note has no position to
-    // count towards, and the slot now carries the fact actually worth having.
-    d.assert('the bar carries the board\u2019s presence where a clock would be, and no clock',
-      !!bar.el.querySelector('.pos-pres') && !bar.el.querySelector('.tbar-time'),
-      bar.el.querySelector('.pos-pres')
-        ? `the badge reads "${bar.el.querySelector('.pos-pres-w')?.textContent || ''}", and there is no clock`
-        : 'no presence badge in the bar');
+    /**
+     * 🔴 THE TWO TRANSPORT ASSERTS THAT USED TO STAND HERE WENT WITH THE BAR,
+     * AND THEY ARE REPLACED RATHER THAN DROPPED. They read *"the transport
+     * offers no position and no loop"* and *"the bar carries the board's
+     * presence where a clock would be"*, and both were about a bar whose only
+     * child was the badge. What they were really claiming is the claim below:
+     * there is exactly ONE place on this page that says whether the Raspberry
+     * Pi is answering, and this page has no position to seek to.
+     */
+    const badges = document.querySelectorAll('.pos-pres');
+    d.assert('the board’s presence is in the footer, once on the page and nowhere else',
+      badges.length === 1 && inst.head.contains(pres.el)
+      && pres.el.classList.contains('panel-head-on') && !document.querySelector('.tbar'),
+      `${badges.length} presence badge(s), ${inst.head.contains(pres.el) ? 'in' : 'NOT in'} the footer, `
+      + `and ${document.querySelector('.tbar') ? 'a transport bar is still on the page' : 'no transport bar'}`);
+    /**
+     * 🔴 THE FOOTER IS THE COMPONENT'S OWN ROW AND ITS TWO ENDS ARE THE
+     * STYLESHEET'S CELLS, NOT ARITHMETIC ON THIS PAGE. `.panel-head` is
+     * `minmax(0,1fr) auto minmax(0,1fr)` with `.panel-head-on` in column 1 at
+     * `justify-self: start` and `.panel-head-mid` in column 3 at
+     * `justify-self: end`. Measuring the two rects is the only thing that knows
+     * which rule won, and `positron-ui` is emphatic that reading the stylesheet
+     * is not the same as measuring the boxes.
+     * ⚠️ THE MARGIN IS THE FOOTER'S OWN CENTRE, so this cannot pass on a row
+     * that laid both children out on top of each other.
+     */
+    const footBox = inst.head.getBoundingClientRect();
+    const badgeBox = pres.el.getBoundingClientRect();
+    const midiBox = midiBtn.getBoundingClientRect();
+    d.assert('the footer puts the badge on the left and the midi button on the right',
+      badgeBox.right < footBox.left + footBox.width / 2
+      && midiBox.left > footBox.left + footBox.width / 2,
+      `the footer spans ${footBox.left.toFixed(1)} to ${footBox.right.toFixed(1)}, the badge ends at `
+      + `${badgeBox.right.toFixed(1)} and the button starts at ${midiBox.left.toFixed(1)}`);
+    /**
+     * 🔴 THE NAMEPLATE IS IN THE CASE'S TOP RIGHT CORNER, 2026-09-25: *"knobs:
+     * rm right panel. use regular nameplate"*. This assert used to read *the
+     * rotaries are the case's left column and the nameplate runs down its right
+     * edge*, because the plate was a rail down that edge and the rotaries were
+     * a fixed column beside the scroller. Both are gone and so is that
+     * measurement.
+     *
+     * 🔴 AND IT COULD NEVER HAVE PASSED, WHICH IS WORSE THAN IT BEING STALE.
+     * It read `inst.shown() === 'knobs'`, and `shown()` RETURNS AN ARRAY:
+     * `panel-layout.mjs` maps over the plate's lines, so an array was being
+     * compared to a string and the answer is `false` under every circumstance.
+     * ⚠️ AND ITS FAILURE MESSAGE READ PERFECTLY, which is the expensive half. A
+     * template literal stringifies a one element array to `knobs`, so the red
+     * line said *the plate starts at 653.0 and reads “knobs”* while failing: a
+     * red that describes a healthy page is how a real regression gets lost in
+     * the noise. `/shape/` writes the same comparison correctly with
+     * `.join(' ')` and that is what this does now.
+     *
+     * 🔴 **IT IS TWO ASSERTS BECAUSE `top right` IS TWO ALIGNMENTS THAT LOOK
+     * LIKE ONE**, which is `/shape/`'s reading of the same instruction an hour
+     * earlier and is kept identical on purpose. They are set by two different
+     * rules in `shell.css` and can break separately: the right edge comes from
+     * `.panel-plate[data-place="end"]`, which is `justify-content: flex-end`
+     * plus `margin-left: auto`, and the top inset from
+     * `.panel-case > .panel-plate`, which is `padding-block: var(--panel-pad) 0`
+     * and reaches every cased page. `positron-ui` records `/twelve/` having two
+     * of three alignments line up while the third was 30 px out.
+     * 🔴 **THE INK IS MEASURED, NOT THE PLATE.** `.panel-plate` is a flex box
+     * spanning the case's whole content width, so its own rect is right at both
+     * edges whatever the placement does to the name inside it: a check reading
+     * `plate.el` would pass under `ends`, under `mid` and under a placement that
+     * had stopped working. `plate.lines[0]` is the `knobs` line itself.
+     * ⚠️ **AND THE INSET IS READ OFF THE CASE RATHER THAN TYPED.** `.panel-case`
+     * is `padding: 0 var(--panel-pad)`, so its computed `padding-right` IS that
+     * token and the plate's own `padding-block` is the same token again. A `20`
+     * typed here would be a shared measurement in two files, which is the defect
+     * `--sld-col` exists to stop.
+     * ⚠️ MEASURED AGAINST THE CASE'S INNER EDGES, NOT ITS BORDER BOX: the case
+     * carries a 1 px border and comparing against the outer box reports a
+     * shortfall on a plate that is exactly right.
+     * ⚠️ AND THE NAME IS READ THROUGH `shown()`, WHICH ASKS THE BROWSER WHAT IT
+     * RENDERED. `caps: false` is a claim about the PICTURE, and `/circuit/`
+     * typed `novation` and rendered `NOVATION` on `text-transform` alone while a
+     * check reading `textContent` graded the source and stayed green either way.
+     */
+    const caseBox = inst.case.getBoundingClientRect();
+    const caseCs = getComputedStyle(inst.case);
+    const inset = parseFloat(caseCs.paddingRight);
+    const innerRight = caseBox.right - parseFloat(caseCs.borderRightWidth);
+    const innerTop = caseBox.top + parseFloat(caseCs.borderTopWidth);
+    const ink = inst.plate.lines[0].getBoundingClientRect();
+    d.assert('the nameplate is at the right of the case, one inset in, and it reads knobs in lower case',
+      inst.plate.place === 'end' && inst.shown().join(' ') === 'knobs'
+      && Math.abs((innerRight - ink.right) - inset) <= 1,
+      `ink right ${ink.right.toFixed(1)} against inner right ${innerRight.toFixed(1)}, `
+      + `${(innerRight - ink.right).toFixed(1)} px of a ${inset.toFixed(1)} px inset, reading `
+      + `${inst.shown().join(' ')}`);
+    d.assert('and it sits at the top of the case, the same inset down',
+      Math.abs((ink.top - innerTop) - inset) <= 1,
+      `ink top ${ink.top.toFixed(1)} against inner top ${innerTop.toFixed(1)}, `
+      + `${(ink.top - innerTop).toFixed(1)} px of a ${inset.toFixed(1)} px inset`);
+    /**
+     * 🔴 AND THE ROTARIES ARE STILL THE FIRST THING IN THE CASE AND STILL AT ITS
+     * LEFT, WHICH IS *"left to rotaries cutoff reseonance"* surviving the rail's
+     * removal. They were a fixed COLUMN beside the scroller and they are the
+     * flow's first child now, so the claim that can still be made is about the
+     * order and the edge rather than about a column.
+     * ⚠️ IT READS THE FLOW'S CHILD LIST RATHER THAN A RECT FOR THE ORDER HALF,
+     * because two blocks stacked in a flex column both start at the same x and a
+     * rect cannot tell which is first.
+     */
+    const knobBox = knobs.el.getBoundingClientRect();
+    const flowKids = [...inst.flow.children];
+    d.assert('the rotaries come first in the case and sit at its left edge',
+      flowKids[0] === knobs.el
+      && Math.abs((knobBox.left - (caseBox.left + parseFloat(caseCs.borderLeftWidth))) - inset) <= 1,
+      `the rotaries are child ${flowKids.indexOf(knobs.el) + 1} of ${flowKids.length} and start at `
+      + `${knobBox.left.toFixed(1)}, ${inset.toFixed(1)} px inside a case that spans `
+      + `${caseBox.left.toFixed(1)} to ${caseBox.right.toFixed(1)}`);
+    /**
+     * 🔴 TWENTY-FIVE KEYS, AND THE COUNT IS READ OFF THE DOM RATHER THAN OFF
+     * `keyRange`. Asserting the helper against itself would pass on a keyboard
+     * that drew nothing.
+     * 🔴 AND IT USED TO SAY `its box spans the case` WHILE COMPARING THE BOX
+     * AGAINST THE FLOW, WHICH IS A QUANTITY THE BOX ITSELF SETS. `.panel-flow`
+     * is `width: max-content`, so it is as wide as the widest thing in it, and
+     * `Math.abs(kbBox.width - flowBox.width) <= 1` was two readings of one
+     * number: it could not fail, and it printed `992.0 px wide inside a flow
+     * 992.0 px wide` against a case measuring 686.0. That is `positron-verify`'s
+     * measure the quantity in question, not one adjacent to it, in its cheapest
+     * form, and it was hiding a dead option: `full` reaches nothing in a
+     * `max-content` host. See the block beside `createKeyboard`.
+     * ✅ SO WHAT IS GRADED NOW IS THE CLAIM THAT CAN STILL FAIL: no key was
+     * stretched. *"do not stretch it ever"*, and `--k-max` is what says how
+     * wide a white key may get, read off the row rather than typed here so a
+     * change to the ceiling cannot leave this assert describing the old one.
+     */
+    const kbBox = kb.el.getBoundingClientRect();
+    const keysEl = kb.el.querySelector('.keys');
+    const kMax = parseFloat(getComputedStyle(keysEl).getPropertyValue('--k-max')) || 62;
+    const white = [...kb.el.querySelectorAll('.k:not(.sharp)')];
+    const widest = Math.max(...white.map((k) => k.getBoundingClientRect().width));
+    d.assert('the keyboard is twenty-five keys and not one of them was stretched',
+      kb.el.querySelectorAll('.k').length === 25
+      && kb.el.classList.contains('kbd-full')
+      && widest <= kMax + 0.5,
+      `${kb.el.querySelectorAll('.k').length} keys, the widest white one ${widest.toFixed(1)} px `
+      + `against a ${kMax.toFixed(1)} px ceiling, in a box ${kbBox.width.toFixed(1)} px wide `
+      + `over a case ${inst.case.getBoundingClientRect().width.toFixed(1)} px wide`);
+    /**
+     * 🔴 A VISIT ASKS THE BROWSER FOR NOTHING IT HAS NOT ALREADY AGREED TO,
+     * WHICH IS *"always enable midi"* AND CLAUDE.md'S STANDING RULE AT THE SAME
+     * TIME. `requestMIDIAccess` raises a permission prompt, so a page that
+     * called it on load would put a dialog in front of somebody who came to
+     * read. A browser that has already said yes is a different case and the
+     * press on it is furniture.
+     * 🔴 **TWO COUNTERS, BECAUSE ONE OF THEM CANNOT SEE AN ASYNCHRONOUS OPEN.**
+     * `midiAskedOnLoad` is read at the module's LAST LINE and says the load path
+     * itself asks nothing; the permission answer arrives a tick later, so that
+     * number stays 0 on a granted browser where the page really did open MIDI
+     * on the visit. `midiAskedOnVisit` is read after the decision and before any
+     * press, which is the whole of a visit. **An assert on the first alone would
+     * pass vacuously on exactly the machine the ask is about.**
+     * ⚠️ AND THE BRANCH IS NAMED IN THE DETAIL RATHER THAN LEFT TO BE INFERRED.
+     * `demo/verify.mjs`'s Chrome answers `prompt`, so this run grades *nothing
+     * was asked*; the granted side is graded by the assert below it, which needs
+     * no particular machine.
+     * ⚠️ AND THE BUTTON IS NOT IN `.pos-controls`. `verify.mjs` presses every
+     * button in that row on every run, and this one asks a shared board to
+     * listen to whatever is plugged in here. It is in the instrument's footer,
+     * which the harness does not press, so the check drives it itself.
+     */
+    const granted = OPENS_ON_LOAD(midiPermission);
+    d.assert('a visit asks the browser for nothing unless it has already said yes',
+      midiAskedOnLoad === 0
+      && (granted ? midiOpenedByPermission && midiAskedOnVisit === 1
+                  : !midiOpenedByPermission && midiAskedOnVisit === 0)
+      && document.querySelectorAll('.pos-controls button').length === 0
+      && !document.querySelector('.pos-controls')?.contains(midiBtn),
+      `this browser answers “${midiPermission}”, so the branch graded here is `
+      + `“${granted ? 'already granted, so the page opened MIDI with no press'
+                         : 'not granted, so the visit asked nothing'}”: `
+      + `the module asked ${midiAskedOnLoad} time(s), the visit ${midiAskedOnVisit}, and the `
+      + `control row holds ${document.querySelectorAll('.pos-controls button').length} button(s)`);
+    /**
+     * 🔴 THE OTHER BRANCH, GRADED ON A MACHINE THAT IS NOT IN IT, BECAUSE
+     * *"unless it has already said yes"* IS EXACTLY THE SHAPE THAT PASSES WHERE
+     * THE CONDITION NEVER HOLDS. The load path asks one named function whether
+     * to open, so that function can be asked here about every answer a browser
+     * can give, with no permission, no prompt and no device.
+     * ⚠️ IT IS A NEGATIVE CONTROL IN BOTH DIRECTIONS AND THAT IS THE POINT. The
+     * naive reading of *"always enable midi"* is a predicate that returns true
+     * for everything, and it fails the `prompt` line; a page that never opened
+     * fails the `granted` line. Neither can be green here.
+     * ⚠️ AND `unavailable` IS ITS OWN ANSWER RATHER THAN A FALSY ONE. Safari has
+     * no Web MIDI and Firefox throws on this descriptor, and a probe that could
+     * not answer must never read as a yes.
+     */
+    d.assert('and only an already granted browser opens it, which is checked for every answer a browser can give',
+      OPENS_ON_LOAD('granted') === true
+      && OPENS_ON_LOAD('prompt') === false
+      && OPENS_ON_LOAD('denied') === false
+      && OPENS_ON_LOAD('unavailable') === false
+      && OPENS_ON_LOAD(undefined) === false,
+      'granted opens, prompt denied unavailable and no answer at all do not');
+    /**
+     * 🔴 AND THE PRESS OPENS SOMETHING REAL, WHICH IS THE POSITIVE HALF. A
+     * negative control on its own is satisfied by a button wired to nothing,
+     * and this project has shipped exactly that twice: a control that looks
+     * live and is inert.
+     * ⚠️ THE STATE IS NOT ASSERTED ON, ONLY REPORTED. `createMidi` resolves
+     * `requestMIDIAccess` asynchronously and this desk's answer depends on what
+     * the browser was launched with, so `connected`, `none plugged in` and
+     * `refused` are all correct answers here. What is asserted is that the
+     * press ASKED, once, and that a real api came back.
+     * ⚠️ AND `midiAsked === 1` IS A SECOND CLAIM RATHER THAN A RESTATEMENT:
+     * `openMidi` is idempotent, so a second press would read 2.
+     */
+    /* ⚠️ `openMidi()` AND NOT A SECOND `click()`, BECAUSE THE BUTTON DISABLES
+       ITSELF ONCE IT HAS DONE ITS JOB. A disabled button fires no click, so a
+       second press would prove the DISABLE rather than the guard inside the
+       function, and the guard is the thing that has to hold when a page calls
+       it from two places. */
+    openMidi();
+    d.assert('the press opens a real MIDI access, and asks for it exactly once',
+      midiAsked === 1 && !!midi && typeof midi.state === 'function' && midiBtn.disabled,
+      `${midiAsked} ask(s) after a press and a second call on a browser answering `
+      + `\u201c${midiPermission}\u201d, and the access reads `
+      + `\u201c${midi ? midi.state() : 'nothing open'}\u201d with ${midi ? midi.ports() : 0} input(s)`);
     d.assert('this page makes no sound of its own',
       !!board.ctx() && !!board.playout(), 'every sample it can play arrived over the socket');
 
@@ -1260,52 +1775,57 @@
     if (SELFCHECK && handRun) {
       const h = handRun;
       /**
-       * 🔴 A. UNMISTAKABLE, ON TWO CHANNELS, AND IT WAS THREE UNTIL THE HANDLE
-       * WAS TOLD TO STOP CHANGING. The symbol lights while the slider is
-       * automated, even at a turn where the handle is standing still, and the
+       * 🔴 A. UNMISTAKABLE, ON TWO CHANNELS, AND IT WAS THREE UNTIL THE DIAL
+       * WAS TOLD TO STOP CHANGING. The symbol lights while the rotary is
+       * automated, even at a turn where the needle is standing still, and the
        * log says when it started, which is the only channel that survives a
        * screenshot taken a minute later.
-       * ⚠️ THE HANDLE IS DELIBERATELY NOT ONE OF THEM ANY MORE: a slider being
-       * driven should look like a slider, and a handle that changes shape while
-       * it moves reads as one that has broken. The comparison is against the
-       * slider beside it rather than a remembered colour, which is what having
+       * ⚠️ THE DIAL IS DELIBERATELY NOT ONE OF THEM: a control being driven
+       * should look like that control, and a needle that changes shape while it
+       * moves reads as one that has broken. The comparison is against the
+       * rotary beside it rather than a remembered colour, which is what having
        * two of them buys.
        */
-      d.assert('while a hand runs its symbol is lit, and the slider beside it is untouched',
+      d.assert('while a hand runs its symbol is lit, and the rotary beside it is untouched',
         h.lit.mine === 'on' && h.lit.other === 'off' && h.lit.pressed === 'true'
         && h.lit.glyph !== h.lit.otherGlyph && h.lit.starts === 1
         && d.api.logs.some((l) => l.msg.includes('cutoff is moving by itself')),
         `the driven symbol is ${h.lit.glyph} and the one beside it ${h.lit.otherGlyph}, `
         + `its row reads ${h.lit.mine} against ${h.lit.other}, and the log has the line`);
       /**
-       * 🔴 B. PER SLIDER, AND THIS IS A NEGATIVE CONTROL: it fails if the hand
+       * 🔴 B. PER ROTARY, AND THIS IS A NEGATIVE CONTROL: it fails if the hand
        * is a module-level singleton, which is the obvious way to write one.
        */
-      d.assert('a hand belongs to one slider: the other never moved and never said it was on',
+      d.assert('a hand belongs to one rotary: the other never moved and never said it was on',
         h.otherStill === h.startedWith && h.otherRow === 'off',
         `resonance sat at ${h.otherStill} for the whole ${'2.1'} s the cutoff was being driven, `
         + `and its own row still reads ${h.otherRow}`);
       /**
-       * 🔴 C. THREE WAYS TO TAKE IT BACK, AND ALL THREE HAVE TO WORK. A pointer
-       * on the lane, an arrow key, and the page calling `set()` itself. The
-       * last two both go through `set()`, which is why one rule covers them and
-       * cannot be forgotten for one of them.
+       * 🔴 C. TWO WAYS TO TAKE IT BACK ON A ROTARY, AND BOTH HAVE TO WORK: a
+       * wheel over the dial and an arrow key on it. Both run `handApi.yield()`
+       * and then `set(..., { from: 'hand' })`, which is the funnel a real drag
+       * ends in too.
+       * 🔴 THE THIRD ROUTE THE SLIDER HAD IS NOT ASSERTED AND IS NOT SILENTLY
+       * GONE. `slider.set()` yields the hand and `knob.set()` does not, so *the
+       * page takes the dial back* is not true here. Asserting it would be a
+       * promise the component does not keep, and asserting its opposite would
+       * write a probable defect down as a feature. It is named as ungraded, in
+       * `handChecks` and in the report.
        */
-      d.assert('a pointer, an arrow key and the page each take the handle back in one frame',
-        h.heldByPointer && h.heldByKey && h.heldByPage
-        && h.onLift === h.atPointer && h.keyStuck === h.afterKey && h.pageStuck === 12,
-        `the pointer left it at ${h.atPointer} and it was still there on the lift, `
-        + `an arrow key left it at ${h.afterKey} and it stayed, `
-        + `and the page put it at 12 and it stayed at ${h.pageStuck}`);
+      d.assert('a wheel and an arrow key each take the dial back in one frame',
+        h.heldByWheel && h.heldByKey
+        && h.keyStuck === h.afterKey && h.atWheel !== h.movedTo,
+        `the wheel left it at ${h.atWheel}, an arrow key left it at ${h.afterKey} `
+        + 'and it was still there 400 ms later');
       /**
        * ⚠️ YIELD, NOT OFF. Nothing pressed the button, so the hand picks the
-       * movement up from where the pointer left it. A motorised fader you can
+       * movement up from where the wheel left it. A motorised control you can
        * grab is the physical thing the phrase names.
        */
-      d.assert('and it picks the movement up again when the pointer lifts, from where it was left',
-        h.resumed !== h.onLift && h.movedTo !== h.from && h.offAfter === 'off',
-        `it swept ${h.from} to ${h.movedTo}, was put at ${h.onLift} by hand, read ${h.resumed} `
-        + '400 ms after the lift, and a second press turned it off');
+      d.assert('and it picks the movement up again after the yield, from where it was left',
+        h.resumed !== h.atWheel && h.movedTo !== h.from && h.offAfter === 'off',
+        `it swept ${h.from} to ${h.movedTo}, was put at ${h.atWheel} by hand, read ${h.resumed} `
+        + 'after the yield ran out, and a second press turned it off');
       /**
        * 🔴 THE GUARDS, AND TWO OF THEM ARE PROVED BY BREAKING SOMETHING. Never
        * on load: nothing had asked for a hand before this press. Never in the
@@ -1601,6 +2121,66 @@
     // keys is not an error. Every other page with a diagram passes them here.
   }, { how: true, atEnd: true });
 
+  /**
+   * 🔴 THE CHECKS HAD NO WAY IN, AND THAT IS WHY THIS EXISTS. Every one of them
+   * sat behind `startNote()`, which was the Play button's handler; Play was
+   * removed on 2026-09-17 (*"remove thay button and test tone"*) and nothing
+   * ever called `startNote` again. The page has been running its load-time
+   * assert and nothing else since, on a page that carries a send gate, an
+   * invisible hand, a keyboard and now a cased panel. **A green page with no
+   * coverage is the worst possible control**, and the assert COUNT is the only
+   * thing that says so.
+   *
+   * 🔴 THE SILENT WORK GOES FIRST AND EVERY ASSERT LANDS IN ONE RUN, WHICH IS
+   * THE ARRANGEMENT THE PAGE ALREADY ARGUED FOR AND NOW DEPENDS ON. The sweep
+   * is 600 ms of nothing and the hand is about 3.2 s of nothing, and
+   * `verify.mjs` allows only 2.0 s between two asserts. What it allows before
+   * the FIRST one is `settleMs`, which is 20 s here, and the test for *this
+   * page has not asserted yet* is `n <= shellAsserts`. So nothing may assert
+   * until the waiting is over, which is also why the kit guard moved out of the
+   * load path.
+   *
+   * ⚠️ `?board=1` IS THE ONE ROUTE THAT TOUCHES THE INSTRUMENT, and it is the
+   * same opt-in it always was: `startNote()` starts yoshimi, loads the patch
+   * and holds a note, and then runs the same block. Without it nothing here
+   * sends a byte to the board.
+   * ⚠️ AND IT IS NOT AWAITED BEFORE `d.ready()`. The harness waits for `ready`
+   * BEFORE it drives a page, so a page that only becomes ready at the end of
+   * its own checks fails that wait and is graded not at all. `/muta/` and
+   * `/radio/` both do exactly this.
+   */
+  async function runChecks() {
+    if (!SELFCHECK) return;
+    /* 🔴 THE PERMISSION ANSWER FIRST, AND THE PRESS SECOND, SO THE TWO CANNOT
+       BE CONFUSED FOR EACH OTHER. `midiAskedOnVisit` is the count with no press
+       in it, and a check that pressed while the query was still in flight would
+       read a number that is a race rather than a measurement. */
+    await midiSettled;
+    /* 🔴 THE PRESS THAT OPENS MIDI, DRIVEN HERE BECAUSE THE HARNESS CANNOT
+       REACH IT. `verify.mjs` presses `.pos-controls button`, and this button is
+       deliberately in the instrument's footer instead: a control that asks a
+       shared board to listen to whatever is plugged in must not be pressed
+       dozens of times a day by a suite. Driving it from inside the gate is what
+       `/mirror/` had to do for the same reason when its headset buttons were
+       switched off.
+       ⚠️ AND ON A BROWSER THAT HAD ALREADY SAID YES THIS PRESS DOES NOTHING,
+       which is correct and is asserted rather than assumed: the button is
+       already disabled by then, a disabled button fires no click, and
+       `openMidi` is idempotent anyway. */
+    midiBtn.click();
+    if (MAY_PLAY) { await startNote(); return; }
+    await sweepChecks();
+    await handChecks();
+    freeChecks();
+    checkAll();
+  }
+
+  /* The counter read at the LAST line of the module, which is the whole of a
+     visit. A reading taken inside `checkAll` could not tell a visit apart from
+     a press, because by then the press has happened. */
+  midiAskedOnLoad = midiAsked;
+
   d.ready();
+  runChecks();
 </script>
 </html>

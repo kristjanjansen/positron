@@ -17,13 +17,50 @@
    *
    * ── WHAT IS ACTUALLY HAPPENING ─────────────────────────────────────────────
    *
-   * The text in the box is Faust, a language for describing a signal. Pressing
-   * COMPILE hands it to `libfaust`, which is the Faust compiler itself built as
-   * WebAssembly and vendored beside this page, and gets back a second, much
-   * smaller WebAssembly module that IS this instrument. That module goes into
-   * an `AudioWorkletNode` and the audio thread runs it. Nothing is interpreted:
-   * ten lines of text become a few kilobytes of machine code, in about ten
-   * milliseconds, in the tab.
+   * The text in the box is Faust, a language for describing a signal. A moment
+   * after the typing stops it goes to `libfaust`, which is the Faust compiler
+   * itself built as WebAssembly and vendored beside this page, and back comes a
+   * second, much smaller WebAssembly module that IS this instrument. That module
+   * goes into an `AudioWorkletNode` and the audio thread runs it. Nothing is
+   * interpreted: a page of text becomes a few kB of machine code, in a few tens
+   * of milliseconds, in the tab.
+   * ⚠️ THIS SAID `PRESSING COMPILE` UNTIL 2026-09-25 AND THAT BUTTON WAS DELETED
+   * ON 2026-09-24. A sentence naming a control that is gone is the drift rule in
+   * its cheapest form, and nothing type-checks one.
+   *
+   * ── kB, AND IT IS 1000 BYTES ───────────────────────────────────────────────
+   *
+   * 🔴 ONE UNIT FOR EVERY SIZE THIS PAGE PRINTS, DECIDED ONCE HERE. Asked
+   * 2026-09-25 as *"faust all sizes in kb"*, and the ask left two things to
+   * settle that a reader cannot settle from the page: whether a kB is 1000 bytes
+   * or 1024, and how many decimals.
+   * ✅ **1000, BECAUSE THAT IS WHAT THE SYMBOL `kB` MEANS.** 1024 bytes is `KiB`
+   * and writing `kB` for it is a symbol that means two things on one page. It
+   * also puts kB and MB on ONE ladder: the four log lines here already divided
+   * by 1e6 for MB while the `per voice` cell divided by 1024 for `KB`, so this
+   * page carried both conventions at once, which is what the ask is about.
+   * ✅ **TWO DECIMALS, AND THE RESOLUTION IS SET BY THE SMALLEST THING THAT
+   * MOVES.** The source cell is a few hundred bytes and has to change when
+   * somebody types a line, which is this page's whole subject. MEASURED: one
+   * decimal leaves `0.8 kB` standing still through thirty characters, and a cell
+   * that cannot move on an ordinary edit is a cell that teaches a reader to skip
+   * the row. Two decimals is 10 byte resolution and every cell moves.
+   * ⚠️ **MB ABOVE A MEGABYTE, ON THE SAME LADDER AND NOT A SECOND CONVENTION.**
+   * The compiler is `6.16 MB`; written in kB it is `6162.47`, which is the same
+   * number in a place where nobody can read it, and that number is the one
+   * warning this page gives about somebody's bandwidth.
+   * ⚠️ **AND TWO ASSERTS KEEP THEIR BYTES ON PURPOSE**, both named in their own
+   * comments: the pinned compile and `to the byte`. Those compare an IDENTITY
+   * rather than report a size, and a fingerprint rounded to 10 bytes is not a
+   * fingerprint. Everything else a reader sees goes through `kb()` or `mb()`.
+   * ⚠️ **A COMMENT MAY STILL STATE AN EXACT BYTE COUNT**, because that is a
+   * `wc -c` measurement somebody will re-run rather than a size being read. What
+   * a comment may not carry is a DIVIDED unit that disagrees with the page,
+   * which is how `256.1 KB` sat beside a cell that now reads `262.26 kB`.
+   * ⚠️ **ONE `MiB` SURVIVES AND IT IS NOT A MISS.** `plan-fau.md` §6.2 measured
+   * a PROCESS growing from 91 to 603 MiB, which is memory rather than a file and
+   * is quoted below in the symbol that document used. `MiB` cannot be mistaken
+   * for `MB` the way `KB` could, which is the whole reason the symbols exist.
    *
    * 🔴 NOTHING IS FETCHED ON A VISIT, AND THE COMPILER IS 6.16 MB. It arrives
    * on the first press and not before, which is the `/reel/` repair applied to
@@ -70,13 +107,19 @@
    * ⚠️ NOTHING IS HIDDEN. Every captured line goes into this page's own log,
    * where a reader can see it, and the count is asserted.
    *
-   * 🔴 3. `effect = _, _;` IS IN EVERY PRESET AND IT IS NOT DECORATION.
+   * 🔴 3. AN `effect` LINE IS IN EVERY PRESET AND IT IS NOT DECORATION.
    * MEASURED: compiling a polyphonic DSP that defines no `effect` costs one of
    * those aborts every time, because the generator probes for one and libfaust
    * throws when it is not there. With a pass-through effect declared, a poly
    * compile is console-clean. So the line is worth 1 console error per compile
    * and it is the shape a Faust instrument takes anyway: a per-voice `process`
    * and one `effect` after the mixer.
+   * ✅ AND SINCE 2026-09-25 ONE PRESET PUTS SOMETHING REAL THERE. This said
+   * `effect = _, _;` IS IN EVERY PRESET, which was true of all four and is true
+   * of five of the six: `Hall` ends with `dm.freeverb_demo`, so the page now
+   * shows what the line is for rather than only asserting that it is needed.
+   * The argument above is unchanged and is why the other five still carry a
+   * wire that changes nothing.
    *
    * 🔴 4. AN AUTOCOMPILE THAT FIRES UNDER A HELD NOTE TAKES THE NOTE AWAY.
    * Asked 2026-09-23 as *"autocompile on cerain interval / inactivity"*, and
@@ -140,8 +183,15 @@
    * ⚠️ AND THE STK PIANO IS NOT A PRESET HERE. `faust-stk/piano1.dsp` compiles
    * in 1,690 ms, which is 1.7 seconds of frozen page on this desk and several
    * times that on a phone, because libfaust is synchronous inside its own wasm.
-   * `plan-fau.md` §9.4 puts it in a later session behind a Worker. Every preset
-   * on this page compiles in under 110 ms.
+   * `plan-fau.md` §9.4 puts it in a later session behind a Worker. Its source is
+   * 21.92 kB, which is the other half of the same fact: nobody wrote that sound
+   * into a library, so the text is as long as the sound is complicated.
+   * ⚠️ AND THIS LINE SAID `EVERY PRESET ON THIS PAGE COMPILES IN UNDER 110 ms`
+   * UNTIL 2026-09-25, WHEN THE CLARINET ARRIVED AND MADE IT FALSE. RE-MEASURED
+   * that day, all six polyphonic, warm compiler, this desk: five of them are
+   * between 28 and 102 ms and the clarinet is 273. The sentence is kept in this
+   * shape rather than deleted because it is the page's own ceiling, and the
+   * number it names is the thing to check before adding a seventh.
    *
    * 🔴 AND THERE IS NO RASPBERRY PI IN THE PICTURE, WHICH IS THE POINT OF THE
    * PLAN'S FIRST OPEN QUESTION. `faust2rpialsaconsole` is real and the board
@@ -215,6 +265,17 @@
   const COMPILER_VERSION = '2.89.2';
 
   /**
+   * 🔴 THE ONLY TWO PLACES A SIZE IS DIVIDED. See the header for why 1000 and
+   * why two decimals. They are functions rather than a rule somebody has to
+   * remember, because this page printed sizes from eleven separate expressions
+   * and two of them disagreed about what a kilobyte is.
+   * ⚠️ THEY RETURN STRINGS, so an assert comparing a cell to one of them is
+   * comparing what the reader can see rather than a number behind it.
+   */
+  const kb = (bytes) => (bytes / 1000).toFixed(2);
+  const mb = (bytes) => (bytes / 1e6).toFixed(2);
+
+  /**
    * 🔴 THE ORGAN PRESET, COMPILED UNDER THE NAME `fau_pin`, IS EXACTLY THIS
    * MANY BYTES OF MACHINE CODE, AND THE NAME IS PART OF THE PIN.
    * `plan-fau.md` §3.3 measured that generated code is deterministic for the
@@ -231,14 +292,22 @@
    * idea from `workers/view/build.mjs`, done at runtime rather than at build
    * time: change any one of them and this goes red with the new number in its
    * own detail line. 4,540 of voice, 2,224 of effect, 502 of mixer.
+   * 🔴 IT STAYS IN BYTES WHILE EVERY OTHER SIZE ON THIS PAGE WENT TO kB ON
+   * 2026-09-25, AND THAT IS THE ONE EXCEPTION THE UNIT RULE NAMES. This is a
+   * FINGERPRINT rather than a size: at two decimals of a kB it would pass any
+   * change under ten bytes, which is most of what it exists to catch.
+   * ✅ AND THE BLANK LINES THE SAME DAY'S ASK PUT INTO THE LISTING DO NOT MOVE
+   * IT, MEASURED RATHER THAN ASSUMED: the Organ source went 761 B to 765 B and
+   * 14 lines to 18, and this compiled to 7,266 B before and after. Comments and
+   * blank lines are gone by the time libfaust generates anything.
    */
   const PINNED = { name: 'fau_pin', bytes: 7266 };
 
   /**
    * ⚠️ EIGHT VOICES, WHICH IS A CHOICE ABOUT MEMORY RATHER THAN ABOUT MUSIC.
-   * The per-voice struct is the `per voice` cell, and it is 256.1 KB for
+   * The per-voice struct is the `per voice` cell, and it is 262.26 kB for
    * anything built on `os.osc`, because a Faust oscillator carries a 65,536
-   * entry sine table. Eight of those is 2 MB before any audio buffer exists,
+   * entry sine table. Eight of those is 2.10 MB before any audio buffer exists,
    * and `plan-fau.md` §11 item 11 records that nobody has measured what an
    * iPhone grants an AudioWorklet. Eight hands and a pedal is more than anybody
    * plays at once here.
@@ -265,12 +334,35 @@
    * it, which is a thing a visitor can do by accident and the log says so.
    *
    * ⚠️ AND THE COMPRESSION IS A DICTIONARY, NOT MAGIC, WHICH IS WHY `djembe` IS
-   * HERE. 75 bytes of source becoming 12,820 bytes of machine code is real, and
-   * it is real because `pm.djembe_ui_MIDI` is a NAME for something living in
-   * the 2.4 MB of library that was already downloaded. The moment the sound is
+   * HERE. 0.27 kB of source becoming 17.21 kB of machine code is real, and it is
+   * real because `pm.djembe_ui_MIDI` is a NAME for something living in the
+   * 2.41 MB of library that was already downloaded. The moment the sound is
    * something nobody wrote a library function for, the source is as long as the
-   * sound is complicated: the STK waveguide piano is 21,916 bytes of it. Both
-   * halves of that belong on the page rather than only the flattering one.
+   * sound is complicated: the STK waveguide piano is 21.92 kB of it. Both halves
+   * of that belong on the page rather than only the flattering one.
+   * ⚠️ THOSE TWO FIGURES READ `75 bytes` AND `12,820 bytes` UNTIL 2026-09-25 AND
+   * BOTH WERE STALE. The djembe grew its comments on 2026-09-24 and nothing here
+   * moved with it. RE-MEASURED that day against this file's own source, which is
+   * the only reason the new pair is worth anything.
+   *
+   * ── A BLANK LINE AFTER EVERY COMMENT, AND IT IS ONLY THIS LISTING ──────────
+   *
+   * 🔴 ASKED 2026-09-25 AS *"add nl after comments"*, WITH A WORKED EXAMPLE
+   * RATHER THAN A DESCRIPTION, AND THE SCOPE WAS PUT TO THE OWNER AND ANSWERED:
+   * the Faust listing shown on this page, not a repository sweep and not a
+   * convention for new JavaScript. So it applies to the `code` strings below and
+   * to nothing else in this file.
+   * ✅ **THE FORM IS: A COMMENT ON ITS OWN LINE IS FOLLOWED BY A BLANK LINE
+   * BEFORE THE CODE IT INTRODUCES.** Two comment lines in a row are one comment
+   * and take one blank line after the pair, because the blank separates the
+   * comment from its code rather than the lines from each other.
+   * ⚠️ **A TRAILING COMMENT GETS NOTHING, AND THAT IS NOT AN OVERSIGHT.**
+   * `gate = button("gate");   // 1 while a key is held down` introduces no code:
+   * the code is to its left and already read. A blank line under it would
+   * separate two statements that belong together.
+   * ⚠️ **AND IT COSTS FOUR TO SIX LINES A PRESET, WHICH IS WHY `rows` MOVED.**
+   * See `createField` below: the box is sized to the longest listing, MEASURED
+   * rather than guessed, and this ask changed which number that is.
    */
   const PRESETS = [
     {
@@ -284,11 +376,15 @@ gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
 gate = button("gate");                         // 1 while a key is held down
 
 // attack, decay, sustain, release. Seconds, except the 0.7 which is a level
+
 env  = en.adsr(0.005, 0.12, 0.7, 0.35, gate);
+
 // three sine partials: the note, its octave, and its twelfth, each quieter
+
 tone = os.osc(freq) + 0.5 * os.osc(freq * 2) + 0.25 * os.osc(freq * 3);
 
 // what you hear. <: splits one signal into the two the speakers want
+
 process = tone * env * gain * 0.2 <: _, _;
 effect  = _, _;   // runs once after the mixer. _ is a wire that changes nothing
 `,
@@ -310,13 +406,17 @@ gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
 gate = button("gate");                         // 1 while a key is held down
 
 // the tine: 14 times the note, gone in 20 ms. This is the hammer hitting it
+
 knock = os.osc(freq * 14) * en.ar(0.001, 0.02, gate) * 3.2 * gain;
+
 // the body: the note itself, ringing on for about a second
+
 body  = os.osc(freq) * en.ar(0.001, 0.9, gate) * 1.1;
 env   = en.adsr(0.002, 1.4, 0.0, 0.4, gate);   // 0.0 sustain, so it dies away
 
 // both of them bend the carrier's pitch instead of being added to it,
 // which is FM, and it is what makes this a Rhodes and not three oscillators
+
 process = os.osc(freq + (knock + body) * freq * 0.02) * env * gain * 0.3 <: _, _;
 effect  = _, _;
 `,
@@ -329,6 +429,7 @@ effect  = _, _;
 
 // a physical model somebody else wrote, taken whole out of the library.
 // pm is physmodels. It builds its own controls, which is what _ui_ means
+
 process = pm.djembe_ui_MIDI <: _, _;
 effect  = _, _;
 `,
@@ -351,11 +452,80 @@ gate = button("gate");                         // 1 while a key is held down
 
 // 3.51 is the whole patch. It is not a whole multiple of the note, so the
 // partials it adds belong to no harmonic series and the ear hears metal
+
 strike = os.osc(freq * 3.51) * en.ar(0.001, 0.35, gate) * 2.0;
 env    = en.ar(0.002, 2.2, gate);   // attack and release only, no sustain
 
 process = os.osc(freq + strike * freq * 0.03) * env * gain * 0.25 <: _, _;
 effect  = _, _;
+`,
+    },
+    {
+      /* 🔴 THE FIFTH, ADDED 2026-09-25 ON *"add more patches if you have"*, AND
+         `if you have` WAS READ AS THE CONDITION IT IS. This one is not invented:
+         `plan-fau.md` §1.4 names `pm.clarinet_ui_MIDI` as the measured example
+         behind its own headline sentence, *"61 bytes of source becomes a
+         clarinet"*, and `physmodels.lib` is already inside the 2.41 MB of
+         library this page downloads. Nothing new crosses the wire for it.
+         🔴 AND THE PLAN'S COMPILE TIME DOES NOT TRANSFER TO THIS PAGE, MEASURED
+         2026-09-25 BEFORE IT WAS ADDED. §2.2 records 94 to 106 ms; compiled the
+         way THIS page compiles, which is polyphonic with a voice, an effect and
+         a mixer, it is 273 to 344 ms on this desk. The plan's figure is a MONO
+         compile and this page has never made one. That is the slowest preset
+         here by nearly three times over the next one and it is still an order of
+         magnitude under the STK piano's 1,690 ms, which is the one refused.
+         ⚠️ `pm.brass_ui_MIDI` COMPILES IN 155 ms AND WAS NOT CHOSEN. It is in
+         the same library and it would have been the cheaper row; it has never
+         been measured in this repository, and picking a sound on a number the
+         page does not otherwise care about is how provenance gets lost. */
+      id: 'clarinet',
+      label: 'Clarinet',
+      what: 'the same one line as the drum with a blown tube behind it instead of a struck skin',
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
+
+// another name out of the same library as the drum, and a blown tube keeps
+// a delay line per voice where a struck skin keeps almost nothing
+
+process = pm.clarinet_ui_MIDI <: _, _;
+effect  = _, _;
+`,
+    },
+    {
+      /* 🔴 THE SIXTH, AND IT IS THE ONLY ONE THAT USES THE LINE EVERY OTHER
+         PRESET CARRIES. This file's own header says in capitals that
+         `effect = _, _;` IS NOT DECORATION, and until this row nothing on the
+         page showed what it is for: five patches all ended with a wire that
+         changes nothing. Here the last line is a real reverb, so a visitor can
+         see that the effect runs ONCE on the mix rather than once per voice.
+         ✅ MEASURED AND ALREADY IN THIS REPOSITORY, the same condition as the
+         clarinet: `plan-fau.md` §1.4 has `dm.freeverb_demo` at 51 B of source
+         and 12,274 B compiled in 39 ms, and `demos.lib` is inside the library
+         already downloaded.
+         ⚠️ AND THE READOUT IS WHERE IT SHOWS. `machine code` counts the voice,
+         the effect and the mixer together, so this is 19.27 kB against the
+         Organ's 7.27 kB out of a source 84 bytes SHORTER. The per-voice cell
+         does not move at all, because the room is not in the voice, and the
+         assert below reads all three of those at once. */
+      id: 'hall',
+      label: 'Hall',
+      what: 'the Organ with a real room on the end of it, which is what the effect line is for',
+      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
+
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
+
+env  = en.adsr(0.005, 0.12, 0.7, 0.35, gate);
+tone = os.osc(freq) + 0.5 * os.osc(freq * 2) + 0.25 * os.osc(freq * 3);
+
+// the Organ again, unchanged down to here
+
+process = tone * env * gain * 0.2 <: _, _;
+
+// and every other patch ends with a wire that changes nothing. This one
+// puts a room there, and it runs once on the mix rather than once per voice
+
+effect  = dm.freeverb_demo;
 `,
     },
   ];
@@ -384,12 +554,17 @@ effect  = _, _;
      * ⚠️ AND THE 6.16 MB DOWNLOAD IS A LOG LINE RATHER THAN A CELL, for the
      * same reason one step along: it happens exactly once per page, and a cell
      * that changes once is not a measurement either.
+     * 🔴 THREE OF THE FOUR KEYS CHANGED ON 2026-09-25, AND THE ONE THAT ALREADY
+     * SAID `KB` CHANGED TOO. `source` and `machine code` read `B`, `per voice`
+     * read `KB` and divided by 1024, so the row carried raw bytes beside a
+     * kilobyte that was not the same kilobyte as the log's. All three are `kB`
+     * at 1000 bytes now. See the unit block in the header.
      */
     readout: {
       compile: 'ms',
-      source: 'B',
-      'machine code': 'B',
-      'per voice': 'KB',
+      source: 'kB',
+      'machine code': 'kB',
+      'per voice': 'kB',
     },
     /**
      * 🔴 NO CONTROL ROW AT ALL SINCE 2026-09-24, ASKED AS *"rm compile button
@@ -511,7 +686,7 @@ effect  = _, _;
   async function bootCompiler() {
     if (faust) return faust;
     const t0 = performance.now();
-    d.log(`fetching the Faust compiler, ${(COMPILER_BYTES / 1e6).toFixed(2)} MB, once`);
+    d.log(`fetching the Faust compiler, ${mb(COMPILER_BYTES)} MB, once`);
     const { instantiateFaustModuleFromFile, LibFaust, FaustCompiler, FaustPolyDspGenerator }
       = await import(VENDOR.mjs);
     const realError = console.error;
@@ -530,7 +705,7 @@ effect  = _, _;
     const ms = performance.now() - t0;
     const raw = vendorBytes(), wire = vendorBytes('encodedBodySize');
     d.log(`Faust ${compiler.version()} is in this tab, ready in ${ms.toFixed(0)} ms`, 'hi');
-    d.log(`it weighs ${(raw / 1e6).toFixed(2)} MB and ${(wire / 1e6).toFixed(2)} MB of that `
+    d.log(`it weighs ${mb(raw)} MB and ${mb(wire)} MB of that `
         + `crossed the wire, so whatever served it `
         + `${wire && wire < raw * 0.9 ? 'compressed it' : 'did not compress it'}`);
     return faust;
@@ -637,10 +812,10 @@ effect  = _, _;
 
     lastName = uniq;
     setCell('compile', ms.toFixed(0));
-    setCell('machine code', bytes);
-    setCell('per voice', (meta.size / 1024).toFixed(1));
-    d.log(`${name} compiled in ${ms.toFixed(0)} ms into ${bytes} bytes of machine code, `
-        + `${(meta.size / 1024).toFixed(1)} KB a voice, ${VOICES} voices`, 'hi');
+    setCell('machine code', kb(bytes));
+    setCell('per voice', kb(meta.size));
+    d.log(`${name} compiled in ${ms.toFixed(0)} ms into ${kb(bytes)} kB of machine code, `
+        + `${kb(meta.size)} kB a voice, ${VOICES} voices`, 'hi');
     if (!meta.ui || !JSON.stringify(meta.ui).includes('gate')) {
       d.log('this one declares no gate, so the keys cannot start it. A polyphonic voice '
           + 'needs freq, gain and gate');
@@ -659,14 +834,21 @@ effect  = _, _;
   const source = createField({
     label: 'FAUST',
     grow: 'wide',
-    /* 🔴 SIXTEEN SINCE 2026-09-24, BECAUSE THE PATCHES GREW COMMENTS.
-       Asked as *"can you have comments in fau file what lines do?"*, and at 12
-       rows the longest preset was cut through the middle of `process`, which is
-       the one line a reader most needs to see. A box sized to the content it
-       used to hold is a box that hides the content it holds now. MEASURED: the
-       four presets are 14, 16, 6 and 13 lines with their comments, so 16 is
-       the longest of them rather than a number that looked about right. */
-    rows: 16,
+    /* 🔴 TWENTY SINCE 2026-09-25, AND IT HAS NOW MOVED TWICE FOR THE SAME
+       REASON. It was 12 until the patches grew comments (*"can you have comments
+       in fau file what lines do?"*), where the longest preset was cut through
+       the middle of `process`, which is the one line a reader most needs to see.
+       It was 16 until the blank lines went in (*"add nl after comments"*) and
+       two more presets arrived, which between them added four to six lines to
+       every listing that has a comment in it.
+       🔴 A BOX SIZED TO THE CONTENT IT USED TO HOLD HIDES THE CONTENT IT HOLDS
+       NOW, and that is the whole rule: this number is READ OFF the presets and
+       never guessed. MEASURED 2026-09-25 by counting the `code` strings in this
+       file: 18, 20, 7, 14, 7 and 17 lines, so 20 is the longest of them.
+       ⚠️ AND IT IS THE LONGEST RATHER THAN A COMFORTABLE AVERAGE, because a
+       listing that does not fit is one a visitor has to scroll inside a box
+       whose own scrollbar is the least visible thing on the page. */
+    rows: 20,
     code: true,
     value: PRESETS[0].code,
     onInput: onType,
@@ -684,7 +866,7 @@ effect  = _, _;
   source.el.classList.add('fau-src');
 
   function showSource() {
-    setCell('source', new TextEncoder().encode(source.value()).length);
+    setCell('source', kb(new TextEncoder().encode(source.value()).length));
   }
   function onType() {
     showSource();
@@ -948,7 +1130,7 @@ effect  = _, _;
     if (powered) return;
     powered = true;
     paintPower(true);
-    d.log(`switching on: the compiler is ${(COMPILER_BYTES / 1e6).toFixed(2)} MB and this is `
+    d.log(`switching on: the compiler is ${mb(COMPILER_BYTES)} MB and this is `
         + `the press that pulls it`);
     try {
       await bootCompiler();
@@ -1041,7 +1223,7 @@ effect  = _, _;
   showSource();
   paintPower(false);
   d.log(`nothing is fetched until you switch FAU on. That press pulls the Faust `
-      + `compiler, ${(COMPILER_BYTES / 1e6).toFixed(2)} MB, once`);
+      + `compiler, ${mb(COMPILER_BYTES)} MB, once`);
 
   // ── the picture ────────────────────────────────────────────────────────────
   const dg = createDiagram(d.el, {
@@ -1077,14 +1259,20 @@ effect  = _, _;
         ] },
       { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
         children: [
-          { id: 'box', label: 'text box', sub: '10 lines of Faust', tech: 'browser',
+          { id: 'box', label: 'text box', sub: '7 to 20 lines', tech: 'browser',
             note: 'What a visitor types, and the only input this page has. Everything below it '
-                + 'is made from these few hundred bytes and nothing else.' },
+                + 'is made from under a kilobyte of text and nothing else.' },
           { id: 'lf', label: 'libfaust', sub: '2.89.2, wasm', tech: 'browser',
-            note: 'The Faust compiler itself, 3.6 MB of **WebAssembly**, with 2.4 MB of plain '
+            note: 'The Faust compiler itself, 3.60 MB of **WebAssembly**, with 2.41 MB of plain '
                 + 'Faust library source beside it that it reads out of its own filesystem. '
                 + 'Fetched once, on the first press.' },
-          { id: 'dsp', label: 'dsp module', sub: '4 to 13KB', tech: 'sound',
+          /* ⚠️ THE RANGE IS ROUNDED TO WHOLE kB AND IT IS A LABEL RATHER THAN A
+             READING, which is why it does not carry the readout's two decimals.
+             It read `4 to 13KB` until 2026-09-25 and was wrong at both ends:
+             MEASURED across the six presets that day, 6.95 to 19.27 kB. The
+             live figure is the `machine code` cell, and this says roughly how
+             big the thing in the box gets. */
+          { id: 'dsp', label: 'dsp module', sub: '7 to 19 kB', tech: 'sound',
             note: 'A second WebAssembly module, made in this tab a moment ago, holding this '
                 + 'instrument and nothing else. It is what a visitor changes by typing.' },
           { id: 'awn', label: 'AudioWorklet', sub: '8 voices, 128 frames', tech: 'sound',
@@ -1098,7 +1286,7 @@ effect  = _, _;
     ],
     links: [
       { from: 'box', to: 'lf',
-        note: 'A few hundred bytes for something small. The compression is a dictionary rather '
+        note: 'Under a kilobyte for something small. The compression is a dictionary rather '
             + 'than magic: a one line drum is one line because somebody else wrote the model '
             + 'into the library beside the compiler.' },
       /* A link between two children of one container takes NO label: the gap
@@ -1150,11 +1338,45 @@ effect  = _, _;
       runs === 0 && node === null && ctx === null && midi === null,
       `${runs} compiles, node ${node ? 'built' : 'none'}, audio ${ctx ? 'open' : 'none'}, `
       + `MIDI ${midi ? 'asked' : 'not asked'}`);
-    d.assert('the box opens with a whole instrument in it, and the readout counts its bytes',
-      Number(d.api.readout.source) === new TextEncoder().encode(PRESETS[0].code).length,
-      `${d.api.readout.source} B`);
+    /* 🔴 THE CELL IS ROUND-TRIPPED THROUGH 1000 RATHER THAN COMPARED AGAINST
+       `kb()`, AND THAT IS THE WHOLE POINT OF THIS ASSERT. The first version
+       read `d.api.readout.source === kb(bytes)`, which is two numbers out of
+       one field: change `kb()` to divide by 1024 and the cell and the expected
+       value move together and this stays green, which is the failure
+       `positron-verify` records about a check whose halves share a bug.
+       Multiplying the printed value back by 1000 tests the LADDER instead.
+       ⚠️ AND THE TOLERANCE IS DERIVED, NOT PICKED. Two decimals of a kB is
+       five bytes of rounding at any magnitude, so the round trip through 1000
+       can never miss by more than 5 and a round trip through 1024 misses this
+       source by 15. MEASURED on the Organ: 765 B prints 0.77 and comes back
+       770, against 0.75 and 750. */
+    const srcBytes = new TextEncoder().encode(PRESETS[0].code).length;
+    d.assert('the box opens with a whole instrument in it, and the readout measures it in '
+           + 'kB of 1000 bytes',
+      Math.abs(Number(d.api.readout.source) * 1000 - srcBytes) <= 5,
+      `${d.api.readout.source} kB reads back as ${Number(d.api.readout.source) * 1000} B `
+      + `against ${srcBytes} B`);
     d.assert('the readout is the four cells the ask left it with, which is an even count',
       Object.keys(d.api.readout).length === 4, Object.keys(d.api.readout).join(', '));
+    /* 🔴 THE UNIT ITSELF, ASSERTED, BECAUSE THE ASK WAS ABOUT THE UNIT AND
+       NOTHING ELSE ON THIS PAGE WOULD NOTICE ONE GOING BACK. Three of the four
+       cells are sizes and all three have to say `kB`; `compile` is a time and
+       has to stay `ms`, which is the negative half and is why this names all
+       four rather than counting how many say kB. A cell relabelled to `B` or to
+       `KB` takes this red on its own, and so would a sweep that renamed the lot.
+       ⚠️ READ OFF THE RENDERED CELL AND NOT OFF THE `readout` OBJECT THIS PAGE
+       HANDED `mount()`, WHICH WAS THE FIRST TRY AND IS TWO NUMBERS FROM ONE
+       FIELD. `api.readout` is values rather than units, and the map in this
+       file would agree with itself whatever reached the screen. `shell.mjs`
+       puts the unit in a `.pos-u` inside the cell, so that is the far side of
+       the boundary and it is what a reader is looking at. */
+    const unitOf = (key) => [...d.readoutEl.querySelectorAll('.pos-cell')]
+      .find((c) => c.querySelector('.pos-k')?.textContent === key)
+      ?.querySelector('.pos-u')?.textContent;
+    d.assert('every size in the readout is in kB and the one time is not',
+      unitOf('source') === 'kB' && unitOf('machine code') === 'kB'
+        && unitOf('per voice') === 'kB' && unitOf('compile') === 'ms',
+      Object.keys(d.api.readout).map((k) => `${k} in ${unitOf(k)}`).join(', '));
     d.assert('nothing cut and nothing refused in the picture', dg.cuts.length === 0,
       dg.cuts.map((c) => c.full).join(', ') || 'nothing');
     d.assert('the only headless line in the picture is the one joining a set', dg.ties === 1,
@@ -1162,14 +1384,48 @@ effect  = _, _;
     d.assert('the pedal is read on one controller, and the page says which',
       pedal.cc === (Number(q.get('pedal')) || SUSTAIN_CC), `controller ${pedal.cc}`);
 
+    /* 🔴 THE LISTING'S OWN FORMAT, GRADED, BECAUSE A FORMAT NOTHING CHECKS IS A
+       FORMAT THAT COMES BACK. Asked 2026-09-25 as *"add nl after comments"* and
+       scoped by the owner to these six sources: a comment on its own line is
+       followed by a blank line before the code it introduces. A run of comment
+       lines is ONE comment and takes one blank after the run, so a comment
+       followed by another comment is not a violation.
+       ⚠️ AND THE NEGATIVE HALF IS COUNTING THE COMMENTS, because `nothing out
+       of place` is vacuously true of a listing with no comments in it at all,
+       and deleting them is the cheapest way to make this assert stop meaning
+       anything. Both counts have to survive: own-line comments, which this
+       grades, and TRAILING ones, which must stay on their code line and are
+       exactly what the format does NOT apply to. MEASURED today: 16 and 21. */
+    const fmt = { own: 0, trail: 0, bad: [] };
+    for (const pr of PRESETS) {
+      const lines = pr.code.replace(/\n$/, '').split('\n');
+      lines.forEach((line, i) => {
+        const own = /^\s*\/\//.test(line);
+        if (own) fmt.own++;
+        else if (line.includes('//')) fmt.trail++;
+        const next = lines[i + 1];
+        if (!own || next === undefined) return;
+        if (!/^\s*\/\//.test(next) && next.trim() !== '') fmt.bad.push(`${pr.id} line ${i + 1}`);
+      });
+    }
+    d.assert('every comment on its own line in the six listings is followed by a blank line, '
+           + 'and there are comments in them to check',
+      fmt.bad.length === 0 && fmt.own >= 10 && fmt.trail >= 10,
+      fmt.bad.join(', ') || `${fmt.own} own-line comments each followed by a blank, `
+      + `${fmt.trail} still sitting on their own code line`);
+
     /* Typing is the page's whole subject, so the number it moves is asserted
        rather than assumed. */
     const wasBytes = Number(d.api.readout.source);
     source.set(`${PRESETS[0].code}\n// a comment the check typed\n`);
     showSource();
-    d.assert('editing the text changes the byte count under it',
+    /* ⚠️ THIRTY CHARACTERS IS 0.03 kB, WHICH THE CELL CAN SHOW AND ONLY JUST.
+       That is what set the two decimals in the header's unit block: at one
+       decimal this assert would be comparing `0.76` against `0.76` and would go
+       red on a page where the typing worked perfectly. */
+    d.assert('editing the text changes the size under it',
       Number(d.api.readout.source) > wasBytes,
-      `${wasBytes} B became ${d.api.readout.source} B`);
+      `${wasBytes} kB became ${d.api.readout.source} kB`);
     source.set(PRESETS[0].code);
     showSource();
 
@@ -1311,17 +1567,27 @@ effect  = _, _;
     d.assert('everything a compiling page needs really arrived, to the byte',
       vendorLoads().length === 4 && vendorBytes() === PAGE_BYTES,
       `${vendorLoads().length} files, ${vendorBytes()} B of ${PAGE_BYTES} B`);
-    d.assert('ten lines of text became machine code, and it took longer than nothing',
+    /* ⚠️ THE ONE ABOVE KEEPS ITS BYTES, AND IT IS THE SECOND OF THE TWO THE
+       UNIT RULE NAMES. `to the byte` is the claim; at 0.01 MB of resolution a
+       file arriving 4,000 bytes short would read as having arrived. */
+    /* ⚠️ `ten lines` UNTIL 2026-09-25. The blank-line ask took the Organ to 18
+       lines and the longest preset to 20, so the number in this sentence had
+       stopped being true of anything in the list. */
+    d.assert('a page of text became machine code, and it took longer than nothing',
       first.ok && first.bytes > 1000 && first.ms > 0,
-      `${first.bytes} B in ${first.ms.toFixed(0)} ms`);
+      `${kb(first.bytes)} kB in ${first.ms.toFixed(0)} ms`);
     /* 🔴 THE `checkCompiledDefs` IDEA AT RUNTIME. One known source under one
        known name is exactly this many bytes, or something about the compiler,
-       its flags or this page's arguments has moved. */
+       its flags or this page's arguments has moved.
+       ⚠️ AND IT IS THE FIRST OF THE TWO ASSERTS THE UNIT RULE EXEMPTS. A
+       fingerprint rounded to 10 bytes is not a fingerprint, and this one has
+       already earned its resolution once: see `PINNED`, where it caught a 78
+       byte difference that was a NAME rather than a change to the instrument. */
     d.assert('a known source under a known name is exactly the machine code it was last time',
       first.bytes === PINNED.bytes, `${first.bytes} B against ${PINNED.bytes} B`);
     d.assert('one voice of it is a quarter of a megabyte, because a Faust oscillator '
            + 'carries a sine table', first.size > 200000 && first.size < 400000,
-      `${(first.size / 1024).toFixed(1)} KB`);
+      `${kb(first.size)} kB`);
 
     /* 🔴 THE PAGE'S WHOLE CLAIM, AS ONE ASSERT. Editing the text has to change
        the bytes the audio thread is running. A page that compiled the same
@@ -1331,7 +1597,7 @@ effect  = _, _;
     const second = await build(edited, 'edited organ', 'fau_alt');
     d.assert('editing the text changes the machine code the audio thread is running',
       second.ok && second.bytes !== first.bytes,
-      `${first.bytes} B became ${second.bytes} B, from names of the same length`);
+      `${kb(first.bytes)} kB became ${kb(second.bytes)} kB, from names of the same length`);
 
     /* The error path, which is the first thing a visitor meets, and the console
        it must not reach. */
@@ -1352,7 +1618,8 @@ effect  = _, _;
        after the button and the byte count carries its name's length. */
     const after = await build(PRESETS[0].code, 'organ again');
     d.assert('and the next good compile still works, so one bad source does not end the page',
-      after.ok && after.size === first.size, `${after.bytes} B, ${after.size} B a voice`);
+      after.ok && after.size === first.size,
+      `${kb(after.bytes)} kB, ${kb(after.size)} kB a voice`);
 
     /* ── the sound ────────────────────────────────────────────────────────── */
     const quiet = level();
@@ -1421,22 +1688,62 @@ effect  = _, _;
     const drum = await build(PRESETS[2].code, 'djembe');
     d.assert('a preset named in one line compiles to more machine code than ten lines of '
            + 'arithmetic, because the model was already in the library',
-      drum.ok && drum.bytes > second.bytes, `${drum.bytes} B from ${PRESETS[2].code.length} B `
-      + `of source, against ${second.bytes} B from ${edited.length} B`);
+      drum.ok && drum.bytes > second.bytes,
+      `${kb(drum.bytes)} kB from ${kb(PRESETS[2].code.length)} kB of source, against `
+      + `${kb(second.bytes)} kB from ${kb(edited.length)} kB`);
     d.assert('and one voice of it costs a thousandth of what the organ\'s voice costs',
-      drum.size < first.size / 100, `${(drum.size / 1024).toFixed(1)} KB against `
-      + `${(first.size / 1024).toFixed(1)} KB`);
+      drum.size < first.size / 100, `${kb(drum.size)} kB against ${kb(first.size)} kB`);
+
+    /* 🔴 THE TWO ONE-LINE MODELS SIDE BY SIDE, WHICH IS THE `a dictionary
+       rather than magic` ARGUMENT AT ITS SHARPEST AND WAS GRADED BY NOTHING
+       UNTIL THE CLARINET ARRIVED ON 2026-09-25. Both are a single `pm.` name
+       out of the same library and both are about a quarter of a kB of source,
+       and what they keep PER VOICE differs by nearly five hundred times: a
+       struck skin holds almost no state and a blown tube is a delay line. The
+       page's own sentence about compression is true of the drum and would be
+       read as true of every library model without this beside it.
+       ⚠️ FOUND BY `id` RATHER THAN BY INDEX. The rows above still use indices
+       and two new presets have just been appended below them; an index is a key
+       that the next `(add more)` moves, and a check reading the wrong preset
+       fails on a page where nothing is wrong. */
+    const byId = (id) => PRESETS.find((x) => x.id === id);
+    const reed = await build(byId('clarinet').code, 'clarinet');
+    d.assert('two patches that are each one line out of the same library keep wildly '
+           + 'different amounts per voice',
+      reed.ok && reed.size > drum.size * 100,
+      `${kb(reed.size)} kB a voice against the drum's ${kb(drum.size)} kB, from `
+      + `${kb(byId('clarinet').code.length)} kB and ${kb(byId('djembe').code.length)} kB `
+      + 'of source');
+
+    /* 🔴 THE ONE CLAIM ONLY `Hall` CAN MAKE, AND IT IS WHY THAT PRESET IS HERE.
+       Five of the six end with `effect = _, _;`, which this file's header calls
+       NOT DECORATION and which nothing on this page demonstrated until
+       2026-09-25. A real room on that line is MORE machine code out of LESS
+       source, and not one byte of it lands in the voice, because an effect runs
+       once on the mix rather than once per voice. A page that quietly compiled
+       the effect per voice would pass every other check in this block.
+       ⚠️ SEVEN CHARACTERS AGAIN, because these bytes are compared against
+       `first` and a module's name is embedded in it. See `PINNED`. */
+    const hall = await build(byId('hall').code, 'hall', 'fau_hal');
+    d.assert('a patch with a real effect on the end is more machine code out of less text, '
+           + 'and none of it is in the voice',
+      hall.ok && hall.bytes > first.bytes && hall.size === first.size
+        && byId('hall').code.length < PRESETS[0].code.length,
+      `${kb(hall.bytes)} kB from ${kb(byId('hall').code.length)} kB, against the Organ's `
+      + `${kb(first.bytes)} kB from ${kb(PRESETS[0].code.length)} kB, and `
+      + `${kb(hall.size)} kB a voice either way`);
 
     /* 🔴 EVERY PRESET IN THE LIST, WHICH IS THE ONLY THING THAT CATCHES ONE
-       THAT DOES NOT COMPILE. The checks above name three of the four by index,
-       and the fourth arrived with the ask that said *"(add more)"*: nothing in
-       this block would have compiled it, so a preset that does not parse would
-       have shipped and the first person to find out would be a visitor picking
-       it. A list is exactly where a broken member hides. */
+       THAT DOES NOT COMPILE. The checks above name four of the six, and the
+       other two arrived with asks that said *"(add more)"* and *"add more
+       patches if you have"*: nothing in this block would have compiled them, so
+       a preset that does not parse would have shipped and the first person to
+       find out would be a visitor picking it. A list is exactly where a broken
+       member hides. */
     const each = [];
     for (const p of PRESETS) {
       const r = await build(p.code, p.label.toLowerCase());
-      each.push(`${p.label} ${r.ok ? `${r.bytes} B` : `FAILED, ${r.error}`}`);
+      each.push(`${p.label} ${r.ok ? `${kb(r.bytes)} kB` : `FAILED, ${r.error}`}`);
     }
     d.assert('every preset in the selector compiles, including the ones no other check names',
       each.every((s) => !s.includes('FAILED')), each.join(', '));
