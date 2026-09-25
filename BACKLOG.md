@@ -139,7 +139,57 @@ that header row or puts the plate in the rack's first row. `instrument.mjs:108`
 is the header and its right cell is the plate's home, at `end` and never `ends`.
 
 
-### Open 2026-09-25: an edge to edge horizontal separator on every button group
+### Part done 2026-09-25: an edge to edge horizontal separator on every button group
+
+✅ **THE KIT HALF IS DONE, COMMIT `8ea1b59`. MEASURED: `/kit/` 217/217 before
+(205 page asserts) and 221/221 after (209), so the four new asserts are the whole
+of the change.** `verify.mjs muta shape` 104/104 green, `instrument-test` 17 ok.
+
+    panel.seam()     a rule, edge to edge of the case
+    panel.band(el)   a block stacked across the case, under what is there
+    inst.seam() / inst.band(el)   forwarded by createInstrument
+
+⚠️ **`band()` IS NOT `add()`.** `add()` puts a block in the scroller,
+`band()` puts it in the case, and that distinction is the whole constraint.
+
+🔴 **AND THE CONSTRAINT IS STRUCTURAL RATHER THAN STYLISTIC, MEASURED ON
+`/knobs/` RATHER THAN ARGUED: A SEAM IS EDGE TO EDGE ONLY AS A CHILD OF THE
+CASE.** Inside the scroller it is not hard, it is impossible. A rule put in that
+page's `.panel-flow` laid out at **992 px against a 686 px case**, because the
+flow is `width: max-content` around a keyboard wider than the panel. A negative
+margin made it wider still and reached nothing: **`scrollLeft` clamps at 0**, so
+inline-start overflow inside `overflow-x: auto` is clipped for good. **A page
+whose sections live in the flow has to lift them into bands to get this.**
+
+✅ **THE SEAM CROSSES A SIDE PLATE RAIL AND THE NAME IS PAINTED OVER IT.**
+MEASURED: a side plate is `justify-content: flex-end` under `writing-mode:
+vertical-rl`, so the ink sits at the TOP of the rail. `/shape/` **41 px of ink in
+a rail of 1722**, `/knobs/` **41 in 199**. The rule passes behind the word and
+reappears either side of it. ⚠️ The ground is on the LINE and not on the
+plate, deliberately: a background on the plate would mask the whole rail and
+erase the seam across it, which is the opposite of edge to edge.
+
+🔴 **AND THE GRID CASE NEEDED EXPLICIT ROWS, WHICH `shell.css` PREDICTED IN
+ITS OWN COMMENT**: *"which looks identical until a case grows a third child"*. A
+case grows third and fourth children the moment it carries bands. MEASURED before
+the fix, a four child case laid out `1721.5px 70.5px 0px 0px 1px 70.5px`, **six
+tracks for four bands**, two of them empty ones the plate had blocked.
+
+✅ **THE ASSERTS WERE SABOTAGED TO PROVE THEY BITE.** Remove the negative
+margin: **2 of 4 red**, reading `20.0 px off the left inner edge and -20.0 off the
+right`, which is the case’s own padding at both ends. Remove the row count:
+**1 of 4 red**, with the seam and the band piled into row 1 at y17126.3. The
+fourth is a negative control, a case with no side plate carrying no count.
+
+⚠️ **STILL OPEN: WHICH PAGES GET SEAMS.** `/knobs/` and `/shape/` are being
+decided by their own agents this round, and each has to judge whether lifting its
+sections into bands costs anything it already guarantees. **`createButtonGroup`’s
+four pages (`kit`, `mirror`, `twelve`, `weight`) were deliberately NOT swept**,
+on the rule that a component name is not evidence that a page wants a rule drawn
+through it.
+⚠️ **AND NOTHING GRADES THE SEAM ON A PHONE.** `demo/verify.mjs` runs at 756
+px with no viewport override and `--panel-pad` does not change there, so the
+margin holding at phone width is READ and not measured.
 
 ⚠️ **ASKED, VERBATIM:** *"on each button group have horizontal panel separator
 edge to edge"*.
@@ -893,6 +943,13 @@ ROW *AND* A WORKING DIRECTORY OF BUILD SCRIPTS.** `demo/manifest.mjs:282`,
 
 ⚠️ **PRICED 2026-09-25: 55 live files hold the path `demo/resources`**,
 plus **1** under `archive/` which stays by the standing rule.
+✅ **RE-COUNTED LATER THE SAME DAY AND THE 55 STANDS, WHICH IS WORTH SAYING
+BECAUSE A NAIVE GREP NOW ANSWERS 89.** The extra 34 are `workers/view/public/`,
+which is the tracked BUILD OUTPUT and regenerates from `cd workers/view && node
+build.mjs`, plus `workers/tapes/test.mjs`. **They are not hand edits and must
+not be rewritten by hand**: the rename edits the sources and then rebuilds, and
+a sweep that rewrote the output directly would be undone by the next build while
+looking correct in the diff.
 🔴 **TWO OF THEM ARE IN `CLAUDE.md`'S OWN "Run and check" BLOCK**, lines
 214 and 215: `node demo/resources/measure-durations.mjs` and `node
 demo/resources/build-mimproject-images.mjs --check`. **A command in that block
