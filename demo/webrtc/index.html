@@ -119,7 +119,21 @@
     const w = await waitForWhip({
       onTick: ({ waitedMs, err }) => d.log(`whip leg not up at ${(waitedMs / 1000).toFixed(0)}s${err ? ` (${err})` : ''}`),
     });
-    if (!w.ok) { d.log(w.aborted ? 'page left' : 'whip leg never came up', 'bad'); return; }
+    // 🔴 A PAGE THAT CANNOT REACH ITS SUBJECT SAYS SO, IN AN ASSERT, NOT IN A LOG.
+    // This line used to `d.log` and return, which is how this page read 8/8
+    // GREEN on a desk where it had never connected: a log is not graded, so the
+    // suite saw a page that simply stopped having opinions. MEASURED 2026-09-25:
+    // `node demo/verify.mjs webrtc` printed `page asserted something · 2`, and
+    // both of those two are the shell's feedback-button asserts.
+    // ⚠️ `aborted` IS NOT A FAILURE. The page being left is the harness tearing
+    // down, and grading that red would make every clean teardown a defect.
+    if (!w.ok) {
+      if (w.aborted) { d.log('page left', 'bad'); return; }
+      d.assert('the whip leg came up', false,
+        `no publisher after ${(w.waitedMs / 1000).toFixed(0)}s, so nothing could be played`);
+      await d.run('check');
+      return;
+    }
     d.log(`whip leg publishing after ${(w.waitedMs / 1000).toFixed(1)}s`, 'hi');
 
     // ffmpeg reaching DTLS state=10 is not the same as Cloudflare being ready
@@ -130,7 +144,17 @@
         await whepPlay(whep());
         d.log(`WHEP negotiated in ${Math.round(performance.now() - started)} ms`, 'hi');
         await playOrPrompt(video, d);
-        return;
+        // 🔴 `break`, NOT `return`, AND THIS ONE CHARACTER IS WHY THIS PAGE HAS
+        // NEVER GRADED ITSELF. A `return` here leaves `d.run('check')` below
+        // unreachable on the SUCCESS path, and the failure path returns too, so
+        // every route out of this handler skipped the checks. The standing
+        // explanation in this repository was that the checks sat behind a
+        // connection that never happened. That was wrong and it was the more
+        // comforting answer: they sat behind a connection that DID happen, and
+        // were skipped anyway. MEASURED 2026-09-25 with a publisher awake and
+        // WHEP media confirmed reaching this machine at 389 frames and
+        // 3,554,870 bytes: still `page asserted something · 2`.
+        break;
       } catch (e) {
         try { pc?.close(); } catch { /* fine */ }
         pc = null;

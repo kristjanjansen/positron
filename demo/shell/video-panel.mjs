@@ -19,6 +19,45 @@
 // changes. `.ico` in shell.css fixes it to the control's own height, which is
 // the same rule `stepper.mjs` follows for its arrows.
 //
+// 🔴 AND A FOURTH PLACE THAT IS NOT IN THE FOOTER AT ALL: `slots.caption`, ON
+// THE PICTURE, LOW DOWN, WHERE SUBTITLES LIVE. Asked for 2026-09-25 against
+// `/stage/`: *"Overlay the questions who are appearing on top of video, sort of
+// a place where usually videos have subtitles and uh, make them more contrasty.
+// So remove them from video panel footer and move them actually on top of a
+// video in the lower part."* It is a MOVE and not a new idea: that page already
+// put its question in `slots.centre`, and the footer is the wrong home for a
+// thing that arrives, changes and leaves, because the centre slot is a grid
+// track and a longer question widens the row under the picture.
+// ⚠️ THE FOOTER SLOTS ARE UNTOUCHED AND SO IS `centre`. Three pages fill a
+// centre slot today and nothing about them changes; this is a fourth place, not
+// a replacement. `shell.css` at `.pos-vp-cap` carries the contrast numbers,
+// which are the reason the overlay is a scrim and a plate rather than a
+// brighter ink.
+//
+// 🔴 AND A PANEL CAN BE ASKED FOR ONE FOOTER AND ONLY ONE: `soloFooter: true`.
+// Asked in the same breath: *"remove the count time counter from the video
+// panel, from a footer, and remove a footer as well. So video panel only should
+// have single footer, which looks and behaves like uh, audience one."*
+// MEASURED on `/stage/` 2026-09-25, which is what that report is about: the
+// audience panel is a bare `.pos-vp` with ONE `.pos-vp-foot` under its picture,
+// and the control room's panel is the same thing wrapped in a `.pos-glue` with
+// a second part in it: a whole transport bar whose only visible content is an
+// `output.tbar-time` reading `0:00.000 / 22:11.850`. That bar IS the second
+// footer and that clock IS the counter, and both come from `glue()` below.
+// ⚠️ SO THE OPTION DOES NOT REMOVE ANYTHING, IT REFUSES. A page asks for one
+// footer by NOT gluing; what this option adds is that a page which said one
+// footer and then glues a bar is TOLD, at the call, where the stack still says
+// who asked. `createTransportBar` already refuses a loop and a loopSlot
+// together for the same reason.
+// ⚠️ AND IT IS OPT IN, BECAUSE THE OTHER FIVE PAGES ARE NOT ASKING FOR THIS.
+// MEASURED 2026-09-25 rather than assumed: six pages call `createVideoPanel`
+// (`held`, `kit`, `making`, `mirror`, `stage`, `weight`, plus `local-remote.mjs`
+// which only `/kit/` uses), and `glue()` has exactly TWO live callers, `/kit/`'s
+// specimen at `demo/kit/index.html:2789` and `/stage/`'s control room at
+// `demo/stage/index.html:1759`. `/kit/` glues on purpose, to demonstrate the
+// method. So the default is unchanged for all five other pages, and the one
+// page that must keep gluing is the one whose whole job is to show that it can.
+//
 // ⚠️ FULLSCREEN IS `shell/fullscreen.mjs` AND NOT `requestFullscreen`. That file
 // exists because an iPhone has NO element Fullscreen API at all: the only thing
 // that fills an iPhone screen is a `<video>`, and `p.requestFullscreen?.()`
@@ -127,6 +166,18 @@ export function createPanelValues(fields = []) {
  * loses to nothing, because these selectors exist nowhere else.
  *
  * THE BLOCK TO MOVE, VERBATIM, is `PANEL_VALUES_CSS` below.
+ *
+ * ⚠️ `.pos-vp-k` LOST ITS CAPS AND ITS TRACKING ON 2026-09-25, with every other
+ * readout key and control label in `shell.css`. It is a readout KEY in a panel
+ * footer, and the owner's chosen scope for *"no uppercase"* was every button on
+ * the site, previewed with tabs, buttons, badges and readout keys all losing
+ * theirs. The tracking went with the caps, which is the one rule that pass
+ * followed everywhere: `letter-spacing: .1em` existed to open out tracked caps
+ * and lowercase mono does not want it.
+ * ⚠️ AND IT HAS TO BE CHANGED HERE BECAUSE THIS SHIM IS WHERE THE RULE LIVES.
+ * `.pos-vp-k` is in NO stylesheet, so the check below never finds it and this
+ * block is injected on every page that builds a panel value row. A sweep of
+ * `shell.css` could not have reached it.
  */
 const PANEL_VALUES_CSS = `
 .pos-vp-vals {
@@ -137,7 +188,7 @@ const PANEL_VALUES_CSS = `
 .pos-vp-vals::-webkit-scrollbar { display: none; }
 .pos-vp-cell { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 .pos-vp-k {
-  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  font: 500 9.5px/1 var(--mono);
   color: var(--dim2);
 }
 .pos-vp-v {
@@ -239,6 +290,19 @@ export function createVideoPanel({
    * about the source still leads the row.
    */
   values = null,
+  /**
+   * 🔴 ONE FOOTER AND ONLY ONE. See the note at the top of this file for the
+   * measurement that bought it. `true` makes `glue()` THROW rather than build a
+   * second storey under the footer, so a page that has declared a single
+   * audience-style footer cannot quietly grow a second one again.
+   * ⚠️ IT SAYS NOTHING ABOUT WHAT THE FOOTER CONTAINS. The slots are still the
+   * page's, and "looks and behaves like the audience one" is two other
+   * decisions that already have their own options: the same three slots, and
+   * `fullMode: 'footer'`, which is what keeps the row on screen while the
+   * picture is full. `hover` takes the footer away, which is the behaviour the
+   * audience panel does NOT have.
+   */
+  soloFooter = false,
 } = {}) {
   if (!FULL_MODES.includes(fullMode)) {
     throw new Error(`video panel: fullMode is one of ${FULL_MODES.join(', ')}, not ${JSON.stringify(fullMode)}.`);
@@ -261,6 +325,21 @@ export function createVideoPanel({
    */
   if (aspect) stage.style.setProperty('--vp-aspect', aspect);
   if (media) stage.append(media.el || media);
+  /**
+   * 🔴 THE CAPTION SLOT, AND IT IS INSIDE THE STAGE RATHER THAN INSIDE THE
+   * PANEL. Two reasons, both measured elsewhere in this file. The stage is the
+   * element that keeps filling the screen when the panel goes full
+   * (`.pos-vp[data-full] .pos-vp-stage { height: 100% }`), so a caption in here
+   * travels with the picture instead of being left in a box the picture has
+   * grown out of. And `.pos-fsx`, the way back out, is already
+   * `position: absolute` in this same stage, so this is the arrangement that is
+   * known to work rather than a second one.
+   * ⚠️ ALWAYS BUILT, NEVER CONDITIONAL. `.pos-vp-cap:empty { display: none }`
+   * means an unused slot draws nothing at all, so there is no option to
+   * remember and no page that has to opt in to being able to say something.
+   */
+  const capSlot = el('div', 'pos-vp-cap');
+  stage.append(capSlot);
   root.append(stage);
 
   // ── the default left slot: is the thing feeding this answering ────────────
@@ -341,6 +420,8 @@ export function createVideoPanel({
    * component was built around.
    */
   let surface = root;
+  /** What `glue()` has put under the footer, so `footers()` can count it. */
+  const glued = [];
 
   const api = {
     el: root,
@@ -348,8 +429,25 @@ export function createVideoPanel({
     foot,
     /** The panel, or the glued box holding it and whatever is under it. */
     get surface() { return surface; },
-    /** The three slots, so a page can fill or empty one after the fact. */
-    slots: { left: leftSlot, centre: centreSlot, right: rightSlot },
+    /**
+     * The three footer slots, so a page can fill or empty one after the fact,
+     * plus `caption`, which is NOT in the footer: it is the overlay on the
+     * lower part of the picture, where subtitles live. Fill it the same way:
+     * `panel.slots.caption.append(node)`, and empty it with
+     * `panel.slots.caption.textContent = ''`, which makes it draw nothing.
+     */
+    slots: {
+      left: leftSlot, centre: centreSlot, right: rightSlot, caption: capSlot,
+    },
+    /**
+     * How many full-width rows are stacked under the picture: the panel's own
+     * footer, plus anything `glue()` has put beneath it.
+     *
+     * ⚠️ A NUMBER RATHER THAN A BOOLEAN, so a page can ASSERT the count instead
+     * of believing it. `/stage/` was reported as having two footers and nothing
+     * on the page could say so; `footers() === 1` is the claim in one reading.
+     */
+    footers: () => 1 + glued.length,
     /** The default badge, or null when a page supplied its own left slot. */
     presence,
     /** The named value row, or null. `values.set('fps', '30.0')`. */
@@ -379,6 +477,19 @@ export function createVideoPanel({
       const parts = blocks.filter(Boolean).map((b) => b.el || b);
       if (!parts.length) return surface;
       /**
+       * 🔴 REFUSED HERE, NOT IGNORED, AND NOT AT CONSTRUCTION. A page declares
+       * `soloFooter` where it builds the panel and glues somewhere else
+       * entirely, often hundreds of lines later, so this is the call whose
+       * stack names the line that has to change. Doing nothing instead would be
+       * a silent refusal, which is the shape this project calls a lie: the page
+       * would read as though it had a second footer and not have one.
+       */
+      if (soloFooter) {
+        throw new Error('video panel: soloFooter is on, so this panel has one footer'
+          + ` and ${parts.length} block(s) asked to be glued under it.`
+          + ' Drop soloFooter, or do not glue.');
+      }
+      /**
        * 🔴 A MARKER, NOT THE NEXT SIBLING, AND `/kit/` FOUND THIS ON THE FIRST
        * RUN. The obvious way to remember a place is to hold the node after it
        * and `insertBefore` that one afterwards. Here the node after the panel is
@@ -394,6 +505,7 @@ export function createVideoPanel({
       const mark = parent ? parent.insertBefore(document.createComment('glue'), surface) : null;
       surface = createGlue(surface, ...parts);
       if (mark) mark.replaceWith(surface);
+      glued.push(...parts);
       return surface;
     },
     /** Which way it goes full. Changing it while full re-applies immediately. */

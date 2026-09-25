@@ -30,6 +30,86 @@ let lastError = null;
 let lastStderr = '';
 let stopping = false;   // a SIGTERM exit is not a fault
 
+/**
+ * 🔴 THE PICTURE IS A FILM NOW, NOT `testsrc2`. Asked 2026-09-25: *"can you
+ * replace test screen with r2 mim-goes-sustainable-2011-kirikustseen.mp4"*, and
+ * then, when a browser-side background was proposed, *"why not ffmpeg take that
+ * and stream?"* followed by *"keep pipeline"*. That is the right instinct and it
+ * is the whole reason this belongs here: the container encodes ONCE and every
+ * viewer gets the result as ordinary live delivery. A page-side background
+ * meant every visit downloading **252,886,867 bytes**, and `CLAUDE.md`'s rule
+ * from `/reel/` is that a visit, a step and a scrub must open nothing.
+ * ⚠️ THE PIPELINE IS UNCHANGED, WHICH WAS THE INSTRUCTION. Same `-re` on every
+ * input, same `drawFilters` burn, same libx264 CBR with a fixed GOP and
+ * `-bf 0`, same aac and libopus. ONLY the input swaps.
+ * ⚠️ AND IT IS OURS. The corpus row says *"MIMproject, ours. The file is in our
+ * own R2 bucket"*, so this is not somebody else's server, which is the rule
+ * that governs every other source in this repository.
+ * ⚠️ `PUB_SOURCE=` EMPTY PUTS `testsrc2` BACK, deliberately. The test pattern
+ * is what the measurement rig reads a burned clock off, and a film is a worse
+ * subject for that than a moving chart is. One env var, no rebuild, because
+ * `PUB_W`/`PUB_H`/`PUB_FPS` earned exactly that argument on this same file.
+ */
+const FILM = 'https://positron-station.kristjan-jansen.workers.dev'
+  + '/media/mimproject/mim-goes-sustainable-2011-kirikustseen.mp4';
+const SOURCE = process.env.PUB_SOURCE === undefined ? FILM : process.env.PUB_SOURCE;
+
+/**
+ * 🔴 NO BURNED CLOCK OVER THE FILM. Asked 2026-09-25: *"rm burn overlay. not
+ * needed for messages sync, right"*, and that is correct, verified rather than
+ * agreed: cue sync reads the PLAYHEAD'S OWN WALL CLOCK out of the manifest.
+ * `src/timed-messages.js` defaults to `clock: 'pdt'` and gets it from
+ * `video.getStartDate()` and the PDT tags. It never reads a pixel, so the
+ * overlay was never part of that path.
+ * ⚠️ WHAT IT WAS ACTUALLY FOR, AND WHAT IS LOST: measuring latency off the
+ * PICTURE. The burned epoch is how glass to glass was measured on this account,
+ * which is where the `p50 67 ms` figure comes from, and `rig/measure-llhls.html`
+ * reads it back. With the burn off, that measurement cannot be taken from a
+ * frame at all. It is a real capability and it is one env var away rather than
+ * deleted, for the same reason `PUB_SOURCE` is.
+ * ⚠️ AND `/stage/` ALREADY EXPECTED THIS. Its own comment records that the
+ * burned clock is not in the feed when a film is up and that `readBurnedFrom`
+ * degrades to `null`, which its assert tolerates because it grades the PLAYHEAD
+ * rather than the picture. So nothing downstream is surprised.
+ * ⚠️ `PUB_BURN=1` PUTS IT BACK, over whatever the source is.
+ */
+const BURN = process.env.PUB_BURN === '1';
+
+/**
+ * The input arguments for one leg. A film and a test pattern are not the same
+ * shape of input, and this is the one place that knows the difference.
+ * ⚠️ `-stream_loop -1` BEFORE `-i`, because it is an INPUT option. A show that
+ * ends mid-stream is a live input going dark, and the container has no idea how
+ * long anybody is watching.
+ * ⚠️ AND THE FILM CARRIES ITS OWN SOUND, so a lavfi tone is not mixed under a
+ * performance. `-map` is then explicit on both streams: with two inputs and no
+ * map, ffmpeg picks the best of each and silently preferred the film's audio
+ * over the chord, which is a behaviour change nobody wrote down.
+ */
+/**
+ * The video filter chain, or nothing at all when there is no filtering to do.
+ * ⚠️ AN EMPTY `-vf` IS AN ERROR, NOT A NO-OP, so a chain that comes out empty
+ * has to leave the flag off entirely rather than pass a bare string.
+ * ⚠️ AND A TRAILING COMMA IS ALSO AN ERROR: `src.pre` ends in one so it can be
+ * concatenated with a filter, which means dropping the filter leaves it
+ * dangling. Trimmed here, once, rather than at each call.
+ */
+function vf(pre, draw) {
+  const chain = (BURN ? pre + draw : pre).replace(/,+$/, '');
+  return chain ? ['-vf', chain] : [];
+}
+
+function sourceArgs({ w, h, fps }) {
+  if (!SOURCE) return { input: ['-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`], pre: '' };
+  return {
+    input: ['-re', '-stream_loop', '-1', '-i', SOURCE],
+    // Normalise to the encode budget BEFORE the burn is drawn, so the overlay is
+    // the same size on every source and never scaled with the picture.
+    pre: `scale=${w}:${h}:force_original_aspect_ratio=decrease,`
+       + `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=${fps},`,
+  };
+}
+
 
 // Encoder settings Cloudflare LL-HLS requires: H.264, CBR, fixed GOP, and
 // B-frames OFF (they break LL-HLS). GOP == segment length; 2 s is the shortest
@@ -179,6 +259,7 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
   const epoch = (Date.now() / 1000).toFixed(6);
   const draw = drawFilters({ epoch, hue: 0 });   // see the note above
+  const src = sourceArgs({ w, h, fps });
   const wantV = tracks !== 'a';
   const wantA = tracks !== 'v';
   return [
@@ -192,9 +273,17 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
     //
     // The container-vs-local A/B could not have caught this: the local arm was
     // given these same args, so both sides shared the defect.
-    ...(wantV ? ['-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`] : []),
-    ...(wantA ? ['-re', '-f', 'lavfi', '-i', CHORD] : []),
-    ...(wantV ? ['-vf', draw] : []),
+    // The film (or `testsrc2` when `PUB_SOURCE` is empty). See `sourceArgs`.
+    ...(wantV ? src.input : []),
+    // ⚠️ THE CHORD IS ONLY FOR A SOURCE WITH NO SOUND OF ITS OWN. A sine triad
+    // under a church scene is not a stand-in, it is a second thing happening.
+    ...(wantA && !SOURCE ? ['-re', '-f', 'lavfi', '-i', CHORD] : []),
+    ...(wantA && SOURCE && !wantV ? ['-re', '-stream_loop', '-1', '-i', SOURCE] : []),
+    // ⚠️ EXPLICIT MAPS, because two inputs and no map is ffmpeg guessing, and
+    // what it guesses changed the moment input 0 gained an audio stream.
+    ...(wantV && wantA && !SOURCE ? ['-map', '0:v:0', '-map', '1:a:0'] : []),
+    ...(wantV && wantA && SOURCE ? ['-map', '0:v:0', '-map', '0:a:0?'] : []),
+    ...(wantV ? vf(src.pre, draw) : []),
     ...(wantV ? [
       '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
       '-profile:v', 'main', '-pix_fmt', 'yuv420p',
@@ -222,11 +311,16 @@ function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
   // processes on two Cloudflare inputs — the page already says so — and any
   // page showing them side by side needs to tell them apart.
   const draw = drawFilters({ epoch, hue: 150 });
+  const src = sourceArgs({ w, h, fps });
   return [
     '-hide_banner', '-loglevel', 'warning',
-    '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
-    '-re', '-f', 'lavfi', '-i', 'sine=frequency=440',
-    '-vf', draw,
+    // The film, or `testsrc2` when `PUB_SOURCE` is empty. See `sourceArgs`.
+    ...src.input,
+    // The 440 sine only when the source is silent, for the reason on the RTMPS
+    // leg: a tone under a performance is a second thing happening.
+    ...(SOURCE ? [] : ['-re', '-f', 'lavfi', '-i', 'sine=frequency=440']),
+    ...(SOURCE ? ['-map', '0:v:0', '-map', '0:a:0?'] : ['-map', '0:v:0', '-map', '1:a:0']),
+    ...vf(src.pre, draw),
     '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.1',
     '-bf', '0', '-pix_fmt', 'yuv420p', '-g', String(gop), '-b:v', bitrate,
     '-c:a', 'libopus', '-ar', '48000', '-ac', '2',

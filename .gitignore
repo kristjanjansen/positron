@@ -106,3 +106,21 @@ tmp/
 Circuit_pack/
 Sampler_pack/
 OG/ASMR_pack/
+
+# ── compiled rig binaries, which are build output and machine state ────────
+# 🔴 THE RIG BUILDS THREE MACH-O BINARIES AND NONE OF THEM WERE COVERED.
+# MEASURED 2026-09-25: `git check-ignore -v` answered NOTHING for
+# `rig/m1/bin/audiotap`, `midisend` or `midilisten`. No Mach-O is tracked
+# anywhere in this repository today, and that is luck rather than policy: it
+# holds only because the build has always happened in `~/positron-rack`, outside
+# the checkout. The day anybody compiles in place, a `git add` commits an
+# arm64 binary.
+# ⚠️ AND A COMMITTED `audiotap` WOULD BE WORSE THAN NOISE. Its TCC grant to
+# record system audio is keyed to an absolute path AND a 40-byte cdhash, so the
+# binary is not portable in principle: another machine's copy is refused, and a
+# refused tap emits correctly clocked SILENCE that every layer above reports as
+# success. The sources are in `rig/m1/` and are the canonical copy.
+# ⚠️ A DIRECTORY RATHER THAN THREE FILENAMES, for the reason this file already
+# gives itself twice: a filename rule rots the moment the next tool arrives
+# under a different name.
+rig/m1/bin/

@@ -1,5 +1,88 @@
 ## Open
 
+### Open 2026-09-25: FIVE UI ASKS ON `/stage/`, COLLECTED AS A STREAM
+
+🔴 **ASKED, VERBATIM, ONE MESSAGE, AFTER** *"can we please in the name of god fix
+the stage ui 1 asked 1000000 times"*. Collected here first and worked second,
+which is the rule asked for 2026-09-19. Every item says which file it touches.
+
+**1. A STALE QUESTION ON LOAD.** *"So when I load it, I get some kind of stale
+uh, question. Where is it coming from? Who entered it? Was it me or somebody who
+tested the page? It's called Oled sa tontu inimene, are you a ghost or a human?
+So please clear that uh, uh, back, um, history in the, in the messages."*
+
+🔴 **THERE IS NO HISTORY TO CLEAR, AND THAT IS THE FINDING.** Measured
+2026-09-25 by reading the code rather than inferring from the symptom:
+- `workers/relay/src/index.js` is stateless fan-out. `webSocketMessage` sends
+  **VERBATIM, to everyone, sender included**, and `#accept` sends a joiner
+  NOTHING. There is no `storage.put`, no retained last message and no backlog.
+- `demo/stage/index.html` has **no `localStorage`, no `sessionStorage` and no
+  `indexedDB`**, so nothing is restored on load.
+- `fetchBack` is called once, at line 2140, INSIDE the stop and upload path. No
+  archive is replayed on load.
+- The string `tont` does not exist anywhere in `demo`, `workers` or `src`.
+
+✅ **SO IT WAS TYPED BY A PERSON, LIVE, INTO A CONTROL ROOM ON THE SHARED ROOM,
+AND IT ARRIVED WHILE THE PAGE WAS OPEN.** Not the owner and not the harness: the
+harness sends `ASK_TITLE`, which is `Kas sa oled teinud ökopattu?`.
+🔴 **THE DEFECT IS THE ROOM, AT `demo/stage/index.html:67`**:
+`const ROOM = Q.get('room') || 'stage-demo'`. A FIXED default means every
+visitor, every probe and every harness run share one room with the public, so a
+stranger's question lands on the owner's screen. `demo/verify.mjs` gives every
+other page its own room per run. **This is the same shape as the `FCM_TOPIC`
+bug in `CLAUDE.md`: one shared resource with everything around it partitioned.**
+⚠️ **AND A SECOND, SMALLER ONE.** `ASK_TITLE` at line 2281 is the PREFILLED
+`value` of the control room's question field at line 2284, so an Estonian
+question about eco-sins is on screen on load even with the room fixed. That is
+not the text reported, and both are wrong on a page that reads `OFF AIR`.
+**Files: `demo/stage/index.html`, and `demo/verify.mjs` if the run needs a room.**
+
+**2. THE VIDEO PANEL GETS ONE FOOTER AND LOSES THE TIMER.** *"In the control
+room, the first two modules, the video panel and the transport plus timeline,
+remove the count time counter from the video panel, from a footer, and remove a
+footer as well. So video panel only should have single footer, which looks and
+behaves like uh, audience one."*
+**Files: `demo/shell/video-panel.mjs` (SHARED, 6 pages use it), then
+`demo/stage/index.html`.** The audience panel's footer is the reference, so the
+control room's is the one that changes.
+
+**3. THE QUESTIONS GO ON THE PICTURE, WHERE SUBTITLES LIVE.** *"Overlay the
+questions who are appearing on top of video, sort of a place where usually
+videos have subtitles and uh, make them more contrasty. So remove them from
+video panel footer and move them actually on top of a video in the lower part."*
+**Files: `demo/shell/video-panel.mjs` or `demo/shell/shell.css` for the overlay,
+then `demo/stage/index.html`.** Line 1915 records that the question currently
+comes off BOTH footers and `show()` puts it in a panel's centre, so this is a
+move rather than a new element.
+
+**4. `PLAY RECORDING` IS NOT A STANDARD BUTTON.** *"when I look at the transport
+uh, play recording is has this huge font size and it's kind of off to the right
+so please make it as a standard button and for the buttons please use our
+regular button styling with no uppercase"*
+**Files: `demo/stage/index.html:1371` uses class `tbar-x`, plus
+`demo/shell/transport-bar.mjs` and `demo/shell/shell.css` (SHARED, 30 pages use
+the bar).** ⚠️ **SCOPE IS OPEN AND IS BEING ASKED**: uppercase is the house
+style in over 25 rules in `shell.css`, so "no uppercase" is either this page's
+transport or every button on the site, and those are very different jobs.
+
+**5. THE TWO CARRIED OVER FROM SESSION 49, REPORTED AND NOT DONE.**
+- ⚠️ **THE SIDE BORDERS ON THE ACTIVE TAB**, asked about with a crop of
+  `CONTROLROOM` showing a vertical rule each side. `.pos-tabs-t` carries
+  `border: 0` and the selected rule is an inset bottom shadow only, so the rule
+  each side comes from somewhere else and is not yet located.
+  **File: `demo/shell/shell.css`.**
+- 🔴 **REFUSED 2026-09-25: THE FILM STARTS WITH THE SHOW AND STAYS THAT WAY.**
+  Carried as *"the film starts with the show, which was a reversal forced by
+  removing its play button rather than something asked for"*, and it needed a
+  decision: a film control comes back, or the film stops starting with the show.
+  Put to the owner with three options, and **THE OWNER CHOSE to leave it exactly
+  as it is, starting with the show, with no film control.** So the reversal is
+  the decision now rather than an accident nobody signed off, and this line
+  leaves the file by being refused in writing rather than by going quiet, which
+  is CLAUDE.md's rule about anything in here.
+  **File: `demo/stage/index.html`, unchanged.**
+
+
 ### Done 2026-09-25: `/llhls/` was dark, and the key rotation is what did it
 
 🔴 **ASKED, VERBATIM:** *"lets focus on get llmhls demo properly working. what
@@ -155,6 +238,31 @@ another network opening it, or a phone on mobile data.
 8/8 that contained **two** page asserts, both of them the shell's. A green page
 with no coverage is the worst possible control, and the assert count said so the
 whole time.
+
+### Done 2026-09-25: `/webrtc/` GRADES ITSELF NOW, AND THE CAUSE WAS NOT THE CONNECTION
+
+✅ **FIXED. `page asserted something` went from 2 to 10 and the page reads
+16/16**, headless, with a publisher awake: `peer connection connected`,
+`a track arrived audio:live video:live`, `a VIDEO track arrived`,
+`video is advancing`, `frames are actually RENDERED 1280x720`,
+`element is playing`.
+🔴 **AND THE DIAGNOSIS UNDER THE HEADING BELOW WAS WRONG.** Two defects, both
+in `demo/webrtc/index.html`, neither of them about WebRTC:
+1. **`d.run('check')` WAS DEAD CODE.** It sat after a `for` loop whose success
+   branch `return`ed and whose failure branch `return`ed. Every route out of
+   that handler skipped the checks, so the page could not have graded itself
+   however well the transport worked. `return` became `break`.
+2. **A PAGE THAT COULD NOT REACH ITS SUBJECT LOGGED IT AND VANISHED.** The
+   `whip leg never came up` branch was a bare `d.log`, and a log is not graded,
+   so the suite saw a page that simply stopped having opinions. It asserts now,
+   with the wait in words, and an aborted teardown is still not graded red.
+⚠️ **SO THE SENTENCE `WHEP DOES NOT CONNECT IN THIS HEADLESS CHROME, FOR ANY
+PAGE` IS WITHDRAWN.** It does connect, headless, from this desk, today.
+⚠️ **AND THE THIRD OWED ITEM BELOW IS ANSWERED**: whether WHEP connects from a
+real browser here was the unmeasured thing, and it is measured now at 389
+frames and 3,554,870 bytes with no VPN involved.
+⚠️ **THE ORIGINAL ENTRY IS KEPT BELOW UNCHANGED**, because the wrong first
+answer is the reason the rule is worth anything, and this repository says so.
 
 ### Open 2026-09-25: `/webrtc/` has been GREEN WITH ZERO COVERAGE, and WHEP does not connect here at all
 
