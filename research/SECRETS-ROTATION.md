@@ -54,7 +54,7 @@ rotation — but delete it from `.env` and from any Worker secret store),
 once after a log echo). Rotate with:
 `wrangler secret put <NAME> --name <worker>` from a no-.env dir.
 
-## 2026-09-10 — ROOM_TOKEN rotated; RTMPS key still owed
+## 2026-09-10 ROOM_TOKEN rotated, and 2026-09-24 the RTMPS key after it
 
 **`ROOM_TOKEN` — ROTATED, and verified dead.** It was found sitting in a
 COMMITTED log at HEAD (`proto/m2m/logs/p3b-server-a.log`, as
@@ -65,17 +65,29 @@ on `rtc.positron.studio`. The committed string is therefore a dead literal and
 needed no history rewrite. Only `studio/engine.mjs` and `studio/verify.mjs`
 consume it, both from `.env`, so nothing deployed broke.
 
-⚠️ **`positron-demo`'s RTMPS stream key is exposed and NOT yet rotated.** It
-reached a session transcript on 2026-09-10 via a bare
-`GetStreamServiceSettings`, which returns the key in clear. Anyone holding it
-can PUBLISH to the input the live demos play, so the risk is vandalism of
-positron.studio rather than data loss.
+✅ **`positron-demo`'s RTMPS stream key WAS exposed and IS ROTATED**, at
+**2026-09-24T19:08:11Z**. It had reached a session transcript on 2026-09-10 via
+a bare `GetStreamServiceSettings`, which returns the key in clear, and anyone
+holding it could PUBLISH to the input the live demos play, so the risk was
+vandalism of positron.studio rather than data loss. The old value is dead.
 
-**There is no rotate-key API for a Cloudflare live input** — the key is bound to
-the input, so rotating means DELETE AND RECREATE, which mints a new UID and
-ripples into `demo/shell/live.mjs`, `workers/pub`'s container, and every demo
-that plays it. Deliberately not done in the same breath as finding it; it is a
-scoped change, not a one-liner.
+🔴 **AND THE REASON IT SAT UNROTATED FOR TWO WEEKS WAS A WRONG SENTENCE IN THIS
+FILE.** It said *"There is no rotate-key API for a Cloudflare live input"*, and
+concluded that rotating meant DELETE AND RECREATE, which mints a new UID and
+ripples into `demo/shell/live.mjs`, `workers/pub`'s container and every demo
+that plays it. That made a one-command fix look like a scoped refactor, so it
+was deferred, and then deferred again.
+✅ **`POST /stream/live_inputs/<uid>/rotate_keys` EXISTS, AND HAS SINCE
+2026-07-31.** It rotates the key IN PLACE: **the input UID did not change**, so
+nothing in the repository needed editing and no demo moved. The whole ripple the
+paragraph above described was imaginary.
+⚠️ **THE LESSON IS THE ONE THIS REPOSITORY KEEPS PAYING FOR, ARRIVING AS A
+SECURITY COST RATHER THAN A DOCUMENTATION ONE.** A confident sentence about a
+provider's API outlived the API. Nothing type-checks a claim about somebody
+else's endpoint, and the more expensive the claim makes the work sound, the
+longer it survives unchecked, because nobody goes looking for a cheaper way to
+do a thing they have already been told is hard. **Re-read the provider's
+current docs before deferring anything on the strength of a note in here.**
 
 **Also audited, and found harmless:** the RTMPS stream keys, SRT passphrases and
 WHIP publish URL committed under `proto/m2m/artifacts/`, `proto/m2m/logs/`,

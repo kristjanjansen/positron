@@ -85,13 +85,15 @@ inside a single task.
 
 🔴 **AND MOVING `research/SECRETS-ROTATION.md` DOES NOT UNPUBLISH IT. NOBODY SHOULD READ
 THE MOVE AS A FIX.** The repository is public and the file is in git history, so
-it is fetchable from a clone at its old path forever. It names one credential
-that is **still unrotated**: `positron-demo`'s RTMPS stream key, exposed to a
-session transcript on 2026-09-10 by a bare `GetStreamServiceSettings`. **The
-only thing that closes it is a human rotating it in the Cloudflare dashboard**,
-and for a live input that means DELETE AND RECREATE, which mints a new UID and
-ripples into `demo/shell/live.mjs`, `workers/pub`'s container and every demo
-that plays it. The file says so itself. ⚠️ **A history rewrite is not the fix
+it is fetchable from a clone at its old path forever. It named one credential as
+still unrotated, `positron-demo`'s RTMPS stream key, exposed to a session
+transcript on 2026-09-10 by a bare `GetStreamServiceSettings`. ✅ **THAT KEY IS
+ROTATED, 2026-09-24T19:08:11Z**, through `POST
+/stream/live_inputs/<uid>/rotate_keys`, which rotates IN PLACE and left the
+input UID alone, so nothing in the repository moved. ⚠️ **THE FILE'S OWN
+SENTENCE IS WHAT HELD IT UP**: it said no such endpoint existed and that
+rotating meant delete and recreate, which made a one-command fix read as a
+scoped refactor. Corrected in place on 2026-09-25. ⚠️ **A history rewrite is not the fix
 either** and was not attempted: the file's own §3 already makes that argument
 about the `kristjanjansen/studio` exposure, in its own words, that rotating is
 what actually fixes an exposure and that rewriting history is optional cleanup
