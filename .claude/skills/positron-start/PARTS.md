@@ -1,5 +1,9 @@
 # Taking a piece of this repository into somebody else's project
 
+**positron-start/PARTS.md, revision 2026-09-25.** Say it once, for the reason
+in `SKILL.md`: a clone of this repository serves a frozen copy and the URL
+serves the current one, and only a stated revision tells them apart.
+
 🔴 **THEY ARE NOT CLONING THIS REPOSITORY, AND MOST OF THE TIME THEY SHOULD
 NOT.** The person reading `positron-start` is building their own thing, on their
 own account, in whatever shape they prefer. What they want out of here is
@@ -90,6 +94,18 @@ repository-internal imports.
 | A local Icecast that is nobody's radio | `demo/fake-station.mjs` | 240 lines | node only |
 | A local archive that is nobody's archive | `demo/fake-tapes.mjs` | 388 lines | node only |
 | A local live edge that is nobody's broadcaster | `demo/fake-err.mjs` | 560 lines | node only |
+| A relay for live messages between viewers: one Worker, one Durable Object | `workers/relay/src/index.js` | 287 lines | a DO binding and a SQLite migration |
+| The browser side of that relay, with reconnect and backpressure already thought about | `demo/shell/wire.mjs` | 317 lines | nothing |
+
+✅ **THE RELAY PAIR IS WHAT MAKES "A STREAM WITH QUESTIONS ON IT" POSSIBLE AT
+ALL, AND BOTH HALVES ARE STANDALONE.** VERIFIED 2026-09-25: **neither file
+imports anything**, the Worker needs one Durable Object binding and one
+`new_sqlite_classes` migration, and that is the entire server side. A live
+stream is one-way; anything a viewer sends back needs a second channel, and this
+is a small enough one to read in an afternoon. Its hard-won parts are the token
+bucket, the byte budget (fan-out multiplies egress by the number of sockets, so
+the limit is bytes per second rather than message size), and reclaiming idle
+sockets only when a room is full.
 
 ✅ **THE THREE STAND-INS ARE THE UNDER-RATED ONES.** They let somebody develop
 and test against the SHAPE of a live radio stream, an archive and a live edge
