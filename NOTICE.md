@@ -39,6 +39,7 @@ satisfies that, rather than what creates it.
 | WebXR input profiles | `demo/shell/vendor/` | `LICENSE-webxr-input-profiles` (MIT) |
 | chord transition tables | `demo/resources/chord-tables.json` | `demo/resources/LICENSE-chord-tables` |
 | two Csound scores, from `tarmoj/vclick` | used by `demo/click/` | GPL-3.0, attributed in `demo/click/index.html` |
+| hls.js 1.7.1, unmodified | `proto/remixer/hls.min.js` and `proto/flipper/hls.min.js`, byte identical | Apache-2.0, [video-dev/hls.js](https://github.com/video-dev/hls.js) |
 
 ## Recordings, films and archive material
 

@@ -446,6 +446,199 @@ example `liveSyncDurationCount: 3` with `maxBufferLength: 12` and
 `backBufferLength: 4` on the multi-channel page. **Do not re-derive those from
 memory.**
 
+🔴 **AND IF WHAT THEY ARE BUILDING PLAYS LL-HLS, THE SINGLE MOST USEFUL THING IN
+THIS REPOSITORY IS ONE FILE: `src/low-latency-player.js`. TAKE IT.** It is MIT,
+it is about a thousand lines, and it is `createLowLatencyPlayer(video, src,
+opts)`. `demo/llhls/index.html` is a ten-line caller of it and is the worked
+example to copy.
+✅ **IT IS A WRAPPER, NOT A FORK, AND THAT IS WHY IT TRANSFERS.** MEASURED
+2026-09-25: both vendored copies of hls.js here are **byte identical to the
+official 1.7.1 dist**, 618,156 bytes, sha256 `6cfad701a61f…`. **Nothing is
+patched.** So somebody can take their own hls.js at their own version, keep
+upgrading it from npm forever, and there is no patch to re-apply and no fork to
+maintain. **All of the value is in the configuration and in the control loops
+around it.**
+🔴 **DO NOT LET THEM SHIP `new Hls({ lowLatencyMode: true })` AND CALL IT DONE.
+THE DEFAULTS ARE WRONG IN THREE DIRECTIONS AT ONCE**, read off the bundled 1.7.1
+rather than recalled:
+- **`startFragPrefetch` false, `initialLiveManifestSize` 1,
+  `startOnSegmentBoundary` false.** All three push the same way, begin with less
+  material and not on a boundary, and `video.buffered` under MSE is the
+  INTERSECTION of the audio and video buffers, so the element gets handed 0.05 s
+  to play while video holds 5 s. Play there and it stalls immediately, the
+  watchdog seeks, and the seek leaves a hole. The wrapper sets them **true, 3,
+  true** and costs up to one segment of latency for it.
+- **`maxLiveSyncPlaybackRate` 1 and `maxLatency` Infinity**, which together mean
+  there is **no recovery at all**: whatever latency a startup hiccup handed the
+  player is the latency it keeps for ever. MEASURED on the same stream with the
+  same config: **7.6 s one run, 15.4 s the next.**
+- **`capLevelOnFPSDrop` false**, and turning it on is necessary and not
+  sufficient: it keys on dropped frames, and the phone that stutters drops **3
+  frames out of 507** while advancing the media clock at 0.16 to 0.41x. Cap on
+  the symptom that is actually present, which is the ADVANCE ratio.
+⚠️ **AND THE HARD-WON PART IS THE PART THAT LOOKS LIKE NOISE.** Most of that
+file is not configuration, it is what to do when a live stream misbehaves: when
+a drift-seek is allowed to fire at all (a seek aborts every in-flight fragment
+load, which is what stops the buffer ever growing, so **smooth at 8 s beats
+jerky at 6 s**), when a reload is the only lever left, and why a watchdog on the
+native path needs BOTH signals frozen before it believes anything is wrong.
+**Every one of those rules was written after shipping the version without it.**
+The reasons are in `positron-streaming`; send them there rather than
+paraphrasing.
+⚠️ **THE OTHER HALF OF THE PLAYER IS THAT ON WEBKIT IT DOES NOT USE hls.js AT
+ALL.** It prefers native HLS there and gates that on `ManagedMediaSource`, never
+on `canPlayType`, which answers `"maybe"` in Chrome too and will happily put
+Chrome on a path it cannot play. Measured on desktop Safari, same page, same
+40 s: native 0.961x advance and 5.25 s latency against hls.js 0.344x and 7.71 s.
+
+✅ **THEY WILL ASK WHETHER THEY CAN SKIP THE FILE AND JUST SET THE RIGHT
+OPTIONS. ASKED HERE 2026-09-25:** *"can we not use it without wrapper just
+'right config'"*. **Yes, partly, and the part they can have is worth taking on
+day one.** This is the entire options half of that file. Every default beside
+it was measured off the bundled hls.js 1.7.1 on 2026-09-25, not recalled:
+
+```js
+new Hls({
+  lowLatencyMode: true,                   // default true ALREADY, this line changes nothing
+  backBufferLength: 30,                   // default Infinity
+  manifestLoadingMaxRetry: Infinity,      // default 1
+  manifestLoadingRetryDelay: 3000,        // default 1000
+  manifestLoadingMaxRetryTimeout: 8000,   // default 64000
+  levelLoadingMaxRetry: 4,                // default 4, unchanged
+  levelLoadingRetryDelay: 1000,           // default 1000, unchanged
+  fragLoadingMaxRetry: 4,                 // default 6, LOWERED
+  fragLoadingRetryDelay: 500,             // default 1000
+  fragLoadingMaxRetryTimeout: 4000,       // default 64000
+  maxLiveSyncPlaybackRate: 1.05,          // default 1, which means no catch-up at all
+  capLevelOnFPSDrop: true,                // default false
+  startFragPrefetch: true,                // default false
+  initialLiveManifestSize: 3,             // default 1
+  startOnSegmentBoundary: true,           // default false
+  liveSyncDuration: 3.0,                  // default undefined (falls back to liveSyncDurationCount 3)
+});
+```
+
+⚠️ **THREE OF THOSE SIXTEEN LINES CHANGE NOTHING AND ARE THERE TO SAY WHAT WAS
+MEANT.** `lowLatencyMode`, `levelLoadingMaxRetry` and `levelLoadingRetryDelay`
+are already the defaults. Thirteen lines do the work.
+⚠️ **AND DO NOT ADD `liveSyncDurationCount` BESIDE `liveSyncDuration`.** hls.js
+throws on that combination at construction, which means a blank page.
+
+✅ **WHAT THOSE OPTIONS ALONE BUY, AND IT IS REAL.** The picture catches up
+instead of keeping whatever delay it happened to start with. It starts with
+enough material that the first few seconds are not a stall. It steps the
+quality down when the device cannot keep up. It keeps waiting for a stream that
+is not live yet instead of giving up after one try. It stops hoarding what has
+already been watched.
+
+🔴 **WHAT THEY DO NOT BUY IS EVERYTHING THAT HAPPENS AFTER SOMETHING GOES
+WRONG, WHICH IS 98 PER CENT OF THAT FILE.** MEASURED 2026-09-25: 1,070 lines,
+and the options above are sixteen of them. No options object decides when to
+jump forward, when to give up and start the player over, when waiting is better
+than acting, or when the phone is telling you something other than what it
+looks like. Concretely, with the options and nothing else:
+- **A broadcast that drops and comes back leaves the viewer on a dead
+  picture.** Cloudflare gives the stream a new identity every time the encoder
+  reconnects, even for two seconds, and the only cure is to throw the player
+  away and build a new one.
+- **A page opened before the broadcast starts stays broken after it starts.**
+  It gets an empty playlist, wedges silently, and never tries again.
+- **On a phone it can play badly and report that it is fine.** The measured
+  case advanced the picture at a fifth of real speed with plenty downloaded and
+  three dropped frames out of 507, so every built-in alarm stayed quiet.
+- **On an iPhone and a Mac it uses the worse of the two available players.**
+  Apple's own is better there and nothing in an options object will choose it.
+
+✅ **SO SAY IT TO THEM LIKE THIS.** Set the options whatever else they do: it is
+one paste and it costs nothing. Take the file as well if anybody other than
+them will be watching, if it has to run unattended, or if somebody will watch
+it on a phone. They can skip the file if this is a demo they will be standing
+next to and can reload by hand when it sulks.
+
+### How to actually GET the file into their project
+
+🔴 **THE MECHANICS ARE GENERAL AND LIVE IN `PARTS.md`, NOT HERE.** Fetching a
+file out of this repository is the same job whatever the file is, and writing it
+out once per subject is how four slightly different versions of one instruction
+get made. Read it before fetching anything:
+`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/PARTS.md`
+It carries the two base URLs, the `curl` form, the four checks that decide
+whether a file transfers at all, the table of parts that are known to, and the
+list of things that look reusable and are not.
+
+**For this one:** `src/low-latency-player.js`, 1,070 lines, MIT. VERIFIED
+2026-09-25 to have **no imports at all** and exactly one export,
+`createLowLatencyPlayer(video, url, opts)`, so it needs no build step, no
+bundler and no package. Its only dependency is `window.Hls` existing first.
+⚠️ hls.js itself is **Apache-2.0**, so if they vendor that too it belongs in
+whatever notice file their project keeps.
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.1/dist/hls.min.js"></script>
+<script type="module">
+  import { createLowLatencyPlayer } from './src/low-latency-player.js';
+  const player = createLowLatencyPlayer(video, manifestUrl, { preferNative: 'auto' });
+  player.on('latency', ({ latency, buffer, rates }) => { /* their readout */ });
+</script>
+```
+
+⚠️ **THE hls.js SCRIPT TAG MUST COME FIRST AND MUST BE A GLOBAL BUILD.** The
+file reads `window.Hls`. An ES module import of hls.js does not set it.
+
+### 🔴 THE PLAYER IS THE LAST OF FOUR THINGS, AND THE OTHER THREE DECIDE WHETHER IT IS LOW LATENCY AT ALL
+
+**A perfect player in front of an ordinary input is ordinary HLS**, and it fails
+in the worst way available: everything works, nothing errors, and the delay is
+just quietly ten or twenty seconds. Check all four or do not promise low latency.
+
+1. 🔴 **THE INPUT MUST BE CREATED WITH `preferLowLatency: true` AND
+   `recording.mode: "automatic"`. BOTH, OR THE LL-HLS PIPELINE IS NEVER
+   ENGAGED.** This is the one that bites, because `mode: "off"` looks like the
+   thrifty choice and it also disables HLS playback entirely.
+
+   ```sh
+   curl -X POST -H "Authorization: Bearer $CF_API_TOKEN" \
+     "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/stream/live_inputs" \
+     --data '{"meta":{"name":"their-input"},"preferLowLatency":true,
+              "recording":{"mode":"automatic","timeoutSeconds":10}}'
+   ```
+
+   ⚠️ **AND IT IS ALSO WHAT MAKES LATENCY MEASURABLE.** `preferLowLatency` is
+   what puts `EXT-X-PROGRAM-DATE-TIME` in the manifest, and Cloudflare strips
+   in-band metadata, so without it there is no wall clock to measure against.
+2. 🔴 **THE ENCODER MUST BE H.264, CBR, FIXED GOP, AND B-FRAMES OFF.** B-frames
+   break LL-HLS. The GOP must equal the segment length and **2 seconds is the
+   shortest Cloudflare recommends**, so in ffmpeg terms that is `-g` at twice
+   the frame rate, `-bf 0`, and a real bitrate cap rather than a quality target.
+3. **THE PLAYBACK URL NEEDS `?protocol=llhls` ON IT.** Without it they get the
+   ordinary manifest from the same input.
+4. **THEN the player.**
+
+✅ **AND MAKE THEM PROVE IT RATHER THAN BELIEVE IT, IN ONE COMMAND.** While
+something is publishing, fetch a rendition playlist and look at the tags. This
+is the check that separates "we configured low latency" from "it is low
+latency", and it needs no browser and no stopwatch:
+
+```sh
+# the master lists renditions; open any one of them and read its tags
+curl -s "https://customer-<CODE>.cloudflarestream.com/<UID>/manifest/video.m3u8?protocol=llhls"
+curl -s "<one rendition URL from that list>" | grep -E "PART-INF|SERVER-CONTROL|TARGETDURATION"
+```
+
+**What a working low-latency input says**, measured on this account 2026-09-25:
+
+```
+#EXT-X-TARGETDURATION:3
+#EXT-X-PART-INF:PART-TARGET=0.5
+#EXT-X-SERVER-CONTROL:PART-HOLD-BACK=1.5,CAN-BLOCK-RELOAD=YES
+```
+
+🔴 **NO `PART-INF` LINE MEANS IT IS NOT LOW LATENCY, WHATEVER THE DASHBOARD
+SAYS AND WHATEVER THE PLAYER DOES.** Go back to point 1. ⚠️ And tell them the
+floor honestly: `PART-HOLD-BACK` is 1.5 s against a 2 s keyframe interval, so
+**a target under about two seconds is unreachable on this provider** and
+promising one is promising a stall.
+
 What belongs HERE is the three facts that change what you promise somebody:
 
 🔴 **1. CLOUDFLARE STREAM'S WebRTC CANNOT BE RECORDED. THIS IS THE ONE PEOPLE
@@ -650,6 +843,16 @@ thing they asked for, `https://<their site>/<page>/` is.
 ---
 
 ## What to copy, and what not to
+
+🔴 **THE HOW IS IN `PARTS.md`, BESIDE THIS FILE.** This section is about WHAT is
+worth taking and why. The mechanics of actually getting a file into somebody
+else's project, the two base URLs, the `curl` form, the four checks that decide
+whether a file transfers, and the table of parts that are known to, are one
+fetch away:
+`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/PARTS.md`
+⚠️ **READ IT BEFORE COPYING ANY FILE OUT OF HERE**, including one this section
+recommends. A file that imports something else in this repository drags a tree
+behind it, and the failure shows up after they have built on it.
 
 🔴 **WHAT TRANSFERS IS THE COMPOSITION, AND IT IS THE ONLY THING HERE WORTH
 COPYING WHOLESALE.** Not a page, not a control, not a measurement: the way the

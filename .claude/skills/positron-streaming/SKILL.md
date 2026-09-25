@@ -588,6 +588,272 @@ From `src/low-latency-player.js` (v14).
   paused state, so re-request it, or a tab that becomes visible again seeks and
   stays paused for ever.
 
+### Can it be done with the right config and no wrapper? The measured split
+
+Asked 2026-09-25, verbatim: *"can we not use it without wrapper just 'right
+config'"*. The honest answer is **partly, and the part config buys is the
+smaller one.**
+
+MEASURED 2026-09-25 against `src/low-latency-player.js` at v14. The file is
+**1,070 lines** by `wc -l`, **546 of them code** and 470 comment. The
+`new Hls({...})` literal is lines **401 to 461**, and inside it there are
+**17 key lines**: 15 unconditional, one conditional `liveSyncDuration`, one
+`...(opts.hlsConfig)` spread for the caller. That is **1.6 per cent of the file
+and 3.1 per cent of its code.** Both vendored copies of hls.js in this
+repository are byte identical to the official 1.7.1 dist (618,156 bytes, sha256
+`6cfad701a61fb8a99add5e84449e64661169b0652bf44ceb2a28465c8817b5f1`), so there
+is no patch and no fork anywhere in the picture. **Everything that is not those
+17 lines is control loops.**
+
+#### (a) What IS pure config: paste this and get real benefit with no wrapper
+
+Every default below was read off the bundled 1.7.1 with `grep` on the minified
+dist on 2026-09-25. None of them is recalled.
+
+```js
+new Hls({
+  lowLatencyMode: true,                   // default true ALREADY, this line changes nothing
+  backBufferLength: 30,                   // default Infinity
+  manifestLoadingMaxRetry: Infinity,      // default 1
+  manifestLoadingRetryDelay: 3000,        // default 1000
+  manifestLoadingMaxRetryTimeout: 8000,   // default 64000
+  levelLoadingMaxRetry: 4,                // default 4, unchanged
+  levelLoadingRetryDelay: 1000,           // default 1000, unchanged
+  fragLoadingMaxRetry: 4,                 // default 6, LOWERED
+  fragLoadingRetryDelay: 500,             // default 1000
+  fragLoadingMaxRetryTimeout: 4000,       // default 64000
+  maxLiveSyncPlaybackRate: 1.05,          // default 1, which means no catch-up at all
+  capLevelOnFPSDrop: true,                // default false
+  startFragPrefetch: true,                // default false
+  initialLiveManifestSize: 3,             // default 1
+  startOnSegmentBoundary: true,           // default false
+  liveSyncDuration: 3.0,                  // default undefined (falls back to liveSyncDurationCount 3)
+});
+```
+
+- 🔴 **THREE OF THOSE SIXTEEN LINES ARE NO-OPS, AND NOTHING SAID SO UNTIL
+  2026-09-25.** `lowLatencyMode` already defaults to `true` in 1.7.1,
+  `levelLoadingMaxRetry` already defaults to 4, and `levelLoadingRetryDelay`
+  already defaults to 1000. Keeping them in the wrapper is fine as a statement
+  of intent. A reader who pastes them expecting a change gets none.
+  **Thirteen lines move something.**
+- 🔴 **`maxLiveSyncPlaybackRate` IS THE HIGHEST-VALUE LINE IN THE OBJECT AND IT
+  IS PURE CONFIG.** Read out of the bundle: hls.js's own
+  `LatencyController.onTimeupdate` touches `media.playbackRate` only when
+  `lowLatencyMode` is on AND `maxLiveSyncPlaybackRate !== 1` AND the level is
+  live, and it then requires `forwardBufferLength > 1` and a drift above
+  0.05 s. At the default of 1 that entire controller is dead code, which is
+  what "hls.js has no recovery" means in practice. One line switches on a real
+  catch-up loop that already carries its own runway rule.
+- ⚠️ **AND THE TWO CATCH-UP LOOPS THEN COEXIST.** The wrapper writes
+  `video.playbackRate` itself on its own 500 ms tick; hls.js writes it on
+  timeupdate. READ FROM THE SOURCE, not measured on a stream: at 2 s of drift
+  hls.js's curve saturates straight to the 1.05 cap while the wrapper's
+  `1 + drift/100` gives 1.02, so the wrapper is the GENTLER of the two. Which
+  one wins at a given instant is UNMEASURED here and would need a run with both
+  rates logged to settle.
+- ⚠️ **THE `xxxLoading*` KEYS ARE DEPRECATED SHIMS IN 1.7.1 AND THEY LOG A
+  WARNING.** `Fd(Hls.DefaultConfig, userConfig, logger)` rewrites
+  `manifestLoading{MaxRetry,RetryDelay,MaxRetryTimeout}` into
+  `manifestLoadPolicy`, the level ones into `playlistLoadPolicy` and the frag
+  ones into `fragLoadPolicy`, then warns `setting(s) are deprecated, use
+  "<policy>"`. The rewrite only happens when the matching `LoadPolicy` was not
+  also passed. They work today and they are the first thing that will break on
+  an hls.js upgrade. **The wrapper has not been moved off them.**
+- ⚠️ **DO NOT ADD `liveSyncDurationCount` BESIDE `liveSyncDuration`.** The same
+  function throws `Illegal hls.js config: don't mix up
+  liveSyncDurationCount/liveMaxLatencyDurationCount and
+  liveSyncDuration/liveMaxLatencyDuration`. The test is on the USER config, so
+  the built-in default of 3 does not trip it, only a second key you passed.
+- ⚠️ **`liveSyncDuration` ONLY COUNTS IF IT IS PASSED AT CONSTRUCTION.**
+  Confirmed in the bundle: the `targetLatency` getter prefers it only when
+  `this.hls.userConfig.liveSyncDuration` is set, or when `_targetLatencyUpdated`
+  is set, which only the `hls.targetLatency` setter does. Assigning
+  `hls.config.liveSyncDuration` after the fact is silently ignored.
+- ⚠️ **AND `maxLatency` IS NOT A CONFIG KEY.** It is a getter derived from
+  `liveMaxLatencyDuration` (default undefined) or
+  `liveMaxLatencyDurationCount` (default `Infinity`) times target duration,
+  which is where the Infinity in the header of the player file comes from.
+  There is no `maxLatency: 8` to paste.
+
+#### (b) What config cannot buy, one entry per behaviour
+
+Every item below is a control loop, a watchdog, an event handler or a decision.
+**None of them has an hls.js option behind it.** Line ranges are from v14 and
+the reason is the one already written in the file or in this skill.
+
+- **Which player to run at all: native HLS on WebKit, gated on
+  `ManagedMediaSource`** (lines 235 to 289 for the decision, 533 to 666 for the
+  branch, about 189 lines). Without it, Safari gets hls.js. Measured on desktop
+  Safari 26.6.2 over WebDriver, same page, same 40 s: native 0.961x advance and
+  5.25 s latency and 0 errors, against hls.js 0.344x and 7.71 s and 2 errors
+  and a buffer hole. hls.js cannot configure itself out of being hls.js.
+- **Do not call `play()` until the audio/video INTERSECTION is playable**
+  (`startWhenPlayable`, lines 808 to 823, 16 lines, `startBuffer` 1.0 s with an
+  8 s timeout). Without it the element plays with the 0.05 s the intersection
+  offers while video holds 5 s, stalls at once, and the starved watchdog's seek
+  leaves the 5.5 s orphan hole that was still visible 40 s later.
+  `initialLiveManifestSize` pushes the same way but does not gate `play()`.
+- **The advance-ratio cap** (lines 950 to 973, 24 lines, `advanceFloor` 0.8 for
+  `advanceTicksBeforeCap` 6 consecutive ticks, then `hls.autoLevelCapping` down
+  one). Without it a phone that drops 3 frames of 507 never trips
+  `capLevelOnFPSDrop` and just crawls at 0.16 to 0.41x for ever. `autoLevelCapping`
+  is a property, not an option, and nothing in hls.js watches rate of advance.
+- **The drift-seek governor and its three conditions** (lines 988 to 1021,
+  34 lines, plus the `DEFAULTS` block at 103 to 128). A drift-seek must be
+  `minDriftSeekMs` 10,000 ms since the last one, have `driftSeekMinBuffer` 1.5 s
+  of runway, and after `driftHeldBeforeYield` 3 refusals the player RAISES its
+  own target by 1 s up to `maxTargetBias` 6. Without it you get the measured
+  iPhone loop: a seek every 2 to 3 s for two minutes, each followed by "ERR
+  aborted" on both tracks, some of them issued with buf=0.02.
+- **Escalating a silently failing drift-seek to a rebuild** (inside the same
+  block, `failedDriftSeeks >= 6`). `syncToEdge` returns false when
+  `liveSyncPosition` is null or behind the playhead, and without the escalation
+  the player no-ops for ever with `playbackRate` parked at 1.
+- **`syncToEdge` never seeks backwards** (lines 680 to 690, 11 lines). After a
+  Cloudflare UID swap `liveSyncPosition` can point BEHIND the playhead on a
+  stale level, and obeying it makes things worse.
+- **The starved watchdog, which must not seek over an audio-only shortfall**
+  (lines 882 to 932, 51 lines). When video holds more than 2 s past the
+  playhead and the intersection holds under 0.5 s, the missing piece is an
+  audio segment, and it waits `audioLagTicks` 12 ticks instead. Seeking forward
+  cannot conjure an audio segment; it only opens the hole.
+- **The hole-skip inside that branch** (lines 896 to 907, 12 lines). A playhead
+  beached at a hole with a real range just ahead gets skipped after 3
+  consecutive confirming ticks, once per target. hls.js's own gap controller
+  takes about 20 s to do anything, and the measured parks were 18.5 s and
+  20.0 s at `readyState` 1. The 3-tick confirmation filters ordinary in-flight
+  seeks; the one-attempt-per-target rule stops the measured ct 0 to skip-target
+  bounce every 3 s on a wedged mid-swap level.
+- **Destroy and rebuild on a fatal `manifestParsingError`** (the ERROR handler
+  at 508 to 526 plus `rebuild` at 355 to 378, about 43 lines). A page opened
+  before the broadcast exists gets a 204 and an empty manifest, and patching a
+  live instance (stopLoad/loadSource/startLoad) leaves it wedged with no
+  errors, no loads and no recovery. The backoff rises with
+  `consecutiveFailures` so the first retries are quick and stale manifests are
+  not hammered.
+- **Media-error quick fixes before the blunt instrument** (lines 512 to 517,
+  6 lines). `recoverMediaError()` twice, with `swapAudioCodec()` on the second,
+  reset to zero by `LEVEL_LOADED`. Without the counter a codec-mismatch stream
+  loops on recovery for ever.
+- **The hard rate limit across ALL reload triggers** (lines 362 to 378, the
+  3,000 ms floor, plus `rebuildCooldown` 4,000 ms disarming the watchdogs after
+  one, plus `scheduleRebuild` deferring rather than dropping). Fatal errors,
+  watchdogs and visibility all funnel through it. **Rebuild storms were the
+  direct cause of the v4 tab crash.**
+- **The source watchdog on the hls.js path** (lines 863 to 872, 10 lines). The
+  live edge frozen for `sourceStallTimeout` 12 s means the origin died, and it
+  runs even while paused so a playhead advancing through the remaining buffer
+  cannot mask it. Cloudflare mints a NEW video UID on every encoder reconnect,
+  even a 2 second one, and seeking can never recover that.
+- **The source watchdog on the native path, which needs BOTH signals frozen**
+  (lines 592 to 614, 23 lines). Under native HLS `currentTime` does not share a
+  timeline with `seekable`: a healthy stream showed currentTime 38.42 against
+  seekableEnd 23.5, and the edge-only version reloaded a stream playing at
+  exactly 1.000x. The watchdog was manufacturing the fault it was watching for.
+- **The player watchdog** (lines 937 to 948, 12 lines). Playhead frozen for
+  `stallTimeout` 6 s seeks, and after `seeksBeforeReload` 2 failures rebuilds.
+- **PROGRAM-DATE-TIME wall latency, reported always and acted on carefully**
+  (lines 974 to 986, 13 lines, via `hls.playingDate`). `hls.latency` freezes
+  stale during a socket-open ingest pause, measured 1.7 s reported against
+  8.4 s true, and PDT is the only honest signal there. The trigger is off by
+  default and additionally requires `liveSyncPosition` to be usefully ahead,
+  because a wall lag with nothing buffered ahead is player-irreducible.
+- **Re-requesting `play()` when Chrome pauses muted video in a background tab**
+  (lines 874 to 881, 8 lines, plus `onVisibility` at 1025 to 1034, 10 lines).
+  `boot()` only plays on `MANIFEST_PARSED`, so without this a tab that becomes
+  visible again seeks and then stays paused for ever.
+- **Reporting `null` rather than `0` when the playhead sits outside every
+  buffered range** (`bufferReport`, lines 692 to 734, 43 lines). Safari reported
+  currentTime 38.42 against buffered [[18,25]] on a stream playing at 1.000x.
+  0 there reads as starved and drives the wrong decision: 0 means
+  measured-and-empty, null means cannot tell. The same function reports the
+  per-type buffers separately out of `hls.bufferController.tracks`, because
+  `video.buffered` being the INTERSECTION is what makes an audio lag look like
+  an empty buffer.
+- **Measuring advance and edge rate against a long baseline rather than an EMA**
+  (`measureRates`, lines 736 to 806, 71 lines). The EMA read 0.624 on desktop
+  Safari at t=35 s while a two-point measurement of the same player gave 1.000
+  sustained, because an exponential average of a quantity with a long startup
+  transient is mostly a report on the transient. The reference point moves only
+  on a jump, because a seek is not a playback rate, and it refreshes every 30 s.
+  **`advance` is the number that separates "the device cannot keep up" from
+  "the edge is running away", which have opposite fixes.** hls.js has no such
+  reading.
+- **`nextBufferedAhead`: a range only counts if it starts a real gap past the
+  playhead and is longer than 0.5 s** (lines 329 to 336, 8 lines). Without the
+  width test the player skips into a scrap and starves again immediately.
+- **Watching the MediaSource directly** (`watchMediaSource`, lines 825 to 854,
+  30 lines). `mediaSourceRequiresReset` with every buffer dumped appeared in
+  three separate iPhone runs, and `ManagedMediaSource` also GATES loading
+  through `startstreaming` / `endstreaming`. None of it is observable from
+  outside, and it re-grabs every second because a rebuild makes a new
+  MediaSource.
+- **Freezing the last decoded frame into the poster before teardown**
+  (`freezeFrame`, lines 338 to 353, 16 lines). Without it every rebuild flashes
+  black.
+- **Reserving layout from the master manifest before the first frame** (the
+  `MANIFEST_PARSED` handler, lines 479 to 491, 13 lines). RESOLUTION is
+  available about 200 ms after `loadSource` and seconds before `videoWidth` is
+  set, so the aspect ratio can be set with no jump.
+- **Reporting level switches** (lines 495 to 504, 10 lines). Four renditions
+  with tightly clustered BANDWIDTH and one INDEPENDENT part per 2.0 s segment
+  make ABR churn a jank candidate, and it is UNMEASURED on the device that
+  showed the problem, so the count is emitted for a phone to answer it.
+- **A reload on terminal element errors and on `ended`, on the native path**
+  (lines 632 to 640, 9 lines). `MEDIA_ERR_DECODE` (3) and
+  `MEDIA_ERR_SRC_NOT_SUPPORTED` (4) are terminal for the element and only a
+  reload clears them. Measured at t=153 s on an iPhone: code 3, then
+  currentTime back to 0 and nothing further.
+- **Native latency from `getStartDate()`, with nothing else hidden behind it**
+  (lines 579 to 586 and 616 to 629). Native HLS exposes no `hls.latency`. The
+  first Safari run reported an entirely empty readout for 45 s because every
+  field sat behind `getStartDate()`, exactly when the numbers were most wanted.
+- **Shared state declared above the point where the native branch returns**
+  (lines 291 to 321, 31 lines). It used to sit beside `measureRates()`, which
+  is AFTER that return, so on an iPhone the native interval threw "Cannot
+  access 'lastAdvT' before initialization" every tick and the page showed
+  nothing. Desktop Chrome never takes that branch, so local verify could not
+  catch it.
+- **Deferring the `engine` emit out of the constructor** (lines 473 to 477 and
+  538 to 545). A synchronous emit inside `createLowLatencyPlayer` reaches
+  nobody, because the caller has not chained `.on()` yet. The iOS report came
+  back with no ENGINE line and that was this bug, not a device signal, twice.
+- **The events and the surface itself** (`api`, lines 1048 to 1069, 22 lines):
+  `latency`, `dimensions`, `rebuild`, `resync`, `stall`, `start`, `level`,
+  `advance-capped`, `target-raised`, `audio-lag`, `ms`, `engine`,
+  `media-error`, `waiting`. This is what makes a page gradable at all, and
+  `demo/llhls/index.html` asserts on exactly these.
+
+#### The answer, in one paragraph
+
+**Take the config. It is thirteen effective lines, it is free, and
+`maxLiveSyncPlaybackRate` alone turns hls.js's own latency controller from dead
+code into a working catch-up loop.** What it does not buy is any behaviour that
+depends on deciding something: a stream whose UID changed mid-broadcast still
+needs a destroy-and-rebuild, a page opened before the broadcast exists still
+wedges, an iPhone still crawls at 0.2x with a full buffer while reporting no
+dropped frames, and Safari still gets the worse of two players. **Config sets
+the starting conditions. The other 98 per cent of the file is what happens
+after something goes wrong**, and every rule in it was written after shipping
+the version without it.
+
+🔴 **ONE THING THE FILE AND THIS SKILL DISAGREED ABOUT, FOUND 2026-09-25.** The
+line above reading "Native HLS gives one lever and it is a reload, so rate limit
+it" and the file's own comment reading "rate limited, because a reload storm is
+worse than a stall" are both describing a rate limit that **does not run**.
+`nativeReload()` at line 564 tests `since < cfg.nativeReloadCooldownMs`, and
+`nativeReloadCooldownMs` is **defined nowhere**: not in `DEFAULTS`, not in any
+caller, `grep` across the repository returns only the two copies of that same
+line in `src/` and in the deployed `workers/view/public/src/`. `since <
+undefined` is `false`, so the guard never returns and the native path has no
+cooldown of its own. What bounds it in practice is the surrounding code rather
+than the named limit: the source watchdog resets `nativeEdgeMoved` before
+calling, which re-arms a 12 s timer, and the other two triggers are element
+events. ⚠️ **This is not fixed here** (documentation-only task, and `src/` is
+deployed). Fixing it is one line in `DEFAULTS`, and the honest fix also needs a
+number chosen rather than guessed.
+
 ## Timed messages beside a stream
 
 From `src/timed-messages.js`.
