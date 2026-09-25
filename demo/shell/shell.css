@@ -4121,6 +4121,42 @@ button.pos-pg-lab:hover { color: var(--fg); }
    confidently about. Drawing both in one colour would make the interesting one
    look like the ordinary one. */
 .kpad-chord[data-sure] { color: var(--dim); }
+/* 🔴 THE TEMPO AND THE ALIGNMENT, ON A KEYBOARD THAT LOOPS AND ON NO OTHER.
+   Asked 2026-09-25: *"in keyboadd looper: do basic bmp detection / quant and
+   when first loop set, all next ones align on it, either times shorter, same or
+   longer"*. `keyboard.mjs` builds these two spans only when `loop: true`, so
+   MEASURED 2026-09-26 they exist on exactly two pages of the seven that mount
+   the component.
+   🔴 NO WIDTH HERE, FOR THE REASON `.kpad-chord` ALREADY GIVES. Each reserve is
+   the widest thing its cell can ever say, and both of those are decided by
+   tables in `numloop.mjs`: `TEMPO_BAND` bounds a detected tempo to three digits
+   and `RATIOS` holds every label the ratio cell can print. A number typed in
+   this file would be a second copy of them and would go quietly narrow the first
+   time somebody adds `1/8`, which is the `--sld-col` defect this stylesheet
+   already records twice. `keyboard.mjs` computes both and writes `min-width` in
+   `ch`.
+   🔴 AND THE RESERVE IS THE POINT RATHER THAN A DETAIL. A tempo appears the
+   moment a take closes and a ratio changes on every take after it, under the
+   hands of somebody watching the row, and nothing that redraws while somebody is
+   looking at it may change how much room it takes.
+   ⚠️ TWO INKS ON THE TEMPO, AND THE WORD IS THE CHANNEL RATHER THAN THE COLOUR.
+   The cell says `heard` for a tempo inferred off three gaps in a performance and
+   `set` for one a page stated, so a reader who cannot see the difference between
+   two greys has already been told. `--dim2` is the default because a DETECTED
+   tempo is an inference and this project has paid repeatedly for drawing one as
+   a fact; `[data-said]` brightens it to the ink `.kpad-at` uses for a reading it
+   is sure of. Same pair, same argument, as `.kpad-chord[data-sure]`.
+   ⚠️ AND THE RATIO CELL HAS ONE INK, WHICH IS ALSO A DECISION. `first`, `x2` and
+   `as played` are equally factual statements about what the lap IS, so a second
+   colour here would be a channel with nothing to carry.
+   ⚠️ `tabular-nums` ON BOTH, so `x1/2` and `x1/4` and a tempo walking from 98 to
+   101 are the same width as each other inside their own reserve. */
+.kpad-tempo, .kpad-ratio {
+  font: 500 11px/1 var(--mono); color: var(--dim2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.kpad-tempo[data-said] { color: var(--dim); }
+.kpad-ratio { color: var(--dim); }
 /* the same gutter label as a slider's, for the same reason: one word saying
    what the control next to it moves, in a face that cannot be mistaken for the
    control itself */
