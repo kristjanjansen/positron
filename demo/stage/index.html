@@ -1840,8 +1840,26 @@
      * the log rather than quietly fixed, because starting somebody's film for
      * them is the page deciding what they meant.
      */
-    if (bgVideo && bgVideo.paused) {
-      d.log('the show is on air with the film stopped, so what is going out is a still', 'warn');
+    /**
+     * 🔴 THE SHOW STARTS THE FILM AGAIN SINCE 2026-09-25, AND IT IS A REVERSAL
+     * OF 2026-09-19 THAT THE SAME DAY'S OTHER CHANGE FORCED. *"make video
+     * transport indepencent of when show starts"* was right while the film had
+     * a play button of its own: one press meant two things and there was no way
+     * to look at the picture without recording a show. **Removing that button
+     * on 2026-09-25 removed the only way a person could start the film at
+     * all**, so the independence became a show that can only ever go out over a
+     * still, which is what was reported within the hour: *"clikced start webrtf,
+     * timelne playing, no video"*.
+     * ⚠️ **THE 2026-09-18 ASK BEHIND ALL OF IT IS STILL HONOURED**: *"video
+     * sthould stop in control room in beginning"*. The film does not run to
+     * nobody. It starts when a show starts and not before, which is the only
+     * press left that could mean it.
+     */
+    if (bgVideo) {
+      filmCommand.play();
+      d.log('the film starts with the show, since it has no press of its own', 'hi');
+    } else {
+      d.log('the show is on air with no film loaded, so what is going out is the pattern', 'warn');
     }
     // The window starts chasing the show now that there is one.
     roomStrip.strip.setFollow(true);
@@ -2839,13 +2857,13 @@
     await new Promise((r) => setTimeout(r, 300));
     const showLive = bgVideo
       ? { at: bgVideo.currentTime, was: filmAt0, paused: bgVideo.paused } : null;
-    A('starting a show does not start the film, which has its own transport',
-      !!showLive && showLive.paused === true && showLive.at === showLive.was
+    A('starting a show starts the film, because nothing else can',
+      !!showLive && showLive.paused === false && showLive.at > showLive.was
         && phase === 'live',
       showLive
-        ? `the show is "${phase}" and the film sat at ${showLive.at.toFixed(2)}s `
-          + `across 300 ms, paused ${showLive.paused}`
-        : 'there was no film to leave alone');
+        ? `the show is "${phase}" and the film went ${showLive.was.toFixed(2)}s to `
+          + `${showLive.at.toFixed(2)}s in 300 ms, paused ${showLive.paused}`
+        : 'there was no film to start');
 
     /**
      * 🔴 NOW PRESS THE FILM'S OWN PLAY, WHICH IS A DIFFERENT BUTTON UNDER A
