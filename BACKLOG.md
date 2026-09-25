@@ -1,5 +1,192 @@
 ## Open
 
+### Done 2026-09-25: `/llhls/` was dark, and the key rotation is what did it
+
+🔴 **ASKED, VERBATIM:** *"lets focus on get llmhls demo properly working. what
+should be streaming there for testing?"*
+
+✅ **THE ANSWER TO THE QUESTION IS: NOTHING EXTERNAL, AND NOTHING YOU HAVE TO
+START.** `/llhls/` is its own source. Pressing its one control opens a socket to
+`wss://pub.positron.studio/watch`, and **that socket IS the reference count**:
+holding it wakes the `positron-pub` container, which runs ffmpeg on
+`testsrc2` plus a chord with the epoch burned in by `drawtext`, and publishes
+over RTMPS to the live input in `demo/shell/live.mjs`. Closing the tab is how
+the publisher learns nobody is watching. So there is no OBS to set up, no file
+to push, and no other server involved. `rig/push-llhls.sh` exists for pushing
+something else in, and is not needed for a test.
+
+🔴 **AND IT WAS BROKEN, BY YESTERDAY'S KEY ROTATION, IN THE ONE PLACE THE
+HANDOFF SAID TO LOOK AND THEN LOOKED PAST.** The handoff reads *"the input UID
+did not change, so nothing in the repository needed editing"*, which is TRUE and
+is the whole trap: the key is not in the repository, it is a Worker secret
+(`STREAM_KEY` on `positron-pub`), and rotating the key in Cloudflare without
+re-putting that secret leaves the publisher authenticating with a dead value.
+MEASURED 2026-09-25, holding the socket for 100 s:
+- **The RTMPS leg died every time**, `ffmpeg exit 224`, with
+  `error:0A00007F:SSL routines::bad write retry` and `Error writing trailer:
+  Broken pipe` out of the flv muxer. It came up (`publishing=true pid=30`), was
+  refused, and the 30 s sweep restarted it into the same wall.
+- **The input never went live**: `lifecycle` read `status: disconnected`,
+  `videoUID: null`, and the manifest answered **204** for the whole run, which
+  is Cloudflare saying it has nothing.
+- 🔴 **THE WHIP LEG PUBLISHED THE WHOLE TIME, 0 RESTARTS**, on the same
+  container, the same ffmpeg, the same network and the same test pattern. **That
+  is what makes this a credential fault rather than an encoder fault**: the two
+  legs differ in exactly one thing, and it is which secret they carry. `WHIP_URL`
+  was not rotated.
+- **It worked six hours before the rotation.** `pub.positron.studio/logs` still
+  holds a real session from **2026-09-24T13:25Z**: segments loading off video
+  UID `d94be5df`, latency about 6 s, `ADV=0.99`, three level switches. The key
+  was rotated at **19:08:11Z**. Worked, rotated, dark.
+
+✅ **FIXED 2026-09-25** by putting the current key into the secret, fetched and
+piped in one command so it was never printed, never written to a file and never
+returned to an agent: `wrangler secret put STREAM_KEY --name positron-pub`.
+
+⚠️ **THE LESSON, AND IT IS NOT ABOUT STREAMING.** A rotation is not done when the
+provider accepts it. It is done when **every consumer of that credential has the
+new value**, and the consumers are exactly the places a repository cannot see,
+which is why they are the places nobody checks. The sentence *"nothing in the
+repository needed editing"* was written as reassurance and read as completion.
+⚠️ **AND THE SYMPTOM POINTED AWAY FROM THE CAUSE.** A broken pipe out of an FLV
+muxer reads as a network fault or a sick encoder, and there is a container in
+the path to blame. The thing that settled it in one run was having a SECOND leg
+on the same container with a different credential, which is a comparison that
+existed for an unrelated reason.
+
+### Open 2026-09-25: the native reload rate limit does not exist, and two files say it does
+
+🔴 **FOUND while answering the config question, not looked for.**
+`src/low-latency-player.js:564` reads `if (since < cfg.nativeReloadCooldownMs)
+return;` and **`nativeReloadCooldownMs` is defined NOWHERE**. Not in `DEFAULTS`
+(lines 103 to 235, 23 keys, it is not among them), not in any caller. MEASURED by
+grep across the repository: the identifier appears **twice**, and both are that
+same line, in `src/low-latency-player.js` and its byte-identical deployed copy
+under `workers/view/public/`. **`since < undefined` is `false`**, so the guard
+never returns and every native reload goes straight through.
+
+🔴 **THE POINT IS NOT THE MISSING LINE, IT IS THAT TWO PLACES CLAIM THE GUARD
+WORKS.** The function's own comment says it is *"rate limited, because a reload
+storm is worse than a stall"*, and `positron-streaming` says **"Native HLS gives
+one lever and it is a reload, so rate limit it"**. The same skill records that
+**rebuild storms were the direct cause of the v4 tab crash**. So a defence that
+was designed, commented, and written down in a skill is inert in the shipped
+file, and every reader of either sentence believes it is there. ⚠️ **AN
+UNDEFINED CONSTANT IS THE QUIETEST POSSIBLE FAILURE IN JAVASCRIPT**: no throw, no
+warning, and a comparison that silently decides the safe branch is the one never
+taken.
+
+⚠️ **WHAT IS NOT KNOWN, AND WHY THIS IS NOT A ONE-LINE FIX YET.**
+1. **The number has to be chosen rather than guessed.** The hls.js path next door
+   uses `rebuildCooldown: 4000` with a 3,000 ms trigger gap. A native reload is
+   heavier: it tears the element down and refetches. `sourceStallTimeout` is
+   12000 and `stallTimeout` is 6000, so anything at or under 6 s risks reloading
+   inside a stall the watchdog is still measuring.
+2. 🔴 **NOTHING IN THIS REPOSITORY CAN TEST IT.** The native path is WebKit only,
+   `verify.mjs` drives headless Chrome and never takes that branch, and
+   `verify-native.mjs` needs a real iPhone. This is the exact class the file's
+   own comment records: *"local verify could not catch it because desktop Safari
+   never takes that branch"*, arriving one layer along.
+3. **What bounds it today is accident, not design.** The source watchdog resets
+   `nativeEdgeMoved` before calling, which re-arms a 12 s timer, and the other
+   two triggers are element events. So the storm is unlikely rather than
+   prevented, which is a different claim from the one being made.
+
+**The fix is one key in `DEFAULTS` beside `rebuildCooldown`, plus a number with a
+reason on it, plus a run of `verify-native.mjs` on a phone before anybody says it
+is rate limited again.** NOT done in this session: `src/` is deployed and the
+verification path needs a device that is not here.
+
+### Done 2026-09-25: a new user gets the hls.js config, and ours is stock and wrapped
+
+🔴 **ASKED, VERBATIM:** *"want tom make sure when new user works with llhls it
+will get the hls.js optimizations / "right config" we have done. do our llhls
+demo work on "right config" or patched hls.js?"*
+
+Two questions in one, and the second decides the first.
+1. **Is `hls.min.js` in this repository stock or patched?** `demo/llhls/index.html`
+   loads `/proto/remixer/hls.min.js`, a VENDORED copy rather than a CDN URL, and
+   a vendored minified bundle is exactly the shape that can carry an edit nobody
+   records. `proto/flipper/hls.min.js` is a second copy. Settle it by comparing
+   both against the official dist of the same version, not by reading them.
+2. **Whatever the answer, the config has to travel.** `src/low-latency-player.js`
+   (v14) is where the measured knobs live and `positron-streaming` already
+   carries the reasons. `positron-start` does NOT point at either, so somebody
+   standing up a site of their own gets hls.js defaults, which the skill says in
+   measured terms are wrong in three directions at once: `maxLiveSyncPlaybackRate`
+   1 and `maxLatency` Infinity park the player at whatever latency the startup
+   hiccup gave it (7.6 s one run, 15.4 s the next, same stream same config), and
+   `startFragPrefetch` false, `initialLiveManifestSize` 1 and
+   `startOnSegmentBoundary` false all push against a low-latency live start.
+
+✅ **BOTH HALVES ANSWERED 2026-09-25, AND THE ANSWER TO THE SECOND QUESTION IS
+STOCK.** MEASURED: `proto/remixer/hls.min.js` and `proto/flipper/hls.min.js` are
+byte identical to each other AND to the official hls.js 1.7.1 dist from npm,
+**618,156 bytes, sha256 `6cfad701a61fb8a99add5e84449e64661169b0652bf44ceb2a28465c8817b5f1`**.
+**Nothing is patched.** What makes LL-HLS work here is `src/low-latency-player.js`,
+a WRAPPER, which is why it transfers at all: somebody can upgrade hls.js from npm
+for ever with no patch to re-apply.
+⚠️ **AND IT WAS NOT ATTRIBUTED.** hls.js is **Apache-2.0**, vendored twice, on a
+repository that went public yesterday, and it was absent from `NOTICE.md`. A row
+was added. Noticed only because the question forced an audit of the bundle.
+
+🔴 **ASKED AS A FOLLOW-UP, VERBATIM:** *"can we not use it without wrapper just
+"right config""*. **Partly, and the split is measured.** The `new Hls({...})`
+literal is lines 401 to 461 of 1,070, holding **17 key lines**, which is **1.6
+per cent of the file** and 3.1 per cent of its 546 code lines. The other 98 per
+cent is what happens after something goes wrong, and **none of it has an hls.js
+option behind it**: the native-WebKit path (~189 lines), the advance-ratio cap,
+the drift-seek governor, the starved watchdog that must not seek over an
+audio-only shortfall, destroy-and-rebuild on a fatal `manifestParsingError`, the
+PDT wall-latency fallback, and twenty more, each with its line range and its
+failure written down in `positron-streaming`.
+✅ **THREE OF THE SIXTEEN PASTE-ABLE KEYS ARE NO-OPS** against 1.7.1 defaults
+(`lowLatencyMode`, `levelLoadingMaxRetry`, `levelLoadingRetryDelay`), which
+nothing had said before. **Thirteen move something.**
+🔴 **AND THE `xxxLoading*` KEYS ARE DEPRECATED SHIMS IN 1.7.1 THAT LOG A
+WARNING**, rewritten internally into `manifestLoadPolicy` / `playlistLoadPolicy`
+/ `fragLoadPolicy`. They work today and they are **the first thing that breaks on
+an hls.js upgrade**, which is a live maintenance fact about a file nobody has
+moved off them.
+⚠️ **`maxLatency` IS NOT A CONFIG KEY**, it is a getter off
+`liveMaxLatencyDurationCount` (default Infinity). ⚠️ And `liveSyncDuration`
+must not be paired with `liveSyncDurationCount`: hls.js throws
+`Illegal hls.js config: don't mix up`.
+
+**WRITTEN INTO:** `.claude/skills/positron-streaming/SKILL.md` (+266, the
+reference copy with every measurement), and `.claude/skills/positron-start/SKILL.md`
+(+64 in Step 4b, plain register, the paste-able object plus what it does and does
+not buy and when to take the whole file instead).
+
+### Done 2026-09-25: the rotate-keys claim was stale in three files, on a public repo
+
+🔴 **ASKED, VERBATIM:** *"rm stale rotate keys stuff"*
+
+`HANDOFF.md` records `positron-demo`'s RTMPS key as ROTATED at
+2026-09-24T19:08:11Z with the input UID unchanged, and says the `rotate_keys`
+endpoint has existed since 2026-07-31. Four lines in three files still said
+otherwise, on a repository anybody can now read.
+
+✅ **DONE 2026-09-25, ALL FOUR.** `research/SECRETS-ROTATION.md`: the heading
+`RTMPS key still owed`, the `exposed and NOT yet rotated` paragraph, and the
+`There is no rotate-key API for a Cloudflare live input` claim under it.
+`BACKLOG.md` twice and `LAYOUT.md` once, both of which had copied the
+delete-and-recreate ripple out of that third sentence.
+🔴 **AND THE WRONG SENTENCE IS THE PART WORTH KEEPING, SO IT WAS CORRECTED
+RATHER THAN DELETED.** `POST /stream/live_inputs/<uid>/rotate_keys` has existed
+since 2026-07-31 and rotates IN PLACE, leaving the input UID alone, so nothing
+in the repository needed editing. The file had said rotating meant DELETE AND
+RECREATE with a new UID rippling through `demo/shell/live.mjs`, `workers/pub`'s
+container and every demo that plays it. **That made a one-command fix read as a
+scoped refactor, so a live exposed credential sat unrotated for two weeks.** The
+cost of this class of staleness is usually a wasted lookup; here it was an open
+credential, which is why the correction says so in the file rather than quietly
+swapping the tense.
+⚠️ **NOT RE-MEASURED TODAY.** The rotation is taken from `HANDOFF.md`'s
+timestamp rather than from the API, deliberately: the way to confirm a live
+input's key from here is to fetch the key, which is the exact call
+(`GetStreamServiceSettings`, in clear) that caused the original exposure.
+
 ### Open 2026-09-24: more embedded knowledge into skills, and the .md files tidied
 
 🔴 **ASKED:** *"add more of this embedded knowledge to skills. clean up .md
@@ -32,12 +219,14 @@ GUESSING.** Two halves:
    with the research, **27** references rewritten in **17** files, and
    `research/SECRETS-ROTATION.md`, **7** in **6**. `LAYOUT.md` now records both
    moves and the reasoning.
-   🔴 **AND THE MOVE IS NOT THE FIX FOR THE KEY.** The repository is public and
+   🔴 **AND THE MOVE WAS NOT THE FIX FOR THE KEY.** The repository is public and
    the file is already in git history, so it is still readable at its old path
-   by anyone who clones. `positron-demo`'s RTMPS stream key is STILL UNROTATED,
-   and the only thing that closes it is a human rotating it in the Cloudflare
-   dashboard, which for a live input means delete and recreate and a new UID
-   through `demo/shell/live.mjs`, `workers/pub` and every demo that plays it.
+   by anyone who clones. ✅ **THE KEY ITSELF IS ROTATED, 2026-09-24T19:08:11Z**,
+   through `POST /stream/live_inputs/<uid>/rotate_keys`, which rotates in place
+   and did NOT change the input UID, so `demo/shell/live.mjs`, `workers/pub` and
+   every demo that plays it needed no edit. The delete-and-recreate ripple this
+   line used to describe came from a wrong sentence in
+   `research/SECRETS-ROTATION.md`, corrected 2026-09-25.
 ⚠️ **NOTHING HERE IS A DELETION.** `LAYOUT.md` decides where a file goes and
 this is a `LAYOUT.md` question; the plans move of 2026-09-20 is the precedent,
 and it cost 129 files holding a path by name.
@@ -96,9 +285,9 @@ most of the repository's **191 MB**.
 ⚠️ Smaller findings, none of them a stop: `rig/moq/mtx/moq-key.pem` is a
 committed PRIVATE KEY (a self-signed local cert for `moq-mtx-local`, so the
 exposure is nil, but a scanner will flag it and it should not be in a public
-tree); `research/SECRETS-ROTATION.md` publishes a map of past exposures including one it
-says is **still unrotated** (`positron-demo`'s RTMPS key) and one in another
-repo it calls *"still public"*; there is **no LICENSE file**, so publishing
+tree); `research/SECRETS-ROTATION.md` publishes a map of past exposures, one of which it
+said was still unrotated (`positron-demo`'s RTMPS key, ROTATED since, on
+2026-09-24) and one in another repo it calls *"still public"*; there is **no LICENSE file**, so publishing
 leaves everything all rights reserved by default; and the commits carry a WORK
 email address on a personal repository.
 

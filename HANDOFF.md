@@ -36,11 +36,20 @@ one before concluding a rule was ignored.
 
 ## What is deployed
 
-**BUILD `e0158ba-133813-eba3`**, confirmed on the edge at the time.
-⚠️ **THE LIVE SITE IS CURRENT IN SUBSTANCE AND NOT IN BYTES.** Eight files under
-`demo/` changed after that deploy and every change is a COMMENT: the path
-rewrites from `measured-devices-2026-09-20.md` moving to `research/`. Nothing a
-visitor sees is different. A redeploy is tidiness, not a fix.
+**BUILD `3e0dbc2-040248-d71a`**, deployed and confirmed on the edge 2026-09-25,
+11 files. It cleared the comment-only drift left by the previous stamp
+`e0158ba-133813-eba3`, which was the path rewrites from
+`measured-devices-2026-09-20.md` moving to `research/`. **Nothing a visitor sees
+changed in that deploy**, and nothing under `demo/`, `src/` or `workers/` has
+changed since.
+
+✅ **`/llhls/` IS WORKING AGAIN AND WAS DARK FOR A DAY.** MEASURED 2026-09-25
+against the deploy, `DEMO_BASE=https://positron.studio node demo/verify.mjs
+llhls`: **12/12 green**, publisher held, manifest 200, player attached, and
+**0 rebuilds, 0 stalls, 0 resyncs, 1 level switch** once playing, with 0 console
+errors and 0 failed requests. The cause was the RTMPS key rotation not reaching
+the `STREAM_KEY` Worker secret; the whole story is in the rewritten rotation
+entry below and in `BACKLOG.md`.
 
 The front page is **11 sections over 58 listed rows** (59 in `DEMOS`, `feedback`
 is `unlisted`), titled **`positron: 58 media art experiments`** from
@@ -92,8 +101,30 @@ then delete the original.
 ✅ **`positron-demo`'s RTMPS KEY IS ROTATED**, 2026-09-24T19:08:11Z, and the
 input UID did not change, so nothing in the repository needed editing. The
 `rotate_keys` endpoint exists since 2026-07-31 and `research/SECRETS-ROTATION.md`
-still says it does not; that file is wrong on this point and right about the
-rest.
+said it does not; that file was wrong on this point and right about the rest,
+and it was corrected on 2026-09-25.
+
+🔴 **AND THE SENTENCE ABOVE IS TRUE AND TOOK `/llhls/` OFF THE AIR FOR A DAY.
+CORRECTED 2026-09-25.** *"Nothing in the repository needed editing"* is right,
+and it is not the question. **The key is not in the repository.** It is a Worker
+secret, `STREAM_KEY` on `positron-pub`, and rotating the key at Cloudflare
+without re-putting that secret leaves the publisher offering a dead credential.
+MEASURED: the RTMPS leg came up and was refused every 30 s with `ffmpeg exit
+224`, `SSL routines::bad write retry` and a broken pipe out of the flv muxer,
+the input read `status: disconnected` with `videoUID: null`, and the manifest
+answered 204 for as long as anybody held it. **The WHIP leg on the same
+container published throughout with 0 restarts**, which is what identified this
+as a credential fault in one run rather than an encoder hunt: two legs, one
+container, differing only in which secret they carry.
+✅ **FIXED**, by piping the current key straight into `wrangler secret put
+STREAM_KEY --name positron-pub` without printing it. Confirmed after: input
+`live: true, status: ready`, manifest 200, and the packaging back to
+`PART-TARGET=0.5`, `PART-HOLD-BACK=1.5`, `TARGETDURATION=3`, 41 parts with 11
+independent.
+⚠️ **THE RULE THIS EARNED: A ROTATION IS NOT DONE WHEN THE PROVIDER ACCEPTS IT,
+IT IS DONE WHEN EVERY CONSUMER HOLDS THE NEW VALUE.** The consumers are exactly
+the places a repository cannot see, which is why nobody checks them, and a
+reassuring sentence about the repository reads as completion.
 
 ## What the skill learned tonight, from watching rather than reasoning
 
@@ -115,14 +146,75 @@ outperforming its instructions. The three that matter most:
 
 ## What is open
 
-- **Nothing is deployed since this morning's stamp.** See above: comments only.
-- **`research/SECRETS-ROTATION.md` is public and one line of it is wrong** (the
-  no-rotate-key claim). It also documents exposures, which is a judgement call
-  now that anybody can read it.
+🔴 **THE ONE TO PICK UP FIRST: `nativeReloadCooldownMs` IS REFERENCED AND NEVER
+DEFINED, SO THE NATIVE RELOAD RATE LIMIT DOES NOT RUN.** Found 2026-09-25 while
+answering an unrelated question about hls.js configuration, not looked for.
+`src/low-latency-player.js:564` reads:
+
+```js
+if (since < cfg.nativeReloadCooldownMs) return;   // cfg.nativeReloadCooldownMs is undefined
+```
+
+**`since < undefined` is `false`**, so the guard never returns and every native
+reload goes straight through. MEASURED by grep across the repository: the
+identifier appears **twice**, and both are that same line, in
+`src/low-latency-player.js` and its byte-identical deployed copy under
+`workers/view/public/`. It is **not** in `DEFAULTS` (lines 103 to 235, 23 keys)
+and not in any caller.
+🔴 **TWO PLACES CLAIM THE GUARD WORKS, WHICH IS THE ACTUAL PROBLEM.** The
+function's own comment says it is *"rate limited, because a reload storm is
+worse than a stall"*, and `positron-streaming` says **"Native HLS gives one
+lever and it is a reload, so rate limit it"**. The same skill records that
+**rebuild storms were the direct cause of the v4 tab crash**. So a defence that
+was designed, commented and written into a skill is inert in the shipped file,
+and every reader of either sentence believes it is there.
+⚠️ **AN UNDEFINED CONSTANT IS THE QUIETEST FAILURE JAVASCRIPT HAS**: no throw,
+no warning, and the comparison silently picks the branch that does nothing.
+⚠️ **NOT FIXED 2026-09-25 FOR TWO REASONS, AND NEITHER IS EFFORT.**
+1. **The number has to be chosen rather than guessed.** `rebuildCooldown` next
+   door is 4000 with a 3,000 ms trigger gap, but a native reload is heavier: it
+   tears the element down and refetches. `stallTimeout` is 6000 and
+   `sourceStallTimeout` is 12000, so anything at or under 6 s risks reloading
+   inside a stall the watchdog has not finished measuring.
+2. 🔴 **NOTHING HERE CAN TEST IT, AND THE PHONE IS OFF.** Said 2026-09-25: *"my
+   phone is off atm"*. The native path is WebKit only, `verify.mjs` drives
+   headless Chrome and never takes that branch, and `verify-native.mjs` needs a
+   real iPhone. This is the file's own recorded trap arriving one layer along:
+   *"local verify could not catch it because desktop Safari never takes that
+   branch"*.
+⚠️ **WHAT BOUNDS IT TODAY IS ACCIDENT, NOT DESIGN.** The source watchdog resets
+`nativeEdgeMoved` before calling, which re-arms a 12 s timer, and the other two
+triggers are element events. So a storm is unlikely rather than prevented, and
+that is a smaller claim than the one currently written down.
+✅ **THE FIX IS ONE KEY IN `DEFAULTS` BESIDE `rebuildCooldown`**, plus a number
+with a reason on it, plus `node demo/verify-native.mjs` on a phone before
+anybody writes "rate limited" again. Full workings in `BACKLOG.md`.
+
+- ✅ **DEPLOYED 2026-09-25: BUILD `3e0dbc2-040248-d71a`**, confirmed on the
+  edge, 11 files. That cleared the comment-only drift this file used to describe
+  as "nothing deployed since this morning's stamp".
+- ✅ **`research/SECRETS-ROTATION.md` IS CORRECTED**, 2026-09-25. The
+  no-rotate-key claim is gone and the entry now records why it mattered. It
+  still documents exposures, which is still a judgement call on a public
+  repository.
 - **`claude plugin eval` is gated here**, so the two cases in `evals/` have no
   runner in this repository and were graded by hand.
 - **The `pro` remote at `mbp:positron.git` still holds PRE-REWRITE history** and
   was unreachable when checked. Force-push it before anybody pushes from that
   machine, or the old objects come back.
-- **`workers/view/public/` holds stale path references** that regenerate on the
-  next build.
+- 🔴 **`positron-start` NOW NAMES A URL THAT 404s, AND IT WILL KEEP 404ing UNTIL
+  THIS IS PUSHED.** `.claude/skills/positron-start/PARTS.md` is new and
+  untracked, and `SKILL.md` points at it TWICE by full raw URL, which is the
+  only way a non-Claude agent can reach it. MEASURED 2026-09-25:
+  `raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/PARTS.md`
+  answers **404**. A clone of this repository is fine, because Claude Code reads
+  the file off disk; **the paste-block route is not**, and that is the route the
+  whole skill exists to serve.
+  ⚠️ **AND PUSHING NEEDS THE PERSONAL ACCOUNT**, per the dance at the top of
+  `CLAUDE.md`: `gh auth switch --user kristjanjansen`, push, then switch back to
+  `Kristjan-Jansen_enefit`. The branch here is `session-28-station-videoradio`
+  tracking `origin/main`, so the push is `HEAD:main` rather than `HEAD`.
+- ⚠️ **SEVEN FILES ARE UNCOMMITTED** as of 2026-09-25: `BACKLOG.md`,
+  `HANDOFF.md`, `LAYOUT.md`, `NOTICE.md`, `research/SECRETS-ROTATION.md` and the
+  two skills. All documentation. Nothing under `demo/`, `src/` or `workers/`
+  changed, which is why the deploy above carries no visitor-visible difference.
