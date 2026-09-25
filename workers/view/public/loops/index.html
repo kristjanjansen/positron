@@ -9,8 +9,12 @@
 
 <script type="module">
   import { mount, guard } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { setSymbol } from '/shell/symbol.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { LOOP_WAYS, LOOP_TURN, WAY_GLYPH, WAY_SAYS } from '/shell/looper.mjs';
   import { createDeck, workerTickHost } from '/timeline/transport.mjs';
   import { createNest, nestedDrift } from '/timeline/nested.mjs';
   import { refDeck, quotation } from '/timeline/score.mjs';
@@ -18,20 +22,38 @@
 
   const PARENT = 12000, CHILD = 2000;
 
+  /**
+   * 🔴 THE WAYS ARE THE KIT'S, AND THEY ARE THE THREE DIRECTIONS RATHER THAN
+   * ALL FIVE. Asked 2026-09-25 as *"add loop modes to loops"*.
+   *
+   * `demo/shell/looper.mjs` holds five ways and its `LOOP_TURN` puts three of
+   * them on a button, with the reason written beside it: directions, and only
+   * directions, because `half` is a SPEED and `chop` is a LENGTH. That reason
+   * holds here and is stronger, not weaker. A speed is already on this page,
+   * drawn rather than switched: the middle placement runs at 2x and is half as
+   * wide, which is the whole point of it being there. A length is what `in` and
+   * `out` already are on every quotation. Putting either on this button would
+   * give the page a second control for something it already shows.
+   * ⚠️ AND FIVE STATES CANNOT SAY WHICH ONE THEY ARE IN. `WAY_GLYPH` gives
+   * `round`, `half` and `chop` the same arrow, and the kit records that the
+   * glyph IS the state rather than the next press. Three faces, three states.
+   */
+  const WAYS = LOOP_TURN.map((i) => LOOP_WAYS[i][0]);      // round, back, pingpong
+  const BACKWARDS = 'the same four events, read from the end';
+
   const d = mount({
     name: 'loops',
-    what: 'One two-second recording, placed three times. Each '
-      + 'placement points at the whole recording rather than copying it, so the same four events '
-      + 'appear in all three; the middle one runs at double speed, so it is '
-      + 'half as wide.',
+    what: 'One two-second recording placed three times, the last of them '
+      + 'looping twice in whichever direction the button shows.',
     readout: { typical: 'ms', worst: 'ms', pass: '', wraps: '' },
     // the numbers live under the lane they describe; this row would repeat them
     // somewhere with less context. Still published for CDP.
     showReadout: false,
-    // No skip button. It existed because the subject started 12 s into a 24 s
-    // piece — which is a reason to shorten the piece, not to add a control that
-    // apologises for its length.
-    controls: [],
+    // ONE CONTROL, AND IT IS THE LOOPER'S. No skip button: that one existed
+    // because the subject started 12 s into a 24 s piece, which is a reason to
+    // shorten the piece rather than to add a control apologising for its
+    // length. This one changes what the page is about.
+    controls: [{ id: 'way', label: WAY_GLYPH[WAYS[0]], aria: WAY_SAYS[WAYS[0]] }],
   });
   guard(d);
 
@@ -46,17 +68,49 @@
   // recording saying it got there.
   const kidMarks = markAdapter({
     rates: [0.25, 0.5, 1, 2],
-    onFire: (_payload, ev) => {
+    // ⚠️ THE LOG NAMES THE POSITION IN THE RECORDING, NOT THE POSITION IN THE
+    // DECK THAT FIRED. Since the mirrored copy below exists, `ev.at` is the
+    // position in whichever of the two is playing, and on the mirrored one that
+    // is the recording read from the other end. `payload.i` is which of the four
+    // events this is, which is the one thing both copies agree on.
+    onFire: (payload, ev) => {
       if (!Number.isFinite(ev?.at)) return;   // never invent a position
-      d.log(`recording mark at ${(ev.at / 1000).toFixed(1)}s`);
+      const src = childItems[payload?.i]?.at;
+      d.log(`recording mark at ${((Number.isFinite(src) ? src : ev.at) / 1000).toFixed(1)}s`);
     },
   });
-  // FOUR marks, at 0 / 0.5 / 1.0 / 1.5 s. Every use below takes the WHOLE
-  // recording, so all four appear in all of them and the only things that
-  // differ are width and repetition. The previous fixture had one use take 3 s
-  // of it and another 1.5 s, which changed the mark COUNT as well as the speed —
-  // two variables at once, and the reader could not tell which caused what.
-  const childItems = marks(4, CHILD);      // also projected into the parent below
+  /**
+   * FOUR MARKS, AND THEY ARE NOT EVENLY SPACED. Every use below takes the WHOLE
+   * recording, so all four appear in all of them and the only things that differ
+   * are width, repetition and direction.
+   *
+   * 🔴 THIS WAS `marks(4, CHILD)` UNTIL THE DIRECTIONS ARRIVED, AND EVENLY
+   * SPACED MARKS ARE THEIR OWN MIRROR. The set {0, 500, 1000, 1500} reversed is
+   * the same set, so a backwards pass would have drawn exactly the picture a
+   * forwards pass draws and the new control would have been a claim with no
+   * readout. That is this project's own rule about a statistic that is constant
+   * by construction over its subject: it is not a weak measurement, it is a
+   * blind one. Uneven spacing is the whole of what makes the mirror visible.
+   * ⚠️ The earlier fixture had one use take 3 s of the recording and another
+   * 1.5 s, which changed the mark COUNT as well as the speed: two variables at
+   * once, and the reader could not tell which caused what. That is unchanged.
+   */
+  const SRC_AT = [0, 300, 1100, 1600];
+  const childItems = SRC_AT.map((at, i) => ({ at, kind: 'mark', id: `m${i}`, payload: { i } }));
+  /**
+   * BACKWARDS IS A MIRRORED COPY, AND THAT IS NOT A SHORTCUT. `looper.mjs` says
+   * the same thing about audio in its own header: no shipping engine plays a
+   * buffer at a negative rate, so backwards is a mirrored copy of the samples.
+   * The same is true one floor up. `repeatGeometry` in `timeline/score.mjs`
+   * throws on a rate that is not strictly positive, and `loopPhase` is a forward
+   * modulo, so a quotation cannot run a child backwards. A second deck holding
+   * the same four events mirrored in time can, and it is the same four events
+   * rather than four new ones: `payload.i` carries which is which.
+   */
+  const mirror = (at) => SRC_AT[0] + SRC_AT[SRC_AT.length - 1] - at;
+  const rewoundItems = childItems
+    .map((m) => ({ ...m, at: mirror(m.at), id: `${m.id}r` }))
+    .sort((a, b) => a.at - b.at);
   const child = createDeck({
     items: childItems,
     adapters: { mark: kidMarks.adapter },
@@ -71,6 +125,19 @@
     // nest plays it.
   });
   refDeck(child, 'kurenniemi-1972');
+  const rewound = createDeck({
+    items: rewoundItems,
+    adapters: { mark: kidMarks.adapter },
+    range: [0, CHILD],
+  });
+  refDeck(rewound, 'kurenniemi-1972-rewound');
+  const REFS = { forward: 'kurenniemi-1972', rewound: 'kurenniemi-1972-rewound' };
+  /** Which way a span reads, decided by WHICH DECK IT QUOTES rather than by a
+   *  flag the page would have to keep in step with the nest. */
+  const isBack = (sp) => sp && sp.deck === rewound;
+  const itemsOf = (sp) => (isBack(sp) ? rewoundItems : childItems);
+  /** Where in the recording an event of this span's deck came from. */
+  const srcOf = (sp, at) => (isBack(sp) ? mirror(at) : at);
 
   // ── the parent ──────────────────────────────────────────────────────────
   const own = markAdapter({ rates: [0.25, 0.5, 1, 2] });
@@ -96,49 +163,115 @@
   // simply never happened. Three passes, zero wraps, and a page whose whole
   // subject is looping quietly not looping. The assert that should have caught
   // it was tolerant of "not reached yet" and passed vacuously every run.
-  const nest = createNest(parent, {
-    resolve: (ref) => (ref === 'kurenniemi-1972' ? child : null),
-    tickHost: workerTickHost(),
+  // ONE HOST FOR EVERY BUILD. The nest is rebuilt when the direction changes,
+  // and a worker per press would be three workers by the time a reader has
+  // pressed the button twice.
+  const boundaryHost = workerTickHost();
+
+  /**
+   * THE ARRANGEMENT, REBUILT WHEN THE DIRECTION CHANGES.
+   *
+   * A nest has no `remove`, so a different loop is a different nest. That is
+   * what `/score/` already does when a reader picks another document, and it is
+   * cheap here: nothing is fetched, decoded or allocated beyond the spans.
+   *
+   * 🔴 TWO PASSES IN EVERY DIRECTION, so the only thing the button changes is
+   * the direction. `round` and `back` are one quotation with `repeat: 2` over
+   * one of the two copies; `pingpong` is the two copies end to end, which is
+   * word for word how `looper.mjs` describes pingpong in audio.
+   * ⚠️ AND PINGPONG HAS NO WRAP, WHICH IS A FACT AND NOT AN OMISSION. A wrap is
+   * a boundary INSIDE one quotation. Pingpong's joint is between two of them, so
+   * it arrives as a presence exit and a presence enter, both of which are in the
+   * log, and `wraps` honestly stays 0. The readout says passes for that reason.
+   */
+  // 🔴 DECLARED HERE, NOT AT `createStripView`. `buildNest` runs before the
+  // strip exists and reads `view`, and a `const` further down shadows its whole
+  // block from the top: the read would throw rather than answer `undefined`,
+  // which is how seven asserts on another page went silent while it read green.
+  let view = null;
+  let nest = null, loopIds = [], wraps = 0;
+  function buildNest(way) {
+    nest?.dispose();
+    wraps = 0;
+    d.set('wraps', 0);
+    nest = createNest(parent, {
+      resolve: (ref) => (ref === REFS.forward ? child : ref === REFS.rewound ? rewound : null),
+      tickHost: boundaryHost,
+    });
+
+    // a plain fragment, then the same source at speed, then the same source
+    // looped. THREE USES, ONE RECORDING, and each shows a different knob a
+    // quotation carries. Same slice twice at two speeds is what makes "faster" a
+    // WIDTH you can see rather than a word.
+    // All of them take 0–2s, the whole recording, and start on a whole second so
+    // the ruler above reads them without arithmetic.
+    nest.add(quotation({ id: 'plain', ref: REFS.forward, at: 1000, in: 0, out: CHILD }));
+    nest.add(quotation({ id: 'fast', ref: REFS.forward, at: 4000, in: 0, out: CHILD,
+                         rate: 2 }));
+    if (way === 'pingpong') {
+      nest.add(quotation({ id: 'loop', ref: REFS.forward, at: 6000, in: 0, out: CHILD }));
+      nest.add(quotation({ id: 'loop-back', ref: REFS.rewound, at: 8000, in: 0, out: CHILD }));
+      loopIds = ['loop', 'loop-back'];
+    } else {
+      nest.add(quotation({ id: 'loop', ref: way === 'back' ? REFS.rewound : REFS.forward,
+                           at: 6000, in: 0, out: CHILD, repeat: 2 }));
+      loopIds = ['loop'];
+    }
+
+    // A 2-pass loop draws as ONE span carrying repeat:2, so the looping is
+    // implied rather than shown. `onWrap` is what counts the passes; the log is
+    // left to the recording's own marks, which say where in the source we are
+    // and are therefore the evidence that it is the SAME source coming round
+    // again, in whichever direction.
+    nest.onWrap(() => { wraps++; d.set('wraps', wraps); });
+
+    // A QUOTATION ARRIVING AND LEAVING IS AN EVENT. The nest counted enters and
+    // exits and had no way to subscribe to them, so a score made of quotations
+    // could be watched only by polling for it. `onPresence` is symmetric with
+    // `onWrap`; here it is what makes the structure audible in the log rather
+    // than only visible in the picture, and under pingpong it is what reports
+    // the joint.
+    nest.onPresence(({ span, present, parentPos }) => {
+      d.log(`${span} ${present ? 'starts' : 'ends'} at ${(parentPos / 1000).toFixed(2)}s`,
+        present ? 'hi' : 'info');
+    });
+    view?.strip.fit();
+    view?.strip.invalidate();
+  }
+
+  let wayIx = 0;
+  const way = () => WAYS[wayIx];
+  /**
+   * ⚠️ `setSymbol`, NEVER `button.textContent`. Writing the text throws away the
+   * span `symbol.mjs` centres the glyph inside, and the three faces here are not
+   * the same shape: `→` and `←` are one code point each and `⇆` is drawn wider.
+   * That is the `/videoradio/` report, *"play button is always square"*, in a
+   * control that changes its face on every press.
+   */
+  function showWay() {
+    const b = d.button('way');
+    if (!b) return;
+    setSymbol(b, WAY_GLYPH[way()]);
+    b.setAttribute('aria-label', WAY_SAYS[way()]);
+    b.title = WAY_SAYS[way()];
+  }
+  d.on('way', () => {
+    wayIx = (wayIx + 1) % WAYS.length;
+    showWay();
+    buildNest(way());
+    d.log(`loop ${way()}`, 'hi');
   });
 
-  // a plain fragment, then the same source looped three times
-  // THREE USES, ONE RECORDING, and each shows a different knob a quotation
-  // carries. Same slice twice at two speeds is what makes "faster" a WIDTH you
-  // can see rather than a word: six marks in three seconds, then the same six
-  // in one and a half.
-  // All three take 0–2s, the whole recording, and start on a whole second so
-  // the ruler above reads them without arithmetic.
-  nest.add(quotation({ id: 'plain', ref: 'kurenniemi-1972', at: 1000, in: 0, out: CHILD }));
-  nest.add(quotation({ id: 'fast', ref: 'kurenniemi-1972', at: 4000, in: 0, out: CHILD,
-                       rate: 2 }));
-  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 6000, in: 0, out: CHILD,
-                       repeat: 2 }));
+  buildNest(way());
 
-  // A 3-pass loop draws as ONE span carrying repeat:3, so the looping is implied
-  // rather than shown. `onWrap` is what counts the passes; the log is left to
-  // the recording's own marks, which say where in the source we are and are
-  // therefore the evidence that it is the SAME source coming round again.
-  let wraps = 0;
-  nest.onWrap(() => { wraps++; d.set('wraps', wraps); });
-
-  // A QUOTATION ARRIVING AND LEAVING IS AN EVENT. The nest counted enters and
-  // exits and had no way to subscribe to them, so a score made of quotations
-  // could be watched only by polling for it. `onPresence` is new and symmetric
-  // with `onWrap`; here it is what makes the structure audible in the log
-  // rather than only visible in the picture.
-  nest.onPresence(({ span, present, parentPos }) => {
-    d.log(`${span} ${present ? 'starts' : 'ends'} at ${(parentPos / 1000).toFixed(2)}s`,
-      present ? 'hi' : 'info');
-  });
-
-  createTransportBar(d.el, parent, { scrub: false });
-  const view = createStripView(d.el, parent, {
+  const bar = createTransportBar(d.el, parent, { scrub: false });
+  view = createStripView(d.el, parent, {
     size: 'auto', follow: false, gutter: 150,
     lanes: [
-      // ONE SLICE PER PASS. A 3-pass loop is a single row carrying repeat:3, so
-      // the strip drew one long bar and the looping — the entire subject of this
-      // page — was invisible. `rows` may return MORE rows than it was given, so
-      // each pass becomes its own span and the loop reads as [ ][ ][ ].
+      // ONE SLICE PER PASS. A 2-pass loop is a single row carrying repeat:2, so
+      // the strip drew one long bar and the looping, the entire subject of this
+      // page, was invisible. `rows` may return MORE rows than it was given, so
+      // each pass becomes its own span and the loop reads as [ ][ ].
       { id: 'deck-span', kind: 'deck-span', // Cubase's vocabulary, because it is the one DAW that draws this exact
         // distinction: a PART is a container placed on the timeline, an EVENT is
         // a single occurrence inside it. Ableton and Pro Tools say "clip", which
@@ -161,7 +294,8 @@
               if (!Number.isFinite(from) || !(end > from)) continue;
               out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
                          payload: { durMs: end - from, pass: i + 1, of: n, quo: sp.id,
-                                    from: sp.c0, to: sp.c1, rate: sp.rate || 1 } });
+                                    from: sp.c0, to: sp.c1, rate: sp.rate || 1,
+                                    back: isBack(sp) } });
             }
           }
           return out;
@@ -175,20 +309,28 @@
         // one whose label matters most — narrow IS the thing being shown. On a
         // 2x slice the range goes and the speed stays; a later pass keeps its
         // number and drops the rest.
+        // ⚠️ AND THE DIRECTION IS ON THE BAR, because a mirrored pass of an
+        // unevenly spaced recording is visible in the event row below and the
+        // part row would otherwise be the one place that could not say which
+        // way it is going. The glyph is the kit's own, so it is the same face
+        // the button is showing.
         labelOf: (sp, { bw } = {}) => {
           const p = sp.row?.payload || {};
           const n = (ms) => String(+(ms / 1000).toFixed(1));
           const range = `${n(p.from)}–${n(p.to)}s`;
           const fast = p.rate && p.rate !== 1 ? `@${p.rate}x` : '';
           const pass = p.of > 1 ? `${p.pass}/${p.of}` : '';
-          if (bw && bw < 84) return fast || pass || range;
-          return [range, fast, pass].filter(Boolean).join(' ');
+          const turn = p.back ? WAY_GLYPH.back : '';
+          if (bw && bw < 84) return turn || fast || pass || range;
+          return [range, fast, pass, turn].filter(Boolean).join(' ');
         },
         describeRow: (r) => {
           const p = r.payload || {};
           const src = `takes ${(p.from / 1000).toFixed(1)}–${(p.to / 1000).toFixed(1)}s of it`;
-          if (p.of > 1) return [src, `pass ${p.pass} of ${p.of}`];
-          return [src, p.rate !== 1 ? `played at ${p.rate}x speed` : 'played once, at normal speed'];
+          const turn = p.back ? 'read from the end' : 'read from the start';
+          if (p.of > 1) return [src, `pass ${p.pass} of ${p.of}`, turn];
+          if (p.rate !== 1) return [src, `played at ${p.rate}x speed`, turn];
+          return [src, 'played once, at normal speed', turn];
         } },
       // WHERE THE SOURCE'S OWN MARKS LAND. This is the row that makes "one
       // recording, used twice" something you can see rather than something the
@@ -201,6 +343,9 @@
       { id: 'from-source', kind: 'mark', label: 'event', height: 44, width: 2,
         as: 'ticks', color: '#6f7d94', terse: true,
         subLabel: ['the same four,', 'inside every part'],
+        // ⚠️ THE SPAN'S OWN ITEMS, NOT `childItems`. A mirrored pass quotes the
+        // other copy, and drawing the forward copy's positions under it would
+        // be a picture of a pass that is not being played.
         rows: () => {
           const out = [];
           for (const sp of nest.spans()) {
@@ -208,20 +353,52 @@
             for (let i = 0; i < n; i++) {
               const base = nest.iterationAt(sp.id, i);
               if (!Number.isFinite(base)) continue;
-              for (const m of childItems) {
+              for (const m of itemsOf(sp)) {
                 if (m.at < sp.c0 || m.at >= sp.c1) continue;
                 out.push({ at: base + (m.at - sp.c0) / (sp.rate || 1),
                            id: `${sp.id}#${i}:${m.id}`, kind: 'mark',
-                           payload: { srcAt: m.at } });
+                           payload: { srcAt: srcOf(sp, m.at), back: isBack(sp) } });
               }
             }
           }
           return out;
         },
         colorOfRow: () => '#6f7d94',
-        describeRow: (r) => `${((r.payload?.srcAt ?? 0) / 1000).toFixed(1)}s into the recording` },
+        describeRow: (r) => [
+          `${((r.payload?.srcAt ?? 0) / 1000).toFixed(1)}s into the recording`,
+          r.payload?.back ? 'this pass reads from the end' : 'this pass reads from the start',
+        ] },
     ],
   });
+
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-25: *"timeline
+   * demos: glue transport and timelines"*. The bar passes `scrub: false`
+   * BECAUSE the strip below it is this page's position surface, which is exactly
+   * the claim gluing makes.
+   *
+   * ⚠️ `createTransportBar(d.el, ...)` HAS ALREADY APPENDED THE BAR. Its first
+   * argument is a mount point rather than a hint, so this moves two existing
+   * children of `d.el` into one box rather than making a second of either.
+   * ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, never after: a node captured
+   * afterwards points at something that is no longer in the page.
+   */
+  const afterStrip = view.surface.nextSibling;
+  d.el.insertBefore(createGlue(bar.el, view.surface), afterStrip);
+
+  // 🔴 ONE BAR AND ONE STRIP, COUNTED FROM THE DOM RATHER THAN LOOKED AT.
+  // `/stage/` carried a DOUBLED transport bar through two reports in 2026-09-25,
+  // because `createTransportBar(parent, ...)` appends to the parent it is given:
+  // deleting the `createGlue` line removed nothing, and a screenshot cannot tell
+  // one bar from two when they are stacked. A count can.
+  d.assert('one bar and one strip, and they are one surface',
+    d.el.querySelectorAll('.tbar').length === 1
+      && d.el.querySelectorAll('canvas.pos-strip').length === 1
+      && bar.el.parentElement === view.surface.parentElement
+      && !!bar.el.parentElement?.classList.contains('pos-glue'),
+    `${d.el.querySelectorAll('.tbar').length} bar(s), `
+    + `${d.el.querySelectorAll('canvas.pos-strip').length} strip(s), `
+    + `in .${bar.el.parentElement?.className}`);
 
   /**
    * The parent's own marks still run — they are what drives `onDrift`, and
@@ -244,34 +421,63 @@
     if (!asserted) { asserted = true; check(); }
   }
 
-  // `iteration()` answers 0 wherever the playhead is, including before the loop
-  // has started — so the log announced "pass 1 of 3" at 0.25 s for a loop that
-  // begins at 5.5 s. A pass only exists while the playhead is inside the span.
-  const inLoop = () => {
-    const from = nest.iterationAt?.('loop', 0);
-    const to = nest.iterationAt?.('loop', 2);
+  /**
+   * WHICH PASS OF THE LOOP THE PLAYHEAD IS IN, counted across however many
+   * quotations the loop is made of. Two of the three directions are one
+   * quotation repeated and the third is two quotations end to end, and a reader
+   * should not have to know which to read a pass number.
+   *
+   * ⚠️ `iteration()` answers 0 wherever the playhead is, including before the
+   * loop has started, so the log once announced "pass 1 of 3" at 0.25 s for a
+   * loop that begins at 5.5 s. A pass only exists while the playhead is inside
+   * one of the loop's own spans.
+   */
+  function passNow() {
+    if (!nest) return null;
+    const of = loopIds.reduce((t, id) => t + (nest.span(id)?.iterations || 1), 0);
     const p = parent.position();
-    return Number.isFinite(from) && Number.isFinite(to) && p >= from && p < to;
-  };
+    let before = 0;
+    for (const id of loopIds) {
+      const sp = nest.span(id);
+      if (!sp) continue;
+      const its = sp.iterations || 1;
+      const from = nest.iterationAt(id, 0), to = nest.iterationAt(id, its);
+      if (Number.isFinite(from) && Number.isFinite(to) && p >= from && p < to)
+        return { n: before + (nest.iteration(id) || 0) + 1, of };
+      before += its;
+    }
+    return null;
+  }
 
   setInterval(() => {
-    const it = inLoop() ? nest.iteration?.('loop') : null;
-    d.set('pass', it === null || it === undefined ? '' : `${it + 1}/2`);
+    const at = passNow();
+    d.set('pass', at ? `${at.n}/${at.of}` : '');
     const L = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (L) {
+      // Two lines, and neither is glued together with a middot. The direction
+      // is not here because it is on the bars themselves, where a reader is
+      // already looking to see which pass is which.
       L.subLabel = [`${nest.spans().length} of them,`,
-                    wraps ? `1 recording · ${wraps} wrap${wraps === 1 ? '' : 's'}` : '1 recording'];
+                    wraps ? `1 recording, ${wraps} wrap${wraps === 1 ? '' : 's'}` : '1 recording'];
       view.strip.invalidate();
     }
   }, 200);
 
-  /** The five asserts this page has always had — now run on their own. */
+  /** How many passes the loop is, whether that is one quotation repeated or two
+   *  quotations end to end. */
+  const loopPasses = () => loopIds.reduce((t, id) => t + (nest.span(id)?.iterations || 1), 0);
+
+  /** The asserts this page has always had, now run on their own. */
   function check() {
     const spans = nest.spans();
-    d.assert('three uses registered', spans.length === 3, spans.map((s) => s.id).join(','));
-    const loop = spans.find((s) => s.id === 'loop');
-    d.assert('loop declares 2 passes', loop && (loop.repeat === 2 || loop.repeat?.times === 2),
-      JSON.stringify(loop && loop.repeat));
+    // ⚠️ PLACEMENTS, NOT SPANS, SINCE THE DIRECTIONS ARRIVED. There and back is
+    // one placement made of two quotations, so counting spans would have made
+    // this assert answer a question about the arrangement's plumbing rather
+    // than about what a reader is looking at.
+    d.assert('three placements of one recording',
+      spans.length - loopIds.length + 1 === 3, spans.map((sp) => sp.id).join(','));
+    d.assert('the loop is 2 passes', loopPasses() === 2,
+      `${loopPasses()} over ${loopIds.length} quotation${loopIds.length === 1 ? '' : 's'}`);
     const dr = nestedDrift(parent);
     const k = dr?.kinds?.mark;
     d.assert('nest reports drift as rows, not as a scalar',
@@ -280,8 +486,12 @@
     // 'polled', and a polled boundary nobody polls never fires at all.
     d.assert('the loop boundary is committed, not polled',
       nest.boundary() === 'lookahead', nest.boundary());
-    d.assert('quotations round-trip out of the nest',
-      nest.quotationsOf(child).length === 3, String(nest.quotationsOf(child).length));
+    // BOTH COPIES, because a backwards pass quotes the mirrored one and reading
+    // only the forward deck would report a shrinking arrangement as the
+    // direction changed.
+    const quoted = nest.quotationsOf(child).length + nest.quotationsOf(rewound).length;
+    d.assert('quotations round-trip out of the nest', quoted === spans.length,
+      `${quoted} of ${spans.length}`);
     // The one that makes "faster" a claim rather than a picture: the fast use
     // asked for 2x and the nest AGREED to it. `caps.rates` on the child is
     // [0.5,1,2], so 4x would have been refused and reported as a degradation
@@ -292,13 +502,77 @@
     // the first wrap is one PASS after the loop starts, not at the loop start —
     // asserting against 12000 called 0 wraps a failure at 12652 ms, when the
     // boundary was still 1.3 s away
-    const firstWrap = nest.iterationAt?.('loop', 1);
+    // ⚠️ AND ONLY WHERE A WRAP IS THE MECHANISM. There and back is two
+    // quotations, so its joint is a presence exit and a presence enter and
+    // `wraps` is honestly 0. Asserting a wrap there would fail a page that is
+    // working, which is this suite's own rule about an option that must
+    // announce itself.
+    const oneQuotation = loopIds.length === 1;
+    const firstWrap = oneQuotation ? nest.iterationAt?.('loop', 1) : null;
     const reached = Number.isFinite(firstWrap) && parent.position() >= firstWrap;
-    d.assert('wraps observed once past the first boundary', wraps > 0 || !reached,
-      `${wraps} wraps · pos ${Math.round(parent.position())} · first boundary ${firstWrap}`);
+    d.assert('wraps observed once past the first boundary',
+      !oneQuotation || wraps > 0 || !reached,
+      `${wraps} wraps, pos ${Math.round(parent.position())}, first boundary ${firstWrap}`);
   }
 
-  d.log(`${PARENT / 1000}s long · one ${CHILD / 1000}s recording of ${childItems.length} marks · used three ways`);
+  /**
+   * 🔴 EVERY DIRECTION IS GRADED, AND BY COUNTING WHAT IS THERE RATHER THAN BY
+   * TOLERATING WHAT IS NOT. This page has already shipped quietly not looping,
+   * and the check that should have caught it passed vacuously every run because
+   * it was satisfied by "not reached yet". These three cannot: each one requires
+   * eight events over two passes and a strict direction inside each pass, so an
+   * arrangement that built nothing fails rather than passes.
+   *
+   * ⚠️ THE ORDER COMES FROM THE NEST'S OWN INVERSE MAP, `parentPos`, and not
+   * from the arithmetic the lanes above draw with. Grading a picture against the
+   * function that drew it is an A/B where both arms share the bug.
+   * ⚠️ AND IT NEEDS NO PLAYBACK, which is the other half of not being tolerant.
+   * A check that has to wait for the playhead to reach 6 s is a check that gets
+   * written to pass when it has not got there yet.
+   */
+  const WAY_WORD = { round: 'forwards', back: 'backwards', pingpong: 'there and back' };
+  function loopEvents() {
+    const out = [];
+    for (const id of loopIds) {
+      const sp = nest.span(id);
+      if (!sp) continue;
+      const n = sp.iterations || 1;
+      for (let i = 0; i < n; i++) {
+        for (const m of itemsOf(sp)) {
+          const at = nest.parentPos(id, m.at, i);
+          if (Number.isFinite(at)) out.push({ at, src: srcOf(sp, m.at), pass: `${id}#${i}` });
+        }
+      }
+    }
+    return out.sort((a, b) => a.at - b.at);
+  }
+  const falls = (a) => a.length > 1 && a.every((v, i) => i === 0 || v < a[i - 1]);
+  const rises = (a) => a.length > 1 && a.every((v, i) => i === 0 || v > a[i - 1]);
+
+  function checkWay(w) {
+    buildNest(w);
+    const rows = loopEvents();
+    const byPass = new Map();
+    for (const r of rows) { if (!byPass.has(r.pass)) byPass.set(r.pass, []); byPass.get(r.pass).push(r.src); }
+    const passes = [...byPass.values()];
+    // what each way MEANS, which is the claim rather than a second copy of the
+    // arithmetic: forwards reads up, backwards reads down, there and back does
+    // one of each in that order.
+    const want = w === 'round' ? [false, false] : w === 'back' ? [true, true] : [false, true];
+    const ok = passes.length === want.length
+      && rows.length === childItems.length * want.length
+      && passes.every((pp, i) => pp.length === childItems.length
+        && (want[i] ? falls(pp) : rises(pp)));
+    d.assert(`${w}: every pass reads the recording ${WAY_WORD[w]}`, ok,
+      `${rows.length} events over ${passes.length} passes, `
+      + passes.map((pp) => pp.map((v) => (v / 1000).toFixed(1)).join(' ')).join(' then '));
+  }
+  if (SELFCHECK) {
+    for (const w of WAYS) checkWay(w);
+    buildNest(way());        // back to the direction the button is showing
+  }
+
+  d.log(`${PARENT / 1000}s long, one ${CHILD / 1000}s recording of ${childItems.length} marks, used three ways`);
   d.ready();
 </script>
 </html>

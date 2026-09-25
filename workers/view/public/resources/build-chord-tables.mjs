@@ -2,6 +2,7 @@
 //
 //   node demo/resources/build-chord-tables.mjs           # count, pack, write, print the numbers
 //   node demo/resources/build-chord-tables.mjs --check   # print the numbers, write nothing
+//   node demo/resources/build-chord-tables.mjs --check --keep=5   # what another prune would cost
 //
 // 🔴 IT CONTACTS NOBODY. It reads the corpora
 // `demo/resources/fetch-chord-corpora.mjs` cached once under `tmp/`, which is
@@ -40,6 +41,20 @@ const X = join(REPO, 'tmp', 'chord-corpora', 'x');
 const OUT = join(HERE, 'chord-tables.json');
 const LIC = join(HERE, 'LICENSE-chord-tables');
 const CHECK = process.argv.includes('--check');
+
+/**
+ * 🔴 `--keep=N` IS FOR MEASURING WHAT ANOTHER PRUNE WOULD COST AND IT REFUSES TO
+ * WRITE. `demo/resources/chord-e6-keep.mjs` sweeps the prune and needs the byte
+ * count off THIS packer rather than off a second copy of it, and a flag that
+ * could also write the table would mean the shipped file's shape was decided on
+ * a command line somebody typed once. The shipped number is the constant below
+ * and nothing else, so a table on this disk always matches the source.
+ */
+const argKeep = /^--keep=(\d+)$/.exec(process.argv.find((a) => a.startsWith('--keep=')) || '');
+if (argKeep && !CHECK) {
+  console.error('--keep= measures a prune and never writes one. Add --check, or edit KEEP.');
+  process.exit(1);
+}
 
 if (!existsSync(X)) {
   console.error('tmp/chord-corpora/x is not here. Run demo/resources/fetch-chord-corpora.mjs first, then unpack it.');
@@ -89,14 +104,105 @@ function count(seqs) {
 const ranked = (m) => [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
 
 /**
- * 🔴 THE PRUNE, AND THE TWO NUMBERS IN IT WERE MEASURED RATHER THAN CHOSEN.
+ * 🔴 THE PRUNE, AND THE THREE NUMBERS IN IT WERE MEASURED RATHER THAN CHOSEN.
  * `demo/resources/bench-chord-suggester.mjs` graded the table at four settings on
  * held-out songs: unpruned reads 48.5 per cent top 1 and 120,662 bytes of JSON,
  * and `ctx>=8 row>=3 keep 3` reads **48.6 per cent and 25,252**. Pruning to a
  * fifth of the size costs nothing measurable, because everything it removes was
  * seen once or twice and was never going to be the top answer anyway.
+ *
+ * 🔴 `KEEP` WAS 3 UNTIL 2026-09-26 AND THE COMMENT BELOW ASKED FOR THIS
+ * MEASUREMENT BY NAME. `demo/resources/chord-e6-keep.mjs` swept it at 3, 4, 5, 6
+ * and 8, refitting the temperature at every step because the prune is itself a
+ * temperature, and read the byte count off THIS packer rather than off a copy.
+ * Held at the real songs' own cycle rate, which is the one comparison a scoring
+ * rule cannot tilt:
+ *
+ *   jazz   KEEP 3  7.15 distinct in ten   KEEP 5  7.32   KEEP 8  7.41   real 7.42
+ *   pop    KEEP 3  4.56                   KEEP 5  4.55   KEEP 8  4.51   real 4.65
+ *
+ * 🔴 SO THE VOCABULARY GAIN IS A JAZZ GAIN AND POP DOES NOT HAVE ONE. Raising
+ * the prune closes 63 per cent of jazz's remaining gap and moves pop the wrong
+ * way by a hundredth of a chord. That is worth knowing before anybody reads
+ * *"the ceiling is the prune"* as a fact about tables in general.
+ * 🔴 AND THE GAIN THAT PAID FOR THIS IS THE WAY HOME, NOT THE WALK. MEASURED
+ * over 4,000 held-out jazz contexts: a four chord route to the tonic exists on
+ * **92.7 per cent** of them at KEEP 3 and **98.5** at KEEP 5, over **307**
+ * distinct routes against 150, with attestation 95.4 against 98.3. Seven contexts
+ * in a hundred had no way home at all and now have one.
+ * ⚠️ `MIN_ROW = 3` DOES NOT MOVE AND IS NOT WHAT CHANGED. A context with no
+ * fourth row seen three times still keeps three rows: MEASURED, 32.6 per cent of
+ * jazz contexts fill a fourth slot and 26.4 per cent a fifth, so most of them
+ * never reach the new ceiling. Sampling with no floor costs 9.5 points of
+ * attestation, which is the trade pure PMI was refused for.
+ * ⚠️ AND 6 AND 8 WERE REFUSED RATHER THAN MISSED. They buy 0.02 and 0.09 more
+ * distinct chords in ten for another 2,724 and 8,172 bytes, and take the route's
+ * attestation to 95.2 and 94.4 against a floor of about 94.
  */
-const MIN_CTX = 8, MIN_ROW = 3, KEEP = 3;
+const MIN_CTX = 8, MIN_ROW = 3, KEEP = argKeep ? Number(argKeep[1]) : 5;
+
+/**
+ * 🔴 THE TEMPERATURE THE PAGE DRAWS WITH, ONE NUMBER PER STYLE, AND IT IS IN THE
+ * TABLE BECAUSE IT IS A FACT ABOUT THE STYLE RATHER THAN ABOUT THE CODE.
+ * `plans/plan-better-chords-2026-09-25.md` measured that taking the most likely
+ * chord ten times in a row falls into a repeating cycle **99.1 per cent** of the
+ * time on jazz and **99.8** on pop, against **52.7** and **89.0** for the real
+ * songs, and that sampling instead reproduces the real statistics.
+ *
+ * 🔴 AND THESE TWO NUMBERS ARE NOT THE PLAN'S TWO NUMBERS, WHICH IS THE
+ * INTERESTING RESULT RATHER THAN A DISAGREEMENT. The plan swept temperatures
+ * over EVERY row a context had and landed on 1.0 for jazz and 0.5 to 0.8 for
+ * pop. **This table keeps three rows**, which is already a sharpening, so the
+ * same variety costs a much flatter dial. MEASURED 2026-09-25 by
+ * `demo/resources/chord-e4-generators.mjs`, which builds this exact shape from
+ * the training split and walks ten steps through `suggest.mjs`'s own sampler:
+ *
+ *   jazz  T 1.0  81.6% cycle  5.92 distinct   T 3.5  53.1%  7.13   real 52.7%  7.42
+ *   pop   T 1.0  92.1% cycle  4.30 distinct   T 1.4  87.3%  4.67   real 89.0%  4.65
+ *
+ * 🔴 AND THEY MOVED AGAIN ON 2026-09-26 BECAUSE `KEEP` MOVED, WHICH IS THE SAME
+ * FINDING ARRIVING A SECOND TIME. Five rows is a flatter thing to draw from than
+ * three, so the same variety costs a much COLDER dial: jazz fell from 3.5 to 1.7
+ * and pop from 1.4 to 0.8. MEASURED by `demo/resources/chord-e6-keep.mjs`, which
+ * refits the temperature at every prune for exactly this reason:
+ *
+ *   jazz  KEEP 5 T 1.7  52.5% cycle  7.33 distinct  97.0% attested   real 52.7%  7.42
+ *   pop   KEEP 5 T 0.8  89.1% cycle  4.55 distinct  98.2% attested   real 89.0%  4.65
+ *
+ * ⚠️ A NUMBER BELOW 1 IS NOT A MISTAKE AND THE SEARCH HAD TO BE TAUGHT THAT. Pop
+ * at five rows needs SHARPENING, not flattening, and a sweep floored at 1.0
+ * answered 1.00 for every pop prune while missing the cycle rate by sixteen
+ * points.
+ * ⚠️ ATTESTATION IS THE FLOOR AND IT IS NOWHERE NEAR IT: 97.0 per cent on jazz
+ * and 98.2 on pop, against the 94 nothing ships below.
+ */
+const TEMP = { jazz: 1.7, pop: 0.8 };
+
+/**
+ * 🔴 HOW MUCH OF THE MIXTURE IS THE PLAYER'S OWN TAKE, ONE NUMBER PER STYLE, AND
+ * IT IS IN THE TABLE FOR THE THIRD TIME FOR THE THIRD REASON. The temperature is
+ * here because the corpora differ; so is this, and the difference is larger.
+ * `plans/plan-better-chords-2026-09-25.md` section 6.2 measured 0.2 to 0.3 on
+ * iRb and never looked at pop, so its range is a JAZZ range that reads as a
+ * general one.
+ *
+ * MEASURED 2026-09-26 by `demo/resources/chord-e7-take.mjs`, with expansion off,
+ * through this table's own shape and through `suggest.mjs`'s `adaptRows`:
+ *
+ *   jazz  w 0.25  +6.32 top 1   50.2% cycle  7.44 distinct  98.0% attested   real 52.0%  7.44
+ *   pop   w 0.10  +5.09 top 1   86.7% cycle  4.67 distinct  98.4% attested   real 89.0%  4.65
+ *   pop   w 0.25 would read +17.77 top 1 and 83.6% cycle with 4.89 distinct
+ *
+ * 🔴 SO POP'S HUGE TOP 1 GAIN IS THE PLAN'S OWN CAVEAT AT FULL VOLUME AND IS NOT
+ * A REASON TO TURN THE DIAL UP. A Billboard run is a verse or a chorus, which is
+ * a loop, so adapting to it predicts it almost for free and drives the generator
+ * FURTHER from how real pop repeats itself rather than closer. **The four
+ * measures are what refuse the bigger number**, which is the whole reason this
+ * project does not score on top 1 alone.
+ * ⚠️ AND A TABLE WRITTEN BEFORE THIS FIELD EXISTED READS AS 0.25, which is jazz's
+ * measured value rather than a neutral one, stated here rather than hidden.
+ */
+const MIX = { jazz: 0.25, pop: 0.1 };
 
 const styles = {};
 for (const which of ['jazz', 'pop']) {
@@ -155,6 +261,8 @@ const table = { v: 1, alpha: ALPHA, keep: KEEP, syms: SYMS };
 for (const which of ['jazz', 'pop']) {
   const { c } = styles[which];
   table[which] = {
+    temp: TEMP[which],
+    mix: MIX[which],
     bi: pack(c.bi, 1),
     tri: pack(c.tri, 2),
     uni: SYMS.map((s) => pch((c.uni.get(s) || 0) / c.total)).join(''),

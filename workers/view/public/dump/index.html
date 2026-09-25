@@ -15,10 +15,22 @@
      a page rule beating the stylesheet on source order is a thing this project
      measures going wrong, and the reason to carry that risk was removed. */
 
-  /* The ports list is short on purpose: four devices with their outputs is
-     eight rows, and the traffic below it is what the page is for. */
-  .ports .pos-tbl-body { max-height: 190px; }
-  .traffic .pos-tbl-body { max-height: min(60vh, 620px); }
+  /* 🔴 THE TWO HEIGHT RULES THAT STOOD HERE ARE GONE, AND DELETING THEM IS
+     PART OF THE CHANGE RATHER THAN A TIDY-UP. They were
+     `.ports .pos-tbl-body { max-height: 190px }` and
+     `.traffic .pos-tbl-body { max-height: min(60vh, 620px) }`, both CEILINGS,
+     so each box was whatever height its rows made it underneath one: nothing
+     at all when empty and hundreds of pixels a second later. Both tables ask
+     for `minRows` now, and `shell.css`'s `.pos-tbl[data-rows] .pos-tbl-body`
+     answers with `height` AND `max-height: none` at (0,3,0), which beats a
+     page's (0,2,0) whatever the source order says. Leaving them would have
+     left two DEAD RULES reading as correct, which this project measures as its
+     second most expensive kind of defect after a dead JavaScript guard.
+     ⚠️ THE HEIGHTS ARE READ BACK RATHER THAN REASONED ABOUT. See the three
+     measurements in `check`: empty, overflowing and cleared, one number.
+     ⚠️ `.ports` and `.traffic` stay and nothing styles them. They are what
+     tells the two tables apart in the DOM, in a screenshot and in the checks
+     below, and the sizes they used to carry now live beside the tables. */
 </style>
 
 <script type="module">
@@ -45,6 +57,50 @@
    */
 
   const MAX_ROWS = 400;
+
+  /**
+   * 🔴 THE TABLES ARE DRAWN AT ONCE, EMPTY, AT A HEIGHT THEY KEEP. Asked for
+   * 2026-09-25: *"dump: nothing asked yet / press Listen, then play something /
+   * show empthy tables / miditables immidately with fixed heigh. no texdt in
+   * them until dumps arrive"*. The two quoted strings were this page's `empty`
+   * captions and they are gone: `minRows` makes the TABLE ITSELF the empty
+   * state, so a heading and a stack of ruled rows stand where a sentence used
+   * to, and nothing is written in them until a message lands.
+   *
+   * ⚠️ AND IT BUMPS INTO `an empty box is a line`, WHICH POINTS THE OTHER WAY
+   * AND IS NOT IN CONFLICT HERE. `demo/shell/roll.mjs:111` argues FOR a caption,
+   * because a container with nothing in it must not paint its own edges, and
+   * this project has paid for that three times (`/typist/`'s 2 px band,
+   * `.pos-controls`'s 14 px one, `drop.mjs`'s hidden footer). **A framed table
+   * is not an empty box.** Its heading names the columns and its ruled rows say
+   * how many records will fit, which is structure a reader can see and read a
+   * meaning off. What that rule refuses is a rectangle saying nothing, and this
+   * is the opposite of one. **So this is not a caption waiting to be put
+   * back**, and `/pack/`'s `an empty table draws no heading` is not being
+   * contradicted either: that assert is about a heading over NOTHING, and there
+   * is something under this one.
+   *
+   * 🔴 FLOOR AND CEILING ARE ONE NUMBER, WHICH IS THE HALF THAT COST SOMETHING
+   * ELSEWHERE. `/wish/` records a box that was *"7 lines for one connection and
+   * 16 for the next"* and therefore moved the log and the end of the page on
+   * every press. Rows land here in hundreds and they land on their own, so a
+   * box that grew with them would do that to everything under it without
+   * anybody touching the page.
+   *
+   * ⚠️ TWO NUMBERS, NOT ONE, AND THE SECOND ONE IS A CHOICE RATHER THAN A
+   * MEASUREMENT. `PORTS_ROWS` is 6 because that is what this box already is:
+   * the `max-height: 190px` it replaces is 5.9 rows at `--tbl-row-h`, and
+   * `/circuit/` and `/evo/` both reserve exactly 6 for a MIDI table through
+   * `createMidiLog({ reserve: 6 })`, which is the same request one step
+   * earlier. `TRAFFIC_ROWS` is 16 because this page's whole subject is the
+   * traffic and the other two reserve 6 for a side panel: 16 rows is 518.40 px,
+   * which is under the 620 px ceiling it replaces and is 60vh of an 864 px
+   * viewport, a 1080p screen with an ordinary browser on it. **Answering a
+   * request about the EMPTY state by making the one table this page exists for
+   * five times shorter would be answering a different request.**
+   */
+  const PORTS_ROWS = 6;
+  const TRAFFIC_ROWS = 16;
 
   const d = mount({
     name: 'dump',
@@ -114,7 +170,9 @@
       { key: 'state', label: 'state', width: 86 },
     ],
     cap: 40,
-    empty: 'nothing asked yet',
+    // ⚠️ NO `empty:`. `minRows` ignores one, and a sentence inside a framed
+    // table lands in the first ruled row and reads as a record.
+    minRows: PORTS_ROWS,
     note: 'hover',
   });
   ports.el.classList.add('ports');
@@ -137,7 +195,7 @@
     // ⚠️ IT STANDS DOWN WHILE THE KEYBOARD IS IN THE TABLE, or it would drag
     // the view off the focused row between two arrow presses.
     stick: true,
-    empty: 'press Listen, then play something',
+    minRows: TRAFFIC_ROWS,
     // The port name is what somebody checks AFTER finding a row, never what
     // they scan down, so it is on the hover rather than in a sixth column that
     // would push the row past a phone's width.
@@ -502,6 +560,32 @@
   // ---------------------------------------------------------------- checks
 
   d.on('check', async () => {
+    /**
+     * 🔴 THE EMPTY FRAME IS READ BEFORE ANYTHING IS PUT IN IT, which is the
+     * only moment it exists. Everything below this line feeds the known stream,
+     * and a measurement of the empty state taken after that would be a
+     * measurement of a full table.
+     * ⚠️ THE BODY, NOT THE WRAPPER. `shell.css` sets the height on
+     * `.pos-tbl-body`, which is the box that scrolls; the wrapper also holds
+     * the heading and would report a different number for a reason that has
+     * nothing to do with this.
+     * ⚠️ AND `getComputedStyle(...).display` FOR THE HEADING, NOT `.hidden`.
+     * `el.hidden` is a fact about an attribute and this project has already
+     * shipped an assert reading it green while the heading was on screen:
+     * `.pos-tbl-row`'s own `display: grid` beat the browser's `[hidden]` until
+     * `shell.css` said otherwise. Only the computed value knows what is drawn.
+     */
+    const bodyOf = (t) => t.el.querySelector('.pos-tbl-body');
+    const boxH = (t) => +bodyOf(t).getBoundingClientRect().height.toFixed(2);
+    const roomIn = (t) => bodyOf(t).querySelectorAll('.pos-tbl-rest').length;
+    const headDrawn = (t) => getComputedStyle(t.el.querySelector('.pos-tbl-head')).display !== 'none';
+    const empty = {
+      h: boxH(traffic), text: bodyOf(traffic).textContent,
+      room: roomIn(traffic), rows: traffic.count(),
+      portsH: boxH(ports), portsRoom: roomIn(ports), portsRows: ports.count(),
+      heads: headDrawn(ports) && headDrawn(traffic),
+    };
+
     // Everything gradable here is gradable from the known stream, which is why
     // it is a control rather than a branch. Nothing below needs a device.
     if (!shown) feedKnown();
@@ -574,6 +658,45 @@
 
     d.assert('no secret in this page', !location.href.includes('token'));
 
+    // ── the frame, measured at every filling it can have ──────────────────
+    /**
+     * 🔴 A READOUT CELL IS NOT AN ASSERT AND NEITHER IS A NUMBER IN A COMMENT.
+     * The whole point of `minRows` is that the box does not move, so the check
+     * is four readings of one box at four fillings: empty before anything
+     * arrived, overflowing, emptied again by the real `Clear` handler, and
+     * holding a single row. If any one of them differs the page is pushing
+     * everything under it up and down as messages land, which is the defect
+     * `/wish/` paid for.
+     * ⚠️ THE CLEAR IS THE REAL HANDLER, driven through `d.run`, so what is
+     * measured is the button a person presses rather than a private reset.
+     */
+    const full = { h: boxH(traffic), rows: traffic.count() };
+    await d.run('clear');
+    const cleared = { h: boxH(traffic), rows: traffic.count(), room: roomIn(traffic) };
+    feedInquiry();
+    const one = { h: boxH(traffic), rows: traffic.count(), room: roomIn(traffic) };
+
+    d.assert('the table is the same height empty, overflowing and emptied again',
+      empty.h > 0 && empty.h === full.h && full.h === cleared.h && cleared.h === one.h,
+      `${empty.h} px at ${empty.rows} rows, ${full.h} px at ${full.rows}, `
+      + `${cleared.h} px cleared, ${one.h} px at ${one.rows}`);
+
+    // ⚠️ THE NEGATIVE HALF, and it is the half that says the box is holding
+    // itself open rather than being held open by the rows in it: the room a
+    // placeholder takes is given back one row at a time, so the two always sum
+    // to the reserved count and a placeholder is never counted as a record.
+    d.assert('the room is given back a row at a time, and a row of room is not a row',
+      cleared.room === TRAFFIC_ROWS && cleared.rows === 0
+        && one.room === TRAFFIC_ROWS - 1 && one.rows === 1,
+      `${cleared.room} rows of room over ${cleared.rows} records, `
+      + `then ${one.room} over ${one.rows}`);
+
+    d.assert('both tables stood open with nothing written in them, under their own column names',
+      empty.text.trim() === '' && empty.rows === 0 && empty.room === TRAFFIC_ROWS
+        && empty.portsRows === 0 && empty.portsRoom === PORTS_ROWS && empty.heads,
+      `traffic ${empty.room} rows of room and ${empty.rows} records at ${empty.h} px, `
+      + `ports ${empty.portsRoom} and ${empty.portsRows} at ${empty.portsH} px, `
+      + `both headings drawn, text ${JSON.stringify(empty.text)}`);
 
     // What a real device would add, said in words rather than left as a silence.
     if (!access) {

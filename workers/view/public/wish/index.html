@@ -202,21 +202,19 @@
        margin that was never declared. */
     padding: 6px 10px;
   }
-  /* 🔴 THE RIGHT OF EVERY ROW IS FOR ACTIONS AND IT IS EMPTY TODAY. Asked in
-     the same breath: *"reserve right side of diagram+allowed to action buttons
-     etc. align diagram to left?"*. Nothing is built into it yet, which is the
-     whole reason it is declared here: a column that arrives with its first
-     button moves the picture sideways under the reader's eye.
-     🔴 AND ITS TENANT IS KNOWN, WHICH IS WHY THE THIRD VERDICT MADE THIS
-     COLUMN WORTH MORE THAN *buttons may appear later*. An incomplete row is
-     the one row with something a person can supply: the missing number in
-     `{ op: 'cc', to: 1 }` is a controller number, and the ask that followed was
-     whether it could be given by turning the knob. An allowed row has nothing
-     to ask for and a refused one has nothing to offer.
-     ⚠️ IT IS NOT BUILT AND THE REASON IS MEASURED. Learning a controller number
-     from a knob needs WebMIDI, which this page declares in its tags and opens
-     nowhere: there is not one `requestMIDIAccess` in it. That is a piece of
-     work rather than a button.
+  /* 🔴 THE RIGHT OF EVERY ROW IS FOR ACTIONS, AND SINCE 2026-09-25 THERE ARE
+     TWO IN IT. Asked on 2026-09-22 as *"reserve right side of diagram+allowed
+     to action buttons etc. align diagram to left?"* and filled on 2026-09-25 by
+     *"wish: when connections (diagram rows) are there, enable them. add small
+     remove button on each to the right of the row"*. It was declared empty for
+     three days for the reason that still governs it: a column that arrives with
+     its first button moves the picture sideways under the reader's eye, so the
+     width was reserved before anything wanted it.
+     🔴 AND ITS TENANT WAS PREDICTED WRONG, WHICH IS WORTH LEAVING IN. This
+     comment said the tenant was the incomplete row's missing controller number,
+     learned by turning a knob. That is still unbuilt. What landed instead is
+     the switch that makes an ALLOWED row real and the remove that takes any row
+     off the page, and the knob is still a piece of work rather than a button.
      🔴 AND THE WIDTH IS A MEASUREMENT RATHER THAN A TASTE. `diagram.mjs` draws
      a row of boxes while its host is at least 560 px wide and stacks them into
      one tall column below that. This page is 688 px at its widest, the glue
@@ -227,7 +225,32 @@
      column grows the page says which number broke it. */
   .wish-conn-act {
     grid-column: 2; grid-row: 1 / 3; min-width: 0;
-    display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+    /* 🔴 THE TWO CONTROLS STACK, AND IT IS THE 72 px ABOVE THAT DECIDES IT
+       RATHER THAN A LOOK. MEASURED 2026-09-25 with both of them built: the box
+       and its word are 37.3 px and the remove square is 34.0, which is 77.3 px
+       side by side against a column of 72 and would either overflow the picture
+       or have to widen the column, and widening the column is what the
+       paragraph above forbids. The column spans both rows of the connection
+       grid, so it is 120 px tall at its shortest, and two 34 px controls with a
+       6 px gap take 74 of that. */
+    display: flex; flex-direction: column; align-items: flex-end;
+    justify-content: center; gap: 6px;
+  }
+  /* 🔴 THE SQUARE IS `shell.css`'s OWN 34, RE-DECLARED HERE BECAUSE THAT RULE
+     IS SCOPED TO `.pos-controls` AND THIS BUTTON IS NOT IN IT. `shell.mjs`
+     stamps `data-glyph` on a control whose whole label is one non-letter and
+     `.pos-controls button[data-glyph="1"]` squares it; a glyph button anywhere
+     else keeps the 18 px word padding of a pill, which is a word of air round
+     one character. MEASURED 2026-09-25 by taking this rule off and running the
+     page: the same button lays out at **45.8 px** wide against the 34.0 it has
+     with the rule, in a column of 72.
+     ⚠️ THE NUMBER IS COPIED, NOT MEASURED AGAIN, so the two cannot disagree
+     about what a square is. The shared rule needing a page copy is reported
+     rather than fixed here, because this page does not own `shell.css`. */
+  .wish-conn-act button[data-glyph="1"] {
+    width: 34px; height: 34px; padding: 0;
+    display: grid; place-items: center;
+    font-size: 15px; line-height: 1;
   }
   /* 🔴 A ROW IS PRESSED TO CHOOSE IT, AND THE TREATMENT IS THE TABLE'S OWN.
      Asked as *"clickin on row enables it (left yellow border and slihjt bg
@@ -400,12 +423,30 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createCheck } from '/shell/check.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { createTable } from '/shell/table.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createBay, printLink, checkTransforms, delivers, OP_HELP } from '/shell/bay.mjs';
+  import { createBay, printLink, checkTransforms, delivers, classOf, OP_HELP } from '/shell/bay.mjs';
   import { describe, reword } from '/shell/instruments.mjs';
+  import { decode } from '/shell/midi-decode.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+
+  /**
+   * 🔴 A COUNTER IN FRONT OF THE ONE CALL THAT REACHES AN INSTRUMENT, AND IT IS
+   * `/tom/`'s. `navigator.requestMIDIAccess` raises a browser permission dialog
+   * and hands back every port on the desk, and this page may not make that call
+   * on a visit or under the harness. A comment saying so is a claim about a
+   * file; this makes *nothing was opened* a number an assert can read, which is
+   * the same shape as `reached` for the agent further down.
+   * ⚠️ IT IS WRAPPED BEFORE ANY OF THIS PAGE'S OWN CODE RUNS, or the wrapper
+   * would be grading whatever happened after it.
+   */
+  let midiAsked = 0;
+  if (navigator.requestMIDIAccess) {
+    const real = navigator.requestMIDIAccess.bind(navigator);
+    navigator.requestMIDIAccess = (...a) => { midiAsked++; return real(...a); };
+  }
 
   /**
    * 🔴 SAY WHAT YOU WANT AND THE DESK PROPOSES A PATCH. Asked 2026-09-21:
@@ -413,12 +454,24 @@
    * you are translating them to a batch pay via the models from Cloudflare,
    * maybe even try out different models."*
    *
-   * 🔴 **IT PROPOSES AND IT NEVER CONNECTS, AND THAT IS NOT CAUTION, IT IS THE
+   * 🔴 **IT PROPOSES, AND A PERSON PRESSES, AND THAT IS NOT CAUTION, IT IS THE
    * MEASUREMENT.** Run against the real models and the real desk on the day this
    * was built: asked to put the mod wheel on the master filter, the 70B returned
    * a perfectly valid patch pointed at the **wrong instrument**. Nothing in a
    * validator can catch that, because there is nothing invalid about it. What
    * catches it is somebody reading one line of text.
+   * 🔴 **THIS PARAGRAPH READ `IT NEVER CONNECTS` UNTIL 2026-09-25, AND HALF OF
+   * IT IS NOW FALSE.** Asked: *"wish: when connections (diagram rows) are there,
+   * enable them"*, settled the same day as *"arhive bay demo and rm from index.
+   * use the connecting code in wish"*. A row carries a switch since then and
+   * throwing it makes the link REAL: `bay.mjs`'s `link`, `send` and `unlink`,
+   * the same code `/bay/` used before its page was archived. **What did not
+   * change is the sentence above it**: nothing is connected by an answer
+   * arriving, only by somebody reading the row and pressing the switch on it.
+   * ⚠️ **AND NOTHING IS OPENED UNTIL THAT PRESS.** There is no
+   * `requestMIDIAccess` on the load path, and under `?selfcheck=1` there is
+   * none at all: the checks drive the whole routing path through two stand-in
+   * ports, so a suite run is never a hand on somebody's instrument.
    *
    * ⚠️ **NOTHING HERE REACHES CLOUDFLARE UNTIL A PRESS, AND NOTHING REACHES IT
    * UNDER THE HARNESS AT ALL.** It is somebody's account, and a suite run is
@@ -692,7 +745,16 @@
      * whose computer it runs on, which is a fact about the bill rather than
      * about what a visitor is looking at.
      */
-    what: 'Say which instrument should play which, and a language model proposes the connection.',
+    /**
+     * 🔴 THE SENTENCE MOVED WITH THE PAGE ON 2026-09-25, WHICH IS THE RULE
+     * RATHER THAN A POLISH. It read *proposes the connection*, and a row now
+     * carries a switch that makes the connection real, so the one line under
+     * the title was describing a page that only ever talked. A description that
+     * has drifted is worse than a missing one, because a visitor believes it.
+     * ⚠️ STILL ONE SENTENCE, with no colon, no semicolon and no second clause
+     * bolted on: what a switch does is said by the switch's own label.
+     */
+    what: 'Say which instrument should play which, and a language model proposes a connection you can switch on.',
     /**
      * 🔴 NO READOUT AT ALL. Asked 2026-09-21: *"rm links / 1 / refused / 1"*,
      * which is both remaining cells after the two timings came off earlier the
@@ -1136,12 +1198,22 @@
 
   // ── the desk, as a bay, so the proposal is graded by the real validator ───
 
-  function freshBay() {
+  /**
+   * @param {object} [o]
+   * @param {boolean} [o.live] wire the in-ports to the one function on this
+   *   page that can put a byte on a wire. A graded bay takes no `deliver` at
+   *   all, so a proposal being checked cannot reach an instrument even if some
+   *   later edit called `send` on it by mistake.
+   */
+  function freshBay({ live = false } = {}) {
     const b = createBay();
     for (const p of PORTS) {
       b.addPort({
         id: p.id, label: p.label, dir: p.dir, medium: 'midi', shape: { protocol: '1.0' },
-        ...(p.dir === 'in' ? { accepts: ACCEPTS[p.id] ?? ['note', 'cc'], never: NEVER } : { emits: EMITS }),
+        ...(p.dir === 'in'
+          ? { accepts: ACCEPTS[p.id] ?? ['note', 'cc'], never: NEVER,
+              ...(live ? { deliver: (ev) => writeOut(p.id, ev) } : {}) }
+          : { emits: EMITS }),
       });
     }
     return b;
@@ -1236,6 +1308,217 @@
        counted yesterday, because the only rows that moved are the ones nothing
        was refusing. */
     return { rows, ok, needs: waiting, refused: rows.length - ok - waiting };
+  }
+
+  // ── the desk, and the links that are real ────────────────────────────────
+
+  /**
+   * 🔴 A PROPOSAL BECOMES A CONNECTION ON A PRESS, NEVER ON AN ANSWER. Asked
+   * 2026-09-25: *"wish: when connections (diagram rows) are there, enable
+   * them"*, and settled in the same breath as *"use the connecting code in
+   * wish"*. Every line of what makes a link real is `bay.mjs`'s and is moved
+   * into service here rather than rewritten: `link()` validates and holds it,
+   * `send()` applies the transforms and drops what the far end does not consent
+   * to, `deliver` is the one way out, and `unlink()` takes it down. `/bay/`'s
+   * page went to `archive/` the same day and its module did not.
+   * 🔴 TWO BAYS, AND THEY ANSWER TWO DIFFERENT QUESTIONS. `grade()` builds a
+   * fresh one per press, because *is this proposal any good* has to be asked of
+   * a clean desk or the second answer would be refused for closing a loop with
+   * the first. This one holds only links somebody pressed, so its `links()` is
+   * the honest reading of what this page is doing to the room right now.
+   */
+  /** Destination port id -> something with `.send(bytes)`. */
+  const outs = new Map();
+  /** Source port id -> something with `.onmidimessage`. */
+  const ins = new Map();
+  /**
+   * 🔴 A COUNT IS ONLY EVIDENCE ON THE FAR SIDE OF THE BOUNDARY. `bay.mjs`
+   * counts what a link QUEUED and what a port was HANDED, and both of those are
+   * true of a desk with nothing plugged into it. This counts messages that were
+   * turned into bytes and written to a port, which is the only number on this
+   * page that means anything left the tab.
+   */
+  let crossed = 0;
+  let deskOpen = null;
+
+  const desk = freshBay({ live: true });
+
+  /**
+   * 🔴 AN EVENT BACK INTO BYTES, AND THE LIST IS SHORT ON PURPOSE. There is no
+   * branch here for SysEx, for a program change or for a clock byte, so none of
+   * them CAN BE EXPRESSED, whatever a link or a model says. The `never` list on
+   * a port is a declaration and this is arithmetic, which is the second wall
+   * `/bay/` put behind the first, and the reason it matters on this desk is in
+   * CLAUDE.md: the Circuit has no factory reset and therefore no undo.
+   * ⚠️ IT IS THE ONE FUNCTION ON THIS PAGE THAT CAN PUT A BYTE ON A WIRE.
+   */
+  function toBytes(ev) {
+    const ch = Math.max(0, Math.min(15, (ev.ch ?? 1) - 1));
+    if (ev.cls === 'note') return [(ev.d2 === 0 ? 0x80 : 0x90) | ch, ev.d1, ev.d2 ?? 0];
+    if (ev.cls === 'cc') return [0xb0 | ch, ev.d1, ev.d2 ?? 0];
+    if (ev.cls === 'bend') return [0xe0 | ch, ev.d1 ?? 0, ev.d2 ?? 64];
+    return null;
+  }
+
+  function writeOut(id, ev) {
+    const bytes = toBytes(ev);
+    const port = outs.get(id);
+    if (!bytes || !port) return;
+    try { port.send(bytes); crossed++; }
+    catch (e) { d.log(`${NAME_OF(id)} refused a message: ${e.message}`, 'warn'); }
+  }
+
+  /**
+   * 🔴 ALL NOTES OFF AND ALL SOUND OFF, ON EVERY CHANNEL, WHEN A LINK COMES
+   * DOWN. This page's own `FACTS` name the case in one line: the Model 12's REC
+   * buttons SEND NO NOTE OFF. A link cut while one of them is held leaves a note
+   * sounding on an instrument nobody has a finger on, and the switch that
+   * caused it has just stopped being able to carry the release.
+   * ⚠️ CC 123 AND CC 120 ARE ORDINARY CHANNEL MODE CONTROL CHANGES, so this
+   * expresses nothing `toBytes` could not already build: no SysEx, no program
+   * change, no clock byte, and nothing that touches flash.
+   * ⚠️ BOTH, AND IN THAT ORDER. All Notes Off releases held notes and lets their
+   * release envelopes finish, which is the musical answer; All Sound Off cuts
+   * the voices dead, which is the answer when something never sent a release at
+   * all. Sending only the first leaves a hung voice on a long release and only
+   * the second makes an ordinary release sound broken.
+   * ⚠️ AND EVERY CHANNEL, NOT THE ONE THE LINK USED. A stuck note is by
+   * definition on a channel nothing is tracking any more, which is exactly why
+   * the transform that moved it is no help here.
+   */
+  function hush(id) {
+    const port = outs.get(id);
+    if (!port) return 0;
+    let n = 0;
+    for (let ch = 1; ch <= 16; ch++) {
+      for (const cc of [123, 120]) {
+        try { port.send(toBytes({ cls: 'cc', ch, d1: cc, d2: 0 })); n++; crossed++; }
+        catch { /* a port may have gone between the press and here */ }
+      }
+    }
+    return n;
+  }
+
+  /**
+   * One real source, listened to. The decode is `midi-decode.mjs`'s and the
+   * class is `bay.mjs`'s, so what a message IS is decided in one place for the
+   * page, the validator and the picture.
+   */
+  function wireSource(id, port) {
+    port.onmidimessage = (e) => {
+      const m = decode(Array.from(e.data));
+      desk.send(id, { cls: classOf(m), ch: m.ch, d1: m.d1, d2: m.d2 });
+    };
+  }
+
+  /**
+   * 🔴 NOTHING IS OPENED UNTIL SOMEBODY THROWS A SWITCH, AND NOTHING AT ALL IS
+   * OPENED UNDER THE HARNESS. `requestMIDIAccess` raises a permission dialog and
+   * hands back every instrument on the desk; a suite run is dozens of Chromes,
+   * and a check that took this branch would be a hand on somebody's instrument.
+   * That is `/shape/`'s rule and it is why the gate is on the CALL rather than
+   * on the control: a switch that does nothing is the shape this project calls
+   * a lie, so under `?selfcheck=1` the same wiring runs against two stand-in
+   * ports and the whole path is graded for nothing.
+   */
+  function openDesk() {
+    if (!deskOpen) deskOpen = SELFCHECK ? Promise.resolve(standInPorts()) : realPorts();
+    return deskOpen;
+  }
+
+  /**
+   * 🔴 THE MATCH IS ON THE PORT'S NAME, AND THAT IS A KNOWN WEAKNESS RATHER
+   * THAN AN OVERSIGHT. `PORTS` is DECLARED on this page, measured off this desk,
+   * because the page is about the sentence rather than about discovery; the only
+   * thing that can join a declared row to a real port is the label, and a label
+   * is the thing a replug changes. CoreMIDI really does rename a held port to
+   * `Circuit 2`, which `bay.mjs`'s own header records. An instrument that comes
+   * back under another name reads here as an instrument that is not plugged in,
+   * and the log says which one did not answer.
+   */
+  async function realPorts() {
+    if (!navigator.requestMIDIAccess) {
+      d.log('this browser has no Web MIDI, so nothing here can be connected', 'warn');
+      return { real: true, ports: 0 };
+    }
+    let access;
+    try { access = await navigator.requestMIDIAccess({ sysex: false }); }
+    catch (e) { d.log(`MIDI was refused: ${e.message}`, 'warn'); return { real: true, ports: 0 }; }
+    const adopt = () => {
+      for (const p of PORTS) {
+        /* A port this page calls `out` is a thing that SENDS, which is a Web
+           MIDI input. The two vocabularies are opposite and this is where they
+           meet. */
+        const pool = p.dir === 'out' ? access.inputs : access.outputs;
+        const found = [...pool.values()].find((x) => x.name === p.label);
+        const map = p.dir === 'out' ? ins : outs;
+        if (!found) { map.delete(p.id); continue; }
+        if (map.get(p.id) === found) continue;
+        map.set(p.id, found);
+        if (p.dir === 'out') wireSource(p.id, found);
+      }
+    };
+    adopt();
+    /* Plugging an instrument in after the page loaded is the ordinary case, not
+       an edge one. A page that looks once is a page you have to reload. */
+    access.onstatechange = adopt;
+    const here = PORTS.filter((p) => ins.has(p.id) || outs.has(p.id)).length;
+    d.log(`${here} of ${PORTS.length} ports on this desk answered`);
+    return { real: true, ports: here };
+  }
+
+  /**
+   * 🔴 THE STAND-IN IS THE SAME WIRING WITH TWO OBJECTS IN PLACE OF TWO PORTS,
+   * AND THAT IS THE WHOLE REASON IT IS WORTH ANYTHING. A check that called
+   * `desk.send` directly would grade `bay.mjs`, which has its own test beside
+   * it; what this page adds is the decode, the class, the byte encoder and the
+   * two maps, and every one of those is on the path below. What it cannot grade
+   * is `requestMIDIAccess` itself and whether a real instrument answers to the
+   * name this page declares for it.
+   */
+  const heardBytes = [];
+  function standInPorts() {
+    for (const p of PORTS) {
+      if (p.dir === 'in') {
+        outs.set(p.id, { send: (bytes) => heardBytes.push({ id: p.id, bytes }) });
+      } else {
+        const port = { name: p.label, onmidimessage: null };
+        ins.set(p.id, port);
+        wireSource(p.id, port);
+      }
+    }
+    return { real: false, ports: PORTS.length };
+  }
+
+  /**
+   * 🔴 BOTH ENDS HAVE TO BE THERE, OR THE SWITCH IS A LIE. A link held in a bay
+   * with nothing plugged into either end is arithmetic nobody asked for: the
+   * box would be lit, the log would say connected, and not one message could
+   * ever cross. `caps.mjs` already answers this shape for a whole demo row, in
+   * words and with the reason, and this is the same answer one control down.
+   */
+  async function connect(c) {
+    await openDesk();
+    const miss = !ins.has(c.link.from) ? c.link.from : !outs.has(c.link.to) ? c.link.to : null;
+    if (miss) {
+      d.log(`nothing on this desk answered to ${NAME_OF(miss)}, so that connection was not made`, 'warn');
+      return false;
+    }
+    const r = desk.link(c.link.from, c.link.to, c.link.transforms || []);
+    if (!r.ok) { d.log(`the desk refused that connection: ${r.why}`, 'warn'); return false; }
+    c.linkId = r.id;
+    d.log(`connected ${c.row.say}`, 'hi');
+    return true;
+  }
+
+  /** @param {boolean} [quiet] one line per answer rather than one per link. */
+  function disconnect(c, quiet = false) {
+    if (!c.linkId) return false;
+    desk.unlink(c.linkId);
+    c.linkId = null;
+    const n = hush(c.link.to);
+    if (!quiet) d.log(`disconnected ${c.row.say}, and ${n} quietening messages went after it`);
+    return true;
   }
 
   // ── the words, the names and the picture ─────────────────────────────────
@@ -1850,6 +2133,13 @@
       for (const other of conns) other.el.tabIndex = other === c ? 0 : -1;
     });
     c.el.addEventListener('keydown', (e) => {
+      /* 🔴 ONLY THE ROW'S OWN KEYS, AND THIS LINE IS WHAT THE ACTION COLUMN
+         COST. The switch and the remove button sit INSIDE this row, so without
+         it a space on the checkbox bubbles up here, is `preventDefault`ed as
+         the row's choose key, and the box never toggles. `check.mjs` exists
+         partly so that the space key is the browser's job rather than a page's,
+         and a container that eats it takes that back. */
+      if (e.target !== c.el) return;
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(conns.indexOf(c)); return; }
       const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
       const jump = e.key === 'Home' ? 0 : e.key === 'End' ? conns.length - 1 : null;
@@ -1861,6 +2151,87 @@
       const want = jump !== null ? jump : here + step;
       conns[Math.max(0, Math.min(conns.length - 1, want))]?.el.focus();
     });
+  }
+
+  /**
+   * 🔴 THE RIGHT OF A ROW, FILLED FOR THE FIRST TIME ON 2026-09-25. Asked:
+   * *"when connections (diagram rows) are there, enable them. add small remove
+   * button on each to the right of the row"*, which is two controls and only
+   * one of them belongs on every row.
+   * 🔴 ONLY AN ALLOWED ROW GETS A SWITCH. A refused link is the desk saying no,
+   * and an incomplete one is waiting for a number a person can supply, so a
+   * switch on either would be a control that cannot do the thing it names,
+   * which is this project's own definition of a lying control. Both still get a
+   * remove, because taking a wrong answer off the page is the one thing a
+   * reader can do about either of them.
+   * 🔴 AND NEITHER OF THEM IS IN `.pos-controls`, WHICH IS A DECISION AND NOT AN
+   * ACCIDENT. `demo/verify.mjs` presses `.pos-controls button, .tbar-x` in
+   * document order: a remove button in that row would be pressed on every run
+   * and would empty the page in the middle of its own checks, and a switch in it
+   * would make a suite run a hand on somebody's instrument, which is `/shape/`'s
+   * standing rule. The row's own column is where they go, and the checks below
+   * press them by reference.
+   */
+  function fitActions(c) {
+    if (c.row.ok) {
+      const live = createCheck({
+        label: 'on',
+        title: 'makes this connection on the desk\nnothing crosses until it is on',
+        onChange: async (on) => {
+          const done = on ? await connect(c) : disconnect(c);
+          /* Back where it was when the desk could not do it, rather than a box
+             that says a connection exists. `quiet`, or the handler runs again
+             and asks the desk a second time. */
+          if (on && !done) live.set(false, true);
+        },
+      });
+      /* The visible word first, so the name a screen reader reads still starts
+         with the word a reader sees, and then which connection it is about: on
+         a reply of three rows, three controls announced as `on` are three
+         controls nobody can tell apart. */
+      live.input.setAttribute('aria-label', `on, ${c.row.say}`);
+      c.live = live;
+      c.act.append(live.el);
+    }
+    /* ⚠️ `×` U+00D7 HAS NO EMOJI FORM, which is the whole of this project's
+       glyph rule: `✖` and most of the geometric shapes default to a colour
+       picture at a size of their own on some machines and not on others. */
+    const rm = el('button', '', '×', { 'data-glyph': '1',
+      'aria-label': `remove ${c.row.say}`,
+      title: 'takes this connection off the page' });
+    rm.addEventListener('click', (e) => {
+      /* The row under it is `role="button"` and a press inside it means choose
+         me, so a press that is about to delete the row has to stop here: it
+         would otherwise show the object of a row that is gone by the next
+         frame. */
+      e.stopPropagation();
+      removeRow(c);
+    });
+    c.rm = rm;
+    c.act.append(rm);
+  }
+
+  /**
+   * 🔴 A ROW LEAVES WITH ITS CONNECTION, NEVER WITHOUT IT. A live link whose row
+   * has gone is a link nobody can see and nobody can switch off, so the page
+   * would be routing an instrument on the strength of a sentence that is no
+   * longer on screen.
+   * ⚠️ AND THE COMPONENT KEEPS ITS HEIGHT. Removing the last row lays an empty
+   * one back, which is this page's standing reservation: nothing may change how
+   * much room it takes while somebody is looking at it.
+   */
+  function removeRow(c) {
+    const was = c.row.say;
+    disconnect(c);
+    c.dg?.destroy();
+    c.el.remove();
+    conns = conns.filter((x) => x !== c);
+    if (!conns.length) clearAnswer();
+    else {
+      conns.forEach((x, i) => { x.el.tabIndex = i === 0 ? 0 : -1; });
+      choose(Math.max(0, Math.min(chosen, conns.length - 1)));
+    }
+    d.log(`${was} is off the page, ${conns.length} connection(s) left`);
   }
 
   function show(links) {
@@ -1912,6 +2283,13 @@
       c.say.replaceChildren(...lines.map((t) => el('div', '', t)));
       c.say.hidden = !lines.length;
     }
+    /* 🔴 THE CONTROLS ARE BUILT AFTER `conns` IS ASSIGNED, NOT INSIDE THE MAP
+       ABOVE IT. `drawOne` is spread into a NEW object, so a handler closing over
+       the one that went in would hold a row whose `linkId` nothing else can
+       see: the switch would connect and the remove would find nothing to take
+       down. Two objects for one row is the `createTransportBar` trap in another
+       costume. */
+    for (const c of conns) fitActions(c);
     conns.forEach(wire);
     choose(0);
     g.picture = {
@@ -1961,7 +2339,14 @@
        presence: a box that had held one answer would keep its edges for the
        rest of the page's life. */
     delete patch.dataset.shown;
-    for (const c of conns) c.dg?.destroy();
+    /* 🔴 A NEW QUESTION TAKES DOWN THE CONNECTIONS THE LAST ANSWER MADE, AND
+       THAT IS NOT TIDINESS. The rows ARE the answer here, so a link that
+       outlived its row would be an instrument being routed by a sentence nobody
+       can read any more, with no switch left anywhere to stop it. One line for
+       the lot rather than one per link, because it is one event. */
+    let off = 0;
+    for (const c of conns) { if (disconnect(c, true)) off++; c.dg?.destroy(); }
+    if (off) d.log(`${off} connection(s) came down with the answer they belonged to`);
     conns = [];
     chosen = -1;
     /* 🔴 BACK TO ONE EMPTY ROW, NEVER TO NO ROW AT ALL. The room a
@@ -3514,31 +3899,58 @@
         + `${rowsOf().indexOf(document.activeElement) + 1}`);
 
       /**
-       * 🔴 THE ACTION COLUMN IS RESERVED FROM THE FIRST PAINT, WHICH IS THE
-       * WHOLE ASK: *"reserve right side of diagram+allowed to action buttons
-       * etc"*. Nothing is in it yet, so the only thing that can be measured is
-       * that it takes its width with nothing in it and that the picture stops
-       * at its edge. A column that arrived with its first button would move the
-       * picture sideways under the reader's eye.
-       * ⚠️ AND THE ROW WITH NO ANSWER IN IT IS MEASURED TOO, because *from the
-       * first paint* is a claim about the state nobody has pressed anything in.
+       * 🔴 THE ACTION COLUMN IS RESERVED FROM THE FIRST PAINT, AND THE CLAIM
+       * GREW A HALF ON 2026-09-25 WHEN SOMETHING FINALLY MOVED INTO IT. It used
+       * to be that the column takes its width with NOTHING in it, which was the
+       * whole of *"reserve right side of diagram+allowed to action buttons
+       * etc"*. What has to hold now is that filling it moved nothing:
+       * everything the actions take comes off the picture, and `diagram.mjs`
+       * stacks the entire figure into one tall column the moment what is left
+       * drops under 560 px.
+       * ⚠️ SO THE CONTROLS ARE MEASURED AGAINST THE COLUMN RATHER THAN STYLED
+       * AND LOOKED AT. The widest of them against `--wish-act`, every one of
+       * their right edges against the column's, and the column's own width
+       * against what it was asked for. A fixed grid track cannot be pushed
+       * wider by what is in it, so the failure this catches is the other one: a
+       * control that overflows and lies across the picture while every width in
+       * the stylesheet still reads correct.
+       * ⚠️ AND STACKED RATHER THAN SIDE BY SIDE IS A CLAUSE, because side by
+       * side is what does not fit and is exactly what a later edit would try.
+       * ⚠️ THE SQUARE IS A CLAUSE FOR THE SAME REASON, AND IT WAS ADDED AFTER
+       * MEASURING THAT NOTHING CAUGHT IT. `shell.css`'s `[data-glyph]` rule is
+       * scoped to `.pos-controls`, so this page carries its own copy; taking
+       * that copy away lays the button out at 45.8 px, which still fits the
+       * column and so passed every clause above it. A page-local copy of a
+       * shared rule that nothing grades is a copy that drifts.
+       * ⚠️ THE ROW WITH NO ANSWER IN IT IS MEASURED TOO, because *from the first
+       * paint* is a claim about the state nobody has pressed anything in, and
+       * that row holds no controls at all.
        */
       const actOf = (r) => r.querySelector('.wish-conn-act').getBoundingClientRect();
       const want = parseFloat(getComputedStyle(rs[1]).getPropertyValue('--wish-act'));
       const withAnswer = actOf(rs[1]);
       const picture = figs()[1].getBoundingClientRect();
+      const kids = [...rs[1].querySelector('.wish-conn-act').children];
+      const boxes = kids.map((k) => k.getBoundingClientRect());
+      const widest = Math.max(0, ...boxes.map((b) => b.width));
+      const stacked = boxes.length === 2 && boxes[1].top >= boxes[0].bottom - 0.5;
       clearAnswer();
       const atRest = actOf(rowsOf()[0]);
-      d.assert('the right of every row is reserved for actions, and the picture stops at its edge',
+      d.assert('the actions fit the column reserved for them, and the picture stops at its edge',
         want > 0 && Math.abs(withAnswer.width - want) < 0.5
         && Math.abs(atRest.width - want) < 0.5
         && picture.right <= withAnswer.left + 0.5
-        && rs[1].querySelector('.wish-conn-act').childElementCount === 0,
+        && kids.length === 2 && widest <= want && stacked
+        && boxes.every((b) => b.right <= withAnswer.right + 0.5)
+        && Math.abs(boxes[1].width - 34) < 0.5 && Math.abs(boxes[1].height - 34) < 0.5
+        && rowsOf()[0].querySelector('.wish-conn-act').childElementCount === 0,
         `${want} px asked for, ${withAnswer.width.toFixed(1)} px standing with an answer and `
-        + `${atRest.width.toFixed(1)} px with none, holding `
-        + `${rs[1].querySelector('.wish-conn-act').childElementCount} controls; the picture ends `
-        + `at ${picture.right.toFixed(0)} and the column starts at ${withAnswer.left.toFixed(0)}`);
+        + `${atRest.width.toFixed(1)} px with none, holding ${kids.length} controls of `
+        + `${boxes.map((b) => `${b.width.toFixed(1)} by ${b.height.toFixed(1)}`).join(' and ')} px `
+        + `${stacked ? 'stacked' : 'side by side'}; the picture ends at `
+        + `${picture.right.toFixed(0)} and the column starts at ${withAnswer.left.toFixed(0)}`);
     }
+
 
     /**
      * 🔴 AND THE LEFT EDGE IS THE HALF THE RESERVED COLUMN COULD NOT FIX.
@@ -4279,6 +4691,134 @@
         crow.querySelectorAll('button').length === 0 && crowH === 0,
         `${crow.querySelectorAll('button').length} buttons in the row, ${crowH} px tall, `
         + `hidden ${crow.hidden}`);
+    }
+
+    /* ── the switch, and what really crosses when it is on ──────────────────
+       🔴 ASKED 2026-09-25: *"wish: when connections (diagram rows) are there,
+       enable them"*, settled as *"use the connecting code in wish"*. Everything
+       below drives the controls a person presses, against two stand-in ports
+       rather than against the desk: `bay.mjs` has its own test beside it, so
+       what these grade is what this PAGE adds, which is the decode, the class,
+       the byte encoder, the two maps and the four presses.
+       ⚠️ AND NOT ONE OF THEM OPENS AN INSTRUMENT, which is the first clause of
+       the first one rather than a remark here. */
+    {
+      const at = () => heardBytes.length;
+      show(REPAIRED);
+      const c = conns[0];
+      const linksBefore = desk.links().length;
+      const askedBefore = midiAsked;
+      /* A real press on the real control, not a call to `connect`: what is
+         being graded includes the checkbox, its handler and the shell's own
+         keyboard behaviour coming free with a form control. */
+      c.live.input.click();
+      await openDesk();
+      await Promise.resolve();
+      d.assert('a proposal becomes a connection on a press, and no instrument was opened to do it',
+        linksBefore === 0 && desk.links().length === 1 && !!c.linkId
+        && c.live.get() === true && midiAsked === 0 && askedBefore === 0,
+        `${linksBefore} links before the press and ${desk.links().length} after, `
+        + `the box reads ${c.live.get()}, and requestMIDIAccess was called ${midiAsked} time(s)`);
+
+      /* 🔴 A NOTE PLAYED AT THE SOURCE, THROUGH THE WHOLE PATH. 0x91 is a note
+         on, channel 2, which is the channel this keyboard really sends on, and
+         the reply's one transform is `transpose by 1`. So 60 arriving as 61 is
+         the transform running rather than a message being copied across. */
+      const beforeNote = at();
+      const crossedBefore = crossed;
+      ins.get(REPAIRED[0].from).onmidimessage({ data: [0x91, 60, 100] });
+      const got = heardBytes.slice(beforeNote);
+      d.assert('a connected link really carries a message, with its transform applied',
+        got.length === 1 && got[0].id === REPAIRED[0].to
+        && got[0].bytes[0] === 0x91 && got[0].bytes[1] === 61 && got[0].bytes[2] === 100
+        && crossed === crossedBefore + 1,
+        `${got.length} message(s) reached ${got[0]?.id}, `
+        + `[${(got[0]?.bytes ?? []).map((b) => b.toString(16)).join(' ')}] from a 60 played on `
+        + `channel 2, and ${crossed - crossedBefore} of them left the tab`);
+
+      /* 🔴 THE TWO LISTS, WHICH IS WHY `bay.mjs` HAS TWO. The Circuit consents
+         to note, cc and bend, so a program change is DROPPED at the boundary
+         and counted rather than refusing the link: *I do not use that* against
+         *that damages me*, and only the second is worth an error. A page that
+         only ever sent notes would grade neither. */
+      const beforePc = at();
+      ins.get(REPAIRED[0].from).onmidimessage({ data: [0xc1, 5] });
+      const link = desk.links()[0];
+      d.assert('a class the far end does not consent to is dropped at the boundary and counted',
+        at() === beforePc && link.dropped === 1 && link.sent === 1,
+        `${at() - beforePc} message(s) arrived, ${link.dropped} dropped and ${link.sent} sent`);
+
+      /* 🔴 OFF MEANS OFF, AND IT QUIETENS WHAT IT WAS REACHING. This page's own
+         FACTS say the Model 12's REC buttons send no note off, so a link cut
+         under a held note leaves it sounding with nothing left to carry the
+         release. 16 channels by two channel mode messages is 32. */
+      const beforeOff = at();
+      c.live.input.click();
+      const quiet = heardBytes.slice(beforeOff);
+      const afterQuiet = at();
+      ins.get(REPAIRED[0].from).onmidimessage({ data: [0x91, 60, 100] });
+      d.assert('switching it off takes the link down and quietens the instrument it was reaching',
+        desk.links().length === 0 && !c.linkId && c.live.get() === false
+        && quiet.length === 32
+        && quiet.every((m) => m.id === REPAIRED[0].to && m.bytes[0] >= 0xb0 && m.bytes[0] <= 0xbf)
+        && quiet.filter((m) => m.bytes[1] === 123).length === 16
+        && quiet.filter((m) => m.bytes[1] === 120).length === 16
+        && at() === afterQuiet,
+        `${desk.links().length} links left, ${quiet.length} quietening messages went out and `
+        + `${at() - afterQuiet} more crossed after it was switched off`);
+
+      /* 🔴 A REFUSED ROW HAS NOTHING TO SWITCH ON, AND REMOVE IS THE ONE THING
+         A READER CAN DO ABOUT IT. `CANNED` is the reply the real 70B gave with
+         its argument under the wrong key, so this is the refused row rather
+         than a constructed one. */
+      show(CANNED);
+      const bad = conns[0];
+      const badAct = bad.el.querySelector('.wish-conn-act');
+      const wasTall = rowsOf()[0].getBoundingClientRect().height;
+      bad.rm.click();
+      const left = rowsOf();
+      d.assert('a refused connection offers no switch, and remove takes a row off the page',
+        bad.row.ok === false && !bad.live
+        && badAct.childElementCount === 1 && !badAct.querySelector('.pos-check')
+        && left.length === 1 && left[0].querySelector('.wish-conn-act').childElementCount === 0
+        && Math.abs(left[0].getBoundingClientRect().height - wasTall) < 0.5,
+        `the refused row held ${badAct.childElementCount} control(s) and `
+        + `${badAct.querySelectorAll('.pos-check').length} switch(es); ${left.length} row(s) left, `
+        + `${wasTall.toFixed(1)} px tall before the press and `
+        + `${left[0].getBoundingClientRect().height.toFixed(1)} px after`);
+
+      /**
+       * 🔴 AND THE PICTURE IS STILL A ROW OF BOXES WHERE THIS PAGE IS READ.
+       * `diagram.mjs` lays a row out while its host is at least 560 px and
+       * stacks it into one tall column below that, so a control that made the
+       * reserved column wider would double the height of every connection. The
+       * width is swept on the COMPONENT rather than on the window, because
+       * `demo/verify.mjs` runs at one width with no viewport override and a
+       * media query it cannot enter is a layout nothing here can grade.
+       * ⚠️ 390 AND 560 ARE MEASURED AND NOT ASSERTED ON, because the figure has
+       * always stacked there: 72 px of actions and 12 of gap come off a 390 px
+       * component whatever is in them. What is asserted at every width is that
+       * nothing overflows the column, which is the failure the controls could
+       * actually cause.
+       */
+      const sweep = [];
+      for (const w of [390, 560, 756, 1280]) {
+        answer.style.width = `${w}px`;
+        show(REPAIRED);
+        const act = rowsOf()[0].querySelector('.wish-conn-act');
+        const box = act.getBoundingClientRect();
+        const over = [...act.children].map((k) => k.getBoundingClientRect())
+          .some((b) => b.right > box.right + 0.5 || b.width > box.width + 0.5);
+        sweep.push({ w, mode: conns[0]?.dg?.mode ?? 'not drawn',
+          fig: figs()[0].getBoundingClientRect().width, over });
+      }
+      answer.style.width = '';
+      clearAnswer();
+      d.assert('the actions overflow the column at no width, and the picture is still a row where it was',
+        sweep.every((s) => !s.over)
+        && sweep.filter((s) => s.w >= 756).every((s) => s.mode === 'row'),
+        sweep.map((s) => `${s.w}: ${s.mode} across ${s.fig.toFixed(0)} px`
+          + `${s.over ? ', actions overflowing' : ''}`).join(' | '));
     }
 
     /**

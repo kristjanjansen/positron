@@ -67,6 +67,26 @@ const is = (what, cond, detail) => {
     && plateSpec('', 'TOM', 'mid').place === 'end',
     'two lines keep mid, one line still goes to end');
 
+  /**
+   * 🔴 THE ONE PLACEMENT THAT SURVIVES A SINGLE LINE, AND IT IS A NEGATIVE
+   * CONTROL AGAINST THE RULE DIRECTLY ABOVE IT. The downgrade to `end` exists
+   * because `ends` is `space-between` and parks a lone child on the LEFT, which
+   * is an argument about a horizontal row. A plate glued down the edge of the
+   * case is not one, and one line is its ordinary case: `/shape/` asked for
+   * exactly that, `shape` with no maker. Without the exemption the only page
+   * that asked for a vertical plate would silently get a horizontal one, and
+   * nothing would look broken.
+   */
+  const sideOne = plateSpec('', 'shape', 'side');
+  is('a one line plate asked for down the side stays down the side',
+    sideOne.place === 'side' && sideOne.lines.length === 1 && sideOne.lines[0] === 'shape',
+    `${JSON.stringify(sideOne.lines)} at ${sideOne.place}`);
+  is('NEGATIVE CONTROL: the exemption is for that placement and nothing else',
+    plateSpec('', 'MODEL 12', 'ends').place === 'end'
+    && plateSpec('', 'TOM', 'mid').place === 'end'
+    && plateSpec(MAKER, 'shape', 'side').place === 'side',
+    'ends and mid still fall back to end on one line, side does not');
+
   is('the maker is declared once here, so no page types it',
     MAKER === 'POSITRON' && /export const MAKER/.test(src),
     `MAKER is ${JSON.stringify(MAKER)}`);

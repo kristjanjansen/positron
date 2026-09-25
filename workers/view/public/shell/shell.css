@@ -1,5 +1,49 @@
 /* demo/shell/shell.css — the ONLY stylesheet. Tokens from workers/view/menu.html. */
 
+/* 🔴 NO UPPERCASE ON BUTTONS AND CONTROLS, SITE WIDE, 2026-09-25. Asked for on
+   `/stage/`'s transport as *"for the buttons please use our regular button
+   styling with no uppercase"*, and the SCOPE was put to the owner as three
+   choices with previews (that one bar / every transport bar / every button on
+   the site). The owner chose EVERY BUTTON ON THE SITE, having seen a preview in
+   which tabs, buttons, badges and readout keys all lost their caps. So this is
+   the stylesheet's decision and not one page's.
+   ⚠️ IT REVERSES *"always uppercase"*, WHICH WAS INSTRUCTED 2026-09-16 AND IS
+   STILL QUOTED IN TWO PLACES IN THIS FILE. Both quotes are kept where they
+   stand, with the reversal written beside them, because a rule deleted without
+   its argument is a rule that comes back from whoever reads the argument next.
+   ⚠️ AND THE TRACKING WENT WITH THE CAPS, EVERY TIME, AS ONE DECISION. Every
+   `letter-spacing` removed in that pass was there to open out tracked caps;
+   lowercase mono is already wide and does not want it. The tab row's
+   `margin-right: -.1em` went with its own `letter-spacing` for the same reason
+   and its note says so at `.pos-tabs-t`. No new tracking number was invented
+   anywhere, which is why this is describable in one sentence.
+   🔴 TWENTY-NINE RULES CHANGED AND TEN DID NOT, AND THE TEN ARE THE POINT.
+   This was NOT a sweep: `text-transform: uppercase` appears on things that are
+   not controls, and CLAUDE.md's middot rule warns in capitals what a sweep
+   costs. What kept its caps, and why:
+     `.pos-sec-h` `.pos-act-h` `.pos-how` `.pos-dg-t`   headings and a diagram
+                                                        title, not controls
+     `.pos-cap`                                         a picture's caption
+     `.pos-tbl-head`                                    a column name over rows
+     `.pos-drop-say` `.pos-drop-title`                  a sentence and a heading
+                                                        on the drop cover
+     `.panel-plate-l` `.panel-cap, .panel-sub`          an INSTRUMENT's own
+                                                        silkscreen. A replica of
+                                                        somebody else's panel is
+                                                        a picture of a real
+                                                        object, and real panels
+                                                        are printed in caps.
+                                                        `panel-layout.mjs`
+                                                        reads this transform
+                                                        back in `shown()` and
+                                                        `/evo/` asserts on it.
+   ⚠️ `text-transform` IS A RENDERING PROPERTY AND CHANGES NO `textContent`, SO
+   NO ASSERT THAT READS TEXT COULD BREAK. MEASURED: exactly two consumers read
+   the property itself, `panel-layout.mjs`'s `shown()` and `/evo/`'s own `ink()`
+   helper, and both are on `.panel-sub` / `.panel-plate-l`, which are in the
+   list above. What CAN still break is a hardcoded caps LABEL in a page, which
+   is a page's own string and not this file's. */
+
 :root {
   --bg: #0b0e14; --card: #11151d; --card2: #151b26;
   --line: #1f2937; --line2: #2b3546;
@@ -153,8 +197,11 @@
   /* 🔴 HOW FAR A SWITCHED-OFF CONTROL'S FURNITURE DIMS, AND IT IS PUBLISHED
      FOR THE SAME REASON THE HEAD AND FOOT ARE: a caller that has to guess a
      component's own number is a caller that guesses it wrong.
-     MEASURED 2026-09-21 on `/evo/`, whose whole panel is switched off. Its
-     function button names are wider than the buttons, so the page draws them
+     MEASURED 2026-09-21 on `/evo/`, whose whole panel WAS switched off then
+     and is fully interactive since 2026-09-25 (*"make all buttons
+     interactive"*). This is the measurement that bought the number rather than
+     a description of that page today, and the number it bought is unchanged.
+     Its function button names are wider than the buttons, so the page drew them
      itself rather than using the pad's own label slots, and it had no number to
      match: they rendered at FULL strength, **5.91:1** against the card, over
      buttons dimmed to .38 and beside the pad's own top labels at **1.96:1**.
@@ -201,6 +248,29 @@
      why it sits on the BAR rather than the wrapper are all on `.pos-tabs-bar`
      below. Changing the air round every tab row on the site is this line. */
   --pos-tabs-air: 28px;
+  /* 🔴 HOW MUCH ROOM A FOCUSED TAB'S RING NEEDS, AND WHY THE ROW HAS TO RESERVE
+     IT. `.pos-tabs-bar` is `overflow-x: auto`, and a non-visible overflow on one
+     axis forces the OTHER axis to `auto` as well, so the row is a scroll
+     container on both axes and clips anything painted outside its box. The row
+     is exactly as tall as a tab, so a `:focus-visible` ring drawn 4 px outside
+     the tab had its top and bottom strokes CUT and only its two verticals
+     survived. Reported in session 49 as a vertical rule each side of
+     `CONTROLROOM` and never diagnosed, because nothing about the tab's own
+     borders explains it: they measure 0/0/0/0 and the selected rule is an inset
+     bottom shadow.
+     ⚠️ MEASURED 2026-09-25 on `/stage/` at 1280 px, before changing anything:
+     the bar's box is 177.5..199.5, the tab's box is the same 177.5..199.5, and
+     the ring's box is 173.5..203.5, which is **4.0 px outside at each end**,
+     and the bar's own padding was 0. Screenshotted with the tab focused from
+     the keyboard: one grey vertical stroke each side, no horizontals.
+     ⚠️ IT IS `outline-offset` PLUS `outline-width` AND NOTHING ELSE. Both are
+     published in this file (3 px and 1 px, at `:focus-visible`), so if either
+     changes this changes with it. A ring that does not fit is a ring that reads
+     as a border somebody drew on purpose.
+     ⚠️ AND THE ROW'S AIR DOES NOT MOVE. The padding comes OUT of the margin
+     below, so the distance from `.pos-head` to a tab's ink is still the 28 px
+     that was measured on all three tabbed pages. */
+  --pos-tabs-ring: 4px;
   --disp-h: 26px;
   /* 🔴 NEARLY NEUTRAL SINCE 2026-09-21, and the pair in `SCHEMES.backlit` moved
      with them by the rule three paragraphs up. Asked: *"reduce blue hue a lot in
@@ -1059,10 +1129,22 @@ button.pos-pri[data-busy="1"] {
    carries ▶/❚❚/↺ for every state, and a state rule weighs the same (0,2,0) as
    a plain `.tbar-word` one, so the `[data-state]` selector here is what makes
    sure a word button never draws a triangle beside its word. */
+/* 🔴 A WORD BUTTON ON THE BAR IS AN ORDINARY BUTTON. Asked 2026-09-25 with a
+   crop of `Start HLS` and `Start WebRTC` beside `Send` and `Send in 10s`:
+   *"these buttons should be same (like below ones). how you have different
+   bittons on transport than the others"*. They were 11px `--sans` in `--dim`
+   against the site's 13px `--mono` in `--fg`, so two buttons a thumb apart were
+   a different typeface, a different size and a different ink.
+   ⚠️ AND THIS OVERRULES THE FURNITURE ARGUMENT BELOW, WHICH IS KEPT. It held
+   that the bar is furniture around a playhead and a place you can go should not
+   compete with what is running. True of a `LOOP` beside a playhead. False of
+   the two controls that start the show, which are the whole point of the page.
+   ⚠️ GLYPH BUTTONS ARE UNTOUCHED. `.tbar-x` on its own is still the square
+   glyph box at 15px, which is right for a triangle and wrong for a word. */
 .tbar-toggle.tbar-word {
-  width: auto; min-width: 0; padding: 0 var(--pad-bar);
-  font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim);
+  width: auto; min-width: 0; padding: 0 var(--pad-btn);
+  font: 500 13px/1 var(--mono);
+  color: var(--fg);
 }
 .tbar-toggle.tbar-word::before,
 .tbar-toggle.tbar-word[data-state]::before { content: none; }
@@ -1070,7 +1152,7 @@ button.pos-pri[data-busy="1"] {
 .tbar-toggle.tbar-word > .tbar-w0 { visibility: visible; }
 .tbar-toggle.tbar-word[data-state="playing"] > .tbar-w0 { visibility: hidden; }
 .tbar-toggle.tbar-word[data-state="playing"] > .tbar-w1 { visibility: visible; }
-.tbar-toggle.tbar-word:hover { color: var(--fg); background: var(--card2); }
+/* the toggle's hover and active are in the rule above, with the other three. */
 
 /* a page button that belongs to the transport — sits with the toggle, and is
    the SAME SQUARE as it. These are transport verbs, so they are glyphs on a
@@ -1088,15 +1170,58 @@ button.pos-pri[data-busy="1"] {
    the bar is spent on the thing that is running, and a place you can go should
    not compete with it. */
 .tbar-x.tbar-word, .tbar-loop.tbar-word, .tbar-slot.tbar-word {
-  width: auto; min-width: 0; padding: 0 var(--pad-bar);
+  width: auto; min-width: 0; padding: 0 var(--pad-btn);
   /* ⚠️ 500, NOT 600. At 600 `LOOP` was the heaviest ink on a bar whose job is
      to be furniture around a playhead — it read as the thing to press, which it
      is not. Tracked uppercase already carries enough weight to be a label. */
-  font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim);
+  font: 500 13px/1 var(--mono);
+  color: var(--fg);
 }
+/* 🔴 IT PRESSES LIKE AN ORDINARY BUTTON, AND IT DID NOT. Reported 2026-09-25:
+   *"when i push start hls i get no shimmer on button (use kit buttons!)"*.
+   `button:hover` is `border-color: var(--dim2)` and `button:active` is
+   `background: var(--card)`, both at (0,1,1). This rule is (0,3,0), so once the
+   colours were aligned to the ordinary button it set the SAME background the
+   button already has and outranked `:active` while the pointer was on it. Hover
+   became a no-op and the press had no feedback at all, on the one control whose
+   whole job is to tell you the show started. Border on hover, the darker face on
+   press, and both spelled out here rather than left to the base rule they lose
+   to. */
 .tbar-x.tbar-word:hover, .tbar-loop.tbar-word:hover,
-.tbar-slot.tbar-word:hover { color: var(--fg); background: var(--card2); }
+.tbar-slot.tbar-word:hover, .tbar-toggle.tbar-word:hover {
+  color: var(--fg); background: var(--card2); border-color: var(--dim2);
+}
+/* 🔴 A BUTTON WAITING ON SOMETHING SAYS SO BY MOVING. Asked 2026-09-25: *"do
+   shimmering on start button until on air"*. `/stage/`'s publisher wake is
+   seconds of nothing between the press and a picture, and this page has twice
+   shipped a control that looked dead during it: once for real, when the handler
+   was never wired, and once because the wake was silent. **A shimmer is how a
+   page says "heard you, working" without claiming the show started.**
+   ⚠️ A SWEEP OF LIGHT ACROSS THE FACE, NOT A PULSING OPACITY. Fading a label in
+   and out reads as a fault, the same way a blinking timecode did on this page.
+   A travelling highlight reads as progress.
+   ⚠️ `background-size` MOVES, NOT `background-position`, so it composites on
+   the GPU and costs nothing on a phone.
+   ⚠️ AND IT RESPECTS `prefers-reduced-motion`, where it becomes a still, dimmer
+   face: the state still reads, it just does not travel. */
+@keyframes tbar-shimmer { from { background-position: -140% 0; } to { background-position: 240% 0; } }
+.tbar-word[data-pending] {
+  background-image: linear-gradient(100deg,
+    transparent 20%,
+    color-mix(in oklab, var(--hi) 22%, transparent) 50%,
+    transparent 80%);
+  background-repeat: no-repeat;
+  background-size: 60% 100%;
+  animation: tbar-shimmer 1.15s linear infinite;
+  border-color: color-mix(in oklab, var(--hi) 45%, var(--line2));
+}
+@media (prefers-reduced-motion: reduce) {
+  .tbar-word[data-pending] { animation: none; background-image: none; color: var(--dim); }
+}
+.tbar-x.tbar-word:active, .tbar-loop.tbar-word:active,
+.tbar-slot.tbar-word:active, .tbar-toggle.tbar-word:active {
+  background: var(--card); border-color: var(--dim2);
+}
 
 /* RECORD IS RED, and armed rather than shouting: a filled red dot on a dark
    face. It is the one control on the bar that starts WRITING something, and the
@@ -2314,10 +2439,13 @@ button.pos-pg-pad:hover { filter: brightness(1.35); }
   .pos-pg-rows .pos-pg-pad { animation: none !important; transition: none !important; }
 }
 /* The column of labels, and the corner above it.
-   🔴 NO DIVIDER, asked for as *"rm divider vert line next to pads"*. */
+   🔴 NO DIVIDER, asked for as *"rm divider vert line next to pads"*, AND THE
+   TWO DECLARATIONS THAT SAY SO ARE NOT HERE. They sit beside `.panel-fixed-l`,
+   three thousand lines down, because that is the rule they have to beat and
+   this one came first. See the block there, which carries the measurement. */
 .pos-pg-labs {
   display: flex; flex-direction: column; gap: var(--pg-gap);
-  width: var(--pg-lab); border-right: 0; padding-right: 0;
+  width: var(--pg-lab);
 }
 /* ⚠️ THE CORNER IS RESERVED EVEN WHEN IT IS EMPTY, or the first label sits a
    ruler's height above the first row of pads and the two columns never line up
@@ -2672,8 +2800,13 @@ button.pos-pg-lab:hover { color: var(--fg); }
    and carries the reason. What made the row tall is on `.pos-fb-x` below. */
 .pos-fb-top { display: flex; align-items: center; gap: 10px; min-height: 0; }
 .pos-fb-top .pos-fb-h, .pos-fb-top .pos-fb-x { line-height: 1; }
-/* uppercase to match the FEEDBACK button that opens it: the panel and the
-   control share a name, so they should share its shape too. */
+/* ⚠️ IT WEARS WHATEVER THE BUTTON THAT OPENS IT WEARS, AND THAT IS WHY IT
+   CHANGED. This rule was `text-transform: uppercase` with the reason *"to match
+   the FEEDBACK button that opens it: the panel and the control share a name, so
+   they should share its shape too"*. `.pos-fb-btn` lost its caps on 2026-09-25
+   with every other button, so keeping them here would have broken the one
+   relationship the rule was written to hold. The reason survives; the value
+   followed it. */
 .pos-fb-h { font: 600 13px/1.2 var(--mono); margin: 0; text-transform: uppercase; letter-spacing: .06em; }
 /* 🔴 IT HAS TO GIVE UP THE 34 px HEIGHT EVERY BUTTON GETS, AND THAT IS WHERE
    THE TOP PADDING WENT. REPORTED as *"reduce top padding to match horiz
@@ -2872,18 +3005,29 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-tabs-bar {
   display: flex; gap: 28px; overflow-x: auto;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  margin-top: var(--pos-tabs-air); margin-bottom: var(--pos-tabs-air);
+  /* Room for a focused tab's ring, taken out of the margin rather than added
+     to it: see `--pos-tabs-ring`. */
+  padding-block: var(--pos-tabs-ring);
+  margin-top: calc(var(--pos-tabs-air) - var(--pos-tabs-ring));
+  margin-bottom: calc(var(--pos-tabs-air) - var(--pos-tabs-ring));
 }
 .pos-tabs-bar::-webkit-scrollbar { display: none; }
-/* ⚠️ `margin-right: -.1em` IS NOT A NUDGE, IT IS THE LETTER-SPACE COMING BACK.
-   `letter-spacing` puts its space AFTER every character including the last, so
-   a letter-spaced word carries an invisible trailing gap and the space between
-   two tabs is the flex gap PLUS that. It is uniform in CSS and uneven to look
-   at, because the eye measures from the last stem rather than from the box.
-   Cancelling exactly one letter-space puts every gap back on 20 px of ink-to-
-   ink, which is what "equal space between" means. Same trick any typesetter
-   uses on tracked caps; it must stay tied to the `letter-spacing` above, so if
-   one changes the other changes with it. */
+/* 🔴 THE TRACKING AND ITS CORRECTION BOTH LEFT ON 2026-09-25, TOGETHER, WHICH
+   IS WHAT THE NOTE THAT USED TO STAND HERE DEMANDED. It said `margin-right:
+   -.1em` was not a nudge but the LETTER-SPACE COMING BACK: `letter-spacing`
+   puts its space AFTER every character including the last, so a tracked word
+   carries an invisible trailing gap and the space between two tabs was the flex
+   gap PLUS that, uniform in CSS and uneven to look at. It ended *"it must stay
+   tied to the `letter-spacing` above, so if one changes the other changes with
+   it"*, and this is that change: a tab is lowercase now, `letter-spacing: .1em`
+   existed only to open out tracked caps, and with no letter-space to cancel the
+   negative margin was a 1.1 px lie about where the ink ends.
+   ⚠️ SO THE GAP IS NOW THE DECLARED NUMBER. `gap: 28px` above is 28 px of
+   ink-to-ink rather than 28 minus a letter-space, which is the first time the
+   row's spacing has been readable off one declaration.
+   ⚠️ AND A LOWERCASE TAB DOES NOT WANT THE TRACKING ANYWAY. Tracking is what
+   caps need and what lowercase mono already has; the two went as one decision
+   rather than as a removal plus a taste judgement. */
 .pos-tabs-t {
   flex: 0 0 auto; white-space: nowrap;
   background: none; border: 0; border-radius: 0; height: 22px; padding: 0 0 3px;
@@ -2953,6 +3097,40 @@ button.pos-pg-lab:hover { color: var(--fg); }
    under a heading that could not. As wide as its widest row, it has nothing to
    scroll on x and the wrapper above does that job for both of them. */
 .pos-tbl-body { max-height: var(--tbl-h, 420px); overflow-y: auto; min-width: min-content; }
+/* 🔴 A TABLE WHOSE HEIGHT IS CHOSEN, NOT LEFT TO ITS CONTENT. Asked on
+   `/dump/` 2026-09-25: *"show empthy tables / miditables immidately with fixed
+   heigh. no texdt in them until dumps arrive"*. `table.mjs` carries the whole
+   argument beside `minRows`, including why this reverses a four day old
+   decision on the same page and why it does not reverse `an empty box is a
+   line`.
+   🔴 `height` AND `max-height: none`, WHICH IS FLOOR AND CEILING AT ONE NUMBER
+   AND IS THE HALF THIS PROJECT HAS PAID FOR. `/wish/` records a box that was
+   *"7 lines for one connection and 16 for the next"* and moved the log and the
+   end of the page on every press. A `max-height` alone would let this box grow
+   from empty to full as messages arrive, which is that defect with the rows
+   arriving on their own instead of on a click.
+   ⚠️ THE ROW COUNT IS WRITTEN BY THE COMPONENT AND THE ROW HEIGHT IS THE ONE
+   `--tbl-row-h` DECLARED ABOVE, so this is the same measurement the rows
+   themselves are made of rather than a second copy of it. `.pos-midilog` next
+   to it reserves its room off the identical property. */
+.pos-tbl[data-rows] .pos-tbl-body {
+  height: calc(var(--tbl-rows, 6) * var(--tbl-row-h));
+  max-height: none;
+}
+/* 🔴 A ROW OF ROOM AND NOT A ROW, WHICH IS THE POINT AND IS `roll.mjs`'s OWN
+   LESSON WORD FOR WORD. It carries no `.pos-tbl-row` class, so nothing that
+   counts rows counts it, it is `aria-hidden` so a screen reader is not told
+   about records that do not exist, and it takes no focus. A placeholder
+   wearing the row class took nine asserts red on `/nola/` the moment it was
+   tried, each one reporting five rows on a page holding four chords.
+   ⚠️ IT TAKES ITS HEIGHT AND ITS RULE FROM THE SAME TWO VALUES A REAL ROW
+   DOES, so the reservation is the real height rather than close to it. A box
+   that reserves approximately is the `min-height` that never applied wearing
+   different clothes. */
+.pos-tbl-rest {
+  height: var(--tbl-row-h); border-bottom: 1px solid #ffffff08; pointer-events: none;
+}
+.pos-tbl-body > .pos-tbl-rest:last-child { border-bottom: 0; }
 /* 🔴 THE ROW IS AS SHORT AS ITS TEXT ALLOWS, BECAUSE THE BOX IS THE PAGE.
    REPORTED as *"page should fit more"* against a table of 334 records showing
    about twenty-three of them. `line-height` and the vertical padding are the
@@ -3398,6 +3576,16 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .kbd {
   /* the box's own padding, published so a glued child can bleed to its edges */
   --kbd-pad: 9px;
+  /* 🔴 HOW FAR INSIDE ITS OWN BOX A CONTROL'S LETTER SITS ON THE PAD ROW, WHICH
+     IS THE INLINE PADDING OF A BUTTON IN IT. Published because the footer under
+     that row lines its TEXT up with a control's LETTER rather than with a
+     control's BOX, so this number is read in two places and typed in one.
+     ⚠️ IT IS DECLARED HERE AND NOT ON `.kpad`, WHICH IS WHERE IT BELONGS BY
+     SUBJECT AND WOULD NOT HAVE WORKED. A custom property inherits DOWNWARD and
+     never sideways, and `.kbd-foot` is that row's SIBLING: this stylesheet
+     already records `--fdr-foot` on `.pos-fdr` being invisible to the column
+     beside it, falling back silently while the source read as correct. */
+  --kpad-pad: 9px;
   margin: 0 0 10px; padding: var(--kbd-pad);
   background: var(--card); border: 1px solid var(--line); border-radius: 4px;
   /* 🔴 THE BOX IS AS WIDE AS THE INSTRUMENT, WHICH IS THE OTHER HALF OF NOT
@@ -3408,6 +3596,23 @@ button.pos-pg-lab:hover { color: var(--fg); }
      already did. */
   width: fit-content; max-width: 100%;
 }
+/* 🔴 THE BOX SPANS ITS HOST WHEN A PAGE ASKS, AND ONLY THEN. Asked on
+   `/knobs/` 2026-09-25: *"make keyboard 25 full w."*, for a keyboard inside an
+   instrument panel where a box narrower than the panel reads as a column that
+   does not line up with anything above it.
+   ⚠️ IT REVERSES NOTHING ABOVE IT. `fit-content` is right as the DEFAULT for
+   the reason written there, an eight key keyboard in an 800 px panel is a box
+   of empty surface, and that argument is about a component with no instruction.
+   A page that says `full` has decided, and the decision is visible in one word
+   at the call site rather than in a width typed into a page stylesheet.
+   ⚠️ AND IT DOES NOT TOUCH THE KEY CEILING. `--k-max` still pins a white key at
+   62 px, so this makes the BOX wide and never the keys: fifteen white keys are
+   wider than any panel here, so a 25 key layout fills it by being large rather
+   than by being stretched. *"do not stretch it ever"* stands.
+   `.kbd.kbd-full` is (0,2,0) against the (0,1,0) above it, which is the
+   smallest thing that can win, and it sits after it so nothing rests on
+   weight alone. */
+.kbd.kbd-full { width: 100%; }
 /* ⚠️ NO PADDING ON THE PAD ROW, REPORTED TWICE IN ONE MINUTE WITH A DEVTOOLS
    SHOT OF `div.kpad  padding 0px 9px`: *"transpose has extra padding left not
    needed"* and *"notes off have extra padding on right, rm"*. The keys start at
@@ -3440,6 +3645,80 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 
 .kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 🔴 THE PAGE'S OWN ROW INSIDE THE KEYBOARD'S BOX, AND ITS RULE REACHES THE
+   BOX'S BORDER. Reported 2026-09-25 off a crop of `/nola/`: *"the border on top
+   of footer goes edge to edge. in the life of me i don ot understand why you do
+   not see it and build a soliutiojn that stays (glued panels) not invent custom
+   css with measurements each time"*.
+
+   🔴 **THE PAGE HAD BUILT ITS OWN AND THE JOIN WAS VISIBLE.** `.nola-foot`
+   carried `--foot-air: 10px`, a `margin-top`, a `padding-top` and a
+   `border-top`, appended INSIDE `.kbd`, which is `padding: var(--kbd-pad)`.
+   **MEASURED: the rule stopped 9.0 px short of the box's border at BOTH ends**,
+   and 10 was a second copy of a distance this file already publishes.
+   ⚠️ AND THE OBJECTION IS TO WHERE IT WAS BUILT, NOT TO THE NUMBER. `/tom/`
+   fixed the nameplate's padding in its own stylesheet and *"every page after it
+   inherited the defect and not the fix"*, re-reported on `/plai/`. Ten pages
+   import `keyboard.mjs`.
+
+   ✅ **THE BLEED IS DERIVED, NEVER TYPED.** `--kbd-pad` is declared on `.kbd`
+   with a comment that already says it is published *"so a glued child can bleed
+   to its edges"*, so this is that sentence finally having a caller. A `-9px`
+   written here would be the `--sld-col` defect, a shared measurement in two
+   files that will disagree.
+   ⚠️ IT IS THE SAME IDEA AS `.panel-seam` ONE BOX OVER: a rule owned by the
+   component that escapes exactly one inset to reach the box's own edge, rather
+   than a page reasoning about a parent's padding.
+
+   ✅ **AND THE CONTENT COMES BACK IN BY THE SAME TOKEN, WHICH IS THE SECOND
+   ASK**: *"add space on left of nona to be same as top and bottob paddings"*.
+   The plate sat at 0 px from the row's left edge while the row had air above
+   and below it. Padding the row by `--kbd-pad` after bleeding it by `--kbd-pad`
+   puts the left, the top and the bottom on one number, and lines the content up
+   with the keys above it rather than with an edge nothing else uses.
+   ⚠️ AND THE BOTTOM INSET IS THE BOX'S OWN, WHICH IS WHY THERE IS A ZERO IN
+   THAT SHORTHAND. The footer is the last thing in `.kbd`, so `.kbd`'s
+   `padding-bottom` is already sitting under it: padding the row as well would
+   make the air below the content twice the air above it and beside it, for a
+   reason nobody would find.
+
+   🔴 **AND THE LEFT IS BIGGER THAN THE OTHER THREE SINCE 2026-09-25, WHICH
+   REVERSES THE SENTENCE THAT STOOD HERE AN HOUR AGO.** It said all four sides
+   read `--kbd-pad`, and that was correct as BOX geometry and wrong on the
+   screen. Reported with a crop: *"just add some padding to left of nola. i do
+   not understand how to do nameplate properly"*.
+   🔴 **MEASURED, from `.kbd`'s own inner edge, the pad row above against the
+   footer below:**
+
+     .kpad's first button, its BOX       +9.00
+     the same button's LETTER            +19.00     (1 px border, 9 px padding)
+     the footer's plate, its BOX          +9.00
+     the plate's LETTER                   +9.00
+
+   **The two boxes agreed to the pixel and the two letters were 10.00 px
+   apart**, so the name read under-indented under a row it was supposedly lined
+   up with. A reader sees ink, not boxes.
+   ⚠️ **SO THE INDENT IS DERIVED FROM THE CONTROL, NOT TYPED.** `--kpad-pad` is
+   that button's own inline padding, declared once on `.kbd` and read by the
+   button and by this rule, and the `1px` is the border every control in this
+   file draws. Typing `19px` here would be the second copy of a measurement that
+   this round was asked to stop inventing.
+   ⚠️ **ONLY THE LEFT, WHICH IS WHAT WAS ASKED.** The right stays `--kbd-pad`,
+   so the control at that end does not move.
+   ⚠️ **AND IT INDENTS WHATEVER IS AT THE LEFT END, WHICH IS RIGHT FOR A LABEL
+   AND WOULD BE WRONG FOR A CONTROL.** A button put there would carry its own
+   border and padding on top of this and its letter would land 10 px further in
+   than the row above. Today the footer has one caller and a nameplate at that
+   end; the day one starts with a control, this becomes a rule about the TEXT in
+   the row rather than about the row. Recorded rather than guessed at. */
+.kbd-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: var(--kbd-pad);
+  margin-inline: calc(-1 * var(--kbd-pad));
+  padding: var(--kbd-pad) var(--kbd-pad) 0
+           calc(var(--kbd-pad) + var(--kpad-pad) + 1px);
+  border-top: 1px solid var(--line);
+}
 /* `notes off` is not a third octave button — it undoes something rather than
    moving somewhere, so it sits apart from the pair instead of beside it. */
 /* 🔴 HOW FAR FROM HOME, BESIDE THE PAIR THAT MOVES IT. `keyboard.mjs` argues
@@ -3640,6 +3919,44 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .roll { --roll-top: calc(var(--roll-row-h, 26px) / 2); }
 .roll > :first-child { height: calc(var(--roll-row-h, 26px) + var(--roll-top)); }
 .roll > :first-child .roll-cell { height: 100%; padding-top: var(--roll-top); }
+/* 🔴 AND THE LANE HAS TO GROW WITH THE ROW OR `height: 100%` ABOVE RESOLVES
+   AGAINST 26 px AND THE RULES STOP SHORT. This is the FIFTH request about
+   these vertical lines and the first one whose verb was never in doubt:
+   *"rm gap in piano roll vert lines"*, 2026-09-25, with a screenshot of
+   `/nola/`. The four before it are in `roll.mjs`, including the one that was
+   read as `remove them` and meant `they are still not continuous`. **The lines
+   stay. The gap goes.** `lines: false` is still the rollback.
+   🔴 MEASURED BEFORE CHANGING ANYTHING, at 1280 px on `/nola/`, cell bottom to
+   the next cell's top down the roll: **6.5, 0, 0, 0, 0, 0, 0**. One gap, after
+   the FIRST row only, and every other join already exact. The rules were
+   continuous for the whole picture except its top row, which is why four
+   reports in a row could each look like the last one coming back.
+   🔴 THE CAUSE IS TWO RULES ABOVE THAT AGREE ON PAPER AND NOT ON SCREEN. The
+   first row is `26 + 13 = 39 px` so the first dot sits a whole row below the
+   box's top, and the comment beside it says the room *"goes inside the first
+   cell"* so that *"the line spans the taller box"*. It never did:
+   `.roll-lane` carries `height: var(--roll-row-h)`, a flat 26 px, so the cell's
+   `height: 100%` resolved against 26 and not against 39. MEASURED: row 303 to
+   342, lane and cell both **309.5 to 335.5**, which is the lane CENTRED in the
+   taller row with 6.5 px of unruled button above it and 6.5 px below.
+   ⚠️ CENTRED, WHICH IS WHY IT IS 6.5 AND NOT 13. A row is a `<button>`, and a
+   button centres its content box whatever `display` says. So the intended
+   13 px of head came out as 6.5 above the rules and 6.5 below them, and the
+   half below is the gap in the screenshot.
+   ✅ ONE LINE: the lane takes the row it is in. Then the cell's `height: 100%`
+   is 39 px, the `padding-top` above centres the dot in what is left, and the
+   rule spans the whole first row. MEASURED after: **0, 0, 0, 0, 0, 0, 0**. */
+.roll > :first-child .roll-lane { height: 100%; }
+/* 🔴 AND THE NAME GOES WITH THE DOTS, WHICH THE MEASUREMENT FOUND AND NOBODY
+   HAD REPORTED. `.roll-label` is `top: 0` with a flat `--roll-row-h`, so in a
+   39 px first row it centred in the top 26 px while the dots centred in the
+   whole thing. MEASURED at 1280 px on `/nola/`, label centre against dot
+   centre: row 0 **-6.5 px**, rows 1, 2 and 3 **0**. A chord name sitting above
+   the chord it names, on the one row a reader looks at first.
+   ⚠️ IT TAKES THE SAME TWO DECLARATIONS AS THE CELL rather than a number of
+   its own, so the two cannot drift: whatever head the first row holds back, the
+   name is held back by the same amount. */
+.roll > :first-child .roll-label { height: 100%; padding-top: var(--roll-top); }
 /* 🔴 A RULE WHERE EACH WHITE KEY BEGINS, RUNNING THE WHOLE HEIGHT OF THE ROLL.
    Asked for, then reported as not continuous, then removed on a misreading of
    that report, then asked for again in four words. They are drawn on the CELL
@@ -3740,7 +4057,13 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .kpad-tight { margin-left: -4px; }
 
 /* the two note namings, `C` or `1`, in the pad's own segmented geometry */
-.kpad-names button { width: auto; padding: 0 8px; font-size: 10.5px;
+/* ⚠️ NO PADDING HERE, AND THERE WAS ONE UNTIL 2026-09-25 THAT HAD NEVER
+   APPLIED. It read `padding: 0 8px`, and `.kpad button` sixty lines below is the
+   same weight, (0,1,1) against (0,1,1), so the later rule won every time and the
+   computed value has always been 9 px. MEASURED before removing it: 9px, and the
+   buttons 26.63 px each either way. A dead declaration beside a token saying the
+   same thing is the drift this round was asked to stop. */
+.kpad-names button { width: auto; font-size: 10.5px;
                      font-family: 'positron-accidentals', var(--mono); }
 .kpad-names button[data-on] { color: var(--fg); background: var(--line); }
 
@@ -3750,6 +4073,90 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 /* at home it is a fact rather than a reading, so it says so quietly */
 .kpad-at[data-home] { color: var(--dim2); }
+/* 🔴 THE CHORD BEING HELD, TO THE RIGHT OF THE DISPLACEMENT, IN A BOX THAT
+   NEVER CHANGES SIZE. Asked 2026-09-25: *"add chord name to the footer, right
+   from the transpose message. avoind text moving in x axis"*.
+   🔴 THE RESERVE IS SET FROM JAVASCRIPT AND THERE IS NO WIDTH HERE ON PURPOSE.
+   The widest name this cell can ever say is a root letter, `name.mjs`'s longest
+   quality and a slash bass, and all three of those live in that module's
+   tables. A number typed in this file would be a second copy of them and would
+   go quietly narrow the first time a quality is added, which is the
+   `--sld-col` defect this stylesheet already records: a shared measurement in
+   two files is a measurement that will disagree. `keyboard.mjs` computes it
+   and writes `min-width` in `ch`.
+   ⚠️ `ch` ON THE MONO FACE IS EXACTLY CHARACTERS, and `tabular-nums` is here
+   for the digits a name can carry (`min7b5`, `maj7`, `sus4`) so the box is the
+   same width whichever of them is in it.
+   ⚠️ NO SEPARATOR BEFORE IT. The row's own `gap` is what stands between this
+   and the displacement beside it: two facts, two cells, and the standing rule
+   about a row of facts not being one string with glue in it. */
+/* 🔴 AND IT SITS ONE CHARACTER FURTHER LEFT SINCE 2026-09-25, ASKED AS *"move
+   chordname ca 1ch left in keyboar"*.
+   ⚠️ `ch` BECAUSE THE RESERVE BESIDE IT IS IN `ch`. The cell's width is a
+   character count computed from `name.mjs`'s tables, so a nudge typed in pixels
+   would be the one number in this control that stops meaning characters the
+   day the face or the size changes.
+   🔴 **A NEGATIVE MARGIN, WHICH MOVES THIS CELL AND NOTHING ELSE IN THE ROW.**
+   The row is the displacement, this, and then a right hand group whose first
+   member carries `margin-left: auto`. That auto margin absorbs whatever is
+   freed, so the controls on the right do not follow this left and the
+   displacement on the left does not move at all.
+   ⚠️ **AND IT DOES NOT TOUCH THE RESERVE, WHICH IS THE ONE THING NOT TO
+   BREAK.** `min-width` is still the widest name this cell can ever hold, so the
+   box is the same width whatever is in it and nothing beside it moves when a
+   name goes from `C` to `G#min7b5/D#`. A `padding-right` or a narrower reserve
+   would have moved the ink by the same amount and reintroduced exactly the
+   movement the cell exists to prevent. */
+.kpad-chord {
+  font: 500 11px/1 'positron-accidentals', var(--mono); color: var(--dim2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  margin-left: -1ch;
+}
+/* 🔴 TWO INKS FOR TWO KINDS OF STATEMENT, AND THEY ARE `/nola/`'s TWO. That
+   page draws this same reading in its own corner today and is handing it over
+   here, so the pair is copied rather than invented: a name the recogniser is
+   sure of is `--dim`, and a reading below the margin, which is two chords it
+   cannot choose between, stays at `--dim2`. `name.mjs` measured what separates
+   them: at a margin of 1.0 it is never wrong about the readings it speaks
+   confidently about. Drawing both in one colour would make the interesting one
+   look like the ordinary one. */
+.kpad-chord[data-sure] { color: var(--dim); }
+/* 🔴 THE TEMPO AND THE ALIGNMENT, ON A KEYBOARD THAT LOOPS AND ON NO OTHER.
+   Asked 2026-09-25: *"in keyboadd looper: do basic bmp detection / quant and
+   when first loop set, all next ones align on it, either times shorter, same or
+   longer"*. `keyboard.mjs` builds these two spans only when `loop: true`, so
+   MEASURED 2026-09-26 they exist on exactly two pages of the seven that mount
+   the component.
+   🔴 NO WIDTH HERE, FOR THE REASON `.kpad-chord` ALREADY GIVES. Each reserve is
+   the widest thing its cell can ever say, and both of those are decided by
+   tables in `numloop.mjs`: `TEMPO_BAND` bounds a detected tempo to three digits
+   and `RATIOS` holds every label the ratio cell can print. A number typed in
+   this file would be a second copy of them and would go quietly narrow the first
+   time somebody adds `1/8`, which is the `--sld-col` defect this stylesheet
+   already records twice. `keyboard.mjs` computes both and writes `min-width` in
+   `ch`.
+   🔴 AND THE RESERVE IS THE POINT RATHER THAN A DETAIL. A tempo appears the
+   moment a take closes and a ratio changes on every take after it, under the
+   hands of somebody watching the row, and nothing that redraws while somebody is
+   looking at it may change how much room it takes.
+   ⚠️ TWO INKS ON THE TEMPO, AND THE WORD IS THE CHANNEL RATHER THAN THE COLOUR.
+   The cell says `heard` for a tempo inferred off three gaps in a performance and
+   `set` for one a page stated, so a reader who cannot see the difference between
+   two greys has already been told. `--dim2` is the default because a DETECTED
+   tempo is an inference and this project has paid repeatedly for drawing one as
+   a fact; `[data-said]` brightens it to the ink `.kpad-at` uses for a reading it
+   is sure of. Same pair, same argument, as `.kpad-chord[data-sure]`.
+   ⚠️ AND THE RATIO CELL HAS ONE INK, WHICH IS ALSO A DECISION. `first`, `x2` and
+   `as played` are equally factual statements about what the lap IS, so a second
+   colour here would be a channel with nothing to carry.
+   ⚠️ `tabular-nums` ON BOTH, so `x1/2` and `x1/4` and a tempo walking from 98 to
+   101 are the same width as each other inside their own reserve. */
+.kpad-tempo, .kpad-ratio {
+  font: 500 11px/1 var(--mono); color: var(--dim2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.kpad-tempo[data-said] { color: var(--dim); }
+.kpad-ratio { color: var(--dim); }
 /* the same gutter label as a slider's, for the same reason: one word saying
    what the control next to it moves, in a face that cannot be mistaken for the
    control itself */
@@ -3758,7 +4165,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
   color: var(--dim2); white-space: nowrap;
 }
 .kpad button {
-  height: var(--kpad-h); padding: 0 9px;
+  height: var(--kpad-h); padding: 0 var(--kpad-pad);
   font: 500 11px/1 var(--mono); color: var(--dim);
   background: var(--card); border-color: var(--line);
 }
@@ -4140,7 +4547,35 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    the square. Re-measure if the row's type or padding changes — a size computed
    from four other values looks more rigorous and is one edit from being quietly
    wrong. */
-.pos-controls button[data-glyph="1"] {
+/* 🔴 AND `EVERY PAGE` NOW MEANS EVERY BUTTON, NOT EVERY BUTTON IN ONE ROW.
+   This read `.pos-controls button[data-glyph="1"]` until 2026-09-25, so a glyph
+   button anywhere outside that row kept the pill's 18 px of side padding and
+   was not a square at all. MEASURED on `/wish/`'s per-row remove button:
+   **45.83 px wide against 34.00 tall, padding 18px both sides**, with the
+   attribute correctly set. The rule's name said every page and its scope said
+   one row, and the name was the honest half.
+   🔴 IT MATTERS MORE TODAY THAN IT DID YESTERDAY, BECAUSE THIS STREAM IS
+   MOVING CONTROLS OUT OF `.pos-controls` ON PURPOSE. `/wish/` puts a remove
+   button on every row, `/shape/` keeps everything that can reach a real
+   instrument out of that row entirely (`demo/verify.mjs` presses it on every
+   run), and `/stage/` puts its transports in the bar. Every one of those is a
+   glyph button the old scope could not reach.
+   🔴 AND IT WENT UNNOTICED BECAUSE THE WRONG SIZE STILL FITTED. `/wish/`'s
+   action column is 72 px and 45.83 goes into it, so nothing collided and
+   nothing looked broken. **A check on this reads the rendered box and never
+   the presence of the attribute**, which is what `/kit/` now does.
+   ⚠️ THE SCOPE COMES OFF AND THE SPECIFICITY DROPS WITH IT, from (0,2,1) to
+   (0,1,1), which is the one thing that could have cost something: a component
+   rule at (0,2,0) that used to lose would now win. MEASURED after, both cases
+   in one run: a glyph button inside `.pos-controls` is **34.00 by 34.00** and
+   one outside it is **34.00 by 34.00**. Nothing took the row's buttons away.
+   ⚠️ AND A PAGE STILL HAS TO SET THE ATTRIBUTE ITSELF OUTSIDE THAT ROW.
+   `shell.mjs` stamps it from a control's label, and it only ever sees the
+   controls it builds; a page drawing its own button passes
+   `{ 'data-glyph': '1' }`. That is a real seam and it is the smaller half:
+   a page that forgets it gets a pill, where before a page that remembered it
+   got one anyway. */
+button[data-glyph="1"] {
   width: 34px; height: 34px; padding: 0;
   display: grid; place-items: center;
   font-size: 15px; line-height: 1;
@@ -4403,12 +4838,25 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-pres-w {
   display: inline-block; text-align: left;
   min-width: calc(var(--pres-ch, 0) * 1ch);
-  /* UPPERCASE, LIKE EVERY OTHER LABEL ON THIS SITE. Instructed 2026-09-16,
-     *"always uppercase"*. It costs no width here: this is a monospace face,
-     so a capital has the same advance as a lowercase letter and the `ch`
-     reserve above is unchanged. No letter-spacing, for the same reason the
-     reserve exists. */
   text-transform: uppercase;
+  /* 🔴 UPPERCASE, AND IT WENT LOWERCASE FOR ABOUT AN HOUR ON 2026-09-25 BEFORE
+     THE OWNER PUT IT BACK: *"onlne status should be uppercase"*. The original
+     instruction was 2026-09-16, `always uppercase`, and it stood.
+     ⚠️ WHAT WENT WRONG IS WORTH MORE THAN THE RULE. The no-uppercase ask was
+     *"for the buttons please use our regular button styling with no
+     uppercase"*, and when I put the scope to the owner I offered "every button
+     on the site" with a preview listing tabs, buttons, badges AND readout keys.
+     They picked it, so a badge was swept in on the strength of my own preview.
+     **THE ASK SAID BUTTONS. A PRESENCE BADGE IS NOT A BUTTON**, it is a status,
+     and nobody presses it. The preview was wrong and the choice inherited the
+     error, which is how an agreed decision can still be the wrong one.
+     ⚠️ THE `ch` RESERVE IS UNAFFECTED EITHER WAY, monospace, same advance.
+     ⚠️ THE `ch` RESERVE ABOVE IS UNCHANGED EITHER WAY. This is a monospace
+     face, so a capital and a lowercase letter have the same advance, which is
+     the same reason the old note gave for the caps being free. There is still
+     no letter-spacing here, and that one is structural: `ch` is the advance of
+     `0`, and tracking would add one space per character to a box reserved in
+     `ch`. */
   /* The fade the word changes through. 90 ms each way, opacity only: a state
      change is an event and may move, and this box has no room to slide in. */
   transition: opacity 90ms linear;
@@ -4615,6 +5063,85 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-vp-l { justify-content: flex-start; }
 .pos-vp-c { justify-content: center; }
 .pos-vp-r { justify-content: flex-end; }
+
+/* 🔴 THE CAPTION SLOT: ON THE PICTURE, LOW DOWN, WHERE SUBTITLES LIVE. Asked
+   for 2026-09-25 against `/stage/`, whose audience question was sitting in the
+   panel FOOTER: *"Overlay the questions who are appearing on top of video, sort
+   of a place where usually videos have subtitles and uh, make them more
+   contrasty. So remove them from video panel footer and move them actually on
+   top of a video in the lower part."* `createVideoPanel` exposes it as
+   `api.slots.caption`; the three footer slots are untouched and so is the
+   centre one that `/stage/` and `/kit/` already fill.
+   🔴 A SCRIM AND A PLATE, NOT A BRIGHTER INK, AND THE NUMBERS ARE THE WHOLE
+   ARGUMENT. Text over arbitrary video is unreadable at some frames whatever
+   colour it is: COMPUTED against `--fg` #e6e6e6, a caption with nothing behind
+   it contrasts **1.25:1** over a white frame and **3.16:1** over a mid grey
+   one, both below anything readable, while over this scrim it is **12.13:1**
+   at worst and over the scrim AND the plate **15.77:1** at worst. A frame is
+   not a colour you can design against, so the backing has to be opaque enough
+   that the frame stops mattering.
+   ⚠️ THE SCRIM IS A GRADIENT AND THE PLATE IS FLAT, WHICH IS TWO JOBS. The
+   gradient stops the caption reading as a black bar stuck across the picture;
+   the plate is what carries the worst case, because a gradient is thin where
+   the text's ascenders are.
+   ⚠️ ABSOLUTE, SO NOTHING MOVES. CLAUDE.md: nothing that changes while somebody
+   is looking at it may change how much room it takes. A question arriving,
+   changing or leaving must not push the picture, the footer or the page, and
+   the footer version of this could not make that promise: it sat in a grid
+   track and a longer question widened the row.
+   ⚠️ AND IT IS CLEAR OF THE WAY OUT IN FULL SCREEN. `.pos-fsx` is 34 px at
+   12 px from the bottom right INSIDE this same stage, so a full-width caption
+   at the bottom edge would sit under it. 58 px is that button's bottom inset
+   plus its height plus the same air again.
+   ⚠️ WHERE IT ACTUALLY LANDS, MEASURED ON `/making/` AT 1280 px: a 686x385.9
+   picture, the slot covering the bottom **22.4 per cent** of it and the text
+   **18.0 px off the bottom edge, which is 4.7 per cent** up. In full screen the
+   58 px bottom inset puts it at about 7 per cent of an 800 px stage. Both are
+   under the ~10 per cent a broadcast subtitle sits at, deliberately: a 386 px
+   inline picture is small, and a caption a tenth of the way up one lands over
+   the middle of whoever is in it. The number rises with the picture, which is
+   the behaviour a fixed percentage would not give.
+   ⚠️ AND IT MOVES NOTHING. MEASURED on the same page, filling the slot and
+   emptying it again: stage 385.9 -> 385.9, panel 442.9 -> 442.9, footer top
+   614.4 -> 614.4, and the caption's bottom edge is 614.4 as well, which is the
+   footer's top. It is on the picture and not in the row under it. */
+.pos-vp-cap {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 36px 12px 18px;
+  background: linear-gradient(to top,
+    rgba(0, 0, 0, .85), rgba(0, 0, 0, .55) 40%, rgba(0, 0, 0, 0));
+  /* The scrim is not a target. Whatever a page puts in here usually is: on
+     `/stage/` it is the buttons an audience answers with. */
+  pointer-events: none;
+}
+/* 🔴 THE PLATE IS ON THE CHILD, AND IT WILL BEAT A PAGE'S OWN BACKGROUND ON
+   SOURCE ORDER. `.pos-vp-cap > *` is (0,1,0) and sits here, far down this file,
+   so a page whose caption content carries a plain one-class background loses it.
+   Nothing in the kit is affected. MEASURED: `.pos-choice`, the one component
+   `/stage/` puts here, declares no background at all. A caller that does need
+   its own has to match at (0,2,0), which is this file's standing answer and is
+   already written down at `.pos-faux`. Said out loud because a component that
+   paints over its children's grounds and does not say so is how `.pos-pres`
+   spent months with every state colour dead. */
+.pos-vp-cap > * {
+  pointer-events: auto;
+  background: rgba(0, 0, 0, .7);
+  border-radius: 3px;
+  padding: 5px 10px;
+  color: var(--fg);
+  max-width: 100%;
+}
+/* 🔴 AN EMPTY BOX IS A LINE, AND THIS ONE WOULD BE A BAND OF SCRIM ACROSS THE
+   BOTTOM OF EVERY PICTURE. Same rule as `.pos-readout`, `.pos-controls`,
+   `.pos-log` and `.pos-vp-under`, and `display: flex` above beats the UA's
+   `[hidden]`, so both halves have to be said here or a page setting
+   `caption.hidden = true` gets a property that reads as set and a scrim that is
+   still on screen. */
+.pos-vp-cap:empty, .pos-vp-cap[hidden] { display: none; }
+.pos-vp[data-full] .pos-vp-cap {
+  padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+}
 
 /* ⚠️ THE CLOSE BUTTON IS `.pos-fsx` NOW AND ITS RULES ARE WITH THE REST OF
    FULL SCREEN, a thousand lines up. It used to be `.pos-vp-close`, a ✕ in the
@@ -5131,12 +5658,20 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    ⚠️ CHECKED BEFORE SWEEPING, because a rule on `:disabled` reaches every page
    and one of them might have had a control that really was refusing a press.
    MEASURED 2026-09-21, all four pages that disable a pad, knob or fader:
-   `/evo/` is a replica whose whole panel is switched off (20 pads of 20, 8
+   `/evo/` was a replica whose whole panel was switched off (20 pads of 20, 8
    knobs of 8, 2 faders of 2), `/circuit/`'s master volume is *"a pot. Whether
    it sends anything has not been measured"*, `/twelve/`'s SUB and MAIN are the
    analogue outputs with *"nothing on MIDI"*, and `/kit/`'s are specimens of
    this state. **Not one is a refusal**, so this is a change rather than an
-   option. If a control ever genuinely does refuse a press, it needs its own
+   option.
+   🔴 AND `/evo/` STOPPED BEING ONE OF THE FOUR ON 2026-09-25, ON *"make all
+   buttons interactive"*. Its pads are live and none of them is disabled, and
+   the count in that sentence was wrong twice over by then: the six function
+   buttons went on 2026-09-23, so it was 14 pads and not 20. **The survey is
+   kept in the past tense because it is the evidence that bought the change,
+   not a description of what is on screen** — this stylesheet already keeps
+   `/stage/`'s 4:3 film the same way, for the same reason. Three pages still
+   give this rule subjects, so the rule is untouched. If a control ever genuinely does refuse a press, it needs its own
    class and its own cursor rather than this one back.
    ⚠️ `default`, NOT `auto`. Over a `<button>` the initial value already
    resolves to the arrow, but `auto` on text-bearing furniture resolves to the
@@ -5635,6 +6170,34 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    (0,2,0), and that one at least had a rule to beat. */
 .panel-fixed-l { border-right: 1px solid var(--line); padding-right: var(--panel-gap); }
 .panel-fixed-r { border-left: 1px solid var(--line); padding-left: var(--panel-gap); }
+/* 🔴 A STEP GRID'S LABEL COLUMN CARRIES NO DIVIDER, AND THE TWO DECLARATIONS
+   THAT SAY SO LIVED THREE THOUSAND LINES ABOVE THIS RULE AND HAD NEVER ONCE
+   APPLIED. `.pos-pg-labs` declared `border-right: 0; padding-right: 0` next to
+   the rest of the step grid; both selectors are (0,1,0), this one is later, so
+   it won every time. A dead rule reads as correct, and this repository has now
+   measured six of them.
+   🔴 THE COST WAS VISIBLE AND SHIPPED FOR THREE DAYS. MEASURED at 1280 px on
+   `/tom/`: the label column's CONTENT box computed to **0.00 px** against
+   `width: 22px`, because `box-sizing: border-box` is global here and 16 px of
+   `--panel-gap` plus a 1 px border ate the whole of it. So **64 of 64 labels
+   were clipped**: the ink of `63` is 12.04 px and the ink of a lone `0` is
+   6.02, which is exactly why 0 to 9 looked perfect and every two digit number
+   lost its second digit. Reported as *"you lost 2-digin numbers from tom
+   demo"*. It also put back the divider that *"rm divider vert line next to
+   pads"* had removed, so one dead rule produced two separate complaints.
+   🔴 AND IT CAME IN UNDER AN UNCHANGED ASSERT COUNT. It arrived with
+   `2a8a450`, whose message reads *"/tom/ converted and back at exactly
+   44/44"*. The count was the evidence that nothing had moved, and the count
+   cannot see a clipped glyph.
+   ✅ ORDER, NOT WEIGHT, WHICH IS WHY THIS SITS HERE RATHER THAN BEING WRITTEN
+   `.panel-fixed.pos-pg-labs`. The block above says in as many words why
+   `.panel-fixed-l` is deliberately (0,1,0): *"a component scoped one level
+   deeper than its caller is a component the caller cannot correct"*. Raising
+   this to (0,2,0) would start the escalation that rule exists to avoid, and a
+   tie decided by source order is the smallest thing that can win.
+   ⚠️ BOTH SIDES, because a step grid on a panel's RIGHT column is one argument
+   away and would arrive with the same defect and a different edge. */
+.pos-pg-labs { border-inline: 0; padding-inline: 0; }
 
 /* 🔴 THE INSET IS ON THE SCROLLER AND NOT ON `.panel-flow` INSIDE IT, so a
    horizontal scrollbar sits inside the card's inset with the content rather
@@ -5818,6 +6381,19 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--dim2);
   text-transform: uppercase;
 }
+/* 🔴 THE ONE PLATE THAT KEEPS WHAT WAS TYPED, AND IT IS A DEPARTURE RATHER
+   THAN AN EXCEPTION THAT WAS MISSED. Asked 2026-09-25 on `/shape/`:
+   *"nameplate is \"shape\" vertical glued section"*, lower case, where every
+   plate in this project is upper case.
+   ⚠️ THE UPPERCASE RULE ABOVE IS ABOUT REPLICAS AND IS UNCHANGED. It was asked
+   for as *"replica names always in uppercase"*, and its whole argument is that
+   `/tom/`, `/twelve/`, `/circuit/` and `/evo/` name machines somebody else made
+   and should read as one shelf. `/shape/` is a replica of nothing: the name is
+   the page's own, and shouting it would be this stylesheet answering a
+   question it was not asked.
+   ⚠️ `(0,2,0)` AGAINST THE `(0,1,0)` ABOVE, WHICH IS THE SMALLEST THING THAT
+   CAN WIN, and it sits after it so nothing rests on weight alone. */
+.panel-plate-asis .panel-plate-l { text-transform: none; }
 /* The maker at one end and the model at the other, across whatever the plate
    spans: a card on `/circuit/`, the whole instrument on `/twelve/`. */
 .panel-plate[data-place="ends"] { display: flex; justify-content: space-between; }
@@ -5856,6 +6432,214 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   display: flex; justify-content: flex-end; text-align: right; margin-left: auto;
   column-gap: var(--panel-gap);
 }
+
+/* 🔴 THE FOURTH PLACEMENT: THE NAME TURNED ON ITS SIDE AND GLUED DOWN THE EDGE
+   OF THE CASE, 2026-09-25, ASKED FOR ON `/shape/` AS *"wrap into isntrument
+   box. nameplate is \"shape\" vertical glued section"*. The three above are all
+   horizontal, so this is a placement rather than an option on one of them, and
+   `panel-layout.mjs` carries the argument for why it is a fourth mode in the
+   COMPONENT rather than a rotation in one page's stylesheet.
+
+   🔴 AND IT DOES NOT UNDO *"rm nameplates"*, WHICH IS WRITTEN OUT IN FULL IN
+   `instrument.mjs` AND IS REPEATED HERE BECAUSE THIS IS WHERE SOMEBODY WILL
+   LOOK. `plate: false` exists because a plate in the HEADER sits beside a
+   status control that already prints the instrument's name, so it is the name
+   twice on one row. This plate is not on that row and not in that header: it is
+   the silkscreen down the side of the case, the length of the whole instrument,
+   nowhere near the status. **Both decisions stand and neither is a reversal of
+   the other.**
+
+   🔴 `writing-mode: vertical-rl` PLUS `rotate: 180deg`, WHICH IS HOW THE TEXT
+   READS BOTTOM TO TOP. That is the direction a name is printed down the side of
+   a rack unit and down the spine of a book in most of the world, so a reader
+   tilts their head the way they already expect to. `sideways-lr` says it in one
+   declaration and is not in Chromium, so the pair is what works everywhere.
+   ⚠️ AND IT IS NOT A `transform: rotate`. A transform leaves the element's BOX
+   lying flat, so the column beside it would be sized by a word on its side and
+   the case would reserve the name's length as WIDTH. `writing-mode` turns the
+   box itself, so the grid track is genuinely as narrow as the type and as tall
+   as the name. */
+.panel-plate[data-place="side"] {
+  writing-mode: vertical-rl; rotate: 180deg;
+  display: flex; align-items: center; justify-content: flex-end;
+  /* the same gap two horizontal lines get, now running the other way */
+  gap: var(--panel-gap);
+}
+/* 🔴 THE CASE BECOMES TWO COLUMNS, AND IT IS A GRID BECAUSE THE PLATE HAS TO
+   SPAN WHATEVER IS BESIDE IT. The panel is a flex COLUMN by default and its
+   case holds exactly two children, the plate and the wrap or strip, so this
+   needs no wrapper and no reparenting: a page that does not ask for a side
+   plate has the DOM and the rules it had yesterday.
+   🔴 THE ROWS ARE EXPLICIT SINCE 2026-09-25, AND THE LINE THAT STOOD HERE
+   PREDICTED EXACTLY WHY. It read *"`grid-row: 1` ON BOTH, NOT `1 / -1`. With no
+   explicit rows the end line `-1` IS line 1, so `1 / -1` computes to a zero
+   span and the browser falls back to one row, **which looks identical until a
+   case grows a third child**"*. A case grows third and fourth children the
+   moment it carries bands and the seams between them, and both halves of that
+   sentence then bite: the plate spans ONE row and stops under the first band,
+   and a seam spanning both columns cannot be auto placed into a row the plate
+   occupies, so it is pushed past it.
+   🔴 MEASURED, a case with a strip, two bands and a seam, before the count
+   existed: the row template came out `1721.5px 70.5px 0px 0px 1px 70.5px`,
+   **six tracks for four bands**, two of them empty ones the plate had blocked.
+   With `--panel-rows` it is `repeat(4, auto)`, the plate runs to the case's
+   bottom on `/shape/` and on `/knobs/`, and the seam measures **x297.0..983.0
+   on both**, which is each case's inner edge to inner edge.
+   ⚠️ THE COUNT IS WRITTEN BY `panel-layout.mjs` AND IS NOT A MEASUREMENT. It is
+   how many children the case has, which a stylesheet cannot ask and a component
+   already knows, and it arrives as a custom property so every rule about
+   placement stays here.
+   ⚠️ AND `var(--panel-row, 1)` KEEPS THE OLD BEHAVIOUR AS ITS FALLBACK, so a
+   case nobody has given bands to lays out exactly as it did, one row, both
+   children in it, the plate stretched beside the instrument.
+   ⚠️ AND `minmax(0, 1fr)` ON THE CONTENT TRACK, NEVER A BARE `1fr`. A grid
+   item's automatic minimum is its CONTENT, so a strip holding a keyboard wider
+   than the panel would push the track past the case instead of scrolling
+   inside it. That is the same rule this stylesheet already writes down three
+   times for a scrolling flex row. */
+.panel[data-plate-side] { display: grid; align-items: stretch; }
+.panel[data-plate-side] { grid-template-rows: repeat(var(--panel-rows, 1), auto); }
+.panel[data-plate-side="left"] { grid-template-columns: auto minmax(0, 1fr); }
+.panel[data-plate-side="right"] { grid-template-columns: minmax(0, 1fr) auto; }
+.panel[data-plate-side] > * { grid-row: var(--panel-row, 1); }
+.panel[data-plate-side] > .panel-plate { grid-row: 1 / -1; }
+.panel[data-plate-side="left"] > * { grid-column: 2; }
+.panel[data-plate-side="left"] > .panel-plate { grid-column: 1; }
+.panel[data-plate-side="right"] > * { grid-column: 1; }
+.panel[data-plate-side="right"] > .panel-plate { grid-column: 2; }
+/* 🔴 A SEAM, WHICH IS WHAT *"glued section"* MEANS AND IS ALREADY THIS
+   COMPONENT'S OWN LINE. `.panel-fixed-l` draws exactly this between the fixed
+   column and the strip, `border-right: 1px solid var(--line)` with
+   `--panel-gap` beside it, and `/muta/` records the argument for when a rule
+   beats spacing: *"two blocks that are each two rows deep read the gap between
+   them as the gap between columns inside them"*. A plate running the full
+   height of a case is that, so it takes the treatment the case already has
+   rather than a second one.
+   ⚠️ THE PADDING IS VERTICAL HERE BECAUSE THE PLATE IS. `.panel-case` is
+   `padding: 0 var(--panel-pad)`, so a child glued to the left edge needs its
+   own block inset the way `.panel-fixed` and `.panel-strip` already supply
+   theirs, and it must not take the top-only inset the horizontal placements get
+   from `.panel-case > .panel-plate`. (0,2,0) against that rule's (0,2,0), later
+   in the file, which is a tie decided by order the way this stylesheet prefers.
+   ⚠️ AND IT TAKES NO WIDTH IT DOES NOT NEED: the track is `auto`, so the column
+   is the type's own measure plus these two insets.
+   ⚠️ `padding-block` AND NOTHING ELSE, DELIBERATELY. The rule it beats sets
+   `padding-block` alone too, so there is no inline padding here to cancel and
+   no shorthand to fight: the side-specific rules below add the one edge that
+   faces the instrument. This stylesheet already records what a shorthand does
+   to a longhand written later, and the cheapest way not to lose that argument
+   is not to start it. */
+.panel-case > .panel-plate[data-place="side"] { padding-block: var(--panel-pad); }
+.panel[data-plate-side="left"] > .panel-plate {
+  border-right: 1px solid var(--line); margin-right: var(--panel-gap);
+  padding-right: var(--panel-gap);
+}
+.panel[data-plate-side="right"] > .panel-plate {
+  border-left: 1px solid var(--line); margin-left: var(--panel-gap);
+  padding-left: var(--panel-gap);
+}
+
+/* 🔴 A RULE ACROSS THE CASE, FROM ONE INNER EDGE TO THE OTHER, 2026-09-25,
+   ASKED FOR AS *"on each button group have horizontal panel separator edge to
+   edge"* with a sketch drawing rules between `/knobs/`'s rotaries, its keyboard
+   and its footer.
+
+   🔴 **EDGE TO EDGE IS THE WHOLE ASK, AND IT IS WHAT SAYS A SEAM CANNOT LIVE IN
+   THE SCROLLER.** MEASURED on `/knobs/`, a rule put in `.panel-flow`: it laid
+   out at **992 px against a 686 px case**, because that flow is
+   `width: max-content` around a keyboard wider than the panel. Pulling it left
+   made it wider still and reached nothing, because `scrollLeft` clamps at **0**
+   and inline-start overflow inside `overflow-x: auto` is clipped for good. A
+   rule there is as wide as the widest row and scrolls with it.
+
+   ✅ **AS A CHILD OF THE CASE IT IS ONE NEGATIVE MARGIN.** `.panel-case` is
+   `padding: 0 var(--panel-pad)`, horizontal only, so that is the single inset
+   between a case child and the case's inner edge. MEASURED at 1280 px against
+   each case's own inner edges: `/shape/` **x297.0..983.0**, `/knobs/`
+   **x297.0..983.0**, `/evo/` **x297.0..983.0**, `/tom/` **x297.0..983.0**. Two
+   of those carry a side plate, one on each edge; two are flex cases with none.
+   ⚠️ AN UNCASED PANEL NEEDS NO SECOND RULE. `--panel-pad` is 0 there, so the
+   margin is 0 and the seam is the panel's own width, which is the same
+   additive-then-override shape every other inset here already has.
+   ⚠️ `flex: 0 0 auto`, OR A FLEX COLUMN SHARING OUT SLACK TAKES THE RULE'S ONE
+   PIXEL. It is the thinnest child a case can have and the first thing a
+   `flex-shrink` of 1 would round away.
+
+   🔴 AND IT SPANS BOTH COLUMNS ON A CASE WITH A SIDE PLATE, SO IT CROSSES THE
+   RAIL. That is what the sketch draws and it is what a scribed line on a real
+   panel does. (0,3,0) against the column rules' (0,2,0), so it wins on weight
+   rather than on order. */
+.panel-seam {
+  height: 1px; flex: 0 0 auto; background: var(--line);
+  margin-inline: calc(-1 * var(--panel-pad));
+}
+/* 🔴 A BAND BRINGS ITS OWN BLOCK INSET, WHICH IS WHAT `.panel-fixed` AND
+   `.panel-strip` ALREADY DO AND IS THE WHOLE REASON THE CASE PADS HORIZONTALLY
+   ONLY. FOUND 2026-09-25 BY THE AGENT THAT FIRST TRIED TO USE `band()`, which
+   is the second caller finding the hole the first one could not.
+
+   🔴 **MEASURED ON `/shape/`, nine sections lifted out of the strip and
+   appended to the case with a seam between them. INK, not boxes, because the
+   element boxes read 0 on the working page too:**
+
+     one section's last lane to the next section's heading
+       in the strip, as it ships        40.0 px
+       as bands, before this rule        1.0 px
+     last lane to the seam 0.0, seam to the next heading 0.0
+     and the last band 0.0 px off the case's inner bottom
+
+   Nine of those is 52 sliders and nine headings in one unbroken block with
+   hairlines through it, the bottom one flush against the case's border.
+   🔴 **THE CAUSE IS `/held/`'s LESSON A THIRD TIME.** `.pos-stack` owns the
+   40 px rhythm as a margin on its own children, a section lifted out of a stack
+   stops being one of them, `.panel-case` computes `row-gap: normal`, and its
+   padding is `0 var(--panel-pad)`. **Nothing replaced it, and nothing threw.**
+
+   ✅ **IT IS A RULE ON THE BAND AND NOT A CONDITIONED RULE ON THE CASE, WHICH
+   IS STRICTLY NARROWER.** A `.panel-case[data-bands] { row-gap }` would have
+   been the obvious shape and it is wrong twice: in a FLEX case that gap lands
+   between the plate and the strip as well, pushing `/shape/`'s strip down by a
+   number nobody asked for, and it would add to the strip's OWN
+   `padding-block` on one side of a seam while the band paid nothing on the
+   other. A class that only exists on a band cannot reach a case that has none.
+   ⚠️ **MARGIN, NOT PADDING, AND THAT IS THE ONE PLACE THIS DEPARTS FROM
+   `.panel-strip`.** A band may paint its own ground, `.panel-group` is
+   `background: var(--card2)`, and padding inside a box with a background is a
+   STRIPE rather than air, which `positron-ui` records from `/fau/`. The strip
+   paints nothing, so padding is right there and margin is right here.
+   ⚠️ **AND THE LAST BAND KEEPS ITS MARGIN, WHICH IS WHERE THIS DIFFERS FROM
+   `.pos-stack`.** A stack drops the last child's margin because a stack has no
+   box of its own; a CASE has one, and the last band's margin is the inset
+   between it and the border, exactly the job `.panel-strip`'s `padding-bottom`
+   does on every page that has no bands.
+   ⚠️ `--panel-pad` RATHER THAN `--panel-gap`, so the number is the inset the
+   case already keeps around its controls. Two bands are then 40 px apart, which
+   is that inset twice rather than a `--pos-gap` typed here to match the page
+   rhythm, and across a seam it is 20 px, 1 px and 20 px. */
+.panel-band { margin-block: var(--panel-pad); }
+.panel[data-plate-side] > .panel-seam { grid-column: 1 / -1; }
+/* 🔴 AND THE NAME SURVIVES THE CROSSING, WHICH IS THE HALF THAT HAD TO BE
+   DESIGNED RATHER THAN LEFT TO LUCK. A side plate is `justify-content:
+   flex-end` under `writing-mode: vertical-rl` with `rotate: 180deg`, which puts
+   the ink at the TOP of the rail and leaves the rest of it empty: MEASURED,
+   `/shape/`'s ink is y339.5..380.4 in a rail y339.5..2061.0, and `/knobs/`'s is
+   y146.3..187.1 in a rail y146.3..344.8. **41 px of ink in 1722 and in 199.**
+   So a seam misses the name almost everywhere, and *almost* is a fact about
+   today's band heights rather than a property of the component.
+   ✅ **SO THE INK GETS A GROUND AND THE PLATE GETS A LAYER, AND THE SEAM PASSES
+   BEHIND THE WORD.** A grid item with a `z-index` paints above its siblings
+   whatever the DOM order, so the rule reappears either side of the name instead
+   of being cut by it.
+   ⚠️ **THE GROUND IS ON THE LINE AND NOT ON THE PLATE**, deliberately. A
+   background on the plate would mask the whole rail and erase the seam across
+   it, which is the opposite of edge to edge. On the line it is a box the size of
+   the word.
+   ⚠️ **AND IT CHANGES NOTHING TODAY.** `--card` over a `.panel-case` whose
+   background is `--card` is invisible, on both of the two pages this can reach:
+   `.panel-case >` is what keeps it off an uncased panel, which has no ground of
+   its own for this to match. */
+.panel-case > .panel-plate[data-place="side"] { position: relative; z-index: 1; }
+.panel-case > .panel-plate[data-place="side"] .panel-plate-l { background: var(--card); }
 
 /* 🔴 THE INSTRUMENT HEADER, 2026-09-22, ASKED FOR AS *"create instrumet
    header/glue: similar to transport glue etc. left: online status button:

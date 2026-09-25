@@ -901,6 +901,8 @@
   let panelWith = null;       // { panel, reading }  the absorber is on the block
   let panelWithout = null;    // { panel, reading }  NEGATIVE CONTROL: no absorber
   let panelGrowBlk = null;    // the dashed block that absorbs the slack
+  let seamRail = null;        // { panel, seam, band }  a seam crossing a side plate's rail
+  let seamPlain = null;       // { panel, seam, band }  the same seam on a case with no rail
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A segment display, as
@@ -1129,6 +1131,65 @@
    * about is the arrangement and the fader, and a second frame loop on a page
    * that already runs several would cost a reader something for nothing.
    */
+  /**
+   * 🔴 THE NEWEST BLOCK, AND IT IS FIRST IN THE FILE FOR THE REASON THIS PAGE
+   * ALREADY ASSERTS ONE ROW DOWN: *"in kit move online stuff to topmost item
+   * (all new should land top, make rule)"*. What a reader does not know about
+   * is what arrived since they last looked.
+   *
+   * 🔴 TWO SPECIMENS, AND THE SECOND IS NOT A REPEAT. A seam reaches the case's
+   * inner edges the same way on every panel, but only a case with a SIDE PLATE
+   * is a grid, and only on a grid does it have a rail to cross and a row count
+   * to be placed by. One of each is the smallest pair that can show both, and
+   * the asserts at the foot of this file measure the two against their OWN
+   * cases rather than against each other.
+   * ⚠️ THE BAND UNDER THE SEAM IS A DASHED BLOCK RATHER THAN A CONTROL, because
+   * what these two show is where a rule lands and not what a band holds. The
+   * PANEL block further down already shows a case full of real controls.
+   */
+  section('hardware', 'PANEL SEAM',
+    'A rule across a panel from one inner edge of its case to the other.',
+    `const p = createPanelLayout({ side: null, plate: { lines: ['SEAM'], place: 'side' } });
+p.seam()                      // a rule, edge to edge of the case
+p.band(keysBox)               // a block stacked across the case, under the strip
+inst.seam(); inst.band(el)    // the same two, forwarded by createInstrument`,
+    (box) => {
+      box.classList.add('kit-wide');
+
+      /**
+       * One panel built twice, the only difference being whether it carries a
+       * side plate. A specimen built from a shared function rather than typed
+       * twice is the only version where the two can be COMPARED, which is the
+       * argument the PANEL block below already makes about its own pair.
+       */
+      const build = (rail) => {
+        const p = createPanelLayout({
+          side: null,
+          plateSide: 'left',
+          plate: rail ? { lines: ['SEAM'], place: 'side' } : { lines: ['SEAM'], place: 'end' },
+          strip: { tabindex: 0, role: 'group', label: 'the panel’s strip' },
+        });
+        p.flow.append(el('div', 'kit-blk', 'the strip, which is band one'));
+        const seam = p.seam();
+        const band = p.band(el('div', 'kit-blk', 'a band, across the whole case'));
+        /* 🔴 A SECOND BAND WITH NO SEAM BETWEEN THEM, BECAUSE THE TWO DISTANCES
+           ARE DIFFERENT AND ONLY ONE OF THEM WAS EVER IN QUESTION. Across a
+           seam it is the band's inset, the rule, and the next band's inset; band
+           to band it is two insets and nothing in the middle. `/shape/` measured
+           the second one at 1.0 px where the page it came from reads 40.0, so a
+           specimen with one band could not have shown the number that was
+           lost. */
+        const band2 = p.band(el('div', 'kit-blk', 'a second band, no seam between them'));
+        box.append(p.el);
+        return { panel: p, seam, band, band2 };
+      };
+
+      box.append(el('p', 'kit-cap', 'a side plate, so the case is a grid and the rule crosses the rail'));
+      seamRail = build(true);
+      box.append(el('p', 'kit-cap', 'no side plate, which is a flex case and needs no row count'));
+      seamPlain = build(false);
+    });
+
   section('timeline', 'LOCAL AND REMOTE',
     'One thing running here and the same thing running somewhere else, side by '
     + 'side, with one fader between them.',
@@ -5174,6 +5235,71 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       && was === 'online' && now === 'offline',
       `${was} became ${now} after ${headSpec.presses()} press`);
 
+    /**
+     * 🔴 THE SWITCH IS THE SAME WIDTH IN BOTH STATES, AND `(same w)` IS THE ASK
+     * RATHER THAN A CHECK SOMEBODY THOUGHT OF. Asked 2026-09-25: *"just [() ON]
+     * and [() OFF] (same w)"*. `off` is one character wider than `on`, so a
+     * control sized to whichever word is showing changes size under the finger
+     * that pressed it, which is the rule the transport bar already states about
+     * its own two state button.
+     * 🔴 AND IT IS EXACT, NOT CLOSE. A tolerance here would hide precisely the
+     * defect being asked about, because the two words differ by one character
+     * and one character is 6.62 px on this face.
+     * 🔴 **DRIVEN BY A REAL PRESS, FROM WHATEVER STATE THE ASSERT ABOVE LEFT
+     * IT IN.** Setting the state twice from one starting point would compare a
+     * badge against itself, which is this project's own rule about a statistic
+     * that is constant by construction over its subject.
+     * ⚠️ AND IT WAITS OUT THE SWAP. The word fades 90 ms out, changes at the
+     * trough and fades 90 ms back, so reading immediately would grade the word
+     * that is leaving.
+     * ⚠️ THE ARIA LABEL IS THE OTHER HALF AND IT KEEPS THE NAME. `of` was not
+     * removed, only hidden from the paint: the eye reads the nameplate on the
+     * same row and a screen reader reads this, and *"switch on and off"* would
+     * name nothing.
+     */
+    {
+      const btn = headSpec.acting.online.el;
+      /* ⚠️ THE MEASURING WINDOW IS SHUT ACROSS BOTH WAITS, which is the third
+         place it has to be. A word swaps at the trough of a 90 ms fade, so this
+         has to wait twice, and an `await` inside the window is a frame drawn
+         with all five parts open. The check at the foot of this file counts
+         those and its own comment records taking a `settle()` out reading
+         `3 frames`. */
+      const land = async () => {
+        settle();
+        await new Promise((r) => setTimeout(r, 260));
+        measure();
+      };
+      await land();                      // the press in the assert above is still fading
+      const before = headSpec.acting.online.state();
+      const wBefore = btn.getBoundingClientRect().width;
+      const sBefore = (btn.textContent || '').trim();
+      btn.click();                       // a REAL press, back the other way
+      await land();
+      const after = headSpec.acting.online.state();
+      const wAfter = btn.getBoundingClientRect().width;
+      const sAfter = (btn.textContent || '').trim();
+      const aria = btn.getAttribute('aria-label') || '';
+      /* 🔴 THE RESERVE IS THE EXACT HALF AND THE RENDERED WIDTH IS THE
+         SUB-PIXEL ONE, AND BOTH ARE HERE BECAUSE ONLY TOGETHER DO THEY SAY WHAT
+         WAS ASKED. `--pres-ch` is a CHARACTER COUNT computed off the words
+         themselves, so `3` is `off` and nothing else, and it cannot drift. The
+         rendered widths then differ by 0.02 px, which is text metrics inside a
+         box that does not move: the defect being asked about is one CHARACTER,
+         6.62 px on this face, and 0.1 px cannot hide 6.62. `/kit/`'s own
+         presence check reads a spread of 0.02 on the same component. */
+      const ch = btn.querySelector('.pos-pres-w')?.style.getPropertyValue('--pres-ch');
+      d.assert('the header switch is one width in both states, and says the state without the name',
+        before !== after && Math.abs(wBefore - wAfter) <= 0.1 && ch === '3'
+        && sBefore !== sAfter
+        && /^(on|off)$/.test(sBefore) && /^(on|off)$/.test(sAfter)
+        && !/PLAI/.test(sBefore) && !/PLAI/.test(sAfter)
+        && aria.includes('PLAI'),
+        `"${sBefore}" ${wBefore.toFixed(2)} px against "${sAfter}" ${wAfter.toFixed(2)} px, `
+        + `a reserve of ${ch} characters which is the longer word, `
+        + `pressed from ${before} to ${after}, and the label still reads "${aria}"`);
+    }
+
     /* 🔴 THE OTHER HALF, AS AN ABSENCE. A badge that was a button with the
        handler left off would satisfy the assert above by never being pressed.
        ⚠️ IT READS THE STATUS CELL AND NOT THE HEADER. My first version asked
@@ -8027,6 +8153,155 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
        phone. See the note where the specimen was built. */
   }
 
+  // ── the panel seam ────────────────────────────────────────────────────────
+  //
+  // 🔴 EVERY CLAIM HERE IS MEASURED AGAINST THE SEAM'S OWN CASE, never against
+  // a number typed in. *"Edge to edge"* is a relationship between two
+  // rectangles, and this page has already been corrected twelve times in one
+  // evening for reasoning about one of them instead of reading both.
+  if (seamRail && seamPlain) {
+    /**
+     * 🔴 THE CASE'S INNER EDGE IS ITS BORDER BOX LESS ITS OWN BORDER, AND
+     * READING THE BORDER BOX WOULD HAVE BEEN WRONG BY 1 px AT EACH END. That is
+     * the whole width of the thing being measured, so a check that took the
+     * outer rectangle would grade a correct seam as 2 px short and an
+     * overhanging one as perfect.
+     */
+    const inner = (panel) => {
+      const c = getComputedStyle(panel.el);
+      const r = panel.el.getBoundingClientRect();
+      return { l: r.left + parseFloat(c.borderLeftWidth), r: r.right - parseFloat(c.borderRightWidth) };
+    };
+
+    /* 1. 🔴 EDGE TO EDGE, ON BOTH ARRANGEMENTS, WHICH IS THE ASK IN ONE LINE:
+       *"on each button group have horizontal panel separator edge to edge"*.
+       BOTH ends of BOTH seams, because a rule can be right on one edge and
+       20 px short on the other, and `.panel-case`'s `padding: 0 var(--panel-pad)`
+       is the one inset that would do exactly that. */
+    {
+      const rails = [['a side plate', seamRail], ['no side plate', seamPlain]];
+      const read = rails.map(([what, s]) => {
+        const i = inner(s.panel), r = s.seam.getBoundingClientRect();
+        return { what, dl: r.left - i.l, dr: r.right - i.r, h: r.height, w: r.width };
+      });
+      d.assert('a seam reaches both inner edges of its case, on a panel with a rail and on one without',
+        read.every((x) => Math.abs(x.dl) <= 0.6 && Math.abs(x.dr) <= 0.6 && Math.abs(x.h - 1) <= 0.1),
+        read.map((x) => `${x.what}: ${x.w.toFixed(1)} px wide, `
+          + `${x.dl.toFixed(1)} px off the left inner edge and ${x.dr.toFixed(1)} off the right, `
+          + `${x.h.toFixed(1)} px tall`).join('; '));
+    }
+
+    /* 2. 🔴 IT CROSSES THE RAIL, AND THE NAME SURVIVES THE CROSSING. Two
+       separate facts, because a seam that stopped at the plate would pass a
+       width check on the other edge alone, and a seam drawn THROUGH the letters
+       would pass this one. The plate carries a `z-index` so its ink paints over
+       the rule, and the ground is on the LINE rather than on the plate, or the
+       whole rail would mask the seam and edge to edge would stop being true. */
+    {
+      const plate = seamRail.panel.plate.el;
+      const pr = plate.getBoundingClientRect();
+      const sr = seamRail.seam.getBoundingClientRect();
+      const line = plate.querySelector('.panel-plate-l');
+      const ink = getComputedStyle(line).backgroundColor;
+      const ground = getComputedStyle(seamRail.panel.el).backgroundColor;
+      const pcs = getComputedStyle(plate);
+      const railGround = pcs.backgroundColor;
+      d.assert('the seam crosses the plate’s rail, and the name is painted over it rather than cut by it',
+        sr.left < pr.left - 0.6 && sr.right > pr.right + 0.6
+        && pcs.zIndex === '1' && ink === ground
+        && /^rgba\(0, 0, 0, 0\)$|^transparent$/.test(railGround),
+        `seam x${sr.left.toFixed(1)}..${sr.right.toFixed(1)} across a rail at `
+        + `x${pr.left.toFixed(1)}..${pr.right.toFixed(1)}, the plate at z-index ${pcs.zIndex}, `
+        + `its line painted ${ink} on a case of ${ground}, `
+        + `and the rail itself ${railGround} so it masks none of the rule`);
+    }
+
+    /* 3. 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THAT SAYS THE ROW COUNT IS DOING
+       ANYTHING. A grid case with no count lays every child into row 1, so the
+       band would sit ON TOP of the strip rather than under it and the plate
+       would stop under the first row. So: the bands stack in source order, and
+       the rail runs the case's whole height. MEASURED before the count existed,
+       a four child case came out `1721.5px 70.5px 0px 0px 1px 70.5px`, six
+       tracks for four bands, with two the plate had blocked. */
+    {
+      const p = seamRail.panel;
+      const strip = p.strip.getBoundingClientRect();
+      const seam = seamRail.seam.getBoundingClientRect();
+      const band = seamRail.band.getBoundingClientRect();
+      const plate = p.plate.el.getBoundingClientRect();
+      const i = inner(p);
+      const c = getComputedStyle(p.el);
+      const cr = p.el.getBoundingClientRect();
+      const bottom = cr.bottom - parseFloat(c.borderBottomWidth);
+      const top = cr.top + parseFloat(c.borderTopWidth);
+      d.assert('the bands stack in order and the rail runs past every one of them',
+        strip.bottom <= seam.top + 0.6 && seam.bottom <= band.top + 0.6
+        && Math.abs(plate.top - top) <= 0.6 && Math.abs(plate.bottom - bottom) <= 0.6
+        && p.el.style.getPropertyValue('--panel-rows') === '4',
+        `strip ends ${strip.bottom.toFixed(1)}, seam ${seam.top.toFixed(1)}..${seam.bottom.toFixed(1)}, `
+        + `band starts ${band.top.toFixed(1)}, the rail is `
+        + `${(plate.bottom - plate.top).toFixed(1)} px against a case inside of `
+        + `${(bottom - top).toFixed(1)}, and --panel-rows is `
+        + `"${p.el.style.getPropertyValue('--panel-rows')}"`);
+    }
+
+    /**
+     * 4. 🔴 A CASE WITH BANDS HAS A VERTICAL RHYTHM, AND IT HAD NONE UNTIL
+     * 2026-09-25. FOUND by the `/shape/` agent, which is the second caller
+     * finding the hole the first one could not: nine sections lifted out of the
+     * strip read **1.0 px** of ink from one section's last lane to the next
+     * section's heading, against **40.0 px** on the page as it ships, with the
+     * last band **0.0 px** off the case's inner bottom.
+     * 🔴 THE CAUSE WAS `/held/`'s LESSON A THIRD TIME: `.pos-stack` owns the
+     * 40 px rhythm as a margin on its own children, a block lifted out of a
+     * stack stops being one, and `.panel-case` pads horizontally only.
+     * 🔴 **THREE DISTANCES, NOT ONE, BECAUSE THEY COME FROM THREE PLACES AND
+     * CAN BREAK SEPARATELY.** Across a seam it is the band's own inset either
+     * side of a 1 px rule; band to band it is two insets and nothing between;
+     * and under the last band it is one inset against the case's border, which
+     * is the job `.panel-strip`'s `padding-bottom` does on a case with no
+     * bands. `positron-ui` records `/twelve/` having two of three alignments
+     * line up while the third was 30 px out, which one bundled assert cannot
+     * report.
+     * ⚠️ AND EVERY NUMBER IS READ AGAINST THE CASE'S OWN `--panel-pad` RATHER
+     * THAN AGAINST A 20 TYPED HERE, so this cannot drift from the stylesheet.
+     */
+    {
+      const p = seamRail.panel;
+      const pad = parseFloat(getComputedStyle(p.el).getPropertyValue('--panel-pad'));
+      const c = getComputedStyle(p.el);
+      const bottom = p.el.getBoundingClientRect().bottom - parseFloat(c.borderBottomWidth);
+      const seam = seamRail.seam.getBoundingClientRect();
+      const a = seamRail.band.getBoundingClientRect();
+      const b = seamRail.band2.getBoundingClientRect();
+      const belowSeam = a.top - seam.bottom;
+      const between = b.top - a.bottom;
+      const under = bottom - b.bottom;
+      d.assert('a band brings its own inset, so a case with bands has a rhythm and a floor',
+        Math.abs(belowSeam - pad) <= 0.6
+        && Math.abs(between - 2 * pad) <= 0.6
+        && Math.abs(under - pad) <= 0.6,
+        `--panel-pad is ${pad} px, the seam stands ${belowSeam.toFixed(1)} px off the band under it, `
+        + `two bands with no seam sit ${between.toFixed(1)} px apart, `
+        + `and the last one is ${under.toFixed(1)} px off the case's inner bottom`);
+    }
+
+    /* 5. ⚠️ AND A PANEL WITH NO RAIL IS NOT A GRID AND IS NOT NUMBERED, which is
+       the half that keeps this off the seven cased pages that asked for none.
+       An inline style nothing reads is a thing somebody has to explain later. */
+    {
+      const p = seamPlain.panel;
+      const cs = getComputedStyle(p.el);
+      d.assert('NEGATIVE CONTROL: a case with no side plate is a flex column and carries no row count',
+        cs.display === 'flex' && !p.el.dataset.plateSide
+        && p.el.style.getPropertyValue('--panel-rows') === ''
+        && seamPlain.band.style.getPropertyValue('--panel-row') === '',
+        `display ${cs.display}, plateSide ${p.el.dataset.plateSide || 'unset'}, `
+        + `--panel-rows "${p.el.style.getPropertyValue('--panel-rows')}", `
+        + `--panel-row on the band "${seamPlain.band.style.getPropertyValue('--panel-row')}"`);
+    }
+  }
+
   // ── local and remote ──────────────────────────────────────────────────────
   //
   // 🔴 EVERY CLAIM HERE IS A COMPARISON OR A LEVEL, WHICH IS WHAT ONLY THIS
@@ -8958,6 +9233,163 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         kb.lightNote(71, false, 'ai'); kb.lightNote(72, false, 'hint');
       }
 
+      /* 🔴 THE FIRST LOOP SETS THE UNIT AND EVERY LATER ONE IS AN INTEGER RATIO
+         OF IT. Asked 2026-09-25: *"in keyboadd looper: do basic bmp detection /
+         quant and when first loop set, all next ones align on it, either times
+         shorter, same or longer"*. The arithmetic is `numloop.mjs`'s and is
+         graded with no browser at 36 ok; what only a browser can say is whether
+         this keyboard USES it, and that is what these four blocks are.
+         🔴 AND THE ASSERT ASKS WHAT HAS HAPPENED, COUNTED, WHICH IS THE TRAP
+         ALREADY WRITTEN DOWN ON THE PAGE NEXT DOOR. `/loops/` shipped a page
+         whose whole subject was looping, quietly not looping, because its check
+         tolerated *not reached yet* and passed vacuously every run. So the
+         load-bearing claim here is not `lap === unit / 2`, which is a number
+         this page would be reading back from the module that wrote it. It is
+         that the second loop WRAPPED, three times, at the aligned lap and not
+         at the length it was played at, counted off the notes the PAGE heard
+         come back.
+         🔴 EVERY WAIT IN HERE IS SPENT AGAINST A BUDGET, AND THE BUDGET IS THE
+         HARNESS'S BOOT WAIT RATHER THAN ANY RULE ABOUT TASTE. `/kit/` calls
+         `d.ready()` at the foot of this block, and `demo/verify.mjs` waits
+         1400 ms plus forty polls of 150 ms for that flag before it declares the
+         page dead and skips every assert on it. MEASURED 2026-09-26: this page
+         becomes ready about 5.9 s after navigation, so there is roughly two
+         seconds of room in the whole file and a first draft of this block spent
+         2.7 s of it and took `/kit/` fully red at 207 asserts, with the harness
+         reporting *console: nothing, so it is hanging rather than throwing*.
+         ⚠️ SO THE DETECTION IS GRADED BY ITS INPUT RATHER THAN BY ITS OUTPUT.
+         A tempo `numloop.mjs` will speak about has to sit in 80 to 160 a
+         minute, which is three gaps of at least 375 ms, which is 1.2 s of
+         waiting before anything can be asserted. What a browser adds over
+         `numloop-test.mjs` is not the arithmetic, it is whether this file hands
+         the module the right list, and that is a stronger claim measured
+         cheaply: four notes have to arrive as FOUR onsets and not as the eight
+         movements a tape holds, and still produce no tempo.
+         🔴 AND THE NOTES ARE HELD RATHER THAN STRUCK, WHICH IS THE WHOLE
+         REASON THIS CHECK CAN TELL THE TWO LISTS APART. MEASURED 2026-09-26:
+         with the notes struck and released in the same millisecond, feeding
+         EVERY movement in instead of the key-downs still answers four onsets,
+         because `numloop.mjs` collapses anything inside 50 ms into one chord and
+         a down and its own up were 0 ms apart. The sabotage came back fully
+         green and the check was decoration. Holding each note 70 ms puts every
+         movement clear of that window, so the wrong list answers EIGHT.
+         ⚠️ NOTES PLAYED PAST THE KEYS, THE WAY MIDI ARRIVES, so the two takes
+         can be told apart by note number while both are running. The block
+         above proves that path is taped and comes back. */
+      {
+        /* ⚠️ ITS OWN, BECAUSE THE ONE AT THE HEAD OF THE SELF-CHECK IS IN A
+           DIFFERENT BLOCK AND `nap` IS NOT DEFINED HERE. MEASURED 2026-09-26 by
+           borrowing it: `ReferenceError: nap is not defined`, which killed every
+           check after this point, left `d.ready()` uncalled and took the whole
+           page red with the harness reporting nothing but a count. */
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        kb.loops.forget();
+        for (let s = 0; s < kb.loops.slots; s++) kb.loops.clear(s);
+        kb.loops.releaseUnit();
+
+        const UNIT_NOTE = 84, LATER_NOTE = 81;
+        /* ⚠️ 70 ms AND NOT 50, WHICH IS THE THRESHOLD ITSELF. `numloop.mjs`
+           merges onsets 50 ms apart or closer into one chord, and a timer asked
+           for 50 fires at 48 as readily as at 53, so a check written at the
+           boundary would count four onsets on one run and three on the next. 70
+           clears it by more than any timer here has ever been out. */
+        const HOLD = 70;
+
+        kb.loops.press(0); kb.loops.settle(0);          // the first take arms
+        const started = performance.now();
+        for (let k = 0; k < 4; k++) {
+          kb.lightNote(UNIT_NOTE, true);
+          await wait(HOLD);
+          kb.lightNote(UNIT_NOTE, false);
+          if (k < 3) await wait(HOLD);
+        }
+        const played = Math.round(performance.now() - started);
+        kb.loops.press(0); kb.loops.settle(0);          // and goes round, setting the unit
+        const first = kb.tune(), fit0 = kb.loops.fit(0), unit = kb.loops.unit();
+        /* Taken with the ratio cell holding a reading, and compared at the foot
+           of this block against the same cells holding nothing. */
+        const wide = (e) => +e.getBoundingClientRect().width.toFixed(2);
+        const heldWide = [wide(first.tempoEl), wide(first.ratioEl), wide(kb.chord().el)];
+        d.assert('the onsets handed to the tempo are the four notes played, not the eight movements taped, and four notes that say no tempo leave the cell empty',
+          first.reading.onsets === 4 && first.reading.intervals === 3
+            && kb.taped(0) === 8
+            && first.reading.source === 'none' && first.reading.bpm === null
+            && first.tempo === '' && first.ratio === 'first'
+            && fit0?.first === true && Math.abs(kb.loops.lap(0) - played) <= 40,
+          `${kb.taped(0)} movement(s) taped arrived as ${first.reading.onsets} onset(s) and `
+          + `${first.reading.intervals} gap(s), the footer reads "${first.tempo}" and `
+          + `"${first.ratio}", and the ${played} ms take set a ${unit?.ms} ms unit`);
+
+        /* 🔴 A TAKE AT 0.59 OF THE UNIT, WHICH IS DELIBERATELY NOT A RATIO OF
+           IT. The nearest allowed ratio is a half and the snap moves it by about
+           17 per cent, well inside the 30 per cent `numloop.mjs` will stretch a
+           performance, so this is the case the feature exists for rather than
+           the refusal beside it. */
+        kb.loops.forget();
+        kb.loops.press(1); kb.loops.settle(1);
+        const startedTwo = performance.now();
+        kb.lightNote(LATER_NOTE, true); kb.lightNote(LATER_NOTE, false);
+        await wait(300);
+        const playedTwo = Math.round(performance.now() - startedTwo);
+        kb.loops.press(1); kb.loops.settle(1);
+        const fit1 = kb.loops.fit(1), second = kb.tune();
+        const lap = kb.loops.lap(1);
+        d.assert('a second take is snapped onto an integer ratio of the first, and the footer says which',
+          fit1?.snapped === true && fit1.label === '1/2'
+            && lap === Math.round(unit.ms / 2) && second.ratio === 'x1/2'
+            && second.tempo === '',
+          `${playedTwo} ms played against a ${unit.ms} ms unit came back as a ${lap} ms `
+          + `lap, which the footer calls "${second.ratio}"`);
+
+        /* 🔴 AND NOW THE PART THAT IS NOT ARITHMETIC: DID IT WRAP THERE. Counted
+           off what the page HEARD, over a window long enough for three turns,
+           while the first loop is still running.
+           ⚠️ THE TOLERANCE IS DERIVED FROM THE TWO CANDIDATES RATHER THAN TYPED.
+           A fixed window could be wide enough to contain both the aligned lap
+           and the played one, which is a check that cannot tell them apart and
+           would pass with the alignment ripped out. Half the distance between
+           them can only ever match one, and the guard refuses to conclude
+           anything at all if they are too close together to separate. */
+        const before = kitHeard.length;
+        await wait(540);
+        const turns = kitHeard.slice(before).filter((e) => e.how === 'loop' && e.n === LATER_NOTE);
+        const gaps = turns.slice(1).map((e, k) => Math.round(e.t - turns[k].t));
+        const apart = Math.abs(lap - playedTwo), tol = apart / 2;
+        for (let s = 0; s < kb.loops.slots; s++) kb.loops.clear(s);
+        d.assert('the second loop wraps on the aligned lap, counted, rather than on the length it was played at',
+          apart >= 25 && turns.length >= 3 && gaps.length >= 2
+            && gaps.every((g) => Math.abs(g - lap) < tol)
+            && gaps.every((g) => Math.abs(g - playedTwo) > tol),
+          `${turns.length} turn(s) in 540 ms at ${gaps.join(', ')} ms, against a `
+          + `${lap} ms aligned lap and the ${playedTwo} ms it was played at, which are `
+          + `${apart} ms apart`);
+
+        /* 🔴 AND THE ABSENCES, WHICH ARE THE HALF A CELL IS EASIEST TO GET WRONG
+           ON, PLUS THE ONE WORD THE BLOCKS ABOVE CANNOT REACH. Clearing every
+           slot must empty both cells; a page that states the tempo must read
+           `set` rather than `heard`, because a number a page knows and a number
+           inferred off somebody's playing are different claims and only one of
+           them may be drawn as a fact.
+           ⚠️ AND IT PUTS THE KEYBOARD BACK. A stated tempo survives every slot
+           being cleared, by design, so without the release this block would
+           change the specimen for every reader after it. */
+        const gone = kb.tune();
+        kb.loops.assume(150);
+        const told = kb.tune();
+        const toldWide = [wide(told.tempoEl), wide(told.ratioEl), wide(kb.chord().el)];
+        kb.loops.releaseUnit();
+        const back = kb.tune();
+        d.assert('clearing empties both cells, a stated tempo reads set rather than heard, and neither cell changes width',
+          gone.tempo === '' && gone.ratio === '' && kb.loops.unit() === null
+            && told.tempo === '150 bpm set' && told.reading.source === 'given'
+            && back.tempo === '' && back.reading.bpm === null
+            && heldWide.every((w) => w > 0)
+            && heldWide.every((w, k) => Math.abs(w - toldWide[k]) < 0.5),
+          `cleared it reads "${gone.tempo}" and "${gone.ratio}", stated "${told.tempo}", `
+          + `released "${back.tempo}", and the cells measure ${heldWide.join(', ')} px `
+          + `against ${toldWide.join(', ')} px`);
+      }
+
       const kpad = kb.el.querySelector('.kpad');
       const sus = [...kpad.querySelectorAll('.pos-toggle')]
         .find((e) => /sustain/i.test(e.textContent))?.getBoundingClientRect();
@@ -8979,6 +9411,153 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
           && gap >= 0 && gap <= 12 && gap2 >= 0 && gap2 <= 12,
         `left edges ${Math.round(lp?.left)}, ${Math.round(sus?.left)}, `
         + `${Math.round(off?.left)}, with ${gap} px and ${gap2} px between them`);
+
+      /**
+       * 🔴 THE CHORD NAME SAYS WHAT IS HELD AND MOVES NOTHING WHILE IT DOES.
+       * Asked 2026-09-25: *"add chord name to the footer, right from the
+       * transpose message. avoind text moving in x axis"*, and the second
+       * sentence is the half a check can settle. The two chords driven here are
+       * the shortest and the longest name this cell can produce, `C5` at two
+       * characters and a half diminished seventh at eight, and the point is
+       * that the box is the same either way.
+       * ⚠️ IT MEASURES THE RECTS OF THE CELL AND OF THE ROW AROUND IT, not the
+       * string. A cell that says the right thing and shoves its neighbours is
+       * exactly what was asked against, and only a rect can tell them apart.
+       * ⚠️ AND THE NAME IS READ TOO, or this passes on a cell that never says
+       * anything at all, which is a box of reserved air and the thing this
+       * project calls a green check with no coverage.
+       */
+      const chordEl = kpad.querySelector('.kpad-chord');
+      if (chordEl) {
+        const edges = () => [chordEl, ...kpad.querySelectorAll('.kpad-names, .kpad-at')]
+          .map((e) => +e.getBoundingClientRect().left.toFixed(2));
+        const at0 = edges();
+        const w0 = +chordEl.getBoundingClientRect().width.toFixed(2);
+        kb.lightNote(60, true); kb.lightNote(67, true);
+        const small = chordEl.textContent;
+        const at1 = edges();
+        const w1 = +chordEl.getBoundingClientRect().width.toFixed(2);
+        kb.lightNote(60, false); kb.lightNote(67, false);
+        for (const n of [59, 62, 65, 69]) kb.lightNote(n, true);
+        const big = chordEl.textContent;
+        const at2 = edges();
+        const w2 = +chordEl.getBoundingClientRect().width.toFixed(2);
+        for (const n of [59, 62, 65, 69]) kb.lightNote(n, false);
+        const empty = chordEl.textContent;
+        const same = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 0.51);
+        d.assert('the footer names the chord being held and nothing in the row moves sideways',
+          small === 'C5' && big.length > small.length && empty === ''
+            && same(at0, at1) && same(at0, at2) && w0 === w1 && w1 === w2,
+          `two notes read "${small}", five read "${big}", letting go reads `
+          + `"${empty}", the cell stays ${w0} px and the row's left edges stay `
+          + `${at0.join(', ')}`);
+      }
+    }
+
+    /**
+     * 🔴 THREE CLAIMS ABOUT THE CASCADE, MEASURED AGAINST RENDERED BOXES, AND
+     * ALL THREE ARE HERE BECAUSE A DEAD RULE READS AS CORRECT. This page is
+     * where component drift is supposed to become visible, and each of these
+     * names a defect that shipped while every assert on every page stayed
+     * green.
+     * ⚠️ THEY BUILD THEIR OWN SPECIMENS RATHER THAN READING THE PAGE'S,
+     * because two of the three are combinations no specimen on this page wears:
+     * the defects were reachable only from `/wish/` and `/tom/`, and a check
+     * that can only run on the page that already has the bug is a check that
+     * arrives after it.
+     */
+    {
+      const probe = el('div', 'kit-cascade-probe');
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:600px';
+      document.body.append(probe);
+
+      /* 🔴 A GLYPH BUTTON IS A SQUARE WHEREVER IT IS, AND THE RULE SAYING SO
+         WAS SCOPED TO ONE ROW UNTIL 2026-09-25. MEASURED on `/wish/` before the
+         widening: 45.83 px wide against 34.00 tall, with the attribute set
+         correctly, because `.pos-controls button[data-glyph="1"]` could not
+         reach a button in a table row.
+         🔴 AND IT IS MEASURED ON THE BOX, NEVER ON THE ATTRIBUTE, which is the
+         whole reason it went unnoticed: `/wish/`'s action column is 72 px, the
+         wrong size fitted inside it, and nothing collided. An assert reading
+         `dataset.glyph` would have passed throughout. */
+      const sq = (host) => {
+        const b = el('button', '', '⇄');
+        b.type = 'button'; b.dataset.glyph = '1';
+        host.append(b);
+        const r = b.getBoundingClientRect();
+        b.remove();
+        return { w: +r.width.toFixed(2), h: +r.height.toFixed(2) };
+      };
+      const row = el('div', 'pos-controls');
+      probe.append(row);
+      const inRow = sq(row);
+      const loose = sq(probe);
+      d.assert('a glyph button is a square outside the control row as well as inside it',
+        inRow.w === 34 && inRow.h === 34 && loose.w === 34 && loose.h === 34,
+        `in the row ${inRow.w} by ${inRow.h}, outside it ${loose.w} by ${loose.h}`);
+
+      /* 🔴 A STEP GRID'S LABEL COLUMN KEEPS ITS WIDTH ON A PANEL'S FIXED
+         COLUMN, AND FOR THREE DAYS IT DID NOT. `.pos-pg-labs` declared
+         `border-right: 0; padding-right: 0` three thousand lines above
+         `.panel-fixed-l`, both at (0,1,0), so the panel won and the label
+         column's CONTENT box computed to 0.00 px against `width: 22px` under
+         `box-sizing: border-box`. MEASURED on `/tom/`: 64 of 64 labels clipped,
+         a lone `0` being 6.02 px of ink and `63` being 12.04, which is exactly
+         why 0 to 9 looked perfect.
+         🔴 THIS PAGE COULD NOT HAVE CAUGHT IT AND THAT IS WHY THE SPECIMEN IS
+         BUILT HERE. `createStepGrid`'s three specimens on this page hand it a
+         bare `div` as `fixed`, so none of them wears `.panel-fixed-l`, and
+         `/tom/` was the only page in the repository putting the two together:
+         the one page with the defect was the only page that could grade it. */
+      const panel = el('div', 'panel panel-case');
+      const labs = el('div', 'panel-fixed panel-fixed-l pos-pg-labs');
+      labs.style.setProperty('--pg-lab', '22px');
+      const lab = el('span', '', '63');
+      labs.append(lab); panel.append(labs); probe.append(panel);
+      const labCs = getComputedStyle(labs);
+      const inner = labs.clientWidth;
+      const ink = lab.getBoundingClientRect().width;
+      d.assert('a step grid’s labels keep their whole width on a panel’s fixed column',
+        inner >= 22 && ink <= inner + 0.01
+          && labCs.borderRightWidth === '0px' && labCs.paddingRight === '0px',
+        `content box ${inner.toFixed(2)} px against a 22 px width, ink ${ink.toFixed(2)} px, `
+        + `border ${labCs.borderRightWidth}, padding ${labCs.paddingRight}`);
+      probe.remove();
+    }
+
+    /* 🔴 THE PIANO ROLL'S RULES RUN THE WHOLE PICTURE, INCLUDING PAST THE
+       FIRST ROW. Five requests have been made about these lines and the fifth
+       was *"rm gap in piano roll vert lines"*, 2026-09-25. MEASURED before the
+       repair, cell bottom to the next cell's top all the way down a four row
+       roll: 6.5, 0, 0, 0, 0, 0, 0. ONE gap, under the first row only, which is
+       why four reports in a row could each look like the last one returning.
+       🔴 AND THE FIRST ROW IS THE TALL ONE, WHICH IS THE WHOLE OF IT: it holds
+       half a row back so the top dots are not crowded against the box, the room
+       was meant to go inside the CELL, and the lane it sits in kept a flat
+       height, so `height: 100%` resolved against the lane instead of the row.
+       ⚠️ THE LABEL IS THE SECOND HALF AND NOBODY REPORTED IT. Measured in the
+       same pass: the chord name in row 0 sat 6.5 px above the dots it names,
+       and every other row was exact. */
+    {
+      const roll = document.querySelector('.roll');
+      const rows = roll ? [...roll.children] : [];
+      const cellOf = (r) => r.querySelector('.roll-cell:not(.sharp)');
+      const gaps = [];
+      for (let i = 1; i < rows.length; i++) {
+        const a = cellOf(rows[i - 1]), b = cellOf(rows[i]);
+        if (a && b) gaps.push(+(b.getBoundingClientRect().top - a.getBoundingClientRect().bottom).toFixed(2));
+      }
+      const mid = (e) => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; };
+      const offs = rows.map((r) => {
+        const dot = r.querySelector('.roll-cell'), lbl = r.querySelector('.roll-label');
+        return (dot && lbl) ? +(mid(lbl) - mid(dot)).toFixed(2) : null;
+      }).filter((v) => v !== null);
+      d.assert('the piano roll’s vertical rules have no gap in them, the first row included',
+        gaps.length >= 2 && gaps.every((g) => Math.abs(g) < 0.51)
+          && offs.length >= 1 && offs.every((o) => Math.abs(o) < 0.51),
+        `${gaps.length} join(s) reading ${gaps.join(', ')} px, worst `
+        + `${gaps.length ? Math.max(...gaps.map(Math.abs)).toFixed(2) : 'n/a'}; `
+        + `${offs.length} label(s) off their dots by ${offs.join(', ')} px`);
     }
 
     d.assert('every focus ring in the shell is 1 px, and not one of them paints on a mouse press',

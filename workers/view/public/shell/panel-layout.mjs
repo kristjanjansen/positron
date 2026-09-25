@@ -7,6 +7,9 @@
 //   p.strip                   the scroller
 //   p.flow                    the column inside the scroller
 //   p.grow(keysBox)           this child of the flow absorbs the slack
+//   p.band(keysBox)           a block stacked under the strip, across the case
+//   p.unband(keysBox)         take one back out, and renumber what is left
+//   p.seam()                  a rule between two bands, edge to edge of the case
 //   p.check()                 measure it, and report a flow with slack and no absorber
 //   p.cuts                    what check() found, the way createDiagram reports a cut label
 //
@@ -125,9 +128,22 @@ export function createPanelLayout(o = {}) {
   const {
     cased = true, side = 'left', flow: wantFlow = true, grow: growEl = null,
     cls = {}, strip: stripOpts = {}, plate: plateOpts = null,
+    /**
+     * 🔴 WHICH EDGE A `side` PLATE IS GLUED TO, AND IT IS A SEPARATE ARGUMENT
+     * FROM `side` ON PURPOSE. `side` names the edge the FIXED COLUMN is on and
+     * every caller has already decided it; deriving this from that one, say by
+     * taking the opposite edge, would be this component guessing at a layout
+     * question nobody asked it. Two facts, two arguments.
+     * ⚠️ IT IS READ ONLY WHEN THE PLATE'S PLACEMENT IS `side`, so the seven
+     * pages wearing a case today pass nothing and get exactly what they got.
+     */
+    plateSide = 'left',
   } = o;
   if (side !== null && side !== 'left' && side !== 'right') {
     throw new Error(`createPanelLayout: side is 'left', 'right' or null, not ${JSON.stringify(side)}`);
+  }
+  if (plateSide !== 'left' && plateSide !== 'right') {
+    throw new Error(`createPanelLayout: plateSide is 'left' or 'right', not ${JSON.stringify(plateSide)}`);
   }
 
   const add = (base, extra) => (extra ? `${base} ${extra}` : base);
@@ -159,6 +175,19 @@ export function createPanelLayout(o = {}) {
   if (plateOpts) {
     plate = plateOpts.el && plateOpts.lines ? plateOpts : createNameplate(plateOpts);
     root.append(plate.el);
+    /**
+     * 🔴 A `side` PLATE TURNS THE CASE INTO TWO COLUMNS, AND IT DOES IT WITH AN
+     * ATTRIBUTE RATHER THAN WITH A NEW ELEMENT. The case holds exactly two
+     * children, the plate and the wrap or strip, so the arrangement is entirely
+     * a stylesheet's business: no wrapper, no reparenting, and every page that
+     * does not ask for this gets a DOM identical to yesterday's, which is the
+     * property that makes this safe to land in shared kit before seven pages
+     * are re-run.
+     * ⚠️ IT IS WRITTEN FROM THE PLATE'S OWN `place` RATHER THAN FROM A SECOND
+     * FLAG, so a caller cannot ask for a side column and a horizontal plate and
+     * get a layout that means neither. One fact decides it.
+     */
+    if (plate.place === 'side') root.dataset.plateSide = plateSide;
   }
 
   let wrap = null, fixed = null;
@@ -187,6 +216,136 @@ export function createPanelLayout(o = {}) {
 
   const flowEl = wantFlow ? el('div', add('panel-flow', cls.flow)) : null;
   if (flowEl) strip.append(flowEl);
+
+  /**
+   * A band is a block stacked across the case, and a seam is the rule between
+   * two of them.
+   *
+   * 🔴 ASKED FOR 2026-09-25: *"on each button group have horizontal panel
+   * separator edge to edge"*, with a sketch of `/knobs/` drawing rules between
+   * the rotaries, the keyboard and the footer. **EDGE TO EDGE IS THE WHOLE
+   * DIFFICULTY AND IT DECIDES WHERE A SEAM MAY LIVE.**
+   *
+   * 🔴 **A SEAM IS A CHILD OF THE CASE. INSIDE THE SCROLLER IT IS NOT MERELY
+   * HARD, IT IS IMPOSSIBLE, AND THAT WAS MEASURED RATHER THAN ARGUED.** A rule
+   * put in `/knobs/`'s `.panel-flow` laid out at **992 px against a 686 px
+   * case**, because the flow is `width: max-content` and holds a keyboard wider
+   * than the panel, and 306 px of it sat behind `.panel-strip`'s
+   * `overflow-x: auto`. Pulling it left with a negative margin made it wider
+   * still and bought nothing: `scrollLeft` clamps at **0**, so inline-start
+   * overflow inside a scroller is clipped and can never be reached. **A seam
+   * between two rows of the flow is as wide as the widest row and scrolls with
+   * it, which is not a separator, it is a line inside a picture.**
+   *
+   * ✅ **AS A CASE CHILD IT IS ONE NEGATIVE MARGIN AND NOTHING ELSE.** The
+   * ancestor walk says why: `.panel-case` is `padding: 0 var(--panel-pad)`,
+   * horizontal only, so between a case child and the case's inner edge there is
+   * exactly ONE inset. MEASURED at 1280 px on the four cased pages, against
+   * each case's own inner edges: `/shape/` **x297.0..983.0**, `/knobs/`
+   * **x297.0..983.0**, `/evo/` **x297.0..983.0**, `/tom/` **x297.0..983.0**.
+   * Two of those carry a side plate, one on each edge, and a rule 1 px tall.
+   * ⚠️ **AND THAT IS `positron-ui`'S OWN RULE ABOUT THIS EXACT SHAPE**: *"when
+   * you are writing a third override to escape a parent, you are in the wrong
+   * container"*. The wrong container here is the scroller.
+   *
+   * 🔴 **THE NUMBERS BELOW ARE A ROW COUNT, WHICH IS NOT A MEASUREMENT.** A
+   * case with a side plate is a GRID, and its plate has to span every band or
+   * the rail stops under the first one. `grid-row: 1 / -1` cannot do it: with
+   * no explicit rows the end line `-1` IS line 1, which this stylesheet already
+   * records, so the plate spans one row and a full width seam is then pushed
+   * past it by auto placement. MEASURED before the count existed: a four child
+   * case laid out `1721.5px 70.5px 0px 0px 1px 70.5px`, six tracks for four
+   * bands, with two empty ones the plate had blocked. With the count it is
+   * `repeat(4, auto)`, the plate runs to the case's bottom on both pages, and
+   * the seam crosses the rail.
+   * ⚠️ **A CUSTOM PROPERTY, NEVER THE PROPERTY**, which is this file's standing
+   * rule one line down from the one about heights. `--panel-row` and
+   * `--panel-rows` are counts a stylesheet reads, so every rule about placement
+   * stays in `shell.css` where it can be overridden and read.
+   * ⚠️ **AND THEY ARE WRITTEN ONLY ON A GRID CASE.** A panel with no side plate
+   * is a flex column, its bands stack by themselves, and an inline style nothing
+   * reads on seven pages is a thing to explain later for no reason.
+   */
+  function layBands() {
+    if (!root.dataset.plateSide) return 0;
+    let n = 0;
+    for (const kid of root.children) {
+      if (plate && kid === plate.el) continue;
+      kid.style.setProperty('--panel-row', String(++n));
+    }
+    root.style.setProperty('--panel-rows', String(n));
+    return n;
+  }
+
+  /**
+   * Stack a block across the case, under whatever is already there.
+   *
+   * ⚠️ IT APPENDS, AND THE SCROLLER IS THEREFORE ALWAYS THE FIRST BAND, because
+   * `strip` is the one part of this component that is not optional and is built
+   * before any caller can speak. A page that needs a band ABOVE it is one
+   * argument away and nobody has asked for one.
+   *
+   * 🔴 THE CLASS IS APPLIED HERE RATHER THAN TYPED ON A PAGE, which is the
+   * argument `grow()` already makes eight lines up and which this one needs
+   * more: `.panel-band` carries the band's whole block inset, so a page that
+   * forgot it would get a case with no vertical rhythm at all and nothing would
+   * throw. **MEASURED on `/shape/` by the agent that tried to use this, nine
+   * sections lifted out of the strip: ink from one section's last lane to the
+   * next section's heading went from 40.0 px to 1.0 px, with the last band
+   * 0.0 px off the case's inner bottom.** Fifty-two sliders in one unbroken
+   * block with hairlines through it.
+   * 🔴 AND THE CAUSE IS `/held/`'s LESSON A THIRD TIME: `.pos-stack` owns the
+   * 40 px page rhythm as a margin on its own children, a block lifted out of a
+   * stack stops being one of them, and `.panel-case` pads horizontally only, so
+   * nothing replaced it. **A page with no siblings gets no rhythm, and a band
+   * is exactly that.**
+   */
+  function band(block) {
+    if (!block) return null;
+    const e = block.el || block;
+    e.classList.add('panel-band');
+    root.append(e);
+    layBands();
+    return e;
+  }
+
+  /**
+   * Take a band back out, and renumber what is left.
+   *
+   * 🔴 IT EXISTS BECAUSE THE ALTERNATIVE IS A PAGE SPLICING `case.children`,
+   * AND THAT WOULD BREAK SILENTLY RATHER THAN VISIBLY. `band()` owns two things
+   * a caller cannot see: the class that carries the inset, and the row numbers
+   * a grid case is placed by. A page removing a band itself would leave
+   * `--panel-rows` counting a child that has gone and `--panel-row` with a hole
+   * in it, so the plate's rail would run past the end of the case and the band
+   * after the hole would land in an empty track. Nothing throws and nothing
+   * looks wrong until somebody opens the page, which is the `/blocks/` shape
+   * this component already refuses once, for `grow`.
+   * ⚠️ IT TAKES THE CLASS OFF AS WELL AS THE ELEMENT, so a block a page keeps
+   * and puts back somewhere else does not carry a panel's inset with it into a
+   * stack that already has its own.
+   * ⚠️ AND IT IS A NO-OP ON ANYTHING THAT IS NOT A BAND OF THIS CASE, rather
+   * than a throw, because a page swapping parts calls this on whatever it is
+   * holding and half of those have already gone.
+   */
+  function unband(block) {
+    if (!block) return null;
+    const e = block.el || block;
+    if (e.parentNode !== root || !e.classList.contains('panel-band')) return null;
+    e.classList.remove('panel-band');
+    e.style.removeProperty('--panel-row');
+    e.remove();
+    layBands();
+    return e;
+  }
+
+  /** A rule between two bands, from one inner edge of the case to the other. */
+  function seam() {
+    const s = createPanelSeam();
+    root.append(s);
+    layBands();
+    return s;
+  }
 
   /** @type {string[]} what check() found, the way createDiagram reports a cut. */
   const cuts = [];
@@ -253,7 +412,26 @@ export function createPanelLayout(o = {}) {
     return { flowH, kidsH, gap, slack, growing, cuts, measured };
   }
 
-  return { el: root, wrap, fixed, strip, flow: flowEl, plate, cased, side, grow, check, cuts };
+  // The strip is band one, and the count has to exist before a caller adds a
+  // second. On a panel with no side plate this returns 0 and writes nothing.
+  layBands();
+
+  return {
+    el: root, wrap, fixed, strip, flow: flowEl, plate, cased, side,
+    grow, band, unband, seam, check, cuts,
+  };
+}
+
+/**
+ * A rule across a panel, 1 px of `--line`.
+ *
+ * 🔴 IT IS ONLY EDGE TO EDGE AS A CHILD OF THE CASE, AND `createPanelLayout`'s
+ * `seam()` IS HOW A PAGE GETS ONE THERE. Exported for a caller assembling a
+ * case by hand, which `/kit/` does; everything about where it may live and what
+ * was measured is beside `layBands` above.
+ */
+export function createPanelSeam() {
+  return el('div', 'panel-seam');
 }
 
 /**
@@ -285,10 +463,51 @@ export function createPanelLayout(o = {}) {
  * setting their nameplates three ways and why this component exists. A
  * placement is arrangement, and arrangement is what this file owns.
  */
+/**
+ * 🔴 `side`: THE PLATE TURNED ON ITS SIDE AND GLUED DOWN THE EDGE OF THE CASE,
+ * ADDED 2026-09-25. Asked for on `/shape/`: *"wrap into isntrument box.
+ * nameplate is \"shape\" vertical glued section"*. Every placement before it is
+ * horizontal (`ends` on `/tom/`, `end` on `/twelve/` and in every header, `mid`
+ * on `/evo/`), so this is a fourth placement rather than an option on one of
+ * them, and it is built HERE so all seven pages wearing the case can have it
+ * rather than one page rotating text in its own stylesheet.
+ *
+ * 🔴 AND IT DOES NOT UNDO *"rm nameplates"*. `instrument.mjs` records
+ * `plate: false`, added 2026-09-22 on that ask, and the reason it gives is
+ * specific and still true: **the status control already prints the
+ * instrument's name in front of its state, so a plate BESIDE IT is the name
+ * twice on one row.** That is an objection to a plate in the HEADER. A plate
+ * turned ninety degrees and glued down the edge of the case is a different
+ * object in a different place: it names the whole instrument the way the
+ * silkscreen down the side of a real one does, it is nowhere near the status
+ * control, and it cannot be the same fact twice because it is not on that row.
+ * **Both decisions stand.** `plate: false` is still how a header gives its
+ * plate up, and a page that wants the name on the case asks for this.
+ *
+ * ⚠️ `writing-mode`, NOT A `rotate`. A transform takes the element out of flow
+ * and leaves a box the width of the text it used to be, so the column beside it
+ * would be sized by a word lying down. `writing-mode` changes the box, so the
+ * grid track is genuinely the height of the name and as narrow as its type.
+ *
+ * 🔴 `caps: false` KEEPS WHAT WAS TYPED, AND IT IS HERE BECAUSE THE ASK SAYS
+ * `shape` IN LOWER CASE. `shell.css` uppercases every plate on a rule asked for
+ * 2026-09-21 (*"replica names always in uppercase"*), which is about a shelf of
+ * REPLICAS reading as one shelf: `/tom/`, `/twelve/`, `/circuit/` and `/evo/`
+ * all name a machine somebody else made. `/shape/` is not a replica of
+ * anything, the name asked for is the page's own slug, and `SHAPE` would be
+ * this component answering a different question from the one it was asked.
+ * ⚠️ IT IS A COMPONENT OPTION AND NOT A PAGE RULE, FOR THE REASON THIS FILE
+ * ALREADY HAS IN WRITING one function up: `/tom/` fixed a plate in its own
+ * stylesheet, *"every page after it inherited the defect and not the fix"*, and
+ * it was reported again on `/plai/`. A page reaching into `.panel-plate-l` to
+ * turn a transform off is that, exactly.
+ * ⚠️ AND `shown()` BELOW ALREADY HANDLES IT, because it reads the COMPUTED
+ * transform rather than assuming one. Nothing about the check changes.
+ */
 export function createNameplate(o = {}) {
-  const { lines = [], place = 'ends', cls = '' } = o;
-  if (place !== 'ends' && place !== 'mid' && place !== 'end') {
-    throw new Error(`createNameplate: place is 'ends', 'mid' or 'end', not ${JSON.stringify(place)}`);
+  const { lines = [], place = 'ends', cls = '', caps = true } = o;
+  if (place !== 'ends' && place !== 'mid' && place !== 'end' && place !== 'side') {
+    throw new Error(`createNameplate: place is 'ends', 'mid', 'end' or 'side', not ${JSON.stringify(place)}`);
   }
   // 🔴 REFUSED RATHER THAN DRAWN EMPTY. A plate with nothing on it is a
   // container with nothing in it painting its own edges, which is the shape this
@@ -300,6 +519,11 @@ export function createNameplate(o = {}) {
   // `[data-place="ends"]` rather than a bare `[data-place]`: an attribute
   // selector matches on PRESENCE, and an empty one would satisfy a bare test.
   root.dataset.place = place;
+  /* ⚠️ A CLASS AND NOT AN ATTRIBUTE HERE, because this one only ever turns a
+     transform OFF and there is nothing to match a value against. Everything
+     said about `[data-place]` matching an empty attribute is about a property
+     with three settings; this has two and the absence is the default. */
+  if (!caps) root.classList.add('panel-plate-asis');
   const parts = lines.map((t) => {
     const e = el('div', 'panel-plate-l', t);
     root.append(e);

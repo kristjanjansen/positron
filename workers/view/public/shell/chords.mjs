@@ -265,7 +265,7 @@ export function parseChords(line) {
  * chords in a row jump the hand up and down the keyboard, and a seventh chord
  * with a slash bass can simply not fit.
  *
- * Three modes, and each one is a real way people play:
+ * Four modes, and each one is a real way people play:
  *   `root`  what the parser said. Kept because it is the SPELLING, and a chart
  *           that shows a shape nobody asked for is lying about the symbol.
  *   `close` every note folded into one octave above the lowest, which is the
@@ -273,13 +273,55 @@ export function parseChords(line) {
  *   `lead`  the inversion whose notes move least from the chord before it,
  *           which is what makes a PROGRESSION playable: the hand stays put and
  *           the notes change under it. `near` is the previous chord's notes.
+ *   `split` the root alone underneath and the rest of the chord above it,
+ *           placed where it moves least from the chord before. Two hands.
+ *
+ * 🔴 `split` WAS ASKED FOR WITH A PICTURE, 2026-09-25: *"what voicing?
+ * wanna this"*, beside a piano tutorial of `Cmaj7 Dm7 Em7 Fmaj7` notated on two
+ * staves, ONE BASS NOTE PER CHORD IN THE LEFT HAND (C, D, E, F) AND THREE NOTES
+ * IN THE RIGHT THAT BARELY MOVE. A musician calls it a rootless voicing over a
+ * bass root, and that name is written here once so a reader who knows it can
+ * find this, and nowhere a visitor looks: `positron-ui` bans a private
+ * vocabulary on a control, and this exact page has already paid for it, with
+ * `SPELLED CLOSE LEADING` and the report *"i do not know what spelled close
+ * leading means"*.
+ * 🔴 THE ROOT LEAVES THE RIGHT HAND, WHICH IS THE WHOLE OF IT. The note
+ * underneath already has it, so the hand above spends its notes on the ones
+ * that carry the harmony, and it is then free to sit still while the bass
+ * walks. That is why the tutorial's treble barely moves under four different
+ * chords.
+ * ⚠️ AND NOTHING IS LOST WHEN THE ROOT GOES, WHICH IS WHY THIS IS SAFE ON
+ * EVERY CHORD SIZE INCLUDING A TRIAD. A split voicing holds exactly the pitch
+ * classes of the spelling, every chord and every time, because the note that
+ * left the right hand is the note that arrived in the left. A triad gets a TWO NOTE
+ * right hand and that is the answer rather than a shortfall: the alternative,
+ * dropping the fifth instead so that three notes are left, puts the root back
+ * above a bass that already has it, which is the one thing this mode exists to
+ * take away. `c5` becomes one note over its own root, which is a power chord
+ * with the hands apart and is still every note the symbol names.
+ * 🔴 A SLASH CHORD KEEPS ITS ROOT, BECAUSE THE PREMISE OF THIS MODE STOPS
+ * BEING TRUE ABOUT IT. `Fm6/C` names C as the note underneath, so the note
+ * underneath does NOT have the root, and taking F out of the hand would delete
+ * a note the symbol says is in the chord rather than move it. `Fm6/C` in this
+ * mode is C3 D3 F3 G#3 C4: the named bass below, the whole of Fm6 above it,
+ * placed to move least, which is what `lead` already does with it. The `bass`
+ * option below is UNCHANGED and still means only *the first note is a named
+ * slash bass*: it decides WHICH note goes underneath, and this mode only
+ * decides whether the root is spent on that job. Nothing about `Fm6/C` in the
+ * other three modes moves.
+ * ⚠️ THE ROOT IS READ AS THE LOWEST NOTE OF THE CHORD, once a named bass
+ * has been taken off it. That is exactly what `parseChord` returns, and it is
+ * what every caller in this repository passes, `/nola/`'s learned rows
+ * included, because `name.mjs`'s `notesOf` is a `parseChord` of the name. A
+ * caller handing this mode an INVERTED chord would have its lowest note taken
+ * for a root, so hand it the spelling and let this decide where it goes.
  *
  * ⚠️ AND THE BASS IS NOT INVERTED, IN ANY MODE. A slash chord names a bass and
  * folding it up is a different chord with the same letters, which is the same
  * mistake `parseChord` already refuses when it puts the bass below the root.
  * It is kept at the bottom and only moved by whole octaves to fit the window.
  */
-export const VOICINGS = ['root', 'close', 'lead'];
+export const VOICINGS = ['root', 'close', 'lead', 'split'];
 
 /** Every octave transposition of `notes` whose span fits inside `lo`..`hi`. */
 const inversions = (notes) => {
@@ -309,18 +351,46 @@ const distance = (a, b) => {
  *
  * @param {number[]} notes  a chord's notes, lowest first, bass included
  * @param {object} o
- * @param {'root'|'close'|'lead'} [o.mode]
+ * @param {'root'|'close'|'lead'|'split'} [o.mode]
  * @param {number} o.lo     lowest note the keyboard can draw
  * @param {number} o.hi     highest note the keyboard can draw
- * @param {number[]} [o.near]  the previous chord, for `lead`
+ * @param {number[]} [o.near]  the previous chord, for `lead` and `split`
  * @param {boolean} [o.bass]   is the first note a slash bass
  * @returns {{notes:number[], outside:number[], mode:string}}
  */
 export function voiceChord(notes, { mode = 'root', lo = 48, hi = 72, near = [], bass = false } = {}) {
   const src = [...notes].sort((a, b) => a - b);
   if (!src.length) return { notes: [], outside: [], mode };
-  const bassNote = bass ? src[0] : null;
-  const body = bass ? src.slice(1) : src;
+  let bassNote = bass ? src[0] : null;
+  let body = bass ? src.slice(1) : src;
+  /**
+   * 🔴 `split` TAKES THE ROOT OUT OF THE HAND AND PUTS IT UNDERNEATH, AND
+   * THAT IS THE ONLY THING IT CHANGES HERE. Everything below is the machinery
+   * the other three modes already use: `bassUnder` pins a pitch class under the
+   * body wherever the body ends up, `places` fits the body at every inversion
+   * and octave, and the `near` rule chooses. So this mode is a different BODY
+   * and a different note underneath it, not a second voicing routine.
+   * ⚠️ A CHORD WITH FEWER THAN TWO NOTES ABOVE ITS BASS IS LEFT WHOLE, because
+   * taking the root off a one note chord leaves a hand with nothing in it.
+   */
+  const split = mode === 'split';
+  /**
+   * 🔴 THE ROOT LEAVES THE HAND ONLY WHEN THE ROOT IS THE NOTE GOING
+   * UNDERNEATH, WHICH IS THE WHOLE ANSWER TO WHAT A SLASH CHORD DOES HERE. This
+   * mode's one argument is that the bass already has the root, so the hand above
+   * need not spend a note on it. `Fm6/C` NAMES a different bass, the argument
+   * stops being true, and dropping the F would delete a note the symbol says is
+   * in the chord. So a slash chord in this mode is the chord over its named
+   * bass, placed to move least, which is what `lead` already does with it.
+   * ⚠️ AND THAT IS WHAT KEEPS THE INVARIANT UNIVERSAL: a split voicing holds
+   * exactly the pitch classes of the spelling, every chord, every time, because
+   * the note that leaves the hand is the note that arrives underneath.
+   */
+  const dropRoot = split && bassNote === null && body.length >= 2;
+  if (dropRoot) {
+    bassNote = body[0];
+    body = body.slice(1);
+  }
   /**
    * 🔴 THE BASS FOLLOWS THE CHORD AND STAYS UNDER IT, AND IT KEEPS ITS PITCH
    * CLASS. With the bass pinned to one octave while the body was free to move,
@@ -368,6 +438,17 @@ export function voiceChord(notes, { mode = 'root', lo = 48, hi = 72, near = [], 
     return { notes: out, outside: out.filter((n) => n < lo || n > hi), mode };
   }
 
+  /* ⚠️ THE TWO WAYS OF CHOOSING, NAMED ONCE, because `split` needs both of
+     them and the first version of it wrote the span rule out a second time. */
+  const bySpan = (list) => list.reduce((best, p) => {
+    if (span(p.full) < span(best.full)) return p;
+    if (span(p.full) === span(best.full)
+        && Math.min(...p.full) < Math.min(...best.full)) return p;
+    return best;
+  }, list[0]);
+  const nearestTo = (list, want, of) => list.reduce((best, p) =>
+    (distance(of(p), want) < distance(of(best), want) ? p : best), list[0]);
+
   let pick;
   if (mode === 'close') {
     /**
@@ -381,15 +462,36 @@ export function voiceChord(notes, { mode = 'root', lo = 48, hi = 72, near = [], 
      * ⚠️ A tie goes to the lowest, so two equal answers do not depend on the
      * order of the list.
      */
-    pick = places.reduce((best, p) => {
-      if (span(p.full) < span(best.full)) return p;
-      if (span(p.full) === span(best.full)
-          && Math.min(...p.full) < Math.min(...best.full)) return p;
-      return best;
-    }, places[0]);
+    pick = bySpan(places);
+  } else if (split) {
+    /**
+     * 🔴 THE HAND IS WHAT HAS TO STAY STILL, SO THE DISTANCE IS MEASURED OVER
+     * THE BODY AND NOT OVER THE WHOLE VOICING. The bass is SUPPOSED to move: it
+     * walks C D E F under the four chords in the picture that asked for this.
+     * Including it makes the thing being minimised partly the movement of the
+     * one voice nobody wants held still, and the bass moves with the body
+     * anyway, so a body placed an octave up takes its bass with it and the two
+     * terms are not independent. MEASURED over five lines and thirty chords: the
+     * hand above travels **114 semitones when the body is what is compared and
+     * 132 when the whole voicing is**, over an identical 185 for the voicing as
+     * a whole, and the two choose differently on 10 of the 30.
+     * ⚠️ AND ON THE FOUR CHORDS IN THE PICTURE THEY AGREE EXACTLY, which is
+     * worth saying because those four are the only evidence that was supplied
+     * and they would have settled nothing. `Cmaj7 Dm7 Em7 Fmaj7` comes out
+     * note for note the same either way.
+     * ⚠️ AND THE PREVIOUS CHORD'S HAND IS ITS NOTES WITHOUT THE LOWEST ONE,
+     * which is an inference this mode is entitled to make about its OWN output:
+     * in a split voicing the lowest note is the bass, by construction. A caller
+     * redraws a whole line in one mode, so `near` came from here.
+     */
+    const prev = [...near].sort((a, b) => a - b);
+    const nearBody = prev.length > 1 ? prev.slice(1) : prev;
+    /* ⚠️ WITH NOTHING TO MOVE FROM IT IS THE CLOSE ONE, which is the answer
+       `lead` already gives to a first chord and for the same reason: root
+       position for it would make the second chord jump to meet it. */
+    pick = nearBody.length ? nearestTo(places, nearBody, (p) => p.body) : bySpan(places);
   } else if (mode === 'lead' && near.length) {
-    pick = places.reduce((best, p) =>
-      (distance(p.full, near) < distance(best.full, near) ? p : best), places[0]);
+    pick = nearestTo(places, near, (p) => p.full);
   } else {
     /* `root` keeps the spelling and only moves it onto the keys, and a `lead`
        with nothing to lead from is a `close`: a first chord has no previous

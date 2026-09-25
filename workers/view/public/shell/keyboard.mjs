@@ -122,7 +122,28 @@ import { createToggle } from './toggle.mjs';
    button. `numloop.mjs` owns WHICH slot is doing what; the keyboard owns what
    recording and looping MEAN, which is the same division the page keeps with the
    keyboard. */
-import { createNumLoop } from './numloop.mjs';
+/* ⚠️ `RATIOS` AND `TEMPO_BAND` COME ACROSS WITH IT, AND THEY ARE THE RESERVES
+   RATHER THAN THE ARITHMETIC. The two footer cells added 2026-09-25 must not
+   change width while a player is looking at them, so each one reserves the
+   widest thing it can ever say. Reading those widths off the module that
+   decides them means adding a ratio or moving the band cannot leave a cell
+   quietly too narrow, which is the `--sld-col` defect this project has already
+   paid for twice: a shared measurement typed in two files is a measurement that
+   will disagree. */
+import { createNumLoop, RATIOS, TEMPO_BAND } from './numloop.mjs';
+/* 🔴 THE NAMER ALREADY EXISTS AND IT IS NOT `chords.mjs`. Asked 2026-09-25:
+   *"add chord name to the footer, right from the transpose message"*. The
+   obvious first move is `chords.mjs`, because that file is about chords and is
+   imported all over this project, and it is the WRONG DIRECTION: it turns
+   `Cmaj` into notes. This needs notes turned into `Cmaj`, which
+   `demo/shell/name.mjs` does, which `name-test.mjs` grades with ten negative
+   controls, and whose own header spends a page on why the two are different
+   problems rather than one problem with the arrow turned round.
+   ⚠️ SO NOTHING IS NAMED TWICE HERE. The reserved width below is computed from
+   that module's own `RECOGNISED` and `NOTE_LETTERS` rather than from a number
+   typed in this file, which is the same reason `name.mjs` takes its letters out
+   of `chords.mjs` instead of writing them again. */
+import { nameChord, RECOGNISED, NOTE_LETTERS } from './name.mjs';
 
 /**
  * 🔴 WHERE A BLACK KEY SITS, AS FRACTIONS OF ITS OWN WIDTH, FROM
@@ -290,6 +311,59 @@ export const QWERTY_CHROMATIC = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7
 export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
 
 /**
+ * 🔴 A KEYBOARD OF N SEMITONES, AND IT IS A COMPONENT BECAUSE THE SECOND PAGE
+ * ASKED FOR IT. Asked on `/knobs/` 2026-09-25 as *"make keyboard 25 full w."*.
+ * `/nola/` already builds exactly this inline, twenty-five keys from a letter
+ * map with `hi<n>` ids for the ones no letter reaches, and `/knobs/` was about
+ * to write it a second time. **A control that exists in one page and nowhere
+ * else is a component that has not been noticed yet**, which is this project's
+ * own rule and the reason three pages once had three different radio rows.
+ *
+ * ⚠️ 25 KEYS IS `span: 24`, AND THE OFF BY ONE IS THE WHOLE NAMING PROBLEM.
+ * A 25 key controller is two octaves C to C, which is 24 SEMITONES inclusive of
+ * both ends. The argument is the span in semitones because that is what a note
+ * number is measured in and what `base + span` means; `KEY_SPAN_25` is here so
+ * a caller never has to do that subtraction in its own head.
+ *
+ * 🔴 THE LETTERS ARE READ OFF THE MAP'S VALUES AND NEVER OFF ITS ORDER, WHICH
+ * `/nola/` RECORDS AS A REAL BUG. `QWERTY_CHROMATIC` has a GAP in it: `l` is 14
+ * and nothing sits at 13, so handing the nth letter to the nth semitone puts a
+ * white letter on a black key and moves every shape a hand knows one key out.
+ * ⚠️ AND A KEY WITH NO LETTER STILL NEEDS AN ID, because `keys` is a list of
+ * ids and `map` is keyed by them. `hi<semitone>` is what `/nola/` chose and it
+ * is kept, so the two builds produce identical ids and nothing that reads one
+ * has to learn the other.
+ * ⚠️ `letters` COMES BACK AS A SET rather than `true`, which is what
+ * `createKeyboard` wants for a layout with more keys than the computer keyboard
+ * has letters. The component's own note beside `letters` argues it.
+ *
+ * @param {number} [span] semitones from the leftmost key to the rightmost,
+ *   inclusive of both, so a two octave picture is 24 and gives 25 keys.
+ * @returns {{map, keys, sharps, letters, whites}} the four arguments
+ *   `createKeyboard` takes, plus the white key count a caller may want for a
+ *   width. Spread it: `createKeyboard(host, { ...keyRange(24), base: 48 })`.
+ */
+export const KEY_SPAN_25 = 24;
+
+export function keyRange(span = KEY_SPAN_25) {
+  const map = {}, keys = [], sharps = new Set(), letters = new Set();
+  /* the five pitch classes a piano paints black, which is a fact about a
+     keyboard rather than about this letter map */
+  const BLACK = new Set([1, 3, 6, 8, 10]);
+  const letterAt = Object.fromEntries(
+    Object.entries(QWERTY_CHROMATIC).map(([k, v]) => [v, k]));
+  let whites = 0;
+  for (let i = 0; i <= span; i++) {
+    const id = letterAt[i] ?? `hi${i}`;
+    map[id] = i;
+    keys.push(id);
+    if (BLACK.has(((i % 12) + 12) % 12)) sharps.add(id); else whites++;
+    if (letterAt[i]) letters.add(id);
+  }
+  return { map, keys, sharps, letters, whites };
+}
+
+/**
  * @param host     element to append the keyboard to
  * @param base     MIDI note of the leftmost key (60 = middle C)
  * @param onDown   (note, how) — how is 'key' | 'pointer' | 'midi' | 'panic'
@@ -314,7 +388,7 @@ export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
  * @param pad      `false` draws no octave pair and no `Notes off`, for a chord
  *                 chart rather than an instrument. See the block beside it.
  * @returns {{el, keysEl, pad, noteOf, keyOf, press, release, base, shiftOctave,
- *            panic, lightNote, notes, timing, destroy}}
+ *            panic, lightNote, notes, chord, timing, destroy}}
  *          `el` is the WHOLE component — keys plus pad — so a page that places
  *          it by hand places both. `keysEl` is the key row alone.
  */
@@ -330,6 +404,34 @@ export function createKeyboard(host, {
   /** where this component says what its loop is doing. `d.log`, normally. */
   log = null,
   names: wantNames = true,
+  /** name the chord being held, in the footer. See the block beside it. */
+  chord: wantChord = true,
+  /**
+   * 🔴 A ROW OF THE PAGE'S OWN UNDER THE COMPONENT'S, WITH A RULE ACROSS THE
+   * BOX ABOVE IT. `foot: true` and the row comes back as `api.foot`.
+   *
+   * 🔴 IT EXISTS BECAUSE A PAGE BUILT ONE BY HAND AND THE OWNER SAW THE JOIN.
+   * Reported 2026-09-25 against `/nola/`: *"the border on top of footer goes
+   * edge to edge. in the life of me i don ot understand why you do not see it
+   * and build a soliutiojn that stays (glued panels) not invent custom css with
+   * measurements each time"*. That page carried `.nola-foot` with a
+   * `--foot-air: 10px` of its own and a `border-top`, appended INSIDE `.kbd`,
+   * which is `padding: var(--kbd-pad)`. **So the rule stopped 9 px short of the
+   * box's border at both ends**, and the number it was drawn with was a second
+   * copy of a distance this stylesheet already publishes.
+   * ⚠️ AND THE COMPLAINT IS ABOUT WHERE IT WAS BUILT RATHER THAN ABOUT THE
+   * PIXELS. `/tom/` repaired the nameplate's padding in its own stylesheet and
+   * *"every page after it inherited the defect and not the fix"*, which was
+   * re-reported on `/plai/`. Ten pages import this module, so this is written
+   * once and no page writes that border again.
+   * ⚠️ IT IS NOT THE PAD ROW AND DOES NOT TOUCH IT. The octave pair, the
+   * displacement, the chord name, `Loop`, `Sustain` and `Notes off` are
+   * controls ABOUT THE KEYS and stay where they are; this is the row for what
+   * the keys PLAY, which is the page's business.
+   */
+  foot: wantFoot = false,
+  /** 🔴 THE BOX SPANS ITS HOST INSTEAD OF SIZING TO THE KEYS. See `full` below. */
+  full = false,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
   /**
@@ -418,6 +520,21 @@ export function createKeyboard(host, {
   };
 
   const el = make('div', 'kbd');
+  /**
+   * 🔴 A KEYBOARD THAT SPANS ITS HOST, ASKED FOR ON `/knobs/` 2026-09-25 AS
+   * *"make keyboard 25 full w."*. `.kbd` is `width: fit-content` by default and
+   * that is the right default, because a full width panel holding a 496 px
+   * keyboard is a box of empty surface that reads as a layout which failed.
+   * ⚠️ IT DOES NOT TOUCH THE KEY CEILING, WHICH IS A DIFFERENT DECISION AND
+   * STANDS. `shell.css` records *"make it higher in desktop to have similar
+   * proportions as monile. do not stretch it ever"* and pins a white key
+   * between 49 and 62 px. `full` makes the BOX span its host; the keys keep
+   * their own range inside it, so a 25 key layout fills a panel because
+   * fifteen white keys are wider than the panel rather than because anything
+   * was stretched to fit.
+   * ⚠️ OPT IN, so the nine pages that pass nothing are unchanged.
+   */
+  if (full) el.classList.add('kbd-full');
   const keysEl = make('div', 'keys');
   const els = new Map();
   const letterOf = new Map();         // element -> letter, for the hit test
@@ -691,21 +808,47 @@ export function createKeyboard(host, {
    * nobody can use, which is the same rule the pad itself follows.
    */
   const nameSeg = make('span', 'step pos-seg kpad-names');
-  const mkName = (text, mode, title) => {
+  /* ⚠️ THE ACCESSIBLE NAME IS THE FULL PHRASE AND THE VISIBLE ONE IS A LETTER.
+     `N` and `D` are not self explanatory, and `positron-ui` bans a control whose
+     label is this project's private vocabulary with nothing a reader can look
+     up. A `title` is a DESCRIPTION rather than a name, so a screen reader would
+     have announced *"N, pressed"*; `aria-label` makes the name the words. */
+  const mkName = (text, mode, title, aria) => {
     const b = make('button', '', text, { type: 'button', title });
+    b.setAttribute('aria-label', aria);
     b.onclick = () => api.setNaming(mode);
     nameSeg.append(b);
     return b;
   };
-  /* 🔴 THE TWO STANDARD TERMS, ASKED FOR IN THIS ORDER: *"c | 1 - someting more
-     descriptive?"*, then `C D E | 1 2 3`, then *"Notes | Degrees"*, 2026-09-23.
-     These are what the two namings are CALLED: note names are absolute, a C is
-     a C in any key, and scale degrees are relative, so `1` moves when the key
-     does. The glyphs showed which was which and named neither, and a word a
-     reader can look up beats a demonstration they have to decode. */
-  const letterBtn = mkName('Notes', 'letter', 'name the keys as notes, which do not move');
-  const degreeBtn = mkName('Degrees', 'degree',
-    'name the keys as scale degrees, which move with the key');
+  /* 🔴 THE FOURTH SPELLING OF ONE LABEL, AND THE THREE BEFORE IT ARE KEPT
+     BECAUSE THE ARGUMENT MOVED RATHER THAN BEING WON. Asked in this order:
+     *"c | 1 - someting more descriptive?"*, then `C D E | 1 2 3`, then
+     *"Notes | Degrees"* on 2026-09-23, then *"keyboard component: Notes |
+     Degreens -> Nt | Dg."* on 2026-09-25, then *"Nt | Dg to N | D in
+     keyboard"* the same day. **FIVE spellings, and each one is kept because the
+     argument moved rather than being won.**
+     🔴 AND THE COMMENT THAT STOOD HERE UNTIL TODAY ARGUED THE OPPOSITE IN
+     WRITING, so it is replaced rather than left to contradict the code. It
+     said *"a word a reader can look up beats a demonstration they have to
+     decode"*, which was the right answer to the question it was asked: `C D E`
+     against `1 2 3` DEMONSTRATES the two namings and names neither, so a
+     reader has to work out what the row is offering. `Nt` and `Dg` are not
+     that. They are the words themselves, shortened, so the thing a reader
+     looks up is still a word and it is still the right one.
+     ✅ WHAT BUYS IT IS THE ROW. This footer holds a naming pair, an octave
+     pair, a displacement, a chord name and three buttons, and `Notes` plus
+     `Degrees` is twelve characters of it for a control nobody presses twice a
+     session. MEASURED on `/nola/` at 1280 px, the same segmented row built both
+     ways in the same pad: **118.48 px against 65.50**, so the row gets 52.98 px
+     back, which is most of what the chord cell beside it costs.
+     ⚠️ AND THE `title` IS NOT WHAT IS BEING SHORTENED. It is the sentence a
+     reader looks up when an abbreviation does not tell them enough, so it
+     stays exactly as it was and carries the meaning the label gives up. That
+     is the whole reason this is a shortening rather than a loss. */
+  const letterBtn = mkName('N', 'letter',
+    'name the keys as notes, which do not move', 'note names');
+  const degreeBtn = mkName('D', 'degree',
+    'name the keys as scale degrees, which move with the key', 'scale degrees');
   const paintNaming = () => {
     for (const [b, mode] of [[letterBtn, 'letter'], [degreeBtn, 'degree']]) {
       if (naming === mode) b.dataset.on = '1'; else delete b.dataset.on;
@@ -772,6 +915,98 @@ export function createKeyboard(host, {
     if (d === 0) atEl.dataset.home = '1'; else delete atEl.dataset.home;
   };
   pad.append(atEl);
+  /**
+   * 🔴 WHAT IS BEING HELD, NAMED, TO THE RIGHT OF THE DISPLACEMENT. Asked
+   * 2026-09-25: *"add chord name to the footer, right from the transpose
+   * message. avoind text moving in x axis"*.
+   *
+   * 🔴 THE SECOND SENTENCE IS THE HARD HALF AND IT IS SOLVED BY A RESERVE, NOT
+   * BY A SHORT NAME. A chord name is one character for `C` and eleven for
+   * `G#min7b5/D#`, so a cell that sizes to its content moves everything beside
+   * it on every chord somebody plays, which is exactly the rule this project
+   * already has in writing: nothing that redraws while somebody is looking at
+   * it may change how much room it takes. The widest thing this cell can ever
+   * say is reserved at build time and the name is drawn inside it.
+   * ⚠️ AND THE WIDTH IS COMPUTED FROM `name.mjs`'s OWN TABLES RATHER THAN
+   * TYPED. A root letter (`C` or `C#`), the longest quality that module will
+   * ever return (`min7b5`), a slash and a bass letter. A number typed here
+   * would be right today and silently narrow the first time a quality is added
+   * to `RECOGNISED`, and a name clipped by an ellipsis is this project's own
+   * signal that something is in the wrong place. `presence.mjs` reserves its
+   * word the same way and for the same reason.
+   * ⚠️ `ch` ON A MONO FACE IS EXACTLY CHARACTERS, which is what makes the
+   * arithmetic above a measurement rather than an estimate.
+   *
+   * 🔴 IT IS A CELL BESIDE THE DISPLACEMENT, NOT A STRING JOINED TO IT. Two
+   * facts, two elements, no separator between them, which is the standing rule
+   * about a row of facts being cells rather than one string with glue in it.
+   *
+   * ⚠️ TWO INKS, AND THEY ARE `/nola/`'s TWO, because that page is giving this
+   * readout up to this component and the two must not disagree about what a
+   * colour means. A name the recogniser is sure of and two readings it cannot
+   * choose between are different statements: `--dim` for the first, `--dim2`
+   * for the second. `name.mjs` measured the margin that separates them.
+   */
+  const LETTER_CH = Math.max(...NOTE_LETTERS.map((l) => l.length));
+  const CHORD_CH = LETTER_CH + Math.max(...RECOGNISED.map(([q]) => q.length))
+                 + 1 + LETTER_CH;
+  const chordEl = wantChord ? make('span', 'kpad-chord', '') : null;
+  if (chordEl) {
+    chordEl.style.minWidth = `${CHORD_CH}ch`;
+    pad.append(chordEl);
+  }
+  /**
+   * 🔴 TWO MORE CELLS, AND ONLY ON A KEYBOARD THAT LOOPS. Asked 2026-09-25:
+   * *"in keyboadd looper: do basic bmp detection / quant and when first loop
+   * set, all next ones align on it, either times shorter, same or longer"*. The
+   * arithmetic is `numloop.mjs`'s and it deliberately chose no cells, because a
+   * readout is the surface's and this is the surface.
+   *
+   * 🔴 GATED ON `wantLoop`, WHICH IS WHAT KEEPS THIS OFF THE PAGES THAT DO NOT
+   * LOOP. MEASURED 2026-09-26: seven pages mount this component and exactly two
+   * of them pass `loop: true`, `/kit/` and `/nola/`, so two cells appear on two
+   * pages and the other five rows are byte for byte what they were. That is the
+   * `:has(> .panel-strip:empty)` argument one component along: a component rule
+   * with a CONDITION on it can be provably narrow, where a page-local repair to
+   * a shared component is how a defect gets paid for twice.
+   *
+   * 🔴 A TEMPO NOBODY HAS PLAYED IS AN EMPTY CELL. Never `0`, which reads as a
+   * very confident measurement of nothing, and never `120`, which is this
+   * project's favourite invented number. `numloop.mjs` answers `bpm: null` with
+   * a sentence saying what was missing and this draws the empty string.
+   * 🔴 AND WHETHER IT WAS HEARD OR SET IS PART OF THE READING, NOT A FOOTNOTE.
+   * A detected tempo is an INFERENCE off three gaps in somebody's playing, and
+   * this project has paid repeatedly for printing one as a fact. The WORD says
+   * which (`heard` off the playing, `set` by a page with its own clock) and the
+   * ink corroborates it the way `.kpad-chord` already does for a name it is sure
+   * of. The word is the channel; the colour is the second opinion.
+   *
+   * 🔴 AND A REFUSED SNAP IS A WORD RATHER THAN A BLANK. When a take is further
+   * than `MAX_STRETCH` from every allowed ratio the lap stays exactly as it was
+   * played, which is a real outcome a player should be able to tell from
+   * *nothing happened*. `as played` says so. `first` is the take that SET the
+   * unit, which is not a refusal and must not read like one.
+   *
+   * ⚠️ RESERVED IN `ch` FROM THE TABLES THAT DECIDE THEM. A bpm this module
+   * detects is folded into `TEMPO_BAND`, so three digits is the widest it can
+   * ever be, and the ratio words come off `RATIOS`. Nothing here is a typed
+   * number that goes quietly narrow the first time somebody adds `1/8`.
+   * ⚠️ A `given` TEMPO CAN SIT OUTSIDE THE BAND AND IS THE ONE CASE THAT WIDENS
+   * THIS CELL, and it is not the failure the reserve exists to stop: a page sets
+   * that once, at build, where the rule is about a cell changing size under a
+   * player's hands. Nothing in this repository calls `assume` yet.
+   */
+  const TEMPO_CH = String(Math.round(TEMPO_BAND[1])).length + ' bpm '.length
+                 + Math.max('heard'.length, 'set'.length);
+  const RATIO_CH = Math.max('as played'.length, 'first'.length,
+                            ...RATIOS.map((x) => x.label.length + 1));
+  const tempoEl = wantLoop ? make('span', 'kpad-tempo', '') : null;
+  const ratioEl = wantLoop ? make('span', 'kpad-ratio', '') : null;
+  if (tempoEl) {
+    tempoEl.style.minWidth = `${TEMPO_CH}ch`;
+    ratioEl.style.minWidth = `${RATIO_CH}ch`;
+    pad.append(tempoEl, ratioEl);
+  }
   const panicBtn = make('button', '', 'Notes off', {
     type: 'button', title: 'stop every note that is still sounding',
   });
@@ -841,6 +1076,12 @@ export function createKeyboard(host, {
     pad.append(node);
   });
   if (wantPad) el.append(pad);
+  /* 🔴 THE PAGE'S ROW GOES IN LAST, AND THE COMPONENT OWNS ITS EDGES. The rule
+     above it bleeds through `--kbd-pad` to the box's own border and the row's
+     content is inset by that same token, so the left, top and bottom air is one
+     number read once. See `.kbd-foot` in `shell.css` for the measurement. */
+  const footEl = wantFoot ? make('div', 'kbd-foot') : null;
+  if (footEl) el.append(footEl);
 
   host.append(el);
 
@@ -860,12 +1101,64 @@ export function createKeyboard(host, {
      answers the wrong way on every key up. */
   let viaKey = 0;
 
+  /**
+   * 🔴 WHAT IS SOUNDING IS TWO SETS AND NOT ONE, WHICH IS THE ONE THING ABOUT
+   * NAMING A CHORD HERE THAT IS NOT OBVIOUS. `held` is the KEYS this
+   * component's own funnel pressed; `fingerNotes` is the NOTES a page lit from
+   * somewhere this component never saw, which is the MIDI case and is the whole
+   * point on a page with a keyboard plugged in. Reading either one alone names
+   * half an instrument: `held` alone says nothing about a chord played on a
+   * real keyboard, and `fingerNotes` alone says nothing about a chord clicked
+   * on screen.
+   * ⚠️ `hint`, `remote` AND `ai` ARE DELIBERATELY NOT IN IT. `lightNote` keeps
+   * them out of `fingerNotes` already, and they are notes nobody is holding: a
+   * proposal named as though it were being played is the colour rule this
+   * component already keeps, arriving as a readout.
+   * ⚠️ AND IT IS A SET OF NOTES RATHER THAN OF KEYS, so a note played past the
+   * drawn range still counts toward the name. A 25 key picture does not bound
+   * what a hand can play into it.
+   */
+  const sounding = () => {
+    const out = new Set();
+    for (const k of held) out.add(noteOf(k));
+    for (const n of fingerNotes) out.add(n);
+    return [...out];
+  };
+
+  /**
+   * 🔴 ONE NOTE IS NOT A CHORD AND THE KEY ITSELF ALREADY SAYS WHAT IT IS.
+   * Below two notes this cell is empty, because every key on this keyboard
+   * prints its own note name and a footer repeating one of them is the same
+   * fact twice. From two up, `name.mjs`'s own margin decides what is said and
+   * how confidently: MEASURED there, a bare fifth is the only two note reading
+   * it is ever sure of, which is exactly right, and everything else comes back
+   * as a faint guess until a third note pins it down.
+   * ⚠️ NO SETTLING WINDOW HERE, WHICH IS A DECISION. `name.mjs` exports
+   * `createSettler` for a page that is LEARNING chords and needs the largest
+   * set held across a roll, and `/nola/` uses it for exactly that. A footer is
+   * a readout of what is down right now, it has no timer, and a debounce would
+   * make this component's answer depend on a clock that nothing here can grade.
+   * The name flickers while a chord is being rolled; the LAYOUT does not, which
+   * is the half the ask was about.
+   */
+  function paintChord() {
+    if (!chordEl) return;
+    const down = sounding();
+    const r = down.length >= 2 ? nameChord(down) : null;
+    chordEl.textContent = r?.ok ? r.label : '';
+    /* ⚠️ DELETED, NEVER SET TO THE EMPTY STRING, which is the same trap
+       `paintAt` above names: `[data-sure]` matches on PRESENCE, so a guess
+       would wear the confident ink for the rest of the page's life. */
+    if (r?.sure) chordEl.dataset.sure = '1'; else delete chordEl.dataset.sure;
+  }
+
   function press(k, how = 'key') {
     if (!(k in map) || held.has(k)) return;
     held.add(k);
     onTape(k, true);
     viaKey++;
     try { onDown(noteOf(k), how); } finally { viaKey--; }
+    paintChord();
   }
 
   function release(k, how = 'key') {
@@ -874,6 +1167,7 @@ export function createKeyboard(host, {
     onTape(k, false);
     viaKey++;
     try { onUp(noteOf(k), how); } finally { viaKey--; }
+    paintChord();
   }
 
   /**
@@ -926,6 +1220,12 @@ export function createKeyboard(host, {
     notes: new Set(),
     outside: 0,        // movements that came in past the keys, for the log
     pressedAt: 0,      // when the button was touched. See `onTouch` below
+    /* How this take's lap was fitted to the first one, or null while the slot
+       holds nothing. It is `numloop.mjs`'s whole answer rather than the number
+       it arrived at, because `lap` alone cannot say whether it was snapped, to
+       what, or why a snap was refused, and all three are what the footer and
+       `onLoop` report. */
+    fit: null,
   }));
 
   /* 🔴 ONE FLAG FOR *THESE NOTES ARE COMING BACK, NOT GOING IN*, AND IT REPLACED
@@ -1168,11 +1468,52 @@ export function createKeyboard(host, {
     else loopBtn.el.setAttribute('data-loop', s);
   };
 
+  /**
+   * 🔴 THE LAST TAKE CLOSED, WHICH IS WHAT THE RATIO CELL IS ABOUT, AND IT IS
+   * KEPT HERE RATHER THAN READ OFF A SLOT. Ten slots can each hold a fit and the
+   * cell holds one reading, so *which* has to be a decision: it is the take a
+   * player most recently sent round, because that is the one they are asking
+   * about when they look.
+   * ⚠️ AND IT LETS GO WHEN ITS OWN SLOT DOES. Clearing the slot the cell is
+   * describing would otherwise leave a reading about a loop that no longer
+   * exists, which is the stale-readout defect this project keeps finding.
+   */
+  let lastFit = null, lastFitSlot = -1;
+
+  /**
+   * 🔴 THE TWO CELLS, AND THE ABSENCES ARE THE HALF WORTH READING. An empty cell
+   * where there is no tempo, never `0` and never `120`; `as played` where the
+   * snap was refused, because a refusal is an outcome and a blank is not.
+   * ⚠️ IT IS SIDE EFFECT FREE ON THE MACHINE. `tempo()` and `unit()` are
+   * readers, so a repaint cannot change what it is reporting, which is how this
+   * can be called from every branch of `enterLoop` without thinking about it.
+   */
+  const paintTune = () => {
+    if (!tempoEl) return;
+    const tu = machine.tempo();
+    if (!(tu.bpm > 0) || tu.source === 'none') {
+      tempoEl.textContent = '';
+      delete tempoEl.dataset.said;
+    } else {
+      tempoEl.textContent = `${Math.round(tu.bpm)} bpm ${tu.source === 'given' ? 'set' : 'heard'}`;
+      if (tu.source === 'given') tempoEl.dataset.said = '1';
+      else delete tempoEl.dataset.said;
+    }
+    /* The unit going means every slot is empty, so there is no take left for the
+       cell to be describing. `numloop.mjs` owns when that happens and this only
+       reads it. */
+    if (!machine.unit()) { lastFit = null; lastFitSlot = -1; }
+    ratioEl.textContent = !lastFit ? ''
+      : lastFit.first ? 'first'
+      : lastFit.snapped ? `x${lastFit.label}`
+      : 'as played';
+  };
+
   const enterLoop = (i, to, was) => {
     const t = takes[i];
     const n = SLOTS > 1 ? `loop ${i + 1}` : 'loop';
     if (to === 'recording') {
-      t.tape = []; t.at = 0; t.outside = 0; t.going = false; t.rec = true;
+      t.tape = []; t.at = 0; t.outside = 0; t.going = false; t.rec = true; t.fit = null;
       /* 🔴 THE PHRASE YOU HAD ALREADY PLAYED GOES IN FIRST. See `phraseStart`.
          It also means the 250 ms a press waits to find out whether it is half of
          a double one costs no notes: anything played inside that window is in the
@@ -1216,22 +1557,63 @@ export function createKeyboard(host, {
           machine.clear(i);
           log?.(`nothing was played into ${n}, so there is no loop`, 'warn');
           paintLoop();
+          paintTune();
           onLoop?.(false, { slot: i, state: 'empty' });
           return;
         }
-        t.lap = Math.max(MIN_LAP, raw);
+        /**
+         * 🔴 THE ONE CALL THAT ALIGNS A LAP, AND IT SITS EXACTLY WHERE THE LAP
+         * WAS ALREADY BEING SET. Asked 2026-09-25: *"in keyboadd looper: do
+         * basic bmp detection / quant and when first loop set, all next ones
+         * align on it, either times shorter, same or longer"*. `fitLap` is the
+         * only method on the machine that changes the tempo or the unit, so
+         * putting it here means a lap is decided once, in the one place this
+         * file has ever decided one.
+         * ⚠️ THE FLOOR IS APPLIED FIRST AND STILL BELONGS TO THIS FILE. 250 ms
+         * is a judgement about a take too short to be a performance, and it has
+         * to bite before anything is snapped or the unit could be set to a few
+         * milliseconds and every later loop would be a ratio of nothing.
+         * ⚠️ AND THE ONSETS ARE THE KEY-DOWNS, NOT THE MOVEMENTS. A tape holds a
+         * down and an up for every note, and feeding both in would report a
+         * pulse at twice the tempo somebody is playing, with a key's HOLD LENGTH
+         * masquerading as a gap between notes.
+         */
+        const heardBefore = machine.tempo().source;
+        const fit = machine.fitLap(i, Math.max(MIN_LAP, raw), {
+          onsets: t.tape.filter((e) => e.down).map((e) => e.t),
+        });
+        t.lap = fit.lap;
+        t.fit = fit;
+        lastFit = fit; lastFitSlot = i;
         const fromKeys = t.tape.length - t.outside;
         log?.(`${n} is going round: ${t.tape.length} movement(s) over ${t.lap} ms`
             + `${raw < MIN_LAP ? `, the take being ${raw} ms and held to the 250 ms floor` : ''}`
             + `${t.outside ? `, ${t.outside} of them played past the keys on screen` : ''}`
             + `${fromKeys && t.outside ? ` and ${fromKeys} on them` : ''}`);
+        /* 🔴 THE ACCOUNT IS LOGGED, BECAUSE A LAP THAT CHANGED UNDER A PLAYER
+           AND SAID NOTHING IS THE THING THEY WILL REPORT AS A BUG. `fit.why` is
+           a finished sentence from the module that made the decision, so the log
+           cannot drift from the arithmetic the way a sentence written here
+           would. The tempo's own sentence goes with it the one time it changes,
+           which is the take that found it. */
+        log?.(fit.why);
+        if (heardBefore === 'none' && machine.tempo().source !== 'none') {
+          log?.(machine.tempo().why);
+        }
       } else {
         log?.(`${n} is playing again`);
       }
       t.going = true;
       runTake(i);
+      /* ⚠️ FOUR MORE FIELDS, AND THEY ARE SENT ON A REPLAY AS WELL AS ON A
+         CLOSE. `t.fit` is a fact about the take and not about the press, so a
+         slot coming back from `stopped` reports the same ratio it has always
+         had rather than an empty one, which is what a page drawing a row per
+         slot needs. */
       onLoop?.(true, { slot: i, state: 'looping', lap: t.lap, moves: t.tape.length,
-                       outside: t.outside });
+                       outside: t.outside,
+                       ratio: t.fit?.label || '', snapped: !!t.fit?.snapped,
+                       bpm: machine.tempo().bpm, tempoSource: machine.tempo().source });
     } else if (to === 'stopped') {
       const still = t.keys.size + t.notes.size;
       stopTake(i);
@@ -1242,10 +1624,16 @@ export function createKeyboard(host, {
       const had = t.tape ? t.tape.length : 0;
       stopTake(i);
       t.tape = null;
+      t.fit = null;
+      /* ⚠️ THE CELL LETS GO WITH THE SLOT IT WAS DESCRIBING. Leaving it standing
+         would report a ratio for a take that has just been thrown away, which a
+         reader cannot tell from a ratio for one that is still there. */
+      if (i === lastFitSlot) { lastFit = null; lastFitSlot = -1; }
       if (had) log?.(`${n} thrown away, ${had} movement(s) with it`);
       onLoop?.(false, { slot: i, state: 'empty' });
     }
     paintLoop();
+    paintTune();
   };
 
   /**
@@ -1260,6 +1648,12 @@ export function createKeyboard(host, {
     onTouch: (i) => { takes[i].pressedAt = performance.now(); },
     onEnter: (i, to, o) => enterLoop(i, to, o.was),
   });
+  /* ⚠️ PAINTED ONCE AT BUILD, SO THE TWO CELLS OPEN EMPTY RATHER THAN HOLDING
+     whatever `textContent` a fresh span happens to have. It is the empty string
+     either way; doing it here is what makes that a decision rather than a
+     coincidence, and it is the same reason `paintAt` runs before anybody has
+     pressed an octave button. */
+  paintTune();
 
   function setLoop() { machine.press(0); }
 
@@ -1322,6 +1716,12 @@ export function createKeyboard(host, {
 
   const api = {
     el, keysEl, pad,
+    /**
+     * The page's own row inside the keyboard's box, or `null` where the caller
+     * did not ask for one. `foot: true`. The rule above it and the air around
+     * its contents belong to this component. See the option's own block.
+     */
+    foot: footEl,
     /** the three pad buttons, in the order they are drawn — for a page's own check */
     padButtons: [downBtn, upBtn, panicBtn],
     /** the displacement readout, so a check reads what a player reads */
@@ -1370,6 +1770,35 @@ export function createKeyboard(host, {
       state: (i) => machine.state(i),
       states: () => machine.states(),
       slots: SLOTS,
+      /**
+       * 🔴 THE TEMPO, AND `bpm` IS `null` RATHER THAN A NUMBER WHEN NOBODY HAS
+       * PLAYED ONE. `source` says `detected`, `given` or `none` and `why` is a
+       * finished sentence, so a page reporting this can never print a guess as a
+       * measurement by accident.
+       */
+      tempo: () => machine.tempo(),
+      /** the length every later loop is aligned to and which slot set it, or null */
+      unit: () => machine.unit(),
+      /**
+       * How this slot's lap was fitted, or `null` while it holds nothing. A
+       * COPY, because the caller must not be able to edit the account of a
+       * decision this component has already acted on.
+       */
+      fit: (i) => (takes[i]?.fit ? { ...takes[i].fit } : null),
+      /**
+       * A page with its own clock says what the tempo is, and then nothing here
+       * is inferring anything. `step-grid.mjs`'s `clock.bpm()` is the caller
+       * this exists for, and the cell says `set` rather than `heard` after it.
+       */
+      assume(bpm) { const r = machine.assume(bpm); paintTune(); return r; },
+      /**
+       * Drop the unit and the tempo on purpose, without clearing a slot.
+       * ⚠️ IT IS THE OTHER HALF OF `assume`, AND IT IS HERE SO A CHECK CAN PUT
+       * THIS KEYBOARD BACK AS IT FOUND IT. A tempo a page stated survives every
+       * slot being cleared, by design, so without this a block that says what
+       * the tempo is has changed the component for every block after it.
+       */
+      releaseUnit() { machine.releaseUnit(); paintTune(); },
     },
     /** what a loop is doing, for a page that wants to say so and for a check */
     looping: (i = 0) => !!takes[i]?.going,
@@ -1449,6 +1878,13 @@ export function createKeyboard(host, {
       touches.clear();
       for (const k of [...held]) release(k, 'panic');
       for (const b of els.values()) b.classList.remove('down');
+      /* ⚠️ AND THE NOTES LIT FROM OUTSIDE GO WITH THE PAINT, or the footer
+         goes on naming a chord under a button labelled `Notes off`. The lamps
+         above are cleared by hand for exactly this reason and the set behind
+         them was not. `remote` is left alone here as it is there: those are
+         somebody else's notes and this button does not reach them. */
+      fingerNotes.clear();
+      paintChord();
       onPanic?.();
     },
     /**
@@ -1478,6 +1914,17 @@ export function createKeyboard(host, {
         if (on) fingerNotes.add(note); else fingerNotes.delete(note);
       }
       if (who === 'self' && !viaKey) tapeNote(note, !!on, vel);
+      /* 🔴 AND THE FOOTER IS REPAINTED HERE AS WELL AS IN THE FUNNEL, BECAUSE
+         THIS IS THE ONLY ROUTE A MIDI NOTE TAKES. A note played on a keyboard
+         plugged into the machine never reaches `press`: the page hears it and
+         lights it, which is this component's own rule that a key is lit by a
+         NOTE and never by the press that caused it. Repainting only in the
+         funnel would give `/knobs/` and `/instrument/` a chord cell that stays
+         empty while somebody plays a chord, which is the shape of control this
+         project calls a lie.
+         ⚠️ IT IS OUTSIDE THE `if (!k) return` BELOW, so a note past the drawn
+         range still counts toward the name. */
+      paintChord();
       if (!k) return;
       /* 🔴 `ai` IS A FOURTH LAMP AND NOT A FOURTH COLOUR OF THE SAME ONE. Asked
          2026-09-23: *"when fading, fade them also in keyboard so smaller are on
@@ -1490,6 +1937,47 @@ export function createKeyboard(host, {
     },
     /** every note this keyboard can produce, for a caller that needs the range */
     notes: () => keys.map(noteOf),
+    /**
+     * 🔴 WHAT THE FOOTER IS SAYING, AND THE ELEMENT IT SAYS IT IN, BECAUSE A
+     * CONTROL A CHECK CANNOT READ IS A CONTROL NOTHING GRADES. This component
+     * already learned that about the pad, whose own header records three
+     * ungraded controls: `verify.mjs` presses `.pos-controls` and nothing else,
+     * so anything drawn here has to be observable from the api or it is
+     * invisible to every harness in the project.
+     * ⚠️ IT RETURNS THE READING AND THE ELEMENT, NOT JUST THE STRING. The
+     * string answers *what does it say*; `el` is what answers *does it move*,
+     * which is the half the ask was actually about and which only a rect can
+     * settle.
+     */
+    chord: () => {
+      const down = sounding();
+      const r = down.length >= 2 ? nameChord(down) : null;
+      return { el: chordEl, notes: down, name: chordEl ? chordEl.textContent : '',
+               sure: !!r?.sure, reading: r };
+    },
+    /**
+     * 🔴 WHAT THE TWO LOOP CELLS ARE SAYING, AND THE ELEMENTS THEY SAY IT IN,
+     * FOR THE SAME REASON `chord()` EXISTS: a control a check cannot read is a
+     * control nothing grades, and `verify.mjs` presses `.pos-controls` and
+     * nothing else.
+     * ⚠️ IT RETURNS THE STRINGS AND THE ELEMENTS. The strings answer *what does
+     * it say*, which is the half about absences; the elements answer *does it
+     * move*, which only a rect can settle and which is the whole reason both
+     * cells carry a reserve.
+     * ⚠️ AND IT IS THE DRAWN TEXT RATHER THAN A SECOND FORMATTING OF THE STATE.
+     * A reader built here that re-derived `124 bpm heard` from `tempo()` could
+     * agree perfectly with itself while the cell on screen said something else,
+     * which is this project's two-numbers-from-one-field defect arriving as a
+     * check.
+     */
+    tune: () => ({
+      tempoEl,
+      ratioEl,
+      tempo: tempoEl ? tempoEl.textContent : '',
+      ratio: ratioEl ? ratioEl.textContent : '',
+      reading: machine.tempo(),
+      unit: machine.unit(),
+    }),
     /** what this keyboard was built with, so a check can grade the numbers as well as the machinery */
     timing: { swipeFrames, swipePx, keyMinPx: KEY_MIN_PX, blackRatio: BLACK_RATIO },
     /**

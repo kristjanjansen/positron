@@ -318,19 +318,38 @@
   .evo-rot { display: flex; align-items: center; gap: var(--ctl-gap); padding: 0; }
   /* ⚠️ THE DIVIDER RULE MOVED INTO `shell.css` AS `.pos-knob-div` when this row
      became `createKnobBank`. Nothing draws `.evo-rot-div` any more. */
-  .evo-rot .pos-knob-lab { color: var(--dim); }
+  /* 🔴 THE ROTARY NAMES WERE `--dim` UNTIL 2026-09-25 AND THEY ARE NOT ANY
+     MORE, BECAUSE THE CONTROLS THEY NAME NOW WORK. `C1` to `C8` are the only
+     type this panel still prints, and a name dimmed below its own control is
+     the shape that was reported here as *"on dislable pad buttons make labels
+     way lighter"*. That report was about a DEAD panel, and it was right about
+     one: the names were the brightest thing in a set of controls nobody could
+     press. On a live panel the same rule points the other way, and the page
+     asserts the ink rather than trusting either reading. */
 
   /* ── the keys ──────────────────────────────────────────────────────────── */
-  /* 🔴 THE KEYS ARE A PICTURE, NOT A CONTROL SURFACE, AND THAT IS WHY THEY DO
-     NOT TAKE A POINTER. This keyboard has no sound engine in it: it is a
-     controller, so a key that lit when you pressed it on screen would be
+  /* 🔴 THE KEYS TAKE A POINTER SINCE 2026-09-25, AND THE RULE THEY REVERSE IS
+     QUOTED IN FULL SO IT IS NOT RE-ARGUED. Asked: *"evo: / make all buttons
+     interactive"*. This rule read `.evo-keys { pointer-events: none }` under the
+     heading *"THE KEYS ARE A PICTURE, NOT A CONTROL SURFACE, AND THAT IS WHY
+     THEY DO NOT TAKE A POINTER. This keyboard has no sound engine in it: it is
+     a controller, so a key that lit when you pressed it on screen would be
      claiming a thing happened somewhere. Nothing happens anywhere. The keys
-     light when the real ones are played and at no other time.
-     ⚠️ A DISABLED BUTTON WOULD BE THE WRONG TOOL. `disabled` is a `return` in
-     front of a handler and this project has already lost sixteen asserts to
-     one, twice in a day; these keys have no handler to guard. What is wanted is
-     a surface that never offered a press in the first place. */
-  .evo-keys { pointer-events: none; }
+     light when the real ones are played and at no other time."*
+     🔴 **WHAT WAS RIGHT IN IT IS THE CLAIM, AND THE CLAIM IS ANSWERED RATHER
+     THAN DROPPED.** A press here still says nothing about the instrument,
+     because it never reaches the MIDI table, never touches a counter this page
+     measures the hardware with, and cannot leave the browser at all: this page
+     opens INPUTS and there is no `send` anywhere in it. What a press moves is
+     the drawing, which is what a drawing is for.
+     ⚠️ **AND A MOUSE HAS NO VELOCITY, SO THE DISPLAY SAYS NOTHING FOR A KEY
+     PRESSED HERE.** A real key fills the three digits with how hard it was hit.
+     Printing a number this page invented would be the one thing the old rule
+     was protecting, and an empty field is what this project already does with
+     anything unmeasured.
+     ⚠️ THE OLD RULE'S SECOND HALF IS STILL LAW AND IS WHY THESE ARE NOT
+     `disabled`: `disabled` is a `return` in front of a handler and this project
+     has lost sixteen asserts to one, twice in a day. */
   /* 🔴 `.kpad`, AND THE OLD RULE SAID `.pad`, WHICH MATCHED NOTHING. A dead
      selector reads as correct, and this one had never hidden anything: the
      keyboard's own control row was on this page all along, so a replica of a
@@ -589,7 +608,7 @@
 
   const d = mount({
     name: 'evo',
-    what: 'An Evolution MK-425C on screen, moving when the real one moves.',
+    what: 'An Evolution MK-425C you can work on screen, moving when the real one moves.',
     /* 🔴 NO READOUT, ON PURPOSE. Asked 2026-09-21: *"rm keys / velocity / bend /
        channel in evo"*, which is all four cells, so the row goes rather than
        shrinking to an odd two.
@@ -801,6 +820,96 @@
     disp2.set(about);
   }
 
+  // ── worked by hand, and it is a second source that must never pass for the
+  //    first ────────────────────────────────────────────────────────────────
+
+  /**
+   * 🔴 EVERY CONTROL ON THIS PANEL WORKS NOW, AND NOTHING A HAND DOES HERE MAY
+   * EVER BE MISTAKEN FOR THE INSTRUMENT. Asked 2026-09-25: *"evo: / make all
+   * buttons interactive"*. Until that morning the whole panel was built
+   * `disabled: true` and the keys were `pointer-events: none`, so a visitor
+   * without an MK-425C on the desk saw a drawing that could not be touched.
+   * 🔴 **THE THING THAT MADE THAT DEFENSIBLE IS KEPT, AND IT IS THE SEPARATION
+   * RATHER THAN THE DEADNESS.** `take()` is THE WIRE and nothing else writes to
+   * it: it is what fills the MIDI table, `chSeen`, `ccSeen`, `notes`, `vLo`,
+   * `vHi`, `bendRaw`, `knobCC` and every `{ from: 'hardware' }` move that this
+   * page's own checks are written against. A hand press goes through the
+   * functions below instead, moves the DRAWING and the display, and touches not
+   * one of those. **So the table stays a record of what arrived**, which is what
+   * `/dump/` is for and what this page says its table is.
+   * ⚠️ **AND THE KIT ALREADY HAD THE VOCABULARY, WHICH IS WHY NO COMPONENT
+   * CHANGED.** `knob.mjs` and `fader.mjs` have meant `from: 'hand'` against
+   * `from: 'hardware'` since before this page existed, and both count the two
+   * separately as `handMoves()` and `hardwareMoves()`. The asserts below read
+   * whichever one they are a claim about.
+   * 🔴 **AND NOTHING CAN LEAVE THIS PAGE EVEN IF IT WANTED TO.** `open()` asks
+   * for `{ sysex: false }`, walks `access.inputs`, and there is no `.send(` and
+   * no read of `access.outputs` anywhere in this file. That is what makes this
+   * change safe against `/shape/`'s rule about somebody's real instrument, and
+   * there is an assert on it below rather than a sentence.
+   */
+  const handSaid = new Set();
+  /** A fact worth saying once, when a hand first reaches a kind of control. */
+  function sayOnce(key, line, level) {
+    if (handSaid.has(key)) return;
+    handSaid.add(key);
+    d.log(line, level);
+  }
+
+  /**
+   * 🔴 A KEYPAD DIGIT PLAYS BACK WHAT THAT BUTTON WAS MEASURED SENDING, AND THE
+   * READING IS THE SAME ONE THE WIRE GETS. 📄 Measured off this desk through
+   * `/dump/`: a bank select LSB, a bank select MSB and then a program change,
+   * with nine of the ten giving programs 1 to 9 on channel 2.
+   * ⚠️ IT DOES NOT CALL `take()`, WHICH WOULD PUT THREE ROWS IN THE TABLE THAT
+   * NEVER CROSSED A WIRE. The display's reading for a program change is the
+   * manual's own, the program in the three digits and the channel in the two,
+   * and it is written here the same way `take` writes it so the two cannot
+   * drift apart in a way a reader could see.
+   */
+  function handProgram(face) {
+    sayOnce('program', `pressing a button here moves this drawing and sends nothing, `
+      + 'because this page opens MIDI inputs and has no output at all. On the desk '
+      + `button ${face} was measured sending a bank select pair and program ${face} `
+      + `on channel ${GLOBAL_CH}`);
+    show(Number(face), GLOBAL_CH);
+  }
+
+  /**
+   * 🔴 THE `-` AND `+` KEYS AND THE OCTAVE PAIR PRESS AND MOVE NOTHING, AND
+   * THAT IS THE HONEST ANSWER RATHER THAN A HALF FINISHED ONE. Both pairs are
+   * documented and neither has ever been captured: the manual gives the octave
+   * pair 11 octaves of range, `/dump/` saw no octave shift at all in 25 notes,
+   * and nothing this page has heard tells it what a single press of `-` or `+`
+   * sends. **A button that moved this drawing on a guess would be a page
+   * inventing a fact about an instrument**, which is the sentence this page has
+   * carried over the octave pair since it was built and is still true.
+   * ✅ SO THE PRESS IS REAL, THE FLASH IS REAL, AND WHAT IS UNKNOWN IS SAID.
+   * That is what separates this from the state it was in, where the press was
+   * refused and a reader learned nothing.
+   */
+  function handUnmeasured(key, line) {
+    sayOnce(key, line, 'warn');
+  }
+
+  /**
+   * 🔴 A ROTARY TURNED BY HAND FILLS BOTH FIELDS, AND ITS SLOT IS THE ONE THING
+   * THAT IS MORE CERTAIN HERE THAN ON THE WIRE. When a CC arrives, which of the
+   * eight sent it is an INFERENCE this page makes from the order numbers first
+   * appeared. When a hand turns C5, it is C5, and no inference is involved.
+   * ⚠️ **AND NO CONTROLLER NUMBER IS CLAIMED.** Which MIDI CC a slot sends is a
+   * per preset, per unit setting in non volatile memory printed in none of the
+   * three manuals, so a hand turn fills the value and the slot and says nothing
+   * about a number nobody here knows. `knobCC` is the wire's map and a hand
+   * never writes to it.
+   */
+  function handRotary(slot, v) {
+    sayOnce('rotary', `turning a rotary here fills the display the way the instrument `
+      + 'does and claims no controller number, because which MIDI CC a slot sends is '
+      + 'held in the keyboard and printed in no manual');
+    show(v, slot + 1);
+  }
+
   // ── twelve half height buttons, in a 3 wide by 4 tall grid ──────────────
 
   /**
@@ -846,13 +955,44 @@
            and a keypad digit is nothing else. */
         label: face, half: true,
         aria: digit ? `assignable button ${face}` : `${face} button`,
-        tint: 'var(--evo-ink)', latch: false, disabled: true,
+        /* 🔴 LIVE SINCE 2026-09-25, AND `latch: false` IS WHY A PRESS FLASHES
+           RATHER THAN STAYING LIT. `pad.mjs` calls `onPress` and `flash()` for
+           an unlatched pad, which is the same 160 ms flash a program change
+           arriving on the wire gives this button. One picture for one event,
+           whichever side it came from, and the log line is where they differ.
+           🔴 **AND THE HANDLER IS ON THE GRID AND NOT HERE, WHICH COST A RUN
+           AND WAS FOUND BY A DELIBERATE SABOTAGE RATHER THAN BY READING.**
+           `createPadGrid` builds each pad as
+           `createPad({ ...specs[y][x], onPress: (on, self) => onPress(on, x, y, self) })`,
+           so a per pad `onPress` returned from this factory is SPREAD IN AND
+           THEN OVERWRITTEN. `createPad`'s own documentation lists `onPress` as a
+           pad option and this factory returns pad options, so the wrong version
+           reads as correct, throws nothing and lights the pad on every press
+           because the flash is the component's own.
+           ⚠️ **IT IS THE `/stage/` DEFECT OF THIS SESSION IN A SECOND
+           COSTUME**, where two transport buttons did nothing because the page
+           passed `onPress` where `transport-bar.mjs` reads `onClick`. Here the
+           NAME is right and the LEVEL is wrong, which is harder to see. */
+        tint: 'var(--evo-ink)', latch: false,
         title: digit
           ? `program ${face}, sent with a bank select pair in front of it. `
             + `In edit mode this is the keypad digit ${face}`
           : `${face}. Pressed together with the other one it sends a snap shot, `
             + 'which is every controller’s current value at once',
       };
+    },
+    /* 🔴 ONE HANDLER FOR TWELVE BUTTONS, AT THE LEVEL THE COMPONENT ACTUALLY
+       READS IT. See the note in the factory above for what the other level
+       cost. The grid hands over the position rather than the face, so the face
+       is read back out of `KEYPAD`, which is the one place this panel's layout
+       is written down. */
+    onPress: (on, x, y) => {
+      const face = KEYPAD[y][x];
+      if (/\d/.test(face)) { handProgram(face); return; }
+      handUnmeasured('snapshot', `${face} pressed. What this button sends on its own has `
+        + 'never been captured here, and the manual only documents the pair: pressed '
+        + 'together the two send a snap shot, which is every controller’s current value '
+        + 'at once');
     },
   });
   /** Program number to the button that carries it, so a flash needs no arithmetic. */
@@ -893,13 +1033,38 @@
     label: 'pitchbend', sub: `C${BEND_SLOT}`, min: 0, max: 16383, value: 8192,
     title: 'pitch bend, printed C9 on the panel. Seven bit in a fourteen bit '
          + 'message, and it was measured reaching 13952 rather than 16383',
-    disabled: true,
+    /**
+     * 🔴 A HAND MOVE IS SNAPPED TO THE STEPS THIS WHEEL REALLY HAS, WHICH IS
+     * THE ONE PLACE INTERACTIVITY COULD HAVE INVENTED PRECISION. Measured: 106
+     * bend messages, **every one with an LSB of 0**, so 128 of the 16384
+     * positions exist and the other 16256 cannot be reached by the object this
+     * is a picture of. A lane 16383 units long hands a dragging finger any of
+     * them, and a drawing that resolves finer than its instrument is the same
+     * mistake as printing a number nobody measured.
+     * ⚠️ AND THE DISPLAY SHOWS THE SEVEN BIT VALUE, which is what `take()` does
+     * with a bend off the wire, for the reason written there.
+     */
+    onInput: (v, from) => {
+      if (from === 'hardware') return;
+      const msb = Math.round(v / 128);
+      if (msb * 128 !== v) { bend.set(msb * 128, { from: 'hand' }); return; }
+      sayOnce('bend', 'this wheel resolves 128 steps and not 16384, because every one '
+        + 'of the 106 bend messages measured off the instrument carried a low byte of '
+        + 'zero, so a drag here lands on the steps the wheel really has');
+      show(msb, BEND_SLOT);
+    },
   });
   /** Measured: CC 1, values 57 to 127 seen, which is the documented default. */
   const mod = createFader({
     label: 'modulation', sub: `C${MOD_SLOT}`, min: 0, max: 127, value: 0,
     title: 'the modulation wheel, printed C10 on the panel, sending CC 1',
-    disabled: true,
+    /* 🔴 THE ONE CONTROL WHOSE SLOT AND CONTROLLER NUMBER ARE BOTH KNOWN, so a
+       hand move can fill the display exactly as the wire does and claim nothing
+       extra. CC 1 is the documented default and was measured here. */
+    onInput: (v, from) => {
+      if (from === 'hardware') return;
+      show(v, MOD_SLOT);
+    },
   });
   const wheels = el('div', 'evo-wheels');
   const wheelRow = el('div', 'evo-wheelrow');
@@ -944,12 +1109,27 @@
      A panel MIRROR draws a button at the size the real one is relative to what
      is around it, and `--ctl-w` is sized for a control somebody presses with a
      finger. These two are drawn, not pressed. */
+  /* 🔴 THEY PRESS AND THE DRAWING DOES NOT MOVE, WHICH IS THE WHOLE POINT. The
+     paragraph above is unchanged and is the reason: the octave step is
+     unmeasured, so a keyboard that slid an octave under a press would be this
+     page inventing a fact about an instrument. `createKeyboard` is pinned at
+     `minBase: KEY_LO, maxBase: KEY_LO` for the same reason and stays pinned.
+     ✅ WHAT THE PRESS BUYS IS THE SENTENCE, said once, in the log. Before this
+     the button refused the press and a reader learned nothing at all. */
   const octDown = createPad({
-    top: MINUS, round: true, small: true, latch: false, disabled: true, aria: 'octave down',
+    top: MINUS, round: true, small: true, latch: false, aria: 'octave down',
+    onPress: () => handUnmeasured('octave', 'the octave pair presses and this keyboard '
+      + 'does not move, because the octave step has never been captured here: the '
+      + 'manual gives these two 11 octaves of range and the 25 notes measured off the '
+      + 'desk were one contiguous run with no shift in them'),
     title: 'octave down. Nothing this sends has ever been captured',
   });
   const octUp = createPad({
-    top: '+', round: true, small: true, latch: false, disabled: true, aria: 'octave up',
+    top: '+', round: true, small: true, latch: false, aria: 'octave up',
+    onPress: () => handUnmeasured('octave', 'the octave pair presses and this keyboard '
+      + 'does not move, because the octave step has never been captured here: the '
+      + 'manual gives these two 11 octaves of range and the 25 notes measured off the '
+      + 'desk were one contiguous run with no shift in them'),
     title: 'octave up. Nothing this sends has ever been captured',
   });
   /* 🔴 NEITHER NAME IS PRINTED HERE ANY MORE. Asked 2026-09-23: *"rm octave and
@@ -1005,7 +1185,9 @@
       title: `${ROTARIES[i]}, a fully assignable rotary. Which controller `
            + 'number this slot sends is held in the keyboard and printed in no '
            + 'manual, so nothing here claims one until one is heard',
-      disabled: true,
+      /* A hand turn knows its own slot with certainty, which the wire never
+         does. See `handRotary` for why that is the interesting half. */
+      onInput: (v, from) => { if (from !== 'hardware') handRotary(i, v); },
     });
     knobs.push(k);
   }
@@ -1032,10 +1214,60 @@
   const keyNames = [];
   for (let i = 0; i < KEYS; i++) { keyMap[`k${i}`] = i; keyNames.push(`k${i}`); }
   const keysBox = el('div', 'evo-keys');
+  /* 🔴 `onDown` AND `onUp` ARE THE WHOLE OF WHAT MADE THESE KEYS LIVE, AND THE
+     COMPONENT NEEDED NO CHANGE. The keyboard has always lit the key it was
+     pressed on and always called these two; what stopped a press reaching it
+     was this page's own `pointer-events: none`, which came off on 2026-09-25
+     with the reasoning quoted in full at that rule.
+     ⚠️ **`how` IS THE THING TO READ AND NOT THE NOTE.** `lightNote` is what
+     `take()` uses for a note off the wire and it does NOT call these, so a
+     `pointer` here is always somebody's finger and never the instrument. The
+     page asserts that separation rather than trusting this sentence.
+     ⚠️ AND `minBase` AND `maxBase` STAY PINNED, so nothing a hand does can
+     slide the drawing off the range the wire was measured at. */
+  /* Declared above the callback that reads it, which is this file's own rule:
+     a `const` shadows its whole block from the top and `/nola/` paid for it. */
+  let handKey = 0;
   const kbd = createKeyboard(keysBox, {
     base: KEY_LO, map: keyMap, keys: keyNames, letters: false,
     sharps: new Set(keyNames.filter((_, i) => KEY_PATTERN[i] === 'B')),
     minBase: KEY_LO, maxBase: KEY_LO,
+    /**
+     * 🔴 THE PAGE LIGHTS THE KEY, AND TAKING `pointer-events` OFF WITHOUT THIS
+     * WOULD HAVE SHIPPED A KEYBOARD THAT TOOK A PRESS AND DID NOTHING AT ALL.
+     * MEASURED 2026-09-25, by the assert below going red on the first run: the
+     * press reached this callback and **0 keys lit**, because `press()` in
+     * `keyboard.mjs` calls `onDown` and never touches a class. Its own comment
+     * is the rule: *"a key is lit by a NOTE and never by the press that caused
+     * it"*, which is why `take()` calls `lightNote` for the wire and why a page
+     * that never passed `onDown` had nothing to light one with.
+     * ⚠️ **SO THE KEYS WERE INERT FOR TWO REASONS AND THE STYLESHEET WAS ONLY
+     * ONE OF THEM.** That is the shape this session already paid for on
+     * `/stage/`, where two transport buttons did nothing because the page
+     * passed `onPress` where the component reads `onClick`. A control that
+     * looks live and is inert is worse than one that refuses a press.
+     * ⚠️ AND `viaKey` IS THE COMPONENT'S OWN GUARD FOR THIS: a `lightNote`
+     * called from inside `onDown` is excluded from the finger set and the tape,
+     * so echoing a press back is not a second note.
+     */
+    onDown: (note, how) => {
+      if (how === 'midi' || how === 'panic') return;
+      handKey++;
+      kbd.lightNote(note, true);
+      /* 🔴 THE DISPLAY SAYS NOTHING FOR A KEY PRESSED HERE, AND THAT IS THE
+         RULE RATHER THAN AN OMISSION. A real key fills the three digits with
+         how hard it was hit, and a mouse has no velocity to report. Nothing
+         unmeasured prints as a number on this site, and a zero would read as a
+         very confident measurement of nothing. */
+      show('', '');
+      sayOnce('key', `${noteName(note)} pressed on screen. The three digits stay empty `
+        + 'because a key played here has no velocity to report, and the instrument '
+        + 'fills them with how hard a real key was hit');
+    },
+    onUp: (note, how) => {
+      if (how === 'midi' || how === 'panic') return;
+      kbd.lightNote(note, false);
+    },
   });
   flow.append(keysBox);
   /* 🔴 THE KEYS ARE WHAT ABSORBS THE PANEL'S SLACK, AND IT IS AN ARGUMENT NOW
@@ -1052,21 +1284,26 @@
   panel.grow(keysBox);
 
   /**
-   * 🔴 EVERY PRINTED LABEL ON THIS PANEL NAMES SOMETHING SWITCHED OFF, SO EVERY
-   * ONE OF THEM DIMS. Reported 2026-09-21: *"on dislable pad buttons make labels
-   * way lighter"*. The rule and the measurements are on `.panel-sub[data-off]`
-   * near the top of this file; this is the line that applies it.
-   * 🔴 **IT IS A SWEEP RATHER THAN SIX SEPARATE FLAGS BECAUSE THE PREMISE IS
-   * TRUE OF THE WHOLE PANEL, AND THE PREMISE IS ASSERTED.** MEASURED: 20 pads
-   * of 20, 8 rotaries of 8 and 2 wheels of 2 are disabled, because this page is
-   * a picture of somebody else's instrument and nothing on it is bound to
-   * anything. A page where some controls were live would have to mark only the
-   * labels naming the dead ones, so the check below refuses the day that
-   * becomes true here rather than letting these labels quietly start lying.
-   * ⚠️ THE NAMEPLATE IS NOT SWEPT and cannot be: `.panel-plate-l` is neither
-   * `.panel-sub` nor `.panel-cap`, because the make and the model name no control.
+   * 🔴 THE LABEL DIMMING SWEEP IS GONE, 2026-09-25, AND THE LINE IT REPLACED
+   * ASKED FOR EXACTLY THIS DAY IN WRITING. It read
+   * `for (const lab of card.querySelectorAll('.panel-sub, .panel-cap')) lab.dataset.off = '1';`
+   * under the heading *"EVERY PRINTED LABEL ON THIS PANEL NAMES SOMETHING
+   * SWITCHED OFF, SO EVERY ONE OF THEM DIMS"*, from the report
+   * *"on dislable pad buttons make labels way lighter"* on 2026-09-21, and its
+   * own comment finished: *"A page where some controls were live would have to
+   * mark only the labels naming the dead ones, so the check below refuses the
+   * day that becomes true here rather than letting these labels quietly start
+   * lying."*
+   * ✅ **THAT DAY IS TODAY AND THE ANSWER IS SIMPLER THAN THE SENTENCE
+   * EXPECTED**, because it is not SOME of the controls: every pad, every
+   * rotary and both wheels take a press now, so there is no dead one left for a
+   * label to name. The sweep does not get narrower, it goes.
+   * ⚠️ AND THE CHECK BELOW TURNED OVER WITH IT, from a ceiling on the loudest
+   * printed name to a floor under the faintest, against the same 3.0. The
+   * baseline it replaces read **1.89:1 on all eight**, which fails the new
+   * bound, so the two asserts sit provably on opposite sides of one number
+   * rather than one of them being retuned until it passed.
    */
-  for (const lab of card.querySelectorAll('.panel-sub, .panel-cap')) lab.dataset.off = '1';
 
   // ── the MIDI event log ──────────────────────────────────────────────────
 
@@ -1120,14 +1357,28 @@
    * from one field move together while being wrong.
    */
   const chSaid = new Set();
+  /* 🔴 `decode` ALREADY COUNTS FROM ONE AND THIS LINE COUNTED AGAIN, SO THE ONE
+     SENTENCE THIS PAGE WRITES ABOUT ITS OWN SUBJECT SAID `3` FOR A KEYBOARD ON
+     2. Found 2026-09-25 while making the panel interactive, not by a check.
+     📄 `midi-decode.mjs:122`: `const ch = (st & 0x0f) + 1;   // 1-16 for a
+     reader; the wire is 0-15`, so `m.ch` is already the number a person reads,
+     and `const n = ch + 1` here made it one higher. The page then took its own
+     `n === GLOBAL_CH` test the wrong way and logged the disagreement as a
+     WARNING, on every session, about an instrument that was answering exactly
+     where it was measured.
+     🔴 **IT SURVIVED BECAUSE NOTHING GRADED IT AND ONE NEIGHBOUR DID.** `chSeen`
+     holds the same `m.ch` and the assert on it reads `includes(GLOBAL_CH)`,
+     which is right and passes, so the page had one correct reading of the
+     channel and one wrong one two lines apart. The harness prints no page log,
+     so 59/59 green said nothing about the sentence a visitor reads. There is an
+     assert on the sentence now. */
   function sayChannel(ch) {
     if (chSaid.has(ch)) return;
     chSaid.add(ch);
-    const n = ch + 1;
-    d.log(n === GLOBAL_CH
-      ? `this keyboard is answering on channel ${n}, which is where it was measured`
-      : `this keyboard is answering on channel ${n}, and it was measured on `
-        + `${GLOBAL_CH}`, n === GLOBAL_CH ? undefined : 'warn');
+    d.log(ch === GLOBAL_CH
+      ? `this keyboard is answering on channel ${ch}, which is where it was measured`
+      : `this keyboard is answering on channel ${ch}, and it was measured on `
+        + `${GLOBAL_CH}`, ch === GLOBAL_CH ? undefined : 'warn');
   }
 
   /**
@@ -1517,6 +1768,117 @@
         .every((t) => /[0-9A-F]{2}/.test(t.textContent)), `${traffic.count()} rows`);
 
     /**
+     * 🔴 THE ASK, MADE CHECKABLE. Asked 2026-09-25: *"evo: / make all buttons
+     * interactive"*, against a panel where every pad, every rotary and both
+     * wheels were built `disabled: true` and the keys carried
+     * `pointer-events: none`.
+     * ⚠️ **THE KEYBOARD'S OWN PAD IS EXCLUDED AND THAT IS NOT A CONVENIENCE.**
+     * `createKeyboard` draws an octave pair and a `Notes off` for a keyboard
+     * somebody plays from a computer, and this page hides it with
+     * `.evo-keys .kbd .kpad { display: none }` because this instrument's octave
+     * pair is in the back strip. It is `.step`, not `.pos-pad`, so it is not in
+     * this count anyway, and the next assert is the one that keeps it away.
+     */
+    const pads = [...card.querySelectorAll('.pos-pad')];
+    const dials = [...card.querySelectorAll('.pos-knob')];
+    const lanes = [...card.querySelectorAll('.pos-fdr')];
+    const switchedOff = pads.filter((p) => p.disabled).length
+      + card.querySelectorAll('[data-off]').length;
+    d.assert('every control on this panel takes a press, and none is left switched off',
+      pads.length === 14 && dials.length === ROTARIES.length && lanes.length === 2
+        && switchedOff === 0,
+      `${pads.length} pads, ${dials.length} rotaries, ${lanes.length} wheels, `
+      + `${switchedOff} switched off`);
+
+    /**
+     * 🔴 WHAT THE SUITE PRESSES DID NOT CHANGE, AND THAT HAD TO BE TRUE BEFORE
+     * ANY OF THE ABOVE COULD BE DONE. `demo/verify.mjs:819` clicks
+     * `.pos-controls button, .tbar-x` on every run, dozens of times a day, so a
+     * page that makes inert controls live is a page that changes what the suite
+     * DOES to it. **Every control on this panel is inside the card and none of
+     * them is in that row**, which is why enabling them reached nothing.
+     * 🔴 **AND `/shape/` STATES THE RULE THIS IS AN INSTANCE OF**: *"a `move
+     * everything` in there would be the suite putting a random patch on
+     * somebody's synth dozens of times a day"*. There is a Novation Circuit and
+     * a Raspberry Pi on this desk and neither has an undo. This page cannot
+     * reach either even by accident, because it opens MIDI INPUTS and has no
+     * output path at all, and the assert below is that claim rather than this
+     * sentence.
+     * ⚠️ MEASURED WITH THE HARNESS'S OWN SELECTOR, typed once here, so a page
+     * that grew a second control in that row would have to answer for it.
+     */
+    const pressedBySuite = [...document.querySelectorAll('.pos-controls button, .tbar-x')];
+    const hiddenPad = keysBox.querySelector('.kpad');
+    d.assert('the only control the suite presses here is the presence button',
+      pressedBySuite.length === 1 && pres.el.contains(pressedBySuite[0])
+        && card.querySelectorAll('.pos-controls').length === 0
+        && !!hiddenPad && getComputedStyle(hiddenPad).display === 'none',
+      `${pressedBySuite.length} in the row the harness clicks, `
+      + `${card.querySelectorAll('.pos-pad, .pos-knob, .pos-fdr').length} panel controls `
+      + `outside it, the keyboard’s own pad ${hiddenPad ? 'hidden' : 'missing'}`);
+
+    /**
+     * 🔴 A HAND ON THE PANEL MOVES THE DRAWING AND ADDS NOT ONE ROW TO THE
+     * TABLE, WHICH IS THE WHOLE SAFETY ARGUMENT FOR MAKING IT INTERACTIVE AT
+     * ALL. That table is a record of what ARRIVED, the same thing `/dump/` is,
+     * and a screen press did not arrive: it never crossed a wire. A page where
+     * the two were indistinguishable would be worse than a page nobody can
+     * touch, because a reader would believe it.
+     * ⚠️ **BOTH SIDES, BECAUSE ONE OF THEM ALONE IS VACUOUS.** A panel that did
+     * nothing at all would also add no rows, so the display has to have moved;
+     * and a table that was empty to begin with would pass the first half by
+     * accident, so the row count before has to be non zero.
+     * ⚠️ AND THE WIRE'S OWN COUNTERS ARE READ ACROSS THE PRESS, because
+     * `notes`, `ccSeen` and `chSeen` are what this page's measurements of the
+     * instrument are built on and a hand must not be able to move any of them.
+     */
+    /* 🔴 THE PAD IS READ ON ITS OWN BEFORE THE KNOB IS TOUCHED, AND THAT IS NOT
+       TIDINESS: THE FIRST VERSION OF THIS ASSERT PASSED WITH THE PAD DOING
+       NOTHING AT ALL. It read both controls and then one reading at the end, so
+       the knob satisfied every clause and a keypad press that never reached the
+       page was invisible. **A deliberate sabotage is what found it**, by coming
+       back green when it should have gone red, and the defect it uncovered was
+       real: a per pad `onPress` that `createPadGrid` overwrites. Two controls
+       are two readings. */
+    const rowsBefore = traffic.count();
+    const wire = { notes, cc: ccSeen.size, ch: chSeen.size, bend: bendRaw };
+    keypad.at(1, 0).button.click();               // the `2` key, an assignable button
+    const byPad = { three: disp3.text().trim(), two: disp2.text().trim(),
+                    rows: traffic.count() };
+    knobs[4].set(99, { from: 'hand' });           // C5, turned by a hand
+    d.assert('working the panel by hand moves the drawing and puts nothing on the wire',
+      rowsBefore > 0 && byPad.rows === rowsBefore && traffic.count() === rowsBefore
+        && byPad.three === '2' && byPad.two === String(GLOBAL_CH)
+        && disp3.text().trim() === '99' && disp2.text().trim() === '5'
+        && notes === wire.notes && ccSeen.size === wire.cc && chSeen.size === wire.ch
+        && bendRaw === wire.bend && knobs[4].handMoves() > 0,
+      `${rowsBefore} rows before and ${traffic.count()} after, `
+      + `the pad read "${byPad.three}" over "${byPad.two}" and the rotary `
+      + `"${disp3.text().trim()}" over "${disp2.text().trim()}", `
+      + `${knobs[4].handMoves()} hand move(s) and ${knobs[4].hardwareMoves()} from the wire`);
+
+    /**
+     * 🔴 THE ONE SENTENCE THIS PAGE WRITES ABOUT ITS OWN SUBJECT SAID THE WRONG
+     * NUMBER, AND NOTHING GRADED IT UNTIL NOW. `sayChannel` added one to a
+     * channel `midi-decode.mjs` had already counted from one, so a keyboard
+     * answering exactly where it was measured was reported as a WARNING naming
+     * a channel it was not on. Found 2026-09-25 by reading, not by a red run,
+     * because the harness prints no page log and every other assert was green.
+     * ✅ **TWO INDEPENDENT SOURCES, WHICH IS THE POINT.** The number in the
+     * sentence comes from the prose path and `chSeen` comes from the byte, so
+     * they can disagree and say so. That is the repair this project took from
+     * the MIM corpus, where two numbers derived from ONE field moved together
+     * while both were wrong.
+     */
+    const logText = (document.querySelector('.pos-log') || {}).textContent || '';
+    const said = logText.match(/answering on channel (\d+)/);
+    d.assert('the channel this page says out loud is the channel it heard',
+      !!said && Number(said[1]) === GLOBAL_CH && chSeen.has(Number(said[1]))
+        && logText.includes('which is where it was measured'),
+      said ? `the log says channel ${said[1]} and the wire carried ${[...chSeen].join(',')}`
+           : 'the log never named a channel');
+
+    /**
      * 🔴 THE PANEL'S COUNTS, WHICH ARE WHERE A REPLICA GOES WRONG FIRST. Six
      * function buttons and five dual press labels is a 425C; eight and eight is
      * a 449C, and a cover photograph in one of this instrument's own manuals is
@@ -1550,6 +1912,49 @@
       `${bars3} bars and ${bars2} bars, both bare inside one window`);
 
     if (d.el.isConnected) {
+      /**
+       * 🔴 A REAL POINTER ON A REAL KEY, BECAUSE THE ALTERNATIVE IS THE FAILURE
+       * THIS WHOLE TASK STARTED FROM: A CONTROL THAT LOOKS LIVE AND IS INERT.
+       * The keys stopped being `pointer-events: none` on 2026-09-25 and nothing
+       * in a stylesheet can say whether a press now REACHES the page, so this
+       * drives the component's own pointer path and reads what the page did.
+       * ⚠️ **SCROLLED IN AND THE RECTANGLE RE-READ AFTER**, which is this
+       * project's own recorded trap: `demo/verify.mjs` runs in an 800 by 600
+       * viewport and these pages are taller, so an event dispatched at a `y`
+       * past the bottom lands on nothing at all, silently, and the check reads
+       * as a dead control.
+       * ⚠️ AND `elementFromPoint` IS WHAT THE COMPONENT USES, so the point has
+       * to be the middle of a key rather than the element being the target.
+       * `keyboard.mjs` wraps its `setPointerCapture` for exactly this: a
+       * `PointerEvent` built in script is untrusted and capture throws on it.
+       * 🔴 **THE DISPLAY MUST STAY EMPTY, WHICH IS THE HALF THAT IS A CLAIM
+       * ABOUT HONESTY RATHER THAN ABOUT WIRING.** A real key fills the three
+       * digits with how hard it was hit and a mouse has no velocity, so a
+       * number there would be this page inventing one.
+       */
+      {
+        const keyEl = keysBox.querySelector('.k');
+        const keysEl = keysBox.querySelector('.keys');
+        keyEl.scrollIntoView({ block: 'center' });
+        const r = keyEl.getBoundingClientRect();
+        const at = {
+          bubbles: true, isPrimary: true, pointerId: 91, pointerType: 'mouse',
+          clientX: Math.round(r.left + r.width / 2),
+          clientY: Math.round(r.top + r.height / 2),
+        };
+        const before = handKey;
+        keysEl.dispatchEvent(new PointerEvent('pointerdown', at));
+        const lit = keysBox.querySelectorAll('.k.down').length;
+        const three = disp3.text().trim(), two = disp2.text().trim();
+        keysEl.dispatchEvent(new PointerEvent('pointerup', at));
+        d.assert('a key pressed on screen lights, reaches the page and reports no velocity',
+          handKey === before + 1 && lit === 1 && three === '' && two === ''
+            && keysBox.querySelectorAll('.k.down').length === 0,
+          `${handKey - before} press(es) reached the page, ${lit} key lit, `
+          + `display "${three}" over "${two}", ${keysBox.querySelectorAll('.k.down').length} `
+          + 'still down after the release');
+      }
+
       /**
        * 🔴 BOTH FIELDS ARE THE BACKLIT KIND AND THE WINDOW THEY SIT IN AGREES.
        * The failure this catches is a page and a component disagreeing about
@@ -2169,14 +2574,26 @@
         + `with ${rot.querySelectorAll('.pos-knob-div').length} divider(s) at `
         + `${rotBank.splits().join(',')}`);
 
-      d.assert('every printed name on the panel is dimmed with the controls it names',
-        dimmedNames.length >= rotCount && loudest.r < 3 && faintest.r > 1.5,
+      /* 🔴 THIS ASSERT TURNED OVER ON 2026-09-25 AND THE OLD ONE IS QUOTED SO IT
+         IS NOT RE-ARGUED. It read `every printed name on the panel is dimmed
+         with the controls it names`, at `loudest.r < 3 && faintest.r > 1.5`, and
+         it was right about a panel where nothing could be pressed.
+         ✅ **SAME NUMBER, OTHER SIDE, WHICH IS WHAT MAKES THE CHANGE A
+         MEASUREMENT RATHER THAN A RETUNE.** The old bound was a CEILING at 3.0
+         and this is a FLOOR at 3.0, so the baseline these names measured
+         yesterday, **1.89:1 on all eight**, fails this one outright. A check
+         that would have passed before and after would be saying nothing. */
+      d.assert('every printed name on the panel is readable, now that what it names works',
+        dimmedNames.length >= rotCount && faintest.r > 3,
         `${dimmedNames.length} names, "${loudest.t}" loudest at ${loudest.r.toFixed(2)}:1, `
         + `"${faintest.t}" faintest at ${faintest.r.toFixed(2)}:1`);
 
-      /* ⚠️ THE NEGATIVE CONTROL. The make and the model name no control, they are
-         true whether or not anything is plugged in, and a sweep that dimmed
-         every word on the card would have taken them too. */
+      /* ⚠️ THE NEGATIVE CONTROL, AND IT OUTLIVED THE SWEEP IT WAS WRITTEN
+         AGAINST. The make and the model name no control, they are true whether
+         or not anything is plugged in, and a sweep that dimmed every word on the
+         card would have taken them too. That sweep went on 2026-09-25 when the
+         panel became workable, so what this guards now is its return: a page
+         that ever dims by class again must not reach these two words. */
       const plateEl = card.querySelector('.panel-plate-l');
       const plateR = seenRatio(plateEl);
       d.assert('NEGATIVE CONTROL: the nameplate names no control and is not dimmed',
@@ -2185,25 +2602,33 @@
         + `against ${loudest.r.toFixed(2)}:1 for the loudest printed name`);
 
       /**
-       * 🔴 AND NOTHING ON THIS PANEL SHOWS THE REFUSAL CURSOR. Asked 2026-09-21:
-       * *"rm disable cursor o ndisabled knobs/padbuttins, just use regular.
-       * noniteractive cursor"*. `not-allowed` says *you tried to use this and
-       * were refused*, and nothing here is refusing anybody: the page's own
-       * header says the keys are a picture rather than a control surface,
-       * because a key that lit when you pressed it would be claiming something
-       * happened somewhere. A refusal cursor on a picture is the interface
-       * apologising for a press that was never on offer.
+       * 🔴 EVERY CONTROL NOW SHOWS THE CURSOR OF A CONTROL THAT WORKS, AND THIS
+       * ASSERT REPLACED ONE THAT COULD NO LONGER RUN AT ALL. It read
+       * `no control on this panel wears the refusal cursor` and it queried
+       * `.pos-pad:disabled`, `.pos-knob[data-off] .pos-knob-dial` and
+       * `.pos-fdr[data-off] .pos-fdr-lane`. Every one of those three matches
+       * nothing on this page since the panel went live, so
+       * `getComputedStyle(null)` would have THROWN and taken every assert after
+       * it out of the run in silence. **A selector that stops matching is this
+       * project's fifth dead rule and this is the sixth**, caught here by
+       * looking rather than by a red run, because a check that throws names the
+       * page and not the change.
+       * ⚠️ WHAT IT WAS FOR IS KEPT: `not-allowed` says *you tried to use this
+       * and were refused*, and nothing on this panel refuses anybody. It used to
+       * be `default` on a dead control and it is the working cursor on a live
+       * one, and neither of them is a refusal.
        * ⚠️ ALL THREE KINDS, because the rule lives in three separate
-       * declarations in `shell.css` and a sweep that missed one would leave the
-       * fader lane refusing while the pads did not.
+       * declarations in `shell.css` and a check that read one would leave the
+       * fader lane wrong while the pads were right.
        */
       const cursors = {
-        pad: getComputedStyle(card.querySelector('.pos-pad:disabled')).cursor,
-        dial: getComputedStyle(card.querySelector('.pos-knob[data-off] .pos-knob-dial')).cursor,
-        lane: getComputedStyle(card.querySelector('.pos-fdr[data-off] .pos-fdr-lane')).cursor,
+        pad: getComputedStyle(card.querySelector('.pos-pad')).cursor,
+        dial: getComputedStyle(card.querySelector('.pos-knob-dial')).cursor,
+        lane: getComputedStyle(card.querySelector('.pos-fdr-lane')).cursor,
       };
-      d.assert('no control on this panel wears the refusal cursor',
-        Object.values(cursors).every((c) => c === 'default'),
+      d.assert('every control on this panel shows a working cursor and none shows a refusal',
+        cursors.pad === 'pointer' && cursors.dial === 'ns-resize'
+          && cursors.lane === 'ns-resize',
         Object.entries(cursors).map(([k, v]) => `${k} ${v}`).join(', '));
 
       /**

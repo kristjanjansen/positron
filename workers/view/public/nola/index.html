@@ -111,16 +111,20 @@
    */
   import { mount, guard, el } from '/shell/shell.mjs';
   import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
-  import { createKeyboard, QWERTY_CHROMATIC } from '/shell/keyboard.mjs';
+  import { createKeyboard, keyRange, KEY_SPAN_25, QWERTY_CHROMATIC }
+    from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC, damperSec } from '/shell/pedal.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createNameplate } from '/shell/panel-layout.mjs';
   import { createField } from '/shell/field.mjs';
   import { parseChord, parseChords, voiceChord, VOICINGS } from '/shell/chords.mjs';
   import { nameChord, createSettler, createTally, chordKey, fromKey, notesOf }
     from '/shell/name.mjs';
-  import { suggest, useTables, tablesIn } from '/shell/suggest.mjs';
+  import { suggest, routeTo, useTables, tablesIn, mkRandom } from '/shell/suggest.mjs';
   import { createRoll } from '/shell/roll.mjs';
+  import { createTable } from '/shell/table.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -304,14 +308,20 @@
    * full scale. Everything downstream of `press` is shared, so a voice, a
    * damper, a pedal and a steal cannot tell the two apart.
    */
+  /* ⚠️ `name` IS WHAT THE SELECTOR DRAWS AND IS TITLE CASE SINCE 2026-09-25.
+     It was `PIANO` and `RHODES` and was read by nothing at all, because the
+     control that named the two instruments carried its own option labels. The
+     standard patch selector reads its names off the list it is handed, and a
+     shouted name in a cell that elsewhere holds `Vibraphone Soft 2` would be
+     this page drawing the component differently from every other caller. */
   const PIANO = {
-    id: 'piano', name: 'PIANO', say: 'piano',
+    id: 'piano', name: 'Piano', say: 'piano',
     notes: PIANO_NOTES, peak: PIANO_PEAK,
     file: (note) => `/nola/${note}.mp3`,
     layerAt: () => null,
   };
   const RHODES = {
-    id: 'rhodes', name: 'RHODES', say: 'Rhodes',
+    id: 'rhodes', name: 'Rhodes', say: 'Rhodes',
     notes: RHODES_NOTES, peak: RHODES_PEAK,
     file: (note, layer) => `/nola/rhodes-${String(note).padStart(3, '0')}-${layer}.m4a`,
     layerAt: rhodesLayerAt,
@@ -338,7 +348,8 @@
      ⚠️ AND IT IS WHAT DEFINES THE WORD `roll` ON THE PAGE, which is what lets
      the control above the keys be labelled with it. */
   const ONE = 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
-    + 'of chords you either type in or teach it by playing';
+    + 'of chords you type in or teach it by playing and a four chord way home it '
+    + 'works out from them';
 
   const d = mount({
     name: 'nola',
@@ -897,26 +908,17 @@
    * fitting, on a keyboard that is drawing those very keys.
    */
   const SHOWN = () => Math.max(...Object.values(KEY_MAP));
-  const { KEY_MAP, KEY_ORDER, KEY_SHARPS, KEY_LETTERS } = (() => {
-    const map = {}, order = [], sharps = new Set(), lettered = new Set();
-    const BLACK = new Set([1, 3, 6, 8, 10]);
-    /* 🔴 READ OFF THE CONSTANT'S VALUES, NOT ITS ORDER, AND THAT MATTERS
-       SINCE `l` LANDED. This took `Object.keys()` and handed the nth letter to
-       the nth semitone, which was right only while the map had no gaps in it.
-       `l` is a D and sits at 14, with the C sharp at 13 belonging to a letter
-       nobody has asked for, so a positional read would have put `l` on the
-       black key and moved every shape a hand knows one key out. */
-    const letterAt = Object.fromEntries(
-      Object.entries(QWERTY_CHROMATIC).map(([k, v]) => [v, k]));
-    for (let i = 0; i <= 24; i++) {
-      const id = letterAt[i] ?? `hi${i}`;
-      map[id] = i;
-      order.push(id);
-      if (BLACK.has(i % 12)) sharps.add(id);
-      if (letterAt[i]) lettered.add(id);
-    }
-    return { KEY_MAP: map, KEY_ORDER: order, KEY_SHARPS: sharps, KEY_LETTERS: lettered };
-  })();
+  /* 🔴 TWENTY-FIVE KEYS OFF THE KIT SINCE 2026-09-25, AND THE ARITHMETIC
+     CAME FROM HERE. This page built the map inline and `/knobs/` was about to
+     write it a second time, which is this project's rule about a control that
+     exists in one page being a component nobody has noticed yet.
+     ⚠️ WHAT THE COMPONENT KEPT IS THE BUG THIS PAGE FOUND. `keyRange` reads the
+     letters off `QWERTY_CHROMATIC`'s VALUES rather than off its order, because
+     `l` is a D at 14 with nothing at 13, so a positional read puts a white
+     letter on a black key. It keeps the `hi<n>` ids too, so the two builds
+     produce identical keys and nothing that reads one has to learn the other. */
+  const { map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS }
+    = keyRange(KEY_SPAN_25);
 
   const keysHost = el('div', 'nola-keys');
   keysHost.style.setProperty('--k-min', `${KEY_MIN}px`);
@@ -926,6 +928,17 @@
     base: 48,
     map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
     minBase: 24, maxBase: 84,
+    /* 🔴 THE INSTRUMENT ROW IS THE COMPONENT'S FOOTER SINCE 2026-09-25, AND
+       THIS PAGE NO LONGER DRAWS ITS OWN. Reported off a crop of that row: *"the
+       border on top of footer goes edge to edge. in the life of me i don ot
+       understand why you do not see it and build a soliutiojn that stays (glued
+       panels) not invent custom css with measurements each time"*. This page
+       had `.nola-foot` with a `--foot-air: 10px`, a `margin-top`, a
+       `padding-top` and a `border-top`, inside a `.kbd` that pads by
+       `--kbd-pad`, so the line stopped 9 px short of the box at both ends.
+       `keyboard.mjs` owns the row, the line and the air now, for all ten pages
+       that import it. */
+    foot: true,
     /* ⚠️ `vel` IS WHAT THE LOOP GIVES BACK AND `100` IS WHAT A CLICK IS WORTH. A
        key on screen has no velocity, so the flat value stands for it; a looped
        note carries the one it was played with. */
@@ -1061,10 +1074,29 @@
    * the page is reading the sentence.
    */
   /**
-   * 🔴 WHICH INSTRUMENT THE KEYS PLAY, AS ONE CONTROL FROM THE KIT. Two
-   * mutually exclusive named options is `createChoice` and nothing else:
-   * `picker.mjs` is a stepper for a list too long to show, and a toggle would
-   * make one of the two instruments the absence of the other.
+   * 🔴 WHICH INSTRUMENT THE KEYS PLAY, AS THE STANDARD PATCH SELECTOR. Asked
+   * 2026-09-25: *"in nolda demo convert instrument radiobutton to std patch
+   * selector"*.
+   * ⚠️ THE COMMENT THAT STOOD HERE ARGUED AGAINST THIS ASK IN WRITING, that two
+   * mutually exclusive named options is `createChoice` and nothing else and
+   * that `picker.mjs` is a stepper for a list too long to show. An instruction
+   * supersedes a rule and `LAYOUT.md` already says so; what a superseded rule
+   * must not do is stay here contradicting the page it sits in. One half of it
+   * is kept below and is the reason the arrows WRAP: over a list of two, a
+   * clamping arrow is a control that does nothing half the time, which is the
+   * shape this project calls a lie.
+   * 🔴 AND IT CARRIES NO LABEL, BECAUSE THE ROW IT IS IN IS NOW AN INSTRUMENT
+   * FOOTER. `createInstrument`'s header is a name at one end and a patch
+   * selector at the other, and this row became that row in the same change:
+   * `nola` on the plate at the left, the sound on the right. An `INSTRUMENT`
+   * label beside the plate would be two pieces of small caps at one end of one
+   * row. `/kit/` and `/fau/` both call this component with no label either.
+   * ⚠️ `what` IS `sound` RATHER THAN `patch`, AND THAT IS A DECISION ABOUT WORDS
+   * A VISITOR READS. It is the noun in both arrows' hovers and in the
+   * dropdown's accessible name, and *the patch before this one* over a choice
+   * between a sampled grand and a 1977 Rhodes is a description drifted from the
+   * thing it points at. The COMPONENT is the standard patch selector; `what` is
+   * what this one really steps.
    * 🔴 IT IS NOT IN `.pos-controls`, AND THAT IS ABOUT THE HARNESS RATHER THAN
    * ABOUT TASTE. `demo/verify.mjs` clicks every button in that row, 650 ms
    * apart, while this page's own checks are already running at load, so a
@@ -1075,16 +1107,81 @@
    * a pair that belongs tight is one block. What the keys play and the keys are
    * one thing, the way the sustain button under them already is.
    */
-  const instPick = createChoice({
-    label: 'INSTRUMENT',
-    options: [['Piano', 'piano'], ['Rhodes', 'rhodes']],
-    at: 0,
-    onPick: (id) => setInstrument(id),
-    title: (id) => (id === 'rhodes'
-      ? 'Jeff Learman’s own 1977 Rhodes Mark I Stage 73, sampled as jRhodes3d at '
-        + 'five velocities and used here under CC BY-NC-SA 4.0'
-      : 'a sampled grand, FluidR3 GM, recorded at one velocity'),
+  const instPick = createPicker({
+    what: 'sound',
+    prev: () => stepInst(-1),
+    next: () => stepInst(+1),
+    onPick: (i) => chooseInst(INSTRUMENTS[i].id),
   });
+  /* 🔴 THE TWO ARROWS ARE NAMED ONCE, HERE, AND NEVER INDEXED AGAIN. This is
+     the whole reason the conversion was not mechanical: `createChoice` returned
+     one button PER OPTION, so `buttons[0]` was Piano and `buttons[1]` was
+     Rhodes, and ten call sites in this file said so in a trailing comment.
+     `createPicker` returns `buttons = [back, fwd]`, so the same two indexes
+     become *previous* and *next*.
+     ⚠️ AND THE FAILURE WOULD HAVE BEEN SILENT IN THE ONE DIRECTION THAT
+     MATTERS. `buttons[1]` meaning RHODES still lands on the Rhodes, because
+     *next* from the piano is the Rhodes; `buttons[0]` meaning PIANO becomes
+     *previous*, which is a direction rather than a name. A blind swap stays
+     green and drives the wrong thing. */
+  const [instBack, instFwd] = instPick.buttons;
+  const instCell = instPick.el.querySelector('.pos-pick-cell');
+
+  /* 🔴 THE LICENCE LIVES ON THE VALUE CELL AND IS WRITTEN BACK AFTER EVERY
+     DRAW, WHICH IS THE ONE PART OF THIS CHANGE THAT COULD BREAK SOMETHING
+     OUTSIDE THIS PAGE. The Rhodes is used under CC BY-NC-SA 4.0 and attribution
+     has to travel with the work. A picker has no slot built for it: the two
+     arrows carry *the sound before this one* and *the sound after this one*,
+     and the cell OVERWRITES its own title on every draw, at `picker.mjs:103`
+     and again at `:160`, so anything written there is gone the next time the
+     name is drawn.
+     ✅ SO THE CREDIT IS WRITTEN BY THE ONE FUNCTION THAT DRAWS. Every draw on
+     this page goes through `drawInst`, which is the only caller of `show()`
+     here, so there is no path that leaves the credit off.
+     ⚠️ AND IT FOLLOWS THE SELECTION RATHER THAN NAMING BOTH AT ONCE, which is
+     the real difference from the control it replaces. `createChoice` gave every
+     option its own button and so its own hover; a picker shows one name at a
+     time. The credit is reachable exactly while the work it credits is the one
+     in use, and the reader who never chooses the Rhodes never plays it either.
+     ⚠️ THE CELL'S OWN TITLE IS NOT BEING THROWN AWAY BY THIS. `picker.mjs` puts
+     the whole name there because the cell ellipsizes at a fixed width; `Piano`
+     and `Rhodes` are five and six characters in a cell reserved for eight, so
+     nothing here is ever cut and there is no name to lose. On a page with long
+     patch names this would be the wrong home.
+     ⚠️ AND THE LOG LINE IS THE SECOND CHANNEL AND IS UNTOUCHED: `setInstrument`
+     still says which instrument the keys play, on every switch. */
+  const CREDIT = {
+    rhodes: 'Jeff Learman’s own 1977 Rhodes Mark I Stage 73, sampled as jRhodes3d at '
+      + 'five velocities and used here under CC BY-NC-SA 4.0',
+    piano: 'a sampled grand, FluidR3 GM, recorded at one velocity',
+  };
+  function drawInst() {
+    instPick.show(inst.name, INSTRUMENTS.indexOf(inst));
+    instCell.title = CREDIT[inst.id];
+  }
+  const chooseInst = (id) => { setInstrument(id); drawInst(); };
+  /* ⚠️ IT WRAPS. See the head of this block: over a list of two, an arrow that
+     clamps is dead at one end and there is nothing on the face to say so. */
+  const stepInst = (by) => {
+    const i = INSTRUMENTS.indexOf(inst);
+    chooseInst(INSTRUMENTS[(i + by + INSTRUMENTS.length) % INSTRUMENTS.length].id);
+  };
+  instPick.options(INSTRUMENTS.map((x) => x.name), INSTRUMENTS.indexOf(inst));
+  drawInst();
+
+  /* 🔴 THE PAGE'S OWN CHECKS PRESS THIS CONTROL BY NAME, NEVER BY INDEX. Ten
+     call sites below used to click an index and write the instrument in a
+     trailing comment, which is exactly the arrangement the block above says
+     goes quietly wrong.
+     ⚠️ IT PRESSES, IT DOES NOT SET. `setInstrument` is one call away and
+     reaching for it would leave the control this change replaces graded by
+     nothing, which is the loss `positron-verify` records on `/mirror/` and
+     `/blocks/`, where ten and six asserts went silent behind a control nobody
+     could press. */
+  const pressInst = (id) => {
+    for (let n = 0; n < INSTRUMENTS.length && inst.id !== id; n++) instFwd.click();
+    return inst.id;
+  };
 
   /**
    * 🔴 WHERE THE CHORD IS PUT, WHICH IS A DIFFERENT QUESTION FROM WHAT IT IS.
@@ -1116,6 +1213,7 @@
     root: 'the notes exactly as the chord symbol spells them, stacked upward from the root',
     close: 'the same notes packed as close together as they go, so one hand can hold them',
     lead: 'each chord put where it moves your hand least from the one before it',
+    split: 'the root on its own for your left hand and the rest of the chord above it for your right',
   };
   const voicePick = createChoice({
     /* ⚠️ `VOICING` IS THE TERM AND A TERM IS NOT JARGON. It was `CHORDS` for
@@ -1128,7 +1226,18 @@
        anything: these were literal capitals typed into the page, which made two
        ordinary words look like an abbreviation. */
     label: 'VOICING',
-    options: [['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead']],
+    /* \u{1F534} `Split` IS A FOURTH OPTION SINCE 2026-09-25, ASKED FOR WITH A PICTURE
+       RATHER THAN A WORD: *"what voicing? wanna this"*, beside a piano tutorial
+       of `Cmaj7 Dm7 Em7 Fmaj7` on two staves with one bass note per chord in the
+       left hand and three notes in the right that barely move.
+       \u{1F534} AND THE LABEL IS A PLAIN WORD BECAUSE THIS EXACT CONTROL HAS ALREADY
+       PAID FOR THE OTHER KIND. These read `SPELLED`, `CLOSE` and `LEADING` for
+       ten minutes and the report was *"i do not know what spelled close leading
+       means"*. A musician calls this one a rootless voicing over a bass root,
+       and `chords.mjs` writes that name down once for a reader who knows it.
+       `Split` is what a visitor SEES: the chord split into a note underneath
+       and a handful above it. */
+    options: [['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead'], ['Split', 'split']],
     at: VOICINGS.indexOf('lead'),
     /* 🔴 A VOICING PRESS RE-VOICES EVERYTHING, LEARNED ROWS INCLUDED, AND THAT
        IS THE ANSWER TO *"you can revoice if i choose so?"*. A row lands where
@@ -1176,10 +1285,6 @@
   const tapeAt = () => Math.round(performance.now());
 
   const instrument = el('div', 'nola-inst');
-  /* ⚠️ THE TWO PICKERS ARE ONE ROW: what is playing and where the chords are
-     put are both about the instrument under them, and two labelled choices on
-     two lines would read as two unrelated settings. */
-  const picks = el('div', 'nola-picks');
   /* 🔴 THE VOICING PICKER IS PUT AWAY, ASKED FOR IN THESE WORDS: *"it feels
      'exact' does not have role in played mode except savign my position. i am
      lost in this setting"*, then *"can we archive it and pick one for now so i
@@ -1194,18 +1299,71 @@
      is measured rather than chosen: `chords-test.mjs` reads 27 semitones of
      movement over seven chords for `lead` against 57 for close and 46 for root.
      *"without travelline too much"* is exactly what that number is. */
-  picks.append(instPick.el);
+  /* 🔴 THE INSTRUMENT SWITCH IS A FOOTER INSIDE THE KEYBOARD'S OWN BOX SINCE
+     2026-09-25, ASKED AS *"add piano / rhodes into a isntrument footer to the
+     right glued under keyboaed"*. It was a labelled row a block ABOVE the keys,
+     which is the same complaint `roll.mjs` already answers from the other side:
+     a thing that belongs to the instrument goes inside the instrument's box,
+     and that is what makes it line up with it.
+     ⚠️ INSIDE `.kbd`, NOT UNDER IT, WHICH IS WHAT `glued` CAN MEAN HERE. The
+     keyboard's box is `width: fit-content`, so a sibling below it would either
+     be a different width or force the box to stretch, and stretching it is the
+     one thing that box's own rule refuses. Appended to `keys.el` it shares the
+     border, the ground and the padding, and there is no seam to get wrong.
+     ⚠️ AND IT DOES NOT TOUCH THE COMPONENT'S OWN FOOTER. The octave pair, the
+     displacement, the chord name, `Loop`, `Sustain` and `Notes off` are
+     controls ABOUT THE KEYS and belong to `keyboard.mjs`; which instrument the
+     keys play is this page's, so it gets a row of its own under theirs.
+     ⚠️ THE ATTRIBUTION TRAVELS WITH THE CONTROL AND IS NOT RE-HOMED. The
+     Rhodes' licence needs a name a reader can reach, and since 2026-09-23 that
+     is this control's own hover plus the log line on the first press. Which
+     ELEMENT of the control holds it changed when the control did, on
+     2026-09-25, and the block above the picker carries that whole argument.
+     🔴 AND IT IS A TWO ENDED ROW SINCE 2026-09-25, WITH A LINE ABOVE IT. Asked
+     as *"add top border to that footer. add nola nameplace to the left of
+     footer"*, so `hard right` below is now one end of it rather than the whole
+     of it, and the line is the first thing drawn across the inside of this box.
+     The stylesheet carries why it is a line here and spacing everywhere else. */
+  const instFoot = keys.foot;
+  /* 🔴 THE PAGE'S OWN NAMEPLATE AT THE OTHER END OF THAT ROW, ASKED 2026-09-25
+     AS *"add nola nameplace to the left of footer"*. This page had no plate at
+     all until today, measured: zero occurrences of `nameplate` or `pos-plate`.
+     With the selector at the right it makes the row an instrument header laid
+     on its back, which is the same pairing `createInstrument` already draws.
+     🔴 `place: 'ends'`, NOT WHAT `plateSpec` RETURNS, AND THIS IS THE ONE THING
+     HERE THAT WOULD HAVE PUT BOTH CHILDREN ON THE RIGHT WHILE EVERY RULE ABOUT
+     THE ROW READ AS CORRECT. `plateSpec('', 'nola')` downgrades a single line to
+     `end`, and it is right to: `ends` is `space-between`, which parks a lone
+     child on the LEFT of a plate that SPANS its container, and that is a bug
+     everywhere except here. Left is the placement this row was asked for, and
+     `.panel-plate[data-place="end"]` carries `margin-left: auto`, which absorbs
+     the row's free space before `justify-content` ever runs and drags the plate
+     across to sit beside the selector.
+     ⚠️ SO `createNameplate` IS CALLED DIRECTLY RATHER THAN THROUGH `plateSpec`.
+     `plateSpec` keeps one line only for `side`, which is a vertical plate glued
+     down a case, and reaching into `demo/shell/` to widen that list would be a
+     change to a shared module for one page's benefit.
+     ⚠️ AND IT IS UPPERCASE, WHICH IS THE COMPONENT'S DEFAULT RATHER THAN A
+     CHOICE MADE HERE. `caps: false` exists for `/shape/`, whose ask named a
+     lower case word in a sentence about nothing else; nothing was said about
+     the case of this one, so it takes the project's rule. */
+  const plate = createNameplate({ lines: ['nola'], place: 'ends' });
+  instFoot.append(plate.el, instPick.el);
   /* 🔴 THE CREDIT COMES OFF THE FACE AND DOES NOT LEAVE THE PAGE, because the
      licence is not a preference. Asked 2026-09-23 to remove the sentence, and
      CC BY-NC-SA 4.0 requires attribution to travel with the work: what it does
-     NOT require is a paragraph under the keys. It is on the instrument picker's
+     NOT require is a paragraph under the keys. It is on the sound selector's
      hover, where this page already keeps a fact a reader may want and does not
      need on the face, and in the log when the Rhodes is first chosen.
+     ⚠️ WHICH ELEMENT OF THAT CONTROL HOLDS IT IS NOT A DETAIL AND MOVED WITH
+     THE CONTROL ON 2026-09-25: a selector draws ONE name at a time and
+     overwrites its own hover every time it draws. The block beside
+     `createPicker` carries the whole argument and the check reads it there.
      ⚠️ AND THE SHIPPED FILES ARE THE OTHER HALF: `demo/nola/LICENSE-jrhodes3d`
      and `PROVENANCE-rhodes.json` go out with the recordings and `build.mjs`
      carries the line that keeps them there. Deleting the sentence outright would
      have left the attribution in nothing a visitor can reach. */
-  instrument.append(picks, keysHost);
+  instrument.append(keysHost);
 
   /* 🔴 THE ONE CONTROL THAT ONLY EXISTS UNDER `?rec=1`, so no visitor meets it
      and no harness press moves. It writes the take to a file and says how much
@@ -1258,38 +1416,49 @@
      where the roll's rows come from, which is what the field is. */
   const topRow = el('div', 'nola-top');
   topRow.append(chordField.el);
+
   /**
-   * 🔴 WHAT THE PAGE THINKS IT IS HEARING, IN A BOX THAT CANNOT CHANGE ITS OWN
-   * HEIGHT. `positron-ui` bans a live sentence under a picture because it
-   * rewraps between two and three lines while somebody reads it, and it bans a
-   * page narrating its own state in prose. This is neither: one line, `nowrap`,
-   * a reserved height, and it changes when a chord settles rather than on a
-   * clock. It is a readout cell's shape without being a readout, which this
-   * page has declared it has none of.
-   * 🔴 AND WHAT IT IS FOR IS THE UNSURE CASE, WHICH IS THE INTERESTING ONE.
-   * `C E G#` is `Caug` and `Eaug` and `G#aug`, three names for one set of
-   * notes, and the page saying so is a real property of music rather than a
-   * failure state. A single confident wrong answer would be worse, and this
-   * page has a particularly bad version of that available to it: the roll
-   * lights a row when you play it, so a wrong name written in gets CONFIRMED
-   * back to somebody who trusted it.
-   * ⚠️ DECLARED HERE RATHER THAN WHERE IT IS FILLED, because the stack is built
-   * here and a page that spliced a row in afterwards would be deciding its own
-   * reading order twice.
+   * 🔴 A FOUR CHORD WAY HOME, WHICH IS A DIFFERENT OFFER FROM A CHORD THAT COMES
+   * NEXT. The complaint that bought this page's suggester its rewrite was three
+   * complaints, and the third was *"not moving anywhere"*, taken literally and
+   * MEASURED in `plans/plan-better-chords-2026-09-25.md`: taking the old
+   * suggestion ten times in a row fell into a repeating cycle **99.1 per cent**
+   * of the time, three quarters of them the three rotations of ii V I. Nothing
+   * on this page had a destination, so nothing could arrive at one.
+   * ✅ `suggest.mjs` SEARCHES THE SAME TABLE FOR A RUN OF FOUR THAT LANDS ON THE
+   * TONIC. MEASURED against this table's shape over 4,000 held-out jazz
+   * contexts: a route exists on **92.7 per cent** of them and its transitions
+   * are attested in songs the table has never seen **98.3 per cent** of the
+   * time.
+   *
+   * 🔴 AND IT IS NOT IN THE ROLL, BECAUSE THE ROLL SHOWS ONE PROPOSAL AND THAT
+   * WAS ASKED FOR IN THOSE WORDS: *"add suggestions to piano roll. just one"*.
+   * Four more rows under the one proposal would undo that ask by arriving from a
+   * different direction. A way home is a sequence rather than a choice between
+   * chords, so it gets its own block and its own heading.
+   * ⚠️ `minRows: 4` RESERVES THE ROOM WHETHER OR NOT THERE IS A ROUTE, which is
+   * the same reason the roll reserves eight: a block that grows the moment
+   * somebody plays their second chord moves the keyboard down the page while
+   * they are looking at it.
+   * ⚠️ AND PICKING A ROW PUTS IT ON THE KEYS, the way picking a roll row already
+   * does. `table.mjs` moves focus on an arrow and opens on Enter, so stepping
+   * down four chords costs nothing and lighting one is a decision.
    */
-  /* 🔴 THE READING SITS ON THE ROLL RATHER THAN ON A LINE OF ITS OWN. Asked
-     2026-09-23: *"rm nothign held and the whole element ith chord names"*, then
-     *"add played chord to top left of pianoroll, grayer than right side chord
-     names"*.
-     It was a block in the page stack, which meant a row of its own height
-     reserved for one or two words, and `nothing held` printed there whenever
-     hands were off the keys. What you are playing belongs ON the picture of what
-     you are playing, opposite the names of the chords already in it.
-     ⚠️ GREYER THAN THOSE NAMES ON PURPOSE: the labels on the right are a record
-     and this is a reading of the moment, so it must not compete with them. */
-  const readLine = el('div', 'nola-read');
-  readLine.hidden = true;
-  d.stack.add(topRow, chordList, instrument);
+  const homeWrap = el('div', 'nola-home');
+  const homeSay = el('div', 'nola-home-h', 'A WAY HOME');
+  const homeTbl = createTable({
+    columns: [
+      { key: 'name', label: 'chord', grow: true, hi: true },
+      /* ⚠️ THE NUMERAL IS THE COLUMN THAT SAYS IT IS GOING SOMEWHERE. Four chord
+         names are four chords; `ii V I` under them is the arrival, and this page
+         already explains its numerals in the log. */
+      { key: 'numeral', label: 'numeral', width: 96, align: 'right' },
+    ],
+    minRows: 4,
+    onPick: (row) => showChord(row),
+  });
+  homeWrap.append(homeSay, homeTbl.el);
+  d.stack.add(topRow, chordList, instrument, homeWrap);
 
   // ── the MIDI keyboard ─────────────────────────────────────────────────────
 
@@ -1545,7 +1714,6 @@
      and draws a proposal under them, so five meant the roll still grew while
      somebody played, which is the one thing reserving the room exists to
      prevent. */
-  keysHost.append(readLine);
   const roll = createRoll(keys.el, {
     base: keys.base, keys: KEY_ORDER, map: KEY_MAP, sharps: KEY_SHARPS, prepend: true,
     scroller: keys.keysEl,
@@ -1596,8 +1764,23 @@
        * and the keys above them are where a melody goes, which is the hand
        * position anybody playing chords and a tune already uses.
        */
+      /**
+       * \u{1F534} `split` GETS THE WHOLE DRAWN KEYBOARD AND NOT THE LETTER ROW, AND
+       * THAT IS ARITHMETIC RATHER THAN A PREFERENCE. The letter row is fourteen
+       * semitones, which is one hand, and this voicing is two: a note
+       * underneath plus three above it needs more room than a hand has.
+       * MEASURED on the four chords that asked for it, into 48 to 62: three of
+       * them fit and `Fmaj7` comes out F3 A3 C4 E4, whose E4 is 64, TWO
+       * SEMITONES ABOVE the top letter key. One chord of four would have been
+       * drawn with a note nobody can reach and `outside` would have said so on
+       * every redraw.
+       * \u26a0\ufe0f AND THE PROMISE THE LETTER ROW MAKES IS NOT BEING BROKEN, it is
+       * being declined by a mode that never made it. The three other voicings
+       * still fit under the letters, which is what the control was asked for;
+       * this one is for two hands and says so in its own hover.
+       */
       const { notes: shifted, outside } = voiceChord(c.notes, {
-        mode: voicing, lo: base, hi: base + REACH,
+        mode: voicing, lo: base, hi: base + (voicing === 'split' ? SHOWN() : REACH),
         near: rows.length ? rows[rows.length - 1].notes : [],
         bass: c.bass !== null,
       });
@@ -1709,6 +1892,23 @@
    */
   const LEARN_STYLE = q.get('style') === 'pop' ? 'pop' : 'jazz';
   /**
+   * 🔴 ONE SEEDED STREAM FOR EVERY DRAW THIS PAGE MAKES, AND THE SEED IS FIXED
+   * RATHER THAN TAKEN OFF THE CLOCK. `suggest.mjs` draws its first slot out of
+   * the table since 2026-09-25 instead of taking the most likely row, which is
+   * the whole of the fix for *"they sound unimaginative"*, and a draw off
+   * `Math.random` would make every check on this page flake for a living.
+   * ✅ AND A FIXED SEED IS NOT A PAGE THAT REPEATS ITSELF, because the stream
+   * ADVANCES. Play the same two chords four times over and the four answers are
+   * four different draws; what a fixed seed buys is that the same session played
+   * the same way twice is the same session, which is the only condition under
+   * which any of the plan's numbers can be checked against this page.
+   * ⚠️ `?seed=` IS THE WAY TO A DIFFERENT LINE, and it is a query a person can
+   * use rather than a switch the harness flips. A page that drew one way for
+   * `?selfcheck=1` and another way for a visitor is a page nothing grades.
+   */
+  const DRAW_SEED = Number(q.get('seed')) || 20260925;
+  const draw = mkRandom(DRAW_SEED);
+  /**
    * 🔴 THE TABLE IS FETCHED, SO IT IS FETCHED ON A PRESS AND NEVER ON A VISIT.
    * 12,746 bytes against the 3,824,981 this page already ships in recordings,
    * which is 0.33 per cent, and it is still not loaded until somebody asks the
@@ -1774,21 +1974,41 @@
    * the whole keyboard to work in, `near` can put it beside the last chord
    * instead of at the bottom of the picture.
    */
+  /* \u26a0\ufe0f AND `split` IS WIDE WHEREVER IT IS ASKED FOR, for the reason written
+     over `drawChords`: a voicing with a hand either side of it does not fit
+     inside one hand's letter row, and a learned row or a proposal drawn in it
+     would carry a note above the letters exactly as a typed one would. */
   const voiceRow = (notes, near, { wide = false } = {}) => voiceChord(notes, {
-    mode: voicing, lo: keys.base, hi: keys.base + (wide ? SHOWN() : REACH),
+    mode: voicing, lo: keys.base, hi: keys.base + (wide || voicing === 'split' ? SHOWN() : REACH),
     near, bass: false });
 
+  /**
+   * 🔴 THE CHORD CAME OFF THE ROLL'S TOP LEFT ON 2026-09-25, ASKED AS *"rm
+   * chord from top left (as it moves to keyb compoentn)"*. `keyboard.mjs` draws
+   * a chord name in its own footer now, so a second name an inch above it is
+   * one fact in two places, and two places can disagree.
+   *
+   * 🔴 AND THE READING STAYS, BECAUSE IT IS NOT THE SAME QUANTITY. The
+   * component's footer is a readout of what is UNDER THE HANDS: it has no
+   * clock, on purpose, and its own header says a debounce would make its answer
+   * depend on a timer nothing can grade. This page's reading is SETTLED, over
+   * `LEARN_WINDOW`, past the subset window that tells a lifted finger from a
+   * chord change, and it is the quantity the tally, the roll and five of this
+   * page's own checks are about. A footer cannot carry it and this page must
+   * not ask it to.
+   * ✅ SO WHAT WAS GIVEN UP IS THE DISPLAY AND NOT THE FACT, which is
+   * `positron-ui`'s rule about deleting a block: rehome what it said. It is
+   * state now, the checks read it, and the one name a visitor sees is the
+   * component's.
+   * ⚠️ NULL RATHER THAN AN EMPTY LABEL, so *nothing has been named* and *a
+   * name with no confidence behind it* stay two different answers. That is the
+   * same trap `[data-sure]` had when this was an element.
+   */
+  let reading = null;
   function showReading(r) {
     /* 🔴 ONE NAME, ALWAYS. *"just forget about or...rec it, interpet it"*. The
-       margin decides the ink rather than the words. */
-    /* ⚠️ EMPTY RATHER THAN `nothing held`. A cell does not have to say it is a
-       cell, and the roll under it already says what this is about. */
-    readLine.textContent = r ? r.label : '';
-    /* ⚠️ DELETED RATHER THAN SET EMPTY. `[data-sure]` matches on PRESENCE, so
-       an empty string would leave a guess wearing the confident ink for the
-       rest of the page's life. Measured elsewhere in this project as exactly
-       that defect on a full screen panel. */
-    if (r?.sure) readLine.dataset.sure = '1'; else delete readLine.dataset.sure;
+       margin decides how sure it looks rather than the words. */
+    reading = r ? { label: r.label, sure: !!r.sure } : null;
   }
 
   /**
@@ -1851,9 +2071,9 @@
     lastGuess = null;
     guessPlayed = false;
     lightGuess([]);
-    if (mode !== 'learn' || learned.length < 2) return;
+    if (mode !== 'learn' || learned.length < 2) { drawHome(); return; }
     guessAt = performance.now();
-    const r = suggest({ chords: learned }, { style: LEARN_STYLE });
+    const r = suggest({ chords: learned }, { style: LEARN_STYLE, rnd: draw });
     if (!r.ok) return;
     lastGuess = r;
     /* 🔴 WHERE THE KEY CAME FROM, SAID OUT LOUD, WHICH IS THE DECISION THIS
@@ -1925,6 +2145,54 @@
          read off one picture and find on another is a proposal you travel to. */
       lightGuess(notes);
     }
+    drawHome();
+  }
+
+  /** the way home on screen, so a check can read what was offered */
+  let lastHome = null, homeRedraws = 0, saidHome = '';
+  /**
+   * 🔴 THE ROUTE IS REDRAWN WITH THE PROPOSAL AND NEVER ON ITS OWN, which is how
+   * it inherits the hold that was asked for as *"do not offer new when i hae not
+   * played old suggestion for a while"*. Four chords you are working your way
+   * through must not be replaced under you any more than one chord must, and two
+   * offers on two different clocks would be a page talking over itself.
+   * ⚠️ AND IT IS FILTERED BY NOTHING. The single proposal is never a chord
+   * already in the roll, because a chord you are playing is nothing to try; a
+   * way home is a SEQUENCE, the tonic is very often a chord you have already
+   * played, and a route forbidden from landing on it would be a route that
+   * cannot arrive.
+   */
+  function drawHome() {
+    homeRedraws++;
+    lastHome = null;
+    homeWrap.hidden = mode !== 'learn';
+    if (mode !== 'learn' || learned.length < 2 || !tablesIn()) {
+      homeSay.textContent = 'A WAY HOME';
+      homeTbl.set([]);
+      return;
+    }
+    const r = routeTo({ chords: learned }, { style: LEARN_STYLE, rnd: draw });
+    lastHome = r;
+    homeSay.textContent = r.targetName ? `A WAY HOME TO ${r.targetName}` : 'A WAY HOME';
+    if (!r.ok) {
+      /* 🔴 SAID IN WORDS RATHER THAN LEFT AS AN EMPTY BOX. MEASURED: this table
+         gets from a held-out context to the tonic in four chords 92.7 per cent
+         of the time, so one context in thirteen has no way home in it, and four
+         blank rows under a heading is a page that looks broken rather than one
+         reporting a fact about what it has counted. */
+      homeTbl.set([]);
+      if (r.says !== saidHome) { saidHome = r.says; d.log(r.says); }
+      return;
+    }
+    let near = learned.length ? learned[learned.length - 1].notes : [];
+    const rows = [];
+    for (const c of r.steps) {
+      const pc = parseChord(c.name);
+      const notes = pc.ok ? voiceRow(pc.notes, near, { wide: true }).notes : [];
+      if (notes.length) near = notes;
+      rows.push({ name: c.name, numeral: c.numeral || '', notes });
+    }
+    homeTbl.set(rows);
   }
 
   function addLearned(key) {
@@ -2225,14 +2493,37 @@
     clearTimeout(admitTimer);
     settler.reset();
     tally.release(performance.now());
-    readLine.hidden = mode !== 'learn';
+    /* ⚠️ THE READING IS DROPPED ON EVERY MODE CHANGE, because `heardChange`
+       returns early outside the learning mode, so a reading left standing here
+       would be the last chord of the previous mode sitting in the state a check
+       reads. It used to be hidden rather than cleared, which is the same
+       mistake one element along. */
+    showReading(null);
     /* 🔴 HIDDEN IN `Played`, NOT GREYED. Asked 2026-09-23: *"when played, hide
        chords input"*. A disabled field is a control saying *you could type here
        but not now*, and in this mode you never can: the roll's rows come from
        your hands and the field has nothing to do with them. It was disabled
        rather than hidden because disabling was the smaller change at the time,
-       and a greyed box holding four chords you cannot reach is furniture. */
-    chordField.el.hidden = mode === 'learn';
+       and a greyed box holding four chords you cannot reach is furniture.
+       🔴 AND `hidden` WAS SETTING AN ATTRIBUTE AND CHANGING NOTHING ON SCREEN
+       FOR AS LONG AS IT HAD BEEN THERE. Asked again 2026-09-25: *"only show
+       chords textfield when typed is selected"*, which reads as a new request
+       and is the old one reporting that it never landed. `shell.css` gives
+       `.pos-field` an explicit `display: inline-flex`, and ANY author rule beats
+       the browser's own `[hidden] { display: none }`, so the field stayed drawn
+       and the property read as set. This project has measured that exact defect
+       on the readout, the control row, the log, the glue and a table heading,
+       and `.pos-field` is the sixth component to want the one line patch that
+       fixes it. That line belongs in `shell.css` and is not this page's to
+       write.
+       ✅ SO THE FIELD LEAVES THE DOCUMENT RATHER THAN ASKING A STYLESHEET TO
+       HIDE IT. It is a page deciding what is in its own row, it needs no CSS at
+       all, and `isConnected` is a fact about the document rather than about an
+       attribute, which is the only kind of fact the check below can trust.
+       ⚠️ AND IT IS STILL DISABLED, because a detached field is still typed into
+       by anything holding a reference to it. */
+    if (mode === 'learn') chordField.el.remove();
+    else if (!chordField.el.isConnected) topRow.append(chordField.el);
     chordField.disabled(mode === 'learn');
     if (mode === 'learn') {
       showReading(null);
@@ -2240,6 +2531,11 @@
     } else {
       drawChords(chordField.value());
     }
+    /* ⚠️ CALLED HERE AS WELL AS FROM `drawGuesses`, BECAUSE THAT ONE IS ALLOWED
+       TO DO NOTHING. A proposal nobody has played yet is left alone, so the
+       redraw returns early and the way home would keep whatever it was showing
+       for the other mode. A mode change is the one moment both have to move. */
+    drawHome();
     if (!say) return;
     if (mode === 'learn') {
       /* 🔴 THE ONE ARBITRARY CHOICE, SAID OUT LOUD ONCE. `C6` and `Am7` are the
@@ -2275,8 +2571,16 @@
    * so a mode switch there would change what the roll holds in the middle of
    * the damper check. The page's own check presses it instead, which grades
    * more than a harness click would.
-   * ⚠️ TWO NAMED MODES IS `createChoice` AND NOTHING ELSE, which is what this
-   * page already decided about the instrument row.
+   * ⚠️ TWO NAMED MODES IS `createChoice`, AND THE INSTRUMENT ROW IS NO LONGER
+   * THE PRECEDENT FOR THAT. It made the same argument in writing until
+   * 2026-09-25, when it was asked to become the standard patch selector and
+   * the argument was superseded by an instruction. What is left here is the
+   * argument on its own merits, which is unchanged and is `choice.mjs`'s own:
+   * two mutually exclusive named modes are one segmented object with the armed
+   * one lit, and both names are readable without pressing anything. The row
+   * below the keys had a reason to change that this one does not: it sits at
+   * the right hand end of an instrument footer, opposite a nameplate, which is
+   * a shape a segmented row cannot take.
    */
   const modePick = createChoice({
     label: 'ROLL',
@@ -2297,6 +2601,13 @@
       : 'the roll is the line of chords typed in the field beside this'),
   });
   topRow.prepend(modePick.el);
+  /* 🔴 ONCE AT LOAD, BECAUSE `setMode` ONLY EVER RUNS ON A PRESS. A page opened
+     at `?learn=0` never calls it, so without this line the way home would sit
+     there in the typed mode as a heading over four empty rows on a page where
+     nothing was ever going to fill them, which is `an empty box is a line` in
+     its larger form. It also puts the block in the right state for the mode this
+     page really opened in rather than the one it is usually opened in. */
+  drawHome();
 
   // ── what only this page can say ───────────────────────────────────────────
   //
@@ -2514,6 +2825,128 @@
         onRoll.join(',') === onKeys.join(','),
         `roll at ${onRoll.join(',')} px against ${onKeys.join(',')} px on the instrument`);
 
+      /* 🔴 AND THE INSTRUMENT SWITCH IS IN THAT BOX TOO, HARD RIGHT, ASKED
+         2026-09-25 AS *"add piano / rhodes into a isntrument footer to the right
+         glued under keyboaed"*. It was a labelled row a block above the keys.
+         ⚠️ THREE CLAIMS AND THREE RECTS, because `positron-ui` records two of
+         three alignments lining up while the third was 30 px out, and arithmetic
+         in a comment is not evidence. It is inside `keys.el`, it is under the
+         component's OWN footer rather than under the keys two rows up, and its
+         right edge is the box's right edge.
+         ⚠️ AND `glued` IS WHAT THE PARENT TEST IS FOR. A row that merely looked
+         flush under a sibling box would pass a gap test and still be a second
+         surface; being inside `.kbd` is what makes it the same one. */
+      const footBox = instFoot.getBoundingClientRect();
+      const pickBox = instPick.el.getBoundingClientRect();
+      const padBox = keys.el.querySelector('.kpad').getBoundingClientRect();
+      const underPad = Math.round((footBox.top - padBox.bottom) * 10) / 10;
+      const offRight = Math.round((footBox.right - pickBox.right) * 10) / 10;
+      /* ⚠️ THE CONTROL IS NOW `--kbd-pad` IN FROM THE ROW'S EDGE RATHER THAN ON
+         IT, AND THAT IS THE CHANGE OF 2026-09-25 RATHER THAN A LOOSENED CHECK.
+         The row bleeds out to the box's border, so its own edge IS the border
+         and `hard right` became the box's inset, which is the inset the keys
+         above already keep. Read off the box rather than typed. */
+      const kbdPad = parseFloat(getComputedStyle(keys.el).getPropertyValue('--kbd-pad'));
+      d.assert('the instrument switch is a footer inside the keyboard\u2019s own box, hard right',
+        instFoot.parentElement === keys.el
+        && underPad >= 8 && underPad <= 12 && Math.abs(offRight - kbdPad) < 1
+        && pickBox.width < footBox.width,
+        `${underPad} px under the keyboard\u2019s own footer, ${offRight} px in from the `
+        + `right edge against a ${kbdPad} px box inset, and ${Math.round(pickBox.width)} px `
+        + `of control in a ${Math.round(footBox.width)} px row`);
+
+      /* 🔴 AND THE NAMEPLATE IS AT THE OTHER END OF THAT ROW, ASKED IN THE SAME
+         BREATH AS *"add nola nameplace to the left of footer"*. Its LEFT edge is
+         what this reads, because that is the only thing the right arrangement
+         and the wrong one disagree about: `.panel-plate[data-place="end"]`
+         carries `margin-left: auto`, which absorbs the row's free space before
+         `justify-content` runs and parks the plate beside the selector, and a
+         row with both children on the right still looks like a row.
+         ⚠️ AND IT READS WHAT THE BROWSER RENDERS RATHER THAN WHAT WAS TYPED.
+         `plate.shown()` reads the computed `text-transform`, which is how
+         `/circuit/` was caught rendering `NOVATION` off a source that typed
+         `novation` with a check that graded the source and stayed green either
+         way. This plate is upper case by the project's own rule, and this is the
+         half that says the rule really reached it. */
+      /* 🔴 AND THE INSET IS MEASURED INK AGAINST INK, NOT PADDING AGAINST A
+         TOKEN. ASKED TWICE. First 2026-09-25 as *"add space on left of nona to be
+         same as top and bottob paddings"*, which was answered by giving all three
+         sides `--kbd-pad`, and then again the same evening, with a crop: *"just
+         add some padding to left of nola. i do not understand how to do nameplate
+         properly"*.
+         🔴 THE FIRST ANSWER WAS RIGHT ABOUT THE BOXES AND WRONG ABOUT THE
+         LETTERS, WHICH IS THE WHOLE LESSON HERE. MEASURED from `.kbd`'s inner
+         edge: the pad row's first button and this plate both had their BOX at
+         +9.00, agreeing to the pixel, while that button's LETTER sat at +19.00
+         against the plate's at +9.00. A button carries its own border and inline
+         padding, so two boxes agreeing is not two letters agreeing, and the plate
+         read under-indented against the row above it while every number matched.
+         ⚠️ SO THE OLD CHECK WAS GREEN WHILE THE PAGE LOOKED WRONG, and it is
+         kept here as the reason this one reads a `Range` instead. It compared the
+         row's three paddings to `--kbd-pad` and could never have seen the fault
+         it was standing next to. That is the second assert this round that passed
+         while the render was off, and both were caught by looking rather than by
+         counting.
+         ✅ THE 10 px IS DERIVED AND NOT TYPED. `shell.css` publishes
+         `--kpad-pad` on `.kbd` now, the pad row's buttons read it, and the
+         footer's left inset is `calc(var(--kbd-pad) + var(--kpad-pad) + 1px)`,
+         the 1 px being the border every control in that file draws. */
+      const inkLeft = (e) => {
+        const r = document.createRange(); r.selectNodeContents(e);
+        return r.getBoundingClientRect().left;
+      };
+      const plateBox = plate.el.getBoundingClientRect();
+      const ctlInk = inkLeft(keys.el.querySelector('.kpad-names button'));
+      const nameInk = inkLeft(plate.el.querySelector('.panel-plate-l'));
+      const between = Math.round(pickBox.left - plateBox.right);
+      d.assert('the page’s own nameplate is at the left end of that footer, its letter under the row above',
+        plate.el.parentElement === instFoot && between > 0
+        && plate.shown().join(' ') === 'NOLA'
+        && Math.abs(nameInk - ctlInk) < 0.6,
+        `it reads ${plate.shown().join(' ')}, its letter at x${nameInk.toFixed(2)} against `
+        + `x${ctlInk.toFixed(2)} for the first control on the row above, `
+        + `and ${between} px of row between it and the control`);
+
+      /* 🔴 AND THE TWO ROWS ARE SEPARATED BY A LINE RATHER THAN BY A GAP, WHICH
+         REVERSES THIS PROJECT'S STANDING RULE FOR THIS ONE ROW AND WAS ASKED FOR
+         IN THOSE WORDS: *"add top border to that footer"*. `/muta/` records the
+         same reversal for the same reason, two blocks that needed a rule between
+         them rather than more air.
+         🔴 THE INK IS READ OFF THE BOX RATHER THAN TYPED TWICE. The claim is not
+         *there is a 1 px line*, it is *the line across the inside of this box is
+         drawn in the box's own edge colour*, and only a comparison can say that.
+
+         🔴 **AND IT RUNS EDGE TO EDGE SINCE 2026-09-25, WHICH IS THIS ASSERT
+         TURNED ROUND.** It read *"IT RUNS THE WIDTH OF THE KEYS, NOT OF THE
+         BOX"* and required `inL > 0`, on an argument written in this file that
+         a line touching the border would be the only thing in the box doing it.
+         The report was *"the border on top of footer goes edge to edge. in the
+         life of me i don ot understand why you do not see it"*, so the argument
+         was wrong and the assert was grading it. **MEASURED before: 9.0 px in
+         at both ends.**
+         ⚠️ **BOTH ENDS, BECAUSE ONE END LINING UP IS HALF AN ALIGNMENT**, and
+         against the box's own border rather than against a 0 typed here.
+         ⚠️ AND THE ROW IS NO LONGER FLUSH WITH THE PAD ABOVE IT, which is the
+         other half of the same change: the pad starts at the box's content edge
+         and this now starts at the border, so they are `--kbd-pad` apart by
+         construction. That is asserted rather than dropped. */
+      const footCss = getComputedStyle(instFoot);
+      const boxCss = getComputedStyle(keys.el);
+      const boxBox = keys.el.getBoundingClientRect();
+      const bL = Math.round((footBox.left - boxBox.left) * 10) / 10;
+      const bR = Math.round((boxBox.right - footBox.right) * 10) / 10;
+      const edge = parseFloat(boxCss.borderLeftWidth);
+      d.assert('one line right across the inside of the keyboard’s box, in the box’s own ink',
+        footCss.borderTopStyle === 'solid'
+        && Math.round(parseFloat(footCss.borderTopWidth)) === 1
+        && footCss.borderTopColor === boxCss.borderTopColor
+        && Math.abs(bL - edge) < 0.6 && Math.abs(bR - edge) < 0.6
+        && Math.abs((padBox.left - footBox.left) - kbdPad) < 0.6,
+        `${footCss.borderTopWidth} of ${footCss.borderTopColor} against the box’s own `
+        + `${boxCss.borderTopWidth} ${boxCss.borderTopColor}, reaching the box’s `
+        + `${edge} px border with ${bL} px on the left and ${bR} px on the right, `
+        + `and the pad row above it starting ${Math.round((padBox.left - footBox.left) * 10) / 10} px further in`);
+
       /* 🔴 THE FIRST ROW IS AS FAR FROM THE TOP AS THE ROWS ARE FROM EACH OTHER.
          Asked with a crop: *"add more space on first row on top of dots / label
          so disace from separators and from top is rohghly same"*. Every dot is
@@ -2661,6 +3094,29 @@
           charts.every((c) => c.outside.length === 0)
           && charts.every((c) => c.notes.every((n) => n >= keys.base && n <= keys.base + 24)),
           charts.map((c) => `${c.label} ${Math.min(...c.notes)}-${Math.max(...c.notes)}`).join(', '));
+
+        /* \u{1F534} THE SPLIT VOICING IS DRAWN, WHICH IS THE ONE THING `chords.mjs`
+           CANNOT SAY ABOUT IT. That module grades the note numbers with ten
+           checks and no browser; what only this page can answer is whether the
+           ROLL survived a voicing that is wider than the others, because a note
+           under the body could have landed off the bottom of the keys and a roll
+           has no column for a note the keyboard does not draw. It reads the
+           dots back off the picture rather than off `charts`.
+           \u26a0\ufe0f AND IT PUTS THE CONTROL BACK, so the checks after this one see
+           the page in the state they were written against. */
+        voicePick.set(VOICINGS.indexOf('split'));
+        const splitDots = dotsNow(), splitSpans = spanNow();
+        const under = charts.every((c) =>
+          c.notes[0] === Math.min(...c.notes) && c.notes[1] - c.notes[0] >= 1);
+        d.assert('the split voicing puts a note under every chord and the roll draws every one of them',
+          under && charts.every((c) => c.outside.length === 0)
+          && charts.every((c) => c.notes.every((n) => n >= keys.base && n <= keys.base + SHOWN()))
+          && splitDots === spelledDots,
+          `${charts.map((c) => `${c.label} ${c.notes.join(',')}`).join(', ')}, `
+          + `spanning ${splitSpans.join(',')} against ${spelled.join(',')} spelled, `
+          + `the same ${splitDots} dots, and all of it inside `
+          + `${keys.base} to ${keys.base + SHOWN()}`);
+        voicePick.set(VOICINGS.indexOf('lead'));
       }
 
       /* 🔴 THE ROLL IS ONE TAB STOP AND THE ARROWS MOVE INSIDE IT, WHICH IS THE
@@ -2966,12 +3422,20 @@
 
     /* ── the Rhodes, driven through the control a visitor presses ────────── */
     //
-    // 🔴 EVERY ONE OF THESE GOES THROUGH `instPick.buttons[n].click()` RATHER
-    // THAN THROUGH `setInstrument`. The picker is outside `.pos-controls`, so
-    // no harness will ever press it, and a check that reached past it would
-    // leave the one control this change adds graded by nothing. That is the
-    // loss `positron-verify` records on `/mirror/` and `/blocks/`, where ten
-    // and six asserts went silent behind a control nobody could press.
+    // 🔴 EVERY ONE OF THESE GOES THROUGH `pressInst(<id>)`, WHICH PRESSES THE
+    // CONTROL, RATHER THAN THROUGH `setInstrument`. The selector is outside
+    // `.pos-controls`, so no harness will ever press it, and a check that
+    // reached past it would leave the one control this page owns graded by
+    // nothing. That is the loss `positron-verify` records on `/mirror/` and
+    // `/blocks/`, where ten and six asserts went silent behind a control
+    // nobody could press.
+    // 🔴 AND IT NAMES THE INSTRUMENT RATHER THAN INDEXING THE CONTROL, SINCE
+    // 2026-09-25. These ten call sites read `instPick.buttons[0]` for PIANO and
+    // `buttons[1]` for RHODES, which was true of `createChoice` and is false of
+    // the selector that replaced it: a picker's two buttons are `previous` and
+    // `next`. `buttons[1]` would have gone on landing on the Rhodes by luck and
+    // `buttons[0]` would have become a direction, with every line's own comment
+    // still reading correctly. See the block beside the control.
     {
       /* 🔴 THE FETCHING PART COMES FIRST AND IS READ OFF THE WIRE. What is
          being graded is which file the page ASKED FOR, not which layer it
@@ -2979,7 +3443,7 @@
          grading its own arithmetic, which is how a `playbackRate` forced to 1
          read green on this page once already. */
       const before = gotUrls.length;
-      instPick.buttons[1].click();                            // RHODES
+      pressInst('rhodes');
       await press(60, 20, performance.now());                 // barely touched
       await sleep(40);
       const playedSoft = lastPlayed && lastPlayed.url.split('/').pop();
@@ -3029,13 +3493,22 @@
         `the analyser read ${hush.toFixed(4)} with nothing playing and `
         + `${rhodesLoud.toFixed(4)} 150 ms into a Rhodes note at velocity 100`);
 
+      /* 🔴 READ WHILE THE RHODES IS THE ONE CHOSEN, WHICH IS NOT A DETAIL OF
+         THIS CHECK BUT THE WHOLE DIFFERENCE THE NEW CONTROL MAKES. A choice
+         gave every option a button and so a hover that existed whatever was
+         selected; a selector shows ONE name at a time, so the credit is on the
+         value cell and follows the selection. Taking this reading after the
+         switch to the piano below would have read the piano's line and gone red
+         on a page doing exactly what it promises. */
+      const rhodesCredit = instCell.title;
+
       /* 🔴 AND THE LEVEL IS THE WHOLE REASON THERE ARE TWO CONSTANTS. The piano
          files are 21 dB down and the Rhodes files are at full scale, so an
          instrument switch that reused one number would be about 20 dB out in
          one direction or the other. The same key at the same velocity on both
          is the only reading that says whether that was got right. */
       await quiet();
-      instPick.buttons[0].click();                            // PIANO
+      pressInst('piano');
       await press(60, 100, performance.now());
       await sleep(150);
       const pianoLoud = peak();
@@ -3044,13 +3517,23 @@
       /* 🔴 THE ATTRIBUTION IS A LICENCE TERM, NOT A COURTESY, AND IT MOVED OFF
          THE FACE ON 2026-09-23. Asked to remove the sentence under the keys, and
          CC BY-NC-SA 4.0 requires attribution to travel with the work; what it
-         does not require is a paragraph on the page. It is on the instrument
-         picker's hover now, so this asserts the words a reader can still reach
-         rather than the element that used to carry them. */
+         does not require is a paragraph on the page. It is on the sound
+         selector's hover, so this asserts the words a reader can still reach
+         rather than the element that used to carry them.
+         🔴 AND THE SECOND HALF IS THE NEGATIVE CONTROL THAT GRADES THE HAZARD
+         THE NEW CONTROL BROUGHT WITH IT. `picker.mjs` overwrites the value
+         cell's own title on every draw, at `:103` and again at `:160`, so a
+         credit written once at build would be gone the next time the name was
+         drawn and this check would still be green on whatever happened to be
+         there. Reading the PIANO's title after a switch says two things at
+         once: the credit survived a redraw, and it is following the selection
+         rather than sitting there as a constant. */
+      const pianoCredit = instCell.title;
       d.assert('the Rhodes is still credited where a reader can reach it, as the licence requires',
-        /Learman/.test(instPick.buttons[1].title)
-          && /CC BY-NC-SA 4\.0/.test(instPick.buttons[1].title),
-        `the Rhodes hover reads "${instPick.buttons[1].title.slice(0, 60)}..."`);
+        /Learman/.test(rhodesCredit) && /CC BY-NC-SA 4\.0/.test(rhodesCredit)
+          && pianoCredit !== rhodesCredit && !/Learman/.test(pianoCredit),
+        `with the Rhodes chosen the control reads "${rhodesCredit.slice(0, 60)}...", and `
+        + `after a redraw on the piano it reads "${pianoCredit.slice(0, 34)}..."`);
 
       d.assert('the two instruments land within a few dB of each other at one velocity',
         Math.abs(apart) < 6 && pianoLoud > 0.02,
@@ -3066,7 +3549,7 @@
          ⚠️ THESE CALL THE HANDLERS DIRECTLY, which is as close to the wire as a
          headless check can get: Web MIDI cannot be driven without a device. */
       await quiet();
-      instPick.buttons[1].click();                            // RHODES
+      pressInst('rhodes');
       const tap0 = d.tap();
       for (const n of [60, 64, 67]) midiDown(n - transpose, 96, 0, performance.now());
       await sleep(80);
@@ -3265,7 +3748,7 @@
         `${after.voiced - tapWas.voiced} voice(s) started from a key that was already up, `
         + `${after.late - tapWas.late} of them damped on arrival, and `
         + `${voices.filter((v) => !v.damped).length} left ringing with nothing to stop them`);
-      instPick.buttons[0].click();                            // back to PIANO
+      pressInst('piano');
 
       /* 🔴 AND THE READING THAT DECIDES A LEVEL IS A CHORD, NOT A NOTE. One
          note at the wrong level is quiet or loud; six at the wrong level is a
@@ -3287,7 +3770,7 @@
          the piano's own worst case, and `LOUDEST` is already a third of full
          scale for exactly this reason. */
       await quiet();
-      instPick.buttons[1].click();                            // RHODES
+      pressInst('rhodes');
       for (const n of [60, 64, 67]) await press(n, 100, performance.now());
       await sleep(150);
       const chord = peak();
@@ -3313,7 +3796,7 @@
       await press(64, 100, performance.now());                // and never let go
       await sleep(150);
       const underFinger = peak();
-      instPick.buttons[0].click();                            // PIANO, key still down
+      pressInst('piano');                                     // key still down
       await sleep(250);
       const afterSwitch = peak(), stranded = voices.length;
       lift(64);
@@ -3321,7 +3804,7 @@
       /* ⚠️ THE CONTROL IS THE SAME NOTE HELD THE SAME WAY WITH NOBODY
          SWITCHING. Without it all that is measured is that a Rhodes note gets
          quieter on its own, which it does. */
-      instPick.buttons[1].click();
+      pressInst('rhodes');
       await press(64, 100, performance.now());
       await sleep(400);
       const unswitched = peak();
@@ -3331,7 +3814,24 @@
         + `250 ms after the switch, against ${unswitched.toFixed(4)} at 400 ms with no switch`);
       lift(64);
       keys.panic();
-      instPick.buttons[0].click();                            // back where a visitor finds it
+
+      /* 🔴 AND THE WAY BACK IS THE `‹` ARROW, PRESSED ON PURPOSE, BECAUSE A
+         SELECTOR HAS A DIRECTION THE CONTROL IT REPLACED DID NOT HAVE. Every
+         other press on this page is `pressInst`, which walks forward until the
+         control reads the instrument it was given, so without this one line
+         `‹` would be a button nothing in the repository has ever pressed.
+         ⚠️ AND IT IS THE HALF THAT CAN BE DEAD. Over a list of two a clamping
+         `‹` does nothing at all from the first entry, and there is no mark on
+         the face that says so: it looks exactly like an arrow that works. This
+         is the only check that says the arrows wrap.
+         ⚠️ IT ALSO PUTS THE PAGE BACK WHERE A VISITOR FINDS IT, which is what
+         this line was doing before and still has to do. */
+      const backFrom = inst.id;
+      instBack.click();
+      d.assert('the other arrow really moves, so neither end of a list of two is a dead control',
+        backFrom === 'rhodes' && inst.id === 'piano' && instCell.title === CREDIT.piano,
+        `‹ from the ${backFrom} reached the ${inst.id}, which is where a visitor finds `
+        + 'this page, and the credit on the control came with it');
     }
 
     /* ── the roll learning what is played, driven by real key presses ────── */
@@ -3364,11 +3864,19 @@
       const drop = (ns) => { for (const n of ns) keys.release(keys.keyOf(n)); };
 
       modePick.buttons[0].click();                            // PLAYED
-      d.assert('switching the roll to what you play empties it and turns the typed line off',
-        mode === 'learn' && rows() === 0 && readLine.hidden === false
+      /* 🔴 `isConnected`, NOT `hidden`, AND THE DIFFERENCE IS THE WHOLE OF WHY
+         *"only show chords textfield when typed is selected"* was asked twice.
+         `el.hidden` is a fact about an attribute and this check read a fact about
+         a property beside it, so it passed every run while the field was on
+         screen: `.pos-field` carries an explicit `display`, and any author rule
+         beats the browser's own `[hidden]`. Membership of the document is the one
+         thing that cannot be overruled by a stylesheet. */
+      d.assert('switching the roll to what you play empties it and takes the typed field away',
+        mode === 'learn' && rows() === 0
+        && chordField.el.isConnected === false
         && chordField.input.disabled === true,
         `${rows()} rows, and the typed field is `
-        + `${chordField.input.disabled ? 'off' : 'still live'}`);
+        + `${chordField.el.isConnected ? 'still in the page' : 'out of the page'}`);
 
       /* 🔴 AND IT IS EXACTLY AS TALL EMPTY AS IT IS FULL, WHICH IS THE WHOLE
          POINT OF ASKING FOR IT. *"make piano roll h fixed to 5 items even when
@@ -3398,8 +3906,27 @@
       hold([60, 64, 67]);
       await sleep(LEARN_WINDOW + 120);
       d.assert('holding three keys names the chord they make, and says so where it can be read',
-        readLine.textContent === 'Cmaj' && readLine.dataset.sure === '1',
-        `the page reads ${readLine.textContent} off notes 60, 64 and 67`);
+        reading?.label === 'Cmaj' && reading?.sure === true,
+        `the page reads ${reading?.label ?? 'nothing'} off notes 60, 64 and 67`);
+
+      /* 🔴 AND THE NAME A VISITOR READS IS THE KEYBOARD'S OWN FOOTER, WHICH IS
+         WHY THIS PAGE GAVE THE ROLL'S CORNER UP. Asked 2026-09-25: *"rm chord
+         from top left (as it moves to keyb compoentn)"*. A display was deleted
+         here, so the fact it carried is asserted where it now lives, which is
+         this project's rule about deleting a block rather than a courtesy.
+         ⚠️ TWO QUANTITIES, READ AT THE ONE MOMENT THEY AGREE. The footer names
+         what is under the hands with no clock at all and this page's reading is
+         settled over `LEARN_WINDOW`, so they part company while a chord is being
+         rolled and meet while one is standing still. The chord has been down for
+         a whole window here, which is that moment.
+         ⚠️ AND THE ELEMENT IS ASSERTED AS WELL AS THE STRING, because a footer
+         built with `chord: false` would answer an empty name and this check
+         would read it as a page that named nothing. */
+      const foot = keys.chord();
+      d.assert('the chord under the fingers is named in the keyboard\u2019s own footer',
+        foot.name === 'Cmaj' && foot.sure === true && !!foot.el?.isConnected,
+        `the footer reads ${foot.name || 'nothing'}`
+        + `${foot.sure ? ' and is sure of it' : ' without the confident ink'}`);
 
       /* 🔴 THE NEGATIVE CONTROL FOR THE THRESHOLD, AND IT IS THE HALF THAT
          MAKES THE ADMISSION MEAN ANYTHING. Named is not learned: a chord you
@@ -3475,10 +4002,10 @@
          the new set being a SUBSET of the one before, and holding one chord with
          the fingers moving produced `Fmaj7/C`, `Fmaj/C`, `Fmaj7/C` in a row,
          each going into the tally as its own chord. */
-      const beforeLift = readLine.textContent;
+      const beforeLift = reading?.label;
       drop([67]);                                             // one finger off Cmaj
       await sleep(LEARN_WINDOW + 120);
-      const onLift = readLine.textContent;
+      const onLift = reading?.label;
       const scoredOnLift = tally.scores(performance.now()).length;
       hold([67]);
       await sleep(LEARN_WINDOW + 120);
@@ -3544,31 +4071,16 @@
       hold([65, 69, 72]);
       await sleep(LEARN_WINDOW + 120);
       d.assert('a second chord is named while the first stays picked',
-        readLine.textContent === 'Fmaj' && roll.picked() === 0 && rows() === 1,
-        `the page reads ${readLine.textContent} and row ${roll.picked()} is still chosen`);
+        reading?.label === 'Fmaj' && roll.picked() === 0 && rows() === 1,
+        `the page reads ${reading?.label ?? 'nothing'} and row ${roll.picked()} is still chosen`);
 
-      /* 🔴 AND THE READING IS NOT FLUSH WITH THE CORNER IT SITS IN. Asked
-         2026-09-23: *"add top and left padding on chord name on pianoroll"*.
-         ⚠️ MEASURED AGAINST THE ROLL RATHER THAN AGAINST THE DECLARATION. Reading
-         the padding back off `getComputedStyle` would only prove the stylesheet
-         says what it says; what the ask is about is the gap between the first
-         letter and the roll's own edge, so this compares where the TEXT starts
-         with where the roll starts. A range walker put the box around the text
-         itself, because the element is absolute and its own rect never moves
-         when padding is what changed. */
-      const readBox = readLine.getBoundingClientRect();
-      const rollBox = roll.el.getBoundingClientRect();
-      const rng = document.createRange();
-      rng.selectNodeContents(readLine);
-      const inkBox = rng.getBoundingClientRect();
-      rng.detach?.();
-      const inL = Math.round(inkBox.left - readBox.left);
-      const inT = Math.round(inkBox.top - readBox.top);
-      d.assert('the played reading sits in from the roll’s corner rather than against it',
-        inL >= 4 && inL <= 12 && inT >= 2 && inT <= 10
-          && readBox.left >= rollBox.left - 1 && readBox.top >= rollBox.top - 1,
-        `its first letter is ${inL} px in and ${inT} px down from the corner of a `
-        + `box that starts ${Math.round(readBox.left - rollBox.left)} px from the roll`);
+      /* ⚠️ ONE CHECK LEFT THIS BLOCK ON 2026-09-25 AND IS NOT REPLACED, WHICH IS
+         WORTH A LINE RATHER THAN A SILENT DROP. It measured how far the played
+         reading's first letter sat in from the roll's corner, `6 px in and 4 px
+         down`, and that reading is not drawn on the roll any more. The padding it
+         graded belonged to an element that no longer exists, so there is nothing
+         to re-point it at: the name is in the keyboard's footer now, where the
+         component reserves its own room and `/kit/` measures it. */
 
       await sleep(900);
       d.assert('NEGATIVE CONTROL: and the second chord is tallied separately rather than added on',
@@ -3576,6 +4088,13 @@
         && tally.timesOf(chordKey(5, 'maj'), performance.now()) === 1,
         `the first chord is in and the second is on its first arrival of ${LEARN_TIMES}, `
         + `so the roll still has ${rows()} row`);
+
+      /* 🔴 THE WAY HOME'S HEIGHT, TAKEN HERE BECAUSE THIS IS THE ONLY MOMENT IT
+         IS VISIBLE AND EMPTY. One chord is in, the block is on screen with
+         nothing in it, and the reading is compared against the same block with
+         four chords in it further down. Reserved room is a claim that can only
+         be made by measuring both states of the real page. */
+      const homeH0 = homeWrap.getBoundingClientRect().height;
 
       for (let i = 1; i < LEARN_TIMES; i++) {
         drop([65, 69, 72]);
@@ -3782,6 +4301,71 @@
         window.__demo.logs.some((l) => l.msg.includes('as the key')),
         window.__demo.logs.filter((l) => l.msg.includes('as the key')).pop()?.msg || 'nothing said');
 
+      /* ── a four chord way home ──────────────────────────────────────────── */
+      //
+      // 🔴 THE THIRD WORD OF THE COMPLAINT WAS *"not moving anywhere"*, AND IT
+      // WAS TRUE OF THIS PAGE IN A WAY NOTHING HERE COULD SEE. MEASURED in
+      // `plans/plan-better-chords-2026-09-25.md`: taking the old suggestion ten
+      // times in a row fell into a repeating cycle 99.1 per cent of the time
+      // with 3.74 distinct chords in ten, against the real songs' 52.7 per cent
+      // and 7.42. The page offered a next chord and had no destination at all.
+      const homeRows = () =>
+        [...homeTbl.scroller().querySelectorAll('.pos-tbl-row')];
+      d.assert('the page offers a four chord way home, and its last chord is the key it read',
+        lastHome?.ok === true && lastHome.steps.length === 4
+        && lastHome.steps[3].root === lastHome.tonic
+        && homeRows().length === 4
+        && homeSay.textContent.includes(lastHome.targetName),
+        `${homeSay.textContent} reading `
+        + `${lastHome?.steps.map((c) => `${c.name} ${c.numeral}`).join(', ')}`);
+
+      /* 🔴 AND THE ROOM IS RESERVED, WHICH IS THE SAME RULE THE ROLL'S EIGHT
+         ROWS ALREADY OBEY. A block that grows the moment somebody plays their
+         second chord moves the keyboard down the page while they are looking at
+         it, and the keyboard is the thing their hands are on. */
+      const homeH1 = homeWrap.getBoundingClientRect().height;
+      d.assert('the way home reserved its room, so nothing moved when one arrived',
+        homeH0 > 0 && Math.abs(homeH1 - homeH0) < 1,
+        `${homeH0.toFixed(1)} px with nothing in it and ${homeH1.toFixed(1)} px with four `
+        + 'chords in it');
+
+      /* 🔴 THE ROUTE IS DRAWN RATHER THAN THE BEST ONE TAKEN, WHICH IS THE
+         ARGMAX LESSON ARRIVING ONE LEVEL UP. MEASURED on this table's shape over
+         4,000 held-out contexts: the best path alone puts 72.6 per cent of its
+         six commonest routes into ii V I, and drawing the path drops that to
+         18.5 while attestation stays at 98.3 per cent. A best path is as cliched
+         as a best chord. */
+      const wasHome = homeRedraws;
+      const ways = new Set();
+      for (let i = 0; i < 12; i++) {
+        drawHome();
+        if (lastHome?.ok) ways.add(lastHome.steps.map((c) => c.name).join(' '));
+      }
+      d.assert('asking for a way home again can answer differently, because the path is drawn',
+        ways.size > 1 && homeRedraws === wasHome + 12,
+        `${ways.size} different ways home in 12 draws: ${[...ways].join(' / ')}`);
+
+      /* 🔴 AND THE CHORD IN THE ROLL IS DRAWN TOO, WHICH IS THE HALF A PLAYER
+         ACTUALLY SEES. `suggest.mjs` samples its first slot instead of taking
+         the likeliest row, and this page shows the SECOND slot, which is chosen
+         from the rows the first one did not take. MEASURED over every trigram
+         context in the shipped jazz table: the second slot now answers 1.69
+         different chords a context and moves at all in 68.7 per cent of them,
+         where before it was one chord, always.
+         ⚠️ ASKED THROUGH THE SAME CALL THE PAGE MAKES AND NOT BY REDRAWING THE
+         ROLL, because forcing twelve proposals would replace the row the checks
+         below are about. The seed is this page's own. */
+      const offers = new Set();
+      const again = mkRandom(DRAW_SEED);
+      for (let i = 0; i < 12; i++) {
+        const r = suggest({ chords: learned }, { style: LEARN_STYLE, rnd: again });
+        if (r.ok && r.picks.length) offers.add((r.picks[1] || r.picks[0]).name);
+      }
+      d.assert('and the chord it proposes is drawn from the table rather than always the commonest',
+        offers.size > 1,
+        `after ${learned.map((l) => l.name).join(' then ')} the page can offer `
+        + `${[...offers].join(' or ')}`);
+
       /* ── the chord nothing can name, which is the interesting one ──────── */
       //
       // 🔴 `C E G#` IS `Caug` AND `Eaug` AND `G#aug`, three names for one set of
@@ -3801,7 +4385,7 @@
          `positron-verify`'s counter-beats-a-state rule, one step along: a
          reading taken next to the event that clears it is a reading of the
          clearing. */
-      const unsureRead = readLine.textContent, unsureSure = readLine.dataset.sure;
+      const unsureRead = reading?.label, unsureSure = reading?.sure;
       const unsureRows = rows();
       /* 🔴 READ THE TALLY, NOT THE ROLL, AND THIS WAS FOUND BY SABOTAGE. The
          first version of this check asserted the ROW COUNT had not moved, and
@@ -3827,7 +4411,7 @@
          so a coin toss looks different from a certainty, and `alts` still
          carries the other name. The margin decides how loudly, not whether. */
       d.assert('a chord with more than one name is still written down, and still looks unsure',
-        unsureRead === 'Caug' && unsureSure === undefined
+        unsureRead === 'Caug' && unsureSure === false
         && unsureTallied === '0:aug' && unsureRows === 3 && learned.length === 2,
         `the page read ${unsureRead} while the keys were down without the confident ink, `
         + `the roll stayed at ${unsureRows} rows, and the tally is holding `
@@ -3856,10 +4440,35 @@
       d.assert('NEGATIVE CONTROL: playing a chord in the typed mode teaches the page nothing',
         mode === 'type' && learned.length === 2 && typedRows === 4
         && typedTallied === null && everScored === scoredBeforeTyped
-        && labels()[0] === 'Cmaj I' && readLine.hidden === true,
+        && labels()[0] === 'Cmaj I' && reading === null,
         `the roll is the typed line again at ${typedRows} rows reading `
         + `${labels().join(', ')}, and the tally scored ${everScored} chords against the `
         + `${scoredBeforeTyped} it had before the mode changed`);
+
+      /* 🔴 THE FIFTH REPORT ABOUT THE ROLL'S VERTICAL RULES WAS *"rm gap in
+         piano roll vert lines"*, WITH A SCREENSHOT OF THIS PAGE, AND THE REPAIR
+         IS IN `shell.css` RATHER THAN HERE. `roll.mjs` carries all five reports
+         and the reason four of them could each look like the last one coming
+         back: the gap was never where any of them said. It was under the FIRST
+         row only, because that row is half a row taller so the top dot is not
+         crowded, while the lane the rules are painted in kept a flat 26 px, so
+         they stopped 6.5 px short at each end of a 39 px row.
+         ⚠️ LANES, NOT ROWS, WHICH IS WHY THIS COULD BE MISSED. A row's own rect
+         was already flush at every join in the picture that was complained about,
+         so measuring rows reports `no gap` about a picture with one in it. The
+         rules live in `.roll-lane`, so that is the box to measure.
+         ⚠️ AND EVERY LANE, INCLUDING THE RESERVED ONES. A rest carries a lane and
+         cells of its own, so the rules run the whole height of the roll whether
+         or not there are chords that far down, and the join this was reported
+         about is the one between a real row and whatever is under it. */
+      const lanes = [...roll.el.querySelectorAll('.roll-lane')]
+        .map((l) => l.getBoundingClientRect());
+      const joins = lanes.slice(1)
+        .map((r, i) => Math.round((r.top - lanes[i].bottom) * 10) / 10);
+      d.assert('the roll\u2019s vertical rules run the whole way down with no gap in them',
+        lanes.length >= 8 && joins.length >= 7 && joins.every((g) => Math.abs(g) < 0.6),
+        `${lanes.length} ruled lanes and ${joins.length} joins reading `
+        + `${joins.join(', ')} px`);
 
       /* And back to whatever the visitor asked for, since `?learn=1` is a
          person saying which mode they came for. */
@@ -3947,7 +4556,23 @@
              READS the recordings and serves them, so an arrow from the worker
              into the files would draw the flow backwards, which a reader
              following the picture would believe. */
-          { id: 'files', label: 'recordings', sub: '95 files, 3.6MB', tech: 'file',
+          /* 🔴 `samples`, NOT `recordings`, ASKED 2026-09-25 AS *"recoridng in
+             diagram is unclear. samples?"*. Two things on this page are called a
+             recording and the box named neither of them clearly: the instrument's
+             own audio files, and the take this page writes out under `?rec=1`,
+             which really is a recording OF THE PLAYER. A box in the machine the
+             files are served from, reading `recordings`, is one word away from
+             saying the site keeps what you played.
+             ⚠️ AND IT IS RIGHT ABOUT WHICH RHODES IT NAMES, which is the other
+             seam and the reason this was not a free rename. `demo/shell/rhodes.mjs`
+             is a SYNTHESISED Rhodes made of arithmetic and it is not on this page
+             and not in this picture; what is in this box is 95 files somebody
+             recorded off real instruments. A sampler plays samples and arithmetic
+             has none, so the word separates the two rather than sitting on the
+             seam between them. The note keeps `recorded by Jeff Learman`, because
+             that is the fact the licence needs and the word `samples` does not
+             carry. */
+          { id: 'files', label: 'samples', sub: '95 files, 3.6MB', tech: 'file',
             note: 'The piano is 30 notes a minor third apart at one velocity layer. The Rhodes '
                 + 'is 15 notes at five layers each, recorded by Jeff Learman and used under '
                 + 'CC BY-NC-SA 4.0.' },
@@ -4023,56 +4648,61 @@
 </script>
 
 <style>
-  .nola-picks { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  /* 🔴 THE INSTRUMENT FOOTER HAS NO RULE IN THIS FILE ANY MORE, AND THAT IS THE
+     WHOLE REPAIR. Reported 2026-09-25 off a crop of it: *"the border on top of
+     footer goes edge to edge. in the life of me i don ot understand why you do
+     not see it and build a soliutiojn that stays (glued panels) not invent
+     custom css with measurements each time"*.
+     🔴 **WHAT STOOD HERE WAS `.nola-foot`, WITH A `--foot-air: 10px` OF ITS OWN,
+     A `margin-top`, A `padding-top` AND A `border-top`**, on a row appended
+     inside `.kbd`, which pads by `--kbd-pad`. **MEASURED: the line stopped
+     9.0 px short of the box's border at both ends.**
+     🔴 **AND THE PARAGRAPH THAT STOOD HERE ARGUED FOR IT.** It said the line
+     *"RUNS THE WIDTH OF THE KEYS, NOT OF THE BOX"* and that bleeding *"would be
+     the only thing in here touching the border"*, and the page asserted that
+     inset at both ends. Every word of it was reasoning where a component was
+     wanted, which is what was objected to: the line, the air and the row's own
+     insets belong to `keyboard.mjs` and reach all ten pages that import it.
+     ✅ `createKeyboard({ foot: true })`, and `api.foot` is the row. `.kbd-foot`
+     in `shell.css` carries the bleed, derived from `--kbd-pad` rather than
+     typed, and the symmetric inset asked for in the same breath: *"add space on
+     left of nona to be same as top and bottob paddings"*.
+     ⚠️ **WHAT THIS PAGE STILL DECIDES IS WHAT GOES IN THE ROW**, which is the
+     plate at one end and the sound selector at the other, and the plate's
+     `place: 'ends'` is still this page's call for the reason beside it: `end`
+     carries a `margin-left: auto` that would park both children on the right. */
 
-  /* 🔴 THE MODE AND THE FIELD IT TURNS OFF ARE ONE ROW. `Played` disables the
-     CHORDS field, and a control that greys out something a block away is a page
-     asking a reader to work out what happened. Same arrangement as `.nola-picks`
-     below, and the same reason: a pair that belongs tight is one block. */
+  /* 🔴 THE MODE AND THE FIELD IT TURNS OFF ARE ONE ROW. `Played` takes the
+     CHORDS field out of the document, and a control that removes something a
+     block away is a page asking a reader to work out what happened.
+     ⚠️ AND THE ROW DOES NOT COLLAPSE WHEN THE FIELD GOES, because `.pos-choice`
+     keeps its own height and the field was the only thing that grew. A row that
+     changed height on a mode press would be the reflow this page already
+     refuses for a reading under a picture. */
   .nola-top { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
   .nola-top .pos-field { flex: 1 1 220px; min-width: 0; }
 
-  /* 🔴 ONE LINE THAT CANNOT CHANGE ITS OWN HEIGHT, WHICH IS THE WHOLE OF WHY
-     IT IS ALLOWED TO EXIST. `positron-ui` bans a live sentence under a picture
-     because it rewraps between two and three lines while somebody reads it, and
-     the test it gives is not *is it short*, it is *can this change its own
-     height while somebody is looking at it*. `nowrap`, one `min-height` in the
-     same units as the text, and an ellipsis rather than a second line.
-     ⚠️ AND IT CHANGES WHEN A CHORD SETTLES, which is a few times a second at
-     most and is an event rather than a clock.
-     ⚠️ `[hidden]` HAS TO BE SAID OUT LOUD HERE because a `display` rule beats
-     the attribute's own default, which is how a hidden element goes on being
-     drawn with nothing in it. */
-  /* 🔴 ON THE ROLL'S TOP LEFT, OPPOSITE THE NAMES ON ITS RIGHT. Asked as *"add
-     played chord to top left of pianoroll, grayer than right side chord names"*.
-     It is absolute so it costs the picture no height and moves no column: the
-     roll's first row already reserves a whole row of space above its dots, which
-     is where this sits.
-     ⚠️ GREYER THAN THE ROW LABELS ON PURPOSE, and `--dim2` against their
-     `--dim`. Those are a record of chords that are IN the roll; this is a
-     reading of the moment and must not compete with them. */
-  .nola-keys { position: relative; }
-  /* 🔴 AND IT IS NOT FLUSH WITH THE CORNER. Asked 2026-09-23: *"add top and left
-     padding on chord name on pianoroll"*. It was pinned at `left: 0; top: 0`,
-     which put the first letter hard against the roll's own left rule and the top
-     of the picture, so it read as a label stuck to the frame rather than as a
-     reading sitting in the room the roll already reserves above its first row.
-     ⚠️ THE NUMBERS ARE A JUDGEMENT AND NOT A DERIVATION, which is worth saying
-     because most measurements on this page are tied to something. 6 px left
-     clears the lane rule without reaching the first dot column, and 3 px top
-     keeps it inside `--roll-top`, the half row the roll already holds back.
-     ⚠️ PADDING RATHER THAN A MOVED CORNER, so the box stays anchored and its
-     `text-overflow` still clips against the same edge when a name is long. */
-  .nola-read { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none;
-               padding: 3px 0 0 6px;
-               font: 500 11px/1.5 var(--mono); letter-spacing: .04em; color: var(--dim2);
-               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* ⚠️ A SECOND INK FOR A SECOND KIND OF FACT, which is the rule `.nola-chord-r`
-     already follows one element along. A name the page is sure of and two names
-     it cannot choose between are not the same statement, and reading them in
-     the same colour would make the interesting one look like the ordinary one. */
-  .nola-read[data-sure] { color: var(--dim); }
-  .nola-read[hidden] { display: none; }
+  /* 🔴 THE HEADING IS IN THE TABLE HEADING'S OWN REGISTER, NOT THE ACCENT'S.
+     `shell.css` sets `.pos-tbl-head` at 10px uppercase on `--dim2` with .06em of
+     tracking, and this line sits directly above one, so anything else would read
+     as a second kind of label an inch from the first. The accent is a budget and
+     is spent on what is chosen or live; a destination is neither.
+     ⚠️ `nowrap` BECAUSE IT NAMES A CHORD THAT CHANGES. `A WAY HOME TO Cmaj7` and
+     `A WAY HOME TO D#min7` are different widths, and a heading that can fold
+     onto a second line is a block that changes its own height while somebody is
+     looking at it, which is the one thing this page reserves room to prevent. */
+  .nola-home-h { font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+                 color: var(--dim); margin-bottom: 8px;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 🔴 NOTHING IS PINNED TO THIS BOX ANY MORE, SO IT IS NOT A CONTAINING
+     BLOCK ANY MORE. It carried `position: relative` for one absolute child, the
+     chord name on the roll's top left, and that name moved into the keyboard's
+     own footer on 2026-09-25. A `position` kept for a child that has gone is a
+     rule that reads as load-bearing and is not, which is the dead rule this
+     project keeps measuring in the other direction. The two lines it still
+     needs are at the foot of this sheet, with the gap arithmetic they belong
+     to. */
 
   /* 🔴 A CHORD THE PAGE IS PROPOSING IS NOT A CHORD THE PAGE HEARD YOU PLAY,
      AND THE ROLL MUST NOT DRAW THEM THE SAME. What it learned is a record of

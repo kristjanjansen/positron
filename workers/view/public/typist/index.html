@@ -187,12 +187,19 @@
     // its own — the zoom needed naming, the replay claim was the point — and
     // the result was four sentences nobody reads. What a visitor needs: what
     // this is, what to press, what the numbers mean.
-    what: 'Type, and every change is written down as where the text changed and what '
-      + 'it changed to, never as the key you pressed. Drag the '
-      + 'line below to any moment to put the box back as it was, and zoom in until each '
-      + 'mark becomes the letter it recorded. "Worked out" counts the deletions where '
-      + 'nothing said what had been removed, so the text before and after had to be '
-      + 'compared.',
+    // 🔴 ONE SENTENCE, AND IT WAS THREE. Two of them had to go and only one of
+    // the two was about length. `"Worked out" counts the deletions where
+    // nothing said what had been removed` described a READOUT CELL, and this
+    // page dropped its readout: that sentence had been naming a thing nobody
+    // could see for as long as `readout: null` has been here, which is
+    // radio1965's Synthesize button in a quieter form. The other named a
+    // gesture the strip already affords. What is new is the last clause: the
+    // loop's direction button runs a stretch of the recording backwards, and a
+    // description that did not say so would drift the same way the first one
+    // did.
+    what: 'Type, and every change is written down as where the text changed and what it '
+      + 'changed to rather than as the key you pressed, which is what lets any moment of '
+      + 'it be put back or run backwards.',
     // 🔴 NO READOUT, AND THE ROW IS NOT DRAWN EITHER. Asked for, and this is
     // the one page where it was in the way: the document IS the readout — you
     // can see the letters, the cursor and the highlight, and a row of cells
@@ -537,7 +544,73 @@
     opPos = log.map((r) => deck.toPos(r.at)).sort((a, b) => a - b);
     if (!capturing) deck.seek(0);       // a seek is an actuation; see `assert`
 
-    bar = createTransportBar(barHost, deck, { scrub: false });
+    /**
+     * ── the loop modes ─────────────────────────────────────────────────────
+     *
+     * 🔴 THREE DIRECTIONS, NOT FIVE, AND THE DECISION IS `/loops/`'s BECAUSE IT
+     * WAS TAKEN THE SAME DAY. Asked for as *"add loop modes to typist"*.
+     * `looper.mjs` holds five ways and its own `LOOP_TURN = [0, 1, 4]` cycles
+     * three of them: `round`, `back`, `pingpong`. The two it leaves out do not
+     * belong on a bar that already has their controls. `half` is a RATE and the
+     * rate picker four controls to the left already reads 0.25 to 4; `chop` is a
+     * LENGTH and the two presses of Loop already choose one. And `WAY_GLYPH`
+     * gives `round`, `half` and `chop` the same arrow, so a five-way control
+     * could not say which of its states it was in, which is the failure this
+     * project calls a control that lies.
+     *
+     * 🔴 AND IT IS THE BAR'S OWN `loopWays`, NOT A BUTTON OF THIS PAGE'S.
+     * `/loops/` put its direction in `.pos-controls` because what it turns
+     * round is a NEST of quotations rather than a loop on a deck. Here the deck
+     * IS the thing being played, which is the case `transport-bar.mjs` wrote
+     * `loopWays` for in as many words: *"for a deck that IS the thing being
+     * played, which on this site means a drawn record rather than a
+     * recording"*. A record of edits is exactly that, so this page uses the
+     * control that exists instead of a fourth copy of it.
+     *
+     * 🔴 WHAT `back` MEANS HERE, AND NOTHING ABOUT IT FOLLOWS FROM THE AUDIO
+     * MEANING OF THE WORD. The subject is an edit history. Playing it `round`
+     * is RETYPING. Playing it `back` is UNTYPING, and `pingpong` is typing and
+     * untyping in turn.
+     * **Untyping is not each edit being undone. It is FEWER EDITS being read.**
+     * Every row is a range and what went into it, and the document at any
+     * moment is the fold of the rows before that moment, so a playhead moving
+     * left is a shorter prefix and nothing has to know how to reverse an edit.
+     * Three things fall out of that, and they are the three the harness's own
+     * key sequence is made of:
+     *   · **A BACKSPACE PLAYED BACKWARDS IS A CHARACTER APPEARING.** The fold
+     *     at the moment before a deletion still contains what it removed, so
+     *     the letters come back exactly where they were. No inverse of a
+     *     deletion is stored anywhere and none is needed, which matters because
+     *     a backspace *"never says what it removed"* in the first place.
+     *   · **AN ARROW KEY PLAYED BACKWARDS PUTS THE CURSOR BACK**, with not one
+     *     letter moving. A cursor move is a row like any other and the fold
+     *     carries the selection, so the one gesture that produces no `input`
+     *     event at all runs backwards for free.
+     *   · **AND THE FIRST LETTER SURVIVES.** The fold at position 0 is an empty
+     *     document, which is the bug this page shipped once: a lap that reaches
+     *     the start of the recording empties the box, and that is CORRECT here
+     *     because the box at that moment held nothing. What it must never do is
+     *     empty the box you are still typing into, which is what `assert`
+     *     refuses and what `onLoop` below is for.
+     *
+     * 🔴 AND A REVERSED LAP RUNS WITH THE DECK PAUSED, WHICH IS THE ONE THING
+     * THIS PAGE HAD TO BE TOLD. `transport.setRate` refuses a negative rate, so
+     * the bar drives a backward lap from its own clock, seeking the deck frame
+     * by frame while `deck.playing()` stays FALSE. `frame()` below hands the
+     * box over when the deck starts playing, and that test cannot see a lap at
+     * all: without this the playhead would sweep while the document sat
+     * frozen, because `apply` and `assert` both refuse to touch a box somebody
+     * is typing into. Arming a loop is a decision to play, so it is the moment
+     * the take ends.
+     * ⚠️ AND IT DOES NOT REWIND. `stopCapture` seeks to 0 because that is what
+     * pressing play means; a loop has just chosen a place to be, and throwing
+     * it away would move the playhead out of the loop on the frame it started.
+     */
+    bar = createTransportBar(barHost, deck, {
+      scrub: false,
+      loopWays: true,
+      onLoop: (what) => { if (what === 'set') stopCapture({ rewind: false }); },
+    });
     view = createStripView(stripHost, deck, {
       size: 'auto', follow: false, gutter: 132,
       // 36 EACH, AND THE NUMBER IS ARITHMETIC, NOT TASTE. The gutter draws a
@@ -653,12 +726,21 @@
   }
 
   // ── what you do to it ────────────────────────────────────────────────────
-  function stopCapture() {
+  /**
+   * The take ends and the recording becomes something to play.
+   *
+   * ⚠️ `rewind` IS FALSE FOR A LOOP AND TRUE FOR EVERYTHING ELSE. Pressing play
+   * means from the top, so a take that ends that way goes back to 0. A loop has
+   * already chosen the two places it lives between and seeked to the first of
+   * them, so rewinding here would move the playhead out of the loop on the
+   * frame the loop started.
+   */
+  function stopCapture({ rewind = true } = {}) {
     if (!capturing) return;
     capturing = false;
     keys.readOnly = true;
     d.log(`your recording: ${log.length} edits, ${live.text.length} letters`, 'hi');
-    if (deck) deck.seek(0);
+    if (rewind && deck) deck.seek(0);
   }
 
   function startOwn() {
@@ -944,6 +1026,141 @@
       d.assert('drag to any moment and the box holds that moment, cursor included',
         probes.length === 3 && restored === 3,
         `${restored} of ${probes.length} · ${seen.join(' · ')}`);
+      deck.seek(0);
+      await nextFrame();
+    }
+
+    // ── backwards ─────────────────────────────────────────────────────────
+    /**
+     * 🔴 NONE OF THIS PLAYS ANYTHING, AND THAT IS THE POINT. `/loops/` put it
+     * in one line the same day: *"a check that waits for the playhead to reach
+     * 6 s is a check that gets written to pass when it has not got there yet"*.
+     * A backward lap is the bar seeking this deck frame by frame, so what these
+     * grade is the thing the lap is made of — the fold at a position — read at
+     * positions chosen here rather than reached by a clock.
+     */
+    const posAt = (i) => deck.toPos(rows[i].at);
+    const mid = (i, j) => (posAt(i) + posAt(j)) / 2;
+    const iDel = rows.findIndex((r) => r.op.type === OP_DELETE);
+    const iSel = rows.findIndex((r) => r.op.type === OP_SELECT);
+
+    // 🔴 THE CASE THAT DEFINES THE MODE. A deletion stores WHERE and HOW MUCH
+    // and never what it took, so there is no inverse of it anywhere in this
+    // file. Backwards works anyway, because the fold one moment earlier still
+    // holds the letters: untyping is a shorter prefix, not an undo.
+    const delOp = rows[iDel]?.op;
+    const dBefore = iDel > 0 ? deck.reduceAt(KIND, mid(iDel - 1, iDel)) : null;
+    const dAfter = iDel > 0 ? deck.reduceAt(KIND, mid(iDel, iDel + 1)) : null;
+    const cameBack = dBefore ? dBefore.text.slice(delOp.range[0], delOp.range[1]) : '';
+    d.assert('a backspace played backwards is the character it removed coming back',
+      !!dBefore && !!dAfter && cameBack.length === delOp.range[1] - delOp.range[0]
+        && cameBack.length > 0
+        && dAfter.text === dBefore.text.slice(0, delOp.range[0]) + dBefore.text.slice(delOp.range[1]),
+      `edit ${iDel} took ${JSON.stringify(cameBack)} out at ${delOp?.range[0]} · the document is `
+      + `${dAfter?.text.length} characters on the forward side of it and ${dBefore?.text.length} `
+      + `on the backward side, and nothing here stores an inverse of a deletion`);
+
+    // ⚠️ THE OTHER HALF OF THE SAME CLAIM, on the one gesture that produces no
+    // `input` event at all. A cursor move is a row like any other and the fold
+    // carries the selection, so running backwards past one moves the caret and
+    // leaves every letter where it is.
+    const selOp = rows[iSel]?.op;
+    const sBefore = iSel > 0 ? deck.reduceAt(KIND, mid(iSel - 1, iSel)) : null;
+    const sAfter = iSel > 0 ? deck.reduceAt(KIND, mid(iSel, iSel + 1)) : null;
+    d.assert('an arrow key played backwards puts the cursor back with not one letter moving',
+      !!sBefore && !!sAfter && sBefore.text === sAfter.text
+        && sBefore.selection[0] !== sAfter.selection[0]
+        && sAfter.selection[0] === selOp.range[0],
+      `edit ${iSel} moved the cursor from ${sBefore?.selection[0]} to ${sAfter?.selection[0]} `
+      + `over the same ${sAfter?.text.length} characters`);
+
+    /**
+     * 🔴 TWO PASSES, A STRICT DIRECTION INSIDE EACH, AND EIGHT EVENTS IN BOTH.
+     * The standard is `/loops/`'s from the same day. What is counted is how
+     * many EDITS ARE IN FORCE at a position, which is the quantity untyping is
+     * about: a lap running backwards may make the document longer wherever it
+     * crosses a deletion, so text length cannot say which way it is going and
+     * counting it would be measuring the wrong thing.
+     */
+    const inForce = (pos) => rows.filter((_, i) => posAt(i) <= pos).length;
+    const lo = posAt(0), hi = posAt(rows.length - 1);
+    const ramp = (a, b, n) => Array.from({ length: n }, (_, k) => a + (b - a) * (k / (n - 1)));
+    const walk = (xs, sign) => {
+      let strict = true, moved = 0;
+      for (let i = 1; i < xs.length; i++) {
+        const dx = (xs[i] - xs[i - 1]) * sign;
+        if (dx < 0) strict = false;
+        if (dx > 0) moved++;
+      }
+      return { strict, moved };
+    };
+    const downs = ramp(hi, lo, 24), ups = ramp(lo, hi, 24);
+    const D = walk(downs.map(inForce), -1), U = walk(ups.map(inForce), 1);
+    d.assert('a lap running backwards takes the edits off one at a time, and a forward one puts them on',
+      D.strict && U.strict && D.moved >= 8 && U.moved >= 8,
+      `24 places down the recording: ${D.moved} of them took edits off and none put any back · `
+      + `the same 24 back up: ${U.moved} put edits on and none took any off`);
+
+    // ⚠️ AND THE PICTURE AT EVERY ONE OF THOSE PLACES, not just the direction.
+    // This is the deck's own seek, which binary-searches its cursor on a jump,
+    // against the whole prefix folded from nothing — so a backward jump landing
+    // on the wrong side of an edit shows up here and nowhere else.
+    let tied = 0, firstLoose = null;
+    for (const pos of downs) {
+      const want = foldOps(rows.slice(0, inForce(pos)).map((r) => ({ op: r.op })));
+      const got = deck.reduceAt(KIND, pos);
+      if (got && same(want, got)) tied++;
+      else if (firstLoose === null) firstLoose = +pos.toFixed(1);
+    }
+    d.assert('and at every one of them the document is the fold of exactly the edits in force',
+      tied === downs.length,
+      `${tied} of ${downs.length} places, walking backwards`
+      + (firstLoose === null ? '' : ` · first apart at ${firstLoose} ms`));
+
+    // 🔴 THE FIXTURE'S OWN NEGATIVE CONTROL, AND `/loops/` NEEDED ITS FIXTURE
+    // CHANGED FOR WANT OF IT: its marks were their own mirror, so a backward
+    // pass drew the forward picture and the control had no readout at all. This
+    // recording is 24 characters typed, ten backspaced, then a paste and a
+    // selection typed over, so the two directions cannot be confused.
+    const lens = rows.map((_, i) => foldOps(rows.slice(0, i + 1).map((r) => ({ op: r.op }))).text.length);
+    const apartAt = lens.findIndex((x, i) => x !== lens[lens.length - 1 - i]);
+    d.assert('the recording is not its own mirror, so backwards is a different picture from forwards',
+      apartAt >= 0,
+      `${lens.length} moments · ${lens[0]} characters at the first and ${lens[lens.length - 1]} at the last, `
+      + `first apart from its mirror at edit ${apartAt}`);
+
+    if (SELFCHECK) {
+      // The real control, pressed the way a finger does, read back off the bar
+      // rather than off the glyph on its face.
+      const wayBtn = bar.api.loopExtra('way');
+      const turn = [bar.api.way];
+      for (let i = 0; i < 3; i++) { wayBtn?.click(); turn.push(bar.api.way); }
+      d.assert('one button turns through the three directions and comes back to the first',
+        !!wayBtn && turn.join(' ') === 'round back pingpong round', turn.join(' '));
+
+      /**
+       * 🔴 THE ONE THING A BACKWARD LAP NEEDS THAT A FORWARD ONE DOES NOT, AND
+       * IT IS DRIVEN RATHER THAN READ. `deck.playing()` is FALSE for the whole
+       * of a reversed lap, so the test that hands the box over when the
+       * transport takes it cannot see one, and a page that only looked there
+       * would sweep the playhead across a frozen document. Set the box back to
+       * being yours, arm a real loop with two real presses of Loop, and require
+       * that the page let go of it WHILE THE DECK IS STOPPED — which is the
+       * half that makes this different from pressing play.
+       */
+      while (bar.api.way !== 'back') wayBtn.click();
+      capturing = true;
+      deck.seek(posAt(5));
+      bar.api.pressLoop();
+      deck.seek(posAt(40));
+      bar.api.pressLoop();
+      const armed = { loop: bar.api.loop, playing: deck.playing(), yours: capturing };
+      d.assert('a loop running backwards takes the box back, and the deck is stopped when it does',
+        !armed.yours && !!armed.loop && armed.playing === false,
+        `way ${bar.api.way}, loop ${armed.loop ? armed.loop.map((x) => x.toFixed(0)).join(' to ') : 'none'} ms, `
+        + `deck playing ${armed.playing}, still yours to type into ${armed.yours}`);
+      bar.api.pressLoop();                       // the third press takes it off
+      while (bar.api.way !== 'round') wayBtn.click();
       deck.seek(0);
       await nextFrame();
     }
