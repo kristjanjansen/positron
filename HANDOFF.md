@@ -1,57 +1,76 @@
-# Handoff, 2026-09-25, session 50, a carry-over commit and a five ask round
+# Handoff, 2026-09-26, session 50, a stream of asks worked to the end
 
-🔴 **THE SESSION BEFORE THIS ONE WAS CLOSED BY ACCIDENT WITH 8,285
-INSERTIONS UNCOMMITTED, AND THAT IS THE FIRST THING THIS SESSION DEALT WITH.**
-35 files across the demo pages, the kit and three skills, plus a new plan and
-`workers/tapes`, were sitting loose in the checkout. They are commit
-`22294ed` now.
+✅ **THE TREE IS CLEAN AND EVERY ASK IN THIS SESSION’S STREAM IS EITHER DONE OR
+WRITTEN DOWN AS REFUSED.** 15 commits on `session-28-station-videoradio` since
+`e5ae793`. **57 demo rows, 55 shelled, 74 plans**, counted rather than remembered.
 
-⚠️ **IT WAS COMMITTED WITHOUT A BROWSER RUN, AND THAT IS SAID PLAINLY
-RATHER THAN IMPLIED.** What was checked before staging: 18 demo pages parse
-under `check-html`, and the four no-browser kit tests read `instrument-test`
-17 ok, `looper-test` 18 ok, `chords-test` 49 ok, `diagram-test` 93 ok, all
-0 failed. **That is not a claim that any page is green.** `/stage/`'s 33/47
-from session 49 still stands and nothing below revisits it.
+🔴 **IT OPENED WITH 8,285 INSERTIONS UNCOMMITTED FROM A SESSION CLOSED BY
+ACCIDENT.** That is `22294ed`, checked before staging and committed without a
+browser run, which its own message says plainly.
 
-✅ **A PEER SESSION IS LIVE IN THIS CHECKOUT AND WAS ASKED BEFORE THE INDEX
-WAS TOUCHED.** MEASURED first: every dirty file was last written between 20:30
-and 21:52 and the peer started about 21:58, so none of it was its work. It
-confirmed in writing that it holds nothing here. Staged by name, never
-`git add -A`, which the repository's own hook refuses anyway.
+## What shipped, and where to open it
 
-## The five asks that arrived this session, all collected before any was worked
+| | measured |
+| --- | --- |
+| `/nola/` patch selector, plate, top border | 95/95 to 98/98 |
+| the kit’s panel seam and bands | `/kit/` 217/217 to 221/221 |
+| `/shape/` plate top right, seam REFUSED with a measurement | 49/49 to 50/50 |
+| `/knobs/` rail gone, MIDI opens without a prompt | 31 of 35 to 34 of 38 |
+| band rhythm, chord nudge, `ON`/`OFF`, keyboard footer, `N`/`D` | `/kit/` to 223/223 |
+| the nameplate’s letter under the row above | `/nola/` 102/102 |
+| chord sampling and a four chord way home | 98/98 to 102/102 |
+| `Split`, a voicing with the root in the left hand | 102/102 to 103/103 |
+| KEEP 5, slot B drawn, the take adaptation | `suggest-test` 29 to 44 |
+| the looper’s tempo and alignment | `/kit/` 223/223 to 227/227 |
+| the take wired into `/nola/` | 103/103 to **106/106** |
 
-They are in `BACKLOG.md` under `## Open`, newest first, written the way the
-2026-09-19 rule asks: verbatim, with the slug, the file and what is already
-known that makes each one non-obvious.
+**http://127.0.0.1:8890/nola/** and **http://127.0.0.1:8890/kit/#keyboard**.
+NOT DEPLOYED. `workers/view/public` is rebuilt at stamp `eb50054-212941-00dd`
+and carries the 18,237 byte table, so a deploy is one command and nobody asked.
 
-1. **`/nola/`**: the instrument choice becomes the standard patch selector, the
-   footer gains a top border and a plate on its left.
-2. **`/shape/`**: the left rail goes and the plate moves to the top right.
-3. **An edge to edge horizontal separator** on each panel section.
-4. **`/knobs/`**: MIDI is always enabled and the plate stays vertical.
-5. **`resources` renames to `niemi`**, ASKED A SECOND TIME while the first ask
-   sat in this file unworked.
+## 🔴 THE THING THIS SESSION KEEPS PROVING: A GREEN ASSERT IS NOT A LOOKING
 
-🔴 **AND A DEFECT WAS FOUND IN THE CARRY-OVER WHILE BASELINING, WHICH IS
-THE KIND THAT STAYS RED FOREVER WITHOUT ANYBODY READING IT.**
-`demo/knobs/index.html:1447` asserts `inst.shown() === 'knobs'`, and
-`shown()` returns an **ARRAY** (`demo/shell/panel-layout.mjs:391`). An array is
-never equal to a string, **so that assert cannot pass in any circumstance.**
-`/shape/index.html:1375` does the same comparison correctly with
-`.join(' ')`. ⚠️ **AND ITS FAILURE MESSAGE READS PERFECTLY**, because
-`${inst.shown()}` stringifies a one element array to `knobs`, so the line says
-*the plate starts at 653.0 and reads “knobs”* while failing. A red
-that describes a healthy page is how a real regression gets lost in the noise.
+**FOUR asserts were found that could not fail or that passed while the render was
+wrong**, and not one was caught by a count.
 
-**BASELINE MEASURED before any edit of this round**, `nola shape knobs`
-together: **173/179 green, 6 failed**. ⚠️ One other headless Chrome was
-running alongside that suite, which the harness reported itself, so it is a
-baseline rather than evidence of a regression. Of the six, the relay ones and
-`this page makes no sound of its own` are the board being offline, measured
-the same day as `no reply in 5 s`, and not code.
+- `/knobs/:1447` compared `inst.shown()`, an ARRAY, to a string. **It could never
+  pass**, and its message read *"the plate starts at 653.0 and reads “knobs”"*
+  while failing.
+- `/knobs/` compared the keyboard’s box against `.panel-flow`, **which is sized
+  BY that box**, printing `992.0 px wide inside a flow 992.0 px wide`.
+- `/nola/`’s footer check compared three paddings to a token and **was green
+  while the plate read visibly under-indented**, because two boxes agreeing is not
+  two letters agreeing.
+- an onset sabotage **came back fully green**, because a note struck and released
+  in the same millisecond collapses to one onset either way.
+
+⚠️ **AND ONE PAGE ASSERT REQUIRED THE OPPOSITE OF WHAT WAS ASKED**, reading
+*"IT RUNS THE WIDTH OF THE KEYS, NOT OF THE BOX"*. A page local decision had been
+written into a check, so the check defended it against the owner.
+
+## 🔴 AND THE REPORTING WAS PART OF THE COMPLAINT
+
+*"i do not usrstand what you are doing"*, after two long reports about band
+rhythm and case children. **The plumbing is not the report.** What shipped, what
+it looks like and where to open it is.
+
+## What is open and why
+
+- 🔴 **`resources` to `niemi` HAS NOT STARTED AND WAS ASKED TWICE.** It runs
+  LAST and alone. **Priced at 55 source files**, re-checked: a naive grep answers
+  89 and the extra 34 are `workers/view/public/`, the tracked build output.
+- ⚠️ **`/kit/` has under a second and a half of boot budget left.** A draft
+  block took it to **0/1 with 207 asserts**, because the whole page reads red when
+  `d.ready()` misses the wait.
+- ⚠️ **`place: 'side'` has zero page callers** now. Nothing deleted.
+- ⚠️ A flaky pair on `/knobs/` whose 900 ms wait was set when the lap was
+  2,200 ms and is now 14,000.
+- ⚠️ **NOBODY HAS PLAYED A NOTE.** Every chord number in this session is about
+  written symbols. The `Split` voicing, the sampling, the tempo constants and the
+  take adaptation are all unheard.
 
 ---
+
 
 # Handoff, 2026-09-25, session 49, a bad session with a few real fixes in it
 
