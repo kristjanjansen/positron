@@ -584,3 +584,167 @@ split pruned and quantised exactly the way `build-chord-tables.mjs` prunes and
 quantises: `ctx>=8`, `row>=3`, **three rows a context**, one character of
 probability. **That shape is not the shape section 4.1 swept**, and section 4.1's
 temperatures do not survive the difference. See the section above.
+
+## 14. What was built on 2026-09-26, and the ceiling that was not where this document said it was
+
+Asked after playing with what section 13 shipped, verbatim: *"suggeston are
+better but still a bit meh"*. Two jobs were set from this document: raise `KEEP`,
+and build item 3. Both are done. A third thing was found on the way and it is the
+one that explains the report.
+
+🔴 **THE CEILING SECTION 13 NAMED IS REAL AND IT IS SMALL, AND THE ONE IT DID NOT
+NAME IS WHAT A PLAYER MEETS.** MEASURED by `demo/resources/chord-e6-keep.mjs`,
+which sweeps the prune at 3, 4, 5, 6 and 8 rows and **refits the temperature at
+every step**, because the prune is itself a temperature and a sweep that held the
+dial still would be measuring two changes and reporting one.
+
+Held at the real songs' own cycle rate, which is the one comparison a scoring
+rule cannot tilt:
+
+| KEEP | bytes | jazz distinct/10 | jazz attested | pop distinct/10 | route found | routes |
+| --- | --- | --- | --- | --- | --- | --- |
+| **3** | 12,789 | 7.15 | 97.2% | 4.56 | 92.7% | 150 |
+| 4 | 15,513 | 7.18 | 96.6% | 4.55 | 98.1% | 239 |
+| **5** | **18,237** | **7.32** | **97.0%** | **4.55** | **98.5%** | **307** |
+| 6 | 20,961 | 7.34 | 97.3% | 4.53 | 98.5% | 383 |
+| 8 | 26,409 | 7.41 | 97.2% | 4.51 | 98.5% | 503 |
+| **THE REAL SONGS** | | **7.42** | 100% | **4.65** | | |
+
+🔴 **SO THE VOCABULARY GAIN IS 0.27 DISTINCT CHORDS IN TEN AT MOST, IT IS A JAZZ
+GAIN ONLY, AND POP MOVES THE WRONG WAY.** *"Raising `KEEP` is the only thing that
+would move it"* was true and reads as a bigger promise than it pays. Surprisal
+does not move at all across the sweep (4.46 to 4.47 against the music's 4.84) and
+neither does the rate of answering the corpus's commonest chord (15.2 to 15.0
+against 13.5). **The prune closes the vocabulary gap and closes nothing else.**
+
+✅ **WHAT PAID FOR `KEEP 5` IS THE WAY HOME, NOT THE WALK.** A four chord route to
+the tonic existed on 92.7 per cent of held-out jazz contexts and now exists on
+98.5, over 307 distinct routes against 150. **Seven contexts in a hundred had no
+way home at all.** 6 and 8 buy 0.02 and 0.09 more distinct chords for another
+2,724 and 8,172 bytes and take the route's attestation to 95.2 and 94.4 against a
+floor of about 94, so they are refused rather than missed.
+
+⚠️ **AND THE DIAL MOVED AGAIN, WHICH IS SECTION 13'S LESSON ARRIVING A SECOND
+TIME.** Five rows is a flatter thing to draw from than three, so the same variety
+costs a COLDER dial: jazz **3.5 to 1.7**, pop **1.4 to 0.8**. A search floored at
+1.0 answered `T 1.00` for every pop prune above three while missing the cycle rate
+by sixteen points, so a number below 1 is not a mistake.
+⚠️ **AND A COARSE GRID MEASURES THE GRID.** A sweep at 1, 1.5, 2, 2.5 made KEEP 5
+look WORSE than KEEP 3, because the fit it wanted sat between two of its points.
+
+### 14.1 Slot B was still an argmax, and slot B is the one on screen
+
+🔴 **SLOT B ANSWERS EXACTLY 2.00 DISTINCT CHORDS A CONTEXT, AT EVERY PRUNE FROM
+THREE ROWS TO EIGHT.** That number is not a table fact. B is the highest pointwise
+mutual information row that A did not take, so it is the PMI top unless A collided
+with the PMI top, in which case it is the PMI second. **Two values, for any width
+of table, forever.** No prune and no temperature can reach it.
+
+🔴 **SO THIS DOCUMENT'S WHOLE LESSON HAD BEEN APPLIED TO SLOT A AND NEVER TO SLOT
+B, AND `/nola/` DRAWS SLOT B.** Section 13 said the fix *"had to reach it"* and
+measured that a drawn A moves B in 68.7 per cent of contexts, which is true and is
+about WHETHER it moves rather than about how far. It moves between two chords.
+
+✅ **THE REPAIR IS THE SAME REPAIR, ONE SLOT SIDEWAYS**, which is now the third
+time: chord, then path, then the other slot. `2^(pmi/T)` is `(p/u)^(1/T)`, so a
+row is drawn in proportion to how specific it is and one dial means the same thing
+everywhere. MEASURED on jazz, 2,000 held-out contexts, 40 draws each:
+
+| | distinct B | attested | globally commonest |
+| --- | --- | --- | --- |
+| **argmax, as shipped** | **2.00** | 92.98% | 4.2% |
+| **drawn at 1** | **3.53** | 92.79% | 5.0% |
+| drawn at 2 | 3.64 | 92.53% | 5.8% |
+| drawn at 4 | 3.73 | 92.50% | 6.7% |
+
+**1 buys 77 per cent of the available width for two tenths of a point of
+attestation**, and it is a definition rather than a fit, so it is a constant in
+`suggest.mjs` and not a field in the table.
+⚠️ **AND IT COST ONE OF THE SEVEN NAMED DEVICES, RECORDED RATHER THAN TUNED
+AWAY.** With a pool of four finally full, `A7 Dm7` offers `Bmin7b5` where it used
+to offer `G7`. The table still HOLDS the real next chord for 7 of 7 and the drawn
+page reaches it within 24 draws for 7 of 7; what lost one is the argmax pair.
+⚠️ **AND `temp: 0` STOPPED BEING DETERMINISTIC FOR HALF AN HOUR.** Drawing B made
+`suggest(ctx, { temp: 0 })` fall through to `Math.random`, and two checks went red
+in one run and green in the next with no code between them. `temp: 0` now means
+the argmax of BOTH slots.
+⚠️ **AND `beam` OF 64 WOULD HAVE TURNED THE ROUTE BACK INTO AN ARGMAX SILENTLY.**
+It was derived from `KEEP 3`, where `3^3` is 27; at five rows the live set is 125.
+It is 256.
+
+### 14.2 Within take adaptation, which survives the prune where the temperature did not
+
+🔴 **+6.32 POINTS OF TOP 1 ON HELD-OUT JAZZ, THROUGH THE TABLE THAT SHIPS.**
+MEASURED by `demo/resources/chord-e7-take.mjs` with expansion OFF, which is the
+conservative reading section 6.2 asked for. Section 6.2's +7.44 was measured on
+full counts; this is the same gain through five pruned rows and one character of
+probability, and unlike the temperature **it very nearly survives the difference**.
+
+🔴 **AND THE PLAN'S SENTENCE AND THE PLAN'S MEASUREMENT ARE TWO DIFFERENT
+WINDOWS.** Section 6.2 says *over the last sixteen to thirty two chords* and what
+it measured was the FIRST sixteen of a piece. They do not score alike. MEASURED at
+weight 0.25 on the same 4,351 held-out contexts:
+
+    the last 16 chords    +1.98 points
+    the first 16 chords   +5.91
+    everything so far     +6.32
+
+**A sliding window of sixteen is worth a third of what keeping the take is
+worth**, because sixteen chords ago is the section you have just left. `mkTake`
+keeps 64, which is everything so far for any realistic take.
+
+✅ **AND IT COSTS NOTHING ON THE OTHER THREE MEASURES, WHICH IS THE CONDITION THIS
+DOCUMENT'S SECTION 9 SETS.** Jazz, ten step walks from 755 held-out positions:
+
+| | cycles | distinct/10 | attested | surprisal | commonest |
+| --- | --- | --- | --- | --- | --- |
+| world only | 53.3% | 7.29 | 98.2% | 4.42 | 15.9% |
+| **adapted, 0.25** | **50.2%** | **7.44** | **98.0%** | **4.58** | **14.6%** |
+| **THE REAL SONGS** | **52.0%** | **7.44** | 100% | **4.84** | **13.8%** |
+
+Three of the four move toward the music and the fourth moves 1.3 points past it.
+
+🔴 **AND THE MIXING WEIGHT IS A STYLE FACT, WHICH IS THE THIRD DIAL TO TURN OUT TO
+BE ONE.** Section 6.2 measured iRb only, so its 0.2 to 0.3 is a JAZZ range that
+reads as a general one. **Pop wants 0.1.** At 0.25 pop reads **+17.77 points of
+top 1** and drives every one of the four measures AWAY from real pop: 83.6 per
+cent cycling against the music's 89.0, and 4.89 distinct against 4.65. **That
+enormous number is this document's own caveat at full volume**, because a
+Billboard run is a verse or a chorus, which is a loop. The four measures are what
+refuse it, which is the whole reason this project does not score on top 1 alone.
+
+🔴 **A SUGGESTION MUST NOT FEED THE ADAPTATION, AND IT IS A COUNTER NOW RATHER
+THAN A RULE.** Every chord that can reach a take goes through `heard(chord,
+source)`, only `'played'` counts, **there is no default source** so a careless
+call is the refused one, and `refused` is a number a check reads. MEASURED as the
+shape of the trap rather than left as a warning: a generator fed its own output
+cycles **56.8 per cent** of the time against 50.2 and drops to 7.23 distinct
+chords from 7.44, **moving away from real music on both axes at once**.
+✅ **THE NEGATIVE CONTROL WORKS, WHICH IS WHAT MAKES THE +6.32 WORTH ANYTHING.**
+Somebody else's take at the same weight reads **-1.24 points** on jazz and -3.03
+on pop, the same sign and the same size as section 6.1's composer control.
+🔴 **AND A PERSISTENT PROFILE IS STILL REFUSED.** Nothing is stored, nothing is
+sent, and `suggest-test.mjs` asserts the absence over the module's own source with
+the comments stripped.
+
+### 14.3 What this could not settle
+
+1. 🔴 **STILL NOBODY HAS PLAYED A NOTE.** Section 12.1 is unchanged and every
+   number above is about written chord symbols.
+2. 🔴 **THE FOUR MEASURES CANNOT TELL A REAL TAKE FROM A STRANGER'S.** On the ten
+   step walks, somebody else's take reads 49.8 per cent cycling and 7.50 distinct
+   against a real take's 50.2 and 7.44, which is a tie. **Only top 1 separates
+   them**, and it does, at +6.32 against -1.24. So the four measures say the
+   adaptation costs nothing and cannot say it is adapting to the right person.
+   An A/B where both arms share the property returns identical, and this is that.
+3. ⚠️ **THE WINDOW OF 64 IS FITTED TO PIECES, NOT TO AN EVENING.** A chart is 30
+   to 80 chords with expansion off, so *everything so far* and *the last 64* are
+   the same arm on most of the corpus. Whether a take should forget when somebody
+   changes tune is not measurable on a lead sheet.
+4. ⚠️ **THE TAKE'S OWN BACKOFF FLOOR OF 2 WAS NOT SWEPT.** A trigram the take has
+   met twice is used and once is not, and that number was reasoned rather than
+   measured.
+5. ⚠️ **`MIN_CTX` AND `MIN_ROW` WERE NOT SWEPT EITHER**, only `KEEP`. The gain
+   from a wider prune might be larger if fewer contexts were dropped whole.
+6. ⚠️ **AND THE WHOLE OF "DRY" IS STILL UNTOUCHED**, which section 12.2 calls
+   probably the larger half of the complaint.

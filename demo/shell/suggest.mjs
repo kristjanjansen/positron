@@ -86,6 +86,46 @@
 // seed twice is the same line, and two seeds are two lines. One half alone
 // passes on a sampler that always returns the same thing.
 //
+// ── AND SLOT B WAS STILL AN ARGMAX UNTIL 2026-09-26 ────────────────────────
+//
+// 🔴 REPORTED AS *"suggeston are better but still a bit meh"*. `/nola/` draws
+// the SECOND slot, and slot B is the highest pointwise mutual information row
+// that A did not take, so it is the PMI top unless A collided with it and the PMI
+// second when it did. MEASURED by `demo/resources/chord-e6-keep.mjs` while
+// sweeping the prune at 3, 4, 5, 6 and 8 rows: **exactly 2.00 distinct chords a
+// context at every one of them.** Two values, for any width of table.
+//
+// ✅ **SO THE FIX WAS THE SAME FIX ONE SLOT SIDEWAYS**, and it is `B_TEMP` below:
+// jazz, 2,000 held-out contexts, 40 draws each, 2.00 distinct becomes **3.53**
+// for two tenths of a point of attestation.
+//
+// 🔴 AND THE PRUNE MOVED IN THE SAME BREATH, BECAUSE IT WAS THE OTHER CEILING.
+// `KEEP` was 3 and is 5. The four chord way home now exists on **98.5 per cent**
+// of held-out jazz contexts against 92.7, over **307** distinct routes against
+// 150. ⚠️ The walk gains much less: held at the real songs' own cycle rate, the
+// vocabulary goes 7.15 to 7.32 against the music's 7.42 on jazz, and pop does not
+// gain at all. The table costs **18,237 bytes** against 12,789 at the old prune,
+// which is 0.48 per cent of what `/nola/` already asks a visitor for.
+//
+// ── A TAKE ADAPTS TO WHAT IS BEING PLAYED NOW, AND FORGETS ─────────────────
+//
+// 🔴 THE LARGEST SINGLE GAIN IN THE PLAN, AND THE ONLY ONE ABOUT A PERSON.
+// Section 6.2, expansion off, re-measured through THIS table's shape by
+// `demo/resources/chord-e7-take.mjs`: **+6.32 points of top 1 on held-out jazz**,
+// where the whole step from a bigram to a trigram was 4.5. It costs nothing on
+// the other three measures: distinct chords in ten go 7.29 to 7.44 against the
+// real songs' 7.44, surprisal 4.42 to 4.58 against 4.84, and the rate of
+// answering the corpus's single commonest chord falls 15.9 to 14.6 against 13.8.
+//
+// 🔴 `mkTake` TAKES A SOURCE AND COUNTS WHAT IT REFUSED, WHICH IS THE RULE MADE
+// ASSERTABLE. `/nola/` carries *"you recorded a suggestion. why>"*, and a
+// suggester that learns from its own output writes its own line and calls it
+// yours. MEASURED as a number rather than left as a warning: a generator fed its
+// own suggestions cycles **56.8 per cent** of the time against 50.2 and loses
+// vocabulary, moving away from real music on both axes at once.
+// ⚠️ AND A PERSISTENT PROFILE IS STILL REFUSED, at +0.60 points from a composer's
+// entire body of work. Nothing here is stored and nothing here leaves.
+//
 // ── WHAT THIS MODULE WILL NOT CLAIM ────────────────────────────────────────
 //
 // ⚠️ THE ASK WAS *"want them to be openstudiojazz quality stuff"* AND THE
@@ -332,7 +372,14 @@ export function useTables(json) {
        silently sampled at 1.0 is the wrong dial and would show as a page that
        wanders. `build-chord-tables.mjs` writes the field. */
     const temp = Number.isFinite(st.temp) && st.temp >= 0 ? st.temp : 1;
-    made[id] = { id, bi: read(st.bi, 1), tri: read(st.tri, 2), uni, spell, temp };
+    /* 🔴 AND SO DOES THE MIX, FOR THE SAME REASON AND WITH A BIGGER GAP BETWEEN
+       THE STYLES. How much of a suggestion is the player's own take is a fact
+       about how much the music repeats itself: MEASURED, jazz wants 0.25 and pop
+       0.1, and pop at 0.25 scores hugely better on top 1 while moving every one
+       of the four measures away from real pop. A table written before this field
+       existed reads as 0.25, which is jazz's measured value. */
+    const mix = Number.isFinite(st.mix) && st.mix >= 0 && st.mix <= 1 ? st.mix : 0.25;
+    made[id] = { id, bi: read(st.bi, 1), tri: read(st.tri, 2), uni, spell, temp, mix };
   }
   LOADED = made;
   for (const id of Object.keys(made)) STYLES[id] = made[id];
@@ -380,13 +427,50 @@ function chordOfSymbol(sym, tonic, style, key) {
  * surprisal, with suggestions that are visibly wrong.
  * ⚠️ THE COUNT FLOOR IS ALREADY IN THE SHIPPED TABLE, pruned at three, so there
  * is nothing here to apply it with and nothing here that could get it wrong.
- * ⚠️ AND THE POOL THE BENCHMARK SWEPT WAS FOUR WHILE THE SHIPPED TABLE KEEPS
- * THREE ROWS A CONTEXT, so the pool here can never exceed three. That is a
- * difference between what was graded and what ships, it is stated rather than
- * hidden, and it can only make slot B MORE conservative than the 90.7 per cent
- * attestation that was measured.
+ * ✅ AND THE POOL THE BENCHMARK SWEPT WAS FOUR, WHICH THE SHIPPED TABLE COULD NOT
+ * FILL UNTIL 2026-09-26. `build-chord-tables.mjs` kept three rows a context, so
+ * this number was a ceiling that never came down: the pool held at most three and
+ * slot B was measured on a narrower thing than it was graded on. `KEEP` is 5 now,
+ * MEASURED at a mean pool of **3.75** against 2.91 before, so the setting the
+ * benchmark swept is finally the setting that runs.
  */
 const POOL = 4;
+
+/**
+ * 🔴 SLOT B IS DRAWN TOO SINCE 2026-09-26, AND THE MEASUREMENT THAT FOUND IT WAS
+ * LOOKING FOR SOMETHING ELSE. `demo/resources/chord-e6-keep.mjs` swept the prune
+ * at 3, 4, 5, 6 and 8 rows and slot B answered **exactly 2.00 distinct chords a
+ * context at every one of them**. That number is not a coincidence and not a
+ * table fact: B is the highest pointwise mutual information row that A did not
+ * take, so it is the PMI top unless A collided with the PMI top, in which case it
+ * is the PMI second. **Two values, for any width of table, forever.**
+ *
+ * 🔴 SO THE PLAN'S WHOLE LESSON HAD BEEN APPLIED TO SLOT A AND NEVER TO SLOT B,
+ * AND SLOT B IS THE ONE ON SCREEN. `/nola/` draws the second pick. Sampling slot
+ * A widened what a walk looks like and could not widen what a player is offered,
+ * which is the shape of the report that followed: *"suggeston are better but
+ * still a bit meh"*.
+ *
+ * ✅ MEASURED at `KEEP 5` over 2,000 held-out jazz contexts, 40 draws each:
+ *
+ *   argmax, as shipped   2.00 distinct   92.98% attested   4.2% globally commonest
+ *   drawn at 1           3.53            92.79%            5.0%
+ *   drawn at 2           3.64            92.53%            5.8%
+ *   drawn at 4           3.73            92.50%            6.7%
+ *
+ * **1 buys 77 per cent of the available width for two tenths of a point of
+ * attestation**, and 2 and 4 buy the rest by answering the corpus's commonest
+ * chord more often, which is the quantity the complaint is about.
+ * ⚠️ AND 1 IS A DEFINITION RATHER THAN A FIT, WHICH IS WHY IT IS NOT IN THE
+ * TABLE BESIDE THE STYLE TEMPERATURE. `2^(pmi/1)` is `p/u` exactly, so a row is
+ * drawn in proportion to how specific it is to this context. There is no corpus
+ * fact in it to be different per style, and nothing was tuned against a target.
+ * ⚠️ SLOT B'S ATTESTATION HAS ALWAYS SAT BELOW THE 94 PER CENT FLOOR AND THE
+ * FLOOR IS NOT ABOUT IT. The benchmark measured slot B at **90.7 per cent** and
+ * shipped it; the floor is about the ten step walk, which is slot A's. What
+ * matters here is that the draw moved it by 0.2 points rather than by nine.
+ */
+const B_TEMP = 1;
 
 /**
  * 🔴 A SEEDED RANDOM SOURCE, AND IT IS THE SAME ONE THE MEASUREMENTS USE.
@@ -449,16 +533,163 @@ export function sampleRow(rows, temp, rnd) {
   return rows[rows.length - 1][0];
 }
 
-function twoSlots(style, ctx, { temp = 1, rnd = null } = {}) {
-  const { rows, how } = rowsFor(style, ctx);
+/**
+ * The two slots over one context, in table symbols.
+ * ⚠️ EXPORTED FOR THE SAME REASON `rowsFor` AND `sampleRow` ARE: what `/nola/`
+ * draws is slot B, so a measurement of slot B has to be of THIS function rather
+ * than of a copy of it. `demo/resources/chord-e6-keep.mjs` sweeps the prune
+ * through it, and slot B is the half a prune moves that a walk cannot see.
+ */
+/**
+ * 🔴 A TAKE ADAPTS THE TABLE TO WHAT IS BEING PLAYED NOW, AND IT IS THE LARGEST
+ * SINGLE GAIN IN `plans/plan-better-chords-2026-09-25.md`. Section 6.2, MEASURED
+ * with section expansion OFF so a repeated A section cannot inflate it:
+ *
+ *    8 chords seen   54.70% top 1 against 49.35% world only   +5.35
+ *   16 chords seen   57.21% against 49.77%                    +7.44
+ *   32 chords seen   58.89% against 50.59%                    +8.30
+ *
+ * For comparison, the whole step from a bigram to a trigram was 4.5 points and
+ * justified downloading two corpora.
+ * ⚠️ AND PART OF THAT GAIN IS THAT MUSIC REPEATS ITSELF RATHER THAN THAT
+ * ANYTHING WAS LEARNED ABOUT A PERSON. With expansion ON the same sweep reads
+ * +10.1, and the difference between the two numbers is exactly the repetition
+ * the corpus adds. **+7.44 is the conservative reading and is the one to quote.**
+ *
+ * 🔴 A PERSISTENT PROFILE IS REFUSED AND THE REFUSAL IS MEASURED, NOT CAUTIOUS.
+ * Section 6.1: a composer's ENTIRE body of work, leave one chart out over 27
+ * composers and 461 charts, is worth **+0.60 points** at its best weight, and a
+ * stranger's work at the same weight reads 0.76 points BELOW the baseline. Thirty
+ * charts of somebody's life buys six tenths of a point. **This object holds the
+ * current take and forgets.** Nothing is stored, nothing is sent, and there is no
+ * `localStorage` anywhere in this file.
+ *
+ * 🔴 AND `heard` IS A COUNTED WRAPPER RATHER THAN A SETTER, WHICH IS THE ONLY
+ * WAY THE RULE CAN BE ASSERTED INSTEAD OF CLAIMED. `/nola/` carries a rule from
+ * a report reading *"you recorded a suggestion. why>"*, and it matters twice over
+ * once a log feeds anything: **a suggester that learns from its own suggestions
+ * writes its own line and calls it yours.** So every chord that can reach the
+ * adaptation goes through one function, that function takes a SOURCE and counts
+ * what it refused, and `refused` is a number a check can read. This repository
+ * already owns that shape: `/reel/` proved *a visit opens nothing* by routing
+ * every URL through one counted function rather than by reading the file.
+ * ⚠️ THERE IS NO DEFAULT SOURCE, ON PURPOSE. `heard(c)` with no second argument
+ * is REFUSED, because a default of `'played'` would make the careless call the
+ * dangerous one, and the whole point is that the dangerous call is the loud one.
+ *
+ * 🔴 THE WINDOW IS 64 AND IT IS NOT THE PLAN'S SIXTEEN, WHICH WAS FOUND BY
+ * MEASURING THE THREE WINDOWS THE PLAN'S SENTENCE COULD HAVE MEANT. It says
+ * *over the last sixteen to thirty two chords* and what section 6.2 actually
+ * measured was the FIRST sixteen of a piece. Those are different windows and they
+ * do not score alike. MEASURED on held-out jazz at weight 0.25, expansion off:
+ *
+ *   the last 16 chords    +1.98 points of top 1
+ *   the first 16 chords   +5.91
+ *   everything so far     +6.32
+ *
+ * **A sliding window of sixteen is worth a third of what keeping the take is
+ * worth**, because sixteen chords ago is the section you just left. 64 is
+ * everything so far for any take shorter than that and a slow forget after it,
+ * and it reads +6.32 on the same contexts.
+ * ⚠️ AND IT IS STILL NOT A PROFILE. A window that forgets nothing WITHIN a take
+ * is not a thing that persists BETWEEN takes, which is what section 6.1 refused
+ * at +0.60 points. This object dies with the tab.
+ *
+ * ⚠️ THE MIXING WEIGHT IS NOT HERE, IT IS IN THE TABLE, beside the temperature
+ * and for the same measured reason: jazz wants 0.25 and pop 0.1.
+ *
+ * @param {{window?: number}} [o]  how many recent chords count.
+ * @returns {{heard, chords, counted, refused, clear, window}}
+ */
+export function mkTake({ window = 64 } = {}) {
+  const chords = [];
+  let counted = 0, refused = 0;
+  return {
+    /**
+     * One chord that was played, or one that was not. Returns whether it counted.
+     * @param {{root:number, quality:string}} chord
+     * @param {string} source  `'played'` and nothing else is counted.
+     */
+    heard(chord, source) {
+      if (source !== 'played' || !chord || !Number.isFinite(chord.root)) { refused++; return false; }
+      chords.push({ root: chord.root, quality: chord.quality });
+      while (chords.length > window * 4) chords.shift();
+      counted++;
+      return true;
+    },
+    get chords() { return chords.slice(-window); },
+    get counted() { return counted; },
+    get refused() { return refused; },
+    clear() { chords.length = 0; counted = 0; refused = 0; },
+    window,
+  };
+}
+
+/**
+ * The table's rows for this context with the take's own counts mixed in.
+ *
+ * 🔴 THE MIX IS `(1 - w) * world + w * yours`, WHICH IS THE PLAN'S OWN RECIPE
+ * AND NOT A NEW ONE. The take backs off exactly as the table does, trigram first
+ * and bigram when the trigram has fewer than `floor` sightings, because sixteen
+ * chords hold almost no trigram twice and a take with no backoff would contribute
+ * nothing at all on most contexts.
+ * ⚠️ IT RE-SORTS, SO THE MIXTURE DECIDES BOTH SLOTS. Slot A draws from these rows
+ * and slot B takes its pool off the top of them, which is what makes the
+ * adaptation reach the chord the page actually shows.
+ * ⚠️ EXPORTED SO THE MEASUREMENTS GRADE THIS FUNCTION RATHER THAN A COPY OF IT,
+ * the same reason `rowsFor` and `sampleRow` are.
+ *
+ * @param {Array<[string, number]>} rows  what the table holds
+ * @param {string[]} take  the take's chords as table symbols, oldest first
+ * @param {string[]} ctx  the context being asked about, as table symbols
+ */
+export function adaptRows(rows, take, ctx, { weight = 0.25, floor = 2 } = {}) {
+  if (!take || take.length < 3 || !(weight > 0)) return rows;
+  const a = ctx[ctx.length - 2], b = ctx[ctx.length - 1];
+  let d = new Map(), tot = 0;
+  if (a !== undefined && b !== undefined) {
+    for (let i = 2; i < take.length; i++) {
+      if (take[i - 2] === a && take[i - 1] === b) { d.set(take[i], (d.get(take[i]) || 0) + 1); tot++; }
+    }
+  }
+  if (tot < floor) {
+    d = new Map(); tot = 0;
+    for (let i = 1; i < take.length; i++) {
+      if (take[i - 1] === b) { d.set(take[i], (d.get(take[i]) || 0) + 1); tot++; }
+    }
+  }
+  if (!tot) return rows;
+  const out = new Map((rows || []).map(([s, p]) => [s, (1 - weight) * p]));
+  for (const [s, n] of d) out.set(s, (out.get(s) || 0) + weight * n / tot);
+  return [...out].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1));
+}
+
+export function twoSlots(style, ctx, { temp = 1, rnd = null, bTemp = 0, take = null,
+  weight = 0.25 } = {}) {
+  const got = rowsFor(style, ctx);
+  const how = got.how;
+  const rows = take ? adaptRows(got.rows, take, ctx, { weight }) : got.rows;
   if (!rows.length) return null;
   const A = sampleRow(rows, temp, rnd);
-  let B = null, best = -Infinity;
-  for (const [s, p] of rows.slice(0, POOL)) {
-    if (s === A) continue;
-    const u = style.uni.get(s) || 1e-6;
-    const score = Math.log2(p / u);
-    if (score > best) { best = score; B = s; }
+  const pool = rows.slice(0, POOL).filter(([s]) => s !== A)
+    .map(([s, p]) => [s, Math.log2(p / (style.uni.get(s) || 1e-6))]);
+  let B = null;
+  if (!pool.length) B = null;
+  else if (!(bTemp > 0) || typeof rnd !== 'function') {
+    /* The argmax, which is what this shipped before 2026-09-26 and is still what
+       `bTemp: 0` means. `suggest-test.mjs` uses it as the negative control. */
+    let best = -Infinity;
+    for (const [s, score] of pool) if (score > best) { best = score; B = s; }
+  } else {
+    /* 🔴 THE SAME DRAW AS SLOT A, OVER THE SAME QUANTITY SLOT B WAS ALREADY
+       RANKED BY. `2^(pmi/T)` is `(p/u)^(1/T)`, so the weight is the specificity
+       itself raised to `1/T` and one dial means the same thing in both slots. */
+    const top = Math.max(...pool.map(([, sc]) => sc));
+    const w = pool.map(([, sc]) => Math.pow(2, (sc - top) / bTemp));
+    const sum = w.reduce((a, b) => a + b, 0);
+    let r = rnd() * sum;
+    B = pool[pool.length - 1][0];
+    for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) { B = pool[i][0]; break; } }
   }
   return { A, B: B ?? (rows.find(([s]) => s !== A)?.[0] ?? null), how, rows };
 }
@@ -481,21 +712,35 @@ function twoSlots(style, ctx, { temp = 1, rnd = null } = {}) {
  * probability of a step raised to `1/T`, so one dial means the same thing to a
  * chord and to a route. Weighting by the whole path's probability instead is the
  * same code with `temp` divided by `steps`, which is how both were graded.
- * ⚠️ `beam` OF 64 PRUNES NOTHING AT FOUR STEPS, because the shipped table keeps
- * three rows a context and `3^3` is 27. It is a ceiling for a longer route
- * rather than a filter on this one, and a beam that pruned would be an argmax
- * wearing a different name.
+ * ⚠️ `beam` OF 256 PRUNES NOTHING AT FOUR STEPS, because the shipped table keeps
+ * five rows a context and `5^3` is 125. It is a ceiling for a longer route rather
+ * than a filter on this one, and a beam that pruned would be an argmax wearing a
+ * different name.
+ * 🔴 IT READ 64 UNTIL 2026-09-26 AND THAT NUMBER WAS DERIVED FROM `KEEP`, SO
+ * RAISING THE PRUNE WOULD HAVE TURNED THIS BACK INTO AN ARGMAX SILENTLY. At
+ * `KEEP 5` the live set is 125 paths and a beam of 64 would have thrown the
+ * lower half away by probability before the draw ever saw it, which is the
+ * failure this whole plan is about arriving through a constant nobody re-read.
+ *
+ * ✅ MEASURED at `KEEP 5` over 4,000 held-out jazz contexts: a route is found on
+ * **98.5 per cent** of them against 92.7 at `KEEP 3`, over **307** distinct
+ * routes against 150, attested **95.4 per cent** against 98.3.
  *
  * @returns {{path: string[], lp: number, tried: number}|null}
  */
 export function routeOver(style, ctx0, target, steps = 4,
-  { temp = 1, rnd = null, beam = 64 } = {}) {
+  { temp = 1, rnd = null, beam = 256, take = null, weight = 0.25 } = {}) {
   if (!style || !target || steps < 1) return null;
   let live = [{ ctx: [...ctx0], path: [], lp: 0 }];
   for (let d = 0; d < steps; d++) {
     const next = [];
     for (const st of live) {
-      const { rows } = rowsFor(style, st.ctx);
+      /* ⚠️ THE TAKE IS MIXED IN AT EVERY STEP RATHER THAN ONLY THE FIRST,
+         because the context moves as the route is built and a way home that
+         sounded like this player at step one and like nobody at step three would
+         be the adaptation switching itself off half way. */
+      const got = rowsFor(style, st.ctx);
+      const rows = take ? adaptRows(got.rows, take, st.ctx, { weight }) : got.rows;
       for (const [s, p] of rows) {
         if (d < steps - 1 && s === target) continue;      // arrive once, at the end
         if (d === steps - 1 && s !== target) continue;    // and it must land on it
@@ -535,7 +780,8 @@ export function routeOver(style, ctx0, target, steps = 4,
  *   random source, so a caller that needs to repeat itself can.
  * @returns {{ok, style, source, key, keyName, tonic, guessed, from, picks, says}}
  */
-export function suggest(context, { style = 'jazz', temp = null, rnd = null } = {}) {
+export function suggest(context, { style = 'jazz', temp = null, rnd = null,
+  take = null, mix = null, bTemp = null } = {}) {
   const chords = (context?.chords || []).filter((c) => c && Number.isFinite(c.root));
   const blank = { ok: false, style, source: 'none', key: null, keyName: '', tonic: 0,
     guessed: false, from: '', picks: [], says: '' };
@@ -553,7 +799,21 @@ export function suggest(context, { style = 'jazz', temp = null, rnd = null } = {
   if (table && table.tri) {
     const ctx = chords.map((c) => symbolOf(c.root, c.quality, tonic));
     const T = temp === null ? (table.temp ?? 1) : temp;
-    const got = twoSlots(table, ctx, { temp: T, rnd: rnd || Math.random });
+    /* ⚠️ THE TAKE IS TURNED INTO SYMBOLS WITH **THIS CALL'S** TONIC AND NOT WITH
+       ONE IT REMEMBERED. The key is a fiat that a third chord can change, and a
+       take holding symbols from an older tonic would quietly be a take of a
+       different piece. It holds chords, and the arithmetic happens here. */
+    const mine = take ? take.chords.map((c) => symbolOf(c.root, c.quality, tonic)) : null;
+    /* 🔴 `temp: 0` MEANS THE ARGMAX AND THE ARGMAX OF A TWO SLOT ANSWER IS BOTH
+       SLOTS, WHICH WAS FOUND BY BREAKING IT. Drawing slot B made
+       `suggest(ctx, { temp: 0 })` fall through to `Math.random`, so a call that
+       had been deterministic since the day this file was written silently was
+       not, and two checks went red in one run and green in the next with no code
+       between them. That is the shape of flake this repository spends whole
+       sessions on. A caller wanting a fixed A with a drawn B passes both dials. */
+    const bT = bTemp === null ? (T > 0 ? B_TEMP : 0) : bTemp;
+    const got = twoSlots(table, ctx, { temp: T, rnd: rnd || Math.random, bTemp: bT,
+      take: mine, weight: mix === null ? (table.mix ?? 0.25) : mix });
     const usual = got && chordOfSymbol(got.A, tonic, table, key);
     const other = got && got.B && chordOfSymbol(got.B, tonic, table, key);
     if (usual) {
@@ -646,7 +906,7 @@ export function suggest(context, { style = 'jazz', temp = null, rnd = null } = {
  *   steps: Array<{root, quality, name, numeral}>, says}}
  */
 export function routeTo(context, { style = 'jazz', steps = 4, target = null,
-  temp = null, rnd = null } = {}) {
+  temp = null, rnd = null, take = null, mix = null } = {}) {
   const chords = (context?.chords || []).filter((c) => c && Number.isFinite(c.root));
   const blank = { ok: false, style, source: 'none', key: null, keyName: '', tonic: 0,
     guessed: false, target: '', targetName: '', steps: [], says: '' };
@@ -667,7 +927,9 @@ export function routeTo(context, { style = 'jazz', steps = 4, target = null,
   const aim = target || `0${key && key.mode === 'minor' ? 'min' : 'maj'}`;
   const ctx = chords.map((c) => symbolOf(c.root, c.quality, tonic));
   const T = temp === null ? (table.temp ?? 1) : temp;
-  const got = routeOver(table, ctx, aim, steps, { temp: T, rnd: rnd || Math.random });
+  const mine = take ? take.chords.map((c) => symbolOf(c.root, c.quality, tonic)) : null;
+  const got = routeOver(table, ctx, aim, steps, { temp: T, rnd: rnd || Math.random,
+    take: mine, weight: mix === null ? (table.mix ?? 0.25) : mix });
   const home = chordOfSymbol(aim, tonic, table, key);
   if (!got) {
     return { ...blank, key, keyName, tonic, guessed, target: aim,

@@ -151,6 +151,12 @@ function run(label, songs) {
   for (const [p, k] of ranked(paths).slice(0, 6)) console.log(`      ${pct(k, found).padStart(5)}%  ${p}`);
 
   /* ══ THE SHAPE THAT SHIPS, WHICH IS NOT THE SHAPE ABOVE ══════════════════ */
+  /* ⚠️ THE NUMBERS THIS SECTION PRINTS MOVED ON 2026-09-26 AND THE COMMENTS IN
+     THIS FILE ARE FROM THE DAY BEFORE. `KEEP` went from 3 to 5 and the
+     temperatures were refitted from 3.5 and 1.4 to 1.7 and 0.8, so the sweep
+     below now finds its best fit in a different place. The prune sweep that
+     decided it is `demo/resources/chord-e6-keep.mjs`, and the within take
+     adaptation this file knows nothing about is `chord-e7-take.mjs`. */
   const ship = shipShape(c, { id: label.toLowerCase() });
   console.log(`\n${'-'.repeat(78)}`);
   console.log(`THE SHIPPED TABLE'S SHAPE: top 3 rows a context, ctx>=8, row>=3, 89 steps`);

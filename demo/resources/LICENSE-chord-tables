@@ -5,7 +5,7 @@ works. Neither corpus is redistributed here: both stay in tmp/, which is
 gitignored, and are fetched once by demo/resources/fetch-chord-corpora.mjs.
 
 Written by demo/resources/build-chord-tables.mjs on 2026-09-25.
-Pruned at ctx>=8 row>=3 keep 3. Do not edit by hand: run the script.
+Pruned at ctx>=8 row>=3 keep 5. Do not edit by hand: run the script.
 
 -- The jazz table -----------------------------------------------------------
 
