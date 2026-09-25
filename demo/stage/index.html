@@ -1937,7 +1937,19 @@
        * The real leg keeps a long deadline, because Cloudflare genuinely takes
        * seconds and a person is watching it rather than a harness.
        */
-      const seen = await waitForFirstFrame(v, { timeoutMs: 20000 });
+      /**
+       * 🔴 SHORTER THAN THE CHECK THAT WAITS FOR IT. This was 20 s while the
+       * page's own check polls 10 s for `phase === 'live'`, so a start that
+       * took longer than ten seconds reported `before` on a show that was
+       * about to be fine. Warm, the frame arrives in under a second and it
+       * never showed; cold, it is the whole failure. MEASURED: 37/49 with
+       * twelve asserts downstream of a running show red and NOTHING in the log,
+       * because no error was involved at all, only two timeouts that disagreed.
+       * ⚠️ **A TIMEOUT IS PART OF A CONTRACT WITH WHOEVER IS WAITING.** Two
+       * waits for one event must be ordered deliberately, and the inner one has
+       * to be the shorter.
+       */
+      const seen = await waitForFirstFrame(v, { timeoutMs: 12000 });
       /**
        * ⚠️ THE BADGE GOES `live` BECAUSE FRAMES ARRIVED, NOT BECAUSE A PROMISE
        * SETTLED. A WHEP track exists before it carries anything, so a page that
@@ -1965,13 +1977,27 @@
        * same in-page loopback and its `check` handler was reported as never
        * reaching. It was waiting for a leg that cannot connect here.
        */
-      let track = live.sub.inbound.getVideoTracks()[0];
+      /**
+       * 🔴 NO CANVAS FALLBACK ANY MORE, AND LEAVING ONE BEHIND IS WHAT BROKE
+       * THIS PAGE. It read `track = stream.getVideoTracks()[0]` when no frame
+       * had crossed, and `stream` was the canvas capture that the pure-receiver
+       * change deleted. So on a COLD start, where the container has not reached
+       * Cloudflare inside the 20 s wait, this branch threw
+       * `ReferenceError: stream is not defined`, the catch below swallowed it,
+       * and the show never reached `live`. MEASURED: 37/49, twelve asserts
+       * downstream of a running show red, and the page said only
+       * `the show did not start`.
+       * ⚠️ **A FALLBACK TO A THING THAT NO LONGER EXISTS IS WORSE THAN NO
+       * FALLBACK**, because it only runs on the unhappy path, which is the one
+       * nobody measures. This page publishes nothing now: the only picture
+       * there has ever been is the one that came back.
+       */
+      const track = live.sub.inbound.getVideoTracks()[0];
       if (!seen.frames) {
-        recSource = 'canvas';
-        track = stream.getVideoTracks()[0];
-        d.log('no frame crossed the WebRTC leg, so what is recorded is the canvas '
-          + 'we meant to send rather than the picture that came back', 'warn');
+        d.log('no frame has crossed the WebRTC leg yet, so the recording starts '
+          + 'on a track that is still filling', 'warn');
       }
+      if (!track) throw new Error('the WebRTC leg carried no video track');
       rec = startRecorder(track);
       recTrack = track;
       followWriteHead();
@@ -2886,7 +2912,9 @@
      */
     const showToggle = showBar.el.querySelector('.tbar-toggle');
     showToggle?.click();
-    for (let i = 0; i < 200 && phase !== 'live'; i++) {
+    // ⚠️ LONGER THAN THE FIRST-FRAME WAIT INSIDE `startShow`, DELIBERATELY.
+    // Two waits for one event must be ordered, and the inner one is 12 s.
+    for (let i = 0; i < 400 && phase !== 'live'; i++) {
       await new Promise((r) => setTimeout(r, 50));
     }
     /**
