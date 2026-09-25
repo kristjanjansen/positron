@@ -2724,3 +2724,123 @@ ISOLATION RUN LIE.** The run that appeared to clear the shell change was the run
 in which they had just been killed. The harness prints that warning for exactly
 this reason and it was read past. **Kill your own probes before believing a
 bisect.**
+
+## 114. A green page with no coverage is the worst possible control (session 49)
+
+🔴 **`/webrtc/` WAS USED FOR MOST OF AN AFTERNOON AS PROOF THAT WHEP WORKED,
+ON THE STRENGTH OF A RUN READING 8/8 GREEN.** The reasoning was sound on its
+face: that page subscribes to the SAME live input, in the SAME headless Chrome,
+with the SAME helper, and it passes. So WHEP must work, and `/stage/` must be
+doing something different. Five rewrites of `/stage/` followed.
+
+🔴 **IT CONTAINS TWO PAGE ASSERTS AND BOTH ARE THE SHELL'S.** MEASURED at the
+end, from the line that had been printed on every one of those runs:
+`page asserted something · 2`. Everything that page claims about WebRTC sits
+behind `await d.run('check')`, which is the last statement of a retry loop that
+`return`s on success. **The connection never succeeded, so the loop never
+returned, so the checks were never reached.** Six of its eight greens belong to
+the shell and the page contributes none.
+
+🔴 **AND THE REAL FAULT WAS A VPN, WHICH PASSES THE HANDSHAKE AND DROPS THE
+MEDIA.** MEASURED with no positron page involved at all, a bare
+`RTCPeerConnection` against the live input, the same minute, one toggle apart:
+
+    VPN ON    status 201   connection failed      0 frames        0 bytes
+    VPN OFF   status 201   connection connected   489 frames  4,428,273 bytes
+
+**The status is 201 either way.** WHEP signalling is ordinary HTTPS and it
+succeeds, so Cloudflare answers the offer, the page logs `pc connecting`, and
+every line about signalling reads healthy while nothing arrives. What fails is
+UDP, about fifteen seconds later, as an ICE timeout that looks exactly like a
+bug in whichever page is open. `/stage/` went to 49/49 the moment the VPN went
+off, with no code change between the two runs.
+
+⚠️ **THE COST WAS NOT THE VPN, IT WAS THE CONTROL.** This project already
+records, in writing, that a green suite can mean zero coverage and that only the
+assert COUNT says so. That count was on screen for every run of `/webrtc/` all
+afternoon. **Before comparing against a passing page, read how many asserts it
+made.** A page that cannot reach its subject does not fail, it passes with
+nothing in it.
+⚠️ **AND A PAGE THAT CANNOT REACH ITS SUBJECT MUST SAY SO**, the way `caps.mjs`
+un-links a row WITH THE REASON IN WORDS. `/webrtc/` passing silently is the
+defect; the VPN merely revealed it.
+⚠️ **THREE INNOCENT THINGS WERE BLAMED IN ORDER**: the page, then the harness,
+then headless Chrome, each with a confident write-up. Headless was measured
+clean afterwards, 408 frames decoded. **Blaming the environment is the same
+mistake as blaming the code, when neither has been measured on its own.**
+
+## 115. Held asserts turn every wait into a silent truncation (session 49)
+
+🔴 **`/stage/` COLLECTS ITS ASSERTS INTO AN ARRAY AND FLUSHES THEM WHEN
+`checks()` RETURNS**, so nothing is reported until the whole block finishes. A
+show on this page needs a container wake, MEASURED at about **22 seconds** cold,
+then a second to connect. Widening the check's poll to cover that was tried at
+28 s, 45 s and 80 s. **Every one of them pushed the flush past
+`demo/verify.mjs`'s patience, and the page reported 2 asserts instead of 37
+while the suite printed 12/12 GREEN.**
+
+⚠️ **SO THE WAIT CANNOT BE LONG ENOUGH TO SUCCEED AND SHORT ENOUGH TO REPORT.**
+This is not a number to tune. `settleMs` was raised from 25000 to 75000, which
+is what `/webrtc/` declares, and it changes nothing on its own: `verify.mjs`
+caps the first-assert budget at `FIRST_ASSERT_CEIL = 30000` regardless.
+⚠️ **AND THE SAME RUN CONTRADICTED ITSELF, WHICH IS THE TELL.** The start assert
+read `the page is "before"` and the stop assert a few lines later read `the page
+is "live" and the button reads STOP WEBRTC`. **The show was starting correctly
+the whole time and the check was measuring too early.**
+✅ **THE ANSWER IS TO GRADE A LEG THE HARNESS CAN CARRY.** LL-HLS comes up in
+seconds where WebRTC needs a container, and it exercises the same recorder,
+archive and strip. A check that cannot be run in the budget available is a check
+pointed at the wrong subject.
+
+## 116. Repointing a container is not merging its contents (session 49)
+
+🔴 **FOLDING THE ARCHIVE TAB INTO THE CONTROL ROOM WAS DONE WITH ONE BLANKET
+REPLACE**, `tabs.panel('archive')` to `tabs.panel('controlroom')`. The archive's
+bar, strip AND diagram all arrived in a panel that already had its own, so the
+page rendered **two transport bars, two timelines and two diagrams**. Reported
+on sight as *"wtf is going on here woth doubling"*.
+⚠️ A one-line change that moves a destination moves EVERY child that names it.
+**Count what is already in the destination before pointing anything at it.**
+
+## 117. A control that moves into the harness's reach takes every check that presses it (session 49)
+
+🔴 **MOVING TWO BUTTONS FROM `.pos-controls` ONTO THE TRANSPORT BAR PUT THEM IN
+THE DRILL'S PATH.** `demo/verify.mjs` presses `.pos-controls button, .tbar-x`,
+and a bar's `extras` render as `.tbar-x`. So the harness began starting the show
+itself, and the page's own check, which pressed the same button, became the
+SECOND press of a control that is its own stop. **Twelve asserts went red and
+the change looked like it had broken the page.**
+⚠️ **THE OLD FORM WAS SAFE ONLY BY ACCIDENT.** It clicked `.tbar-toggle`, which
+the drill does not press, so the two had never collided.
+🔴 **AND IT TOOK THE 25 s SETTLE WITH IT.** `settleMs` is spent on the FIRST
+control pressed and nowhere else, so while the starts were a page-level row the
+first press bought the container 25 seconds to wake. On the bar they get
+nothing. **A timing guarantee that lives in another component is not a
+guarantee**, and neither half of that was visible in the diff.
+
+## 118. A fallback to a variable that no longer exists only runs when things are already bad (session 49)
+
+🔴 **`startShow` KEPT `track = stream.getVideoTracks()[0]` AS ITS NO-FRAMES
+FALLBACK**, and `stream` was the canvas capture that the pure-receiver change
+had deleted. On a warm run a frame always arrived, so the branch never ran and
+the page measured **49/49**. Cold, no frame crossed inside the wait, the branch
+threw `ReferenceError`, the surrounding catch swallowed it, and the show never
+reached `live`: **37/49 with twelve asserts red and one log line saying only
+`the show did not start`.**
+⚠️ **A FALLBACK IS THE UNHAPPY PATH BY DEFINITION, WHICH IS THE PATH NOBODY
+MEASURES.** Deleting a variable means grepping for it, including inside the
+branches that exist precisely for the case you are not testing.
+
+## 119. A green run against a warm dependency is a measurement of the warmth (session 49)
+
+🔴 **`/stage/` WAS SHIPPED ON A 49/49 THAT WAS REALLY A MEASUREMENT OF A
+CONTAINER SOMEBODY ELSE'S RUN HAD ALREADY WOKEN.** The pure-receiver change was
+verified minutes after runs that had left `positron-pub` publishing, so its WHIP
+leg was up before the page ever asked. Re-measured cold the same day: **37/49**.
+It was reported as green to the owner twice.
+⚠️ **NOTHING IN THE OUTPUT DISTINGUISHES THE TWO.** The suite cannot see whether
+a dependency was already hot, so a page whose first act is to wake something
+must be graded from cold at least once before anybody says it passes.
+⚠️ **IT IS THIS PROJECT'S OWN A/B RULE ARRIVING THROUGH STATE RATHER THAN
+THROUGH CODE**: before running a comparison, ask what defect it could NOT
+detect. A warm container is a defect the comparison cannot detect.
