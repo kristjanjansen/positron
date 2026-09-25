@@ -236,6 +236,49 @@ Every 06 log opens with `BUILD <sha>-<hhmmss>`, so a report can be attributed.
 Clear with `POST /logs/clear`. `GET /status` blocks on the container's cold start
 — that is expected, not a hang.
 
+## The VPN passes the handshake and drops the media
+
+🔴 **BEFORE DEBUGGING ANY WebRTC FAILURE, CHECK THE VPN. IT COST MOST OF A
+SESSION ON 2026-09-25 AND IT LOOKED LIKE CODE EVERY SINGLE TIME.** `/stage/` was
+rewritten five different ways, the harness was blamed, then headless Chrome was
+blamed, then the page was declared broken for visitors. None of them were it.
+
+```sh
+node demo/check-whep.mjs      # a real browser, the live input, no positron page
+```
+
+**MEASURED the same minute, same machine, one toggle apart:**
+
+| | status | connection | frames | bytes |
+| --- | --- | --- | --- | --- |
+| VPN ON | **201** | failed | **0** | **0** |
+| VPN OFF | **201** | connected | 489 | 4,428,273 |
+
+🔴 **THE STATUS IS 201 EITHER WAY, WHICH IS WHY THIS IS SO HARD TO SEE.** The
+WHEP handshake is ordinary HTTPS and it succeeds, so Cloudflare answers the
+offer, the page logs `pc connecting`, and every signalling line reads healthy
+while **not one byte of media ever arrives**. What fails is UDP, fifteen seconds
+later, as an ICE timeout that reads like a bug in whatever page you are looking
+at.
+⚠️ **AND `/stage/` WAS 49/49 THE MOMENT THE VPN WENT OFF**, with no code change
+between the two runs.
+
+✅ **MOST WORK IS UNAFFECTED AND DOES NOT NEED THE VPN OFF.** Everything that is
+HTTPS still works: LL-HLS (`llhls` reads 12/12 with the VPN on), the relay and
+every Durable Object page, R2 uploads and downloads, Cloudflare deploys,
+`wrangler`, the GitHub push dance, the stand-ins, and every page with no live
+WebRTC leg in it. **Only the UDP media path is lost.** So this is a rule about
+one class of failure, not a reason to work unprotected.
+
+🔴 **AND THE REAL LESSON IS ABOUT THE CONTROL, NOT THE VPN.** `/webrtc/` was
+used for hours as proof that WHEP worked, on the strength of a run reading
+**8/8 green**. It contains **two** page asserts and both are the shell's: that
+page's own checks sit behind a connection that never happened, so they have
+never run on this desk. **A green page with no coverage is the worst possible
+control**, and this project already knows it in writing, because a green suite
+can mean zero coverage and **only the assert COUNT says so**. The count was
+printed on every one of those runs.
+
 ## What costs real money and somebody else's server
 
 🔴 **EVERY CONNECTION THIS REPOSITORY OPENS TO AN ERR MOUNT APPEARS IN A PUBLIC
