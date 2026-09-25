@@ -5,6 +5,27 @@ description: Stand up a positron-shaped site of somebody's own on Cloudflare, fr
 
 # Standing up a positron of your own
 
+**positron-start, revision 2026-09-25.**
+
+🔴 **SAY THAT REVISION OUT LOUD, ONCE, EARLY, IN A SENTENCE THEY CAN READ.**
+Something like *"I am following the positron setup guide, revision
+2026-09-25."* It costs one line and it is the only way anybody can tell whether
+you are working from the current instructions or from a stale copy.
+⚠️ **BECAUSE THERE ARE TWO DOORS INTO THIS FILE AND THEY DRIFT.** An agent told
+to READ THE URL gets whatever is on the `main` branch at that moment, which is
+current by construction. Claude Code in a CLONE of this repository reads
+`.claude/skills/` off the disk instead, which is frozen at whatever was cloned
+or last pulled. **The checkout wins silently for that reader**, so a person
+following along with a months-old clone gets months-old instructions and
+nothing on screen says so.
+⚠️ **AND RAW GITHUB CACHES FOR A FEW MINUTES**, so a fetch within a minute or
+two of a push is serving the previous version. `cmp` before concluding a rule
+was ignored.
+✅ **IF THE REVISION YOU ARE READING IS OLDER THAN A FEW MONTHS, SAY SO AND
+OFFER TO RE-FETCH IT:**
+`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md`
+
+
 🔴 **ASSUME THE PERSON READING THIS IS NOT A DEVELOPER.** They pasted a prompt
 out of a README. They may never have opened a terminal, they do not know what
 wrangler is, and they cannot tell a missing dependency from a broken account.
@@ -675,6 +696,142 @@ that by today's per-minute-delivered rate and say the monthly figure before
 anybody builds it. A page that only plays when somebody presses something costs
 a fraction of the same thing. **This is the single strongest reason to make a
 stream open on a press rather than on a visit.**
+
+---
+
+## Step 4d. If they want an audience that can answer back
+
+🔴 **THIS IS A DIFFERENT PRODUCT FROM "PUT A STREAM ON A PAGE", AND IT IS THE
+ONE PEOPLE ACTUALLY MEAN WHEN THEY DESCRIBE A SHOW.** A stream is one way. The
+moment they say *"and then we ask the audience something"*, they need a second
+channel back, and a rule for WHEN a question appears relative to the picture.
+Both halves exist and both are small.
+
+🔴 **FIRST, THE DECISION THAT MAKES THIS EASY: ONE TRANSPORT, NOT TWO.** Pick
+WebRTC or pick LL-HLS for a given show. **Do not run both at once.** Two
+transports means two live inputs, two publishers or a dual-output trick, two
+meters on the bill, and an audience split across a latency gap of several
+seconds that every cue then has to straddle. One transport removes all of that
+and removes nothing anybody asked for.
+
+**Which one, in one sentence each:**
+- **WebRTC (WHIP in, WHEP out)** when the answers matter and the room is small.
+  Sub-second, so a question can be asked and answered as if everyone were in one
+  place. Measured on this account: p50 67 ms glass to glass.
+- **LL-HLS (RTMPS in)** when the audience is large or on phones. A few seconds
+  behind, scales without thinking about it, and survives bad networks. The floor
+  on Cloudflare is about two seconds and there is no way under it.
+⚠️ **AND THEY CANNOT BE SWAPPED LATER WITHOUT A NEW INPUT.** WHIP and WHEP must
+be used together, an RTMPS input is never served over WHEP, so the transport
+choice is baked into which live input exists. Say that before they pick.
+
+**The four pieces, and three of them are fetched rather than written.** Read
+`PARTS.md` for the mechanics.
+
+1. **The input.** `src/provision.sh` for the LL-HLS one. For WebRTC, create the
+   input and use its WHIP and WHEP URLs.
+2. **The publisher. OBS is the realistic answer and you do not have to build
+   anything.** It speaks RTMPS out of the box and WHIP since v30, so a person
+   with OBS on a laptop is a complete broadcast rig. 🔴 **THE WHIP PUBLISH URL
+   CARRIES THE STREAM KEY IN ITS PATH**, so it goes in OBS's settings on their
+   own machine and NEVER into a web page. A page that needs to publish needs a
+   Worker to hold the credential and proxy the handshake.
+3. **The player.** `src/low-latency-player.js` for the HLS route. For WHEP it is
+   about thirty lines of `RTCPeerConnection` and one POST of an SDP offer.
+4. **The way back, which is the piece they will not have thought about.**
+   `workers/relay/src/index.js` is one Worker with one Durable Object, and
+   `demo/shell/wire.mjs` is the browser side. **Neither imports anything.** Each
+   room is `idFromName(room)`, so two shows never see each other's answers, and
+   it sleeps when nobody is connected, which is what keeps it free.
+
+### 🔴 THE THING A VISITOR MEETS IS THE THING YOU BUILT, NOT A STAND-IN OF IT
+
+**Make the real path the default and let the TEST opt out, never the other way
+round.** This is a rule because it was got backwards here and cost a page most
+of its point. `/stage/` defaulted to a local loopback, two peer connections
+talking to each other inside the same tab, with the real Cloudflare leg behind a
+query parameter. Every line of it was correct and it was the right default for a
+harness. **The person who was sent a link got a page that never touched the
+platform it exists to demonstrate**, and nothing on screen said so.
+
+⚠️ **A STAND-IN IS FOR THE RUN, AND A RUN IS NOT A PERSON.** Keep the fake radio,
+the fake archive, the in-page loopback: they are how a check costs nobody
+anything, and this repository has three of them for exactly that. **What they
+must never be is what opens when somebody presses the button.** The test flag is
+the thing that switches AWAY from reality, and it is held by the harness, which
+is the one caller that can be told to hold it.
+
+⚠️ **AND THE BILL THAT FALLS OUT OF THIS IS REAL, SO SAY IT IN THE SAME
+SENTENCE.** Flipping a default to the real path means every visit, and every
+harness run that does not opt out, now costs whatever the real path costs. That
+is a thing to decide out loud with the number in front of them, not a thing to
+discover in a dashboard.
+
+### What actually does the publishing, since they will ask
+
+🔴 **SOMETHING HAS TO ENCODE AND PUSH, AND A WEB PAGE CANNOT BE IT FOR HLS.**
+RTMPS is a long-lived TLS socket carrying an FLV mux, and a browser has WebRTC
+and HTTP and neither is that. A page CAN publish WHIP, so for the WebRTC route a
+browser is a complete publisher. **For the HLS route it never is.** Three real
+answers, in the order to suggest them:
+
+1. ✅ **OBS on their own machine.** RTMPS out of the box, WHIP since v30. Nothing
+   to build, nothing to host, and a person with a laptop is a broadcast rig.
+   **This is the right answer for almost everybody** and it is what to say first.
+2. ✅ **ffmpeg in a container, when it has to run unattended.** This repository
+   does it: ONE container runs **two ffmpeg legs**, an RTMPS one feeding the
+   LL-HLS input and a WHIP one feeding the WebRTC input, from the same source.
+   That is the only way one source reaches both kinds of audience, and it is
+   also the cheapest thing that can run to a schedule with nobody in the room.
+   ⚠️ **Containers are Workers Paid only.**
+3. ⚠️ **OBS inside a container.** Measured here and it works, and it is the
+   heaviest of the three: a 1.25 GB image, about 190 per cent of one core for
+   720p30, and **a Cloudflare container has no `/dev/shm`, so any browser source
+   kills it in a crash loop** until `mkdir -p /dev/shm && chmod 1777 /dev/shm`
+   runs before the supervisor. Worth it only when a show genuinely needs OBS
+   scenes AND has to run unattended in the cloud.
+
+⚠️ **AND WHATEVER PUBLISHES, THE ENCODER SETTINGS FROM THE FOUR PRECONDITIONS
+STILL APPLY**: H.264, CBR, fixed GOP equal to the segment length, B-frames off.
+OBS will happily send B-frames and break LL-HLS with every other box ticked.
+
+### When the question appears, which is the whole craft of it
+
+🔴 **DO NOT PUT A TIMECODE ON SCREEN.** There is a burned-in clock in this
+repository and it is a measuring instrument, not a show. An audience should
+never see it.
+
+🔴 **AND DO NOT SEND A QUESTION IN THE VIDEO.** Cloudflare's transcode **strips
+ID3, SCTE-35, DATERANGE and SEI, verified**. Anything embedded in the media
+arrives at nobody. The question travels on the relay; only its TIMING is tied to
+the picture.
+
+**On WebRTC: fire it the moment it arrives.** At sub-second latency the viewer
+is effectively live, and 67 ms is inside the noise of a person noticing a
+question at all. No clock needed. **This is why WebRTC is the easy one and why a
+small interactive show should choose it.**
+
+**On LL-HLS: hold it by that viewer's own latency.** Every viewer is behind live
+by their own amount, so a question pushed to everybody at once reaches one
+person three seconds into a scene and another eight. Two ways, in order of
+effort:
+- ✅ **The cheap one, which needs nothing new.** The player already reports each
+  viewer's own latency on its `latency` event. Delay the question by that
+  number. It is one subtraction and it is right to within the accuracy of a
+  figure the player is already computing.
+- ✅ **The exact one.** `src/timed-messages.js`, 228 lines and standalone. A cue
+  is `{id, at, data}` where `at` is **epoch ms of the STREAM moment**, and it
+  fires when THAT viewer's playhead reaches it, so everybody sees it at the same
+  point in the show whatever their latency. It reads the wall clock that LL-HLS
+  already puts in the playlist (`EXT-X-PROGRAM-DATE-TIME`), which exists only
+  because the input was made with `preferLowLatency`. ⚠️ **It also lets a cue be
+  scheduled ahead, revised, cancelled, and delivered to somebody who joined
+  late**, which is what a real show needs and what the cheap rule cannot do.
+
+⚠️ **THE ANSWERS COMING BACK ARE A DIFFERENT TIMELINE AND DO NOT NEED ANY OF
+THIS.** Stamp each answer against the recording, not against the viewer's
+playhead. Live timing decides when somebody is ASKED; the archive only has to
+say when they answered.
 
 ---
 
