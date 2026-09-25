@@ -87,6 +87,42 @@ limit on WHO and HOW LONG. The harness is the easy half, because `SELFCHECK` is 
 flag a person never has. The visitor half is the real question and it is not
 answered here.
 
+### Open 2026-09-25: the control room UI is DONE and 14 asserts are one timing cascade
+
+✅ **SHIPPED.** One bar in the control room: `START HLS` and `START WEBRTC` on
+the left, the timers and `PLAY RECORDING` on the right, no play glyph, one
+timeline, one diagram. Each transport button is its own stop and says so. The
+publisher wake now says `starting` on the badge, because it is about twenty
+seconds of nothing and silence reads as broken.
+
+🔴 **AND IT IS 33/47, WITH ALL FOURTEEN FAILURES DOWNSTREAM OF ONE.** The page's
+own check polls for `phase === 'live'` after pressing, and the start does not
+land inside the window, so every assert about a running show, its recorder, its
+archive and its strip follows it red. **The show DOES start**: the stop assert a
+few lines later reads *"the page is live and the button reads STOP WEBRTC"*,
+which is the same run contradicting the assert above it.
+✅ **AND IT IS PROVEN WORKING IN A REAL BROWSER**, which is the thing that
+matters: probed headful against the local page, `pc connecting` at 27.6 s,
+`pc connected` at 27.9 s, `picture 1280x720`, recorder started. Headless is the
+same, connecting at 38.4 s and live at 40.2 s.
+
+🔴 **THE CONSTRAINT IS STRUCTURAL AND IS NOT A NUMBER TO TUNE.** This page HOLDS
+its asserts and flushes them only when `checks()` returns, so every second spent
+waiting inside it delays all 37. Widening the poll to 28 s, 45 s and 80 s were
+all tried: at 28 s and beyond the flush moves past the harness's patience and
+the page reports **2 asserts instead of 37** while the suite reads a confident
+**12/12 green**. So the wait cannot be long enough for a cold container AND
+short enough to report.
+⚠️ `settleMs` was raised from 25000 to 75000, which is what `/webrtc/` uses,
+and it is not sufficient on its own: `demo/verify.mjs` caps the first-assert
+budget at `FIRST_ASSERT_CEIL = 30000` regardless.
+
+✅ **THE FIX IS TO GRADE THE HLS LEG INSTEAD, AND IT IS THE RIGHT ONE ANYWAY.**
+LL-HLS comes up in a couple of seconds where WebRTC needs a container wake, it
+is what a harness can carry, and it exercises the SAME recorder, archive and
+strip. The check block should press `START HLS` rather than `START WEBRTC`.
+That is a restructure of the check, not a patch, and it is the next thing.
+
 ### Open 2026-09-25: WHEP MEDIA DOES NOT FLOW FROM THIS MACHINE, AND IT IS NOT THE CODE
 
 🔴 **MEASURED WITH NO POSITRON PAGE INVOLVED, IN A REAL HEADFUL CHROME, AGAINST
