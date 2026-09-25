@@ -122,7 +122,7 @@
   import { parseChord, parseChords, voiceChord, VOICINGS } from '/shell/chords.mjs';
   import { nameChord, createSettler, createTally, chordKey, fromKey, notesOf }
     from '/shell/name.mjs';
-  import { suggest, routeTo, useTables, tablesIn, mkRandom } from '/shell/suggest.mjs';
+  import { suggest, routeTo, useTables, tablesIn, mkRandom, mkTake } from '/shell/suggest.mjs';
   import { createRoll } from '/shell/roll.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
@@ -2034,6 +2034,22 @@
   /** every chord this page has ever proposed, so none of them is ever learned */
   const proposed = new Set();
   /**
+   * 🔴 WHAT IS BEING PLAYED RIGHT NOW, MIXED INTO THE COUNTED TABLE, AND IT IS
+   * THE LARGEST SINGLE GAIN IN `plans/plan-better-chords-2026-09-25.md`.
+   * Section 14.2, MEASURED over 4,351 held-out jazz contexts through the table
+   * that ships: **+6.32 points of top 1**, where the whole step from a bigram to
+   * a trigram was 4.5 and justified downloading two corpora.
+   * ✅ AND IT COSTS NOTHING ON THE OTHER THREE MEASURES, which is the condition
+   * that plan sets: 50.2 per cent cycling against the real songs' 52.0, 7.44
+   * distinct chords in ten against 7.44, and 98.0 per cent attested against 100.
+   * ⚠️ IT IS NOT A PROFILE AND NOTHING IS STORED. The window is 64 chords, the
+   * object dies with the tab, and section 6.1 measured what a persistent one
+   * would buy: +0.60 points from a composer's entire body of work, against
+   * -0.76 from a stranger's. There is no `localStorage` on this page and this
+   * does not add one.
+   */
+  const take = mkTake();
+  /**
    * 🔴 HOW LONG A PROPOSAL IS LEFT ALONE. Asked 2026-09-23: *"do not offer new
    * when i hae not played old suggestion for a while"*. A proposal is a thing to
    * TRY, and one that is replaced before you have got round to it is not an
@@ -2073,7 +2089,7 @@
     lightGuess([]);
     if (mode !== 'learn' || learned.length < 2) { drawHome(); return; }
     guessAt = performance.now();
-    const r = suggest({ chords: learned }, { style: LEARN_STYLE, rnd: draw });
+    const r = suggest({ chords: learned }, { style: LEARN_STYLE, rnd: draw, take });
     if (!r.ok) return;
     lastGuess = r;
     /* 🔴 WHERE THE KEY CAME FROM, SAID OUT LOUD, WHICH IS THE DECISION THIS
@@ -2171,7 +2187,7 @@
       homeTbl.set([]);
       return;
     }
-    const r = routeTo({ chords: learned }, { style: LEARN_STYLE, rnd: draw });
+    const r = routeTo({ chords: learned }, { style: LEARN_STYLE, rnd: draw, take });
     lastHome = r;
     homeSay.textContent = r.targetName ? `A WAY HOME TO ${r.targetName}` : 'A WAY HOME';
     if (!r.ok) {
@@ -2343,6 +2359,24 @@
      */
     if (!got.enough) return;
     const key = chordKey(r.root, r.quality);
+    /**
+     * 🔴 THE TAKE IS FED HERE, AND `addLearned` WOULD HAVE WASTED MOST OF THE
+     * GAIN. `learned[]` is the DISTINCT chords somebody keeps coming back to,
+     * capped at `LEARN_SLOTS` of 6, and the adaptation wants the STREAM: every
+     * chord event as it settles, repeats included. This line is the one place
+     * that knows a chord has really been played, and it sits ABOVE every early
+     * return below it, because a chord the learning rules refuse to write into
+     * the roll is still a chord somebody played.
+     * 🔴 AND THE SOURCE IS THE RULE THIS PAGE ALREADY CARRIES, MADE COUNTABLE.
+     * *"you recorded a suggestion. why>"*. A suggester fed its own output writes
+     * its own line and calls it yours, MEASURED as a number rather than left as
+     * a warning: a generator taking its own suggestions cycles 56.8 per cent of
+     * the time against 50.2 and drops to 7.23 distinct chords from 7.44, moving
+     * away from real music on both axes at once.
+     * ⚠️ `heard` HAS NO DEFAULT SOURCE, so this call has to say which it is, and
+     * `take.refused` is the number the negative control below reads.
+     */
+    take.heard(r, proposed.has(key) ? 'suggested' : 'played');
     /* 🔴 REMEMBER WHERE THE HANDS WERE, NOT ONLY WHAT THEY SPELLED. Reported
        2026-09-23 with a screenshot: A major was played as A3 C#4 E4 and drawn as
        C#3 E3 A3, and the question was *"why it suggest someting i do not play"*.
@@ -4212,6 +4246,12 @@
       /* ⚠️ AND PLAYING IT RELEASES THE HOLD, which is what keeps this from being
          a proposal frozen on the screen. */
       const held0 = guessPlayed;
+      /* 🔴 THE TAKE, READ ON BOTH SIDES OF THE TWO TIMES THIS CHECK PLAYS A
+         PROPOSAL, because a negative control whose `refused` is 0 because
+         nothing was ever proposed proves nothing at all. Between here and
+         `takeAfter` the check plays this page's own proposal twice, so the
+         adaptation must refuse exactly two and count none. */
+      const takeBefore = { counted: take.counted, refused: take.refused };
       hold(guesses[0].notes);
       await sleep(LEARN_WINDOW + 140);
       drop(guesses[0].notes);
@@ -4243,12 +4283,65 @@
         tally.msOf(triedKey, performance.now()) === afterMoveOn,
         `after playing ${guesses[0].name} again the tally still has `
         + `${Math.round(tally.msOf(triedKey, performance.now()))} ms of it`);
+      const takeAfter = { counted: take.counted, refused: take.refused };
+      /* 🔴 A COUNTER ON THE FAR SIDE OF THE BOUNDARY, WHICH IS THE ONLY THING
+         THAT SAYS THE TAKE IS WIRED RATHER THAN HELD. `suggest` and `routeTo`
+         each read `take.chords` exactly once and only when they were handed a
+         take, so a page that built one and forgot to pass it reads 0 here while
+         every other assert on this page stays green. It wraps the redraw the
+         line below was already making rather than forcing another, because a
+         forced proposal would replace the row the checks under it are about. */
+      let takeReads = 0;
+      const chordsProp = Object.getOwnPropertyDescriptor(take, 'chords');
+      Object.defineProperty(take, 'chords', { configurable: true,
+        get() { takeReads++; return chordsProp.get.call(take); } });
       drawGuesses();
+      Object.defineProperty(take, 'chords', chordsProp);
       d.assert('and playing it releases the hold, so the next redraw may offer something else',
         held0 === false && freedAfter === true && guessRedraws > redrawsWas,
         `the proposal was ${held0 ? 'already' : 'not'} taken up, was `
         + `${freedAfter ? 'taken up' : 'still waiting'} after playing it, and the next `
         + `redraw ${guessRedraws > redrawsWas ? 'recomputed' : 'still held'}`);
+
+      /* ── the take, which is what makes the two offers above about you ──── */
+      //
+      // 🔴 +6.32 POINTS OF TOP 1 ON HELD-OUT JAZZ, and it was built, graded and
+      // called by nothing until this wiring. `plans/plan-better-chords-2026-09-25.md`
+      // section 14.2 has the measurement and the three measures it does not cost.
+      d.assert('the take reaches both halves of the offer, the chord and the way home',
+        takeReads === 2,
+        `the page read its take ${takeReads} time(s) drawing one proposal and one way `
+        + `home, and it is holding ${take.counted} chord(s) of the ${take.window} it keeps`);
+
+      /* 🔴 THE SITE IS THE SETTLE AND NOT `addLearned`, AND THIS IS THE ASSERT
+         THAT SAYS SO. `learned[]` is the DISTINCT chords somebody came back to,
+         capped at `LEARN_SLOTS`, and the adaptation is measured on the STREAM of
+         chord events with repeats in it. A take fed from the roll's rows would
+         read the same as the roll and most of the gain would be gone. */
+      d.assert('the take is the stream of chords played, repeats and all, not the roll\u2019s rows',
+        take.counted > learned.length && take.counted === take.chords.length,
+        `${take.counted} chord(s) into the take against ${learned.length} row(s) in the roll, `
+        + `which is what a take fed from ${LEARN_SLOTS} learned slots would have been capped at`);
+
+      /* 🔴 AND A SUGGESTION MUST NOT TEACH THE SUGGESTER, WHICH IS THIS PAGE'S
+         OLDEST RULE HERE AND IS A NUMBER NOW RATHER THAN A PROHIBITION.
+         Reported as *"you recorded a suggestion. why>"*. MEASURED in the plan: a
+         generator fed its own output cycles 56.8 per cent of the time against
+         50.2 and drops to 7.23 distinct chords from 7.44.
+         ⚠️ AND IT IS DRIVEN RATHER THAN DECLARED. The two holds above played a
+         chord this page proposed, so `refused` has somewhere to come from; an
+         assert reading 0 refused because nothing was ever offered would be the
+         vacuous shape this repository keeps paying for. */
+      const heardKeys = take.chords.map((c) => chordKey(c.root, c.quality));
+      d.assert('NEGATIVE CONTROL: nothing this page proposed ever taught the suggester',
+        takeAfter.refused === takeBefore.refused + 2
+        && takeAfter.counted === takeBefore.counted
+        && proposed.size > 0 && heardKeys.length > 0
+        && !heardKeys.some((k) => proposed.has(k)),
+        `${take.counted} chord(s) played and ${take.refused} of the page's own refused, `
+        + `${takeAfter.refused - takeBefore.refused} of them the proposal this check played `
+        + `twice, and none of the ${proposed.size} chord(s) this page has proposed is in `
+        + `the take`);
 
       /* 🔴 THE PROPOSAL IS ON THE KEYS, SMALLER, AND UNDERNEATH WHAT YOU PLAY.
          Asked as *"make suggested notes appear subtly and be smaller that real
