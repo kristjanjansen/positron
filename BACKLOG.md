@@ -1,5 +1,107 @@
 ## Open
 
+### Done 2026-09-25: a voicing with the root in the left hand and the rest rootless
+
+✅ **DONE 2026-09-25 AS `Split`. MEASURED: chords-test 49 ok to 60 ok, `/nola/`
+102/102 to 103/103**, so the fourth control button cost no assert anywhere and
+the one new page assert is the whole of the change. Open it at
+**http://127.0.0.1:8890/nola/** and press `Split` in the VOICING row.
+
+**THE FOUR CHORDS FROM THE SCREENSHOT, ACTUAL NOTE NUMBERS**, window 48 to 72,
+written out by hand in the test rather than computed from the rule they grade:
+
+    Cmaj7   48, 52, 55, 59    C3 / E3 G3 B3
+    Dm7     50, 53, 57, 60    D3 / F3 A3 C4
+    Em7     52, 55, 59, 62    E3 / G3 B3 D4
+    Fmaj7   53, 57, 60, 64    F3 / A3 C4 E4
+
+The bass walks C3 D3 E3 F3, one note a chord, and the right hand travels **14
+semitones over three changes, worst single move 2**. That is the tutorial’s two
+staves.
+
+✅ **THE NAME IS `Split` AND THE JARGON IS KEPT OUT OF SIGHT.** `rootless` and
+`shell` are the vocabulary this control already drew a complaint about, so the
+musician’s name is written once in `chords.mjs` for a reader who knows it and
+nowhere a visitor looks. The hover reads *"the root on its own for your left hand
+and the rest of the chord above it for your right"*.
+
+✅ **A TRIAD LOSES ITS ROOT LIKE EVERYTHING ELSE** and gets a two note right
+hand, `Cmaj` as C3 / E3 G3. Dropping the fifth instead would put the root back
+above a bass that already has it, which is the one thing the mode exists to take
+away. **Nothing is ever lost**, and that is an invariant over ten chords: a split
+voicing holds exactly the pitch classes of the spelling.
+🔴 **AND A SLASH CHORD KEEPS ITS ROOT, DECIDED BY A RED TEST RATHER THAN BY
+TASTE.** `Fm6/C` is C3 D3 F3 G#3 C4. The premise of the mode is that the note
+underneath already HAS the root; `Fm6/C` names a different note underneath, so
+the premise fails and dropping the F would delete a note the symbol names. **The
+first version dropped it and the pitch class assert went red**, which is how the
+decision got made.
+
+✅ **FOUR SABOTAGES, EACH RUN AND REVERTED**: leaving the root in the hand 4 red,
+dropping it from a slash chord as well 2, placing the hand by span instead of
+leading it 1, dropping the fifth instead of the root 5.
+
+🔴 **ONE MEASUREMENT DECIDED A LINE OF CODE.** The distance is taken over the
+BODY and not the whole voicing, because the bass is supposed to walk. MEASURED
+over five lines and thirty chords: the hand travels **114 semitones compared body
+to body against 132 compared whole to whole**, choosing differently on **10 of the
+30**. ⚠️ **And on the four chords in the screenshot the two agree note for
+note, so the supplied evidence would have settled nothing.**
+
+⚠️ **THE PAGE GIVES `split` THE WHOLE DRAWN KEYBOARD (48 to 72) RATHER THAN
+THE LETTER ROW (48 to 62).** MEASURED: into the letter row three of the four fit
+and `Fmaj7` needs 64, **two semitones above the top letter key**. The letter row
+is one hand and this voicing is two, so the mode declines a promise it never
+made. **The bass is never let out of the window**, because the roll has no column
+for a note the keyboard does not draw.
+
+⚠️ **STILL OPEN: NOBODY HAS PLAYED IT.** Every number here is note numbers and
+pixels, and whether this is the sound in the screenshot is a listening question.
+⚠️ And a caller handing this mode an ALREADY INVERTED chord would have its
+lowest note taken for a root. Every caller here passes `parseChord` output, so it
+is documented and not enforced.
+
+🔴 **ASKED, VERBATIM, WITH TWO SCREENSHOTS:** *"what voicing? wanna this"*.
+One crop is `/nola/`’s roll on `Cmaj7 Dm7 Em7 Fmaj7`. The other is a piano
+tutorial of **the same four chords**, notated on two staves: **a single bass note
+per chord in the left hand (C, D, E, F) and three notes in the right that barely
+move between chords.**
+
+✅ **WHAT IT IS, NAMED: A ROOTLESS VOICING OVER A BASS ROOT.** The left hand
+takes the root alone, the right hand drops the root and plays the notes that
+carry the harmony, and the upper structure is placed to move as little as
+possible from the chord before it. **That is why the tutorial’s treble barely
+moves while the bass walks up C D E F.**
+
+🔴 **AND `/nola/` CANNOT DO IT TODAY, WHICH THE PLAN ALREADY SAID IN
+WRITING.** `plans/plan-better-chords-2026-09-25.md` section 12.2: the page voices
+with `voiceChord(... near, bass: false)`, *"which is close position, no bass and
+no inner voice motion, into a sampled piano"*, and **"nothing in this document
+changes one thing a listener hears about the SOUND of a chord"**. It called this
+*"probably the larger half of the complaint"*. **This is that half.**
+
+⚠️ **`bass` ALREADY EXISTS IN `voiceChord` AND IT IS NOT THIS.**
+`demo/shell/chords.mjs:319` takes `bass = false`, and `:322` reads
+`src[0]`, **the lowest note of a SLASH chord’s named bass**. `:277` records
+that the bass is never inverted in any mode. So the machinery for putting a note
+underneath exists and is about `Fm6/C`, not about splitting a chord across two
+hands. **Do not overload it silently.**
+
+⚠️ **IT IS A FOURTH ENTRY IN A SHARED CONSTANT.** `VOICINGS = ['root',
+'close', 'lead']` at `:282`, and `/nola/:1228` draws them as
+`[['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead']]`.
+🔴 **SO THE NAME MUST BE A PLAIN WORD AND THIS PAGE HAS ALREADY PAID FOR
+GETTING THAT WRONG.** The labels read `SPELLED`, `CLOSE` and `LEADING` for ten
+minutes and the report was *"i do not know what spelled close leading means"*.
+**`rootless` and `shell` are exactly that vocabulary again.**
+
+⚠️ **AND ADDING A CONTROL OPTION MOVES EVERY OTHER CONTROL’S HARNESS PRESS**,
+which is `positron-verify`’s standing rule. `chords.mjs` is imported by
+`keyboard.mjs`, `roll.mjs`, `name.mjs`, `suggest.mjs` and `/nola/`.
+⚠️ **THE ROLL HAS TO SURVIVE IT**: a bass note an octave or two below the
+body widens the range `roll.mjs` draws, and this page already records a roll
+drawn beside the instrument having *"neither its width nor its range"*.
+
 ### Open 2026-09-25: the keyboard looper detects a tempo and every later loop aligns to the first
 
 🔴 **ASKED, VERBATIM:** *"in keyboadd looper: do basic bmp detection / quant
