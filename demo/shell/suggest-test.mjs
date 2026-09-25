@@ -14,9 +14,11 @@
 // tonic, the two slots, the spelling, and whether the name that comes out can
 // be turned back into notes at all.
 //
-// ⚠️ NINE OF THESE ARE NEGATIVE CONTROLS, including a truncated table, a
-// sabotaged unigram, a style that does not exist, a sampler held at the argmax
-// and a way home to a chord nothing reaches.
+// ⚠️ SIXTEEN OF THESE ARE NEGATIVE CONTROLS, including a truncated table, a
+// sabotaged unigram, a style that does not exist, a sampler held at the argmax,
+// a way home to a chord nothing reaches, a beam narrowed until it is an argmax
+// again, a take of somebody else's chords and a take fed nothing but the page's
+// own suggestions.
 //
 // 🔴 AND THE SAMPLER'S CHECK IS TWO HALVES OR IT IS NOTHING. `suggest.mjs` draws
 // slot A rather than taking the maximum since 2026-09-25, so every number in
@@ -30,7 +32,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { suggest, useTables, tablesIn, styleNames, STYLES, keysFitting, pickKey, numeralIn,
-  mkRandom, routeTo, rowsFor } from './suggest.mjs';
+  mkRandom, routeTo, rowsFor, mkTake, adaptRows } from './suggest.mjs';
 import { parseChord } from './chords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -165,17 +167,49 @@ const DEVICES = [
 // 9. 🔴 THE MEASUREMENT THE WHOLE TABLE IS FOR. Not *does it decode* but *does
 //    a chord somebody played come back with the chord that really follows it*.
 {
-  const missed = [], atA = [];
+  /* 🔴 THIS CHECK WAS ONE ASSERT AND IS THREE SINCE 2026-09-26, BECAUSE RAISING
+     `KEEP` TO 5 TOOK THE OLD ONE RED FOR A REASON THAT IS NOT A DEFECT. Slot B
+     is the pointwise mutual information pick over a pool of four, and the pool
+     could not be filled while the table kept three rows. With five rows,
+     `A7 Dm7` offers `Bmin7b5` where it used to offer `G7`: a rarer and more
+     specific chord, which is what slot B is FOR and which is exactly why it
+     names the real next chord only 9.9 per cent of the time by design.
+     ⚠️ SO THE CLAIM IS SPLIT INTO THE THREE THINGS IT WAS CONFLATING: what the
+     table KNOWS, what the drawn page OFFERS, and what the argmax pair alone
+     happens to show. Losing one of seven at the third is recorded rather than
+     tuned away. */
+  const CLS = { maj: 'maj', maj7: 'maj', min: 'min', min7: 'min', 7: 'dom',
+    dim: 'dim', min7b5: 'hdim', sus4: 'sus', sus2: 'sus', aug: 'aug' };
+  const held = [], drawn = [], atArgmax = [];
   for (const [label, chords, wantRoot] of DEVICES) {
-    const r = suggest({ chords }, { style: 'jazz', temp: 0 });
-    const roots = r.picks.map((p) => p.root);
-    if (roots[0] === wantRoot) atA.push(label);
-    else if (!roots.includes(wantRoot)) missed.push(`${label} gave ${names(r)}`);
+    const { key, tonic } = pickKey(chords);
+    const ctx = chords.map((c) => `${(((c.root - tonic) % 12) + 12) % 12}${CLS[c.quality]}`);
+    const deg = String((((wantRoot - tonic) % 12) + 12) % 12);
+    const { rows } = rowsFor(STYLES.jazz, ctx);
+    if (rows.some(([sym]) => /^\d+/.exec(sym)[0] === deg)) held.push(label);
+    const rnd = mkRandom(24);
+    let got = false;
+    for (let i = 0; i < 24 && !got; i++) {
+      if (suggest({ chords }, { style: 'jazz', rnd }).picks.some((p) => p.root === wantRoot)) got = true;
+    }
+    if (got) drawn.push(label);
+    if (suggest({ chords }, { style: 'jazz', temp: 0 }).picks.some((p) => p.root === wantRoot)) {
+      atArgmax.push(label);
+    }
+    void key;
   }
-  ok('the jazz table names the real next chord for the devices it was graded on',
-    missed.length === 0,
-    missed.length ? missed.join('; ')
-      : `${atA.length} of ${DEVICES.length} at the first slot and the rest at the second`);
+  ok('the jazz table HOLDS the real next chord for every device it was graded on',
+    held.length === DEVICES.length,
+    `${held.length} of ${DEVICES.length}, the missing ones being `
+    + `${DEVICES.filter(([l]) => !held.includes(l)).map(([l]) => l).join(', ') || 'none'}`);
+  ok('and the page reaches it, because the draw gets there where one argmax does not',
+    drawn.length === DEVICES.length,
+    `${drawn.length} of ${DEVICES.length} offered within 24 draws`);
+  ok('AND THE ARGMAX PAIR ALONE LOST ONE WHEN KEEP WENT TO 5, which is slot B '
+    + 'reaching further rather than the table forgetting',
+    atArgmax.length === DEVICES.length - 1,
+    `${atArgmax.length} of ${DEVICES.length} at the argmax pair, the odd one out being `
+    + `${DEVICES.filter(([l]) => !atArgmax.includes(l)).map(([l]) => l).join(', ') || 'none'}`);
 }
 
 // 10. 🔴 AND EVERY ONE OF THEM READ THE TABLE RATHER THAN FALLING THROUGH TO
@@ -359,15 +393,27 @@ ok('each style carries its own temperature, and they are not the same number',
 //     MEASURED in the plan: sampling without a floor costs 9.5 points of
 //     attestation for 1.8 bits, which is the same trade pure PMI was refused for.
 {
-  let widest = 0, n = 0;
+  let widest = 0, n = 0, short = 0;
   for (const st of [STYLES.jazz, STYLES.pop]) {
     for (const m of [st.tri, st.bi]) for (const rows of m.values()) {
       widest = Math.max(widest, rows.length); n++;
+      if (rows.length < json.keep) short++;
     }
   }
   ok('there is no tail in this table to draw from, because the build already cut it',
-    widest <= 3 && n > 1000,
-    `${n} contexts across both styles and the widest holds ${widest} rows`);
+    widest === json.keep && json.keep === 5 && n > 1000,
+    `${n} contexts across both styles, the table declares keep ${json.keep} and the `
+    + `widest holds ${widest} rows`);
+  /* 🔴 AND THE FLOOR IS STILL DOING THE CUTTING, WHICH IS THE HALF THAT RAISING
+     `KEEP` COULD HAVE QUIETLY UNDONE. `MIN_ROW = 3` means a context with no
+     fourth row seen three times keeps three however high the ceiling goes. If the
+     floor had been dropped instead of the ceiling raised, nearly every context
+     would fill all five slots and this number would collapse. */
+  ok('NEGATIVE CONTROL: most contexts still hold FEWER rows than the ceiling, so the '
+    + 'count floor was not what moved',
+    short > n * 0.5,
+    `${short} of ${n} contexts hold fewer than ${json.keep} rows, which is `
+    + `${(100 * short / n).toFixed(1)} per cent`);
 }
 
 console.log('\n== a four chord way home ==');
@@ -469,6 +515,179 @@ console.log('\n== a four chord way home ==');
 ok('and the real table is back in place after the sabotage',
   DEVICES.every(([, chords]) => suggest({ chords }, { style: 'jazz', temp: 0 }).source === 'corpus'),
   `${DEVICES.length} of ${DEVICES.length} reading the table again`);
+
+console.log('\n== slot B is drawn too, which is what a player is actually shown ==');
+
+// 🔴 THE FINDING THAT PAID FOR THIS SECTION. `chord-e6-keep.mjs` swept the prune
+//    at 3, 4, 5, 6 and 8 rows and slot B answered EXACTLY 2.00 distinct chords a
+//    context at every one of them, because B is the highest pointwise mutual
+//    information row that A did not take: the PMI top unless A collided with it,
+//    the PMI second when it did. Two values, for any width of table. The plan's
+//    whole lesson had been applied to slot A and slot B is the one on screen.
+{
+  const ctx = [C(0, 'maj7'), C(5, 'maj7')];
+  const drawn = new Set(), argmax = new Set();
+  const rnd = mkRandom(5), rnd2 = mkRandom(5);
+  for (let i = 0; i < 200; i++) {
+    const a = suggest({ chords: ctx }, { style: 'jazz', rnd });
+    if (a.picks[1]) drawn.add(a.picks[1].name);
+    const b = suggest({ chords: ctx }, { style: 'jazz', rnd: rnd2, bTemp: 0 });
+    if (b.picks[1]) argmax.add(b.picks[1].name);
+  }
+  ok('the second slot answers more than two chords now, because it is drawn rather than maximised',
+    drawn.size > 2, `after Cmaj7 Fmaj7 it offers ${[...drawn].join(', ')}`);
+  // NEGATIVE CONTROL, and it is the measurement itself turned into a check: held
+  // at `bTemp: 0` the same context over the same two hundred draws can answer at
+  // most two, whatever slot A does and however wide the table is.
+  ok('NEGATIVE CONTROL: held at the argmax the second slot can only ever answer two chords',
+    argmax.size <= 2 && argmax.size < drawn.size,
+    `${argmax.size} at the argmax against ${drawn.size} drawn, over 200 draws of one context`);
+}
+
+// 🔴 THE BEAM IS A CEILING AND NOT A FILTER, AND RAISING `KEEP` IS WHAT MADE
+//    THAT WORTH ASSERTING. It read 64 while the table kept three rows, where
+//    `3^3` is 27; at five rows the live set is 125, so the old constant would
+//    have thrown the lower half away by probability before the draw saw it and
+//    turned the route quietly back into an argmax.
+{
+  const ctx = { chords: [C(2, 'min7'), C(7, '7')] };
+  const wide = new Set();
+  const rnd = mkRandom(17);
+  for (let i = 0; i < 100; i++) wide.add(routeTo(ctx, { style: 'jazz', rnd }).steps.map((c) => c.name).join(' '));
+  ok('a way home is drawn from many routes, not from the few a narrow beam would leave',
+    wide.size > 5, `${wide.size} different ways home over 100 draws`);
+}
+
+console.log('\n== a take, which adapts to what is being played now and forgets ==');
+
+/* 🔴 A TAKE THAT MEETS THE CONTEXT BEING ASKED ABOUT, AND THE FIRST ONE DID NOT.
+   A line in a different corner of the key changes nothing, correctly, and a check
+   written on one reads as the adaptation never having been wired up at all. This
+   is somebody vamping a ii V and going somewhere the table does not expect, three
+   times over, which is the whole case the adaptation exists for. */
+const TAKE_LINE = [C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
+  C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
+  C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
+  C(9, 'min7'), C(2, '7'), C(7, 'maj7')];
+
+// 🔴 THE LARGEST SINGLE GAIN IN `plans/plan-better-chords-2026-09-25.md`, section
+//    6.2, MEASURED at +7.44 points of top 1 on full counts and re-measured at
+//    **+6.32 through this table's shape** by `demo/resources/chord-e7-take.mjs`,
+//    against a whole bigram-to-trigram step worth 4.5. It has to actually move
+//    what comes back or none of that reached the page.
+{
+  const ctx = [C(2, 'min7'), C(7, '7')];
+  const before = suggest({ chords: ctx }, { style: 'jazz', temp: 0 });
+  const take = mkTake();
+  for (const c of TAKE_LINE) take.heard(c, 'played');
+  const after = suggest({ chords: ctx }, { style: 'jazz', temp: 0, take });
+  ok('a take of what somebody is playing changes what comes back',
+    names(before) !== names(after) && take.counted === TAKE_LINE.length,
+    `${names(before)} without it and ${names(after)} after ${take.counted} chords`);
+}
+
+// 🔴 THE RULE THIS PAGE ALREADY PAID FOR, AS A COUNTER RATHER THAN AS A CLAIM.
+//    Reported on `/nola/`: *"you recorded a suggestion. why>"*. A suggester that
+//    learns from its own suggestions writes its own line and calls it yours, so
+//    every chord that can reach the adaptation goes through ONE function that
+//    takes a source and counts what it refused.
+{
+  const take = mkTake();
+  const ctx = [C(2, 'min7'), C(7, '7')];
+  const clean = suggest({ chords: ctx }, { style: 'jazz', temp: 0 }).picks.map((p) => p.name).join('/');
+  for (const c of TAKE_LINE) take.heard(c, 'suggested');
+  for (const c of TAKE_LINE) take.heard(c);
+  for (const c of TAKE_LINE) take.heard(c, 'played ');
+  const after = suggest({ chords: ctx }, { style: 'jazz', temp: 0, take }).picks.map((p) => p.name).join('/');
+  ok('NEGATIVE CONTROL: a take fed nothing but the page\'s own suggestions learns nothing at all',
+    take.counted === 0 && take.refused === TAKE_LINE.length * 3 && take.chords.length === 0
+    && clean === after,
+    `${take.refused} chords refused and ${take.counted} counted, and the suggestion is `
+    + `${after} either way`);
+  ok('NEGATIVE CONTROL: there is no default source, so a careless call is the refused one',
+    mkTake().heard(C(0, 'maj7')) === false
+    && mkTake().heard(C(0, 'maj7'), 'played') === true,
+    'heard(chord) is refused and heard(chord, \'played\') is counted');
+}
+
+// NEGATIVE CONTROL: the mixing itself, asked directly. A take that never matches
+// the context must hand back exactly the rows it was given, or the adaptation is
+// adding chords nobody played.
+{
+  const rows = [['0maj', 0.5], ['7dom', 0.3], ['2min', 0.2]];
+  const same = adaptRows(rows, ['9aug', '9aug', '9aug', '9aug'], ['0maj', '5maj'], { weight: 0.3 });
+  const moved = adaptRows(rows, ['0maj', '5maj', '11dom', '0maj', '5maj', '11dom'],
+    ['0maj', '5maj'], { weight: 0.3 });
+  const off = adaptRows(rows, ['0maj', '5maj', '11dom'], ['0maj', '5maj'], { weight: 0 });
+  ok('NEGATIVE CONTROL: a take that never met this context changes nothing',
+    same.length === rows.length && same.every(([sy], i) => sy === rows[i][0])
+    && off.length === rows.length && off.every(([sy], i) => sy === rows[i][0]),
+    `${same.length} rows back unchanged, and weight 0 is unchanged too`);
+  /* ⚠️ IT ENTERS AND CLIMBS, IT DOES NOT TAKE OVER, WHICH IS WHAT A WEIGHT OF
+     0.25 MEANS AND WAS WRITTEN OUT WRONG THE FIRST TIME. At 0.3 against a world
+     row holding 0.5 the take's chord cannot reach the top, and asserting that it
+     would have been doing the machine's arithmetic a second time and getting it
+     wrong. What is promised is that a chord the table never offered here is now
+     on the list and above rows it was not in. */
+  ok('and a take that HAS met it puts what followed onto the list and above the rest',
+    moved.length === rows.length + 1 && moved[1][0] === '11dom'
+    && Math.abs(moved.find(([sy]) => sy === '11dom')[1] - 0.3) < 1e-9,
+    `${moved.map(([sy, p]) => `${sy} ${(100 * p).toFixed(0)}%`).join('  ')}`);
+}
+
+// 🔴 NOTHING IS STORED, AND SECTION 6.1 REFUSED A PERSISTENT PROFILE ON A
+//    MEASUREMENT: a composer's ENTIRE body of work is worth +0.60 points, and a
+//    stranger's at the same weight reads 0.76 BELOW the baseline. This is
+//    asserted over the module's own source with its comments stripped, because
+//    an absence asserted over raw source grades the prose, which this repository
+//    has already been caught doing twice.
+{
+  const src = readFileSync(join(HERE, 'suggest.mjs'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const banned = ['localStorage', 'sessionStorage', 'indexedDB', 'fetch(', 'XMLHttpRequest',
+    'navigator.', 'document.'];
+  const found = banned.filter((b) => src.includes(b));
+  ok('NOTHING IS STORED AND NOTHING LEAVES: a take dies with the tab',
+    found.length === 0,
+    `none of ${banned.join(', ')} appears in the code, and the take is a plain array`);
+  const take = mkTake({ window: 4 });
+  for (const c of TAKE_LINE) take.heard(c, 'played');
+  const kept = take.chords;
+  take.clear();
+  ok('and the window forgets, and clearing it leaves nothing behind',
+    kept.length === 4 && kept[3].root === TAKE_LINE[TAKE_LINE.length - 1].root
+    && take.chords.length === 0 && take.counted === 0,
+    `${TAKE_LINE.length} chords in, ${kept.length} kept, 0 after clear()`);
+}
+
+// 🔴 THE MIX IS A STYLE FACT AND TRAVELS IN THE TABLE, WHICH IS THE THIRD TIME
+//    THIS PROJECT HAS FOUND THAT. MEASURED: jazz wants 0.25 and pop 0.1, and pop
+//    at 0.25 scores hugely better on top 1 while moving every one of the four
+//    measures AWAY from real pop, which is the plan's own caveat that part of the
+//    gain is music repeating itself rather than anything about a person.
+ok('each style carries its own mixing weight, and they are not the same number',
+  STYLES.jazz.mix === 0.25 && STYLES.pop.mix === 0.1,
+  `jazz mixes a take in at ${STYLES.jazz.mix} and pop at ${STYLES.pop.mix}`);
+
+// The way home adapts too, since a route is a run of the same lookups.
+{
+  const ctx = { chords: [C(2, 'min7'), C(7, '7')] };
+  const take = mkTake();
+  /* ⚠️ THIS TAKE OVERLAPS THE ROUTE'S OWN CONTEXT ON PURPOSE, AND THE FIRST ONE
+     DID NOT. A take of chords the route never passes through changes nothing,
+     correctly, and a check written on one would have read as the adaptation
+     never reaching `routeOver` at all. `Dm7 G7 Em7` round and round makes the
+     trigram the route starts on one the take has met twice. */
+  for (const c of [C(2, 'min7'), C(7, '7'), C(4, 'min7'),
+    C(2, 'min7'), C(7, '7'), C(4, 'min7'),
+    C(2, 'min7'), C(7, '7'), C(4, 'min7')]) take.heard(c, 'played');
+  const a = routeTo(ctx, { style: 'jazz', rnd: mkRandom(8) });
+  const b = routeTo(ctx, { style: 'jazz', rnd: mkRandom(8), take });
+  ok('the four chord way home reads the take as well, at every step of the route',
+    a.ok && b.ok && a.steps.map((c) => c.name).join(' ') !== b.steps.map((c) => c.name).join(' '),
+    `${a.steps.map((c) => c.name).join(' ')} without it and `
+    + `${b.steps.map((c) => c.name).join(' ')} with it`);
+}
 
 console.log(`\n${pass} ok, ${fail} failed`);
 process.exit(fail ? 1 : 0);

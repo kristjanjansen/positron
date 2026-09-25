@@ -111,13 +111,19 @@ export const f = (x, n = 2) => Number(x).toFixed(n);
  * nobody has.
  *
  * The three constants are read off `build-chord-tables.mjs` and are the same
- * three: `MIN_CTX 8`, `MIN_ROW 3`, `KEEP 3`, quantised over `ALPHA.length - 1`.
+ * three: `MIN_CTX 8`, `MIN_ROW 3`, `KEEP 5`, quantised over `ALPHA.length - 1`.
+ * ⚠️ `KEEP` WAS 3 HERE UNTIL 2026-09-26 AND THIS DEFAULT IS THE ONE THING IN
+ * THIS FILE THAT CAN GO STALE SILENTLY. It is a copy of a number that lives in
+ * another file, so a prune changed there and not here would make every
+ * experiment grade a shape nobody ships, which is the exact defect this function
+ * was written to prevent. `chord-e6-keep.mjs` and `chord-e7-take.mjs` pass `keep`
+ * explicitly for that reason; `chord-e4-generators.mjs` takes the default.
  *
  * @returns {{id, bi: Map, tri: Map, uni: Map, spell: Map, temp}} the object
  *   `useTables` hands a page, so the shipped `suggest.mjs` can be pointed
  *   straight at it.
  */
-export function shipShape(c, { id = 'x', temp = 1, minCtx = 8, minRow = 3, keep = 3,
+export function shipShape(c, { id = 'x', temp = 1, minCtx = 8, minRow = 3, keep = 5,
   steps = 89 } = {}) {
   const q = (p) => Math.max(0, Math.min(steps, Math.round(p * steps))) / steps;
   const shrink = (m) => {
