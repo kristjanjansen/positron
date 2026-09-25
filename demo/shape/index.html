@@ -577,14 +577,38 @@
    * pages already wear `createInstrument` over `createPanelLayout`, so this is
    * `/shape/` joining them rather than anything being built here.
    *
+   * 🔴 AND THE PLATE MOVED TO THE TOP RIGHT LATER THE SAME DAY, WHICH REVERSES
+   * THE SECOND HALF OF THAT ASK. Asked 2026-09-25 with a screenshot of the rack
+   * carrying a narrow column down its left edge: *"rm left panel / section. use
+   * nameplate on top right. shape demo"*. The left rail IS the vertical plate,
+   * so this is a reversal rather than a repair and the argument for the rail
+   * comes out with it instead of sitting here contradicting the page.
+   * 🔴 **`place: 'end'` AND NOT A HEADER, WHICH WAS CHECKED RATHER THAN
+   * ASSUMED.** `.panel-head-plate` is `grid-column: 2; justify-self: center`,
+   * so building a header row would put the plate in the CENTRE of the case.
+   * `end` is `/twelve/`'s placement exactly. MEASURED after the change on the
+   * live page at 1280 px: the case is `display: flex` again, the plate lands at
+   * x922.2..963.0 y359.5..370.5, its ink sits 20.0 px from the case's inner
+   * right edge and 20.0 px from its inner top, both of which are `--panel-pad`,
+   * and the strip takes the case's full inner width at x317..963.
+   * ⚠️ AND `plateSide` CAME OUT WITH IT RATHER THAN BEING LEFT SET.
+   * `panel-layout.mjs:189` reads it only when the placement is `side`, so a
+   * `plateSide: 'left'` under `place: 'end'` is an argument nothing reads,
+   * which is the dead-rule shape this project pays for most often.
+   * ⚠️ **AND `place: 'side'` STAYS IN THE KIT.** `/knobs/` is its other caller
+   * and keeps it, and `demo/shell/instrument-test.mjs` grades
+   * `plateSpec('', 'shape', 'side')` with no browser at all. That test is about
+   * the FUNCTION rather than about this page, so it is left alone: rewriting it
+   * to match this page would delete `/knobs/`'s only no-browser coverage of
+   * that path.
+   *
    * 🔴 AND IT DOES NOT UNDO *"rm nameplates"*, WHICH HAS TO BE SAID BECAUSE THE
    * TWO LOOK CONTRADICTORY. `instrument.mjs` records `plate: false`, added
    * 2026-09-22 on that ask, and the reason it gives is specific: a HEADER's
    * status control already prints the instrument's name in front of its state,
-   * so a plate beside it is the name twice on one row. This page has no header,
-   * this plate is not on that row, and it is turned ninety degrees and glued
-   * down the edge of the case the way a rack unit is silkscreened. **Both
-   * decisions stand.**
+   * so a plate beside it is the name twice on one row. This page has no header
+   * and no status control, so nothing else on this case says which instrument
+   * it is. **Both decisions stand.**
    *
    * ⚠️ `caps: false`, WHICH IS A DEPARTURE AND IS NAMED AS ONE. Every other
    * plate in this project is upper case (`POSITRON TOM`, `MODEL 12`, `PLAITS`,
@@ -605,8 +629,8 @@
    * flex row needs.
    */
   const inst = createInstrument({
-    name: 'shape', maker: '', place: 'side', caps: false,
-    panel: { side: null, flow: false, plateSide: 'left' },
+    name: 'shape', maker: '', place: 'end', caps: false,
+    panel: { side: null, flow: false },
   });
   inst.add(rack.el);
   d.stack.add(bar, inst.el, traffic.el);
@@ -1228,11 +1252,19 @@
    * one.
    *
    * 🔴 AND FOUR MORE SABOTAGES ON 2026-09-25, WHEN THE PAGE GAINED THE
-   * INSTRUMENT BOX, THE GLYPH AND THE ROW. The page reads **49/49 with 43 page
-   * asserts** (it was 45/45 with 39). Three broken at once, each taking exactly
-   * its own assert red and nothing else, **49 to 46**:
-   *   `caps: true`     the plate reads `SHAPE`, and the height half stays green,
-   *                    which is right: the placement was not what was broken
+   * INSTRUMENT BOX, THE GLYPH AND THE ROW. The page read **49/49 with 43 page
+   * asserts** that day (it was 45/45 with 39), and it reads **50/50 with 44**
+   * since the plate moved to the top right and its one assert became two.
+   * Three broken at once, each taking exactly its own assert red and nothing
+   * else, **49 to 46**:
+   *   `caps: true`     the plate reads `SHAPE`, and the placement half stays
+   *                    green, which is right: the placement was not what was
+   *                    broken. ⚠️ THAT SABOTAGE WAS RUN AGAINST THE OLD ASSERT,
+   *                    which measured the plate's HEIGHT against the case, and
+   *                    it has NOT been re-run against the two that replaced it
+   *                    when the plate moved to the top right later the same day.
+   *                    The name half is `shown()` either way, so the reading is
+   *                    expected to hold and is not a measurement
    *   no `data-glyph`  **45.83 by 34.00**, which is the number `shell.css`
    *                    records from `/wish/` for a glyph button outside
    *                    `.pos-controls`, reproduced here on the page that
@@ -1349,18 +1381,35 @@
       `${g.width.toFixed(2)} by ${g.height.toFixed(2)}, announced as "${hand.getAttribute('aria-label')}"`);
 
     /**
-     * 🔴 THE PLATE IS AS TALL AS THE INSTRUMENT BESIDE IT, WHICH IS THE ONE
-     * THING THE NEW PLACEMENT COULD GET WRONG AND THE ONLY REASON THIS PAGE IS
-     * THE FIRST CALLER OF IT. `shell.css` records the trap it was written
-     * around: with no explicit rows, `grid-row: 1 / -1` computes to a ZERO SPAN
-     * and both children land in row 1 anyway, so a plate that looked right for
-     * the wrong reason is exactly what a source reading would have reported.
-     * `align-items: stretch` is what really does it, and only a rect says so.
-     * ⚠️ MEASURED AGAINST THE CASE'S INNER HEIGHT, NOT ITS BORDER BOX. The case
-     * is `padding: 0 var(--panel-pad)` with a 1 px border, so the plate's own
-     * `padding-block` sits INSIDE a content box that is the border box less two
-     * borders. Comparing against the outer box would report a 2 px shortfall on
-     * a plate that is exactly right.
+     * 🔴 THE PLATE IS IN THE CASE'S TOP RIGHT CORNER, ONE INSET IN FROM BOTH
+     * EDGES, 2026-09-25: *"rm left panel / section. use nameplate on top right.
+     * shape demo"*. This assert used to measure the plate's HEIGHT against the
+     * case's inner height, because the plate was a rail down the left edge. The
+     * rail is gone and so is that measurement.
+     * 🔴 **AND IT IS TWO ASSERTS BECAUSE `top right` IS TWO ALIGNMENTS THAT
+     * LOOK LIKE ONE.** They are set by two different rules in `shell.css` and
+     * can break separately: the right edge comes from
+     * `.panel-plate[data-place="end"]`, which is `justify-content: flex-end`
+     * plus `margin-left: auto`, and the top inset comes from
+     * `.panel-case > .panel-plate`, which is `padding-block: var(--panel-pad) 0`
+     * and reaches every cased page. `positron-ui` records `/twelve/` having two
+     * of three alignments line up while the third was 30 px out, which is the
+     * failure a single bundled assert cannot report.
+     * 🔴 **THE INK IS MEASURED, NOT THE PLATE.** `.panel-plate` is a flex box
+     * that spans the case's whole content width, so its own rect is right at
+     * both edges whatever the placement does to the name inside it: a check
+     * reading `plate.el` would pass under `ends`, under `mid` and under a
+     * placement that had stopped working. `plate.lines[0]` is the `shape` line
+     * itself, which is the thing a reader is looking at.
+     * ⚠️ **AND THE INSET IS READ ONCE, OFF THE CASE, RATHER THAN TYPED TWICE.**
+     * `.panel-case` is `padding: 0 var(--panel-pad)`, so its computed
+     * `padding-right` IS that token, and the plate's own `padding-block` is the
+     * same token again. A `20` typed here would be a shared measurement in two
+     * files, which is the defect `--sld-col` exists to stop.
+     * ⚠️ MEASURED AGAINST THE CASE'S INNER EDGES, NOT ITS BORDER BOX, which is
+     * what the old assert already did for the height: the case carries a 1 px
+     * border and comparing against the outer box reports a shortfall on a plate
+     * that is exactly right.
      * ⚠️ AND THE NAME IS READ THROUGH `shown()`, WHICH ASKS THE BROWSER WHAT IT
      * RENDERED. `/circuit/` typed `novation` and rendered `NOVATION` on
      * `text-transform` alone, and a check reading `textContent` graded the
@@ -1369,13 +1418,21 @@
      */
     const caseBox = inst.case.getBoundingClientRect();
     const cs = getComputedStyle(inst.case);
-    const inner = caseBox.height - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
-    const plateBox = inst.plate.el.getBoundingClientRect();
-    d.assert('the nameplate runs the full inner height of the case, and it reads shape in lower case',
-      inst.plate.place === 'side' && inst.shown().join(' ') === 'shape'
-      && Math.abs(plateBox.height - inner) <= 1,
-      `plate ${plateBox.height.toFixed(2)} against ${inner.toFixed(2)} of inner case, reading `
+    const pad = parseFloat(cs.paddingRight);
+    const innerRight = caseBox.right - parseFloat(cs.borderRightWidth);
+    const innerTop = caseBox.top + parseFloat(cs.borderTopWidth);
+    const ink = inst.plate.lines[0].getBoundingClientRect();
+    d.assert('the nameplate is at the right of the case, one inset in, and it reads shape in lower case',
+      inst.plate.place === 'end' && inst.shown().join(' ') === 'shape'
+      && Math.abs((innerRight - ink.right) - pad) <= 1,
+      `ink right ${ink.right.toFixed(1)} against inner right ${innerRight.toFixed(1)}, `
+      + `${(innerRight - ink.right).toFixed(1)} px of a ${pad.toFixed(1)} px inset, reading `
       + `${inst.shown().join(' ')}`);
+
+    d.assert('and it sits at the top of the case, the same inset down',
+      Math.abs((ink.top - innerTop) - pad) <= 1,
+      `ink top ${ink.top.toFixed(1)} against inner top ${innerTop.toFixed(1)}, `
+      + `${(ink.top - innerTop).toFixed(1)} px of a ${pad.toFixed(1)} px inset`);
 
     /**
      * 🔴 AN EMPTY TABLE DRAWS NO HEADING AND SAYS NOTHING, AND IT STILL HOLDS
