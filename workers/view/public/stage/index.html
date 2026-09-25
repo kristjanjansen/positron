@@ -173,10 +173,10 @@
      * the harness, for the reason above, and neither button outranks the other
      * on screen.
      */
-    controls: [
-      { id: 'hls', label: 'Start HLS', primary: true },
-      { id: 'webrtc', label: 'Start WebRTC', primary: true },
-    ],
+    // ⚠️ NO CONTROLS ROW. The two starts are on the control room's transport
+    // bar, because starting a show is a transport verb and a page-level row
+    // also showed them on the Audience tab, where they are nobody's business.
+    controls: [],
     /**
      * 🔴 NO READOUT. Asked 2026-09-17 as *"rm 3 frames"*, and both cells deserved
      * it for the same reason: `panels` read 3 on every visit and `frames` read
@@ -1060,18 +1060,12 @@
      * What IS asserted about the button is the thing only it can say, that it
      * refuses before a show has ended and offers itself after.
      */
-    extras: [
-      { id: 'playrec', label: 'PLAY RECORDING', word: true,
-        aria: 'play the recording this show made',
-        onPress: () => archiveCommand.play() },
-    ],
+    // 🔴 NOT IN THE PAGE. The control room has ONE bar and it is the show's, so
+    // this one must not hold `__demo.transport`: a harness would press a toggle
+    // no visitor can reach. It stays because it owns the archive deck's
+    // command, which PLAY RECORDING drives.
+    publish: false,
   });
-  /** Off until a show has ended and left something behind. */
-  function paintPlayRec() {
-    const b = bar.extra('playrec');
-    if (b) b.disabled = !archiveMedia;
-  }
-  paintPlayRec();
 
   const VIDEO_LANE = {
       /**
@@ -1229,7 +1223,6 @@
    * ⚠️ The order is the order they were already in, bar then strip, so gluing
    * them changes what they look like and not where they are.
    */
-  tabs.panel('controlroom').append(createGlue(bar.el, strip.el));
 
   /**
    * 🔴 THE QUESTION GOES TO THE AUDIENCE AND BACK TO THE CONTROL ROOM. Asked
@@ -1354,6 +1347,22 @@
     // One rate, so the bar draws no rate row: a live show has one speed.
     adapters: { show: { caps: { rates: [1] }, actuate: () => {} } },
   });
+  /**
+   * 🔴 AN ELEMENT, NOT A DESCRIPTOR. `right` takes DOM nodes and does
+   * `right[0].dataset.end = '1'`; `extras` takes `{id,label,onPress}`. Passing
+   * the wrong shape threw `Cannot set properties of undefined (setting 'end')`
+   * and took the page out before `ready`.
+   * ⚠️ AND IT IS DISABLED UNTIL THERE IS A RECORDING, because a control that
+   * plays nothing is the shape this project calls a lie. Nothing is asserted
+   * THROUGH it: the playback checks drive `archiveCommand` and the file's own
+   * element, which is the road that exists whether or not a button does.
+   */
+  const playRecBtn = el('button', 'tbar-x', 'PLAY RECORDING',
+    { type: 'button', 'aria-label': 'play the recording this show made' });
+  playRecBtn.disabled = true;
+  playRecBtn.addEventListener('click', () => archiveCommand.play());
+  const paintPlayRec = () => { playRecBtn.disabled = !archiveMedia; };
+
   const showBar = createTransportBar(room, showDeck, {
     /**
      * 🔴 NO `LIVE` CHIP, ASKED 2026-09-18: *"rm 'live' from transport bar in
@@ -1366,7 +1375,19 @@
      * clock is a duration against a nominal end nobody set, which is the exact
      * claim the chip existed to avoid making.
      */
-    live: false, time: false, scrub: false, loop: false, absolute: false,
+    // 🔴 ONE BAR: the two starts on the LEFT, the timers and PLAY RECORDING on
+    // the RIGHT, and no play glyph at all. Asked for across four messages.
+    live: false, time: true, scrub: false, loop: false, absolute: false,
+    toggle: false,
+    extras: [
+      { id: 'hls', label: 'START HLS', word: true,
+        aria: 'start or stop the show over low latency HLS',
+        onPress: () => toggleTransport('hls') },
+      { id: 'webrtc', label: 'START WEBRTC', word: true,
+        aria: 'start or stop the show over WebRTC',
+        onPress: () => toggleTransport('webrtc') },
+    ],
+    right: [playRecBtn],
     /**
      * 🔴 TWO WORDS, NOT A RED DOT. Asked 2026-09-19: *"replace timeline-glued
      * transport record button with start | stop text labels (same w)"*. The dot
@@ -1391,11 +1412,13 @@
      * different element. Without that fix this bar would have been pressed by
      * the play drill and STARTED A SHOW in the middle of the page's own checks.
      */
-    publish: false,
+    publish: true,
     command: {
       play: () => startShow(),
       pause: () => stopShow(),
-      seek: () => {},        // a live show has nowhere to seek to
+      // A live show has nowhere to seek to and a finished one does. This is the
+      // control room's only transport now, so it answers for both phases.
+      seek: (ms) => { if (archiveMedia) archiveCommand.seek(ms); else showDeck.seek(ms); },
     },
   });
 
@@ -1445,8 +1468,16 @@
   }
 
   /** Tear down whichever leg is carrying, so a switch never leaves two open. */
+  /**
+   * 🔴 THE PUBLISHER HOLD SURVIVES A SWITCH. Closing it here dropped the
+   * container's viewer count to zero, stopped its ffmpeg legs, and the very
+   * next line asked it to wake again: the page then subscribed to an input
+   * whose publisher was still coming back up. **The hold is a reference count
+   * on the container, not a property of a transport**: both legs come from ONE
+   * container, so wanting either is wanting it awake. It is released when the
+   * show stops, which is `toggleTransport`'s business.
+   */
   function dropTransport() {
-    if (hold) { try { hold.close(); } catch { /* already gone */ } hold = null; }
     if (hlsPlayer) { try { hlsPlayer.destroy(); } catch { /* already gone */ } hlsPlayer = null; }
     if (hlsHold) { try { hlsHold.close(); } catch { /* already gone */ } hlsHold = null; }
   }
@@ -1479,8 +1510,39 @@
     d.log('the audience is on WebRTC', 'hi');
   }
 
-  d.on('webrtc', () => whileStarting('hls', startWebrtc));
-  d.on('hls', () => whileStarting('webrtc', startHls));
+  /**
+   * 🔴 ONE BUTTON PER TRANSPORT AND IT IS ITS OWN STOP. The running one ends
+   * the show; the other switches, because one input cannot serve both.
+   */
+  function paintTransport() {
+    for (const [id, name] of [['hls', 'HLS'], ['webrtc', 'WEBRTC']]) {
+      const b = showBar?.extra(id);
+      if (!b) continue;
+      const on = transport === id;
+      b.textContent = on ? `STOP ${name}` : `START ${name}`;
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  let switching = false;
+  async function toggleTransport(which) {
+    if (switching) return;
+    switching = true;
+    for (const id of ['hls', 'webrtc']) { const b = showBar?.extra(id); if (b) b.disabled = true; }
+    try {
+      if (transport === which) {
+        await stopShow(); dropTransport();
+        if (hold) { try { hold.close(); } catch { /* gone */ } hold = null; }
+        transport = null;
+      }
+      else if (which === 'hls') await startHls();
+      else await startWebrtc();
+    } finally {
+      switching = false;
+      for (const id of ['hls', 'webrtc']) { const b = showBar?.extra(id); if (b) b.disabled = false; }
+      paintTransport(); paintPlayRec();
+    }
+  }
 
   /**
    * 🔴 THE CONTROL ROOM HAS A TIMELINE TOO. Asked 2026-09-18: *"rm 'live' from
@@ -1550,6 +1612,8 @@
    * two things.
    */
   room.append(createGlue(showBar.el, roomStrip.el));
+  paintTransport();
+  paintPlayRec();
 
   /**
    * 🔴 THE FILM HAS ITS OWN TRANSPORT, AND IT IS GLUED UNDER THE PICTURE IT
@@ -1832,7 +1896,6 @@
     // The card comes back, which is the same swap `openArchive` does in reverse:
     // there is no recording again, so there is no video element again either.
     archive.panel.stage.textContent = '';
-    archive.panel.stage.append(noTape.el || noTape);
     chunks.length = 0;
     QUESTIONS.length = 0;
     ANSWERS.length = 0;
@@ -2474,6 +2537,22 @@
     if (q.get('selfcheck') !== '1') return;
 
     /**
+     * 🔴 WAKE THE CONTAINER FIRST, SO IT IS WARM BY THE TIME A SHOW IS ASKED
+     * FOR. Probed in a real browser: a cold wake is about **22 seconds**, and
+     * the leg connects a second after it. These asserts are HELD and flushed
+     * only when this function finishes, so a poll wide enough to cover that
+     * wake pushes the flush past the harness's patience and the page reports
+     * **2 asserts instead of 37** while the suite reads a confident 12/12.
+     * ⚠️ **SO THE WAIT IS SPENT ON WORK RATHER THAN ON WAITING.** Holding the
+     * socket here costs nothing and lets every assert that needs no show run
+     * while ffmpeg comes up, which is the same trick `settleMs` plays for the
+     * first control.
+     * ⚠️ AND IT IS INSIDE THE `selfcheck` GATE, so a visitor still opens
+     * nothing until they press something.
+     */
+    if (!hold) hold = holdPublisher(() => {});
+
+    /**
      * ⚠️ IT COUNTS AGAINST `TABS`, NOT AGAINST A TYPED NUMBER. It said `three`
      * in the name and `=== 3` twice in the body, so removing the Archive tab on
      * 2026-09-25 took it red on a page that was doing exactly what it promises.
@@ -2720,12 +2799,11 @@
      * we in the recording this page made". The film's bar would have the
      * harness pressing play on a quarter of a gigabyte of somebody's film.
      */
-    A('the published transport is the archive\u2019s, not the film\u2019s or the show\u2019s',
-      window.__demo?.transport === bar.api
-      && window.__demo?.transport !== filmBar.api && window.__demo?.transport !== showBar.api,
-      window.__demo?.transport === bar.api ? 'the archive bar has the name'
-        : window.__demo?.transport === filmBar.api ? 'the FILM bar has it'
-          : window.__demo?.transport === showBar.api ? 'the SHOW bar has it' : 'nothing has it');
+    A('the published transport is the control room\u2019s one bar',
+      window.__demo?.transport === showBar.api
+      && window.__demo?.transport !== filmBar.api && window.__demo?.transport !== bar.api,
+      window.__demo?.transport === showBar.api ? 'the control room bar has the name'
+        : window.__demo?.transport === filmBar.api ? 'the FILM bar has it' : 'nothing has it');
 
     const p1 = panels[1].panel;
     p1.full(true).then(() => {
@@ -2910,11 +2988,39 @@
      * ⚠️ AND IT WAITS ON THE PAGE'S OWN STATE rather than on a timer, so a
      * press that does nothing fails here rather than three asserts later.
      */
-    const showToggle = showBar.el.querySelector('.tbar-toggle');
-    showToggle?.click();
+    /**
+     * 🔴 IT AWAITS THE FUNCTION RATHER THAN CLICKING, AND GOES TO A KNOWN STATE
+     * FIRST. The bar has no toggle: the two transport buttons ARE the toggle,
+     * they live in `extras` and render as `.tbar-x`, which `demo/verify.mjs`
+     * presses on every page. So by the time this runs a show may already be on,
+     * and a second press of a button that is its own stop would END it.
+     */
+    /**
+     * 🔴 CLICKED, NOT AWAITED, AND THE DIFFERENCE IS THE WHOLE CHECK BLOCK.
+     * These asserts are HELD and flushed only when `checks()` finishes, so
+     * anything awaited here delays every one of them. Awaiting the start pushed
+     * the flush past the harness's patience and the page reported **2 asserts
+     * instead of 37** while the suite read a confident 12/12 green.
+     * ⚠️ AND THE POLL BELOW IS WHAT WAITS INSTEAD, which is what the original
+     * did for exactly this reason.
+     */
+    const showToggle = showBar.extra('webrtc');
+    /**
+     * ⚠️ ONLY IF IT IS NOT ALREADY RUNNING. `demo/verify.mjs` presses
+     * `.pos-controls button, .tbar-x`, and these buttons became `.tbar-x` when
+     * they moved onto the bar, so the drill may have started the show already.
+     * A second press of a button that is its own stop would END it, which is
+     * what took twelve asserts red on the run before this line existed.
+     */
+    if (transport !== 'webrtc') showToggle?.click();
     // ⚠️ LONGER THAN THE FIRST-FRAME WAIT INSIDE `startShow`, DELIBERATELY.
     // Two waits for one event must be ordered, and the inner one is 12 s.
-    for (let i = 0; i < 400 && phase !== 'live'; i++) {
+    // ⚠️ WIDE, BECAUSE A COLD CONTAINER IS THE COMMON CASE HERE. Probed in a
+    // real browser: the wake takes about 22 s and the leg connects a second
+    // after that, so a 20 s poll reported `before` on a show that was seconds
+    // from being fine. `settleMs` buys the FIRST pressed control 25 s and this
+    // is the rest of it.
+    for (let i = 0; i < 900 && phase !== 'live'; i++) {
       await new Promise((r) => setTimeout(r, 50));
     }
     /**
@@ -3158,11 +3264,11 @@
       `muted ${mutedAtStart} showing ${glyphMuted}, then ${mutedAfter} showing ${glyphLoud}, `
       + `and ${bgVideo ? bgVideo.muted : 'no film'} showing ${glyphOf()} again`);
 
-    A('the transport bar in the control room is what starts the show',
-      !!showToggle && phase === 'live' && showDeck.playing(),
+    A('one transport button starts the show, and becomes its stop',
+      !!showToggle && phase === 'live' && /^STOP/.test(showToggle.textContent),
       showToggle
-        ? `one press took the page to "${phase}" and the bar's deck is ${showDeck.playing() ? 'running' : 'stopped'}`
-        : 'the control room bar has no play button at all');
+        ? `the page is "${phase}" and the button reads "${showToggle.textContent}"`
+        : 'the control room bar has no transport button at all');
 
     // 2. A real peer connection was negotiated, whichever leg it is.
     A('a peer connection carried the picture, rather than the page handing itself its own stream',
@@ -3288,13 +3394,13 @@
      * before any of that, and the five asserts below it are all about the
      * archive: they would have read a page that had not finished stopping.
      */
-    showToggle?.click();
+    await toggleTransport('webrtc');
     for (let i = 0; i < 300 && !(phase === 'stopped' && archiveMedia); i++) {
       await new Promise((r) => setTimeout(r, 50));
     }
-    A('the same press stops the show, and the bar goes back to where it started',
-      phase === 'stopped' && !showDeck.playing(),
-      `the page is "${phase}" and the bar's deck is ${showDeck.playing() ? 'still running' : 'stopped'}`);
+    A('the same button stops the show, and says START again',
+      phase === 'stopped' && /^START/.test(showToggle?.textContent || ''),
+      `the page is "${phase}" and the button reads "${showToggle?.textContent}"`);
 
     /**
      * 5. R2, asserted in BOTH modes with one count. Without `?r2=1` the claim
@@ -3547,7 +3653,7 @@
         questions: QUESTIONS.length, answers: ANSWERS.length, options: OPTIONS.length,
         video: !!archive.panel.stage.querySelector('video'),
       };
-      showToggle?.click();
+      await toggleTransport('webrtc');
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const polls = SHOWN_ON.filter((id) => byId.get(id).panel.slots.centre.children.length);
       const after = {
@@ -3816,9 +3922,10 @@
    * ignored, so a diagram asked to live in a tab would have appeared under the
    * page instead, looking exactly like the thing that was just moved.
    */
+  // 🔴 ONE DIAGRAM. There were two, one per panel, and folding the Archive tab
+  // into the control room put both of them in the same panel.
   const dgRoom = createDiagram(tabs.panel('controlroom'), DIAGRAM_SPEC, { how: true });
-  const dgArchive = createDiagram(tabs.panel('controlroom'), DIAGRAM_SPEC, { how: true });
-  const DIAGRAMS = [['controlroom', dgRoom], ['archive', dgArchive]];
+  const DIAGRAMS = [['controlroom', dgRoom]];
   const cutLines = DIAGRAMS.flatMap(([where, dg]) =>
     (dg?.cuts ?? []).map((c) => `${where}/${c.id}: its ${c.where} was cut to "${c.shown}"`));
   if (cutLines.length) d.log(`the diagram shortened ${cutLines.length} to fit: ${cutLines.join(' · ')}`, 'warn');
