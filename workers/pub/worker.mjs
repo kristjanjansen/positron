@@ -245,11 +245,30 @@ export class Pub extends Container {
       if (rec.url) { try { await fetch(rec.url, { method: 'DELETE' }); } catch { /* gone */ } }
       return json({ ok: true }, 200);
     }
-    if (url.pathname === '/whip' && request.method === 'OPTIONS') {
+    /**
+     * 🔴 THE PREFLIGHT HAS TO COVER `/whip/<id>` AND NOT ONLY `/whip`, AND IT
+     * DID NOT, SO THE SESSION TEARDOWN HAS NEVER WORKED FROM A BROWSER ON
+     * ANOTHER ORIGIN. MEASURED 2026-09-25 from `http://127.0.0.1:8890`:
+     *
+     *   Access to fetch at 'https://pub.positron.studio/whip/67b6344…' has been
+     *   blocked by CORS policy: Response to preflight request doesn't pass
+     *   access control check: It does not have HTTP ok status.
+     *
+     * `DELETE` is not a simple method, so a cross-origin one preflights, and
+     * the OPTIONS for the SESSION path fell through to the 404 below. The POST
+     * that opens a session was fine, because its path is exactly `/whip`.
+     * ⚠️ **IT SURVIVED BECAUSE THE PATH WAS NEVER DRIVEN.** `/stage/` defaulted
+     * to an in-page loopback, so the real publish and its teardown only ran
+     * behind a query parameter nobody's harness passed. Removing that default
+     * on 2026-09-25 ran this line for the first time and it failed immediately.
+     * **A route with no caller is a route with no evidence.**
+     */
+    if (url.pathname.startsWith('/whip') && request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: {
         'access-control-allow-origin': '*',
         'access-control-allow-methods': 'POST,DELETE,OPTIONS',
         'access-control-allow-headers': 'content-type',
+        'access-control-max-age': '86400',
       } });
     }
 
