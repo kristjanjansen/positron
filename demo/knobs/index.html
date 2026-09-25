@@ -338,9 +338,10 @@
 
   // ── the rotaries ──────────────────────────────────────────────────────────
   //
-  // They go in the instrument's FIXED COLUMN, on the left, which is the ask
-  // (*"left to rotaries cutoff reseonance"*) and is also what a fixed column is
-  // for: the thing that stays put while the rest of the case scrolls.
+  // They are the FIRST thing in the case and they sit at its left edge, which
+  // is the ask (*"left to rotaries cutoff reseonance"*). They were a fixed
+  // COLUMN beside the keyboard until 2026-09-25: see the block beside
+  // `createInstrument` for why that column left with the nameplate's rail.
   /**
    * 🔴 A HAND ON EACH, AND THE PAGE SAYS SO IN THREE PLACES WHENEVER ONE IS ON.
    * This page HAD something that moved its own sliders and it was taken out on
@@ -593,32 +594,23 @@
   // `createInstrument` over `createPanelLayout`, and `/kit/` grades it, so this
   // is a page joining a component rather than a component being invented.
   //
-  // 🔴 THE ROTARIES ARE THE FIXED COLUMN AND THE KEYBOARD IS THE STRIP, WHICH
-  // IS WHAT THE TWO SLOTS MEAN RATHER THAN WHERE THEY HAPPEN TO SIT. A fixed
-  // column holds what must stay put while the rest of the case scrolls; the
-  // keyboard is fifteen white keys wide and scrolls at every width this page
-  // has been measured at. So the ask, *"left to rotaries cutoff reseonance"*,
-  // and the component's own contract want the same arrangement.
+  // 🔴 ONE SCROLLING REGION AND A PLATE, SINCE 2026-09-25. The rotaries were a
+  // FIXED COLUMN beside the keyboard until *"knobs: rm right panel. use regular
+  // nameplate"*: the only thing that column drew was a `border-right` facing the
+  // rail that instruction removes, and with the rail gone it is a vertical line
+  // between two blocks that the sketch draws stacked. They are the flow's two
+  // children now, the rotaries first, which keeps *"left to rotaries cutoff
+  // reseonance"* true without a column to hold it.
   //
-  // 🔴 THE PLATE RUNS DOWN THE RIGHT EDGE, `place: 'side'` WITH
-  // `plateSide: 'right'`. The ask is *"right is 'knobs' namepate"*, and a case
-  // whose left column is already the rotaries has no horizontal end left to put
-  // a name on: `end` would park it over the keyboard. `side` turns the plate's
-  // own box with `writing-mode` rather than rotating it, so the grid track is
-  // as narrow as the type and as tall as the instrument.
-  // ⚠️ `plateSide` IS A SEPARATE ARGUMENT FROM `side` AND BOTH ARE PASSED.
-  // `panel-layout.mjs` refuses to derive one from the other, because taking the
-  // opposite edge would be the component guessing at a layout question nobody
-  // asked it.
   // ⚠️ `caps: false`, SO THE PLATE READS `knobs` AND NOT `KNOBS`. The ask names
   // it in lower case and so does the slug; `/shape/` took the same option on
   // the same day, and `panel-layout.mjs` carries the argument: the uppercase
   // rule is about a shelf of REPLICAS reading as one shelf, and this page is a
   // replica of nothing.
   // ⚠️ `maker: ''` IS HOW A PAGE SAYS *this carries no brand*, which is what
-  // `/twelve/` means by `MODEL 12` alone. `plateSpec` keeps a single line on
-  // `side` rather than downgrading it to `end`, so one word still runs down the
-  // edge.
+  // `/twelve/` means by `MODEL 12` alone, and `plateSpec` turns one line with no
+  // maker into `end` rather than `ends`, because `ends` is `space-between` and
+  // parks a lone child on the LEFT.
 
   /**
    * 🔴 THE FOOTER'S RIGHT HAND CONTROL, AND IT POINTS THE OPPOSITE WAY TO
@@ -685,6 +677,65 @@
   midiBtn.addEventListener('click', () => openMidi());
 
   /**
+   * 🔴 A BROWSER THAT HAS ALREADY SAID YES IS LISTENING BEFORE ANYBODY PRESSES
+   * ANYTHING. Asked 2026-09-25 as *"always enable midi"*, and the naive reading
+   * of that is a permission dialog in front of every visitor who came to read:
+   * `requestMIDIAccess` is a PROMPT, and CLAUDE.md's standing rule is that a
+   * visit opens nothing and asks nothing.
+   * ✅ `navigator.permissions.query({ name: 'midi' })` ASKS THE BROWSER WHAT IT
+   * HAS ALREADY DECIDED AND RAISES NOTHING. On the desk this page is used at
+   * the answer is `granted` and the press is gone; on a first visit it is
+   * `prompt` and nothing happens, which is the same visit as yesterday's.
+   * ⚠️ IT MATCHES WHAT `createMidi` WILL ASK FOR. That is
+   * `requestMIDIAccess({ sysex: false })`, and a bare `{ name: 'midi' }`
+   * descriptor is the same request, so a `granted` here cannot be a grant for
+   * a different permission than the one about to be used.
+   * ⚠️ AND THE QUERY IS NOT EVERYWHERE. Safari has no Web MIDI at all and
+   * Firefox answers this descriptor with a throw, so it is wrapped and the
+   * answer is `unavailable`, which opens nothing. A probe that could not answer
+   * must never read as a yes.
+   *
+   * 🔴 THE DECISION IS A NAMED FUNCTION AND NOT AN `if`, BECAUSE THE BRANCH
+   * THIS DESK TAKES IS NOT THE BRANCH THAT MATTERS. `demo/verify.mjs`'s Chrome
+   * answers `prompt` (MEASURED 2026-09-25), so a check written only against
+   * what happens here would grade the *nothing happened* side and say nothing
+   * at all about the side the ask is about. `checkAll` reads this function
+   * directly against all five answers, which is the half that cannot go vacuous
+   * on a machine where the condition never holds.
+   */
+  const OPENS_ON_LOAD = (state) => state === 'granted';
+  /** What the browser answered, and whether the page opened MIDI by itself. */
+  let midiPermission = 'not asked', midiOpenedByPermission = false, midiAskedOnVisit = -1;
+  /**
+   * 🔴 AWAITED BY THE CHECKS BEFORE THEY PRESS ANYTHING, because this settles a
+   * tick after the module's last line and `midiAskedOnLoad` is read on that
+   * line. Without the wait, *a visit asked 0 times* would stay green on a
+   * browser where the page HAD opened MIDI on the visit, one tick later: the
+   * assert would be measuring the module body rather than the visit, which is
+   * this project's vacuous pass in its cheapest form.
+   */
+  const midiSettled = (async () => {
+    try {
+      const st = await navigator.permissions?.query({ name: 'midi' });
+      midiPermission = st ? st.state : 'unavailable';
+    } catch {
+      midiPermission = 'unavailable';
+    }
+    if (OPENS_ON_LOAD(midiPermission)) {
+      openMidi();
+      midiOpenedByPermission = true;
+      d.log('this browser has already allowed MIDI here, so it is listening without a press');
+    }
+    /* The whole cost of a visit, read after the decision and before any press.
+       ⚠️ AND IT IS A SECOND NUMBER RATHER THAN A REPLACEMENT FOR
+       `midiAskedOnLoad`: that one says the module body asks nothing, this one
+       says the visit asks nothing more than the browser has already agreed to,
+       and only both together cover a page that opens asynchronously. */
+    midiAskedOnVisit = midiAsked;
+    return midiPermission;
+  })();
+
+  /**
    * 🔴 THE FOOTER IS THE INSTRUMENT HEADER AT THE FOOT, NOT A ROW THIS PAGE
    * LAYS OUT. Asked as *"add footer with rasperry pi online padge. on right add
    * enable midi button"*, and `instrument.mjs` already owns exactly that shape:
@@ -723,17 +774,73 @@
    * anybody. It hangs off the keyboard's own `notes off` now, which is the
    * control a player reaches for when they want everything to stop.
    */
+  /**
+   * 🔴 THE RIGHT RAIL IS GONE AND THE NAME SITS IN THE CASE'S TOP RIGHT CORNER,
+   * 2026-09-25: *"knobs: rm right panel. use regular nameplate. i do not
+   * usrstand what you are doing"*. The rail was a column down the right edge of
+   * the case running its full height with nothing in it but the turned word,
+   * and the seams stopped short of it.
+   * 🔴 THIS REVERSES A READING FROM THE SAME DAY AND THE OLD ONE IS QUOTED HERE
+   * SO THE PAGE DOES NOT READ AS DISAGREEING WITH ITSELF. *"knobs nameplate
+   * vertically"* was taken as *keep the vertical rail*, and it was wrong. The
+   * placement that is asked for is the one every other cased page here already
+   * uses.
+   * ⚠️ AND IT IS `/shape/`'s ANSWER RATHER THAN A SECOND ONE. That page was
+   * given the same instruction an hour earlier (*"rm left panel / section. use
+   * nameplate on top right"*) and is committed at `54a1d02`; copying it is what
+   * keeps two instrument panels one shelf rather than two pages.
+   *
+   * ⚠️ `plateSide` CAME OUT WITH THE PLACEMENT RATHER THAN BEING LEFT SET.
+   * `panel-layout.mjs` only reads it when the plate's placement is `side`, so
+   * `plateSide: 'right'` under `place: 'end'` is an argument nothing reads,
+   * which is a line that looks load bearing and is not.
+   * ⚠️ AND THE FIXED COLUMN CAME OUT TOO, BECAUSE ITS ONLY DIVIDER FACED THE
+   * RAIL THAT IS GONE. `.panel-fixed-l` draws a `border-right` against the
+   * scroller, which is the vertical line the owner's screenshot shows the seams
+   * stopping at. With one flow the rotaries sit above the keys, which is the
+   * order the sketch draws.
+   * ⚠️ `flow: false` IS `/shape/`'s AND NOT THIS PAGE'S. Nine slider sections
+   * are meant to sit side by side and scroll; two blocks that stack want the
+   * flow's flex COLUMN, which is what puts the rotaries over the keyboard
+   * instead of beside it.
+   *
+   * 🔴 NO SEAM HERE YET, AND IT IS A MEASURED REFUSAL RATHER THAN AN OVERSIGHT.
+   * *"on each button group have horizontal panel separator edge to edge"* was
+   * built on this page and taken back out the same day. A case with BANDS has
+   * no vertical rhythm of its own: `.pos-stack` owns the project's 40 px gap
+   * and a band is not one of its children, `.panel-case` computes
+   * `row-gap: normal`, and its padding is `0 var(--panel-pad)`, horizontal
+   * only. MEASURED here at 1280 px with the keyboard lifted into a band under a
+   * seam: **the strip's bottom to the seam 0.0 px, the seam to the keyboard
+   * 0.0 px, and the keyboard to the case's inner bottom 0.0 px**. The keys sat
+   * on the rule and on the case's own border. `/shape/` measured the identical
+   * zero the same hour across nine sections, so it is the component and not
+   * this page.
+   * ⚠️ AND THE REPAIR IS NOT A `padding-block` TYPED HERE. That is the `/tom/`
+   * nameplate mistake verbatim, where one page fixed a shared component in its
+   * own stylesheet and every page after it inherited the defect and not the
+   * fix, and it was re-reported on `/plai/`. `.panel-case` has to own the gap
+   * between its bands and the inset under the last one.
+   * ✅ WHAT DID MEASURE WELL WHILE IT WAS BUILT, so nobody has to find it
+   * again: the seam reached **x297.0 to x983.0**, which is this case's own
+   * inner edges to the pixel, and it crossed the plate's column as well as the
+   * content one.
+   * ⚠️ AND TWO OF THE SKETCH'S THREE RULES WERE NEVER THIS PAGE'S TO DRAW.
+   * `.panel-case` is `border: 1px solid var(--line)`, which is the first, and
+   * `createGlue` puts 1 px of `--line` between the case and the footer, which
+   * is the third: MEASURED, the case bottom is 344.8 and the footer top 345.8.
+   */
   const inst = createInstrument({
     name: 'knobs',
     maker: '',
     caps: false,
-    place: 'side',
-    panel: { side: 'left', plateSide: 'right' },
+    place: 'end',
+    panel: { side: null },
     header: { at: 'foot', plate: false, online: false, patch: midiBtn },
   });
   inst.head.prepend(pres.el);
   pres.el.classList.add('panel-head-on');
-  inst.fixed.append(knobs.el);
+  inst.add(knobs.el);
   d.stack.add(inst.el);
 
   /**
@@ -780,10 +887,22 @@
    * the one note this page sounds by itself was two octaves below the leftmost
    * key and nothing on screen lit for it. At 48 the range is 48 to 72 and a
    * player reaching for the sound the sliders are acting on can find it.
-   * ⚠️ `full: true` MAKES THE BOX SPAN THE STRIP AND NEVER THE KEYS. `--k-max`
-   * still pins a white key at 62 px, so a 25 key layout fills a panel because
-   * fifteen white keys are wider than the panel rather than because anything
-   * was stretched. *"do not stretch it ever"* stands.
+   * 🔴 `full: true` MAKES THE BOX SPAN ITS HOST AND NEVER THE KEYS, AND ON THIS
+   * PAGE IT REACHES NOTHING, WHICH WAS MEASURED ON 2026-09-25 RATHER THAN READ.
+   * `.kbd.kbd-full` is `width: 100%` and the host is `.panel-flow`, which is
+   * `width: max-content`: a box asking for all of a box that is sized by that
+   * same box. MEASURED at 1280 px: **the keyboard 992.0 px, the flow 992.0 px
+   * and the case 686.0 px**, so `full` resolves to the keyboard's own width and
+   * the box hangs 306 px out of a 455.8 px scroller, which the strip then
+   * scrolls.
+   * ⚠️ IT IS RECORDED AND NOT REPAIRED, because the repair is the keyboard
+   * leaving the scroller for a band of its own and the case has no vertical
+   * rhythm between bands yet. MEASURED with it banded: the box became 582.0 px,
+   * which is the case's own content width, and the keys scrolled inside it on
+   * `.keys`' own `overflow-x: auto`, **777 px of keys in 564 px of box**. That
+   * is what the option was asked for. See the refusal beside `createInstrument`.
+   * ⚠️ `--k-max` pins a white key at 62 px either way, so nothing here stretches
+   * a key. *"do not stretch it ever"* stands.
    */
   /* ⚠️ THE HOST IS THE CASE'S FLOW, WHICH IS WHAT `inst.add` WOULD DO ONE LINE
      LATER. `createKeyboard` appends to its host unconditionally, so there is no
@@ -1096,12 +1215,26 @@
      * `handApi.yield()` and then `set(v + one, { from: 'hand' })`, which is the
      * same funnel a drag ends in.
      */
+    /* 🔴 THE ARROW POINTS AWAY FROM WHERE THE DIAL ALREADY IS, AND A FIXED
+       `ArrowUp` HAD THIS CHECK RED FOR AS LONG AS THE CUTOFF OPENED AT 127.
+       MEASURED 2026-09-25 before it was changed: the assert read `CC 71`, one
+       controller of two, because an up arrow on a rotary already AT ITS CEILING
+       clamps to the same number, sends nothing, and looks exactly like a dial
+       wired to nothing. The knob was right and the check was pressing a key
+       that could not move it.
+       ⚠️ AND THE CEILING IS READ OFF THE DIAL RATHER THAN TYPED. `knob.mjs`
+       publishes it as `aria-valuemax`, so a rotary whose range changes cannot
+       leave this check describing the old one, and a 127 typed here would be
+       the shared measurement in two files this project keeps repairing. */
     const g4 = makeCcSend();
     const homes = [cutoff.value(), reso.value()];
     sendTo = g4;
     for (const k of [cutoff, reso]) {
-      k.el.querySelector('.pos-knob-dial').dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+      const dial = k.el.querySelector('.pos-knob-dial');
+      const ceiling = parseFloat(dial.getAttribute('aria-valuemax'));
+      const key = k.value() >= ceiling ? 'ArrowDown' : 'ArrowUp';
+      dial.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
     }
     sendTo = gate;
     const drove = g4.tick(0)?.set ?? [];
@@ -1429,60 +1562,171 @@
       `the footer spans ${footBox.left.toFixed(1)} to ${footBox.right.toFixed(1)}, the badge ends at `
       + `${badgeBox.right.toFixed(1)} and the button starts at ${midiBox.left.toFixed(1)}`);
     /**
-     * 🔴 THE NAMEPLATE IS DOWN THE RIGHT EDGE AND THE ROTARIES ARE THE FIXED
-     * COLUMN, WHICH IS THE WHOLE OF *"left to rotaries cutoff reseonance, right
-     * is 'knobs' namepate"*. Measured against the case's own box rather than
-     * read off the attribute, because `data-plate-side` is what was ASKED for
-     * and a rect is what happened.
-     * ⚠️ AND THE PLATE IS THE NAME AS TYPED. `caps: false` is a departure from
-     * every other plate here and `shown()` is what actually renders, transform
-     * included, so it is the thing to read.
+     * 🔴 THE NAMEPLATE IS IN THE CASE'S TOP RIGHT CORNER, 2026-09-25: *"knobs:
+     * rm right panel. use regular nameplate"*. This assert used to read *the
+     * rotaries are the case's left column and the nameplate runs down its right
+     * edge*, because the plate was a rail down that edge and the rotaries were
+     * a fixed column beside the scroller. Both are gone and so is that
+     * measurement.
+     *
+     * 🔴 AND IT COULD NEVER HAVE PASSED, WHICH IS WORSE THAN IT BEING STALE.
+     * It read `inst.shown() === 'knobs'`, and `shown()` RETURNS AN ARRAY:
+     * `panel-layout.mjs` maps over the plate's lines, so an array was being
+     * compared to a string and the answer is `false` under every circumstance.
+     * ⚠️ AND ITS FAILURE MESSAGE READ PERFECTLY, which is the expensive half. A
+     * template literal stringifies a one element array to `knobs`, so the red
+     * line said *the plate starts at 653.0 and reads “knobs”* while failing: a
+     * red that describes a healthy page is how a real regression gets lost in
+     * the noise. `/shape/` writes the same comparison correctly with
+     * `.join(' ')` and that is what this does now.
+     *
+     * 🔴 **IT IS TWO ASSERTS BECAUSE `top right` IS TWO ALIGNMENTS THAT LOOK
+     * LIKE ONE**, which is `/shape/`'s reading of the same instruction an hour
+     * earlier and is kept identical on purpose. They are set by two different
+     * rules in `shell.css` and can break separately: the right edge comes from
+     * `.panel-plate[data-place="end"]`, which is `justify-content: flex-end`
+     * plus `margin-left: auto`, and the top inset from
+     * `.panel-case > .panel-plate`, which is `padding-block: var(--panel-pad) 0`
+     * and reaches every cased page. `positron-ui` records `/twelve/` having two
+     * of three alignments line up while the third was 30 px out.
+     * 🔴 **THE INK IS MEASURED, NOT THE PLATE.** `.panel-plate` is a flex box
+     * spanning the case's whole content width, so its own rect is right at both
+     * edges whatever the placement does to the name inside it: a check reading
+     * `plate.el` would pass under `ends`, under `mid` and under a placement that
+     * had stopped working. `plate.lines[0]` is the `knobs` line itself.
+     * ⚠️ **AND THE INSET IS READ OFF THE CASE RATHER THAN TYPED.** `.panel-case`
+     * is `padding: 0 var(--panel-pad)`, so its computed `padding-right` IS that
+     * token and the plate's own `padding-block` is the same token again. A `20`
+     * typed here would be a shared measurement in two files, which is the defect
+     * `--sld-col` exists to stop.
+     * ⚠️ MEASURED AGAINST THE CASE'S INNER EDGES, NOT ITS BORDER BOX: the case
+     * carries a 1 px border and comparing against the outer box reports a
+     * shortfall on a plate that is exactly right.
+     * ⚠️ AND THE NAME IS READ THROUGH `shown()`, WHICH ASKS THE BROWSER WHAT IT
+     * RENDERED. `caps: false` is a claim about the PICTURE, and `/circuit/`
+     * typed `novation` and rendered `NOVATION` on `text-transform` alone while a
+     * check reading `textContent` graded the source and stayed green either way.
      */
     const caseBox = inst.case.getBoundingClientRect();
-    const plateBox = inst.plate.el.getBoundingClientRect();
+    const caseCs = getComputedStyle(inst.case);
+    const inset = parseFloat(caseCs.paddingRight);
+    const innerRight = caseBox.right - parseFloat(caseCs.borderRightWidth);
+    const innerTop = caseBox.top + parseFloat(caseCs.borderTopWidth);
+    const ink = inst.plate.lines[0].getBoundingClientRect();
+    d.assert('the nameplate is at the right of the case, one inset in, and it reads knobs in lower case',
+      inst.plate.place === 'end' && inst.shown().join(' ') === 'knobs'
+      && Math.abs((innerRight - ink.right) - inset) <= 1,
+      `ink right ${ink.right.toFixed(1)} against inner right ${innerRight.toFixed(1)}, `
+      + `${(innerRight - ink.right).toFixed(1)} px of a ${inset.toFixed(1)} px inset, reading `
+      + `${inst.shown().join(' ')}`);
+    d.assert('and it sits at the top of the case, the same inset down',
+      Math.abs((ink.top - innerTop) - inset) <= 1,
+      `ink top ${ink.top.toFixed(1)} against inner top ${innerTop.toFixed(1)}, `
+      + `${(ink.top - innerTop).toFixed(1)} px of a ${inset.toFixed(1)} px inset`);
+    /**
+     * 🔴 AND THE ROTARIES ARE STILL THE FIRST THING IN THE CASE AND STILL AT ITS
+     * LEFT, WHICH IS *"left to rotaries cutoff reseonance"* surviving the rail's
+     * removal. They were a fixed COLUMN beside the scroller and they are the
+     * flow's first child now, so the claim that can still be made is about the
+     * order and the edge rather than about a column.
+     * ⚠️ IT READS THE FLOW'S CHILD LIST RATHER THAN A RECT FOR THE ORDER HALF,
+     * because two blocks stacked in a flex column both start at the same x and a
+     * rect cannot tell which is first.
+     */
     const knobBox = knobs.el.getBoundingClientRect();
-    d.assert('the rotaries are the case’s left column and the nameplate runs down its right edge',
-      knobBox.left < caseBox.left + caseBox.width / 2
-      && plateBox.left > caseBox.left + caseBox.width / 2
-      && inst.shown() === 'knobs' && inst.plate.el.dataset.place === 'side',
-      `the case spans ${caseBox.left.toFixed(1)} to ${caseBox.right.toFixed(1)}, the rotaries start at `
-      + `${knobBox.left.toFixed(1)}, the plate starts at ${plateBox.left.toFixed(1)} and reads `
-      + `“${inst.shown()}”`);
+    const flowKids = [...inst.flow.children];
+    d.assert('the rotaries come first in the case and sit at its left edge',
+      flowKids[0] === knobs.el
+      && Math.abs((knobBox.left - (caseBox.left + parseFloat(caseCs.borderLeftWidth))) - inset) <= 1,
+      `the rotaries are child ${flowKids.indexOf(knobs.el) + 1} of ${flowKids.length} and start at `
+      + `${knobBox.left.toFixed(1)}, ${inset.toFixed(1)} px inside a case that spans `
+      + `${caseBox.left.toFixed(1)} to ${caseBox.right.toFixed(1)}`);
     /**
      * 🔴 TWENTY-FIVE KEYS, AND THE COUNT IS READ OFF THE DOM RATHER THAN OFF
      * `keyRange`. Asserting the helper against itself would pass on a keyboard
      * that drew nothing.
-     * ⚠️ AND `full` IS A CLAIM ABOUT THE BOX, NOT ABOUT THE KEYS. `--k-max`
-     * pins a white key at 62 px whatever this says, so what is asserted is that
-     * the WRAPPER spans its host. The key row inside it scrolls, which is what
-     * fifteen white keys do in any panel this page has been measured in.
+     * 🔴 AND IT USED TO SAY `its box spans the case` WHILE COMPARING THE BOX
+     * AGAINST THE FLOW, WHICH IS A QUANTITY THE BOX ITSELF SETS. `.panel-flow`
+     * is `width: max-content`, so it is as wide as the widest thing in it, and
+     * `Math.abs(kbBox.width - flowBox.width) <= 1` was two readings of one
+     * number: it could not fail, and it printed `992.0 px wide inside a flow
+     * 992.0 px wide` against a case measuring 686.0. That is `positron-verify`'s
+     * measure the quantity in question, not one adjacent to it, in its cheapest
+     * form, and it was hiding a dead option: `full` reaches nothing in a
+     * `max-content` host. See the block beside `createKeyboard`.
+     * ✅ SO WHAT IS GRADED NOW IS THE CLAIM THAT CAN STILL FAIL: no key was
+     * stretched. *"do not stretch it ever"*, and `--k-max` is what says how
+     * wide a white key may get, read off the row rather than typed here so a
+     * change to the ceiling cannot leave this assert describing the old one.
      */
     const kbBox = kb.el.getBoundingClientRect();
-    const flowBox = inst.flow.getBoundingClientRect();
-    d.assert('the keyboard is twenty-five keys and its box spans the case',
+    const keysEl = kb.el.querySelector('.keys');
+    const kMax = parseFloat(getComputedStyle(keysEl).getPropertyValue('--k-max')) || 62;
+    const white = [...kb.el.querySelectorAll('.k:not(.sharp)')];
+    const widest = Math.max(...white.map((k) => k.getBoundingClientRect().width));
+    d.assert('the keyboard is twenty-five keys and not one of them was stretched',
       kb.el.querySelectorAll('.k').length === 25
       && kb.el.classList.contains('kbd-full')
-      && Math.abs(kbBox.width - flowBox.width) <= 1,
-      `${kb.el.querySelectorAll('.k').length} keys in a box ${kbBox.width.toFixed(1)} px wide `
-      + `inside a flow ${flowBox.width.toFixed(1)} px wide`);
+      && widest <= kMax + 0.5,
+      `${kb.el.querySelectorAll('.k').length} keys, the widest white one ${widest.toFixed(1)} px `
+      + `against a ${kMax.toFixed(1)} px ceiling, in a box ${kbBox.width.toFixed(1)} px wide `
+      + `over a case ${inst.case.getBoundingClientRect().width.toFixed(1)} px wide`);
     /**
-     * 🔴 MIDI IS OPENED BY A PRESS AND NEVER BY A VISIT, AND THE NEGATIVE HALF
-     * IS THE ONE THAT CAN FAIL. `requestMIDIAccess` raises a permission prompt,
-     * so a page that asked on load would ask every visitor for a device most of
-     * them do not have. `midiAskedOnLoad` is the counter read at the last line
-     * of the module, which is the whole of the visit; a reading taken here
-     * could not tell a visit apart from a press, because by now the check has
-     * pressed.
+     * 🔴 A VISIT ASKS THE BROWSER FOR NOTHING IT HAS NOT ALREADY AGREED TO,
+     * WHICH IS *"always enable midi"* AND CLAUDE.md'S STANDING RULE AT THE SAME
+     * TIME. `requestMIDIAccess` raises a permission prompt, so a page that
+     * called it on load would put a dialog in front of somebody who came to
+     * read. A browser that has already said yes is a different case and the
+     * press on it is furniture.
+     * 🔴 **TWO COUNTERS, BECAUSE ONE OF THEM CANNOT SEE AN ASYNCHRONOUS OPEN.**
+     * `midiAskedOnLoad` is read at the module's LAST LINE and says the load path
+     * itself asks nothing; the permission answer arrives a tick later, so that
+     * number stays 0 on a granted browser where the page really did open MIDI
+     * on the visit. `midiAskedOnVisit` is read after the decision and before any
+     * press, which is the whole of a visit. **An assert on the first alone would
+     * pass vacuously on exactly the machine the ask is about.**
+     * ⚠️ AND THE BRANCH IS NAMED IN THE DETAIL RATHER THAN LEFT TO BE INFERRED.
+     * `demo/verify.mjs`'s Chrome answers `prompt`, so this run grades *nothing
+     * was asked*; the granted side is graded by the assert below it, which needs
+     * no particular machine.
      * ⚠️ AND THE BUTTON IS NOT IN `.pos-controls`. `verify.mjs` presses every
      * button in that row on every run, and this one asks a shared board to
      * listen to whatever is plugged in here. It is in the instrument's footer,
      * which the harness does not press, so the check drives it itself.
      */
-    d.assert('a visit asks the browser for nothing, and the midi button is not in the control row',
-      midiAskedOnLoad === 0 && document.querySelectorAll('.pos-controls button').length === 0
+    const granted = OPENS_ON_LOAD(midiPermission);
+    d.assert('a visit asks the browser for nothing unless it has already said yes',
+      midiAskedOnLoad === 0
+      && (granted ? midiOpenedByPermission && midiAskedOnVisit === 1
+                  : !midiOpenedByPermission && midiAskedOnVisit === 0)
+      && document.querySelectorAll('.pos-controls button').length === 0
       && !document.querySelector('.pos-controls')?.contains(midiBtn),
-      `the visit asked ${midiAskedOnLoad} time(s) and the control row holds `
-      + `${document.querySelectorAll('.pos-controls button').length} button(s)`);
+      `this browser answers “${midiPermission}”, so the branch graded here is `
+      + `“${granted ? 'already granted, so the page opened MIDI with no press'
+                         : 'not granted, so the visit asked nothing'}”: `
+      + `the module asked ${midiAskedOnLoad} time(s), the visit ${midiAskedOnVisit}, and the `
+      + `control row holds ${document.querySelectorAll('.pos-controls button').length} button(s)`);
+    /**
+     * 🔴 THE OTHER BRANCH, GRADED ON A MACHINE THAT IS NOT IN IT, BECAUSE
+     * *"unless it has already said yes"* IS EXACTLY THE SHAPE THAT PASSES WHERE
+     * THE CONDITION NEVER HOLDS. The load path asks one named function whether
+     * to open, so that function can be asked here about every answer a browser
+     * can give, with no permission, no prompt and no device.
+     * ⚠️ IT IS A NEGATIVE CONTROL IN BOTH DIRECTIONS AND THAT IS THE POINT. The
+     * naive reading of *"always enable midi"* is a predicate that returns true
+     * for everything, and it fails the `prompt` line; a page that never opened
+     * fails the `granted` line. Neither can be green here.
+     * ⚠️ AND `unavailable` IS ITS OWN ANSWER RATHER THAN A FALSY ONE. Safari has
+     * no Web MIDI and Firefox throws on this descriptor, and a probe that could
+     * not answer must never read as a yes.
+     */
+    d.assert('and only an already granted browser opens it, which is checked for every answer a browser can give',
+      OPENS_ON_LOAD('granted') === true
+      && OPENS_ON_LOAD('prompt') === false
+      && OPENS_ON_LOAD('denied') === false
+      && OPENS_ON_LOAD('unavailable') === false
+      && OPENS_ON_LOAD(undefined) === false,
+      'granted opens, prompt denied unavailable and no answer at all do not');
     /**
      * 🔴 AND THE PRESS OPENS SOMETHING REAL, WHICH IS THE POSITIVE HALF. A
      * negative control on its own is satisfied by a button wired to nothing,
@@ -1504,7 +1748,8 @@
     openMidi();
     d.assert('the press opens a real MIDI access, and asks for it exactly once',
       midiAsked === 1 && !!midi && typeof midi.state === 'function' && midiBtn.disabled,
-      `${midiAsked} ask(s) after a press and a second call, and the access reads `
+      `${midiAsked} ask(s) after a press and a second call on a browser answering `
+      + `\u201c${midiPermission}\u201d, and the access reads `
       + `\u201c${midi ? midi.state() : 'nothing open'}\u201d with ${midi ? midi.ports() : 0} input(s)`);
     d.assert('this page makes no sound of its own',
       !!board.ctx() && !!board.playout(), 'every sample it can play arrived over the socket');
@@ -1906,13 +2151,22 @@
    */
   async function runChecks() {
     if (!SELFCHECK) return;
+    /* 🔴 THE PERMISSION ANSWER FIRST, AND THE PRESS SECOND, SO THE TWO CANNOT
+       BE CONFUSED FOR EACH OTHER. `midiAskedOnVisit` is the count with no press
+       in it, and a check that pressed while the query was still in flight would
+       read a number that is a race rather than a measurement. */
+    await midiSettled;
     /* 🔴 THE PRESS THAT OPENS MIDI, DRIVEN HERE BECAUSE THE HARNESS CANNOT
        REACH IT. `verify.mjs` presses `.pos-controls button`, and this button is
        deliberately in the instrument's footer instead: a control that asks a
        shared board to listen to whatever is plugged in must not be pressed
        dozens of times a day by a suite. Driving it from inside the gate is what
        `/mirror/` had to do for the same reason when its headset buttons were
-       switched off. */
+       switched off.
+       ⚠️ AND ON A BROWSER THAT HAD ALREADY SAID YES THIS PRESS DOES NOTHING,
+       which is correct and is asserted rather than assumed: the button is
+       already disabled by then, a disabled button fires no click, and
+       `openMidi` is idempotent anyway. */
     midiBtn.click();
     if (MAY_PLAY) { await startNote(); return; }
     await sweepChecks();
