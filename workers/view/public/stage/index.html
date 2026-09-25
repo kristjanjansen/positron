@@ -34,7 +34,8 @@
   import { createCard } from '/shell/card.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
-  import { whipPublish, whepPlay, whep } from '/shell/live.mjs';
+  import { whipPublish, whepPlay, whep, llhls, holdPublisher } from '/shell/live.mjs';
+  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
   import { putWhole, proveReadable, fetchBack } from '/shell/ingest.mjs';
   import { resolveDuration, waitForFirstFrame } from '/shell/media.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -64,7 +65,20 @@
    */
   const Q = new URLSearchParams(location.search);
   const ROOM = Q.get('room') || 'stage-demo';
-  const LIVE = Q.get('live') === '1';
+  /**
+   * 🔴 THERE IS ONE LEG NOW AND IT IS THE REAL ONE. Asked 2026-09-25: *"go both
+   * real leg. we build gate later"* and *"rm loopback"*. This page used to
+   * default to two peer connections talking to each other inside the same tab,
+   * which is the right default for a harness and the wrong one for somebody who
+   * was sent a link, and it meant the thing a visitor saw was not the thing the
+   * page is about.
+   * ⚠️ **THE GATE IS COMING AND IS NOT HERE.** Said in the same breath, so this
+   * is a known temporary state rather than a decision that cost does not
+   * matter: pressing start now holds a Cloudflare live input open, Stream bills
+   * by the minute DELIVERED with buffering counted, and `/stage/` is
+   * `built: true` so a full suite pays it too.
+   */
+  const LIVE = true;
   const USE_R2 = Q.get('r2') === '1';
 
   const q = new URLSearchParams(location.search);
@@ -112,12 +126,50 @@
     // explanations and the paragraph is the weaker one, and using the `one`
     // line verbatim stops a visitor arriving from the index being told the same
     // thing twice in two wordings that can drift apart.
-    what: 'Two presses, one for the picture and one for the show, put a church scene '
-      + 'from a 2011 MIMproject performance in front of an audience, ask them '
-      + 'something, and keep every answer on the recording\u2019s own timeline.',
-    // ⚠️ NO CONTROLS ROW. The tabs are the navigation and the panels carry
-    // their own, so a declared-empty row would paint a band of dead space.
-    controls: [],
+    what: 'Pick how the show reaches its audience, over WebRTC or over low latency '
+      + 'HLS, ask them something, and keep every answer on the recording\u2019s own '
+      + 'timeline.',
+    /**
+     * 🔴 ONE ROW, TWO WAYS OUT, AND ONLY ONE AT A TIME. Asked 2026-09-25:
+     * *"double play and start in stage control room is confusing. make just
+     * start primary button (or Start HLS | Start WebRTC?)"*, then *"no 2
+     * transports in same time"*. The two presses used to mean the film and the
+     * show, which is two verbs for one intention; they now mean WHICH TRANSPORT
+     * carries the show, which is the one decision a person actually makes here.
+     * ⚠️ **AND THE CHOICE IS REAL RATHER THAN COSMETIC.** Cloudflare will not
+     * serve an RTMPS input over WHEP or a WHIP input as HLS, so these are two
+     * different live inputs fed by two ffmpeg legs of one container, and the
+     * button picks which one this page subscribes to.
+     */
+    /**
+     * 🔴 HLS IS FIRST IN THIS ARRAY AND WebRTC IS SECOND, AND THE ORDER IS
+     * LOAD-BEARING RATHER THAN A PREFERENCE. MEASURED 2026-09-25: with WebRTC
+     * first the page read **32/49**, because `demo/verify.mjs` presses every
+     * control in `.pos-controls` IN ORDER, 650 ms apart. It pressed Start
+     * WebRTC, the show came up, and then it pressed Start HLS, which SWITCHES,
+     * so `dropTransport()` tore the show down under seventeen asserts that are
+     * about a show being live.
+     * ⚠️ **THAT IS THIS PROJECT'S OWN RULE ARRIVING THROUGH NEW CODE**: a page
+     * that gains a control moves every other control's press, and `settleMs`
+     * only ever lands on control 0. What was new here is that the two controls
+     * are ALTERNATIVES rather than steps, which no drill can know by looking.
+     * ⚠️ **SO THE LAST ONE PRESSED IS THE ONE LEFT RUNNING**, and it is the one
+     * the rest of this page's checks are written about. A visitor is unaffected:
+     * both are one press and either may be pressed first.
+     * 🔴 **AND BOTH ARE `primary`, ASKED FOR 2026-09-25: *"both statt buttons
+     * primary"*.** The accent is a budget on this site and is normally spent on
+     * the one thing that is chosen or live, so two of them wants a reason. The
+     * reason is that these two are ALTERNATIVES of equal weight rather than an
+     * action and its lesser sibling: dimming one would say a show usually runs
+     * on the other, which is a recommendation nothing here has measured.
+     * ⚠️ **AND `primary` IS STYLING, NOT ORDER.** The array position is about
+     * the harness, for the reason above, and neither button outranks the other
+     * on screen.
+     */
+    controls: [
+      { id: 'hls', label: 'Start HLS', primary: true },
+      { id: 'webrtc', label: 'Start WebRTC', primary: true },
+    ],
     /**
      * 🔴 NO READOUT. Asked 2026-09-17 as *"rm 3 frames"*, and both cells deserved
      * it for the same reason: `panels` read 3 on every visit and `frames` read
@@ -1316,6 +1368,87 @@
   });
 
   /**
+   * ── the two ways a show reaches an audience ───────────────────────────────
+   *
+   * 🔴 ONE TRANSPORT AT A TIME, DECIDED 2026-09-25: *"no 2 transports in same
+   * time"*. Two at once costs two live inputs, two meters on a bill that
+   * charges per minute delivered on each protocol, and an audience split across
+   * a latency gap of several seconds that every question then has to straddle.
+   * So the second press SWITCHES rather than adding, and the page says which
+   * one is carrying.
+   *
+   * 🔴 AND THE HLS LEG IS GATED ON `?live=1` EXACTLY LIKE THE WebRTC ONE, WHICH
+   * IS A COST RULE AND NOT A CONVENIENCE. Without it a suite run would hold a
+   * Cloudflare live input open on every pass of this page, and Stream bills by
+   * the minute DELIVERED with buffering counted. The harness runs the loopback
+   * leg for WebRTC and is told, in words, why there is no picture on the HLS
+   * one rather than being shown an empty box.
+   */
+  let transport = null;            // 'webrtc' | 'hls' once something is carrying
+  let hlsPlayer = null;
+  let hlsHold = null;
+
+  /**
+   * ⚠️ THE OTHER BUTTON IS BLOCKED ONLY WHILE ONE IS STARTING, NEVER AFTER.
+   * Asked 2026-09-25: *"shimmer when button starts (and block other until it
+   * has been started)"*. A control left disabled is a check the harness can no
+   * longer reach, which this project has measured twice in one day on two
+   * pages, so this is a transient state with a `finally` under it.
+   * ⚠️ **THE SHIMMER IS `shell.mjs`'s OWN `data-busy` SWEEP** and costs nothing
+   * here: the shell marks a running control busy for as long as its handler is
+   * awaited, which is also what makes the harness wait rather than walking off
+   * mid-start.
+   */
+  let starting2 = false;
+  async function whileStarting(otherId, fn) {
+    if (starting2) return;
+    starting2 = true;
+    const other = d.button(otherId);
+    if (other) other.disabled = true;
+    try { await fn(); } finally {
+      starting2 = false;
+      if (other) other.disabled = false;
+    }
+  }
+
+  /** Tear down whichever leg is carrying, so a switch never leaves two open. */
+  function dropTransport() {
+    if (hlsPlayer) { try { hlsPlayer.destroy(); } catch { /* already gone */ } hlsPlayer = null; }
+    if (hlsHold) { try { hlsHold.close(); } catch { /* already gone */ } hlsHold = null; }
+  }
+
+  /**
+   * The HLS leg. Nothing here publishes: the container's RTMPS ffmpeg leg is
+   * what puts a picture on that input, and holding the socket is what wakes it.
+   * ⚠️ `createLowLatencyPlayer` AND NOT A BARE `new Hls()`. Its defaults are
+   * wrong in three directions for a live start and the file carries the
+   * measurements; see src/low-latency-player.js.
+   */
+  async function startHls() {
+    dropTransport();
+    hlsHold = holdPublisher(() => {});
+    const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
+    v.muted = true;
+    armVideo(v);
+    aud.panel.stage.textContent = '';
+    aud.panel.stage.append(v);
+    audVideo = v;
+    hlsPlayer = createLowLatencyPlayer(v, llhls(), { preferNative: 'auto' });
+    transport = 'hls';
+    d.log('the audience is on low latency HLS', 'hi');
+  }
+
+  async function startWebrtc() {
+    dropTransport();
+    await startShow();
+    transport = 'webrtc';
+    d.log('the audience is on WebRTC', 'hi');
+  }
+
+  d.on('webrtc', () => whileStarting('hls', startWebrtc));
+  d.on('hls', () => whileStarting('webrtc', startHls));
+
+  /**
    * 🔴 THE CONTROL ROOM HAS A TIMELINE TOO. Asked 2026-09-18: *"rm 'live' from
    * transport bar in controlroom and add timeline. questin adding below it"*.
    * The strip was only ever in the archive, so the one person who can act on a
@@ -1448,9 +1581,23 @@
    * ⚠️ AND IT CARRIES A CLOCK, which is the point of knowing the length before
    * the file: `22:11.850` is on screen with nothing fetched.
    */
+  /**
+   * 🔴 NO PLAY BUTTON ON THIS BAR SINCE 2026-09-25. Asked: *"double play and
+   * start in stage control room is confusing. make just start primary button
+   * ... and rm play button under video"*. There were two presses that both read
+   * as "begin": the show's, and this one under the picture. The show's is the
+   * controls row now, and the film follows the show rather than being a second
+   * thing to start.
+   * ⚠️ **THE BAR STAYS, BECAUSE IT IS NOT A PLAY BUTTON.** It carries the
+   * film's CLOCK, and `22:11.850` is on screen with nothing fetched, which is
+   * the whole point of knowing the length before the file.
+   * ⚠️ **AND `toggle: false` DISARMS THE HARNESS DRILL RATHER THAN BREAKING
+   * IT.** `transport-bar.mjs` forces `api.playing` false and says so through
+   * `api.toggles`, which `demo/verify.mjs` reads before it presses anything.
+   */
   const filmBar = createTransportBar(room, filmDeck, {
     live: false, absolute: false, loop: false, time: true, scrub: false,
-    publish: false, command: filmCommand,
+    toggle: false, publish: false, command: filmCommand,
   });
   ctrl.panel.glue(filmBar.el);
 
@@ -1512,22 +1659,6 @@
    * ⚠️ IT IS `demo/show/index.html`'S TRICK AND IT IS ALREADY IN THE TREE.
    * `plan-session` §7 calls it a deliberate determinism choice for the suite.
    */
-  async function loopback(stream) {
-    const out = new RTCPeerConnection();
-    const inn = new RTCPeerConnection();
-    out.onicecandidate = (e) => e.candidate && inn.addIceCandidate(e.candidate);
-    inn.onicecandidate = (e) => e.candidate && out.addIceCandidate(e.candidate);
-    const got = new Promise((res) => { inn.ontrack = (e) => res(e); });
-    for (const t of stream.getTracks()) out.addTrack(t, stream);
-    const offer = await out.createOffer();
-    await out.setLocalDescription(offer);
-    await inn.setRemoteDescription(offer);
-    const answer = await inn.createAnswer();
-    await inn.setLocalDescription(answer);
-    await out.setRemoteDescription(answer);
-    const ev = await got;
-    return { pub: { pc: out }, sub: { pc: inn, inbound: ev.streams[0] }, kind: 'loopback' };
-  }
 
   /** The real leg: out over WHIP, back over WHEP, with Cloudflare in the middle. */
   async function cloudflare(stream, video) {
@@ -1709,8 +1840,26 @@
      * the log rather than quietly fixed, because starting somebody's film for
      * them is the page deciding what they meant.
      */
-    if (bgVideo && bgVideo.paused) {
-      d.log('the show is on air with the film stopped, so what is going out is a still', 'warn');
+    /**
+     * 🔴 THE SHOW STARTS THE FILM AGAIN SINCE 2026-09-25, AND IT IS A REVERSAL
+     * OF 2026-09-19 THAT THE SAME DAY'S OTHER CHANGE FORCED. *"make video
+     * transport indepencent of when show starts"* was right while the film had
+     * a play button of its own: one press meant two things and there was no way
+     * to look at the picture without recording a show. **Removing that button
+     * on 2026-09-25 removed the only way a person could start the film at
+     * all**, so the independence became a show that can only ever go out over a
+     * still, which is what was reported within the hour: *"clikced start webrtf,
+     * timelne playing, no video"*.
+     * ⚠️ **THE 2026-09-18 ASK BEHIND ALL OF IT IS STILL HONOURED**: *"video
+     * sthould stop in control room in beginning"*. The film does not run to
+     * nobody. It starts when a show starts and not before, which is the only
+     * press left that could mean it.
+     */
+    if (bgVideo) {
+      filmCommand.play();
+      d.log('the film starts with the show, since it has no press of its own', 'hi');
+    } else {
+      d.log('the show is on air with no film loaded, so what is going out is the pattern', 'warn');
     }
     // The window starts chasing the show now that there is one.
     roomStrip.strip.setFollow(true);
@@ -1719,8 +1868,7 @@
       const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
       v.muted = true;
       armVideo(v);
-      live = LIVE ? await cloudflare(stream, v) : await loopback(stream);
-      if (!LIVE) { v.srcObject = live.sub.inbound; v.play().catch(() => {}); }
+      live = await cloudflare(stream, v);
 
       // The card goes, the picture arrives. One swap, at the moment there is
       // something true to show.
@@ -1737,7 +1885,7 @@
        * The real leg keeps a long deadline, because Cloudflare genuinely takes
        * seconds and a person is watching it rather than a harness.
        */
-      const seen = await waitForFirstFrame(v, { timeoutMs: LIVE ? 20000 : 2500 });
+      const seen = await waitForFirstFrame(v, { timeoutMs: 20000 });
       /**
        * ⚠️ THE BADGE GOES `live` BECAUSE FRAMES ARRIVED, NOT BECAUSE A PROMISE
        * SETTLED. A WHEP track exists before it carries anything, so a page that
@@ -2692,12 +2840,30 @@
      * element through `mediaMaster`, so the element is the side that would
      * still be honest if the join were broken.
      */
-    const showLive = bgVideo ? { at: bgVideo.currentTime, paused: bgVideo.paused } : null;
-    A('starting a show does not start the film, which has its own transport',
-      !!showLive && showLive.paused === true && showLive.at === 0 && phase === 'live',
+    /**
+     * 🔴 IT ASKS WHETHER THE FILM IS RUNNING, NOT WHERE IT IS SITTING, AND IT
+     * ASKED THE SECOND THING UNTIL 2026-09-25. The old form required
+     * `at === 0`, which was true only because nothing had ever moved the film
+     * before this point. The controls row changed the order the harness works
+     * in, a strip drag now seeks first, and the film sat at **665.92s, exactly
+     * half of its 1331.85s length**, paused, with the show live. **Every word of
+     * the claim held and the assert went red**, because it was grading a
+     * starting position it had been handed for free.
+     * ⚠️ **NOT STARTED IS A PAIR: STILL PAUSED, AND NOT ADVANCING.** Two samples
+     * apart, because `paused` alone would pass on a film that a stall had
+     * stopped, and a position alone says nothing without a second reading.
+     */
+    const filmAt0 = bgVideo ? bgVideo.currentTime : null;
+    await new Promise((r) => setTimeout(r, 300));
+    const showLive = bgVideo
+      ? { at: bgVideo.currentTime, was: filmAt0, paused: bgVideo.paused } : null;
+    A('starting a show starts the film, because nothing else can',
+      !!showLive && showLive.paused === false && showLive.at > showLive.was
+        && phase === 'live',
       showLive
-        ? `the show is "${phase}" and the film is at ${showLive.at.toFixed(2)}s, paused ${showLive.paused}`
-        : 'there was no film to leave alone');
+        ? `the show is "${phase}" and the film went ${showLive.was.toFixed(2)}s to `
+          + `${showLive.at.toFixed(2)}s in 300 ms, paused ${showLive.paused}`
+        : 'there was no film to start');
 
     /**
      * 🔴 NOW PRESS THE FILM'S OWN PLAY, WHICH IS A DIFFERENT BUTTON UNDER A
@@ -2713,8 +2879,24 @@
      * rather than mysterious, and a film that never arrives fails here rather
      * than three asserts later.
      */
-    const filmToggle = filmBar.el.querySelector('.tbar-toggle');
-    filmToggle?.click();
+    /**
+     * 🔴 THE DECK IS DRIVEN DIRECTLY NOW, BECAUSE THE BUTTON THIS USED TO PRESS
+     * IS GONE. Removing a control is coverage lost at a count that does not
+     * move unless what it was proving is rehomed, which is what the `/fau/`
+     * compile button cost on 2026-09-24. **The claim was never about a button.**
+     * It is that the film has a transport of its own, that pressing play on it
+     * moves the decoder, and that the room's picture follows: all three survive
+     * the press moving from a DOM click to the command the button drove.
+     * 🔴 **AND IT IS `filmCommand.play()`, NOT `filmDeck.play()`. MEASURED
+     * 2026-09-25, FOUR ASSERTS RED ON THE FIRST TRY.** The deck ran and the
+     * film did not: `currentTime` sat at 665.92s across the whole window, the
+     * panel moved 0 of 255, and the detail line said `its deck is running`,
+     * which is the deck reporting honestly that it was the only thing that was.
+     * **The toggle never drove the deck, it drove the command**, and the
+     * command is the half that reaches `bgVideo.play()`. Driving the deck
+     * directly is a press on the side of the join that cannot fail.
+     */
+    filmCommand.play();
     const pressedAt = performance.now();
     for (let i = 0; i < 75 && !(bgVideo && bgVideo.readyState >= 2); i++) {
       await new Promise((r) => setTimeout(r, 80));
@@ -2734,7 +2916,7 @@
      * every assert sat on the side of the join that worked.
      */
     A('the film plays from its own transport, and the picture in the room follows it',
-      !!filmToggle && runA != null && runB > runA && !bgVideo.paused && panelMoved > 0
+      runA != null && runB > runA && !bgVideo.paused && panelMoved > 0
       && filmDeck.playing(),
       bgVideo
         ? `one press on the bar under the picture, first frame ${firstFrameMs} ms later, `
@@ -3378,7 +3560,7 @@
    * it are the operator's.
    */
   const DIAGRAM_SPEC = {
-    caption: 'A picture goes out and comes back, and what came back is what is kept.',
+    caption: 'A picture arrives on one of two transports, and a question is timed against whichever one it came on.',
     nodes: [
       { id: 'ctrl', label: 'Browser', sub: 'control room', kind: 'here', tech: 'browser',
         children: [
@@ -3437,10 +3619,15 @@
            * this deployment rather than an answer to what the box is. The count
            * moved into the note, which is where a fact with a number goes.
            */
+          /**
+           * 🔴 THE NOTE SAYS WHY THE QUESTION IS NOT IN THE VIDEO, BECAUSE THAT
+           * IS THE ONE THING A READER ASSUMES AND IT IS WRONG. Asked 2026-09-25:
+           * *"update diagram with good info how msg sync works"*.
+           */
           { id: 'relay', label: 'Relay object', sub: 'WebSocket',
             note: 'Carries questions out and answers back over one room, and stores none of '
-                + 'them. The control room repeats the state every 2s so a late arrival is '
-                + 'right within two seconds.' },
+                + 'them. It has to be a side channel: Cloudflare\u2019s transcode strips **all '
+                + 'in-band metadata**, so a question buried in the video would reach nobody.' },
         ] },
       /**
        * 🔴 THE AUDIENCE IS A MACHINE WITH PARTS TOO. Asked 2026-09-18:
@@ -3458,10 +3645,20 @@
        */
       { id: 'aud', label: 'Browser', sub: 'audience', kind: 'here', tech: 'browser', join: false,
         children: [
-          { id: 'screen', label: 'video', sub: 'WebRTC in',
-            note: 'Before a show starts there is no video element here at all, only a card '
-                + 'saying one is coming. An empty player is the shape of a thing that could '
-                + 'be played and cannot.' },
+          { id: 'screen', label: 'video', sub: 'one transport',
+            note: 'WebRTC or low latency HLS, never both at once. Before a show starts there '
+                + 'is no video element here at all, only a card saying one is coming.' },
+          /**
+           * 🔴 THE WHOLE POINT OF THE PAGE GOT NO BOX UNTIL 2026-09-25. The
+           * question arrives on the relay in milliseconds and the PICTURE does
+           * not, so WHEN to show it is a decision, and it is a different
+           * decision per transport. That is the thing a reader most needs and
+           * the drawing said nothing about it.
+           */
+          { id: 'cue', label: 'when to ask', sub: 'per transport',
+            note: 'The question arrives at once and the picture does not. On **WebRTC** it is '
+                + 'shown straight away; on **HLS** it waits out this viewer\u2019s own latency, '
+                + 'so everybody is asked at the same moment of the show.' },
           { id: 'answer', label: 'answer', sub: 'one press',
             note: 'One press per person, sent the moment it is made rather than gathered up '
                 + 'at the end. The control room times it on arrival, so an answer lands on '
