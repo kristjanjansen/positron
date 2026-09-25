@@ -489,21 +489,98 @@ can be regression tested.**
 
 ---
 
+## 13. What was built on 2026-09-25, and the one number that did not survive
+
+Items 1 and 2 of section 10 are built. Items 3 and 4 are not.
+
+🔴 **THE TEMPERATURES IN SECTION 4.1 ARE NOT THE TEMPERATURES THAT SHIPPED, AND
+THE REASON IS THE TABLE RATHER THAN THE DIAL.** Section 4.1 swept a temperature
+over EVERY row a context had with a count of three or more.
+`demo/resources/chord-tables.json` keeps the **top three rows only**, which is
+already a sharpening, so the same variety costs a much flatter dial. MEASURED
+2026-09-25 by `demo/resources/chord-e4-generators.mjs`, which builds that exact
+shape out of the training split and walks ten steps through `suggest.mjs`'s own
+sampler:
+
+| | cycles | distinct/10 | attested | surprisal |
+| --- | --- | --- | --- | --- |
+| jazz, the argmax | 99.1% | 3.73 | 99.3% | 3.60 |
+| jazz, **T 1.0**, the plan's number | 81.6% | 5.92 | 99.0% | 3.91 |
+| jazz, **T 3.5**, what ships | **53.1%** | **7.13** | **97.2%** | 4.45 |
+| jazz, uniform over the three | 40.5% | 7.53 | 95.8% | 4.70 |
+| **THE REAL JAZZ SONGS** | **52.7%** | **7.42** | 100% | 4.84 |
+| pop, the argmax | 99.8% | 2.42 | 99.3% | 3.31 |
+| pop, **T 0.8**, the plan's range | 94.9% | 4.03 | 98.6% | 3.42 |
+| pop, **T 1.4**, what ships | **87.3%** | **4.67** | **98.3%** | 3.55 |
+| **THE REAL POP SONGS** | **89.0%** | **4.65** | 100% | 4.22 |
+
+✅ **AND THE THIRD MEASURE MOVES THE SAME WAY, WHICH IS THE ONE THAT SAYS
+*CLICHE* IN A NUMBER.** The global max rate, how often a generator answers with
+the single commonest chord in the corpus whatever was played: jazz **27.4 per
+cent at the argmax, 15.3 at T 3.5, and 13.5 in the real songs**; pop **34.9, 24.4
+and 20.3**. Nothing was tuned against it and both styles land beside the music.
+
+✅ **THE CONCLUSION IS UNCHANGED AND THE ARITHMETIC IS NOT.** Sampling still
+reproduces the statistics of real music on the two axes the complaint is about,
+and attestation is nowhere near the 94 per cent floor. What moved is the number
+in the table, and it moved because the prune is itself a temperature.
+⚠️ **AND THE CEILING IS THE PRUNE.** Uniform over three rows is 7.53 distinct
+chords in ten at a 40.5 per cent cycle rate, so no temperature reaches the real
+songs' 7.42 with their cycle rate as well. Raising `KEEP` from 3 is the only
+thing that would, and it costs bytes rather than accuracy. Nobody has asked.
+
+🔴 **THE ROUTE'S SAMPLING CONVENTION WAS DECIDED BY MEASUREMENT AND THE OBVIOUS
+ONE LOSES.** Weighting a whole path by its own probability, which is the exact
+analogue of sampling one chord, barely touches the cliche: MEASURED on jazz, the
+best path alone puts **72.6 per cent** of its six commonest routes into ii V I,
+per-path sampling **73.6 per cent**, and weighting **per step**, which is the
+geometric mean probability of a step raised to `1/T`, drops it to **18.5 per
+cent**. Coverage is identical at 92.7 per cent and attestation moves from 98.8 to
+98.3. So `routeOver` weights per step.
+⚠️ **AND COVERAGE IS 92.7 PER CENT, NOT THE 99.6 IN SECTION 4.2**, for the same
+reason as the temperature: three rows a context is a narrower graph to find a
+path through. 98.3 per cent attestation is unchanged from the 98.2 measured
+there.
+
+✅ **WHAT A PLAYER SEES.** `/nola/` draws the SECOND slot, not the first, so the
+fix had to reach it. Slot B is chosen from the rows slot A did not take, so a
+drawn A moves it: MEASURED over every trigram context in the shipped jazz table,
+the second slot now answers **1.69 different chords a context and moves at all in
+68.7 per cent of them** (pop 1.76 and 75.8), where before it was one chord,
+always. And the page gained a four chord way home in a block of its own.
+
+⚠️ **THE TARGET IS STILL THE TONIC AND SECTION 12.4 IS STILL OPEN.** It is the
+key's own tonic, major or minor by the mode, named in the block's heading.
+Nothing infers a destination and nobody picks one.
+⚠️ **THE SEED IS FIXED AND THAT IS A DECISION, NOT A DEFAULT.** `/nola/` draws
+from one seeded stream, `?seed=` changes it, and the stream ADVANCES, so the same
+two chords played four times over are four different draws. A draw off the clock
+would have made every check on that page flake.
+
+
 ## The scripts
 
-All six live in this session's scratchpad rather than in the repository, because
-they are measurements rather than a build step, and every one of them reuses
-`demo/resources/chord-corpus.mjs` verbatim so nothing is re-implemented:
+✅ **THEY MOVED INTO `demo/resources/` ON 2026-09-25, WHEN ITEMS 1 AND 2 WERE
+BUILT**, beside `bench-chord-suggester.mjs`, because a measurement nobody can
+re-run is a number that goes stale silently. Every one of them reuses
+`demo/resources/chord-corpus.mjs` verbatim so nothing is re-implemented, and
+every one of them still contacts nobody.
 
 | script | what it measured |
 | --- | --- |
-| `e1-modal.mjs` | probability mass, slot concentration, how much choice slot B has |
-| `e1b-vsmusic.mjs` | the suggester's spread against the music's |
-| `e2-position.mjs` | duration and section position, re-parsed and graded |
-| `e3-cycles.mjs` | where ten accepted suggestions lead |
-| `e4-generators.mjs` | four generators and the arriving path, against the real songs |
-| `e5-vibe.mjs` | composer adaptation and the within take curve, with and without expansion |
+| `demo/resources/chord-exp-lib.mjs` | the shared loading and the split, plus `shipShape`, which is new |
+| `demo/resources/chord-e1-modal.mjs` | probability mass, slot concentration, how much choice slot B has |
+| `demo/resources/chord-e1b-vsmusic.mjs` | the suggester's spread against the music's |
+| `demo/resources/chord-e2-position.mjs` | duration and section position, re-parsed and graded |
+| `demo/resources/chord-e3-cycles.mjs` | where ten accepted suggestions lead |
+| `demo/resources/chord-e4-generators.mjs` | four generators and the arriving path, against the real songs, and since 2026-09-25 the SHIPPED sampler and the SHIPPED route as well |
+| `demo/resources/chord-e5-vibe.mjs` | composer adaptation and the within take curve, with and without expansion |
+| `demo/resources/chord-e5b-noexpand.mjs` | the same curve with section expansion off |
 
-⚠️ **THEY SHOULD MOVE INTO `demo/resources/` IF ANY OF THIS IS BUILT**, beside
-`bench-chord-suggester.mjs`, because a measurement nobody can re-run is a number
-that goes stale silently.
+🔴 **AND `chord-e4-generators.mjs` NOW GRADES THE CODE THAT SHIPS RATHER THAN A
+COPY OF IT.** It imports `sampleRow`, `rowsFor` and `routeOver` from
+`demo/shell/suggest.mjs` and points them at `shipShape`, which is the training
+split pruned and quantised exactly the way `build-chord-tables.mjs` prunes and
+quantises: `ctx>=8`, `row>=3`, **three rows a context**, one character of
+probability. **That shape is not the shape section 4.1 swept**, and section 4.1's
+temperatures do not survive the difference. See the section above.

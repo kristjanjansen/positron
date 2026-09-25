@@ -122,8 +122,9 @@
   import { parseChord, parseChords, voiceChord, VOICINGS } from '/shell/chords.mjs';
   import { nameChord, createSettler, createTally, chordKey, fromKey, notesOf }
     from '/shell/name.mjs';
-  import { suggest, useTables, tablesIn } from '/shell/suggest.mjs';
+  import { suggest, routeTo, useTables, tablesIn, mkRandom } from '/shell/suggest.mjs';
   import { createRoll } from '/shell/roll.mjs';
+  import { createTable } from '/shell/table.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -347,7 +348,8 @@
      ⚠️ AND IT IS WHAT DEFINES THE WORD `roll` ON THE PAGE, which is what lets
      the control above the keys be labelled with it. */
   const ONE = 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
-    + 'of chords you either type in or teach it by playing';
+    + 'of chords you type in or teach it by playing and a four chord way home it '
+    + 'works out from them';
 
   const d = mount({
     name: 'nola',
@@ -926,6 +928,17 @@
     base: 48,
     map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
     minBase: 24, maxBase: 84,
+    /* 🔴 THE INSTRUMENT ROW IS THE COMPONENT'S FOOTER SINCE 2026-09-25, AND
+       THIS PAGE NO LONGER DRAWS ITS OWN. Reported off a crop of that row: *"the
+       border on top of footer goes edge to edge. in the life of me i don ot
+       understand why you do not see it and build a soliutiojn that stays (glued
+       panels) not invent custom css with measurements each time"*. This page
+       had `.nola-foot` with a `--foot-air: 10px`, a `margin-top`, a
+       `padding-top` and a `border-top`, inside a `.kbd` that pads by
+       `--kbd-pad`, so the line stopped 9 px short of the box at both ends.
+       `keyboard.mjs` owns the row, the line and the air now, for all ten pages
+       that import it. */
+    foot: true,
     /* ⚠️ `vel` IS WHAT THE LOOP GIVES BACK AND `100` IS WHAT A CLICK IS WORTH. A
        key on screen has no velocity, so the flat value stands for it; a looped
        note carries the one it was played with. */
@@ -1299,7 +1312,7 @@
      footer"*, so `hard right` below is now one end of it rather than the whole
      of it, and the line is the first thing drawn across the inside of this box.
      The stylesheet carries why it is a line here and spacing everywhere else. */
-  const instFoot = el('div', 'nola-foot');
+  const instFoot = keys.foot;
   /* 🔴 THE PAGE'S OWN NAMEPLATE AT THE OTHER END OF THAT ROW, ASKED 2026-09-25
      AS *"add nola nameplace to the left of footer"*. This page had no plate at
      all until today, measured: zero occurrences of `nameplate` or `pos-plate`.
@@ -1324,7 +1337,6 @@
      the case of this one, so it takes the project's rule. */
   const plate = createNameplate({ lines: ['nola'], place: 'ends' });
   instFoot.append(plate.el, instPick.el);
-  keys.el.append(instFoot);
   /* 🔴 THE CREDIT COMES OFF THE FACE AND DOES NOT LEAVE THE PAGE, because the
      licence is not a preference. Asked 2026-09-23 to remove the sentence, and
      CC BY-NC-SA 4.0 requires attribution to travel with the work: what it does
@@ -1392,7 +1404,49 @@
      where the roll's rows come from, which is what the field is. */
   const topRow = el('div', 'nola-top');
   topRow.append(chordField.el);
-  d.stack.add(topRow, chordList, instrument);
+
+  /**
+   * 🔴 A FOUR CHORD WAY HOME, WHICH IS A DIFFERENT OFFER FROM A CHORD THAT COMES
+   * NEXT. The complaint that bought this page's suggester its rewrite was three
+   * complaints, and the third was *"not moving anywhere"*, taken literally and
+   * MEASURED in `plans/plan-better-chords-2026-09-25.md`: taking the old
+   * suggestion ten times in a row fell into a repeating cycle **99.1 per cent**
+   * of the time, three quarters of them the three rotations of ii V I. Nothing
+   * on this page had a destination, so nothing could arrive at one.
+   * ✅ `suggest.mjs` SEARCHES THE SAME TABLE FOR A RUN OF FOUR THAT LANDS ON THE
+   * TONIC. MEASURED against this table's shape over 4,000 held-out jazz
+   * contexts: a route exists on **92.7 per cent** of them and its transitions
+   * are attested in songs the table has never seen **98.3 per cent** of the
+   * time.
+   *
+   * 🔴 AND IT IS NOT IN THE ROLL, BECAUSE THE ROLL SHOWS ONE PROPOSAL AND THAT
+   * WAS ASKED FOR IN THOSE WORDS: *"add suggestions to piano roll. just one"*.
+   * Four more rows under the one proposal would undo that ask by arriving from a
+   * different direction. A way home is a sequence rather than a choice between
+   * chords, so it gets its own block and its own heading.
+   * ⚠️ `minRows: 4` RESERVES THE ROOM WHETHER OR NOT THERE IS A ROUTE, which is
+   * the same reason the roll reserves eight: a block that grows the moment
+   * somebody plays their second chord moves the keyboard down the page while
+   * they are looking at it.
+   * ⚠️ AND PICKING A ROW PUTS IT ON THE KEYS, the way picking a roll row already
+   * does. `table.mjs` moves focus on an arrow and opens on Enter, so stepping
+   * down four chords costs nothing and lighting one is a decision.
+   */
+  const homeWrap = el('div', 'nola-home');
+  const homeSay = el('div', 'nola-home-h', 'A WAY HOME');
+  const homeTbl = createTable({
+    columns: [
+      { key: 'name', label: 'chord', grow: true, hi: true },
+      /* ⚠️ THE NUMERAL IS THE COLUMN THAT SAYS IT IS GOING SOMEWHERE. Four chord
+         names are four chords; `ii V I` under them is the arrival, and this page
+         already explains its numerals in the log. */
+      { key: 'numeral', label: 'numeral', width: 96, align: 'right' },
+    ],
+    minRows: 4,
+    onPick: (row) => showChord(row),
+  });
+  homeWrap.append(homeSay, homeTbl.el);
+  d.stack.add(topRow, chordList, instrument, homeWrap);
 
   // ── the MIDI keyboard ─────────────────────────────────────────────────────
 
@@ -1811,6 +1865,23 @@
    */
   const LEARN_STYLE = q.get('style') === 'pop' ? 'pop' : 'jazz';
   /**
+   * 🔴 ONE SEEDED STREAM FOR EVERY DRAW THIS PAGE MAKES, AND THE SEED IS FIXED
+   * RATHER THAN TAKEN OFF THE CLOCK. `suggest.mjs` draws its first slot out of
+   * the table since 2026-09-25 instead of taking the most likely row, which is
+   * the whole of the fix for *"they sound unimaginative"*, and a draw off
+   * `Math.random` would make every check on this page flake for a living.
+   * ✅ AND A FIXED SEED IS NOT A PAGE THAT REPEATS ITSELF, because the stream
+   * ADVANCES. Play the same two chords four times over and the four answers are
+   * four different draws; what a fixed seed buys is that the same session played
+   * the same way twice is the same session, which is the only condition under
+   * which any of the plan's numbers can be checked against this page.
+   * ⚠️ `?seed=` IS THE WAY TO A DIFFERENT LINE, and it is a query a person can
+   * use rather than a switch the harness flips. A page that drew one way for
+   * `?selfcheck=1` and another way for a visitor is a page nothing grades.
+   */
+  const DRAW_SEED = Number(q.get('seed')) || 20260925;
+  const draw = mkRandom(DRAW_SEED);
+  /**
    * 🔴 THE TABLE IS FETCHED, SO IT IS FETCHED ON A PRESS AND NEVER ON A VISIT.
    * 12,746 bytes against the 3,824,981 this page already ships in recordings,
    * which is 0.33 per cent, and it is still not loaded until somebody asks the
@@ -1969,9 +2040,9 @@
     lastGuess = null;
     guessPlayed = false;
     lightGuess([]);
-    if (mode !== 'learn' || learned.length < 2) return;
+    if (mode !== 'learn' || learned.length < 2) { drawHome(); return; }
     guessAt = performance.now();
-    const r = suggest({ chords: learned }, { style: LEARN_STYLE });
+    const r = suggest({ chords: learned }, { style: LEARN_STYLE, rnd: draw });
     if (!r.ok) return;
     lastGuess = r;
     /* 🔴 WHERE THE KEY CAME FROM, SAID OUT LOUD, WHICH IS THE DECISION THIS
@@ -2043,6 +2114,54 @@
          read off one picture and find on another is a proposal you travel to. */
       lightGuess(notes);
     }
+    drawHome();
+  }
+
+  /** the way home on screen, so a check can read what was offered */
+  let lastHome = null, homeRedraws = 0, saidHome = '';
+  /**
+   * 🔴 THE ROUTE IS REDRAWN WITH THE PROPOSAL AND NEVER ON ITS OWN, which is how
+   * it inherits the hold that was asked for as *"do not offer new when i hae not
+   * played old suggestion for a while"*. Four chords you are working your way
+   * through must not be replaced under you any more than one chord must, and two
+   * offers on two different clocks would be a page talking over itself.
+   * ⚠️ AND IT IS FILTERED BY NOTHING. The single proposal is never a chord
+   * already in the roll, because a chord you are playing is nothing to try; a
+   * way home is a SEQUENCE, the tonic is very often a chord you have already
+   * played, and a route forbidden from landing on it would be a route that
+   * cannot arrive.
+   */
+  function drawHome() {
+    homeRedraws++;
+    lastHome = null;
+    homeWrap.hidden = mode !== 'learn';
+    if (mode !== 'learn' || learned.length < 2 || !tablesIn()) {
+      homeSay.textContent = 'A WAY HOME';
+      homeTbl.set([]);
+      return;
+    }
+    const r = routeTo({ chords: learned }, { style: LEARN_STYLE, rnd: draw });
+    lastHome = r;
+    homeSay.textContent = r.targetName ? `A WAY HOME TO ${r.targetName}` : 'A WAY HOME';
+    if (!r.ok) {
+      /* 🔴 SAID IN WORDS RATHER THAN LEFT AS AN EMPTY BOX. MEASURED: this table
+         gets from a held-out context to the tonic in four chords 92.7 per cent
+         of the time, so one context in thirteen has no way home in it, and four
+         blank rows under a heading is a page that looks broken rather than one
+         reporting a fact about what it has counted. */
+      homeTbl.set([]);
+      if (r.says !== saidHome) { saidHome = r.says; d.log(r.says); }
+      return;
+    }
+    let near = learned.length ? learned[learned.length - 1].notes : [];
+    const rows = [];
+    for (const c of r.steps) {
+      const pc = parseChord(c.name);
+      const notes = pc.ok ? voiceRow(pc.notes, near, { wide: true }).notes : [];
+      if (notes.length) near = notes;
+      rows.push({ name: c.name, numeral: c.numeral || '', notes });
+    }
+    homeTbl.set(rows);
   }
 
   function addLearned(key) {
@@ -2381,6 +2500,11 @@
     } else {
       drawChords(chordField.value());
     }
+    /* ⚠️ CALLED HERE AS WELL AS FROM `drawGuesses`, BECAUSE THAT ONE IS ALLOWED
+       TO DO NOTHING. A proposal nobody has played yet is left alone, so the
+       redraw returns early and the way home would keep whatever it was showing
+       for the other mode. A mode change is the one moment both have to move. */
+    drawHome();
     if (!say) return;
     if (mode === 'learn') {
       /* 🔴 THE ONE ARBITRARY CHOICE, SAID OUT LOUD ONCE. `C6` and `Am7` are the
@@ -2446,6 +2570,13 @@
       : 'the roll is the line of chords typed in the field beside this'),
   });
   topRow.prepend(modePick.el);
+  /* 🔴 ONCE AT LOAD, BECAUSE `setMode` ONLY EVER RUNS ON A PRESS. A page opened
+     at `?learn=0` never calls it, so without this line the way home would sit
+     there in the typed mode as a heading over four empty rows on a page where
+     nothing was ever going to fill them, which is `an empty box is a line` in
+     its larger form. It also puts the block in the right state for the mode this
+     page really opened in rather than the one it is usually opened in. */
+  drawHome();
 
   // ── what only this page can say ───────────────────────────────────────────
   //
@@ -2679,13 +2810,19 @@
       const padBox = keys.el.querySelector('.kpad').getBoundingClientRect();
       const underPad = Math.round((footBox.top - padBox.bottom) * 10) / 10;
       const offRight = Math.round((footBox.right - pickBox.right) * 10) / 10;
+      /* ⚠️ THE CONTROL IS NOW `--kbd-pad` IN FROM THE ROW'S EDGE RATHER THAN ON
+         IT, AND THAT IS THE CHANGE OF 2026-09-25 RATHER THAN A LOOSENED CHECK.
+         The row bleeds out to the box's border, so its own edge IS the border
+         and `hard right` became the box's inset, which is the inset the keys
+         above already keep. Read off the box rather than typed. */
+      const kbdPad = parseFloat(getComputedStyle(keys.el).getPropertyValue('--kbd-pad'));
       d.assert('the instrument switch is a footer inside the keyboard\u2019s own box, hard right',
         instFoot.parentElement === keys.el
-        && underPad >= 8 && underPad <= 12 && Math.abs(offRight) < 1
+        && underPad >= 8 && underPad <= 12 && Math.abs(offRight - kbdPad) < 1
         && pickBox.width < footBox.width,
         `${underPad} px under the keyboard\u2019s own footer, ${offRight} px in from the `
-        + `right edge, and ${Math.round(pickBox.width)} px of control in a `
-        + `${Math.round(footBox.width)} px row`);
+        + `right edge against a ${kbdPad} px box inset, and ${Math.round(pickBox.width)} px `
+        + `of control in a ${Math.round(footBox.width)} px row`);
 
       /* 🔴 AND THE NAMEPLATE IS AT THE OTHER END OF THAT ROW, ASKED IN THE SAME
          BREATH AS *"add nola nameplace to the left of footer"*. Its LEFT edge is
@@ -2700,14 +2837,28 @@
          `novation` with a check that graded the source and stayed green either
          way. This plate is upper case by the project's own rule, and this is the
          half that says the rule really reached it. */
+      /* 🔴 AND ITS LEFT INSET IS THE ROW'S TOP AND BOTTOM INSET, ASKED
+         2026-09-25 AS *"add space on left of nona to be same as top and bottob
+         paddings"*. It sat at 0.0 px from the row's left edge while the row had
+         air above and below it, because the row now bleeds to the box's border
+         and something has to put the content back. All three read `--kbd-pad`,
+         and the check reads all three rather than one: a repair that fixed the
+         left and lost the air would pass a check that only looked left. */
       const plateBox = plate.el.getBoundingClientRect();
+      const footCs = getComputedStyle(instFoot);
       const offLeft = Math.round((plateBox.left - footBox.left) * 10) / 10;
+      const inset = [footCs.paddingLeft, footCs.paddingTop, footCs.marginTop]
+        .map((v) => parseFloat(v));
       const between = Math.round(pickBox.left - plateBox.right);
-      d.assert('the page’s own nameplate is at the left end of that footer, not beside the control',
-        plate.el.parentElement === instFoot && Math.abs(offLeft) < 1 && between > 0
-        && plate.shown().join(' ') === 'NOLA',
+      d.assert('the page’s own nameplate is at the left end of that footer, inset the way the row is',
+        plate.el.parentElement === instFoot && between > 0
+        && plate.shown().join(' ') === 'NOLA'
+        && Math.abs(offLeft - kbdPad) < 1
+        && inset.every((v) => Math.abs(v - kbdPad) < 0.01),
         `it reads ${plate.shown().join(' ')}, ${offLeft} px in from the row’s left edge, `
-        + `with ${between} px of row between it and the control`);
+        + `with left ${inset[0]}, top ${inset[1]} and the air above the line ${inset[2]} `
+        + `all reading the box’s own ${kbdPad} px, and ${between} px of row `
+        + `between it and the control`);
 
       /* 🔴 AND THE TWO ROWS ARE SEPARATED BY A LINE RATHER THAN BY A GAP, WHICH
          REVERSES THIS PROJECT'S STANDING RULE FOR THIS ONE ROW AND WAS ASKED FOR
@@ -2717,29 +2868,37 @@
          🔴 THE INK IS READ OFF THE BOX RATHER THAN TYPED TWICE. The claim is not
          *there is a 1 px line*, it is *the line across the inside of this box is
          drawn in the box's own edge colour*, and only a comparison can say that.
-         A number typed in two files is the defect `--sld-col` and `--ctl-gap`
-         both exist to close, one element along.
-         ⚠️ AND IT RUNS THE WIDTH OF THE KEYS, NOT OF THE BOX. `.kbd` publishes
-         `--kbd-pad` so a child CAN bleed to the box's edges, and this one
-         deliberately does not: the pad row above starts at the box's own content
-         edge on a rule that was reported twice, so a line bleeding through the
-         padding would be the only thing in here touching the border. Both ends
-         are measured, because one end lining up is half an alignment. */
+
+         🔴 **AND IT RUNS EDGE TO EDGE SINCE 2026-09-25, WHICH IS THIS ASSERT
+         TURNED ROUND.** It read *"IT RUNS THE WIDTH OF THE KEYS, NOT OF THE
+         BOX"* and required `inL > 0`, on an argument written in this file that
+         a line touching the border would be the only thing in the box doing it.
+         The report was *"the border on top of footer goes edge to edge. in the
+         life of me i don ot understand why you do not see it"*, so the argument
+         was wrong and the assert was grading it. **MEASURED before: 9.0 px in
+         at both ends.**
+         ⚠️ **BOTH ENDS, BECAUSE ONE END LINING UP IS HALF AN ALIGNMENT**, and
+         against the box's own border rather than against a 0 typed here.
+         ⚠️ AND THE ROW IS NO LONGER FLUSH WITH THE PAD ABOVE IT, which is the
+         other half of the same change: the pad starts at the box's content edge
+         and this now starts at the border, so they are `--kbd-pad` apart by
+         construction. That is asserted rather than dropped. */
       const footCss = getComputedStyle(instFoot);
       const boxCss = getComputedStyle(keys.el);
       const boxBox = keys.el.getBoundingClientRect();
-      const inL = Math.round((footBox.left - boxBox.left) * 10) / 10;
-      const inR = Math.round((boxBox.right - footBox.right) * 10) / 10;
-      d.assert('one line across the inside of the keyboard’s box, in the box’s own ink',
+      const bL = Math.round((footBox.left - boxBox.left) * 10) / 10;
+      const bR = Math.round((boxBox.right - footBox.right) * 10) / 10;
+      const edge = parseFloat(boxCss.borderLeftWidth);
+      d.assert('one line right across the inside of the keyboard’s box, in the box’s own ink',
         footCss.borderTopStyle === 'solid'
         && Math.round(parseFloat(footCss.borderTopWidth)) === 1
         && footCss.borderTopColor === boxCss.borderTopColor
-        && Math.abs(footBox.left - padBox.left) < 1
-        && Math.abs(footBox.right - padBox.right) < 1
-        && Math.abs(inL - inR) < 1 && inL > 0,
+        && Math.abs(bL - edge) < 0.6 && Math.abs(bR - edge) < 0.6
+        && Math.abs((padBox.left - footBox.left) - kbdPad) < 0.6,
         `${footCss.borderTopWidth} of ${footCss.borderTopColor} against the box’s own `
-        + `${boxCss.borderTopWidth} ${boxCss.borderTopColor}, sitting ${inL} px in from the box `
-        + `on the left and ${inR} px on the right, flush with the row above it`);
+        + `${boxCss.borderTopWidth} ${boxCss.borderTopColor}, reaching the box’s `
+        + `${edge} px border with ${bL} px on the left and ${bR} px on the right, `
+        + `and the pad row above it starting ${Math.round((padBox.left - footBox.left) * 10) / 10} px further in`);
 
       /* 🔴 THE FIRST ROW IS AS FAR FROM THE TOP AS THE ROWS ARE FROM EACH OTHER.
          Asked with a crop: *"add more space on first row on top of dots / label
@@ -3860,6 +4019,13 @@
         `the first chord is in and the second is on its first arrival of ${LEARN_TIMES}, `
         + `so the roll still has ${rows()} row`);
 
+      /* 🔴 THE WAY HOME'S HEIGHT, TAKEN HERE BECAUSE THIS IS THE ONLY MOMENT IT
+         IS VISIBLE AND EMPTY. One chord is in, the block is on screen with
+         nothing in it, and the reading is compared against the same block with
+         four chords in it further down. Reserved room is a claim that can only
+         be made by measuring both states of the real page. */
+      const homeH0 = homeWrap.getBoundingClientRect().height;
+
       for (let i = 1; i < LEARN_TIMES; i++) {
         drop([65, 69, 72]);
         await sleep(60);
@@ -4064,6 +4230,71 @@
       d.assert('and the page says which key it read them in, because a key is a guess',
         window.__demo.logs.some((l) => l.msg.includes('as the key')),
         window.__demo.logs.filter((l) => l.msg.includes('as the key')).pop()?.msg || 'nothing said');
+
+      /* ── a four chord way home ──────────────────────────────────────────── */
+      //
+      // 🔴 THE THIRD WORD OF THE COMPLAINT WAS *"not moving anywhere"*, AND IT
+      // WAS TRUE OF THIS PAGE IN A WAY NOTHING HERE COULD SEE. MEASURED in
+      // `plans/plan-better-chords-2026-09-25.md`: taking the old suggestion ten
+      // times in a row fell into a repeating cycle 99.1 per cent of the time
+      // with 3.74 distinct chords in ten, against the real songs' 52.7 per cent
+      // and 7.42. The page offered a next chord and had no destination at all.
+      const homeRows = () =>
+        [...homeTbl.scroller().querySelectorAll('.pos-tbl-row')];
+      d.assert('the page offers a four chord way home, and its last chord is the key it read',
+        lastHome?.ok === true && lastHome.steps.length === 4
+        && lastHome.steps[3].root === lastHome.tonic
+        && homeRows().length === 4
+        && homeSay.textContent.includes(lastHome.targetName),
+        `${homeSay.textContent} reading `
+        + `${lastHome?.steps.map((c) => `${c.name} ${c.numeral}`).join(', ')}`);
+
+      /* 🔴 AND THE ROOM IS RESERVED, WHICH IS THE SAME RULE THE ROLL'S EIGHT
+         ROWS ALREADY OBEY. A block that grows the moment somebody plays their
+         second chord moves the keyboard down the page while they are looking at
+         it, and the keyboard is the thing their hands are on. */
+      const homeH1 = homeWrap.getBoundingClientRect().height;
+      d.assert('the way home reserved its room, so nothing moved when one arrived',
+        homeH0 > 0 && Math.abs(homeH1 - homeH0) < 1,
+        `${homeH0.toFixed(1)} px with nothing in it and ${homeH1.toFixed(1)} px with four `
+        + 'chords in it');
+
+      /* 🔴 THE ROUTE IS DRAWN RATHER THAN THE BEST ONE TAKEN, WHICH IS THE
+         ARGMAX LESSON ARRIVING ONE LEVEL UP. MEASURED on this table's shape over
+         4,000 held-out contexts: the best path alone puts 72.6 per cent of its
+         six commonest routes into ii V I, and drawing the path drops that to
+         18.5 while attestation stays at 98.3 per cent. A best path is as cliched
+         as a best chord. */
+      const wasHome = homeRedraws;
+      const ways = new Set();
+      for (let i = 0; i < 12; i++) {
+        drawHome();
+        if (lastHome?.ok) ways.add(lastHome.steps.map((c) => c.name).join(' '));
+      }
+      d.assert('asking for a way home again can answer differently, because the path is drawn',
+        ways.size > 1 && homeRedraws === wasHome + 12,
+        `${ways.size} different ways home in 12 draws: ${[...ways].join(' / ')}`);
+
+      /* 🔴 AND THE CHORD IN THE ROLL IS DRAWN TOO, WHICH IS THE HALF A PLAYER
+         ACTUALLY SEES. `suggest.mjs` samples its first slot instead of taking
+         the likeliest row, and this page shows the SECOND slot, which is chosen
+         from the rows the first one did not take. MEASURED over every trigram
+         context in the shipped jazz table: the second slot now answers 1.69
+         different chords a context and moves at all in 68.7 per cent of them,
+         where before it was one chord, always.
+         ⚠️ ASKED THROUGH THE SAME CALL THE PAGE MAKES AND NOT BY REDRAWING THE
+         ROLL, because forcing twelve proposals would replace the row the checks
+         below are about. The seed is this page's own. */
+      const offers = new Set();
+      const again = mkRandom(DRAW_SEED);
+      for (let i = 0; i < 12; i++) {
+        const r = suggest({ chords: learned }, { style: LEARN_STYLE, rnd: again });
+        if (r.ok && r.picks.length) offers.add((r.picks[1] || r.picks[0]).name);
+      }
+      d.assert('and the chord it proposes is drawn from the table rather than always the commonest',
+        offers.size > 1,
+        `after ${learned.map((l) => l.name).join(' then ')} the page can offer `
+        + `${[...offers].join(' or ')}`);
 
       /* ── the chord nothing can name, which is the interesting one ──────── */
       //
@@ -4347,59 +4578,29 @@
 </script>
 
 <style>
-  /* 🔴 THE INSTRUMENT FOOTER, IN THE KEYBOARD'S OWN BOX: THE PAGE'S NAMEPLATE
-     AT ONE END AND THE SOUND SELECTOR AT THE OTHER. Asked 2026-09-25, first as
-     *"add piano / rhodes into a isntrument footer to the right glued under
-     keyboaed"* and then as *"add top border to that footer. add nola nameplace
-     to the left of footer"*. `.kbd` paints the ground, the border and the
-     padding, so there is nothing here about a seam, a width or a corner: this
-     row only has to say where in that box it sits and what separates it.
-
-     🔴 `justify-content: space-between`, AND THE BLANKET `margin-left: auto` IS
-     GONE RATHER THAN NARROWED. It read `.nola-foot > * { margin-left: auto }`
-     while this row held ONE child, with an argument that a second control added
-     later would sit beside the first rather than be pushed away by a rule about
-     the row. That argument was about a row with one end. This row has two, and
-     an auto margin on EVERY child parks every one of them on the right,
-     including a plate asked for on the left. An auto margin also absorbs free
-     space BEFORE `justify-content` runs, so the two cannot be mixed.
-     ⚠️ AND THE PLATE HAS TO BE `data-place="ends"` FOR THE SAME REASON. `end`
-     carries its own `margin-left: auto` in `shell.css`, which would reintroduce
-     exactly this from inside the component. The page asserts the plate's left
-     edge against the row's, which is the only thing the two arrangements
-     disagree about.
-
-     🔴 A LINE ABOVE IT, WHICH REVERSES THIS PROJECT'S STANDING RULE FOR THIS ONE
-     ROW AND WAS ASKED FOR IN THOSE WORDS. *Separation is spacing, not lines* is
-     right between two blocks on a page; inside one box, at this pitch, a wider
-     gap under the keyboard's own footer reads as the gap between the controls
-     INSIDE that footer, because at this pitch it is one. `/muta/` records the
-     same reversal for the same reason, two grids that needed a rule between
-     them rather than more air.
-     ⚠️ IT IS `--line`, WHICH IS THE INK `.kbd`'s OWN BORDER IS DRAWN IN, so the
-     line across the inside of the box and the box's own edge are one colour by
-     construction rather than by two numbers agreeing.
-     ⚠️ AND IT RUNS THE WIDTH OF THE KEYS, NOT OF THE BOX. `.kbd` publishes
-     `--kbd-pad` precisely so a child can bleed to the box's edges, and this one
-     deliberately does not: the pad row above starts at the box's own content
-     edge on a rule reported twice, so a line that bled through the padding would
-     be the only thing in here touching the border.
-
-     ⚠️ ONE NUMBER FOR BOTH HALVES OF THE AIR AROUND THAT LINE, declared once so
-     the two cannot disagree. `--sld-col` and `--ctl-gap` are both repairs for
-     the same defect, a shared measurement typed in two places. It is the 10 px
-     `.kbd .keys` already puts under the keys: two rows of machinery under one
-     instrument should not be two distances apart.
-     ⚠️ AND `center` RATHER THAN `flex-end`, WHICH WAS RIGHT FOR A ROW HOLDING
-     ONE CONTROL AND IS NOT RIGHT FOR THIS ONE. The plate's line is 11 px tall
-     and the selector is 34; bottom aligning them puts the name below the
-     control's optical centre and hard against the bottom edge of the box. */
-  .nola-foot {
-    --foot-air: 10px;
-    display: flex; align-items: center; justify-content: space-between;
-    margin-top: var(--foot-air); padding-top: var(--foot-air);
-    border-top: 1px solid var(--line);
-  }
+  /* 🔴 THE INSTRUMENT FOOTER HAS NO RULE IN THIS FILE ANY MORE, AND THAT IS THE
+     WHOLE REPAIR. Reported 2026-09-25 off a crop of it: *"the border on top of
+     footer goes edge to edge. in the life of me i don ot understand why you do
+     not see it and build a soliutiojn that stays (glued panels) not invent
+     custom css with measurements each time"*.
+     🔴 **WHAT STOOD HERE WAS `.nola-foot`, WITH A `--foot-air: 10px` OF ITS OWN,
+     A `margin-top`, A `padding-top` AND A `border-top`**, on a row appended
+     inside `.kbd`, which pads by `--kbd-pad`. **MEASURED: the line stopped
+     9.0 px short of the box's border at both ends.**
+     🔴 **AND THE PARAGRAPH THAT STOOD HERE ARGUED FOR IT.** It said the line
+     *"RUNS THE WIDTH OF THE KEYS, NOT OF THE BOX"* and that bleeding *"would be
+     the only thing in here touching the border"*, and the page asserted that
+     inset at both ends. Every word of it was reasoning where a component was
+     wanted, which is what was objected to: the line, the air and the row's own
+     insets belong to `keyboard.mjs` and reach all ten pages that import it.
+     ✅ `createKeyboard({ foot: true })`, and `api.foot` is the row. `.kbd-foot`
+     in `shell.css` carries the bleed, derived from `--kbd-pad` rather than
+     typed, and the symmetric inset asked for in the same breath: *"add space on
+     left of nona to be same as top and bottob paddings"*.
+     ⚠️ **WHAT THIS PAGE STILL DECIDES IS WHAT GOES IN THE ROW**, which is the
+     plate at one end and the sound selector at the other, and the plate's
+     `place: 'ends'` is still this page's call for the reason beside it: `end`
+     carries a `margin-left: auto` that would park both children on the right. */
 
   /* 🔴 THE MODE AND THE FIELD IT TURNS OFF ARE ONE ROW. `Played` takes the
      CHORDS field out of the document, and a control that removes something a
@@ -4410,6 +4611,19 @@
      refuses for a reading under a picture. */
   .nola-top { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
   .nola-top .pos-field { flex: 1 1 220px; min-width: 0; }
+
+  /* 🔴 THE HEADING IS IN THE TABLE HEADING'S OWN REGISTER, NOT THE ACCENT'S.
+     `shell.css` sets `.pos-tbl-head` at 10px uppercase on `--dim2` with .06em of
+     tracking, and this line sits directly above one, so anything else would read
+     as a second kind of label an inch from the first. The accent is a budget and
+     is spent on what is chosen or live; a destination is neither.
+     ⚠️ `nowrap` BECAUSE IT NAMES A CHORD THAT CHANGES. `A WAY HOME TO Cmaj7` and
+     `A WAY HOME TO D#min7` are different widths, and a heading that can fold
+     onto a second line is a block that changes its own height while somebody is
+     looking at it, which is the one thing this page reserves room to prevent. */
+  .nola-home-h { font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+                 color: var(--dim); margin-bottom: 8px;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* 🔴 NOTHING IS PINNED TO THIS BOX ANY MORE, SO IT IS NOT A CONTAINING
      BLOCK ANY MORE. It carried `position: relative` for one absolute child, the
