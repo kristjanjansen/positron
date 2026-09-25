@@ -122,7 +122,15 @@ import { createToggle } from './toggle.mjs';
    button. `numloop.mjs` owns WHICH slot is doing what; the keyboard owns what
    recording and looping MEAN, which is the same division the page keeps with the
    keyboard. */
-import { createNumLoop } from './numloop.mjs';
+/* ⚠️ `RATIOS` AND `TEMPO_BAND` COME ACROSS WITH IT, AND THEY ARE THE RESERVES
+   RATHER THAN THE ARITHMETIC. The two footer cells added 2026-09-25 must not
+   change width while a player is looking at them, so each one reserves the
+   widest thing it can ever say. Reading those widths off the module that
+   decides them means adding a ratio or moving the band cannot leave a cell
+   quietly too narrow, which is the `--sld-col` defect this project has already
+   paid for twice: a shared measurement typed in two files is a measurement that
+   will disagree. */
+import { createNumLoop, RATIOS, TEMPO_BAND } from './numloop.mjs';
 /* 🔴 THE NAMER ALREADY EXISTS AND IT IS NOT `chords.mjs`. Asked 2026-09-25:
    *"add chord name to the footer, right from the transpose message"*. The
    obvious first move is `chords.mjs`, because that file is about chords and is
@@ -947,6 +955,58 @@ export function createKeyboard(host, {
     chordEl.style.minWidth = `${CHORD_CH}ch`;
     pad.append(chordEl);
   }
+  /**
+   * 🔴 TWO MORE CELLS, AND ONLY ON A KEYBOARD THAT LOOPS. Asked 2026-09-25:
+   * *"in keyboadd looper: do basic bmp detection / quant and when first loop
+   * set, all next ones align on it, either times shorter, same or longer"*. The
+   * arithmetic is `numloop.mjs`'s and it deliberately chose no cells, because a
+   * readout is the surface's and this is the surface.
+   *
+   * 🔴 GATED ON `wantLoop`, WHICH IS WHAT KEEPS THIS OFF THE PAGES THAT DO NOT
+   * LOOP. MEASURED 2026-09-26: seven pages mount this component and exactly two
+   * of them pass `loop: true`, `/kit/` and `/nola/`, so two cells appear on two
+   * pages and the other five rows are byte for byte what they were. That is the
+   * `:has(> .panel-strip:empty)` argument one component along: a component rule
+   * with a CONDITION on it can be provably narrow, where a page-local repair to
+   * a shared component is how a defect gets paid for twice.
+   *
+   * 🔴 A TEMPO NOBODY HAS PLAYED IS AN EMPTY CELL. Never `0`, which reads as a
+   * very confident measurement of nothing, and never `120`, which is this
+   * project's favourite invented number. `numloop.mjs` answers `bpm: null` with
+   * a sentence saying what was missing and this draws the empty string.
+   * 🔴 AND WHETHER IT WAS HEARD OR SET IS PART OF THE READING, NOT A FOOTNOTE.
+   * A detected tempo is an INFERENCE off three gaps in somebody's playing, and
+   * this project has paid repeatedly for printing one as a fact. The WORD says
+   * which (`heard` off the playing, `set` by a page with its own clock) and the
+   * ink corroborates it the way `.kpad-chord` already does for a name it is sure
+   * of. The word is the channel; the colour is the second opinion.
+   *
+   * 🔴 AND A REFUSED SNAP IS A WORD RATHER THAN A BLANK. When a take is further
+   * than `MAX_STRETCH` from every allowed ratio the lap stays exactly as it was
+   * played, which is a real outcome a player should be able to tell from
+   * *nothing happened*. `as played` says so. `first` is the take that SET the
+   * unit, which is not a refusal and must not read like one.
+   *
+   * ⚠️ RESERVED IN `ch` FROM THE TABLES THAT DECIDE THEM. A bpm this module
+   * detects is folded into `TEMPO_BAND`, so three digits is the widest it can
+   * ever be, and the ratio words come off `RATIOS`. Nothing here is a typed
+   * number that goes quietly narrow the first time somebody adds `1/8`.
+   * ⚠️ A `given` TEMPO CAN SIT OUTSIDE THE BAND AND IS THE ONE CASE THAT WIDENS
+   * THIS CELL, and it is not the failure the reserve exists to stop: a page sets
+   * that once, at build, where the rule is about a cell changing size under a
+   * player's hands. Nothing in this repository calls `assume` yet.
+   */
+  const TEMPO_CH = String(Math.round(TEMPO_BAND[1])).length + ' bpm '.length
+                 + Math.max('heard'.length, 'set'.length);
+  const RATIO_CH = Math.max('as played'.length, 'first'.length,
+                            ...RATIOS.map((x) => x.label.length + 1));
+  const tempoEl = wantLoop ? make('span', 'kpad-tempo', '') : null;
+  const ratioEl = wantLoop ? make('span', 'kpad-ratio', '') : null;
+  if (tempoEl) {
+    tempoEl.style.minWidth = `${TEMPO_CH}ch`;
+    ratioEl.style.minWidth = `${RATIO_CH}ch`;
+    pad.append(tempoEl, ratioEl);
+  }
   const panicBtn = make('button', '', 'Notes off', {
     type: 'button', title: 'stop every note that is still sounding',
   });
@@ -1160,6 +1220,12 @@ export function createKeyboard(host, {
     notes: new Set(),
     outside: 0,        // movements that came in past the keys, for the log
     pressedAt: 0,      // when the button was touched. See `onTouch` below
+    /* How this take's lap was fitted to the first one, or null while the slot
+       holds nothing. It is `numloop.mjs`'s whole answer rather than the number
+       it arrived at, because `lap` alone cannot say whether it was snapped, to
+       what, or why a snap was refused, and all three are what the footer and
+       `onLoop` report. */
+    fit: null,
   }));
 
   /* 🔴 ONE FLAG FOR *THESE NOTES ARE COMING BACK, NOT GOING IN*, AND IT REPLACED
@@ -1402,11 +1468,52 @@ export function createKeyboard(host, {
     else loopBtn.el.setAttribute('data-loop', s);
   };
 
+  /**
+   * 🔴 THE LAST TAKE CLOSED, WHICH IS WHAT THE RATIO CELL IS ABOUT, AND IT IS
+   * KEPT HERE RATHER THAN READ OFF A SLOT. Ten slots can each hold a fit and the
+   * cell holds one reading, so *which* has to be a decision: it is the take a
+   * player most recently sent round, because that is the one they are asking
+   * about when they look.
+   * ⚠️ AND IT LETS GO WHEN ITS OWN SLOT DOES. Clearing the slot the cell is
+   * describing would otherwise leave a reading about a loop that no longer
+   * exists, which is the stale-readout defect this project keeps finding.
+   */
+  let lastFit = null, lastFitSlot = -1;
+
+  /**
+   * 🔴 THE TWO CELLS, AND THE ABSENCES ARE THE HALF WORTH READING. An empty cell
+   * where there is no tempo, never `0` and never `120`; `as played` where the
+   * snap was refused, because a refusal is an outcome and a blank is not.
+   * ⚠️ IT IS SIDE EFFECT FREE ON THE MACHINE. `tempo()` and `unit()` are
+   * readers, so a repaint cannot change what it is reporting, which is how this
+   * can be called from every branch of `enterLoop` without thinking about it.
+   */
+  const paintTune = () => {
+    if (!tempoEl) return;
+    const tu = machine.tempo();
+    if (!(tu.bpm > 0) || tu.source === 'none') {
+      tempoEl.textContent = '';
+      delete tempoEl.dataset.said;
+    } else {
+      tempoEl.textContent = `${Math.round(tu.bpm)} bpm ${tu.source === 'given' ? 'set' : 'heard'}`;
+      if (tu.source === 'given') tempoEl.dataset.said = '1';
+      else delete tempoEl.dataset.said;
+    }
+    /* The unit going means every slot is empty, so there is no take left for the
+       cell to be describing. `numloop.mjs` owns when that happens and this only
+       reads it. */
+    if (!machine.unit()) { lastFit = null; lastFitSlot = -1; }
+    ratioEl.textContent = !lastFit ? ''
+      : lastFit.first ? 'first'
+      : lastFit.snapped ? `x${lastFit.label}`
+      : 'as played';
+  };
+
   const enterLoop = (i, to, was) => {
     const t = takes[i];
     const n = SLOTS > 1 ? `loop ${i + 1}` : 'loop';
     if (to === 'recording') {
-      t.tape = []; t.at = 0; t.outside = 0; t.going = false; t.rec = true;
+      t.tape = []; t.at = 0; t.outside = 0; t.going = false; t.rec = true; t.fit = null;
       /* 🔴 THE PHRASE YOU HAD ALREADY PLAYED GOES IN FIRST. See `phraseStart`.
          It also means the 250 ms a press waits to find out whether it is half of
          a double one costs no notes: anything played inside that window is in the
@@ -1450,22 +1557,63 @@ export function createKeyboard(host, {
           machine.clear(i);
           log?.(`nothing was played into ${n}, so there is no loop`, 'warn');
           paintLoop();
+          paintTune();
           onLoop?.(false, { slot: i, state: 'empty' });
           return;
         }
-        t.lap = Math.max(MIN_LAP, raw);
+        /**
+         * 🔴 THE ONE CALL THAT ALIGNS A LAP, AND IT SITS EXACTLY WHERE THE LAP
+         * WAS ALREADY BEING SET. Asked 2026-09-25: *"in keyboadd looper: do
+         * basic bmp detection / quant and when first loop set, all next ones
+         * align on it, either times shorter, same or longer"*. `fitLap` is the
+         * only method on the machine that changes the tempo or the unit, so
+         * putting it here means a lap is decided once, in the one place this
+         * file has ever decided one.
+         * ⚠️ THE FLOOR IS APPLIED FIRST AND STILL BELONGS TO THIS FILE. 250 ms
+         * is a judgement about a take too short to be a performance, and it has
+         * to bite before anything is snapped or the unit could be set to a few
+         * milliseconds and every later loop would be a ratio of nothing.
+         * ⚠️ AND THE ONSETS ARE THE KEY-DOWNS, NOT THE MOVEMENTS. A tape holds a
+         * down and an up for every note, and feeding both in would report a
+         * pulse at twice the tempo somebody is playing, with a key's HOLD LENGTH
+         * masquerading as a gap between notes.
+         */
+        const heardBefore = machine.tempo().source;
+        const fit = machine.fitLap(i, Math.max(MIN_LAP, raw), {
+          onsets: t.tape.filter((e) => e.down).map((e) => e.t),
+        });
+        t.lap = fit.lap;
+        t.fit = fit;
+        lastFit = fit; lastFitSlot = i;
         const fromKeys = t.tape.length - t.outside;
         log?.(`${n} is going round: ${t.tape.length} movement(s) over ${t.lap} ms`
             + `${raw < MIN_LAP ? `, the take being ${raw} ms and held to the 250 ms floor` : ''}`
             + `${t.outside ? `, ${t.outside} of them played past the keys on screen` : ''}`
             + `${fromKeys && t.outside ? ` and ${fromKeys} on them` : ''}`);
+        /* 🔴 THE ACCOUNT IS LOGGED, BECAUSE A LAP THAT CHANGED UNDER A PLAYER
+           AND SAID NOTHING IS THE THING THEY WILL REPORT AS A BUG. `fit.why` is
+           a finished sentence from the module that made the decision, so the log
+           cannot drift from the arithmetic the way a sentence written here
+           would. The tempo's own sentence goes with it the one time it changes,
+           which is the take that found it. */
+        log?.(fit.why);
+        if (heardBefore === 'none' && machine.tempo().source !== 'none') {
+          log?.(machine.tempo().why);
+        }
       } else {
         log?.(`${n} is playing again`);
       }
       t.going = true;
       runTake(i);
+      /* ⚠️ FOUR MORE FIELDS, AND THEY ARE SENT ON A REPLAY AS WELL AS ON A
+         CLOSE. `t.fit` is a fact about the take and not about the press, so a
+         slot coming back from `stopped` reports the same ratio it has always
+         had rather than an empty one, which is what a page drawing a row per
+         slot needs. */
       onLoop?.(true, { slot: i, state: 'looping', lap: t.lap, moves: t.tape.length,
-                       outside: t.outside });
+                       outside: t.outside,
+                       ratio: t.fit?.label || '', snapped: !!t.fit?.snapped,
+                       bpm: machine.tempo().bpm, tempoSource: machine.tempo().source });
     } else if (to === 'stopped') {
       const still = t.keys.size + t.notes.size;
       stopTake(i);
@@ -1476,10 +1624,16 @@ export function createKeyboard(host, {
       const had = t.tape ? t.tape.length : 0;
       stopTake(i);
       t.tape = null;
+      t.fit = null;
+      /* ⚠️ THE CELL LETS GO WITH THE SLOT IT WAS DESCRIBING. Leaving it standing
+         would report a ratio for a take that has just been thrown away, which a
+         reader cannot tell from a ratio for one that is still there. */
+      if (i === lastFitSlot) { lastFit = null; lastFitSlot = -1; }
       if (had) log?.(`${n} thrown away, ${had} movement(s) with it`);
       onLoop?.(false, { slot: i, state: 'empty' });
     }
     paintLoop();
+    paintTune();
   };
 
   /**
@@ -1494,6 +1648,12 @@ export function createKeyboard(host, {
     onTouch: (i) => { takes[i].pressedAt = performance.now(); },
     onEnter: (i, to, o) => enterLoop(i, to, o.was),
   });
+  /* ⚠️ PAINTED ONCE AT BUILD, SO THE TWO CELLS OPEN EMPTY RATHER THAN HOLDING
+     whatever `textContent` a fresh span happens to have. It is the empty string
+     either way; doing it here is what makes that a decision rather than a
+     coincidence, and it is the same reason `paintAt` runs before anybody has
+     pressed an octave button. */
+  paintTune();
 
   function setLoop() { machine.press(0); }
 
@@ -1610,6 +1770,35 @@ export function createKeyboard(host, {
       state: (i) => machine.state(i),
       states: () => machine.states(),
       slots: SLOTS,
+      /**
+       * 🔴 THE TEMPO, AND `bpm` IS `null` RATHER THAN A NUMBER WHEN NOBODY HAS
+       * PLAYED ONE. `source` says `detected`, `given` or `none` and `why` is a
+       * finished sentence, so a page reporting this can never print a guess as a
+       * measurement by accident.
+       */
+      tempo: () => machine.tempo(),
+      /** the length every later loop is aligned to and which slot set it, or null */
+      unit: () => machine.unit(),
+      /**
+       * How this slot's lap was fitted, or `null` while it holds nothing. A
+       * COPY, because the caller must not be able to edit the account of a
+       * decision this component has already acted on.
+       */
+      fit: (i) => (takes[i]?.fit ? { ...takes[i].fit } : null),
+      /**
+       * A page with its own clock says what the tempo is, and then nothing here
+       * is inferring anything. `step-grid.mjs`'s `clock.bpm()` is the caller
+       * this exists for, and the cell says `set` rather than `heard` after it.
+       */
+      assume(bpm) { const r = machine.assume(bpm); paintTune(); return r; },
+      /**
+       * Drop the unit and the tempo on purpose, without clearing a slot.
+       * ⚠️ IT IS THE OTHER HALF OF `assume`, AND IT IS HERE SO A CHECK CAN PUT
+       * THIS KEYBOARD BACK AS IT FOUND IT. A tempo a page stated survives every
+       * slot being cleared, by design, so without this a block that says what
+       * the tempo is has changed the component for every block after it.
+       */
+      releaseUnit() { machine.releaseUnit(); paintTune(); },
     },
     /** what a loop is doing, for a page that wants to say so and for a check */
     looping: (i = 0) => !!takes[i]?.going,
@@ -1766,6 +1955,29 @@ export function createKeyboard(host, {
       return { el: chordEl, notes: down, name: chordEl ? chordEl.textContent : '',
                sure: !!r?.sure, reading: r };
     },
+    /**
+     * 🔴 WHAT THE TWO LOOP CELLS ARE SAYING, AND THE ELEMENTS THEY SAY IT IN,
+     * FOR THE SAME REASON `chord()` EXISTS: a control a check cannot read is a
+     * control nothing grades, and `verify.mjs` presses `.pos-controls` and
+     * nothing else.
+     * ⚠️ IT RETURNS THE STRINGS AND THE ELEMENTS. The strings answer *what does
+     * it say*, which is the half about absences; the elements answer *does it
+     * move*, which only a rect can settle and which is the whole reason both
+     * cells carry a reserve.
+     * ⚠️ AND IT IS THE DRAWN TEXT RATHER THAN A SECOND FORMATTING OF THE STATE.
+     * A reader built here that re-derived `124 bpm heard` from `tempo()` could
+     * agree perfectly with itself while the cell on screen said something else,
+     * which is this project's two-numbers-from-one-field defect arriving as a
+     * check.
+     */
+    tune: () => ({
+      tempoEl,
+      ratioEl,
+      tempo: tempoEl ? tempoEl.textContent : '',
+      ratio: ratioEl ? ratioEl.textContent : '',
+      reading: machine.tempo(),
+      unit: machine.unit(),
+    }),
     /** what this keyboard was built with, so a check can grade the numbers as well as the machinery */
     timing: { swipeFrames, swipePx, keyMinPx: KEY_MIN_PX, blackRatio: BLACK_RATIO },
     /**
