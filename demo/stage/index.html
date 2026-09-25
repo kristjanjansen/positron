@@ -931,6 +931,17 @@
    */
   const maxSpanMs = () => Math.max(ARCHIVE_WINDOW_MS * ZOOM_OUT, (recordedMs ?? SHOW_MS) * 1.05);
   const archive = byId.get('controlroom');
+  /**
+   * 🔴 THE ARCHIVE'S BAR AND STRIP ARE BUILT OFF-PAGE. `createTransportBar` and
+   * `createStripView` APPEND TO THE PARENT THEY ARE GIVEN, so passing the
+   * control room panel put them on screen no matter what else was removed:
+   * deleting the `createGlue(...)` line changed nothing and the page kept
+   * showing two bars and two timelines, reported twice. **The first argument is
+   * a mount point, not a hint.**
+   * ⚠️ They are still constructed, because `archiveCommand` and the archive
+   * deck are what PLAY RECORDING drives and what the playback checks read.
+   */
+  const offstage = document.createElement('div');
   const archiveDeck = createDeck({
     range: [0, SHOW_MS],
     // One item and one adapter, so the bar has a kind to read rates off. The
@@ -1043,7 +1054,7 @@
     },
   };
 
-  const bar = createTransportBar(tabs.panel('controlroom'), archiveDeck, {
+  const bar = createTransportBar(offstage, archiveDeck, {
     live: false, scrub: false, absolute: false, time: false, loop: false,
     command: archiveCommand,
     /**
@@ -1104,7 +1115,7 @@
    * they get it. Below the floor the space under the last lane is empty, and
    * that was explicitly accepted rather than packed out with something.
    */
-  const strip = createStripView(tabs.panel('controlroom'), archiveDeck, {
+  const strip = createStripView(offstage, archiveDeck, {
     size: 'auto', gutter: 110, lanes: [VIDEO_LANE], minHeight: STRIP_MIN_H,
     onSeek: (ms) => archiveCommand.seek(ms),
     // A FUNCTION, not a number: the widest useful view changes the moment a
@@ -2482,7 +2493,9 @@
     aspect: `${STAGE_W} / ${STAGE_H}`,
   });
   archive.panel.stage.textContent = '';
-  archive.panel.stage.append(noTape.el || noTape);
+  // 🔴 NO `Nothing recorded yet` CARD. PLAY RECORDING already says it by being
+  // disabled, and a paragraph explaining that nothing has happened yet is
+  // furniture where a control would do.
 
   // Every panel's default badge is told the same thing, because they all show
   // the same picture and it is this page drawing it.
