@@ -1,12 +1,22 @@
 # Handoff, 2026-09-26, session 50, a stream of asks worked to the end
 
+✅ **DEPLOYED AND PUSHED. BUILD `a6ef334-215438-fca1`, CONFIRMED ON THE EDGE**
+at **https://positron.studio**, and `acc8355` is on
+`origin/session-28-station-videoradio`.
+
 ✅ **THE TREE IS CLEAN AND EVERY ASK IN THIS SESSION’S STREAM IS EITHER DONE OR
-WRITTEN DOWN AS REFUSED.** 15 commits on `session-28-station-videoradio` since
-`e5ae793`. **57 demo rows, 55 shelled, 74 plans**, counted rather than remembered.
+WRITTEN DOWN AS REFUSED.** 18 commits since `e5ae793`. **57 demo rows, 55
+shelled, 74 plans**, counted rather than remembered.
 
 🔴 **IT OPENED WITH 8,285 INSERTIONS UNCOMMITTED FROM A SESSION CLOSED BY
 ACCIDENT.** That is `22294ed`, checked before staging and committed without a
 browser run, which its own message says plainly.
+
+⚠️ **THE ACTIVE GITHUB ACCOUNT WAS PUT BACK**, verified rather than assumed:
+`gh auth status` reads `Kristjan-Jansen_enefit` active after the push.
+⚠️ **AND `deploy.mjs` REBUILDS BEFORE IT SHIPS**, so the stamp on the edge names
+the commit BEFORE the one carrying it. `acc8355` exists only to bring that string
+back into the repository so a page’s stamp can be attributed.
 
 ## What shipped, and where to open it
 
