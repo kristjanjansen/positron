@@ -15,6 +15,25 @@
  *
  * Works with createLowLatencyPlayer (hls.js path and Safari native path).
  *
+ * 🔴 AND SINCE 2026-09-25 IT WORKS ON WebRTC TOO, WHERE THERE IS NO PDT AND
+ * THEREFORE NO PLAYHEAD CLOCK AT ALL. Before this, `playheadTime()` returned
+ * null on a WHEP subscription and `tick()` returned early every single time,
+ * so cues NEVER FIRED and nothing said so: no error, no warning, an empty
+ * overlay and a queue that only grew. That is the worst shape a failure can
+ * take in this repository's own words, and it is why `clock` is now explicit
+ * rather than inferred.
+ *
+ *   clock: 'pdt'   (default, unchanged) the playhead's own wall clock. Every
+ *                  viewer sees a cue at the same POINT IN THE VIDEO whatever
+ *                  their latency. Needs EXT-X-PROGRAM-DATE-TIME, which exists
+ *                  only because the input was made with preferLowLatency.
+ *   clock: 'live'  fire on arrival. For WebRTC, where the viewer IS live:
+ *                  measured p50 67 ms glass to glass, which is inside the
+ *                  noise of a person noticing a question.
+ *   clock: 'lag'   wall clock minus THIS viewer's own reported latency. The
+ *                  cheap rule for an HLS stream with no usable PDT. One
+ *                  subtraction against a figure the player already computes.
+ *
  *   const cues = createTimedMessages(player, video, {
  *     onMessage: (cue, {lateMs}) => showOverlay(cue.data),
  *   });
@@ -37,6 +56,21 @@ const DEFAULTS = {
   wsRetryMax: 15000,
   /** Auth token appended to the WS URL (?token=…) when the URL lacks one. */
   token: null,
+  /**
+   * Which clock decides that a cue is due. See the header.
+   * 'pdt' | 'live' | 'lag'. Default 'pdt', which is what this file has always
+   * done, so nothing that already uses it changes behaviour.
+   */
+  clock: 'pdt',
+  /**
+   * For clock:'lag' only. Reads this viewer's current latency in SECONDS.
+   * `createLowLatencyPlayer` reports exactly this on its 'latency' event, so
+   * the usual wiring is a closure over the last value seen there.
+   * Returning null means "cannot tell", which HOLDS the cue rather than firing
+   * it: a cue fired at the wrong moment cannot be taken back, and this project
+   * has already paid once for reading "cannot tell" as a number.
+   */
+  latencySeconds: null,
 };
 
 export function createTimedMessages(player, video, opts = {}) {
@@ -58,6 +92,24 @@ export function createTimedMessages(player, video, opts = {}) {
 
   /** Wall-clock epoch ms at the current playhead, or null if unknowable. */
   function playheadTime() {
+    // ── clock:'live' — WebRTC. There is no playhead clock and there is no
+    // need for one: the viewer is live, so "now" is now. Returning the wall
+    // clock makes every cue whose `at` has passed due immediately, which is
+    // exactly the intended behaviour and keeps ONE code path in tick().
+    if (cfg.clock === 'live') return Date.now();
+
+    // ── clock:'lag' — wall clock minus this viewer's own latency.
+    if (cfg.clock === 'lag') {
+      const secs = typeof cfg.latencySeconds === 'function'
+        ? cfg.latencySeconds()
+        : cfg.latencySeconds;
+      // null/undefined/NaN means CANNOT TELL, which is not the same as zero.
+      // Hold rather than guess.
+      if (secs == null || !Number.isFinite(secs)) return null;
+      return Date.now() - secs * 1000;
+    }
+
+    // ── clock:'pdt' — the original, and still the default.
     // hls.js: fragment PROGRAM-DATE-TIME mapped to currentTime.
     const d = player.hls?.playingDate;
     if (d) return d.getTime();
@@ -213,8 +265,10 @@ export function createTimedMessages(player, video, opts = {}) {
     connect,
     attachSubtitleTrack,
     attachMetadataTrack,
-    /** Epoch ms at the playhead — exposed for "schedule N s from now" UIs. */
+    /** Epoch ms at the playhead, exposed for "schedule N s from now" UIs. */
     get playheadTime() { return playheadTime(); },
+    /** Which clock is deciding, so a page can SAY so in its readout. */
+    get clock() { return cfg.clock; },
     get pending() { return queue.length; },
     get stats() { return stats; },
     destroy() {
