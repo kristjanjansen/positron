@@ -260,6 +260,38 @@ offer, the page logs `pc connecting`, and every signalling line reads healthy
 while **not one byte of media ever arrives**. What fails is UDP, fifteen seconds
 later, as an ICE timeout that reads like a bug in whatever page you are looking
 at.
+🔴 **AND THE PARAGRAPH BELOW WAS WRONG ABOUT `/webrtc/`, CORRECTED 2026-09-25.
+THE OWNER SAYS THERE IS NO VPN ON THIS MACHINE, AND WHEP WORKS HERE.** Three
+measurements the same afternoon, each one undoing a conclusion above it:
+- 🔴 **`demo/check-whep.mjs` WAS LYING, AND IT IS THE TOOL THIS WHOLE RULE
+  RESTS ON.** Its early return answers a WHEP POST of status >= 300 with
+  `nothing is publishing to that input`, and its verdict block then printed a
+  confident **CHECK THE VPN FIRST** anyway, because it only tested
+  `framesDecoded > 0`. So it blamed a VPN that does not exist for an input that
+  had no publisher. It has three outcomes now and exits 2 on `INCONCLUSIVE`.
+- ✅ **WITH A PUBLISHER AWAKE, WHEP MEDIA REACHES THIS MACHINE:** `status 201`,
+  `connection connected`, **389 frames, 3,554,870 bytes**. No VPN, no code
+  change. Holding a socket to `wss://pub.positron.studio/watch` is what wakes
+  the container, and nothing below is measurable until it is awake.
+- 🔴 **AND `/webrtc/`'s TWO ASSERTS WERE NOT THE CONNECTION'S FAULT. THE
+  CHECKS WERE UNREACHABLE ON EVERY PATH.** `d.run('check')` sat after a `for`
+  loop whose success branch `return`ed and whose failure branch `return`ed, so
+  no route through that handler ever reached it. The comforting explanation
+  written here was that the checks sat behind a connection that never happened.
+  They sat behind a connection that DID happen and were skipped anyway. One
+  character, `return` to `break`, plus an assert where a bare `d.log` used to
+  swallow an unreachable subject. **MEASURED after, headless, publisher awake:
+  `page asserted something` went from 2 to 10 and `/webrtc/` reads 16/16 with
+  `peer connection connected`, `a VIDEO track arrived`, `frames are actually
+  RENDERED 1280x720` and `element is playing` among them.**
+⚠️ **WHAT SURVIVES.** The VPN table below was measured one toggle apart and
+is kept: a VPN really does pass the handshake and drop the media. What does not
+survive is **using it as the explanation for any red on this desk**, and the
+sentence that WHEP does not connect in this headless Chrome for any page.
+⚠️ **THE LESSON IS THE ONE THIS FILE ALREADY TEACHES, ONE LAYER UP.** A green
+page with no coverage is the worst possible control, and this time the page with
+no coverage was **the diagnostic tool itself**. Check that a check can fail.
+
 ⚠️ **AND `/stage/` WAS 49/49 THE MOMENT THE VPN WENT OFF**, with no code change
 between the two runs.
 
@@ -416,6 +448,42 @@ bug was a fact true of every part and of no part's author.
   ⚠️ A plan nobody reads is a plan that gets rewritten by the next person who
   needs it. Reporting it in full when it is fresh is the only moment it is
   cheap.
+
+- 🔴 **FINISHED MEANS DEPLOYED, AND THE REPORT SAYS WHAT TO WATCH AND WHERE.**
+  Instructed 2026-09-25: *"deploy. write to claude.md keep doung it and have
+  clear status what to waach when somehing is finished with link"*. So the end
+  of a piece of work is three things, every time, in this order:
+
+  1. **DEPLOY IT.** `cd workers/view && node build.mjs` then
+     `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN node workers/view/deploy.mjs`.
+     Do not wait to be asked, do not hold a finished change for a tidier moment,
+     and do not report a fix that is only in the working tree as done.
+  2. **QUOTE THE BUILD STAMP THE DEPLOY CONFIRMED**, the
+     `<sha>-<hhmmss>-<hash>` line it prints, because it is the only way to tell
+     a page that shipped from a page that built.
+  3. **SAY WHAT TO LOOK AT, AS A URL THAT CAN BE CLICKED**, and say what should
+     be different about it. Not *"the stage UI is fixed"*. **`Reload
+     https://positron.studio/stage/ and OFF AIR should read STARTING when you
+     press Start HLS`**, which is a thing somebody can check in five seconds and
+     tell you you are wrong about.
+
+  🔴 **WHY IT IS A RULE: THE BUILD ARTEFACT IS COMMITTED AND THE EDGE IS NOT THE
+  WORKING TREE.** `workers/view/public/` is 393 generated files, so a fix in
+  `demo/` changes nothing anybody can see until `build.mjs` copies it and
+  `deploy.mjs` uploads it. MEASURED 2026-09-25: `/stage/`'s shared room was
+  fixed in the tree while `workers/view/public/stage/index.html` still carried
+  `stage-demo`, and the owner was looking at the old page while being told the
+  bug was gone.
+  ⚠️ **AND A STATUS IS NOT A SUMMARY OF WHAT YOU DID.** It is a list of things
+  that are now true, each one checkable, with the one URL to check them on. The
+  session this was asked in produced *"i do not see ui fixes"* and *"how you
+  spent 40min again?"* about work that was real, finished and sitting unbuilt:
+  the shared kit had the new footer, overlay and button, and the page had never
+  been wired to any of it. **Nothing is done until somebody else can see it.**
+  ⚠️ **WHAT WENT WRONG IS WORTH KEEPING: A CAPABILITY IS NOT A CHANGE.** An
+  agent that adds `soloFooter` to `video-panel.mjs` has finished ITS job and the
+  page still looks identical. If a report hands over an API, the next thing on
+  the list is calling it, and it is not finished until the screenshot changes.
 
 - 🔴 **A FINISHED PAGE IS HANDED OVER AS A URL, NOT AS A PATH.**
   `demo/radio/index.html` is not an answer to *"where is it"* — it is the

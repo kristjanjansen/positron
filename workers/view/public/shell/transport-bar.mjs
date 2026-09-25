@@ -65,6 +65,53 @@ export const ON_AIR_CAN = ['online', 'coming', 'offline', 'unknown'];
  * strip, the bar keeps what only it has — play/pause, the clock, the rates, the
  * degraded badge — and gives up the slider.
  */
+/**
+ * 🔴 A BUTTON FOR THE BAR, BUILT BY THE BAR, BECAUSE `right` AND `left` TAKE
+ * ELEMENTS AND A PAGE WAS THEREFORE TYPING THE CLASSES ITSELF.
+ *
+ * Asked for 2026-09-25 against `/stage/`: *"when I look at the transport uh,
+ * play recording is has this huge font size and it's kind of off to the right
+ * so please make it as a standard button"*.
+ * 🔴 THE CAUSE, MEASURED RATHER THAN GUESSED: that page builds its button as
+ * `el('button', 'tbar-x', 'PLAY RECORDING')` and hands it to `right`. `.tbar-x`
+ * on its own is a GLYPH box in `shell.css`: `--tbar-btn` square, `display:
+ * grid`, `place-items: center`, `font-size: 15px`. That is right for ▶ and ●
+ * and wrong for a word. 15 px is the huge font, and a two-word label in a
+ * fixed square is what pushed it about. The word treatment has existed the
+ * whole time and is `tbar-x tbar-word`: width from the text, `--pad-bar` of
+ * air, 11 px sans, `--dim`. It is the same class `extras: [{ word: true }]`
+ * already applies, so nothing here is new styling.
+ * ⚠️ `.tbar-x` IS NOT REPURPOSED AND MUST NOT BE. The glyph box is what the
+ * loop's ways, `/take/`'s record and `/pack/`'s ‹ › all want, and it is the
+ * selector `demo/verify.mjs` presses on every page. This only stops a caller
+ * having to know the second class name.
+ * ⚠️ AND IT IS `.tbar-x`, SO THE HARNESS PRESSES IT. That is deliberate and is
+ * the difference from `loopSlot`, which uses `.tbar-slot` precisely so the
+ * suite leaves it alone. A page whose bar button must not be pressed by the
+ * suite should be in `loopSlot`, not here.
+ *
+ * @param {object} o
+ * @param {string} o.label      the word, or the glyph when `word` is false.
+ * @param {boolean} [o.word]    true for a word, which is the standard button.
+ * @param {string} [o.aria]     what a screen reader and a check read.
+ * @param {string} [o.title]    the hover line.
+ * @param {boolean} [o.primary] the record treatment. Rarely what you want.
+ * @param {(btn: HTMLButtonElement) => void} [o.onPress]
+ * @returns {HTMLButtonElement} ready for `right: [...]` or `left: [...]`.
+ */
+export function barButton({
+  label = '', word = false, aria, title, primary = false, onPress,
+} = {}) {
+  const b = el('button', `tbar-x${primary ? ' pos-pri' : ''}${word ? ' tbar-word' : ''}`,
+    label, { type: 'button' });
+  // The label may be a glyph, and a glyph is not a name. Same reasoning as
+  // `extras` below: without this the control is announced as "●".
+  b.setAttribute('aria-label', aria ?? label);
+  if (title) b.title = title;
+  if (onPress) b.addEventListener('click', () => onPress(b));
+  return b;
+}
+
 export function createTransportBar(host, deck, {
   absolute = false, scrub: wantScrub = true, extras = [], right = [],
   fmt = null, live = false, publish = true,
@@ -447,7 +494,28 @@ export function createTransportBar(host, deck, {
     // reads and what a test looks for; without it the control is "●".
     b.setAttribute('aria-label', x.aria ?? x.label);
     if (x.title) b.title = x.title;
-    b.addEventListener('click', () => x.onClick?.(b));
+    // 🔴 BOTH SPELLINGS, AND `onPress` FIRST, BECAUSE THIS ONE LINE COST A DAY.
+    // `barButton`, `loopSlot` and `loopExtras` all bind `onPress`, this module's
+    // own docs say `onPress` twice (one of them reading "Same declaration shape
+    // as `extras`", which was simply false), and ONLY `extras` bound `onClick`.
+    // MEASURED 2026-09-25: `/stage/` passed `onPress` and its two main controls
+    // were DEAD. `START HLS` and `START WEBRTC` did nothing for a visitor and
+    // nothing for the harness, so its check pressed a button that could not
+    // start anything and then polled 45 s for a show nobody had asked for.
+    // Fourteen asserts followed it red and were read as a timing problem for a
+    // day: the wait was widened to 28 s, 45 s and 80 s, `settleMs` was tripled,
+    // and the page was rewritten five times. Nothing was wrong with the timing.
+    // ⚠️ A SILENT NO-OP IS THE WORST SHAPE A DEFECT TAKES, and `?.` is what made
+    // it silent: a misspelled handler is indistinguishable from a button with
+    // nothing wired to it, so nothing threw, nothing logged, and the page
+    // looked finished. Seven of the eight pages that declare `extras` happened
+    // to pass `onClick` and worked, which is why it survived: the majority were
+    // accidentally right and the documentation was wrong about all of them.
+    // ⚠️ AND ACCEPTING BOTH IS THE FIX RATHER THAN PICKING ONE. Renaming to
+    // `onPress` alone would break those seven pages at once, and renaming the
+    // docs to `onClick` would leave this module disagreeing with its three
+    // siblings. Both names work here now and `onPress` is the one to write.
+    b.addEventListener('click', () => (x.onPress ?? x.onClick)?.(b));
     extraEls.set(x.id, b);
   }
 

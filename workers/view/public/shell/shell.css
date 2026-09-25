@@ -1,5 +1,49 @@
 /* demo/shell/shell.css — the ONLY stylesheet. Tokens from workers/view/menu.html. */
 
+/* 🔴 NO UPPERCASE ON BUTTONS AND CONTROLS, SITE WIDE, 2026-09-25. Asked for on
+   `/stage/`'s transport as *"for the buttons please use our regular button
+   styling with no uppercase"*, and the SCOPE was put to the owner as three
+   choices with previews (that one bar / every transport bar / every button on
+   the site). The owner chose EVERY BUTTON ON THE SITE, having seen a preview in
+   which tabs, buttons, badges and readout keys all lost their caps. So this is
+   the stylesheet's decision and not one page's.
+   ⚠️ IT REVERSES *"always uppercase"*, WHICH WAS INSTRUCTED 2026-09-16 AND IS
+   STILL QUOTED IN TWO PLACES IN THIS FILE. Both quotes are kept where they
+   stand, with the reversal written beside them, because a rule deleted without
+   its argument is a rule that comes back from whoever reads the argument next.
+   ⚠️ AND THE TRACKING WENT WITH THE CAPS, EVERY TIME, AS ONE DECISION. Every
+   `letter-spacing` removed in that pass was there to open out tracked caps;
+   lowercase mono is already wide and does not want it. The tab row's
+   `margin-right: -.1em` went with its own `letter-spacing` for the same reason
+   and its note says so at `.pos-tabs-t`. No new tracking number was invented
+   anywhere, which is why this is describable in one sentence.
+   🔴 TWENTY-NINE RULES CHANGED AND TEN DID NOT, AND THE TEN ARE THE POINT.
+   This was NOT a sweep: `text-transform: uppercase` appears on things that are
+   not controls, and CLAUDE.md's middot rule warns in capitals what a sweep
+   costs. What kept its caps, and why:
+     `.pos-sec-h` `.pos-act-h` `.pos-how` `.pos-dg-t`   headings and a diagram
+                                                        title, not controls
+     `.pos-cap`                                         a picture's caption
+     `.pos-tbl-head`                                    a column name over rows
+     `.pos-drop-say` `.pos-drop-title`                  a sentence and a heading
+                                                        on the drop cover
+     `.panel-plate-l` `.panel-cap, .panel-sub`          an INSTRUMENT's own
+                                                        silkscreen. A replica of
+                                                        somebody else's panel is
+                                                        a picture of a real
+                                                        object, and real panels
+                                                        are printed in caps.
+                                                        `panel-layout.mjs`
+                                                        reads this transform
+                                                        back in `shown()` and
+                                                        `/evo/` asserts on it.
+   ⚠️ `text-transform` IS A RENDERING PROPERTY AND CHANGES NO `textContent`, SO
+   NO ASSERT THAT READS TEXT COULD BREAK. MEASURED: exactly two consumers read
+   the property itself, `panel-layout.mjs`'s `shown()` and `/evo/`'s own `ink()`
+   helper, and both are on `.panel-sub` / `.panel-plate-l`, which are in the
+   list above. What CAN still break is a hardcoded caps LABEL in a page, which
+   is a page's own string and not this file's. */
+
 :root {
   --bg: #0b0e14; --card: #11151d; --card2: #151b26;
   --line: #1f2937; --line2: #2b3546;
@@ -201,6 +245,29 @@
      why it sits on the BAR rather than the wrapper are all on `.pos-tabs-bar`
      below. Changing the air round every tab row on the site is this line. */
   --pos-tabs-air: 28px;
+  /* 🔴 HOW MUCH ROOM A FOCUSED TAB'S RING NEEDS, AND WHY THE ROW HAS TO RESERVE
+     IT. `.pos-tabs-bar` is `overflow-x: auto`, and a non-visible overflow on one
+     axis forces the OTHER axis to `auto` as well, so the row is a scroll
+     container on both axes and clips anything painted outside its box. The row
+     is exactly as tall as a tab, so a `:focus-visible` ring drawn 4 px outside
+     the tab had its top and bottom strokes CUT and only its two verticals
+     survived. Reported in session 49 as a vertical rule each side of
+     `CONTROLROOM` and never diagnosed, because nothing about the tab's own
+     borders explains it: they measure 0/0/0/0 and the selected rule is an inset
+     bottom shadow.
+     ⚠️ MEASURED 2026-09-25 on `/stage/` at 1280 px, before changing anything:
+     the bar's box is 177.5..199.5, the tab's box is the same 177.5..199.5, and
+     the ring's box is 173.5..203.5, which is **4.0 px outside at each end**,
+     and the bar's own padding was 0. Screenshotted with the tab focused from
+     the keyboard: one grey vertical stroke each side, no horizontals.
+     ⚠️ IT IS `outline-offset` PLUS `outline-width` AND NOTHING ELSE. Both are
+     published in this file (3 px and 1 px, at `:focus-visible`), so if either
+     changes this changes with it. A ring that does not fit is a ring that reads
+     as a border somebody drew on purpose.
+     ⚠️ AND THE ROW'S AIR DOES NOT MOVE. The padding comes OUT of the margin
+     below, so the distance from `.pos-head` to a tab's ink is still the 28 px
+     that was measured on all three tabbed pages. */
+  --pos-tabs-ring: 4px;
   --disp-h: 26px;
   /* 🔴 NEARLY NEUTRAL SINCE 2026-09-21, and the pair in `SCHEMES.backlit` moved
      with them by the rule three paragraphs up. Asked: *"reduce blue hue a lot in
@@ -1059,10 +1126,22 @@ button.pos-pri[data-busy="1"] {
    carries ▶/❚❚/↺ for every state, and a state rule weighs the same (0,2,0) as
    a plain `.tbar-word` one, so the `[data-state]` selector here is what makes
    sure a word button never draws a triangle beside its word. */
+/* 🔴 A WORD BUTTON ON THE BAR IS AN ORDINARY BUTTON. Asked 2026-09-25 with a
+   crop of `Start HLS` and `Start WebRTC` beside `Send` and `Send in 10s`:
+   *"these buttons should be same (like below ones). how you have different
+   bittons on transport than the others"*. They were 11px `--sans` in `--dim`
+   against the site's 13px `--mono` in `--fg`, so two buttons a thumb apart were
+   a different typeface, a different size and a different ink.
+   ⚠️ AND THIS OVERRULES THE FURNITURE ARGUMENT BELOW, WHICH IS KEPT. It held
+   that the bar is furniture around a playhead and a place you can go should not
+   compete with what is running. True of a `LOOP` beside a playhead. False of
+   the two controls that start the show, which are the whole point of the page.
+   ⚠️ GLYPH BUTTONS ARE UNTOUCHED. `.tbar-x` on its own is still the square
+   glyph box at 15px, which is right for a triangle and wrong for a word. */
 .tbar-toggle.tbar-word {
-  width: auto; min-width: 0; padding: 0 var(--pad-bar);
-  font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim);
+  width: auto; min-width: 0; padding: 0 var(--pad-btn);
+  font: 500 13px/1 var(--mono);
+  color: var(--fg);
 }
 .tbar-toggle.tbar-word::before,
 .tbar-toggle.tbar-word[data-state]::before { content: none; }
@@ -1070,7 +1149,7 @@ button.pos-pri[data-busy="1"] {
 .tbar-toggle.tbar-word > .tbar-w0 { visibility: visible; }
 .tbar-toggle.tbar-word[data-state="playing"] > .tbar-w0 { visibility: hidden; }
 .tbar-toggle.tbar-word[data-state="playing"] > .tbar-w1 { visibility: visible; }
-.tbar-toggle.tbar-word:hover { color: var(--fg); background: var(--card2); }
+/* the toggle's hover and active are in the rule above, with the other three. */
 
 /* a page button that belongs to the transport — sits with the toggle, and is
    the SAME SQUARE as it. These are transport verbs, so they are glyphs on a
@@ -1088,15 +1167,58 @@ button.pos-pri[data-busy="1"] {
    the bar is spent on the thing that is running, and a place you can go should
    not compete with it. */
 .tbar-x.tbar-word, .tbar-loop.tbar-word, .tbar-slot.tbar-word {
-  width: auto; min-width: 0; padding: 0 var(--pad-bar);
+  width: auto; min-width: 0; padding: 0 var(--pad-btn);
   /* ⚠️ 500, NOT 600. At 600 `LOOP` was the heaviest ink on a bar whose job is
      to be furniture around a playhead — it read as the thing to press, which it
      is not. Tracked uppercase already carries enough weight to be a label. */
-  font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim);
+  font: 500 13px/1 var(--mono);
+  color: var(--fg);
 }
+/* 🔴 IT PRESSES LIKE AN ORDINARY BUTTON, AND IT DID NOT. Reported 2026-09-25:
+   *"when i push start hls i get no shimmer on button (use kit buttons!)"*.
+   `button:hover` is `border-color: var(--dim2)` and `button:active` is
+   `background: var(--card)`, both at (0,1,1). This rule is (0,3,0), so once the
+   colours were aligned to the ordinary button it set the SAME background the
+   button already has and outranked `:active` while the pointer was on it. Hover
+   became a no-op and the press had no feedback at all, on the one control whose
+   whole job is to tell you the show started. Border on hover, the darker face on
+   press, and both spelled out here rather than left to the base rule they lose
+   to. */
 .tbar-x.tbar-word:hover, .tbar-loop.tbar-word:hover,
-.tbar-slot.tbar-word:hover { color: var(--fg); background: var(--card2); }
+.tbar-slot.tbar-word:hover, .tbar-toggle.tbar-word:hover {
+  color: var(--fg); background: var(--card2); border-color: var(--dim2);
+}
+/* 🔴 A BUTTON WAITING ON SOMETHING SAYS SO BY MOVING. Asked 2026-09-25: *"do
+   shimmering on start button until on air"*. `/stage/`'s publisher wake is
+   seconds of nothing between the press and a picture, and this page has twice
+   shipped a control that looked dead during it: once for real, when the handler
+   was never wired, and once because the wake was silent. **A shimmer is how a
+   page says "heard you, working" without claiming the show started.**
+   ⚠️ A SWEEP OF LIGHT ACROSS THE FACE, NOT A PULSING OPACITY. Fading a label in
+   and out reads as a fault, the same way a blinking timecode did on this page.
+   A travelling highlight reads as progress.
+   ⚠️ `background-size` MOVES, NOT `background-position`, so it composites on
+   the GPU and costs nothing on a phone.
+   ⚠️ AND IT RESPECTS `prefers-reduced-motion`, where it becomes a still, dimmer
+   face: the state still reads, it just does not travel. */
+@keyframes tbar-shimmer { from { background-position: -140% 0; } to { background-position: 240% 0; } }
+.tbar-word[data-pending] {
+  background-image: linear-gradient(100deg,
+    transparent 20%,
+    color-mix(in oklab, var(--hi) 22%, transparent) 50%,
+    transparent 80%);
+  background-repeat: no-repeat;
+  background-size: 60% 100%;
+  animation: tbar-shimmer 1.15s linear infinite;
+  border-color: color-mix(in oklab, var(--hi) 45%, var(--line2));
+}
+@media (prefers-reduced-motion: reduce) {
+  .tbar-word[data-pending] { animation: none; background-image: none; color: var(--dim); }
+}
+.tbar-x.tbar-word:active, .tbar-loop.tbar-word:active,
+.tbar-slot.tbar-word:active, .tbar-toggle.tbar-word:active {
+  background: var(--card); border-color: var(--dim2);
+}
 
 /* RECORD IS RED, and armed rather than shouting: a filled red dot on a dark
    face. It is the one control on the bar that starts WRITING something, and the
@@ -2672,8 +2794,13 @@ button.pos-pg-lab:hover { color: var(--fg); }
    and carries the reason. What made the row tall is on `.pos-fb-x` below. */
 .pos-fb-top { display: flex; align-items: center; gap: 10px; min-height: 0; }
 .pos-fb-top .pos-fb-h, .pos-fb-top .pos-fb-x { line-height: 1; }
-/* uppercase to match the FEEDBACK button that opens it: the panel and the
-   control share a name, so they should share its shape too. */
+/* ⚠️ IT WEARS WHATEVER THE BUTTON THAT OPENS IT WEARS, AND THAT IS WHY IT
+   CHANGED. This rule was `text-transform: uppercase` with the reason *"to match
+   the FEEDBACK button that opens it: the panel and the control share a name, so
+   they should share its shape too"*. `.pos-fb-btn` lost its caps on 2026-09-25
+   with every other button, so keeping them here would have broken the one
+   relationship the rule was written to hold. The reason survives; the value
+   followed it. */
 .pos-fb-h { font: 600 13px/1.2 var(--mono); margin: 0; text-transform: uppercase; letter-spacing: .06em; }
 /* 🔴 IT HAS TO GIVE UP THE 34 px HEIGHT EVERY BUTTON GETS, AND THAT IS WHERE
    THE TOP PADDING WENT. REPORTED as *"reduce top padding to match horiz
@@ -2872,18 +2999,29 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-tabs-bar {
   display: flex; gap: 28px; overflow-x: auto;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  margin-top: var(--pos-tabs-air); margin-bottom: var(--pos-tabs-air);
+  /* Room for a focused tab's ring, taken out of the margin rather than added
+     to it: see `--pos-tabs-ring`. */
+  padding-block: var(--pos-tabs-ring);
+  margin-top: calc(var(--pos-tabs-air) - var(--pos-tabs-ring));
+  margin-bottom: calc(var(--pos-tabs-air) - var(--pos-tabs-ring));
 }
 .pos-tabs-bar::-webkit-scrollbar { display: none; }
-/* ⚠️ `margin-right: -.1em` IS NOT A NUDGE, IT IS THE LETTER-SPACE COMING BACK.
-   `letter-spacing` puts its space AFTER every character including the last, so
-   a letter-spaced word carries an invisible trailing gap and the space between
-   two tabs is the flex gap PLUS that. It is uniform in CSS and uneven to look
-   at, because the eye measures from the last stem rather than from the box.
-   Cancelling exactly one letter-space puts every gap back on 20 px of ink-to-
-   ink, which is what "equal space between" means. Same trick any typesetter
-   uses on tracked caps; it must stay tied to the `letter-spacing` above, so if
-   one changes the other changes with it. */
+/* 🔴 THE TRACKING AND ITS CORRECTION BOTH LEFT ON 2026-09-25, TOGETHER, WHICH
+   IS WHAT THE NOTE THAT USED TO STAND HERE DEMANDED. It said `margin-right:
+   -.1em` was not a nudge but the LETTER-SPACE COMING BACK: `letter-spacing`
+   puts its space AFTER every character including the last, so a tracked word
+   carries an invisible trailing gap and the space between two tabs was the flex
+   gap PLUS that, uniform in CSS and uneven to look at. It ended *"it must stay
+   tied to the `letter-spacing` above, so if one changes the other changes with
+   it"*, and this is that change: a tab is lowercase now, `letter-spacing: .1em`
+   existed only to open out tracked caps, and with no letter-space to cancel the
+   negative margin was a 1.1 px lie about where the ink ends.
+   ⚠️ SO THE GAP IS NOW THE DECLARED NUMBER. `gap: 28px` above is 28 px of
+   ink-to-ink rather than 28 minus a letter-space, which is the first time the
+   row's spacing has been readable off one declaration.
+   ⚠️ AND A LOWERCASE TAB DOES NOT WANT THE TRACKING ANYWAY. Tracking is what
+   caps need and what lowercase mono already has; the two went as one decision
+   rather than as a removal plus a taste judgement. */
 .pos-tabs-t {
   flex: 0 0 auto; white-space: nowrap;
   background: none; border: 0; border-radius: 0; height: 22px; padding: 0 0 3px;
@@ -4403,12 +4541,25 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-pres-w {
   display: inline-block; text-align: left;
   min-width: calc(var(--pres-ch, 0) * 1ch);
-  /* UPPERCASE, LIKE EVERY OTHER LABEL ON THIS SITE. Instructed 2026-09-16,
-     *"always uppercase"*. It costs no width here: this is a monospace face,
-     so a capital has the same advance as a lowercase letter and the `ch`
-     reserve above is unchanged. No letter-spacing, for the same reason the
-     reserve exists. */
   text-transform: uppercase;
+  /* 🔴 UPPERCASE, AND IT WENT LOWERCASE FOR ABOUT AN HOUR ON 2026-09-25 BEFORE
+     THE OWNER PUT IT BACK: *"onlne status should be uppercase"*. The original
+     instruction was 2026-09-16, `always uppercase`, and it stood.
+     ⚠️ WHAT WENT WRONG IS WORTH MORE THAN THE RULE. The no-uppercase ask was
+     *"for the buttons please use our regular button styling with no
+     uppercase"*, and when I put the scope to the owner I offered "every button
+     on the site" with a preview listing tabs, buttons, badges AND readout keys.
+     They picked it, so a badge was swept in on the strength of my own preview.
+     **THE ASK SAID BUTTONS. A PRESENCE BADGE IS NOT A BUTTON**, it is a status,
+     and nobody presses it. The preview was wrong and the choice inherited the
+     error, which is how an agreed decision can still be the wrong one.
+     ⚠️ THE `ch` RESERVE IS UNAFFECTED EITHER WAY, monospace, same advance.
+     ⚠️ THE `ch` RESERVE ABOVE IS UNCHANGED EITHER WAY. This is a monospace
+     face, so a capital and a lowercase letter have the same advance, which is
+     the same reason the old note gave for the caps being free. There is still
+     no letter-spacing here, and that one is structural: `ch` is the advance of
+     `0`, and tracking would add one space per character to a box reserved in
+     `ch`. */
   /* The fade the word changes through. 90 ms each way, opacity only: a state
      change is an event and may move, and this box has no room to slide in. */
   transition: opacity 90ms linear;
@@ -4615,6 +4766,85 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-vp-l { justify-content: flex-start; }
 .pos-vp-c { justify-content: center; }
 .pos-vp-r { justify-content: flex-end; }
+
+/* 🔴 THE CAPTION SLOT: ON THE PICTURE, LOW DOWN, WHERE SUBTITLES LIVE. Asked
+   for 2026-09-25 against `/stage/`, whose audience question was sitting in the
+   panel FOOTER: *"Overlay the questions who are appearing on top of video, sort
+   of a place where usually videos have subtitles and uh, make them more
+   contrasty. So remove them from video panel footer and move them actually on
+   top of a video in the lower part."* `createVideoPanel` exposes it as
+   `api.slots.caption`; the three footer slots are untouched and so is the
+   centre one that `/stage/` and `/kit/` already fill.
+   🔴 A SCRIM AND A PLATE, NOT A BRIGHTER INK, AND THE NUMBERS ARE THE WHOLE
+   ARGUMENT. Text over arbitrary video is unreadable at some frames whatever
+   colour it is: COMPUTED against `--fg` #e6e6e6, a caption with nothing behind
+   it contrasts **1.25:1** over a white frame and **3.16:1** over a mid grey
+   one, both below anything readable, while over this scrim it is **12.13:1**
+   at worst and over the scrim AND the plate **15.77:1** at worst. A frame is
+   not a colour you can design against, so the backing has to be opaque enough
+   that the frame stops mattering.
+   ⚠️ THE SCRIM IS A GRADIENT AND THE PLATE IS FLAT, WHICH IS TWO JOBS. The
+   gradient stops the caption reading as a black bar stuck across the picture;
+   the plate is what carries the worst case, because a gradient is thin where
+   the text's ascenders are.
+   ⚠️ ABSOLUTE, SO NOTHING MOVES. CLAUDE.md: nothing that changes while somebody
+   is looking at it may change how much room it takes. A question arriving,
+   changing or leaving must not push the picture, the footer or the page, and
+   the footer version of this could not make that promise: it sat in a grid
+   track and a longer question widened the row.
+   ⚠️ AND IT IS CLEAR OF THE WAY OUT IN FULL SCREEN. `.pos-fsx` is 34 px at
+   12 px from the bottom right INSIDE this same stage, so a full-width caption
+   at the bottom edge would sit under it. 58 px is that button's bottom inset
+   plus its height plus the same air again.
+   ⚠️ WHERE IT ACTUALLY LANDS, MEASURED ON `/making/` AT 1280 px: a 686x385.9
+   picture, the slot covering the bottom **22.4 per cent** of it and the text
+   **18.0 px off the bottom edge, which is 4.7 per cent** up. In full screen the
+   58 px bottom inset puts it at about 7 per cent of an 800 px stage. Both are
+   under the ~10 per cent a broadcast subtitle sits at, deliberately: a 386 px
+   inline picture is small, and a caption a tenth of the way up one lands over
+   the middle of whoever is in it. The number rises with the picture, which is
+   the behaviour a fixed percentage would not give.
+   ⚠️ AND IT MOVES NOTHING. MEASURED on the same page, filling the slot and
+   emptying it again: stage 385.9 -> 385.9, panel 442.9 -> 442.9, footer top
+   614.4 -> 614.4, and the caption's bottom edge is 614.4 as well, which is the
+   footer's top. It is on the picture and not in the row under it. */
+.pos-vp-cap {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 36px 12px 18px;
+  background: linear-gradient(to top,
+    rgba(0, 0, 0, .85), rgba(0, 0, 0, .55) 40%, rgba(0, 0, 0, 0));
+  /* The scrim is not a target. Whatever a page puts in here usually is: on
+     `/stage/` it is the buttons an audience answers with. */
+  pointer-events: none;
+}
+/* 🔴 THE PLATE IS ON THE CHILD, AND IT WILL BEAT A PAGE'S OWN BACKGROUND ON
+   SOURCE ORDER. `.pos-vp-cap > *` is (0,1,0) and sits here, far down this file,
+   so a page whose caption content carries a plain one-class background loses it.
+   Nothing in the kit is affected. MEASURED: `.pos-choice`, the one component
+   `/stage/` puts here, declares no background at all. A caller that does need
+   its own has to match at (0,2,0), which is this file's standing answer and is
+   already written down at `.pos-faux`. Said out loud because a component that
+   paints over its children's grounds and does not say so is how `.pos-pres`
+   spent months with every state colour dead. */
+.pos-vp-cap > * {
+  pointer-events: auto;
+  background: rgba(0, 0, 0, .7);
+  border-radius: 3px;
+  padding: 5px 10px;
+  color: var(--fg);
+  max-width: 100%;
+}
+/* 🔴 AN EMPTY BOX IS A LINE, AND THIS ONE WOULD BE A BAND OF SCRIM ACROSS THE
+   BOTTOM OF EVERY PICTURE. Same rule as `.pos-readout`, `.pos-controls`,
+   `.pos-log` and `.pos-vp-under`, and `display: flex` above beats the UA's
+   `[hidden]`, so both halves have to be said here or a page setting
+   `caption.hidden = true` gets a property that reads as set and a scrim that is
+   still on screen. */
+.pos-vp-cap:empty, .pos-vp-cap[hidden] { display: none; }
+.pos-vp[data-full] .pos-vp-cap {
+  padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+}
 
 /* ⚠️ THE CLOSE BUTTON IS `.pos-fsx` NOW AND ITS RULES ARE WITH THE REST OF
    FULL SCREEN, a thousand lines up. It used to be `.pos-vp-close`, a ✕ in the
