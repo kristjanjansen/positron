@@ -1387,6 +1387,7 @@
   let transport = null;            // 'webrtc' | 'hls' once something is carrying
   let hlsPlayer = null;
   let hlsHold = null;
+  let hold = null;          // the container stays awake while a show is on
 
   /**
    * ⚠️ THE OTHER BUTTON IS BLOCKED ONLY WHILE ONE IS STARTING, NEVER AFTER.
@@ -1413,6 +1414,7 @@
 
   /** Tear down whichever leg is carrying, so a switch never leaves two open. */
   function dropTransport() {
+    if (hold) { try { hold.close(); } catch { /* already gone */ } hold = null; }
     if (hlsPlayer) { try { hlsPlayer.destroy(); } catch { /* already gone */ } hlsPlayer = null; }
     if (hlsHold) { try { hlsHold.close(); } catch { /* already gone */ } hlsHold = null; }
   }
@@ -1864,11 +1866,27 @@
     // The window starts chasing the show now that there is one.
     roomStrip.strip.setFollow(true);
     try {
-      const stream = master.captureStream(25);
+      /**
+       * 🔴 THIS PAGE IS A PURE RECEIVER SINCE 2026-09-25. Asked in those words:
+       * *"make it pure receivers"*. It used to capture its own canvas and
+       * publish it over WHIP, and that is what made the two transports
+       * impossible to have together: **stage and the container's own WHIP leg
+       * were two publishers on one live input**, which is one publisher and a
+       * fight, and Cloudflare holds an input against a stale publisher for a
+       * measured 45 s before accepting a new session.
+       * ✅ **SO THE CONTAINER PUBLISHES AND THIS PAGE SUBSCRIBES.** Holding the
+       * socket is what wakes it; it runs two ffmpeg legs, RTMPS for the HLS
+       * input and WHIP for the WebRTC one, from one source. Nothing here
+       * competes for either.
+       * ⚠️ **THE CANVAS IS STILL DRAWN AND IS NOW A MONITOR RATHER THAN THE
+       * SOURCE.** What it shows is what the control room is looking at; what
+       * goes out is whatever the container is publishing.
+       */
       const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
       v.muted = true;
       armVideo(v);
-      live = await cloudflare(stream, v);
+      if (!hold) hold = holdPublisher(() => {});
+      live = { pub: null, sub: await whepPlay(whep(), v, { log: d.log }), kind: 'receiver' };
 
       // The card goes, the picture arrives. One swap, at the moment there is
       // something true to show.
