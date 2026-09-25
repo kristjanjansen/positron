@@ -65,8 +65,19 @@ or checking it tells you nothing about what is running. Compare `md5sum` against
   and a diff against it says which sessions have moved since.
 
 
-- **`rack` plays Ableton Live from a browser and it is LIVE (2026-09-12).**
-  <https://positron.studio/able/>, 15/15. A note number crosses the relay,
+- 🔴 **`/able/` WAS RETIRED ON 2026-09-25 AND THE ENTRY BELOW IS KEPT
+  RATHER THAN DELETED, BECAUSE THE RIG IT DESCRIBES STILL RUNS.** Instructed:
+  *"arhcive able demo and rm from index"*. The page is at
+  `archive/demos/able-index.html`, its manifest row is gone, and
+  **<https://positron.studio/able/> is a 404**. Nothing under `rig/` was
+  touched, so `rig/m1/live-agent.mjs`, `rig/m1/pace-agent.mjs` and the Core
+  Audio tap all still work exactly as described. ⚠️ **AND NO LIVE PAGE
+  ADDRESSES `m1-1` ANY MORE**, so the agent on that Mac has nothing in a browser
+  left to answer. ⚠️ `rig/m1/README.md` and `rig/m1/pace-agent.mjs`
+  still PRINT `/able/` URLs, one of them on every start, and that is recorded in
+  `BACKLOG.md` rather than repaired.
+- **`rack` played Ableton Live from a browser and it WAS live (2026-09-12).**
+  <https://positron.studio/able/> (**a 404 since 2026-09-25, see above**), 15/15. A note number crosses the relay,
   `rig/m1/live-agent.mjs` hands it to Live over CoreMIDI, and a **Core Audio
   process tap** sends a copy of what Live renders back down the same socket —
   so Live keeps playing out of its own speakers while the page hears it too.
@@ -142,7 +153,8 @@ or checking it tells you nothing about what is running. Compare `md5sum` against
   deaf, so its relay agent must live in a login session — the box is a service
   that dials out on boot, this is a performance instrument you wake on purpose.
   `rig/m1/README.md` has the measurements, the two traps and the
-  revisit order. `/able/` stays live and reports silence AS silence.
+  revisit order. `/able/` reported silence AS silence, which is the behaviour to
+  preserve if it ever comes back.
 - **An avfoundation device INDEX is a shared mutable global, exactly like a
   fixed port.** `ffmpeg -f avfoundation -i ":0"` meant the microphone when
   `rig/m1/README.md` was written and means **BlackHole** today —

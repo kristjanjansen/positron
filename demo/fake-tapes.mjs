@@ -6,7 +6,7 @@
 // Then open the page against it:
 //   http://127.0.0.1:8890/tapes/?base=http://127.0.0.1:8901
 //
-// 🔴 WHY THIS EXISTS. `/tapes/` plays twenty-four Kurenniemi recordings off
+// 🔴 WHY THIS EXISTS. `/tapes/` plays twenty-three Kurenniemi recordings off
 // archive.org, and the standing instruction is *"stil: super careful with
 // external sources, better avoid"*. The reasoning that got that reply was
 // "it uses archive.org, not ERR, so it is safe to run": the rule is about whose
@@ -121,7 +121,7 @@ const bytesFor = (ms) => framesFor(ms) * FRAME_BYTES;
 /**
  * 🔴 EVERY .mp4 ROW IS A REAL MP4, BUILT ONE AT A TIME AND KEPT.
  *
- * Eight of the twenty-four rows are `video/mp4`, and `/tapes/` opens them in an
+ * Eight of the twenty-three rows are `video/mp4`, and `/tapes/` opens them in an
  * `<audio>` element on the strength of `canPlayType`. MP3 bytes under an
  * `.mp4` name would be a stand-in answering a different shape from the thing it
  * stands in for, which is the failure mode a stand-in has: whatever a browser
@@ -272,7 +272,7 @@ export function startTapes({ port = 8901, quiet = false } = {}) {
  * A recording of exactly `row.ms`, as one tile repeated.
  *
  * 🔴 THE FILE IS NEVER MATERIALISED, AND THAT IS NOT A MICRO-OPTIMISATION. The
- * twenty-four rows come to 2 h 22 min, which is 68 MB at this bitrate, and a
+ * twenty-three rows come to 2 h 15 min, which is 65 MB at this bitrate, and a
  * Map of buffers keyed by duration would hold all of it for the life of a run
  * that reads two of them. Byte `i` of the file is byte `i % tile.length` of the
  * tile, so a Range reply is a walk over the tile with no allocation but the

@@ -125,9 +125,22 @@ export function createPanelLayout(o = {}) {
   const {
     cased = true, side = 'left', flow: wantFlow = true, grow: growEl = null,
     cls = {}, strip: stripOpts = {}, plate: plateOpts = null,
+    /**
+     * 🔴 WHICH EDGE A `side` PLATE IS GLUED TO, AND IT IS A SEPARATE ARGUMENT
+     * FROM `side` ON PURPOSE. `side` names the edge the FIXED COLUMN is on and
+     * every caller has already decided it; deriving this from that one, say by
+     * taking the opposite edge, would be this component guessing at a layout
+     * question nobody asked it. Two facts, two arguments.
+     * ⚠️ IT IS READ ONLY WHEN THE PLATE'S PLACEMENT IS `side`, so the seven
+     * pages wearing a case today pass nothing and get exactly what they got.
+     */
+    plateSide = 'left',
   } = o;
   if (side !== null && side !== 'left' && side !== 'right') {
     throw new Error(`createPanelLayout: side is 'left', 'right' or null, not ${JSON.stringify(side)}`);
+  }
+  if (plateSide !== 'left' && plateSide !== 'right') {
+    throw new Error(`createPanelLayout: plateSide is 'left' or 'right', not ${JSON.stringify(plateSide)}`);
   }
 
   const add = (base, extra) => (extra ? `${base} ${extra}` : base);
@@ -159,6 +172,19 @@ export function createPanelLayout(o = {}) {
   if (plateOpts) {
     plate = plateOpts.el && plateOpts.lines ? plateOpts : createNameplate(plateOpts);
     root.append(plate.el);
+    /**
+     * 🔴 A `side` PLATE TURNS THE CASE INTO TWO COLUMNS, AND IT DOES IT WITH AN
+     * ATTRIBUTE RATHER THAN WITH A NEW ELEMENT. The case holds exactly two
+     * children, the plate and the wrap or strip, so the arrangement is entirely
+     * a stylesheet's business: no wrapper, no reparenting, and every page that
+     * does not ask for this gets a DOM identical to yesterday's, which is the
+     * property that makes this safe to land in shared kit before seven pages
+     * are re-run.
+     * ⚠️ IT IS WRITTEN FROM THE PLATE'S OWN `place` RATHER THAN FROM A SECOND
+     * FLAG, so a caller cannot ask for a side column and a horizontal plate and
+     * get a layout that means neither. One fact decides it.
+     */
+    if (plate.place === 'side') root.dataset.plateSide = plateSide;
   }
 
   let wrap = null, fixed = null;
@@ -285,10 +311,51 @@ export function createPanelLayout(o = {}) {
  * setting their nameplates three ways and why this component exists. A
  * placement is arrangement, and arrangement is what this file owns.
  */
+/**
+ * 🔴 `side`: THE PLATE TURNED ON ITS SIDE AND GLUED DOWN THE EDGE OF THE CASE,
+ * ADDED 2026-09-25. Asked for on `/shape/`: *"wrap into isntrument box.
+ * nameplate is \"shape\" vertical glued section"*. Every placement before it is
+ * horizontal (`ends` on `/tom/`, `end` on `/twelve/` and in every header, `mid`
+ * on `/evo/`), so this is a fourth placement rather than an option on one of
+ * them, and it is built HERE so all seven pages wearing the case can have it
+ * rather than one page rotating text in its own stylesheet.
+ *
+ * 🔴 AND IT DOES NOT UNDO *"rm nameplates"*. `instrument.mjs` records
+ * `plate: false`, added 2026-09-22 on that ask, and the reason it gives is
+ * specific and still true: **the status control already prints the
+ * instrument's name in front of its state, so a plate BESIDE IT is the name
+ * twice on one row.** That is an objection to a plate in the HEADER. A plate
+ * turned ninety degrees and glued down the edge of the case is a different
+ * object in a different place: it names the whole instrument the way the
+ * silkscreen down the side of a real one does, it is nowhere near the status
+ * control, and it cannot be the same fact twice because it is not on that row.
+ * **Both decisions stand.** `plate: false` is still how a header gives its
+ * plate up, and a page that wants the name on the case asks for this.
+ *
+ * ⚠️ `writing-mode`, NOT A `rotate`. A transform takes the element out of flow
+ * and leaves a box the width of the text it used to be, so the column beside it
+ * would be sized by a word lying down. `writing-mode` changes the box, so the
+ * grid track is genuinely the height of the name and as narrow as its type.
+ *
+ * 🔴 `caps: false` KEEPS WHAT WAS TYPED, AND IT IS HERE BECAUSE THE ASK SAYS
+ * `shape` IN LOWER CASE. `shell.css` uppercases every plate on a rule asked for
+ * 2026-09-21 (*"replica names always in uppercase"*), which is about a shelf of
+ * REPLICAS reading as one shelf: `/tom/`, `/twelve/`, `/circuit/` and `/evo/`
+ * all name a machine somebody else made. `/shape/` is not a replica of
+ * anything, the name asked for is the page's own slug, and `SHAPE` would be
+ * this component answering a different question from the one it was asked.
+ * ⚠️ IT IS A COMPONENT OPTION AND NOT A PAGE RULE, FOR THE REASON THIS FILE
+ * ALREADY HAS IN WRITING one function up: `/tom/` fixed a plate in its own
+ * stylesheet, *"every page after it inherited the defect and not the fix"*, and
+ * it was reported again on `/plai/`. A page reaching into `.panel-plate-l` to
+ * turn a transform off is that, exactly.
+ * ⚠️ AND `shown()` BELOW ALREADY HANDLES IT, because it reads the COMPUTED
+ * transform rather than assuming one. Nothing about the check changes.
+ */
 export function createNameplate(o = {}) {
-  const { lines = [], place = 'ends', cls = '' } = o;
-  if (place !== 'ends' && place !== 'mid' && place !== 'end') {
-    throw new Error(`createNameplate: place is 'ends', 'mid' or 'end', not ${JSON.stringify(place)}`);
+  const { lines = [], place = 'ends', cls = '', caps = true } = o;
+  if (place !== 'ends' && place !== 'mid' && place !== 'end' && place !== 'side') {
+    throw new Error(`createNameplate: place is 'ends', 'mid', 'end' or 'side', not ${JSON.stringify(place)}`);
   }
   // 🔴 REFUSED RATHER THAN DRAWN EMPTY. A plate with nothing on it is a
   // container with nothing in it painting its own edges, which is the shape this
@@ -300,6 +367,11 @@ export function createNameplate(o = {}) {
   // `[data-place="ends"]` rather than a bare `[data-place]`: an attribute
   // selector matches on PRESENCE, and an empty one would satisfy a bare test.
   root.dataset.place = place;
+  /* ⚠️ A CLASS AND NOT AN ATTRIBUTE HERE, because this one only ever turns a
+     transform OFF and there is nothing to match a value against. Everything
+     said about `[data-place]` matching an empty attribute is about a property
+     with three settings; this has two and the absence is the default. */
+  if (!caps) root.classList.add('panel-plate-asis');
   const parts = lines.map((t) => {
     const e = el('div', 'panel-plate-l', t);
     root.append(e);

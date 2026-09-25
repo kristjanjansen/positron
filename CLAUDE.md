@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. R&D, not a product. 59 demo rows of which
-57 are shelled, a Raspberry Pi in another building, a Novation Circuit on the
+Live at **https://positron.studio**. R&D, not a product. 57 demo rows of which
+55 are shelled, a Raspberry Pi in another building, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
@@ -25,7 +25,7 @@ here?*; `DEMOS` is the story order and answers *where do I start?*, and
 | `LESSONS.md` | why the rules exist, at length |
 | `PROGRESS.md` | what was measured, when |
 | `LAYOUT.md` | where a new file goes, and the two renames that were priced and rejected |
-| `plans/` | every plan, 72 of them today (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
+| `plans/` | every plan, 74 of them today (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
 
 ## The skills, and when to load one
 

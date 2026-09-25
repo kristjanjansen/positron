@@ -243,8 +243,12 @@ export function createPad({
  * @param {number} o.cols   how many across. **This is the beat, so it is the
  *                          number that matters**: 16 for sixteenths of a bar.
  * @param {number} [o.rows] default 1
- * @param {(x:number, y:number)=>object} [o.pad]  options for the pad at x, y
- * @param {(on:boolean, x:number, y:number, pad:object)=>void} [o.onPress]
+ * @param {(x:number, y:number)=>object} [o.pad]  options for the pad at x, y.
+ *   ⚠️ An `onPress` returned from here is a PER PAD handler and it runs, before
+ *   the grid's. It was silently discarded until 2026-09-25; see the note where
+ *   the pads are built.
+ * @param {(on:boolean, x:number, y:number, pad:object)=>void} [o.onPress] the
+ *   whole grid's handler, which is told which pad it was.
  * @returns {{el:HTMLElement, pads:object[][], at:Function, column:Function,
  *            lit:()=>number, clear:Function}}
  */
@@ -285,9 +289,29 @@ export function createPadGrid({ cols, rows = 1, pad = () => ({}), onPress = () =
   for (let y = 0; y < rows; y++) {
     const row = [];
     for (let x = 0; x < cols; x++) {
+      /**
+       * 🔴 BOTH HANDLERS RUN. THE GRID'S OWN USED TO OVERWRITE THE PAD'S AND
+       * NOTHING SAID SO. `createPad` documents `onPress` as a pad option and
+       * `pad(x, y)` returns pad options, so the API invited a per-pad handler
+       * and then spread it straight into the property the line below replaced.
+       * A caller got no error, no warning and a pad that still lit on every
+       * press, because the flash is this component's own.
+       * 🔴 MEASURED AS A LIVE DEFECT 2026-09-25 ON `/evo/`: a deliberate
+       * sabotage of a per-pad handler came back GREEN, because that handler had
+       * never run in the first place. That is `/stage/`'s dead buttons in a
+       * second costume, and this one is harder to see: the name is right, the
+       * wiring is right, and the LEVEL is wrong.
+       * ⚠️ THE PAD'S OWN GOES FIRST, because it is the more specific statement
+       * and a grid level handler is usually the one that logs or routes. If the
+       * pad's throws, the grid's does not run, which is ordinary and is how a
+       * caller finds out.
+       * ⚠️ AND A GRID WITH NO PER PAD HANDLER IS UNCHANGED, which is every
+       * caller today.
+       */
+      const own = specs[y][x].onPress;
       const p = createPad({
         ...specs[y][x],
-        onPress: (on, self) => onPress(on, x, y, self),
+        onPress: (on, self) => { own?.(on, self); onPress(on, x, y, self); },
       });
       row.push(p);
       el.append(p.el);

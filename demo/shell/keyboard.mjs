@@ -123,6 +123,19 @@ import { createToggle } from './toggle.mjs';
    recording and looping MEAN, which is the same division the page keeps with the
    keyboard. */
 import { createNumLoop } from './numloop.mjs';
+/* 🔴 THE NAMER ALREADY EXISTS AND IT IS NOT `chords.mjs`. Asked 2026-09-25:
+   *"add chord name to the footer, right from the transpose message"*. The
+   obvious first move is `chords.mjs`, because that file is about chords and is
+   imported all over this project, and it is the WRONG DIRECTION: it turns
+   `Cmaj` into notes. This needs notes turned into `Cmaj`, which
+   `demo/shell/name.mjs` does, which `name-test.mjs` grades with ten negative
+   controls, and whose own header spends a page on why the two are different
+   problems rather than one problem with the arrow turned round.
+   ⚠️ SO NOTHING IS NAMED TWICE HERE. The reserved width below is computed from
+   that module's own `RECOGNISED` and `NOTE_LETTERS` rather than from a number
+   typed in this file, which is the same reason `name.mjs` takes its letters out
+   of `chords.mjs` instead of writing them again. */
+import { nameChord, RECOGNISED, NOTE_LETTERS } from './name.mjs';
 
 /**
  * 🔴 WHERE A BLACK KEY SITS, AS FRACTIONS OF ITS OWN WIDTH, FROM
@@ -290,6 +303,59 @@ export const QWERTY_CHROMATIC = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7
 export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
 
 /**
+ * 🔴 A KEYBOARD OF N SEMITONES, AND IT IS A COMPONENT BECAUSE THE SECOND PAGE
+ * ASKED FOR IT. Asked on `/knobs/` 2026-09-25 as *"make keyboard 25 full w."*.
+ * `/nola/` already builds exactly this inline, twenty-five keys from a letter
+ * map with `hi<n>` ids for the ones no letter reaches, and `/knobs/` was about
+ * to write it a second time. **A control that exists in one page and nowhere
+ * else is a component that has not been noticed yet**, which is this project's
+ * own rule and the reason three pages once had three different radio rows.
+ *
+ * ⚠️ 25 KEYS IS `span: 24`, AND THE OFF BY ONE IS THE WHOLE NAMING PROBLEM.
+ * A 25 key controller is two octaves C to C, which is 24 SEMITONES inclusive of
+ * both ends. The argument is the span in semitones because that is what a note
+ * number is measured in and what `base + span` means; `KEY_SPAN_25` is here so
+ * a caller never has to do that subtraction in its own head.
+ *
+ * 🔴 THE LETTERS ARE READ OFF THE MAP'S VALUES AND NEVER OFF ITS ORDER, WHICH
+ * `/nola/` RECORDS AS A REAL BUG. `QWERTY_CHROMATIC` has a GAP in it: `l` is 14
+ * and nothing sits at 13, so handing the nth letter to the nth semitone puts a
+ * white letter on a black key and moves every shape a hand knows one key out.
+ * ⚠️ AND A KEY WITH NO LETTER STILL NEEDS AN ID, because `keys` is a list of
+ * ids and `map` is keyed by them. `hi<semitone>` is what `/nola/` chose and it
+ * is kept, so the two builds produce identical ids and nothing that reads one
+ * has to learn the other.
+ * ⚠️ `letters` COMES BACK AS A SET rather than `true`, which is what
+ * `createKeyboard` wants for a layout with more keys than the computer keyboard
+ * has letters. The component's own note beside `letters` argues it.
+ *
+ * @param {number} [span] semitones from the leftmost key to the rightmost,
+ *   inclusive of both, so a two octave picture is 24 and gives 25 keys.
+ * @returns {{map, keys, sharps, letters, whites}} the four arguments
+ *   `createKeyboard` takes, plus the white key count a caller may want for a
+ *   width. Spread it: `createKeyboard(host, { ...keyRange(24), base: 48 })`.
+ */
+export const KEY_SPAN_25 = 24;
+
+export function keyRange(span = KEY_SPAN_25) {
+  const map = {}, keys = [], sharps = new Set(), letters = new Set();
+  /* the five pitch classes a piano paints black, which is a fact about a
+     keyboard rather than about this letter map */
+  const BLACK = new Set([1, 3, 6, 8, 10]);
+  const letterAt = Object.fromEntries(
+    Object.entries(QWERTY_CHROMATIC).map(([k, v]) => [v, k]));
+  let whites = 0;
+  for (let i = 0; i <= span; i++) {
+    const id = letterAt[i] ?? `hi${i}`;
+    map[id] = i;
+    keys.push(id);
+    if (BLACK.has(((i % 12) + 12) % 12)) sharps.add(id); else whites++;
+    if (letterAt[i]) letters.add(id);
+  }
+  return { map, keys, sharps, letters, whites };
+}
+
+/**
  * @param host     element to append the keyboard to
  * @param base     MIDI note of the leftmost key (60 = middle C)
  * @param onDown   (note, how) — how is 'key' | 'pointer' | 'midi' | 'panic'
@@ -314,7 +380,7 @@ export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
  * @param pad      `false` draws no octave pair and no `Notes off`, for a chord
  *                 chart rather than an instrument. See the block beside it.
  * @returns {{el, keysEl, pad, noteOf, keyOf, press, release, base, shiftOctave,
- *            panic, lightNote, notes, timing, destroy}}
+ *            panic, lightNote, notes, chord, timing, destroy}}
  *          `el` is the WHOLE component — keys plus pad — so a page that places
  *          it by hand places both. `keysEl` is the key row alone.
  */
@@ -330,6 +396,10 @@ export function createKeyboard(host, {
   /** where this component says what its loop is doing. `d.log`, normally. */
   log = null,
   names: wantNames = true,
+  /** name the chord being held, in the footer. See the block beside it. */
+  chord: wantChord = true,
+  /** 🔴 THE BOX SPANS ITS HOST INSTEAD OF SIZING TO THE KEYS. See `full` below. */
+  full = false,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
   /**
@@ -418,6 +488,21 @@ export function createKeyboard(host, {
   };
 
   const el = make('div', 'kbd');
+  /**
+   * 🔴 A KEYBOARD THAT SPANS ITS HOST, ASKED FOR ON `/knobs/` 2026-09-25 AS
+   * *"make keyboard 25 full w."*. `.kbd` is `width: fit-content` by default and
+   * that is the right default, because a full width panel holding a 496 px
+   * keyboard is a box of empty surface that reads as a layout which failed.
+   * ⚠️ IT DOES NOT TOUCH THE KEY CEILING, WHICH IS A DIFFERENT DECISION AND
+   * STANDS. `shell.css` records *"make it higher in desktop to have similar
+   * proportions as monile. do not stretch it ever"* and pins a white key
+   * between 49 and 62 px. `full` makes the BOX span its host; the keys keep
+   * their own range inside it, so a 25 key layout fills a panel because
+   * fifteen white keys are wider than the panel rather than because anything
+   * was stretched to fit.
+   * ⚠️ OPT IN, so the nine pages that pass nothing are unchanged.
+   */
+  if (full) el.classList.add('kbd-full');
   const keysEl = make('div', 'keys');
   const els = new Map();
   const letterOf = new Map();         // element -> letter, for the hit test
@@ -697,14 +782,31 @@ export function createKeyboard(host, {
     nameSeg.append(b);
     return b;
   };
-  /* 🔴 THE TWO STANDARD TERMS, ASKED FOR IN THIS ORDER: *"c | 1 - someting more
-     descriptive?"*, then `C D E | 1 2 3`, then *"Notes | Degrees"*, 2026-09-23.
-     These are what the two namings are CALLED: note names are absolute, a C is
-     a C in any key, and scale degrees are relative, so `1` moves when the key
-     does. The glyphs showed which was which and named neither, and a word a
-     reader can look up beats a demonstration they have to decode. */
-  const letterBtn = mkName('Notes', 'letter', 'name the keys as notes, which do not move');
-  const degreeBtn = mkName('Degrees', 'degree',
+  /* 🔴 THE FOURTH SPELLING OF ONE LABEL, AND THE THREE BEFORE IT ARE KEPT
+     BECAUSE THE ARGUMENT MOVED RATHER THAN BEING WON. Asked in this order:
+     *"c | 1 - someting more descriptive?"*, then `C D E | 1 2 3`, then
+     *"Notes | Degrees"* on 2026-09-23, then *"keyboard component: Notes |
+     Degreens -> Nt | Dg."* on 2026-09-25.
+     🔴 AND THE COMMENT THAT STOOD HERE UNTIL TODAY ARGUED THE OPPOSITE IN
+     WRITING, so it is replaced rather than left to contradict the code. It
+     said *"a word a reader can look up beats a demonstration they have to
+     decode"*, which was the right answer to the question it was asked: `C D E`
+     against `1 2 3` DEMONSTRATES the two namings and names neither, so a
+     reader has to work out what the row is offering. `Nt` and `Dg` are not
+     that. They are the words themselves, shortened, so the thing a reader
+     looks up is still a word and it is still the right one.
+     ✅ WHAT BUYS IT IS THE ROW. This footer holds a naming pair, an octave
+     pair, a displacement, a chord name and three buttons, and `Notes` plus
+     `Degrees` is twelve characters of it for a control nobody presses twice a
+     session. MEASURED on `/nola/` at 1280 px, the same segmented row built both
+     ways in the same pad: **118.48 px against 65.50**, so the row gets 52.98 px
+     back, which is most of what the chord cell beside it costs.
+     ⚠️ AND THE `title` IS NOT WHAT IS BEING SHORTENED. It is the sentence a
+     reader looks up when an abbreviation does not tell them enough, so it
+     stays exactly as it was and carries the meaning the label gives up. That
+     is the whole reason this is a shortening rather than a loss. */
+  const letterBtn = mkName('Nt', 'letter', 'name the keys as notes, which do not move');
+  const degreeBtn = mkName('Dg', 'degree',
     'name the keys as scale degrees, which move with the key');
   const paintNaming = () => {
     for (const [b, mode] of [[letterBtn, 'letter'], [degreeBtn, 'degree']]) {
@@ -772,6 +874,46 @@ export function createKeyboard(host, {
     if (d === 0) atEl.dataset.home = '1'; else delete atEl.dataset.home;
   };
   pad.append(atEl);
+  /**
+   * 🔴 WHAT IS BEING HELD, NAMED, TO THE RIGHT OF THE DISPLACEMENT. Asked
+   * 2026-09-25: *"add chord name to the footer, right from the transpose
+   * message. avoind text moving in x axis"*.
+   *
+   * 🔴 THE SECOND SENTENCE IS THE HARD HALF AND IT IS SOLVED BY A RESERVE, NOT
+   * BY A SHORT NAME. A chord name is one character for `C` and eleven for
+   * `G#min7b5/D#`, so a cell that sizes to its content moves everything beside
+   * it on every chord somebody plays, which is exactly the rule this project
+   * already has in writing: nothing that redraws while somebody is looking at
+   * it may change how much room it takes. The widest thing this cell can ever
+   * say is reserved at build time and the name is drawn inside it.
+   * ⚠️ AND THE WIDTH IS COMPUTED FROM `name.mjs`'s OWN TABLES RATHER THAN
+   * TYPED. A root letter (`C` or `C#`), the longest quality that module will
+   * ever return (`min7b5`), a slash and a bass letter. A number typed here
+   * would be right today and silently narrow the first time a quality is added
+   * to `RECOGNISED`, and a name clipped by an ellipsis is this project's own
+   * signal that something is in the wrong place. `presence.mjs` reserves its
+   * word the same way and for the same reason.
+   * ⚠️ `ch` ON A MONO FACE IS EXACTLY CHARACTERS, which is what makes the
+   * arithmetic above a measurement rather than an estimate.
+   *
+   * 🔴 IT IS A CELL BESIDE THE DISPLACEMENT, NOT A STRING JOINED TO IT. Two
+   * facts, two elements, no separator between them, which is the standing rule
+   * about a row of facts being cells rather than one string with glue in it.
+   *
+   * ⚠️ TWO INKS, AND THEY ARE `/nola/`'s TWO, because that page is giving this
+   * readout up to this component and the two must not disagree about what a
+   * colour means. A name the recogniser is sure of and two readings it cannot
+   * choose between are different statements: `--dim` for the first, `--dim2`
+   * for the second. `name.mjs` measured the margin that separates them.
+   */
+  const LETTER_CH = Math.max(...NOTE_LETTERS.map((l) => l.length));
+  const CHORD_CH = LETTER_CH + Math.max(...RECOGNISED.map(([q]) => q.length))
+                 + 1 + LETTER_CH;
+  const chordEl = wantChord ? make('span', 'kpad-chord', '') : null;
+  if (chordEl) {
+    chordEl.style.minWidth = `${CHORD_CH}ch`;
+    pad.append(chordEl);
+  }
   const panicBtn = make('button', '', 'Notes off', {
     type: 'button', title: 'stop every note that is still sounding',
   });
@@ -860,12 +1002,64 @@ export function createKeyboard(host, {
      answers the wrong way on every key up. */
   let viaKey = 0;
 
+  /**
+   * 🔴 WHAT IS SOUNDING IS TWO SETS AND NOT ONE, WHICH IS THE ONE THING ABOUT
+   * NAMING A CHORD HERE THAT IS NOT OBVIOUS. `held` is the KEYS this
+   * component's own funnel pressed; `fingerNotes` is the NOTES a page lit from
+   * somewhere this component never saw, which is the MIDI case and is the whole
+   * point on a page with a keyboard plugged in. Reading either one alone names
+   * half an instrument: `held` alone says nothing about a chord played on a
+   * real keyboard, and `fingerNotes` alone says nothing about a chord clicked
+   * on screen.
+   * ⚠️ `hint`, `remote` AND `ai` ARE DELIBERATELY NOT IN IT. `lightNote` keeps
+   * them out of `fingerNotes` already, and they are notes nobody is holding: a
+   * proposal named as though it were being played is the colour rule this
+   * component already keeps, arriving as a readout.
+   * ⚠️ AND IT IS A SET OF NOTES RATHER THAN OF KEYS, so a note played past the
+   * drawn range still counts toward the name. A 25 key picture does not bound
+   * what a hand can play into it.
+   */
+  const sounding = () => {
+    const out = new Set();
+    for (const k of held) out.add(noteOf(k));
+    for (const n of fingerNotes) out.add(n);
+    return [...out];
+  };
+
+  /**
+   * 🔴 ONE NOTE IS NOT A CHORD AND THE KEY ITSELF ALREADY SAYS WHAT IT IS.
+   * Below two notes this cell is empty, because every key on this keyboard
+   * prints its own note name and a footer repeating one of them is the same
+   * fact twice. From two up, `name.mjs`'s own margin decides what is said and
+   * how confidently: MEASURED there, a bare fifth is the only two note reading
+   * it is ever sure of, which is exactly right, and everything else comes back
+   * as a faint guess until a third note pins it down.
+   * ⚠️ NO SETTLING WINDOW HERE, WHICH IS A DECISION. `name.mjs` exports
+   * `createSettler` for a page that is LEARNING chords and needs the largest
+   * set held across a roll, and `/nola/` uses it for exactly that. A footer is
+   * a readout of what is down right now, it has no timer, and a debounce would
+   * make this component's answer depend on a clock that nothing here can grade.
+   * The name flickers while a chord is being rolled; the LAYOUT does not, which
+   * is the half the ask was about.
+   */
+  function paintChord() {
+    if (!chordEl) return;
+    const down = sounding();
+    const r = down.length >= 2 ? nameChord(down) : null;
+    chordEl.textContent = r?.ok ? r.label : '';
+    /* ⚠️ DELETED, NEVER SET TO THE EMPTY STRING, which is the same trap
+       `paintAt` above names: `[data-sure]` matches on PRESENCE, so a guess
+       would wear the confident ink for the rest of the page's life. */
+    if (r?.sure) chordEl.dataset.sure = '1'; else delete chordEl.dataset.sure;
+  }
+
   function press(k, how = 'key') {
     if (!(k in map) || held.has(k)) return;
     held.add(k);
     onTape(k, true);
     viaKey++;
     try { onDown(noteOf(k), how); } finally { viaKey--; }
+    paintChord();
   }
 
   function release(k, how = 'key') {
@@ -874,6 +1068,7 @@ export function createKeyboard(host, {
     onTape(k, false);
     viaKey++;
     try { onUp(noteOf(k), how); } finally { viaKey--; }
+    paintChord();
   }
 
   /**
@@ -1449,6 +1644,13 @@ export function createKeyboard(host, {
       touches.clear();
       for (const k of [...held]) release(k, 'panic');
       for (const b of els.values()) b.classList.remove('down');
+      /* ⚠️ AND THE NOTES LIT FROM OUTSIDE GO WITH THE PAINT, or the footer
+         goes on naming a chord under a button labelled `Notes off`. The lamps
+         above are cleared by hand for exactly this reason and the set behind
+         them was not. `remote` is left alone here as it is there: those are
+         somebody else's notes and this button does not reach them. */
+      fingerNotes.clear();
+      paintChord();
       onPanic?.();
     },
     /**
@@ -1478,6 +1680,17 @@ export function createKeyboard(host, {
         if (on) fingerNotes.add(note); else fingerNotes.delete(note);
       }
       if (who === 'self' && !viaKey) tapeNote(note, !!on, vel);
+      /* 🔴 AND THE FOOTER IS REPAINTED HERE AS WELL AS IN THE FUNNEL, BECAUSE
+         THIS IS THE ONLY ROUTE A MIDI NOTE TAKES. A note played on a keyboard
+         plugged into the machine never reaches `press`: the page hears it and
+         lights it, which is this component's own rule that a key is lit by a
+         NOTE and never by the press that caused it. Repainting only in the
+         funnel would give `/knobs/` and `/instrument/` a chord cell that stays
+         empty while somebody plays a chord, which is the shape of control this
+         project calls a lie.
+         ⚠️ IT IS OUTSIDE THE `if (!k) return` BELOW, so a note past the drawn
+         range still counts toward the name. */
+      paintChord();
       if (!k) return;
       /* 🔴 `ai` IS A FOURTH LAMP AND NOT A FOURTH COLOUR OF THE SAME ONE. Asked
          2026-09-23: *"when fading, fade them also in keyboard so smaller are on
@@ -1490,6 +1703,24 @@ export function createKeyboard(host, {
     },
     /** every note this keyboard can produce, for a caller that needs the range */
     notes: () => keys.map(noteOf),
+    /**
+     * 🔴 WHAT THE FOOTER IS SAYING, AND THE ELEMENT IT SAYS IT IN, BECAUSE A
+     * CONTROL A CHECK CANNOT READ IS A CONTROL NOTHING GRADES. This component
+     * already learned that about the pad, whose own header records three
+     * ungraded controls: `verify.mjs` presses `.pos-controls` and nothing else,
+     * so anything drawn here has to be observable from the api or it is
+     * invisible to every harness in the project.
+     * ⚠️ IT RETURNS THE READING AND THE ELEMENT, NOT JUST THE STRING. The
+     * string answers *what does it say*; `el` is what answers *does it move*,
+     * which is the half the ask was actually about and which only a rect can
+     * settle.
+     */
+    chord: () => {
+      const down = sounding();
+      const r = down.length >= 2 ? nameChord(down) : null;
+      return { el: chordEl, notes: down, name: chordEl ? chordEl.textContent : '',
+               sure: !!r?.sure, reading: r };
+    },
     /** what this keyboard was built with, so a check can grade the numbers as well as the machinery */
     timing: { swipeFrames, swipePx, keyMinPx: KEY_MIN_PX, blackRatio: BLACK_RATIO },
     /**

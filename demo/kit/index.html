@@ -8979,6 +8979,153 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
           && gap >= 0 && gap <= 12 && gap2 >= 0 && gap2 <= 12,
         `left edges ${Math.round(lp?.left)}, ${Math.round(sus?.left)}, `
         + `${Math.round(off?.left)}, with ${gap} px and ${gap2} px between them`);
+
+      /**
+       * 🔴 THE CHORD NAME SAYS WHAT IS HELD AND MOVES NOTHING WHILE IT DOES.
+       * Asked 2026-09-25: *"add chord name to the footer, right from the
+       * transpose message. avoind text moving in x axis"*, and the second
+       * sentence is the half a check can settle. The two chords driven here are
+       * the shortest and the longest name this cell can produce, `C5` at two
+       * characters and a half diminished seventh at eight, and the point is
+       * that the box is the same either way.
+       * ⚠️ IT MEASURES THE RECTS OF THE CELL AND OF THE ROW AROUND IT, not the
+       * string. A cell that says the right thing and shoves its neighbours is
+       * exactly what was asked against, and only a rect can tell them apart.
+       * ⚠️ AND THE NAME IS READ TOO, or this passes on a cell that never says
+       * anything at all, which is a box of reserved air and the thing this
+       * project calls a green check with no coverage.
+       */
+      const chordEl = kpad.querySelector('.kpad-chord');
+      if (chordEl) {
+        const edges = () => [chordEl, ...kpad.querySelectorAll('.kpad-names, .kpad-at')]
+          .map((e) => +e.getBoundingClientRect().left.toFixed(2));
+        const at0 = edges();
+        const w0 = +chordEl.getBoundingClientRect().width.toFixed(2);
+        kb.lightNote(60, true); kb.lightNote(67, true);
+        const small = chordEl.textContent;
+        const at1 = edges();
+        const w1 = +chordEl.getBoundingClientRect().width.toFixed(2);
+        kb.lightNote(60, false); kb.lightNote(67, false);
+        for (const n of [59, 62, 65, 69]) kb.lightNote(n, true);
+        const big = chordEl.textContent;
+        const at2 = edges();
+        const w2 = +chordEl.getBoundingClientRect().width.toFixed(2);
+        for (const n of [59, 62, 65, 69]) kb.lightNote(n, false);
+        const empty = chordEl.textContent;
+        const same = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 0.51);
+        d.assert('the footer names the chord being held and nothing in the row moves sideways',
+          small === 'C5' && big.length > small.length && empty === ''
+            && same(at0, at1) && same(at0, at2) && w0 === w1 && w1 === w2,
+          `two notes read "${small}", five read "${big}", letting go reads `
+          + `"${empty}", the cell stays ${w0} px and the row's left edges stay `
+          + `${at0.join(', ')}`);
+      }
+    }
+
+    /**
+     * 🔴 THREE CLAIMS ABOUT THE CASCADE, MEASURED AGAINST RENDERED BOXES, AND
+     * ALL THREE ARE HERE BECAUSE A DEAD RULE READS AS CORRECT. This page is
+     * where component drift is supposed to become visible, and each of these
+     * names a defect that shipped while every assert on every page stayed
+     * green.
+     * ⚠️ THEY BUILD THEIR OWN SPECIMENS RATHER THAN READING THE PAGE'S,
+     * because two of the three are combinations no specimen on this page wears:
+     * the defects were reachable only from `/wish/` and `/tom/`, and a check
+     * that can only run on the page that already has the bug is a check that
+     * arrives after it.
+     */
+    {
+      const probe = el('div', 'kit-cascade-probe');
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:600px';
+      document.body.append(probe);
+
+      /* 🔴 A GLYPH BUTTON IS A SQUARE WHEREVER IT IS, AND THE RULE SAYING SO
+         WAS SCOPED TO ONE ROW UNTIL 2026-09-25. MEASURED on `/wish/` before the
+         widening: 45.83 px wide against 34.00 tall, with the attribute set
+         correctly, because `.pos-controls button[data-glyph="1"]` could not
+         reach a button in a table row.
+         🔴 AND IT IS MEASURED ON THE BOX, NEVER ON THE ATTRIBUTE, which is the
+         whole reason it went unnoticed: `/wish/`'s action column is 72 px, the
+         wrong size fitted inside it, and nothing collided. An assert reading
+         `dataset.glyph` would have passed throughout. */
+      const sq = (host) => {
+        const b = el('button', '', '⇄');
+        b.type = 'button'; b.dataset.glyph = '1';
+        host.append(b);
+        const r = b.getBoundingClientRect();
+        b.remove();
+        return { w: +r.width.toFixed(2), h: +r.height.toFixed(2) };
+      };
+      const row = el('div', 'pos-controls');
+      probe.append(row);
+      const inRow = sq(row);
+      const loose = sq(probe);
+      d.assert('a glyph button is a square outside the control row as well as inside it',
+        inRow.w === 34 && inRow.h === 34 && loose.w === 34 && loose.h === 34,
+        `in the row ${inRow.w} by ${inRow.h}, outside it ${loose.w} by ${loose.h}`);
+
+      /* 🔴 A STEP GRID'S LABEL COLUMN KEEPS ITS WIDTH ON A PANEL'S FIXED
+         COLUMN, AND FOR THREE DAYS IT DID NOT. `.pos-pg-labs` declared
+         `border-right: 0; padding-right: 0` three thousand lines above
+         `.panel-fixed-l`, both at (0,1,0), so the panel won and the label
+         column's CONTENT box computed to 0.00 px against `width: 22px` under
+         `box-sizing: border-box`. MEASURED on `/tom/`: 64 of 64 labels clipped,
+         a lone `0` being 6.02 px of ink and `63` being 12.04, which is exactly
+         why 0 to 9 looked perfect.
+         🔴 THIS PAGE COULD NOT HAVE CAUGHT IT AND THAT IS WHY THE SPECIMEN IS
+         BUILT HERE. `createStepGrid`'s three specimens on this page hand it a
+         bare `div` as `fixed`, so none of them wears `.panel-fixed-l`, and
+         `/tom/` was the only page in the repository putting the two together:
+         the one page with the defect was the only page that could grade it. */
+      const panel = el('div', 'panel panel-case');
+      const labs = el('div', 'panel-fixed panel-fixed-l pos-pg-labs');
+      labs.style.setProperty('--pg-lab', '22px');
+      const lab = el('span', '', '63');
+      labs.append(lab); panel.append(labs); probe.append(panel);
+      const labCs = getComputedStyle(labs);
+      const inner = labs.clientWidth;
+      const ink = lab.getBoundingClientRect().width;
+      d.assert('a step grid’s labels keep their whole width on a panel’s fixed column',
+        inner >= 22 && ink <= inner + 0.01
+          && labCs.borderRightWidth === '0px' && labCs.paddingRight === '0px',
+        `content box ${inner.toFixed(2)} px against a 22 px width, ink ${ink.toFixed(2)} px, `
+        + `border ${labCs.borderRightWidth}, padding ${labCs.paddingRight}`);
+      probe.remove();
+    }
+
+    /* 🔴 THE PIANO ROLL'S RULES RUN THE WHOLE PICTURE, INCLUDING PAST THE
+       FIRST ROW. Five requests have been made about these lines and the fifth
+       was *"rm gap in piano roll vert lines"*, 2026-09-25. MEASURED before the
+       repair, cell bottom to the next cell's top all the way down a four row
+       roll: 6.5, 0, 0, 0, 0, 0, 0. ONE gap, under the first row only, which is
+       why four reports in a row could each look like the last one returning.
+       🔴 AND THE FIRST ROW IS THE TALL ONE, WHICH IS THE WHOLE OF IT: it holds
+       half a row back so the top dots are not crowded against the box, the room
+       was meant to go inside the CELL, and the lane it sits in kept a flat
+       height, so `height: 100%` resolved against the lane instead of the row.
+       ⚠️ THE LABEL IS THE SECOND HALF AND NOBODY REPORTED IT. Measured in the
+       same pass: the chord name in row 0 sat 6.5 px above the dots it names,
+       and every other row was exact. */
+    {
+      const roll = document.querySelector('.roll');
+      const rows = roll ? [...roll.children] : [];
+      const cellOf = (r) => r.querySelector('.roll-cell:not(.sharp)');
+      const gaps = [];
+      for (let i = 1; i < rows.length; i++) {
+        const a = cellOf(rows[i - 1]), b = cellOf(rows[i]);
+        if (a && b) gaps.push(+(b.getBoundingClientRect().top - a.getBoundingClientRect().bottom).toFixed(2));
+      }
+      const mid = (e) => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; };
+      const offs = rows.map((r) => {
+        const dot = r.querySelector('.roll-cell'), lbl = r.querySelector('.roll-label');
+        return (dot && lbl) ? +(mid(lbl) - mid(dot)).toFixed(2) : null;
+      }).filter((v) => v !== null);
+      d.assert('the piano roll’s vertical rules have no gap in them, the first row included',
+        gaps.length >= 2 && gaps.every((g) => Math.abs(g) < 0.51)
+          && offs.length >= 1 && offs.every((o) => Math.abs(o) < 0.51),
+        `${gaps.length} join(s) reading ${gaps.join(', ')} px, worst `
+        + `${gaps.length ? Math.max(...gaps.map(Math.abs)).toFixed(2) : 'n/a'}; `
+        + `${offs.length} label(s) off their dots by ${offs.join(', ')} px`);
     }
 
     d.assert('every focus ring in the shell is 1 px, and not one of them paints on a mouse press',

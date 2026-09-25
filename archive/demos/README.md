@@ -1,14 +1,121 @@
 # archive/demos: retired demo pages
 
 One file per page, kept verbatim and named `<slug>-index.html`. Nothing in here
-is loaded, imported or deployed. `workers/view/build.mjs` enumerates `demo/`,
-and these files sit outside it, so a slug archived here 404s on
-positron.studio and any link anybody kept is dead.
+is loaded, imported or deployed. `workers/view/build.mjs` walks the rows of
+`demo/manifest.mjs` and skips anything without `built: true`, so a page with no
+row is never copied, and these files sit outside `demo/` as well. A slug
+archived here 404s on positron.studio and any link anybody kept is dead.
+⚠️ **THAT SENTENCE READ "ENUMERATES `demo/`" UNTIL 2026-09-25 AND THE BUILD
+DOES NOT.** `build.mjs:531` is `for (const d of DEMO_MANIFEST)` with a
+`if (!d.built) continue` under it, which is why taking a row out is the half
+that actually removes a page and why moving the directory alone would not.
 
 A page is archived rather than deleted when the code still answers a question
 somebody may ask again. It is not a fallback and must not be wired back in: a
 page here has no row in `demo/manifest.mjs`, so no harness opens it and nothing
 grades it any more.
+
+## `bay-index.html`, `able-index.html`, retired 2026-09-25
+
+Two instructions, one shape: *"arhive bay demo and rm from index. use the
+connecting code in wish"* and *"arhcive able demo and rm from index"*. No fault
+was reported on either and none was found. The owner was asked which reading of
+*archive* was meant and confirmed BOTH halves each time, so `built: false` alone
+was refused: the rows are out of `demo/manifest.mjs` and the files are out of
+`demo/`. `/bay/` and `/able/` 404 on positron.studio, no harness opens them and
+nothing grades them any more. MEASURED across the move: **`DEMOS` went from 59
+rows to 57.**
+
+### `bay`, the first page here that sent to an instrument
+
+`/bay/`, act 4, instruments group, created 2026-09-21, `built: true`, no
+`settleMs`, no controls row. Its line read *"route one instrument to another,
+with the connections it refuses explained in words"*, and its four cells were
+`instruments`, `links`, `sent` and `heard`. **`heard` sat beside `sent` on
+purpose**: they are counted at opposite ends of the link, and a counter on the
+sending side is not evidence the far end did anything.
+
+Asked for as *"Can you do patchbay deno called bay"*, straight after
+`plans/plan-patchbay.md`. The three hardware panels before it all listen. This
+one routed one instrument into another and could therefore do damage, which is
+why every port carried an `accepts` list and why nothing on the page turned a
+SysEx, a program change or a clock byte into bytes. The line that mattered:
+**the Circuit's input does not accept SysEx**, because that device has no
+factory reset and one byte inside a SysEx message overwrites a patch. It made
+**37 asserts** of its own.
+
+🔴 **THE MODULE IS NOT RETIRED, IT IS REHOMED, AND THAT WAS THE OTHER HALF OF
+THE SAME SENTENCE.** *"use the connecting code in wish"*. `demo/shell/bay.mjs`
+is pure and was never in the page: it holds the model, the validator and the
+text form, and `node demo/shell/bay-test.mjs` grades it with no browser at all.
+MEASURED on the day of the move: **69/69 green**, most of them negative
+controls, because a validator is the one kind of code that passes a naive suite
+by returning `{ok: true}` to everything. ⚠️ **AND THE PAGE AND THE MANIFEST BOTH
+UNDERSTATED IT**: the page's own header says 36 asserts and the manifest row
+said 30. The page is archived with its number as it was written, which is what
+an archive is for.
+
+⚠️ **NEITHER KIT MODULE IS ORPHANED BY THIS, WHICH WAS MEASURED RATHER THAN
+ASSUMED.** After the move `demo/shell/bay.mjs` still has three live importers
+(`demo/wish/index.html`, `workers/wish/src/wish.mjs`,
+`workers/wish/src/wish-test.mjs`) and `demo/shell/instruments.mjs` still has one
+(`demo/wish/index.html`). ⚠️ `research/name-lookups-2026-09-21.md` says
+`demo/bay/index.html` was *"the only live importer"* of `describe()`; that was
+already wrong before this move, because `/wish/` imports it too.
+
+⚠️ **EVERY OTHER LIVE FILE NAMING `bay` NAMES THE MODULE OR THE LESSON, NOT THE
+PAGE.** `demo/shape/index.html`, `demo/evo/index.html`, `demo/wish/index.html`,
+`demo/kit/index.html`, `demo/shell/presence.mjs`, `demo/shell/instruments.mjs`,
+`demo/shell/instruments-test.mjs` and `workers/wish/src/wish.mjs` all write
+`/bay/` in prose, in a comment, recording which page paid for a lesson. **Not
+one of them is a link and not one is a live string.** They are left exactly as
+they are, the same way `xr-quit.mjs` still names `/blocks/`.
+
+### `able`, Ableton Live played from a browser with no virtual audio cable
+
+`/able/`, act 4, instruments group, created 2026-09-12, `settleMs: 12000`,
+`room: 'fixed'`. Its line read *"play Ableton Live on a studio Mac from here,
+with no virtual audio cable"*. **Six readout cells** counted off the file on the
+day it moved, `sound`, `round trip`, `bitrate`, `buffer`, `dropouts` and `midi`.
+⚠️ The comment above them says SEVEN and explains that eight do not fit, since
+the row is `repeat(auto-fit, minmax(96px, 1fr))` and a nine-cell row wrapped at
+this page's width. **The prose and the object disagree by one and the object is
+the fact.** It is archived as written, which is what an archive is for.
+One control, `Start and connect`, **hidden rather than removed**, because
+pressing a key already started the sound and the socket dialled on load, while
+all **11 of the page's asserts** hung off that handler and `verify.mjs` presses
+`.pos-controls button`. `?checks=1` brought it back.
+
+`buffer` and `dropouts` are the cells worth keeping in mind: *"it sounds noisy"*
+and *"the stream is fine"* were both true at once for an hour, because the
+samples arriving over the relay measured bit-clean against the source while the
+page still sounded wrong. A cushion being trimmed or starved was the only part
+of the path that could do that, and it was the one part with no number on it.
+
+🔴 **THE SLUG WAS HELD BY A DIFFERENT PAGE FIRST, SO THERE ARE TWO FILES IN THIS
+DIRECTORY THAT WERE BOTH `/able/`.** `rack-index.html`, further down, is the
+CHECKUP that had the slug until 2026-09-20; this file is the PLAYER that
+replaced it. Neither is a fallback for the other.
+
+🔴 **ARCHIVING THE PAGE DID NOT ARCHIVE THE AGENT, AND `rig/` WAS NOT TOUCHED.**
+`room: 'fixed'` meant `m1-1` is **the address of the studio Mac's agent** rather
+than a rendezvous the page invented. `rig/m1/live-agent.mjs`,
+`rig/m1/pace-agent.mjs`, `rig/m1/README.md`, `rig/m1/studio.positron.rack-agent.plist`
+and `rig/board/board.mjs` all still name it and all still run. Nothing in either
+instruction said to touch them.
+⚠️ **BUT NO LIVE PAGE ADDRESSES `m1-1` ANY MORE**, measured after the move:
+`room: 'fixed'` is down to `mirror`, `wire`, `grains` and `knobs`, and all of
+those except `wire` are `studio-1`, the Raspberry Pi. So the agent on that Mac
+has nothing in the browser to answer, and `rig/m1/README.md` still prints
+`https://positron.studio/able/` and `http://127.0.0.1:8890/able/?relay=...` as
+the way in. **Those are the dangling links this retirement leaves**, and they
+are named here rather than silently repaired, because `rig/` was out of scope.
+
+⚠️ **THE OTHER FILES NAMING `able` NAME THE LESSON.** `demo/shell/board.mjs`,
+`demo/shell/presence.mjs`, `demo/knobs/index.html` and `demo/grains/index.html`
+write `/able/` in comments recording what it measured; `demo/kit/index.html`
+does too, and also carries it in a LIVE list of cards, which is the one live
+reference either retirement leaves behind.
 
 ## `blocks-index.html`, `memento-index.html`, `num-index.html`, retired 2026-09-24
 
@@ -173,6 +280,11 @@ be the same observation.
 ⚠️ **This is not what `/able/` is now.** The slug is live again with a
 different page, created 2026-09-12, which PLAYS Ableton Live from the browser.
 The file here is the page that held the slug before it.
+🔴 **AND THE PARAGRAPH ABOVE STOPPED BEING TRUE ON 2026-09-25**, kept as it was
+written because it records what was there. The slug is not live: that player is
+archived too, at `able-index.html` in this directory, so `/able/` is a 404 and
+both pages that ever answered it are here. **Two files, one slug, and neither is
+a fallback for the other.**
 
 It asked a Mac in a studio whether it was actually set up: not whether it was
 switched on, but whether every link held. Live up, answering remote control, an
