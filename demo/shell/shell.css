@@ -6326,20 +6326,39 @@ button[data-glyph="1"] {
    case holds exactly two children, the plate and the wrap or strip, so this
    needs no wrapper and no reparenting: a page that does not ask for a side
    plate has the DOM and the rules it had yesterday.
-   ⚠️ `grid-row: 1` ON BOTH, NOT `1 / -1`. With no explicit rows the end line
-   `-1` IS line 1, so `1 / -1` computes to a zero span and the browser falls
-   back to one row, which looks identical until a case grows a third child. Both
-   children sit in row one and `align-items: stretch` is what makes the plate as
-   tall as the instrument beside it.
+   🔴 THE ROWS ARE EXPLICIT SINCE 2026-09-25, AND THE LINE THAT STOOD HERE
+   PREDICTED EXACTLY WHY. It read *"`grid-row: 1` ON BOTH, NOT `1 / -1`. With no
+   explicit rows the end line `-1` IS line 1, so `1 / -1` computes to a zero
+   span and the browser falls back to one row, **which looks identical until a
+   case grows a third child**"*. A case grows third and fourth children the
+   moment it carries bands and the seams between them, and both halves of that
+   sentence then bite: the plate spans ONE row and stops under the first band,
+   and a seam spanning both columns cannot be auto placed into a row the plate
+   occupies, so it is pushed past it.
+   🔴 MEASURED, a case with a strip, two bands and a seam, before the count
+   existed: the row template came out `1721.5px 70.5px 0px 0px 1px 70.5px`,
+   **six tracks for four bands**, two of them empty ones the plate had blocked.
+   With `--panel-rows` it is `repeat(4, auto)`, the plate runs to the case's
+   bottom on `/shape/` and on `/knobs/`, and the seam measures **x297.0..983.0
+   on both**, which is each case's inner edge to inner edge.
+   ⚠️ THE COUNT IS WRITTEN BY `panel-layout.mjs` AND IS NOT A MEASUREMENT. It is
+   how many children the case has, which a stylesheet cannot ask and a component
+   already knows, and it arrives as a custom property so every rule about
+   placement stays here.
+   ⚠️ AND `var(--panel-row, 1)` KEEPS THE OLD BEHAVIOUR AS ITS FALLBACK, so a
+   case nobody has given bands to lays out exactly as it did, one row, both
+   children in it, the plate stretched beside the instrument.
    ⚠️ AND `minmax(0, 1fr)` ON THE CONTENT TRACK, NEVER A BARE `1fr`. A grid
    item's automatic minimum is its CONTENT, so a strip holding a keyboard wider
    than the panel would push the track past the case instead of scrolling
    inside it. That is the same rule this stylesheet already writes down three
    times for a scrolling flex row. */
 .panel[data-plate-side] { display: grid; align-items: stretch; }
+.panel[data-plate-side] { grid-template-rows: repeat(var(--panel-rows, 1), auto); }
 .panel[data-plate-side="left"] { grid-template-columns: auto minmax(0, 1fr); }
 .panel[data-plate-side="right"] { grid-template-columns: minmax(0, 1fr) auto; }
-.panel[data-plate-side] > * { grid-row: 1; }
+.panel[data-plate-side] > * { grid-row: var(--panel-row, 1); }
+.panel[data-plate-side] > .panel-plate { grid-row: 1 / -1; }
 .panel[data-plate-side="left"] > * { grid-column: 2; }
 .panel[data-plate-side="left"] > .panel-plate { grid-column: 1; }
 .panel[data-plate-side="right"] > * { grid-column: 1; }
@@ -6375,6 +6394,64 @@ button[data-glyph="1"] {
   border-left: 1px solid var(--line); margin-left: var(--panel-gap);
   padding-left: var(--panel-gap);
 }
+
+/* 🔴 A RULE ACROSS THE CASE, FROM ONE INNER EDGE TO THE OTHER, 2026-09-25,
+   ASKED FOR AS *"on each button group have horizontal panel separator edge to
+   edge"* with a sketch drawing rules between `/knobs/`'s rotaries, its keyboard
+   and its footer.
+
+   🔴 **EDGE TO EDGE IS THE WHOLE ASK, AND IT IS WHAT SAYS A SEAM CANNOT LIVE IN
+   THE SCROLLER.** MEASURED on `/knobs/`, a rule put in `.panel-flow`: it laid
+   out at **992 px against a 686 px case**, because that flow is
+   `width: max-content` around a keyboard wider than the panel. Pulling it left
+   made it wider still and reached nothing, because `scrollLeft` clamps at **0**
+   and inline-start overflow inside `overflow-x: auto` is clipped for good. A
+   rule there is as wide as the widest row and scrolls with it.
+
+   ✅ **AS A CHILD OF THE CASE IT IS ONE NEGATIVE MARGIN.** `.panel-case` is
+   `padding: 0 var(--panel-pad)`, horizontal only, so that is the single inset
+   between a case child and the case's inner edge. MEASURED at 1280 px against
+   each case's own inner edges: `/shape/` **x297.0..983.0**, `/knobs/`
+   **x297.0..983.0**, `/evo/` **x297.0..983.0**, `/tom/` **x297.0..983.0**. Two
+   of those carry a side plate, one on each edge; two are flex cases with none.
+   ⚠️ AN UNCASED PANEL NEEDS NO SECOND RULE. `--panel-pad` is 0 there, so the
+   margin is 0 and the seam is the panel's own width, which is the same
+   additive-then-override shape every other inset here already has.
+   ⚠️ `flex: 0 0 auto`, OR A FLEX COLUMN SHARING OUT SLACK TAKES THE RULE'S ONE
+   PIXEL. It is the thinnest child a case can have and the first thing a
+   `flex-shrink` of 1 would round away.
+
+   🔴 AND IT SPANS BOTH COLUMNS ON A CASE WITH A SIDE PLATE, SO IT CROSSES THE
+   RAIL. That is what the sketch draws and it is what a scribed line on a real
+   panel does. (0,3,0) against the column rules' (0,2,0), so it wins on weight
+   rather than on order. */
+.panel-seam {
+  height: 1px; flex: 0 0 auto; background: var(--line);
+  margin-inline: calc(-1 * var(--panel-pad));
+}
+.panel[data-plate-side] > .panel-seam { grid-column: 1 / -1; }
+/* 🔴 AND THE NAME SURVIVES THE CROSSING, WHICH IS THE HALF THAT HAD TO BE
+   DESIGNED RATHER THAN LEFT TO LUCK. A side plate is `justify-content:
+   flex-end` under `writing-mode: vertical-rl` with `rotate: 180deg`, which puts
+   the ink at the TOP of the rail and leaves the rest of it empty: MEASURED,
+   `/shape/`'s ink is y339.5..380.4 in a rail y339.5..2061.0, and `/knobs/`'s is
+   y146.3..187.1 in a rail y146.3..344.8. **41 px of ink in 1722 and in 199.**
+   So a seam misses the name almost everywhere, and *almost* is a fact about
+   today's band heights rather than a property of the component.
+   ✅ **SO THE INK GETS A GROUND AND THE PLATE GETS A LAYER, AND THE SEAM PASSES
+   BEHIND THE WORD.** A grid item with a `z-index` paints above its siblings
+   whatever the DOM order, so the rule reappears either side of the name instead
+   of being cut by it.
+   ⚠️ **THE GROUND IS ON THE LINE AND NOT ON THE PLATE**, deliberately. A
+   background on the plate would mask the whole rail and erase the seam across
+   it, which is the opposite of edge to edge. On the line it is a box the size of
+   the word.
+   ⚠️ **AND IT CHANGES NOTHING TODAY.** `--card` over a `.panel-case` whose
+   background is `--card` is invisible, on both of the two pages this can reach:
+   `.panel-case >` is what keeps it off an uncased panel, which has no ground of
+   its own for this to match. */
+.panel-case > .panel-plate[data-place="side"] { position: relative; z-index: 1; }
+.panel-case > .panel-plate[data-place="side"] .panel-plate-l { background: var(--card); }
 
 /* 🔴 THE INSTRUMENT HEADER, 2026-09-22, ASKED FOR AS *"create instrumet
    header/glue: similar to transport glue etc. left: online status button:
