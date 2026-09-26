@@ -190,15 +190,19 @@ http://webtypography.net/3.1.1), the same rule about spacing as about type.
 
 ## 2. Type
 
-🔴 **ONE FAMILY, AND IT IS THE FACE THE MACHINE HAS.** Instructed 2026-09-26:
-*"use same font as eccm (thay they actyually serve, not roboto not prenent)"*.
-eccm.ee declares Roboto and serves nothing, so it draws **Helvetica** on a Mac
-and Arial on Windows (MEASURED through `CSS.getPlatformFontsForNode`). So the
-body names Helvetica, then Arial, then the generic sans-serif, no file is
-loaded, and the page asserts that `document.fonts` is empty. Vignelli (READ,
-Typefaces, The Basic Ones): *"is not the type but what you do with it that
-counts."* What it costs: Helvetica has no 600, so headings say 700; Arial has
-never been looked at (§6).
+🔴 **ONE FAMILY, SCHIBSTED GROTESK, SELF HOSTED IN TWO SUBSETS.** Chosen
+2026-09-26 as *"Use font e"* off `demo/eccm/type.html`, where seven setups
+were shown in the page's own sizes. Before that the instruction was *"use same
+font as eccm (thay they actyually serve, not roboto not prenent)"*: eccm.ee
+declares Roboto and serves nothing, so it draws **Helvetica** on a Mac and
+Arial on Windows (MEASURED through `CSS.getPlatformFontsForNode`), and the
+page did the same for a day until the owner called it *"rough and 90ies"*.
+The body names Schibsted Grotesk, then Helvetica, Arial and the generic; the
+page asserts both subsets are loaded and in use, because Š and Ž live in
+latin-ext and a missing subset draws them from the fallback mid-word.
+Vignelli (READ, Typefaces, The Basic Ones): *"is not the type but what you do
+with it that counts."* Not done: a size-adjusted fallback, so a swap reflows
+once; and nobody has looked at it on Windows (§6).
 
 🔴 **A SCALE OF FEW SIZES WITH LARGE CONTRAST BETWEEN THEM.** Bringhurst 3.1.1,
 *"Don't compose without a scale"* (READ): *"limit yourself, at first, to a
