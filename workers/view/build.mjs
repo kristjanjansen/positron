@@ -335,9 +335,9 @@ const FILES = [
   // ── four more families, for demo/eccm/type.html, the specimen page ─────────
   // Asked 2026-09-26: "suggest better type alternatives." Each is one variable
   // file per subset (latin, latin-ext), fetched once from Google's static host,
-  // SIL OFL, the licence beside them. The live page loads none of these; the
-  // specimen page is where the face is chosen. When a face is chosen the
-  // others leave, and if none is, all of them do.
+  // SIL OFL, the licence beside them. Schibsted Grotesk was chosen off the
+  // specimen page on 2026-09-26 and the live pages load it; the other three
+  // and Plex stay only for the specimen page and leave with it.
   ['demo/eccm/vendor/inter-latin.woff2', 'eccm/vendor/inter-latin.woff2'],
   ['demo/eccm/vendor/inter-latin-ext.woff2', 'eccm/vendor/inter-latin-ext.woff2'],
   ['demo/eccm/vendor/LICENSE-inter', 'eccm/vendor/LICENSE-inter'],

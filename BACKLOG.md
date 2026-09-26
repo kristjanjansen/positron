@@ -1,6 +1,6 @@
 ## Open
 
-### Open 2026-09-26: better type alternatives for eccm, suggested and shown
+### Done 2026-09-26: better type alternatives for eccm, suggested and shown, and E chosen
 
 ⚠️ **THREE MORE IN THE SAME MINUTES:** *"fau compile: its on top of textarea.
 secondary. small button variant. you took 17+ min and failed"* (the agent had
@@ -14,6 +14,8 @@ buttons 3rem with 24 each side). All done.
 space in between"*: the small line to the title 8 to 12 px, the title to the
 summary 12 to 16 px. Done.
 
+✅ **CHOSEN:** *"Use font e"*, Schibsted Grotesk, on the live pages since; the
+specimen page stays with all seven and its other files.
 ⚠️ **ASKED, VERBATIM:** *"suggest better type alternatives."* after the face was
 named as the one decision left. A shortlist with reasons in the reply, and a
 specimen page `demo/eccm/type.html` setting the same list row, facts and
