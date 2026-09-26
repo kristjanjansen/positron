@@ -938,7 +938,7 @@ export const DEMOS = [
   // design for somebody else's site rather than one of positron's own; graded
   // like any other, and its `__demo` is its own ten lines.
   { name: 'eccm', group: 'kit', act: 0, created: '2026-09-26', built: true, unlisted: true,
-    one: 'a reading site for a contemporary music centre, in a type system of its own',
+    one: 'a reading site for a contemporary music centre, laid out like its own front page in the face that page already shows',
     tags: ['typography'] },
 
   // ── pages that are not shelled demos, but are the point of the whole rig ──

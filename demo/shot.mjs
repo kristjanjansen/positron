@@ -26,7 +26,8 @@
 // ✅ **`Emulation.setDeviceMetricsOverride` IS THE ONE THAT IS REAL.** It sets
 // the layout viewport the page actually uses, so `@media (max-width: 560px)`
 // enters, `@container` resolves against a real box, `100vw` is the phone's, and
-// `window.innerWidth` agrees with all of them. `mobile: true` also makes the
+// `window.innerWidth` agrees with all of them until something overflows, and
+// then it does not (see the overflow line below). `mobile: true` also makes the
 // page honour `<meta name=viewport>` the way a phone does, which is the
 // difference between a narrow desktop and a phone and is exactly where this
 // project's layouts break.
@@ -186,7 +187,12 @@ for (const w of (widths.length ? widths : WIDTHS)) {
   const { result } = await S('Runtime.evaluate', {
     expression: `JSON.stringify({
       w: innerWidth, h: Math.min(document.documentElement.scrollHeight, 6000),
-      dpr: devicePixelRatio, overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth),
+      // 🔴 AGAINST clientWidth, NOT innerWidth. MEASURED 2026-09-26 on /eccm/ at
+      // 375: a title with no break opportunity ran the page to 404 px, and
+      // mobile Chrome widened the LAYOUT viewport to match, so innerWidth read
+      // 404 as well and this line printed no overflow on a page that had 29 px
+      // of it. clientWidth is the initial containing block and stays 375.
+      dpr: devicePixelRatio, overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
       top: ${JSON.stringify(HASH)} ? Math.max(0, Math.floor((document.getElementById(${JSON.stringify(HASH)}) || document.body).getBoundingClientRect().top + scrollY) - 8) : 0,
     })`, returnByValue: true,
   });
