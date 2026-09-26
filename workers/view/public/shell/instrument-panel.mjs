@@ -36,82 +36,28 @@
 // one component along: a required ordering a caller types is an ordering no
 // browser check can see when it is missing.
 //
-// ── THIS FILE IS THE FOURTH THING IN THIS KIT WITH "PANEL" IN ITS NAME, AND
-//    THAT IS NAMED HERE SO NOBODY "TIDIES" IT ──────────────────────────────────
-//   `panel.mjs`         a canvas with a footer of numbers, for the XR room.
-//   `panel-layout.mjs`  a HARDWARE PANEL: a fixed column that does not scroll,
-//                       a strip that does, and a case around the lot.
-//   `xr-panel.mjs`      a panel hung in an immersive session.
-//   this file           the same instrument with NO fixed column and NO
-//                       scroller, expressed as glued rows.
-// The build ENUMERATES `demo/shell/`, so a new module here needs no registration
-// anywhere; what it does refuse is an import with no deployed file, and it scans
-// modules rather than only pages. `workers/view/build.mjs:432` and `:451`.
-// ⚠️ **AND THAT PATH IS `workers/view/build.mjs`, NOT `demo/build.mjs`.**
-// `panel-layout.mjs` names the second one a few lines into its own header and
-// there is no such file, which is this project's most repeated defect in its
-// cheapest form: a path in a comment that no longer resolves.
+// The fourth file here with "panel" in its name, and none of them collide:
+// panel.mjs is a canvas with a footer for XR, panel-layout.mjs is a hardware
+// panel with a fixed column and a scroller, xr-panel.mjs hangs one in a
+// headset. This one is the same instrument with no column and no scroller,
+// for an instrument that FITS; /knobs/ measured 992 px inside a 686 px case
+// and keeps panel-layout. The build enumerates demo/shell/ (workers/view/
+// build.mjs), so nothing is registered.
 //
-// 🔴 **AND IT DOES NOT REPLACE `panel-layout.mjs`. THE TWO ANSWER DIFFERENT
-// QUESTIONS AND BOTH ANSWERS ARE RIGHT.** That one is for an instrument whose
-// controls are WIDER THAN THE PAGE — `/knobs/`'s flow measured 992 px inside a
-// 686 px case — so it has a scroller, and its own notes record that a seam
-// inside that scroller is impossible rather than merely hard. This one is for
-// an instrument that FITS, where there is nothing to scroll and every row can
-// therefore run edge to edge. **Nothing here is applied to any page**, which is
-// explicit in the ask, so the choice between them is still open on every page.
+// Surveyed across the seven instrument pages before it was written: a knob
+// bank row, a keyboard at the bottom and a plate carrying two facts are each
+// drawn on three or more pages; the picture row is drawn on none, because
+// /muta/ and /fau/ both had to pass theirs as a glue part OUTSIDE the case to
+// get edge to edge. That is what a picture row gives by construction.
 //
-// 🔴 **AND THE SHAPE IN THE SKETCH IS NOT INVENTED. SURVEYED ACROSS THE SEVEN
-// PAGES THAT DRAW AN INSTRUMENT, 2026-09-26.** Three of its four row kinds are
-// already drawn on three or more pages each:
+// Not applied to any page, and what it would break if it were: /evo/'s
+// keyboard has no intrinsic height and lives on panel.grow; /knobs/ scrolls
+// its whole strip as one; /twelve/ is uncased; /nola/'s footer belongs to the
+// keyboard component. /kit/ had a GLUE block before, deleted 2026-09-18 as
+// two grey boxes; every specimen here is an instrument somebody could play.
 //
-//   a bank of knobs on one row   `/knobs/` 2, `/evo/` 8 with a 4|4 hairline,
-//                                `/circuit/` 8 macros, `/twelve/` 8 pans
-//   a keyboard at the bottom     `/knobs/`, `/evo/`, `/nola/`, `/fau/`
-//   a plate carrying two facts   `/evo/`, `/twelve/`, `/circuit/`, `/tom/`,
-//                                `/nola/`, `/muta/`, `/fau/`
-//   the plate-and-patch FOOTER   `/knobs/`, `/nola/`, `/muta/` twice, `/fau/`
-//
-// 🔴 **THE PICTURE ROW IS THE ONE THAT IS NOT DRAWN ANYWHERE, AND THE REASON IS
-// THE REASON THIS COMPONENT EXISTS.** No page puts a picture in the case as its
-// top row. `/muta/` and `/fau/` both pass theirs as `parts: [scope.el]`, a
-// glued surface OUTSIDE the case, and `/fau/` records why in its own words: a
-// block handed to `add()` sits inside the case's 20 px inset and the ask was
-// **edge to edge**, asked twice, the second time because a fourth inset nobody
-// had counted was `.panel-case`'s own. The ask that bought that move was
-// *"glued instrument feel like waveforms on muta"*. **So two pages have already
-// escaped a case to get what a glued row gives by construction**, and a picture
-// row here is `pad: false` and nothing else.
-//
-// ⚠️ **WHAT IT WOULD BREAK IF IT WERE APPLIED, WHICH IS WHY IT IS NOT.**
-// Recorded now, while it is known, rather than discovered by whoever converts a
-// page first. `/evo/`'s keyboard has NO intrinsic height and lives entirely on
-// `panel.grow`, measured at 334.03 px against 24 with the absorber off, and
-// nothing here grows. `/knobs/` measured its keyboard at 992 px inside a 686 px
-// case and scrolls the whole strip as one; glued rows would scroll the keys
-// inside their own row instead, which is a behaviour change on a shipped page
-// that `/knobs/` has already declined once. `/twelve/` is uncased and moves
-// `.panel-case` onto its fixed COLUMN. `/circuit/` scrolls the case rather than
-// a strip inside it. And `/nola/`'s footer is `keyboard.mjs`'s own `foot`,
-// owned there for every page that imports a keyboard, so a panel carrying both
-// a keyboard row and a plate row would offer that page two footers.
-//
-// 🔴 **AND `/kit/` HAS HAD A GLUE BLOCK BEFORE AND IT WAS DELETED ON
-// INSTRUCTION, 2026-09-18:** *"i see no poiint in glue, it looks off and
-// pointless in docs. just glue the 4 we have properly"*. It went with its two
-// grey specimen boxes reading `a block` and `and another`, and the recorded
-// reason is the one that governs every example built for this component: **it
-// demonstrated the mechanism and none of the reason for it, which is what made
-// it read as furniture.** So every specimen on that page is an instrument
-// somebody could operate, with real controls in it, and not a picture of a
-// seam.
-//
-// ⚠️ **WHAT A CALLER OWNS.** What is in a row, what the picture draws, which
-// keyboard, and what the plate says. This owns the ORDER, the seams, the ground
-// under each row, and the two insets. A component that travels with one
-// instrument's proportions is a component with one caller, which is the line
-// `panel-layout.mjs` already draws and the reason `/evo/`'s keypad padding and
-// `/circuit/`'s eight-column track did not come along with it.
+// A caller owns what is in a row, the picture, the keyboard and the plate's
+// words. This owns the order, the seams, the ground and the two insets.
 
 import { createGlueRows } from './glue.mjs';
 import { createNameplate } from './panel-layout.mjs';

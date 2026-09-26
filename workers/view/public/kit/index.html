@@ -1039,7 +1039,7 @@
   // behind, the build read it in its dead zone, `section()` swallowed the throw,
   // and the page died much later on an empty map.
   let ipanelSpec = null;      // { sketch, stomp, box16, desk, pic }
-  let rowsSpec = null;        // { g, rowOne, rowTwo, rowPic, shape, loop, speed }
+  let rowsSpec = null;        // { g, rowOne, rowPic, shape, settings, meter, form, hidden, hiddenPic, scopes, waves }
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
@@ -1308,45 +1308,112 @@ p.shape()                     // ['viz','controls','keys','plate']`,
    * block failed to show.**
    */
   section('panel', 'GLUED ROWS',
-    'Rows on one surface, a hairline between them, each row painting its own ground.',
+    'Rows on one surface with a hairline between them, in six shapes: a station strip, a settings list, a display with its buttons, a form, the strip with a row hidden, and three pictures.',
     `const g = createGlueRows();
 g.row([station], { align: 'start' })
-g.row([speed, loop], { align: 'between' })   // one control against each edge
-g.row(scope.el, { pad: false })              // edge to edge, which is what a picture wants
-g.remove(row)                                // the seam goes with it
+g.row([label, control], { align: 'between' })   // one against each edge
+g.row([send], { align: 'end' })
+g.row(scope.el, { pad: false })                  // edge to edge, which is what a picture wants
+row.hidden = true                                // the seam goes with it
 ROW_ALIGN  // start, center, end, between`,
     (add) => {
-      const g = createGlueRows();
+      /* ⚠️ NO LOOP BUTTON, ASKED OUT 2026-09-26: *"rm loop button from glued
+         rows, add way more examples of glued rows"*. And no caption under any
+         of these, for the reason the panels above have none: the note names
+         the six and the eye tells them apart. */
+      const cap = (t) => el('div', 'panel-cap', t);
+
+      /* 1. A STATION STRIP. What to listen to, how fast, what is coming out. */
+      const strip = createGlueRows();
       const stations = ['Raadio 2', 'Klassikaraadio', 'Vikerraadio'];
       let atStation = 0;
       const hop = (d) => { atStation = (atStation + d + stations.length) % stations.length; return stations[atStation]; };
-      /* ⚠️ THE CALLER DRAWS. `picker.mjs` wires the arrows straight onto `prev`
-         and `next`, and its `onPick` belongs to the `<select>` underneath, so a
-         picker whose work is in `onPick` is inert on the arrows. MEASURED here
-         by pressing one. */
       const station = createPicker({
         label: '', what: 'station',
         prev: () => station.show(hop(-1)), next: () => station.show(hop(1)),
         onPick: (name) => station.show(name),
       });
       station.show(stations[atStation]);
-      const speed = createChoice({
-        label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1,
-      });
-      /* 🔴 `between` NEEDS TWO CHILDREN OR IT MEANS NOTHING. A single item under
-         `space-between` parks on the LEFT, indistinguishable from `start`, and
-         the first draft of this row had one. `createNameplate` records the same
-         trap about `place: 'ends'`. */
-      const loop = createToggle({ label: 'loop', size: 'small' });
+      const speed = createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 });
       const shape = createWaveShape({ name: 'sawtooth' });
-
-      const rowOne = g.row([station], { align: 'start' });
-      const rowTwo = g.row([speed, loop], { align: 'between' });
-      const rowPic = g.row(shape.el, { pad: false });
+      /* NO `between` ANYWHERE IN THIS BLOCK. MEASURED three times: on the
+         settings list, the meter and this strip it came out 8 px apart against
+         an 8 px gap, because a shrink-to-fit surface is only as wide as its
+         widest row and a picture that fills a row has no width of its own to
+         give it. `between` spreads only across a row with an intrinsic width,
+         which on this page is the keyboard, and the panel's plate row above
+         already grades it there. */
+      const rowOne = strip.row([station], { align: 'start' });
+      strip.row([speed, createPresence({ of: '', mode: 'badge', state: 'online' })], { align: 'start' });
+      const rowPic = strip.row(shape.el, { pad: false });
       shape.redraw();
 
-      add(g);
-      rowsSpec = { g, rowOne, rowTwo, rowPic, shape, loop, speed };
+      /* 2. A SETTINGS LIST. A name against one edge and its control against the
+            other, three times, which is the row `between` exists for and which
+            needs two children to mean anything. */
+      /* ⚠️ `start`, NOT `between`, AND THE FIRST DRAFT HAD `between`. MEASURED:
+         the two ends sat 8 px apart against a row gap of 8 px, because the
+         surface is its own size and every row in this list is short, so there
+         was nothing to spread across. `between` means something only when
+         another row sets the width; here it was `start` wearing a hat. */
+      const settings = createGlueRows();
+      settings.row([cap('REVERB'), createChoice({ label: '', options: [['dry', 0], ['room', 1], ['hall', 2]], at: 1 })], { align: 'start' });
+      let oct = 0;
+      const octave = createStepper({ what: 'octave', prev: () => String(--oct), next: () => String(++oct) });
+      settings.row([cap('OCTAVE'), octave], { align: 'start' });
+      settings.row([cap('BOARD'), createPresence({ of: '', mode: 'badge', state: 'offline' })], { align: 'start' });
+
+      /* 3. A DISPLAY OVER ITS BUTTONS. A seven segment field as a picture row,
+            and the group that drives it under it. */
+      const meter = createGlueRows();
+      const seg = createSegment({ digits: 3 });
+      seg.set(127);
+      meter.row(seg.el, { align: 'center' });
+      let held = 127;
+      const bank = createButtonGroup({
+        label: '', buttons: [
+          { id: 'down', label: '−', onPress: () => seg.set(held = Math.max(0, held - 1)) },
+          { id: 'up', label: '+', onPress: () => seg.set(held = Math.min(999, held + 1)) },
+          { id: 'reset', label: 'RESET', onPress: () => seg.set(held = 127) },
+        ],
+      });
+      meter.row([bank], { align: 'start' });
+
+      /* 4. A FORM. Two fields and the one action, pushed to the end, which is
+            the row `end` exists for. */
+      const form = createGlueRows();
+      form.row([createField({ label: 'title', value: 'Rehearsal moved', grow: 'wide' })], { align: 'start' });
+      form.row([createField({ label: 'tags', placeholder: 'comma separated', grow: 'wide' })], { align: 'start' });
+      const send = el('button', '', 'SAVE');
+      send.type = 'button';
+      form.row([send], { align: 'end' });
+
+      /* 5. THE STRIP WITH ITS PICTURE HIDDEN. Two rows showing and one seam
+            between them, and no orphan line where the third row was. The
+            assert at the foot of this file toggles the first strip's picture
+            and measures; this one stands still so a reader can see it. */
+      const hidden = createGlueRows();
+      const station2 = createPicker({
+        label: '', what: 'station',
+        prev: () => station2.show(stations[0]), next: () => station2.show(stations[0]),
+        onPick: (name) => station2.show(name),
+      });
+      station2.show(stations[0]);
+      hidden.row([station2], { align: 'start' });
+      hidden.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 })], { align: 'start' });
+      const shape2 = createWaveShape({ name: 'sawtooth' });
+      const hiddenPic = hidden.row(shape2.el, { pad: false });
+      hiddenPic.hidden = true;
+
+      /* 6. THREE PICTURES AND NOTHING ELSE. Every row edge to edge, so the
+            surface is three pictures and two hairlines. */
+      const scopes = createGlueRows();
+      const waves = ['sawtooth', 'square', 'triangle'].map((name) => createWaveShape({ name }));
+      for (const w of waves) scopes.row(w.el, { pad: false });
+      for (const w of waves) w.redraw();
+
+      add(strip, settings, meter, form, hidden, scopes);
+      rowsSpec = { g: strip, rowOne, rowPic, shape, settings, meter, form, hidden, hiddenPic, scopes, waves };
     }, { bare: true });
 
   section('hardware', 'PANEL SEAM',
@@ -5160,34 +5227,6 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     }
 
     /**
-     * 🔴 `between` PUTS ONE CHILD AT EACH END, AND IT IS GRADED BECAUSE A ROW
-     * WITH ONE CHILD CANNOT TELL IT FROM `start`. That is the trap
-     * `createNameplate` already records about `place: 'ends'`, which parks a
-     * lone line on the left, and it is invisible in a screenshot.
-     */
-    {
-      const row = rowsSpec.rowTwo;
-      const kids = [...row.children];
-      const inset = px(row, 'paddingLeft');
-      const box = r(row);
-      const offL = +(r(kids[0]).left - (box.left + inset)).toFixed(1);
-      const offR = +((box.right - inset) - r(kids[kids.length - 1]).right).toFixed(1);
-      const apart = +(r(kids[kids.length - 1]).left - r(kids[0]).right).toFixed(1);
-      /* ⚠️ THE FLOOR IS THE ROW'S OWN GAP AND NOT A TYPED NUMBER, because what
-         separates `between` from `start` is exactly that: `start` would leave
-         these two `--ctl-gap` apart. It read `apart > 100` until the surface
-         stopped stretching to the page, and then 60.4 px of real separation
-         failed a threshold that had been describing the empty space rather than
-         the arrangement. */
-      const rowGap = px(row, 'columnGap') || px(row, 'gap');
-      d.assert('a row aligned between puts one control against each inner edge, which needs two of them',
-        kids.length === 2 && Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6
-        && rowGap > 0 && apart > rowGap * 2,
-        `${kids.length} control(s), ${offL} px off the left inset and ${offR} px off the right, `
-        + `${apart} px apart against a row gap of ${rowGap} px`);
-    }
-
-    /**
      * 🔴 EDGE TO EDGE MEANS THE PICTURE'S OWN LEFT EDGE, AND A CONTROL ROW'S
      * INK STARTS ONE INSET FURTHER IN. This is the shape `/muta/` and `/fau/`
      * both left the case to get, and `/fau/` had to be told twice because a
@@ -5261,6 +5300,60 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         patchEl.textContent === was && moved === 0 && rowMoved === 0 && taller === 0 && grew > 0,
         `a name ${longer.length} characters long drew ${grew.toFixed(1)} px wide and moved the `
         + `instrument's name by ${moved} px, the row by ${rowMoved} px and its depth by ${taller} px`);
+    }
+
+    /**
+     * 🔴 EVERY ROW'S INK STARTS ON ONE LINE, AND A COMPONENT BRINGS NO INSET OF
+     * ITS OWN INTO A ROW. Photographed 2026-09-26: the keys sat 29 px from the
+     * surface edge while `NOLA` and every knob row sat at 20, because the glue
+     * rule stripped the keyboard's border and left its 9 px padding behind.
+     * **Padding on a box that no longer has a border is a margin the component
+     * invented, and a component does not own its outer margin.** So this walks
+     * every row of every panel on the page and measures its FIRST child's left
+     * edge against the row's content edge; anything but 0 is a component
+     * carrying an inset the row already supplies. A row with its inset off is
+     * measured against its border edge instead.
+     * ⚠️ IT NAMES THE OFFENDERS, because *"fix systematically"* means all of
+     * them and not the one in the crop.
+     */
+    {
+      const panels = [['sketch', ipanelSpec.sketch.glue], ['stomp', ipanelSpec.stomp.glue],
+        ['box16', ipanelSpec.box16.glue], ['desk', ipanelSpec.desk.glue], ['strip', rowsSpec.g],
+        ['settings', rowsSpec.settings], ['meter', rowsSpec.meter], ['form', rowsSpec.form],
+        ['hidden', rowsSpec.hidden], ['scopes', rowsSpec.scopes]];
+      /* ⚠️ THE FIRST DRAFT MEASURED THE CHILD'S BOX AGAINST THE ROW'S CONTENT
+         EDGE AND NAMED THREE CENTRED KNOB ROWS AS OFFENDERS AT +216 px, while
+         the keyboard, whose box IS flush and whose 9 px is INSIDE it, passed.
+         The claim is about what a child carries, so that is what is read: its
+         own left padding, border and margin, which a row's child must have none
+         of. Alignment is the row's business and is graded elsewhere. */
+      /* ⚠️ AND THE SECOND DRAFT FLAGGED A TOGGLE FOR ITS OWN 9 px OF PADDING
+         INSIDE ITS OWN 1 px BORDER, WHICH IS THE CONTROL'S SHAPE AND NOT AN
+         INSET. The owner's words draw the line: *"component without border but
+         with padding is essentially component with margin"*. So three separate
+         claims, each named in the detail: a MARGIN is never the child's; PADDING
+         is an invented margin only where there is no border to frame it; and a
+         BORDER inside a row is a box in a box only on something that is not a
+         control, because a button's edge is the button. */
+      const isControl = (el) => el.matches('button, input, select, textarea, [role="button"], .pos-choice, .pos-pick, .pos-toggle, .pos-check, .pos-stepper, .pos-bgroup');
+      const off = [];
+      let kidsSeen = 0;
+      for (const [name, g] of panels) {
+        for (const row of g.rows()) {
+          if (getComputedStyle(row).display === 'none') continue;
+          for (const kid of row.children) {
+            kidsSeen++;
+            const tag = `${name}/${row.dataset.kind || 'row'} ${kid.className.split(' ')[0]}`;
+            const m = px(kid, 'marginLeft'), p = px(kid, 'paddingLeft'), b = px(kid, 'borderLeftWidth');
+            if (m > 0.6) off.push(`${tag} margin ${m}px`);
+            if (p > 0.6 && b === 0) off.push(`${tag} padding ${p}px with no border`);
+            if (b > 0.6 && !isControl(kid)) off.push(`${tag} border ${b}px on a non-control`);
+          }
+        }
+      }
+      d.assert('no child of a glued row carries a margin, a borderless padding, or a border that is not a control\u2019s',
+        kidsSeen >= 30 && off.length === 0,
+        `${kidsSeen} row children measured, ${off.length} carrying an inset of their own${off.length ? `: ${off.join(', ')}` : ''}`);
     }
 
     /**
