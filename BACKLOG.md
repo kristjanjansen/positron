@@ -1,5 +1,26 @@
 ## Open
 
+### Open 2026-09-26: convert `/fau/` to the new rules, in the background, per the audit plan
+
+⚠️ **ASKED, VERBATIM:** *"do fau in bg"*, after `plans/plan-instrument-audit.md`
+was reported in full. The plan is the brief: shared change 1 (the field reads
+`--edge`, `--r` and a published `--field-pad`; six pages and `feedback.mjs` in
+the blast radius, assert counts before and after on each), shared change 2 (the
+instrument panel's plate row takes a control at each end, one kit specimen and
+one assert), then the page. The agent does not commit; the session does.
+
+### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
+
+⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
+extra care"*. Done in the kit the same minute: five badges out of the glued rows
+block, the two justified rows given a `MUTE` button as their second end, the two
+settings lists a third label-and-control pair. What "extra care" means for the
+badge in a glued row is not decided and is not to be guessed at; the badge
+reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
+composites a translucent dot, and each of those is a fact a row would have to
+respect on purpose.
+
+
 ### Done 2026-09-26: the instrument audit, `plans/plan-instrument-audit.md`, reported in full
 
 ✅ The pick is `/fau/`; two shared changes come first (the field reads the three tokens; the plate row takes a control at each end); every defect the five phone shots show is in a shared component. Proposed only, nothing changed.
