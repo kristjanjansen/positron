@@ -397,7 +397,7 @@
      all four of its edges and nothing else does. */
   .kit-step-s { border: 1px dashed var(--kit-edge); background: var(--card2); }
 
-  /* 🔴 A TAB THAT HOLDS SOMETHING NEW CARRIES A DOT. Tabs hide five sixths of
+  /* 🔴 A TAB THAT HOLDS SOMETHING NEW CARRIES A DOT. Tabs hide all but one of
      this page, so the standing rule that the newest block goes at the top needs
      a second half: a reader has to be able to tell WHICH part the new thing is
      in without opening all six. The mark says that, and the block being first
@@ -420,7 +420,7 @@
      🔴 AND EVERY TAB RESERVES THE SLOT, WHICH IS THE HOUSE PATTERN RATHER
      THAN A COST. The first version of this hung the dot in the 28 px the row
      already puts between two tabs, on the reasoning that reserving a slot on
-     six tabs to use one was waste. It is the opposite: `--ctl-head` reserves a
+     every tab to use one was waste. It is the opposite: `--ctl-head` reserves a
      label's slot on every control that has no label, for exactly this reason,
      and the standing rule is that **a slot is reserved even when empty**.
      Reserving it buys two things a gap cannot. The row is the same width
@@ -439,7 +439,7 @@
   /* 🔴 THE NEW-BLOCK DOT IS GONE, 2026-09-21: *"what is this dot? i never askd"*.
      It was added in session 40 by a background agent that had spotted a real
      problem and solved it unasked: this page's rule is that the newest block
-     goes at the TOP, and a tab row hides five sixths of the page, so the rule
+     goes at the TOP, and a tab row hides all but one part of the page, so the rule
      stops working the moment the sections are tabbed. The mark named the part
      holding the newest block.
      🔴 THE PROBLEM WAS REAL AND THE DECISION WAS NOT THE AGENT'S TO MAKE. This
@@ -461,7 +461,7 @@
      CHECK THAT MEASURES ONE PASSES WHILE MEASURING NOTHING. About forty of the
      checks at the foot of this file read real geometry — a badge the same width
      in five states, two greys told apart by ink, six display fields at 55.63 px
-     with a spread of 0.000 — and a tab row would have handed four fifths of
+     with a spread of 0.000 — and a tab row would have handed all but one part of
      them a box with no size. That is the shape this project has already paid
      for four times: a stand-in makes a page runnable without making it graded.
      So every panel is laid out for the length of the measuring window and put
@@ -513,7 +513,8 @@
   import { decode } from '/shell/midi-decode.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
-  import { createGlue } from '/shell/glue.mjs';
+  import { createGlue, createGlueRows } from '/shell/glue.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -563,7 +564,7 @@
   const failed = [];
 
   /**
-   * 🔴 FIVE PARTS, NAMED ACROSS THE TOP, AND THE PAGE IS NOW THE LARGEST
+   * 🔴 THE PARTS ARE NAMED ACROSS THE TOP, AND THE PAGE IS NOW THE LARGEST
    * CALLER OF ITS OWN TAB COMPONENT. Asked 2026-09-21: *"in bg reogranize kit
    * into tabs. recommend. my ideas: input layout hardware diagram"*. Thirty
    * four blocks on one scroll is a page nobody reaches the bottom of, and the
@@ -614,12 +615,34 @@
    * ⚠️ AND THE LABELS ARE TYPED UPPERCASE THOUGH THE STYLESHEET WOULD DO IT.
    * Same reason as `.kit-h`: the source should read like the page.
    */
+  /**
+   * 🔴 `panel` IS THE SEVENTH PART, ADDED 2026-09-26, AND IT SITS NEXT TO
+   * `hardware` RATHER THAN FIRST. It was built first, on the reasoning that the
+   * tab row is this page's reading order now and *"all new should land top"*
+   * ought to follow it there. **MEASURED: that took three asserts on other
+   * blocks red, all of them reading 0.** Putting a new part first changes which
+   * part `createTabs` OPENS, and a check that measures a rect outside the
+   * measuring window was reading a part that is now shut. The rule about the
+   * newest thing is about BLOCKS and is satisfied one screen down, where these
+   * two are the first calls to `section()`; the opening tab is load-bearing for
+   * checks that predate the tab row, and it stays where it was.
+   * ⚠️ **AND IT HOLDS TWO BLOCKS, WHICH IS THE BAR `basics` FAILED.** That part
+   * lasted an hour on one block, and the argument recorded against it is that
+   * **a tab is a promise that there is something behind it**.
+   * ⚠️ NEXT TO `hardware` BECAUSE THE TWO ARE KIN AND ARE NOT THE SAME
+   * QUESTION. That part answers *what do I have for drawing an instrument* with
+   * the PARTS of one: a channel strip, a seven segment field, a seam. This one
+   * answers *how is a whole instrument put together*.
+   * ⚠️ IT IS `PANEL` AND NOT `PANELS`, matching every other label here, all of
+   * which name a family in the singular.
+   */
   const GROUPS = [
     ['input', 'INPUT'],
     ['status', 'STATUS'],
     ['timeline', 'TIMELINE'],
     ['layout', 'LAYOUT'],
     ['hardware', 'HARDWARE'],
+    ['panel', 'PANEL'],
     ['diagram', 'DIAGRAM'],
   ];
 
@@ -675,7 +698,7 @@
    * CHECK THAT MEASURES ONE PASSES WHILE MEASURING NOTHING. About forty of the
    * checks below read real geometry — a badge the same width in five states,
    * two greys told apart by ink, six display fields at 55.63 px with a spread
-   * of 0.000 — and a tab row would have taken four fifths of this page's
+   * of 0.000 — and a tab row would have taken all but one part of this page's
    * coverage away while leaving the count and the colour exactly where they
    * were. That is the failure this project has recorded four times, and the
    * cure is the same one: make the instrument able to see, then break it and
@@ -997,6 +1020,13 @@
   let envSpec = null;         // { one, two, three, flat }
   let filtSpec = null;        // { live, deep, refused }
   let waveSpec = null;        // { drawnViews, pulse, blend, two, measured, drawnNames }
+  // ⚠️ DECLARED HERE WITH THE REST, NOT BESIDE THEIR BLOCKS, for the reason the
+  // eight comments above give: these two are the newest blocks and therefore the
+  // topmost ones, and a block that moved on this page once left its `const`
+  // behind, the build read it in its dead zone, `section()` swallowed the throw,
+  // and the page died much later on an empty map.
+  let ipanelSpec = null;      // { sketch, stomp, box16, desk, tabs }
+  let rowsSpec = null;        // { surface, rows, hideable, buttons }
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
@@ -1147,6 +1177,262 @@
    * what these two show is where a rule lands and not what a band holds. The
    * PANEL block further down already shows a case full of real controls.
    */
+  /**
+   * 🔴 THE NEWEST BLOCK ON THIS PAGE, AND THEREFORE THE FIRST CALL TO
+   * `section()`. Asked for 2026-09-26 with a sketch: *"do a instrument panel
+   * coponent properly in kit. its our glued style"*, *"add several examples to
+   * kit"*, *"make separate tab panels for it in kit"*.
+   *
+   * 🔴 **AND `/kit/` HAS HAD A GLUE BLOCK BEFORE. IT WAS DELETED ON
+   * INSTRUCTION, 2026-09-18:** *"i see no poiint in glue, it looks off and
+   * pointless in docs. just glue the 4 we have properly"*. It went with its two
+   * grey specimen boxes reading `a block` and `and another`. The recorded reason
+   * is the one that governs every specimen below: **it demonstrated the
+   * mechanism and none of the reason for it, which is what made it read as
+   * furniture.** So there are no grey boxes here. Every panel is an instrument
+   * somebody could operate, with the kit's own controls in it, and the four of
+   * them differ in SHAPE rather than in contents.
+   *
+   * ⚠️ FOUR SPECIMENS, IN THEIR OWN TABS, WHICH IS WHAT WAS ASKED FOR. Four
+   * full panels stacked in one block is a scroll nobody reaches the bottom of,
+   * which is the argument that put this whole page behind tabs in the first
+   * place. `hash: false` on this row, for the reason the TABS block gives: a
+   * sandbox that writes `#sketch` while a reader scrolls past it is one
+   * component reaching outside its own box.
+   */
+  section('panel', 'INSTRUMENT PANEL',
+    'A picture, rows of controls, a keyboard and a nameplate, glued into one object.',
+    `createInstrumentPanel({
+  viz:   filter.el,                                 // edge to edge
+  rows:  [[cutoff, res, drive], [a, d, s, r]],      // top to bottom
+  keys:  kb.el,
+  plate: { name: 'NOLA', patch: 'RHODES MK I' },
+})
+p.addRow([lfo, depth])        // always above the keys and the foot
+p.patch('WURLITZER 200A')     // rewrite the foot's right half
+p.shape()                     // ['viz','controls','keys','plate']`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const o = out('press a patch name to change the foot');
+
+      const knob = (label, value) => createKnob({ label, min: 0, max: 127, value });
+
+      /* 1. THE SKETCH, WHOLE. Every row kind the component has, in order. */
+      const pic = createFilterView({ label: 'filter', type: 'low pass 24dB', freq: 78, resonance: 40 });
+      const keysHost = el('div');
+      const kb = createKeyboard(keysHost, {
+        base: 48, letters: false,
+        onDown: (n) => kb.lightNote(n, true),
+        onUp: (n) => kb.lightNote(n, false),
+      });
+      const sketch = createInstrumentPanel({
+        viz: pic.el,
+        rows: [
+          [knob('CUTOFF', 78), knob('RES', 40), knob('DRIVE', 20)],
+          [knob('ATTACK', 8), knob('DECAY', 44), knob('SUSTAIN', 96), knob('RELEASE', 30)],
+        ],
+        /* 🔴 `kb.el` AND NOT THE HOST IT WAS BUILT IN. `createKeyboard` appends
+           into a parent, so handing the parent over puts the keyboard THREE
+           levels under the surface, and `.pos-glue > * > .kbd` reaches two.
+           MEASURED before this line changed: 4 px of border still on the keys
+           and 10 px of their own bottom margin under them, so the row was even
+           at the top and 10 px deeper at the bottom. A wrapper is exactly what
+           `shell.css` warns about two rules along, where a direct-child selector
+           fixed `/radio/` and left `/pack/` as reported. */
+        keys: kb.el,
+        plate: { name: 'NOLA', patch: 'RHODES MK I' },
+      });
+      /* ⚠️ `redraw()` BECAUSE A MEASURING WINDOW HOLDS NO FRAME. The component
+         resizes on an observation, which is a frame away, and this page lays
+         every closed panel out synchronously and reads the pixels on the same
+         line. `synth-view.mjs` publishes this call for exactly this caller. */
+      pic.redraw();
+
+      /* 2. NO PICTURE AND NO KEYBOARD. A pedal is four knobs and a name, and a
+            panel that insisted on the other two rows would draw two empty
+            boxes, which is the rule about a container with nothing in it. */
+      const stomp = createInstrumentPanel({
+        rows: [[knob('MIX', 40), knob('TIME', 88), knob('TONE', 64), knob('FEEDBACK', 52)]],
+        plate: { name: 'POSITRON', patch: 'SPRING REVERB' },
+      });
+
+      /* 3. PADS RATHER THAN KEYS. The keyboard row is a row like any other, so
+            what goes in it is the caller's: this one is sixteen pads. */
+      const box16 = createInstrumentPanel({
+        rows: [[knob('TEMPO', 100), knob('SWING', 12)]],
+        keys: createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ top: String(y * 8 + x + 1) }) }).el,
+        plate: { name: 'POSITRON', patch: 'SIXTEEN' },
+      });
+
+      /* 4. ROWS AND NOTHING ELSE. No picture, no keyboard, no foot: the shape
+            reads `controls controls` and the surface still has exactly one
+            border round it and one seam in it. */
+      const desk = createInstrumentPanel({
+        rows: [
+          [createFader({ label: 'CH1', min: 0, max: 127, value: 96 }),
+           createFader({ label: 'CH2', min: 0, max: 127, value: 60 }),
+           createFader({ label: 'CH3', min: 0, max: 127, value: 108 }),
+           createFader({ label: 'CH4', min: 0, max: 127, value: 44 })],
+          [knob('LOW', 64), knob('MID', 70), knob('HIGH', 58)],
+        ],
+      });
+
+      const byTab = { sketch, stomp, box16, desk };
+      const panelFor = (id) => byTab[id];
+
+      const tabs = createTabs({
+        hash: false,
+        tabs: [
+          { id: 'sketch', label: 'The sketch' },
+          { id: 'stomp', label: 'No picture, no keys' },
+          { id: 'box16', label: 'Pads instead of keys' },
+          { id: 'desk', label: 'Rows and nothing else' },
+        ],
+        /* ⚠️ A SENTENCE, NOT A ROW OF FACTS WITH GLUE IN IT. This read
+           `box16 <middot> controls keys plate` for one run, which is the
+           character CLAUDE.md bans in anything a visitor sees and the shape it
+           bans it for: a middot lets a line bolt a second and a third fact on. */
+        onPick: (id) => { o.textContent = `this one is ${panelFor(id).shape().join(', ')}`; },
+      });
+      tabs.panel('sketch').append(sketch.el);
+      tabs.panel('stomp').append(stomp.el);
+      tabs.panel('box16').append(box16.el);
+      tabs.panel('desk').append(desk.el);
+
+      /* 🔴 THE FOOT'S RIGHT-HAND END IS THE ONE THAT CHANGES, AND PRESSING A
+         NAME IS THE ONLY WAY TO SHOW THAT NOTHING ELSE MOVES WHEN IT DOES. The
+         plate is `place: 'ends'`, so the patch grows leftward into air. The
+         assert at the foot of this file measures the name's left edge before and
+         after, which is the claim rather than the picture.
+         🔴 **AND IT WRITES TO THE PANEL YOU CAN SEE, WHICH IT DID NOT AT FIRST.**
+         It drove the sketch whatever tab was open, so pressing it while looking
+         at SIXTEEN changed a foot on another tab and the control read as inert.
+         A control whose only honest behaviour is to do nothing is the shape this
+         project calls a lie, and this one was worse: it did something, somewhere
+         else.
+         ⚠️ **AND THE PANEL WITH NO FOOT SAYS SO RATHER THAN THROWING AT A
+         READER.** `patch()` refuses a plate that has no reserved box for it,
+         because a line that arrives late moves the page, and this is where a
+         reader meets that refusal in words. */
+      const patches = ['RHODES MK I', 'WURLITZER 200A', 'CP-70'];
+      let atPatch = 0;
+      const step = (d) => { atPatch = (atPatch + d + patches.length) % patches.length; return patches[atPatch]; };
+      /* 🔴 `prev` AND `next` ARE WIRED STRAIGHT ONTO THE TWO BUTTONS, SO THE
+         CALLER DRAWS AND THE CALLER REPORTS. `picker.mjs` does `b.onclick =
+         prev`, and its `onPick` belongs to the invisible `<select>` underneath,
+         which is the native list a phone opens. **MEASURED here by pressing the
+         arrow: nothing happened at all**, because the first draft put the work
+         in `onPick` and handed `prev`/`next` a function that only returned a
+         name. The component's own header says it is not the caller's job to
+         call `show()` afterwards, and that sentence is about `options()`; on
+         this path it is exactly the caller's job. */
+      const apply = (name) => {
+        pick.show(name);
+        const open = panelFor(tabs.at());
+        if (!open.plate) { o.textContent = `${name} chosen, and this panel has no foot to write it in`; return; }
+        open.patch(name);
+        o.textContent = `the foot reads ${name}`;
+      };
+      const pick = createPicker({
+        label: '', what: 'patch',
+        prev: () => apply(step(-1)),
+        next: () => apply(step(1)),
+        onPick: (name) => apply(name),
+      });
+      /* 🔴 SEEDED, OR THE CELL DRAWS ITS PLACEHOLDER UNTIL SOMEBODY PRESSES AN
+         ARROW, AND THE PLACEHOLDER IS AN EM DASH. `picker.mjs` builds the cell
+         with one and fills it from `options()`; a prev/next picker hands over no
+         list, so the two specimens further down this page have been showing a
+         character this project bans in anything a reader looks at. Fixed here
+         rather than in the component, because changing what an unfilled picker
+         draws is a decision about every page that has one. */
+      pick.show(patches[atPatch]);
+
+      box.append(tabs.el, pick.el, o);
+      ipanelSpec = { sketch, stomp, box16, desk, tabs, pic, patches, pick };
+    });
+
+  /**
+   * 🔴 THE BASE THE BLOCK ABOVE IS BUILT ON, ASKED FOR IN THE SAME BREATH:
+   * *"base on generic \\"glued containers/rows\\" component that you also need
+   * to add to kit"*.
+   *
+   * ⚠️ **AND IT IS NOT AN INSTRUMENT, WHICH IS THE WHOLE POINT OF SHOWING IT
+   * SEPARATELY.** If every specimen of a generic component is an instrument,
+   * the component is not generic, it is that instrument with a factory around
+   * it. This one is a station strip: what to listen to, how fast, and a picture
+   * of what is coming out, three rows that have nothing to do with a keyboard.
+   *
+   * 🔴 AND THE REMOVE BUTTON IS THE SPECIMEN, NOT DECORATION. The mechanism is
+   * a 1 px `gap` over a line-coloured ground, and the thing a reader cannot see
+   * from a still picture is what happens to the seam when a row goes: a
+   * `display: none` child takes no gap in a flex column, so the surface closes
+   * up with no orphan rule left behind. **That is the REASON the deleted GLUE
+   * block failed to show.**
+   */
+  section('panel', 'GLUED ROWS',
+    'Rows on one surface, a hairline between them, each row painting its own ground.',
+    `const g = createGlueRows();
+g.row([picker, stepper])                 // a row of controls, centred
+g.row(scope.el, { pad: false })           // edge to edge, which is what a picture wants
+g.row([left, right], { align: 'between' })
+g.remove(row)                             // the seam goes with it
+ROW_ALIGN  // start, center, end, between`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const o = out('three rows');
+
+      const g = createGlueRows();
+      const stations = ['Raadio 2', 'Klassikaraadio', 'Vikerraadio'];
+      let atStation = 0;
+      const hop = (d) => { atStation = (atStation + d + stations.length) % stations.length; return stations[atStation]; };
+      /* ⚠️ THE CALLER DRAWS, for the reason the block above this one records
+         at length: the arrows are wired straight onto `prev` and `next`. */
+      const tune = (name) => { station.show(name); o.textContent = `${name}, ${g.count()} rows`; };
+      const station = createPicker({
+        label: '', what: 'station',
+        prev: () => tune(hop(-1)), next: () => tune(hop(1)),
+        onPick: (name) => tune(name),
+      });
+      station.show(stations[atStation]);
+      const speed = createChoice({
+        label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1,
+        onPick: (_v, name) => { o.textContent = `speed ${name}, ${g.count()} rows`; },
+      });
+      const shape = createWaveShape({ name: 'sawtooth' });
+
+      /* 🔴 `between` NEEDS TWO CHILDREN OR IT MEANS NOTHING, AND THE FIRST DRAFT
+         OF THIS SPECIMEN HAD ONE. `justify-content: space-between` with a single
+         item parks it on the LEFT, which is indistinguishable from `start`, so
+         the row demonstrated an alignment it was not using. `createNameplate`
+         records the identical trap about `place: 'ends'` and answered it with a
+         fourth placement; here the answer is simply to put something at the
+         other end, and a loop switch is what a strip like this really has. */
+      const loop = createToggle({
+        label: 'loop', size: 'small',
+        onChange: (on) => { o.textContent = `loop ${on ? 'on' : 'off'}, ${g.count()} rows`; },
+      });
+      const rowOne = g.row([station], { align: 'start' });
+      const rowTwo = g.row([speed, loop], { align: 'between' });
+      const rowPic = g.row(shape.el, { pad: false });
+      shape.redraw();
+
+      /* ⚠️ HIDDEN RATHER THAN REMOVED, because those are two different claims
+         and `hidden` is the one a reader can undo. Both are true of the seam:
+         `.pos-rows-r[hidden]` is `display: none`, which takes no `gap`. */
+      const cut = el('button', '', 'HIDE THE PICTURE');
+      cut.addEventListener('click', () => {
+        rowPic.hidden = !rowPic.hidden;
+        cut.textContent = rowPic.hidden ? 'SHOW THE PICTURE' : 'HIDE THE PICTURE';
+        o.textContent = rowPic.hidden ? 'two rows showing, and no seam left over' : 'three rows';
+      });
+
+      const controls = el('div', 'pos-controls');
+      controls.append(cut);
+      box.append(g.el, controls, o);
+      rowsSpec = { g, rowOne, rowTwo, rowPic, cut, shape, loop, speed };
+    });
+
   section('hardware', 'PANEL SEAM',
     'A rule across a panel from one inner edge of its case to the other.',
     `const p = createPanelLayout({ side: null, plate: { lines: ['SEAM'], place: 'side' } });
@@ -4771,7 +5057,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   // 🔴 EVERY BLOCK IS BUILT, SO THE PARTS CLOSE. The window was open for the
   // build because a diagram measures its own text when it is made and came out
   // laid out for 320 px inside a 658 px panel without it. Nothing above this
-  // line waited for anything, so no frame was ever rendered with all five parts
+  // line waited for anything, so no frame was ever rendered with all parts
   // open, and the scroll below lands where a reader will actually find it.
   settle();
 
@@ -4781,7 +5067,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
    * instruction is *"in kit move online stuff to topmost item (all new should
    * land top, make rule)"*, and the reason is written down: this page is read
    * by somebody checking what the kit has, and what they do not know about is
-   * what arrived since they last looked. **A tab row hides four fifths of the
+   * what arrived since they last looked. **A tab row hides all but one part of the
    * page**, so the newest block can be at the top of a part nobody opens, and a
    * reader who never presses that tab is never told. A quiet break is the worst
    * kind.
@@ -4847,6 +5133,259 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   settle();
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   measure();
+
+  /* ── the glued rows and the instrument panel built on them ──────────────── */
+  {
+    const r = (e) => (e.el || e).getBoundingClientRect();
+    const px = (e, prop) => parseFloat(getComputedStyle(e.el || e)[prop]) || 0;
+    const bg = (e) => getComputedStyle(e.el || e).backgroundColor;
+    const edge = (e) => px(e, 'borderTopWidth') + px(e, 'borderBottomWidth')
+      + px(e, 'borderLeftWidth') + px(e, 'borderRightWidth');
+    const shown = (g) => g.rows().filter((row) => getComputedStyle(row).display !== 'none');
+    /** The gaps between consecutive VISIBLE rows, which is what a seam is. */
+    const seams = (g) => {
+      const v = shown(g);
+      return v.slice(1).map((row, i) => +(r(row).top - r(v[i]).bottom).toFixed(1));
+    };
+
+    const sk = ipanelSpec.sketch;
+
+    /**
+     * 🔴 ONE BORDER ROUND THE LOT AND NONE INSIDE IT, WHICH IS WHAT `.pos-glue`
+     * PROMISES AND IS THE TEMPLATE THIS PAGE ALREADY USES FOR THE GLUED
+     * TRANSPORT BAR. The seam is a flex `gap` showing the box's own ground
+     * through, so it is never drawn and can never double.
+     */
+    {
+      const gaps = seams(sk.glue);
+      const inner = sk.glue.rows().map(edge);
+      d.assert('an instrument panel is one surface: one border round it, none inside, and a 1 px seam between rows',
+        sk.el.classList.contains('pos-glue')
+        && px(sk.el, 'borderTopWidth') === 1
+        && inner.every((n) => n === 0)
+        && gaps.length === 4 && gaps.every((n) => Math.abs(n - 1) <= 0.6),
+        `${gaps.length} seam(s) reading ${gaps.join(', ')} px, one edge of ${px(sk.el, 'borderTopWidth')} px `
+        + `round ${sk.glue.count()} rows, ${inner.filter((n) => n).length} of them carrying an edge of their own`);
+    }
+
+    /**
+     * 🔴 EVERY ROW PAINTS ITS OWN GROUND, AND THIS IS THE ASSERT THAT MAKES THAT
+     * A FACT RATHER THAN A COMMENT. `.pos-glue` is `gap: 1px` over a `--line`
+     * ground, so a row with no background of its own lets the line colour
+     * through its WHOLE area and the seam stops being a seam. Three callers have
+     * each paid for that in their own stylesheet before the container owned it.
+     * ⚠️ IT IS READ AGAINST A SURFACE THAT IS KNOWN TO BE `--card`, this page's
+     * own specimen box, rather than against a token parsed out of a string.
+     */
+    {
+      const card = bg(document.querySelector('.kit-box'));
+      const rows = sk.glue.rows();
+      const wrong = rows.filter((row) => bg(row) !== card).length;
+      d.assert('every row paints its own ground, so the seam cannot come through one',
+        wrong === 0 && bg(sk.el) !== card && rows.length > 0,
+        `${rows.length - wrong} of ${rows.length} rows read ${card}, and the surface under them `
+        + `reads ${bg(sk.el)}, which is the colour the seam is made of`);
+    }
+
+    /**
+     * 🔴 THE SKETCH'S ORDER IS THE COMPONENT'S AND NOT THE CALLER'S. Graded
+     * against the RENDERED children and against their tops, because a list this
+     * module keeps and a page a browser drew are two different facts, and
+     * `/pack/` has already been caught believing the first one.
+     */
+    {
+      const order = sk.shape().join(' ');
+      const tops = sk.glue.rows().map((row) => r(row).top);
+      const rising = tops.every((t, i) => i === 0 || t > tops[i - 1]);
+      d.assert('the panel renders in the order the sketch draws, top to bottom',
+        order === 'viz controls controls keys plate' && rising,
+        `${order}, at y ${tops.map((t) => t.toFixed(0)).join(', ')}`);
+    }
+
+    /**
+     * 🔴 AND A ROW ASKED FOR LATE STILL LANDS ABOVE THE KEYBOARD AND THE FOOT.
+     * The node test grades this against a stub; this grades it against a browser,
+     * which is the pair `instrument-test.mjs` already draws between the two.
+     * ⚠️ IT PUTS THE ROW BACK, because a check does not get to leave a reader
+     * looking at a panel they did not ask for.
+     */
+    {
+      const late = sk.addRow([createKnob({ label: 'LFO', min: 0, max: 127, value: 30 })]);
+      const after = sk.shape().join(' ');
+      const above = r(late).bottom <= r(sk.keys).top && r(late).bottom <= r(sk.plateRow).top;
+      sk.glue.remove(late);
+      d.assert('a row asked for after the keyboard and the foot exist still lands above both',
+        after === 'viz controls controls controls keys plate' && above
+        && sk.shape().join(' ') === 'viz controls controls keys plate',
+        `with it: ${after} · its bottom ${r(late).bottom.toFixed(0)} against keys `
+        + `${r(sk.keys).top.toFixed(0)} and foot ${r(sk.plateRow).top.toFixed(0)}`);
+    }
+
+    /**
+     * 🔴 A ROW THAT GOES AWAY TAKES ITS SEAM WITH IT, WHICH IS THE ONE THING A
+     * STILL PICTURE OF THIS COMPONENT CANNOT SHOW. A `display: none` child takes
+     * no `gap` in a flex column, so what is left is rows with one hairline
+     * between each pair and no orphan rule where the row was.
+     */
+    {
+      const g = rowsSpec.g;
+      const before = seams(g);
+      rowsSpec.rowPic.hidden = true;
+      const during = seams(g);
+      const count = shown(g).length;
+      rowsSpec.rowPic.hidden = false;
+      const back = seams(g);
+      d.assert('hiding a row closes the surface up and leaves no seam where it was',
+        before.length === 2 && during.length === 1 && count === 2
+        && during.every((n) => Math.abs(n - 1) <= 0.6)
+        && back.length === 2 && back.every((n) => Math.abs(n - 1) <= 0.6),
+        `${before.length} seam(s) at ${before.join(', ')} px, ${during.length} at `
+        + `${during.join(', ')} with ${count} rows showing, ${back.length} at ${back.join(', ')} again`);
+    }
+
+    /**
+     * 🔴 `between` PUTS ONE CHILD AT EACH END, AND IT IS GRADED BECAUSE A ROW
+     * WITH ONE CHILD CANNOT TELL IT FROM `start`. That is the trap
+     * `createNameplate` already records about `place: 'ends'`, which parks a
+     * lone line on the left, and it is invisible in a screenshot.
+     */
+    {
+      const row = rowsSpec.rowTwo;
+      const kids = [...row.children];
+      const inset = px(row, 'paddingLeft');
+      const box = r(row);
+      const offL = +(r(kids[0]).left - (box.left + inset)).toFixed(1);
+      const offR = +((box.right - inset) - r(kids[kids.length - 1]).right).toFixed(1);
+      const apart = +(r(kids[kids.length - 1]).left - r(kids[0]).right).toFixed(1);
+      d.assert('a row aligned between puts one control against each inner edge, which needs two of them',
+        kids.length === 2 && Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6 && apart > 100,
+        `${kids.length} control(s), ${offL} px off the left inset and ${offR} px off the right, `
+        + `${apart} px apart`);
+    }
+
+    /**
+     * 🔴 EDGE TO EDGE MEANS THE PICTURE'S OWN LEFT EDGE, AND A CONTROL ROW'S
+     * INK STARTS ONE INSET FURTHER IN. This is the shape `/muta/` and `/fau/`
+     * both left the case to get, and `/fau/` had to be told twice because a
+     * fourth inset nobody had counted was the case's own.
+     */
+    {
+      const pic = ipanelSpec.pic.el;
+      const surface = r(sk.el);
+      const gapL = +(r(pic).left - (surface.left + px(sk.el, 'borderLeftWidth'))).toFixed(1);
+      const gapR = +((surface.right - px(sk.el, 'borderRightWidth')) - r(pic).right).toFixed(1);
+      const inset = px(sk.controls()[0], 'paddingLeft');
+      d.assert('the picture row runs to both inner edges while a control row keeps its inset',
+        Math.abs(gapL) <= 0.6 && Math.abs(gapR) <= 0.6 && inset >= 12,
+        `the picture sits ${gapL} px and ${gapR} px off the inner edges, against a control row's ${inset} px`);
+    }
+
+    /**
+     * 🔴 A ROW'S INSET AND A CASE'S ARE ONE NUMBER, ASSERTED RATHER THAN
+     * COMMENTED. `shell.css` declares `--rows-pad` as a second name for
+     * `.panel-case`'s 20 px, because that one is redeclared as 0 on an uncased
+     * panel and a glued surface is glued whether or not anybody built a case.
+     * A measurement typed twice is a measurement that will disagree, and this
+     * page is where the two are made to agree.
+     */
+    {
+      const cased = document.querySelector('.panel-case');
+      const rowPad = px(sk.controls()[0], 'paddingLeft');
+      const casePad = cased ? px(cased, 'paddingLeft') : -1;
+      d.assert('a glued row starts its ink on the same line a case does, which is the point of the second token',
+        cased !== null && rowPad === casePad && rowPad > 0,
+        `a row pads ${rowPad} px and a case pads ${casePad} px`);
+    }
+
+    /**
+     * 🔴 THE FOOT'S TWO ENDS ARE AT THE TWO ENDS, OR `place: 'ends'` MEANS
+     * NOTHING. A plate sized to its own content inside a centred row would put
+     * the name and the patch next to each other in the middle.
+     */
+    {
+      const [nameEl, patchEl] = sk.plate.lines;
+      const row = r(sk.plateRow);
+      const inset = px(sk.plateRow, 'paddingLeft');
+      const offL = +(r(nameEl).left - (row.left + inset)).toFixed(1);
+      const offR = +((row.right - inset) - r(patchEl).right).toFixed(1);
+      const apart = +(r(patchEl).left - r(nameEl).right).toFixed(1);
+      d.assert('the foot puts the name against one inner edge and the patch against the other',
+        Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6 && apart > 100,
+        `the name is ${offL} px off the left inset and the patch ${offR} px off the right, `
+        + `${apart} px apart`);
+    }
+
+    /**
+     * 🔴 AND REWRITING THE PATCH MOVES NOTHING ELSE, WHICH IS WHY IT IS THE
+     * RIGHT-HAND END. A right-aligned box grows leftward into air. The name is
+     * the fixed half and sits against the fixed edge.
+     * ⚠️ IT PUTS THE ORIGINAL BACK, and it measures a LONGER name so a width
+     * that did not change would be the failure rather than the pass.
+     */
+    {
+      const [nameEl, patchEl] = sk.plate.lines;
+      const was = patchEl.textContent;
+      const nameL = r(nameEl).left, rowW = r(sk.plateRow).width, footH = r(sk.plateRow).height;
+      const longer = 'WURLITZER 200A ELECTRIC';
+      sk.patch(longer);
+      const grew = r(patchEl).width;
+      const moved = +(r(nameEl).left - nameL).toFixed(1);
+      const rowMoved = +(r(sk.plateRow).width - rowW).toFixed(1);
+      const taller = +(r(sk.plateRow).height - footH).toFixed(1);
+      sk.patch(was);
+      d.assert('rewriting the patch moves neither the name nor the row it is in',
+        patchEl.textContent === was && moved === 0 && rowMoved === 0 && taller === 0 && grew > 0,
+        `a name ${longer.length} characters long drew ${grew.toFixed(1)} px wide and moved the `
+        + `instrument's name by ${moved} px, the row by ${rowMoved} px and its depth by ${taller} px`);
+    }
+
+    /**
+     * 🔴 THE PATCH CONTROL IS PRESSED RATHER THAN READ, BECAUSE IT SHIPPED
+     * INERT AND NOTHING SAID SO. `picker.mjs` wires `prev` and `next` straight
+     * onto its two buttons and its `onPick` belongs to the `<select>`
+     * underneath, so a caller that puts its work in `onPick` gets a control
+     * that draws nothing and changes nothing when an arrow is pressed. It looked
+     * perfectly correct in a screenshot and in the source.
+     * ⚠️ **SO THE GESTURE IS DRIVEN, NOT THE CALLBACK.** A check that called
+     * `sketch.patch()` would have been green throughout, which is this
+     * project's own rule about a meter gated on intent: drive the real gesture.
+     * ⚠️ AND IT PUTS THE FOOT BACK.
+     */
+    {
+      const [, patchEl] = sk.plate.lines;
+      const was = patchEl.textContent;
+      const cell = ipanelSpec.pick.el.querySelector('.pos-pick-cell, .pos-pick-seg')
+        || ipanelSpec.pick.el;
+      const drawnBefore = (cell.textContent || '').trim();
+      ipanelSpec.pick.el.querySelectorAll('button')[1].click();
+      const now = patchEl.textContent;
+      const drawn = (cell.textContent || '').trim();
+      sk.patch(was);
+      ipanelSpec.pick.show(was);
+      d.assert('pressing the patch arrow changes the foot and the control draws what it chose',
+        now !== was && now.length > 0 && drawn.includes(now) && drawnBefore.includes(was),
+        `the foot went from "${was}" to "${now}", and the control read "${drawnBefore}" then "${drawn}"`);
+    }
+
+    /**
+     * 🔴 A KEYBOARD IN A ROW GIVES UP ITS OWN BOX, AND THE HALF THAT SHOWS IS
+     * ITS BOTTOM MARGIN. `.kbd` carries `margin: 0 0 10px`, which `.pos-glue`
+     * zeroes on DIRECT children only, so a keyboard one level down would make a
+     * row 10 px deeper at the bottom than at the top. That is this project's own
+     * *"a reservation that only one of two equal things makes is a reservation
+     * that breaks them"*, and the rule that fixes it is written `> X` and
+     * `> * > X` because a direct-child selector once fixed one page and left
+     * another exactly as reported.
+     */
+    {
+      const kbEl = sk.keys.querySelector('.kbd');
+      const above = +(r(kbEl).top - (r(sk.keys).top + px(sk.keys, 'paddingTop'))).toFixed(1);
+      const below = +((r(sk.keys).bottom - px(sk.keys, 'paddingBottom')) - r(kbEl).bottom).toFixed(1);
+      d.assert('a keyboard glued into a row keeps no border and no margin of its own, so the row is even',
+        kbEl !== null && edge(kbEl) === 0 && Math.abs(above - below) <= 0.6,
+        `${above} px of row above the keys and ${below} px below, with ${edge(kbEl)} px of border on them`);
+    }
+  }
 
   /**
    * 🔴 THE TWO COLUMNS SHARE ONE PITCH, AND NOTHING IN THE BROWSER MAKES THEM.
@@ -5262,7 +5801,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       /* ⚠️ THE MEASURING WINDOW IS SHUT ACROSS BOTH WAITS, which is the third
          place it has to be. A word swaps at the trough of a 90 ms fade, so this
          has to wait twice, and an `await` inside the window is a frame drawn
-         with all five parts open. The check at the foot of this file counts
+         with all parts open. The check at the foot of this file counts
          those and its own comment records taking a `settle()` out reading
          `3 frames`. */
       const land = async () => {
@@ -5797,7 +6336,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   /**
    * 🔴 THE TOGGLE ACTS OR IT IS NOT A CONTROL, SO NOTHING BELOW ASSERTS AN
    * OPTION THAT WAS PASSED IN. A real click goes down the same path a finger
-   * takes, the counter behind all five specimens says whether the page was
+   * takes, the counter behind all the specimens says whether the page was
    * told, and the disabled one is clicked on purpose to prove the counter can
    * refuse to move. That is what the SWITCH block asserted until 2026-09-23 and
    * it is what this one inherits; what left with the switch is the knob travel
@@ -6319,7 +6858,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     // THE RULE THIS PAGE ALREADY WROTE DOWN AND WHICH I BROKE ON THE FIRST RUN.
     // Reading a file is a promise, so an `await` here sits inside the measuring
     // window, a `requestAnimationFrame` callback finds it open, and a frame is
-    // drawn with all five parts laid out at once. It went red immediately and
+    // drawn with all parts laid out at once. It went red immediately and
     // named the count, which is what that counter is for: no reading of the
     // source can see an await, and three other places on this page do exactly
     // this dance for the same reason.
@@ -6482,7 +7021,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     // ⚠️ THE MEASURING WINDOW SHUTS ACROSS THIS WAIT AND OPENS AGAIN AFTER IT.
     // Both widths are read with every part laid out, which is the only state
     // either of them is a real number in; what may not happen is a frame being
-    // rendered with all five parts open, and this loop is one of the two places
+    // rendered with all parts open, and this loop is one of the two places
     // on the page that gives the browser the chance. See `measure()` above.
     settle();
     for (let i = 0; i < 40 && t?.dataset.state !== 'playing'; i++) {
@@ -8734,7 +9273,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
 
   // ── the parts, and whether a reader can still find what is new ──────────
   //
-  // 🔴 EVERY CHECK ABOVE THIS LINE MEASURED THE PAGE WITH ALL FIVE PARTS LAID
+  // 🔴 EVERY CHECK ABOVE THIS LINE MEASURED THE PAGE WITH EVERY PART LAID
   // OUT. Everything below measures the parts themselves, so the window shuts
   // here and the page is in the state a reader has it in.
   settle();
@@ -8744,7 +9283,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   const addressWas = location.hash;
 
   /**
-   * 🔴 THE FIVE PARTS HOLD EVERY BLOCK, AND NOTHING IS ORPHANED. The tab row is
+   * 🔴 THE PARTS HOLD EVERY BLOCK, AND NOTHING IS ORPHANED. The tab row is
    * this page's whole index now: a block in no part is a block that cannot be
    * reached, and it would look exactly like a block that was never written.
    * `section()` throws on a part that does not exist, so the failure this
@@ -8777,7 +9316,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
    * nobody asked for it; the ordering rule predates it and is untouched.
    * ⚠️ AND IT IS WORTH SAYING WHAT IS NO LONGER CHECKED: nothing now asserts
    * that a reader can FIND the newest block, only that it is first where it
-   * lives. A tab row still hides five sixths of this page, and that is a real
+   * lives. A tab row still hides all but one part of this page, and that is a real
    * gap rather than a solved problem.
    */
   {
@@ -8844,7 +9383,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
    * A closed panel has to have no size, or the tabs are doing nothing; and the
    * same panel has to HAVE a size while `.kit-measuring` is on, or the window
    * every geometry check on this page depends on was decoration. The second
-   * reading is the one that would have caught a tab row taking four fifths of
+   * reading is the one that would have caught a tab row taking all but one part of
    * this page's coverage away in silence, and it is here rather than in a note
    * because a note cannot go red.
    */
@@ -8871,7 +9410,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
    * measuring window safe for somebody reading the page rather than only for
    * the harness: a `requestAnimationFrame` callback runs immediately before a
    * frame is drawn, so a callback that finds the window open is a frame that
-   * would have shown all five parts at once. It can only happen if an `await`
+   * would have shown every part at once. It can only happen if an `await`
    * lands inside the window, and no reading of the source can see one.
    * ⚠️ PROVED BY BREAKING IT: taking the `settle()` out of the toggle check's
    * wait reads `3 frames` here and goes red, with everything else on the page
@@ -8880,7 +9419,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   d.assert('nothing was ever drawn with every part open at once',
     paintedOpen === 0,
     paintedOpen === 0 ? 'the window held no wait, so no frame fell inside it'
-                      : `${paintedOpen} frame(s) were drawn with all five parts laid out`);
+                      : `${paintedOpen} frame(s) were drawn with all ${GROUPS.length} parts laid out`);
 
   /**
    * 🔴 THE BLOCKS INSIDE A PART KEEP THE PROJECT'S ONE GAP, WHICH IS THE RULE
