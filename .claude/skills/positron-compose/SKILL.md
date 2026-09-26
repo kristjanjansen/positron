@@ -527,26 +527,26 @@ space, meaning the container's.
   left-aligned, every item its own width, the gap between items and between
   lines, nothing squished and nothing past the inset. Eight octave buttons in a
   320 px frame are two lines, MEASURED on `/kit/`.
-- **A justified row may not wrap that way.** `space-between` justifies each
-  wrapped line on its own: MEASURED on `/nola/` at 375, `N D − + 0` on one line
-  and `Loop Sustain Panic` right-aligned on the next, which is the shape that
-  reads as broken. *"if you have a justified layout in desktop, you need to go
-  to left alignment in mobile and have gaps between elements, not just
-  squished."* So below `--row-min`, the width its content needs, every child of
-  a between row is made at least a full line wide, `min-width: min(100%,
-  max(0px, calc((var(--row-min, 20rem) - 100%) * 999)))`, and the row is LINEAR:
-  one child per line, on the left inset, one gap apart. Above it the children sit
-  at the two edges. No media query anywhere. `100%` is the flex container, so
-  **the same row is justified at full width and linear in a 320 px frame on the
-  same page**, MEASURED on `/kit/` at desk width, which is what makes a phone
-  arrangement gradable at all.
+- **A justified row has exactly two children, each end one element.**
+  `space-between` justifies each wrapped line on its own: MEASURED on `/nola/`
+  at 375, `N D − + 0` on one line and `Loop Sustain Panic` right-aligned on the
+  next, which is the shape that reads as broken, and it happens only when a
+  wrapped line holds two or more items. With one item per line it parks each at
+  the start. So a between row of two ends wraps into two left-aligned lines at
+  their own sizes with no extra rule, no threshold and no media query, and
+  `createGlueRows` refuses any other count. *"if you have a justified layout in
+  desktop, you need to go to left alignment in mobile and have gaps between
+  elements, not just squished."* ⚠️ **THE FIRST DRAFT OF THIS RULE FORCED EACH
+  CHILD TO A FULL LINE WITH A `min-width` TRICK AND THE KIT'S 320 px FRAME
+  SHOWED A BUTTON STRETCHED ACROSS THE ROW WITH ITS WORD PUSHED RIGHT**: linear
+  answered by stretching, which is the header's own phone defect
+  (`.panel-head-mid > * { width: 100% }`) rebuilt one component along. A control
+  in a linear row is at its own size or it is not linear.
 - **`between` needs a width to spread across, and a shrink-to-fit surface has
   none.** MEASURED three times at 8 px apart against an 8 px gap. A justified
   row lives on a `full: true` surface or on one whose width some other row sets
   (a keyboard); anywhere else it is `start` with a longer name.
-⚠️ **AND THE THRESHOLD IS TYPED ONCE, ON THE ROW, FROM WHAT ITS CONTENT NEEDS.**
-`--row-min` defaults to 20rem. It is a number about the content of that row,
-which is the kind the skill's one test allows; it is not a breakpoint.
+⚠️ **A FOOTER WITH FIVE CONTROLS IN IT IS NOT A JUSTIFIED ROW, IT IS TWO GROUPS**, one element each, and then it is one. That is the shape `.kbd-foot` needs and does not have.
 
 🔴 **A COMPONENT ASKS ITS OWN BOX, NEVER THE WINDOW.** *"a component in a half
 page column on a 1280 px screen is 600 px wide, and a viewport query would tell

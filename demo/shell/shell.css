@@ -1000,23 +1000,16 @@ button.pos-pri[data-busy="1"] {
   --inset: 0px;
 }
 .pos-rows-r[hidden] { display: none; }
-/* 🔴 WHEN A ROW JUSTIFIES AND WHEN IT GOES LINEAR, DECIDED BY THE ROW'S OWN
-   WIDTH AND NEVER BY THE VIEWPORT. A row wraps as a cluster: left-aligned, one
-   gap, never squished (that is `flex-wrap` above). A JUSTIFIED row may not
-   wrap that way, because `space-between` justifies each wrapped line on its
-   own and reads as broken (/nola/'s footer at 375: one line left, one right).
-   So below `--row-min`, the width its content needs, every child of a between
-   row is made at least a full line wide and the row is linear. Above it the
-   children sit at the two edges. `100%` here is the flex container, so the
-   same row is justified in a wide surface and linear in a 320 px one on the
-   same page, which is what makes it gradable at desktop width. */
-.pos-rows-r[data-align="between"] > * {
-  min-width: min(100%, max(0px, calc((var(--row-min, 20rem) - 100%) * 999)));
-}
-/* a reserved box at the end of a justified row hugs the edge it sits against:
-   a presence badge reserves its widest word, and `ONLINE` in an 8ch reserve
-   otherwise stands 2ch short of the inset it is meant to touch */
-.pos-rows-r[data-align="between"] > :last-child { text-align: end; }
+/* 🔴 A JUSTIFIED ROW HAS EXACTLY TWO CHILDREN, AND THAT IS THE WHOLE PHONE
+   RULE. A row wraps as a cluster (`flex-wrap` above): left-aligned, one gap,
+   every item its own size. `space-between` justifies each wrapped line on its
+   own, which is the /nola/ footer defect, but only when a line holds two or
+   more items; with one item per line it parks each at the start. So a between
+   row of two ends wraps into two left-aligned lines at their own sizes with no
+   rule at all, and `createGlueRows` refuses any other count. The first draft
+   forced each child to a full line with a `min-width` trick, and the kit's
+   320 px frame showed a MUTE button stretched across the row with its word
+   pushed right: linear answered by stretching, the header's own phone defect. */
 /* a surface that takes the width it is given, which is also where `between`
    has something to spread across */
 .pos-rows.pos-rows-full { width: 100%; }
