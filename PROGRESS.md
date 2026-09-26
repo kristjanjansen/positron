@@ -1,3 +1,39 @@
+# Session 52 (2026-09-26): eccm in its own face, the event page, the form, and a logo redraw
+
+**NOTHING ON THE EDGE CHANGED.** Still `8ee0914-162532-2f29`. Everything below
+is local, on `8ae13ee` plus the handoff commit.
+
+**MEASURED LOCALLY:** `/eccm/` 17/17 with 11 page asserts (8 in session 51);
+at 375, all 11 green, mark and menu 198 px of 812, `scrollWidth` 375.
+`/fau/` 50/50 with 44 to 51/51 with 45. `/kit/` 245/245 to 246/246 with 234.
+`instrument-panel-test.mjs` 21 ok to 26 ok. Scratch build 418 files, 14 under
+`eccm/`, no Plex reference.
+
+**MEASURED THROUGH `CSS.getPlatformFontsForNode`:** every text element on
+`/eccm/` draws in Helvetica or Helvetica-Bold, with `document.fonts` empty,
+which is the reading the design plan took on eccm.ee itself.
+
+**MEASURED ON THE TAGLINE, natural width of "estonian centre of contemporary
+music" at 27 px against the picture's 311:** DIN Condensed Bold 329 (95 per
+cent), Avenir Next Condensed Demi Bold 395 (79), Arial Narrow Bold 415 (75),
+Helvetica Neue Condensed Bold 422 (74), Helvetica Bold 506 (62).
+
+**MEASURED ON THE SERVED JPEG, row by row:** the ink box is x 35 to 344, y 27
+to 174 in 381 by 199; capitals 93 tall from y 29, stroke 14; the C a 44 by 97
+stadium open from y 60 to 88, the second 81 px right of the first; the M's
+arms 10 wide meeting on the baseline; five stave hairlines on a 7.375 pitch
+from y 58.5 to 88, 12 px past the M; three joins flush along letter edges at
+y 58.5, 88 and 108; tagline x-height 14, baselines 153 and 174, lines 311 and
+221 wide.
+
+**MEASURED ON THE THUMBNAILS eccm.ee SERVES (9 files, 510 KB):** 300 on the
+long side, seven of them 300 by 192 to 205, one 227 by 300, one 300 by 150. At
+a 300 by 200 box the 3:2 ones draw at 1.000 to 1.042, the two odd ones at
+1.32 and 1.33.
+
+**MEASURED, THE COST OF A BUTTON MOVE BY BACKGROUND AGENT:** 20 minutes 24
+seconds, 122 tool calls, 379,714 tokens. The owner called it excessive at 17.
+
 # Session 51 (2026-09-26): composition as a system, the instrument panel, and the first eccm page
 
 **MEASURED ON THE EDGE AT `8ee0914-162532-2f29`:** `/eccm/` 14/14 (8 page

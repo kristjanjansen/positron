@@ -132,11 +132,13 @@
      one gap, nothing past the gutter, no hamburger; the language switch is
      text, up beside the mark where eccm.ee keeps its flag */
   .nav { display: flex; flex-wrap: wrap; column-gap: var(--eccm-s-6); row-gap: var(--eccm-s-1); }
-  .nav a { text-decoration: none; }
-  .nav a:hover { text-decoration-line: underline; text-decoration-color: var(--eccm-accent); }
-  .nav [aria-current="page"] { text-decoration-line: underline; text-decoration-color: currentColor; }
-  /* the switch: the current language is text, the other is a link with the
-     page's own underline, both at the menu's size */
+  .nav a, .lang a { text-decoration: none; }
+  .nav a:hover, .lang a:hover { text-decoration-line: underline; text-decoration-color: var(--eccm-accent); }
+  .nav [aria-current="page"], .lang [aria-current="page"] { text-decoration-line: underline; text-decoration-color: currentColor; text-decoration-thickness: 1px; text-underline-offset: 0.15em; }
+  /* the switch: the current language is text and carries the menu's own
+     current-page line, the other is a link with no line until hovered, both
+     at the menu's size (asked 2026-09-26: "et en underlines do not match
+     menu ones") */
   .lang { display: flex; column-gap: var(--eccm-s-3); }
 
   /* the event list, in eccm.ee's own shape: the picture at the start, the
@@ -212,8 +214,21 @@
   .form input[type="file"] { padding: 0; border: 0; }
   .form textarea { line-height: var(--eccm-lh-body); resize: vertical; }
   .hint { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
-  .pic-field { display: flex; flex-wrap: wrap; gap: var(--eccm-s-4); align-items: flex-start; }
-  .pic-field img { inline-size: 14rem; aspect-ratio: 3 / 2; object-fit: cover; }
+  /* the picture field: the current picture and a drop field side by side,
+     each at least 14rem, one under the other when the measure cannot hold
+     both. The native input covers the whole field at zero opacity, so a drop
+     or a click anywhere on it is a drop or a click on the control, with no
+     script; the dashed rule is the affordance, solid ink is the hover, and
+     the accent ring is the keyboard's (asked 2026-09-26: "do proper file
+     styling with drop affodance") */
+  .field-name { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
+  .drop { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--eccm-s-4); }
+  .drop img { inline-size: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+  .drop-zone { position: relative; display: grid; place-content: center; gap: var(--eccm-s-2); padding: var(--eccm-s-6); text-align: center; border: 1px dashed var(--eccm-rule-strong); cursor: pointer; }
+  .drop-zone:hover { border: 1px solid var(--eccm-ink); }
+  .drop-zone:has(input:focus-visible) { border: 1px solid var(--eccm-ink); outline: 2px solid var(--eccm-accent); outline-offset: 2px; }
+  .form .drop-zone input { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; opacity: 0; cursor: pointer; }
+  .drop-say { text-wrap: balance; }
   .actions { display: flex; flex-wrap: wrap; gap: var(--eccm-s-3); margin-block-start: var(--eccm-s-4); }
 }
 

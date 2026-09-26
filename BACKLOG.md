@@ -42,6 +42,15 @@ the tagline's baseline at the far end of the head band, at the menu's size,
 the current language as plain text and the other as a link with the page's
 own underline. The logo page resets the overlay's viewBox to the full frame
 so it still lies on the JPEG.
+⚠️ **AND:** *"et en underlines do not match menu ones"*. The switch takes the
+menu's own rule: a line in ink under the current language only, none under
+the other, the accent on hover. One selector list shared with the menu.
+⚠️ **AND, WITH A CROP OF THE FORM'S FILE FIELD:** *"do proper file styling with
+drop affodance"*. A dashed drop field beside the current picture, wording that
+says drag here or choose, the native input laid invisibly over the whole
+field so a drop or a click anywhere lands on it without script, solid ink on
+hover, the focus ring from the keyboard. What script would add and this page
+does not have: a highlight while a file is being dragged over it.
 
 ### Done 2026-09-26: the eccm event page, an edit button and an edit form, HTML only, in the eccm system
 
