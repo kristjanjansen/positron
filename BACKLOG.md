@@ -1,6 +1,20 @@
 ## Open
 
-### Open 2026-09-26: eccm site design analysis, in the background, as a plan
+### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
+
+⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
+extra care"*. Done in the kit the same minute: five badges out of the glued rows
+block, the two justified rows given a `MUTE` button as their second end, the two
+settings lists a third label-and-control pair. What "extra care" means for the
+badge in a glued row is not decided and is not to be guessed at; the badge
+reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
+composites a translucent dot, and each of those is a fact a row would have to
+respect on purpose.
+
+
+### Done 2026-09-26: eccm site design analysis, in the background, as a plan
+
+✅ `plans/plan-eccm-design.md`, 614 lines, 5 requests to eccm.ee of 12 allowed, reported in full. Verdict: stock Cassiopeia plus a 1,231 byte `user.css`, Roboto declared and never served, 14.4 px body on a 142 character line, a 381 by 199 JPEG logo from a 2023 PSD and no vector anywhere; one family in two weights at 18 px on 66 ch, about 30 `--eccm-*` tokens, a demo under `demo/eccm/` importing nothing from `shell/`, and a 25 rule skill outline. Next step is one email to ECCM for the vector and the tagline face.
 
 ⚠️ **ASKED, VERBATIM (dictated):** *"In bg do eccm site design analysis. We
 need not to take it all and we actually should improve it, especially
@@ -15,18 +29,6 @@ deliver good typography based, white space based UI for a website and write it
 into a plan."* Read-only against eccm.ee, a handful of fetches with a browser
 user agent and no crawl. Lands in `plans/plan-eccm-design.md` and is reported
 here in full when it arrives.
-
-### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
-
-⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
-extra care"*. Done in the kit the same minute: five badges out of the glued rows
-block, the two justified rows given a `MUTE` button as their second end, the two
-settings lists a third label-and-control pair. What "extra care" means for the
-badge in a glued row is not decided and is not to be guessed at; the badge
-reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
-composites a translucent dot, and each of those is a fact a row would have to
-respect on purpose.
-
 
 ### Done 2026-09-26: convert `/fau/` to the new rules, in the background, per the audit plan
 
