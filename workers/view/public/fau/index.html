@@ -6,6 +6,43 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 THE ONE ROAD TO A COMPILE SITS IN THE BOTTOM RIGHT CORNER OF THE WELL.
+     Asked 2026-09-26: "rm compile from footer, put it absolutely to bottom
+     right corner of textarea, small button variant". Two rules, and every
+     number in them is a token the surface already keeps, read rather than
+     typed: the button sits `--rows-pad` in from the right, which is the same
+     x the patch selector's edge takes in the foot, and `--rows-gap` up from the
+     bottom, which is the air every row keeps; the band it lives in is the
+     button's own height (`--ctl-sm`, which `button.pos-sm` reads too) with a
+     `--rows-gap` above it and below it. One height, one place.
+     🔴 THE BAND IS THE FIELD'S, BELOW THE TEXTAREA, AND NOT THE TEXTAREA'S OWN
+     BOTTOM PADDING. THE FIRST DRAFT PUT IT INSIDE THE TEXTAREA AND THE PHONE
+     FOUND IT OUT. At 341 px the twenty-row box wraps the Organ to more lines
+     than it holds, so the textarea SCROLLS, and a scroll container's bottom
+     padding scrolls away with its content: PHOTOGRAPHED at 375 with the button
+     sitting over `os.osc` on the last visible line, on a page whose rule
+     read as correct at 1280. So the field carries the band as its own
+     `padding-bottom`, under the scroller where no line can reach, and paints
+     the well's ground (`--bg`, the textarea's own) so the band IS the well
+     rather than a stripe of row colour under it, which is positron-ui's
+     *"air inside a box belongs to the box"* with the box being the well.
+     ⚠️ THE FIELD IS THE POSITIONED ANCESTOR, NOT THE ROW AND NOT THE GLUE.
+     MEASURED with `node demo/ancestry.mjs fau '.pos-field textarea'
+     padding-bottom --width 375` against the deployed page before this rule
+     existed: `nearest ancestor that is a containing block: (none)`, offsetParent
+     the body, so an absolute button would have been placed against the
+     document rather than the well. With this rule the same walk reads
+     `label.pos-field.tall  CB(position:relative)` carrying the 58 px band
+     under a textarea whose own padding is the `16 20 16 20` every well keeps.
+     The field has no border inside a glue, so its padding edge IS the well's. */
+  .pos-field.fau-src {
+    position: relative;
+    background: var(--bg);
+    padding-bottom: calc(var(--ctl-sm) + 2 * var(--rows-gap));
+  }
+  .pos-field.fau-src > .fau-compile { position: absolute; right: var(--rows-pad); bottom: var(--rows-gap); }
+</style>
 
 <script type="module">
   /**
@@ -128,7 +165,7 @@
    * for at that moment: a compile blocks the thread it runs on, builds a WHOLE
    * NEW `AudioWorkletNode` and calls `pedal.forgetKeys()`, so the only right
    * moment for one is a moment the visitor chose. Typing now changes the bytes
-   * under the box and nothing else, and `Compile` in the foot is the one road.
+   * under the box and nothing else, and `Compile` in the corner of the box is the one road.
    *
    * ── THE PANEL, THE SWITCH AND `custom` ─────────────────────────────────────
    *
@@ -137,10 +174,14 @@
    * textarea (edge to edge), below it footer with on/off"*, and moved onto
    * `createInstrumentPanel` on 2026-09-26 (plans/plan-instrument-audit.md): the
    * text is its picture row, edge to edge by construction, the keys are its
-   * keys row, and the foot is its plate with the name and the patch picker at
-   * one end and `Compile` at the other. The name sits in the foot now, where the sketch of
-   * 2026-09-26 puts it. Nothing here is drawn by this page, and the seven page
-   * rules that used to repair the field and the case went with the move.
+   * keys row, and the foot is its plate with the name at the start and the
+   * patch picker at the far end, unlabelled, which is the panel's own rule
+   * since 2026-09-26 (*"patch selector have no label and is in right"*).
+   * `Compile` is not in the foot: it sits in the bottom right corner of the
+   * text, in the two rules at the top of this file, which are the only page
+   * rules left. The name sits in the foot, where the sketch of 2026-09-26 puts
+   * it, and the seven page rules that used to repair the field and the case
+   * went with the move.
    *
    * 🔴 `custom` IS THE ANSWER TO THE OBJECTION THAT MADE THE PRESETS BUTTONS,
    * RATHER THAN A REVERSAL OF IT. The argument written here until 2026-09-23
@@ -568,11 +609,14 @@ effect  = dm.freeverb_demo;
      * next to fau on"*. `shell.mjs` hides an empty `.pos-controls`, which it
      * has to, because that row carries 14 px under it and a band of dead space
      * reads as something that failed to render.
-     * ⚠️ THE ONE VERB THIS PAGE HAS IS IN THE PANEL'S FOOT, NOT HERE. `Compile`
-     * came back on 2026-09-26 (*"replace it with compile (shimmer). no
-     * autocompile"*) as a kit button at the far end of the plate row, beside
-     * the instrument it compiles rather than in the row under the readout,
-     * which is for controls that are not the instrument's own.
+     * ⚠️ THE ONE VERB THIS PAGE HAS IS IN THE CORNER OF THE TEXT, NOT HERE.
+     * `Compile` came back on 2026-09-26 (*"replace it with compile (shimmer).
+     * no autocompile"*) as a kit button at the far end of the plate row, and
+     * moved the same day into the bottom right corner of the source it
+     * compiles (*"rm compile from footer, put it absolutely to bottom right
+     * corner of textarea, small button variant"*), beside the thing it acts on
+     * rather than in the row under the readout, which is for controls that
+     * are not the instrument's own.
      */
   });
   guard(d);
@@ -983,8 +1027,11 @@ effect  = dm.freeverb_demo;
   //
   // See the header for why `custom` exists and why it is not in the list.
   const CUSTOM = 'custom';
+  /* 🔴 NO `label`. The picker is the plate row's far end and the panel strips a
+     caption off anything handed in there anyway, so this page does not build
+     one to be thrown away. `what` stays: it is the arrows' titles and the
+     select's own `aria-label`, which is the name a screen reader hears. */
   const patch = createPicker({
-    label: 'patch',
     what: 'patch',
     prev: () => stepPatch(-1),
     next: () => stepPatch(+1),
@@ -1076,20 +1123,37 @@ effect  = dm.freeverb_demo;
   const compile = createButtonGroup({
     buttons: [{ id: 'compile', label: 'Compile', primary: true, onPress: () => pressCompile() }],
   });
+  /* 🔴 THE BUTTON, LIFTED OUT OF THE GROUP'S ROW, AND THE ROW IS NEVER
+     APPENDED. `createButtonGroup` is the kit's one factory for a button that
+     wears the busy sweep while its promise is open (`data-busy`, `disabled`,
+     `aria-busy`, all set on the button itself), and that contract is why it is
+     built here. What it wraps the button in is a segment join for several
+     buttons sharing edges, and one button in the corner of a well is not a
+     row: inside `.step` it would carry the segment's padding and the row's
+     34 px, where what was asked for is *"small button variant"*. `pos-sm` is
+     that variant (`shell.css`), a modifier on the element the way `pos-pri`
+     is; `fau-compile` is what the two page rules above position. */
+  const compileBtn = compile.button('compile');
+  compileBtn.classList.add('pos-sm', 'fau-compile');
 
   // ── the page ───────────────────────────────────────────────────────────────
   //
   // 🔴 THE INSTRUMENT IS THE KIT'S GLUED PANEL, SINCE 2026-09-26. The text is
   // its picture row, edge to edge by construction, the keys are its keys row,
-  // and the foot is its plate: the name with the patch picker beside it at the
-  // start, and Compile at the other end (*"align to right, fau stays in
-  // left"*). The name is in the foot because the sketch of 2026-09-26 puts it
-  // there (plans/plan-instrument-audit.md). No page rule is left.
+  // and the foot is its plate: the name at the start and the patch picker at
+  // the far end, which is where the component puts a `patch` control and the
+  // rule it carries since the same day. Compile is in the corner of the text,
+  // not on the foot (*"rm compile from footer"*). The name is in the foot
+  // because the sketch of 2026-09-26 puts it there
+  // (plans/plan-instrument-audit.md). The two rules at the top of this file
+  // are the only page rules, and both are about the corner.
   const panel = createInstrumentPanel({
     viz: source.el,
     keys: keys.el,
-    plate: { name: 'FAU', status: patch, patch: compile },
+    plate: { name: 'FAU', patch },
   });
+  source.el.classList.add('fau-src');
+  source.el.append(compileBtn);
   d.el.append(panel.el);
 
   showSource();
@@ -1246,15 +1310,54 @@ effect  = dm.freeverb_demo;
       const row = rect(panel.plateRow);
       const inset = cs(panel.plateRow, 'paddingLeft');
       const l = +(rect(panel.plate.el).left - row.left).toFixed(1);
-      const rr = +(row.right - rect(compile.el).right).toFixed(1);
-      d.assert('the foot holds the name and the patch selector at the start and Compile at the other end',
-        Math.abs(l - inset) <= 0.6 && Math.abs(rr - inset) <= 0.6 && rect(patch.el).left > rect(panel.plate.el).right,
-        `${l} px in on the left and ${rr} px on the right against an inset of ${inset}, the picker after the name`);
+      const rr = +(row.right - rect(patch.el).right).toFixed(1);
+      /* 🔴 THE FOOT SINCE 2026-09-26: the name on the left inset, the patch
+         selector on the right inset with no caption, and Compile NOT in it.
+         Its `display` is read COMPUTED rather than off `hidden`, because a foot
+         with nothing left in it must paint nothing, and only the computed value
+         says whether a box is being drawn. This one still holds two ends. */
+      const footDisplay = getComputedStyle(panel.plateRow).display;
+      const captioned = patch.el.querySelector('.pos-pick-l') !== null;
+      d.assert('the foot holds the name at the start and the patch selector, unlabelled, at the far end, and Compile is not in it',
+        Math.abs(l - inset) <= 0.6 && Math.abs(rr - inset) <= 0.6 && rect(patch.el).left > rect(panel.plate.el).right
+          && !captioned && !panel.plateRow.contains(compileBtn)
+          && footDisplay !== 'none' && panel.plateRow.children.length === 2,
+        `${l} px in on the left and ${rr} px on the right against an inset of ${inset}, `
+        + `${captioned ? 'a caption on the picker' : 'no caption on the picker'}, `
+        + `the foot ${footDisplay} with ${panel.plateRow.children.length} ends`);
       const rowsPad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rows-pad'));
       const ink = cs(source.input, 'paddingLeft') + cs(source.input, 'borderLeftWidth');
       d.assert('the first line of code sits on the inset the keys and the foot keep',
         ink === rowsPad && cs(panel.keys, 'paddingLeft') === rowsPad && inset === rowsPad && rowsPad > 0,
         `the code starts ${ink} px in, the keys row ${cs(panel.keys, 'paddingLeft')} and the foot ${inset}, against --rows-pad ${rowsPad}`);
+      /* 🔴 COMPILE IS INSIDE THE WELL, IN ITS BOTTOM RIGHT CORNER, ON THE
+         INSETS THE ROWS KEEP, SMALL, AND UNDER NO LINE OF CODE. Printed as the
+         rect pair, button against the text box and the well, because this is
+         the page whose corner was reasoned about five times and measured once.
+         The well is the field; the text box is the scroller inside it, and on
+         a phone it scrolls, so a line can reach the text box's bottom EDGE and
+         the button has to sit a row gap below that edge, never over it. The
+         first draft measured the button against the text's padding and read
+         green at 756 px while a phone showed it over `os.osc`. */
+      const rowsGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rows-gap'));
+      const ctlSm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-sm'));
+      const bt = rect(compileBtn), well = rect(source.el);
+      const inR = +(well.right - bt.right).toFixed(1);
+      const inB = +(well.bottom - bt.bottom).toFixed(1);
+      const clear = +(bt.top - ta.bottom).toFixed(1);
+      const sameEdge = +(well.right - ta.right).toFixed(1);
+      const oneGround = getComputedStyle(source.el).backgroundColor === getComputedStyle(source.input).backgroundColor;
+      const f1 = (n) => n.toFixed(1);
+      d.assert('Compile sits in the bottom right corner of the well, on the rows’ own insets, small, and below the text box’s edge by a row gap',
+        Math.abs(inR - rowsPad) <= 0.6 && Math.abs(inB - rowsGap) <= 0.6 && Math.abs(clear - rowsGap) <= 0.6
+          && sameEdge === 0 && oneGround
+          && Math.abs(bt.height - ctlSm) <= 0.6 && bt.height < 34 && ctlSm > 0
+          && compileBtn.classList.contains('pos-sm') && compileBtn.classList.contains('pos-pri')
+          && source.el.contains(compileBtn),
+        `button ${f1(bt.left)},${f1(bt.top)} to ${f1(bt.right)},${f1(bt.bottom)} against the text box `
+        + `${f1(ta.left)},${f1(ta.top)} to ${f1(ta.right)},${f1(ta.bottom)} and the well to ${f1(well.right)},${f1(well.bottom)}: `
+        + `${inR} px in from the right, ${inB} px up from the bottom, ${clear} px below the text box, `
+        + `${f1(bt.height)} px tall against --ctl-sm ${ctlSm}, ${oneGround ? 'one ground' : 'TWO grounds'}`);
     }
     /* 🔴 THE UNIT ITSELF, ASSERTED, BECAUSE THE ASK WAS ABOUT THE UNIT AND
        NOTHING ELSE ON THIS PAGE WOULD NOTICE ONE GOING BACK. Three of the four
