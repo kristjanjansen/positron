@@ -403,6 +403,17 @@ bug was a fact true of every part and of no part's author.
   A reader who has to open the file to learn what was decided was handed a
   filename with extra steps. Say what it concluded, what it measured, what it
   refused and why, and what it could not settle.
+  🔴 **AND WHEN A PLAN LANDS FROM A BACKGROUND AGENT MID-TASK, THE NEXT REPLY IS
+  THAT PLAN, IN DETAIL, BEFORE ANY OTHER WORK IS REPORTED.** Instructed
+  2026-09-26: *"Give me plans in detail when arriving. Write rule on it"*, after
+  an 816 line plan on eccm.ee landed and the reply that followed it was about a
+  boot budget, with the plan deferred to *"reading it in full before relaying
+  it"* and then not relayed. A plan the owner asked for is the most expensive
+  thing a session produces and the cheapest to lose: it arrives once, and a
+  reply that mentions it in passing teaches the reader it was not important.
+  The report carries the verdict, every numbered section's finding with its
+  numbers, what was refused and why, what could not be settled, and the cost.
+  Other work waits one reply.
   ⚠️ **THE UNCERTAINTY IS PART OF THE REPORT, NOT A FOOTNOTE.** This project
   keeps paying for confident sentences that outlived their facts. A plan written
   from documentation rather than from a running thing says so, and names what
