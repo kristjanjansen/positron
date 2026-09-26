@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ECCM: kujundus pildist</title>
+<!-- demo/eccm/derive.html: the working example of plans/plan-eccm-design-from-image.md,
+     asked 2026-09-26 as "Build some wxamplee on detection. Also specimen on
+     serif fints complimeting serif based event groaphics from detection".
+     Every event picture in this directory is read on a 64 px canvas at view
+     time (the plan's route c, the demo's route), and for each the page shows
+     what the plan's §1 measures: the three biggest colours, the mean luminance
+     and chroma, whether the edges are flat, and what follows from §3 and §4:
+     a ground for the head band if all four edges are one colour that is not
+     white, lightened until the muted ink passes 4.5:1; an interaction accent
+     if the picture has a real hue, toned into the window where it passes
+     4.5:1 on white and 3:1 against the ink; or the reason for neither. Beside
+     each picture a sample head is drawn in the derived scheme. The last
+     section sets the same head in three serifs over the Gestures ground,
+     because that graphic is typed in a serif; whether a graphic's type is a
+     serif is not something 64 pixels can say, and the page says so. Every
+     picture is same-origin, so the canvas is not tainted; nothing is fetched
+     from elsewhere. Not graded by verify.mjs. -->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./eccm.css">
+<style>
+  @font-face { font-family: 'Source Serif 4'; font-weight: 200 900; font-display: swap; src: url('./vendor/source-serif-4-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 200 900; font-display: swap; src: url('./vendor/source-serif-4-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'EB Garamond'; font-weight: 400 800; font-display: swap; src: url('./vendor/eb-garamond-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'EB Garamond'; font-weight: 400 800; font-display: swap; src: url('./vendor/eb-garamond-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Cormorant Garamond'; font-weight: 300 700; font-display: swap; src: url('./vendor/cormorant-garamond-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Cormorant Garamond'; font-weight: 300 700; font-display: swap; src: url('./vendor/cormorant-garamond-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @layer page {
+    .intro { max-inline-size: var(--eccm-measure); }
+    .intro + .intro { margin-block-start: 1lh; }
+    .tally { margin-block: var(--eccm-s-8); font-variant-numeric: tabular-nums; }
+    /* one card per picture: the picture and its readings, and the sample head
+       in the derived scheme; the hairline is the gallery's, not the page's */
+    .card { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: var(--eccm-s-6) var(--eccm-s-8); margin-block-start: var(--eccm-s-12); padding-block-start: var(--eccm-s-6); border-block-start: 1px solid var(--eccm-rule); }
+    .card-pic img { inline-size: 100%; max-inline-size: 300px; aspect-ratio: 3 / 2; object-fit: cover; }
+    .card-name { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); margin-block-end: var(--eccm-s-2); }
+    .swatches { display: flex; flex-wrap: wrap; gap: var(--eccm-s-2); margin-block-start: var(--eccm-s-3); }
+    .sw { inline-size: 2.5rem; block-size: 2.5rem; border: 1px solid var(--eccm-rule); }
+    .sw-label { display: block; font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); inline-size: 2.5rem; overflow-wrap: anywhere; }
+    .readings { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--eccm-s-1) var(--eccm-s-4); margin-block-start: var(--eccm-s-4); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); font-variant-numeric: tabular-nums; }
+    .readings dt { color: var(--eccm-ink-2); }
+    .readings dd { color: var(--eccm-ink); }
+    /* the sample: the head of an event page in the derived scheme. A ground
+       when the picture gave one, the page's white when not; the accent on the
+       one place it is allowed, an underline, and the focus ring */
+    .sample { padding: var(--eccm-s-6); background: var(--ev-ground, var(--eccm-ground)); outline: 1px solid var(--eccm-rule); }
+    .sample .kicker { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); margin-block-end: var(--eccm-s-3); }
+    .sample .title { font-size: var(--eccm-t-xl); line-height: var(--eccm-lh-head); text-wrap: balance; font-family: var(--serif, inherit); font-weight: var(--serif-weight, 400); }
+    .sample .facts-line { margin-block-start: var(--eccm-s-4); }
+    .sample a { text-decoration-color: var(--ev-accent, var(--eccm-rule-strong)); text-decoration-thickness: 2px; }
+    .sample .verdict { margin-block-start: var(--eccm-s-4); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
+    .serifs { display: grid; gap: var(--eccm-s-6); margin-block-start: var(--eccm-s-8); }
+    section + section { margin-block-start: var(--eccm-s-16); }
+    h2 { font-size: var(--eccm-t-l); margin-block-end: var(--eccm-s-4); }
+  }
+</style>
+</head>
+<body>
+<header class="site-head">
+  <div class="frame">
+    <a class="mark" href="./"><img src="./logo.svg" width="310" height="147" alt="ECCM, Eesti Nüüdismuusika Keskus"></a>
+    <span class="lang"><span aria-current="page" lang="et">ET</span><a href="https://eccm.ee/index.php/en/" lang="en">EN</a></span>
+  </div>
+</header>
+<nav class="site-nav" aria-label="Menüü">
+  <div class="frame">
+    <ul class="nav">
+      <li><a href="./">Avaleht</a></li>
+      <li><a href="./logo.html">Logo</a></li>
+      <li><a href="./type.html">Kirjatüüp</a></li>
+      <li><a href="./derive.html" aria-current="page">Kujundus pildist</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="frame">
+  <h1>Kujundus pildist</h1>
+  <p class="intro">Every event picture below is read on a 64 pixel canvas as this page opens. From those pixels the page takes what the plan says a picture can give: a ground for the head of the event page, if all four edges are one colour and that colour is not white, lightened until the muted ink reads on it; an accent for underlines and focus rings, if the picture has a real hue, toned until it reads on white and stands apart from the ink; or the reason it gives neither, which is most of them.</p>
+  <p class="intro">Beside each picture the head of an event page is drawn in what it gave. The prose under it would stay ink on white on every event; only the head takes the ground, and the accent shows only where the page already uses one.</p>
+  <p class="tally" id="tally">Reading the pictures.</p>
+  <div id="cards"></div>
+
+  <section id="serif-section">
+    <h2>Seriifkiri seriifidega graafika juurde</h2>
+    <p class="intro">The Gestures graphic is typed in a serif with reversed letters. For an event whose graphic is set in a serif, the title could answer it in one. Below, the same head over the derived ground with the title in three serifs, each self hosted and subset for Š and Ž. Sixty four pixels cannot tell a serif from a sans, so this is not detected: in the editing form it is one checkbox beside the picture, <i>Graafika kiri on seriifidega</i>, and the migration script leaves it off.</p>
+    <div class="serifs" id="serifs"></div>
+  </section>
+</main>
+
+<footer class="frame site-foot">
+  <span>Eesti Nüüdismuusika Keskus, Herne 11A, 10135 Tallinn</span>
+  <span><a href="./">Tulevased üritused</a></span>
+  <span>Kujunduse proov: pildid on eccm.ee omad seisuga 26.09.2026.</span>
+</footer>
+
+<script type="module">
+  // ── colour arithmetic, the plan's §4 in code ─────────────────────────────
+  const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const gam = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+  const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;            // linear rgb in
+  const contrast = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
+  const hex = ([r, g, b]) => '#' + [r, g, b].map((c) => Math.round(Math.min(1, Math.max(0, gam(c))) * 255).toString(16).padStart(2, '0')).join('');
+  const fromHex = (h) => [1, 3, 5].map((i) => lin(parseInt(h.slice(i, i + 2), 16) / 255));
+  // OKLab, Björn Ottosson's matrices, linear sRGB both ways
+  const toLab = ([r, g, b]) => {
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  };
+  const fromLab = ([L, a, b]) => {
+    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+    return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+  };
+  const inGamut = (rgb) => rgb.every((c) => c >= -0.0005 && c <= 1.0005);
+  const lch = ([L, a, b]) => [L, Math.hypot(a, b), (Math.atan2(b, a) * 180 / Math.PI + 360) % 360];
+  const fromLch = ([L, C, h]) => fromLab([L, C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)]);
+
+  const INK = fromHex('#1a1a1a'), INK2 = fromHex('#555555'), WHITE = [1, 1, 1];
+  const Y_INK = lum(INK), Y_INK2 = lum(INK2), Y_WHITE = 1;
+  // the accent window: 4.5:1 on white and 3:1 against the ink, both at once
+  const Y_LO = 3 * (Y_INK + 0.05) - 0.05, Y_HI = 1.05 / 4.5 - 0.05;
+
+  // ── the reading, §1 ──────────────────────────────────────────────────────
+  const read = (img) => {
+    const W = 64, H = Math.max(8, Math.round(64 * img.naturalHeight / img.naturalWidth));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, W, H);
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const px = [];
+    for (let i = 0; i < d.length; i += 4) px.push([lin(d[i] / 255), lin(d[i + 1] / 255), lin(d[i + 2] / 255)]);
+    const at = (x, y) => px[y * W + x];
+    const labs = px.map(toLab);
+    const chroma = labs.map((l) => Math.hypot(l[1], l[2]));
+    const meanY = px.reduce((s, p) => s + lum(p), 0) / px.length;
+    const meanC = chroma.reduce((s, v) => s + v, 0) / chroma.length;
+    const vivid = chroma.filter((v) => v >= 0.04).length / chroma.length;
+    // top three colours by a 4 bit histogram
+    const bins = new Map();
+    for (let i = 0; i < d.length; i += 4) { const k = ((d[i] >> 4) << 8) | ((d[i + 1] >> 4) << 4) | (d[i + 2] >> 4); bins.set(k, (bins.get(k) || 0) + 1); }
+    const top = [...bins.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => ({ hex: '#' + [(k >> 8) & 15, (k >> 4) & 15, k & 15].map((v) => (v * 17).toString(16).padStart(2, '0')).join(''), share: n / px.length }));
+    // edges: the outer two rows or columns, one colour if 97 per cent sit within 12 of 255 of the median
+    const edge = (pts) => {
+      const ch = [0, 1, 2].map((i) => { const v = pts.map((p) => Math.round(gam(p[i]) * 255)).sort((a, b) => a - b); return v[v.length >> 1]; });
+      const near = pts.filter((p) => [0, 1, 2].every((i) => Math.abs(Math.round(gam(p[i]) * 255) - ch[i]) <= 12)).length / pts.length;
+      return { flat: near >= 0.97, share: near, rgb: ch.map((v) => lin(v / 255)) };
+    };
+    const rows = (ys) => ys.flatMap((y) => Array.from({ length: W }, (_, x) => at(x, y)));
+    const cols = (xs) => xs.flatMap((x) => Array.from({ length: H }, (_, y) => at(x, y)));
+    const edges = { top: edge(rows([0, 1])), bottom: edge(rows([H - 2, H - 1])), left: edge(cols([0, 1])), right: edge(cols([W - 2, W - 1])) };
+    const flatAll = Object.values(edges).every((e) => e.flat);
+    // the seed: the hue bin with the most vivid pixels, its mean colour
+    let seed = null;
+    if (vivid >= 0.01) {
+      const hb = Array.from({ length: 24 }, () => ({ n: 0, L: 0, a: 0, b: 0 }));
+      labs.forEach((l, i) => { if (chroma[i] >= 0.04) { const h = (Math.atan2(l[2], l[1]) * 180 / Math.PI + 360) % 360; const b = hb[Math.floor(h / 15) % 24]; b.n++; b.L += l[0]; b.a += l[1]; b.b += l[2]; } });
+      const best = hb.reduce((m, b) => (b.n > m.n ? b : m));
+      seed = lch([best.L / best.n, best.a / best.n, best.b / best.n]);
+    }
+    return { meanY, meanC, vivid, top, edges, flatAll, seed };
+  };
+
+  // ── what follows, §3 and §4 ──────────────────────────────────────────────
+  const derive = (r) => {
+    const out = { ground: null, groundNote: '', accent: null, accentNote: '' };
+    if (!r.flatAll) out.groundNote = 'no flat edge';
+    else {
+      const es = Object.values(r.edges);
+      let g = [0, 1, 2].map((i) => es.reduce((s, e) => s + e.rgb[i], 0) / 4);
+      if (contrast(Y_WHITE, lum(g)) < 1.1) out.groundNote = 'the edge is white';
+      else {
+        let mix = 0;
+        while (contrast(lum(g), Y_INK2) < 4.5 && mix < 0.6) { mix += 0.05; g = g.map((c, i) => c + (WHITE[i] - c) * 0.05 / (1 - (mix - 0.05))); }
+        // recompute plainly from the edge colour to avoid drift
+        const base = [0, 1, 2].map((i) => es.reduce((s, e) => s + e.rgb[i], 0) / 4);
+        g = base.map((c) => c + (1 - c) * mix);
+        if (contrast(lum(g), Y_INK2) < 4.5) out.groundNote = 'no lightening reaches 4.5 for the muted ink';
+        else out.ground = { rgb: g, hex: hex(g), lightened: mix, onInk: contrast(lum(g), Y_INK), onInk2: contrast(lum(g), Y_INK2), vsWhite: contrast(Y_WHITE, lum(g)), edge: hex(base) };
+      }
+    }
+    if (r.meanC < 0.02 && !r.seed) out.accentNote = 'grey';
+    else if (!r.seed) out.accentNote = 'no seed over 1 per cent';
+    else {
+      let [, C, h] = r.seed, found = null;
+      for (let L = 0.30; L <= 0.85 && !found; L += 0.005) {
+        let c = C, rgb = fromLch([L, c, h]);
+        while (!inGamut(rgb) && c > 0.005) { c -= 0.005; rgb = fromLch([L, c, h]); }
+        const y = lum(rgb);
+        if (y >= Y_LO && y <= Y_HI && c >= 0.04) found = { rgb, L, C: c, h };
+      }
+      if (!found) out.accentNote = 'accent fails: no tone of this hue keeps 0.04 chroma inside the window';
+      else out.accent = { hex: hex(found.rgb), onWhite: contrast(lum(found.rgb), Y_WHITE), vsInk: contrast(lum(found.rgb), Y_INK), chroma: found.C, hue: found.h, seed: hex(fromLch(r.seed)) };
+    }
+    return out;
+  };
+
+  // ── the pictures, in the list's order ────────────────────────────────────
+  const PICS = [
+    { file: 'ic_large_w900h600q100_gestures-situations-small.jpg', kicker: '30.09.2026 19.00 ECCM Ulysses', title: 'Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa', serif: true },
+    { file: 'ic_medium_w300h300q100_chatgpt-image-sep-13-2026-10-27-27-am.png', kicker: '08.10.2026 19.00 Eesti Nüüdismuusika Keskus', title: 'Schönbergi sari' },
+    { file: 'ic_medium_w300h300q100_morton-feldman.jpg', kicker: '10.10.2026 18.00 Arvo Pärdi Keskus, Laulasmaa', title: 'Morton Feldman 100: For Philip Guston' },
+    { file: 'ic_medium_w300h300q100_enmt-scrapyard-2-eriti-vaike-copy.jpg', kicker: '10.10.2026 19.30 Kanuti Gildi SAAL', title: 'Scrapyard' },
+    { file: 'ic_medium_w300h300q100_screenshot-2026-08-31-at-11-21-15.png', kicker: '11.10.2026 19.00 Eesti Nüüdismuusika Keskus', title: 'Gestuurid/situatsioonid: ilma partituurita kuulamine. Liisa Hõbepappel, Kenn-Erik Kannike, Liis Vares' },
+    { file: 'ic_medium_w300h300q100_improtest.jpg', kicker: '13.10.2026 19.00 ECCM saal', title: 'Improtest: Electro Funeral' },
+    { file: 'ic_medium_w300h300q100_screenshot-2026-09-04-at-09-40-01.png', kicker: '22.10 kuni 25.10.2026 ECCM', title: '11. Üle Heli festival „Heli on vaba“' },
+    { file: 'ic_medium_w300h300q100_u-ansambel-eccm-rida-tais-mv-150.jpg', kicker: '03.11.2026 19.00 ERR Uudistemaja', title: 'Surm' },
+    { file: 'ic_medium_w300h300q100_germination.png', kicker: '06.11.2026 19.00 Startbahn-Genezarethkirche, Berliin', title: 'Sound Plasma 10: Tallinna Uue Muusika Ansambli kontsert Berliinis' },
+  ];
+  const f2 = (n) => n.toFixed(2), pc = (n) => `${Math.round(100 * n)} per cent`;
+
+  const sample = (p, o, serif) => {
+    const s = document.createElement('div');
+    s.className = 'sample';
+    if (o.ground) s.style.setProperty('--ev-ground', o.ground.hex);
+    if (o.accent) s.style.setProperty('--ev-accent', o.accent.hex);
+    if (serif) { s.style.setProperty('--serif', serif.family); s.style.setProperty('--serif-weight', serif.weight); }
+    s.innerHTML = `<p class="kicker"></p><p class="title"></p><p class="facts-line"><a href="./event.html">Osta pilet</a>, <a href="./event.html">lisa kalendrisse</a></p><p class="verdict"></p>`;
+    s.querySelector('.kicker').textContent = p.kicker;
+    s.querySelector('.title').textContent = p.title;
+    s.querySelector('.verdict').textContent = serif ? serif.name
+      : `${o.ground ? `ground ${o.ground.hex}` : `no ground, ${o.groundNote}`}; ${o.accent ? `accent ${o.accent.hex}` : `no accent, ${o.accentNote}`}.`;
+    return s;
+  };
+
+  const cards = document.getElementById('cards');
+  const tally = { ground: 0, accent: 0, neither: 0 };
+  let gestures = null;
+  for (const p of PICS) {
+    const img = new Image(); img.src = `./${p.file}`;
+    await img.decode();
+    const r = read(img), o = derive(r);
+    if (o.ground) tally.ground++; if (o.accent) tally.accent++; if (!o.ground && !o.accent) tally.neither++;
+    if (p.serif) gestures = { p, o };
+    const card = document.createElement('article'); card.className = 'card';
+    const left = document.createElement('div'); left.className = 'card-pic';
+    const name = document.createElement('p'); name.className = 'card-name'; name.textContent = `${p.file}, ${img.naturalWidth} by ${img.naturalHeight}`;
+    left.append(name, img);
+    const sw = document.createElement('div'); sw.className = 'swatches';
+    const swatch = (hexv, label) => { const w = document.createElement('div'); const b = document.createElement('div'); b.className = 'sw'; b.style.background = hexv; const l = document.createElement('span'); l.className = 'sw-label'; l.textContent = label; w.append(b, l); return w; };
+    r.top.forEach((t) => sw.append(swatch(t.hex, `${t.hex} ${Math.round(100 * t.share)}%`)));
+    if (o.ground) sw.append(swatch(o.ground.hex, 'ground'));
+    if (o.accent) sw.append(swatch(o.accent.hex, 'accent'));
+    left.append(sw);
+    const dl = document.createElement('dl'); dl.className = 'readings';
+    const row = (k, v) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
+    row('luminance', f2(r.meanY));
+    row('chroma', `${r.meanC.toFixed(3)} mean, ${pc(r.vivid)} of pixels over 0.04`);
+    row('edges', Object.entries(r.edges).map(([k, e]) => `${k} ${e.flat ? 'flat' : Math.round(100 * e.share) + '%'}`).join(', '));
+    row('ground', o.ground ? `${o.ground.hex} from the edge ${o.ground.edge}, lightened ${pc(o.ground.lightened)}; ink ${f2(o.ground.onInk)}:1, muted ink ${f2(o.ground.onInk2)}:1, against white ${f2(o.ground.vsWhite)}:1` : o.groundNote);
+    row('accent', o.accent ? `${o.accent.hex} from seed ${o.accent.seed}, chroma ${o.accent.chroma.toFixed(3)}, hue ${Math.round(o.accent.hue)}; on white ${f2(o.accent.onWhite)}:1, against ink ${f2(o.accent.vsInk)}:1` : o.accentNote);
+    left.append(dl);
+    card.append(left, sample(p, o));
+    cards.append(card);
+  }
+  document.getElementById('tally').textContent = `${PICS.length} pictures read: ${tally.ground} give a ground, ${tally.accent} an accent, ${tally.neither} neither. The window for an accent is a luminance between ${Y_LO.toFixed(3)} and ${Y_HI.toFixed(3)}.`;
+
+  // ── the serif specimen over the Gestures ground ──────────────────────────
+  const serifs = document.getElementById('serifs');
+  for (const s of [
+    { family: "'Source Serif 4', Georgia, serif", weight: 400, name: 'Source Serif 4, regular. A text serif with an optical size axis; the calmest of the three.' },
+    { family: "'EB Garamond', Georgia, serif", weight: 500, name: 'EB Garamond, medium. The nearest to the poster’s own letters, an old style with small x-height, so a size up may be wanted.' },
+    { family: "'Cormorant Garamond', Georgia, serif", weight: 600, name: 'Cormorant Garamond, semibold. A display Garamond, sharper and lighter; at text sizes it thins out, so titles only.' },
+  ]) serifs.append(sample(gestures.p, gestures.o, s));
+</script>
+</body>
+</html>

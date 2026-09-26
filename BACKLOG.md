@@ -1,5 +1,19 @@
 ## Open
 
+### Open 2026-09-26: a working example of design from the picture, and a serif specimen for serif-typed graphics
+
+⚠️ **ASKED, VERBATIM:** *"Build some wxamplee on detection. Also specimen on
+serif fints complimeting serif based event groaphics from detection"*. So:
+`demo/eccm/derive.html`, the plan's §5 steps 1 to 3 as one page: every event
+picture read on a 64 px canvas at view time, the flat-edge test, the chroma
+test, the seed and the tone rule, every contrast pair computed, the ground
+and the accent or the reason for neither, and a sample head rendered in the
+derived scheme beside each picture. And a serif section: for a graphic whose
+type is a serif (Gestures), the same head with the title in three serifs
+(Source Serif 4, EB Garamond, Cormorant Garamond) over the derived ground.
+Whether a graphic's type is a serif is not something these pixels can say;
+the page says so and shows where an editor's checkbox would go.
+
 ### Done 2026-09-26: better type alternatives for eccm, suggested and shown, and E chosen
 
 ⚠️ **THREE MORE IN THE SAME MINUTES:** *"fau compile: its on top of textarea.
