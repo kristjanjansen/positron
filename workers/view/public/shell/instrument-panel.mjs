@@ -95,9 +95,9 @@ function partOf(v) {
  * @param {string} [o.cls]           extra classes for the surface.
  */
 export function createInstrumentPanel(o = {}) {
-  const { viz = null, rows: rowSpecs = [], keys = null, plate: plateSpec = null, cls = '' } = o;
+  const { viz = null, rows: rowSpecs = [], keys = null, plate: plateSpec = null, cls = '', full = false } = o;
 
-  const glue = createGlueRows({ cls: cls ? `pos-ipanel ${cls}` : 'pos-ipanel' });
+  const glue = createGlueRows({ cls: cls ? `pos-ipanel ${cls}` : 'pos-ipanel', full });
   /** @type {{el: Element, kind: string}[]} the rows, in order, with their kind. */
   const kept = [];
 

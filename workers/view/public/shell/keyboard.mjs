@@ -385,7 +385,7 @@ export function keyRange(span = KEY_SPAN_25) {
  *                     deliberately; no page passes them.
  * @param letters  `true` for all keys, `false` for none, or a Set of which keys
  *                 carry a letter. A 25 key layout has no 25 letters to give.
- * @param pad      `false` draws no octave pair and no `Notes off`, for a chord
+ * @param pad      `false` draws no octave pair and no `Panic`, for a chord
  *                 chart rather than an instrument. See the block beside it.
  * @returns {{el, keysEl, pad, noteOf, keyOf, press, release, base, shiftOctave,
  *            panic, lightNote, notes, chord, timing, destroy}}
@@ -425,7 +425,7 @@ export function createKeyboard(host, {
    * re-reported on `/plai/`. Ten pages import this module, so this is written
    * once and no page writes that border again.
    * ⚠️ IT IS NOT THE PAD ROW AND DOES NOT TOUCH IT. The octave pair, the
-   * displacement, the chord name, `Loop`, `Sustain` and `Notes off` are
+   * displacement, the chord name, `Loop`, `Sustain` and `Panic` are
    * controls ABOUT THE KEYS and stay where they are; this is the row for what
    * the keys PLAY, which is the page's business.
    */
@@ -778,7 +778,7 @@ export function createKeyboard(host, {
    * was right about every caller it had, because every one was an INSTRUMENT.
    * `/nola/` draws a list of CHORD CHARTS: a row of small keyboards with a
    * chord lit on each, which nobody plays an octave on and nobody sends a panic
-   * from. An octave pair and a `Notes off` under each of twelve chords is a
+   * from. An octave pair and a `Panic` under each of twelve chords is a
    * screen of controls that do not belong to anything.
    * ⚠️ SO THE RULE'S OWN ARITHMETIC IS WHAT CHANGED, NOT ITS REASONING. It says
    * a keyboard that sometimes has an octave control is two components; a
@@ -1007,7 +1007,7 @@ export function createKeyboard(host, {
     ratioEl.style.minWidth = `${RATIO_CH}ch`;
     pad.append(tempoEl, ratioEl);
   }
-  const panicBtn = make('button', '', 'Notes off', {
+  const panicBtn = make('button', '', 'Panic', {
     type: 'button', title: 'stop every note that is still sounding',
   });
   panicBtn.onclick = () => api.panic();
@@ -1015,7 +1015,7 @@ export function createKeyboard(host, {
    * 🔴 THE SUSTAIN LIVES IN THE KEYBOARD'S OWN FOOTER NOW. Asked 2026-09-23:
    * *"integrate sustain to footer, create toggle button, big and small, use
    * small below keyboard, left from notes off"*. It is the same argument the
-   * pad itself was built on: an octave pair, a `Notes off` and a damper are all
+   * pad itself was built on: an octave pair, a `Panic` and a damper are all
    * controls ABOUT the keys, and a hand's width away at the top of the page is
    * the wrong place for any of them. `/nola/` and `/fau/` each drew their own
    * switch in their own row, which is two pages solving one problem twice.
@@ -1027,7 +1027,7 @@ export function createKeyboard(host, {
    * sustains should not grow a control they cannot use.
    */
   /**
-   * 🔴 THE ROW IS `Loop`, `Sustain`, `Notes off`, STATED IN THOSE WORDS, and it
+   * 🔴 THE ROW IS `Loop`, `Sustain`, `Panic`, STATED IN THOSE WORDS, and it
    * is a keyboard function rather than a page mode. Asked 2026-09-23 as *"wait
    * make it a keyboard funcion, a button in bottom rihjt (left from sustain)
    * called 'Loop'"*, after a first reading that would have made it a third option
@@ -1375,7 +1375,7 @@ export function createKeyboard(host, {
   /* 🔴 STOPPING A LOOP MID NOTE MUST NOT LEAVE THE NOTE ON. Cutting the timers
      stops the next movement arriving, which means the note-off that was due never
      comes: what a player hears is the loop stopping with a chord still sounding,
-     and the only way out is `Notes off`. */
+     and the only way out is `Panic`. */
   const stopTake = (i) => {
     const t = takes[i];
     for (const timer of t.timers) clearTimeout(timer);
@@ -1879,7 +1879,7 @@ export function createKeyboard(host, {
       for (const k of [...held]) release(k, 'panic');
       for (const b of els.values()) b.classList.remove('down');
       /* ⚠️ AND THE NOTES LIT FROM OUTSIDE GO WITH THE PAINT, or the footer
-         goes on naming a chord under a button labelled `Notes off`. The lamps
+         goes on naming a chord under a button labelled `Panic`. The lamps
          above are cleared by hand for exactly this reason and the set behind
          them was not. `remote` is left alone here as it is there: those are
          somebody else's notes and this button does not reach them. */

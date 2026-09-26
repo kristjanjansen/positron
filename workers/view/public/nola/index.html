@@ -1311,7 +1311,7 @@
      one thing that box's own rule refuses. Appended to `keys.el` it shares the
      border, the ground and the padding, and there is no seam to get wrong.
      ⚠️ AND IT DOES NOT TOUCH THE COMPONENT'S OWN FOOTER. The octave pair, the
-     displacement, the chord name, `Loop`, `Sustain` and `Notes off` are
+     displacement, the chord name, `Loop`, `Sustain` and `Panic` are
      controls ABOUT THE KEYS and belong to `keyboard.mjs`; which instrument the
      keys play is this page's, so it gets a row of its own under theirs.
      ⚠️ THE ATTRIBUTION TRAVELS WITH THE CONTROL AND IS NOT RE-HOMED. The
@@ -1646,7 +1646,7 @@
    * 🔴 THE CHORDS ON SCREEN, ONE SMALL KEYBOARD EACH.
    *
    * ⚠️ `pad: false` AND `letters: false`, WHICH IS WHAT MAKES THIS A PICTURE
-   * RATHER THAN AN INSTRUMENT. An octave pair and a `Notes off` under each of
+   * RATHER THAN AN INSTRUMENT. An octave pair and a `Panic` under each of
    * twelve chords is a screen of controls belonging to nothing, and the letters
    * would claim a computer key plays a chord chart.
    * ⚠️ AND PRESSING ONE STILL SOUNDS, because a chord you can hear is the whole
@@ -3040,7 +3040,7 @@
       /* ⚠️ THE ROLL'S ONLY CONTROLS ARE ITS OWN ROWS, ONE EACH, AND THIS ASSERT
          SAID `no controls at all` UNTIL THE ROWS BECAME SELECTABLE AN HOUR
          LATER. What it was protecting is still protected: the keyboards this
-         replaced brought an octave pair and a `Notes off` EACH, four chords
+         replaced brought an octave pair and a `Panic` EACH, four chords
          deep, which is a screen of controls belonging to nothing. A row that
          picks itself is the picture answering, not a control row. */
       d.assert('the roll carries one control per chord and no pad of its own',
@@ -4949,7 +4949,7 @@
   }
   /* 🔴 THE SUSTAIN BUTTON SITS WITH THE OCTAVE PAD, NOT IN `.pos-controls`.
      `keyboard.mjs` already argues this about the pad itself: an octave pair and
-     a `Notes off` are controls ABOUT the keys, and a hand's width away at the
+     a `Panic` are controls ABOUT the keys, and a hand's width away at the
      top of the page is the wrong place for any of them. A pedal is the same
      kind of thing.
      ⚠️ AND `presence.mjs` WARNS THAT A CONTROL OUTSIDE THAT ROW IS ONE NO
