@@ -334,8 +334,8 @@ const CSS_ID = 'pos-sv-css';
 function ensureCss() {
   if (document.getElementById(CSS_ID)) return;
   const s = el('style', '', `
-.pos-sv { display: block; background: var(--card); border: 1px solid var(--line);
-          border-radius: 4px; overflow: hidden; }
+.pos-sv { display: block; background: var(--card); border: var(--edge);
+          border-radius: var(--r); overflow: hidden; }
 .pos-sv[hidden] { display: none; }
 .pos-sv-c { display: block; width: 100%; height: var(--sv-h, 96px); }
 `);
