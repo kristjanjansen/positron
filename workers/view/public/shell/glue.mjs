@@ -50,59 +50,14 @@ export function createGlue(...blocks) {
   return box;
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
-   ROWS: the same surface, built up one row at a time.
-
-   🔴 ASKED FOR 2026-09-26 as the base of an instrument panel: *"base on generic
-   \"glued containers/rows\" component that you also need to add to kit"*. It is
-   in THIS file and not in a new one because `createGlue` above and this are the
-   same surface with two interfaces, and two files defining one look is how a
-   look drifts. `.pos-glue` is declared once in `shell.css` and both reach it.
-
-   ⚠️ WHAT IS ACTUALLY NEW HERE, BECAUSE `createGlue` ALREADY GLUES. Three
-   things, and none of them is the border:
-
-     1. **A ROW IS A CONTAINER, AND IT PAINTS ITS OWN GROUND.** `createGlue`
-        takes blocks that are already surfaces — a readout, a transport bar, a
-        strip — and every one of them has a background of its own. A row holds
-        loose CONTROLS, which do not. `.pos-glue` is `gap: 1px` over a `--line`
-        ground, so a child with no background lets that colour through its whole
-        area and the 1 px seam stops being a seam. That trap is recorded three
-        times already, against `/wish/` and twice against `/pack/`, each time as
-        a caller remembering to paint a ground in its own stylesheet. Here the
-        container does it and there is nothing to remember.
-     2. **ROWS ARRIVE AFTER THE SURFACE EXISTS.** `createGlue(...blocks)` is one
-        call with everything in hand, which is right for a fixed pair. A panel's
-        rows are built from a page's own parts and some of them are conditional.
-     3. **A ROW CAN GO AWAY WITHOUT LEAVING A SEAM BEHIND.** A `display: none`
-        child takes no `gap` in a flex column, which is what `.pos-report`
-        already leans on for a report holding only a log.
-
-   🔴 AND THE ROW IS A FLEX CONTAINER, WHICH IS NOT DECORATION: IT IS THE FIX
-   FOR THIS PROJECT'S MEASURED DOUBLE-LINE DEFECT. A `<textarea>`, `<canvas>`,
-   `<img>`, `<video>`, `<iframe>` or `<select>` is inline by default and sits on
-   a TEXT BASELINE, so a BLOCK parent reserves descender space under it: on
-   `/fau/` the field wrapper's bottom measured **557.5** against the textarea's
-   **556.0**, both elements reading `0/0/0/0` for every border, and inside a glue
-   that 1.5 px strip is painted in the seam colour and reads as a second line.
-   It took four wrong answers, one of which deleted a real affordance on a guess.
-   A flex container BLOCKIFIES its children, so a replaced element handed
-   straight to `row()` cannot leave that strip at all.
-   ⚠️ **IT REACHES ONE LEVEL ONLY, AND THAT IS SAID OUT LOUD RATHER THAN PAPERED
-   OVER.** A caller that hands over a `<div>` with a canvas inside it is back in
-   the block-parent case and the container cannot see it. A `.pos-rows-r canvas`
-   rule would reach it and would also be a rule about somebody else's component,
-   so what is here instead is the structural half plus this sentence.
-   ⚠️ **AND THE SAME IS TRUE OF EVERY `.pos-glue > X` PATCH IN `shell.css`**,
-   which is why all seven of them are written `> X` AND `> * > X`: `/radio/`
-   glues a scope straight in and `/pack/` wraps it, and a direct-child selector
-   fixed one page and left the other exactly as reported.
-
-   ⚠️ NO `[hidden]` PATCH ON THE SURFACE AND ONE ON THE ROW. `.pos-glue[hidden]`
-   already exists in `shell.css` for exactly this reason and covers the surface;
-   the row sets `display: flex` of its own, so it needs its own, which is the
-   fifth component in this project to need that patch.
-   ──────────────────────────────────────────────────────────────────────────── */
+/* ── ROWS: the same surface, built up one row at a time ───────────────────────
+   In this file because createGlue and this are one surface with two interfaces.
+   A row paints its own ground (the seam is the glue's line-coloured background
+   through a 1 px gap, and a child with none paints seam colour over its whole
+   area), is a flex box (which blockifies a canvas or textarea, the /fau/ 1.5 px
+   baseline strip), and can be hidden without leaving a seam (display: none
+   takes no gap). Every `.pos-glue > X` patch in shell.css is also `> * > X`,
+   because pages wrap their parts inconsistently. */
 
 /** The alignments a row may take. A closed set, because `justify-content` has
  *  values that mean nothing in a row of controls and a typo in a string option

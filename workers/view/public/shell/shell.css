@@ -194,32 +194,18 @@
   --ctl-head: 15px;
   --ctl-foot: 17px;
   --ctl-step: calc(var(--ctl-foot) + var(--ctl-gap) + var(--ctl-head));
-  /* 🔴 A GLUED ROW'S HORIZONTAL INSET, AND IT IS DELIBERATELY THE SAME 20 px
-     `.panel-case` PADS WITH. A glued panel and a cased one are two arrangements
-     of one object, so a row's ink and a case's ink must start on the same line
-     or the two look like two components.
-     ⚠️ **IT IS A SECOND NAME FOR ONE NUMBER, WHICH THIS FILE OTHERWISE REFUSES**
-     — `--sld-col` and `--ctl-gap` both exist because a measurement typed twice
-     is a measurement that will disagree. It cannot read `--panel-pad` because
-     that one is declared ON `.panel` as 0 and overridden on `.panel-case`, so
-     outside a panel there is nothing to read, and a glued surface is glued
-     whether or not anybody built a case.
-     ✅ **SO THE AGREEMENT IS ASSERTED RATHER THAN COMMENTED.** `/kit/` measures
-     a row's computed padding against `.panel-case`'s and requires them equal,
-     which is the only form of "these must not disagree" this project trusts. */
+  /* a glued row's inset: the same 20 and 16 as .panel-case and .panel-flow,
+     a second name only because those are declared on .panel and read as
+     nothing outside one. /kit/ asserts the two agree. */
   --rows-pad: 20px;
-  /* 🔴 AND THE ROW'S OWN DEPTH, WHICH IS `.panel-flow`'S 16 px BETWEEN ROWS FOR
-     THE SAME REASON: two rows of a glued panel and two rows of a cased one are
-     the same distance apart or the two arrangements read as two components.
-     🔴 **IT IS HERE BECAUSE THE FIRST DRAFT READ `var(--panel-gap)` AND
-     MEASURED ZERO.** That token is declared on `.panel`, so outside one there
-     is nothing to read, and an unresolved `var()` makes the WHOLE `padding`
-     shorthand invalid at computed-value time rather than dropping one side: the
-     row fell back to 0 on all four edges and every inset assert on `/kit/` read
-     `a row pads 0 px`. The same trap had already been avoided one line up and
-     was walked into on the next declaration. **A custom property inherits
-     downward, never sideways, and never from a class nothing above you wears.** */
   --rows-gap: 16px;
+  /* the house edge, corner and inset. Every surface reads these; a control
+     (button, pad, tag) does not, its edge is its shape. `.pos-glue > *` zeroes
+     the first two, a row zeroes the third, and nothing is patched by name.
+     `--inset` is deliberately undeclared: a surface reads var(--inset, <own
+     default>) and keeps it until a row sets it to 0. */
+  --edge: 1px solid var(--line);
+  --r: 4px;
   /* 🔴 HOW FAR A SWITCHED-OFF CONTROL'S FURNITURE DIMS, AND IT IS PUBLISHED
      FOR THE SAME REASON THE HEAD AND FOOT ARE: a caller that has to guess a
      component's own number is a caller that guesses it wrong.
@@ -480,8 +466,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    it is the point. `mount()` still throws. */
 .pos-readout {
   display: flex; flex-wrap: wrap;
-  gap: 1px; background: var(--line); border: 1px solid var(--line);
-  border-radius: 4px; margin: 0 0 14px; overflow: hidden;
+  gap: 1px; background: var(--line); border: var(--edge);
+  border-radius: var(--r); margin: 0 0 14px; overflow: hidden;
 }
 .pos-readout > * { flex: 1 1 96px; min-width: 0; }
 /* 🔴 A FIXED NUMBER OF ROWS, ASKED FOR 2026-09-21 AS *"why not 5x2 cells?"* and
@@ -914,7 +900,7 @@ button.pos-pri[data-busy="1"] {
 .pos-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);
   white-space: pre-wrap;                /* ← a <pre> is `pre`; see above */
-  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  background: var(--card); border: var(--edge); border-radius: var(--r);
   /* ⚠️ A HEIGHT EVEN WITH NOTHING IN IT. The log collapsed to zero until the
      first line arrived and then shoved the whole page down — and on a page
      where a control WRITES to the log, pressing it moved the button you were
@@ -984,121 +970,44 @@ button.pos-pri[data-busy="1"] {
    component's own margin shorthand silently beat the page rhythm and measured
    0.0 px. `.pos-glue.pos-glue` weighs (0,2,0) and cannot lose to a component,
    whatever order anybody adds one in. */
-/* 🔴 `clip`, NOT `hidden`, SINCE 2026-09-26. `hidden` is one of the SCROLLABLE
-   values (`scroll`, `auto`, `hidden`), so every glued surface was a scroll
-   container: `position: sticky` inside one stuck to the glue instead of the
-   page, a focus ring on a control against the edge was cut, and the surface
-   made a block formatting context nobody asked for. `clip` is non-scrollable
-   and does none of that. Polaris ships `overflow: clip` on its Card for the
-   same reason. Baseline widely since 2022, Safari 16.
-   ⚠️ `clip` FORBIDS SCROLLING THROUGH ANY MECHANISM, `scrollIntoView`
-   included, which `hidden` still allowed. Nothing here scrolls the surface
-   itself; a part that scrolls does so inside its own box.
-   ⚠️ AND `clip` DOES NOT RESET A FLEX CHILD'S AUTOMATIC MINIMUM SIZE, where
-   `hidden` did. Every part of a glue carries `min-width: 0` for its own
-   reasons already, so nothing here leaned on that side effect; a future part
-   that does will read its width back and find out. */
+/* clip, not hidden: hidden is a scrollable value and makes the surface a
+   scroll container (sticky sticks to it, an edge focus ring is cut). clip does
+   not reset a flex child's auto minimum size; every part carries min-width: 0. */
 .pos-glue {
   display: flex; flex-direction: column;
-  gap: 1px; background: var(--line); border: 1px solid var(--line);
-  border-radius: 4px; overflow: clip;
+  gap: 1px; background: var(--line); border: var(--edge);
+  border-radius: var(--r); overflow: clip;
 }
 /* `display: flex` beats the UA's `[hidden]` rule, the same patch the readout,
    the control row and the report all already carry. */
 .pos-glue[hidden] { display: none; }
-.pos-glue.pos-glue > * { border: 0; border-radius: 0; margin: 0; }
+.pos-glue.pos-glue > * { --edge: 0; --r: 0; border: 0; border-radius: 0; margin: 0; }
 
 /* ── a glued surface built out of ROWS (.pos-rows) ───────────────────────────
-   🔴 THE SURFACE IS `.pos-glue` ABOVE AND THIS IS ONLY WHAT A ROW ADDS.
-   `createGlueRows` in `demo/shell/glue.mjs` writes both classes, so the border,
-   the radius and the 1 px seam are the same declarations `.pos-report` and
-   every glued pair already use, and a change to the glued look reaches this
-   without a second edit. Asked for 2026-09-26 as the base of an instrument
-   panel: *"base on generic \"glued containers/rows\" component"*.
-
-   🔴 THE ROW PAINTS ITS OWN GROUND, AND THAT IS THE WHOLE REASON THIS BLOCK
-   EXISTS. `.pos-glue` is `gap: 1px` over a `--line` ground, so a child with no
-   background of its own lets the line colour through its ENTIRE area and the
-   seam stops being a seam. Three callers have paid for that already, each by
-   remembering to paint a ground in their own stylesheet: `/wish/`'s parts,
-   `/pack/`'s wave host, and `.pos-glue > .pos-scope` a few thousand lines down
-   this file. A row holds loose controls, which have no surface of their own, so
-   the container does it and there is nothing to remember.
-
-   ⚠️ AND IT IS `--card`, THE SAME GROUND `.panel-case` PAINTS. A glued panel and
-   a cased one are two arrangements of one object and must not be two colours.
-
-   ⚠️ `display: flex` HERE IS STRUCTURAL AND NOT ARRANGEMENT. A flex container
-   BLOCKIFIES its children, which is what stops a `<canvas>` or a `<textarea>`
-   handed straight to `row()` from sitting on a text baseline and leaving the
-   descender strip that `/fau/` measured at 557.5 against 556.0 and that renders
-   here in the seam colour as a second line. `glue.mjs` carries the argument.
-
-   ⚠️ `min-width: 0`, WHICH THIS FILE HAS NOW WRITTEN DOWN FOUR TIMES. A flex
-   item will not shrink below its content, so a row holding a knob bank or a
-   keyboard that scrolls itself would push the surface wider than the page
-   instead, which is the 141 px of page overflow `tabs.mjs` shipped and `/kit/`
-   caught.
-
-   ⚠️ AND THE `[hidden]` PATCH IS REQUIRED, NOT TIDINESS. Any author rule setting
-   `display` beats the browser's own `[hidden] { display: none }`, so without
-   this a row a caller hid would stay on screen with the property reading as set
-   — which is the defect measured on `/pack/`, where three column headings were
-   drawn over three empty tables while their assert read `head.hidden === true`
-   and passed. This is the fifth component in this project to need the patch. */
-/* 🔴 A PANEL IS AS WIDE AS THE INSTRUMENT, NOT AS WIDE AS THE PAGE, AND THIS
-   STYLESHEET ALREADY SAID SO ABOUT THE KEYBOARD BEFORE THE FIRST BUILD OF THIS
-   COMPONENT IGNORED IT. `.kbd` is `width: fit-content; max-width: 100%` with
-   the reason written beside it: *"a full width panel holding a 496 px keyboard
-   is 800 px of empty surface, which reads as a layout that failed rather than
-   as an instrument at its own size"*.
-   🔴 **THE FIRST BUILD STRETCHED, AND THE VERDICT WAS *"plainly awful"*.** Four
-   knobs on a pedal floated in the middle of a 660 px band with roughly 250 px of
-   bare surface either side of them, four times over, because a glued surface
-   with no width of its own fills whatever it is put in and `align-items:
-   center` then parks the controls in the middle of the emptiness. The controls
-   were right and the box around them was making a claim about the object's size
-   that nothing had measured.
-   ⚠️ **AND `max-width: 100%` IS THE OTHER HALF**, so an instrument wider than
-   the page is held inside it and its own rows scroll, rather than dragging the
-   document sideways. Same pair, same file, same argument, four rules along. */
+   The surface is `.pos-glue`; a row adds a ground, an inset and a flex box.
+   Ground: the seam is the glue's `--line` background through a 1 px gap, so a
+   child with none paints seam colour over its whole area. Flex: it blockifies
+   a canvas or textarea, which otherwise leaves a 1.5 px baseline strip in seam
+   colour (/fau/: wrapper 557.5, textarea 556.0). fit-content: a panel is as
+   wide as its instrument, not the page (four knobs in a 660 px band, "plainly
+   awful"). [hidden] is declared because any author display beats the UA's. */
 .pos-rows { width: fit-content; max-width: 100%; }
 .pos-rows-r {
   display: flex; align-items: center; gap: var(--ctl-gap);
   min-width: 0; background: var(--card);
   padding: var(--rows-gap) var(--rows-pad);
+  /* the row IS the inset: a surface inside it reads `--inset` and gets none */
+  --inset: 0px;
 }
 .pos-rows-r[hidden] { display: none; }
-/* 🔴 EDGE TO EDGE FOR A PICTURE, AND IT IS AN OPTION RATHER THAN A SECOND
-   COMPONENT. `panel.mjs` already records why: *"a panel in a headset is a
-   SCREEN, and a screen with a margin around its image reads as a photograph of
-   a screen"*. The same is true of a visualisation row in a glued panel, and the
-   seam either side of it is the only edge it is meant to have, which is the
-   reason `/pack/` took the padding and the border off its waveform host. */
+/* a picture row: no inset, and one child is the row */
 .pos-rows-r[data-pad="off"] { padding: 0; }
-/* 🔴 AND AN EDGE TO EDGE ROW HOLDING ONE THING MAKES THAT THING THE ROW. A flex
-   item is `flex: 0 1 auto` by default, so it does not grow: a picture in a row
-   with the inset taken off would sit at its own intrinsic width with the row's
-   ground either side of it, which is a smaller box in a wider box and reads as a
-   layout that failed rather than as a screen. `:only-child` is the condition
-   that keeps this narrow, the way `:has(> .panel-strip:empty)` keeps the empty
-   plate rule to the one case in this repository that is empty: a row with two
-   things in it has an arrangement, and `data-align` is what decides it. */
 .pos-rows-r[data-pad="off"] > :only-child { flex: 1 1 auto; min-width: 0; }
 .pos-rows-r[data-align="start"] { justify-content: flex-start; }
 .pos-rows-r[data-align="center"] { justify-content: center; }
 .pos-rows-r[data-align="end"] { justify-content: flex-end; }
 .pos-rows-r[data-align="between"] { justify-content: space-between; }
-/* 🔴 A NAMEPLATE IN A ROW SPANS THE ROW, OR `place: 'ends'` MEANS NOTHING. That
-   placement is `justify-content: space-between`, which puts the name at one end
-   and the patch at the other OF THE PLATE — so a plate sized to its own content
-   inside a centred row would sit the two words next to each other in the middle
-   of the panel and look like a placement nobody chose.
-   ⚠️ **AND NO `padding: 0` HERE, WHICH THE FIRST DRAFT HAD.** Every inset a
-   plate carries is written `.panel-case > .panel-plate`, and a plate in a row
-   has no case above it, so there is nothing to override: that declaration would
-   have been this project's sixth measured dead rule. Checked by reading every
-   `.panel-plate` selector in this file rather than by reasoning about it. */
+/* a plate spans its row, or `place: 'ends'` has nothing to spread across */
 .pos-rows-r > .panel-plate { flex: 1 1 auto; min-width: 0; }
 
 /* ── readout and log, joined ──────────────────────────────────────────── */
@@ -1191,7 +1100,7 @@ button.pos-pri[data-busy="1"] {
    dot looked like part of the button. */
 .tbar {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  background: var(--card); border: 1px solid var(--line);
+  background: var(--card); border: var(--edge);
   /* 🔴 ONE PADDING ON BOTH AXES, AND THE THREE NUMBERS BELOW ARE ONE SUM.
      MEASURED with the bar mounted in headless Chrome: the play toggle sat at
      11 px from the left edge and 9 px from the top, because the padding read
@@ -1199,7 +1108,7 @@ button.pos-pri[data-busy="1"] {
      button sizes"*. At a flat 8 the inset is 9 each way, and `--tbar-btn` (34)
      plus twice the padding plus twice the border IS the 52 below, so the height
      can no longer disagree with the padding that produces it. */
-  border-radius: 4px; padding: 8px;
+  border-radius: var(--r); padding: 8px;
   min-height: 52px;
 }
 /* 🔴 ONE HEIGHT FOR EVERY BUTTON ON THE BAR, SET RATHER THAN IMPLIED. There
@@ -1529,7 +1438,7 @@ button.pos-pri[data-busy="1"] {
   -webkit-touch-callout: none;
 }
 /* ⚠️ and no margin here either, for the same reason — see .tbar above */
-.pos-strip { display: block; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+.pos-strip { display: block; width: 100%; background: var(--card); border: var(--edge); border-radius: var(--r); }
 .strip-mini { height: 44px; }
 .strip { height: 120px; }
 .strip-deep { height: min(58vh, 520px); }
@@ -1561,7 +1470,7 @@ button.pos-pri[data-busy="1"] {
    out is a real thing to want. */
 .pos-strip-foot {
   display: block; width: 100%;
-  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  background: var(--card); border: var(--edge); border-radius: var(--r);
   padding: 7px 10px;
   height: calc(var(--sf-lines, 2) * 1.5em + 14px);
   overflow: hidden;
@@ -1648,7 +1557,7 @@ button.pos-pri[data-busy="1"] {
    look without touching anyone's layout. */
 video {
   display: block; max-width: 100%;
-  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  background: var(--card); border: var(--edge); border-radius: var(--r);
 }
 /* …and `display: block` beats the UA sheet's `[hidden] { display: none }`, so
    without this every hidden <video> on every page becomes a visible empty box.
@@ -1899,7 +1808,6 @@ video[hidden] { display: none; }
    step brighter than the letter marker and one step under a press. */
 .k.hint .kn { color: var(--fg); opacity: .8; }
 
-
 /* ── in a headset ─────────────────────────────────────────────────────────
    Turned on by demo/shell/caps.mjs when navigator.xr reports immersive-vr —
    a capability call, never a user-agent string, because research/quest-xr §1.7
@@ -1988,7 +1896,6 @@ video[hidden] { display: none; }
 /* The page behind must not scroll under a cover that is only position:fixed,
    and iOS will happily rubber-band it. */
 .pos-faux-host, .pos-faux-host body { overflow: hidden; overscroll-behavior: none; }
-
 
 /* ── the way back out of it (createFullscreenExit in fullscreen.mjs) ──────
    🔴 REPORTED FROM AN IPHONE, 2026-09-19: *"I can not leave fullscreen on
@@ -3006,7 +2913,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    thing — a picture needs a margin on the side it is being crowded from. */
 .pos-scope { margin: 22px 0 12px; }
 .pos-scope-c {
-  display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px;
+  display: block; width: 100%; border: var(--edge); border-radius: var(--r);
   background: var(--card);
 }
 .pos-scope-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0; }
@@ -3035,8 +2942,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    1 px on `/pack/` and 0 on `/radio/` from the same rule. */
 .pos-glue > .pos-scope, .pos-glue > * > .pos-scope { margin: 0; }
 .pos-glue > .pos-scope { background: var(--card); padding: 10px 12px; }
-.pos-glue > .pos-scope > .pos-scope-c,
-.pos-glue > * > .pos-scope > .pos-scope-c { border: 0; }
+
 /* 🔴 AND THE SAME FOR A TRANSPORT INSIDE A GLUED PART, which is the other half
    of *"rm double bordering"*. A bar on a page draws its own edge and should;
    a bar that is one part of a glued block has the glue drawing it, and the two
@@ -3044,7 +2950,6 @@ button.pos-pg-lab:hover { color: var(--fg); }
    ⚠️ ONE LEVEL DEEP AS WELL AS DIRECT, because a page wraps the bar in the
    element that paints the part's ground, which is what `.pos-glue`'s own rule
    requires of every child. */
-.pos-glue > .tbar, .pos-glue > * > .tbar { border: 0; }
 
 /* ── note grid ────────────────────────────────────────────────────────────
    demo/shell/note-grid.mjs. One row per pattern, sixteen steps across, pitch up
@@ -3055,12 +2960,11 @@ button.pos-pg-lab:hover { color: var(--fg); }
    under it is a shape this project already has, and a second one that behaved
    differently inside a glue would be two answers to one question. */
 .pos-ngrid { margin: 0; }
-.pos-ngrid-c { display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px;
+.pos-ngrid-c { display: block; width: 100%; border: var(--edge); border-radius: var(--r);
   background: var(--card); }
 .pos-ngrid-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0;
   min-height: 1.5em; }
 .pos-glue > .pos-ngrid { margin: 0; background: var(--card); padding: 10px 12px; }
-.pos-glue > .pos-ngrid > .pos-ngrid-c { border: 0; }
 
 /* ── message list ─────────────────────────────────────────────────────────
    demo/shell/messages.mjs. One renderer for live traffic and for a history of
@@ -3200,7 +3104,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    ⚠️ `overflow-y: hidden` RATHER THAN THE `hidden` SHORTHAND, because the
    wrapper must not grow a second vertical scrollbar over the body's own. */
 .pos-tbl {
-  border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+  border: var(--edge); border-radius: var(--r); background: var(--card);
   font: 400 11px/1.55 var(--mono);
   overflow-x: auto; overflow-y: hidden;
   /* 🔴 HOW LITTLE ROOM THE GROWING COLUMN MAY BE LEFT WITH. `table.mjs` builds
@@ -3720,7 +3624,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
      beside it, falling back silently while the source read as correct. */
   --kpad-pad: 9px;
   margin: 0 0 10px; padding: var(--kbd-pad);
-  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  background: var(--card); border: var(--edge); border-radius: var(--r);
   /* 🔴 THE BOX IS AS WIDE AS THE INSTRUMENT, WHICH IS THE OTHER HALF OF NOT
      STRETCHING. With a ceiling on a key, a full width panel holding a 496 px
      keyboard is 800 px of empty surface, which reads as a layout that failed
@@ -3763,15 +3667,10 @@ button.pos-pg-lab:hover { color: var(--fg); }
    surface rather than two boxes touching. Same contract every other glued child
    keeps, and it is why the wrapper exists at all: a piano roll sitting on the
    keyboard it names is the claim `glue.mjs` was written for. */
-/* ⚠️ `> * >` AS WELL AS `>`, ADDED 2026-09-26 FOR A KEYBOARD INSIDE A GLUED
-   ROW. `.pos-glue.pos-glue > *` reaches DIRECT children only, so a keyboard one
-   level down keeps its own border, its radius and — the one that actually shows
-   — `margin: 0 0 10px`, which is a reservation only the bottom of the row makes
-   and is this file's own *"a reservation that only one of two equal things
-   makes is a reservation that breaks them"*. Two components already carry the
-   identical pair of selectors for the identical reason, `.pos-scope` and
-   `.tbar`, so this is the third rather than a new idea. */
-.pos-glue > .kbd, .pos-glue > * > .kbd { margin: 0; border: 0; border-radius: 0; background: transparent; }
+/* A keyboard in a glue: its inset goes through its own token so the footer's
+   bleed follows, and the row paints the ground. Measured 2026-09-26: keys at
+   29 px in a surface whose every other row sat at 20. */
+.pos-glue > .kbd, .pos-glue > * > .kbd { --kbd-pad: 0px; margin: 0; background: transparent; }
 
 /* ⚠️ 25 PER CENT TALLER ON A DESKTOP, AND THE BLOCK IS HERE RATHER THAN BESIDE
    `.k` FOR ONE REASON: A MEDIA QUERY ADDS NO SPECIFICITY, so a plain `.k` rule
@@ -3908,7 +3807,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    `.kbd` is the whole condition. */
 .roll:not(.kbd > *) {
   padding: 9px; background: var(--card);
-  border: 1px solid var(--line); border-radius: 4px;
+  border: var(--edge); border-radius: var(--r);
 }
 /* 🔴 A GLUED ROLL SPANS THE BOX AND GIVES THE WIDTH STRAIGHT BACK. The margin
    is what lets a picked row's ground reach the surface's own edges; the equal
@@ -4630,7 +4529,7 @@ html.xr .pos-acts .pos-row:not([data-xr]):focus-within { opacity: 1; }
   display: flex; flex-direction: column; gap: 7px;
   min-width: 0;
   padding: 13px 14px 12px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  background: var(--card); border: var(--edge); border-radius: var(--r);
   color: var(--fg); text-decoration: none;
   transition: background 120ms ease, border-color 120ms ease;
 }
@@ -5082,7 +4981,6 @@ button[data-glyph="1"] {
 }
 .pos-pres[data-mode="dot"] { gap: 0; }
 
-
 /* ── a video panel: a picture and three slots under it — shell/video-panel.mjs ──
    🔴 ONE BOX, NOT TWO THINGS NEAR EACH OTHER. Asked 2026-09-17 after looking at
    `/mirror/`: *"See how mirror video panel connects and see how they connect.
@@ -5124,8 +5022,8 @@ button[data-glyph="1"] {
 .pos-vp {
   display: block;
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  border: var(--edge);
+  border-radius: var(--r);
   /* The footer's corners are clipped to the box's, which is what gives it its
      bottom left and bottom right without a second radius to keep in step. */
   overflow: hidden;
@@ -6110,11 +6008,11 @@ button[data-glyph="1"] {
    where a value too wide for the field survives. */
 .pos-disp {
   display: inline-flex; align-items: center; min-width: 0; max-width: 100%;
-  padding: 7px 10px;
+  padding: var(--inset, 7px 10px);
   color: var(--disp-ink);
   background: var(--disp-back);
-  border: 1px solid var(--line);
-  border-radius: 3px;
+  border: var(--edge);
+  border-radius: min(var(--r), 3px);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 /* Two fields in one window: the page draws the window, so each display gives
@@ -6287,7 +6185,7 @@ button[data-glyph="1"] {
 .panel-case {
   --panel-pad: 20px;
   padding: 0 var(--panel-pad); background: var(--card);
-  border: 1px solid var(--line); border-radius: 4px;
+  border: var(--edge); border-radius: var(--r);
 }
 .panel-wrap { display: flex; align-items: stretch; min-width: 0; }
 
@@ -6444,7 +6342,7 @@ button[data-glyph="1"] {
 .panel-row { display: flex; align-items: flex-end; }
 /* A group of controls the panel prints a box around. */
 .panel-group {
-  background: var(--card2); border: 1px solid var(--line); border-radius: 5px;
+  background: var(--card2); border: var(--edge); border-radius: 5px;
 }
 
 /* 🔴 THE NAMEPLATE: ONE INK RULE AND TWO PLACEMENTS. All three callers already
@@ -6906,8 +6804,8 @@ button[data-glyph="1"] {
 .panel-win {
   display: flex; align-items: flex-end; justify-content: space-between;
   padding: 7px 9px;
-  background: var(--disp-back); border: 1px solid var(--line);
-  border-radius: 3px;
+  background: var(--disp-back); border: var(--edge);
+  border-radius: min(var(--r), 3px);
 }
 
 /* 🔴 A PRINTED LABEL, AND WHAT GOES IN ONE IS THE PANEL'S OWN WORDS.
@@ -7121,8 +7019,8 @@ button[data-glyph="1"] {
      and draws the same hairline, in one declaration instead of four. */
   gap: 1px;
   background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  border: var(--edge);
+  border-radius: var(--r);
   /* The seams and the corners are clipped to the box, the same way `.pos-vp`
      does it, so nothing inside needs a second radius kept in step. */
   overflow: hidden;
