@@ -158,6 +158,19 @@
      file along. */
   --knob-w: calc(var(--ctl-w) * 1.1);
   --ctl-gap: 8px;
+  /* 🔴 THE SMALL CONTROL, ONE HEIGHT, DECLARED HERE ONCE. Asked 2026-09-26 for
+     `/fau/`'s Compile as *"small button variant"*, and `/wish/`'s remove button
+     has an open line asking for the same thing. MEASURED before this line
+     existed: 26 px was typed in FOUR places with no name between them, on
+     `.kpad` as `--kpad-h`, on the small toggle, on a stacked checkbox row and on
+     the feedback button. Four copies of one number is the `--sld-col` defect
+     waiting to happen; the toggle's own comment already calls 26 *"the 26 px
+     `.kpad` already argues for"*, so this is that argument given a name.
+     ⚠️ TYPED, NOT DERIVED, for the reason the glyph square gives: a size
+     computed from other values looks rigorous and is one edit from being
+     quietly wrong. It is 34 minus one `--ctl-gap` today, and that is a fact
+     about it rather than a formula it reads. `button.pos-sm` reads it below. */
+  --ctl-sm: 26px;
   /* ── THE CONTROL LAYOUT CONTRACT ──────────────────────────────────────
 
      🔴 A HARDWARE CONTROL HAS A WORKING SURFACE AND SOME FURNITURE AROUND IT,
@@ -3727,7 +3740,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
   .keys { --k-h: calc(74px * 1.25); --k-hs: calc(46px * 1.25); }
 }
 
-.kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kpad { --kpad-h: var(--ctl-sm); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* 🔴 THE PAGE'S OWN ROW INSIDE THE KEYBOARD'S BOX, AND ITS RULE REACHES THE
    BOX'S BORDER. Reported 2026-09-25 off a crop of `/nola/`: *"the border on top
    of footer goes edge to edge. in the life of me i don ot understand why you do
@@ -4107,7 +4120,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
   -webkit-touch-callout: none; touch-action: manipulation;
   transition: background .08s linear, border-color .08s linear, color .08s linear;
 }
-.pos-toggle[data-size="small"] { height: 26px; padding: 0 9px; font-size: 10.5px; }
+.pos-toggle[data-size="small"] { height: var(--ctl-sm); padding: 0 9px; font-size: 10.5px; }
 .pos-toggle:hover:not([disabled]) { color: var(--fg); border-color: var(--dim2); }
 .pos-toggle[aria-pressed="true"] {
   color: var(--fg);
@@ -4663,6 +4676,27 @@ button[data-glyph="1"] {
   display: grid; place-items: center;
   font-size: 15px; line-height: 1;
 }
+
+/* ── the small button (button.pos-sm) ────────────────────────────────────
+   🔴 ONE SMALL VARIANT, A MODIFIER ON THE ELEMENT, SIZED FROM TWO TOKENS AND
+   NO TYPED PIXEL. Asked 2026-09-26 for `/fau/`: *"rm compile from footer, put
+   it absolutely to bottom right corner of textarea, small button variant"*,
+   and the kit had none: `/wish/`'s remove button is an open line asking for
+   *"small variant (create in kit if not exists)"*. It is `--ctl-sm` tall, which
+   is the height the small toggle and a keyboard's pad row already are, so a
+   small button and a small toggle in one row sit on one edge, and its air is
+   HALF the pill's `--pad-btn` rather than a fourth padding figure, which is the
+   scale-of-three argument at `:root` kept to three. The face, the type and the
+   border are the button's own and are not restated.
+   ⚠️ AFTER `button[data-glyph="1"]` ON PURPOSE. Both are (0,1,1), so the one
+   written later wins the height, and a small glyph button needs this one to.
+   The square pairing has to name both, which is (0,2,1) and is the smallest
+   thing that can beat a rule needing both conditions, not an escalation.
+   ⚠️ `.pos-pri` COMPOSES WITH IT UNCHANGED: the ring is a `box-shadow` and
+   paints outside the border at any height, so a small primary is the same
+   halo on a shorter face and nothing here restates it. */
+button.pos-sm { height: var(--ctl-sm); padding: 0 calc(var(--pad-btn) / 2); }
+button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; }
 
 /* ── loop: one button, three presses — shell/transport-bar.mjs ───────────── */
 /* 🔴 IT SHARES `.tbar-x`'s LOOK AND NOT ITS CLASS, and that is not tidiness —

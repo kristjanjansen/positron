@@ -1,6 +1,27 @@
 ## Open
 
-### Open 2026-09-26: the instrument panel's patch selector is unlabelled and at the right, and `/fau/`'s Compile moves into the textarea's corner
+### Done 2026-09-26: the instrument panel's patch selector is unlabelled and at the right, and `/fau/`'s Compile moves into the textarea's corner
+
+✅ **DONE BY A BACKGROUND AGENT, GREEN LOCALLY.** `createInstrumentPanel` now
+puts the patch picker at the far end of the plate row with no caption by
+construction: a `.pos-pick-l` on the patch control is removed from the DOM,
+a picker handed in as `status` throws naming the right slot, and
+`instrument-panel-test.mjs` grades it (21 ok to 26 ok). The rule is in the
+module header and in `positron-ui`. `/fau/` builds its picker with no label
+and Compile is out of the foot: it is `button.pos-sm.pos-pri` appended into
+the source field, absolutely placed on `--rows-pad` and `--rows-gap`, on a
+band the FIELD carries below the scroller (the first draft padded the
+textarea and the band scrolled away with the text on a phone). `pos-sm` is a
+new kit variant reading one new token, `--ctl-sm: 26px`, which was typed in
+four places before; `/kit/`'s BUTTON GROUP shows it at the top of the block.
+MEASURED: fau 50/50 with 44 page asserts to 51/51 with 45, kit 245/245 to
+246/246, no assert moved by press order; at 375 the button sits 20 px in
+from the well's right and 16 px up from its bottom, 16 px below the text box,
+its right edge on the picker's x to 0 px. Seen and left: the twenty-row text
+box scrolls on a phone, and `Panic` still wraps alone (its own line below).
+`/wish/`'s remove button can now take `pos-sm`. ⚠️ **IT TOOK 17 MINUTES AND
+THE OWNER SAID SO**: the brief asked for two pages of shots, an ancestry walk
+and rect pairs for a button move. One targeted run and one shot next time.
 
 ⚠️ **ASKED, VERBATIM, MID-TASK, FOR A BACKGROUND AGENT:** *"in bg make rule
 for instumet panel that patch selector have no label and is in right. do it in

@@ -239,6 +239,34 @@ un-shouts a string somebody typed in capitals leaves the capitals in the data;
 the kit's specimens and any page's preset list carry the name as it should
 print.
 
+🔴 **AND ON AN INSTRUMENT PANEL THE PATCH SELECTOR CARRIES NO LABEL AND SITS
+AT THE RIGHT END OF THE PLATE ROW, BY DEFAULT.** Instructed 2026-09-26: *"make
+rule for instumet panel that patch selector have no label and is in right. do
+it in fau"*. MEASURED before: `/fau/` handed its picker to
+`createInstrumentPanel` as `status`, so it sat beside the name at the START
+wearing a `PATCH` caption while a Compile button held the far end, and nothing
+refused it, because the option shape read as correct on the page that had it
+backwards. The component does both halves now so no page has to remember:
+`patch` is the only slot a selector goes in and it is the far end by
+construction, a `.pos-pick` handed in as `status` THROWS, and a `.pos-pick-l`
+caption on the patch control is REMOVED from the DOM rather than hidden, because
+a plate reading `NAME   ‹ Organ ›` already says what the control is and a word
+between them names what the reader is reading. The `<select>` keeps its own
+`aria-label`, so the name a screen reader hears is untouched.
+`instrument-panel-test.mjs` grades the order and the strip with no browser
+(21 to 26 ok); `/kit/`'s foot specimen and `/fau/` grade the rendered offsets,
+picker right edge on the row's inset and no caption under it, and `/fau/`
+grades that Compile is not in the foot.
+⚠️ **AND `pos-sm` IS THE SMALL BUTTON THE SAME ASK NAMED.** *"rm compile from
+footer, put it absolutely to bottom right corner of textarea, small button
+variant"*. The kit had none; `/wish/`'s remove button was waiting for one. It
+is `--ctl-sm` tall, which is 26 and was typed in four places (`.kpad`, the
+small toggle, a stacked checkbox row, the feedback button) with no name between
+them until it was declared once at `:root`, and half a pill's `--pad-btn` of
+air rather than a fourth padding figure. It is shown at the top of `/kit/`'s
+BUTTON GROUP block as a word, a primary and a glyph square, and `/fau/`'s
+Compile wears it, positioned by the field and inset by the rows' own tokens.
+
 ## /kit/ itself
 
 🔴 **THE NEWEST COMPONENT GOES AT THE TOP OF `/kit/`, AND ITS HEADING IS

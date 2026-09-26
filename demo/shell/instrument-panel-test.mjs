@@ -60,6 +60,17 @@ function stubDocument() {
         return k;
       },
       remove() { if (node.parentNode) node.parentNode.removeChild(node); },
+      /* One class selector, descendants only, which is the one query these two
+         modules make (`.pos-pick-l` under a patch control). Anything else is
+         refused rather than answered wrongly. */
+      querySelectorAll(sel) {
+        const m = /^\.([\w-]+)$/.exec(sel);
+        if (!m) throw new Error(`stub querySelectorAll: only a single .class selector, not ${JSON.stringify(sel)}`);
+        const hits = [];
+        const walk = (n) => { for (const k of n.children) { if (k._cls.has(m[1])) hits.push(k); walk(k); } };
+        walk(node);
+        return hits;
+      },
     };
     return node;
   };
@@ -226,6 +237,48 @@ ok('the four row kinds are named in the order the sketch draws them',
     txt.plateRow.children.length === 1 && txt.plateRow.children[0] === txt.plate.el && txt.plateRow.dataset.align === 'center'
     && txt.plate.lines.length === 2 && txt.status === null && txt.patchEnd === null,
     `${txt.plateRow.children.length} child, ${txt.plateRow.dataset.align}, ${txt.plate.lines.length} lines`);
+}
+
+// 11. 🔴 THE PATCH SELECTOR IS THE FAR END AND CARRIES NO LABEL, BY DEFAULT.
+//     Asked 2026-09-26: *"make rule for instumet panel that patch selector have
+//     no label and is in right"*. A picker is what `createPicker` builds: a
+//     `.pos-pick` wrap holding a `.pos-pick-l` caption when it was given one.
+//     Three claims, each with the wrong answer named: the picker lands LAST in
+//     the row (the order); its caption is gone from the DOM, not hidden (the
+//     label); and the same picker handed in as `status` is refused rather than
+//     drawn beside the name (the option shape `/fau/` shipped for a day).
+{
+  const picker = () => {
+    const wrap = document.createElement('span'); wrap.className = 'pos-pick';
+    const cap = document.createElement('span'); cap.className = 'pos-pick-l'; cap.textContent = 'patch';
+    const seg = document.createElement('span'); seg.className = 'step pos-seg pos-pick-seg';
+    wrap.append(cap, seg);
+    return { el: wrap, cap };
+  };
+  const pk = picker();
+  const sw = document.createElement('button');
+  const p = createInstrumentPanel({ keys: document.createElement('div'), plate: { name: 'FAU', status: sw, patch: pk } });
+  const row = p.plateRow;
+  const last = row.children[row.children.length - 1];
+  ok('the patch selector is the last thing in the plate row, after the name and its switch',
+    last === pk.el && row.children.length === 2 && row.children[0].children[0] === p.plate.el && p.patchEnd === pk.el,
+    `${row.children.length} ends, the selector ${last === pk.el ? 'last' : 'NOT last'}`);
+  const left = pk.el.querySelectorAll('.pos-pick-l').length;
+  ok('and its caption is gone from the DOM, because the row already says what it is',
+    left === 0 && pk.cap.parentNode === null && pk.el.children.length === 1,
+    `${left} caption(s) left under the selector, ${pk.el.children.length} child of the wrap`);
+
+  const alone = picker();
+  const solo = createInstrumentPanel({ plate: { name: 'FAU', patch: alone } });
+  ok('with no switch the selector is still the far end of a justified row, and still unlabelled',
+    solo.plateRow.dataset.align === 'between' && solo.plateRow.children[1] === alone.el
+    && alone.el.querySelectorAll('.pos-pick-l').length === 0,
+    `${solo.plateRow.dataset.align}, ${solo.plateRow.children.length} ends`);
+
+  ok('a selector handed in as the status is refused, because the start of the row is the wrong end for it',
+    threw(() => createInstrumentPanel({ plate: { name: 'FAU', status: picker(), patch: document.createElement('button') } })));
+  ok('NEGATIVE CONTROL: a switch that is not a selector is still taken as the status',
+    !threw(() => createInstrumentPanel({ plate: { name: 'FAU', status: document.createElement('button') } })));
 }
 
 console.log(`\n${pass} ok, ${fail} failed`);

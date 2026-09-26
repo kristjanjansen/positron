@@ -5,13 +5,30 @@
 //     viz:   scope.el,                                  // the picture, edge to edge
 //     rows:  [[cutoff, res, drive], [a, d, s, r]],      // rows of controls
 //     keys:  kb.el,                                     // the keyboard
-//     plate: { name: 'NOLA', patch: 'RHODES MK I' },    // the foot
-//     // or plate: { name: 'FAU', status: power, patch: picker }, a control at each end
+//     plate: { name: 'NOLA', patch: 'Rhodes Mk I' },    // the foot
+//     // or plate: { name: 'FAU', status: power, patch: picker }: a switch after
+//     // the name, and the patch selector at the far end with no label
 //   });
 //   p.el          the surface, to append to the page
 //   p.addRow(…)   another row of controls, always above the keys and the plate
-//   p.patch('WURLITZER 200A')                           // rewrite the foot's right half
+//   p.patch('Wurlitzer 200A')                           // rewrite the foot's right half
 //   p.shape()     ['viz', 'controls', 'controls', 'keys', 'plate']
+//
+// 🔴 THE PATCH SELECTOR CARRIES NO LABEL AND SITS AT THE RIGHT END OF THE
+// PLATE ROW, AND THE COMPONENT DOES BOTH SO NO PAGE HAS TO REMEMBER. Asked
+// 2026-09-26: *"make rule for instumet panel that patch selector have no label
+// and is in right"*. Before it, `/fau/` handed its picker in as `status`, so it
+// sat beside the name at the START, wearing a `PATCH` caption, while a Compile
+// button held the far end: the page had the option shape backwards and nothing
+// refused it. Now `patch` is the only slot a selector goes in and it is the
+// far end by construction; a picker handed in as `status` THROWS rather than
+// landing at the start; and any `.pos-pick-l` caption the picker was built
+// with is removed here, because the row already says what the control is: a
+// plate reads `NAME   ‹ Organ ›`, and a word `PATCH` between them names what
+// the reader is already reading. The `<select>` keeps its own `aria-label`
+// (`choose a patch`), so the name a screen reader hears is untouched.
+// `instrument-panel-test.mjs` grades the order and the strip with no browser;
+// `/kit/` and `/fau/` grade the rendered offsets.
 //
 // 🔴 ASKED FOR 2026-09-26, WITH A SKETCH, AND THE SKETCH IS THE CONTRACT:
 // *"do a instrument panel coponent properly in kit. its our glued style"*.
@@ -89,6 +106,25 @@ function elOf(v) {
   return v.el && v.el.nodeType === 1 ? v.el : null;
 }
 
+/** Is this a `createPicker` control? Read off its class, which is what renders. */
+function isPicker(e) {
+  return !!(e && e.classList && e.classList.contains('pos-pick'));
+}
+
+/**
+ * Take a picker's caption off. `createPicker` appends `.pos-pick-l` when it is
+ * given a `label`, and on a plate the caption names what the row already says.
+ * ⚠️ REMOVED, NOT HIDDEN. A `display: none` caption would still be in the DOM
+ * and `.pos-pick` is a flex row with a gap, so hiding is right too, but a
+ * check that counts the picker's children would then have to know the rule.
+ * Gone is gone, and the node test can see it without a stylesheet.
+ */
+function unlabel(ctl) {
+  const found = ctl.querySelectorAll ? ctl.querySelectorAll('.pos-pick-l') : [];
+  for (const l of found) l.remove();
+  return found.length;
+}
+
 /**
  * An instrument panel.
  *
@@ -156,6 +192,10 @@ export function createInstrumentPanel(o = {}) {
    * start end and the patch at the end, so it still goes linear on a phone by
    * the rule `.pos-rows-r` carries. The text case is untouched: one plate
    * spanning its row, exactly as before.
+   *
+   * 🔴 AND A SELECTOR IS THE END, NEVER THE START, WITH NO CAPTION ON IT. The
+   * header carries the ask. `status` is for a switch; a `.pos-pick` handed in
+   * there is refused, and a `.pos-pick` handed in as `patch` loses its label.
    */
   let plate = null, plateRow = null, status = null, patchEnd = null, patchLine = null;
   if (plateSpec) {
@@ -164,6 +204,14 @@ export function createInstrumentPanel(o = {}) {
     const patchCtl = built ? null : elOf(plateSpec.patch);
     const patchText = built || patchCtl ? null : plateSpec.patch;
     const caps = plateSpec.caps !== false;
+    /* 🔴 A PATCH SELECTOR IN THE STATUS SLOT IS THE RULE BROKEN BY THE OPTION
+       SHAPE, AND IT IS REFUSED HERE RATHER THAN DRAWN AT THE START. This is the
+       arrangement `/fau/` shipped for a day: the picker beside the name and a
+       button at the end. `createGlueRows` refuses a bad alignment the same way. */
+    if (isPicker(status)) {
+      throw new Error('createInstrumentPanel: a patch selector goes in `patch`, which is the far end of the plate row; `status` is the switch beside the name');
+    }
+    if (patchCtl && isPicker(patchCtl)) unlabel(patchCtl);
     if (built || (!status && !patchCtl)) {
       plate = built
         ? plateSpec
