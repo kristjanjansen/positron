@@ -1,5 +1,39 @@
 ## Open
 
+### Open 2026-09-26: audit the instruments against positron-compose, pick one, propose
+
+⚠️ **ASKED, VERBATIM, MID-TASK, HANDED TO A BACKGROUND AGENT:** *"now audit all
+instruments in bg to the new rules we make. pick one. do not do anything just
+assess and propose."* Read-only. Lands in `plans/plan-instrument-audit.md` and is
+reported here in full.
+
+
+### Open 2026-09-26: the presence badge's own inset, the justified-to-linear rule, full-width glue
+
+⚠️ **TWO MORE IN THE SAME STREAM, VERBATIM.** With a crop of the settings list:
+*"board offline does not comply with the label / control grid. make it a general
+rule and component (subgrid?) if you have not done so"*. And: *"Notes off ->
+rename to Panic"*. The first is `positron-compose` section 2 exactly, things
+line up because they share a coordinate system, and the research names subgrid
+as the primitive this project reached past; three `[label, control]` rows in
+one surface must share one label column and one control column. The second is
+one word in `keyboard.mjs` and every page follows.
+
+🔴 **ASKED, WITH A CROP OF THE STATION STRIP:** *"do same side-effect treatment for
+online status thing. its almost always in the left. make composition rules on
+when to justify layout in mobile when to make it linear (avail space?). make
+different examples on it. add more full w glue examples too"*.
+
+In the crop the `ONLINE` badge sits about 24 px after the speed segment on a row
+whose gap is 8, so the badge carries roughly 16 px of its own. The row-child
+assert did not flag it, which means the inset is INSIDE the badge rather than on
+its box. Three deliverables: the badge reads `--inset` like every other surface;
+a row wraps as a cluster and a justified row goes linear below the width its
+content needs, decided by the container's width and never the viewport's; and
+`createGlueRows({ full: true })` for a surface that takes the width it is given,
+which is also where `between` is real.
+
+
 ### Open 2026-09-26: an alternative CMS for eccm.ee on the Cloudflare stack, a plan
 
 ⚠️ **ASKED, VERBATIM, MID-TASK, AND HANDED TO A BACKGROUND AGENT:** *"in bg do a

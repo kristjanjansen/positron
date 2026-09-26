@@ -135,6 +135,8 @@
      a box and an edge nobody wrote. */
   .kit-nobox { border: 0; border-radius: 0; background: none; padding: 0; }
   .kit-fig { flex: 1 1 200px; min-width: 0; }
+  /* two surfaces in the kit's phone frame, spaced by the page's one gap */
+  .kit-narrow { display: grid; gap: var(--pos-gap); }
   /* One column's worth of a figure and the word naming it, so a row of four can
      be read without a legend. The word is under the box rather than in it,
      because what is IN the box is the component's own honesty mark. */
@@ -1039,7 +1041,7 @@
   // behind, the build read it in its dead zone, `section()` swallowed the throw,
   // and the page died much later on an empty map.
   let ipanelSpec = null;      // { sketch, stomp, box16, desk, pic }
-  let rowsSpec = null;        // { g, rowOne, rowPic, shape, settings, meter, form, hidden, hiddenPic, scopes, waves }
+  let rowsSpec = null;        // the glued rows specimens, by name
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
@@ -1356,7 +1358,10 @@ ROW_ALIGN  // start, center, end, between`,
          surface is its own size and every row in this list is short, so there
          was nothing to spread across. `between` means something only when
          another row sets the width; here it was `start` wearing a hat. */
-      const settings = createGlueRows();
+      /* `grid`: three label-and-control rows on one column pair. Photographed
+         without it: BOARD is five letters to REVERB's six and its badge sat 10 px
+         left of the other two controls. */
+      const settings = createGlueRows({ grid: true });
       settings.row([cap('REVERB'), createChoice({ label: '', options: [['dry', 0], ['room', 1], ['hall', 2]], at: 1 })], { align: 'start' });
       let oct = 0;
       const octave = createStepper({ what: 'octave', prev: () => String(--oct), next: () => String(++oct) });
@@ -1412,8 +1417,42 @@ ROW_ALIGN  // start, center, end, between`,
       for (const w of waves) scopes.row(w.el, { pad: false });
       for (const w of waves) w.redraw();
 
-      add(strip, settings, meter, form, hidden, scopes);
-      rowsSpec = { g: strip, rowOne, rowPic, shape, settings, meter, form, hidden, hiddenPic, scopes, waves };
+      /* 7. FULL WIDTH, WHICH IS WHERE `between` IS REAL. The same station strip
+            told to take the width it is given; its speed row now has an edge to
+            put the badge against. */
+      const stripFull = createGlueRows({ full: true });
+      const station3 = createPicker({ label: '', what: 'station', prev: () => station3.show(stations[0]), next: () => station3.show(stations[0]), onPick: (x) => station3.show(x) });
+      station3.show(stations[1]);
+      stripFull.row([station3], { align: 'start' });
+      const fullBetween = stripFull.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 }),
+        createPresence({ of: '', mode: 'badge', state: 'online' })], { align: 'between' });
+      const shape3 = createWaveShape({ name: 'square' });
+      stripFull.row(shape3.el, { pad: false });
+      shape3.redraw();
+
+      /* 8. A FULL-WIDTH SETTINGS LIST: the label column is as wide as the widest
+            label and every control starts on the same line, across the page. */
+      const settingsFull = createGlueRows({ full: true, grid: true });
+      settingsFull.row([cap('INSTRUMENT'), createChoice({ label: '', options: [['piano', 0], ['rhodes', 1], ['wurli', 2]], at: 1 })]);
+      settingsFull.row([cap('VELOCITY'), createChoice({ label: '', options: [['soft', 0], ['medium', 1], ['hard', 2]], at: 1 })]);
+      settingsFull.row([cap('BOARD'), createPresence({ of: 'Raspberry Pi', mode: 'badge', state: 'checking' })]);
+
+      /* 9. THE SAME TWO ROWS IN A 320 px FRAME, ON THE SAME PAGE. The justified
+            row goes LINEAR, one child per line, left-aligned, because its
+            container is narrower than `--row-min`; the start row wraps as a
+            cluster. Both are decided by the frame's width and not the window's,
+            which is what lets the harness grade a phone layout at desk width. */
+      const narrow = el('div', 'kit-phone kit-narrow');
+      const stripNarrow = createGlueRows({ full: true });
+      const narrowBetween = stripNarrow.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 }),
+        createPresence({ of: '', mode: 'badge', state: 'online' })], { align: 'between' });
+      const clusterNarrow = createGlueRows({ full: true });
+      const clusterRow = clusterNarrow.row(['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C'].map((t) => { const b = el('button', '', t); b.type = 'button'; return b; }), { align: 'start' });
+      narrow.append(stripNarrow.el, clusterNarrow.el);
+
+      add(strip, settings, meter, form, hidden, scopes, stripFull, settingsFull, narrow);
+      rowsSpec = { g: strip, rowOne, rowPic, shape, settings, meter, form, hidden, hiddenPic, scopes, waves,
+        stripFull, fullBetween, settingsFull, stripNarrow, narrowBetween, clusterNarrow, clusterRow, narrow };
     }, { bare: true });
 
   section('hardware', 'PANEL SEAM',
@@ -5227,6 +5266,72 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     }
 
     /**
+     * 🔴 LABEL AND CONTROL ROWS SHARE ONE COLUMN PAIR. Photographed: BOARD's
+     * badge 10 px left of REVERB's and OCTAVE's controls, because each flex row
+     * put its control where its own label's width left it. On the grid variant
+     * every second child starts on one line and every first child on another.
+     */
+    {
+      for (const [name, g] of [['settings', rowsSpec.settings], ['settingsFull', rowsSpec.settingsFull]]) {
+        const rows = g.rows().filter((row) => row.children.length === 2);
+        const labs = rows.map((row) => +r(row.children[0]).left.toFixed(1));
+        const ctls = rows.map((row) => +r(row.children[1]).left.toFixed(1));
+        const spread = (xs) => Math.max(...xs) - Math.min(...xs);
+        d.assert(`${name}: every control starts on one line and every label on another, across ${rows.length} rows`,
+          rows.length >= 3 && spread(labs) <= 0.6 && spread(ctls) <= 0.6 && ctls[0] > labs[0],
+          `labels at x ${labs.join(', ')}, controls at x ${ctls.join(', ')}`);
+      }
+    }
+
+    /**
+     * 🔴 THE SAME JUSTIFIED ROW IS JUSTIFIED AT FULL WIDTH AND LINEAR IN A
+     * 320 px FRAME, ON ONE PAGE, DECIDED BY THE ROW'S OWN WIDTH. Below
+     * `--row-min` each child is at least a full line, so they stack left-aligned
+     * with the row's gap between them, which is the owner's *"go to left
+     * alignment in mobile and have gaps between elements, not just squished"*.
+     * Measured at desk width, which is the whole point of deciding it by the
+     * container.
+     */
+    {
+      const wide = rowsSpec.fullBetween, tight = rowsSpec.narrowBetween;
+      const gapOf = (row) => px(row, 'columnGap') || px(row, 'gap');
+      const ins = (row) => px(row, 'paddingLeft');
+      const [wa, wb] = wide.children, [ta, tb] = tight.children;
+      const wApart = +(r(wb).left - r(wa).right).toFixed(1);
+      const wL = +(r(wa).left - (r(wide).left + ins(wide))).toFixed(1);
+      const wR = +((r(wide).right - ins(wide)) - r(wb).right).toFixed(1);
+      d.assert('at full width a justified row puts one child against each inset with room between',
+        Math.abs(wL) <= 0.6 && Math.abs(wR) <= 0.6 && wApart > gapOf(wide) * 4,
+        `${wL} px off the left inset, ${wR} px off the right, ${wApart} px apart`);
+      const stacked = r(tb).top >= r(ta).bottom - 0.6;
+      const tL = [+(r(ta).left - (r(tight).left + ins(tight))).toFixed(1), +(r(tb).left - (r(tight).left + ins(tight))).toFixed(1)];
+      const between = +(r(tb).top - r(ta).bottom).toFixed(1);
+      d.assert('in a 320 px frame the same row is linear: one child per line, both on the left inset, one gap apart',
+        r(tight).width < 340 && stacked && tL.every((x) => Math.abs(x) <= 0.6) && Math.abs(between - px(tight, 'rowGap')) <= 0.6,
+        `frame ${r(tight).width.toFixed(0)} px wide, lefts ${tL.join(' and ')} px off the inset, ${between} px between the lines against a gap of ${px(tight, 'rowGap')}`);
+    }
+
+    /**
+     * 🔴 A START ROW THAT DOES NOT FIT WRAPS AS A CLUSTER: left-aligned, the
+     * row's gap between items and between lines, nothing squished and nothing
+     * past the inset. Eight octave buttons in a 320 px frame is two lines.
+     */
+    {
+      const row = rowsSpec.clusterRow;
+      const kids = [...row.children];
+      const tops = [...new Set(kids.map((k) => Math.round(r(k).top)))];
+      const inset = px(row, 'paddingLeft');
+      const firsts = tops.map((t) => kids.find((k) => Math.round(r(k).top) === t));
+      const onInset = firsts.every((k) => Math.abs(r(k).left - (r(row).left + inset)) <= 0.6);
+      const widths = kids.map((k) => +r(k).width.toFixed(1));
+      const even = Math.max(...widths) - Math.min(...widths) <= 0.6;
+      const inside = kids.every((k) => r(k).right <= r(row).right - inset + 0.6);
+      d.assert('a start row too wide for its frame wraps left-aligned on the row\u2019s gap, every button its own width',
+        tops.length >= 2 && onInset && even && inside,
+        `${kids.length} buttons on ${tops.length} lines, first of each ${onInset ? 'on' : 'OFF'} the inset, widths ${Math.min(...widths)} to ${Math.max(...widths)} px, ${inside ? 'none' : 'some'} past the right inset`);
+    }
+
+    /**
      * 🔴 EDGE TO EDGE MEANS THE PICTURE'S OWN LEFT EDGE, AND A CONTROL ROW'S
      * INK STARTS ONE INSET FURTHER IN. This is the shape `/muta/` and `/fau/`
      * both left the case to get, and `/fau/` had to be told twice because a
@@ -5320,7 +5425,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const panels = [['sketch', ipanelSpec.sketch.glue], ['stomp', ipanelSpec.stomp.glue],
         ['box16', ipanelSpec.box16.glue], ['desk', ipanelSpec.desk.glue], ['strip', rowsSpec.g],
         ['settings', rowsSpec.settings], ['meter', rowsSpec.meter], ['form', rowsSpec.form],
-        ['hidden', rowsSpec.hidden], ['scopes', rowsSpec.scopes]];
+        ['hidden', rowsSpec.hidden], ['scopes', rowsSpec.scopes], ['stripFull', rowsSpec.stripFull],
+        ['settingsFull', rowsSpec.settingsFull], ['stripNarrow', rowsSpec.stripNarrow], ['clusterNarrow', rowsSpec.clusterNarrow]];
       /* ⚠️ THE FIRST DRAFT MEASURED THE CHILD'S BOX AGAINST THE ROW'S CONTENT
          EDGE AND NAMED THREE CENTRED KNOB ROWS AS OFFENDERS AT +216 px, while
          the keyboard, whose box IS flush and whose 9 px is INSIDE it, passed.
@@ -9707,9 +9813,9 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
           + `${growth.toFixed(1)} ms further out than the first`);
       }
 
-      /* 🔴 THE FOOTER ROW READS `Loop`, `Sustain`, `Notes off`, AND THE CLAIM IS
+      /* 🔴 THE FOOTER ROW READS `Loop`, `Sustain`, `Panic`, AND THE CLAIM IS
          THE GAP AS MUCH AS THE ORDER. Settled 2026-09-23 as *"buttons: Loop
-         Sustain Notes off"* after two reports that read as position and were
+         Sustain Panic"* after two reports that read as position and were
          about spacing: *"move loop button to right"*, then *"loop is leftmost of
          3 in riht"*. A flex line hands its free space to every `margin-left:
          auto` on it EQUALLY, so the rule that pushed one toggle right spread two
@@ -9930,10 +10036,10 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
          left edges 444 and 444 and went red for the right reason with the wrong
          story. A check that names a control has to name the control. */
       const off = [...kpad.querySelectorAll('button')]
-        .find((e) => /notes off/i.test(e.textContent))?.getBoundingClientRect();
+        .find((e) => /panic/i.test(e.textContent))?.getBoundingClientRect();
       const gap = lp && sus ? Math.round(sus.left - lp.right) : -1;
       const gap2 = sus && off ? Math.round(off.left - sus.right) : -1;
-      d.assert('Loop, Sustain and Notes off sit in that order, tight against each other',
+      d.assert('Loop, Sustain and Panic sit in that order, tight against each other',
         !!(sus && lp && off) && lp.left < sus.left && sus.left < off.left
           && Math.abs(sus.top - lp.top) < 1
           && gap >= 0 && gap <= 12 && gap2 >= 0 && gap2 <= 12,
