@@ -286,6 +286,17 @@ object's size that nothing had measured.** `.pos-rows` takes the same pair now.
 ⚠️ **`max-width: 100%` IS THE OTHER HALF**, so an object wider than the page is
 held inside it and scrolls its own rows rather than dragging the document.
 
+🔴 **TWO THINGS SIDE BY SIDE ARE CLEARLY THE SAME SIZE OR CLEARLY DIFFERENT,
+NEVER ALMOST THE SAME.** Reported 2026-09-26 on `/eccm/` with a crop: a 146 px
+picture beside a text block of 170 to 200 px, in the owner's words *"image
+should be bigger to avoid awkard a-bit-longer text. gestat 101,
+just-a-bit-different sizes are nervous"*. A small difference reads as an
+error in one of them; a large one reads as a decision. The picture went to
+its own 300 px, clearly the taller of the two. **When a row pairs a picture
+with text, size the picture so it is the taller by a margin the eye cannot
+mistake, or make the text the taller by the same margin; the band in between
+is where the layout looks unfinished.**
+
 🔴 **A SUGGESTION, NOT A PRESCRIPTION.** Every Layout: *"A declaration of
 `width: 20rem` means just that: make it 20rem wide, regardless of circumstance.
 But `flex-basis: 20rem` tells the browser to consider 20rem as an ideal."*

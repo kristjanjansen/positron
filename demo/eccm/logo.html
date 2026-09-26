@@ -30,8 +30,9 @@
        for pixel; the redraw is inlined so its ink can take the accent */
     .stage { position: relative; inline-size: 381px; max-inline-size: 100%; aspect-ratio: 381 / 199; }
     .stage > * { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; }
-    .stage svg { color: var(--eccm-accent); opacity: 0.75; }
+    .stage svg { inline-size: 100%; block-size: 100%; color: var(--eccm-accent); opacity: 0.75; }
     .x2 { inline-size: 762px; }
+    .x2.ink { inline-size: 620px; }
     .sizes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--eccm-s-8); }
     .sizes figure { flex: 0 1 auto; }
     .faces { display: grid; gap: var(--eccm-s-6); }
@@ -48,8 +49,8 @@
 <body>
 <header class="site-head">
   <div class="frame">
-    <a class="mark" href="./"><img src="./logo.svg" width="381" height="199" alt="ECCM, Eesti Nüüdismuusika Keskus"></a>
-    <span class="lang"><a href="./logo.html" aria-current="page" lang="et">ET</a> <a href="https://eccm.ee/index.php/en/" lang="en">EN</a></span>
+    <a class="mark" href="./"><img src="./logo.svg" width="310" height="147" alt="ECCM, Eesti Nüüdismuusika Keskus"></a>
+    <span class="lang"><span aria-current="page" lang="et">ET</span><a href="https://eccm.ee/index.php/en/" lang="en">EN</a></span>
   </div>
 </header>
 <nav class="site-nav" aria-label="Menüü">
@@ -73,8 +74,8 @@
         <figcaption>Serveeritud: JPEG, 381 by 199, 34,053 bytes, drawn one to one.</figcaption>
       </figure>
       <figure>
-        <img src="./logo.svg" width="381" height="199" alt="the SVG redraw">
-        <figcaption>Ümber joonistatud: SVG, about 3 KB, the same box.</figcaption>
+        <img src="./logo.svg" width="310" height="147" alt="the SVG redraw">
+        <figcaption>Ümber joonistatud: SVG, about 3 KB, cropped to its ink, at the same scale.</figcaption>
       </figure>
     </div>
   </section>
@@ -96,7 +97,7 @@
         <figcaption>The JPEG at 2x, which is what every Retina screen shows of it today.</figcaption>
       </figure>
       <figure>
-        <img class="x2" src="./logo.svg" alt="the SVG at twice its size">
+        <img class="x2 ink" src="./logo.svg" alt="the SVG at twice its size">
         <figcaption>The SVG at 2x.</figcaption>
       </figure>
     </div>
@@ -120,9 +121,9 @@
   <section>
     <h2>Mis on mõõdetud, mis mitte</h2>
     <dl>
-      <dt>The capitals</dt><dd>93 px tall from y 29, stroke 14, the E's bars 38 and 31 wide and 13 tall, the M's arms 10 wide meeting on the baseline</dd>
+      <dt>The capitals</dt><dd>93 px tall from y 29, stroke 14, the E's bars 38 and 31 wide, 13 tall and the bottom one 14, the M's arms 10 wide meeting on the baseline</dd>
       <dt>The C</dt><dd>a stadium 44 wide and 97 tall, open on the right from y 60 to y 88, and the second C is the first moved 81 px right</dd>
-      <dt>The stave</dt><dd>five hairlines 1.5 px tall on a 7.5 px pitch, 12 px past the M, and three joins between the letters at the heights the picture shows them</dd>
+      <dt>The stave</dt><dd>five hairlines 1.5 px tall on a 7.375 px pitch, 12 px past the M, and three joins between the letters, each running flush along an edge of the letter it meets, which is where the picture has them</dd>
       <dt>The tagline</dt><dd>x-height 14, baselines at 153 and 174, lines 311 and 221 px wide, centred under the mark</dd>
       <dt>Not known</dt><dd>the tagline's face, the designer, whether the letters were drawn or typed, and whether the mark may be redrawn at all</dd>
       <dt>Next</dt><dd>one email to ECCM asking for the vector, the face and the designer's name. It has not gone.</dd>
@@ -141,7 +142,14 @@
   // and the face rows are one template with the family swapped, so the five
   // differ in nothing else. Both read ./logo.svg from this origin.
   const svgText = await (await fetch('./logo.svg')).text();
-  for (const host of document.querySelectorAll('.inline-svg')) host.innerHTML = svgText;
+  for (const host of document.querySelectorAll('.inline-svg')) {
+    host.innerHTML = svgText;
+    // the file's box is its ink; over the JPEG it needs the JPEG's frame
+    const svg = host.querySelector('svg');
+    svg.setAttribute('viewBox', '0 0 381 199');
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+  }
 
   const FACES = [
     ["'DIN Condensed', sans-serif", 'normal', 700, 'DIN Condensed, bold. The redraw asks for this first, because it needs the least squeeze.'],

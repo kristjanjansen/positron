@@ -56,17 +56,14 @@
     --eccm-rule: #d9d9d9;
     --eccm-rule-strong: #999999;
     --eccm-accent: #b3400f;
-    /* the row's ground: the second rung of the grouping ladder, which is the
-       rung eccm.ee's list stands on (rgba(127,127,127,.05) over white there) */
-    --eccm-tint: #f4f4f4;
-    /* under the date drawn over a picture. White on this over a WHITE picture,
-       the worst case, is 4.7:1, so the date reads over any photograph; the
-       plan's objection to a date box (white on #ddd at 1.36:1 when the picture
-       is missing) is answered by the scrim, not by dropping the box */
-    --eccm-scrim: rgb(0 0 0 / 0.55);
-    /* the picture column. eccm.ee's thumbnails are 300 on the long side and
-       224 px is under that, so nothing is ever upscaled (design plan rule 14) */
-    --eccm-pic-w: 14rem;
+    /* the picture column is the thumbnail's own width: eccm.ee makes them 300
+       on the long side, so 300 draws eight of the ten at 1:1. The first cut
+       had 224, and the picture came out 146 px tall beside text of 170 to
+       200, which is the almost-equal that reads as nervous (asked 2026-09-26:
+       "image should be bigger to avoid awkward a-bit-longer text. gestalt
+       101, just-a-bit-different sizes are nervous"). A typed pixel, because
+       it is the size of an object, not a relationship (positron-compose §0) */
+    --eccm-pic-w: 300px;
     /* the mark, on a desk. eccm.ee draws it at 381 px */
     --eccm-mark-w: 20rem;
   }
@@ -101,14 +98,23 @@
      a row with exactly two ends, the mark and the switch, and the frame gives
      it a width to spread across (positron-compose §6) */
   .site-head { padding-block: var(--eccm-s-6); }
-  .site-head > .frame { display: flex; justify-content: space-between; align-items: flex-start; column-gap: var(--eccm-s-6); }
-  .site-nav { border-block: 1px solid var(--eccm-rule); }
+  /* baseline: the mark's box is its ink and its bottom edge is the tagline's
+     baseline, so the switch sits on that line (asked 2026-09-26: "et en lang
+     position / stylying neds work", when it floated 24 px above the E on the
+     JPEG's empty margin) */
+  .site-head > .frame { display: flex; justify-content: space-between; align-items: baseline; column-gap: var(--eccm-s-6); }
+  /* the menu band is ruled in the logo's own ink, not the hairline grey
+     (asked 2026-09-26: "use black on top menu borders to mach with logo") */
+  .site-nav { border-block: 1px solid var(--eccm-ink); }
   .site-nav > .frame {
     display: flex; flex-wrap: wrap; align-items: baseline;
     column-gap: var(--eccm-s-6); row-gap: var(--eccm-s-1);
     padding-block: var(--eccm-s-3);
   }
-  main { padding-block: var(--eccm-s-8) var(--eccm-s-24); }
+  /* main is the box the list asks about its width (positron-compose §6, a
+     component asks its own box, never the window), because the row's shape
+     depends on whether 45 ch of text fits beside a 300 px picture */
+  main { padding-block: var(--eccm-s-8) var(--eccm-s-16); container-type: inline-size; }
   .site-foot {
     border-block-start: 1px solid var(--eccm-rule);
     padding-block: var(--eccm-s-8) var(--eccm-s-12);
@@ -129,58 +135,116 @@
   .nav a { text-decoration: none; }
   .nav a:hover { text-decoration-line: underline; text-decoration-color: var(--eccm-accent); }
   .nav [aria-current="page"] { text-decoration-line: underline; text-decoration-color: currentColor; }
-  .lang { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); }
+  /* the switch: the current language is text, the other is a link with the
+     page's own underline, both at the menu's size */
+  .lang { display: flex; column-gap: var(--eccm-s-3); }
 
-  /* the event list, in eccm.ee's own shape: a tinted row, the picture with the
-     day over it at the start, the title and the facts beside it. Rows are
-     separated by space and by their tint, never by a line; every title starts
-     on one x because the picture column is one width for the whole list */
-  .events { display: grid; row-gap: var(--eccm-s-3); max-inline-size: 60rem; }
+  /* the event list, in eccm.ee's own shape: the picture at the start, the
+     title and the facts beside it. The picture is plain, nothing drawn over
+     it and no ground under the row (asked 2026-09-26: "i asked just to use
+     event images, not overlay anything ... unneccessary backgrounds"). Rows
+     are separated by space alone, two steps above the gaps inside a row
+     (positron-compose §1, §4); every title starts on one x because the
+     picture column is one width for the whole list */
+  .events { display: grid; row-gap: var(--eccm-s-8); max-inline-size: 60rem; }
   .ev {
     display: grid; grid-template-columns: var(--eccm-pic-w) minmax(0, 1fr);
-    column-gap: var(--eccm-s-4); align-items: start;
-    padding: var(--eccm-s-2); background: var(--eccm-tint);
+    column-gap: var(--eccm-s-6); align-items: start;
   }
-  .ev-pic { position: relative; display: block; aspect-ratio: 3 / 2; overflow: clip; background: var(--eccm-rule); text-decoration: none; }
+  .ev-pic { display: block; aspect-ratio: 3 / 2; overflow: clip; }
   .ev-pic img { inline-size: 100%; block-size: 100%; object-fit: cover; }
-  .ev-pic::after { content: ''; position: absolute; inset: 0; background: var(--eccm-scrim); }
-  .ev-day {
-    position: absolute; inset: 0; z-index: 1;
-    display: grid; place-content: center; text-align: center;
-    color: #fff; line-height: 1;
-  }
-  .ev-day b { display: block; font-size: var(--eccm-t-2xl); font-weight: 700; }
-  .ev-day span { display: block; font-size: var(--eccm-t-s); margin-block-start: var(--eccm-s-1); }
   /* a compound title has no break opportunity at a slash, and eccm.ee's own
      list opens with one: Gestuurid/situatsioonid: is 24 characters that ran
      52 px past the phone's column (MEASURED at 375, 404 px of page in 375),
      so the title gets the same floor the prose has (design plan rule 21) */
-  .ev-title { font-size: var(--eccm-t-xl); overflow-wrap: anywhere; }
-  .ev-when { margin-block-start: var(--eccm-s-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* no underline under a bold title (asked 2026-09-26: "this thin underline
+     under bold title is pathetic design"); the row's shape says it is a link,
+     and hover puts a line back for the pointer */
+  .ev-title { font-size: var(--eccm-t-l); overflow-wrap: anywhere; }
+  .ev-title a { text-decoration-line: none; }
+  .ev-title a:hover, .ev-title a:focus-visible { text-decoration-line: underline; }
+  /* one bold line per row, the title; the date is ink at body weight */
+  .ev-when { margin-block-start: var(--eccm-s-2); font-variant-numeric: tabular-nums; }
   .ev-when time + time { margin-inline-start: var(--eccm-s-2); }
   .ev-meta { display: flex; flex-wrap: wrap; gap: var(--eccm-s-1) var(--eccm-s-4); margin-block-start: var(--eccm-s-1); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
   .ev-summary { margin-block-start: var(--eccm-s-2); }
+
+  /* ── the event page and the edit form, HTML only ─────────────────────────── */
+  /* a crumb above a title: the page this one came from, small, in the muted ink */
+  .crumb { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); margin-block-end: var(--eccm-s-4); }
+  /* the title and its one action are a row with exactly two ends; on a phone
+     the two wrap to two left aligned lines at their own sizes (compose §6) */
+  .event-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--eccm-s-4) var(--eccm-s-8); margin-block-end: var(--eccm-s-8); }
+  .event-head h1 { flex: 1 1 30ch; max-inline-size: var(--eccm-measure); margin-block-end: 0; }
+  /* the facts: a two column list at the measure, the label in the muted ink,
+     one gap for all rows, no rule and no box */
+  .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--eccm-s-6); row-gap: var(--eccm-s-2); max-inline-size: var(--eccm-measure); }
+  .facts dt { color: var(--eccm-ink-2); }
+  .facts a + a { margin-inline-start: var(--eccm-s-3); }
+  /* the picture at the measure, its shape reserved from its own pixels so
+     nothing moves while it arrives, never wider than the prose under it */
+  .event-pic { max-inline-size: var(--eccm-measure); margin-block: var(--eccm-s-12); }
+  .event-pic img { inline-size: 100%; aspect-ratio: 900 / 599; object-fit: cover; }
+  .event-pic figcaption { margin-block-start: var(--eccm-s-2); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
+  /* prose flow: the owl, one leading between paragraphs, a heading carries
+     more air above it than below (compose §1 on why the Stack is the owl) */
+  .flow > * + * { margin-block-start: var(--eccm-flow, 1em); }
+  .flow > h2 { --eccm-flow: 2.5em; font-size: var(--eccm-t-l); }
+  .flow > h2 + * { --eccm-flow: 0.75em; }
+  .credits { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--eccm-s-6); row-gap: var(--eccm-s-1); }
+  .credits dt { color: var(--eccm-ink-2); }
+  .small { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
+  /* a button: a word in a 44 px box ruled in ink, no radius, no shadow; the
+     primary one is ink filled. 2.75rem is a finger, not a relationship */
+  .btn { display: inline-flex; align-items: center; block-size: 2.75rem; padding-inline: var(--eccm-s-4); border: 1px solid var(--eccm-ink); background: var(--eccm-ground); color: var(--eccm-ink); text-decoration: none; cursor: pointer; }
+  .btn:hover { text-decoration: none; background: var(--eccm-tint, #f4f4f4); }
+  .btn-pri { background: var(--eccm-ink); color: var(--eccm-ground); }
+  .btn-pri:hover { background: #000; }
+  /* the form: one column at the measure, a visible label above each field,
+     fields a finger tall, ruled in the strong hairline, ink on white */
+  .note { color: var(--eccm-ink-2); margin-block-end: var(--eccm-s-8); }
+  .form { display: grid; gap: var(--eccm-s-6); max-inline-size: var(--eccm-measure); }
+  .field { display: grid; gap: var(--eccm-s-1); }
+  .field label { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
+  .field-row { display: grid; gap: var(--eccm-s-6); grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+  .form input, .form select, .form textarea { inline-size: 100%; border: 1px solid var(--eccm-rule-strong); border-radius: 0; background: var(--eccm-ground); color: var(--eccm-ink); padding: var(--eccm-s-2) var(--eccm-s-3); font: inherit; }
+  .form input:not([type="file"]), .form select { block-size: 2.75rem; }
+  .form input[type="file"] { padding: 0; border: 0; }
+  .form textarea { line-height: var(--eccm-lh-body); resize: vertical; }
+  .hint { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
+  .pic-field { display: flex; flex-wrap: wrap; gap: var(--eccm-s-4); align-items: flex-start; }
+  .pic-field img { inline-size: 14rem; aspect-ratio: 3 / 2; object-fit: cover; }
+  .actions { display: flex; flex-wrap: wrap; gap: var(--eccm-s-3); margin-block-start: var(--eccm-s-4); }
 }
 
 @layer page {
-  h1 { font-size: var(--eccm-t-2xl); margin-block-end: var(--eccm-s-6); }
+  h1 { font-size: var(--eccm-t-2xl); margin-block-end: var(--eccm-s-8); }
 }
 
-/* the phone: the picture a square at the row's start, small enough that a
-   300 px thumbnail is never upscaled, the day a size down, the title a size
-   down, the mark at 11rem so the mark and the menu together stay under a
-   quarter of the first screen (eccm.ee spends 40 per cent of it). MEASURED
-   at 12rem with the switch on a third menu line: 238 px of 812 */
+/* the phone: the mark at 11rem so the mark and the menu together stay under
+   a quarter of the first screen (eccm.ee spends 40 per cent of it). MEASURED
+   at 12rem with the switch on a third menu line: 238 px of 812. The row's
+   phone shape is the container query above, which the phone also enters */
 @media (max-width: 40rem) {
-  @layer base { :root { --eccm-pic-w: 6.5rem; --eccm-mark-w: 11rem; } }
+  @layer base { :root { --eccm-mark-w: 11rem; } }
   @layer layout {
     .site-head { padding-block: var(--eccm-s-4); }
     .site-nav > .frame { padding-block: var(--eccm-s-2); }
     main { padding-block: var(--eccm-s-6) var(--eccm-s-16); }
   }
+}
+
+/* the compact row: a square thumbnail at the row's start, small enough that
+   no 300 px picture is upscaled, the title at body size and bold. Decided by
+   the list's own container, not the window: 300 px of picture, a gap and
+   45 ch of Helvetica at 18 px is about 47rem, and under that the text column
+   would fall below the measure (MEASURED at the harness's 756 px window: 40 ch
+   in a 400 px column beside the 300 px picture) */
+@container (max-width: 47rem) {
   @layer components {
+    .events { row-gap: var(--eccm-s-6); }
+    .ev { column-gap: var(--eccm-s-4); grid-template-columns: 6.5rem minmax(0, 1fr); }
     .ev-pic { aspect-ratio: 1; }
-    .ev-day b { font-size: var(--eccm-t-xl); }
-    .ev-title { font-size: var(--eccm-t-l); }
+    .ev-title { font-size: var(--eccm-t-m); }
   }
 }

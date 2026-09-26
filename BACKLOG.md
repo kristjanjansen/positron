@@ -1,5 +1,78 @@
 ## Open
 
+### Open 2026-09-26: `/eccm/` looks bad, the pictures are to be plain, and the air, the title size and the grounds get a critical look
+
+⚠️ **ASKED, VERBATIM, ON THE FIRST CUT OF THE REBUILD:** *"eccm page looks bad.
+i asked just to use event imaes, not overlay anything. have a critical look on
+whitespace, title type size, unneccessary backgrounds"*. So: the day and
+month over each picture go, and the scrim under them; the tinted row ground
+goes, rows are separated by space alone (the first rung of the ladder,
+positron-compose §4); the list title drops from `--eccm-t-xl` to `--eccm-t-l`
+on a desk and `--eccm-t-m` bold on a phone, so one line per row is bold; the
+date line loses its bold; the gap between rows becomes two steps above the
+gaps inside a row. `demo/eccm/eccm.css`, `demo/eccm/index.html`, and the
+scrim assert becomes its opposite, that a row paints no ground and nothing
+is painted over its picture.
+⚠️ **AND A MINUTE LATER, WITH A CROP:** *"this really clearly shows that image
+shouyld be bigger to avoid awkard a-bit-longer text. gestat 101,
+just-a-bit-different sizes are nervous"*. The picture goes to its own 300 px
+width, 300 by 200 at 3:2, clearly taller than a row's text; the rule goes into
+`positron-compose` §3. Two of the ten pictures are not 3:2 and are stretched
+to the box, said in the assert rather than hidden.
+⚠️ **THEN FOUR MORE, IN A ROW, VERBATIM:** *"it sould be light, airy, good type
+stuff"*; *"this thin underline under bold title is pathetic design"*; *"look up
+priniples on whitespace any design with type"*; *"and add to eccm skill"*. So:
+title links lose the underline (hover may keep one); the whole page gets
+lighter, one bold line at most per row, more air between rows and around the
+list; a research agent surveys the primary sources on whitespace in
+typographic design (Bringhurst, Tschichold, Müller-Brockmann, Ruder, Hochuli,
+Vignelli, Lupton, Butterick, Rutter's vertical rhythm, Refactoring UI) and
+writes `.claude/skills/eccm-ui/SKILL.md`, the skill the design plan's §G
+outlined and nobody wrote, with those principles and today's asks as rules;
+`CLAUDE.md` gets its trigger row. The page is re-set to the skill once it
+lands, in one pass rather than a change per message.
+⚠️ **AND:** *"use black on top menu borders to mach with logo"*. The menu band's
+two rules read `--eccm-ink`, the ink the logo is drawn in, instead of
+`--eccm-rule`. Done at once, one declaration.
+⚠️ **AND:** *"et en lang position / stylying neds work"*. Cause: the SVG carried the
+JPEG's empty margins (29 px above the E, 25 below the tagline, 35 left of the
+E in a 381 box), so `align-items: flex-start` put the switch 24 px above the
+ink. The SVG is cropped to its ink (viewBox 35 27 310 147), the switch sits on
+the tagline's baseline at the far end of the head band, at the menu's size,
+the current language as plain text and the other as a link with the page's
+own underline. The logo page resets the overlay's viewBox to the full frame
+so it still lies on the JPEG.
+
+### Done 2026-09-26: the eccm event page, an edit button and an edit form, HTML only, in the eccm system
+
+✅ **DONE, LOCALLY.** `demo/eccm/event.html`: the title and a Muuda button as
+a two ended row, six facts in a `dl` at the measure (when, where, organiser,
+tickets, three calendar links as text, phone and site), the 900 px poster
+eccm.ee serves on that page at the measure with its shape reserved, the
+prose at 66 ch in sentence case with two subheadings and a credits list, and
+no script. `demo/eccm/edit.html`: a native form at the measure with a visible
+label above each field, `datetime-local` for start and end, a select for the
+category, a 24 row textarea holding the prose with blank lines between
+paragraphs and `##` for a subheading, the current picture beside a file
+field, Salvesta and Loobu; it says it saves nothing and submits to the event
+page by GET. Seven components in `eccm.css` carry both (crumb, event head,
+facts, figure, flow, button, form). The list's first row links here. Looked
+at, both pages, at 375 and 1280: no overflow.
+
+⚠️ **ASKED, VERBATIM:** *"implement single page
+https://eccm.ee/index.php/et/134-gestuurid-situatsioonid-ilma-partituurita-kuulamine-marianna-liik-artjom-astrov-maryn-liis-rueuetelmaa/2026-09-30-19-00
+plus button to edit and edit form. html only using eccm ds"*. The content
+comes from the copy of that page the design scan saved on 2026-09-26
+(`04-event.html`, 62,496 bytes), so nothing is fetched from eccm.ee except
+the page's full-size picture if it has one. Two pages beside `index.html`:
+`event.html`, the design plan's §D event page (title, a `dl` of facts, the
+picture at measure width, the prose at 66 ch, add-to-calendar as text) with an
+edit button, and `edit.html`, a native form prefilled with the same event,
+labelled fields, `datetime-local` for the dates, a textarea for the prose,
+no script and no saving, which the page says. The button, the form fields
+and the fact list become `eccm.css` components. The first row of the list
+links to the local page.
+
 ### Done 2026-09-26: the instrument panel's patch selector is unlabelled and at the right, and `/fau/`'s Compile moves into the textarea's corner
 
 ✅ **DONE BY A BACKGROUND AGENT, GREEN LOCALLY.** `createInstrumentPanel` now
