@@ -1041,7 +1041,11 @@ button.pos-pri[data-busy="1"] {
 .pos-rows-r > .panel-plate { flex: 1 1 auto; min-width: 0; }
 /* the foot's start end when the foot holds controls: the name and its switch as
    one flex item, so a justified row still has exactly two ends */
-.pos-ipanel-name { display: flex; align-items: center; gap: var(--ctl-gap); min-width: 0; }
+/* The start end is a cluster and wraps as one: a name with a wide control
+   beside it drops the control under the name on a phone rather than pushing
+   the row sideways, which is compose §6's rule for any row that is not two
+   ends. */
+.pos-ipanel-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); min-width: 0; }
 
 /* ── readout and log, joined ──────────────────────────────────────────── */
 /* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
@@ -6472,6 +6476,14 @@ button[data-glyph="1"] {
    ⚠️ `(0,2,0)` AGAINST THE `(0,1,0)` ABOVE, WHICH IS THE SMALLEST THING THAT
    CAN WIN, and it sits after it so nothing rests on weight alone. */
 .panel-plate-asis .panel-plate-l { text-transform: none; }
+/* 🔴 A PATCH IS SHOWN AS IT WAS WRITTEN. Asked 2026-09-26: *"patches are
+   always sentence cased"*. The uppercase above is about a MAKER and a MODEL
+   reading as one shelf; a patch is the name somebody gave a sound, and
+   `Rhodes Mk I` shouted as `RHODES MK I` is the stylesheet renaming it.
+   `createInstrumentPanel` marks its patch line, so this reaches every plate
+   that has one and nothing else. Same weight as `.panel-plate-l`, later in the
+   file, so order decides and nothing rests on specificity. */
+.panel-plate-patch { text-transform: none; }
 /* The maker at one end and the model at the other, across whatever the plate
    spans: a card on `/circuit/`, the whole instrument on `/twelve/`. */
 .panel-plate[data-place="ends"] { display: flex; justify-content: space-between; }

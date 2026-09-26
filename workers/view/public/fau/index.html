@@ -121,20 +121,14 @@
    * The argument above is unchanged and is why the other five still carry a
    * wire that changes nothing.
    *
-   * 🔴 4. AN AUTOCOMPILE THAT FIRES UNDER A HELD NOTE TAKES THE NOTE AWAY.
-   * Asked 2026-09-23 as *"autocompile on cerain interval / inactivity"*, and
-   * the two halves of that ask are not equally safe. A compile blocks the
-   * thread it runs on, builds a WHOLE NEW `AudioWorkletNode` and calls
-   * `pedal.forgetKeys()`, so an INTERVAL fires in the middle of a word being
-   * typed and in the middle of a chord being held. This page compiles when
-   * typing has STOPPED for `AUTO_IDLE_MS`, and then only while nothing is
-   * sounding: the timer re-arms every `AUTO_HOLD_MS` for as long as a finger or
-   * the pedal is holding anything, so the new instrument arrives after the last
-   * note has been let go rather than instead of it.
-   * ⚠️ AND IT IS OFF UNDER `SELFCHECK`. A compile nobody asked for, landing
-   * between an assert and the reading it is about, is a check grading a
-   * different page. The check block switches it on for a window of its own and
-   * off again, which is also the only way it is graded at all.
+   * 🔴 4. NOTHING COMPILES BUT A PRESS. Asked 2026-09-26 as *"no
+   * autocompile"*, after two days in which a compile landed 800 ms after the
+   * typing stopped. That timer was careful (it waited under a held note, it
+   * re-armed on every keystroke) and it was still a compile nobody had asked
+   * for at that moment: a compile blocks the thread it runs on, builds a WHOLE
+   * NEW `AudioWorkletNode` and calls `pedal.forgetKeys()`, so the only right
+   * moment for one is a moment the visitor chose. Typing now changes the bytes
+   * under the box and nothing else, and `Compile` in the foot is the one road.
    *
    * ── THE PANEL, THE SWITCH AND `custom` ─────────────────────────────────────
    *
@@ -143,8 +137,8 @@
    * textarea (edge to edge), below it footer with on/off"*, and moved onto
    * `createInstrumentPanel` on 2026-09-26 (plans/plan-instrument-audit.md): the
    * text is its picture row, edge to edge by construction, the keys are its
-   * keys row, and the foot is its plate with the name, the power switch and the
-   * patch picker on it. The name sits in the foot now, where the sketch of
+   * keys row, and the foot is its plate with the name and the patch picker at
+   * one end and `Compile` at the other. The name sits in the foot now, where the sketch of
    * 2026-09-26 puts it. Nothing here is drawn by this page, and the seven page
    * rules that used to repair the field and the case went with the move.
    *
@@ -161,7 +155,7 @@
    * preset that was loaded a moment ago still fires a change rather than being
    * swallowed as "no change".
    *
-   * 🔴 AND THE SWITCH IS NOW THE ONLY THING THAT OPENS ANYTHING. `on` fetches
+   * 🔴 AND `Compile` IS THE ONLY THING THAT OPENS ANYTHING. The first press fetches
    * the compiler, compiles the patch in the box and asks for Web MIDI. Those
    * were three separate presses, and one of them was not a press at all:
    * `createMidi` asks the browser for access the moment it is built, so this
@@ -205,15 +199,14 @@
    * changes this.
    */
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createKeyboard, QWERTY_CHROMATIC } from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC } from '/shell/pedal.mjs';
   import { createField } from '/shell/field.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
-  import { createPresenceButton } from '/shell/presence.mjs';
-  import { HEADER_STATES, HEADER_SAYS } from '/shell/instrument.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -535,7 +528,7 @@ effect  = dm.freeverb_demo;
   ];
 
   const ONE = 'a synthesiser you type in, compiled to machine code in this tab '
-            + 'a moment after you stop typing';
+            + 'when you press Compile';
 
   const d = mount({
     name: 'fau',
@@ -572,25 +565,14 @@ effect  = dm.freeverb_demo;
     },
     /**
      * 🔴 NO CONTROL ROW AT ALL SINCE 2026-09-24, ASKED AS *"rm compile button
-     * next to fau on"*. The presets left this row on 2026-09-23 for the patch
-     * selector in the panel's footer, COMPILE was the one verb left in it, and
-     * now there is no `controls` key on this page. `shell.mjs` hides an empty
-     * `.pos-controls`, which it has to, because that row carries 14 px under it
-     * and a band of dead space reads as something that failed to render.
-     * `lanes` and `draw` were already in that shape.
-     * ✅ **AND THE PRESS IT REPLACED IS NOT MISSING, IT IS THE PAGE'S OWN
-     * SUBJECT.** This page compiles `AUTO_IDLE_MS` after typing stops, which is
-     * what `ONE` says in the words a visitor reads, and the switch compiles what
-     * is in the box the moment it goes on. A button that forces a compile
-     * NOW was a fifth road to the same place, and the three that are left are
-     * the ones somebody asked for.
-     * 🔴 **WHAT IT COST IS THREE ASSERTS THAT READ ITS `disabled` ATTRIBUTE AS
-     * EVIDENCE OF POWER STATE.** That clause is gone from all three, and the
-     * claim it was making, that nothing can start a compile on a page nobody
-     * switched on, is asserted on the autocompile instead, where it now has
-     * teeth: the check arms one with the instrument off and measures `autos`.
-     * A conjunct deleted without being rehomed is coverage lost at a count that
-     * does not move, which is this project's quietest kind of defect.
+     * next to fau on"*. `shell.mjs` hides an empty `.pos-controls`, which it
+     * has to, because that row carries 14 px under it and a band of dead space
+     * reads as something that failed to render.
+     * ⚠️ THE ONE VERB THIS PAGE HAS IS IN THE PANEL'S FOOT, NOT HERE. `Compile`
+     * came back on 2026-09-26 (*"replace it with compile (shimmer). no
+     * autocompile"*) as a kit button at the far end of the plate row, beside
+     * the instrument it compiles rather than in the row under the readout,
+     * which is for controls that are not the instrument's own.
      */
   });
   guard(d);
@@ -829,12 +811,11 @@ effect  = dm.freeverb_demo;
 
   // ── the text ───────────────────────────────────────────────────────────────
   //
-  // 🔴 TYPING AND SETTING ARE TWO DIFFERENT EVENTS AND ONLY ONE OF THEM ARMS
-  // ANYTHING. `onType` is a person at the keyboard: it re-counts the bytes,
-  // moves the patch selector to `custom` if the text has left its preset, and
-  // starts the idle timer. `showSource()` is the page writing into its own box,
-  // which happens every time a patch is loaded, and arming an autocompile there
-  // would schedule a second compile of what was just compiled.
+  // 🔴 TYPING AND SETTING ARE TWO DIFFERENT EVENTS. `onType` is a person at
+  // the keyboard: it re-counts the bytes and moves the patch selector to
+  // `custom` if the text has left its preset. `showSource()` is the page
+  // writing into its own box, which happens every time a patch is loaded.
+  // Neither compiles anything: since 2026-09-26 only the Compile button does.
   const source = createField({
     /* 🔴 NO CAPTION. `label: ''` builds no span (`field.mjs`, `if (label)`),
        where this page used to build a FAUST label and hide it by rule: a caption
@@ -871,7 +852,6 @@ effect  = dm.freeverb_demo;
   function onType() {
     showSource();
     matchPatch();
-    armAuto();
   }
 
   // ── the keys ───────────────────────────────────────────────────────────────
@@ -1040,7 +1020,7 @@ effect  = dm.freeverb_demo;
   }
 
   /**
-   * Put a preset in the box, and compile it if the instrument is on.
+   * Put a preset in the box, and compile it if the instrument is already live.
    *
    * 🔴 TWO FUNCTIONS FOR ONE ACTION, AND THE SPLIT IS THE QUEUE. `loadPatch` is
    * what a control calls and it takes a turn on the compile queue; `applyPatch`
@@ -1055,148 +1035,65 @@ effect  = dm.freeverb_demo;
     showSource();
     showPatch(i);
     d.log(`${p.label}: ${p.what}`);
-    if (!powered) return { ok: false, off: true };
+    if (!live()) return { ok: false, off: true };
     return build(p.code, p.label.toLowerCase());
   }
   const loadPatch = (i) => serial(() => applyPatch(i));
 
-  // ── compiling when the typing stops ────────────────────────────────────────
+  // ── the Compile button ─────────────────────────────────────────────────────
   //
-  // See the header: inactivity rather than an interval, and never under a held
-  // note.
-  /** How long the typing has to have stopped. Long enough to cross a pause for
-   *  thought mid-line, short enough that nobody waits for it on purpose. */
-  const AUTO_IDLE_MS = 800;
-  /** And how often it looks again while something is sounding. A re-arm rather
-   *  than a full idle wait, so the new instrument arrives just after the last
-   *  key comes up rather than a second later. */
-  const AUTO_HOLD_MS = 150;
-  /**
-   * 🔴 OFF UNDER `SELFCHECK`, AND THE CHECK BLOCK TURNS IT ON FOR ITS OWN
-   * WINDOW. A compile nobody asked for, landing between an assert and the
-   * reading it is about, grades a page that is not the one on screen.
-   */
-  let autoOn = !SELFCHECK;
-  let autoTimer = 0;
-  /**
-   * 🔴 A COUNTER OF AUTOCOMPILES, WHICH IS NOT `runs` AND NOT A TIMER.
-   * `runs` counts every compile from every road, so an assert reading it could
-   * be satisfied, or broken, by the harness pressing COMPILE at the wrong
-   * moment. This only moves when an autocompile reaches `build`, which is the
-   * far side of every decision this feature makes: the idle wait, the held-note
-   * re-arm and the queue.
-   */
-  let autos = 0;
-  function armAuto() {
-    clearTimeout(autoTimer);
-    if (!autoOn || !powered) return;
-    autoTimer = setTimeout(fireAuto, AUTO_IDLE_MS);
-  }
-  function fireAuto() {
-    if (!autoOn || !powered) return;
-    /* A compile builds a new node and forgets every key, so one that fires
-       under a chord takes the chord away. It waits instead. */
-    if (holding()) { autoTimer = setTimeout(fireAuto, AUTO_HOLD_MS); return; }
-    /* 🔴 THE GUARD IS INSIDE THE QUEUED TASK AND NOT ONLY IN FRONT OF IT, AND
-       IT CAME OFF THE DELETED COMPILE BUTTON ON 2026-09-24. The two tests above
-       stop a compile being STARTED while the instrument is off; neither says
-       anything about one already sitting on the queue when the switch goes off
-       underneath it, which is exactly the order a check runs in. A compile that
-       built a node onto a page saying it was off would be the lying control
-       this project keeps writing rules about.
-       ⚠️ AND IT SITS BEFORE `autos++`, so a refused task does not move the
-       counter every autocompile assert on this page is written against. */
-    serial(async () => {
-      if (!powered) { d.log('FAU went off before the typing settled, so nothing was compiled'); return null; }
-      autos++;
-      return build(source.value(), 'typing');
+  // 🔴 ONE PRESS DOES THE THREE THINGS THAT USED TO BE THREE PRESSES, AND SINCE
+  // 2026-09-26 IT IS THE ONLY ROAD TO A COMPILE. Asked as *"rm fau off button"*
+  // and *"replace it with compile (shimmer). no autocompile"*. The first press
+  // pulls the compiler; every press compiles what is in the box; the first one
+  // that works also looks for a MIDI keyboard. There is no switch and no idle
+  // timer: typing changes the bytes under the box and nothing else, a preset
+  // pick fills the box (and recompiles only if something is already on the
+  // audio thread, because a picker naming a Djembe over an Organ still
+  // sounding would be the lying control this project has a rule about), and
+  // the thread runs what was last compiled until the next press.
+  // ⚠️ THE SHIMMER IS THE KIT'S. `createButtonGroup` sets `data-busy` while a
+  // handler's promise is open, which is the one sweep every working button in
+  // this project wears (`shell.css`, `button[data-busy="1"]`), so a compile
+  // behind a six megabyte fetch is visible for as long as it takes and the
+  // button cannot be pressed twice.
+  // ⚠️ A PRESS UNDER A HELD NOTE TAKES THE NOTE AWAY, and that is the trade the
+  // ask made: the autocompile waited for the key to come up because nobody had
+  // asked for it; a press is somebody asking.
+  // ⚠️ AND IT IS AWAITABLE FROM OUTSIDE through `compileJob`, so a check that
+  // pressed the button and then read the page is not reading it 6 MB early.
+  const live = () => node !== null;
+  let compileJob = Promise.resolve();
+  function pressCompile() {
+    compileJob = serial(async () => {
+      if (!faust) d.log(`the compiler is ${mb(COMPILER_BYTES)} MB and this is the press that pulls it`);
+      const out = await build(source.value(), picked >= 0 ? PRESETS[picked].label.toLowerCase() : 'typing');
+      if (out.ok) startMidi();
+      return out;
     });
+    return compileJob;
   }
-
-  // ── the switch ─────────────────────────────────────────────────────────────
-  //
-  // 🔴 ONE PRESS DOES THE THREE THINGS THAT USED TO BE THREE PRESSES: it pulls
-  // the compiler, compiles what is in the box, and looks for a MIDI keyboard.
-  // ⚠️ AND IT IS AWAITABLE FROM OUTSIDE. `createPresenceButton`'s handler does
-  // not await anything, so the page keeps the promise: a check that pressed the
-  // switch and then read the page would otherwise be reading it 6 MB early.
-  let powered = false;
-  let powerJob = Promise.resolve();
-
-  function togglePower() {
-    powerJob = powered ? powerOff() : powerOn();
-    return powerJob;
-  }
-
-  async function powerOn() {
-    if (powered) return;
-    powered = true;
-    paintPower(true);
-    d.log(`switching on: the compiler is ${mb(COMPILER_BYTES)} MB and this is `
-        + `the press that pulls it`);
-    try {
-      await bootCompiler();
-      await applyPatch(picked >= 0 ? picked : lastPatch);
-      startMidi();
-    } catch (e) {
-      /* A switch that says it is on while nothing arrived is the lying control
-         this project has a rule about, so it goes back off with the reason. */
-      powered = false;
-      paintPower(false);
-      d.log(`switching on failed: ${String(e?.message || e)}`, 'bad');
-    }
-  }
-
-  async function powerOff() {
-    powered = false;
-    clearTimeout(autoTimer);
-    allOff();
-    if (node) {
-      try { node.allNotesOff?.(true); } catch { /* it is going away anyway */ }
-      node.disconnect();
-      node.destroy?.();
-      node = null;
-    }
-    midi?.close();
-    midi = null;
-    paintPower(false);
-    /* 🔴 THE CONTEXT IS LEFT RUNNING ON PURPOSE. Suspending it freezes the
-       analyser, which then keeps handing back the last window it measured, so a
-       check asking "is this silent now" would read the sound that was playing a
-       moment ago and believe it. With nothing connected to the master the
-       context is already silent, and the meter keeps saying so honestly. */
-    d.log('switched off: there is nothing on the audio thread now');
-  }
-
-  function paintPower(on) {
-    power.set(on ? 'online' : 'offline');
-  }
+  const compile = createButtonGroup({
+    buttons: [{ id: 'compile', label: 'Compile', primary: true, onPress: () => pressCompile() }],
+  });
 
   // ── the page ───────────────────────────────────────────────────────────────
   //
   // 🔴 THE INSTRUMENT IS THE KIT'S GLUED PANEL, SINCE 2026-09-26. The text is
   // its picture row, edge to edge by construction, the keys are its keys row,
-  // and the foot is its plate: the name, the power switch after it, the patch
-  // picker at the other end. The name is in the foot because the sketch of
-  // 2026-09-26 puts it there, and `instrument.mjs`'s top-right argument gave
-  // way to it (plans/plan-instrument-audit.md). No page rule is left.
-  // ⚠️ THE SWITCH IS BUILT HERE WITH THE HEADER'S OWN WORDS, so it says `on`
-  // and `off` beside a plate that already says FAU, and its label still names
-  // the instrument for somebody who cannot see the plate.
-  const power = createPresenceButton({
-    of: 'FAU', can: HEADER_STATES, says: HEADER_SAYS, state: 'offline', showName: false,
-    press: () => togglePower(), aria: 'switch FAU on and off',
-  });
+  // and the foot is its plate: the name with the patch picker beside it at the
+  // start, and Compile at the other end (*"align to right, fau stays in
+  // left"*). The name is in the foot because the sketch of 2026-09-26 puts it
+  // there (plans/plan-instrument-audit.md). No page rule is left.
   const panel = createInstrumentPanel({
     viz: source.el,
     keys: keys.el,
-    plate: { name: 'FAU', status: power, patch },
+    plate: { name: 'FAU', status: patch, patch: compile },
   });
   d.el.append(panel.el);
 
   showSource();
-  paintPower(false);
-  d.log(`nothing is fetched until you switch FAU on. That press pulls the Faust `
+  d.log(`nothing is fetched until you press Compile. That press pulls the Faust `
       + `compiler, ${mb(COMPILER_BYTES)} MB, once`);
 
   // ── the picture ────────────────────────────────────────────────────────────
@@ -1300,14 +1197,12 @@ effect  = dm.freeverb_demo;
        Nothing is compiled, no sound device is open, and nobody has been asked
        about a MIDI keyboard. A page that fetched nothing while quietly doing
        the other three would pass the assert above.
-       ⚠️ IT WAS FOUR UNTIL 2026-09-24, and the fourth read
-       `d.button('compile').disabled === true`, which is gone with the button.
-       **The claim it was making is not gone**: that nothing can start a compile
-       on a page nobody switched on is asserted further down, on the autocompile,
-       with the instrument off and `autos` as the witness. It is a better check
-       than the one it replaces, because a `disabled` attribute is a statement
-       about a control and that one is a statement about the road. */
-    d.assert('and a page nobody has switched on compiles nothing, opens no sound device and '
+       ⚠️ IT WAS FOUR UNTIL 2026-09-24, and the fourth read a compile button's
+       `disabled`. **The claim it was making is not gone**: that nothing can
+       start a compile on a page nobody has pressed is asserted further down by
+       typing into the box and counting `runs`, which is a statement about the
+       road rather than about a control. */
+    d.assert('and a page nobody has pressed Compile on compiles nothing, opens no sound device and '
            + 'asks for no MIDI',
       runs === 0 && node === null && ctx === null && midi === null,
       `${runs} compiles, node ${node ? 'built' : 'none'}, audio ${ctx ? 'open' : 'none'}, `
@@ -1351,10 +1246,10 @@ effect  = dm.freeverb_demo;
       const row = rect(panel.plateRow);
       const inset = cs(panel.plateRow, 'paddingLeft');
       const l = +(rect(panel.plate.el).left - row.left).toFixed(1);
-      const rr = +(row.right - rect(patch.el).right).toFixed(1);
-      d.assert('the foot holds the name and the power switch at the start and the patch selector at the other end',
-        Math.abs(l - inset) <= 0.6 && Math.abs(rr - inset) <= 0.6 && rect(power.el).left > rect(panel.plate.el).right,
-        `${l} px in on the left and ${rr} px on the right against an inset of ${inset}, the switch after the name`);
+      const rr = +(row.right - rect(compile.el).right).toFixed(1);
+      d.assert('the foot holds the name and the patch selector at the start and Compile at the other end',
+        Math.abs(l - inset) <= 0.6 && Math.abs(rr - inset) <= 0.6 && rect(patch.el).left > rect(panel.plate.el).right,
+        `${l} px in on the left and ${rr} px on the right against an inset of ${inset}, the picker after the name`);
       const rowsPad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rows-pad'));
       const ink = cs(source.input, 'paddingLeft') + cs(source.input, 'borderLeftWidth');
       d.assert('the first line of code sits on the inset the keys and the foot keep',
@@ -1466,79 +1361,43 @@ effect  = dm.freeverb_demo;
       patchSays() === PRESETS[0].label && picked === 0 && runs === 0,
       `${patchSays()} selected, ${runs} compiles`);
 
-    /* ── the switch, pressed rather than called ────────────────────────────
-       🔴 A REAL CLICK ON THE REAL CONTROL. Calling `powerOn()` would grade the
-       function and say nothing about the button in the panel's footer being
-       wired to it, which is the half a visitor touches. `positron-verify`
-       records a page whose checks went silent the day a control was disabled,
-       and the opposite mistake is this one: a check that never presses.
-       ⚠️ AND IT IS AWAITED THROUGH `powerJob`, because the presence button's
-       own handler does not await anything. Reading the page straight after the
-       click would be reading it 6 MB early. */
-    const beforeOn = runs;
-    power.el.click();
-    await powerJob;
-    d.assert('the switch is the one press that fetches the compiler, compiles the patch in the '
-           + 'box and reaches for MIDI',
-      power.state() === 'online' && node !== null && runs === beforeOn + 1
-        && midi !== null && vendorLoads().length === 4,
-      `${power.state()}, ${runs - beforeOn} compile, MIDI ${midi?.state()}, `
-      + `${vendorLoads().length} vendor files`);
-
-    /* ── the autocompile, and the two things it must never do ──────────────
-       🔴 IT IS SWITCHED ON HERE AND OFF AGAIN, because the default under
-       `SELFCHECK` is off and has to stay off: a compile nobody asked for,
-       landing between an assert and the reading it is about, grades a page that
-       is not the one on screen. This window is the only time it runs in a
-       harness, and it is the only reason the feature is graded at all.
-       ⚠️ MEASURED ON `autos`, WHICH ONLY AN AUTOCOMPILE MOVES. `runs` counts
-       every compile from every road, so a compile arriving in the middle of
-       this from somewhere else would break an assert about a feature it has
-       nothing to do with.
-       ⚠️ THE ROAD THAT USED TO DO THAT WAS A COMPILE PRESS FROM THE HARNESS,
-       AND IT IS GONE SINCE 2026-09-24 WITH THE BUTTON. The separate counter
-       stays: the switch is still a compile `runs` counts, this block still
-       calls `build()` directly, and a counter that is right for one reason and
-       kept for another is cheaper than one that has to be reintroduced. */
-    autoOn = true;
-    const autoBefore = autos;
-    /* Three keystrokes 500 ms apart is 1.2 s of typing, which is longer than
-       `AUTO_IDLE_MS`. An interval would have fired inside it and an idle timer
-       that is not re-armed on every keystroke would have fired too. */
+    /* ── typing compiles nothing, which is the whole of "no autocompile" ────
+       🔴 TWO KEYSTROKES AND A WAIT LONGER THAN ANY IDLE TIMER THIS PAGE EVER
+       HAD. Until 2026-09-26 a compile landed 800 ms after typing stopped and
+       four asserts here graded when it did and did not; asked as *"no
+       autocompile"*, the road is gone, and what is graded now is its absence,
+       on `runs`, driven by a real `input` event rather than a call. */
+    const typedBefore = runs;
     typeInto(`${PRESETS[0].code}\n// one\n`);
     await sleep(500);
     typeInto(`${PRESETS[0].code}\n// one two\n`);
-    await sleep(500);
-    typeInto(`${PRESETS[0].code}\n// one two three\n`);
-    await sleep(200);
-    d.assert('typing does not compile in the middle of a word, however long the typing goes on',
-      autos === autoBefore,
-      `${autos - autoBefore} autocompiles in 1.2 s of typing, past a ${AUTO_IDLE_MS} ms wait`);
-    await sleep(AUTO_IDLE_MS + 400);
-    d.assert('and exactly one compile lands once the typing has stopped',
-      autos === autoBefore + 1, `${autos - autoBefore} autocompile after the keys went quiet`);
+    await sleep(1400);
+    d.assert('typing compiles nothing, however long it goes on and however long it pauses',
+      runs === typedBefore, `${runs - typedBefore} compiles after 1.9 s of typing and waiting`);
 
-    /* 🔴 THE ONE WITH THE TRAP IN IT. A compile builds a whole new
-       `AudioWorkletNode` and calls `pedal.forgetKeys()`, so an autocompile
-       under a held chord takes the chord away, and the visitor's own typing is
-       what caused it. */
-    const heldBefore = autos;
-    press(60, 100);
-    await sleep(120);
-    const heldLevel = level();
-    typeInto(`${PRESETS[0].code}\n// typed while a key was down\n`);
-    await sleep(AUTO_IDLE_MS + 400);
-    d.assert('an autocompile waits while a note is being held, because building a new node '
-           + 'takes the note away',
-      autos === heldBefore && level() > heldLevel * 0.5,
-      `${autos - heldBefore} autocompiles, ${heldLevel.toFixed(5)} held, `
-      + `${level().toFixed(5)} still sounding`);
-    lift(60);
-    await sleep(AUTO_HOLD_MS + 600);
-    d.assert('and it lands as soon as the key comes up, rather than waiting out another silence',
-      autos === heldBefore + 1, `${autos - heldBefore} autocompile after the key came up`);
-    autoOn = false;
-    clearTimeout(autoTimer);
+    /* ── Compile, pressed rather than called ───────────────────────────────
+       🔴 A REAL CLICK ON THE REAL CONTROL. Calling `pressCompile()` would grade
+       the function and say nothing about the button in the panel's foot being
+       wired to it, which is the half a visitor touches. `positron-verify`
+       records a page whose checks went silent the day a control was disabled,
+       and the opposite mistake is this one: a check that never presses.
+       ⚠️ THE SHIMMER IS READ WHILE THE PRESS IS OPEN, off the attribute the
+       stylesheet keys the sweep on, because a button that compiled without
+       saying so is the silent control this project has a rule about. The press
+       is then awaited through `compileJob`, because reading the page straight
+       after the click would be reading it 6 MB early. */
+    const beforePress = runs;
+    const btn = compile.button('compile');
+    btn.click();
+    const sweptWhileBusy = btn.dataset.busy === '1' && btn.disabled;
+    await compileJob;
+    d.assert('Compile is the one press that fetches the compiler, compiles what is in the box and '
+           + 'reaches for MIDI',
+      node !== null && runs === beforePress + 1 && midi !== null && vendorLoads().length === 4,
+      `${runs - beforePress} compile, MIDI ${midi?.state()}, ${vendorLoads().length} vendor files`);
+    d.assert('and the button wears the kit\'s busy sweep for as long as the compile takes, then gives it back',
+      sweptWhileBusy && btn.dataset.busy === undefined && !btn.disabled,
+      `busy ${sweptWhileBusy ? 'while the compiler arrived' : 'never set'}, clear after`);
 
     /* ── from here on it costs the compiler, and it is ONE task on the queue ──
        🔴 EVERYTHING BELOW RUNS INSIDE `serial`, AND NOT ONE `serial` PER
@@ -1758,54 +1617,29 @@ effect  = dm.freeverb_demo;
     showPatch(0);
     });
 
-    /* ── switching it off, which is the negative control for switching it on ──
-       🔴 OUTSIDE THE QUEUE, because `powerOff` is not a queued task and a check
-       that waited for one from inside another would deadlock.
-       ⚠️ THIS PARAGRAPH USED TO SAY WHAT KEPT IT SAFE FROM THE HARNESS'S OWN
-       COMPILE PRESS, and since 2026-09-24 there is no such press: the row is
-       empty and the page has no controls. What is left of that argument is the
-       part that was always the real one, which is that the guard lives inside
-       the queued task rather than on any control. */
-    power.el.click();
-    await powerJob;
-    press(60, 100);
-    await sleep(400);
-    d.assert('switching it off takes the instrument off the audio thread, and then a key does '
-           + 'nothing at all',
-      power.state() === 'offline' && node === null && midi === null && level() < 0.002,
-      `${power.state()}, node ${node ? 'still built' : 'gone'}, `
-      + `${level().toFixed(5)} after pressing a key`);
-
-    /* 🔴 AND TYPING INTO AN INSTRUMENT THAT IS OFF COMPILES NOTHING, WHICH IS
-       THE CLAIM THE DELETED COMPILE BUTTON USED TO CARRY. Three asserts read
-       that button's `disabled` attribute as evidence that nothing could start a
-       compile on a page nobody had switched on. A `disabled` attribute is a
-       statement about one control; this is a statement about the only road that
-       is left, measured on the far side of every guard on it.
-       ⚠️ TWO ASSERTS RATHER THAN ONE, AND THE REASON IS THE HARNESS. A check
-       block that waits longer than three quiet polls without asserting is cut
-       off and everything after it is lost while the run stays green, which is
-       LESSONS #113 and cost /muta/ two checks. The full idle wait plus a margin
-       is longer than that, so it is split at 500 ms and each half says
-       something true on its own: first that the timer has not fired early, then
-       that it never fires at all. */
-    const offBefore = { autos, runs };
-    autoOn = true;
-    typeInto(`${PRESETS[0].code}\n// typed with the instrument off\n`);
+    /* ── and typing into a LIVE instrument compiles nothing either ──────────
+       🔴 THE STRONGER HALF OF "no autocompile". The assert before the press
+       typed into an instrument with nothing on the audio thread, where the old
+       timer would have refused anyway; this one types into the compiled Organ,
+       which is exactly where a compile used to land 800 ms later, and reads
+       the thread as well as the counter: the node object must be the same one.
+       ⚠️ SPLIT AT 500 ms FOR THE HARNESS. A check block that waits longer than
+       three quiet polls without asserting is cut off and everything after it is
+       lost while the run stays green, which is LESSONS #113 and cost /muta/ two
+       checks. */
+    const liveBefore = { runs, node };
+    typeInto(`${PRESETS[0].code}\n// typed into a live instrument\n`);
     await sleep(500);
-    d.assert('typing on an instrument that is off does not compile inside the idle wait',
-      autos === offBefore.autos && runs === offBefore.runs,
-      `${autos - offBefore.autos} autocompiles and ${runs - offBefore.runs} compiles `
-      + `${AUTO_IDLE_MS - 500} ms before the wait is even up`);
-    await sleep(AUTO_IDLE_MS - 200);
-    d.assert('and the wait passes with nothing compiled, because an autocompile on an instrument '
-           + 'that is off has nowhere to land',
-      autos === offBefore.autos && runs === offBefore.runs && node === null,
-      `${autos - offBefore.autos} autocompiles, ${runs - offBefore.runs} compiles and `
-      + `${node ? 'a node on the thread' : 'nothing on the audio thread'} past a `
-      + `${AUTO_IDLE_MS} ms wait`);
-    autoOn = false;
-    clearTimeout(autoTimer);
+    d.assert('typing into a live instrument does not compile inside what used to be the idle wait',
+      runs === liveBefore.runs && node === liveBefore.node,
+      `${runs - liveBefore.runs} compiles at 500 ms, the same node on the thread`);
+    await sleep(900);
+    d.assert('and past it nothing has compiled either, so the thread runs what was last pressed',
+      runs === liveBefore.runs && node === liveBefore.node,
+      `${runs - liveBefore.runs} compiles at 1.4 s, the same node on the thread`);
+    source.set(PRESETS[0].code);
+    showSource();
+    showPatch(0);
 
     /* 🔴 EVERY CELL HAS MOVED BY NOW OR ONE OF THEM IS A CONSTANT. This is the
        only assert on the page that can say a readout row is worth looking at,
@@ -1817,10 +1651,8 @@ effect  = dm.freeverb_demo;
       stuck.length === 0,
       [...moved].map(([k, seen]) => `${k} ${seen.size}`).join(', '));
 
-    /* And back on, so a person opening this page with the checks running finds
-       an instrument rather than the wreckage of one. */
-    power.el.click();
-    await powerJob;
+    /* The instrument is left live with the Organ on the thread, which is what a
+       person opening this page with the checks running should find. */
   }
 
   ifSelfcheck(checks, { log: d.log,
