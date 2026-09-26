@@ -145,10 +145,11 @@
      title and the facts beside it. The picture is plain, nothing drawn over
      it and no ground under the row (asked 2026-09-26: "i asked just to use
      event images, not overlay anything ... unneccessary backgrounds"). Rows
-     are separated by space alone, two steps above the gaps inside a row
-     (positron-compose §1, §4); every title starts on one x because the
-     picture column is one width for the whole list */
-  .events { display: grid; row-gap: var(--eccm-s-8); max-inline-size: 60rem; }
+     are separated by space alone, three steps above the gaps inside a row
+     (positron-compose §1, §4; asked 2026-09-26 "it sould be light, airy, good
+     type stuff", and start with too much); every title starts on one x
+     because the picture column is one width for the whole list */
+  .events { display: grid; row-gap: var(--eccm-s-12); max-inline-size: 60rem; }
   .ev {
     display: grid; grid-template-columns: var(--eccm-pic-w) minmax(0, 1fr);
     column-gap: var(--eccm-s-6); align-items: start;
@@ -185,14 +186,16 @@
   .facts a + a { margin-inline-start: var(--eccm-s-3); }
   /* the picture at the measure, its shape reserved from its own pixels so
      nothing moves while it arrives, never wider than the prose under it */
-  .event-pic { max-inline-size: var(--eccm-measure); margin-block: var(--eccm-s-12); }
+  .event-pic { max-inline-size: var(--eccm-measure); margin-block: 2lh; }
   .event-pic img { inline-size: 100%; aspect-ratio: 900 / 599; object-fit: cover; }
   .event-pic figcaption { margin-block-start: var(--eccm-s-2); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
-  /* prose flow: the owl, one leading between paragraphs, a heading carries
-     more air above it than below (compose §1 on why the Stack is the owl) */
-  .flow > * + * { margin-block-start: var(--eccm-flow, 1em); }
-  .flow > h2 { --eccm-flow: 2.5em; font-size: var(--eccm-t-l); }
-  .flow > h2 + * { --eccm-flow: 0.75em; }
+  /* prose flow: the owl, and the space is counted in the leading, Rutter's
+     one line between paragraphs and a heading carrying two above and half a
+     line below (eccm-ui §1, Bringhurst 2.2.2). The first cut said one leading
+     and set 1em, which is 18 px against a 27 px line; 1lh is the line */
+  .flow > * + * { margin-block-start: var(--eccm-flow, 1lh); }
+  .flow > h2 { --eccm-flow: 2lh; font-size: var(--eccm-t-l); }
+  .flow > h2 + * { --eccm-flow: 0.5lh; }
   .credits { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--eccm-s-6); row-gap: var(--eccm-s-1); }
   .credits dt { color: var(--eccm-ink-2); }
   .small { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
