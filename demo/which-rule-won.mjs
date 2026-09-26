@@ -2,7 +2,7 @@
 // THAT WAS MADE FOR IT, WHERE EACH CAME FROM, AND WHICH ONE WON.
 //
 //   node demo/which-rule-won.mjs kit '.pos-rows-r' padding-left
-//   node demo/which-rule-won.mjs nola '.panel-plate' padding-top --width 390
+//   node demo/which-rule-won.mjs nola '.panel-plate' padding-top --width 375
 //   node demo/which-rule-won.mjs fau '.fau-src textarea' padding-top --base https://positron.studio
 //
 // 🔴 IT EXISTS BECAUSE THIRTY CASCADE INCIDENTS IN THIS REPOSITORY WERE FOUND BY
@@ -143,7 +143,7 @@ if (WIDTH) {
   // asked OF the phone layout. A media block that only applies at 390 px has no
   // answer at 756.
   const mobile = WIDTH <= 560;
-  await S('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: 900, deviceScaleFactor: mobile ? 2 : 1, mobile });
+  await S('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: mobile ? 812 : 900, deviceScaleFactor: mobile ? 3 : 1, mobile });  // the phone is an iPhone mini, as in shot.mjs
 }
 await S('Page.navigate', { url: `${BASE}/${slug}/` });
 await sleep(WAIT);

@@ -2,7 +2,7 @@
 // ANCESTOR, ONE PROPERTY'S VALUE, ITS RECT, AND WHICH KIND OF CONTEXT IT MAKES.
 //
 //   node demo/ancestry.mjs fau '.fau-src textarea' padding-left
-//   node demo/ancestry.mjs nola '.panel-plate' padding-top --width 390
+//   node demo/ancestry.mjs nola '.panel-plate' padding-top --width 375
 //
 // 🔴 IT EXISTS BECAUSE *"edge to edge"* WAS ANSWERED BY ZEROING THREE INSETS
 // AND ASKED AGAIN THE NEXT DAY BECAUSE THERE WERE FOUR. The fourth was
@@ -97,7 +97,7 @@ await S('Page.enable');
 await S('Runtime.enable');
 if (WIDTH) {
   const mobile = WIDTH <= 560;
-  await S('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: 900, deviceScaleFactor: mobile ? 2 : 1, mobile });
+  await S('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: mobile ? 812 : 900, deviceScaleFactor: mobile ? 3 : 1, mobile });  // the phone is an iPhone mini, as in shot.mjs
 }
 await S('Page.navigate', { url: `${BASE}/${slug}/` });
 await sleep(WAIT);

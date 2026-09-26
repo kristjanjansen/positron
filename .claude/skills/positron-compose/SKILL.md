@@ -36,9 +36,13 @@ cheapest form"*. **Alignment is where both get reported.** Nobody ever reported
 
 ## 0. Before touching anything: look, then read the report for its verb
 
-🔴 **LOOK AT IT AT 390 PX BEFORE SAYING IT IS DONE. THEN AT 1280.**
-`node demo/shot.mjs <slug> 390 1280` exists since 2026-09-26 and prints
-sideways overflow with every shot. It exists because this project could not see
+🔴 **LOOK AT IT ON AN IPHONE MINI BEFORE SAYING IT IS DONE. THEN AT 1280.**
+`node demo/shot.mjs <slug> 375 1280` exists since 2026-09-26 and prints
+sideways overflow with every shot. **The phone is 375 by 812 at 3x**, instructed
+the same day as *"use iphone mini size for mob testing"*: the narrowest current
+iPhone, so what fits it fits every iPhone. The measurements below that say 390
+were taken before that instruction, at the 12 through 16's width, and are kept
+as what they measured. It exists because this project could not see
 its own phone layouts and had written that down in three places as a fact about
 the harness rather than as a thing to fix. The first six phone shots ever taken
 of this site found five kinds of defect that had been there for weeks, all

@@ -1,7 +1,7 @@
 // demo/shot.mjs — LOOK AT A PAGE AT A WIDTH. One command, one picture per width.
 //
-//   node demo/shot.mjs kit                      # 390, 768 and 1280
-//   node demo/shot.mjs kit 390                  # just the phone
+//   node demo/shot.mjs kit                      # 375, 768 and 1280: an iPhone mini, an iPad, the desk
+//   node demo/shot.mjs kit 375                  # just the phone
 //   node demo/shot.mjs kit --hash instrument-panel
 //   node demo/shot.mjs kit --base https://positron.studio
 //   node demo/shot.mjs kit --clip 2400          # stop the capture 2400 px down
@@ -53,15 +53,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * 🔴 THREE WIDTHS, AND THEY ARE MEASUREMENTS OF REAL SCREENS RATHER THAN ROUND
- * NUMBERS. 390 is an iPhone 12 through 16 and is the commonest phone width
- * there is; `shell.css` already records a defect that showed at exactly 390 and
- * another at 360, which is an ordinary Android. 768 is an iPad portrait, which
- * is where a two column layout has to decide what it is. 1280 is the desk.
- * ⚠️ **AND 390 IS NOT THE NARROWEST THING THAT EXISTS.** 360 is, and this file
- * takes any width as an argument so the next report can be reproduced at the
+ * NUMBERS. **The phone is an iPhone mini: 375 by 812 CSS px at 3x.** Instructed
+ * 2026-09-26: *"use iphone mini size for mob testing"*. It is the narrowest
+ * current iPhone, so a layout that fits it fits every iPhone, and it is narrower
+ * than the 390 this file shipped with, which is the 12 through 16 and which the
+ * first six shots were taken at. 768 is an iPad portrait, where a two column
+ * layout has to decide what it is. 1280 is the desk.
+ * ⚠️ **AND 375 IS NOT THE NARROWEST THING THAT EXISTS.** 360 is, an ordinary
+ * Android, and `shell.css` records a defect that showed at exactly that width.
+ * This file takes any width as an argument so a report can be reproduced at the
  * width it was reported at rather than at the nearest one this list has.
  */
-const WIDTHS = [390, 768, 1280];
+const WIDTHS = [375, 768, 1280];
+/** The mini's own height and density, so a phone shot is a shot of a phone. */
+const PHONE = { height: 812, dpr: 3 };
 
 const argv = process.argv.slice(2);
 const flag = (name, fallback = null) => {
@@ -143,13 +148,15 @@ for (const w of (widths.length ? widths : WIDTHS)) {
    * visual viewport that can differ from the layout one, and it reports touch.
    * A narrow window on a desk is a different rendering and has never been the
    * thing being asked about.
-   * ⚠️ **AND `deviceScaleFactor` IS 2 ON THE PHONE**, so a hairline seam is
-   * captured at the density it is actually drawn at. A 1 px line on a 1x shot
-   * of a 2x screen is the one thing a picture cannot show honestly.
+   * ⚠️ **AND `deviceScaleFactor` IS 3 ON THE PHONE, THE MINI'S OWN**, so a
+   * hairline seam is captured at the density it is actually drawn at. A 1 px
+   * line on a 1x shot of a 3x screen is the one thing a picture cannot show
+   * honestly, and the line-width snapping rule is different at 3 (exact) from
+   * 1.5 (rounds down), so the density is part of the measurement.
    */
   const mobile = w <= 560;
   await S('Emulation.setDeviceMetricsOverride', {
-    width: w, height: 900, deviceScaleFactor: mobile ? 2 : 1, mobile,
+    width: w, height: mobile ? PHONE.height : 900, deviceScaleFactor: mobile ? PHONE.dpr : 1, mobile,
   });
   // ⚠️ `maxTouchPoints` ONLY WHEN ENABLING. CDP refuses 0 with "Touch points must
   // be between 1 and 16", so a desktop pass that sends it dies after the phone
