@@ -1,6 +1,8 @@
 ## Open
 
-### Open 2026-09-26: audit the instruments against positron-compose, pick one, propose
+### Done 2026-09-26: the instrument audit, `plans/plan-instrument-audit.md`, reported in full
+
+✅ The pick is `/fau/`; two shared changes come first (the field reads the three tokens; the plate row takes a control at each end); every defect the five phone shots show is in a shared component. Proposed only, nothing changed.
 
 ⚠️ **ASKED, VERBATIM, MID-TASK, HANDED TO A BACKGROUND AGENT:** *"now audit all
 instruments in bg to the new rules we make. pick one. do not do anything just
