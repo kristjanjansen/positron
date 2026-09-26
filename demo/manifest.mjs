@@ -933,6 +933,14 @@ export const DEMOS = [
     one: 'what visitors wrote into the box beside every demo title',
     tags: ['DO', 'WS', 'relay'] },
 
+  // A reading site in a type system of its own, sharing nothing with shell.css
+  // (plans/plan-eccm-design.md §E). `unlisted`, because it is a demo of a
+  // design for somebody else's site rather than one of positron's own; graded
+  // like any other, and its `__demo` is its own ten lines.
+  { name: 'eccm', group: 'kit', act: 0, created: '2026-09-26', built: true, unlisted: true,
+    one: 'a reading site for a contemporary music centre, in a type system of its own',
+    tags: ['typography'] },
+
   // ── pages that are not shelled demos, but are the point of the whole rig ──
   //
   // Both live outside demo/, so `built` stays false — it means "a shelled page

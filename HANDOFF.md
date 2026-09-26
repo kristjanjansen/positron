@@ -30,6 +30,11 @@ panel marks its patch line and the stylesheet stops shouting it; kit 245/245.
 REPORTED IN FULL**: the design (stock Cassiopeia, no font served, a JPEG logo,
 a dark-on-white system of one family) and the setup (its own private repository,
 `eccm.positron.studio`, staging here and production on ECCM's account).
+✅ **`/eccm/` EXISTS, UNLISTED, AS THE FIRST TYPOGRAPHY DEMO** (asked *"Can we
+do minimal eccm demo in positron demo for starters"*): `demo/eccm/` with its own
+stylesheet, nothing from `shell/`, Plex Sans vendored, ten real events, eight
+asserts of its own. Next on it: an event page, EN, the logo redraw, and a look
+on a Windows machine.
 ⚠️ **THE DESIGN AGENT WROTE `plans/plan-eccm-design.md`** (typography, the
 logo, a small design system, against `positron-compose`).
 ✅ **`plans/plan-eccm-cms.md` GAINED §5 THE RADA7 SHAPE, §8 DRAFTS, PASTE, DATES,

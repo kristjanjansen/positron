@@ -323,6 +323,15 @@ const FILES = [
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
+  // ── the typeface `/eccm/` is set in, vendored ──────────────────────────────
+  // Same reasoning as the pair above: a font is not an import and `.woff2` is
+  // not in `demoFiles()`'s set, so it is listed by name. Two files because
+  // Estonian is split across two subsets (Š Ž in latin-ext), one variable
+  // weight axis each. LICENCE: SIL OFL 1.1, IBM Plex, beside them.
+  ['demo/eccm/vendor/plex-sans-latin.woff2', 'eccm/vendor/plex-sans-latin.woff2'],
+  ['demo/eccm/vendor/plex-sans-latin-ext.woff2', 'eccm/vendor/plex-sans-latin-ext.woff2'],
+  ['demo/eccm/vendor/LICENSE-ibm-plex-sans', 'eccm/vendor/LICENSE-ibm-plex-sans'],
+
   // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
   //
   // ⚠️ LISTED BY NAME FOR THE THIRD REASON IN A ROW AND IT IS THE SAME ONE:

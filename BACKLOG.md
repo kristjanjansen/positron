@@ -12,6 +12,20 @@ composites a translucent dot, and each of those is a fact a row would have to
 respect on purpose.
 
 
+### Done 2026-09-26: a minimal eccm demo under `demo/eccm/`, for starters
+
+✅ `https://positron.studio/eccm/`: one static page, `eccm.css` with `@layer` and the §D tokens, IBM Plex Sans as two variable files (latin 40 KB, latin-ext 26 KB, OFL beside them) listed by name in `build.mjs`, the ten events off the scanned front page in sentence case, the seven menu items and ET/EN as text, a text wordmark that scales, an events grid whose rows are subgrids, and eight asserts of its own (own origin only, no sideways drag, both subsets loaded, nothing under 14 px, every title on one x, 45 to 75 ch, header under a quarter of a phone, every link underlined). The two phone shots of eccm.ee that arrived meanwhile (*"Its not good looking"*, *"Logo does not scale"*) are what §B measured and what this page answers. Not built: an event page, EN, the logo redraw, `events.json` (the rows are static HTML, one source rather than two).
+
+⚠️ **ASKED, VERBATIM:** *"Can we do minimal eccm demo in positron demo for
+starters"*. Per `plans/plan-eccm-design.md` §E: `demo/eccm/index.html` with its
+own `eccm.css` and nothing from `demo/shell/`, the tokens and the event list
+from §D, a dozen real events from the scan in `events.json` (no request to
+eccm.ee from the page), IBM Plex Sans 400 and 600 self-hosted with `latin` plus
+`latin-ext`, a manifest row `built: true, unlisted: true`, and its own
+`window.__demo` so `verify.mjs` grades it. `.woff2` is not in `build.mjs`'s
+allowlist and has to be added by name. Handed over as
+`https://positron.studio/eccm/`.
+
 ### Done 2026-09-26: patch names are always sentence cased
 
 ✅ Landed: `createInstrumentPanel` marks its patch line `panel-plate-patch`, `shell.css` sets that line's transform to none after the plate's uppercase rule at the same weight, the kit's specimens now type `Rhodes Mk I`, `Wurlitzer 200A`, `Spring reverb` and `Sixteen`, and one kit assert reads it off `shown()`: `NOLA over Rhodes Mk I, the patch line's transform none`. Kit 245/245. The rule is in `positron-ui` as *A patch name is shown as it was written*.
