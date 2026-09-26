@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Muuda sündmust. ECCM</title>
+<!-- demo/eccm/edit.html: the edit form for one event, HTML only, in the eccm
+     system: native fields with visible labels, datetime-local for the dates,
+     a textarea for the prose with a blank line between paragraphs, and a
+     drop field for the picture beside the current one: the native file input
+     lies over the whole field, so a drop or a click anywhere on it lands on
+     the control with no script (what script would add is a highlight while a
+     file is dragged over it). Nothing is
+     saved anywhere and the page says so; Salvesta submits to the event page
+     with GET so the form is exercised and nothing is written. What the real
+     editing surface does behind this is plans/plan-eccm-cms.md §8. -->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./eccm.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="frame">
+    <a class="mark" href="./"><img src="./logo.svg" width="310" height="147" alt="ECCM, Eesti Nüüdismuusika Keskus"></a>
+    <span class="lang"><span aria-current="page" lang="et">ET</span><a href="https://eccm.ee/index.php/en/" lang="en">EN</a></span>
+  </div>
+</header>
+<nav class="site-nav" aria-label="Menüü">
+  <div class="frame">
+    <ul class="nav">
+      <li><a href="./">Avaleht</a></li>
+      <li><a href="https://eccm.ee/index.php/et/eccm">ECCM</a></li>
+      <li><a href="https://eccm.ee/index.php/et/tallinn-1965">Tallinn 1965</a></li>
+      <li><a href="https://eccm.ee/nan/">NAN</a></li>
+      <li><a href="https://eccm.ee/index.php/et/ulysses">Ulysses</a></li>
+      <li><a href="https://eccm.ee/index.php/et/konkursid">Konkursid</a></li>
+      <li><a href="https://eccm.ee/index.php/et/syndmusest">Sündmused</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="frame">
+  <p class="crumb"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine</a></p>
+  <h1>Muuda sündmust</h1>
+  <p class="note">Kujunduse proov: see vorm ei salvesta midagi.</p>
+
+  <form class="form" action="./event.html" method="get">
+    <div class="field">
+      <label for="f-title">Pealkiri</label>
+      <input id="f-title" name="title" value="Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa" required>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="f-start">Algus</label>
+        <input id="f-start" name="start" type="datetime-local" value="2026-09-30T19:00" required>
+      </div>
+      <div class="field">
+        <label for="f-end">Lõpp</label>
+        <input id="f-end" name="end" type="datetime-local" value="2026-09-30T20:00">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="f-venue">Koht</label>
+        <input id="f-venue" name="venue" value="ECCM saal">
+      </div>
+      <div class="field">
+        <label for="f-address">Aadress</label>
+        <input id="f-address" name="address" value="Herne 11A, 10135 Tallinn">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="f-organiser">Korraldaja</label>
+        <input id="f-organiser" name="organiser" value="Eesti Nüüdismuusika Keskus">
+      </div>
+      <div class="field">
+        <label for="f-category">Kategooria</label>
+        <select id="f-category" name="category">
+          <option>ECCM</option>
+          <option>Improtest</option>
+          <option>Schönbergi ühing</option>
+          <option>TUMA</option>
+          <option>U:</option>
+          <option selected>Ulysses</option>
+          <option>festival</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="f-tickets">Piletid</label>
+      <input id="f-tickets" name="tickets" type="url" value="https://fienta.com/et/gestuurid-situatsioonid-ilma-partituurita-kuulamine-marianna-liik-artjom-astrov-maryn-liis-ruutelmaa">
+    </div>
+    <div class="field">
+      <label for="f-summary">Lühikirjeldus</label>
+      <textarea id="f-summary" name="summary" rows="2">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</textarea>
+      <p class="hint">Üks lause. Nimekirjas pealkirja all.</p>
+    </div>
+    <div class="field">
+      <label for="f-body">Kirjeldus</label>
+      <textarea id="f-body" name="body" rows="24">Gestuurid/situatsioonid: ilma partituurita kuulamine on sündinud soovist mõtestada praegust aegruumi ja selle vajadusi ning nihutades lühiaktsioonide žesti keskme heliloominguga seotud kogukonna konteksti. Selle tulemusel kutsub Eesti Nüüdismuusika Keskus igaks aktsiooniks kaks erinevat heliloomingu ja interpretatsiooniga tegelevat professionaalset loojat oma keskusesse ja annab neile vabad käed. Uue komponendina kutsutakse igasse gestuuri/situatsiooni ka kolmas kunstnik mõnest teisest praktikast või loomevaldkonnast, tuues protsessi teistsuguse pagasi, kehalisuse või ruumitaju. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider. Kahte esimesse aktsiooni kaasatud heliloojad ja etenduskunstnikud on: Marianna Liik, Liisa Hõbepappel, Artjom Astrov, Kenn-Eerik Kannike, Liis Vares ja Maryn-Liis Rüütelmaa.
+
+Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul.
+
+Gestuurid/situatsioonid ei ole koostööformaat, vaid riskantne olukord. See loob situatsioone, kus heli ei ole komponeeritud, vaid tekib selle tagajärjel, et kehad püüavad kooskõlastada oma tegevust ilma kokkuleppeta.
+
+Gestuurid/situatsioonid: kuulamine ilma partituurita pakub välja pigem probleemi kui formaadi.
+
+See loob situatsioone, milles heli ei ole komponeeritud, vaid tekib tagajärjena kehade püüdlustele koordineeruda ilma kokkuleppeta.
+
+Puudub partituur, ühine keel ja kohustus jõuda teoseni.
+
+Projekt on üles ehitatud minimaalsele kolme osaleja kooslusele ning žestide kogumile, mis toimivad üleminekuoperaatoritena.
+
+Neid žeste ei saa korrata ega optimeerida; need tähistavad pigem läve kui tegevusi.
+
+Kuulamist käsitletakse seisundi, mitte oskusena.
+
+Viivitus, arusaamatus, väsimus ja vaikus ei ole katkestused, vaid struktuursed elemendid, mis korraldavad kogu välja.
+
+Olukord käivitatakse ning seejärel lastakse sellel autonoomselt areneda.
+
+Koreograafia ei seisne heli ja liikumise organiseerimises, vaid koordineerimise enese ebastabiilsuses.
+
+Tulemus ei ole etendus, vaid jääk, jälg sellest, et oldi kohal lahendamata probleemi sees.
+
+Gestuurid/situatsioonid: kuulamine ilma partituurita ei püüa muusikat ümber defineerida.
+
+See hoiab muusikalise keele peatatud olekus, et uurida tingimusi, milles heli saab üldse veel aset leida.
+
+Gestuurid/situatsioonid toimib kaasaskantava struktuurina, mitte lokaalse väljendusvormina.
+
+Iga iteratsioon aktiveerib sama probleemi erinevas kontekstis.
+
+Projekt ei tõlgi kultuure, see asetab need surve alla.
+
+## 5 gestuurist gestuuride/situatsioonideni
+
+Tegemist on edasiarendusega elektron.art kunstisaalis toimunud „5 gestuuri“ aktsioonidele, mille raames kohtusid aastatel 2023 kuni 2025 kunstnike duod: Claudia Lepik, Maxim Mjödov, Sveta Grigorjeva, Mikhail Pashchuk, Raul Keller, Kärt Koppel, Laivi Suurväli, Krõõt Juurak, Marta Vaarik, Gregor Kulla, Jaan Evart, Hendrik Kaljujärv, Riina Maidre, Marto Mägi, Kymbali Williams, Liisamari Viik, Viktoria Martjanova, Maxim Nikanorov, Kitty Florentine, Grete Rattasepp ja Arolin Raudva. Kokku toimus 11 „5 gestuuri“ lühiaktsiooni, nendest viimane koostöös SAAL Biennaal festivaliga. Eelnevatest gestuuridest jäid kõlama küsimused, mis kanduvad edasi eelootavatesse gestuuridesse/situatsioonidesse. Milline žest on võimalik seal, kus vormid on ette määratud ja ressursid piiratud? Milliseid tingimusi on vaja, et võiks sündida midagi uut?
+
+Toimunud aktsioonide põhjal sai selgeks, et sellest on kujunenud püsiv, kuid avatud žestide formaat. Hoitud vorm, mis võib ikka uuesti esile kerkida, kui tekib ruum, vajadus ja kuulaja.
+
+## Alissa Šnaider
+
+Alissa Šnaider on kunstnik, koreograaf, dramaturg ja kuraator, kes tegutseb nii etenduskunstide kui visuaalkunsti valdkonnas.
+
+Tema looming hõlmab nii koreograafiat, lavastamist, fotograafiat kui ka kirjutamist. Oma praktikas käsitleb ta žesti mitte pelgalt väljendusvahendina, vaid tegevusena, mis konfigureerib tähelepanu, aja ja kehade vahelisi suhteid. Selle asemel, et luua kindlaid vorme, tekitab ta olukordi, milles kohalolu, viivitus, nihestatus ja haavatavus jäävad aktiivseteks seisunditeks.
+
+Alissa on aktsioonidesarja „Gestuurid/situatsioonid“ algataja ning käesoleva versiooni puhul on tegemist algse gestuuride formaadi edasiarendusega, mille raames luuakse performatiivseid olukordi, mille keskmes on risk, mittekoordineeritud olek ja kuulamine. Projekt toimib teisaldatava struktuurina, mida aktiveerivad erinevad osalejate kooslused ja nende kontekstispetsiifilised žestid.
+
+Tema visuaalne looming laiendab neid olukordi, käsitledes pilte pigem tegevuse jäägina kui kujutistena. Kirjutamine toimib tema loomingus väljendus- ja sekkumisvahendina, saates protsesse ilma neid stabiliseerimata.
+
+Ta tegutseb rahvusvaheliselt nii kunsti-, kuraatori- kui ka dramaturgilistes kontekstides. https://www.snaider.ee/2
+
+## Tegijad
+
+Kunstnikud: Marianna Liik, Liisa Hõbepappel, Artjom Astrov, Kenn-Eerik Kannike, Liis Vares, Maryn-Liis Rüütelmaa
+Dramaturg: Alissa Šnaider
+Graafiline disain: Jaan Evart
+Loovkommunikatsioon: Maria Solei Järvet
+Kaasprodutsent: Maria Hansar, Eesti Nüüdismuusika Keskus
+Projektijuht: Annika Üprus
+Toetajad: Eesti Kultuurkapital, Tallinna linn, Ulysses platvorm
+Kestus: 60 min
+
+Kaasrahastatud Euroopa Liidu poolt. Avaldatud seisukohad ja arvamused on ainult autorite omad ega pruugi kajastada Euroopa Liidu või Euroopa Hariduse ja Kultuuri Rakendusameti (EACEA) seisukohti ja arvamusi. Euroopa Liit ega EACEA nende eest ei vastuta.</textarea>
+      <p class="hint">Tühi rida alustab uut lõiku, rida algusega ## on vahepealkiri.</p>
+    </div>
+    <div class="field">
+      <span class="field-name">Pilt</span>
+      <div class="drop">
+        <img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt="the current picture">
+        <label class="drop-zone" for="f-picture">
+          <input id="f-picture" name="picture" type="file" accept="image/*">
+          <span class="drop-say"><b>Lohista uus pilt siia</b> või vali fail</span>
+          <span class="hint">JPEG või PNG, vähemalt 900 px lai. Praegune pilt jääb, kui uut ei vali.</span>
+        </label>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-pri" type="submit">Salvesta</button>
+      <a class="btn" href="./event.html">Loobu</a>
+    </div>
+  </form>
+</main>
+
+<footer class="frame site-foot">
+  <span>Eesti Nüüdismuusika Keskus, Herne 11A, 10135 Tallinn</span>
+  <span><a href="./">Tulevased üritused</a></span>
+  <span>Kujunduse proov: sisu on eccm.ee oma seisuga 26.09.2026.</span>
+</footer>
+</body>
+</html>

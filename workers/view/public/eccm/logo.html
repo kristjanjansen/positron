@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ECCM logo: serveeritud ja ümber joonistatud</title>
+<!-- demo/eccm/logo.html: the logo test page. eccm.ee serves one picture of
+     its mark, a 381 by 199 JPEG (./eccm_tallinn_logod_72dpi_no_tln.jpg, read
+     2026-09-26) and no vector anywhere; ./logo.svg is an interim redraw
+     measured off that JPEG row by row. This page puts the two side by side,
+     on top of each other, at twice the size, at the sizes the site shows
+     them, and sets the tagline in every condensed face this machine has so
+     the face can be picked by eye. It shares eccm.css with the front page and
+     imports nothing from demo/shell/. Not graded by verify.mjs, which opens
+     index.html per slug; node demo/shot.mjs takes a slug too, so look at this
+     one in a browser. -->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./eccm.css">
+<style>
+  @layer page {
+    /* flow: one owl inside a section, one gap between sections, nothing typed
+       per pair (positron-compose §1, the owl for vertical flow) */
+    h2 { font-size: var(--eccm-t-xl); }
+    main > section { margin-block-start: var(--eccm-s-16); }
+    section > * + * { margin-block-start: var(--eccm-s-4); }
+    .fig-grid { display: grid; gap: var(--eccm-s-8) var(--eccm-s-6); grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); }
+    figcaption { margin-block-start: var(--eccm-s-2); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
+    /* the JPEG and the SVG in one box, so the redraw sits on the picture pixel
+       for pixel; the redraw is inlined so its ink can take the accent */
+    .stage { position: relative; inline-size: 381px; max-inline-size: 100%; aspect-ratio: 381 / 199; }
+    .stage > * { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; }
+    .stage svg { inline-size: 100%; block-size: 100%; color: var(--eccm-accent); opacity: 0.75; }
+    .x2 { inline-size: 762px; }
+    .x2.ink { inline-size: 620px; }
+    .sizes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--eccm-s-8); }
+    .sizes figure { flex: 0 1 auto; }
+    .faces { display: grid; gap: var(--eccm-s-6); }
+    .faces svg { inline-size: 381px; max-inline-size: 100%; block-size: auto; }
+    .faces figcaption { margin-block-start: var(--eccm-s-1); }
+    dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--eccm-s-2) var(--eccm-s-6); max-inline-size: var(--eccm-measure); }
+    dt { color: var(--eccm-ink-2); }
+  }
+  @media (max-width: 40rem) {
+    @layer page { dl { grid-template-columns: minmax(0, 1fr); gap: var(--eccm-s-1); } dd + dt { margin-block-start: var(--eccm-s-3); } }
+  }
+</style>
+</head>
+<body>
+<header class="site-head">
+  <div class="frame">
+    <a class="mark" href="./"><img src="./logo.svg" width="310" height="147" alt="ECCM, Eesti Nüüdismuusika Keskus"></a>
+    <span class="lang"><span aria-current="page" lang="et">ET</span><a href="https://eccm.ee/index.php/en/" lang="en">EN</a></span>
+  </div>
+</header>
+<nav class="site-nav" aria-label="Menüü">
+  <div class="frame">
+    <ul class="nav">
+      <li><a href="./">Avaleht</a></li>
+      <li><a href="./logo.html" aria-current="page">Logo</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="frame">
+  <h1>Logo, serveeritud ja ümber joonistatud</h1>
+  <p class="prose">eccm.ee serves one picture of its mark, a 381 by 199 JPEG exported from Photoshop in February 2023, and no vector anywhere on the site. Until ECCM sends the original, the mark on these pages is an SVG redrawn from that picture, measured row by row rather than traced, so it lies over the JPEG to the pixel.</p>
+
+  <section>
+    <h2>Kõrvuti</h2>
+    <div class="fig-grid">
+      <figure>
+        <img src="./eccm_tallinn_logod_72dpi_no_tln.jpg" width="381" height="199" alt="the JPEG eccm.ee serves">
+        <figcaption>Serveeritud: JPEG, 381 by 199, 34,053 bytes, drawn one to one.</figcaption>
+      </figure>
+      <figure>
+        <img src="./logo.svg" width="310" height="147" alt="the SVG redraw">
+        <figcaption>Ümber joonistatud: SVG, about 3 KB, cropped to its ink, at the same scale.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Üksteise peal</h2>
+    <div class="stage">
+      <img src="./eccm_tallinn_logod_72dpi_no_tln.jpg" alt="">
+      <div class="inline-svg" data-src="./logo.svg"></div>
+    </div>
+    <p class="prose">The redraw in orange over the served picture. Where the two agree, orange sits on black. Orange on white is ink the redraw has and the JPEG lacks. Black with no orange on it is ink the JPEG has and the redraw lacks.</p>
+  </section>
+
+  <section>
+    <h2>Kaks korda suurem</h2>
+    <div class="fig-grid">
+      <figure>
+        <img class="x2" src="./eccm_tallinn_logod_72dpi_no_tln.jpg" alt="the JPEG at twice its size">
+        <figcaption>The JPEG at 2x, which is what every Retina screen shows of it today.</figcaption>
+      </figure>
+      <figure>
+        <img class="x2 ink" src="./logo.svg" alt="the SVG at twice its size">
+        <figcaption>The SVG at 2x.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Lehel näidatud suurustes</h2>
+    <div class="sizes">
+      <figure><img src="./logo.svg" style="inline-size: 12rem" alt="the SVG at the phone's width"><figcaption>12rem, the phone.</figcaption></figure>
+      <figure><img src="./logo.svg" style="inline-size: 20rem" alt="the SVG at the desk's width"><figcaption>20rem, the desk.</figcaption></figure>
+      <figure><img src="./eccm_tallinn_logod_72dpi_no_tln.jpg" style="inline-size: 12rem" alt="the JPEG at the phone's width"><figcaption>12rem, the JPEG.</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Alakirja kiri</h2>
+    <p class="prose">The tagline's typeface is not known: a condensed grotesque with a double-storey a, an angled terminal on the t and a straight-tailed y, at an x-height of 14 px in a picture with JPEG ringing round every stroke. Each row below sets the two lines in a face this machine has and squeezes them to the widths the picture measures, 311 and 221 px, so every row is the right size and none is the right letters. The redraw uses the row that needs the least squeeze, and the figure under each row is measured on this machine. Pick by eye, or wait for the name.</p>
+    <div class="faces"></div>
+  </section>
+
+  <section>
+    <h2>Mis on mõõdetud, mis mitte</h2>
+    <dl>
+      <dt>The capitals</dt><dd>93 px tall from y 29, stroke 14, the E's bars 38 and 31 wide, 13 tall and the bottom one 14, the M's arms 10 wide meeting on the baseline</dd>
+      <dt>The C</dt><dd>a stadium 44 wide and 97 tall, open on the right from y 60 to y 88, and the second C is the first moved 81 px right</dd>
+      <dt>The stave</dt><dd>five hairlines 1.5 px tall on a 7.375 px pitch, 12 px past the M, and three joins between the letters, each running flush along an edge of the letter it meets, which is where the picture has them</dd>
+      <dt>The tagline</dt><dd>x-height 14, baselines at 153 and 174, lines 311 and 221 px wide, centred under the mark</dd>
+      <dt>Not known</dt><dd>the tagline's face, the designer, whether the letters were drawn or typed, and whether the mark may be redrawn at all</dd>
+      <dt>Next</dt><dd>one email to ECCM asking for the vector, the face and the designer's name. It has not gone.</dd>
+    </dl>
+  </section>
+</main>
+
+<footer class="frame site-foot">
+  <span>Eesti Nüüdismuusika Keskus, Herne 11A, 10135 Tallinn</span>
+  <span><a href="./">Tulevased üritused</a></span>
+  <span>Kujunduse proov: pilt on eccm.ee oma seisuga 26.09.2026.</span>
+</footer>
+
+<script type="module">
+  // The overlay needs the SVG inline so its ink can be recoloured from CSS,
+  // and the face rows are one template with the family swapped, so the five
+  // differ in nothing else. Both read ./logo.svg from this origin.
+  const svgText = await (await fetch('./logo.svg')).text();
+  for (const host of document.querySelectorAll('.inline-svg')) {
+    host.innerHTML = svgText;
+    // the file's box is its ink; over the JPEG it needs the JPEG's frame
+    const svg = host.querySelector('svg');
+    svg.setAttribute('viewBox', '0 0 381 199');
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+  }
+
+  const FACES = [
+    ["'DIN Condensed', sans-serif", 'normal', 700, 'DIN Condensed, bold. The redraw asks for this first, because it needs the least squeeze.'],
+    ["'Helvetica Neue', 'Arial Narrow', sans-serif", 'condensed', 700, 'Helvetica Neue, condensed, bold. The redraw falls back to this where there is no DIN.'],
+    ["'Avenir Next Condensed', sans-serif", 'normal', 600, 'Avenir Next Condensed, demi bold.'],
+    ["'Arial Narrow', sans-serif", 'normal', 700, 'Arial Narrow, bold, which is the face a Windows machine has.'],
+    ['Helvetica, Arial, sans-serif', 'normal', 700, 'The page’s own face, bold, not condensed, so the squeeze is visible.'],
+  ];
+  const faces = document.querySelector('.faces');
+  for (const [family, stretch, weight, name] of FACES) {
+    const fig = document.createElement('figure');
+    fig.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 128 381 54" width="381" height="54" role="img" aria-label="${name}">
+      <g fill="#1a1a1a" font-size="27" lengthAdjust="spacingAndGlyphs">
+        <text x="34" y="153" textLength="311">estonian centre of contemporary music</text>
+        <text x="76" y="174" textLength="221">eesti nüüdismuusika keskus</text>
+      </g></svg><figcaption></figcaption>`;
+    const g = fig.querySelector('g');
+    g.setAttribute('font-family', family);
+    g.setAttribute('font-stretch', stretch);
+    g.setAttribute('font-weight', String(weight));
+    faces.append(fig);
+    // how far each face is squeezed: the natural width of the same words in
+    // the same face at the same size, measured, against the 311 px the
+    // picture holds; the face that needs the least squeeze is the nearest
+    // to the one the picture was set in
+    const probe = fig.querySelector('text').cloneNode(true);
+    probe.removeAttribute('textLength');
+    g.append(probe);
+    const natural = probe.getComputedTextLength();
+    probe.remove();
+    fig.querySelector('figcaption').textContent = `${name} Natural width ${natural.toFixed(0)} px, squeezed to 311, ${(100 * 311 / natural).toFixed(0)} per cent.`;
+  }
+</script>
+</body>
+</html>
