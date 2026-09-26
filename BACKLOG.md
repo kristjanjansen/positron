@@ -13,7 +13,9 @@ one decision and most are one line. In the order the evidence ranks them:
    no `!important`. **Prerequisite: the 4 `!important` in the file go first**,
    because importance inverts layer order. Measured: 841 selectors, 766 rules, max
    specificity (0,5,1), zero ids, 0 `@layer` today.
-2. **`.pos-glue { overflow: clip }`, not `hidden`.** `hidden` is a scrollable
+2. ✅ **DONE 2026-09-26, `b14de8a`: `.pos-glue { overflow: clip }`.** `/kit/` 238/238,
+   `/transport/` and `/lanes/` unmoved. Left in the list so the order reads whole.
+   The original line: `.pos-glue { overflow: clip }`, not `hidden`. `hidden` is a scrollable
    value: it makes every glued surface a scroll container, so `position: sticky`
    inside one sticks to the wrong thing and an edge control's focus ring is
    clipped, which is a WCAG 2.4.7 failure. Polaris ships `clip` on its Card.

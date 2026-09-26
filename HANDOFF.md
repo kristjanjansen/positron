@@ -1,3 +1,55 @@
+# Handoff, 2026-09-26, session 51 continued: the composition research, and what it changed
+
+🔴 **THE VERDICT THAT OPENED THIS HALF WAS *"plainly awful"*, THEN *"it kind of
+seems that you don't understand CSS layout models at all"*, AND THE WORK HERE IS
+THE ANSWER TO THAT RATHER THAN TO ANY ONE PAGE.** Four research strands ran in
+parallel and every one is kept whole in `research/`: the repository's own record
+of **118 UI corrections in the owner's words**, the layout-systems literature,
+how nine design systems build a glued surface, and the cascade cures measured on
+the day's browsers. Together about 4,000 lines. They are the base of a new skill.
+
+✅ **`positron-compose` EXISTS, 719 LINES, WITH A TRIGGER ROW IN `CLAUDE.md`.**
+Load it before deciding where anything goes. Its one governing test, from the
+correction survey: **of 47 typed pixel numbers in `shell.css`, 20 described a
+relationship between two elements and could have been a primitive; 15 described
+a body or an object and were right to type.** A number that says how two things
+relate is a bug waiting.
+⚠️ **THE FOURTH STRAND CORRECTED A SENTENCE THE THIRD DRAFT CARRIED**, and the
+correction is in the skill with its reason: container queries fix a component
+asking about the window; they do NOT fix a media query losing to a later plain
+rule, because `@container` adds no specificity. That is `@layer`'s job.
+
+✅ **THREE TOOLS, ALL PROVEN ON REAL PAGES, ALL IN THE RUN LIST.**
+`demo/shot.mjs` shoots any page at a phone width and at the desk through CDP
+device emulation and prints sideways overflow; the extension's window resize
+reported success and rendered at 1429 px. `demo/which-rule-won.mjs` prints
+every declaration for one property and which won, `<- via shorthand` beside
+each; run on the `/fau/` textarea it showed the documented incident line for
+line. `demo/ancestry.mjs` walks to the root and counts who insets you; run on
+`/nola/`'s nameplate at 390 it found three.
+
+🔴 **THE FIRST PHONE SHOTS THIS SITE HAS EVER TAKEN OF ITSELF FOUND FIVE KINDS
+OF DEFECT ACROSS SIX PAGES**, all invisible at 756, in `BACKLOG.md` with the CSS
+behind two of them named: a justified row wrapping into a left line and a right
+line, empty boxes the size of a screen, a truncated knob label, a readout
+wrapping 3+1 because it counts cells rather than width, and horizontal
+scrollers with nothing saying there is more.
+
+✅ **ONE OF THE SEVEN RANKED `shell.css` CHANGES IS DONE**: `.pos-glue` clips
+rather than hides, `b14de8a`, because `hidden` made every glued surface a scroll
+container. `/kit/` 238/238, `/transport/` and `/lanes/` unmoved. **The other six
+are in `BACKLOG.md` in evidence order and none is started**: `@layer` in one
+line once the four `!important` go, a spacing scale where seven names cover
+five numbers, `.kbd-foot` going linear below a width, seven tokens read and set
+nowhere, stylelint at 95 problems, subgrid for the control row.
+
+✅ **DEPLOYED AT THE END OF THIS HALF: see the build stamp in the commit after
+this one.** The PANEL part carries no box, no readout, no captions and no tab
+row: *"let the panels be the panels."*
+
+---
+
+
 # Handoff, 2026-09-26, session 51, a glued rows component and the panel built on it
 
 ✅ **DEPLOYED. BUILD `9e0907c-074214-52d7`, CONFIRMED ON THE EDGE** at
