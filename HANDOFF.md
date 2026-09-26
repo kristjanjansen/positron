@@ -1,3 +1,58 @@
+# Handoff, 2026-09-26, session 51, a glued rows component and the panel built on it
+
+✅ **DEPLOYED. BUILD `9e0907c-074214-52d7`, CONFIRMED ON THE EDGE** at
+**https://positron.studio/kit/#instrument-panel**.
+`DEMO_BASE=https://positron.studio node demo/verify.mjs kit` reads **239/239**
+against the deploy, the same as locally. **NOT PUSHED**, because nobody asked and
+the push switches the machine-wide GitHub account.
+
+✅ **`/kit/` IS 227/227 TO 239/239**, and `node demo/shell/instrument-panel-test.mjs`
+is **15 ok, 0 failed**. 57 demo rows, 55 shelled, 74 plans, counted rather than
+remembered.
+
+## What shipped
+
+| | where |
+| --- | --- |
+| `createGlueRows`, a glued surface built one row at a time | `demo/shell/glue.mjs` |
+| `createInstrumentPanel`, the sketch that was asked for | `demo/shell/instrument-panel.mjs` |
+| its order graded with no browser | `demo/shell/instrument-panel-test.mjs` |
+| `.pos-rows-r`, `--rows-pad`, `--rows-gap` | `demo/shell/shell.css` |
+| a seventh tab part, `PANEL`, holding two blocks | `demo/kit/index.html` |
+
+🔴 **NOTHING IS APPLIED TO ANY PAGE, WHICH WAS EXPLICIT IN THE ASK.** Seven
+pages draw an instrument and not one of them changed.
+
+## Two defects found by LOOKING at it, neither of which a check caught
+
+🔴 **THE ROW'S PADDING READ `var(--panel-gap)`, WHICH IS DECLARED ON `.panel`.**
+Outside a panel there is nothing to read, and an unresolved `var()` makes the
+WHOLE `padding` shorthand invalid rather than dropping one side, so every row
+measured **0 px of inset on all four edges**. The same trap had been avoided one
+declaration earlier and walked into on the next.
+🔴 **AND THE PATCH CONTROL WAS INERT.** `picker.mjs` wires `prev` and `next`
+straight onto its two arrows, and its `onPick` belongs to the `<select>`
+underneath, which is the native list a phone opens. A caller that puts its work
+in `onPick` has built a control that draws nothing and does nothing. **Two
+pickers in `/kit/`'s own `INSTRUMENT` block are written exactly that way and
+have been inert for as long as they have existed**, drawing the cell's
+placeholder, which is an em dash. In `BACKLOG.md`, not fixed in the component.
+
+## What was measured rather than reasoned about
+
+⚠️ **A NEW TAB PART PUT FIRST TOOK THREE ASSERTS RED.** It changes which part
+`createTabs` opens, and checks that read a rect outside the measuring window
+were reading a part that is now shut. The part sits next to `HARDWARE` instead.
+⚠️ **THREE CSS SABOTAGES, EACH RED ON EXACTLY ONE ASSERT**: a row that paints
+no ground reads 0 of 5 rows on the card colour, a picture that stops filling its
+row sits **231 px** off both inner edges, a hidden row that keeps its box leaves
+3 rows showing. Three sabotages of the module took the node test red as well.
+⚠️ **AND ONE RUN IN SIX READ `238/239` WITH A FAILURE NOBODY CAPTURED.** Four
+runs since are 239/239. Written down in `BACKLOG.md` rather than explained away.
+
+---
+
+
 # Handoff, 2026-09-26, session 50, a stream of asks worked to the end
 
 ✅ **DEPLOYED AND PUSHED. BUILD `a6ef334-215438-fca1`, CONFIRMED ON THE EDGE**
