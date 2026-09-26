@@ -1041,7 +1041,11 @@ button.pos-pri[data-busy="1"] {
 .pos-rows-r > .panel-plate { flex: 1 1 auto; min-width: 0; }
 /* the foot's start end when the foot holds controls: the name and its switch as
    one flex item, so a justified row still has exactly two ends */
-.pos-ipanel-name { display: flex; align-items: center; gap: var(--ctl-gap); min-width: 0; }
+/* The start end is a cluster and wraps as one: a name with a wide control
+   beside it drops the control under the name on a phone rather than pushing
+   the row sideways, which is compose §6's rule for any row that is not two
+   ends. */
+.pos-ipanel-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); min-width: 0; }
 
 /* ── readout and log, joined ──────────────────────────────────────────── */
 /* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
