@@ -122,6 +122,15 @@ export function createGlueRows(o = {}) {
     if (!ROW_ALIGN.includes(align)) {
       throw new Error(`createGlueRows.row: align is one of ${ROW_ALIGN.join(', ')}, not ${JSON.stringify(align)}`);
     }
+    const parts = (Array.isArray(content) ? content : [content]).filter(Boolean);
+    // 🔴 A JUSTIFIED ROW HAS TWO ENDS. With one item per wrapped line
+    // `space-between` parks it at the start, so two ends go linear on a phone
+    // by themselves, at their own sizes; three or more justify each wrapped
+    // line separately, which is the defect /nola/'s footer shows at 375. A
+    // caller with more than two things has two rows or a cluster.
+    if (align === 'between' && parts.length !== 2) {
+      throw new Error(`createGlueRows.row: a justified row has two ends, not ${parts.length}`);
+    }
     const r = el('div', rcls ? `pos-rows-r ${rcls}` : 'pos-rows-r');
     /* ⚠️ THE VALUE IS ALWAYS WRITTEN, never left empty to mean off. An attribute
        selector matches on PRESENCE, which is the defect `video-panel.mjs`
@@ -129,9 +138,7 @@ export function createGlueRows(o = {}) {
        applying to a panel that had been full once. */
     r.dataset.align = align;
     if (!pad) r.dataset.pad = 'off';
-    for (const c of (Array.isArray(content) ? content : [content])) {
-      if (c) r.append(c.el || c);
-    }
+    for (const c of parts) r.append(c.el || c);
     const at = before && (before.el || before);
     root.insertBefore(r, at && at.parentNode === root ? at : null);
     const i = at && at.parentNode === root ? list.indexOf(at) : list.length;
