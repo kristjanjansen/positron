@@ -36,12 +36,17 @@
      `label.pos-field.tall  CB(position:relative)` carrying the 58 px band
      under a textarea whose own padding is the `16 20 16 20` every well keeps.
      The field has no border inside a glue, so its padding edge IS the well's. */
-  .pos-field.fau-src {
-    position: relative;
-    background: var(--bg);
-    padding-bottom: calc(var(--ctl-sm) + 2 * var(--rows-gap));
-  }
-  .pos-field.fau-src > .fau-compile { position: absolute; right: var(--rows-pad); bottom: var(--rows-gap); }
+  /* 🔴 OVER THE TEXT BOX'S OWN CORNER, NOT ON A BAND UNDER IT. The first cut
+     put a 58 px band under the scroller and a primary button on it, and the
+     owner's verdict was "fau compile: its on top of textarea. secondary.
+     small button variant. you took 17+ min and failed" (2026-09-26). So: the
+     field is the containing block, the button sits one row gap in from the
+     text box's bottom right corner, over the text, small and secondary, and
+     the text box keeps its last lines clear of it with its own bottom
+     padding, which scrolls with the text and is there at the end of it. */
+  .pos-field.fau-src { position: relative; }
+  .pos-field.fau-src textarea { padding-bottom: calc(var(--ctl-sm) + 2 * var(--rows-gap)); }
+  .pos-field.fau-src > .fau-compile { position: absolute; right: var(--rows-gap); bottom: var(--rows-gap); }
 </style>
 
 <script type="module">
@@ -1135,6 +1140,9 @@ effect  = dm.freeverb_demo;
      is; `fau-compile` is what the two page rules above position. */
   const compileBtn = compile.button('compile');
   compileBtn.classList.add('pos-sm', 'fau-compile');
+  // secondary: the group built it primary and the owner asked for secondary
+  // (2026-09-26); the busy sweep does not depend on the primary look
+  compileBtn.classList.remove('pos-pri');
 
   // ── the page ───────────────────────────────────────────────────────────────
   //
@@ -1342,22 +1350,18 @@ effect  = dm.freeverb_demo;
       const rowsGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rows-gap'));
       const ctlSm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-sm'));
       const bt = rect(compileBtn), well = rect(source.el);
-      const inR = +(well.right - bt.right).toFixed(1);
-      const inB = +(well.bottom - bt.bottom).toFixed(1);
-      const clear = +(bt.top - ta.bottom).toFixed(1);
-      const sameEdge = +(well.right - ta.right).toFixed(1);
-      const oneGround = getComputedStyle(source.el).backgroundColor === getComputedStyle(source.input).backgroundColor;
+      const inR = +(ta.right - bt.right).toFixed(1);
+      const inB = +(ta.bottom - bt.bottom).toFixed(1);
       const f1 = (n) => n.toFixed(1);
-      d.assert('Compile sits in the bottom right corner of the well, on the rows’ own insets, small, and below the text box’s edge by a row gap',
-        Math.abs(inR - rowsPad) <= 0.6 && Math.abs(inB - rowsGap) <= 0.6 && Math.abs(clear - rowsGap) <= 0.6
-          && sameEdge === 0 && oneGround
+      d.assert('Compile sits over the text box’s bottom right corner, one row gap in, small and secondary',
+        Math.abs(inR - rowsGap) <= 0.6 && Math.abs(inB - rowsGap) <= 0.6
+          && bt.left > ta.left && bt.top > ta.top
           && Math.abs(bt.height - ctlSm) <= 0.6 && bt.height < 34 && ctlSm > 0
-          && compileBtn.classList.contains('pos-sm') && compileBtn.classList.contains('pos-pri')
+          && compileBtn.classList.contains('pos-sm') && !compileBtn.classList.contains('pos-pri')
           && source.el.contains(compileBtn),
         `button ${f1(bt.left)},${f1(bt.top)} to ${f1(bt.right)},${f1(bt.bottom)} against the text box `
-        + `${f1(ta.left)},${f1(ta.top)} to ${f1(ta.right)},${f1(ta.bottom)} and the well to ${f1(well.right)},${f1(well.bottom)}: `
-        + `${inR} px in from the right, ${inB} px up from the bottom, ${clear} px below the text box, `
-        + `${f1(bt.height)} px tall against --ctl-sm ${ctlSm}, ${oneGround ? 'one ground' : 'TWO grounds'}`);
+        + `${f1(ta.left)},${f1(ta.top)} to ${f1(ta.right)},${f1(ta.bottom)}: `
+        + `${inR} px in from the right, ${inB} px up from the bottom, ${f1(bt.height)} px tall against --ctl-sm ${ctlSm}, well ${f1(well.right)},${f1(well.bottom)}`);
     }
     /* 🔴 THE UNIT ITSELF, ASSERTED, BECAUSE THE ASK WAS ABOUT THE UNIT AND
        NOTHING ELSE ON THIS PAGE WOULD NOTICE ONE GOING BACK. Three of the four
