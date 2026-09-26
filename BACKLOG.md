@@ -1,5 +1,39 @@
 ## Open
 
+### Open 2026-09-26: `/kit/` reads 237/237 in the harness and shows ten FAILs in a real browser
+
+🔴 **SEEN 2026-09-26 WHILE LOOKING AT THE NEW PANEL BLOCKS, AND IT IS NOT
+THEIRS.** `node demo/verify.mjs kit` is **237/237 green**. The same page opened
+by hand in Chrome at `http://127.0.0.1:8890/kit/`, read off `__demo.asserts`,
+reports **202 asserts with 10 failing**, and **not one of the ten is a new
+one**:
+
+    a pad with nothing above it still reserves the slot
+    a waveform on both sides is two different pictures
+    two blocks in one part sit the project's one gap apart
+    a loop armed long before the first note comes back at once
+    a loop keeps its place over several turns rather than walking away
+    the onsets handed to the tempo are the four notes played
+    a second take is snapped onto an integer ratio of the first
+    the second loop wraps on the aligned lap, counted
+    clearing empties both cells, a stated tempo reads set rather than heard
+    Loop, Sustain and Notes off sit in that order, tight against each other
+
+⚠️ **TWO THINGS ARE DIFFERENT AND ONLY ONE OF THEM IS MEASURED.** The harness
+appends `?selfcheck=1` and this reading did not, which is why the totals differ
+at all; and the reading was taken while the page was still running, at 202 of
+237. **So this is an observation and not yet a finding.** What makes it worth
+writing down is that six of the ten are the looper, the take and the tempo,
+which are the asserts session 50 added and which are the only timing-dependent
+ones on the page.
+
+⚠️ **THE THING TO DO IS ONE COMMAND, NOT A HUNT:** open
+`http://127.0.0.1:8890/kit/?selfcheck=1`, wait for `ready`, and read
+`__demo.asserts` again. If it is still red there, a page that is green headless
+and red in a browser is the worst shape this project knows, because the harness
+is the thing everybody trusts.
+
+
 ### Open 2026-09-26: a glued rows component, and an instrument panel built on it, both in `/kit/` only
 
 🔴 **ASKED, VERBATIM, WITH A SKETCH:** *"do a instrument panel coponent properly
