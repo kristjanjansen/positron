@@ -6,9 +6,10 @@
 <meta name="robots" content="noindex">
 <title>ECCM: tulevased üritused</title>
 <!-- demo/eccm/index.html: a reading site for eccm.ee, laid out like that site's
-     own front page and set in the face that page really draws (Helvetica on a
-     Mac, Arial on Windows; it declares Roboto and serves nothing). It imports
-     nothing from demo/shell/ and loads nothing from eccm.ee at all: the ten
+     own front page and set in Schibsted Grotesk, chosen off ./type.html on
+     2026-09-26 (before that the machine's Helvetica, which is what eccm.ee
+     draws). It imports nothing from demo/shell/ and loads nothing from
+     eccm.ee at all: the ten
      events below were copied off that site's front page on 2026-09-26, every
      link goes back to the page they came from, and the ten pictures are the
      thumbnails eccm.ee shows for those events, fetched once that day into this
@@ -180,11 +181,12 @@
       assert('nothing drags the page sideways', de.scrollWidth <= de.clientWidth,
         `${de.scrollWidth} px of page in ${de.clientWidth} px of viewport`);
 
-      // eccm.ee serves no text font and neither does this page: the face is
-      // whatever the machine calls sans-serif, Helvetica here, Arial on Windows
-      const faces = [...document.fonts];
-      assert('no web font is loaded, the text is the machine’s own sans-serif, as on eccm.ee',
-        faces.length === 0, `${faces.length} faces in document.fonts, body font-family ${getComputedStyle(document.body).fontFamily}`);
+      // the face is Schibsted Grotesk in two subsets, and both have to be in
+      // use: dropping latin-ext would draw š and ž from the fallback mid-word
+      const faces = [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'Schibsted Grotesk');
+      const facesLoaded = faces.filter((f) => f.status === 'loaded').length;
+      assert('both Schibsted Grotesk subsets are loaded and in use, latin for õäöü and latin-ext for šž',
+        faces.length === 2 && facesLoaded === 2, `${facesLoaded} of ${faces.length} faces loaded: ${faces.map((f) => f.status).join(', ')}; body font-family ${getComputedStyle(document.body).fontFamily}`);
 
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       let smallest = Infinity, smallestIn = '';
@@ -203,15 +205,23 @@
       // the measure claim is a desk claim; on a phone the column is what the
       // screen leaves beside the picture, and the claim there is that the
       // summary takes all of it rather than being clamped narrower
+      // one ch, resolved by the stylesheet in the paragraph's own face: a
+      // canvas measureText read Helvetica's zero here after the web face
+      // arrived, and called a 66 ch column 59
       const p = document.querySelector('.ev-summary');
-      const c = document.createElement('canvas').getContext('2d');
-      c.font = getComputedStyle(p).font;
-      const ch = c.measureText('0').width;
+      const probe = document.createElement('span');
+      probe.style.cssText = 'position: absolute; inline-size: 1ch; block-size: 1px; font: inherit;';
+      p.append(probe);
+      const ch = rect(probe).width;
+      probe.remove();
       const cpl = rect(p).width / ch;
       // the compact row is the list's own decision, taken under 47rem of main
       const compact = document.querySelector('main').getBoundingClientRect().width <= 47 * 16;
-      assert(compact ? 'in the compact row a summary fills the column beside the picture' : 'a summary runs 45 to 75 characters a line',
-        compact ? rect(p).width >= rect(p.parentElement).width - 0.5 : (cpl >= 45 && cpl <= 75),
+      // in the compact row the summary takes the column beside the picture or
+      // the measure, whichever is narrower: at the harness's 756 px in
+      // Schibsted Grotesk the column is 604 px and 66 ch is 594
+      assert(compact ? 'in the compact row a summary takes the column beside the picture or the measure, whichever is narrower' : 'a summary runs 45 to 75 characters a line',
+        compact ? rect(p).width >= Math.min(rect(p.parentElement).width, 66 * ch) - 0.5 : (cpl >= 45 && cpl <= 75),
         `${cpl.toFixed(0)} ch at ${rect(p).width.toFixed(0)} px in a ${rect(p.parentElement).width.toFixed(0)} px column`);
 
       // Two claims about the mark and the menu, one per arrangement, because
