@@ -21,7 +21,21 @@ paragraph in each candidate, vendored under `demo/eccm/vendor/` with their
 OFL files and listed by name in `build.mjs`, so the choice is made by looking.
 No change to the live pages until one is chosen.
 
-### Open 2026-09-26: a plan for an event page whose design comes from the event's picture, in the background
+### Done 2026-09-26: a plan for an event page whose design comes from the event's picture, `plans/plan-eccm-design-from-image.md`, reported in full
+
+✅ **LANDED AND RELAYED.** 369 lines. Verdict: detection is about fifty lines in
+the edit form at upload and is not the effort; the guardrails are, and they
+are arithmetic. MEASURED on the ten event pictures: two give a ground (both
+Gestures files, a sage #bbc0ba on all four edges), one gives an accent (the
+Scrapyard stage photo, a blue at 7.06 on white), five give something that
+fails a contrast check, four give nothing. Median cut merges the Gestures red
+disc with its type; the ground comes from the flat edge and the seed from the
+highest chroma mass instead. The accent window is Y 0.131 to 0.183, so a seed
+is never used as it comes. Two tokens may vary on the event page only, a
+ground under the head and the interaction accent; the list page changes
+nothing. Route (a), the browser at upload storing three columns, for the CMS;
+route (c), a view-time read behind a flag, for the demo. First step: fifteen
+lines and a look at a sage band under the nav. Not built.
 
 ⚠️ **ASKED, VERBATIM:** *"one idea is to actually change event body design
 based on the event image. rest of eccm stays minimal, out of the way.
