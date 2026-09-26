@@ -216,6 +216,8 @@ node demo/resources/measure-durations.mjs   # how long each recording is, asked 
 node demo/resources/build-mimproject-images.mjs --check   # the recovered pictures, prints only
 node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
 node demo/shot.mjs kit 390 1280          # LOOK at a page at a phone width and at the desk, before saying it is done
+node demo/which-rule-won.mjs fau '.fau-src textarea' padding-top   # every declaration for one property, and which won; sees a shorthand beating a longhand
+node demo/ancestry.mjs nola '.panel-plate' padding-top --width 390  # every ancestor's inset and which one makes a containing block, before writing a fourth override
 DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
 
 cd workers/view && node build.mjs && npx wrangler deploy    # ALWAYS build first
