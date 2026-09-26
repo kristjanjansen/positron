@@ -1423,9 +1423,10 @@ ROW_ALIGN  // start, center, end, between`,
       const stripFull = createGlueRows({ full: true });
       const station3 = createPicker({ label: '', what: 'station', prev: () => station3.show(stations[0]), next: () => station3.show(stations[0]), onPick: (x) => station3.show(x) });
       station3.show(stations[1]);
-      stripFull.row([station3], { align: 'start' });
-      const fullBetween = stripFull.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 }),
-        (() => { const b = el('button', '', 'MUTE'); b.type = 'button'; return b; })()], { align: 'between' });
+      /* the station at one end and MUTE at the other is a radio strip's first
+         row, and it is wide enough that the same row wraps in the frame below */
+      const fullBetween = stripFull.row([station3, (() => { const b = el('button', '', 'MUTE'); b.type = 'button'; return b; })()], { align: 'between' });
+      stripFull.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 })], { align: 'start' });
       const shape3 = createWaveShape({ name: 'square' });
       stripFull.row(shape3.el, { pad: false });
       shape3.redraw();
@@ -1438,14 +1439,16 @@ ROW_ALIGN  // start, center, end, between`,
       settingsFull.row([cap('TUNING'), createStepper({ what: 'cents', prev: () => '', next: () => '' })]);
 
       /* 9. THE SAME TWO ROWS IN A 320 px FRAME, ON THE SAME PAGE. The justified
-            row goes LINEAR, one child per line, left-aligned, because its
-            container is narrower than `--row-min`; the start row wraps as a
-            cluster. Both are decided by the frame's width and not the window's,
-            which is what lets the harness grade a phone layout at desk width. */
+            row wraps into two left-aligned lines at their own sizes, because a
+            between row has two ends and one item per line parks at the start;
+            the start row wraps as a cluster. Both are decided by the frame's
+            width and not the window's, which is what lets the harness grade a
+            phone layout at desk width. */
       const narrow = el('div', 'kit-phone kit-narrow');
       const stripNarrow = createGlueRows({ full: true });
-      const narrowBetween = stripNarrow.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 }),
-        (() => { const b = el('button', '', 'MUTE'); b.type = 'button'; return b; })()], { align: 'between' });
+      const station4 = createPicker({ label: '', what: 'station', prev: () => station4.show(stations[0]), next: () => station4.show(stations[0]), onPick: (x) => station4.show(x) });
+      station4.show(stations[1]);
+      const narrowBetween = stripNarrow.row([station4, (() => { const b = el('button', '', 'MUTE'); b.type = 'button'; return b; })()], { align: 'between' });
       const clusterNarrow = createGlueRows({ full: true });
       const clusterRow = clusterNarrow.row(['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C'].map((t) => { const b = el('button', '', t); b.type = 'button'; return b; }), { align: 'start' });
       narrow.append(stripNarrow.el, clusterNarrow.el);
@@ -5285,12 +5288,13 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
 
     /**
      * 🔴 THE SAME JUSTIFIED ROW IS JUSTIFIED AT FULL WIDTH AND LINEAR IN A
-     * 320 px FRAME, ON ONE PAGE, DECIDED BY THE ROW'S OWN WIDTH. Below
-     * `--row-min` each child is at least a full line, so they stack left-aligned
-     * with the row's gap between them, which is the owner's *"go to left
-     * alignment in mobile and have gaps between elements, not just squished"*.
-     * Measured at desk width, which is the whole point of deciding it by the
-     * container.
+     * 320 px FRAME, ON ONE PAGE, DECIDED BY THE ROW'S OWN WIDTH. A between row
+     * has two ends, so when it wraps each line holds one item and `space-between`
+     * parks it at the start: two left-aligned lines at their own sizes, the
+     * owner's *"go to left alignment in mobile and have gaps between elements,
+     * not just squished"*. The first draft forced each child to a full line and
+     * stretched a button across the row; so this also reads each child's WIDTH
+     * in the frame against its width at full size, and requires them equal.
      */
     {
       const wide = rowsSpec.fullBetween, tight = rowsSpec.narrowBetween;
@@ -5304,11 +5308,13 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         Math.abs(wL) <= 0.6 && Math.abs(wR) <= 0.6 && wApart > gapOf(wide) * 4,
         `${wL} px off the left inset, ${wR} px off the right, ${wApart} px apart`);
       const stacked = r(tb).top >= r(ta).bottom - 0.6;
+      const ownSize = Math.abs(r(tb).width - r(wb).width) <= 0.6 && Math.abs(r(ta).width - r(wa).width) <= 0.6;
       const tL = [+(r(ta).left - (r(tight).left + ins(tight))).toFixed(1), +(r(tb).left - (r(tight).left + ins(tight))).toFixed(1)];
       const between = +(r(tb).top - r(ta).bottom).toFixed(1);
       d.assert('in a 320 px frame the same row is linear: one child per line, both on the left inset, one gap apart',
-        r(tight).width < 340 && stacked && tL.every((x) => Math.abs(x) <= 0.6) && Math.abs(between - px(tight, 'rowGap')) <= 0.6,
-        `frame ${r(tight).width.toFixed(0)} px wide, lefts ${tL.join(' and ')} px off the inset, ${between} px between the lines against a gap of ${px(tight, 'rowGap')}`);
+        r(tight).width < 340 && stacked && ownSize && tL.every((x) => Math.abs(x) <= 0.6) && Math.abs(between - px(tight, 'rowGap')) <= 0.6,
+        `frame ${r(tight).width.toFixed(0)} px wide, lefts ${tL.join(' and ')} px off the inset, ${between} px between the lines against a gap of ${px(tight, 'rowGap')}, `
+        + `the button ${r(tb).width.toFixed(1)} px wide in the frame and ${r(wb).width.toFixed(1)} at full width`);
     }
 
     /**
