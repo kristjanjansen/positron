@@ -664,8 +664,19 @@ for (const t of targets) {
   await sleep(1400);
 
   // ready, with a bounded wait — never a bare sleep
+  // 🔴 THE WAIT IS 7.4 s UNLESS THE PAGE DECLARES `bootMs`, AND ONE PAGE DOES.
+  // MEASURED 2026-09-26: /kit/ reaches `ready` at 7.3 s locally and 7.7 s on
+  // the edge with 231 asserts landed, because it builds and grades every
+  // specimen before it says ready, by design (a closed tab is laid out only
+  // inside its measuring window, so nothing there can be deferred). Locally it
+  // cleared this loop by 0.1 s; against the deploy it read 0/1 twice for a page
+  // that is 243/243. `bootMs` is declared per page in the manifest with the
+  // measurement beside it, the same shape as `settleMs`, and is not a knob for
+  // a page that is merely slow. `positron-verify`: a page that misses this wait
+  // is graded not at all, which is the worst face a harness has.
   let ready = false;
-  for (let i = 0; i < 40 && !ready; i++) {
+  const bootTries = Math.max(40, Math.ceil(((t.bootMs || 0) - 1400) / 150));
+  for (let i = 0; i < bootTries && !ready; i++) {
     ready = await ev('!!(window.__demo && window.__demo.ready)');
     if (!ready) await sleep(150);
   }
