@@ -868,7 +868,7 @@
   // about a headset. ⚠️ DECLARED UP HERE WITH THE OTHERS, for the reason those
   // lines give: this is the newest block and therefore the topmost one, and a
   // `let` left where a block used to be is read in its dead zone.
-  let bgSpec = null, bgRow = null, xrSpec = null;
+  let bgSpec = null, bgRow = null, xrSpec = null, smallSpec = null;
   // The choice specimen, kept so the button group can be measured AGAINST it
   // rather than against a number typed into a check. The claim being graded is
   // that the two are different sizes of object, which is a comparison or it is
@@ -1291,16 +1291,22 @@ p.shape()                     // ['viz','controls','keys','plate']`,
       /* 5. A SWITCH AND A PICKER ON THE FOOT. The plate's ends are controls: the
             name and its power switch at the start, the patch picker at the end,
             which is what /fau/, /muta/, /knobs/ and /shape/ put on a foot bar.
-            The keyboard is what gives `between` a width to spread across. */
+            The keyboard is what gives `between` a width to spread across.
+            🔴 THE PICKER HAS NO LABEL AND IS THE END, WHICH IS THE PANEL'S RULE
+            SINCE 2026-09-26 (*"patch selector have no label and is in right"*):
+            a `patch` control is the far end by construction and the panel
+            strips a `.pos-pick-l` off it, so this specimen builds none, and the
+            three names are sentence cased because a patch is printed as it was
+            written (the rule two blocks up in positron-ui). */
       const kb2 = createKeyboard(el('div'), {
         base: 48, letters: false,
         onDown: (n) => kb2.lightNote(n, true),
         onUp: (n) => kb2.lightNote(n, false),
       });
-      const patches = ['ORGAN', 'RHODES', 'CLARINET'];
+      const patches = ['Organ', 'Rhodes', 'Clarinet'];
       let atPatch = 0;
       const pick = createPicker({
-        label: 'patch', what: 'patch',
+        what: 'patch',
         prev: () => pick.show(patches[atPatch = (atPatch + 2) % 3], atPatch),
         next: () => pick.show(patches[atPatch = (atPatch + 1) % 3], atPatch),
         onPick: (i) => pick.show(patches[atPatch = i], i),
@@ -3348,8 +3354,11 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
   section('input', 'BUTTON GROUP',
     'Buttons that each do something, sharing one row and one label, which is not a choice '
     + 'of one thing out of three. `enable(id, false, why)` greys one and puts `why` in its '
-    + 'title, and it throws if `why` is missing.',
-    `const g = createButtonGroup({ label: 'log', buttons: [
+    + 'title, and it throws if `why` is missing. Above it, the small variant: `pos-sm` on '
+    + 'any button, the small toggle\'s own height, as a word, as a primary and as a glyph square.',
+    `el('button', 'pos-sm', 'Copy')                     // the small variant, --ctl-sm tall
+el('button', 'pos-sm', '×', { 'data-glyph': '1' })  // and its square
+const g = createButtonGroup({ label: 'log', buttons: [
   { id: 'copy', label: 'Copy' },
   { id: 'clear', label: 'Clear' },
   { id: 'save', label: 'Save', aria: 'save the log to a file' },
@@ -3357,6 +3366,25 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
 g.enable('clear', false, 'The log on this page is already empty.');`,
     (box) => {
       box.classList.add('kit-wide');
+
+      /* 🔴 THE SMALL VARIANT, NEWEST, SO AT THE TOP OF THE BOX. `button.pos-sm`
+         (`shell.css`), asked 2026-09-26 for `/fau/`'s Compile as *"small button
+         variant"* and wanted by `/wish/`'s remove button before that. A plain
+         button stands first so the eye has the 34 to measure the 26 against;
+         then the word, the primary (the ring is a shadow and survives the
+         height), and the glyph square `/wish/` asked for.
+         ⚠️ NOT IN A `.pos-controls` ROW. Both harnesses press every button in
+         one, by position, and a row of four with no handlers added above the
+         group would move every press on this page below it. A `kit-row` keeps
+         the press order where it was, which is the TOGGLE block's own choice. */
+      const plain = el('button', '', 'Copy', { type: 'button' });
+      const small = el('button', 'pos-sm', 'Copy', { type: 'button' });
+      const smallPri = el('button', 'pos-pri pos-sm', 'Compile', { type: 'button' });
+      const smallGlyph = el('button', 'pos-sm', '×', { type: 'button', 'data-glyph': '1', 'aria-label': 'remove' });
+      const smallRow = el('div', 'kit-row');
+      smallRow.append(plain, small, smallPri, smallGlyph);
+      box.append(smallRow);
+      smallSpec = { plain, small, smallPri, smallGlyph };
 
       // ⚠️ SHOWN IN A `.pos-controls` ROW, WHICH IS WHERE IT GOES. Both
       // harnesses press `.pos-controls button`, which is a DESCENDANT selector,
@@ -5435,11 +5463,17 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const afterName = +(r(ft.status).left - r(nameEl).right).toFixed(1);
       const mid = (e) => r(e).top + r(e).height / 2;
       const oneLine = Math.abs(mid(ft.status) - mid(ft.patchEnd)) <= 1;
-      d.assert('the foot holds the name and its switch at the start and the picker at the end, each on the row’s inset',
-        Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6 && afterName > 0 && afterName <= 12 && oneLine
+      /* ⚠️ AND NO CAPTION ON THE PICKER, READ OFF THE DOM UNDER THE RENDERED
+         END rather than off this page's own call, which passes none: the
+         panel's rule is that it strips one, and a specimen that never handed
+         one in cannot grade that. The node test hands one in; this reads that
+         the far end on screen carries nothing but the control. */
+      const captioned = ft.patchEnd.querySelector('.pos-pick-l') !== null;
+      d.assert('the foot holds the name and its switch at the start and the picker, unlabelled, at the end, each on the row’s inset',
+        Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6 && afterName > 0 && afterName <= 12 && oneLine && !captioned
           && ft.plateRow.dataset.align === 'between' && ft.status === ipanelSpec.power.el && ft.patchEnd === ipanelSpec.pick.el,
-        `name ${offL} px off the left inset, switch ${afterName} px after it, picker ${offR} px off the right inset, `
-        + `${oneLine ? 'on one line' : 'on two lines'}`);
+        `name ${offL} px off the left inset, switch ${afterName} px after it, picker ${offR} px off the right inset `
+        + `${captioned ? 'with a caption' : 'with no caption'}, ${oneLine ? 'on one line' : 'on two lines'}`);
     }
 
     /**
@@ -6560,6 +6594,30 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       && toggleSpec.small.button.dataset.size === 'small'
       && !toggleSpec.lit.button.hasAttribute('data-size'),
       `${bigH.toFixed(1)} px big against ${smallH.toFixed(1)} px small`);
+
+    /**
+     * 🔴 THE SMALL BUTTON IS THE SMALL TOGGLE'S HEIGHT, READ OFF `--ctl-sm`
+     * RATHER THAN TYPED HERE, AND ITS GLYPH FORM IS A SQUARE OF THE SAME.
+     * `pos-sm`, 2026-09-26. Three rendered boxes and one token, compared, so
+     * a toggle and a button that stopped agreeing would fail here rather than
+     * drift. The negative half is the plain button beside them staying a
+     * control's 34: a stylesheet that shrank every button would pass a check
+     * that only measured the small ones. The primary keeps its ring, which is
+     * a shadow and not a size, so it is read as present rather than measured.
+     */
+    {
+      const ctlSm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-sm'));
+      const hOf = (b) => b.getBoundingClientRect().height;
+      const wOf = (b) => b.getBoundingClientRect().width;
+      const ring = getComputedStyle(smallSpec.smallPri).boxShadow !== 'none';
+      d.assert('a small button is the small toggle\'s own height, its glyph form is a square of it, and a plain button beside it stays a control\'s',
+        ctlSm > 0 && Math.abs(hOf(smallSpec.small) - ctlSm) < 0.6 && Math.abs(hOf(smallSpec.smallPri) - ctlSm) < 0.6
+          && Math.abs(hOf(smallSpec.smallGlyph) - ctlSm) < 0.6 && Math.abs(wOf(smallSpec.smallGlyph) - ctlSm) < 0.6
+          && Math.abs(hOf(smallSpec.plain) - 34) < 0.6 && Math.abs(smallH - ctlSm) < 0.6 && ring,
+        `${hOf(smallSpec.small).toFixed(1)} px small, ${wOf(smallSpec.smallGlyph).toFixed(1)} by `
+        + `${hOf(smallSpec.smallGlyph).toFixed(1)} glyph, ${hOf(smallSpec.plain).toFixed(1)} plain, against --ctl-sm ${ctlSm} `
+        + `and the small toggle's ${smallH.toFixed(1)}; the primary ${ring ? 'keeps' : 'lost'} its ring`);
+    }
 
     /**
      * 🔴 ONE YELLOW, READ OFF THE STYLESHEET RATHER THAN TYPED HERE. `--hi`
