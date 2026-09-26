@@ -1,5 +1,20 @@
 # Handoff, 2026-09-26, session 51 continued: the composition research, and what it changed
 
+✅ **EVENING, ON THE EDGE AT `4d978e6-145223-5ba7`, 243/243:** `createGlueRows`
+has `grid` (rows are subgrids on one label column and one control column) and
+`full` (the surface takes the width it is given); rows wrap as clusters and a
+justified row goes linear below `--row-min`, decided by the container's width,
+so the same row is justified at full width and linear in the kit's 320 px frame
+on one page. `Notes off` is `Panic`. The presence badge was measured to carry no
+inset of its own. **`/kit/` declares `bootMs: 12000`** because it says ready at
+7.3 s locally and 7.7 s on the edge against the harness's fixed 7.4 s; it read
+0/1 on the edge three times for a page that is 243/243 before that landed.
+✅ **`plans/plan-eccm-cms.md` LANDED AND WAS REPORTED IN FULL**, and `CLAUDE.md`
+now says a plan that lands mid-task is the next reply, because the first reply
+after it was about a boot budget.
+⚠️ **AN AUDIT AGENT IS WRITING `plans/plan-instrument-audit.md`**: all nine
+instruments against `positron-compose`, one picked, assess and propose only.
+
 ✅ **LATER THE SAME DAY, AND ON THE EDGE AT `ef4fcbe-143850-2f25`:** the seven
 per-component glue patches are gone. `--edge`, `--r` and `--inset` are read by
 every surface (nineteen in `shell.css`, plus the synth view's injected sheet);
