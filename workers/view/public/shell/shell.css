@@ -993,13 +993,46 @@ button.pos-pri[data-busy="1"] {
    awful"). [hidden] is declared because any author display beats the UA's. */
 .pos-rows { width: fit-content; max-width: 100%; }
 .pos-rows-r {
-  display: flex; align-items: center; gap: var(--ctl-gap);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap);
   min-width: 0; background: var(--card);
   padding: var(--rows-gap) var(--rows-pad);
   /* the row IS the inset: a surface inside it reads `--inset` and gets none */
   --inset: 0px;
 }
 .pos-rows-r[hidden] { display: none; }
+/* 🔴 WHEN A ROW JUSTIFIES AND WHEN IT GOES LINEAR, DECIDED BY THE ROW'S OWN
+   WIDTH AND NEVER BY THE VIEWPORT. A row wraps as a cluster: left-aligned, one
+   gap, never squished (that is `flex-wrap` above). A JUSTIFIED row may not
+   wrap that way, because `space-between` justifies each wrapped line on its
+   own and reads as broken (/nola/'s footer at 375: one line left, one right).
+   So below `--row-min`, the width its content needs, every child of a between
+   row is made at least a full line wide and the row is linear. Above it the
+   children sit at the two edges. `100%` here is the flex container, so the
+   same row is justified in a wide surface and linear in a 320 px one on the
+   same page, which is what makes it gradable at desktop width. */
+.pos-rows-r[data-align="between"] > * {
+  min-width: min(100%, max(0px, calc((var(--row-min, 20rem) - 100%) * 999)));
+}
+/* a reserved box at the end of a justified row hugs the edge it sits against:
+   a presence badge reserves its widest word, and `ONLINE` in an 8ch reserve
+   otherwise stands 2ch short of the inset it is meant to touch */
+.pos-rows-r[data-align="between"] > :last-child { text-align: end; }
+/* a surface that takes the width it is given, which is also where `between`
+   has something to spread across */
+.pos-rows.pos-rows-full { width: 100%; }
+/* 🔴 LABEL AND CONTROL ROWS SHARE ONE COLUMN PAIR, OR THEY DO NOT LINE UP.
+   Three `[label, control]` rows laid out as three flex rows put each control
+   wherever its own label's width left it (REVERB, OCTAVE and BOARD are 6, 6
+   and 5 letters, and the third control sat 10 px left of the other two).
+   Things line up because they share a coordinate system: the surface is the
+   grid, its first column is as wide as the widest label, and every row is a
+   subgrid on those same lines. Subgrid is widely available since 2026-03. A
+   row with one child spans both columns, so a picture row still runs edge to
+   edge. Column gap is 0 because the seam is only ever between rows. */
+.pos-rows.pos-rows-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 1px 0; }
+.pos-rows-grid > .pos-rows-r { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; justify-items: start; }
+.pos-rows-grid > .pos-rows-r > :only-child { grid-column: 1 / -1; }
+.pos-rows-grid > .pos-rows-r[hidden] { display: none; }
 /* a picture row: no inset, and one child is the row */
 .pos-rows-r[data-pad="off"] { padding: 0; }
 .pos-rows-r[data-pad="off"] > :only-child { flex: 1 1 auto; min-width: 0; }
