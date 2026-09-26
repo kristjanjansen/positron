@@ -1,5 +1,27 @@
 ## Open
 
+### Open 2026-09-26: patch names are always sentence cased
+
+⚠️ **ASKED, VERBATIM:** *"parches are awalys sentence cased"* (patches are always
+sentence cased). A rule for the kit, not a page fix: wherever a patch name is
+printed (the picker, the nameplate's second line, a plate's patch end, a log
+line), it is `Organ`, never `ORGAN` and never `organ`. To be found by measuring
+which components upper-case their text (`createNameplate` is the suspect) and
+written into `positron-ui` beside the readout rules.
+
+### Open 2026-09-26: `/fau/`, the OFF switch goes and a COMPILE button takes its place, no autocompile
+
+⚠️ **ASKED, VERBATIM, TWO MESSAGES:** *"rm fau off button"*, then *"replace it
+with compile (shimmer). no autocompile"*. The plate's status control (the
+presence switch built with `createPresenceButton`, landed today) is removed;
+in its place a `Compile` button in the kit's shimmer treatment (the sweep the
+stylesheet already has, to be found by name in `shell.css` before anything is
+written), and the page stops compiling on its own after typing stops. Touches
+`demo/fau/index.html`, its `what`, the manifest `one` line if the way it is
+worked changes (it does: a press compiles), and the asserts that named the
+autocompile (`an autocompile waits while a note is being held` and friends).
+`positron-ui`, `positron-compose` and `positron-verify` all apply.
+
 ### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
 
 ⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
@@ -11,6 +33,17 @@ reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
 composites a translucent dot, and each of those is a fact a row would have to
 respect on purpose.
 
+
+### Done 2026-09-26: a third eccm plan, the actual project setup
+
+✅ `plans/plan-eccm-setup.md`: its own private repository from the first commit (positron is public since 2026-09-24), `eccm.positron.studio` and `eccm-media.positron.studio` as one-line custom domains on this zone, staging on this account and production on ECCM's as two wrangler environments, a repository tree, local dev, deploy, a seven-step handover, half a day before the CMS plan's session 1. Reported in full.
+
+⚠️ **ASKED, VERBATIM:** *"make third plan on actual project setup. inside our
+outside repo? i do not have domain for it. eccm.positron.studio somehow?"*.
+Lands in `plans/plan-eccm-setup.md`: repository (in positron or its own),
+hostname (`eccm.positron.studio` on this zone as staging, `eccm.ee` on ECCM's
+account later), the Cloudflare pieces to create and on whose account, the
+wrangler environments, local development, and the handover. Reported in full.
 
 ### Done 2026-09-26: eccm site design analysis, in the background, as a plan
 
