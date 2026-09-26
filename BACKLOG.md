@@ -1,6 +1,15 @@
 ## Open
 
-### Open 2026-09-26: a working example of design from the picture, and a serif specimen for serif-typed graphics
+### Done 2026-09-26: a working example of design from the picture, and a serif specimen for serif-typed graphics
+
+✅ **LIVE AT https://positron.studio/eccm/derive.** Nine pictures read at
+view time: one ground (the Gestures poster, #c7cbc6 after 20 per cent of
+white, ink 10.8:1 and muted ink 4.6:1), six accents toned into the window,
+three grey. The plan would refuse Gestures' toned accent as a colour the
+poster lacks; the page tones every seed and prints the numbers, the line is
+the owner's. Three serifs over the sage ground for the serif section, two
+Garamonds vendored for it. Not detected and said so: whether a graphic's type
+is a serif.
 
 ⚠️ **ASKED, VERBATIM:** *"Build some wxamplee on detection. Also specimen on
 serif fints complimeting serif based event groaphics from detection"*. So:
