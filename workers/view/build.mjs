@@ -350,6 +350,13 @@ const FILES = [
   ['demo/eccm/vendor/source-serif-4-latin.woff2', 'eccm/vendor/source-serif-4-latin.woff2'],
   ['demo/eccm/vendor/source-serif-4-latin-ext.woff2', 'eccm/vendor/source-serif-4-latin-ext.woff2'],
   ['demo/eccm/vendor/LICENSE-source-serif-4', 'eccm/vendor/LICENSE-source-serif-4'],
+  // two Garamonds for demo/eccm/derive.html's serif specimen (asked 2026-09-26)
+  ['demo/eccm/vendor/eb-garamond-latin.woff2', 'eccm/vendor/eb-garamond-latin.woff2'],
+  ['demo/eccm/vendor/eb-garamond-latin-ext.woff2', 'eccm/vendor/eb-garamond-latin-ext.woff2'],
+  ['demo/eccm/vendor/LICENSE-eb-garamond', 'eccm/vendor/LICENSE-eb-garamond'],
+  ['demo/eccm/vendor/cormorant-garamond-latin.woff2', 'eccm/vendor/cormorant-garamond-latin.woff2'],
+  ['demo/eccm/vendor/cormorant-garamond-latin-ext.woff2', 'eccm/vendor/cormorant-garamond-latin-ext.woff2'],
+  ['demo/eccm/vendor/LICENSE-cormorant-garamond', 'eccm/vendor/LICENSE-cormorant-garamond'],
 
   // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
   //
