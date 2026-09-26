@@ -217,6 +217,28 @@ a number that looked about right.
   pre-sets a counter to 0 is worse, because a zero reads as a very confident
   measurement of nothing.
 
+## A patch name is shown as it was written
+
+🔴 **PATCHES ARE ALWAYS SENTENCE CASED.** Instructed 2026-09-26: *"patches are
+always sentence cased"*. A patch is the name somebody gave a sound, and it is
+printed the way they wrote it: `Organ`, `Rhodes Mk I`, `Spring reverb`. Never
+`ORGAN`, never `organ`. That holds in a picker, in a log line, in a readout
+cell and on a plate.
+⚠️ **THE PLATE IS WHERE IT WAS BEING BROKEN, BY A RULE THAT WAS RIGHT ABOUT
+SOMETHING ELSE.** `.panel-plate-l` is uppercase because *"replica names always
+in uppercase"* was asked for, so a maker and a model read as one shelf across
+`/tom/`, `/twelve/`, `/circuit/` and `/evo/`. A patch is not a maker. Until
+2026-09-26 `createInstrumentPanel` handed its patch text to the same line
+class, so the kit's own specimen typed `RHODES MK I` to look right. The panel
+now marks its patch line `panel-plate-patch` and `shell.css` sets its transform
+back to none, at the same weight as the uppercase rule and after it, so it
+reaches every plate that has a patch line and nothing else. The kit asserts it
+off `shown()`, which reads the rendered transform rather than the source.
+⚠️ **AND IT IS WRITTEN SENTENCE CASE AT THE SOURCE TOO.** A rule that only
+un-shouts a string somebody typed in capitals leaves the capitals in the data;
+the kit's specimens and any page's preset list carry the name as it should
+print.
+
 ## /kit/ itself
 
 🔴 **THE NEWEST COMPONENT GOES AT THE TOP OF `/kit/`, AND ITS HEADING IS

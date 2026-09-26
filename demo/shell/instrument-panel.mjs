@@ -173,6 +173,7 @@ export function createInstrumentPanel(o = {}) {
           caps,
         });
       patchLine = plate.lines.length > 1 ? plate.lines[plate.lines.length - 1] : null;
+      if (patchLine) patchLine.classList.add('panel-plate-patch');
       plateRow = glue.row(plate.el, { cls: 'pos-ipanel-plate' });
     } else {
       plate = createNameplate({ lines: [plateSpec.name].filter((t) => t != null && t !== ''), place: 'ends', caps });
@@ -184,6 +185,7 @@ export function createInstrumentPanel(o = {}) {
       } else if (patchText != null && patchText !== '') {
         const tail = createNameplate({ lines: [patchText], place: 'ends', caps });
         patchLine = tail.lines[0];
+        patchLine.classList.add('panel-plate-patch');
         patchEnd = tail.el;
       }
       plateRow = patchEnd
@@ -202,6 +204,12 @@ export function createInstrumentPanel(o = {}) {
 
   /**
    * Rewrite the foot's right-hand end.
+   *
+   * ⚠️ THE PATCH LINE IS MARKED `panel-plate-patch` AND PRINTS AS WRITTEN.
+   * Asked 2026-09-26: *"patches are always sentence cased"*. The plate's
+   * uppercase is about a maker and a model; a patch is the name somebody gave
+   * a sound, so `shell.css` turns the transform off on this one line and the
+   * text handed here is shown exactly as typed.
    *
    * 🔴 IT THROWS ON A PANEL WHOSE PLATE HAS NO SECOND LINE, RATHER THAN GROWING
    * ONE. A line that arrives after the panel is on screen makes the foot taller
