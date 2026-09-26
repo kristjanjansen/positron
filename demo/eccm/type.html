@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ECCM: kirjatüübi proovid</title>
+<!-- demo/eccm/type.html: the type specimen page. The same list row, two facts
+     and one paragraph, set in each candidate face at the sizes and weights
+     the live page uses, so the face is chosen by looking rather than by
+     argument. Asked 2026-09-26: "suggest better type alternatives." after the
+     face was named as the one decision left. The candidates are vendored
+     under ./vendor/ with their OFL files, subset latin and latin-ext (Š and Ž
+     live in latin-ext), fetched once from Google's static host and served
+     from here. Instrument Serif was tried and dropped: no latin-ext subset.
+     The first specimen is the machine's Helvetica, which is what the live
+     page uses today. Not graded. -->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./eccm.css">
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap; src: url('./vendor/inter-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap; src: url('./vendor/inter-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Archivo'; font-weight: 400 700; font-stretch: 62% 125%; font-display: swap; src: url('./vendor/archivo-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Archivo'; font-weight: 400 700; font-stretch: 62% 125%; font-display: swap; src: url('./vendor/archivo-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Schibsted Grotesk'; font-weight: 400 900; font-display: swap; src: url('./vendor/schibsted-grotesk-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Schibsted Grotesk'; font-weight: 400 900; font-display: swap; src: url('./vendor/schibsted-grotesk-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 200 900; font-display: swap; src: url('./vendor/source-serif-4-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 200 900; font-display: swap; src: url('./vendor/source-serif-4-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'IBM Plex Sans'; font-weight: 100 700; font-display: swap; src: url('./vendor/plex-sans-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'IBM Plex Sans'; font-weight: 100 700; font-display: swap; src: url('./vendor/plex-sans-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @layer page {
+    /* each specimen sets two families and a width, and everything inside it
+       reads them; the sizes, weights and spaces are the live page's own */
+    .spec { font-family: var(--body); margin-block-start: var(--eccm-s-16); }
+    .spec-name { font-family: Helvetica, Arial, sans-serif; font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); margin-block-end: var(--eccm-s-6); padding-block-start: var(--eccm-s-4); border-block-start: 1px solid var(--eccm-rule); }
+    .spec .ev-title, .spec .spec-h { font-family: var(--head); font-stretch: var(--head-stretch, 100%); font-weight: var(--head-weight, 400); }
+    .spec .spec-h { font-size: var(--eccm-t-2xl); line-height: var(--eccm-lh-head); max-inline-size: var(--eccm-measure); margin-block: var(--eccm-s-8) var(--eccm-s-6); }
+    .spec .facts { margin-block-end: var(--eccm-s-8); }
+    .spec .ev { margin-block-end: var(--eccm-s-8); }
+    .intro { max-inline-size: var(--eccm-measure); }
+    .intro + .intro { margin-block-start: 1lh; }
+  }
+</style>
+</head>
+<body>
+<header class="site-head">
+  <div class="frame">
+    <a class="mark" href="./"><img src="./logo.svg" width="310" height="147" alt="ECCM, Eesti Nüüdismuusika Keskus"></a>
+    <span class="lang"><span aria-current="page" lang="et">ET</span><a href="https://eccm.ee/index.php/en/" lang="en">EN</a></span>
+  </div>
+</header>
+<nav class="site-nav" aria-label="Menüü">
+  <div class="frame">
+    <ul class="nav">
+      <li><a href="./">Avaleht</a></li>
+      <li><a href="./logo.html">Logo</a></li>
+      <li><a href="./type.html" aria-current="page">Kirjatüüp</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="frame">
+  <h1>Kirjatüübi proovid</h1>
+  <p class="intro">The same row, two facts, a title and a paragraph, at the live page's sizes, weights and spaces, in each candidate. The first is the machine's Helvetica, which is what the live page uses. Every other face is self hosted, subset to latin and latin-ext so Š and Ž are in the same face as the rest, and licensed under the SIL Open Font License.</p>
+  <p class="intro">What to look for: whether the large title at text weight holds its own against the mark; whether the small muted line stays legible at 14 px; whether the paragraph reads calmly at 66 characters; and whether Š, Ž, Õ, Ä, Ö and Ü sit in the words rather than beside them.</p>
+
+  <section class="spec" style="--body: Helvetica, Arial, sans-serif; --head: Helvetica, Arial, sans-serif;">
+    <p class="spec-name">A. Helvetica, Arial, sans-serif. The machine's own, no file loaded. The live page today.</p>
+    <div class="ev">
+      <a class="ev-pic" href="./event.html" tabindex="-1" aria-hidden="true"><img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt=""></a>
+      <div class="ev-body">
+        <p class="ev-kicker"><time datetime="2026-09-30T19:00+03:00">30.09.2026</time><time>19.00</time><span>ECCM</span><span>Ulysses</span></p>
+        <h2 class="ev-title"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</a></h2>
+        <p class="ev-summary prose">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</p>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Millal</dt><dd><time>30.09.2026 kell 19.00</time>, 60 min</dd></div>
+      <div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div>
+    </dl>
+    <p class="spec-h">Žest, šokk, Õnne, Äkki, Öö, Üksi. Morton Feldman 100: For Philip Guston</p>
+    <p class="prose">Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider.</p>
+  </section>
+
+  <section class="spec" style="--body: 'IBM Plex Sans', Helvetica, Arial, sans-serif; --head: 'IBM Plex Sans', Helvetica, Arial, sans-serif;">
+    <p class="spec-name">B. IBM Plex Sans, one variable file per subset. The design plan's pick: a technical grotesque with a condensed sibling the logo's tagline could be reset in.</p>
+    <div class="ev">
+      <a class="ev-pic" href="./event.html" tabindex="-1" aria-hidden="true"><img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt=""></a>
+      <div class="ev-body">
+        <p class="ev-kicker"><time datetime="2026-09-30T19:00+03:00">30.09.2026</time><time>19.00</time><span>ECCM</span><span>Ulysses</span></p>
+        <h2 class="ev-title"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</a></h2>
+        <p class="ev-summary prose">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</p>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Millal</dt><dd><time>30.09.2026 kell 19.00</time>, 60 min</dd></div>
+      <div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div>
+    </dl>
+    <p class="spec-h">Žest, šokk, Õnne, Äkki, Öö, Üksi. Morton Feldman 100: For Philip Guston</p>
+    <p class="prose">Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider.</p>
+  </section>
+
+  <section class="spec" style="--body: 'Inter', Helvetica, Arial, sans-serif; --head: 'Inter', Helvetica, Arial, sans-serif;">
+    <p class="spec-name">C. Inter, one variable file per subset. The even, large x-height screen grotesque; the safest reading face, and the most common.</p>
+    <div class="ev">
+      <a class="ev-pic" href="./event.html" tabindex="-1" aria-hidden="true"><img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt=""></a>
+      <div class="ev-body">
+        <p class="ev-kicker"><time datetime="2026-09-30T19:00+03:00">30.09.2026</time><time>19.00</time><span>ECCM</span><span>Ulysses</span></p>
+        <h2 class="ev-title"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</a></h2>
+        <p class="ev-summary prose">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</p>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Millal</dt><dd><time>30.09.2026 kell 19.00</time>, 60 min</dd></div>
+      <div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div>
+    </dl>
+    <p class="spec-h">Žest, šokk, Õnne, Äkki, Öö, Üksi. Morton Feldman 100: For Philip Guston</p>
+    <p class="prose">Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider.</p>
+  </section>
+
+  <section class="spec" style="--body: 'Archivo', Helvetica, Arial, sans-serif; --head: 'Archivo', Helvetica, Arial, sans-serif; --head-stretch: 80%;">
+    <p class="spec-name">D. Archivo, one variable file per subset with a width axis from 62 to 125. Titles at width 80, so the headings echo the mark's condensed capitals while the body stays at 100; one family, two voices.</p>
+    <div class="ev">
+      <a class="ev-pic" href="./event.html" tabindex="-1" aria-hidden="true"><img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt=""></a>
+      <div class="ev-body">
+        <p class="ev-kicker"><time datetime="2026-09-30T19:00+03:00">30.09.2026</time><time>19.00</time><span>ECCM</span><span>Ulysses</span></p>
+        <h2 class="ev-title"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</a></h2>
+        <p class="ev-summary prose">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</p>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Millal</dt><dd><time>30.09.2026 kell 19.00</time>, 60 min</dd></div>
+      <div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div>
+    </dl>
+    <p class="spec-h">Žest, šokk, Õnne, Äkki, Öö, Üksi. Morton Feldman 100: For Philip Guston</p>
+    <p class="prose">Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider.</p>
+  </section>
+
+  <section class="spec" style="--body: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; --head: 'Schibsted Grotesk', Helvetica, Arial, sans-serif;">
+    <p class="spec-name">E. Schibsted Grotesk, one variable file per subset. A newspaper's grotesque, 2023, made for headlines and columns; more character than Inter, less than Archivo.</p>
+    <div class="ev">
+      <a class="ev-pic" href="./event.html" tabindex="-1" aria-hidden="true"><img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt=""></a>
+      <div class="ev-body">
+        <p class="ev-kicker"><time datetime="2026-09-30T19:00+03:00">30.09.2026</time><time>19.00</time><span>ECCM</span><span>Ulysses</span></p>
+        <h2 class="ev-title"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</a></h2>
+        <p class="ev-summary prose">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</p>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Millal</dt><dd><time>30.09.2026 kell 19.00</time>, 60 min</dd></div>
+      <div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div>
+    </dl>
+    <p class="spec-h">Žest, šokk, Õnne, Äkki, Öö, Üksi. Morton Feldman 100: For Philip Guston</p>
+    <p class="prose">Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider.</p>
+  </section>
+
+  <section class="spec" style="--body: 'Inter', Helvetica, Arial, sans-serif; --head: 'Source Serif 4', Georgia, serif;">
+    <p class="spec-name">F. Source Serif 4 for titles over Inter for everything else. The pairing arvopart.ee makes with Minion and Maison Neue, in two open faces; the serif is the one voice in the list and the sans stays out of the way.</p>
+    <div class="ev">
+      <a class="ev-pic" href="./event.html" tabindex="-1" aria-hidden="true"><img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt=""></a>
+      <div class="ev-body">
+        <p class="ev-kicker"><time datetime="2026-09-30T19:00+03:00">30.09.2026</time><time>19.00</time><span>ECCM</span><span>Ulysses</span></p>
+        <h2 class="ev-title"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</a></h2>
+        <p class="ev-summary prose">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</p>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Millal</dt><dd><time>30.09.2026 kell 19.00</time>, 60 min</dd></div>
+      <div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div>
+    </dl>
+    <p class="spec-h">Žest, šokk, Õnne, Äkki, Öö, Üksi. Morton Feldman 100: For Philip Guston</p>
+    <p class="prose">Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider.</p>
+  </section>
+
+  <section class="spec" style="--body: 'Source Serif 4', Georgia, serif; --head: 'Source Serif 4', Georgia, serif;">
+    <p class="spec-name">G. Source Serif 4 for everything. A text serif with an optical size axis; the calmest long read on white, and the furthest from the mark.</p>
+    <div class="ev">
+      <a class="ev-pic" href="./event.html" tabindex="-1" aria-hidden="true"><img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt=""></a>
+      <div class="ev-body">
+        <p class="ev-kicker"><time datetime="2026-09-30T19:00+03:00">30.09.2026</time><time>19.00</time><span>ECCM</span><span>Ulysses</span></p>
+        <h2 class="ev-title"><a href="./event.html">Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</a></h2>
+        <p class="ev-summary prose">Tööprotsessi viimane hetk, võimalus olla tunnistajaks kolme osaleja koosmõjus tekkinud olukorrale.</p>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Millal</dt><dd><time>30.09.2026 kell 19.00</time>, 60 min</dd></div>
+      <div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div>
+    </dl>
+    <p class="spec-h">Žest, šokk, Õnne, Äkki, Öö, Üksi. Morton Feldman 100: For Philip Guston</p>
+    <p class="prose">Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul. Kõikides aktsioonides on osalistele toeks dramaturg Alissa Šnaider.</p>
+  </section>
+</main>
+
+<footer class="frame site-foot">
+  <span>Eesti Nüüdismuusika Keskus, Herne 11A, 10135 Tallinn</span>
+  <span><a href="./">Tulevased üritused</a></span>
+  <span>Kujunduse proov: kirjatüübid on SIL OFL litsentsiga, failid siinsamas.</span>
+</footer>
+</body>
+</html>
