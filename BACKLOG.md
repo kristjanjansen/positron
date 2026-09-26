@@ -1,5 +1,26 @@
 ## Open
 
+### Open 2026-09-26: better type alternatives for eccm, suggested and shown
+
+⚠️ **THREE MORE IN THE SAME MINUTES:** *"fau compile: its on top of textarea.
+secondary. small button variant. you took 17+ min and failed"* (the agent had
+put it on a band under the text box, primary; it sits over the box's corner
+now, small and secondary, one row gap in); *"rm old eccm version, latest is
+fine"* (v1 and v2 removed, Plex stays for the specimen page); *"add biiit more
+padding on input fields and buttons"* (fields 3rem tall with 12 by 16 inside,
+buttons 3rem with 24 each side). All done.
+
+⚠️ **AND, WITH A CROP OF TWO ROWS:** *"feels like these need biiit more vert
+space in between"*: the small line to the title 8 to 12 px, the title to the
+summary 12 to 16 px. Done.
+
+⚠️ **ASKED, VERBATIM:** *"suggest better type alternatives."* after the face was
+named as the one decision left. A shortlist with reasons in the reply, and a
+specimen page `demo/eccm/type.html` setting the same list row, facts and
+paragraph in each candidate, vendored under `demo/eccm/vendor/` with their
+OFL files and listed by name in `build.mjs`, so the choice is made by looking.
+No change to the live pages until one is chosen.
+
 ### Open 2026-09-26: a plan for an event page whose design comes from the event's picture, in the background
 
 ⚠️ **ASKED, VERBATIM:** *"one idea is to actually change event body design
