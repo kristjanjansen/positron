@@ -135,6 +135,22 @@
      a box and an edge nobody wrote. */
   .kit-nobox { border: 0; border-radius: 0; background: none; padding: 0; }
   .kit-fig { flex: 1 1 200px; min-width: 0; }
+  /* 🔴 AN INSTRUMENT IS NOT A FIGURE AND MUST NOT SHARE A ROW WITH THREE MORE
+     OF THEM. `.kit-fig` is written for a 96 px picture of a filter curve, four
+     across; a panel is an object with a keyboard in it, and two of those side by
+     side at 200 px each would squeeze both below the width of their own
+     contents. These get a row each, at their own width, which is what makes the
+     four comparable: they differ in SHAPE and the eye can only see that if
+     nothing else about them is being decided by the column they landed in. */
+  .kit-fig-inst { flex: 1 1 100%; margin-bottom: 18px; }
+  /* 🔴 A CAPTION IS NEARER THE THING IT NAMES THAN THE NEXT THING ALONG, AND IT
+     WAS NOT. `.kit-fig-l` sits 8 px under its own figure and `.kit-figs` puts
+     12 px under that, so a caption between two stacked panels was 8 px from one
+     and 12 from the other, which at a glance is neither. 8 above and 30 below
+     makes the pair read as a pair. It is the same distance argument
+     `createStack`'s heading support already settles for a block and its title,
+     one element the other way up. */
+  .kit-fig-inst:last-child { margin-bottom: 0; }
   /* One column's worth of a figure and the word naming it, so a row of four can
      be read without a legend. The word is under the box rather than in it,
      because what is IN the box is the component's own honesty mark. */
@@ -1252,14 +1268,19 @@ p.shape()                     // ['viz','controls','keys','plate']`,
             panel that insisted on the other two rows would draw two empty
             boxes, which is the rule about a container with nothing in it. */
       const stomp = createInstrumentPanel({
-        rows: [[knob('MIX', 40), knob('TIME', 88), knob('TONE', 64), knob('FEEDBACK', 52)]],
+        rows: [[knob('MIX', 40), knob('TIME', 88), knob('TONE', 64), knob('REPEATS', 52)]],
         plate: { name: 'POSITRON', patch: 'SPRING REVERB' },
       });
 
       /* 3. PADS RATHER THAN KEYS. The keyboard row is a row like any other, so
             what goes in it is the caller's: this one is sixteen pads. */
       const box16 = createInstrumentPanel({
-        rows: [[knob('TEMPO', 100), knob('SWING', 12)]],
+        /* ⚠️ `start`, BECAUSE TWO KNOBS CENTRED OVER SIXTEEN PADS IS A BAND OF
+           EMPTY SURFACE WITH SOMETHING IN THE MIDDLE OF IT. A drum box puts its
+           tempo at one end; the pads set the panel's width and the knobs line up
+           with the first of them. This is the row option earning its place
+           rather than being demonstrated. */
+        rows: [[[knob('TEMPO', 100), knob('SWING', 12)], { align: 'start' }]],
         keys: createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ top: String(y * 8 + x + 1) }) }).el,
         plate: { name: 'POSITRON', patch: 'SIXTEEN' },
       });
@@ -1277,27 +1298,25 @@ p.shape()                     // ['viz','controls','keys','plate']`,
         ],
       });
 
-      const byTab = { sketch, stomp, box16, desk };
-      const panelFor = (id) => byTab[id];
-
-      const tabs = createTabs({
-        hash: false,
-        tabs: [
-          { id: 'sketch', label: 'The sketch' },
-          { id: 'stomp', label: 'No picture, no keys' },
-          { id: 'box16', label: 'Pads instead of keys' },
-          { id: 'desk', label: 'Rows and nothing else' },
-        ],
-        /* ⚠️ A SENTENCE, NOT A ROW OF FACTS WITH GLUE IN IT. This read
-           `box16 <middot> controls keys plate` for one run, which is the
-           character CLAUDE.md bans in anything a visitor sees and the shape it
-           bans it for: a middot lets a line bolt a second and a third fact on. */
-        onPick: (id) => { o.textContent = `this one is ${panelFor(id).shape().join(', ')}`; },
-      });
-      tabs.panel('sketch').append(sketch.el);
-      tabs.panel('stomp').append(stomp.el);
-      tabs.panel('box16').append(box16.el);
-      tabs.panel('desk').append(desk.el);
+      /* 🔴 NO TAB ROW HERE, AND THE FIRST BUILD HAD ONE. *"I never said put the
+         tabs on the instruments. I said put a new tab to the kit page and make
+         instruments sub page there"*. A tab row inside a block inside a tab row
+         is two navigations one inside the other, and the inner one hides three
+         of four specimens behind a press on a page whose whole job is to show
+         what the kit has. The four stand together and are compared by looking. */
+      const shown = [
+        [sketch, 'every row the component has'],
+        [stomp, 'no picture and no keys'],
+        [box16, 'pads where the keys go'],
+        [desk, 'rows and nothing else'],
+      ];
+      const figs = el('div', 'kit-figs');
+      for (const [panel, caption] of shown) {
+        const cell = el('div', 'kit-fig kit-fig-inst');
+        cell.append(panel.el, el('span', 'kit-fig-l', caption));
+        figs.append(cell);
+      }
+      const panelFor = () => sketch;
 
       /* 🔴 THE FOOT'S RIGHT-HAND END IS THE ONE THAT CHANGES, AND PRESSING A
          NAME IS THE ONLY WAY TO SHOW THAT NOTHING ELSE MOVES WHEN IT DOES. The
@@ -1328,10 +1347,8 @@ p.shape()                     // ['viz','controls','keys','plate']`,
          this path it is exactly the caller's job. */
       const apply = (name) => {
         pick.show(name);
-        const open = panelFor(tabs.at());
-        if (!open.plate) { o.textContent = `${name} chosen, and this panel has no foot to write it in`; return; }
-        open.patch(name);
-        o.textContent = `the foot reads ${name}`;
+        sketch.patch(name);
+        o.textContent = `the first panel's foot reads ${name}`;
       };
       const pick = createPicker({
         label: '', what: 'patch',
@@ -1348,8 +1365,8 @@ p.shape()                     // ['viz','controls','keys','plate']`,
          draws is a decision about every page that has one. */
       pick.show(patches[atPatch]);
 
-      box.append(tabs.el, pick.el, o);
-      ipanelSpec = { sketch, stomp, box16, desk, tabs, pic, patches, pick };
+      box.append(figs, pick.el, o);
+      ipanelSpec = { sketch, stomp, box16, desk, figs, pic, patches, pick };
     });
 
   /**
@@ -5257,10 +5274,18 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const offL = +(r(kids[0]).left - (box.left + inset)).toFixed(1);
       const offR = +((box.right - inset) - r(kids[kids.length - 1]).right).toFixed(1);
       const apart = +(r(kids[kids.length - 1]).left - r(kids[0]).right).toFixed(1);
+      /* ⚠️ THE FLOOR IS THE ROW'S OWN GAP AND NOT A TYPED NUMBER, because what
+         separates `between` from `start` is exactly that: `start` would leave
+         these two `--ctl-gap` apart. It read `apart > 100` until the surface
+         stopped stretching to the page, and then 60.4 px of real separation
+         failed a threshold that had been describing the empty space rather than
+         the arrangement. */
+      const rowGap = px(row, 'columnGap') || px(row, 'gap');
       d.assert('a row aligned between puts one control against each inner edge, which needs two of them',
-        kids.length === 2 && Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6 && apart > 100,
+        kids.length === 2 && Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6
+        && rowGap > 0 && apart > rowGap * 2,
         `${kids.length} control(s), ${offL} px off the left inset and ${offR} px off the right, `
-        + `${apart} px apart`);
+        + `${apart} px apart against a row gap of ${rowGap} px`);
     }
 
     /**
