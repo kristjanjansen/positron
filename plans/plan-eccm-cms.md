@@ -346,6 +346,148 @@ double opt-in"* under REMAINING (unstarted), so it is not a lift. Inbound
 (`info@`, replies, bounces) is Email Routing to a Worker, free, and positron's
 `workers/mail` is exactly that shape.
 
+### The rada7 shape, MEASURED from four letters, and what an ECCM issue borrows
+
+Asked 2026-09-26: *"see ../toimps on rada7 newsletter parser. id assume eccm
+could deliver similar newsletter, any hints how rada7/ivo composes it?"*.
+`../toimps` is a week calendar built out of newsletters, and its parser
+(`src/parse.mjs`, 916 lines) is a description of the rada7 letter written by
+somebody who had to read it by machine. Four letters sit in its `mail/`
+directory as Gmail plaintext (2026-07-30, 08-26, 09-10, 09-17) and its
+`PLAN.md` §5 counts ~201 threads from `uudiskiri@rada7.ee` in the owner's
+Gmail. Everything below is MEASURED on those four files unless marked.
+
+**The envelope.** From `uudiskiri@rada7.ee`, signed *Ivo* (Ivo Kiviorg),
+weekly with gaps, sent late Wednesday or Thursday night: the four `Date:`
+headers read 21:52Z, 22:11Z, 20:36Z and 22:06Z, and toimps found one at 22:32Z
+that says *"täna ehk reedel"*, which is only true in Europe/Tallinn where it
+was already 01:32 on Friday. The subject is a joke and never a summary:
+*"Suvi?!"*, *"AVR, AVL ja AVP"*, *"TLN vs TRT"*, *"Suffering is not a guarantee
+of art"*. Subscribers are BCC (envelope `To:` is `teave@rada7.ee`) and D1 sees
+the display name as *"Rada7.ee via Rada7.ee uudiskiri"*, so a list server
+relays it. No images, no columns, no HTML layout to speak of: the `text/plain`
+part IS the letter, and `<strong>` survives into it as `*asterisks*`.
+
+| letter | bytes | words | links | of which Facebook events | bold spans | day headers |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-07-30 | 5,522 | 590 | 20 | 14 | 35 | 0 |
+| 2026-08-26 | 4,156 | 422 | 20 | 14 | 36 | 3 |
+| 2026-09-10 | 3,462 | 362 | 15 | 9 | 5 | 0 |
+| 2026-09-17 | 5,320 | 567 | 22 | 10 | 20 | 0 |
+
+**The running order, the same in all four:**
+
+1. *"Tere!"*, then one paragraph of the writer's week: a holiday, a Postimees
+   article, an evening lost to SoundCloud. It is a person talking.
+2. **Listening first, going out second.** New releases with the act in bold,
+   the record's name in quotes and the link right after it: *"Meisterjaani
+   lühialbumit "Mitteintelligentne tantsumuusika <bandcamp>""*. toimps counts
+   22 such links across eight letters and attaches only the ones that name
+   exactly one event; the rest are the letter's own.
+3. **The events, one sentence each.** Either under bold weekday headers
+   (`*REEDE*`, `*LAUPÄEV*`, `*PÜHAPÄEV*`, the 08-26 letter) or as flowing
+   prose with the weekday inside the sentence (09-10, 09-17). Within a
+   sentence the grammar is fixed: **the venue is the anchor text of the link,
+   inflected** (*Von Krahlis*, *Paavli Kultuurivabrikus*), **the link is the
+   Facebook event**, **the act or the series is in bold**, the rest of the bill
+   is plain prose after *"kus"* or *"kus laval"*, the day is a weekday word,
+   and an hour is almost never written (toimps first measured 84 rows and 84
+   without a start time, then found a few *"kell 19.00"*). A price appears as
+   a joke (*"Pilet grandmassive kolmekas"*). A listening link for the
+   headliner often follows.
+4. A closing culture note with press links: Tartu's night-life strategy, a
+   club closing, a building threatening two rock clubs.
+5. *"Head kuulamist ja kohtumisteni! Ivo"*, and a one-line footer with the
+   one management link: *"/Lahkuda ja liituda <rada7.ee/uudiskiri> saab
+   endiselt siin! Soovita ka sõbrale!/"*.
+
+**What toimps had to build to read it, which is the measure of the shape.**
+Ivo's prose takes *"three hundred lines of grammar and still refuses two events
+in ten"*: weekday stems with seven case endings, *"järgmisel"* meaning after
+this weekend (two earlier rules were wrong and the archive settled it), venue
+names inflected so a 40-row lexicon with hand-written forms is needed, artist
+names inflected so a prefix match is the best available, and dates and times
+being the same five characters (*"18.06"*). The Disainikeskus letter, a date
+line over a title line over a link, *"needs forty and refuses none"*. A venue's
+own letter (Kultuurikatel, Kai) writes *"30. septembril"* and *"kell 19.00"*
+in separate paragraphs and links a ticket shop, and toimps' third grammar
+exists for exactly that. ⚠️ Two of the four letters the toimps inbox collected
+on its own had a `text/plain` part that was an apology (*"your email software
+can't display HTML emails"*, 792 characters beside 116 KB of HTML), which is
+what MailerLite, Mailchimp and Smaily produce by default; and Smaily wraps
+every link in `trck.smai.ly/r?url=` so the Facebook event and the ticket page
+were nine identical tracking URLs until unwrapped.
+
+**Ivo keeps a fuller list and the letter is his edit of it.** Verbatim from
+2026-07-23 via toimps: *"võite täitsa uurida radaseitsme eventside alt
+terviklikumat nimekirja"*, at `facebook.com/rada7.ee/events`. toimps' whole
+argument is that the edit is the product: *"Ivo already did the work of
+picking"*, and *"the best field is free: the verbatim sentence Ivo wrote"*.
+He is Tallinn-centric and says so; Tartu, Viljandi and Vaskjala appear as side
+trips.
+
+**The hints for an ECCM issue, in order of how much they are worth:**
+
+1. **The sentence is the product, and a machine cannot write it.** ECCM's
+   advantage over rada7 is that its events are already rows with a date, an
+   hour, a hall and a ticket link, so the *skeleton* of an issue is a query:
+   the next seven or thirty days, grouped by day, title in the issue's
+   language, venue, hour, one link. That skeleton is what the composer fills
+   in; **the paragraph above it is what a named person writes**, and an issue
+   with no paragraph is a calendar export nobody reads. `../trip`'s composer
+   split, *"AI prepares, human voices"*, is the same conclusion from the other
+   direction.
+2. **Borrow the running order, not the prose style.** Greeting; one personal
+   paragraph; the events grouped under **bold day headers** (they read well in
+   plain text and they are the one shape both a person and toimps parse
+   without a lexicon); one sentence per event with **the event's name in bold
+   and the venue as the link's anchor text**; a closing note; a signature by a
+   person with a name; one footer line carrying unsubscribe. A subject that is
+   a line somebody wrote, not *"Uudiskiri nr 42"*.
+3. **Write the date as an organisation, not as a curator.** Ivo writes
+   weekdays because his letter is about the week in front of it. ECCM writes
+   about specific evenings up to a fortnight ahead, so each event carries
+   **"30. septembril kell 19.00"** in its own sentence, or better, the date
+   block form: a date line, a title line, a link. That shape needs no year
+   (rolled forward from the send date) and no lexicon. Times in 24-hour with a
+   dot or a colon, never a bare number; a range as *"19.00–21.00"* is one
+   evening and is read as such.
+4. **One link per event and it is the canonical page on eccm.ee, not
+   Facebook.** The current slugs already carry date and hour
+   (`/134-gestuurid-…/2026-09-30-19-00`) and the new site's event page will
+   carry JSON-LD (section 13), so the link is the machine-readable record and
+   the letter can stay prose. **No click-tracking wrappers**, or if the ESP
+   insists, ones that keep the target in a `url=` parameter, which is the only
+   shape toimps can unwrap.
+5. **Send a real `text/plain` part.** Not the ESP's apology stub. It is the
+   same words as the HTML with `*bold*` and `<links>` in angle brackets, which
+   is what Gmail renders from the HTML anyway; it is what toimps and every
+   plaintext client read; and a multipart whose plain half matches its HTML
+   half is a small deliverability signal in its own right. Since the plan
+   already sends one row per recipient through the `send_email` binding, the
+   plain part is one more string in the same message.
+6. **Cadence follows the calendar, not the week.** rada7 is weekly because
+   the scene produces a weekend every week; ECCM has 98 events over two years,
+   about one a week. GUESSED: a monthly issue with the month's programme plus
+   a short issue in any week that has a premiere, rather than a weekly that is
+   empty half the time. Send in the evening, Tallinn time, and anchor every
+   date in `Europe/Tallinn` (toimps' first rule, learned from a Friday that
+   read as Thursday in UTC).
+7. **Publish every issue as a page.** rada7.ee is a frozen WordPress archive
+   (*"Artiklite arhiiv. 1999 – 2019."*) and the letters exist only in inboxes;
+   `../trip` keeps `/uudiskiri/[slug]`. The `issue` table in section 7 already
+   has a slug; render it, link it from the footer as *"loe veebis"*, and the
+   archive is also the newsletter's search presence.
+8. **A listening link per event is the one rada7 habit worth copying
+   outright.** A Bandcamp, SoundCloud or YouTube link for the composer or the
+   ensemble, right after the sentence, is what turns a listing into a reason
+   to go, and the `event` row can carry it as one optional URL field.
+
+What could not be measured: rada7's HTML half (toimps keeps only the plain
+rendering), its subscriber count, and whether Ivo writes in a tool or in Gmail;
+INFERRED from the list-server display name and the BCC envelope that it is a
+plain mailing list, which is also why every letter is pure text.
+
 ## 6. The Cloudflare stack, concretely, with today's free limits
 
 Every number below was READ on 2026-09-26 from developers.cloudflare.com and
@@ -578,6 +720,214 @@ Object alarm that fires AT the time and records scheduled-against-actual; it is
 the right tool if a send must land at 09:00:00 and overkill for a concert
 listing.
 
+### Drafts: where an unsaved draft lives
+
+Asked 2026-09-26: *"draft saving? localstorage or bg PUT?"*. **Both, with
+different jobs, and the server copy is the record.**
+
+- **A `draft` row exists from the first keystroke that follows "New".** The
+  editor page creates the row on open (`POST /api/draft` returns an id), and
+  every change after that is a **debounced background `PUT /api/draft/:id`**:
+  2 s after the last input, and on `blur`, `visibilitychange` to hidden and
+  `pagehide`, with the full form body each time so the request is idempotent.
+  The reply carries `updated_at` and `rev`, and the page shows *"salvestatud
+  12:04:31"* next to the buttons. The PUT sends the `rev` it last saw and the
+  server refuses a stale one with `409` and the newer body, so a tab left open
+  on the laptop cannot overwrite what was typed on the phone an hour later.
+  Cost on Workers Free: an hour of continuous typing at one save per 2 s idle
+  is under 1,800 D1 writes against 100,000 a day, and a real editing hour is a
+  fraction of that.
+- **`localStorage` is the crash buffer, never the record.** Written on every
+  `input` event under the key `draft:<id>`, cleared when a PUT succeeds, and
+  read once on load: if the local copy is newer than the server's
+  `updated_at`, the page offers *"taasta salvestamata muudatused"* and does
+  nothing until asked. Wrapped in try/catch because it can be empty or throw
+  in a private window. It is per browser and per device, which is exactly why
+  it cannot be the record: the editor at home does not have the office
+  laptop's `localStorage`, and the newsletter composer and the scheduler need
+  the server to know a draft exists at all.
+- **The failure that will actually happen is the Access session expiring
+  mid-edit.** The PUT then returns a `302` to the login page, `fetch` follows
+  it, and the page receives a `200` whose body is HTML. Test `content-type`
+  before believing a save; on a non-JSON reply keep the local copy, show
+  *"sessioon aegus, ava leht uuesti, tekst on alles"*, and do not clear
+  anything.
+- **Autosave never touches the published row.** The `draft` table holds the
+  working copy of any kind of row (`kind`, `row_id`, `lang`, `body_json`,
+  `rev`, `updated_at`, `updated_by`) and *Publish* copies it over the live row
+  in one transaction, so an editor correcting a typo in a published event can
+  save ten times without a visitor seeing a half-finished sentence. This is one
+  table more than section 7 lists.
+
+For comparison, positron's `workers/items` store has no PUT at all: an item is
+POSTed once with a `publish_at`, its `unpublished` status is *scheduled*, not
+*draft*, and the page's `draft()` is a function that reads the two fields at
+press time. Nothing is persisted on the client. That is right for a two-field
+notification and wrong for an 800-word open call.
+
+### Paste: what a paste from Word, Google Docs or a browser becomes
+
+Asked: *"rich text paste / parsing?"*. The body is a `<textarea>` holding the
+markdown subset `md.ts` renders, and **a plain textarea receives the
+`text/plain` flavour of the clipboard**, which is where the loss is: headings
+become ordinary lines, bullets become `•` glyphs or vanish, **every link loses
+its URL and keeps only its words**, and bold is gone. Nobody notices until the
+open call is published with its Jotform link as plain text.
+
+- **A `paste` listener on the textarea reads `clipboardData.getData('text/html')`
+  first.** When it is present, parse it with `DOMParser` and walk it into the
+  subset: `h1` to `h3` become `##`, `p` a paragraph, `ul` and `ol` become `- `
+  and `1. `, `strong` and `b` become `**`, `em` and `i` become `*`, `a` becomes
+  `[words](href)`, `br` a newline; everything else is unwrapped and its text
+  kept, and `style`, `class`, `span`, `font`, `o:p`, `img` and `table` are
+  dropped. Then insert the result at the caret with `setRangeText`. About 80
+  lines. Turndown (READ from memory, not measured today: about 30 KB, with a
+  plugin for Word) does the same with more cases covered, and is the fallback
+  if the hand-written walker starts growing.
+- **The two traps that the walker must know about, INFERRED from what these
+  editors emit rather than measured today:** Word marks lists as
+  `<p class="MsoListParagraph">` with a literal middle dot glyph and
+  `mso-list` styles, not as `<ul>`, so a paragraph opening with a middle dot,
+  a bullet, a hyphen or a lone `o` is turned into `- `; and Google Docs wraps the whole paste in
+  `<b style="font-weight:normal">`, a bold tag that is not bold, so weight is
+  read from the computed style and never from the tag name.
+- **Normalise on the way in.** ` ` to a space, three dots to one
+  character or three as the house style decides, straight quotes left alone
+  (Estonian uses „ ” and the editor may type either), and a URL pasted as
+  plain text is left as text because `md.ts` autolinks `https` on render.
+- **A pasted image is an upload.** `../trip`'s `lib/dropzone.js` already does
+  this: its `paste` listener walks `clipboardData.items`, uploads every
+  `image/*` item through the same endpoint as drag-and-drop, and inserts the
+  returned id. The same 4,144 bytes carry over.
+- **The server renders, the client only edits.** Whatever the paste handler
+  produces is still markdown that goes through `md.ts` on the server, and the
+  preview endpoint renders the same POST body, so a paste that fooled the
+  walker is visible in the preview and cannot produce raw HTML on the site.
+  No `contenteditable`, no rich-text editor; the paste handler is the whole
+  concession.
+
+### Dates: the picker
+
+Asked: *"decent datepicker (native is super rough)?"*. **Native
+`<input type="datetime-local">` is fine on a phone and poor on a desk**: a
+segmented field with a small popover in Chrome, spinners for the time half in
+Firefox, a bare field in Safari on macOS, no week numbers, no locale control of
+the month names, no way to say "the same time next Friday". Positron's kit has
+no date control at all (MEASURED: no `date`, `datetime-local` or picker in
+`demo/shell/`), so there is nothing to reuse.
+
+- **The field stays a native `datetime-local` and the picker is an
+  enhancement over it.** The form posts the input's ISO value whether or not
+  JavaScript ran, which is also what keeps the editor a server-rendered form.
+- **The enhancement is one small library, and the pick is flatpickr** (READ
+  from memory, to be measured when it is installed: about 20 KB of script and
+  CSS, no dependencies, an Estonian locale file, `enableTime`, `time_24hr`,
+  `weekNumbers`, `altInput` so the field displays *"30. september 2026,
+  19.00"* while posting ISO, `minDate` for `publish_at`, range mode for a
+  festival's start and end). It has been in maintenance since 2022, which for
+  a date picker is a stable thing to be. Alternatives seen and not chosen:
+  Air Datepicker (smaller, ESM, fewer years behind it), Vanilla Calendar Pro
+  (modern, heavier), Cally (a web component, date only, no time), and Duet's
+  picker (deprecated).
+- **Concerts start on the hour or the half hour**, so the time half can be a
+  `<select>` of quarter hours from 10.00 to 23.00 beside a date-only picker,
+  which is faster to use than any time picker and needs no library for the
+  time at all. Either shape is fine; the one thing not to do is two code
+  paths, native on `pointer: coarse` and a library on `pointer: fine`, because
+  then one of them is never tested.
+- **`publish_at` gets the same control, empty by default**, with the hint
+  *"tühi = kohe"* next to it, and a preview of the moment in words
+  (*"kolmapäeval 30.09 kell 09.00"*) under the field, because a wrong month
+  in a segmented field is invisible and a wrong weekday in words is not.
+
+### Items for the stream, which the editor also composes
+
+Asked: *"note that they also compose items for streaming (see items demo)"*.
+Read as: ECCM will also write short items that go out at a moment to phones
+and to a feed, the thing `demo/items/` does, not only pages that appear. That
+page is a two-field composer (title, body) and a moment; the store (a Durable
+Object per room, `workers/items`) holds the item as `unpublished`, fires an
+**alarm at the named moment**, flips it to `new`, announces it once over FCM to
+the phones that asked, and later puts it away at a `shelf_at` it was also
+told when written. It records scheduled-against-actual, which is how it knows
+its alarms land within a few hundred milliseconds.
+
+- **Two publish paths in one editor.** Pages and events go to D1 and appear
+  by the WHERE clause; a stream item goes to the items store, because *appear
+  when asked for* and *fire at 09:00:00 and tell the phones* are different
+  promises and only the second needs an alarm. The editor's item form is the
+  `demo/items/` composer with an `away` moment added.
+- **The store's room is `eccm`**, and section 10 of this plan already says
+  why the FCM topic is an allowlist of one room rather than a prefix test:
+  every run of a test suite once notified every real subscriber for a day.
+- **The same item can be the newsletter's short issue.** An item with
+  `publish_at` and a body is also a paragraph, and the composer can offer
+  *"saada ka kirjana"*, which creates an `issue` row from it; this is the
+  cheap version of the *"short issue in any week that has a premiere"* above.
+- **What a stream item is not**: an event. It has no venue, no hall, no
+  ticket; it is *"täna õhtul on veel kümme piletit"*. Modelling it as a third
+  content type with two fields is right, and modelling it as an event with
+  most fields empty is the Joomla schema arriving by another road.
+
+### Images, the `../trip` model in full
+
+Asked: *"see ../trip on image handling and resizing and caching"*. READ on
+2026-09-26 from `plans/images.md` (378 lines, status shipped), `lib/media.ts`,
+`lib/lqip.ts` and the trip `CLAUDE.md`. trip settled this over a week in July
+2026 with a Lighthouse lab on real 3 to 5 MB originals, and the numbers below
+are its.
+
+- **One original per image in R2, named by content hash, and every size is a
+  URL.** The bucket is public through a custom hostname (`media.trip.dance`;
+  `r2.dev` has *"no cache/transforms"*), objects are `ed/<sha256-16>.<ext>`
+  with `Cache-Control: immutable` set on PUT, and a rendition is
+  `https://media.trip.dance/cdn-cgi/image/width=800,quality=82,format=auto/<key>`,
+  built by one function, `cdn(key, transform, quality)`. Quality, format and
+  the width ladder live in that function and can change with no backfill.
+  trip calls it the **rent model**: zone Image Transformations bill per unique
+  transformation per month (5,000 free, then $0.50 per 1,000), a tiered edge
+  cache serves repeats, and no Worker sits in the image path.
+- **A fixed ladder bounds the bill.** Content images at 320, 800, 1200 and
+  1600; heroes at 1024, 1600 and 2560; `srcset` from the ladder and an honest
+  `sizes`; Client Hints rejected because arbitrary widths unbound the unique
+  count and fragment the cache. Uniques are then ladder × images: for ECCM,
+  98 events with one picture each is about 400 uniques a month against 5,000.
+- **The markup contract that scored 100.** Explicit `width` and `height` on
+  every `<img>` (CLS 0), `loading="lazy" decoding="async"` below the fold,
+  `fetchpriority="high"` on the one hero, `format=auto` so the browser's
+  `Accept` header picks AVIF or WebP (MEASURED by trip: 84 KB AVIF against
+  110 KB WebP at 800 wide), and a **blurred tiny rendition inlined as a
+  `data:` URI at render time** so a cached page paints the wash on first paint
+  (`lqip.ts`: at most 8 KB, a 4 s timeout, falls back to the plain URL). The
+  hero verdict after measuring: one wide-crop `<img>` with `object-fit: cover`,
+  and `<picture>` art direction dropped because it cost 55 KB for a crop
+  nobody needed.
+- **The traps trip paid for, each one a line here so ECCM does not:**
+  `wrangler r2 object put` writes to local Miniflare unless `--remote` is
+  given, and a first upload pass went nowhere; **a 404 on the R2 custom
+  hostname is edge-cached for four hours** (`max-age=14400`), so a URL
+  requested before its object exists is poisoned, the migration order is
+  upload first and announce after, and a Cache Rule makes 404s `no-store` on
+  the media host; a cold transform of a 5 MB original takes 490 ms to 1.3 s,
+  so trip's cron prewarms the newest ten items' renditions each morning;
+  `format=auto` sometimes declines AVIF on very large sources; and a Worker's
+  own same-zone subrequest can bypass `/cdn-cgi/image` and hand back the
+  original, which is why `lqip.ts` refuses anything over 8 KB.
+- **Uploads go through the Worker**, because the hash needs the bytes, and
+  the body limit of 100 MB is plenty for a photograph. The pending-bucket
+  quarantine and the vision pre-screen exist for community uploads and are
+  not needed where only editors upload.
+- **OG images are a fourth kind**: 1200×630, PNG or JPEG and never WebP or
+  AVIF (older scrapers reject them), baked at publish time or memoised on the
+  first crawler hit into R2 under `og/`, with a versioned URL that is
+  `immutable` and changes when the content does.
+
+So the earlier line in this section, *"Sizes are made on request by Images
+transformations from the one original"*, stands and is now concrete: a
+`media` row is `(id, key, w, h, bytes, alt_et, alt_en)`, the alt texts are
+required fields in the editor, and every `<img>` on the site is produced by
+one function that nobody writes around.
+
 ## 9. Migration
 
 **Three ways out of Joomla, in order of preference, and the first two need
@@ -771,6 +1121,131 @@ folder.** It answers eight of the twelve rows above and turns the migration
 from a scrape into a script.
 
 ---
+
+## 13. Caching, SEO and the sitemap
+
+Asked 2026-09-26: *"add caching / seo / sitemap story"*. The current site has
+none of the three that can be seen from outside: no `Sitemap:` line in
+`robots.txt`, no sitemap at the usual path, no `Cache-Control` worth the name
+on a Joomla page. Nothing is lost by starting from zero.
+
+### Caching, in three layers, and what each one saves
+
+1. **Static assets are served before the Worker runs and cost nothing.** CSS,
+   fonts, the `/nan/` site and any file with a hash in its name go to Workers
+   static assets, *"free and unlimited"* on the request quota (section 6), with
+   `immutable` caching because the name changes when the file does. This is
+   the only layer that saves Worker invocations, and it only changes on a
+   deploy, which is exactly why trip's cache plan refuses to pre-render pages
+   that must change without one: *"prerendered pages are deploy-time ASSETS
+   that tag-purge cannot touch"*.
+2. **HTML is rendered per request and cached at the edge with tags.** trip's
+   pattern, READ from its pages: each route declares `maxAge`, `swr` and tags
+   (`home` 300 s with a 3,600 s stale window, a news article 3,600 s with
+   86,400 s stale and the tags `news-<id>` and `news`, the sitemap 86,400 s),
+   through the Astro Cloudflare adapter's Workers Cache provider, whose config
+   comment reads *"edge hits bypass the Worker, purge by tag"*. Publishing
+   calls a purge endpoint with the tags that changed, at most 20 a call, and
+   the purge is **eventually consistent, 10 to 30 s** (trip's memory of a
+   session spent believing a deploy was broken). For a plain Worker without
+   Astro the same shape is `Cache-Control: public, s-maxage=3600,
+   stale-while-revalidate=86400` plus a `Cache-Tag` header and the zone purge
+   API. ⚠️ Whether tag purge is gated by zone plan is to be READ from the
+   Cloudflare docs when this is built; the fact on the table is that it works
+   on trip's zone, which is not an Enterprise zone.
+3. **D1 reads are what the HTML cache actually saves.** At 500 visitors a day
+   the Worker request budget is untouched either way (section 6); what a
+   cached list page saves is the 30-row scan on every hit and the 50 to 100 ms
+   it costs. trip's measured numbers on cached pages: HIT time to first byte
+   47 to 65 ms, a MISS with the database join 95 ms.
+
+**Two rules that the WHERE-clause scheduling of section 8 now needs.** First,
+**a scheduled row going live must purge the lists**, because a cached list
+page does not know the clock moved; the fifteen-minute cron already in the
+plan does it (select rows whose `publish_at` passed since the last run, purge
+`events` and `home`, and the languages' front pages), and until it runs the
+list is at most `maxAge` old, so keep the list pages' `maxAge` short (300 s)
+and their stale window long. Second, **the shared shell is baked into every
+cached page**, so a deploy that changes the header or footer purges the index
+tags too, which trip learned by shipping a new navigation that stayed old on
+every cached index.
+
+**Three small rules from trip's traps.** A 404 is `no-store`, on the Worker
+and on the media host, so a URL asked for before it exists is not poisoned for
+its `maxAge`. The editor, the preview and anything behind Access are
+`no-store` and carry nothing cacheable, since a cached page is communal and
+*"anything personal renders ... on uncached routes ... never baked into a
+cached page"*. And a preview Worker cannot purge its own zone (Cloudflare error
+1003), so the purge is exercised from the deployed Worker, not from `wrangler
+dev --remote`.
+
+### SEO, which for this site means being a correct document
+
+- **Server-rendered HTML with the content in it**, which Joomla also did, so
+  nothing is lost and nothing needs hydrating. Per page: `<title>` as *"event
+  title, date, ECCM"*, a `<meta name="description">` of about 160 characters
+  from the body's first paragraph, a `<link rel="canonical">`, and **`hreflang`
+  alternates** for `et`, `en` and `x-default`, since section 3 gives every row
+  two slugs.
+- **`og:` and `twitter:` tags, hand-rolled, about thirty lines.** trip checked
+  and Astro core has no SEO module; its `Base.astro` emits `og:site_name`,
+  `og:locale et_EE`, `og:type article` or `website`, title, description, url,
+  an **absolute** `og:image` with width, height, type and alt,
+  `twitter:card summary_large_image`, and `article:published_time`. The image
+  is the event's own picture cropped to 1200×630 by one transformation, or the
+  house card when there is none.
+- **JSON-LD `Event` on every event page**, which is the one thing that makes
+  the calendar legible to Google's event results, to calendar apps and to
+  aggregators like toimps, whose resolvers read JSON-LD before HTML:
+  `name`, `startDate` and `endDate` with the Tallinn offset written out
+  (`2026-09-30T19:00:00+03:00`), `location` as a `Place` with a
+  `PostalAddress`, `offers.url` for the ticket link, `image`, `organizer`,
+  `eventStatus`, and `performer` when there is one. `Organization` on the
+  front page with the logo and the address. No `BreadcrumbList` until there is
+  a breadcrumb.
+- **Feeds.** RSS per language at `/et/feed.xml` and `/en/feed.xml` (Joomla
+  today answers `?format=feed&type=rss`, so that URL joins the redirect
+  table), and an **iCalendar feed at `/events.ics`** for the same rows,
+  because a cultural centre's calendar is something people subscribe to in
+  Calendar and Outlook, and it costs forty lines.
+- **`robots.txt` allows everything and carries the `Sitemap:` line.** The
+  editor and `?preview=` answers carry `X-Robots-Tag: noindex`. trip's
+  robots file is the staging shape (`Disallow: /` with one group per preview
+  bot, because Meta's parser binds directives to the nearest `User-agent`
+  line), and that lesson only matters here if the new site runs on a staging
+  hostname before cutover, which it should: staging `noindex`, production
+  open, and the flip is one deploy.
+- **The redirect table from section 9 is the SEO work that matters most.**
+  Every Joomla URL that has ever been linked 301s to its new page; a site
+  that changes every URL without that loses whatever standing it had.
+- **Alt text is a required field per language** in the editor, and the
+  markup contract from the images section (explicit dimensions, lazy below
+  the fold, one hero) is what trip's pages scored 100 with; the same recipe
+  gives the same score here because the pages are smaller.
+
+### The sitemap
+
+- **One file, `/sitemap.xml`, generated from D1 on request** and cached for a
+  day under the tag `sitemap`, purged on publish. It lists every published
+  event in both languages with `xhtml:link rel="alternate" hreflang` pairs,
+  every page, every news article if any ever exist, and every newsletter
+  issue's web page; `lastmod` from `updated_at` and nothing else, because
+  Google ignores `priority` and `changefreq`. Past events stay in it: they
+  are the archive and they carry the inbound links.
+- **No index file and no chunking.** trip chunks at 40,000 URLs because it
+  has 54,000 threads; ECCM has about 300 URLs and will not reach the 50,000
+  URL limit in its lifetime. `sitemap.xml.ts` and `lib/sitemap.js` (the XML
+  escaper) are the template, minus the chunk loop.
+- **The host comes from the configured origin, never from `request.url`**,
+  which trip notes *"lies about protocol on workerd"*; a sitemap that names
+  `http://` URLs is a sitemap of pages that redirect.
+- **Submit it once in Search Console for each language's property**, and
+  keep the old Joomla property alive until the redirects have been crawled,
+  which the coverage report shows.
+
+What this section costs: about a session's half, folded into session 3 of
+section 11, which already lists *"sitemap and RSS"*. The JSON-LD and the
+iCalendar feed are the two additions to that line.
 
 ## Sources
 

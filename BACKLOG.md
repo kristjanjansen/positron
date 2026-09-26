@@ -1,5 +1,21 @@
 ## Open
 
+### Open 2026-09-26: eccm site design analysis, in the background, as a plan
+
+⚠️ **ASKED, VERBATIM (dictated):** *"In bg do eccm site design analysis. We
+need not to take it all and we actually should improve it, especially
+typography, anti-aliasing and similar stuff. Also look at the logo situation. Is
+it available on vector? Maybe convert into a vector. And what else is there?
+Have a kind of a separate small design system. When we do the demo, we share the
+zero with Positron, Positron just can host the demo of it. So what is the
+minimal kind of nice typography, dark on white approach and also details, and
+compare and contrast it with our Positron composer or composing skill. Maybe we
+can get more things right here. Think about the ECCM visual or UI skill to
+deliver good typography based, white space based UI for a website and write it
+into a plan."* Read-only against eccm.ee, a handful of fetches with a browser
+user agent and no crawl. Lands in `plans/plan-eccm-design.md` and is reported
+here in full when it arrives.
+
 ### Open 2026-09-26: convert `/fau/` to the new rules, in the background, per the audit plan
 
 ⚠️ **ASKED, VERBATIM:** *"do fau in bg"*, after `plans/plan-instrument-audit.md`
@@ -19,6 +35,39 @@ badge in a glued row is not decided and is not to be guessed at; the badge
 reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
 composites a translucent dot, and each of those is a fact a row would have to
 respect on purpose.
+
+
+### Done 2026-09-26: eccm plan follow-ups, images per `../trip`, and a caching, SEO and sitemap story
+
+✅ `plans/plan-eccm-cms.md` §8 *Images, the trip model in full* (one hashed original in R2, `/cdn-cgi/image` renditions on a fixed ladder, the markup contract that scored 100, five traps trip paid for) and a new §13 *Caching, SEO and the sitemap* (three cache layers and what each saves, the two rules WHERE-clause scheduling now needs, `og:` and JSON-LD `Event`, RSS and iCal, one unchunked sitemap from D1).
+
+⚠️ **ASKED, VERBATIM:** *"see ../trip on image handling and resizing and caching.
+add caching / seo / sitemap story."* Read `../trip`'s image pipeline (what it
+resizes with, where it caches, how it serves) before answering, and add three
+things the plan has none of: what is cached where and for how long, what a page
+carries for a search engine and a share card, and how a sitemap is produced from
+D1.
+
+### Done 2026-09-26: eccm plan follow-ups, the editing surface
+
+✅ Four subsections in `plans/plan-eccm-cms.md` §8: drafts (a `draft` table behind a debounced PUT with `rev`, `localStorage` as the crash buffer only, the Access expiry trap), paste (an 80 line `text/html` walker into the markdown subset, the Word and Google Docs traps, pasted images upload), dates (native `datetime-local` enhanced by flatpickr, or a quarter-hour select), stream items (the `demo/items/` composer and `workers/items` alarms as a second publish path).
+
+⚠️ **ASKED, VERBATIM:** *"jooomla: draft saving? localstorae or bg PUT? rich
+text paste / parsing? decent datepicker (native is super rough)? note that they
+also compose items for streaming (see items demo)"*. Four answers, each a section
+in `plans/plan-eccm-cms.md`: where an unsaved draft lives, what a paste from Word
+or a browser becomes, which date picker and why the native one is not it, and
+the fact that `demo/items/` is already a composer of dated items on the same
+stack, so the editor is not built from nothing.
+
+### Done 2026-09-26: the rada7 newsletter's shape, from the parser in `../toimps`, as hints for eccm
+
+✅ Landed in `plans/plan-eccm-cms.md` §5 as *The rada7 shape*, MEASURED on four letters and toimps' three grammars, eight hints in order of worth, reported in full.
+
+⚠️ **ASKED, VERBATIM:** *"see ../toimps on rada7 newsletter parser. id assume eccm
+could deliver similar newsletter, any hints how rada7/ivo composes it?. go"*.
+Read-only: what the parser expects tells what the newsletter is made of. Lands as
+a section in `plans/plan-eccm-cms.md`.
 
 
 ### Done 2026-09-26: the instrument audit, `plans/plan-instrument-audit.md`, reported in full
