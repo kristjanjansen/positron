@@ -9,19 +9,6 @@ line), it is `Organ`, never `ORGAN` and never `organ`. To be found by measuring
 which components upper-case their text (`createNameplate` is the suspect) and
 written into `positron-ui` beside the readout rules.
 
-### Open 2026-09-26: `/fau/`, the OFF switch goes and a COMPILE button takes its place, no autocompile
-
-⚠️ **ASKED, VERBATIM, TWO MESSAGES:** *"rm fau off button"*, then *"replace it
-with compile (shimmer). no autocompile"*. The plate's status control (the
-presence switch built with `createPresenceButton`, landed today) is removed;
-in its place a `Compile` button in the kit's shimmer treatment (the sweep the
-stylesheet already has, to be found by name in `shell.css` before anything is
-written), and the page stops compiling on its own after typing stops. Touches
-`demo/fau/index.html`, its `what`, the manifest `one` line if the way it is
-worked changes (it does: a press compiles), and the asserts that named the
-autocompile (`an autocompile waits while a note is being held` and friends).
-`positron-ui`, `positron-compose` and `positron-verify` all apply.
-
 ### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
 
 ⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
@@ -33,6 +20,26 @@ reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
 composites a translucent dot, and each of those is a fact a row would have to
 respect on purpose.
 
+
+### Done 2026-09-26: `/fau/`, the OFF switch goes and a COMPILE button takes its place, no autocompile
+
+✅ Landed: the presence switch, the idle timer and the switch-off path are gone; the foot is `FAU` with the patch picker beside it at the start and a primary `Compile` at the far end, wearing the kit's `data-busy` sweep while the compiler arrives; a preset pick recompiles only when something is already on the thread. `what` and the manifest line say *when you press Compile*. 50/50 with 44 page asserts (47 before: eight about the switch and the autocompile out, five in: typing compiles nothing, the press, the sweep, and typing into a live instrument compiles nothing at 500 ms and at 1.4 s). `.pos-ipanel-name` wraps, so the picker drops under the name on a phone; kit 244/244.
+
+⚠️ **ASKED, VERBATIM, TWO MESSAGES:** *"rm fau off button"*, then *"replace it
+with compile (shimmer). no autocompile"*. The plate's status control (the
+presence switch built with `createPresenceButton`, landed today) is removed;
+in its place a `Compile` button in the kit's shimmer treatment (the sweep the
+stylesheet already has, to be found by name in `shell.css` before anything is
+written), and the page stops compiling on its own after typing stops. Touches
+`demo/fau/index.html`, its `what`, the manifest `one` line if the way it is
+worked changes (it does: a press compiles), and the asserts that named the
+autocompile (`an autocompile waits while a note is being held` and friends).
+`positron-ui`, `positron-compose` and `positron-verify` all apply.
+⚠️ **THEN, THREE MORE MESSAGES:** *"compile (shimmer) -> "Compile" button, align
+to right, fau stays in left"*, *"(nameplate)"*, *"tell when ready to see at
+url"*. So the foot is the nameplate `FAU` at the left end and `Compile` at the
+right end, in the shimmer treatment, and the reply that says it is done carries
+`https://positron.studio/fau/`.
 
 ### Done 2026-09-26: a third eccm plan, the actual project setup
 
