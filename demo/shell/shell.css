@@ -1029,12 +1029,19 @@ button.pos-pri[data-busy="1"] {
 /* a picture row: no inset, and one child is the row */
 .pos-rows-r[data-pad="off"] { padding: 0; }
 .pos-rows-r[data-pad="off"] > :only-child { flex: 1 1 auto; min-width: 0; }
+/* a well that is the whole row keeps its text on the surface's own inset, handed
+   through the field's token, so its first glyph lines up with every other row's
+   ink (/fau/: the code against the keys and the foot at 20) */
+.pos-rows-r[data-pad="off"] { --field-pad: var(--rows-gap) var(--rows-pad); }
 .pos-rows-r[data-align="start"] { justify-content: flex-start; }
 .pos-rows-r[data-align="center"] { justify-content: center; }
 .pos-rows-r[data-align="end"] { justify-content: flex-end; }
 .pos-rows-r[data-align="between"] { justify-content: space-between; }
 /* a plate spans its row, or `place: 'ends'` has nothing to spread across */
 .pos-rows-r > .panel-plate { flex: 1 1 auto; min-width: 0; }
+/* the foot's start end when the foot holds controls: the name and its switch as
+   one flex item, so a justified row still has exactly two ends */
+.pos-ipanel-name { display: flex; align-items: center; gap: var(--ctl-gap); min-width: 0; }
 
 /* ── readout and log, joined ──────────────────────────────────────────── */
 /* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
@@ -2736,10 +2743,16 @@ button.pos-pg-lab:hover { color: var(--fg); }
   font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); white-space: nowrap;
 }
+/* A text box is a well, not a control whose border is its shape: it paints its
+   own ground, and in a glue its edge doubled the seam (/fau/, 2 px). So it reads
+   --edge and --r and goes flat by inheritance, and kit's isControl leaves it out.
+   --field-pad is the text's inset, published like --kbd-pad; a row's --inset: 0px
+   does not reach it, because that air is the well's and not the row's.
+   Outside a glue nothing moves: /items/ reads 1px --line2 4px before and after. */
 .pos-field input, .pos-field textarea {
   font: 400 12.5px/1.4 var(--mono); color: var(--fg); background: var(--bg);
-  border: 1px solid var(--line2); border-radius: 4px;
-  padding: 0 9px; height: 34px; width: 100%; min-width: 0;
+  border: var(--edge); border-color: var(--line2); border-radius: var(--r);
+  padding: var(--field-pad, 0 9px); height: 34px; width: 100%; min-width: 0;
 }
 /* 🔴 AND THE FOCUS COLOUR HAS TO BE RE-DECLARED HERE, BECAUSE THE GLOBAL ONE
    LOSES. MEASURED 2026-09-23 with `CSS.getMatchedStylesForNode` on a field with
@@ -2763,7 +2776,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    with more to say should be able to see it; horizontal resizing would push
    the panel wider than the screen. */
 .pos-field.tall textarea {
-  height: auto; padding: 7px 9px; line-height: 1.5; resize: vertical;
+  height: auto; padding: var(--field-pad, 7px 9px); line-height: 1.5; resize: vertical;
   font-family: var(--sans); font-size: 13.5px;
 }
 /* `code: true` on createField. A program, not prose: the mono face comes back

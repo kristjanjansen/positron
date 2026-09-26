@@ -16,15 +16,6 @@ into a plan."* Read-only against eccm.ee, a handful of fetches with a browser
 user agent and no crawl. Lands in `plans/plan-eccm-design.md` and is reported
 here in full when it arrives.
 
-### Open 2026-09-26: convert `/fau/` to the new rules, in the background, per the audit plan
-
-⚠️ **ASKED, VERBATIM:** *"do fau in bg"*, after `plans/plan-instrument-audit.md`
-was reported in full. The plan is the brief: shared change 1 (the field reads
-`--edge`, `--r` and a published `--field-pad`; six pages and `feedback.mjs` in
-the blast radius, assert counts before and after on each), shared change 2 (the
-instrument panel's plate row takes a control at each end, one kit specimen and
-one assert), then the page. The agent does not commit; the session does.
-
 ### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
 
 ⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
@@ -36,6 +27,17 @@ reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
 composites a translucent dot, and each of those is a fact a row would have to
 respect on purpose.
 
+
+### Done 2026-09-26: convert `/fau/` to the new rules, in the background, per the audit plan
+
+✅ Landed: the field reads `--edge`, `--r` and `--field-pad` (kit, crate, items, nola, stage unchanged in page-own asserts), the plate row takes a status and a patch control as its two ends (`instrument-panel-test.mjs` 15 to 21 ok, kit 243 to 244), and `/fau/` is `createInstrumentPanel` with no page rules at all (53/53, page asserts 43 to 47). Looked at on 375 and 1280. Left open: an edgeless well has no focus ring inside a glue; the keyboard's own pad row still splits `Panic` onto a second line on a phone (shared defect A).
+
+⚠️ **ASKED, VERBATIM:** *"do fau in bg"*, after `plans/plan-instrument-audit.md`
+was reported in full. The plan is the brief: shared change 1 (the field reads
+`--edge`, `--r` and a published `--field-pad`; six pages and `feedback.mjs` in
+the blast radius, assert counts before and after on each), shared change 2 (the
+instrument panel's plate row takes a control at each end, one kit specimen and
+one assert), then the page. The agent does not commit; the session does.
 
 ### Done 2026-09-26: eccm plan follow-ups, images per `../trip`, and a caching, SEO and sitemap story
 
