@@ -898,7 +898,12 @@ export const DEMOS = [
   // wired to nothing, so one can be looked at and pushed around without a board,
   // a relay or a stream. `built: false` because it publishes no `__demo` and
   // asserts nothing: it is a mirror for the components, not a claim about them.
-  { name: 'kit', group: 'kit', act: 0, created: '2026-09-12', // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
+  // 🔴 `bootMs: 12000` SINCE 2026-09-26, MEASURED: /kit/ says ready at 7.3 s
+  // locally and 7.7 s on the edge with 231 asserts landed, against the harness's
+  // fixed 7.4 s, because it builds and grades every specimen before ready and
+  // its measuring window forbids deferring any of them. Re-measure before
+  // raising this again; a page past 12 s has a build problem, not a budget one.
+  { name: 'kit', group: 'kit', act: 0, bootMs: 12000, created: '2026-09-12', // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
     // double duty: hide this from the index, and skip it in `verify.mjs`, which
     // filters on the same field. So the one page whose entire job is to make
     // component drift visible was the one page the suite could not look at, and

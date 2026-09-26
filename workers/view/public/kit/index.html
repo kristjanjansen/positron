@@ -1346,7 +1346,7 @@ ROW_ALIGN  // start, center, end, between`,
          which on this page is the keyboard, and the panel's plate row above
          already grades it there. */
       const rowOne = strip.row([station], { align: 'start' });
-      strip.row([speed, createPresence({ of: '', mode: 'badge', state: 'online' })], { align: 'start' });
+      strip.row([speed], { align: 'start' });
       const rowPic = strip.row(shape.el, { pad: false });
       shape.redraw();
 
@@ -1366,7 +1366,7 @@ ROW_ALIGN  // start, center, end, between`,
       let oct = 0;
       const octave = createStepper({ what: 'octave', prev: () => String(--oct), next: () => String(++oct) });
       settings.row([cap('OCTAVE'), octave], { align: 'start' });
-      settings.row([cap('BOARD'), createPresence({ of: '', mode: 'badge', state: 'offline' })], { align: 'start' });
+      settings.row([cap('MODE'), createChoice({ label: '', options: [['mono', 0], ['poly', 1]], at: 1 })], { align: 'start' });
 
       /* 3. A DISPLAY OVER ITS BUTTONS. A seven segment field as a picture row,
             and the group that drives it under it. */
@@ -1425,7 +1425,7 @@ ROW_ALIGN  // start, center, end, between`,
       station3.show(stations[1]);
       stripFull.row([station3], { align: 'start' });
       const fullBetween = stripFull.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 }),
-        createPresence({ of: '', mode: 'badge', state: 'online' })], { align: 'between' });
+        (() => { const b = el('button', '', 'MUTE'); b.type = 'button'; return b; })()], { align: 'between' });
       const shape3 = createWaveShape({ name: 'square' });
       stripFull.row(shape3.el, { pad: false });
       shape3.redraw();
@@ -1435,7 +1435,7 @@ ROW_ALIGN  // start, center, end, between`,
       const settingsFull = createGlueRows({ full: true, grid: true });
       settingsFull.row([cap('INSTRUMENT'), createChoice({ label: '', options: [['piano', 0], ['rhodes', 1], ['wurli', 2]], at: 1 })]);
       settingsFull.row([cap('VELOCITY'), createChoice({ label: '', options: [['soft', 0], ['medium', 1], ['hard', 2]], at: 1 })]);
-      settingsFull.row([cap('BOARD'), createPresence({ of: 'Raspberry Pi', mode: 'badge', state: 'checking' })]);
+      settingsFull.row([cap('TUNING'), createStepper({ what: 'cents', prev: () => '', next: () => '' })]);
 
       /* 9. THE SAME TWO ROWS IN A 320 px FRAME, ON THE SAME PAGE. The justified
             row goes LINEAR, one child per line, left-aligned, because its
@@ -1445,7 +1445,7 @@ ROW_ALIGN  // start, center, end, between`,
       const narrow = el('div', 'kit-phone kit-narrow');
       const stripNarrow = createGlueRows({ full: true });
       const narrowBetween = stripNarrow.row([createChoice({ label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1 }),
-        createPresence({ of: '', mode: 'badge', state: 'online' })], { align: 'between' });
+        (() => { const b = el('button', '', 'MUTE'); b.type = 'button'; return b; })()], { align: 'between' });
       const clusterNarrow = createGlueRows({ full: true });
       const clusterRow = clusterNarrow.row(['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C'].map((t) => { const b = el('button', '', t); b.type = 'button'; return b; }), { align: 'start' });
       narrow.append(stripNarrow.el, clusterNarrow.el);
