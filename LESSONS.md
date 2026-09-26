@@ -2844,3 +2844,49 @@ must be graded from cold at least once before anybody says it passes.
 ⚠️ **IT IS THIS PROJECT'S OWN A/B RULE ARRIVING THROUGH STATE RATHER THAN
 THROUGH CODE**: before running a comparison, ask what defect it could NOT
 detect. A warm container is a defect the comparison cannot detect.
+
+
+## 120. A tool that measures against innerWidth reads zero overflow on a phone that has some (session 52)
+
+🔴 **`demo/shot.mjs` PRINTED `none dragging the page sideways` ON `/eccm/` AT
+375 WHILE THE PAGE'S OWN ASSERT READ `404 px of page in 375 px of viewport`.**
+Same page, same minute, one toggle apart, and the difference was the
+denominator. Under mobile emulation Chrome widens the LAYOUT viewport to the
+widest content, so `innerWidth` grew to 404 with the overflow and
+`scrollWidth - innerWidth` was 0. `document.documentElement.clientWidth` is
+the initial containing block and stayed 375.
+⚠️ **THE TOOL'S OWN COMMENT SAID `window.innerWidth` AGREES WITH THE LAYOUT
+VIEWPORT, WHICH IS TRUE UNTIL SOMETHING OVERFLOWS.** A measurement that agrees
+with the truth on every healthy page and disagrees on every sick one is the
+worst instrument there is, and it was the instrument this project had just
+adopted for exactly that question.
+✅ Measure sideways overflow against `clientWidth`, in the page's asserts and
+in the tools alike.
+
+## 121. Size the verification to the change, not to the rulebook (session 52)
+
+🔴 **A BACKGROUND AGENT TOOK 17 MINUTES, 122 TOOL CALLS AND 380,000 TOKENS TO
+MOVE ONE BUTTON AND UNLABEL ONE PICKER**, because the brief enumerated every
+verification this repository's rules could apply: a node test, a two page
+harness run, shots at two widths of two pages, an ancestry walk, rect pairs.
+The owner's words: *"17min to move a compile field. this is way too escessive
+that yu do with you verify stuff"*.
+⚠️ **EVERY STEP WAS A RULE, AND THE SUM WAS THE DEFECT.** The rules exist for
+a rewrite of a component; a button move is not one. `CLAUDE.md` already said
+verify economically, and a brief that lists every applicable check is the
+opposite of economical.
+✅ A one-control change gets `check-html`, ONE `verify.mjs <slug>` of the
+touched page, and one shot at 375 if the change shows on a phone. More only
+when one of those shows something wrong. In memory as well as here.
+
+## 122. A mark with margins inside its box aligns to air (session 52)
+
+🔴 **THE LANGUAGE SWITCH FLOATED 24 PX ABOVE THE LOGO'S E**, reported as *"et
+en lang position / stylying neds work"*. The SVG redraw kept the JPEG's frame
+as its viewBox, so its box carried 29 px of nothing above the E and 25 below
+the tagline, and `align-items: flex-start` aligned the switch to that nothing.
+⚠️ **IT IS THE INK-NOT-BOX RULE (positron-compose §2) ARRIVING THROUGH A
+FILE.** A box can be measured and still be the wrong thing to align to when
+the file put air inside it. The fix is the file's viewBox, not a margin on the
+switch: crop the mark to its ink, and then the head band's two ends align on
+the tagline's baseline, which is the mark's bottom edge, with no number typed.

@@ -1,3 +1,73 @@
+# Handoff, 2026-09-26, end of session 52: eccm in its own face, and a stream still open
+
+## Deployed, committed, in flight
+
+🔴 **NOTHING WAS DEPLOYED THIS SESSION.** The edge still serves BUILD
+`8ee0914-162532-2f29` from session 51, so **https://positron.studio/eccm/ is
+the OLD page** (Plex Sans, the text wordmark, month headings) and
+**https://positron.studio/fau/ is the OLD panel** (Compile in the foot). Three
+commits since then carry everything below, plus one for this handoff, and the
+push has not been done either (the account dance in `CLAUDE.md`).
+
+| | |
+| --- | --- |
+| `fd3391a` | eccm in the face eccm.ee draws, their thumbnails, their layout, a logo redraw |
+| `627b04f` | the instrument panel's patch picker unlabelled at the far end, `pos-sm`, Compile in the textarea's corner |
+| `8ae13ee` | plain pictures at their own size, the event page and the edit form, the logo cropped to its ink |
+
+⚠️ **A BACKGROUND AGENT WAS STILL WRITING `.claude/skills/eccm-ui/SKILL.md`
+WHEN THIS WAS WRITTEN**: a survey of whitespace and type principles from
+primary sources (Bringhurst, Tschichold, Müller-Brockmann, Ruder, Hochuli,
+Vignelli, Lupton, Butterick, Rutter, Refactoring UI) written as the skill the
+design plan's §G outlined, with today's asks as rules. Asked for as *"look up
+priniples on whitespace any design with type"* and *"and add to eccm skill"*.
+**Report it in full when it lands, then re-set the four eccm pages against it
+in ONE pass (the open backlog entry lists what that pass owes), add its
+trigger row to `CLAUDE.md`, commit, deploy fau and eccm together, and confirm
+the stamp on the edge.** If the agent died with the session, the skill is not
+there and the survey has to be run again.
+
+## Where to open it, locally, with `node demo/server.mjs` running
+
+| open | what it is now |
+| --- | --- |
+| http://127.0.0.1:8890/eccm/ | the list in Helvetica, ten of eccm.ee's own 300 px thumbnails drawn plain at their own size, no tint, titles a step down and not underlined, rows 32 px apart, the compact row decided by `main`'s width under 47rem; 17/17 with 11 page asserts |
+| http://127.0.0.1:8890/eccm/event.html | eccm.ee's page for event 134 in this system, HTML only: title and a Muuda button as two ends, six facts in a `dl`, the 900 px poster at the measure, the prose at 66 ch in sentence case, credits |
+| http://127.0.0.1:8890/eccm/edit.html | the form, HTML only: labelled native fields, `datetime-local`, a 24 row textarea, a drop field for the picture over an invisible native input, Salvesta and Loobu; saves nothing and says so |
+| http://127.0.0.1:8890/eccm/logo.html | the served JPEG and `logo.svg` side by side, overlaid in orange, at 2x and at both page sizes, and the tagline in five faces with a measured squeeze under each |
+| http://127.0.0.1:8890/fau/ | the patch picker unlabelled at the far end, Compile small and primary in the textarea's bottom right corner; 51/51 with 45 page asserts |
+| http://127.0.0.1:8890/kit/#button-group | `pos-sm` on `--ctl-sm: 26px`; 246/246 |
+
+58 rows, 56 built, 78 plans, counted.
+
+## The owner's verdicts today, verbatim, because they set the tone for the next session
+
+- *"17min to move a compile field. this is way too escessive that yu do with you verify stuff"*: the fau brief asked for two pages of shots, an ancestry walk and rect pairs for a button move. Written into memory: a one-control change gets one targeted run and one shot.
+- *"eccm page looks bad. i asked just to use event imaes, not overlay anything. have a critical look on whitespace, title type size, unneccessary backgrounds"*, then with a crop *"gestat 101, just-a-bit-different sizes are nervous"*, then *"it sould be light, airy, good type stuff"*, *"this thin underline under bold title is pathetic design"*. Every one is answered in `8ae13ee` except the airy pass, which waits for the skill.
+- Six more small asks on the header and the form arrived after that commit and are done in the working tree, uncommitted at the moment of writing and committed with this handoff: menu rules in ink, the switch on the tagline's baseline with the menu's underline rule, the SVG cropped to its ink, the drop field.
+
+## What was found on the way, all fixed
+
+- **`demo/shot.mjs` printed no overflow on a page 29 px too wide.** Mobile Chrome widens the layout viewport to the content, so `scrollWidth - innerWidth` read 0 while `clientWidth` stayed 375. It measures against `clientWidth` now. LESSONS #120.
+- **A compound title with no break at a slash** ran the phone 404 px wide; titles carry the prose's `overflow-wrap` floor.
+- **The SVG aligned to air.** The JPEG's empty margins were inside the SVG's box, so a switch aligned to the box floated 24 px above the E. The file's viewBox is the ink now (35 27 310 147); the logo page's overlay resets it to the JPEG's frame. LESSONS #122.
+- **The tagline face by measurement**: natural width of the tagline in five installed faces against the picture's 311 px, DIN Condensed 329 (a 5 per cent squeeze), Avenir Next Condensed 395, Arial Narrow 415, Helvetica Neue Condensed 422, Helvetica 506. The SVG asks for DIN first.
+
+## Open in `BACKLOG.md`, this session's headings
+
+- Open 2026-09-26: `/eccm/` looks bad, the pictures are to be plain, and the air, the title size and the grounds get a critical look (everything in it is done except the airy pass, which waits for the skill; strike it when that pass lands)
+- Done 2026-09-26: the eccm event page, an edit button and an edit form
+- Done 2026-09-26: the instrument panel's patch selector is unlabelled and at the right, and `/fau/`'s Compile moves into the textarea's corner
+- Done 2026-09-26: `/eccm/` in the face eccm.ee really draws, with their thumbnails, nearer their layout, and a logo test page
+- Everything from session 51's list is unchanged and still open.
+
+## Next on eccm, in order
+
+1. The skill lands: relay, re-set the pages, deploy. 2. The English tree. 3. The email to ECCM for the vector logo, the tagline face and the designer's name (not sent; the redraw is interim and says so in its `<desc>`). 4. A look on a Windows machine. 5. The setup plan's session 0.
+
+---
+
+
 # Handoff, 2026-09-26, end of session 51: where everything is
 
 ## Deployed, and where to open it

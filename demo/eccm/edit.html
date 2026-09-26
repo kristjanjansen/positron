@@ -7,8 +7,11 @@
 <title>Muuda sündmust. ECCM</title>
 <!-- demo/eccm/edit.html: the edit form for one event, HTML only, in the eccm
      system: native fields with visible labels, datetime-local for the dates,
-     a textarea for the prose with a blank line between paragraphs, a file
-     field for the picture with the current one shown beside it. Nothing is
+     a textarea for the prose with a blank line between paragraphs, and a
+     drop field for the picture beside the current one: the native file input
+     lies over the whole field, so a drop or a click anywhere on it lands on
+     the control with no script (what script would add is a highlight while a
+     file is dragged over it). Nothing is
      saved anywhere and the page says so; Salvesta submits to the event page
      with GET so the form is exercised and nothing is written. What the real
      editing surface does behind this is plans/plan-eccm-cms.md §8. -->
@@ -164,13 +167,14 @@ Kaasrahastatud Euroopa Liidu poolt. Avaldatud seisukohad ja arvamused on ainult 
       <p class="hint">Tühi rida alustab uut lõiku, rida algusega ## on vahepealkiri.</p>
     </div>
     <div class="field">
-      <label for="f-picture">Pilt</label>
-      <div class="pic-field">
+      <span class="field-name">Pilt</span>
+      <div class="drop">
         <img src="./ic_medium_w300h300q100_gestures-situations-small.jpg" width="300" height="199" alt="the current picture">
-        <div>
+        <label class="drop-zone" for="f-picture">
           <input id="f-picture" name="picture" type="file" accept="image/*">
-          <p class="hint">Praegune pilt jääb, kui uut ei vali.</p>
-        </div>
+          <span class="drop-say"><b>Lohista uus pilt siia</b> või vali fail</span>
+          <span class="hint">JPEG või PNG, vähemalt 900 px lai. Praegune pilt jääb, kui uut ei vali.</span>
+        </label>
       </div>
     </div>
     <div class="actions">
