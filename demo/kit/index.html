@@ -135,22 +135,6 @@
      a box and an edge nobody wrote. */
   .kit-nobox { border: 0; border-radius: 0; background: none; padding: 0; }
   .kit-fig { flex: 1 1 200px; min-width: 0; }
-  /* 🔴 AN INSTRUMENT IS NOT A FIGURE AND MUST NOT SHARE A ROW WITH THREE MORE
-     OF THEM. `.kit-fig` is written for a 96 px picture of a filter curve, four
-     across; a panel is an object with a keyboard in it, and two of those side by
-     side at 200 px each would squeeze both below the width of their own
-     contents. These get a row each, at their own width, which is what makes the
-     four comparable: they differ in SHAPE and the eye can only see that if
-     nothing else about them is being decided by the column they landed in. */
-  .kit-fig-inst { flex: 1 1 100%; margin-bottom: 18px; }
-  /* 🔴 A CAPTION IS NEARER THE THING IT NAMES THAN THE NEXT THING ALONG, AND IT
-     WAS NOT. `.kit-fig-l` sits 8 px under its own figure and `.kit-figs` puts
-     12 px under that, so a caption between two stacked panels was 8 px from one
-     and 12 from the other, which at a glance is neither. 8 above and 30 below
-     makes the pair read as a pair. It is the same distance argument
-     `createStack`'s heading support already settles for a block and its title,
-     one element the other way up. */
-  .kit-fig-inst:last-child { margin-bottom: 0; }
   /* One column's worth of a figure and the word naming it, so a row of four can
      be read without a legend. The word is under the box rather than in it,
      because what is IN the box is the component's own honesty mark. */
@@ -777,7 +761,19 @@
    * at the top of the file with a part name and the mark follows it with
    * nothing to remember.
    */
-  function section(tab, title, note, src, build) {
+  /**
+   * 🔴 `bare`: NO BOX, NO READOUT, THE SPECIMENS ARE BLOCKS OF THE PAGE. Asked
+   * 2026-09-26 about the PANEL part: *"don't wrap things in another wrappers
+   * because instruments are already wrappers so it's unnecessary. information
+   * footer is unnecessary. let the panels be the panels just extending to the
+   * layout"*. An instrument panel has a border and a ground of its own; a
+   * `.kit-box` round it is a bordered box round a bordered box, which is the
+   * doubled edge `.pos-glue` and `.pos-report` both exist to avoid, one level
+   * up. So `build` is handed `add` instead of a box, and every block it adds is
+   * a child of the part's own stack, spaced by the page's one rhythm with
+   * nothing typed.
+   */
+  function section(tab, title, note, src, build, { bare = false } = {}) {
     const into = panels.get(tab);
     if (!into) throw new Error(`section ${title}: no part called ${tab}`);
     // 🔴 ONE ELEMENT PER SECTION, WHICH IS WHAT A STACK ASKS FOR. These four
@@ -793,12 +789,13 @@
     sec.append(el('h2', 'kit-h', title));
     if (note) sec.append(el('p', 'kit-n', note));
     if (src) sec.append(el('pre', 'kit-src', src));
-    const box = el('div', 'kit-box');
-    sec.append(box);
-    try { build(box); built.push(title); }
+    const box = bare ? null : el('div', 'kit-box');
+    if (box) sec.append(box);
+    const add = (...blocks) => into.add(...blocks);
+    try { build(bare ? add : box); built.push(title); }
     catch (e) {
       failed.push(`${title}: ${e.message}`);
-      box.append(el('div', 'kit-cut', `this block did not build: ${e.message}`));
+      (box || sec).append(el('div', 'kit-cut', `this block did not build: ${e.message}`));
       d.log(`${title} did not build: ${e.message}`, 'bad');
     }
   }
@@ -1041,8 +1038,8 @@
   // topmost ones, and a block that moved on this page once left its `const`
   // behind, the build read it in its dead zone, `section()` swallowed the throw,
   // and the page died much later on an empty map.
-  let ipanelSpec = null;      // { sketch, stomp, box16, desk, tabs }
-  let rowsSpec = null;        // { surface, rows, hideable, buttons }
+  let ipanelSpec = null;      // { sketch, stomp, box16, desk, pic }
+  let rowsSpec = null;        // { g, rowOne, rowTwo, rowPic, shape, loop, speed }
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
@@ -1217,7 +1214,7 @@
    * component reaching outside its own box.
    */
   section('panel', 'INSTRUMENT PANEL',
-    'A picture, rows of controls, a keyboard and a nameplate, glued into one object.',
+    'A picture, rows of controls, a keyboard and a nameplate, glued into one object, in four shapes.',
     `createInstrumentPanel({
   viz:   filter.el,                                 // edge to edge
   rows:  [[cutoff, res, drive], [a, d, s, r]],      // top to bottom
@@ -1227,16 +1224,12 @@
 p.addRow([lfo, depth])        // always above the keys and the foot
 p.patch('WURLITZER 200A')     // rewrite the foot's right half
 p.shape()                     // ['viz','controls','keys','plate']`,
-    (box) => {
-      box.classList.add('kit-wide');
-      const o = out('press a patch name to change the foot');
-
+    (add) => {
       const knob = (label, value) => createKnob({ label, min: 0, max: 127, value });
 
       /* 1. THE SKETCH, WHOLE. Every row kind the component has, in order. */
       const pic = createFilterView({ label: 'filter', type: 'low pass 24dB', freq: 78, resonance: 40 });
-      const keysHost = el('div');
-      const kb = createKeyboard(keysHost, {
+      const kb = createKeyboard(el('div'), {
         base: 48, letters: false,
         onDown: (n) => kb.lightNote(n, true),
         onUp: (n) => kb.lightNote(n, false),
@@ -1251,10 +1244,7 @@ p.shape()                     // ['viz','controls','keys','plate']`,
            into a parent, so handing the parent over puts the keyboard THREE
            levels under the surface, and `.pos-glue > * > .kbd` reaches two.
            MEASURED before this line changed: 4 px of border still on the keys
-           and 10 px of their own bottom margin under them, so the row was even
-           at the top and 10 px deeper at the bottom. A wrapper is exactly what
-           `shell.css` warns about two rules along, where a direct-child selector
-           fixed `/radio/` and left `/pack/` as reported. */
+           and 10 px of their own bottom margin under them. */
         keys: kb.el,
         plate: { name: 'NOLA', patch: 'RHODES MK I' },
       });
@@ -1264,30 +1254,23 @@ p.shape()                     // ['viz','controls','keys','plate']`,
          line. `synth-view.mjs` publishes this call for exactly this caller. */
       pic.redraw();
 
-      /* 2. NO PICTURE AND NO KEYBOARD. A pedal is four knobs and a name, and a
-            panel that insisted on the other two rows would draw two empty
-            boxes, which is the rule about a container with nothing in it. */
+      /* 2. NO PICTURE AND NO KEYBOARD. A pedal is four knobs and a name. */
       const stomp = createInstrumentPanel({
         rows: [[knob('MIX', 40), knob('TIME', 88), knob('TONE', 64), knob('REPEATS', 52)]],
         plate: { name: 'POSITRON', patch: 'SPRING REVERB' },
       });
 
-      /* 3. PADS RATHER THAN KEYS. The keyboard row is a row like any other, so
-            what goes in it is the caller's: this one is sixteen pads. */
+      /* 3. PADS WHERE THE KEYS GO. The keyboard row is a row like any other.
+            ⚠️ `start`, because two knobs centred over sixteen pads is a band of
+            empty surface with something in the middle of it; a drum box puts
+            its tempo at one end. */
       const box16 = createInstrumentPanel({
-        /* ⚠️ `start`, BECAUSE TWO KNOBS CENTRED OVER SIXTEEN PADS IS A BAND OF
-           EMPTY SURFACE WITH SOMETHING IN THE MIDDLE OF IT. A drum box puts its
-           tempo at one end; the pads set the panel's width and the knobs line up
-           with the first of them. This is the row option earning its place
-           rather than being demonstrated. */
         rows: [[[knob('TEMPO', 100), knob('SWING', 12)], { align: 'start' }]],
         keys: createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ top: String(y * 8 + x + 1) }) }).el,
         plate: { name: 'POSITRON', patch: 'SIXTEEN' },
       });
 
-      /* 4. ROWS AND NOTHING ELSE. No picture, no keyboard, no foot: the shape
-            reads `controls controls` and the surface still has exactly one
-            border round it and one seam in it. */
+      /* 4. ROWS AND NOTHING ELSE. No picture, no keyboard, no foot. */
       const desk = createInstrumentPanel({
         rows: [
           [createFader({ label: 'CH1', min: 0, max: 127, value: 96 }),
@@ -1298,76 +1281,13 @@ p.shape()                     // ['viz','controls','keys','plate']`,
         ],
       });
 
-      /* 🔴 NO TAB ROW HERE, AND THE FIRST BUILD HAD ONE. *"I never said put the
-         tabs on the instruments. I said put a new tab to the kit page and make
-         instruments sub page there"*. A tab row inside a block inside a tab row
-         is two navigations one inside the other, and the inner one hides three
-         of four specimens behind a press on a page whose whole job is to show
-         what the kit has. The four stand together and are compared by looking. */
-      const shown = [
-        [sketch, 'every row the component has'],
-        [stomp, 'no picture and no keys'],
-        [box16, 'pads where the keys go'],
-        [desk, 'rows and nothing else'],
-      ];
-      const figs = el('div', 'kit-figs');
-      for (const [panel, caption] of shown) {
-        const cell = el('div', 'kit-fig kit-fig-inst');
-        cell.append(panel.el, el('span', 'kit-fig-l', caption));
-        figs.append(cell);
-      }
-      const panelFor = () => sketch;
-
-      /* 🔴 THE FOOT'S RIGHT-HAND END IS THE ONE THAT CHANGES, AND PRESSING A
-         NAME IS THE ONLY WAY TO SHOW THAT NOTHING ELSE MOVES WHEN IT DOES. The
-         plate is `place: 'ends'`, so the patch grows leftward into air. The
-         assert at the foot of this file measures the name's left edge before and
-         after, which is the claim rather than the picture.
-         🔴 **AND IT WRITES TO THE PANEL YOU CAN SEE, WHICH IT DID NOT AT FIRST.**
-         It drove the sketch whatever tab was open, so pressing it while looking
-         at SIXTEEN changed a foot on another tab and the control read as inert.
-         A control whose only honest behaviour is to do nothing is the shape this
-         project calls a lie, and this one was worse: it did something, somewhere
-         else.
-         ⚠️ **AND THE PANEL WITH NO FOOT SAYS SO RATHER THAN THROWING AT A
-         READER.** `patch()` refuses a plate that has no reserved box for it,
-         because a line that arrives late moves the page, and this is where a
-         reader meets that refusal in words. */
-      const patches = ['RHODES MK I', 'WURLITZER 200A', 'CP-70'];
-      let atPatch = 0;
-      const step = (d) => { atPatch = (atPatch + d + patches.length) % patches.length; return patches[atPatch]; };
-      /* 🔴 `prev` AND `next` ARE WIRED STRAIGHT ONTO THE TWO BUTTONS, SO THE
-         CALLER DRAWS AND THE CALLER REPORTS. `picker.mjs` does `b.onclick =
-         prev`, and its `onPick` belongs to the invisible `<select>` underneath,
-         which is the native list a phone opens. **MEASURED here by pressing the
-         arrow: nothing happened at all**, because the first draft put the work
-         in `onPick` and handed `prev`/`next` a function that only returned a
-         name. The component's own header says it is not the caller's job to
-         call `show()` afterwards, and that sentence is about `options()`; on
-         this path it is exactly the caller's job. */
-      const apply = (name) => {
-        pick.show(name);
-        sketch.patch(name);
-        o.textContent = `the first panel's foot reads ${name}`;
-      };
-      const pick = createPicker({
-        label: '', what: 'patch',
-        prev: () => apply(step(-1)),
-        next: () => apply(step(1)),
-        onPick: (name) => apply(name),
-      });
-      /* 🔴 SEEDED, OR THE CELL DRAWS ITS PLACEHOLDER UNTIL SOMEBODY PRESSES AN
-         ARROW, AND THE PLACEHOLDER IS AN EM DASH. `picker.mjs` builds the cell
-         with one and fills it from `options()`; a prev/next picker hands over no
-         list, so the two specimens further down this page have been showing a
-         character this project bans in anything a reader looks at. Fixed here
-         rather than in the component, because changing what an unfilled picker
-         draws is a decision about every page that has one. */
-      pick.show(patches[atPatch]);
-
-      box.append(figs, pick.el, o);
-      ipanelSpec = { sketch, stomp, box16, desk, figs, pic, patches, pick };
-    });
+      /* 🔴 FOUR BLOCKS OF THE PAGE, NOT FOUR THINGS IN A BOX. Asked as *"let the
+         panels be the panels just extending to the layout"*. No caption under
+         each, because the four differ in shape and the eye can see that; a
+         caption saying so would be the information footer that was asked out. */
+      add(sketch, stomp, box16, desk);
+      ipanelSpec = { sketch, stomp, box16, desk, pic };
+    }, { bare: true });
 
   /**
    * 🔴 THE BASE THE BLOCK ABOVE IS BUILT ON, ASKED FOR IN THE SAME BREATH:
@@ -1390,65 +1310,44 @@ p.shape()                     // ['viz','controls','keys','plate']`,
   section('panel', 'GLUED ROWS',
     'Rows on one surface, a hairline between them, each row painting its own ground.',
     `const g = createGlueRows();
-g.row([picker, stepper])                 // a row of controls, centred
-g.row(scope.el, { pad: false })           // edge to edge, which is what a picture wants
-g.row([left, right], { align: 'between' })
-g.remove(row)                             // the seam goes with it
+g.row([station], { align: 'start' })
+g.row([speed, loop], { align: 'between' })   // one control against each edge
+g.row(scope.el, { pad: false })              // edge to edge, which is what a picture wants
+g.remove(row)                                // the seam goes with it
 ROW_ALIGN  // start, center, end, between`,
-    (box) => {
-      box.classList.add('kit-wide');
-      const o = out('three rows');
-
+    (add) => {
       const g = createGlueRows();
       const stations = ['Raadio 2', 'Klassikaraadio', 'Vikerraadio'];
       let atStation = 0;
       const hop = (d) => { atStation = (atStation + d + stations.length) % stations.length; return stations[atStation]; };
-      /* ⚠️ THE CALLER DRAWS, for the reason the block above this one records
-         at length: the arrows are wired straight onto `prev` and `next`. */
-      const tune = (name) => { station.show(name); o.textContent = `${name}, ${g.count()} rows`; };
+      /* ⚠️ THE CALLER DRAWS. `picker.mjs` wires the arrows straight onto `prev`
+         and `next`, and its `onPick` belongs to the `<select>` underneath, so a
+         picker whose work is in `onPick` is inert on the arrows. MEASURED here
+         by pressing one. */
       const station = createPicker({
         label: '', what: 'station',
-        prev: () => tune(hop(-1)), next: () => tune(hop(1)),
-        onPick: (name) => tune(name),
+        prev: () => station.show(hop(-1)), next: () => station.show(hop(1)),
+        onPick: (name) => station.show(name),
       });
       station.show(stations[atStation]);
       const speed = createChoice({
         label: 'speed', options: [['0.5', 0.5], ['1', 1], ['2', 2]], at: 1,
-        onPick: (_v, name) => { o.textContent = `speed ${name}, ${g.count()} rows`; },
       });
+      /* 🔴 `between` NEEDS TWO CHILDREN OR IT MEANS NOTHING. A single item under
+         `space-between` parks on the LEFT, indistinguishable from `start`, and
+         the first draft of this row had one. `createNameplate` records the same
+         trap about `place: 'ends'`. */
+      const loop = createToggle({ label: 'loop', size: 'small' });
       const shape = createWaveShape({ name: 'sawtooth' });
 
-      /* 🔴 `between` NEEDS TWO CHILDREN OR IT MEANS NOTHING, AND THE FIRST DRAFT
-         OF THIS SPECIMEN HAD ONE. `justify-content: space-between` with a single
-         item parks it on the LEFT, which is indistinguishable from `start`, so
-         the row demonstrated an alignment it was not using. `createNameplate`
-         records the identical trap about `place: 'ends'` and answered it with a
-         fourth placement; here the answer is simply to put something at the
-         other end, and a loop switch is what a strip like this really has. */
-      const loop = createToggle({
-        label: 'loop', size: 'small',
-        onChange: (on) => { o.textContent = `loop ${on ? 'on' : 'off'}, ${g.count()} rows`; },
-      });
       const rowOne = g.row([station], { align: 'start' });
       const rowTwo = g.row([speed, loop], { align: 'between' });
       const rowPic = g.row(shape.el, { pad: false });
       shape.redraw();
 
-      /* ⚠️ HIDDEN RATHER THAN REMOVED, because those are two different claims
-         and `hidden` is the one a reader can undo. Both are true of the seam:
-         `.pos-rows-r[hidden]` is `display: none`, which takes no `gap`. */
-      const cut = el('button', '', 'HIDE THE PICTURE');
-      cut.addEventListener('click', () => {
-        rowPic.hidden = !rowPic.hidden;
-        cut.textContent = rowPic.hidden ? 'SHOW THE PICTURE' : 'HIDE THE PICTURE';
-        o.textContent = rowPic.hidden ? 'two rows showing, and no seam left over' : 'three rows';
-      });
-
-      const controls = el('div', 'pos-controls');
-      controls.append(cut);
-      box.append(g.el, controls, o);
-      rowsSpec = { g, rowOne, rowTwo, rowPic, cut, shape, loop, speed };
-    });
+      add(g);
+      rowsSpec = { g, rowOne, rowTwo, rowPic, shape, loop, speed };
+    }, { bare: true });
 
   section('hardware', 'PANEL SEAM',
     'A rule across a panel from one inner edge of its case to the other.',
@@ -5362,34 +5261,6 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         patchEl.textContent === was && moved === 0 && rowMoved === 0 && taller === 0 && grew > 0,
         `a name ${longer.length} characters long drew ${grew.toFixed(1)} px wide and moved the `
         + `instrument's name by ${moved} px, the row by ${rowMoved} px and its depth by ${taller} px`);
-    }
-
-    /**
-     * 🔴 THE PATCH CONTROL IS PRESSED RATHER THAN READ, BECAUSE IT SHIPPED
-     * INERT AND NOTHING SAID SO. `picker.mjs` wires `prev` and `next` straight
-     * onto its two buttons and its `onPick` belongs to the `<select>`
-     * underneath, so a caller that puts its work in `onPick` gets a control
-     * that draws nothing and changes nothing when an arrow is pressed. It looked
-     * perfectly correct in a screenshot and in the source.
-     * ⚠️ **SO THE GESTURE IS DRIVEN, NOT THE CALLBACK.** A check that called
-     * `sketch.patch()` would have been green throughout, which is this
-     * project's own rule about a meter gated on intent: drive the real gesture.
-     * ⚠️ AND IT PUTS THE FOOT BACK.
-     */
-    {
-      const [, patchEl] = sk.plate.lines;
-      const was = patchEl.textContent;
-      const cell = ipanelSpec.pick.el.querySelector('.pos-pick-cell, .pos-pick-seg')
-        || ipanelSpec.pick.el;
-      const drawnBefore = (cell.textContent || '').trim();
-      ipanelSpec.pick.el.querySelectorAll('button')[1].click();
-      const now = patchEl.textContent;
-      const drawn = (cell.textContent || '').trim();
-      sk.patch(was);
-      ipanelSpec.pick.show(was);
-      d.assert('pressing the patch arrow changes the foot and the control draws what it chose',
-        now !== was && now.length > 0 && drawn.includes(now) && drawnBefore.includes(was),
-        `the foot went from "${was}" to "${now}", and the control read "${drawnBefore}" then "${drawn}"`);
     }
 
     /**

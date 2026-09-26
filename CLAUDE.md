@@ -214,6 +214,7 @@ node workers/mail/test.mjs               # what arrives at positron@ is spam or 
 node demo/resources/measure-durations.mjs   # how long each recording is, asked once
 node demo/resources/build-mimproject-images.mjs --check   # the recovered pictures, prints only
 node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
+node demo/shot.mjs kit 390 1280          # LOOK at a page at a phone width and at the desk, before saying it is done
 DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
 
 cd workers/view && node build.mjs && npx wrangler deploy    # ALWAYS build first
