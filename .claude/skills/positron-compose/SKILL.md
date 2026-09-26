@@ -369,6 +369,29 @@ canvas computing 1 px `--line` inside a glue computing the same 1 px with nothin
 between them. **A ring on a control that already has an edge colours that edge.
 It does not grow a second one.**
 
+🔴 **A CONTAINER THAT STRIPS A COMPONENT'S BORDER STRIPS ITS PADDING IN THE
+SAME RULE, THROUGH THE COMPONENT'S OWN TOKEN.** Padding on a box that no longer
+has a border is a margin the component invented, and a component does not own
+its outer margin: the row it is in supplies the inset. Photographed 2026-09-26:
+the keys sat **29 px** from a glued surface's edge while the nameplate under
+them and every knob row sat at **20**, because `.pos-glue > .kbd` had zeroed
+border, radius and margin and left `padding: var(--kbd-pad)` standing. Asked as
+*"rm its padding/margin (component without border but with padding is
+essentially component with margin and we do not do it, it's ui side-effect)"*.
+The fix is `--kbd-pad: 0px` in that rule and never `padding: 0`, because the
+keyboard's footer bleeds by `calc(-1 * var(--kbd-pad))` and pads by the same
+token; zero the padding alone and the footer overshoots by 9 px each side.
+✅ **THE BIG STEP, WHICH IS WHAT STOPS THE NEXT COMPONENT DOING IT:** three
+things, and the third is the one that holds. **A component's outer inset is a
+token on the component and never a literal**, so a container can take it away
+in one declaration. **Every `.pos-glue > X, .pos-glue > * > X` patch that strips
+a border zeros that token beside it**, in the same rule, so the two cannot come
+apart. **And `/kit/` measures every child of every glued row for its own left
+padding, border and margin and requires zero**, which is the check that found
+the keyboard and then found two more the same minute: a synth view carrying a
+1 px border into a row, and a toggle carrying a 10 px margin. A rule nobody has
+to remember is the only kind that holds.
+
 🔴 **THE RADIUS IS DECLARED ONCE ON THE CONTAINER, AND THE FIRST AND LAST
 SECTIONS READ IT BACK.** `border-radius: inherit` on the four longhands of
 `:first-child` and `:last-child`, which is Bootstrap's list-group verbatim and

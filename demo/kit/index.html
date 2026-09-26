@@ -5264,6 +5264,58 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     }
 
     /**
+     * 🔴 EVERY ROW'S INK STARTS ON ONE LINE, AND A COMPONENT BRINGS NO INSET OF
+     * ITS OWN INTO A ROW. Photographed 2026-09-26: the keys sat 29 px from the
+     * surface edge while `NOLA` and every knob row sat at 20, because the glue
+     * rule stripped the keyboard's border and left its 9 px padding behind.
+     * **Padding on a box that no longer has a border is a margin the component
+     * invented, and a component does not own its outer margin.** So this walks
+     * every row of every panel on the page and measures its FIRST child's left
+     * edge against the row's content edge; anything but 0 is a component
+     * carrying an inset the row already supplies. A row with its inset off is
+     * measured against its border edge instead.
+     * ⚠️ IT NAMES THE OFFENDERS, because *"fix systematically"* means all of
+     * them and not the one in the crop.
+     */
+    {
+      const panels = [['sketch', ipanelSpec.sketch.glue], ['stomp', ipanelSpec.stomp.glue],
+        ['box16', ipanelSpec.box16.glue], ['desk', ipanelSpec.desk.glue], ['rows', rowsSpec.g]];
+      /* ⚠️ THE FIRST DRAFT MEASURED THE CHILD'S BOX AGAINST THE ROW'S CONTENT
+         EDGE AND NAMED THREE CENTRED KNOB ROWS AS OFFENDERS AT +216 px, while
+         the keyboard, whose box IS flush and whose 9 px is INSIDE it, passed.
+         The claim is about what a child carries, so that is what is read: its
+         own left padding, border and margin, which a row's child must have none
+         of. Alignment is the row's business and is graded elsewhere. */
+      /* ⚠️ AND THE SECOND DRAFT FLAGGED A TOGGLE FOR ITS OWN 9 px OF PADDING
+         INSIDE ITS OWN 1 px BORDER, WHICH IS THE CONTROL'S SHAPE AND NOT AN
+         INSET. The owner's words draw the line: *"component without border but
+         with padding is essentially component with margin"*. So three separate
+         claims, each named in the detail: a MARGIN is never the child's; PADDING
+         is an invented margin only where there is no border to frame it; and a
+         BORDER inside a row is a box in a box only on something that is not a
+         control, because a button's edge is the button. */
+      const isControl = (el) => el.matches('button, input, select, textarea, [role="button"], .pos-choice, .pos-pick, .pos-toggle, .pos-check, .pos-stepper, .pos-bgroup');
+      const off = [];
+      let kidsSeen = 0;
+      for (const [name, g] of panels) {
+        for (const row of g.rows()) {
+          if (getComputedStyle(row).display === 'none') continue;
+          for (const kid of row.children) {
+            kidsSeen++;
+            const tag = `${name}/${row.dataset.kind || 'row'} ${kid.className.split(' ')[0]}`;
+            const m = px(kid, 'marginLeft'), p = px(kid, 'paddingLeft'), b = px(kid, 'borderLeftWidth');
+            if (m > 0.6) off.push(`${tag} margin ${m}px`);
+            if (p > 0.6 && b === 0) off.push(`${tag} padding ${p}px with no border`);
+            if (b > 0.6 && !isControl(kid)) off.push(`${tag} border ${b}px on a non-control`);
+          }
+        }
+      }
+      d.assert('no child of a glued row carries a margin, a borderless padding, or a border that is not a control\u2019s',
+        kidsSeen >= 30 && off.length === 0,
+        `${kidsSeen} row children measured, ${off.length} carrying an inset of their own${off.length ? `: ${off.join(', ')}` : ''}`);
+    }
+
+    /**
      * 🔴 A KEYBOARD IN A ROW GIVES UP ITS OWN BOX, AND THE HALF THAT SHOWS IS
      * ITS BOTTOM MARGIN. `.kbd` carries `margin: 0 0 10px`, which `.pos-glue`
      * zeroes on DIRECT children only, so a keyboard one level down would make a

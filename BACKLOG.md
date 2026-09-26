@@ -1,5 +1,20 @@
 ## Open
 
+### Open 2026-09-26: the keyboard's inset inside a glue, and more glued rows examples
+
+🔴 **ASKED, WITH THREE CROPS:** *"keyboard padding is not consistent from the
+rest. fix systematically"*, then *"rm its padding/margin (component without
+border but with padding is essentially component with margin and we do not do
+it, it's ui side-effect. tell me exact rule in skill what you change for it and
+what is the big step to get rid of this negative side-effect on other
+components"*, then *"rm loop button from glued rows, add way more examples of
+glued rows"*.
+
+MEASURED before touching it: `div.kbd 600 x 146.5, padding 9px` inside a row
+that already pads 20, so the keys sat at 29 while `NOLA` and every knob sat at
+20. The glue rule stripped border, radius and margin and left the padding.
+
+
 ### Open 2026-09-26: what the composition research says to change in `shell.css`, in order
 
 🔴 **FROM `research/cascade-cures-2026-09-26.md`, `glued-containers`, `layout-systems`

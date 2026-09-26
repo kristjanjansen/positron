@@ -3771,7 +3771,28 @@ button.pos-pg-lab:hover { color: var(--fg); }
    makes is a reservation that breaks them"*. Two components already carry the
    identical pair of selectors for the identical reason, `.pos-scope` and
    `.tbar`, so this is the third rather than a new idea. */
-.pos-glue > .kbd, .pos-glue > * > .kbd { margin: 0; border: 0; border-radius: 0; background: transparent; }
+/* 🔴 AND THE PADDING GOES WITH THE BORDER, SINCE 2026-09-26, THROUGH THE
+   TOKEN. Photographed: the keys sat 29 px from a glued surface's edge while the
+   nameplate under them sat at 20, because this rule stripped the border and
+   left `padding: var(--kbd-pad)` standing. **Padding on a box that no longer
+   has a border is a margin the component invented, and a component does not
+   own its outer margin; the row it is in already supplies the inset.** Asked as
+   *"rm its padding/margin (component without border but with padding is
+   essentially component with margin and we do not do it, it's ui side-effect)"*.
+   ⚠️ `--kbd-pad: 0px`, NOT `padding: 0`, because `.kbd-foot` bleeds by
+   `calc(-1 * var(--kbd-pad))` to reach the box's edge and pads by the same
+   token: zero the padding alone and the footer overshoots by 9 px on each side.
+   One token, everything derived from it follows. `/evo/` had already written
+   `.evo-keys .kbd { --kbd-pad: 0px }` page-locally, which is the same fix
+   paid for once by one page rather than owned by the component. */
+.pos-glue > .kbd, .pos-glue > * > .kbd { --kbd-pad: 0px; margin: 0; border: 0; border-radius: 0; background: transparent; }
+/* 🔴 A SYNTH VIEW IN A GLUE GIVES UP ITS EDGE, FOUND 2026-09-26 BY THE SAME
+   ASSERT THAT FOUND THE KEYBOARD'S PADDING. `.pos-sv` draws a 1 px `--line`
+   border round its picture; in a row with its inset off that border sits
+   directly against the glue's 1 px seam, and two 1 px lines touching is a 2 px
+   line, which is the exact defect `.pos-glue > .pos-scope > .pos-scope-c`
+   already corrects two components up. Same patch, same pair of selectors. */
+.pos-glue > .pos-sv, .pos-glue > * > .pos-sv { border: 0; border-radius: 0; }
 
 /* ⚠️ 25 PER CENT TALLER ON A DESKTOP, AND THE BLOCK IS HERE RATHER THAN BESIDE
    `.k` FOR ONE REASON: A MEDIA QUERY ADDS NO SPECIFICITY, so a plain `.k` rule
