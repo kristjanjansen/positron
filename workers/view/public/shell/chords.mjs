@@ -59,6 +59,33 @@ export const QUALITIES = [
   ['sus4', [0, 5, 7]],
   ['add9', [0, 4, 7, 14]],
   ['m7b5', [0, 3, 6, 10]],
+  /**
+   * 🔴 FIVE SPELLINGS OF THREE CHORDS THAT ARE ALREADY IN THIS TABLE, AND THEY
+   * ARE HERE BECAUSE THEY WERE COUNTED. MEASURED 2026-09-26 by
+   * `demo/resources/chord-refused.mjs` over 2,076 charts and 159,644 written
+   * chords: `h7` **1,754**, `o7` **882**, `hdim7` **200**, `h` **105** and `o`
+   * **85**, which is **3,026 occurrences** of five ways of writing a half
+   * diminished seventh, a diminished seventh and a diminished triad.
+   * ⚠️ THEY ADD NO QUALITY, WHICH IS THE WHOLE REASON THEY COULD BE ADDED ON
+   * THEIR OWN. Every one maps through `QUALITY_SAYS` onto a name this parser
+   * already returns, so nothing downstream sees a string it has not seen
+   * before: not `RECOGNISED` in `name.mjs`, which reserves the chord cell's
+   * width, and not `CLASS_OF` in `suggest.mjs`, which turns a quality into a
+   * class the counted table knows.
+   * 🔴 AND THE GLYPH SPELLINGS ARE DELIBERATELY NOT HERE, THOUGH THEY WERE
+   * COUNTED TOO. `^` for a major seventh (62), `^9` (60) and `+` for an
+   * augmented triad (48) cannot be reached from a typed line at all, because
+   * `parseChords` splits on everything that is not a chord character and those
+   * three ARE the separator. MEASURED: `parseChords('C+')` returns **C major
+   * and no bad token**, so the plus is eaten before this table is consulted. A
+   * row for it would be a row that cannot be reached, which is the exact thing
+   * the missing `M` row below is a note about. Widening the splitter is a
+   * change to the GRAMMAR rather than to this table, so it was reported and
+   * deliberately not made here.
+   */
+  ['hdim7', [0, 3, 6, 10]],
+  ['h7', [0, 3, 6, 10]],
+  ['o7', [0, 3, 6, 9]],
   ['maj', [0, 4, 7]],
   ['min', [0, 3, 7]],
   ['dim', [0, 3, 6]],
@@ -75,7 +102,43 @@ export const QUALITIES = [
   ['7', [0, 4, 7, 10]],
   ['6', [0, 4, 7, 9]],
   ['5', [0, 7]],
+  /**
+   * 🔴 `2` IS A CHORD AND THIS TABLE SAID IT WAS NOT. Reported 2026-09-26 as
+   * *"chord or no chord"*, with `/nola/` refusing the typed line `Cmaj7 C2/E`
+   * beside an Open Studio lesson, *Getting From I to IV*, playing `C2/E` with
+   * that caption over the keys.
+   * 🔴 THE INTERVALS ARE `[0, 2, 7]` AND NOT `[0, 2, 4, 7]`, AND THE SYMBOL
+   * THAT WAS ASKED ABOUT IS THE ARGUMENT. `C2/E` puts the THIRD in the bass,
+   * which is only a thing to do if the third is not already in the chord: with
+   * a third in the stack the slash would be saying nothing, and `C2/E` and `C2`
+   * would hold the same pitch classes. So the second and the fifth, no third,
+   * and the third arrives underneath when the symbol asks for it. **`C2/E` is
+   * E3 C4 D4 G4, note numbers 52 60 62 67.**
+   * ⚠️ AND THE OTHER READING IS `add9` ALREADY. `[0, 2, 4, 7]` is a major triad
+   * with a ninth folded down into the same octave, and this table has `add9` at
+   * `[0, 4, 7, 14]`, which is the same chord voiced the way people play it.
+   * Adding a second row for it would have been two names for one chord with the
+   * second one sounding worse.
+   * 🔴 SO THIS ROW IS THE SAME THREE NOTES AS `sus2`, AND THAT IS SAID HERE
+   * RATHER THAN HIDDEN. Two names for one sound, both of them real: `sus2` says
+   * a suspension, which is a claim about what happens NEXT, and `2` says a
+   * colour the chord simply has. A page shows back the name that was typed, so
+   * a person who wrote `C2` reads `C2`.
+   * ⚠️ NEITHER CORPUS SETTLES IT, WHICH IS WORTH SAYING BECAUSE EVERY OTHER ROW
+   * ADDED TODAY WAS COUNTED. MEASURED: `2` is written **0 times** in 159,644
+   * chords, against `sus2` 264 and `add9` 23. It is contemporary teaching
+   * vocabulary and both corpora predate it. **The screenshot is the evidence
+   * here, not the measurement.**
+   */
+  ['2', [0, 2, 7]],
   ['m', [0, 3, 7]],
+  /* ⚠️ THE TWO BARE GLYPH SPELLINGS SIT DOWN HERE WITH `m` RATHER THAN BESIDE
+     `h7` AND `o7`, FOR THE REASON THIS TABLE IS ORDERED THE WAY IT IS. `h` is a
+     prefix of `h7` and `hdim7` and `o` of `o7`, so a single character row above
+     a longer one carrying it is exactly the shadowing `chords-test.mjs` walks
+     the table to refuse. Same rule that put `m` after `maj` and `min`. */
+  ['h', [0, 3, 6, 10]],
+  ['o', [0, 3, 6]],
   /* 🔴 THERE IS NO `M` ROW, AND THERE WAS ONE UNTIL `chords-test.mjs` REPORTED
      IT. A capital `M` is normalised to `maj` before this table is consulted, so
      a row for it could never be reached: the lookup is case blind and would
@@ -84,11 +147,21 @@ export const QUALITIES = [
   ['', [0, 4, 7]],
 ];
 
-/** What a quality is CALLED once it is parsed, so two spellings read as one. */
+/**
+ * What a quality is CALLED once it is parsed, so two spellings read as one.
+ *
+ * ⚠️ `2` IS DELIBERATELY ABSENT FROM THIS MAP AND IT IS THE ONE ROW ADDED
+ * TODAY THAT IS. Every other new spelling is folded onto a name the page
+ * already shows, because `h7` and `hdim7` are two ways of writing one thing
+ * nobody calls `h7` out loud. `2` is what the lesson captions and what the
+ * person typed, so it comes back as `2` and `C2` reads `C2`. Folding it onto
+ * `sus2` would show a visitor a chord they did not write.
+ */
 export const QUALITY_SAYS = {
   '': 'maj', m: 'min', min: 'min', maj: 'maj',
   m6: 'min6', m7: 'min7', m9: 'min9', m11: 'min11', m13: 'min13',
   m7b5: 'min7b5', sus: 'sus4',
+  hdim7: 'min7b5', h7: 'min7b5', h: 'min7b5', o7: 'dim7', o: 'dim',
 };
 
 /** The default octave a chord is voiced in. C4 is 60, which is middle C. */
