@@ -1,5 +1,58 @@
 ## Open
 
+### Open 2026-09-26: a glued rows component, and an instrument panel built on it, both in `/kit/` only
+
+🔴 **ASKED, VERBATIM, WITH A SKETCH:** *"do a instrument panel coponent properly
+in kit. its our glued style"*, then the sketch, then *"where name is nameplate.
+add several examples to kit. base on generic \"glued containers/rows\" component
+that you also need to add to kit. do not apply to any page yet. make separate tab
+panels for it in kit"*.
+
+The sketch, as it was drawn:
+
+    -----------
+     viz? orsmth
+    -----------
+     ()()...
+    -----------
+     ()()()...
+    -----------
+     ...etc...
+    -----------
+     ||keys?||||
+    -----------
+      name patch
+    -----------
+
+**TWO components, not one.** A generic glued containers/rows component first,
+then the instrument panel as a caller of it.
+
+**FILES:** a new `demo/shell/<glued rows>.mjs`, a new instrument panel module,
+`demo/shell/shell.css` for both, and `demo/kit/index.html` for the sections. **NO
+page changes at all**, which is explicit in the ask.
+
+⚠️ **AND IT GETS ITS OWN TAB PART IN `/kit/`**, rather than landing in `layout`
+or `hardware`.
+
+🔴 **WHAT IS ALREADY THERE, SO THIS IS NOT A FOURTH COPY.** `createGlue` in
+`demo/shell/glue.mjs` is the LOOK and is 20 lines: it filters, it wraps, it
+returns the child unwrapped when there is one. `.pos-glue` in `shell.css` is
+`gap: 1px` over a `--line` ground with the children giving up border and radius.
+`panel-layout.mjs` already has `band()`, `unband()` and `seam()`, and its seam
+notes say a seam inside the scroller is IMPOSSIBLE rather than merely hard,
+measured at 992 px against a 686 px case. **The new thing is the ROWS, not the
+glue.**
+
+⚠️ **THE TRAP THIS SHAPE WALKS INTO IS WRITTEN DOWN THREE TIMES ALREADY:** every
+glued part paints its own ground or the seam colour comes through its whole area,
+and a replaced element in a glue (`canvas`, `textarea`, `img`, `video`) is
+inline by default and leaves a strip that renders as a second line. A `viz` row
+is a canvas and a `keys` row is a component with its own box.
+
+⚠️ **`/kit/` HAS UNDER A SECOND AND A HALF OF BOOT BUDGET LEFT** and reads
+227/227 today. A draft block took it to 0/1 with 207 asserts once, because the
+whole page reads red when `d.ready()` misses the wait.
+
 ### Open 2026-09-26: `C+` reads as C major instead of being refused
 
 🔴 **FOUND 2026-09-26 WHILE ADDING `2`, AND IT IS WORSE THAN A MISSING ROW:
