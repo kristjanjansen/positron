@@ -1032,6 +1032,23 @@ button.pos-pri[data-busy="1"] {
    — which is the defect measured on `/pack/`, where three column headings were
    drawn over three empty tables while their assert read `head.hidden === true`
    and passed. This is the fifth component in this project to need the patch. */
+/* 🔴 A PANEL IS AS WIDE AS THE INSTRUMENT, NOT AS WIDE AS THE PAGE, AND THIS
+   STYLESHEET ALREADY SAID SO ABOUT THE KEYBOARD BEFORE THE FIRST BUILD OF THIS
+   COMPONENT IGNORED IT. `.kbd` is `width: fit-content; max-width: 100%` with
+   the reason written beside it: *"a full width panel holding a 496 px keyboard
+   is 800 px of empty surface, which reads as a layout that failed rather than
+   as an instrument at its own size"*.
+   🔴 **THE FIRST BUILD STRETCHED, AND THE VERDICT WAS *"plainly awful"*.** Four
+   knobs on a pedal floated in the middle of a 660 px band with roughly 250 px of
+   bare surface either side of them, four times over, because a glued surface
+   with no width of its own fills whatever it is put in and `align-items:
+   center` then parks the controls in the middle of the emptiness. The controls
+   were right and the box around them was making a claim about the object's size
+   that nothing had measured.
+   ⚠️ **AND `max-width: 100%` IS THE OTHER HALF**, so an instrument wider than
+   the page is held inside it and its own rows scroll, rather than dragging the
+   document sideways. Same pair, same file, same argument, four rules along. */
+.pos-rows { width: fit-content; max-width: 100%; }
 .pos-rows-r {
   display: flex; align-items: center; gap: var(--ctl-gap);
   min-width: 0; background: var(--card);
