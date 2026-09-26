@@ -1,5 +1,53 @@
 ## Open
 
+### Open 2026-09-26: an alternative CMS for eccm.ee on the Cloudflare stack, a plan
+
+⚠️ **ASKED, VERBATIM, MID-TASK, AND HANDED TO A BACKGROUND AGENT:** *"in bg do a
+scan of https://eccm.ee/index.php/et/ and make a plan to build an alternative cms
+for them. its joomla atm. how it will look at in cf stack? they seem to have news
+and events and pages and perhaps something else. what its just basic posting and
+scheduled posting. see their api, there are likely bloat schema perhaps not always
+filled / used. can we use cf db for it. also can we get away with free plan?
+multilanguage? joomla vs icagenda. newsletter? see also ../trip for some of these
+ideas (composer, mail rig)"*.
+
+The plan lands in `plans/plan-eccm-cms.md` and is reported here in full when it
+does, not as a filename. ⚠️ The scan is bounded: a handful of pages and the
+JSON API once, no crawling loop, because it is somebody else's server.
+
+
+### Open 2026-09-26: quieten Safari's text scaling, selection and loupe on the phone
+
+⚠️ **ASKED, VERBATIM, AND PARKED ON INSTRUCTION:** *"try to minimize safari scaling
+and selecting and loupe effects. put this to backlog. see
+~/projects/enefit-design-systems Chart component css for inspiration, write that
+ref down and currently we move on"*.
+
+🔴 **THE MEASUREMENT THAT PROMPTED IT.** The owner's iPhone mini wrapped the kit's
+prose to three lines and its code block a word short, while both the Chrome
+emulation at 375 and the **real iPhone 13 mini simulator, iOS 17.5, SF Mono**
+wrapped identically to each other and not to the phone. Boxes were the same
+width on all three. So the difference is Safari's own text size (the `AA` menu),
+roughly 115 to 125 per cent, scaling text and not layout. That is a real
+condition, it is the WCAG text-resize case, and layouts here have to tolerate
+it; `positron-ui` already records the loupe and the selection handles on
+`/keys/`, `/mirror/` and `/blocks/`, answered with `-webkit-touch-callout: none`
+and `user-select` on controls and canvases.
+
+✅ **THE REFERENCE TO READ FIRST**, the design system's Chart component itself,
+not its examples (the first draft of this line pointed at four `app/examples/*.tsx`
+files, which is where a component is used and not where it is written):
+    /Users/s32863/projects/enefit-design-system/components/Chart/ChartTooltip.css
+    /Users/s32863/projects/enefit-design-system/components/Chart/Chart.css
+    /Users/s32863/projects/enefit-design-system/components/Chart/ChartCursor.css
+    /Users/s32863/projects/enefit-design-system/components/Chart/ChartGrid.css
+    /Users/s32863/projects/enefit-design-system/components/Chart/ChartDot.css
+
+⚠️ What to look at in it: `-webkit-text-size-adjust`, `user-select`,
+`-webkit-touch-callout`, `touch-action`, and whatever it does about `font-size`
+under a system text-size change. Nothing here is decided until that is read.
+
+
 ### Open 2026-09-26: the keyboard's inset inside a glue, and more glued rows examples
 
 🔴 **ASKED, WITH THREE CROPS:** *"keyboard padding is not consistent from the
