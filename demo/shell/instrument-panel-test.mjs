@@ -188,5 +188,45 @@ ok('the four row kinds are named in the order the sketch draws them',
     words.every((s) => !s.includes(EM) && !s.includes(MID)), `${words.length} words`);
 }
 
+// 10. The foot takes a control at each end, since 2026-09-26. The name keeps its
+//     plate, a status goes after it, a patch that is a control replaces the patch
+//     line, and text written into a control is refused. The text case is asserted
+//     again at the end so this cannot have moved it.
+{
+  const sw = document.createElement('button'), pk = document.createElement('div');
+  const p = createInstrumentPanel({ keys: document.createElement('div'), plate: { name: 'FAU', status: sw, patch: { el: pk } } });
+  const row = p.plateRow;
+  ok('a foot with controls is one justified row of two ends, and the shape still ends in a plate',
+    p.shape().join(' ') === 'keys plate' && row.dataset.align === 'between' && row.children.length === 2,
+    `${p.shape().join(' ')}, ${row.dataset.align}, ${row.children.length} ends`);
+  const start = row.children[0];
+  ok('the start end is the name and then the switch, and the end is the patch control',
+    start.children.length === 2 && start.children[0] === p.plate.el && start.children[1] === sw
+    && row.children[1] === pk && p.status === sw && p.patchEnd === pk
+    && p.plate.lines.length === 1 && p.plate.lines[0].textContent === 'FAU',
+    `${start.children.length} in the start end, plate reads ${p.plate.lines.map((l) => l.textContent).join('|')}`);
+  ok('a patch end that is a control refuses text, because there is no reserved line to write into',
+    threw(() => p.patch('ORGAN')));
+
+  const sw2 = document.createElement('button');
+  const t = createInstrumentPanel({ plate: { name: 'NOLA', patch: 'RHODES MK I', status: sw2 } });
+  t.patch('WURLITZER 200A');
+  ok('a switch beside a text patch keeps the text at the far end and still writable',
+    t.plateRow.dataset.align === 'between' && t.plateRow.children.length === 2
+    && t.plateRow.children[0].children[1] === sw2 && t.plateRow.children[1].children[0].textContent === 'WURLITZER 200A',
+    `${t.plateRow.children.length} ends, patch reads ${t.plateRow.children[1].children[0].textContent}`);
+
+  const lone = createInstrumentPanel({ plate: { name: 'NOLA', status: document.createElement('button') } });
+  ok('a switch and no patch is a start row with one end, not a justified row with nothing to justify',
+    lone.plateRow.dataset.align === 'start' && lone.plateRow.children.length === 1 && threw(() => lone.patch('X')),
+    `${lone.plateRow.dataset.align}, ${lone.plateRow.children.length} child`);
+
+  const txt = createInstrumentPanel({ plate: { name: 'NOLA', patch: 'RHODES MK I' } });
+  ok('a text plate is exactly what it was: one plate spanning a centred row, the patch its second line',
+    txt.plateRow.children.length === 1 && txt.plateRow.children[0] === txt.plate.el && txt.plateRow.dataset.align === 'center'
+    && txt.plate.lines.length === 2 && txt.status === null && txt.patchEnd === null,
+    `${txt.plateRow.children.length} child, ${txt.plateRow.dataset.align}, ${txt.plate.lines.length} lines`);
+}
+
 console.log(`\n${pass} ok, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -138,13 +138,15 @@
    *
    * ── THE PANEL, THE SWITCH AND `custom` ─────────────────────────────────────
    *
-   * 🔴 THE INSTRUMENT IS A `createInstrument` CASE AND NOT A ROW OF BUTTONS.
+   * 🔴 THE INSTRUMENT IS THE KIT'S GLUED PANEL AND NOT A ROW OF BUTTONS.
    * Asked 2026-09-23: *"create instument panel, fau on top right, below the
-   * textarea (edge to edge), below it footer with on/off"*. The nameplate is
-   * the case's own, printed at the top right; the text box is the whole of the
-   * strip under it; and the footer is that component's glued header at
-   * `at: 'foot'`, which is the same seam a transport bar has over the strip it
-   * drives. Nothing here is drawn by this page.
+   * textarea (edge to edge), below it footer with on/off"*, and moved onto
+   * `createInstrumentPanel` on 2026-09-26 (plans/plan-instrument-audit.md): the
+   * text is its picture row, edge to edge by construction, the keys are its
+   * keys row, and the foot is its plate with the name, the power switch and the
+   * patch picker on it. The name sits in the foot now, where the sketch of
+   * 2026-09-26 puts it. Nothing here is drawn by this page, and the seven page
+   * rules that used to repair the field and the case went with the move.
    *
    * 🔴 `custom` IS THE ANSWER TO THE OBJECTION THAT MADE THE PRESETS BUTTONS,
    * RATHER THAN A REVERSAL OF IT. The argument written here until 2026-09-23
@@ -209,7 +211,9 @@
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC } from '/shell/pedal.mjs';
   import { createField } from '/shell/field.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
-  import { createInstrument } from '/shell/instrument.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
+  import { createPresenceButton } from '/shell/presence.mjs';
+  import { HEADER_STATES, HEADER_SAYS } from '/shell/instrument.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -832,8 +836,11 @@ effect  = dm.freeverb_demo;
   // which happens every time a patch is loaded, and arming an autocompile there
   // would schedule a second compile of what was just compiled.
   const source = createField({
-    label: 'FAUST',
-    grow: 'wide',
+    /* 🔴 NO CAPTION. `label: ''` builds no span (`field.mjs`, `if (label)`),
+       where this page used to build a FAUST label and hide it by rule: a caption
+       over a box holding Faust names what a reader is already reading, and the
+       title and the patch picker say it again. The accessible name is set below. */
+    label: '',
     /* 🔴 TWENTY SINCE 2026-09-25, AND IT HAS NOW MOVED TWICE FOR THE SAME
        REASON. It was 12 until the patches grew comments (*"can you have comments
        in fau file what lines do?"*), where the longest preset was cut through
@@ -853,17 +860,10 @@ effect  = dm.freeverb_demo;
     value: PRESETS[0].code,
     onInput: onType,
   });
-  /* 🔴 THE NAME THE HIDDEN LABEL USED TO CARRY. `.pos-field-l` is `display: none`
-     on this page, and `field.mjs` wires no `aria-label`, `for` or `labelledby`,
-     so without this the editor is an unnamed text box. A caption is furniture
-     here and a name is not. */
+  /* 🔴 THE NAME THE MISSING CAPTION WOULD HAVE CARRIED. `field.mjs` wires no
+     `aria-label`, `for` or `labelledby`, checked rather than assumed, so without
+     this the editor is an unnamed text box. */
   source.input.setAttribute('aria-label', 'the Faust program this page compiles');
-  /* 🔴 ITS OWN CLASS, BECAUSE IT MOVED OUT OF THE CASE ON 2026-09-24 AND EVERY
-     RULE ABOUT IT WAS WRITTEN `.fau-panel .pos-field`. A selector naming an
-     ancestor is a selector that dies silently when the element moves, which is
-     the dead rule this stylesheet has now measured five times. `createField`
-     takes no `cls`, so the page adds one. */
-  source.el.classList.add('fau-src');
 
   function showSource() {
     setCell('source', kb(new TextEncoder().encode(source.value()).length));
@@ -875,11 +875,8 @@ effect  = dm.freeverb_demo;
   }
 
   // ── the keys ───────────────────────────────────────────────────────────────
-  const keysHost = el('div', 'fau-keys');
-  /* 44 px a key rather than the component's 49, for the same reason `/nola/`
-     lowers it: two octaves is what an instrument wants and fifteen white keys
-     at 49 px do not fit the page. The component reads the property. */
-  keysHost.style.setProperty('--k-min', '44px');
+  /* The keyboard is built in a throwaway host and its own box goes into the
+     panel's keys row, the way /kit/'s sketch specimen hands over `kb.el`. */
 
   /**
    * 🔴 THE LETTERS ARE ON THE BOTTOM OCTAVE, WHICH IS C3 HERE. Asked
@@ -914,7 +911,7 @@ effect  = dm.freeverb_demo;
     return { KEY_MAP: map, KEY_ORDER: order, KEY_SHARPS: sharps, KEY_LETTERS: lettered };
   })();
 
-  const keys = createKeyboard(keysHost, {
+  const keys = createKeyboard(el('div'), {
     base: 48,
     map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
     minBase: 24, maxBase: 84,
@@ -934,6 +931,11 @@ effect  = dm.freeverb_demo;
     sustain: true,
     onSustain: (on) => pedal.set(on),
   });
+  /* 44 px a key rather than the component's 49, for the same reason `/nola/`
+     lowers it: two octaves is what an instrument wants and fifteen white keys
+     at 49 px do not fit the page. The component reads the property off its
+     own box, which is the element that goes into the panel. */
+  keys.el.style.setProperty('--k-min', '44px');
 
   // ── the foot ───────────────────────────────────────────────────────────────
   //
@@ -1167,58 +1169,30 @@ effect  = dm.freeverb_demo;
   }
 
   function paintPower(on) {
-    inst.online.set(on ? 'online' : 'offline');
+    power.set(on ? 'online' : 'offline');
   }
 
   // ── the page ───────────────────────────────────────────────────────────────
   //
-  // 🔴 THE CASE IS `createInstrument` AND THE FOOTER IS ITS HEADER AT THE FOOT.
-  // `/muta/` is the other caller of that arrangement. The plate stays with the
-  // CASE rather than moving into the bar (`plate: false`), which is what puts
-  // `FAU` at the top right instead of at the bottom of the panel, where a name
-  // is read after the thing it names.
-  // ⚠️ `side: null` AND `flow: false`, BOTH FOR ONE REASON: there is exactly one
-  // thing in this instrument and it is the text. A fixed column holds what must
-  // stay put while the rest scrolls, and a flow stacks rows; one text box needs
-  // neither, and `.panel-flow` is `width: max-content`, which on a textarea is
-  // its `cols` attribute and would draw this program about twenty characters
-  // wide. That is the exact box the row this panel replaced was written to
-  // avoid, and its one line survives in the stylesheet below.
-  const inst = createInstrument({
-    name: 'FAU',
-    maker: '',
-    host: d.el,
-    header: {
-      at: 'foot',
-      plate: false,
-      online: { of: 'FAU', state: 'offline', press: () => togglePower() },
-      patch: patch.el,
-    },
-    /* 🔴 THE TEXT IS A GLUE PART AND NOT CASE CONTENTS, CHANGED 2026-09-24.
-       Asked as *"input edge to edge of container w, add paddign on top, add line
-       in top. glued instrument feel like waveforms on muta"*, and the last
-       clause is the whole answer: `/muta/` passes its wave shape as
-       `parts: [scope.el]` and this page was calling `inst.add()`.
-       ⚠️ **THEY ARE TWO DIFFERENT SLOTS AND `instrument.mjs` SAYS SO IN ITS OWN
-       WORDS**: `add()` puts something INSIDE the case, where it scrolls with the
-       panel and sits within the case's inset, and a part is its own surface with
-       the glue's seam either side of it, *"the same edge the bar has, at the same
-       width"*. So three of the four asks are one move rather than three rules.
-       🔴 **AND THIS IS WHY `edge to edge` WAS ASKED TWICE.** It was answered on
-       2026-09-23 by zeroing `.panel-strip`'s padding on both axes, and the
-       comment below counted THREE boxes doing the insetting. There were four:
-       `.panel-case` carries `padding: 0 var(--panel-pad)` with `--panel-pad:
-       20px`, on the case itself, which no page rule touched. A child cannot
-       reach its way out of a parent's padding, so the text was 20 px short at
-       both ends for a day while every rule about it read as correct.
-       ⚠️ THE CASE KEEPS THE PLATE AND IS NOT LEFT EMPTY: `plate: false` on the
-       header is what holds `FAU` in the case's top inset, which is the same
-       place `/muta/` keeps its own. */
-    parts: [source.el],
-    panel: { side: null, flow: false, cls: { panel: 'fau-panel' } },
+  // 🔴 THE INSTRUMENT IS THE KIT'S GLUED PANEL, SINCE 2026-09-26. The text is
+  // its picture row, edge to edge by construction, the keys are its keys row,
+  // and the foot is its plate: the name, the power switch after it, the patch
+  // picker at the other end. The name is in the foot because the sketch of
+  // 2026-09-26 puts it there, and `instrument.mjs`'s top-right argument gave
+  // way to it (plans/plan-instrument-audit.md). No page rule is left.
+  // ⚠️ THE SWITCH IS BUILT HERE WITH THE HEADER'S OWN WORDS, so it says `on`
+  // and `off` beside a plate that already says FAU, and its label still names
+  // the instrument for somebody who cannot see the plate.
+  const power = createPresenceButton({
+    of: 'FAU', can: HEADER_STATES, says: HEADER_SAYS, state: 'offline', showName: false,
+    press: () => togglePower(), aria: 'switch FAU on and off',
   });
-
-  d.el.append(keysHost);
+  const panel = createInstrumentPanel({
+    viz: source.el,
+    keys: keys.el,
+    plate: { name: 'FAU', status: power, patch },
+  });
+  d.el.append(panel.el);
 
   showSource();
   paintPower(false);
@@ -1358,6 +1332,35 @@ effect  = dm.freeverb_demo;
       + `against ${srcBytes} B`);
     d.assert('the readout is the four cells the ask left it with, which is an even count',
       Object.keys(d.api.readout).length === 4, Object.keys(d.api.readout).join(', '));
+
+    /* ── the panel, read off rects ─────────────────────────────────────────
+       🔴 FOUR CLAIMS THIS PAGE NEVER GRADED, added with the move onto the kit's
+       panel. Each is a rect pair, because this is the page whose text box was
+       reported five times and fixed wrong three times by reading rules. */
+    {
+      const rect = (e) => (e.el || e).getBoundingClientRect();
+      const cs = (e, k) => parseFloat(getComputedStyle(e.el || e)[k]) || 0;
+      d.assert('the panel is a picture, keys and a foot, in that order',
+        panel.shape().join(' ') === 'viz keys plate', panel.shape().join(' '));
+      const ta = rect(source.input), sf = rect(panel.el);
+      const gapL = +(ta.left - (sf.left + cs(panel.el, 'borderLeftWidth'))).toFixed(1);
+      const gapR = +((sf.right - cs(panel.el, 'borderRightWidth')) - ta.right).toFixed(1);
+      d.assert('the text runs edge to edge of the surface, one border apart',
+        Math.abs(gapL) <= 0.6 && Math.abs(gapR) <= 0.6 && cs(source.input, 'borderLeftWidth') === 0,
+        `${gapL} px and ${gapR} px inside the surface’s border, with ${cs(source.input, 'borderLeftWidth')} px of its own`);
+      const row = rect(panel.plateRow);
+      const inset = cs(panel.plateRow, 'paddingLeft');
+      const l = +(rect(panel.plate.el).left - row.left).toFixed(1);
+      const rr = +(row.right - rect(patch.el).right).toFixed(1);
+      d.assert('the foot holds the name and the power switch at the start and the patch selector at the other end',
+        Math.abs(l - inset) <= 0.6 && Math.abs(rr - inset) <= 0.6 && rect(power.el).left > rect(panel.plate.el).right,
+        `${l} px in on the left and ${rr} px on the right against an inset of ${inset}, the switch after the name`);
+      const rowsPad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rows-pad'));
+      const ink = cs(source.input, 'paddingLeft') + cs(source.input, 'borderLeftWidth');
+      d.assert('the first line of code sits on the inset the keys and the foot keep',
+        ink === rowsPad && cs(panel.keys, 'paddingLeft') === rowsPad && inset === rowsPad && rowsPad > 0,
+        `the code starts ${ink} px in, the keys row ${cs(panel.keys, 'paddingLeft')} and the foot ${inset}, against --rows-pad ${rowsPad}`);
+    }
     /* 🔴 THE UNIT ITSELF, ASSERTED, BECAUSE THE ASK WAS ABOUT THE UNIT AND
        NOTHING ELSE ON THIS PAGE WOULD NOTICE ONE GOING BACK. Three of the four
        cells are sizes and all three have to say `kB`; `compile` is a time and
@@ -1473,13 +1476,13 @@ effect  = dm.freeverb_demo;
        own handler does not await anything. Reading the page straight after the
        click would be reading it 6 MB early. */
     const beforeOn = runs;
-    inst.online.el.click();
+    power.el.click();
     await powerJob;
     d.assert('the switch is the one press that fetches the compiler, compiles the patch in the '
            + 'box and reaches for MIDI',
-      inst.online.state() === 'online' && node !== null && runs === beforeOn + 1
+      power.state() === 'online' && node !== null && runs === beforeOn + 1
         && midi !== null && vendorLoads().length === 4,
-      `${inst.online.state()}, ${runs - beforeOn} compile, MIDI ${midi?.state()}, `
+      `${power.state()}, ${runs - beforeOn} compile, MIDI ${midi?.state()}, `
       + `${vendorLoads().length} vendor files`);
 
     /* ── the autocompile, and the two things it must never do ──────────────
@@ -1763,14 +1766,14 @@ effect  = dm.freeverb_demo;
        empty and the page has no controls. What is left of that argument is the
        part that was always the real one, which is that the guard lives inside
        the queued task rather than on any control. */
-    inst.online.el.click();
+    power.el.click();
     await powerJob;
     press(60, 100);
     await sleep(400);
     d.assert('switching it off takes the instrument off the audio thread, and then a key does '
            + 'nothing at all',
-      inst.online.state() === 'offline' && node === null && midi === null && level() < 0.002,
-      `${inst.online.state()}, node ${node ? 'still built' : 'gone'}, `
+      power.state() === 'offline' && node === null && midi === null && level() < 0.002,
+      `${power.state()}, node ${node ? 'still built' : 'gone'}, `
       + `${level().toFixed(5)} after pressing a key`);
 
     /* 🔴 AND TYPING INTO AN INSTRUMENT THAT IS OFF COMPILES NOTHING, WHICH IS
@@ -1816,7 +1819,7 @@ effect  = dm.freeverb_demo;
 
     /* And back on, so a person opening this page with the checks running finds
        an instrument rather than the wreckage of one. */
-    inst.online.el.click();
+    power.el.click();
     await powerJob;
   }
 
@@ -1830,130 +1833,4 @@ effect  = dm.freeverb_demo;
      compiler is a page waiting for a harness that is waiting for the page. */
   d.ready();
 </script>
-
-<style>
-  /* 🔴 THE TEXT TAKES THE WHOLE PANEL, WHICH IS WHAT `edge to edge` IN THE ASK
-     MEANS AND IS NOT WHAT A PANEL DOES BY DEFAULT. `.panel-strip` is a flex row
-     whose children keep their own width, because the panels this component was
-     written for are as wide as the instrument they draw and the strip is what
-     scrolls. Here the instrument IS the text, so the one child grows to the
-     case instead. A program in a box that fits about twenty characters is less
-     than one line of Faust, which is why the plain row this replaced carried
-     the same single line. */
-  /* ⚠️ AND THIS ONE IS KEPT DELIBERATELY THOUGH THE STRIP IS EMPTY TODAY.
-     `.panel-strip` is a flex row whose children keep their own width, because
-     the panels this component was written for are as wide as the instrument
-     they draw. Anything this page ever puts IN the case wants growing the same
-     way, and the rule costs nothing while there is nothing to match. */
-  .fau-panel .panel-strip > .pos-field { flex: 1 1 100%; min-width: 0; }
-
-  /* 🔴 EDGE TO EDGE MEANS THE BOX'S OWN EDGES, AND IT WAS ONLY HALF TRUE. Asked
-     2026-09-23 off a crop: *"edit field edge to edge, no bottom padding no field
-     title"*, which is the same `edge to edge` as the original ask finally taken
-     the whole way.
-     ⚠️ THREE THINGS WERE INSETTING IT AND THEY ARE THREE DIFFERENT BOXES: the
-     strip's own `--panel-gap` at the sides, the strip's `--panel-pad` under it,
-     and the field's `FAUST` label above it. Removing one and leaving the others
-     is how a thing looks *nearly* edge to edge for a week.
-     🔴 AND THE LABEL GOES RATHER THAN BEING HIDDEN. A `FAUST` over a box holding
-     Faust is a caption naming what a reader is already reading, and this page's
-     title, its sentence and the patch picker all say it again. The field keeps
-     its `aria-label`, because what a caption does for a sighted reader the
-     accessible name does for everybody else and only one of the two was ever
-     furniture. ⚠️ AND `createField` DOES NOT WIRE ONE, checked rather than
-     assumed: there is no `aria-label`, no `for` and no `labelledby` in that
-     module, so hiding the span would have left the textarea with no name at all.
-     The page sets it below. */
-  /* 🔴 AND THE FOURTH BOX WAS `.panel-case` ITSELF, FOUND 2026-09-24 WHEN
-     `edge to edge` WAS ASKED A SECOND TIME. `padding: 0 var(--panel-pad)` with
-     `--panel-pad: 20px` sits on the case, and a child cannot reach its way out
-     of its parent's padding however many of its own rules say 0. Every rule
-     above was correct and the text was still 20 px short at both ends.
-     ✅ **SO IT IS NOT A FIFTH OVERRIDE, IT IS A DIFFERENT SLOT.** The text is a
-     glue part now, a sibling of the case rather than a child of it, so it takes
-     the glue's full width the way the footer bar does and there is no padding
-     left to fight. The rules that follow are about the part, keyed on its own
-     class, because the ones they replace all named `.fau-panel` as an ancestor
-     the field no longer has. */
-  .fau-src { gap: 0; }
-  .fau-src .pos-field-l { display: none; }
-
-  /* 🔴 AND THE CASE'S OWN STRIP IS EMPTY NOW, SO IT MUST NOT KEEP ITS HEIGHT.
-     MEASURED 2026-09-24 the moment the text moved out: the case was a **71 px**
-     band holding one word, with an empty **40 px** strip inside it whose whole
-     height was `padding-block: var(--panel-pad)` at 20 px each way. That is this
-     project's empty box rule, which `/typist/` paid for as a 2 px line nobody
-     wrote and `.pos-controls[hidden]` already exists for: **a container with
-     nothing in it must not paint its edges or hold its height.**
-     ⚠️ THE PLATE IS NOT IN THE STRIP AND SURVIVES THIS, which was measured
-     rather than hoped: it sits in the case's top inset at 748.5 px, and the case
-     keeps `FAU` at the top right where the 2026-09-23 ask put it.
-     🔴 **AND IT MOVED INTO `shell.css` ON 2026-09-24, WHICH IS WHERE IT SHOULD
-     HAVE GONE FIRST.** It was written here, page scoped, on the argument that
-     making it a component rule would change every instrument page. That argument
-     is wrong twice over: the condition `:has(> .panel-strip:empty)` matches only
-     a case with nothing in its strip, and MEASURED across the three pages that
-     build an instrument, `/kit/` adds 62 blocks, `/fau/` 5 and `/muta/` 4, so
-     exactly one case in the repository is empty. And `shell.css`'s own note on
-     the plate records `/tom/` making exactly this mistake about exactly this
-     component: a private fix, every later page inheriting the defect and not the
-     fix, and the same report arriving again on `/plai/`. The rule and the plate's
-     missing bottom padding are both there now. */
-  /* 🔴 THE TOP PADDING IS ON THE TEXTAREA AND NOT ON THE PART, CORRECTED
-     2026-09-24 AFTER SHIPPING IT THE OTHER WAY AND BEING SHOWN A CROP OF IT.
-     On the part it was 10 px of `--card` sitting above a well painted
-     `--card-2`, so the page drew **case, seam, a second band of the same dark,
-     then the well** and read as *"a mess"*, which it was. Two bands of one
-     colour with a line between them is not air above the text, it is a strip of
-     furniture nobody asked for.
-     ✅ **AIR INSIDE A BOX BELONGS TO THE BOX.** The padding is the textarea's
-     own, so the input is one unbroken surface from the seam down and the first
-     row of code sits away from the line. That is what *"add paddign on top"*
-     asks for once *"add line in top"* is the seam.
-     ⚠️ AND THE PART KEEPS NO BACKGROUND OF ITS OWN, so there is no third tone
-     left to stack. The glue paints the seam and the textarea paints the well. */
-  /* The resize grip is the textarea's own and sits on its corner; at the glue's
-     edge it would sit on the glue's corner, which reads as the whole instrument
-     being resizable.
-     ⚠️ AND THE BOTTOM BORDER WENT WITH THE MOVE. It was the line between the
-     text and the footer while both were inside one case; as a glue part the
-     seam already draws that line, and keeping the border would have drawn it
-     twice at 2 px. */
-  .fau-src textarea { border-radius: 0; border-width: 0; resize: vertical; }
-  /* 🔴 `(0,2,1)`, WHICH IS A TIE AND NOT AN ESCALATION, AND IT WAS MEASURED
-     LOSING FIRST. The padding was written on `.fau-src textarea`, which is
-     `(0,1,1)`, against `shell.css`'s `.pos-field.tall textarea` at `(0,2,1)`
-     setting `padding: 7px 9px` as a SHORTHAND. Weight decides before order does,
-     so the shorthand put the top back to 7 px and the computed value said so
-     while the source read as correct. The border on the same element DID win,
-     because the rule it beats is `(0,1,1)` and a tie goes to the later sheet.
-     ⚠️ **THE FIX IS TO MATCH THE COMPONENT'S WEIGHT, NEVER TO OUTRUN IT.** This
-     stylesheet records `.pos-faux` needing `(0,2,0)` to beat a page, and the
-     rule that came out of it is that raising specificity to win a fight with
-     your own stylesheet is how the next fight starts one step higher. A tie
-     plus source order is the smallest thing that can win. */
-  .pos-field.fau-src textarea { padding: 14px 14px 14px 16px; }
-  /* 🔴 `display: block`, AND IT IS THE DOUBLE BOTTOM BORDER. Reported twice,
-     the second time precisely as *"still double bottom border on fau textarea"*,
-     and MEASURED rather than found by looking: the field wrapper's bottom sat at
-     **557.5** and the textarea's at **556.0**. A textarea is `inline-block` and
-     sits on a TEXT BASELINE, so its block parent reserves the descender space
-     under it. That 1.5 px strip belongs to the wrapper, the wrapper is
-     transparent, and a glue paints `--line` behind its children as the seam. So
-     the page drew a 1.5 px line of seam colour, then the real 1 px seam, and the
-     two together read as a doubled border.
-     ⚠️ **NOTHING IN EITHER ELEMENT'S BORDERS WAS WRONG**, which is why reading
-     the CSS found nothing: both measured `0/0/0/0` throughout. The line was a
-     BACKGROUND showing through a gap that layout left, and the only instrument
-     that says so is the pair of rects.
-     ⚠️ AND THIS IS WHY A GLUE IS WHERE IT SHOWS UP. Anywhere else the strip is
-     the page's own background and invisible; inside a glue the ground behind a
-     child is deliberately `--line`, so every stray pixel of it is a line. */
-  .fau-src textarea { display: block; }
-
-  /* A row of keys wider than the page scrolls itself rather than dragging the
-     page sideways. `min-width: 0` is what lets a flex child shrink below its
-     content, which is the whole of that bug. */
-  .fau-keys { min-width: 0; overflow-x: auto; }
-</style>
 </html>

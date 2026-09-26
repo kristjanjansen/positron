@@ -12,7 +12,18 @@ inset of its own. **`/kit/` declares `bootMs: 12000`** because it says ready at
 ✅ **`plans/plan-eccm-cms.md` LANDED AND WAS REPORTED IN FULL**, and `CLAUDE.md`
 now says a plan that lands mid-task is the next reply, because the first reply
 after it was about a boot budget.
-⚠️ **AN AUDIT AGENT IS WRITING `plans/plan-instrument-audit.md`**: all nine
+✅ **`/fau/` IS THE FIRST INSTRUMENT ON `createInstrumentPanel`**, per
+`plans/plan-instrument-audit.md`: the field reads the three tokens and goes flat
+inside a glue by inheritance, the plate row takes a control at each end (status
+after the name, the patch picker as the far end), and the page lost every rule
+of its own. 53/53 with 47 page asserts, kit 244/244. Two things left open by the
+agent and written in `BACKLOG.md`: no focus ring on an edgeless well in a glue,
+and the keyboard pad row's `Panic` wrapping alone on a phone.
+⚠️ **A DESIGN AGENT IS WRITING `plans/plan-eccm-design.md`** (typography, the
+logo, a small design system, against `positron-compose`).
+✅ **`plans/plan-eccm-cms.md` GAINED §5 THE RADA7 SHAPE, §8 DRAFTS, PASTE, DATES,
+STREAM ITEMS AND TRIP'S IMAGES, AND §13 CACHING, SEO, SITEMAP**, all reported.
+⚠️ **THE AUDIT AGENT WROTE `plans/plan-instrument-audit.md`**: all nine
 instruments against `positron-compose`, one picked, assess and propose only.
 
 ✅ **LATER THE SAME DAY, AND ON THE EDGE AT `ef4fcbe-143850-2f25`:** the seven
