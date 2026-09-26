@@ -984,10 +984,24 @@ button.pos-pri[data-busy="1"] {
    component's own margin shorthand silently beat the page rhythm and measured
    0.0 px. `.pos-glue.pos-glue` weighs (0,2,0) and cannot lose to a component,
    whatever order anybody adds one in. */
+/* 🔴 `clip`, NOT `hidden`, SINCE 2026-09-26. `hidden` is one of the SCROLLABLE
+   values (`scroll`, `auto`, `hidden`), so every glued surface was a scroll
+   container: `position: sticky` inside one stuck to the glue instead of the
+   page, a focus ring on a control against the edge was cut, and the surface
+   made a block formatting context nobody asked for. `clip` is non-scrollable
+   and does none of that. Polaris ships `overflow: clip` on its Card for the
+   same reason. Baseline widely since 2022, Safari 16.
+   ⚠️ `clip` FORBIDS SCROLLING THROUGH ANY MECHANISM, `scrollIntoView`
+   included, which `hidden` still allowed. Nothing here scrolls the surface
+   itself; a part that scrolls does so inside its own box.
+   ⚠️ AND `clip` DOES NOT RESET A FLEX CHILD'S AUTOMATIC MINIMUM SIZE, where
+   `hidden` did. Every part of a glue carries `min-width: 0` for its own
+   reasons already, so nothing here leaned on that side effect; a future part
+   that does will read its width back and find out. */
 .pos-glue {
   display: flex; flex-direction: column;
   gap: 1px; background: var(--line); border: 1px solid var(--line);
-  border-radius: 4px; overflow: hidden;
+  border-radius: 4px; overflow: clip;
 }
 /* `display: flex` beats the UA's `[hidden]` rule, the same patch the readout,
    the control row and the report all already carry. */
