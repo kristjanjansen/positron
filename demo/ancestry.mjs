@@ -60,6 +60,12 @@ const chrome = spawn(CHROME, [
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--mute-audio',
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
 chrome.stderr.on('data', () => {});
+// ⚠️ CHROME DIES WITH THIS PROCESS, WHATEVER KILLED IT. A run that threw
+// after launch left a headless Chrome alive, and the next verify run marked
+// itself as not evidence because of it. `exit` fires on a normal end, an
+// uncaught throw and a SIGTERM; SIGINT is turned into an exit so it fires too.
+process.on('exit', () => { try { chrome.kill(); } catch { /* already gone */ } });
+process.on('SIGINT', () => process.exit(130));
 
 let wsUrl = null, port = null;
 for (let i = 0; i < 60 && !wsUrl; i++) {
