@@ -1,5 +1,63 @@
 ## Open
 
+### Open 2026-09-26: what the composition research says to change in `shell.css`, in order
+
+🔴 **FROM `research/cascade-cures-2026-09-26.md`, `glued-containers`, `layout-systems`
+AND THE CORRECTION TAXONOMY, ALL WRITTEN 2026-09-26.** None of these is done. Each is
+one decision and most are one line. In the order the evidence ranks them:
+
+1. **`@layer reset, base, layout, components, page, responsive;` at the top of
+   `shell.css`.** One line. It cures the shorthand-beats-longhand incident and the
+   media-query-that-never-ran incident structurally, and with `[hidden] {
+   display: none }` left UNLAYERED it cures the six-component `[hidden]` patch with
+   no `!important`. **Prerequisite: the 4 `!important` in the file go first**,
+   because importance inverts layer order. Measured: 841 selectors, 766 rules, max
+   specificity (0,5,1), zero ids, 0 `@layer` today.
+2. **`.pos-glue { overflow: clip }`, not `hidden`.** `hidden` is a scrollable
+   value: it makes every glued surface a scroll container, so `position: sticky`
+   inside one sticks to the wrong thing and an edge control's focus ring is
+   clipped, which is a WCAG 2.4.7 failure. Polaris ships `clip` on its Card.
+   Better still where rows carry focus chrome (every knob row): no clip, and the
+   first and last children take the radius back with `border-radius: inherit` on
+   the four longhands. ⚠️ `clip` does NOT reset a flex child's automatic minimum
+   size; only the scrollable values do. Spec-derived, verify in the targets.
+3. **A spacing scale.** 48 tokens at `:root` and no scale among them: `--pos-gap`
+   40, `--panel-pad` 20, `--rows-pad` 20, `--panel-gap` 16, `--rows-gap` 16,
+   `--ctl-gap` 8, `--kbd-pad` 9 are seven names for five numbers with no stated
+   relationship. Not one of eleven surveyed systems ships a raw ratio for spacing;
+   all use 2, 4, 8, 12, 16, 24, 32, 48, 64 and land on a multiple of 4 or 8.
+   Refactoring UI's floor: no two adjacent steps closer than 25 per cent.
+4. **`.kbd-foot` goes linear below a width.** `justify-content: space-between;
+   gap: 8px` with no phone behaviour wraps into a left line and a right line on
+   `/nola/` and on the kit at 390 px. A Switcher (`flex-basis: calc((var(--threshold)
+   - 100%) * 999)`) is one row or one column with no media query and no state
+   where one item has wrapped and looks picked out. It reaches ten pages.
+5. **Seven custom properties are read and set nowhere in `demo/`:** `--k-dot`,
+   `--k-max`, `--k-pad`, `--pad`, `--roll-row-h`, `--sld-seam`, `--wrap`. Each
+   `var()` of them is either a fallback doing all the work or a dead read. And
+   twelve are declared and never read: `--mi-magenta --mi-teal --mi-orange
+   --mi-blue --mi-maroon --mi-teal-lit --mi-maroon-lit --pad-bar --ctl-step
+   --pg-now --tbl-grow --span-n`. The other 25 unknowns ARE set, by JavaScript or
+   a page sheet, so `no-unknown-custom-properties` cannot go in as an error
+   until they carry `@property` registrations.
+6. **Stylelint with the measured config**, 95 problems today, 54 of them the
+   deliberate base-then-hover pattern at warning level. It catches the
+   within-block shorthand bug and nothing across rules; that needs the CDP
+   `which-rule-won` script, which exists in the session scratchpad and is worth
+   adopting into `demo/` beside `shot.mjs`, read first.
+7. **Subgrid for the control row.** `--ctl-head`, `--ctl-foot` and `--ctl-step`
+   are the published contract; a grid over the row with three tracks and
+   `grid-template-rows: subgrid` on each control aligns every lane, button and
+   dial with no published numbers and no caller opting in. Widely available since
+   March 2026.
+
+⚠️ **AND THE THING THE FOURTH STRAND CORRECTED, SO IT IS NOT REPEATED:**
+container queries fix a component asking about the window when it wanted its own
+box. They do NOT fix a media query losing to a later plain rule; `@container`
+adds no specificity and is resolved by source order exactly like `@media`. That
+is `@layer`'s job, item 1.
+
+
 ### Open 2026-09-26: five phone defects, SEEN for the first time, across six instrument pages
 
 🔴 **THE FIRST PHONE SHOTS THIS PROJECT HAS EVER TAKEN OF ITSELF, 2026-09-26,

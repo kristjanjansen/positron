@@ -40,6 +40,7 @@ somebody broke it.
 
 | load | before |
 | --- | --- |
+| `positron-compose` | deciding where anything goes, writing any padding, margin, gap, width, border or radius, or saying a layout is done. It is the composition and cascade half; `positron-ui` is the kit half, and a layout task loads both |
 | `positron-ui` | building or changing any interface, control, readout, table, transport bar or stylesheet rule |
 | `positron-diagram` | drawing or editing a diagram |
 | `positron-verify` | running or changing a harness, adding or removing a control, believing a red run, reporting a measurement or an absence |
