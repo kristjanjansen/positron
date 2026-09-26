@@ -513,7 +513,7 @@
   import { createMidiLog } from '/shell/midi-log.mjs';
   import { createSegment, GLYPHS, SEGMENTS, SCHEMES } from '/shell/segment.mjs';
   import { decode } from '/shell/midi-decode.mjs';
-  import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
+  import { createPresence, createPresenceButton, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createGlue, createGlueRows } from '/shell/glue.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
@@ -524,7 +524,7 @@
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
-  import { createInstrument } from '/shell/instrument.mjs';
+  import { createInstrument, HEADER_STATES, HEADER_SAYS } from '/shell/instrument.mjs';
   import { createControlGrid } from '/shell/control-grid.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createXrProbe, xrCaps, onXrCaps, reasonFor, canEnter, answered, XR_STATES }
@@ -1040,7 +1040,7 @@
   // topmost ones, and a block that moved on this page once left its `const`
   // behind, the build read it in its dead zone, `section()` swallowed the throw,
   // and the page died much later on an empty map.
-  let ipanelSpec = null;      // { sketch, stomp, box16, desk, pic }
+  let ipanelSpec = null;      // { sketch, stomp, box16, desk, foot, pic, power, pick }
   let rowsSpec = null;        // the glued rows specimens, by name
 
   /**
@@ -1216,12 +1216,13 @@
    * component reaching outside its own box.
    */
   section('panel', 'INSTRUMENT PANEL',
-    'A picture, rows of controls, a keyboard and a nameplate, glued into one object, in four shapes.',
+    'A picture, rows of controls, a keyboard and a nameplate, glued into one object, in five shapes, the last with a switch and a picker on its foot.',
     `createInstrumentPanel({
   viz:   filter.el,                                 // edge to edge
   rows:  [[cutoff, res, drive], [a, d, s, r]],      // top to bottom
   keys:  kb.el,
   plate: { name: 'NOLA', patch: 'RHODES MK I' },
+  // or plate: { name: 'FAU', status: power, patch: picker }, a control at each end
 })
 p.addRow([lfo, depth])        // always above the keys and the foot
 p.patch('WURLITZER 200A')     // rewrite the foot's right half
@@ -1287,8 +1288,36 @@ p.shape()                     // ['viz','controls','keys','plate']`,
          panels be the panels just extending to the layout"*. No caption under
          each, because the four differ in shape and the eye can see that; a
          caption saying so would be the information footer that was asked out. */
-      add(sketch, stomp, box16, desk);
-      ipanelSpec = { sketch, stomp, box16, desk, pic };
+      /* 5. A SWITCH AND A PICKER ON THE FOOT. The plate's ends are controls: the
+            name and its power switch at the start, the patch picker at the end,
+            which is what /fau/, /muta/, /knobs/ and /shape/ put on a foot bar.
+            The keyboard is what gives `between` a width to spread across. */
+      const kb2 = createKeyboard(el('div'), {
+        base: 48, letters: false,
+        onDown: (n) => kb2.lightNote(n, true),
+        onUp: (n) => kb2.lightNote(n, false),
+      });
+      const patches = ['ORGAN', 'RHODES', 'CLARINET'];
+      let atPatch = 0;
+      const pick = createPicker({
+        label: 'patch', what: 'patch',
+        prev: () => pick.show(patches[atPatch = (atPatch + 2) % 3], atPatch),
+        next: () => pick.show(patches[atPatch = (atPatch + 1) % 3], atPatch),
+        onPick: (i) => pick.show(patches[atPatch = i], i),
+      });
+      pick.options(patches, 0);
+      let footOn = false;
+      const power = createPresenceButton({
+        of: 'POSITRON', can: HEADER_STATES, says: HEADER_SAYS, state: 'offline', showName: false,
+        press: () => power.set((footOn = !footOn) ? 'online' : 'offline'), aria: 'switch POSITRON on and off',
+      });
+      const foot = createInstrumentPanel({
+        keys: kb2.el,
+        plate: { name: 'POSITRON', status: power, patch: pick },
+      });
+
+      add(sketch, stomp, box16, desk, foot);
+      ipanelSpec = { sketch, stomp, box16, desk, foot, pic, power, pick };
     }, { bare: true });
 
   /**
@@ -5390,6 +5419,30 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     }
 
     /**
+     * 🔴 THE FOOT TAKES A CONTROL AT EACH END, AND EACH SITS ON THE ROW'S INSET.
+     * The name and its switch are one start end and the picker is the other, so
+     * the row is still two ends and goes linear on a phone by the rule above the
+     * between row. Measured against the insets the way /muta/ grades its header,
+     * so the two pages assert one claim.
+     */
+    {
+      const ft = ipanelSpec.foot;
+      const row = r(ft.plateRow);
+      const inset = px(ft.plateRow, 'paddingLeft');
+      const nameEl = ft.plate.lines[0];
+      const offL = +(r(nameEl).left - (row.left + inset)).toFixed(1);
+      const offR = +((row.right - px(ft.plateRow, 'paddingRight')) - r(ft.patchEnd).right).toFixed(1);
+      const afterName = +(r(ft.status).left - r(nameEl).right).toFixed(1);
+      const mid = (e) => r(e).top + r(e).height / 2;
+      const oneLine = Math.abs(mid(ft.status) - mid(ft.patchEnd)) <= 1;
+      d.assert('the foot holds the name and its switch at the start and the picker at the end, each on the row’s inset',
+        Math.abs(offL) <= 0.6 && Math.abs(offR) <= 0.6 && afterName > 0 && afterName <= 12 && oneLine
+          && ft.plateRow.dataset.align === 'between' && ft.status === ipanelSpec.power.el && ft.patchEnd === ipanelSpec.pick.el,
+        `name ${offL} px off the left inset, switch ${afterName} px after it, picker ${offR} px off the right inset, `
+        + `${oneLine ? 'on one line' : 'on two lines'}`);
+    }
+
+    /**
      * 🔴 AND REWRITING THE PATCH MOVES NOTHING ELSE, WHICH IS WHY IT IS THE
      * RIGHT-HAND END. A right-aligned box grows leftward into air. The name is
      * the fixed half and sits against the fixed edge.
@@ -5429,7 +5482,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
      */
     {
       const panels = [['sketch', ipanelSpec.sketch.glue], ['stomp', ipanelSpec.stomp.glue],
-        ['box16', ipanelSpec.box16.glue], ['desk', ipanelSpec.desk.glue], ['strip', rowsSpec.g],
+        ['box16', ipanelSpec.box16.glue], ['desk', ipanelSpec.desk.glue], ['foot', ipanelSpec.foot.glue], ['strip', rowsSpec.g],
         ['settings', rowsSpec.settings], ['meter', rowsSpec.meter], ['form', rowsSpec.form],
         ['hidden', rowsSpec.hidden], ['scopes', rowsSpec.scopes], ['stripFull', rowsSpec.stripFull],
         ['settingsFull', rowsSpec.settingsFull], ['stripNarrow', rowsSpec.stripNarrow], ['clusterNarrow', rowsSpec.clusterNarrow]];
@@ -5447,7 +5500,10 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
          is an invented margin only where there is no border to frame it; and a
          BORDER inside a row is a box in a box only on something that is not a
          control, because a button's edge is the button. */
-      const isControl = (el) => el.matches('button, input, select, textarea, [role="button"], .pos-choice, .pos-pick, .pos-toggle, .pos-check, .pos-stepper, .pos-bgroup');
+      /* not input or textarea: a text box is a well and reads --edge (shell.css,
+         .pos-field input), so in a glue it has no border to exempt, and one it
+         did show would be the doubled seam /fau/ paid for */
+      const isControl = (el) => el.matches('button, select, [role="button"], .pos-choice, .pos-pick, .pos-toggle, .pos-check, .pos-stepper, .pos-bgroup');
       const off = [];
       let kidsSeen = 0;
       for (const [name, g] of panels) {

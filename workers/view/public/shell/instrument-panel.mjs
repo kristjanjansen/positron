@@ -6,6 +6,7 @@
 //     rows:  [[cutoff, res, drive], [a, d, s, r]],      // rows of controls
 //     keys:  kb.el,                                     // the keyboard
 //     plate: { name: 'NOLA', patch: 'RHODES MK I' },    // the foot
+//     // or plate: { name: 'FAU', status: power, patch: picker }, a control at each end
 //   });
 //   p.el          the surface, to append to the page
 //   p.addRow(…)   another row of controls, always above the keys and the plate
@@ -61,6 +62,7 @@
 
 import { createGlueRows } from './glue.mjs';
 import { createNameplate } from './panel-layout.mjs';
+import { el } from './shell.mjs';
 
 /** The row kinds, in the order the sketch draws them. `shape()` returns these. */
 export const ROW_KINDS = ['viz', 'controls', 'keys', 'plate'];
@@ -80,6 +82,13 @@ function partOf(v) {
   return { el: e, opt };
 }
 
+/** An element, or the element of a built control. A string or nothing is null. */
+function elOf(v) {
+  if (!v || typeof v === 'string') return null;
+  if (v.nodeType === 1) return v;
+  return v.el && v.el.nodeType === 1 ? v.el : null;
+}
+
 /**
  * An instrument panel.
  *
@@ -90,8 +99,9 @@ function partOf(v) {
  * @param {Array[]} [o.rows]         rows of controls, top to bottom. Each entry
  *   is an array of controls, or an array of `[controls, options]`.
  * @param {Element|object} [o.keys]  the keyboard.
- * @param {object|false} [o.plate]   `{ name, patch }`, or a built nameplate, or
- *   `false` for a panel with no foot.
+ * @param {object|false} [o.plate]   `{ name, patch, status }`, or a built
+ *   nameplate, or `false` for a panel with no foot. `patch` is a string or a
+ *   control; `status` is a control placed after the name.
  * @param {string} [o.cls]           extra classes for the surface.
  */
 export function createInstrumentPanel(o = {}) {
@@ -138,17 +148,48 @@ export function createInstrumentPanel(o = {}) {
    * ⚠️ **AND THE PATCH IS THE RIGHT-HAND END ON PURPOSE.** It is the half that
    * CHANGES, and a right-aligned box grows leftward into air, so a longer patch
    * name moves nothing. The name is fixed and sits against the fixed edge.
+   *
+   * 🔴 AND EITHER END MAY BE A CONTROL, SINCE 2026-09-26. `status` is a control
+   * placed after the name, and `patch` may be a control instead of a string;
+   * /fau/, /muta/, /knobs/ and /shape/ all put a switch and a picker on a foot
+   * bar. The row is then two ends, justified: the name with its switch as ONE
+   * start end and the patch at the end, so it still goes linear on a phone by
+   * the rule `.pos-rows-r` carries. The text case is untouched: one plate
+   * spanning its row, exactly as before.
    */
-  let plate = null, plateRow = null;
+  let plate = null, plateRow = null, status = null, patchEnd = null, patchLine = null;
   if (plateSpec) {
-    plate = plateSpec.el && plateSpec.lines
-      ? plateSpec
-      : createNameplate({
-        lines: [plateSpec.name, plateSpec.patch].filter((t) => t != null && t !== ''),
-        place: plateSpec.place || 'ends',
-        caps: plateSpec.caps !== false,
-      });
-    plateRow = glue.row(plate.el, { cls: 'pos-ipanel-plate' });
+    const built = !!(plateSpec.el && plateSpec.lines);
+    status = built ? null : elOf(plateSpec.status);
+    const patchCtl = built ? null : elOf(plateSpec.patch);
+    const patchText = built || patchCtl ? null : plateSpec.patch;
+    const caps = plateSpec.caps !== false;
+    if (built || (!status && !patchCtl)) {
+      plate = built
+        ? plateSpec
+        : createNameplate({
+          lines: [plateSpec.name, patchText].filter((t) => t != null && t !== ''),
+          place: plateSpec.place || 'ends',
+          caps,
+        });
+      patchLine = plate.lines.length > 1 ? plate.lines[plate.lines.length - 1] : null;
+      plateRow = glue.row(plate.el, { cls: 'pos-ipanel-plate' });
+    } else {
+      plate = createNameplate({ lines: [plateSpec.name].filter((t) => t != null && t !== ''), place: 'ends', caps });
+      const start = el('div', 'pos-ipanel-name');
+      start.append(plate.el);
+      if (status) start.append(status);
+      if (patchCtl) {
+        patchEnd = patchCtl;
+      } else if (patchText != null && patchText !== '') {
+        const tail = createNameplate({ lines: [patchText], place: 'ends', caps });
+        patchLine = tail.lines[0];
+        patchEnd = tail.el;
+      }
+      plateRow = patchEnd
+        ? glue.row([start, patchEnd], { align: 'between', cls: 'pos-ipanel-plate' })
+        : glue.row([start], { align: 'start', cls: 'pos-ipanel-plate' });
+    }
     plateRow.dataset.kind = 'plate';
     kept.push({ el: plateRow, kind: 'plate' });
   }
@@ -173,10 +214,13 @@ export function createInstrumentPanel(o = {}) {
    */
   function patch(text) {
     if (!plate) throw new Error('createInstrumentPanel.patch: this panel has no plate');
-    if (plate.lines.length < 2) {
+    if (patchEnd && !patchLine) {
+      throw new Error('createInstrumentPanel.patch: this plate’s patch end is a control, so there is no text to rewrite');
+    }
+    if (!patchLine) {
       throw new Error('createInstrumentPanel.patch: this plate has no patch line, so there is no reserved box to write into');
     }
-    plate.lines[plate.lines.length - 1].textContent = text;
+    patchLine.textContent = text;
     return text;
   }
 
@@ -187,6 +231,10 @@ export function createInstrumentPanel(o = {}) {
     keys: keysRow,
     plate,
     plateRow,
+    /** The foot's status control, or `null`. The element, as handed in. */
+    status,
+    /** The foot's end: the patch control, or the text patch's own plate, or `null`. */
+    patchEnd,
     /** The control rows, in order. */
     controls: () => controlRows.slice(),
     /** Every row, in the order the page renders them, with its kind. */
