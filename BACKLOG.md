@@ -14,7 +14,7 @@ contrast guardrails and the fallback to the plain page, the cost of each
 route, and a first experiment on the demo's event page with the Gestures
 graphic. Reported in full when it lands.
 
-### Open 2026-09-26: `/eccm/` feels rough and 90s beside arvopart.ee, and antialiasing
+### Done 2026-09-26: `/eccm/` feels rough and 90s beside arvopart.ee, and antialiasing, all but the face
 
 ⚠️ **ASKED, VERBATIM:** *"do you have font antialias in positron and in eccm?"*,
 *"in yr demos"*, then *"eccm feels still v rough and 90ies compared to arvo part
@@ -54,7 +54,7 @@ one. Also asked in the same minute: *"do make changes to eccm now. perhaps
 keep old htmls aroind for now for comparions?"*, answered with `v1.html` and
 `v2.html` beside the live page.
 
-### Open 2026-09-26: `/eccm/` looks bad, the pictures are to be plain, and the air, the title size and the grounds get a critical look
+### Done 2026-09-26: `/eccm/` looks bad, the pictures are to be plain, and the air, the title size and the grounds get a critical look
 
 ⚠️ **ASKED, VERBATIM, ON THE FIRST CUT OF THE REBUILD:** *"eccm page looks bad.
 i asked just to use event imaes, not overlay anything. have a critical look on
