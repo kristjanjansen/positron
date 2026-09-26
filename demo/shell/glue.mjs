@@ -71,15 +71,22 @@ export const ROW_ALIGN = ['start', 'center', 'end', 'between'];
  * @param {string}   [o.cls]    extra classes, for a caller's own rules.
  * @param {boolean}  [o.pad=true]    the default inset for rows of this surface.
  * @param {string}   [o.align='center'] the default alignment for its rows.
+ * @param {boolean}  [o.full=false]  take the width given rather than the content's.
+ * @param {boolean}  [o.grid=false]  rows are subgrids on two shared columns, label and control.
  * @returns {{el: Element, row: Function, remove: Function, rows: Function,
  *            count: Function}}
  */
 export function createGlueRows(o = {}) {
-  const { cls = '', pad: padDefault = true, align: alignDefault = 'center' } = o;
+  const { cls = '', pad: padDefault = true, align: alignDefault = 'center', full = false, grid = false } = o;
   if (!ROW_ALIGN.includes(alignDefault)) {
     throw new Error(`createGlueRows: align is one of ${ROW_ALIGN.join(', ')}, not ${JSON.stringify(alignDefault)}`);
   }
-  const root = el('div', cls ? `pos-glue pos-rows ${cls}` : 'pos-glue pos-rows');
+  // `full`: the surface takes the width it is given rather than its content's.
+  // A surface is its own size by default; a strip across a page is not.
+  // `grid`: every row is a subgrid on the surface's two columns, label and
+  // control, so three such rows share one pair of lines rather than each
+  // putting its control where its own label's width left it.
+  const root = el('div', `pos-glue pos-rows${full ? ' pos-rows-full' : ''}${grid ? ' pos-rows-grid' : ''}${cls ? ` ${cls}` : ''}`);
   /**
    * 🔴 A SURFACE WITH NO ROWS DOES NOT PAINT ITS EDGES, AND IT IS `hidden`
    * RATHER THAN NOT APPENDED. `createGlue` above returns `null` for nothing,

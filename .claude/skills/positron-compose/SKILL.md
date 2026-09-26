@@ -203,6 +203,20 @@ dial with no published numbers at all. The tokens work; they also require every
 component author to opt in, and callers still counted two of the three
 contributors and came up 30 px short.
 
+🔴 **LABEL-AND-CONTROL ROWS SHARE ONE COLUMN PAIR, AND THAT IS A COMPONENT
+OPTION, NOT A LAYOUT A PAGE WRITES.** Photographed 2026-09-26 on a three-row
+settings list: `REVERB` and `OCTAVE` are six letters and `BOARD` is five, and
+BOARD's badge sat **10 px left** of the other two controls, because each flex
+row put its control where its own label's width left it. Asked as *"does not
+comply with the label / control grid. make it a general rule and component
+(subgrid?)"*. `createGlueRows({ grid: true })`: the surface is a two-column
+grid, `max-content minmax(0, 1fr)`, and every row is a subgrid on those lines,
+so the label column is as wide as the widest label across ALL rows and every
+control starts on one x. A row with one child spans both columns, so a picture
+row still runs edge to edge. **Any surface holding two or more `[label,
+control]` rows is a `grid` surface**; three flex rows that happen to line up
+today are three rows that will not tomorrow.
+
 🔴 **A RESERVED SLOT OUTLIVES ITS LABEL, AND A CONSTANT OFFSET HIDES WHILE A
 PER-ROW ONE ANNOUNCES ITSELF.** `/circuit/`'s round buttons drifted **75 px
 down a five row column** from 15 px of reserved top-label slot per cell after
@@ -504,18 +518,35 @@ are one object.
 
 ## 6. The phone, which is where a desk layout goes to be found out
 
-🔴 **A JUSTIFIED ROW HAS NO PHONE BEHAVIOUR.** `justify-content: space-between`
-wraps into a left-justified line and a right-justified line, each justified on
-its own, which is the shape that reads as broken. MEASURED 2026-09-26 on
-`/nola/`: `N D − + 0` on one line and `Loop Sustain Notes off` right-aligned on
-the next. The owner's words: *"if you have a justified layout in desktop, you
-need to go to left alignment in mobile and have gaps between elements, not just
-squished elements."* **Below a width a row goes LINEAR: left-aligned, one
-`gap`, wrapping as a Cluster.** Every Layout's Switcher does this with no media
-query at all: `flex-basis: calc((var(--threshold) - 100%) * 999)` is positive
-below the threshold and invalid above it, so the row is one row or one column
-and never the state where one item has wrapped and grown and looks *"picked
-out"*.
+🔴 **WHEN A ROW JUSTIFIES AND WHEN IT GOES LINEAR: DECIDED BY THE ROW'S OWN
+WIDTH, NEVER BY THE VIEWPORT, AND THE RULE HAS THREE HALVES.** Asked 2026-09-26
+as *"make composition rules on when to justify layout in mobile when to make it
+linear (avail space?)"*, and the answer to the parenthesis is yes, available
+space, meaning the container's.
+- **A start row wraps as a cluster.** `flex-wrap: wrap` and one `gap`:
+  left-aligned, every item its own width, the gap between items and between
+  lines, nothing squished and nothing past the inset. Eight octave buttons in a
+  320 px frame are two lines, MEASURED on `/kit/`.
+- **A justified row may not wrap that way.** `space-between` justifies each
+  wrapped line on its own: MEASURED on `/nola/` at 375, `N D − + 0` on one line
+  and `Loop Sustain Panic` right-aligned on the next, which is the shape that
+  reads as broken. *"if you have a justified layout in desktop, you need to go
+  to left alignment in mobile and have gaps between elements, not just
+  squished."* So below `--row-min`, the width its content needs, every child of
+  a between row is made at least a full line wide, `min-width: min(100%,
+  max(0px, calc((var(--row-min, 20rem) - 100%) * 999)))`, and the row is LINEAR:
+  one child per line, on the left inset, one gap apart. Above it the children sit
+  at the two edges. No media query anywhere. `100%` is the flex container, so
+  **the same row is justified at full width and linear in a 320 px frame on the
+  same page**, MEASURED on `/kit/` at desk width, which is what makes a phone
+  arrangement gradable at all.
+- **`between` needs a width to spread across, and a shrink-to-fit surface has
+  none.** MEASURED three times at 8 px apart against an 8 px gap. A justified
+  row lives on a `full: true` surface or on one whose width some other row sets
+  (a keyboard); anywhere else it is `start` with a longer name.
+⚠️ **AND THE THRESHOLD IS TYPED ONCE, ON THE ROW, FROM WHAT ITS CONTENT NEEDS.**
+`--row-min` defaults to 20rem. It is a number about the content of that row,
+which is the kind the skill's one test allows; it is not a breakpoint.
 
 🔴 **A COMPONENT ASKS ITS OWN BOX, NEVER THE WINDOW.** *"a component in a half
 page column on a 1280 px screen is 600 px wide, and a viewport query would tell
