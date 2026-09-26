@@ -194,6 +194,32 @@
   --ctl-head: 15px;
   --ctl-foot: 17px;
   --ctl-step: calc(var(--ctl-foot) + var(--ctl-gap) + var(--ctl-head));
+  /* 🔴 A GLUED ROW'S HORIZONTAL INSET, AND IT IS DELIBERATELY THE SAME 20 px
+     `.panel-case` PADS WITH. A glued panel and a cased one are two arrangements
+     of one object, so a row's ink and a case's ink must start on the same line
+     or the two look like two components.
+     ⚠️ **IT IS A SECOND NAME FOR ONE NUMBER, WHICH THIS FILE OTHERWISE REFUSES**
+     — `--sld-col` and `--ctl-gap` both exist because a measurement typed twice
+     is a measurement that will disagree. It cannot read `--panel-pad` because
+     that one is declared ON `.panel` as 0 and overridden on `.panel-case`, so
+     outside a panel there is nothing to read, and a glued surface is glued
+     whether or not anybody built a case.
+     ✅ **SO THE AGREEMENT IS ASSERTED RATHER THAN COMMENTED.** `/kit/` measures
+     a row's computed padding against `.panel-case`'s and requires them equal,
+     which is the only form of "these must not disagree" this project trusts. */
+  --rows-pad: 20px;
+  /* 🔴 AND THE ROW'S OWN DEPTH, WHICH IS `.panel-flow`'S 16 px BETWEEN ROWS FOR
+     THE SAME REASON: two rows of a glued panel and two rows of a cased one are
+     the same distance apart or the two arrangements read as two components.
+     🔴 **IT IS HERE BECAUSE THE FIRST DRAFT READ `var(--panel-gap)` AND
+     MEASURED ZERO.** That token is declared on `.panel`, so outside one there
+     is nothing to read, and an unresolved `var()` makes the WHOLE `padding`
+     shorthand invalid at computed-value time rather than dropping one side: the
+     row fell back to 0 on all four edges and every inset assert on `/kit/` read
+     `a row pads 0 px`. The same trap had already been avoided one line up and
+     was walked into on the next declaration. **A custom property inherits
+     downward, never sideways, and never from a class nothing above you wears.** */
+  --rows-gap: 16px;
   /* 🔴 HOW FAR A SWITCHED-OFF CONTROL'S FURNITURE DIMS, AND IT IS PUBLISHED
      FOR THE SAME REASON THE HEAD AND FOOT ARE: a caller that has to guess a
      component's own number is a caller that guesses it wrong.
@@ -967,6 +993,82 @@ button.pos-pri[data-busy="1"] {
    the control row and the report all already carry. */
 .pos-glue[hidden] { display: none; }
 .pos-glue.pos-glue > * { border: 0; border-radius: 0; margin: 0; }
+
+/* ── a glued surface built out of ROWS (.pos-rows) ───────────────────────────
+   🔴 THE SURFACE IS `.pos-glue` ABOVE AND THIS IS ONLY WHAT A ROW ADDS.
+   `createGlueRows` in `demo/shell/glue.mjs` writes both classes, so the border,
+   the radius and the 1 px seam are the same declarations `.pos-report` and
+   every glued pair already use, and a change to the glued look reaches this
+   without a second edit. Asked for 2026-09-26 as the base of an instrument
+   panel: *"base on generic \"glued containers/rows\" component"*.
+
+   🔴 THE ROW PAINTS ITS OWN GROUND, AND THAT IS THE WHOLE REASON THIS BLOCK
+   EXISTS. `.pos-glue` is `gap: 1px` over a `--line` ground, so a child with no
+   background of its own lets the line colour through its ENTIRE area and the
+   seam stops being a seam. Three callers have paid for that already, each by
+   remembering to paint a ground in their own stylesheet: `/wish/`'s parts,
+   `/pack/`'s wave host, and `.pos-glue > .pos-scope` a few thousand lines down
+   this file. A row holds loose controls, which have no surface of their own, so
+   the container does it and there is nothing to remember.
+
+   ⚠️ AND IT IS `--card`, THE SAME GROUND `.panel-case` PAINTS. A glued panel and
+   a cased one are two arrangements of one object and must not be two colours.
+
+   ⚠️ `display: flex` HERE IS STRUCTURAL AND NOT ARRANGEMENT. A flex container
+   BLOCKIFIES its children, which is what stops a `<canvas>` or a `<textarea>`
+   handed straight to `row()` from sitting on a text baseline and leaving the
+   descender strip that `/fau/` measured at 557.5 against 556.0 and that renders
+   here in the seam colour as a second line. `glue.mjs` carries the argument.
+
+   ⚠️ `min-width: 0`, WHICH THIS FILE HAS NOW WRITTEN DOWN FOUR TIMES. A flex
+   item will not shrink below its content, so a row holding a knob bank or a
+   keyboard that scrolls itself would push the surface wider than the page
+   instead, which is the 141 px of page overflow `tabs.mjs` shipped and `/kit/`
+   caught.
+
+   ⚠️ AND THE `[hidden]` PATCH IS REQUIRED, NOT TIDINESS. Any author rule setting
+   `display` beats the browser's own `[hidden] { display: none }`, so without
+   this a row a caller hid would stay on screen with the property reading as set
+   — which is the defect measured on `/pack/`, where three column headings were
+   drawn over three empty tables while their assert read `head.hidden === true`
+   and passed. This is the fifth component in this project to need the patch. */
+.pos-rows-r {
+  display: flex; align-items: center; gap: var(--ctl-gap);
+  min-width: 0; background: var(--card);
+  padding: var(--rows-gap) var(--rows-pad);
+}
+.pos-rows-r[hidden] { display: none; }
+/* 🔴 EDGE TO EDGE FOR A PICTURE, AND IT IS AN OPTION RATHER THAN A SECOND
+   COMPONENT. `panel.mjs` already records why: *"a panel in a headset is a
+   SCREEN, and a screen with a margin around its image reads as a photograph of
+   a screen"*. The same is true of a visualisation row in a glued panel, and the
+   seam either side of it is the only edge it is meant to have, which is the
+   reason `/pack/` took the padding and the border off its waveform host. */
+.pos-rows-r[data-pad="off"] { padding: 0; }
+/* 🔴 AND AN EDGE TO EDGE ROW HOLDING ONE THING MAKES THAT THING THE ROW. A flex
+   item is `flex: 0 1 auto` by default, so it does not grow: a picture in a row
+   with the inset taken off would sit at its own intrinsic width with the row's
+   ground either side of it, which is a smaller box in a wider box and reads as a
+   layout that failed rather than as a screen. `:only-child` is the condition
+   that keeps this narrow, the way `:has(> .panel-strip:empty)` keeps the empty
+   plate rule to the one case in this repository that is empty: a row with two
+   things in it has an arrangement, and `data-align` is what decides it. */
+.pos-rows-r[data-pad="off"] > :only-child { flex: 1 1 auto; min-width: 0; }
+.pos-rows-r[data-align="start"] { justify-content: flex-start; }
+.pos-rows-r[data-align="center"] { justify-content: center; }
+.pos-rows-r[data-align="end"] { justify-content: flex-end; }
+.pos-rows-r[data-align="between"] { justify-content: space-between; }
+/* 🔴 A NAMEPLATE IN A ROW SPANS THE ROW, OR `place: 'ends'` MEANS NOTHING. That
+   placement is `justify-content: space-between`, which puts the name at one end
+   and the patch at the other OF THE PLATE — so a plate sized to its own content
+   inside a centred row would sit the two words next to each other in the middle
+   of the panel and look like a placement nobody chose.
+   ⚠️ **AND NO `padding: 0` HERE, WHICH THE FIRST DRAFT HAD.** Every inset a
+   plate carries is written `.panel-case > .panel-plate`, and a plate in a row
+   has no case above it, so there is nothing to override: that declaration would
+   have been this project's sixth measured dead rule. Checked by reading every
+   `.panel-plate` selector in this file rather than by reasoning about it. */
+.pos-rows-r > .panel-plate { flex: 1 1 auto; min-width: 0; }
 
 /* ── readout and log, joined ──────────────────────────────────────────── */
 /* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
@@ -3630,7 +3732,15 @@ button.pos-pg-lab:hover { color: var(--fg); }
    surface rather than two boxes touching. Same contract every other glued child
    keeps, and it is why the wrapper exists at all: a piano roll sitting on the
    keyboard it names is the claim `glue.mjs` was written for. */
-.pos-glue > .kbd { margin: 0; border: 0; border-radius: 0; background: transparent; }
+/* ⚠️ `> * >` AS WELL AS `>`, ADDED 2026-09-26 FOR A KEYBOARD INSIDE A GLUED
+   ROW. `.pos-glue.pos-glue > *` reaches DIRECT children only, so a keyboard one
+   level down keeps its own border, its radius and — the one that actually shows
+   — `margin: 0 0 10px`, which is a reservation only the bottom of the row makes
+   and is this file's own *"a reservation that only one of two equal things
+   makes is a reservation that breaks them"*. Two components already carry the
+   identical pair of selectors for the identical reason, `.pos-scope` and
+   `.tbar`, so this is the third rather than a new idea. */
+.pos-glue > .kbd, .pos-glue > * > .kbd { margin: 0; border: 0; border-radius: 0; background: transparent; }
 
 /* ⚠️ 25 PER CENT TALLER ON A DESKTOP, AND THE BLOCK IS HERE RATHER THAN BESIDE
    `.k` FOR ONE REASON: A MEDIA QUERY ADDS NO SPECIFICITY, so a plain `.k` rule
