@@ -1,5 +1,25 @@
 # Handoff, 2026-09-26, session 51 continued: the composition research, and what it changed
 
+✅ **LATER THE SAME DAY, AND ON THE EDGE AT `ef4fcbe-143850-2f25`:** the seven
+per-component glue patches are gone. `--edge`, `--r` and `--inset` are read by
+every surface (nineteen in `shell.css`, plus the synth view's injected sheet);
+`.pos-glue > *` zeroes the first two, a row zeroes the third. A `.pos-glue > X`
+patch that strips a border may not be written again; the skill says so. Asked
+for as *"what is all this bloat ... those 1px rules and the whole life story"*.
+✅ **AND THE BLOAT WAS MEASURED BEFORE IT WAS CUT:** across everything added that
+day, 876 comment lines against 885 of code. `shell.css`'s additions went from
+72 per cent comment to 34; the two modules from 70 to about 60. The kit page is
+47, which is that file's own rate.
+⚠️ **THE PHONE IS AN IPHONE MINI, 375 by 812 at 3x, IN ALL THREE TOOLS.** And a
+real WebKit check exists now: `xcrun simctl` has an `iPhone 13 mini` device
+created this session (`tmp/shots/sim/udid.txt`), and its shots of the live
+page wrap like Chrome's emulation does. The owner's own phone wraps more, which
+is Safari's text size setting, not the font or the viewport; parked in
+`BACKLOG.md` with the design system's Chart CSS as the reference to read first.
+⚠️ **A BACKGROUND AGENT IS WRITING `plans/plan-eccm-cms.md`**, an alternative
+CMS for eccm.ee on the Cloudflare stack, asked for mid-task. Report it in full
+when it lands, not as a filename.
+
 🔴 **THE VERDICT THAT OPENED THIS HALF WAS *"plainly awful"*, THEN *"it kind of
 seems that you don't understand CSS layout models at all"*, AND THE WORK HERE IS
 THE ANSWER TO THAT RATHER THAN TO ANY ONE PAGE.** Four research strands ran in
