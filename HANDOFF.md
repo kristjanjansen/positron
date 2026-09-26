@@ -2,12 +2,19 @@
 
 ## Deployed, committed, in flight
 
-🔴 **NOTHING WAS DEPLOYED THIS SESSION.** The edge still serves BUILD
-`8ee0914-162532-2f29` from session 51, so **https://positron.studio/eccm/ is
-the OLD page** (Plex Sans, the text wordmark, month headings) and
-**https://positron.studio/fau/ is the OLD panel** (Compile in the foot). Three
-commits since then carry everything below, plus one for this handoff, and the
-push has not been done either (the account dance in `CLAUDE.md`).
+✅ **DEPLOYED, TWICE, LATE IN THE SESSION: BUILD `3193665-195146-8947` IS ON
+THE EDGE**, confirmed by `deploy.mjs` and by a fetch of the page. The first
+deploy (`e306095`) was graded against the edge at 68/68, eccm 11 page asserts
+and fau 45; the second carries the type pass and the event head and was
+confirmed by stamp only. The edge drops `.html`, so the clean addresses are
+https://positron.studio/eccm/, /eccm/event, /eccm/edit, /eccm/logo, /eccm/v1
+and /eccm/v2. Nothing has been pushed (the account dance in `CLAUDE.md`).
+The paragraph below this one was written before the deploys and is kept as
+the record of the order things happened in.
+
+🔴 **NOTHING HAD BEEN DEPLOYED WHEN THIS HANDOFF WAS FIRST WRITTEN.** The edge
+then served BUILD `8ee0914-162532-2f29` from session 51. Three commits carried
+everything below, plus one for this handoff.
 
 | | |
 | --- | --- |
@@ -15,8 +22,11 @@ push has not been done either (the account dance in `CLAUDE.md`).
 | `627b04f` | the instrument panel's patch picker unlabelled at the far end, `pos-sm`, Compile in the textarea's corner |
 | `8ae13ee` | plain pictures at their own size, the event page and the edit form, the logo cropped to its ink |
 
-⚠️ **A BACKGROUND AGENT WAS STILL WRITING `.claude/skills/eccm-ui/SKILL.md`
-WHEN THIS WAS WRITTEN**: a survey of whitespace and type principles from
+✅ **THE ECCM SKILL LANDED AND WAS APPLIED** (`.claude/skills/eccm-ui/SKILL.md`,
+415 lines, relayed in full, three stale lines corrected, its trigger row in
+`CLAUDE.md`). ⚠️ **A SECOND AGENT IS WRITING `plans/plan-eccm-design-from-image.md`**,
+an event page whose design comes from its picture; report it in full when it
+lands. What follows was true when written and is kept: a survey of whitespace and type principles from
 primary sources (Bringhurst, Tschichold, Müller-Brockmann, Ruder, Hochuli,
 Vignelli, Lupton, Butterick, Rutter, Refactoring UI) written as the skill the
 design plan's §G outlined, with today's asks as rules. Asked for as *"look up
