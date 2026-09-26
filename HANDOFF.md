@@ -1,3 +1,87 @@
+# Handoff, 2026-09-26, end of session 51: where everything is
+
+## Deployed, and where to open it
+
+BUILD **`8ee0914-162532-2f29`** on https://positron.studio, verified against the
+edge after the last deploy: **`/eccm/` 14/14, `/kit/` 245/245, `/fau/` 50/50**.
+The tree is clean at `ab73eb1`; nothing has been pushed today (the push needs
+the personal account dance in `CLAUDE.md`, and was not asked for).
+
+| open | what it is now |
+| --- | --- |
+| https://positron.studio/eccm/ | the first eccm typography demo, unlisted: Plex Sans self-hosted, ten real events, a text wordmark that scales, a nav that wraps, an events grid whose rows are subgrids, eight asserts of its own |
+| https://positron.studio/fau/ | `createInstrumentPanel` with `Compile` in the foot at the far end, the name and the patch picker at the start, no switch and no autocompile; the first press pulls the compiler |
+| https://positron.studio/kit/ | PANEL tab with five panel shapes, GLUED ROWS with `grid` and `full` specimens, patch names shown as written |
+
+## The three eccm plans, all reported in full in the session
+
+| plan | decided |
+| --- | --- |
+| `plans/plan-eccm-cms.md` | one Worker, D1 of eleven tables plus `draft`, R2 originals with `/cdn-cgi/image` renditions, Access OTP, `publish_at` as a WHERE clause, newsletter needs Workers Paid; today's additions: §5 the rada7 shape (eight hints, the sentence is the product), §8 drafts (a `draft` table behind a debounced PUT with `rev`, `localStorage` as crash buffer), paste (a `text/html` walker into the markdown subset), dates (native `datetime-local` enhanced by flatpickr), stream items (`workers/items` alarms as a second publish path), trip's image model; §13 caching, SEO, JSON-LD `Event`, RSS and iCal, one unchunked sitemap |
+| `plans/plan-eccm-design.md` | eccm.ee today is stock Cassiopeia, Roboto declared and never served, 14.4 px on 142 characters a line, `width: 3320px` typed, a 381 by 199 JPEG logo from a 2023 PSD and no vector; the system is one family (Plex Sans) in two weights, 18 px on 66 ch, about 30 `--eccm-*` tokens; eight of `positron-compose`'s ten sections carry over and a typography layer is what it lacks; a 25 rule `eccm-ui` skill outline; **first step is one email to ECCM for the vector and the tagline face** |
+| `plans/plan-eccm-setup.md` | its own private repository `kristjanjansen/eccm` from the first commit (positron is public since 2026-09-24), `eccm.positron.studio` and `eccm-media.positron.studio` as one-line custom domains on this zone, staging on this account and production on ECCM's as two wrangler environments, a seven step handover, half a day before the CMS plan's session 1 |
+
+## What the eccm demo does not have yet, in the order to build it
+
+1. An event page (title, a `dl` meta block, the picture at measure width, prose at 66 ch, add-to-calendar as text). 2. The English tree. 3. The logo: send the email; redraw for the demo meanwhile. 4. A look on a Windows machine at 16 to 18 px, which nothing on this desk can take. 5. Then the setup plan's session 0, which moves the page out of positron into its own repository and onto `eccm.positron.studio`; the `demo/eccm/` row goes `built: false` that day.
+
+## Open in `BACKLOG.md`, verbatim headings
+
+- Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
+- Open 2026-09-26: the presence badge's own inset, the justified-to-linear rule, full-width glue
+- Open 2026-09-26: quieten Safari's text scaling, selection and loupe on the phone
+- Open 2026-09-26: the keyboard's inset inside a glue, and more glued rows examples
+- Open 2026-09-26: what the composition research says to change in `shell.css`, in order
+- Open 2026-09-26: five phone defects, SEEN for the first time, across six instrument pages
+- Open 2026-09-26: `/kit/` reads 237/237 in the harness and shows ten FAILs in a real browser
+- Open 2026-09-26: a glued rows component, and an instrument panel built on it, both in `/kit/` only
+- Open 2026-09-26: `C+` reads as C major instead of being refused
+- Open 2026-09-26: `CLASS_OF` files 14 of 26 qualities as major, `dim7` included
+- Open 2026-09-26: `2` can be typed and will never be suggested
+- Open 2026-09-25: the keyboard’s note naming pair reads N and D, not Nt and Dg
+- Open 2026-09-25: the keyboard footer rule is edge to edge, and it belongs to the kit
+- Open 2026-09-25: `/knobs/` has a flaky pair of asserts, and the constant is 6.4x stale
+- Open 2026-09-25: `full: true` reaches nothing on `/knobs/`, and it was hidden by a dead assert
+- Open 2026-09-25: a synth on/off says ON and OFF, not FAU ON and FAU OFF
+- Open 2026-09-25: the chord name moves about one character left in the keyboard
+- Open 2026-09-25: `/shape/` loses its left rail and the plate moves to the top right
+- Open 2026-09-25: `/wish/`'s diagram should gently grey what is not plugged in
+- Open 2026-09-25: a closed page leaves the show running, and it is billed
+- Open 2026-09-25: `/stage/`'s transport buttons are hand rolled, so they lost the shimmer
+- Open 2026-09-25: `/wish/`'s remove button should be a small kit variant
+- Open 2026-09-25: `PLAY RECORDING` is clipped to `PL RECOR`
+- Open 2026-09-25: the control room timeline does not move
+- Open 2026-09-25: two more on `/stage/`, one of them a live defect
+- Open 2026-09-25: the control room's time footer, ASKED THREE TIMES
+- Open 2026-09-25: three asks on `/knobs/` and the shared keyboard, reported against a broken page
+- Open 2026-09-25: better sounding chords, and the session died before the research started
+- Open 2026-09-25: `.panel-head-mid` overflows its own grid track at every width
+- Open 2026-09-25: a stream of per-demo requests, COLLECTED WHILE IT IS STILL ARRIVING
+- Open 2026-09-25: four reports on `/stage/` from looking at the working tree
+- Open 2026-09-25: a stale question appears on `/stage/` while the page is OFF AIR
+- Open 2026-09-25: the active tab on `/stage/` has a vertical rule down each side
+- Open 2026-09-25: `/stage/` lost its loopback, and the gate that replaces it is owed
+- Open 2026-09-25: the control room UI is DONE and 14 asserts are one timing cascade
+- Open 2026-09-25: WHEP MEDIA DOES NOT FLOW FROM THIS MACHINE, AND IT IS NOT THE CODE
+- Open 2026-09-25: `/webrtc/` has been GREEN WITH ZERO COVERAGE, and WHEP does not connect here at all
+- Open 2026-09-25: `/stage/` is DEPLOYED AT 37/49 and its WebRTC start fails cold
+- Open 2026-09-25: `/stage/`'s control room has two ways to start and it confuses
+- Open 2026-09-25: the native reload rate limit does not exist, and two files say it does
+- Open 2026-09-24: more embedded knowledge into skills, and the .md files tidied
+- Open 2026-09-24: the repo goes public, and a README somebody can paste
+- Open 2026-09-24: `/fau/`'s second round, and four wrong answers before the right one
+- Open 2026-09-24: `/fau/`'s panel, four asks and one of them is a repeat
+- Open 2026-09-24: the remote looper, and the distributed instrument behind it
+- Open, carried in from HANDOFF.md on 2026-09-24
+
+## Rules that landed today, so nobody re-derives them
+
+- `positron-compose` is the composition and cascade skill (10 sections), loaded before any padding, margin, gap, width, border or radius is written; `positron-ui` gained *A patch name is shown as it was written*.
+- A plan that lands mid-task is the next reply, in full (`CLAUDE.md`).
+- The phone is an iPhone mini, 375 by 812 at 3x, in `shot.mjs`, `which-rule-won.mjs` and `ancestry.mjs`.
+- A `.pos-glue > X` patch that strips a border may not be written; surfaces read `--edge`, `--r`, `--inset`.
+- A justified row has exactly two ends; a start row wraps as a cluster; `between` needs a width to spread across.
+
 # Handoff, 2026-09-26, session 51 continued: the composition research, and what it changed
 
 ✅ **EVENING, ON THE EDGE AT `4d978e6-145223-5ba7`, 243/243:** `createGlueRows`

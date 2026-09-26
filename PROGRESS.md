@@ -1,3 +1,37 @@
+# Session 51 (2026-09-26): composition as a system, the instrument panel, and the first eccm page
+
+**MEASURED ON THE EDGE AT `8ee0914-162532-2f29`:** `/eccm/` 14/14 (8 page
+asserts), `/kit/` 245/245 (233), `/fau/` 50/50 (44). Kit asserts went 231 to
+233 in the day (one for a plate row with a control at each end, one for a patch
+name rendered as written); fau went 43 to 47 with the panel and 47 to 44 with
+`Compile` replacing the switch and the autocompile (eight out, five in).
+
+**MEASURED ON eccm.ee, 5 requests of 12 allowed, two headless renders:** body
+14.4 px on a 1.3 line height, 142 characters a line at 1280, description 12 px,
+calendar cells 10 px; `"Roboto", sans-serif` declared and no text font served,
+Chrome drew Helvetica; 170,243 bytes of icon font for four glyphs; nav hover
+orange on white 1.97:1, the date box's no-image fallback 1.36:1; `.container-nav`
+typed at `width: 3320px`, so `scrollWidth` is 3,320 at every width and a phone
+has 2,945 px of sideways overflow; the header is 325 of 812 px on a phone; the
+logo is a 381 by 199 JPEG, 34,053 bytes, exported from Photoshop CC 2019 on
+2023-02-17, no vector anywhere on three pages.
+
+**MEASURED WHILE VENDORING PLEX:** Google's `css2` endpoint hands the same
+variable file for weights 400 and 600 (identical MD5), so two files carry both
+subsets: latin 40,240 bytes, latin-ext 25,868. Both load on the demo page
+because it contains ü and ž.
+
+**MEASURED IN THE RADA7 LETTERS (`../toimps`), four files:** 3,462 to 5,522
+bytes, 362 to 590 words, 15 to 22 links of which 9 to 14 are Facebook events,
+5 to 36 bold spans, day headers in one letter of four. Ivo's prose needs about
+three hundred lines of grammar and still refuses two events in ten; a date block
+letter needs forty and refuses none.
+
+**AND THE ONE TOOL FINDING WORTH A LINE:** `which-rule-won.mjs` names the UA's
+2 px as the winner for a `var()`-valued `border` shorthand while the computed
+line says 1 px, because CDP hands back no longhand ranges for it. The computed
+line is the fact.
+
 # Session 39: three panels, a patch bay, a spoken patch, and four bugs found by measuring (2026-09-21)
 
 **A STREAM OF SEVEN REQUESTS ARRIVED WHILE THE HANDOFF WAS BEING READ, AND
