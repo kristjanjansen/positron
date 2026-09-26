@@ -19,7 +19,18 @@ after the name, the patch picker as the far end), and the page lost every rule
 of its own. 53/53 with 47 page asserts, kit 244/244. Two things left open by the
 agent and written in `BACKLOG.md`: no focus ring on an edgeless well in a glue,
 and the keyboard pad row's `Panic` wrapping alone on a phone.
-⚠️ **A DESIGN AGENT IS WRITING `plans/plan-eccm-design.md`** (typography, the
+✅ **`/fau/` HAS `Compile` IN ITS FOOT AND NO SWITCH, NO AUTOCOMPILE** (asked
+*"rm fau off button"*, *"replace it with compile (shimmer). no autocompile"*,
+*"align to right, fau stays in left"*): the name and the patch picker at the
+start, a primary Compile wearing the kit's busy sweep at the far end, the first
+press pulls the compiler. 50/50 with 44 page asserts, BUILD `8de9168`.
+✅ **PATCHES ARE ALWAYS SENTENCE CASED**, a `positron-ui` rule since today: the
+panel marks its patch line and the stylesheet stops shouting it; kit 245/245.
+✅ **`plans/plan-eccm-design.md` AND `plans/plan-eccm-setup.md` LANDED AND WERE
+REPORTED IN FULL**: the design (stock Cassiopeia, no font served, a JPEG logo,
+a dark-on-white system of one family) and the setup (its own private repository,
+`eccm.positron.studio`, staging here and production on ECCM's account).
+⚠️ **THE DESIGN AGENT WROTE `plans/plan-eccm-design.md`** (typography, the
 logo, a small design system, against `positron-compose`).
 ✅ **`plans/plan-eccm-cms.md` GAINED §5 THE RADA7 SHAPE, §8 DRAFTS, PASTE, DATES,
 STREAM ITEMS AND TRIP'S IMAGES, AND §13 CACHING, SEO, SITEMAP**, all reported.

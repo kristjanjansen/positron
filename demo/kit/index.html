@@ -1221,11 +1221,11 @@
   viz:   filter.el,                                 // edge to edge
   rows:  [[cutoff, res, drive], [a, d, s, r]],      // top to bottom
   keys:  kb.el,
-  plate: { name: 'NOLA', patch: 'RHODES MK I' },
+  plate: { name: 'NOLA', patch: 'Rhodes Mk I' },
   // or plate: { name: 'FAU', status: power, patch: picker }, a control at each end
 })
 p.addRow([lfo, depth])        // always above the keys and the foot
-p.patch('WURLITZER 200A')     // rewrite the foot's right half
+p.patch('Wurlitzer 200A')     // rewrite the foot's right half, shown as written
 p.shape()                     // ['viz','controls','keys','plate']`,
     (add) => {
       const knob = (label, value) => createKnob({ label, min: 0, max: 127, value });
@@ -1249,7 +1249,7 @@ p.shape()                     // ['viz','controls','keys','plate']`,
            MEASURED before this line changed: 4 px of border still on the keys
            and 10 px of their own bottom margin under them. */
         keys: kb.el,
-        plate: { name: 'NOLA', patch: 'RHODES MK I' },
+        plate: { name: 'NOLA', patch: 'Rhodes Mk I' },
       });
       /* ⚠️ `redraw()` BECAUSE A MEASURING WINDOW HOLDS NO FRAME. The component
          resizes on an observation, which is a frame away, and this page lays
@@ -1260,7 +1260,7 @@ p.shape()                     // ['viz','controls','keys','plate']`,
       /* 2. NO PICTURE AND NO KEYBOARD. A pedal is four knobs and a name. */
       const stomp = createInstrumentPanel({
         rows: [[knob('MIX', 40), knob('TIME', 88), knob('TONE', 64), knob('REPEATS', 52)]],
-        plate: { name: 'POSITRON', patch: 'SPRING REVERB' },
+        plate: { name: 'POSITRON', patch: 'Spring reverb' },
       });
 
       /* 3. PADS WHERE THE KEYS GO. The keyboard row is a row like any other.
@@ -1270,7 +1270,7 @@ p.shape()                     // ['viz','controls','keys','plate']`,
       const box16 = createInstrumentPanel({
         rows: [[[knob('TEMPO', 100), knob('SWING', 12)], { align: 'start' }]],
         keys: createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ top: String(y * 8 + x + 1) }) }).el,
-        plate: { name: 'POSITRON', patch: 'SIXTEEN' },
+        plate: { name: 'POSITRON', patch: 'Sixteen' },
       });
 
       /* 4. ROWS AND NOTHING ELSE. No picture, no keyboard, no foot. */
@@ -5453,7 +5453,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const [nameEl, patchEl] = sk.plate.lines;
       const was = patchEl.textContent;
       const nameL = r(nameEl).left, rowW = r(sk.plateRow).width, footH = r(sk.plateRow).height;
-      const longer = 'WURLITZER 200A ELECTRIC';
+      const longer = 'Wurlitzer 200A electric';
       sk.patch(longer);
       const grew = r(patchEl).width;
       const moved = +(r(nameEl).left - nameL).toFixed(1);
@@ -5464,6 +5464,24 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         patchEl.textContent === was && moved === 0 && rowMoved === 0 && taller === 0 && grew > 0,
         `a name ${longer.length} characters long drew ${grew.toFixed(1)} px wide and moved the `
         + `instrument's name by ${moved} px, the row by ${rowMoved} px and its depth by ${taller} px`);
+    }
+
+    /**
+     * 🔴 A PATCH IS SHOWN AS IT WAS WRITTEN, AND THE NAME ABOVE IT IS NOT.
+     * Asked 2026-09-26: *"patches are always sentence cased"*. Read off what
+     * the browser renders (`shown()`) rather than off the source, which is the
+     * half that made `/circuit/`'s uppercase check worth anything: a check on
+     * `textContent` grades the string that was typed and stays green whether
+     * or not a transform shouts it.
+     */
+    {
+      const [nameEl, patchEl] = sk.plate.lines;
+      const [nameShown, patchShown] = sk.plate.shown();
+      const tf = getComputedStyle(patchEl).textTransform;
+      d.assert('a patch name renders as it was typed while the instrument’s name renders in capitals',
+        patchShown === patchEl.textContent && patchShown !== patchShown.toUpperCase()
+          && nameShown === nameEl.textContent.toUpperCase() && tf === 'none',
+        `${nameShown} over ${patchShown}, the patch line’s transform ${tf}`);
     }
 
     /**

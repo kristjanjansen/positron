@@ -1,14 +1,5 @@
 ## Open
 
-### Open 2026-09-26: patch names are always sentence cased
-
-⚠️ **ASKED, VERBATIM:** *"parches are awalys sentence cased"* (patches are always
-sentence cased). A rule for the kit, not a page fix: wherever a patch name is
-printed (the picker, the nameplate's second line, a plate's patch end, a log
-line), it is `Organ`, never `ORGAN` and never `organ`. To be found by measuring
-which components upper-case their text (`createNameplate` is the suspect) and
-written into `positron-ui` beside the readout rules.
-
 ### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
 
 ⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
@@ -20,6 +11,17 @@ reserves its widest word in `ch`, hugs a bar's left edge by the bar's rule, and
 composites a translucent dot, and each of those is a fact a row would have to
 respect on purpose.
 
+
+### Done 2026-09-26: patch names are always sentence cased
+
+✅ Landed: `createInstrumentPanel` marks its patch line `panel-plate-patch`, `shell.css` sets that line's transform to none after the plate's uppercase rule at the same weight, the kit's specimens now type `Rhodes Mk I`, `Wurlitzer 200A`, `Spring reverb` and `Sixteen`, and one kit assert reads it off `shown()`: `NOLA over Rhodes Mk I, the patch line's transform none`. Kit 245/245. The rule is in `positron-ui` as *A patch name is shown as it was written*.
+
+⚠️ **ASKED, VERBATIM:** *"parches are awalys sentence cased"* (patches are always
+sentence cased). A rule for the kit, not a page fix: wherever a patch name is
+printed (the picker, the nameplate's second line, a plate's patch end, a log
+line), it is `Organ`, never `ORGAN` and never `organ`. To be found by measuring
+which components upper-case their text (`createNameplate` is the suspect) and
+written into `positron-ui` beside the readout rules.
 
 ### Done 2026-09-26: `/fau/`, the OFF switch goes and a COMPILE button takes its place, no autocompile
 
