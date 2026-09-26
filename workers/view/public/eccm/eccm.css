@@ -177,12 +177,15 @@
      then the summary at body size. Reported 2026-09-26 with a crop of a row
      whose title, date and summary were three sizes a step apart: "it feels
      unprofessiona (yea type size scale but...)" */
-  .ev-kicker { display: flex; flex-wrap: wrap; gap: var(--eccm-s-1) var(--eccm-s-4); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); font-variant-numeric: tabular-nums; margin-block-end: var(--eccm-s-2); }
+  .ev-kicker { display: flex; flex-wrap: wrap; gap: var(--eccm-s-1) var(--eccm-s-4); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); font-variant-numeric: tabular-nums; margin-block-end: var(--eccm-s-3); }
   .ev-kicker time + time { margin-inline-start: calc(-1 * var(--eccm-s-2)); }
   .ev-title { font-size: var(--eccm-t-2xl); overflow-wrap: anywhere; }
   .ev-title a { text-decoration-line: none; }
   .ev-title a:hover, .ev-title a:focus-visible { text-decoration-line: underline; }
-  .ev-summary { margin-block-start: var(--eccm-s-3); }
+  /* a step more between the three registers than the first cut had (asked
+     2026-09-26 with a crop: "feels like these need biiit more vert space in
+     between"): 12 px under the small line, 16 px under the title */
+  .ev-summary { margin-block-start: var(--eccm-s-4); }
 
   /* ── the event page and the edit form, HTML only ─────────────────────────── */
   /* a crumb above a title: the page this one came from, small, in the muted ink */
@@ -226,7 +229,7 @@
   .small { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
   /* a button: a word in a 44 px box ruled in ink, no radius, no shadow; the
      primary one is ink filled. 2.75rem is a finger, not a relationship */
-  .btn { display: inline-flex; align-items: center; block-size: 2.75rem; padding-inline: var(--eccm-s-4); border: 1px solid var(--eccm-ink); background: var(--eccm-ground); color: var(--eccm-ink); text-decoration: none; cursor: pointer; }
+  .btn { display: inline-flex; align-items: center; block-size: 3rem; padding-inline: var(--eccm-s-6); border: 1px solid var(--eccm-ink); background: var(--eccm-ground); color: var(--eccm-ink); text-decoration: none; cursor: pointer; }
   .btn:hover { text-decoration: none; background: var(--eccm-tint, #f4f4f4); }
   .btn-pri { background: var(--eccm-ink); color: var(--eccm-ground); }
   .btn-pri:hover { background: #000; }
@@ -237,8 +240,10 @@
   .field { display: grid; gap: var(--eccm-s-1); }
   .field label { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
   .field-row { display: grid; gap: var(--eccm-s-6); grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
-  .form input, .form select, .form textarea { inline-size: 100%; border: 1px solid var(--eccm-rule-strong); border-radius: 0; background: var(--eccm-ground); color: var(--eccm-ink); padding: var(--eccm-s-2) var(--eccm-s-3); font: inherit; }
-  .form input:not([type="file"]), .form select { block-size: 2.75rem; }
+  .form input, .form select, .form textarea { inline-size: 100%; border: 1px solid var(--eccm-rule-strong); border-radius: 0; background: var(--eccm-ground); color: var(--eccm-ink); padding: var(--eccm-s-3) var(--eccm-s-4); font: inherit; }
+  /* a step more air in the fields and the buttons (asked 2026-09-26: "add
+     biiit more padding on input fields and buttons"): 3rem tall, 12 by 16 in */
+  .form input:not([type="file"]), .form select { block-size: 3rem; }
   .form input[type="file"] { padding: 0; border: 0; }
   .form textarea { line-height: var(--eccm-lh-body); resize: vertical; }
   .hint { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
