@@ -34,7 +34,9 @@ content needs, decided by the container's width and never the viewport's; and
 which is also where `between` is real.
 
 
-### Open 2026-09-26: an alternative CMS for eccm.ee on the Cloudflare stack, a plan
+### Done 2026-09-26: an alternative CMS for eccm.ee on the Cloudflare stack, `plans/plan-eccm-cms.md`
+
+✅ **LANDED, 816 lines, reported in full in the session.** Verdict: an events system with a few pages attached, not a CMS; free plan yes for the site, no for the newsletter; three sessions to parity, five with mail; the first thing to ask ECCM for is the database dump and the images folder.
 
 ⚠️ **ASKED, VERBATIM, MID-TASK, AND HANDED TO A BACKGROUND AGENT:** *"in bg do a
 scan of https://eccm.ee/index.php/et/ and make a plan to build an alternative cms
