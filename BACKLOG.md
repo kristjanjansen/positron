@@ -1,5 +1,74 @@
 ## Open
 
+### Open 2026-09-26: the instrument panel's patch selector is unlabelled and at the right, and `/fau/`'s Compile moves into the textarea's corner
+
+⚠️ **ASKED, VERBATIM, MID-TASK, FOR A BACKGROUND AGENT:** *"in bg make rule
+for instumet panel that patch selector have no label and is in right. do it in
+fau. rm compile from footer, put it absolutely to bottom right corner of
+textarea, small button variant"*. Three parts:
+- **A rule, in the component and in `positron-ui`.** `createInstrumentPanel`
+  (`demo/shell/instrument-panel.mjs`) puts the patch picker at the FAR END of
+  the plate row with NO label, by default, so no page has to remember. Today
+  `/fau/` has the name and the picker at the start (handoff, session 51).
+- **Applied on `/fau/`** (`demo/fau/index.html`).
+- **Compile leaves the foot.** It sits absolutely in the bottom right corner
+  of the Faust source textarea as a SMALL button variant. Whether the kit has
+  a small variant is not known: the open line below about `/wish/`'s remove
+  button suggests it does not, so it is one shared class in `shell.css`,
+  shown in `/kit/`, before the page uses it. The textarea keeps its last line
+  clear of the button, and a foot left empty paints nothing.
+- Verify: `check-html`, then `node demo/verify.mjs fau kit` only, against
+  today's 50/50 with 44 page asserts and 245/245; a control moving changes
+  the harness press order, so every moved assert is accounted for.
+
+### Done 2026-09-26: `/eccm/` in the face eccm.ee really draws, with their thumbnails, nearer their layout, and a logo test page
+
+✅ **DONE AND GREEN LOCALLY, DEPLOYED WITH THE NEXT DEPLOY.** `/eccm/` reads
+17/17 with 11 page asserts, up from 8. The face is `Helvetica, Arial,
+sans-serif` and the page loads no font at all (MEASURED through
+`CSS.getPlatformFontsForNode`: Helvetica and Helvetica-Bold on every element,
+the reading the design plan took on eccm.ee itself). The ten rows carry
+eccm.ee's own 300 px thumbnails under their own file names, drawn at a
+largest scale of 0.993, in the original's shape: a tinted row, the picture
+with the day over it at the start on a 0.55 scrim (4.7:1 for white over a
+white picture), the title and the bold date line beside it. The mark is
+`logo.svg`, redrawn from the served JPEG row by row so it overlays it to the
+pixel, and `logo.html` shows the two side by side, on top of each other, at
+2x and at both page sizes, with the tagline in five faces and a measured
+squeeze under each: DIN Condensed needs 5 per cent, Helvetica Neue Condensed
+26, Arial Narrow 25, Avenir Next Condensed 21, so the SVG asks for DIN first.
+At 375: 200 px of mark and menu (24.6 per cent of 812), no sideways overflow,
+all 11 green. Two things found on the way: a compound title with no break at
+a slash ran the phone 29 px wide and the title got the prose's
+`overflow-wrap` floor, and `demo/shot.mjs` measured overflow against
+`innerWidth`, which mobile Chrome widens to the content, so it printed none;
+it reads `clientWidth` now. Left out on purpose: the login form, the
+calendar, the `Üksikasjad` button (the title is the link), the category
+colours, and the month headings (the original has none). IBM Plex Sans is gone
+from `demo/eccm/vendor/` and from `build.mjs`. Not sent: the email for the
+vector.
+
+⚠️ **ASKED, VERBATIM:** *"use same font as eccm (thay they actyually serve,
+not roboto not prenent). use image thumbnails from their event posts, resize
+using css. try be more like original layout, to the logo test page (current,
+reinterpet in svg)"*. Four asks, all on `demo/eccm/`:
+- **The face.** eccm.ee declares `"Roboto", sans-serif` and serves no text
+  font, so what a visitor sees is the machine's own sans-serif: Helvetica on a
+  Mac, Arial on Windows (MEASURED, `plans/plan-eccm-design.md` §B). So the
+  page drops IBM Plex Sans and its two vendored files and declares that stack.
+  The Plex assert turns into its opposite: no web font is loaded.
+- **The thumbnails.** Each of the ten rows gets the picture eccm.ee shows for
+  that event, fetched ONCE from eccm.ee into `demo/eccm/img/` and served from
+  positron's own origin, sized in CSS, never upscaled. The own-origin assert
+  stays true.
+- **The layout.** Nearer the original front page (the picture with the date
+  over it at the row's start, title, venue and description beside it), keeping
+  the type rules the design plan argued for: nothing under 14 px, a measure,
+  one left edge.
+- **The logo test page.** A second page in the same directory showing the
+  served JPEG beside an SVG redraw of the mark measured off the raster, marked
+  interim in its own `<desc>`, because the email for the vector has not gone.
+
 ### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
 
 ⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
