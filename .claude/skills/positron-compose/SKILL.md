@@ -381,16 +381,36 @@ essentially component with margin and we do not do it, it's ui side-effect)"*.
 The fix is `--kbd-pad: 0px` in that rule and never `padding: 0`, because the
 keyboard's footer bleeds by `calc(-1 * var(--kbd-pad))` and pads by the same
 token; zero the padding alone and the footer overshoots by 9 px each side.
-✅ **THE BIG STEP, WHICH IS WHAT STOPS THE NEXT COMPONENT DOING IT:** three
-things, and the third is the one that holds. **A component's outer inset is a
-token on the component and never a literal**, so a container can take it away
-in one declaration. **Every `.pos-glue > X, .pos-glue > * > X` patch that strips
-a border zeros that token beside it**, in the same rule, so the two cannot come
-apart. **And `/kit/` measures every child of every glued row for its own left
-padding, border and margin and requires zero**, which is the check that found
-the keyboard and then found two more the same minute: a synth view carrying a
-1 px border into a row, and a toggle carrying a 10 px margin. A rule nobody has
-to remember is the only kind that holds.
+✅ **THE BIG STEP, DONE THE SAME DAY, AND IT IS THREE TOKENS AND NO PATCHES.**
+Nineteen surfaces declared `1px solid var(--line)` and `4px` literally, so a
+glue had to strip each one it met by name: seven per-component patches, each
+with a paragraph, all doing one job. The owner's verdict: *"what is all this
+bloat, those 1px rules and the whole life story, all the baggage of
+nonsystematic let's-measure-pixels what I tried to discard and you wrote a
+composing skill for."* Correct, and the patches are gone. **`--edge` and `--r`
+are declared once at `:root` and read by every surface**, the synth view's own
+injected stylesheet included; **`.pos-glue > *` sets both to 0** and every
+surface inside a glue goes flat by inheritance, the next one written included.
+**`--inset` is the third and is deliberately undeclared**: a surface reads
+`var(--inset, <its own default>)` and keeps it until a row sets `--inset: 0px`,
+and then every surface in the row loses it at once. Controls whose border is
+their shape (a toggle, a pad, a knob's hand, a tag) do not read these.
+🔴 **SO THE RULE IS NOW A PROHIBITION.** A new surface reads the three tokens
+or it is not a surface of this kit. **A `.pos-glue > X` patch that strips a
+border may not be written**; if one seems needed, the component is not reading
+`--edge`, and that is what to fix. `/kit/` measures every child of every glued
+row for its own left margin, its padding where it has no border, and its border
+where it is not a control, and requires zero; that assert found the keyboard,
+then the synth view, then the display, in one afternoon.
+
+⚠️ **`between` SPREADS ONLY ACROSS A ROW WITH AN INTRINSIC WIDTH, WHICH ON A
+SHRINK-TO-FIT SURFACE IS RARE.** MEASURED three times on `/kit/`: on a settings
+list, on a meter and on a station strip, two children under `space-between`
+came out **8 px apart against an 8 px gap**, because the surface is as wide as
+its widest row and a picture that fills a row has no width of its own to give
+it. Only the keyboard has one, so the panel's plate row is where `between` is
+real, and the glued rows block claims it nowhere. A shrink-to-fit surface plus
+`between` is `start` with a longer name.
 
 🔴 **THE RADIUS IS DECLARED ONCE ON THE CONTAINER, AND THE FIRST AND LAST
 SECTIONS READ IT BACK.** `border-radius: inherit` on the four longhands of

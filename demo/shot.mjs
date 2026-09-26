@@ -98,6 +98,12 @@ const chrome = spawn(CHROME, [
   '--mute-audio',
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
 chrome.stderr.on('data', () => {});
+// ⚠️ CHROME DIES WITH THIS PROCESS, WHATEVER KILLED IT. A run that threw
+// after launch left a headless Chrome alive, and the next verify run marked
+// itself as not evidence because of it. `exit` fires on a normal end, an
+// uncaught throw and a SIGTERM; SIGINT is turned into an exit so it fires too.
+process.on('exit', () => { try { chrome.kill(); } catch { /* already gone */ } });
+process.on('SIGINT', () => process.exit(130));
 
 let wsUrl = null, port = null;
 for (let i = 0; i < 60 && !wsUrl; i++) {
@@ -181,14 +187,16 @@ for (const w of (widths.length ? widths : WIDTHS)) {
     expression: `JSON.stringify({
       w: innerWidth, h: Math.min(document.documentElement.scrollHeight, 6000),
       dpr: devicePixelRatio, overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth),
+      top: ${JSON.stringify(HASH)} ? Math.max(0, Math.floor((document.getElementById(${JSON.stringify(HASH)}) || document.body).getBoundingClientRect().top + scrollY) - 8) : 0,
     })`, returnByValue: true,
   });
   const page = JSON.parse(result.value);
-  const height = CLIP || page.h;
+  // with --hash the capture starts AT the block, not at the top of the page
+  const height = Math.min(CLIP || page.h, page.h - page.top);
 
   const { data } = await S('Page.captureScreenshot', {
     format: 'png', captureBeyondViewport: true,
-    clip: { x: 0, y: 0, width: w, height, scale: 1 },
+    clip: { x: 0, y: page.top, width: w, height, scale: 1 },
   });
   const file = join(OUT, `${slug}-${w}${HASH ? `-${HASH}` : ''}.png`);
   await writeFile(file, Buffer.from(data, 'base64'));
