@@ -208,6 +208,18 @@
      a row's computed padding against `.panel-case`'s and requires them equal,
      which is the only form of "these must not disagree" this project trusts. */
   --rows-pad: 20px;
+  /* 🔴 AND THE ROW'S OWN DEPTH, WHICH IS `.panel-flow`'S 16 px BETWEEN ROWS FOR
+     THE SAME REASON: two rows of a glued panel and two rows of a cased one are
+     the same distance apart or the two arrangements read as two components.
+     🔴 **IT IS HERE BECAUSE THE FIRST DRAFT READ `var(--panel-gap)` AND
+     MEASURED ZERO.** That token is declared on `.panel`, so outside one there
+     is nothing to read, and an unresolved `var()` makes the WHOLE `padding`
+     shorthand invalid at computed-value time rather than dropping one side: the
+     row fell back to 0 on all four edges and every inset assert on `/kit/` read
+     `a row pads 0 px`. The same trap had already been avoided one line up and
+     was walked into on the next declaration. **A custom property inherits
+     downward, never sideways, and never from a class nothing above you wears.** */
+  --rows-gap: 16px;
   /* 🔴 HOW FAR A SWITCHED-OFF CONTROL'S FURNITURE DIMS, AND IT IS PUBLISHED
      FOR THE SAME REASON THE HEAD AND FOOT ARE: a caller that has to guess a
      component's own number is a caller that guesses it wrong.
@@ -1023,7 +1035,7 @@ button.pos-pri[data-busy="1"] {
 .pos-rows-r {
   display: flex; align-items: center; gap: var(--ctl-gap);
   min-width: 0; background: var(--card);
-  padding: var(--panel-gap) var(--rows-pad);
+  padding: var(--rows-gap) var(--rows-pad);
 }
 .pos-rows-r[hidden] { display: none; }
 /* 🔴 EDGE TO EDGE FOR A PICTURE, AND IT IS AN OPTION RATHER THAN A SECOND
@@ -1033,6 +1045,15 @@ button.pos-pri[data-busy="1"] {
    seam either side of it is the only edge it is meant to have, which is the
    reason `/pack/` took the padding and the border off its waveform host. */
 .pos-rows-r[data-pad="off"] { padding: 0; }
+/* 🔴 AND AN EDGE TO EDGE ROW HOLDING ONE THING MAKES THAT THING THE ROW. A flex
+   item is `flex: 0 1 auto` by default, so it does not grow: a picture in a row
+   with the inset taken off would sit at its own intrinsic width with the row's
+   ground either side of it, which is a smaller box in a wider box and reads as a
+   layout that failed rather than as a screen. `:only-child` is the condition
+   that keeps this narrow, the way `:has(> .panel-strip:empty)` keeps the empty
+   plate rule to the one case in this repository that is empty: a row with two
+   things in it has an arrangement, and `data-align` is what decides it. */
+.pos-rows-r[data-pad="off"] > :only-child { flex: 1 1 auto; min-width: 0; }
 .pos-rows-r[data-align="start"] { justify-content: flex-start; }
 .pos-rows-r[data-align="center"] { justify-content: center; }
 .pos-rows-r[data-align="end"] { justify-content: flex-end; }
