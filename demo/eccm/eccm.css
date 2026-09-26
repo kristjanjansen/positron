@@ -73,9 +73,17 @@
   body {
     font: 400 var(--eccm-t-m) / var(--eccm-lh-body) Helvetica, Arial, sans-serif;
     text-wrap: pretty;
-    -webkit-font-smoothing: auto;
+    /* grayscale antialiasing: on a Mac the default subpixel rendering draws
+       Helvetica heavier than a designed site looks, and a lighter page was
+       asked for; Windows ignores both lines (asked 2026-09-26: "do you have
+       font antialias in positron and in eccm?", and neither did) */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3 { font-weight: 700; line-height: var(--eccm-lh-head); text-wrap: balance; }
+  /* headings at text weight: hierarchy is size and space, and bold is spent
+     nowhere by default (eccm-ui §2, Vignelli; asked 2026-09-26 as "rough and
+     90ies", which system Helvetica in bold is) */
+  h1, h2, h3 { font-weight: 400; line-height: var(--eccm-lh-head); text-wrap: balance; }
   a {
     color: inherit;
     text-decoration-line: underline;
@@ -163,31 +171,48 @@
   /* no underline under a bold title (asked 2026-09-26: "this thin underline
      under bold title is pathetic design"); the row's shape says it is a link,
      and hover puts a line back for the pointer */
-  .ev-title { font-size: var(--eccm-t-l); overflow-wrap: anywhere; }
+  /* a row's text is three registers with large contrast between them
+     (eccm-ui §2, Vignelli's twice): a small muted line first with the date,
+     time, venue and category, the title at twice the body in text weight,
+     then the summary at body size. Reported 2026-09-26 with a crop of a row
+     whose title, date and summary were three sizes a step apart: "it feels
+     unprofessiona (yea type size scale but...)" */
+  .ev-kicker { display: flex; flex-wrap: wrap; gap: var(--eccm-s-1) var(--eccm-s-4); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); font-variant-numeric: tabular-nums; margin-block-end: var(--eccm-s-2); }
+  .ev-kicker time + time { margin-inline-start: calc(-1 * var(--eccm-s-2)); }
+  .ev-title { font-size: var(--eccm-t-2xl); overflow-wrap: anywhere; }
   .ev-title a { text-decoration-line: none; }
   .ev-title a:hover, .ev-title a:focus-visible { text-decoration-line: underline; }
-  /* one bold line per row, the title; the date is ink at body weight */
-  .ev-when { margin-block-start: var(--eccm-s-2); font-variant-numeric: tabular-nums; }
-  .ev-when time + time { margin-inline-start: var(--eccm-s-2); }
-  .ev-meta { display: flex; flex-wrap: wrap; gap: var(--eccm-s-1) var(--eccm-s-4); margin-block-start: var(--eccm-s-1); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
-  .ev-summary { margin-block-start: var(--eccm-s-2); }
+  .ev-summary { margin-block-start: var(--eccm-s-3); }
 
   /* ── the event page and the edit form, HTML only ─────────────────────────── */
   /* a crumb above a title: the page this one came from, small, in the muted ink */
   .crumb { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); margin-block-end: var(--eccm-s-4); }
-  /* the title and its one action are a row with exactly two ends; on a phone
-     the two wrap to two left aligned lines at their own sizes (compose §6) */
-  .event-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--eccm-s-4) var(--eccm-s-8); margin-block-end: var(--eccm-s-8); }
-  .event-head h1 { flex: 1 1 30ch; max-inline-size: var(--eccm-measure); margin-block-end: 0; }
-  /* the facts: a two column list at the measure, the label in the muted ink,
-     one gap for all rows, no rule and no box */
-  .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--eccm-s-6); row-gap: var(--eccm-s-2); max-inline-size: var(--eccm-measure); }
-  .facts dt { color: var(--eccm-ink-2); }
+  /* the head of an event page: the title, the facts and the actions in one
+     column and the picture beside them at its own size on a desk, the two
+     stacked under 60rem of main. arvopart.ee's page for the same concert uses
+     the width this way and the demo did not (compared 2026-09-26) */
+  .event-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--eccm-s-8); margin-block-end: 2lh; }
+  .event-lead h1 { max-inline-size: var(--eccm-measure); margin-block: var(--eccm-s-2) var(--eccm-s-8); }
+  /* the facts as label over value, the label small in the muted ink, cells at
+     least 14rem so a phone stacks them and a desk pairs them, no rule, no box */
+  .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: var(--eccm-s-6) var(--eccm-s-8); max-inline-size: var(--eccm-measure); }
+  .facts > div { display: grid; gap: var(--eccm-s-1); align-content: start; }
+  .facts dt { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
   .facts a + a { margin-inline-start: var(--eccm-s-3); }
-  /* the picture at the measure, its shape reserved from its own pixels so
-     nothing moves while it arrives, never wider than the prose under it */
-  .event-pic { max-inline-size: var(--eccm-measure); margin-block: 2lh; }
+  .event-actions { display: flex; flex-wrap: wrap; gap: var(--eccm-s-3); margin-block-start: var(--eccm-s-8); }
+  /* the picture at its own size, its shape reserved from its own pixels so
+     nothing moves while it arrives */
+  .event-pic { max-inline-size: var(--eccm-measure); }
   .event-pic img { inline-size: 100%; aspect-ratio: 900 / 599; object-fit: cover; }
+  /* the next events at the foot, so the page does not end in a dead end */
+  .next { margin-block-start: var(--eccm-s-16); }
+  .next h2 { font-size: var(--eccm-t-l); margin-block-end: var(--eccm-s-6); }
+  .next-list { display: grid; gap: var(--eccm-s-4); max-inline-size: var(--eccm-measure); }
+  .next-list li { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--eccm-s-6); }
+  .next-list time { font-variant-numeric: tabular-nums; color: var(--eccm-ink-2); }
+  .next-list a { text-decoration-line: none; }
+  .next-list a:hover, .next-list a:focus-visible { text-decoration-line: underline; }
+  .next-list small { display: block; font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
   .event-pic figcaption { margin-block-start: var(--eccm-s-2); font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); }
   /* prose flow: the owl, and the space is counted in the leading, Rutter's
      one line between paragraphs and a heading carrying two above and half a
@@ -237,6 +262,10 @@
 
 @layer page {
   h1 { font-size: var(--eccm-t-2xl); margin-block-end: var(--eccm-s-8); }
+  /* the list's heading is a label above the list, small and muted, because
+     the titles are the page (arvopart.ee's ghost section label, compared
+     2026-09-26); it stays the h1 for the outline */
+  h1.list-label { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2); margin-block-end: var(--eccm-s-6); }
 }
 
 /* the phone: the mark at 11rem so the mark and the menu together stay under
@@ -258,11 +287,17 @@
    45 ch of Helvetica at 18 px is about 47rem, and under that the text column
    would fall below the measure (MEASURED at the harness's 756 px window: 40 ch
    in a 400 px column beside the 300 px picture) */
+@container (min-width: 60rem) {
+  @layer components {
+    .event-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--eccm-s-12); align-items: start; }
+  }
+}
+
 @container (max-width: 47rem) {
   @layer components {
     .events { row-gap: var(--eccm-s-6); }
     .ev { column-gap: var(--eccm-s-4); grid-template-columns: 6.5rem minmax(0, 1fr); }
     .ev-pic { aspect-ratio: 1; }
-    .ev-title { font-size: var(--eccm-t-m); }
+    .ev-title { font-size: var(--eccm-t-xl); }
   }
 }

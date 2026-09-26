@@ -1,5 +1,34 @@
 ## Open
 
+### Open 2026-09-26: a plan for an event page whose design comes from the event's picture, in the background
+
+⚠️ **ASKED, VERBATIM:** *"one idea is to actually change event body design
+based on the event image. rest of eccm stays minimal, out of the way.
+gesutres has very good graphics design for example as preview image. build
+design-from-image detection is quite an effort i assume. plan in bg"*. A
+background agent writes `plans/plan-eccm-design-from-image.md`: what can be
+read off a picture (palette, tone, light or dark, saturation), where it runs
+(the browser at upload in the edit form, a Worker at publish, the browser at
+view), which `--eccm-*` tokens may vary per event and which never do, the
+contrast guardrails and the fallback to the plain page, the cost of each
+route, and a first experiment on the demo's event page with the Gestures
+graphic. Reported in full when it lands.
+
+### Open 2026-09-26: `/eccm/` feels rough and 90s beside arvopart.ee, and antialiasing
+
+⚠️ **ASKED, VERBATIM:** *"do you have font antialias in positron and in eccm?"*,
+*"in yr demos"*, then *"eccm feels still v rough and 90ies compared to arvo part
+keskus (same info)"*. MEASURED: `shell.css` sets no smoothing, `eccm.css` sets
+`auto`, the platform default. Done in one pass: grayscale antialiasing on the
+eccm body; headings at weight 400 with the list title a size up, so hierarchy
+is size and space; the event page head as two columns on a desk (title, facts
+as label over value, a ticket button and the edit button at the start, the
+picture beside them at its own size), one column under 60rem of main; the
+next three events at the foot. NOT done, a decision for the owner: the face.
+Helvetica is the instruction and is also most of the 90s; arvopart.ee serves
+Maison Neue and Minion Pro. The design plan's Plex Sans is in `v1.html` to
+compare.
+
 ### Done 2026-09-26: compare arvopart.ee's page for Morton Feldman 100 with eccm.ee's, and three things to take
 
 ✅ **COMPARED AND REPORTED.** arvopart.ee: Maison Neue and Minion Pro served,
