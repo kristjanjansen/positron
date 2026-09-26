@@ -323,6 +323,15 @@ const FILES = [
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
+  // ── IBM Plex Sans, kept ONLY for demo/eccm/v1.html, the comparison copy ──
+  // /eccm/ itself is set in the machine's Helvetica since 2026-09-26 and loads
+  // no font. v1.html is the session 51 page kept beside it for comparison
+  // (asked: "perhaps keep old htmls aroind for now for comparions?"), and it
+  // is the one reader of these two files. When v1.html goes, so do these.
+  ['demo/eccm/vendor/plex-sans-latin.woff2', 'eccm/vendor/plex-sans-latin.woff2'],
+  ['demo/eccm/vendor/plex-sans-latin-ext.woff2', 'eccm/vendor/plex-sans-latin-ext.woff2'],
+  ['demo/eccm/vendor/LICENSE-ibm-plex-sans', 'eccm/vendor/LICENSE-ibm-plex-sans'],
+
   // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
   //
   // ⚠️ LISTED BY NAME FOR THE THIRD REASON IN A ROW AND IT IS THE SAME ONE:

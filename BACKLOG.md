@@ -1,5 +1,30 @@
 ## Open
 
+### Done 2026-09-26: compare arvopart.ee's page for Morton Feldman 100 with eccm.ee's, and three things to take
+
+✅ **COMPARED AND REPORTED.** arvopart.ee: Maison Neue and Minion Pro served,
+16 px on 24, a 48 px red serif title, a 524 px text column beside a 572 px
+picture, facts as muted label over value, an outlined ticket button, four
+related events, one column on a phone with no overflow. eccm.ee: Helvetica
+drawn, 14.4 on 18.7 with the description at 12 px, a 26 px title, the picture
+in a bordered card, an INFORMATION bar, 3,320 px wide at every width.
+⚠️ **TO TAKE, IN ORDER, NOT DONE:** a two column head on a desk (facts and
+prose at the measure, the picture beside them at its own size, one column on
+a phone); a ticket button after the facts or the prose; facts as label over
+value; the next three events at the foot; bold names in prose, sparingly.
+**Not to take:** two webfonts and a serif, the green duotone and circle crops,
+labels near 2.5:1, red for titles and dates.
+
+⚠️ **ASKED, VERBATIM:** *"cmpare
+https://www.arvopart.ee/arvo-pardi-keskus/sundmused/sundmus/morton-feldman-100-ansambel-u/
+https://eccm.ee/index.php/et/109-morton-feldman-100-for-philip-guston/2026-10-10-18-00"*.
+The same concert on two sites. One fetch of each page, shots at 1280 and 375,
+the face, sizes, measure and leading read through CDP, and a comparison
+reported in the reply, with what the eccm demo should take from the better
+one. Also asked in the same minute: *"do make changes to eccm now. perhaps
+keep old htmls aroind for now for comparions?"*, answered with `v1.html` and
+`v2.html` beside the live page.
+
 ### Open 2026-09-26: `/eccm/` looks bad, the pictures are to be plain, and the air, the title size and the grounds get a critical look
 
 ⚠️ **ASKED, VERBATIM, ON THE FIRST CUT OF THE REBUILD:** *"eccm page looks bad.

@@ -48,6 +48,7 @@ somebody broke it.
 | `positron-xr` | any `gl: true` or headset page, `verify-gl.mjs`, `verify-quest.mjs`, full screen on a phone |
 | `positron-hardware` | anything under `rig/`, a page that plays real hardware, any claim about an instrument |
 | `positron-history` | following a link, slug or path out of an older file, or repeating a claim about a rename |
+| `eccm-ui` | any change under `demo/eccm/`, any page for eccm.ee wherever it is hosted, or any claim about type on a white page. It is the type half; `positron-compose` is the composition half, and a page of text loads both |
 
 ⚠️ **AND THE TRIGGER IS THE WORK, NOT THE FILE.** Adding one button to a page
 is a `positron-ui` task AND a `positron-verify` task, because adding a control
