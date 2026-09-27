@@ -57,6 +57,14 @@
     .sample .credits dt { color: var(--ev-ink2); font-family: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; }
     .sample :focus-visible { outline: 2px solid var(--ev-accent, var(--ev-ink)); outline-offset: 2px; }
     section + section { margin-block-start: var(--eccm-s-16); }
+  }
+  /* on a phone the sample's ground runs edge to edge: the sample leaves the
+     frame's gutter by exactly that gutter and pads itself by the same token,
+     so the text stays on the frame's line (asked 2026-09-27 with a crop:
+     "Bg colors edge to edge hzomtally on mobile"; positron-compose §1, an
+     escape is owned by the component and derived from the token it escapes) */
+  @media (max-width: 40rem) {
+    .sample { margin-inline: calc(-1 * var(--eccm-gutter)); padding-inline: var(--eccm-gutter); outline: none; }
     h2.sec { font-size: var(--eccm-t-l); margin-block-end: var(--eccm-s-4); }
   }
 </style>
