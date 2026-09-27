@@ -89,8 +89,7 @@
 
 <main class="frame">
   <h1>Kujundus pildist</h1>
-  <p class="intro">Every event picture below is read as this page opens, twice. At 64 pixels for its colour: a light picture gives a light scheme with a ground taken from a flat edge, or a pastel of its hue, or a light grey when it has no hue; a dark picture inverts the whole page, light text on a dark ground of its hue or a dark grey. An accent for underlines, focus and the filled button is toned from the picture's strongest hue until it reads on that ground. At up to 600 pixels for its type: text-like shapes are measured for stroke contrast and for feet at the baseline, which is what separates a Garamond from a grotesque, and the verdict is serif, sans, unsure, or no type found.</p>
-  <p class="intro">Beside each picture a short event page is drawn in what it gave: the head, the two buttons in the system face, a paragraph with rich text and credits. When the graphic's type reads as a serif, the title, the facts and the body take Source Serif 4; in light text on a dark ground the body stays in the sans and only the title and facts take the serif. A filled button is the ground's inverse and never the accent, which stays on underlines and the focus ring.</p>
+  <p class="intro">Each picture is read as the page opens: its colour at 64 pixels gives a light or a dark scheme, a ground and an accent for underlines and focus, and its type at up to 600 pixels gives serif, sans or no type found. Beside it a short event page is drawn in what it gave, with the title and the facts in Source Serif 4 when the graphic's type reads as a serif, and the body in it only on a ground near white.</p>
   <p class="tally" id="tally">Reading the pictures.</p>
   <div id="cards"></div>
 
@@ -361,24 +360,22 @@
   const SERIF = { family: "'Source Serif 4', Georgia, serif", weight: 400 };
 
   // ── the pictures, in the list's order ────────────────────────────────────
+  // the next set of events off eccm.ee's calendar, page two, read 2026-09-27
+  // (asked: "replace examples for next set of events in eccm calendar"); ten
+  // events are on that page and the four Schönberg dates carry no picture
   const PICS = [
-    { file: 'ic_large_w900h600q100_gestures-situations-small.jpg', kicker: '30.09.2026 19.00 ECCM Ulysses', title: 'Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa', gestures: true, serifByHand: true },
-    { file: 'ic_medium_w300h300q100_chatgpt-image-sep-13-2026-10-27-27-am.png', kicker: '08.10.2026 19.00 Eesti Nüüdismuusika Keskus', title: 'Schönbergi sari' },
-    { file: 'ic_medium_w300h300q100_morton-feldman.jpg', kicker: '10.10.2026 18.00 Arvo Pärdi Keskus, Laulasmaa', title: 'Morton Feldman 100: For Philip Guston' },
-    { file: 'ic_medium_w300h300q100_enmt-scrapyard-2-eriti-vaike-copy.jpg', kicker: '10.10.2026 19.30 Kanuti Gildi SAAL', title: 'Scrapyard' },
-    { file: 'ic_medium_w300h300q100_screenshot-2026-08-31-at-11-21-15.png', kicker: '11.10.2026 19.00 Eesti Nüüdismuusika Keskus', title: 'Gestuurid/situatsioonid: ilma partituurita kuulamine. Liisa Hõbepappel, Kenn-Erik Kannike, Liis Vares' },
-    { file: 'ic_medium_w300h300q100_improtest.jpg', kicker: '13.10.2026 19.00 ECCM saal', title: 'Improtest: Electro Funeral' },
-    { file: 'ic_medium_w300h300q100_screenshot-2026-09-04-at-09-40-01.png', kicker: '22.10 kuni 25.10.2026 ECCM', title: '11. Üle Heli festival „Heli on vaba“' },
-    { file: 'ic_medium_w300h300q100_u-ansambel-eccm-rida-tais-mv-150.jpg', kicker: '03.11.2026 19.00 ERR Uudistemaja', title: 'Surm' },
-    { file: 'ic_medium_w300h300q100_germination.png', kicker: '06.11.2026 19.00 Startbahn-Genezarethkirche, Berliin', title: 'Sound Plasma 10: Tallinna Uue Muusika Ansambli kontsert Berliinis' },
-  ];
-  const f2 = (n) => n.toFixed(2), pc = (n) => `${Math.round(100 * n)} per cent`;
+    { file: 'ic_medium_w300h300q100_sound-plasma-berlin-cover-vaike.png', kicker: '12.11.2026 19.00 Mustpeade maja valge saal TUMA', title: 'Sound Plasma 10' },
+    { file: 'ic_medium_w300h300q100_1-ansambel-u-fb-pais-2110-1640x924px.jpg', kicker: 'ECCM saal U:', title: 'Koosloome õpituba' },
+    { file: 'ic_medium_w300h300q100_sohvi-viik-11-pisike.jpg', kicker: '28.11.2026 19.30 St Paul’s Hall, Huddersfield TUMA', title: 'Tallinna Uue Muusika Ansambel Huddersfieldi nüüdismuusika festivalil' },
+    { file: 'ic_medium_w300h300q100_enmt-pic-suur-3.jpg', kicker: '05.12.2026 19.00 ECCM saal TUMA', title: 'Uus kontserdisari: Up to Three / Kuni kolm' },
+    { file: 'ic_medium_w300h300q100_open-space-4.jpeg', kicker: '12.12.2026 19.00 ECCM saal TUMA', title: 'Open Space #5' },
+    { file: 'ic_medium_w300h300q100_u-punane.jpg', kicker: '29.12.2026 ECCM saal U:', title: 'U: vana-aasta uue muusika kontsert' },
+  ];  const f2 = (n) => n.toFixed(2), pc = (n) => `${Math.round(100 * n)} per cent`;
 
   const FLAGS = new URLSearchParams(location.search);
   const TIMES = (window.__times = []);
   const cards = document.getElementById('cards');
   const tally = { light: 0, dark: 0, accent: 0, serif: 0 };
-  let gestures = null;
   for (const p of PICS) {
     if (FLAGS.get('first') && PICS.indexOf(p) >= Number(FLAGS.get('first'))) break;
     const img = new Image(); img.src = `./${p.file}`;
@@ -393,7 +390,6 @@
     const s = scheme(r, t);
     TIMES.push({ file: p.file.slice(22, 40), decode: Math.round(t1 - t0), colour: Math.round(t2 - t1), type: Math.round(t3 - t2), scheme: Math.round(performance.now() - t3) });
     tally[s.mode]++; if (s.accent) tally.accent++; if (s.serif) tally.serif++;
-    if (p.gestures) gestures = { p, s };
     const card = document.createElement('article'); card.className = 'card';
     const top = document.createElement('div'); top.className = 'card-top';
     const left = document.createElement('div'); left.className = 'card-pic';
@@ -419,7 +415,7 @@
     card.append(top, sample(p, s));
     cards.append(card);
   }
-  document.getElementById('tally').textContent = `${PICS.length} pictures read: ${tally.light} light schemes and ${tally.dark} dark, ${tally.accent} with an accent, ${tally.serif} read as serif-typed. A verdict needs at least 8 shapes that sit in a line of others their size, after rules through the words are erased; serif is 45 per cent or more of them with stroke contrast over 0.9 or a foot over 1.8 times the stem, sans is 25 per cent or fewer, and between is unsure. These are heuristics with thresholds chosen on these pictures, not measurements of a face.`;
+  document.getElementById('tally').textContent = `${PICS.length} pictures read: ${tally.light} light schemes and ${tally.dark} dark, ${tally.accent} with an accent, ${tally.serif} read as serif-typed.`;
 
   // ?first=N reads only the first N pictures and ?type=0 skips the type
   // reading, for a probe; window.__times carries each picture's timings

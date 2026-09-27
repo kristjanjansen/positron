@@ -136,8 +136,9 @@
      component asks its own box, never the window), because the row's shape
      depends on whether 45 ch of text fits beside a 300 px picture */
   main { padding-block: var(--eccm-s-8) var(--eccm-s-16); container-type: inline-size; }
+  /* the footer carries no rule above it (asked 2026-09-27: "rm border above
+     eccm footer"); the air alone separates it */
   .site-foot {
-    border-block-start: 1px solid var(--eccm-rule);
     padding-block: var(--eccm-s-8) var(--eccm-s-12);
     display: flex; flex-wrap: wrap; gap: var(--eccm-s-2) var(--eccm-s-8);
     font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--eccm-ink-2);
