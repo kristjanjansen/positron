@@ -1,3 +1,47 @@
+# Handoff, 2026-09-27, session 52 continued: the eccm demo grew a face, an event page, a form and a page that designs from a picture
+
+## Deployed, committed, in flight
+
+✅ **EVERYTHING BELOW IS ON THE EDGE.** The last deploy of this half is named in
+the commit after this one; `deploy.mjs` confirmed each one by stamp. Nothing
+is pushed (the account dance in `CLAUDE.md`). No agent is running.
+
+| open | what it is now |
+| --- | --- |
+| https://positron.studio/eccm/ | the list in Schibsted Grotesk (chosen off the specimen page as "Use font e"), grayscale antialiased, ten of eccm.ee's thumbnails plain at 300 px, each row a small muted line, a large light title and a summary, rows 48 px apart, the menu ruled in the logo's ink, the switch on the tagline's baseline; 17/17 with 11 page asserts |
+| https://positron.studio/eccm/event | the event page: title, facts as label over value, Osta pilet and Muuda, the poster beside them on a desk, prose in leading units, credits, the next three events; HTML only |
+| https://positron.studio/eccm/edit | the form: labelled fields 3rem tall, native date fields without the iOS box, a drop field for the picture over the invisible native input; saves nothing and says so |
+| https://positron.studio/eccm/type | the specimen page: seven setups of the same row, Helvetica, Plex, Inter, Archivo at width 80, Schibsted Grotesk (chosen), Source Serif 4 over Inter, Source Serif 4 alone, all self hosted |
+| https://positron.studio/eccm/logo | the served JPEG and the SVG redraw, overlaid, at 2x, at both page sizes, the tagline in five faces with a measured squeeze; DIN Condensed first |
+| https://positron.studio/eccm/derive | the working example of the design-from-image plan: six events off eccm.ee's calendar page two, each read for colour and type, a scheme derived (light or dark, ground, accent, serif or not) and a short event page drawn in it; the buttons in the system face in two modes; grounds edge to edge on a phone |
+
+## The plans and skills that landed this half, all relayed in full
+
+- `.claude/skills/eccm-ui/SKILL.md`, 415 lines, the typography layer: whitespace and type from primary sources, today's asks as rules, its trigger row in `CLAUDE.md`. Corrected three stale lines the day it landed and gained the label-over-value rule.
+- `plans/plan-eccm-design-from-image.md`, 369 lines: what a picture can give (measured on the ten pictures then on disk), three routes priced, what may vary and what never does, the guardrails, a first experiment. The derive page is that experiment, three passes on.
+
+## What the derive page does today, so nobody re-derives it
+
+Colour at 64 px: a light picture gives a light scheme with the ground from a flat non-white edge or the lightest big colour taken most of the way to white (chroma capped at 0.02), white for a grey picture whose own ground is white, a light grey for other grey ones; a dark picture (mean luminance under 0.22) inverts to light text on the picture's hue at OKLCH lightness 0.28 if that hue is strong (chroma 0.08) and outside the yellow-to-brown band (hue 40 to 110), walking the picture's hues strongest first, else a pure dark grey. An accent is toned from the strongest clean hue into a window where it stands 3:1 off the ground and the ink, for underlines and focus only. A filled button is the ground's inverse, never the accent. Type at up to 600 px: rules through words erased, shapes that sit in a line of others their size, stroke contrast and feet at the baseline; serif at 45 per cent, no type under 8 shapes. The body takes the serif only on a ground near white. `?first=N` and `?type=0` are probe flags; `window.__times` carries timings.
+
+🔴 **A FULL-PAGE CAPTURE OF THE DERIVE PAGE STALLS CHROME.** It was 23,800 px tall with nine whole sample pages and `Page.captureScreenshot` with `captureBeyondViewport` never answered; an hour went into a hang that was in the screenshot tool and not in the page (LESSONS #123). It is 11,000 px now; clip it card by card, and `demo/shot.mjs` takes a slug, not a file.
+
+## The owner's verdicts this half, verbatim
+
+*"eccm feels still v rough and 90ies compared to arvo part keskus"*, *"it feels unprofessiona (yea type size scale but...)"*, *"fau compile: its on top of textarea. secondary. small button variant. you took 17+ min and failed"*, *"good job"* after the derive page's third pass. The comparison with arvopart.ee is in `BACKLOG.md` with what was taken (a two column head, a ticket button, facts as label over value, next events) and what was not (webfonts, duotone, red titles).
+
+## Open in `BACKLOG.md`
+
+- Open 2026-09-27: the derive page's examples become the next set of events, and the handoff (this)
+- Everything from session 51's list is unchanged and still open, and the eccm move-out (the setup plan's session 0) is the next big step: the demo is now six pages with a form in a public repository holding ECCM's pictures and one event's full text.
+
+## Next on eccm, in order
+
+1. The setup plan's session 0: its own private repository and `eccm.positron.studio`, half a day. 2. The English tree. 3. The email to ECCM for the vector logo and the tagline face, not sent. 4. A look on Windows, where nothing here has been drawn. 5. The design-from-image route (a) in the form, which is the CMS's session 2.
+
+---
+
+
 # Handoff, 2026-09-26, end of session 52: eccm in its own face, and a stream still open
 
 ## Deployed, committed, in flight

@@ -1,3 +1,35 @@
+# Session 52, second half (2026-09-26 to 27): the eccm face, the event page, the derive page
+
+**ON THE EDGE**, each deploy confirmed by stamp: eccm 17/17 with 11 page
+asserts throughout; fau 51/51 with 45 after Compile moved over the text box
+corner; kit 246/246.
+
+**MEASURED, the type specimen:** natural width of the logo tagline at 27 px
+against the picture's 311: DIN Condensed 329, Avenir Next Condensed 395,
+Arial Narrow 415, Helvetica Neue Condensed 422, Helvetica 506.
+
+**MEASURED, the comparison with arvopart.ee, one fetch each:** Maison Neue
+and Minion Pro served, 16 px on 24, a 48 px red serif title, a 524 px text
+column beside a 572 px picture, no overflow at 375; eccm.ee's event page 14.4
+on 18.7, the description at 12 px, 3,320 px wide at every width.
+
+**MEASURED, the derive page on the first nine pictures:** colour at 64 px, 1
+to 9 ms a picture; type at up to 600 px, 1 to 10 ms after the quadratic
+lookup went (the first version took minutes on a photograph). First serif
+detector: three photographs read serif, the Gestures poster four shapes.
+After lines and rule erasure: no photograph reads as type, Improtest 9 shapes
+100 per cent serif, Gestures 0 shapes. Schemes on those nine: six light and
+three dark, four accents; on the six of calendar page two, see the derive
+page's own tally. Page height 23,782 px with nine full samples, 13,854 with
+short ones, 11,185 without the mailing block and foot line.
+
+**MEASURED, the phone fixes:** a credits label column beside its value wrapped
+`Maria Solei Järvet` on five lines at 375; the compact thumbnail 6.5rem to
+5.5rem; the sample edge to edge at 375, 0 to 375 with the text at 16.
+
+**MEASURED, cost of the two agents this half:** the skill 25 min, 103 tool
+calls, 275,199 tokens; the plan 15 min, 55 calls, 223,488 tokens.
+
 # Session 52 (2026-09-26): eccm in its own face, the event page, the form, and a logo redraw
 
 **NOTHING ON THE EDGE CHANGED.** Still `8ee0914-162532-2f29`. Everything below

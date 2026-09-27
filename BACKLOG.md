@@ -1,5 +1,25 @@
 ## Open
 
+### Done 2026-09-27: the derive page's examples become the next set of events off eccm.ee, and the handoff
+
+✅ **DONE.** Page two of the calendar holds ten events and four of them, the
+Schönberg series dates, carry no picture, so the six that do are the
+examples: Sound Plasma 10, Koosloome õpituba, TUMA in Huddersfield, Up to
+Three, Open Space #5, U: vana-aasta. Read: three light schemes and three
+dark, three accents, two read as serif-typed (the Sound Plasma cover, and a
+photograph of the ensemble whose 13 line-sitting shapes the detector took for
+type, which is the verdict's own limit showing). The opening is three
+sentences. `HANDOFF.md`, `LESSONS.md` 123 and 124, `PROGRESS.md` written.
+
+⚠️ **ASKED, VERBATIM:** *"good job. replace examples for next set of events in
+eccm calendar and write handoff"*. One fetch of eccm.ee's events page two
+(the front page said 26 upcoming over three pages), its events' pictures
+fetched once each into `demo/eccm/` under their own names, and the derive
+page's list of pictures, kickers and titles replaced with them in sentence
+case; the front page list keeps its ten. Then `HANDOFF.md`, `LESSONS.md` and
+`PROGRESS.md` for the second half of session 52.
+⚠️ **AND:** *"rm border above eccm footer"*. Done, in `eccm.css`, every page.
+
 ### Done 2026-09-27: the derived samples' grounds run edge to edge on a phone
 
 ⚠️ **ASKED, VERBATIM, WITH A CROP:** *"Bg colors edge to edge hzomtally on

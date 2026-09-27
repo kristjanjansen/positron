@@ -2890,3 +2890,39 @@ FILE.** A box can be measured and still be the wrong thing to align to when
 the file put air inside it. The fix is the file's viewBox, not a margin on the
 switch: crop the mark to its ink, and then the head band's two ends align on
 the tagline's baseline, which is the mark's bottom edge, with no number typed.
+
+
+## 123. A screenshot tool that stalls looks exactly like a page that hangs (session 52)
+
+🔴 **AN HOUR WENT INTO A HANG THAT WAS NOT IN THE PAGE.** The derive page's
+second pass overran a two minute budget three times in a row. The first
+overrun was real, a quadratic lookup in the type reading, fixed in one line.
+Every overrun after it was two things at once: twenty stranded Chrome
+helpers from the first runs pegging the machine, and, once those were
+killed, `Page.captureScreenshot` with `captureBeyondViewport` on a page
+23,800 px tall, which never answers. The page itself finished in under
+twenty seconds every time, MEASURED by reading the tab's title from the
+browser endpoint while the tab's own thread was busy.
+⚠️ **TWO INSTRUMENTS FOUND IT AND NEITHER WAS THE HARNESS.** A title marker
+set by the page at each step, read through `/json/list` which needs no
+renderer, said where the page was; a 40 second stall detector on every CDP
+call said which call never came back. Both are five lines and both are in
+the scratchpad tools now.
+✅ Kill your own browsers before the next probe, put a timeout on every CDP
+call, and clip a tall page by element instead of capturing all of it.
+
+## 124. A photograph's grain reads as serif to a stroke test, and a rule through a word welds its letters (session 52)
+
+🔴 **THE FIRST SERIF DETECTOR CALLED THREE PHOTOGRAPHS SERIF AND MISSED THE
+ONE SERIF POSTER.** Stroke contrast and feet at the baseline are what
+separate a Garamond from a grotesque, and specks of grain have both, at
+random, in quantity. And the Gestures poster draws three stave lines through
+its words, so every letter on a line was one shape with the line and none
+was letter sized.
+✅ **TYPE SITS IN LINES, AND A RULE IS NOT A LETTER.** Erase horizontal runs
+longer than a tenth of the width before labelling, and count a shape only
+when three or more others of its height share its baseline. MEASURED after:
+no photograph reads as type, the Improtest wordmark reads serif on its own.
+⚠️ **AND THE LIMIT IS SAID, NOT HIDDEN.** The Gestures letters lie on a dark
+red disc, and a luminance threshold cannot lift them off it, so that poster
+reads no type and is marked serif by hand with the reason printed beside it.
