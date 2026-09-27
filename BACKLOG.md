@@ -1,5 +1,29 @@
 ## Open
 
+### Open 2026-09-27: the derive page, third pass, five asks with three phone crops
+
+⚠️ **ASKED, VERBATIM:** *"Pick sorce serif rm others"*; *"Prefer ligher tones but
+with bit color like leftmost on light bgs"*; *"Iimpeo: shoild be black on
+white. See the logo no grays realky"*; *"Readability issues. Discourage
+brownish muddiah tones pick purer daker grayer in fhis case. Shorten texts on
+de amples pages get huge"*. So: Source Serif 4 is the serif and the two
+Garamonds leave with their files and build lines; a light ground is the
+picture's lightest big colour taken most of the way to white, a breath of
+colour at most; a grey picture whose own ground is white gets the page's
+white, not a grey; a dark ground takes the picture's hue only when that hue
+is pure and strong, and a muddy or weak one gives a pure dark grey with no
+accent; the sample text is a third of what it was.
+⚠️ **AND, A MINUTE LATER:** *"Readability issues on a purchase button"*, of the
+accent-filled one on the brown scheme. A filled button is the ground's
+inverse, ink on white or white on the dark ground, never the accent; the
+accent stays on underlines and the focus ring.
+⚠️ **AND TWO MORE:** *"Fall back to nonmudsy detected colors first"* (a dark
+scheme walks the picture's hues strongest first and takes the first that is
+strong and clean, grey only when none is); *"When darker bg in light Mode
+(gestures) and sans, do not use it on body. Legibility rules as indark bgs"*
+(the body takes the serif only on a ground near white; on the Gestures sage
+it stays in the sans).
+
 ### Done 2026-09-27: four phone fixes on eccm, with crops
 
 ⚠️ **ASKED, VERBATIM, WITH TWO PHONE CROPS:** *"Improve credits table on
