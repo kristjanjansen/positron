@@ -30,13 +30,21 @@ events, newest first, off the past events list's last two pages. The earlier
 sets stay reachable by `?set=1` and `?set=2` so the Huddersfield rule
 above keeps its example. ✅ MEASURED on the six: three dark grounds (plum 353, indigo 281, a pure dark grey for the Ludensemble poster, which is about black), three light (two greys, one pale pink), one serif verdict.
 
-### Open 2026-09-27: move eccm out of positron, verbatim
+### Done 2026-09-27: move eccm out of positron, verbatim
 
 *"so how to move on frome here? i'd propose movign eccm outside if positron
 repo to krisjanjansen/eccm and ~/personal/eccm but share wrangler et setup and
 publish current eccm demo as it is to eccm.positron.studio. when done, scrap
 all eccm stuff from positron. can you  do it?"* Worked after the two lines
 above land, from the session 0 plan.
+✅ Done the same day by a background agent: https://eccm.positron.studio/ answers
+200 on every page, font and picture, https://github.com/kristjanjansen/eccm holds
+the history (private, `main`, at `~/personal/eccm`), and the positron side is
+committed as `5da6325` and deployed as BUILD `5da6325-081318-4c5e`, with
+`/eccm/*` answering 301 to the new host. `HANDOFF.md` has the whole list. The
+derive page is `public/derive.html` there now, so the two derive lines above are
+worked in that repository and deployed with
+`env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler deploy --env staging`.
 
 ### Done 2026-09-27: the derive page's examples become the next set of events off eccm.ee, and the handoff
 

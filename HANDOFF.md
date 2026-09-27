@@ -1,6 +1,59 @@
 # Handoff, 2026-09-27, session 52 continued: the eccm demo grew a face, an event page, a form and a page that designs from a picture
 
 
+## 2026-09-27, session 52, the move-out: eccm is its own repository and its own site
+
+Asked: *"i'd propose movign eccm outside if positron repo to krisjanjansen/eccm
+and ~/personal/eccm but share wrangler et setup and publish current eccm demo as
+it is to eccm.positron.studio. when done, scrap all eccm stuff from positron"*.
+Done by a background agent in one sitting; the session committed the positron
+side by path as `5da6325`, the build output as `33704ec`, and deployed it as
+BUILD `5da6325-081318-4c5e`. MEASURED after: `/eccm/`, `/eccm/derive` and
+`/eccm/derive?set=2` on positron.studio answer **301** to the same path on
+https://eccm.positron.studio, which answers 200.
+
+- **The site is https://eccm.positron.studio/**, the Worker `eccm-staging`
+  (static assets, no script yet) with the custom domain on this zone;
+  https://eccm-staging.kristjan-jansen.workers.dev is the second door.
+  MEASURED after the deploy: `/`, `/event`, `/edit`, `/derive`,
+  `/derive?set=2`, `/logo`, `/type`, one font, one picture, `eccm.css` and
+  `logo.svg` all **200**, an unknown path 404, `/event/` a 307 to `/event`,
+  every page carrying `X-Robots-Tag: noindex`, and no `/eccm/` path left in
+  any deployed page. Shot at 375 and 1280 from the new host, nothing dragging
+  the page sideways.
+- **The repository is https://github.com/kristjanjansen/eccm, private, branch
+  `main`**, at `~/personal/eccm`, carried out of this one with
+  `git filter-repo` on a fresh clone so the 20 commits that touched
+  `demo/eccm/`, the four eccm plans, the `eccm-ui` skill and
+  `archive/eccm-derive-mailing/` keep their history. `demo/eccm/` is
+  `public/` there and `public/` is the source, no build. `wrangler.jsonc`
+  carries a `staging` environment (this account) and a blank `production`
+  one (ECCM's, at cutover); `tools/` holds copies of `shot.mjs`,
+  `which-rule-won.mjs`, `ancestry.mjs` and `check-html.mjs` with headers
+  naming positron as the original and a full URL accepted as target;
+  `positron-compose` is copied beside `eccm-ui`; `CLAUDE.md` and `README.md`
+  are written for whoever inherits it. Deploy is
+  `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler deploy --env staging`
+  from that directory. Its commits carry the work address, as here.
+- **Scrapped from positron**: `demo/eccm/`, `.claude/skills/eccm-ui/`, the
+  four `plans/plan-eccm-*.md`, `archive/eccm-derive-mailing/`, the manifest
+  row, the skill table row in `CLAUDE.md`, the eccm vendor font lines in
+  `workers/view/build.mjs`, and `workers/view/public/eccm/`. The counts at the
+  top of `CLAUDE.md` are re-measured: 57 rows, 55 shelled, 75 plans.
+  `workers/view/src/index.js` gained a 301 from `/eccm/*` to the same path on
+  the new host, query kept, because those URLs were handed over from here
+  this morning; the plan's section 7 said `built: false` and a `one` line
+  instead, which cannot be done once the row is gone.
+- **Left alone on purpose**: the standing files, `research/`, the rest of
+  `archive/`, and the lines in `CLAUDE.md`, `demo/shot.mjs` and
+  `positron-compose` that cite `/eccm/` as where a lesson was learned.
+  `workers/shout` and `plans/plan-radio-messages.md` name eccm.ee's radio
+  archive, which is the organisation and not the demo.
+- **Next, from `plans/plan-eccm-setup.md`, now in the new repository**: the
+  two derive fixes queued in `BACKLOG.md`, the CMS plan's session 1 on
+  `eccm.positron.studio`, the EN tree, the email to ECCM for the vector logo
+  and for who runs `eccm.ee`'s DNS, and the Windows look.
+
 ## Deployed, committed, in flight
 
 ✅ **EVERYTHING BELOW IS ON THE EDGE.** The last deploy of this half is named in
