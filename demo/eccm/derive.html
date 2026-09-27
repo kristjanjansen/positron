@@ -247,16 +247,29 @@
 
   // ── the scheme, §3 and §4 with the asks of 2026-09-27 ────────────────────
   const scheme = (r, t) => {
-    const dark = r.meanY < 0.22;
-    const s = { mode: dark ? 'dark' : 'light', notes: [] };
+    let dark = r.meanY < 0.22;
+    // a pure hue: chroma 0.08 or more and outside the yellow-to-brown band
+    // (OKLCH hue 40 to 110), which reads as mud however dark it is (asked
+    // 2026-09-27: "Discourage brownish muddiah tones pick purer daker
+    // grayer")
+    const isPure = (c) => c[1] >= 0.08 && !(c[2] >= 40 && c[2] <= 110);
+    const pick = r.hues.find((x) => isPure(x.lch));
+    // a dark picture that is not about black: no pure hue to make a dark
+    // ground of, and a mid tone holding a real share of it, the wall behind
+    // players dressed in black (asked 2026-09-27 of the Huddersfield
+    // photograph, which had read as a pure dark grey: "that lighter tone can
+    // be bg? maybe bitl ligtened nicely no to wash out. i do not now what
+    // the rule could be but image in general is not about black"); the mid
+    // tone is the ground and the scheme is light. White type on a black
+    // poster does not count as a wall, which is what the 0.85 ceiling is for
+    let wall = null;
+    if (dark && !pick) {
+      wall = r.top.map((c) => ({ ...c, y: lum(fromHex(c.hex)) })).filter((c) => c.share >= 0.05 && c.y >= 0.25 && c.y < 0.85).sort((a, b) => b.y - a.y)[0] || null;
+      if (wall) dark = false;
+    }
+    const s = { mode: dark ? 'dark' : 'light', notes: [], wall };
     if (dark) {
-      // a dark ground of the picture's hue only when the hue is pure and
-      // strong: chroma 0.08 or more and outside the yellow-to-brown band
-      // (OKLCH hue 40 to 110), which reads as mud however dark it is (asked
-      // 2026-09-27: "Discourage brownish muddiah tones pick purer daker
-      // grayer"); otherwise a pure dark grey
-      const isPure = (c) => c[1] >= 0.08 && !(c[2] >= 40 && c[2] <= 110);
-      const pick = r.hues.find((x) => isPure(x.lch));
+      // a dark ground of the picture's pure hue, otherwise a pure dark grey
       const g = pick ? gamutLch(0.28, Math.min(pick.lch[1], 0.06), pick.lch[2]) : { rgb: fromHex('#262626') };
       s.ground = g.rgb;
       s.groundNote = pick ? `the picture’s hue ${Math.round(pick.lch[2])} at OKLCH lightness 0.28${pick !== r.hues[0] ? `, passing over its stronger hue ${Math.round(r.hues[0].lch[2])} as mud` : ''}` : r.seed ? `a pure dark grey; none of the picture’s ${r.hues.length} hues is both strong and clean` : 'a pure dark grey, the picture has no hue';
@@ -278,7 +291,14 @@
       // a flat edge that is not white is the ground before anything else is
       // asked, however little chroma the picture has: the Gestures sage is
       // 77 per cent of its poster at chroma 0.010 and was read as grey once
-      if (flatBase && contrast(Y_WHITE, lum(flatBase)) >= 1.1) {
+      if (wall) {
+        // the wall taken half way to white, with a little of its colour
+        // kept: lightened, not washed out
+        const [L0, C0, h0] = lch(toLab(fromHex(wall.hex)));
+        s.ground = gamutLch(L0 + (1 - L0) * 0.5, Math.min(C0, 0.03), h0).rgb;
+        s.groundNote = `the picture’s mid tone ${wall.hex}, ${Math.round(100 * wall.share)} per cent of it, taken half way to white with its chroma kept to 0.03; the picture is not about black`;
+        while (contrast(lum(s.ink2), lum(s.ground)) < 4.5) s.ink2 = s.ink2.map((c) => c * 0.9);
+      } else if (flatBase && contrast(Y_WHITE, lum(flatBase)) >= 1.1) {
         const [L0, C0, h0] = lch(toLab(flatBase));
         s.ground = gamutLch(Math.max(0.95, L0 + (1 - L0) * 0.6), Math.min(C0, 0.02), h0).rgb;
         s.groundNote = `the flat edge ${hex(flatBase)} taken most of the way to white, chroma capped at 0.02`;
@@ -359,20 +379,50 @@
   // the serif is Source Serif 4, chosen 2026-09-27 ("Pick sorce serif rm others")
   const SERIF = { family: "'Source Serif 4', Georgia, serif", weight: 400 };
 
-  // ── the pictures, in the list's order ────────────────────────────────────
-  // the next set of events off eccm.ee's calendar, page two, read 2026-09-27
-  // (asked: "replace examples for next set of events in eccm calendar"); ten
-  // events are on that page and the four Schönberg dates carry no picture
-  const PICS = [
-    { file: 'ic_medium_w300h300q100_sound-plasma-berlin-cover-vaike.png', kicker: '12.11.2026 19.00 Mustpeade maja valge saal TUMA', title: 'Sound Plasma 10' },
-    { file: 'ic_medium_w300h300q100_1-ansambel-u-fb-pais-2110-1640x924px.jpg', kicker: 'ECCM saal U:', title: 'Koosloome õpituba' },
-    { file: 'ic_medium_w300h300q100_sohvi-viik-11-pisike.jpg', kicker: '28.11.2026 19.30 St Paul’s Hall, Huddersfield TUMA', title: 'Tallinna Uue Muusika Ansambel Huddersfieldi nüüdismuusika festivalil' },
-    { file: 'ic_medium_w300h300q100_enmt-pic-suur-3.jpg', kicker: '05.12.2026 19.00 ECCM saal TUMA', title: 'Uus kontserdisari: Up to Three / Kuni kolm' },
-    { file: 'ic_medium_w300h300q100_open-space-4.jpeg', kicker: '12.12.2026 19.00 ECCM saal TUMA', title: 'Open Space #5' },
-    { file: 'ic_medium_w300h300q100_u-punane.jpg', kicker: '29.12.2026 ECCM saal U:', title: 'U: vana-aasta uue muusika kontsert' },
-  ];  const f2 = (n) => n.toFixed(2), pc = (n) => `${Math.round(100 * n)} per cent`;
+  // ── the pictures, three sets off eccm.ee ────────────────────────────────
+  // the newest set is the default and the earlier two answer ?set=1 and
+  // ?set=2, so every rule keeps the picture it was written on
+  const SETS = {
+    // calendar page one, read 2026-09-26
+    1: [
+      { file: 'ic_large_w900h600q100_gestures-situations-small.jpg', kicker: '30.09.2026 19.00 ECCM Ulysses', title: 'Gestuurid/situatsioonid: ilma partituurita kuulamine. Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa', gestures: true, serifByHand: true },
+      { file: 'ic_medium_w300h300q100_chatgpt-image-sep-13-2026-10-27-27-am.png', kicker: '08.10.2026 19.00 Eesti Nüüdismuusika Keskus', title: 'Schönbergi sari' },
+      { file: 'ic_medium_w300h300q100_morton-feldman.jpg', kicker: '10.10.2026 18.00 Arvo Pärdi Keskus, Laulasmaa', title: 'Morton Feldman 100: For Philip Guston' },
+      { file: 'ic_medium_w300h300q100_enmt-scrapyard-2-eriti-vaike-copy.jpg', kicker: '10.10.2026 19.30 Kanuti Gildi SAAL', title: 'Scrapyard' },
+      { file: 'ic_medium_w300h300q100_screenshot-2026-08-31-at-11-21-15.png', kicker: '11.10.2026 19.00 Eesti Nüüdismuusika Keskus', title: 'Gestuurid/situatsioonid: ilma partituurita kuulamine. Liisa Hõbepappel, Kenn-Erik Kannike, Liis Vares' },
+      { file: 'ic_medium_w300h300q100_improtest.jpg', kicker: '13.10.2026 19.00 ECCM saal', title: 'Improtest: Electro Funeral' },
+      { file: 'ic_medium_w300h300q100_screenshot-2026-09-04-at-09-40-01.png', kicker: '22.10 kuni 25.10.2026 ECCM', title: '11. Üle Heli festival „Heli on vaba“' },
+      { file: 'ic_medium_w300h300q100_u-ansambel-eccm-rida-tais-mv-150.jpg', kicker: '03.11.2026 19.00 ERR Uudistemaja', title: 'Surm' },
+      { file: 'ic_medium_w300h300q100_germination.png', kicker: '06.11.2026 19.00 Startbahn-Genezarethkirche, Berliin', title: 'Sound Plasma 10: Tallinna Uue Muusika Ansambli kontsert Berliinis' },
+    ],
+    // calendar page two, read 2026-09-27 (asked: "replace examples for next
+    // set of events in eccm calendar"); ten events are on that page and the
+    // four Schönberg dates carry no picture
+    2: [
+      { file: 'ic_medium_w300h300q100_sound-plasma-berlin-cover-vaike.png', kicker: '12.11.2026 19.00 Mustpeade maja valge saal TUMA', title: 'Sound Plasma 10' },
+      { file: 'ic_medium_w300h300q100_1-ansambel-u-fb-pais-2110-1640x924px.jpg', kicker: 'ECCM saal U:', title: 'Koosloome õpituba' },
+      { file: 'ic_medium_w300h300q100_sohvi-viik-11-pisike.jpg', kicker: '28.11.2026 19.30 St Paul’s Hall, Huddersfield TUMA', title: 'Tallinna Uue Muusika Ansambel Huddersfieldi nüüdismuusika festivalil' },
+      { file: 'ic_medium_w300h300q100_enmt-pic-suur-3.jpg', kicker: '05.12.2026 19.00 ECCM saal TUMA', title: 'Uus kontserdisari: Up to Three / Kuni kolm' },
+      { file: 'ic_medium_w300h300q100_open-space-4.jpeg', kicker: '12.12.2026 19.00 ECCM saal TUMA', title: 'Open Space #5' },
+      { file: 'ic_medium_w300h300q100_u-punane.jpg', kicker: '29.12.2026 ECCM saal U:', title: 'U: vana-aasta uue muusika kontsert' },
+    ],
+    // the six most recent past events, newest first, read 2026-09-27 (asked:
+    // "take next set of images"); calendar page three holds four Schönberg
+    // dates and no picture, so these are off the past events list's last two
+    // pages, and two events sharing one picture count once
+    3: [
+      { file: 'ic_medium_w300h300q100_54943047942-c00f72f881-v.jpg', kicker: '21.09.2026 17.00 Museum of Modern Art Warsaw, Kinomozeum EES', title: 'EMA Varssavi sügisel' },
+      { file: 'ic_medium_w300h300q100_sohvi-viik-15-vaike-4.jpg', kicker: '21.09.2026 19.30 Witold Lutosławski Polish Radio Concert Studio TUMA', title: 'Tallinna Uue Muusika Ansambel Varssavi sügisel' },
+      { file: 'ic_medium_w300h300q100_serge.jpg', kicker: '13.09.2026 20.00 ECCM saal, Pühavaimu 9 EES', title: 'EMA Pika tänava festivalil: Ajaloolise elektroonilise muusika kontsert, vanavanemate eri' },
+      { file: 'ic_medium_w300h300q100_ludens-grisey-riley-piletikeskus-1500x780px.jpg', kicker: '13.09.2026 18.00 Arhitektuurikeskus/ EKKM Collaboration', title: 'LUDENSEMBLE esitleb: Gérard Grisey „Vortex temporum“ ja Terry Riley „In C“' },
+      { file: 'ic_medium_w300h300q100_schoenberg-kurtag-1422x2284.jpg', kicker: '10.09.2026 19.00 Eesti Nüüdismuusika Keskus Schönbergi ühing', title: 'Schönbergi sari' },
+      { file: 'ic_medium_w300h300q100_joy2.jpeg', kicker: '31.05.2026 19.00 ECCM saal Koostöö', title: '„JOY!“ MUBA Uue muusika ansambli kontsert' },
+    ],
+  };
+  const f2 = (n) => n.toFixed(2), pc = (n) => `${Math.round(100 * n)} per cent`;
 
   const FLAGS = new URLSearchParams(location.search);
+  const PICS = SETS[FLAGS.get('set')] || SETS[3];
   const TIMES = (window.__times = []);
   const cards = document.getElementById('cards');
   const tally = { light: 0, dark: 0, accent: 0, serif: 0 };
@@ -403,7 +453,7 @@
     left.append(sw);
     const dl = document.createElement('dl'); dl.className = 'readings';
     const row = (k, v) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
-    row('luminance', `${f2(r.meanY)}, so a ${s.mode} scheme`);
+    row('luminance', `${f2(r.meanY)}${s.wall ? `, dark but not about black, its mid tone ${s.wall.hex} holds ${Math.round(100 * s.wall.share)} per cent` : ''}, so a ${s.mode} scheme`);
     row('chroma', `${r.meanC.toFixed(3)} mean, ${pc(r.vivid)} of pixels over 0.04`);
     row('edges', Object.entries(r.edges).map(([k, e]) => `${k} ${e.flat ? 'flat' : Math.round(100 * e.share) + '%'}`).join(', '));
     row('ground', `${hex(s.ground)}, ${s.groundNote}; ink ${f2(contrast(lum(s.ink), lum(s.ground)))}:1, muted ink ${f2(contrast(lum(s.ink2), lum(s.ground)))}:1`);

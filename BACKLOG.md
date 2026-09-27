@@ -1,5 +1,35 @@
 ## Open
 
+### Done 2026-09-27: a dark picture that is not about black gets its mid tone as the ground
+
+⚠️ **ASKED, VERBATIM, WITH A CROP** of the Huddersfield photograph, players in
+black on a mauve wall, which read as a pure dark grey: *"that lighter tone can
+be bg? maybe bitl ligtened nicely no to wash out. i do not now what the rule
+could be but image in general is not about black"*. ✅ The rule: a dark picture
+with no pure hue to make a dark ground of, and a mid tone (luminance 0.25 to
+0.85) holding 5 per cent or more of it, is not about black; the scheme goes
+light and the mid tone, taken half way to white with its chroma kept to 0.03,
+is the ground. Only that fallback changed; a dark picture with a pure hue keeps
+its dark ground. ⚠️ A first cut read the mode off the picture's edges instead,
+which moved three light grounds that were right and left Huddersfield at a pale
+tint, and was reverted before it was committed.
+
+### Done 2026-09-27: "take next set of images"
+
+Asked mid-task, verbatim. MEASURED: eccm.ee's calendar page three carries four
+Schönberg dates and no picture, so the next set is the six most recent past
+events, newest first, off the past events list's last two pages. The earlier
+sets stay reachable by `?set=1` and `?set=2` so the Huddersfield rule
+above keeps its example. ✅ MEASURED on the six: three dark grounds (plum 353, indigo 281, a pure dark grey for the Ludensemble poster, which is about black), three light (two greys, one pale pink), one serif verdict.
+
+### Open 2026-09-27: move eccm out of positron, verbatim
+
+*"so how to move on frome here? i'd propose movign eccm outside if positron
+repo to krisjanjansen/eccm and ~/personal/eccm but share wrangler et setup and
+publish current eccm demo as it is to eccm.positron.studio. when done, scrap
+all eccm stuff from positron. can you  do it?"* Worked after the two lines
+above land, from the session 0 plan.
+
 ### Done 2026-09-27: the derive page's examples become the next set of events off eccm.ee, and the handoff
 
 ✅ **DONE.** Page two of the calendar holds ten events and four of them, the
