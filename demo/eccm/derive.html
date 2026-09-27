@@ -14,7 +14,7 @@
      serif, sans, unsure or no type, from stroke contrast and feet at the
      baseline of text-like shapes. Beside each picture a sample event page is
      drawn in what it gave: the head, the buttons in the system face in both
-     modes, a longer body, credits, a rich text block and a mailing block, so
+     modes, a body with rich text and credits, so
      a serif is judged in use and a dark scheme is judged on a whole page.
      Every picture is same-origin, so the canvas is not tainted; nothing is
      fetched from elsewhere. Not graded by verify.mjs. -->
@@ -55,14 +55,6 @@
     .sample .body ul { list-style: disc; padding-inline-start: 1.2em; }
     .sample .credits { margin-block-start: 2lh; font-family: var(--ev-title-face); }
     .sample .credits dt { color: var(--ev-ink2); font-family: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; }
-    .sample .mail { margin-block-start: 2lh; max-inline-size: var(--eccm-measure); padding: var(--eccm-s-6); outline: 1px solid var(--ev-ink2); font-family: var(--ev-body-face); }
-    .sample .mail .mail-name { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--ev-ink2); font-family: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; }
-    .sample .mail h3 { font-size: var(--eccm-t-l); font-family: var(--ev-title-face); margin-block: var(--eccm-s-2) var(--eccm-s-4); }
-    .sample .mail ul { list-style: none; padding: 0; display: grid; gap: var(--eccm-s-2); }
-    .sample .mail li { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--eccm-s-4); }
-    .sample .mail time { color: var(--ev-ink2); font-variant-numeric: tabular-nums; font-family: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; }
-    .sample .mail a { color: inherit; text-decoration-color: var(--ev-accent, var(--ev-ink2)); }
-    .sample .verdict { margin-block-start: 2lh; font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--ev-ink2); font-family: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; }
     .sample :focus-visible { outline: 2px solid var(--ev-accent, var(--ev-ink)); outline-offset: 2px; }
     section + section { margin-block-start: var(--eccm-s-16); }
     h2.sec { font-size: var(--eccm-t-l); margin-block-end: var(--eccm-s-4); }
@@ -90,7 +82,7 @@
 <main class="frame">
   <h1>Kujundus pildist</h1>
   <p class="intro">Every event picture below is read as this page opens, twice. At 64 pixels for its colour: a light picture gives a light scheme with a ground taken from a flat edge, or a pastel of its hue, or a light grey when it has no hue; a dark picture inverts the whole page, light text on a dark ground of its hue or a dark grey. An accent for underlines, focus and the filled button is toned from the picture's strongest hue until it reads on that ground. At up to 600 pixels for its type: text-like shapes are measured for stroke contrast and for feet at the baseline, which is what separates a Garamond from a grotesque, and the verdict is serif, sans, unsure, or no type found.</p>
-  <p class="intro">Beside each picture a short event page is drawn in what it gave: the head, the two buttons in the system face, a paragraph with rich text, credits and a mailing block. When the graphic's type reads as a serif, the title, the facts and the body take Source Serif 4; in light text on a dark ground the body stays in the sans and only the title and facts take the serif. A filled button is the ground's inverse and never the accent, which stays on underlines and the focus ring.</p>
+  <p class="intro">Beside each picture a short event page is drawn in what it gave: the head, the two buttons in the system face, a paragraph with rich text and credits. When the graphic's type reads as a serif, the title, the facts and the body take Source Serif 4; in light text on a dark ground the body stays in the sans and only the title and facts take the serif. A filled button is the ground's inverse and never the accent, which stays on underlines and the focus ring.</p>
   <p class="tally" id="tally">Reading the pictures.</p>
   <div id="cards"></div>
 
@@ -351,11 +343,9 @@
       <p class="actions"><a class="btn btn-pri" href="./event.html">Osta pilet</a><a class="btn" href="./event.html">Lisa kalendrisse</a></p>
       <div class="body flow"><p>${BODY[0]}</p><p>Kõigile, keda huvitab <strong>heli, mis ei ole komponeeritud</strong>, ja kes on valmis <em>kuulama ilma partituurita</em>. Vaata ka <a href="./event.html">sarja eelmisi aktsioone</a>.</p></div>
       <dl class="credits"><div><dt>Kunstnikud</dt><dd>Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</dd></div><div><dt>Graafiline disain</dt><dd>Jaan Evart</dd></div></dl>
-      <div class="mail"><p class="mail-name">Uudiskiri, 29. september</p><h3>Sel nädalal ECCMis</h3><ul><li><time>K 30.09</time><span><a href="./event.html">Gestuurid/situatsioonid</a>, ECCM saal, 19.00</span></li><li><time>L 10.10</time><span><a href="./event.html">Morton Feldman 100</a>, Arvo Pärdi Keskus, 18.00</span></li></ul></div>
-      <p class="verdict"></p>`;
+      `;
     el.querySelector('.kicker').textContent = p.kicker;
     el.querySelector('.title').textContent = p.title;
-    el.querySelector('.verdict').textContent = `${s.mode} scheme; ground ${s.groundNote}; ${s.accent ? `accent ${hex(s.accent.rgb)}` : s.notes.join('; ')}; ${s.serif ? 'serif in the title and facts' + (s.mode === 'light' && lum(s.ground) >= 0.8 ? ' and the body' : ', the body stays in the sans on a ground this dark') : 'no serif'}${s.serifHow ? ' (' + s.serifHow + ')' : ''}.`;
     return el;
   };
 
@@ -416,6 +406,7 @@
     row('accent', s.accent ? `${hex(s.accent.rgb)}, chroma ${s.accent.C.toFixed(3)}, hue ${Math.round(s.accent.h)}; on the ground ${f2(contrast(lum(s.accent.rgb), lum(s.ground)))}:1, for underlines and focus only` : s.notes.join('; '));
     row('button', `${hex(s.btnFill)} filled with ${hex(s.onBtn)} text, ${f2(contrast(lum(s.btnFill), lum(s.onBtn)))}:1`);
     row('type', `${t.verdict}: ${t.n} text-like shapes at ${t.W} px, ${t.polarity}, ${pc(t.share)} serif-like, median stroke contrast ${f2(t.contrast)}, median foot ${f2(t.foot)}`);
+    row('serif', s.serif ? `in the title and facts${s.mode === 'light' && lum(s.ground) >= 0.8 ? ' and the body' : ', the body stays in the sans on a ground this dark'} (${s.serifHow})` : 'none');
     top.append(left, dl);
     card.append(top, sample(p, s));
     cards.append(card);

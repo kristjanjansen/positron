@@ -1,5 +1,14 @@
 ## Open
 
+### Done 2026-09-27: the mailing block and the foot line leave the derived samples, archived as markdown
+
+⚠️ **ASKED, VERBATIM:** *"Rm sellel nadalal eccmis and footer from detected
+examples. Archice that code to md”s"*. ✅ Both out of every sample on
+`demo/eccm/derive.html`; the readings beside each picture gained a `serif`
+row so nothing the foot line said is lost; the eight stylesheet rules, the
+two markup lines and the one script line are in
+`archive/eccm-derive-mailing/mailing-and-verdict-2026-09-27.md` as they were.
+
 ### Done 2026-09-27: the derive page, third pass, seven asks with three phone crops
 
 ✅ **LIVE AT https://positron.studio/eccm/derive.** Read today: Gestures on
