@@ -1,5 +1,66 @@
 ## Open
 
+### Done 2026-09-27: four phone fixes on eccm, with crops
+
+⚠️ **ASKED, VERBATIM, WITH TWO PHONE CROPS:** *"Improve credits table on
+mobile. More rules to skill?"*, *"Make square thimbs in cronpage biit smaller
+on mob"*, *"Date field too much padding. File gield more padding and improve
+tupogra there"*. So: the credits and facts lists stack label over value on
+a phone instead of a label column that eats half the width; a rule in
+`eccm-ui` §4 says a label and value pair stacks below 40rem; the compact
+row's square thumbnail 6.5rem to 5.5rem; the native date fields lose the
+appearance iOS gives them, which centres the value in a tall box; the drop
+field gets more room and its two lines set as a lead and a hint.
+
+### Done 2026-09-27: the derive page, second pass, nine asks dictated at once, the serif detector honest about one poster
+
+✅ **DONE, WITH ONE HONEST LIMIT.** The detector erases rules through words,
+keeps only shapes that sit in a line of others their size, and scores stroke
+contrast and feet. MEASURED on the nine pictures: no photograph reads as
+type any more (the first pass called three of them serif from their grain);
+the Improtest wordmark reads serif on its own (9 shapes, 100 per cent); the
+Gestures poster reads no type, because its letters lie on the dark red disc
+under three rules and a luminance threshold cannot lift them off it, so it
+is marked serif by hand and the page says so. Schemes: six light, three dark
+(Scrapyard, the 09-04 photo, germination), four accents, grey pictures on a
+light grey, hued ones without a flat edge on a pastel. The buttons are the
+kit's in the system face in both modes and read the scheme's tokens. The page
+is 23,800 px tall with nine whole sample pages and a full capture of it
+stalls Chrome; clip it.
+
+⚠️ **ASKED, VERBATIM, DICTATED:** *"work on the detection some more. Can you
+detect the serif versus sans serif? Uh, for example, gesturid gestures could use
+serif. also uh, to a longer body text and other texts uh, in the serif
+examples. Um, rich text, mailings, etc. Regarding the get the ticket or add to
+the calendar, make them uh, as a standard buttons, what we already have in
+edit. Those shouldn't uh, change the typeface, whatever the context is. They
+are kind of system buttons, but they, but they should have kind of um, regular
+and inversed uh, modes and get those accent colors uh, right. Also, if the uh,
+image is, if the colors for me, uh, images are dark, like those dark blues and
+uh, etc., inverse the whole thing. So. white on uh, dark blue or uh, dark gray
+mm. and other elements should uh, record mm, should mm, act accordingly like
+uh, like was uh, get the ticket buttons mm. I'm not sure when you introduce
+uh, serifs Uh, do not use serif on the body text while in white on dark. But
+uh, but the rest uh, of uh, event uh, information can be serif. Mm. Also, do
+not afraid to have a, a gray or pastel uh, backgrounds. Those black and white
+images you detected, they should give a light gray uh, to the background. So
+go."* As nine rules for `demo/eccm/derive.html` and the buttons in `eccm.css`:
+1. Serif or sans is detected from the picture: dark or light text-like
+   components at up to 600 px, stroke contrast and feet at the baseline per
+   component, a share and a verdict printed, honest about being a heuristic.
+2. A serif-typed graphic (Gestures) gets serif titles and facts.
+3. The samples carry a longer body, credits, a rich text block and a mailing
+   block, so the serif is judged in use.
+4. Buy and calendar are the kit's buttons, in the system face whatever the
+   context, never the serif.
+5. Buttons have a regular and an inversed mode; the inversed one takes the
+   accent when there is one, with a text colour that passes on it.
+6. A dark picture inverts the whole sample: light text on a dark ground of
+   the picture's hue or a dark grey, and the buttons follow.
+7. In white on dark the body text is never serif; the title and facts may be.
+8. A picture with a hue and no flat edge gives a pastel ground of its hue.
+9. A grey picture gives a light grey ground.
+
 ### Done 2026-09-26: a working example of design from the picture, and a serif specimen for serif-typed graphics
 
 ✅ **LIVE AT https://positron.studio/eccm/derive.** Nine pictures read at

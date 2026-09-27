@@ -376,6 +376,12 @@ wide measure token for list rows was never built; do not name it.
   the phone arrangement), where eccm.ee spends **325 px, 40 per cent**
   (MEASURED). No container types a pixel width; eccm.ee types **3,320** and
   drags every page **2,945 px sideways at 375** (MEASURED).
+- **A label and value list** (the facts, the credits) is two columns on a
+  desk, the label in `--eccm-ink-2` beside its value, and label over value
+  under 40rem, because a label column beside a phone's value gives the value
+  half the width and wraps a name every four letters (MEASURED on an iPhone,
+  2026-09-27, `Loovkommunikatsioon` beside `Maria Solei Järvet` on five
+  lines). The pairs are wrapped in a `div` so one grid rule does both.
 - **The footer** is ruled above in `--eccm-rule`, set at `--eccm-t-s` in
   `--eccm-ink-2`, with `--eccm-s-8` above and `--eccm-s-12` below.
 - **Colour** is `--eccm-ink` on `--eccm-ground`; `--eccm-ink-2` for meta and
