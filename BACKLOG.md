@@ -1,6 +1,14 @@
 ## Open
 
-### Open 2026-09-27: the derive page, third pass, five asks with three phone crops
+### Done 2026-09-27: the derive page, third pass, seven asks with three phone crops
+
+✅ **LIVE AT https://positron.studio/eccm/derive.** Read today: Gestures on
+#ebf0ea from its sage edge; Schönberg on #f9f9ea from its lightest big
+colour with a teal accent; Improtest and the 08-31 graphic on white;
+Feldman and U: on a light grey; Scrapyard and germination on their own dark
+blues; the 09-04 photograph on a pure dark grey because none of its four
+hues is both strong and clean. Every filled button is ink on white or white
+on dark at 17.4:1. The page is 13,900 px tall from 23,800.
 
 ⚠️ **ASKED, VERBATIM:** *"Pick sorce serif rm others"*; *"Prefer ligher tones but
 with bit color like leftmost on light bgs"*; *"Iimpeo: shoild be black on
