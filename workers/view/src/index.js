@@ -450,6 +450,17 @@ const routes = {
       return env.ASSETS.fetch(new URL('/notes/index.html', url.origin));
     }
 
+    // ── /eccm/* moved out, 2026-09-27 ──────────────────────────────────────
+    // The eccm demo lived under demo/eccm/ for two days and its URLs were
+    // handed over from here; the project is its own repository now and the
+    // site is https://eccm.positron.studio/ (plans went with it). Same path
+    // there, query kept, 301 because nothing is coming back. Assets are tried
+    // before the Worker, so this is reached only because the build no longer
+    // writes public/eccm/.
+    if (p === '/eccm' || p.startsWith('/eccm/')) {
+      return Response.redirect(`https://eccm.positron.studio${p.slice(5) || '/'}${url.search}`, 301);
+    }
+
     // Anything else that reached the Worker is a path with no static asset.
     return new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } });
   },

@@ -1,5 +1,6 @@
 # Handoff, 2026-09-27, session 52 continued: the eccm demo grew a face, an event page, a form and a page that designs from a picture
 
+
 ## Deployed, committed, in flight
 
 ✅ **EVERYTHING BELOW IS ON THE EDGE.** The last deploy of this half is named in

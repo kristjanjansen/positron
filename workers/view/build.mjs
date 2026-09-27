@@ -323,34 +323,6 @@ const FILES = [
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
-  // ── IBM Plex Sans, kept for demo/eccm/type.html, the specimen page ───────
-  // /eccm/ itself is set in the machine's Helvetica since 2026-09-26 and loads
-  // no font. The comparison copies v1 and v2 were kept for an hour and removed
-  // on "rm old eccm version, latest is fine"; the specimen page is now the one
-  // reader of these two files, beside the four families listed under it.
-  ['demo/eccm/vendor/plex-sans-latin.woff2', 'eccm/vendor/plex-sans-latin.woff2'],
-  ['demo/eccm/vendor/plex-sans-latin-ext.woff2', 'eccm/vendor/plex-sans-latin-ext.woff2'],
-  ['demo/eccm/vendor/LICENSE-ibm-plex-sans', 'eccm/vendor/LICENSE-ibm-plex-sans'],
-
-  // ── four more families, for demo/eccm/type.html, the specimen page ─────────
-  // Asked 2026-09-26: "suggest better type alternatives." Each is one variable
-  // file per subset (latin, latin-ext), fetched once from Google's static host,
-  // SIL OFL, the licence beside them. Schibsted Grotesk was chosen off the
-  // specimen page on 2026-09-26 and the live pages load it; the other three
-  // and Plex stay only for the specimen page and leave with it.
-  ['demo/eccm/vendor/inter-latin.woff2', 'eccm/vendor/inter-latin.woff2'],
-  ['demo/eccm/vendor/inter-latin-ext.woff2', 'eccm/vendor/inter-latin-ext.woff2'],
-  ['demo/eccm/vendor/LICENSE-inter', 'eccm/vendor/LICENSE-inter'],
-  ['demo/eccm/vendor/archivo-latin.woff2', 'eccm/vendor/archivo-latin.woff2'],
-  ['demo/eccm/vendor/archivo-latin-ext.woff2', 'eccm/vendor/archivo-latin-ext.woff2'],
-  ['demo/eccm/vendor/LICENSE-archivo', 'eccm/vendor/LICENSE-archivo'],
-  ['demo/eccm/vendor/schibsted-grotesk-latin.woff2', 'eccm/vendor/schibsted-grotesk-latin.woff2'],
-  ['demo/eccm/vendor/schibsted-grotesk-latin-ext.woff2', 'eccm/vendor/schibsted-grotesk-latin-ext.woff2'],
-  ['demo/eccm/vendor/LICENSE-schibsted-grotesk', 'eccm/vendor/LICENSE-schibsted-grotesk'],
-  ['demo/eccm/vendor/source-serif-4-latin.woff2', 'eccm/vendor/source-serif-4-latin.woff2'],
-  ['demo/eccm/vendor/source-serif-4-latin-ext.woff2', 'eccm/vendor/source-serif-4-latin-ext.woff2'],
-  ['demo/eccm/vendor/LICENSE-source-serif-4', 'eccm/vendor/LICENSE-source-serif-4'],
-
   // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
   //
   // ⚠️ LISTED BY NAME FOR THE THIRD REASON IN A ROW AND IT IS THE SAME ONE:
