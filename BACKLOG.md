@@ -1,5 +1,13 @@
 ## Open
 
+### Open 2026-09-27: derive, "why serif? no serifs on image" (Ludensemble)
+
+Asked with a crop of the Ludensemble poster card, whose type is a wide geometric sans in capitals and which the detector read as serif, 15 shapes, 100 per cent serif-like. Goes into derive.html in its new home once the move-out lands, since demo/eccm/ is already gone from this checkout; the cause is measured first.
+
+### Open 2026-09-27: derive, "missing a small pinkish hue here" (Varssavi photograph)
+
+Asked with a crop of the sohvi-viik-15 card: the photograph has a faint warm pink cast and the ground came out a neutral #ededed because mean chroma 0.017 fell under the 0.02 grey threshold. Same home and timing as the line above.
+
 ### Done 2026-09-27: a dark picture that is not about black gets its mid tone as the ground
 
 ⚠️ **ASKED, VERBATIM, WITH A CROP** of the Huddersfield photograph, players in

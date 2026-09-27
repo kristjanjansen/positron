@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. R&D, not a product. 58 demo rows of which
-56 are shelled, a Raspberry Pi in another building, a Novation Circuit on the
+Live at **https://positron.studio**. R&D, not a product. 57 demo rows of which
+55 are shelled, a Raspberry Pi in another building, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
@@ -25,7 +25,7 @@ here?*; `DEMOS` is the story order and answers *where do I start?*, and
 | `LESSONS.md` | why the rules exist, at length |
 | `PROGRESS.md` | what was measured, when |
 | `LAYOUT.md` | where a new file goes, and the two renames that were priced and rejected |
-| `plans/` | every plan, 78 of them today (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
+| `plans/` | every plan, 75 of them today (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
 
 ## The skills, and when to load one
 
@@ -48,7 +48,6 @@ somebody broke it.
 | `positron-xr` | any `gl: true` or headset page, `verify-gl.mjs`, `verify-quest.mjs`, full screen on a phone |
 | `positron-hardware` | anything under `rig/`, a page that plays real hardware, any claim about an instrument |
 | `positron-history` | following a link, slug or path out of an older file, or repeating a claim about a rename |
-| `eccm-ui` | any change under `demo/eccm/`, any page for eccm.ee wherever it is hosted, or any claim about type on a white page. It is the type half; `positron-compose` is the composition half, and a page of text loads both |
 
 ⚠️ **AND THE TRIGGER IS THE WORK, NOT THE FILE.** Adding one button to a page
 is a `positron-ui` task AND a `positron-verify` task, because adding a control
