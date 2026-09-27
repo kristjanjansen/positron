@@ -1,5 +1,12 @@
 ## Open
 
+### Done 2026-09-27: the derived samples' grounds run edge to edge on a phone
+
+⚠️ **ASKED, VERBATIM, WITH A CROP:** *"Bg colors edge to edge hzomtally on
+mobile"*. ✅ Under 40rem the sample escapes the frame's gutter by
+`calc(-1 * var(--eccm-gutter))` and pads by the same token; MEASURED at 375:
+the sample is 375 px wide and the page does not scroll sideways.
+
 ### Done 2026-09-27: the mailing block and the foot line leave the derived samples, archived as markdown
 
 ⚠️ **ASKED, VERBATIM:** *"Rm sellel nadalal eccmis and footer from detected
