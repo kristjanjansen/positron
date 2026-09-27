@@ -1,12 +1,12 @@
 ## Open
 
-### Open 2026-09-27: derive, "why serif? no serifs on image" (Ludensemble)
+### Done 2026-09-27: derive, "why serif? no serifs on image" (Ludensemble)
 
-Asked with a crop of the Ludensemble poster card, whose type is a wide geometric sans in capitals and which the detector read as serif, 15 shapes, 100 per cent serif-like. Goes into derive.html in its new home once the move-out lands, since demo/eccm/ is already gone from this checkout; the cause is measured first.
+Asked with a crop of the Ludensemble poster card, whose type is a wide geometric sans in capitals and which the detector read as serif, 15 shapes, 100 per cent serif-like. Goes into derive.html in its new home once the move-out lands, since demo/eccm/ is already gone from this checkout; the cause is measured first. ✅ MEASURED: at 300 px the poster's letters are 7 to 9 px tall with 2 px stems, and 15 of 15 read as serif because a capital's bar is the whole glyph width and one pixel of antialiasing is half a stroke. A serif is now read only on letters 14 px tall or more with a stem of 3 px or more, else the verdict is "type too small to read for serifs"; Sound Plasma (46 px, stem 5) and Improtest (38 to 46 px, stem 7) keep their serif, the Huddersfield photograph loses a false one its arrows had made. Live at https://eccm.positron.studio/derive, fourth card.
 
-### Open 2026-09-27: derive, "missing a small pinkish hue here" (Varssavi photograph)
+### Done 2026-09-27: derive, "missing a small pinkish hue here" (Varssavi photograph)
 
-Asked with a crop of the sohvi-viik-15 card: the photograph has a faint warm pink cast and the ground came out a neutral #ededed because mean chroma 0.017 fell under the 0.02 grey threshold. Same home and timing as the line above.
+Asked with a crop of the sohvi-viik-15 card: the photograph has a faint warm pink cast and the ground came out a neutral #ededed because mean chroma 0.017 fell under the 0.02 grey threshold. Same home and timing as the line above. ✅ MEASURED: the picture's mean colour has a cast of hue 347 at chroma 0.016, which the hue bins cannot see because they count only pixels over 0.04. A grey picture with a cast of 0.006 or more keeps it in the ground at chroma 0.008 to 0.015: #f3e7ed there, ink 14.5:1, muted ink 6.2:1; Open Space, Scrapyard and Surm stay #ededed. Live at https://eccm.positron.studio/derive, second card.
 
 ### Done 2026-09-27: a dark picture that is not about black gets its mid tone as the ground
 
