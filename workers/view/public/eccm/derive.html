@@ -23,10 +23,6 @@
 <style>
   @font-face { font-family: 'Source Serif 4'; font-weight: 200 900; font-display: swap; src: url('./vendor/source-serif-4-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
   @font-face { font-family: 'Source Serif 4'; font-weight: 200 900; font-display: swap; src: url('./vendor/source-serif-4-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-  @font-face { font-family: 'EB Garamond'; font-weight: 400 800; font-display: swap; src: url('./vendor/eb-garamond-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-  @font-face { font-family: 'EB Garamond'; font-weight: 400 800; font-display: swap; src: url('./vendor/eb-garamond-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-  @font-face { font-family: 'Cormorant Garamond'; font-weight: 300 700; font-display: swap; src: url('./vendor/cormorant-garamond-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-  @font-face { font-family: 'Cormorant Garamond'; font-weight: 300 700; font-display: swap; src: url('./vendor/cormorant-garamond-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
   @layer page {
     .intro { max-inline-size: var(--eccm-measure); }
     .intro + .intro { margin-block-start: 1lh; }
@@ -46,12 +42,13 @@
     /* the sample: a whole event page in the derived scheme. Every colour is a
        token the script set; the faces are two more tokens, the title's and
        the body's, and the buttons read neither */
-    .sample { padding: var(--eccm-s-8) var(--eccm-s-8) var(--eccm-s-12); background: var(--ev-ground); color: var(--ev-ink); outline: 1px solid var(--eccm-rule); }
+    .sample { padding: var(--eccm-s-8); background: var(--ev-ground); color: var(--ev-ink); outline: 1px solid var(--eccm-rule); }
     .sample .kicker { font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--ev-ink2); margin-block-end: var(--eccm-s-3); }
     .sample .title { font-size: var(--eccm-t-2xl); line-height: var(--eccm-lh-head); text-wrap: balance; font-family: var(--ev-title-face); font-weight: var(--ev-title-weight, 400); max-inline-size: var(--eccm-measure); }
     .sample .facts { margin-block-start: var(--eccm-s-8); font-family: var(--ev-title-face); }
     .sample .facts dt { color: var(--ev-ink2); font-family: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; }
     .sample .actions { display: flex; flex-wrap: wrap; gap: var(--eccm-s-3); margin-block-start: var(--eccm-s-8); }
+    .sample .btn-pri { background: var(--ev-btn-fill); color: var(--ev-on-btn); }
     .sample .body { max-inline-size: var(--eccm-measure); margin-block-start: 2lh; font-family: var(--ev-body-face); }
     .sample .body h2 { font-size: var(--eccm-t-l); font-family: var(--ev-title-face); }
     .sample .body a { text-decoration-color: var(--ev-accent, var(--ev-ink2)); text-decoration-thickness: 2px; color: inherit; }
@@ -67,7 +64,6 @@
     .sample .mail a { color: inherit; text-decoration-color: var(--ev-accent, var(--ev-ink2)); }
     .sample .verdict { margin-block-start: 2lh; font-size: var(--eccm-t-s); line-height: var(--eccm-lh-meta); color: var(--ev-ink2); font-family: 'Schibsted Grotesk', Helvetica, Arial, sans-serif; }
     .sample :focus-visible { outline: 2px solid var(--ev-accent, var(--ev-ink)); outline-offset: 2px; }
-    .serifs { display: grid; gap: var(--eccm-s-8); margin-block-start: var(--eccm-s-8); }
     section + section { margin-block-start: var(--eccm-s-16); }
     h2.sec { font-size: var(--eccm-t-l); margin-block-end: var(--eccm-s-4); }
   }
@@ -94,15 +90,10 @@
 <main class="frame">
   <h1>Kujundus pildist</h1>
   <p class="intro">Every event picture below is read as this page opens, twice. At 64 pixels for its colour: a light picture gives a light scheme with a ground taken from a flat edge, or a pastel of its hue, or a light grey when it has no hue; a dark picture inverts the whole page, light text on a dark ground of its hue or a dark grey. An accent for underlines, focus and the filled button is toned from the picture's strongest hue until it reads on that ground. At up to 600 pixels for its type: text-like shapes are measured for stroke contrast and for feet at the baseline, which is what separates a Garamond from a grotesque, and the verdict is serif, sans, unsure, or no type found.</p>
-  <p class="intro">Beside each picture a whole event page is drawn in what it gave: the head, the two buttons in the system face in both modes, a longer body, the credits, a rich text block and a mailing block. When the graphic's type reads as a serif, the title, the facts and the body take one; in light text on a dark ground the body stays in the sans and only the title and facts take the serif.</p>
+  <p class="intro">Beside each picture a short event page is drawn in what it gave: the head, the two buttons in the system face, a paragraph with rich text, credits and a mailing block. When the graphic's type reads as a serif, the title, the facts and the body take Source Serif 4; in light text on a dark ground the body stays in the sans and only the title and facts take the serif. A filled button is the ground's inverse and never the accent, which stays on underlines and the focus ring.</p>
   <p class="tally" id="tally">Reading the pictures.</p>
   <div id="cards"></div>
 
-  <section id="serif-section">
-    <h2 class="sec">Kolm seriifkirja Gestuuride juurde</h2>
-    <p class="intro">The same page in the Gestures scheme with three serifs, each self hosted and subset for Š and Ž, so the choice is made in use rather than on a line.</p>
-    <div class="serifs" id="serifs"></div>
-  </section>
 </main>
 
 <footer class="frame site-foot">
@@ -171,8 +162,12 @@
       labs.forEach((l, i) => { if (chroma[i] >= 0.04) { const h = (Math.atan2(l[2], l[1]) * 180 / Math.PI + 360) % 360; const b = hb[Math.floor(h / 15) % 24]; b.n++; b.L += l[0]; b.a += l[1]; b.b += l[2]; } });
       const best = hb.reduce((m, b) => (b.n > m.n ? b : m));
       seed = lch([best.L / best.n, best.a / best.n, best.b / best.n]);
+      // every hue the picture has, strongest first, so a scheme can pass over
+      // a muddy one for a purer one behind it (asked 2026-09-27: "Fall back to
+      // nonmudsy detected colors first")
+      var hues = hb.filter((b) => b.n >= 0.01 * labs.length).sort((a, b) => b.n - a.n).map((b) => ({ share: b.n / labs.length, lch: lch([b.L / b.n, b.a / b.n, b.b / b.n]) }));
     }
-    return { meanY, meanC, vivid, top, edges, flatAll, seed };
+    return { meanY, meanC, vivid, top, edges, flatAll, seed, hues: hues || [] };
   };
 
   // ── type, on up to 600 px: stroke contrast and feet, per text-like shape ──
@@ -256,41 +251,73 @@
     const dark = r.meanY < 0.22;
     const s = { mode: dark ? 'dark' : 'light', notes: [] };
     if (dark) {
-      // a dark ground of the picture's hue, or a dark grey; light text on it
-      const g = r.seed ? gamutLch(0.30, Math.min(r.seed[1], 0.05), r.seed[2]) : { rgb: fromHex('#2b2b2b') };
-      s.ground = g.rgb; s.groundNote = r.seed ? `the picture’s hue at OKLCH lightness 0.30` : 'a dark grey, the picture has no hue';
+      // a dark ground of the picture's hue only when the hue is pure and
+      // strong: chroma 0.08 or more and outside the yellow-to-brown band
+      // (OKLCH hue 40 to 110), which reads as mud however dark it is (asked
+      // 2026-09-27: "Discourage brownish muddiah tones pick purer daker
+      // grayer"); otherwise a pure dark grey
+      const isPure = (c) => c[1] >= 0.08 && !(c[2] >= 40 && c[2] <= 110);
+      const pick = r.hues.find((x) => isPure(x.lch));
+      const g = pick ? gamutLch(0.28, Math.min(pick.lch[1], 0.06), pick.lch[2]) : { rgb: fromHex('#262626') };
+      s.ground = g.rgb;
+      s.groundNote = pick ? `the picture’s hue ${Math.round(pick.lch[2])} at OKLCH lightness 0.28${pick !== r.hues[0] ? `, passing over its stronger hue ${Math.round(r.hues[0].lch[2])} as mud` : ''}` : r.seed ? `a pure dark grey; none of the picture’s ${r.hues.length} hues is both strong and clean` : 'a pure dark grey, the picture has no hue';
+      s.pure = !!pick; s.pickHue = pick ? pick.lch : null;
       s.ink = WHITE; s.ink2 = fromHex('#c9c9c9');
       while (contrast(lum(s.ink2), lum(s.ground)) < 4.5) s.ink2 = s.ink2.map((c) => c + (1 - c) * 0.1);
       s.onAccentIsInk = true;
     } else {
       s.ink = INK; s.ink2 = INK2; s.onAccentIsInk = false;
       const es = Object.values(r.edges);
-      if (r.flatAll && contrast(Y_WHITE, lum([0, 1, 2].map((i) => es.reduce((q, e) => q + e.rgb[i], 0) / 4))) >= 1.1) {
-        const base = [0, 1, 2].map((i) => es.reduce((q, e) => q + e.rgb[i], 0) / 4);
-        let mix = 0, g = base;
-        while (contrast(lum(g), lum(INK2)) < 4.5 && mix < 0.6) { mix += 0.05; g = base.map((c) => c + (1 - c) * mix); }
-        s.ground = g; s.groundNote = `the flat edge ${hex(base)}${mix ? `, lightened ${Math.round(mix * 100)} per cent` : ''}`;
-      } else if (r.seed && r.meanC >= 0.02) {
-        s.ground = gamutLch(0.94, 0.03, r.seed[2]).rgb; s.groundNote = `a pastel of the picture’s hue ${Math.round(r.seed[2])}`;
+      // a light ground: the picture's own flat edge, or its lightest big
+      // colour, taken most of the way to white so a breath of its colour is
+      // left (asked 2026-09-27: "Prefer ligher tones but with bit color like
+      // leftmost on light bgs"); a grey picture whose own ground is white
+      // gets the page's white and no grey at all ("Iimpeo: shoild be black on
+      // white. See the logo no grays realky")
+      const flatBase = r.flatAll ? [0, 1, 2].map((i) => es.reduce((q, e) => q + e.rgb[i], 0) / 4) : null;
+      const big = r.top[0], bigRgb = fromHex(big.hex), bigY = lum(bigRgb);
+      // a flat edge that is not white is the ground before anything else is
+      // asked, however little chroma the picture has: the Gestures sage is
+      // 77 per cent of its poster at chroma 0.010 and was read as grey once
+      if (flatBase && contrast(Y_WHITE, lum(flatBase)) >= 1.1) {
+        const [L0, C0, h0] = lch(toLab(flatBase));
+        s.ground = gamutLch(Math.max(0.95, L0 + (1 - L0) * 0.6), Math.min(C0, 0.02), h0).rgb;
+        s.groundNote = `the flat edge ${hex(flatBase)} taken most of the way to white, chroma capped at 0.02`;
+      } else if (r.meanC < 0.02 && bigY >= 0.85 && big.share >= 0.5) {
+        s.ground = WHITE; s.groundNote = 'white, the picture’s own ground is white and it has no hue';
+      } else if (r.meanC < 0.02) {
+        s.ground = fromHex('#ededed'); s.groundNote = 'a light grey, the picture has no hue';
       } else {
-        s.ground = fromHex('#ebebeb'); s.groundNote = 'a light grey, the picture has no hue';
+        const from = bigY >= 0.5 ? bigRgb : null;
+        if (from) {
+          const [L0, C0, h0] = lch(toLab(from));
+          s.ground = gamutLch(Math.max(0.95, L0 + (1 - L0) * 0.6), Math.min(C0, 0.02), h0).rgb;
+          s.groundNote = `the lightest big colour ${hex(from)} taken most of the way to white, chroma capped at 0.02`;
+        } else {
+          s.ground = gamutLch(0.96, 0.015, r.seed[2]).rgb; s.groundNote = `a light tint of the picture’s hue ${Math.round(r.seed[2])}`;
+        }
       }
     }
     // the accent: the seed's hue and chroma, toned until it reads where it is used
     s.accent = null;
-    if (r.seed && r.meanC >= 0.02) {
-      const [, C, h] = r.seed;
+    if (r.seed && r.meanC >= 0.02 && (!dark || s.pure)) {
+      const src = (dark && s.pickHue) || (r.hues.find((x) => !(x.lch[2] >= 40 && x.lch[2] <= 110) && x.lch[1] >= 0.04) || {}).lch || r.seed;
+      const [, C, h] = src;
       const yg = lum(s.ground);
       const ok = dark
         ? (y) => contrast(y, yg) >= 3 && contrast(y, Y_INK) >= 4.5 && y <= 0.6      // an underline on the dark ground, ink text on the filled button
-        : (y) => contrast(y, Y_WHITE) >= 4.5 && contrast(y, Y_INK) >= 3 && contrast(y, yg) >= 3; // white text on the filled button, off the ink, off the ground
+        : (y) => contrast(y, yg) >= 3 && contrast(y, Y_INK) >= 3 && y <= 0.35; // an underline that stands off the ground and off the ink
       for (let L = dark ? 0.45 : 0.30; L <= 0.9 && !s.accent; L += 0.005) {
         const g = gamutLch(L, C, h);
         if (g.C >= 0.04 && ok(lum(g.rgb))) s.accent = { rgb: g.rgb, L, C: g.C, h };
       }
       if (!s.accent) s.notes.push('no tone of the hue keeps 0.04 chroma inside the window');
-    } else s.notes.push('no accent, the picture is grey');
-    s.onAccent = s.accent ? (s.onAccentIsInk ? INK : WHITE) : (dark ? INK : WHITE);
+    } else s.notes.push(dark && r.seed ? 'no accent, the hue is too weak or too muddy for one' : 'no accent, the picture is grey');
+    // the filled button is the ground's inverse, ink on white or white on the
+    // dark ground, never the accent (asked 2026-09-27: "Readability issues on
+    // a purchase button", of an accent-filled one); the accent stays on
+    // underlines and the focus ring
+    s.btnFill = dark ? WHITE : INK; s.onBtn = dark ? INK : WHITE;
     // the faces: a serif for a serif-typed graphic, in the title and facts; in
     // the body only on a light ground
     s.serif = t.verdict === 'serif' || !!r.serifByHand;
@@ -300,40 +327,40 @@
 
   // ── the sample page ──────────────────────────────────────────────────────
   const BODY = [
-    'Gestuurid/situatsioonid: ilma partituurita kuulamine on sündinud soovist mõtestada praegust aegruumi ja selle vajadusi ning nihutades lühiaktsioonide žesti keskme heliloominguga seotud kogukonna konteksti. Selle tulemusel kutsub Eesti Nüüdismuusika Keskus igaks aktsiooniks kaks erinevat heliloomingu ja interpretatsiooniga tegelevat professionaalset loojat oma keskusesse ja annab neile vabad käed.',
     'Avalik žest ei ole valmis teose esitlus ega klassikaline kontsert. See on kümnepäevase protsessi viimane hetk, võimalus olla tunnistajaks olukorrale, mis on tekkinud kolme osaleja koosmõjus ja mida ei saa korrata täpselt samal kujul.',
   ];
-  const sample = (p, s, serif) => {
+  const sample = (p, s) => {
     const el = document.createElement('div');
     el.className = 'sample';
     const set = (k, v) => el.style.setProperty(k, v);
     set('--ev-ground', hex(s.ground)); set('--ev-ink', hex(s.ink)); set('--ev-ink2', hex(s.ink2));
-    if (s.accent) set('--ev-accent', hex(s.accent.rgb)); set('--ev-on-accent', hex(s.onAccent));
-    const face = serif || (s.serif ? SERIFS[1] : null);
+    if (s.accent) set('--ev-accent', hex(s.accent.rgb));
+    set('--ev-btn-fill', hex(s.btnFill)); set('--ev-on-btn', hex(s.onBtn));
+    const face = s.serif ? SERIF : null;
     set('--ev-title-face', face ? face.family : 'inherit');
     if (face) set('--ev-title-weight', face.weight);
-    set('--ev-body-face', face && s.mode === 'light' ? face.family : 'inherit');
+    // the body takes the serif only on a ground near white; on a darker light
+    // ground, the Gestures sage, it stays in the sans, the same legibility
+    // rule as on a dark ground (asked 2026-09-27)
+    const bodySerif = face && s.mode === 'light' && lum(s.ground) >= 0.8;
+    set('--ev-body-face', bodySerif ? face.family : 'inherit');
     el.innerHTML = `
       <p class="kicker"></p>
       <p class="title"></p>
-      <dl class="facts"><div><dt>Millal</dt><dd>30.09.2026 kell 19.00, 60 min</dd></div><div><dt>Kus</dt><dd>ECCM saal, Herne 11A, Tallinn</dd></div><div><dt>Korraldaja</dt><dd>Eesti Nüüdismuusika Keskus, Ulysses</dd></div><div><dt>Piletid</dt><dd>12 ja 8 eurot</dd></div></dl>
+      <dl class="facts"><div><dt>Millal</dt><dd>30.09.2026 kell 19.00</dd></div><div><dt>Kus</dt><dd>ECCM saal, Herne 11A</dd></div></dl>
       <p class="actions"><a class="btn btn-pri" href="./event.html">Osta pilet</a><a class="btn" href="./event.html">Lisa kalendrisse</a></p>
-      <div class="body flow"><p>${BODY[0]}</p><p>${BODY[1]}</p><h2>Kellele</h2><p>Kõigile, keda huvitab <strong>heli, mis ei ole komponeeritud</strong>, ja kes on valmis <em>kuulama ilma partituurita</em>. Vaata ka <a href="./event.html">sarja eelmisi aktsioone</a>.</p><ul><li>Kestus 60 minutit, vaheajata</li><li>Sissepääs alates 18.30</li><li>Fotografeerimine on keelatud</li></ul></div>
-      <dl class="credits"><div><dt>Kunstnikud</dt><dd>Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</dd></div><div><dt>Dramaturg</dt><dd>Alissa Šnaider</dd></div><div><dt>Graafiline disain</dt><dd>Jaan Evart</dd></div></dl>
-      <div class="mail"><p class="mail-name">Uudiskiri, 29. september</p><h3>Sel nädalal ECCMis</h3><ul><li><time>K 30.09</time><span><a href="./event.html">Gestuurid/situatsioonid</a>, ECCM saal, 19.00</span></li><li><time>N 08.10</time><span><a href="./event.html">Schönbergi sari</a>, ECCM saal, 19.00</span></li><li><time>L 10.10</time><span><a href="./event.html">Morton Feldman 100</a>, Arvo Pärdi Keskus, 18.00</span></li></ul></div>
+      <div class="body flow"><p>${BODY[0]}</p><p>Kõigile, keda huvitab <strong>heli, mis ei ole komponeeritud</strong>, ja kes on valmis <em>kuulama ilma partituurita</em>. Vaata ka <a href="./event.html">sarja eelmisi aktsioone</a>.</p></div>
+      <dl class="credits"><div><dt>Kunstnikud</dt><dd>Marianna Liik, Artjom Astrov, Maryn-Liis Rüütelmaa</dd></div><div><dt>Graafiline disain</dt><dd>Jaan Evart</dd></div></dl>
+      <div class="mail"><p class="mail-name">Uudiskiri, 29. september</p><h3>Sel nädalal ECCMis</h3><ul><li><time>K 30.09</time><span><a href="./event.html">Gestuurid/situatsioonid</a>, ECCM saal, 19.00</span></li><li><time>L 10.10</time><span><a href="./event.html">Morton Feldman 100</a>, Arvo Pärdi Keskus, 18.00</span></li></ul></div>
       <p class="verdict"></p>`;
     el.querySelector('.kicker').textContent = p.kicker;
     el.querySelector('.title').textContent = p.title;
-    el.querySelector('.verdict').textContent = serif ? serif.name
-      : `${s.mode} scheme; ground ${s.groundNote}; ${s.accent ? `accent ${hex(s.accent.rgb)}` : s.notes.join('; ')}; ${s.serif ? 'serif in the title and facts' + (s.mode === 'light' ? ' and the body' : ', the body stays in the sans on the dark ground') : 'no serif'}${s.serifHow ? ' (' + s.serifHow + ')' : ''}.`;
+    el.querySelector('.verdict').textContent = `${s.mode} scheme; ground ${s.groundNote}; ${s.accent ? `accent ${hex(s.accent.rgb)}` : s.notes.join('; ')}; ${s.serif ? 'serif in the title and facts' + (s.mode === 'light' && lum(s.ground) >= 0.8 ? ' and the body' : ', the body stays in the sans on a ground this dark') : 'no serif'}${s.serifHow ? ' (' + s.serifHow + ')' : ''}.`;
     return el;
   };
 
-  const SERIFS = [
-    { family: "'Source Serif 4', Georgia, serif", weight: 400, name: 'Source Serif 4, regular. A text serif with an optical size axis; the calmest of the three, and the one that holds a paragraph best.' },
-    { family: "'EB Garamond', Georgia, serif", weight: 500, name: 'EB Garamond, medium. The nearest to the poster’s own letters, an old style with a small x-height; the body wants a size up.' },
-    { family: "'Cormorant Garamond', Georgia, serif", weight: 600, name: 'Cormorant Garamond, semibold. A display Garamond, sharper and lighter; it thins out in a paragraph, so titles and facts only in practice.' },
-  ];
+  // the serif is Source Serif 4, chosen 2026-09-27 ("Pick sorce serif rm others")
+  const SERIF = { family: "'Source Serif 4', Georgia, serif", weight: 400 };
 
   // ── the pictures, in the list's order ────────────────────────────────────
   const PICS = [
@@ -386,7 +413,8 @@
     row('chroma', `${r.meanC.toFixed(3)} mean, ${pc(r.vivid)} of pixels over 0.04`);
     row('edges', Object.entries(r.edges).map(([k, e]) => `${k} ${e.flat ? 'flat' : Math.round(100 * e.share) + '%'}`).join(', '));
     row('ground', `${hex(s.ground)}, ${s.groundNote}; ink ${f2(contrast(lum(s.ink), lum(s.ground)))}:1, muted ink ${f2(contrast(lum(s.ink2), lum(s.ground)))}:1`);
-    row('accent', s.accent ? `${hex(s.accent.rgb)}, chroma ${s.accent.C.toFixed(3)}, hue ${Math.round(s.accent.h)}; on the ground ${f2(contrast(lum(s.accent.rgb), lum(s.ground)))}:1, button text ${hex(s.onAccent)} on it ${f2(contrast(lum(s.accent.rgb), lum(s.onAccent)))}:1` : s.notes.join('; '));
+    row('accent', s.accent ? `${hex(s.accent.rgb)}, chroma ${s.accent.C.toFixed(3)}, hue ${Math.round(s.accent.h)}; on the ground ${f2(contrast(lum(s.accent.rgb), lum(s.ground)))}:1, for underlines and focus only` : s.notes.join('; '));
+    row('button', `${hex(s.btnFill)} filled with ${hex(s.onBtn)} text, ${f2(contrast(lum(s.btnFill), lum(s.onBtn)))}:1`);
     row('type', `${t.verdict}: ${t.n} text-like shapes at ${t.W} px, ${t.polarity}, ${pc(t.share)} serif-like, median stroke contrast ${f2(t.contrast)}, median foot ${f2(t.foot)}`);
     top.append(left, dl);
     card.append(top, sample(p, s));
@@ -394,8 +422,6 @@
   }
   document.getElementById('tally').textContent = `${PICS.length} pictures read: ${tally.light} light schemes and ${tally.dark} dark, ${tally.accent} with an accent, ${tally.serif} read as serif-typed. A verdict needs at least 8 shapes that sit in a line of others their size, after rules through the words are erased; serif is 45 per cent or more of them with stroke contrast over 0.9 or a foot over 1.8 times the stem, sans is 25 per cent or fewer, and between is unsure. These are heuristics with thresholds chosen on these pictures, not measurements of a face.`;
 
-  const serifs = document.getElementById('serifs');
-  for (const s of SERIFS) serifs.append(sample(gestures.p, gestures.s, s));
   // ?first=N reads only the first N pictures and ?type=0 skips the type
   // reading, for a probe; window.__times carries each picture's timings
 </script>
