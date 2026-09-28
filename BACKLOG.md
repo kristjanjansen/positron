@@ -1,5 +1,335 @@
 ## Open
 
+### Open 2026-09-28: tom, less air to the left of the step grid's numbers
+
+ASKED, VERBATIM: *"reduce left padding on tom's left numbers"*. The page is
+https://positron.studio/tom/ and the numbers are the step grid's label column.
+
+**NOT STARTED, AND THE PADDING IS NOT WHERE THE ASK'S WORDS POINT.** MEASURED
+by reading the stylesheet rather than the screen:
+
+```css
+.pos-pg-lab  { padding: 0 6px 0 0; }   /* shell.css:2572, the LEFT is already 0 */
+.pos-pg-labs { border-inline: 0; padding-inline: 0; }  /* shell.css:6329 */
+```
+
+**So neither the number nor its column carries any left padding at all**, and
+whatever air is there belongs to something further out: the panel's own inset
+(`--panel-gap`), `.panel-fixed`, or the scroller. **`node demo/ancestry.mjs tom
+'.pos-pg-lab' padding-left --width 375` names the ancestor before a single
+number is typed**, which is what that tool exists for and is cheaper than a
+fourth override.
+
+🔴 **AND THIS EXACT COLUMN HAS A SCAR ON IT, SO NOTHING HERE IS TO BE GUESSED
+AT.** `shell.css:6302` records that `.pos-pg-labs`' `border-right: 0;
+padding-right: 0` sat three thousand lines above `.panel-fixed-l` and **had
+never once applied**: both selectors are (0,1,0), the later one won, and 16 px
+of `--panel-gap` plus a 1 px border ate the label column's whole 22 px content
+box. **64 of 64 labels were clipped and it shipped for three days**, reported as
+*"you lost 2-digin numbers from tom demo"*, under an UNCHANGED assert count.
+⚠️ **SO THE REPAIR IS ORDER, NOT WEIGHT.** That comment says in as many words
+why the fix is not `.panel-fixed.pos-pg-labs`: raising to (0,2,0) starts the
+escalation `.panel-fixed-l` is deliberately (0,1,0) to avoid. A tie decided by
+source order is the smallest thing that can win.
+⚠️ **AND `--pg-lab` IS NOT THE NUMBER TO CHANGE**, which `demo/tom/index.html:79`
+says outright: 22 px holds `63` with room.
+⚠️ **READ THE INK, NOT THE BOX.** `/tom/`'s own check at `:1284` compares the
+label's TEXT against what the column SHOWS of it, in the label's own font,
+because three alignment asserts were green while a reader could see `5` where
+`52` belongs. Any change to this column's width or inset is graded by that
+assert or it is not graded at all.
+
+### Open 2026-09-28: the invisible hand's button on a knob loses its border
+
+ASKED, VERBATIM: *"rm border around inviisble hand button on knob dials"*.
+
+**NOT STARTED, AND IT IS ONE DECLARATION**, `demo/shell/shell.css:5456` inside
+`.pos-knob-hand`:
+
+```css
+background: var(--card); border: 1px solid var(--line); border-radius: 50%;
+```
+
+plus `.pos-knob-hand:hover { border-color: var(--line2); … }` on the next line.
+
+🔴 **THE GROUND STAYS WHEN THE BORDER GOES, AND THE RULE'S OWN COMMENT SAYS
+WHY**: *"it sits ON the drawing, so it needs a ground of its own or the ring
+shows through the glyph"*. Deleting `background` with the border is the obvious
+over-reach and would put the ring behind the symbol. **Delete the `border`, keep
+the `background`, and decide what `:hover` says instead**, because that rule has
+nothing left to change once the border is gone and a hover that changes nothing
+is a hover that reads as a dead control. `color: var(--fg)` is already in it and
+may be the whole answer.
+⚠️ **AND THE RADIUS IS NOT THE BORDER.** `border-radius: 50%` shapes the
+GROUND, so it stays.
+⚠️ **NOTHING ELSE IN THIS RULE MOVES.** The position is read off the drawing
+through `--knob-ring-f` and `--knob-dial-r` rather than typed, the button costs
+no height because it is absolute, and `[data-on="1"]` lights the SYMBOL only,
+which was instructed as *"just color it yellow when enabled (the symbol)"* and
+is `.sld-hand`'s rule verbatim. A border removal must not become a second
+channel for the on state.
+**Where it shows**: every page drawing a knob with `hand`. `/knobs/`, `/muta/`
+and `/shape/` are the ones to look at, `/kit/` holds the specimen.
+
+### Open 2026-09-28: fix the invisible hand button on /shape/
+
+ASKED, VERBATIM, with a screenshot: *"fix invisuble hand button"*. The picture
+is https://positron.studio/shape/ : a `CIRCUIT NOT CONNECTED` status, a
+`SENDS TO` label over a three segment row reading `Synth 1 | Synth 2 |
+Session`, and **the square `⇄` button standing well clear of that row, with a
+full rounded border of its own**.
+
+**NOT STARTED, AND WHAT *FIX* MEANS IS NOT SETTLED.** Asked back in the session
+it arrived in. Two readings, and they want different changes:
+- **IT SHOULD BE JOINED TO THE ROW, AND THE PAGE'S OWN SKETCH SAYS SO.**
+  `demo/shape/index.html:18` and `:514` both draw it as
+  `[Synth1|Synths] [⇄] <- square button`, and `:1290` writes the order out as
+  `[Circuit …] [sends to …] [⇄]`. The screenshot shows a gap instead. The kit
+  already has the join: `.pos-seg`, which is what `slider.mjs`'s hand button
+  uses against its lane (`shell.css:2037`), with the note that a segment giving
+  up its inner corners is the whole of that rule.
+- **OR IT IS THE BUTTON'S APPEARANCE**, since the ask arrived one line before
+  *"rm border around inviisble hand button on knob dials"* and may be the same
+  complaint on the other component.
+
+**Where it lives.** `demo/shape/index.html:584` builds it as a plain
+`el('button', 'pos-btn', …)` with `centreSymbol`, `:602` appends it as
+`bar.append(parts.el, hand)`, and it toggles between `move everything` and
+`put back` through `HAND_SAYS` from `demo/shell/hand.mjs`.
+⚠️ **AND `/shape/` HAS A STANDING HOLE THIS TOUCHES**, already open: **there is
+no one-press way back for a slider moved BY HAND**, because the `move
+everything` glyph offers the way back only while something is running. Whatever
+happens to this button, do not make that worse.
+⚠️ **THE HARNESS PRESSES `.pos-controls button` BY POSITION** and `:236` records
+that this page already thinks about it: the hand button is kept out of that row
+on purpose, because *a suite run must not be a hand on somebody's instrument*.
+Moving this button INTO a row the harness sweeps would start a hand on every
+run.
+
+### Open 2026-09-28: muta, the knob grid centres and the Test tone button fills the phone
+
+ASKED, VERBATIM: *"muta: center the knob grid. test tone button takes full w on
+mobile (buttons prop?)"*. Two asks in one line, one page,
+https://positron.studio/muta/.
+
+**NOT STARTED.**
+
+**Half one, the knob grid centres.** `demo/muta/index.html:520` and `:537` build
+TWO grids through `createControlGrid`, `cols: 2` (the four big knobs) and
+`cols: 3` (the three attenuverters and three more). **So *the knob grid* is two
+objects and they have different column counts**, which is exactly the case where
+centering one and not the other looks like a mistake rather than a decision.
+Confirm which is meant, or centre both and say so.
+⚠️ **AND `muta` IS `fit-content` SINCE 2026-09-28**, 34.0 to 559.0 px where its
+case ran 34.0 to 722.0, on the compose rule that an instrument is as wide as the
+instrument. **Centring inside a box that is already shrink-wrapped to its
+content does nothing**, so this ask is either about the grid inside the panel or
+about the panel inside the page, and those are two different lines in two
+different files. LOOK at it at both widths before writing either.
+⚠️ **`control-grid` ALSO CARRIES A KNOWN NAMING DEFECT**, already open below:
+`--cg-pitch` and `grid.pitch()` both report 84 while the lattice steps 94,
+because `size()` calls `pitchFor(w, h, 0)` with the gap zeroed and sets `gap`
+separately. Anybody reading pitch numbers while centring this grid will read
+that 84 and be wrong by 10.
+
+**Half two, the Test tone button full width on a phone.** `demo/muta/
+index.html:628` builds it as a plain `<button class="muta-tone">` with
+`aria-pressed`, and it sits in the instrument panel's `status` slot, which is
+the position after the name at the START end of the plate row. Its comment
+records that the slot used to hold the on and off switch and that the button is
+deliberately NOT a kit component.
+
+**THE PARENTHESIS IS A QUESTION AND THE ANSWER IS NO.** `createControlGrid`
+takes `items`, `cols`, `gap`, `host` and `cls`, and **there is no `buttons`
+prop**, on it or on the instrument panel. The nearest existing spellings of
+*take the width you are given* are `full: true` on `createInstrumentPanel` and
+`createGlueRows`, `.pos-rows-full` at `shell.css:1029` and `.kbd-full` at
+`:3723`. So the shape that matches this repository is a `full` option or a kit
+class, NOT a page rule, and the decision is whether it belongs to the button,
+to the plate row's slot, or to the panel at phone width.
+⚠️ **IT IS IN A JUSTIFIED ROW WITH TWO ENDS**, which already goes linear below
+`--row-min`, so *full width on mobile* may be a property of that row's linear
+mode rather than of this one button. If it is, it reaches all six instrument
+pages and is shared work, done once and first. **If it is written on
+`.muta-tone` it reaches one page and nothing else, which is cheaper and
+narrower.** Price both before choosing; this is the same fork as the nameplate
+ask above.
+
+### Open 2026-09-28: the screen keyboard is a third higher, on the phone and at the desk
+
+ASKED, VERBATIM: *"make screen keyboard 1/3 higher on both mobile and
+desktop"*.
+
+**NOT STARTED.** It is two tokens and one media query, and the arithmetic is
+worth writing down before anybody types a number.
+
+**Where it lives, all three lines in `demo/shell/shell.css`.**
+
+```css
+.k        { height: var(--k-h, 74px); }        /* :1714, the white key */
+.k.sharp  { height: var(--k-hs, 46px); }       /* :1744, the black key */
+@media (min-width: 561px) {                     /* :3754 */
+  .keys { --k-h: calc(74px * 1.25); --k-hs: calc(46px * 1.25); }
+}
+```
+
+**SO THE DESK IS ALREADY 1.25x AND THE PHONE IS THE BASE**, which means *a
+third higher on both* is 74 to **98.67** and 46 to **61.33** on the phone, and
+92.5 to **123.33** and 57.5 to **76.67** at the desk, if the 1.25 stays a
+separate factor. Two ways to write it and they are not the same:
+- **multiply the base and leave the 1.25 alone**, which keeps one statement of
+  *the desk is a quarter taller than the phone* and moves both ends together.
+  This is the one to write unless told otherwise.
+- type four new numbers, which is four numbers to keep in step and is the
+  defect `positron-compose` names: a typed number that describes a
+  RELATIONSHIP is a bug waiting.
+
+⚠️ **THE MEDIA QUERY’S POSITION IS LOAD-BEARING AND MUST NOT MOVE.** Its own
+comment says why: **a media query adds no specificity**, so a plain `.k` rule
+written after it wins at every width, and `.pos-pick`'s whole phone layout sat
+above a plain rule that beat it and had never run in its life. The block sets
+the two PROPERTIES `.k` reads and sits after every rule that reads them.
+⚠️ **AND THE BREAKPOINT IS 561, THE OTHER SIDE OF THE 560 THIS STYLESHEET USES
+SEVEN TIMES.** A third breakpoint is a third answer to a settled question.
+⚠️ **ONE PAGE OVERRIDES THE KEY HEIGHT OUTRIGHT**: `.evo-keys .k { height:
+auto }` at `shell.css:6401`, and its comment says that is *the only* thing
+making that keyboard work. `/evo/` will not move with this and should be
+LOOKED at afterwards rather than assumed unaffected.
+
+**What a taller key changes that is not the key.** The keys are in a scroller,
+the roll above them shares the keyboard's grid template character for
+character, and the pad row and footer sit under it. `node demo/shot.mjs <slug>
+375 1280` on a page that draws all three is the reading. Every page with a
+keyboard is in scope: `nola`, `knobs`, `fau`, `evo`, `looper`, `instrument`,
+`kit`.
+
+### Open 2026-09-28: the Loop button goes when the Evolution keyboard is not connected
+
+ASKED, VERBATIM: *"rm loop button when evolution keyboad is not connected"*.
+
+**NOT STARTED, AND WHICH PAGE IT IS HAS TO BE CONFIRMED BEFORE ANYTHING IS
+WRITTEN.** The Evolution MK-425C is `/evo/`'s subject, and `/evo/` has **no
+loop button at all**: `grep -n loop demo/evo/index.html` prints nothing.
+**Three pages pass `loop: true`**: `demo/kit/index.html`, `demo/nola/index.html`
+(`:981`) and `demo/tom/index.html`. The screenshot in the ask above this one is
+`/nola/`, which is the likeliest subject, and `/kit/` is the specimen page where
+the control exists to be looked at rather than used.
+
+**Where it lives.** `demo/shell/keyboard.mjs:400` takes `loop: wantLoop` and
+`:1027` builds `loopBtn` behind it; `:935` says the gate on `wantLoop` is *what
+keeps this off the pages that do not want it*. So the component already has the
+mechanism and what is missing is the page telling it the truth at the right
+moment.
+
+**WHAT MAKES THIS THE HARD ONE, AND IT IS NOT THE BUTTON.**
+- **Connection is not a fact at load, it is a fact that changes.** The Web MIDI
+  path is `requestMIDIAccess` plus `onstatechange`; a keyboard plugged in after
+  the page opened has to bring the button BACK, and one unplugged mid-loop has
+  to take it away while a loop is running. `wantLoop` is read once at build
+  time today.
+- ⚠️ **AND A CONTROL THAT APPEARS AND DISAPPEARS MOVES EVERY OTHER CONTROL'S
+  HARNESS PRESS.** `demo/verify.mjs:830` presses `.pos-controls button, .tbar-x`
+  by position. The `N | D` removal turned out NOT to have this problem because
+  the pad lives inside the keyboard's own box, so the same may be true here and
+  is to be CHECKED rather than assumed either way. What DID break that day was
+  two pages naming the control in a SELECTOR, and only one of those two ways of
+  naming fails loudly.
+- ⚠️ **NOTHING IS CONNECTED TO THIS DESK DURING A CHECK RUN.** `/knobs/` already
+  carries two standing reds of exactly this shape. So the harness sees the
+  DISCONNECTED case by default, which means the button is absent in every run
+  and any assert that presses it goes with it. Decide what the check grades
+  before writing the gate: an absence is a measurement too, and this project has
+  a rule about a green page with no coverage.
+- ⚠️ **AND IT INTERACTS WITH THE ASK ABOVE ABOUT THE PAD ROW WRAPPING**, because
+  removing a control changes the width that row needs. Do the wrap fix in a way
+  that survives three controls becoming two.
+
+### Open 2026-09-28: the keyboard's lower buttons wrap onto two lines, and they belong on one
+
+ASKED, VERBATIM, with a screenshot: *"keyboard lower bittons (+- panic etc) go
+to the same line"*. The picture shows the octave pair and its `0` on one line
+and `Loop`, `Sustain`, `Panic` pushed to the right end of a SECOND line under
+them.
+
+**NOT STARTED.** It is the pad row, `.kpad`, and not the footer: the footer is
+`.kbd-foot` and carries the page's own row.
+
+**Where it lives.** `demo/shell/keyboard.mjs:1040` marks the right hand group
+(`rightSide = [loop, sustain, panic]`, first one `kpad-right`, rest
+`kpad-tight`); `demo/shell/shell.css:3758` is `.kpad` and `:4167` is
+`.kpad-right`.
+
+**WHY IT DOES THIS, READ FROM THE STYLESHEET AND NOT YET MEASURED.**
+
+```css
+.kpad { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kpad-right { margin-left: auto; }
+```
+
+`flex-wrap: wrap` and a `margin-left: auto` are the two halves. The row wraps
+when it runs out of width, and the auto margin then takes the free space on the
+SECOND line instead of the first, so the group does not just drop, it drops and
+right-aligns. That is this project's already-named phone defect, *a justified
+row wrapping into a left line and a right line*, arriving in a component
+rather than in a page.
+
+⚠️ **AND THE AUTO MARGIN HAS A HISTORY THAT ANY FIX HAS TO KEEP.** The comment
+at `shell.css:4154` records the previous repair: `.kpad .pos-toggle {
+margin-left: auto }` spread the controls across the row the moment a second
+toggle existed, because **a flex line hands its free space to every auto margin
+on it equally**. The rule that replaced it is *the builder marks the group, the
+CSS does not infer it*, and *adding a fourth control changes no CSS*. A fix that
+goes back to per-control selectors undoes that.
+
+**What is NOT yet known and has to be looked at before anything is written.**
+- **At what width it wraps, and whether the picture is a phone or the desk.**
+  `node demo/shot.mjs <slug> 375 1280` LOOKS at both, which is the step this
+  project keeps paying for skipping.
+- **Whether one line is possible at 375 at all**, or whether the answer is that
+  the row goes linear as a whole (the `--row-min` behaviour `createGlueRows`
+  already has) rather than half-wrapping. If the controls cannot fit, *same
+  line* and *readable* are two asks and the second one wins; say so in writing
+  rather than shrinking type to win an argument with arithmetic.
+
+**IT IS THE SHARED COMPONENT, SO IT IS DONE ONCE AND FIRST.** Every page with a
+keyboard draws this row: `nola`, `knobs`, `fau`, `evo`, `looper`, `instrument`
+and `kit`. The assert COUNT on each is the reading afterwards, not the colour.
+
+### Open 2026-09-28: the instrument layout's nameplate on a phone, its own section, centered
+
+ASKED, VERBATIM: *"in instrument layout, on mobile the nameplate goes below all
+othe section on its own section and it centered hzontally"*.
+
+**NOT STARTED, AND THE READING IS NOT SETTLED YET.** The sentence can be a
+report (*this is what it does now and it is wrong*) or an ask (*this is what it
+should do*), and the two want opposite changes. Asked back in the session it
+arrived in; whichever answer comes, it is written here first.
+
+**Where it lives.** `demo/shell/instrument-panel.mjs` builds the plate as the
+LAST row already (`ROW_KINDS = ['viz', 'controls', 'keys', 'plate']`, and
+`addRow` inserts controls BEFORE the keys and the plate however late it is
+called), so *below all other sections* is the desk behaviour too. The row is
+built by `createNameplate` in `demo/shell/panel-layout.mjs` and laid out by
+`createGlueRows` in `demo/shell/glue.mjs`; `.pos-rows-r` and the row tokens are
+in `demo/shell/shell.css`.
+
+**What is already known and makes it non-obvious.**
+- **A justified row has exactly two ends, and it goes LINEAR below
+  `--row-min`**, decided by the CONTAINER's width and not the window's. So on a
+  phone the plate's name end and patch end stop being two ends and stack. That
+  is the existing rule, from session 51, and it is the likeliest source of
+  whatever the phone is drawing now.
+- **Centering is not the kit's habit.** Every other row in the panel is a start
+  row or a justified one. A centered plate is a new alignment in that component
+  and reaches all six pages at once.
+- **SIX PAGES DRAW IT**: `fau`, `knobs`, `muta`, `shape`, `tom`, and `kit`
+  (which holds the specimens). A change in the component is one change in six
+  places, so it is the shared-work agent's job and goes BEFORE any page agent.
+- The phone is an **iPhone mini, 375 by 812 at 3x**: `node demo/shot.mjs <slug>
+  375 1280` LOOKS at it, `node demo/ancestry.mjs` walks who insets it.
+- `positron-compose` AND `positron-ui` both load before this one is written,
+  by the trigger table in `CLAUDE.md`: it is a layout task and a kit task.
+
 ### Done 2026-09-28: fau, "rm bell and hall from fau they do not diffentiate. btin somehintg instresting"
 
 ✅ **TWO OUT, TWO IN, AND THE PICKER IS SIX ROWS THAT ARE SIX INSTRUMENTS.**
