@@ -1,9 +1,39 @@
 ## Open
 
+### fau: "rm bell and hall from fau they do not diffentiate. btin somehintg instresting"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"rm bell and hall from fau they do not
+diffentiate. btin somehintg instresting"*. Slug `fau`, file
+`demo/fau/index.html`, `PRESETS` at line 434. With an agent.
+⚠️ Known and non-obvious, and the complaint is EXACT rather than a matter of
+taste:
+- `Bell` at 511 is the Rhodes with ONE NUMBER CHANGED, `3.51` instead of a whole
+  multiple, and its own comment says so. `Hall` at 576 is the Organ unchanged
+  plus `effect = dm.freeverb_demo`, and its own comment says that. So two of the
+  six rows are edits of other rows, and a picker of six that is really four
+  teaches a visitor less than it appears to.
+- ✅ WHAT A REPLACEMENT HAS TO CLEAR, and these are the page's own published
+  standards: nothing new may cross the wire, because the 2.41 MB of Faust
+  library is already downloaded and `physmodels.lib` is inside it; and compile
+  time is a measured cost this page prints. `clarinet` is 273 to 344 ms compiled
+  the way this page compiles, which is polyphonic with a voice, an effect and a
+  mixer, and is the slowest row by nearly three times. An STK piano at 1,690 ms
+  was REFUSED. `pm.brass_ui_MIDI` at 155 ms was considered and not chosen.
+- ⚠️ AND THE PAGE COMPILES ON LOAD SINCE EARLIER TODAY, so `PRESETS[0]`'s cost
+  is now a visitor's cost on every visit.
+- `PRESETS[0].code` is the text box's initial value and `patch.options(...)`
+  builds the picker from the array, so the array is the single source. There is
+  a line-count constant READ OFF the presets rather than typed, which moves if
+  the longest row changes.
+- ⚠️ **FOUR GOOD ROWS BEAT SIX WITH TWO EDITS IN IT**, and the agent was told
+  that shipping four is a real answer rather than a failure.
+
 ### keyboard component: "rm N | D setting from keyboard component"
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"finally: rm N | D setting from keyboard
-component"*. File `demo/shell/keyboard.mjs`. NOT STARTED, and deliberately held
+component"*, and then, when told it was being held: *"N D can be last"*. So the
+ordering is the owner's and not an excuse. File `demo/shell/keyboard.mjs`. NOT
+STARTED, and held
 for a few minutes: two page agents are mid-run on `/muta/` and `/knobs/`, and
 `/knobs/` carries a keyboard, so removing a control from the component while a
 page agent is reading its own assert counts would poison their before and after.
