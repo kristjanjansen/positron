@@ -26,13 +26,16 @@
      `/circuit/` get, and it is the answer to *"you have several instroments
      done by now. can you not reuse ui?"*: the component already had this right
      and every line I wrote was moving away from it.
-     ⚠️ ONE LINE IS STILL NEEDED AND IT ADDS RATHER THAN TAKES AWAY.
-     `.panel-case` has NO vertical padding on purpose, which is what lets a
-     divider reach the card's edges, so a plate placed as the case's first child
-     sits 1 px under the border. `/twelve/` puts its plate above the boxes and
-     `/circuit/` puts it inside the card, so neither of them has ever been in
-     this position. The title gets its own room here, over it, which is what was
-     asked for four times. */
+     🔴 AND SINCE 2026-09-28 THERE IS NO PLATE RULE HERE AT ALL, BECAUSE THE
+     PLATE IS NOT IN THE CASE ANY MORE. Asked as *"tom: apply instrument
+     panel"*: `instrument-panel.mjs` puts the nameplate in a row of its own
+     across the FOOT, which is what the sketch that bought that component draws,
+     so the two rules that used to float it over the top right corner of the
+     case are gone. They were `.tom { position: relative }` and
+     `.tom > .panel-plate { position: absolute; top/right: var(--panel-pad) }`,
+     written for *"move grid upwards"* when the plate sat in the flow at 31 px
+     tall and pushed the first pad down to 62. A plate at the foot takes nothing
+     off the top, so the thing those two rules bought is now free. */
 
   /* 🔴 THE GRID'S OWN RULES LEFT THIS FILE ON 2026-09-22 AND ARE IN
      `shell.css` UNDER `step-grid`. `/pack/` grew a second hand-rolled grid the
@@ -43,8 +46,9 @@
      report that took an edge off this grid travelled with the rules, because a
      condensed rule reads as an opinion and the next person to touch it will put
      the border back.
-     WHAT IS STILL HERE is only what is about THIS page: the plate's own room,
-     and the line under the grid that says what was last heard. */
+     WHAT IS STILL HERE is only what is about THIS page: the label column giving
+     up the panel's divider, and the line under the instrument that says what
+     was last heard. */
 
   /* ⚠️ THE LABEL COLUMN IS THE PANEL'S FIXED COLUMN, so it carries both the
      component's class and the panel's. The gap is the one the panel's flow
@@ -93,23 +97,6 @@
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
 
-  /* 🔴 THE PLATE FLOATS SO THE GRID RISES, asked for as *"move grid upwards"*.
-     MEASURED before: the plate sat in the flow at 31 px tall carrying its own
-     20 px top inset, so everything under it started 32 px down and the first
-     pad at 62. Out of the flow it keeps the same inset from the case's corner
-     and gives its height back to the grid.
-     ⚠️ PAGE SCOPED, because `.panel-plate` belongs to `/twelve/` and
-     `/circuit/` too, where a plate sits above a strip that scrolls and floating
-     it over the contents would be wrong. `/muta/` made the same change for the
-     same reason and says so in its own file.
-     ⚠️ AND NO PADDING, or the inset is counted twice: `shell.css` gives a plate
-     in a case `padding-block: var(--panel-pad) 0` precisely because it earns
-     its own top inset while it is IN the flow. */
-  .tom { position: relative; }
-  .tom > .panel-plate {
-    position: absolute; top: var(--panel-pad, 20px); right: var(--panel-pad, 20px);
-    padding: 0;
-  }
 </style>
 
 <script type="module">
@@ -117,7 +104,8 @@
   import { createDrop } from '/shell/drop.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
+  import { createPanelLayout } from '/shell/panel-layout.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createStepGrid } from '/shell/step-grid.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { readZip } from '/shell/unzip.mjs';
@@ -564,7 +552,13 @@
    * outside it is a control nothing presses: the checks below drive it by name,
    * which is the cost this session has now paid twice over.
    */
-  const bar = createTransportBar(d.el, deck,
+  /* 🔴 A DETACHED HOST, BECAUSE THE ROW THIS BAR BELONGS IN DOES NOT EXIST YET.
+     `createTransportBar` appends itself to whatever it is handed, and the
+     instrument panel is assembled below out of parts this file has already
+     built. Handing it `d.el` and letting the panel's row take the node away
+     would render the same and say something else, and a page whose source
+     disagrees with its DOM is the shape this project keeps paying for. */
+  const bar = createTransportBar(document.createElement('div'), deck,
     { scrub: false, loop: false, right: [tempo.el], verb: 'stop' });
 
   /**
@@ -626,24 +620,33 @@
   // ── the grid ────────────────────────────────────────────────────────────
   //
   // 🔴 A FIXED COLUMN BESIDE ONE SCROLLER, WHICH IS `panel-layout.mjs`'S WHOLE
-  // CONTRACT AND NOT THIS PAGE'S ARITHMETIC. Sixty four steps is about 1,150 px
-  // and a phone is 390: the steps scroll inside their own box or the PAGE drags
-  // sideways, and `overflow-x` cannot shrink a flex item below its content, so
-  // it takes `min-width: 0` on the same element. That pair was measured on this
-  // project once as 141 px of page overflow.
+  // CONTRACT AND NOT THIS PAGE'S ARITHMETIC. The steps scroll inside their own
+  // box or the PAGE drags sideways, and `overflow-x` cannot shrink a flex item
+  // below its content, so it takes `min-width: 0` on the same element. That
+  // pair was measured on this project once as 141 px of page overflow.
+  // ⚠️ THE MEASUREMENT THAT BOUGHT IT IS DATED AND IS NOT A DESCRIPTION OF THIS
+  // GRID TODAY. It was sixty four steps at about 1,150 px against a 390 px
+  // phone; it has been sixteen steps since 2026-09-21 and they fit, which the
+  // scroll assert below states at length. What the page promises is that when
+  // they DO overflow the strip takes it, and that is true at any count.
   // ⚠️ `flow: false`: the scroller's own child is the content. The flow carries
   // `gap: var(--panel-gap)` at 16 px, and this grid's vertical rhythm is 2 px,
   // which has to match the name column beside it exactly.
+  /* 🔴 THE CASE IS KEPT AND ITS EDGE IS NOT, WHICH IS THE WHOLE REASON THIS
+     NESTS CLEANLY. `cased: true` is what supplies `--panel-pad: 20px`, so the
+     label column and the steps keep the inset they have always had, from the
+     component rather than from a number typed here. The BORDER and the radius
+     come off by themselves: `.panel-case` reads `--edge` and `--r`, the glue
+     sets both to 0 on its own children, and a custom property inherits, so the
+     case goes flat inside a row without one `.pos-glue > .panel` patch. That is
+     the rule `positron-compose` states as a prohibition: a new surface reads
+     the three tokens or it is not a surface of this kit, and a patch that
+     strips a border may not be written.
+     ⚠️ THE PLATE IS NOT THE PANEL'S ANY MORE. It is the instrument panel's foot
+     below, which is where the sketch that bought that component puts it. */
   const panel = createPanelLayout({
     side: 'left', flow: false,
     cls: { panel: 'tom', fixed: 'tom-fixed' },
-    /* The case places its own nameplate and owns the inset. See below. */
-    /* 🔴 THE MAKER CAME OFF 2026-09-22, ASKED FOR AS *"rm positron from plai
-       and tom nameplates"*. One line cannot use `ends`, which is
-       `space-between` and parks a lone child on the LEFT. `end` pushes it
-       right, and `panel-layout.mjs` records `/twelve/` being reported for
-       exactly that. */
-    plate: { lines: ['TOM'], place: 'end' },
     /**
      * ⚠️ THE SCROLLER TAKES NO TAB STOP, WHICH IS A DEPARTURE FROM WHAT THE
      * COMPONENT OFFERS AND HAS A REASON. `transport-bar.mjs` binds the project's
@@ -729,28 +732,54 @@
    * is space rather than a rule nobody wrote.
    */
   const line = el('div', 'tom-line', '');
-  d.stack.add(panel.el, line);
 
+  // ── the instrument ──────────────────────────────────────────────────────
+  //
   /**
-   * 🔴 THE CASE IS PRINTED, ASKED FOR AS *"add titles to tom area: left:
-   * positron right: tom"*. `place: 'ends'` is exactly that: the maker at one
-   * end of the plate and the model at the other, which is how every other
-   * instrument on this desk wears its name and is why the component has that
-   * placement at all.
-   * ⚠️ AND IT IS A REAL NAMEPLATE RATHER THAN TWO SPANS. `panel-layout.mjs`
-   * owns it because three replicas once set their names three ways, and it
-   * REFUSES a plate with no lines on it, which is the empty-box rule one
-   * component along.
+   * 🔴 THE TRANSPORT, THE GRID AND THE NAMEPLATE ARE ONE OBJECT SINCE
+   * 2026-09-28, ASKED FOR AS *"tom: apply instrument panel"*. They were three
+   * blocks a page gap apart, and gluing them is a CLAIM that they are one
+   * thing, which is exactly true here: the bar drives the grid, the grid is the
+   * bar's own position surface, and the plate is what the two of them are
+   * called. `createGlue`'s own header names a strip sitting on the transport
+   * bar that drives it as the pair the look was invented for.
+   *
+   * 🔴 AND THE ORDER IS THE COMPONENT'S, NOT THIS PAGE'S. `addRow` and the
+   * `rows` list both insert above the keyboard and the foot however late they
+   * are called, so the plate cannot end up anywhere but the bottom. The
+   * transport above the grid is the standing ask (*"a 8x64 grid with transport
+   * on top"*) and it is the order these two rows are written in.
+   *
+   * ⚠️ `pad: false` ON BOTH ROWS, AND THAT IS NOT A LOOK, IT IS WHAT MAKES A
+   * CHILD TAKE ITS ROW. `.pos-rows-r[data-pad="off"] > :only-child` is
+   * `flex: 1 1 auto; min-width: 0`; a padded row's only child is `flex: 0 1
+   * auto`, so the bar would have shrunk to the width of its own controls and
+   * the tempo would have sat beside them instead of at the far end. Each part
+   * then carries its own inset, which is how every other glued bar in this
+   * repository already reads: the bar's 8 px and the case's 20.
+   *
+   * ⚠️ `full: true`, BECAUSE THIS INSTRUMENT IS NOT ITS OWN SIZE. `.pos-rows`
+   * is `width: fit-content` by default, which is right for four knobs on a
+   * pedal and wrong for a sixteen step grid whose pads are measured off the
+   * width they are given. A surface sized by its content, holding content sized
+   * by its surface, has nothing to settle on.
+   *
+   * 🔴 THE MAKER CAME OFF 2026-09-22, ASKED FOR AS *"rm positron from plai and
+   * tom nameplates"*, and `place: 'end'` is what keeps the one line that is
+   * left at the right-hand end. `ends` is `space-between`, which parks a lone
+   * child on the LEFT, and `panel-layout.mjs` records `/twelve/` being reported
+   * for exactly that. The plate has moved from the case's top right corner to
+   * the foot, which is the panel's own arrangement, and nothing about which end
+   * it sits at was asked to change.
    * ⚠️ TYPED UPPERCASE THOUGH THE RULE UPPERCASES IT ANYWAY, so the source
    * reads like the page. Same rule `/kit/` states about its own headings.
    */
-  /* 🔴 THE PANEL PLACES IT SINCE 2026-09-22 AND THIS PAGE USED TO PREPEND IT,
-     carrying `.tom .panel-plate { padding: 16px 0 0 }` in its own stylesheet to
-     put the plate off the top border. That rule was a page repairing a shared
-     component privately, so every page written after it inherited the defect
-     and not the fix, which is exactly what happened to `/plai/`. The inset is
-     `--panel-pad` in `shell.css` now and this page types nothing. */
-  const plate = panel.plate;
+  const inst = createInstrumentPanel({
+    rows: [[[bar.el], { pad: false }], [[panel.el], { pad: false }]],
+    plate: { name: 'TOM', place: 'end' },
+    full: true,
+  });
+  d.stack.add(inst.el, line);
 
   /**
    * 🔴 THE PLAY STATE COMES OFF THE TRANSPORT'S OWN LISTENER, AND MY FIRST TRY
@@ -1189,6 +1218,45 @@
       `the bar says data-scrub="${bar.el.dataset.scrub}" and its slider computes `
       + `display: ${getComputedStyle(scrubEl).display}, against ${grid.ticks.length} `
       + 'ticks on the ruler that do seek');
+  }
+
+  /**
+   * 🔴 THE ARRANGEMENT IS READ OFF THE DOM, NOT OFF THE CALL. `shape()` walks
+   * the rendered children and reports each one's kind, which is the component's
+   * own answer to the difference between what a module remembers and what a
+   * browser draws, and this project has been caught believing the first one:
+   * `/pack/`'s heading assert read a PROPERTY and passed every run while three
+   * headings were on screen.
+   * ⚠️ THE ORDER IS THE CLAIM. The transport is above the grid because that is
+   * what was asked for, and the plate is at the foot because the panel puts it
+   * there whatever order a caller writes.
+   */
+  d.assert('the transport, the grid and the nameplate are one glued object, in that order',
+    JSON.stringify(inst.shape()) === JSON.stringify(['controls', 'controls', 'plate'])
+    && inst.el.classList.contains('pos-glue')
+    && inst.el.contains(bar.el) && inst.el.contains(panel.el),
+    `${inst.shape().join(', ')}, on a ${inst.el.className.split(' ').join('.')}`);
+
+  /**
+   * 🔴 ONE EDGE PER OBJECT, MEASURED RATHER THAN READ. The grid still lives in a
+   * `.panel-case`, which paints `border: var(--edge)` and `border-radius:
+   * var(--r)` of its own; inside a glued row both tokens are 0 and a custom
+   * property inherits, so the case goes flat with no page rule and no
+   * `.pos-glue > .panel` patch anywhere. That inheritance is the whole reason
+   * this nests, and a stylesheet change that broke it would leave a card drawn
+   * inside a card with every line of both files reading as correct.
+   * ⚠️ AND THE SURFACE STILL HAS ITS OWN, which is the half a single check
+   * would miss: a border that has gone everywhere is not one border, it is
+   * none.
+   */
+  {
+    const caseCs = getComputedStyle(panel.el);
+    const surfCs = getComputedStyle(inst.el);
+    d.assert('the grid’s case gives up its own edge inside the panel, and the panel keeps one',
+      caseCs.borderTopWidth === '0px' && caseCs.borderTopLeftRadius === '0px'
+      && parseFloat(surfCs.borderTopWidth) > 0,
+      `the case draws ${caseCs.borderTopWidth} at radius ${caseCs.borderTopLeftRadius}, `
+      + `the surface ${surfCs.borderTopWidth} at radius ${surfCs.borderTopLeftRadius}`);
   }
 
   /**
