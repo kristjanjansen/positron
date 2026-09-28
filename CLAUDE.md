@@ -14,7 +14,14 @@ node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"
 
 The front page is ordered NEWEST FIRST, because the index answers *what is new
 here?*; `DEMOS` is the story order and answers *where do I start?*, and
-`byNewest()` copies it. `built: false` hides a row from the index.
+`byNewest()` copies it. 🔴 **`unlisted: true` HIDES A ROW FROM THE INDEX, AND
+`built: false` DOES NOT.** This line said `built: false` until 2026-09-28 and it
+was acted on and DEPLOYED before one `curl` measured it: `built: false` takes
+the page out of the deploy entirely, because `workers/view/build.mjs:532` reads
+`if (!d.built) continue` while enumerating directories, so `/grains/` answered
+**404** while the front page went on drawing a `grains` card with no link behind
+it. The front page never looks at `built`. `byGroup()` filters on `unlisted`,
+once, so the two index renderers cannot disagree.
 
 ## The standing files, and what each one answers
 
@@ -462,7 +469,10 @@ bug was a fact true of every part and of no part's author.
   and keeping them in step is what made reordering expensive enough to get
   wrong: the 05/28 swap left one page still declaring its old number inside its
   own `mount()`, which only the full sweep caught. Moving a demo is now moving a
-  line in the array. `built: false` hides one from the index.
+  line in the array. **`unlisted: true` hides one from the index and leaves the
+  page deployed at its URL; `built: false` takes it out of the deploy and
+  leaves a dead card on the front page.** See the measurement at the top of
+  this file.
 - Every demo mounts the shell (`demo/shell/shell.mjs`) and publishes
   `window.__demo` — human-openable and CDP-drivable from the same page. Assert on
   `__demo`, never on DOM ids.

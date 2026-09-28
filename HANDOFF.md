@@ -1,3 +1,49 @@
+# Handoff, 2026-09-28, session 53: a stream of ten page requests, collected first and worked second
+
+## 🔴 `grains` IS OFF THE FRONT PAGE, AND IT IS COMING BACK
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"hide grains from index. note in handoff:
+bring it back when we have time"*. This is that note.
+
+**`unlisted: true` on the `grains` row in `demo/manifest.mjs`.** MEASURED after
+the edit, counted and not remembered: **57 demos, 55 built, 55 cards drawn**,
+one card fewer than the 56 the front page carried that morning.
+
+- **NOTHING WAS DELETED AND THE PAGE IS STILL DEPLOYED.**
+  **https://positron.studio/grains/** answers for anybody holding the link, and
+  it is still in `node demo/verify.mjs` with no argument, because the page is
+  `built: true`. Only the card is gone.
+- **TO BRING IT BACK: delete `unlisted: true` from that row. Nothing else.**
+  Then `node demo/verify.mjs grains` and read the assert COUNT against what it
+  was. It is a page with a Raspberry Pi at the other end (`settleMs: 60000`,
+  `room: 'fixed'`), so the board has to be up before any of that means
+  anything, and `positron-hardware` is the skill to load first.
+
+### 🔴 AND THE FIRST ANSWER WAS `built: false`, IT WAS WRONG, AND IT WENT LIVE
+
+`CLAUDE.md` said, in two places, that *"`built: false` hides a row from the
+index"*. **It does neither half of that**, and the deploy that shipped on its
+word was caught by one `curl` a minute later:
+
+| | front page card | https://positron.studio/grains/ |
+| --- | --- | --- |
+| `built: false` (deployed 14:58, wrong) | **still drawn**, with no link behind it | **404** |
+| `unlisted: true` (the fix) | **gone** | **200** |
+
+⚠️ **WHY, AND IT IS TWO UNRELATED MECHANISMS.** `workers/view/build.mjs` line
+532 reads `if (!d.built) continue` while it ENUMERATES demo directories, so an
+unbuilt demo is never copied into the deploy at all. The front page never
+consults `built`: `byGroup()` in `demo/manifest.mjs` filters on **`unlisted`**,
+and does it there rather than in either renderer, with its own comment saying
+*"a row that has to be hidden in two places is a row that will show up in
+one"*. `feedback` already wore `unlisted` and was the working example the whole
+time.
+
+⚠️ **THE RESULT OF GUESSING WAS THE WORST OF BOTH**: a dead card on the front
+page over a page that had stopped existing. **`CLAUDE.md` IS CORRECTED**, in
+both places, and this is the standing-file rule catching its own author. The
+line was true enough to act on and wrong enough to deploy.
+
 # Handoff, 2026-09-27, session 52 continued: the eccm demo grew a face, an event page, a form and a page that designs from a picture
 
 
