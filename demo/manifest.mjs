@@ -812,27 +812,26 @@ export const DEMOS = [
    * 🔴 SOMEBODY ELSE'S FIRMWARE, COMPILED RATHER THAN REWRITTEN, AND THAT IS
    * THE WHOLE CLAIM. `LESSONS.md` #81: `/grains/` said *"the same granulator in
    * this page and on a Raspberry Pi"* and it was false, because the page ran a
-   * REIMPLEMENTATION. This page runs `plaits/dsp/voice.cc` and
-   * `warps/dsp/modulator.cc` from pinned commits with no line of either
-   * changed, and each wasm carries its own digest over its own source set, so a
-   * second build elsewhere can be compared to it by something other than two
-   * people agreeing it sounds right.
+   * REIMPLEMENTATION. This page runs `plaits/dsp/voice.cc` from a pinned commit
+   * with no line of it changed, and the wasm carries its own digest over its own
+   * source set, so a second build elsewhere can be compared to it by something
+   * other than two people agreeing it sounds right.
    * ⚠️ THAT COMPARISON HAS NOT BEEN MADE. Nothing has been built on the board,
    * so what exists today is one end and the hook for the other.
-   * 🔴 TWO UNEDITED FIRMWARES IN ONE GRAPH IS THE THING THIS PAGE SHOWS AND
-   * ONE ON ITS OWN COULD NOT. The oscillator is what the effect is given to
-   * work on, so the chain needs no signal from anywhere else.
-   * 🔴 AND HALF OF WARPS IS AN OCTAVE DOWN AT 48 kHz, WHICH IS PRINTED
-   * RATHER THAN HIDDEN. `Modulator::Init` takes the rate and gets the
-   * oscillators and the follower times right, and the filter bank coefficients
-   * are fixed numbers baked at 96,000 in `lookup_tables.py`. So the six cross
-   * modulation algorithms are exactly right and the twenty vocoder bands sit an
-   * octave low. Running the context at 96 kHz is not the repair: `plai_init`
-   * refuses any rate but 48000, and the two firmwares would stop being able to
-   * feed each other at all.
+   * 🔴 AND IT WAS TWO FIRMWARES UNTIL 2026-09-28, WHICH IS WHY THIS BLOCK USED
+   * TO READ THE OTHER WAY. Asked, verbatim: *"muta: arhive/rmwarps and rm all
+   * routing code around it"*. Warps is out of the page and out of the worklet,
+   * and three paragraphs left with it: one headed *"TWO UNEDITED FIRMWARES IN
+   * ONE GRAPH IS THE THING THIS PAGE SHOWS AND ONE ON ITS OWN COULD NOT"*, one
+   * about half of Warps sitting an octave down at 48 kHz because its filter bank
+   * coefficients are baked at 96,000, and a count of two files under 280 KB.
+   * ⚠️ `demo/muta/vendor/warp.wasm` AND `build/warp_shim.cc` ARE STILL ON DISK
+   * AND NOTHING FETCHES THEM. `build/build.sh` compiles that shim into that
+   * artefact and there is no emscripten on this machine, so removing them is a
+   * build script change somebody able to run it has to verify.
    * ⚠️ NO `room` AND NO `settleMs` OVER 8 s. This page opens no socket, reaches
-   * no relay and touches nothing outside the deploy: two files under 280 KB
-   * together and an AudioWorklet. `plans/plan-vcv-modules.md` §12.4 is the
+   * no relay and touches nothing outside the deploy: 196.0 KB of one artefact
+   * and an AudioWorklet. `plans/plan-vcv-modules.md` §12.4 is the
    * experiment, and `plans/plan-two-more-modules.md` is where Warps was picked
    * over the four other modules that were priced.
    * ⚠️ THE POLYPHONY IS THE HOST'S AND NOT THE FIRMWARE'S. Plaits in hardware
@@ -850,7 +849,7 @@ export const DEMOS = [
    * this one keeps.
    */
   { name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
-    one: 'two of Emilie Gillet’s firmwares, an oscillator and an effect, compiled from their own C++ to WebAssembly and chained in one audio graph',
+    one: 'eight voices of Emilie Gillet’s Plaits firmware, compiled unmodified from its own C++ to WebAssembly on the audio thread',
     /* ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so a browser with no MIDI
        keeps this row linked and the page says why rather than the row vanishing,
        which would read as the demo not existing. The page plays from its own

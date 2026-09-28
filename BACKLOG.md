@@ -504,7 +504,100 @@ on wish, just keep x button"*. Slug `wish`, file `demo/wish/index.html`
   a switch there would put a suite's hand on somebody's instrument. Keep the
   `×` where it is.
 
-### muta: archive/remove Warps, apply the instrument panel, unlabel the patch selector, visualization to the top
+### Done 2026-09-28: muta, "arhive/rmwarps and rm all routing code around it. apply instument panel. no label on patch selctor. move visualization to top of instrument"
+
+✅ **ALL FOUR DONE.** Warps is out of `demo/muta/index.html` and out of
+`demo/muta/muta-worklet.js`, where the whole `WarpMod` class, its `W` table and
+its `registerProcessor` line came to 208 lines. 640 insertions and 1,468
+deletions across the two files.
+- **THE ROUTING, WHICH IS WHAT THE ASK NAMED.** It was `node -> warpNode ->
+  wetGain -> destination` with a dry bypass `node -> splitter(ch 0) -> dryGain ->
+  destination` and a 20 ms crossfade between them driven by the effect's switch.
+  Both gains, the crossfade and `wetFade` are gone. ⚠️ **THE SPLITTER STAYS AND
+  IS NOW THE WHOLE GRAPH**, and that is not routing around an effect: Plaits
+  renders `out` on channel 0 and `aux` on channel 1, which are TWO SOCKETS rather
+  than a stereo pair, so connecting the node straight to a destination would put
+  two different sounds in two ears. Channel 0 is the jack a rack would patch.
+- ⚠️ **LEFT ON DISK AND FETCHED BY NOTHING:** `demo/muta/vendor/warp.wasm`,
+  `vendor/LICENSE-warps`, `vendor/PROVENANCE-warp.json` and
+  `build/warp_shim.cc`. `build/build.sh` compiles that shim into that artefact
+  and there is no emscripten here, so removing them is a build script change
+  somebody able to run it has to verify. No `archive/` copy was made, because the
+  history is the archive.
+- **THE COST WAS FACED RATHER THAN SIDESTEPPED.** `bands` was called *"THE CELL
+  THIS PAGE EXISTS TO PRINT"* and it is Warps' filter bank, so it went. `peak`
+  changed MEANING in the same edit: it read the effect's meter because that was
+  the end of the chain, and it reads the oscillator's now because that is the end
+  of the chain.
+- **The panel, the unlabelled selector and the picture on top are ONE call**,
+  `createInstrumentPanel({ viz, rows, plate: { name, status, patch }, cls })`. A
+  `viz` row is `pad: false` and nothing is ever inserted above it, so "top of
+  instrument" is the component's construction rather than a rule this page keeps.
+  MEASURED: the picture spans 35.0 to 558.0 px inside a row of 35.0 to 558.0 px.
+- ⚠️ THE PICKER IS STILL BUILT WITH `label: 'model'` ON PURPOSE, so the assert
+  has something to catch: with no label in the source there would be nothing to
+  strip and nothing to grade. `.plai-pick`, the wrapper div it used to sit in,
+  had to go, because the component tests the control it is handed for `.pos-pick`
+  and a picker inside a div is not a picker to that rule.
+- ⚠️ **THE PANEL IS ITS OWN SIZE NOW, NOT THE PAGE'S, AND IT IS THE ONE VISIBLE
+  CHANGE TO LOOK AT.** `.pos-rows` is `width: fit-content` and `full` was not
+  passed, so it measures 34.0 to 559.0 px where the case ran 34.0 to 722.0. That
+  is `positron-compose` section 3, an instrument is as wide as the instrument,
+  written down after four knobs on a pedal floated in a 660 px band and the
+  verdict was *"plainly awful"*. **One word, `full: true`, reverses it**, and the
+  assert changes back with it.
+- `Test tone` lost its home in `.panel-head`'s grid and is a row of its own,
+  added late because the component guarantees insertion above the keys and the
+  plate. **The two `@media` blocks that re-placed it at 700 and 560 px are gone
+  with the grid they were arguing with.**
+
+- **MEASURED: 55 total with 49 page asserts and 1 FAIL before, 48 total with 42
+  page asserts and 48/48 green after.** 🔴 **NINE ASSERTS WENT AND HAVE NO
+  REPLACEMENT**, named rather than buried, because a lost assert is the thing
+  that goes quiet: the two-module digest check, the firmware block length, the
+  carried frames, the vocoder's octave, the octave shift's ownership, that the
+  effect really combines two signals and not one twice, that the whole chain fits
+  a render quantum, that the chain is silent unmoved and sounds when played, and
+  that each instrument draws its OWN signal. Two arrived, six were rewritten.
+  🔴 **THE TWO LARGEST HOLES, PLAINLY: nothing now grades that the two pictures
+  are two signals**, which mattered because two pictures fed from one buffer
+  would satisfy "both are drawn" and prove nothing, **and nothing grades the leg
+  between the node and the destination.** No replacement was invented.
+- ✅ **THE `.pos-readout` RED FROM THE KIT CHANGE IS REPAIRED**, and the agent had
+  the same diagnosis at baseline before the message arrived. The selector is
+  `.pos-report`, the assert is KEPT rather than deleted, and the claim changed
+  with it: the left edges still agree to the pixel and that half is asserted, the
+  right edges cannot agree any more because the panel is fit-content.
+
+🔴 **TWO DEFECTS WERE INTRODUCED, FOUND AND FIXED BEFORE HANDOVER, AND BOTH ARE
+WORTH READING.** A DEADLOCK THAT READ AS SILENCE: `ensureAudio` guards on
+`ctx.state === 'running'` and otherwise awaits `booting`, which cannot settle
+inside the check block that `boot()` runs as its last act. `idleIfEmpty` used to
+need BOTH instruments off, so with the effect on it never suspended and the guard
+was never tested; with one instrument it suspends every time. MEASURED:
+**fourteen asserts red at exactly 0.0000, and the assert doing the switching
+PASSED**, because what it asserts is that nothing is sounding. A check that
+breaks the page and then measures silence. And THE KNOB BLOCK SQUEEZED INSTEAD OF
+SCROLLING AT 375: the two grids are flex items, a flex item shrinks by default,
+and there is no `.panel-flow` scroller above them any more, so HARMONICS and
+MORPH were drawn as `HAR` and `M`. The page did not drag sideways, so nothing
+said so.
+⚠️ AND A RULE WAS REMOVED RATHER THAN SHIPPED: a `flex: 0 0 auto` on
+`.muta-tone` could not be shown doing anything, because at 375 the panel is 343
+px and the button about 108. Two dead rules from the old file went too:
+`.muta-panel { --ctl-gap: 16px }` and its 560 px override carried a long comment
+claiming to set the rotary pitch, and they do not, because `createControlGrid({
+gap: 10 })` writes an inline style no custom property can reach.
+⚠️ ONE TRAP AVOIDED: the divider read `var(--panel-gap)`, declared by `.panel`,
+and there is no `.panel` above this any more. An unresolved `var()` makes its
+declaration invalid, so the line would have silently lost its air at both ends.
+
+⚠️ **NOT SETTLED:** the 375 px reading is a screenshot and not an assert, because
+`verify.mjs` runs at 756 px with no viewport override. Whether the panel should
+be fit-content or `full: true` is a judgement from the compose rules rather than
+an instruction. The readout at 375 lays out three cells and then `SOUNDING` alone
+on a line, which is the shell computing columns from a count rather than from the
+available width, already recorded and not touched.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"muta: arhive/rmwarps and rm all routing
 code around it.  apply instument panel. no label on patch selctor. move
