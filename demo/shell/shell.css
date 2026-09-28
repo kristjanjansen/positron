@@ -972,8 +972,9 @@ button.pos-pri[data-busy="1"] {
    The standing rule is that separation is SPACING and a line repeating it is a
    second channel. That rule is about the gap BETWEEN surfaces, which is the
    rhythm `.pos-stack` owns. Inside ONE surface there is no rhythm to repeat,
-   and air is what would read wrong: two boxes 22 px apart ARE two surfaces,
-   which is the separate arrangement and is still the default.
+   and air is what would read wrong: two boxes a page gap apart ARE two
+   surfaces, which is the separate arrangement and is still what a pair gets
+   until somebody glues it.
 
    ⚠️ THE CHILD RULE IS DOUBLE-CLASSED ON PURPOSE. `.pos-glue > *` weighs
    (0,1,0), exactly what `.pos-strip` and `.tbar` weigh for their own
@@ -1064,9 +1065,11 @@ button.pos-pri[data-busy="1"] {
 /* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
    PAGE. Asked for 2026-09-16: *"combine readout with log component, put it top
    of it. they can be used split or also be the same thing in bottom of page"*.
-   `mount({ joined: true })` picks it and `createReport()` builds it; the split
-   pair is still the default, so a page that does not ask keeps its layout to
-   the element.
+   🔴 AND IT IS WHAT EVERY PAGE GETS SINCE 2026-09-28, instructed as *"global:
+   move all reading sections atop of the logs and glue them (you have
+   patterns). use you new glueing code for this, see the kit"*. `createReport()`
+   builds it with `createGlue`, so the box is the same box a page glues for
+   itself; `mount({ joined: false })` is the opt-out and no page passes it.
 
    🔴 WHAT SEPARATES THE TWO HALVES IS 1 px OF `--line`, AND THAT IS NOT A
    DIVIDER. The standing rule is that separation is spacing, and that a line is
