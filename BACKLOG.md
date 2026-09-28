@@ -322,7 +322,85 @@ change desc accrodingly"*. Slug `pack`, files `demo/pack/index.html` and
   no dash, no second clause bolted on, and they change in the same commit as
   the behaviour.
 
-### shape: "apply instument panel with secitons. rm put back button"
+### Done 2026-09-28: shape, "apply instument panel with secitons. rm put back button"
+
+✅ **DONE, AND THE STOP SURVIVED.** The page wore `createInstrument` over
+`createPanelLayout` and passed `side: null` and `flow: false`, two options whose
+only job was to switch the case's own parts off. What is left after switching
+both off IS `createInstrumentPanel` with no picture row and no keys row, so it
+builds `createInstrumentPanel({ full: true, plate: { name: 'shape', caps: false
+} })` and the nine sections the Circuit reference publishes are nine glued rows,
+one per heading. MEASURED: `panel.shape()` reads nine `controls` rows and a
+`plate`, 52 lanes, at every width. They were nine blocks 40 px apart before.
+- A part switch is a HIDE now, not a rebuild: a part's rows are built once and
+  kept, and `.pos-rows-r[hidden]` is `display: none`, which takes no gap, so the
+  seams are right with a part's rows off screen. Graded at 4 of 13 sections drawn
+  for Session.
+
+🔴 **THE STOP FOR THE RUNNING HANDS IS THE SECOND PRESS OF THE `move everything`
+GLYPH.** While anything is moving by itself the control redraws as `↺`, announces
+itself as `put everything back`, and its press calls `putBack()`, which stops
+every hand on every part and sends every parameter this page has moved home. When
+nothing is moving it is `⇄ move everything` again.
+- **WHY THERE:** the page's written defence is about the HANDS, not the values,
+  and the control that starts them is the one that should stop them. One idea,
+  one control, on one axis.
+- ✅ `putBack()` IS NOT DEAD CODE WITH A COMMENT ON IT. Its only caller is
+  `hand.onclick` in its `back` state, and the check reaches it by pressing the
+  REAL button, so its assert is stronger than it was: **54 control changes across
+  all three parts, against 3 before.**
+- The state is read off `handsRunning`, counted in `handSaid`, the one place both
+  edges of a hand arrive, so a hand that stops on its own at the ten minute
+  ceiling or because the tab went to the background turns the control back by
+  itself.
+- ⚠️ **IT FLIPS ON `running` ALONE AND DELIBERATELY NOT ON `changed()`.** A
+  control that became `put everything back` because somebody nudged one slider is
+  a control that changed its mind under a reader's hand, and the next press would
+  undo the nudge they had just made.
+- `setSymbol` rather than `textContent`, so the ink stays centred, which is
+  `symbol.mjs`'s own rule. `↺` U+21BA has no emoji presentation, the same test
+  `⇄` U+21C4 passed when the button was built.
+
+- **MEASURED: 50/50 green with 44 page asserts before, 53/53 green with 47
+  after.** One left, four arrived, five reworded in place. The one that left was a
+  measurement about a case the page no longer has.
+- 🔴 **SABOTAGED TO PROVE THEY BITE, TWICE.** `caps: true` turns the plate assert
+  red reading `SHAPE`, which re-runs a sabotage the page's own notes had flagged
+  as not re-run since the plate moved. `syncHand` made a no-op turns **four red at
+  once**, and those four ARE the argument for the arrangement: the control never
+  offers the way back, the second press scatters again instead of stopping (**40
+  still moving**), nothing goes home (**54 left moved**), and the transition never
+  happens.
+- 🔴 **AND ONE OF THOSE FOUR CAME BACK GREEN IN ITS FIRST FORM.** `and it goes
+  back to offering a move` originally read only the state AFTER the second press,
+  and a control stuck on `move everything` forever satisfies that perfectly. It
+  was strengthened to read both states and the sabotage was re-run. Recorded in
+  the page.
+- **THE CONTROL ROW, MEASURED OFF REAL RECTS AT THE FOUR WIDTHS, confirming line
+  46's prediction:** 390 px goes from three lines to **two**, 560 px from two to
+  **ONE** at 464.2 of content in a 528 px column, 756 and 1280 stay one line. No
+  sideways overflow at any of the four, `scrollWidth - clientWidth` is 0 every
+  time.
+- ⚠️ **THE PLATE MOVED FROM THE CASE'S TOP RIGHT TO THE FOOT, WHICH REVERSES**
+  *"use nameplate on top right"* from 2026-09-25. `addRow` inserts above the
+  keyboard and the foot however late it is called, precisely so a panel cannot be
+  assembled in another order, so applying the component means accepting its order.
+  The alternative was a page-local plate outside the component, which is the
+  hand-rolled defect the component exists to end. Written up in the page as a
+  reversal rather than slipped in.
+
+🔴 **THE REAL LOSS, NAMED: a parameter moved BY HAND and never scattered has no
+one-press way back from this page any more.** The glyph offers the way back only
+while something is running. The undo is the instrument's own, which the page has
+always said in the log: a control change moves the live voice and never writes
+flash, so reloading the session on the Circuit brings the patch back. Judged a
+smaller cost than a control that flips meaning when you nudge a slider, and it is
+reversible on a word.
+⚠️ **AND NOBODY HAS PLAYED THE CIRCUIT FROM THIS PAGE SINCE THE CHANGE.** `emit`,
+`toBytes` and the channel map are untouched and the byte asserts are unchanged,
+but *"shape still works"* is a fact from 2026-09-21 rather than from today. The
+390 px arrangement is measured but not asserted, because `demo/verify.mjs` runs
+at 756 px only.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"shape: apply instument panel with
 secitons. rm put back button"*. Slug `shape`, file `demo/shape/index.html`.
