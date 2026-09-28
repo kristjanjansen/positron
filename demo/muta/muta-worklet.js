@@ -1,21 +1,24 @@
-// demo/muta/muta-worklet.js: both instruments on the audio thread, in two
-// real worklet processors.
+// demo/muta/muta-worklet.js: the instrument on the audio thread, in one real
+// worklet processor.
 //
-// 🔴 TWO PROCESSORS, TWO WASM MODULES, ONE GRAPH. `plai-voice` runs Plaits and
-// `warp-mod` runs Warps, and the page connects the first into the second. They
-// are two separate `.wasm` artefacts built from two separate shims at one
-// pinned commit, and neither knows the other exists: what joins them is a
-// WebAudio connection, which is the thing this page is for. Registering both
-// here rather than in two files is one `addModule` and one global scope.
+// 🔴 AND THERE WERE TWO UNTIL 2026-09-28. `warp-mod` ran Warps in this same
+// file, downstream of `plai-voice`, out of a second `.wasm` built from a second
+// shim at the same pinned commit; neither knew the other existed and what
+// joined them was a WebAudio connection made in the page. It went out on
+// *"arhive/rmwarps and rm all routing code around it"*, and the class and its
+// `registerProcessor` line went with it. The shim and the artefact are still in
+// `build/` and `vendor/`.
 //
-// 🔴 AND THE PLAITS NODE PUTS ITS TWO JACKS ON TWO CHANNELS, WHICH IS WHAT
-// CHANGED WHEN THE CHAIN ARRIVED. Plaits renders `out` and `aux`, and until
-// this page had something downstream to feed they were the same signal copied
-// to both channels with a switch to say which. Warps takes a CARRIER and a
-// MODULATOR, so channel 0 carries `out` and channel 1 carries `aux` and the
-// effect below gets two genuinely different signals out of one oscillator.
-// ⚠️ THAT IS STILL NOT A STEREO PAIR. Two jacks on a module are not left and
-// right, and nothing here pans them.
+// 🔴 THE PLAITS NODE PUTS ITS TWO JACKS ON TWO CHANNELS. Plaits renders `out`
+// and `aux`, and on the hardware they are two sockets. Channel 0 carries `out`
+// and channel 1 carries `aux`.
+// ⚠️ THAT IS NOT A STEREO PAIR. Two jacks on a module are not left and right,
+// and nothing here pans them, which is why the page takes channel 0 through a
+// splitter rather than connecting this node to a destination.
+// ⚠️ **AND THE TWO CHANNELS ARE KEPT RATHER THAN COLLAPSED.** They were the
+// same signal copied to both with a switch to say which, until the effect
+// needed a carrier and a modulator. `aux` is a real jack the module has, so
+// dropping it would be this page deciding an instrument has one output.
 //
 // 🔴 NOT A ScriptProcessorNode, AND THAT IS THE POINT OF THE PAGE.
 // `plans/plan-vcv-modules.md` §9.2 measured the only shipped browser build of
@@ -421,10 +424,10 @@ class PlaiVoice extends AudioWorkletProcessor {
     }
     // 🔴 ONE JACK PER CHANNEL, WHICH IS NOT A STEREO PAIR AND IS NOT A
     // PANNING DECISION. Plaits renders TWO outputs, `out` and `aux`, and on
-    // the hardware they are two sockets. Channel 0 carries `out` and channel 1
-    // carries `aux` so that `warp-mod` below has a carrier and a modulator to
-    // work on; a page listening to this node directly would hear two different
-    // sounds in two ears, which is why nothing connects it to a destination.
+    // the hardware they are two sockets. A page listening to this node directly
+    // would hear two different sounds in two ears, which is why nothing
+    // connects it to a destination: the page takes channel 0 through a splitter
+    // instead, and that is the jack a rack would patch.
     ch[0].set(this.out.subarray(0, frames));
     if (ch.length > 1) ch[1].set(this.aux.subarray(0, frames));
 
@@ -478,214 +481,6 @@ class PlaiVoice extends AudioWorkletProcessor {
   }
 }
 
-/**
- * ── WARPS, THE SECOND FIRMWARE ─────────────────────────────────────────────
- *
- * The parameter ids, the second of three copies. The others are
- * demo/muta/build/warp_shim.cc and demo/muta/index.html, and all three spell
- * the names out because a mismatch moves the wrong control rather than
- * throwing.
- */
-const W = {
-  algorithm: 0, amount: 1, drive1: 2, drive2: 3, note: 4, carrier: 5,
-};
-
-/**
- * 🔴 AN UNCONNECTED INPUT IS AN EMPTY ARRAY, NOT AN ARRAY OF ZEROS, AND THAT
- * IS THE ONE TRAP IN A PROCESSOR THAT TAKES INPUT. Chrome hands `inputs[0]` as
- * `[]` when nothing upstream is producing, so `inputs[0][0].length` throws and
- * `inputs[0][0]` is `undefined` before that. This module still has work to do
- * in that case: with a carrier shape set it renders its own oscillator and
- * needs no external signal at all, so the answer is a silent input rather than
- * an early return.
- *
- * ⚠️ AND IT NEVER RETURNS FALSE. A processor that returns false is torn down
- * for the life of the page, and this one is downstream of an instrument that
- * is silent most of the time.
- */
-class WarpMod extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this.ex = null;
-    this.inL = null;
-    this.inR = null;
-    this.out = null;
-    this.aux = null;
-    this.inLPtr = 0;
-    this.inRPtr = 0;
-    this.outPtr = 0;
-    this.auxPtr = 0;
-    this.blockSize = 60;
-    this.quanta = 0;
-    this.scopeRing = new Float32Array(SCOPE_RING);
-    this.scopeAt = 0;
-    this.scopePeriod = 0;
-    this.scopeHz = 0;
-    this.scopePrev = null;
-    this.peak = 0;
-    this.inPeak = 0;
-    this.blocksLast = 0;
-    this.spoke = false;
-    this.port.onmessage = (e) => this.onMessage(e.data);
-    this.port.onmessageerror = () =>
-      this.port.postMessage({ t: 'fail', why: 'a message could not be read on the audio thread' });
-  }
-
-  onMessage(m) {
-    if (!m) return;
-    if (m.t === 'wasm') { this.boot(m.bytes, m.rate); return; }
-    if (!this.ex) return;
-    if (m.t === 'param') { this.ex.warp_set_param(m.id, m.value); return; }
-  }
-
-  boot(bytes, rate) {
-    try {
-      const module = new WebAssembly.Module(bytes);
-      const imports = WebAssembly.Module.imports(module).length;
-      const ex = new WebAssembly.Instance(module, {}).exports;
-      // A STANDALONE_WASM reactor runs its static constructors in
-      // `_initialize`. `warps/dsp/vocoder.h:39` is
-      // `const float kFollowerGain = sqrtf(kNumBands);` at namespace scope,
-      // which clang is expected to fold at -O3 and may instead emit into
-      // `__wasm_call_ctors`, and `--no-entry` does not call that. Skipping this
-      // would leave the envelope followers at a gain of zero, which is SILENCE
-      // rather than an error.
-      if (typeof ex._initialize === 'function') ex._initialize();
-
-      // ⚠️ THE RETURN IS NOT A REFUSAL, UNLIKE `plai_init`. It answers whether
-      // the host rate is the rate the filter bank's coefficients were computed
-      // at, and at 48 kHz it is 0 and the module runs anyway with its twenty
-      // vocoder bands an octave low. The page prints the shift.
-      const tableRateOk = ex.warp_init(rate) === 1;
-
-      this.inLPtr = ex.warp_in_l_ptr();
-      this.inRPtr = ex.warp_in_r_ptr();
-      this.outPtr = ex.warp_out_ptr();
-      this.auxPtr = ex.warp_aux_ptr();
-      const cap = ex.warp_scratch_frames();
-      this.inL = new Float32Array(ex.memory.buffer, this.inLPtr, cap);
-      this.inR = new Float32Array(ex.memory.buffer, this.inRPtr, cap);
-      this.out = new Float32Array(ex.memory.buffer, this.outPtr, cap);
-      this.aux = new Float32Array(ex.memory.buffer, this.auxPtr, cap);
-      this.blockSize = ex.warp_block_size();
-      this.ex = ex;
-
-      this.port.postMessage({
-        t: 'ready',
-        imports,
-        bytes: bytes.byteLength,
-        tableRateOk,
-        hostRate: rate,
-        dspRate: ex.warp_sample_rate(),
-        tableRate: ex.warp_table_rate(),
-        blockSize: this.blockSize,
-        maxBlock: ex.warp_max_block(),
-        scratch: cap,
-        bands: ex.warp_band_count(),
-        bandShift: ex.warp_band_shift(),
-        bandLo: ex.warp_band_lo(),
-        bandHi: ex.warp_band_hi(),
-        build: readString(ex, ex.warp_build()),
-        sourceSha: readString(ex, ex.warp_source_sha()),
-      });
-    } catch (err) {
-      this.port.postMessage({ t: 'fail', why: String(err && err.message || err) });
-    }
-  }
-
-  process(inputs, outputs) {
-    const ch = outputs[0];
-    const inp = inputs[0];
-    if (!this.spoke) {
-      this.spoke = true;
-      this.port.postMessage({
-        t: 'entered', ready: !!this.ex,
-        chans: ch ? ch.length : -1,
-        inChans: inp ? inp.length : -1,
-        frames: ch && ch[0] ? ch[0].length : -1,
-      });
-    }
-    if (!this.ex || !ch || !ch.length) return true;
-    const frames = ch[0].length;
-    if (frames > this.out.length) return true;
-
-    // CHANNEL 0 IS THE CARRIER AND CHANNEL 1 IS THE MODULATOR, which is the
-    // order `warps/dsp/modulator.cc:214` reads them in: `input->l` is index 0
-    // and `input->r` is index 1. A one channel input feeds both, because a
-    // module patched with one cable does the same thing.
-    const a = inp && inp.length ? inp[0] : null;
-    const b = inp && inp.length > 1 ? inp[1] : a;
-    let inPeak = 0;
-    for (let i = 0; i < frames; i++) {
-      const l = a ? a[i] : 0;
-      const r = b ? b[i] : 0;
-      this.inL[i] = l;
-      this.inR[i] = r;
-      const m = l < 0 ? -l : l;
-      if (m > inPeak) inPeak = m;
-    }
-
-    this.blocksLast = this.ex.warp_render(this.inLPtr, this.inRPtr, this.outPtr, this.auxPtr, frames);
-
-    let peak = 0;
-    for (let i = 0; i < frames; i++) {
-      const v = this.out[i];
-      const m = v < 0 ? -v : v;
-      if (m > peak) peak = m;
-    }
-    // THE MAIN OUTPUT ON BOTH CHANNELS. `aux` is the module's second jack and
-    // is metered below rather than heard, for the same reason Plaits' is: two
-    // sockets are not two ears.
-    for (let c = 0; c < ch.length; c++) ch[c].set(this.out.subarray(0, frames));
-
-    if (peak > this.peak) this.peak = peak;
-    if (inPeak > this.inPeak) this.inPeak = inPeak;
-
-    for (let i = 0; i < frames; i++) {
-      this.scopeRing[this.scopeAt] = this.out[i];
-      this.scopeAt = (this.scopeAt + 1) % SCOPE_RING;
-    }
-
-    this.quanta++;
-
-    /* The picture's own cadence, the same 8 quanta the oscillator uses. The
-       effect takes its period from the oscillator's note when it is being fed
-       one, and finds its own otherwise, which is the internal carrier case. */
-    if (this.quanta % 8 === 0) {
-      const win = scopeWindow(this.scopeRing, this.scopeAt, this.scopePeriod, this.scopePrev);
-      if (win) {
-        this.scopePeriod = win.period;
-        this.scopePrev = win;
-        this.port.postMessage({ t: 'wave', wave: win, waveFrames: win.spanFrames });
-      }
-    }
-
-    if (this.quanta % 94 === 0) {
-      this.port.postMessage({
-        t: 'meter',
-        peak: this.peak,
-        inPeak: this.inPeak,
-        blocks: this.ex.warp_blocks_rendered(),
-        frames: this.ex.warp_frames_rendered(),
-        blocksPerQuantum: this.blocksLast,
-        // 🔴 THE FRAMES SITTING IN A BLOCK THAT IS NOT FULL YET. 128 is not a
-        // multiple of 60, so this is never the same two quanta running and a
-        // reading that never moved would mean the carry is not being kept.
-        carry: this.ex.warp_carry(),
-        algorithm: this.ex.warp_algorithm(),
-        blend: this.ex.warp_algorithm_blend(),
-        vocoding: this.ex.warp_vocoding() === 1,
-        vocoderAmount: this.ex.warp_vocoder_amount(),
-        carrier: this.ex.warp_carrier_shape(),
-        quantum: frames,
-      });
-      this.peak = 0;
-      this.inPeak = 0;
-    }
-    return true;
-  }
-}
-
 /** Read a NUL-terminated ASCII string out of wasm memory. The shim returns
  *  pointers to static `const char[]`, so there is nothing to free. */
 function readString(ex, ptr) {
@@ -698,4 +493,3 @@ function readString(ex, ptr) {
 }
 
 registerProcessor('plai-voice', PlaiVoice);
-registerProcessor('warp-mod', WarpMod);
