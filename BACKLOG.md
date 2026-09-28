@@ -56,7 +56,82 @@ page agent is reading its own assert counts would poison their before and after.
 - ⚠️ `noteName()` still has to answer something once the control is gone, so the
   decision is which naming survives, not merely which button leaves.
 
-### muta: "on by default, no online button, put a test tone on that spot"
+### Done 2026-09-28: muta, "on by default, no online button, put a test tone on that spot"
+
+✅ **ALL THREE DONE, AND THE STANDING RULE HOLDS.** The plate's `status` slot
+holds the `Test tone` button, the presence control is gone, and the instrument is
+ready the moment the page is.
+- 🔴 **THE SPLIT IS NOT `/fau/`'S SPLIT, AND THE REASON IS EXACT.** `/fau/`'s
+  compile is arithmetic over a file it ships, so its whole load half is pure
+  computation. Muta's firmware has to end up inside an `AudioWorkletGlobalScope`,
+  and a worklet module cannot be added without an `AudioContext`. So the line
+  falls elsewhere: a VISIT fetches the wasm and builds the main thread instance,
+  and a GESTURE makes the context, adds the worklet, posts the bytes and shakes
+  hands. `boot()` is `warmUp()` and `open()` now, and `arm()` keeps the two
+  deadlock guards verbatim, because the check block calls `arm()` from inside
+  `open()` and that is precisely the hang the old comment documents.
+- **A touch anywhere on `panel.el` arms it**, pointerdown or keydown, capture
+  phase, the listener removing itself once it has armed. Lifted from `/fau/`.
+- **WHAT THE ONLINE BUTTON WAS GATING, AND WHERE EACH HALF WENT.** The boot,
+  split as above. `ensureMidi()`, which did NOT move to the load path, because
+  `requestMIDIAccess` is a permission prompt and belongs to a gesture; it is the
+  first line of `arm()` now, MEASURED as `the visit asked 0 times and everything
+  since asked 1`. The `plaitsOn` flag, REMOVED rather than pinned true, because
+  nothing can switch this instrument off any more and `light()`,
+  `togglePlaits()`, `idleIfEmpty()` and two `if (!plaitsOn) return` guards were
+  branches that could never be taken. And the harness's one gesture, which now
+  dispatches a real `PointerEvent('pointerdown')` at `panel.el` rather than
+  clicking a switch, so the path under test is still a person's path.
+- **THE PRESENCE STATE WENT NOWHERE. IT IS GONE.** No badge, no lamp, no state.
+  What the lamp claimed, *this instrument is running*, has stopped being a
+  question whose answer differs from *the page is open*, and the two facts it
+  conflated are both in the log instead: one line for the fetch and the build,
+  one for the first quantum.
+- ⚠️ **`Test tone` WAS BORN `disabled` AND IS LIVE FROM THE FIRST FRAME NOW.** A
+  press made before the firmware lands queues behind the visit's own fetch rather
+  than being refused, because a dead button in the one slot a visitor looks at
+  would be the page answering *on by default* with a control that is not.
+- **MEASURED ON A RUN THAT WAS ALONE (`pgrep` showed 0 other headless Chromes):
+  48/48 green with 42 page asserts before, 49/49 green with 43 after.** Two
+  added, one removed, six changed one for one. The added pair each carry the half
+  that can actually fail: *the firmware is asked for by the visit and no sound
+  device is*, where a page that opened a device on load satisfies the first
+  clause and fails the second, and *the sound device is opened by a touch on the
+  panel, and the touch fetches nothing*, where the fetch count is what proves the
+  split was worth making, since a touch that triggered the download would look
+  identical from outside.
+- **A VISIT, STEP BY STEP:** no context, no worklet, no MIDI, no sound; one fetch
+  of `/muta/vendor/plai.wasm`, **200,710 bytes, same origin, a file this
+  repository ships**; the log reads `196.0 KB of WebAssembly off this site in 4
+  ms, built and waiting for a finger`; then nothing until a finger lands. First
+  touch: MIDI asked once, context at 48000, worklet loaded, bytes across the
+  port, handshake, knobs pushed, costs measured, **169 ms from the touch to the
+  first rendered quantum with 0 further fetches**. Still silent. `Test tone` or a
+  MIDI key is the only thing that makes a sound.
+- Four log lines changed because they named a control that is not there, and
+  `pluck()`'s failure line no longer says `turn the instrument on first`.
+- ✅ The `what` and the manifest `one` were CHECKED AGAINST EACH OTHER rather
+  than assumed, and neither mentions a switch or the tone button, so neither
+  drifted and neither needed editing.
+
+🔴 **ONE REAL LOSS OF COVERAGE, NAMED RATHER THAN BURIED.** *"an oscillator that
+is switched off makes no sound, whichever way it is asked"* is deleted. It was
+the answer to *"when plaits is off and warps in on from plaits, how it can play
+at all?"*, and it pressed the switch off and then asked the oscillator to sound
+BOTH ways in, the tone button and a real `keyDown`. Its subject is gone, and it
+was deleted rather than rewritten against `plaitsOn === true`, which would be a
+check that cannot fail. **What is no longer graded: that the two doors into the
+voice allocator can be shut.** If this page ever grows a way to stop the
+instrument, that assert comes back with it.
+⚠️ **AND ONE QUESTION FOR THE OWNER: 196 KB NOW CROSSES ON EVERY VISIT**, paid by
+a visitor who never plays. It is same origin and this repository's own file, and
+`/fau/` spends 6.16 MB the same way by explicit ask, so the precedent was treated
+as covering it. **One line moves it back behind the first touch.**
+⚠️ The nameplate no longer lines up with anything on its row, because a 34 px
+button is in it and the row is taller. Nothing reported it and nothing asserts
+it. And nothing grades the leg between the worklet node and the destination,
+which was already true and is worth repeating because the removed assert was the
+last one that pressed anything near it.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"muta: on by default, no online button, put
 a test tone on that spot"*. Slug `muta`, file `demo/muta/index.html`. Not

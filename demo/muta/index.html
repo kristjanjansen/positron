@@ -100,17 +100,21 @@
     margin-right: var(--rows-gap);
   }
 
-  /* 🔴 THE `Test tone` BUTTON IS A ROW OF THE PANEL, AND IT WAS A HEADER CELL
-     UNTIL 2026-09-28. Asked 2026-09-25: *"make a Test tone button in the right
-     of plaits"*, and answered then by placing it in `.panel-head`'s first grid
-     column, measured at eight widths against a model picker that overflows its
-     own track. That header is gone with the case: `createInstrumentPanel` is a
-     stack of glued rows and has no grid to place anything in.
-     ✅ **SO IT IS A ROW OF ITS OWN, WHICH IS WHAT THE COMPONENT OFFERS AND
-     NEEDS NO ARITHMETIC AT ALL.** The button sits on the panel's own inset,
-     under the rotaries it plays and above the foot that switches them on, and
-     the three page rules that placed it by column and re-placed it at two
-     widths are gone with the cell they were fighting over. */
+  /* 🔴 THE `Test tone` BUTTON HAS BEEN IN THREE PLACES IN THREE DAYS AND IS IN
+     THE PLATE'S `status` SLOT NOW. Asked 2026-09-25 as *"make a Test tone
+     button in the right of plaits"* and answered by placing it in
+     `.panel-head`'s first grid column, which took eight widths of measuring
+     against a model picker that overflows its own track and two media queries;
+     then, when the case went, a row of the panel on the panel's own inset; and
+     now, asked 2026-09-28 as *"no online button, put a test tone on that spot"*,
+     the slot beside the name that the on and off switch had.
+     ✅ **AND EACH MOVE REMOVED PAGE CSS RATHER THAN ADDING IT.** Three
+     placement rules and two media queries went with the header, the `align`
+     option went with the row, and what is left is one declaration.
+     ⚠️ `flex: 0 0 auto` BECAUSE `.pos-ipanel-name` IS A WRAPPING FLEX ROW.
+     Without it the button is a flex item with the default `flex-shrink: 1`
+     beside a nameplate, so a narrow plate row would squeeze the words rather
+     than wrapping them onto the next line, which is what the wrap is for. */
   .muta-tone { flex: 0 0 auto; }
 </style>
 
@@ -166,12 +170,14 @@
      of the two that had to pass a picture in as a glue part OUTSIDE the case to
      get it edge to edge. The picture is a row now and is edge to edge by
      construction, which is the fourth half of the same ask.
-     ⚠️ AND THE TWO CONSTANTS STILL COME FROM `instrument.mjs`, because the
-     words a switch says (`on`, `off`) are one pair for the whole site and
-     `/kit/` imports them from there too. */
+     🔴 **AND THE `status` SLOT HOLDS THE `Test tone` BUTTON SINCE 2026-09-28,
+     NOT A SWITCH.** Asked: *"muta: on by default, no online button, put a test
+     tone on that spot"*. `createPresenceButton`, `HEADER_STATES` and
+     `HEADER_SAYS` came in here for that switch and all three went with it; the
+     slot takes any built control, which is what `/knobs/` already relies on.
+     The words `on` and `off` were the only thing this page read out of
+     `instrument.mjs` and nothing says them any more. */
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
-  import { createPresenceButton } from '/shell/presence.mjs';
-  import { HEADER_STATES, HEADER_SAYS } from '/shell/instrument.mjs';
 
   // ONE ARTEFACT, ONE SHIM, ONE PINNED COMMIT.
   //
@@ -297,16 +303,16 @@
      * than deleted because the next reader will ask why a page of rotaries has
      * a button on it.
      * 🔴 **THE ROW ITSELF STAYS EMPTY, AND THAT IS A DECISION.** `Test tone`
-     * belongs to PLAITS and sits on PLAITS' own header, beside the switch that
-     * powers it, where the ask put it. Putting it here instead would have made
-     * it control 0, which is the ONE control `settleMs` lands on, and this page
-     * has already paid for moving control 0 once.
-     * 🔴 **SO THE HARNESS STILL PRESSES NOTHING AND THE PAGE STILL PRESSES ITS
-     * OWN BUTTONS.** `demo/verify.mjs` drives a page by clicking everything in
-     * `.pos-controls`; this page has none, so every press it takes is one the
-     * page makes for it behind `SELFCHECK`, which is already how both
-     * instruments are switched on. The tone button joins that list rather than
-     * changing the arrangement.
+     * belongs to PLAITS and sits on PLAITS' own plate, in the slot the on and
+     * off switch had, where *"put a test tone on that spot"* put it. Putting it
+     * here instead would have made it control 0, which is the ONE control
+     * `settleMs` lands on, and this page has already paid for moving control 0
+     * once.
+     * 🔴 **SO THE HARNESS STILL PRESSES NOTHING AND THE PAGE STILL MAKES ITS
+     * OWN GESTURES.** `demo/verify.mjs` drives a page by clicking everything in
+     * `.pos-controls`; this page has none, so the one gesture it takes is a
+     * pointer event the page dispatches at its own panel behind `SELFCHECK`,
+     * which is what opens the audio for a visitor too.
      * ⚠️ `.pos-controls[hidden]` EXISTS FOR EXACTLY THIS, because an empty
      * control row left a 14 px band, which is the empty-box rule.
      */
@@ -316,14 +322,23 @@
 
   let ctx = null, node = null, ready = null, wasmBytes = 0, wasmImports = -1;
   let bootMs = null, quiet = null, loud = null, entered = null, costPerQuantumMs = null;
-  let oneVoiceMs = null, manyVoiceMs = null;
+  let oneVoiceMs = null, manyVoiceMs = null, fetchMs = null;
+  /* 🔴 WHAT THE VISIT DID, READ AT THE LAST LINE OF THE MODULE, WHICH IS THE
+     ONLY MOMENT THAT QUESTION HAS AN ANSWER. `wasmFetches` counts asks for the
+     firmware and `armedBy` names the thing that opened the sound device, and
+     both are snapshotted below alongside `midiAsksOnLoad`, on that line's own
+     reasoning: by the time the checks run a gesture has happened, so a reading
+     taken there could not tell a visit apart from a press. This is *on by
+     default* measured rather than described. */
+  let wasmFetches = 0, wasmFetchesOnLoad = -1, ctxOnLoad = null, nodeOnLoad = null;
+  let armedBy = null, toneDeadOnLoad = null;
   let model = 0, droning = false, meters = 0, bench = null;
   let voiceCount = SLIDER_MAX_VOICES, trim = 1;
   let lastNote = null, lastOff = null, chord = null, blockRule = null;
   let last = { peak: 0, blocks: 0, renders: 0, held: 0, poly: 0,
                blocksPerQuantum: 0, engine: -1, frames: 0 };
 
-  // ⚠️ DECLARED HERE, ABOVE EVERYTHING THAT CLOSES OVER THEM. `boot()` and
+  // ⚠️ DECLARED HERE, ABOVE EVERYTHING THAT CLOSES OVER THEM. `open()` and
   // `onWorklet()` both reach these, and `positron-ui` records a page where a
   // `const` declared later in the same block silently took seven asserts out
   // of a run through its temporal dead zone.
@@ -583,35 +598,35 @@
      child on the left, which `/twelve/` was reported for. The page does not
      choose that placement and cannot get it wrong. */
   /**
-   * 🔴 A SWITCH ON THE PANEL'S FOOT, WHICH IS WHERE `createInstrumentPanel`
-   * PUTS A `status` CONTROL: after the name, at the start end of the plate row.
-   * Asked 2026-09-22 as *"create instrumet header/glue ... left: online status
-   * button: enabled disabled (green/gray)"* and then *"apply to muta's"*, and
-   * the panel this page wore until 2026-09-28 built it from a `header` option.
-   * ⚠️ **THE PAGE BUILDS IT ITSELF NOW, WHICH IS FIFTEEN LINES IT DID NOT
-   * WRITE BEFORE.** `createInstrument` took an `online` object and made the
-   * button; `createInstrumentPanel` takes a built control, which is what lets a
-   * foot carry a switch, a picker or anything else. The words are the site's
-   * (`HEADER_SAYS`), so a switch here still says `on` and `off` like every
-   * other one.
-   * 🔴 **IT REALLY SWITCHES SOMETHING, WHICH IS WHY IT IS A BUTTON AND NOT A
-   * BADGE.** `createPresenceButton` for a control that acts and
-   * `createPresence` for one that reports, and this one starts the audio
-   * context, compiles the wasm and puts the oscillator into the graph.
-   * ⚠️ `showName: false`, because the plate is on the same row and an
-   * instrument named twice on one line is the doubled channel this project
-   * keeps objecting to. The `aria` label still names it, so the eye reads the
-   * plate and a screen reader reads the label.
+   * 🔴 THE `Test tone` BUTTON, AND IT SITS WHERE THE ON AND OFF SWITCH USED TO.
+   * Asked 2026-09-28: *"muta: on by default, no online button, put a test tone
+   * on that spot"*. `status` is the slot after the name at the start end of the
+   * plate row, and it was a `createPresenceButton` reading `on` and `off` from
+   * 2026-09-22 (*"create instrumet header/glue ... left: online status button:
+   * enabled disabled (green/gray)"*) until today.
+   * 🔴 **THERE IS NOTHING LEFT TO SWITCH, WHICH IS WHY THE BUTTON IS GONE
+   * RATHER THAN MOVED.** The instrument is on from the moment the page is: the
+   * firmware is fetched and built on the visit and the sound device opens on
+   * the first touch of the panel, so a control saying *this one is running* has
+   * nothing to report and a control saying *turn it on* has nothing to do.
+   * `plaitsOn`, `light()`, `togglePlaits()` and `idleIfEmpty()` all went with
+   * it, because a flag that can only ever be true is a dead guard wearing a
+   * name, and this project pays more for those than for anything else.
+   * ⚠️ **IT IS A PLAIN `<button>` WITH `aria-pressed` RATHER THAN A KIT
+   * COMPONENT, AND THAT IS THE KIT'S OWN ANSWER.** `check.mjs` records why a
+   * checkbox is a checkbox: *pressed* is the wrong verb for *this one is in the
+   * set*. Here the verb is right. This is a thing somebody armed, which is the
+   * shape `choice.mjs` gives its segments, and one segment is not a segmented
+   * row. A presence button was tried and refused: it reports a state and this
+   * reports what a press did.
+   * ⚠️ **AND IT IS LIVE FROM THE FIRST FRAME.** It used to be born `disabled`
+   * because the oscillator was off, and a press that arrives before the
+   * firmware has landed now queues behind the visit's own fetch rather than
+   * being refused. A dead button in the one slot a visitor looks at would be
+   * this page answering *on by default* with a control that is not.
    */
-  const power = createPresenceButton({
-    of: 'PLAITS',
-    can: HEADER_STATES,
-    says: HEADER_SAYS,
-    state: 'offline',
-    showName: false,
-    press: () => togglePlaits(),
-    aria: 'switch PLAITS on and off',
-  });
+  const toneBtn = el('button', 'muta-tone', 'Test tone', { 'aria-pressed': 'false' });
+  toneBtn.addEventListener('click', () => toggleTone());
 
   const scope = createWaveShape({
     reason: null,
@@ -661,7 +676,7 @@
   const panel = createInstrumentPanel({
     viz: scope.el,
     rows: [[knobGrid]],
-    plate: { name: 'PLAITS', status: power, patch: pick },
+    plate: { name: 'PLAITS', status: toneBtn, patch: pick },
     cls: 'plai-panel',
   });
 
@@ -672,18 +687,19 @@
   if (SELFCHECK || location.search.includes('probe=1')) window.__scopeGet = () => scope.get();
 
   /**
-   * 🔴 A SWITCHED OFF INSTRUMENT DRAWS NOTHING, asked for as *"if warps off do
-   * not show wave"* and true of this one for the same reason. The worklet keeps
-   * running whatever the switch says, because the graph is built once and the
-   * switch is about what a person has turned on, so the windows keep arriving
-   * and the picture would keep drawing them.
-   * ⚠️ **AND `anyInk` IS NOT THE SAME TEST.** An instrument switched on can be
-   * silent and a silent one can still be switched on; only the switch says what
-   * a reader asked for. Checking the ink alone would leave a picture up on a
-   * panel that says it is off.
+   * 🔴 THE PICTURE IS THE INK AND NOTHING ELSE SINCE 2026-09-28, AND IT USED TO
+   * BE THE INK AND THE SWITCH. This read `if (!plaitsOn || !anyInk(...))`, and
+   * the paragraph here argued that the two are different tests: an instrument
+   * switched on can be silent and a silent one can still be switched on, so
+   * checking the ink alone would leave a picture up on a panel that says it is
+   * off. Every word of that was true of a page with a switch on it.
+   * ⚠️ **THERE IS NO SWITCH, SO THERE IS NO SECOND TEST.** Nothing on this page
+   * can say *off* any more, and a flag that is true for the whole life of the
+   * page is a guard that cannot fire. What is left is the honest half: a
+   * picture shows what is sounding, and nothing sounding draws nothing.
    */
   function paintScope() {
-    if (!plaitsOn || !anyInk(plaitsWave)) {
+    if (!anyInk(plaitsWave)) {
       scope.set({ points: null, reason: null });
       return;
     }
@@ -765,37 +781,13 @@
     onPedal: (down, value, freed) => d.log(down ? PEDAL_SAYS.down
       : freed ? PEDAL_SAYS.freed(freed) : PEDAL_SAYS.up),
   });
-  /**
-   * 🔴 THE `Test tone` BUTTON, WHICH IS WHAT IS LEFT OF THE AUTOMATIC DRONE.
-   * Asked 2026-09-25: *"no automatic drone. make a Test tone button in the
-   * right of plaits. when midi notes arrive, they turn off test tone and vice
-   * versa"*.
-   * ⚠️ **IT IS A PLAIN `<button>` WITH `aria-pressed` RATHER THAN A KIT
-   * COMPONENT, AND THAT IS THE KIT'S OWN ANSWER.** `check.mjs` records why a
-   * checkbox is a checkbox: *pressed* is the wrong verb for *this one is in the
-   * set*. Here the verb is right. This is a thing somebody armed, which is the
-   * shape `choice.mjs` gives its segments, and one segment is not a segmented
-   * row. A presence button was tried and refused: it reports a state and this
-   * reports what a press did.
-   * 🔴 **AND IT IS LIVE ONLY WHILE PLAITS IS.** A test tone out of an
-   * oscillator that is switched off is the question this page was asked on
-   * 2026-09-25 and the answer is that it cannot sound, so the control says so
-   * rather than accepting a press and doing nothing. `light()` owns the state,
-   * beside the two lamps, because three things saying whether PLAITS is on is
-   * one fact with three writers.
-   */
-  const toneBtn = el('button', 'muta-tone', 'Test tone',
-    { 'aria-pressed': 'false', disabled: '' });
-  toneBtn.addEventListener('click', () => toggleTone());
-  /* 🔴 A ROW OF THE PANEL, AND IT IS ADDED LATE ON PURPOSE. `addRow` inserts
-     above the keyboard and the foot however late it is called, which is the
-     component's own guarantee and the reason it exists: the sketch's order is
-     the component's and not the caller's, so a panel that can be assembled
-     wrong is a panel that will be. The button is built here, beside the
-     function it presses, and lands where the panel says it goes.
-     ⚠️ `align: 'start'`, because a lone control centred on a row reads as a
-     caption rather than as a thing to press. */
-  panel.addRow(toneBtn, { align: 'start' });
+  /* 🔴 THE `Test tone` BUTTON IS BUILT ABOVE, BESIDE THE PLATE IT SITS ON, AND
+     IT WAS BUILT HERE AND ADDED AS A ROW OF ITS OWN UNTIL 2026-09-28. The ask
+     that moved it is *"put a test tone on that spot"*, the spot being the one
+     the on and off switch had, so the control has to exist before
+     `createInstrumentPanel` is called rather than being inserted after it.
+     ⚠️ `toggleTone` IS A FUNCTION DECLARATION, so the listener up there reaches
+     it however far above this line it is attached. */
 
   let midiNotes = 0, midiUps = 0;
   /**
@@ -855,12 +847,14 @@
    * this. There is one now, so *either* is one press, and it is still
    * idempotent, which is what keeps the count below at 1 however many times it
    * is reached.
-   * 🔴 **IT RUNS BEFORE `ensureAudio`, AND THE ORDER IS LOAD BEARING TWICE
+   * 🔴 **IT RUNS AT THE TOP OF `arm()`, AND THE ORDER IS LOAD BEARING TWICE
    * OVER.** A permission prompt has to be reachable from the gesture that
-   * caused it, and `ensureAudio` awaits `boot()`, which runs this page's whole
-   * check block as its last act: called after it, the count this page asserts
-   * on would still be zero while the assert read it. Neither reason is
+   * caused it, and `arm()` awaits `open()`, which runs this page's whole
+   * check block as its last act: called after that await, the count this page
+   * asserts on would still be zero while the assert read it. Neither reason is
    * cosmetic and they point the same way.
+   * ⚠️ **AND THE GESTURE THAT CARRIES IT IS THE FIRST TOUCH OF THE PANEL SINCE
+   * 2026-09-28**, because the switch that used to carry it is gone.
    * ⚠️ **`createMidi` IS SYNCHRONOUS AND ASKS ASYNCHRONOUSLY**, so `midi` is
    * assigned on this line and `midi.state()` answers `refused`, `unsupported`
    * or `connected` whenever the browser gets round to saying. Nothing here
@@ -902,20 +896,25 @@
    * and never release, which is the stuck note reported on 2026-09-22 as *"that
    * pluck never goes away"*.
    */
+  /* ⚠️ `await arm()` IS THE WHOLE OF WHAT THIS PRESS HAS TO BUY SINCE
+     2026-09-28, AND IT USED TO BE A GUARD. The line above it read
+     `if (!plaitsOn) return`, which was right while a switch had to be pressed
+     first; now the press that reaches this IS the gesture, and the pointer
+     event that produced it has already started the arming through the panel's
+     own capture listener, so this await is usually a promise that has already
+     settled. */
   async function toggleTone() {
     if (droning) { stopTone(); return; }
-    if (!plaitsOn) return;          // the control is disabled, so this is a guard
-    await ensureAudio();
+    await arm();
     send({ t: 'allOff' });
     pedal.panic();
     droneWanted = true;
     startDrone();
     toneBtn.setAttribute('aria-pressed', 'true');
   }
-  /** The tone down, from wherever: the button, a key arriving, PLAITS going
-   *  off. One writer for the intent, the sound and the button's own state,
-   *  because three callers setting three things is how one of them gets
-   *  missed. */
+  /** The tone down, from wherever: the button or a key arriving. One writer for
+   *  the intent, the sound and the button's own state, because three callers
+   *  setting three things is how one of them gets missed. */
   function stopTone() {
     stopDrone();
     droneWanted = false;
@@ -943,24 +942,20 @@
   /**
    * One note, at the pitch the control is showing. `holdMs` of 0 sustains.
    *
-   * 🔴 AND NOTHING IS PLAYED WHILE THE OSCILLATOR IS SWITCHED OFF, WHICH IS
-   * THE ANSWER TO *"when plaits is off and warps in on from plaits - how it can
-   * play at all?"*, 2026-09-25. MEASURED before this line existed, at every leg
-   * of the graph with an analyser hung off each one: switching PLAITS off with
-   * WARPS on and the carrier reading `from PLAITS` leaves the oscillator, the
-   * effect, both gains and the splitter at **0.000000**, in both orders of
-   * pressing. So the graph was already right about the SWITCHES and the
-   * question named a door nothing had shut: a note. Nothing could open that
-   * door until today, because the drone was the only source and going off
-   * stopped it. The keyboard is listened to from a power-up now and there is a
-   * `Test tone` button, so two things can ask a switched-off oscillator to
-   * sound, and neither may.
-   * ⚠️ IT IS HERE AND IN `startDrone`, WHICH ARE THE TWO DOORS INTO THE VOICE
-   * ALLOCATOR. A test on the keyboard alone would have left the button, and a
-   * test on the button alone would have left the keyboard.
+   * 🔴 THE `if (!plaitsOn) return` THAT STOOD HERE IS GONE WITH THE SWITCH,
+   * 2026-09-28, AND THAT IS A REAL LOSS OF A GUARD RATHER THAN A TIDY UP. It
+   * was the answer to *"when plaits is off and warps in on from plaits - how it
+   * can play at all?"*, 2026-09-25: two things could ask a switched off
+   * oscillator to sound, a key and the tone button, and neither might. There is
+   * no off any more, so the question has no subject and the guard could never
+   * be false.
+   * ⚠️ **WHAT STILL STOPS A NOTE BEFORE THE INSTRUMENT IS UP IS `send`**, which
+   * posts nothing while there is no worklet node. A key cannot arrive before
+   * then anyway: `ensureMidi` runs inside `arm()`, so the browser is not
+   * listening to a keyboard until the first touch of the panel has opened the
+   * audio.
    */
   function noteOn(note, holdMs, level) {
-    if (!plaitsOn) return;
     send({ t: 'noteOn', note, holdMs, level });
   }
   /** The same note, let go. `holdMs` of 0 on the way in is what makes this the
@@ -977,11 +972,65 @@
    */
   function pitch() { return knobs.get('pitch').value(); }
 
-  // ── boot ────────────────────────────────────────────────────────────────
-  // 🔴 NOTHING HERE HAPPENS ON A VISIT. No fetch, no AudioContext, no decode.
-  // A visit, a slider drag and a model change all open nothing; the wasm is
-  // asked for by a press on a header's turn on and never before it.
-  async function boot() {
+  // ── the firmware, which a visit gets ────────────────────────────────────
+  //
+  /**
+   * 🔴 THE HALF OF THE OLD `boot()` THAT TOUCHES NO SOUND DEVICE, SPLIT OUT
+   * 2026-09-28 FOR *"muta: on by default"*. The instrument has to be READY the
+   * moment the page is, and a browser will not hand out a running audio context
+   * without a gesture anyway, so *on by default* cannot mean a context on load
+   * and it cannot mean a noise on load. What it can mean, and what this is, is
+   * that everything which is arithmetic over a file this repository ships has
+   * already happened when a visitor arrives: the wasm is fetched and a second
+   * instance of it is built for the cost bench. Nothing here can make a sound.
+   * ✅ **THE SHAPE IS `/fau/`'S, BUILT THE SAME DAY FOR THE SAME ASK** (*"fau:
+   * compile on loading so i can play"*): one function boots the firmware and
+   * touches no context, and `arm()` below is the only thing in this file that
+   * does touch one, with every caller of it a gesture.
+   * ⚠️ **AND THE BYTES COME OFF THIS SITE, WHICH IS WHY A VISIT MAY SPEND
+   * THEM.** `/muta/vendor/plai.wasm` is 200,710 bytes on this origin, a file
+   * this repository ships. The standing rule a load-path fetch looks like it
+   * breaks is about somebody else's server, and `/reel/` broke it by asking
+   * arhiiv.err.ee for a newsreel on every visit. Nothing is asked of anybody
+   * here, and the check below reads what the browser really loaded rather than
+   * taking this paragraph's word for it.
+   * ⚠️ **IDEMPOTENT AND SELF-HEALING.** A failed fetch clears the handle, so a
+   * press after a bad network starts a second one rather than waiting for ever
+   * on a promise that already rejected.
+   */
+  let warmed = null;
+  function warmUp() {
+    if (warmed) return warmed;
+    wasmFetches++;
+    const t0 = performance.now();
+    warmed = grab(PLAI_URL).then((bytes) => {
+      wasmBytes = bytes.byteLength;             // read BEFORE anything transfers it
+      fetchMs = performance.now() - t0;
+      /* THE BENCH IS BUILT HERE AND IT IS NOT A SOUND. It is a second instance
+         of the same module on the main thread, rendering into its own memory
+         and connected to nothing, which is what makes the cost readings
+         possible at all: `performance` is not exposed to an
+         AudioWorkletGlobalScope. Building it on the visit is the difference
+         between an instrument that is ready and one that is only downloaded. */
+      bench = makeBench(bytes);
+      d.log(`${(wasmBytes / 1024).toFixed(1)} KB of WebAssembly off this site in `
+          + `${fetchMs.toFixed(0)} ms, built and waiting for a finger`, 'hi');
+      return bytes;
+    }).catch((e) => {
+      warmed = null;
+      d.log(`the firmware did not arrive, so a press will ask again: ${e?.message || e}`, 'bad');
+      throw e;
+    });
+    return warmed;
+  }
+
+  // ── the sound device, which a gesture gets ──────────────────────────────
+  // 🔴 THIS IS THE ONLY FUNCTION IN THIS FILE THAT TOUCHES AN AudioContext, AND
+  // EVERY CALLER OF IT IS A GESTURE: a touch anywhere on the panel, the test
+  // tone button, or a MIDI key, which cannot arrive before one of the other two
+  // has opened the keyboard. A visit, a knob drag and a model change all open
+  // nothing.
+  async function open() {
     if (ctx) return;
     const t0 = performance.now();
 
@@ -1013,8 +1062,13 @@
     // first render and then timed out, which looks exactly like a broken
     // instrument and is a dropped message. The worklet's header has the whole
     // account.
-    const bytes = await grab(PLAI_URL);
-    wasmBytes = bytes.byteLength;               // read BEFORE the transfer empties it
+    //
+    // ⚠️ AND THE FETCH IS THE VISIT'S SINCE 2026-09-28, WHICH IS WHY THIS IS AN
+    // AWAIT ON A PROMISE RATHER THAN A `grab`. On an ordinary visit it has
+    // settled long before a finger lands and this line costs nothing; on a
+    // press made in the first fraction of a second it is the one wait a visitor
+    // pays, and paying it once is the whole of what *on by default* buys.
+    const bytes = await warmUp();
 
     node = new AudioWorkletNode(ctx, 'plai-voice', { outputChannelCount: [2] });
     node.port.onmessage = (e) => onWorklet(e.data);
@@ -1065,15 +1119,19 @@
     // bytes for the cost measurement below, which needs a second instance of
     // exactly the same module rather than a second download of it.
     node.port.postMessage({ t: 'wasm', bytes, rate: ctx.sampleRate });
-    /* 🔴 THE BOOT DOES NOT LIGHT ANYTHING, AND IT DID UNTIL 2026-09-22. A line
-       here set the lamp the moment the wasm answered, which was right while one
-       switch started a pair of firmwares and wrong the moment they became
-       separate: reported as *"plaits on still makes warps on"*, because
-       pressing either one booted both and the handshake then lit both lamps
-       behind the toggles' backs.
-       ✅ **`light()` IS THE ONLY THING THAT WRITES THE LAMP**, and it reads
-       `plaitsOn`. Compiling a firmware is not the same fact as a person having
-       switched it on, and only one of those is what a lamp claims. */
+    /* 🔴 THE BOOT DOES NOT LIGHT ANYTHING, AND THERE IS NOTHING LEFT TO LIGHT.
+       A line here set a lamp the moment the wasm answered, which was right
+       while one switch started a pair of firmwares and wrong the moment they
+       became separate: reported 2026-09-22 as *"plaits on still makes warps
+       on"*, because pressing either one booted both and the handshake then lit
+       both lamps behind the toggles' backs. The repair was that `light()` and
+       nothing else wrote the lamp, and it read `plaitsOn`, because compiling a
+       firmware is not the same fact as a person having switched it on.
+       ⚠️ **BOTH THE LAMP AND THE FLAG WENT ON 2026-09-28**, and the lesson is
+       kept because it is about a class of mistake rather than about that lamp:
+       a machine getting ready and a person asking for something are two facts,
+       and a single indicator that stands for both will be wrong about one of
+       them. */
     ready = await waitReady;
     wasmImports = ready.imports;
     trim = ready.trim;
@@ -1081,15 +1139,22 @@
     // check block with it, and a page that stops before it grades itself is a
     // page whose one red line is a stack trace. The assert below says the same
     // thing with the numbers beside it.
+    /* 🔴 AND THE CLOCK STARTS AT THE TOUCH, WHICH IS A DIFFERENT NUMBER FROM
+       THE ONE THIS LINE PRINTED UNTIL 2026-09-28. It read `after the fetch
+       began`, and the fetch is the visit's now, so this is what a finger buys
+       rather than what a download costs. The download is timed separately in
+       `warmUp` and both are in the log, because collapsing them would hide
+       exactly the saving the split was made for. */
     try {
       bootMs = (await waitFirst) - t0;
-      d.log(`first quantum ${bootMs.toFixed(0)} ms after the fetch began`, 'ok');
+      d.log(`first quantum ${bootMs.toFixed(0)} ms after the panel was touched`, 'ok');
     } catch (e) {
       d.log(String(e.message || e), 'bad');
     }
 
     d.log(`${(wasmBytes / 1024).toFixed(1)} KB of WebAssembly, ${wasmImports} imports, `
-        + `first sample ${bootMs.toFixed(0)} ms after the fetch began`, 'hi');
+        + `${fetchMs == null ? '?' : fetchMs.toFixed(0)} ms to fetch on the visit and `
+        + `${bootMs == null ? '?' : bootMs.toFixed(0)} ms from the touch to the first sample`, 'hi');
     d.log(ready.build);
     // ⚠️ THE 210.1 MB IS A PUBLISHED ZIP, NOT A PAGE WEIGHT, AND
     // plans/plan-vcv-modules.md §9.3 marks it as unmeasured for exactly that
@@ -1139,7 +1204,9 @@
 
     setVoices(knobs.get('voices').value());
 
-    bench = makeBench(bytes);
+    // ⚠️ THE BENCH IS ALREADY BUILT. `warmUp` made it on the visit, because it
+    // is arithmetic over bytes rather than a device, and `bench = makeBench(…)`
+    // stood on this line until 2026-09-28.
     // TWO PRICES, NOT ONE, because the readout cell can only show the setting
     // in front of you and the interesting fact is what the eighth voice costs.
     oneVoiceMs = costOf(model, 1);
@@ -1186,13 +1253,6 @@
      * nothing: it waits 600 ms and reads what an untriggered voice puts out,
      * which is the number the loud one is only meaningful against.
      */
-    /* ⚠️ AND IT NEEDS PLAITS SWITCHED ON, WHICH IT ALWAYS HAS BEEN WHEN IT
-       RUNS. `noteOn` refuses while the oscillator is off since 2026-09-25, so
-       a pluck into a switched-off instrument measures silence. This block is
-       behind `SELFCHECK`, and under that flag the page presses PLAITS' own
-       switch as the last line of the module, so this is only ever reached from
-       that press. A guard here would be a branch nothing can take, which is
-       this project's most expensive kind of defect wearing a safety jacket. */
     await ifSelfcheck(async () => {
       const mid = meters;
       pluck();
@@ -1201,7 +1261,7 @@
       await measureChord();
     }, { log: d.log,
          say: 'the pluck and the chord that measure this page are checks, so they run '
-           + 'under a harness and never for somebody who just turned it on' });
+           + 'under a harness and never for somebody who just touched the panel' });
 
     await d.run('check');
   }
@@ -1442,7 +1502,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   function pluck() {
-    if (!node) { d.log('turn the instrument on first', 'bad'); return; }
+    if (!node) { d.log('the instrument is not on the audio thread yet', 'bad'); return; }
     // Six milliseconds of gate. `voice.cc` reads the trigger through a delay
     // line five blocks long and only re-arms once it falls under 0.1, so
     // anything shorter can be written and read back as nothing.
@@ -1450,39 +1510,34 @@
   }
 
   /**
-   * 🔴 ONE BOOT, TWO BUTTONS, AND NEITHER OF THEM STARTS HALF A GRAPH. The two
-   * firmwares are one audio chain: the oscillator feeds the effect, so there is
-   * no state where one is running and the other is not. Both header buttons
-   * therefore start the SAME boot, and both light when it lands.
-   * ⚠️ **WHAT DIFFERS IS WHAT A SECOND PRESS DOES.** Turning either off
-   * suspends the context, which stops both, and the two lights say so together.
-   * A page that let one be turned off alone would be offering a state its own
-   * audio graph cannot be in.
+   * 🔴 NO SWITCH AT ALL SINCE 2026-09-28, AND THIS IS THE THIRD TIME THIS BLOCK
+   * HAS LOST ONE. Asked: *"muta: on by default, no online button, put a test
+   * tone on that spot"*. It was two switches and two lamps while there was an
+   * effect (*"initial plaits on does nto alter warps turnon. separately
+   * controllable"*, 2026-09-22), one switch and one lamp after
+   * *"arhive/rmwarps and rm all routing code around it"*, and none now.
+   * ⚠️ **WHAT SURVIVES IS THE HALF THAT WAS NEVER ABOUT THE SWITCH.** A browser
+   * will not make a sound before a gesture, so the audio context still opens on
+   * one. What is gone is the idea that a PERSON has to say *on* first: the
+   * gesture is whatever they were going to do anyway, and the firmware is
+   * already in hand when they do it.
+   * 🔴 **AND `plaitsOn` WENT WITH IT RATHER THAN BEING PINNED TRUE.** Nothing
+   * can switch this instrument off, so a flag saying whether it is on has one
+   * value for the life of the page, and every `if (!plaitsOn) return` reading
+   * it is a branch nothing can take. This project's most expensive class of
+   * defect is a guard that cannot fire, because it reads as safety and is
+   * scenery. `light()` and `idleIfEmpty()` went the same way: one wrote a lamp
+   * that no longer exists, the other suspended the context when the instrument
+   * was off and there is no off.
    */
-  /**
-   * 🔴 ONE INSTRUMENT AND ONE SWITCH, AND THERE WERE TWO UNTIL 2026-09-28.
-   * Asked 2026-09-22: *"initial plaits on does nto alter warps turnon.
-   * separately controllable. when starting with warps, turn on audio too but
-   * switch to sine. when turing on plaits, set plaits to 'from plaits'"*, which
-   * bought an effect with its own switch, its own lamp, its own carrier picker
-   * and a rule about which carrier followed which switch. All of it went with
-   * the effect on *"arhive/rmwarps and rm all routing code around it"*.
-   * ⚠️ **WHAT SURVIVES IS THE HALF THAT WAS NEVER ABOUT THE EFFECT.** The audio
-   * context is not the instrument's: the first press starts it, because a
-   * browser will not make a sound before a gesture, and turning the instrument
-   * off suspends it, because a running context with nothing to say is a page
-   * holding an audio device for no reason. That was written as *"the LAST one
-   * off"* when there were two, and one is the last one.
-   */
-  let booting = null;
-  let plaitsOn = false;
+  let arming = null;
   let outSplit = null;
 
   /**
    * 🔴 IT RETURNS AT ONCE WHEN THE CONTEXT IS ALREADY RUNNING, AND AWAITING
-   * `booting` UNCONDITIONALLY WAS A DEADLOCK. `boot()` runs this page's whole
+   * `arming` UNCONDITIONALLY WAS A DEADLOCK. `open()` runs this page's whole
    * check block as its last act, so anything called FROM that block which
-   * awaited `booting` waited for a promise that could not settle until it
+   * awaited `arming` waited for a promise that could not settle until it
    * returned. The MIDI switch did exactly that: pressed inside the check, it
    * sat on `await booting` for ever and the assert read `still nothing` on a
    * control that was working.
@@ -1491,11 +1546,11 @@
    * 🔴 **AND IT NEEDED A SECOND GUARD ON 2026-09-28, WHICH IS THE SAME DEADLOCK
    * ARRIVING THROUGH THE DOOR THE FIRST ONE LEFT OPEN.** `ctx.state ===
    * 'running'` covers a press made while the context is up, and the check block
-   * now SUSPENDS it: `idleIfEmpty` used to need BOTH instruments off, so with
-   * the effect switched on it never ran, and the check that switches the
+   * then SUSPENDED it: `idleIfEmpty` used to need BOTH instruments off, so with
+   * the effect switched on it never ran, and the check that switched the
    * oscillator off and on again could not reach a suspended context. With one
-   * instrument it suspends every time, so the press that turns it back on found
-   * `state === 'suspended'`, fell through to `await booting`, and waited for a
+   * instrument it suspended every time, so the press that turned it back on
+   * found `state === 'suspended'`, fell through to the await, and waited for a
    * promise that cannot settle until the check block it is running inside
    * returns.
    * 🔴 **AND IT READ AS SILENCE RATHER THAN AS A HANG, WHICH IS WHY IT IS
@@ -1504,87 +1559,31 @@
    * PASSED, because what it asserts is that nothing is sounding. A check that
    * breaks the page and then measures silence is the vacuous pass this project
    * keeps paying for.
+   * ⚠️ **NEITHER SUSPENDER EXISTS ANY MORE AND BOTH GUARDS STAY**, which is a
+   * decision rather than an oversight. The tone button presses `arm()` from
+   * inside the check block on every run, so the first guard fires there every
+   * time; and a tab in the background suspends a context on its own, which no
+   * switch of this page's was ever needed for.
    * ✅ **THE SECOND GUARD IS `ready`, WHICH IS THE HANDSHAKE HAVING LANDED.**
-   * Past that point the boot has made the context, the node and the wasm, and
+   * Past that point `open()` has made the context, the node and the wasm, and
    * everything left in it is this page's own checks, so a resume is the whole
-   * of what a press needs. Before it, awaiting `booting` is still right.
+   * of what a press needs. Before it, awaiting `arming` is still right.
+   * ⚠️ **AND THE MIDI ASK IS INSIDE IT SINCE 2026-09-28**, because the gesture
+   * that used to carry it was the switch and there is no switch. A permission
+   * prompt belongs to the gesture that caused it and `ensureMidi` is
+   * idempotent, so the first touch of the panel asks once and nothing asks
+   * again. It is called BEFORE the await for the same reason it was called
+   * before the old `ensureAudio`: `open()` runs this page's whole check block
+   * as its last act, and a prompt raised after that would be raised after the
+   * check that counts it.
    */
-  async function ensureAudio() {
+  async function arm() {
+    ensureMidi();
     if (ctx && ctx.state === 'running') return;
     if (ctx && ready) { await ctx.resume(); return; }
-    if (!booting) booting = boot().catch((e) => { booting = null; d.fail(e); });
-    await booting;
+    if (!arming) arming = open().catch((e) => { arming = null; d.fail(e); });
+    await arming;
     if (ctx && ctx.state !== 'running') await ctx.resume();
-  }
-  /** Suspend when the instrument is off, so a stopped page holds no device. */
-  async function idleIfEmpty() {
-    if (!plaitsOn && ctx && ctx.state === 'running') {
-      await ctx.suspend();
-      d.log('the instrument is off, so the audio context is suspended');
-    }
-  }
-  const light = () => {
-    power.set(plaitsOn ? 'online' : 'offline');
-    /* ⚠️ THE TEST TONE IS PLAITS' OWN CONTROL AND IT IS ONLY LIVE WHILE PLAITS
-       IS. It is written here rather than at the three callers for the reason
-       `startDrone` already gives about itself: where several callers set a
-       thing, the thing has to own the rule or one caller is always missed. */
-    toneBtn.disabled = !plaitsOn;
-  };
-
-  async function togglePlaits() {
-    if (plaitsOn) {
-      plaitsOn = false;
-      /* 🔴 THE DRONE HAS TO BE STOPPED, NOT JUST THE NOTES, AND THIS SENT ONLY
-         `allOff` UNTIL 2026-09-22. A drone is `trigger_patched` cleared, which
-         bypasses the lowpass gate and lets the engine simply RUN: releasing the
-         notes does nothing to it, so an oscillator switched off went on
-         sounding, and with an effect downstream set to take it, went on being
-         heard. Reported as *"if plaits is off and warps on when i am on 'from
-         plaits' i should get no sound"*. The effect is gone and the rule is
-         not: a drone is not a note, so switching off has to stop it as well. */
-      stopTone();
-      send({ t: 'allOff' });
-      /* ⚠️ AND THE FOOT IS FORGOTTEN. A pedal left down across a switch off
-         would hold the next session's first note for ever, and nothing on
-         screen would say why. */
-      pedal.panic();
-      light();
-      paintScope();
-      await idleIfEmpty();
-      return;
-    }
-    /* 🔴 THE FLAG IS SET BEFORE THE BOOT, NOT AFTER IT, and the ordering is not
-       cosmetic: `ensureAudio` awaits `boot()`, and `boot()` runs this page's
-       whole check block at its end. With the flag set afterwards the checks ran
-       while the page still believed nothing was on, so the pictures were blank
-       and two asserts went red on a page that was working.
-       ⚠️ AND IT IS ALSO THE HONEST ORDER FOR A READER: the lamp shows what was
-       asked for the moment it is asked, and the sound follows. A boot that
-       fails puts it back. */
-    plaitsOn = true;
-    light();
-    /* 🔴 FROM THE PRESS, BEFORE THE AUDIO. See `ensureMidi`: a permission
-       prompt belongs to the gesture that caused it, and `ensureAudio` awaits a
-       boot that runs this page's whole check block. */
-    ensureMidi();
-    try {
-      await ensureAudio();
-    } catch (e) {
-      plaitsOn = false; light();
-      throw e;
-    }
-    /* 🔴 IT MAKES NO SOUND UNTIL SOMETHING ASKS FOR ONE, REVERSED 2026-09-25:
-       *"no automatic drone"*. This used to set the intent and start the drone
-       here, on the 2026-09-22 reasoning that *"the press is the ask"* and that
-       *"the first thing a visitor does produces a continuous sound they can
-       then take a knob to"*. That reading is gone: turning an instrument on is
-       switching it into the chain, and what it plays is the `Test tone` button
-       or a key. A switch that also played was doing two things.
-       ⚠️ AND THE KEYBOARD IS WHAT MAKES THAT LIVEABLE. The page is listening
-       from this press, so an instrument that has just been switched on already
-       has something to play it. */
-    light();
   }
 
   /**
@@ -1628,9 +1627,10 @@
        written as many times as there are callers and one of them is always
        missed. */
     if (!droneWanted) return;
-    /* 🔴 AND NOT OUT OF AN OSCILLATOR THAT IS SWITCHED OFF. The other half of
-       the gate in `noteOn` above, and the reasoning is there. */
-    if (!plaitsOn) return;
+    /* 🔴 AND THE `if (!plaitsOn) return` THAT STOOD HERE IS GONE WITH THE
+       SWITCH, 2026-09-28, the same removal and the same loss as in `noteOn`
+       above. It was the second of the two doors into the voice allocator, and
+       there is nothing left to shut either of them against. */
     /* ⚠️ AND THE KEYBOARD'S BOOKKEEPING GOES WITH THEM. The shim silences every
        level patched voice when a drone starts, so notes this page still thinks
        are down no longer exist, and a pedal lifting later would send note offs
@@ -1684,7 +1684,52 @@
 
     d.assert('the first quantum of audio was rendered',
       bootMs != null && bootMs > 0,
-      bootMs == null ? 'nothing was ever rendered' : `${bootMs.toFixed(0)} ms after the fetch began`);
+      bootMs == null ? 'nothing was ever rendered'
+                     : `${bootMs.toFixed(0)} ms after the panel was touched`);
+
+    /**
+     * 🔴 *"ON BY DEFAULT"* MEASURED ON BOTH SIDES OF THE LINE THIS PAGE MAY NOT
+     * CROSS, ASKED 2026-09-28 AS *"muta: on by default, no online button, put a
+     * test tone on that spot"*. A visit may not open a sound device and may not
+     * make a noise, so the only honest reading of *on* is that everything which
+     * is arithmetic over a file this site ships has already happened when a
+     * visitor arrives. This is the half that says the visit did it.
+     * ⚠️ **BOTH HALVES, AND THE SECOND IS THE ONE THAT CAN FAIL.** That the
+     * firmware was asked for is the claim; that no context and no worklet node
+     * existed at the last line of the module is the claim's whole cost, and a
+     * page that opened a device on load would satisfy the first and fail this.
+     * ⚠️ **AND IT IS COUNTED AT THE LAST LINE OF THE MODULE RATHER THAN HERE**,
+     * for the reason `midiAsksOnLoad` already carries: by the time a check block
+     * runs, a gesture has happened, so a reading taken here could not tell a
+     * visit apart from a press.
+     */
+    d.assert('the firmware is asked for by the visit and no sound device is',
+      wasmFetchesOnLoad === 1 && ctxOnLoad === false && nodeOnLoad === false
+        && wasmBytes > 0,
+      `the visit made ${wasmFetchesOnLoad} fetch of the firmware and opened `
+      + `${ctxOnLoad ? 'an audio context' : 'no audio context'} and `
+      + `${nodeOnLoad ? 'a worklet node' : 'no worklet node'}, and the `
+      + `${(wasmBytes / 1024).toFixed(1)} KB took ${fetchMs == null ? '?' : fetchMs.toFixed(0)} ms`);
+
+    /**
+     * 🔴 AND THE OTHER HALF: THE DEVICE IS OPENED BY A TOUCH ON THE PANEL AND
+     * COSTS NO SECOND FETCH. `armedBy` is set by the capture listener at the
+     * foot of this module and by nothing else, so this is a fact about which
+     * path ran rather than about which path exists.
+     * ⚠️ **THE FETCH COUNT IS THE HALF THAT PROVES THE SPLIT WAS WORTH MAKING.**
+     * If the touch had triggered the download, the page would look identical
+     * from the outside and the whole saving would be imaginary: same context,
+     * same node, same sound, and a visitor waiting for 196 KB with a finger on
+     * a control. One fetch, made before any gesture, is the measurement.
+     * ⚠️ AND IT IS `d.assert` RATHER THAN A LOG LINE BECAUSE THE PREVIOUS
+     * ARRANGEMENT WAS NEVER GRADED: the page asked for the wasm inside `boot()`
+     * and nothing anywhere said when.
+     */
+    d.assert('the sound device is opened by a touch on the panel, and the touch fetches nothing',
+      armedBy === 'a touch on the panel' && wasmFetches === wasmFetchesOnLoad
+        && !!ctx && !!node && !!ready,
+      `${armedBy || 'nothing'} opened it, ${wasmFetches - wasmFetchesOnLoad} fetches since, `
+      + `context ${ctx ? ctx.state : 'none'}, worklet ${node ? 'built' : 'none'}`);
 
     d.assert('the audio thread runs at the rate the DSP was compiled for',
       !!ready && ready.rateOk && Math.round(ready.hostRate) === 48000,
@@ -1885,14 +1930,21 @@
      * ⚠️ **`shape()` READS THE DOM, NOT THE COMPONENT'S OWN LIST**, which is
      * its header's stated reason and is the whole value of asking: what a
      * module remembers and what a browser renders are two facts, and only the
-     * second one is the page. The `Test tone` row is added after the panel is
-     * built, so a component that appended rather than inserting would put it
-     * after the foot and this is what would say so.
+     * second one is the page.
+     * 🔴 **THREE ROWS SINCE 2026-09-28, AND IT WAS FOUR.** The `Test tone`
+     * button was a `controls` row of its own and is a control on the plate now
+     * (*"put a test tone on that spot"*), so the middle `controls` that used to
+     * hold it is gone. What that row also bought was a check on the component's
+     * INSERTION rule: it was added after the panel was built, so a component
+     * that appended rather than inserting would have put it after the foot and
+     * this assert would have said so. Nothing on this page is added late any
+     * more, so that half is no longer graded here, and it is recorded rather
+     * than quietly dropped. `/nola/` still adds rows late.
      */
     const shape = panel.shape();
     d.assert('the panel draws the picture first, then its controls, then its foot',
-      shape.length === 4 && shape[0] === 'viz' && shape[1] === 'controls'
-        && shape[2] === 'controls' && shape[3] === 'plate',
+      shape.length === 3 && shape[0] === 'viz' && shape[1] === 'controls'
+        && shape[2] === 'plate',
       shape.join(', '));
 
     /**
@@ -1916,12 +1968,13 @@
       + `${vizInk.height.toFixed(0)} px tall`);
 
     /**
-     * 🔴 THE FOOT HOLDS THE NAME AND ITS SWITCH AT ONE END AND THE PATCH
-     * SELECTOR AT THE OTHER, WITH NO CAPTION ON IT. Asked 2026-09-28 as *"no
-     * label on patch selctor"*, and it is the component's rule since
-     * 2026-09-26: `patch` is the only slot a selector goes in, it is the far
-     * end by construction, and a `.pos-pick-l` on it is REMOVED from the DOM
-     * rather than hidden.
+     * 🔴 THE FOOT HOLDS THE NAME AND THE `Test tone` BUTTON AT ONE END AND THE
+     * PATCH SELECTOR AT THE OTHER, WITH NO CAPTION ON IT. Asked 2026-09-28 as
+     * *"no label on patch selctor"* and, later the same day, *"put a test tone
+     * on that spot"*, the spot being the `status` slot the on and off switch
+     * had. The picker half is the component's rule since 2026-09-26: `patch` is
+     * the only slot a selector goes in, it is the far end by construction, and
+     * a `.pos-pick-l` on it is REMOVED from the DOM rather than hidden.
      * ⚠️ **THE PICKER IS STILL BUILT WITH `label: 'model'`, WHICH IS WHAT
      * MAKES THIS AN ASSERT RATHER THAN A RESTATEMENT.** With no label in the
      * source there would be nothing for the component to strip and nothing for
@@ -1938,7 +1991,7 @@
     const nameEnd = panel.plateRow.querySelector('.pos-ipanel-name')?.getBoundingClientRect();
     const patchEnd = panel.patchEnd?.getBoundingClientRect();
     const caption = panel.patchEnd?.querySelector('.pos-pick-l');
-    d.assert('the foot carries the name and its switch at one end and an unlabelled patch selector at the other',
+    d.assert('the foot carries the name and the test tone at one end and an unlabelled patch selector at the other',
       !!nameEnd && !!patchEnd && !caption
         && Math.abs((nameEnd.left - plateRow.left) - (plateRow.right - patchEnd.right)) <= 1
         && nameEnd.left - plateRow.left > 4 && patchEnd.left > nameEnd.right,
@@ -1949,36 +2002,38 @@
         : 'the foot is missing an end');
 
     /**
-     * 🔴 AND THE `Test tone` BUTTON IS A ROW OF ITS OWN, ON ITS OWN INSET.
-     * Asked 2026-09-25: *"make a Test tone button in the right of plaits"*, and
-     * answered then by placing it in `.panel-head`'s first grid column, which
-     * took eight widths of measuring against a model picker that overflows its
-     * own track and two media queries to keep it off that picker on a narrow
-     * screen. There is no header to place it in now.
-     * ⚠️ **THE POSITION IS MEASURED AND NOT ARGUED ABOUT**, which is what
-     * that history is for: `positron-ui` records `/twelve/` corrected twelve
-     * times in one evening for reasoning about rects rather than reading them.
-     * ⚠️ **AND THE NEGATIVE HALF IS THE COUNT.** One button on the page, so a
-     * rule or a call that made a second one takes this red.
-     * ✅ AND IT NEEDS NO MEDIA QUERY AT ALL, WHICH IS THE REAL SAVING. A row
-     * holding one control at its own size is the same arrangement at every
-     * width, so the two `@media` blocks that re-placed it at 700 and 560 px are
-     * gone with the grid they were arguing with.
+     * 🔴 AND THE `Test tone` BUTTON IS IN THE `status` SLOT, WHICH IS AFTER THE
+     * NAME AND BEFORE THE PICKER. Asked 2026-09-28: *"no online button, put a
+     * test tone on that spot"*. The spot is exactly where a
+     * `createPresenceButton` reading `on` and `off` stood, which is where
+     * `createInstrumentPanel` puts whatever it is handed as `status`, so this
+     * is a check that the page passed it to that slot rather than any of the
+     * other three it could have reached for.
+     * 🔴 **THE CLAIM IT REPLACES WAS THAT THE BUTTON WAS A ROW OF ITS OWN**, on
+     * its own inset, under the rotaries and above the foot, measured against
+     * three rects. Before that it was a header cell placed by grid column, and
+     * that version took eight widths of measuring and two media queries. Each
+     * arrangement was the previous one's repair and each was asked for; this
+     * one is the first with no arithmetic in it at all, because the component
+     * owns where a `status` control goes.
+     * ⚠️ **THE NEGATIVE HALF IS THE COUNT**, which survives all three
+     * arrangements: one button on the page, so a rule or a call that made a
+     * second one takes this red.
+     * ⚠️ **AND `panel.status` IS READ RATHER THAN THE CLASS**, because the
+     * question is which SLOT it landed in. A `.muta-tone` anywhere in the plate
+     * row would satisfy a query and say nothing about that.
      */
-    const toneRow = panel.controls()[1]?.getBoundingClientRect();
     const tone = toneBtn.getBoundingClientRect();
-    const knobRow = panel.controls()[0]?.getBoundingClientRect();
+    const plateName = panel.plateRow.querySelector('.pos-ipanel-name');
     const tones = document.querySelectorAll('.muta-tone').length;
-    d.assert('the test tone button is a row of its own, under the rotaries it plays',
-      tones === 1 && !!toneRow && !!knobRow && tone.width > 0
-        && toneRow.top >= knobRow.bottom - 0.5
-        && toneRow.bottom <= plateRow.top + 0.5
-        && Math.abs((tone.left - toneRow.left) - (nameEnd.left - plateRow.left)) <= 1,
-      `${tones} tone button on the page, ${(tone.left - toneRow.left).toFixed(1)} px in `
-      + `against the foot's ${nameEnd ? (nameEnd.left - plateRow.left).toFixed(1) : '?'} px, `
-      + `in a row running ${toneRow.top.toFixed(1)} to ${toneRow.bottom.toFixed(1)} px between `
-      + `the rotaries ending at ${knobRow.bottom.toFixed(1)} and the foot at `
-      + `${plateRow.top.toFixed(1)}`);
+    d.assert('the test tone button is in the slot the on and off switch had, after the name',
+      tones === 1 && panel.status === toneBtn && plateName?.contains(toneBtn)
+        && tone.width > 0 && tone.left > nameEnd.left && tone.right < patchEnd.left
+        && toneDeadOnLoad === false,
+      `${tones} tone button on the page, ${panel.status === toneBtn ? 'in' : 'NOT in'} the `
+      + `status slot, spanning ${tone.left.toFixed(1)} to ${tone.right.toFixed(1)} px between `
+      + `the name at ${nameEnd.left.toFixed(1)} and the picker at ${patchEnd.left.toFixed(1)}, `
+      + `and on the visit it was ${toneDeadOnLoad ? 'dead' : 'pressable'}`);
 
     /**
      * 🔴 THE PANEL STARTS WHERE THE REST OF THE PAGE DOES AND IS ITS OWN SIZE
@@ -2072,28 +2127,36 @@
           : 'the row or a dial is not on the page');
 
     /**
-     * 🔴 THE KEYBOARD IS OPENED BY A PRESS AND NEVER BY A VISIT, WHICH IS THE
+     * 🔴 THE KEYBOARD IS OPENED BY A GESTURE AND NEVER BY A VISIT, WHICH IS THE
      * HALF THAT COSTS A VISITOR SOMETHING. `requestMIDIAccess` is a permission
      * prompt, so a page that asked on load would ask every visitor for a device
      * most of them do not have.
+     * 🔴 **AND IT IS THE HALF OF *"on by default"* THAT DOES NOT MOVE TO THE
+     * LOAD PATH, WHICH IS THE WHOLE REASON TO SAY SO OUT LOUD.** The firmware
+     * went to the visit on 2026-09-28 and this deliberately did not go with it:
+     * a wasm off this site is arithmetic over a file, and a permission prompt
+     * is a thing asked of a person. The gesture that carries it used to be the
+     * on and off switch and is now the first touch of the panel, which is
+     * inside `arm()` for exactly this reason.
      * 🔴 **THIS REPLACES THE ASSERT THAT WENT WITH THE MIDI BUTTON**, which
      * read `midiBtn.el.tagName === 'BUTTON' && midiWas === false && !!midi` and
      * pressed that button here to get its answer. It was standing in for three
      * facts and two of them outlive the control: NOTHING is open before the
-     * press, and something real is open after it. The third, that the lamp
+     * gesture, and something real is open after it. The third, that the lamp
      * followed the press rather than the port count, went with the lamp.
      * ⚠️ **THE NEGATIVE HALF IS THE ONE THAT CAN FAIL**, and it is the count
      * read at the last line of the module rather than a flag read here: by the
-     * time this runs a press has happened, so a reading taken now could not
-     * tell a visit apart from a press.
-     * ⚠️ **AND `midiAsks === 1` IS THE SECOND CLAIM, NOT A RESTATEMENT.** The
-     * check block below switches the instrument off and on again, and every
-     * press reaches `ensureMidi`, so a prompt per press would climb. One is
-     * what idempotent means, measured rather than asserted about the flag.
+     * time this runs a gesture has happened, so a reading taken now could not
+     * tell a visit apart from a touch.
+     * ⚠️ **AND `midiAsks === 1` IS THE SECOND CLAIM, NOT A RESTATEMENT.**
+     * `arm()` calls `ensureMidi` on every entry and the tone button presses
+     * `arm()` twice inside the check block below, so a prompt per call would
+     * climb. One is what idempotent means, measured rather than asserted about
+     * the flag.
      */
-    d.assert('the keyboard is opened by a press and never by a visit, and it is asked for once',
+    d.assert('the keyboard is opened by a gesture and never by a visit, and it is asked for once',
       midiAsksOnLoad === 0 && midiAsks === 1 && !!midi && typeof midi.state === 'function',
-      `the visit asked ${midiAsksOnLoad} times and the presses since asked `
+      `the visit asked ${midiAsksOnLoad} times and everything since asked `
       + `${midiAsks}, and the access now reads ${midi ? midi.state() : 'nothing open'} with `
       + `${midi ? midi.ports() : 0} input(s)`);
 
@@ -2165,7 +2228,7 @@
       /**
        * 🔴 THESE FOUR MOVED BEHIND THE GATE ON 2026-09-25, AND THEY HAD BEEN
        * PRINTING `FAIL` INTO A VISITOR'S OWN LOG FOR AS LONG AS THE PLUCK HAS
-       * BEEN GATED. Every one of them reads a number that only `boot()`'s own
+       * BEEN GATED. Every one of them reads a number that only `open()`'s own
        * gated measuring block sets: `loud`, `chord` and `blockRule` are all
        * `null` on a visit, so the conditions were false and
        * `shell.mjs`'s `assert` logs a failing line where a person can read it.
@@ -2231,34 +2294,42 @@
        * the drone. The suppression is gone with the automatic drone and the
        * silence it was protecting is the same silence, so the claim survives its
        * cause.
-       * 🔴 **AND THE SWITCH IS PRESSED TWICE INSIDE IT, WHICH IS THE HALF THAT
-       * FAILS.** This pressed the EFFECT's switch, because `toggleWarps` called
-       * `startDrone` too and a tone nobody asked for had three ways back in.
-       * That switch is gone and the shape of the check is not: turning the
-       * instrument off and on again is the one gesture that can bring a drone
-       * back behind the intent flag, and a check that only ever pressed nothing
-       * would pass on a page that played itself.
+       * 🔴 **AND A GESTURE IS MADE INSIDE IT, WHICH IS THE HALF THAT CAN FAIL.**
+       * It pressed the EFFECT's switch first, because `toggleWarps` called
+       * `startDrone` too; then the instrument's own switch, off and on, because
+       * that was the one gesture that could bring a drone back behind the intent
+       * flag. Both switches are gone and the shape of the check is not: since
+       * 2026-09-28 the gesture that can start something is a TOUCH ON THE PANEL,
+       * which is what opens the audio, and *"on by default"* is exactly the ask
+       * that could make a page play itself. A check that only ever pressed
+       * nothing would pass on one that did.
+       * ⚠️ **THE SECOND TOUCH REACHES `arm()` AND NOT THE LISTENER**, which
+       * removed itself on the first one. That is the path a second gesture
+       * really takes, so it is the path worth driving.
        */
       send({ t: 'allOff' });
       await sleep(500);
       const idleQuiet = last ? last.peak : 1, idleDroning = droning;
-      power.el.click();
-      await sleep(250);
-      power.el.click();
+      panel.el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      await arm();
       await sleep(500);
-      const afterCycle = last ? last.peak : 1;
-      d.assert('an instrument switched on makes no sound until the test tone or a key asks',
-        idleQuiet < 0.001 && idleDroning === false && afterCycle < 0.001,
-        `with it on and nothing pressed the oscillator is at ${idleQuiet.toFixed(6)}, `
-        + `the page says droning ${idleDroning}, and after it was switched off and `
-        + `on again it is ${afterCycle.toFixed(6)}`);
+      const afterTouch = last ? last.peak : 1;
+      d.assert('an instrument that is on by default makes no sound until the test tone or a key asks',
+        idleQuiet < 0.001 && idleDroning === false && afterTouch < 0.001,
+        `with it up and nothing pressed the oscillator is at ${idleQuiet.toFixed(6)}, `
+        + `the page says droning ${idleDroning}, and after a second touch on the panel `
+        + `it is ${afterTouch.toFixed(6)}`);
 
       /**
        * 🔴 THE TEST TONE IS A REAL BUTTON AND IT IS PRESSED HERE. Asked
        * 2026-09-25: *"make a Test tone button in the right of plaits"*. A check
        * that called `startDrone` would grade the DSP and say nothing about the
-       * control, which is the defect this page already records about reaching
-       * past the switch on its foot.
+       * control, which is the defect this page has recorded about reaching past
+       * a control since it had one.
+       * ⚠️ **AND THE PRESS IS DOING TWO JOBS SINCE 2026-09-28.** It is the only
+       * gesture in this file that both opens the audio and makes a sound, so a
+       * `toggleTone` that failed to `await arm()` would be caught here as a
+       * silent first press rather than anywhere more obvious.
        * ⚠️ **BOTH HALVES, AND THE SECOND PRESS IS THE ONE THAT CAN FAIL.** A
        * button that starts a tone and cannot stop it looks identical while
        * somebody is pressing it the first time.
@@ -2317,37 +2388,23 @@
           ? `${plaitsWave.length} samples with ${crossings} zero crossings in the window`
           : 'the oscillator had no ink in it');
 
-      /**
-       * 🔴 AND THE ANSWER TO *"when plaits is off and warps in on from plaits -
-       * how it can play at all?"*, ASKED 2026-09-25. It cannot, and until that
-       * day nothing said so: the drone was the only source and switching the
-       * oscillator off stopped it, so the silence was a consequence of one path
-       * rather than a rule. There are two sources now.
-       * ⚠️ **IT PRESSES THE SWITCH AND THEN ASKS BOTH WAYS IN**, the button and a
-       * key through the real `keyDown`. A test on one of them would have left the
-       * other, and the two doors are in two functions.
-       * ⚠️ **AND IT USED TO READ THE FAR END OF THE CHAIN**, because the question
-       * it answers is about an effect carrying `from PLAITS` out of an
-       * oscillator that is off, and the carrier was read rather than assumed so
-       * that a picker on `sine` could not turn this into a measurement of an
-       * effect making its own sound. The effect is gone; the question it
-       * answered was never about the effect, it was about whether a switched
-       * off oscillator can be made to sound, and that is what is left.
-       */
-      power.el.click();                       // the instrument off
-      await sleep(300);
-      const offDisabled = toneBtn.disabled;
-      toneBtn.click();
-      keyDown(64, 100);
-      await sleep(500);
-      const offOsc = last ? last.peak : 1;
-      keyUp(64);
-      power.el.click();                       // and back on for everything below
-      await sleep(500);
-      d.assert('an oscillator that is switched off makes no sound, whichever way it is asked',
-        offDisabled === true && offOsc < 0.001,
-        `with PLAITS off the tone button is ${offDisabled ? 'not pressable' : 'LIVE'} `
-        + `and a press of it plus a key leave the oscillator at ${offOsc.toFixed(6)}`);
+      /* 🔴 `an oscillator that is switched off makes no sound, whichever way it
+         is asked` WENT WITH THE SWITCH ON 2026-09-28, AND IT IS THE ONE REAL
+         LOSS OF COVERAGE IN THAT EDIT. It was the answer to *"when plaits is off
+         and warps in on from plaits - how it can play at all?"*, asked
+         2026-09-25: it pressed the switch off, then asked the oscillator to
+         sound BOTH ways in, through the tone button and through the real
+         `keyDown`, and required 0.000000 out of it and a dead tone button.
+         ⚠️ **IT IS REMOVED RATHER THAN REWRITTEN BECAUSE ITS SUBJECT IS GONE.**
+         There is no off, so there is no state in which a source may be refused,
+         and the two guards it graded (`if (!plaitsOn) return` in `noteOn` and in
+         `startDrone`) are gone with it. Rewriting it against `plaitsOn === true`
+         would be a check that cannot fail, which this project holds to be worse
+         than no check at all.
+         ⚠️ **WHAT IS NOT GRADED ANY MORE, IN WORDS**: that the two doors into
+         the voice allocator can be shut. If this page ever grows a way to stop
+         the instrument, that assert comes back with it and both doors go back
+         under one test. */
 
       const want = 13;                    // bass drum, a model nothing defaults to
       setModel(want);
@@ -2774,13 +2831,47 @@
     }, { log: d.log, say: 'the test tone, the picture, the model switch and the voice stealing are checked only under a harness, because every one of them presses a control or changes the sound' });
   });
 
-  /* ⚠️ THIS LINE HAS BEEN WRONG TWICE AND IS REWRITTEN A THIRD TIME. It said
-     `turn an instrument on at the top of its case and it plays`, which was two
-     things wrong at once, and then `from the switch under its case`, which was
-     right about a case. There is no case: the switch is on the panel's foot,
-     beside the name, and there is one instrument rather than two. A sentence a
-     visitor reads is part of the page. */
-  d.log('turn the instrument on from the switch on its foot, then press Test tone to '
+  /**
+   * 🔴 ANY GESTURE ON THE PANEL OPENS THE SOUND DEVICE, WHICH IS WHAT *"on by
+   * default"* MEANS ON A PAGE THAT MAY NOT PLAY ITSELF. Asked 2026-09-28:
+   * *"muta: on by default, no online button, put a test tone on that spot"*.
+   * A browser hands out no running AudioContext without a gesture, and this
+   * project's standing rule is that a visit opens nothing and a sound happens
+   * on a press, so the instrument cannot be audible by itself. What it can be,
+   * and now is, is READY: the firmware arrived with the page, and the first
+   * touch of the panel pays for the device before a finger reaches a control.
+   * ✅ **THE SHAPE IS `/fau/`'S, LIFTED RATHER THAN INVENTED**, built there the
+   * same day for *"fau: compile on loading so i can play"*.
+   * ⚠️ **IT IS THE PANEL AND NOT THE DOCUMENT**, so scrolling or tapping
+   * somewhere else on the page opens no sound device. Touching the instrument
+   * is the gesture; reading the page is not.
+   * ⚠️ **AND IT IS THE CAPTURE PHASE**, so it runs before a control's own
+   * handler rather than after it. That does not make the gesture that arms it
+   * instant, because the node still has to be built and that is an await; what
+   * it makes instant is every gesture after a visitor has touched anything at
+   * all, which includes the knobs, whose sound has to follow the hand.
+   * ⚠️ **AND IT RECORDS WHAT ARMED IT.** `armedBy` is the evidence for the
+   * assert below: a page that opened a device on the load path and a page that
+   * opened one on a touch are indistinguishable from inside the check block,
+   * because by then both have one open.
+   */
+  const armOnTouch = () => {
+    if (armedBy) return;
+    armedBy = 'a touch on the panel';
+    panel.el.removeEventListener('pointerdown', armOnTouch, true);
+    panel.el.removeEventListener('keydown', armOnTouch, true);
+    arm();
+  };
+  panel.el.addEventListener('pointerdown', armOnTouch, true);
+  panel.el.addEventListener('keydown', armOnTouch, true);
+
+  /* ⚠️ THESE FOUR LINES HAVE BEEN WRONG THREE TIMES AND ARE REWRITTEN A FOURTH.
+     They said `turn an instrument on at the top of its case and it plays`, then
+     `from the switch under its case`, then `from the switch on its foot`, and
+     the switch is now gone as well. A sentence a visitor reads is part of the
+     page, and the last one was the most expensive kind of stale: it named a
+     control that is not there. */
+  d.log('the instrument is on when the page is, so press Test tone beside its name to '
       + 'hear it, or play a MIDI keyboard. The voice count is this page’s own and the '
       + 'instrument has no such control');
   d.log('the test tone and the keys never sound together: a key stops the tone and '
@@ -2788,39 +2879,55 @@
   d.log('left of the divider are Plaits’ four front panel rotaries, in its own positions. '
       + 'Right of it are its three attenuverters, then decay and colour, which the panel '
       + 'reaches by holding a button rather than with knobs of their own');
-  d.log('nothing is fetched until the instrument is turned on');
+  d.log('the firmware comes off this site on the visit and no sound device is opened '
+      + 'until the panel is touched, which is the gesture a browser wants for a sound '
+      + 'anyway');
+
+  /* ── the firmware a visit gets ────────────────────────────────────────────
+     🔴 ASKED 2026-09-28: *"muta: on by default"*. This is that, and it is the
+     whole of it: one fetch of the 196 KB artefact this repository ships, off
+     this origin, started here and never again.
+     ⚠️ IT IS NOT AWAITED AND NOTHING WAITS FOR IT. The download is network and
+     the page paints through it; what blocks is the main thread's own
+     `WebAssembly.Module`, and that lands after the page is on screen.
+     ⚠️ AND THE CATCH IS INSIDE `warmUp`, because a page whose only report of a
+     failed download is an unhandled rejection is a page that looks like it is
+     still coming. */
+  warmUp();
+
+  /* ⚠️ THE COUNTS BEFORE ANY GESTURE, READ AT THE LAST LINE OF THE VISIT, AND
+     OUTSIDE THE GATE ON PURPOSE. Everything above this line is what a page load
+     does, and what it has to have done is exactly one thing: ask this site for
+     the firmware. Inside `ifSelfcheck` these would stay unset for a visitor and
+     the asserts that read them would go red on a page where nothing is wrong,
+     which is the shape this project calls a harness artefact. Reading a counter
+     costs a visitor nothing. */
+  midiAsksOnLoad = midiAsks;
+  wasmFetchesOnLoad = wasmFetches;
+  ctxOnLoad = ctx !== null;
+  nodeOnLoad = node !== null;
+  toneDeadOnLoad = toneBtn.disabled;
 
   /**
-   * 🔴 THE HARNESS CANNOT REACH THE PANEL'S OWN SWITCH, SO THE PAGE PRESSES IT.
+   * 🔴 THE HARNESS CANNOT REACH THE PANEL, SO THE PAGE TOUCHES IT.
    * `demo/verify.mjs` clicks every button in `.pos-controls` and nothing else,
-   * and `Start audio` left that row on 2026-09-22. Without this line the audio
-   * would never start under a harness and **every assert behind the boot would
-   * stop running rather than fail**, which is the shape `positron-verify`
-   * records on `/mirror/` and `/blocks/` in one day.
-   * ⚠️ **IT PRESSES THE REAL BUTTON RATHER THAN CALLING `boot()`**, so the path
-   * under test is the path a person takes. A check that reached past the
-   * control would pass on a page whose button was wired to nothing, which is
-   * exactly the defect this arrangement could introduce.
-   * ⚠️ AND IT IS ONE PRESS, WHICH IT WAS NOT UNTIL 2026-09-28. The second press
-   * here was the effect's own switch, because a switched off instrument draws
-   * nothing and the two-picture assert needed both pictures. Both went with the
-   * effect.
+   * and this page has no such row. Without this line the audio would never open
+   * under a harness and **every assert behind it would stop running rather than
+   * fail**, which is the shape `positron-verify` records on `/mirror/` and
+   * `/blocks/` in one day.
+   * ⚠️ **IT DISPATCHES A REAL POINTER EVENT RATHER THAN CALLING `arm()`**, so
+   * the path under test is the path a person takes. A check that reached past
+   * the listener would pass on a page whose listener was attached to nothing,
+   * which is exactly the defect this arrangement could introduce. It was a
+   * `power.el.click()` until 2026-09-28, for the same reason, on the control
+   * that has gone.
    */
-  /* ⚠️ THE COUNT BEFORE ANY PRESS, READ AT THE LAST LINE OF THE VISIT, AND
-     OUTSIDE THE GATE ON PURPOSE. This is the negative half of `the keyboard is
-     opened by a press and never by a visit`: everything above this line is what
-     a page load does, and what it has to have done is nothing. Inside
-     `ifSelfcheck` it would stay unset for a visitor and the assert that reads it
-     would go red on a page where nothing is wrong, which is the shape this
-     project calls a harness artefact. Reading a counter costs a visitor
-     nothing. */
-  midiAsksOnLoad = midiAsks;
   ifSelfcheck(() => {
-    power.el.click();
+    panel.el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   }, {
     log: d.log,
-    say: 'the audio is started by pressing PLAITS’ own turn on, because this page has '
-      + 'no row of controls for a harness to press',
+    say: 'the audio is opened by touching the panel, because this page has no row of '
+      + 'controls for a harness to press',
   });
   /* ⚠️ HERE AND NOT AT THE END OF THE CHECKS, WHICH WAS TRIED AND REVERTED.
      `verify.mjs` waits 7.4 s for `__demo.ready` before it grades anything, so a
