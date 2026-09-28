@@ -13,40 +13,73 @@
      `move everything` in there would be the suite putting a random patch on
      somebody's synth dozens of times a day.
 
-     🔴 THREE CONTROLS SINCE 2026-09-28, WHICH IS THE SKETCH'S OWN COUNT.
-     Asked as a sketch of one line on 2026-09-25: *"[circuit connected]
-     [Synth1|Synths] [⇄] <- square button, makes all buttons `invisible hand`
-     staeting from random positions"*. The row carried a FOURTH, `put back`, as
-     a departure that was written up as one, and *"rm put back button"* took it
-     out. The stop it carried did not go with it: the glyph is a toggle now and
-     its second state IS the way back, which is written out beside the button.
+     🔴 THREE CONTROLS IN TWO BOXES SINCE 2026-09-28, AND THE THIRD IS INSIDE
+     THE SECOND. Asked as a sketch of one line on 2026-09-25: *"[circuit
+     connected] [Synth1|Synths] [⇄] <- square button, makes all buttons
+     `invisible hand` staeting from random positions"*. The row carried a
+     FOURTH, `put back`, as a departure that was written up as one, and *"rm put
+     back button"* took it out. The stop it carried did not go with it: the
+     glyph is a toggle now and its second state IS the way back, which is
+     written out beside the button. Then *"fix invisuble hand button"* arrived
+     with a screenshot of the glyph standing clear of the chooser wearing a
+     rounded ring of its own, and it became the chooser's LAST SEGMENT. So this
+     row has two flex children and the gap below is spent once.
 
-     🔴 MEASURED OFF REAL RECTS AT THE FOUR WIDTHS, 2026-09-28, with a throwaway
-     probe. The three controls are 195.1 (status), 288.4 (chooser on a desktop,
-     215.1 in its phone layout with the label on top) and 34.0 (the glyph), with
-     a 10 px gap between each:
+     🔴 MEASURED OFF REAL RECTS AT FIVE WIDTHS, 2026-09-28, AFTER THE JOIN, with
+     a throwaway probe. The status is 195.1 and the chooser is 321.4 on a
+     desktop and 248.1 in its phone layout with the label on top, both of which
+     now INCLUDE the 34.0 square and the pixel its border shares with `Session`:
 
-       390 px    column 358.0   two lines   status | chooser and glyph
-       560 px    column 528.0   ONE LINE    464.2 of content in 528
-       756 px    column 688.0   ONE LINE    517.5 of content and 20 of gaps in 688
-      1280 px    column 688.0   ONE LINE    the same 537.5, the column is fixed
+       375 px    column 343.0   two lines   status, then the chooser
+       390 px    column 358.0   two lines   status, then the chooser
+       560 px    column 528.0   ONE LINE    453.2 of content in 528
+       756 px    column 688.0   ONE LINE    526.5 of content and 10 of gap in 688
+      1280 px    column 688.0   ONE LINE    the same 526.5, the column is fixed
 
-     🔴 AND 560 px IS THE LINE THE FOURTH CONTROL COST, WHICH THE NOTE THAT USED
-     TO STAND HERE PREDICTED AND THIS ONE MEASURES. It read *"Three would be
-     195.1 + 215.1 + 34 + 20 = 464.2 in a 528 px column, which is one line"*,
-     against a measured TWO lines with `put back` in the row. Measured after:
-     464.2 in 528.0, one line, left edges 16.0, 221.1 and 446.2. The 390 px case
-     went from three lines to two the same way.
-     ⚠️ AND AT 390 NOTHING FITS HOWEVER MANY THERE ARE: 464.2 against a 358 px
-     column, so it breaks 1 and 2, the status on its own line and then the
-     chooser in its phone layout with the glyph beside it. A row that scrolled
-     sideways instead is already recorded in this project as a thing nobody
-     reads.
-     ⚠️ AND NO SIDEWAYS DRAG AT ANY OF THE FOUR, measured as
+     🔴 AND THE JOIN GAVE 11 px BACK, WHICH MOVED THE TABLE AND MOVED NO LINE
+     BREAK. Before it the three boxes were 195.1, 288.4 and 34.0 with two 10 px
+     gaps, which is 537.5; after it they are 195.1 and 321.4 with one gap, which
+     is 526.5. A joined segment overlaps its neighbour by a pixel and spends no
+     gap, so one object is narrower than the same two controls standing apart.
+     ⚠️ WRAPPING IS UNCHANGED AND IS MEASURED AS THE ROW'S OWN HEIGHT AGAINST
+     ITS TALLEST CHILD, which is the only reading that answers it: the bar is
+     `align-items: center` and the chooser is 47.5 tall on a phone against the
+     status pill's 34, so the two have different TOPS on one line and a count of
+     distinct tops says two where a reader sees one. 91.5 against 47.5 at 375,
+     47.5 against 47.5 at 560, 34.0 against 34.0 at 756.
+     ⚠️ AND AT 375 NOTHING FITS HOWEVER MANY THERE ARE: 453.2 against a 343 px
+     column, so it breaks 1 and 1, the status on its own line and then the whole
+     chooser with the glyph on its end. A row that scrolled sideways instead is
+     already recorded in this project as a thing nobody reads.
+     ⚠️ 375 IS THE PHONE AND 390 IS KEPT BESIDE IT. 375 is the iPhone mini,
+     which is what `demo/shot.mjs` opens and the narrower of the two; 390 is the
+     12 through 16 and is what the four widths in the note before this one were
+     measured at, so it stays for comparison.
+     ⚠️ AND NO SIDEWAYS DRAG AT ANY OF THE FIVE, measured as
      `documentElement.scrollWidth - clientWidth` and 0 every time, with the
-     panel taking the page column exactly at each one (358.0, 528.0, 688.0,
-     688.0). The assert below re-checks it at the one width the harness runs. */
+     chooser's own segment scroller measuring 0 of overflow as well. That one is
+     worth saying: `.pos-choice .step` is `overflow-x: auto`, so a fourth
+     segment could have pushed the row into scrolling and hidden the glyph
+     behind an edge, and at no width does it. The assert below re-checks the
+     page at the one width the harness runs. */
   .shape-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* 🔴 THE HAND IS A SQUARE AT EVERY WIDTH, AND THE ONE RULE THAT WOULD HAVE
+     STRETCHED IT IS THE PHONE'S. `.pos-choice .step button` is (0,2,1) inside
+     `@media (max-width: 560px)` and gives every option `flex: 1 0 auto` and
+     `padding: 0 var(--pad-seg)` so three names share the row, which is right
+     for a name and wrong for a glyph: `button[data-glyph="1"]` is only (0,1,1),
+     so a 34 px square would have grown to fill whatever the three words left
+     and carried 12 px of side padding inside a box 34 px wide.
+     ⚠️ IT TIES THAT RULE RATHER THAN OUTRUNNING IT. `.pos-choice
+     button.shape-hand` is (0,2,1) as well, and this stylesheet is loaded after
+     `shell.css`, so a tie is enough. Raising the weight to be sure is how
+     `.pos-faux` ended up needing (0,2,0) and how the next fight starts one step
+     higher.
+     ⚠️ AND IT IS NOT IN A MEDIA QUERY, deliberately: the claim is that this
+     control is a square at every width, and a plain rule says that where two
+     rules either side of 560 px would only say it twice. */
+  .pos-choice button.shape-hand { flex: none; padding: 0; }
 
   /* 🔴 A SECTION IS A GLUED ROW'S ONLY CHILD, AND IT NEEDS THE TWO DECLARATIONS
      EVERY FLEX ITEM IN A FLEX ROW NEEDS. `.pos-rows-r` is `display: flex`, and
@@ -581,7 +614,7 @@
     },
   };
   let handMode = 'move';
-  const hand = el('button', 'pos-btn', HAND_SAYS.move.glyph, { type: 'button', 'data-glyph': '1' });
+  const hand = el('button', 'pos-btn shape-hand', HAND_SAYS.move.glyph, { type: 'button', 'data-glyph': '1' });
   hand.title = HAND_SAYS.move.title;
   hand.setAttribute('aria-label', HAND_SAYS.move.aria);
   centreSymbol(hand);
@@ -599,7 +632,49 @@
   }
 
   const bar = el('div', 'shape-bar');
-  bar.append(parts.el, hand);
+  bar.append(parts.el);
+  /**
+   * 🔴 THE HAND IS THE LAST SEGMENT OF THE CHOOSER'S ROW, NOT A BUTTON
+   * STANDING BESIDE IT. Reported 2026-09-28 with a screenshot as *"fix
+   * invisuble hand button"*: the square sat 10 px clear of `Synth 1 | Synth 2 |
+   * Session` wearing a full rounded border of its own.
+   * ⚠️ THE SKETCH DOES NOT SETTLE IT AND THE PAGE DOES. `[Synth1|Synths] [⇄]`
+   * puts the glyph next to the chooser and says nothing about whether the two
+   * touch, and a reading of a drawing is not evidence. What settles it is that
+   * this page ALREADY draws this exact join below the bar, MEASURED at 40 of
+   * its 52 lanes: a slider's own hand is a square on the end of its lane with
+   * no gap and no ring of its own, so the one at the top of the page was the
+   * same control drawn a second way on one screen.
+   * MEASURED before, at three widths, with a throwaway probe: a 10.00 px gap at
+   * 375, 756 and 1280, and at 375 the button sat 6.75 px ABOVE the segments it
+   * was beside, because `.pos-choice` puts its label on top there and a
+   * neighbour centres itself on the label and the options together.
+   *
+   * 🔴 AND THE JOIN IS `.pos-seg`, WHICH THIS ROW ALREADY WEARS, SO THERE IS NO
+   * CSS HERE ABOUT JOINING. Being a child of the segment makes `Session` stop
+   * being `:last-child`, so the kit zeroes ITS corners and rounds this one's,
+   * and `.pos-seg > * + *` overlaps the two borders by a pixel. `shell.css`
+   * records that a segment which rounds its own corners has to give up the
+   * inner ones and that `.sld-lane` needs one explicit line for it; a button
+   * has no radius rule of its own and needs no such line, which is why the only
+   * page rule this took is about the PHONE and not about the seam.
+   *
+   * ⚠️ `parts.buttons` IS THE PUBLIC WAY IN. `createChoice` returns its button
+   * list and does not return its segment, and a page reaching for
+   * `.pos-choice-seg` would be a page keyed on a class name it does not own:
+   * this project's own rule about a dead selector being born the day somebody
+   * renames a class. Inserting after the last option is the same position with
+   * nothing to go stale.
+   * ⚠️ AND NOTHING THE COMPONENT DOES REACHES IT. `set`, `disabled` and
+   * `pending` all walk the `buttons` array they built, so a fourth child is
+   * invisible to them, and `aria-pressed` is never written on it.
+   * 🔴 IT IS STILL OUT OF `.pos-controls`, WHICH IS THE ONE THING THIS MOVE HAD
+   * TO NOT BREAK. `.shape-bar` is a stack child, `demo/verify.mjs` presses
+   * `.pos-controls button, .tbar-x`, and this button is in neither. MEASURED
+   * after the move: 0 buttons in the harness row, unchanged. The assert below
+   * reads it rather than trusting this sentence.
+   */
+  parts.buttons[parts.buttons.length - 1].after(hand);
   /**
    * 🔴 NO CAPTION, AND THE ROOM IS HELD ANYWAY. Asked 2026-09-25: *"rm move a
    * slider and what it sends is listed here"*.
@@ -1287,10 +1362,12 @@
    * 24 s. The manifest row still declares 4000 and it is now inert on this
    * page, which is reported rather than edited from here.
    * ⚠️ `prepend` BECAUSE THE ROW IS BUILT BEFORE THIS CONTROL EXISTS, and the
-   * sketch puts the status first. The order is `[Circuit …] [sends to …] [⇄]`
-   * and there is an assert on it below. It carried a fourth, `put back`, until
-   * the ask *"rm put back button"* on 2026-09-28, so the row is now exactly the
-   * three the sketch drew.
+   * sketch puts the status first. The order a reader sees is
+   * `[Circuit …] [sends to …| ⇄]` and there is an assert on it below. It
+   * carried a fourth control, `put back`, until the ask *"rm put back button"*
+   * on 2026-09-28, and the glyph stopped being a control of the row's own on
+   * *"fix invisuble hand button"* the same day: it is the chooser's last
+   * segment now, so this row has two children and three things in it.
    */
   bar.prepend(pres.el);
 
@@ -1465,10 +1542,23 @@
      * rather than counted so that a control moving into the harness row is a
      * red line rather than a number that still adds up.
      */
+    /**
+     * ⚠️ AND IT READS THE HARNESS'S OWN SELECTOR SINCE 2026-09-28, WHICH IS
+     * WHAT MADE IT SAFE TO MOVE THE GLYPH. `demo/verify.mjs` presses
+     * `.pos-controls button, .tbar-x`, and this line named only the first half,
+     * so a control wearing `.tbar-x` would have passed it while the suite
+     * pressed it on every run. The glyph became a segment of the chooser that
+     * day; the chooser is in `.shape-bar` and `.shape-bar` is a stack child, so
+     * neither selector reaches either control, and this asks the question the
+     * way the harness asks it rather than the way this page remembers it.
+     */
+    const PRESSED = '.pos-controls button, .tbar-x';
+    const pressed = [...document.querySelectorAll(PRESSED)];
     const mine = [pres.el, hand];
-    d.assert('the status button and the hand both sit in the page row and neither is in the harness row',
-      mine.every((e) => bar.contains(e) && !e.closest('.pos-controls')),
-      `${mine.filter((e) => bar.contains(e)).length} of 2 in .shape-bar`);
+    d.assert('the status button and the hand both sit in the page row and neither is one the harness presses',
+      mine.every((e) => bar.contains(e) && !pressed.includes(e)),
+      `${mine.filter((e) => bar.contains(e)).length} of 2 in .shape-bar, `
+      + `${pressed.length} elements match ${PRESSED}`);
 
     /**
      * 🔴 THE ROW IS ONE LINE AND IT IS IN THE ORDER THAT WAS ASKED FOR, WHICH IS
@@ -1479,12 +1569,19 @@
      * ⚠️ IT IS THE RECTS AND NOT THE DOM. `.shape-bar` is `flex-wrap: wrap`, so
      * source order tells you nothing about what a reader sees, and this project
      * has paid four times for a layout claim read out of a stylesheet.
-     * ⚠️ AND IT IS TRUE AT THE ONE WIDTH THIS HARNESS RUNS, 756 px. The four
+     * ⚠️ AND IT IS TRUE AT THE ONE WIDTH THIS HARNESS RUNS, 756 px. The five
      * widths in the note above the stylesheet were measured with a throwaway
      * probe and are not this assert.
      * ⚠️ AND IT IS THREE SINCE 2026-09-28, WHICH IS THE SKETCH'S OWN COUNT. The
      * fourth was `put back`, kept as a departure and written up as one until
      * the ask *"rm put back button"* took it out.
+     * 🔴 THE THIRD IS NOW INSIDE THE SECOND, SO THIS HALF OF THE CLAIM GOT
+     * WEAKER AND THE ASSERT UNDER IT IS WHERE THE JOIN IS GRADED. The glyph is
+     * the chooser's last segment since *"fix invisuble hand button"*, so its
+     * left edge is inside the chooser's rect and is greater than it by
+     * construction rather than by layout. What this still reads honestly is
+     * what a visitor sees left to right and on one line, which is the sketch's
+     * claim; what it can no longer see is a seam that came apart.
      */
     const row = [pres.el, parts.el, hand].map((e) => e.getBoundingClientRect());
     d.assert('the three controls sit on one line, in the order the sketch put them',
@@ -1492,6 +1589,56 @@
       && row.every((r, i) => i === 0 || r.left > row[i - 1].left),
       `${new Set(row.map((r) => Math.round(r.top))).size} line at ${Math.round(innerWidth)} px, `
       + `left edges ${row.map((r) => Math.round(r.left)).join(', ')}`);
+
+    /**
+     * 🔴 THE GLYPH AND THE CHOOSER ARE ONE OBJECT, AND THAT IS A MEASUREMENT OF
+     * TWO RECTS RATHER THAN A CLASS NAME. Reported 2026-09-28 as *"fix invisuble
+     * hand button"* with a screenshot: the square stood 10.00 px clear of
+     * `Session` with a full ring of its own, MEASURED at 375, 756 and 1280
+     * before anything was changed, and at 375 it also sat 6.75 px above the
+     * options because a neighbour of `.pos-choice` centres itself on the label
+     * and the segments together. Joined, the two borders share one pixel and
+     * the tops agree.
+     * ⚠️ IT IS THE OVERLAP AND THE TOP, WHICH ARE TWO WAYS A SEAM COMES APART
+     * AND ONLY ONE OF THEM IS VISIBLE IN A DESKTOP SCREENSHOT. A row that lost
+     * `.pos-seg` would read +0 or +10 here; the phone misalignment was invisible
+     * at every width the harness runs and is the half a person reported.
+     * ⚠️ AND THE `-1` IS READ, NOT TYPED TWICE. `.pos-seg > * + *` is
+     * `margin-left: -1px` in `shell.css`, so this compares the rendered margin
+     * against the rendered gap instead of asserting a number this page decided.
+     */
+    const lastOpt = parts.buttons[parts.buttons.length - 1].getBoundingClientRect();
+    const glyph = hand.getBoundingClientRect();
+    const overlap = glyph.left - lastOpt.right;
+    const pull = parseFloat(getComputedStyle(hand).marginLeft);
+    d.assert('the hand is joined to the chooser rather than standing beside it, sharing one pixel of border',
+      Math.abs(overlap - pull) <= 0.5 && Math.abs(glyph.top - lastOpt.top) <= 0.5,
+      `${overlap.toFixed(2)} px between them against a ${pull.toFixed(2)} px pull, `
+      + `tops ${glyph.top.toFixed(2)} and ${lastOpt.top.toFixed(2)}`);
+
+    /**
+     * 🔴 AND THE SEAM HAS NO NOTCH IN IT, WHICH IS THE OTHER HALF AND HAS ITS
+     * OWN FAILURE. `shell.css` records it on `.sld-lane`: a segment that rounds
+     * its own corners keeps them inside a join, because `.pos-seg > *` sits high
+     * in that file and a component's later `border-radius` wins on source order.
+     * A lane needs one explicit line for it and a button needs none, so the
+     * right thing to check is not that anybody wrote a line, it is that the
+     * OUTSIDE is round and the INSIDE is square on the rendered boxes.
+     * ⚠️ AND THE OUTER CORNER IS COMPARED AGAINST THE ONE AT THE OTHER END
+     * RATHER THAN AGAINST A 4. `.pos-seg` writes `4px` and so does `button`;
+     * reading the first option's LEFT corner and requiring the glyph's right to
+     * match it is the same claim with no number typed here to disagree later.
+     */
+    const firstOpt = getComputedStyle(parts.buttons[0]);
+    const lastCs = getComputedStyle(parts.buttons[parts.buttons.length - 1]);
+    const handCs = getComputedStyle(hand);
+    d.assert('the joined row rounds only its outer corners, so the seam is a line rather than a notch',
+      handCs.borderTopRightRadius === firstOpt.borderTopLeftRadius
+      && handCs.borderBottomRightRadius === firstOpt.borderBottomLeftRadius
+      && parseFloat(lastCs.borderTopRightRadius) === 0
+      && parseFloat(lastCs.borderBottomRightRadius) === 0,
+      `outer ${firstOpt.borderTopLeftRadius} and ${handCs.borderTopRightRadius}, `
+      + `seam ${lastCs.borderTopRightRadius}`);
 
     /**
      * 🔴 A GLYPH IS A PICTURE, SO IT IS NOT A NAME, AND THE SQUARE IS READ OFF
