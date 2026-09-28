@@ -156,7 +156,59 @@ Two requests. Not started.
   it is deliberately outside `.pos-controls` so the suite never writes to an
   instrument. Removing it moves the assert count.
 
-### wish: "rm on button on wish, just keep x button"
+### Done 2026-09-28: wish, "rm on button on wish, just keep x button"
+
+✅ **DONE.** The `on` check is gone from every connection row, which now carries
+one control, the `×` square, in the same reserved 72 px column, so the picture
+beside it did not move. `createCheck` was this page's only use of
+`/shell/check.mjs` and the import went with it.
+- **A ROW THAT EXISTS IS CONNECTED.** `show()` gained `connectAll()`, which
+  connects every row graded `ok` and stamps `data-connected="1"` when the desk
+  really made the link. `×` was already disconnecting before removing, so it is
+  now one gesture that takes the link down, sends the 32 quietening messages and
+  clears the row.
+- ⚠️ TWO THINGS HAD TO MOVE WITH IT. `show()` now takes the previous answer's
+  links down at its head, because a destroyed row that kept its link would be an
+  instrument routed by a sentence no longer on screen with nothing left on the
+  page to stop it, and a check calling `show()` twice was exactly how a live
+  link would have leaked into a run. `connectAll` is ONE promise chain rather
+  than one per row, so a second answer cannot start connecting while the first
+  is still opening the desk.
+- ✅ **NOTHING CONNECTS BY ITSELF.** `show()` is reachable only out of a press
+  on `Interpret`, on a prepared row, or on a release of `Hold to talk`. A page
+  load calls `clearAnswer()`, which lays one empty row and never calls `show()`.
+  Under `?selfcheck=1` the desk branch returns stand-in ports and
+  `requestMIDIAccess` is never reached at all.
+- **MEASURED: 76/76 green and 70 page asserts BEFORE, 77/77 green and 71
+  AFTER.** The one added is the hole the switch used to cover by snapping back
+  to off: a row the desk could not make is graded `ok`, holds 0 links, carries
+  no `data-connected`, and the log names the port. Every other line is a rewrite
+  in place, so nothing went silent. The connect assert drives a REAL GESTURE,
+  `rowEls()[0].click()` through `useExample`, `Interpret`, `askBox`, `think` and
+  `post`, rather than calling `connect()` or `show()`.
+- The `what` and the manifest `one` are the same sentence again: *"say which
+  instrument should play which, and a language model makes the connection on the
+  desk"*. The old one promised *"a connection you can switch on"*, a control a
+  visitor would now look for and never find. The manifest comment that described
+  the switch was rewritten by the session in the same commit.
+
+⚠️ **LEFT OPEN, AND IT IS A DECISION RATHER THAN A DEFECT: an allowed row that
+connected and an allowed row whose instrument is not plugged in look the same.**
+The log says `nothing on this desk answered to <name>, so that connection was
+not made` and the row carries no `data-connected`, which is what the new assert
+reads, but a reader looking at the row sees one picture either way. The switch
+used to carry that by snapping back to off. No visual state was invented,
+because dimming a whole row is a bigger claim than the ask. A rule keyed on
+`.wish-conn:not([data-connected])[data-verdict="allowed"]` is one line whenever
+it is wanted.
+
+⚠️ **AND A KIT GAP, NOT FIXED:** `shell.css`'s glyph square is scoped to
+`.pos-controls`, so this page carries its own copy of `button[data-glyph="1"]
+{ width: 34px; height: 34px }` and taking it away lays the button out at 45.8
+px. That was already true and already in the page's comment. It matters more now
+that this is the row's only control. `positron-ui` records `pos-sm` as the small
+button variant this remove button was waiting for, which is the same gap from
+the other side.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28, WITH A SCREENSHOT** of a connection row's
 right hand column showing an `on` checkbox above an `×` button: *"rm on button
