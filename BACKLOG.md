@@ -254,7 +254,24 @@ answered the same shape earlier today by splitting compile from attach: it is
 READY on load and the first gesture arms the audio. That is the reading to
 build.
 
-### global: "all nameplates are uppercase"
+### Done 2026-09-28: global, "all nameplates are uppercase"
+
+✅ **DONE BY THE SESSION, NOT AN AGENT, because it is shared and two page agents
+were about to open those files.** `caps` already defaulted to true in
+`instrument-panel.mjs`, so this was the removal of two opt-outs: `/knobs/` and
+`/shape/` both passed `caps: false` and both carried an argument for it.
+⚠️ **THE ARGUMENT WAS REAL AND IS KEPT IN WORDS RATHER THAN DELETED.** The
+2026-09-21 rule, *"replica names always in uppercase"*, had been read narrowly as
+being about a shelf of REPLICAS reading as one shelf, and neither page is a
+replica of anything. The second ask overrules that reading: one treatment for
+every plate is the plainer rule, and a rule with two defensible exceptions in it
+is a rule somebody has to remember.
+⚠️ The option STAYS in `panel-layout.mjs`, because a page that has to print a
+typed string will need it, with a note to delete it if nothing passes it next
+time somebody reads that file.
+- Both plate asserts read the RENDERED word rather than the typed one, so both
+  moved with it. MEASURED: **`shape` 53/53 green**, **`knobs` 37/39 with the same
+  two pre-existing reds** it had before, the relay and the audio graph.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"all nameplates are uppercase"*. Every page
 with a plate, and the component that draws it.

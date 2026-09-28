@@ -1,4 +1,164 @@
-# Handoff, 2026-09-28, session 53: a stream of ten page requests, collected first and worked second
+# Handoff, 2026-09-28, session 53: a stream of thirteen requests, collected first and worked second
+
+## Where it is right now
+
+**DEPLOYED AND CONFIRMED ON THE EDGE: BUILD `46cbb03-164617-1505`**, which is
+commit `46cbb03`. **20 commits this session**, the working tree is CLEAN, and
+nothing is in flight. MEASURED after, counted and not remembered: **57 demos, 55
+built, 55 cards drawn**, and **75 plans in `plans/`**.
+
+🔴 **EVERY DEPLOY THIS SESSION CAME FROM A CLEAN WORKTREE AT THE LAST COMMIT,
+NOT FROM THE WORKING TREE, AND THAT IS WORTH KEEPING.** Up to eight agents were
+writing in this checkout at once, and `node build.mjs` sweeps whatever is there,
+so a deploy from the working tree would have shipped half-written pages to the
+live site. The form:
+
+```sh
+git worktree add --detach <scratch>/deploy-wt HEAD     # once
+git -C <scratch>/deploy-wt reset --hard $(git rev-parse HEAD)   # every time
+cd <scratch>/deploy-wt/workers/view && node build.mjs
+cd <scratch>/deploy-wt && env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN node workers/view/deploy.mjs
+```
+
+⚠️ **`reset --hard`, NOT `checkout`.** A plain `checkout` ABORTS once the
+worktree holds its own build output, and it aborts in a way that is easy to read
+as success: the build then runs against the OLD commit and the deploy ships it
+again. That happened once today and was caught only by reading the BUILD stamp
+against the commit it claimed to be.
+
+## What was asked and what it is now, thirteen requests
+
+Asked as a stream over one afternoon, collected into `BACKLOG.md` verbatim as
+they arrived and worked second, which is the standing rule. Every one is struck
+off. One agent per page, one agent for anything shared, and the session made
+every commit.
+
+| ask | where it is now |
+| --- | --- |
+| global: reading sections atop the logs, glued | https://positron.studio/kit/ shows all four shapes |
+| all nameplates are uppercase | done by the session, two opt-outs removed |
+| muta: rm Warps and its routing, panel, unlabelled selector, picture on top | https://positron.studio/muta/ |
+| muta: on by default, no online button, test tone in that spot | same page, second round |
+| shape: panel with sections, rm `put back` | https://positron.studio/shape/ |
+| knobs: panel, rm "midi is listening" | https://positron.studio/knobs/ |
+| knobs: use the rotary sliders grid | same page, second round |
+| fau: compile on loading so i can play | https://positron.studio/fau/ |
+| fau: rm Bell and Hall, bring something interesting | same page, second round |
+| wish: rm the `on` button, keep the `×` | https://positron.studio/wish/ |
+| wish: align the close top margin to the diagram's | same page, second round |
+| pack: support any wavs in a zip | https://positron.studio/pack/ |
+| tom: apply the instrument panel | https://positron.studio/tom/ |
+| dump: all buttons secondary | https://positron.studio/dump/ |
+| hide grains from the index | card gone, page still 200 |
+
+**The one line still open from the stream is the keyboard's `N | D` pair**, and
+it is open on the owner's own ordering: *"N D can be last"*. See below.
+
+## The assert counts, which are the reading rather than the colour
+
+| page | before | after |
+| --- | --- | --- |
+| `dump` | 25/25, 19 page | **25/25, 19** unmoved |
+| `wish` | 76/76, 70 page | **77/77, 71** |
+| `pack` | 26/26, 20 (derived) | **31/31, 24** |
+| `tom` | 37/37 | **39/39** |
+| `shape` | 50/50, 44 page | **53/53, 47** |
+| `knobs` | 36/38, 2 red | **38/40, the same 2 red** |
+| `fau` | 51/51, 45 page | **56/56, 50** |
+| `muta` | 55, 49 page, 1 red | **49/49, 43** |
+| `circuit-sample-test` | 52/52 | **84/84**, sabotages 5 to 10 |
+| `kit` | 246/234 | **247/235** |
+
+⚠️ **`muta` IS THE ONE THAT WENT DOWN, AND IT IS NOT A REGRESSION HIDDEN IN A
+TABLE.** Nine asserts left with Warps, named one by one in `BACKLOG.md`, and two
+of them are holes worth carrying: nothing now grades that the two pictures are
+two signals, and nothing grades the leg between the node and the destination. A
+tenth left with the on/off switch in the second round: *"an oscillator that is
+switched off makes no sound, whichever way it is asked"*, which was deleted with
+its subject rather than rewritten into a check that cannot fail.
+🔴 **`knobs` CARRIES TWO STANDING REDS AND THEY ARE NOT THIS SESSION'S.** `the
+relay delivered the control messages this page sent` (nothing answers in
+`studio-1`, the Raspberry Pi is not on the relay) and `this page makes no sound
+of its own` (a check run never starts the audio graph). It also has a KNOWN FLAKY
+PAIR about a wheel and an arrow key that goes red only when another headless
+Chrome is alongside; the harness prints a warning when that is true, and a red
+under it is not evidence.
+
+## The four things worth a decision, all of them reversible
+
+- **`muta` is fit-content now**, 34.0 to 559.0 px where its case ran 34.0 to
+  722.0. That is the compose rule that an instrument is as wide as the
+  instrument. **One word, `full: true`, puts it back.**
+- **`muta` fetches 196 KB on every visit**, paid by a visitor who never plays. It
+  is same origin and this repository's own file, and `/fau/` spends 6.16 MB the
+  same way by explicit ask, so the precedent was treated as covering it. **One
+  line moves it back behind the first touch.**
+- **`shape` has no one-press way back for a slider moved BY HAND.** The `move
+  everything` glyph offers the way back only while something is running. The undo
+  is the instrument's own, which the page says in its log.
+- **`wish` shows a connected row and an unplugged one identically.** The log says
+  which and the row carries no `data-connected`, but the row reads the same
+  either way. A rule keyed on
+  `.wish-conn:not([data-connected])[data-verdict="allowed"]` is one line.
+
+## Three defects found and fixed that nobody asked about
+
+- 🔴 **`CLAUDE.md` SAID `built: false` HIDES A ROW FROM THE INDEX. IT DOES
+  NEITHER HALF OF THAT, AND THE WRONG ANSWER WENT LIVE BEFORE ONE `curl`
+  MEASURED IT.** `build.mjs:532` reads `if (!d.built) continue` while it
+  ENUMERATES demo directories, so `/grains/` answered **404**, while the front
+  page went on drawing a `grains` card with no link behind it, because
+  `byGroup()` filters on **`unlisted`** and never looks at `built`. The worst of
+  both. `CLAUDE.md` is corrected in both places it made the claim.
+- 🔴 **A LIVE CRASH IN `circuit-sample.mjs` REACHABLE FROM A STRANGER'S ZIP.**
+  `frames` came from the DECLARED block align while the reader stepped by the
+  DERIVED one, so a file declaring a smaller block align than its own frame
+  claimed more frames than it had bytes and killed three exported functions
+  inside a `DataView`. The module's whole stance is that a refusal is a value a
+  caller can show and nothing throws.
+- 🔴 **`DEPTHS` WAS DOING TWO JOBS.** `slotsIn()` used it as one of three sync
+  conditions, so teaching the decoder 24 bit would silently have made the Circuit
+  slot walker twice as likely to find a sample table in noise. Split into
+  `SLOT_DEPTHS`, still `[16]`.
+
+## What the kit gained
+
+- **`joined` is the default for every page** and `createReport` builds its
+  surface with `createGlue`. The import cycle was why it had never been done:
+  `glue.mjs` imported `el` from `shell.mjs`, so calling back would have been a
+  cycle in the frame every page mounts. It carries a three line local `div()`
+  now, which is what `stack.mjs` already did for the same reason.
+- **`.pos-rows-r > :only-child` takes the row**, whether or not the row has an
+  inset. Asked for INDEPENDENTLY by `/shape/` and `/tom/` on one day, which is
+  what made it a kit rule rather than either page's business.
+- **`circuit-sample.mjs` reads anybody's WAV: 901 of 901 against 749**, with 24
+  bit and a documented stereo mixdown, graded against ffmpeg sample for sample at
+  a worst difference of **0**.
+- **`instrument-panel.mjs`'s header is corrected**: it named `/knobs/` as a page
+  it would break, which was a fact about `.panel-flow`'s `max-content` and not
+  about the instrument.
+
+## Open in `BACKLOG.md`, the ones this session put there
+
+- **`keyboard component`: "rm N | D setting from keyboard component"**, and
+  *"N D can be last"*. NOT STARTED. `keyboard.mjs:848` is `letterBtn` and its
+  pair, with `naming` at 480, `noteName` at 481 and the API at 1809 to 1818.
+  🔴 **SEVEN PAGES BUILD A KEYBOARD AND ALL OF THEM MOVE**: `fau`, `instrument`,
+  `evo`, `kit`, `looper`, `knobs`, `nola`. ⚠️ And `noteName()` still has to
+  answer something once the control is gone, so the decision is WHICH NAMING
+  SURVIVES, not merely which button leaves. It also closes a 2026-09-25 line by
+  deleting its subject.
+- **`control-grid`: the pitch is 84 and the lattice steps 94.** `size()` calls
+  `pitchFor(w, h, 0)` with the gap zeroed and sets `gap` separately, so
+  `--cg-pitch` and `grid.pitch()` both report 84 while the lattice steps 94. The
+  component's own comment says *"the gap is inside the pitch"*, which is the one
+  sentence in that file that is not true of the code. A naming and comment defect
+  rather than a layout one.
+- **`crate`: a dead branch round `.pos-readout`.** `demo/crate/index.html:141`
+  queries `.pos-readout` inside `d.el`, and the readout has never been a
+  descendant of `d.el`. So `.vain-nums` has never applied and the numbers have
+  always been on screen before there were any. **READ, NOT MEASURED**: nobody
+  opened that page. One run of `node demo/verify.mjs crate` settles it.
 
 ## 🔴 `grains` IS OFF THE FRONT PAGE, AND IT IS COMING BACK
 
