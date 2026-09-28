@@ -1,3 +1,171 @@
+# Handoff, 2026-09-28, session 54: a stream of eight, collected first and worked second
+
+## Where it is right now
+
+**DEPLOYED, PUSHED AND CONFIRMED ON THE EDGE: BUILD `a05166b-203845-7a89`.**
+Confirmed by reading the deployed `shell/shell.mjs` rather than by trusting
+`deploy.mjs`'s own line. **7 commits this session**, the working tree is CLEAN,
+nothing is in flight, and `4155175` is on
+`origin/session-28-station-videoradio`. ⚠️ **THE ACTIVE GITHUB ACCOUNT WAS PUT
+BACK AND CHECKED**: `gh auth status` reads `Kristjan-Jansen_enefit` active.
+
+MEASURED after, counted and not remembered: **57 demos, 55 built, 55 cards**,
+and **75 plans in `plans/`**. None of those three moved today; no manifest row
+was touched.
+
+⚠️ **`deploy.mjs` REBUILDS BEFORE IT SHIPS**, so the stamp on the edge is eight
+seconds past the one `build.mjs` printed and both name the commit BEFORE the one
+carrying them. `4155175` exists only to bring the built tree back into this
+checkout, which had gone stale: session 53 deployed from a detached worktree
+every time and the output never came back, so four pages nobody touched today
+(`fau`, `knobs`, `panel-layout.mjs`, `keyboard.mjs`) were behind in
+`workers/view/public`.
+
+## The eight asks, and what each one is now
+
+Asked as a stream over one afternoon, written into `BACKLOG.md` verbatim as they
+arrived and worked second, which is the standing rule. **The collection was one
+commit of its own, `056ad87`, made before a single one of them was worked.**
+Shared work went first, by one agent, alone; then three page agents in parallel;
+the session made every commit.
+
+| ask | where it is now |
+| --- | --- |
+| rm border around the hand button on knob dials | https://positron.studio/knobs/ |
+| fix the invisible hand button | https://positron.studio/shape/ |
+| muta: centre the knob grid | **REFUSED IN WRITING**, one decision waiting, see below |
+| muta: Test tone full width on mobile | https://positron.studio/muta/ |
+| make the screen keyboard 1/3 higher | https://positron.studio/nola/ |
+| rm the Loop button when the Evolution is not connected | same page |
+| keyboard's lower buttons on the same line | same page, and see the hole below |
+| reduce left padding on tom's left numbers | https://positron.studio/tom/ |
+
+## The assert counts, which are the reading rather than the colour
+
+| page | before | after |
+| --- | --- | --- |
+| `nola` | 106/106, 100 page | **107/107, 101** |
+| `kit` | 247/247, 235 page | **249/249, 237** |
+| `shape` | 53/53, 47 page | **55/55, 49** |
+| `tom` | 39/39, 28 page | **40/40, 29** |
+| `muta` | 49/49, 43 page | **49/49, 43** unmoved |
+| `looper` `instrument` `evo` `fau` `knobs` `dump` | | all unmoved |
+
+**Not one assert left. Six arrived.** A final targeted run of the five touched
+pages together on the committed tree reads **500/500 green**, and every per-page
+count matches what its agent reported.
+🔴 **`muta`'s UNMOVED COUNT IS THE HONEST READING AND NOT A GAP.** Nothing
+appeared or disappeared there and the change sits inside a `max-width: 560`
+block, and **`demo/verify.mjs` runs at 756 px with no viewport override**, so no
+harness on this site can enter any of today's phone blocks. `node demo/shot.mjs
+<slug> 375` is the only instrument. That is in `BACKLOG.md` as its own entry.
+⚠️ `knobs` still carries its two standing reds about the Raspberry Pi not being
+on this desk, identical before and after.
+
+## The measurements worth keeping, one per ask
+
+- **The knob hand button reads `border: 0`, not a deleted declaration.** The
+  base `button, .pos-btn` rule sets a `--line2` border as a SHORTHAND, so
+  deleting the line would have left a ring **brighter** than the one being
+  removed. `which-rule-won.mjs` printed all three declarations and the winner.
+  The ground and the 50% radius stay: the button is drawn over the dial.
+- **The pad row: at 375 it is 323 px and its eight children need 523.4 px, of
+  which 218.5 px is three reserved readout cells holding their widest possible
+  reading while empty.** So the thing that did not fit was invisible. It is two
+  ends in two boxes now, and what made it FIT is the tempo and ratio cells
+  leaving with `Loop`, which is 161.7 px.
+- **The keys are a third taller through two tokens**, 74 to 98.66 and 46 to
+  61.33 on the phone, 92.50 to 123.33 and 57.50 to 76.66 at the desk. The 1.25
+  did not move, the media query did not move, and the 74 and 46 now appear ONCE
+  in the file each instead of twice.
+- **The nameplate centres because the plate gives up `flex: 1 1 auto`.** A box
+  that spans its row makes `justify-content: center` a no-op, which is why
+  `/tom/` was ALREADY `justify-content: center` and hard right at x313.5. Five
+  live panels measured at 375, all centred on 187.5 to within 0.05 px.
+- **The Loop gate: the page owns the device test, the component owns the row.**
+  The test is `/evo/`'s own `/mk-?4\d\dc|evolution/i` character for character,
+  because CoreMIDI calls the port `MK-425C USB MIDI Keyboard` and the maker's
+  name is in nobody's port list. A sounding loop is **stopped and kept, never
+  cleared**.
+- **muta's full-width button needed TWO declarations**, because a flex item
+  cannot widen its parent: the button rule alone gives the cluster's 165.4 px,
+  not the row's 301.0.
+- **tom's gutter: the ask named the right symptom and pointed at the wrong
+  box.** The label and its column carry no left padding at all; the whole of the
+  air was `.panel-case`'s 20 px. The column box went 21 to 9, against the
+  transport bar's play button at 9 and the log's ink at 13.
+- **shape's join gave 11 px back** and the seam is -1.00 px, which is exactly
+  the rendered margin of `.pos-seg > * + *`, so the assert compares the gap
+  against the pull rather than against a number the page typed.
+
+## 🔴 ONE DECISION IS WAITING AND MUST NOT GO QUIET
+
+**Does `/muta/`'s PANEL centre in the PAGE?** `BACKLOG.md` has it in full.
+
+**Centring the knob grid is impossible and that is measured three ways**:
+`.plai-knobs` is the widest row of a `fit-content` surface, so client equals
+scroll at 483 at both 1280 and 560; both grids are `flex: 0 0 auto` and each box
+is the sum of its own tracks; and a LIVE `justify-content: center` moved the
+first grid **0.0 px** at 1280 and at 560, then put it at **-1.5** at 480 and
+**-54.0** at 375 with `scrollLeft` clamped at 0. **A no-op where there is room
+and a permanent clip where there is not.**
+
+**The one box with slack is the panel inside the page, 525 px in a 688 px body,
+all 163 px of it on the right.** One `margin-inline: auto` plus one assert
+rewrite, about ten minutes. It costs the left edge that the `h1`, the `what`
+paragraph, the report and the log all share, and `/muta/`'s own assert written
+the same day says the instrument starts where the rest of the page does. It was
+not guessed at, because reverting a documented decision hours old on a guess is
+the `/tom/` *"no top padding on titles"* shape.
+
+## What is carried, four entries, none of them quiet
+
+- **The pad row still wraps at 375 WITH the Evolution plugged in, by 200.4 px.**
+  The ordinary state fits; the connected one does not.
+- **Every phone block landed today is graded by nothing**, for the reason above.
+  Both of these want a container query, and **both surfaces are `width:
+  fit-content`, which `container-type: inline-size` collapses.** Attempted in
+  thought, refused in writing, twice.
+- **`step-grid.mjs`'s `size()` reads `strip.clientWidth`, which INCLUDES the
+  scroller's own 16 px of left padding**, so the grid is sized for more room
+  than it has: 624 against 638 at 1280, 14 px over, and the arithmetic
+  reproduces it exactly. Found while measuring something else. One line, and it
+  reaches `/kit/` and `/pack/` too.
+- **`createChoice` has no slot for a trailing control.** `/shape/` inserts after
+  its documented button list, which is stable, but the honest home is a
+  `trailing` option carrying the specificity tie with it.
+
+## Three things found on the way that nobody asked about
+
+- 🔴 **ONE FACT IN A BRIEF WAS WRONG AND THE AGENT CAUGHT IT.** The session told
+  the shared agent that `/tom/` passes `loop: true`. **It does not, and has no
+  keyboard at all**: that `loop: true` is inside a comment about a transport bar
+  removed earlier. Two pages pass it, `/kit/` and `/nola/`. This is the
+  standing-file rule catching a brief instead of a file.
+- 🔴 **A `/shape/` ASSERT COULD HAVE PASSED WHILE THE SUITE PRESSED THE
+  CONTROL.** It read `!e.closest('.pos-controls')` while the harness presses
+  `.pos-controls button, .tbar-x`, so a control wearing `.tbar-x` would have
+  passed it every run. It reads the harness's own selector verbatim now, with no
+  change to the count.
+- 🔴 **`/tom/`'s COMMENT ABOUT ITS OWN OLD SCAR WAS STALE.** `.pos-pg-labs` now
+  sits AFTER `.panel-fixed-l`, which is the first of the two cures that comment
+  said were still owed. A comment claiming a repair is still owed is this
+  project's cheapest recurring defect, so the paragraph is rewritten.
+
+## How it was run, because the arrangement is the reusable part
+
+**Eight requests, one collection commit, one shared agent, three page agents,
+seven commits, all of them the session's.** No agent committed and no agent ran
+`git add`. Every page agent was told `demo/shell/` was closed to it and to
+report a kit-shaped fix rather than write it; **two of the three did exactly
+that**, which is where the last two carried entries came from.
+
+Verification was targeted throughout: `check-html.mjs` first, then
+`verify.mjs <slug>` on the touched pages only, then ONE five-page run at the
+end. No full suite was run today.
+
+---
+
 # Handoff, 2026-09-28, session 53: a stream of thirteen requests, collected first and worked second
 
 ## Where it is right now
