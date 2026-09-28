@@ -80,13 +80,72 @@
      label's own `padding: 0 6px 0 0` leaves 16 px for 12.04 px of ink, which is
      what the assert below reads. Widening the column to pay for a gutter the
      grid asked to have removed would put the divider back at 108 px of width.
-     ⚠️ AND IT IS A PAGE RULE UNDER PROTEST. The durable repair is in the
-     component and is one of two lines in `shell.css`, either moving `.pos-pg-labs`
-     after `.panel-fixed-l` or writing it `.panel-fixed.pos-pg-labs`. This page
-     is the only caller that puts a step grid's labels on a panel's fixed column
-     (`/kit/`'s three specimens hand it a bare `div`), so nothing else is
-     affected today and nothing else grades it either. */
-  .tom-fixed { gap: var(--pg-gap); border-right: 0; padding-right: 0; }
+     ✅ AND IT IS NO LONGER A PAGE RULE UNDER PROTEST, BECAUSE THE DURABLE
+     REPAIR LANDED. This paragraph said the cure was still owed and named two
+     lines in `shell.css`; the first of them was written. `.pos-pg-labs
+     { border-inline: 0; padding-inline: 0 }` now sits at `shell.css:6407`,
+     AFTER `.panel-fixed-l` at `shell.css:6378`, with the measurement beside it.
+     MEASURED 2026-09-28 at 375 and at 1280: `.panel-fixed` computes
+     `padding-left: 0px`, `padding-right: 0px` and no border on both. So the two
+     declarations below now AGREE with the component instead of being the only
+     thing holding the column open. They stay because a page rule in a `<style>`
+     after the `<link>` is the tie that won here first, and two agreeing rules
+     are cheaper than a reader working out which one is load bearing.
+
+     🔴 AND THE COLUMN HANGS OUT OF THE CARD'S INSET SINCE 2026-09-28, ASKED FOR
+     AS *"reduce left padding on tom's left numbers"*. NEITHER THE NUMBER NOR ITS
+     COLUMN CARRIES ANY LEFT PADDING AND NEITHER EVER DID: `.pos-pg-lab` is
+     `padding: 0 6px 0 0` and `.pos-pg-labs` is `padding-inline: 0`. The air a
+     reader was pointing at belongs one box further out, which is why the first
+     command was `node demo/ancestry.mjs tom '.pos-pg-lab' padding-left` and not
+     an edit.
+     🔴 THREE BOXES INSET THIS COLUMN'S LEFT EDGE AND ONLY ONE IS INSIDE THE
+     OBJECT. `body` gives 16 and `.pos-glue` gives its 1 px border, which are the
+     page's own margin and the object's own edge. The third is `.panel-case`'s
+     `padding: 0 var(--panel-pad)` at 20 px, which no rule on this page touched.
+     That is the whole of it, at both widths, identically.
+     🔴 THE COMPARISON THAT SETTLES IT IS INSIDE ONE GLUED OBJECT, because that
+     is what a reader is looking at. MEASURED from the object's own left edge,
+     the same at 375 and at 1280: the transport bar puts its play button at 9,
+     the log puts its first line of ink at 13, and this column's box sat at 21
+     with `63` inking at 24.96 and `0` at 30.98. Three rows of one surface, and
+     the gutter was the only one set in past 13. ⚠️ AND `0` IS THE READING, NOT
+     `63`: the first ten rows are single digits, they are the ones sitting
+     directly under the play button, and the column is right aligned, so what a
+     reader compares against that button is 30.98.
+     🔴 `--panel-pad` IS NOT THE THING TO LOWER, WHICH WAS CHECKED RATHER THAN
+     ASSUMED. On this page that one token does three jobs: the card's left inset,
+     the card's RIGHT inset, and `.panel-fixed`'s and `.panel-strip`'s
+     `padding-block`, which is the air above the first row of pads and below the
+     last. Lowering it answers one ask by moving three things, on the page whose
+     own four-round scar is about a title's air.
+     ⚠️ AND `--pg-lab` IS STILL NOT THE NUMBER TO CHANGE, for the reason two
+     paragraphs up. Narrowing the column to buy two pixels spends the 3.96 px
+     that the ink assert below reads as its entire headroom.
+     ✅ SO THE COLUMN LEAVES THE CARD'S INSET RATHER THAN FIGHTING IT, AND THE
+     ESCAPE IS DERIVED FROM THE TOKEN IT IS ESCAPING. A child never gets out of a
+     parent's padding by declaring its own, and a typed `-12px` here would be a
+     relationship between two boxes wearing a minus sign. `calc(var(--ctl-gap) -
+     var(--panel-pad))` says it instead: the ruler keeps the kit's smallest
+     published air from the card's border in place of the card's full inset.
+     MEASURED after, both widths: the box lands at 9, which is the transport
+     bar's own content inset to the pixel, `63` inks at 12.96 against the log's
+     13, and `0` at 18.98. The assert below reads the box against the BAR rather
+     than against a number, so if either token moves the two stop agreeing out
+     loud.
+     ⚠️ IT MOVES THIS COLUMN AND NOTHING ELSE. The nameplate left the case on the
+     same day and the strip's right edge is still the card's 20, so the card is
+     the width it was and only the ruler hangs out.
+     ⚠️ AND THE FULL ESCAPE WAS LOOKED AT AND REFUSED. `calc(-1 *
+     var(--panel-pad))` is the form this project sanctions for a part that must
+     reach its own box's edge, and this one must not: it lands `63` at 4.96 from
+     the object's edge, which photographs as a column about to be clipped, on the
+     one page whose gutter has been clipped before. `-16` was looked at too and
+     puts `63` at 8.96, inside the transport bar's own inset. */
+  .tom-fixed {
+    gap: var(--pg-gap); border-right: 0; padding-right: 0;
+    margin-inline-start: calc(var(--ctl-gap) - var(--panel-pad));
+  }
 
   /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
      prose allowed here at all. It says which sample was last heard and why, and
@@ -1277,6 +1336,34 @@
     d.assert('and the last one still does, so the two columns share one pitch',
       Math.abs(nz.top - rz.top) < 1 && Math.abs(nz.bottom - rz.bottom) < 1,
       `top ${(nz.top - rz.top).toFixed(2)} px apart over ${grid.labels.length} rows`);
+  }
+
+  /**
+   * 🔴 THE GUTTER'S LEFT INSET IS A CLAIM ABOUT THE ROW ABOVE IT, SO IT IS READ
+   * AGAINST THAT ROW AND NEVER AGAINST A NUMBER. The column hangs out of the
+   * card's inset by `calc(var(--ctl-gap) - var(--panel-pad))`, and what that
+   * expression is FOR is landing it on the transport bar's own content inset.
+   * Two tokens standing in for one distance is this project's most repeated
+   * defect, and the published cure is to write the assert that requires them to
+   * agree. If `--ctl-gap` moves, or the bar's 8 px does, this goes red rather
+   * than the gutter quietly drifting back out.
+   * ⚠️ THE BAR'S FIRST CONTROL, NOT THE BAR. `.tbar` is full width inside the
+   * glue and its left edge is the object's; the inset being compared is where
+   * its play button starts, which is the thing sitting directly above these
+   * numbers on screen.
+   * ⚠️ AND IT IS THE BOX, NOT THE INK. The ink assert below is what grades what
+   * a reader can READ in this column; this one grades where the column sits,
+   * and the two are separate because a column can be perfectly placed and still
+   * clipped, which is exactly how 2026-09-25 happened.
+   */
+  {
+    const toggleEl = bar.el.querySelector('.tbar-toggle');
+    const box = grid.labels[0].getBoundingClientRect();
+    const tgl = toggleEl.getBoundingClientRect();
+    d.assert('the gutter starts where the transport bar’s first control does, one inset for the object',
+      Math.abs(box.left - tgl.left) < 1,
+      `the column at ${box.left.toFixed(2)} against the play button at `
+      + `${tgl.left.toFixed(2)}, ${(box.left - tgl.left).toFixed(2)} px apart`);
   }
 
   /**
