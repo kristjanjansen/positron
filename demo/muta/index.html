@@ -99,6 +99,28 @@
     padding-right: var(--rows-gap);
     margin-right: var(--rows-gap);
   }
+  /* 🔴 THE KNOB GRID CANNOT BE CENTRED IN THIS PANEL, AND THAT IS A
+     MEASUREMENT RATHER THAN A PREFERENCE. Asked 2026-09-28: *"muta: center the
+     knob grid"*, and there is no rule here because there is nothing to centre
+     it in. This row is the WIDEST ROW of a `width: fit-content` surface, so the
+     panel is as wide as this row is: MEASURED at 1280, `.plai-knobs` reads
+     client 483 against scroll 483, and the same at 560. Both grids are
+     `flex: 0 0 auto` and each `.pos-cg` is as wide as its own tracks, so there
+     is no free space inside either of them either. **A centring declaration
+     moved the first grid by 0.0 px at both widths.**
+     🔴 **AND BELOW 483 px OF ROW IT STOPS BEING A NO-OP AND BECOMES A CLIP.**
+     The same `justify-content: center`, MEASURED: at 480 the first grid landed
+     at -1.5 and at 375 at -54.0, with `scrollLeft` clamped at 0 in both, so
+     54 px of the 2 by 2 group sits off the left edge and cannot be scrolled
+     back. `positron-compose` §1: inline-start overflow inside `overflow-x:
+     auto` is clipped for good, and this row is a scroller by design.
+     ⚠️ **THE ONE BOX WITH SLACK IS THE PANEL INSIDE THE PAGE**, 525 px in a
+     688 px body at 1280, all 163 px of it on the right. Centring that is one
+     `margin-inline: auto` and it is deliberately NOT written, because it takes
+     the instrument off the left edge the title, the paragraph, the report and
+     the log all share, and this page's own check below says in as many words
+     that the panel starts where the rest of the page does. It is a decision to
+     be asked for rather than guessed at. */
 
   /* 🔴 THE `Test tone` BUTTON HAS BEEN IN THREE PLACES IN THREE DAYS AND IS IN
      THE PLATE'S `status` SLOT NOW. Asked 2026-09-25 as *"make a Test tone
@@ -116,6 +138,50 @@
      beside a nameplate, so a narrow plate row would squeeze the words rather
      than wrapping them onto the next line, which is what the wrap is for. */
   .muta-tone { flex: 0 0 auto; }
+
+  /* 🔴 AND ON A PHONE IT TAKES THE WHOLE ROW. Asked 2026-09-28: *"test tone
+     button takes full w on mobile (buttons prop?)"*.
+     🔴 **THE PARENTHESIS IS A QUESTION AND THE ANSWER IS NO.**
+     `createControlGrid` takes `items`, `cols`, `gap`, `host` and `cls`, and
+     there is no `buttons` prop, on it or on `createInstrumentPanel`. The kit's
+     existing spelling of *take the width you are given* is `full: true` on
+     `createInstrumentPanel` and `createGlueRows`, plus `.pos-rows-full` and
+     `.kbd-full`. This is PAGE SCOPED on purpose: the kit shape would be a
+     `full` option on the plate's `status` slot, that slot reaches six
+     instrument pages, and nothing has asked for it on the other five.
+     🔴 **IT IS TWO DECLARATIONS BECAUSE A FLEX ITEM CANNOT WIDEN ITS PARENT.**
+     `.pos-ipanel-name` is a shrink to fit cluster holding the nameplate and
+     this button. MEASURED at 375 with each half on its own: the button rule
+     alone takes the button to **165.4 px**, which is the cluster's own width
+     and not the row's, and the cluster rule alone leaves the button at 108.5.
+     Together they read 301.0. So the cluster takes the line and the button
+     takes the cluster.
+     ✅ **AND THE NAMEPLATE STAYS CENTRED, WHICH IS THE OTHER ASK OF THE SAME
+     DAY** (*"on mobile the nameplate ... is centered hzontally"*, the block at
+     the foot of `shell.css`). MEASURED at 375, 480 and 560: `PLAITS` centres on
+     187.5, 240.0 and 278.5 against row centres of 187.5, 240.0 and 278.5, and
+     the button comes to 301.0, 406.0 and 483.0, which is the patch picker's
+     width at each of those widths TO THE PIXEL. A centred name over two
+     controls of one width is one block; a centred name with a 108.5 px button
+     hanging off it over a 301 px picker is the nervous almost-the-same
+     `positron-compose` §3 refuses.
+     ⚠️ **AT THE DESK NOTHING MOVES**, measured at 1280: the button is 108.5 px
+     and the panel is 462 px tall with this block and without it. The phone pays
+     19 px of panel height, 504 to 523.
+     ⚠️ **AND NO HARNESS HERE CAN ENTER THIS BLOCK**, which is said out loud
+     rather than left to be found. `demo/verify.mjs` runs at 756 px with no
+     viewport override, so the check below that reads this button's position is
+     a DESK measurement and says nothing about this layout. It is graded by
+     `node demo/shot.mjs muta 375` and by nothing else, and `BACKLOG.md` carries
+     that hole for all six pages that build a plate.
+     ⚠️ **AND IT SITS AT THE FOOT OF THIS SHEET, AFTER THE RULE IT OVERRIDES.**
+     A media query adds no specificity, so `.muta-tone` above at (0,1,0) would
+     beat this one at (0,1,0) on source order at every width, which is the dead
+     rule `.pos-pick`'s whole phone layout was for weeks. Order, not weight. */
+  @media (max-width: 560px) {
+    .plai-panel .pos-ipanel-name { flex: 1 1 100%; }
+    .muta-tone { flex: 1 1 100%; }
+  }
 </style>
 
 <script type="module">
