@@ -4342,7 +4342,16 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
          from sustain) called 'Loop'"* and then, pointedly, *"do not wire nola,
          its gloabl keyboard fn"*. The keyboard records what it emits and replays
          it through its own press path, so a page needs no code for it, and this
-         block is where that claim gets to be true in front of a reader. */
+         block is where that claim gets to be true in front of a reader.
+         🔴 AND IT IS OFFERED HERE WHATEVER IS PLUGGED IN, WHICH IS A DECISION
+         AND NOT AN OVERSIGHT. Since 2026-09-28 the control can be withdrawn,
+         asked for as *"rm loop button when evolution keyboad is not
+         connected"*, and `/nola/` withdraws it until that keyboard answers.
+         This page has no MIDI at all and never will: a gallery whose job is to
+         show what the kit has, hiding the control the component grew most
+         recently, would be a gallery nobody can read. `offerLoop`'s default is
+         shown for exactly this caller, and the check below drives both states
+         rather than letting the gallery stand in for a measurement. */
       const kb = createKeyboard(holder, {
         base: 60, loop: true, loops: 10, sustain: true,
         onDown: (n, how) => {
@@ -10227,12 +10236,16 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         .find((e) => /sustain/i.test(e.textContent))?.getBoundingClientRect();
       const lp = [...kpad.querySelectorAll('.pos-toggle')]
         .find((e) => /loop/i.test(e.textContent))?.getBoundingClientRect();
-      /* ⚠️ FOUND BY ITS WORD AND NOT BY `.kpad-right`, WHICH IS NOW A POSITION
-         RATHER THAN A CONTROL. That class marks whichever control STARTS the
-         right hand group, so it moved onto `Sustain` when the row was reordered
-         and this check quietly began measuring the same element twice: it read
-         left edges 444 and 444 and went red for the right reason with the wrong
-         story. A check that names a control has to name the control. */
+      /* ⚠️ FOUND BY ITS WORD AND NEVER BY A POSITION CLASS. This read
+         `.kpad-right`, which marked whichever control STARTED the right hand
+         group, so it moved onto `Sustain` when the row was reordered and this
+         check quietly began measuring the same element twice: left edges 444
+         and 444, red for the right reason with the wrong story. A check that
+         names a control has to name the control.
+         ⚠️ AND THE CLASS IS OFF THIS ROW ENTIRELY SINCE 2026-09-28, when the pad
+         became two ends in two boxes, so the same lesson now reads as a reason
+         this check needed no change at all. `Loop` can leave the row and come
+         back under `offerLoop` and these three still find themselves. */
       const off = [...kpad.querySelectorAll('button')]
         .find((e) => /panic/i.test(e.textContent))?.getBoundingClientRect();
       const gap = lp && sus ? Math.round(sus.left - lp.right) : -1;
@@ -10243,6 +10256,90 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
           && gap >= 0 && gap <= 12 && gap2 >= 0 && gap2 <= 12,
         `left edges ${Math.round(lp?.left)}, ${Math.round(sus?.left)}, `
         + `${Math.round(off?.left)}, with ${gap} px and ${gap2} px between them`);
+
+      /**
+       * 🔴 THE `Loop` CONTROL CAN BE WITHDRAWN AND GIVEN BACK WHILE THE PAGE IS
+       * OPEN, AND A SOUNDING LOOP IS STOPPED AND KEPT. Asked 2026-09-28 as *"rm
+       * loop button when evolution keyboad is not connected"*, and a cable is
+       * not a fact that holds still: the control has to be able to leave and to
+       * come back. `/nola/` is the page that decides WHEN, off the MIDI port
+       * names; this grades WHAT HAPPENS, which is the component's half and
+       * belongs where the component is demonstrated.
+       * 🔴 THE HARD PART IS THE RUNNING LOOP, AND THE TWO OBVIOUS ANSWERS ARE
+       * BOTH WRONG. Leaving it going strands a phrase with nothing that can
+       * reach it, because this control is the only way to stop one and `Panic`
+       * stops notes rather than loops. Clearing it throws away something
+       * somebody played. So the slot is walked to `stopped`, which keeps its
+       * tape, and the take is still there when the control comes back.
+       * ⚠️ FOUR CLAIMS AND ONE ASSERT ONLY BECAUSE THEY ARE ONE TRANSACTION:
+       * it left the row, the loop stopped, the take survived, and it came back
+       * at the head of the group rather than after `Sustain`. The detail line
+       * prints all four so a failure says which.
+       */
+      {
+        /* ⚠️ ITS OWN `wait`. The one above is declared inside the tempo block
+           and a `const` shadows its whole block from the top, which this page
+           has already paid for once: the first run of this check threw
+           `wait is not defined`, the page died on `__demo.ready` at 230 asserts
+           and the harness named itself rather than the line. */
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const end = kpad.querySelector('.kpad-grp-end');
+        /* ⚠️ `.kpad-grp-start`, NEVER `.kpad-grp`. Both ends wear that class, so
+           a check reading the bare one is reading whichever comes first in
+           document order, which is a fact about the builder's append order
+           rather than about the row. This page has already gone red once for
+           reading the same element twice under `.kpad-right`. */
+        const start = kpad.querySelector('.kpad-grp-start');
+        const cells = () => kpad.querySelectorAll('.kpad-tempo, .kpad-ratio').length;
+        const startW = () => +start.getBoundingClientRect().width.toFixed(1);
+        kb.loops.clear(0); kb.loops.forget();
+        kb.loops.press(0); kb.loops.settle(0);
+        kb.lightNote(60, true); kb.lightNote(60, false);
+        await wait(300);
+        kb.loops.press(0); kb.loops.settle(0);
+        const ran = { inRow: kb.loopOffered(), state: kb.loops.state(0), taped: kb.taped(0),
+                      cells: cells(), w: startW() };
+        kb.offerLoop(false);
+        const gone = { inRow: kb.loopOffered(), state: kb.loops.state(0), taped: kb.taped(0),
+                       cells: cells(), w: startW() };
+        kb.offerLoop(true);
+        const back = { inRow: kb.loopOffered(), first: end.firstElementChild === kb.loop.el,
+                       taped: kb.taped(0), cells: cells(), w: startW() };
+        kb.loops.clear(0); kb.loops.forget();
+        d.assert('the Loop control can be taken away and given back, and a loop it was running stops with its take kept',
+          ran.inRow === true && ran.state === 'looping' && ran.taped > 0
+          && gone.inRow === false && gone.state === 'stopped' && gone.taped === ran.taped
+          && back.inRow === true && back.first === true && back.taped === ran.taped,
+          `running it read ${ran.state} with ${ran.taped} movement(s) in the row, `
+          + `withdrawn it reads ${gone.state} with ${gone.taped} still on the slot and `
+          + `${gone.inRow ? 'still' : 'not'} in the row, and offered again it is back `
+          + `${back.first ? 'at the head of the group' : 'in the wrong place'} with `
+          + `${back.taped} movement(s)`);
+
+        /**
+         * 🔴 AND THE TWO READOUT CELLS GO WITH IT, WHICH IS A SEPARATE CLAIM
+         * AND THEREFORE A SEPARATE ASSERT. `positron-ui` records three
+         * alignments that looked like one being three asserts, and this is the
+         * same shape: the button leaving is about a control, and `kpad-tempo`
+         * and `kpad-ratio` leaving is about a RESERVE. They can only ever say
+         * something about a loop, so with no control to start one they are a
+         * reserved slot outliving its label, which cost `/circuit/` 75 px of
+         * drift down a five row column.
+         * ⚠️ AND IT IS THE ROW'S MEASURED WIDTH RATHER THAN THE COUNT ALONE,
+         * because those cells are EMPTY most of the time: a count going to zero
+         * would also be satisfied by two cells that had never reserved anything,
+         * and the whole point of them is the room they hold. MEASURED on
+         * `/nola/` at 375 px, where this decides whether the row fits: 86.1 px
+         * and 59.6 px plus two 8 px gaps, and the row goes from needing 523.4 px
+         * in a 323 px box to 304.4 px, which is one line.
+         */
+        d.assert('the tempo and ratio cells leave with the Loop control and take their reserve with them',
+          ran.cells === 2 && gone.cells === 0 && back.cells === 2
+          && ran.w - gone.w >= 140 && Math.abs(back.w - ran.w) < 0.5,
+          `offered it draws ${ran.cells} cell(s) across ${ran.w} px, withdrawn `
+          + `${gone.cells} across ${gone.w} px, which is ${(ran.w - gone.w).toFixed(1)} px `
+          + `of reserve, and offered again ${back.cells} across ${back.w} px`);
+      }
 
       /**
        * 🔴 THE CHORD NAME SAYS WHAT IS HELD AND MOVES NOTHING WHILE IT DOES.
