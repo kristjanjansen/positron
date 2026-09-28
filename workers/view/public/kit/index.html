@@ -545,9 +545,15 @@
    *
    * `readout: null` because the subject here is the controls themselves. Every
    * readout on this page is a SPECIMEN rather than this page's own instrument,
-   * including the two in the block at the top: that block is about where the
-   * numbers and the log SIT, and a sandbox that joined its own pair could only
-   * ever show one of the two arrangements.
+   * including the ones in the READOUT AND LOG block: that block is about where
+   * the numbers and the log SIT, and a page's own pair can only ever be in one
+   * of the two arrangements at a time.
+   * ⚠️ AND THIS PAGE'S OWN PAIR IS JOINED, LIKE EVERY OTHER PAGE'S, SINCE
+   * 2026-09-28. It does not say so, because that is the default now and a flag
+   * repeating a default is a flag that will be left behind when the default
+   * moves. What is at the foot of this page is a `.pos-report` holding a hidden
+   * readout and the log, which is the half-empty case the specimens below
+   * grade: one border, no seam.
    */
   const d = mount({
     name: 'kit',
@@ -854,10 +860,11 @@
   let stackSpec = null, emptySpec = null, emptyBlock = null;
   const stackBlocks = [];
 
-  let joinedSpec = null;      // a readout on top of a log, one surface
+  let joinedSpec = null;      // the default: a readout on top of a log, one surface
   let logOnlySpec = null;     // joined, with no readout declared
+  let roOnlySpec = null;      // joined, with the log switched off
   let neitherSpec = null;     // joined, with neither — there is nothing to draw
-  let splitSpec = null;       // the default: two surfaces, the page between them
+  let splitSpec = null;       // the opt-out: two surfaces, the page between them
   // the two `.pos-body` stand-ins, held rather than queried: the gaps this
   // block grades are measured FROM them, and `querySelector` would find
   // whichever came first and grade the wrong arrangement
@@ -3707,17 +3714,20 @@ const row = page.stack();                // a block that is itself a column`,
     });
 
   section('status', 'READOUT AND LOG',
-    'The numbers now and the record of what happened, split or joined into one surface.',
-    `mount({ readout: { sent: '/s', lost: '' }, joined: true })   // one surface, at the foot
-mount({ readout: { sent: '/s', lost: '' } })                 // two surfaces, the default
-createReport({ readout, showLog: false, joined: true })      // the same pair, standalone
-createReport({ readout, rows: 2, size: 'sm' })               // 1 x n, 2 x n. The count must be even
+    'The numbers now and the record of what happened, glued into one surface at the foot of the page.',
+    `mount({ readout: { sent: '/s', lost: '' } })                 // one surface at the foot, the default
+mount({ readout: { sent: '/s', lost: '' }, joined: false })  // two surfaces, the opt-out
+createReport({ readout, showLog: false })                    // the same pair, standalone
+createReport({ readout, rows: 2, size: 'sm', joined: false }) // 1 x n, 2 x n. The count must be even
 // size: 'sm' is a 15px value instead of 19. The KEY does not shrink with it`,
     (box) => {
       box.classList.add('kit-wide');
 
       // ── joined ──────────────────────────────────────────────────────────
-      joinedSpec = createReport({ readout: { sent: '/s', lost: '' }, joined: true });
+      // No `joined` flag: it is the default since 2026-09-28, and a flag
+      // repeating a default is a flag that will be left behind when the default
+      // moves. The opt-out is spelled out on the split specimen below.
+      joinedSpec = createReport({ readout: { sent: '/s', lost: '' } });
       joinedSpec.set('sent', 48);
       joinedSpec.set('lost', 0, 'ok');
       // A fixed time on every line, so this block draws the same picture on
@@ -3738,17 +3748,34 @@ createReport({ readout, rows: 2, size: 'sm' })               // 1 x n, 2 x n. Th
       // `readout: null` on a real page, which is the `/typist/` case: the
       // document IS the readout and cells repeating it would be the same facts
       // twice. The surface is still one box, and there is no seam in it.
-      logOnlySpec = createReport({ joined: true });
+      logOnlySpec = createReport();
       logOnlySpec.line('nothing to count on this page', null, 1240);
       box.append(el('p', 'kit-cap', 'joined, with no readout declared'), logOnlySpec.foot);
+
+      // ── joined, with the log switched off ───────────────────────────────
+      // 🔴 `showLog: false` ON A PAGE THAT HAS A READOUT, WHICH IS
+      // `/videoradio/`'S SHAPE AND WAS GRADED NOWHERE UNTIL 2026-09-28. That
+      // page is `gl: true` and rotates four ERR mounts, so it is the one page
+      // this project may not run to find out, and the arrangement it gets was
+      // changed on the day joined became the default. A glue of one block is
+      // that block, unwrapped, so what comes back here is the READOUT itself
+      // wearing `.pos-report`: one border, its own, and no wrapper to hide.
+      // That last part is the whole reason the unwrap matters rather than being
+      // tidy — `/videoradio/` hides `.pos-readout` by name for full screen, and
+      // a wrapper round it would have stayed on screen as a band of its own two
+      // edges, which is the `/typist/` defect arriving by a new road.
+      roOnlySpec = createReport({ readout: { sent: '/s', lost: '' }, showLog: false });
+      roOnlySpec.set('sent', 48);
+      roOnlySpec.set('lost', 0, 'ok');
+      box.append(el('p', 'kit-cap', 'joined, with the log switched off'), roOnlySpec.foot);
 
       // ⚠️ AND WITH NEITHER THERE IS NOTHING TO APPEND, which is the point:
       // `foot` comes back null rather than an empty box drawing its own two
       // borders as a 2 px band. Nothing goes in the page for this one.
-      neitherSpec = createReport({ showLog: false, joined: true });
+      neitherSpec = createReport({ showLog: false });
 
       // ── split ───────────────────────────────────────────────────────────
-      splitSpec = createReport({ readout: { sent: '/s', lost: '' } });
+      splitSpec = createReport({ readout: { sent: '/s', lost: '' }, joined: false });
       splitSpec.set('sent', 48);
       splitSpec.set('lost', 0, 'ok');
       splitSpec.line('the board answered', 'hi', 1240);
@@ -3767,7 +3794,7 @@ createReport({ readout, rows: 2, size: 'sm' })               // 1 x n, 2 x n. Th
        */
       const splitStack = createStack(undefined, 'kit-col');
       splitStack.add(splitSpec.top, splitPage, splitSpec.foot);
-      box.append(el('p', 'kit-cap', 'split, which is the default'), splitStack.el);
+      box.append(el('p', 'kit-cap', 'split, the opt-out, which no page asks for'), splitStack.el);
 
       /**
        * 🔴 THE CELLS THEMSELVES, FOLDED IN FROM A SECTION OF THEIR OWN. Asked
@@ -3823,8 +3850,13 @@ createReport({ readout, rows: 2, size: 'sm' })               // 1 x n, 2 x n. Th
       // ⚠️ THE SAME TEN CELLS AND THE SAME TEN VALUES IN BOTH, so the only thing
       // that can differ on screen is the arrangement. Two specimens differing in
       // their content would be demonstrating the content.
-      kitRoFlex = fillTen(createReport({ readout: ten(), showLog: false }));
-      kitRoGrid = fillTen(createReport({ readout: ten(), rows: 2, size: 'sm', showLog: false }));
+      // ⚠️ `joined: false` BECAUSE THESE TWO ARE READOUTS, NOT REPORTS. They are
+      // appended as `.readoutEl`, and a joined report with no log is that
+      // readout wearing `.pos-report`, which carries the page's 40 px foot gap.
+      // Two specimens about the SHAPE of a row of cells would have arrived with
+      // a gap above them that is a fact about where a report sits.
+      kitRoFlex = fillTen(createReport({ readout: ten(), showLog: false, joined: false }));
+      kitRoGrid = fillTen(createReport({ readout: ten(), rows: 2, size: 'sm', showLog: false, joined: false }));
       box.append(
         el('p', 'kit-cap', 'ten cells with no shape asked for, which is the default'),
         kitRoFlex.readoutEl,
@@ -7971,7 +8003,10 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       + `one edge of ${outer} px round both, ${inner.join(' and ')} inside`);
   }
 
-  // and the default is still two surfaces with the page between them. The
+  // and the opt-out is still two surfaces with the page between them. It stops
+  // being the default on 2026-09-28 and it is still built, still on this page
+  // and still graded, because an arrangement nothing on the site can be looked
+  // at in is an arrangement that rots. The
   // readout is part of the flow above the body and takes the SMALL gap; the log
   // is the foot and takes the BIG one, which is the same gap a joined report
   // gets, so the two arrangements agree about where the page ends.
@@ -8007,6 +8042,31 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     d.assert('a joined surface with no readout is one box with no seam in it',
       !!rep && gone && Math.abs(drop - 1) <= 0.5,
       `the log starts ${drop.toFixed(1)} px inside the box, which is its edge and nothing else`);
+  }
+
+  // 🔴 AND WITH THE LOG SWITCHED OFF, THE READOUT IS THE SURFACE, WITH NO
+  // WRAPPER ROUND IT. A glue of one block is that block, so the element handed
+  // back IS `readoutEl`, carrying `.pos-report` and its own single 1 px edge.
+  // Two claims, because they fail separately: that there is no second box (the
+  // doubled edge), and that hiding the readout leaves NOTHING on screen, which
+  // is what `/videoradio/` does to it in full screen and is the case a wrapper
+  // would have broken.
+  {
+    const rep = roOnlySpec?.foot;
+    const same = !!rep && rep === roOnlySpec.readoutEl;
+    const edge = rep ? px(rep, 'Top') : -1;
+    // measured by hiding it and reading the computed display back, because
+    // `el.hidden` is a fact about an attribute and this claim is about ink
+    let gone = false;
+    if (rep) {
+      rep.hidden = true;
+      gone = getComputedStyle(rep).display === 'none';
+      rep.hidden = false;
+    }
+    d.assert('a joined surface with no log is the readout itself, one edge and no wrapper',
+      same && edge === 1 && gone,
+      same ? `the readout is the surface, ${edge} px of edge, and hiding it leaves ${gone ? 'nothing' : 'a box behind'}`
+           : 'a wrapper was drawn round a single block');
   }
 
   // 🔴 AND WITH NEITHER HALF, NO BOX. This is the `/typist/` defect in the

@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '5da6325-081318-4c5e';
+export const BUILD = '2a7e7d2-155044-0edf';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -12,14 +12,21 @@ export const BUILD = '5da6325-081318-4c5e';
 //   const d = mount({ name:'transport', what:'…', readout:{drift:'ms'} });
 //   d.set('drift', 0.4);  d.log('seeked');  d.ready();
 
-// ⚠️ THE ONLY IMPORT IN THIS FILE, AND IT IS A LEAF. `shell.mjs` is the frame
-// every page mounts, so a dependency here is a dependency everywhere;
+// ⚠️ EVERY IMPORT IN THIS FILE IS A LEAF. `shell.mjs` is the frame every page
+// mounts, so a dependency here is a dependency everywhere;
 // `symbol.mjs` imports nothing and touches nothing but the element it is handed.
 import { centreSymbol } from './symbol.mjs';
 // ⚠️ AND SO IS THIS ONE. `stack.mjs` imports nothing — it makes its own element
 // with `createElement` rather than borrowing `el()` from here, which is what
 // keeps a cycle out of the frame every page mounts.
 import { createStack } from './stack.mjs';
+// ⚠️ AND SO IS THIS ONE, SINCE 2026-09-28, AND IT HAD TO BECOME ONE FIRST.
+// `glue.mjs` read `import { el } from './shell.mjs'`, so this line would have
+// been a cycle and `createReport` below built its own `<div class="pos-glue">`
+// instead. It now makes its own element the way `stack.mjs` does, so the glued
+// surface a report draws and the glued surface a page draws are ONE
+// implementation rather than two that agree today.
+import { createGlue } from './glue.mjs';
 
 const LOG_CAP = 400;
 
@@ -46,14 +53,29 @@ export function mount({
   // full-width band nobody wrote. A container with nothing in it must not
   // paint its edges.
   showLog = true,
-  // 🔴 `true` PUTS THE READOUT ON TOP OF THE LOG AS ONE SURFACE, AT THE FOOT.
-  // Asked for 2026-09-16: *"combine readout with log component, put it top of
-  // it. they can be used split or also be the same thing in bottom of page"*.
-  // The split pair — a readout above the controls, a log under the page — is
-  // still the default, so a page that does not ask keeps the layout it had.
+  // 🔴 THE READOUT SITS ON TOP OF THE LOG AS ONE SURFACE AT THE FOOT, ON EVERY
+  // PAGE, AND IT IS THE DEFAULT SINCE 2026-09-28. Instructed: *"global: move
+  // all reading sections atop of the logs and glue them (you have patterns).
+  // use you new glueing code for this, see the kit"*.
+  // ⚠️ IT WAS `false` UNTIL THEN, ASKED FOR AS AN OPTION 2026-09-16 (*"combine
+  // readout with log component, put it top of it. they can be used split or
+  // also be the same thing in bottom of page"*), AND THREE PAGES OF 56 ASKED
+  // FOR IT IN TWO YEARS OF DAYS. That is the shape this project already has a
+  // rule about: `rows` was added opt in for one readout that wrapped 7 and 3,
+  // fixed that page, and left every page written afterwards free to make the
+  // same shape again. A rule nobody has to remember is the only kind that
+  // holds, so the arrangement somebody wants is the one a page gets for saying
+  // nothing.
+  // ⚠️ THE FLAG SURVIVES AS AN OPT-OUT AND NO PAGE PASSES IT. `joined: false`
+  // is how a page says the two are not one object, and the bar for saying it is
+  // a reason a reader can see on the page rather than a preference. `/kit/` is
+  // the only caller today, and it passes `false` to a specimen because showing
+  // both arrangements side by side is what that page is for. If the count is
+  // still zero next time somebody reads this, delete the split arm rather than
+  // leaving an arrangement nothing on the site can be looked at in.
   // `createReport()` below owns both arrangements and the empty cases; this
   // flag only chooses between them.
-  joined = false,
+  joined = true,
   controls = [],         // [{id, label, primary?}]
   index = '/',
 } = {}) {
@@ -222,10 +244,12 @@ export function mount({
   const column = createStack(document.body);
   const page = createStack(body);
 
-  // ⚠️ THE ORDER IS THE ARRANGEMENT, AND SPLIT IS UNCHANGED TO THE ELEMENT.
+  // ⚠️ THE ORDER IS THE ARRANGEMENT, AND A SKIPPED SLOT COSTS NOTHING.
   // `report.top` is the readout when the two are split and NOTHING when they
-  // are joined; `report.foot` is the log when they are split, the one joined
-  // surface when they are not, and `null` when there is nothing to draw.
+  // are joined, which since 2026-09-28 is every page; `report.foot` is the log
+  // when they are split, the one joined surface when they are not, and `null`
+  // when there is nothing to draw. `createStack().add` skips a null, so the
+  // joined column is head, controls, page, report, with no empty slot in it.
   column.add(head, report.top, cbar, body, report.foot);
 
   // ── the machine contract ────────────────────────────────────────────────
@@ -443,10 +467,28 @@ export function mount({
  *
  * Two arrangements, and a page chooses with one flag:
  *
- *   split (default)   `top` is the readout, above the controls
- *                     `foot` is the log, under the page
- *   joined            `top` is nothing, `foot` is ONE surface at the bottom of
+ *   joined (default)  `top` is nothing, `foot` is ONE surface at the bottom of
  *                     the page with the readout sitting on top of the log
+ *   split             `top` is the readout, above the controls
+ *                     `foot` is the log, under the page
+ *
+ * 🔴 JOINED IS THE DEFAULT SINCE 2026-09-28, AND THE SURFACE IS `createGlue`'S.
+ * Instructed: *"global: move all reading sections atop of the logs and glue
+ * them (you have patterns). use you new glueing code for this, see the kit"*.
+ * The look was always `.pos-glue` in shell.css — one border, a 1 px seam of
+ * `--line`, children giving up their own edges — but the ELEMENT was built here
+ * with two lines of `el('div', 'pos-glue pos-report')`, because `glue.mjs`
+ * imported `el` from this file and importing it back would have been a cycle.
+ * `glue.mjs` makes its own element now, so there is one function in this kit
+ * that makes a glued surface and a report is one of the things it makes. The
+ * seam between the readout and the log is therefore the same seam
+ * `instrument-panel.mjs` gets, from the same `gap: 1px` over the same ground.
+ * ⚠️ AND `createGlue` UNWRAPS A GLUE OF ONE, which is what a report holding
+ * only a readout now is: `showLog: false` hands one part over and gets that
+ * part back, wearing `.pos-report` and its own single border. That is the same
+ * picture the wrapper drew and one element less to hide, which is the case
+ * `/videoradio/` has: it hides `.pos-readout` by name for full screen, and a
+ * wrapper round it would have stayed on screen as a band of its own two edges.
  *
  * 🔴 AND A CONTAINER WITH NOTHING IN IT MUST NOT PAINT ITS EDGES, WHICH IS THE
  * WHOLE REASON THIS FUNCTION DECIDES WHAT GETS APPENDED RATHER THAN THE PAGE.
@@ -461,7 +503,7 @@ export function mount({
  * report holding NEITHER is never appended at all, so there is no box to paint.
  */
 export function createReport({
-  readout = {}, showReadout = true, showLog = true, joined = false,
+  readout = {}, showReadout = true, showLog = true, joined = true,
   rows = 0, size = '',
 } = {}) {
   // 🔴 AN EVEN NUMBER OF CELLS, AND WHEN IT IS ODD THE ANSWER IS TO CUT ONE.
@@ -579,14 +621,29 @@ export function createReport({
     return r;
   }
 
-  // `pos-glue` is the LOOK (one border, a 1 px seam, children giving up their
-  // own edges) and is shared with any other glued pair; `pos-report` is only
-  // this box's own position on the page. Two classes because they are two
-  // facts, and the second one is the half that is not reusable.
-  const rep = el('div', 'pos-glue pos-report');
-  rep.append(readoutEl);
-  if (showLog) rep.append(logEl);
-  if (!readoutEl.hidden || showLog) { r.report = rep; r.foot = rep; }
+  // `createGlue` puts `pos-glue` on: the LOOK, one border, a 1 px seam and the
+  // children giving up their own edges, shared with every other glued pair on
+  // the site. `pos-report` is added here and is only this box's own position on
+  // the page. Two classes because they are two facts, and the second one is the
+  // half that is not reusable.
+  //
+  // ⚠️ THE HIDDEN READOUT IS STILL HANDED OVER, NOT FILTERED OUT. A page with
+  // `readout: null` or `showReadout: false` gets a surface holding a
+  // `display: none` readout and a log, which draws one border and no seam
+  // because a `display: none` child takes no `gap` in a flex column. Filtering
+  // it would unwrap the glue to a bare `.pos-log` and take the element off the
+  // page, and three pages reach for `.pos-readout` by name to assert that it is
+  // present and paints nothing.
+  const rep = createGlue(readoutEl, showLog ? logEl : null);
+  // 🔴 AND WITH NEITHER HALF TO DRAW, NOTHING IS APPENDED AT ALL. This is
+  // `/typist/`'s defect in the joined arrangement: an empty bordered container
+  // renders as a full-width band made entirely of its own two edges, MEASURED
+  // at 2.0 px with 0 children and reported as "old UI creeping in". `foot`
+  // stays null, so there is nothing for `mount()` to put on the page.
+  if (!readoutEl.hidden || showLog) {
+    rep.classList.add('pos-report');
+    r.report = rep; r.foot = rep;
+  }
   return r;
 }
 

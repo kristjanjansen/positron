@@ -8,11 +8,18 @@
 // own border and radius to the box. That is now `.pos-glue` in shell.css and
 // this file is the way a page reaches it.
 //
-// ⚠️ SEPARATE IS STILL THE DEFAULT, on both pairs, and that is the point of the
-// word "can" in the ask. Two blocks 22 px apart are two surfaces and the page
-// stack already spaces them; gluing is a CLAIM that they are one object, which
-// is true of a strip sitting on the transport bar that drives it and false of
-// most other neighbours. A page that does not ask keeps what it has.
+// ⚠️ SEPARATE IS STILL THE DEFAULT FOR A PAIR A PAGE GLUES ITSELF, and that is
+// the point of the word "can" in the ask. Two blocks a page gap apart are two
+// surfaces and the stack already spaces them; gluing is a CLAIM that they are
+// one object, which is true of a strip sitting on the transport bar that drives
+// it and false of most other neighbours. A page that does not ask keeps what it
+// has.
+// 🔴 THE READOUT AND THE LOG ARE NO LONGER ONE OF THOSE PAIRS, SINCE
+// 2026-09-28. Instructed: *"global: move all reading sections atop of the logs
+// and glue them (you have patterns). use you new glueing code for this, see the
+// kit"*. That claim is now made once, for every page, by `createReport` in
+// shell.mjs, which builds its surface with `createGlue` below. So the sentence
+// above is about a pair somebody assembles on a page, not about the report.
 //
 // ⚠️ WHY THIS IS NOT `createStack(host, 'pos-glue')`. A stack owns the AIR
 // between blocks and a glue owns the absence of it: `.pos-stack`'s children
@@ -27,7 +34,19 @@
 // report holding only a log draws one border and no seam). A page building its
 // blocks conditionally therefore cannot accidentally gain an edge.
 
-import { el } from './shell.mjs';
+// 🔴 AND THIS FILE IMPORTS NOTHING, BECAUSE `shell.mjs` IMPORTS IT. It read
+// `import { el } from './shell.mjs'` until 2026-09-28, which is why
+// `createReport` had to hand-roll its own `<div class="pos-glue">` rather than
+// call the function below: shell.mjs importing this would have been a cycle in
+// the frame every page mounts, and `createReport`'s own header says so at
+// length. `stack.mjs` already answered this exact question the same way and
+// writes out why — the three calls here are `el('div', cls)` with no text and
+// no attributes, so `div()` below is the whole of what was borrowed.
+const div = (cls) => {
+  const e = document.createElement('div');
+  e.className = cls;
+  return e;
+};
 
 /**
  * Glue blocks into one surface, in the order given.
@@ -45,7 +64,7 @@ export function createGlue(...blocks) {
   const parts = blocks.filter(Boolean).map((b) => b.el || b);
   if (!parts.length) return null;
   if (parts.length === 1) return parts[0];
-  const box = el('div', 'pos-glue');
+  const box = div('pos-glue');
   box.append(...parts);
   return box;
 }
@@ -86,7 +105,7 @@ export function createGlueRows(o = {}) {
   // `grid`: every row is a subgrid on the surface's two columns, label and
   // control, so three such rows share one pair of lines rather than each
   // putting its control where its own label's width left it.
-  const root = el('div', `pos-glue pos-rows${full ? ' pos-rows-full' : ''}${grid ? ' pos-rows-grid' : ''}${cls ? ` ${cls}` : ''}`);
+  const root = div(`pos-glue pos-rows${full ? ' pos-rows-full' : ''}${grid ? ' pos-rows-grid' : ''}${cls ? ` ${cls}` : ''}`);
   /**
    * 🔴 A SURFACE WITH NO ROWS DOES NOT PAINT ITS EDGES, AND IT IS `hidden`
    * RATHER THAN NOT APPENDED. `createGlue` above returns `null` for nothing,
@@ -131,7 +150,7 @@ export function createGlueRows(o = {}) {
     if (align === 'between' && parts.length !== 2) {
       throw new Error(`createGlueRows.row: a justified row has two ends, not ${parts.length}`);
     }
-    const r = el('div', rcls ? `pos-rows-r ${rcls}` : 'pos-rows-r');
+    const r = div(rcls ? `pos-rows-r ${rcls}` : 'pos-rows-r');
     /* ⚠️ THE VALUE IS ALWAYS WRITTEN, never left empty to mean off. An attribute
        selector matches on PRESENCE, which is the defect `video-panel.mjs`
        shipped: `dataset.full = full ? mode : ''` kept every full-screen rule
