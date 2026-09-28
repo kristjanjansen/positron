@@ -1,6 +1,111 @@
 ## Open
 
-### fau: "rm bell and hall from fau they do not diffentiate. btin somehintg instresting"
+### Done 2026-09-28: fau, "rm bell and hall from fau they do not diffentiate. btin somehintg instresting"
+
+✅ **TWO OUT, TWO IN, AND THE PICKER IS SIX ROWS THAT ARE SIX INSTRUMENTS.**
+
+**`Pluck`**, in `Bell`'s place. Twelve milliseconds of noise into a delay line
+that feeds itself, `+ ~ lap`.
+- **It is the ONLY patch on the page that uses `~`, the operator that lets a
+  signal read its own output.** Everything else runs forwards: the Organ adds
+  oscillators up, the Rhodes bends one with another, and the two `pm.` names hide
+  whatever they do. This one has **no oscillator in it at all** and its pitch is
+  the LENGTH of the loop.
+- It is the counterweight to `Djembe` and `Clarinet`, which is this page's own
+  *"the compression is a dictionary rather than magic"* argument shown from the
+  inside: the same kind of thing those two name in one word, written out in four
+  lines a visitor can edit.
+- **AND IT IS MEASURABLE IN THE READOUT, WHICH IS THE THIRD THING.** Its `per
+  voice` is **16.47 kB, a buffer**, where the drum's 0.57 kB is a handful of
+  numbers and the organ's 262.26 kB is a sine table. Three mechanisms, one cell.
+- ⚠️ The damper is ONE TERM (`keep = 0.9 + 0.099 * gate`) rather than a second
+  envelope, because a string with constant feedback rings on past the key and
+  then nothing the sustain pedal does can be told apart from the instrument
+  ignoring it. MEASURED offline at 440 Hz: RMS **0.0009** in the first tenth of a
+  second after the key lifts against **0.075** in the first tenth it was held.
+
+**`Sweep`**, in `Hall`'s place. A sawtooth through a resonant low pass whose
+corner is driven by an envelope of its own, with the room on the effect line.
+- **It is the THIRD WAY OF MAKING A SOUND and the page did not have one.** Organ
+  and Rhodes both BUILD a sound up; this one starts with everything, because a
+  sawtooth has every harmonic of the note in it, and takes most of it away again.
+  First `fi.` on the page, and the one envelope that moves something other than a
+  level.
+- Its `per voice` is **108 bytes, the smallest figure this page has ever
+  printed**, next to the Organ's 262.26 kB from a source of about the same
+  length.
+- ✅ **AND IT KEEPS `Hall`'S LESSON ON A VOICE THAT IS NOBODY ELSE'S**, which was
+  the half of `Hall` worth having: five listings end with a bare wire and this
+  one ends with a real room.
+
+⚠️ **AND ONE MORE WAS REFUSED, WHICH IS THE ASK BEING APPLIED TO THE ANSWER.** An
+additive row using `sum(i, 32, os.osc(freq*(i+1))/(i+1))` would teach that the
+language writes a loop as an expression and would move the `machine code` cell by
+a digit. It is the Organ with more partials, which is `Bell`'s shape wearing a
+new mechanism, so it did not go in.
+
+**COMPILE TIME, MEASURED AGAINST THE VENDORED libfaust 2.89.2 THE WAY THE PAGE
+COMPILES** (a voice, an effect and a mixer, `-ftz 2`), four consecutive compiles
+each with a fresh name so nothing comes off the factory cache. The rig was
+checked rather than assumed: compiled under the page's own pinned name it answers
+the Organ at **7,266 B**, which is `PINNED.bytes` to the byte.
+
+| preset | compile, 4 runs (ms) | machine code | per voice |
+| --- | --- | --- | --- |
+| Organ | 63 / 26 / 24 / 23 | 7,253 B | 262,264 B |
+| Rhodes | 30 / 29 / 28 / 29 | 7,755 B | 262,284 B |
+| **Pluck** | **26 / 26 / 26 / 25** | **8,635 B** | **16,472 B** |
+| **Sweep** | **111 / 109 / 114 / 106** | **21,318 B** | **108 B** |
+| Djembe | 82 / 82 / 82 / 81 | 17,206 B | 572 B |
+| Clarinet | 251 / 243 / 241 / 242 | 15,311 B | 278,740 B |
+
+The two that left, for comparison: **Bell 23 to 25 ms**, **Hall 96 to 98 ms**.
+**NEITHER NEW ROW IS SLOWER THAN `Clarinet`.** `Pluck` at 26 ms is the second
+cheapest in the picker; `Sweep` is about 15 ms dearer than the `Hall` it
+replaces, which buys the filter, the new voice and the room.
+⚠️ **THOSE ARE NODE FIGURES AND THE BROWSER IS SLOWER, STATED RATHER THAN
+SMOOTHED.** The harness has the Organ at 34 and 40 ms in Chrome against node's 23
+to 26, so this desk runs about 1.4x to 1.6x the node number, consistent with the
+`Clarinet` figure the file already carried. The Clarinet comment was corrected
+with it: it said *"nearly three times the next one"*, which was true against
+`Hall` and is **about twice** against `Sweep`, re-measured side by side so only
+the ratio is quoted.
+
+✅ **NOTHING NEW CROSSES THE WIRE, AND IT IS ASSERTED RATHER THAN ARGUED.** `no`,
+`de`, `fi` and `dm` are all inside the 2.41 MB `.data` blob the page already
+fetches. The checks read the browser's own resource record: **20 resources, every
+one of them this origin**, and **4 files, 6,379,006 B of 6,379,006 B** for the
+compiler, both unchanged.
+
+**MEASURED: 49 page asserts before, 50 after**, every one accounted for. Minus
+the `Hall` assert, which compared `Hall` against the ORGAN and only worked
+because `Hall` WAS the Organ. Plus a room assert rewritten as a CONTROLLED PAIR:
+it compiles the `Sweep` listing twice, once as it stands and once with its last
+line replaced by a bare wire, both under seven character names so the byte counts
+are comparable, reading **21.33 kB with the room against 9.45 kB without, and
+0.11 kB a voice either way**. One string differs from the other by its last line,
+so the difference cannot be anything else. Plus a `Pluck` assert bracketed on
+BOTH sides so it cannot pass on "bigger than the drum", which most of this page
+satisfies.
+⚠️ The first run was 55/56 with the known marginal pedal assert red at
+`0.798` against its picked 0.8 floor, with another headless Chrome alongside. Run
+again: **56/56**. That floor is still marginal and this change did not touch it.
+
+🔴 **AND ONE REPAIR NOBODY ASKED FOR, BECAUSE THE REORDER WOULD HAVE BROKEN IT
+SILENTLY.** The new order is Organ, Rhodes, Pluck, Sweep, Djembe, Clarinet: the
+four you can read and edit first, then the two that hide everything behind a
+name. **TWO CHECKS STILL READ `PRESETS[2]` FOR THE DRUM**, and under the new
+order index 2 is the string, so both would have compiled the wrong preset and
+reported the right one. `byId` is declared beside `PRESETS` now with a header
+saying what an index cost. `PRESETS[0]` survives on purpose, because that is a
+claim about which row the box OPENS with.
+
+⚠️ **NOT SETTLED: NOTHING HAS BEEN HEARD.** Levels are offline renders and the
+page's own analyser. MEASURED at velocity 100, one voice at 440 Hz: `Pluck` peaks
+at 0.378 with the ring at 0.075 RMS decaying to silence in about a second,
+`Sweep` peaks at 0.220 against the Organ's 0.218. **Eight voices at once has not
+been metered on any patch**, and `Sweep`'s filter runs at Q 6, which is the one
+place a chord could be hotter than the single note suggests.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"rm bell and hall from fau they do not
 diffentiate. btin somehintg instresting"*. Slug `fau`, file
