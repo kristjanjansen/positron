@@ -85,7 +85,65 @@ asserted by name. So this is a component default plus the removal of every
 page's opt-out plus the asserts that read the rendered word.
 ⚠️ SHARED, so the session does it once before any page agent starts.
 
-### knobs: "use rotaty sliders grid"
+### Done 2026-09-28: knobs, "use rotaty sliders grid"
+
+✅ **DONE.** `createKnobBank` is out and `createControlGrid({ cols: 2, gap:
+KNOB_GAP, items: [cutoff, reso] })` is in. The panel row is otherwise untouched,
+still first, still `align: 'start'`, and the two rotaries, their controllers,
+their homes, the hand, the send gate and the board path are byte-identical.
+- **MEASURED at 1280 and at 375: two columns, an 84 px track, a 10 px gap, 94.0
+  px centre to centre, at BOTH widths**, because the component fixes its track
+  count and track size at the measured pitch and never uses `1fr`. The same
+  triple `/muta/`'s lattice reads, which is the point of using the component.
+- The gap is passed as an OPTION and never as a custom property, which is the
+  trap `/muta/` paid for: `createControlGrid`'s gap is an inline style no custom
+  property can reach. `KNOB_GAP` is a const because the new assert reads it too.
+- **THE VISIBLE CHANGE IS THAT THE COLUMN TRACK OPENED FROM A DIAL'S WIDTH TO A
+  CELL'S HEIGHT.** `pitchFor` is `max(width, height)`, a knob cell is 50.6 wide
+  and 84 tall, so the dials went from 58.6 px apart (`--knob-w` 50.6 plus
+  `--ctl-gap` 8, which is what a `.pos-knob-row` gives) to 94.0.
+- ✅ **AND `RESONA…` IS GONE, MEASURED RATHER THAN HOPED FOR.** `.pos-knob-lab`
+  is `max-width: 100%` with an ellipsis and that 100% used to be the 50.6 px
+  dial; a cell is 84 px now, so `RESONANCE` renders in full at both widths. That
+  was a standing defect recorded in `positron-compose`, it was not the ask, and
+  the ask fixed it.
+- **MEASURED: 37/39 green with 2 FAILED before, 38/40 green with 2 FAILED
+  after.** The one added exists because a flex row and a lattice look alike in a
+  screenshot and differ only by a measurement, so a page that quietly fell back
+  to a row would stay green on every other claim here: *the two rotaries stand
+  one lattice pitch apart, wider than the row it replaced*, reading 94.0 against
+  the 58.6 a dial at a row gap would have given. Every number in it is read back,
+  the pitch off the component, the gap off `KNOB_GAP`, the dial off its own rect,
+  `--ctl-gap` off the root, so a label growing and widening the cell moves both
+  sides of the comparison at once.
+- ⚠️ **ONE CAVEAT PRINTED RATHER THAN HIDDEN:** the grid's BOX is on the inset at
+  55.0, and the first dial's INK starts at 71.7, 16.7 px further in, because a
+  cell is the square pitch and a dial is `--knob-w` centred in it. The same 17 px
+  `/muta/` wrote down. It was NOT corrected with a margin, because a per-element
+  correction is the thing `positron-compose` exists to refuse, and the number is
+  in the assert's detail line where a reader of a run sees it.
+- The two remaining reds are the standing pair: the relay (nothing answers in
+  `studio-1`) and the audio graph (a check run never starts it).
+- ⚠️ NEITHER RUN WAS A RUN ALONE, because the `/muta/` agent held a headless
+  Chrome throughout, and the known flaky pair went red on the first run and green
+  on the second with no code between them. Not chased, on the standing rule.
+
+### control-grid: the pitch is 84 and the lattice steps 94, found 2026-09-28, not asked for
+
+FOUND while putting `/knobs/` on the lattice. `demo/shell/control-grid.mjs`
+calls its track the PITCH, and the distance between two centres is `pitch +
+gap`: `size()` calls `pitchFor(w, h, 0)` with the gap deliberately zeroed and
+then sets `gap` separately, so `--cg-pitch` and `grid.pitch()` both report **84**
+while the lattice actually steps **94**.
+⚠️ The component's own comment says *"the gap is inside the pitch"*, which is
+the one sentence in that file that is not true of the code. The lattice is still
+square, because both axes get the same gap, so this is a NAMING AND COMMENT
+defect rather than a layout one. It cost one pass to work out.
+⚠️ **AND IT IS THE THIRD FILE TO WRITE DOWN THAT THE GAP IS AN INLINE STYLE NO
+CUSTOM PROPERTY CAN REACH** (`/muta/`'s stylesheet, `/knobs/`'s, and this).
+By this project's own rule that is a thing the component should say in its own
+header. If either is corrected, `/muta/`'s comment and `/knobs/`'s new assert
+both move with it.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"knobs: use rotaty sliders grid"*. Slug
 `knobs`, file `demo/knobs/index.html`. Not started.
