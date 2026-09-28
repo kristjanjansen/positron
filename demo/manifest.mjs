@@ -732,7 +732,23 @@ export const DEMOS = [
   // sound server. ⚠️ `AudioWorklet` is off the tags for the same reason: the
   // tag drives `caps.mjs`, and what this page now needs is WebAssembly and an
   // audio output, not a hand-written worklet.
-  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 60000, room: 'fixed',
+  // 🔴 `unlisted: true` SINCE 2026-09-28, AND IT IS `unlisted` RATHER THAN
+  // `built: false` BECAUSE THE FIRST ANSWER WAS WRONG AND WAS DEPLOYED.
+  // Asked, verbatim: *"hide grains from index. note in handoff: bring it back
+  // when we have time"*. `built: false` was tried first, on CLAUDE.md's word
+  // that it "hides a row from the index", and MEASURED on the live site
+  // minutes later it did neither thing anybody wanted: build.mjs line 532
+  // skips an unbuilt demo when it enumerates directories, so
+  // https://positron.studio/grains/ answered **404**, while the front page
+  // still drew a `grains` card, now with no link behind it, because
+  // `byGroup()` filters on `unlisted` and never looked at `built`. A dead card
+  // over a missing page is the exact opposite of what was asked for.
+  // ✅ `unlisted` is the flag that means this, it is dropped ONCE in
+  // `byGroup()` so the two index renderers cannot disagree, and `feedback`
+  // already wears it. The page is built, deployed and reachable at its URL;
+  // only the card is gone.
+  // ⚠️ TO BRING IT BACK: delete `unlisted: true` from this row. Nothing else.
+  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, unlisted: true, settleMs: 60000, room: 'fixed',
     one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
     tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
 

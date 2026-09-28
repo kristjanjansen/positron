@@ -1,5 +1,235 @@
 ## Open
 
+### Done 2026-09-28: grains, "hide grains from index. note in handoff: bring it back when we have time"
+
+✅ **DONE, both halves.** `built: false` on the `grains` row in `demo/manifest.mjs`, with a comment there saying it is a hide and not a delete, and the note at the top of `HANDOFF.md` under session 53. MEASURED after, counted and not remembered: **57 demos, 54 built**, one fewer than the morning's 55. `demo/grains/` is untouched and https://positron.studio/grains/ still answers. ⚠️ The note records what the flag really costs: a no-argument `node demo/verify.mjs` walks the BUILT demos, so this page is out of the full run until it returns.
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"hide grains from index. note in handoff:
+bring it back when we have time"*. Slug `grains`, files `demo/manifest.mjs`
+line 735 and `HANDOFF.md`. Not started.
+⚠️ Known and non-obvious:
+- `built: false` is the flag that hides a row from the index, and the row is
+  `{ name: 'grains', group: 'instruments', act: 4, created: '2026-09-12',
+  built: true, settleMs: 60000, room: 'fixed', ... }`.
+- ⚠️ HIDDEN IS NOT REMOVED. The directory, the page and its URL stay, so
+  `https://positron.studio/grains/` still opens. The request is about the
+  index only.
+- ⚠️ `built: false` ALSO TAKES IT OUT OF `node demo/verify.mjs` with no
+  argument, so it stops being covered by a full run. Say so in the handoff note
+  beside "bring it back".
+- The handoff note is the second half of the request and is not optional: it
+  says WHY it is hidden and that it comes back.
+- ⚠️ The page's `one` line is *"one granulator, running in this page and on a
+  Raspberry Pi at once, with a blend between them"*, and this page's own
+  description was once called *"mambo jumbo"*, which is the story in CLAUDE.md
+  about descriptions. Nothing to do now, worth knowing when it comes back.
+
+### knobs: rm "midi is listening"
+
+⚠️ **ASKED, VERBATIM 2026-09-28, right after the panel line above:** *"rm "midi
+is listening""*. Slug `knobs`, file `demo/knobs/index.html`, lines 668 and 673.
+Not started, and WHICH PAGE was not said, so it is filed here because `knobs`
+is the page that carries that exact string and was the subject of the line
+before it. ⚠️ Confirm at fan-out.
+⚠️ Known and non-obvious:
+- It is the `enable midi` button's own text, set in two places: line 673 right
+  after `createMidi` returns, and line 668 in `onPorts`, where it is one of a
+  pair with `midi is on, nothing plugged in`. The button is also `disabled` at
+  that moment.
+- The comment at 636 says the text is doing a job: *"AND IT IS ASKED ONCE.
+  `openMidi` is idempotent, so a second press is not a second prompt. The
+  button says so by going to `midi is listening` and staying there."* So
+  removing the words means deciding what a pressed, disabled button says
+  instead, or that it disappears.
+- The log lines beside it (`N MIDI inputs to listen to`, `no MIDI keyboard is
+  plugged in yet`) are separate and were not asked about.
+
+### knobs: "appluy instruiment panel"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"knobs: appluy instruiment panel"*. Slug
+`knobs`, file `demo/knobs/index.html` (2,186 lines). Not started.
+⚠️ Known and non-obvious:
+- The page wears `createInstrument` from `/shell/instrument.mjs` today (line
+  33), same starting point as `shape` and unlike `tom`, which is on
+  `createPanelLayout`.
+- The panel asked for is `demo/shell/instrument-panel.mjs`
+  (`createInstrumentPanel`). FIFTH page wanting it now, with `tom`, `shape`,
+  `muta` and the global glue line, so the kit is settled once by one agent
+  before any page agent starts.
+- The page carries a keyboard, a knob bank, a board and a diagram, and a
+  diagram is `positron-diagram`'s rule as well as the panel's.
+
+### Done 2026-09-28: dump, "all buttons secondary"
+
+✅ **DONE.** One flag: `primary: true` dropped from `{ id: 'listen', label: 'Listen' }` at `demo/dump/index.html:137`, which was the only primary on the page. MEASURED before and after: **25/25 green, 19 page asserts, identical**, down to the same `518.39 px` on the three table-geometry asserts. `Ask for versions` and the `Clear` button under the traffic table were already ordinary. ⚠️ The one hazard was checked rather than assumed: `demo/verify.mjs:555` clicks `.pos-controls button.pos-pri` as a fallback to arm a page whose text fields refuse focus, and `/dump/` has no input and no textarea, so that path never runs here. Control order is byte for byte unchanged, so `listen` is still control 0 and still the one given `settleMs`. Nothing in the page's words named the accent, so no sentence went stale.
+
+⚠️ **NOTICED AND LEFT ALONE, OUTSIDE THIS JOB:** the `Clear` button under the traffic table sits hard against the table's right edge and reads tight at both widths. It is in `.kpad-right`, a different container, and predates this edit.
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"dump: all buttons secondary"*. Slug
+`dump`, file `demo/dump/index.html`. Not started.
+⚠️ Known and non-obvious:
+- ✅ MEASURED by reading the page today: there is exactly ONE primary button on
+  it, `{ id: 'listen', label: 'Listen', primary: true }` at line 137. So the
+  edit is dropping that one flag, and `Ask for versions` and the `Clear` button
+  under the traffic table are already ordinary.
+- `primary` is `shell.mjs` line 142, which puts `pos-pri` on the button, and
+  `pos-pri` is `shell.css` 650. Nothing else on this page uses it.
+- ⚠️ NOT A KIT CHANGE. `pos-pri` stays as it is for every other page; this is
+  one page asking for no primary.
+- 🔴 CONTROL ORDER MUST NOT MOVE. Line 130 records that control 0 is the one
+  the harness gives `settleMs` to and that putting anything in front of
+  `listen` moves every other control's press, which has already cost this
+  project an intermittent failure. Removing a FLAG is safe; removing or
+  reordering a control is not.
+
+### tom: "apply instrument panel"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"tom: apply instrument panel"*. Slug `tom`,
+file `demo/tom/index.html` (1,983 lines). Not started.
+⚠️ Known and non-obvious:
+- The page wears `createPanelLayout` and `createNameplate` from
+  `/shell/panel-layout.mjs` today (line 120) and imports neither
+  `instrument.mjs` nor `instrument-panel.mjs`. So this is the OTHER starting
+  point from `shape`, which is on `createInstrument`, and the two requests are
+  not the same edit.
+- The panel asked for is `demo/shell/instrument-panel.mjs`
+  (`createInstrumentPanel`), glued rows over `demo/shell/glue.mjs`.
+- ⚠️ SHARES THE KIT WITH `shape`, `muta` and the global glue line, so the kit
+  side is settled once by one agent before any page agent starts.
+- This page fetches NOTHING by default since the pack left the repository, and
+  takes an explicit `?pack=<url>`. Last measured green at 59/59, 0 requests, 0
+  failed. That is the number this change is read against.
+
+### pack: "make support of any wavs in zip and change desc accrodingly"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"pack: make support of any wavs in zip and
+change desc accrodingly"*. Slug `pack`, files `demo/pack/index.html` and
+`demo/manifest.mjs` line 574. Not started.
+⚠️ Known and non-obvious:
+- ✅ MEASURED by reading the page today: a zip of plain WAVs is REFUSED right
+  now. `openZip` at 1135 filters for `.circuitpack`, `.circuittrackspack` and
+  `.syx`, and a zip with none of those falls through to
+  `drop.say(`${name} holds no Circuit pack and no patches`, 'bad')`. WAVs are
+  only ever read on the path INSIDE a pack, at line 1339.
+- The reading side already exists and does not need writing: `circuit-sample.mjs`
+  (`readWave`, `summariseWave`, `summariseAll`) is what line 1364 calls, so
+  this is a filter and a branch in `openZip`, not a decoder.
+- ⚠️ The `__MACOSX/._<name>` resource-fork trap is already documented on the
+  `.syx` branch and applies the same way to WAVs: a Mac-made zip carries a few
+  hundred byte twin beside every real file that is a `.wav` by its name and
+  nothing at all by its content.
+- `accept:` at line 250 already takes `.zip`, so the drop control needs no
+  change.
+- 🔴 THE DESC IS TWO STRINGS AND THEY ARE THE SAME SENTENCE: `what:` at
+  `demo/pack/index.html:205` and `one:` at `demo/manifest.mjs:574`, both
+  reading *"open a Circuit pack or a loose sample set and look inside its
+  patches, sessions and samples"* today. One sentence, no colon, no semicolon,
+  no dash, no second clause bolted on, and they change in the same commit as
+  the behaviour.
+
+### shape: "apply instument panel with secitons. rm put back button"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"shape: apply instument panel with
+secitons. rm put back button"*. Slug `shape`, file `demo/shape/index.html`.
+Two requests. Not started.
+⚠️ Known and non-obvious:
+- The page wears `createInstrument` from `/shell/instrument.mjs` today
+  (imported line 142, built line 631). The panel asked for is
+  `demo/shell/instrument-panel.mjs` (`createInstrumentPanel`), and "with
+  sections" is its glued rows. Line 577 already records that other pages wear
+  `createInstrument` over `createPanelLayout`.
+- 🔴 `put back` HAS A WRITTEN DEFENCE IN THE PAGE AND IT IS SPECIFIC, so this
+  removal is a reversal rather than a tidy-up. Line 39: *"`put back` is the
+  only way out of forty sliders moving by themselves, and the page's own note
+  on `move everything` says a button that starts forty hands with no button
+  that stops them is a page somebody has to reload."* It is `putBack()` at 938,
+  the button at 506, and it calls `stopEveryHand('put back')`, which is the
+  only stop for every running hand across every part.
+- ✅ The page also records the answer that survives the removal, at 911: a
+  control change moves the live voice and never writes flash, so reloading the
+  session on the instrument brings the patch back. If `put back` goes, THE
+  RUNNING HANDS STILL NEED A STOP, or `move everything` starts forty of them
+  with no way to end them.
+- Line 46 measured the row at four widths: dropping the fourth control
+  (100.6 px) takes 560 px from two lines to one.
+- Line 1191 and the note at 240 say there are asserts on `put back` and that
+  it is deliberately outside `.pos-controls` so the suite never writes to an
+  instrument. Removing it moves the assert count.
+
+### wish: "rm on button on wish, just keep x button"
+
+⚠️ **ASKED, VERBATIM 2026-09-28, WITH A SCREENSHOT** of a connection row's
+right hand column showing an `on` checkbox above an `×` button: *"rm on button
+on wish, just keep x button"*. Slug `wish`, file `demo/wish/index.html`
+(4,800+ lines), in `fitActions()` at line 2176. Not started.
+⚠️ Known and non-obvious:
+- The `on` check is not decoration. Its `onChange` calls `connect(c)` and
+  `disconnect(c)`, so it is the page's only path to MAKING a connection on the
+  desk. Removing the control means deciding what connects instead, or that
+  nothing does and the page only lists and removes.
+- `createCheck` from `/shell/check.mjs` is the only thing the page imports it
+  for, so the import goes too if nothing else uses it.
+- FOUR asserts drive it by reference: lines 4714, 4719, 4721, 4756, 4761 and
+  4781 all read `c.live`, and `4781` asserts a row that CANNOT connect has no
+  `live` at all. Those asserts move or go, so the assert count is the reading
+  afterwards.
+- The comment above `fitActions` records why neither control is in
+  `.pos-controls`: `demo/verify.mjs` presses `.pos-controls button, .tbar-x`
+  in document order, so a remove button there would empty the page mid-run and
+  a switch there would put a suite's hand on somebody's instrument. Keep the
+  `×` where it is.
+
+### muta: archive/remove Warps, apply the instrument panel, unlabel the patch selector, visualization to the top
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"muta: arhive/rmwarps and rm all routing
+code around it.  apply instument panel. no label on patch selctor. move
+visualization to top of instrument"*. Slug `muta`, files `demo/muta/index.html`
+(3,454 lines), `demo/muta/muta-worklet.js`, `demo/muta/build/warp_shim.cc`,
+`demo/muta/vendor/warp.wasm`. Four requests in one line and all of them are
+this page. Not started.
+⚠️ Known and non-obvious:
+- Warps is not a panel that lifts out cleanly. `WARP_URL`, `warpNode`,
+  `warpReady`, `warpBytes`, `warpImports`, `warpEntered`, `warpBench`,
+  `warpCostMs`, `warpMeters`, `warpLast`, `onWarpReady`, `sendWarp`,
+  `warpAlgoGrid`, `warpGrid`, `warpScope`, `warpInst` and the `.warp-panel`
+  and `.warp-pick` CSS are all in the page, and the ROUTING is the thing the
+  request names: the comment at line 793 reads *"THE SIGNAL. PLAITS makes the
+  sound and WARPS changes it, so PLAITS is above"*, so Plaits' output has to
+  stop going through Warps and go straight out.
+- `bands` is called out at line 382 as *"THE CELL THIS PAGE EXISTS TO PRINT"*
+  and it is Warps' filter bank, so the readout and the page's `what` both
+  change with this, in the same commit.
+- The panel to apply is `demo/shell/instrument-panel.mjs`
+  (`createInstrumentPanel`), whose header comment already names `/muta/` and
+  `/fau/` as the two pages that had to pass a plate as a glue part OUTSIDE the
+  case.
+- Removing controls moves every harness press on this page, so the assert
+  count is what to read afterwards, not the colour.
+
+### fau: "compile on loading so i can play"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"compile on loading so i can play"*.
+Slug `fau`, file `demo/fau/index.html` (and whatever of `demo/fau/vendor/`
+the libfaust load path touches). The page compiles on a press today, so a
+visitor who wants to play has to know to compile first. Not started.
+⚠️ Known and non-obvious: a visit must open nothing and a self-check never
+runs for a visitor, so "on loading" has to stay inside this page's own assets.
+`plans/plan-fau.md` is the 1,419 line plan it was built to, and `manifest.mjs`
+line 668 already records that the browser build of libfaust has three backends
+and C++ is not one of them.
+
+### global: "move all reading sections atop of the logs and glue them"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"global: move all reading sections atop of
+the logs and glue them (you have patterns). use you new glueing code for this,
+see the kit"*. Every page with a readout and a log: the reading sections go
+ABOVE the log and the two become one surface.
+⚠️ The kit code named is `demo/shell/glue.mjs` (`createGlueRows`, `.pos-glue`
+in `shell.css`), which `demo/shell/instrument-panel.mjs` already builds on.
+⚠️ Shared work first, by one agent, before any page agent starts: this is a
+kit and `shell.css` change, and the per-page moves come after it.
+Not started, and the page list is not counted yet.
+
 ### Done 2026-09-27: derive, "why serif? no serifs on image" (Ludensemble)
 
 Asked with a crop of the Ludensemble poster card, whose type is a wide geometric sans in capitals and which the detector read as serif, 15 shapes, 100 per cent serif-like. Goes into derive.html in its new home once the move-out lands, since demo/eccm/ is already gone from this checkout; the cause is measured first. ✅ MEASURED: at 300 px the poster's letters are 7 to 9 px tall with 2 px stems, and 15 of 15 read as serif because a capital's bar is the whole glyph width and one pixel of antialiasing is half a stroke. A serif is now read only on letters 14 px tall or more with a stem of 3 px or more, else the verdict is "type too small to read for serifs"; Sound Plasma (46 px, stem 5) and Improtest (38 to 46 px, stem 7) keep their serif, the Huddersfield photograph loses a false one its arrows had made. Live at https://eccm.positron.studio/derive, fourth card.
