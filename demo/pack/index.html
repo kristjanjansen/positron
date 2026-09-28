@@ -2340,10 +2340,20 @@
         { name: 'hits/Snare.wav', bytes: wavBytes(24000) },
         // 🔴 THE SHAPE A REAL BAG OF SAMPLES ARRIVES IN, AND IT IS NOT THE
         // CIRCUIT'S. MEASURED 2026-09-28 across the six zips in `tmp/packs/`
-        // that hold WAVs: 901 files, of which 749 are 16 bit mono and this page
-        // can decode, and **152 are stereo or 24 bit and it cannot**. So this is
-        // not a corner case invented for a check, it is a sixth of the corpus.
+        // that hold WAVs: 901 files, in 18 distinct chunk layouts, of which only
+        // 84 are a plain `fmt ` then `data`. So this is not a corner case
+        // invented for a check, it is the corpus.
+        // 🔴 AND THIS ROW WAS A REFUSAL FOR ONE MORNING. It read 24 bit stereo,
+        // which `circuit-sample.mjs` could not decode until later the same day,
+        // and the assert below graded that refusal. The module reads all 901 now,
+        // so `Room.wav` is an ORDINARY ROW and the assert is the positive one.
         { name: 'Room.wav', bytes: wavBytes(44100, { rate: 44100, bits: 24, channels: 2 }) },
+        // ⚠️ AND THE REFUSAL BRANCH IS STILL LIVE CODE, so it keeps a subject of
+        // its own rather than losing its grading to the good news above. Six
+        // channels are refused BY NAME and deliberately: a plain average is right
+        // for a stereo pair and is a guess for a surround set, where a centre, a
+        // surround pair and an LFE do not weigh the same.
+        { name: 'Surround.wav', bytes: wavBytes(44100, { rate: 44100, channels: 6 }) },
         { name: 'readme.txt', bytes: new TextEncoder().encode('recorded on a desk') },
         { name: 'Cymbal.wav', bytes: notWave },
       ]);
@@ -2359,12 +2369,12 @@
         .map((c) => c.textContent);
 
       d.assert('a zip of plain wavs opens as a sample set, in the archive\'s own order, with no patches and no sessions',
-        samples.length === 4
-        && samples.map((w) => w.name).join(' ') === 'Kick.wav Snare.wav Room.wav Cymbal.wav'
+        samples.length === 5
+        && samples.map((w) => w.name).join(' ') === 'Kick.wav Snare.wav Room.wav Surround.wav Cymbal.wav'
         && samples[0].row.seconds === 0.1 && samples[1].row.seconds === 0.5
         && cells[0] === 'Kick.wav' && cells[1] === '0.10 s' && cells[4] === '0.60'
         && patches.length === 0 && sessions.length === 0
-        && tabs.buttons[2].textContent === '4 SAMPLES'
+        && tabs.buttons[2].textContent === '5 SAMPLES'
         && tabs.enabled('samples') === true
         && tabs.enabled('patches') === false && tabs.enabled('sessions') === false
         && tabs.at() === 'samples'
@@ -2376,7 +2386,7 @@
         + `${fetched - beforeBag} request(s)`);
 
       d.assert('NEGATIVE CONTROL: a Mac resource fork is a wav by its name and is never a row',
-        inBag.length === 6
+        inBag.length === 7
         && inBag.some((e) => e.name === '__MACOSX/._Kick.wav')
         && !samples.some((w) => w.name.startsWith('._'))
         && !samples.some((w) => w.name === 'readme.txt'),
@@ -2385,19 +2395,24 @@
         + `and the table shows ${samples.length}`);
 
       d.assert('NEGATIVE CONTROL: a wav the decoder refuses keeps its row, says why and is counted as refused',
-        samples[3].row.ok === false
-        && /rather than "RIFF"/.test(samples[3].row.why || '')
-        && /3 of 4 samples read, 1 refused/.test(bagSaid),
-        `the fourth row says "${samples[3]?.row.why}", and the log says `
+        samples[4].row.ok === false
+        && /rather than "RIFF"/.test(samples[4].row.why || '')
+        && /4 of 5 samples read, 1 refused/.test(bagSaid),
+        `the last row says "${samples[4]?.row.why}", and the log says `
         + `"${bagSaid.split('\n').filter((l) => /samples read/.test(l)).pop()}"`);
 
       /**
-       * 🔴 THE HALF THAT IS NOT A REFUSAL AND IS NOT A READING EITHER. A 24 bit
-       * stereo file's HEADER reads perfectly and its AUDIO is not decoded here,
-       * so the row is neither `ok: false` nor complete, and this page's previous
-       * only shapes were those two. Before today the row builder called
-       * `null.toFixed(2)` on it and the play button offered a press that could
-       * only log a refusal.
+       * 🔴 A 24 BIT STEREO FILE IS AN ORDINARY ROW, AND THIS ASSERT SAID THE
+       * OPPOSITE FOR ONE MORNING. It read that the header reads, the audio does
+       * not, the measured cells are empty and the play button is off, which was
+       * exactly true of `circuit-sample.mjs` until 24 bit and a documented
+       * stereo mixdown landed in it the same day. The fixture did not change and
+       * the answer did: `Room.wav` measures, draws and plays.
+       * ⚠️ AND `peak` IS THE MIXDOWN'S, WHICH IS A DIFFERENT NUMBER FROM THE
+       * LOUDEST CHANNEL'S. `MIX` is the mean, so a hard panned file reads below
+       * its own loudest channel and that is a fact about the file rather than a
+       * loss. MEASURED over the 150 real stereo files in `tmp/packs/`: the ratio
+       * runs 0.46642 at worst, 0.99996 at the median and exactly 1 at best.
        */
       {
         const rowsNow = [...sampleTable.scroller().querySelectorAll('.pos-tbl-row')];
@@ -2406,17 +2421,39 @@
         openSample(2, false);
         const roomBtn = playBtn.disabled;
         openSample(0, false);
-        d.assert('a wav whose header reads and whose audio this page cannot decode keeps its header cells, empties the measured ones and cannot be played',
-          samples[2].row.ok === true && samples[2].row.peak === null
+        d.assert('a 24 bit stereo wav reads, measures, draws and plays like any other row',
+          samples[2].row.ok === true && samples[2].row.peak !== null
           && roomCells[0] === 'Room.wav' && roomCells[1] === '1.00 s'
           && roomCells[2] === '44,100' && roomCells[3] === '44.1 kHz'
-          && roomCells[4] === '' && roomCells[5] === ''
-          && /24 bit is not decoded here/.test(room.title)
-          && roomBtn === true && playBtn.disabled === false
+          && roomCells[4] !== '' && roomCells[5] !== ''
+          && roomBtn === false && playBtn.disabled === false
           && waveHost.hidden === false,
           `the row reads ${JSON.stringify(roomCells)}, its hover says `
           + `"${room.title.split('\n').pop()}", and play was `
           + `${roomBtn ? 'off' : 'on'} for it and ${playBtn.disabled ? 'off' : 'on'} for Kick.wav`);
+
+        /**
+         * 🔴 AND THE BRANCH THE ASSERT ABOVE USED TO GRADE IS STILL LIVE CODE,
+         * so it gets a subject that will not be decoded away next time the
+         * module widens. Six channels are refused BY NAME, which is the whole
+         * stance of that module: a refusal is a value a caller can show and
+         * nothing throws.
+         */
+        const sur = rowsNow[3];
+        const surCells = [...sur.querySelectorAll('.pos-tbl-c')].map((c) => c.textContent);
+        openSample(3, false);
+        const surBtn = playBtn.disabled;
+        openSample(0, false);
+        d.assert('a wav whose header reads and whose audio this page will not mix down keeps its header cells, empties the measured ones and cannot be played',
+          samples[3].row.ok === true && samples[3].row.peak === null
+          && surCells[0] === 'Surround.wav' && surCells[1] === '1.00 s'
+          && surCells[2] === '44,100' && surCells[3] === '44.1 kHz'
+          && surCells[4] === '' && surCells[5] === ''
+          && /channels are not mixed down here/.test(sur.title)
+          && surBtn === true && playBtn.disabled === false,
+          `the row reads ${JSON.stringify(surCells)}, its hover says `
+          + `"${sur.title.split('\n').pop()}", and play was `
+          + `${surBtn ? 'off' : 'on'} for it and ${playBtn.disabled ? 'off' : 'on'} for Kick.wav`);
       }
     }
 

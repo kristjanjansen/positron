@@ -266,6 +266,101 @@ used by both, so there is no second copy.
 - ⚠️ **AND THE 59/59 IN THIS FILE AND IN CLAUDE.md IS `pack` AND `tom`
   TOGETHER**, not either page alone. Caught independently by two agents today.
 
+✅ **AND THE LAST THIRD LANDED THE SAME DAY: `demo/shell/circuit-sample.mjs`
+READS ALL 901 NOW, AGAINST 749.** 24 bit PCM (three bytes little endian, sign
+extended from the top byte, assembled by hand because there is no `getInt24` and
+a shifted signed byte puts the sign in the wrong bit) and a documented stereo
+mixdown. **901 read, 901 measure, 901 draw, 901 play, 0 refused**, where it was
+749 with 152 refused, the 152 being 100 at 24 bit and 52 at 16 bit stereo.
+- 🔴 **AND NON-REFUSAL IS NOT CORRECTNESS, SO THE ARITHMETIC IS GRADED AGAINST
+  ffmpeg**, a decoder nobody here wrote. One file of each of the five shapes,
+  decoded to floats and compared sample for sample: **worst single sample
+  difference 0, worst per channel peak difference 0, 0 frame counts disagreed.**
+  Exactly equal, not approximately. That arm pipes bytes to ffmpeg's stdin so the
+  test still writes nothing to disk, and skips with a named line where ffmpeg is
+  absent.
+- **THE MIXDOWN IS THE MEAN, exported as `MIX` so a reading can be attributed to
+  it.** The sum invents clipping the file does not have, two correlated channels
+  at 0.8 reading 1.6. The left channel alone reports silence for a hard panned
+  sample that is not silent. The mean cannot leave -1 to 1, so `clipped` keeps
+  meaning *this file touches the rail* rather than *our arithmetic did*.
+- ⚠️ **A PEAK AFTER A MIXDOWN IS A DIFFERENT NUMBER FROM A PEAK PER CHANNEL, so
+  `content()` REPORTS BOTH** and the comparison is a cell rather than an
+  argument. MEASURED over the 150 real stereo files: **0.46642 at worst, 0.99996
+  at the median, exactly 1 at best**, 39 landing on 1, 15 below 0.9, 26 dual
+  mono. The widest file in the corpus reads at less than half the level of its
+  own loudest channel, which is a real fact about a wide sample and is
+  indistinguishable from a quiet one unless both numbers are on screen.
+- **THE ONE CASE WHERE THE MEAN LIES IS NAMED:** two channels in exact anti phase
+  average to digital silence, so `content().cancelled` is set when the mix is
+  silent and a channel is not, because *this file is empty* and *this mixdown
+  cancelled* are two findings and a bare zero is the wrong one. **Zero anti phase
+  files in the 901**, so it is a guard against a shape rather than a report of
+  one, and the module says so.
+- **STILL REFUSED, BY NAME, EACH WITH ITS COUNT IN THE SENTENCE AND NONE OF THEM
+  THROWING:** 32 bit float, turned away at the FORMAT gate rather than the depth
+  gate because float is a different number line rather than a wider integer and
+  is allowed to run past 1.0; 8 bit, which is unsigned with a 128 bias where every
+  other depth is signed, so getting it wrong halves the level and adds a DC
+  offset, which is exactly the plausible audio this module exists not to invent;
+  32 bit integer; `WAVE_FORMAT_EXTENSIBLE` (0xFFFE, how most DAWs would have
+  written these very files, and measurably not how these were: all 100 declare
+  plain tag 1); and more than two channels. Zero float files among the 965 real
+  WAVs on this disk, so nothing here could grade it.
+
+🔴 **THREE THINGS FOUND ON THE WAY, AND THE FIRST IS A LIVE CRASH REACHABLE FROM
+A STRANGER'S ZIP.** `frames` came from the DECLARED block align while the reader
+stepped by the DERIVED one, so a file declaring a block align smaller than its own
+frame claimed more frames than it had bytes, and `toMono`, `content` and
+`summarise` all died inside a `DataView`. MEASURED before the repair: 8 frames
+claimed over 8 bytes, 16 bytes asked for. The module's whole stance is that a
+refusal is a value a caller can show and nothing throws, and this was the
+exception nobody had met because until today only 48 kHz 16 bit mono could reach
+it. Clamped now, with `framesClamped` saying so. 0 of the 901 need it.
+🔴 **AND WIDENING `DEPTHS` WOULD SILENTLY HAVE WIDENED THE SLOT WALKER'S SYNC
+CHECK.** `slotsIn()` tested `DEPTHS.includes(bits)` as one of its three sync
+conditions, so teaching the decoder 24 bit would have made the walker twice as
+likely to find a sample table in noise, on a completely different corpus: 16 bit
+on all 1,536 Circuit slots measured. One list doing two jobs. Split into
+`SLOT_DEPTHS`, still `[16]`, and every negative control still refuses.
+🔴 **AND THE CHUNK WALKER FINALLY HAS A REAL CORPUS, WHICH THE MODULE'S HEADER
+SAID FOR A WEEK IT COULD NOT HAVE.** All 64 samples in a Circuit pack are `fmt `
+then `data`, so only synthetic fixtures could grade it. These 901 files carry **18
+distinct chunk layouts**, and **265 put their audio somewhere other than offset
+44, the deepest at byte 736**. Only 84 are plain `fmt `+`data`. **247 carry a
+`bext` broadcast chunk 602 bytes long that a 44 byte assumption would have played
+as audio, and 11 put `bext` BEFORE `fmt `**, which a reader expecting the format
+chunk first would read as having no format chunk at all. All 11 parse, and it is
+asserted.
+
+**MEASURED: the module test 52/52 before and 84/84 after, sabotages 5 to 10,
+negative controls 6 to 9.** ⚠️ The brief's "57 asserts, seven sabotages" does not
+reproduce, and the reason is worth knowing: it is 52 on this machine because
+`tmp/personal/New Pack.circuitpack` left this repository on 2026-09-24 and the
+test early exits on it.
+⚠️ **AND THAT EXIT STRANDS 58 OF THE TEST'S 142 ASSERTS ON ANY CHECKOUT THAT
+FOLLOWS CLAUDE.md**, including the whole `tmp/packs` sysex stream corpus block,
+which grades files that ARE on this disk and is skipped only because a different
+file is not. The new corpus section was put ABOVE the exit. The repair is to wrap
+lines 1130 to 1731 in an existence test rather than exiting, and it was reported
+rather than done.
+
+🔴 **AND IT LEFT `/pack/` RED BY ONE, WHICH THE SESSION FIXED.** The assert
+written that morning had as its entire subject a fixture built to be undecodable
+that had become decodable. `Room.wav` is an ordinary row now and the assert is the
+positive one. ⚠️ **THE REFUSAL BRANCH IS STILL LIVE CODE, so it got a subject that
+cannot be decoded away next time the module widens**: a `Surround.wav` at six
+channels, refused by name. Adding a row moved three other counts, which were
+updated with it. **MEASURED after: `/pack/` 31/31 green, `circuit-sample-test`
+84/84 green, `/tom/` 39/39 green.**
+
+⚠️ **ONE ADMISSION WORTH READING IN THE DIFF: a rounded reading is not a fact, and
+it was nearly shipped.** The first survey printed the mixdown ratio median as
+`1.0000` through `toFixed(4)`, that went into a code comment, and the assert built
+on it went red, because it is **0.99996**. Both carry five places now and the
+comment records the mistake. It is the same shape this project has paid for at
+larger scale.
+
 🔴 **THE DEFECT THE REAL CORPUS FOUND, WHICH NOBODY ASKED ABOUT AND WHICH
 `fill()` THREW ON: 152 OF THE 901 ARE STEREO OR 24 BIT.** `readWave` reads their
 headers perfectly so `summarise` answers `ok: true`, but `toMono` decodes only 16
