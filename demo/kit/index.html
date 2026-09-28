@@ -10261,7 +10261,13 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
        */
       const chordEl = kpad.querySelector('.kpad-chord');
       if (chordEl) {
-        const edges = () => [chordEl, ...kpad.querySelectorAll('.kpad-names, .kpad-at')]
+        /* ⚠️ `.kpad-names` WAS IN THIS LIST AND LEFT WITH THE `N | D` PAIR ON
+           2026-09-28. It is a SPREAD rather than a `querySelector`, so losing it
+           quietly narrowed what this assert watches instead of throwing, which
+           is the shape worth naming: the same removal DID throw on `/nola/`,
+           where the selector was singular. The octave pair is the row's first
+           control now and is what the left edges are read off. */
+        const edges = () => [chordEl, ...kpad.querySelectorAll('.kpad-oct, .kpad-at')]
           .map((e) => +e.getBoundingClientRect().left.toFixed(2));
         const at0 = edges();
         const w0 = +chordEl.getBoundingClientRect().width.toFixed(2);

@@ -2930,7 +2930,32 @@
         return r.getBoundingClientRect().left;
       };
       const plateBox = plate.el.getBoundingClientRect();
-      const ctlInk = inkLeft(keys.el.querySelector('.kpad-names button'));
+      /* 🔴 THE REFERENCE IS THE ROW'S LEFT EDGE PLUS A BUTTON'S OWN INK
+         INSET, AND IT WAS ONE NAMED CONTROL'S LETTER UNTIL 2026-09-28. It read
+         `.kpad-names button`, the `N` of the naming pair, which left the
+         keyboard component on *"finally: rm N | D setting from keyboard
+         component"*. Two things go wrong when a selector names one control:
+         `querySelector` answers `null` and `inkLeft(null)` THROWS, taking this
+         assert and every one after it out of the page in silence; and the
+         control that inherits first place may not be a letter at all.
+         🔴 IT IS NOT, AND THAT IS WHY MOVING THE SELECTOR ONE CONTROL ALONG WAS
+         THE WRONG REPAIR. MEASURED the same evening: pointed at `.kpad-oct
+         button` this assert read **x53.08 against the plate's x54.00** and went
+         red at a tolerance of 0.6. `.step button.ico` is `padding: 0` and a
+         fixed square, so the octave button CENTRES a glyph in 24 px and its ink
+         lands wherever that glyph's advance puts it. The naming pair passed for
+         five days because it was `width: auto` over `.kpad button`'s
+         `0 var(--kpad-pad)`, so its letter sat at exactly the inset this claim
+         is about. **An alignment that holds by one glyph's width is luck.**
+         ✅ SO THE INSET IS READ OFF A BUTTON THAT HAS A WORD IN IT, as its ink
+         minus its own border box, and applied to the pad ROW's left edge. That
+         is ink against ink in the quantity the claim is about, it survives any
+         reordering of the row, and it does not care which control is first. */
+      const padRow = keys.el.querySelector('.kpad');
+      const wordBtn = [...padRow.querySelectorAll('button')]
+        .find((b) => (b.textContent || '').trim().length > 1);
+      const inset = inkLeft(wordBtn) - wordBtn.getBoundingClientRect().left;
+      const ctlInk = padRow.getBoundingClientRect().left + inset;
       const nameInk = inkLeft(plate.el.querySelector('.panel-plate-l'));
       const between = Math.round(pickBox.left - plateBox.right);
       d.assert('the page’s own nameplate is at the left end of that footer, its letter under the row above',
@@ -2938,7 +2963,9 @@
         && plate.shown().join(' ') === 'NOLA'
         && Math.abs(nameInk - ctlInk) < 0.6,
         `it reads ${plate.shown().join(' ')}, its letter at x${nameInk.toFixed(2)} against `
-        + `x${ctlInk.toFixed(2)} for the first control on the row above, `
+        + `x${ctlInk.toFixed(2)}, which is the row above starting at `
+        + `x${padRow.getBoundingClientRect().left.toFixed(2)} plus the `
+        + `${inset.toFixed(2)} px "${(wordBtn.textContent || '').trim()}" sits inside its own box, `
         + `and ${between} px of row between it and the control`);
 
       /* 🔴 AND THE TWO ROWS ARE SEPARATED BY A LINE RATHER THAN BY A GAP, WHICH
