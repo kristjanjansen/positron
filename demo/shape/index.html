@@ -653,13 +653,14 @@
    * page-local plate outside the component, which is the hand-rolled defect the
    * component exists to end.
    *
-   * ⚠️ `caps: false`, WHICH IS A DEPARTURE AND IS NAMED AS ONE, AND IT IS
-   * UNCHANGED BY THE MOVE. Every other plate in this project is upper case
-   * (`POSITRON TOM`, `MODEL 12`, `PLAITS`, `WARPS`) under a rule asked for
-   * 2026-09-21, *"replica names always in uppercase"*. That rule is about a
-   * shelf of REPLICAS reading as one shelf; this page is a replica of nothing,
-   * the name asked for is the page's own slug, and the ask spells it lower
-   * case.
+   * 🔴 THE PLATE READS `SHAPE` SINCE 2026-09-28, AND THIS COMMENT ARGUED THE
+   * OTHER WAY. Asked, verbatim: *"all nameplates are uppercase"*, which
+   * overrules the departure this page carried. The departure was real and is
+   * worth keeping in words: every other plate is upper case (`POSITRON TOM`,
+   * `MODEL 12`, `PLAITS`) under a rule asked for 2026-09-21, *"replica names
+   * always in uppercase"*, that rule is about a shelf of REPLICAS reading as
+   * one shelf, and this page is a replica of nothing. One treatment for every
+   * plate is the plainer rule and it is the one that was asked for twice.
    * ⚠️ AND THE NAME SITS AT THE START OF THE FOOT, WHICH IS THE COMPONENT'S
    * DEFAULT AND IS NOT ASKED FOR HERE. `place: 'ends'` is `space-between` and
    * parks a lone child on the left, which is where the sketch draws the name
@@ -684,7 +685,7 @@
    */
   const panel = createInstrumentPanel({
     full: true,
-    plate: { name: 'shape', caps: false },
+    plate: { name: 'shape' },
   });
   d.stack.add(bar, panel.el, traffic.el);
 
@@ -1561,8 +1562,8 @@
     const foot = panel.plateRow.getBoundingClientRect();
     const footPad = parseFloat(getComputedStyle(panel.plateRow).paddingLeft);
     const ink = panel.plate.lines[0].getBoundingClientRect();
-    d.assert('the nameplate is at the start of the foot, one inset in, and it reads shape in lower case',
-      panel.plate.shown().join(' ') === 'shape'
+    d.assert('the nameplate is at the start of the foot, one inset in, and it reads SHAPE in upper case',
+      panel.plate.shown().join(' ') === 'SHAPE'
       && Math.abs((ink.left - foot.left) - footPad) <= 1,
       `ink left ${ink.left.toFixed(1)} against row left ${foot.left.toFixed(1)}, `
       + `${(ink.left - foot.left).toFixed(1)} px of a ${footPad.toFixed(1)} px inset, reading `

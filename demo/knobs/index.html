@@ -888,10 +888,14 @@
    * one of its own, which is why `online: false` and a hand `prepend` stood
    * here. `status:` takes a built control, so nothing reaches into a component
    * to place it any more.
-   * ⚠️ `caps: false`, SO THE PLATE READS `knobs` AND NOT `KNOBS`. The ask names
-   * it in lower case and so does the slug, and `panel-layout.mjs` carries the
-   * argument: the uppercase rule is about a shelf of REPLICAS reading as one
-   * shelf, and this page is a replica of nothing.
+   * 🔴 THE PLATE READS `KNOBS`, AND THIS COMMENT ARGUED THE OTHER WAY UNTIL
+   * 2026-09-28. Asked, verbatim: *"all nameplates are uppercase"*. The
+   * exception this page and `/shape/` both carried was that the uppercase rule
+   * is about a shelf of REPLICAS reading as one shelf and neither page is a
+   * replica of anything. That was a good argument and the ask overrules it:
+   * every plate on the site is one treatment now, which is a plainer rule than
+   * one with two defensible exceptions in it. `caps` defaults to true in
+   * `instrument-panel.mjs`, so the option is simply not passed.
    *
    * 🔴 THE ROTARIES ARE ONE ROW AND IT IS `start`, WHICH IS *"left to rotaries
    * cutoff reseonance"* SURVIVING THE MOVE. A glue row centres by default, and
@@ -918,7 +922,7 @@
   const panel = createInstrumentPanel({
     rows: [[[knobs], { align: 'start' }]],
     keys: kb.el,
-    plate: { name: 'knobs', caps: false, status: pres, patch: midiBtn },
+    plate: { name: 'knobs', status: pres, patch: midiBtn },
   });
   d.stack.add(panel.el);
 
@@ -1617,8 +1621,8 @@
     const footPad = parseFloat(footCs.paddingLeft);
     const footBox = panel.plateRow.getBoundingClientRect();
     const ink = panel.plate.lines[0].getBoundingClientRect();
-    d.assert('the plate is the last row and its name is one inset in, reading knobs in lower case',
-      panel.rows().at(-1).kind === 'plate' && panel.plate.shown().join(' ') === 'knobs'
+    d.assert('the plate is the last row and its name is one inset in, reading KNOBS in upper case',
+      panel.rows().at(-1).kind === 'plate' && panel.plate.shown().join(' ') === 'KNOBS'
       && Math.abs((ink.left - footBox.left) - footPad) <= 1,
       `ink left ${ink.left.toFixed(1)} against a row starting at ${footBox.left.toFixed(1)}, `
       + `${(ink.left - footBox.left).toFixed(1)} px of a ${footPad.toFixed(1)} px inset, reading `

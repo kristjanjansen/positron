@@ -489,13 +489,19 @@ export function createPanelSeam() {
  * would be sized by a word lying down. `writing-mode` changes the box, so the
  * grid track is genuinely the height of the name and as narrow as its type.
  *
- * 🔴 `caps: false` KEEPS WHAT WAS TYPED, AND IT IS HERE BECAUSE THE ASK SAYS
- * `shape` IN LOWER CASE. `shell.css` uppercases every plate on a rule asked for
- * 2026-09-21 (*"replica names always in uppercase"*), which is about a shelf of
- * REPLICAS reading as one shelf: `/tom/`, `/twelve/`, `/circuit/` and `/evo/`
- * all name a machine somebody else made. `/shape/` is not a replica of
- * anything, the name asked for is the page's own slug, and `SHAPE` would be
- * this component answering a different question from the one it was asked.
+ * 🔴 `caps: false` KEEPS WHAT WAS TYPED, AND SINCE 2026-09-28 NO PAGE PASSES
+ * IT. Asked, verbatim: *"all nameplates are uppercase"*. `shell.css` uppercases
+ * every plate on a rule asked for 2026-09-21 (*"replica names always in
+ * uppercase"*), which was read narrowly as being about a shelf of REPLICAS
+ * reading as one shelf: `/tom/`, `/twelve/`, `/circuit/` and `/evo/` all name a
+ * machine somebody else made, while `/shape/` and `/knobs/` are replicas of
+ * nothing and both took the opt-out. **The second ask overrules that reading.**
+ * One treatment for every plate is the plainer rule, and a rule with two
+ * defensible exceptions in it is a rule somebody has to remember.
+ * ⚠️ THE OPTION STAYS RATHER THAN BEING DELETED, because a page that genuinely
+ * has to print a typed string will need it, and the argument above is kept in
+ * words so nobody re-derives it from scratch. If nothing passes it next time
+ * somebody reads this, delete it.
  * ⚠️ IT IS A COMPONENT OPTION AND NOT A PAGE RULE, FOR THE REASON THIS FILE
  * ALREADY HAS IN WRITING one function up: `/tom/` fixed a plate in its own
  * stylesheet, *"every page after it inherited the defect and not the fix"*, and

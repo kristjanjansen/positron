@@ -1,5 +1,45 @@
 ## Open
 
+### muta: "on by default, no online button, put a test tone on that spot"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"muta: on by default, no online button, put
+a test tone on that spot"*. Slug `muta`, file `demo/muta/index.html`. Not
+started.
+⚠️ Known and non-obvious: the presence control is a `createPresenceButton` the
+page builds itself and passes to the panel as `plate: { status }`, since
+`createInstrumentPanel` takes a BUILT control where `createInstrument` took an
+`online` object. `Test tone` is `panel.addRow(toneBtn, { align: 'start' })`, a
+row of its own between the rotaries and the foot, added late because the
+component guarantees insertion above the keys and the plate.
+🔴 **"ON BY DEFAULT" RUNS STRAIGHT INTO THE STANDING RULE AND HAS TO BE READ
+CAREFULLY.** A visit opens nothing and a sound happens on a press, so this
+cannot mean the page makes a noise or opens an AudioContext by itself. `/fau/`
+answered the same shape earlier today by splitting compile from attach: it is
+READY on load and the first gesture arms the audio. That is the reading to
+build.
+
+### global: "all nameplates are uppercase"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"all nameplates are uppercase"*. Every page
+with a plate, and the component that draws it.
+⚠️ Known and non-obvious: the plate takes `caps`, and pages disagree today.
+`muta` passes `PLAITS` already capitalised as a STRING, `knobs` and `shape`
+both pass `caps: false` deliberately, and `shape`'s lower case `shape` is
+asserted by name. So this is a component default plus the removal of every
+page's opt-out plus the asserts that read the rendered word.
+⚠️ SHARED, so the session does it once before any page agent starts.
+
+### knobs: "use rotaty sliders grid"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"knobs: use rotaty sliders grid"*. Slug
+`knobs`, file `demo/knobs/index.html`. Not started.
+⚠️ Known and non-obvious: the page's rotaries are passed to the instrument
+panel as `rows: [[[knobs], { align: 'start' }]]`, so they are a row of controls
+rather than a lattice. `createControlGrid` is the kit's lattice and `/muta/` and
+`/shape/` both wear it. ⚠️ `--ctl-w` and the control grid's own `gap: 10` are
+written as an INLINE style no custom property can reach, which is recorded in
+`/muta/`'s stylesheet after a comment claimed otherwise for weeks.
+
 ### Done 2026-09-28: grains, "hide grains from index. note in handoff: bring it back when we have time"
 
 ✅ **DONE, both halves.** `built: false` on the `grains` row in `demo/manifest.mjs`, with a comment there saying it is a hide and not a delete, and the note at the top of `HANDOFF.md` under session 53. MEASURED after, counted and not remembered: **57 demos, 54 built**, one fewer than the morning's 55. `demo/grains/` is untouched and https://positron.studio/grains/ still answers. ⚠️ The note records what the flag really costs: a no-argument `node demo/verify.mjs` walks the BUILT demos, so this page is out of the full run until it returns.
