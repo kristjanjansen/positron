@@ -1042,7 +1042,19 @@ button.pos-pri[data-busy="1"] {
 .pos-rows-grid > .pos-rows-r[hidden] { display: none; }
 /* a picture row: no inset, and one child is the row */
 .pos-rows-r[data-pad="off"] { padding: 0; }
-.pos-rows-r[data-pad="off"] > :only-child { flex: 1 1 auto; min-width: 0; }
+/* 🔴 AND A PADDED ROW'S ONLY CHILD TAKES THE ROW TOO, SINCE 2026-09-28. This
+   said `[data-pad="off"]` only, and the missing half was asked for INDEPENDENTLY
+   BY TWO PAGES ON ONE DAY, which is what makes it a kit rule rather than either
+   page's business. /shape/ carried `.shape-sec { flex: 1 1 auto; min-width: 0 }`
+   as a page rule, because without it a section sizes its row from its widest
+   lane and `.sld-group`'s `minmax(0, 1fr)` tracks resolve against nothing.
+   /tom/ hit the same wall from the other side and had to set BOTH its rows to
+   `pad: false`, because a padded transport bar shrank to the width of its own
+   controls and put the tempo stepper beside them instead of at the far end.
+   ⚠️ A row's only child is the row, whether or not the row has an inset. The
+   inset is about where the ink starts, not about how wide the block is, and
+   those two were tangled here because the picture row needed both at once. */
+.pos-rows-r > :only-child { flex: 1 1 auto; min-width: 0; }
 /* a well that is the whole row keeps its text on the surface's own inset, handed
    through the field's token, so its first glyph lines up with every other row's
    ink (/fau/: the code against the keys and the foot at 20) */
