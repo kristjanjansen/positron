@@ -132,9 +132,16 @@
      * anything in front of `listen` moves every other control's press. That has
      * already cost this project an intermittent failure on a page where nothing
      * had changed.
+     * 🔴 AND NO BUTTON HERE IS PRIMARY. Asked 2026-09-28: *"dump: all buttons
+     * secondary"*. `Listen` carried `primary: true` and so wore `pos-pri`, the
+     * site's one accent, which is spent on what is CHOSEN or LIVE. Neither
+     * control on this page is either: both are a question put to whatever is
+     * plugged in, and the accent belongs to the traffic that answers. Dropping
+     * the FLAG is all that changed. The ORDER is untouched, for the reason
+     * directly above, and `pos-pri` is unchanged for every other page.
      */
     controls: [
-      { id: 'listen', label: 'Listen', primary: true },
+      { id: 'listen', label: 'Listen' },
       { id: 'ask', label: 'Ask for versions' },
       /**
        * 🔴 `Clear` IS NOT HERE. Asked 2026-09-20: *"move clear below table to

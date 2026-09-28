@@ -104,11 +104,26 @@
    * is quoted below in the symbol that document used. `MiB` cannot be mistaken
    * for `MB` the way `KB` could, which is the whole reason the symbols exist.
    *
-   * 🔴 NOTHING IS FETCHED ON A VISIT, AND THE COMPILER IS 6.16 MB. It arrives
-   * on the first press and not before, which is the `/reel/` repair applied to
-   * a download rather than to a stream: that page opened a newsreel and a day's
-   * radio on every visit for a first frame nobody had asked to see. The page
-   * says in its log what pressing will cost before anybody presses anything.
+   * 🔴 THE COMPILER ARRIVES ON A VISIT SINCE 2026-09-28, AND THIS BLOCK SAID
+   * THE OPPOSITE UNTIL THAT DAY. Asked as *"fau: compile on loading so i can
+   * play"*. Until then the 6.16 MB and the first compile both sat behind the
+   * Compile press, on the `/reel/` reasoning: that page opened a newsreel and a
+   * day's radio on every visit for a first frame nobody had asked to see.
+   * ⚠️ AND THE RULE IT LOOKS LIKE IT BREAKS IS ABOUT SOMEBODY ELSE'S SERVER.
+   * `/reel/` was reaching arhiiv.err.ee, where every connection this repository
+   * opens lands in a public broadcaster's audience figures. Every byte this
+   * page pulls on a visit comes off `/fau/vendor/`, four files this repository
+   * ships, on this origin, and nothing at all is asked of anybody else. That is
+   * asserted rather than argued: the check block reads every resource the
+   * browser really loaded and requires all of them to be same origin.
+   * 🔴 AND THE AUDIO HALF DID NOT MOVE WITH IT. No AudioContext, no worklet
+   * node and no MIDI on a visit, which is the other half of the same ask: a
+   * compile is arithmetic over a file this page ships, and a context is a sound
+   * device. Every sound page in this repository opens one on a gesture and not
+   * before, and one page departing from that quietly is how a rule stops being
+   * a rule. So the shape is: the instrument is COMPILED when you get there and
+   * it reaches the audio thread on the first key you press, which is the
+   * gesture a browser wants for a sound anyway.
    *
    * ── THE THREE THINGS THAT ARE NOT OBVIOUS FROM THE CODE ────────────────────
    *
@@ -163,14 +178,20 @@
    * The argument above is unchanged and is why the other five still carry a
    * wire that changes nothing.
    *
-   * 🔴 4. NOTHING COMPILES BUT A PRESS. Asked 2026-09-26 as *"no
-   * autocompile"*, after two days in which a compile landed 800 ms after the
-   * typing stopped. That timer was careful (it waited under a held note, it
-   * re-armed on every keystroke) and it was still a compile nobody had asked
-   * for at that moment: a compile blocks the thread it runs on, builds a WHOLE
-   * NEW `AudioWorkletNode` and calls `pedal.forgetKeys()`, so the only right
-   * moment for one is a moment the visitor chose. Typing now changes the bytes
-   * under the box and nothing else, and `Compile` in the corner of the box is the one road.
+   * 🔴 4. TYPING COMPILES NOTHING, AND THE LOAD COMPILE IS NOT A REVERSAL OF
+   * THAT. Asked 2026-09-26 as *"no autocompile"*, after two days in which a
+   * compile landed 800 ms after the typing stopped. That timer was careful (it
+   * waited under a held note, it re-armed on every keystroke) and it was still
+   * a compile nobody had asked for at that moment: a compile blocks the thread
+   * it runs on, builds a WHOLE NEW `AudioWorkletNode` and calls
+   * `pedal.forgetKeys()`, so the only right moment for one is a moment the
+   * visitor chose.
+   * ⚠️ AND THE ONE A VISIT MAKES IS NONE OF THOSE THINGS. It is one compile of
+   * text nobody has touched, before anybody is holding anything, with no node
+   * to replace and no keys to forget, and it happens exactly once. What was
+   * refused is a compile that keeps arriving while somebody works. Typing still
+   * changes the bytes under the box and nothing else, and `Compile` in the
+   * corner of the box is still the one road to a second one.
    *
    * ── THE PANEL, THE SWITCH AND `custom` ─────────────────────────────────────
    *
@@ -201,14 +222,17 @@
    * preset that was loaded a moment ago still fires a change rather than being
    * swallowed as "no change".
    *
-   * 🔴 AND `Compile` IS THE ONLY THING THAT OPENS ANYTHING. The first press fetches
-   * the compiler, compiles the patch in the box and asks for Web MIDI. Those
-   * were three separate presses, and one of them was not a press at all:
-   * `createMidi` asks the browser for access the moment it is built, so this
-   * page was asking every visitor about a MIDI keyboard before they had touched
-   * it. A visit now fetches nothing, compiles nothing, builds no AudioContext
-   * and asks for no MIDI, and the first two of those are asserted against the
-   * browser's own record rather than a counter this page keeps.
+   * 🔴 AND THE FIRST TOUCH IS WHAT OPENS A SOUND DEVICE, WHICH SINCE 2026-09-28
+   * IS A KEY RATHER THAN A BUTTON. `createMidi` asks the browser for access the
+   * moment it is built, so this page was asking every visitor about a MIDI
+   * keyboard before they had touched it. That moved onto the Compile press on
+   * 2026-09-23 and onto the first gesture with the load compile, so the one
+   * press that used to do three things is now a key that does three things and
+   * a button that still recompiles. A visit builds no AudioContext, puts
+   * nothing on the audio thread and asks about no MIDI keyboard, and all three
+   * are asserted; what a visit DOES do is pull the four vendor files and
+   * compile the Organ, counted off the browser's own record rather than off a
+   * counter this page keeps.
    *
    * ── WHAT THIS PAGE DELIBERATELY DOES NOT DO ────────────────────────────────
    *
@@ -574,7 +598,7 @@ effect  = dm.freeverb_demo;
   ];
 
   const ONE = 'a synthesiser you type in, compiled to machine code in this tab '
-            + 'when you press Compile';
+            + 'as the page opens';
 
   const d = mount({
     name: 'fau',
@@ -666,9 +690,10 @@ effect  = dm.freeverb_demo;
 
   // ── the audio graph ────────────────────────────────────────────────────────
   //
-  // One context, made on the first press rather than at load: an AudioContext
-  // created on a visit is a visit making a sound device busy for a page nobody
-  // has touched.
+  // One context, made on the first touch of the instrument rather than at load:
+  // an AudioContext created on a visit is a visit making a sound device busy for
+  // a page nobody has put a finger on. The compile moved to the load path on
+  // 2026-09-28 and this deliberately did not go with it.
   let ctx = null, master = null, meter = null, node = null;
   function audio() {
     /* 🔴 THE RESUME IS OUTSIDE THE ONCE-ONLY HALF, because a context is
@@ -789,8 +814,69 @@ effect  = dm.freeverb_demo;
    * supposed to cause one.
    */
   let runs = 0;
+
   /**
-   * Compile what is in the box and put it on the audio thread.
+   * 🔴 THE LAST GOOD COMPILE, WAITING FOR A GESTURE, AND THE SPLIT IS WHAT
+   * LETS A VISIT COMPILE WITHOUT OPENING A SOUND DEVICE. Until 2026-09-28
+   * compiling and reaching the audio thread were one function, so a compile was
+   * necessarily an AudioContext and `"compile on loading"` would have been an
+   * AudioContext on a visit. `build()` leaves its module here; `attach()` is
+   * the only thing in this file that touches a context, and everything that
+   * calls it is a gesture.
+   * ⚠️ `onThread` IS THE OBJECT AND NOT A FLAG, so `attach()` can tell "the
+   * audio is already running THIS compile" from "the audio is running the
+   * previous one", which is the difference between a no-op and a swap.
+   */
+  let ready = null;      // { gen, name } compiled and not yet on the audio thread
+  let onThread = null;   // the `ready` the live node was built from
+
+  /**
+   * Put the last good compile on the audio thread, opening the audio if this is
+   * the first time. Returns whether there is anything on the thread.
+   *
+   * 🔴 EVERY CALLER IS A GESTURE: a key, a MIDI note, the Compile button, or a
+   * compile made while the audio was already open. Nothing on the load path
+   * reaches this.
+   */
+  async function attach() {
+    if (!ready) return false;
+    if (node && onThread === ready) return true;
+    const first = node === null;
+    const t0 = performance.now();
+    audio();
+    const next = await ready.gen.createNode(ctx, VOICES);
+    const old = node;
+    node = next;
+    onThread = ready;
+    node.connect(master);
+    if (old) {
+      /* Everything the old node was holding goes with it. `allNotesOff` first,
+         because a worklet disconnected mid-note leaves its voices ringing in a
+         graph nobody can reach. */
+      try { old.allNotesOff?.(true); } catch { /* it is going away anyway */ }
+      old.disconnect();
+      if (typeof old.destroy === 'function') old.destroy();
+      /* The foot survives a recompile and the fingers do not: the new node has
+         never been told about any key, so anything the old one was holding is
+         gone whatever the page thinks.
+         🔴 AND ONLY WHERE THERE WAS AN OLD NODE, WHICH IS NEW ON 2026-09-28
+         AND IS NOT TIDINESS. On the FIRST attach the fingers are real: the key
+         that opened the audio is under somebody's hand and `press()` recorded
+         it a moment ago, so forgetting it here would leave a note that nothing
+         can ever let go of. */
+      pedal.forgetKeys();
+    }
+    if (first) {
+      d.log(`the compiled instrument reached the audio thread in `
+          + `${(performance.now() - t0).toFixed(0)} ms, which is all a key press had to buy`, 'hi');
+    }
+    startMidi();
+    return true;
+  }
+
+  /**
+   * Compile what is in the box, and put it on the audio thread if the audio is
+   * already open.
    * @returns {Promise<{ok: boolean, ms: number, bytes: number, size: number, error?: string}>}
    */
   async function build(code, name, pin = '') {
@@ -827,23 +913,13 @@ effect  = dm.freeverb_demo;
       + (gen.effectFactory?.code.length || 0)
       + (gen.mixerBuffer?.length || 0);
 
-    audio();
-    const next = await gen.createNode(ctx, VOICES);
-    const old = node;
-    node = next;
-    node.connect(master);
-    if (old) {
-      /* Everything the old node was holding goes with it. `allNotesOff` first,
-         because a worklet disconnected mid-note leaves its voices ringing in a
-         graph nobody can reach. */
-      try { old.allNotesOff?.(true); } catch { /* it is going away anyway */ }
-      old.disconnect();
-      if (typeof old.destroy === 'function') old.destroy();
-    }
-    /* The foot survives a recompile and the fingers do not: the new node has
-       never been told about any key, so anything the old one was holding is
-       gone whatever the page thinks. */
-    pedal.forgetKeys();
+    ready = { gen, name: uniq };
+    /* 🔴 A COMPILE DOES NOT OPEN A SOUND DEVICE. With the audio already open
+       the new module goes straight onto the thread, which is what a recompile
+       has always done; with it shut, this compile is what the first key press
+       will find waiting. `ctx` is the whole test, because it is null exactly
+       until somebody has touched the instrument. */
+    if (ctx) await attach();
 
     lastName = uniq;
     setCell('compile', ms.toFixed(0));
@@ -988,13 +1064,46 @@ effect  = dm.freeverb_demo;
   /** How many notes this page believes are being held, by hand or by foot. */
   const holding = () => pedal.fingers() + pedal.held();
 
+  /**
+   * 🔴 THE NOTES A HAND PUT DOWN WHILE THE FIRST NODE WAS STILL BEING BUILT.
+   * The first key press is the gesture that opens the audio, and building a
+   * worklet out of a compile that is already done is an await: short, measured
+   * in the log, and not zero. A note pressed inside that window is remembered
+   * here and sent the moment the node exists, and a note LET GO inside it is
+   * taken out again, so a press and release faster than the window cannot leave
+   * a note sounding that nothing is holding.
+   */
+  const waiting = new Map();
+  /** The one arming in flight, so eight fingers landing at once build one node. */
+  let arming = null;
+  function arm() {
+    if (node || !ready) return null;
+    if (!arming) {
+      arming = serial(attach)
+        .catch((e) => { d.log(`it could not reach the audio thread: ${e?.message || e}`, 'bad'); return false; })
+        .finally(() => { arming = null; });
+    }
+    return arming;
+  }
+
+  /** @returns {Promise<unknown>|undefined} the arming, where this press started one. */
   function press(note, vel = 100) {
-    if (!node) { d.log('nothing is on the audio thread, so switch FAU on'); return; }
-    pedal.keyDown(note);
-    node.keyOn(0, note, vel);
     keys.lightNote?.(note, true);
+    pedal.keyDown(note);
+    if (node) { node.keyOn(0, note, vel); return undefined; }
+    const job = arm();
+    if (!job) {
+      d.log('nothing is compiled yet, so press Compile in the corner of the text');
+      return undefined;
+    }
+    waiting.set(note, vel);
+    return job.then(() => {
+      for (const [k, v] of waiting) node?.keyOn(0, k, v);
+      waiting.clear();
+    });
   }
   function lift(note) {
+    waiting.delete(note);
     pedal.keyUp(note);                 // it decides whether that is a release
     keys.lightNote?.(note, false);
   }
@@ -1087,23 +1196,31 @@ effect  = dm.freeverb_demo;
     showSource();
     showPatch(i);
     d.log(`${p.label}: ${p.what}`);
-    if (!live()) return { ok: false, off: true };
+    /* 🔴 A PICK ALWAYS COMPILES SINCE 2026-09-28, AND THAT IS THE PICKER
+       STAYING HONEST RATHER THAN EXTRA WORK. It used to refuse unless the
+       instrument was already live, which was right while a compile meant
+       pulling six megabytes. Now a patch is compiled and waiting before anybody
+       touches the page, so refusing here would leave the Organ waiting under a
+       selector reading `Djembe`, and the first key would sound the wrong
+       instrument. The compiler is in the tab by then, so this costs the tens of
+       milliseconds in the `compile` cell and nothing else. */
     return build(p.code, p.label.toLowerCase());
   }
   const loadPatch = (i) => serial(() => applyPatch(i));
 
   // ── the Compile button ─────────────────────────────────────────────────────
   //
-  // 🔴 ONE PRESS DOES THE THREE THINGS THAT USED TO BE THREE PRESSES, AND SINCE
-  // 2026-09-26 IT IS THE ONLY ROAD TO A COMPILE. Asked as *"rm fau off button"*
-  // and *"replace it with compile (shimmer). no autocompile"*. The first press
-  // pulls the compiler; every press compiles what is in the box; the first one
-  // that works also looks for a MIDI keyboard. There is no switch and no idle
-  // timer: typing changes the bytes under the box and nothing else, a preset
-  // pick fills the box (and recompiles only if something is already on the
-  // audio thread, because a picker naming a Djembe over an Organ still
-  // sounding would be the lying control this project has a rule about), and
-  // the thread runs what was last compiled until the next press.
+  // 🔴 IT IS THE ONE ROAD TO COMPILING WHAT YOU TYPED, AND SINCE 2026-09-28 IT
+  // IS NO LONGER THE ONE ROAD TO A COMPILE. Asked as *"rm fau off button"* and
+  // *"replace it with compile (shimmer). no autocompile"*, and then as *"fau:
+  // compile on loading so i can play"*. The visit compiles the preset the box
+  // opens with; this button compiles whatever is in the box now, which is the
+  // only way anything a visitor WROTE reaches the audio thread. There is no
+  // switch and no idle timer: typing changes the bytes under the box and
+  // nothing else, a preset pick recompiles (because a picker naming a Djembe
+  // over an Organ still sounding would be the lying control this project has a
+  // rule about), and the thread runs what was last compiled until the next
+  // press.
   // ⚠️ THE SHIMMER IS THE KIT'S. `createButtonGroup` sets `data-busy` while a
   // handler's promise is open, which is the one sweep every working button in
   // this project wears (`shell.css`, `button[data-busy="1"]`), so a compile
@@ -1114,13 +1231,14 @@ effect  = dm.freeverb_demo;
   // asked for it; a press is somebody asking.
   // ⚠️ AND IT IS AWAITABLE FROM OUTSIDE through `compileJob`, so a check that
   // pressed the button and then read the page is not reading it 6 MB early.
-  const live = () => node !== null;
   let compileJob = Promise.resolve();
   function pressCompile() {
     compileJob = serial(async () => {
-      if (!faust) d.log(`the compiler is ${mb(COMPILER_BYTES)} MB and this is the press that pulls it`);
       const out = await build(source.value(), picked >= 0 ? PRESETS[picked].label.toLowerCase() : 'typing');
-      if (out.ok) startMidi();
+      /* A press is a gesture, so this is the one place a BUTTON is allowed to
+         open the audio. Where it is already open, `build()` has swapped the
+         node already and this returns without doing anything. */
+      if (out.ok) await attach();
       return out;
     });
     return compileJob;
@@ -1164,9 +1282,64 @@ effect  = dm.freeverb_demo;
   source.el.append(compileBtn);
   d.el.append(panel.el);
 
+  /* 🔴 THE FIRST TOUCH ANYWHERE ON THE INSTRUMENT OPENS THE AUDIO, NOT THE
+     FIRST KEY, AND THE NUMBER IS WHY. MEASURED 2026-09-28 in headless Chrome on
+     this desk: a key pressed as the very first gesture on the page takes
+     134 ms to reach the audio thread, which is an AudioContext and an
+     `audioWorklet.addModule` and cannot be made faster from inside a page. It
+     is paid once, and it is paid on the one note a visitor is listening hardest
+     to.
+     ✅ SO ANY GESTURE ON THE PANEL PAYS IT INSTEAD: clicking into the code,
+     stepping the patch selector, moving the octave, pressing Compile. A browser
+     grants user activation to the whole document on the first pointer press, so
+     by the time a finger reaches a key the node is already there and the note is
+     immediate.
+     ⚠️ IT IS THE PANEL AND NOT THE DOCUMENT, so a scroll or a tap somewhere
+     else on the page opens no sound device. Touching the instrument is the
+     gesture; reading the page is not.
+     ⚠️ AND IT IS THE CAPTURE PHASE, so it runs before the keyboard's own
+     handler rather than after it. That does not make the note that arms it
+     instant, because the node still has to be built and that is an await; what
+     it makes instant is every gesture after a visitor has touched anything at
+     all.
+     ⚠️ THE LISTENERS STAY UNTIL THEY ACTUALLY ARM. `arm()` answers null while
+     nothing is compiled yet, which is the first fraction of a second of a
+     visit, and a listener that removed itself on that touch would leave the
+     page back where it started. */
+  const armOnTouch = () => {
+    if (!arm()) return;
+    panel.el.removeEventListener('pointerdown', armOnTouch, true);
+    panel.el.removeEventListener('keydown', armOnTouch, true);
+  };
+  panel.el.addEventListener('pointerdown', armOnTouch, true);
+  panel.el.addEventListener('keydown', armOnTouch, true);
+
   showSource();
-  d.log(`nothing is fetched until you press Compile. That press pulls the Faust `
-      + `compiler, ${mb(COMPILER_BYTES)} MB, once`);
+  d.log(`the Faust compiler is ${mb(COMPILER_BYTES)} MB off this site, it is on its way now, `
+      + `and the Organ in the box is compiled the moment it lands`);
+  d.log('no sound device is opened until you press a key, which is the gesture a browser '
+      + 'wants for a sound anyway');
+
+  /* ── the compile a visit gets ─────────────────────────────────────────────
+     🔴 ASKED 2026-09-28: *"fau: compile on loading so i can play"*. This is
+     that, and it is the whole of it: one compile of the preset the box opens
+     with, started here and never again.
+     ⚠️ IT IS NOT AWAITED AND NOTHING WAITS FOR IT. The download is network and
+     the page paints through it; what blocks is the wasm instantiation and
+     libfaust itself, and both of those land after the page is on screen and
+     readable. A visitor who starts typing before it finishes loses nothing,
+     because their first press compiles what they typed.
+     ⚠️ AND IT GOES THROUGH `serial` LIKE EVERYTHING ELSE, so a preset picked
+     while it is still in flight queues behind it rather than booting a second
+     compiler.
+     ⚠️ THE CATCH IS THE HALF THAT MATTERS ON A BAD NETWORK. Six megabytes can
+     fail, and a page whose only report of that is an unhandled rejection is a
+     page that looks like it is still coming. */
+  const warm = serial(() => build(PRESETS[0].code, PRESETS[0].label.toLowerCase()))
+    .catch((e) => {
+      d.log(`the compiler did not arrive, so press Compile to try again: ${e?.message || e}`, 'bad');
+      return { ok: false };
+    });
 
   // ── the picture ────────────────────────────────────────────────────────────
   const dg = createDiagram(d.el, {
@@ -1208,7 +1381,7 @@ effect  = dm.freeverb_demo;
           { id: 'lf', label: 'libfaust', sub: '2.89.2, wasm', tech: 'browser',
             note: 'The Faust compiler itself, 3.60 MB of **WebAssembly**, with 2.41 MB of plain '
                 + 'Faust library source beside it that it reads out of its own filesystem. '
-                + 'Fetched once, on the first press.' },
+                + 'Fetched once, as the page opens.' },
           /* ⚠️ THE RANGE IS ROUNDED TO WHOLE kB AND IT IS A LABEL RATHER THAN A
              READING, which is why it does not carry the readout's two decimals.
              It read `4 to 13KB` until 2026-09-25 and was wrong at both ends:
@@ -1223,8 +1396,8 @@ effect  = dm.freeverb_demo;
                 + 'as a **Blob** of stringified classes, because an **AudioWorkletGlobalScope** '
                 + 'has no module loader at all.' },
           { id: 'spk', label: 'speakers', sub: 'or a phone', tech: 'device',
-            note: 'The end of it. Everything above happened in the time between pressing a '
-                + 'button and hearing this.' },
+            note: 'The end of it. Everything above it is built before you touch anything, so a '
+                + 'key press is the whole distance between a finger and this.' },
         ] },
     ],
     links: [
@@ -1263,21 +1436,39 @@ effect  = dm.freeverb_demo;
        and this page's first compile is behind a 6 MB fetch. A check block whose
        first assert lands three seconds in reads as a page that asserted
        nothing, which is what `/nola/` measured on 2026-09-23. */
-    d.assert('a visit fetches no compiler at all, counted off what the browser really loaded',
-      vendorLoads().length === 0, `${vendorLoads().length} files from the vendor directory`);
-    /* 🔴 THE NEGATIVE CONTROL BESIDE IT, AND IT IS THREE SEPARATE COSTS.
-       Nothing is compiled, no sound device is open, and nobody has been asked
-       about a MIDI keyboard. A page that fetched nothing while quietly doing
-       the other three would pass the assert above.
-       ⚠️ IT WAS FOUR UNTIL 2026-09-24, and the fourth read a compile button's
-       `disabled`. **The claim it was making is not gone**: that nothing can
-       start a compile on a page nobody has pressed is asserted further down by
-       typing into the box and counting `runs`, which is a statement about the
-       road rather than about a control. */
-    d.assert('and a page nobody has pressed Compile on compiles nothing, opens no sound device and '
-           + 'asks for no MIDI',
-      runs === 0 && node === null && ctx === null && midi === null,
-      `${runs} compiles, node ${node ? 'built' : 'none'}, audio ${ctx ? 'open' : 'none'}, `
+    /* 🔴 THE RULE THE LOAD COMPILE RUNS STRAIGHT INTO, GRADED RATHER THAN
+       ARGUED. A visit here may compile because every byte it pulls is this
+       repository's own, off this origin; what CLAUDE.md refuses is a visit that
+       opens somebody else's thing, and `/reel/` was reaching a broadcaster.
+       That is a claim about WHERE the requests went, so it is read off
+       `performance.getEntriesByType('resource')`, which is every resource this
+       document really loaded rather than a list this page keeps.
+       ⚠️ AND THE COUNT IS THE NEGATIVE HALF. A page that had loaded nothing at
+       all would pass "no foreign host" vacuously, and this assert runs in the
+       first milliseconds of a visit, which is exactly when that is nearly true.
+       ⚠️ IT WAS `a visit fetches no compiler at all` UNTIL 2026-09-28. The
+       claim moved rather than the rule: what a visit may not do is spend
+       somebody else's server, and it never did. */
+    const loaded = () => performance.getEntriesByType('resource');
+    const foreign = loaded().filter((e) => new URL(e.name, location.href).origin !== location.origin);
+    d.assert('everything a visit loads comes off this site, so compiling on load costs no other '
+           + 'server a byte',
+      foreign.length === 0 && loaded().length > 0,
+      foreign.map((e) => new URL(e.name, location.href).origin).join(', ')
+      || `${loaded().length} resources, every one of them ${location.origin}`);
+    /* 🔴 THE HALF OF THE OLD RULE THAT DID NOT MOVE, AND IT IS THE ONE ABOUT
+       HARDWARE. A compile is arithmetic; a context is a sound device and a MIDI
+       request is a question put to somebody. None of the three may happen
+       before a gesture, and the load compile deliberately reaches none of them:
+       `build()` stops at `ready` and `attach()` is the only thing in the file
+       that touches a context.
+       ⚠️ IT WAS FOUR CLAIMS UNTIL 2026-09-24 and the fourth read a compile
+       button's `disabled`; it was four again until 2026-09-28 and the fourth
+       was `runs === 0`, which has stopped being true on purpose. */
+    d.assert('and a visit opens no sound device, puts nothing on the audio thread and asks about '
+           + 'no MIDI keyboard',
+      ctx === null && node === null && midi === null,
+      `audio ${ctx ? 'open' : 'none'}, node ${node ? 'built' : 'none'}, `
       + `MIDI ${midi ? 'asked' : 'not asked'}`);
     /* 🔴 THE CELL IS ROUND-TRIPPED THROUGH 1000 RATHER THAN COMPARED AGAINST
        `kb()`, AND THAT IS THE WHOLE POINT OF THIS ASSERT. The first version
@@ -1434,6 +1625,29 @@ effect  = dm.freeverb_demo;
     source.set(PRESETS[0].code);
     showSource();
 
+    /* ── the ask itself, which is everything above this line being true while
+         a whole instrument was quietly compiled ────────────────────────────
+       🔴 *"fau: compile on loading so i can play"*, 2026-09-28. Every assert
+       before this one is deliberately cheap and lands in the first
+       milliseconds, because `demo/verify.mjs` gives up after five quiet polls
+       and this wait is a six megabyte download. The wait itself is here rather
+       than at the top for the same reason.
+       ⚠️ AND WHAT IS ASSERTED IS THE PAIR: the compiler is in the tab AND
+       nothing was pressed to get it there. Either half on its own is satisfied
+       by the page this replaced. */
+    await warm;
+    d.assert('the compiler arrived and a whole instrument was compiled with nobody pressing '
+           + 'anything, off the four files this page ships',
+      faust !== null && ready !== null && runs === 1 && vendorLoads().length === 4,
+      `${runs} compile with no press, ${vendorLoads().length} vendor files, `
+      + `${ready?.name || 'nothing'} waiting for a key`);
+    /* The negative control beside it, and it is the one that would have gone
+       red on any design that reached the audio thread at load. */
+    d.assert('and it got there without opening a sound device, so nothing has been played at '
+           + 'anybody', ctx === null && node === null && midi === null,
+      `audio ${ctx ? 'open' : 'none'}, node ${node ? 'built' : 'none'}, `
+      + `MIDI ${midi ? 'asked' : 'not asked'}`);
+
     /* ── the patch selector's fourth state ─────────────────────────────────
        🔴 DRIVEN BY A REAL `input` EVENT, NOT BY CALLING THE HANDLER. What is
        being claimed is that TYPING moves the selector, and a check that calls
@@ -1463,10 +1677,19 @@ effect  = dm.freeverb_demo;
       `${wasSaying} became ${patchSays()}, with nothing selected in the list under it`);
     /* The other half. A selector that said `custom` whatever it was shown would
        pass the assert above, so it has to be able to come back. */
+    const beforePick = runs;
     await applyPatch(0);
-    d.assert('and loading a preset again takes it off custom, having compiled nothing to do it',
-      patchSays() === PRESETS[0].label && picked === 0 && runs === 0,
-      `${patchSays()} selected, ${runs} compiles`);
+    /* 🔴 AND WHAT IS WAITING FOR THE FIRST KEY IS THE PRESET THE SELECTOR
+       SHOWS, WHICH IS A NEW CLAIM ON 2026-09-28. This read `runs === 0` while a
+       pick could not compile at all; now a pick recompiles, and the thing worth
+       grading is that the two agree. A selector naming one instrument over a
+       compile of another is the lying control this project has a rule about,
+       and it is the defect the old refusal would have shipped. */
+    d.assert('and loading a preset again takes it off custom, with that preset compiled and '
+           + 'waiting for the first key',
+      patchSays() === PRESETS[0].label && picked === 0
+        && runs === beforePick + 1 && (ready?.name || '').startsWith('organ'),
+      `${patchSays()} selected, ${runs - beforePick} compile, ${ready?.name} waiting`);
 
     /* ── typing compiles nothing, which is the whole of "no autocompile" ────
        🔴 TWO KEYSTROKES AND A WAIT LONGER THAN ANY IDLE TIMER THIS PAGE EVER
@@ -1482,6 +1705,50 @@ effect  = dm.freeverb_demo;
     d.assert('typing compiles nothing, however long it goes on and however long it pauses',
       runs === typedBefore, `${runs - typedBefore} compiles after 1.9 s of typing and waiting`);
 
+    /* ── "so i can play", as one assert ────────────────────────────────────
+       🔴 THE FIRST KEY IS THE WHOLE OF SWITCHING THIS ON. No button in
+       between, no six megabytes in between, and no compile in between: the
+       press buys a worklet node out of a module that is already built, and the
+       `runs` delta of zero is what says so. Before 2026-09-28 the same press
+       logged *"nothing is on the audio thread, so switch FAU on"*, naming a
+       switch that had been deleted four days earlier.
+       ⚠️ `press()` IS WHAT THE KEYBOARD'S OWN `onDown` CALLS, which is the
+       same road a finger takes and is how the existing sound check drives this
+       page. What it returns is the arming, so this reads the instrument after
+       the node exists rather than 20 ms early. */
+    const armBefore = runs;
+    const armT0 = performance.now();
+    /* 🔴 A POINTER ON THE PANEL AND NOT ON A KEY, WHICH IS THE ROAD THE 134 ms
+       LIVES ON. `arming` is read BEFORE anything in this block calls `arm()`,
+       because what is being claimed is that the LISTENER did it: a check that
+       armed the audio itself and then asserted the audio was armed would be
+       green with both listeners deleted. */
+    panel.el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const armedByTouch = arming !== null;
+    await arming;
+    const armMs = performance.now() - armT0;
+    d.assert('touching the instrument anywhere opens the sound device and puts the waiting '
+           + 'compile on the audio thread, without compiling anything',
+      armedByTouch && ctx !== null && node !== null && runs === armBefore,
+      `${armedByTouch ? 'the touch armed it' : 'the touch did nothing'} in ${armMs.toFixed(0)} ms, `
+      + `${runs - armBefore} compiles, audio ${ctx ? 'open' : 'none'}`);
+    /* 🔴 AND THEN THE KEY IS FREE, WHICH IS THE WHOLE OF *"so i can play"*. The
+       press does no work at all: no fetch, no compile, no node, so the time it
+       takes is the time a function call takes and the sound is already on its
+       way. MEASURED by the clock around the call rather than claimed. */
+    const keyT0 = performance.now();
+    press(60, 100);
+    const keyMs = performance.now() - keyT0;
+    await sleep(220);
+    const armLevel = level();
+    d.assert('and a key pressed after that sounds with nothing at all in between',
+      armLevel > 0.01 && keyMs < 5 && runs === armBefore,
+      `the press itself took ${keyMs.toFixed(1)} ms, ${runs - armBefore} compiles, `
+      + `level ${armLevel.toFixed(5)}`);
+    lift(60);
+    allOff();
+    await sleep(400);
+
     /* ── Compile, pressed rather than called ───────────────────────────────
        🔴 A REAL CLICK ON THE REAL CONTROL. Calling `pressCompile()` would grade
        the function and say nothing about the button in the panel's foot being
@@ -1494,14 +1761,22 @@ effect  = dm.freeverb_demo;
        is then awaited through `compileJob`, because reading the page straight
        after the click would be reading it 6 MB early. */
     const beforePress = runs;
+    const nodeBefore = node;
     const btn = compile.button('compile');
     btn.click();
     const sweptWhileBusy = btn.dataset.busy === '1' && btn.disabled;
     await compileJob;
-    d.assert('Compile is the one press that fetches the compiler, compiles what is in the box and '
-           + 'reaches for MIDI',
-      node !== null && runs === beforePress + 1 && midi !== null && vendorLoads().length === 4,
-      `${runs - beforePress} compile, MIDI ${midi?.state()}, ${vendorLoads().length} vendor files`);
+    /* ⚠️ THE SENTENCE HERE READ *"the one press that fetches the compiler"*
+       UNTIL 2026-09-28, WHICH THE LOAD COMPILE MADE FALSE. What Compile is now
+       is the one road to a SECOND compile, and the assert grades that: a new
+       module on the thread, out of the same four files the visit already
+       pulled, with no fifth request behind it. */
+    d.assert('Compile compiles what is in the box again and swaps it onto the audio thread, off '
+           + 'the files the visit already pulled',
+      node !== null && node !== nodeBefore && runs === beforePress + 1
+        && midi !== null && vendorLoads().length === 4,
+      `${runs - beforePress} compile, a ${node === nodeBefore ? 'reused' : 'new'} node, `
+      + `MIDI ${midi?.state()}, ${vendorLoads().length} vendor files`);
     d.assert('and the button wears the kit\'s busy sweep for as long as the compile takes, then gives it back',
       sweptWhileBusy && btn.dataset.busy === undefined && !btn.disabled,
       `busy ${sweptWhileBusy ? 'while the compiler arrived' : 'never set'}, clear after`);
@@ -1763,8 +2038,8 @@ effect  = dm.freeverb_demo;
   }
 
   ifSelfcheck(checks, { log: d.log,
-    say: 'the checks this page runs on itself are off for a visitor, because they fetch six '
-       + 'megabytes of compiler and play notes in front of you' });
+    say: 'the checks this page runs on itself are off for a visitor, because they compile every '
+       + 'preset in the list and play notes in front of you' });
 
   /* 🔴 `ready()` AFTER THE CHECKS ARE STARTED AND NOT AT THE END OF THEM.
      `demo/verify.mjs` waits up to six seconds for `__demo.ready` before it

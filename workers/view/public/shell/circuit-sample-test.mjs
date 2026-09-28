@@ -86,6 +86,25 @@ const int16 = (values) => {
   return out;
 };
 
+// 🔴 THREE BYTES LITTLE ENDIAN, WRITTEN BY HAND AND NOT BY A `DataView`, WHICH
+// IS THE POINT. There is no `setInt24`, so this is an INDEPENDENT second
+// implementation of the byte order the module reads: if both sides shared one
+// helper the test would be grading the helper. Negative values are written as
+// the two's complement in 24 bits, which is where the sign really lives.
+const int24 = (values) => {
+  const out = new Uint8Array(values.length * 3);
+  values.forEach((v, i) => {
+    const u = ((v % 0x1000000) + 0x1000000) % 0x1000000;
+    out[i * 3] = u & 0xff;
+    out[i * 3 + 1] = (u >> 8) & 0xff;
+    out[i * 3 + 2] = (u >> 16) & 0xff;
+  });
+  return out;
+};
+
+/** Two channel frames from two equal length lists, left then right per frame. */
+const interleave = (l, r) => l.flatMap((v, i) => [v, r[i]]);
+
 console.log('\n-- the container, on files whose every number is known by construction --');
 
 {
@@ -205,25 +224,253 @@ console.log('\n-- what it refuses, by name, as a value rather than a throw --');
     W.readWave(new Uint8Array(8)).why);
 }
 
-// 🔴 THE DEPTHS AND CHANNEL COUNTS THAT ARE REFUSED ON PURPOSE. `DEPTHS` is one
-// entry long because the corpus is one depth deep, and a page asking for 8 bit
-// gets a sentence rather than arithmetic nobody graded.
+// ═════════════════════════════════════ 24 bit, and the sign in the top byte ══
+//
+// 🔴 EVERY VALUE BELOW IS WRITTEN OUT BY HAND BEFORE THE MODULE IS ASKED
+// ANYTHING, WHICH IS THE ONLY WAY A DEPTH BRANCH IS GRADED RATHER THAN
+// EXERCISED. `DEPTHS` gained 24 on 2026-09-28 because 100 real files on this
+// disk are 24 bit, and a 24 bit reader that is subtly wrong does not throw and
+// does not look wrong: it produces audio at a strange amplitude or with the
+// sign of every loud sample inverted, which is the module's own definition of
+// the worst thing a decoder can hand a page.
+
+console.log('\n-- 24 bit, three bytes little endian, the sign in the top one --');
+
+{
+  // 0, full scale positive, full scale negative, one step either way, and half
+  // scale. The same six shapes the 16 bit block above uses, one depth along.
+  const KNOWN24 = [0, 8388607, -8388608, 1, -1, 4194304];
+  const w = W.readWave(wav({ bits: 24, pcm: int24(KNOWN24) }));
+  ok('a 24 bit file parses, three bytes to a frame, and the duration comes off the data length',
+    w.ok && w.bits === 24 && w.blockAlign === 3 && w.blockAlignOk && w.byteRateOk
+    && w.frames === 6 && w.dataBytes === 18 && w.partialFrameBytes === 0,
+    `${w.frames} frames of ${w.blockAlign} bytes`);
+  const m = W.toMono(w);
+  ok('and the floats are the int24 values over 8388608, full scale negative reaching exactly -1',
+    m.ok && m.samples.length === 6
+    && m.samples[0] === 0 && m.samples[1] === 8388607 / 8388608 && m.samples[2] === -1
+    && m.samples[3] === 1 / 8388608 && m.samples[4] === -1 / 8388608 && m.samples[5] === 0.5,
+    m.ok ? [...m.samples].join(', ') : m.why);
+
+  // 🔴 THE SABOTAGE THAT SAYS THE SIGN IS READ FROM THE TOP BYTE AND NOT FROM
+  // THE MIDDLE ONE. `0x00 0x00 0x80` is -8388608 and its low two bytes are
+  // `00 00`, which a 16 bit reader calls 0 and a reader taking the sign off
+  // byte 1 calls +8388608. Three answers, one file, and only one is right.
+  const low = new DataView(w.data.buffer, w.data.byteOffset).getInt16(2 * 3, true);
+  ok('SABOTAGE: reading the low two bytes of that full scale negative frame gives 0, not -1',
+    low === 0 && m.samples[2] === -1,
+    `the low 16 bits read ${low} and the frame is ${m.samples[2]}`);
+
+  // 🔴 AND THE ONE A BYTE ORDER MISTAKE PRODUCES, WHICH IS THE COMMON ONE.
+  // 0x123456 big endian is 0x563412, a completely different sample, and both
+  // are inside -1 to 1 so nothing downstream could tell them apart.
+  const be = W.toMono(W.readWave(wav({ bits: 24, pcm: Uint8Array.from([0x56, 0x34, 0x12]) })));
+  ok('SABOTAGE: the bytes 56 34 12 read as 0x123456 and not as 0x563412, so the order is little endian',
+    Math.round(be.samples[0] * 8388608) === 0x123456,
+    `${Math.round(be.samples[0] * 8388608).toString(16)} rather than 563412`);
+
+  // ⚠️ THE RAIL IS ONE STEP OF THE FILE'S OWN DEPTH. A sample at 0.99998 of
+  // full scale is 256 steps off the rail in 24 bit and would have counted as
+  // clipped under the old 16 bit constant.
+  const near = W.content(W.readWave(wav({ bits: 24, pcm: int24([8388607, 8388352, 0]) })));
+  ok('one step off full scale counts as clipped and 256 steps off does not, which is the 24 bit rail',
+    near.clipped === 1 && near.peak === 8388607 / 8388608,
+    `${near.clipped} clipped of 3, and the 16 bit rail would have said 2`);
+}
+
+console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
+
+// 🔴 THE MIXDOWN IS DOCUMENTED IN THE MODULE AND IT IS THE MEAN, so these
+// grade the mean AND grade that it is not one of the three things it could
+// have been. A sum, a left channel and a max all give a different answer to
+// at least one of the files below, which is what makes them a test.
+{
+  const L = [8000, 0, 16384, -32768];
+  const R = [0, 8000, 16384, -32768];
+  const w = W.readWave(wav({ channels: 2, pcm: int16(interleave(L, R)) }));
+  const m = W.toMono(w);
+  ok('a 16 bit stereo file is 4 frames of 4 bytes and mixes down to one float a frame',
+    w.ok && w.channels === 2 && w.blockAlign === 4 && w.blockAlignOk
+    && w.frames === 4 && m.ok && m.samples.length === 4 && m.mixed === true,
+    `${w.frames} frames, mixed ${m.mixed}`);
+  ok('and every value is the MEAN of the two channels, which is the arithmetic the module names',
+    m.samples[0] === 4000 / 32768 && m.samples[1] === 4000 / 32768
+    && m.samples[2] === 16384 / 32768 && m.samples[3] === -1
+    && m.mix === W.MIX,
+    `${[...m.samples].map((v) => Math.round(v * 32768)).join(', ')}, mix "${m.mix}"`);
+  // 🔴 THE THREE IT IS NOT, EACH DISPROVED BY A NAMED FRAME. Without these the
+  // assert above is satisfied by any function that happens to agree on one row,
+  // and the three candidates the module's own comment weighs are exactly the
+  // three a reader would suspect.
+  const sum0 = (L[0] + R[0]) / 32768;
+  const left1 = L[1] / 32768;
+  const max0 = Math.max(Math.abs(L[0]), Math.abs(R[0])) / 32768;
+  ok('NEGATIVE CONTROL: it is not the sum, not the left channel and not the louder of the two',
+    m.samples[0] !== sum0 && m.samples[1] !== left1 && m.samples[0] !== max0
+    && sum0 === 8000 / 32768 && left1 === 0 && max0 === 8000 / 32768,
+    `frame 0 is ${Math.round(m.samples[0] * 32768)} where a sum says ${Math.round(sum0 * 32768)} `
+    + `and a max says ${Math.round(max0 * 32768)}, and frame 1 is `
+    + `${Math.round(m.samples[1] * 32768)} where the left channel alone says 0`);
+
+  // 🔴 PER CHANNEL PEAKS ARE A SECOND, INDEPENDENT READING AND THIS IS WHY.
+  const c = W.content(w);
+  ok('content reports the mixed peak AND each channel\'s own, because they are different numbers',
+    c.peak === 1 && c.channelPeaks.length === 2
+    && c.channelPeaks[0] === 1 && c.channelPeaks[1] === 1
+    && c.channelPeak === 1 && c.channels === 2 && c.mixed === true,
+    `mix ${c.peak}, channels ${c.channelPeaks.join(' and ')}`);
+
+  // 🔴 THE HARD PANNED CASE, WHERE THE TWO READINGS DISAGREE BY 6 dB. This is
+  // the shape the corpus has: the widest of 150 real stereo files reads 0.4664
+  // of its own loudest channel after the mix.
+  // ⚠️ FULL SCALE POSITIVE IS 32767/32768 AND NOT 1, WHICH IS WRITTEN OUT
+  // RATHER THAN ROUNDED TO, because the first version of the swap sabotage
+  // below asserted 1 and went red on a correct reading. The asymmetry is real:
+  // -32768 reaches exactly -1 and +32767 never reaches +1.
+  const FS = 32767 / 32768;
+  const panned = W.readWave(wav({ channels: 2, pcm: int16(interleave([32767, 0], [0, 0])) }));
+  const pc = W.content(panned);
+  ok('a hard panned file reads half as loud mixed as its loudest channel, and BOTH numbers are reported',
+    pc.peak === FS / 2 && pc.channelPeak === FS && pc.cancelled === false,
+    `mixed ${pc.peak.toFixed(4)} against a channel peak of ${pc.channelPeak.toFixed(4)}`);
+
+  // 🔴 SABOTAGE: THE TWO CHANNELS SWAPPED. The mean is symmetric so it must NOT
+  // move, and the per channel peaks MUST. A reader taking the left channel
+  // alone fails the first half; one that reads channel 0 twice fails the second.
+  const swapped = W.readWave(wav({ channels: 2, pcm: int16(interleave(R, L)) }));
+  const sm = W.toMono(swapped);
+  const sc = W.content(swapped);
+  const pannedSwap = W.content(W.readWave(wav({ channels: 2, pcm: int16(interleave([0, 0], [32767, 0])) })));
+  ok('SABOTAGE: swapping the channels leaves the mean untouched and moves the per channel reading',
+    sm.samples.every((v, i) => v === m.samples[i])
+    && pannedSwap.channelPeaks[0] === 0 && pannedSwap.channelPeaks[1] === FS
+    && pc.channelPeaks[0] === FS && pc.channelPeaks[1] === 0
+    && pannedSwap.peak === pc.peak,
+    `the mean is the same 4 values and the peaks went ${pc.channelPeaks.join('/')} to ${pannedSwap.channelPeaks.join('/')}`);
+
+  // 🔴 SABOTAGE: ONE CHANNEL INVERTED, WHICH IS THE ONE CASE THE MEAN LIES
+  // ABOUT. The mix is digital silence and the file is loud, and a bare zero
+  // there would read as an empty sample.
+  const anti = W.readWave(wav({ channels: 2, pcm: int16(interleave([20000, -9000], [-20000, 9000])) }));
+  const ac = W.content(anti);
+  ok('SABOTAGE: two channels in anti phase mix to silence, and it is reported as cancelled rather than empty',
+    ac.peak === 0 && ac.silent === true && ac.cancelled === true
+    && Math.abs(ac.channelPeak - 20000 / 32768) < 1e-9,
+    `mix is silent while the channels peak at ${ac.channelPeak.toFixed(4)}`);
+  ok('NEGATIVE CONTROL: a file that really is empty is silent and NOT cancelled, so the two are told apart',
+    W.content(W.readWave(wav({ channels: 2, pcm: new Uint8Array(16) }))).silent === true
+    && W.content(W.readWave(wav({ channels: 2, pcm: new Uint8Array(16) }))).cancelled === false
+    && W.content(W.readWave(wav({ pcm: int16([0, 0, 0]) }))).cancelled === false,
+    'silent and cancelled are two cells and only one of them is set here');
+
+  // 24 bit stereo is the commonest refused shape on this disk: 98 of the 152.
+  const both = W.readWave(wav({ bits: 24, channels: 2, pcm: int24(interleave([8388607, 0], [0, -8388608])) }));
+  const bm = W.toMono(both);
+  ok('24 bit stereo, which is 98 of the 152 files that used to open with no numbers at all',
+    both.ok && both.blockAlign === 6 && both.blockAlignOk && both.frames === 2
+    && bm.ok && Math.abs(bm.samples[0] - 8388607 / 8388608 / 2) < 1e-9
+    && bm.samples[1] === -0.5,
+    `${both.frames} frames of ${both.blockAlign} bytes, ${[...bm.samples].join(' and ')}`);
+}
+
+console.log('\n-- the depths and the shapes still refused, each one by name --');
+
+// 🔴 A WIDENED CONSTANT IS NOT THE JOB. What is NOT in `DEPTHS` is a decision
+// with a corpus behind it: there are zero 8 bit, zero 32 bit integer, zero IEEE
+// float and zero WAVE_FORMAT_EXTENSIBLE files among the 965 real `.wav` files
+// on this disk, counting one archive deeper. Each is refused with its name in
+// the sentence, and none of them throws.
 {
   const eight = W.readWave(wav({ bits: 8, pcm: new Uint8Array([0, 128, 255]) }));
   const m8 = W.toMono(eight);
   ok('an 8 bit file PARSES and then refuses to decode, which is the honest split',
     eight.ok && eight.bits === 8 && eight.frames === 3 && m8.ok === false && m8.why.includes('8 bit'),
     m8.why);
-  const twentyfour = W.readWave(wav({ bits: 24, pcm: new Uint8Array(9) }));
-  ok('and 24 bit the same way, with the reason naming the depth',
-    twentyfour.ok && twentyfour.frames === 3 && W.toMono(twentyfour).why.includes('24 bit'));
-  const stereo = W.readWave(wav({ channels: 2, pcm: int16([1, 2, 3, 4]) }));
-  ok('a stereo file parses as 2 frames and is not mixed down, because no mixdown has been graded',
-    stereo.ok && stereo.frames === 2 && stereo.blockAlignOk
-    && W.toMono(stereo).why.includes('2 channels'),
-    W.toMono(stereo).why);
-  ok('DEPTHS says 16 and only 16, so the refusal and the decoder cannot drift apart',
-    JSON.stringify(W.DEPTHS) === '[16]');
+  const m32 = W.toMono(W.readWave(wav({ bits: 32, pcm: new Uint8Array(12) })));
+  ok('and 32 bit integer the same way, with the depth named rather than a number printed',
+    m32.ok === false && m32.why.includes('32 bit') && m32.why.includes('16 and 24'),
+    m32.why);
+  // 🔴 IEEE FLOAT IS REFUSED AT THE FORMAT GATE AND NOT AT THE DEPTH GATE, and
+  // that ordering is the honest one: float is a different number line rather
+  // than a wider integer, it is allowed to run past 1.0, and `peak`, `clipped`
+  // and the rail all mean something else on it.
+  const flt = W.readWave(wav({ format: 3, bits: 32, pcm: new Uint8Array(8) }));
+  ok('32 bit IEEE float is refused by NAME at the format gate, which is a decision and not an oversight',
+    flt.ok === false && flt.why.includes('IEEE float') && flt.why.includes('PCM')
+    && flt.format === 3,
+    flt.why);
+  const ext = W.readWave(wav({ format: 0xfffe, bits: 24, pcm: new Uint8Array(6) }));
+  ok('and WAVE_FORMAT_EXTENSIBLE too, which is how most DAWs would have written these 24 bit files',
+    ext.ok === false && ext.why.includes('EXTENSIBLE'),
+    ext.why);
+  // ⚠️ AND THE REASON THAT REFUSAL COSTS NOTHING HERE IS A MEASUREMENT: every
+  // one of the 100 real 24 bit files declares format tag 1, plain PCM.
+  const six = W.readWave(wav({ channels: 6, pcm: int16(new Array(12).fill(1000)) }));
+  ok('more than two channels is refused by name, because a plain average is a guess about a surround set',
+    six.ok && six.channels === 6 && W.toMono(six).ok === false
+    && W.toMono(six).why.includes('6 channels') && W.toMono(six).why.includes('LFE'),
+    W.toMono(six).why);
+  ok('DEPTHS is 16 and 24, MIX_CHANNELS_MAX is 2, and every refusal above quotes them',
+    JSON.stringify(W.DEPTHS) === '[16,24]' && W.MIX_CHANNELS_MAX === 2
+    && W.FULL_SCALE[16] === 32768 && W.FULL_SCALE[24] === 8388608,
+    `${W.DEPTHS.join(' and ')} bit, up to ${W.MIX_CHANNELS_MAX} channels`);
+  // 🔴 AND NOT ONE OF THEM THROWS, WHICH IS THE PROPERTY THE WHOLE MODULE
+  // RESTS ON: a page opening a stranger's zip shows a sentence, never a stack.
+  const shapes = [
+    wav({ bits: 8, pcm: new Uint8Array(3) }),
+    wav({ bits: 32, pcm: new Uint8Array(8) }),
+    wav({ bits: 24, channels: 6, pcm: new Uint8Array(36) }),
+    wav({ format: 3, bits: 32, pcm: new Uint8Array(8) }),
+    wav({ format: 0xfffe, bits: 24, pcm: new Uint8Array(6) }),
+    wav({ bits: 12, pcm: new Uint8Array(6) }),
+    wav({ bits: 0, pcm: new Uint8Array(4) }),
+  ];
+  let threw = 0, refused = 0;
+  for (const b of shapes) {
+    try {
+      const x = W.readWave(b);
+      const r = x.ok === false ? x : W.toMono(x);
+      if (r.ok === false && r.why.length > 20) refused++;
+      // content and summarise take the same shapes and must not throw either
+      if (x.ok) { W.content(x); W.summarise(x, 'x'); }
+    } catch (e) { threw++; }
+  }
+  ok(`all ${shapes.length} undecodable shapes are refused in words through every entry point, and none throws`,
+    refused === shapes.length && threw === 0,
+    `${refused} refused, ${threw} threw`);
+}
+
+console.log('\n-- the block align that used to throw a RangeError out of three functions --');
+
+// 🔴 FOUND WHILE ADDING THE TWO SHAPES ABOVE, AND IT WAS LIVE ON A PAGE THAT
+// OPENS ANYBODY'S ZIP. `frames` comes from the DECLARED block align and the
+// reader steps by the DERIVED one, so a file declaring a block align SMALLER
+// than its own frame claimed more frames than there were bytes and `toMono`,
+// `content` and `summarise` all died inside a `DataView`. MEASURED before the
+// repair: 8 frames claimed over 8 bytes, 16 bytes asked for, three exported
+// functions throwing `RangeError: Offset is outside the bounds of the DataView`.
+{
+  const w = W.readWave(wav({ pcm: int16([1, 2, 3, 4]), blockAlign: 1 }));
+  let threw = 0;
+  let m, c, r;
+  try { m = W.toMono(w); c = W.content(w); r = W.summarise(w, 'x'); } catch (e) { threw++; }
+  ok('a block align of 1 on a 16 bit mono file is clamped to the frames the data can supply, not thrown on',
+    threw === 0 && w.ok && w.framesDeclared === 8 && w.frames === 4
+    && w.framesClamped === true && m.ok && m.samples.length === 4
+    && c.ok && r.ok && r.frames === 4,
+    `${w.framesDeclared} frames declared, ${w.frames} readable, ${threw} throws`);
+  ok('and a file whose block align is right says so, so the clamp cannot hide a real disagreement',
+    W.readWave(wav({ pcm: int16([1, 2]) })).framesClamped === false
+    && W.readWave(wav({ pcm: int16([1, 2, 3, 4]), blockAlign: 4 })).framesClamped === false
+    && W.readWave(wav({ pcm: int16([1, 2, 3, 4]), blockAlign: 4 })).frames === 2,
+    'a block align that is too LARGE reports fewer frames and is not a clamp');
+  // ⚠️ THE SAME SHAPE ON A STEREO 24 BIT FILE, because the clamp has to be
+  // computed from the real frame size rather than from a constant.
+  const s = W.readWave(wav({ bits: 24, channels: 2, pcm: int24(new Array(8).fill(0)), blockAlign: 2 }));
+  ok('and on a 24 bit stereo file the clamp counts six byte frames rather than two byte ones',
+    s.ok && s.framesDeclared === 12 && s.frames === 4 && s.framesClamped === true
+    && W.toMono(s).ok && W.toMono(s).samples.length === 4,
+    `${s.framesDeclared} declared, ${s.frames} readable at ${s.channels * s.bits / 8} bytes a frame`);
 }
 
 // ═══════════════════════════════════════════ the other container ═════════
@@ -638,6 +885,244 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
   ok('a slot claiming more audio than the image holds is refused with both numbers',
     W.slotsIn(over).ok === false && /are left in the image/.test(W.slotsIn(over).why),
     W.slotsIn(over).why);
+}
+
+// ═══════════════════════ every wav in every zip, which is what the job is ═══
+//
+// 🔴 THIS BLOCK SITS ABOVE THE `New Pack.circuitpack` EARLY EXIT ON PURPOSE,
+// the same way the stream and slot blocks do, because the pack left this
+// repository on 2026-09-24 and everything below that exit is unreachable on a
+// checkout that follows CLAUDE.md. A measurement behind a file nobody has is a
+// measurement nobody takes.
+//
+// 🔴 AND THIS IS THE CORPUS THE MODULE'S HEADER SAID DID NOT EXIST. It has said
+// since 2026-09-21 that all 64 samples in the pack are `fmt ` then `data` and
+// nothing else, so no real file here could grade the chunk walker and only the
+// synthetic fixtures above could. That stopped being true the day `/pack/`
+// started opening anybody's zip: these 901 files carry **18 distinct chunk
+// layouts** and **265 of them put the audio somewhere other than offset 44**.
+
+console.log('\n-- 901 real wavs out of six zips, which is what "any wavs in zip" means --');
+
+if (!fs.existsSync(PACKS)) {
+  note('tmp/packs is not on this machine, so the 901 file corpus is unmeasured here');
+} else {
+  /**
+   * ⚠️ READ IN MEMORY, NOTHING EXTRACTED, NOTHING EXECUTED, and the resource
+   * forks counted rather than quietly skipped. A `.zip` made on a Mac carries a
+   * `__MACOSX/._name.wav` beside every real file: 88 of the 989 named `.wav`
+   * entries here are those, they are 4 KB of finder metadata rather than audio,
+   * and counting them as refused samples would put an 88 file hole in every
+   * figure below.
+   */
+  const FORK = (name) => /(^|\/)__MACOSX\//.test(name) || /^\._/.test(name.split('/').pop());
+
+  const files = [];
+  let named = 0, forks = 0;
+  for (const z of fs.readdirSync(PACKS).filter((f) => f.endsWith('.zip'))) {
+    let list;
+    try { list = readZip(fs.readFileSync(path.join(PACKS, z))); } catch { continue; }
+    const wav = list.filter((e) => /\.wav$/i.test(e.name));
+    if (!wav.length) continue;
+    named += wav.length;
+    for (const e of wav) {
+      if (FORK(e.name)) { forks++; continue; }
+      files.push({ zip: z, name: e.name, bytes: await e.read() });
+    }
+  }
+
+  ok('989 named .wav entries across six zips, 88 of them Mac resource forks, leaving 901 real files',
+    named === 989 && forks === 88 && files.length === 901,
+    `${named} named, ${forks} forks, ${files.length} real`);
+
+  // 🔴 THE FOUR QUESTIONS THE REQUEST IS ABOUT, ASKED SEPARATELY BECAUSE A
+  // FILE THAT READS IS NOT A FILE THAT PLAYS. Before 2026-09-28 all 901 read
+  // and only 749 of them did anything else, so a page showed a full header row
+  // and four empty measured cells on 152 of them.
+  let read = 0, play = 0, measure = 0, draw = 0, threw = 0;
+  const shapes = new Map();
+  const layouts = new Map();
+  let notAt44 = 0, deepest = 0, stereo = 0, deep24 = 0, mixedRows = 0;
+  const waves = [];
+  for (const f of files) {
+    try {
+      const w = W.readWave(f.bytes);
+      if (!w.ok) continue;
+      read++;
+      waves.push(w);
+      const key = `${w.rate} ${w.bits} ${w.channels}`;
+      shapes.set(key, (shapes.get(key) || 0) + 1);
+      const lay = w.chunkIds.join(' ');
+      layouts.set(lay, (layouts.get(lay) || 0) + 1);
+      if (w.dataAt !== 44) { notAt44++; deepest = Math.max(deepest, w.dataAt); }
+      if (w.channels === 2) stereo++;
+      if (w.bits === 24) deep24++;
+      const m = W.toMono(w);
+      if (m.ok && m.samples.length === w.frames) play++;
+      if (m.mixed) mixedRows++;
+      const c = W.content(w);
+      if (c.ok) measure++;
+      const row = W.summarise(w, f.name.split('/').pop());
+      if (row.ok && row.peak !== null && row.sound !== null && row.chanPeak !== null) draw++;
+    } catch (e) { threw++; }
+  }
+
+  ok('all 901 read, measure, draw and play, against 749 that played before 24 bit and stereo landed',
+    read === 901 && play === 901 && measure === 901 && draw === 901 && threw === 0,
+    `${read} read, ${measure} measured, ${draw} drawable, ${play} play, ${threw} threw`);
+
+  // 🔴 THE SHAPE CENSUS, WHICH IS WHAT SAYS THE 152 WERE A REAL POPULATION AND
+  // NOT AN ODDITY. Two whole zips are nothing but 24 bit stereo.
+  ok('the shapes are 534 + 215 sixteen bit mono, 98 twenty four bit stereo, 52 sixteen bit stereo and 2 twenty four bit mono',
+    shapes.get('44100 16 1') === 534 && shapes.get('48000 16 1') === 215
+    && shapes.get('44100 24 2') === 98 && shapes.get('44100 16 2') === 52
+    && shapes.get('44100 24 1') === 2 && shapes.size === 5,
+    [...shapes].map(([k, v]) => `${v} at ${k.split(' ').join('/')}`).join(', '));
+  ok('so 100 of them are 24 bit and 150 are stereo, and 152 files needed one branch or the other',
+    deep24 === 100 && stereo === 150 && mixedRows === 150
+    && waves.filter((w) => w.bits === 24 || w.channels > 1).length === 152,
+    `${deep24} at 24 bit, ${stereo} stereo, ${mixedRows} mixed down`);
+
+  // 🔴 AND THE CHUNK WALKER FINALLY HAS A REAL CORPUS, WHICH IS A CLAIM THIS
+  // MODULE'S HEADER HAS BEEN UNABLE TO MAKE SINCE IT WAS WRITTEN. `bext` is a
+  // broadcast metadata chunk 602 bytes long, and a reader that skipped 44 bytes
+  // would have played it as audio on 247 files.
+  ok('18 distinct chunk layouts, and 265 of the 901 put their audio somewhere other than offset 44',
+    layouts.size === 18 && notAt44 === 265 && deepest === 736
+    && layouts.get('fmt  data') === 84
+    && layouts.get('fmt  bext junk data') === 247
+    && layouts.get('fmt  data LIST CDif CDif') === 515,
+    `${layouts.size} layouts, deepest audio at byte ${deepest}, and only ${layouts.get('fmt  data')} are plain fmt-then-data`);
+  // ⚠️ THREE FILES PUT `bext` BEFORE `fmt `, so a reader that assumed the format
+  // chunk comes first would miss it on those. The walker does not assume.
+  ok('and 11 of them put bext BEFORE fmt, which a reader expecting fmt first would read as no fmt at all',
+    waves.filter((w) => w.chunkIds[0] !== 'fmt ').length === 11
+    && waves.filter((w) => w.chunkIds[0] !== 'fmt ').every((w) => w.chunkIds[0] === 'bext')
+    && waves.filter((w) => w.chunkIds[0] !== 'fmt ').every((w) => w.ok && w.frames > 0),
+    `${waves.filter((w) => w.chunkIds[0] !== 'fmt ').length} files open on bext, all of them parsed`);
+
+  // 🔴 THE TOTALS A PAGE SHOWS, AND `mixed` IS THE ONE THAT WAS NOT THERE.
+  const all = W.summariseAll(waves);
+  ok('summariseAll counts the whole corpus, 0 refused, and says how many had to be mixed down',
+    all.count === 901 && all.parsed === 901 && all.refused === 0 && all.mixed === 150
+    && all.depths.slice().sort((a, b) => a - b).join() === '16,24'
+    && all.channels.slice().sort((a, b) => a - b).join() === '1,2',
+    `${all.parsed} parsed, ${all.mixed} mixed, ${(all.seconds / 60).toFixed(1)} minutes of audio`);
+
+  // 🔴 THE MIXDOWN AGAINST THE REAL STEREO FILES, WHICH IS THE NUMBER THE
+  // MODULE'S COMMENT QUOTES. If the mean were a sum this ratio would run above
+  // 1; if it were the left channel it would sit at 0 on a hard panned file.
+  const ratios = [];
+  let cancelled = 0, clamped = 0;
+  for (const w of waves) {
+    if (w.framesClamped) clamped++;
+    if (w.channels !== 2) continue;
+    const c = W.content(w);
+    if (c.cancelled) cancelled++;
+    if (c.channelPeak > 0) ratios.push(c.peak / c.channelPeak);
+  }
+  ratios.sort((a, b) => a - b);
+  // ⚠️ THE MEDIAN IS 0.99996 AND THIS ASSERT SAID 1 UNTIL IT WENT RED. The
+  // survey that produced the figure printed four decimal places and `1.0000`
+  // was a ROUNDING rather than a reading, so the number went into the module's
+  // comment wrong before this line caught it. It is asserted to five places
+  // here for exactly that reason.
+  ok('the mixed peak runs 0.46642 to exactly 1 of the loudest channel over the 150 stereo files, median 0.99996',
+    ratios.length === 150
+    && ratios[0].toFixed(5) === '0.46642'
+    && ratios[ratios.length - 1] === 1
+    && ratios[Math.floor(ratios.length / 2)].toFixed(5) === '0.99996'
+    && ratios.filter((r) => r === 1).length === 39
+    && ratios.every((r) => r <= 1)
+    && ratios.filter((r) => r < 0.9).length === 15,
+    `worst ${ratios[0].toFixed(5)}, 39 of 150 land on exactly 1, 15 below 0.9, `
+    + 'and not one above 1 because a mean of two numbers cannot exceed the larger');
+  ok('and not one of the 901 cancels or needs its frame count clamped, so both guards are guards rather than reports',
+    cancelled === 0 && clamped === 0,
+    'the anti phase and block align fixtures above are the only subjects either has');
+
+  // ── the oracle, which is not this file and not this repository ──────────
+  //
+  // 🔴 A DEPTH BRANCH GRADED AGAINST ITSELF IS `timeline/csound.mjs` AGAIN:
+  // 22 asserts green for months with two real defects, because the check
+  // derived its answer from the formula the code implements. ffmpeg decodes
+  // these files with an implementation nobody here wrote, so it is the oracle.
+  // ⚠️ IT SKIPS CLEANLY WHERE FFMPEG IS NOT INSTALLED, the way
+  // `timeline/lab/csound-oracle.mjs` does, because a check nobody can run is a
+  // check nobody runs.
+  // ⚠️ AND THE BYTES GO DOWN A PIPE, so this file still writes nothing to disk.
+  {
+    const cp = await import('node:child_process');
+    let have = true;
+    try { cp.execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { have = false; }
+    if (!have) note('ffmpeg is not on PATH, so the 24 bit and stereo arithmetic was not graded against a second decoder');
+    else {
+      // One file of each of the five shapes, taken from the corpus rather than
+      // chosen, so the oracle covers what the census found.
+      const bySh = new Map();
+      for (let i = 0; i < waves.length; i++) {
+        const k = `${waves[i].rate} ${waves[i].bits} ${waves[i].channels}`;
+        if (!bySh.has(k)) bySh.set(k, i);
+      }
+      let worstSample = 0, worstPeak = 0, framesOff = 0, graded = 0;
+      for (const [, i] of bySh) {
+        const w = waves[i];
+        const raw = cp.execFileSync('ffmpeg',
+          ['-v', 'error', '-i', 'pipe:0', '-f', 'f32le', '-acodec', 'pcm_f32le', '-'],
+          { input: Buffer.from(files[i].bytes), maxBuffer: 1 << 28 });
+        const fl = new Float32Array(raw.buffer, raw.byteOffset, Math.floor(raw.length / 4));
+        const ch = w.channels;
+        const frames = Math.floor(fl.length / ch);
+        if (frames !== w.frames) framesOff++;
+        const mine = W.toMono(w).samples;
+        const peaks = W.channelPeaks(w).peaks;
+        const ref = new Array(ch).fill(0);
+        for (let k = 0; k < Math.min(frames, w.frames); k++) {
+          let sum = 0;
+          for (let c = 0; c < ch; c++) {
+            const v = fl[k * ch + c];
+            sum += v;
+            if (Math.abs(v) > ref[c]) ref[c] = Math.abs(v);
+          }
+          worstSample = Math.max(worstSample, Math.abs(mine[k] - sum / ch));
+        }
+        for (let c = 0; c < ch; c++) worstPeak = Math.max(worstPeak, Math.abs(peaks[c] - ref[c]));
+        graded++;
+      }
+      ok(`ffmpeg decodes one file of each of the ${graded} shapes to the same floats, sample for sample`,
+        graded === 5 && framesOff === 0 && worstSample === 0 && worstPeak === 0,
+        `worst sample difference ${worstSample}, worst channel peak difference ${worstPeak}, `
+        + `${framesOff} frame counts disagreed`);
+    }
+  }
+
+  // 🔴 THE SABOTAGE ON REAL BYTES, WHICH IS THE ONE THAT MATTERS MOST. Every
+  // fixture above is built by this file; this one takes a 24 bit stereo file
+  // out of somebody's zip and tells it that it is 16 bit mono. Nothing about
+  // the file is unreadable afterwards: it parses, it decodes, every float is
+  // in range, and it is completely different audio.
+  {
+    const i = waves.findIndex((w) => w.bits === 24 && w.channels === 2);
+    const good = waves[i];
+    const bad = files[i].bytes.slice();
+    const dv = new DataView(bad.buffer, bad.byteOffset);
+    dv.setUint16(good.fmtAt + 14, 16, true);      // bits 24 -> 16
+    dv.setUint16(good.fmtAt + 2, 1, true);        // channels 2 -> 1
+    dv.setUint16(good.fmtAt + 12, 2, true);       // block align 6 -> 2
+    const w2 = W.readWave(bad);
+    const a = W.toMono(good).samples;
+    const b = W.toMono(w2).samples;
+    let same = 0;
+    for (let k = 0; k < Math.min(200, b.length); k++) if (a[k] === b[k]) same++;
+    ok('SABOTAGE on real bytes: a 24 bit stereo file relabelled 16 bit mono still parses and decodes DIFFERENT audio',
+      w2.ok && w2.bits === 16 && w2.frames === good.frames * 3
+      && W.toMono(w2).ok && b.every((v) => v >= -1 && v <= 1)
+      && same < 20,
+      `${same} of the first 200 samples agree, and the depth is read from the header rather than guessed`);
+    ok('NEGATIVE CONTROL: the untouched file still reads 24 bit stereo, so the relabelling is the difference',
+      good.bits === 24 && good.channels === 2 && W.readWave(files[i].bytes).bits === 24,
+      `${files[i].name.split('/').pop()}`);
+  }
 }
 
 // ------------------------------------------------------------ the real pack

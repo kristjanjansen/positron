@@ -1726,7 +1726,21 @@ and red in a browser is the worst shape this project knows, because the harness
 is the thing everybody trusts.
 
 
-### Open 2026-09-26: a glued rows component, and an instrument panel built on it, both in `/kit/` only
+### Done 2026-09-28: a glued rows component, and an instrument panel built on it, no longer `/kit/` only
+
+✅ **APPLIED TO FIVE PAGES ON 2026-09-28**, which is what *"do not apply to any
+page yet"* was waiting for: `/fau/`, `/knobs/`, `/muta/`, `/shape/` and `/tom/`
+all wear `createInstrumentPanel` now, and `createReport` in `shell.mjs` is built
+on `createGlue`, so every page on the site gets a glued surface whether or not it
+is an instrument. ⚠️ AND THE COMPONENT CHANGED UNDER THE TRAFFIC: its header
+named `/knobs/` as a page it would break, which was a fact about `.panel-flow`'s
+`max-content` and not about the instrument, and it is corrected. `/tom/` keeps
+`createPanelLayout` INSIDE a row, which is the shape the file did not anticipate,
+because 64 label rows beside 16 scrolling steps need a fixed column. One kit rule
+was owed and is in: `.pos-rows-r > :only-child` takes the row whether or not the
+row has an inset, asked for independently by `/shape/` and `/tom/` on one day.
+
+### The original ask, kept
 
 🔴 **ASKED, VERBATIM, WITH A SKETCH:** *"do a instrument panel coponent properly
 in kit. its our glued style"*, then the sketch, then *"where name is nameplate.
@@ -2206,7 +2220,20 @@ still only about two steps. Reliability needs roughly a THIRD of a lap, about
 different quantity to assert**. That is a design call, which is why it is written
 here rather than patched.
 
-### Open 2026-09-25: `full: true` reaches nothing on `/knobs/`, and it was hidden by a dead assert
+### Done 2026-09-28: `full: true` reaches nothing on `/knobs/`, and it was hidden by a dead assert
+
+✅ **CLOSED BY THE INSTRUMENT PANEL, MEASURED RATHER THAN DECLARED.** The option
+had no effect because `.kbd.kbd-full` is `width: 100%` of a `max-content` host,
+and `.pos-rows` is `width: fit-content` with `max-width: 100%`, so a glued
+surface stops at the room there is. **MEASURED at 1280 px before and after: the
+keyboard box 990.0 px to 646.0 px, the widest white key 62.0 px to 49.0 px, which
+is `--k-min`, the component's own grid track floor and not a squash, with 777.0
+px of keys scrolling in 646.0 px of box.** 777 is exactly the figure this page's
+own 2026-09-25 banded measurement recorded. The assert now prints the surface
+width and the scroll figures beside the box, rather than asserting the box
+against a quantity the box itself sets, which is what made it dead.
+
+### Closed 2026-09-25 line, kept for its measurement
 
 ⚠️ **FOUND 2026-09-25 while repairing an assert that could never fail.**
 `.kbd.kbd-full` is `width: 100%` of a `max-content` host, **so the option has no

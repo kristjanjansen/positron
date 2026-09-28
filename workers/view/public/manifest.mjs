@@ -503,17 +503,22 @@ export const DEMOS = [
    * catch that. A person reading one line can.
    * 🔴 **AND THIS LINE READ `IT PROPOSES AND NEVER CONNECTS` UNTIL
    * 2026-09-25**, when the rows were made live on the ask *"when connections
-   * (diagram rows) are there, enable them"*. **The proposing half is unchanged
-   * and so is the reason for it**: a switch appears only on an ALLOWED row,
-   * nothing crosses until somebody presses it, and `requestMIDIAccess` is behind
-   * that press and is never reached under `?selfcheck=1`. What changed is that
-   * the press now exists.
+   * (diagram rows) are there, enable them"*. A switch then appeared on every
+   * ALLOWED row and nothing crossed until somebody pressed it.
+   * 🔴 **AND THE SWITCH IS GONE SINCE 2026-09-28.** Asked, verbatim: *"rm on
+   * button on wish, just keep x button"*. **A ROW THAT EXISTS IS CONNECTED
+   * NOW**, and the `×` takes the link down, quietens the instrument and clears
+   * the row in one gesture. **The gate did not move, only the gesture that
+   * opens it**: an answer lands only out of a press on `Interpret`, on a
+   * prepared row, or on a release of `Hold to talk`, a page load lays no rows
+   * at all, and `requestMIDIAccess` is still behind a person's press and is
+   * still never reached under `?selfcheck=1`.
    * ⚠️ IT NEEDS `node demo/wish-local.mjs` RUNNING, because a browser cannot
    * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
    * the harness.
    */
   { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
-    one: 'say which instrument should play which, and a language model proposes a connection you can switch on',
+    one: 'say which instrument should play which, and a language model makes the connection on the desk',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
 
   // `bay` was a demo and is archived at archive/demos/bay-index.html, removed
@@ -571,7 +576,7 @@ export const DEMOS = [
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
   { name: 'pack', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
-    one: 'open a Circuit pack or a loose sample set and look inside its patches, sessions and samples',
+    one: 'open a Circuit pack or any zip of WAVs and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
   /**
    * 🔴 THE GRID, AND ITS ROWS ARE WHATEVER A READER OPENS. Asked 2026-09-21:
@@ -674,7 +679,7 @@ export const DEMOS = [
    */
   { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
     one: 'a synthesiser you type in, compiled to machine code in this tab '
-       + 'when you press Compile',
+       + 'as the page opens',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
 
   // `able` was a demo and is archived at archive/demos/able-index.html, removed
@@ -732,7 +737,23 @@ export const DEMOS = [
   // sound server. ⚠️ `AudioWorklet` is off the tags for the same reason: the
   // tag drives `caps.mjs`, and what this page now needs is WebAssembly and an
   // audio output, not a hand-written worklet.
-  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 60000, room: 'fixed',
+  // 🔴 `unlisted: true` SINCE 2026-09-28, AND IT IS `unlisted` RATHER THAN
+  // `built: false` BECAUSE THE FIRST ANSWER WAS WRONG AND WAS DEPLOYED.
+  // Asked, verbatim: *"hide grains from index. note in handoff: bring it back
+  // when we have time"*. `built: false` was tried first, on CLAUDE.md's word
+  // that it "hides a row from the index", and MEASURED on the live site
+  // minutes later it did neither thing anybody wanted: build.mjs line 532
+  // skips an unbuilt demo when it enumerates directories, so
+  // https://positron.studio/grains/ answered **404**, while the front page
+  // still drew a `grains` card, now with no link behind it, because
+  // `byGroup()` filters on `unlisted` and never looked at `built`. A dead card
+  // over a missing page is the exact opposite of what was asked for.
+  // ✅ `unlisted` is the flag that means this, it is dropped ONCE in
+  // `byGroup()` so the two index renderers cannot disagree, and `feedback`
+  // already wears it. The page is built, deployed and reachable at its URL;
+  // only the card is gone.
+  // ⚠️ TO BRING IT BACK: delete `unlisted: true` from this row. Nothing else.
+  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, unlisted: true, settleMs: 60000, room: 'fixed',
     one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
     tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
 
@@ -791,27 +812,26 @@ export const DEMOS = [
    * 🔴 SOMEBODY ELSE'S FIRMWARE, COMPILED RATHER THAN REWRITTEN, AND THAT IS
    * THE WHOLE CLAIM. `LESSONS.md` #81: `/grains/` said *"the same granulator in
    * this page and on a Raspberry Pi"* and it was false, because the page ran a
-   * REIMPLEMENTATION. This page runs `plaits/dsp/voice.cc` and
-   * `warps/dsp/modulator.cc` from pinned commits with no line of either
-   * changed, and each wasm carries its own digest over its own source set, so a
-   * second build elsewhere can be compared to it by something other than two
-   * people agreeing it sounds right.
+   * REIMPLEMENTATION. This page runs `plaits/dsp/voice.cc` from a pinned commit
+   * with no line of it changed, and the wasm carries its own digest over its own
+   * source set, so a second build elsewhere can be compared to it by something
+   * other than two people agreeing it sounds right.
    * ⚠️ THAT COMPARISON HAS NOT BEEN MADE. Nothing has been built on the board,
    * so what exists today is one end and the hook for the other.
-   * 🔴 TWO UNEDITED FIRMWARES IN ONE GRAPH IS THE THING THIS PAGE SHOWS AND
-   * ONE ON ITS OWN COULD NOT. The oscillator is what the effect is given to
-   * work on, so the chain needs no signal from anywhere else.
-   * 🔴 AND HALF OF WARPS IS AN OCTAVE DOWN AT 48 kHz, WHICH IS PRINTED
-   * RATHER THAN HIDDEN. `Modulator::Init` takes the rate and gets the
-   * oscillators and the follower times right, and the filter bank coefficients
-   * are fixed numbers baked at 96,000 in `lookup_tables.py`. So the six cross
-   * modulation algorithms are exactly right and the twenty vocoder bands sit an
-   * octave low. Running the context at 96 kHz is not the repair: `plai_init`
-   * refuses any rate but 48000, and the two firmwares would stop being able to
-   * feed each other at all.
+   * 🔴 AND IT WAS TWO FIRMWARES UNTIL 2026-09-28, WHICH IS WHY THIS BLOCK USED
+   * TO READ THE OTHER WAY. Asked, verbatim: *"muta: arhive/rmwarps and rm all
+   * routing code around it"*. Warps is out of the page and out of the worklet,
+   * and three paragraphs left with it: one headed *"TWO UNEDITED FIRMWARES IN
+   * ONE GRAPH IS THE THING THIS PAGE SHOWS AND ONE ON ITS OWN COULD NOT"*, one
+   * about half of Warps sitting an octave down at 48 kHz because its filter bank
+   * coefficients are baked at 96,000, and a count of two files under 280 KB.
+   * ⚠️ `demo/muta/vendor/warp.wasm` AND `build/warp_shim.cc` ARE STILL ON DISK
+   * AND NOTHING FETCHES THEM. `build/build.sh` compiles that shim into that
+   * artefact and there is no emscripten on this machine, so removing them is a
+   * build script change somebody able to run it has to verify.
    * ⚠️ NO `room` AND NO `settleMs` OVER 8 s. This page opens no socket, reaches
-   * no relay and touches nothing outside the deploy: two files under 280 KB
-   * together and an AudioWorklet. `plans/plan-vcv-modules.md` §12.4 is the
+   * no relay and touches nothing outside the deploy: 196.0 KB of one artefact
+   * and an AudioWorklet. `plans/plan-vcv-modules.md` §12.4 is the
    * experiment, and `plans/plan-two-more-modules.md` is where Warps was picked
    * over the four other modules that were priced.
    * ⚠️ THE POLYPHONY IS THE HOST'S AND NOT THE FIRMWARE'S. Plaits in hardware
@@ -829,7 +849,7 @@ export const DEMOS = [
    * this one keeps.
    */
   { name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
-    one: 'two of Emilie Gillet’s firmwares, an oscillator and an effect, compiled from their own C++ to WebAssembly and chained in one audio graph',
+    one: 'eight voices of Emilie Gillet’s Plaits firmware, compiled unmodified from its own C++ to WebAssembly on the audio thread',
     /* ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so a browser with no MIDI
        keeps this row linked and the page says why rather than the row vanishing,
        which would read as the demo not existing. The page plays from its own
