@@ -173,10 +173,13 @@
    * and one `effect` after the mixer.
    * ✅ AND SINCE 2026-09-25 ONE PRESET PUTS SOMETHING REAL THERE. This said
    * `effect = _, _;` IS IN EVERY PRESET, which was true of all four and is true
-   * of five of the six: `Hall` ends with `dm.freeverb_demo`, so the page now
+   * of five of the six: the sixth ends with `dm.freeverb_demo`, so the page now
    * shows what the line is for rather than only asserting that it is needed.
    * The argument above is unchanged and is why the other five still carry a
    * wire that changes nothing.
+   * ⚠️ THAT PRESET WAS `Hall` AND IT IS `Sweep` SINCE 2026-09-28. The lesson
+   * did not move, the voice under it did: `Hall` was the Organ typed out again
+   * with a reverb on the end, which is the half of it the ask refused.
    *
    * 🔴 4. TYPING COMPILES NOTHING, AND THE LOAD COMPILE IS NOT A REVERSAL OF
    * THAT. Asked 2026-09-26 as *"no autocompile"*, after two days in which a
@@ -489,6 +492,111 @@ effect  = _, _;
 `,
     },
     {
+      /* 🔴 THE THIRD, ADDED 2026-09-28 IN PLACE OF `Bell`, WHICH IS THE ROW THE
+         ASK TOOK OUT: *"rm bell and hall from fau they do not diffentiate"*.
+         `Bell` was the Rhodes with `3.51` typed where a whole number had been,
+         and its own comment said so, so a visitor stepping onto it learned a
+         number rather than a mechanism.
+         🔴 WHAT THIS ONE SHOWS AND NOTHING ELSE ON THE PAGE DOES IS `~`, THE
+         OPERATOR THAT LETS A SIGNAL READ ITS OWN OUTPUT. Everything else here
+         runs forwards: the Organ adds oscillators up, the Rhodes bends one with
+         another, and the two library names below hide whatever they do. This
+         patch has no oscillator in it at all. Twelve milliseconds of noise go
+         into a delay line that feeds itself, the LENGTH of that delay is the
+         pitch, and the fraction that survives a lap is the decay. It is
+         Karplus-Strong, the cheapest physical model there is, and it is the
+         counterweight to `Djembe` and `Clarinet`: the same kind of thing those
+         two name in one word, written out where a visitor can change it.
+         ✅ MEASURED 2026-09-28, compiled the way THIS page compiles, which is
+         polyphonic with a voice, an effect and a mixer: 68 ms cold and 27 to
+         30 ms warm, 8.61 kB of machine code, 16.47 kB a voice. That per-voice
+         figure is the only one on this page that is a BUFFER rather than a
+         table or almost nothing, which is what a delay line is.
+         ⚠️ NOTHING NEW CROSSES THE WIRE. `no`, `de` and `fi` are all inside the
+         2.41 MB of library the page has already downloaded, the same condition
+         the Clarinet below was chosen under.
+         ⚠️ AND THE DAMPER IS ONE TERM RATHER THAN A SECOND ENVELOPE. A string
+         with a constant feedback rings on after the key comes up, which is what
+         a real one does and is wrong on a keyboard with eight voices and a
+         sustain pedal, because then nothing the foot does can be told apart
+         from the instrument ignoring it. `keep` drops to 0.9 when the gate
+         goes. MEASURED offline at 440 Hz: an RMS of 0.0009 in the first tenth
+         of a second after the key lifts, against 0.075 in the first tenth it
+         was held. */
+      id: 'pluck',
+      label: 'Pluck',
+      what: 'a burst of noise in a loop that reads its own output, which is a string',
+      code: `import("stdfaust.lib");   // brings in no, en, de and fi, used below
+
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
+
+// twelve milliseconds of noise, which is the finger leaving the string
+
+burst = no.noise * en.ar(0.001, 0.012, gate) * gain;
+
+// one lap of the loop. How long the lap is IS the note, and how much of it
+// comes back is the decay, which drops to 0.9 when the key lifts
+
+keep = 0.9 + 0.099 * gate;
+lap  = de.fdelay(2048, ma.SR / freq - 1) : fi.lowpass(1, 5000) : *(keep);
+
+// ~ feeds the output back into the + it is written on, one sample later
+
+process = burst : (+ ~ lap) * 0.4 <: _, _;
+effect  = _, _;
+`,
+    },
+    {
+      /* 🔴 THE FOURTH, ADDED 2026-09-28 IN PLACE OF `Hall`, AND IT KEEPS THE ONE
+         THING `Hall` WAS FOR. That row was the Organ verbatim with
+         `effect = dm.freeverb_demo;` under it, which is a real lesson about the
+         last line of every listing sitting on a voice the page already had. The
+         room moves here, onto a voice that is nobody else's.
+         🔴 AND THE VOICE IS THE THIRD WAY OF MAKING A SOUND, WHICH THIS PAGE
+         DID NOT HAVE. The Organ adds oscillators together and the Rhodes bends
+         one with another, so both of them BUILD the sound up. This one starts
+         with a sawtooth, which has every harmonic of the note in it already,
+         and takes most of that away again with a filter whose corner is driven
+         by an envelope of its own rather than by the volume.
+         ✅ MEASURED 2026-09-28, compiled the way this page compiles: 106 to
+         118 ms, 21.29 kB of machine code, and 108 BYTES a voice, which is the
+         smallest per-voice figure this page has ever printed and is worth
+         having beside the Organ's 262.26 kB. A sawtooth and a two pole filter
+         keep almost nothing; `os.osc` carries a 65,536 entry sine table.
+         ⚠️ AND THE ROOM IS NOT IN THOSE 108 BYTES, WHICH IS WHAT THE ASSERT
+         BELOW GRADES. MEASURED the same day by compiling this listing twice,
+         once as it stands and once with a bare wire on the last line:
+         21.29 kB against 9.42 kB of machine code, and 108 bytes a voice either
+         way, so the room really does run once on the mix.
+         ⚠️ NOTHING NEW CROSSES THE WIRE. `dm` is `demos.lib` and `fi` is
+         `filters.lib`, both already in the downloaded library. */
+      id: 'sweep',
+      label: 'Sweep',
+      what: 'a sawtooth with most of it taken away again by a filter that moves',
+      code: `import("stdfaust.lib");   // brings in os, en, fi and dm, used below
+
+freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
+gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
+gate = button("gate");                         // 1 while a key is held down
+
+saw = os.sawtooth(freq);                     // every harmonic is in here already
+env = en.adsr(0.005, 0.2, 0.6, 0.3, gate);   // this envelope is on the volume
+
+// and this one is on the corner the filter cuts at, which is where the
+// sound is. It opens to twelve times the note and shuts back down to it
+
+cut = freq * (1 + 11 * en.ar(0.002, 0.5, gate));
+
+process = saw : fi.resonlp(cut, 6, 1) * env * gain * 0.12 <: _, _;
+
+// a real room, and it runs once on the mix rather than once per voice
+
+effect  = dm.freeverb_demo;
+`,
+    },
+    {
       id: 'djembe',
       label: 'Djembe',
       what: 'a drum somebody else modelled, named in one line',
@@ -502,34 +610,8 @@ effect  = _, _;
 `,
     },
     {
-      /* 🔴 THE FOURTH, ADDED 2026-09-23 BECAUSE THE ASK SAID SO: *"patch
-         selector holds organ and rhodes (add more)"*. It is the Rhodes with one
-         number changed and it sounds nothing like it, which is the cheapest
-         thing this page can show a visitor about the language: `3.51` is not a
-         whole multiple of the note, so the partials it adds belong to no
-         harmonic series and the ear hears metal instead of a piano. */
-      id: 'bell',
-      label: 'Bell',
-      what: 'the same three lines as the Rhodes at a ratio that is not a whole number',
-      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
-
-freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
-gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
-gate = button("gate");                         // 1 while a key is held down
-
-// 3.51 is the whole patch. It is not a whole multiple of the note, so the
-// partials it adds belong to no harmonic series and the ear hears metal
-
-strike = os.osc(freq * 3.51) * en.ar(0.001, 0.35, gate) * 2.0;
-env    = en.ar(0.002, 2.2, gate);   // attack and release only, no sustain
-
-process = os.osc(freq + strike * freq * 0.03) * env * gain * 0.25 <: _, _;
-effect  = _, _;
-`,
-    },
-    {
-      /* 🔴 THE FIFTH, ADDED 2026-09-25 ON *"add more patches if you have"*, AND
-         `if you have` WAS READ AS THE CONDITION IT IS. This one is not invented:
+      /* 🔴 ADDED 2026-09-25 ON *"add more patches if you have"*, AND `if you
+         have` WAS READ AS THE CONDITION IT IS. This one is not invented:
          `plan-fau.md` §1.4 names `pm.clarinet_ui_MIDI` as the measured example
          behind its own headline sentence, *"61 bytes of source becomes a
          clarinet"*, and `physmodels.lib` is already inside the 2.41 MB of
@@ -539,8 +621,14 @@ effect  = _, _;
          way THIS page compiles, which is polyphonic with a voice, an effect and
          a mixer, it is 273 to 344 ms on this desk. The plan's figure is a MONO
          compile and this page has never made one. That is the slowest preset
-         here by nearly three times over the next one and it is still an order of
-         magnitude under the STK piano's 1,690 ms, which is the one refused.
+         here and it is still an order of magnitude under the STK piano's
+         1,690 ms, which is the one refused.
+         ⚠️ `nearly three times over the next one` STOOD HERE UNTIL 2026-09-28
+         AND `Sweep` MOVED IT. RE-MEASURED that day with the vendored compiler
+         under node, every preset the same way so that only the ratio is being
+         quoted: clarinet 241 to 260 ms against Sweep's 106 to 118, which is
+         about twice rather than three times. The 273 to 344 above is the
+         in-browser figure and is unchanged.
          ⚠️ `pm.brass_ui_MIDI` COMPILES IN 155 ms AND WAS NOT CHOSEN. It is in
          the same library and it would have been the cheaper row; it has never
          been measured in this repository, and picking a sound on a number the
@@ -557,45 +645,20 @@ process = pm.clarinet_ui_MIDI <: _, _;
 effect  = _, _;
 `,
     },
-    {
-      /* 🔴 THE SIXTH, AND IT IS THE ONLY ONE THAT USES THE LINE EVERY OTHER
-         PRESET CARRIES. This file's own header says in capitals that
-         `effect = _, _;` IS NOT DECORATION, and until this row nothing on the
-         page showed what it is for: five patches all ended with a wire that
-         changes nothing. Here the last line is a real reverb, so a visitor can
-         see that the effect runs ONCE on the mix rather than once per voice.
-         ✅ MEASURED AND ALREADY IN THIS REPOSITORY, the same condition as the
-         clarinet: `plan-fau.md` §1.4 has `dm.freeverb_demo` at 51 B of source
-         and 12,274 B compiled in 39 ms, and `demos.lib` is inside the library
-         already downloaded.
-         ⚠️ AND THE READOUT IS WHERE IT SHOWS. `machine code` counts the voice,
-         the effect and the mixer together, so this is 19.27 kB against the
-         Organ's 7.27 kB out of a source 84 bytes SHORTER. The per-voice cell
-         does not move at all, because the room is not in the voice, and the
-         assert below reads all three of those at once. */
-      id: 'hall',
-      label: 'Hall',
-      what: 'the Organ with a real room on the end of it, which is what the effect line is for',
-      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
-
-freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
-gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
-gate = button("gate");                         // 1 while a key is held down
-
-env  = en.adsr(0.005, 0.12, 0.7, 0.35, gate);
-tone = os.osc(freq) + 0.5 * os.osc(freq * 2) + 0.25 * os.osc(freq * 3);
-
-// the Organ again, unchanged down to here
-
-process = tone * env * gain * 0.2 <: _, _;
-
-// and every other patch ends with a wire that changes nothing. This one
-// puts a room there, and it runs once on the mix rather than once per voice
-
-effect  = dm.freeverb_demo;
-`,
-    },
   ];
+
+  /**
+   * 🔴 A PRESET IS REACHED BY `id`, NEVER BY INDEX, AND 2026-09-28 IS WHY THIS
+   * IS DECLARED UP HERE RATHER THAN HALFWAY DOWN THE CHECK BLOCK. The warning
+   * was already written beside the one check that used it, in those words, and
+   * two checks a hundred lines above it still read `PRESETS[2]` for the drum.
+   * On the day `Bell` and `Hall` came out and `Pluck` and `Sweep` went in after
+   * the Rhodes, index 2 stopped being the drum and became the string, so both
+   * of them would have compiled the wrong preset and reported the right one.
+   * `PRESETS[0]` survives on purpose: that is the row the box OPENS with, which
+   * is a claim about position rather than about which sound it is.
+   */
+  const byId = (id) => PRESETS.find((x) => x.id === id);
 
   const ONE = 'a synthesiser you type in, compiled to machine code in this tab '
             + 'as the page opens';
@@ -956,8 +1019,11 @@ effect  = dm.freeverb_demo;
        every listing that has a comment in it.
        🔴 A BOX SIZED TO THE CONTENT IT USED TO HOLD HIDES THE CONTENT IT HOLDS
        NOW, and that is the whole rule: this number is READ OFF the presets and
-       never guessed. MEASURED 2026-09-25 by counting the `code` strings in this
-       file: 18, 20, 7, 14, 7 and 17 lines, so 20 is the longest of them.
+       never guessed. RE-MEASURED 2026-09-28, after `Bell` and `Hall` left and
+       `Pluck` and `Sweep` arrived, by counting the `code` strings in this file:
+       18, 20, 20, 19, 7 and 7 lines, so 20 is still the longest of them and
+       this number did not have to move. It read 18, 20, 7, 14, 7 and 17 on
+       2026-09-25, which is the same answer off a different list.
        ⚠️ AND IT IS THE LONGEST RATHER THAN A COMFORTABLE AVERAGE, because a
        listing that does not fit is one a visitor has to scroll inside a box
        whose own scrollbar is the least visible thing on the page. */
@@ -1387,8 +1453,12 @@ effect  = dm.freeverb_demo;
              It read `4 to 13KB` until 2026-09-25 and was wrong at both ends:
              MEASURED across the six presets that day, 6.95 to 19.27 kB. The
              live figure is the `machine code` cell, and this says roughly how
-             big the thing in the box gets. */
-          { id: 'dsp', label: 'dsp module', sub: '7 to 19 kB', tech: 'sound',
+             big the thing in the box gets.
+             ⚠️ RE-MEASURED 2026-09-28, when `Bell` and `Hall` left and `Pluck`
+             and `Sweep` arrived: 7.27 to 21.33 kB, so the top of the range
+             moved and the bottom did not. `Sweep` is the widest because it
+             carries a real reverb on its effect line. */
+          { id: 'dsp', label: 'dsp module', sub: '7 to 21 kB', tech: 'sound',
             note: 'A second WebAssembly module, made in this tab a moment ago, holding this '
                 + 'instrument and nothing else. It is what a visitor changes by typing.' },
           { id: 'awn', label: 'AudioWorklet', sub: '8 voices, 128 frames', tech: 'sound',
@@ -1591,7 +1661,9 @@ effect  = dm.freeverb_demo;
        and deleting them is the cheapest way to make this assert stop meaning
        anything. Both counts have to survive: own-line comments, which this
        grades, and TRAILING ones, which must stay on their code line and are
-       exactly what the format does NOT apply to. MEASURED today: 16 and 21. */
+       exactly what the format does NOT apply to. MEASURED 2026-09-25: 16 and
+       21. RE-MEASURED 2026-09-28 over the six listings as they stand now, two
+       of them new: 18 and 22, and nothing out of place. */
     const fmt = { own: 0, trail: 0, bad: [] };
     for (const pr of PRESETS) {
       const lines = pr.code.replace(/\n$/, '').split('\n');
@@ -1929,11 +2001,11 @@ effect  = dm.freeverb_demo;
     /* Two presets, and the cell that tells them apart. A drum somebody else
        modelled carries almost no state; anything with an oscillator in it
        carries a sine table. */
-    const drum = await build(PRESETS[2].code, 'djembe');
+    const drum = await build(byId('djembe').code, 'djembe');
     d.assert('a preset named in one line compiles to more machine code than ten lines of '
            + 'arithmetic, because the model was already in the library',
       drum.ok && drum.bytes > second.bytes,
-      `${kb(drum.bytes)} kB from ${kb(PRESETS[2].code.length)} kB of source, against `
+      `${kb(drum.bytes)} kB from ${kb(byId('djembe').code.length)} kB of source, against `
       + `${kb(second.bytes)} kB from ${kb(edited.length)} kB`);
     d.assert('and one voice of it costs a thousandth of what the organ\'s voice costs',
       drum.size < first.size / 100, `${kb(drum.size)} kB against ${kb(first.size)} kB`);
@@ -1946,11 +2018,9 @@ effect  = dm.freeverb_demo;
        struck skin holds almost no state and a blown tube is a delay line. The
        page's own sentence about compression is true of the drum and would be
        read as true of every library model without this beside it.
-       ⚠️ FOUND BY `id` RATHER THAN BY INDEX. The rows above still use indices
-       and two new presets have just been appended below them; an index is a key
-       that the next `(add more)` moves, and a check reading the wrong preset
-       fails on a page where nothing is wrong. */
-    const byId = (id) => PRESETS.find((x) => x.id === id);
+       ⚠️ FOUND BY `id` RATHER THAN BY INDEX, and `byId` is declared beside
+       `PRESETS` since 2026-09-28, where the header on it records what an index
+       cost the two checks above this one. */
     const reed = await build(byId('clarinet').code, 'clarinet');
     d.assert('two patches that are each one line out of the same library keep wildly '
            + 'different amounts per voice',
@@ -1959,31 +2029,58 @@ effect  = dm.freeverb_demo;
       + `${kb(byId('clarinet').code.length)} kB and ${kb(byId('djembe').code.length)} kB `
       + 'of source');
 
-    /* 🔴 THE ONE CLAIM ONLY `Hall` CAN MAKE, AND IT IS WHY THAT PRESET IS HERE.
+    /* 🔴 THE THIRD POINT ON THE SAME AXIS, AND IT IS THE ONE `Pluck` IS FOR.
+       The two checks above read the `per voice` cell off a drum and a reed to
+       show that a library name says nothing about what a voice KEEPS. The
+       string is the third answer and it is a different KIND of answer: the
+       drum's 0.57 kB is a handful of numbers, the organ's 262.26 kB is a sine
+       table `os.osc` carries, and this is a BUFFER, one lap of sound long,
+       because a delay line that feeds itself has to hold the lap. So the cell
+       separates three mechanisms rather than two sizes.
+       ⚠️ AND IT IS BRACKETED ON BOTH SIDES, because `bigger than the drum`
+       alone is satisfied by anything with an oscillator in it, which is most of
+       this page. MEASURED 2026-09-28: 16.47 kB, against the drum's 0.57 and the
+       organ's 262.26. */
+    const string = await build(byId('pluck').code, 'pluck');
+    d.assert('the string keeps a lap of sound per voice, which is neither a table nor almost '
+           + 'nothing',
+      string.ok && string.size > drum.size * 10 && string.size < first.size / 10,
+      `${kb(string.size)} kB a voice, between the drum's ${kb(drum.size)} kB and the `
+      + `organ's ${kb(first.size)} kB`);
+
+    /* 🔴 THE ONE CLAIM ONLY THE PRESET WITH A REAL `effect` LINE CAN MAKE.
        Five of the six end with `effect = _, _;`, which this file's header calls
        NOT DECORATION and which nothing on this page demonstrated until
-       2026-09-25. A real room on that line is MORE machine code out of LESS
-       source, and not one byte of it lands in the voice, because an effect runs
-       once on the mix rather than once per voice. A page that quietly compiled
-       the effect per voice would pass every other check in this block.
-       ⚠️ SEVEN CHARACTERS AGAIN, because these bytes are compared against
-       `first` and a module's name is embedded in it. See `PINNED`. */
-    const hall = await build(byId('hall').code, 'hall', 'fau_hal');
-    d.assert('a patch with a real effect on the end is more machine code out of less text, '
-           + 'and none of it is in the voice',
-      hall.ok && hall.bytes > first.bytes && hall.size === first.size
-        && byId('hall').code.length < PRESETS[0].code.length,
-      `${kb(hall.bytes)} kB from ${kb(byId('hall').code.length)} kB, against the Organ's `
-      + `${kb(first.bytes)} kB from ${kb(PRESETS[0].code.length)} kB, and `
-      + `${kb(hall.size)} kB a voice either way`);
+       2026-09-25. An effect runs ONCE on the mix rather than once per voice, so
+       a real room on that line is thousands of bytes of extra machine code and
+       not one byte of extra voice. A page that quietly compiled the effect per
+       voice would pass every other check in this block.
+       🔴 THE CONTROL IS THE SAME PATCH WITH THE ROOM TAKEN OFF, WHICH IS NEW ON
+       2026-09-28 AND IS THE STRONGER SHAPE. Until then this compared `Hall`
+       against the ORGAN, two different sources, so `more machine code` was a
+       claim about two patches rather than about the effect line, and it only
+       held at all because `Hall` was the Organ typed out again. Here one string
+       differs from the other by its last line, so the difference in the answer
+       cannot be anything else.
+       ⚠️ SEVEN CHARACTERS EACH, because these two byte counts are compared with
+       each other and a module's name is embedded in it. See `PINNED`. */
+    const roomy = await build(byId('sweep').code, 'sweep', 'fau_wet');
+    const dry = await build(byId('sweep').code.replace('dm.freeverb_demo;', '_, _;'),
+      'sweep dry', 'fau_dry');
+    d.assert('a real room on the effect line is thousands of bytes of machine code and not one '
+           + 'byte of voice, because it runs once on the mix',
+      roomy.ok && dry.ok && roomy.bytes - dry.bytes > 5000 && roomy.size === dry.size,
+      `${kb(roomy.bytes)} kB with the room against ${kb(dry.bytes)} kB with a bare wire, and `
+      + `${kb(roomy.size)} kB a voice either way`);
 
     /* 🔴 EVERY PRESET IN THE LIST, WHICH IS THE ONLY THING THAT CATCHES ONE
-       THAT DOES NOT COMPILE. The checks above name four of the six, and the
-       other two arrived with asks that said *"(add more)"* and *"add more
-       patches if you have"*: nothing in this block would have compiled them, so
-       a preset that does not parse would have shipped and the first person to
-       find out would be a visitor picking it. A list is exactly where a broken
-       member hides. */
+       THAT DOES NOT COMPILE. The checks above name five of the six now and the
+       Rhodes is nobody's subject, and every preset this page has ever gained
+       arrived with an ask that said *"(add more)"*, *"add more patches if you
+       have"* or *"btin somehintg instresting"*: nothing else in this block
+       would have compiled them, so a preset that does not parse would have
+       shipped and the first person to find out would be a visitor picking it.
+       A list is exactly where a broken member hides. */
     const each = [];
     for (const p of PRESETS) {
       const r = await build(p.code, p.label.toLowerCase());
