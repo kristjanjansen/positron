@@ -218,7 +218,74 @@ runs for a visitor, so "on loading" has to stay inside this page's own assets.
 line 668 already records that the browser build of libfaust has three backends
 and C++ is not one of them.
 
-### global: "move all reading sections atop of the logs and glue them"
+### crate: a dead branch round `.pos-readout`, found 2026-09-28, not asked for
+
+FOUND by the kit agent while making the joined report the default, READ off
+`shell.mjs` rather than measured on the page, and NOT fixed because nobody asked
+for it. `demo/crate/index.html:141` does
+`const readout = d.el.querySelector('.pos-readout')` and then, under
+`if (readout)`, adds `.vain-nums`, moves the readout into `.vain-block` and
+hides it until an upload produces numbers. `d.el` is `.pos-body`, and the
+readout has never been a descendant of it, because `mount()` adds it to
+`document.body` through the column stack. So the query has always answered null,
+`.vain-nums` has never been applied, and the numbers have always been on screen
+before there were any.
+⚠️ It matters more now than it did: the readout's home is inside the glued
+report, so reviving the branch carries a second decision. Lifting the readout
+out leaves the report holding only a log, which is a legal shape that draws one
+border with no seam, but it is a decision rather than a side effect.
+⚠️ NOT MEASURED. Nobody opened that page. One run of `node demo/verify.mjs
+crate` would settle whether the numbers really are on screen from the start.
+
+### Done 2026-09-28: global, "move all reading sections atop of the logs and glue them"
+
+✅ **DONE.** `joined` is the DEFAULT for every page now, in both `mount()` and
+`createReport()`, and the surface is built by `createGlue` from
+`demo/shell/glue.mjs` rather than by a hand-rolled element. Four files:
+`demo/shell/glue.mjs`, `demo/shell/shell.mjs`, `demo/shell/shell.css`
+(comments only, no declaration moved) and `demo/kit/index.html`.
+- ⚠️ THE IMPORT CYCLE WAS THE WHOLE REASON IT HAD NOT BEEN DONE. `glue.mjs`
+  imported `el` from `shell.mjs`, so `shell.mjs` calling back into `glue.mjs`
+  would have been a cycle in the frame every page mounts. It now carries a three
+  line local `div(cls)`, which is what `stack.mjs` already did for the same
+  reason.
+- `joined: false` survives as an opt-out and NO page passes it. Only `/kit/`
+  passes it, on a specimen, because showing both arrangements is what that page
+  is for. The comment says out loud that if the count is still zero next time
+  somebody reads it, the split arm should be deleted rather than left.
+- MEASURED against a pristine copy of the four files, so the only difference
+  between the two runs is this change: `click` 24/24 and 12 page asserts
+  UNCHANGED, `typist` 25/25 and 19 UNCHANGED, `muta` 55 and 49 UNCHANGED,
+  `kit` 246/234 to 247/235, which is the one new assert and it is green. Not one
+  assert went silent.
+- `createGlue` unwraps a glue of one block, so a report with `showLog: false` is
+  the readout ITSELF wearing `.pos-report`, one element fewer. That is what
+  keeps `/videoradio/` right: its full screen path hides `.pos-readout` with
+  `display: none !important`, and a wrapper round a single block would have left
+  a box of its own two edges on screen, which is `/typist/`'s "old UI creeping
+  in" band arriving by a new road.
+- ⚠️ FOUR PAGES OF 54 WERE RUN, chosen to cover every shape the component can
+  produce. The other 50 were not opened, and a page carrying its own CSS or its
+  own assert about where the readout sits is something only that page's run
+  finds. One did: `/muta/` went red on a 1.0 px delta and its own agent has the
+  one line repair.
+- ⚠️ `.pos-report { margin: var(--pos-gap) 0 0 }` IS A DEAD RULE ON EVERY REAL
+  PAGE and was left alone. MEASURED: `node demo/which-rule-won.mjs click
+  '.pos-report' margin-top` prints `WON margin-top: 0 | .pos-stack >
+  :not(:first-child)`, and the 40 px above a report comes from `.pos-body`'s
+  stack margin instead. It is live in exactly one place, `/kit/`'s specimen box,
+  where the report is placed by hand. Removing it takes that specimen's gap with
+  it and needs the specimen moved into a stack, which nobody asked for.
+- ✅ `/making/` had its now redundant `joined: true` removed by the session, with
+  the measured argument that used to justify it kept as history rather than as a
+  reason. **38/38 green, 0 failed.**
+- ⚠️ THREE CLAIMS IN THE BRIEF WERE WRONG AND THE AGENT CHECKED THEM: TWO pages
+  passed `joined: true`, not three, and ONE passes `showLog: false`, not two
+  (the rest were kit specimens and a line of sample code in a string), and
+  `createReport` did NOT hand-roll its border, radius and seam, it always wore
+  `.pos-glue` and hand-rolled only the element. Worth adding: 11 pages pass
+  `showReadout: false`, so 29 of 54 built pages get the one box with no seam
+  rather than the seamed pair.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"global: move all reading sections atop of
 the logs and glue them (you have patterns). use you new glueing code for this,
