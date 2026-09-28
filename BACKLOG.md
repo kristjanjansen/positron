@@ -1,6 +1,136 @@
 ## Open
 
-### Open 2026-09-28: tom, less air to the left of the step grid's numbers
+### Open 2026-09-28: step-grid sizes itself against the scroller's own padding, so the last column hangs over the edge, found not asked for
+
+**FOUND BY THE `/tom/` AGENT WHILE MEASURING SOMETHING ELSE, AND DELIBERATELY
+NOT FIXED THERE**, because it is a kit line and that agent's file was the page.
+
+`demo/shell/step-grid.mjs:500`, inside `size()`:
+
+```js
+const box = strip.clientWidth;   // and clientWidth INCLUDES padding
+```
+
+On `/tom/` that `strip` is a `.panel-strip.panel-strip-l`, and
+`.panel-strip-l { padding-left: var(--panel-gap) }` is **16 px of padding INSIDE
+the scroller**, deliberately: the comment above it records the 2026-09-23 ask
+that made it padding rather than a margin. **So the grid is sized for 16 px more
+room than it has.**
+
+**MEASURED at 1280 before the gutter change: `clientWidth` 624, `scrollWidth`
+638, 14 px past the right edge. At 375: 279 and 286, 7 px past.** The arithmetic
+reproduces it exactly: `floor((624 - 15*2) / 16) = 37`, grid `16*37 + 15*2 =
+622`, available `624 - 16 = 608`, overflow 14.
+
+⚠️ **IT OSCILLATES WITH `cellSize`'s `floor`, WHICH IS WHY IT WAS NOT USED AS AN
+ARGUMENT FOR THE GUTTER MAGNITUDE**: after that change 1280 went 14 to **2** and
+375 went 7 to **11**. A number that moves both ways under an unrelated edit is
+not evidence for the unrelated edit.
+
+**The fix is subtracting the scroller's inline padding inside `size()`, one line**,
+and it reaches `/kit/`'s three specimens and `/pack/` as well as `/tom/`.
+
+### Open 2026-09-28: createChoice has no slot for a trailing control, found not asked for
+
+**FOUND BY THE `/shape/` AGENT AND REPORTED RATHER THAN WRITTEN**, because
+`demo/shell/` was closed to it.
+
+`/shape/` now puts its invisible hand button into the chooser's segmented row by
+inserting after `parts.buttons[parts.buttons.length - 1]`. **That works, it is
+stable, and it uses `createChoice`'s DOCUMENTED return rather than naming
+`.pos-choice-seg`**, which is how this project's dead selectors get born. But
+the call site is not the honest home for it.
+
+**A `trailing` option on `demo/shell/choice.mjs` is**, for *a segment that is an
+action rather than an option*. It would carry the one page rule with it:
+
+```css
+.pos-choice button.shape-hand { flex: none; padding: 0; }
+```
+
+which exists only because `.pos-choice .step button` is (0,2,1) inside the phone
+block and `button[data-glyph="1"]` is only (0,1,1), so without it a 34 px square
+grows into whatever the words leave and takes 12 px of side padding inside a
+34 px box. **The next page to do this would write that rule again.**
+
+⚠️ **`.tbar-loopgrp` IS THE KIT'S EXISTING EXAMPLE** of a toggle glued to a
+glyph action, so this would be the second, which is the count at which a thing
+becomes a component here.
+⚠️ **ONE THING IS REASONED AND NOT MEASURED**: whether an action button inside a
+row of `aria-pressed` options announces correctly. `choice.mjs` uses
+`aria-pressed` buttons rather than `role="radio"` on purpose and says changing
+that is an eleven call site decision, so no radio group is being polluted and
+the glyph keeps its own `aria-label`. **No screen reader has been on it.**
+
+### Open 2026-09-28: the keyboard's pad row cannot hold its controls on one line at 375 px
+
+FOUND while answering *"keyboard lower bittons (+- panic etc) go to the same
+line"*. That ask got the repair it needed (the row is two ends in two boxes now,
+so a wrapped line is left aligned instead of stranded at the right, see `.kpad`
+in `demo/shell/shell.css`), and the LITERAL ask is arithmetically out of reach at
+that width.
+
+**MEASURED on https://positron.studio/nola/ at 375 px, before and after:** the
+row is **323 px** wide and its eight children need **467.4 px plus seven 8 px
+gaps, which is 523.4 px**. Of that, **272.9 px is the five controls** and
+**218.5 px is three reserved readout cells** (`.kpad-chord` 72.8, `.kpad-tempo`
+86.1, `.kpad-ratio` 59.6) which hold their widest possible reading whether or not
+anything is written in them. **The controls alone would fit with about 50 px to
+spare.** So the thing that does not fit is invisible, which is why the row looks
+like it should.
+
+**WHAT WOULD FIX IT:** the three readout cells take a line of their own above the
+controls when the row is narrow, leaving `-`, `+`, `0`, `Loop`, `Sustain` and
+`Panic` on one line. **NOT DONE because it needs the ROW'S OWN BOX to decide it,
+not the window's**: `/kit/` demonstrates keyboards in a 320 px frame at desktop
+width, and `/evo/` and `/instrument/` draw keyboards much narrower than the page.
+A `@media` query is blind to all three. `@container` is the right form and
+`.kbd` cannot carry it: `container-type: inline-size` applies inline size
+containment, and `.kbd` is `width: fit-content`, so its contents would be taken
+out of its own sizing and it would collapse. The wrapper that could carry one
+would change what sizes a keyboard's box on every page that has one, which is a
+measurement nobody has made.
+
+### Open 2026-09-28: the instrument panel's phone layout is graded by nothing
+
+The nameplate centres at 560 px and under (asked as *"in instrument layout, on
+mobile the nameplate goes below all othe section on its own section and it
+centered hzontally"*, done, at the foot of `demo/shell/shell.css`). **No harness
+here can enter that block.** `demo/verify.mjs` runs at 756 px with no viewport
+override, and `/kit/`'s narrow specimens are narrow BOXES at desktop WIDTH, which
+a media query cannot see either. It was MEASURED with `node demo/shot.mjs <slug>
+375` on all six pages that build a plate and it is asserted by nothing, so it can
+go stale silently, which is this repository's most expensive kind of defect.
+The cure is the same container query the entry above wants and has the same
+`width: fit-content` problem, one surface out: `.pos-rows`.
+
+### Done 2026-09-28: tom, less air to the left of the step grid's numbers
+
+✅ **DONE, `c9a780b`. THE ASK NAMED THE RIGHT SYMPTOM AND POINTED AT THE WRONG
+BOX**, which the ancestry walk settled before a number was typed: the whole of
+the air was `.panel-case`'s 20 px of `--panel-pad`, and two of the three
+ancestors the walk named are not in the object at all. One declaration on the
+page's own `.tom-fixed`, `margin-inline-start: calc(var(--ctl-gap) -
+var(--panel-pad))`, so the column LEAVES the card's inset rather than fighting
+it and the escape is derived from the token it escapes.
+**MEASURED from the object's own left edge, before and after:** the column box
+**21 to 9**, `63`'s ink **24.96 to 12.96**, a lone `0`'s ink **30.98 to 18.98**,
+against the transport bar's play button at **9** and the log's first ink at
+**13**. Identical at 375 and 1280. The card is 686 wide and the nameplate is at
+317 both times, and the strip's right edge is 963 both times.
+**THE MAGNITUDE WAS SWEPT, NOT CHOSEN**: `-4` refused as indistinguishable from
+zero in the crop, `-16` puts `63` inside the transport bar's own inset, `-20`
+photographs as a column about to be clipped on the one page whose gutter has
+been clipped before.
+**39/39 with 28 page asserts to 40/40 with 29.** The one that arrived reads the
+column against the BAR and never against a number. The ink assert is untouched
+and was confirmed across the whole sweep rather than reasoned: a margin moves a
+box and does not narrow one.
+⚠️ **AND THE PAGE'S COMMENT ABOUT THE OLD SCAR WAS STALE, SO IT IS REWRITTEN.**
+`.pos-pg-labs` now sits after `.panel-fixed-l`, which is the first of the two
+cures that comment said were still owed.
+⚠️ **THE PHONE PAGE IS 64 px TALLER**, 1745 to 1809: the strip gained 12, so
+`--pg-cell` went 15 to 16 and 64 rows each grew 1 px.
 
 ASKED, VERBATIM: *"reduce left padding on tom's left numbers"*. The page is
 https://positron.studio/tom/ and the numbers are the step grid's label column.
@@ -39,7 +169,21 @@ because three alignment asserts were green while a reader could see `5` where
 `52` belongs. Any change to this column's width or inset is graded by that
 assert or it is not graded at all.
 
-### Open 2026-09-28: the invisible hand's button on a knob loses its border
+### Done 2026-09-28: the invisible hand's button on a knob loses its border
+
+✅ **DONE, `750c751`, AND IT IS `border: 0` RATHER THAN A DELETED
+DECLARATION.** MEASURED with `which-rule-won.mjs` before anything was written:
+the base `button, .pos-btn` rule sets `border: 1px solid var(--line2)` as a
+SHORTHAND, so deleting the line would have left a ring **brighter** than the one
+being removed. That is the whole reason this is not a one character edit.
+MEASURED after on `/knobs/` at 1280: `border-top-width: 0px`, `border-top-style:
+none`, `background-color: rgb(17, 21, 29)` which is `--card` kept,
+`border-radius: 50%` kept, box still 22 by 22.
+**The `:hover` was decided rather than left**: its border half went with the
+border it named, or it would have been the seventh dead rule measured here. The
+`--fg2` to `--fg` on the glyph is what is left, and this control IS a glyph, so
+its ink is its whole appearance. `[data-on="1"]` is untouched and `.sld-hand`
+was not touched at all.
 
 ASKED, VERBATIM: *"rm border around inviisble hand button on knob dials"*.
 
@@ -71,7 +215,40 @@ channel for the on state.
 **Where it shows**: every page drawing a knob with `hand`. `/knobs/`, `/muta/`
 and `/shape/` are the ones to look at, `/kit/` holds the specimen.
 
-### Open 2026-09-28: fix the invisible hand button on /shape/
+### Done 2026-09-28: fix the invisible hand button on /shape/
+
+✅ **DONE, `c61c2f2`. IT IS THE CHOOSER'S LAST SEGMENT NOW, IN TWO LINES OF
+CODE AND NO CSS ABOUT JOINING.** The button is inserted after
+`parts.buttons[last]`, which is `createChoice`'s documented return, so the page
+never names `.pos-choice-seg`. `.pos-seg` already owns the join: `Session`
+stops being `:last-child`, the kit zeroes its corners and rounds the hand's, and
+a button has no radius rule of its own so it needs no unnotch line.
+**MEASURED before at three widths: a 10.00 px gap, two full 4px rings, and at
+375 the square sitting 6.75 px HIGH** against the options beside it, because
+`.pos-choice` puts its label on top there. **That half was invisible at every
+width the harness runs.** After: seam **-1.00 px** at all three, which is exactly
+the rendered margin of `.pos-seg > * + *`, outer corners 4px, seam 0px, tops
+equal at 165.50 and at 213.00. **The join gave 11 px back.**
+**One page rule was needed and it is about the phone, not the seam.**
+`.pos-choice .step button` is (0,2,1) in a max-width 560 block;
+`button[data-glyph="1"]` is only (0,1,1), so the square would have grown into
+whatever three words left it. `.pos-choice button.shape-hand` **TIES** at
+(0,2,1) and wins on source order. A tie, not an escalation.
+**53/53 with 47 to 55/55 with 49**, the before re-run today rather than taken
+from the brief. Both new asserts were **broken on purpose in a live page** by
+appending the hand back onto the bar.
+**THE HAZARD DID NOT BITE**: after the move `.pos-controls button, .tbar-x`
+matches **0 elements** on this page, so nothing starts a hand on the Circuit on
+a suite run. And one existing assert was strengthened without moving the count:
+it read `!e.closest('.pos-controls')` while the harness presses `.pos-controls
+button, .tbar-x`, so a control wearing `.tbar-x` would have passed it while the
+suite pressed it every run.
+⚠️ **THE SKETCH DID NOT SETTLE THE READING AND THE FILE NOW SAYS SO.**
+`[Synth1|Synths] [⇄]` says nothing about whether the two touch. **What settles
+it is the page itself: 40 of its 52 lanes already draw this exact join**, so the
+one at the top was the same control drawn a second way on one screen.
+⚠️ **THE STANDING HOLE IS UNCHANGED AND WAS CHECKED RATHER THAN ASSUMED**: a
+slider moved BY HAND still has no one-press way back.
 
 ASKED, VERBATIM, with a screenshot: *"fix invisuble hand button"*. The picture
 is https://positron.studio/shape/ : a `CIRCUIT NOT CONNECTED` status, a
@@ -106,7 +283,71 @@ on purpose, because *a suite run must not be a hand on somebody's instrument*.
 Moving this button INTO a row the harness sweeps would start a hand on every
 run.
 
-### Open 2026-09-28: muta, the knob grid centres and the Test tone button fills the phone
+### Open 2026-09-28: muta, the Test tone button fills the phone (DONE) and the knob grid has nothing to centre in (REFUSED, one decision waiting)
+
+✅ **HALF TWO IS DONE, `040f266`, AND IT NEEDED TWO DECLARATIONS RATHER THAN
+ONE, BECAUSE A FLEX ITEM CANNOT WIDEN ITS PARENT.** `.pos-ipanel-name` is a
+shrink-to-fit cluster holding the nameplate and this button, so the button rule
+alone gives you the CLUSTER's width and not the ROW's. MEASURED at 375 with each
+half applied on its own: as shipped 165.4 and 108.5, **button rule alone 165.4
+and 165.4**, cluster rule alone 301.0 and 108.5, **both 301.0 and 301.0**.
+**IT DOES NOT FIGHT THE CENTRED NAMEPLATE THAT LANDED AN HOUR EARLIER.**
+MEASURED at three phone widths: `PLAITS` centres on **187.5, 240.0 and 278.5**,
+which is the row centre to the pixel at each one, while the button and the
+picker both take the whole row. The picker was ALREADY on its own line at 480
+and 560 before this, so nothing new wraps anywhere in the block's range. At 1280
+the two screenshots are identical and the button is 108.5 px as before. **The
+phone pays 19 px of panel height, 504 to 523.**
+**IT IS PAGE SCOPED ON PURPOSE AND THE COMMENT NAMES THE KIT SHAPE.** The plate
+row already wraps into two lines below 560 on all six panel pages, so the only
+thing missing was this page's control filling a line it already had. A kit
+option on the `status` slot would reach `fau`, `knobs`, `shape`, `tom` and
+`kit`, and nobody has asked for it on any of them.
+🔴 **AND THE PARENTHESIS IN THE ASK IS A QUESTION WHOSE ANSWER IS NO.**
+`createControlGrid` takes `items`, `cols`, `gap`, `host` and `cls`. **There is
+no `buttons` prop**, on it or on `createInstrumentPanel`. Read off the module.
+
+🔴 **HALF ONE IS REFUSED IN WRITING, AND THE REFUSAL IS MEASURED THREE WAYS.**
+`.plai-knobs` is the WIDEST ROW of a `width: fit-content` surface, so the panel
+is as wide as this row is: **client equals scroll at 483 at both 1280 and 560,
+zero slack.** Both grids are `flex: 0 0 auto` and each `.pos-cg` is the sum of
+its own tracks and gaps, so there is no slack inside either of them either. And
+a live `justify-content: center` was applied and MEASURED rather than argued
+about: **it moved the first grid 0.0 px at 1280 and at 560, then put it at -1.5
+at 480 and -54.0 at 375 with `scrollLeft` clamped at 0**, which is 91 px of the
+2 by 2 group off the left edge and unreachable for good. **A no-op where there
+is room and a permanent clip where there is not.** Inline-start overflow inside
+`overflow-x: auto` is clipped permanently and this row is a scroller BY DESIGN,
+made one after `HARMONICS` and `MORPH` were photographed cut to `HAR` and `M`.
+The numbers are written into the page beside `.plai-knobs` so nobody
+re-attempts it.
+
+🔴 **ONE DECISION IS WAITING ON THE OWNER AND MUST NOT GO QUIET.** **The one box
+with slack is the PANEL inside the PAGE: 525 px in a 688 px body at 1280, all
+163 px of it on the right.** At 375 there is none. That is one declaration,
+`.plai-panel { margin-inline: auto }`, plus a rewrite of one assert, about ten
+minutes.
+- **Against it**: it takes the instrument off the left edge that the `h1`, the
+  `what` paragraph, the report and the log all share at x296, which is the only
+  vertical line the page has; `/muta/`'s own assert, written THE SAME DAY, reads
+  *"the instrument starts where the rest of the page does and is as wide as its
+  widest row"* and its comment says *"the claim that survives is the LEFT edge"*,
+  so centring takes that red on purpose; the ask says *knob grid*, not
+  *instrument*; and five other pages build the same `fit-content` panel.
+- **For it**: it is the only reading of the ask that can move anything, and at
+  the desk the instrument ends at 821 while the report under it runs to 984,
+  which is visibly what a person would call not centred.
+- **It was not guessed at**, because reverting a documented decision made hours
+  earlier on a guess is the `/tom/` *"no top padding on titles"* shape, where
+  the reading that destroys work was taken four times in a row.
+⚠️ **`full: true` ON THE PANEL WAS PRICED AND REJECTED**: it would give the knob
+row 165 px of real slack to centre in, and that is the shape `positron-compose`
+quotes as **"plainly awful"**, four knobs floating in a 660 px band. It answers
+the letter of the ask by rebuilding a defect already reported.
+⚠️ **49/49 WITH 43 PAGE ASSERTS, UNCHANGED, WHICH IS THE HONEST READING**:
+nothing appeared or disappeared and the change sits inside a `max-width: 560`
+block the harness cannot enter at 756 px. **This layout is graded by nothing**
+and the only instrument is `node demo/shot.mjs muta 375`.
 
 ASKED, VERBATIM: *"muta: center the knob grid. test tone button takes full w on
 mobile (buttons prop?)"*. Two asks in one line, one page,
@@ -155,7 +396,24 @@ pages and is shared work, done once and first. **If it is written on
 narrower.** Price both before choosing; this is the same fork as the nameplate
 ask above.
 
-### Open 2026-09-28: the screen keyboard is a third higher, on the phone and at the desk
+### Done 2026-09-28: the screen keyboard is a third higher, on the phone and at the desk
+
+✅ **DONE, `750c751`, AS TWO TOKENS AT `:root` AND NOT FOUR TYPED HEIGHTS.**
+`--k-white: calc(74px * 4 / 3)` and `--k-black: calc(46px * 4 / 3)`, read by the
+two `.k` rules and by the one media query.
+**MEASURED on `/nola/` before and after: 74.00 to 98.66 and 46.00 to 61.33 at
+375; 92.50 to 123.33 and 57.50 to 76.66 at 1280.**
+The 1.25 did not move and is still the only thing that media query says. The
+media query did not move and the breakpoint is still 561. **The 74 and the 46
+now each appear ONCE in the file**; before this they each appeared twice, once
+as a `var()` fallback and once inside the media query's `calc`.
+⚠️ **THE TOKENS ARE AT `:root` AND NOT ON `.keys`, DELIBERATELY**: `.k` is also
+a label class under `.pos-xr-offer`, and a token declared on `.keys` would leave
+that one with no height at all rather than with its fallback, because an
+unresolved `var()` takes the whole declaration with it.
+⚠️ **`/evo/` DID NOT MOVE, AS EXPECTED AND AS LOOKED AT**, because
+`.evo-keys .k { height: auto }` overrides the component outright. 64/58,
+identical.
 
 ASKED, VERBATIM: *"make screen keyboard 1/3 higher on both mobile and
 desktop"*.
@@ -203,7 +461,38 @@ character, and the pad row and footer sit under it. `node demo/shot.mjs <slug>
 keyboard is in scope: `nola`, `knobs`, `fau`, `evo`, `looper`, `instrument`,
 `kit`.
 
-### Open 2026-09-28: the Loop button goes when the Evolution keyboard is not connected
+### Done 2026-09-28: the Loop button goes when the Evolution keyboard is not connected
+
+✅ **DONE, `750c751`.** `keyboard.mjs` gained `api.offerLoop(present)` and
+`api.loopOffered()`; `/nola/` calls `offerLoop(false)` at once and decides from
+`onPorts` on every change; `midi.mjs`'s `onPorts` gained a SECOND argument
+rather than a changed one, because *something is plugged in* and *that keyboard
+is plugged in* are different facts and a count cannot answer the second.
+🔴 **AND ONE FACT IN THE BRIEF WAS WRONG: `/tom/` DOES NOT PASS `loop: true`
+AND HAS NO KEYBOARD AT ALL.** That `loop: true` is inside a comment about a
+transport bar removed earlier. **Two pages pass it, `/kit/` and `/nola/`.**
+**The page owns the device test, the component owns the row.** Nothing in
+`keyboard.mjs` asks for a MIDI port or knows what an Evolution is: putting the
+test there would make seven pages request Web MIDI in order to draw a keyboard.
+The test is `/evo/`'s own `/mk-?4\d\dc|evolution/i` character for character,
+because CoreMIDI calls the port `MK-425C USB MIDI Keyboard` and **the maker's
+name is in nobody's port list**.
+**A SOUNDING LOOP IS STOPPED AND KEPT, NEVER CLEARED.** Both obvious answers
+are wrong: leaving it running strands a phrase with nothing that can reach it,
+and clearing throws away something somebody played.
+**IT STARTS WITHDRAWN ON `/nola/` AND THAT IS A DECISION**: the answer is not
+known until `requestMIDIAccess` resolves, and a button on screen for half a
+second and then gone is a control disappearing under somebody's hand. `/kit/`
+keeps it offered always, because that page has no MIDI and never will.
+**No assert left. Three arrived**, grading the absence, the withdrawal and
+return of a running loop with its take kept, and the 161.7 px of reserve
+leaving with the cells. The `/nola/` one **drives `offerLoop(true)`, the same
+call the page makes**, rather than simulating it.
+⚠️ **AND THE TWO HAZARDS WERE CHECKED RATHER THAN ASSUMED.** `.pos-controls`
+holds zero buttons on `/nola/` and the pad is inside `.kbd`, so no harness press
+moved. No page names the control in a selector: `/kit/` finds it by its WORDS
+and `/nola/` reads the first button with more than one character, which now
+prints `"Sustain"` instead of `"Loop"` and still passes.
 
 ASKED, VERBATIM: *"rm loop button when evolution keyboad is not connected"*.
 
@@ -244,7 +533,31 @@ moment.
   removing a control changes the width that row needs. Do the wrap fix in a way
   that survives three controls becoming two.
 
-### Open 2026-09-28: the keyboard's lower buttons wrap onto two lines, and they belong on one
+### Done 2026-09-28: the keyboard's lower buttons wrap onto two lines, and they belong on one
+
+✅ **DONE, `750c751`, AND THE MEASUREMENT IS THE INTERESTING PART.** At 375 on
+`/nola/` the row is **323 px** and its eight children need **523.4 px**, of
+which **272.9 px is five controls and 218.5 px is three reserved readout cells**
+holding their widest possible reading while empty. **So the thing that did not
+fit was invisible.**
+**The row is two ends in two boxes now**, `.kpad-grp-start` and `.kpad-grp-end`
+under `justify-content: space-between`, and the auto margin is gone. A flex line
+hands its free space to the auto margins ON THAT LINE, so the wrapped line
+right-aligned itself exactly the way the full one did.
+🔴 **THE PREVIOUS REPAIR IS KEPT AND MOVED ONE ELEMENT OUT, NOT UNDONE.** Its
+principle was *the builder marks the group and the CSS does not infer it*, and a
+group in a box of its own states that harder. Adding or REMOVING a control is
+still no CSS at all, which the Loop gate needed and the classes could not have
+done. `.kpad-tight` is deleted rather than left matching nothing. **`.kpad-right`
+STAYS because `/dump/` uses it** on a lone `Clear`; measured there at 984.0
+against 984.0, unmoved, and `/dump/` is 25/25.
+**MEASURED after, in the ordinary state: one line, left edge 26.0, `Panic`'s
+right edge 349.0 against the row's own 349.0**, 304.4 px in 323.
+⚠️ **WHAT MADE IT FIT IS THE TEMPO AND RATIO CELLS LEAVING WITH `Loop`**, which
+is the Loop gate's mechanism. They are readouts ABOUT the loop and can say
+nothing while there is no control to start one.
+🔴 **AND IT IS NOT FINISHED: WITH THE EVOLUTION PLUGGED IN THE ROW STILL WRAPS
+BY 200.4 px.** Carried as its own Open entry at the head of this file.
 
 ASKED, VERBATIM, with a screenshot: *"keyboard lower bittons (+- panic etc) go
 to the same line"*. The picture shows the octave pair and its `0` on one line
@@ -295,7 +608,35 @@ goes back to per-control selectors undoes that.
 keyboard draws this row: `nola`, `knobs`, `fau`, `evo`, `looper`, `instrument`
 and `kit`. The assert COUNT on each is the reading afterwards, not the colour.
 
-### Open 2026-09-28: the instrument layout's nameplate on a phone, its own section, centered
+### Done 2026-09-28: the instrument layout's nameplate on a phone, its own section, centered
+
+✅ **DONE, `750c751`, READ AS AN INSTRUCTION AND NOT AS A BUG REPORT**, on the
+grounds that it is parallel in construction to *"keyboard lower bittons go to
+the same line"*, which is plainly one. The owner was told that was the reading
+being built.
+*Below all other sections* was already true at every width. **What is new is the
+centring**, in one `@media (max-width: 560px)` block at the FOOT of `shell.css`.
+**MEASURED at 375 before:** `/muta/` drew `PLAITS` and its `Test tone` hard left
+at x37 with the picker on a second line, and `/tom/` was ALREADY
+`justify-content: center` **and it made no difference**, with `TOM` at x313.5,
+hard right.
+🔴 **THE LOAD BEARING LINE IS THE PLATE GIVING UP `flex: 1 1 auto`.**
+`.pos-rows-r > .panel-plate` makes a plate span its row so `place: 'ends'` has
+something to spread across, and **a spanning box is exactly what makes
+`justify-content: center` a no-op**. Two lines come with it: `column-gap`,
+because a shrunk `ends` plate has no width for `space-between` to spend, and
+`margin-left: 0`, because `place: 'end'` absorbs the free space with an auto
+margin that OUTRANKS the container's justification and would park `/tom/` back
+on the right.
+**MEASURED at 375 after, row centre 187.5: `tom` 187.55, `fau` 187.55, `shape`
+187.50, `muta` 187.50, `knobs` 187.50 on both its clusters.** At 1280 nothing
+moved.
+**The status control centres WITH the name it belongs to**, because it lives
+inside `.pos-ipanel-name`, so `/muta/`'s `Test tone` reads as one block with
+`PLAITS` rather than as a button hanging off a centred word.
+🔴 **NO HARNESS HERE CAN SEE THIS BLOCK.** Carried as its own Open entry at the
+head of this file. `/kit/`'s four plate specimens have zero width on a visit, so
+this is measured on five live panels and not on the gallery.
 
 ASKED, VERBATIM: *"in instrument layout, on mobile the nameplate goes below all
 othe section on its own section and it centered hzontally"*.
