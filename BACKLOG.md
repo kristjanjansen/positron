@@ -1,5 +1,31 @@
 ## Open
 
+### keyboard component: "rm N | D setting from keyboard component"
+
+⚠️ **ASKED, VERBATIM 2026-09-28:** *"finally: rm N | D setting from keyboard
+component"*. File `demo/shell/keyboard.mjs`. NOT STARTED, and deliberately held
+for a few minutes: two page agents are mid-run on `/muta/` and `/knobs/`, and
+`/knobs/` carries a keyboard, so removing a control from the component while a
+page agent is reading its own assert counts would poison their before and after.
+⚠️ Known and non-obvious:
+- It is `letterBtn` and its pair at `keyboard.mjs:848`, `mkName('N', 'letter',
+  ...)` against a degrees button, with `naming` at 480, `noteName` at 481, the
+  API surface at 1809 to 1818 (`naming()`, and a setter), and the `.kn` span
+  each key carries at 507.
+- 🔴 **SEVEN PAGES BUILD A KEYBOARD AND ALL OF THEM MOVE**: `fau`, `instrument`,
+  `evo`, `kit`, `looper`, `knobs`, `nola`. Removing a control moves every other
+  control's harness press on every one of them, which is the count to read
+  afterwards rather than the colour.
+- The component's own comment at 802 argues FOR the pair: *"TWO SEGMENTS RATHER
+  THAN A SWITCH, because neither naming is the"* default, and 466 records that
+  both namings are real and neither is a nickname for the other. That argument
+  is being overruled, so it is kept in words rather than deleted.
+- ⚠️ A related line is already open from 2026-09-25: *"the keyboard's note
+  naming pair reads N and D, not Nt and Dg"*. This removal closes it by deleting
+  its subject, and that should be said there rather than left dangling.
+- ⚠️ `noteName()` still has to answer something once the control is gone, so the
+  decision is which naming survives, not merely which button leaves.
+
 ### muta: "on by default, no online button, put a test tone on that spot"
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"muta: on by default, no online button, put
