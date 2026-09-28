@@ -679,7 +679,7 @@ export const DEMOS = [
    */
   { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
     one: 'a synthesiser you type in, compiled to machine code in this tab '
-       + 'when you press Compile',
+       + 'as the page opens',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
 
   // `able` was a demo and is archived at archive/demos/able-index.html, removed

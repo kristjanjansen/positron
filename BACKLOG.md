@@ -453,7 +453,84 @@ this page. Not started.
 - Removing controls moves every harness press on this page, so the assert
   count is what to read afterwards, not the colour.
 
-### fau: "compile on loading so i can play"
+### Done 2026-09-28: fau, "compile on loading so i can play"
+
+✅ **DONE, AND BOTH RULES HOLD.** The page's one `build()` was split in two.
+`build()` boots libfaust, compiles and stops, leaving the module in a new `ready`
+slot, touching no AudioContext at all. `attach()` is the ONLY thing in the file
+that touches a context, and every caller of it is a gesture. So a visit compiles
+and opens nothing.
+- 🔴 **WHY THIS IS NOT THE `/reel/` DEFECT.** The 6.16 MB of compiler comes off
+  `/fau/vendor/`, four files this repository ships, on this origin. Nothing is
+  asked of anybody else's server. `/reel/` was reaching arhiiv.err.ee, where
+  every connection lands in a public broadcaster's audience figures. No
+  AudioContext, no worklet node and no MIDI request happens until somebody
+  touches the instrument, and the page was NOT given a suspended context at load,
+  because every other sound page here opens one on a gesture and one page
+  departing from that quietly is how a rule stops being a rule.
+- **MEASURED, on loopback on this desk:** first contentful paint **64 ms**,
+  `Faust 2.89.2 in this tab, ready in 54 ms` (three runs: 54, 48, 25),
+  `organ compiled in 65 ms into 7.27 kB of machine code, 262.26 kB a voice, 8
+  voices`, log-stamped at 0.16 s. **The whole instrument is compiled and waiting
+  about 170 ms after the page opens.** The readout carries `compile 41 ms`,
+  `source 0.77 kB`, `machine code 7.27 kB`, `per voice 262.26 kB` before anybody
+  has pressed anything, where it used to be four empty cells until you found the
+  Compile button.
+- **THE FREEZE, MEASURED RATHER THAN GUESSED: 239 frames in the first 4 s, worst
+  gaps 48.4, 40.6, 28.2, 17.7, 17.6 ms.** So the worst single stall is about 48
+  ms, three dropped frames, once, and it lands AFTER first paint, so the page is
+  on screen and readable through it. ⚠️ `PerformanceObserver` `longtask` recorded
+  ZERO entries across a 65 ms synchronous wasm compile even though the type is in
+  `supportedEntryTypes`, so it is blind in headless Chrome here and the frame gap
+  recorder is what answers "did it freeze".
+- **REQUESTS, read off the browser's own record over a 9 s visit with no press
+  rather than off a counter the page keeps: 28 requests, ONE origin, ZERO
+  external, 6,379,006 bytes decoded**, which is exactly this page's `PAGE_BYTES`
+  constant. The page asserts it now, with the count as the negative half, because
+  a page that had loaded nothing would pass "no foreign host" vacuously.
+- **MEASURED: 51/51 with 45 page asserts before, 55/55 with 49 after**, and every
+  one of the four is accounted for: two removed because they claimed a visit
+  fetches no compiler, four added including two negative controls. Three existing
+  asserts changed their sentence because what they claimed stopped being true.
+  ⚠️ The arming assert reads `arming` BEFORE anything in its block calls `arm()`,
+  so a check that armed the audio itself would not pass with both listeners
+  deleted.
+- ⚠️ **A RED WAS SEEN AND WAS NOT THIS CHANGE.** The first run was 54/55 with
+  `every voice the pedal is holding is still sounding` red at `0.25131 held,
+  0.19413 pedalled` against a 0.8 floor, and the harness warned another headless
+  Chrome was running alongside, which was a peer agent's. Re-run ALONE: 55/55,
+  and that assert measured `0.21188 held, 0.25178 pedalled`, the ratio on the
+  other side of 1.
+- **ONE REFINEMENT BEYOND THE LITERAL ASK, because the measurement demanded it:**
+  the first touch ANYWHERE on the instrument panel arms the audio, not only the
+  first key. Clicking into the code, stepping the patch selector, moving the
+  octave or pressing Compile all pay the arming cost, so by the time a finger
+  reaches a key the note is immediate.
+- **THE ONE COST THAT COULD NOT BE REMOVED: 136 ms from the first pointer press
+  to the module being on the audio thread**, which is `new AudioContext()` plus
+  `audioWorklet.addModule()`, paid exactly once. A key press itself is 0.2 ms and
+  compiles nothing.
+- The `what` and the manifest `one` are the same sentence again: *"a synthesiser
+  you type in, compiled to machine code in this tab as the page opens"*. Five
+  other visitor-facing strings moved with the behaviour, including a dead control
+  message that still named a switch deleted on 2026-09-24, two diagram notes, and
+  a self-check refusal line that promised a visitor it was sparing them six
+  megabytes the page now downloads anyway.
+
+⚠️ **THREE THINGS FOUND ON THE WAY, NONE ASKED FOR:** the pedal assert compares
+an RMS ratio against a picked 0.8 floor on a beating eight note cluster and
+measured 0.77 and 1.19 today with no code between the runs, so it wants a measure
+that is not the RMS of a cluster. The four cell readout wraps 3 + 1 at 375 px,
+which is the kit-level "a count is not a width", and it is newly visible because
+those cells used to be empty on a visit. And `longtask` being blind in headless
+is worth knowing before anybody else reaches for it.
+
+⚠️ **NOT SETTLED:** every number is loopback on this desk, where the log reports
+`6.38 MB of that crossed the wire, so whatever served it did not compress it`.
+Cloudflare brotlis that file, so a real visit should move far fewer bytes, and
+the page prints the answer in its own log on any origin. A phone has not been
+measured, and the Organ compiling in 65 ms here will be several times slower
+there.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"compile on loading so i can play"*.
 Slug `fau`, file `demo/fau/index.html` (and whatever of `demo/fau/vendor/`
