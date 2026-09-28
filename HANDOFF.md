@@ -26,12 +26,17 @@ as success: the build then runs against the OLD commit and the deploy ships it
 again. That happened once today and was caught only by reading the BUILD stamp
 against the commit it claimed to be.
 
-## What was asked and what it is now, thirteen requests
+## What was asked and what it is now, fourteen requests
 
 Asked as a stream over one afternoon, collected into `BACKLOG.md` verbatim as
 they arrived and worked second, which is the standing rule. Every one is struck
 off. One agent per page, one agent for anything shared, and the session made
 every commit.
+
+⚠️ **THIS HEADING READ `thirteen` UNTIL THE LAST ONE LANDED.** It was thirteen
+done and one held, which was true when it was written, and the keyboard's
+`N \| D` is the fourteenth. The rows below outnumber the asks because four pages
+were asked about twice.
 
 | ask | where it is now |
 | --- | --- |
@@ -50,9 +55,10 @@ every commit.
 | tom: apply the instrument panel | https://positron.studio/tom/ |
 | dump: all buttons secondary | https://positron.studio/dump/ |
 | hide grains from the index | card gone, page still 200 |
+| keyboard: rm the `N \| D` setting | done last, on the owner's ordering, see below |
 
-**The one line still open from the stream is the keyboard's `N | D` pair**, and
-it is open on the owner's own ordering: *"N D can be last"*. See below.
+**EVERY LINE OF THE STREAM IS STRUCK OFF.** The last of them was the keyboard's
+`N | D` pair, held to the end on the owner's own ordering: *"N D can be last"*.
 
 ## The assert counts, which are the reading rather than the colour
 
@@ -140,14 +146,32 @@ under it is not evidence.
 
 ## Open in `BACKLOG.md`, the ones this session put there
 
-- **`keyboard component`: "rm N | D setting from keyboard component"**, and
-  *"N D can be last"*. NOT STARTED. `keyboard.mjs:848` is `letterBtn` and its
-  pair, with `naming` at 480, `noteName` at 481 and the API at 1809 to 1818.
-  🔴 **SEVEN PAGES BUILD A KEYBOARD AND ALL OF THEM MOVE**: `fau`, `instrument`,
-  `evo`, `kit`, `looper`, `knobs`, `nola`. ⚠️ And `noteName()` still has to
-  answer something once the control is gone, so the decision is WHICH NAMING
-  SURVIVES, not merely which button leaves. It also closes a 2026-09-25 line by
-  deleting its subject.
+- ✅ **`keyboard component`: "rm N | D setting from keyboard component" IS DONE**,
+  and this bullet is kept because it said three things and only one of them was
+  right. **The naming that survives is the NOTE NAME**, and the whole degree path
+  went with the button rather than being pinned, because GREPPING first showed
+  that nothing outside `keyboard.mjs` had ever called `setNaming`,
+  `nameButtons`, `naming()`, `setTonic` or `tonic()`, so it was a branch that
+  could never be taken. **The assert counts did not move on any of the seven
+  pages** (`looper` 8, `instrument` 10, `evo` 58, `nola` 100, `fau` 50, `knobs`
+  34, `kit` 235 page asserts, 544 in the set both times).
+  🔴 **AND THE WARNING IN THIS BULLET WAS WRONG: THE HARNESS PRESS ORDER WAS
+  NEVER AT RISK.** `demo/verify.mjs:830` presses `.pos-controls button, .tbar-x`
+  and the whole pad lives inside the keyboard's own box, so the rule about a
+  control moving every other control's press had no subject here. **What DID
+  break is what nobody had written down: two pages named the control in a
+  selector.** `/nola/` read `.kpad-names button` as the first control on the pad
+  row and `inkLeft(null)` would have thrown, taking that assert and every one
+  after it out of the page in silence; `/kit/` spread the same class into a list
+  of left edges, where losing it narrows the assert instead of failing it, which
+  is worse. **A shared control's name lives in pages as well as in the
+  component, and only one of those two ways of naming it fails loudly.**
+  ⚠️ **AND THE OBVIOUS REPAIR ON `/nola/` WAS WRONG TOO**: pointed one control
+  along at `.kpad-oct button` it read x53.08 against the plate's x54.00 and went
+  red, because `.step button.ico` is `padding: 0` and centres a glyph, so its ink
+  is wherever the glyph's advance puts it. The inset is read off a button with a
+  WORD in it now and applied to the row's left edge. MEASURED after: **x54.00
+  against x54.00**. `BACKLOG.md` has all of it.
 - **`control-grid`: the pitch is 84 and the lattice steps 94.** `size()` calls
   `pitchFor(w, h, 0)` with the gap zeroed and sets `gap` separately, so
   `--cg-pitch` and `grid.pitch()` both report 84 while the lattice steps 94. The

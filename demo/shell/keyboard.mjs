@@ -403,7 +403,6 @@ export function createKeyboard(host, {
   loops: wantLoops = 1,
   /** where this component says what its loop is doing. `d.log`, normally. */
   log = null,
-  names: wantNames = true,
   /** name the chord being held, in the footer. See the block beside it. */
   chord: wantChord = true,
   /**
@@ -460,27 +459,22 @@ export function createKeyboard(host, {
      `unicode-range` is for. */
   const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
   /**
-   * 🔴 THE OTHER WAY OF NAMING A KEY, ASKED FOR 2026-09-23: *"add small
-   * radiobutton [C | 1th] (correc?) to swich CDE 123 markup (not sure on this
-   * theouri)"*. The uncertainty in the ask is fair and the answer is that both
-   * namings are real and neither is a nickname for the other: `C` is the note,
-   * an absolute pitch; `1` is the DEGREE, which says what that note does in a
-   * key and is the same language the roman numerals over a chord are in.
-   * ⚠️ SO A DEGREE NEEDS A TONIC AND A LETTER DOES NOT. Without one there is
-   * nothing to be the first of, and the default is the keyboard's own leftmost
-   * pitch class, which on every page here is a C.
-   * ⚠️ AND IT CARRIES NO OCTAVE NUMBER. `1` is a role rather than a place, and
-   * `1₃` would be two answers to one question in five characters.
+   * 🔴 A KEY IS NAMED AS A NOTE, AND SINCE 2026-09-28 THERE IS NO SECOND
+   * NAMING TO CHOOSE. Instructed: *"finally: rm N | D setting from keyboard
+   * component"*. What stood here was a second table, `1 ♭2 2 ♭3 …`, naming each
+   * key as a SCALE DEGREE against a tonic, with a segmented pair on the pad to
+   * switch between the two. The argument for that pair is kept beside the pad,
+   * where the control was, because it was overruled rather than answered.
+   * 🔴 AND THE NOTE NAME IS WHAT SURVIVES, WHICH IS THE DECISION THE ASK DID
+   * NOT MAKE. It was the default every page has ever opened on; it is an
+   * absolute pitch, so nothing has to be told to it before it is right; and the
+   * degree naming needed a tonic that NOT ONE CALLER EVER SET, which was
+   * checked rather than assumed. `setTonic` was documented in this file as the
+   * thing `/nola/` would use and `/nola/` never called it, so a keyboard left
+   * to guess called its own leftmost key the tonic, which is right in C and
+   * wrong in every other key anybody plays in.
    */
-  /* ⚠️ `♭`, NOT `b`. The flat sign is the notation and the letter is a
-     transcription of it that a keyboard happens to have; the mono face has it,
-     and `b2` beside a row of note names containing a B is genuinely ambiguous. */
-  const DEGREES = ['1', '♭2', '2', '♭3', '3', '4', '♭5', '5', '♭6', '6', '♭7', '7'];
-  let tonic = ((base % 12) + 12) % 12;
-  let naming = 'letter';
-  const noteName = (n) => (naming === 'degree'
-    ? DEGREES[(((n - tonic) % 12) + 12) % 12]
-    : `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`);
+  const noteName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
   /**
    * 🔴 A DOT WHERE THE LETTER USED TO BE, AND THE KEY'S BACKGROUND NO LONGER
    * MOVES AT ALL. Asked 2026-09-23: *"do not change bg colors. do colored dots
@@ -799,63 +793,38 @@ export function createKeyboard(host, {
   // controls drift into looking like two kinds of thing; shell.css only
   // changes the SIZE here.
   /**
-   * 🔴 TWO SEGMENTS RATHER THAN A SWITCH, because neither naming is the
-   * absence of the other. A switch says on or off, and `C` is not `1` turned
-   * off. It wears `.step`, which is the stepper's segmented geometry, for the
-   * reason the octave pair beside it does: copying four rules at a new height
-   * is how two controls drift into looking like two kinds of thing.
-   * ⚠️ IT IS DRAWN ONLY WITH THE PAD, so a chord chart does not grow a control
-   * nobody can use, which is the same rule the pad itself follows.
+   * 🔴 THE NAMING PAIR IS GONE FROM THIS ROW, AND ITS ARGUMENT IS KEPT HERE
+   * BECAUSE IT WAS OVERRULED RATHER THAN ANSWERED. Instructed 2026-09-28:
+   * *"finally: rm N | D setting from keyboard component"*, and then, on being
+   * told it was being held while two page agents were mid-run on pages that
+   * carry a keyboard: *"N D can be last"*. The ordering was the owner's too.
+   *
+   * WHAT STOOD HERE: two segments, `N` and `D`, relabelling every key as a note
+   * name or as a scale degree. TWO SEGMENTS RATHER THAN A SWITCH, because
+   * neither naming is the absence of the other and `C` is not `1` turned off.
+   * It wore `.step`, the stepper's segmented geometry, for the reason the
+   * octave pair beside it still does: copying four rules at a new height is how
+   * two controls drift into looking like two kinds of thing. And it was drawn
+   * only with the pad, so a chord chart could not grow a control nobody can
+   * use.
+   * 🔴 THE LABEL WAS SPELLED FIVE TIMES AND EVERY SPELLING IS KEPT, BECAUSE
+   * THE ARGUMENT MOVED RATHER THAN BEING WON: *"c | 1 - someting more
+   * descriptive?"*, then `C D E | 1 2 3`, then *"Notes | Degrees"* on
+   * 2026-09-23, then *"keyboard component: Notes | Degreens -> Nt | Dg."* on
+   * 2026-09-25, then *"Nt | Dg to N | D in keyboard"* the same day. MEASURED on
+   * `/nola/` at 1280 px, the same segmented row built as words and shortened:
+   * **118.48 px against 65.50**. The sixth spelling is no control at all, and
+   * 65.50 px is what this row stops spending.
+   * ⚠️ AND THE ACCESSIBILITY ARGUMENT IS WHY THE PAIR WAS DEFENSIBLE AT ONE
+   * LETTER RATHER THAN CHEAP: `N` and `D` are not self explanatory, so each
+   * button carried a `title` naming the naming in full and an `aria-label` that
+   * made the accessible NAME the words, because a `title` is a description and
+   * a screen reader would otherwise have announced *"N, pressed"*.
+   * ⚠️ WHAT A READER CAN CHECK IS THE ROW, AND ONE PAGE NAMED THIS CONTROL IN
+   * A SELECTOR. `/nola/` measures its own nameplate's ink against the FIRST
+   * control on this row, which is the octave pair now; it read `.kpad-names
+   * button` and would have thrown on `null` the moment this left.
    */
-  const nameSeg = make('span', 'step pos-seg kpad-names');
-  /* ⚠️ THE ACCESSIBLE NAME IS THE FULL PHRASE AND THE VISIBLE ONE IS A LETTER.
-     `N` and `D` are not self explanatory, and `positron-ui` bans a control whose
-     label is this project's private vocabulary with nothing a reader can look
-     up. A `title` is a DESCRIPTION rather than a name, so a screen reader would
-     have announced *"N, pressed"*; `aria-label` makes the name the words. */
-  const mkName = (text, mode, title, aria) => {
-    const b = make('button', '', text, { type: 'button', title });
-    b.setAttribute('aria-label', aria);
-    b.onclick = () => api.setNaming(mode);
-    nameSeg.append(b);
-    return b;
-  };
-  /* 🔴 THE FOURTH SPELLING OF ONE LABEL, AND THE THREE BEFORE IT ARE KEPT
-     BECAUSE THE ARGUMENT MOVED RATHER THAN BEING WON. Asked in this order:
-     *"c | 1 - someting more descriptive?"*, then `C D E | 1 2 3`, then
-     *"Notes | Degrees"* on 2026-09-23, then *"keyboard component: Notes |
-     Degreens -> Nt | Dg."* on 2026-09-25, then *"Nt | Dg to N | D in
-     keyboard"* the same day. **FIVE spellings, and each one is kept because the
-     argument moved rather than being won.**
-     🔴 AND THE COMMENT THAT STOOD HERE UNTIL TODAY ARGUED THE OPPOSITE IN
-     WRITING, so it is replaced rather than left to contradict the code. It
-     said *"a word a reader can look up beats a demonstration they have to
-     decode"*, which was the right answer to the question it was asked: `C D E`
-     against `1 2 3` DEMONSTRATES the two namings and names neither, so a
-     reader has to work out what the row is offering. `Nt` and `Dg` are not
-     that. They are the words themselves, shortened, so the thing a reader
-     looks up is still a word and it is still the right one.
-     ✅ WHAT BUYS IT IS THE ROW. This footer holds a naming pair, an octave
-     pair, a displacement, a chord name and three buttons, and `Notes` plus
-     `Degrees` is twelve characters of it for a control nobody presses twice a
-     session. MEASURED on `/nola/` at 1280 px, the same segmented row built both
-     ways in the same pad: **118.48 px against 65.50**, so the row gets 52.98 px
-     back, which is most of what the chord cell beside it costs.
-     ⚠️ AND THE `title` IS NOT WHAT IS BEING SHORTENED. It is the sentence a
-     reader looks up when an abbreviation does not tell them enough, so it
-     stays exactly as it was and carries the meaning the label gives up. That
-     is the whole reason this is a shortening rather than a loss. */
-  const letterBtn = mkName('N', 'letter',
-    'name the keys as notes, which do not move', 'note names');
-  const degreeBtn = mkName('D', 'degree',
-    'name the keys as scale degrees, which move with the key', 'scale degrees');
-  const paintNaming = () => {
-    for (const [b, mode] of [[letterBtn, 'letter'], [degreeBtn, 'degree']]) {
-      if (naming === mode) b.dataset.on = '1'; else delete b.dataset.on;
-      b.setAttribute('aria-pressed', naming === mode ? 'true' : 'false');
-    }
-  };
-  paintNaming();
 
   const octPair = make('span', 'step pos-seg kpad-oct');
   /* 🔴 SHIFT MOVES ONE SEMITONE, AND THE PICTURE DOES NOT CHANGE SHAPE.
@@ -877,15 +846,16 @@ export function createKeyboard(host, {
   };
   const downBtn = mkOct('−', 'down one octave (z), or one semitone with shift', -12);
   const upBtn = mkOct('+', 'up one octave (x), or one semitone with shift', 12);
-  /* ⚠️ THE NAMING COMES FIRST: *"change order of c|1 and +-"*, 2026-09-23. It
-     says what the keys are CALLED, and the pair after it says where they are,
-     so the row reads in the order somebody needs it.
-     🔴 AND IT IS BUILT ABOVE, NOT HERE. Appending it before its own `const` was
-     a temporal dead zone that threw on every keyboard page at once, reported in
-     four words: *"Cannot access 'nameSeg' before initialization"*. Third one
-     today, and the shape is always the same: a declaration shadows its whole
-     block from the top, and moving an APPEND is enough to open one. */
-  if (wantNames) pad.append(nameSeg);
+  /* ⚠️ THE OCTAVE PAIR IS THE FIRST THING ON THIS ROW SINCE 2026-09-28, AND
+     IT WAS SECOND FOR FIVE DAYS. The naming pair came first on *"change order
+     of c|1 and +-"*, 2026-09-23, because what the keys are CALLED reads before
+     where they are, and it is what left.
+     🔴 AND WHATEVER IS APPENDED HERE IS BUILT ABOVE, NOT HERE. Appending the
+     naming pair before its own `const` was a temporal dead zone that threw on
+     every keyboard page at once, reported in four words: *"Cannot access
+     'nameSeg' before initialization"*. The shape is always the same: a
+     declaration shadows its whole block from the top, and moving an APPEND is
+     enough to open one. */
   pad.append(octPair);
   /**
    * 🔴 HOW FAR FROM HOME, WHICH AMENDS THIS FILE'S OWN RULE AND IS NOT THE
@@ -1806,30 +1776,13 @@ export function createKeyboard(host, {
     taped: (i = 0) => (takes[i]?.tape ? takes[i].tape.length : 0),
     /** how far this keyboard has moved from where it was built, in semitones */
     displacement: () => base - HOME,
-    /** the naming control's two buttons, in the order they are drawn */
-    nameButtons: [letterBtn, degreeBtn],
-    /** `letter` or `degree`. Relabels every key; nothing else moves. */
-    setNaming(mode) {
-      naming = mode === 'degree' ? 'degree' : 'letter';
-      paintNaming();
-      for (const k of keys) label(els.get(k), k);
-      return naming;
-    },
-    naming: () => naming,
-    /**
-     * Which pitch class is `1`.
-     *
-     * ⚠️ A PAGE THAT KNOWS THE KEY SHOULD SAY SO. `/nola/` reads one off the
-     * first chord in its line and prints it in the log; a keyboard left to
-     * guess calls its own leftmost key the tonic, which is right until somebody
-     * plays in anything but C.
-     */
-    setTonic(pc) {
-      tonic = (((pc | 0) % 12) + 12) % 12;
-      for (const k of keys) label(els.get(k), k);
-      return tonic;
-    },
-    tonic: () => tonic,
+    /* ⚠️ `nameButtons`, `setNaming`, `naming`, `setTonic` AND `tonic` STOOD
+       HERE AND LEFT WITH THE `N | D` PAIR ON 2026-09-28. Nothing outside this
+       file called any of the five, which was GREPPED rather than assumed, and
+       `setTonic` is the one worth naming: its own comment said `/nola/` reads a
+       key off the first chord in its line and should say so, and `/nola/` never
+       did. A setter nobody calls is what made the degree naming a branch that
+       could only ever be right in C. See the pad. */
     noteOf, keyOf, press, release,
     get base() { return base; },
     /**

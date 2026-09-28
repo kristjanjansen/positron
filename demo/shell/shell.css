@@ -4167,16 +4167,14 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .kpad-right { margin-left: auto; }
 .kpad-tight { margin-left: -4px; }
 
-/* the two note namings, `C` or `1`, in the pad's own segmented geometry */
-/* ⚠️ NO PADDING HERE, AND THERE WAS ONE UNTIL 2026-09-25 THAT HAD NEVER
-   APPLIED. It read `padding: 0 8px`, and `.kpad button` sixty lines below is the
-   same weight, (0,1,1) against (0,1,1), so the later rule won every time and the
-   computed value has always been 9 px. MEASURED before removing it: 9px, and the
-   buttons 26.63 px each either way. A dead declaration beside a token saying the
-   same thing is the drift this round was asked to stop. */
-.kpad-names button { width: auto; font-size: 10.5px;
-                     font-family: 'positron-accidentals', var(--mono); }
-.kpad-names button[data-on] { color: var(--fg); background: var(--line); }
+/* 🔴 `.kpad-names` STOOD HERE AND WENT WITH THE `N | D` PAIR ON 2026-09-28,
+   asked for as *"finally: rm N | D setting from keyboard component"*. Two rules,
+   deleted rather than left to match nothing: a stylesheet rule for an element no
+   component builds any more is this project's dead rule, which reads as correct
+   and is the second most expensive kind of defect here.
+   ⚠️ AND THE ACCIDENTALS FACE STAYS, because `.k .kn` and `.kpad-chord` use
+   it for `♯` and `♭` in note and chord names. It was the degree table's `♭2`
+   that needed it here and nothing else. */
 
 .kpad-at {
   min-width: 3.2em; font: 500 11px/1 var(--mono); color: var(--dim);

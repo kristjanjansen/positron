@@ -133,33 +133,66 @@ taste:
 - ⚠️ **FOUR GOOD ROWS BEAT SIX WITH TWO EDITS IN IT**, and the agent was told
   that shipping four is a real answer rather than a failure.
 
-### keyboard component: "rm N | D setting from keyboard component"
+### Done 2026-09-28: keyboard component, "rm N | D setting from keyboard component"
 
-⚠️ **ASKED, VERBATIM 2026-09-28:** *"finally: rm N | D setting from keyboard
-component"*, and then, when told it was being held: *"N D can be last"*. So the
-ordering is the owner's and not an excuse. File `demo/shell/keyboard.mjs`. NOT
-STARTED, and held
-for a few minutes: two page agents are mid-run on `/muta/` and `/knobs/`, and
-`/knobs/` carries a keyboard, so removing a control from the component while a
-page agent is reading its own assert counts would poison their before and after.
-⚠️ Known and non-obvious:
-- It is `letterBtn` and its pair at `keyboard.mjs:848`, `mkName('N', 'letter',
-  ...)` against a degrees button, with `naming` at 480, `noteName` at 481, the
-  API surface at 1809 to 1818 (`naming()`, and a setter), and the `.kn` span
-  each key carries at 507.
-- 🔴 **SEVEN PAGES BUILD A KEYBOARD AND ALL OF THEM MOVE**: `fau`, `instrument`,
-  `evo`, `kit`, `looper`, `knobs`, `nola`. Removing a control moves every other
-  control's harness press on every one of them, which is the count to read
-  afterwards rather than the colour.
-- The component's own comment at 802 argues FOR the pair: *"TWO SEGMENTS RATHER
-  THAN A SWITCH, because neither naming is the"* default, and 466 records that
-  both namings are real and neither is a nickname for the other. That argument
-  is being overruled, so it is kept in words rather than deleted.
-- ⚠️ A related line is already open from 2026-09-25: *"the keyboard's note
-  naming pair reads N and D, not Nt and Dg"*. This removal closes it by deleting
-  its subject, and that should be said there rather than left dangling.
-- ⚠️ `noteName()` still has to answer something once the control is gone, so the
-  decision is which naming survives, not merely which button leaves.
+✅ **DONE, AND THE NAMING THAT SURVIVES IS THE NOTE NAME.** Asked, verbatim:
+*"finally: rm N | D setting from keyboard component"*, and then, when told it
+was being held while two page agents were mid-run: *"N D can be last"*, so the
+ordering was the owner's as well. `demo/shell/keyboard.mjs`, `shell.css`,
+`/kit/` and `/nola/`.
+- **WHAT LEFT:** the two segments and their factory, `DEGREES`, `tonic`,
+  `naming`, `paintNaming`, the `names:` option, and five entries off the API,
+  `nameButtons`, `setNaming`, `naming`, `setTonic` and `tonic`. `noteName` is
+  one expression now. Two `shell.css` rules went with it, deleted rather than
+  left to match nothing.
+- 🔴 **THE DEGREE PATH WENT WITH THE BUTTON RATHER THAN BEING PINNED, AND THE
+  REASON IS MEASURED: NOT ONE CALLER EVER SET A TONIC.** GREPPED across the
+  repository before deciding: nothing outside `keyboard.mjs` called `setNaming`,
+  `nameButtons`, `naming()`, `setTonic` or `tonic()`, and `setTonic`'s own
+  comment named `/nola/` as the page that would use it. So the degree naming was
+  reachable only from the control being deleted, and keeping it would have left
+  a branch that can never be taken, which is `/muta/`'s `plaitsOn` flag one
+  component along.
+- ✅ **THE ASSERT COUNTS DID NOT MOVE, ON ANY OF THE SEVEN PAGES.** MEASURED
+  before and after, page asserts: `looper` 8, `instrument` 10, `evo` 58, `nola`
+  100, `fau` 50, `knobs` 34, `kit` 235. Whole set **544 asserts both times**,
+  542/544 before and 541/544 on the first run after, and the difference is the
+  one red below. `knobs`'s two standing reds are its own and are unchanged.
+- ⚠️ **AND THE HARNESS PRESS ORDER WAS NEVER AT RISK, WHICH THIS ENTRY GOT
+  WRONG WHEN IT WAS WRITTEN.** It said in red that removing a control moves
+  every other control's harness press on all seven pages. It does not:
+  `demo/verify.mjs` presses `.pos-controls button, .tbar-x`, and the whole pad
+  lives inside the keyboard's own box. CHECKED at `verify.mjs:830` rather than
+  assumed. The rule is real and this control was not its subject.
+- 🔴 **ONE PAGE WENT RED AND IT IS THE INTERESTING HALF: `/nola/` NAMED THE
+  CONTROL IN A SELECTOR, AND MOVING THE SELECTOR ONE CONTROL ALONG WAS THE
+  WRONG REPAIR.** That page reads its own nameplate's letter against the first
+  control on the pad row, as `inkLeft(...querySelector('.kpad-names button'))`.
+  A gone control answers `null` and `inkLeft(null)` THROWS, which would have
+  taken that assert and every one after it out of the page in silence. Pointed
+  at `.kpad-oct button` instead it read **x53.08 against the plate's x54.00** and
+  went red at a tolerance of 0.6, because `.step button.ico` is `padding: 0` and
+  a fixed square, so the octave button CENTRES a glyph and its ink lands
+  wherever that glyph's advance puts it. The naming pair had passed for five days
+  because it was `width: auto` over `.kpad button`'s `0 var(--kpad-pad)`, so its
+  letter sat at exactly the inset the claim is about. **An alignment that holds
+  by one glyph's width is luck.**
+  ✅ **THE REPAIR READS THE INSET OFF A BUTTON WITH A WORD IN IT** (its ink minus
+  its own border box) and applies it to the pad ROW's left edge, which is ink
+  against ink in the quantity the claim is about and survives any reordering of
+  the row. MEASURED after: **x54.00 against x54.00**, the row starting at x44.00
+  plus the 10.00 px `Loop` sits inside its own box.
+  ⚠️ **`/kit/` NAMED IT TOO AND WOULD NOT HAVE THROWN, WHICH IS WORSE.** Its
+  chord-cell assert spreads `querySelectorAll('.kpad-names, .kpad-at')` into a
+  list of left edges, so losing one quietly narrowed what the assert watches
+  instead of failing. Repointed at `.kpad-oct`.
+- ✅ **AND TWO OLDER LINES ARE CLOSED BY DELETING THEIR SUBJECT**: the 2026-09-25
+  *"Nt | Dg to N | D in keyboard"* line, and ask 3 of the three-ask `/knobs/`
+  section. Both say so in place.
+- ⚠️ **THE ARGUMENT FOR THE PAIR IS KEPT IN WORDS, AT THE PAD, BECAUSE IT WAS
+  OVERRULED RATHER THAN ANSWERED**, together with all five spellings of its
+  label and the 118.48 px against 65.50 px measurement that bought the shortest
+  one.
 
 ### Done 2026-09-28: muta, "on by default, no online button, put a test tone on that spot"
 
@@ -2490,7 +2523,14 @@ recomputes the implementation proves nothing.
 that file’s own stated division and is also how this can be worked while another
 agent holds `keyboard.mjs`.
 
-### Open 2026-09-25: the keyboard’s note naming pair reads N and D, not Nt and Dg
+### Closed 2026-09-28 by deleting its subject: the keyboard’s note naming pair reads N and D, not Nt and Dg
+
+🔴 **THE PAIR IS GONE FROM THE COMPONENT SINCE 2026-09-28** on *"finally: rm
+N | D setting from keyboard component"*, so this line has nothing left to
+rename. It was DONE first, as `N | D`, and lived that way for five days. Kept
+rather than struck out, because the section under it is the width and hover
+reasoning a one letter control needed, and the page that paid for that lesson
+still exists. See the `Done 2026-09-28` entry at the top of this file.
 
 ⚠️ **ASKED, VERBATIM:** *"Nt | Dg to N | D in keyboard"*. The naming pair in
 the keyboard’s own footer.
@@ -3302,7 +3342,11 @@ rotaries.
 midi` and should read `Enable midi`. ⚠️ A peer deployed a *"no uppercase on
 buttons, site wide"* rule, so this is sentence case and NOT a return to caps.
 
-**3. ASKED, VERBATIM:** *"Nt|Dg -> N|D"*. 🔴 **THIS IS
+**3. ASKED, VERBATIM:** *"Nt|Dg -> N|D"*. ✅ **DONE, AND THEN THE WHOLE
+CONTROL WAS REMOVED ON 2026-09-28**, on *"finally: rm N | D setting from keyboard
+component"*, so there is no label left to spell. The 118.48 px against 65.50 px
+below is the measurement that is still being quoted, and the row now gets that
+65.50 px back. 🔴 **THIS IS
 `demo/shell/keyboard.mjs` AND IT REACHES TEN PAGES**: `fau`, `dump`, `evo`,
 `instrument`, `knobs`, `kit`, `looper`, `nola`, `radio`, plus `chords.mjs` and
 `roll.mjs`. **It is the FIFTH spelling of that label** and the file records the
