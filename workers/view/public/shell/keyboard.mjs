@@ -403,7 +403,6 @@ export function createKeyboard(host, {
   loops: wantLoops = 1,
   /** where this component says what its loop is doing. `d.log`, normally. */
   log = null,
-  names: wantNames = true,
   /** name the chord being held, in the footer. See the block beside it. */
   chord: wantChord = true,
   /**
@@ -460,27 +459,22 @@ export function createKeyboard(host, {
      `unicode-range` is for. */
   const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
   /**
-   * 🔴 THE OTHER WAY OF NAMING A KEY, ASKED FOR 2026-09-23: *"add small
-   * radiobutton [C | 1th] (correc?) to swich CDE 123 markup (not sure on this
-   * theouri)"*. The uncertainty in the ask is fair and the answer is that both
-   * namings are real and neither is a nickname for the other: `C` is the note,
-   * an absolute pitch; `1` is the DEGREE, which says what that note does in a
-   * key and is the same language the roman numerals over a chord are in.
-   * ⚠️ SO A DEGREE NEEDS A TONIC AND A LETTER DOES NOT. Without one there is
-   * nothing to be the first of, and the default is the keyboard's own leftmost
-   * pitch class, which on every page here is a C.
-   * ⚠️ AND IT CARRIES NO OCTAVE NUMBER. `1` is a role rather than a place, and
-   * `1₃` would be two answers to one question in five characters.
+   * 🔴 A KEY IS NAMED AS A NOTE, AND SINCE 2026-09-28 THERE IS NO SECOND
+   * NAMING TO CHOOSE. Instructed: *"finally: rm N | D setting from keyboard
+   * component"*. What stood here was a second table, `1 ♭2 2 ♭3 …`, naming each
+   * key as a SCALE DEGREE against a tonic, with a segmented pair on the pad to
+   * switch between the two. The argument for that pair is kept beside the pad,
+   * where the control was, because it was overruled rather than answered.
+   * 🔴 AND THE NOTE NAME IS WHAT SURVIVES, WHICH IS THE DECISION THE ASK DID
+   * NOT MAKE. It was the default every page has ever opened on; it is an
+   * absolute pitch, so nothing has to be told to it before it is right; and the
+   * degree naming needed a tonic that NOT ONE CALLER EVER SET, which was
+   * checked rather than assumed. `setTonic` was documented in this file as the
+   * thing `/nola/` would use and `/nola/` never called it, so a keyboard left
+   * to guess called its own leftmost key the tonic, which is right in C and
+   * wrong in every other key anybody plays in.
    */
-  /* ⚠️ `♭`, NOT `b`. The flat sign is the notation and the letter is a
-     transcription of it that a keyboard happens to have; the mono face has it,
-     and `b2` beside a row of note names containing a B is genuinely ambiguous. */
-  const DEGREES = ['1', '♭2', '2', '♭3', '3', '4', '♭5', '5', '♭6', '6', '♭7', '7'];
-  let tonic = ((base % 12) + 12) % 12;
-  let naming = 'letter';
-  const noteName = (n) => (naming === 'degree'
-    ? DEGREES[(((n - tonic) % 12) + 12) % 12]
-    : `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`);
+  const noteName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
   /**
    * 🔴 A DOT WHERE THE LETTER USED TO BE, AND THE KEY'S BACKGROUND NO LONGER
    * MOVES AT ALL. Asked 2026-09-23: *"do not change bg colors. do colored dots
@@ -791,6 +785,39 @@ export function createKeyboard(host, {
    * exists, which is the thing `/keys/` did before this component was written.
    */
   const pad = make('div', 'kpad');
+  /**
+   * 🔴 THE ROW IS TWO ENDS IN TWO BOXES SINCE 2026-09-28, AND THAT IS WHAT
+   * MAKES IT WRAP WITHOUT STRANDING ANYTHING. Reported at phone width:
+   * *"keyboard lower bittons (+- panic etc) go to the same line"*, off a crop
+   * of `/nola/` with the octave pair on one line and `Loop Sustain Panic`
+   * pushed to the RIGHT END of a second line under them.
+   *
+   * 🔴 WHAT WAS WRONG WAS THE AUTO MARGIN, NOT THE MARKING. The row used to
+   * put `kpad-right` on the first of the right hand controls and `kpad-tight`
+   * on the rest, and the principle behind that is kept word for word: the
+   * BUILDER says where the groups are and the stylesheet does not infer it. A
+   * `margin-left: auto` can only ever be right on a line with room to spare,
+   * because a flex line hands its free space to the auto margins ON THAT LINE,
+   * so the wrapped line right-aligned itself exactly the way the full one did.
+   * Two boxes and `space-between` say the same thing and survive the wrap,
+   * because `space-between` parks a lone item on a line at the START.
+   *
+   * ⚠️ ADDING A FOURTH CONTROL IS STILL ONE LINE AND NO CSS, which is the
+   * property the old arrangement was built for. So is TAKING ONE AWAY while
+   * the page is open, which `offerLoop` below does and which the classes could
+   * not have done without re-marking whichever control inherited first place.
+   *
+   * ⚠️ AND AT 375 px THE ROW STILL CANNOT HOLD EVERYTHING ON ONE LINE, WHICH IS
+   * MEASURED AND IS NOT WHAT THIS CHANGES. `/nola/`'s row is 323 px there and
+   * its children need 523.4 px: 272.9 px of that is the five controls, and the
+   * other 218.5 px is the three reserved readout cells (`kpad-chord`,
+   * `kpad-tempo`, `kpad-ratio`), which hold their widest reading whether or not
+   * anything is written in them. The controls alone would fit with 50 px to
+   * spare. Putting the readouts on a line of their own is a narrow arrangement
+   * and needs the row's own box to decide it, which is `BACKLOG.md`.
+   */
+  const padStart = make('div', 'kpad-grp kpad-grp-start');
+  const padEnd = make('div', 'kpad-grp kpad-grp-end');
   // ⚠️ IT WEARS `.step`, WHICH IS THE STEPPER'S CLASS, AND THAT IS THE POINT.
   // The segmented geometry — borders overlapped by a pixel so a join is one
   // line, corners rounded only on the outer two, the hovered button raised so
@@ -799,63 +826,38 @@ export function createKeyboard(host, {
   // controls drift into looking like two kinds of thing; shell.css only
   // changes the SIZE here.
   /**
-   * 🔴 TWO SEGMENTS RATHER THAN A SWITCH, because neither naming is the
-   * absence of the other. A switch says on or off, and `C` is not `1` turned
-   * off. It wears `.step`, which is the stepper's segmented geometry, for the
-   * reason the octave pair beside it does: copying four rules at a new height
-   * is how two controls drift into looking like two kinds of thing.
-   * ⚠️ IT IS DRAWN ONLY WITH THE PAD, so a chord chart does not grow a control
-   * nobody can use, which is the same rule the pad itself follows.
+   * 🔴 THE NAMING PAIR IS GONE FROM THIS ROW, AND ITS ARGUMENT IS KEPT HERE
+   * BECAUSE IT WAS OVERRULED RATHER THAN ANSWERED. Instructed 2026-09-28:
+   * *"finally: rm N | D setting from keyboard component"*, and then, on being
+   * told it was being held while two page agents were mid-run on pages that
+   * carry a keyboard: *"N D can be last"*. The ordering was the owner's too.
+   *
+   * WHAT STOOD HERE: two segments, `N` and `D`, relabelling every key as a note
+   * name or as a scale degree. TWO SEGMENTS RATHER THAN A SWITCH, because
+   * neither naming is the absence of the other and `C` is not `1` turned off.
+   * It wore `.step`, the stepper's segmented geometry, for the reason the
+   * octave pair beside it still does: copying four rules at a new height is how
+   * two controls drift into looking like two kinds of thing. And it was drawn
+   * only with the pad, so a chord chart could not grow a control nobody can
+   * use.
+   * 🔴 THE LABEL WAS SPELLED FIVE TIMES AND EVERY SPELLING IS KEPT, BECAUSE
+   * THE ARGUMENT MOVED RATHER THAN BEING WON: *"c | 1 - someting more
+   * descriptive?"*, then `C D E | 1 2 3`, then *"Notes | Degrees"* on
+   * 2026-09-23, then *"keyboard component: Notes | Degreens -> Nt | Dg."* on
+   * 2026-09-25, then *"Nt | Dg to N | D in keyboard"* the same day. MEASURED on
+   * `/nola/` at 1280 px, the same segmented row built as words and shortened:
+   * **118.48 px against 65.50**. The sixth spelling is no control at all, and
+   * 65.50 px is what this row stops spending.
+   * ⚠️ AND THE ACCESSIBILITY ARGUMENT IS WHY THE PAIR WAS DEFENSIBLE AT ONE
+   * LETTER RATHER THAN CHEAP: `N` and `D` are not self explanatory, so each
+   * button carried a `title` naming the naming in full and an `aria-label` that
+   * made the accessible NAME the words, because a `title` is a description and
+   * a screen reader would otherwise have announced *"N, pressed"*.
+   * ⚠️ WHAT A READER CAN CHECK IS THE ROW, AND ONE PAGE NAMED THIS CONTROL IN
+   * A SELECTOR. `/nola/` measures its own nameplate's ink against the FIRST
+   * control on this row, which is the octave pair now; it read `.kpad-names
+   * button` and would have thrown on `null` the moment this left.
    */
-  const nameSeg = make('span', 'step pos-seg kpad-names');
-  /* ⚠️ THE ACCESSIBLE NAME IS THE FULL PHRASE AND THE VISIBLE ONE IS A LETTER.
-     `N` and `D` are not self explanatory, and `positron-ui` bans a control whose
-     label is this project's private vocabulary with nothing a reader can look
-     up. A `title` is a DESCRIPTION rather than a name, so a screen reader would
-     have announced *"N, pressed"*; `aria-label` makes the name the words. */
-  const mkName = (text, mode, title, aria) => {
-    const b = make('button', '', text, { type: 'button', title });
-    b.setAttribute('aria-label', aria);
-    b.onclick = () => api.setNaming(mode);
-    nameSeg.append(b);
-    return b;
-  };
-  /* 🔴 THE FOURTH SPELLING OF ONE LABEL, AND THE THREE BEFORE IT ARE KEPT
-     BECAUSE THE ARGUMENT MOVED RATHER THAN BEING WON. Asked in this order:
-     *"c | 1 - someting more descriptive?"*, then `C D E | 1 2 3`, then
-     *"Notes | Degrees"* on 2026-09-23, then *"keyboard component: Notes |
-     Degreens -> Nt | Dg."* on 2026-09-25, then *"Nt | Dg to N | D in
-     keyboard"* the same day. **FIVE spellings, and each one is kept because the
-     argument moved rather than being won.**
-     🔴 AND THE COMMENT THAT STOOD HERE UNTIL TODAY ARGUED THE OPPOSITE IN
-     WRITING, so it is replaced rather than left to contradict the code. It
-     said *"a word a reader can look up beats a demonstration they have to
-     decode"*, which was the right answer to the question it was asked: `C D E`
-     against `1 2 3` DEMONSTRATES the two namings and names neither, so a
-     reader has to work out what the row is offering. `Nt` and `Dg` are not
-     that. They are the words themselves, shortened, so the thing a reader
-     looks up is still a word and it is still the right one.
-     ✅ WHAT BUYS IT IS THE ROW. This footer holds a naming pair, an octave
-     pair, a displacement, a chord name and three buttons, and `Notes` plus
-     `Degrees` is twelve characters of it for a control nobody presses twice a
-     session. MEASURED on `/nola/` at 1280 px, the same segmented row built both
-     ways in the same pad: **118.48 px against 65.50**, so the row gets 52.98 px
-     back, which is most of what the chord cell beside it costs.
-     ⚠️ AND THE `title` IS NOT WHAT IS BEING SHORTENED. It is the sentence a
-     reader looks up when an abbreviation does not tell them enough, so it
-     stays exactly as it was and carries the meaning the label gives up. That
-     is the whole reason this is a shortening rather than a loss. */
-  const letterBtn = mkName('N', 'letter',
-    'name the keys as notes, which do not move', 'note names');
-  const degreeBtn = mkName('D', 'degree',
-    'name the keys as scale degrees, which move with the key', 'scale degrees');
-  const paintNaming = () => {
-    for (const [b, mode] of [[letterBtn, 'letter'], [degreeBtn, 'degree']]) {
-      if (naming === mode) b.dataset.on = '1'; else delete b.dataset.on;
-      b.setAttribute('aria-pressed', naming === mode ? 'true' : 'false');
-    }
-  };
-  paintNaming();
 
   const octPair = make('span', 'step pos-seg kpad-oct');
   /* 🔴 SHIFT MOVES ONE SEMITONE, AND THE PICTURE DOES NOT CHANGE SHAPE.
@@ -877,16 +879,17 @@ export function createKeyboard(host, {
   };
   const downBtn = mkOct('−', 'down one octave (z), or one semitone with shift', -12);
   const upBtn = mkOct('+', 'up one octave (x), or one semitone with shift', 12);
-  /* ⚠️ THE NAMING COMES FIRST: *"change order of c|1 and +-"*, 2026-09-23. It
-     says what the keys are CALLED, and the pair after it says where they are,
-     so the row reads in the order somebody needs it.
-     🔴 AND IT IS BUILT ABOVE, NOT HERE. Appending it before its own `const` was
-     a temporal dead zone that threw on every keyboard page at once, reported in
-     four words: *"Cannot access 'nameSeg' before initialization"*. Third one
-     today, and the shape is always the same: a declaration shadows its whole
-     block from the top, and moving an APPEND is enough to open one. */
-  if (wantNames) pad.append(nameSeg);
-  pad.append(octPair);
+  /* ⚠️ THE OCTAVE PAIR IS THE FIRST THING ON THIS ROW SINCE 2026-09-28, AND
+     IT WAS SECOND FOR FIVE DAYS. The naming pair came first on *"change order
+     of c|1 and +-"*, 2026-09-23, because what the keys are CALLED reads before
+     where they are, and it is what left.
+     🔴 AND WHATEVER IS APPENDED HERE IS BUILT ABOVE, NOT HERE. Appending the
+     naming pair before its own `const` was a temporal dead zone that threw on
+     every keyboard page at once, reported in four words: *"Cannot access
+     'nameSeg' before initialization"*. The shape is always the same: a
+     declaration shadows its whole block from the top, and moving an APPEND is
+     enough to open one. */
+  padStart.append(octPair);
   /**
    * 🔴 HOW FAR FROM HOME, WHICH AMENDS THIS FILE'S OWN RULE AND IS NOT THE
    * THING THAT RULE REFUSED. The header says there is no octave number on the
@@ -914,7 +917,7 @@ export function createKeyboard(host, {
        measured once, in `video-panel.mjs`'s full screen state. */
     if (d === 0) atEl.dataset.home = '1'; else delete atEl.dataset.home;
   };
-  pad.append(atEl);
+  padStart.append(atEl);
   /**
    * 🔴 WHAT IS BEING HELD, NAMED, TO THE RIGHT OF THE DISPLACEMENT. Asked
    * 2026-09-25: *"add chord name to the footer, right from the transpose
@@ -953,7 +956,7 @@ export function createKeyboard(host, {
   const chordEl = wantChord ? make('span', 'kpad-chord', '') : null;
   if (chordEl) {
     chordEl.style.minWidth = `${CHORD_CH}ch`;
-    pad.append(chordEl);
+    padStart.append(chordEl);
   }
   /**
    * 🔴 TWO MORE CELLS, AND ONLY ON A KEYBOARD THAT LOOPS. Asked 2026-09-25:
@@ -1005,7 +1008,7 @@ export function createKeyboard(host, {
   if (tempoEl) {
     tempoEl.style.minWidth = `${TEMPO_CH}ch`;
     ratioEl.style.minWidth = `${RATIO_CH}ch`;
-    pad.append(tempoEl, ratioEl);
+    padStart.append(tempoEl, ratioEl);
   }
   const panicBtn = make('button', '', 'Panic', {
     type: 'button', title: 'stop every note that is still sounding',
@@ -1066,15 +1069,13 @@ export function createKeyboard(host, {
                      onChange: (on) => onSustain?.(on) })
     : null;
   /* 🔴 THE ROW SAYS WHERE ITS OWN GROUPS ARE, AND THE STYLESHEET NO LONGER
-     GUESSES. The first of these takes the free space and pushes the rest to the
-     right; the others sit tight against it. Adding a fourth control is one more
-     entry in this array and no CSS at all, which is the opposite of what the
-     `margin-left: auto` on every toggle did when `Loop` arrived. */
-  const rightSide = [loopBtn?.el, sustainBtn?.el, panicBtn].filter(Boolean);
-  rightSide.forEach((node, i) => {
-    node.classList.add(i === 0 ? 'kpad-right' : 'kpad-tight');
-    pad.append(node);
-  });
+     GUESSES. These go in the row's far end, in this order, and the box they go
+     in is what pushes them right and what keeps them together when the row
+     wraps. Adding a fourth control is one more entry in this array and no CSS
+     at all, which is the opposite of what the `margin-left: auto` on every
+     toggle did when `Loop` arrived. */
+  padEnd.append(...[loopBtn?.el, sustainBtn?.el, panicBtn].filter(Boolean));
+  pad.append(padStart, padEnd);
   if (wantPad) el.append(pad);
   /* 🔴 THE PAGE'S ROW GOES IN LAST, AND THE COMPONENT OWNS ITS EDGES. The rule
      above it bleeds through `--kbd-pad` to the box's own border and the row's
@@ -1657,6 +1658,79 @@ export function createKeyboard(host, {
 
   function setLoop() { machine.press(0); }
 
+  /**
+   * 🔴 OFFER THE `Loop` CONTROL, OR TAKE IT AWAY. Asked 2026-09-28: *"rm loop
+   * button when evolution keyboad is not connected"*. A keyboard plugged in
+   * after the page opened brings it back and one unplugged takes it away, so
+   * this is a method rather than a build-time flag: `wantLoop` is read once,
+   * and a cable is not a fact that holds still.
+   *
+   * 🔴 THE PAGE DECIDES WHAT `connected` MEANS AND THIS DECIDES WHAT THE ROW
+   * LOOKS LIKE, which is the division this file keeps everywhere else and which
+   * `midi.mjs` states outright: a page owns MIDI. Nothing here asks for a MIDI
+   * port, reads a device name or knows what an Evolution is; it is handed a
+   * boolean. Putting the device test in here would make seven pages request
+   * Web MIDI to draw a keyboard.
+   *
+   * 🔴 AND A LOOP THAT IS SOUNDING IS STOPPED AND KEPT, NEVER CLEARED. The
+   * control is the only way to stop one, so withdrawing it while a loop runs
+   * would leave a phrase going round with nothing that can reach it, and
+   * `Panic` stops notes rather than loops. Clearing would be worse: a take is
+   * something somebody played. So every sounding slot is walked to `stopped`,
+   * which is one press of its own key and keeps its tape, and plugging the
+   * keyboard back in gives the control back with the takes still on it.
+   * ⚠️ `press` THEN `settle` IS ONE IMMEDIATE PRESS. A press is held for
+   * `doubleMs` to find out whether it is half of a double one, and `settle`
+   * runs it now; a clock cannot wait here, because the row has to be right
+   * before the next frame.
+   *
+   * ⚠️ IT IS THE DEFAULT THAT IS SHOWN, so a page that never calls this is
+   * exactly what it was. `/kit/` is that page: its keyboard is a specimen of
+   * the component and has no MIDI at all, and a gallery that hid the control
+   * this component grew most recently would be a gallery nobody can read.
+   *
+   * 🔴 AND THE TEMPO AND RATIO CELLS GO WITH IT, WHICH IS WHAT MAKES THE ROW
+   * FIT A PHONE. Those two are readouts ABOUT the loop and can say nothing at
+   * all while there is no control to start one, so leaving them standing is a
+   * reserved slot outliving its label, which this project has measured once as
+   * 75 px of drift down a five row column on `/circuit/`. MEASURED here: at
+   * 375 px on `/nola/` they are 86.1 px and 59.6 px of the 523.4 px a 323 px
+   * row was being asked to hold, and taking them with the button brings it to
+   * 304.4 px, so `-`, `+`, `0`, `Sustain` and `Panic` land on ONE LINE. That is
+   * the second half of *"keyboard lower bittons (+- panic etc) go to the same
+   * line"*, arriving from the ask next to it.
+   * ⚠️ THEY ARE REMOVED AND RE-APPENDED RATHER THAN HIDDEN, the same way the
+   * button is, because `[hidden]` on an element whose stylesheet rule sets a
+   * `display` is a fact about an attribute rather than about the screen, and
+   * four components here have needed that patch already.
+   *
+   * @param {boolean} present
+   * @returns {boolean} whether the control is now in the row
+   */
+  function offerLoop(present) {
+    if (!loopBtn) return false;
+    const want = !!present;
+    if (want === padEnd.contains(loopBtn.el)) return want;
+    if (want) {
+      padEnd.prepend(loopBtn.el);
+      /* The two cells were appended last, so appending puts them back where
+         they were: after the chord name and before the row's far end. */
+      if (tempoEl) padStart.append(tempoEl, ratioEl);
+    } else {
+      for (let i = 0; i < SLOTS; i++) {
+        /* `recording` needs two presses: one closes the take into a loop and the
+           second stops it. Reading the state again between them is what makes
+           that two steps rather than an assumption about the walk. */
+        if (machine.state(i) === 'recording') { machine.press(i); machine.settle(i); }
+        if (machine.state(i) === 'looping') { machine.press(i); machine.settle(i); }
+      }
+      loopBtn.el.remove();
+      if (tempoEl) { tempoEl.remove(); ratioEl.remove(); }
+    }
+    paintLoop();
+    return want;
+  }
+
   // An octave button at the end of the range that still looks pressable is a
   // control that lies about having somewhere to go.
   function paintPad() {
@@ -1738,6 +1812,16 @@ export function createKeyboard(host, {
     /** the `Loop` toggle, or null when the caller did not ask for one */
     loop: loopBtn,
     /**
+     * Put the `Loop` control in the row or take it out of it, and say which it
+     * is now. The full account is on `offerLoop` above; the short version is
+     * that the page decides what *connected* means, a sounding loop is stopped
+     * and kept rather than cleared, and a keyboard with no `loop: true` answers
+     * `false` and does nothing.
+     */
+    offerLoop,
+    /** whether the `Loop` control is in the row right now */
+    loopOffered: () => !!loopBtn && padEnd.contains(loopBtn.el),
+    /**
      * 🔴 THE TAKES, AND THIS IS WHAT A NUMBER PAD DRIVES. Asked 2026-09-23:
      * *"num works. how come you can not add it to keyboard"*. A page that has a
      * numeric pad on its MIDI keyboard calls `press(i)` with the slot and gets
@@ -1806,30 +1890,13 @@ export function createKeyboard(host, {
     taped: (i = 0) => (takes[i]?.tape ? takes[i].tape.length : 0),
     /** how far this keyboard has moved from where it was built, in semitones */
     displacement: () => base - HOME,
-    /** the naming control's two buttons, in the order they are drawn */
-    nameButtons: [letterBtn, degreeBtn],
-    /** `letter` or `degree`. Relabels every key; nothing else moves. */
-    setNaming(mode) {
-      naming = mode === 'degree' ? 'degree' : 'letter';
-      paintNaming();
-      for (const k of keys) label(els.get(k), k);
-      return naming;
-    },
-    naming: () => naming,
-    /**
-     * Which pitch class is `1`.
-     *
-     * ⚠️ A PAGE THAT KNOWS THE KEY SHOULD SAY SO. `/nola/` reads one off the
-     * first chord in its line and prints it in the log; a keyboard left to
-     * guess calls its own leftmost key the tonic, which is right until somebody
-     * plays in anything but C.
-     */
-    setTonic(pc) {
-      tonic = (((pc | 0) % 12) + 12) % 12;
-      for (const k of keys) label(els.get(k), k);
-      return tonic;
-    },
-    tonic: () => tonic,
+    /* ⚠️ `nameButtons`, `setNaming`, `naming`, `setTonic` AND `tonic` STOOD
+       HERE AND LEFT WITH THE `N | D` PAIR ON 2026-09-28. Nothing outside this
+       file called any of the five, which was GREPPED rather than assumed, and
+       `setTonic` is the one worth naming: its own comment said `/nola/` reads a
+       key off the first chord in its line and should say so, and `/nola/` never
+       did. A setter nobody calls is what made the degree naming a branch that
+       could only ever be right in C. See the pad. */
     noteOf, keyOf, press, release,
     get base() { return base; },
     /**

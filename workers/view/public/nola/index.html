@@ -988,6 +988,32 @@
   });
 
   /**
+   * 🔴 THE `Loop` CONTROL IS OFFERED ONLY WHILE THE EVOLUTION IS PLUGGED IN.
+   * Asked 2026-09-28: *"rm loop button when evolution keyboad is not
+   * connected"*. `keyboard.mjs` owns the control and this page owns what
+   * *connected* means, which is `midi.mjs`'s own division: a page owns MIDI.
+   *
+   * 🔴 IT STARTS WITHDRAWN, AND THAT IS A DECISION RATHER THAN A DETAIL. The
+   * component's default is offered, because `/kit/` is a gallery with no MIDI
+   * at all and a gallery that hid this component's newest control would be
+   * unreadable. Here the answer is not known until `requestMIDIAccess` resolves,
+   * and a button that is on screen for half a second and then vanishes is a
+   * control disappearing under somebody's hand. Absent, then offered, is a
+   * control ARRIVING, which is the honest direction.
+   * ⚠️ SO A BROWSER WITH NO WEB MIDI NEVER SHOWS IT. Safari has none, and the
+   * answer there is the true one: this keyboard is not connected and cannot be.
+   *
+   * 🔴 THE TEST IS `/evo/`'s, CHARACTER FOR CHARACTER, RATHER THAN A SECOND
+   * SPELLING OF THE SAME QUESTION. That page filters its inputs with it, and
+   * `/wish/` records why a name test cannot just look for the word `Evolution`:
+   * CoreMIDI calls this port `MK-425C USB MIDI Keyboard`, so the maker's name is
+   * in nobody's port list. The model number is what is actually on the wire.
+   */
+  const EVO_PORT = /mk-?4\d\dc|evolution/i;
+  const evoHere = (names) => names.some((n) => EVO_PORT.test(n));
+  keys.offerLoop(false);
+
+  /**
    * 🔴 TRANSPOSE MOVES WHAT ARRIVES OVER MIDI AND NOTHING ELSE, AND THAT IS THE
    * WHOLE POINT OF IT. It exists to correct a keyboard that is a semitone flat,
    * which is a fact about a box on this desk rather than about the piano. An
@@ -1595,8 +1621,27 @@
     onControl: midiControl,
     onProgram: midiProgram,
     log: d.log,
-    onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
-                            : 'no MIDI keyboard is plugged in, and the keys on screen still play'),
+    /* ⚠️ THE NAMES DECIDE THE `Loop` CONTROL AND THE COUNT DECIDES THE LOG
+       LINE, and they are two different questions. Something being plugged in is
+       not the Evolution being plugged in, which is why `midi.mjs` passes both.
+       ⚠️ AND IT RUNS ON EVERY CHANGE RATHER THAN ONCE. `onstatechange` is what
+       makes a keyboard plugged in after this page opened bring the control back
+       and one unplugged take it away; a page that only looks once is a page you
+       have to reload, which that module already says in those words. */
+    onPorts: (n, names = []) => {
+      d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
+              : 'no MIDI keyboard is plugged in, and the keys on screen still play');
+      const had = keys.loopOffered();
+      const now = keys.offerLoop(evoHere(names));
+      /* Only on a change, or a keyboard that reports itself twice says this
+         twice. A log line is for something that happened. */
+      if (now !== had) {
+        d.log(now
+          ? 'the Evolution is here, so Loop is back in the keyboard’s footer'
+          : 'the Evolution has gone, so Loop has left the footer and anything '
+            + 'it was playing has stopped. The takes are still on their slots');
+      }
+    },
   });
   /* 🔴 THE TAP IS READABLE FROM OUTSIDE THE PAGE, so a check can compare the two
      sides without the page summarising itself first, and so a person can read it
@@ -2930,7 +2975,32 @@
         return r.getBoundingClientRect().left;
       };
       const plateBox = plate.el.getBoundingClientRect();
-      const ctlInk = inkLeft(keys.el.querySelector('.kpad-names button'));
+      /* 🔴 THE REFERENCE IS THE ROW'S LEFT EDGE PLUS A BUTTON'S OWN INK
+         INSET, AND IT WAS ONE NAMED CONTROL'S LETTER UNTIL 2026-09-28. It read
+         `.kpad-names button`, the `N` of the naming pair, which left the
+         keyboard component on *"finally: rm N | D setting from keyboard
+         component"*. Two things go wrong when a selector names one control:
+         `querySelector` answers `null` and `inkLeft(null)` THROWS, taking this
+         assert and every one after it out of the page in silence; and the
+         control that inherits first place may not be a letter at all.
+         🔴 IT IS NOT, AND THAT IS WHY MOVING THE SELECTOR ONE CONTROL ALONG WAS
+         THE WRONG REPAIR. MEASURED the same evening: pointed at `.kpad-oct
+         button` this assert read **x53.08 against the plate's x54.00** and went
+         red at a tolerance of 0.6. `.step button.ico` is `padding: 0` and a
+         fixed square, so the octave button CENTRES a glyph in 24 px and its ink
+         lands wherever that glyph's advance puts it. The naming pair passed for
+         five days because it was `width: auto` over `.kpad button`'s
+         `0 var(--kpad-pad)`, so its letter sat at exactly the inset this claim
+         is about. **An alignment that holds by one glyph's width is luck.**
+         ✅ SO THE INSET IS READ OFF A BUTTON THAT HAS A WORD IN IT, as its ink
+         minus its own border box, and applied to the pad ROW's left edge. That
+         is ink against ink in the quantity the claim is about, it survives any
+         reordering of the row, and it does not care which control is first. */
+      const padRow = keys.el.querySelector('.kpad');
+      const wordBtn = [...padRow.querySelectorAll('button')]
+        .find((b) => (b.textContent || '').trim().length > 1);
+      const inset = inkLeft(wordBtn) - wordBtn.getBoundingClientRect().left;
+      const ctlInk = padRow.getBoundingClientRect().left + inset;
       const nameInk = inkLeft(plate.el.querySelector('.panel-plate-l'));
       const between = Math.round(pickBox.left - plateBox.right);
       d.assert('the page’s own nameplate is at the left end of that footer, its letter under the row above',
@@ -2938,7 +3008,9 @@
         && plate.shown().join(' ') === 'NOLA'
         && Math.abs(nameInk - ctlInk) < 0.6,
         `it reads ${plate.shown().join(' ')}, its letter at x${nameInk.toFixed(2)} against `
-        + `x${ctlInk.toFixed(2)} for the first control on the row above, `
+        + `x${ctlInk.toFixed(2)}, which is the row above starting at `
+        + `x${padRow.getBoundingClientRect().left.toFixed(2)} plus the `
+        + `${inset.toFixed(2)} px "${(wordBtn.textContent || '').trim()}" sits inside its own box, `
         + `and ${between} px of row between it and the control`);
 
       /* 🔴 AND THE TWO ROWS ARE SEPARATED BY A LINE RATHER THAN BY A GAP, WHICH
@@ -3624,6 +3696,32 @@
          the loop's own counter against itself would agree with itself whatever
          happened, which is the trap this project has already paid for. */
       {
+        /**
+         * 🔴 THE CONTROL IS NOT IN THE ROW ON A VISIT, AND THAT IS GRADED
+         * BEFORE IT IS PUT BACK. Asked 2026-09-28: *"rm loop button when
+         * evolution keyboad is not connected"*. Nothing is plugged into this
+         * desk during a check run, so the DISCONNECTED case is what the harness
+         * meets by default and the absence is the measurement.
+         * 🔴 AND THEN IT IS OFFERED, OR TWELVE ASSERTS BELOW THIS ONE WOULD
+         * SIMPLY STOP RUNNING. An assert that never runs cannot fail and only
+         * the COUNT says so, which is this project's worst shape. `offerLoop`
+         * is the SAME call the page makes from `onPorts` when a keyboard
+         * appears, driven rather than simulated, so nothing here is a path a
+         * person cannot reach. It is the `/mirror/` repair: drive the mode
+         * nobody on this desk can reach, rather than letting the checks behind
+         * it go quiet.
+         * ⚠️ IT IS NOT GATED ON `SELFCHECK` AND MUST NOT BE. A page that
+         * behaves one way for the harness and another for a person is a page
+         * nothing grades. What is gated is the whole check block, as always.
+         */
+        d.assert('the Loop control is out of the footer until an Evolution is plugged in',
+          keys.loopOffered() === false && keys.loop !== null
+          && keys.el.querySelector('.kpad-grp-end').contains(keys.loop.el) === false,
+          `nothing on this desk matches ${EVO_PORT}, MIDI reads `
+          + `${midi.state()} with ${midi.ports()} input(s) named `
+          + `${JSON.stringify(midi.names())}, so the control is built and out of the row`);
+        keys.offerLoop(true);
+
         /* ⚠️ PRESSED, NOT CALLED. `keys.loop.set(true)` is the api and a person
            has a button, and those are two paths: this project's own rule is that
            a harness presses the control. It also means a toggle that stopped

@@ -237,8 +237,13 @@
        underneath. The column spans both rows of the connection grid, so it is
        120 px tall at its shortest and one 34 px control sits in the middle of
        that. */
+    /* ⚠️ `flex-start` IS THE OTHER HALF OF THE ALIGNMENT ABOVE, and the two
+       have to be read together: this column spans both rows of the connection
+       grid and is 120 px tall at its shortest, so `center` put a 34 px square
+       in the middle of a reserve while the picture beside it started at the
+       top. */
     display: flex; flex-direction: column; align-items: flex-end;
-    justify-content: center; gap: 6px;
+    justify-content: flex-start; gap: 6px;
   }
   /* 🔴 THE SQUARE IS `shell.css`'s OWN 34, RE-DECLARED HERE BECAUSE THAT RULE
      IS SCOPED TO `.pos-controls` AND THIS BUTTON IS NOT IN IT. `shell.mjs`
@@ -379,7 +384,22 @@
        holds the right hand end, so the picture sits in the left of the row.
        Going further is a change to the component and was not made. */
     grid-column: 1; grid-row: 1; min-width: 0;
-    min-height: 120px; display: flex; flex-direction: column; justify-content: center;
+    /* 🔴 `flex-start`, NOT `center`, SINCE 2026-09-28. Asked with a crop of a
+       row whose `×` sat half way down beside a picture that started at the top:
+       *"align close top margin to diagram top margin"*.
+       ⚠️ AND THE THING BEING ALIGNED TO WAS NOT A MARGIN. MEASURED before
+       touching it: this cell runs 174.5 to 294.5 and the figure inside it runs
+       184.5 to 284.5, so the picture's 10 px of air was the LEFTOVER of
+       centring a 100 px figure in a 120 px reserve, and `.pos-dg`'s own
+       `margin-top` and `padding-top` both read 0. A number that is the half of
+       a subtraction is a number no sibling can read, which is why the repair is
+       not a 10 px anything on the actions column: both cells start their
+       content at the top of the row now, and they agree at every width and in
+       both of the drawer's modes without either knowing the other's height.
+       ⚠️ THE RESERVE IS UNCHANGED AND SO IS WHAT IT IS FOR. 120 px still holds
+       the row still between states; the slack simply sits under the picture
+       rather than being split above and below it. */
+    min-height: 120px; display: flex; flex-direction: column; justify-content: flex-start;
   }
   /* 🔴 ONE PADDING ON BOTH AXES, ASKED FOR AS *"just have unified x y
      padding"*. The row was `6px 10px`, so the air above a picture was not the

@@ -28,7 +28,8 @@
   // `knob.mjs` and `slider.mjs` both import `createHandDrive` from
   // `hand-drive.mjs`, so `hand: true` and `onHand:` mean the same thing on
   // both, and this page's subject comes across untouched.
-  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createControlGrid } from '/shell/control-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createMidi } from '/shell/midi.mjs';
@@ -401,10 +402,33 @@
     onInput: (v) => move(RESO, v),
     onChange: (v) => land(RESO, v),
   });
-  // 🔴 A BANK, NOT A ROW THIS PAGE LAYS OUT. `createKnobBank` is what every
-  // other panel here puts rotaries in, and it already owns the row, the gap and
-  // the sideways scroll a narrow column needs.
-  const knobs = createKnobBank([cutoff, reso]);
+  /**
+   * 🔴 THE LATTICE, SINCE 2026-09-28, ASKED FOR AS *"knobs: use rotaty sliders
+   * grid"*. It was `createKnobBank` until this line, which is a flex ROW at
+   * `--ctl-gap`: the two rotaries sat 8 px apart and their centres were as far
+   * apart as a dial is wide. `createControlGrid` is the kit's lattice and
+   * `/muta/` already wears it, so the two pages that carry rotaries now carry
+   * them at one pitch.
+   * ⚠️ **AND A LATTICE OF ONE ROW IS STILL A LATTICE, WHICH IS WHAT MAKES THIS
+   * VISIBLE AT ALL.** `pitchFor` is `max(width, height)`, and a knob cell is far
+   * taller than it is wide, so the column track opens out to the ROW pitch: the
+   * two dials move apart by the difference between a dial's width and a cell's
+   * height, and the dial sits centred in its own square cell. The centres are on
+   * the same square grid a second row would land on, which is the whole claim
+   * the component makes.
+   * 🔴 **THE GAP IS PASSED, NEVER SET AS A CUSTOM PROPERTY, AND `/muta/`'s OWN
+   * STYLESHEET RECORDS WHY.** `createControlGrid` writes its gap as an INLINE
+   * style, which no `--ctl-gap` on a page can reach: a `.muta-panel { --ctl-gap:
+   * 16px }` there claimed to set the rotary pitch, did not, and the lattice
+   * measured 94.0 px across at a pitch of 84 plus 10 while the rule read as
+   * correct. 10 is the component's own figure and is what `/muta/` passes, so
+   * the two lattices are one measurement rather than two that happen to agree.
+   * ⚠️ AND IT SCROLLS SIDEWAYS RATHER THAN SQUEEZING, which is the pair
+   * `.pos-knob-row` had and `.pos-cg` has: `overflow-x` with `min-width: 0`
+   * beside it, or a narrow surface drags the document instead of the row.
+   */
+  const KNOB_GAP = 10;
+  const knobs = createControlGrid({ cols: 2, gap: KNOB_GAP, items: [cutoff, reso] });
 
   // ── audio ─────────────────────────────────────────────────────────────────
   /**
@@ -888,19 +912,30 @@
    * one of its own, which is why `online: false` and a hand `prepend` stood
    * here. `status:` takes a built control, so nothing reaches into a component
    * to place it any more.
-   * ⚠️ `caps: false`, SO THE PLATE READS `knobs` AND NOT `KNOBS`. The ask names
-   * it in lower case and so does the slug, and `panel-layout.mjs` carries the
-   * argument: the uppercase rule is about a shelf of REPLICAS reading as one
-   * shelf, and this page is a replica of nothing.
+   * 🔴 THE PLATE READS `KNOBS`, AND THIS COMMENT ARGUED THE OTHER WAY UNTIL
+   * 2026-09-28. Asked, verbatim: *"all nameplates are uppercase"*. The
+   * exception this page and `/shape/` both carried was that the uppercase rule
+   * is about a shelf of REPLICAS reading as one shelf and neither page is a
+   * replica of anything. That was a good argument and the ask overrules it:
+   * every plate on the site is one treatment now, which is a plainer rule than
+   * one with two defensible exceptions in it. `caps` defaults to true in
+   * `instrument-panel.mjs`, so the option is simply not passed.
    *
    * 🔴 THE ROTARIES ARE ONE ROW AND IT IS `start`, WHICH IS *"left to rotaries
    * cutoff reseonance"* SURVIVING THE MOVE. A glue row centres by default, and
    * two rotaries centred over twenty-five keys is a band of empty surface with
    * something in the middle of it. `/kit/`'s drum box specimen already wrote
    * that reading down against the same shape.
-   * ⚠️ AND IT IS THE BANK, NOT TWO KNOBS IN A ROW. `createKnobBank` owns the
-   * row, the gap and the sideways scroll a narrow surface needs, and a panel
-   * row holding it adds an inset and a seam and nothing else.
+   * ⚠️ AND IT IS THE LATTICE, NOT TWO KNOBS THIS PAGE LAYS OUT.
+   * `createControlGrid` owns the pitch, the gap and the sideways scroll a
+   * narrow surface needs, and a panel row holding it adds an inset and a seam
+   * and nothing else. The block beside the rotaries has the swap.
+   * ⚠️ **AND `start` IS THE HALF A RECT CATCHES AND THE LATTICE MOVED THE INK
+   * INSIDE IT.** The grid's own box still sits on the row's inset, which is
+   * what the assert below reads, and the first DIAL now sits half a spare cell
+   * further in, because a cell is the square pitch and a dial is `--knob-w`.
+   * That offset is the lattice and is printed in the detail rather than
+   * corrected, which is the same reading `/muta/` wrote down at 17 px.
    *
    * ⚠️ WHAT LEFT WITH THE CASE, SO NOBODY GOES LOOKING FOR IT: the case's
    * border and its 20 px inset, the scrolling strip, `panel.band()` and the
@@ -918,7 +953,7 @@
   const panel = createInstrumentPanel({
     rows: [[[knobs], { align: 'start' }]],
     keys: kb.el,
-    plate: { name: 'knobs', caps: false, status: pres, patch: midiBtn },
+    plate: { name: 'knobs', status: pres, patch: midiBtn },
   });
   d.stack.add(panel.el);
 
@@ -1617,8 +1652,8 @@
     const footPad = parseFloat(footCs.paddingLeft);
     const footBox = panel.plateRow.getBoundingClientRect();
     const ink = panel.plate.lines[0].getBoundingClientRect();
-    d.assert('the plate is the last row and its name is one inset in, reading knobs in lower case',
-      panel.rows().at(-1).kind === 'plate' && panel.plate.shown().join(' ') === 'knobs'
+    d.assert('the plate is the last row and its name is one inset in, reading KNOBS in upper case',
+      panel.rows().at(-1).kind === 'plate' && panel.plate.shown().join(' ') === 'KNOBS'
       && Math.abs((ink.left - footBox.left) - footPad) <= 1,
       `ink left ${ink.left.toFixed(1)} against a row starting at ${footBox.left.toFixed(1)}, `
       + `${(ink.left - footBox.left).toFixed(1)} px of a ${footPad.toFixed(1)} px inset, reading `
@@ -1633,19 +1668,61 @@
      * because two rows stacked on a surface both start at the same x and a rect
      * cannot tell which is first.
      * ⚠️ AND `start` IS THE HALF A RECT CATCHES. A row centres by default, so
-     * the bank sitting on the row's own inset is the only thing that says the
-     * alignment took.
+     * the lattice sitting on the row's own inset is the only thing that says
+     * the alignment took.
+     * ⚠️ **THE BOX IS THE GRID'S AND THE INK IS THE DIAL'S, AND SINCE THE
+     * LATTICE ARRIVED THEY ARE NO LONGER THE SAME EDGE.** A cell is the square
+     * pitch and a dial is `--knob-w`, so the first dial sits half the spare cell
+     * further in. The offset is PRINTED rather than asserted, because it is the
+     * lattice doing what it says and not a row that failed to align, and a
+     * reader of this run should be able to see how far in the ink starts.
      */
     const knobRow = panel.rows()[0].el;
     const knobBox = knobs.el.getBoundingClientRect();
     const rowBox = knobRow.getBoundingClientRect();
+    const firstDial = knobs.cells[0].querySelector('.pos-knob-dial');
+    const dialLeft = firstDial ? firstDial.getBoundingClientRect().left : NaN;
     d.assert('the rotaries are the first row and sit on its left inset',
       panel.rows()[0].kind === 'controls' && knobRow.contains(knobs.el)
       && Math.abs((knobBox.left - rowBox.left) - parseFloat(getComputedStyle(knobRow).paddingLeft)) <= 1,
       `the rotaries are row ${panel.rows().findIndex((r) => r.el === knobRow) + 1} of `
       + `${panel.rows().length} and start at ${knobBox.left.toFixed(1)}, `
       + `${(knobBox.left - rowBox.left).toFixed(1)} px inside a row spanning `
-      + `${rowBox.left.toFixed(1)} to ${rowBox.right.toFixed(1)}`);
+      + `${rowBox.left.toFixed(1)} to ${rowBox.right.toFixed(1)}, with the first `
+      + `dial's ink at ${Number.isFinite(dialLeft) ? dialLeft.toFixed(1) : '?'}`);
+    /**
+     * 🔴 THE TWO DIAL CENTRES SIT ONE LATTICE PITCH APART, WHICH IS THE ONLY
+     * THING THAT SAYS *"knobs: use rotaty sliders grid"* TOOK. Asked
+     * 2026-09-28. A flex row and a lattice look alike in a screenshot and
+     * differ by a measurement: `.pos-knob-row` puts two dials `--knob-w` plus
+     * `--ctl-gap` apart, which is about 58 px, and `createControlGrid` opens the
+     * column out to the taller of the cell's two dimensions, which on a knob is
+     * its height. So a page that quietly fell back to a row would be green on
+     * every other claim here and red on this one.
+     * ⚠️ **ONE ROW, SO ACROSS AGAINST DOWN CANNOT BE THE CLAIM.** `/muta/` has
+     * four rotaries and grades its step right against its step down; this page
+     * has two and no second row, so what is left to grade is that the step is
+     * the LATTICE's and not the row's.
+     * ⚠️ AND EVERY NUMBER IN IT IS READ BACK rather than typed: the pitch off
+     * the component, the gap off the one `KNOB_GAP` the call site passes, the
+     * dial off its own rect and `--ctl-gap` off the root. The step a flex row
+     * would have given is then a measurement rather than a memory, so a label
+     * growing and widening the cell moves both sides of the comparison at once.
+     */
+    const cs = knobs.centres();
+    const step = cs.length > 1 ? cs[1].x - cs[0].x : NaN;
+    const pitch = knobs.pitch();
+    const dialW = firstDial ? firstDial.getBoundingClientRect().width : 0;
+    const ctlGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-gap')) || 0;
+    const rowStep = dialW + ctlGap;
+    d.assert('the two rotaries stand one lattice pitch apart, wider than the row it replaced',
+      Number.isFinite(step) && pitch > 0 && Math.abs(step - (pitch + KNOB_GAP)) <= 1
+      && step > rowStep + 1,
+      Number.isFinite(step)
+        ? `${step.toFixed(1)} px between the centres, which is a ${pitch} px pitch and a `
+          + `${KNOB_GAP} px gap, against the ${rowStep.toFixed(1)} px a ${dialW.toFixed(1)} px `
+          + `dial at a ${ctlGap.toFixed(1)} px row gap would have given`
+        : 'the grid reported no centres');
     /**
      * 🔴 TWENTY-FIVE KEYS, AND THE COUNT IS READ OFF THE DOM RATHER THAN OFF
      * `keyRange`. Asserting the helper against itself would pass on a keyboard
