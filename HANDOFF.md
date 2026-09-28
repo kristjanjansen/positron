@@ -2,10 +2,17 @@
 
 ## Where it is right now
 
-**DEPLOYED AND CONFIRMED ON THE EDGE: BUILD `46cbb03-164617-1505`**, which is
-commit `46cbb03`. **20 commits this session**, the working tree is CLEAN, and
+**DEPLOYED AND CONFIRMED ON THE EDGE: BUILD `1bb044c-185248-a072`**, which is
+commit `1bb044c`. **21 commits this session**, the working tree is CLEAN, and
 nothing is in flight. MEASURED after, counted and not remembered: **57 demos, 55
 built, 55 cards drawn**, and **75 plans in `plans/`**.
+
+⚠️ **THE STAMP AND THE COUNT ABOVE READ `46cbb03-164617-1505` AND `20` UNTIL
+THE KEYBOARD'S `N \| D` PAIR LANDED.** Nothing else moved with it: the manifest
+was not touched, so the demo and plan counts are the same three numbers
+recounted. CONFIRMED on the edge after the deploy rather than assumed, by
+reading the deployed `shell/keyboard.mjs`: `noteName` is one expression, and the
+two remaining mentions of the control are both in comments.
 
 🔴 **EVERY DEPLOY THIS SESSION CAME FROM A CLEAN WORKTREE AT THE LAST COMMIT,
 NOT FROM THE WORKING TREE, AND THAT IS WORTH KEEPING.** Up to eight agents were
