@@ -24,7 +24,92 @@ line 735 and `HANDOFF.md`. Not started.
   description was once called *"mambo jumbo"*, which is the story in CLAUDE.md
   about descriptions. Nothing to do now, worth knowing when it comes back.
 
-### knobs: rm "midi is listening"
+### Done 2026-09-28: knobs, rm "midi is listening"
+
+✅ **DONE, AND THE ANSWER IS THAT THE BUTTON LEAVES RATHER THAN CHANGES ITS
+WORDS.** `enable midi` is at the right end of the foot on a visit. After the
+press, or on a browser that had already granted, THE BUTTON IS REMOVED FROM THE
+FOOT and never reads anything else. The port count moves to the log, where it
+already was: `N MIDI inputs to listen to`, or `no MIDI keyboard is plugged in
+yet, so nothing will arrive`.
+- **WHY REMOVAL RATHER THAN A SUBSTITUTE SENTENCE.** `openMidi` is idempotent, so
+  after the first press there is nothing left to press: a disabled control here
+  is a SPENT control, not a picture of hardware the way `/circuit/`'s master
+  volume is, and `positron-ui` records that a disabled control in this kit means
+  bound to nothing. `midi is listening` was a control label narrating a state,
+  which is the one thing a button must not do, and a substitute sentence is the
+  same shape wearing different words.
+- ⚠️ The granted-on-load path is consistent: the button is never seen at all on
+  such a browser, and the existing log line says why.
+- **MEASURED, AND IT COSTS A JUMP: the foot was 66.0 px tall with the button and
+  is 43.0 px without it**, so opening MIDI lifts the report and the picture under
+  it by 23 px, once. The room was DELIBERATELY NOT RESERVED, on this project's
+  own feedback-panel reading that a reserve exists only for the moments a jump is
+  possible and stops at the terminal state, and a permanently reserved band under
+  a control that has gone is the empty band that rule refuses. On the only branch
+  anybody sees it, the browser's MIDI dialog is up while it happens. ⚠️ **ONE
+  LINE TO REVERSE IF THE JUMP IS NOT WANTED**, and the trade is a permanent empty
+  band.
+
+### Done 2026-09-28: knobs, "appluy instruiment panel"
+
+✅ **DONE**, with `joined: true` dropped in the same edit as the third item.
+`createInstrumentPanel({ rows, keys, plate })` replaces `createInstrument` over
+`createPanelLayout`: no bordered case, no scrolling strip, no nameplate in a
+corner, and the presence badge is passed as `status:` instead of being
+hand-`prepend`ed into `.panel-head-on`, so nothing reaches into a component to
+place it any more.
+- 🔴 **`instrument-panel.mjs`'S HEADER SAID THIS PAGE WOULD BREAK, AND IT IS NO
+  LONGER TRUE.** It reads *"/knobs/ scrolls its whole strip as one"* and
+  *"/knobs/ measured 992 px inside a 686 px case and keeps panel-layout"*. That
+  was a fact about `.panel-flow` being `width: max-content`, which is the same
+  fact that made `full: true` reach nothing here. A glued surface is
+  `width: fit-content; max-width: 100%`, so it stops at the room there is.
+  **MEASURED at 1280 px, before and after: keyboard box 990.0 px to 646.0 px,
+  widest white key 62.0 px to 49.0 px, which is `--k-min`, the component's own
+  grid-track floor and not a squash, with 777.0 px of keys scrolling in 646.0 px
+  of box.** 777 is exactly the number this page's 2026-09-25 banded measurement
+  recorded.
+- ✅ **THIS CLOSES THE 2026-09-25 HANDOFF LINE** *"`full: true` reaches nothing
+  on `/knobs/`, and it was hidden by a dead assert"*. The option reaches
+  something now.
+- ✅ **AND IT DOES NOT UNDO THE 2026-09-25 NAMEPLATE INSTRUCTION**, which is said
+  in the file: *"knobs: rm right panel. use regular nameplate"* removed a
+  vertical rail and asked for the kit's plate, and both are still true. On this
+  component the plate IS the foot, reading `knobs` and the badge at one end and
+  the MIDI button at the other, which is the original *"add footer with rasperry
+  pi online padge. on right add enable midi button"* intact.
+- ✅ **AND THE SEAM THIS PAGE ASKED FOR IN 2026-09-25 AND HAD TO REFUSE NOW COMES
+  FREE.** *"on each button group have horizontal panel separator edge to edge"*
+  was refused because a case has no vertical rhythm between bands, MEASURED at
+  0.0 px three times over. A glued surface is seams by construction.
+- ⚠️ THE KEYBOARD HAD TO BE BUILT BEFORE THE PANEL: `createKeyboard` appends into
+  a host unconditionally and hands back no detached form, so it is built into a
+  throwaway div and `kb.el` is what the panel is given, which is what `/kit/`'s
+  specimens do and their comment says why.
+- **MEASURED: 36/38 green with 2 FAILED before, 37/39 green with 2 FAILED
+  after**, page asserts 34 to 35, the before taken by restoring
+  `git show HEAD:demo/knobs/index.html` and running it on today's `shell.mjs`.
+  🔴 **THE TWO REDS ARE THE SAME TWO ON BOTH RUNS, IDENTICAL WORDING AND CAUSE,
+  AND NEITHER IS THIS CHANGE**: `the relay delivered the control messages this
+  page sent · 0 of 0 came back`, because nothing answered in `studio-1` and the
+  Raspberry Pi is not on the relay, and `this page makes no sound of its own`,
+  because a check run never starts the audio graph. Not re-run to chase a green.
+- Six asserts rewritten and one added. The new one grades BOTH halves of the
+  other ask: *opening MIDI takes its button off the foot, and the word it leaves
+  with is still a press*. One correctness note carried into the code: all three
+  arguments of `d.assert` are evaluated before it runs, so a `null` reached
+  inside a failure message throws out of the whole check block and silently takes
+  every assert after it.
+
+⚠️ **LEFT, ALL PRE-EXISTING:** `RESONA…` still truncates on the
+cutoff/resonance row, which is the standing compose item that a label which
+truncates is in the wrong place and a knob label has nowhere else to be. The keys
+row still reads as cut off at the right edge with no fade or peek, true of every
+scroller on the site and strictly better than before, because what scrolls is now
+the keys rather than the whole instrument hanging out of a case. `knob.mjs`'s
+unguarded `setPointerCapture` still means no check here drives the real pointer
+path. The `?board=1` path is ungraded on this desk.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28, right after the panel line above:** *"rm "midi
 is listening""*. Slug `knobs`, file `demo/knobs/index.html`, lines 668 and 673.
@@ -44,7 +129,7 @@ before it. ⚠️ Confirm at fan-out.
 - The log lines beside it (`N MIDI inputs to listen to`, `no MIDI keyboard is
   plugged in yet`) are separate and were not asked about.
 
-### knobs: "appluy instruiment panel"
+
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"knobs: appluy instruiment panel"*. Slug
 `knobs`, file `demo/knobs/index.html` (2,186 lines). Not started.
@@ -82,7 +167,53 @@ before it. ⚠️ Confirm at fan-out.
   project an intermittent failure. Removing a FLAG is safe; removing or
   reordering a control is not.
 
-### tom: "apply instrument panel"
+### Done 2026-09-28: tom, "apply instrument panel"
+
+✅ **DONE.** The transport bar, the grid and the nameplate are ONE glued surface
+built by `createInstrumentPanel`, where they were three blocks a page gap apart.
+Gluing them is a claim that they are one object and it is true here: the bar
+drives the grid, the grid is the bar's own position surface (`scrub: false`), and
+the plate is what the two of them are called. `shape()` reads the rendered
+children back as `controls, controls, plate`.
+- ⚠️ **THE GRID KEEPS `createPanelLayout` AND KEEPS ITS CASE**, which is the part
+  worth knowing. `instrument-panel.mjs` says in its header that it is for an
+  instrument with NO column and NO scroller, and tom has both: 64 label rows
+  beside 16 steps that have to scroll rather than drag the document. So the panel
+  layout goes INSIDE a row. `cased: true` supplies `--panel-pad: 20px`, so the
+  label column and the steps keep their inset from the component rather than from
+  a number typed on the page.
+- ✅ **THE BORDER AND THE RADIUS COME OFF BY THEMSELVES.** `.panel-case` reads
+  `--edge` and `--r`, `.pos-glue.pos-glue > *` sets both to 0 on the row, and a
+  custom property inherits. NO `.pos-glue > .panel` patch was written, which
+  `positron-compose` states as a prohibition rather than a preference. MEASURED:
+  the case draws **0px at radius 0px** while the surface around it draws **1px at
+  radius 4px**.
+- **THREE PAGE STYLESHEET RULES ARE GONE**, and they are gone because the plate
+  moved rather than because anybody swept them: `.tom { position: relative }` and
+  the two `.tom > .panel-plate` absolute-position rules existed only because the
+  plate sat in the flow at 31 px tall and pushed the first pad down to 62, asked
+  as *"move grid upwards"*. A plate at the foot takes nothing off the top. Two
+  dead symbols removed with them: `const plate = panel.plate`, declared and never
+  read, and `createNameplate`, imported and never called.
+- **MEASURED: 37/37 before, 39/39 green after, 0 requests, 0 failed, 0 console
+  errors.** The +2 are the two asserts added, nothing was removed and no gate
+  changed. The new pair: *the transport, the grid and the nameplate are one glued
+  object, in that order*, read off `shape()` and not off the call, and *the
+  grid's case gives up its own edge inside the panel, and the panel keeps one*,
+  whose negative half is the point, because a border that has gone everywhere is
+  not one border, it is none.
+- The page still fetches nothing by default. `PACK` untouched, counters
+  untouched, and the run asserts it.
+- A stale claim beside the edit was corrected: the comment read *"Sixty four
+  steps is about 1,150 px and a phone is 390"* in the present tense about a grid
+  that has been sixteen steps since 2026-09-21 and a phone that has been 375
+  since 2026-09-26.
+
+🔴 **A STANDING HOLE BEHIND THAT "39/39 GREEN", TRUE BEFORE THIS CHANGE AND
+UNCHANGED BY IT: 13 OF TOM'S ASSERTS HAVE NOT RUN SINCE THE PACK LEFT THE
+REPOSITORY.** Every reading check is behind `?pack=<url>` resolving, and the page
+logs *"the pack here is not published, so the reading checks did not run"*. The
+count is what says so, which is exactly why this project reads the count.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"tom: apply instrument panel"*. Slug `tom`,
 file `demo/tom/index.html` (1,983 lines). Not started.
@@ -100,7 +231,71 @@ file `demo/tom/index.html` (1,983 lines). Not started.
   takes an explicit `?pack=<url>`. Last measured green at 59/59, 0 requests, 0
   failed. That is the number this change is read against.
 
-### pack: "make support of any wavs in zip and change desc accrodingly"
+### Done 2026-09-28: pack, "make support of any wavs in zip and change desc accrodingly"
+
+✅ **DONE, with one third handed on.** A zip of plain WAVs opens as a sample set:
+`fill([], [], wavs)`, the footer carries the file name, the log reads `N of M
+samples read`, and `tabs.enable` switches PATCHES and SESSIONS off and moves the
+open tab to SAMPLES by itself. Two more branches changed with it: a zip holding
+loose `.syx` AND WAVs now shows both, where it was passing an empty third list
+to a `fill` that has always taken three, and the final refusal reads `holds no
+Circuit pack, no patches and no samples` because it can now be wrong about a
+third thing. The WAV loop `openPack` had inline is one function, `readWavs`,
+used by both, so there is no second copy.
+- **THE DESC IS THE SAME SENTENCE IN BOTH PLACES AGAIN:** *"open a Circuit pack
+  or any zip of WAVs and look inside its patches, sessions and samples"*, in
+  `demo/pack/index.html:205` and `demo/manifest.mjs`. What it trades away is `a
+  loose sample set`, which named the bulk SysEx transfers, and those still open.
+- **MAC RESOURCE FORKS ARE DROPPED BY NAME, ON BOTH SPELLINGS**: an entry under
+  `__MACOSX/`, or a basename starting `._`. Not by size, because a fork is a few
+  hundred bytes and so is a short drum hit. Both tests, because a fork that has
+  been extracted and re-zipped keeps the `._` and loses the directory.
+- ✅ **MEASURED ON THE REAL CORPUS RATHER THAN REASONED ABOUT**, six zips in
+  `tmp/packs/` run through the real `unzip.mjs` and `circuit-sample.mjs` in
+  node: **989 named `.wav` entries, 88 forks dropped, 901 rows**. `one-shots.zip`
+  is the exact shape: 40 real WAVs each with a 239 to 308 byte
+  `__MACOSX/one-shots/._<name>.wav` beside it, so without the filter it shows 80
+  rows, half of them alarms about the archiver's own packaging.
+- **MEASURED: 30/30 green with 24 page asserts after, 0 requests, 0 failed.**
+  Four new asserts, all of which run on the deploy because they need no pack and
+  no corpus, two of them negative controls. **PROVED BY BREAKING IT:** with the
+  fork filter disabled the same run reads **26/30, 4 red**, and those 4 are the
+  only asserts on the no-pack path that `readWavs` can reach. ⚠️ The BEFORE
+  figure, 26/26 and 20, is DERIVED and not measured, because the harness was not
+  run before the edit. Said plainly rather than quoted as a reading.
+- ⚠️ **AND THE 59/59 IN THIS FILE AND IN CLAUDE.md IS `pack` AND `tom`
+  TOGETHER**, not either page alone. Caught independently by two agents today.
+
+🔴 **THE DEFECT THE REAL CORPUS FOUND, WHICH NOBODY ASKED ABOUT AND WHICH
+`fill()` THREW ON: 152 OF THE 901 ARE STEREO OR 24 BIT.** `readWave` reads their
+headers perfectly so `summarise` answers `ok: true`, but `toMono` decodes only 16
+bit mono, so `peak`, `sound`, `lead` and `trail` all came back `null` and the row
+builder called `r.peak.toFixed(2)` on `null`. It could not arise before today:
+every WAV in a `.circuitpack` is 48 kHz 16 bit mono, 64 of 64. The measured
+shapes across the 901: 534 at 44.1/16/mono, 215 at 48/16/mono, 98 at
+44.1/24/stereo, 52 at 44.1/16/stereo, 2 at 44.1/24/mono.
+✅ Repaired in the page so it is honest rather than broken: the header cells stay
+and the measured cells go EMPTY rather than zero, and **the play button follows
+the audio rather than the header**. It read `!r.ok`, which was the same thing
+while every reachable file was 16 bit mono, so on `one-shots.zip` every row would
+have offered a live Play that logs a refusal and makes no sound, which is the
+control that lies. It is `!mono.ok` now.
+⚠️ **THE REST IS `demo/shell/circuit-sample.mjs` AND IS WITH AN AGENT.**
+`DEPTHS` is `[16]` and `toMono` refuses anything not mono, so 152 of 901 open
+with no peak, no sound share, no waveform and no playback. "Support any wavs" is
+two thirds done until that module gains 24 bit and a documented mixdown, and its
+own header says why the limits are there: nothing but 16 bit mono has ever been
+graded against a real file, so it wants a fixture and a sabotage rather than a
+widened constant.
+
+⚠️ **THREE SMALLER THINGS LEFT, NONE ASKED FOR:** a loose `.wav` dropped on its
+own is still refused, because `accept:` does not list it and adding it moves the
+hint string an assert measures. `Roland_Classics.zip` shows its bulk transfer and
+ignores its 48 loose WAVs, since the `.syx` branch wins and returns first, which
+keeps the existing `48 filled and 16 empty` assert true. And NOTHING HERE RAN
+AGAINST A REAL `.circuitpack`, because there is none on this machine since
+2026-09-24, so the `openPack` path is graded by reasoning and by the node run
+over the real zips rather than by the harness.
 
 ⚠️ **ASKED, VERBATIM 2026-09-28:** *"pack: make support of any wavs in zip and
 change desc accrodingly"*. Slug `pack`, files `demo/pack/index.html` and
