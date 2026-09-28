@@ -209,6 +209,32 @@ export function createInstrumentPanel(o = {}) {
    * 🔴 AND A SELECTOR IS THE END, NEVER THE START, WITH NO CAPTION ON IT. The
    * header carries the ask. `status` is for a switch; a `.pos-pick` handed in
    * there is refused, and a `.pos-pick` handed in as `patch` loses its label.
+   *
+   * 🔴 **ON A PHONE THIS ROW CENTRES, AND IT IS THE ONLY CENTRED ROW IN THIS
+   * COMPONENT.** Asked 2026-09-28: *"in instrument layout, on mobile the
+   * nameplate goes below all othe section on its own section and it centered
+   * hzontally"*. The first half was already true at every width, because
+   * `ROW_KINDS` puts the plate last and `addRow` inserts before it; what is new
+   * is the centring, and it lives in `shell.css` at the foot of the file, under
+   * `.pos-ipanel-plate`, at 560 px and under.
+   * ⚠️ **IT IS PHONE ONLY BECAUSE CENTRING IS NOT THIS KIT'S HABIT.** Every
+   * other row in a panel is a start row or a justified one, and a new alignment
+   * in a shared component reaches `fau`, `knobs`, `muta`, `shape`, `tom` and
+   * `kit` at once. What earns it at 375 px is that the row has already gone
+   * linear by then: MEASURED, `/muta/` drew its name on one line and its patch
+   * picker on a second, both hard left against a 341 px row, which is a column
+   * of two left-aligned fragments rather than a foot bar.
+   * 🔴 **AND THE CONTROLS ON THE ROW GO WITH THE NAME.** `/muta/`'s `Test tone`
+   * sits in `status`, so it is inside `.pos-ipanel-name` and centres as one
+   * block with the name it belongs to rather than hanging off a centred word.
+   * The patch selector keeps its own width and is already the full width of the
+   * row at that size, measured, so it is centred by construction and loses
+   * nothing. A centred row with a picker in it is not the same object as a
+   * centred word, and this is which of the two it is.
+   * ⚠️ **NO HARNESS HERE ENTERS THAT BLOCK.** `demo/verify.mjs` runs at 756 px,
+   * so the six pages above pass every assert without it, and it is looked at
+   * with `node demo/shot.mjs <slug> 375`. The stylesheet says what would make it
+   * gradable and why that is not free.
    */
   let plate = null, plateRow = null, status = null, patchEnd = null, patchLine = null;
   if (plateSpec) {

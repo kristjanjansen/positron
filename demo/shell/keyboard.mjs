@@ -785,6 +785,39 @@ export function createKeyboard(host, {
    * exists, which is the thing `/keys/` did before this component was written.
    */
   const pad = make('div', 'kpad');
+  /**
+   * 🔴 THE ROW IS TWO ENDS IN TWO BOXES SINCE 2026-09-28, AND THAT IS WHAT
+   * MAKES IT WRAP WITHOUT STRANDING ANYTHING. Reported at phone width:
+   * *"keyboard lower bittons (+- panic etc) go to the same line"*, off a crop
+   * of `/nola/` with the octave pair on one line and `Loop Sustain Panic`
+   * pushed to the RIGHT END of a second line under them.
+   *
+   * 🔴 WHAT WAS WRONG WAS THE AUTO MARGIN, NOT THE MARKING. The row used to
+   * put `kpad-right` on the first of the right hand controls and `kpad-tight`
+   * on the rest, and the principle behind that is kept word for word: the
+   * BUILDER says where the groups are and the stylesheet does not infer it. A
+   * `margin-left: auto` can only ever be right on a line with room to spare,
+   * because a flex line hands its free space to the auto margins ON THAT LINE,
+   * so the wrapped line right-aligned itself exactly the way the full one did.
+   * Two boxes and `space-between` say the same thing and survive the wrap,
+   * because `space-between` parks a lone item on a line at the START.
+   *
+   * ⚠️ ADDING A FOURTH CONTROL IS STILL ONE LINE AND NO CSS, which is the
+   * property the old arrangement was built for. So is TAKING ONE AWAY while
+   * the page is open, which `offerLoop` below does and which the classes could
+   * not have done without re-marking whichever control inherited first place.
+   *
+   * ⚠️ AND AT 375 px THE ROW STILL CANNOT HOLD EVERYTHING ON ONE LINE, WHICH IS
+   * MEASURED AND IS NOT WHAT THIS CHANGES. `/nola/`'s row is 323 px there and
+   * its children need 523.4 px: 272.9 px of that is the five controls, and the
+   * other 218.5 px is the three reserved readout cells (`kpad-chord`,
+   * `kpad-tempo`, `kpad-ratio`), which hold their widest reading whether or not
+   * anything is written in them. The controls alone would fit with 50 px to
+   * spare. Putting the readouts on a line of their own is a narrow arrangement
+   * and needs the row's own box to decide it, which is `BACKLOG.md`.
+   */
+  const padStart = make('div', 'kpad-grp kpad-grp-start');
+  const padEnd = make('div', 'kpad-grp kpad-grp-end');
   // ⚠️ IT WEARS `.step`, WHICH IS THE STEPPER'S CLASS, AND THAT IS THE POINT.
   // The segmented geometry — borders overlapped by a pixel so a join is one
   // line, corners rounded only on the outer two, the hovered button raised so
@@ -856,7 +889,7 @@ export function createKeyboard(host, {
      'nameSeg' before initialization"*. The shape is always the same: a
      declaration shadows its whole block from the top, and moving an APPEND is
      enough to open one. */
-  pad.append(octPair);
+  padStart.append(octPair);
   /**
    * 🔴 HOW FAR FROM HOME, WHICH AMENDS THIS FILE'S OWN RULE AND IS NOT THE
    * THING THAT RULE REFUSED. The header says there is no octave number on the
@@ -884,7 +917,7 @@ export function createKeyboard(host, {
        measured once, in `video-panel.mjs`'s full screen state. */
     if (d === 0) atEl.dataset.home = '1'; else delete atEl.dataset.home;
   };
-  pad.append(atEl);
+  padStart.append(atEl);
   /**
    * 🔴 WHAT IS BEING HELD, NAMED, TO THE RIGHT OF THE DISPLACEMENT. Asked
    * 2026-09-25: *"add chord name to the footer, right from the transpose
@@ -923,7 +956,7 @@ export function createKeyboard(host, {
   const chordEl = wantChord ? make('span', 'kpad-chord', '') : null;
   if (chordEl) {
     chordEl.style.minWidth = `${CHORD_CH}ch`;
-    pad.append(chordEl);
+    padStart.append(chordEl);
   }
   /**
    * 🔴 TWO MORE CELLS, AND ONLY ON A KEYBOARD THAT LOOPS. Asked 2026-09-25:
@@ -975,7 +1008,7 @@ export function createKeyboard(host, {
   if (tempoEl) {
     tempoEl.style.minWidth = `${TEMPO_CH}ch`;
     ratioEl.style.minWidth = `${RATIO_CH}ch`;
-    pad.append(tempoEl, ratioEl);
+    padStart.append(tempoEl, ratioEl);
   }
   const panicBtn = make('button', '', 'Panic', {
     type: 'button', title: 'stop every note that is still sounding',
@@ -1036,15 +1069,13 @@ export function createKeyboard(host, {
                      onChange: (on) => onSustain?.(on) })
     : null;
   /* 🔴 THE ROW SAYS WHERE ITS OWN GROUPS ARE, AND THE STYLESHEET NO LONGER
-     GUESSES. The first of these takes the free space and pushes the rest to the
-     right; the others sit tight against it. Adding a fourth control is one more
-     entry in this array and no CSS at all, which is the opposite of what the
-     `margin-left: auto` on every toggle did when `Loop` arrived. */
-  const rightSide = [loopBtn?.el, sustainBtn?.el, panicBtn].filter(Boolean);
-  rightSide.forEach((node, i) => {
-    node.classList.add(i === 0 ? 'kpad-right' : 'kpad-tight');
-    pad.append(node);
-  });
+     GUESSES. These go in the row's far end, in this order, and the box they go
+     in is what pushes them right and what keeps them together when the row
+     wraps. Adding a fourth control is one more entry in this array and no CSS
+     at all, which is the opposite of what the `margin-left: auto` on every
+     toggle did when `Loop` arrived. */
+  padEnd.append(...[loopBtn?.el, sustainBtn?.el, panicBtn].filter(Boolean));
+  pad.append(padStart, padEnd);
   if (wantPad) el.append(pad);
   /* 🔴 THE PAGE'S ROW GOES IN LAST, AND THE COMPONENT OWNS ITS EDGES. The rule
      above it bleeds through `--kbd-pad` to the box's own border and the row's
@@ -1627,6 +1658,79 @@ export function createKeyboard(host, {
 
   function setLoop() { machine.press(0); }
 
+  /**
+   * 🔴 OFFER THE `Loop` CONTROL, OR TAKE IT AWAY. Asked 2026-09-28: *"rm loop
+   * button when evolution keyboad is not connected"*. A keyboard plugged in
+   * after the page opened brings it back and one unplugged takes it away, so
+   * this is a method rather than a build-time flag: `wantLoop` is read once,
+   * and a cable is not a fact that holds still.
+   *
+   * 🔴 THE PAGE DECIDES WHAT `connected` MEANS AND THIS DECIDES WHAT THE ROW
+   * LOOKS LIKE, which is the division this file keeps everywhere else and which
+   * `midi.mjs` states outright: a page owns MIDI. Nothing here asks for a MIDI
+   * port, reads a device name or knows what an Evolution is; it is handed a
+   * boolean. Putting the device test in here would make seven pages request
+   * Web MIDI to draw a keyboard.
+   *
+   * 🔴 AND A LOOP THAT IS SOUNDING IS STOPPED AND KEPT, NEVER CLEARED. The
+   * control is the only way to stop one, so withdrawing it while a loop runs
+   * would leave a phrase going round with nothing that can reach it, and
+   * `Panic` stops notes rather than loops. Clearing would be worse: a take is
+   * something somebody played. So every sounding slot is walked to `stopped`,
+   * which is one press of its own key and keeps its tape, and plugging the
+   * keyboard back in gives the control back with the takes still on it.
+   * ⚠️ `press` THEN `settle` IS ONE IMMEDIATE PRESS. A press is held for
+   * `doubleMs` to find out whether it is half of a double one, and `settle`
+   * runs it now; a clock cannot wait here, because the row has to be right
+   * before the next frame.
+   *
+   * ⚠️ IT IS THE DEFAULT THAT IS SHOWN, so a page that never calls this is
+   * exactly what it was. `/kit/` is that page: its keyboard is a specimen of
+   * the component and has no MIDI at all, and a gallery that hid the control
+   * this component grew most recently would be a gallery nobody can read.
+   *
+   * 🔴 AND THE TEMPO AND RATIO CELLS GO WITH IT, WHICH IS WHAT MAKES THE ROW
+   * FIT A PHONE. Those two are readouts ABOUT the loop and can say nothing at
+   * all while there is no control to start one, so leaving them standing is a
+   * reserved slot outliving its label, which this project has measured once as
+   * 75 px of drift down a five row column on `/circuit/`. MEASURED here: at
+   * 375 px on `/nola/` they are 86.1 px and 59.6 px of the 523.4 px a 323 px
+   * row was being asked to hold, and taking them with the button brings it to
+   * 304.4 px, so `-`, `+`, `0`, `Sustain` and `Panic` land on ONE LINE. That is
+   * the second half of *"keyboard lower bittons (+- panic etc) go to the same
+   * line"*, arriving from the ask next to it.
+   * ⚠️ THEY ARE REMOVED AND RE-APPENDED RATHER THAN HIDDEN, the same way the
+   * button is, because `[hidden]` on an element whose stylesheet rule sets a
+   * `display` is a fact about an attribute rather than about the screen, and
+   * four components here have needed that patch already.
+   *
+   * @param {boolean} present
+   * @returns {boolean} whether the control is now in the row
+   */
+  function offerLoop(present) {
+    if (!loopBtn) return false;
+    const want = !!present;
+    if (want === padEnd.contains(loopBtn.el)) return want;
+    if (want) {
+      padEnd.prepend(loopBtn.el);
+      /* The two cells were appended last, so appending puts them back where
+         they were: after the chord name and before the row's far end. */
+      if (tempoEl) padStart.append(tempoEl, ratioEl);
+    } else {
+      for (let i = 0; i < SLOTS; i++) {
+        /* `recording` needs two presses: one closes the take into a loop and the
+           second stops it. Reading the state again between them is what makes
+           that two steps rather than an assumption about the walk. */
+        if (machine.state(i) === 'recording') { machine.press(i); machine.settle(i); }
+        if (machine.state(i) === 'looping') { machine.press(i); machine.settle(i); }
+      }
+      loopBtn.el.remove();
+      if (tempoEl) { tempoEl.remove(); ratioEl.remove(); }
+    }
+    paintLoop();
+    return want;
+  }
+
   // An octave button at the end of the range that still looks pressable is a
   // control that lies about having somewhere to go.
   function paintPad() {
@@ -1707,6 +1811,16 @@ export function createKeyboard(host, {
     sustain: sustainBtn,
     /** the `Loop` toggle, or null when the caller did not ask for one */
     loop: loopBtn,
+    /**
+     * Put the `Loop` control in the row or take it out of it, and say which it
+     * is now. The full account is on `offerLoop` above; the short version is
+     * that the page decides what *connected* means, a sounding loop is stopped
+     * and kept rather than cleared, and a keyboard with no `loop: true` answers
+     * `false` and does nothing.
+     */
+    offerLoop,
+    /** whether the `Loop` control is in the row right now */
+    loopOffered: () => !!loopBtn && padEnd.contains(loopBtn.el),
     /**
      * 🔴 THE TAKES, AND THIS IS WHAT A NUMBER PAD DRIVES. Asked 2026-09-23:
      * *"num works. how come you can not add it to keyboard"*. A page that has a

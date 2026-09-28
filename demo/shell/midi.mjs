@@ -24,8 +24,21 @@
  * @param {(note:number, ch:number, at:number)=>void} o.onUp
  * @param {(cc:number, value:number, ch:number, at:number)=>void} [o.onControl]
  * @param {(line:string, kind?:string)=>void} [o.log]
- * @param {(n:number)=>void} [o.onPorts]  called with the input count, on every change
- * @returns {{ports:()=>number, state:()=>string, close:()=>void}}
+ * @param {(n:number, names:string[])=>void} [o.onPorts]  called with the input
+ *   count and the port NAMES, on every change.
+ *   🔴 THE NAMES ARE THE SECOND ARGUMENT SINCE 2026-09-28, AND A COUNT COULD
+ *   NOT HAVE ANSWERED THE QUESTION THAT NEEDED THEM. `/nola/` shows its `Loop`
+ *   control only while the Evolution is plugged in (*"rm loop button when
+ *   evolution keyboad is not connected"*), and *something is plugged in* and
+ *   *that keyboard is plugged in* are different facts. A page that wants to
+ *   know which device this is has to be told which device this is.
+ *   ⚠️ IT IS AN ADDED ARGUMENT AND NOT A CHANGED ONE, so every caller written
+ *   before it reads exactly what it read. A new property that silently switches
+ *   a page's behaviour is the shape of loss `positron-verify` records as 27
+ *   asserts becoming 17, every one of them green.
+ *   ⚠️ AND THE MATCHING IS THE PAGE'S. This file does not know what an Evolution
+ *   is, which is the same division it already keeps about what a note means.
+ * @returns {{ports:()=>number, names:()=>string[], state:()=>string, close:()=>void}}
  */
 export function createMidi({
   onDown, onUp, onControl, onProgram, log = () => {}, onPorts = () => {},
@@ -43,6 +56,8 @@ export function createMidi({
   onAny = null,
 } = {}) {
   let ports = 0, state = 'asking', access = null;
+  /** the input port names, rebuilt on every change, so a page can say which device */
+  const names = [];
 
   const wire = (port) => {
     port.onmidimessage = (e) => {
@@ -75,15 +90,18 @@ export function createMidi({
 
   const recount = () => {
     ports = 0;
-    for (const p of access.inputs.values()) { wire(p); ports++; }
+    names.length = 0;
+    /* ⚠️ `name` CAN BE null ON A PORT, so the empty string stands in for it
+       rather than a `null` a caller's regular expression would throw on. */
+    for (const p of access.inputs.values()) { wire(p); names.push(p.name || ''); ports++; }
     state = ports ? 'connected' : 'none plugged in';
-    onPorts(ports);
+    onPorts(ports, [...names]);
   };
 
   (async () => {
     if (!navigator.requestMIDIAccess) {
       state = 'unsupported';
-      onPorts(0);
+      onPorts(0, []);
       log('this browser has no MIDI, but the keys on screen still play', 'warn');
       return;
     }
@@ -93,17 +111,22 @@ export function createMidi({
       // Plugging a keyboard in after the page loaded is the ordinary case, not
       // an edge one — a page that only looks once is a page you have to reload.
       access.onstatechange = recount;
-      log(ports ? `${ports} MIDI input${ports === 1 ? '' : 's'} · play it`
+      /* ⚠️ NO MIDDOT. This line joined the count and `play it` with one, which
+         is two facts glued into a sentence, and it reaches every page that opens
+         MIDI. The shared ones are decided once, which is here. */
+      log(ports ? `${ports} MIDI input${ports === 1 ? '' : 's'}. Play one.`
                 : 'no MIDI keyboard plugged in; the keys on screen still play');
     } catch (e) {
       state = 'refused';
-      onPorts(0);
+      onPorts(0, []);
       log(`MIDI was refused: ${e.message}`, 'warn');
     }
   })();
 
   return {
     ports: () => ports,
+    /** the input port names, copied, for a page asking which device is there */
+    names: () => [...names],
     state: () => state,
     close: () => {
       if (!access) return;
