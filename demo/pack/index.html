@@ -202,7 +202,7 @@
     name: 'pack',
     // ⚠️ THE PAGE'S SENTENCE AND THE INDEX'S ARE ONE STRING, because a page with
     // a diagram carries the index's own line verbatim.
-    what: 'open a Circuit pack or a loose sample set and look inside its patches, sessions and samples',
+    what: 'open a Circuit pack or any zip of WAVs and look inside its patches, sessions and samples',
     /**
      * 🔴 NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD. Instructed
      * 2026-09-21: *"rm patches 64 / sessions 32 / different 32 of 32 / filled
@@ -1124,6 +1124,50 @@
   }
 
   /**
+   * 🔴 THE WAVS OUT OF ANY ZIP, WHICH SINCE 2026-09-28 IS NOT ONLY A PACK.
+   * Asked for as *"pack: make support of any wavs in zip and change desc
+   * accrodingly"*. Nothing here decodes anything: `circuit-sample.mjs` already
+   * had `readWave` and `summarise`, and this is the loop that hands them a zip
+   * entry, which `openPack` had inline and `openZip` now needs as well. A second
+   * copy of it would have been the shape this project keeps paying for.
+   *
+   * 🔴 AND A MAC RESOURCE FORK IS A `.wav` BY ITS NAME AND NOTHING AT ALL BY ITS
+   * CONTENT, SO IT NEVER REACHES THE TABLE. A zip made on a Mac carries
+   * `__MACOSX/._<name>` of a few hundred bytes beside every real file. Letting
+   * those in would put a refused row next to every real sample saying the file
+   * does not start `RIFF`, which is a table of alarms that are all the
+   * archiver's own packaging. The `.syx` branch below already knew
+   * about this shape and answers it by taking the BIGGEST rather than the first,
+   * which works for one file and cannot work for sixty four.
+   * ⚠️ IT IS A NAME TEST AND NOT A SIZE THRESHOLD. A fork is small, and so is a
+   * short drum hit: `0.12 s` of 48 kHz mono is 11.5 kB and the pack holds
+   * shorter. Only the name says which is which.
+   * ⚠️ AND BOTH SPELLINGS ARE REFUSED, the directory and the `._` prefix, because
+   * a fork that has been extracted and re-zipped keeps the second and loses the
+   * first.
+   *
+   * ⚠️ THE ORDER IS THE ARCHIVE'S OWN, which is what `openPack` has always done
+   * and is the only honest answer for a zip somebody made themselves.
+   * `samplesIn()` in `circuit-sample.mjs` sorts by the trailing number instead,
+   * because `sample_10.wav` has to follow `sample_2.wav` in a pack whose slots
+   * ARE those numbers. In a bag of drum hits called `Kick 1.wav` and `Bass
+   * 3.wav` that same sort is a reordering nobody asked for, so this page does
+   * not use it.
+   */
+  async function readWavs(list) {
+    const out = [];
+    for (const e of list) {
+      const name = e.name.split('/').pop();
+      if (!/\.wav$/i.test(name)) continue;
+      if (/(^|\/)__MACOSX\//.test(e.name) || name.startsWith('._')) continue;
+      const bytes = await e.read();
+      const wave = readWave(bytes);
+      out.push({ name, size: e.size, wave, row: summariseWave(wave, name) });
+    }
+    return out;
+  }
+
+  /**
    * 🔴 A REAL DOWNLOAD IS A ZIP OF PACKS, NOT A PACK, AND THE FIRST BUILD
    * REFUSED IT. MEASURED on the soundbank in `purchased/`: 2 `.circuitpack`, 1
    * `.circuittrackspack`, 128 `.syx`, an `.xlsx`, two `.txt` and 10 `.url` in one
@@ -1131,6 +1175,16 @@
    * those packs were measured.
    * ⚠️ A `.circuittrackspack` IS FOR THE OTHER INSTRUMENT and is named rather
    * than opened. `research/circuit-soundbank-2026-09-21.md` §5 measured that.
+   *
+   * 🔴 AND A ZIP OF PLAIN WAVS IS A SAMPLE SET, WHICH THIS REFUSED UNTIL
+   * 2026-09-28. It filtered for `.circuitpack`, `.circuittrackspack` and `.syx`,
+   * and a bag of drum hits fell all the way through to *holds no Circuit pack
+   * and no patches*, on a page whose third tab is samples and whose reader had
+   * been reading WAVs out of packs since the day it was written. The reading side
+   * needed nothing: this is a filter and a branch.
+   * ⚠️ AND A ZIP HOLDING BOTH LOOSE PATCHES AND WAVS NOW SHOWS BOTH. `fill()`
+   * always took three lists and the `.syx` branch was passing an empty one for
+   * the third.
    */
   async function openZip(name, bytes) {
     let list;
@@ -1167,11 +1221,25 @@
         await openSyx(big.name, big.bytes);
         return;
       }
-      fill(got, [], []);
+      fill(got, [], await readWavs(list));
       drop.say(name, 'good');
       return;
     }
-    drop.say(`${name} holds no Circuit pack and no patches`, 'bad');
+    // ⚠️ READ LAST, AND THAT IS ARITHMETIC RATHER THAN TIDINESS. Every branch
+    // above returns without them, and `Roland_Classics.zip` carries 48 real
+    // WAVs beside its bulk transfer, so reading them at the top of this function
+    // would decode 5.7 MB of audio on the way to throwing it away.
+    const wavs = await readWavs(list);
+    if (wavs.length) {
+      // ⚠️ NO EXTRA SENTENCE HERE. `fill()` logs how many of them read and how
+      // many were refused, which is the one thing a bag of somebody else's WAVs
+      // can be wrong about, and the footer carries the file's name the way it
+      // does for every other way in.
+      fill([], [], wavs);
+      drop.say(name, 'good');
+      return;
+    }
+    drop.say(`${name} holds no Circuit pack, no patches and no samples`, 'bad');
   }
 
   /**
@@ -1336,7 +1404,6 @@
       .filter((e) => /\.syx$/.test(e.name))
       .sort((a, b) => (+(a.name.match(/\d+/) || [0])[0]) - (+(b.name.match(/\d+/) || [0])[0]));
     const sess = list.filter((e) => e.name.endsWith('.circuitsession'));
-    const wav = list.filter((e) => e.name.endsWith('.wav'));
 
     const got = [];
     for (const e of syx) got.push({ name: e.name.split('/').pop(), bytes: await e.read() });
@@ -1360,13 +1427,7 @@
     // name rather than throwing, and decodes to plain floats.
     // ⚠️ AND THE RAW BYTES ARE NOT KEPT. `readWave` copies the data chunk, so
     // holding the file as well would be a second 5.1 MB of the same audio.
-    const sm = [];
-    for (const e of wav) {
-      const b = await e.read();
-      const name = e.name.split('/').pop();
-      const wave = readWave(b);
-      sm.push({ name, size: e.size, wave, row: summariseWave(wave, name) });
-    }
+    const sm = await readWavs(list);
 
     fill(got, st, sm);
     drop.say(`${name}${from ? ` ${from}` : ''}`, 'good');
@@ -1680,18 +1741,41 @@
         return { i, name: w.name, len: '', frames: '', rate: '', peak: '', sound: '',
                  hover: `this one did not read: ${r.why}` };
       }
+      /**
+       * 🔴 A HEADER THAT READ AND AUDIO THAT DID NOT ARE TWO DIFFERENT FACTS,
+       * AND CONFLATING THEM THREW. MEASURED 2026-09-28 on `one-shots.zip`, an
+       * ordinary bag of forty drum hits: they are **44.1 kHz, 24 bit, stereo**,
+       * so `readWave` reads every header and `toMono` refuses every one of them,
+       * because it decodes 16 bit mono and says so in words. `summarise` then
+       * answers `ok: true` with `peak`, `sound`, `lead` and `trail` all `null`,
+       * and this row builder called `r.peak.toFixed(2)` on it.
+       * ⚠️ IT COULD NOT ARISE UNTIL TODAY, which is why it sat here. Every WAV
+       * in a `.circuitpack` is 48 kHz 16 bit mono, 64 of 64, and the only other
+       * way in was a bulk transfer, whose slots are the same. A zip of anybody's
+       * samples is the first thing that brings another shape through the door.
+       * ✅ SO THE MEASURED CELLS GO EMPTY AND THE HEADER CELLS STAY. `length`,
+       * `frames` and `rate` are read off the header and are true; `peak` and
+       * `sound` are read off the audio and were never taken. Nothing unmeasured
+       * prints as a zero here, and the reason is on the row's own hover.
+       */
+      const heard = r.peak !== null;
       return {
         i,
         name: w.name,
         len: `${r.seconds.toFixed(2)} s`,
         frames: r.frames.toLocaleString(),
         rate: `${(r.rate / 1000).toFixed(r.rate % 1000 ? 1 : 0)} kHz`,
-        peak: r.peak.toFixed(2),
-        sound: `${r.sound.toFixed(0)}%`,
+        peak: heard ? r.peak.toFixed(2) : '',
+        sound: heard ? `${r.sound.toFixed(0)}%` : '',
         hover: `${r.rate} Hz, ${r.bits} bit, ${r.channels === 1 ? 'mono' : `${r.channels} channels`}`
              + `, ${r.frames.toLocaleString()} frames in ${kb(w.size)}`
-             + `, ${r.lead} frame(s) of silence at the front and ${r.trail} at the back`
-             + `${r.silent ? ', and it is silent all through' : ''}. Press to hear it`,
+             + (heard
+               ? `, ${r.lead} frame(s) of silence at the front and ${r.trail} at the back`
+                 + `${r.silent ? ', and it is silent all through' : ''}. Press to hear it`
+               // ⚠️ A SECOND LINE RATHER THAN A JOIN. A `title` really does break
+               // on a newline, and the refusal is a second fact rather than a
+               // clause bolted onto the first.
+               : `\n${r.why}`),
       };
     }));
 
@@ -1790,17 +1874,26 @@
      * marked row above carries all five, and the one that could not be a column
      * is the refusal, which is the row's own hover and its blank cells.
      */
-    playBtn.disabled = !r.ok;
+    // ⚠️ THE PICTURE IS DRAWN FROM THE SAME FLOATS THE SOUND IS MADE OF, out of
+    // `toMono`, so what is on screen and what comes out of the speaker cannot
+    // be two readings of one file that disagree.
+    const mono = r.ok ? toMono(w.wave) : { ok: false };
+    /**
+     * 🔴 THE PLAY BUTTON FOLLOWS THE AUDIO, NOT THE HEADER, AND IT READ `!r.ok`
+     * UNTIL 2026-09-28. Those were the same thing while every file that could
+     * reach this page was 48 kHz 16 bit mono. They stopped being the same thing
+     * the moment a zip of anybody's samples could be opened: MEASURED on
+     * `one-shots.zip`, forty 24 bit stereo files whose headers all read, so
+     * every row would have offered a live Play that logs a refusal and makes no
+     * sound. That is the shape this project calls a control that lies.
+     */
+    playBtn.disabled = !mono.ok;
     /* The bar's clock and slider need a length before they mean anything, and a
        slot that did not read has none. */
     deck.pause();
     deck.setRange([0, r.ok && r.seconds > 0 ? Math.round(r.seconds * 1000) : 1]);
     deck.seek(0);
 
-    // ⚠️ THE PICTURE IS DRAWN FROM THE SAME FLOATS THE SOUND IS MADE OF, out of
-    // `toMono`, so what is on screen and what comes out of the speaker cannot
-    // be two readings of one file that disagree.
-    const mono = r.ok ? toMono(w.wave) : { ok: false };
     if (mono.ok) {
       waveHost.hidden = false;
       wave.buffer(peaksOf(mono.samples));
@@ -1818,6 +1911,9 @@
       wave.playhead(0);
     } else { wave.clear(); waveHost.hidden = true; }
 
+    // ⚠️ THE PRESS STILL REACHES `playSample`, WHICH SAYS IN THE LOG WHY A FILE
+    // THIS PAGE CANNOT DECODE MADE NO SOUND. A press is somebody asking, and
+    // answering it with silence is worse than answering it with the reason.
     if (andPlay && r.ok) playSample(i);
   }
 
@@ -2143,6 +2239,185 @@
         `the patch reader counts ${patchesIn(noise).length} in 350 bytes of noise whose head is `
         + `${[...noise.subarray(0, 6)].map((x) => x.toString(16).padStart(2, '0')).join(' ')}, `
         + 'and a rar never reaches it');
+    }
+
+    /**
+     * 🔴 A ZIP OF PLAIN WAVS, GRADED WITH NO FILE AND NO CORPUS, SO IT RUNS ON
+     * THE DEPLOY TOO. Asked for 2026-09-28 as *"pack: make support of any wavs
+     * in zip and change desc accrodingly"*. Until that day `openZip` filtered
+     * for `.circuitpack`, `.circuittrackspack` and `.syx`, and a bag of drum
+     * hits fell through every branch to *holds no Circuit pack and no patches*.
+     * ⚠️ THE FIXTURE IS BUILT HERE RATHER THAN FETCHED, which is the only way
+     * this can be a check at all: a zip in the repository is a file the deploy
+     * would have to serve and a request this page must not make, and a zip in
+     * `tmp/` is a check that runs on one machine. `storedZip` writes method 0,
+     * which `unzip.mjs` reads and which needs no compressor.
+     * 🔴 AND WRITING A ZIP IS NOT WRITING A MESSAGE. Everything else this page
+     * refuses to build is a SysEx frame, because building one is the first half
+     * of sending one and the thing at the other end has no factory reset. A zip
+     * container reaches no instrument, and the bytes inside this one are two
+     * sine bursts and a deliberate refusal.
+     */
+    {
+      /**
+       * PCM, at whatever shape the caller asks for. The default is 48 kHz 16 bit
+       * mono, which is what every sample in a `.circuitpack` is, 64 of 64.
+       * ⚠️ IT TAKES THE OTHER SHAPES TOO, because the whole point of opening
+       * anybody's zip is that the files in it are not a Circuit's.
+       */
+      const wavBytes = (frames, { rate = 48000, bits = 16, channels = 1 } = {}) => {
+        const per = bits / 8, block = per * channels, len = frames * block;
+        const b = new Uint8Array(44 + len);
+        const dv = new DataView(b.buffer);
+        const put = (at, s) => { for (let k = 0; k < s.length; k++) b[at + k] = s.charCodeAt(k); };
+        put(0, 'RIFF'); dv.setUint32(4, 36 + len, true); put(8, 'WAVE');
+        put(12, 'fmt '); dv.setUint32(16, 16, true);
+        dv.setUint16(20, 1, true); dv.setUint16(22, channels, true);
+        dv.setUint32(24, rate, true); dv.setUint32(28, rate * block, true);
+        dv.setUint16(32, block, true); dv.setUint16(34, bits, true);
+        put(36, 'data'); dv.setUint32(40, len, true);
+        // A burst rather than silence, for the reason every stand-in in this
+        // repository is a tone: a page that reported a peak of zero about
+        // silence would pass a check it never made.
+        for (let k = 0; k < frames; k++) {
+          const v = Math.sin(k / 9) * 0.6;
+          for (let c = 0; c < channels; c++) {
+            const at = 44 + k * block + c * per;
+            if (bits === 16) dv.setInt16(at, Math.round(v * 32767), true);
+            else {
+              const q = Math.round(v * 8388607);
+              b[at] = q & 0xff; b[at + 1] = (q >> 8) & 0xff; b[at + 2] = (q >> 16) & 0xff;
+            }
+          }
+        }
+        return b;
+      };
+      /** A zip with nothing compressed in it, which is a hundred bytes of header. */
+      const storedZip = (files) => {
+        const enc = new TextEncoder();
+        const locals = [], centrals = [];
+        let off = 0;
+        for (const f of files) {
+          const nm = enc.encode(f.name);
+          const loc = new Uint8Array(30 + nm.length + f.bytes.length);
+          const lv = new DataView(loc.buffer);
+          lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true);
+          lv.setUint32(18, f.bytes.length, true); lv.setUint32(22, f.bytes.length, true);
+          lv.setUint16(26, nm.length, true);
+          loc.set(nm, 30); loc.set(f.bytes, 30 + nm.length);
+          locals.push(loc);
+          const cen = new Uint8Array(46 + nm.length);
+          const cv = new DataView(cen.buffer);
+          cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+          cv.setUint32(20, f.bytes.length, true); cv.setUint32(24, f.bytes.length, true);
+          cv.setUint16(28, nm.length, true); cv.setUint32(42, off, true);
+          cen.set(nm, 46);
+          centrals.push(cen);
+          off += loc.length;
+        }
+        const cdLen = centrals.reduce((n2, c) => n2 + c.length, 0);
+        const out = new Uint8Array(off + cdLen + 22);
+        let p = 0;
+        for (const l of locals) { out.set(l, p); p += l.length; }
+        const cdAt = p;
+        for (const c of centrals) { out.set(c, p); p += c.length; }
+        const ev = new DataView(out.buffer, p);
+        ev.setUint32(0, 0x06054b50, true);
+        ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+        ev.setUint32(12, cdLen, true); ev.setUint32(16, cdAt, true);
+        return out;
+      };
+
+      // 🔴 THE FORK SITS BETWEEN THE TWO GOOD FILES ON PURPOSE. A filter that
+      // missed it would show four rows in a different order, so the order is
+      // part of what this grades rather than an accident of how it was built.
+      const fork = new Uint8Array(300);
+      fork.set([0x00, 0x05, 0x16, 0x07], 0);
+      const notWave = new Uint8Array([0x52, 0x58, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]);
+      const bag = storedZip([
+        { name: 'Kick.wav', bytes: wavBytes(4800) },
+        { name: '__MACOSX/._Kick.wav', bytes: fork },
+        { name: 'hits/Snare.wav', bytes: wavBytes(24000) },
+        // 🔴 THE SHAPE A REAL BAG OF SAMPLES ARRIVES IN, AND IT IS NOT THE
+        // CIRCUIT'S. MEASURED 2026-09-28 across the six zips in `tmp/packs/`
+        // that hold WAVs: 901 files, of which 749 are 16 bit mono and this page
+        // can decode, and **152 are stereo or 24 bit and it cannot**. So this is
+        // not a corner case invented for a check, it is a sixth of the corpus.
+        { name: 'Room.wav', bytes: wavBytes(44100, { rate: 44100, bits: 24, channels: 2 }) },
+        { name: 'readme.txt', bytes: new TextEncoder().encode('recorded on a desk') },
+        { name: 'Cymbal.wav', bytes: notWave },
+      ]);
+      const inBag = readZip(bag);
+      const beforeBag = fetched;
+      await openZip('a bag of drum hits.zip', bag);
+      const bagSaid = window.__demo.logs.map((l) => l.msg).join('\n');
+      /* ⚠️ `.pos-tbl-c` AND THE SCROLLER, NOT `children` AND NOT `el`. The
+         heading IS a `.pos-tbl-row` and it comes first in the element, which
+         this page has now paid for four times. */
+      const cells = [...(sampleTable.scroller()
+        .querySelector('.pos-tbl-row')?.querySelectorAll('.pos-tbl-c') || [])]
+        .map((c) => c.textContent);
+
+      d.assert('a zip of plain wavs opens as a sample set, in the archive\'s own order, with no patches and no sessions',
+        samples.length === 4
+        && samples.map((w) => w.name).join(' ') === 'Kick.wav Snare.wav Room.wav Cymbal.wav'
+        && samples[0].row.seconds === 0.1 && samples[1].row.seconds === 0.5
+        && cells[0] === 'Kick.wav' && cells[1] === '0.10 s' && cells[4] === '0.60'
+        && patches.length === 0 && sessions.length === 0
+        && tabs.buttons[2].textContent === '4 SAMPLES'
+        && tabs.enabled('samples') === true
+        && tabs.enabled('patches') === false && tabs.enabled('sessions') === false
+        && tabs.at() === 'samples'
+        && drop.note.textContent === 'a bag of drum hits.zip'
+        && fetched === beforeBag,
+        `${samples.length} row(s) reading ${JSON.stringify(samples.map((w) => w.name))}, `
+        + `the first one ${JSON.stringify(cells)}, tab "${tabs.buttons[2].textContent}", `
+        + `open tab ${tabs.at()}, footer "${drop.note.textContent}", `
+        + `${fetched - beforeBag} request(s)`);
+
+      d.assert('NEGATIVE CONTROL: a Mac resource fork is a wav by its name and is never a row',
+        inBag.length === 6
+        && inBag.some((e) => e.name === '__MACOSX/._Kick.wav')
+        && !samples.some((w) => w.name.startsWith('._'))
+        && !samples.some((w) => w.name === 'readme.txt'),
+        `the zip holds ${inBag.length} entries, `
+        + `${inBag.filter((e) => /\.wav$/i.test(e.name)).length} of them named .wav, `
+        + `and the table shows ${samples.length}`);
+
+      d.assert('NEGATIVE CONTROL: a wav the decoder refuses keeps its row, says why and is counted as refused',
+        samples[3].row.ok === false
+        && /rather than "RIFF"/.test(samples[3].row.why || '')
+        && /3 of 4 samples read, 1 refused/.test(bagSaid),
+        `the fourth row says "${samples[3]?.row.why}", and the log says `
+        + `"${bagSaid.split('\n').filter((l) => /samples read/.test(l)).pop()}"`);
+
+      /**
+       * 🔴 THE HALF THAT IS NOT A REFUSAL AND IS NOT A READING EITHER. A 24 bit
+       * stereo file's HEADER reads perfectly and its AUDIO is not decoded here,
+       * so the row is neither `ok: false` nor complete, and this page's previous
+       * only shapes were those two. Before today the row builder called
+       * `null.toFixed(2)` on it and the play button offered a press that could
+       * only log a refusal.
+       */
+      {
+        const rowsNow = [...sampleTable.scroller().querySelectorAll('.pos-tbl-row')];
+        const room = rowsNow[2];
+        const roomCells = [...room.querySelectorAll('.pos-tbl-c')].map((c) => c.textContent);
+        openSample(2, false);
+        const roomBtn = playBtn.disabled;
+        openSample(0, false);
+        d.assert('a wav whose header reads and whose audio this page cannot decode keeps its header cells, empties the measured ones and cannot be played',
+          samples[2].row.ok === true && samples[2].row.peak === null
+          && roomCells[0] === 'Room.wav' && roomCells[1] === '1.00 s'
+          && roomCells[2] === '44,100' && roomCells[3] === '44.1 kHz'
+          && roomCells[4] === '' && roomCells[5] === ''
+          && /24 bit is not decoded here/.test(room.title)
+          && roomBtn === true && playBtn.disabled === false
+          && waveHost.hidden === false,
+          `the row reads ${JSON.stringify(roomCells)}, its hover says `
+          + `"${room.title.split('\n').pop()}", and play was `
+          + `${roomBtn ? 'off' : 'on'} for it and ${playBtn.disabled ? 'off' : 'on'} for Kick.wav`);
+      }
     }
 
     const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;

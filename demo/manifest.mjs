@@ -576,7 +576,7 @@ export const DEMOS = [
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
   { name: 'pack', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
-    one: 'open a Circuit pack or a loose sample set and look inside its patches, sessions and samples',
+    one: 'open a Circuit pack or any zip of WAVs and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
   /**
    * 🔴 THE GRID, AND ITS ROWS ARE WHATEVER A READER OPENS. Asked 2026-09-21:
