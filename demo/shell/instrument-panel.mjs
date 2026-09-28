@@ -57,10 +57,17 @@
 // The fourth file here with "panel" in its name, and none of them collide:
 // panel.mjs is a canvas with a footer for XR, panel-layout.mjs is a hardware
 // panel with a fixed column and a scroller, xr-panel.mjs hangs one in a
-// headset. This one is the same instrument with no column and no scroller,
-// for an instrument that FITS; /knobs/ measured 992 px inside a 686 px case
-// and keeps panel-layout. The build enumerates demo/shell/ (workers/view/
-// build.mjs), so nothing is registered.
+// headset. This one is the same instrument with no column and no scroller.
+// 🔴 AND THE "FOR AN INSTRUMENT THAT FITS" CLAUSE HERE WAS WRONG, MEASURED AND
+// CORRECTED 2026-09-28. It read that /knobs/ measured 992 px inside a 686 px
+// case and keeps panel-layout. That 992 was a property of .panel-flow being
+// width: max-content, not of the instrument. A glued surface is width:
+// fit-content with max-width: 100%, so it stops at the room there is: the same
+// keyboard is 646.0 px in a 688.0 px surface with 777.0 px of keys scrolling in
+// its own row, and the widest white key is 49.0 px, which is --k-min, the
+// component's own grid track floor and not a squash. /knobs/ wears this
+// component now. The build enumerates demo/shell/ (workers/view/build.mjs), so
+// nothing is registered.
 //
 // Surveyed across the seven instrument pages before it was written: a knob
 // bank row, a keyboard at the bottom and a plate carrying two facts are each
@@ -68,10 +75,16 @@
 // /muta/ and /fau/ both had to pass theirs as a glue part OUTSIDE the case to
 // get edge to edge. That is what a picture row gives by construction.
 //
-// Not applied to any page, and what it would break if it were: /evo/'s
-// keyboard has no intrinsic height and lives on panel.grow; /knobs/ scrolls
-// its whole strip as one; /twelve/ is uncased; /nola/'s footer belongs to the
-// keyboard component. /kit/ had a GLUE block before, deleted 2026-09-18 as
+// Worn by /fau/, /knobs/ and /tom/ as of 2026-09-28. What it would still break
+// elsewhere: /evo/'s keyboard has no intrinsic height and lives on panel.grow;
+// /twelve/ is uncased; /nola/'s footer belongs to the keyboard component.
+// ⚠️ /tom/ KEEPS panel-layout INSIDE A ROW, which is the shape this file did
+// not anticipate: 64 label rows beside 16 steps that have to scroll need a
+// fixed column, and cased: true supplies the inset. The case gives up its own
+// border and radius by itself, because .panel-case reads --edge and --r and
+// .pos-glue.pos-glue > * sets both to 0 on the row. MEASURED there: the case
+// draws 0px at radius 0px inside a surface drawing 1px at radius 4px, with no
+// .pos-glue > .panel patch written. /kit/ had a GLUE block before, deleted 2026-09-18 as
 // two grey boxes; every specimen here is an instrument somebody could play.
 //
 // A caller owns what is in a row, the picture, the keyboard and the plate's
