@@ -503,17 +503,22 @@ export const DEMOS = [
    * catch that. A person reading one line can.
    * 🔴 **AND THIS LINE READ `IT PROPOSES AND NEVER CONNECTS` UNTIL
    * 2026-09-25**, when the rows were made live on the ask *"when connections
-   * (diagram rows) are there, enable them"*. **The proposing half is unchanged
-   * and so is the reason for it**: a switch appears only on an ALLOWED row,
-   * nothing crosses until somebody presses it, and `requestMIDIAccess` is behind
-   * that press and is never reached under `?selfcheck=1`. What changed is that
-   * the press now exists.
+   * (diagram rows) are there, enable them"*. A switch then appeared on every
+   * ALLOWED row and nothing crossed until somebody pressed it.
+   * 🔴 **AND THE SWITCH IS GONE SINCE 2026-09-28.** Asked, verbatim: *"rm on
+   * button on wish, just keep x button"*. **A ROW THAT EXISTS IS CONNECTED
+   * NOW**, and the `×` takes the link down, quietens the instrument and clears
+   * the row in one gesture. **The gate did not move, only the gesture that
+   * opens it**: an answer lands only out of a press on `Interpret`, on a
+   * prepared row, or on a release of `Hold to talk`, a page load lays no rows
+   * at all, and `requestMIDIAccess` is still behind a person's press and is
+   * still never reached under `?selfcheck=1`.
    * ⚠️ IT NEEDS `node demo/wish-local.mjs` RUNNING, because a browser cannot
    * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
    * the harness.
    */
   { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
-    one: 'say which instrument should play which, and a language model proposes a connection you can switch on',
+    one: 'say which instrument should play which, and a language model makes the connection on the desk',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
 
   // `bay` was a demo and is archived at archive/demos/bay-index.html, removed
