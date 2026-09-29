@@ -29,10 +29,16 @@
      whole area and the 1 px seam stops being a seam. MEASURED on `/wish/` the
      same day; neither of the kit's existing glued pairs says it out loud. */
   /* ⚠️ THE PICTURE'S HOST PAINTS A GROUND TOO, AND IT WENT RED WITHOUT ONE.
-     The component styles its own `.pos-wave` and this is the wrapper the page
-     puts it in, so it had no background and the glue's line colour came
-     straight through its whole area. Third part, same trap, measured the same
-     day on `/wish/`.
+     The component styles its own `.pos-scope` and paints nothing behind it, so
+     the host had no background and the glue's line colour came straight through
+     its whole area. Third part, same trap, measured the same day on `/wish/`.
+     ⚠️ AND THE HOST IS THE ROW ITSELF SINCE 2026-09-29, not a `<div>` the page
+     puts inside one. `createGlueRows` gives every row `background: var(--card)`
+     already, so this declaration is a second statement of one colour rather than
+     the only one, and it is kept because a part that paints its own ground is
+     what this page has paid for three times. MEASURED after the change, with a
+     sample open: the row computes `rgb(17, 21, 29)` and the surface behind it
+     `rgb(31, 41, 55)`, which is `--card` on `--line`.
      🔴 AND THE GROUND IS ALL IT CARRIES NOW. It was `background` plus
      `padding: 10px 12px` until 2026-09-22, removed on a screenshot reading
      *"rm padding and its border around waveform canvas"*: an inset picture
@@ -41,20 +47,37 @@
      it would let the glue's line colour through the whole part, which is the
      trap the paragraph above records. */
   .pk-wave { background: var(--card); }
-  /* 🔴 THREE HAND-ROLLED BUTTONS AND A LINE OF PROSE STOOD HERE UNTIL
-     2026-09-21, ASKED FOR AS *"use standard wave visualizer (what we had in
-     radio wtc and standard transport)"*. The wave was already the standard one;
-     the transport was `►`, `■` and a `loop` toggle typed into this page while
-     `createTransportBar` is what thirty other pages use, which is exactly the
-     hand-rolled control `positron-ui` exists to stop.
-     🔴 AND THE PADDING CAME OFF 2026-09-22: *"rm double padding around
-     transport. its just glued transport to table"*. `.tbar` already carries its
-     own `padding: 8px` and its own `min-height: 52px`, so a wrapper adding ten
-     more pixels was a second inset round a control that had already reserved
-     its room. ⚠️ THE GROUND STAYS, for the reason above it. */
-  .pk-player { background: var(--card); }
-  /* The sessions tab's transport sits in the same kind of wrapper, for the same
-     reason and with the same absence of padding. */
+  /* 🔴 `.pk-player` STOOD HERE AND WENT WITH THE SAMPLES TAB'S TRANSPORT ON
+     2026-09-29, ASKED FOR AS *"pack: sample player: rm transport below
+     waveform. rm border around waveform. use glued panel"*. It was the ground
+     under `createTransportBar`, the bar is gone, and a rule with nothing left
+     matching it reads as correct forever, which is exactly what the note at the
+     top of this element already records about `.pk-line`.
+     ⚠️ `.pk-bar` BELOW IS NOT IT AND IT STAYS. That one is the SESSIONS tab's
+     own bar, over the sixteen step picture, and nothing in this ask is about
+     that tab. */
+  /* 🔴 WHAT SAYS A FILE WILL MAKE NO SOUND, NOW THAT THE GREYED PLAY BUTTON IS
+     NOT THERE TO SAY IT. `playBtn.disabled = !mono.ok` was this page's only
+     visible statement at rest that a 24 bit or a surround WAV had opened, drawn
+     nothing and would make no sound, and FOUR asserts read that one button.
+     MEASURED before the transport came out, against a locally served zip of
+     four WAVs: with `Surround.wav` open the play button computed `disabled` and
+     the picture's part computed `display: none`, so the only thing on screen
+     about it was a dimmed control. The fact is a row of the glued panel now, in
+     the slot the picture would have taken.
+     ⚠️ THE TYPE IS `.pos-sub`'s AND THIS RULE ADDS NO NUMBERS OF ITS OWN. It
+     drops the margin and sets the ink. A sub-line owns no outer margin inside a
+     row that already supplies the inset, and `.pos-sub`'s `margin: 4px 0 0` on a
+     flex item in a centred row reads as 20 px of air above the words against 16
+     below. Same weight as `.pos-sub` and later in the cascade, which is the
+     smallest thing that can win.
+     ⚠️ AND THE INK IS `--bad` BECAUSE THE LOG ALREADY SAYS IT IN `--bad`.
+     `playSample` logs a refusal with `'bad'`, so the line under the table and
+     the line in the log are one fact in one colour rather than two. */
+  .pk-why { margin: 0; color: var(--bad); }
+  /* The sessions tab's transport sits in a wrapper of its own, for the same
+     reason and with the same absence of padding. That tab is still `createGlue`
+     and was not part of this ask. */
   .pk-bar { background: var(--card); }
   /* 🔴 THE SIXTEEN STEP PICTURE OF THE PRESSED REGION. The pads carry the
      ground, and the host's padding is exactly the grid's own gap, so the outer
@@ -139,7 +162,7 @@
   import { noteName } from '/shell/note-grid.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createStack } from '/shell/stack.mjs';
-  import { createGlue } from '/shell/glue.mjs';
+  import { createGlue, createGlueRows } from '/shell/glue.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
@@ -693,101 +716,52 @@
    */
 
   /**
-   * 🔴 THE PLAYER IS UNDER THE TABLE AND GLUED TO IT, ASKED FOR 2026-09-21 AS
-   * *"move sample player below table, add loop"*. It was asked for at the TOP
-   * an hour earlier and the second instruction supersedes the first; what did
-   * not change is that the two are ONE component rather than two blocks with
-   * the page's rhythm between them.
-   * ⚠️ EACH PART PAINTS ITS OWN GROUND, which `/wish/` measured the same day and
-   * which neither of the kit's existing glued pairs says out loud: `.pos-glue`
-   * is `gap: 1px` over a `--line` ground, so a child with no background of its
-   * own lets that colour through its whole area and the seam stops being a seam.
+   * 🔴 THE TRANSPORT UNDER THE WAVEFORM IS GONE, ASKED FOR 2026-09-29 AS *"pack:
+   * sample player: rm transport below waveform. rm border around waveform. use
+   * glued panel"*. What stood here was `createTransportBar` on a follower deck,
+   * with `play`, `pause` and `seek` in its `command` and a `Loop` toggle in its
+   * `loopSlot`, and `.pk-player` was the ground under it.
    *
-   * 🔴 THE LOOP IS `AudioBufferSourceNode.loop` AND NOT `looper.mjs`, AND THAT
-   * IS A DECISION RATHER THAN AN OVERSIGHT. CLAUDE.md's rule is to build from
-   * the kit and the kit HAS a looper, so this needs a reason. That module owns
-   * a RING fed by a tap on a live graph: `keep()` opens a window, `close()`
-   * makes a buffer out of what arrived, and it refuses anything under a quarter
-   * of a second. A sample is already a whole buffer sitting in memory, so using
-   * it would mean playing the sample into a tap and capturing it back in real
-   * time to get something we are holding already, and a 0.12 s sample would be
-   * refused by its own minimum.
-   * ⚠️ WHAT THAT MODULE WOULD REALLY BRING IS ITS FIVE WAYS, `round back half
-   * chop pingpong`, which would be worth having on a drum sample. That is a
-   * component change rather than a page change and nobody has asked for it.
+   * 🔴 THE PAGE IS STILL PLAYABLE AND ALWAYS WAS, WHICH IS WHY THIS IS A REMOVAL
+   * AND NOT A LOSS. `onPick: (r) => openSample(r.i, true)` on the samples table
+   * is a press on a ROW, and that press is what decodes a slot and starts a
+   * voice. The bar's `play` called the same function one surface further down.
+   *
+   * 🔴 AND `Loop` DIED WITH IT, WHICH IS A CONTROL THAT WAS ASKED FOR BY NAME.
+   * 2026-09-21: *"move sample player below table, add loop"*. NOTHING ON THIS
+   * PAGE CAN LOOP A SAMPLE NOW, because looping is one boolean on the running
+   * `AudioBufferSourceNode` and there is no control left to write it. That is the
+   * ask being carried out rather than an oversight, and no replacement was
+   * invented: whether it comes back is somebody's decision and not this file's.
+   *
+   * ⚠️ WHAT WENT WITH THE BAR, SO NOBODY LOOKS FOR IT LATER: the follower `deck`,
+   * the `looping` flag, the `loopBtn` and `playBtn` handles, and `playSample`'s
+   * `from` argument, whose only caller was the bar's `seek`. `createDeck` and
+   * `createTransportBar` ARE STILL IMPORTED, because the SESSIONS tab's step bar
+   * is built from both and this ask is not about that tab.
+   *
+   * ⚠️ AND THE PICTURE KEEPS ITS OWN HEAD. `wave.playhead()` is driven off
+   * `AudioContext.currentTime` exactly as it was, so a playing sample still has a
+   * line crossing it. What is gone is a second reading of that one position on a
+   * slider, which is the rule about one position surface per page arriving from
+   * the other direction.
+   *
+   * ⚠️ AND THE ARGUMENT FOR NOT USING `looper.mjs` HERE IS KEPT, because it is
+   * about what a loop IS rather than about this control. That module owns a RING
+   * fed by a tap on a live graph, it refuses anything under a quarter of a
+   * second, and a sample is already a whole buffer sitting in memory: using it
+   * would mean playing the sample into a tap and capturing it back in real time
+   * to get something we are holding already. What it would really bring is its
+   * five ways, `round back half chop pingpong`, which would be worth having on a
+   * drum sample. That is a component change and nobody has asked for it.
    */
-  /**
-   * 🔴 THE TRANSPORT IS `createTransportBar` AND NOT THREE BUTTONS TYPED HERE.
-   * Asked 2026-09-21 with a screenshot: *"use standard wave visualizer (what we
-   * had in radio wtc and standard transport)"*. The wave was already the
-   * standard component; what was hand-rolled was `►`, `■` and a `loop` toggle,
-   * on a page that sits one tab away from the thirty pages using the real one.
-   *
-   * 🔴 THE DECK IS A FOLLOWER AND THE PAGE OWNS THE SOUND, which is `/crate/`'s
-   * arrangement and for the same reason: an `AudioBufferSourceNode` cannot be
-   * seeked, paused or resumed, so anything that claimed to be driving one from
-   * a deck would be a control writing to a clock nobody is listening to. The
-   * page starts a voice, the voice's own position is pushed into the deck each
-   * frame, and the bar draws what it is given.
-   * ⚠️ ONE CLOCK, NOT TWO. `AudioContext.currentTime` is the only clock that
-   * agrees with what is being heard, and it already drove the waveform. The
-   * deck is fed from that same function rather than running free, so the bar's
-   * playhead and the wave's cannot be two readings of one sound that disagree.
-   *
-   * 🔴 `publish: false`, AND THAT IS NOT DODGING THE HARNESS. `demo/verify.mjs`
-   * presses `__demo.transport`'s toggle and asserts the position advanced. On
-   * this page nothing can advance until a file has been opened and a row
-   * pressed, so publishing would take a drill red on a page where nothing is
-   * wrong. The bar is graded by this page's own checks, which open a pack first.
-   *
-   * 🔴 LOOP TAKES THE `loopSlot`, BECAUSE THE BAR'S OWN LOOP IS A DIFFERENT
-   * THING. That one marks an A and a B on a deck and plays the passage between
-   * them. What this page means by loop is `AudioBufferSourceNode.loop`, the
-   * whole sample again, which is one boolean on a running voice. Putting it in
-   * the slot keeps it exactly where the old button was, on the standard bar,
-   * without two controls called LOOP meaning two things.
-   */
-  const player = el('div', 'pk-player');
-  // ONE DECK FOR THE PAGE'S LIFE: the bar binds its deck when it is built, so a
-  // deck made later leaves the bar pointing at something nobody is playing.
-  const deck = createDeck({ items: [], adapters: {}, range: [0, 1] });
-  const bar = createTransportBar(player, deck, {
-    publish: false,
-    loop: false,
-    loopSlot: [{
-      id: 'loop', label: 'Loop', word: true, aria: 'loop the open sample',
-      title: 'keep it running until you stop it',
-      onPress: (btn) => {
-        looping = !looping;
-        btn.setAttribute('aria-pressed', String(looping));
-        // The running voice, not only the next one: a toggle that took effect
-        // on the NEXT press is a control that does nothing for as long as you
-        // are listening, which is this project's named hazard.
-        if (voice) voice.loop = looping;
-      },
-    }],
-    command: {
-      play: () => { if (picked2 >= 0) playSample(picked2); },
-      pause: () => stopSample(),
-      // A buffer source has no seek. Starting a new one at an offset is the
-      // only honest answer, and it is what a person pressing the slider means.
-      seek: (pos) => { if (picked2 >= 0) playSample(picked2, Math.max(0, pos) / 1000); },
-    },
-  });
-  const loopBtn = bar.slot('loop');
-  loopBtn.setAttribute('aria-pressed', 'false');
-  /* ⚠️ REACHED THROUGH `bar.api.el`, NOT THROUGH `document`. A page that finds
-     its own control with a document-wide selector finds whichever one is first
-     in the DOM, which is a fact about source order rather than about this bar.
-     `transport-bar.mjs` records a harness pressing one bar while grading
-     another for exactly that reason. */
-  const playBtn = bar.api.el.querySelector('.tbar-toggle');
 
   /**
-   * 🔴 THE WAVEFORM SITS DIRECTLY ON TOP OF THE TRANSPORT, ASKED FOR
-   * 2026-09-21 as *"add waveform visualiser to pack"* and then *"its glued to
-   * top of transport"*. So the component is three parts: the list, the picture
-   * of the open sample, and the transport under it.
+   * 🔴 THE WAVEFORM SITS UNDER THE LIST, ASKED FOR 2026-09-21 as *"add waveform
+   * visualiser to pack"* and then *"its glued to top of transport"*. The
+   * transport it was glued to the top of came out on 2026-09-29, so the surface
+   * is two parts now, the list and the picture of the open sample, and a third
+   * that is on screen only when there is no picture to draw.
    * ⚠️ IT DRAWS AND IT DOES NOT PLAY. This page owns the `AudioContext` and
    * already builds an `AudioBuffer` out of `toMono`, so the view is handed a
    * position and never a sound. Two audio paths in one page is the shape
@@ -814,8 +788,73 @@
    * still has nothing to scroll and its relative shape is the subject, which is
    * the same reasoning `/grains/` is given in that file.
    */
-  const waveHost = el('div', 'pk-wave');
-  const wave = createGrainScope(waveHost, { seconds: 1, height: 96 });
+  /**
+   * 🔴 `createGlueRows` AND NOT `createGlue`, ASKED FOR AS *"use glued panel"*.
+   * `createGlue` takes every part in one call and is the pair it was written for;
+   * the rows surface adds them one at a time and owns each row's inset and
+   * alignment through `pad`, `align`, `full` and `grid`, which is what a panel
+   * means on `/kit/`, `/knobs/`, `/muta/` and `/shape/`.
+   * 🔴 NOT `createInstrumentPanel`, WHICH WAS PRICED AND REFUSED BEFORE ANY OF
+   * THIS WAS WRITTEN. That one is this surface plus a picture row, control rows
+   * and a nameplate at the foot. There is no instrument on this tab and no name
+   * to put on a plate.
+   * ⚠️ `full: true`, BECAUSE A TABLE IS A STRIP ACROSS THE PAGE RATHER THAN AN
+   * OBJECT AT ITS OWN SIZE. `.pos-rows` is `width: fit-content`, which is right
+   * for four knobs on a pedal and wrong for a six column list; `.pos-glue` on its
+   * own is a block and was width auto. MEASURED before: the surface was 688 px in
+   * a 688 px panel, so this is what keeps the tab the width it already had.
+   * ⚠️ AND THE ROWS ARE `pad: false` EXCEPT THE WORDS. The list and the picture
+   * go edge to edge, which is what a picture wants and what the table already got
+   * inside the glue; a sentence needs the row's own `--rows-gap --rows-pad` so
+   * its first glyph starts where every other ink on the page starts.
+   */
+  const samplesRows = createGlueRows({ full: true, pad: false });
+  samplesRows.row(sampleTable.el);
+  /**
+   * 🔴 THE PICTURE'S HOST IS THE ROW ITSELF, CARRYING THIS PAGE'S OWN `.pk-wave`,
+   * AND THE ALTERNATIVE WAS MEASURED RATHER THAN ARGUED ABOUT. `.pk-wave` was a
+   * `<div>` inside the glue and the scope went inside that, which put the scope
+   * TWO levels under the surface. `shell.css` zeroes a glued scope's margin with
+   * `.pos-glue > .pos-scope, .pos-glue > * > .pos-scope`, and it says in its own
+   * comment why the second half exists: `/radio/` glues the scope straight in and
+   * this page wrapped it. A row between them makes the scope THREE levels down,
+   * where neither half of that selector reaches, and `.pos-scope` is
+   * `margin: 22px 0 12px`. So keeping the wrapper would have put 22 px of `--card`
+   * above the canvas and 12 below it, inside the glued part, which is the inset
+   * removed from this exact page on 2026-09-22 (*"rm padding and its border
+   * around waveform canvas"*) arriving again by a different road.
+   * ✅ THE ROW IS THE HOST, SO THE SCOPE IS A DIRECT CHILD OF A DIRECT CHILD AND
+   * THE KIT'S RULE REACHES IT WITH NOTHING WRITTEN HERE. `cls` puts `.pk-wave` on
+   * the row, so the page rule that paints the picture's ground is unchanged and
+   * still applies to the picture's host.
+   * ⚠️ AND THE GROUND IS PAINTED TWICE ON PURPOSE. `.pos-rows-r` carries
+   * `background: var(--card)` and so does `.pk-wave`, and this page has paid three
+   * times for a glued part with no ground of its own: the glue is `gap: 1px` over
+   * a `--line` ground, so a transparent part lets that colour through its whole
+   * area and the seam stops being a seam. Two declarations of one colour is
+   * cheaper than the fourth time.
+   */
+  const waveRow = samplesRows.row(undefined, { cls: 'pk-wave' });
+  const wave = createGrainScope(waveRow, { seconds: 1, height: 96 });
+  /**
+   * 🔴 THE REFUSAL LINE, WHICH IS WHERE `playBtn.disabled` WENT. The greyed play
+   * button was the only thing on screen at rest saying that a file had opened and
+   * would make no sound, and the transport it lived on is gone. This row says it
+   * in words, in the slot the picture would have had, and the two are mutually
+   * exclusive: for any open sample there is a picture or there is a sentence.
+   * ⚠️ IT SAYS THE SHORT FACT AND NOT THE WHOLE REASON. The reason is long prose
+   * out of `circuit-sample.mjs`, the kind that runs to two clauses and a colon,
+   * and it is already in two places a reader can reach, the row's own hover and
+   * the log. This page has been corrected three times for saying one fact on
+   * three surfaces, and a third copy of a paragraph that can wrap to a different
+   * number of lines per sample is also a box that changes its own height.
+   * ⚠️ AND THE TWO WORDINGS ARE CONSTANTS, so an assert reads the string the page
+   * shows rather than a second copy of it typed into a check.
+   */
+  const WHY_UNREAD = 'this file did not read';
+  const WHY_UNPLAYABLE = 'this one cannot be played here';
+  const whyEl = el('div', 'pos-sub pk-why');
+  const whyRow = samplesRows.row(whyEl, { pad: true });
   /**
    * 🔴 THE PAGE HIDES ITS OWN PART, BECAUSE THE SCOPE DOES NOT HIDE ITSELF AND
    * SHOULD NOT. `/radio/` draws a scrolling picture from `feed()` before any
@@ -824,8 +863,32 @@
    * with the swap the rule moves to where it is true, which is here.
    * ⚠️ AND IT IS `hidden` ON THE GLUED PART, not on the canvas, or the glue
    * keeps a 1 px seam round nothing.
+   * 🔴 THE GLUED PART IS THE ROW SINCE 2026-09-29. This was `waveHost.hidden`
+   * while the surface was `createGlue`, where the host WAS a child of the glue.
+   * On `createGlueRows` the child of the glue is the row, and `.pos-rows-r` paints
+   * `--card` and takes the surface's `gap: 1px` whatever is inside it, so a
+   * hidden host in a shown row is the 1 px seam round nothing that the line above
+   * warns about. `.pos-rows-r[hidden] { display: none }` is the kit's own answer
+   * and it is why the switch is the row and nowhere else.
    */
-  waveHost.hidden = true;
+  waveRow.hidden = true;
+  whyRow.hidden = true;
+  panel('samples').append(samplesRows.el);
+  /**
+   * 🔴 IS THIS PART BEING DRAWN, READ OFF THE SCREEN RATHER THAN OFF AN
+   * ATTRIBUTE. `el.hidden` is a fact about an attribute and `display` is a fact
+   * about what a reader can see, and this page is where the difference was paid
+   * for: its own `an empty table draws no heading` assert read `head.hidden ===
+   * true` and passed every run while three headings were on screen.
+   * ⚠️ AND THE RECT IS A SECOND, WEAKER TEST THAT ONLY MEANS ANYTHING WITH THE
+   * TAB OPEN. An inactive tab panel has no layout at all, so every rect inside it
+   * reads zero while `getComputedStyle` goes on answering real values, which is
+   * the half-true measurement this page's own glue check was caught making.
+   * `away()` is the half that holds whatever tab is open; `onScreen()` is the
+   * half that needs this tab to be the open one.
+   */
+  const away = (x) => getComputedStyle(x).display === 'none';
+  const onScreen = (x) => !away(x) && x.getBoundingClientRect().height > 0;
   /** How many lit pixels the scope has drawn. The differential a check needs. */
   function waveInk() {
     const c = wave.canvas;
@@ -842,12 +905,11 @@
     return n;
   }
 
-  panel('samples').append(createGlue(sampleTable.el, waveHost, player));
 
   // ── what is open ─────────────────────────────────────────────────────────
   let patches = [], rows = [], sessions = [], samples = [];
   let picked = -1, pickedSession = -1, picked2 = -1, played = 0;
-  let ac = null, lastPlayed = null, voice = null, looping = false;
+  let ac = null, lastPlayed = null, voice = null;
 
   const WIDE_BYTES = 1508;
   /* ⚠️ MODULE SCOPE SINCE 2026-09-21, and it was local to `showSession`. The
@@ -1879,23 +1941,31 @@
     // be two readings of one file that disagree.
     const mono = r.ok ? toMono(w.wave) : { ok: false };
     /**
-     * 🔴 THE PLAY BUTTON FOLLOWS THE AUDIO, NOT THE HEADER, AND IT READ `!r.ok`
-     * UNTIL 2026-09-28. Those were the same thing while every file that could
-     * reach this page was 48 kHz 16 bit mono. They stopped being the same thing
-     * the moment a zip of anybody's samples could be opened: MEASURED on
-     * `one-shots.zip`, forty 24 bit stereo files whose headers all read, so
-     * every row would have offered a live Play that logs a refusal and makes no
-     * sound. That is the shape this project calls a control that lies.
+     * 🔴 WHAT SAYS A FILE WILL MAKE NO SOUND, AND IT WAS `playBtn.disabled =
+     * !mono.ok` UNTIL 2026-09-29. The play button was the only thing on screen at
+     * rest that said so, and the transport it lived on came out today, so the
+     * fact moved to a row of the panel rather than going quiet. There is a picture
+     * or there is a sentence, never both and never neither.
+     * 🔴 THE LINE THAT MOVED HERE FOLLOWS THE AUDIO, NOT THE HEADER, AND IT READ
+     * `!r.ok` UNTIL 2026-09-28. Those were the same thing while every file that
+     * could reach this page was 48 kHz 16 bit mono. They stopped being the same
+     * thing the moment a zip of anybody's samples could be opened: MEASURED on
+     * `one-shots.zip`, forty 24 bit stereo files whose headers all read, so every
+     * row would have offered a live Play that logs a refusal and makes no sound.
+     * That is the shape this project calls a control that lies.
+     * ⚠️ AND IT IS TWO WORDINGS BECAUSE THEY ARE TWO FACTS. A file whose HEADER
+     * would not read never got as far as its audio. A file whose header read and
+     * whose audio this page will not mix down is a 24 bit, an eight bit or a
+     * surround file, which is an ordinary thing to be handed rather than a fault
+     * in it. The long reason for either is on the row's own hover.
      */
-    playBtn.disabled = !mono.ok;
-    /* The bar's clock and slider need a length before they mean anything, and a
-       slot that did not read has none. */
-    deck.pause();
-    deck.setRange([0, r.ok && r.seconds > 0 ? Math.round(r.seconds * 1000) : 1]);
-    deck.seek(0);
-
     if (mono.ok) {
-      waveHost.hidden = false;
+      /* ⚠️ THE WORDS ARE CLEARED AS WELL AS PUT AWAY. A hidden row holding the
+         last refusal is state left behind, which is the shape `video-panel.mjs`
+         shipped when it wrote `dataset.full = ''` instead of deleting it. */
+      whyEl.textContent = '';
+      whyRow.hidden = true;
+      waveRow.hidden = false;
       wave.buffer(peaksOf(mono.samples));
       /* 🔴 `wave.source(w.name)` STOOD HERE AND CAME OFF 2026-09-22: *"rm
          sample name from corner of the canvas"*. The name is drawn INSIDE the
@@ -1909,7 +1979,12 @@
          been a change reaching three pages to remove one line from a fourth.
          Not calling the setter is the whole fix. */
       wave.playhead(0);
-    } else { wave.clear(); waveHost.hidden = true; }
+    } else {
+      wave.clear();
+      waveRow.hidden = true;
+      whyEl.textContent = r.ok ? WHY_UNPLAYABLE : WHY_UNREAD;
+      whyRow.hidden = false;
+    }
 
     // ⚠️ THE PRESS STILL REACHES `playSample`, WHICH SAYS IN THE LOG WHY A FILE
     // THIS PAGE CANNOT DECODE MADE NO SOUND. A press is somebody asking, and
@@ -1929,12 +2004,15 @@
    * rather than an error. It is fired and left.
    */
   /**
-   * @param {number} i      which slot
-   * @param {number} [from] seconds into the sample to start at, which is what a
-   *   press on the transport's slider means. A buffer source has no seek, so
-   *   the only honest answer to one is a new voice started at an offset.
+   * ⚠️ IT TOOK A `from` IN SECONDS UNTIL 2026-09-29 AND THE ONLY CALLER WAS THE
+   * TRANSPORT'S `seek`. A buffer source has no seek, so the only honest answer to
+   * a press on a slider was a new voice started at an offset. There is no slider
+   * now, so the argument is gone rather than left standing with nothing passing
+   * it, which is this project's dead-guard shape in its cheapest form.
+   *
+   * @param {number} i  which slot
    */
-  function playSample(i, from = 0) {
+  function playSample(i) {
     const w = samples[i];
     if (!w) return;
     const mono = toMono(w.wave);
@@ -1953,21 +2031,26 @@
       buf.copyToChannel(mono.samples, 0);
       const src = ac.createBufferSource();
       src.buffer = buf;
-      src.loop = looping;
       src.connect(ac.destination);
-      // ⚠️ THE HANDLE IS KEPT SO THE LOOP TOGGLE CAN REACH A SOUND THAT IS
-      // ALREADY RUNNING. A toggle that only took effect on the NEXT press is a
-      // control that looks live and does nothing for as long as you are
-      // listening, which is this project's named hazard.
+      /* ⚠️ THE HANDLE IS KEPT BECAUSE A SECOND PRESS HAS TO SILENCE THE FIRST.
+         It was also how the loop toggle reached a sound that was already running,
+         and that control is gone; `stopSample` and this `onended` are the two
+         callers left, and both need to know which voice is the current one. */
       src.onended = () => {
         if (voice !== src) return;
         voice = null;
-        /* ⚠️ THE BAR HAS TO BE TOLD, or its toggle stays saying PAUSE over a
-           page making no sound. A one-shot ending is a state change nothing
-           else on this page would notice. */
-        deck.pause();
+        /* 🔴 THE HEAD GOES BACK TO THE TOP WHEN A ONE-SHOT ENDS, WHICH IT DID
+           NOT UNTIL 2026-09-29 AND NOBODY REPORTED. This said `deck.pause()`,
+           which put the transport's toggle back to Play and left the picture's
+           line standing at the far right. `stopSample` below already carries the
+           rule in writing, that a line left in a picture with nothing playing
+           reads as a sound that is paused and nothing here can resume, and a
+           natural end is the same fact as a stop. PHOTOGRAPHED at 1280 with the
+           transport gone: a finished sample kept a hairline at the right edge
+           and there was no longer a second control saying it had stopped. */
+        wave.playhead(0);
       };
-      src.start(0, Math.max(0, Math.min(from, buf.duration)));
+      src.start();
       voice = src;
       played++;
       /**
@@ -1977,7 +2060,7 @@
        * a `requestAnimationFrame` loop that never stops is a phone's battery
        * spent drawing a still picture.
        */
-      const began = ac.currentTime - from;
+      const began = ac.currentTime;
       /**
        * 🔴 ONE CLOCK FEEDS BOTH SURFACES. This used to move the waveform's head
        * alone; the transport bar's playhead now comes off the same function, by
@@ -1993,16 +2076,13 @@
       const tick = () => {
         if (voice !== src) return;
         const t = ac.currentTime - began;
-        const at = looping && buf.duration > 0 ? t % buf.duration : t;
-        deck.seek(Math.round(at * 1000));
-        wave.playhead(buf.duration > 0 ? at / buf.duration : 0);
+        wave.playhead(buf.duration > 0 ? t / buf.duration : 0);
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
-      deck.play();
       lastPlayed = { name: w.name, frames: mono.frames, rate: mono.rate, seconds: buf.duration };
       d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at `
-          + `${mono.rate} Hz${looping ? ', looping' : ''}`);
+          + `${mono.rate} Hz`);
     } catch (e) {
       d.log(`no sound here (${e.message})`, 'bad');
     }
@@ -2016,13 +2096,12 @@
     // STOPPED. A line left in the middle of a picture with nothing playing
     // reads as a sound that is paused, and nothing here can resume.
     wave.playhead(0);
-    deck.pause();
-    deck.seek(0);
   }
 
-  /* ⚠️ NO LISTENERS HERE ANY MORE. The bar's `command` object is what calls
-     `playSample` and `stopSample`, and its `loopSlot` owns the loop toggle, so
-     a press and a programmatic call go down one path instead of two. */
+  /* ⚠️ NOTHING LISTENS HERE, AND SINCE 2026-09-29 THERE IS NOTHING LEFT TO
+     LISTEN TO. The samples tab's transport owned the only presses that reached
+     `playSample` and `stopSample` other than a press on a row, and it is gone.
+     A row is the one way in, through the table's own `onPick`. */
 
   // ── what a visit is allowed to have done ─────────────────────────────────
   d.assert('a visit opens nothing, asks for nothing and makes no sound',
@@ -2055,11 +2134,18 @@
      * block footer, glued"* at once. A footer with a border and no words is an
      * empty box painting a line nobody wrote.
      */
-    d.assert('with nothing open there is no waveform, so no empty box paints an edge',
-      waveHost.hidden === true && waveHost.getBoundingClientRect().height === 0
+    /* 🔴 IT READS THE ROWS' COMPUTED `display` AND NOT THEIR RECTS, AND THE
+       REASON IS THE TAB STRIP. With nothing open `tabs.el.hidden` is true, so
+       every rect under it is zero whether a part is away or not and the old
+       reading of `height === 0` could not fail. A row's own computed `display` is
+       true either way. */
+    d.assert('with nothing open there is neither a waveform nor a word about one, so no empty part paints an edge',
+      samplesRows.count() === 3 && away(waveRow) === true && away(whyRow) === true
       && wave.showing() === 'scrolling',
-      `the picture is ${waveHost.hidden ? 'away' : 'up'} at `
-      + `${waveHost.getBoundingClientRect().height} px, showing ${wave.showing()}`);
+      `the panel holds ${samplesRows.count()} rows with the picture `
+      + `${away(waveRow) ? 'away' : 'up'} and the words `
+      + `${away(whyRow) ? 'away' : 'up'}, showing ${wave.showing()}, `
+      + 'and the whole tab strip is away so no rect here is evidence');
 
     d.assert('the block has no footer until something has been opened',
       drop.note.hidden === true && drop.note.textContent === ''
@@ -2418,19 +2504,27 @@
         const rowsNow = [...sampleTable.scroller().querySelectorAll('.pos-tbl-row')];
         const room = rowsNow[2];
         const roomCells = [...room.querySelectorAll('.pos-tbl-c')].map((c) => c.textContent);
-        openSample(2, false);
-        const roomBtn = playBtn.disabled;
+        /* 🔴 A PRESS ON THE ROW, WHICH IS WHAT SOUNDS A SAMPLE NOW. This read
+           `playBtn.disabled` on both files until 2026-09-29 and the transport it
+           read is gone, so the claim in the title is graded by the counter that
+           only `playSample` increments and by what the panel puts on screen. */
+        const beforeRoom = played;
+        openSample(2, true);
+        const roomPlayed = played - beforeRoom;
+        const roomPic = onScreen(waveRow);
+        const roomSaid = onScreen(whyRow) ? whyEl.textContent : '';
+        stopSample();
         openSample(0, false);
         d.assert('a 24 bit stereo wav reads, measures, draws and plays like any other row',
           samples[2].row.ok === true && samples[2].row.peak !== null
           && roomCells[0] === 'Room.wav' && roomCells[1] === '1.00 s'
           && roomCells[2] === '44,100' && roomCells[3] === '44.1 kHz'
           && roomCells[4] !== '' && roomCells[5] !== ''
-          && roomBtn === false && playBtn.disabled === false
-          && waveHost.hidden === false,
+          && roomPlayed === 1 && roomPic === true && roomSaid === ''
+          && onScreen(waveRow) === true && onScreen(whyRow) === false,
           `the row reads ${JSON.stringify(roomCells)}, its hover says `
-          + `"${room.title.split('\n').pop()}", and play was `
-          + `${roomBtn ? 'off' : 'on'} for it and ${playBtn.disabled ? 'off' : 'on'} for Kick.wav`);
+          + `"${room.title.split('\n').pop()}", it played ${roomPlayed} time(s) and drew `
+          + `${roomPic ? 'a picture' : 'no picture'} with the panel saying "${roomSaid}"`);
 
         /**
          * 🔴 AND THE BRANCH THE ASSERT ABOVE USED TO GRADE IS STILL LIVE CODE,
@@ -2441,19 +2535,28 @@
          */
         const sur = rowsNow[3];
         const surCells = [...sur.querySelectorAll('.pos-tbl-c')].map((c) => c.textContent);
-        openSample(3, false);
-        const surBtn = playBtn.disabled;
+        /* 🔴 THE PRESS IS MADE AND REFUSED, WHICH IS A STRONGER CLAIM THAN A
+           DIMMED BUTTON EVER WAS. `playSample` returns before `played++` for a
+           file it cannot mix down, so the counter says the press made no sound,
+           and the panel's own row says so to a reader. */
+        const beforeSur = played;
+        openSample(3, true);
+        const surPlayed = played - beforeSur;
+        const surPic = onScreen(waveRow);
+        const surSaid = onScreen(whyRow) ? whyEl.textContent : '';
         openSample(0, false);
-        d.assert('a wav whose header reads and whose audio this page will not mix down keeps its header cells, empties the measured ones and cannot be played',
+        d.assert('a wav whose header reads and whose audio this page will not mix down keeps its header cells, empties the measured ones, draws no picture and says so in words',
           samples[3].row.ok === true && samples[3].row.peak === null
           && surCells[0] === 'Surround.wav' && surCells[1] === '1.00 s'
           && surCells[2] === '44,100' && surCells[3] === '44.1 kHz'
           && surCells[4] === '' && surCells[5] === ''
           && /channels are not mixed down here/.test(sur.title)
-          && surBtn === true && playBtn.disabled === false,
+          && surPlayed === 0 && surPic === false && surSaid === WHY_UNPLAYABLE
+          && onScreen(waveRow) === true && onScreen(whyRow) === false,
           `the row reads ${JSON.stringify(surCells)}, its hover says `
-          + `"${sur.title.split('\n').pop()}", and play was `
-          + `${surBtn ? 'off' : 'on'} for it and ${playBtn.disabled ? 'off' : 'on'} for Kick.wav`);
+          + `"${sur.title.split('\n').pop()}", the press played it ${surPlayed} time(s), `
+          + `the panel drew ${surPic ? 'a picture' : 'no picture'} and said "${surSaid}", `
+          + 'and Kick.wav puts the picture back');
       }
     }
 
@@ -2935,11 +3038,19 @@
         + `${lastPlayed?.rate} Hz against ${samples[0].row.frames.toLocaleString()} in its header`);
 
       /**
-       * 🔴 THE PLAYER IS UNDER THE TABLE AND THE TWO ARE ONE BOX, MEASURED OFF
-       * REAL RECTS. `glued` is three numbers rather than a look: the player
-       * starts where the table ends, the seam between them is 1 px, and both
-       * paint a ground of their own, because a transparent child lets the
-       * glue's own colour through and the seam stops being a seam.
+       * 🔴 THE PICTURE IS UNDER THE TABLE AND THE TWO ARE ONE BOX, MEASURED OFF
+       * REAL RECTS. It was three parts with a transport at the foot until
+       * 2026-09-29 and it is two rows of a `createGlueRows` panel now, plus a
+       * third that is away while there is a picture to draw. The numbers are the
+       * same three claims: the picture's row starts where the list's row ends, the
+       * seam between them is 1 px, and every row paints a ground of its own,
+       * because a transparent part lets the glue's own colour through and the
+       * seam stops being a seam.
+       * ⚠️ AND IT ASKS THE ROW AND THE THING INSIDE IT SEPARATELY. The glue's
+       * `--edge: 0` inherits to any depth, so the table and the canvas should both
+       * compute 0 px of border while the surface computes 1; a part that drew its
+       * own edge inside this box is the doubled line this page has reported three
+       * times.
        */
       {
         /**
@@ -2964,29 +3075,33 @@
         // rather than the half that sounds, which is the split this page made
         // for the player and is useful here for the same reason.
         openSample(0, false);
-        const glue = player.parentElement;
-        const t = sampleTable.el.getBoundingClientRect();
-        const pl = player.getBoundingClientRect();
+        const glue = samplesRows.el;
+        const tableRow = sampleTable.el.parentElement;
+        const t = tableRow.getBoundingClientRect();
         const ground = (x) => getComputedStyle(x).backgroundColor;
-        const wv = waveHost.getBoundingClientRect();
+        const wv = waveRow.getBoundingClientRect();
         /* ⚠️ AND NOTHING INSIDE DRAWS A SECOND EDGE, which is the reported
            fault rather than an extra: *"rm double bordering"*. MEASURED at the
            time on `/radio/`: a component's 1 px against the glue's 1 px in the
            same colour reads as one 2 px line. */
         const inner = (x) => parseFloat(getComputedStyle(x).borderTopWidth);
-        d.assert('the list, the picture and the transport are one box, in that order, with 1 px seams',
-          glue.classList.contains('pos-glue') && glue.children.length === 3
-          && inner(glue) > 0 && inner(wave.canvas) === 0 && inner(bar.api.el) === 0
+        d.assert('the list and the picture are two rows of one glued panel, in that order, with a 1 px seam',
+          glue.classList.contains('pos-glue') && glue.classList.contains('pos-rows')
+          && samplesRows.count() === 3 && glue.children.length === 3
+          && glue.children[0] === tableRow && glue.children[1] === waveRow
+          && glue.children[2] === whyRow && away(whyRow) === true
+          && inner(glue) > 0 && inner(tableRow) === 0 && inner(waveRow) === 0
+          && inner(wave.canvas) === 0 && inner(sampleTable.el) === 0
           && Math.abs(wv.top - t.bottom - 1) < 0.6
-          && Math.abs(pl.top - wv.bottom - 1) < 0.6
-          && ground(player) !== 'rgba(0, 0, 0, 0)'
+          && ground(tableRow) !== 'rgba(0, 0, 0, 0)'
+          && ground(waveRow) !== 'rgba(0, 0, 0, 0)'
           && ground(sampleTable.el) !== 'rgba(0, 0, 0, 0)'
-          && ground(waveHost) !== 'rgba(0, 0, 0, 0)'
-          && ground(player) !== ground(glue),
-          `seams ${(wv.top - t.bottom).toFixed(1)} and ${(pl.top - wv.bottom).toFixed(1)} px `
-          + `with the tab open, the parts paint ${ground(sampleTable.el)}, ${ground(waveHost)} `
-          + `and ${ground(player)} against the glue's ${ground(glue)}, and inside it the `
-          + `picture draws ${inner(wave.canvas)} px and the transport ${inner(bar.api.el)} px`);
+          && ground(waveRow) !== ground(glue),
+          `one seam of ${(wv.top - t.bottom).toFixed(1)} px with the tab open, the rows paint `
+          + `${ground(tableRow)} and ${ground(waveRow)} against the glue's ${ground(glue)}, `
+          + `the table inside its row paints ${ground(sampleTable.el)}, and the borders read `
+          + `${inner(glue)} on the surface, ${inner(waveRow)} on the picture's row and `
+          + `${inner(wave.canvas)} on the canvas`);
 
         /**
          * 🔴 THE PICTURE IS ASKED FOR INK RATHER THAN FOR A COLUMN COUNT, which
@@ -3050,74 +3165,36 @@
       }
 
       /**
-       * 🔴 THE LOOP REACHES A SOUND THAT IS ALREADY RUNNING, which is the whole
-       * of *"add loop"* that can go wrong. A toggle taking effect only on the
-       * NEXT press is a control that looks live and does nothing for as long as
-       * anybody is listening, and that is this project's named hazard. So the
-       * check presses loop WHILE a voice is playing and reads the voice.
-       * ⚠️ AND IT PUTS IT BACK, because every check after this one would
-       * otherwise be running against a page left looping.
+       * 🔴 THREE ASSERTS STOOD HERE AND WENT WITH THE TRANSPORT ON 2026-09-29,
+       * WHICH IS THE HONEST ARITHMETIC RATHER THAN A TIDY-UP. They were *the loop
+       * toggle looks pressed as well as reading pressed, and fits the bar*, which
+       * read a computed background colour through a press because a `loopSlot`
+       * button had shipped with no pressed state at all; *pressing loop changes
+       * the sound that is already playing, not only the next one*, which pressed
+       * Loop WHILE a voice was running and read `voice.loop`; and *and the
+       * transport really lets go of it, so a looping sample can be got out of*,
+       * which pressed the bar's own toggle rather than calling `stopSample`.
+       * 🔴 THE PAGE NO LONGER MAKES ANY OF THOSE CLAIMS, because there is no loop
+       * and no transport to make them about. `positron-verify`'s rule is that a
+       * removed thing takes its checks with it SILENTLY unless somebody accounts
+       * for them, so they are named here rather than left to a count nobody
+       * diffed.
+       * ⚠️ WHAT IS KEPT IS THE PRESS THAT SOUNDS A SAMPLE, because every check
+       * after this one reads the marked row and needs one open, and because a row
+       * press is now the page's only way in.
        */
       openSample(0, true);
-      const wasLooping = voice?.loop;
-      loopBtn.click();
-      const nowLooping = voice?.loop;
-      /**
-       * 🔴 THE TOGGLE'S STATE HAS TO BE VISIBLE, NOT ONLY ANNOUNCED. MEASURED
-       * 2026-09-21: a `loopSlot` button is styled as a GLYPH box and had no
-       * pressed state at all, so this control said `aria-pressed="true"` to a
-       * screen reader and looked identical to a reader with eyes. Both halves
-       * are asserted here, and the colour is read as a COMPUTED value because
-       * that is the only thing that knows which rule won.
-       */
-      {
-        /* ⚠️ THE SAMPLES TAB HAS TO BE THE OPEN ONE OR THE BAR IS NOT LAID OUT.
-           The first build of this read 0 px wide with the picture check's tab
-           still selected, which is a measurement of a hidden element rather
-           than a fault in the button. */
-        const wasTab = tabs.at();
-        tabs.go('samples');
-        const was = loopBtn.getAttribute('aria-pressed') === 'true';
-        if (was) loopBtn.click();                       // start from off, whatever ran before
-        const off = getComputedStyle(loopBtn).backgroundColor;
-        loopBtn.click();
-        const on = getComputedStyle(loopBtn).backgroundColor;
-        const box = loopBtn.getBoundingClientRect();
-        const barBox = bar.api.el.getBoundingClientRect();
-        d.assert('the loop toggle looks pressed as well as reading pressed, and fits the bar',
-          off !== on && loopBtn.getAttribute('aria-pressed') === 'true'
-          && box.width > 34 && box.right <= barBox.right + 1,
-          `${off} off to ${on} on, ${box.width.toFixed(0)} px wide ending `
-          + `${(barBox.right - box.right).toFixed(1)} px inside the bar`);
-        loopBtn.click();
-        if (was) loopBtn.click();                       // and leave it as it was found
-        tabs.go(wasTab);
-      }
-
-      d.assert('pressing loop changes the sound that is already playing, not only the next one',
-        wasLooping === false && nowLooping === true
-        && loopBtn.getAttribute('aria-pressed') === 'true' && looping === true,
-        `the running voice went loop ${wasLooping} to ${nowLooping}, `
-        + `the button says ${loopBtn.getAttribute('aria-pressed')}`);
-
-      /* ⚠️ THE BAR'S OWN TOGGLE, NOT A `stopSample()` CALL. A check that calls
-         the function the button calls grades the function and says nothing
-         about the button, which is how a control ends up inert with a green
-         suite behind it. */
-      playBtn.click();
-      d.assert('and the transport really lets go of it, so a looping sample can be got out of',
-        voice === null && looping === true && deck.position() === 0
-        && deck.transport.playing === false,
-        `the voice is ${voice === null ? 'gone' : 'still held'}, the toggle is still on, `
-        + `the head is parked at ${deck.position()} and the deck is `
-        + `${deck.transport.playing ? 'still playing' : 'stopped'}`);
-      loopBtn.click();
+      stopSample();
 
       /**
        * 🔴 THE ROW IS WHAT SAYS WHICH SAMPLE IS OPEN NOW, and this assert used
        * to read a sentence under the player that no longer exists. The five
        * facts it carried are cells on the marked row, which is where they were
        * asked to go.
+       * ⚠️ AND IT READ `playBtn.disabled === false` AS ITS LAST CLAUSE UNTIL
+       * 2026-09-29, which was the page saying this file can be played. The panel
+       * says it now, by drawing a picture and putting its refusal row away, and
+       * the two are read off computed `display` rather than off `hidden`.
        */
       {
         /* ⚠️ `.on` IS WHAT `table.mark()` SETS, and reading the scroller rather
@@ -3125,14 +3202,19 @@
            has now paid for four times. */
         const mark = sampleTable.scroller().querySelector('.pos-tbl-row.on');
         const cells = [...(mark?.querySelectorAll('.pos-tbl-c') || [])].map((c) => c.textContent);
-        d.assert('the marked row carries every fact the sentence under the player used to',
+        /* ⚠️ THE TITLE NAMED THE SENTENCE UNDER THE PLAYER UNTIL 2026-09-29, and
+           the player has gone too, so it pointed two removals back. A title is
+           read by whoever reads a suite run and has to stand on its own. */
+        d.assert('the marked row carries every fact about the open sample, and the panel says it can be played',
           picked2 === 0 && cells.length === 6
           && cells[0] === samples[0].name
           && cells[1] === `${samples[0].row.seconds.toFixed(2)} s`
           && cells[2] === samples[0].row.frames.toLocaleString()
           && /kHz$/.test(cells[3]) && cells[4] === samples[0].row.peak.toFixed(2)
-          && playBtn.disabled === false,
-          `the marked row reads ${JSON.stringify(cells)}`);
+          && away(waveRow) === false && away(whyRow) === true,
+          `the marked row reads ${JSON.stringify(cells)}, with the picture `
+          + `${away(waveRow) ? 'away' : 'up'} and the refusal row `
+          + `${away(whyRow) ? 'away' : 'up'}`);
       }
 
       /**
@@ -3143,6 +3225,10 @@
        * ⚠️ IT ALSO PROVES THE PRESS REFUSES. A row that cannot decode must not
        * increment the play counter, or the page reports having played something
        * that made no sound.
+       * ⚠️ AND WHAT SAYS SO ON SCREEN IS THE PANEL'S OWN ROW SINCE 2026-09-29. It
+       * was `playBtn.disabled === true` on a transport that no longer exists, and
+       * this file is the other wording: its HEADER would not read, so it never
+       * got as far as its audio.
        * 🔴 AND IT READS THE LOG NOW, BECAUSE THE LINE IT USED TO READ WAS
        * REMOVED ON 2026-09-22 AND THE REFUSAL COUNT MOVED THERE. A removed
        * display takes its checks with it SILENTLY unless somebody follows the
@@ -3156,7 +3242,9 @@
       openSample(0, true);
       const said = window.__demo.logs.map((l) => l.msg).join('\n');
       d.assert('NEGATIVE CONTROL: a sample that will not read keeps its row, is counted as refused and does not play',
-        sampleTable.count() === 1 && played === beforeBad && playBtn.disabled === true
+        sampleTable.count() === 1 && played === beforeBad
+        && away(waveRow) === true && whyEl.textContent === WHY_UNREAD
+        && away(whyRow) === false
         && /0 of 1 samples read, 1 refused/.test(said)
         && /did not read/.test(sampleTable.scroller().querySelector('.pos-tbl-row')?.title || '')
         && tabs.buttons[2].textContent === '1 SAMPLE'
@@ -3164,6 +3252,8 @@
         && tabs.enabled('patches') === false && tabs.enabled('sessions') === false,
         `${sampleTable.count()} row saying `
         + `"${sampleTable.scroller().querySelector('.pos-tbl-row')?.title}", `
+        + `the panel says "${whyEl.textContent}" with the picture `
+        + `${away(waveRow) ? 'away' : 'up'}, `
         + `and the log says "${said.split('\n').filter((l) => /samples read/.test(l)).pop()}"`);
       // ⚠️ `scroller()` AND NOT `el`, AND THE FIRST TRY READ THE HEADING. The
       // heading is `.pos-tbl-row pos-tbl-head` and it is FIRST in the element,
@@ -3265,7 +3355,11 @@
           d.assert('an empty slot opens, shows 0.00 s and starts nothing, while a filled one plays',
             afterEmpty === wasPlayed && played === wasPlayed + 1
             && samples[emptyAt].row.seconds === 0 && samples[fullAt].row.seconds > 0
-            && deck.range[1] > 1,
+            /* ⚠️ IT READ `deck.range[1] > 1` UNTIL 2026-09-29, which was the
+               transport's clock having been given a real length. There is no
+               transport, so what is read is the buffer the page really built,
+               which is a fact about the audio rather than about a control. */
+            && lastPlayed?.name === samples[fullAt].name && lastPlayed.seconds > 0,
             `slot ${emptyAt} is empty and played ${afterEmpty - wasPlayed} time(s), `
             + `slot ${fullAt} is ${samples[fullAt].row.seconds.toFixed(2)} s and played `
             + `${played - afterEmpty} time(s)`);

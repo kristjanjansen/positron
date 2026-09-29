@@ -3031,6 +3031,17 @@ button.pos-pg-lab:hover { color: var(--fg); }
    what `.pos-glue` requires of every child, so a direct-child selector fixed
    one page and left the other exactly as reported. MEASURED: the canvas read
    1 px on `/pack/` and 0 on `/radio/` from the same rule. */
+/* 🔴 AND THE CANVAS BORDER READINGS ABOVE ARE DATED 2026-09-21 AND ARE NO
+   LONGER WHAT THIS STYLESHEET DOES. `.pos-scope-c` reads `border: var(--edge)`
+   and `.pos-glue.pos-glue > *` sets `--edge: 0`, which INHERITS to any depth,
+   so a glued canvas has computed 0 px since the tokens landed, direct child or
+   one level deep. MEASURED 2026-09-29 on `/pack/` and on both arrangements
+   built by hand: bare 1 px, glued 0 px, no stylesheet patch involved.
+   🔴 READ THAT BEFORE WRITING A `.pos-glue > X` RULE TO STRIP THIS BORDER.
+   The ring that was still on screen today was painted INTO the canvas by
+   `grain-scope.mjs`, in `--line`, where no selector and no computed value can
+   reach it, and it is gone from that file rather than from here. The whole
+   account is in the comment it left behind. */
 .pos-glue > .pos-scope, .pos-glue > * > .pos-scope { margin: 0; }
 .pos-glue > .pos-scope { background: var(--card); padding: 10px 12px; }
 
@@ -7405,6 +7416,34 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    width of the row at 375 px, measured, so centring it moves nothing and takes
    nothing away.
 
+   🔴 **AND THE NAME CLUSTER IS THE LOWEST LINE OF THE ROW, WHICH IS `order: 1`
+   AND IS NEW ON 2026-09-29.** Asked in these words: *"general: intrument panel:
+   nameplate is the lowest of the bottom components in mobile"*. The plate row
+   is already the last row of the panel at every width, so the ask is about the
+   order INSIDE it once it wraps, and the wrap put the name on top.
+   ⚠️ **MEASURED AT 375 BEFORE AND AFTER, as rendered tops rather than as source
+   order.** `/muta/` read name 586.8 over picker 647.8 and now reads picker
+   586.8 over name 619.8; `/fau/` read name 777.7 over picker 796.7 and now
+   reads picker 777.7 over name 815.7; `/knobs/` read name 457.2 over its
+   `enable midi` button 476.2 and now reads the button first.
+   🔴 **THE CONTROL IN THE CLUSTER GOES DOWN WITH THE NAME, WHICH IS THE POINT
+   OF ORDERING THE CLUSTER AND NOT THE PLATE.** `/muta/`'s `Test tone` and
+   `/knobs/`'s presence badge live INSIDE `.pos-ipanel-name`, so one declaration
+   moves the whole start end. Splitting them would change what that element is
+   on six pages, which is a much larger thing than this ask.
+   ⚠️ **A ROW WITH ONE CHILD IS UNTOUCHED, AND THAT IS BY ABSENCE RATHER THAN BY
+   LUCK.** `createInstrumentPanel` only builds `.pos-ipanel-name` when the plate
+   has a `status` or a `patch` CONTROL; a bare `{ name }` plate is a single
+   `.panel-plate` and this selector matches nothing in it. MEASURED at 375:
+   `/shape/` and `/tom/` are one child of class `panel-plate`, `/muta/`,
+   `/fau/` and `/knobs/` are two with `.pos-ipanel-name` first in the DOM.
+   ⚠️ **AND `order` MOVES THE PAINT, NEVER THE TAB STOP.** On the three pages
+   with two children the keyboard still reaches the cluster's control before the
+   picker while the picker is drawn above it. That is the known cost of `order`
+   and it is one stop on a row of two, so it is recorded rather than worked
+   around; `flex-wrap: wrap-reverse` would have the identical mismatch and would
+   also flip the cross-axis alignment of every line.
+
    ⚠️ **AND NO HARNESS HERE CAN SEE THIS BLOCK, WHICH IS SAID OUT LOUD RATHER
    THAN LEFT TO BE DISCOVERED.** `demo/verify.mjs` runs at 756 px with no
    viewport override, so every assert on every one of those six pages passes
@@ -7421,5 +7460,5 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
     justify-content: center; text-align: center;
     margin-left: 0; column-gap: var(--panel-gap);
   }
-  .pos-ipanel-plate > .pos-ipanel-name { justify-content: center; }
+  .pos-ipanel-plate > .pos-ipanel-name { justify-content: center; order: 1; }
 }

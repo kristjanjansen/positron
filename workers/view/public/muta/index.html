@@ -99,28 +99,27 @@
     padding-right: var(--rows-gap);
     margin-right: var(--rows-gap);
   }
-  /* 🔴 THE KNOB GRID CANNOT BE CENTRED IN THIS PANEL, AND THAT IS A
-     MEASUREMENT RATHER THAN A PREFERENCE. Asked 2026-09-28: *"muta: center the
-     knob grid"*, and there is no rule here because there is nothing to centre
-     it in. This row is the WIDEST ROW of a `width: fit-content` surface, so the
-     panel is as wide as this row is: MEASURED at 1280, `.plai-knobs` reads
-     client 483 against scroll 483, and the same at 560. Both grids are
-     `flex: 0 0 auto` and each `.pos-cg` is as wide as its own tracks, so there
-     is no free space inside either of them either. **A centring declaration
-     moved the first grid by 0.0 px at both widths.**
-     🔴 **AND BELOW 483 px OF ROW IT STOPS BEING A NO-OP AND BECOMES A CLIP.**
-     The same `justify-content: center`, MEASURED: at 480 the first grid landed
-     at -1.5 and at 375 at -54.0, with `scrollLeft` clamped at 0 in both, so
-     54 px of the 2 by 2 group sits off the left edge and cannot be scrolled
-     back. `positron-compose` §1: inline-start overflow inside `overflow-x:
-     auto` is clipped for good, and this row is a scroller by design.
-     ⚠️ **THE ONE BOX WITH SLACK IS THE PANEL INSIDE THE PAGE**, 525 px in a
-     688 px body at 1280, all 163 px of it on the right. Centring that is one
-     `margin-inline: auto` and it is deliberately NOT written, because it takes
-     the instrument off the left edge the title, the paragraph, the report and
-     the log all share, and this page's own check below says in as many words
-     that the panel starts where the rest of the page does. It is a decision to
-     be asked for rather than guessed at. */
+  /* 🔴 THE KNOBS GROUP CENTRES, AND THE HALF THAT MAKES IT POSSIBLE IS THE
+     PANEL TAKING THE PAGE'S WIDTH. Asked 2026-09-29: *"muta: full content w in
+     deskop, center the knobs group. align test tone to right"*, which is three
+     things in one line and the first of them is what buys the other two.
+     🔴 **THIS BLOCK SAID THE CENTRING COULD NOT BE DONE UNTIL TODAY, AND IT WAS
+     RIGHT ABOUT THE PANEL IT WAS MEASURING.** On a `width: fit-content` surface
+     this row IS the widest row, so the panel was as wide as the row and the row
+     had no free space in it: MEASURED at 1280, `.plai-knobs` read client 483
+     against scroll 483, the same at 560, and a `justify-content: center` moved
+     the first grid **0.0 px** at both. The panel is `full` now, so the row is
+     the page's width and the 483 px group has 163 px of slack to sit in.
+     🔴 **AND THE CLIP THAT BLOCK WARNED ABOUT IS REAL, WHICH IS WHY THE
+     CENTRING IS CONFINED TO WHERE THERE IS ROOM.** MEASURED at 480 and 375,
+     where `max-width: 100%` already had the panel at the window's width before
+     today: the row's client is 406 and 301 against a scroll of 483 either way,
+     so there is nothing to centre in and a centring declaration pushes the 2 by
+     2 group off the LEFT edge by 38.5 and 91 px with `scrollLeft` clamped at 0.
+     `positron-compose` §1: inline-start overflow inside `overflow-x: auto` is
+     clipped for good, and this row is a scroller by design, made one after
+     HARMONICS and MORPH were photographed cut to `HAR` and `M`. The rule is at
+     the foot of this sheet, in a `min-width` block, with its threshold. */
 
   /* 🔴 THE `Test tone` BUTTON HAS BEEN IN THREE PLACES IN THREE DAYS AND IS IN
      THE PLATE'S `status` SLOT NOW. Asked 2026-09-25 as *"make a Test tone
@@ -181,6 +180,52 @@
   @media (max-width: 560px) {
     .plai-panel .pos-ipanel-name { flex: 1 1 100%; }
     .muta-tone { flex: 1 1 100%; }
+  }
+
+  /* 🔴 THE KNOBS GROUP CENTRES WHERE THERE IS ROOM AND NOWHERE ELSE, AND THE
+     THRESHOLD IS THIS SHEET'S EXISTING PHONE BREAKPOINT RATHER THAN A FIFTH
+     NUMBER. The group is 483 px and the row spends `--rows-pad` at each end
+     inside a panel that is now the page's width, so the row's client is the
+     window less 42 px: MEASURED, 646 at 1280 and at the harness's 756, 486 at
+     560, 406 at 480 and 301 at 375. The first width at which the group stops
+     fitting is 525, so a floor of 561 clears it by 4 px and is a number the
+     block above already uses.
+     ⚠️ **`justify-content: safe center` IS THE PRIMITIVE AND IT IS NOT USED, ON
+     PURPOSE.** `safe` falls back to `start` instead of overflowing, which is
+     this rule written once with no threshold in it, and NOTHING in this
+     repository uses it yet. This project verifies desktop Safari and the iPhone
+     as well as the harness Chrome, and support on those two engines was NOT
+     established here, so the query is what is written and the reason is
+     recorded rather than the keyword being trusted.
+     ⚠️ **AND A VIEWPORT QUERY IS A PROXY FOR THE ROW'S OWN WIDTH**, which
+     `positron-compose` §6 refuses in general: a component asks its own box. It
+     holds here because this panel is the page's own width on this page and on
+     no other. `@container` is the form that would be true in general, and
+     `.pos-rows` cannot carry one for the reason `shell.css` records under
+     `.pos-ipanel-plate`: inline size containment takes a surface's contents out
+     of its own sizing and a `fit-content` surface collapses.
+     🔴 AND THE `Test tone` BUTTON GOES TO THE RIGHT, ASKED FOR IN THE SAME
+     LINE. It is in the plate's `status` slot, so it lives INSIDE
+     `.pos-ipanel-name`, which is the START end of a two ended row whose far end
+     is the patch picker. Two declarations: the cluster takes the free space the
+     full width opened up, and the button parks at the far end of the cluster
+     with an auto margin, which lands it against the picker with the row's own
+     `--ctl-gap` between them.
+     🔴 **THE FAR END OF THE ROW WAS NOT ON OFFER, AND THAT IS A CONSTRUCTION
+     RATHER THAN A JUDGEMENT.** `instrument-panel.mjs` THROWS on a `.pos-pick`
+     handed in as `status`, and the far end has been the patch selector's since
+     2026-09-26. Putting the button there means a third slot on a component that
+     reaches six instrument pages, and nothing has asked for it on the other
+     five.
+     ⚠️ **AND BOTH HALVES SIT IN A `min-width` BLOCK SO NEITHER CAN REACH THE
+     PHONE**, where the cluster is already `flex: 1 1 100%` and the button takes
+     the whole line by an ask of 2026-09-28. An auto margin there would have no
+     free space to absorb, which is a no-op by luck rather than by construction,
+     and this project pays more for that difference than for anything else. */
+  @media (min-width: 561px) {
+    .plai-knobs { justify-content: center; }
+    .plai-panel .pos-ipanel-name { flex: 1 1 auto; }
+    .plai-panel .muta-tone { margin-inline-start: auto; }
   }
 </style>
 
@@ -732,18 +777,31 @@
    * and a word between them names what the reader is reading. The picker is
    * still BUILT with a label, so the assert below has something to catch: if
    * the caption ever comes back, the control has left the slot that strips it.
-   * ⚠️ **AND THE SURFACE IS ITS OWN SIZE, NOT THE PAGE'S, WHICH IS A REAL
-   * CHANGE TO WHAT YOU SEE.** `.pos-rows` is `width: fit-content` and this page
-   * does not pass `full`, so the panel is as wide as its widest row rather than
-   * running the width of the readout the way the case did. That is
-   * `positron-compose` §3: an instrument is as wide as the instrument, and the
-   * case it replaces was a 688 px band holding a 342 px row of rotaries.
+   * 🔴 **AND `full` TAKES THE PAGE'S WIDTH, ASKED FOR 2026-09-29 AS *"muta:
+   * full content w in deskop"*. THIS PARAGRAPH SAID THE OPPOSITE UNTIL TODAY
+   * AND THE ARGUMENT IT MADE IS STILL THE RIGHT ONE, WHICH IS WHY IT IS KEPT.**
+   * It read: `.pos-rows` is `width: fit-content` and this page does not pass
+   * `full`, so the panel is as wide as its widest row rather than running the
+   * width of the readout the way the case did, which is `positron-compose` §3,
+   * *an instrument is as wide as the instrument*, written down after four knobs
+   * on a pedal floated in a 660 px band and the verdict was *"plainly awful"*.
+   * ⚠️ **WHAT ANSWERS IT IS THE SECOND HALF OF THE SAME ASK.** A full width
+   * panel with its controls parked hard left is exactly the band that verdict
+   * was about; the knobs centre in the width and the `Test tone` button takes
+   * the right of the plate row, so the band is a decision about where things
+   * sit rather than a surface that ran out of content. Both rules are in this
+   * page's own sheet, confined to the widths that have the room.
+   * ⚠️ **AND THE PHONE IS NOT PAYING FOR IT.** MEASURED at 480 and 375 before
+   * the flag: the panel was ALREADY the window's width less its 16 px page
+   * inset, 448 and 343, because `.pos-rows` carries `max-width: 100%` and this
+   * row is wider than the screen. Only 560 moves, by 3 px, from 525 to 528.
    */
   const panel = createInstrumentPanel({
     viz: scope.el,
     rows: [[knobGrid]],
     plate: { name: 'PLAITS', status: toneBtn, patch: pick },
     cls: 'plai-panel',
+    full: true,
   });
 
   let plaitsWave = null, scopeFrames = 0;
@@ -2052,12 +2110,19 @@
      * different lengths. There is no header and there is no second case, and a
      * plate row is two ends rather than three cells, so the centring claim has
      * nothing left to be about.
+     * ⚠️ **AND IT STOPPED NAMING THE BUTTON ON 2026-09-29.** This was called
+     * `the foot carries the name and the test tone at one end`, which was a
+     * true sentence about a shrink wrapped cluster and is a misleading one now
+     * that *"align test tone to right"* has pushed the button to the far side
+     * of that cluster. What this assert grades is the two ENDS and their
+     * insets; where the button sits inside the start end is the next assert's,
+     * and that is where the new claim went.
      */
     const plateRow = panel.plateRow.getBoundingClientRect();
     const nameEnd = panel.plateRow.querySelector('.pos-ipanel-name')?.getBoundingClientRect();
     const patchEnd = panel.patchEnd?.getBoundingClientRect();
     const caption = panel.patchEnd?.querySelector('.pos-pick-l');
-    d.assert('the foot carries the name and the test tone at one end and an unlabelled patch selector at the other',
+    d.assert('the foot carries the name at one end and an unlabelled patch selector at the other',
       !!nameEnd && !!patchEnd && !caption
         && Math.abs((nameEnd.left - plateRow.left) - (plateRow.right - patchEnd.right)) <= 1
         && nameEnd.left - plateRow.left > 4 && patchEnd.left > nameEnd.right,
@@ -2088,33 +2153,61 @@
      * ⚠️ **AND `panel.status` IS READ RATHER THAN THE CLASS**, because the
      * question is which SLOT it landed in. A `.muta-tone` anywhere in the plate
      * row would satisfy a query and say nothing about that.
+     * 🔴 **AND SINCE 2026-09-29 IT IS PUSHED TO THE RIGHT OF THAT SLOT, WHICH
+     * IS THE THIRD THING IN ONE ASK**: *"align test tone to right"*. The far
+     * end of the ROW was not available, because `instrument-panel.mjs` throws on
+     * a `.pos-pick` in `status` and the far end has been the patch selector's
+     * since 2026-09-26, so the right this can mean is the right of the free
+     * space the full width opened up. MEASURED at 756 before and after: the
+     * button spanned 112.0 to 220.4 px and now spans 313.5 to 422.0, which is
+     * 201.5 px further right and the same 108.5 px wide.
+     * ⚠️ **TWO TERMS, BECAUSE TWO THINGS COULD BE TRUE SEPARATELY.** The button
+     * ending on its cluster's own right edge says the auto margin fired; the
+     * gap to the picker being the row's own `--ctl-gap` says the cluster really
+     * took the free space rather than shrink wrapping somewhere in the middle.
+     * The gap is READ off the row rather than typed, because a number typed
+     * here and a number in `shell.css` is this project's most repeated defect.
+     * ⚠️ **AND IT GRADES THE DESK ONLY.** At 560 and under the cluster and the
+     * button are both `flex: 1 1 100%` and the picker is on its own line, so
+     * the first term is true for a different reason and the second is
+     * vacuous. `node demo/shot.mjs muta 375` is what looks at that.
      */
     const tone = toneBtn.getBoundingClientRect();
     const plateName = panel.plateRow.querySelector('.pos-ipanel-name');
     const tones = document.querySelectorAll('.muta-tone').length;
-    d.assert('the test tone button is in the slot the on and off switch had, after the name',
+    const rowGap = parseFloat(getComputedStyle(panel.plateRow).columnGap) || 0;
+    d.assert('the test tone button is in the slot the on and off switch had, pushed to the right of it',
       tones === 1 && panel.status === toneBtn && plateName?.contains(toneBtn)
         && tone.width > 0 && tone.left > nameEnd.left && tone.right < patchEnd.left
+        && Math.abs(tone.right - nameEnd.right) < 0.5
+        && patchEnd.left - tone.right <= rowGap + 1
         && toneDeadOnLoad === false,
       `${tones} tone button on the page, ${panel.status === toneBtn ? 'in' : 'NOT in'} the `
       + `status slot, spanning ${tone.left.toFixed(1)} to ${tone.right.toFixed(1)} px between `
       + `the name at ${nameEnd.left.toFixed(1)} and the picker at ${patchEnd.left.toFixed(1)}, `
-      + `and on the visit it was ${toneDeadOnLoad ? 'dead' : 'pressable'}`);
+      + `ending ${(nameEnd.right - tone.right).toFixed(1)} px short of its own slot and `
+      + `${(patchEnd.left - tone.right).toFixed(1)} px short of the picker against a `
+      + `${rowGap.toFixed(1)} px row gap, and on the visit it was `
+      + `${toneDeadOnLoad ? 'dead' : 'pressable'}`);
 
     /**
-     * 🔴 THE PANEL STARTS WHERE THE REST OF THE PAGE DOES AND IS ITS OWN SIZE
-     * ACROSS, WHICH IS TWO CLAIMS AND USED TO BE ONE. It read `the case starts
-     * and ends where the rest of the page does`, and both ends held because a
-     * `.panel-case` is as wide as the page it is on.
-     * 🔴 **AND THE RIGHT HAND HALF IS GONE ON PURPOSE, NOT BECAUSE IT FAILED.**
-     * `.pos-rows` is `width: fit-content`, so the panel is as wide as its
-     * widest row, and `positron-compose` §3 is why: *an instrument is as wide
-     * as the instrument, not as wide as the page*, written down after four
-     * knobs on a pedal floated in a 660 px band and the verdict was *"plainly
-     * awful"*. The case this replaces was a 688 px band holding a 342 px row of
-     * rotaries. So the claim that survives is the LEFT edge, which is where the
-     * instrument sits against everything else, plus the negative half that the
-     * page does not drag sideways.
+     * 🔴 THE PANEL STARTS AND ENDS WHERE THE REST OF THE PAGE DOES, WHICH IS
+     * TWO CLAIMS AGAIN AND WAS ONE UNTIL 2026-09-29. Asked in these words:
+     * *"muta: full content w in deskop"*.
+     * 🔴 **THE HALF THAT CAME BACK IS THE RIGHT EDGE, AND IT DID NOT COME BACK
+     * BY ACCIDENT.** This assert read `is as wide as its widest row` and
+     * required `bPanel.right < bRead.right`, because `.pos-rows` is
+     * `width: fit-content` and the page passed no `full`. That was
+     * `positron-compose` §3, *an instrument is as wide as the instrument*,
+     * written after four knobs on a pedal floated in a 660 px band and the
+     * verdict was *"plainly awful"*. The ask overrules it for this page and
+     * answers the objection in the same line, because the knobs centre in the
+     * width and the `Test tone` button takes the right of the plate row.
+     * MEASURED at 1280 before and after: the panel spanned 296 to 821 against
+     * the report's 296 to 984, and now spans 296 to 984.
+     * ⚠️ **SO THE STRICT INEQUALITY HAD TO GO RATHER THAN BE WIDENED.** Left
+     * standing it would be red on a page doing exactly what was asked, and
+     * relaxed to `<=` it would pass a panel of any width at all.
      * ⚠️ **AND THE RULER IS `.pos-report`, WHICH MOVED UNDER THIS PAGE ON
      * 2026-09-28.** It was `.pos-readout`, and the readout became the top half
      * of a glued report that day, so its rect is one border INSIDE the thing a
@@ -2122,24 +2215,31 @@
      * panel at 34.0, a delta of exactly 1.0 against a tolerance of 1, red on a
      * page where nothing was wrong. The repair is the one this page's own
      * comments have made twice already: **read the edge a visitor can see.**
-     * ⚠️ THE THIRD TERM IS THE ONE THAT CAN CATCH A PANEL TOO WIDE FOR ITS
-     * WINDOW, which is what the right hand half used to do by accident.
+     * ⚠️ THE THIRD TERM IS THE ONE THAT CATCHES A PANEL TOO WIDE FOR ITS
+     * WINDOW, and it is now the only one that can: with both edges pinned to
+     * the report, a panel that overflowed would take its ruler with it.
+     * ⚠️ **AND THE GROUP'S OWN WIDTH IS PRINTED BESIDE THE PANEL'S**, because
+     * the number the old claim protected is still the interesting one: a
+     * 483 px group of rotaries in a 646 px row is the band the verdict above
+     * was about, and the detail line is where a reader can see it is a
+     * decision rather than a surface that ran out of content.
      */
     const bPanel = panel.el.getBoundingClientRect();
     const bRead = document.querySelector('.pos-report')?.getBoundingClientRect();
-    const widest = Math.max(...panel.rows().map((r) => {
-      const kid = r.el.firstElementChild;
-      return kid ? kid.getBoundingClientRect().width : 0;
-    }));
-    d.assert('the instrument starts where the rest of the page does and is as wide as its widest row',
+    const bKnobRow = knobGrid.getBoundingClientRect();
+    const group = knobGrid.lastElementChild && knobGrid.firstElementChild
+      ? knobGrid.lastElementChild.getBoundingClientRect().right
+        - knobGrid.firstElementChild.getBoundingClientRect().left
+      : NaN;
+    d.assert('the instrument starts and ends where the rest of the page does',
       !!bPanel && !!bRead && near(bPanel.x, bRead.x)
-        && bPanel.right < bRead.right
+        && near(bPanel.right, bRead.right)
         && document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       bPanel && bRead
         ? `the panel spans ${bPanel.x.toFixed(1)} to ${bPanel.right.toFixed(1)} px against `
-          + `the report's ${bRead.x.toFixed(1)} to ${bRead.right.toFixed(1)} px, its widest `
-          + `row's content is ${widest.toFixed(1)} px, and the page is `
-          + `${document.documentElement.scrollWidth} px wide in a `
+          + `the report's ${bRead.x.toFixed(1)} to ${bRead.right.toFixed(1)} px, holding a `
+          + `${group.toFixed(1)} px group of rotaries in a ${bKnobRow.width.toFixed(1)} px row, `
+          + `and the page is ${document.documentElement.scrollWidth} px wide in a `
           + `${document.documentElement.clientWidth} px window`
         : 'the panel or the report is not on the page');
 
@@ -2158,14 +2258,41 @@
      * about 17 px of empty either side of the ink and none above it. Reading
      * the cell would call a block equal that a reader sees as lopsided.
      * `positron-compose` §2: **a reader sees ink, not boxes.**
-     * ⚠️ THE ROW IS THE RULER because the row IS the inset now: `--rows-pad`
-     * across and `--rows-gap` down, and the 21 px in the stylesheet is what
-     * makes up the difference plus the empty half cell.
+     * ⚠️ THE ROW IS THE RULER FOR THE VERTICAL HALF because the row IS that
+     * inset: `--rows-gap` down, and the 21 px in the stylesheet is what makes up
+     * the difference.
+     * 🔴 **AND THE HORIZONTAL HALF IS A DIFFERENT CLAIM SINCE 2026-09-29,
+     * BECAUSE THE ONE IT REPLACES BECAME FALSE BY DESIGN.** This read `the row
+     * insets the rotaries' ink equally on all three sides` and required the
+     * first dial's LEFT gap to match its top and bottom, which held while the
+     * row was as wide as the group: MEASURED at 1280 before the change, 36.7 px
+     * left against 37.0 above and 37.0 below. The group centres in a full width
+     * row now, so the left gap is 98.2 px and nothing is wrong. **Widening the
+     * tolerance would have left a green assert measuring nothing**, so the claim
+     * is replaced by the one that is true now and was asked for: *"center the
+     * knobs group"*.
+     * ⚠️ **LEFT AGAINST RIGHT, BOTH READ AS INK, AND NOT AS THE TWO GRIDS'
+     * BOXES.** Same reason this assert has always had: a rect reads the box and
+     * a knob's box is its grid cell. The two agree here because the lattice
+     * leaves the same half cell at each end, MEASURED at 1280 as 81.5 px of box
+     * against 98.2 px of ink on both sides, and agreeing is not a reason to
+     * measure the wrong one.
+     * ⚠️ **AND THE FOURTH TERM IS THE NEGATIVE HALF.** A centred flex row that
+     * has overflowed puts its first item off the inline start with `scrollLeft`
+     * clamped at 0, which is unreachable for good: at 375 the group would sit
+     * 91 px off the left edge. That is what the `min-width` block in this
+     * page's sheet is for, and this is the check that a scrolling row is not
+     * also a centring one.
+     * ⚠️ **NOTHING BELOW 561 px IS GRADED BY IT.** `demo/verify.mjs` runs at
+     * 756 px, where the row has 163 px of slack, so this is a DESK measurement.
+     * The widths where the centring is switched off are looked at with
+     * `node demo/shot.mjs muta 375` and by nothing else.
      */
     const bRow = panel.controls()[0]?.getBoundingClientRect();
+    const bKnobs = knobGrid.getBoundingClientRect();
     const bGrid = ownGrid.el.getBoundingClientRect();
-    const dial = knobs.get('pitch')?.el.querySelector('.pos-knob-dial');
-    const bInk = dial?.getBoundingClientRect();
+    const inkOf = (k) => knobs.get(k)?.el.querySelector('.pos-knob-dial')?.getBoundingClientRect() ?? null;
+    const bFirst = inkOf('pitch'), bLast = inkOf('voices');
     /* 🔴 THE DIAL ACROSS AND THE GRID DOWN, WHICH IS NOT AN INCONSISTENCY AND
        WENT RED ONCE FOR LOOKING LIKE ONE. A knob's cell has about 17 px of
        empty either side of the dial and NOTHING above it: what sits at the top
@@ -2173,23 +2300,30 @@
        dial's top instead read **54.0 px against 36.7 across**, because the
        dial's top is under `--ctl-head`, which is a reserved slot rather than an
        edge. The grid's own top IS the first value line. */
-    const air = bRow && bInk
-      ? { left: bInk.left - bRow.left, top: bGrid.top - bRow.top,
-          bottom: bRow.bottom - bGrid.bottom }
-      : null;
-    /* ⚠️ LEFT, TOP AND BOTTOM, NEVER LEFT AND RIGHT. The panel is as wide as
-       its widest row and the rotaries ARE that row, so the right hand gap is
-       whatever the wider row left over. That is the quantity in question being
-       next to the quantity measured, which this project has paid for more than
-       once. */
-    /* ⚠️ AND THE BOTTOM IS THE LAST ROW'S DIAL RATHER THAN THE FIRST'S,
+    /* ⚠️ LEFT AGAINST RIGHT SINCE 2026-09-29, AND IT USED TO BE LEFT, TOP AND
+       BOTTOM WITH NO RIGHT IN IT AT ALL. The note here read: the panel is as
+       wide as its widest row and the rotaries ARE that row, so the right hand
+       gap is whatever the wider row left over, which would be the quantity in
+       question being next to the quantity measured. That was exactly right
+       while the surface shrink wrapped. The row is the page's width now and
+       the group is centred in it, so the right hand gap is the left hand one
+       and comparing them is the whole claim. */
+    /* ⚠️ AND THE BOTTOM IS THE LAST ROW'S GRID RATHER THAN THE FIRST'S,
        because the two grids are two and three rows deep and only the taller one
-       reaches the bottom of the block. */
-    d.assert('the row insets the rotaries\u2019 ink equally on all three sides',
-      !!air && air.left > 16 && Math.abs(air.left - air.top) < 2
-        && Math.abs(air.left - air.bottom) < 2,
-      air ? `${air.left.toFixed(1)} px left of the first dial, ${air.top.toFixed(1)} px above `
-          + `it and ${air.bottom.toFixed(1)} px below the last one`
+       reaches the bottom of the block. `voices` is the last knob of that taller
+       grid, so it is also the rightmost ink on the row. */
+    const air = bRow && bFirst && bLast
+      ? { left: bFirst.left - bKnobs.left, right: bKnobs.right - bLast.right,
+          top: bGrid.top - bRow.top, bottom: bRow.bottom - bGrid.bottom }
+      : null;
+    d.assert('the rotaries’ ink is centred across the row and inset equally above and below',
+      !!air && air.top > 16 && Math.abs(air.top - air.bottom) < 2
+        && Math.abs(air.left - air.right) < 2
+        && knobGrid.scrollWidth <= knobGrid.clientWidth,
+      air ? `${air.left.toFixed(1)} px left of the first dial against ${air.right.toFixed(1)} px `
+          + `right of the last, and ${air.top.toFixed(1)} px above the block against `
+          + `${air.bottom.toFixed(1)} px below it, in a row holding `
+          + `${knobGrid.scrollWidth} px of content in ${knobGrid.clientWidth} px`
           : 'the row or a dial is not on the page');
 
     /**

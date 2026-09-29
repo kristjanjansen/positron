@@ -184,20 +184,35 @@
 
   const d = mount({
     name: 'knobs',
-    // 🔴 ONE LINE, BECAUSE THIS PAGE HAS A DIAGRAM AT THE BOTTOM OF IT. A
-    // paragraph and a picture of the machinery are two explanations of one
-    // thing and the paragraph is the weaker of them: it describes what a reader
-    // can point at an inch below. It is `manifest.mjs`'s own line verbatim, so
-    // arriving from the index does not mean reading the same claim twice in two
-    // wordings that can drift apart.
-    // ⚠️ WHAT THE PARAGRAPH SAID IS REHOMED, NOT DELETED. The gate, the relay
-    // and the twenty millisecond frame are boxes and notes in the picture now.
-    // ⚠️ IT SAYS THE HAND NOW, BECAUSE THE PAGE GAINED A CONTROL. A description
-    // that has drifted is worse than a missing one: nothing type-checks a
-    // sentence and a visitor believes it. `manifest.mjs`'s own line moved in the
-    // same change, verbatim, so arriving from the index does not mean reading
-    // the same claim twice in two wordings.
-    what: 'Play a synthesizer in another building, and turn its knobs while you do.',
+    // 🔴 THREE SENTENCES ON THIS ONE PAGE, ASKED FOR 2026-09-29, AND THE ASK
+    // IS QUOTED SO NOBODY CUTS IT BACK AS A TIDY-UP. Against the one line that
+    // stood here: *"Play a synthesizer in another building, and turn its knobs
+    // while you do."*, the reply was *"- make longer explaingi Pi"*. CLAUDE.md
+    // says a description is ONE SENTENCE and may not be stretched, and this is
+    // the owner overriding that rule HERE and nowhere else. No other page's
+    // description moved with it, and the rule in CLAUDE.md is untouched.
+    // 🔴 WHAT THE EXTRA WORDS BUY IS THE PI, WHICH IS THE ONE THING THE OLD
+    // SENTENCE HID. *"another building"* never said what is in that building, so
+    // a reader was told there is a machine somewhere and nothing about it. The
+    // three added facts are READ OFF THE PICTURE AT THE FOOT OF THIS PAGE rather
+    // than invented: `yoshimi` is a box on the Raspberry Pi, `ctl.set` and `CC`
+    // are the arrows going out through the relay, and `PCM` with `20ms pieces`
+    // is the arrow coming back.
+    // ⚠️ AND IT IS REWRITTEN RATHER THAN APPENDED TO. CLAUDE.md: a change is an
+    // occasion to cut, not to staple a clause on the end. The hook is unchanged
+    // because it is what a visitor came for; everything after it is new.
+    // ⚠️ IT IS STILL `manifest.mjs`'s OWN LINE VERBATIM, differing only in the
+    // first letter's case and the closing full stop, which is what it has always
+    // differed by. Arriving from the index does not mean reading the same claim
+    // twice in two wordings that can drift apart, and the card on the front page
+    // grows with this line.
+    // ⚠️ WHAT THE OLD PARAGRAPH SAID IS STILL REHOMED, NOT RESTORED. The gate
+    // is a box in the picture and the twenty millisecond frame is a note on it;
+    // what has come back here is the ONE fact the picture cannot give somebody
+    // who has not scrolled to it yet, which is what the far machine is.
+    what: 'Play a synthesizer in another building, and turn its knobs while you do. '
+      + 'Over there a Raspberry Pi runs Yoshimi. A relay carries your knob turns out as '
+      + 'MIDI and brings its sound back in 20 ms pieces.',
     /**
      * Six cells, and every one of them moves.
      *
@@ -456,6 +471,25 @@
     room: ROOM,
     relay: q.get('relay') || undefined,
     of: 'Raspberry Pi',
+    /**
+     * 🔴 THE BADGE SAYS THE WORD AND NOT THE NAME, ASKED FOR 2026-09-29 AS
+     * *"Rasp Pi online -> ONLINE"*. It printed `Raspberry Pi online` in the
+     * plate's foot, an inch to the right of a nameplate reading `KNOBS`, on the
+     * one page in this project whose whole subject is that one board. The name
+     * was the longest thing in the foot and the only word in it nobody needed.
+     * ⚠️ AND IT IS THE COMPONENT'S OPTION RATHER THAN A RULE IN THIS PAGE'S
+     * STYLESHEET, BECAUSE THE NAME IS PART OF A RESERVED WIDTH. `presence.mjs`
+     * measures `--pres-ch` over every phrase the badge can EVER say, so hiding
+     * the words with CSS would leave the whole reserve standing and the badge
+     * holding air, and that reserve is the only reason nothing in it moves while
+     * it redraws. MEASURED on this page, 2026-09-29, before and after: `--pres-ch`
+     * 26 and `min-width: 172.187px` against 13 and `86.0933px`, and the badge
+     * round it 190.17 px against 104.08.
+     * ⚠️ THE NAME IS NOT LOST, IT MOVES TO THE HOVER. `presence.mjs`'s `title()`
+     * is `${of} ${word}` whatever the badge prints, so the tooltip and the
+     * accessible name both still read `Raspberry Pi online`. MEASURED after.
+     */
+    showName: false,
     /**
      * 🔴 160 ms, RAISED FROM 100 ON A MEASUREMENT AND A REPORT. Reported
      * 2026-09-16 while listening: *"some vobbly sound, cutoffs, not nice"*, with
