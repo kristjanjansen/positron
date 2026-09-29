@@ -132,11 +132,46 @@
      ✅ **AND EACH MOVE REMOVED PAGE CSS RATHER THAN ADDING IT.** Three
      placement rules and two media queries went with the header, the `align`
      option went with the row, and what is left is one declaration.
-     ⚠️ `flex: 0 0 auto` BECAUSE `.pos-ipanel-name` IS A WRAPPING FLEX ROW.
-     Without it the button is a flex item with the default `flex-shrink: 1`
-     beside a nameplate, so a narrow plate row would squeeze the words rather
-     than wrapping them onto the next line, which is what the wrap is for. */
+     🔴 **AND IT IS OUT OF THE PLATE AGAIN SINCE 2026-09-29, WHICH IS THE
+     FOURTH PLACE IN FIVE DAYS.** *"nameplane is in separate section in bottom"*
+     empties the foot down to the name, so the button went up to the controls
+     row the model picker now sits on, at its far end. That row is
+     `.muta-pickrow` below and it is the two-ended one this page used to make
+     out of its foot.
+     ⚠️ `flex: 0 0 auto` BECAUSE THE BUTTON IS THE FIXED END OF THAT ROW.
+     Without it the button is a flex item with the default `flex-shrink: 1`, so
+     the picker beside it would stop being the half that gives way and the
+     words would squeeze instead. It is the same declaration it carried in the
+     plate and it is keeping the row honest rather than the cluster. */
   .muta-tone { flex: 0 0 auto; }
+
+  /* 🔴 THE PICKER AND ITS DIE ARE ONE THING THAT NEVER BREAKS IN HALF, AND THE
+     PICKER TAKES WHAT THE BUTTON LEAVES. Asked 2026-09-29: *"Patch selector
+     and randomize button go togther and so not wrap and parch takes rest of
+     w"*.
+     ✅ **THE FIRST HALF IS ALREADY TRUE AND IS LEFT ALONE RATHER THAN RE-STATED.**
+     `picker.mjs:204` appends the die INSIDE `.pos-pick`, beside the segment,
+     and `shell.css`'s own phone block keeps it there on purpose: that block was
+     written after the die dropped a whole row below the arrows on `/radio/` and
+     `/mirror/`. So there is no rule here that puts them together. A rule here
+     would be a second copy of one that already works, in a file that cannot see
+     the first.
+     🔴 **WHAT IS NEW IS THE STRETCH, AND IT TAKES THREE DECLARATIONS BECAUSE
+     THE WIDTH LIVES ON THE CELL.** `.pos-pick-cell` is `width: calc(var(--pick-w)
+     + ...)`, 22ch at the desk, so widening `.pos-pick` alone leaves the cell at
+     its own width and spends the difference on air between the segment and the
+     die. The wrapper grows, the segment inside it grows, and the cell's fixed
+     width gives way to `auto`. All three or none.
+     ⚠️ **AND `min-width: 0` ON EACH, BECAUSE A FLEX ITEM'S FLOOR IS ITS
+     CONTENT.** `.pos-pick-cell` is `white-space: nowrap` and the names it holds
+     run to `filtered noise`, so without the floor lowered the row cannot shrink
+     below the longest model name and the button is what goes over the edge.
+     ⚠️ **THIS IS PAGE SCOPED AND THE KIT SHAPE IS NOT BUILT.** A stretching
+     picker would be a `grow` option on `createPicker`, that control is on nine
+     pages, and nothing has asked for it anywhere else. */
+  .muta-pickrow > .pos-pick { flex: 1 1 auto; min-width: 0; }
+  .muta-pickrow .pos-pick-seg { flex: 1 1 auto; min-width: 0; }
+  .muta-pickrow .pos-pick-cell { width: auto; flex: 1 1 auto; min-width: 0; }
 
   /* 🔴 AND ON A PHONE IT TAKES THE WHOLE ROW. Asked 2026-09-28: *"test tone
      button takes full w on mobile (buttons prop?)"*.
@@ -148,22 +183,21 @@
      `.kbd-full`. This is PAGE SCOPED on purpose: the kit shape would be a
      `full` option on the plate's `status` slot, that slot reaches six
      instrument pages, and nothing has asked for it on the other five.
-     🔴 **IT IS TWO DECLARATIONS BECAUSE A FLEX ITEM CANNOT WIDEN ITS PARENT.**
-     `.pos-ipanel-name` is a shrink to fit cluster holding the nameplate and
-     this button. MEASURED at 375 with each half on its own: the button rule
-     alone takes the button to **165.4 px**, which is the cluster's own width
-     and not the row's, and the cluster rule alone leaves the button at 108.5.
-     Together they read 301.0. So the cluster takes the line and the button
-     takes the cluster.
-     ✅ **AND THE NAMEPLATE STAYS CENTRED, WHICH IS THE OTHER ASK OF THE SAME
-     DAY** (*"on mobile the nameplate ... is centered hzontally"*, the block at
-     the foot of `shell.css`). MEASURED at 375, 480 and 560: `PLAITS` centres on
-     187.5, 240.0 and 278.5 against row centres of 187.5, 240.0 and 278.5, and
-     the button comes to 301.0, 406.0 and 483.0, which is the patch picker's
-     width at each of those widths TO THE PIXEL. A centred name over two
-     controls of one width is one block; a centred name with a 108.5 px button
-     hanging off it over a 301 px picker is the nervous almost-the-same
-     `positron-compose` §3 refuses.
+     🔴 **IT WAS TWO DECLARATIONS AND IT IS ONE SINCE 2026-09-29, BECAUSE THE
+     BUTTON'S PARENT CHANGED.** It used to sit inside `.pos-ipanel-name`, a
+     shrink to fit cluster, so the button could not widen past its own parent
+     and the cluster had to be told to take the line first: MEASURED at 375
+     with each half on its own, the button rule alone reached **165.4 px**,
+     which was the cluster's width and not the row's. The button is a direct
+     child of `.muta-pickrow` now and that row is the panel's own full width, so
+     `flex: 1 1 100%` on the button is the whole rule and the second one went.
+     ✅ **AND THE NAMEPLATE IS STILL CENTRED ON A PHONE**, by the same block at
+     the foot of `shell.css` and now with nothing of this page's in the way,
+     because the foot holds one `.panel-plate` and no cluster at all.
+     ⚠️ **THE MEASUREMENTS IN THIS PARAGRAPH ARE THE OLD ARRANGEMENT'S AND ARE
+     KEPT AS THE REASON THE RULE EXISTS**, not as a reading of the page as it
+     stands. The picker and the button are on two lines of one row at 375
+     rather than on two ends of a foot.
      ⚠️ **AT THE DESK NOTHING MOVES**, measured at 1280: the button is 108.5 px
      and the panel is 462 px tall with this block and without it. The phone pays
      19 px of panel height, 504 to 523.
@@ -178,7 +212,7 @@
      beat this one at (0,1,0) on source order at every width, which is the dead
      rule `.pos-pick`'s whole phone layout was for weeks. Order, not weight. */
   @media (max-width: 560px) {
-    .plai-panel .pos-ipanel-name { flex: 1 1 100%; }
+    .muta-pickrow > .pos-pick { flex: 1 1 100%; }
     .muta-tone { flex: 1 1 100%; }
   }
 
@@ -205,27 +239,22 @@
      `.pos-ipanel-plate`: inline size containment takes a surface's contents out
      of its own sizing and a `fit-content` surface collapses.
      🔴 AND THE `Test tone` BUTTON GOES TO THE RIGHT, ASKED FOR IN THE SAME
-     LINE. It is in the plate's `status` slot, so it lives INSIDE
-     `.pos-ipanel-name`, which is the START end of a two ended row whose far end
-     is the patch picker. Two declarations: the cluster takes the free space the
-     full width opened up, and the button parks at the far end of the cluster
-     with an auto margin, which lands it against the picker with the row's own
-     `--ctl-gap` between them.
-     🔴 **THE FAR END OF THE ROW WAS NOT ON OFFER, AND THAT IS A CONSTRUCTION
-     RATHER THAN A JUDGEMENT.** `instrument-panel.mjs` THROWS on a `.pos-pick`
-     handed in as `status`, and the far end has been the patch selector's since
-     2026-09-26. Putting the button there means a third slot on a component that
-     reaches six instrument pages, and nothing has asked for it on the other
-     five.
-     ⚠️ **AND BOTH HALVES SIT IN A `min-width` BLOCK SO NEITHER CAN REACH THE
-     PHONE**, where the cluster is already `flex: 1 1 100%` and the button takes
-     the whole line by an ask of 2026-09-28. An auto margin there would have no
-     free space to absorb, which is a no-op by luck rather than by construction,
-     and this project pays more for that difference than for anything else. */
+     LINE, **WHICH TOOK TWO DECLARATIONS HERE UNTIL 2026-09-29 AND NOW TAKES
+     NONE.** It was in the plate's `status` slot, INSIDE `.pos-ipanel-name`,
+     which was the start end of a two ended foot: the cluster had to be told to
+     take the free space and the button to park at the far end of it with an
+     auto margin, because the far end of the ROW was the picker's and
+     `instrument-panel.mjs` THROWS on a `.pos-pick` handed in as `status`.
+     ✅ **THE ROW THE BUTTON IS ON NOW HAS A FAR END TO GIVE IT.**
+     `.muta-pickrow` is `align: 'between'`, which is `justify-content:
+     space-between` on exactly two children, so the picker holds the start and
+     the button holds the end with no margin, no cluster and no threshold. Both
+     declarations were deleted rather than moved.
+     ⚠️ **AND WHAT IS LEFT IN THIS BLOCK IS ONLY THE KNOBS.** The paragraph
+     that stood here about both halves sitting in a `min-width` block so neither
+     could reach the phone went with the halves it was about. */
   @media (min-width: 561px) {
     .plai-knobs { justify-content: center; }
-    .plai-panel .pos-ipanel-name { flex: 1 1 auto; }
-    .plai-panel .muta-tone { margin-inline-start: auto; }
   }
 </style>
 
@@ -414,11 +443,14 @@
      * than deleted because the next reader will ask why a page of rotaries has
      * a button on it.
      * 🔴 **THE ROW ITSELF STAYS EMPTY, AND THAT IS A DECISION.** `Test tone`
-     * belongs to PLAITS and sits on PLAITS' own plate, in the slot the on and
-     * off switch had, where *"put a test tone on that spot"* put it. Putting it
-     * here instead would have made it control 0, which is the ONE control
-     * `settleMs` lands on, and this page has already paid for moving control 0
-     * once.
+     * belongs to the instrument and rides with it: it was in the plate's
+     * `status` slot from 2026-09-28, where *"put a test tone on that spot"*
+     * put it, and since 2026-09-29 it is the far end of the picker row, because
+     * *"nameplane is in separate section in bottom"* emptied the plate down to
+     * the name. Putting it HERE instead would have made it control 0, which is
+     * the ONE control `settleMs` lands on, and this page has already paid for
+     * moving control 0 once. That argument is about this row and survives every
+     * move the button has made.
      * 🔴 **SO THE HARNESS STILL PRESSES NOTHING AND THE PAGE STILL MAKES ITS
      * OWN GESTURES.** `demo/verify.mjs` drives a page by clicking everything in
      * `.pos-controls`; this page has none, so the one gesture it takes is a
@@ -482,8 +514,17 @@
    * the one knob here that asks for none rather than wearing a refused button.
    */
 
+  /* 🔴 IT IS BUILT WITH NO `label`, AND THAT IS NEW ON 2026-09-29. It used to
+     carry one and never show it: `createInstrumentPanel` strips a `.pos-pick-l`
+     off whatever it puts in the plate's `patch` slot, so the caption was built
+     and then removed, and the assert below read its absence as proof the picker
+     was in that slot. The picker has left the plate, nothing strips anything
+     now, and a `label` here would put a `MODEL` caption back on screen. The ask
+     it would break is *"no label on patch selctor"*, 2026-09-28.
+     ⚠️ `what` IS NOT THE CAPTION. It is the word the arrows and the die say in
+     their own titles, *the model before this one*, and it is what a screen
+     reader gets where a sighted reader gets the plate. */
   const pick = createPicker({
-    label: 'model',
     what: 'model',
     prev: () => setModel(model - 1),
     next: () => setModel(model + 1),
@@ -493,11 +534,9 @@
   pick.options(MODELS, 0);
   /* ⚠️ NO WRAPPER ROUND IT, AND THE WRAPPER WAS LOAD BEARING IN THE WRONG
      DIRECTION. It was a `.plai-pick` div holding the picker, handed to the old
-     header's middle cell. `createInstrumentPanel` tests the control it is given
-     for `.pos-pick` to decide whether to strip its caption, so a picker inside
-     a div is not a picker as far as that rule is concerned: the wrapper would
-     have kept the `PATCH`-shaped caption the ask of 2026-09-28 is about. The
-     picker goes in whole. */
+     header's middle cell. A div round it would take the page's own width rules
+     below off the control they are about, because they select `.pos-pick`
+     itself. The picker goes in whole. */
 
   // ── the panel, arranged the way the panel is ────────────────────────────
   //
@@ -770,13 +809,19 @@
    * get edge to edge"*. A `viz` row is edge to edge (`pad: false`) and nothing
    * is ever inserted above it, so *top of instrument* is not a rule this page
    * has to keep.
-   * 🔴 **AND THE PATCH SELECTOR HAS NO CAPTION BECAUSE IT IS THE `patch`
-   * SLOT.** The component removes a `.pos-pick-l` from the control it puts at
-   * the far end of the plate row, for the reason `positron-ui` records: a plate
-   * reading `PLAITS  ‹ virtual analog ›` already says what the control is,
-   * and a word between them names what the reader is reading. The picker is
-   * still BUILT with a label, so the assert below has something to catch: if
-   * the caption ever comes back, the control has left the slot that strips it.
+   * 🔴 **AND THE PATCH SELECTOR HAS NO CAPTION, WHICH WAS THE COMPONENT'S
+   * DOING UNTIL 2026-09-29 AND IS THIS PAGE'S NOW.** While it sat in the
+   * plate's `patch` slot the component removed its `.pos-pick-l` for the reason
+   * `positron-ui` records: a plate reading `MUTA  ‹ virtual analog ›` already
+   * says what the control is, and a word between them names what the reader is
+   * reading. The picker has left that slot, so nothing strips anything, and the
+   * control is BUILT with no `label` instead. The ask is the same one,
+   * *"no label on patch selctor"*, 2026-09-28.
+   * ⚠️ **AND THE ASSERT THAT GRADED IT HAD TO CHANGE ITS SUBJECT.** It read
+   * the absence of a caption inside `panel.patchEnd` and took that as proof the
+   * picker was in the stripping slot; `patchEnd` is null now, so a check written
+   * that way would be vacuously green. What grades it is the foot assert, which
+   * requires the foot to hold no control at all.
    * 🔴 **AND `full` TAKES THE PAGE'S WIDTH, ASKED FOR 2026-09-29 AS *"muta:
    * full content w in deskop"*. THIS PARAGRAPH SAID THE OPPOSITE UNTIL TODAY
    * AND THE ARGUMENT IT MADE IS STILL THE RIGHT ONE, WHICH IS WHY IT IS KEPT.**
@@ -796,10 +841,41 @@
    * inset, 448 and 343, because `.pos-rows` carries `max-width: 100%` and this
    * row is wider than the screen. Only 560 moves, by 3 px, from 525 to 528.
    */
+  /**
+   * 🔴 **THE FOOT IS THE NAMEPLATE ALONE SINCE 2026-09-29, AND THE NAME IS
+   * `MUTA`.** Asked in these words: *"muta: rename plaits to muta and use
+   * instument panel global behaviour whee nameplane is in separate section in
+   * bottom"*.
+   * 🔴 **BOTH HALVES ARE THE COMPONENT'S OWN BEHAVIOUR, WHICH IS THE POINT OF
+   * THE ASK AND IS WHY NO PAGE CSS ARRANGES IT.** A `plate` carrying only a
+   * `name` is built as ONE `.panel-plate` and given a row of its own, and
+   * `ROW_KINDS` puts a plate last at every width, so *its own section at the
+   * bottom* is what `createInstrumentPanel` draws when it is handed nothing
+   * else. `/shape/` and `/tom/` are the two pages that already looked like
+   * this. What this page was doing instead was the two-ended foot: the name
+   * and the `Test tone` button as a `.pos-ipanel-name` cluster at the start,
+   * the model picker at the far end, and a phone layout that wrapped the two
+   * ends onto two lines.
+   * 🔴 **SO THE PICKER AND THE BUTTON MOVED UP INTO A CONTROLS ROW OF THEIR
+   * OWN**, which is the `align: 'between'` row below and the second half of
+   * the same day's ask. That row is the subject of the sheet's `.muta-pickrow`
+   * block.
+   * ⚠️ **THE NAME LEANS LEFT, WHICH IS A CHOICE AND NOT THE ONLY ONE.** A
+   * lone line under the default `place: 'ends'` parks at the start, which is
+   * `/shape/` exactly; `/tom/` passes `place: 'end'` to park it at the other
+   * edge. Nothing in the ask says which, so this takes the arrangement of the
+   * page it now most resembles. One word changes it.
+   * ⚠️ **AND THE PHONE CENTRES IT WITHOUT BEING ASKED HERE**, by the block at
+   * the foot of `shell.css` that answers *"on mobile the nameplate ... is
+   * centered hzontally"*. That block also carries an `order: 1` about the
+   * `.pos-ipanel-name` cluster, and this page no longer builds one, so that
+   * declaration stops applying here and goes on applying on `/fau/` and
+   * `/knobs/`.
+   */
   const panel = createInstrumentPanel({
     viz: scope.el,
-    rows: [[knobGrid]],
-    plate: { name: 'PLAITS', status: toneBtn, patch: pick },
+    rows: [[knobGrid], [[pick.el, toneBtn], { align: 'between', cls: 'muta-pickrow' }]],
+    plate: { name: 'MUTA' },
     cls: 'plai-panel',
     full: true,
   });
@@ -1357,7 +1433,7 @@
     await sleep(600);
     quiet = meters > before ? last.peak : null;
     d.log(quiet == null ? 'the audio thread reported nothing in 600 ms'
-                        : `untriggered peak ${quiet.toFixed(6)} out of PLAITS`,
+                        : `untriggered peak ${quiet.toFixed(6)} out of the oscillator`,
           quiet == null ? 'bad' : '');
 
     /**
@@ -2066,9 +2142,9 @@
      * than quietly dropped. `/nola/` still adds rows late.
      */
     const shape = panel.shape();
-    d.assert('the panel draws the picture first, then its controls, then its foot',
-      shape.length === 3 && shape[0] === 'viz' && shape[1] === 'controls'
-        && shape[2] === 'plate',
+    d.assert('the panel draws the picture first, then its two control rows, then its foot',
+      shape.length === 4 && shape[0] === 'viz' && shape[1] === 'controls'
+        && shape[2] === 'controls' && shape[3] === 'plate',
       shape.join(', '));
 
     /**
@@ -2119,18 +2195,21 @@
      * and that is where the new claim went.
      */
     const plateRow = panel.plateRow.getBoundingClientRect();
-    const nameEnd = panel.plateRow.querySelector('.pos-ipanel-name')?.getBoundingClientRect();
-    const patchEnd = panel.patchEnd?.getBoundingClientRect();
-    const caption = panel.patchEnd?.querySelector('.pos-pick-l');
-    d.assert('the foot carries the name at one end and an unlabelled patch selector at the other',
-      !!nameEnd && !!patchEnd && !caption
-        && Math.abs((nameEnd.left - plateRow.left) - (plateRow.right - patchEnd.right)) <= 1
-        && nameEnd.left - plateRow.left > 4 && patchEnd.left > nameEnd.right,
-      nameEnd && patchEnd
-        ? `the name starts ${(nameEnd.left - plateRow.left).toFixed(1)} px in and the picker `
-          + `ends ${(plateRow.right - patchEnd.right).toFixed(1)} px from the other edge, `
-          + `with ${caption ? `a caption reading ${caption.textContent}` : 'no caption on it'}`
-        : 'the foot is missing an end');
+    const nameEnd = panel.plateRow.querySelector('.pos-ipanel-name');
+    const plateEl = panel.plateRow.querySelector('.panel-plate');
+    const plateText = plateEl?.textContent.trim();
+    const rows = [...panel.el.querySelectorAll('[data-kind]')];
+    const lastRow = rows[rows.length - 1];
+    d.assert('the foot is a section of its own carrying the name and nothing else',
+      !!plateEl && plateText === 'MUTA' && !nameEnd
+        && panel.plateRow.children.length === 1
+        && lastRow === panel.plateRow
+        && !panel.plateRow.querySelector('.pos-pick, button'),
+      `the foot reads ${JSON.stringify(plateText ?? null)} in `
+      + `${panel.plateRow.children.length} child(ren), it is `
+      + `${lastRow === panel.plateRow ? 'the last row' : 'NOT the last row'} of `
+      + `${rows.length}, it holds ${panel.plateRow.querySelectorAll('.pos-pick, button').length} `
+      + `control(s), and the two-ended cluster is ${nameEnd ? 'STILL THERE' : 'gone'}`);
 
     /**
      * 🔴 AND THE `Test tone` BUTTON IS IN THE `status` SLOT, WHICH IS AFTER THE
@@ -2173,22 +2252,65 @@
      * vacuous. `node demo/shot.mjs muta 375` is what looks at that.
      */
     const tone = toneBtn.getBoundingClientRect();
-    const plateName = panel.plateRow.querySelector('.pos-ipanel-name');
+    const pickRow = panel.el.querySelector('.muta-pickrow');
+    const pickRect = pickRow?.getBoundingClientRect();
+    const pickEl = pick.el.getBoundingClientRect();
     const tones = document.querySelectorAll('.muta-tone').length;
-    const rowGap = parseFloat(getComputedStyle(panel.plateRow).columnGap) || 0;
-    d.assert('the test tone button is in the slot the on and off switch had, pushed to the right of it',
-      tones === 1 && panel.status === toneBtn && plateName?.contains(toneBtn)
-        && tone.width > 0 && tone.left > nameEnd.left && tone.right < patchEnd.left
-        && Math.abs(tone.right - nameEnd.right) < 0.5
-        && patchEnd.left - tone.right <= rowGap + 1
+    d.assert('the test tone button holds the far end of the picker row, with the picker at the near one',
+      tones === 1 && !!pickRow && pickRow.contains(toneBtn) && pickRow.contains(pick.el)
+        && pickRow.children.length === 2
+        && tone.width > 0 && tone.left > pickEl.right
+        && Math.abs((pickEl.left - pickRect.left) - (pickRect.right - tone.right)) <= 1
         && toneDeadOnLoad === false,
-      `${tones} tone button on the page, ${panel.status === toneBtn ? 'in' : 'NOT in'} the `
-      + `status slot, spanning ${tone.left.toFixed(1)} to ${tone.right.toFixed(1)} px between `
-      + `the name at ${nameEnd.left.toFixed(1)} and the picker at ${patchEnd.left.toFixed(1)}, `
-      + `ending ${(nameEnd.right - tone.right).toFixed(1)} px short of its own slot and `
-      + `${(patchEnd.left - tone.right).toFixed(1)} px short of the picker against a `
-      + `${rowGap.toFixed(1)} px row gap, and on the visit it was `
-      + `${toneDeadOnLoad ? 'dead' : 'pressable'}`);
+      `${tones} tone button on the page, ${pickRow?.contains(toneBtn) ? 'on' : 'NOT on'} the `
+      + `picker row of ${pickRow?.children.length} children, the picker starting `
+      + `${pickRect ? (pickEl.left - pickRect.left).toFixed(1) : '?'} px inside the row `
+      + `and the button ending `
+      + `${pickRect ? (pickRect.right - tone.right).toFixed(1) : '?'} px inside the other edge, `
+      + `spanning ${pickEl.left.toFixed(1)} to ${pickEl.right.toFixed(1)} and `
+      + `${tone.left.toFixed(1)} to ${tone.right.toFixed(1)}, `
+      + `and on the visit it was ${toneDeadOnLoad ? 'dead' : 'pressable'}`);
+
+    /**
+     * 🔴 THE SELECTOR AND ITS DIE ARE ON ONE LINE AND THE SELECTOR TOOK THE
+     * REST OF THE WIDTH. Asked 2026-09-29: *"Patch selector and randomize button
+     * go togther and so not wrap and parch takes rest of w"*.
+     * ⚠️ **IT GRADES THE DESK ONLY, AND SAYS SO RATHER THAN IMPLYING
+     * OTHERWISE.** `demo/verify.mjs` runs at 756 px, which is above this page's
+     * 561 threshold and above `shell.css`'s own 560 picker block, so what runs
+     * here is the one-line arrangement. At 375 the row wraps ON PURPOSE, the
+     * button takes its own line by the ask of 2026-09-28, and the claim that
+     * survives there is the die staying beside the segment, which is
+     * `shell.css`'s rule and not this page's. `node demo/shot.mjs muta 375` is
+     * what looks at it.
+     * ⚠️ **AND THE DIE IS FOUND BY CLASS RATHER THAN BY POSITION IN
+     * `pick.buttons`**, because that array is `[back, fwd, die]` and an
+     * arrangement that dropped the die would leave a two-entry array that reads
+     * as healthy from a length test alone.
+     * 🔴 **THE CELL IS NOT THE SEGMENT'S RIGHT EDGE, AND THE FIRST DRAFT OF
+     * THIS ASSERT SAID IT WAS AND WENT RED.** `.pos-pick-seg` is back arrow,
+     * cell, forward arrow, so the cell ends one 34 px arrow short of the
+     * segment. What stretched is the cell's WIDTH: MEASURED at 756, it is
+     * 420.5 px against the 271 px that `--pick-w: 22ch` plus its padding gives
+     * an unstretched one, so the number to grade is the width and not an edge.
+     */
+    const die = pick.el.querySelector('.pos-pick-die')?.getBoundingClientRect();
+    const seg = pick.el.querySelector('.pos-pick-seg')?.getBoundingClientRect();
+    const cell = pick.el.querySelector('.pos-pick-cell')?.getBoundingClientRect();
+    d.assert('the selector and the die sit on one line, and the selector takes the width the button leaves',
+      !!die && !!seg && !!cell
+        && Math.abs(die.top - seg.top) <= 1
+        && die.left >= seg.right - 1
+        && Math.abs(pickEl.right - die.right) <= 1
+        && cell.width > 300 && seg.width > 300
+        && Math.abs((seg.width + die.width + 8) - pickEl.width) <= 1,
+      die && seg && cell
+        ? `the cell is ${cell.width.toFixed(1)} px wide in a ${seg.width.toFixed(1)} px `
+          + `segment, the die is ${(die.top - seg.top).toFixed(1)} px off the segment's `
+          + `line and sits ${(die.left - seg.right).toFixed(1)} px after it, and the two `
+          + `come to ${(seg.width + die.width + 8).toFixed(1)} px against the picker's own `
+          + `${pickEl.width.toFixed(1)}`
+        : 'the picker is missing its segment, its cell or its die');
 
     /**
      * 🔴 THE PANEL STARTS AND ENDS WHERE THE REST OF THE PAGE DOES, WHICH IS

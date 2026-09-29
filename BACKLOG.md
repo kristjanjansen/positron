@@ -35,7 +35,27 @@ one streaming page and nothing here is about language models. Same file.
 - ⚠️ `llhls` has `settleMs: 75000` because a cold container is about 30 s; the
   row moves, the row's fields do not.
 
-### Open 2026-09-29: muta, rename PLAITS to MUTA and give the nameplate its own section at the bottom
+### Done 2026-09-29: muta, rename PLAITS to MUTA and give the nameplate its own section at the bottom
+
+✅ **DONE, `2d6c8de`, deployed in `2d6c8de-135446-6bd8`.** `plate: { name: 'MUTA' }`
+alone, so `createInstrumentPanel` builds one `.panel-plate` and `ROW_KINDS`
+puts it last. The foot is the component's own behaviour and no page CSS
+arranges it, which is what *"use instument panel global behaviour"* asks for.
+`panel.shape()` went `viz controls plate` to `viz controls controls plate`.
+🔴 **THE TWO CONTROLS LEFT THE FOOT AND THREE PAGE RULES DIED WITH THEM.**
+`.plai-panel .pos-ipanel-name` in both media queries and
+`.plai-panel .muta-tone { margin-inline-start: auto }` were all about a
+two-ended plate row and were deleted rather than moved: `align: 'between'` on
+the new row does what the auto margin did, with no threshold.
+⚠️ **THE NAME LEANS LEFT AT THE DESK AND IS CENTRED ON A PHONE, AND ONLY THE
+SECOND HALF WAS DECIDED HERE.** A lone line under the default `place: 'ends'`
+parks at the start, which is `/shape/`; `/tom/` passes `place: 'end'` to park
+it at the other edge. Nothing in the ask says which. The centring is
+`shell.css`'s existing phone block.
+⚠️ **AND THAT BLOCK'S `order: 1` STOPS APPLYING TO THIS PAGE**, because it
+selects `.pos-ipanel-name` and this page no longer builds one. It goes on
+applying on `/fau/` and `/knobs/`, so the open line below about the nameplate
+not being literally last is now about those two and not about `/muta/`.
 
 ASKED, VERBATIM: *"muta: rename plaits to muta and use instument panel global
 behaviour whee nameplane is in separate section in bottom"*. One page,
@@ -65,7 +85,36 @@ https://positron.studio/muta/, file `demo/muta/index.html`.
   shape is wanted on `fau`, `knobs` and `shape` that is a kit decision and a
   separate line.
 
-### Open 2026-09-29: muta, the patch selector and the randomize button are one row that never wraps, and the selector takes the rest of the width
+### Done 2026-09-29: muta, the patch selector and the randomize button are one row that never wraps, and the selector takes the rest of the width
+
+✅ **DONE, `2d6c8de`, the same commit and deploy.**
+✅ **THE FIRST HALF WAS ALREADY TRUE AND NO RULE WAS WRITTEN FOR IT.**
+`picker.mjs:204` appends the die INSIDE `.pos-pick`, and `shell.css`'s phone
+block keeps it on the segment's line on purpose, written after the die dropped
+a whole row below the arrows on `/radio/` and `/mirror/`. MEASURED at 375, 560
+and 1280: the die's top is 0.0 px off the segment's top at all three.
+🔴 **THE STRETCH TOOK THREE DECLARATIONS, BECAUSE THE WIDTH LIVES ON THE
+CELL.** `.pos-pick-cell` is `width: calc(var(--pick-w) + ...)`, 22ch at the
+desk, so widening `.pos-pick` alone spends the difference on air between the
+segment and the die. MEASURED at 1280: the cell is **421.5 px** against the
+271 px an unstretched one gives, the picker holds the row's start and the
+button its end.
+🔴 **AND THE FIRST DRAFT OF THE ASSERT WAS WRONG ABOUT WHICH EDGE TO READ.**
+It required the cell to end where the segment ends; `.pos-pick-seg` is back
+arrow, cell, forward arrow, so the cell ends one 34 px arrow short. It grades
+the cell's WIDTH now. The other red was the same shape: the row's border box
+carries 20 px of `--rows-pad`, so a child sitting at the content edge is 20 px
+inside the row, and the test is a symmetric inset rather than a coincident edge.
+⚠️ **ON A PHONE THE ROW DOES WRAP, ON PURPOSE, AND THE ASK IS READ AS BEING
+ABOUT THE SELECTOR AND THE DIE.** *"go togther and so not wrap"* names that
+pair, and they never separate at any width. The `Test tone` button takes its own
+full-width line at 560 and under, which is the ask of 2026-09-28
+(*"test tone button takes full w on mobile"*) and would have to be revoked to
+put all three on one line at 375. MEASURED at 375: the picker is 301.0 px on
+line one and the button 301.0 px on line two, 0 px of document overflow.
+⚠️ **AND THE STRETCH IS PAGE SCOPED.** The kit shape would be a `grow` option
+on `createPicker`, which is on nine pages, and nothing has asked for it
+elsewhere.
 
 ASKED, VERBATIM: *"Patch selector and randomize button go togther and so not
 wrap and parch takes rest of w"*. Same page, same file, and it is the row the
