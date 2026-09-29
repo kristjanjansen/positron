@@ -1,5 +1,31 @@
 ## Open
 
+### Open 2026-09-29: webrtc gets the same treatment as llhls, and its desc goes to one sentence
+
+ASKED, VERBATIM: *"same treatment ot https://positron.studio/webrtc/ . shorten
+desc to 1 sentence"*. `demo/webrtc/index.html` and the `webrtc` row in
+`demo/manifest.mjs`.
+- **"The same treatment" is the four llhls asks of this sitting**, each entry
+  below: the three state stream toggle in place of the primary button, the
+  publisher idle badge gone, how it works including how it stops, and the video
+  panel with resolution and fps and a short spec.
+- ⚠️ **AND WHAT STOPS IT IS THE SAME MECHANISM, WHICH IS WHY THE PAGES CAN
+  SHARE A COMPONENT.** Both legs live on one container behind
+  `workers/pub/worker.mjs`: the viewer socket reference count, the 30 s sweep,
+  `GRACE_TICKS` of 2. The DIFFERENCE worth saying is the leg: `/webrtc/` is the
+  WHIP publish and WHEP playback, and Cloudflare holds a WHIP input against a
+  stale publisher for about 45 s before accepting a new session, which has no
+  equivalent on the RTMPS side.
+- ⚠️ **THE SPEC DIFFERS TOO AND MUST NOT BE COPIED ACROSS.** The WHIP leg is
+  libopus rather than aac, baseline/3.1, `-bf 0`, MEASURED in
+  `rig/whep/WHIP-FFMPEG-NOTES.md`. Read it rather than repeating llhls's.
+- **The desc**: one sentence, no colon, no semicolon, no dash, no "and" carrying
+  a second fact. Both `what` and the `one` line in `manifest.mjs`, which are the
+  same string on any page with a diagram.
+- 🔴 **THIS PAGE'S OWN CHECKS WERE UNREACHABLE UNTIL 2026-09-25** and the fix
+  took it 8 asserts to 16. Anything done here reads the count before and after,
+  and a drop is a regression rather than a tidy.
+
 ### Open 2026-09-29: the burned-in test pattern, drop the top left counters and stack ABSOLUTE over LOCAL
 
 ASKED, VERBATIM: *"rm top left counters. put absolute and local below each
