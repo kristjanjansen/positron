@@ -136,7 +136,22 @@ as its widest row"*, and the second clause of that stops being true the moment
 `full: true` lands, so that assert is rewritten in the same commit rather than
 left to go red.
 
-### Open 2026-09-29: the instrument panel's nameplate goes to the bottom of the plate row on a phone
+### Done 2026-09-29: the instrument panel's nameplate goes to the bottom of the plate row on a phone
+
+✅ **DONE, `d52b714`, ONE DECLARATION INSIDE THE EXISTING 560 BLOCK**: `order: 1`
+on `.pos-ipanel-plate > .pos-ipanel-name`. MEASURED at 375 on all six pages that
+build a plate: `/muta/`, `/fau/` and `/knobs/` put the far end control at the
+name's old top TO THE PIXEL (586.8, 777.7 and 457.2), and `/shape/` and `/tom/`
+do not move by a hundredth, because a plate with no `status` and no `patch`
+control has no `.pos-ipanel-name` for the selector to match. **The one child case
+is a no-op by absence, measured rather than assumed.** Desktop computes `order: 0`
+and is untouched.
+⚠️ **NO HARNESS ON THIS SITE ENTERED THAT BLOCK AND NONE CAN.** The six pages pass
+every assert whether this works or not. The shots and the table above are the only
+evidence there is.
+⚠️ **TWO THINGS CAME WITH IT AND BOTH HAVE ENTRIES ABOVE**: `/muta/`'s cluster
+wraps so the name is not literally last, and `order` moves the paint and not the
+tab stop.
 
 ASKED, VERBATIM: *"general: intrument panel: nameplate is the lowest of the
 bottom components in mobile"*. **SHARED WORK**: it reaches `fau`, `knobs`,
@@ -664,6 +679,92 @@ dated measurement rather than deleted. **Nobody has been asked whether the LANE
 hands should also come apart, or whether the top one should keep its gap and lose
 its ring.** Not acted on, not re-litigated in the comments. Look at the 1280 shot
 of https://positron.studio/shape/ with both in frame before deciding.
+
+### Open 2026-09-29: an assert written to catch the waveform's ring could never have seen it, found not asked for
+
+🔴 **FOUND BY THE SHARED AGENT WHILE REMOVING THE RING ITSELF.**
+`demo/radio/index.html:5736` reads `getComputedStyle(canvas).borderTopWidth ===
+0` inside a glue. **It was written for the 2026-09-21 report about that exact
+ring, it has been green ever since, and it was green the whole time the ring was
+on screen**, because the ring was painted into the canvas's backing store and
+`getComputedStyle` cannot see paint.
+
+**This is the green page with no coverage, one layer down**: not an assert that
+never ran, an assert that ran every time and asked the wrong instrument.
+**The test that would have caught it is a canvas pixel sample at the corner,
+which is four lines and free**, and is exactly what the shared agent used to
+prove the fix: the outermost pixel read `31,41,55` before, which is `--line`,
+and `17,21,29` after, which is `--card`.
+⚠️ `/radio/` WAS NOT OPENED, RUN OR PROBED for any of this, by instruction. The
+arrangement was measured synthetically on `/grains/` with the real `createGlue`
+and `createGrainScope`. **So this line is about a file that was read, not about a
+page that was run.**
+
+### Open 2026-09-29: a glued scope gets a different inset depending on how deep it is glued, found not asked for
+
+**FOUND BY THE SHARED AGENT.** `demo/shell/shell.css:3035` is
+`.pos-glue > .pos-scope { background: var(--card); padding: 10px 12px }`, a
+DIRECT CHILD selector.
+
+**So a scope glued straight in carries a 10 by 12 inset and one glued a level
+deeper carries none.** `/radio/` and `/tapes/` are the first case. `/pack/` is
+the second and had its inset taken off on 2026-09-22 on *"rm padding and its
+border around waveform canvas"*. **That is one ask answered on one page and not
+on the other two**, and the neighbouring rule at `:3034` names both depths
+precisely because the kit already learned that lesson once.
+⚠️ **NOT ACTED ON AND IT IS NOT OBVIOUS WHICH WAY IT GOES.** Either the inset is
+right and `/pack/` should have kept it, or it is wrong and two pages are drawing
+a box inside a box. `/radio/` cannot be looked at, so this needs `/tapes/`
+against its stand-in and a decision about what a glued picture's inset IS.
+
+### Open 2026-09-29: on a phone muta reads picker, name, button, so the nameplate is not literally last
+
+**FOUND BY THE SHARED AGENT IMMEDIATELY AFTER LANDING THE ASK IT ANSWERS**, and
+reported rather than written, because the fix reaches six pages.
+
+The ask was *"nameplate is the lowest of the bottom components in mobile"* and
+`d52b714` does it with one `order: 1` on the name cluster. MEASURED at 375 on all
+six pages: `/muta/`, `/fau/` and `/knobs/` put the picker or the far end control
+where the name used to be, to the pixel, and `/shape/` and `/tom/` do not move at
+all because a plate with no status and no patch control has no cluster to order.
+🔴 **BUT `/muta/`'s CLUSTER IS 301 px WIDE AND WRAPS**, so the crop at 375 reads
+**picker, `PLAITS`, `Test tone`**. The cluster went to the bottom as one block,
+which is what `shell.css` demands in writing (*the controls on the row go with
+the name*), and the NAME is therefore not the literally lowest thing.
+**Making `PLAITS` the last line is one more `order` inside the cluster**, and it
+would put the name under the button on this page and change what
+`.pos-ipanel-name` stacks as on all six. **Refused in writing, waiting on the
+owner.**
+
+### Open 2026-09-29: the plate row's order moves the paint and not the tab stop
+
+**FOUND BY THE SHARED AGENT WHILE WRITING THE `order` ABOVE**, and recorded in
+`shell.css` rather than worked around.
+
+`order` is a visual reordering only, so on the three pages whose plate row has
+two children the keyboard still reaches the name cluster's control BEFORE the
+patch picker while the picker is drawn above it. **One stop on a row of two**, at
+phone widths only.
+⚠️ `flex-wrap: wrap-reverse` has the identical mismatch and adds a cross axis
+flip, so it is not the way out. The way out is DOM order, which would reorder the
+row at every width and undo what the ask asked for. **Left as is, deliberately,
+and written down so nobody reports it as new.**
+
+### Open 2026-09-29: two agents shared one scratchpad file and one of them measured the other's page
+
+🔴 **THE SHARED AGENT'S PROBE FILE WAS OVERWRITTEN MID-TASK BY A PEER**, in the
+session scratchpad root, and its next four measurements came back as another
+agent's JSON about nameplate ink and fader tops. **It caught this because the
+SHAPE of the output was wrong, not because anything errored**, moved to a
+subdirectory of its own and re-took every measurement.
+
+**A probe that silently answers about another page is the worst shape a
+measurement can have**, because every number it returns is real, consistent and
+about the wrong thing. **The rule is one scratchpad directory per agent, named
+in the brief**, which is what the three agents after it were given.
+⚠️ **AND IT MEANS ONE THING CANNOT BE RULED OUT**: any measurement taken in that
+root between the two runs may belong to a peer. The shared agent's numbers were
+all re-taken after the move. Nobody else reported an anomaly.
 
 ### Open 2026-09-28: step-grid sizes itself against the scroller's own padding, so the last column hangs over the edge, found not asked for
 
