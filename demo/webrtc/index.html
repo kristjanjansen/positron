@@ -6,49 +6,111 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* No margin: the gap between the picture and everything else is
-     `.pos-stack` in shell.css, one rhythm for every page. */
-  video { width: 100%; display: block; background: #000; border-radius: 4px; }
-  .hold { font: 500 10.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
-          border: 1px solid var(--line2); border-radius: 999px; padding: 2px 9px; color: var(--dim2); }
-  .hold[data-on="1"] { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
-</style>
+<!-- 🔴 NO PAGE STYLESHEET SINCE 2026-09-29, for the reasons `/llhls/` writes
+     down in the same breath. The picture is a video panel now, whose stage owns
+     the element's width, height, shape and object-fit, and the `.hold` pill that
+     showed the publisher was replaced by the stream toggle in the control row. -->
 
 <script type="module">
-  import { mount, guard, el, armVideo, playOrPrompt, matchAspect } from '/shell/shell.mjs';
-  import { whep, holdPublisher, waitForWhip } from '/shell/live.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { whep, holdPublisher, waitForWhip, watchPresentedFps } from '/shell/live.mjs';
+  import { createPresenceButton, STREAM, STREAM_CAN } from '/shell/presence.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
 
   const d = mount({
     name: 'webrtc',
-    what: 'The same live picture the HLS pages play, delivered over WHEP instead: one '
-      + 'POST of an offer, one answer back, and the frames arrive over WebRTC. Press '
-      + 'Start the stream and play. This page starts the publisher itself and then '
-      + 'waits for it, so the first seconds are the stream coming up. round trip is '
-      + 'the network round trip to Cloudflare and NOT how far behind the picture is; '
-      + 'nothing on this page measures that.',
+    // 🔴 ONE SENTENCE, AND IT IS THE INDEX'S OWN LINE. Asked 2026-09-29:
+    // *"shorten desc to 1 sentence"*. It was six, and each one of them has a
+    // better home than the top of a page: what the handshake is and how the
+    // stream stops are the picture at the foot of this page, what the control
+    // does is the control's own label, and what `round trip` means is the
+    // readout key's business. This project has cut this rule from four
+    // sentences to three to one and broken it every time within a few pages.
+    what: 'The same live picture the HLS pages play, delivered over WHEP instead.',
     // 🔴 `rtt` WAS A KEY THAT READ AS A LATENCY CLAIM. Quoting this number
     // beside a glass-to-glass one flattered WHEP by about three times once
     // already (CLAUDE.md, candidate-pair RTT). The words now say what it is,
-    // and `state` says `playing`/`paused` rather than `playing rs4` — the
+    // and `state` says `playing`/`paused` rather than `playing rs4`: the
     // readyState behind it is in the assert's detail, where a number that needs
     // a spec to read belongs.
-    readout: { 'round trip': 'ms', fps: '', picture: '', state: '' },
-    controls: [
-      { id: 'go', label: 'Start the stream and play', primary: true },
-    ],
+    // ⚠️ `fps` AND `picture` LEFT THIS ROW ON 2026-09-29 AND WERE NOT DROPPED.
+    // They are facts about the PICTURE and they now sit in the picture's own
+    // footer, which is where the kit puts a number that belongs to one element.
+    // A row above the panel repeating them would be the same fact twice.
+    readout: { 'round trip': 'ms', state: '' },
+    // No primary button. See the note on the control below, and `/llhls/`,
+    // which was asked for the same thing in the same sitting.
+    controls: [],
   });
   guard(d);
 
-  const badge = el('span', 'hold', 'publisher: idle');
-  badge.dataset.on = '0';
-  d.head.append(badge);
+  /**
+   * 🔴 THE SAME CONTROL AND THE SAME THREE WORDS AS `/llhls/`, OUT OF THE SAME
+   * MAP. Asked 2026-09-29 as *"same treatment"*. `STREAM` lives in
+   * `presence.mjs` beside `WIRED` precisely so these two pages cannot drift into
+   * two vocabularies for one idea, and `createPresenceButton` was already the
+   * control: a row button whose face is a live badge with a reserved width.
+   *
+   * 🔴 A PRESS DURING `starting` STOPS HERE TOO, and the middle state is if
+   * anything longer on this leg. The container has to wake, ffmpeg has to reach
+   * DTLS, and Cloudflare then holds a WHIP input against a stale publisher for
+   * about 45 s before it will accept a new session, which has no equivalent on
+   * the RTMPS side.
+   */
+  const stream = createPresenceButton({
+    of: '', showName: false, state: 'offline', says: STREAM, can: STREAM_CAN,
+    aria: 'start or stop the stream',
+    press: () => d.run('toggle'),
+  });
+  stream.because('nothing is publishing until you press');
+  d.controls.hidden = false;
+  d.controls.append(stream.el);
 
-  const video = matchAspect(el('video', '', null, { playsinline: '', muted: '', autoplay: '', controls: '' }));
+  // No native `controls`: see `/llhls/`, where the element's own bar drew a
+  // scrub bar over a live stream and a second ⛶ an inch above the panel's.
+  const video = el('video', '', null, { playsinline: '', muted: '', autoplay: '' });
   video.muted = true;
-  d.el.append(video);
+
+  /**
+   * The picture, its resolution and its frame rate, in cells rather than in one
+   * string with glue in it. `/llhls/` carries the argument in full; what differs
+   * here is the encoder, and it must not be copied across: this leg is WHIP, so
+   * the audio is libopus rather than AAC and the video is offered as baseline
+   * 3.1, MEASURED in `rig/whep/WHIP-FFMPEG-NOTES.md`.
+   */
+  const panel = createVideoPanel({
+    media: video,
+    left: null,
+    fullMode: 'hover',
+    values: [
+      { key: 'size', label: '', reserve: 9 },
+      { key: 'fps', label: 'fps', reserve: 4 },
+      { key: 'source', label: '', reserve: 12 },
+    ],
+  });
+  panel.values.set('source', 'H.264 + Opus');
+  d.el.append(panel.el);
+
+  // A custom property, never `video.style.aspectRatio`. See `/llhls/`: an
+  // inline style on the element beats the two stylesheet rules that let a panel
+  // fill a screen. An SFU can change a sender's resolution mid-call and `resize`
+  // is the only event that reports it, which is why this is not read once.
+  const shape = () => {
+    const w = video.videoWidth, h = video.videoHeight;
+    if (!w || !h) return;
+    panel.values.set('size', `${w}x${h}`);
+    panel.stage.style.setProperty('--vp-aspect', `${w} / ${h}`);
+  };
+  video.addEventListener('loadedmetadata', shape);
+  video.addEventListener('resize', shape);
 
   let pc = null, ws = null, started = 0;
+  let held = false, unwatchFps = null, abort = null, playing = false;
+  // A generation, because the start path awaits a cold container and then
+  // retries a WHEP offer six times: every one of those is a place a press can
+  // land. See `/llhls/`, which took the same shape in the same sitting.
+  let gen = 0;
 
   // A WHEP client is small: offer recvonly, POST the SDP, take the answer.
   async function whepPlay(url) {
@@ -106,19 +168,80 @@
     return res.headers.get('location');
   }
 
-  d.on('go', async () => {
+  /**
+   * 🔴 `stream.state()`, NOT `stream.state`. It is a FUNCTION on the presence api
+   * (`state: () => now`) and `createPresenceButton` hands it through a getter,
+   * so the bare property is the function itself and `fn === 'offline'` is false
+   * forever. MEASURED on the first run of this control: the harness pressed the
+   * toggle, this line called `stop()` on a page that had never started, and the
+   * suite read 16/16 GREEN with the page's own assert count down from 6 to 2.
+   * `/twelve/` had already written this trap down, in these words: a comparison
+   * against a function is a comparison that cannot fail.
+   */
+  d.on('toggle', () => (stream.state() === 'offline' ? start() : stop()));
+
+  /**
+   * Let it go. The socket is the reference count, so closing it is the whole of
+   * it from this end and the publisher's own sweep stops the encoder about a
+   * minute later. The peer connection is closed here as well, because unlike
+   * the socket it costs Cloudflare delivered minutes for as long as it is up.
+   */
+  function stop() {
+    gen++;
+    abort?.abort(); abort = null;
+    unwatchFps?.(); unwatchFps = null;
+    try { ws?.close(); } catch { /* already gone */ }
+    ws = null;
+    held = false;
+    playing = false;
+    try { pc?.close(); } catch { /* already gone */ }
+    pc = null;
+    try { video.pause(); } catch { /* fine */ }
+    video.srcObject = null;
+    panel.values.set('fps', '');
+    d.set('round trip', '');
+    d.set('state', '');
+    stream.set('offline').because('the publisher stops about a minute after the last viewer goes');
+    d.log('let the publisher go. it stops about a minute after the last viewer goes');
+  }
+
+  async function start() {
     if (pc) return;
+    const mine = ++gen;
+    abort = new AbortController();
+    stream.set('coming').because('press again to stop it');
     armVideo(video);          // before any await, or iOS refuses later
+    playing = false;
+    unwatchFps = watchPresentedFps(video, (r) => panel.values.set('fps', r == null ? '' : r.toFixed(1)));
+    /**
+     * 🔴 THE VIEWER COUNT IS REHOMED, NOT DELETED. The badge that went carried
+     * two facts: whether this page is holding the publisher, which the toggle
+     * now says in words, and HOW MANY are holding it, which the toggle cannot
+     * say at all. Deleting a display without rehoming what it said is how a
+     * page quietly stops reporting something.
+     * ⚠️ AND IT IS A LOG LINE RATHER THAN A FOURTH FOOTER CELL, MEASURED
+     * RATHER THAN CHOSEN. At 375 px a four cell row could not fit beside the
+     * panel's own square and scrolled, cutting `H.264 + AAC` in half, and a row
+     * that has to be dragged sideways is a row nobody reads. A count that
+     * changes when somebody arrives or leaves is an EVENT, which is what the
+     * log is for; the other three are properties of the picture above it.
+     */
+    let sawViewers = null;
     ws = holdPublisher((s) => {
-      badge.dataset.on = s.held ? '1' : '0';
-      badge.textContent = s.held ? `publisher: held${s.viewers ? ` (${s.viewers})` : ''}` : 'publisher: idle';
+      held = !!s.held;
+      if (s.viewers != null && s.viewers !== sawViewers) {
+        sawViewers = s.viewers;
+        d.log(`${s.viewers} watching`);
+      }
     });
     d.log('holding the publisher open');
 
-    // Wait for the WHIP LEG, not the HLS manifest — they are different inputs.
+    // Wait for the WHIP LEG, not the HLS manifest. They are different inputs.
     const w = await waitForWhip({
+      signal: abort.signal,
       onTick: ({ waitedMs, err }) => d.log(`whip leg not up at ${(waitedMs / 1000).toFixed(0)}s${err ? ` (${err})` : ''}`),
     });
+    if (gen !== mine) return;   // stopped while the container was waking
     // 🔴 A PAGE THAT CANNOT REACH ITS SUBJECT SAYS SO, IN AN ASSERT, NOT IN A LOG.
     // This line used to `d.log` and return, which is how this page read 8/8
     // GREEN on a desk where it had never connected: a log is not graded, so the
@@ -128,6 +251,7 @@
     // ⚠️ `aborted` IS NOT A FAILURE. The page being left is the harness tearing
     // down, and grading that red would make every clean teardown a defect.
     if (!w.ok) {
+      stream.set('offline').because('the publisher did not come up');
       if (w.aborted) { d.log('page left', 'bad'); return; }
       d.assert('the whip leg came up', false,
         `no publisher after ${(w.waitedMs / 1000).toFixed(0)}s, so nothing could be played`);
@@ -158,28 +282,57 @@
       } catch (e) {
         try { pc?.close(); } catch { /* fine */ }
         pc = null;
+        if (gen !== mine) return;      // stopped between the offer and the answer
         d.log(`whep attempt ${attempt}: ${e.message}`, 'bad');
-        if (attempt === 6) { d.fail(e); return; }
+        if (attempt === 6) { stream.set('offline').because('WHEP would not connect'); d.fail(e); return; }
         await new Promise((r) => setTimeout(r, 4000));
+        if (gen !== mine) return;      // stopped during the wait before the next try
       }
     }
+    if (gen !== mine) return;
+    settle();
     // The checks read what this control just produced, so this is the first
-    // moment they can be true — and a button for them would make them optional.
+    // moment they can be true, and a button for them would make them optional.
     await d.run('check');
-  });
+  }
+
+  /**
+   * 🔴 `on` IS A MEASUREMENT AND IT IS LATCHED, THE SAME RULE AS `/llhls/`.
+   * The control says whether the STREAM is on. A visitor who pauses with the
+   * element's own controls is still holding the socket and still costing
+   * delivered minutes, so a toggle that read `starting` again there would be
+   * describing the player while claiming to describe the source.
+   * ⚠️ AND ON THIS PAGE THE LATCH IS `framePresented`, WHICH ALREADY EXISTS AND
+   * ALREADY CARRIES THE ARGUMENT: this is the page where `26 fps inbound` sat
+   * beside a black rectangle, so `a track arrived` is not `the stream is on`.
+   */
+  function settle() {
+    if (!ws) return;
+    notePresented();
+    if (framePresented) playing = true;
+    stream.set(playing ? 'online' : 'coming')
+      .because(playing ? 'press to stop it' : 'the container and its encoder are waking. press again to stop');
+  }
+  video.addEventListener('playing', settle);
+  video.addEventListener('loadeddata', settle);
+  video.addEventListener('resize', settle);
 
   setInterval(async () => {
     if (!pc) return;
     // the element's own view, which is where the black frame actually lives
-    d.set('picture', video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : 'no frame',
-      video.videoWidth ? 'ok' : 'bad');
+    shape();
     d.set('state', video.paused ? 'paused' : 'playing', video.paused ? 'bad' : 'ok');
-    notePresented();
+    settle();
     const stats = await pc.getStats().catch(() => null);
     if (!stats) return;
     for (const s of stats.values()) {
       if (s.type === 'inbound-rtp' && s.kind === 'video') {
-        if (Number.isFinite(s.framesPerSecond)) d.set('fps', s.framesPerSecond);
+        // ⚠️ `framesPerSecond` IS NOT WHAT THE FOOTER SHOWS, AND THAT IS
+        // DELIBERATE SINCE 2026-09-29. This is the DECODER's rate, and this page
+        // is the one that measured 26 fps of it over a black rectangle. The
+        // footer counts frames the compositor actually presented, through
+        // `requestVideoFrameCallback`. The decoder's own numbers stay here,
+        // where the assert reads them as its detail.
         // Keep these: "videoWidth is 0" alone cannot tell apart "no video RTP
         // arrived at all" from "packets arrived and the decoder produced
         // nothing" from "frames decoded but never presented". They are three
@@ -221,7 +374,50 @@
   let lastVideoRtp = null;
 
   d.on('check', () => {
-    d.assert('publisher held by this page', badge.dataset.on === '1', badge.textContent);
+    // The claim the publisher badge used to carry, read off the socket rather
+    // than off a pill, with the detail naming the control a visitor can see.
+    /**
+     * ⚠️ AND IT READS THE STATE THROUGH THE CALL, AND REQUIRES A STRING, WHICH
+     * IS WHAT MAKES IT ABLE TO FAIL. `stream.state` without the parentheses is
+     * a function, and a function is never `'offline'`, so a check written that
+     * way would pass whatever the badge said. This one goes red on exactly the
+     * bug that shipped for one run of this page.
+     */
+    const said = (stream.badge.textContent || '').trim();
+    const state = stream.state();
+    d.assert('publisher held by this page',
+      held && typeof state === 'string' && state !== 'offline',
+      `toggle reads ${JSON.stringify(said)}, state ${state}, socket ${held ? 'held' : 'let go'}`);
+    /**
+     * The ask itself, graded: one button in the row, it is the toggle, and
+     * nothing in it is a primary. Same check as `/llhls/`, because it is the
+     * same ask.
+     */
+    const btns = [...d.controls.querySelectorAll('button')];
+    d.assert('one control, and it is the stream toggle',
+      btns.length === 1 && btns[0] === stream.el && !d.controls.querySelector('.pos-pri'),
+      `${btns.length} control(s), classes ${btns.map((b) => b.className || '(none)').join(' ')}`);
+    /**
+     * 🔴 *"fix w so it did not ump horztally"*, MEASURED. Every cell is written
+     * at its widest and at its narrowest and the ROW is measured both times,
+     * because the defect is a cell shoving the one after it rather than a cell
+     * resizing. Without the `reserve` on each field this goes red. Synchronous,
+     * with the real readings back before this function yields, so nothing is
+     * painted in between and a person watching the page sees none of it.
+     */
+    {
+      const row = panel.values.el;
+      const was = panel.values.keys().map((k) => [k, panel.values.cell(k).textContent]);
+      const write = (o) => { for (const [k, v] of Object.entries(o)) panel.values.set(k, v); };
+      write({ size: '', fps: '' });
+      const narrow = row.getBoundingClientRect().width;
+      write({ size: '1280x720', fps: '59.9' });
+      const wide = row.getBoundingClientRect().width;
+      for (const [k, v] of was) panel.values.set(k, v);
+      d.assert('a footer number cannot shove the one beside it',
+        Math.abs(wide - narrow) < 0.5,
+        `${narrow.toFixed(1)} px with the cells empty against ${wide.toFixed(1)} px at their widest`);
+    }
     d.assert('peer connection created', !!pc);
     if (pc) {
       d.assert('peer connection connected', pc.connectionState === 'connected', pc.connectionState);
@@ -237,13 +433,78 @@
         framePresented
           ? framePresented
           : lastVideoRtp
-            ? `nothing presented · rtp says ${JSON.stringify(lastVideoRtp)}`
+            ? `nothing presented. rtp says ${JSON.stringify(lastVideoRtp)}`
             : 'nothing presented and NO inbound video rtp at all');
       d.assert('element is playing', !video.paused, video.paused ? `paused rs${video.readyState}` : 'playing');
     }
+    // The picture reports its own damage: every label it had to cut and every
+    // link it could not route comes back on `cuts` rather than being ellipsised
+    // at a reader who can do nothing about it.
+    d.assert('nothing in the picture was cut or refused', dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.id}: ${c.full}`).join(' / ') || 'none');
   });
 
-  d.log('WHEP: one POST of an SDP offer, one answer back');
+  /**
+   * 🔴 HOW IT WORKS, INCLUDING HOW IT STOPS, WHICH IS THE OTHER HALF OF *"same
+   * treatment"*. The mechanism that stops it is the one `/llhls/` draws, because
+   * both legs live on one container behind one Durable Object. What differs is
+   * the leg, and the differences are the reason this page exists: WHIP up,
+   * WHEP down, Opus rather than AAC, no recording on the far side, and a stale
+   * publisher held against a new session for about 45 s.
+   */
+  const dg = createDiagram(d.el, {
+    caption: 'One POST of an offer and one answer back, and then the frames come straight '
+      + 'from Cloudflare over UDP without touching a worker. It stops the same way the '
+      + 'low latency HLS page stops, because both legs are one container counting the '
+      + 'sockets that are holding it open.',
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'ctl', label: 'socket', sub: 'WebSocket', tech: 'browser',
+            note: 'The control at the top of the page opens one socket to the publisher and '
+                + 'holds it. Being open is the whole message, and closing it is the only way '
+                + 'the far side learns that a viewer has gone.' },
+          { id: 'play', label: 'player', sub: 'RTCPeerConnection', tech: 'browser',
+            note: 'Offers two receive only transceivers, because Cloudflare refuses a single '
+                + 'track offer with a 400 either way round. A track arrives MUTED and the '
+                + 'element is only given the stream once media really flows.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'worker, container, Stream', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'pub', label: 'Pub', sub: 'Durable Object', tech: 'cloudflare',
+            note: 'The first socket in starts the publish and the last one out arms a 30 s '
+                + 'alarm. The sweep needs two idle turns, so about a minute of nobody '
+                + 'watching stops the encoder and a reload costs nothing.' },
+          { id: 'ff', label: 'ffmpeg', sub: 'container', tech: 'cloudflare',
+            note: 'The same picture the low latency HLS page gets, encoded for this leg '
+                + 'instead: libopus rather than AAC, H.264 as baseline 3.1, B-frames off. A '
+                + 'dead leg needs about 45 s before Cloudflare takes a new one.' },
+          { id: 'stream', label: 'Stream', sub: 'WHIP in, WHEP out', tech: 'cloudflare',
+            note: 'A second live input, because Cloudflare will not serve WHEP from the RTMPS '
+                + 'input the other page uses. Nothing here is recorded, so a WebRTC source '
+                + 'costs no storage and cannot be archived on their side.' },
+        ] },
+    ],
+    links: [
+      { from: 'ctl', to: 'pub', label: 'I am watching',
+        note: 'Nothing travels up this socket. The publisher counts the sockets in the room '
+            + 'rather than watching for requests, because ffmpeg sending video makes none.' },
+      { from: 'pub', to: 'ff',
+        note: 'Start on the first viewer, stop on the sweep. A leg that dies while somebody '
+            + 'is still watching is restarted by the same sweep 30 s later.' },
+      // No label: an arrow between two boxes inside one container shows
+      // direction only, and the component refuses one written on it anyway.
+      { from: 'ff', to: 'stream',
+        note: 'WHIP, and the publish URL carries the stream key in its path, so a public '
+            + 'page cannot hold it and this leg runs in the container instead.' },
+      { from: 'stream', to: 'play', label: 'WHEP', back: true,
+        note: 'One POST of the offer over ordinary HTTPS, one answer, and the media then '
+            + 'flows over ICE and DTLS and SRTP. The handshake succeeding says nothing about '
+            + 'whether a single frame will arrive, which is what the checks are for.' },
+    ],
+  }, { how: true, atEnd: true });
+
+  d.log('one POST of an SDP offer, one answer back');
   d.ready();
 </script>
 </html>

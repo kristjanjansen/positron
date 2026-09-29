@@ -5253,6 +5253,33 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
   background: var(--card);
   border-top: 1px solid var(--line);
 }
+/* 🔴 AND A SLOT HOLDING A SCROLLING VALUE ROW GIVES THAT FLOOR UP, BECAUSE THE
+   FLOOR ABOVE IS WHAT KEPT `.pos-vp-vals` FROM EVER SCROLLING. That row has
+   declared `overflow-x: auto` with a hidden scrollbar and `-webkit-overflow-
+   scrolling: touch` since it was written, which is a rule that has never once
+   been able to run: `min-content` on the left track resolves to the row's own
+   width, so the track never shrinks and the row never has anything to scroll.
+   A dead rule that reads as done is this project's second most expensive kind of
+   defect and this is the fourth one it has measured.
+   🔴 MEASURED on `/llhls/` at 375 px before this line existed: footer content
+   box 317 px wide, LEFT SLOT 293.7, the 12 px gap, and the right slot starting
+   at x 346.7 against a content box ending at 346. The ⛶ was 21.7 px outside the
+   panel and `.pos-vp { overflow: hidden }` cut it off, so the one control in
+   that footer was invisible on a phone.
+   ⚠️ A CONDITION, NOT A BLANKET CHANGE, AND IT IS PROVABLY NARROW RATHER THAN
+   ARGUABLY NARROW. `.pos-vp-vals` is built by `createPanelValues` and nothing
+   else, and `createVideoPanel` builds one only for a caller that passes
+   `values`, which is `/llhls/` and `/webrtc/` and no other page in this
+   repository. MEASURED after: `/held/` and `/making/`, the two other pages with
+   a panel on a phone, shot at 375 px and byte identical.
+   ⚠️ AND THE ORIGINAL DEFECT STAYS FIXED. The comment above records both side
+   tracks resolving to zero and their contents drawing over the centre. Here the
+   right track is `auto`, so it still takes its content's full width and can
+   never collapse; what gives is the left one, which is the only slot in the row
+   that can scroll. */
+.pos-vp-foot:has(> .pos-vp-l > .pos-vp-vals) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
 /* 🔴 A SLOT HAS A GAP, BECAUSE A SLOT HOLDS MORE THAN ONE THING. Reported
    2026-09-20 with a screenshot of two icon buttons in a panel footer sitting
    flush against each other: *"add space between"*. The footer's own `gap: 12px`

@@ -57,16 +57,72 @@ export function holdPublisher(onState) {
 }
 
 /**
+ * How many frames a second this element is actually PUTTING ON SCREEN.
+ *
+ * 🔴 PRESENTED, NOT DECODED, AND THE DIFFERENCE IS THE ONE BUG BOTH THESE PAGES
+ * HAVE ALREADY SHIPPED. `/webrtc/` read `26 fps inbound` beside a black
+ * rectangle and its own comment says decoding is not rendering; `/llhls/`
+ * measured an iPhone advancing at 0.16x while dropping 3 frames of 507, so
+ * every decoder-side counter said the device was fine. `requestVideoFrameCallback`
+ * fires once per frame the compositor actually showed, which is the number a
+ * person is looking at.
+ *
+ * 🔴 IT IS HERE BECAUSE BOTH PUB-FED PAGES WANT THE SAME NUMBER AND NEITHER
+ * SHOULD TYPE IT. They already share this module for the publisher; a second
+ * copy of a frame counter in the other page is how two pages end up reporting
+ * two different fps under the same word. If a page with no publisher ever wants
+ * it, it belongs in the kit rather than here.
+ *
+ * ⚠️ AN ABSENT API REPORTS `null`, NEVER `0`. Safari before 15.4 and any engine
+ * without `requestVideoFrameCallback` cannot answer, and a zero there reads as
+ * a stalled picture rather than as an unasked question. The caller empties its
+ * cell on null, which is the kit's own rule about a cell with nothing measured
+ * in it.
+ * ⚠️ AND IT COUNTS OVER A WHOLE SECOND RATHER THAN DIVIDING TWO TIMESTAMPS. A
+ * per-frame interval is a sample of one and swings by several fps between two
+ * frames that are both on time.
+ *
+ * @returns {() => void} stop it.
+ */
+export function watchPresentedFps(video, onRate, everyMs = 1000) {
+  if (typeof video?.requestVideoFrameCallback !== 'function') {
+    onRate?.(null);
+    return () => {};
+  }
+  let frames = 0, since = performance.now(), live = true;
+  const tick = () => {
+    if (!live) return;
+    frames++;
+    const now = performance.now();
+    if (now - since >= everyMs) {
+      onRate?.((frames * 1000) / (now - since));
+      frames = 0;
+      since = now;
+    }
+    video.requestVideoFrameCallback(tick);
+  };
+  video.requestVideoFrameCallback(tick);
+  return () => { live = false; };
+}
+
+/**
  * Wait for the WHIP LEG, which is a different input from the HLS one.
  * 07 previously waited on the HLS manifest — a signal about input A while it
  * was about to play input B, so it asked for WHEP before the WHIP handshake had
  * finished and got a 409. The publisher's own status is the right signal.
  */
-export async function waitForWhip({ timeoutMs = 90000, onTick } = {}) {
+export async function waitForWhip({ timeoutMs = 90000, onTick, signal } = {}) {
   const t0 = Date.now();
   const ac = new AbortController();
   const stop = () => ac.abort();
   addEventListener('pagehide', stop, { once: true });
+  // 🔴 A PAGE THAT CAN BE STOPPED HAS TO BE ABLE TO STOP THIS. Added 2026-09-29
+  // when both streaming pages gained a three state toggle whose middle state is
+  // half a minute long: a press during `starting` closes the socket, and
+  // without this the poll went on asking Cloudflare for a publisher nobody was
+  // waiting for until the timeout. `pagehide` was the only way out and a
+  // visitor who has pressed stop has not left the page.
+  signal?.addEventListener('abort', stop, { once: true });
   while (Date.now() - t0 < timeoutMs && !ac.signal.aborted) {
     try {
       const s = await (await fetch(LIVE.pubStatus, { cache: 'no-store', signal: ac.signal })).json();
@@ -113,7 +169,7 @@ async function segmentsReady(signal, want = 2) {
   return { ok: segs >= want, status: `${segs} segment(s)`, segs };
 }
 
-export async function waitForManifest({ timeoutMs = 90000, onTick } = {}) {
+export async function waitForManifest({ timeoutMs = 90000, onTick, signal } = {}) {
   const t0 = Date.now();
   // Tie the poll to the page. Without this the loop kept fetching after
   // navigation and every in-flight request surfaced as net::ERR_ABORTED —
@@ -121,6 +177,9 @@ export async function waitForManifest({ timeoutMs = 90000, onTick } = {}) {
   const ac = new AbortController();
   const stop = () => ac.abort();
   addEventListener('pagehide', stop, { once: true });
+  // And to the page's own stop. See the note on `waitForWhip` above: a visitor
+  // who presses during the half minute this poll covers has not left.
+  signal?.addEventListener('abort', stop, { once: true });
   for (let i = 0; Date.now() - t0 < timeoutMs && !ac.signal.aborted; i++) {
     try {
       const r = await segmentsReady(ac.signal);
