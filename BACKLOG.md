@@ -46,7 +46,30 @@ has no obvious way back on this page. Price it, do not drift into it.
 **And the log line is part of the change.** *"stopped: every note released and
 both rotaries back where they opened"* will be describing two of three things.
 
-### Open 2026-09-29: nola, rm A WAY HOME
+### Done 2026-09-29: nola, rm A WAY HOME
+
+✅ **DONE, `b4c5446`.** The block, its table, its draw function and its three
+pieces of state, three callers, one selector, a height measurement and the last
+clause of the description. **`createTable` went with it**, because those four
+rows were this page's only table and the import would have matched nothing.
+🔴 **THE RESERVE WAS NOT HOLDING THE KEYBOARD STILL, WHICH IS WHAT ITS OWN
+COMMENT CLAIMED.** MEASURED before the cut: the block sat at **y743.8 as the LAST
+child of the body**, against the keyboard at **y239.5**. It was BELOW the keys.
+Taking it out moves the keyboard **0.0 px at 1280**. The log, the diagram and the
+footer come up 225.6 px and nothing a hand is on moved.
+🔴 **AND THE 20.2 px THE KEYBOARD RISES AT 375 IS THE DESCRIPTION, NOT THE
+BLOCK.** The body's own top went 196 to 175.8 at 375 and did not move at 1280,
+and the paragraph measures 20.27 px a line, so the cut clause dropped one wrapped
+line on the phone and none at the desk. Two causes, separated rather than added.
+**107/107 with 101 page asserts to 104/104 with 98**, and the grep agrees, 99 to
+96. Three asserts left, all three about the way home; the fourth graded *both
+halves of the offer* on two takes and grades the surviving half on exactly one,
+because zero is a take built and never handed over.
+⚠️ **`routeTo` IS NOW PAGE-LESS AND KEEPS ITS WHOLE TEST.** `suggest-test.mjs`
+calls it at nine places and reads **44 ok, 0 failed**, run to prove the claim
+rather than assert it. Neither kit file was touched.
+⚠️ **AND IT WAS DRAWING A HEADING AND A COLUMN HEADER OVER FOUR PERMANENTLY EMPTY
+ROWS** on every visit, for anybody who never played two chords. That goes too.
 
 ASKED, VERBATIM: *"rm A WAY HOME"*. One page, https://positron.studio/nola/.
 
