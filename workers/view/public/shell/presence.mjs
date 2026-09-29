@@ -125,6 +125,52 @@ export const WIRED = {
   unknown: 'not connected',
 };
 
+/**
+ * 🔴 WHAT A STREAM SAYS, WHICH IS NEITHER A NETWORK WORD NOR A CABLE WORD.
+ * Asked 2026-09-29 against `/llhls/`: *"rm primary button with status
+ * togglebutton: stream off | starting | on. make a global component for this if
+ * needed"*, and in the same sitting for `/webrtc/` as *"same treatment"*.
+ *
+ * 🔴 **THE COMPONENT WAS NOT WHAT WAS MISSING. THE VOCABULARY WAS.**
+ * `createPresenceButton` is already a primary-row control whose face is a live
+ * badge: it reserves the width of the longest phrase it can ever say, fades the
+ * word through on a change rather than resizing, keeps its announcement for a
+ * screen reader, and lives in `.pos-controls` where `demo/verify.mjs` presses.
+ * Four pages drive one with `WIRED` today. What those two streaming pages
+ * needed was three words, and three words typed into two pages is the
+ * five-vocabularies argument this file already makes about `WIRED` one entry
+ * up: they agree on the day they are written and nothing keeps them agreeing.
+ *
+ * 🔴 **`stream off`, `starting`, `on`, WHICH ARE THE ASK'S OWN WORDS.** They
+ * map onto the states with nothing left over, because the thing being described
+ * really does have exactly these three readings: nothing is publishing, a
+ * container and its encoder are waking, frames are arriving.
+ * ⚠️ **AND `checking` SAYS `starting` TOO, WHICH IS `/stage/`'s DECISION
+ * REACHED INDEPENDENTLY.** That page settled the same question on 2026-09-25
+ * (*"what is started and what is checking. in ui it should be same for user"*):
+ * the two states are different facts and the badge keeps them apart in colour
+ * and motion, but to somebody who has just pressed one button they are one
+ * moment with one name.
+ * ⚠️ **`unknown` AND `offline` BOTH READ `stream off`, THE SAME COLLISION
+ * `WIRED` MAKES AND FOR A BETTER REASON HERE.** Before anybody presses, nothing
+ * IS publishing, and both pages say so in their own log line. The hollow ring
+ * still separates the two states for anybody who can see it, and `STREAM_CAN`
+ * leaves `unknown` out anyway, so a live badge opens on `offline` and the
+ * reserve is measured on `stream off` at ten characters.
+ */
+export const STREAM = {
+  online: 'on',
+  checking: 'starting',
+  coming: 'starting',
+  offline: 'stream off',
+  unknown: 'stream off',
+};
+/**
+ * Which of those a live stream badge can reach, which is what its width is
+ * measured on. The same pairing `transport-bar.mjs` uses for `ON_AIR_CAN`.
+ */
+export const STREAM_CAN = ['offline', 'coming', 'online'];
+
 /** How many expected beats may be missed before it is called gone. */
 export const MISSES = 2;
 
