@@ -1,5 +1,32 @@
 ## Open
 
+### Open 2026-09-29: the index cards should carry the demo's own description
+
+ASKED, VERBATIM: *"copy demo descs (or their first sentence) to index page
+cards"*. `demo/manifest.mjs` and every `demo/<slug>/index.html`.
+- **The two strings today.** `one` in `manifest.mjs` is what a card shows; `what`
+  in a page's `mount()` is what the page shows under its `h1`, appended as
+  `<p class="pos-what">` by `demo/shell/shell.mjs`. CLAUDE.md already says they
+  are the same string on any page with a diagram and that they move together, so
+  on some rows this is a no-op and on others it is a real copy.
+- ⚠️ **MEASURE THE DISAGREEMENT FIRST.** The ask is only worth a sweep where the
+  two differ; the count of rows where `one !== what` is the size of the job and
+  is not known. A page with no `what` at all is a third case.
+- ⚠️ **ONE SENTENCE, AND THE PARENTHESIS IS THE ESCAPE HATCH FOR THE REST.**
+  CLAUDE.md: *"descs are single sentences (do not stretch them with : ; -- etc)"*.
+  So *"or their first sentence"* is the instruction for any `what` that runs to
+  two, and a first sentence that needs a colon to make sense is a rewrite rather
+  than a copy.
+- ⚠️ **THE CARD IS THE SHORTER SURFACE.** The 2026-09-29 handoff records the
+  front page paying **72.5 px on three cards** for keeping knobs's `what` and
+  `one` identical, and calls it reversible in one line. Copying every `what` on
+  to every card makes that trade on 55 rows, so the report carries the front
+  page's height before and after.
+- The single source of truth question is worth asking in the report and NOT
+  deciding unasked: a `one` derived from `what` at build time would make the two
+  impossible to disagree, and that is a change to `manifest.mjs`'s shape rather
+  than a copy.
+
 ### Done 2026-09-29: front page, merge streaming into technologies
 
 ✅ **DONE, `f8583ec`, deployed in `f8583ec-133019-f807`.** Six rows moved
