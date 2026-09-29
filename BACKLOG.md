@@ -1,5 +1,55 @@
 ## Open
 
+### Open 2026-09-29: muta, rename PLAITS to MUTA and give the nameplate its own section at the bottom
+
+ASKED, VERBATIM: *"muta: rename plaits to muta and use instument panel global
+behaviour whee nameplane is in separate section in bottom"*. One page,
+https://positron.studio/muta/, file `demo/muta/index.html`.
+- **The name.** `createInstrumentPanel({ plate: { name: 'PLAITS', ... } })` at
+  about `:802`. The page is called `muta` in `manifest.mjs` and the plate says
+  `PLAITS`, the firmware's name. The plate follows the page.
+- **The section.** Today the plate row is TWO ENDS at every width: the name
+  cluster (`.pos-ipanel-name`, holding the name and the `Test tone` button in
+  `status`) at the start, and the model picker in `patch` at the far end. On a
+  phone that row wraps and reads picker, then name and button, which is the
+  open line below about the nameplate not being literally last. The kit already
+  has the shape asked for: a plate with ONLY a name is a single `.panel-plate`
+  row and the last row of the panel by `ROW_KINDS`, which is what `/shape/` and
+  `/tom/` draw. So the picker and the button leave the plate and go into a
+  controls row above it, and the plate is the name alone.
+- ⚠️ **THE PICKER LOSES ITS CAPTION ONLY IN THE `patch` SLOT.** Out of that slot
+  the `.pos-pick-l` comes back, and *"no label on patch selctor"* (2026-09-28)
+  still stands. The assert at about `:2124` reads `panel.patchEnd` for the
+  caption and has to move with the control.
+- ⚠️ **WHERE `Test tone` GOES IS NOT IN THE ASK.** It leaves the plate with the
+  picker. The assumption worked under is that it sits on the same controls row
+  as the picker and the randomize button, at the far end, which is where the
+  2026-09-29 ask *"Test tone right"* put it. Say so in the report so it can be
+  moved.
+- ⚠️ Page scoped. Nothing in `demo/shell/` changes for this, and if the same
+  shape is wanted on `fau`, `knobs` and `shape` that is a kit decision and a
+  separate line.
+
+### Open 2026-09-29: muta, the patch selector and the randomize button are one row that never wraps, and the selector takes the rest of the width
+
+ASKED, VERBATIM: *"Patch selector and randomize button go togther and so not
+wrap and parch takes rest of w"*. Same page, same file, and it is the row the
+line above creates.
+- The picker is `createPicker({ ..., random: () => setModel(...) })` at about
+  `:485`, so the randomize control is drawn by `picker.mjs` itself. Whether it
+  is inside `.pos-pick` or a sibling decides whether *"go together"* is already
+  true and only the wrap and the width are owed. MEASURE at 375 before writing a
+  rule.
+- **Two rules and no third**: the row does not wrap (`flex-wrap: nowrap` on
+  that row, or the kit's spelling of it if there is one), and the selector is
+  `flex: 1 1 auto; min-width: 0` so it takes what the randomize button leaves.
+  ⚠️ `min-width: 0` or the picker's own `--pick-w` of 22ch (`:696`) keeps the
+  row from shrinking and the button falls off the edge instead of the picker
+  giving way.
+- ⚠️ At 375 the row is 301 px wide inside its inset. A 22ch picker plus a
+  button is wider than that, which is exactly why it wraps today. The width the
+  picker ends up with at 375 is a number the report carries.
+
 ### Done 2026-09-29: knobs, panic should stop the audio as well as the notes
 
 ✅ **DONE, `a8b3d5b`.** `panic()` posts `{ cmd: 'reset' }` to the playout, which
