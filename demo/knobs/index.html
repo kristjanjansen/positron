@@ -1061,12 +1061,49 @@
   }
 
   /**
+   * 🔴 THE PLAYOUT'S OWN LAST WORD ABOUT ITSELF, BECAUSE A COUNT OF WHAT THIS
+   * PAGE POSTED IS A COUNT ON THE NEAR SIDE OF THE BOUNDARY. `panic()` below
+   * drops the sound already in this page by posting to the worklet, and
+   * *postMessage was called* is satisfied by a command the worklet does not
+   * handle: a misspelled `cmd` is inert, throws nothing and logs nothing.
+   * `proto/jam/playout-worklet.js` posts its own counters every 250 ms and
+   * `played` only ever GROWS except through a reset, so a fall in it is the far
+   * side agreeing that the ring really was emptied.
+   * ⚠️ `addEventListener` AND NOT `onmessage`. `board.mjs` owns `onmessage` on
+   * that port and reads the cushion, the underruns and the trims off it, so
+   * assigning over it would take the buffer cell and the breaks line out. A
+   * second listener replaces nothing and the port is already started, because
+   * setting `onmessage` started it.
+   * ⚠️ AND IT ANSWERS NOTHING WITH NO BOARD, WHICH IS SAID RATHER THAN HIDDEN.
+   * With no frames arriving, `played` reads 0 before a reset and 0 after one,
+   * so the far side cannot tell a reset from no reset at all. The check at the
+   * foot of this page says so in words instead of reading it as a pass.
+   * ⚠️ AND IT IS DECLARED ABOVE ITS TWO CALLERS ON PURPOSE. A `let` is in its
+   * dead zone until the module reaches it, and both callers are async and run
+   * long after that, so this is safe either way today and would stop being safe
+   * the moment somebody called one of them earlier. `/twelve/` lost seven
+   * asserts to exactly that, silently and green, and only the COUNT said so.
+   */
+  let plSeen = null, plPort = null;
+  function watchPlayout() {
+    const pl = board.playout();
+    if (!pl || pl.port === plPort) return;
+    plPort = pl.port;
+    plPort.addEventListener('message', (e) => { if (e.data?.stats) plSeen = e.data.stats; });
+  }
+
+  /**
    * Everything the first key press has to do before a note can sound. It
    * replaces what the Play button did, minus the held test tone: the note you
    * hear is the key you pressed.
    */
   async function firstKey() {
     await board.startAudio();
+    // The node exists from here on, so the far side of the panic below has
+    // somebody listening to it. `startAudio` has already set its own
+    // `onmessage` by the time this resolves, which is what makes a second
+    // listener safe rather than a replacement.
+    watchPlayout();
     await measureRtt();
     const status = boardAnswered ? { ok: playing !== null, source: playing } : await askStatus();
     if (!MAY_PLAY) {
@@ -1102,6 +1139,7 @@
 
   async function startNote() {
     await board.startAudio();
+    watchPlayout();     // see `firstKey`: the same reason, the same one line
     await measureRtt();
     const status = boardAnswered ? { ok: playing !== null, source: playing } : await askStatus();
 
@@ -1154,6 +1192,8 @@
 
   /** See the keyboard's `onPanic`: these two call each other and this is why. */
   let panicking = false;
+  /** What the last panic managed, for the check at the foot of this page. */
+  let lastPanic = null;
   function panic() {
     if (panicking) return;
     panicking = true;
@@ -1163,11 +1203,42 @@
       // itself in front of somebody, and stop here means stop. It goes before
       // the `set` calls so the homing is the last thing that touches a dial.
       for (const k of [cutoff, reso]) k.hand?.stop('pause');
-      // The rotaries come back to where they opened, and the board is told to
-      // release every note. The board may be holding notes this page never
-      // pressed, so the message has to go out as well as the dials coming home.
-      if (MAY_PLAY && armed) sendId({ type: 'note.panic' });
+      /**
+       * 🔴 STOPPING THE SOURCE AND DROPPING THE SOUND ALREADY HERE ARE TWO
+       * HALVES AND STOP MEANS BOTH. `note.panic` reaches an instrument in
+       * another building and is the only thing that makes it quiet and KEEPS it
+       * quiet. It does nothing whatever about the cushion this page is already
+       * holding, which is 160 ms of sound the board made BEFORE the button was
+       * pressed and which went on playing after it. Until 2026-09-29 only the
+       * first half was sent, so stop here meant stop in a sixth of a second.
+       * The board may also be holding notes this page never pressed, which is
+       * why the message goes out as well as the dials coming home.
+       * 🔴 AND THE MESSAGE GOES FIRST, WHICH IS A DECISION RATHER THAN THE
+       * ORDER IT WAS TYPED IN. Emptying the ring buys exactly one cushion of
+       * silence and re-arms the prebuffer, so the page is quiet for 160 ms and
+       * then plays whatever landed in the meantime. That silence is only worth
+       * having if the board is stopping during it, so the message that stops
+       * the board leaves before the ring is dropped.
+       * ⚠️ THE TWO STATEMENTS ARE MICROSECONDS APART AND NO RACE IS BEING
+       * FIXED. `board.send` is one synchronous socket write and it returns null
+       * rather than throwing on a closed socket, so neither half can be held up
+       * by the other. What the order states is the intent, and the intent is
+       * what the next reader acts on.
+       * 🔴 AND `reset` IS NOT *STOP AUDIO*. It empties what has arrived and
+       * stops nothing that is still coming: the board captures its JACK graph
+       * continuously, so frames keep landing at fifty a second whatever this
+       * page does, the prebuffer re-arms and the sound is back a cushion later
+       * IF THE BOARD IS STILL SOUNDING. The pair is what makes it quiet and
+       * keeps it quiet, and the log line below says only the half this page can
+       * know about.
+       */
+      const toldBoard = MAY_PLAY && armed;
+      if (toldBoard) sendId({ type: 'note.panic' });
+      const pl = board.playout();
+      const droppedHere = !!pl;
+      if (pl) pl.port.postMessage({ cmd: 'reset' });
       releasedAt = performance.now();
+      lastPanic = { at: releasedAt, toldBoard, droppedHere };
       // Home is where each rotary opened, which is not the same number for the
       // two of them: the cutoff opens where the filter can be heard and the
       // resonance opens where its maker left it.
@@ -1179,7 +1250,25 @@
       cutoff.set(CUTOFF_HOME);
       reso.set(NEUTRAL);
       kb.panic();
-      d.log('stopped: every note released and both rotaries back where they opened');
+      /**
+       * 🔴 THE LINE SAYS WHAT HAPPENED, AND ON AN UNARMED PAGE THAT IS NOT WHAT
+       * THE BUTTON PROMISES. `note.panic` goes only when this page is driving
+       * the board, so a page listening while somebody else plays it drops its
+       * own cushion, goes quiet for 160 ms and hears the sound come straight
+       * back, because it is not allowed to write to the instrument. Saying
+       * *stopped* there would be a page claiming an outcome it cannot know, so
+       * that case gets its own words and its own weight.
+       */
+      if (toldBoard) {
+        d.log(droppedHere
+          ? 'stopped: the board was told to release every note, the sound already in this page was dropped, and both rotaries are back where they opened'
+          : 'stopped: the board was told to release every note and both rotaries are back where they opened, and this page was holding no sound to drop');
+      } else {
+        d.log(droppedHere
+          ? 'stopped here only: the sound already in this page was dropped and both rotaries are back where they opened, and this page is not driving the board, so whatever is still playing over there will be back in a moment'
+          : 'stopped here only: both rotaries are back where they opened, and this page is neither driving the board nor holding any sound of its own',
+        'warn');
+      }
     } finally { panicking = false; }
   }
 
@@ -2029,6 +2118,50 @@
     }
   }
 
+  /**
+   * 🔴 THE ONE CHECK ON `panic()`, AND NOTHING COVERED IT BEFORE 2026-09-29.
+   * The only mention of it in this block was the note above the held-note
+   * assert saying a stop *is a PANIC*, which explains why that check may be
+   * skipped and grades nothing about the panic itself.
+   *
+   * 🔴 AND IT RUNS AFTER `checkAll()` BECAUSE A PANIC NOW LAUNDERS ONE OF ITS
+   * ASSERTS. `{ cmd: 'reset' }` zeroes the worklet's `underruns` and
+   * `trimEvents` as well as its ring, `board.mjs` surfaces those as `starved`
+   * and `trimmed`, and `the cushion never ran dry` reads `starved === 0`. A
+   * panic driven before that assert would take it green by wiping the counter
+   * it reads, which is a check grading the thing that just reset it. Driving it
+   * last also leaves the rotaries and the hands alone until everything that
+   * reads them has run.
+   *
+   * 🔴 WHAT IS GRADED WITH NO BOARD IS THE POSTING, AND THAT IS WEAKER. The
+   * near side says this page called `postMessage`; it cannot say the worklet
+   * did anything with it, so a misspelled `cmd` would pass here. The far side
+   * is `played` falling, which only exists when audio was really flowing, so a
+   * run without `?board=1` and a live board says so in its own detail line
+   * rather than reading as a pass. What the near side DOES catch is the guard:
+   * with no audio graph at all this page must post nothing and claim nothing,
+   * and that branch is the one a visitor meets first.
+   */
+  async function panicCheck() {
+    if (!SELFCHECK) return;
+    const hadNode = !!board.playout();
+    const before = plSeen;
+    panic();
+    const p = lastPanic;
+    // The worklet posts its counters every 250 ms, so wait for a message that
+    // is NEWER than the one in hand rather than for a number of milliseconds.
+    if (hadNode) for (let i = 0; i < 12 && plSeen === before; i++) await wait(50);
+    const answerable = hadNode && !!before && before.played > 0 && !!plSeen && plSeen !== before;
+    const fell = answerable ? plSeen.played < before.played : null;
+    d.assert('a panic drops the sound already in this page, and claims nothing when there is none',
+      !!p && p.droppedHere === hadNode && fell !== false,
+      !hadNode
+        ? 'no audio graph had been built, so there was nothing to drop, nothing was posted and nothing was claimed'
+        : answerable
+          ? `the playout was told to reset and its own count of samples played fell from ${before.played} to ${plSeen.played}`
+          : 'the playout was told to reset, and with nothing arriving its counters read 0 either way, so only the posting is graded on this run');
+  }
+
   // Finer than the gate, so a value it held back is never held much longer than
   // the gate's own 20 ms, and so the 500 ms restatement has a clock to ride on
   // with nothing moving. Started last, after the socket exists.
@@ -2289,11 +2422,14 @@
        the foot and disabled by then, a disabled button fires no click even
        detached, and `openMidi` is idempotent anyway. */
     midiBtn.click();
-    if (MAY_PLAY) { await startNote(); return; }
+    /* The panic drill is last on both routes, and `panicCheck` says why: the
+       reset it drives wipes the two counters `checkAll` asserts on. */
+    if (MAY_PLAY) { await startNote(); await panicCheck(); return; }
     await sweepChecks();
     await handChecks();
     freeChecks();
     checkAll();
+    await panicCheck();
   }
 
   /* The counter read at the LAST line of the module, which is the whole of a
