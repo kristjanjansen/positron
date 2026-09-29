@@ -1,5 +1,34 @@
 ## Open
 
+### Open 2026-09-29: llhls says how it works, including how the stream stops
+
+ASKED, VERBATIM: *"add how it works to llhsl incl how it stops"*. Same page,
+https://positron.studio/llhls/, and it is the same sitting as the toggle ask
+above, so the two are worked together.
+- **The mechanism, READ off `workers/pub/worker.mjs` on 2026-09-29 and to be
+  re-read before it is written down**: the page holds a socket to
+  `wss://pub.positron.studio/watch`; the FIRST socket into the room starts the
+  ffmpeg publish, and `#startPublish` is deliberately not awaited inside the
+  WebSocket upgrade, because awaiting it delayed the 101 by the container's cold
+  start.
+- **How it stops, which is the half the ask names.** `webSocketClose` arms a
+  30 s alarm (`SWEEP_MS`) once the room is empty. The sweep counts idle ticks
+  and `GRACE_TICKS` is 2, so about 60 s of nobody watching, and a reload inside
+  that minute does not thrash the container. Then it POSTs `/stop`, which
+  SIGTERMs both ffmpeg legs, and deletes the alarm. The container's own
+  `sleepAfter = '10m'` is a backstop and is NOT what normally stops it.
+- ⚠️ **AND THE REASON IT IS REFERENCE COUNTED RATHER THAN `sleepAfter` ALONE
+  IS WORTH SAYING ON THE PAGE**: ffmpeg publishing generates no incoming
+  requests at all, so request idleness would kill a stream somebody is watching.
+  That is the sentence a visitor learns something from.
+- ⚠️ **WHERE IT GOES IS A `positron-ui` AND `positron-diagram` QUESTION, NOT A
+  PARAGRAPH BOLTED ON THE `what`.** CLAUDE.md: a desc is ONE sentence and may
+  not be stretched. So this is a diagram, a readout key, or a section of its
+  own, and the page already has a diagram to extend.
+- ⚠️ A leg dying under a live viewer is RESTARTED by the same sweep, and a dead
+  WHIP leg needs about 45 s before Cloudflare accepts a new session. Both are
+  things the page could say and neither is in the ask.
+
 ### Open 2026-09-29: llhls, the primary button becomes a three state stream toggle
 
 ASKED, VERBATIM: *"https://positron.studio/llhls/ rm primary button with status
