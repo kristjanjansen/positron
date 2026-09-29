@@ -1,5 +1,34 @@
 ## Open
 
+### Open 2026-09-29: the burned-in test pattern, drop the top left counters and stack ABSOLUTE over LOCAL
+
+ASKED, VERBATIM: *"rm top left counters. put absolute and local below each
+other"*, with a frame grab. The subject is the PICTURE the publisher burns in,
+so the file is `workers/pub/container/server.mjs` and its `drawtext` filters,
+not any demo page. It reaches `/llhls/`, `/webrtc/` and `/moq/` at once, because
+each leg publishes the same pattern to its own input.
+- **What is on screen in the grab**: a small timecode and frame counter block top
+  left (`00:01:11.967` over `2159`), then `ABSOLUTE` with an epoch and `LOCAL`
+  with a wall clock, drawn as two labelled boxes ON ONE LINE whose values OVERLAP
+  in the middle. The overlap is visible in the grab and is a defect on its own,
+  separate from the ask.
+- ⚠️ **THE EPOCH IS THE MEASUREMENT AND MUST NOT BE TOUCHED.** The burned-in
+  clock is what makes glass-to-glass latency measurable at all, and
+  `positron-streaming` records that `drawtext` CANNOT print epoch milliseconds
+  (`%{expr_int_format}` clamps at INT32_MAX and prints 2147483647), which is why
+  it is seconds with the unit beside it. Moving a line must not become
+  reformatting the number.
+- ⚠️ **AND A MONOSPACE FACE WITH AN EXPLICIT `fontfile`**, both already
+  required: `drawtext` with no `fontfile` resolves to nothing and fails
+  SILENTLY, and in a proportional face the digits shift sideways as they change.
+- ⚠️ **COST IT BEFORE ADDING ANYTHING.** A 56 block machine readable clock row
+  cost a MEASURED +16 per cent encoder CPU on that half vCPU box and was removed
+  on 2026-09-08 because nothing read it. This ask REMOVES a block and moves two,
+  so it should go the other way, and the report says which way it went.
+- ⚠️ **IT NEEDS A CONTAINER BUILD AND DEPLOY, NOT A `workers/view` DEPLOY**,
+  and it cannot be seen until a publisher is awake, which costs Stream minutes.
+  So this is verified once, deliberately, rather than iterated on.
+
 ### Open 2026-09-29: llhls uses the video panel, with resolution and fps and a short spec of what it streams
 
 ASKED, VERBATIM: *"use in llsl use videopanel with resolution / fps (fix w so it
