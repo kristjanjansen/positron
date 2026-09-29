@@ -89,7 +89,18 @@
       { key: 'source', label: '', reserve: 12 },
     ],
   });
-  panel.values.set('source', 'H.264 + Opus');
+  /**
+   * 🔴 THE SPEC IS WRITTEN WHEN THERE IS A PICTURE TO BE A SPEC OF, NOT ON
+   * LOAD. Asked 2026-09-29 against a phone screenshot of this page sitting at
+   * `STREAM OFF`: *"Do not show video details until we have incomng data"*.
+   * It used to be set here, at build time, which kept the footer's value row
+   * non-empty for ever and so kept it on screen describing a stream nobody had
+   * started.
+   * ⚠️ **AND THE HIDING IS THE KIT'S, NOT THIS PAGE'S.** `createPanelValues`
+   * hides its row while every cell is empty, so all this page has to do is not
+   * write a cell early. There is no `hide()` call here to forget.
+   */
+  const SOURCE = 'H.264 + Opus';
   d.el.append(panel.el);
 
   // A custom property, never `video.style.aspectRatio`. See `/llhls/`: an
@@ -100,6 +111,7 @@
     const w = video.videoWidth, h = video.videoHeight;
     if (!w || !h) return;
     panel.values.set('size', `${w}x${h}`);
+    panel.values.set('source', SOURCE);
     panel.stage.style.setProperty('--vp-aspect', `${w} / ${h}`);
   };
   video.addEventListener('loadedmetadata', shape);
@@ -199,6 +211,8 @@
     try { video.pause(); } catch { /* fine */ }
     video.srcObject = null;
     panel.values.set('fps', '');
+    panel.values.set('size', '');
+    panel.values.set('source', '');
     d.set('round trip', '');
     d.set('state', '');
     stream.set('offline').because('the publisher stops about a minute after the last viewer goes');
@@ -409,14 +423,53 @@
       const row = panel.values.el;
       const was = panel.values.keys().map((k) => [k, panel.values.cell(k).textContent]);
       const write = (o) => { for (const [k, v] of Object.entries(o)) panel.values.set(k, v); };
-      write({ size: '', fps: '' });
+      /**
+       * 🔴 THE ROW IS HIDDEN BEFORE A PRESS SINCE 2026-09-29, AND THIS CHECK
+       * HAD TO STOP RELYING ON IT BEING THERE. It used to empty `size` and
+       * `fps` and leave `source`, which held the row open. `source` is written
+       * when a picture arrives now, so on a run with no press every cell is
+       * empty, the kit hides the row, and both measurements would have read
+       * **0 px** and the comparison would have passed having measured nothing.
+       * That is this project's worst shape and it would have been green.
+       * ✅ So the check writes `source` ITSELF in both states, and `narrow > 0`
+       * is a term of the assert rather than an assumption underneath it.
+       */
+      write({ size: '', fps: '', source: SOURCE });
       const narrow = row.getBoundingClientRect().width;
       write({ size: '1280x720', fps: '59.9' });
       const wide = row.getBoundingClientRect().width;
       for (const [k, v] of was) panel.values.set(k, v);
       d.assert('a footer number cannot shove the one beside it',
-        Math.abs(wide - narrow) < 0.5,
-        `${narrow.toFixed(1)} px with the cells empty against ${wide.toFixed(1)} px at their widest`);
+        narrow > 0 && Math.abs(wide - narrow) < 0.5,
+        `${narrow.toFixed(1)} px with the other cells empty against ${wide.toFixed(1)} px at their widest`);
+      /**
+       * 🔴 AND NOTHING IS SAID ABOUT A STREAM WITH NOTHING COMING IN. The ask,
+       * verbatim: *"Do not show video details until we have incomng data"*.
+       * 🔴 **WHAT IS GRADED IS THE MECHANISM, NOT THE STATE THIS RUN HAPPENS TO
+       * BE IN, AND THE FIRST DRAFT GOT THAT WRONG AND WENT RED.** It required
+       * the row to be absent at check time, which is true for a visitor who has
+       * not pressed and FALSE here, because `demo/verify.mjs` presses every
+       * control on the page: the stream reads `online`, a picture is arriving,
+       * and the footer is showing what it should. A check that fails when the
+       * page is working is a check about the harness.
+       * ✅ So it empties every cell and requires the row to go, then writes one
+       * back and requires it to return. Both directions, because hiding a row
+       * for ever is the same defect wearing the opposite sign.
+       * ⚠️ **AND IT IS SYNCHRONOUS WITH THE READINGS PUT BACK**, like the
+       * measurement above it: reading `hidden` forces no layout at all, and
+       * nothing is painted between the two writes.
+       */
+      const keys = panel.values.keys();
+      for (const k of keys) panel.values.set(k, '');
+      const goneWhenEmpty = !panel.values.shown();
+      panel.values.set('source', SOURCE);
+      const backWhenWritten = panel.values.shown();
+      for (const [k, v] of was) panel.values.set(k, v);
+      d.assert('the footer says nothing until something is coming in',
+        goneWhenEmpty && backWhenWritten,
+        `with every cell empty the value row was ${goneWhenEmpty ? 'absent' : 'STILL ON SCREEN'}, `
+        + `and one cell later it was ${backWhenWritten ? 'back' : 'STILL ABSENT'}, `
+        + `with the stream reading ${stream.state()} and ${keys.length} cells on the row`);
     }
     d.assert('peer connection created', !!pc);
     if (pc) {
