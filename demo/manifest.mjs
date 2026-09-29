@@ -805,7 +805,9 @@ export const DEMOS = [
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'play a synthesizer in another building, and turn its knobs while you do',
+    one: 'play a synthesizer in another building, and turn its knobs while you do. '
+      + 'Over there a Raspberry Pi runs Yoshimi. A relay carries your knob turns out as '
+      + 'MIDI and brings its sound back in 20 ms pieces',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
   /**
