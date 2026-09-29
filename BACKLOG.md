@@ -1,6 +1,10 @@
 ## Open
 
-### Open 2026-09-29: front page, merge streaming into technologies
+### Done 2026-09-29: front page, merge streaming into technologies
+
+✅ **DONE, `f8583ec`, deployed in `f8583ec-133019-f807`.** Six rows moved
+(`webrtc`, `moq`, `room`, `now`, `flipper`, `remixer`), `technologies` reads 9
+rows, 55 cards as before. The section keeps the word `technologies`.
 
 ASKED, VERBATIM: *"Merge streaming and technologies."* The file is
 `demo/manifest.mjs`, the `group:` field on seven `streaming` rows (`llhls`,
@@ -16,7 +20,11 @@ list, not this one, so it does not move.
 - The section title is `technologies` today. Whether the merged section keeps
   that word is not in the ask and is left as is.
 
-### Open 2026-09-29: front page, a new streaming section first, holding only llhls
+### Done 2026-09-29: front page, a new streaming section first, holding only llhls
+
+✅ **DONE, `f8583ec`, the same commit and deploy.** The `GROUPS` entry sits above
+`th`, `byGroup()` reads `streaming 1 llhls` first, and the row keeps its
+`settleMs`.
 
 ASKED, VERBATIM: *"Make a new streaming section to fronpage as first and put
 only llms there"*. `llms` is read as `llhls`, the LL-HLS demo, since that is the
