@@ -658,8 +658,7 @@ export const DEMOS = [
    */
   { name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true,
     one: 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
-       + 'of chords you type in or teach it by playing and a four chord way home it '
-       + 'works out from them',
+       + 'of chords you type in or teach it by playing',
     tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },
 
   /**
