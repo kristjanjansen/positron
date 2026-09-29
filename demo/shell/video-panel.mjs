@@ -137,6 +137,27 @@ export function createPanelValues(fields = []) {
     root.append(cell);
     vals.set(key, v);
   }
+  /**
+   * 🔴 THE ROW IS NOT THERE UNTIL SOMETHING HAS BEEN WRITTEN INTO IT, SINCE
+   * 2026-09-29. Asked in these words, against a phone screenshot of `/llhls/`
+   * sitting at `STREAM OFF`: *"Do not show video details until we have incomng
+   * data"*. What that picture showed was a picture-shaped hole with a footer
+   * under it reading an empty `fps`, a clipped `H.264 + AA` and a fullscreen
+   * square, about a stream nobody had started.
+   * ✅ **AND IT IS THE RULE THIS FILE ALREADY STATES, ENFORCED RATHER THAN
+   * ASKED FOR.** `createPanelValues` refuses an empty `fields` list because
+   * *"a row with nothing in it is a box that paints its edges around nothing"*,
+   * and a row whose every cell is empty is that same box, arrived at from the
+   * other direction. A page no longer has to remember to hide it: the row
+   * appears when the first number lands and goes when the last one is cleared.
+   * ⚠️ **IT IS `hidden`, NOT `display: none` IN A STYLESHEET**, so a caller
+   * measuring the row gets 0 rather than a stale rectangle, and so the reason
+   * is readable in the DOM by anybody looking at why the footer is short.
+   */
+  const settle = () => {
+    root.hidden = ![...vals.values()].some((v) => v.textContent !== '');
+  };
+  settle();
   return {
     el: root,
     /** Write one cell. `null`, `undefined` and `''` all empty it. */
@@ -144,8 +165,11 @@ export function createPanelValues(fields = []) {
       const v = vals.get(key);
       if (!v) throw new Error(`panel values: there is no cell called "${key}".`);
       v.textContent = text == null ? '' : String(text);
+      settle();
       return v;
     },
+    /** Is the row on screen? True once any cell carries something. */
+    shown: () => !root.hidden,
     /** One cell's element, for a page that wants to measure it. */
     cell: (key) => vals.get(key) || null,
     keys: () => [...vals.keys()],
@@ -186,6 +210,15 @@ const PANEL_VALUES_CSS = `
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .pos-vp-vals::-webkit-scrollbar { display: none; }
+/* 🔴 THE display: flex ABOVE BEATS THE UA SHEET'S [hidden] RULE, so the row
+   has to be told again. MEASURED 2026-09-29 without this line: the root
+   carried hidden, every value was empty, and the fps LABEL was on screen
+   anyway, in a footer describing a stream nobody had started. That is this
+   project's recurring lesson about hidden not meaning hidden once something
+   has set a display, and shell.css already carries the same repair for a wave
+   view inside a pane.
+   NO BACKTICKS IN THIS BLOCK: it is a template literal, and one would end it. */
+.pos-vp-vals[hidden] { display: none; }
 .pos-vp-cell { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 .pos-vp-k {
   font: 500 9.5px/1 var(--mono);
