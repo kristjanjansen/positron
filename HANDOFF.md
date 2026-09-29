@@ -1,3 +1,155 @@
+# Handoff, 2026-09-29, session 55: eight asks, collected first, worked second, deployed
+
+## Where it is right now
+
+**DEPLOYED, PUSHED AND CONFIRMED ON THE EDGE: BUILD `08a7072-081725-adc6`.**
+**12 commits this session**, the working tree is CLEAN, nothing is in flight,
+and `8ad42bf` is on `origin/session-28-station-videoradio`. ⚠️ **THE ACTIVE
+GITHUB ACCOUNT WAS PUT BACK AND CHECKED**: `gh auth status` reads
+`Kristjan-Jansen_enefit` active.
+
+MEASURED after, counted and not remembered: **57 demos, 55 built, 55 cards**,
+**75 plans in `plans/`**, and **62 open lines in `BACKLOG.md`**.
+
+🔴 **THE FIRST READ OF THE EDGE ANSWERED THE OLD STAMP AND IT WAS CACHE, NOT A
+FAILED DEPLOY.** Seconds after `deploy.mjs` printed its own confirmation line, a
+plain fetch of `/shell/shell.mjs` read `a05166b-203845-7a89`, yesterday's build.
+Two reads a minute later, one plain and one cache busted, both read
+`08a7072-081725-adc6` with `cf-cache-status: HIT`. **So the rule about
+confirming rather than trusting stands, and so does a second one: a single read
+taken immediately after a deploy can be wrong in the alarming direction.** Read
+it twice, a minute apart, before reporting a deploy as failed.
+
+## The eight asks, and where each one is
+
+Asked as a stream over one morning, written into `BACKLOG.md` verbatim as they
+arrived and worked second, which is the standing rule. **The collection was one
+commit of its own, `4c4687a`, made before a single one of them was worked.**
+
+| ask | where it is now |
+| --- | --- |
+| nola: rm label from chord input field to avoid content jump | https://positron.studio/nola/ |
+| muta: full content width at the desk, centre the knobs, Test tone right | https://positron.studio/muta/ |
+| general: instrument panel nameplate lowest on mobile | six pages, https://positron.studio/muta/ at 375 |
+| shape: sends-to right align, rm label, hand is a separate button | https://positron.studio/shape/ |
+| pack: rm transport below waveform, rm border, use glued panel | https://positron.studio/pack/ |
+| twelve: nameplate top padding same as right padding | https://positron.studio/twelve/ |
+| twelve: align channel item (pan, rec) to the bottom | same page |
+| knobs: longer description explaining the Pi, badge reads ONLINE | https://positron.studio/knobs/ |
+
+**Two entries that were OPEN were answered by these asks rather than by work**,
+and both are struck off in writing: muta's waiting decision about centring the
+panel in the page (the answer is no, it takes the full width instead) and
+`createChoice`'s missing `trailing` slot (not wanted, the hand left the group).
+
+## The assert counts, which are the reading rather than the colour
+
+| page | before | after |
+| --- | --- | --- |
+| `nola` | 107/107, 101 page | **107/107, 101** unmoved |
+| `shape` | 55/55, 49 page | **55/55, 49** unmoved, two left and two arrived |
+| `twelve` | 38/38 | **39/39**, one arrived |
+| `muta` | 49/49, 43 page | **49/49, 43** unmoved, four rewritten in place |
+| `pack` | 31/31, 25 page | **31/31, 25** unmoved, three left and six rewritten |
+| `knobs` | 40, 34 page, 2 red | **40, 34, 2 red**, the two standing board reds |
+| `grains` `tapes` | | unmoved, run by the shared agent as controls |
+
+🔴 **AND THREE OF THOSE UNMOVED COUNTS ARE HONEST READINGS RATHER THAN
+COVERAGE.** `/pack/`'s `grep -c "d.assert("` went **65 to 62** while its run
+read 31 both times, because everything after `:2563` is behind a pack the page
+no longer fetches. `/muta/`, `/nola/` and the whole instrument panel change
+happened at widths `demo/verify.mjs` cannot reach, since it runs at 756 px. The
+shots and the probes are the evidence there is, and every agent said so rather
+than implying a green run covered it.
+
+## The measurements worth keeping, one per ask
+
+- **The waveform's ring was PAINT, not CSS, and three reports in nine days all
+  went to the stylesheet.** `grain-scope.mjs` stroked a 1 px `--line` rectangle
+  into its own backing store. The CSS half has been right since the glue was
+  written: `.pos-glue.pos-glue > * { --edge: 0 }` inherits to any depth.
+  MEASURED at the outermost canvas pixel: `31,41,55` before, `17,21,29` after,
+  and `/pack/` then confirmed it with a NEGATIVE CONTROL, repainting the deleted
+  `strokeRect` from the page to prove its instrument could see a ring.
+- **nola's caption was worth 16.5 px of row height**, which is a 9.5 px label
+  line plus the field's own 7 px gap. The row went 50.5 to 34 at 1280 and the
+  keyboard stopped moving on every press. At 375 the wrap leaves 50 px that a
+  caption never caused.
+- **shape's split is only safe because the caption went.** Captioned,
+  `.pos-choice` is 47.5 px tall at 375 and a centred neighbour lands 6.75 px
+  high, which is the 2026-09-28 report exactly. Uncaptioned it is 34.0 and the
+  tops read 0.00 at three widths.
+- **muta's centring threshold is derived, not picked.** The group is 483 px, the
+  row's client is the window less 42, so the first width at which it stops
+  fitting is 525 and the floor is the 561 the sheet already had.
+- **twelve's two gaps were EQUAL as boxes and 18.37 px apart as ink.** Every
+  number a stylesheet set read 14 and 14, so a rect check would have been green
+  the morning it was reported. The plate was carrying `var(--panel-pad)`, 20, in
+  a lane that insets by 14.
+- **knobs's badge reserve went 172.19 to 86.09 px**, and the plate row stopped
+  wrapping at 375 as a side effect, 85 px to 66 px.
+- **pack's greyed play button was saying something no other control said.**
+  `playBtn.disabled = !mono.ok` was the only visible sign that a file cannot be
+  decoded. It is a row of words now, measured on a 6 channel file and a bad
+  header.
+
+## 🔴 WHAT IS WAITING, AND NONE OF IT MAY GO QUIET
+
+- **`Loop` is gone from `/pack/` and it was asked for by name** on 2026-09-21.
+  Nothing on that page can loop a sample. Removed because the ask removed the
+  transport it lived in; no replacement was invented. One boolean and one button
+  if it is wanted back.
+- **On a phone `/muta/` reads picker, `PLAITS`, `Test tone`**, because the name
+  cluster wraps at 301 px. The nameplate went to the bottom as one block, which
+  is what the kit demands in writing. Making the NAME literally last is one more
+  `order` and it changes what `.pos-ipanel-name` stacks as on six pages.
+- **The front page pays 72.5 px on three cards** for keeping knobs's `what` and
+  `one` identical. Reversible in one line if the card should stay short.
+- **muta's foot has a 230 px hole at the desk** and the scope is now the page's
+  largest blank. Both are what the ask asks for. Both want a second opinion.
+
+## Five things found on the way that nobody asked about
+
+- 🔴 **AN ASSERT WRITTEN TO CATCH THE WAVEFORM'S RING COULD NEVER HAVE SEEN
+  IT.** `demo/radio/index.html:5736` reads `getComputedStyle(canvas)
+  .borderTopWidth === 0` and was green every run while the ring was on screen.
+  Not an assert that never ran: one that ran every time and asked the wrong
+  instrument. A corner pixel sample is four lines.
+- 🔴 **`which-rule-won.mjs` IS BLIND TO A LOGICAL SHORTHAND BEATING A PHYSICAL
+  LONGHAND.** Asked for `padding-top` it reported an absence and named the wrong
+  box, while `padding-block` was setting 20. Only its own last line, saying the
+  computed value disagreed with the winner it named, caught it. The project
+  prefers logical longhands, so the tool is blindest where the style is
+  strongest.
+- 🔴 **TWO AGENTS SHARED ONE SCRATCHPAD FILE AND ONE MEASURED THE OTHER'S
+  PAGE.** A probe was overwritten mid-task and four readings came back about
+  somebody else's nameplate. Caught by the SHAPE of the output, not by an error.
+  Every agent after that was given a directory of its own in the brief, and that
+  is the rule now.
+- **A glued scope gets a 10 by 12 inset or none depending on how deep it is
+  glued**, because that rule is direct child only. One ask answered on one page
+  and not on two.
+- **`order` moves the paint and not the tab stop.** One stop on a row of two, at
+  phone widths, recorded in the stylesheet rather than worked around.
+
+## How it was run
+
+**Eight requests, one collection commit, one shared agent, six page agents,
+twelve commits, all of them the session's.** No agent committed and no agent ran
+`git add`. The shared agent ran ALONE and FIRST because all three of its changes
+were in `demo/shell/`, then three pages that did not depend on it went in
+parallel, then the three that did.
+
+⚠️ **AND ONE BRIEF WAS WRONG IN TWO PLACES, BOTH CAUGHT BY THE AGENT HOLDING
+IT.** The session told the shared agent the canvas border had never been removed
+in CSS; it had, by inheritance, and the agent measured that before writing the
+rule it was asked for. The session told `/pack/` that `createGrainScope` takes a
+`reason`; it has no `set()` at all and that option is `synth-view.mjs`'s. **Both
+times the agent measured rather than complied**, which is the arrangement
+working.
+
+---
+
 # Handoff, 2026-09-28, session 54: a stream of eight, collected first and worked second
 
 ## Where it is right now
