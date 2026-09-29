@@ -774,8 +774,39 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       ctx.fillRect(Math.round(x0p + head * (x1p - x0p)), 1, HEAD_PX, H - 2);
     }
 
-    ctx.strokeStyle = C.line; ctx.lineWidth = 1;
-    ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+    /* 🔴 THE PICTURE PAINTS NO FRAME OF ITS OWN, AND IT DID UNTIL 2026-09-29.
+       `ctx.strokeRect(0.5, 0.5, W - 1, H - 1)` in `C.line` stood here, and it
+       is the ring three separate reports were about: *"rm double bordering"*
+       against `/pack/` and *"rm thick borders round waveform"* against
+       `/radio/` on 2026-09-21, *"rm padding and its border around waveform
+       canvas"* against `/pack/` on 2026-09-22, and *"rm border around
+       waveform"* against `/pack/`'s SAMPLES tab today.
+       🔴 ALL THREE EARLIER REPAIRS WENT TO THE STYLESHEET AND NONE OF THEM
+       COULD REACH THIS. MEASURED 2026-09-29 before anything was changed, by
+       reading the computed value and then sampling the canvas: the element's
+       `border-top-width` is 1px on a bare scope and 0px on a glued one, which
+       is `.pos-glue.pos-glue > * { --edge: 0 }` at `shell.css:1018` working
+       exactly as written, and the canvas's own outermost pixel row read
+       `31,41,55` in BOTH arrangements, which is `--line` at #1f2937. So a bare
+       scope drew the CSS border and this stroke as two 1 px lines of one
+       colour touching, which is the 2 px edge reported as THICK, and a glued
+       scope drew this stroke alone, which is the ring reported today.
+       🔴 AND A PAINTED EDGE IS UNREACHABLE BY EVERY CHECK THIS PROJECT HAS.
+       `/radio/` carries an assert reading `getComputedStyle(canvas)
+       .borderTopWidth === 0` inside a glue, written for the 2026-09-21 report,
+       and it has been GREEN the whole time the ring was on screen. A frame in
+       the backing store is the inline-style defect in a different costume: no
+       selector can beat it and no computed value can see it.
+       ✅ SO THE EDGE IS THE ELEMENT'S, WHICH IS THE ONE THAT ALREADY READS
+       `--edge`. A bare scope keeps its border, which is what the kit's own note
+       at `shell.css:3019` requires so a picture on a `--card` ground does not
+       dissolve into it, and a glued one has the glue's seam and nothing else.
+       One edge per object, drawn by the outermost thing that owns it.
+       ⚠️ NO CHECK ANYWHERE COUNTED THIS INK, WHICH WAS CHECKED RATHER THAN
+       ASSUMED. `/pack/`'s `waveInk` counts `r > 40 || g > 45 || b > 55` and
+       #1f2937 is 31/41/55, under all three; `/radio/`'s grain ink wants yellow,
+       its head ink wants near white, and its `waveSpan` wants `b >= 62` with a
+       comment naming this exact border as the thing the blue channel excludes. */
     ctx.restore();
 
     // 🔴 NO PROSE UNDER A PICTURE THAT REDRAWS EVERY FRAME. This carried a
