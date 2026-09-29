@@ -1,5 +1,32 @@
 ## Open
 
+### Open 2026-09-29: front page, merge streaming into technologies
+
+ASKED, VERBATIM: *"Merge streaming and technologies."* The file is
+`demo/manifest.mjs`, the `group:` field on seven `streaming` rows (`llhls`,
+`webrtc`, `moq`, `room`, `now`, `flipper`, `remixer`) and three `technologies`
+rows (`looper`, `strip`, `draw`), and the `GROUPS` map at about `:1164` that
+decides section order and titles. `/kit/` builds its tabs from its OWN groups
+list, not this one, so it does not move.
+- ⚠️ Read with the line below: `llhls` does NOT merge, it goes to the new first
+  section. So `technologies` gains six rows, not seven.
+- `byGroup()` refuses a row whose group is not in `GROUPS` and drops a section
+  with no rows, so the old `streaming` id has to leave the map or be reused,
+  never left dangling.
+- The section title is `technologies` today. Whether the merged section keeps
+  that word is not in the ask and is left as is.
+
+### Open 2026-09-29: front page, a new streaming section first, holding only llhls
+
+ASKED, VERBATIM: *"Make a new streaming section to fronpage as first and put
+only llms there"*. `llms` is read as `llhls`, the LL-HLS demo, since that is the
+one streaming page and nothing here is about language models. Same file.
+- The front page is ordered by `GROUPS` insertion order, so *first* is the first
+  entry of that map, ahead of `th`.
+- One row in a section is what `grains` had, and `byGroup` draws it.
+- ⚠️ `llhls` has `settleMs: 75000` because a cold container is about 30 s; the
+  row moves, the row's fields do not.
+
 ### Open 2026-09-29: muta, rename PLAITS to MUTA and give the nameplate its own section at the bottom
 
 ASKED, VERBATIM: *"muta: rename plaits to muta and use instument panel global
