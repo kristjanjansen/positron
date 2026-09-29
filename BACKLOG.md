@@ -1,6 +1,57 @@
 ## Open
 
-### Open 2026-09-29: webrtc gets the same treatment as llhls, and its desc goes to one sentence
+### Open 2026-09-29: createPresenceButton's `state` is a getter returning a function, and it has bitten two pages, found not asked for
+
+`demo/shell/presence.mjs`. `createPresence`'s api exposes `state: () => now`, a
+FUNCTION, and `createPresenceButton` hands it through a getter, so
+`btn.state === 'offline'` compares against a function object and is false for
+ever.
+🔴 **BOTH TIMES THE SYMPTOM WAS A GREEN RUN WITH SILENTLY MISSING COVERAGE, NOT
+AN ERROR.** `/twelve/` wrote it down in its own words, *"a comparison against a
+function is a comparison that cannot fail"*, and `/llhls/` and `/webrtc/` walked
+into it anyway on 2026-09-29, in a control handler rather than in a check: the
+first run after the edits read **16/16 green with `page asserted something` at
+2 on both pages**, and only the COUNT said so.
+- Fixed at both call sites (`stream.state()`), and each page's presence assert
+  now requires `typeof state === 'string'` so it goes red on exactly that bug.
+- ⚠️ **THE KIT'S SHAPE WAS NOT CHANGED, ON PURPOSE.** A rename on the api moves
+  four other callers (`/circuit/`, `/evo/`, `/shape/`, `/twelve/`) and nobody
+  asked. The two candidates are a rename, or a line in `positron-ui`.
+
+### Open 2026-09-29: the `fps` cell on /llhls/ and /webrtc/ has never shown a number
+
+`watchPresentedFps` counts frames through `requestVideoFrameCallback` and
+reports `null`, never `0`, where the API is absent. Every screenshot is taken
+without a press, so the picture is always empty, and nothing asserts on the
+frame rate.
+🔴 **SO IF IT NEVER FIRES IN THE HARNESS'S HEADLESS CHROME THE CELL SIMPLY
+STAYS EMPTY AND NOTHING SAYS SO.** That is this project's worst shape and it is
+the first thing to look at on the deploy. A press on either page with the
+publisher awake answers it.
+
+### Open 2026-09-29: a press during `starting` is untested by a machine
+
+`stop()`, the generation guards at every await and the new `signal` abort on
+`waitForWhip` and `waitForManifest` have never run in a check, because the
+harness presses each control once. They were READ and they are simple, which is
+reading rather than measuring. Driving a second press costs another container
+wake, which is why it was not done.
+
+### Open 2026-09-29: the container's burn overlay is dormant, so the test pattern fix is invisible in production
+
+`workers/pub/wrangler.jsonc` sets only `PUB_W`, `PUB_H` and `PUB_FPS`.
+`PUB_SOURCE` defaults to the mimproject film and `PUB_BURN` has been off since
+the 2026-09-25 *"rm burn overlay"* change, so the `testsrc2` corner counter and
+every `drawtext` clock are switched off on `pub.positron.studio`.
+- The 2026-09-29 stacking change is therefore live only in the CANVAS twin,
+  which is what nine demo pages draw and what a visitor sees.
+- Turning the container side on is `PUB_SOURCE=""` and `PUB_BURN=1` in that
+  `vars` block plus a `workers/pub` deploy. NOT done, because it changes what
+  every streaming demo shows and nobody asked for that.
+
+### Done 2026-09-29: webrtc gets the same treatment as llhls, and its desc goes to one sentence
+
+✅ **DONE, same commit.** The desc went from six sentences to one, and each sentence it lost has a better home: the handshake and how it stops are the diagram, what the control does is its own label, what `round trip` means is the readout key's. The spec is NOT llhls's: libopus rather than aac, baseline 3.1, `-bf 0`, so the cell reads `H.264 + Opus`. **10 to 13 page asserts**, all eight existing ones untouched and still green.
 
 ASKED, VERBATIM: *"same treatment ot https://positron.studio/webrtc/ . shorten
 desc to 1 sentence"*. `demo/webrtc/index.html` and the `webrtc` row in
@@ -26,7 +77,13 @@ desc to 1 sentence"*. `demo/webrtc/index.html` and the `webrtc` row in
   took it 8 asserts to 16. Anything done here reads the count before and after,
   and a drop is a regression rather than a tidy.
 
-### Open 2026-09-29: the burned-in test pattern, drop the top left counters and stack ABSOLUTE over LOCAL
+### Done 2026-09-29: the burned-in test pattern, drop the top left counters and stack ABSOLUTE over LOCAL
+
+✅ **DONE, `ea21ee4`, deployed in `09c2c26-155029-cbfd`.**
+🔴 **THE TOP LEFT COUNTERS ARE NOT OURS.** No `drawtext` draws them: they are `testsrc2`'s own corner overlay and it has no option to turn it off, MEASURED by rendering raw `testsrc2` with no filters. Covered with a 240x48 `drawbox`, which clears the box at frame 500,000 too.
+🔴 **AND THE TWO COLUMNS WERE WRONG BY CONSTRUCTION.** `COL2` reserved the width of a THIRTEEN character number, which is the canvas's epoch in ms; the ffmpeg side prints seconds with a unit, sixteen characters. Stacking removes the constant rather than correcting it.
+⚠️ **THE LAYOUT LIVES IN THREE FILES** and all three moved: the canvas `burn()` and the filter generator in `demo/shell/pattern.mjs`, and the copy in `workers/pub/container/server.mjs`, which now derives its baselines the same way. At h=720 the numbers sit at y364 and y504 in all three. The block is 140 px taller, so the middle `drawCamera` lays a picture into loses that much.
+⚠️ **CPU: no measurable change**, 12.375 s against 12.208 s over four runs each, inside a 12 per cent swing.
 
 ASKED, VERBATIM: *"rm top left counters. put absolute and local below each
 other"*, with a frame grab. The subject is the PICTURE the publisher burns in,
@@ -55,7 +112,10 @@ each leg publishes the same pattern to its own input.
   and it cannot be seen until a publisher is awake, which costs Stream minutes.
   So this is verified once, deliberately, rather than iterated on.
 
-### Open 2026-09-29: llhls uses the video panel, with resolution and fps and a short spec of what it streams
+### Done 2026-09-29: llhls uses the video panel, with resolution and fps and a short spec of what it streams
+
+✅ **DONE, same commit.** Three cells with reserves in `ch` of the mono face plus `tabular-nums`: `size`, `fps`, `source` reading `H.264 + AAC`. MEASURED by writing every cell empty, measuring the row, then writing every cell at its widest: **215.7 px against 215.7**.
+🔴 **AND IT UNCOVERED A CSS RULE THAT HAD NEVER BEEN ABLE TO RUN.** `.pos-vp-vals` has declared `overflow-x: auto` since it was written while `.pos-vp-foot` floors its left track at `min-content`. MEASURED at 375 before the fix: the fullscreen square sat 21.7 px outside the panel and `overflow: hidden` cut it off, so the one control in that footer was invisible on a phone. Fixed as a `:has()` condition; `/held/` at 375 is byte identical after.
 
 ASKED, VERBATIM: *"use in llsl use videopanel with resolution / fps (fix w so it
 did not ump horztally) and short spec what streams it"*. Same page, same sitting
@@ -79,7 +139,9 @@ https://positron.studio/kit/#video-panel, already on `/held/`, `/making/`,
 - ⚠️ The page's own `what` may NOT carry this: a desc is one sentence and may
   not be stretched. This is a footer, a readout or a panel caption.
 
-### Open 2026-09-29: llhls, remove the publisher idle badge
+### Done 2026-09-29: llhls, remove the publisher idle badge
+
+✅ **DONE, same commit, and it WAS the same change as the toggle.** Whether this page holds the publisher is what the toggle says in words. How MANY hold it is a fact the toggle cannot carry, so it moved to a log line on change rather than being deleted: as a fourth footer cell at 375 the row scrolled and cut `H.264 + AAC` in half.
 
 ASKED, VERBATIM: *"rm publisher: idle badge"*. Same page, same sitting as the
 two llhls asks below, so all three are worked together and the page is verified
@@ -93,7 +155,9 @@ and leaving the page with no way to know the publisher is down.
 say where that reading goes instead. A control that is removed and a fact that
 is removed with it are two decisions, and only one of them was asked for.
 
-### Open 2026-09-29: llhls says how it works, including how the stream stops
+### Done 2026-09-29: llhls says how it works, including how the stream stops
+
+✅ **DONE, same commit.** A diagram at the foot, five boxes in two machines, everything read off `workers/pub/worker.mjs` and the container server. The caption carries the sentence a visitor learns something from: *"The viewers are counted because ffmpeg sending video makes no requests of its own, so a container that slept on request idleness would go to sleep under somebody who was watching."*
 
 ASKED, VERBATIM: *"add how it works to llhsl incl how it stops"*. Same page,
 https://positron.studio/llhls/, and it is the same sitting as the toggle ask
@@ -122,7 +186,9 @@ above, so the two are worked together.
   WHIP leg needs about 45 s before Cloudflare accepts a new session. Both are
   things the page could say and neither is in the ask.
 
-### Open 2026-09-29: llhls, the primary button becomes a three state stream toggle
+### Done 2026-09-29: llhls, the primary button becomes a three state stream toggle
+
+✅ **DONE, `09c2c26`, deployed in `09c2c26-155029-cbfd`.** No new component: `createPresenceButton` already is this control, and what was missing was three words, so `STREAM` and `STREAM_CAN` landed beside `SAYS` and `WIRED` in `demo/shell/presence.mjs`. A press during `starting` STOPS and the badge title says so.
 
 ASKED, VERBATIM: *"https://positron.studio/llhls/ rm primary button with status
 togglebutton: stream off | starting | on. make a global component for this if
