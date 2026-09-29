@@ -1,5 +1,29 @@
 ## Open
 
+### Open 2026-09-29: llhls uses the video panel, with resolution and fps and a short spec of what it streams
+
+ASKED, VERBATIM: *"use in llsl use videopanel with resolution / fps (fix w so it
+did not ump horztally) and short spec what streams it"*. Same page, same sitting
+as the three llhls asks below. `demo/shell/video-panel.mjs`,
+https://positron.studio/kit/#video-panel, already on `/held/`, `/making/`,
+`/mirror/`, `/pack/`, `/stage/`, `/weight/` and `/wish/`.
+- **The parenthesis is the hard part and it is a real defect.** A footer reading
+  live numbers re-lays out on every update, so `1280x720` becoming `1280x72` for
+  one frame, or `59.9` becoming `60`, shifts everything after it sideways. The
+  fix is a fixed width per cell, or tabular figures, and `table.mjs` and the
+  readout already solve this for numbers that change.
+- ⚠️ **AND IT IS THE MIDDOT RULE ONE LAYER DOWN.** CLAUDE.md: *"a row of facts
+  is cells, not one string with glue in it"*, written about a panel footer
+  reading `Apple GPU · locked 59.9 fps`. So resolution and fps are two CELLS,
+  and the fix for the jump is a property of a cell rather than a string.
+- **The short spec is what the encoder is doing**, which is READ off
+  `workers/pub/container/server.mjs`: H.264, CBR, fixed GOP equal to the segment
+  length, B-frames OFF because they break LL-HLS, and the picture size is
+  tunable through `PUB_W`, `PUB_H` and `PUB_FPS`. One sentence of it goes on the
+  page, not all of it.
+- ⚠️ The page's own `what` may NOT carry this: a desc is one sentence and may
+  not be stretched. This is a footer, a readout or a panel caption.
+
 ### Open 2026-09-29: llhls, remove the publisher idle badge
 
 ASKED, VERBATIM: *"rm publisher: idle badge"*. Same page, same sitting as the
