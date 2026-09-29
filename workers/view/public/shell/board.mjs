@@ -56,6 +56,9 @@ export const FRAME_HEADER_BYTES = 12;
  *                             RASPBERRY PI, not a rendezvous a page invented.
  * @param {string} [relay]     override the relay base, for a local worker.
  * @param {string} [of]        what the presence badge calls it.
+ * @param {boolean} [showName] whether the badge PRINTS that name in front of
+ *                             the word. Left alone it is today's behaviour,
+ *                             which is to print it. See the note on it below.
  * @param {number} [cushionMs] the playout floor. See the note on it below.
  * @param {number} [maxCushionMs]
  * @param {number} [everyMs]   the board's heartbeat, 5 s. The badge THROWS
@@ -74,6 +77,37 @@ export function createBoard({
   room,
   relay = undefined,
   of = 'Raspberry Pi',
+  /**
+   * 🔴 WHETHER THE BADGE PRINTS THE NAME, AND THE DEFAULT IS UNCHANGED.
+   * `null` leaves `createPresence` to decide, which for a badge with an `of`
+   * means it prints it, which is what every caller has had since this module
+   * was written. `false` is the one new thing: the badge says `online` and the
+   * name lives only in the tooltip.
+   *
+   * 🔴 IT IS AN OPTION HERE RATHER THAN A RULE IN A PAGE'S STYLESHEET BECAUSE
+   * THE NAME IS PART OF A RESERVED WIDTH, NOT PART OF A STRING. `presence.mjs`
+   * measures `--pres-ch` over every phrase this badge can EVER say, so a badge
+   * that keeps its name reserves room for the longest one. MEASURED 2026-09-29
+   * on a board badge built with the defaults and on the same badge with
+   * `showName: false`: 26 ch and `min-width: 172.187px` against 13 ch and
+   * `min-width: 86.0933px`, which is `Raspberry Pi coming online` against
+   * `coming online`, and the badge round it 190.17 px against 104.08. Hiding
+   * the words with CSS would leave all 172 px of reserve standing and a badge
+   * holding air, and the reserve is the whole reason nothing in it moves while
+   * it redraws.
+   *
+   * ⚠️ AND THE NAME IS NOT LOST TO A SCREEN READER. `presence.mjs`'s `title()`
+   * is `${of} ${word}` whatever the badge shows, so the tooltip and the
+   * accessible name still carry it. CONFIRMED in the same measurement: the
+   * badge read `checking` and its `title` read `Raspberry Pi checking`.
+   *
+   * ⚠️ THE OPTION ALREADY EXISTED ONE LAYER DOWN AND ONLY THIS BUILDER COULD
+   * NOT REACH IT. `demo/kit/index.html` and `demo/shell/instrument.mjs` both
+   * pass `showName: false` to `createPresence` directly; `createBoard` handed
+   * it `of` and `busyWords` and nothing else, so a page using a board had no
+   * way to ask. That is the whole of this change.
+   */
+  showName = null,
   rate = BOARD_RATE,
   frameMs = BOARD_FRAME_MS,
   channels = BOARD_CHANNELS,
@@ -141,6 +175,7 @@ export function createBoard({
    */
   const pres = createPresence({
     of,
+    showName,
     busyWords: { page: 'in use', tool: 'under test' },
   });
   pres.follow({ everyMs, comingMs });
