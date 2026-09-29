@@ -93,15 +93,15 @@ export const DEMOS = [
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
     settleMs: 75000 },
-  { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true,
+  { name: 'webrtc', group: 'technologies', act: 1, created: '2026-09-04', built: true,
     one: 'the same live input over WHEP; same burned-in clock as 06',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
-  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
+  { name: 'moq', group: 'technologies', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
-  { name: 'room', group: 'streaming', act: 2, created: '2026-09-04', built: true,
+  { name: 'room', group: 'technologies', act: 2, created: '2026-09-04', built: true,
     one: 'join a room and see the others; peer to peer, the relay only signals',
     tags: ['getUserMedia', 'WebRTC', 'relay'] },
   { name: 'cues', group: 'messages', act: 2, created: '2026-09-04', built: true,
@@ -253,7 +253,7 @@ export const DEMOS = [
   { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
     one: 'every 1965 newsreel on one line, at the day it was broadcast',
     tags: ['archive', 'timeline'] },
-  { name: 'now', group: 'streaming', act: 5, created: '2026-09-08', built: true,
+  { name: 'now', group: 'technologies', act: 5, created: '2026-09-08', built: true,
     one: 'one live television channel on a line whose right-hand end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
@@ -269,7 +269,7 @@ export const DEMOS = [
     // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
     // of fetching before there is much to see
     settleMs: 4000 },
-  { name: 'flipper', group: 'streaming', act: 5, created: '2026-09-04', built: true,
+  { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
     one: 'eight live television channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
@@ -345,7 +345,7 @@ export const DEMOS = [
   // a second, larger step — four entries out of the build's allowlist and a URL
   // that starts 404ing — and it is decided on purpose rather than as a side
   // effect of tidying the front page.
-  { name: 'remixer', group: 'streaming', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
+  { name: 'remixer', group: 'technologies', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
     one: 'stack archive recordings from any year on one playhead',
     tags: ['HLS', 'timeline', 'not shelled'] },
 
@@ -1184,6 +1184,9 @@ export const GROUPS = new Map([
    * what `caps.mjs` reads to offer a headset page, and `mirror`, `weight` and
    * `floor` still carry it, one of them from another section entirely.
    */
+  // 🔴 FIRST ON THE PAGE SINCE 2026-09-29, AND IT HOLDS ONE ROW. The note above
+  // `messages` has the ask and names the six rows that left it.
+  ['streaming', 'streaming'],
   ['th', 'TH'],
   ['err', 'err'],
   /**
@@ -1243,10 +1246,17 @@ export const GROUPS = new Map([
    * 🔴 `transports` BECAME THREE SECTIONS, ASKED 2026-09-24: *"split onto
    * streamig (who steam smth) and messages (relyng messages etc but not
    * streaming) and rest is techologeis"*.
-   * ⚠️ THE CUT IS WHAT GOES OVER THE WIRE, NOT WHICH API IS IN THE PAGE.
-   * `streaming` is the pages that open a stream and play it: `llhls`, `webrtc`
-   * and `moq` on an input this site starts and stops, `room` on a camera peer
-   * to peer, `now` and `flipper` on a live channel, `remixer` on the archive.
+   * ⚠️ THE CUT WAS WHAT GOES OVER THE WIRE, NOT WHICH API IS IN THE PAGE.
+   * `streaming` was the pages that open a stream and play it: `llhls`,
+   * `webrtc` and `moq` on an input this site starts and stops, `room` on a
+   * camera peer to peer, `now` and `flipper` on a live channel, `remixer` on
+   * the archive.
+   * 🔴 AND SINCE 2026-09-29 `streaming` IS ONE ROW, `llhls`, AND IT IS THE
+   * FIRST SECTION ON THE PAGE. Asked: *"Merge streaming and technologies"*
+   * and *"Make a new streaming section to fronpage as first and put only llms
+   * there"*, with `llms` read as `llhls`. The other six went to
+   * `technologies`, and the map entry sits above `th` because insertion order
+   * is page order.
    * `messages` is a relay whose MESSAGES are the subject: `cues` fires one act
    * to every open copy of the page, `wire` shows the exact bytes going and
    * coming back, `jam` puts two browsers on one pulse with the sound made at
@@ -1261,12 +1271,12 @@ export const GROUPS = new Map([
    * sound, and the audio is what makes a late message audible. It is the
    * arguable row in this section and it is named rather than hidden.
    * ⚠️ `technologies` KEPT THE NAME AND NONE OF ITS ORIGINAL ROWS. It is
-   * `strip` and `draw` out of the old `timeline` group, and since 2026-09-24
+   * `strip` and `draw` out of the old `timeline` group, since 2026-09-24
    * `looper`, a keyboard into a WebAudio synth with a loop pedal on it and
    * nothing on a wire at all, which had nowhere else to go when the old
-   * `instruments` group was emptied.
+   * `instruments` group was emptied, and since 2026-09-29 the six streaming
+   * pages that are not `llhls`.
    */
-  ['streaming', 'streaming'],
   ['messages', 'messages'],
   ['technologies', 'technologies'],
   ['kit', 'kit'],
