@@ -67,10 +67,33 @@ const out = await new Promise((res) => {
 
 const v = out.result?.result?.value || {};
 console.log(JSON.stringify(v, null, 1));
-if (v.framesDecoded > 0) console.log('\nWebRTC media reaches this machine.');
-else {
-  console.log('\n🔴 NO MEDIA ARRIVED, AND THE OFFER WAS ANSWERED.');
-  console.log('   That is a UDP path problem and not this repository.');
-  console.log('   CHECK THE VPN FIRST. It cost most of a session on 2026-09-25.');
+// 🔴 THREE OUTCOMES, NOT TWO, AND CONFLATING TWO OF THEM MADE THIS TOOL LIE.
+// MEASURED 2026-09-25, the day after this file was written: the input had no
+// publisher, the WHEP POST answered 409, the early return above set `note` and
+// left `framesDecoded` undefined, and this block printed a confident CHECK THE
+// VPN FIRST at somebody who had no VPN problem. The VPN rule in `CLAUDE.md`
+// rests on this command, so a false positive here sends the next session down
+// the exact rabbit hole the file exists to prevent.
+// ⚠️ AND THE SHAPE IS THE ONE THIS PROJECT KEEPS PAYING FOR: a check that could
+// not reach its subject reported a verdict about its subject anyway. `/webrtc/`
+// read 8/8 green with two asserts in it on the same day. A tool that cannot
+// tell `no publisher` from `no media` is a green page with no coverage.
+if (v.framesDecoded > 0) {
+  console.log('\nWebRTC media reaches this machine.');
+  process.exit(0);
 }
-process.exit(v.framesDecoded > 0 ? 0 : 1);
+// Nothing was publishing, so the offer was REFUSED rather than answered and no
+// media could have arrived whatever the network is doing. This says nothing
+// about the VPN in either direction, which is the whole point of separating it.
+if (v.note || (v.status && v.status >= 300)) {
+  console.log('\n⚠️  INCONCLUSIVE. NOTHING IS PUBLISHING TO THAT INPUT.');
+  console.log(`   The WHEP POST answered ${v.status}, so there was no stream to send.`);
+  console.log('   THIS IS NOT A VPN VERDICT. Start a publisher and run it again:');
+  console.log('   hold a socket to wss://pub.positron.studio/watch, which wakes the');
+  console.log('   container that publishes both legs, then re-run this command.');
+  process.exit(2);
+}
+console.log('\n🔴 NO MEDIA ARRIVED, AND THE OFFER WAS ANSWERED.');
+console.log('   That is a UDP path problem and not this repository.');
+console.log('   CHECK THE VPN FIRST. It cost most of a session on 2026-09-25.');
+process.exit(1);

@@ -413,6 +413,30 @@ listeners.push((m) => {
       // something a reader of this suite needs to be told rather than have
       // folded into "expected churn".
       probed.push(e.url);
+    } else if (/^blob:/.test(e.url || '')
+               && /ERR_REQUEST_RANGE_NOT_SATISFIABLE/.test(e.text || '')) {
+      // 🔴 A RECORDING HAS TO BE ASKED ITS LENGTH, AND ASKING LOGS A 416.
+      // `resolveDuration` in `demo/shell/media.mjs` sets `currentTime = 1e6` to
+      // make a `MediaRecorder` blob admit a duration, because a file written by
+      // the recorder reports `Infinity` until something seeks it. Chrome serves
+      // the blob itself and answers that seek with a range request past the end,
+      // which it logs as a failed request on a `blob:` URL.
+      // ⚠️ NO PAGE-SIDE CHANGE REMOVES IT, WHICH IS WHAT THIS ALLOWANCE IS
+      // FOR, the same argument as `vain`'s three deliberate refusals above. The
+      // seek is the measurement, not a mistake, and the 416 is the browser
+      // answering the only question that produces a duration.
+      // ⚠️ AND IT IS NEW ONLY BECAUSE THE RECORDING NOW REALLY HAPPENS.
+      // MEASURED 2026-09-25: `/stage/`'s two start buttons were dead, passing
+      // `onPress` to a bar that binds `onClick`, so no show ran, nothing was
+      // recorded and nothing was ever asked its length. Fixing the button made
+      // this appear. A console error that shows up when a page starts working
+      // is evidence the page started working.
+      // ⚠️ SCOPED TO `blob:`, DELIBERATELY. A 416 on an http URL is a real
+      // range bug in the ingest path and must still go red, so this may not be
+      // widened to the error name alone.
+      // Capped like the others, never ignored: past the ceiling this stops being
+      // one duration probe per recording and becomes a page seeking in a loop.
+      probed.push(e.url);
     } else if (errRefusal(`${e.url || ''} ${e.text || ''}`)
                && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) {
       // A rights refusal is a 403 with no ACAO, so the browser reports CORS.

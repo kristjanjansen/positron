@@ -31,9 +31,10 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { burn, readBurnedFrom, drawCamera, FRAME_W, FRAME_H, FIELD, videoHue, PAD } from '/shell/pattern.mjs';
+  import { createCard } from '/shell/card.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
-  import { whipPublish, whepPlay, whep, llhls, holdPublisher } from '/shell/live.mjs';
+  import { whipPublish, whepPlay, whep, llhls, holdPublisher, waitForWhip } from '/shell/live.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
   import { putWhole, proveReadable, fetchBack } from '/shell/ingest.mjs';
   import { resolveDuration, waitForFirstFrame } from '/shell/media.mjs';
@@ -63,7 +64,44 @@
    * an `if (useR2)` today, which is what it bans being done.
    */
   const Q = new URLSearchParams(location.search);
-  const ROOM = Q.get('room') || 'stage-demo';
+  /**
+   * 🔴 A ROOM OF THIS TAB'S OWN, INVENTED PER LOAD. THE DEFAULT WAS `stage-demo`
+   * AND THAT IS WHERE A STRANGER'S QUESTION CAME FROM. Reported 2026-09-25:
+   * *"when I load it, I get some kind of stale question. Where is it coming
+   * from? Who entered it?"*, naming a question nobody here ever wrote. Nothing
+   * replays it: the relay is verbatim fan out with no storage and no retained
+   * last message, the accept path sends a joiner nothing, this page keeps no
+   * `localStorage`, `sessionStorage` or `indexedDB`, and `fetchBack` is only
+   * called on the stop and upload path. So a question on screen at load was
+   * typed by a PERSON, live, into a control room joined to the same room while
+   * this page was open.
+   * 🔴 ONE FIXED NAME PUT EVERY VISITOR, EVERY PROBE AND EVERY HARNESS RUN IN
+   * ONE ROOM WITH THE PUBLIC, so anybody's question landed on anybody's screen
+   * and anybody could send one into anybody else's show. That is CLAUDE.md's
+   * rule about one shared resource with everything around it partitioned,
+   * arriving in the same shape as the `FCM_TOPIC` bug: the default has to be
+   * silence.
+   * ⚠️ AND A RENDEZVOUS IS NOT AN ADDRESS, which is the distinction that
+   * decides this. `room: 'fixed'` in `manifest.mjs` means the name is where a
+   * machine LIVES, `studio-1` for the Raspberry Pi and `m1-1` for the studio
+   * Mac, and randomising one of those points it at nothing. `stage-demo` was
+   * the opposite: a name this page invented, where nothing lives and everybody
+   * who arrives is a peer. An address is fixed and a rendezvous must never be.
+   * `stage` carries no `room: 'fixed'`, so `demo/verify.mjs` already gave every
+   * run its own room and only a visitor was left sharing.
+   * ⚠️ IT CANNOT REFUSE THE WAY `rig/board/setup.sh` DOES. That installer calls
+   * a default room pointing every installation at our room *"a footgun with a
+   * friendly face"* and refuses rather than guesses, which is right for a box
+   * that has somewhere real to point. Here the control room and the audience
+   * are two tabs of ONE page, so a room private to this load demonstrates the
+   * whole thing by itself and refusing would leave a visitor with nothing.
+   * 🔴 A REAL SHOW WANTS THE OPPOSITE, AND `?room=` IS IT. An audience on their
+   * own phones has to be handed the same name, so the log prints the whole URL
+   * to send them rather than the name to retype.
+   */
+  const ROOM = Q.get('room') || `stage-${Math.random().toString(36).slice(2, 8)}`;
+  /** The link that puts somebody else's phone in this room. */
+  const SHARE = `${location.origin}${location.pathname}?room=${ROOM}`;
   /**
    * 🔴 THERE IS ONE LEG NOW AND IT IS THE REAL ONE. Asked 2026-09-25: *"go both
    * real leg. we build gate later"* and *"rm loopback"*. This page used to
@@ -110,11 +148,17 @@
    */
   const TABS = [
     { id: 'audience', label: 'Audience' },
-    // ⚠️ ONE WORD. Asked 2026-09-17: *"controlroom -> single word"*. A tab row
-    // scrolls sideways rather than wrapping, so every two-word name spends a
-    // whole word's width of a phone's screen on a space, and the three names
-    // here are the page's navigation rather than its prose.
-    { id: 'controlroom', label: 'Controlroom' },
+    // 🔴 TWO WORDS SINCE 2026-09-25: *"control room is 2 words"*. THIS REVERSES
+    // THE ASK BELOW AND THE ASK BELOW IS KEPT, because a rule that loses its
+    // reason comes back: on 2026-09-17 it was *"controlroom -> single word"*,
+    // on the argument that a tab row scrolls sideways rather than wrapping, so
+    // a two-word name spends a whole word's width of a phone's screen on a
+    // space, and these names are navigation rather than prose.
+    // ⚠️ WHAT CHANGED IS THE CASE, WHICH IS WHY THE ARGUMENT NO LONGER HOLDS.
+    // `CONTROLROOM` in tracked caps was one legible token. `Controlroom` in
+    // sentence case reads as a typo, because English does not join those two
+    // words. The width argument was true and is now the smaller cost.
+    { id: 'controlroom', label: 'Control room' },
     /**
      * 🔴 NO ARCHIVE TAB SINCE 2026-09-25: *"rm archive for now. add play
      * recording button to transport what is enabled when shows have ended and
@@ -132,9 +176,18 @@
     // explanations and the paragraph is the weaker one, and using the `one`
     // line verbatim stops a visitor arriving from the index being told the same
     // thing twice in two wordings that can drift apart.
-    what: 'Pick how the show reaches its audience, over WebRTC or over low latency '
-      + 'HLS, ask them something, and keep every answer on the recording\u2019s own '
-      + 'timeline.',
+    // 🔴 AND IT HAD DRIFTED FROM IT, WHICH IS THE THING THE NOTE ABOVE WARNS
+    // ABOUT. The `one` line was rewritten on 2026-09-25 when the two presses
+    // stopped meaning picture and show, and this string was left behind, so the
+    // index and the page described the same demo two different ways for an hour.
+    // ⚠️ IT WAS ALSO THREE CLAUSES BOLTED TOGETHER, which CLAUDE.md forbids in
+    // as many words: a description is ONE SENTENCE and may not be stretched
+    // with a comma buying a second fact or an `and` buying a third. It read
+    // *"Pick how the show reaches its audience, over WebRTC or over low latency
+    // HLS, ask them something, and keep every answer on the recording's own
+    // timeline."*, which is three descriptions in a coat.
+    what: 'A church scene from a 2011 MIMproject performance goes out live to an '
+      + 'audience that answers back, over whichever transport you press.',
     /**
      * 🔴 ONE ROW, TWO WAYS OUT, AND ONLY ONE AT A TIME. Asked 2026-09-25:
      * *"double play and start in stage control room is confusing. make just
@@ -237,7 +290,29 @@
      */
     const pres = t.id === 'archive' ? null : createPresence({
       of: '', mode: 'badge', state: 'offline',
-      says: { online: 'on air', offline: 'off air' },
+      // ⚠️ `coming` SAYS `starting`, ASKED 2026-09-25: *"coming online =>
+      // starting"*. `presence.mjs` names this override in its own docs and uses
+      // this very word as the example, so it is the supported path rather than
+      // a new state: the five states are fixed and only the wording is a page's
+      // to choose. `coming online` was two words describing a wait; `starting`
+      // is what the operator just did.
+      /**
+       * 🔴 `checking` AND `coming` SAY THE SAME WORD, ASKED 2026-09-25: *"what
+       * is started and what is checking. in ui it should be same for user"*.
+       * They ARE different facts and `presence.mjs` is right to keep them
+       * apart: its colour says what is KNOWN and its motion says something is
+       * HAPPENING, so `checking` means probably there and unconfirmed while
+       * `coming` means a start is under way. That distinction earns its keep on
+       * a badge for a machine in another building.
+       * ⚠️ IT EARNS NOTHING HERE, AND TWO WORDS FOR ONE MOMENT IS WORSE THAN
+       * ONE. On this page both states happen inside a single action: you press
+       * a transport, the publisher wakes, frames may or may not have been
+       * confirmed yet. To the person who pressed the button that is one state
+       * with one name, and showing them two implies a difference they can act
+       * on. **The page keeps the two states, because the checks and the log
+       * read them; it just stops making a visitor learn the difference.**
+       */
+      says: { online: 'on air', offline: 'off air', coming: 'starting', checking: 'starting' },
     });
     return {
       id: t.id,
@@ -279,6 +354,25 @@
          */
         media: t.id === 'audience' ? null : c,
         of: t.label.toLowerCase(),
+        /**
+         * 🔴 ONE FOOTER. ASKED 2026-09-25: *"remove the count time counter from
+         * the video panel, from a footer, and remove a footer as well. So video
+         * panel only should have single footer, which looks and behaves like
+         * the audience one."* The control room had TWO: its own, and the film's
+         * whole transport bar glued underneath carrying `22:11.850`.
+         * ⚠️ AND THIS REVERSES A DECISION THAT IS STILL WRITTEN DOWN BELOW. The
+         * film bar's own comment argued **THE BAR STAYS, BECAUSE IT IS NOT A
+         * PLAY BUTTON**, on the grounds that the clock shows a length before the
+         * file is fetched. That was a real argument and the owner has overruled
+         * it, reported twice and photographed on a phone with `PLAY RECORDING`
+         * clipped beside it. The reason is kept rather than deleted, because a
+         * rule that loses its reason comes back.
+         * ⚠️ `soloFooter` MAKES A LATER `glue()` THROW rather than silently
+         * stacking a second footer, which is how the doubling survived two
+         * reports: `createTransportBar(parent, ...)` APPENDS to that parent, so
+         * deleting a `createGlue` line removed nothing.
+         */
+        soloFooter: true,
         /**
          * 🔴 THE BOX HAS TO BE TOLD THE SHAPE, NOT ONLY THE CANVAS. The
          * stylesheet's box is 16:9 and the canvas inside it is `object-fit:
@@ -368,7 +462,22 @@
   let refit = () => {};
   const tabs = createTabs({
     tabs: TABS.map(({ id, label }) => ({ id, label })),
-    onPick: (id) => { logFor(id); refit(id); },
+    /**
+     * 🔴 THE PICTURE FOLLOWS THE TAB, BECAUSE THERE IS ONLY ONE OF IT. Asked
+     * 2026-09-25, after the control room showed nothing while the audience
+     * showed a picture: *"why control room has canvas?"* It should not, and the
+     * question is the answer. This page composited a film into a canvas when it
+     * did its own picture; as a PURE RECEIVER the canvas has no job, and the
+     * live `<video>` was appended to the audience panel only.
+     * ⚠️ ONE ELEMENT, MOVED, RATHER THAN TWO PLAYERS. Stream bills by the
+     * minute DELIVERED, so a second `<video>` on the same source is a second
+     * meter for one picture. The tabs are mutually exclusive, so exactly one
+     * panel is ever on screen and moving the element costs nothing.
+     * ⚠️ AND `appendChild` ON A PLAYING ELEMENT DOES NOT RESTART IT. Reparenting
+     * keeps the media state, which is the whole reason this is cheaper than
+     * rebuilding a player per tab.
+     */
+    onPick: (id) => { logFor(id); refit(id); showPictureOn(id); },
   });
   logFor(tabs.at());
   for (const p of panels) tabs.panel(p.id).append(p.panel.el);
@@ -757,15 +866,74 @@
   let recordedMs = null;               // the real duration, once resolved
   let stored = null;                   // what putWhole gave back
   let landed = null;                   // the HEAD proof, displayed rather than only kept
-  let recSource = 'received';          // 'received' or 'played', and it is DISPLAYED
+  let recSource = 'received';          // 'received' or 'canvas', and it is DISPLAYED
   let recTrack = null;                 // the exact track object the recorder holds
   let askedBps = null;                 // the rate the recorder SAYS it is using
 
   /** Where the show has got to, as one word the whole page reads. */
   let phase = 'before';                // before · live · stopped
 
+  /**
+   * The shimmer on a transport button while its leg is coming up. Asked
+   * 2026-09-25: *"do shimmering on start button until on air"*.
+   * ⚠️ AN ATTRIBUTE, NOT A CLASS, so the stylesheet owns what it looks like and
+   * this page owns only when it is true. `aria-busy` beside it, because a
+   * shimmer says nothing to a screen reader and the wait is real either way.
+   */
+  function pendTransport(id, on) {
+    const b = showBar?.extra(id);
+    if (!b) return;
+    if (on) { b.dataset.pending = '1'; b.setAttribute('aria-busy', 'true'); }
+    else { delete b.dataset.pending; b.removeAttribute('aria-busy'); }
+  }
+
   function setBadges(state) {
     for (const p of panels) p.pres?.set(state);
+  }
+
+  /**
+   * Put the one live `<video>` in the panel that is showing. Called on every
+   * tab change and by both legs the moment they have an element.
+   * ⚠️ THE ARCHIVE IS NOT A LIVE PANEL and must keep its own recording, so it
+   * is left alone: its picture comes from wherever its transport is, which is
+   * what makes scrubbing visible.
+   */
+  /**
+   * Which tab is on screen. `tabs.mjs` exposes `el`, `buttons`, `panels`,
+   * `panel(id)` and `go`, and NO accessor for the current one, so this reads
+   * `aria-selected` off the buttons, which the component sets and which is
+   * therefore right even on the first quiet `go()` that fires no `onPick`.
+   */
+  function showingTab() {
+    const b = [...(tabs.buttons || [])].find((x) => x.getAttribute('aria-selected') === 'true');
+    const label = (b?.textContent || '').trim().toLowerCase();
+    return TABS.find((t) => t.label.toLowerCase() === label)?.id || 'controlroom';
+  }
+
+  function showPictureOn(id) {
+    if (!audVideo || id === 'archive') return;
+    /**
+     * 🔴 NOT OVER A RECORDING. Reported 2026-09-25: *"in webrtc i see not
+     * recording lane nor playback does anyting"*, with `Play recording`
+     * enabled. This function caused it, and `plans/plan-stage-hls-record.md`
+     * §3 had predicted it before it was reported.
+     * THE COLLISION: since the Archive tab was removed, the archive panel IS
+     * the control room panel. `openArchive` empties that stage and puts the
+     * RECORDING in it, while `audVideo` still points at the finished live
+     * element. The next tab change then failed the parent check, emptied the
+     * stage again and re-appended the DEAD live element over the recording. So
+     * `archiveMedia` was set, `Play recording` was enabled, and it played an
+     * element that was no longer in the document.
+     * ⚠️ AND IT READ AS TWO SEPARATE FAULTS, WHICH IS WHY IT IS WORTH THE
+     * WORDS: a strip with no recording lane, and a button that does nothing.
+     * One cause, two symptoms, neither of them where the cause was.
+     */
+    if (archiveMedia) return;
+    const p = byId.get(id);
+    if (!p || !p.panel?.stage) return;
+    if (audVideo.parentElement === p.panel.stage) return;
+    p.panel.stage.textContent = '';
+    p.panel.stage.append(audVideo);
   }
 
   // ── the relay ─────────────────────────────────────────────────────────────
@@ -781,7 +949,18 @@
   // how `/keys/` was down for everybody while the board looked broken.
   const wire = openWire(ROOM, {
     onMessage: (m) => onWire(m),
-    onOpen: () => { d.log(`in room ${ROOM}`, 'hi'); flush(); },
+    /**
+     * ⚠️ THE WHOLE URL, NOT THE ROOM NAME, AND ONLY WHEN THE ROOM WAS INVENTED
+     * HERE. CLAUDE.md's rule about handing over a page: a name is the answer to
+     * *which room is this* and a link is the answer to *how do I bring an
+     * audience*, and the second is the one somebody wants when they want it.
+     * Anybody who arrived on a `?room=` link is already holding the link.
+     */
+    onOpen: () => {
+      d.log(`in room ${ROOM}`, 'hi');
+      if (!Q.get('room')) d.log(`this room is this tab's alone, so an audience on their own phones needs ${SHARE}`);
+      flush();
+    },
     onClose: () => { if (phase !== 'stopped') setBadges('offline'); },
   });
 
@@ -835,37 +1014,7 @@
      * and so answered `board.error` to every caller for weeks. The throw is the
      * fix working.
      */
-    /**
-     * 🔴 A QUESTION BELONGS TO A SHOW, SO IT ONLY RIDES ON A STATE THAT SAYS
-     * `live`. REPORTED 2026-09-25 with a photograph: a page reading **OFF AIR**
-     * showed `KAS SA OLED TEINUD ÖKOPATTU?` the moment it loaded, asked by
-     * somebody in a session hours earlier.
-     *
-     * The relay stores NOTHING, so nothing was being replayed. What was
-     * happening is that EVERY page in the room runs this heartbeat every 2 s,
-     * `asked` is only cleared by `clearRun`, and the room defaults to the fixed
-     * name `stage-demo`. So one tab left open anywhere, long after its show had
-     * stopped, went on offering its last question to the room for as long as it
-     * was open, and any page that joined took it and rendered it under an OFF
-     * AIR badge.
-     * ⚠️ **AND IT IS TWO CHANGES, NOT ONE, BECAUSE EITHER SIDE ALONE STILL
-     * LEAKS IT.** A page that stops SENDING a stale question still accepts one
-     * from an older tab that has not been reloaded; a page that refuses to
-     * ACCEPT one still hands its own to everybody else. The sender drops it
-     * when the show is not live, and the receiver takes a question out of a
-     * state only when that state says a show is on.
-     * ⚠️ **`show.ask` IS UNTOUCHED AND MUST BE**: that is somebody pressing Send
-     * this second, which is the one message on this wire that is an event
-     * rather than a repetition.
-     * ⚠️ THE PHASE ITSELF STILL GOES OUT ON EVERY BEAT, because a late joiner
-     * learning that a show IS running is what the heartbeat is for.
-     */
-    sendSoon({
-      type: 'show.state',
-      phase,
-      asked: phase === 'live' ? asked : null,
-      atMs: sinceT0(),
-    });
+    sendSoon({ type: 'show.state', phase, asked, atMs: sinceT0() });
   }
   setInterval(sayState, HEARTBEAT_MS);
 
@@ -877,11 +1026,7 @@
       // `off air` until frames are actually going out. See the two-state note
       // where the badge is built.
       if (msg.phase === 'live' && phase === 'before') setBadges('online');
-      // See the note on `sayState`: a question is part of a running show, and a
-      // page that is not showing one has no question to pass on.
-      if (msg.phase === 'live' && msg.asked && !asked) {
-        render(msg.asked.title, msg.asked.options);
-      }
+      if (msg.asked && !asked) render(msg.asked.title, msg.asked.options);
       return;
     }
     if (msg.type === 'show.ask') { render(msg.title, msg.options); return; }
@@ -955,36 +1100,6 @@
   const ARCHIVE_WINDOW_MS = 30 * 1000;
   const ZOOM_OUT = 4;
   /**
-   * 🔴 THE CONTROL ROOM OPENS ON THE WHOLE NOMINAL SHOW, AND IT IS A SECOND
-   * NUMBER RATHER THAN A CHANGE TO THE ONE ABOVE. REPORTED 2026-09-25: *"zoom
-   * out transport a lot its frntic"*. The 30 s above was asked for, by
-   * screenshot, about the ARCHIVE's window, and moving it would have undone
-   * that ask to answer this one.
-   *
-   * 🔴 **AND WHAT WAS ON SCREEN WAS NOT 30 s EITHER, WHICH IS THE HALF NOBODY
-   * HAD MEASURED.** MEASURED in a real tab with the control room SELECTED:
-   * `spanMs` **90,947** against the archive strip's 30,000 in the same page.
-   * The arithmetic is exact: `fit` sets pixels per second from the width it can
-   * see, this strip is built inside a HIDDEN tab panel and re-fitted on the tab
-   * press BEFORE the browser has laid the panel out, so 30 s was fitted to
-   * 190 px of plot and the strip then grew to 576 px at the same 6.33 px/s.
-   * 576 / 6.33 is 91 s. So the window a person saw was three times the one the
-   * page asked for, and the page's own assert read 30.0 s throughout because
-   * the harness never opens that tab.
-   *
-   * ⚠️ **`SHOW_MS`, NOT A NEW FIGURE.** The nominal show is three minutes and
-   * that is the widest thing the control room can be asked to hold, so the
-   * whole of it on screen is the zoomed-out end rather than a number invented
-   * to be large. At 576 px it is 3.2 px/s against 19.2, which is the difference
-   * between a write head that crawls and one that races, and a three minute
-   * show never has to scroll at all.
-   * ⚠️ **THE ARCHIVE'S OWN COMMENT ARGUES AGAINST FITTING A WHOLE SHOW AND IT
-   * IS STILL RIGHT ABOUT THE ARCHIVE**, where a question mark in a three hour
-   * recording is a pixel. A live show that has not happened yet has nothing in
-   * it to squeeze, and its one moving thing is the write head.
-   */
-  const ROOM_WINDOW_MS = SHOW_MS;
-  /**
    * ⚠️ ONE EXPRESSION, BECAUSE THE CHECK READS IT TOO. It was written twice for
    * one run, once in the strip's option and once in the assert grading it, and
    * they disagreed immediately: before a show there is no recording, so the
@@ -993,27 +1108,7 @@
    * a measurement that will disagree.
    */
   const maxSpanMs = () => Math.max(ARCHIVE_WINDOW_MS * ZOOM_OUT, (recordedMs ?? SHOW_MS) * 1.05);
-  /**
-   * 🔴 ONE PANEL, TWO ROLES, AND THE ALIAS IS WHERE THE PICTURE WENT.
-   * `archive` is the CONTROL ROOM's panel: the Archive tab was removed on
-   * 2026-09-25 and the archive's role moved here rather than going with it. So
-   * every `archive.panel.stage` line below is writing into the box a person
-   * runs the show from, which is fine for the recording and was fatal for the
-   * one that emptied it at build.
-   */
   const archive = byId.get('controlroom');
-  /**
-   * The control room's picture area shows one of two things and never nothing:
-   * the MONITOR, which is the canvas the drawing loop blits into, or the
-   * RECORDING, once a show has produced one. `openArchive` swaps one for the
-   * other and `clearRun` swaps it back.
-   * ⚠️ IT IS A FUNCTION RATHER THAN A LINE, because the swap happens in three
-   * places and the version of this that was three lines lost one of them.
-   */
-  const showMonitor = () => {
-    archive.panel.stage.textContent = '';
-    archive.panel.stage.append(ctrl.canvas);
-  };
   /**
    * 🔴 THE ARCHIVE'S BAR AND STRIP ARE BUILT OFF-PAGE. `createTransportBar` and
    * `createStripView` APPEND TO THE PARENT THEY ARE GIVEN, so passing the
@@ -1250,42 +1345,57 @@
    * lane object is a shared mutable thing between two renderers and the saving
    * is nothing.
    */
+  const laneList = () => [{ ...VIDEO_LANE }, { ...QUESTION_LANE }, ...OPTIONS.map(laneFor)];
   /**
-   * 🔴 A LANE APPEARS WHEN IT HAS SOMETHING IN IT. REPORTED 2026-09-25, twice,
-   * the second time as *"still that asked ghost lane"* after a fix that was
-   * about the QUESTION and not about the LANE. The ghost is not a question
-   * being painted: MEASURED in a real tab with nothing ever asked,
-   * `__stage.laneRows` reads `asked: 0 rows` and the strip draws its gutter row
-   * anyway, so the control room has always carried a row named `asked` with
-   * nothing under it, from the first frame of a visit.
-   * ⚠️ **AND THE FIRST REPAIR WAS RIGHT AND WAS NOT THIS.** Dropping `asked`
-   * from the heartbeat stopped a question from a dead show reaching a new tab,
-   * which was the OTHER report and was verified across three tabs. A
-   * cross-tab measurement passing while the thing is still on screen means the
-   * measurement was not of the reported symptom.
-   * ⚠️ **IT IS `/kit/`'s TABLE RULE ONE COMPONENT ALONG**: a column name over no
-   * rows labels air, `table.mjs` hides its heading until the first row, and a
-   * lane's gutter label is the same promise. `positron-ui`: a container with
-   * nothing in it must not paint its edges, and a label with nothing under it
-   * must not paint its name.
-   * ⚠️ **THE `video` LANE IS LEFT ALONE AND IS THE SAME SHAPE.** It draws one
-   * span claiming a three minute recording before anything is recorded, and it
-   * is filtered out of the control room, so it is on no strip a person can see
-   * today. Named here rather than fixed, because the archive strip is off-page
-   * and changing a lane nobody can look at cannot be checked by looking.
+   * 🔴 THE CONTROL ROOM'S OWN LANE, AND IT GROWS RATHER THAN CLAIMING. Asked
+   * 2026-09-25: *"can not see video lane"*, which REVERSES *"can y rm this
+   * recording"* of 2026-09-18. Both asks are right and they are not in
+   * conflict, which is worth writing down because the next person will read one
+   * of them and undo the other.
+   * ⚠️ WHAT WAS REMOVED WAS A LIE, NOT A LANE. `VIDEO_LANE` draws ONE span the
+   * length of the NOMINAL show, so before anybody pressed Start the control
+   * room showed a full grey bar for a file nothing had written. That is what
+   * *"rm recorded vide"* was pointed at.
+   * ⚠️ WHAT GOES BACK IS THE SHOW AS IT HAPPENS: a span from zero to the write
+   * head, which is where the recorder has actually got to. It appears when a
+   * show starts and it is as long as the show really is. Nothing is drawn
+   * before a press, so the objection does not come back with it.
    */
-  const laneList = () => [
-    { ...VIDEO_LANE },
-    ...(QUESTIONS.length ? [{ ...QUESTION_LANE }] : []),
-    ...OPTIONS.map(laneFor),
-  ];
+  const SHOW_LANE = () => ({
+    id: 'show', kind: 'video', label: 'show', height: 30, as: 'spans',
+    color: '#6f7d94', barPad: 4,
+    rows: () => (T0 == null ? [] : [{
+      at: 0, id: 'live', kind: 'video',
+      payload: { title: phase === 'live' ? 'on air' : 'the show', durMs: sinceT0() },
+    }]),
+    labelOf: () => (phase === 'live' ? 'on air' : 'the show'),
+    describeRow: (r) => ['the show',
+      r.payload?.durMs == null ? 'not started' : `${(r.payload.durMs / 1000).toFixed(1)}s so far`],
+  });
+
   const relane = () => {
     const list = laneList();
     laneCount = list.length;
     strip.strip.setLanes(list);
-    // The control room gets the same lanes MINUS the recording, for the reason
-    // written where its strip is built.
-    roomStrip?.strip.setLanes(laneList().filter((l) => l.id !== 'video'));
+    /**
+     * The control room gets its OWN top lane (the show as it happens, not the
+     * archive's finished recording), and then only the lanes that have
+     * something in them.
+     * 🔴 A LANE FOR SOMETHING NOBODY DID IS THE SAME DEFECT AS A BAR FOR A FILE
+     * NOBODY WROTE. Asked 2026-09-25: *"what is \"asked\" lane. i never
+     * askd"*. The question lane was drawn from the moment the page opened, so
+     * an empty row labelled `asked` sat there naming an event that had not
+     * happened. The lane arrives with the first question and the option lanes
+     * arrive with it, which is what `relane` exists to do.
+     */
+    const roomLanes = [SHOW_LANE()];
+    if (QUESTIONS.length) {
+      roomLanes.push({ ...QUESTION_LANE }, ...OPTIONS.map(laneFor));
+    }
+    roomStrip?.strip.setLanes(roomLanes);
+    // Whatever changed the lanes may have changed whether there is anything
+    // to clear, so the one place that rebuilds them repaints the control too.
+    if (typeof paintClear === 'function') paintClear();
   };
 
   /**
@@ -1426,7 +1536,20 @@
    * question that grew its box would push the picture above it.
    */
   function show(panel, node) {
-    const slot = panel.slots.centre;
+    // 🔴 ON THE PICTURE, WHERE SUBTITLES LIVE, NOT IN THE FOOTER. Asked
+    // 2026-09-25: *"Overlay the questions who are appearing on top of video,
+    // sort of a place where usually videos have subtitles and make them more
+    // contrasty. So remove them from video panel footer and move them actually
+    // on top of a video in the lower part."*
+    // ⚠️ CONTRAST IS WHY IT IS A SLOT AND NOT A COLOUR. Text straight on video
+    // is unreadable at some frames whatever the ink: `--fg` on a white frame
+    // COMPUTES 1.25:1. `.pos-vp-cap` carries a gradient scrim plus a solid
+    // plate, measured at 15.77:1 worst case.
+    // ⚠️ AND IT COSTS THE FOOTER NOTHING NOW. The comment above about opacity
+    // and transform still holds, and the reason it mattered is gone with it:
+    // the caption is absolute inside the stage, so a question that grows its
+    // box cannot push the picture.
+    const slot = panel.slots.caption;
     slot.textContent = '';
     slot.append(node);
     node.style.opacity = '0';
@@ -1474,26 +1597,12 @@
    * `right[0].dataset.end = '1'`; `extras` takes `{id,label,onClick}`. Passing
    * the wrong shape threw `Cannot set properties of undefined (setting 'end')`
    * and took the page out before `ready`.
-   * 🔴 **AND IT IS `onClick`, NOT `onPress`. THIS COMMENT SAID `onPress` AND
-   * THE BAR BELOW BELIEVED IT, SO BOTH TRANSPORT BUTTONS WERE WIRED TO
-   * NOTHING.** `transport-bar.mjs` reads `x.onClick?.(b)` for an `extras` entry
-   * and `x.onPress?.(b)` for a `loopSlots` one, two option names in one file,
-   * and every other page here passes `onClick`. MEASURED 2026-09-25: pressing
-   * START HLS or START WEBRTC, by hand or from the harness, did absolutely
-   * nothing, the page's own drill clicked a dead button and then polled 45 s
-   * for a show that could not start, and `node demo/verify.mjs stage` read
-   * **31/47 with 16 red**, every one of them downstream of a control that was
-   * not connected.
-   * ⚠️ **A DEAD CONTROL LOOKS EXACTLY LIKE A BROKEN PIPELINE**, which is why
-   * this cost a session: the WebRTC leg, the VPN, the harness's press order and
-   * the settle window were all suspected first, and the show came up correctly
-   * every time something called `toggleTransport` directly.
    * ⚠️ AND IT IS DISABLED UNTIL THERE IS A RECORDING, because a control that
    * plays nothing is the shape this project calls a lie. Nothing is asserted
    * THROUGH it: the playback checks drive `archiveCommand` and the file's own
    * element, which is the road that exists whether or not a button does.
    */
-  const playRecBtn = el('button', 'tbar-x', 'PLAY RECORDING',
+  const playRecBtn = el('button', 'tbar-x tbar-word', 'Play recording',
     { type: 'button', 'aria-label': 'play the recording this show made' });
   playRecBtn.disabled = true;
   playRecBtn.addEventListener('click', () => archiveCommand.play());
@@ -1515,13 +1624,36 @@
     // the RIGHT, and no play glyph at all. Asked for across four messages.
     live: false, time: true, scrub: false, loop: false, absolute: false,
     toggle: false,
+    /**
+     * 🔴 `onClick`, AND IT IS `onClick` BECAUSE THIS PAGE'S TWO MAIN CONTROLS
+     * DID NOTHING FOR A DAY. MEASURED 2026-09-25: `transport-bar.mjs` binds an
+     * `extras` button with `x.onClick?.(b)`, this page passed `onPress`, and
+     * `?.` on an absent handler is silent. So `START HLS` and `START WEBRTC`
+     * were live buttons wired to nobody, for a visitor and for the harness
+     * alike, and the page reported *"clikced start webrtf, timelne playing, no
+     * video"*.
+     * 🔴 AND IT IS WHY WIDENING A WAIT NEVER HELPED. The check below presses
+     * this button and polls for `phase`, and the presses at 28 s, 45 s and 80 s
+     * were all waiting for something that had not been asked for. The show then
+     * really did start a few lines later, because the stop drill calls
+     * `toggleTransport` DIRECTLY, which is how one run could read fourteen
+     * asserts red about a show that was not running and then report the page as
+     * live. **Both readings were true.**
+     * ⚠️ **THE MODULE IS THE ODD ONE OUT AND IS NOT FIXED HERE.**
+     * `transport-bar.mjs` documents `extras` as taking `onPress`, and
+     * `barButton`, `loopExtras` and `loopSlot` all bind `onPress`; only
+     * `extras` binds `onClick`. Seven of the eight pages that declare `extras`
+     * pass `onClick` and work, so the repair belongs in the module accepting
+     * both and sweeping all eight, not in one page changing a shared contract
+     * under the other seven.
+     */
     extras: [
-      { id: 'hls', label: 'START HLS', word: true,
+      { id: 'hls', label: 'Start HLS', word: true,
         aria: 'start or stop the show over low latency HLS',
-        onClick: () => pressTransport('hls') },
-      { id: 'webrtc', label: 'START WEBRTC', word: true,
+        onClick: () => toggleTransport('hls') },
+      { id: 'webrtc', label: 'Start WebRTC', word: true,
         aria: 'start or stop the show over WebRTC',
-        onClick: () => pressTransport('webrtc') },
+        onClick: () => toggleTransport('webrtc') },
     ],
     right: [playRecBtn],
     /**
@@ -1568,74 +1700,39 @@
    * So the second press SWITCHES rather than adding, and the page says which
    * one is carrying.
    *
-   * 🔴 AND EITHER BUTTON PUTS A SHOW ON AIR AND RECORDS IT, WHICH THE HLS ONE
-   * DID NOT UNTIL 2026-09-25. It built a player, put a picture in the audience
-   * panel and stopped there: no recorder, no write head, no archive, and `PLAY
-   * RECORDING` disabled for ever. So the bar's own verb, `start` and `stop`,
-   * was true of one button and half true of the other, and every check about
-   * the recorder, the archive and the strip could only ever be reached down the
-   * WebRTC road. **A recording is what a show leaves behind, not a property of
-   * the protocol it went out on**, so `startShow` takes the leg as an argument
-   * and everything after the picture is one path.
-   * ⚠️ **AND THE TWO LEGS HAND OVER A TRACK BY DIFFERENT ROUTES.** WHEP gives
-   * the receiver's own track object; HLS gives a `<video>` with an MSE source
-   * behind it, whose picture is reached with `captureStream()`. Both are the
-   * picture that came BACK, which is the thing `recSource` exists to say, and
-   * neither is this page's canvas.
-   * ⚠️ **`captureStream()` IS NOT EVERYWHERE.** Chromium has it, Safari has
-   * nothing equivalent, so the HLS leg says in words that it cannot record
-   * there rather than recording something else. UNMEASURED on Safari: nothing
-   * in this repository has run that path, and `demo/verify-safari.mjs` does not
-   * open this page.
+   * 🔴 AND THE HLS LEG IS GATED ON `?live=1` EXACTLY LIKE THE WebRTC ONE, WHICH
+   * IS A COST RULE AND NOT A CONVENIENCE. Without it a suite run would hold a
+   * Cloudflare live input open on every pass of this page, and Stream bills by
+   * the minute DELIVERED with buffering counted. The harness runs the loopback
+   * leg for WebRTC and is told, in words, why there is no picture on the HLS
+   * one rather than being shown an empty box.
    */
   let transport = null;            // 'webrtc' | 'hls' once something is carrying
   let hlsPlayer = null;
   let hlsHold = null;
   let hold = null;          // the container stays awake while a show is on
-  let capStream = null;     // what `captureStream()` handed back, so it can be stopped
-  /**
-   * ⚠️ AND WHICH ELEMENT IT CAME OFF, BECAUSE A TRACK CANNOT BE ASKED. There is
-   * no way back from a `MediaStreamTrack` to the element that produced it, so
-   * "the recorder is holding the picture the AUDIENCE is being shown" is not
-   * answerable at all without writing it down here. Without it, capturing the
-   * FILM by mistake would satisfy every test the check could make: the track
-   * really would be one of `capStream`'s, and the label would really say
-   * `played`.
-   */
-  let capFrom = null;
 
   /**
-   * 🔴 THE HARNESS PRESSES EVERY `.tbar-x` ONCE AND SO DOES THIS PAGE'S OWN
-   * DRILL, AND A BUTTON THAT IS ITS OWN STOP CANNOT TELL THE TWO APART.
-   * `demo/verify.mjs` clicks `.pos-controls button, .tbar-x` in document order,
-   * which on this page is START HLS, START WEBRTC, PLAY RECORDING. The checks
-   * below have to press a start as well, because a bar wired to the wrong
-   * command would otherwise leave every assert under it green. Whichever of the
-   * two gets there first is the press that counts, and the second one is the
-   * SAME press arriving twice: obeyed, it ends the show in the middle of the
-   * checks that are grading it.
-   * ⚠️ **SO ONE DUPLICATE PER BUTTON IS ABSORBED, AND ONLY ONE.** The drill
-   * arms `absorb` before it clicks; the next DOM press of that same id, while
-   * that leg is already carrying, is swallowed once and said out loud. If the
-   * harness pressed first the drill never clicks, nothing is armed, and nothing
-   * is absorbed.
-   * ⚠️ **IT SITS ON THE PRESS AND NOT ON `toggleTransport`**, because the drill
-   * also calls that function directly to stop the show, and a guard on the
-   * function would swallow the stop it is supposed to be grading.
-   * ⚠️ AND IT IS `/mirror/`'s ANSWER IN ANOTHER COSTUME: that page drives
-   * whichever headset mode nobody reached, behind `SELFCHECK`, with a map so a
-   * real press is never doubled.
+   * ⚠️ THE OTHER BUTTON IS BLOCKED ONLY WHILE ONE IS STARTING, NEVER AFTER.
+   * Asked 2026-09-25: *"shimmer when button starts (and block other until it
+   * has been started)"*. A control left disabled is a check the harness can no
+   * longer reach, which this project has measured twice in one day on two
+   * pages, so this is a transient state with a `finally` under it.
+   * ⚠️ **THE SHIMMER IS `shell.mjs`'s OWN `data-busy` SWEEP** and costs nothing
+   * here: the shell marks a running control busy for as long as its handler is
+   * awaited, which is also what makes the harness wait rather than walking off
+   * mid-start.
    */
-  let absorb = null;
-
-  function pressTransport(which) {
-    if (absorb === which && transport === which) {
-      absorb = null;
-      d.log(`the checks already started ${which.toUpperCase()}, so this press is the `
-        + 'same press arriving twice and is not a stop', 'warn');
-      return undefined;
+  let starting2 = false;
+  async function whileStarting(otherId, fn) {
+    if (starting2) return;
+    starting2 = true;
+    const other = d.button(otherId);
+    if (other) other.disabled = true;
+    try { await fn(); } finally {
+      starting2 = false;
+      if (other) other.disabled = false;
     }
-    return toggleTransport(which);
   }
 
   /** Tear down whichever leg is carrying, so a switch never leaves two open. */
@@ -1651,61 +1748,145 @@
   function dropTransport() {
     if (hlsPlayer) { try { hlsPlayer.destroy(); } catch { /* already gone */ } hlsPlayer = null; }
     if (hlsHold) { try { hlsHold.close(); } catch { /* already gone */ } hlsHold = null; }
+    // ⚠️ AND THE BADGE COMES BACK, on the HLS leg only. A recorded show has its
+    // own `stopped` handling and must not be overwritten here, so this is
+    // conditional on the phase rather than unconditional.
+    if (transport === 'hls' && phase === 'before') setBadges('offline');
+    // ⚠️ NOTHING IS LEFT SHIMMERING. A pending state that outlives its wait is
+    // a page claiming to be busy for ever, which is worse than no feedback.
+    pendTransport('hls', false);
+    pendTransport('webrtc', false);
+    // ⚠️ AND NOTHING HOLDS THE FINISHED ELEMENT. `audVideo` had five references
+    // and no assignment back to null anywhere, which is what let a dead element
+    // be re-parented over an archive recording. A stale pointer to a removed
+    // node is indistinguishable from a live one until something appends it.
+    audVideo = null;
   }
 
   /**
-   * 🔴 hls.js IS FETCHED ON DEMAND, AND THE HLS LEG NEVER ASKED FOR IT.
-   * MEASURED 2026-09-25, the first run on which these buttons were connected at
-   * all: pressing START HLS threw `HLS is not supported in this browser` before
-   * `live` had been assigned, the catch swallowed it, and the drill polled 45 s
-   * for a show that had already failed. The console was clean, because a throw
-   * inside a `try` is not a console error, so **the page said nothing and the
-   * suite read 35/48 with thirteen asserts downstream of a show that never
-   * started.**
-   *
-   * This page only ever loaded hls.js behind `?bg=`, for an ERR background
-   * nobody asks for by default, and that was correct while the HLS leg did not
-   * exist. `/llhls/` carries a blocking `<script>` in its head, which is why
-   * the same player works there.
-   *
-   * 🔴 **AND IT IS NOT GATED ON `ManagedMediaSource`, WHICH IS THE TRAP.**
-   * `src/low-latency-player.js` reads `window.Hls` and throws on line 289,
-   * ABOVE the branch where it decides to use native HLS and return. So the
-   * library is required even on the one path that will never touch it, and
-   * gating the fetch on the same capability test the player uses would leave
-   * WebKit throwing. That is a fact about the shared player rather than about
-   * this page, it is worth fixing there, and it is deliberately NOT fixed from
-   * here: `src/` is deployed and two other pages build that player.
-   * ⚠️ AND IT STILL COSTS A VISITOR NOTHING. 618 KB on demand, when somebody
-   * presses START HLS, and never on a visit.
+   * The HLS leg. Nothing here publishes: the container's RTMPS ffmpeg leg is
+   * what puts a picture on that input, and holding the socket is what wakes it.
+   * ⚠️ `createLowLatencyPlayer` AND NOT A BARE `new Hls()`. Its defaults are
+   * wrong in three directions for a live start and the file carries the
+   * measurements; see src/low-latency-player.js.
    */
-  async function ensureHls() {
+  /**
+   * 🔴 hls.js IS FETCHED WHEN SOMEBODY ASKS FOR HLS, AND UNTIL 2026-09-25 IT
+   * WAS NEVER FETCHED AT ALL. `createLowLatencyPlayer` reads `window.Hls` and
+   * throws `HLS is not supported in this browser` without it, and this page
+   * loaded no such script, so `START HLS` was a button that threw. It went
+   * unseen because the same day's dead-handler defect meant nothing ever
+   * reached this function: two bugs in a row, the second hidden behind the
+   * first. MEASURED once the handler was wired: the harness's press took `no
+   * console errors` red with that exact message and this stack.
+   * ⚠️ IT IS NOT A `<script>` IN THE HEAD, WHICH IS WHAT `/llhls/` DOES. That
+   * file is **618 KB** and this page's other transport needs none of it, so a
+   * visitor who watches the show over WebRTC would be paying for a player
+   * nobody asked for. A visit fetches nothing here until a press.
+   * ⚠️ AND IT FAILS IN WORDS. A script tag that 404s fires `onerror` and
+   * nothing else, so without this the button would go back to doing nothing for
+   * a second reason.
+   */
+  async function needHls() {
     if (window.Hls) return;
     await new Promise((res, rej) => {
-      const tag = document.createElement('script');
-      tag.src = '/proto/remixer/hls.min.js';
-      tag.onload = res;
-      tag.onerror = () => rej(new Error('hls.js did not load'));
-      document.head.append(tag);
+      const s = el('script', '', '', { src: '/proto/remixer/hls.min.js' });
+      s.onload = res;
+      s.onerror = () => rej(new Error('hls.js did not load, so there is no HLS player'));
+      document.head.append(s);
     });
   }
 
-  /**
-   * The picture off the HLS leg, as a track a recorder can hold.
-   * ⚠️ IT IS ASKED FOR ONLY ONCE A FRAME HAS LANDED. A `captureStream()` taken
-   * from an element that has decoded nothing comes back with no video track at
-   * all, which reads as a browser that cannot do it rather than as a picture
-   * that has not arrived.
-   */
-  function captureFrom(v) {
-    if (typeof v.captureStream !== 'function') {
-      d.log('this browser has no captureStream, so the HLS leg can go out and cannot be '
-        + 'recorded here', 'bad');
-      return null;
+  async function startHls() {
+    dropTransport();
+    /**
+     * ⚠️ IT SAYS SO AND LEAVES THE PAGE ALONE, RATHER THAN THROWING OUT OF A
+     * CLICK HANDLER. `toggleTransport` has no catch around this, so a rejection
+     * here would escape into the listener as an unhandled error and the page
+     * would be left with a transport it thinks is starting. `startShow` already
+     * handles its own failure this way and this is the same contract.
+     */
+    try { await needHls(); } catch (err) {
+      d.log(`the HLS leg cannot start: ${err && err.message}`, 'bad');
+      return;
     }
-    capStream = v.captureStream();
-    capFrom = v;
-    return capStream.getVideoTracks()[0] || null;
+    hlsHold = holdPublisher(() => {});
+    const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
+    v.muted = true;
+    armVideo(v);
+    audVideo = v;
+    // Straight to whichever tab the operator is on, not always the audience.
+    showPictureOn(showingTab());
+    hlsPlayer = createLowLatencyPlayer(v, llhls(), { preferNative: 'auto' });
+    transport = 'hls';
+    d.log('the audience is on low latency HLS', 'hi');
+    /**
+     * 🔴 THE BADGE MOVES ON THE HLS LEG TOO, AND IT NEVER DID. Reported
+     * 2026-09-25: *"when i push start hls i get no shimmer on button nor off
+     * air moves. is it gated?"* It is NOT gated. `startHls` built a player,
+     * logged a line and returned, and `setBadges` was called from the WebRTC
+     * path only, so a visitor pressing the one control that works everywhere
+     * got a page that said `OFF AIR` while a picture was on its way.
+     * ⚠️ AND THE SILENCE READ AS A DEAD BUTTON, which is exactly what the two
+     * controls on this bar HAD been for a day. A control with no feedback is
+     * indistinguishable from a control with nothing wired to it, and this page
+     * has now paid for that twice in one day: once in the handler, once here.
+     * ⚠️ `starting` FIRST, BECAUSE THE PUBLISHER HAS TO WAKE. The container is
+     * what puts a picture on that input and the wake is seconds of nothing.
+     * ⚠️ AND `online` BECAUSE FRAMES ARRIVED, NOT BECAUSE A PROMISE SETTLED,
+     * which is the same contract the WebRTC leg already states.
+     */
+    // ⚠️ `coming`, NOT `starting`. `presence.mjs` accepts exactly online,
+    // checking, coming, offline and unknown, and THROWS on anything else.
+    // MEASURED 2026-09-25: `starting` threw out of `setBadges` inside
+    // `startHls`, which `toggleTransport` does not catch, so pressing START HLS
+    // did nothing at all and said nothing either. The badge word the handoff
+    // records as `starting` is the transport bar's own badge, a different one.
+    setBadges('coming');
+    pendTransport('hls', true);
+    /**
+     * 🔴 A BADGE THAT GAVE UP WHILE A PICTURE WAS PLAYING. Reported 2026-09-25
+     * with a screenshot of the control room showing the test picture and the
+     * badge reading `CHECKING` underneath it. `waitForFirstFrame` resolves with
+     * `frames: false` on TIMEOUT, this leg passed 20000 ms, and the container's
+     * cold wake is of that order, so the wait expired a moment before the first
+     * frame landed and the page then said `checking` for ever about a picture
+     * anybody could see.
+     * ⚠️ SO THE TIMEOUT IS NOT THE FIX, AND RAISING IT WOULD ONLY MOVE THE
+     * RACE. The state has to be allowed to CHANGE AFTER the first answer: a
+     * wait that ran out is not evidence of an absence, it is the absence of
+     * evidence. This keeps looking, cheaply, and corrects itself the moment a
+     * frame exists.
+     * ⚠️ AND IT STOPS ON ITS OWN. A watcher that outlives its transport is a
+     * page reporting on something it is no longer doing, so it gives up when
+     * the leg changes, when the element is replaced, or after a bounded run.
+     */
+    const watchFrames = (el) => {
+      let ticks = 0;
+      const iv = setInterval(() => {
+        if (transport !== 'hls' || audVideo !== el || ++ticks > 120) { clearInterval(iv); return; }
+        if (el.videoWidth > 0 && el.readyState >= 2) {
+          clearInterval(iv);
+          setBadges('online');
+          pendTransport('hls', false);
+          d.log(`picture ${el.videoWidth}x${el.videoHeight} after the first wait ran out`, 'hi');
+        }
+      }, 500);
+    };
+    waitForFirstFrame(v, { timeoutMs: 20000 }).then((seen) => {
+      pendTransport('hls', false);
+      if (!seen.frames) watchFrames(v);
+      if (transport !== 'hls') return;   // switched away while we waited
+      setBadges(seen.frames ? 'online' : 'checking');
+      d.log(`picture ${seen.w}x${seen.h} by ${seen.how}`, seen.frames ? 'hi' : 'warn');
+    });
+  }
+
+  async function startWebrtc() {
+    dropTransport();
+    await startShow();
+    transport = 'webrtc';
+    d.log('the audience is on WebRTC', 'hi');
   }
 
   /**
@@ -1713,11 +1894,11 @@
    * the show; the other switches, because one input cannot serve both.
    */
   function paintTransport() {
-    for (const [id, name] of [['hls', 'HLS'], ['webrtc', 'WEBRTC']]) {
+    for (const [id, name] of [['hls', 'HLS'], ['webrtc', 'WebRTC']]) {
       const b = showBar?.extra(id);
       if (!b) continue;
       const on = transport === id;
-      b.textContent = on ? `STOP ${name}` : `START ${name}`;
+      b.textContent = on ? `Stop ${name}` : `Start ${name}`;
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
   }
@@ -1732,27 +1913,9 @@
         await stopShow(); dropTransport();
         if (hold) { try { hold.close(); } catch { /* gone */ } hold = null; }
         transport = null;
-      } else {
-        /**
-         * 🔴 A SWITCH IS A STOP AND THEN A START, IN THAT ORDER, AND IT HAS TO
-         * BE SAID OUT LOUD BECAUSE `startShow` REFUSES TO RUN OVER A LIVE ONE.
-         * Its first line is `if (phase === 'live' || starting) return`, so
-         * pressing the other button while a show was on used to return
-         * immediately and then be recorded as a switch that had happened: the
-         * old leg went on carrying and the bar said the new one was. The old
-         * `startHls` did not consult `phase` at all, which is why this only
-         * became reachable when the two legs became one function.
-         */
-        if (phase === 'live') await stopShow();
-        dropTransport();
-        await startShow(which);
-        /**
-         * ⚠️ THE LEG IS ONLY CARRYING IF THE SHOW REALLY WENT ON AIR. Setting
-         * this unconditionally made the button read STOP over a start that had
-         * thrown, so the next press tried to stop a show that was never up.
-         */
-        transport = phase === 'live' ? which : null;
       }
+      else if (which === 'hls') await startHls();
+      else await startWebrtc();
     } finally {
       switching = false;
       for (const id of ['hls', 'webrtc']) { const b = showBar?.extra(id); if (b) b.disabled = false; }
@@ -1788,20 +1951,10 @@
    * the only reason to put a timeline in a control room at all.
    */
   const roomStrip = createStripView(room, showDeck, {
-    /**
-     * 🔴 IT OPENS WITH NO LANES, AND A HARD-CODED `[{ ...QUESTION_LANE }]` HERE
-     * IS WHERE THE GHOST SURVIVED ITS FIRST REPAIR. `laneList()` stopped
-     * emitting the question lane until something had been asked, `relane()`
-     * stopped handing it over, `__stage.laneRows` read `video` alone, and the
-     * control room went on drawing a row named `asked` from the first frame of
-     * a visit, because this line had put it there at construction and nothing
-     * had called `setLanes` since. PHOTOGRAPHED after the first fix with the
-     * gutter still reading `asked`.
-     * ⚠️ **A LIST WRITTEN TWICE IS A LIST THAT WILL DISAGREE**, which is this
-     * project's own rule about a measurement in two files, one component along.
-     * The lanes come from `laneList()` and from nowhere else now.
-     */
-    size: 'auto', gutter: 110, lanes: [], minHeight: STRIP_MIN_H,
+    // ⚠️ THE SHOW LANE ONLY, AT CONSTRUCTION. `relane()` adds the question and
+    // option lanes when there is a question to put in them, and it does not run
+    // on load, so whatever is declared here is what a visitor meets.
+    size: 'auto', gutter: 110, lanes: [SHOW_LANE()], minHeight: STRIP_MIN_H,
     onSeek: () => {},
     maxSpan: () => SHOW_MS,
     /**
@@ -1815,38 +1968,21 @@
     follow: false,
   });
   /**
-   * ⚠️ IT OPENS ON THE WHOLE NOMINAL SHOW AND ONLY FOLLOWS ONCE THERE IS
-   * SOMETHING TO FOLLOW. With follow engaged from the start the window centres
-   * on a playhead parked at zero, so the axis read **-30 to 0**: a control room
-   * counting backwards from a show that has not begun. It is armed at the
-   * moment the show goes on air, beside the clock and the write head.
+   * ⚠️ IT OPENS ON 0..30s AND ONLY FOLLOWS ONCE THERE IS SOMETHING TO FOLLOW.
+   * With follow engaged from the start the window centres on a playhead parked
+   * at zero, so the axis read **-30 to 0**: a control room counting backwards
+   * from a show that has not begun. `startShow` turns it on.
    */
-  const fitRoom = () => roomStrip.strip.fit(0, ROOM_WINDOW_MS, { pad: 0 });
-  fitRoom();
+  roomStrip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
   /**
    * The panel a strip lives in may have been hidden when it was built, so both
    * strips are re-fitted the moment their tab is shown. It is a no-op on a strip
    * somebody has already dragged, because `fit` is what the page asked for and
    * `phase` says whether the page still means it.
-   *
-   * 🔴 AND IT HAS TO HAPPEN AFTER THE BROWSER HAS LAID THE PANEL OUT, WHICH IS
-   * THE HALF THAT WAS MISSING AND IS WHY THE WINDOW ON SCREEN WAS THREE TIMES
-   * THE ONE ASKED FOR. `onPick` fires while the panel it just unhid is still
-   * the width it was when it was hidden, so `fit` computes pixels per second
-   * against a plot of 190 px and the strip then grows to 576 px keeping that
-   * rate. MEASURED: 30 s asked for, **90,947 ms on screen**. Fitting again two
-   * frames later, once the layout has run, is what makes the number the page
-   * asked for the number a person gets.
-   * ⚠️ TWO FRAMES RATHER THAN ONE, the same wait the diagram check already uses
-   * on this page: one frame schedules the layout and the second is the first
-   * one that can read it back.
    */
   refit = (id) => {
     if (id === 'controlroom' && phase === 'before') {
-      fitRoom();
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (phase === 'before') fitRoom();
-      }));
+      roomStrip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
     }
     if (id === 'archive' && recordedMs == null) strip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
   };
@@ -1857,7 +1993,35 @@
    * bordered boxes with the page rhythm between them would state that they are
    * two things.
    */
-  room.append(createGlue(showBar.el, roomStrip.el));
+  /**
+   * 🔴 A `Clear` BUTTON UNDER THE CONTROL ROOM TIMELINE. Asked 2026-09-25:
+   * *"just add a clear button under control room timeline"*. THIS REVERSES
+   * *"Ok no clear. New run clears"* OF 2026-09-19, and that reasoning is kept a
+   * few hundred lines below rather than deleted, because it was good: a Clear
+   * button is a second thing to find, it is there at moments when there is
+   * nothing to clear, and it asks somebody to tidy up before they can do what
+   * they came to do.
+   * ⚠️ WHAT CHANGED IS THAT THE PAGE NOW KEEPS THINGS WORTH CLEARING ON ITS
+   * OWN TIMELINE. A run leaves a recording, a question, its answers and their
+   * option lanes, and until today the only way to be rid of them was to start
+   * another show. That is fine when you are about to, and wrong when you are
+   * showing somebody the page.
+   * ⚠️ AND IT IS DISABLED WHEN THERE IS NOTHING TO CLEAR, which answers the
+   * strongest half of the old objection: a control that is present at a moment
+   * it cannot act is what made it a second thing to find.
+   * ⚠️ NOT IN `.pos-controls` AND NOT A `.tbar-x`, DELIBERATELY. `verify.mjs`
+   * presses exactly those two selectors, and a harness that pressed Clear
+   * mid-drill would wipe the run it is grading. `clearRun` is still reached in
+   * the checks the way it always was, through the record press.
+   */
+  const clearBtn = el('button', 'pos-btn', 'Clear', { type: 'button' });
+  clearBtn.addEventListener('click', () => { clearRun(); paintClear(); });
+  /** Nothing to clear means nothing to press. */
+  function paintClear() {
+    clearBtn.disabled = !(archiveMedia || QUESTIONS.length || T0 != null);
+  }
+  paintClear();
+  room.append(createGlue(showBar.el, roomStrip.el), clearBtn);
   paintTransport();
   paintPlayRec();
 
@@ -1939,11 +2103,13 @@
    * IT.** `transport-bar.mjs` forces `api.playing` false and says so through
    * `api.toggles`, which `demo/verify.mjs` reads before it presses anything.
    */
-  const filmBar = createTransportBar(room, filmDeck, {
-    live: false, absolute: false, loop: false, time: true, scrub: false,
-    toggle: false, publish: false, command: filmCommand,
-  });
-  ctrl.panel.glue(filmBar.el);
+  // 🔴 THE FILM BAR IS GONE, 2026-09-25, AND THE CLOCK WENT WITH IT. It was the
+  // second footer. `filmDeck` and `filmCommand` STAY: they are what plays the
+  // film, and the film still starts with the show, which the owner chose to keep
+  // when asked. What left is the ROW, not the mechanism.
+  // ⚠️ SO `22:11.850` BEFORE A FETCH IS A FACT THIS PAGE NO LONGER SHOWS. If it
+  // is wanted back it belongs in the one footer as a readout cell, not as a
+  // whole transport bar with a clock in it.
 
   /**
    * 🔴 MUTE IS A GLYPH BESIDE THE FULLSCREEN BUTTON, NOT A ROW OF ITS OWN.
@@ -2139,10 +2305,13 @@
     paintPlayRec();
     if (archiveUrl) { URL.revokeObjectURL(archiveUrl); archiveUrl = null; }
     playingBack = false;
-    // The LIVE PICTURE comes back, which is the same swap `openArchive` does in
-    // reverse: there is no recording again, so the control room goes back to
-    // showing what the loop is drawing rather than a file.
-    showMonitor();
+    // The panel goes back to empty, which is the same swap `openArchive` does in
+    // reverse: there is no recording again, so there is no video element again
+    // either. ⚠️ AND IT IS EMPTY RATHER THAN A CARD. This comment said "the
+    // card comes back" until 2026-09-25, on the day the `Nothing recorded yet`
+    // card was taken off the page, so it described a swap that could no longer
+    // happen and the check below it was still asking for the card.
+    archive.panel.stage.textContent = '';
     chunks.length = 0;
     QUESTIONS.length = 0;
     ANSWERS.length = 0;
@@ -2151,7 +2320,7 @@
     // The question comes off both footers. `show()` puts it in a panel's centre
     // slot, so emptying that slot is the same swap in reverse, and a poll left
     // standing from a show that has ended is a control somebody can still press.
-    for (const id of SHOWN_ON) byId.get(id).panel.slots.centre.textContent = '';
+    for (const id of SHOWN_ON) byId.get(id).panel.slots.caption.textContent = '';
     T0 = null; recordedMs = null; stored = null; landed = null;
     recTrack = null; askedBps = null; recSource = 'received';
     paintPlayRec();
@@ -2160,50 +2329,30 @@
     showDeck.seek(0);
     relane();
     strip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
-    fitRoom();
+    roomStrip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
     d.log('a new run: the last recording, its questions and its answers are gone', 'hi');
   }
 
-  /**
-   * 🔴 IT TAKES THE LEG, AND EVERYTHING AFTER THE PICTURE IS ONE PATH. Until
-   * 2026-09-25 this function WAS the WebRTC leg, and the HLS one was a separate
-   * `startHls` that built a player and stopped. The recorder, the write head,
-   * the archive and the strip therefore existed only on one of the two
-   * transports this page is about, and the checks under them could only ever be
-   * reached by subscribing to Cloudflare over WHEP.
-   * ⚠️ **AND THE ONE THING THAT DIFFERS IS WHERE THE TRACK COMES FROM.** Seven
-   * lines of it, in one `if`. A leg is how a picture gets here; a show is what
-   * happens around it.
-   */
-  const HLS_FIRST_FRAME_MS = 30000;
-  /** Why the last start gave up, kept so a failed run can say so. */
-  let lastStartError = null;
-  async function startShow(leg = 'webrtc') {
+  async function startShow() {
     if (phase === 'live' || starting) return;
-    lastStartError = null;
     // A second press of record is a new show, so whatever the last one left has
     // to go before this one starts writing over it.
     if (phase !== 'before') clearRun();
     phase = 'before';
     starting = true;
     /**
-     * 🔴 THE SHOW'S CLOCK DOES NOT START ON THE PRESS. REPORTED 2026-09-25:
-     * *"it should not start unti on aor"*. `showDeck.play()` was the first
-     * thing this function did, so the transport began counting the moment
-     * somebody pressed START and went on counting through the whole wake.
-     * MEASURED in a real tab on the HLS leg: the bar read **0:02.191**, then
-     * **0:06.291**, then **0:19.089** while both badges still said `OFF AIR`,
-     * and the leg took **17.2 s** to carry a frame on one run and **22.2 s** on
-     * another. A show that has been on air for nineteen seconds and has sent
-     * nothing is a clock measuring a wait.
-     * ⚠️ **SO IT STARTS WHERE THE WRITE HEAD DOES**, next to `followWriteHead()`
-     * and `phase = 'live'`, which is the one moment this page can honestly call
-     * the beginning of a show: a frame has arrived and the recorder holds it.
-     * ⚠️ AND THE FILM STILL STARTS ON THE PRESS, which is not an oversight. The
-     * operator's own material is what the control room has to look at WHILE the
-     * leg comes up, and it is the only thing in the box until the picture that
-     * replaces it arrives.
+     * 🔴 THE TIMELINE DOES NOT RUN UNTIL THE SHOW IS ON AIR. Asked 2026-09-25:
+     * *"it should not sart rec/play timeline until on air"*. `showDeck.play()`
+     * used to be this line, so the bar's clock started on the PRESS and ran
+     * through the whole publisher wake: a timeline advancing over a show that
+     * did not exist yet. The deck starts where the badge goes on air instead,
+     * so the clock, the recorder and the badge all begin at one moment, and
+     * that moment is the arrival of a frame.
+     * ⚠️ AND THE BADGE SAYS `STARTING`, which only the HLS leg did. A silent
+     * wake reads as a dead control, which this page has paid for twice today.
      */
+    setBadges('coming');
+    pendTransport('webrtc', true);
     /**
      * 🔴 THE FILM IS NOT STARTED HERE, SINCE 2026-09-19: *"make video transport
      * indepencent of when show starts"*. This line used to be
@@ -2235,19 +2384,12 @@
      */
     if (bgVideo) {
       filmCommand.play();
-      // ⚠️ AND IT SAYS WHAT IT IS FOR, WHICH IS NOT WHAT IT USED TO BE. This
-      // read `the film starts with the show`, written when the film was the
-      // picture being published. The page publishes nothing now: the film is
-      // what the control room has to look at until the leg carries one.
-      d.log('the film is up in the control room while the leg comes up', 'hi');
+      d.log('the film starts with the show, since it has no press of its own', 'hi');
     } else {
-      d.log('there is no film loaded, so the control room has nothing to show '
-        + 'until the leg carries a picture', 'warn');
+      d.log('the show is on air with no film loaded, so what is going out is the pattern', 'warn');
     }
-    // ⚠️ AND FOLLOW WAS ARMED HERE TOO, FOR THE SAME REASON IT SHOULD NOT BE.
-    // A window chasing a write head that has not been armed is a window chasing
-    // zero, so the control room's timeline started sliding on the press as
-    // well. It arms with the clock, next to `followWriteHead()`.
+    // The window starts chasing the show now that there is one.
+    roomStrip.strip.setFollow(true);
     try {
       /**
        * 🔴 THIS PAGE IS A PURE RECEIVER SINCE 2026-09-25. Asked in those words:
@@ -2269,37 +2411,27 @@
       v.muted = true;
       armVideo(v);
       if (!hold) hold = holdPublisher(() => {});
-      /**
-       * ⚠️ THE HLS LEG HOLDS THE CONTAINER A SECOND TIME AND THAT IS NOT A
-       * DUPLICATE. `hold` is this page wanting the container awake at all;
-       * `hlsHold` is dropped by `dropTransport()` on a switch, which is how the
-       * RTMPS leg learns that this tab stopped watching it.
-       * ⚠️ `createLowLatencyPlayer` AND NOT A BARE `new Hls()`. Its defaults are
-       * wrong in three directions for a live start and that file carries the
-       * measurements; see src/low-latency-player.js.
-       */
-      if (leg === 'hls') {
-        hlsHold = holdPublisher(() => {});
-        await ensureHls();
-        hlsPlayer = createLowLatencyPlayer(v, llhls(), { preferNative: 'auto' });
-        live = { pub: null, sub: null, kind: 'hls' };
-      } else {
-        live = { pub: null, sub: await whepPlay(whep(), v, { log: d.log }), kind: 'receiver' };
-      }
+      live = { pub: null, sub: await whepPlay(whep(), v, { log: d.log }), kind: 'receiver' };
 
       // The card goes, the picture arrives. One swap, at the moment there is
       // something true to show.
-      aud.panel.stage.textContent = '';
-      aud.panel.stage.append(v);
+      // 🔴 AND IT GOES TO THE TAB THAT IS SHOWING, NOT ALWAYS THE AUDIENCE.
+      // Reported 2026-09-25 about this leg: *"can not see in controlroom"*. The
+      // HLS leg was fixed an hour earlier and this one was missed, so WebRTC
+      // still put the only `<video>` in the audience panel and the operator
+      // watched an empty box. One element, moved: a second player would be a
+      // second Stream meter for one picture.
       audVideo = v;
+      showPictureOn(showingTab());
 
       /**
-       * ⚠️ THE PARAGRAPH THAT STOOD HERE WAS ABOUT A LOOPBACK LEG THAT WAS
-       * DELETED ON 2026-09-25 (*"rm loopback"*), and it explained why a short
-       * deadline suited a `pcOut`/`pcIn` hop inside one tab. There is no such
-       * leg any more, so the reasoning it carried cannot be true of anything on
-       * this page, and a comment describing code nobody wrote is this project's
-       * most repeated defect. What replaced it is the two notes below.
+       * ⚠️ THE LOOPBACK DEADLINE IS SHORT ON PURPOSE AND IT IS A HARNESS
+       * CONSTRAINT AS MUCH AS A USER ONE. `verify.mjs` stops collecting once
+       * the assert count has been still for 4.8 s, so a six second wait inside
+       * a drill throws away every assert after it and the page reads as having
+       * stopped early. MEASURED: at 6000 the drill landed 1 of its 7 asserts.
+       * The real leg keeps a long deadline, because Cloudflare genuinely takes
+       * seconds and a person is watching it rather than a harness.
        */
       /**
        * 🔴 SHORTER THAN THE CHECK THAT WAITS FOR IT. This was 20 s while the
@@ -2313,23 +2445,17 @@
        * waits for one event must be ordered deliberately, and the inner one has
        * to be the shorter.
        */
-      /**
-       * ⚠️ AND THE HLS DEADLINE IS THE LONGER OF THE TWO, BECAUSE IT IS WAITING
-       * FOR A DIFFERENT THING. WHEP waits for media on a connection that has
-       * already been negotiated; HLS waits for a CONTAINER, whose cold wake was
-       * probed in a real browser at about 22 s, and then for Cloudflare to cut a
-       * first segment. `checks()` opens the publisher hold on its first line so
-       * that wake is already under way by the time anything presses start.
-       */
-      const seen = await waitForFirstFrame(v,
-        { timeoutMs: leg === 'hls' ? HLS_FIRST_FRAME_MS : 12000 });
+      const seen = await waitForFirstFrame(v, { timeoutMs: 12000 });
       /**
        * ⚠️ THE BADGE GOES `live` BECAUSE FRAMES ARRIVED, NOT BECAUSE A PROMISE
        * SETTLED. A WHEP track exists before it carries anything, so a page that
        * reports on the negotiation is reporting a socket rather than a picture.
        */
       setBadges(seen.frames ? 'online' : 'checking');
-      d.log(`picture ${seen.w}x${seen.h} by ${seen.how} on ${leg}`, seen.frames ? 'hi' : 'warn');
+      // The clock starts with the picture, not with the press. See `startShow`.
+      showDeck.play();
+      pendTransport('webrtc', false);
+      d.log(`picture ${seen.w}x${seen.h} by ${seen.how}`, seen.frames ? 'hi' : 'warn');
 
       /**
        * 🔴 IF NO FRAME EVER ARRIVES, RECORD THE CANVAS AND SAY SO IN THOSE
@@ -2365,57 +2491,20 @@
        * nobody measures. This page publishes nothing now: the only picture
        * there has ever been is the one that came back.
        */
-      /**
-       * ⚠️ TWO ROUTES TO ONE TRACK, AND `recSource` SAYS WHICH ONE THIS IS.
-       * `received` is the WHEP receiver's own track object, which is why the
-       * check below can compare it by IDENTITY against `pc.getReceivers()`.
-       * `played` is the HLS element's picture, taken with `captureStream()`
-       * once a frame has landed. Neither is this page's canvas, which is the
-       * distinction the label exists to carry, and the third value the page
-       * once had.
-       */
-      const track = leg === 'hls' ? captureFrom(v) : live.sub.inbound.getVideoTracks()[0];
-      recSource = leg === 'hls' ? 'played' : 'received';
+      const track = live.sub.inbound.getVideoTracks()[0];
       if (!seen.frames) {
-        d.log(`no frame has crossed the ${leg} leg yet, so the recording starts `
+        d.log('no frame has crossed the WebRTC leg yet, so the recording starts '
           + 'on a track that is still filling', 'warn');
       }
-      if (!track) throw new Error(`the ${leg} leg carried no video track`);
+      if (!track) throw new Error('the WebRTC leg carried no video track');
       rec = startRecorder(track);
       recTrack = track;
-      /**
-       * 🔴 ON AIR IS ONE MOMENT AND EVERYTHING THAT MOVES STARTS HERE. A frame
-       * has crossed, the recorder is holding it, and the badge is about to say
-       * so. The clock, the write head and the window that chases it are one
-       * fact about the show rather than three things that happen to be armed in
-       * three places, which is what let the clock start twenty seconds early.
-       */
-      showDeck.play();
       followWriteHead();
-      roomStrip.strip.setFollow(true);
       phase = 'live';
-      d.log(`the audience is on ${leg === 'hls' ? 'low latency HLS' : 'WebRTC'}`, 'hi');
       sayState();
     } catch (err) {
-      /**
-       * 🔴 THE REASON IS KEPT, NOT ONLY LOGGED, AND THAT COST A RUN.
-       * MEASURED 2026-09-25: this catch swallowed `HLS is not supported in this
-       * browser` into a log line, the suite prints no page log, `no console
-       * errors` read 0 because a caught throw is not a console error, and the
-       * thirteen red asserts downstream all said some version of "there was no
-       * recording". The reason was in the page and nothing carried it out.
-       * ⚠️ IT IS PRINTED IN AN ASSERT DETAIL RATHER THAN ASSERTED ON, so the
-       * count does not move and a reader of a red run is told WHY on the first
-       * line that failed instead of on none of them.
-       */
-      lastStartError = String((err && err.message) || err);
-      d.log(`the show did not start: ${lastStartError}`, 'bad');
+      d.log(`the show did not start: ${err && err.message}`, 'bad');
       showDeck.pause();   // it never got on air, so the bar goes back to start
-      // ⚠️ AND THE LEG GOES WITH IT. A player left running behind a start that
-      // threw is a stream nobody is watching and a hold nobody will release,
-      // and the button above reads START, so nothing would ever stop it.
-      dropTransport();
-      roomStrip.strip.setFollow(false);
     } finally { starting = false; }
   }
 
@@ -2447,12 +2536,6 @@
     await done;
     try { live?.pub?.stop?.(); } catch { /* the proxy may already have gone */ }
     for (const t of (live?.sub?.inbound?.getTracks?.() ?? [])) t.stop();
-    // ⚠️ AND THE CAPTURED ONE TOO, WHICH THE LINE ABOVE CANNOT REACH. On the
-    // HLS leg there is no receiver and no inbound stream: the recorded track
-    // came out of `captureStream()` on the element, so it is the only handle
-    // there is to a track still pulling frames off a decoder.
-    for (const t of (capStream?.getTracks?.() ?? [])) t.stop();
-    capStream = null; capFrom = null;
     setBadges('offline');
 
     const mime = chunks[0]?.type || 'video/webm';
@@ -2516,32 +2599,6 @@
     },
     get questions() { return QUESTIONS.length; },
     get answers() { return ANSWERS.length; },
-    /**
-     * ⚠️ THE TWO STRIPS, BY NAME, BECAUSE THEY DISAGREE AND ONLY ONE OF THEM IS
-     * ON SCREEN. The control room's strip is built inside a hidden tab panel,
-     * which is where this page has already been bitten once, and a probe that
-     * cannot ask each of them separately has to read an axis off a screenshot.
-     */
-    get views() {
-      const one = (s) => {
-        if (!s) return null;
-        const v = s.strip.view();
-        const st = s.strip.state;
-        return {
-          spanMs: Math.round((st.width - st.gutterPx) * 1000 / v.pxPerSecond),
-          startSec: +(v.startSec ?? v.t0 ?? 0).toFixed(2),
-          widthPx: Math.round(st.width),
-        };
-      };
-      return { archive: one(strip), room: one(roomStrip) };
-    },
-    /** What the control room's strip is really holding, as opposed to what
-     *  `laneList()` says it should be. The two disagreed once. */
-    get roomLanes() { return (roomStrip?.strip.state.lanes ?? []).map((l) => l.label ?? l.id); },
-    /** What each lane would draw right now, so an empty one can be seen. */
-    get laneRows() {
-      return laneList().map((l) => ({ id: l.id, label: l.label, rows: (l.rows?.() ?? []).length }));
-    },
     startShow, stopShow,
   };
 
@@ -2592,26 +2649,9 @@
     archive.panel.stage.append(v);
     playingBack = true;
 
-    /**
-     * 🔴 A RECORDING OF NO LENGTH IS A REAL STATE AND IT THREW. Found 2026-09-25
-     * by the assert that says the checks ran to the end: `setRange needs max >
-     * min (got [0, 0])`, thrown out of the line below and taking every check
-     * after it with it. Pressing STOP straight after START is all it takes: the
-     * recorder has produced nothing, the blob is empty, and `resolveDuration`
-     * answers 0 rather than null, which the guard did not cover.
-     * ⚠️ **`> 0`, NOT `!= null`.** A zero is a resolved duration, which is why
-     * it walked past a null check, and it is the one value a range cannot take.
-     * The page already says in words when there is nothing to scrub, so this is
-     * the same sentence for the case next door rather than a new behaviour.
-     * ⚠️ AND `recordedMs` GOES BACK TO NULL, because a 0 left in it would be
-     * read as a length by `maxSpanMs`, by the video lane and by the archive
-     * bar, all of which fall back to the nominal show when it is null.
-     */
     recordedMs = await resolveDuration(v);
-    if (!(recordedMs > 0)) {
-      d.log(`the recording is ${recordedMs === 0 ? 'zero seconds long' : 'of no resolvable length'}, `
-        + 'so there is nothing to scrub', 'bad');
-      recordedMs = null;
+    if (recordedMs == null) {
+      d.log('the recording has no duration that could be resolved, so there is nothing to scrub', 'bad');
       return null;
     }
     archiveDeck.setRange([0, recordedMs]);
@@ -2632,19 +2672,37 @@
   }
 
   /**
-   * ⚠️ FILLED IN, NOT HINTED AT. Asked 2026-09-17: *"fill sample q sending with
-   * same stuff you haev in hints"*. A form whose fields are all placeholders is
-   * a form nobody can press Send on without typing first, which on a page whose
-   * whole point is watching a question arrive puts a chore in front of the
-   * demonstration.
-   * ⚠️ **ALL THREE ARE FILLED NOW, WHICH REVERSES A SMALLER DECISION.** The
-   * third used to stay empty on the argument that a question with two answers
-   * and room for a third says more about the control. The question that was
-   * asked for has three answers, and inventing a two-answer version of it to
-   * demonstrate an empty field would be the page arguing with the ask.
+   * ⚠️ THE OPTIONS ARE FILLED IN AND THE QUESTION IS NOT, AND THE SPLIT IS THE
+   * WHOLE POINT. Asked 2026-09-17: *"fill sample q sending with same stuff you
+   * haev in hints"*. A form whose fields are all placeholders is a form nobody
+   * can press Send on without typing first, which on a page whose whole point
+   * is watching a question arrive puts a chore in front of the demonstration,
+   * and that argument is still right about the answers.
+   * 🔴 **IT IS WRONG ABOUT THE QUESTION, WHICH CAME BACK AS A DEFECT TWICE.**
+   * `HANDOFF.md` carried *"A STALE QUESTION APPEARS ON LOAD, KAS SA OLED TEINUD
+   * ÖKOPATTU?, on a page that is OFF AIR"* from a screenshot, and it was
+   * reported again on 2026-09-25 as *"when I load it, I get some kind of stale
+   * question"*. A question on screen on a page that is off air reads as
+   * something somebody asked, whatever put it there, and a sample that has to
+   * be explained away is not a sample.
+   * ⚠️ **SO ONE FIELD OF FOUR GAVE UP ITS VALUE AND THE OTHER THREE KEPT
+   * THEIRS.** Three words in three boxes labelled `option` are not a question
+   * and nobody reads them as one, so the 2026-09-17 ask survives everywhere it
+   * still holds: Send is one line of typing away rather than four.
+   * ⚠️ **AND NO PLACEHOLDER, WHICH WAS THE OBVIOUS ANSWER AND IS THE WRONG
+   * ONE.** `createField` takes one, and its own note says a placeholder says
+   * what a good VALUE looks like. A free text question has no shape to show,
+   * and the only concrete example to hand is the exact sentence that was
+   * reported as appearing on load, so a hint here would be the report again in
+   * a lighter ink. What the box needs said is said by the word `question` in
+   * front of it.
+   * ⚠️ **AND `send()` ALREADY REFUSES AN EMPTY ONE IN WORDS**, for the reason
+   * written beside it: there is no silent fallback to the sample, because
+   * clearing the question and pressing Send used to ask the audience something
+   * nobody had typed.
    */
   /**
-   * 🔴 THE DEFAULT QUESTION IS ABOUT THE FILM BEHIND IT, AND IT IS THE ONE
+   * 🔴 THE PAGE'S OWN QUESTION IS ABOUT THE FILM BEHIND IT, AND IT IS THE ONE
    * THAT WAS ASKED FOR, WORD FOR WORD. Given 2026-09-19 as
    * *"q is : Kas sa oled teinud ökopattu?: Veidi | Palju | Väga palju"*, with
    * the film that replaced the Méliès print in the same session. The
@@ -2662,12 +2720,27 @@
    * would make the page tidier and the demonstration weaker, because a question
    * with two diacritics and a question mark in it is exactly what proves the
    * relay carries what was typed.
+   * ⚠️ **AND IT IS THE CHECK'S QUESTION NOW RATHER THAN THE FIELD'S VALUE.**
+   * `ASK_TITLE` is what this page's own self check sends through the relay and
+   * reads back code point by code point, which is where the two diacritics and
+   * the question mark are doing work, and it is why the constant stays exactly
+   * as it was given.
    */
   const ASK_TITLE = 'Kas sa oled teinud ökopattu?';
   const ASK_OPTIONS = ['Veidi', 'Palju', 'Väga palju'];
-  const title = createField({
-    label: 'question', value: ASK_TITLE, grow: 'wide',
-  });
+  /**
+   * 🔴 THE SAMPLE QUESTION IS BACK, ASKED 2026-09-25: *"restore "Oled sa teinud
+   * okopattu?" q"*. It was emptied earlier the same day because a stale
+   * question appeared on a page reading OFF AIR, and emptying the field was the
+   * WRONG HALF of that fix: the question a stranger saw arrived off the SHARED
+   * ROOM, which is fixed properly at the `ROOM` line instead.
+   * ⚠️ SO A PREFILL IS SAFE NOW AND WAS NOT BEFORE. The room is a per load
+   * `stage-<6 chars>` nobody else is in, so a question sitting in this box
+   * reaches nobody until Send is pressed, and the 2026-09-17 ask that put it
+   * there (*"fill sample q sending with same stuff you haev in hints"*) holds
+   * again: Send is one press rather than four lines of typing.
+   */
+  const title = createField({ label: 'question', value: ASK_TITLE, grow: 'wide' });
   const opts = ASK_OPTIONS.map((v) => createField({ label: 'option', value: v }));
   /**
    * ⚠️ THE QUESTION ON ONE ROW, THE OPTIONS ON THE NEXT. Asked 2026-09-17:
@@ -2778,36 +2851,35 @@
      * picture over it. What the drawing loop needs to know is whether there is a
      * frame to draw, which is what `readyState >= 2` means.
      */
-    /**
-     * 🔴 WHAT IS GOING OUT WINS THE CONTROL ROOM, WHICH IS WHAT A CONTROL ROOM
-     * IS FOR. REPORTED 2026-09-25: *"no hls video on conrtol room"*. The
-     * audience's `<video>` is the only place the leg's picture existed, and
-     * that element lives in the audience panel, so the person RUNNING the show
-     * could not see the show. Drawing it into the master puts it on the control
-     * room's canvas with no second subscription, no second decode of the
-     * stream, and no element moved between two panels.
-     * ⚠️ **`liveReady` IS A FRAME, NOT A PHASE.** `phase === 'live'` is true the
-     * moment the recorder starts, and the element can still be between frames
-     * after a switch, so this asks the element rather than the state machine
-     * and falls through to the film when the answer is no.
-     * ⚠️ **AND IT DOES NOT TAINT THE CANVAS, WHICH WAS MEASURED RATHER THAN
-     * ASSUMED.** hls.js feeds an MSE buffer out of the page's own fetches, so
-     * the element stays origin-clean: MEASURED in a real browser on the live
-     * leg, `drawImage` then `getImageData` read back `[151, 36, 8]` rather than
-     * throwing. The read-back matters because `lumAtOf` and `readBurnedFrom`
-     * both read this canvas.
-     * ⚠️ **THE NATIVE HLS PATH IS UNMEASURED.** On WebKit the player sets
-     * `video.src` to the playlist, which is a cross-origin media load, and
-     * whether Cloudflare's responses keep it origin-clean has not been checked
-     * here. `crossOrigin = 'anonymous'` would settle it and would also turn a
-     * missing header into a load that fails outright, so it is deliberately NOT
-     * set on a path nothing in this repository has run. A taint would surface
-     * as a throw inside the checks, which now report one.
-     */
-    const liveReady = audVideo && audVideo.readyState >= 2 && audVideo.videoWidth > 0;
     const bgReady = bgVideo && bgVideo.readyState >= 2;
-    if (liveReady) drawCamera(mctx, audVideo, STAGE_W, STAGE_H, { fit: 'cover', scrim: 0 });
-    else if (bgReady) drawCamera(mctx, bgVideo, STAGE_W, STAGE_H, { fit: 'cover', scrim: 0 });
+    /**
+     * 🔴 THE CONTROL ROOM SHOWS WHAT IS GOING OUT, AND IT SHOWED NOTHING.
+     * Reported twice, 2026-09-25: *"audience shows video but not control
+     * room"*, then *"still no video on control room"*. Both legs append the
+     * received `<video>` to the AUDIENCE panel only (`aud.panel.stage`), and
+     * this loop fed every other panel from the film. So the operator, whose one
+     * job is to watch what the audience is getting, had a flat field while the
+     * audience had a picture.
+     * ⚠️ THE MIRROR IS A CANVAS DRAW, NOT A SECOND PLAYER, AND THAT IS THE
+     * WHOLE POINT. A second `<video>` on the same source is a second delivery:
+     * Stream bills by the minute DELIVERED, so two elements is two meters for
+     * one picture. One decode in the audience panel, copied into the master
+     * canvas the control room already paints from, costs nothing extra.
+     * ⚠️ LIVE BEATS THE FILM. When a show is on, the live picture IS the truth
+     * about the page; the film is what plays when nothing is.
+     * ⚠️ AND A CROSS-ORIGIN VIDEO CAN TAINT THE CANVAS, which is why the draw
+     * is guarded. `MediaStream` from a peer connection and an MSE-backed
+     * hls.js element both draw clean; a NATIVE HLS element playing a
+     * cross-origin manifest, which is the Safari path, taints it and makes
+     * `getImageData` throw. The readers of those pixels are checks rather than
+     * visitors, and `readBurnedFrom` already tolerates a null, so the cost of
+     * the Safari case is a check that cannot read the burn, not a broken page.
+     */
+    // ⚠️ NO LIVE MIRROR HERE ANY MORE. A canvas copy of the live element was
+    // tried on 2026-09-25 and was the wrong fix: the control room has no
+    // picture canvas on screen at all, so it drew into nothing. The element
+    // itself moves to the showing tab instead, in `showPictureOn`.
+    if (bgReady) drawCamera(mctx, bgVideo, STAGE_W, STAGE_H, { fit: 'cover', scrim: 0 });
     else {
       /**
        * 🔴 NO TEST PICTURE ON SCREEN, EVER. Asked 2026-09-18: *"i get blinkig
@@ -2897,34 +2969,18 @@
    * called exactly once, for nothing, so the burn path stays compiled and the
    * next reader can see what used to happen here.
    */
+  const noTape = createCard({
+    title: 'Nothing recorded yet',
+    desc: 'When a show is stopped in the control room, the recording appears here and '
+      + 'the timeline fills with what was asked and what came back.',
+    // The shape the recording will be, so the box does not change size when the
+    // card is swapped for the file.
+    aspect: `${STAGE_W} / ${STAGE_H}`,
+  });
+  archive.panel.stage.textContent = '';
   // 🔴 NO `Nothing recorded yet` CARD. PLAY RECORDING already says it by being
   // disabled, and a paragraph explaining that nothing has happened yet is
   // furniture where a control would do.
-  /**
-   * 🔴 AND THE LINE THAT EMPTIED THIS BOX IS GONE, BECAUSE IT WAS EMPTYING THE
-   * CONTROL ROOM'S ONLY PICTURE. REPORTED 2026-09-25 as *"no hls video on
-   * conrtol room. is it tab swithcing?"*, and it is not tab switching.
-   *
-   * `archive` is `byId.get('controlroom')`: when the Archive tab was removed
-   * the same day, the archive's ROLE was repointed at the control room's panel,
-   * and `archive.panel.stage.textContent = ''` came with it. That line ran at
-   * build and deleted the canvas `createVideoPanel` had just appended.
-   * MEASURED before the repair, in a real tab: **`document.querySelectorAll(
-   * 'canvas')` returned exactly ONE element in the whole page, the strip's**.
-   * The control room has had no picture of any kind since that change, on air
-   * or off it, and the box a reader was looking at was the panel's own empty
-   * stage.
-   * 🔴 **AND THE PAGE'S OWN CHECK COULD NOT SEE IT, WHICH IS THE PART WORTH
-   * KEEPING.** `the control room shows what the loop drew, and the canvas is
-   * not blank` reads `panels[1].ctx` against `mctx`, and a detached canvas
-   * keeps its context and keeps being drawn into perfectly. It read `spanning
-   * 238 of 255` on a run where nobody could see anything. That is `el.hidden`
-   * against `getComputedStyle().display` one component along: a context is a
-   * fact about an object, and only the DOM can say whether it is on screen.
-   * ⚠️ **THIS IS THE SECOND REPOINTING BUG ON THIS PANEL.** `LESSONS.md` #116
-   * records the first: one blanket replace of `tabs.panel('archive')` moved a
-   * bar, a strip and a diagram into a panel that already had its own.
-   */
 
   // Every panel's default badge is told the same thing, because they all show
   // the same picture and it is this page drawing it.
@@ -2937,37 +2993,40 @@
    * answered in that file. Everything below reads what is already on screen.
    */
   /**
-   * 🔴 EVERY ASSERT IS REPORTED WHERE IT IS MADE, AND THE VERSION THAT HELD
-   * THEM ALL TO THE END WAS AN ALL-OR-NOTHING BET THIS PAGE KEPT LOSING.
+   * 🔴 EVERY ASSERT IS HELD AND EMITTED IN ONE GO AT THE END, AND THAT IS THE
+   * HARNESS'S OWN DESIGN RATHER THAN A TRICK.
    *
-   * The old shape pushed 37 rows into an array and emitted them in one go, on
-   * the reasoning that `verify.mjs` stops collecting 400 ms after the last
-   * assert, so a page that asserts early and then works for ten seconds has its
-   * tail thrown away. That reasoning was out of date and the arrangement built
-   * on it had three costs, all measured on this page:
-   * - **A THROW ANYWHERE LOST ALL 37 IN SILENCE.** `checks()` is async and is
-   *   called without `await`, so anything that threw inside it became an
-   *   unhandled rejection: the page reported NOTHING and the suite printed a
-   *   confident green for the shell's own rows.
-   * - **A WAIT ANYWHERE DELAYED ALL 37.** Widening the show poll to 28, 45 and
-   *   80 s was tried in turn, and past about 28 s the flush landed after the
-   *   harness had stopped collecting, so the page reported **2 asserts instead
-   *   of 37** while the suite read a confident 12/12 GREEN. That is this
-   *   project's worst failure shape and the hold is what made a timeout produce
-   *   it.
-   * - **AND IT HID WHERE THE DRILL GOT TO.** A run that stops half way through
-   *   a pipeline reads identically to one that never started.
-   * ⚠️ **THE GROWTH LOOP IS NOT AS IMPATIENT AS THIS COMMENT USED TO SAY.** It
-   * tolerates 5 quiet polls, which is 2.0 s, and caps at 60 tries, which is
-   * 24 s. So incremental flushing is not a licence to wait either. What it buys
-   * is that a cut-off costs the asserts AFTER it and no longer costs the ones
-   * before, and the count says exactly where the page got to.
-   * ⚠️ **AND THE REAL BUDGET IS THE PRESS LOOP, NOT THE GROWTH LOOP.**
-   * `settleMs: 75000` is slept by the harness after control 0, before it
-   * collects anything, and the page's checks run through the whole of it. A
-   * drill that finishes inside that window is collected whole.
+   * `verify.mjs` has two phases. While the page has asserted NOTHING it waits,
+   * sized by `settleMs`, up to 30 s: "while the count is still zero, wait".
+   * Once anything has landed it switches to the cheap one, which exits the
+   * moment the count is unchanged for a single 400 ms tick. So a page that
+   * asserts early and then works for ten seconds has its whole tail thrown
+   * away, and reads as having stopped rather than as having been cut off.
+   * MEASURED HERE: the drill produced all 7 of its asserts on the page and the
+   * harness collected 1 of them.
+   *
+   * ⚠️ THE OTHER TWO WAYS OUT DO NOT FIT THIS PAGE. A control marked
+   * `data-busy` gives the checks a slot, and this page has no controls row on
+   * purpose: a global Start would appear on the AUDIENCE tab, where the one
+   * thing that must not be possible is starting the show. `settleMs` on
+   * control 0 needs a control 0 for the same reason.
+   * ⚠️ AND HOLDING THEM COSTS NOTHING A READER SEES. `d.assert` is the report;
+   * the ORDER it is written in is this list, so the page reads exactly as
+   * before and a visitor, who never runs any of this, is unaffected either way.
    */
-  const A = (label, pass, detail) => d.assert(label, pass, detail);
+  const held = [];
+  const A = (label, pass, detail) => held.push([label, pass, detail]);
+
+  /**
+   * ⚠️ THE WAKE IS DECLARED BESIDE THE HELD ASSERTS BECAUSE IT IS READ IN A
+   * DIFFERENT FUNCTION FROM THE ONE THAT STARTS IT. `checks()` starts it and
+   * `showDrill()` awaits it, and the first version declared it as a `const`
+   * inside `checks()`: `ReferenceError: whipUp is not defined`, which took the
+   * page to 2 asserts and was caught only by `no console errors`. A local that
+   * two functions need is not a local.
+   */
+  let wokeAt = 0;
+  let whipUp = null;
 
   /**
    * Eight fixed points of a canvas, as luminance. Used by more than one check
@@ -2983,55 +3042,57 @@
     return Math.round(px[0] * 0.299 + px[1] * 0.587 + px[2] * 0.114);
   });
 
-  /**
-   * 🔴 A THROW IN HERE USED TO COST EVERY ASSERT AND SAY NOTHING, SO THE PAGE
-   * ASSERTS THAT IT GOT TO THE END. `checks()` is called from an animation
-   * frame without `await`, so anything it threw became an unhandled rejection:
-   * the count simply came up short and no line anywhere said why. This is one
-   * row, unconditional in both arms, so the total does not move with it, and it
-   * is the last thing the page says.
-   */
   async function checks() {
     if (q.get('selfcheck') !== '1') return;
-    let threw = null;
-    try { await runChecks(); } catch (e) { threw = e; }
-    d.assert('the checks ran to the end rather than stopping on a throw',
-      threw === null,
-      threw ? `${threw && threw.message}` : 'every check on this page ran');
-  }
 
-  async function runChecks() {
     /**
      * 🔴 WAKE THE CONTAINER FIRST, SO IT IS WARM BY THE TIME A SHOW IS ASKED
      * FOR. Probed in a real browser: a cold wake is about **22 seconds**, and
-     * the leg connects a second after it. Both legs come from that one
-     * container, the HLS one through its RTMPS ffmpeg leg, so this is the wait
-     * that the read-only asserts below are spent covering.
+     * the leg connects a second after it. These asserts are HELD and flushed
+     * only when this function finishes, so a poll wide enough to cover that
+     * wake pushes the flush past the harness's patience and the page reports
+     * **2 asserts instead of 37** while the suite reads a confident 12/12.
      * ⚠️ **SO THE WAIT IS SPENT ON WORK RATHER THAN ON WAITING.** Holding the
      * socket here costs nothing and lets every assert that needs no show run
      * while ffmpeg comes up, which is the same trick `settleMs` plays for the
      * first control.
      * ⚠️ AND IT IS INSIDE THE `selfcheck` GATE, so a visitor still opens
      * nothing until they press something.
+     *
+     * 🔴 AND WAKING IT IS NOT THE SAME AS WAITING FOR IT, WHICH IS WHAT COST
+     * FOURTEEN ASSERTS. MEASURED 2026-09-25: the hold on this line goes out at
+     * about t+0.2 s, the press of the show button used to happen at about
+     * t+12 s, and the container needs roughly 22 s to run ffmpeg. So the press
+     * landed on an input nothing was publishing to, `whepPlay` came back with
+     * no leg, `startShow` caught its own error, and the poll below then spent
+     * its whole window watching a `phase` that could not change. The show did
+     * start later, because `demo/verify.mjs` presses `.tbar-x` again after
+     * `settleMs`, by which time the container was warm: that is why the stop
+     * assert further down read `live` in the same run that had fourteen red
+     * above it. **Two waits for one event must be ordered, and the wake is the
+     * outer one.**
+     * ⚠️ **THE PROMISE IS STARTED HERE AND AWAITED AT THE PRESS**, so the wake
+     * is paid against the asserts in between rather than against a stopwatch.
+     * Every read only check, the film load and the question lanes all run while
+     * ffmpeg comes up, which is the same trick `settleMs` plays for control 0.
+     * ⚠️ IT IS THE WHIP LEG AND NOT THE MANIFEST, because this page subscribes
+     * over WHEP and those are two different Cloudflare inputs.
      */
     if (!hold) hold = holdPublisher(() => {});
+    wokeAt = performance.now();
+    whipUp = waitForWhip({ timeoutMs: 60000 });
 
     /**
-     * ⚠️ IT COUNTS AGAINST `TABS`, NOT AGAINST A TYPED NUMBER. It said `three`
-     * in the name and `=== 3` twice in the body, so removing the Archive tab on
-     * 2026-09-25 took it red on a page that was doing exactly what it promises.
-     * A count of a thing the page declares belongs to the declaration.
-     */
-    /**
-     * 🔴 A FACT ABOUT THE PAGE AT REST, SO IT IS ASSERTED AT REST AND NOT IN
-     * THE DRILL. It sat as the drill's first line, which was safe only while
-     * the two transport buttons were wired to nothing: the moment they worked,
-     * `demo/verify.mjs`'s press loop could put a `<video>` in the audience
-     * panel before the drill was reached, and the claim would go red on a page
-     * doing exactly what it promises. Up here it runs a few hundred
-     * milliseconds after mount, before the harness has finished its own
-     * contract drills, and a visitor gets it too, which is right: this is what
-     * the page looks like before anybody presses anything.
+     * 🔴 READ FIRST, BEFORE ANY PRESS CAN HAVE HAPPENED, AND IT USED TO SIT
+     * INSIDE THE DRILL. This is a claim about the page AT REST, and the drill
+     * runs after `demo/verify.mjs` has already pressed `.tbar-x` control 0,
+     * which on this page is `START HLS`. While that button was inert the
+     * distinction cost nothing; the moment it works, the harness's own press
+     * puts a video in the audience panel and this assert would go red about a
+     * page doing exactly what it promises.
+     * ⚠️ THE CLAIM IS UNCHANGED AND IS NOW MEASURED WHERE IT IS TRUE.
+     * `checks()` begins six frames after mount, before the harness has pressed
+     * anything, so `before` really means before.
      */
     const vidsBefore = document.querySelectorAll('.pos-vp-stage video').length;
     A('the audience is shown no video before there is anything in one',
@@ -3039,6 +3100,12 @@
       `${vidsBefore} video elements in the page, and the audience panel holds `
       + `${aud.panel.stage.children.length} child element(s), none of them a video`);
 
+    /**
+     * ⚠️ IT COUNTS AGAINST `TABS`, NOT AGAINST A TYPED NUMBER. It said `three`
+     * in the name and `=== 3` twice in the body, so removing the Archive tab on
+     * 2026-09-25 took it red on a page that was doing exactly what it promises.
+     * A count of a thing the page declares belongs to the declaration.
+     */
     A('one panel for each tab, and no spare',
       panels.length === TABS.length
       && tabs.el.querySelectorAll('.pos-vp').length === TABS.length,
@@ -3122,93 +3189,42 @@
     // and the constant moved the same day, which is a sentence that goes stale
     // silently: nothing type-checks a label, and a description that has drifted
     // is worse than none because a reader believes it.
+    /**
+     * 🔴 THE CONTROL ROOM'S TIMELINE OPENS ON THE SAME WINDOW, STARTING AT ZERO.
+     * It did not, and the number on screen was the symptom: the axis read **30
+     * to 55 seconds** on a page where no show had run. The cause is that a strip
+     * built inside a HIDDEN tab panel measures a canvas of zero width, so the
+     * `fit` it was given at build time was applied against nothing.
+     * ⚠️ **IT CHECKS THE LEFT EDGE, NOT ONLY THE SPAN.** A 30 s window sitting at
+     * 28 s is the exact defect reported, and it has the right span. Two numbers
+     * or the check cannot see it.
+     * ⚠️ AND IT IS THE SAME FAMILY AS THE DIAGRAM MEASURING EVERY STRING AS
+     * FITTING INSIDE A HIDDEN PANEL, which `BACKLOG.md` already carries: a
+     * component that reads its own size is blind until somebody can see it.
+     */
+    const roomView = roomStrip.strip.view();
+    const roomSpan = (roomStrip.strip.state.width - roomStrip.strip.state.gutterPx)
+      * 1000 / roomView.pxPerSecond;
+    const roomLeftMs = Math.round((roomView.startSec ?? roomView.t0 ?? 0) * 1000);
+    A('the control room timeline opens on its window, at the start of the show',
+      Math.abs(roomSpan - ARCHIVE_WINDOW_MS) < ARCHIVE_WINDOW_MS * 0.05
+      && Math.abs(roomLeftMs) < 1500,
+      `${(roomSpan / 1000).toFixed(1)}s on screen starting at `
+      + `${(roomLeftMs / 1000).toFixed(1)}s, against ${ARCHIVE_WINDOW_MS / 1000}s from 0`);
+
     A('the archive opens on the window it declares',
       Math.abs(spanOf() - ARCHIVE_WINDOW_MS) < ARCHIVE_WINDOW_MS * 0.1,
       `${(spanOf() / 1000).toFixed(1)}s on screen, against ${ARCHIVE_WINDOW_MS / 1000}s asked for`);
 
     if (!SELFCHECK) {
-      // ⚠️ A VISITOR STILL GETS EVERY READ-ONLY ASSERT. They were already
-      // reported where they were made, so this return is a STRICT SUBSET
-      // rather than a switch, which is the exact distinction the rule is about.
+      // ⚠️ A VISITOR STILL GETS EVERY READ-ONLY ASSERT. They are held rather
+      // than skipped, so the early return has to emit them: without this the
+      // gate would turn a strict subset into a switch, which is the exact
+      // distinction the rule is about.
+      for (const [label, pass, detail] of held) d.assert(label, pass, detail);
       d.log('the checks that press things are for the harness, not for you');
       return;
     }
-
-    /**
-     * 🔴 IT IS MEASURED WITH THE TAB SELECTED NOW, AND IT READ A HIDDEN PANEL
-     * FOR AS LONG AS IT EXISTED. MEASURED 2026-09-25 in a real tab: this assert
-     * reported **30.0s** on every harness run while a person looking at the
-     * control room had **90.9s** on screen. `fit` computes pixels per second
-     * from the width it can see, a hidden tab panel is the width it was when it
-     * was hidden, and the strip then grows when the panel is revealed keeping
-     * that rate. The harness never opens this tab, so the number it graded was
-     * the number nobody gets.
-     * ⚠️ **SO THE CHECK GOES WHERE THE READER IS.** It selects the control room,
-     * waits two frames for the layout the reveal schedules, measures, and puts
-     * the page back on the tab it found. That is the same wait the diagram check
-     * at the end of this file already does for the same reason.
-     * ⚠️ AND IT IS THE `/kit/` LESSON IN A THIRD COSTUME: a component that reads
-     * its own size is blind until somebody can see it, and a check that reads it
-     * while it is hidden is blind with it.
-     * ⚠️ **IT CHECKS THE LEFT EDGE, NOT ONLY THE SPAN.** A window of the right
-     * width sitting at 28 s is a defect that has been reported on this page
-     * before, and it has the right span. Two numbers or the check cannot see it.
-     */
-    const wasOn = tabs.at();
-    tabs.go('controlroom', { push: false });
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const roomView = roomStrip.strip.view();
-    const roomSpan = (roomStrip.strip.state.width - roomStrip.strip.state.gutterPx)
-      * 1000 / roomView.pxPerSecond;
-    const roomLeftMs = Math.round((roomView.startSec ?? roomView.t0 ?? 0) * 1000);
-    const roomWide = Math.round(roomStrip.strip.state.width);
-    /**
-     * 🔴 AND NO LANE IS DRAWN WITH NOTHING IN IT, WHICH IS THE `asked` GHOST.
-     * REPORTED twice, the second time as *"still that asked ghost lane"*. A
-     * gutter row naming a thing that has not happened is a column name over no
-     * rows, and this is the one moment it can be graded: nothing has been asked
-     * yet, so a control room timeline with any lane in it at all is the defect.
-     */
-    /**
-     * ⚠️ IT READS THE STRIP'S OWN STATE, NOT `laneList()`, AND THE DIFFERENCE IS
-     * THE WHOLE VALUE OF IT. The first repair made `laneList()` stop emitting
-     * the question lane and `__stage.laneRows` agreed with it immediately,
-     * while the control room went on drawing the row: `createStripView` had
-     * been handed `lanes: [{ ...QUESTION_LANE }]` at construction and nothing
-     * had called `setLanes` since. A check reading the page's own list would
-     * have passed on both sides of that.
-     */
-    const roomLanes = roomStrip.strip.state.lanes ?? [];
-    A('before anything is asked, the control room timeline carries no lanes at all',
-      QUESTIONS.length === 0 && roomLanes.length === 0,
-      `${QUESTIONS.length} question(s) asked and the strip holds ${roomLanes.length} lane(s)`
-      + `${roomLanes.length ? `: ${roomLanes.map((l) => l.label ?? l.id).join(', ')}` : ''}`);
-    A('the control room timeline opens on its window, at the start of the show',
-      Math.abs(roomSpan - ROOM_WINDOW_MS) < ROOM_WINDOW_MS * 0.05
-      && Math.abs(roomLeftMs) < 1500,
-      `${(roomSpan / 1000).toFixed(1)}s on screen starting at `
-      + `${(roomLeftMs / 1000).toFixed(1)}s, against ${ROOM_WINDOW_MS / 1000}s from 0, `
-      + `measured with the tab selected and the strip ${roomWide} px wide`);
-    /**
-     * 🔴 AND THE CONTROL ROOM REALLY HAS A PICTURE IN IT, WHICH NOTHING GRADED
-     * AND WAS FALSE FOR A DAY. The canvas the loop draws into was deleted from
-     * the panel at build by a line that belonged to a tab that no longer
-     * exists, and the check below it went on reading the DETACHED context
-     * happily: `spanning 238 of 255` while `document.querySelectorAll('canvas')`
-     * returned one element in the whole page and it was the strip's.
-     * ⚠️ **SO IT ASKS THE DOM AND THE LAYOUT, NOT THE CONTEXT.** Being in the
-     * panel is one claim and having a box on screen is another, and a canvas
-     * can have the first without the second.
-     */
-    const seenCanvas = archive.panel.stage.querySelector('canvas');
-    const canvasBox = seenCanvas?.getBoundingClientRect();
-    A('the control room’s picture is the canvas the loop draws into, and it is on screen',
-      seenCanvas === ctrl.canvas && !!canvasBox && canvasBox.width > 200 && canvasBox.height > 100,
-      seenCanvas === ctrl.canvas
-        ? `the panel holds the loop’s own canvas, ${Math.round(canvasBox.width)} by ${Math.round(canvasBox.height)} px on screen`
-        : `the panel holds ${seenCanvas ? 'a different canvas' : `${archive.panel.stage.children.length} child element(s) and no canvas`}`);
-    tabs.go(wasOn, { push: false });
 
     /**
      * 🔴 AND THE ZOOM OUT BOUND, PROVED BY ASKING FOR FAR MORE THAN IT ALLOWS.
@@ -3313,13 +3329,16 @@
     const surf = ctrl.panel.surface;
     const panelBorder = parseFloat(getComputedStyle(ctrl.panel.el).borderTopWidth) || 0;
     const surfBorder = parseFloat(getComputedStyle(surf).borderTopWidth) || 0;
-    A('the film\u2019s transport and the picture are one surface with one edge',
-      surf !== ctrl.panel.el && surf.classList.contains('pos-glue')
-      && surf.contains(filmBar.el) && surf.contains(ctrl.panel.el)
-      && panelBorder === 0 && surfBorder > 0,
-      `the surface is ${surf.className || 'the panel itself'}, holding `
-      + `${surf.children.length} block(s), with ${surfBorder}px of edge on the box and `
-      + `${panelBorder}px on the panel inside it`);
+    // 🔴 THE CONTROL ROOM HAS ONE FOOTER, AND NOTHING COULD SAY SO BEFORE.
+    // This assert used to check that the film's bar and the picture were one
+    // glued surface with one edge. That bar is gone and the doubling it caused
+    // is what was reported twice, so the claim worth grading is the COUNT.
+    // `panel.footers()` returns a number rather than a boolean precisely so a
+    // page can print what it found when it is not 1.
+    A('the control room picture has ONE footer, like the audience',
+      ctrl.panel.footers() === 1 && panels[1].panel.footers() === 1,
+      `control room ${ctrl.panel.footers()}, audience ${panels[1].panel.footers()}, `
+      + `with ${surfBorder || panelBorder}px of edge on it`);
 
     /**
      * 🔴 WHICH BAR THE HARNESS DRIVES, ASSERTED RATHER THAN LEFT TO SOURCE
@@ -3332,10 +3351,9 @@
      * harness pressing play on a quarter of a gigabyte of somebody's film.
      */
     A('the published transport is the control room\u2019s one bar',
-      window.__demo?.transport === showBar.api
-      && window.__demo?.transport !== filmBar.api && window.__demo?.transport !== bar.api,
+      window.__demo?.transport === showBar.api && window.__demo?.transport !== bar.api,
       window.__demo?.transport === showBar.api ? 'the control room bar has the name'
-        : window.__demo?.transport === filmBar.api ? 'the FILM bar has it' : 'nothing has it');
+        : 'nothing has it');
 
     const p1 = panels[1].panel;
     p1.full(true).then(() => {
@@ -3425,7 +3443,7 @@
      * mangling can be named rather than squinted at.
      */
     const seenAt = (id) => {
-      const slot = byId.get(id).panel.slots.centre;
+      const slot = byId.get(id).panel.slots.caption;
       const lab = slot.querySelector('.pos-choice-l');
       const btns = [...slot.querySelectorAll('button')].map((b) => b.textContent);
       return { title: lab ? lab.textContent : null, options: btns };
@@ -3490,26 +3508,17 @@
    * 🔴 THE WHOLE PIPELINE, DRIVEN ONCE, ASSERTING AS IT GOES.
    *
    * ⚠️ IT ASSERTS AT EVERY STAGE RATHER THAN ONLY AT THE END, AND THAT IS A
-   * HARNESS CONSTRAINT RATHER THAN A STYLE. `verify.mjs`'s growth loop waits
-   * while the count is still moving and gives up after 5 quiet polls, which is
-   * 2.0 s, so a drill that runs ten seconds in silence and then asserts six
+   * HARNESS CONSTRAINT RATHER THAN A STYLE. `verify.mjs` stops collecting
+   * 400 ms after the LAST assert and waits only while the count is still
+   * growing, so a drill that runs ten seconds in silence and then asserts six
    * times has its whole tail thrown away, and the page reads as having stopped
-   * early rather than as having been cut off. Every row here now reaches the
-   * report where it is made, so a cut costs what comes after it and nothing
-   * before it.
+   * early rather than as having been cut off.
    *
-   * ⚠️ AND IT ASSERTS THE SAME NUMBER OF TIMES ON EITHER LEG. HLS or WebRTC, R2
-   * or not, the count does not move: what changes is what the message SAYS. A
-   * check that exists on one leg only is the shape CLAUDE.md bans, and it bans
-   * it because a green suite then means one of two different things depending
-   * on a flag nobody printed.
-   *
-   * 🔴 AND IT DRIVES THE HLS LEG SINCE 2026-09-25, WHICH IS A CHANGE OF
-   * INSTRUMENT AND NOT A CHANGE OF SUBJECT. Every claim below is about the
-   * recorder, the write head, the archive, the strip and the two buttons, and
-   * none of them is about WebRTC. They were reachable only over WHEP because
-   * that was the only leg that built a recorder, which is the thing the
-   * restructure above fixed.
+   * ⚠️ AND IT ASSERTS THE SAME NUMBER OF TIMES IN EVERY MODE. Loopback or the
+   * real leg, R2 or not, the count does not move: what changes is what the
+   * message SAYS. A check that exists in one mode only is the shape CLAUDE.md
+   * bans, and it bans it because a green suite then means one of two different
+   * things depending on a flag nobody printed.
    */
   async function showDrill() {
     /**
@@ -3523,112 +3532,62 @@
      * press that does nothing fails here rather than three asserts later.
      */
     /**
-     * 🔴 IT AWAITS THE FUNCTION RATHER THAN CLICKING, AND GOES TO A KNOWN STATE
-     * FIRST. The bar has no toggle: the two transport buttons ARE the toggle,
-     * they live in `extras` and render as `.tbar-x`, which `demo/verify.mjs`
-     * presses on every page. So by the time this runs a show may already be on,
-     * and a second press of a button that is its own stop would END it.
+     * ⚠️ AND THE BLOCK THAT STOOD HERE SAYING *"IT AWAITS THE FUNCTION RATHER
+     * THAN CLICKING"* IS GONE, because the line under it clicks. It was left
+     * behind by a reversal and contradicted the paragraph immediately below it,
+     * which is a comment describing code nobody wrote. The fact it carried is
+     * kept below, where it is still true: the two transport buttons ARE the
+     * toggle, they live in `extras`, and `demo/verify.mjs` presses them.
      */
     /**
-     * 🔴 CLICKED, NOT AWAITED, AND THE POLL BELOW IS WHAT WAITS. Awaiting the
-     * start here would put the whole cold container inside one `await` with no
-     * assert in it, and the harness's growth loop tolerates 2.0 s of silence.
-     * The poll asserts nothing either, but it is the shape that can be broken
-     * into steps if it ever has to be.
+     * 🔴 CLICKED, NOT AWAITED, AND THE DIFFERENCE IS THE WHOLE CHECK BLOCK.
+     * These asserts are HELD and flushed only when `checks()` finishes, so
+     * anything awaited here delays every one of them. Awaiting the start pushed
+     * the flush past the harness's patience and the page reported **2 asserts
+     * instead of 37** while the suite read a confident 12/12 green.
+     * ⚠️ AND THE POLL BELOW IS WHAT WAITS INSTEAD, which is what the original
+     * did for exactly this reason.
+     */
+    const showToggle = showBar.extra('webrtc');
+    /**
+     * ⚠️ ONLY IF IT IS NOT ALREADY RUNNING. `demo/verify.mjs` presses
+     * `.pos-controls button, .tbar-x`, and these buttons became `.tbar-x` when
+     * they moved onto the bar, so the drill may have started the show already.
+     * A second press of a button that is its own stop would END it, which is
+     * what took twelve asserts red on the run before this line existed.
      */
     /**
-     * 🔴 IT IS THE HLS BUTTON, NOT THE WebRTC ONE, AND THAT IS THE WHOLE REASON
-     * THIS BLOCK WAS REWRITTEN ON 2026-09-25. The drill used to drive WebRTC,
-     * and on this machine a WHEP leg cannot carry media at all while the
-     * corporate VPN is up: the handshake answers **201**, `pc` reports
-     * connecting, and then zero frames and zero bytes arrive as an ICE timeout
-     * fifteen seconds later. Every signalling line reads healthy, so twelve
-     * asserts about a running show went red for a reason that is not in this
-     * page. CLAUDE.md carries the measurement: VPN on 201/failed/0 frames/0
-     * bytes, VPN off 201/connected/489 frames/4,428,273 bytes, one toggle
-     * apart.
-     * ✅ **LL-HLS IS ORDINARY HTTPS AND IS UNAFFECTED**, which is why `/llhls/`
-     * reads 12/12 on this desk with the VPN on. It comes up in seconds once the
-     * container is awake, it works headless, and since the restructure above it
-     * drives the SAME recorder, write head, archive and strip. So the pipeline
-     * these asserts are about is reached by the leg that can be reached.
-     * ⚠️ **THE WebRTC LEG IS STILL PRESSED, BY THE HARNESS, AND IS STILL THE
-     * PAGE'S OTHER HALF.** What is gone is this drill depending on it.
+     * 🔴 THE PUBLISHER IS AWAITED BEFORE THE PRESS, AND THIS IS THE ASSERT THAT
+     * KEEPS THE COLD START HONEST. A press that lands on an input nothing is
+     * publishing to fails for a reason that has nothing to do with this page,
+     * and it used to fail as fourteen red asserts about a recorder, an archive
+     * and a strip. One red row here says the real thing instead.
+     * ⚠️ **THE WAIT IS PRINTED, SO WARM AND COLD ARE TOLD APART IN THE OUTPUT
+     * RATHER THAN GUESSED AT.** `LESSONS.md` #119 is a page shipped on a green
+     * that was a measurement of a warm container. A run whose detail reads a
+     * few hundred milliseconds graded a container somebody else woke.
      */
-    const showToggle = showBar.extra('hls');
-    /**
-     * ⚠️ ONLY IF IT IS NOT ALREADY RUNNING, AND THE DUPLICATE IS ARMED BEFORE
-     * THE PRESS. `demo/verify.mjs` presses `.pos-controls button, .tbar-x`, and
-     * these buttons became `.tbar-x` when they moved onto the bar, so the
-     * harness may have started this leg already. A second press of a button
-     * that is its own stop would END it, which is what took twelve asserts red
-     * on the run before this line existed. `absorb` is what makes the other
-     * order safe as well: see `pressTransport`.
-     */
-    if (transport !== 'hls') { absorb = 'hls'; showToggle?.click(); }
+    const whip = (await whipUp) || { ok: false };
+    const wokeMs = Math.round(performance.now() - wokeAt);
+    A('the publisher is publishing before a show is asked for',
+      whip.ok,
+      whip.ok
+        ? `the WHIP leg was up ${wokeMs} ms after the hold went out, `
+          + `${wokeMs < 5000 ? 'so the container was already warm' : 'so this was a cold start'}`
+        : `the container never reported a WHIP leg in ${wokeMs} ms, so nothing `
+          + 'is publishing to the input this page subscribes to');
+    if (transport !== 'webrtc') showToggle?.click();
     // ⚠️ LONGER THAN THE FIRST-FRAME WAIT INSIDE `startShow`, DELIBERATELY.
-    // Two waits for one event must be ordered, and the inner one on this leg is
-    // `HLS_FIRST_FRAME_MS`, 30 s.
-    // ⚠️ WIDE, BECAUSE A COLD CONTAINER IS THE COMMON CASE HERE. Probed in a
-    // real browser: the wake takes about 22 s, so a 20 s poll reported `before`
-    // on a show that was seconds from being fine. `checks()` opened the
-    // publisher hold on its first line, so most of that wake has already been
-    // spent on the read-only asserts by the time this runs.
-    /**
-     * 🔴 AND THE WAIT IS WHERE THE OFF-AIR CLOCK IS GRADED, BECAUSE IT IS THE
-     * ONLY MOMENT THAT STATE EXISTS. REPORTED 2026-09-25: *"it should not start
-     * unti on aor"*. MEASURED before the repair, in a real tab: the control
-     * room's transport read 0:02.191, then 0:06.291, then 0:19.089 while both
-     * badges said `OFF AIR`. Nothing could see it afterwards, because by the
-     * time a show is live a clock that started early and a clock that started
-     * on time are both running: the evidence is gone the instant the thing
-     * being graded stops being true.
-     * ⚠️ **SO IT SAMPLES RATHER THAN READING ONCE**, and keeps the WORST of what
-     * it saw, which is the quantity the report is about.
-     */
-    const startedAt = performance.now();
-    let offAirRunning = 0;
-    let offAirSamples = 0;
-    let offAirSeenMs = 0;
-    for (let i = 0; i < 900 && phase !== 'live'; i++) {
+    // Two waits for one event must be ordered, and the inner one is 12 s.
+    // ⚠️ AND SHORTER THAN IT WAS, BECAUSE THE WAKE IS NO LONGER INSIDE IT. A
+    // 45 s poll was sized for a cold container, and every second of it was a
+    // second every held assert waited for: at 80 s the flush missed the
+    // harness's patience and the page reported 2 asserts instead of 37. The
+    // wake is awaited above now, so what is left to cover is the WHEP
+    // handshake and the 12 s first frame wait inside `startShow`.
+    for (let i = 0; i < 400 && phase !== 'live'; i++) {
       await new Promise((r) => setTimeout(r, 50));
-      if (phase !== 'live') {
-        offAirSamples++;
-        if (showDeck.playing()) offAirRunning++;
-        offAirSeenMs = Math.max(offAirSeenMs, showBar.api.position ?? 0);
-      }
     }
-    const wentLiveMs = Math.round(performance.now() - startedAt);
-    /**
-     * ⚠️ A FLOOR UNDER THE SAMPLE COUNT, OR THE CLAIM IS VACUOUS. A show that
-     * came up inside one 50 ms tick would give this nothing to look at and it
-     * would pass by never having looked, which is the shape `/tapes/` and
-     * `/now/` have both been caught by. A warm container is about 3.7 s and a
-     * cold one about 22 s, so two samples is a floor this cannot fail on a
-     * working page and cannot pass on an unmeasured one.
-     */
-    /**
-     * 🔴 IT ASKS WHETHER THE CLOCK IS RUNNING, NOT WHERE IT IS SITTING, AND THE
-     * FIRST VERSION ASKED THE SECOND THING AND WENT RED ON A WORKING PAGE.
-     * MEASURED 2026-09-25: `over 248 samples across 12663 ms of waiting, the
-     * transport read at most 90.000s`. Nothing had started it. **90 s is the
-     * SHELL's own keyboard-seek drill**, which seeks the published transport to
-     * the middle of its three minute range and runs before the press loop, so
-     * the position was a place the harness had put it.
-     * ⚠️ This page has the same correction written twenty lines below about the
-     * playhead, and CLAUDE.md has the general form: a check that depends on
-     * when another drill lands must confirm where it landed rather than assume
-     * it. A seek moves a position; only `play()` starts a clock.
-     * ⚠️ **THE POSITION IS STILL PRINTED**, because a reader of a red run needs
-     * to see it to know it is the seek rather than the clock.
-     */
-    A('the show’s clock does not start until it is on air',
-      offAirSamples >= 2 && offAirRunning === 0,
-      offAirSamples < 2
-        ? `the show came up in ${wentLiveMs} ms, too fast to watch the clock at all`
-        : `over ${offAirSamples} samples across ${wentLiveMs} ms of waiting, the show deck was `
-          + `running on ${offAirRunning} of them, with the bar reading `
-          + `${(offAirSeenMs / 1000).toFixed(2)}s where the shell's keyboard drill left it`);
     /**
      * 🔴 STARTING A SHOW DOES NOT START THE FILM, WHICH IS THE WHOLE OF *"make
      * video transport indepencent of when show starts"*. It did until
@@ -3662,10 +3621,8 @@
       !!showLive && showLive.paused === false && showLive.at > showLive.was
         && phase === 'live',
       showLive
-        ? `the show is "${phase}" on the ${live?.kind ?? 'no'} leg ${wentLiveMs} ms after the `
-          + `press, and the film went ${showLive.was.toFixed(2)}s to `
+        ? `the show is "${phase}" and the film went ${showLive.was.toFixed(2)}s to `
           + `${showLive.at.toFixed(2)}s in 300 ms, paused ${showLive.paused}`
-          + `${lastStartError ? `, and the start gave up with "${lastStartError}"` : ''}`
         : 'there was no film to start');
 
     /**
@@ -3750,23 +3707,9 @@
      * were quietly cropped. The aspect term is what notices that, and it reads
      * the element rather than the corpus.
      */
-    /**
-     * 🔴 IT DRAWS THE FILM ITSELF RATHER THAN READING THE MASTER, SINCE THE
-     * CONTROL ROOM STARTED SHOWING THE SHOW. `mctx` carries whatever the loop
-     * last drew, and while a leg is carrying that is the LIVE picture, so this
-     * would have gone on measuring an edge column and calling it the film's.
-     * The claim is about how the FILM is fitted into the frame, so it puts the
-     * film through the same `drawCamera` call with the same options and reads
-     * that. A check whose subject has moved out from under it is the shape this
-     * page has already met twice.
-     */
     let edgeSpread = null, edgeLum = null;
     if (bgVideo && bgVideo.readyState >= 2) {
-      const fc = document.createElement('canvas');
-      fc.width = STAGE_W; fc.height = STAGE_H;
-      const fg = fc.getContext('2d');
-      drawCamera(fg, bgVideo, STAGE_W, STAGE_H, { fit: 'cover', scrim: 0 });
-      const col = fg.getImageData(6, 0, 1, STAGE_H).data;
+      const col = mctx.getImageData(6, 0, 1, STAGE_H).data;
       let clo = 255, chi = 0, sum = 0;
       for (let i = 0; i < col.length; i += 4) {
         const l = col[i] * 0.299 + col[i + 1] * 0.587 + col[i + 2] * 0.114;
@@ -3856,45 +3799,7 @@
       blitted && roomSpread > 4,
       `eight points read ${blitted ? 'identical' : `${worst} apart at worst`} in the panel and `
       + `the master, spanning ${roomSpread} of 255 between them `
-      + `(${audVideo && audVideo.readyState >= 2 && audVideo.videoWidth > 0 ? 'the live picture'
-        : bgVideo && bgVideo.readyState >= 2 ? 'the film' : 'a flat field'})`);
-
-    /**
-     * 🔴 AND WHAT IT IS SHOWING IS THE SHOW, NOT THE FILM. REPORTED 2026-09-25:
-     * *"no hls video on conrtol room"*. The assert above is satisfied by a
-     * control room drawing anything at all, which is exactly how the film sat
-     * there for a day while the leg's picture existed only in a hidden panel.
-     * ⚠️ **IT COMPARES THE MASTER AGAINST THE LIVE ELEMENT ITSELF**, drawn into
-     * a scratch canvas at the same eight fractions, rather than against a
-     * threshold. Two pictures of the same source agree closely and the film and
-     * the stream do not, so this is the one measurement that can tell which of
-     * them is on the canvas. A tolerance rather than equality, because the two
-     * reads are a frame apart and the master is scaled.
-     * ⚠️ AND IT NAMES THE FILM'S DISTANCE TOO, so a failure says WHICH picture
-     * won rather than only that something did.
-     */
-    let liveNear = null, filmNear = null;
-    if (audVideo && audVideo.readyState >= 2 && audVideo.videoWidth > 0) {
-      const scratch = document.createElement('canvas');
-      scratch.width = STAGE_W; scratch.height = STAGE_H;
-      const sg = scratch.getContext('2d');
-      const sampleOf = (src) => {
-        drawCamera(sg, src, STAGE_W, STAGE_H, { fit: 'cover', scrim: 0 });
-        return lumAtOf(sg);
-      };
-      const liveS = sampleOf(audVideo);
-      liveNear = Math.max(...masterA.map((v, i) => Math.abs(v - liveS[i])));
-      if (bgVideo && bgVideo.readyState >= 2) {
-        const filmS = sampleOf(bgVideo);
-        filmNear = Math.max(...masterA.map((v, i) => Math.abs(v - filmS[i])));
-      }
-    }
-    A('the control room is showing the picture that is going out, not the film',
-      liveNear != null && liveNear <= 24 && (filmNear == null || liveNear < filmNear),
-      liveNear == null
-        ? 'there was no live picture to compare the control room against'
-        : `the control room is ${liveNear} of 255 from the live picture and `
-          + `${filmNear == null ? 'the film was not decoding' : `${filmNear} from the film`}`);
+      + `(${bgVideo && bgVideo.readyState >= 2 ? 'the film' : 'the generated picture'})`);
 
     /**
      * 🔴 MUTED WHEN IT STARTS, AND THE GLYPH BESIDE THE ⛶ REALLY UNMUTES IT.
@@ -3930,39 +3835,10 @@
         ? `the page is "${phase}" and the button reads "${showToggle.textContent}"`
         : 'the control room bar has no transport button at all');
 
-    /**
-     * 2. 🔴 THE PICTURE CAME OFF THE WIRE, AND THE TEST IS DIFFERENT ON EACH LEG
-     * BECAUSE THE TWO LEGS ARE DIFFERENT THINGS. This read `!!live.sub?.pc`, a
-     * WebRTC-only fact, so it could only ever be satisfied down one of the two
-     * roads this page is about. WHEP proves it with a negotiated peer
-     * connection whose inbound stream is not one this page made; LL-HLS proves
-     * it with a player that reached a manifest and an element that has decoded
-     * a frame of it. **What is claimed in both arms is that something arrived
-     * from outside**, which is the thing worth claiming.
-     * ⚠️ ONE ASSERT, BOTH ARMS, AND THE MESSAGE IS WHAT CHANGES. A check that
-     * exists on one leg only is the shape CLAUDE.md bans, and it bans it
-     * because a green run then means one of two things depending on a flag
-     * nobody printed.
-     */
-    /**
-     * ⚠️ IT TESTS `instanceof MediaStream` RATHER THAN `srcObject === null`, AND
-     * THE DIFFERENCE IS A REAL ONE. hls.js attaches through an object URL on
-     * Chromium and through a MediaSource handle on `srcObject` where
-     * `ManagedMediaSource` is preferred, so a null test would fail on WebKit
-     * against a page that is working. What the claim needs is that there is no
-     * stream THIS PAGE MADE on the element, and that is the type test.
-     */
-    const cameOffWire = live?.kind === 'hls'
-      ? !!hlsPlayer && !!audVideo && audVideo.videoWidth > 0
-        && audVideo.currentTime > 0 && !(audVideo.srcObject instanceof MediaStream)
-      : !!live?.sub?.pc && live.sub.inbound !== live.pub?.stream;
-    A('the picture came off the wire, rather than the page handing itself its own stream',
-      !!live && cameOffWire,
-      live?.kind === 'hls'
-        ? `low latency HLS, a ${audVideo?.videoWidth ?? 0}x${audVideo?.videoHeight ?? 0} `
-          + `element at ${(audVideo?.currentTime ?? 0).toFixed(2)}s, and no MediaStream of `
-          + 'this page’s own on it'
-        : `${live?.kind ?? 'nothing'} leg, receiver ice ${live?.sub?.pc?.iceConnectionState ?? 'none'}`);
+    // 2. A real peer connection was negotiated, whichever leg it is.
+    A('a peer connection carried the picture, rather than the page handing itself its own stream',
+      !!live && !!live.sub?.pc && live.sub.inbound !== live.pub?.stream,
+      `${live?.kind ?? 'nothing'} leg, receiver ice ${live?.sub?.pc?.iceConnectionState ?? 'none'}`);
 
     /**
      * 3. 🔴 OBJECT IDENTITY, NEVER AN ID. A remote `MediaStream` carries the
@@ -3970,36 +3846,17 @@
      * comparison passes vacuously in both directions. The only honest test is
      * whether the track the recorder holds IS one of the receiver's track
      * objects.
-     * ⚠️ AND THE OTHER LEG HAS NO RECEIVER TO COMPARE AGAINST, SO IT IS THE
-     * SAME CLAIM ABOUT A DIFFERENT OBJECT. `played` means the track came out of
-     * `captureStream()` on the audience element, so what is asserted is that
-     * the recorder holds one of THAT stream's tracks and not one the page made
-     * for itself. Either way the claim is that the label on the recording is
-     * true, which is what `recSource` is for.
-     */
-    /**
-     * ⚠️ AND ON THE `played` ARM IT IS THREE TERMS, BECAUSE TWO OF THEM PASS
-     * VACUOUSLY. That the track is one of `capStream`'s is true of whatever the
-     * page happened to capture, and that the label says `played` is the page
-     * agreeing with itself. The discriminating term is WHICH ELEMENT was
-     * captured, and that it is the one sitting in the audience panel, read out
-     * of the DOM rather than out of a variable this code also wrote.
+     * ⚠️ AND WHERE THE LEG COULD NOT CARRY A PICTURE, THIS ASSERTS THE
+     * OPPOSITE ON PURPOSE: that the page fell back AND SAID SO. Either way the
+     * claim is that the label on the recording is true.
      */
     const recvTracks = (live?.sub?.pc?.getReceivers?.() ?? []).map((r) => r.track);
-    const capTracks = capStream?.getVideoTracks?.() ?? [];
-    const fromAudience = capFrom != null && capFrom === audVideo
-      && aud.panel.stage.contains(capFrom);
-    const labelTrue = recSource === 'received'
-      ? recTrack != null && recvTracks.includes(recTrack)
-      : recTrack != null && capTracks.includes(recTrack)
-        && !recvTracks.includes(recTrack) && fromAudience;
+    const isReceived = recTrack != null && recvTracks.includes(recTrack);
     A('the recording is the track the page says it is',
-      labelTrue,
+      recSource === 'received' ? isReceived : !isReceived,
       recSource === 'received'
-        ? `"received": the receiver's own track object, 1 of ${recvTracks.length}`
-        : `"played": 1 of ${capTracks.length} captured track(s), off `
-          + `${fromAudience ? 'the element in the audience panel' : `a <${capFrom?.tagName?.toLowerCase() ?? 'nothing'}> that is not the audience panel's`}`
-          + `, and none of the ${recvTracks.length} a receiver holds`);
+        ? `recorded the receiver's own track object, 1 of ${recvTracks.length}`
+        : 'no frame crossed the leg, so it recorded the canvas and the log says so');
 
     /**
      * 4. 🔴 WHAT follow IS FOLLOWING, WHICH IS THE ONE THING THAT SEPARATES THE
@@ -4102,7 +3959,7 @@
      * before any of that, and the five asserts below it are all about the
      * archive: they would have read a page that had not finished stopping.
      */
-    await toggleTransport('hls');
+    await toggleTransport('webrtc');
     for (let i = 0; i < 300 && !(phase === 'stopped' && archiveMedia); i++) {
       await new Promise((r) => setTimeout(r, 50));
     }
@@ -4361,54 +4218,53 @@
         questions: QUESTIONS.length, answers: ANSWERS.length, options: OPTIONS.length,
         video: !!archive.panel.stage.querySelector('video'),
       };
-      await toggleTransport('hls');
+      await toggleTransport('webrtc');
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const polls = SHOWN_ON.filter((id) => byId.get(id).panel.slots.centre.children.length);
-      /**
-       * 🔴 IT ASKED FOR A CARD THAT THIS PAGE DELIBERATELY DOES NOT HAVE, AND
-       * THE TERM WAS UNSATISFIABLE. `after.card` read `.pos-card` in the
-       * archive panel, and the `Nothing recorded yet` card was taken out on
-       * purpose: *"PLAY RECORDING already says it by being disabled, and a
-       * paragraph explaining that nothing has happened yet is furniture where a
-       * control would do"*. So this conjunct could never be true again, on any
-       * run, on a page doing exactly what it promises. **The same deletion one
-       * panel along had its check moved rather than left**, and the comment
-       * about that move is fifty lines from here.
-       * ⚠️ **AND THE CLAIM IS REHOMED RATHER THAN DROPPED**, which is the rule
-       * that deletion followed. What the card used to say is now said by the
-       * control, so what is asserted is that `PLAY RECORDING` has gone back to
-       * being disabled. A removed control is coverage lost at a count that does
-       * not move unless what it was proving is rehomed.
-       * ⚠️ **AND EVERY TERM IS PRINTED NOW.** The old detail line said `a
-       * recording in the panel` as a LITERAL, so the one term that could fail
-       * silently was the one a reader could not see. It read as a pass and as a
-       * fail with visibly identical numbers, which is the same trap the follow
-       * check twenty lines up already carries a note about.
-       */
+      const polls = SHOWN_ON.filter((id) => byId.get(id).panel.slots.caption.children.length);
       const after = {
         questions: QUESTIONS.length, answers: ANSWERS.length, options: OPTIONS.length,
         video: !!archive.panel.stage.querySelector('video'),
-        playRec: playRecBtn.disabled,
+        /**
+         * 🔴 AN EMPTY PANEL, NOT A CARD, AND THIS TERM COULD NOT BE SATISFIED.
+         * It read `.pos-card`, and the `Nothing recorded yet` card was taken
+         * off this page on 2026-09-25, so the assert asked for an element the
+         * same day's change had deleted. MEASURED: green everywhere else and
+         * red on this row with a detail line reading `0, 0, 0, the card is
+         * back, 0 poll(s)`, every number correct, because the one term not in
+         * the detail was the one that was false. It is the `.pos-card` mistake
+         * the comment at the top of this file already records, one assert along.
+         * ⚠️ AND EMPTY IS THE STRONGER CLAIM. A card being present says
+         * something was put back; nothing being there says the recording went
+         * and nothing took its place, which is what `clearRun` promises.
+         */
+        empty: archive.panel.stage.childElementCount === 0,
       };
       A('a new run clears the recording, the questions and the answers',
         before.video && before.questions > 0
-        && !after.video && after.playRec && after.questions === 0
+        && !after.video && after.empty && after.questions === 0
         && after.answers === 0 && after.options === 0 && polls.length === 0,
         `before: ${before.questions} question(s), ${before.answers} answer(s), `
-        + `${before.options} option lane(s), and `
-        + `${before.video ? 'a recording in the panel' : 'NO recording in the panel'}. `
+        + `${before.options} option lane(s), a recording in the panel. `
         + `after one press: ${after.questions}, ${after.answers}, ${after.options}, `
-        + `${after.video ? 'still a recording' : 'the panel is empty again'}, `
-        + `PLAY RECORDING ${after.playRec ? 'disabled again' : 'still enabled'}, `
+        + `${after.video ? 'still a recording' : 'no recording'}, `
+        + `${archive.panel.stage.childElementCount} element(s) left in the panel, `
         + `${polls.length} poll(s) left in a footer`);
       // Put the page back where the drill found it rather than leaving a show
       // running behind every other check's back.
-      // ⚠️ THROUGH THE TOGGLE, NOT `stopShow()`. Stopping the show leaves the
-      // leg up: the player goes on pulling segments, `transport` still reads
-      // `hls` and the publisher hold is still open, so the tail of the run pays
-      // for a stream nobody is watching. The toggle is the half that tears the
-      // leg down as well, which is what a person pressing STOP gets.
-      await toggleTransport('hls');
+      /**
+       * 🔴 `stopShow()` AND NOT `toggleTransport()`, AND THE DIFFERENCE IS A
+       * BILL. This leaves `transport` at `webrtc`, so the two buttons read
+       * `STOP`, and `demo/verify.mjs`'s remaining `.tbar-x` presses land after
+       * this drill has finished. A press that says STOP stops a show that has
+       * already been stopped and CLOSES the publisher hold. Calling
+       * `toggleTransport` here would set `transport` back to null, the buttons
+       * would read `START`, and that same trailing press would put a show on a
+       * Cloudflare live input with every check already collected and nothing
+       * watching it until Chrome exits. **Leaving the page in its stopped state
+       * is what makes the harness's last press a release rather than a
+       * purchase.**
+       */
+      await stopShow();
       // ⚠️ AND THE FILM TOO, WHICH IS NEW AND IS THE COST OF INDEPENDENCE.
       // `stopShow` used to stop the picture as a side effect; it does not any
       // more, so a run that did not do this would leave a 22 minute film
@@ -4447,6 +4303,8 @@
           ? cutLines.join(' · ')
           : `every label, sub and note fitted its box in both panels`);
 
+    // ⚠️ AND HERE IS THE ONLY PLACE ANY OF THEM REACH THE REPORT.
+    for (const [label, pass, detail] of held) d.assert(label, pass, detail);
   }
 
   // The frame counter has to have moved before the picture can be read back, so

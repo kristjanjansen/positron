@@ -780,27 +780,32 @@ export const DEMOS = [
   // rather than quietly dropping the row, which is the whole reason that check
   // exists: an ungrouped demo still renders a complete-looking front page and
   // the only way to notice is to count. Caught by the build on the first run.
-  // 🔴 `settleMs` DOES LAND ON A CONTROL HERE, AND THIS COMMENT SAID IT COULD
-  // NOT. It read *"not a control-0 press: it has no controls row on purpose"*,
-  // which is true of `.pos-controls` and false of the selector the harness
-  // actually uses: `.pos-controls button, .tbar-x`, and this page's two
-  // transport buttons are `.tbar-x` on the control room's bar. So control 0 is
-  // START HLS, and these 75 s are slept by `demo/verify.mjs` between that press
-  // and START WEBRTC, before it collects anything.
-  // ⚠️ WHICH IS THE BUDGET THE PAGE'S OWN DRILL RUNS INSIDE. It drives the whole
-  // live pipeline (subscribe, record, stop, store, play back, seek) off the HLS
-  // leg, and a cold container wake was probed at about 22 s, so the wait is for
-  // Cloudflare rather than for this page. Every assert is reported where it is
-  // made now, so a drill that overruns costs the asserts after the cut and no
-  // longer costs the ones before it.
+  // ⚠️ `settleMs` SIZES THE WAIT FOR THIS PAGE'S FIRST ASSERT, not a control-0
+  // press: it has no controls row on purpose. Its checks drive the whole live
+  // pipeline (publish, record, stop, store, play back, seek) and hold every
+  // assert until that is done, because `verify.mjs` stops collecting the moment
+  // the count is unchanged for one 400 ms tick.
+  // 🔴 AND SINCE 2026-09-25 IT DOES A SECOND JOB THAT IS THE REAL REASON IT IS
+  // 75 s: IT KEEPS THE HARNESS'S OTHER PRESSES OUT OF THE PAGE'S OWN DRILL.
+  // This page's `START HLS` and `START WEBRTC` are `.tbar-x`, so the harness
+  // presses them, and each one is its own STOP. `settleMs` lands after control
+  // 0 only, so it is the whole gap between that press and the next: at 75 s the
+  // second press arrives after the drill has finished, and the button it finds
+  // reads `STOP WEBRTC`, which releases the publisher rather than starting
+  // another show. A smaller number puts a stop press in the middle of the
+  // drill, which is the failure recorded in this page's own check block as
+  // twelve asserts red.
+  // ⚠️ IT IS NOT SIZING THE CONTAINER WAKE ANY MORE. The check waits for the
+  // publisher itself (`waitForWhip`) before it presses, so the wake is paid
+  // against the asserts before the press rather than against this number.
   { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000,
-    // ⚠️ THE SAME STRING AS THE PAGE'S `what`, AND IT SAID SOMETHING ELSE UNTIL
-    // 2026-09-25: *"two presses, one for the picture and one for the show"*.
-    // The film lost its own play button on 2026-09-25 and starts with the show
-    // now, so there is one press, and what the two buttons decide is which
-    // transport carries it.
-    one: 'pick how the show reaches its audience, over WebRTC or over low latency HLS, '
-      + 'ask them something, and keep every answer on the recording\u2019s own timeline',
+    // \ud83d\udd34 THE TWO PRESSES CHANGED WHAT THEY MEAN, SO THIS SENTENCE HAD TO. It
+    // read *"two presses, one for the picture and one for the show"*, which the
+    // 2026-09-25 transport rework made false twice over: the two presses are
+    // now WHICH TRANSPORT carries the show, and the film lost its play button
+    // in the same change, so there is no press for the picture at all.
+    one: 'a church scene from a 2011 MIMproject performance goes out live to an '
+      + 'audience that answers back, over whichever transport you press',
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
