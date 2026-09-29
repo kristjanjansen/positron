@@ -1,5 +1,19 @@
 ## Open
 
+### Open 2026-09-29: llhls, remove the publisher idle badge
+
+ASKED, VERBATIM: *"rm publisher: idle badge"*. Same page, same sitting as the
+two llhls asks below, so all three are worked together and the page is verified
+once.
+⚠️ **IT MAY BE THE SAME READING THE NEW TOGGLE IS ABOUT.** The toggle ask asks
+for `stream off | starting | on` in place of the primary button, and a badge
+reading `publisher: idle` is the same fact in a second place. If it is, this is
+one change rather than two, and the report says so rather than deleting a badge
+and leaving the page with no way to know the publisher is down.
+⚠️ **AND IF THE BADGE CARRIES SOMETHING THE TOGGLE WILL NOT**, say what, and
+say where that reading goes instead. A control that is removed and a fact that
+is removed with it are two decisions, and only one of them was asked for.
+
 ### Open 2026-09-29: llhls says how it works, including how the stream stops
 
 ASKED, VERBATIM: *"add how it works to llhsl incl how it stops"*. Same page,
