@@ -1,5 +1,51 @@
 ## Open
 
+### Open 2026-09-29: knobs, panic should stop the audio as well as the notes
+
+ASKED, VERBATIM: *"knobs: panic should stop audio"*. One page,
+https://positron.studio/knobs/.
+
+**NOT STARTED.**
+
+**What panic does today**, `demo/knobs/index.html:1157`: it stops both invisible
+hands, sends `note.panic` to the board when `MAY_PLAY && armed`, homes the two
+rotaries to where they opened, calls `kb.panic()` and logs *"stopped: every note
+released and both rotaries back where they opened"*. **Every one of those acts on
+the SOURCE. Not one of them touches the sound already on its way here or already
+in the page.**
+
+🔴 **SO THE PAGE GOES ON MAKING NOISE AFTER A CONTROL THAT SAYS STOP**, and the
+cushion is the measured size of it: `createBoard` runs a **160 ms** floor on this
+page, raised from 100 on 2026-09-16 after *"some vobbly sound, cutoffs, not
+nice"*. That is a sixth of a second of sound that is already in the ring when the
+button is pressed, and it plays out whatever the board does next.
+
+✅ **THE INSTRUMENT FOR IT EXISTS AND THE PAGE CAN REACH IT.**
+`proto/jam/playout-worklet.js:108` takes `{ cmd: 'reset' }`, which drops the ring
+(`rd = wr = buffered = 0`) and re-arms the prebuffer, and `board.playout()`
+returns that node to any page holding a board. **So this is a page change and
+`demo/shell/` need not be touched.**
+
+🔴 **BUT `reset` ALONE IS NOT *STOP AUDIO* AND THE DIFFERENCE MATTERS.** It
+empties what has arrived. It does not stop what is still coming: frames keep
+landing, the prebuffer re-arms, and sound returns a cushion later **if the board
+is still sounding**. What makes it quiet and keep quiet is `note.panic` reaching
+the board, which panic already sends. **So the two halves are a pair**: the
+message stops the source, the reset throws away the sixth of a second already
+past it.
+⚠️ **AND THERE IS A CASE WHERE ONLY ONE HALF FIRES.** `note.panic` goes only when
+`MAY_PLAY && armed`. An unarmed page that is listening to somebody else driving
+the board would drop its cushion and hear the sound come straight back. **That is
+honest behaviour and the log line must not claim otherwise**, because the page
+cannot silence an instrument it is not allowed to write to.
+⚠️ **`ctx.suspend()` IS THE OTHER CANDIDATE AND IS THE BIGGER CLAIM.** It
+silences everything until something resumes it, and `board.mjs:274` records that
+`resume()` is fired **exactly once, inside `startAudio`**, so a suspended context
+has no obvious way back on this page. Price it, do not drift into it.
+
+**And the log line is part of the change.** *"stopped: every note released and
+both rotaries back where they opened"* will be describing two of three things.
+
 ### Open 2026-09-29: nola, rm A WAY HOME
 
 ASKED, VERBATIM: *"rm A WAY HOME"*. One page, https://positron.studio/nola/.
