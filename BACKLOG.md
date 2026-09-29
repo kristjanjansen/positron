@@ -58,7 +58,28 @@ this is a dead argument rather than a defect. Found while reading the call, not
 asked for. Drop it in the same edit or leave it, but do not pretend it does
 something.
 
-### Open 2026-09-29: muta, full content width at the desk, the knobs group centred, Test tone to the right
+### Done 2026-09-29: muta, full content width at the desk, the knobs group centred, Test tone to the right
+
+✅ **DONE, `0f617fb`, ALL THREE HALVES.** MEASURED at 1280: the panel went
+**296..821 to 296..984**, which is the report's own left and right edge to the
+digit. **The centring threshold is derived, not picked**: the group is 483 px in a
+row that spends `--rows-pad` at each end, so the client is the window less 42, and
+the first width at which the group stops fitting is **525**. The floor is the 561
+this sheet already has. MEASURED at four widths, NOTHING CLIPS: the first grid
+moves 317 to 398.5 at 1280 and does not move at 560, 480 or 375, where the row
+still scrolls from its own inset with `scrollLeft` 0. Centred on the INK, 98.2 px
+either side. Test tone took the cheap reading and is 201.5 px further right at
+756, 8.0 px from the picker against a row gap of 8.0.
+🔴 **FOUR ASSERTS WERE REWRITTEN AND THE SECOND CASUALTY WAS NOT PREDICTED.**
+Besides the width claim, *"the row insets the rotaries' ink equally on all three
+sides"* compared the first dial's left gap against its top and bottom, **36.7
+against 37.0 before and 98.2 after**. It is a centring claim now with
+`scrollWidth <= clientWidth` as its negative half, so a scrolling row can never
+also read as a centred one. **ANYBODY APPLYING `full: true` TO `fau`, `knobs`,
+`shape` OR `tom` SHOULD EXPECT THE SAME CASUALTY.**
+49/49 before and after, 43 page asserts, closed a second way because the before
+line was lost: `grep -c "d.assert("` reads 41 at HEAD and 41 in the tree. The
+phone pays 3 px at exactly 560 and nothing at 480 or 375.
 
 ASKED, VERBATIM: *"muta: full content w in deskop, center the knobs group. align
 test tone to right."*. One page, https://positron.studio/muta/.
@@ -306,7 +327,28 @@ comment says exactly that, so the comment is rewritten too.
 remain out of `.pos-controls button, .tbar-x`, which is the one thing yesterday's
 move had to not break and which this one must not break either.
 
-### Open 2026-09-29: pack, the sample player loses its transport and the waveform's border, and becomes a glued panel
+### Done 2026-09-29: pack, the sample player loses its transport and the waveform's border, and becomes a glued panel
+
+✅ **DONE, `5bf144b`, AND THE BORDER HALF WAS `d52b714` BECAUSE THE RING WAS
+PAINT.** CONFIRMED HERE WITH A NEGATIVE CONTROL rather than a computed style,
+which was green the whole time the ring was on screen: the canvas's outermost
+pixel ring reads **0 of 1560 as `--line` as shipped, and 1560 of 1560** with the
+deleted `strokeRect` painted back from the page.
+🔴 **THE GREYED PLAY BUTTON WAS DOING A SECOND JOB** and it has a visible home
+now: a third row of the glued panel, mutually exclusive with the picture, reading
+`this one cannot be played here` or `this file did not read` in `--bad`. MEASURED
+on a 6 channel file and a bad header: 49.25 px with a 1.00 px seam, the picture's
+row to `display: none`, and the words CLEAR rather than linger when a good file
+opens.
+⚠️ **THE BRIEF WAS WRONG ABOUT `createGrainScope` TAKING A `reason`.** It has no
+`set()` at all; `reason` is `synth-view.mjs`'s, which `/muta/` uses and this page
+does not import. The agent measured that rather than arguing with it.
+⚠️ **AND `.pk-wave` IS THE ROW'S CLASS NOW, FORCED BY A MEASUREMENT**: `shell.css`
+zeroes a glued scope's margin one level deep, and a wrapper would have put the
+scope three levels down and restored the 22 px inset removed from this page on
+2026-09-22. The picture row measures 102 px, identical to before.
+31/31 before and after, 25 page asserts, and `grep -c` went 65 to 62. **Loop and
+the dark branch both have entries of their own above.**
 
 ASKED, VERBATIM: *"pack: sample player: rm transport below waveform [screenshot]
 rm border around waveform. use glued panel"*. One page,
@@ -516,7 +558,31 @@ claim is about the fader block's own internals and should survive**, because
 nothing here moves anything inside `.pos-crow`. Check it rather than assume it:
 the run before and the run after should read the same count.
 
-### Open 2026-09-29: knobs, a longer description that explains the Pi, and the badge says ONLINE alone
+### Done 2026-09-29: knobs, a longer description that explains the Pi, and the badge says ONLINE alone
+
+✅ **DONE, `22f3805`.** The description keeps its hook sentence and gains two,
+read off this page's own diagram rather than invented: `yoshimi` is a box inside
+the Raspberry Pi container, `ctl.set` and `CC` are the arrows going out, `PCM` in
+`20ms pieces` is the arrow coming back. The `what` and the manifest's `one` stay
+identical apart from the first letter and the closing stop, checked by pulling
+both out and comparing. **This overrides CLAUDE.md's one sentence rule on ONE
+page, on the owner's instruction, and the page says so. CLAUDE.md is untouched.**
+The badge takes `showName: false`, one line. MEASURED through all five states
+inside the page's own cascade: **ONLINE, CHECKING, COMING ONLINE, OFFLINE,
+UNKNOWN**, where each said `RASPBERRY PI` before it, reserve **172.19 to 86.09
+px**, tooltip still `Raspberry Pi online`. The uppercase needed no rule and none
+was added: `which-rule-won.mjs` names `.pos-pres-w` in `shell.css` as the only
+winner, so it is the component's and not the plate row's.
+🔴 **AND THE PLATE ROW STOPPED WRAPPING AT 375, WHICH NOBODY PREDICTED**: 85 px
+with `enable midi` on one line and the cluster on a second, **66 px** now with all
+of it on one line. The shorter badge collapsed it.
+⚠️ **THE FRONT PAGE PAYS FOR THE TWO STRINGS STAYING IDENTICAL**: the knobs card
+goes **157.4 to 229.9 px**, and grid items stretch to their row, so `twelve` and
+`dump` go with it. **Three cards are 72.5 px taller.** That is the session's
+decision and it is reversible in one line if the card should stay short.
+⚠️ **THE `ONLINE` READING IS THE COMPONENT DRIVEN TO THAT STATE, NOT THE BOARD
+SAYING SO.** The Pi answered online at 10:47 and offline from 10:53 on identical
+code. The two standing reds were there before and are not this change.
 
 ASKED, VERBATIM: *"Play a synthesizer in another building, and turn its knobs
 while you do. - make longer explaingi Pi"* and *"Rasp Pi online -> \"ONLINE\""*.
@@ -765,6 +831,58 @@ in the brief**, which is what the three agents after it were given.
 ⚠️ **AND IT MEANS ONE THING CANNOT BE RULED OUT**: any measurement taken in that
 root between the two runs may belong to a peer. The shared agent's numbers were
 all re-taken after the move. Nobody else reported an anomaly.
+
+### Open 2026-09-29: nothing on /pack/ can loop a sample any more, and Loop was asked for by name
+
+🔴 **`Loop` WENT WITH THE TRANSPORT IN `5bf144b`, WHICH IS WHAT TODAY'S ASK
+REQUIRED, AND IT IS A CONTROL SOMEBODY ASKED FOR BY NAME.** 2026-09-21: *"move
+sample player below table, add loop"*. It lived in the bar's `loopSlot`, and
+looping is one boolean on the running `AudioBufferSourceNode`, so with the bar
+gone there is no control left to write it.
+
+**No replacement was invented, deliberately.** Three asserts went with it, all
+three about the toggle, and none of them had ever run on this machine.
+**This line exists so the removal is not silent.** If Loop is wanted back it is
+its own control in the glued panel, and it is one boolean and one button.
+
+### Open 2026-09-29: four of /pack/'s asserts have never run on this machine
+
+**FOUND BY THE `/pack/` AGENT WHILE REWRITING THEM.** Everything after
+`demo/pack/index.html:2563` sits behind `PACK_HERE ? await realFetch(PACK) :
+null`, and **`/pack/` fetches nothing without `?pack=<url>` since 2026-09-24**,
+when the Circuit pack left this repository. So that whole branch is dark here.
+
+**It is why today's count did not move**: `grep -c "d.assert("` went **65 to
+62** while `verify.mjs pack` read **31/31 with 25 page asserts before and
+after**. The three that left were already silent. **A green suite can mean zero
+coverage and only the count says so**, and here even the count cannot, because
+the difference is in a branch the count never reaches.
+⚠️ **AND ONE REWRITTEN ASSERT IS REASONED FROM THE CODE AND NEVER RUN**: *an
+empty slot opens*, whose body moved off `deck.range[1]` onto `lastPlayed`.
+Driving the branch with a locally built zip of WAVs reaches 33 asserts and then
+throws on `sessions[0].parts`, because a bag of WAVs is not a Circuit pack.
+**The fixture that would light this up is a pack shaped file that is nobody
+else's**, and building one is the open job.
+
+### Open 2026-09-29: pack imports createReport and never calls it, found not asked for
+
+`demo/pack/index.html:141` imports `createReport` and `grep -c "createReport("`
+is **0**. Dead since the readout was removed on 2026-09-21. **Left alone on
+purpose**: it is unrelated to the sample player and would put noise in a commit
+about it. One line to delete.
+
+### Open 2026-09-29: muta's foot has a 230 px hole at the desk, and the scope is the page's largest blank
+
+**BOTH FOUND BY THE `/muta/` AGENT AFTER LANDING `0f617fb`, AND NEITHER IS A
+FAULT.** They are the two things a second pair of eyes should look at on
+https://positron.studio/muta/ at 1280.
+
+- **`PLAITS` sits alone with about 230 px of nothing to its right** before
+  `Test tone` and the picker. That is what *align test tone to right* asks for on
+  a row that is now 688 px wide, and it reads as a foot bar rather than as a
+  gap, but it is the part of the layout most likely to draw a second opinion.
+- **The scope's empty field is now the largest blank area on the page** while
+  nothing is sounding. It was already that shape at 525 px and is simply bigger.
 
 ### Open 2026-09-28: step-grid sizes itself against the scroller's own padding, so the last column hangs over the edge, found not asked for
 
