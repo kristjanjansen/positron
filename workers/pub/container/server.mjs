@@ -100,7 +100,28 @@ function vf(pre, draw) {
 }
 
 function sourceArgs({ w, h, fps }) {
-  if (!SOURCE) return { input: ['-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`], pre: '' };
+  if (!SOURCE) {
+    return {
+      input: ['-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`],
+      // 🔴 THE "TOP LEFT COUNTERS" ARE testsrc2's OWN, NOT A drawtext HERE.
+      // Asked 2026-09-29, verbatim: "rm top left counters", with a grab showing
+      // a timecode over a frame number top left. There is no drawtext for
+      // either anywhere in this file — `ffmpeg -h filter=testsrc2` lists only
+      // size/rate/duration/sar/alpha, no way to turn its own overlay off, so it
+      // has to be PAINTED OVER rather than configured away. A crop would change
+      // the frame size every filter after this one assumes.
+      // MEASURED at 1280x720: the box is a FIXED PIXEL size, about 101x33 at
+      // frame 0, about 115x33 at frame 500,000 (six digits, 4h38m at 30fps) —
+      // the SAME size at 640x360, 1280x720 and 1920x1080 alike, so it does not
+      // scale with the picture. A fixed-pixel cover is therefore the correct
+      // match for it, not a hard-coded position standing in for one that should
+      // track PUB_W/PUB_H. 240x48 clears it with margin to spare even for a
+      // session that runs for days.
+      // ⚠️ ONLY ON THIS BRANCH. The film has no such overlay to hide, and
+      // painting a black box over a corner of it would be a new defect.
+      pre: 'drawbox=x=0:y=0:w=240:h=48:color=black:t=fill,',
+    };
+  }
   return {
     input: ['-re', '-stream_loop', '-1', '-i', SOURCE],
     // Normalise to the encode budget BEFORE the burn is drawn, so the overlay is
@@ -138,6 +159,15 @@ const CHORD = "aevalsrc='(0.06*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)+0.035*sin(2*
 // here ONLY because the image is built from `COPY server.mjs .`, one file, with
 // nothing to import from. src/publish.sh does NOT duplicate it; it generates
 // its filter from pattern.mjs directly. If you change one, change the other.
+// ⚠️ AND AS OF 2026-09-29 THAT IS NO LONGER TRUE OF THE TWO CLOCKS' LAYOUT.
+// Asked, verbatim: "rm top left counters. put absolute and local below each
+// other", naming only "the burned-in test pattern" — this file, not any demo
+// page — so drawFilters() below stacks ABSOLUTE over LOCAL in one column while
+// the canvas keeps the two-column layout it was asked for on 2026-09-18. The
+// hue rotation and the epoch's seconds-not-milliseconds format are still the
+// same spec on both; the on-screen position of the two clocks is not anymore.
+// pattern.mjs and src/publish.sh were left untouched — out of scope for this
+// change and held by other work.
 //
 // TRAP: drawtext with no `fontfile` resolves to nothing and FAILS SILENTLY, so
 // the epoch never reaches the pixels — the one thing that makes glass-to-glass
@@ -165,6 +195,14 @@ const ROW = {
   // at the BOTTOM: the machine's half of the picture, PAD off the bottom edge
   Y: FRAME_H - PAD - 20 - 56,
 };
+// ⚠️ ROW AND FRAME_H NO LONGER POSITION ANYTHING DRAWN HERE, SINCE 2026-09-29.
+// The two burned clocks used to anchor off ROW.Y, which is itself derived from
+// this hard-coded FRAME_H rather than the real encode height — harmless while
+// there was one line to place, wrong the moment a second stacked line needed
+// room below it. drawFilters() now positions both off the actual `h` it is
+// passed. ROW stays: it is still the frozen 48-bit bit-encoding geometry that
+// `rig/whep/*` and `rig/obs-docker/*` key off, even though nothing in this
+// file draws the block row itself (see the note below — removed 2026-09-08).
 
 /** Single-quote a filtergraph option value; the inner escapes are drawtext's. */
 const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
@@ -187,60 +225,89 @@ const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
  * (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of floating-point
  * result to int failed" — measured. Hence the unit printed beside the number.
  */
-function drawFilters({ epoch, hue = 0 }) {
+function drawFilters({ epoch, hue = 0, h = 720 }) {
   // Same typography as the browser canvas: a small brand-yellow word over a big
   // light number, on a dark scrim rather than a white slab. Not hue-rotated —
   // `hue=` is applied to the source first and drawtext paints after it, so
   // #ffd400 is the shell's #ffd400 on every leg whatever its rotation.
-  // ⚠️ `x` IS A PARAMETER AND THERE ARE TWO COLUMNS, 2026-09-18. The canvas
-  // moved its two clocks side by side and shrank them from 84 to 64; this file
-  // is the SAME PICTURE drawn by ffmpeg, so it moves with it or the claim that
-  // there is one pattern with two renderings stops being true.
+  // 🔴 STACKED, ONE COLUMN, NOT TWO — ASKED 2026-09-29, VERBATIM: "put absolute
+  // and local below each other". Until this both clocks sat on one line, in
+  // two columns, and the grab that prompted this showed their VALUES
+  // OVERLAPPING in the middle — a defect on its own, and one that cannot
+  // recur once the two are on separate lines.
+  // ⚠️ THE CANVAS AT demo/shell/pattern.mjs KEEPS ITS TWO COLUMNS. That layout
+  // was asked for by name on 2026-09-18, and this ask named only "the
+  // burned-in test pattern" — this file's drawtext, not any demo page — so the
+  // claim this comment used to make, that ffmpeg draws "the SAME PICTURE" as
+  // the canvas, no longer holds for this block's geometry. It still holds for
+  // the hue rotation and for the epoch being printed in seconds rather than
+  // milliseconds.
   const text = (t, x, y, size, colour) => [
     `drawtext=fontfile=${q(FONT)}`, `text=${q(t)}`,
     `x=${x}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
   const NUM = 64, LBL = 28;   // same sizes as the canvas
-  const COL2 = PAD + Math.round(13 * 0.6 * NUM) + PAD;   // 13 chars of epoch, plus a gutter
   // 🔴 ffmpeg's `y` IS THE TOP OF THE TEXT BOX AND THE CANVAS'S IS THE
-  // BASELINE, SO ONE HAS TO BE CONVERTED INTO THE OTHER. It was a pair of hand
-  // typed numbers, and on 2026-09-18 the canvas moved to a 64 px number while
-  // this kept the offset that belonged to an 84 px one: the number was drawn
-  // **25 px too low** and nothing said so, because no check compares the two
-  // renderings and this one is only ever seen in a container.
-  // 0.774 is that ratio, read back off the numbers this file shipped with
-  // (32 px label offset 25, 84 px number offset 65).
+  // BASELINE, SO ONE HAS TO BE CONVERTED INTO THE OTHER. 0.774 is that ratio,
+  // read back off the numbers this file shipped with (32 px label offset 25,
+  // 84 px number offset 65).
   const top = (baseline, size) => Math.round(baseline - 0.774 * size);
-  // The canvas's own baselines, so the two cannot drift apart again.
-  const NUM_Y = ROW.Y - 20 - PAD;
-  // ⚠️ 80 RATHER THAN 68, ASKED FOR 2026-09-18: *"incr a liitle bit space
-  // betwen labels and timecode numbers"*. What an eye reads as the gap is not
-  // this number: it is this number LESS the number's cap height, which at 64 px
-  // is about 50. So 68 was an 18 px gap and 80 is a 30 px one, which is the
-  // "little bit" and not the near doubling the figures suggest.
-  const LBL_Y = NUM_Y - 80;
+  // EXPRESSED AGAINST `h`, THE REAL ENCODE HEIGHT PASSED IN FROM args()/
+  // whipArgs(), never a hard-coded 720. The two-column version anchored off a
+  // ROW.Y derived from a hard-coded FRAME_H=720, which was already wrong the
+  // moment PUB_H dropped, it just had nothing below it to collide with. Two
+  // STACKED rows do.
+  //
+  // 🔴 AND THE FORM IS `demo/shell/pattern.mjs`'s OWN, NOT A FRACTION OF `h`,
+  // BECAUSE THIS IS THE THIRD COPY OF ONE PICTURE AND THE THREE HAVE TO AGREE.
+  // That file renders the same frame twice, once on a canvas for the demo pages
+  // and once as this filter string for `src/publish.sh`, under its own rule
+  // that the two have to LOOK the same or *"one pattern, two renderings"* is a
+  // claim nothing supports. This file is a third rendering that nothing
+  // imports, so the numbers are copied rather than shared, and copying the
+  // DERIVATION is what keeps them equal: `h * 0.40` and `h * 0.72` were
+  // legible and clear of each other and still landed 76 px and 14 px away from
+  // where the canvas draws them.
+  //
+  // The bed sits PAD off the bottom, is 56 tall and carries a 20 px lip, and
+  // the LOCAL number's baseline sits PAD above it. The ABSOLUTE pair is one
+  // PAIR higher. At h=720 that is 364 and 504, which is what
+  // `node demo/shell/pattern.mjs --epoch=…` prints.
+  // ⚠️ AND THE STACK HAS A FLOOR: at h=360 the ABSOLUTE label's top lands at
+  // y=4 and the next size down puts it off the picture. 720 and 480 both clear
+  // it (its top is 262 and 22). `PUB_H` is 720 here and nothing asks for less,
+  // so this is recorded rather than guarded, because a guard nothing reaches is
+  // a branch nothing has ever run.
+  const ROW_Y = h - PAD - 20 - 56;
+  const NUM_Y_LOC = ROW_Y - 20 - PAD;
+  const NUM_Y_ABS = NUM_Y_LOC - (80 + PAD);
+  // ⚠️ 80, UNCHANGED FROM 2026-09-18: *"incr a liitle bit space betwen labels
+  // and timecode numbers"*. What an eye reads as the gap is not this number:
+  // it is this number LESS the number's cap height, which at 64 px is about
+  // 50, so this is a 30 px gap between a label and its own number.
+  const LBL_Y_ABS = NUM_Y_ABS - 80;
+  const LBL_Y_LOC = NUM_Y_LOC - 80;
   const LABEL = '0xFFD400';
   const VALUE = '0xE9EEF7';
   return [
-    // hue FIRST: rotating chroma afterwards would tint the white boxes and,
-    // with the row on, the row itself — which readBurned thresholds on.
+    // hue FIRST: rotating chroma afterwards would tint the white boxes.
     ...(hue ? [`hue=h=${((hue % 360) + 360) % 360}`] : []),
-    // FOUR draws, mirroring burn()'s layout: a small word, then a big number,
-    // twice. No source label — the hue says which publisher this is, and a name
-    // burned into a picture is a small text nobody can read at the size a demo
-    // shows it.
-    text('ABSOLUTE', PAD, top(LBL_Y, LBL), LBL, LABEL),
+    // FOUR draws: a small word, then a big number, twice — ABSOLUTE above
+    // LOCAL. No source label — the hue says which publisher this is, and a
+    // name burned into a picture is a small text nobody can read at the size a
+    // demo shows it.
+    text('ABSOLUTE', PAD, top(LBL_Y_ABS, LBL), LBL, LABEL),
     // pts-derived, the same instant the row encodes.
-    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y, NUM), NUM, VALUE),
-    text('LOCAL', COL2, top(LBL_Y, LBL), LBL, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y_ABS, NUM), NUM, VALUE),
+    text('LOCAL', PAD, top(LBL_Y_LOC, LBL), LBL, LABEL),
     // LEGIBLE — this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
     // The triple backslash is not a typo: gmtime's strftime argument has to
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
     // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, top(NUM_Y, NUM), NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', PAD, top(NUM_Y_LOC, NUM), NUM, VALUE),
   ].join(',');
 }
 
@@ -258,7 +325,7 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
   const gop = fps * 2;
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
   const epoch = (Date.now() / 1000).toFixed(6);
-  const draw = drawFilters({ epoch, hue: 0 });   // see the note above
+  const draw = drawFilters({ epoch, hue: 0, h });   // see the note above
   const src = sourceArgs({ w, h, fps });
   const wantV = tracks !== 'a';
   const wantA = tracks !== 'v';
@@ -310,7 +377,7 @@ function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
   // A DIFFERENT hue from the RTMPS leg, deliberately. They are two ffmpeg
   // processes on two Cloudflare inputs — the page already says so — and any
   // page showing them side by side needs to tell them apart.
-  const draw = drawFilters({ epoch, hue: 150 });
+  const draw = drawFilters({ epoch, hue: 150, h });
   const src = sourceArgs({ w, h, fps });
   return [
     '-hide_banner', '-loglevel', 'warning',
