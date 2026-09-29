@@ -1,5 +1,39 @@
 ## Open
 
+### Open 2026-09-29: nola, rm A WAY HOME
+
+ASKED, VERBATIM: *"rm A WAY HOME"*. One page, https://positron.studio/nola/.
+
+**NOT STARTED.**
+
+**It is a whole block, not a control.** `demo/nola/index.html:1492` builds
+`homeWrap`, `:1493` the heading `A WAY HOME`, and `:1494` a `createTable` under
+it with a `chord` and a `numeral` column and `minRows: 4`. `drawHome()` at
+`:2246` fills it from `routeTo`, and the heading rewrites itself to `A WAY HOME
+TO <chord>` when a route lands.
+
+**What it touches, counted rather than remembered:** the construction, the
+`drawHome` function and its `lastHome`, `homeRedraws` and `saidHome` state, its
+callers, the `.nola-home` and `.nola-home-h` rules near `:4912`, a height
+measurement at `:4243`, the `ONE` string at `:350` which says *"and a four chord
+way home it works out from them"*, and **four asserts**: `:4428`, `:4524`,
+`:4537` and `:4554`.
+
+🔴 **THE DESCRIPTION LOSES A CLAUSE AND THAT IS THE SAME COMMIT.** `ONE` at
+`:350` is the page's `what` and the manifest's `one`, and it names the way home
+in its last clause. A description that promises a block the page no longer has
+is worse than a missing one. **Cutting the clause takes the sentence back
+towards the one sentence rule rather than away from it.**
+
+⚠️ **`routeTo` STAYS IN THE KIT.** It lives at `demo/shell/suggest.mjs:908` and
+is graded by `demo/shell/suggest-test.mjs` at `:427` and `:466`. After this,
+**no page calls it** and its test still does. Removing a tested kit function on
+one page's ask is a bigger claim than the ask makes, so it stays and this line
+is the record that it is now page-less.
+⚠️ **AND `plans/plan-better-chords-2026-09-25.md` IS NOT TOUCHED.** A plan
+records what was decided when it was decided, the same rule that keeps `archive/`
+spelled the old way.
+
 ### Done 2026-09-29: nola, rm the label from the chord input field to avoid a content jump
 
 ✅ **DONE, `dd7a8fe`. THE CAPTION WAS THE JUMP.** MEASURED at 1280 with a CDP
