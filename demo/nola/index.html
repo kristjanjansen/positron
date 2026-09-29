@@ -1081,14 +1081,31 @@
    * it acts on. The row that used to be here held a SUSTAIN switch and a
    * TRANSPOSE stepper, and both are gone: one moved under the keys where a
    * pedal belongs, and the other went with the instrument being fixed.
+   * 🔴 NO LABEL, AND IT IS A LAYOUT FACT RATHER THAN A TIDY-UP. Asked
+   * 2026-09-29 as *"nola: rm label from chord input field tpo avoid content
+   * jump"*. A `.pos-field` is a column of label over box at `gap: 7px`, and the
+   * label line measured 9.5 px, so the caption was worth exactly 16.5 px of row
+   * height. `.nola-top` is `align-items: flex-end`, the mode chooser is 34 px,
+   * and the box on its own is 34 px too, so with the caption on the field was
+   * the tallest child of the row and the row was 50.5 px. MEASURED at 1280
+   * before this change, switching to `Suggested` and back: the row went 50.5 to
+   * 34 and everything under it moved 16.5 px up the page, which is the jump.
+   * ⚠️ AND THE ACCESSIBLE NAME GOES ON THE BOX IN THE SAME BREATH. `.pos-field`
+   * is a `<label>` with the input inside it, so the name a screen reader hears
+   * was the span that just left, and the placeholder cannot stand in for it
+   * because it is character for character the value.
+   * ⚠️ NO `grow` EITHER, AND IT WAS NEVER DOING ANYTHING. `field.mjs` documents
+   * `wide` or nothing, every other caller passes `wide`, and there is no `.grow`
+   * rule in `shell.css` or in this page. What sizes this box is `.nola-top
+   * .pos-field` at the foot of this sheet, which is why the class going changes
+   * no width: MEASURED, the box is 485.58 px at 1280 with it and without it.
    */
   const chordField = createField({
-    label: 'CHORDS',
     value: 'Cmaj C9 F/C Fm6/C',
     placeholder: 'Cmaj C9 F/C Fm6/C',
-    grow: 'grow',
     onInput: (v) => drawChords(v),
   });
+  chordField.input.setAttribute('aria-label', 'chords');
   const chordList = el('div', 'nola-chords');
 
   /**
@@ -1436,10 +1453,12 @@
         + 'Play for a minute or two, press SAVE TAKE, and the file lands in your downloads');
   }
   /* 🔴 THE MODE SITS BESIDE THE FIELD IT TURNS OFF, not down with the keys.
-     `Played` disables the CHORDS field, and a control that greys out something
-     three blocks away is a page asking a reader to work out what happened. The
-     two pickers under the keys are about the instrument; this one is about
-     where the roll's rows come from, which is what the field is. */
+     `Suggested` takes the chord field out of the document, and a control that
+     removes something three blocks away is a page asking a reader to work out
+     what happened. The two pickers under the keys are about the instrument;
+     this one is about where the roll's rows come from, which is what the field
+     is. ⚠️ AND THE FIELD HAS NO CAPTION TO NAME IT SINCE 2026-09-29, which is
+     the other half of sitting beside the control that owns it. */
   const topRow = el('div', 'nola-top');
   topRow.append(chordField.el);
 
@@ -4863,13 +4882,25 @@
      `place: 'ends'` is still this page's call for the reason beside it: `end`
      carries a `margin-left: auto` that would park both children on the right. */
 
-  /* 🔴 THE MODE AND THE FIELD IT TURNS OFF ARE ONE ROW. `Played` takes the
-     CHORDS field out of the document, and a control that removes something a
+  /* 🔴 THE MODE AND THE FIELD IT TURNS OFF ARE ONE ROW. `Suggested` takes the
+     chord field out of the document, and a control that removes something a
      block away is a page asking a reader to work out what happened.
-     ⚠️ AND THE ROW DOES NOT COLLAPSE WHEN THE FIELD GOES, because `.pos-choice`
-     keeps its own height and the field was the only thing that grew. A row that
-     changed height on a mode press would be the reflow this page already
-     refuses for a reading under a picture. */
+     🔴 AND THIS SAID THE ROW DOES NOT COLLAPSE UNTIL 2026-09-29, WHICH WAS
+     WRONG AND HAD BEEN WRONG FOR AS LONG AS IT STOOD HERE. It argued that
+     `.pos-choice` keeps its own height and the field was the only thing that
+     grew, and the second half of that sentence is the whole defect: the field
+     grew BY ITS LABEL. Asked as *"nola: rm label from chord input field tpo
+     avoid content jump"*. MEASURED at 1280 with the caption still on, pressing
+     `Suggested` and back: the row went 50.5 px to 34 and the keyboard under it
+     moved 16.5 px up the page on every press, both ways. MEASURED after the
+     caption came off: 34 px in both modes, the keyboard at 239.5 px in both,
+     0 px of movement.
+     ⚠️ AND IT IS NOT ZERO ON A PHONE, WHICH IS A SECOND CAUSE AND IS LEFT
+     ALONE. At 375 this row wraps, so the field is a whole second line rather
+     than the tallest child of one. MEASURED 97.5 px to 47.5: 50 px of the row's
+     own 16 px gap and the box's 34, and not one pixel of caption. Keeping a
+     line for a control that is not in the document is a bigger claim than the
+     ask makes, so it is measured here rather than written. */
   .nola-top { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
   .nola-top .pos-field { flex: 1 1 220px; min-width: 0; }
 
