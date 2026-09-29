@@ -1,5 +1,512 @@
 ## Open
 
+### Open 2026-09-29: nola, rm the label from the chord input field to avoid a content jump
+
+ASKED, VERBATIM: *"nola: rm label from chord input field tpo avoid content
+jump"*. One page, https://positron.studio/nola/.
+
+**NOT STARTED.**
+
+**The field is `demo/nola/index.html:1085`**, `createField({ label: 'CHORDS',
+value: 'Cmaj C9 F/C Fm6/C', placeholder: 'Cmaj C9 F/C Fm6/C', grow: 'grow' })`,
+and it sits in `.nola-top` next to the mode chooser.
+
+✅ **DROPPING THE LABEL NEEDS NO KIT CHANGE AND REACHES NO OTHER PAGE.**
+`demo/shell/field.mjs:73` reads `if (label) wrap.append(el('span',
+'pos-field-l', label))`, so a field with no label is already a supported shape.
+The other five call sites (`crate`, `fau`, `items`, `kit`, `stage`) all pass one
+and are untouched.
+
+🔴 **THE JUMP HAS TO BE IDENTIFIED BEFORE IT CAN BE CALLED FIXED, AND THE PAGE
+ALREADY CARRIES A COMMENT SAYING THERE IS NO JUMP.** `demo/nola/index.html:4866`
+says *"THE MODE AND THE FIELD IT TURNS OFF ARE ONE ROW ... AND THE ROW DOES NOT
+COLLAPSE WHEN THE FIELD GOES, because `.pos-choice` keeps its own height and the
+field was the only thing that grew"*. The mechanism is real: `:2604` does
+`chordField.el.remove()` on `Played` and `:2605` appends it back, and `.nola-top`
+is `display: flex; align-items: flex-end; flex-wrap: wrap` at `:4873`. **So
+either that comment is stale or the jump the ask names is a different one.**
+Measure the row's height and the top of the block under it in BOTH modes at 1280
+and at 375 before touching anything, and say which number moved.
+⚠️ **THE LABEL IS WORTH ABOUT 17 px OF ROW HEIGHT**: `.pos-field` is a column
+with `gap: 7px` and `.pos-field-l` is a 10 px uppercase line. If the row's height
+is being set by the field in one mode and by the chooser in the other, that is
+the jump, and removing the label is the cure rather than a cosmetic change.
+
+🔴 **THE WRAPPER IS A `<label>` ELEMENT, SO THE ACCESSIBLE NAME GOES WITH THE
+SPAN.** `field.mjs` builds `el('label', 'pos-field ...')` and the input is inside
+it, so today the input is named by the word CHORDS and by nothing else. **The
+placeholder is character for character the value**, `Cmaj C9 F/C Fm6/C`, so it
+carries no name either. One `aria-label` on `chordField.input` keeps the name
+with no visible line, and that is the form to use rather than shipping an unnamed
+text box.
+
+⚠️ **AND THE CALL PASSES `grow: 'grow'`, WHICH IS NOT A CLASS THIS PROJECT HAS.**
+`field.mjs` documents `wide` or omitted, `shell.css` has `.pos-field.wide` and no
+`.grow` rule at all, and every other call site passes `wide`. It is inert
+because `:4874` sets `.nola-top .pos-field { flex: 1 1 220px }` directly, so
+this is a dead argument rather than a defect. Found while reading the call, not
+asked for. Drop it in the same edit or leave it, but do not pretend it does
+something.
+
+### Open 2026-09-29: muta, full content width at the desk, the knobs group centred, Test tone to the right
+
+ASKED, VERBATIM: *"muta: full content w in deskop, center the knobs group. align
+test tone to right."*. One page, https://positron.studio/muta/.
+
+**NOT STARTED.**
+
+🔴 **THIS ANSWERS THE DECISION THAT WAS WAITING, AND IT ANSWERS IT THE OTHER
+WAY.** The entry below (*"muta, the Test tone button fills the phone (DONE) and
+the knob grid has nothing to centre in (REFUSED, one decision waiting)"*) asked
+whether the panel should CENTRE in the page with `margin-inline: auto`, 525 px in
+a 688 px body. **The answer is no: the panel takes the whole content width
+instead, and the knobs centre inside it.** That entry's waiting decision is
+closed by this line and nothing is left hanging there.
+⚠️ **AND IT TAKES THE SHAPE THAT WAS PRICED AND REJECTED YESTERDAY, ON PURPOSE.**
+`full: true` was refused in writing with the words *"plainly awful"*, four knobs
+floating in a 660 px band, which is `positron-compose`'s own phrase. **What makes
+it different now is the second half of the ask**: the objection was to a wide
+panel with its content stranded at the left, and centring the knobs group is
+exactly the arrangement that objection assumed nobody would write. The refusal
+was about an unfinished version of this. It is still worth a LOOK at 1280 with
+`node demo/shot.mjs muta 1280` before it is called done, because the band is real.
+
+**Three halves, and they are three different files' worth of decision.**
+
+**One, full content width at the desk.** `full: true` on
+`createInstrumentPanel` at `demo/muta/index.html:742` is the kit's existing
+spelling and it passes straight through to `createGlueRows`. **MEASURED
+yesterday: the panel is `fit-content` at 525 px inside a 688 px body, with all
+163 px of the slack on the right.** `.plai-panel` also carries page CSS that may
+be assuming the shrink-wrap, so read it before adding the flag.
+⚠️ **AT THE DESK is in the ask and matters.** At 375 px there is no slack at all,
+so `full` must not change the phone, and the phone is where the plate row and the
+Test tone button both already have rules of their own at 560 and under.
+
+**Two, the knobs group centres.** `.plai-knobs` holds TWO `createControlGrid`
+surfaces (`cols: 2` at `:520` and `cols: 3` at `:537`), and *the knobs group* is
+the wrapper rather than either grid, so both move together as one block.
+🔴 **A PLAIN `justify-content: center` IS THE TRAP AND IT IS MEASURED.**
+Yesterday's live test read **0.0 px of movement at 1280 and 560, then -1.5 at 480
+and -54.0 at 375 with `scrollLeft` clamped at 0**, which is 91 px of the 2 by 2
+group off the left edge and unreachable, because inline-start overflow inside
+`overflow-x: auto` is clipped permanently. The 0.0 px readings were taken with the
+panel still `fit-content`; the first half of this ask is what gives the row
+something to centre in, so those two numbers change and the -54.0 does not.
+**So the centring has to be confined to where there is room**, either by a
+`min-width` query above the phone block or by `justify-content: safe center`.
+⚠️ **`safe center` IS A CANDIDATE AND NOT A FACT YET.** Nothing in this
+repository uses it, its whole point is that it falls back to `start` instead of
+overflowing, and browser support has to be read rather than assumed. Check it,
+and if it is not safe on every engine this project verifies, use the query.
+
+**Three, Test tone aligns right.** The button is the plate row's `status`, so it
+is INSIDE `.pos-ipanel-name` (`shell.css:1094`), the start cluster that holds the
+nameplate. **The row is two ends: the name cluster at the start and the patch
+picker at the end.**
+🔴 **SO *RIGHT* IS AMBIGUOUS AND THE TWO READINGS ARE DIFFERENT COMPONENTS.**
+Either the button pushes to the right of its own cluster or of the row, which is
+a `margin-inline-start: auto` and stays page scoped, **or** it leaves the start
+cluster for the far end, where the picker already is by construction and where
+`instrument-panel.mjs:250` THROWS if a `.pos-pick` is handed in as `status`. The
+second reading means a third slot on a kit component that reaches six pages. **Do
+the first unless it looks wrong in a shot**, and say which was done.
+⚠️ **AND IT COLLIDES WITH THE GENERAL ASK BELOW.** The phone rule landed
+yesterday keeps the Test tone INSIDE the centred name cluster on purpose, because
+a centred word with a button hanging off it is the nervous almost-the-same
+`positron-compose` refuses, and the next entry moves that whole cluster to the
+bottom of the row. **Whatever is written here must not reach the 560 block**, and
+the two asks have to be looked at in one shot at 375 before either is called
+done.
+
+⚠️ **NOTHING HERE IS GRADED BY A HARNESS AT PHONE WIDTH** and `muta` reads
+**49/49 with 43 page asserts** today. The desk half IS gradable: the panel's own
+assert says *"the instrument starts where the rest of the page does and is as wide
+as its widest row"*, and the second clause of that stops being true the moment
+`full: true` lands, so that assert is rewritten in the same commit rather than
+left to go red.
+
+### Open 2026-09-29: the instrument panel's nameplate goes to the bottom of the plate row on a phone
+
+ASKED, VERBATIM: *"general: intrument panel: nameplate is the lowest of the
+bottom components in mobile"*. **SHARED WORK**: it reaches `fau`, `knobs`,
+`muta`, `shape`, `tom` and `kit`, so it is done ONCE, by one agent, BEFORE any
+page agent starts.
+
+**NOT STARTED.**
+
+**Where it is.** The plate is already the LAST row of the panel at every width:
+`ROW_KINDS` in `demo/shell/instrument-panel.mjs` puts it last and `addRow`
+inserts before it. **What the ask is about is the order INSIDE that row once it
+wraps**, which is `shell.css:7421` onward, the `@media (max-width: 560px)` block
+that landed yesterday.
+
+**What a phone draws today.** The plate row is a `.pos-rows-r`, a justified row
+with two ends: `.pos-ipanel-name` (the nameplate and its `status` control) at the
+start, and the patch picker at the end. **MEASURED yesterday at 375: `/muta/`
+draws the name with `Test tone` on line one and the picker on line two.** So the
+nameplate is the TOP of that stack and the ask wants it the BOTTOM.
+
+**The cheap form is one declaration**, `order: 1` on
+`.pos-ipanel-plate > .pos-ipanel-name` inside the existing 560 block, which puts
+the picker above the name and leaves every desktop width untouched. A plate with
+no picker and no status has one child in that row, so ordering it does nothing
+and those pages cannot regress.
+⚠️ **READ THE ASK'S PLURAL BEFORE WRITING THE ONE LINE.** *"the lowest of the
+bottom components"* may mean only the plate row's own members, which is the
+`order` above, or it may mean the nameplate sits below everything at the foot of
+the panel including the keyboard's own foot row on the pages that have one
+(`nola`, `kit`). **The plate is already below the keyboard**, so if that is the
+reading then part of this is already true and the answer says so rather than
+inventing work.
+
+🔴 **AND THE `status` CONTROL GOES WITH THE NAME, WHICH IS WHY THIS IS NOT
+OBVIOUS.** `shell.css`'s comment for that block says in writing that the controls
+on the row go with the name rather than staying put, so `/muta/`'s `Test tone`
+centres as one block with `PLAITS`. **An `order` on the cluster moves the button
+to the bottom too.** That is either right or exactly what the muta ask above is
+fighting, so the two are decided together and photographed together at 375.
+⚠️ **IF THE BUTTON HAS TO STAY UP WHILE THE NAME GOES DOWN, THE CLUSTER HAS TO
+SPLIT**, which is a change to what `.pos-ipanel-name` IS on six pages and is a
+much bigger thing than one `order` line. Price it, do not drift into it.
+
+⚠️ **NO HARNESS ON THIS SITE CAN SEE ANY OF IT.** `demo/verify.mjs` runs at
+756 px with no viewport override, so all six pages will pass every assert whether
+this works or not, and `/kit/`'s narrow specimens are narrow BOXES at desktop
+WIDTH, which a media query cannot read. The instrument is `node demo/shot.mjs
+<slug> 375` on all six, which is what yesterday's centring was checked with. This
+is the third phone-only change in two days with nothing grading it, and the
+entry about that is already open below.
+
+### Open 2026-09-29: shape, the sends-to chooser justifies right, its label goes, and the hand leaves the segment group
+
+ASKED, VERBATIM: *"shape: sents to right align (justify), rm label, invisible
+hand is a separat e button not a radio group"*. One page,
+https://positron.studio/shape/.
+
+**NOT STARTED.**
+
+🔴 **THIS UNDOES YESTERDAY'S JOIN, WHICH WAS ITSELF A REPORTED FIX, AND THAT IS
+THE THING TO GET RIGHT RATHER THAN TO ARGUE WITH.** `c61c2f2` made the glyph the
+chooser's LAST SEGMENT after *"fix invisuble hand button"*, and this ask takes it
+back out. **What the before state actually looked like is measured and is in the
+file**, `demo/shape/index.html:1596` onward: the square stood **10.00 px clear of
+`Session` wearing a full ring of its own at 375, 756 and 1280**, and at 375 it
+also sat **6.75 px ABOVE the options**, because `.pos-choice` puts its label on
+top at that width and a neighbour centres itself on the label and the segments
+together. **So a bare revert reproduces a defect a person reported with a
+screenshot.**
+✅ **AND THE SECOND HALF OF THIS ASK IS WHAT REMOVES THAT.** With no label there
+is no label for a neighbour to centre against: `shell.css:2725` makes
+`.pos-choice` a one column grid on a phone and `:2726` is what puts the caption on
+its own line. **Dropping the caption kills the 6.75 px, not by a new rule but by
+taking away the thing that caused it.** MEASURE it at 375 and say the number,
+because that is the half the person saw and no harness on this site runs there.
+
+**Three halves, one row.** `.shape-bar` at `demo/shape/index.html:65` is
+`display: flex; gap: 10px; align-items: center; flex-wrap: wrap` and holds THREE
+children: the Circuit status button, the chooser, and the hand.
+
+**One, *sents to right align (justify)*.** `sents to` is the label string itself,
+`label: 'sends to'` at `:500`, so the ask names the chooser by its caption and
+asks where the CONTROL goes. **The reading that fits the row is
+`justify-content: space-between` on `.shape-bar`**: the status stays at the left
+edge and the chooser with its glyph goes to the right edge, which is what
+*justify* means on a flex row and what *right align* looks like when there are
+exactly two ends. The sketch this row was built from is
+*"[circuit connected] [Synth1|Synths] [⇄]"*, so nothing about the ORDER changes.
+⚠️ **THE OTHER READING IS `justify-content: flex-end` ON THE WHOLE ROW**, which
+would take the status button right as well. **Confirm before writing it if the
+shot looks wrong**, and say which was done.
+⚠️ **AND THE ROW WRAPS.** At 375 these three already wrap, so whatever is written
+has to be looked at there too: a `space-between` row that wraps puts one child
+per line and the justification does nothing, which would read as the ask having
+been ignored.
+
+**Two, the label goes.** `demo/shell/choice.mjs:94` is `if (label)
+wrap.append(...)`, so a chooser with no caption is already a supported shape and
+this reaches no other page. **It carries no aria wiring**: the span is visible
+text and nothing points at it, so there is no accessible name to lose and none to
+replace. What IS lost is the only words on the page saying what the three
+segments do, so **read the page's `what` line in the same edit** by the standing
+rule that a change in what a page does is a change to what it says.
+
+**Three, the hand is a separate button and not one of the options.** This is the
+right instinct written down twice already: the segments are `aria-pressed`
+buttons standing in for a radio group, `choice.mjs` calls that a real gap left
+alone on purpose across eleven call sites, and `BACKLOG.md`'s own open entry about
+a `trailing` slot flagged *whether an action inside a row of options announces
+correctly* as **reasoned and never measured, with no screen reader on it**. An
+action that is not an option should not be in the group. ✅ **SO THAT OPEN ENTRY IS
+ANSWERED BY THIS ASK AND WANTS NO `trailing` OPTION**, and it is marked so below.
+✅ **THE SQUARE SURVIVES THE MOVE.** `button[data-glyph="1"]` at
+`shell.css:4749` is global and has been since 2026-09-25, so the 34 px square and
+the existing assert on it do not depend on the button being inside `.pos-choice`.
+🔴 **AND ONE PAGE RULE DIES WITH THE JOIN.** `.pos-choice button.shape-hand {
+flex: none; padding: 0 }` at `:82` exists ONLY because the button was a child of
+`.pos-choice`, and a selector that matches nothing is this project's cheapest
+recurring defect. **Delete it in the same commit** and keep the reason in the
+comment above it rather than the rule.
+
+🔴 **TWO ASSERTS GO OR CHANGE, AND THE COUNT WILL DROP.** `shape` reads
+**55/55 with 49 page asserts** today, having gone 53 to 55 yesterday when the
+join landed. The two that arrived are *the hand is joined to the chooser rather
+than standing beside it* (`:1615`, reading the overlap against `.pos-seg`'s own
+rendered `-1 px` pull) and *the joined row rounds only its outer corners*
+(`:1635`). **Both are claims that the join exists**, so both are false by design
+after this. Replace them rather than deleting them: what is worth grading is what
+the person actually reported, which is that the glyph does not stand off on its
+own axis. **A top-alignment assert between the hand and the last option survives
+the split and is the honest heir**, because the 6.75 px was the invisible half.
+✅ **THE ORDER AND ONE LINE ASSERT AT `:1589` STAYS TRUE** and gets stronger: it
+reads left edges ascending on three rects, and with the glyph outside the chooser
+its left edge is a layout fact again rather than one true by construction. Its
+comment says exactly that, so the comment is rewritten too.
+⚠️ **AND THE HARNESS ROW ASSERT AT `:1558` MUST STAY GREEN**: the hand has to
+remain out of `.pos-controls button, .tbar-x`, which is the one thing yesterday's
+move had to not break and which this one must not break either.
+
+### Open 2026-09-29: pack, the sample player loses its transport and the waveform's border, and becomes a glued panel
+
+ASKED, VERBATIM: *"pack: sample player: rm transport below waveform [screenshot]
+rm border around waveform. use glued panel"*. One page,
+https://positron.studio/pack/, the SAMPLES tab. **WITH A SCREENSHOT**, showing
+`slot 20` over a seam, a waveform inside a box with its own ring, another seam,
+and the transport's rounded play button under it.
+
+**NOT STARTED.**
+
+**What is there today.** `demo/pack/index.html:845` is
+`panel('samples').append(createGlue(sampleTable.el, waveHost, player))`, three
+glued parts: the table, the picture, and a `createTransportBar` under it. The bar
+is built at `:754` with `publish: false`, a `command` of play, pause and seek, and
+a `loopSlot` holding the `Loop` toggle.
+
+**One, the border, and THIS IS THE SECOND TIME IT HAS BEEN ASKED FOR.** The page's
+own comment at `:38` records 2026-09-22, *"rm padding and its border around
+waveform canvas"*, and says the padding came off. **The border did not.** The
+reason it survived is that it is not on this page: `.pos-scope-c` at
+`shell.css:3006` carries `border: var(--edge); border-radius: var(--r)` and there
+is exactly one rule for that class in the whole stylesheet. The page removed what
+it owned and the kit kept drawing the ring.
+🔴 **SO THE FIX IS IN `shell.css` AND IT MUST BE SCOPED, WHICH THE KIT ALREADY
+SAYS IN WRITING.** The block above it (*"A GLUED SCOPE DRAWS ONE BORDER, NOT
+TWO"*, 2026-09-21, reported against this page and `/radio/` together) ends with
+**⚠️ THE BORDER STAYS WHERE THERE IS NO GLUE**: a scope bare on a page has
+nothing else drawing its edge, and `/grains/` puts one inside a card whose ground
+is `--card` too, so a global removal dissolves the picture into its background.
+**The form is a glued-scope selector**, and it has to be BOTH direct and one
+level deep, `.pos-glue > .pos-scope-c` and `.pos-glue > * > .pos-scope-c`, for
+the reason the same block records: `/radio/` glues the scope straight in and
+`/pack/` wraps it, and a direct-child selector fixed one page and left the other
+exactly as reported. **SHARED WORK, so it is done once and first**, and the
+pages to look at after are `pack`, `radio`, `tapes` and `grains`.
+
+**Two, the transport goes.** It is the third glued part. **The page stays
+playable without it**: `:675` is `onPick: (r) => openSample(r.i, true)` and
+`:1917` plays on the press, so a row press is what sounds a sample and always
+was. **What goes with the bar is stop, seek and Loop.**
+🔴 **`Loop` WAS ITSELF AN ASK AND IT DIES WITH THE BAR.** 2026-09-21: *"move
+sample player below table, add loop"*, and the toggle lives in the bar's
+`loopSlot` at `:756`. **Confirm whether Loop goes or moves.** A control asked for
+by name leaving the page without a word is the shape this file exists to stop.
+Nothing else on the page can loop a sample: `looping` is one boolean on the
+running `AudioBufferSourceNode` and the page's own comment explains why
+`looper.mjs` is the wrong module for it.
+🔴 **AND THE PLAY BUTTON IS CARRYING A SECOND JOB NOBODY WOULD GUESS.**
+`:1890` is `playBtn.disabled = !mono.ok`, which is **the page's only visible way
+of saying that a file cannot be decoded**: a 24 bit or surround WAV opens, draws
+nothing, and the greyed button is what says so. **Two asserts read exactly that**,
+`:2429` and `:2453`, both comparing a rejected file against `Kick.wav`. With the
+bar gone the signal has to be somewhere else, and the log already says why in
+words (`:1914`), so the honest replacement may be a readout cell or the row
+itself. **Decide it rather than letting two asserts quietly become untestable.**
+
+**Three, *use glued panel*.** The tab is glued ALREADY, with `createGlue`, so the
+ask is about which surface: **`createGlueRows`, the panel the instrument pages
+build with** (`kit`, `knobs`, `muta`, `shape` call it), which adds rows one at a
+time and owns their inset and alignment through `pad`, `align`, `full` and
+`grid`. That is what *panel* means everywhere else on this site now, so it is the
+reading I will take unless you say otherwise.
+⚠️ **THE OTHER READING IS `createInstrumentPanel`**, which is `createGlueRows`
+plus a picture row, control rows and a nameplate at the foot. **There is no
+instrument here and no name to put on a plate**, so it would be a foot bar
+carrying a word this tab does not have. Priced, and not what I will write.
+⚠️ **AND EVERY GLUED PART PAINTS ITS OWN GROUND**, which this page has paid for
+three times and says so at `:28`: `.pos-glue` is `gap: 1px` over a `--line`
+ground, so a part with no background of its own lets that colour through its
+whole area and the seam stops being a seam. Whatever the new surface is, the
+picture's host keeps `background: var(--card)`.
+🔴 **`.pk-player` AT `:55` DIES WITH THE TRANSPORT** and must go in the same
+commit. `.pk-bar` at `:57` STAYS: that is the SESSIONS tab's own bar and this ask
+is about the samples tab. A rule with nothing matching it reads as correct
+forever, which this page's own comment at `:22` already records about `.pk-line`.
+
+⚠️ **THE ASSERT COUNT WILL MOVE AND THE DIRECTION IS DOWN.** Besides the two
+above, `:2967` measures the glued block as three real rects (*"the player"*, the
+picture and the bar, each drawing its own ground against the glue's), `:3063` and
+`:3080` press `loopBtn` and read its colour, and `:2929` calls `playSample(0)`.
+Every one of those is a claim about a control that is leaving. **Rewrite them to
+the new shape rather than deleting them**, and report the before and after count,
+which is the reading rather than the colour.
+
+### Open 2026-09-29: twelve, the nameplate's air above it matches its air to the right
+
+ASKED, VERBATIM: *"adjust nameplate to model name top padding is same as right
+padding"*, **WITH A SCREENSHOT** of the master lane: `MODEL 12` flush right with
+a wide band of air above it, the `F2 F3 F4` row under it, and the `JOG` knob and
+its two shuttle buttons below that. One page, https://positron.studio/twelve/.
+
+**NOT STARTED.**
+
+**Where it is.** `demo/twelve/index.html:744` is `createNameplate({ lines:
+['MODEL 12'], place: 'end' })`, and it is the master lane's FIRST child.
+`.rack-lane` at `:128` is `align-items: center; gap: var(--ctl-gap); padding:
+14px`, **so the right number in the ask is 14 px** and the plate reaches it by
+`margin-left: auto`, which is written down at `:1371` after that assert read the
+wrong yardstick once.
+
+🔴 **THE FIRST JOB IS FINDING OUT WHICH BOX OWNS THE AIR ABOVE IT, AND IT IS NOT
+GUESSABLE FROM THE SCREENSHOT.** The plate is the lane's first child, so the
+lane's own `padding: 14px` is already the top inset, and the picture shows far
+more than 14 px. **So the extra comes from somewhere else**: the plate's own box,
+`.panel-plate-l`'s line box, or a margin the component carries.
+`node demo/ancestry.mjs twelve '.panel-plate' padding-top` and
+`node demo/which-rule-won.mjs twelve '.panel-plate' margin-top` answer it in two
+commands, and both tools exist for exactly this. **Do not write a fourth override
+before running them.**
+
+🔴 **AND THE TWO NUMBERS THE ASK COMPARES ARE NOT THE SAME KIND OF NUMBER, WHICH
+IS THIS PAGE'S OWN LESSON ONE ROW DOWN.** `.rack-lane .pos-knob` at `:151`
+carries it in writing: *"THE ROW GAP IS MEASURED BETWEEN BOXES AND THE EYE
+MEASURES BETWEEN INK"*, and that rule doubles a knob's top gap for precisely this
+reason. **The right gap in the screenshot is ink to border. The top gap a
+stylesheet sets is box to border**, and a plate's box may be taller than its
+letters. So measure the INK both ways before deciding the two are unequal, and
+say which pair of numbers the change was made against.
+
+✅ **IT IS GRADABLE WITHOUT A NEW ASSERT, WHICH IS RARE FOR THIS KIND OF ASK.**
+The assert at `:1389` already PRINTS both halves on every run: *"N px below the
+lane's top, N px off the lane's own inset"*. Today it only requires `b.top >=
+l.top`, which is the weak half. **After this it can require the two gaps to be
+equal**, and it compares two rendered numbers with nothing typed in the page to
+disagree with later. Rewrite the claim in the same commit.
+⚠️ **AND `.panel-plate` IS SHARED FURNITURE.** The ink and all three placements
+are in `shell.css` on purpose, so that `/twelve/`, `/circuit/` and `/evo/` read
+as one shelf of instruments rather than three pages. **If the fix lands on
+`.panel-plate` it reaches all of them and `/kit/`'s specimens**; if it lands on
+`.rack-lane`'s first child it reaches this page. Price both and say which was
+written, because the wrong one here is a silent change to two other replicas.
+
+### Open 2026-09-29: twelve, a channel's PAN and REC fall to the bottom of their block
+
+ASKED, VERBATIM: *"twelwe: align channel item (pan, rec) to the bottom"*. One
+page, https://positron.studio/twelve/, and it is the same screenshot as the entry
+above: `PAN` and `REC` sitting high in a channel strip beside a master lane whose
+`JOG` sits much lower.
+
+**NOT STARTED.**
+
+**Where it is.** `makeStrip` at `demo/twelve/index.html:499` appends three things
+to `.strip-one` in this order: the PAN knob, the REC pad, and `.pos-crow`, which
+holds the three button column and the fader. `.strip-one` at `:207` is a centred
+flex COLUMN with `gap: 14px`, and `:162` is
+`.rack-row > .strip-one > .pos-crow { margin-top: auto }`.
+**So the strip's spare room is all in one place today: between REC and the fader
+block.** MEASURED and written at `:630`: this panel's slack is **25.00 px**, and
+that one declaration is what turns it into air.
+
+**The change is which child absorbs the slack**, not a new alignment: the auto
+margin moves off `.pos-crow` and onto the strip's FIRST child, so the air goes
+above the PAN knob and PAN and REC come down to sit on the fader block. One
+declaration, and the 25.00 px is the number that should move.
+
+🔴 **IT CONTRADICTS A COMMENT THAT ARGUES FROM THE HARDWARE, AND THAT COMMENT HAS
+TO BE REWRITTEN RATHER THAN LEFT STANDING.** `:157` reads *"IT IS ALSO WHERE THE
+PANEL PUTS IT. Knobs and REC at the top, the fader and its buttons in the lower
+block, and the air between them is the gap the hardware has too"*. **The ask
+overrides it**, and a comment defending the old arrangement while the page does
+the new one is this project's most repeated defect in its cheapest form. Replace
+it with what is true after: the ask, the date, and what moved.
+⚠️ **AND IT IS NOT THE 2026-09-21 ASK ABOUT THE RIGHT PANEL.** *"align right
+panel buttons to top"* is `.rack-lane { justify-content: flex-start }` at `:141`
+and is about the MASTER LANE, not a channel. **Nothing here touches it**, and
+they must not be confused when reading the file.
+
+⚠️ **THE PHONE BLOCK ALREADY OVERRIDES THIS EXACT DECLARATION**, at `:332`:
+`.rack-row > .strip-one > .pos-crow { margin-top: 0 }`, inside the block that
+also turns the crow to `column-reverse`. Whatever is written has to be checked
+against that block with `node demo/shot.mjs twelve 375`, or it lands as a rule
+the phone silently ignores while the desk changes.
+⚠️ **AND THE FX FADER IN THE LANE IS A SEPARATE `margin-top: auto`** at `:154`,
+`.rack-lane .strip-master`. It is not a channel and the ask names PAN and REC, so
+it stays where it is unless the shot says the two columns now disagree.
+
+⚠️ **THERE IS AN ASSERT ABOUT WHERE THE BUTTONS LAND** (`:218` records that the
+column aligns to the lane's bottom through `--fdr-foot` rather than to the
+fader's, *"ASSERTED BELOW against the real rects rather than trusted"*). **That
+claim is about the fader block's own internals and should survive**, because
+nothing here moves anything inside `.pos-crow`. Check it rather than assume it:
+the run before and the run after should read the same count.
+
+### Open 2026-09-29: knobs, a longer description that explains the Pi, and the badge says ONLINE alone
+
+ASKED, VERBATIM: *"Play a synthesizer in another building, and turn its knobs
+while you do. - make longer explaingi Pi"* and *"Rasp Pi online -> \"ONLINE\""*.
+One page, https://positron.studio/knobs/.
+
+**NOT STARTED.**
+
+**Half one, the description.** The quoted sentence is this page's `what` at
+`demo/knobs/index.html:200` and, word for word, the `one` line at
+`demo/manifest.mjs:808`. **They are deliberately the same string**, which is the
+standing rule for any page with a diagram, and this page has one (`{ id: 'pi',
+label: 'Raspberry Pi', kind: 'device' }` at `:2110`).
+🔴 **THE ASK OVERRIDES A STANDING RULE AND THE OVERRIDE IS THE OWNER'S TO
+MAKE.** `CLAUDE.md` says **ONE SENTENCE**, asked for 2026-09-19 as *"descs are
+single sentences (do not stretch them with : ; -- etc)"*, and the rule's own text
+records that it said three sentences before that and four before that, and that
+`grains` shipped five and was called *"mambo jumbo"*. **This ask is the opposite
+instruction for this page**, so it is followed, and the rule is not quietly
+rewritten on the strength of one page.
+⚠️ **WHAT THE EXTRA WORDS ARE FOR IS THE PI, WHICH IS THE ONE THING THE SENTENCE
+HIDES.** *"another building"* is doing all the work today and never says what is
+in that building: a Raspberry Pi running the synthesizer, reached over the relay,
+with this page sending MIDI CC to it and PCM coming back. That is what to explain,
+in plain words, and no history and no justification for a design decision by the
+same rule's second half.
+🔴 **AND ONE DECISION COMES WITH IT: DOES THE FRONT PAGE CARD GROW TOO?** The two
+strings move together by the rule, so a longer `what` makes a longer card on the
+index unless they are deliberately split. **I will keep them identical**, which
+is the documented behaviour, **and it makes `knobs`'s card the longest on the
+front page.** Say if the card should stay short and they should differ; that is
+one line either way and it is the owner's call rather than a guess.
+
+**Half two, the badge.** The plate's `status` is the board's own presence badge,
+and it reads `Raspberry Pi online` because `presence.mjs:329` makes a `badge` with
+an `of` name show `${of} ${word}` by default (`:391`). **There is already an
+option for exactly this**: `showName: false`, which `/kit/`'s header specimen and
+`instrument.mjs:199` both pass.
+🔴 **BUT `createBoard` DOES NOT PASS IT THROUGH**, `board.mjs:142` builds its
+presence with `of` and `busyWords` and nothing else, **so this is a KIT change
+and shared work.** ✅ **AND IT IS THE SMALLEST KIND**: `/knobs/` is the only
+caller of `createBoard` in the whole repository, measured, so the option reaches
+one page today and is an option rather than a new behaviour.
+⚠️ **THE RESERVE MOVES WITH THE WORDS AND THAT IS THE POINT OF DOING IT THIS WAY.**
+The badge holds room for the widest phrase it can ever say so it cannot twitch
+when the word changes (`:392`), and dropping the name shrinks that reserve from
+`Raspberry Pi coming online` to `coming online`. **A page rule hiding the name
+with CSS would keep the old reserve and leave a band of empty badge**, which is
+the shape reported 2026-09-16 as *"same spacing between"*.
+⚠️ **THE UPPERCASE IN THE ASK IS ALREADY TRUE OR ALREADY DECIDED.** The plate row
+uppercases what it holds; read the rendered badge with a shot rather than adding
+a `text-transform` to be sure, and if it is NOT uppercase there, say so rather
+than adding one quietly.
+⚠️ **AND THE NAME IS NOT LOST TO A SCREEN READER.** `title()` at `:421` keeps
+`${of} ${word}` on the tooltip whatever the badge shows, so *Raspberry Pi* is
+still on the hover and in the accessible name. Check that after, because the ask
+is about what is printed and not about what is announced.
+
 ### Open 2026-09-28: step-grid sizes itself against the scroller's own padding, so the last column hangs over the edge, found not asked for
 
 **FOUND BY THE `/tom/` AGENT WHILE MEASURING SOMETHING ELSE, AND DELIBERATELY
@@ -30,7 +537,16 @@ not evidence for the unrelated edit.
 **The fix is subtracting the scroller's inline padding inside `size()`, one line**,
 and it reaches `/kit/`'s three specimens and `/pack/` as well as `/tom/`.
 
-### Open 2026-09-28: createChoice has no slot for a trailing control, found not asked for
+### Open 2026-09-28: createChoice has no slot for a trailing control, found not asked for (ANSWERED 2026-09-29, and it is not wanted)
+
+✅ **ANSWERED 2026-09-29 BY AN ASK THAT GOES THE OTHER WAY, SO NO `trailing`
+OPTION IS WANTED.** Asked: *"shape: ... invisible hand is a separat e button not a
+radio group"*. The glyph LEAVES the segmented row rather than getting a proper
+slot inside it, which settles the one thing this entry called reasoned and never
+measured: an action button in a row of options. **Nothing is owed on
+`choice.mjs`**, and if a second page ever wants a glyph glued to a chooser this
+entry is the record of what it would cost. The live entry is at the top of this
+file.
 
 **FOUND BY THE `/shape/` AGENT AND REPORTED RATHER THAN WRITTEN**, because
 `demo/shell/` was closed to it.
@@ -283,7 +799,15 @@ on purpose, because *a suite run must not be a hand on somebody's instrument*.
 Moving this button INTO a row the harness sweeps would start a hand on every
 run.
 
-### Open 2026-09-28: muta, the Test tone button fills the phone (DONE) and the knob grid has nothing to centre in (REFUSED, one decision waiting)
+### Open 2026-09-28: muta, the Test tone button fills the phone (DONE) and the knob grid has nothing to centre in (REFUSED, the decision ANSWERED 2026-09-29)
+
+🔴 **THE DECISION THAT WAS WAITING HERE IS ANSWERED, 2026-09-29, AND THE ANSWER
+IS NO.** Asked: *"muta: full content w in deskop, center the knobs group. align
+test tone to right."*. **The panel does NOT centre in the page with
+`margin-inline: auto`. It takes the whole content width and the knobs centre
+inside it**, which is the `full: true` shape priced and rejected below, asked for
+with the centring that the rejection assumed nobody would write. The live entry
+is at the top of this file. **Nothing is waiting on the owner here any more.**
 
 ✅ **HALF TWO IS DONE, `040f266`, AND IT NEEDED TWO DECLARATIONS RATHER THAN
 ONE, BECAUSE A FLEX ITEM CANNOT WIDEN ITS PARENT.** `.pos-ipanel-name` is a
