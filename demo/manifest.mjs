@@ -69,43 +69,43 @@ export const ACTS = new Map([
 
 export const DEMOS = [
   { name: 'transport', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'twenty things happen a second apart, and each one reports how close to on time it landed',
+    one: 'twenty things are set to happen, one a second',
     tags: ['timeline'] },
   { name: 'lanes', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'an audio lane and a data lane on one transport',
+    one: 'one beat, sent several ways at once',
     tags: ['timeline', 'WebAudio'] },
   { name: 'loops', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one recording placed three times, the last of them looping in whichever direction the button shows',
+    one: 'one two-second recording placed three times, the last of them looping twice in whichever direction the button shows',
     tags: ['timeline'] },
   { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'a score round-trips byte-identically and refuses mutation',
+    one: 'one file format for scores written in different languages',
     tags: ['timeline'] },
   { name: 'sound', group: 'vain', act: 0, created: '2026-09-07', built: true,
-    one: 'a Csound score compiled to a timeline. The tempo map is an integral and the repeat is a quotation',
+    one: 'a Csound score, compiled as you type',
     tags: ['timeline', 'Csound', 'WebAudio'] },
   { name: 'click', group: 'vain', act: 0, created: '2026-09-14', built: true,
-    one: 'U:’s wireless click track, playing their own score with nothing on the wire',
+    one: 'U:’s vClick is a click track with no earpieces, where every player watches a screen for the bar, the beat and a lamp',
     tags: ['timeline', 'Csound'] },
 
   { name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true,
-    one: 'the tuned v6 player on a live input this page starts and stops',
+    one: 'the tuned low-latency player against a live input',
     tags: ['LL-HLS', 'Stream', 'container'],
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
     settleMs: 75000 },
   { name: 'webrtc', group: 'technologies', act: 1, created: '2026-09-04', built: true,
-    one: 'the same live input over WHEP; same burned-in clock as 06',
+    one: 'the same live picture the HLS pages play, delivered over WHEP instead',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
   { name: 'moq', group: 'technologies', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
-    one: 'browser to browser over MoQ, the fast tier',
+    one: 'browser to browser over MoQ',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
   { name: 'room', group: 'technologies', act: 2, created: '2026-09-04', built: true,
-    one: 'join a room and see the others; peer to peer, the relay only signals',
+    one: 'open this page twice and each window shows the other',
     tags: ['getUserMedia', 'WebRTC', 'relay'] },
   { name: 'cues', group: 'messages', act: 2, created: '2026-09-04', built: true,
-    one: 'fire one cue; every open copy of the page acts on it, tokenless',
+    one: 'one press here and every open copy of this page shows the same cue name at the same moment',
     tags: ['DO', 'WS', 'relay'] },
   // Act 2 with `cues` and for the same reason — one act reaching everybody —
   // but on a delay instead of at once, and out to phones rather than to open
@@ -193,7 +193,7 @@ export const DEMOS = [
    */
 
   { name: 'wire', group: 'messages', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
-    one: 'compose a message, watch the exact bytes go and come back, and read the history',
+    one: 'compose a message and watch the exact bytes travel out and come back as the relay\'s own echo',
     tags: ['WS', 'DO', 'SQLite'] },
 
   // The only network-free row in Act 3, and the act's simplest complete
@@ -208,16 +208,16 @@ export const DEMOS = [
   // a 10 s cap. Shrink it and the suite reads zero asserts and calls a working
   // page broken.
   { name: 'take', group: 'capture', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
-    one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
+    one: 'record, then record again, so each take lands on the line after the one before',
     tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
   { name: 'keep', group: 'capture', act: 3, created: '2026-09-08', built: true, settleMs: 30000,
-    one: 'send a picture out, record the copy that comes back, and scrub it',
+    one: 'the picture you send out is recorded as the copy that comes back',
     tags: ['getUserMedia', 'WHIP', 'WHEP', 'timeline'] },
   { name: 'record', group: 'capture', act: 3, created: '2026-09-04', built: true,
-    one: 'record in segments and ship each one, so disk stays flat',
+    one: 'the bytes being held never grow past one segment, however long the show runs',
     tags: ['MediaRecorder', 'R2'] },
   // 🔴 `settleMs` HERE IS NOT FOR A SLOW CONTROL, BECAUSE THIS PAGE HAS NO
   // CONTROLS. The Load button was removed on instruction and the transport's
@@ -238,23 +238,23 @@ export const DEMOS = [
   // graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
 
   { name: 'looper', group: 'technologies', act: 4, created: '2026-09-04', built: true,
-    one: 'a keyboard into a WebAudio synth, then loop what you played',
+    one: 'a keyboard into a synthesiser made of WebAudio, with a loop pedal on it',
     tags: ['WebAudio', 'AudioWorklet'] },
   { name: 'instrument', group: 'messages', act: 4, created: '2026-09-04', built: true,
-    one: 'play an instrument that is somewhere else, and hear how late it is',
+    one: 'a keyboard whose sound may be coming out of a different machine',
     tags: ['WebMIDI', 'relay', 'WebAudio', 'WebRTC'] },
   { name: 'jam', group: 'messages', act: 4, created: '2026-09-04', built: true,
-    one: 'two browsers on one pulse, on a peer-corrected clock',
+    one: 'two machines counting the same eight beats with neither leading',
     tags: ['WS', 'relay', 'WebAudio'] },
 
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
   // committed; the media streams from ERR and nothing is stored here.
   { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
-    one: 'every 1965 newsreel on one line, at the day it was broadcast',
+    one: 'every 1965 newsreel in ERR\'s archive is a mark on one line at the day it was broadcast',
     tags: ['archive', 'timeline'] },
   { name: 'now', group: 'technologies', act: 5, created: '2026-09-08', built: true,
-    one: 'one live television channel on a line whose right-hand end is the present moment',
+    one: 'one ERR television channel on a line whose right-hand end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
@@ -270,7 +270,7 @@ export const DEMOS = [
     // of fetching before there is much to see
     settleMs: 4000 },
   { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
-    one: 'eight live television channels in equal cells; the bar scrubs the 2 h DVR',
+    one: 'eight live ERR channels in equal cells',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
   // Everything that could be reached about one artist, before anything is
@@ -280,14 +280,14 @@ export const DEMOS = [
   // gathers it and folds in the shorter list `aikajana` plays from, and the
   // page re-checks that fold from the other end so the two cannot disagree.
   { name: 'resources', group: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
-    one: 'every reachable source and asset of Erkki Kurenniemi: who holds it, when, and what it allows',
+    one: 'every reachable source for Erkki Kurenniemi\'s work, one row each',
     tags: ['archive', 'provenance'] },
   // The same corpus as the row above, on an axis instead of in a table: one
   // mark per record, as wide as its date is vague, and the twenty-six a browser
   // can open are pressable. Named for the thing you can hear, because that is
   // the reason it exists rather than the table.
   { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true,
-    one: 'every Kurenniemi recording that plays, laid end to end as one long tape',
+    one: 'every Erkki Kurenniemi recording that plays, laid end to end as one long tape',
     tags: ['timeline', 'uncertainty', 'archive'] },
   // The other archive, and it is the opposite kind of thing from the two rows
   // above. Those point at what fourteen institutions hold; this one points at
@@ -356,12 +356,12 @@ export const DEMOS = [
   // for it, which is where a proposal belongs. A row for a page that does not
   // exist makes the list longer and the reader's odds worse.
   { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, settleMs: 26000,
-    one: 'camera in, segments out, played back on the timeline',
+    one: 'a camera, or a generated picture if you would rather not be on one, is recorded in two-second segments and played back on the timeline below',
     tags: ['getUserMedia', 'MediaRecorder', 'R2', 'timeline'] },
   // the first page where all three legs meet: live over a real WebRTC hop, the
   // FAR END of that hop recorded, and the recording scrubbed on the deck
   { name: 'show', group: 'capture', act: 3, created: '2026-09-05', built: true, settleMs: 9000,
-    one: 'live over WebRTC, recorded off the far end of that hop, replayed on the timeline',
+    one: 'what gets recorded is what the far end of a live WebRTC connection actually received',
     tags: ['getUserMedia', 'WebRTC', 'MediaRecorder', 'timeline'] },
 
   // 26 is Act 5 with 19: both are ERR's live output, one television and one
@@ -423,7 +423,7 @@ export const DEMOS = [
   // calls is a description that has drifted from the thing it describes.
   { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
     gl: true, settleMs: 45000,
-    one: 'the same radio and granulator, playing itself, drawn as the instrument rather than as the sound',
+    one: 'a radio station fed through a granulator, playing itself',
     tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
   // The other end of the same station: what it broadcast, kept. A broadcast at
   // the bitrate their own server records is 57.6 MB an hour, which does not fit
@@ -453,7 +453,7 @@ export const DEMOS = [
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
   { name: 'strip', group: 'technologies', act: 0, created: '2026-09-04', built: true,
-    one: 'deep time, uncertain dates, and a statistic that names what it dropped',
+    one: 'two thousand years on one line, where many of the dates are a bracket rather than a day',
     tags: ['timeline', 'canvas'] },
   // The studio Mac as an instrument: the same page as /keys/, pointed at a
   // different machine. What crosses the relay is a note NUMBER, so neither end
@@ -709,7 +709,7 @@ export const DEMOS = [
   // the drawn line invented. The adapter was the asset; its hand-rolled UI is
   // what the kit replaces.
   { name: 'draw', group: 'technologies', act: 0, created: '2026-09-13', built: true,
-    one: 'record a gesture, play it back, and see how much of the line was never recorded',
+    one: 'press record, then draw a line with a finger or a mouse',
     tags: ['pointer', 'timeline', 'canvas'] },
   // The last of the protos to be given a page, promoted from proto/text/: the
   // text recorder this lineage failed to write five times. Every earlier one
@@ -719,7 +719,7 @@ export const DEMOS = [
   // than a replay — 73 edits captured through a real browser, rebuilt to the
   // browser's own text character for character.
   { name: 'typist', group: 'th', act: 0, created: '2026-09-13', built: true,
-    one: 'type, and it types itself back. Drag to any moment and the words and the cursor come back',
+    one: 'every change while typing is written down as where the text changed and what it changed to, so any moment can be put back or run backwards',
     tags: ['timeline', 'text', 'local only'] },
   // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
   // two pages about one subject and the split cost the better half of each:
@@ -938,7 +938,7 @@ export const DEMOS = [
     // harness grades like any other.
     built: true, page: '/kit/',
     src: 'demo/kit/index.html',
-    one: 'every reusable control on one page, wired to nothing',
+    one: 'every reusable control in the shell, on one page, wired to nothing',
     tags: ['shell', 'no network'] },
 
   // 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
