@@ -2,6 +2,20 @@
 
 ## Where it is right now
 
+✅ **DEPLOYED 2026-09-29 13:17, SO THE DECISION BELOW IS TAKEN.** Instructed:
+*"Deploy"*. The edge reads **BUILD `f0fce8b-131741-f86f`**, confirmed by
+`deploy.mjs` and read back twice more, the last with `cf-cache-status: HIT`.
+**Seven assets moved** (`/`, `manifest.mjs`, `/nola/`, `/shell/shell.mjs`,
+`/evo/`, `/making/`, `/pack/`) and 399 were already in the store, which is why
+`/stage/`, `/webrtc/`, `/knobs/` and `video-panel.mjs` were NOT in the upload:
+session 50 had uploaded those exact bytes from its own checkout and wrangler
+dedups by content hash. MEASURED after rather than inferred from the stamp: the
+served `/stage/`, `/webrtc/`, `/knobs/` and `/nola/` are each **byte identical**
+to `workers/view/public/` at HEAD, so the live `/stage/` is session 50's now.
+The build commit is `97d71a0` on `main`.
+⚠️ **STILL NOT RUN: `/stage/` AND `/webrtc/`.** Deploying put session 50's
+pages on the edge. It did not measure them, and that reading is still owed.
+
 🔴 **THE WORKING BRANCH IS `main` NOW, AND IT WAS `session-28-station-videoradio`
 FOR 184 COMMITS.** Instructed: *"just go to main"*. `main`, `origin/main` and the
 old branch all point at **`bdb9335`**, the working tree is CLEAN, nothing is in
