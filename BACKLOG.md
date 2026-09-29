@@ -1,5 +1,35 @@
 ## Open
 
+### Open 2026-09-29: llhls, the primary button becomes a three state stream toggle
+
+ASKED, VERBATIM: *"https://positron.studio/llhls/ rm primary button with status
+togglebutton: stream off | starting | on. make a global component for this if
+needed"*. One page, https://positron.studio/llhls/, file `demo/llhls/index.html`,
+and possibly one new module in `demo/shell/`.
+- **The three states are the ask's own words**: `stream off`, `starting`, `on`.
+  `starting` is not a press, it is what the control reads while the container
+  wakes, so the component has to be told its state rather than toggling itself.
+- ⚠️ **THE MIDDLE STATE IS REAL AND LONG HERE.** `manifest.mjs` gives `llhls`
+  `settleMs: 75000` with the comment *"a cold container + ffmpeg + Stream ingest
+  is ~30 s; without this the harness asserts against a 204 and calls a working
+  demo broken"*. So `starting` is the state a visitor sees for half a minute and
+  it is the one worth getting right.
+- ⚠️ **A PRESS DURING `starting` MUST DECIDE SOMETHING**, and the ask does not
+  say what. Ignored, or stop. Whichever it is, the control says so rather than
+  looking dead: `positron-ui` already carries this project's rule that a control
+  that does nothing and says nothing reads as broken.
+- **On the kit question, *"if needed"* is the instruction.** Look for what
+  already exists before writing a module: `createPresenceButton` and
+  `HEADER_STATES` were built for exactly this shape and `/muta/` returned them
+  when its switch went, and `/stage/` has a transport with an OFF AIR to
+  STARTING reading of its own that was worked on 2026-09-25. A third copy is
+  what earns a kit component; a first one does not.
+- ⚠️ **STARTING THIS STREAM COSTS MONEY AND A CONTAINER.** Every viewer holding
+  `wss://pub.positron.studio/watch` starts an ffmpeg publish, and Stream bills
+  delivered minutes on both protocols. So verify the CONTROL rather than the
+  stream wherever the two can be separated, and do not leave a harness holding
+  the socket.
+
 ### Open 2026-09-29: the index cards should carry the demo's own description
 
 ASKED, VERBATIM: *"copy demo descs (or their first sentence) to index page
