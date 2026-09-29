@@ -1,6 +1,16 @@
 ## Open
 
-### Open 2026-09-29: nola, rm the label from the chord input field to avoid a content jump
+### Done 2026-09-29: nola, rm the label from the chord input field to avoid a content jump
+
+✅ **DONE, `dd7a8fe`. THE CAPTION WAS THE JUMP.** MEASURED at 1280 with a CDP
+probe pressing the mode chooser both ways: `.nola-top` went **50.5 to 34** and
+the keyboard under it moved **16.5 px** every press, which is `.pos-field-l`
+measuring 9.5 px plus the field's own 7 px `row-gap`. **After: 0.0 px.** At 375
+the wrap means the jump goes 66.5 to 50.0 and is not cured, which has an entry
+of its own above. The accessible name moved onto the input and reads back as
+`role=textbox name="chords"`, `grow: 'grow'` went with the caption because
+there is no such rule anywhere, and the comment claiming the row does not
+collapse was wrong for as long as it stood.
 
 ASKED, VERBATIM: *"nola: rm label from chord input field tpo avoid content
 jump"*. One page, https://positron.studio/nola/.
@@ -178,7 +188,22 @@ WIDTH, which a media query cannot read. The instrument is `node demo/shot.mjs
 is the third phone-only change in two days with nothing grading it, and the
 entry about that is already open below.
 
-### Open 2026-09-29: shape, the sends-to chooser justifies right, its label goes, and the hand leaves the segment group
+### Done 2026-09-29: shape, the sends-to chooser justifies right, its label goes, and the hand leaves the segment group
+
+✅ **DONE, `ff56973`, ALL THREE HALVES, AND THE ROW IS `space-between` OVER TWO
+CHILDREN RATHER THAN THREE.** Taking the hand out of the chooser would have made
+`.shape-bar` a three child row, and `space-between` parks a middle child wherever
+its neighbours leave it, so the chooser and the glyph are one group at the far
+end. MEASURED: the bar is 688.0 px against 466.2 of control, so 221.8 px of slack
+is real, and the glyph is flush with the panel below it against 161.48 px off
+before. **THE CAPTION IS WHAT KEEPS THE SPLIT SAFE**: captioned, `.pos-choice` is
+47.5 px tall at 375 and a centred neighbour lands 6.75 px high, which is the
+2026-09-28 report exactly; with no caption it is 34.0 and the tops read 0.00 at
+375, 756 and 1280. The seam reads +10.00 against the row's own rendered column
+gap, the square holds at five widths on the global glyph rule, and the dead
+`.pos-choice button.shape-hand` went with the join. **55/55, 49 page asserts,
+unmoved**: two claims that the join exists left and two arrived. The `what` line
+was deliberately NOT changed and the reasoning is in the page.
 
 ASKED, VERBATIM: *"shape: sents to right align (justify), rm label, invisible
 hand is a separat e button not a radio group"*. One page,
@@ -350,7 +375,19 @@ Every one of those is a claim about a control that is leaving. **Rewrite them to
 the new shape rather than deleting them**, and report the before and after count,
 which is the reading rather than the colour.
 
-### Open 2026-09-29: twelve, the nameplate's air above it matches its air to the right
+### Done 2026-09-29: twelve, the nameplate's air above it matches its air to the right
+
+✅ **DONE, `f63278f`. THE BOXES WERE ALREADY EQUAL, SO IT HAD TO BE DECIDED ON
+INK.** Every number a stylesheet sets read 14 and 14 on both edges, so a rect only
+check would have been green the morning it was reported. MEASURED with a canvas
+probe at 1280: the ink sat **34.84 px** below the lane's inner top edge against
+**16.47 px** inside its right one. After: **14.84 against 16.47, 1.63 apart**, and
+the residual is leading over the cap against trailing letter spacing plus the last
+glyph's side bearing. `text-box: trim-both` would make it WORSE, measured at 2.47,
+because it only trims the top. **What owned the air was the kit putting
+`var(--panel-pad)`, 20, over a plate in a lane that insets by 14**, which has its
+own entry above. 38/38 to 39/39, and the new assert was proved by putting the
+20 px back: one red, the ink half firing while the box half stayed green.
 
 ASKED, VERBATIM: *"adjust nameplate to model name top padding is same as right
 padding"*, **WITH A SCREENSHOT** of the master lane: `MODEL 12` flush right with
@@ -398,7 +435,22 @@ as one shelf of instruments rather than three pages. **If the fix lands on
 `.rack-lane`'s first child it reaches this page. Price both and say which was
 written, because the wrong one here is a silent change to two other replicas.
 
-### Open 2026-09-29: twelve, a channel's PAN and REC fall to the bottom of their block
+### Done 2026-09-29: twelve, a channel's PAN and REC fall to the bottom of their block
+
+✅ **DONE, `f63278f`.** The auto margin moved off `.pos-crow` and onto
+`.rack-row > .strip-one > :first-child`, by position rather than by naming the
+knob, because a rule naming the knob is one a reorder turns into a dead selector.
+MEASURED at 1280: **64.00 px of air moved from between REC and the fader block to
+above the PAN knob**, and the gap under REC is now the strip's own 14 px and
+nothing else. The phone block's matching zero moved with it, so no rule is left
+naming a `.pos-crow` that no longer carries an auto margin. The two fader columns
+land on one line before and after, so the FX fader was left alone.
+⚠️ **THE 25.00 px IN THE OLD COMMENT IS A DIFFERENT QUANTITY AND COULD NOT BE
+RE-MEASURED**: it is the panel FLOW's slack, and this page passes `flow: false`
+and never calls `check()`. The strip's own slack is the 64.00 above.
+⚠️ **AND THE NEW ARRANGEMENT IS ASSERTED BY NOTHING.** Nothing requires that the
+slack sits above the first control. Three rects would do it and would take the
+page to 40.
 
 ASKED, VERBATIM: *"twelwe: align channel item (pan, rec) to the bottom"*. One
 page, https://positron.studio/twelve/, and it is the same screenshot as the entry
@@ -506,6 +558,112 @@ than adding one quietly.
 `${of} ${word}` on the tooltip whatever the badge shows, so *Raspberry Pi* is
 still on the hover and in the accessible name. Check that after, because the ask
 is about what is printed and not about what is announced.
+
+### Open 2026-09-29: a labelless field has no way to name itself, found not asked for
+
+**FOUND BY THE `/nola/` AGENT AND REPORTED RATHER THAN WRITTEN**, because
+`demo/shell/` was closed to it.
+
+`demo/shell/field.mjs:73` is `if (label) wrap.append(...)`, so a field with no
+caption is already a supported shape. **What it does not have is a way to say
+what the box is.** `.pos-field` is a `<label>` element with the input inside it,
+so the caption IS the accessible name, and a caller that drops it ships an
+unnamed text box unless it remembers `setAttribute('aria-label', ...)` on its
+own. `/nola/` now does exactly that at `demo/nola/index.html:1108`, measured back
+with `Accessibility.getPartialAXTree` as `role=textbox name="chords"
+from=attribute:aria-label`.
+
+**The kit shape is one option, `ariaLabel`, used when `label` is absent.**
+`/nola/` is the first caller to drop a caption and is the only one today, so
+this is a second caller away from being worth writing. Written down so the next
+one does not rediscover it as a bug.
+
+### Open 2026-09-29: nola's chord row still moves 50 px on a phone, measured not cured
+
+**MEASURED at 375 px while curing the desktop jump**, with a CDP probe pressing
+the ROLL chooser both ways: `.nola-top` is **97.5 px** with the field in and
+**47.5 px** with it out, so the keyboard still moves **50.0 px** on every press.
+Before the caption went it was **66.5 px**, so today's change took exactly its
+16.5 px and no more.
+
+**The residual is not a caption and cannot be removed the same way.** At 375 the
+row has wrapped: the chooser is a line of its own at 47.5 px and the field is a
+whole second line, so the 50 px is the row's own `gap: 16px` plus the 34 px box.
+**Taking it to zero means holding a line open for a control that is deliberately
+out of the document**, which contradicts the page's own arrangement at
+`demo/nola/index.html:2623` and the assert at `:4027` that grades the field
+LEAVING. That is a bigger claim than the ask made, so it was measured into the
+comment above `.nola-top` and left alone.
+⚠️ **AND THE FIRST PRESS IS WHEN A VISITOR MEETS IT.** The page opens in
+`Suggested`, where the field is out, so the box appears on the first press of
+`Typed` and the page moves under the reader at that moment. Unchanged, and worth
+knowing before anybody calls the phone version done.
+
+### Open 2026-09-29: which-rule-won.mjs is blind to a logical shorthand beating a physical longhand, found not asked for
+
+🔴 **FOUND BY THE `/twelve/` AGENT AND IT NEARLY SENT IT TO THE WRONG BOX.**
+`node demo/which-rule-won.mjs twelve '.panel-plate' padding-top` answered
+**"(nothing declares padding-top on it: INHERITED from ancestor 1 up)"** and
+named `.rack-lane`'s `padding: 14px` as the winner, **while the element's own
+`padding-block: var(--panel-pad) 0` was setting it to 20**. Chrome expands
+`padding-block` into `padding-block-start` and `padding-block-end`, which are
+LOGICAL names, and the tool matches on the physical name that was typed.
+
+✅ **THE ONLY THING THAT SAVED THE READING IS THE TOOL'S OWN LAST LINE**:
+`computed padding-top = 20px (the winner said 14px)`, the instrument saying it
+is wrong. `node demo/ancestry.mjs` is what actually answered, in one line.
+✅ **CONFIRMED BY ASKING FOR THE LOGICAL NAME**: `which-rule-won.mjs twelve
+'.panel-plate' padding-block-start` finds it perfectly, names the shorthand and
+prints the specificity. So the tool is right and its lookup is narrow.
+
+**The fix is one line: try the logical sibling of any physical box axis property
+before reporting an absence**, and say which name it found it under.
+🔴 **AND IT MATTERS BEYOND THAT PAGE.** `padding-block`, `padding-inline` and
+`margin-block` are all over `shell.css`, and this project PREFERS the logical
+longhands precisely because they avoid shorthand fights, so the tool is blindest
+exactly where the house style is strongest. `CLAUDE.md` advertises this tool as
+the answer to *"which declaration won"*, so an absence it reports is trusted.
+
+### Open 2026-09-29: the kit puts the case's default inset over a plate, whatever the case actually insets by, found not asked for
+
+**FOUND BY THE `/twelve/` AGENT WHILE ANSWERING THE NAMEPLATE ASK, AND
+DELIBERATELY NOT WRITTEN THERE**, because `demo/shell/` was closed to it.
+
+`demo/shell/shell.css:6556` is `.panel-case > .panel-plate { padding-block:
+var(--panel-pad) 0 }`. **That is right for a case that insets by `--panel-pad`,
+which is 20, and wrong for one that does not.** `/twelve/`'s master lane insets
+by **14** and declares it three lines up, so its plate was carrying a top inset
+from a token that lane never uses, which is the whole of the air the ask was
+about. The page now deletes it with `.rack-lane > .panel-plate { padding-block:
+0 }` at a specificity tie.
+
+**The kit shape is the plate reading the case's OWN inset**:
+`.panel-case > .panel-plate { padding-block: var(--plate-pad, var(--panel-pad)) 0 }`,
+with a case declaring `--plate-pad` beside its own padding so one declaration
+carries both.
+⚠️ **IT WOULD REACH `/tom/`, `/circuit/`, `/evo/` AND THE INSTRUMENT HEADER, AND
+THE AGENT'S READING IS THAT IT CHANGES NOTHING ON ANY OF THEM**, because each of
+those cases does inset by `--panel-pad` and would resolve the fallback to what it
+gets today. **THAT IS REASONED AND NOT MEASURED.** Measure all four before it
+lands, and the full note is in `demo/twelve/index.html` at the assert's comment
+so the next reader finds it where they will look.
+
+### Open 2026-09-29: shape now draws the same control two ways on one screen, found not asked for
+
+**FOUND BY THE `/shape/` AGENT AFTER DOING EXACTLY WHAT WAS ASKED**, and it is
+the argument the 2026-09-28 join was built on, arriving from the other side.
+
+Each of the page's 40 slider lanes carries its own `⇄` square glued to the end
+of its lane with **no gap and no ring**. The one at the top of the page now
+stands **10 px clear with a full rounded border**, because the ask was *"invisible
+hand is a separat e button not a radio group"* and that is what was written.
+
+**So the page shows one control drawn two ways**, which is the reading that put
+the glyph into the segment in the first place and is written up in the file as a
+dated measurement rather than deleted. **Nobody has been asked whether the LANE
+hands should also come apart, or whether the top one should keep its gap and lose
+its ring.** Not acted on, not re-litigated in the comments. Look at the 1280 shot
+of https://positron.studio/shape/ with both in frame before deciding.
 
 ### Open 2026-09-28: step-grid sizes itself against the scroller's own padding, so the last column hangs over the edge, found not asked for
 
