@@ -1,6 +1,40 @@
 ## Open
 
-### Open 2026-09-29: knobs, panic should stop the audio as well as the notes
+### Done 2026-09-29: knobs, panic should stop the audio as well as the notes
+
+✅ **DONE, `a8b3d5b`.** `panic()` posts `{ cmd: 'reset' }` to the playout, which
+empties the ring and re-arms the prebuffer. **THE RESET GOES AFTER `note.panic`**:
+emptying the ring buys exactly one cushion of silence, and that silence is only
+worth having if the board is stopping during it, so the message that stops the
+board leaves first. ⚠️ **AND THE COMMENT SAYS WHAT THE ORDER DOES NOT DO**: the
+two statements are microseconds apart and `board.send` is one synchronous socket
+write, so the order states an intent rather than fixing a race.
+🔴 **THE LOG LINE IS FOUR CASES NOW, NOT ONE.** `note.panic` goes only when the
+page is armed, so a page listening while somebody else drives the board drops its
+own cushion and hears the sound come straight back. That branch reads **"stopped
+here only"** at `warn` and says the sound will be back in a moment. **The word
+`stopped` alone is reserved for the branch where the message actually left.**
+**40 to 41 asserts, 34 to 35 page.** The new one requires that the page posted the
+reset exactly when there was a node to post it to, and, when the far side can
+speak, that the worklet's own `played` counter FELL, which is a number that only
+ever grows except through a reset.
+🔴 **WHAT COULD NOT BE MEASURED, IN THOSE WORDS: NO REAL AUDIO WAS FLOWING, SO
+NOBODY MEASURED THAT A REAL SOUND STOPPED.** Without `?board=1` the page never
+calls `startAudio()`, so a harness run has no context and no playout node at all.
+The far side branch grades only on `?board=1` with a live board and **has never
+run on this desk**. The guard branch is what is graded today.
+⚠️ **`ctx.suspend()` WAS PRICED AND REFUSED, AND THE PRICE IS HIGHER THAN
+EXPECTED.** The gesture rescue that would bring a suspended context back REMOVES
+ITSELF the moment the context reaches `running` (`board.mjs:299`), so suspending
+here would make the page log *"tap anywhere and it will start"* with nothing
+listening for a tap. That is the exact defect `board.mjs:306` records fixing.
+⚠️ **AND THE FOUR REDS ON THE BEFORE RUN WERE ALL PRE-EXISTING.** Two are the
+standing board ones, and one of those is STRUCTURAL rather than the board being
+off: *this page makes no sound of its own* asserts a context and a playout exist,
+and `runChecks()` only reaches `startAudio()` behind `?board=1`, so it is red on
+every plain run by construction. Two more about the wheel and the arrow key came
+back green on the after run with nothing touched near them, and the agent claimed
+no credit for it.
 
 ASKED, VERBATIM: *"knobs: panic should stop audio"*. One page,
 https://positron.studio/knobs/.
@@ -934,6 +968,50 @@ in the brief**, which is what the three agents after it were given.
 ⚠️ **AND IT MEANS ONE THING CANNOT BE RULED OUT**: any measurement taken in that
 root between the two runs may belong to a peer. The shared agent's numbers were
 all re-taken after the move. Nobody else reported an anomaly.
+
+### Open 2026-09-29: board.mjs cannot empty its own playout, and every page that wants to stop its sound has to reach past it, found not asked for
+
+**FOUND BY THE `/knobs/` AGENT WHILE MAKING PANIC STOP THE AUDIO**, and reported
+rather than written, because `demo/shell/` was closed to it.
+
+**`board.mjs` has no way to drop the sound it is holding**, so the page posts
+`{ cmd: 'reset' }` straight at `board.playout()`, a node the component owns.
+**And it has no way to read the worklet's own counters either**: `port.onmessage`
+takes `bufferedMs`, `underruns` and `trimEvents` and discards `appended`,
+`played` and `dropped`, so the page had to hang a SECOND `addEventListener` on
+that port to grade its own change. It does not touch `onmessage`, deliberately,
+because that one is the component's.
+
+**The kit shape is `board.dropSound()` plus those three counters on
+`board.stats()`.** 🔴 **AND `/keys/` HAS THE SAME GAP**: it holds a 100 ms
+cushion and it has a panic, so it needs the same two lines the day anybody asks.
+
+### Open 2026-09-29: a panic can launder the cushion assert, and the ordering that stops it is a comment rather than a mechanism
+
+🔴 **FOUND BY THE `/knobs/` AGENT WHILE GRADING ITS OWN CHANGE.**
+`{ cmd: 'reset' }` zeroes the worklet's `underruns` and `trimEvents` as well as
+its ring. `board.mjs` surfaces those as `starved` and `trimmed`, and
+`demo/knobs/index.html`'s `the cushion never ran dry` reads `starved === 0`.
+**So a panic driven BEFORE that assert takes it green by wiping the counter it
+reads.**
+
+It is avoided by running `panicCheck()` after `checkAll()` on both routes, and
+the reason is written into the check's header so nobody moves it. ⚠️ **That is a
+convention held by a comment.** The same shape reaches any page that resets a
+counter a later assert reads, and this repository has paid for a check that
+passed because something upstream had cleared its evidence.
+
+### Open 2026-09-29: knobs carries seven em dashes and six middots that predate today
+
+**MEASURED BY THE `/knobs/` AGENT AND DELIBERATELY NOT SWEPT**: `grep` reads
+**7 lines with em dashes and 6 middots** in that page's log lines and assert
+details, none of them written today. `git diff` of today's change contains
+neither.
+
+**Not swept because the ask was one behaviour**, and rewriting eight unrelated
+log lines in the middle of a targeted run is how a change nobody can attribute
+gets made. **The rule is per demo, when that demo is being worked on**, so this
+is the note for the next `/knobs/` task.
 
 ### Open 2026-09-29: nothing on /pack/ can loop a sample any more, and Loop was asked for by name
 
