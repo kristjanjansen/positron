@@ -1,24 +1,113 @@
-# Handoff, 2026-09-29, session 55: eight asks, collected first, worked second, deployed
+# Handoff, 2026-09-29, session 55: ten asks, a second deploy, and the branch finally merged into main
 
 ## Where it is right now
 
-**DEPLOYED, PUSHED AND CONFIRMED ON THE EDGE: BUILD `08a7072-081725-adc6`.**
-**12 commits this session**, the working tree is CLEAN, nothing is in flight,
-and `8ad42bf` is on `origin/session-28-station-videoradio`. ⚠️ **THE ACTIVE
-GITHUB ACCOUNT WAS PUT BACK AND CHECKED**: `gh auth status` reads
+🔴 **THE WORKING BRANCH IS `main` NOW, AND IT WAS `session-28-station-videoradio`
+FOR 184 COMMITS.** Instructed: *"just go to main"*. `main`, `origin/main` and the
+old branch all point at **`bdb9335`**, the working tree is CLEAN, nothing is in
+flight, and `main` tracks `origin/main`. ⚠️ **THE ACTIVE GITHUB ACCOUNT WAS PUT
+BACK AND CHECKED** after every push: `gh auth status` reads
 `Kristjan-Jansen_enefit` active.
 
-MEASURED after, counted and not remembered: **57 demos, 55 built, 55 cards**,
-**75 plans in `plans/`**, and **62 open lines in `BACKLOG.md`**.
+🔴 **AND THE LIVE SITE IS ONE COMMIT BEHIND THE REPOSITORY ON PURPOSE, WHICH IS
+THE FIRST THING TO DECIDE NEXT.** The edge reads **BUILD
+`2bfd5e1-084810-49d6`**, confirmed by fetching `/shell/shell.mjs`. That build
+carries THIS branch's `/stage/`, which is session 49's uncommitted carry-over.
+**The merge replaced it with session 50's**, so a deploy would change `/stage/`
+on the live site, and that deploy is the moment `/stage/` and `/webrtc/` would
+get their first real reading here. Nothing was deployed after the merge because
+nobody asked and because neither page was run.
 
-🔴 **THE FIRST READ OF THE EDGE ANSWERED THE OLD STAMP AND IT WAS CACHE, NOT A
-FAILED DEPLOY.** Seconds after `deploy.mjs` printed its own confirmation line, a
-plain fetch of `/shell/shell.mjs` read `a05166b-203845-7a89`, yesterday's build.
-Two reads a minute later, one plain and one cache busted, both read
-`08a7072-081725-adc6` with `cf-cache-status: HIT`. **So the rule about
-confirming rather than trusting stands, and so does a second one: a single read
-taken immediately after a deploy can be wrong in the alarming direction.** Read
-it twice, a minute apart, before reporting a deploy as failed.
+MEASURED after, counted and not remembered: **22 commits this session**,
+**57 demos, 55 built, 55 cards**, **77 plans in `plans/`**, and **66 open lines
+in `BACKLOG.md`** with **10 struck off today**. ⚠️ The plan count moved 75 to 77
+in the merge rather than by anybody writing one.
+
+🔴 **A READ OF THE EDGE TAKEN SECONDS AFTER A DEPLOY CAN BE WRONG IN THE
+ALARMING DIRECTION.** After the first deploy today, `deploy.mjs` printed its own
+confirmation and a plain fetch of `/shell/shell.mjs` answered **yesterday's
+stamp**. Two reads a minute later, one plain and one cache busted, both answered
+the new one with `cf-cache-status: HIT`. **So confirming rather than trusting
+still stands, and the second half of the rule is: read it twice, a minute apart,
+before reporting a deploy as failed.**
+
+## Two more asks after the stream, and both are live
+
+| ask | where it is |
+| --- | --- |
+| *"rm A WAY HOME"* | https://positron.studio/nola/ , `b4c5446` |
+| *"knobs: panic should stop audio"* | https://positron.studio/knobs/ , `a8b3d5b` |
+
+Both went into `BACKLOG.md` before either was worked, which is the rule, and both
+are deployed in **BUILD `2bfd5e1-084810-49d6`**, confirmed on the edge by reading
+the two pages themselves rather than only the stamp: the way home's hooks are
+absent from the served `/nola/` and the new panic's own words are present in the
+served `/knobs/`.
+
+🔴 **A WAY HOME: THE BRIEF SAID THE BLOCK WAS HOLDING THE KEYBOARD STILL AND IT
+WAS NOT.** MEASURED before the cut: the block sat at **y743.8 as the LAST child
+of the body** against the keyboard at **y239.5**, so it was BELOW the keys and
+its four row reserve was never holding them. Removing it moves the keyboard
+**0.0 px at 1280**. What comes up 225.6 px is the log, the diagram and the
+footer. **And the 20.2 px the keyboard rises at 375 is the DESCRIPTION**, which
+lost a wrapped line when its last clause went, measured at 20.27 px a line. Two
+causes, separated rather than added together.
+**107/107 with 101 page asserts to 104/104 with 98**, the grep agreeing at 99 to
+96. `createTable` went with it, because those four rows were this page's only
+table. `routeTo` is now PAGE-LESS and keeps its whole test: `suggest-test.mjs`
+reads **44 ok, 0 failed**, run to prove it rather than assert it.
+
+🔴 **PANIC: THE RESET IS HALF OF A PAIR AND THE LOG LINE HAD TO STOP PRETENDING
+OTHERWISE.** `panic()` posts `{ cmd: 'reset' }` to the playout, which empties the
+**160 ms** ring, AFTER `note.panic` goes out, because emptying the ring buys one
+cushion of silence and that silence is only worth having if the board is stopping
+during it. ⚠️ The comment says what the order does NOT do: the two statements are
+microseconds apart on one synchronous socket write, so it states an intent rather
+than fixing a race.
+**The log line is four cases now.** `note.panic` goes only when the page is
+armed, so a page listening while somebody else drives the board drops its own
+cushion and hears the sound come straight back. That branch reads **"stopped here
+only"** at `warn`. **The word `stopped` alone is reserved for the branch where
+the message actually left.** 40 to 41 asserts.
+🔴 **AND NOBODY MEASURED THAT A REAL SOUND STOPPED.** Without `?board=1` the page
+never builds a context at all, so the far side of the new assert has never run on
+this desk, and the Pi answered `online` at 10:47 and `offline` from 10:53 on
+identical code. The guard branch is what is graded today.
+
+## The merge, and the four decisions inside it
+
+**`origin/main` carried one commit this branch did not have**, `3f9a230`, a
+squash of session 50 sitting on `61ad3b6`, which is our own merge base. CHECKED
+before merging rather than assumed: `onPress ?? onClick` appeared **0 times** in
+our `transport-bar.mjs` and our `/webrtc/` had **8 asserts** where session 50
+took it to 16. Twelve conflicts, six of them build output, regenerated with
+`node build.mjs` rather than resolved by hand.
+
+🔴 **`/stage/` TAKES THEIRS WHOLESALE, AND THE DATES ARE MISLEADING.** Our last
+commit touching that page is `22294ed` at **09-25 22:01**, later in wall clock
+than session 50's **17:29**, and its own message says what it is: *"the working
+tree as the closed session left it"*, session 49's uncommitted work, with **"NOT
+a claim that any page is green in a browser"** and *"the handoff's 33/47 on
+/stage/ still stands"*. Session 50 then diagnosed that those fourteen failures
+were a dead button rather than the timing tuned for a day. **A later commit date
+is not a later state.**
+- **The manifest's `stage` row went with it**, so the page's `what` and the index
+  card stay one string.
+- **`/kit/`'s tab labels kept OURS**, uppercase, because ours also carries a
+  `panel` tab theirs does not have and taking theirs would have dropped a kit
+  section over a case decision.
+- **Both standing files kept BOTH sides.** `HANDOFF.md` on main was 210 lines
+  holding only session 50; this file is the full history, so that section was
+  inserted in its chronological place between the 09-26 sessions and session 49.
+
+✅ VERIFIED: three pages parse, and `verify.mjs kit tom` reads **289/289 green**,
+which is the pair that exercises the merged `transport-bar.mjs` locally.
+🔴 **NOT RUN: `/stage/` AND `/webrtc/`.** Both drive live WHEP against
+Cloudflare. **Their state in this repository is session 50's reported state and
+this session did not re-measure it.**
+⚠️ **AND ONE INHERITED LINE MAY BE STALE**: main's `BACKLOG.md` still has *"FIVE
+UI ASKS ON `/stage/`"* marked **Open** while session 50's own commit says that UI
+work is all deployed. Not touched, because it is inherited rather than made here.
 
 ## The eight asks, and where each one is
 
@@ -108,7 +197,16 @@ than implying a green run covered it.
 - **muta's foot has a 230 px hole at the desk** and the scope is now the page's
   largest blank. Both are what the ask asks for. Both want a second opinion.
 
-## Five things found on the way that nobody asked about
+- 🔴 **THE LIVE SITE DOES NOT CARRY THE MERGE, AND THE NEXT DEPLOY CHANGES
+  `/stage/`.** The edge is on `2bfd5e1-084810-49d6`, which holds this branch's
+  session 49 carry-over of that page. `main` holds session 50's. **A deploy is
+  one command and it is also the first real reading either `/stage/` or
+  `/webrtc/` has had here.** Decide it before shipping anything else.
+- **`routeTo` is page-less**, `createReport` is imported by `/pack/` and never
+  called, and `board.mjs` still cannot empty its own playout. Three small kit
+  lines, all three written down in `BACKLOG.md` rather than done.
+
+## Eight things found on the way that nobody asked about
 
 - 🔴 **AN ASSERT WRITTEN TO CATCH THE WAVEFORM'S RING COULD NEVER HAVE SEEN
   IT.** `demo/radio/index.html:5736` reads `getComputedStyle(canvas)
@@ -132,10 +230,22 @@ than implying a green run covered it.
 - **`order` moves the paint and not the tab stop.** One stop on a row of two, at
   phone widths, recorded in the stylesheet rather than worked around.
 
+- 🔴 **`which-rule-won.mjs` IS BLIND TO A LOGICAL SHORTHAND BEATING A PHYSICAL
+  LONGHAND**, found on `/twelve/`. Asked for `padding-top` it reported an absence
+  and named the wrong box while `padding-block` was setting 20. Only its own last
+  line, saying the computed value disagreed with the winner it named, caught it.
+- 🔴 **A PANIC CAN LAUNDER THE CUSHION ASSERT ON `/knobs/`.** `{ cmd: 'reset' }`
+  zeroes the worklet's underrun counter as well as its ring, and *the cushion
+  never ran dry* reads `starved === 0`. What stops it today is an ordering held
+  by a comment.
+- **Four of `/pack/`'s asserts have never run on this machine**, because the
+  branch behind them needs a pack the page no longer fetches. It is why that
+  page's count did not move while its `grep` went 65 to 62.
+
 ## How it was run
 
-**Eight requests, one collection commit, one shared agent, six page agents,
-twelve commits, all of them the session's.** No agent committed and no agent ran
+**Ten requests, three collection commits, one shared agent, eight page agents,
+twenty two commits, all of them the session's.** No agent committed and no agent ran
 `git add`. The shared agent ran ALONE and FIRST because all three of its changes
 were in `demo/shell/`, then three pages that did not depend on it went in
 parallel, then the three that did.
@@ -147,6 +257,16 @@ rule it was asked for. The session told `/pack/` that `createGrainScope` takes a
 `reason`; it has no `set()` at all and that option is `synth-view.mjs`'s. **Both
 times the agent measured rather than complied**, which is the arrangement
 working.
+
+⚠️ **AND THE PATH LIMITED COMMIT EARNED ITS RULE TWICE TODAY.** Two agents were
+writing while commits were being made, and `git commit -F msg -- <paths>` is what
+kept each page's work in its own commit. One agent reported a file dirty that was
+not its own and said so rather than going near it, which is the arrangement
+working.
+⚠️ **ONE BRIEF WAS WRONG THREE TIMES IN TOTAL AND EVERY ONE WAS CAUGHT BY THE
+AGENT HOLDING IT**: the canvas border was already zero in CSS, `createGrainScope`
+takes no `reason`, and `/nola/`'s way home was below the keyboard rather than
+above it. **Measuring rather than complying is what a brief is for.**
 
 ---
 
