@@ -1,5 +1,28 @@
 ## Open
 
+### Open 2026-09-29: moq joins the streaming section and gets the same UI treatment
+
+ASKED, VERBATIM: *"Move moq to streaming as well and do same ui treatment"*.
+`demo/moq/index.html` and the `moq` row in `demo/manifest.mjs`.
+- **The move**: `moq` went to `technologies` in the 2026-09-29 merge; it goes
+  back to `streaming`, which then holds `llhls` and `moq` and is still the first
+  section on the front page.
+- **"The same UI treatment" is the four asks `/llhls/` and `/webrtc/` got**: the
+  three state toggle in place of the primary button (`STREAM` and `STREAM_CAN`
+  are already in `demo/shell/presence.mjs`, so this is a third caller, not a new
+  component), the video panel with size, fps and a short spec, a how it works
+  diagram, and a one sentence desc.
+- ⚠️ **THE SPEC AND THE STOP CONDITION ARE BOTH DIFFERENT AND MUST BE READ,
+  NOT COPIED.** This page is browser to browser over MoQ through Cloudflare's
+  relay: there is no ffmpeg leg and no `wss://pub.positron.studio/watch`
+  reference count behind it, so *how it stops* is not the container sweep the
+  other two describe. `positron-streaming` has what is measured, including that
+  a relay cannot live in a Container because there is no inbound QUIC.
+- ⚠️ **AND SAFARI IS BLOCKED ON THIS PAGE FOR A MEASURED REASON**
+  (WebKit 319818, the QUIC flow control window never refilling, about two
+  minutes of streams). If the page says how it works, that belongs in it.
+- `moq` carries `settleMs: 30000`.
+
 ### Open 2026-09-29: createPresenceButton's `state` is a getter returning a function, and it has bitten two pages, found not asked for
 
 `demo/shell/presence.mjs`. `createPresence`'s api exposes `state: () => now`, a
