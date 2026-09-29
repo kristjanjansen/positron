@@ -122,9 +122,15 @@
   import { parseChord, parseChords, voiceChord, VOICINGS } from '/shell/chords.mjs';
   import { nameChord, createSettler, createTally, chordKey, fromKey, notesOf }
     from '/shell/name.mjs';
-  import { suggest, routeTo, useTables, tablesIn, mkRandom, mkTake } from '/shell/suggest.mjs';
+  /* ⚠️ `routeTo` LEFT THIS LINE WITH THE WAY HOME ON 2026-09-29 AND THE KIT
+     FUNCTION STAYED. It is still exported by `suggest.mjs` and still graded by
+     `suggest-test.mjs`, so it keeps its test and has no page calling it. */
+  import { suggest, useTables, tablesIn, mkRandom, mkTake } from '/shell/suggest.mjs';
   import { createRoll } from '/shell/roll.mjs';
-  import { createTable } from '/shell/table.mjs';
+  /* ⚠️ AND `table.mjs` WENT WITH IT, because the way home's four rows were this
+     page's only table. An import that matches nothing reads as correct forever,
+     which is the dead rule this project keeps measuring. The roll is
+     `roll.mjs` and draws its own rows. */
   import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -346,10 +352,16 @@
      it change*. `you either type in or teach it by playing` is ONE clause about
      ONE thing, the roll, rather than a second fact bolted on with an `and`.
      ⚠️ AND IT IS WHAT DEFINES THE WORD `roll` ON THE PAGE, which is what lets
-     the control above the keys be labelled with it. */
+     the control above the keys be labelled with it.
+     🔴 AND A CLAUSE CAME OFF ON 2026-09-29, WHICH IS THE FIRST TIME THIS LINE
+     GOT SHORTER RATHER THAN LONGER. `and a four chord way home it works out from
+     them` described a block that was removed that day, and a description that
+     names a block a visitor cannot find is worse than a missing one. The whole
+     sentence was re-read rather than truncated: what is left is the instrument
+     row and the roll, which is what the page is, and it ends where the page
+     ends rather than trailing off where the cut was made. */
   const ONE = 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
-    + 'of chords you type in or teach it by playing and a four chord way home it '
-    + 'works out from them';
+    + 'of chords you type in or teach it by playing';
 
   const d = mount({
     name: 'nola',
@@ -1462,48 +1474,22 @@
   const topRow = el('div', 'nola-top');
   topRow.append(chordField.el);
 
-  /**
-   * 🔴 A FOUR CHORD WAY HOME, WHICH IS A DIFFERENT OFFER FROM A CHORD THAT COMES
-   * NEXT. The complaint that bought this page's suggester its rewrite was three
-   * complaints, and the third was *"not moving anywhere"*, taken literally and
-   * MEASURED in `plans/plan-better-chords-2026-09-25.md`: taking the old
-   * suggestion ten times in a row fell into a repeating cycle **99.1 per cent**
-   * of the time, three quarters of them the three rotations of ii V I. Nothing
-   * on this page had a destination, so nothing could arrive at one.
-   * ✅ `suggest.mjs` SEARCHES THE SAME TABLE FOR A RUN OF FOUR THAT LANDS ON THE
-   * TONIC. MEASURED against this table's shape over 4,000 held-out jazz
-   * contexts: a route exists on **92.7 per cent** of them and its transitions
-   * are attested in songs the table has never seen **98.3 per cent** of the
-   * time.
-   *
-   * 🔴 AND IT IS NOT IN THE ROLL, BECAUSE THE ROLL SHOWS ONE PROPOSAL AND THAT
-   * WAS ASKED FOR IN THOSE WORDS: *"add suggestions to piano roll. just one"*.
-   * Four more rows under the one proposal would undo that ask by arriving from a
-   * different direction. A way home is a sequence rather than a choice between
-   * chords, so it gets its own block and its own heading.
-   * ⚠️ `minRows: 4` RESERVES THE ROOM WHETHER OR NOT THERE IS A ROUTE, which is
-   * the same reason the roll reserves eight: a block that grows the moment
-   * somebody plays their second chord moves the keyboard down the page while
-   * they are looking at it.
-   * ⚠️ AND PICKING A ROW PUTS IT ON THE KEYS, the way picking a roll row already
-   * does. `table.mjs` moves focus on an arrow and opens on Enter, so stepping
-   * down four chords costs nothing and lighting one is a decision.
-   */
-  const homeWrap = el('div', 'nola-home');
-  const homeSay = el('div', 'nola-home-h', 'A WAY HOME');
-  const homeTbl = createTable({
-    columns: [
-      { key: 'name', label: 'chord', grow: true, hi: true },
-      /* ⚠️ THE NUMERAL IS THE COLUMN THAT SAYS IT IS GOING SOMEWHERE. Four chord
-         names are four chords; `ii V I` under them is the arrival, and this page
-         already explains its numerals in the log. */
-      { key: 'numeral', label: 'numeral', width: 96, align: 'right' },
-    ],
-    minRows: 4,
-    onPick: (row) => showChord(row),
-  });
-  homeWrap.append(homeSay, homeTbl.el);
-  d.stack.add(topRow, chordList, instrument, homeWrap);
+  /* 🔴 A FOUR CHORD WAY HOME STOOD HERE AND WAS REMOVED WHOLE ON 2026-09-29, ON
+     *"rm A WAY HOME"*. It was a heading, a two column table of four rows and
+     `routeTo`, and everything that existed only to serve it went in the same
+     pass: the wrapper, `drawHome` and its three pieces of state, its four
+     callers, the `.nola-home-h` rule, the height measurement that graded its
+     reserve, and the `createTable` import, which this page had for that one
+     table and nothing else. What it measured is not lost: the route search is
+     still `suggest.mjs`'s `routeTo` and is still graded by `suggest-test.mjs`,
+     and `plans/plan-better-chords-2026-09-25.md` keeps the numbers that bought
+     it, because a plan records what was decided when it was decided.
+     ⚠️ AND IT SAT BELOW THE KEYBOARD RATHER THAN ABOVE IT, MEASURED BEFORE THE
+     CUT rather than read off this comment: `.kbd` at y 239.5 and the block at
+     y 743.8 at 1280 px. So its `minRows: 4` reserve was never holding the
+     keyboard still, whatever the note beside it claimed, and taking the block
+     out moved nothing a hand is on. */
+  d.stack.add(topRow, chordList, instrument);
 
   // ── the MIDI keyboard ─────────────────────────────────────────────────────
 
@@ -2151,7 +2137,7 @@
     lastGuess = null;
     guessPlayed = false;
     lightGuess([]);
-    if (mode !== 'learn' || learned.length < 2) { drawHome(); return; }
+    if (mode !== 'learn' || learned.length < 2) return;
     guessAt = performance.now();
     const r = suggest({ chords: learned }, { style: LEARN_STYLE, rnd: draw, take });
     if (!r.ok) return;
@@ -2225,54 +2211,6 @@
          read off one picture and find on another is a proposal you travel to. */
       lightGuess(notes);
     }
-    drawHome();
-  }
-
-  /** the way home on screen, so a check can read what was offered */
-  let lastHome = null, homeRedraws = 0, saidHome = '';
-  /**
-   * 🔴 THE ROUTE IS REDRAWN WITH THE PROPOSAL AND NEVER ON ITS OWN, which is how
-   * it inherits the hold that was asked for as *"do not offer new when i hae not
-   * played old suggestion for a while"*. Four chords you are working your way
-   * through must not be replaced under you any more than one chord must, and two
-   * offers on two different clocks would be a page talking over itself.
-   * ⚠️ AND IT IS FILTERED BY NOTHING. The single proposal is never a chord
-   * already in the roll, because a chord you are playing is nothing to try; a
-   * way home is a SEQUENCE, the tonic is very often a chord you have already
-   * played, and a route forbidden from landing on it would be a route that
-   * cannot arrive.
-   */
-  function drawHome() {
-    homeRedraws++;
-    lastHome = null;
-    homeWrap.hidden = mode !== 'learn';
-    if (mode !== 'learn' || learned.length < 2 || !tablesIn()) {
-      homeSay.textContent = 'A WAY HOME';
-      homeTbl.set([]);
-      return;
-    }
-    const r = routeTo({ chords: learned }, { style: LEARN_STYLE, rnd: draw, take });
-    lastHome = r;
-    homeSay.textContent = r.targetName ? `A WAY HOME TO ${r.targetName}` : 'A WAY HOME';
-    if (!r.ok) {
-      /* 🔴 SAID IN WORDS RATHER THAN LEFT AS AN EMPTY BOX. MEASURED: this table
-         gets from a held-out context to the tonic in four chords 92.7 per cent
-         of the time, so one context in thirteen has no way home in it, and four
-         blank rows under a heading is a page that looks broken rather than one
-         reporting a fact about what it has counted. */
-      homeTbl.set([]);
-      if (r.says !== saidHome) { saidHome = r.says; d.log(r.says); }
-      return;
-    }
-    let near = learned.length ? learned[learned.length - 1].notes : [];
-    const rows = [];
-    for (const c of r.steps) {
-      const pc = parseChord(c.name);
-      const notes = pc.ok ? voiceRow(pc.notes, near, { wide: true }).notes : [];
-      if (notes.length) near = notes;
-      rows.push({ name: c.name, numeral: c.numeral || '', notes });
-    }
-    homeTbl.set(rows);
   }
 
   function addLearned(key) {
@@ -2629,11 +2567,6 @@
     } else {
       drawChords(chordField.value());
     }
-    /* ⚠️ CALLED HERE AS WELL AS FROM `drawGuesses`, BECAUSE THAT ONE IS ALLOWED
-       TO DO NOTHING. A proposal nobody has played yet is left alone, so the
-       redraw returns early and the way home would keep whatever it was showing
-       for the other mode. A mode change is the one moment both have to move. */
-    drawHome();
     if (!say) return;
     if (mode === 'learn') {
       /* 🔴 THE ONE ARBITRARY CHOICE, SAID OUT LOUD ONCE. `C6` and `Am7` are the
@@ -2699,13 +2632,6 @@
       : 'the roll is the line of chords typed in the field beside this'),
   });
   topRow.prepend(modePick.el);
-  /* 🔴 ONCE AT LOAD, BECAUSE `setMode` ONLY EVER RUNS ON A PRESS. A page opened
-     at `?learn=0` never calls it, so without this line the way home would sit
-     there in the typed mode as a heading over four empty rows on a page where
-     nothing was ever going to fill them, which is `an empty box is a line` in
-     its larger form. It also puts the block in the right state for the mode this
-     page really opened in rather than the one it is usually opened in. */
-  drawHome();
 
   // ── what only this page can say ───────────────────────────────────────────
   //
@@ -4240,13 +4166,6 @@
         `the first chord is in and the second is on its first arrival of ${LEARN_TIMES}, `
         + `so the roll still has ${rows()} row`);
 
-      /* 🔴 THE WAY HOME'S HEIGHT, TAKEN HERE BECAUSE THIS IS THE ONLY MOMENT IT
-         IS VISIBLE AND EMPTY. One chord is in, the block is on screen with
-         nothing in it, and the reading is compared against the same block with
-         four chords in it further down. Reserved room is a claim that can only
-         be made by measuring both states of the real page. */
-      const homeH0 = homeWrap.getBoundingClientRect().height;
-
       for (let i = 1; i < LEARN_TIMES; i++) {
         drop([65, 69, 72]);
         await sleep(60);
@@ -4402,12 +4321,16 @@
         + `${Math.round(tally.msOf(triedKey, performance.now()))} ms of it`);
       const takeAfter = { counted: take.counted, refused: take.refused };
       /* 🔴 A COUNTER ON THE FAR SIDE OF THE BOUNDARY, WHICH IS THE ONLY THING
-         THAT SAYS THE TAKE IS WIRED RATHER THAN HELD. `suggest` and `routeTo`
-         each read `take.chords` exactly once and only when they were handed a
-         take, so a page that built one and forgot to pass it reads 0 here while
-         every other assert on this page stays green. It wraps the redraw the
-         line below was already making rather than forcing another, because a
-         forced proposal would replace the row the checks under it are about. */
+         THAT SAYS THE TAKE IS WIRED RATHER THAN HELD. `suggest` reads
+         `take.chords` exactly once and only when it was handed a take, so a page
+         that built one and forgot to pass it reads 0 here while every other
+         assert on this page stays green. It wraps the redraw the line below was
+         already making rather than forcing another, because a forced proposal
+         would replace the row the checks under it are about.
+         ⚠️ IT READ 2 UNTIL 2026-09-29 AND THE SECOND READ WAS `routeTo`'s, which
+         left with the way home. The count is 1 now, and it is still the assert
+         and not a formality: 0 is a take nothing was handed, which is exactly
+         the silent failure this exists to catch. */
       let takeReads = 0;
       const chordsProp = Object.getOwnPropertyDescriptor(take, 'chords');
       Object.defineProperty(take, 'chords', { configurable: true,
@@ -4420,15 +4343,15 @@
         + `${freedAfter ? 'taken up' : 'still waiting'} after playing it, and the next `
         + `redraw ${guessRedraws > redrawsWas ? 'recomputed' : 'still held'}`);
 
-      /* ── the take, which is what makes the two offers above about you ──── */
+      /* ── the take, which is what makes the offer above about you ────────── */
       //
       // 🔴 +6.32 POINTS OF TOP 1 ON HELD-OUT JAZZ, and it was built, graded and
       // called by nothing until this wiring. `plans/plan-better-chords-2026-09-25.md`
       // section 14.2 has the measurement and the three measures it does not cost.
-      d.assert('the take reaches both halves of the offer, the chord and the way home',
-        takeReads === 2,
-        `the page read its take ${takeReads} time(s) drawing one proposal and one way `
-        + `home, and it is holding ${take.counted} chord(s) of the ${take.window} it keeps`);
+      d.assert('the take reaches the offer, so the chord proposed is drawn from what you played',
+        takeReads === 1,
+        `the page read its take ${takeReads} time(s) drawing one proposal, and it is `
+        + `holding ${take.counted} chord(s) of the ${take.window} it keeps`);
 
       /* 🔴 THE SITE IS THE SETTLE AND NOT `addLearned`, AND THIS IS THE ASSERT
          THAT SAYS SO. `learned[]` is the DISTINCT chords somebody came back to,
@@ -4511,49 +4434,20 @@
         window.__demo.logs.some((l) => l.msg.includes('as the key')),
         window.__demo.logs.filter((l) => l.msg.includes('as the key')).pop()?.msg || 'nothing said');
 
-      /* ── a four chord way home ──────────────────────────────────────────── */
-      //
-      // 🔴 THE THIRD WORD OF THE COMPLAINT WAS *"not moving anywhere"*, AND IT
-      // WAS TRUE OF THIS PAGE IN A WAY NOTHING HERE COULD SEE. MEASURED in
-      // `plans/plan-better-chords-2026-09-25.md`: taking the old suggestion ten
-      // times in a row fell into a repeating cycle 99.1 per cent of the time
-      // with 3.74 distinct chords in ten, against the real songs' 52.7 per cent
-      // and 7.42. The page offered a next chord and had no destination at all.
-      const homeRows = () =>
-        [...homeTbl.scroller().querySelectorAll('.pos-tbl-row')];
-      d.assert('the page offers a four chord way home, and its last chord is the key it read',
-        lastHome?.ok === true && lastHome.steps.length === 4
-        && lastHome.steps[3].root === lastHome.tonic
-        && homeRows().length === 4
-        && homeSay.textContent.includes(lastHome.targetName),
-        `${homeSay.textContent} reading `
-        + `${lastHome?.steps.map((c) => `${c.name} ${c.numeral}`).join(', ')}`);
-
-      /* 🔴 AND THE ROOM IS RESERVED, WHICH IS THE SAME RULE THE ROLL'S EIGHT
-         ROWS ALREADY OBEY. A block that grows the moment somebody plays their
-         second chord moves the keyboard down the page while they are looking at
-         it, and the keyboard is the thing their hands are on. */
-      const homeH1 = homeWrap.getBoundingClientRect().height;
-      d.assert('the way home reserved its room, so nothing moved when one arrived',
-        homeH0 > 0 && Math.abs(homeH1 - homeH0) < 1,
-        `${homeH0.toFixed(1)} px with nothing in it and ${homeH1.toFixed(1)} px with four `
-        + 'chords in it');
-
-      /* 🔴 THE ROUTE IS DRAWN RATHER THAN THE BEST ONE TAKEN, WHICH IS THE
-         ARGMAX LESSON ARRIVING ONE LEVEL UP. MEASURED on this table's shape over
-         4,000 held-out contexts: the best path alone puts 72.6 per cent of its
-         six commonest routes into ii V I, and drawing the path drops that to
-         18.5 while attestation stays at 98.3 per cent. A best path is as cliched
-         as a best chord. */
-      const wasHome = homeRedraws;
-      const ways = new Set();
-      for (let i = 0; i < 12; i++) {
-        drawHome();
-        if (lastHome?.ok) ways.add(lastHome.steps.map((c) => c.name).join(' '));
-      }
-      d.assert('asking for a way home again can answer differently, because the path is drawn',
-        ways.size > 1 && homeRedraws === wasHome + 12,
-        `${ways.size} different ways home in 12 draws: ${[...ways].join(' / ')}`);
+      /* 🔴 THREE ASSERTS ABOUT A FOUR CHORD WAY HOME STOOD HERE AND WENT WITH
+         THE BLOCK ON 2026-09-29, ON *"rm A WAY HOME"*. They graded that a route
+         landed on the key the page had read, that the block's four reserved rows
+         held their height when one arrived, and that asking twice could answer
+         differently. All three were about a block a visitor cannot reach any
+         more, so they are gone rather than re-pointed: an assert kept alive
+         against something that no longer exists is the dead guard this project
+         keeps paying for.
+         ⚠️ THE ROUTE SEARCH ITSELF IS STILL GRADED AND THAT IS WHY THIS IS A
+         REMOVAL AND NOT A LOSS. `routeTo` is exported by `demo/shell/suggest.mjs`
+         and `demo/shell/suggest-test.mjs` runs it with no browser at all. What
+         is no longer graded anywhere is the WIRING of it to a page, and nothing
+         is wired to it, which is the honest state to leave this in.
+         ⚠️ THE COUNT WENT 101 TO 98 PAGE ASSERTS, MEASURED BOTH WAYS. */
 
       /* 🔴 AND THE CHORD IN THE ROLL IS DRAWN TOO, WHICH IS THE HALF A PLAYER
          ACTUALLY SEES. `suggest.mjs` samples its first slot instead of taking
@@ -4904,18 +4798,13 @@
   .nola-top { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
   .nola-top .pos-field { flex: 1 1 220px; min-width: 0; }
 
-  /* 🔴 THE HEADING IS IN THE TABLE HEADING'S OWN REGISTER, NOT THE ACCENT'S.
-     `shell.css` sets `.pos-tbl-head` at 10px uppercase on `--dim2` with .06em of
-     tracking, and this line sits directly above one, so anything else would read
-     as a second kind of label an inch from the first. The accent is a budget and
-     is spent on what is chosen or live; a destination is neither.
-     ⚠️ `nowrap` BECAUSE IT NAMES A CHORD THAT CHANGES. `A WAY HOME TO Cmaj7` and
-     `A WAY HOME TO D#min7` are different widths, and a heading that can fold
-     onto a second line is a block that changes its own height while somebody is
-     looking at it, which is the one thing this page reserves room to prevent. */
-  .nola-home-h { font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
-                 color: var(--dim); margin-bottom: 8px;
-                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* ⚠️ `.nola-home-h` STOOD HERE AND WENT WITH THE WAY HOME ON 2026-09-29. It
+     was the block's heading, set in the table heading's own register with a
+     `nowrap` on it because the words named a chord that changes width. The class
+     `.nola-home` never had a rule at all, which is why only one selector left
+     this sheet: the wrapper was a hook and nothing more. A selector matching
+     nothing reads as correct forever, so both names are gone rather than left
+     for the next reader to wonder about. */
 
   /* 🔴 NOTHING IS PINNED TO THIS BOX ANY MORE, SO IT IS NOT A CONTAINING
      BLOCK ANY MORE. It carried `position: relative` for one absolute child, the
