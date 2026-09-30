@@ -1,6 +1,22 @@
 ## Open
 
-### Open 2026-09-30: `/away/` shows lag, and `playing` leaves the readout
+### Done 2026-09-30: plan the WebRTC path for /away/ (plans/plan-away-webrtc.md)
+
+ASKED, VERBATIM: *"write webrtc path to plan"*. A plan in `plans/`, not code: a direct browser to Pi path for the Circuit's audio and notes, with the relay kept for signalling and as the fallback. Reported in full when written.
+
+### Open 2026-09-30: bring the /away/ round trip down
+
+ASKED, VERBATIM: *"can we bring roundtrip more down"*. Measured the same day: press to the note arriving back 151 to 180 ms, median about 170, relay legs about 18 ms each way from both ends, and `arecord` on the Pi at ALSA's default 6000 frame period (125 ms) in a 24000 frame buffer, so frames arrive in 117 ms lumps and the page needs a 160 ms cushion to ride them. First cut: a short `arecord` period in `rig/board/inputs.mjs`, then a smaller cushion on `/away/`, each measured before and after.
+
+### Done 2026-09-30: `/away/` Listen and the online badge are one button
+
+ASKED, VERBATIM: *"listen + online is same button"*. Merge the Listen control and the board's presence badge into a single control, reusing the kit's presence button (`.pos-presence-btn` in `shell.css`) rather than a new one. `demo/away/index.html`.
+
+### Done 2026-09-30: `/away/` lag, broken into steps, and how to cut it (measured, in plans/plan-away-webrtc.md §2)
+
+ASKED, VERBATIM: *"can you calculate lag in multiple steps. how to reduce?"*. Measure each leg (browser to relay, relay to Pi, MIDI to the Circuit and back through the Fast Track Pro, `arecord`'s own buffering, Pi to relay, relay to browser, the playout cushion) and name what shrinks each.
+
+### Done 2026-09-30: `/away/` shows lag, and `playing` leaves the readout
 
 ASKED, VERBATIM: *"show lag. rm playing from readout"*. `demo/away/index.html`: a `lag` cell, key press to sound leaving the speakers, measured by finding the note's onset in the frames that come back plus the playout cushion, blank when no onset is found. The readout goes `playing, level, clipped, buffer` to `level, clipped, buffer, lag`, still even.
 
