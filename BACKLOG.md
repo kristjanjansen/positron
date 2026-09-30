@@ -1,5 +1,23 @@
 ## Open
 
+### Open 2026-09-30: research a minimal code editor with syntax highlighting for the synth languages
+
+ASKED, VERBATIM: *"in bg: invertigate minimal visual code editor with basic syntac hilite for our synths. they are rare languages so perhaps we need use some other templte"*. The languages: Faust (`/fau/`), the SuperCollider subset (`/collide/`), Csound score (`/und/`). Research only, a plan in `plans/`, reported in full when it lands. `/typist/` already pins a textarea over a drawn layer, which is prior art in this repo.
+
+### Open 2026-09-30: knobs under the code on `/collide/` and `/fau/`, read from the code, turned live without a recompile
+
+ASKED, VERBATIM: *"what about variables in code (propose names like C1 / VALUE1 etc) that are under the code and adjust parameters in real time like `var env = EnvGen.kr(Env.adsr(0.4, 0.3, 0.7, VALUE1), gate, doneAction: 2);` is it possible?"*, then *"ok. do test with single knob laer. can we do it on fau too?"*.
+- **Proposed and accepted:** real syntax, not invented names, so the code still runs in the real language. SuperCollider: every function argument except `freq`, `amp`, `gate`, plus `\name.kr(default, lag, spec: [min, max, curve])` NamedControls (new to `sclang-lite.mjs`), each a SynthDef parameter changed with `/n_set` on every sounding node. Faust: every `hslider`/`vslider`/`nentry` except `freq`, `gain`, `gate`, read from the compiled DSP's parameter list with its own min, max and step, set on all voices through faustwasm.
+- **One row of knobs under the code**, built from the compiled program after every compile, a value kept across a recompile when the name survives. One kit piece, two pages.
+- **Start with a single knob** ("single knob laer" read as one row, tested first with one knob): `rel` on `/collide/`'s Pad, `cutoff` on one `/fau/` preset.
+- ⚠️ **WAITS FOR the `/collide/` patches agent**, which is in `demo/collide/` and `sclang-lite.mjs` now.
+
+### Done 2026-09-30: `/collide/`, keep only Pad, add more patches, settle what can be settled
+
+ASKED, VERBATIM: *"keep only pad. settle what you can. add more patches"*. Read as: Pluck and Hat go, Pad stays, new patches take their place. The unsettled list from the build: (1) replacing a definition in place under a running synth, never measured; (2) the 64 wire-buffer count, matched by measurement but the scsynth C++ not read; (3) MIDI never tried with a device (needs a device on this desk, not settleable here); (4) the readout splits 3 + 1 at 375 px, the kit's `/knobs/` and `/away/` problem, a `shell.css` change; (5) no live scope; (6) the diagram prints `/grains/` as a code slug rather than a URL.
+
+- ✅ **DONE, from the agent's report.** Patches Pad (unchanged), Bell, Glass, Growl, Breath, Wah, each gated and heard ending, worst 4-note chord peak 0.67 (Breath first clipped at 2.96, Wah at 1.12, both fixed). (1) **Measured and read**: scsynth reference counts a GraphDef (`SC_GraphDef.cpp` 371 to 387, `SC_Graph.cpp` 87 to 91 and 626 at 19954900); a running sine kept 0.0707 rms and still answered `/n_set` after its def was replaced, so the page now compiles every program as `collide` and frees nothing itself. (2) **The compiler was wrong**: an audio output nothing reads is never given back (`alloc(0)`, 598 to 620); measured 63 unread + 1 loads, 64 + 1 `/fail`s; `wirePeak` fixed, four tests, three sabotages red. (4) **Fixed in the kit**: exactly four readout cells are 2 + 2 under 560 px (`shell.css`), which also cures `/knobs/` and `/away/`. (5) `grain-scope.mjs` is the panel's picture now; it is an EMPTY 72 px band before the first touch. (6) the diagram reads **positron.studio/grains**. (3) MIDI needs a device; and on `/collide/` a MIDI key alone cannot start the engine, a touch must come first. `sclang-lite-test` 63/63, `verify collide` 44/44, 38 page asserts.
+
 ### Done 2026-09-30: a new demo `collide`, SuperCollider typed and compiled in the tab, as `/fau/` does Faust
 
 ASKED, VERBATIM: *"can you do simple supercollider script browser compile demo as in fau called collide? do we have moving pieces?"*
@@ -69,7 +87,7 @@ Collected 2026-09-30 on *"collect todos"*. Each one was listed in `HANDOFF.md` u
 - **/stage/ at 375 px**: long link lines through containers and stacked labels.
 - **`cam` container cold start, a steady-state LL-HLS median, and Safari's MP4 arm are unmeasured.**
 - **`/circuit/` reads 48/49**: `the printed names sit the same distance from the top and both sides`, top 41 against 21. Pre-existing.
-- **`/away/`'s readout wraps three and one on a phone**, as `/knobs/` does; the readout's row rule counts cells, not width.
+- ~~**`/away/`'s readout wraps three and one on a phone**~~ ✅ fixed 2026-09-30 in `shell.css`, four cells are 2 + 2 under 560 px.
 - **The Circuit clips on Fast Track Pro input 1**: 4,108 of 467,520 samples at full scale. The owner was asked to turn the gain down a third; nothing has been measured since.
 
 ### Done 2026-09-30: plan the WebRTC path for /away/ (plans/plan-away-webrtc.md)

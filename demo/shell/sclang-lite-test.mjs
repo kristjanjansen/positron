@@ -30,6 +30,19 @@
 //   the wire ceiling not checked                            49/50, the 65 refusal
 //   an unknown keyword dropped instead of refused           49/50, `mull:`
 //
+// ⚠️ 2026-09-30, THE WIRE COUNT WAS WRONG AND FOUR CHECKS WERE ADDED FOR IT.
+// An output nobody reads was counted as given straight back; scsynth keeps it.
+// MEASURED, 63 ok on the real module, then three sabotaged copies:
+//
+//   the old line back, an unread output given straight back  60/63, the unread
+//                                                            oscillator, Pan2
+//                                                            and the 63 and 64
+//   inputs never given back                                  59/63, and the
+//                                                            forty deep chain
+//   outputs taken BEFORE the inputs are given back           60/63, the chain
+//                                                            reads 2 and both
+//                                                            ceilings move
+//
 // ⚠️ WHAT NONE OF THEM CAN SEE: whether scsynth agrees. Opcode 0 for `*` is a
 // well formed file that loads and plays, louder; only the page's own meter
 // under a changed `amp` can tell a multiply from an add
@@ -74,10 +87,18 @@ for (const p of PRESETS) {
   ok('the Pad is two channels because its freq is multiplied by a two element array',
     pad.r.ok && byName(pad.d, 'Saw').length === 2 && byName(pad.d, 'LPF').length === 2 && pad.r.channels === 2,
     `${byName(pad.d, 'Saw').length} Saw, ${byName(pad.d, 'LPF').length} LPF`);
-  const hat = def(PRESETS[2].code);
-  const out = byName(hat.d, 'Out')[0];
-  ok('the Hat reaches the speakers through Pan2, output 0 left and output 1 right',
-    ins(hat.d, out).join(' ') === '0 Pan2:0 Pan2:1', ins(hat.d, out).join(' '));
+  // No preset pans since the Hat went (2026-09-30), so Pan2 is graded on a
+  // program of its own rather than dropped with it.
+  const pan = def('{ Pan2.ar(WhiteNoise.ar * 0.1, 0.3) }');
+  const out = byName(pan.d, 'Out')[0];
+  ok('Pan2 reaches the speakers as output 0 left and output 1 right',
+    ins(pan.d, out).join(' ') === '0 Pan2:0 Pan2:1', ins(pan.d, out).join(' '));
+}
+for (const p of PRESETS) {
+  const r = compile(p.code);
+  ok(`the ${p.label} preset reads its gate and frees itself, so letting a key go releases it`,
+    r.ok && r.gate && r.gateUsed && r.freesItself && r.warnings.length === 0,
+    r.ok ? (JSON.stringify(r.warnings) === '[]' ? 'no warnings' : JSON.stringify(r.warnings)) : r.message);
 }
 
 // ── the language, against numbers read off SuperCollider's class files ────────
@@ -198,6 +219,27 @@ for (const p of PRESETS) {
   const over = compile(`{ Mix(SinOsc.ar(${freqs(WIRE_CEILING + 1)})) * 0.01 }`);
   ok(`NEGATIVE CONTROL: ${WIRE_CEILING + 1} alive at once is refused before it is sent, because the engine says nothing`,
     !over.ok && /audio signals alive/.test(over.error), over.message ?? 'compiled');
+}
+
+{
+  // 🔴 READ IN SC_GraphDef.cpp's DoBufferColoring, THEN MEASURED ON THE ENGINE,
+  // 2026-09-30: an audio output nobody reads is allocated with a count of 0
+  // and never goes back on the free stack, so it holds its buffer to the end.
+  const unread = compile('{ var a = SinOsc.ar(300); SinOsc.ar(200) }');
+  ok('NEGATIVE CONTROL: an oscillator nobody reads keeps its wire, so this is 2 and not 1',
+    unread.ok && unread.wires === 2, unread.ok ? `${unread.wires} wires` : unread.message);
+  const pan = compile('{ var a = Pan2.ar(SinOsc.ar(300)); SinOsc.ar(200) }');
+  ok('and an unread Pan2 keeps both its outputs: its input goes back, its two outputs stay, and the heard one takes a third',
+    pan.ok && pan.wires === 3, pan.ok ? `${pan.wires} wires` : pan.message);
+  const chain = compile(`{ ${'SinOsc.ar('.repeat(40)}300${')'.repeat(40)} * 0.1 }`);
+  ok('NEGATIVE CONTROL the other way: forty oscillators each read by the next reuse one wire, because inputs are given back first',
+    chain.ok && chain.wires === 1, chain.ok ? `${chain.wires} wire, ${chain.blocks} blocks` : chain.message);
+  const freqs = (n) => `[${Array.from({ length: n }, (_, i) => 100 + i).join(', ')}]`;
+  const fits = compile(`{ var a = SinOsc.ar(${freqs(WIRE_CEILING - 1)}); SinOsc.ar(300, mul: 0.1) }`);
+  const over = compile(`{ var a = SinOsc.ar(${freqs(WIRE_CEILING)}); SinOsc.ar(300, mul: 0.1) }`);
+  ok(`${WIRE_CEILING - 1} unread oscillators and one heard compile and ${WIRE_CEILING} and one are refused, which is where the engine drew the line`,
+    fits.ok && fits.wires === WIRE_CEILING && !over.ok && /audio signals alive/.test(over.error),
+    `${fits.ok ? fits.wires : fits.message}, then ${over.ok ? `${over.wires} compiled` : 'refused'}`);
 }
 
 // ── refusals, each with a line and a column ───────────────────────────────────

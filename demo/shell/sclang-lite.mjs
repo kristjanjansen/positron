@@ -142,7 +142,12 @@ const FOLD1 = {
  * and no `/fail`, and the engine stopped answering `/status`. A 2,886 byte
  * definition refused by an engine that takes 860,000. So it is counted here,
  * the way scsynth colours its buffers (release a block's inputs, then take
- * its outputs), and refused before it is sent.
+ * its outputs, and an output nobody reads is never released), and refused
+ * before it is sent. See `wirePeak`.
+ * ⚠️ NOT ALWAYS SILENT. On 2026-09-30 the same engine answered `/fail` to a
+ * definition one buffer over (64 unread oscillators and one heard) and kept
+ * answering `/status`, so which of the two a refusal looks like depends on the
+ * graph. Counting here makes both moot.
  */
 export const WIRE_CEILING = 64;
 
@@ -763,9 +768,22 @@ function compileOrThrow(src, name) {
 /**
  * How many audio rate signals are alive at once, counted the way scsynth
  * colours its wire buffers: each block first gives back the inputs it was the
- * last reader of, then takes one buffer per audio rate output. An output
- * nobody reads is taken and given straight back, but it is counted at the
- * moment it exists.
+ * last reader of, then takes one buffer per audio rate output. READ in
+ * `server/scsynth/SC_GraphDef.cpp`, `DoBufferColoring`, at commit 19954900:
+ * `ReleaseInputBuffers` then `AllocOutputBuffers` for every block whose
+ * definition does not set `kUnitDef_CantAliasInputsToOutputs` (none of this
+ * subset's do; `PanB2`, `Balance2`, `PlayBuf` and the grain UGens are the kind
+ * that do), and the total is `BufColorAllocator::NumBufs()`, which is the peak.
+ *
+ * 🔴 AN OUTPUT NOBODY READS KEEPS ITS BUFFER TO THE END OF THE GRAPH. This
+ * said it was "taken and given straight back" until 2026-09-30, and that was
+ * wrong: `alloc(count)` with a count of 0 stores 0 and never pushes the index
+ * back on the free stack, and `release` refuses a count that is already 0, so
+ * that buffer is never handed to anybody again. MEASURED on the real engine the
+ * same day: `{ var a = SinOsc.ar([...63 freqs]); SinOsc.ar(300, mul: 0.1) }`
+ * loads and the same with 64 is refused with `/fail`, while the old count said
+ * 1 wire for both, so a program the old rule passed was one the engine
+ * refused.
  */
 export function wirePeak(blocks) {
   const readers = new Map();
@@ -790,7 +808,6 @@ export function wirePeak(blocks) {
       for (let o = 0; o < b.outs; o++) {
         live++;
         peak = Math.max(peak, live);
-        if (!readers.get(`${j}:${o}`)) live--;
       }
     }
   });
