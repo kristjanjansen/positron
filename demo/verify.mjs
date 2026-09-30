@@ -467,6 +467,12 @@ listeners.push((m) => {
     const url = reqUrl.get(m.params.requestId) || '';
     if (m.params.errorText === 'net::ERR_ABORTED') abortedReqs.push(m.params.errorText);
     else if (m.params.corsErrorStatus && errRefusal(url)) probed.push(url);
+    // The duration seek's 416 on a recording blob, the same request the
+    // Log.entryAdded branch above allows. Chrome reports it on BOTH channels,
+    // and until 2026-09-30 only the log side was allowed, so /stage/ went red
+    // on "no failed requests" for the very request that branch explains.
+    // Same scope: `blob:` only, capped through `probed`.
+    else if (/^blob:/.test(url) && m.params.errorText === 'net::ERR_REQUEST_RANGE_NOT_SATISFIABLE') probed.push(url);
     else failedReqs.push(`${m.params.errorText}${url ? ` ${url.slice(0, 70)}` : ''}`);
   }
 });
