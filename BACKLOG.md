@@ -1,5 +1,22 @@
 ## Open
 
+### Open 2026-09-30: cam's LL-HLS leg, built on the existing input by handover
+
+ASKED, VERBATIM: *"cam hls solution?"*. Build `plans/plan-cam-llhls.md` with ONE
+change: no new live input and no new secret (auto mode refuses `wrangler
+secret put`, and the plan's `cam` input needs a `CAM_STREAM_KEY`). The camera
+borrows the LL-HLS input `STREAM_KEY` already publishes to, by the same rule
+`/whip` follows since `e2792e5`: refused with 409 while anybody holds `/watch`,
+and a `/watch` arriving while a camera holds it takes the input back and the
+camera leg is told. `workers/pub/worker.mjs`, `workers/pub/container/server.mjs`,
+`demo/cam/index.html`, `demo/shell/live.mjs`.
+- The plan's traps all stand: tag sockets and count only `watch`, serialise the
+  chunk POSTs, three independent stops, and the viewer sweep's `/stop` must not
+  touch the camera leg.
+- Stream mints a new video UID on every encoder reconnect, so the test pattern
+  and a camera alternating on one input is exactly the case the tuned player's
+  rebuild exists for. Say what it costs in seconds.
+
 ### Open 2026-09-30: cam must work on a network that drops UDP ("make it work!")
 
 ASKED, VERBATIM: *"make it work!"*, with a screenshot of https://positron.studio/cam/
