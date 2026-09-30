@@ -6,85 +6,255 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  canvas { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 10px; }
-  .pill { font: 500 10.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
-          border: 1px solid var(--line2); border-radius: 999px; padding: 2px 9px; color: var(--dim2); }
-  .pill[data-on="1"] { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
-</style>
+<!-- 🔴 NO PAGE STYLESHEET SINCE 2026-09-30, the same as `/llhls/` and
+     `/webrtc/`. The picture is a video panel, whose stage owns the canvas's
+     width, height, shape and fit, and the `relay:` pill that sat beside the
+     title was replaced by the stream toggle in the control row. -->
 
 <script type="module">
   import { mount, guard, el, createShipper } from '/shell/shell.mjs';
-  import { startMoq, MOQ_RELAY, moqSupport } from '/shell/moq.mjs';
+  import { startMoq, MOQ_RELAY, moqSupport, burn, hueFor } from '/shell/moq.mjs';
+  import { drawTestsrc2 } from '/shell/testsrc2.mjs';
+  import { createPresenceButton, STREAM, STREAM_CAN } from '/shell/presence.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
   // loopback publishes AND subscribes one namespace, so a single device measures
-  // the whole path and both ends share one clock — the delta is exact, not an
+  // the whole path and both ends share one clock. The delta is exact, not an
   // estimate. pub/watch split the same leg across two devices.
   const role = q.get('role') || 'loopback';
   // ?codec=vp8 pins the publisher. The MoQ numbers already recorded in HANDOFF
   // (p50 20 ms, 4K30 at zero drops) were taken on VP8, and the publisher now
-  // probes for AV1 first — so without a way to ask for the old one, those
-  // numbers could never be reproduced and a later run would quietly be
-  // comparing two different codecs. A fallback nothing can select is not a
-  // fallback.
+  // probes for AV1 first, so without a way to ask for the old one those
+  // numbers could never be reproduced.
   const codec = q.get('codec') || null;
-  const ns = q.get('ns') || `positron-08-${Math.random().toString(36).slice(2, 8)}`;
+  // ?transport=force bypasses @moq/net's Safari user-agent block. For MEASURING
+  // WebKit bug 319818, not for shipping. See demo/shell/moq.mjs.
+  const forceTransport = q.get('transport') === 'force';
+  const fixedNs = q.get('ns');
+  // A fresh namespace per start: two publishers on one namespace and the second
+  // one dies (rig/moq/RUNBOOK.md §6.4), and a stop then a start is two.
+  const freshNs = () => fixedNs || `positron-08-${Math.random().toString(36).slice(2, 8)}`;
+  let ns = freshNs();
 
   const d = mount({
     name: 'moq',
-    what: 'Browser to browser over MoQ. The clock is burned into the pixels, so the latency is read back off the picture.',
-    readout: { latency: 'ms', p95: 'ms', fps: '', frames: '' },
-    controls: [
-      { id: 'go', label: 'Connect and publish', primary: true },
-    ],
+    // 🔴 ONE SENTENCE, AND IT IS THE INDEX'S OWN LINE. Asked 2026-09-29 as
+    // *"same ui treatment"* as `/llhls/` and `/webrtc/`, whose descriptions went
+    // to one sentence the same day. How the frames travel is the picture at the
+    // foot of this page, and what each number means is its readout key.
+    what: 'The same test picture the other streaming pages play, sent from this browser over MoQ and back.',
+    /**
+     * 🔴 SIX CELLS, AND EVERY ONE IS SOMETHING THIS PAGE ALREADY MEASURES.
+     * Asked 2026-09-30: *"add some stats to webrtc and moq demo"*, against
+     * `/llhls/`'s six. Its HLS words (holes, switches, advance) mean nothing
+     * here, so these are what `demo/shell/moq.mjs` counts:
+     *   p95, worst   the burned clock read back off each decoded frame, in
+     *                loopback where both ends share one clock (`leg.pct`)
+     *   setup        WebTransport plus the MoQT handshake, `st.sessionMs`
+     *   first frame  press to the first decoded frame, `st.firstFrameMs`
+     *   frames       frames decoded, `st.decoded`
+     *   unreadable   decoded frames whose burned clock failed its checksum,
+     *                `st.badRows`, which is what says the latency is honest
+     * ⚠️ THE MEDIAN IS NOT HERE, IT IS UNDER THE PICTURE, labelled glass to
+     * glass, because it was asked for there and one fact in two places is the
+     * same fact twice. `fps` went to the footer for the same reason on the
+     * other two pages.
+     * ⚠️ `p95` WAS DECLARED AND NEVER SHOWN (BACKLOG 2026-09-30). The line
+     * setting it was there; the checks ran before a frame had arrived, so no
+     * run ever reached a second tick with samples in it.
+     */
+    readout: { p95: 'ms', worst: 'ms', setup: 'ms', 'first frame': 's', frames: '', unreadable: '' },
+    controls: [],
   });
   guard(d);
 
-  const pill = el('span', 'pill', 'relay: idle');
-  pill.dataset.on = '0';
-  d.head.append(pill);
+  /**
+   * 🔴 THE SAME CONTROL AND THE SAME THREE WORDS AS `/llhls/` AND `/webrtc/`,
+   * OUT OF THE SAME MAP IN `presence.mjs`. A third caller, not a new component.
+   * ⚠️ WHAT `starting` WAITS FOR IS DIFFERENT HERE AND WAS READ, NOT COPIED.
+   * There is no container and no socket reference count behind this page: the
+   * publisher is this browser, so `starting` is a WebTransport session, a codec
+   * probe and the first frame back, about two seconds rather than thirty.
+   */
+  const stream = createPresenceButton({
+    of: '', showName: false, state: 'offline', says: STREAM, can: STREAM_CAN,
+    aria: 'start or stop the stream',
+    press: () => d.run('toggle'),
+  });
+  stream.because('nothing is publishing until you press');
+  d.controls.hidden = false;
+  d.controls.append(stream.el);
 
   const out = el('canvas');
-  d.el.append(out);
+  /**
+   * 🔴 THE LATENCY UNDER THE PICTURE SAYS WHICH KIND IT IS. Asked 2026-09-30
+   * with the rule from `positron-streaming` beside it: a `candidate-pair` round
+   * trip is not media latency, and quoting WHEP's 25 ms beside MoQ's
+   * glass-to-glass once flattered WHEP about three times. This one is the clock
+   * burned into a frame, read back after an encode, the relay, a decode and a
+   * draw, so its label is the name of that measurement.
+   */
+  const panel = createVideoPanel({
+    media: out,
+    left: null,
+    fullMode: 'hover',
+    /**
+     * ⚠️ NO `size` CELL, UNLIKE `/llhls/` AND `/webrtc/`, AND THE REASON IS
+     * MEASURED. In loopback the size is this page's own publisher, 1280x720 by
+     * construction, so it is a cell that cannot change. And at 375 px the row
+     * with it did not fit beside the fullscreen square: `glass to glass 49`
+     * showed and its `ms` had scrolled out of the row, which cut the one number
+     * this footer exists to carry. A remote publisher of another size is logged by `moq.mjs`.
+     */
+    values: [
+      { key: 'fps', label: 'fps', reserve: 2 },
+      { key: 'codec', label: '', reserve: 3 },
+      { key: 'g2g', label: 'glass to glass', reserve: 6 },
+    ],
+  });
+  d.el.append(panel.el);
+  // What the catalog names, in the words a reader knows it by.
+  const codecName = (c) => (!c ? '' : c.startsWith('av01') ? 'AV1' : c.startsWith('vp09') ? 'VP9'
+    : c.startsWith('vp8') ? 'VP8' : c.split('.')[0]);
 
-  // Checked BEFORE the button does anything. Safari has no WebTransport and
-  // the relay refuses WebSocket, so there is nothing to attempt — say that
-  // instead of showing a black rectangle and a raw library error.
   const ship = createShipper();
   const support = moqSupport();
-  // ?transport=force bypasses @moq/net's Safari user-agent block. For MEASURING
-  // WebKit bug 319818 (flow control never refills; deadlocks after ~16 MiB or
-  // ~7,600 streams), not for shipping — see demo/shell/moq.mjs.
-  const forceTransport = new URLSearchParams(location.search).get('transport') === 'force';
 
-  let leg = null, lastDecoded = 0;
+  /**
+   * 🔴 THE PICTURE IS ffmpeg's `testsrc2` UNDER THE BURNED CLOCK, THE SAME AS
+   * THE CONTAINER LEGS. Asked 2026-09-30: *"try to generate 1:1 same graphics
+   * + timecode bar as in container ffmpeg examples"*. `testsrc2.mjs` is a port
+   * of the C function and was measured pixel for pixel against ffmpeg's own
+   * render. `burn()` then draws the row, the two clocks and the square over it
+   * with `field: false`, and its bed is opaque black, so nothing underneath
+   * can reach what `readBurned` decodes.
+   * ⚠️ `painted` COUNTS CALLS SO A PUBLISHER THAT IGNORED THIS CANNOT PASS AS
+   * ONE THAT USED IT. `startMoq` only draws with it where it takes a `paint`
+   * option, and the assert below reads this count and the pixels that came back.
+   */
+  let painted = 0;
+  const hue = () => hueFor(ns);
+  const paint = (ctx, w, h, frame) => {
+    painted++;
+    drawTestsrc2(ctx, w, h, frame);
+    return burn(ctx, w, h, frame, { field: false, hue: hue() });
+  };
 
-  d.on('go', async () => {
+  let leg = null, lastDecoded = 0, gen = 0, tick = null;
+
+  // `stream.state()`, NOT `stream.state`: a function on the presence api, and a
+  // comparison against a function cannot fail. See `/webrtc/`.
+  d.on('toggle', () => (stream.state() === 'offline' ? start() : stop()));
+
+  /**
+   * 🔴 HOW IT STOPS IS THE PAGE LETTING GO, AND NOTHING ELSE IS HOLDING IT.
+   * No container, no alarm sweep: the publisher is this tab, so closing the
+   * session stops the frames at once, and the relay forgets a broadcast
+   * nobody is publishing.
+   */
+  function stop() {
+    gen++;
+    clearInterval(tick); tick = null;
+    try { leg?.stop(); } catch { /* already gone */ }
+    leg = null;
+    for (const k of panel.values.keys()) panel.values.set(k, '');
+    for (const k of ['p95', 'worst', 'setup', 'first frame', 'frames', 'unreadable']) d.set(k, '');
+    stream.set('offline').because('press to publish again');
+    d.log('closed the session. nothing is publishing');
+  }
+
+  async function start() {
     if (leg) return;
+    const mine = ++gen;
     ship(`MOQ-SUPPORT ${JSON.stringify(support)}`);
     if (!support.ok && !forceTransport) {
       d.log(`MoQ needs WebTransport: ${support.why}. Try Chrome or Edge.`, 'bad');
+      stream.set('offline').because(support.why);
+      await d.run('check');
       return;
     }
-    d.log(`relay ${new URL(MOQ_RELAY).host} · role ${role}, namespace ${ns}`);
-    leg = await startMoq({ out, ns, role, forceTransport, codec, log: (m, k) => d.log(m, k) });
-    pill.dataset.on = '1';
-    pill.textContent = `relay: ${leg.version}`;
+    stream.set('coming').because('press again to stop it');
+    ns = freshNs();
+    lastDecoded = 0;
+    d.log(`relay ${new URL(MOQ_RELAY).host}, role ${role}, namespace ${ns}`);
+    let got;
+    try {
+      got = await startMoq({ out, ns, role, forceTransport, codec, paint, log: (m, k) => d.log(m, k) });
+    } catch (e) {
+      if (gen !== mine) return;
+      stream.set('offline').because('the relay did not answer');
+      d.fail(e);
+      return;
+    }
+    // Stopped while the session was opening: the leg exists now, so close it.
+    if (gen !== mine) { got.stop(); return; }
+    leg = got;
+    d.log(`negotiated ${leg.version}`);
 
-    setInterval(() => {
+    tick = setInterval(() => {
+      if (!leg) return;
       const s = leg.stats;
-      d.set('frames', s.decoded);
-      d.set('fps', s.decoded - lastDecoded);
+      const fps = s.decoded - lastDecoded;
       lastDecoded = s.decoded;
-      const p50 = leg.pct(0.5), p95 = leg.pct(0.95);
-      if (p50 != null) d.set('latency', p50, p50 < 100 ? 'ok' : p50 < 400 ? '' : 'bad');
-      if (p95 != null) d.set('p95', p95);
+      const live = role === 'pub' ? s.encoded > 0 : s.decoded > 0;
+      stream.set(live ? 'online' : 'coming').because(live ? 'press to stop it' : 'waiting for the first frame. press again to stop');
+      d.set('setup', s.sessionMs ?? '');
+      if (s.firstFrameMs != null) d.set('first frame', (s.firstFrameMs / 1000).toFixed(2));
+      if (role !== 'pub') {
+        d.set('frames', s.decoded);
+        d.set('unreadable', s.badRows, s.badRows ? 'bad' : '');
+      }
+      if (s.decoded) {
+        panel.values.set('fps', fps);
+        panel.values.set('codec', codecName(s.catalog?.video?.renditions?.video?.codec ?? s.codec));
+        panel.stage.style.setProperty('--vp-aspect', `${out.width} / ${out.height}`);
+      }
+      const p50 = leg.pct(0.5), p95 = leg.pct(0.95), worst = leg.pct(1);
+      if (p50 != null) panel.values.set('g2g', `${Math.round(p50)} ms`);
+      if (p95 != null) d.set('p95', p95, p95 < 100 ? 'ok' : p95 < 400 ? '' : 'bad');
+      if (worst != null) d.set('worst', worst);
     }, 1000);
-    // The checks read what this control just produced, so this is the first
-    // moment they can be true — and a button for them would make them optional.
+
+    /**
+     * 🔴 THE CHECKS WAIT FOR FRAMES, BECAUSE `startMoq` RETURNS BEFORE ANY.
+     * It hands back the leg once the decoder is configured, and the first
+     * frame is a relay round trip later. MEASURED 2026-09-30 before this
+     * change: the checks ran at that instant and read `0 frame(s)`, `0
+     * decoded` and `0 clean row(s)`, 15/18, on a page whose picture was
+     * arriving. Two seconds of clean rows is 60 samples at 30 fps, which is
+     * enough for a p95 to mean something.
+     */
+    const t0 = performance.now();
+    while (gen === mine && performance.now() - t0 < 15000) {
+      const s = leg.stats;
+      if (role === 'pub' ? s.encoded > 30 : s.samples >= 60 || (role === 'watch' && s.decoded > 30)) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    if (gen !== mine) return;
     await d.run('check');
-  });
+  }
+
+  /**
+   * Is the picture that came back testsrc2? Six bar centres at y 100, above
+   * the clock hands and the checker and below the sweeping square, against
+   * the bar colours. Five of six, because the gradient line and the bouncing
+   * square can each cover one, and a wide tolerance because it has been
+   * through an encoder.
+   */
+  function barsCameBack() {
+    const ctx = out.getContext('2d');
+    const want = [[255, 0, 0], [0, 255, 0], [255, 255, 0], [0, 0, 255], [255, 0, 255], [0, 255, 255]];
+    let hit = 0;
+    const got = want.map((rgb, i) => {
+      const x = Math.round(((i + 0.5) / 6) * out.width);
+      const p = ctx.getImageData(x, 100, 1, 1).data;
+      if (rgb.every((v, k) => Math.abs(v - p[k]) < 70)) hit++;
+      return `${p[0]},${p[1]},${p[2]}`;
+    });
+    return { hit, got };
+  }
 
   d.on('check', () => {
     // On a browser without WebTransport the honest assertion is that the page
@@ -94,43 +264,112 @@
       d.assert('no transport was attempted', !leg);
       return;
     }
+    // The toggle, read through the call and required to be a string, which is
+    // what lets this go red on the `stream.state` bug `/webrtc/` shipped once.
+    const state = stream.state();
+    d.assert('the stream toggle says the stream is on',
+      typeof state === 'string' && state === 'online',
+      `toggle reads ${JSON.stringify((stream.badge.textContent || '').trim())}, state ${state}`);
+    const btns = [...d.controls.querySelectorAll('button')];
+    d.assert('one control, and it is the stream toggle',
+      btns.length === 1 && btns[0] === stream.el && !d.controls.querySelector('.pos-pri'),
+      `${btns.length} control(s)`);
     d.assert('connected to the relay', !!leg);
     if (!leg) return;
     const s = leg.stats;
     d.assert('negotiated an IETF MoQT version', /moq-transport-1\d/.test(String(leg.version)), String(leg.version));
     if (role !== 'watch') {
       d.assert('broadcast published', s.published);
-      // ⚠️ WHICH CODEC RAN, because the publisher now PROBES for one rather
-      // than declaring `vp8`, and a branch the suite cannot see is a branch
-      // nobody asserts. It also names the thing the far end has to decode: VP8
-      // is not hardware-decoded on a Quest 3 or 3S, which is why the probe
-      // exists at all.
+      // WHICH codec ran, because the publisher PROBES for one, and a branch the
+      // suite cannot see is a branch nobody asserts.
       d.assert('names the codec it is publishing', !!s.codec, s.codec ?? 'none');
       d.assert('no encoder errors', s.encErrs === 0, String(s.encErrs));
+      d.assert('the publisher painted testsrc2 under the clock', painted > 0,
+        painted ? `${painted} frame(s) painted` : 'startMoq never called paint, so it drew its own flat field');
     }
     if (role !== 'pub') {
       d.assert('catalog round-tripped through the relay', !!s.catalog, s.catalog ? 'yes' : 'never arrived');
       d.assert('frames arrived over the wire', s.wireFrames > 0, `${s.wireFrames} frame(s)`);
       d.assert('frames decoded', s.decoded > 0, `${s.decoded} decoded`);
       d.assert('no decoder errors', s.decErrs === 0, String(s.decErrs));
+      if (s.decoded) {
+        const b = barsCameBack();
+        d.assert('the picture that came back is testsrc2', b.hit >= 5, `${b.hit} of 6 bars at y 100: ${b.got.join(' ')}`);
+      }
     }
     if (role === 'loopback') {
-      d.assert('burned clock read back from the picture', s.samples > 0,
+      /**
+       * 🔴 THE CLOCK STILL DECODES UNDER A BUSY PICTURE, AND A RATE IS THE
+       * CLAIM, NOT A SINGLE ROW. testsrc2 is saturated bars, a gradient line
+       * that sweeps the whole height and noise, and an encoder spends its bits
+       * where the picture is busy. One clean row would pass while most were
+       * lost, so nine in ten decoded frames have to carry a clean clock.
+       */
+      const read = s.samples + s.badRows;
+      d.assert('burned clock read back from nine in ten frames', s.samples > 0 && s.samples >= 0.9 * read,
         `${s.samples} clean row(s), ${s.badRows} unreadable`);
       if (s.samples) {
         // rig/moq measured p50 26.2 / p95 42.4 ms on a desktop. This asserts an
-        // ENVELOPE wide enough for a phone or a loaded CI box, not that figure —
-        // the claim being tested is "milliseconds, not seconds".
+        // ENVELOPE wide enough for a phone or a loaded CI box, not that figure.
         d.assert('glass-to-glass in milliseconds, not seconds', leg.pct(0.5) < 2000,
           `p50 ${leg.pct(0.5)}ms, p95 ${leg.pct(0.95)}ms, n=${s.samples}`);
       }
     }
+    // The footer carries the latency under its own name. Read off the DOM,
+    // because that is what a reader sees.
+    const lab = [...panel.values.el.querySelectorAll('.pos-vp-k')].map((k) => k.textContent);
+    d.assert('the latency under the picture says it is glass to glass',
+      lab.includes('glass to glass') && !!panel.values.cell('g2g').textContent,
+      `labels ${lab.join(', ')}, value ${JSON.stringify(panel.values.cell('g2g').textContent)}`);
+    d.assert('nothing in the picture was cut or refused', dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.id}: ${c.full}`).join(' / ') || 'none');
   });
+
+  /**
+   * 🔴 HOW IT WORKS. Asked 2026-09-30 as *"and add diagram too"*. Everything
+   * in it is read off `demo/shell/moq.mjs` and `positron-streaming`, not
+   * remembered. It is one browser on both ends because the default role is
+   * loopback, which is what makes the clock exact.
+   */
+  const dg = createDiagram(d.el, {
+    caption: 'This browser draws the picture, encodes it and publishes it to a MoQ relay, then '
+      + 'subscribes to the same broadcast and reads the burned clock back off every frame. '
+      + 'Nothing else is running, so closing the session is the whole of stopping it.',
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'pub', label: 'publisher', sub: 'canvas, WebCodecs', tech: 'browser',
+            note: 'Draws **testsrc2** and the burned clock 30 times a second and encodes them as '
+                + 'AV1, else VP9, else VP8. A frame the encoder cannot take yet is dropped, so '
+                + 'the clock never drifts from wall time.' },
+          { id: 'play', label: 'player', sub: 'WebCodecs, canvas', tech: 'browser',
+            note: 'Decodes each frame into the canvas above and reads the 48 bit clock back out '
+                + 'of the black row. Both ends share one clock, so the difference is the latency '
+                + 'itself rather than an estimate.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'MoQ relay', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'relay', label: 'relay', sub: 'MoQT draft 14', tech: 'cloudflare',
+            note: 'Carries one stream per group of frames and keeps only the live edge. A relay '
+                + 'cannot run in a Container because a Container takes no inbound QUIC, which '
+                + 'is why both ends are browsers.' },
+        ] },
+    ],
+    links: [
+      { from: 'pub', to: 'relay', label: 'MoQT',
+        note: 'One WebTransport session over QUIC carries the catalog, republished every 2 s so a late '
+            + 'subscriber still finds it, and the video track. Safari is refused here because '
+            + 'WebKit bug 319818 stalls its QUIC after about two minutes of streams.' },
+      { from: 'relay', to: 'play', label: 'frames', back: true,
+        note: 'The same session subscribes to the broadcast it just announced, retrying the '
+            + 'catalog until the relay has it, because a subscribe that arrives first is refused.' },
+    ],
+  }, { how: true, atEnd: true });
 
   if (!support.ok) d.log(`${support.why}. This demo needs Chrome or Edge`, 'bad');
   d.log(role === 'loopback'
     ? 'loopback: one page publishes and subscribes the same namespace, so one clock times the whole path'
-    : `role ${role} · pair it with ?role=${role === 'pub' ? 'watch' : 'pub'}&ns=${ns}`);
+    : `role ${role}, pair it with ?role=${role === 'pub' ? 'watch' : 'pub'}&ns=${ns}`);
   d.ready();
 </script>
 </html>

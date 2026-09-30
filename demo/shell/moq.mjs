@@ -191,11 +191,13 @@ async function pickCodec({ want, width, height, framerate, bitrate, log }) {
  *               namespace and the second one dies (§6.4).
  * @param role   'loopback' (publish AND subscribe — one device, one clock, so
  *               the latency delta is exact), 'pub', or 'watch'.
+ * @param paint  optional (ctx, w, h, frame) that draws the whole frame in place
+ *               of the pattern, clock row included. Added 2026-09-30.
  * @param hue    0..359 for the burned pattern. Defaults to a hash of the
  *               namespace, so two publishers on two devices come out different
  *               colours without anyone allocating them.
  */
-export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false, hue = null, codec = null }) {
+export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false, hue = null, codec = null, paint = null }) {
   const patternHue = hue ?? hueFor(ns);
   const gop = fps;                                 // 1 s
   const src = document.createElement('canvas');
@@ -288,7 +290,11 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     let i = 0;
     timers.push(setInterval(() => {
       if (closed) return;
-      burn(sctx, w, h, i, { hue: patternHue });
+      // `paint` replaces the pattern whole: /moq/ passes testsrc2 under the
+      // clock and /cam/ can pass a camera. Whatever it draws must still burn
+      // the clock row, or every latency this page reports goes blank.
+      if (paint) paint(sctx, w, h, i);
+      else burn(sctx, w, h, i, { hue: patternHue });
       // Never queue behind a slow encoder: dropping a frame is cheaper than
       // letting the burned clock drift away from wall time, which would corrupt
       // the measurement rather than just thin it.
