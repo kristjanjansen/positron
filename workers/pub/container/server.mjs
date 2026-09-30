@@ -52,7 +52,12 @@ let stopping = false;   // a SIGTERM exit is not a fault
  */
 const FILM = 'https://positron-station.kristjan-jansen.workers.dev'
   + '/media/mimproject/mim-goes-sustainable-2011-kirikustseen.mp4';
-const SOURCE = process.env.PUB_SOURCE === undefined ? FILM : process.env.PUB_SOURCE;
+// ⚠️ `testsrc2` SPELLED OUT MEANS THE SAME AS EMPTY. Added 2026-09-30 because
+// whether the container runtime passes an EMPTY env value through, rather than
+// dropping it and so selecting the film, was never measured. A word survives
+// any runtime that passes strings at all.
+const RAW_SOURCE = process.env.PUB_SOURCE === undefined ? FILM : process.env.PUB_SOURCE;
+const SOURCE = RAW_SOURCE === 'testsrc2' ? '' : RAW_SOURCE;
 
 /**
  * 🔴 NO BURNED CLOCK OVER THE FILM. Asked 2026-09-25: *"rm burn overlay. not
@@ -159,15 +164,10 @@ const CHORD = "aevalsrc='(0.06*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)+0.035*sin(2*
 // here ONLY because the image is built from `COPY server.mjs .`, one file, with
 // nothing to import from. src/publish.sh does NOT duplicate it; it generates
 // its filter from pattern.mjs directly. If you change one, change the other.
-// ⚠️ AND AS OF 2026-09-29 THAT IS NO LONGER TRUE OF THE TWO CLOCKS' LAYOUT.
-// Asked, verbatim: "rm top left counters. put absolute and local below each
-// other", naming only "the burned-in test pattern" — this file, not any demo
-// page — so drawFilters() below stacks ABSOLUTE over LOCAL in one column while
-// the canvas keeps the two-column layout it was asked for on 2026-09-18. The
-// hue rotation and the epoch's seconds-not-milliseconds format are still the
-// same spec on both; the on-screen position of the two clocks is not anymore.
-// pattern.mjs and src/publish.sh were left untouched — out of scope for this
-// change and held by other work.
+// ⚠️ AND SINCE 2026-09-30 THE TWO CLOCKS' LAYOUT IS THE SAME SPEC AGAIN.
+// Asked, verbatim: "test screen: move local timecode to right not to overlap
+// with absolute". ABSOLUTE on the left margin, LOCAL hanging from the right
+// one, one row, in drawFilters() here and in both renderings in pattern.mjs.
 //
 // TRAP: drawtext with no `fontfile` resolves to nothing and FAILS SILENTLY, so
 // the epoch never reaches the pixels — the one thing that makes glass-to-glass
@@ -225,23 +225,16 @@ const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
  * (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of floating-point
  * result to int failed" — measured. Hence the unit printed beside the number.
  */
-function drawFilters({ epoch, hue = 0, h = 720 }) {
+function drawFilters({ epoch, hue = 0, w = 1280, h = 720 }) {
   // Same typography as the browser canvas: a small brand-yellow word over a big
-  // light number, on a dark scrim rather than a white slab. Not hue-rotated —
-  // `hue=` is applied to the source first and drawtext paints after it, so
-  // #ffd400 is the shell's #ffd400 on every leg whatever its rotation.
-  // 🔴 STACKED, ONE COLUMN, NOT TWO — ASKED 2026-09-29, VERBATIM: "put absolute
-  // and local below each other". Until this both clocks sat on one line, in
-  // two columns, and the grab that prompted this showed their VALUES
-  // OVERLAPPING in the middle — a defect on its own, and one that cannot
-  // recur once the two are on separate lines.
-  // ⚠️ THE CANVAS AT demo/shell/pattern.mjs KEEPS ITS TWO COLUMNS. That layout
-  // was asked for by name on 2026-09-18, and this ask named only "the
-  // burned-in test pattern" — this file's drawtext, not any demo page — so the
-  // claim this comment used to make, that ffmpeg draws "the SAME PICTURE" as
-  // the canvas, no longer holds for this block's geometry. It still holds for
-  // the hue rotation and for the epoch being printed in seconds rather than
-  // milliseconds.
+  // light number, on a dark scrim rather than a white slab. Not hue-rotated,
+  // because `hue=` is applied to the source first and drawtext paints after
+  // it, so #ffd400 is the shell's #ffd400 on every leg whatever its rotation.
+  // 🔴 SIDE BY SIDE, ONE ROW, NEVER OVERLAPPING. ASKED 2026-09-30, VERBATIM:
+  // "test screen: move local timecode to right not to overlap with absolute".
+  // The grab showed the old two column layout still live, with the absolute
+  // number running UNDER the local one, because this container had not been
+  // redeployed since 2026-09-25 and the 2026-09-29 stack never reached it.
   const text = (t, x, y, size, colour) => [
     `drawtext=fontfile=${q(FONT)}`, `text=${q(t)}`,
     `x=${x}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
@@ -253,61 +246,51 @@ function drawFilters({ epoch, hue = 0, h = 720 }) {
   // read back off the numbers this file shipped with (32 px label offset 25,
   // 84 px number offset 65).
   const top = (baseline, size) => Math.round(baseline - 0.774 * size);
-  // EXPRESSED AGAINST `h`, THE REAL ENCODE HEIGHT PASSED IN FROM args()/
-  // whipArgs(), never a hard-coded 720. The two-column version anchored off a
-  // ROW.Y derived from a hard-coded FRAME_H=720, which was already wrong the
-  // moment PUB_H dropped, it just had nothing below it to collide with. Two
-  // STACKED rows do.
-  //
-  // 🔴 AND THE FORM IS `demo/shell/pattern.mjs`'s OWN, NOT A FRACTION OF `h`,
-  // BECAUSE THIS IS THE THIRD COPY OF ONE PICTURE AND THE THREE HAVE TO AGREE.
-  // That file renders the same frame twice, once on a canvas for the demo pages
-  // and once as this filter string for `src/publish.sh`, under its own rule
-  // that the two have to LOOK the same or *"one pattern, two renderings"* is a
-  // claim nothing supports. This file is a third rendering that nothing
-  // imports, so the numbers are copied rather than shared, and copying the
-  // DERIVATION is what keeps them equal: `h * 0.40` and `h * 0.72` were
-  // legible and clear of each other and still landed 76 px and 14 px away from
-  // where the canvas draws them.
-  //
-  // The bed sits PAD off the bottom, is 56 tall and carries a 20 px lip, and
-  // the LOCAL number's baseline sits PAD above it. The ABSOLUTE pair is one
-  // PAIR higher. At h=720 that is 364 and 504, which is what
-  // `node demo/shell/pattern.mjs --epoch=…` prints.
-  // ⚠️ AND THE STACK HAS A FLOOR: at h=360 the ABSOLUTE label's top lands at
-  // y=4 and the next size down puts it off the picture. 720 and 480 both clear
-  // it (its top is 262 and 22). `PUB_H` is 720 here and nothing asks for less,
-  // so this is recorded rather than guarded, because a guard nothing reaches is
-  // a branch nothing has ever run.
+  // EXPRESSED AGAINST `w` AND `h`, THE REAL ENCODE SIZE PASSED IN FROM args()/
+  // whipArgs(), never a hard-coded 1280x720, and in `demo/shell/pattern.mjs`'s
+  // own form, because this is the third copy of one picture and nothing here
+  // can import that file (the image is `COPY server.mjs .`). The bed sits PAD
+  // off the bottom, is 56 tall and carries a 20 px lip; the numbers' baseline
+  // sits PAD above it and the labels' 80 above that. At h=720 that is 504 and
+  // 424, which is what `node demo/shell/pattern.mjs --epoch=…` prints.
   const ROW_Y = h - PAD - 20 - 56;
-  const NUM_Y_LOC = ROW_Y - 20 - PAD;
-  const NUM_Y_ABS = NUM_Y_LOC - (80 + PAD);
-  // ⚠️ 80, UNCHANGED FROM 2026-09-18: *"incr a liitle bit space betwen labels
-  // and timecode numbers"*. What an eye reads as the gap is not this number:
-  // it is this number LESS the number's cap height, which at 64 px is about
-  // 50, so this is a 30 px gap between a label and its own number.
-  const LBL_Y_ABS = NUM_Y_ABS - 80;
-  const LBL_Y_LOC = NUM_Y_LOC - 80;
+  const NUM_Y = ROW_Y - 20 - PAD;
+  const LBL_Y = NUM_Y - 80;
+  // 🔴 THE RIGHT COLUMN IS DERIVED FROM THE WIDEST STRING THIS DRAWS, NOT FROM
+  // A CHARACTER COUNT BORROWED FROM THE CANVAS. That borrowing is exactly what
+  // put LOCAL on top of the absolute number: the old COL2 reserved 13
+  // characters, the canvas's epoch in ms, while this side prints
+  // `%{pts:flt:…}`, which formats with `%.6f`: `1790752257.100333 s`, NINETEEN
+  // characters. MEASURED 2026-09-30 on ffmpeg@7, a 760 px box, 732 of text
+  // and 14 px of border each side. LOCAL is `%H:%M:%S`, eight characters.
+  // ADVANCE is DejaVu Sans Mono Bold's, 1233 of 2048 units for every glyph
+  // printed here, read out of the font's hmtx table, because drawtext cannot
+  // measure a string before drawing it. Same numbers as `ffmpegColumns()` in
+  // pattern.mjs: at 1280 the absolute column is 732 px wide from x=60, LOCAL
+  // starts at x=912, and the two BOXES have 91 px of clear space between them.
+  const ADVANCE = 1233 / 2048;
+  const widest = (chars, size) => chars * ADVANCE * size;
+  const COL2 = Math.round(w - PAD - Math.max(widest(8, NUM), widest(5, LBL)));
   const LABEL = '0xFFD400';
   const VALUE = '0xE9EEF7';
   return [
     // hue FIRST: rotating chroma afterwards would tint the white boxes.
     ...(hue ? [`hue=h=${((hue % 360) + 360) % 360}`] : []),
-    // FOUR draws: a small word, then a big number, twice — ABSOLUTE above
-    // LOCAL. No source label — the hue says which publisher this is, and a
-    // name burned into a picture is a small text nobody can read at the size a
-    // demo shows it.
-    text('ABSOLUTE', PAD, top(LBL_Y_ABS, LBL), LBL, LABEL),
+    // FOUR draws: a small word over a big number, twice, ABSOLUTE on the left
+    // and LOCAL on the right. No source label: the hue says which publisher
+    // this is, and a name burned into a picture is a small text nobody can
+    // read at the size a demo shows it.
+    text('ABSOLUTE', PAD, top(LBL_Y, LBL), LBL, LABEL),
     // pts-derived, the same instant the row encodes.
-    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y_ABS, NUM), NUM, VALUE),
-    text('LOCAL', PAD, top(LBL_Y_LOC, LBL), LBL, LABEL),
-    // LEGIBLE — this box's own wall clock, for a human with a watch. The two
+    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y, NUM), NUM, VALUE),
+    text('LOCAL', COL2, top(LBL_Y, LBL), LBL, LABEL),
+    // LEGIBLE: this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
     // The triple backslash is not a typo: gmtime's strftime argument has to
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
-    // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
+    // bare colon. Measured on ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', PAD, top(NUM_Y_LOC, NUM), NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, top(NUM_Y, NUM), NUM, VALUE),
   ].join(',');
 }
 
@@ -325,7 +308,7 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
   const gop = fps * 2;
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
   const epoch = (Date.now() / 1000).toFixed(6);
-  const draw = drawFilters({ epoch, hue: 0, h });   // see the note above
+  const draw = drawFilters({ epoch, hue: 0, w, h });   // see the note above
   const src = sourceArgs({ w, h, fps });
   const wantV = tracks !== 'a';
   const wantA = tracks !== 'v';
@@ -377,7 +360,7 @@ function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
   // A DIFFERENT hue from the RTMPS leg, deliberately. They are two ffmpeg
   // processes on two Cloudflare inputs — the page already says so — and any
   // page showing them side by side needs to tell them apart.
-  const draw = drawFilters({ epoch, hue: 150, h });
+  const draw = drawFilters({ epoch, hue: 150, w, h });
   const src = sourceArgs({ w, h, fps });
   return [
     '-hide_banner', '-loglevel', 'warning',

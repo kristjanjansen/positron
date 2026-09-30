@@ -47,7 +47,20 @@
     // Both legs encode at once on ONE instance, so this is the real budget.
     // Tunable without rebuilding the image, which is how the stall got
     // diagnosed: half a vCPU could not hold two 720p30 encodes.
-    "PUB_W": "1280", "PUB_H": "720", "PUB_FPS": "30"
+    "PUB_W": "1280", "PUB_H": "720", "PUB_FPS": "30",
+    // TESTSRC2, NOT THE FILM. `testsrc2` (or empty) means testsrc2 in
+    // container/server.mjs; the word, because an empty env value was never
+    // measured surviving the container runtime.
+    // The live stream has shown testsrc2 since 2026-09-25 because the film
+    // commit was never deployed, and /moq/ is about to be matched 1:1 against
+    // this picture, so the deploy that ships the new clock layout must not
+    // also swap the picture underneath it.
+    "PUB_SOURCE": "testsrc2",
+    // THE BURNED CLOCKS ON. server.mjs defaults them OFF since the film
+    // commit, so without this the same deploy would ship testsrc2 with no
+    // ABSOLUTE and no LOCAL at all. Both reach the container through
+    // `envVars` in worker.mjs; a var here is not in the container's env alone.
+    "PUB_BURN": "1"
   },
   "observability": { "enabled": true }
 }
