@@ -15,7 +15,7 @@
   import { mount, guard, el, createShipper } from '/shell/shell.mjs';
   import { startMoq, MOQ_RELAY, moqSupport, burn, hueFor } from '/shell/moq.mjs';
   import { drawTestsrc2 } from '/shell/testsrc2.mjs';
-  import { createPresenceButton, STREAM, STREAM_CAN } from '/shell/presence.mjs';
+  import { createPresenceButton, streamSays, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
@@ -79,7 +79,7 @@
    * probe and the first frame back, about two seconds rather than thirty.
    */
   const stream = createPresenceButton({
-    of: '', showName: false, state: 'offline', says: STREAM, can: STREAM_CAN,
+    of: '', showName: false, state: 'offline', says: streamSays('MoQ'), can: STREAM_CAN,
     aria: 'start or stop the stream',
     press: () => d.run('toggle'),
   });
