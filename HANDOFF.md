@@ -1,3 +1,139 @@
+# Handoff, 2026-09-30, session 56: the streaming section grows to four pages, a camera demo, and a cafe network that drops UDP
+
+## Where it is right now
+
+✅ **DEPLOYED.** The site reads **BUILD `37fef98-081910-af06`**, read back off the
+edge. `positron-pub` is on version **`4d06bdab`** (image `e5d210a0`). Every
+commit this session is on `main`; **nothing is pushed** (push needs the
+personal account dance in CLAUDE.md).
+⚠️ **ONE FILE IS DIRTY ON PURPOSE: `demo/shell/shell.css`**, an uppercase rule for
+secondary buttons that WAITS FOR THE OWNER (see below). The last three site
+deploys were built from a clean `git worktree` at HEAD so agents' in-flight
+files could not ship; the committed `workers/view/public/` is therefore at
+`10c4e9c` (stamp `50d2dee`), behind the edge. The next ordinary build and
+commit catches it up.
+
+MEASURED at the end, counted and not remembered: **58 demos, 56 built, 2
+unlisted**, **78 plans**, **75 `### Open` headings** in `BACKLOG.md`, **8 struck
+today**.
+
+🔴 **THE HANDOFF ABOVE SESSION 55 WAS FIVE HOURS STALE WHEN THIS SESSION
+OPENED.** Fifteen commits from the evening of 2026-09-29 were in git and not
+here, and they are summarised in the next section from git rather than from
+anybody's memory.
+
+## 2026-09-29 evening, reconstructed from git (it was never written down)
+
+| commit | what | stamp |
+| --- | --- | --- |
+| `f8583ec` | front page: streaming one row and first | `f8583ec-133019-f807` |
+| `2d6c8de` `90e7f3d` | muta nameplate and foot | `90e7f3d-150909-448b` |
+| `1d08b46` | index cards carry each page's first sentence | |
+| `ea21ee4` | test pattern stacked (superseded today) | |
+| `09c2c26` | llhls and webrtc: three state toggle, video panel, diagram | `09c2c26-155029-cbfd` |
+| `00774cd` | video panel value row hidden until written | `00774cd-181405-a8fa` |
+
+## What was asked today and where it is
+
+| ask, verbatim or near it | where |
+| --- | --- |
+| more technical connector label and note | https://positron.studio/llhls/ , `9430464`, arrow reads `wss /watch` |
+| longer desc how to patch hls.js, "get ll what we need" | same page, two tables under the diagram, `9430464` |
+| options table: no wrap, default and recommended cols, sans comment | same page, `2f82693` |
+| test screen: local timecode right, no overlap | live stream, `d8c95d3`, side by side |
+| black box: red and green with right widths | live stream and /moq/, `d6b6fb0` |
+| stats on webrtc and moq | https://positron.studio/webrtc/ `f0a1d18`, https://positron.studio/moq/ `50d2dee` |
+| webrtc and moq to streaming, top of index | https://positron.studio/ , `4d7c062` |
+| moq: llhls polish, 1:1 ffmpeg graphics, diagram | https://positron.studio/moq/ , `50d2dee` |
+| new demo cam, 2x2, Start camera, latency on every footer, diagram | https://positron.studio/cam/ , `f74c4a3` |
+| research: webcam to LL-HLS via the container | `plans/plan-cam-llhls.md`, `c830e2d`, NOT built |
+| "make it work!" on a cafe hotspot | `37fef98`, honest captions, TURN route waiting for a key |
+| Local camera to Camera | `37fef98` |
+| cap: all secondary buttons | 🔴 WAITING, see below |
+
+## The measurements worth keeping
+
+- 🔴 **`positron-pub` HAD NOT BEEN DEPLOYED SINCE 2026-09-25 05:24Z.** So neither
+  `ea21ee4` (stacked clocks) nor `3f9a230` (the film as default source) ever
+  reached the live stream. `wrangler deployments list` in `workers/pub` is the
+  one command that says so.
+- 🔴 **A WORKER VAR NEVER REACHED THE CONTAINER.** `server.mjs` reads
+  `PUB_SOURCE` and `PUB_BURN` from `process.env` and nothing forwarded them, so
+  the container always saw the film and no clocks. A `Pub` constructor sets
+  `envVars` now (`e2792e5`). `PUB_SOURCE` is the WORD `testsrc2`, not `""`,
+  because an empty env value was never measured surviving the runtime.
+- ✅ **CONTAINER DEPLOYS WORK FROM THIS MAC NOW.** OrbStack is installed
+  (`/usr/local/bin/docker` points into it); `open -a OrbStack` and docker is up
+  in seconds. The 2026-09-2x note below saying there is no docker here is
+  stale.
+- ⚠️ **A DEPLOYED CONTAINER IMAGE DOES NOT REPLACE A RUNNING INSTANCE.** After
+  the first pub deploy a live frame still showed the old layout with
+  `containerUpS` 2325. It switched only on the next cold start. Grab a frame
+  (`/watch` held, ffmpeg on the LL-HLS URL) before saying the picture changed.
+- **ffmpeg prints ABSOLUTE with SIX decimals**, 19 characters, not the 16 that
+  `ea21ee4` assumed. The owner's grab showed three because LOCAL covered the
+  rest.
+- **`demo/shell/testsrc2.mjs` is ffmpeg's testsrc2 exactly**: 0 of 921,600
+  pixels off ffmpeg's own RGB frame at frames 0, 1, 37, 300, 1234, 5000, and
+  the comparison was shown able to fail. Compare in RGB: `drawbox` goes through
+  YUV and turns 255 into 254.
+- 🔴 **CLOUDFLARE STREAM'S WEBRTC ANSWER IS ICE-LITE WITH ONE UDP CANDIDATE**
+  (`141.101.90.0:1473`), WHIP and WHEP alike. Munged `tcptype passive`
+  candidates were applied by Chrome and ICE still failed. A network that drops
+  UDP gets WebRTC only through a TURN relay over TCP/TLS, and MoQ not at all.
+- 🔴 **THE OWNER'S CAFE HOTSPOT (`172.20.10.1`) DROPS OUTBOUND UDP.** STUN to
+  Cloudflare and Google unanswered, `check-whep.mjs` 201 with zero bytes.
+  Before debugging a red WebRTC or MoQ page, run
+  `node <scratch>/stun.mjs stun.cloudflare.com 3478` or equivalent. This is the
+  VPN rule's sibling: the handshake is HTTPS and succeeds, the media is UDP and
+  does not.
+- **Glass to glass on /cam/ with Chrome's fake camera, on a UDP network**:
+  WebRTC median 104 ms, MoQ p50 46 ms, local capture to screen 83 ms.
+
+## 🔴 WHAT IS WAITING, AND NONE OF IT MAY GO QUIET
+
+- **The TURN key is the owner's step.** Auto mode refused `wrangler secret put`.
+  `GET https://pub.positron.studio/ice` answers 503 until `TURN_KEY_ID` and
+  `TURN_KEY_API_TOKEN` exist on `positron-pub`; the commands are in the session
+  reply and in `workers/pub/worker.mjs`'s comment names. Then test /cam/ ON THE
+  HOTSPOT; the relay path has never run. `/webrtc/`, `/stage/`, `/keep/` do not
+  pass `iceServers` yet.
+- **Secondary buttons**: the literal reading (ALL CAPS, one rule in
+  `shell.css`, 69 buttons on 29 pages, zero width change) is in the working
+  tree, NOT committed. Primary buttons are sentence case and `shell.css` carries
+  a 2026-09-25 "no uppercase on buttons, site wide" decision, so the owner was
+  asked: caps, or a capital first letter. Commit or revert on the answer.
+- **/cam/'s MoQ panel carries the test pattern, not the camera.** `startMoq`
+  now takes `paint`, so this is a page change: pass the camera draw.
+- **/cam/'s LL-HLS leg is designed, not built**: `plans/plan-cam-llhls.md`.
+  MediaRecorder H.264 WebM over a new `/cam` socket, POSTed per chunk into a
+  third container leg, `-c:v copy` to RTMPS on a NEW `cam` live input. The trap
+  it names: `viewers()` counts every socket, so a camera socket would start
+  both test pattern encodes. Needs a new input and secret (owner's step again).
+- **/moq/'s clock text has no scrim**; the container's drawtext has a black 0.55
+  box. A `burn()` option.
+- **`diagram.mjs` at 375** draws a cross-container label over another in the
+  gap between stacked containers and `cuts` does not report it (seen on /cam/
+  and /moq/). `moq.mjs` log lines still carry middots.
+- **/llhls/ read 17/18 once**: two console 404s with no URL on a busy run. Not
+  re-run.
+- `/stage/` and `/webrtc/` "never measured since the merge" from session 55:
+  `/webrtc/` is now 25/25 twice. `/stage/` still unread.
+
+## How it was run
+
+Two streams of asks, each collected into `BACKLOG.md` and committed before any
+was worked (`1b2bba8`, `4cf68f7`, `830f42a`), then eight agents, none of which
+committed. Shared files were done once by the session: the manifest move, the
+`moq.mjs` `paint` option (the moq agent was told not to touch the kit and
+handed back a patch), and every commit. Site deploys during the fan out were
+built in a throwaway `git worktree` at HEAD, which is the clean way to ship
+committed work while agents hold dirty files in the checkout.
+⚠️ One agent `pkill -n`'d a dev server and the session's `:8890` went with it;
+restarted. Tell agents to use their own port.
+
+---
+
 # Handoff, 2026-09-29, session 55: ten asks, a second deploy, and the branch finally merged into main
 
 ## Where it is right now
