@@ -231,6 +231,11 @@ const chrome = spawn(CHROME, [
   '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${PROFILE}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu',
   '--autoplay-policy=no-user-gesture-required', '--mute-audio',
+  // OPT IN: Chrome's generated camera, for a page whose subject is a camera
+  // (`/cam/`). Off by default, because with it every camera page in a run
+  // publishes, and some of those publishes are Stream recordings.
+  ...(process.env.DEMO_FAKE_CAMERA === '1'
+    ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : []),
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
 chrome.stderr.on('data', () => {});
 

@@ -456,16 +456,18 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
 }
 
 /**
- * A CAMERA ONTO THE LL-HLS INPUT, through the Pub Durable Object and the
- * container, with the key never leaving the worker. plans/plan-cam-llhls.md.
+ * A CAMERA ONTO ITS OWN LL-HLS INPUT, through the Pub Durable Object and the
+ * `cam` container instance, with the key never leaving the worker.
+ * plans/plan-cam-llhls.md.
  *
  *   page MediaRecorder (H.264 in WebM, 2 s keyframes, 100 ms slices)
  *     -> wss://pub.positron.studio/cam -> one POST per chunk into the container
- *     -> ffmpeg -c:v copy to RTMPS -> the SAME input `llhls()` plays
+ *     -> ffmpeg -c:v copy to RTMPS -> the camera input `camLlhls()` plays
  *
- * 🔴 IT BORROWS THE TEST PATTERN'S INPUT, so it only gets it while nobody holds
- * `/watch`, and a viewer arriving takes it back. Both arrive here as a state,
- * with the worker's own words, and a page shows them rather than a black box.
+ * 🔴 ITS OWN INPUT, NOT THE TEST PATTERN'S. It borrowed that one by handover
+ * until 2026-09-30 and /llhls/ stalled while a camera was tested on it. One
+ * camera at a time; a second is refused, and that arrives here as `busy` with
+ * the worker's own words, so a page shows them rather than a black box.
  * ⚠️ RECORDING STARTS ON `ready`, NEVER BEFORE. The first chunk carries the
  * WebM header, and a header that reaches the container before ffmpeg exists
  * is a stream ffmpeg can never start.
@@ -475,13 +477,18 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
  *
  * onState({ t, why }): t is one of
  *   ready     the container is publishing what this records
- *   busy      refused, with the worker's reason (a viewer holds the input)
- *   taken     a viewer arrived and took the input back
- *   stopped   the worker ended it (idle, length cap, Stream stopped taking bytes)
+ *   busy      refused, with the worker's reason (another camera is on it)
+ *   stopped  the worker ended it (idle, length cap, Stream stopped taking bytes)
  *   closed    the socket closed with nothing said
  *   unsupported  this browser cannot record H.264
  */
 export const CAM_PROXY = 'wss://pub.positron.studio/cam';
+/** The camera's own RTMPS input ("positron-cam", src/provision-cam.sh). Only the uid. */
+export const CAM_UID = '157863305ec9583187dfbb1c66c031ea';
+export const camLlhls = () =>
+  `https://${LIVE.customer}.cloudflarestream.com/${CAM_UID}/manifest/video.m3u8?protocol=llhls`;
+export const camLifecycle = () =>
+  `https://${LIVE.customer}.cloudflarestream.com/${CAM_UID}/lifecycle`;
 
 export function camFormat() {
   if (typeof MediaRecorder === 'undefined') return null;
@@ -526,7 +533,7 @@ export function camPublish(stream, { url = CAM_PROXY, log = () => {}, onState = 
       };
       rec.start(sliceMs);
       say('ready');
-    } else if (m.t === 'busy' || m.t === 'taken' || m.t === 'stopped') {
+    } else if (m.t === 'busy' || m.t === 'stopped') {
       halt();
       say(m.t, m.error || m.why);
       done = true;

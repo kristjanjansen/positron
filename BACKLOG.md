@@ -1,5 +1,9 @@
 ## Open
 
+### Open 2026-09-30: TURN relay on /webrtc/, /stage/, /keep/, and say which path was taken
+
+ASKED, VERBATIM: *"do in bg"*, after *"should they ask for relay servers? what it improves?"*. `TURN_KEY_ID` and `TURN_KEY_API_TOKEN` are on positron-pub since 2026-09-30 and `GET https://pub.positron.studio/ice` answers 200 with `turns:...:443?transport=tcp` among 7 servers. Pass them to every RTCPeerConnection on those pages, fetched on the PRESS and never on load, and show `direct` or `relay` from the selected candidate pair beside the latency, because a relayed latency is not comparable to a direct one. MoQ gets no help from TURN. `demo/webrtc/index.html`, `demo/stage/index.html`, `demo/keep/index.html`, maybe `demo/shell/live.mjs`.
+
 ### Open 2026-09-30: fix /stage/, the MIM film not the test screen, WebRTC only, local storage to R2 to playback. PRIORITY
 
 ASKED, VERBATIM: *"can you fix stage? do we need another container instace not
@@ -30,7 +34,10 @@ prioritize it!"*. `demo/stage/index.html`, `workers/pub/container/server.mjs`,
   from R2. Make it the page's own path on a press (never on load), each stage
   shown as it happens, and keep the harness off the cap.
 
-### Open 2026-09-30: cam's LL-HLS leg, built on the existing input by handover
+### Done 2026-09-30: cam's LL-HLS leg, on its OWN container and input (the handover was dropped)
+
+DONE, and the design changed on the owner's word: *"A new input needs a CAM_STREAM_KEY secret ... do it"*. Input `157863305ec9583187dfbb1c66c031ea` from `src/provision-cam.sh`, container instance `cam`, pub `91f28914`. No handover, so /llhls/ never sees the camera. MEASURED: first camera frame back 14.3 s after recording, LL-HLS glass to glass 5.4 s and 6.1 s (two short spot readings), /llhls/'s main input recorded one unbroken video across a camera session. The /llhls/ stall in the owner's screenshot was the OLD handover's take-back: Stream answered 404 on the new video's parts for about 70 s, and why is not settled. The original entry follows.
+
 
 ASKED, VERBATIM: *"cam hls solution?"*. Build `plans/plan-cam-llhls.md` with ONE
 change: no new live input and no new secret (auto mode refuses `wrangler

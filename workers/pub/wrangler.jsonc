@@ -15,8 +15,9 @@
     {
       "class_name": "Pub",
       "image": "./container/Dockerfile",
-      // TWO: the test pattern instance (`p1`) and /stage/'s film (`stage`).
-      "max_instances": 2,
+      // THREE: the test pattern instance (`p1`), /stage/'s film (`stage`) and
+      // /cam/'s camera rewrap (`cam`), each on its own input.
+      "max_instances": 3,
       // CUSTOM, not a predefined type, because the predefined ones are wrong in
       // both directions here.
       //
