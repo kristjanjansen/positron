@@ -93,11 +93,11 @@ export const DEMOS = [
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
     settleMs: 75000 },
-  { name: 'webrtc', group: 'technologies', act: 1, created: '2026-09-04', built: true,
+  { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true,
     one: 'the same live picture the HLS pages play, delivered over WHEP instead',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
-  { name: 'moq', group: 'technologies', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
+  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
     one: 'browser to browser over MoQ',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
