@@ -94,7 +94,6 @@
     ]),
     moq: panel('MoQ', moqC, [
       { key: 'lat', label: 'glass to glass', reserve: 6 },
-      { key: 'src', label: '', reserve: 12 },
     ]),
   };
   const wrap = el('div', 'cam-wrap');
@@ -174,6 +173,9 @@
   let ice = null, udp = null, udpAsk = null;
   const NO_UDP = 'This network blocks UDP';
   let meters = {}, paint = null;
+  // Frames the MoQ publisher drew with the camera, so a leg that fell back to
+  // its own test pattern cannot pass as one carrying the camera.
+  let moqPainted = 0;
   let gumBeforePress = 0, gumCalls = 0;
   let openedBeforePress = null;
 
@@ -193,6 +195,7 @@
     openedBeforePress = oursOpened();
     gumBeforePress = gumCalls;
     camErr = null; rtcErr = null; moqErr = null; ice = null; udp = null; udpAsk = null;
+    moqPainted = 0;
     armVideo(localV); armVideo(rtcV); armVideo(hlsV);   // before any await, or iOS refuses later
     try {
       gumCalls++;
@@ -220,15 +223,13 @@
     P.local.values.set('size', `${s.width}x${s.height}`);
 
     // The camera drawn into a 1280x720 frame, contained, with the clock row
-    // burned over it. This canvas is what leaves the page.
+    // burned over it. This canvas is what leaves the page over WebRTC, and the
+    // MoQ leg paints its own canvas with the same function.
     src = document.createElement('canvas');
     src.width = FRAME_W; src.height = FRAME_H;
     const ctx = src.getContext('2d', { alpha: false });
     let i = 0;
-    draw = setInterval(() => {
-      drawCamera(ctx, localV, FRAME_W, FRAME_H);
-      burn(ctx, FRAME_W, FRAME_H, i++, { field: false });
-    }, 1000 / 30);
+    draw = setInterval(() => cameraFrame(ctx, FRAME_W, FRAME_H, i++), 1000 / 30);
     sendStream = src.captureStream(30);
 
     meters.local = localMeter(localV);
@@ -270,6 +271,18 @@
     if (SELFCHECK) await d.run('check');
   }
   const legs = { hls: null };
+
+  /**
+   * One frame of what leaves this page: the camera, contained and scrimmed,
+   * with the clock row and the two clocks burned over it. The container's
+   * `black@0.55` box sits behind every label and number (`scrim: true`), so
+   * the words read over a bright room. WebRTC and MoQ both draw with this, so
+   * the two legs carry the same picture and the same row.
+   */
+  function cameraFrame(ctx, w, h, frame) {
+    drawCamera(ctx, localV, w, h);
+    return burn(ctx, w, h, frame, { field: false, scrim: true });
+  }
 
   async function startRtc(mine) {
     try {
@@ -336,13 +349,15 @@
     }
     try {
       const ns = `positron-cam-${Math.random().toString(36).slice(2, 8)}`;
-      // ⚠️ THE TEST PATTERN, NOT THE CAMERA. `startMoq` draws its own pattern
-      // into its own canvas and takes no source, so the camera cannot ride this
-      // leg until the shared module is taught to. The footer says so.
-      const l = await startMoq({ out: moqC, ns, role: 'loopback', log: (m, k) => d.log(`moq ${m}`, k) });
+      // The camera, through `paint`: startMoq hands its own 1280x720 canvas
+      // to the same draw the WebRTC canvas uses, so the row still decodes.
+      const l = await startMoq({
+        out: moqC, ns, role: 'loopback', log: (m, k) => d.log(`moq ${m}`, k),
+        paint: (ctx, w, h, frame) => { moqPainted++; return cameraFrame(ctx, w, h, frame); },
+      });
       if (gen !== mine) { l.stop(); return; }
       leg = l;
-      P.moq.values.set('src', 'test pattern');
+      d.log('moq: the camera is on its way through the relay');
     } catch (e) {
       moqErr = e?.message || String(e);
       d.log(`moq: ${moqErr}`, 'bad');
@@ -446,7 +461,8 @@
       d.assert('MoQ frames decoded', st.decoded > 0, `${st.decoded} decoded`);
       const mp = leg.pct(0.5);
       d.assert('MoQ glass to glass read off the burned clock', mp != null, mp != null ? `p50 ${ms(mp)} over ${st.samples}` : 'no clean rows');
-      d.assert('the MoQ footer says it carries the test pattern', P.moq.values.cell('src').textContent === 'test pattern');
+      d.assert('the MoQ leg carries the camera, not its own test pattern', moqPainted > 0,
+        moqPainted ? `${moqPainted} frame(s) painted from the camera` : 'startMoq never called paint, so it drew its own pattern');
     }
 
     // ONE assert whatever the network, so the total does not move with it:
@@ -492,8 +508,8 @@
             note: 'The camera is drawn in without cropping and a row of 56 blocks encoding the time is burned over it. '
                 + 'Reading that row back off a returned frame gives glass to glass latency on one clock.' },
           { id: 'moq', label: 'MoQ loop', sub: 'WebCodecs', tech: 'browser',
-            note: 'Publishes and subscribes one namespace from this page, so both ends share one clock. '
-                + 'The shared MoQ module draws its own test pattern and takes no camera yet, so that pattern is what travels.' },
+            note: 'Draws the same camera frame and burned row into its own canvas, then publishes and subscribes '
+                + 'one namespace from this page, so both ends share one clock.' },
           { id: 'player', label: 'player', sub: 'RTCPeerConnection', tech: 'browser',
             note: 'Offers video and audio receive only, because Cloudflare refuses a single track offer, '
                 + 'and reads the burned row off every frame it presents.' },

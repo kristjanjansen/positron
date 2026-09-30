@@ -247,6 +247,9 @@ export function clockColumns(ctx, w, ms, second, { NUM = 64, LBL = 28 } = {}) {
  *   field     false to skip the background fill, when the caller has already
  *             painted the frame (a camera, say). Everything else still draws.
  *   ms        override the clock (tests)
+ *   scrim     true to paint a black 0.55 box behind each label and number, the
+ *             container's `box=1:boxcolor=black@0.55:boxborderw=14`. Off by
+ *             default, so the pages that call this without it do not change.
  */
 export function burn(ctx, w, h, frame, opts = {}) {
   const ms = opts.ms ?? Math.round(performance.timeOrigin + performance.now());
@@ -369,15 +372,41 @@ export function burn(ctx, w, h, frame, opts = {}) {
    * height the stack took back to whatever `drawCamera` lays in behind this.
    */
   const cols = clockColumns(ctx, w, ms, second, { NUM, LBL });
+  /**
+   * 🔴 THE SCRIM IS THE CONTAINER'S BOX, OPT IN, SINCE 2026-09-30. drawtext in
+   * `ffmpegFilters()` draws every word and number on `black@0.55` with a 14 px
+   * border, and a canvas drawing the same furniture over testsrc2's saturated
+   * bars or over a camera had nothing behind its text at all.
+   * ⚠️ THE BOX HUGS THE INK VERTICALLY AND THE ADVANCE HORIZONTALLY, which is
+   * what drawtext does: its box is the text's glyph extent, not the font's line
+   * height, so a label and the number under it get two boxes with a few pixels
+   * between them rather than one slab. Width is the advance, so the box does
+   * not twitch as the digits change.
+   * ⚠️ OPT IN, NOT DEFAULT: nine other pages call this and none of them asked.
+   * It never reaches the row's bed, which starts `PAD` below the numbers'
+   * baseline, so `readBurned` reads the same row either way.
+   */
+  const SCRIM_BORDER = 14;
+  const scrimBehind = (t, x, y) => {
+    if (!opts.scrim) return;
+    const m = ctx.measureText(t);
+    const b = SCRIM_BORDER;
+    const up = Math.ceil(m.actualBoundingBoxAscent), down = Math.ceil(m.actualBoundingBoxDescent);
+    const fill = ctx.fillStyle;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(Math.round(x - b), y - up - b, Math.ceil(m.width) + 2 * b, up + down + 2 * b);
+    ctx.fillStyle = fill;
+  };
+  const say = (t, x, y) => { scrimBehind(t, x, y); ctx.fillText(t, x, y); };
   ctx.font = `bold ${LBL}px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText('ABSOLUTE', PAD, LBL_Y);
-  ctx.fillText(second.label, cols.x2, LBL_Y);
+  say('ABSOLUTE', PAD, LBL_Y);
+  say(second.label, cols.x2, LBL_Y);
   ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#fff';
-  ctx.fillText(String(ms), PAD, NUM_Y);
+  say(String(ms), PAD, NUM_Y);
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, cols.x2, NUM_Y);
+  say(second.text, cols.x2, NUM_Y);
 
   // ── motion, and it MEANS something ───────────────────────────────────────
   // The block has to move, or a rate-controlled encoder dedupes a near-static
