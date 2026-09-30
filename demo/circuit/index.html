@@ -129,7 +129,14 @@
        the other three sides. It stays a page rule with its reason rather than
        growing the shared token an asymmetric form, because the reason is
        instrument specific. */
-    padding: 20px 20px 34px;
+    /* 🔴 THE FOOT AND NOTHING ELSE. This was `padding: 20px 20px 34px`, and
+       the 20 on top was a SECOND inset: since the card became `.panel-case`,
+       the kit's `.panel-case > .panel-plate` gives the printed names the
+       case's own `--panel-pad` above them, because a case is inset on its
+       sides only and its children supply the block axis. MEASURED before:
+       left 21, right 21, top 41, which is both of them stacked plus the
+       border. The sides are `.panel-case`'s already. */
+    padding-bottom: 34px;
   }
   /* ⚠️ THE NAMEPLATE ROW'S RULE IS GONE AND IS NOT LOST. It was
      `display: flex; justify-content: space-between`, the same declaration
