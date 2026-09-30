@@ -26,6 +26,7 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
+import { parseInputs, createInputs } from './inputs.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 
@@ -1261,10 +1262,12 @@ async function handle(msg) {
     // the question the answer belongs to, so it gets the holder and the ages
     // here as well as in `fx.pappus` and the heartbeat.
     case 'audio.status':
-      return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, ...insertState() }
+      // `inputs` rides along: each hardware input streams in a room of its
+      // own (inputs.mjs), so this room's slot says nothing about them.
+      return reply('audio.started', { ...(inst ? { ok: true, source: inst.source, jack: !!inst.jack, ...insertState() }
         : stopSynth ? { ok: true, source: 'synth', ...insertState() }
         : audio ? { ok: true, source: 'capture', ...insertState() }
-        : { ok: false, reason: 'nothing playing', ...insertState() });
+        : { ok: false, reason: 'nothing playing', ...insertState() }), inputs: hwInputs.status() });
     // 🔴 `pongAt`, NOT `at`, AND THIS VERB HAD REPLIED TO NOBODY SINCE IT WAS
     // WRITTEN. `at` is an ENVELOPE field (`wire.mjs`), `format()` throws on the
     // collision by design, the throw was caught by the handler wrapper below and
@@ -1536,5 +1539,17 @@ if (backend() === 'alsa') sweepOrphans();
 // device and makes the picture permanently unavailable.
 sweepStrayEncoders((l) => log('video:', l));
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); try { ws?.close(); } catch {} process.exit(0); });
+// ── hardware inputs, each in a room of its own ───────────────────────────────
+// inputs.mjs has the why. Configured in /etc/default/positron-board as
+// BOARD_INPUTS, and a bad entry is reported here and skipped rather than
+// taking the board down.
+const inputsCfg = parseInputs(process.env.BOARD_INPUTS || '');
+for (const p of inputsCfg.problems) log('inputs:', p);
+const hwInputs = createInputs({
+  inputs: inputsCfg.inputs, room: ROOM, relay: RELAY, frame: FRAME, rate: RATE, name: NAME, id: BOARD_ID,
+  spawn, WebSocket, format, parse, randomId, log: (...a) => log('input', ...a),
+});
+if (!DRY && !ONCE) hwInputs.start();
+
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); hwInputs.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();
