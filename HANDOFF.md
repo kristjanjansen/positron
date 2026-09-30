@@ -1,3 +1,39 @@
+# Handoff, 2026-09-30, session 59: the Pi's MIDI gate, and the direct WebRTC path for /away/
+
+## Where it is right now
+
+- ✅ **Site: BUILD `abfdcbb-154531-1599`**, confirmed on the edge, built from a
+  clean `git worktree` at HEAD (the `shell.css` capitals hunk is still
+  uncommitted and still NOT deployed).
+- ✅ **The Pi is updated** (VPN off, LAN reachable): `inputs.mjs`, `rtc.mjs`,
+  `circuit-cc.mjs`, `board.mjs`, `node-datachannel` 0.33.4 in
+  `/opt/positron-board/rig/board/node_modules`, via `push.sh`. Journal says
+  `inputs: direct path available`. `test.mjs` **193/193 on the Pi**. `/shape/`'s
+  52 synth CCs now pass the gate.
+- **Nothing is pushed.** 59 commits ahead of `origin/main`.
+
+## What landed
+
+| commit | what | check at |
+| --- | --- | --- |
+| `6fb037d` | `/reel/` 27/27 (hover text no longer pushes a mark's length out), `/circuit/` 34/34 (doubled top inset) | https://positron.studio/circuit/ |
+| `abfdcbb` | **the direct path**: `rig/board/rtc.mjs`, `createBoard({ direct: true })`, `/away/` gains `via` and `round trip` | https://positron.studio/away/ press ONLINE: `via` should read `direct` and `round trip` about 4 |
+
+**Measured, laptop and Pi on one network** (plan §9): board round trip 72 to
+**4 ms**; key press to speakers 175 to **~48 ms** (80 in runs with the second
+dry-out); 10 ms frames beat 20 (which ratcheted to ~115 ms lag).
+
+## Open, from this session
+
+- `/away/`'s second dry-out ~5 s after the switch (BACKLOG, suspect the 5 s beat).
+- **The Circuit input still clips**: 8 to 29 samples at full scale per few notes.
+  The owner's hand on input 1's gain.
+- Nothing measured off this network (§7 of the plan): the Pi in another building,
+  TURN use.
+- `/knobs/` reads 2 red on HEAD's kit too (`relay delivered the control
+  messages`, `this page makes no sound of its own`): pre-existing, untouched.
+- Stale comment in `shell.css` above `.panel-case > .panel-plate` about `/circuit/`.
+
 # Handoff, 2026-09-30, session 58: collide, the code box, knobs under the code, und, Loop with the Evolution
 
 A THIRD thread in this checkout today, after session 57 and the /away/ thread
