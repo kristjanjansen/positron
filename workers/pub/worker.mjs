@@ -9,6 +9,11 @@
 //   POST /log                          a device reports what it saw
 //   GET  /logs[?format=text]           read those reports back
 //   POST /logs/clear                   drop them
+//   wss://pub.positron.studio/cam      a camera: MediaRecorder chunks in, the
+//                                      LL-HLS input out, while nobody watches
+//   GET  /cam                          who holds the input, 409 when busy
+//   /stage/watch /stage/status         the same four routes on /stage/'s own
+//   /stage/start /stop                 instance: the MIM film on WHIP, nothing else
 //
 // WHY REFERENCE COUNTING AND NOT sleepAfter ALONE: the Container base class
 // sleeps on REQUEST idleness, and ffmpeg publishing generates no incoming
@@ -25,8 +30,20 @@ const ICE_PER_ADDRESS_HOUR = 20; // and per address, so one caller cannot spend 
 const ICE_TTL_S = 4 * 3600;      // longer than a camera is left on; a credential cannot be refreshed mid-call here
 const GRACE_TICKS = 2;     // ~60 s of nobody watching before we stop
 const NAME = 'p1';
+// /stage/'S OWN INSTANCE of the same class: the MIM film on its own WebRTC
+// input (STAGE_WHIP_URL), WHIP only, no clocks, no RTMPS. Routed by the /stage
+// prefix, so the test pattern instance above is untouched.
+const STAGE = 'stage';
+const STAGE_PATHS = new Set(['/watch', '/status', '/start', '/stop']);
 const LOG_KEEP = 400;          // ring buffer of device reports
 const LOG_MAX_BODY = 2000;     // one report cannot flood the rest out
+const CAM_PER_HOUR = 20;       // camera sessions per hour, DO-counted like /whip
+// 🔴 EVERY CAMERA SESSION IS A STREAM RECORDING. The LL-HLS input is RTMPS, and
+// recording cannot be turned off there, so each session adds its length to the
+// account's 1000 minute storage cap, which blocks new live streams when full.
+const CAM_MAX_MS = 300_000;
+const CAM_IDLE_MS = 5_000;     // no chunk this long and the DO ends the session
+const CAM_TICK_MS = 5_000;     // the alarm's cadence while a camera is live
 
 export class Pub extends Container {
   defaultPort = 8080;
@@ -55,11 +72,26 @@ export class Pub extends Container {
   }
 
   #idleTicks = 0;
+  /**
+   * 'stage' or 'main'. ⚠️ TOLD, THEN REMEMBERED: the alarm fires with no
+   * request, and an object is not told its own name, so the entry worker stamps
+   * every request with x-pub-role and the object keeps the last one it saw.
+   */
+  #role = null;
+  async #getRole() {
+    if (this.#role === null) {
+      try { this.#role = (await this.ctx.storage.get('role')) || 'main'; } catch { this.#role = 'main'; }
+    }
+    return this.#role;
+  }
   /** browser WHIP publishes: rate-limit stamps, and id -> resource URL */
   #whipHits = [];
   #whipRes = new Map();
   /** /ice mints: { at, who } stamps for the two rate limits */
   #iceHits = [];
+  /** camera sessions: rate-limit stamps, and the live one's counters */
+  #camHits = [];
+  #cam = null;
   /** Ring buffer of device reports. Diagnostic; dies with the DO. */
   #log = [];
   #hydrated = false;
@@ -95,6 +127,11 @@ export class Pub extends Container {
 
   async fetch(request) {
     const url = new URL(request.url);
+    const told = request.headers.get('x-pub-role') === STAGE ? STAGE : 'main';
+    if ((await this.#getRole()) !== told) {
+      this.#role = told;
+      try { await this.ctx.storage.put('role', told); } catch { /* re-told on the next request */ }
+    }
 
     // ── a viewer ──────────────────────────────────────────────────────────
     if (url.pathname === '/watch') {
@@ -102,7 +139,9 @@ export class Pub extends Container {
         return new Response('expected websocket', { status: 426 });
       }
       const pair = new WebSocketPair();
-      this.ctx.acceptWebSocket(pair[1]);           // hibernatable
+      // TAGGED, because a camera socket lives on this object too and must not
+      // count as somebody watching (see `viewers()`).
+      this.ctx.acceptWebSocket(pair[1], ['watch']);   // hibernatable
       this.#idleTicks = 0;
       await this.#ensureAlarm();
       // FIRE AND FORGET. Awaiting the publish here delayed the 101 by the
@@ -110,10 +149,59 @@ export class Pub extends Container {
       // ffmpeg was already running — a connection blocking on a video encoder.
       // The alarm sweep retries if this fails, so nothing is lost by not
       // waiting for it.
-      if (this.viewers() === 1) this.#startPublish().catch(() => { /* sweep retries */ });
+      // 🔴 A VIEWER TAKES THE INPUT BACK FROM A CAMERA, the same priority /whip
+      // has: the pages that watch the pattern have no other source, and a
+      // camera page can say why it stopped. The camera is told, its leg is
+      // ended, and only then does the pattern start on the same key.
+      if (this.viewers() === 1) {
+        const give = this.#camLive() ? this.#endCam('taken', 'somebody opened a page that plays the test pattern on this input, and viewers have priority') : Promise.resolve();
+        give.then(() => this.#startPublish()).catch(() => { /* sweep retries */ });
+      }
       try {
         pair[1].send(JSON.stringify({ t: 'hello', viewers: this.viewers() }));
       } catch { /* raced a close */ }
+      return new Response(null, { status: 101, webSocket: pair[0] });
+    }
+
+    // ── a camera, onto the LL-HLS input while nobody is watching it ────────
+    //
+    // `/cam/` records its burned canvas with MediaRecorder and sends each chunk
+    // here; this object POSTs them, in order, into the container's third leg,
+    // which rewraps them to RTMPS on the SAME input and key the test pattern
+    // uses. No second input and no second secret. plans/plan-cam-llhls.md.
+    //
+    // 🔴 REFUSED IN BAND, NOT WITH A STATUS. A browser cannot read the HTTP
+    // status of a refused WebSocket upgrade, so a 409 there reaches the page as
+    // a bare close with no reason. The socket is accepted, told
+    // `{t:'busy', status: 409, error}` and closed with 4409, and the page can
+    // say why in words. A plain GET answers the same question with a real 409.
+    if (url.pathname === '/cam') {
+      const busy = this.#camBusy();
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return json(busy ? { ...busy, status: 409 } : { free: true, viewers: 0 }, busy ? 409 : 200);
+      }
+      const pair = new WebSocketPair();
+      const now = Date.now();
+      this.#camHits = this.#camHits.filter((t) => now - t < 3600_000);
+      const refuse = busy
+        || (this.#camHits.length >= CAM_PER_HOUR ? { error: 'too many camera sessions this hour', limit: CAM_PER_HOUR, status: 429 } : null)
+        || (!this.env.STREAM_KEY ? { error: 'no stream key on this worker', status: 503 } : null);
+      if (refuse) {
+        this.ctx.acceptWebSocket(pair[1], ['cam-refused']);
+        pair[1].serializeAttachment({ role: 'refused' });
+        try {
+          pair[1].send(JSON.stringify({ t: 'busy', status: 409, ...refuse }));
+          pair[1].close(refuse.status === 409 ? 4409 : 4000 + (refuse.status % 1000), String(refuse.error).slice(0, 120));
+        } catch { /* gone */ }
+        return new Response(null, { status: 101, webSocket: pair[0] });
+      }
+      this.#camHits.push(now);
+      const sid = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+      this.ctx.acceptWebSocket(pair[1], ['cam']);
+      pair[1].serializeAttachment({ role: 'cam', sid, at: now });
+      this.#cam = { sid, at: now, lastAt: now, bytes: 0, chunks: 0, open: false, chain: Promise.resolve(), ws: pair[1] };
+      await this.ctx.storage.setAlarm(now + CAM_TICK_MS);
+      try { pair[1].send(JSON.stringify({ t: 'hello', sid, maxS: CAM_MAX_MS / 1000 })); } catch { /* raced */ }
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
 
@@ -123,8 +211,10 @@ export class Pub extends Container {
         const r = await super.fetch(new Request('http://c/status'));
         container = await r.json();
       } catch (e) { container = { error: String(e).slice(0, 200) }; }
+      const c = this.#cam;
       return json({
         viewers: this.viewers(),
+        cam: c ? { sid: c.sid, open: c.open, ageS: Math.round((Date.now() - c.at) / 1000), chunks: c.chunks, bytes: c.bytes, lastChunkAgoMs: Date.now() - c.lastAt } : null,
         idleTicks: this.#idleTicks,
         graceTicks: GRACE_TICKS,
         sweepMs: SWEEP_MS,
@@ -385,7 +475,63 @@ export class Pub extends Container {
     return json({ error: 'use /watch /status /start /stop' }, 404);
   }
 
-  viewers() { return this.ctx.getWebSockets().length; }
+  /**
+   * 🔴 ONLY `watch` SOCKETS ARE VIEWERS. This was every socket the object
+   * held, so a camera socket would have counted as somebody watching and
+   * started both test pattern encodes (plans/plan-cam-llhls.md section 1).
+   * ⚠️ WRITTEN AS "ALL BUT THE CAMERA ONES", not as `getWebSockets('watch')`,
+   * because a viewer socket accepted before tags existed is restored untagged
+   * after a deploy, and it is still somebody watching.
+   */
+  viewers() {
+    return this.ctx.getWebSockets().length
+      - this.ctx.getWebSockets('cam').length
+      - this.ctx.getWebSockets('cam-refused').length;
+  }
+
+  /** Why a camera cannot have the input right now, or null. */
+  #camBusy() {
+    const n = this.viewers();
+    if (n > 0) return { error: `the LL-HLS input is busy: ${n} ${n === 1 ? 'page is' : 'pages are'} watching the test pattern on it, and viewers have priority`, viewers: n };
+    if (this.#camLive()) return { error: 'another camera already holds the LL-HLS input', viewers: 0 };
+    return null;
+  }
+
+  #camLive() {
+    return this.ctx.getWebSockets('cam').some((ws) => ws.readyState === 1 || ws.readyState === 0);
+  }
+
+  /** The live camera session, rebuilt from its socket after an eviction. */
+  #camState() {
+    if (this.#cam) return this.#cam;
+    const ws = this.ctx.getWebSockets('cam')[0];
+    if (!ws) return null;
+    const a = ws.deserializeAttachment() || {};
+    // After an eviction the counters are gone. The session is taken as open
+    // and fresh, so the idle check starts again; the container's own watchdog
+    // is the floor under that guess.
+    this.#cam = { sid: a.sid, at: a.at || Date.now(), lastAt: Date.now(), bytes: 0, chunks: 0, open: true, chain: Promise.resolve(), ws };
+    return this.#cam;
+  }
+
+  /**
+   * End the camera session: tell the page why, close its socket, stop the
+   * container's leg. Every one of the three stops arrives here.
+   */
+  async #endCam(t, why) {
+    const c = this.#camState();
+    this.#cam = null;
+    for (const ws of this.ctx.getWebSockets('cam')) {
+      try { ws.send(JSON.stringify({ t, why })); } catch { /* gone */ }
+      try { ws.close(4000, String(why).slice(0, 120)); } catch { /* gone */ }
+    }
+    try {
+      await super.fetch(new Request('http://c/cam/stop', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sid: c?.sid, why }),
+      }));
+    } catch { /* the container's watchdog is the floor */ }
+  }
 
   /**
    * Source settings, tunable without a redeploy of the IMAGE.
@@ -404,6 +550,19 @@ export class Pub extends Container {
   }
 
   async #startPublish(extra) {
+    if ((await this.#getRole()) === STAGE) {
+      // ONE LEG AND NO ENCODE: the pre-transcoded film copied onto WHIP.
+      const url = this.env.STAGE_WHIP_URL;
+      if (!url) return;
+      try {
+        await super.fetch(new Request('http://c/start-whip', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ url, source: 'film-copy', burn: false }),
+        }));
+      } catch { /* container still waking; the sweep retries */ }
+      return;
+    }
     const key = this.env.STREAM_KEY;
     const whip = this.env.WHIP_URL;
     // Both legs, same refcount. Cloudflare cannot serve WHEP from an RTMPS
@@ -435,6 +594,19 @@ export class Pub extends Container {
   }
 
   async alarm() {
+    // The camera's two stops that need a clock: a socket that went quiet
+    // without closing, and the length cap. Checked every CAM_TICK_MS while a
+    // camera is live; the viewer sweep below runs on its own 30 s count.
+    const c = this.#camLive() ? this.#camState() : null;
+    if (c) {
+      const now = Date.now();
+      if (c.open && now - c.lastAt > CAM_IDLE_MS) await this.#endCam('stopped', `no video from the camera for ${Math.round((now - c.lastAt) / 1000)} s`);
+      else if (now - c.at > CAM_MAX_MS) await this.#endCam('stopped', `a camera session is capped at ${CAM_MAX_MS / 60000} minutes, because every one is recorded on Stream`);
+      else if (this.viewers() === 0) {
+        await this.ctx.storage.setAlarm(now + CAM_TICK_MS);
+        return;
+      } else await this.#endCam('taken', 'somebody opened a page that plays the test pattern on this input, and viewers have priority');
+    }
     const n = this.viewers();
     if (n > 0) {
       this.#idleTicks = 0;
@@ -444,7 +616,10 @@ export class Pub extends Container {
         const r = await super.fetch(new Request('http://c/status'));
         const s = await r.json();
         // either leg dying under a live viewer gets restarted
-        if (!s.publishing || !s.whip?.publishing) await this.#startPublish();
+        const down = (await this.#getRole()) === STAGE
+          ? !s.whip?.publishing
+          : !s.publishing || !s.whip?.publishing;
+        if (down) await this.#startPublish();
       } catch { /* waking */ }
       await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
       return;
@@ -461,11 +636,85 @@ export class Pub extends Container {
     this.#idleTicks = 0;
   }
 
-  async webSocketClose() {
+  async webSocketClose(ws) {
+    const a = ws.deserializeAttachment?.() || {};
+    if (a.role === 'cam') {
+      // The first stop: the page closed, or its tab died (1006). Only the
+      // CURRENT session's close ends the leg, so a stale socket cannot stop a
+      // newer camera.
+      const c = this.#cam;
+      if (!c || c.sid === a.sid) {
+        this.#cam = null;
+        try {
+          await super.fetch(new Request('http://c/cam/stop', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ sid: a.sid, why: 'the camera page closed its socket' }),
+          }));
+        } catch { /* the container's watchdog is the floor */ }
+      }
+      return;
+    }
+    if (a.role === 'refused') return;
     if (this.viewers() === 0) await this.#ensureAlarm();
   }
-  async webSocketError() {}
-  async webSocketMessage() {}
+  async webSocketError(ws) { return this.webSocketClose(ws); }
+
+  /**
+   * A camera's messages. Text is control, binary is one MediaRecorder chunk.
+   * 🔴 THE CHUNKS GO THROUGH ONE PROMISE CHAIN. A DO's input gate does not
+   * cover a non-storage await, so two chunks a few ms apart would otherwise
+   * race each other into ffmpeg's stdin out of order, and a WebM stream with
+   * two clusters swapped is a broken stream.
+   */
+  async webSocketMessage(ws, msg) {
+    const a = ws.deserializeAttachment?.() || {};
+    if (a.role !== 'cam') return;
+    const c = this.#camState();
+    if (!c || c.sid !== a.sid) return;
+    if (typeof msg === 'string') {
+      let m = {};
+      try { m = JSON.parse(msg); } catch { return; }
+      if (m.t !== 'open' || c.open) return;
+      // A viewer may have arrived between the upgrade and this message.
+      if (this.viewers() > 0) return this.#endCam('busy', this.#camBusy()?.error || 'the input is busy');
+      // Nobody is watching, so the pattern's two legs, which may still be up
+      // inside the viewer grace, come down now. The container would stop the
+      // RTMPS one itself before opening the key; this also frees the vCPU of
+      // the WHIP encode nobody is receiving.
+      await this.#stopPublish();
+      try {
+        const r = await super.fetch(new Request('http://c/cam/open', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ key: this.env.STREAM_KEY, fmt: m.fmt === 'mp4' ? 'mp4' : 'webm', sid: c.sid }),
+        }));
+        if (!r.ok) throw new Error(`container ${r.status}`);
+      } catch (e) {
+        return this.#endCam('stopped', `the publisher did not start: ${String(e.message || e).slice(0, 80)}`);
+      }
+      if (this.#cam !== c) return;          // ended while the container woke
+      c.open = true;
+      c.lastAt = Date.now();
+      // ONLY NOW does the page start recording, so the first chunk, which
+      // carries the WebM header, cannot arrive before ffmpeg exists.
+      try { ws.send(JSON.stringify({ t: 'ready', sid: c.sid })); } catch { /* gone */ }
+      return;
+    }
+    if (!c.open) return;
+    c.lastAt = Date.now();
+    c.chunks++;
+    c.bytes += msg.byteLength ?? msg.size ?? 0;
+    const sid = c.sid;
+    c.chain = c.chain.then(async () => {
+      if (this.#cam !== c) return;
+      try {
+        const r = await super.fetch(new Request(`http://c/cam/chunk?sid=${sid}`, { method: 'POST', body: msg }));
+        if (r.status === 409 || r.status === 503) {
+          const why = r.status === 503 ? 'Stream stopped taking the camera\'s bytes' : 'the publisher lost the camera session';
+          await this.#endCam('stopped', why);
+        }
+      } catch { /* one lost chunk; the idle checks catch a dead leg */ }
+    });
+  }
 }
 
 // Group one device's lines without storing who it is: truncated SHA-256 of
@@ -493,6 +742,20 @@ export default {
         note: 'publishes while at least one viewer holds /watch',
       });
     }
-    return getContainer(env.PUB, NAME).fetch(request);
+    // /stage/<path> is the stage instance, and only its four routes.
+    if (url.pathname.startsWith('/stage/')) {
+      const path = url.pathname.slice('/stage'.length);
+      if (!STAGE_PATHS.has(path)) return json({ error: 'use /stage/watch /stage/status /stage/start /stage/stop' }, 404);
+      if (!env.STAGE_WHIP_URL) {
+        return json({ error: 'the stage input is not provisioned: run src/provision-stage.sh' }, 503);
+      }
+      url.pathname = path;
+      const req = new Request(url, request);
+      req.headers.set('x-pub-role', STAGE);
+      return getContainer(env.PUB, STAGE).fetch(req);
+    }
+    const req = new Request(request);
+    req.headers.delete('x-pub-role');
+    return getContainer(env.PUB, NAME).fetch(req);
   },
 };

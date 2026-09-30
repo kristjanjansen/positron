@@ -812,8 +812,7 @@ export const DEMOS = [
     // 2026-09-25 transport rework made false twice over: the two presses are
     // now WHICH TRANSPORT carries the show, and the film lost its play button
     // in the same change, so there is no press for the picture at all.
-    one: 'a church scene from a 2011 MIMproject performance goes out live to an '
-      + 'audience that answers back, over whichever transport you press',
+    one: 'a church scene from a 2011 MIMproject performance goes out live over WebRTC and its recording travels from this browser to R2 to playback',
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
