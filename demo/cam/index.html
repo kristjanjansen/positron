@@ -26,7 +26,8 @@
 
 <script type="module">
   import { mount, guard, el, armVideo } from '/shell/shell.mjs';
-  import { whipPublish, whepPlay, whep, fetchIceServers, probeUdp } from '/shell/live.mjs';
+  import { whipPublish, whepPlay, whep, fetchIceServers, probeUdp, camPublish, llhls } from '/shell/live.mjs';
+  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
   import { startMoq, moqSupport } from '/shell/moq.mjs';
   import { drawCamera, burn, readBurnedFrom, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
@@ -48,21 +49,79 @@
   guard(d);
 
   /**
-   * 🔴 THE LL-HLS SEAM. NOT WIRED, AND IT SAYS SO ON THE PAGE.
-   * Cloudflare will not serve a WHIP input as HLS ("WHIP and WHEP must be used
-   * together"), so a camera needs another road into an RTMPS input and back out
-   * as LL-HLS. A parallel research track owns that road. When it lands, this is
-   * the only thing that changes:
-   *
-   *   HLS_LEG.start({ stream, video, log, signal })
-   *     stream  the MediaStream of the burned canvas, the same one WebRTC sends
-   *     video   the panel's <video>, to play the LL-HLS back into
-   *     returns { stop(): void|Promise, ok: boolean, why?: string }
-   *
-   * The latency for this panel is then read off the burned clock exactly as the
-   * WebRTC panel reads it (`meter(video, ...)` below), so nothing else moves.
+   * 🔴 THE LL-HLS LEG. The burned canvas is recorded with MediaRecorder and
+   * sent over `wss://pub.positron.studio/cam`, the worker POSTs each chunk into
+   * the container, and ffmpeg rewraps it (no encode) to RTMPS on the SAME input
+   * `/llhls/` plays, which is then played back here through the tuned player.
+   * plans/plan-cam-llhls.md, with one change: no input of its own, so it
+   * BORROWS the test pattern's, only while nobody is watching that, and a
+   * viewer arriving takes it back. Both are said on the picture.
+   * ⚠️ EVERY SESSION IS A STREAM RECORDING. The input is RTMPS, where
+   * recording cannot be turned off, and each session adds its length to the
+   * account's 1000 minute cap. So the harness leaves this leg off unless it
+   * asks with `hls=1`, and a visitor gets it only by pressing Start camera.
    */
-  const HLS_LEG = { wired: false, start: null };
+  const HLS_ON = !SELFCHECK || new URLSearchParams(location.search).get('hls') === '1';
+  const HLS = { pub: null, player: null, st: null, err: null, readyAt: null, firstMs: null, rebuilds: 0, starts: [] };
+  const HLS_SAY = {
+    busy: 'LL-HLS input is busy', taken: 'A viewer took LL-HLS back', stopped: 'LL-HLS stopped',
+    closed: 'LL-HLS closed', unsupported: 'LL-HLS needs Chrome or Edge',
+  };
+  /**
+   * hls.js is a classic script that sets `window.Hls`, which the player reads.
+   * Loaded on the press, not on the visit: 600 KB nobody asked for otherwise.
+   */
+  let hlsLib = null;
+  const loadHlsJs = () => (window.Hls ? Promise.resolve() : (hlsLib ||= new Promise((ok, no) => {
+    const sc = document.createElement('script');
+    sc.src = '/proto/remixer/hls.min.js';
+    sc.onload = ok;
+    sc.onerror = () => { hlsLib = null; no(new Error('hls.js did not load')); };
+    document.head.append(sc);
+  })));
+  function startHls(mine) {
+    if (!HLS_ON) {
+      P.hls.slots.caption.textContent = 'LL-HLS is left off under the harness';
+      d.log('ll-hls: not run under the harness without hls=1, because every session is recorded on Stream');
+      return;
+    }
+    const t0 = performance.now();
+    loadHlsJs().catch((e) => d.log(`ll-hls: ${e.message}`, 'bad'));
+    HLS.pub = camPublish(sendStream, {
+      log: (m) => d.log(`ll-hls ${m}`),
+      onState: ({ t, why }) => {
+        if (gen !== mine) return;
+        HLS.st = t;
+        if (t === 'ready') {
+          HLS.readyAt = performance.now();
+          d.log(`ll-hls: the container publishes the camera, ${((HLS.readyAt - t0) / 1000).toFixed(1)} s after asking`, 'hi');
+          // Only now: before this the input carried the pattern or nothing, and
+          // a player built on that would only have to rebuild again.
+          loadHlsJs().then(() => {
+            if (gen !== mine || HLS.st !== 'ready') return;
+            HLS.player = createLowLatencyPlayer(hlsV, llhls())
+              .on('rebuild', ({ why: w }) => { HLS.rebuilds++; d.log(`ll-hls: player rebuilt (${w})`); })
+              .on('start', () => HLS.starts.push(performance.now()));
+            meters.hls = meter(hlsV);
+          }).catch((e) => { HLS.err = e.message; P.hls.slots.caption.textContent = 'LL-HLS could not play'; });
+          return;
+        }
+        HLS.err = why || t;
+        d.log(`ll-hls: ${HLS.err}`, 'bad');
+        P.hls.slots.caption.textContent = HLS_SAY[t] || 'LL-HLS stopped';
+        P.hls.values.set('lat', '');
+        try { HLS.player?.destroy(); } catch { /* gone */ }
+        HLS.player = null;
+        if (meters.hls) meters.hls.live = false;
+      },
+    });
+  }
+  function stopHls() {
+    try { HLS.pub?.stop(); } catch { /* gone */ }
+    try { HLS.player?.destroy(); } catch { /* gone */ }
+    HLS.pub = null; HLS.player = null;
+    try { hlsV.removeAttribute('src'); hlsV.load(); } catch { /* fine */ }
+  }
 
   // ── four pictures ────────────────────────────────────────────────────────
   const video = (muted = true) => {
@@ -119,7 +178,7 @@
    * was shown is not a frame the eye sees.
    */
   function meter(v) {
-    const m = { samples: [], all: 0, frames: 0, bad: 0, live: true };
+    const m = { samples: [], all: 0, frames: 0, bad: 0, live: true, firstAt: null };
     const scratch = document.createElement('canvas');
     if (typeof v.requestVideoFrameCallback !== 'function') return m;
     const tick = () => {
@@ -128,6 +187,7 @@
       const burned = readBurnedFrom(v, scratch);
       if (burned == null) m.bad++;
       else {
+        if (m.firstAt == null) m.firstAt = performance.now();
         m.samples.push(performance.timeOrigin + performance.now() - burned);
         if (m.samples.length > WINDOW) m.samples.shift();
         m.all++;
@@ -238,23 +298,23 @@
       P.local.values.set('lat', ms(median(meters.local.samples)));
       P.rtc.values.set('lat', ms(median(meters.rtc.samples)));
       if (rtcV.videoWidth) P.rtc.values.set('size', `${rtcV.videoWidth}x${rtcV.videoHeight}`);
+      if (meters.hls?.live) {
+        P.hls.values.set('lat', ms(median(meters.hls.samples)));
+        if (HLS.firstMs == null && meters.hls.firstAt != null && HLS.readyAt != null) {
+          HLS.firstMs = meters.hls.firstAt - HLS.readyAt;
+          d.log(`ll-hls: first camera frame back ${(HLS.firstMs / 1000).toFixed(1)} s after recording began`, 'hi');
+        }
+      }
       if (leg) {
         const p50 = leg.pct(0.5);
         if (p50 != null) P.moq.values.set('lat', ms(p50));
       }
     }, 1000);
 
-    // LL-HLS: honest waiting state, or the leg once somebody wires it.
-    let hlsStop = null;
-    if (HLS_LEG.wired && HLS_LEG.start) {
-      const r = await HLS_LEG.start({ stream: sendStream, video: hlsV, log: d.log });
-      hlsStop = r?.stop || null;
-      meters.hls = meter(hlsV);
-    } else {
-      P.hls.values.set('lat', 'not wired');
-      P.hls.slots.caption.textContent = 'A camera cannot reach LL-HLS yet';
-    }
-    legs.hls = hlsStop;
+    // LL-HLS: not awaited, because the container may be waking and the other
+    // two legs should not wait on it.
+    Object.assign(HLS, { st: null, err: null, readyAt: null, firstMs: null, rebuilds: 0, starts: [] });
+    startHls(mine);
 
     // Both asked in parallel and only now, after the press: a relay from our
     // worker for the two peer connections, and whether UDP leaves at all.
@@ -270,7 +330,6 @@
     if (gen !== mine) return;
     if (SELFCHECK) await d.run('check');
   }
-  const legs = { hls: null };
 
   /**
    * One frame of what leaves this page: the camera, contained and scrimmed,
@@ -388,8 +447,7 @@
     sub = null;
     const p = pub; pub = null;
     try { await p?.stop(); } catch { /* gone */ }
-    try { await legs.hls?.(); } catch { /* gone */ }
-    legs.hls = null;
+    stopHls();
     sendStream?.getTracks().forEach((t) => t.stop());
     sendStream = null; src = null;
     cam?.getTracks().forEach((t) => t.stop());
@@ -435,10 +493,13 @@
     }
 
     // Give each leg time to carry enough frames to time.
-    for (let t = 0; t < 40; t++) {
+    // LL-HLS gets up to a minute: a container that was asleep, Stream bringing
+    // a new broadcast up and the player's first segments are all in it.
+    for (let t = 0; t < 120; t++) {
       const rtcDone = rtcErr || (meters.rtc?.all ?? 0) >= 30;
       const moqDone = moqErr || (leg?.stats.samples ?? 0) >= 30;
-      if (rtcDone && moqDone) break;
+      const hlsDone = !HLS_ON || HLS.err || (meters.hls?.all ?? 0) >= 30;
+      if (rtcDone && moqDone && hlsDone) break;
       await wait(500);
     }
     d.assert('the camera is live', cam.getVideoTracks()[0]?.readyState === 'live');
@@ -446,7 +507,22 @@
     d.log(meters.local?.samples.length
       ? `local capture to screen ${ms(median(meters.local.samples))} over ${meters.local.samples.length} frame(s)`
       : 'this browser reports no captureTime, so the local cell stays empty');
-    d.assert('LL-HLS says it is not wired', !HLS_LEG.wired && P.hls.values.cell('lat').textContent === 'not wired');
+    if (!HLS_ON) {
+      d.assert('LL-HLS is left off under the harness and says so', !HLS.pub && /harness/.test(P.hls.slots.caption.textContent),
+        P.hls.slots.caption.textContent || 'nothing said');
+    } else if (HLS.err) {
+      // Refused or taken back is a fact about who else is watching, not a fault
+      // in this page, so the one assert is that it SAID so on the picture.
+      d.assert('LL-HLS names why it is not running, on its own picture', !!P.hls.slots.caption.textContent,
+        `${HLS.st}: ${HLS.err}, caption "${P.hls.slots.caption.textContent}"`);
+    } else {
+      d.assert('LL-HLS: the container took the camera', HLS.st === 'ready', HLS.st || 'no answer');
+      d.assert('LL-HLS: camera frames came back and were shown', (meters.hls?.frames ?? 0) > 0, `${meters.hls?.frames ?? 0} frame(s)`);
+      const hp = median(meters.hls?.samples || []);
+      d.assert('LL-HLS glass to glass read off the burned clock', hp != null,
+        hp != null ? `median ${ms(hp)} over the last ${meters.hls.samples.length}, ${meters.hls.bad} unreadable, first frame ${(HLS.firstMs / 1000).toFixed(1)} s after recording, ${HLS.rebuilds} rebuild(s)` : `${meters.hls?.bad ?? 0} unreadable frame(s)`);
+      if (hp != null) d.assert('LL-HLS in seconds, and more than WebRTC', hp > 500 && hp < 20000, ms(hp));
+    }
 
     d.assert('WebRTC published through the worker', !!pub, rtcErr || (pub ? `id ${pub.id}` : 'no publish'));
     d.assert('WebRTC frames came back and were shown', (meters.rtc?.frames ?? 0) > 0, `${meters.rtc?.frames ?? 0} frame(s)`);
@@ -487,12 +563,15 @@
     // disabled until the press settles, so a click here would land on nothing.
     const tracks = [...cam.getTracks()];
     const pcs = [pub?.pc, sub?.pc].filter(Boolean);
+    const camWs = HLS.pub;
     await stop();
     await wait(800);
     d.assert('stop ends the camera', tracks.every((t) => t.readyState === 'ended'), tracks.map((t) => t.readyState).join(' '));
     d.assert('stop closes every peer connection', pcs.every((p) => p.connectionState === 'closed'),
       pcs.map((p) => p.connectionState).join(' ') || 'none were open');
     d.assert('stop closes the MoQ leg and every timer', !leg && !draw && !paint);
+    if (HLS_ON) d.assert('stop ends the LL-HLS leg', !HLS.pub && !HLS.player,
+      camWs ? `${camWs.state.chunks} chunk(s), ${(camWs.state.bytes / 1e6).toFixed(1)} MB sent` : 'never opened');
     d.assert('the control offers to start again', btn().textContent === 'Start camera', btn().textContent);
   });
 
@@ -525,9 +604,9 @@
           { id: 'relay', label: 'MoQ relay', sub: 'draft-14', tech: 'cloudflare',
             note: 'Cloudflare\'s relay, reached over WebTransport, hands each frame to whoever subscribed to the namespace. '
                 + 'Safari cannot use it yet, so this panel needs Chrome or Edge.' },
-          { id: 'hls', label: 'LL-HLS', sub: 'not wired yet', tech: 'cloudflare',
-            note: 'Stream will not serve a WebRTC input as HLS, so a camera needs another road into an RTMPS input. '
-                + 'That road is being researched, and until it lands this panel waits.' },
+          { id: 'hls', label: 'LL-HLS', sub: 'container to RTMPS', tech: 'cloudflare',
+            note: 'The canvas goes to the worker as H.264 and the container rewraps it onto the test pattern\'s input. '
+                + 'It holds that input only while nobody is watching the pattern.' },
         ] },
     ],
     links: [
@@ -540,6 +619,9 @@
         note: 'The worker forwards the offer to the input\'s secret WHIP address and keeps the session address to itself.' },
       { from: 'stream', to: 'player', label: 'WHEP', back: true,
         note: 'The same input played straight back, asking again on a 409 while the publish is still going live.' },
+      { from: 'canvas', to: 'hls', label: 'WebM',
+        note: 'MediaRecorder starts only once the container is ready, so the first piece, which carries the header, is never lost. '
+            + 'The picture comes back through the same player /llhls/ uses.' },
       { from: 'moq', to: 'relay',
         note: 'Each frame is encoded with WebCodecs and published over WebTransport, and the same page subscribes to it again. '
             + 'The row is read back on the clock that wrote it.' },
