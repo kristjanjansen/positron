@@ -1,5 +1,53 @@
 ## Open
 
+### Open 2026-09-30: cam must work on a network that drops UDP ("make it work!")
+
+ASKED, VERBATIM: *"make it work!"*, with a screenshot of https://positron.studio/cam/
+at a cafe: the camera shows, `WebRTC could not start`, MoQ black, and logs
+pasted from `/cam/`, `/webrtc/` (`pc connecting` then `pc failed` 15 s later)
+and `/moq/` (`All promises were rejected`).
+- 🔴 **MEASURED 2026-09-30 ~11:05, THIS LAPTOP'S NETWORK DROPS OUTBOUND UDP.** The
+  default route is `172.20.10.1` on en0, a phone hotspot. A STUN binding
+  request over UDP to `stun.cloudflare.com:3478` and to
+  `stun.l.google.com:19302` got NO answer in 4 s; `node demo/check-whep.mjs`
+  read `201`, `connecting`, 0 frames, 0 bytes. The same pages were green from
+  this machine an hour earlier on another network. So it is the network, and
+  it is also exactly what a visitor on a hotel or cafe network meets.
+- **WebRTC can be made to work**: TURN over TLS on 443 (Cloudflare Realtime
+  TURN, `turns:turn.cloudflare.com:443?transport=tcp`) relays to Stream's UDP
+  from the far side. Needs a TURN key, a worker route that mints short lived
+  ICE servers so the key never reaches the page, and the page passing them to
+  both the WHIP and the WHEP peer connection. First check whether Stream's own
+  answer already offers ICE-TCP candidates, in which case no TURN is needed.
+- **MoQ cannot, today**: WebTransport is QUIC over UDP and Cloudflare's relay
+  has no WebSocket listener (`positron-streaming`). The honest fix is the
+  panel SAYING the network blocks UDP, rather than a black picture.
+- Every page with a WebRTC leg would gain from the same TURN route: `/webrtc/`,
+  `/stage/`, `/keep/`.
+
+### Open 2026-09-30: all secondary buttons in capitals
+
+ASKED, VERBATIM: *"cap: all secondary buttons"*. Read as: every secondary
+button label in upper case, as the primary ones are. Which component draws a
+secondary button and whether it is one CSS rule in `demo/shell/` or labels per
+page is to be measured, not assumed; check `positron-ui` for what "secondary"
+means in the kit. If "cap" meant something else (a cap on count? a cap
+height?), the words are here.
+
+### Open 2026-09-30: cam, "Local camera" becomes "Camera"
+
+ASKED, VERBATIM: *"Local camera -> Camera"*. The top left panel's footer label
+in `demo/cam/index.html`, and the diagram and any assert that names it.
+
+### Open 2026-09-30: the black box over testsrc2's corner counter becomes red and green
+
+ASKED, VERBATIM: *"what is this black box? put red and green on it with right
+widths"*, with a crop of the live stream's top left corner. It is the 240x48
+cover over testsrc2's own frame counter (`d8c95d3`, from `ea21ee4`). Paint it
+in the bar colours instead: red to testsrc2's first bar edge, `rescale(1, w, 6)`
+= 213 at 1280, green from there to 240. `workers/pub/container/server.mjs` and
+`demo/shell/testsrc2.mjs` together, so `/moq/` stays pixel identical.
+
 ### Done 2026-09-30: the hls.js options table, no wrapped names, default and recommended columns, sans serif comment
 
 DONE 2026-09-30, 2f82693.
