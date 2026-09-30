@@ -539,9 +539,14 @@
         ] },
     ],
     links: [
-      { from: 'ctl', to: 'pub', label: 'I am watching',
-        note: 'Nothing travels up this socket. The publisher counts the sockets in the room '
-            + 'rather than watching for requests, because ffmpeg sending video makes none.' },
+      // Same socket, same label as `/llhls/`, both read off
+      // `workers/pub/worker.mjs`. What differs here is the leg: the first
+      // socket in makes the Pub object POST the container's `/start-whip` as
+      // well as `/start`, because one count holds both.
+      { from: 'ctl', to: 'pub', label: 'wss /watch',
+        note: 'The same hibernatable WebSocket to **wss://pub.positron.studio/watch** the low '
+            + 'latency HLS page holds, and nothing goes up it. The first one in starts the WHIP '
+            + 'leg and the RTMPS leg together, because one **getWebSockets()** count holds both.' },
       { from: 'pub', to: 'ff',
         note: 'Start on the first viewer, stop on the sweep. A leg that dies while somebody '
             + 'is still watching is restarted by the same sweep 30 s later.' },
