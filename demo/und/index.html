@@ -17,6 +17,17 @@
      `--well` is the box's ground, read by the box and the note alike, and is
      this page's darker one as before. */
   .und-editor { --well: #0d1117; }
+  /* 🔴 EACH LINE IN THE COLOUR OF THE LANE THAT DRAWS IT. Asked 2026-09-30,
+     *"can you mathc lane colors and code colors somehow"*: an `i` line is an
+     event tick, a `t` line is the tempo curve, an `m` or `n` line is a part
+     bar, and `code-lang.mjs` tags every coloured token with its line's kind.
+     The inks are the strip's own, set from `INK` and `DERIVED` below so there
+     is one source, and lifted towards their bright end only as far as text on
+     this ground needs: the event ticks are `INK.off` until they sound and
+     `INK.on` when they do, so their text sits between the two. */
+  .und-editor .pos-ln-event { color: color-mix(in oklab, var(--ln-on) 70%, var(--ln-off)); }
+  .und-editor .pos-ln-part, .und-editor .pos-ln-tempo { color: color-mix(in oklab, var(--ln-derived) 80%, #fff); }
+  .und-editor .pos-tk-carry[class*="pos-ln-"] { opacity: .7; }
   /* the compiled document, one record per line — 04's block, scrolled rather
      than padded, because a typed score has no fixed length */
   .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
@@ -139,6 +150,9 @@
   // The host is the box the compile note sits in the corner of. See below.
   const editor = code.el;
   editor.classList.add('und-editor');
+  editor.style.setProperty('--ln-on', INK.on);
+  editor.style.setProperty('--ln-off', INK.off);
+  editor.style.setProperty('--ln-derived', DERIVED);
   d.el.append(editor);
   const warnEl = el('div', 'warn');
   d.el.append(warnEl);
