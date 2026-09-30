@@ -245,6 +245,7 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -540,19 +541,20 @@ effect  = _, _;
       id: 'sweep',
       label: 'Sweep',
       what: 'a sawtooth with most of it taken away again by a filter that moves',
-      code: `import("stdfaust.lib");   // brings in os, en, fi and dm, used below
+      code: `import("stdfaust.lib");   // brings in os, en, fi, si and dm, used below
 
 freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
 gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
 gate = button("gate");                         // 1 while a key is held down
+cutoff = hslider("cutoff[scale:log]", 8000, 100, 8000, 1) : si.smoo;
 
 saw = os.sawtooth(freq);                     // every harmonic is in here already
 env = en.adsr(0.005, 0.2, 0.6, 0.3, gate);   // this envelope is on the volume
 
-// and this one is on the corner the filter cuts at, which is where the
-// sound is. It opens to twelve times the note and shuts back down to it
+// and this one is on the corner the filter cuts at, which is where the sound
+// is. It opens to twelve times the note, never past the cutoff, and shuts again
 
-cut = freq * (1 + 11 * en.ar(0.002, 0.5, gate));
+cut = min(cutoff, freq * (1 + 11 * en.ar(0.002, 0.5, gate)));
 
 process = saw : fi.resonlp(cut, 6, 1) * env * gain * 0.12 <: _, _;
 
@@ -814,6 +816,64 @@ effect  = _, _;
     try { return await fn(); } finally { sink = null; }
   }
 
+  // ── the knobs under the text ──────────────────────────────────────────────
+  //
+  // 🔴 EVERY `hslider`, `vslider` AND `nentry` WRITTEN IN THE BOX, EXCEPT THE
+  // THREE A KEY SETS, IS A KNOB IN ONE ROW UNDER THE TEXT, WITH THE PROGRAM'S
+  // OWN RANGE, STEP AND STARTING VALUE. Asked 2026-09-30 with `/collide/`
+  // (*"can we do it on fau too?"*). They are read out of the compile's own JSON,
+  // `voiceFactory.json` and `effectFactory.json`, walked the way faustwasm's
+  // `parseUI` walks them, because a visit compiles with no node to ask; the node
+  // built from that compile answers the same list from `getParams()`, which the
+  // checks below compare. A turn is `node.setParamValue(address, value)`, and
+  // on a polyphonic node that reaches EVERY voice: the worklet's
+  // `FaustPolyWebAudioDsp.setParamValue` hands a voice path to each of
+  // `fVoiceTable` and an effect path to the effect (vendored `faustwasm.mjs`).
+  // ⚠️ `freq`, `gain` AND `gate` ARE LEFT OUT BECAUSE `keyOn` WRITES THEM,
+  // matched on the address's last part, which is how faustwasm finds them.
+  // ⚠️ ONLY WHAT IS WRITTEN IN THE BOX. `pm.clarinet_ui_MIDI` declares eight
+  // sliders inside the library and `dm.freeverb_demo` four, and none of them
+  // is in the text. A knob for a name nobody can see in the program is a
+  // control the text does not explain, and the editor work that colours a
+  // name and its knob alike has nothing to colour. So a slider becomes a knob
+  // only when its label is typed in a `hslider(`, `vslider(` or `nentry(` here.
+  // ⚠️ `[scale:log]` IS THE EXPONENTIAL WARP, which is what Faust's own log
+  // scale does to a slider's travel; anything else is linear.
+  // ⚠️ THE NAME IS THE SHORTNAME AND THE ADDRESS IS PER COMPILE. The address
+  // carries the compile's name (`/sweep_3/cutoff`), which changes every time,
+  // so a knob is kept across a recompile by its shortname and the address is
+  // looked up afresh on the compile the node was built from.
+  const KEYED = ['freq', 'gain', 'gate'];
+  function readKnobs(voice, effect, code) {
+    const typed = new Set([...code.matchAll(/\b(?:hslider|vslider|nentry)\s*\(\s*"([^"[]*)/g)].map((m) => m[1].trim()));
+    const list = [], addr = new Map();
+    const walk = (items) => {
+      for (const it of items || []) {
+        if (it.items) { walk(it.items); continue; }
+        if (!['hslider', 'vslider', 'nentry'].includes(it.type)) continue;
+        if (KEYED.includes(it.address.split('/').pop())) continue;
+        if (!typed.has(it.label) || addr.has(it.shortname)) continue;
+        const log = (it.meta || []).some((m) => m.scale === 'log') && it.min > 0;
+        addr.set(it.shortname, it.address);
+        list.push({ name: it.shortname, value: it.init, min: it.min, max: it.max,
+          step: it.step, warp: log ? 'exp' : 'lin' });
+      }
+    };
+    walk(voice?.ui);
+    walk(effect?.ui);
+    return { list, addr };
+  }
+  /** How many `setParamValue`s a turn or a new node has sent. */
+  let paramSends = 0;
+  const knobs = createParamKnobs({
+    onChange: (name, v) => {
+      const a = onThread?.addr.get(name);
+      if (node && a) { node.setParamValue(a, v); paramSends++; }
+    },
+  });
+  /** The panel row the knobs sit in, hidden while a program has none. */
+  let knobRow = null;
+
   // ── compiling ──────────────────────────────────────────────────────────────
   //
   // 🔴 ONE QUEUE, BECAUSE THERE IS ONE COMPILER AND ONE AUDIO GRAPH. The page's
@@ -852,7 +912,7 @@ effect  = _, _;
    * audio is already running THIS compile" from "the audio is running the
    * previous one", which is the difference between a no-op and a swap.
    */
-  let ready = null;      // { gen, name } compiled and not yet on the audio thread
+  let ready = null;      // { gen, name, addr } compiled and not yet on the audio thread
   let onThread = null;   // the `ready` the live node was built from
 
   /**
@@ -873,6 +933,13 @@ effect  = _, _;
     const old = node;
     node = next;
     onThread = ready;
+    /* A new node starts every control at the program's default, so the knobs
+       are handed to it before it is heard. `setParamValue` on a polyphonic
+       node reaches every voice, see the knob block below. */
+    for (const [k, v] of knobs.values()) {
+      const a = ready.addr.get(k);
+      if (a) { node.setParamValue(a, v); paramSends++; }
+    }
     node.connect(master);
     if (old) {
       /* Everything the old node was holding goes with it. `allNotesOff` first,
@@ -938,7 +1005,10 @@ effect  = _, _;
       + (gen.effectFactory?.code.length || 0)
       + (gen.mixerBuffer?.length || 0);
 
-    ready = { gen, name: uniq };
+    const kn = readKnobs(meta, gen.effectFactory ? JSON.parse(gen.effectFactory.json) : null, code);
+    ready = { gen, name: uniq, addr: kn.addr };
+    knobs.set(kn.list);
+    if (knobRow) knobRow.hidden = kn.list.length === 0;
     /* 🔴 A COMPILE DOES NOT OPEN A SOUND DEVICE. With the audio already open
        the new module goes straight onto the thread, which is what a recompile
        has always done; with it shut, this compile is what the first key press
@@ -1295,6 +1365,9 @@ effect  = _, _;
     keys: keys.el,
     plate: { name: 'FAU', patch },
   });
+  /* The knobs are the row under the text, hidden until a compile has any. */
+  knobRow = panel.addRow(knobs.el);
+  knobRow.hidden = knobs.names().length === 0;
   d.el.append(panel.el);
 
   /* 🔴 THE FIRST TOUCH ANYWHERE ON THE INSTRUMENT OPENS THE AUDIO, NOT THE
@@ -1517,8 +1590,9 @@ effect  = _, _;
     {
       const rect = (e) => (e.el || e).getBoundingClientRect();
       const cs = (e, k) => parseFloat(getComputedStyle(e.el || e)[k]) || 0;
-      d.assert('the panel is a picture, keys and a foot, in that order',
-        panel.shape().join(' ') === 'viz keys plate', panel.shape().join(' '));
+      d.assert('the panel is a picture, the knob row, keys and a foot, in that order',
+        panel.shape().join(' ') === 'viz controls keys plate' && panel.controls()[0] === knobRow,
+        panel.shape().join(' '));
       const ta = rect(source.input), sf = rect(panel.el);
       const gapL = +(ta.left - (sf.left + cs(panel.el, 'borderLeftWidth'))).toFixed(1);
       const gapR = +((sf.right - cs(panel.el, 'borderRightWidth')) - ta.right).toFixed(1);
@@ -2068,6 +2142,82 @@ effect  = _, _;
     showSource();
     showPatch(0);
     });
+
+    /* ── the knob under the text ─────────────────────────────────────────────
+       ⚠️ OUTSIDE THE `serial` TURN ABOVE, BECAUSE IT RECOMPILES BY TYPING, and
+       the idle compile takes a turn on the same queue: inside that turn it
+       would wait for the turn it is in. MEASURED on the first run of this
+       block, the compile never started and every check after it was lost.
+       🔴 READ OFF THE SCREEN AND OFF THE LIVE NODE, AND TURNED THROUGH THE
+       KNOB'S OWN KEYS. A keydown on the dial is what a person's arrow key does,
+       and it goes through the component, the warp, `onChange` and
+       `setParamValue`. Home is the bottom of the travel, which is 100 Hz. */
+    const kDrawn = () => getComputedStyle(knobRow).display !== 'none';
+    const kOnRow = () => [...knobRow.querySelectorAll('.pos-knob[data-param]')];
+    const cutKnob = () => knobRow.querySelector('.pos-knob[data-param="cutoff"]');
+    await applyPatch(0);
+    d.assert('the Organ has no slider but the three a key sets, so there is no knob row at all, not an empty one',
+      !kDrawn() && kOnRow().length === 0 && knobRow.getBoundingClientRect().height === 0,
+      `${getComputedStyle(knobRow).display}, ${kOnRow().length} knobs`);
+    await applyPatch(PRESETS.findIndex((p) => p.id === 'sweep'));
+    const cutAddr = onThread?.addr.get('cutoff');
+    d.assert('the Sweep has exactly one knob, cutoff, and not the room\'s four, which are the library\'s and not in the text',
+      kDrawn() && kOnRow().length === 1 && !!cutKnob()
+        && cutKnob().querySelector('.pos-knob-v').textContent === '8000',
+      kOnRow().map((k) => `${k.dataset.param} ${k.querySelector('.pos-knob-v').textContent}`).join(', ') || 'no knobs');
+    d.assert('its range is the slider\'s own, 100 to 8000 on a log scale, and the live node knows that address',
+      /hslider\("cutoff\[scale:log\]", 8000, 100, 8000, 1\)/.test(byId('sweep').code)
+        && cutKnob()?.getAttribute('title') === 'cutoff, 100 to 8000, exp'
+        && !!cutAddr && node.getParams().includes(cutAddr),
+      `${cutKnob()?.getAttribute('title')}, ${cutAddr} ${node?.getParams().includes(cutAddr) ? 'is' : 'is not'} in getParams()`);
+    const avg = async (n = 8) => {
+      let sum = 0;
+      for (let i = 0; i < n; i++) { sum += level(); await sleep(25); }
+      return sum / n;
+    };
+    const cutDial = () => cutKnob().querySelector('.pos-knob-dial');
+    press(48, 100);
+    press(55, 100);
+    await sleep(400);
+    const open = await avg();
+    const sendsBefore = paramSends;
+    cutDial().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    await sleep(250);
+    const shut = await avg();
+    d.assert('turning cutoff to the bottom while two keys are held darkens both at once, with no recompile',
+      knobs.value('cutoff') === 100 && paramSends > sendsBefore && shut < open * 0.4 && open > 0.005,
+      `${open.toFixed(5)} rms open, ${shut.toFixed(5)} at 100 Hz, ${paramSends - sendsBefore} setParamValue`);
+    lift(48);
+    lift(55);
+    /* ⚠️ AN ASSERT HERE, BECAUSE THE RECOMPILE BELOW IS THE IDLE WAIT PLUS THE
+       NOTE'S OWN MINIMUM, and a check block quiet for two seconds is cut off
+       with everything after it lost and the run still green. MEASURED on the
+       first run of this block: the seven asserts after this point went. */
+    await sleep(400);
+    d.assert('letting both keys go takes the sound away, with the knob still where it was turned',
+      level() < open * 0.2 && knobs.value('cutoff') === 100 && holding() === 0,
+      `${level().toFixed(5)} rms, cutoff ${knobs.value('cutoff')}, ${holding()} held`);
+    const nodeBefore = node, sendsAtRecompile = paramSends;
+    typeInto(`${byId('sweep').code}// the same Sweep, recompiled\n`);
+    await idle.settled();
+    const newAddr = onThread?.addr.get('cutoff');
+    d.assert('a recompile keeps the knob at 100 and hands it to the new node before it is heard',
+      node !== nodeBefore && knobs.value('cutoff') === 100 && !!newAddr && node.getParams().includes(newAddr)
+        && paramSends > sendsAtRecompile,
+      `${node === nodeBefore ? 'the same' : 'a new'} node, knob ${knobs.value('cutoff')}, `
+      + `${paramSends - sendsAtRecompile} setParamValue to it at ${newAddr}`);
+    press(48, 100);
+    press(55, 100);
+    await sleep(400);
+    const still = await avg();
+    lift(48);
+    lift(55);
+    d.assert('and the same two keys on the new node are as dark as they were before it',
+      still < open * 0.4, `${still.toFixed(5)} rms against ${open.toFixed(5)} open`);
+    await sleep(500);
+    cutDial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    d.assert('and a double press puts it back where the program wrote it, 8000',
+      knobs.value('cutoff') === 8000, String(knobs.value('cutoff')));
 
     /* ── and typing into a LIVE instrument swaps the node after the pause ───
        🔴 INVERTED 2026-09-30, AND IT WAS THE STRONGER HALF OF *"no

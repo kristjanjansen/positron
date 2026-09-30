@@ -14,7 +14,7 @@ ASKED, VERBATIM: *"enable loop button and fucntioanly on onscreen keyboar when e
 
 ASKED, VERBATIM: *"just go"*, to the plan's recommendation (a hand-rolled overlay, `demo/shell/code-box.mjs` and `code-lang.mjs`, one hue per knob parameter). Order: the tokenizer and its node test, then the kit piece, then `/und/` (free now), then `/collide/` and `/fau/` AFTER the live-knobs agent lands, because it is editing both. Not tried on an iPhone; the plan names three things only a real iPhone settles. ⏸ **PARKED ON INSTRUCTION, 2026-09-30:** *"iphone: deal later"*. The three: the caret over transparent text, the selection handles, and whether WebKit scrolls the wrapper to follow the caret. It ships without them.
 
-### Open 2026-09-30: `/collide/` keeps Pad, Growl and Wah only
+### Done 2026-09-30: `/collide/` keeps Pad, Growl and Wah only
 
 ASKED, VERBATIM: *"keep pad growl wah"*. Bell, Glass and Breath go from `demo/collide/presets.mjs`, with their per-patch asserts (three each), so the page count drops by nine. Handed to the live-knobs agent, which is in `demo/collide/` now.
 
@@ -22,13 +22,16 @@ ASKED, VERBATIM: *"keep pad growl wah"*. Bell, Glass and Breath go from `demo/co
 
 ASKED, VERBATIM: *"in bg: invertigate minimal visual code editor with basic syntac hilite for our synths. they are rare languages so perhaps we need use some other templte"*. The languages: Faust (`/fau/`), the SuperCollider subset (`/collide/`), Csound score (`/und/`). Research only, a plan in `plans/`, reported in full when it lands. `/typist/` already pins a textarea over a drawn layer, which is prior art in this repo.
 
-### Open 2026-09-30: knobs under the code on `/collide/` and `/fau/`, read from the code, turned live without a recompile
+### Done 2026-09-30: knobs under the code on `/collide/` and `/fau/`, read from the code, turned live without a recompile
 
 ASKED, VERBATIM: *"what about variables in code (propose names like C1 / VALUE1 etc) that are under the code and adjust parameters in real time like `var env = EnvGen.kr(Env.adsr(0.4, 0.3, 0.7, VALUE1), gate, doneAction: 2);` is it possible?"*, then *"ok. do test with single knob laer. can we do it on fau too?"*.
 - **Proposed and accepted:** real syntax, not invented names, so the code still runs in the real language. SuperCollider: every function argument except `freq`, `amp`, `gate`, plus `\name.kr(default, lag, spec: [min, max, curve])` NamedControls (new to `sclang-lite.mjs`), each a SynthDef parameter changed with `/n_set` on every sounding node. Faust: every `hslider`/`vslider`/`nentry` except `freq`, `gain`, `gate`, read from the compiled DSP's parameter list with its own min, max and step, set on all voices through faustwasm.
 - **One row of knobs under the code**, built from the compiled program after every compile, a value kept across a recompile when the name survives. One kit piece, two pages.
 - **Start with a single knob** ("single knob laer" read as one row, tested first with one knob): `rel` on `/collide/`'s Pad, `cutoff` on one `/fau/` preset.
 - ⚠️ **WAITS FOR the `/collide/` patches agent**, which is in `demo/collide/` and `sclang-lite.mjs` now.
+
+- ✅ **DONE (agent report).** `demo/shell/param-knobs.mjs`, `createParamKnobs({ onChange })`, `set(params)` keeps a surviving value; specs are sclang's `ControlSpec` (`mapSpec` from `Spec.sc`); each knob carries `data-param` and draws in `--param-hue` when set. `/collide/`: `\name.kr(v, lag, spec:)` supported (a number lag is a `LagControl`, as `NamedControl.new` does), a turn is `/n_set` to every live node; Pad's `rel` measured 0.053 s at 0.05 and 1.044 s after eight Page Ups on a HELD note. `/fau/`: knobs read from the compile's own JSON, a turn is `setParamValue` on all voices; Sweep's `cutoff` took two held keys from 0.0767 to 0.0153 rms. Counts: collide 39 page asserts all green, fau 60 (the one red is the old diagram one), kit 260/260. Sabotages: 5 red each.
+- ⚠️ **A decision for the owner:** on `/fau/` only sliders TYPED in the box get knobs; library ones (`pm.clarinet_ui_MIDI` 8, `pm.djembe_ui_MIDI` 3, Sweep's `dm.freeverb_demo` 4) do not. One filter in `readKnobs`. Also: a release already under way is not changed by a turn (EnvGen reads a segment's time at its start); a pointer drag on the knob was not driven (`setPointerCapture` throws for a synthetic pointer).
 
 ### Done 2026-09-30: `/collide/`, keep only Pad, add more patches, settle what can be settled
 

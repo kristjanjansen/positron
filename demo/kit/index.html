@@ -498,6 +498,8 @@
   import { createKeyboard, QWERTY_CHROMATIC, SHARP_KEYS } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createField } from '/shell/field.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
   import { createStripView, createStripFooter, STRIP_FOOTER_EMPTY } from '/shell/strip.mjs';
   import { createFullscreenExit, EXIT_IDLE_MS, toggle as fsToggle, isFull as fsIsFull }
     from '/shell/fullscreen.mjs';
@@ -522,6 +524,7 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
@@ -1201,8 +1204,86 @@
    * PANEL block further down already shows a case full of real controls.
    */
   /**
+   * 🔴 THE NEWEST BLOCK, 2026-09-30, ABOVE KNOBS UNDER THE CODE, AND THE FIRST
+   * CALL TO `section()`. `plans/plan-code-editor.md`, asked as *"a hand-rolled
+   * overlay - maybe not that bad idea"* and *"coloring slider code snippets
+   * would be nice, perhaps each on its own hue"*. The box is the kit field's
+   * own textarea, transparent, over a pre of coloured spans.
+   * ⚠️ THE BOOK IS HANDED `cutoff` AND `res` AND NOT `freq` OR `gate`, which is
+   * what a page does after a compile: only a name with a knob gets a hue, and a
+   * key-driven one is drawn plain. The hslider in the comment is not a
+   * parameter at all. Six rows for seven lines, so it scrolls.
+   * ⚠️ `codeSpec` IS DECLARED ABOVE THE BLOCK, for the reason `cnoteSpec` is.
+   */
+  let codeSpec = null;
+  section('input', 'CODE BOX',
+    'A program box whose text is coloured by language, with each parameter that has a knob in its own hue.',
+    `const hues = createHueBook()             // one per page, the knob row reads it too
+const box = createCodeBox({
+  language: 'faust',                      // 'faust' | 'sclang' | 'csound-sco'
+  rows: 20, value, hues,
+  ariaLabel: 'the Faust program this page compiles',
+})
+hues.assign(knobNames)                    // after a compile that succeeded
+createCompileIdle({ input: box.input, host: box.el, compile })
+box.set(preset); box.params(); box.mark('cutoff', true)`,
+    (box) => {
+      const hues = createHueBook();
+      const cb = createCodeBox({
+        language: 'faust', rows: 6, hues,
+        ariaLabel: 'a Faust program, to show the colours',
+        value: 'import("stdfaust.lib");\n'
+          + '// hslider("ghost", 1, 0, 2, 0.1) in a comment is not a parameter\n'
+          + 'freq = hslider("freq", 440, 40, 8000, 0.01);   // a key sets this one\n'
+          + 'cutoff = hslider("cutoff[unit:Hz]", 1200, 40, 8000, 1);\n'
+          + 'res = hslider("res", 0.5, 0, 0.99, 0.01);\n'
+          + 'gate = button("gate");\n'
+          + 'process = os.sawtooth(freq) : fi.resonlp(cutoff, 1 + res * 8, 1) * en.adsr(0.01, 0.2, 0.7, 0.3, gate) <: _, _;',
+      });
+      hues.assign(['cutoff', 'res']);
+      codeSpec = { cb, hues };
+      box.append(cb.el);
+    });
+
+  /**
    * 🔴 THE NEWEST BLOCK ON THIS PAGE, 2026-09-30, AND THE FIRST CALL TO
-   * `section()`, so it marks INPUT as the part with something new in it.
+   * `section()`. Asked as *"variables in code ... that are under the code and
+   * adjust parameters in real time"*: `/collide/` and `/fau/` hand
+   * `param-knobs.mjs` the parameters their compiler read out of the program,
+   * and it draws one knob each, turning 0 to 1 through the parameter's warp.
+   * ⚠️ `--param-hue` IS SET ON THE MIDDLE ONE ONLY, to show the hook the code
+   * editor work will use; nothing on a real page sets one yet.
+   * ⚠️ `pkSpec` IS DECLARED ABOVE THE BLOCK, for the reason `cnoteSpec` is.
+   */
+  let pkSpec = null;
+  const PK_PARAMS = [
+    { name: 'rel', value: 1.5, min: 0.05, max: 6, warp: 'exp' },
+    { name: 'cutoff', value: 8000, min: 100, max: 8000, warp: 'exp', step: 1 },
+    { name: 'pan', value: 0, min: -1, max: 1 },
+  ];
+  section('input', 'KNOBS UNDER THE CODE',
+    'One knob for each parameter a program declares, with the program\'s own range, rebuilt after every compile and keeping a value whose name survives.',
+    `const knobs = createParamKnobs({
+  onChange: (name, value) => send(name, value),   // a person turned one
+})
+row.append(knobs.el)                              // hidden while it has none
+knobs.set([                                       // after every compile
+  { name: 'rel', value: 1.5, min: 0.05, max: 6, warp: 'exp' },
+  { name: 'cutoff', value: 8000, min: 100, max: 8000, warp: 'exp', step: 1 },
+])                                                // answers every value it kept
+knobs.value('rel')
+// every knob wears data-param="<name>", and --param-hue on it or above it colours its arc`,
+    (box) => {
+      const turns = [];
+      const knobs = createParamKnobs({ onChange: (name, v) => turns.push([name, v]) });
+      knobs.set(PK_PARAMS);
+      knobs.knob('cutoff').el.style.setProperty('--param-hue', '200');
+      pkSpec = { knobs, turns };
+      box.append(knobs.el);
+    });
+
+  /**
+   * 🔴 THE NEWEST BLOCK ON THIS PAGE UNTIL KNOBS UNDER THE CODE, 2026-09-30.
    * Asked as *"unify compilation in ui logic on this and fau ant othes.
    * trigger on inactivity? Small breating "Compiling" note (not button) on
    * right bottom i the plae complile button is in fau. a kit comopnent?"*.
@@ -5310,7 +5391,112 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   measure();
 
-  /* ── the compile note, the newest block ────────────────────────────────────
+  /* ── the code box, the newest block ────────────────────────────────────────
+     🔴 THE WHOLE DESIGN RESTS ON ONE INVARIANT: THE DRAWN LAYER HOLDS EXACTLY
+     THE TEXTAREA'S TEXT, AT EXACTLY THE TEXTAREA'S METRICS, IN EXACTLY ITS
+     RECTANGLE. Read off the rendered elements, never off the source.
+     ⚠️ `refit()` FIRST, BECAUSE A MEASURING WINDOW HOLDS NO FRAME. The box was
+     built inside a closed panel, where it measures nothing on purpose, and its
+     ResizeObserver answers a frame after this line; the same reason the
+     INSTRUMENT PANEL block calls the filter view's `redraw()`. */
+  {
+    const { cb, hues } = codeSpec;
+    cb.refit();
+    const ta = cb.input, ink = cb.ink, sc = cb.scroller;
+    const cs = (e) => getComputedStyle(e);
+    const same = () => ink.textContent === ta.value;
+    const PROPS = ['font-family', 'font-size', 'line-height', 'letter-spacing', 'tab-size', 'white-space',
+      'overflow-wrap', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'];
+    const differ = PROPS.filter((p) => cs(ink).getPropertyValue(p) !== cs(ta).getPropertyValue(p));
+    const ri = ink.getBoundingClientRect(), rt = ta.getBoundingClientRect();
+    const off = Math.max(Math.abs(ri.left - rt.left), Math.abs(ri.top - rt.top),
+      Math.abs(ri.width - rt.width), Math.abs(ri.height - rt.height));
+    d.assert('the coloured layer holds the textarea’s text exactly, at its metrics and in its rectangle',
+      same() && differ.length === 0 && off <= 0.5 && rt.height > 0,
+      `${ta.value.length} characters, ${differ.length ? `differs in ${differ.join(' ')}` : `${PROPS.length} metrics equal`}, `
+      + `rectangles ${off.toFixed(2)} px apart, ${rt.width.toFixed(1)} by ${rt.height.toFixed(1)}`);
+
+    const edge = (e) => parseFloat(cs(e).borderTopWidth) + parseFloat(cs(e).borderBottomWidth);
+    const lh = parseFloat(cs(ta).lineHeight);
+    d.assert('the border is on the scroller and not on the textarea, and six rows of seven lines scroll inside it',
+      edge(sc) === 2 && edge(ta) === 0 && cs(ta).color === 'rgba(0, 0, 0, 0)'
+        && sc.scrollHeight > sc.clientHeight + lh / 2 && cs(sc).overflowY === 'auto'
+        && Math.abs(sc.clientHeight - (6 * lh + parseFloat(cs(ta).paddingTop) + parseFloat(cs(ta).paddingBottom))) <= 1,
+      `scroller ${edge(sc)} px of border, textarea ${edge(ta)}, ink ${cs(ta).color}, `
+      + `${sc.clientHeight} of ${sc.scrollHeight} px shown, ${(sc.clientHeight / lh).toFixed(1)} line heights`);
+
+    // What each parameter span says, and the ink its name is drawn in.
+    const spans = () => [...ink.querySelectorAll('.pos-tk-p')];
+    const nameInk = (s) => cs(s.querySelector('.pos-tk-pname') || s).color;
+    const plainStr = cs(ink.querySelector(':scope > .pos-tk-string')).color;
+    const read = () => spans().map((s) => `${s.dataset.param}${s.dataset.hue ? `:${s.dataset.hue}` : ''}`).join(' ');
+    const hueOk = () => spans().every((s) => (s.dataset.hue
+      ? nameInk(s) !== plainStr && cs(s).backgroundColor !== 'rgba(0, 0, 0, 0)'
+      : nameInk(s) === plainStr && cs(s).backgroundColor === 'rgba(0, 0, 0, 0)'));
+    d.assert('a hue lands only on a parameter with a knob: the key-driven freq and gate are drawn plain, the commented slider is not a parameter',
+      read() === `freq cutoff:${hues.hueOf('cutoff')} res:${hues.hueOf('res')} gate` && hueOk(),
+      `${read()}, a hued name ${nameInk(spans()[1])} against a plain string ${plainStr}`);
+
+    hues.assign(['res']);
+    const after = read();
+    hues.clear().assign(['cutoff', 'res']);
+    d.assert('a name that loses its knob loses its hue on the spot, and the box repaints without a keystroke',
+      after === `freq cutoff res:${hues.hueOf('res')} gate` && read().includes('cutoff:') && hueOk(), after);
+
+    const was = ta.value;
+    ta.value = `${was}\n// typed`;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    const typed = same() && Math.abs(ink.getBoundingClientRect().height - ta.getBoundingClientRect().height) <= 0.5
+      && ink.querySelectorAll('.pos-tk-comment').length === 3;
+    cb.set(was);
+    d.assert('typing repaints the layer from the textarea, and set() repaints it with no input event',
+      typed && same() && ink.querySelectorAll('.pos-tk-comment').length === 2,
+      `${ink.querySelectorAll('.pos-tk-comment').length} comments after set()`);
+  }
+
+  /* ── the knobs under the code, the newest block ────────────────────────────
+     🔴 THE ROW IS DRIVEN THROUGH A KNOB'S OWN KEYS, AND THE HUE IS READ OFF THE
+     PAINTED STROKE. A hook nobody has measured is a hook that may never have
+     worked, and `var()` fallbacks are exactly the kind of CSS that reads as
+     correct and computes to something else. */
+  {
+    const { knobs, turns } = pkSpec;
+    const onRow = () => [...knobs.el.querySelectorAll('.pos-knob[data-param]')];
+    const num = (n) => knobs.knob(n)?.el.querySelector('.pos-knob-v').textContent;
+    d.assert('a knob for each parameter, named by data-param, each printing the value the program wrote',
+      onRow().map((k) => k.dataset.param).join(' ') === 'rel cutoff pan'
+        && num('rel') === '1.50' && num('cutoff') === '8000' && num('pan') === '0.00'
+        && getComputedStyle(knobs.el).display !== 'none',
+      onRow().map((k) => `${k.dataset.param} ${k.querySelector('.pos-knob-v').textContent}`).join(', '));
+    const arc = (n) => getComputedStyle(knobs.knob(n).el.querySelector('.pos-knob-arc')).stroke;
+    const probe = el('span');
+    probe.style.color = 'var(--hi)';
+    knobs.el.append(probe);
+    const hi = getComputedStyle(probe).color;
+    probe.remove();
+    d.assert('with no --param-hue a knob draws in the ordinary accent, and with one it draws in that hue',
+      arc('rel') === hi && arc('pan') === hi && arc('cutoff') !== hi && /^rgb/.test(arc('cutoff')),
+      `rel ${arc('rel')}, cutoff ${arc('cutoff')}, --hi ${hi}`);
+    const dial = knobs.knob('rel').el.querySelector('.pos-knob-dial');
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    d.assert('a key on the dial turns it through the warp to the bottom of the range, and says so to the page',
+      knobs.value('rel') === 0.05 && num('rel') === '0.05' && turns.at(-1)?.join(' ') === 'rel 0.05'
+        && dial.getAttribute('aria-valuetext') === '0.05',
+      `${knobs.value('rel')}, "${num('rel')}", last turn ${turns.at(-1)?.join(' ')}`);
+    const kept = knobs.set([PK_PARAMS[0], { name: 'drive', value: 2, min: 1, max: 8, step: 1 }]);
+    d.assert('a rebuild keeps a value whose name survives, drops the rest and starts a new one where it is written',
+      kept.map((k) => `${k.name} ${k.value}`).join(', ') === 'rel 0.05, drive 2'
+        && onRow().map((k) => k.dataset.param).join(' ') === 'rel drive' && num('rel') === '0.05',
+      kept.map((k) => `${k.name} ${k.value}`).join(', '));
+    knobs.set([]);
+    d.assert('and a program with nothing to turn has no row: nothing drawn, no height',
+      getComputedStyle(knobs.el).display === 'none' && knobs.el.getBoundingClientRect().height === 0,
+      getComputedStyle(knobs.el).display);
+    knobs.set(PK_PARAMS);
+    knobs.knob('cutoff').el.style.setProperty('--param-hue', '200');
+  }
+
+  /* ── the compile note ──────────────────────────────────────────────────────
      🔴 THE STATIC HALF NOW, THE TIMED HALF IN THE BACKGROUND. `/kit/` has about
      two seconds of room before the harness gives up waiting for `ready` (see
      the loop block near the foot), and the timed half is four compiles of a
