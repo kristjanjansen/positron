@@ -173,6 +173,30 @@ const types = (src, lang) => {
     !tokenize('t 0 60 ; i said so\n', csoundSco).some((x) => x.type === 'keyword' && x.from > 2));
 }
 
+{
+  // 🔴 LINE KINDS, so `/und/` can draw a line in the colour of its lane. The
+  // second source is again `csound.mjs`: every line it read a note from is an
+  // event line, and nothing else is.
+  const { html } = render(UND, 'csound-sco');
+  const lines = html.split('\n');
+  const evLines = new Set(lines.map((l, n) => (l.includes('pos-ln-event') ? n + 1 : 0)).filter(Boolean));
+  const notes = new Set(csoundPart(UND).part.rows.filter((r) => r.kind === 'note').map((r) => r.line));
+  ok('Csound score: a line is an event line exactly where csound.mjs read a note',
+    evLines.size === notes.size && [...notes].every((l) => evLines.has(l)),
+    `${evLines.size} event lines, ${notes.size} notes`);
+  ok('Csound score: the t line is tempo and the m and n lines are part',
+    lines.some((l) => /pos-tk-keyword pos-ln-tempo">t</.test(l))
+      && lines.filter((l) => /pos-ln-part">[mn]</.test(l)).length === 2,
+    'tempo and part kinds');
+  const cm = render('i 1 0 1 ; i said so\n', 'csound-sco').html;
+  ok('NEGATIVE CONTROL: a comment on an event line keeps its own ink',
+    /<span class="pos-tk-comment">; i said so<\/span>/.test(cm), cm);
+  const half = tokenize('i 1 0 .5 .\n', csoundSco).filter((x) => x.type === 'number' || x.type === 'carry')
+    .map((x) => `${x.type}:${'i 1 0 .5 .\n'.slice(x.from, x.to)}`).join(' ');
+  ok('NEGATIVE CONTROL: .5 is one number and a lone . is a carry',
+    half === 'number:1 number:0 number:.5 carry:.', half);
+}
+
 // ── parameters, graded against the compilers ────────────────────────────────
 
 let faustCompiler = null, tmp = null;

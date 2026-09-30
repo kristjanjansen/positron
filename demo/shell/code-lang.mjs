@@ -224,10 +224,23 @@ export const csoundSco = {
     [/"(?:[^"\\\n]|\\.)*"?/, 'string'],
     [/(?<=^[ \t]*)[abCdefimnqrstvxy](?=[ \t\n]|$)/m, 'keyword'],   // the statement letter
     [/(?<=^[ \t]*[mn][ \t]+)[A-Za-z_]\w*/m, 'label'],             // m theme, n theme
-    [/[+.^<>!]|np\d+|pp\d+/, 'carry'],                            // a carried or ramped p-field
+    [/[+^<>!]|\.(?!\d)|np\d+|pp\d+/, 'carry'],                    // a carried or ramped p-field; `.5` is a number
     [/-?\d+(?:\.\d*)?(?:[eE][-+]?\d+)?|-?\.\d+/, 'number'],
     [/[A-Za-z_]\w*/, ''],
   ],
+  /**
+   * 🔴 WHAT A LINE IS, SO A PAGE CAN DRAW IT IN THE COLOUR OF THE LANE THAT
+   * SHOWS IT. Asked 2026-09-30 on `/und/` with a screenshot of the score over
+   * its strip: *"can you mathc lane colors and code colors somehow"*. The strip
+   * has three lanes, `part`, `event` and `tempo`, and the score has exactly
+   * those three kinds of line, so the statement letter decides the kind and
+   * every coloured token on the line carries it. Comments keep their own ink.
+   */
+  lineKind: (line) => {
+    const m = /^[ \t]*([a-zA-Z])(?=[ \t]|$)/.exec(line);
+    if (!m) return null;
+    return m[1] === 'i' ? 'event' : m[1] === 't' ? 'tempo' : (m[1] === 'm' || m[1] === 'n') ? 'part' : null;
+  },
 };
 
 export const LANGS = { faust, sclang, 'csound-sco': csoundSco };
@@ -282,6 +295,13 @@ export function render(src, language, { hueOf = () => null, active = null } = {}
     for (let k = t.from + 1; k < t.to; k++) if (cuts.has(k)) { pieces.push({ ...t, from: a, to: k }); a = k; }
     pieces.push({ ...t, from: a });
   }
+  // The kind of the line each offset sits on, when the language says (see
+  // `csoundSco.lineKind`). A token takes the kind of the line it starts on.
+  const starts = [0];
+  if (lang.lineKind) for (let k = 0; k < src.length; k++) if (src[k] === '\n') starts.push(k + 1);
+  const kinds = lang.lineKind ? starts.map((a, n) => lang.lineKind(src.slice(a, n + 1 < starts.length ? starts[n + 1] - 1 : src.length))) : [];
+  let ln = 0;
+  const kindAt = (i) => { while (ln + 1 < starts.length && starts[ln + 1] <= i) ln++; return kinds[ln]; };
   let html = '', pi = 0, open = null;
   for (const t of pieces) {
     if (open && t.from >= open.to) { html += '</span>'; open = null; }
@@ -296,7 +316,8 @@ export function render(src, language, { hueOf = () => null, active = null } = {}
     }
     const txt = esc(src.slice(t.from, t.to));
     const isName = open && t.from >= open.nameFrom && t.to <= open.nameTo;
-    const cls = [t.type && tokenClass(t.type), isName && 'pos-tk-pname'].filter(Boolean).join(' ');
+    const kind = lang.lineKind && t.type && t.type !== 'comment' ? kindAt(t.from) : null;
+    const cls = [t.type && tokenClass(t.type), isName && 'pos-tk-pname', kind && `pos-ln-${kind}`].filter(Boolean).join(' ');
     html += cls ? `<span class="${cls}">${txt}</span>` : txt;
   }
   if (open) html += '</span>';
