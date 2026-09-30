@@ -58,6 +58,14 @@ const BOARD_ID = arg('id', process.env.BOARD_ID || null);
 const DRY = flag('dry');
 const ONCE = flag('once');
 const AUDIO_DEV = arg('audio', process.env.BOARD_AUDIO || 'default');
+// ⚠️ A `hw:` DEVICE OPENS AT ITS OWN CHANNEL COUNT OR NOT AT ALL. MEASURED
+// 2026-09-30 on the Fast Track Pro: `arecord -D hw:CARD=Pro,DEV=0 -c 1` answers
+// `Channels count non available`, because its capture is stereo only. So the
+// device is opened at BOARD_AUDIO_CHANNELS and ONE of them, BOARD_AUDIO_TAKE
+// (1-based), is kept. Not a `plughw` downmix: input 2 has nothing patched and
+// its own noise would be summed into the Circuit.
+const AUDIO_CH = Number(arg('audio-channels', process.env.BOARD_AUDIO_CHANNELS || 1));
+const AUDIO_TAKE = Number(arg('audio-take', process.env.BOARD_AUDIO_TAKE || 1));
 // Which relay is a PARAMETER, not a constant. A hop over the LAN and a hop
 // over the internet are the same protocol, and cost 6 ms against 69 ms
 // (measured, this repo). Choosing per hop is the point.
@@ -581,14 +589,24 @@ async function startAudio(source = 'synth', msg = null) {
              known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture'] };
   }
   if (backend() !== 'alsa') return { ok: false, reason: 'no arecord here — capture needs the board' };
-  const p = spawn('arecord', ['-D', AUDIO_DEV, '-f', 'S16_LE', '-r', String(RATE), '-c', '1', '-t', 'raw', '-q'],
+  if (!(AUDIO_TAKE >= 1 && AUDIO_TAKE <= AUDIO_CH)) {
+    return { ok: false, reason: `BOARD_AUDIO_TAKE ${AUDIO_TAKE} is not one of ${AUDIO_CH} channels` };
+  }
+  const p = spawn('arecord', ['-D', AUDIO_DEV, '-f', 'S16_LE', '-r', String(RATE), '-c', String(AUDIO_CH), '-t', 'raw', '-q'],
     { stdio: ['ignore', 'pipe', 'pipe'] });
+  const IN = BYTES * AUDIO_CH;
   let carry = Buffer.alloc(0);
   p.stdout.on('data', (chunk) => {
     carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
-    while (carry.length >= BYTES) {
-      sendPcm(new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + BYTES)));
-      carry = carry.subarray(BYTES);
+    while (carry.length >= IN) {
+      const all = new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + IN));
+      if (AUDIO_CH === 1) sendPcm(all);
+      else {
+        const one = new Int16Array(FRAME);
+        for (let i = 0; i < FRAME; i++) one[i] = all[i * AUDIO_CH + AUDIO_TAKE - 1];
+        sendPcm(one);
+      }
+      carry = carry.subarray(IN);
     }
   });
   // arecord's complaints go to stderr and are the only clue when a device name
@@ -596,7 +614,7 @@ async function startAudio(source = 'synth', msg = null) {
   p.stderr.on('data', (d) => log('arecord:', String(d).trim()));
   p.on('exit', (code) => { log(`arecord exited ${code} after ${sentFrames} frames`); audio = null; });
   audio = p;
-  return { ok: true, source: 'capture', device: AUDIO_DEV, rate: RATE };
+  return { ok: true, source: 'capture', device: AUDIO_DEV, rate: RATE, deviceChannels: AUDIO_CH, take: AUDIO_TAKE };
 }
 
 function stopAudio() {
