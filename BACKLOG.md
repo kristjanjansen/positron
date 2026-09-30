@@ -1,5 +1,80 @@
 ## Open
 
+### Open 2026-09-30: the "I am watching" connector and its note should be more technical
+
+ASKED, VERBATIM: *"you can be more techincal on this connector label and desc
+below"*, with a screenshot of the `/llhls/` diagram, the `socket` to `Pub` arrow
+and the note under the picture.
+`demo/llhls/index.html:648`, the `{ from: 'ctl', to: 'pub' }` link: `label: 'I
+am watching'` and its `note` (*"Nothing is sent up this socket. Being open is
+the whole message..."*).
+- **`/webrtc/` carries the same link** at `demo/webrtc/index.html:542`, same
+  label, a different note. Both change together or the two pages disagree about
+  one socket.
+- What the arrow really is: a WebSocket to `wss://pub.positron.studio/watch`,
+  held by the `Pub` Durable Object, which counts open sockets in the room; the
+  first one starts the ffmpeg leg and the sweep stops it when the count is zero.
+  Read `positron-streaming` and the worker for the exact route, the sweep
+  interval and whether it is hibernatable before writing the words, rather than
+  copying this line.
+- ⚠️ A connector label is short by the diagram's rules; the technical detail
+  that does not fit goes in the note. Load `positron-diagram` first.
+
+### Open 2026-09-30: the player box's note should say how to patch hls.js to work right
+
+ASKED, VERBATIM: *"add longer desc how to patch hls.js to work right"*, with a
+screenshot of the `/llhls/` diagram's `player` box (`hls.js or native`) and its
+note (*"Waits for two segments before it asks for anything, because Cloudflare
+answers the master playlist with a 200..."*).
+`demo/llhls/index.html:626`, the `{ id: 'play' }` box's `note`.
+- **The material already exists and is measured**: `positron-streaming`'s
+  `## hls.js and the native path: what each default costs` (SKILL.md from
+  line 469): the three knobs that default against a low latency live start,
+  `maxLiveSyncPlaybackRate` switching on hls.js's own latency controller, the
+  live edge picked once with no recovery, the source watchdog, and what the
+  wrapper does that no hls.js option can (rate of advance, Safari's native
+  path at 0.961x / 5.25 s against hls.js 0.344x / 7.71 s). Take the words from
+  there and from what `/llhls/` actually sets, not from memory.
+- ⚠️ **"Longer" collides with the diagram's own rules.** A box note is read on
+  hover under the picture; load `positron-diagram` and check how long a note may
+  run before deciding whether this is one longer note or a short note plus a
+  prose block on the page. Keep the existing two-segments fact, it is true.
+- The one sentence rule is about `what` and `one`, not about diagram notes.
+- **FOLLOW-UP, VERBATIM, SAID WHILE THIS LINE WAS BEING WRITTEN:** *"and get
+  ll what we need"*. Read as: the text should say everything it takes to get
+  real low latency (LL) out of hls.js, the full list rather than a sample. If
+  it meant something else, the words are here to re-read.
+
+### Open 2026-09-30: test screen, local timecode to the right so it does not overlap absolute
+
+ASKED, VERBATIM: *"test screen: move local timecode to right not to overlap
+with absolute"*, with a frame grab from the live stream: `ABSOLUTE
+1790752256.967` and `LOCAL 07:10:57` side by side on one row, the absolute
+number running under the local one, and testsrc2's own corner counter still
+showing top left.
+Three places draw this layout and all three move together, as they did
+yesterday: `burn()` and the filter generator in `demo/shell/pattern.mjs`, and
+`workers/pub/container/server.mjs`.
+- 🔴 **THAT FRAME IS YESTERDAY'S OLD LAYOUT, SO THE CONTAINER WAS NEVER
+  DEPLOYED.** `ea21ee4` (2026-09-29 18:32, *"absolute over local in one column,
+  and the corner counter covered"*) changed `server.mjs` to stack the two and
+  to drawbox over the corner counter. The grab shows neither, so the ffmpeg
+  side is still running the old `server.mjs`. The view deploys since then do
+  not ship `workers/pub/`. Check what the pub worker and its container image
+  are actually on before changing anything, and say which one was measured.
+- ⚠️ **AND THE ASK IS NOT WHAT YESTERDAY BUILT.** Yesterday's ask was *"put
+  absolute and local below each other"*; today's is local to the RIGHT with no
+  overlap. Either the owner is reacting to the undeployed old frame and the
+  stacked layout already answers it, or they want side by side now. Show the
+  stacked frame (canvas pages carry it already, e.g. a pattern page on the
+  local server) and ask which, before building a third layout.
+- If side by side: the old bug was the column sized for a 13 character epoch
+  ms while ffmpeg prints 16 characters (seconds, three decimals, unit), per
+  `ea21ee4`. The right column has to be derived from the widest string either
+  side prints, not a constant.
+- Deploying the container is `positron-streaming` work and costs a restart of
+  the live leg; load it first.
+
 ### Open 2026-09-29: moq joins the streaming section and gets the same UI treatment
 
 ASKED, VERBATIM: *"Move moq to streaming as well and do same ui treatment"*.
