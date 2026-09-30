@@ -4,6 +4,7 @@
 //   wss://pub.positron.studio/watch    a viewer. First one in starts the
 //                                      publish; last one out stops it.
 //   GET  /status                       viewers + container + ffmpeg state
+//   GET  /ice                          short lived TURN servers, 503 with no key
 //   POST /start /stop                  manual override (debugging)
 //   POST /log                          a device reports what it saw
 //   GET  /logs[?format=text]           read those reports back
@@ -19,6 +20,9 @@ import { Container, getContainer } from '@cloudflare/containers';
 
 const SWEEP_MS = 30_000;   // alarm cadence
 const WHIP_PER_HOUR = 20;  // browser publishes allowed per hour, DO-counted
+const ICE_PER_HOUR = 120;        // relay credentials minted per hour, overall
+const ICE_PER_ADDRESS_HOUR = 20; // and per address, so one caller cannot spend the hour
+const ICE_TTL_S = 4 * 3600;      // longer than a camera is left on; a credential cannot be refreshed mid-call here
 const GRACE_TICKS = 2;     // ~60 s of nobody watching before we stop
 const NAME = 'p1';
 const LOG_KEEP = 400;          // ring buffer of device reports
@@ -54,6 +58,8 @@ export class Pub extends Container {
   /** browser WHIP publishes: rate-limit stamps, and id -> resource URL */
   #whipHits = [];
   #whipRes = new Map();
+  /** /ice mints: { at, who } stamps for the two rate limits */
+  #iceHits = [];
   /** Ring buffer of device reports. Diagnostic; dies with the DO. */
   #log = [];
   #hydrated = false;
@@ -192,6 +198,70 @@ export class Pub extends Container {
     if (url.pathname === '/stop' && request.method === 'POST') {
       await this.#stopPublish();
       return json({ ok: true });
+    }
+
+    // ── relay addresses for a network that drops UDP ──────────────────────
+    //
+    // 🔴 WHY THIS EXISTS, MEASURED 2026-09-30 ON A PHONE HOTSPOT. Stream's
+    // WHIP and WHEP answers are `a=ice-lite` with ONE candidate, UDP, and
+    // nothing over TCP. A TCP candidate munged into a real answer at the same
+    // address, and at 443, was applied by Chrome and ICE still failed, so
+    // Stream does not speak ICE-TCP. On a network that drops outbound UDP the
+    // handshake answers 201 and not one packet of media arrives.
+    // Cloudflare Realtime TURN over TLS on 443 is the way round: the browser
+    // reaches the relay over TCP and the relay reaches Stream over UDP from
+    // inside Cloudflare, and that leg is not billed.
+    //
+    // The TURN KEY must never reach a page, because it mints credentials
+    // without limit. It stays in two worker secrets and this route hands out
+    // short lived ICE servers minted from it:
+    //   TURN_KEY_ID          the key's id
+    //   TURN_KEY_API_TOKEN   the key's bearer token
+    // Absent, it answers 503 in words and a page carries on without a relay.
+    //
+    // ⚠️ RATE LIMITED LIKE /whip, IN THIS OBJECT, because a DO is the only place
+    // two requests cannot both pass a check. Per address AND overall: a bare
+    // overall cap lets one caller spend everybody's hour.
+    if (url.pathname === '/ice' && (request.method === 'GET' || request.method === 'HEAD')) {
+      const keyId = this.env.TURN_KEY_ID, token = this.env.TURN_KEY_API_TOKEN;
+      if (!keyId || !token) {
+        return json({ error: 'no TURN key on this worker, so there is no relay for networks that block UDP', iceServers: null }, 503);
+      }
+      const now = Date.now();
+      const who = request.headers.get('cf-connecting-ip') || 'unknown';
+      this.#iceHits = (this.#iceHits || []).filter((h) => now - h.at < 3600_000);
+      if (this.#iceHits.length >= ICE_PER_HOUR
+        || this.#iceHits.filter((h) => h.who === who).length >= ICE_PER_ADDRESS_HOUR) {
+        return json({ error: 'too many relay requests this hour', limit: ICE_PER_ADDRESS_HOUR }, 429);
+      }
+      let up;
+      try {
+        up = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate-ice-servers`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ ttl: ICE_TTL_S }),
+        });
+      } catch (e) {
+        return json({ error: `turn upstream: ${e.message}`, iceServers: null }, 502);
+      }
+      if (!up.ok) return json({ error: `turn upstream ${up.status}`, iceServers: null }, 502);
+      this.#iceHits.push({ at: now, who });
+      const got = await up.json();
+      // Port 53 is refused by browsers and only costs a gathering timeout,
+      // which is Cloudflare's own advice. Nothing else is filtered: ICE picks.
+      const iceServers = (got.iceServers || []).map((s) => ({
+        ...s,
+        urls: [].concat(s.urls).filter((u) => !/:53(\?|$)/.test(u)),
+      })).filter((s) => s.urls.length);
+      return new Response(JSON.stringify({ iceServers, ttl: ICE_TTL_S }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'access-control-allow-origin': '*',
+          // A credential with a clock on it is never cached anywhere.
+          'cache-control': 'no-store',
+        },
+      });
     }
 
     // ── a browser publishes, and never sees the key ───────────────────────
