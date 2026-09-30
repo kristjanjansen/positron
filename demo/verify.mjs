@@ -401,6 +401,17 @@ listeners.push((m) => {
       // being three deliberate refusals and become an archive that is refusing
       // everything.
       probed.push(e.url);
+    } else if (/pub\.positron\.studio\/ice/.test(e.url || '') && /\b(404|503)\b/.test(e.text || '')) {
+      // 🔴 `/ice` ANSWERS 503 WHEN THE WORKER HOLDS NO TURN KEY, AND 404 FROM A
+      // WORKER DEPLOYED BEFORE THE ROUTE EXISTED. Both mean "no relay for a
+      // network that blocks UDP", and `/cam/` asks once per Start press and
+      // carries on without one, saying so in its log. Written 2026-09-30 with
+      // the route, before any key existed.
+      // ⚠️ SCOPED TO THOSE TWO STATUSES. A 429 or a 502 there is a relay that
+      // was meant to work and did not, and must still go red.
+      // Capped like the others, never ignored: past the ceiling this is a page
+      // asking in a loop rather than once per press.
+      probed.push(e.url);
     } else if (/\.archive\.org/.test(e.url || '') && /\b5\d\d\b/.test(e.text || '')) {
       // 🔴 archive.org 5xx ON A METADATA PROBE IS THEIR SERVER, NOT THIS PAGE.
       // `/tapes/` asks all 24 recordings how long they are so a bar can be as

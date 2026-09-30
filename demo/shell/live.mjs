@@ -203,6 +203,112 @@ export async function waitForManifest({ timeoutMs = 90000, onTick, signal } = {}
 // Both halves of a WebRTC round trip through Cloudflare, in one place because
 // two pages need them and each carries lessons that were paid for once.
 
+/**
+ * 🔴 STREAM ANSWERS OVER UDP ONLY, AND A NETWORK THAT DROPS UDP GETS A 201 AND
+ * NO MEDIA. MEASURED 2026-09-30 on a phone hotspot: both the WHIP and the WHEP
+ * answer are `a=ice-lite` with one candidate, `udp 141.101.90.0 1473 typ host`,
+ * and nothing over TCP. A `tcptype passive` candidate munged into a real answer,
+ * at that port and at 443, was applied by Chrome and ICE still failed. So the
+ * way round is a relay the browser reaches over TCP: Cloudflare Realtime TURN,
+ * `turns:turn.cloudflare.com:443?transport=tcp`, minted by our worker so the
+ * TURN key never reaches a page.
+ *
+ * `iceServers` is an OPTION on both helpers rather than a fork of them. Absent,
+ * a peer connection is built exactly as it always was. Present, ICE is handed
+ * the relay as one more route and still chooses; nothing forces relay, so a
+ * network with working UDP keeps its direct path and costs no relay bytes.
+ */
+export const ICE_PROXY = 'https://pub.positron.studio/ice';
+
+/** Cloudflare's STUN, free and unlimited. What a page asks when there is no relay. */
+export const STUN_ONLY = [{ urls: 'stun:stun.cloudflare.com:3478' }];
+
+const rtcConfig = (iceServers) => ({
+  bundlePolicy: 'max-bundle',
+  ...(iceServers?.length ? { iceServers } : {}),
+});
+const hasTurn = (iceServers) => (iceServers || []).some((s) => [].concat(s.urls).some((u) => /^turns?:/.test(u)));
+
+/**
+ * Wait for ICE gathering, capped, because WHIP and WHEP to Cloudflare take no
+ * trickle and the offer has to carry every candidate it is going to have.
+ * ⚠️ WITH A RELAY, STOP SHORTLY AFTER THE FIRST RELAY CANDIDATE. On a network
+ * that drops UDP the relay's UDP routes never answer, so gathering would sit
+ * out the whole cap for nothing; the TCP relay candidate is the one that works
+ * there, and waiting a moment past it lets any sibling arrive.
+ */
+async function gathered(pc, iceServers) {
+  if (pc.iceGatheringState === 'complete') return;
+  const turn = hasTurn(iceServers);
+  await new Promise((res) => {
+    const t = setTimeout(res, turn ? 5000 : 3000);
+    const done = () => { clearTimeout(t); res(); };
+    pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') done(); });
+    if (turn) {
+      pc.addEventListener('icecandidate', (e) => {
+        if (e.candidate && / typ relay /.test(e.candidate.candidate)) setTimeout(done, 400);
+      });
+    }
+  });
+}
+
+/**
+ * Ask our worker for short lived relay servers. Never throws: a page carries
+ * on without a relay, and says which it has.
+ *   { iceServers, relay: true }                   minted
+ *   { iceServers: STUN_ONLY, relay: false, why }  503 (no key yet), 429, or unreachable
+ * STUN is kept on the no-relay path because a server-reflexive candidate is
+ * what `probeUdp` and a failed connection's stats read UDP reachability from.
+ */
+export async function fetchIceServers({ log = () => {}, url = ICE_PROXY } = {}) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    const body = await r.json().catch(() => ({}));
+    if (r.ok && body.iceServers?.length) {
+      log('a relay over TCP is available for a network that blocks UDP');
+      return { iceServers: body.iceServers, relay: true };
+    }
+    const why = r.status === 404 ? 'the worker has no relay route yet'
+      : body.error || `relay ${r.status}`;
+    log(`no relay: ${why}`);
+    return { iceServers: STUN_ONLY, relay: false, why, status: r.status };
+  } catch (e) {
+    log(`no relay: ${e.message}`);
+    return { iceServers: STUN_ONLY, relay: false, why: e.message };
+  }
+}
+
+/**
+ * Does UDP leave this network? One STUN binding request to Cloudflare, read as
+ * a server-reflexive candidate. An answer is proof that UDP gets out and back;
+ * silence within the cap is reported as `udp: false`.
+ * ⚠️ `known: false` when the browser cannot ask at all, which never counts as
+ * blocked: "we did not look" must not read as "it is missing".
+ * ⚠️ WHAT IT CANNOT SEE: a network that lets UDP to 3478 through and drops it
+ * elsewhere. That shape was not met here and is not claimed.
+ */
+export async function probeUdp({ timeoutMs = 3000, iceServers = STUN_ONLY } = {}) {
+  if (typeof RTCPeerConnection !== 'function') return { known: false, udp: null, ms: 0 };
+  const t0 = performance.now();
+  const pc = new RTCPeerConnection({ iceServers });
+  pc.createDataChannel('udp-probe');
+  return new Promise((res) => {
+    let over = false;
+    const finish = (udp) => {
+      if (over) return; over = true;
+      clearTimeout(t);
+      try { pc.close(); } catch { /* gone */ }
+      res({ known: true, udp, ms: Math.round(performance.now() - t0) });
+    };
+    const t = setTimeout(() => finish(false), timeoutMs);
+    pc.onicecandidate = (e) => {
+      if (e.candidate && / typ srflx /.test(e.candidate.candidate)) finish(true);
+      else if (!e.candidate) finish(false);
+    };
+    pc.createOffer().then((o) => pc.setLocalDescription(o)).catch(() => finish(false));
+  });
+}
+
 /** Where a browser asks OUR worker to publish for it. The worker holds the key. */
 export const WHIP_PROXY = 'https://pub.positron.studio/whip';
 
@@ -221,21 +327,14 @@ export const WHIP_PROXY = 'https://pub.positron.studio/whip';
  * `stop()` matters. The worker hands back an opaque id because Cloudflare's own
  * resource URL is ALSO credential-bearing; DELETE goes back through the worker.
  */
-export async function whipPublish(stream, { log = () => {} } = {}) {
-  const pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
+export async function whipPublish(stream, { log = () => {}, iceServers = null } = {}) {
+  const pc = new RTCPeerConnection(rtcConfig(iceServers));
   for (const t of stream.getTracks()) pc.addTrack(t, stream);
   pc.onconnectionstatechange = () => log(`publish ${pc.connectionState}`);
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  if (pc.iceGatheringState !== 'complete') {
-    await new Promise((res) => {
-      const t = setTimeout(res, 3000);
-      pc.addEventListener('icegatheringstatechange', () => {
-        if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); }
-      });
-    });
-  }
+  await gathered(pc, iceServers);
   const res = await fetch(WHIP_PROXY, {
     method: 'POST',
     headers: { 'content-type': 'application/sdp' },
@@ -270,8 +369,8 @@ export async function whipPublish(stream, { log = () => {} } = {}) {
  *    video with different msids, so the second `ontrack` replaces the first.
  *    One stream that we own, every arriving track added to it.
  */
-export async function whepPlay(url, video, { log = () => {}, onTrack } = {}) {
-  const pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
+export async function whepPlay(url, video, { log = () => {}, onTrack, iceServers = null } = {}) {
+  const pc = new RTCPeerConnection(rtcConfig(iceServers));
   pc.addTransceiver('video', { direction: 'recvonly' });
   pc.addTransceiver('audio', { direction: 'recvonly' });
 
@@ -292,14 +391,7 @@ export async function whepPlay(url, video, { log = () => {}, onTrack } = {}) {
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  if (pc.iceGatheringState !== 'complete') {
-    await new Promise((res) => {
-      const t = setTimeout(res, 3000);
-      pc.addEventListener('icegatheringstatechange', () => {
-        if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); }
-      });
-    });
-  }
+  await gathered(pc, iceServers);
   const res = await offerSdp(url, pc.localDescription.sdp, { log });
   await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
   return { pc, inbound, location: res.headers.get('location') };

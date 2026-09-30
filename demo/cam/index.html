@@ -26,7 +26,7 @@
 
 <script type="module">
   import { mount, guard, el, armVideo } from '/shell/shell.mjs';
-  import { whipPublish, whepPlay, whep } from '/shell/live.mjs';
+  import { whipPublish, whepPlay, whep, fetchIceServers, probeUdp } from '/shell/live.mjs';
   import { startMoq, moqSupport } from '/shell/moq.mjs';
   import { drawCamera, burn, readBurnedFrom, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
@@ -81,7 +81,7 @@
     return p;
   };
   const P = {
-    local: panel('Local camera', localV, [
+    local: panel('Camera', localV, [
       { key: 'lat', label: 'capture to screen', reserve: 6 },
       { key: 'size', label: '', reserve: 9 },
     ]),
@@ -168,6 +168,11 @@
   let src = null, draw = null, sendStream = null;
   let pub = null, sub = null, rtcErr = null;
   let leg = null, moqErr = null;
+  // What this network lets through, asked once per press and never on a visit.
+  // `ice` is the worker's answer about a relay; `udp` is one STUN binding
+  // request, which is the only honest way to say a network blocks UDP.
+  let ice = null, udp = null, udpAsk = null;
+  const NO_UDP = 'This network blocks UDP';
   let meters = {}, paint = null;
   let gumBeforePress = 0, gumCalls = 0;
   let openedBeforePress = null;
@@ -187,7 +192,7 @@
     const mine = ++gen;
     openedBeforePress = oursOpened();
     gumBeforePress = gumCalls;
-    camErr = null; rtcErr = null; moqErr = null;
+    camErr = null; rtcErr = null; moqErr = null; ice = null; udp = null; udpAsk = null;
     armVideo(localV); armVideo(rtcV); armVideo(hlsV);   // before any await, or iOS refuses later
     try {
       gumCalls++;
@@ -250,6 +255,16 @@
     }
     legs.hls = hlsStop;
 
+    // Both asked in parallel and only now, after the press: a relay from our
+    // worker for the two peer connections, and whether UDP leaves at all.
+    udpAsk = probeUdp().then((r) => {
+      udp = r;
+      if (r.known) d.log(r.udp ? `UDP reaches Cloudflare (${r.ms} ms)` : `no answer over UDP in ${r.ms} ms, so this network looks like it blocks UDP`, r.udp ? '' : 'bad');
+      return r;
+    });
+    ice = await fetchIceServers({ log: (m) => d.log(`webrtc ${m}`) });
+    if (gen !== mine) return;
+
     await Promise.all([startRtc(mine), startMoqLeg(mine)]);
     if (gen !== mine) return;
     if (SELFCHECK) await d.run('check');
@@ -258,23 +273,57 @@
 
   async function startRtc(mine) {
     try {
-      pub = await whipPublish(sendStream, { log: (m, k) => d.log(`webrtc ${m}`, k) });
+      pub = await whipPublish(sendStream, { iceServers: ice?.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
       if (gen !== mine) return;
       pub.pc.addEventListener('connectionstatechange', () => {
-        if (['failed', 'disconnected'].includes(pub?.pc.connectionState)) {
+        const st = pub?.pc.connectionState;
+        if (st === 'failed') rtcFailed(mine, 'the publish could not connect');
+        else if (st === 'disconnected') {
           d.log('webrtc: the publish dropped. Somebody may have opened a page that plays this input, and it takes it back', 'bad');
         }
       });
-      sub = await whepPlay(whep(), rtcV, { log: (m, k) => d.log(`webrtc ${m}`, k) });
+      sub = await whepPlay(whep(), rtcV, { iceServers: ice?.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
+      sub.pc.addEventListener('connectionstatechange', () => {
+        if (sub?.pc.connectionState === 'failed') rtcFailed(mine, 'the picture could not come back');
+      });
       if (gen !== mine) return;
     } catch (e) {
       // A 409 from the worker is the container holding the input for viewers.
       rtcErr = /409/.test(e.message) && /busy/.test(e.message)
         ? 'the WebRTC input is busy, because somebody is watching the test pattern on it'
         : e.message;
-      d.log(`webrtc: ${rtcErr}`, 'bad');
+      if (/409/.test(e.message) && /busy/.test(e.message)) {
+        d.log(`webrtc: ${rtcErr}`, 'bad');
+        P.rtc.slots.caption.textContent = 'WebRTC could not start';
+      } else await rtcFailed(mine, rtcErr);
+    }
+  }
+
+  /**
+   * 🔴 THE HANDSHAKE IS HTTPS AND ANSWERS 201 ON A NETWORK THAT DROPS UDP, and
+   * then not one packet of media arrives. MEASURED 2026-09-30 on a phone
+   * hotspot: Stream answers with one UDP candidate and nothing else, so ICE
+   * fails fifteen seconds later and the WHEP play meets a 409, because the
+   * publish never went live. Said as `could not start` that reads as a broken
+   * page; the cause is the network, and the page can prove it with one STUN
+   * request, so it says so. With a relay from `/ice` this path should not be
+   * reached at all, and if it is, it says the relay did not get through either.
+   */
+  async function rtcFailed(mine, why) {
+    if (gen !== mine || P.rtc.slots.caption.dataset.said) return;
+    P.rtc.slots.caption.dataset.said = '1';
+    const u = await (udpAsk || Promise.resolve(udp));
+    if (gen !== mine) return;
+    rtcErr = rtcErr || why;
+    if (u?.known && u.udp === false) {
+      rtcErr = ice?.relay
+        ? 'this network blocks UDP and the picture did not get through the relay over TCP either'
+        : 'this network blocks UDP, which WebRTC media travels over, and no relay over TCP is set up yet';
+      P.rtc.slots.caption.textContent = NO_UDP;
+    } else {
       P.rtc.slots.caption.textContent = 'WebRTC could not start';
     }
+    d.log(`webrtc: ${rtcErr}`, 'bad');
   }
 
   async function startMoqLeg(mine) {
@@ -297,6 +346,18 @@
     } catch (e) {
       moqErr = e?.message || String(e);
       d.log(`moq: ${moqErr}`, 'bad');
+      // WebTransport is QUIC, which is UDP, and Cloudflare's relay has no
+      // fallback over TCP. A rejected session on a network where STUN got no
+      // answer is that network, not this page.
+      const u = await (udpAsk || Promise.resolve(udp));
+      if (gen !== mine) return;
+      if (u?.known && u.udp === false) {
+        moqErr = 'this network blocks UDP, and MoQ runs over QUIC, which is UDP';
+        d.log(`moq: ${moqErr}`, 'bad');
+        P.moq.slots.caption.textContent = NO_UDP;
+      } else {
+        P.moq.slots.caption.textContent = 'MoQ could not reach the relay';
+      }
     }
   }
 
@@ -322,6 +383,7 @@
     for (const k of Object.keys(P)) {
       for (const key of P[k].values.keys()) P[k].values.set(key, '');
       P[k].slots.caption.textContent = '';
+      delete P[k].slots.caption.dataset.said;
     }
     btn().textContent = 'Start camera';
     d.log('camera off, and every leg closed');
@@ -387,6 +449,22 @@
       d.assert('the MoQ footer says it carries the test pattern', P.moq.values.cell('src').textContent === 'test pattern');
     }
 
+    // ONE assert whatever the network, so the total does not move with it:
+    // a leg that failed names its cause on its own picture, and where one STUN
+    // request got no answer that cause is the network blocking UDP.
+    {
+      const said = (err, p) => {
+        const cap = p.slots.caption.textContent;
+        if (!err) return { ok: true, txt: 'ran' };
+        if (!cap) return { ok: false, txt: 'failed with nothing on the picture' };
+        return { ok: !(udp?.known && udp.udp === false) || cap === NO_UDP, txt: cap };
+      };
+      const r1 = said(rtcErr, P.rtc), r2 = said(moqErr, P.moq);
+      d.assert('a leg that failed says why on its own picture', r1.ok && r2.ok,
+        `webrtc ${r1.txt}, moq ${r2.txt}, UDP ${udp?.known ? (udp.udp ? 'answered' : 'no answer') : 'not asked'}`
+        + `, relay ${ice?.relay ? 'yes' : 'no'}`);
+    }
+
     // And the stop, because a camera page that leaves a leg open bills Stream
     // minutes for as long as it is open. ⚠️ `stop()` and not a click: this runs
     // inside the press that started it, and the shell holds that button
@@ -426,8 +504,8 @@
             note: 'Holds the stream key so the page never sees it, and proxies one offer and one answer. '
                 + 'It takes the input from the container only while nobody is watching the test pattern on it.' },
           { id: 'stream', label: 'Stream', sub: 'WHIP in, WHEP out', tech: 'cloudflare',
-            note: 'The WebRTC live input the WebRTC page plays, and nothing sent to it is recorded. '
-                + 'Media reaches it straight from the browser over UDP and never crosses the worker.' },
+            note: 'The WebRTC live input, and nothing sent to it is recorded. Media reaches it over UDP. '
+                + 'A network that blocks UDP needs a TURN relay over TCP, which the worker hands out once it holds a key.' },
           { id: 'relay', label: 'MoQ relay', sub: 'draft-14', tech: 'cloudflare',
             note: 'Cloudflare\'s relay, reached over WebTransport, hands each frame to whoever subscribed to the namespace. '
                 + 'Safari cannot use it yet, so this panel needs Chrome or Edge.' },
