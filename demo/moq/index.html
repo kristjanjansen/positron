@@ -129,7 +129,9 @@
    * of the C function and was measured pixel for pixel against ffmpeg's own
    * render. `burn()` then draws the row, the two clocks and the square over it
    * with `field: false`, and its bed is opaque black, so nothing underneath
-   * can reach what `readBurned` decodes.
+   * can reach what `readBurned` decodes. `scrim: true` puts the container's
+   * `black@0.55` box behind every label and number, so the words read over the
+   * bars the way they do on the stream.
    * ⚠️ `painted` COUNTS CALLS SO A PUBLISHER THAT IGNORED THIS CANNOT PASS AS
    * ONE THAT USED IT. `startMoq` only draws with it where it takes a `paint`
    * option, and the assert below reads this count and the pixels that came back.
@@ -139,7 +141,7 @@
   const paint = (ctx, w, h, frame) => {
     painted++;
     drawTestsrc2(ctx, w, h, frame);
-    return burn(ctx, w, h, frame, { field: false, hue: hue() });
+    return burn(ctx, w, h, frame, { field: false, hue: hue(), scrim: true });
   };
 
   let leg = null, lastDecoded = 0, gen = 0, tick = null;
