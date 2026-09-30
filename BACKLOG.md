@@ -39,7 +39,9 @@ height?), the words are here.
 ASKED, VERBATIM: *"Local camera -> Camera"*. The top left panel's footer label
 in `demo/cam/index.html`, and the diagram and any assert that names it.
 
-### Open 2026-09-30: the black box over testsrc2's corner counter becomes red and green
+### Done 2026-09-30: the black box over testsrc2's corner counter becomes red and green
+
+DONE 2026-09-30: red to 213, green to 240, in the container and the canvas port; the port is 0 of 921,600 pixels off ffmpeg's RGB frame at frames 0, 37, 300, 1234.
 
 ASKED, VERBATIM: *"what is this black box? put red and green on it with right
 widths"*, with a crop of the live stream's top left corner. It is the 240x48
