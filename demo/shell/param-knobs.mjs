@@ -36,7 +36,7 @@
 // (the Growl on `/collide/`, the Organ on `/fau/`) pulled the keyboard under
 // it up by a knob's height, and picking one with a parameter pushed it down
 // again, under the hand that was about to play it.
-// ⚠️ THE RESERVE IS A KNOB, NOT A NUMBER. An empty row holds a bank of one
+// ⚠️ THE RESERVE IS A KNOB, NOT A NUMBER. An empty row holds a lattice of one
 // knob that is `visibility: hidden`, `inert` and `aria-hidden`, alone in
 // the row, so the height is whatever a knob is today and
 // cannot disagree with it when the knob grows a label. A typed `min-height`
@@ -68,7 +68,8 @@
 // hue book the code box reads (`code-lang.mjs`, `createHueBook`), so a
 // parameter's text and its knob cannot disagree. Nothing here sets a hue.
 
-import { createKnob, createKnobBank, knobPlaces } from './knob.mjs';
+import { createKnob, knobPlaces } from './knob.mjs';
+import { createControlGrid } from './control-grid.mjs';
 import { MOVES, MOVE_TURN } from './hand.mjs';
 
 /** What an empty row says. See the header. */
@@ -180,11 +181,25 @@ export function createParamKnobs({ onChange = () => {}, onHold = null } = {}) {
     return entry;
   }
 
+  /* 🔴 ON THE KIT'S LATTICE, SINCE 2026-09-30: *"use knob grid on those
+     dynamic knobs"*. `createControlGrid` is what `/knobs/` lays its knobs on:
+     every cell one measured pitch wide and tall, so two knobs' centres sit a
+     square apart whatever their labels say. A plain bank spaced them by their
+     label widths. One row of up to `COLS`, `/knobs/`' own gap; the old
+     lattice is destroyed on every rebuild, because it holds a ResizeObserver. */
+  const COLS = 4, GAP = 10;
+  let grid = null;
+  const lattice = (knobs) => {
+    grid?.destroy();
+    grid = createControlGrid({ cols: Math.min(knobs.length, COLS), gap: GAP, items: knobs });
+    return grid.el;
+  };
+
   /** The reserve an empty row holds: a hidden knob for the height, and nothing to read. */
   function none() {
     const wrap = document.createElement('div');
     wrap.className = 'pos-pknobs-none';
-    const ghost = createKnobBank([createKnob({ label: 'none', min: 0, max: 1, value: 0 })]).el;
+    const ghost = lattice([createKnob({ label: 'none', min: 0, max: 1, value: 0 })]);
     ghost.classList.add('pos-pknobs-ghost');
     ghost.inert = true;
     ghost.setAttribute('aria-hidden', 'true');
@@ -222,7 +237,12 @@ export function createParamKnobs({ onChange = () => {}, onHold = null } = {}) {
     }
     now = next;
     root.replaceChildren();
-    root.append(now.size ? createKnobBank([...now.values()].map((e) => e.knob)).el : none());
+    root.append(now.size ? lattice([...now.values()].map((e) => e.knob)) : none());
+    /* ⚠️ MEASURED AGAIN ONCE ATTACHED. The lattice sizes its pitch when it is
+       built, which is before it is in the page, and a detached cell measures
+       0 px: the ResizeObserver repairs that a frame later, but a caller that
+       reads the row's height straight after `set()` got 0. MEASURED on `/kit/`. */
+    if (root.isConnected) grid?.size();
     for (const [name, i] of was) now.get(name)?.knob.hand?.start(i, 'rebuilt');
     return [...now].map(([name, e]) => ({ name, value: e.value }));
   }
