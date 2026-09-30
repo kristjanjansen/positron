@@ -166,6 +166,21 @@ export const STREAM = {
   unknown: 'stream off',
 };
 /**
+ * 🔴 AND EACH STREAMING PAGE NAMES ITS OWN TRANSPORT. Asked 2026-09-30:
+ * *"webrtc demo: button labels: WEBRTC OFF / WEBRTC ON. analogue titles form
+ * moq / llhls"*. The `CAMERA` shape below, with the transport's name in it, so
+ * `/webrtc/`, `/llhls/` and `/moq/` read differently while sharing one
+ * vocabulary. The badge uppercases by CSS, so `LL-HLS` is written as it is
+ * said and `MoQ` reads MOQ.
+ */
+export const streamSays = (name) => ({
+  online: `${name} on`,
+  checking: 'starting',
+  coming: 'starting',
+  offline: `${name} off`,
+  unknown: `${name} off`,
+});
+/**
  * Which of those a live stream badge can reach, which is what its width is
  * measured on. The same pairing `transport-bar.mjs` uses for `ON_AIR_CAN`.
  */

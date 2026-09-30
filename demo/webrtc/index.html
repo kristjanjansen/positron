@@ -14,7 +14,7 @@
 <script type="module">
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { whep, holdPublisher, waitForWhip, watchPresentedFps, fetchIceServers, readIcePath } from '/shell/live.mjs';
-  import { createPresenceButton, STREAM, STREAM_CAN } from '/shell/presence.mjs';
+  import { createPresenceButton, streamSays, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
@@ -90,7 +90,7 @@
    * the RTMPS side.
    */
   const stream = createPresenceButton({
-    of: '', showName: false, state: 'offline', says: STREAM, can: STREAM_CAN,
+    of: '', showName: false, state: 'offline', says: streamSays('WebRTC'), can: STREAM_CAN,
     aria: 'start or stop the stream',
     press: () => d.run('toggle'),
   });

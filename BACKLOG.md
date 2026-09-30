@@ -1,5 +1,31 @@
 ## Open
 
+### Open 2026-09-30: `/shape/` works with the Circuit on the Pi, and makes a sound to hear the change
+
+ASKED, VERBATIM, ACROSS TWO MESSAGES: *"https://positron.studio/shape/ - make it work with pi circuit. test tone button?"*, then *"or keyboard?"*. Today `/shape/` edits a Circuit's synth over local Web MIDI (`demo/shell/circuit-cc.mjs`, 98 CC parameters) and needs the instrument on this USB port. The Circuit on the desk now hangs off the Pi (`studio-1`, input `circuit`, room `studio-1-circuit`), which `/away/` already reaches through `createBoard`: Listen via the `input.want` lease, notes through the board.
+🔴 **THE BOARD REFUSES EVERY CC BUT 123 TODAY.** `rig/board/inputs.mjs:40` `midiVerdict` lets only note on, note off and CC 123 value 0 through, on channels 1, 2 and 10, because the Circuit has no factory reset. So `/shape/` over the Pi needs that gate widened to the CC numbers `circuit-cc.mjs` lists for the synth channels, and nothing that writes flash (no SysEx, no program change). A CC edits the current patch in RAM; that is the claim to check against `plans/plan-circuit-patches.md` before widening, and `rig/board/test.mjs` needs a sabotage for it. The board change then has to be copied to the Pi and the service restarted.
+⚠️ **TEST TONE OR KEYBOARD, UNDECIDED.** A test tone is one button playing a held note so a knob turn is heard; the kit keyboard (as on `/away/`) lets you play. `/away/` already has both the Listen waveform and the keyboard, so the keyboard may be the cheaper one. Files: `demo/shape/index.html`, `rig/board/inputs.mjs`, `rig/board/test.mjs`.
+
+### Open 2026-09-30: the streaming pages' toggle names its transport, WEBRTC OFF / WEBRTC ON
+
+ASKED, VERBATIM: *"webrtc demo: button labels: WEBRTC OFF / WEBRTC ON. analogue titles form moq / llhls"*. So `/webrtc/` reads WEBRTC OFF, STARTING, WEBRTC ON, `/llhls/` LL-HLS OFF / LL-HLS ON and `/moq/` MOQ OFF / MOQ ON, replacing the shared `STREAM` words (`stream off`, `starting`, `on`) in `demo/shell/presence.mjs`. The /cam/ `CAMERA` words are the precedent. No assert reads the words.
+
+### Open 2026-09-30: carried in from HANDOFF.md, items that lived only there
+
+Collected 2026-09-30 on *"collect todos"*. Each one was listed in `HANDOFF.md` under a "waiting" or "open" heading and had no line in this file.
+
+- **Rotate the TURN token.** `TURN_KEY_API_TOKEN` was visible as a secret name and is in a transcript. Suggested, not done.
+- **Test the TURN relay with the VPN on.** The relay branch has never run; every leg went `direct`. https://positron.studio/webrtc/ footer should read `relay` with a moving picture, and /cam/'s MoQ should stay black.
+- **`video-panel.mjs` has no way to REPLACE its picture.** A page emptying `panel.stage` loses the caption slot and the full screen exit (the /stage/ questions bug, 2026-09-30).
+- **`transport-bar.mjs` has no toggle that drives another deck.** /stage/'s play button is borrowed from the hidden archive bar.
+- **/stage/ streams the 253 MB film into an unseen canvas on every show.**
+- **`hidden` does nothing on a `createGlueRows({ grid: true })` surface**, a `shell.css` specificity problem found by the stage agent.
+- **/stage/ at 375 px**: long link lines through containers and stacked labels.
+- **`cam` container cold start, a steady-state LL-HLS median, and Safari's MP4 arm are unmeasured.**
+- **`/circuit/` reads 48/49**: `the printed names sit the same distance from the top and both sides`, top 41 against 21. Pre-existing.
+- **`/away/`'s readout wraps three and one on a phone**, as `/knobs/` does; the readout's row rule counts cells, not width.
+- **The Circuit clips on Fast Track Pro input 1**: 4,108 of 467,520 samples at full scale. The owner was asked to turn the gain down a third; nothing has been measured since.
+
 ### Done 2026-09-30: plan the WebRTC path for /away/ (plans/plan-away-webrtc.md)
 
 ASKED, VERBATIM: *"write webrtc path to plan"*. A plan in `plans/`, not code: a direct browser to Pi path for the Circuit's audio and notes, with the relay kept for signalling and as the fallback. Reported in full when written.
@@ -6064,6 +6090,8 @@ repository has already shipped a green page with zero coverage more than once.
 ⚠️ **`demo/shell/` IS SHARED, SO ANY CHANGE THERE IS DONE ONCE, BY ONE AGENT,
 WITH `/kit/` RE-RUN.**
 
+
+🔴 **REPORTED AGAIN 2026-09-30, WITH A SCREENSHOT OF `/nola/`:** *"still not a good sounding suggestion"*. The lanes read `Fmaj`, `Cmaj7`, and the hollow suggestion `C#dim7`. ⚠️ **READ WITH `CLASS_OF` BELOW**: `dim7` is one of the 14 qualities `suggest.mjs` files as major, so the suggester may be scoring a diminished seventh as a major chord. C to C#dim7 is a real passing move towards Dm in the corpus, and on its own after Cmaj7 it sounds wrong, which is the complaint. Not yet worked: the research this entry asks for has still not started.
 
 ### Open 2026-09-25: `.panel-head-mid` overflows its own grid track at every width
 
