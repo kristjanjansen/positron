@@ -16,10 +16,6 @@
                padding: 14px; display: flex; flex-direction: column; gap: 14px; }
   .stage-form { display: flex; flex-direction: column; gap: 12px; }
   .stage-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-  /* The recording's path. The numbers are tabular so a size that grows every
-     2 s does not shuffle the words after it, and a long R2 key breaks rather
-     than pushing the page sideways on a phone. */
-  .stage-chain-v { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
 </style>
 
 <script type="module">
@@ -31,7 +27,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView, STRIP_MIN_H } from '/shell/strip.mjs';
-  import { createGlue, createGlueRows } from '/shell/glue.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { burn, readBurnedFrom, drawCamera, FRAME_W, FRAME_H, FIELD, videoHue, PAD } from '/shell/pattern.mjs';
@@ -67,7 +63,7 @@
    * an hour would eat a person's cap and a working page would read red.
    * ⚠️ SO THE SWITCH IS `SELFCHECK`, WHICH IS THE FLAG THE HARNESS ALREADY
    * APPENDS TO EVERY PAGE. A run with `?selfcheck=1` records into this
-   * browser and plays that copy back, and says in the readout that R2 was
+   * browser and plays that copy back, and says in the log that R2 was
    * skipped. `?r2=1` still forces the upload (for a probe that wants the whole
    * chain under selfcheck) and `?r2=0` turns it off for a person.
    * ⚠️ NOTHING HAPPENS ON LOAD EITHER WAY. The upload runs when a show is
@@ -954,6 +950,31 @@
     return TABS.find((t) => t.label.toLowerCase() === label)?.id || 'controlroom';
   }
 
+  /**
+   * 🔴 SWAP A PANEL'S PICTURE AND KEEP THE PANEL'S OWN PARTS. Reported
+   * 2026-09-30: *"i can not see questions sent nor in audiene nor in control
+   * room"*. The question lands in `panel.slots.caption`, which `video-panel.mjs`
+   * builds INSIDE the stage, next to the full screen way out. This page emptied
+   * the stage with `textContent = ''` to put a picture in, four times, and one
+   * of them ran at load on the control room. So the caption slot was a detached
+   * element: the question rendered into it, the relay round trip was real, the
+   * check reading the slot passed, and nobody could see it.
+   * ⚠️ `video-panel.mjs` HAS NO WAY TO REPLACE ITS PICTURE, which is the real
+   * gap. This is the page's way round it until the kit has one.
+   */
+  function setPicture(panel, node) {
+    const keep = (c) => c === panel.slots.caption
+      || (c.nodeType === 1 && c.classList.contains('pos-fsx'));
+    for (const c of [...panel.stage.childNodes]) if (!keep(c)) c.remove();
+    if (node) panel.stage.insertBefore(node, panel.slots.caption);
+  }
+  /** Is a panel's caption slot still on its picture, rather than detached. */
+  const captionOn = (panel) => panel.slots.caption.isConnected
+    && panel.slots.caption.parentElement === panel.stage;
+  /** The picture in a panel's stage, which is everything but the panel's own parts. */
+  const pictureIn = (panel) => [...panel.stage.children].filter((c) => c !== panel.slots.caption
+    && !c.classList.contains('pos-fsx'));
+
   function showPictureOn(id) {
     if (!audVideo || id === 'archive') return;
     /**
@@ -976,8 +997,7 @@
     const p = byId.get(id);
     if (!p || !p.panel?.stage) return;
     if (audVideo.parentElement === p.panel.stage) return;
-    p.panel.stage.textContent = '';
-    p.panel.stage.append(audVideo);
+    setPicture(p.panel, audVideo);
   }
 
   // ── the relay ─────────────────────────────────────────────────────────────
@@ -1266,6 +1286,7 @@
    */
   let archiveMedia = null;
   let archiveMaster = null;       // the mediaMaster, so a check can read its counters
+  let roomMaster = null;          // the same element driving the control room's visible deck
   let archiveUrl = null;          // the blob URL the archive is playing, so a new run can revoke it
   const archiveCommand = {
     play: () => (archiveMedia ? archiveMedia.play().catch(() => {}) : archiveDeck.play()),
@@ -1646,10 +1667,24 @@
    * THROUGH it: the playback checks drive `archiveCommand` and the file's own
    * element, which is the road that exists whether or not a button does.
    */
-  const playRecBtn = el('button', 'tbar-x tbar-word', 'Play recording',
-    { type: 'button', 'aria-label': 'play the recording this show made' });
+  /**
+   * 🔴 THE KIT'S OWN PLAY BUTTON, NOT A WORD. Asked 2026-09-30: *"play
+   * recording should be stn play button, when show stops, timeliune cursor
+   * should go to beginning and playback button should be on pause state"*.
+   * It is the toggle of the archive's transport bar, the one bound to
+   * `archiveDeck` and `archiveCommand`, lifted into this bar's right slot. So
+   * its glyph is that deck's state (paused, playing, ended) and its press goes
+   * through the same command the playback checks drive, with no second copy
+   * of either.
+   * ⚠️ `transport-bar.mjs` HAS NO OPTION FOR A TOGGLE THAT DRIVES ANOTHER DECK,
+   * which is why the element is borrowed rather than asked for.
+   * ⚠️ NOT A `.tbar-x`, so the harness does not press it: it plays nothing
+   * until a show has stopped, and the checks reach playback through
+   * `archiveCommand`.
+   */
+  const playRecBtn = bar.el.querySelector('.tbar-toggle');
+  playRecBtn.setAttribute('aria-label', 'play or pause the recording this show made');
   playRecBtn.disabled = true;
-  playRecBtn.addEventListener('click', () => archiveCommand.play());
   const paintPlayRec = () => { playRecBtn.disabled = !archiveMedia; };
 
   const showBar = createTransportBar(room, showDeck, {
@@ -1822,7 +1857,7 @@
    * one-position-surface rule is not in play: two tabs, two subjects, one each.
    * The bar above it already passes `scrub: false`, so this tab still has
    * exactly one thing you can drag.
-   * ⚠️ **AND IT DOES NOT SEEK.** A live show has nowhere to go, so pressing the
+   * ⚠️ **AND IT DOES NOT SEEK WHILE A SHOW IS ON.** A live show has nowhere to go, so pressing the
    * strip moves nothing, the same answer the bar gives by having no slider.
    */
   /**
@@ -1843,7 +1878,9 @@
     // option lanes when there is a question to put in them, and it does not run
     // on load, so whatever is declared here is what a visitor meets.
     size: 'auto', gutter: 110, lanes: [SHOW_LANE()], minHeight: STRIP_MIN_H,
-    onSeek: () => {},
+    // A live show has nowhere to seek to. A finished one is a recording, and
+    // pressing the strip moves the recording, the same road the bar takes.
+    onSeek: (ms) => { if (archiveMedia) archiveCommand.seek(ms); },
     maxSpan: () => SHOW_MS,
     /**
      * 🔴 `follow: false` AT CONSTRUCTION, NOT `setFollow(false)` AFTERWARDS.
@@ -1911,50 +1948,22 @@
   paintClear();
 
   /**
-   * ── the recording's path: this browser, then R2, then playback ────────────
-   *
-   * 🔴 THE CHAIN IS SOMETHING A PERSON SEES, ONE ROW PER STAGE. Asked
-   * 2026-09-30: *"i want so see local storaage -> r2 -> playback"*. Every
-   * stage already happened, in the log, in words nobody reads during a show.
-   * Three rows under the timeline, in the order the bytes travel, each saying
-   * where the recording is and how big it is there.
-   * ⚠️ `grid`, SO THE THREE VALUES START ON ONE LINE whatever their labels'
-   * widths, which is what `createGlueRows({ grid })` is for.
-   * ⚠️ HIDDEN UNTIL A SHOW STARTS. Three rows saying nothing has happened are
-   * three rows of furniture on a visit, and a visit opens nothing.
-   * ⚠️ THE LOCAL ROW CHANGES EVERY 2 s WHILE A SHOW RUNS, which is a piece
-   * arriving rather than a clock, and its text is kept short enough that it
-   * does not wrap at 375 px, so the rows under it do not move.
+   * 🔴 WHERE THE RECORDING IS, AS DATA AND NOT AS ROWS ON SCREEN. Asked
+   * 2026-09-30: *"rm, put non-realtime versions to diagram"*, about three glue
+   * rows under the timeline reading local, R2 and playback. What those rows
+   * said that never changes (pieces kept in IndexedDB, uploaded when the show
+   * stops, played from R2) is in the diagram now; what changes (an upload's
+   * progress, a refusal, a failure) goes to the log when it happens.
+   * ⚠️ PUBLISHED ON `__demo.chain`, so the checks read the state the page
+   * acted on rather than a sentence it printed.
    */
-  const chain = createGlueRows({ grid: true, full: true, cls: 'stage-chain' });
-  /**
-   * ⚠️ HIDDEN ON A WRAPPER, NOT ON THE SURFACE. MEASURED 2026-09-30: `hidden`
-   * on the surface itself did nothing, because `.pos-rows.pos-rows-grid` sets
-   * `display: grid` at the same weight as `[hidden]` and later in `shell.css`,
-   * so three empty rows sat on the page at load. A kit rule to fix, not this
-   * page's; the wrapper is the page's way round it until then.
-   */
-  const chainBox = el('div', 'stage-chain-box');
-  chainBox.append(chain.el);
-  const chainV = {};
-  for (const [id, label] of [['local', 'local'], ['r2', 'R2'], ['play', 'playback']]) {
-    chainV[id] = el('span', 'stage-chain-v', '');
-    chain.row([el('div', 'panel-cap', label), chainV[id]], { align: 'start' });
+  const recPath = { local: '', r2: '', play: '', url: null };
+  function recPathReset() {
+    recPath.local = ''; recPath.r2 = ''; recPath.play = ''; recPath.url = null;
   }
-  chainBox.hidden = true;
-  /** Write one stage. A URL is a link, so the object a person is told about is one press away. */
-  function chainSay(id, text, href) {
-    const v = chainV[id];
-    v.textContent = text;
-    if (href) v.append(' ', el('a', '', href.replace(/^https?:\/\//, ''), { href, target: '_blank', rel: 'noopener' }));
-    chainBox.hidden = false;
-  }
-  function chainReset() {
-    for (const v of Object.values(chainV)) v.textContent = '';
-    chainBox.hidden = true;
-  }
+  window.__demo.chain = recPath;
 
-  room.append(createGlue(showBar.el, roomStrip.el), chainBox, clearBtn);
+  room.append(createGlue(showBar.el, roomStrip.el), clearBtn);
   paintTransport();
   paintPlayRec();
 
@@ -2174,9 +2183,9 @@
    * The fast OPFS handle is worker-only. IndexedDB stores a Blob per record,
    * commits each one on its own, and its size is the sum of what committed.
    * ⚠️ WHAT IS UPLOADED IS READ BACK OUT OF IT, NOT TAKEN FROM MEMORY, so the
-   * chain on screen is the chain the bytes took. The memory copy stays as the
-   * fallback for a browser that refuses IndexedDB (a private window can), and
-   * the local row says which one it is.
+   * path the diagram draws is the path the bytes took. The memory copy stays
+   * as the fallback for a browser that refuses IndexedDB (a private window
+   * can), and `__demo.chain.local` says which one it is.
    * ⚠️ ONE SHOW IS KEPT, NEVER A PILE. A new show clears the store before it
    * writes, and Clear clears it, so a visitor's disk holds at most the last
    * recording. Nothing is opened, read or cleared on load.
@@ -2220,10 +2229,10 @@
     } catch { /* nothing to clear is the same answer */ }
   }
   function paintLocal() {
-    chainSay('local', `${localPieces} piece${localPieces === 1 ? '' : 's'}, `
-      + `${mib(localBytes)} in ${localWhere === 'IndexedDB' ? 'IndexedDB' : 'tab memory'}`);
+    recPath.local = `${localPieces} piece${localPieces === 1 ? '' : 's'}, `
+      + `${mib(localBytes)} in ${localWhere === 'IndexedDB' ? 'IndexedDB' : 'tab memory'}`;
   }
-  /** Start a show's local copy: one store, emptied, and the row says where. */
+  /** Start a show's local copy: one store, emptied, and `recPath` says where. */
   async function localBegin() {
     await openLocal();
     await localClear();
@@ -2323,6 +2332,9 @@
   function clearRun() {
     archiveMaster?.dispose?.();
     archiveMaster = null;
+    roomMaster?.dispose?.();
+    roomMaster = null;
+    showDeck.setRange([0, SHOW_MS]);
     if (archiveMedia) { try { archiveMedia.pause(); } catch { /* already gone */ } }
     archiveMedia = null;
     paintPlayRec();
@@ -2334,7 +2346,7 @@
     // card comes back" until 2026-09-25, on the day the `Nothing recorded yet`
     // card was taken off the page, so it described a swap that could no longer
     // happen and the check below it was still asking for the card.
-    archive.panel.stage.textContent = '';
+    setPicture(archive.panel, null);
     chunks.length = 0;
     QUESTIONS.length = 0;
     ANSWERS.length = 0;
@@ -2347,9 +2359,9 @@
     T0 = null; recordedMs = null; stored = null; landed = null;
     recTrack = null; askedBps = null; recSource = 'received';
     // ⚠️ AND THE LOCAL COPY GOES WITH IT, so a device keeps one recording at
-    // most, and the chain rows go back to hidden because there is no chain.
+    // most, and the recording's path is empty again because there is none.
     localClear();
-    chainReset();
+    recPathReset();
     paintPlayRec();
     archiveDeck.setRange([0, SHOW_MS]);
     archiveDeck.seek(0);
@@ -2548,9 +2560,12 @@
       }
       if (!track) throw new Error('the WebRTC leg carried no video track');
       await localBegin();
-      chainSay('r2', USE_R2 ? 'uploads when the show stops'
-        : 'off for this run (a harness run keeps the upload cap for people; ?r2=1 turns it on)');
-      chainSay('play', USE_R2 ? 'plays from R2 once it is there' : 'plays this browser\u2019s copy');
+      recPath.r2 = USE_R2 ? 'waiting' : 'off';
+      recPath.play = USE_R2 ? 'r2' : 'local';
+      if (!USE_R2) {
+        d.log('R2 is off for this run, so the recording stays in this browser and plays from '
+          + 'there (a harness run keeps the upload cap for people, and ?r2=1 turns it on)');
+      }
       rec = startRecorder(track);
       recTrack = track;
       followWriteHead();
@@ -2598,8 +2613,8 @@
      * 🔴 STAGE ONE ENDS: THE RECORDING IS READ BACK OUT OF WHERE IT WAS KEPT.
      * The pieces were committed to IndexedDB as they arrived, and the file that
      * goes to R2 is assembled from those records rather than from the array in
-     * memory, so the row that said where the recording lives was describing the
-     * bytes that actually travel.
+     * memory, so where the page says the recording lives is where the bytes
+     * that travel came from.
      */
     const blob = await localRead(mime);
     paintLocal();
@@ -2607,16 +2622,16 @@
       + `${localWhere === 'IndexedDB' ? 'IndexedDB' : 'this tab\u2019s memory'}`, 'hi');
 
     /**
-     * 🔴 STAGE TWO: R2, FOR A PERSON, WITH ITS PROGRESS ON SCREEN. See the note
-     * on `USE_R2` for why the harness skips it. "Uploaded" and "readable" are
-     * two claims, so a HEAD after the upload is what the R2 row reports, and
-     * its length has to be the length that left this browser.
+     * 🔴 STAGE TWO: R2, FOR A PERSON, WITH ITS PROGRESS IN THE LOG. See the
+     * note on `USE_R2` for why the harness skips it. "Uploaded" and "readable"
+     * are two claims, so a HEAD after the upload is what `__demo.chain.r2`
+     * reports, and its length has to be the length that left this browser.
      * ⚠️ AND STAGE THREE PLAYS THE R2 URL ITSELF, NOT A BLOB MADE FROM IT. This
      * used to fetch the object back into a Blob and play a `blob:` URL, which
      * proved the bytes came from R2 and showed a person nothing of the sort.
-     * The element's `src` is the public object now, so the address on screen is
-     * the address playing. A refused or failed upload falls back to this
-     * browser's copy and the playback row says so.
+     * The element's `src` is the public object now, so the address in the log
+     * is the address playing. A refused or failed upload falls back to this
+     * browser's copy and the log says so.
      */
     let src = null;
     if (upload) {
@@ -2629,15 +2644,13 @@
        */
       try { stored = await uploadToR2(blob); } catch (e) {
         stored = null;
-        chainSay('r2', `the upload failed (${e && e.message}), so the recording stays in this browser`);
-        d.log(`the upload to R2 failed: ${e && e.message}`, 'bad');
+        recPath.r2 = 'failed';
+        d.log(`the upload to R2 failed (${e && e.message}), so the recording stays in this browser`, 'bad');
       }
       if (stored) {
         const head = await proveReadable(stored.url);
         landed = { ok: head.ok, bytes: head.bytes, url: stored.url, key: stored.key, sent: blob.size };
-        chainSay('r2', head.ok
-          ? `${mib(head.bytes)} stored and served back, deleted in 6 h`
-          : `stored and not served back (HTTP ${head.status})`);
+        recPath.r2 = head.ok ? 'stored' : 'unreadable';
         d.log(head.ok
           ? `R2 holds it and serves it back: ${head.bytes} bytes at ${stored.key}, gone in 6h`
           : `R2 took it and will not serve it back (HTTP ${head.status})`,
@@ -2657,30 +2670,43 @@
   }
 
   /**
-   * One recording to R2 as ONE object, with the upload's progress on screen.
+   * One recording to R2 as ONE object, with the upload's progress in the log.
    * ⚠️ IT IS `ingest.mjs`'s `putWhole` WITH AN `XMLHttpRequest` WHERE THE PUT
    * WAS, because `fetch` reports no upload progress and a person asked to SEE
-   * this stage. Same session, same single segment, same close. The right home
+   * this stage. It reaches the log a quarter at a time, since a line per
+   * progress event would bury everything else in it. Same session, same single segment, same close. The right home
    * for it is an `onProgress` option on `putWhole`, which is a shared module
    * and not this page's to change.
    * @returns {Promise<{url: string, key: string, session: string, bytes: number}|null>}
    */
   async function uploadToR2(blob) {
-    chainSay('r2', 'opening an upload session');
+    recPath.r2 = 'opening';
+    d.log('opening an upload session for R2');
     const sess = await openSession({ log: d.log });
     if (!sess) {
-      chainSay('r2', 'refused by the upload route (five sessions an hour per address), see the log');
+      recPath.r2 = 'refused';
+      d.log('the upload route refused a session (five sessions an hour per address), so the '
+        + 'recording stays in this browser', 'bad');
       return null;
     }
     if (blob.size > sess.limits.maxSegmentBytes) {
-      chainSay('r2', `${mib(blob.size)} is over the ${mib(sess.limits.maxSegmentBytes)} one upload may be`);
+      recPath.r2 = 'too big';
+      d.log(`${mib(blob.size)} is over the ${mib(sess.limits.maxSegmentBytes)} one upload may be, `
+        + 'so the recording stays in this browser', 'bad');
       return null;
     }
+    recPath.r2 = 'uploading';
+    let quarter = -1;
     const put = await new Promise((res) => {
       const x = new XMLHttpRequest();
       x.open('PUT', `${INGEST}/seg/${sess.session}/0?fmt=webm`);
       x.upload.onprogress = (e) => {
-        if (e.lengthComputable) chainSay('r2', `uploading ${Math.round((e.loaded / e.total) * 100)}% of ${mib(e.total)}`);
+        if (!e.lengthComputable) return;
+        const q = Math.floor((e.loaded / e.total) * 4);
+        if (q > quarter) {
+          quarter = q;
+          d.log(`uploading to R2, ${Math.round((e.loaded / e.total) * 100)}% of ${mib(e.total)}`);
+        }
       };
       x.onload = () => {
         let j = {};
@@ -2691,13 +2717,15 @@
       x.send(blob);
     });
     if (!put.ok || !put.j.key) {
-      chainSay('r2', `the upload was refused (HTTP ${put.status} ${put.j.error || ''})`);
+      recPath.r2 = 'refused';
+      d.log(`R2 refused the upload (HTTP ${put.status} ${put.j.error || ''})`, 'bad');
       return null;
     }
     const r = await fetch(`${INGEST}/close/${sess.session}?fmt=webm`, { method: 'POST' });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.base) {
-      chainSay('r2', `the upload would not close (HTTP ${r.status} ${j.error || ''})`);
+      recPath.r2 = 'not closed';
+      d.log(`the upload to R2 would not close (HTTP ${r.status} ${j.error || ''})`, 'bad');
       return null;
     }
     const file = put.j.key.split('/').pop();
@@ -2733,12 +2761,8 @@
     },
     get questions() { return QUESTIONS.length; },
     get answers() { return ANSWERS.length; },
-    // The recording's path, as the three rows a person reads.
-    get chain() {
-      return { local: chainV.local.textContent, r2: chainV.r2.textContent, play: chainV.play.textContent,
-        where: localWhere, bytes: localBytes, pieces: localPieces, useR2: USE_R2,
-        playing: archiveMedia?.currentSrc || null };
-    },
+    // The recording's path, the same object `__demo.chain` carries.
+    get chain() { return window.__demo.chain; },
     startShow, stopShow,
   };
 
@@ -2788,11 +2812,11 @@
     // *`, and an element only asks for it when told to before it loads.
     if (fromR2) v.crossOrigin = 'anonymous';
     v.src = src;
-    chainSay('play', fromR2 ? 'loading from R2' : 'loading this browser\u2019s copy');
+    recPath.play = fromR2 ? 'r2' : 'local';
+    recPath.url = fromR2 ? src : null;
     // The card goes and the real file takes its place. One swap, at the moment
     // there is something true to show.
-    archive.panel.stage.textContent = '';
-    archive.panel.stage.append(v);
+    setPicture(archive.panel, v);
     playingBack = true;
 
     recordedMs = await resolveDuration(v);
@@ -2800,7 +2824,6 @@
     // a recording that resolves to nothing stops here rather than there.
     if (!(recordedMs > 0)) {
       recordedMs = null;
-      chainSay('play', 'the recording has no length that could be resolved');
       d.log('the recording has no duration that could be resolved, so there is nothing to scrub', 'bad');
       return null;
     }
@@ -2815,10 +2838,23 @@
      * loads it was trying to recover.
      */
     archiveMaster = mediaMaster(archiveDeck, v, { stallPolicy: 'hold' });
+    /**
+     * 🔴 AND THE CONTROL ROOM'S OWN TIMELINE BECOMES THE RECORDING'S, WITH ITS
+     * CURSOR AT THE START. Asked 2026-09-30, the same message as the play
+     * button. The visible strip is `showDeck`'s, which sat wherever the show
+     * stopped while the recording played on a deck nobody can see. So the
+     * deck takes the recording's length, goes to 0, and follows the element
+     * the same way `archiveDeck` does. The element is paused, so the play
+     * button beside it reads paused.
+     * ⚠️ `mediaMaster` ONLY READS THE ELEMENT, it never seeks or plays it, so
+     * two of them on one element cannot fight.
+     */
+    showDeck.setRange([0, recordedMs]);
+    showDeck.seek(0);
+    roomMaster = mediaMaster(showDeck, v, { stallPolicy: 'hold' });
+    roomStrip.strip.fit(0, recordedMs);
     archiveMedia = v;           // from here the bar and the strip drive the file
     paintPlayRec();
-    if (fromR2) chainSay('play', `${(recordedMs / 1000).toFixed(1)} s from R2, press Play recording:`, src);
-    else chainSay('play', `${(recordedMs / 1000).toFixed(1)} s from this browser\u2019s copy, press Play recording`);
     d.log(`the archive holds ${(recordedMs / 1000).toFixed(1)}s, playing from `
       + `${fromR2 ? src : 'this browser\u2019s own copy'}`, 'hi');
     return { video: v, mime, ms: recordedMs };
@@ -3069,6 +3105,7 @@
      * of the join that worked.
      */
     archiveMaster?.tick();
+    roomMaster?.tick();
     // ⚠️ AND THE FILM'S, FOR THE REASON WRITTEN ABOVE: a `mediaMaster` that is
     // built and never ticked is an object that does nothing, which this page has
     // already paid for once on the archive.
@@ -3130,7 +3167,7 @@
     // card is swapped for the file.
     aspect: `${STAGE_W} / ${STAGE_H}`,
   });
-  archive.panel.stage.textContent = '';
+  setPicture(archive.panel, null);
   // 🔴 NO `Nothing recorded yet` CARD. PLAY RECORDING already says it by being
   // disabled, and a paragraph explaining that nothing has happened yet is
   // furniture where a control would do.
@@ -3595,21 +3632,30 @@
      * a question in a log line. The detail prints the code points so a
      * mangling can be named rather than squinted at.
      */
+    /**
+     * 🔴 AND IT READS THE SLOT ONLY WHILE THE SLOT IS ON THE PICTURE. This
+     * check passed for days while no question was visible anywhere, because
+     * the page had emptied the stage and the slot it read was detached: the
+     * text was in it and the document was not. `on` is the term that was
+     * missing.
+     */
     const seenAt = (id) => {
-      const slot = byId.get(id).panel.slots.caption;
+      const panel = byId.get(id).panel;
+      const slot = panel.slots.caption;
       const lab = slot.querySelector('.pos-choice-l');
       const btns = [...slot.querySelectorAll('button')].map((b) => b.textContent);
-      return { title: lab ? lab.textContent : null, options: btns };
+      return { on: captionOn(panel), title: lab ? lab.textContent : null, options: btns };
     };
     const heard = SHOWN_ON.map((id) => [id, seenAt(id)]);
-    const intact = heard.every(([, h]) => h.title === ASK_TITLE
+    const intact = heard.every(([, h]) => h.on && h.title === ASK_TITLE
       && h.options.length === ASK_OPTIONS.length
       && h.options.every((o, i) => o === ASK_OPTIONS[i]));
     const points = (t) => [...(t || '')].map((c) => (c.codePointAt(0) > 127
       ? `U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}` : c)).join('');
     A('the question comes back off the relay with every character it was sent with',
       intact,
-      heard.map(([id, h]) => `${id}: ${points(h.title)} [${h.options.map(points).join(' | ')}]`)
+      heard.map(([id, h]) => `${id}${h.on ? '' : ' (slot NOT on the picture)'}: `
+        + `${points(h.title)} [${h.options.map(points).join(' | ')}]`)
         .join(', ') + `, against ${points(ASK_TITLE)} [${ASK_OPTIONS.map(points).join(' | ')}]`);
     const sc = strip.el;
     const sctx = sc.getContext('2d');
@@ -4125,8 +4171,8 @@
       `${chunks.length} pieces after 3.5s, recorder ${rec?.state ?? 'none'}`);
 
     /**
-     * 🔴 STAGE ONE OF THE CHAIN: THE RECORDING GROWS IN THIS BROWSER, AND THE
-     * ROW A PERSON READS SAYS SO. Committed pieces against recorded pieces and
+     * 🔴 STAGE ONE OF THE CHAIN: THE RECORDING GROWS IN THIS BROWSER, AND
+     * `__demo.chain` SAYS SO. Committed pieces against recorded pieces and
      * committed bytes against recorded bytes, because a store that took the
      * first piece and dropped the rest would still hold "a recording".
      * ⚠️ IT REQUIRES IndexedDB, NOT THE FALLBACK. The harness's Chrome has a
@@ -4135,11 +4181,37 @@
      */
     await localChain.catch(() => {});
     const memBytes = chunks.reduce((n, c) => n + c.size, 0);
-    A('the recording grows in this browser\u2019s IndexedDB while the show runs, and the row says so',
+    const ch = window.__demo.chain;
+    A('the recording grows in this browser\u2019s IndexedDB while the show runs, and the page says so',
       localWhere === 'IndexedDB' && localPieces >= 1 && localPieces === chunks.length
-        && localBytes === memBytes && !chainBox.hidden && /IndexedDB/.test(chainV.local.textContent),
+        && localBytes === memBytes && /IndexedDB/.test(ch.local),
       `${localPieces} of ${chunks.length} pieces committed to ${localWhere}, ${localBytes} of `
-      + `${memBytes} bytes, and the row reads "${chainV.local.textContent}"`);
+      + `${memBytes} bytes, and the chain reads "${ch.local}"`);
+
+    /**
+     * 🔴 THE QUESTION IS STILL ON BOTH PICTURES ONCE THE SHOW IS ON AIR. The
+     * live picture going into a panel is exactly the moment the stage used to
+     * be emptied, caption and all, so the question asked earlier in this run
+     * has to survive it on both sides: the audience's, where the picture just
+     * arrived, and the control room's.
+     * ⚠️ IT ASKS AGAIN HERE, because starting a show clears the run and the
+     * question asked before it went with it. So this is a send and a sighting
+     * in one: through `ask()`, the relay and `render()`, with the live picture
+     * already in the audience panel.
+     */
+    asked = null;
+    ask(ASK_TITLE, ASK_OPTIONS);
+    for (let i = 0; i < 50 && !asked; i++) await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const onAir = SHOWN_ON.map((id) => {
+      const panel = byId.get(id).panel;
+      return [id, captionOn(panel), !!panel.slots.caption.querySelector('.pos-choice-l'),
+        pictureIn(panel).length];
+    });
+    A('while the show is on air, the question is still on the audience\u2019s and the control room\u2019s picture',
+      !!asked && onAir.every(([, on, q]) => on && q),
+      onAir.map(([id, on, q, n]) => `${id}: slot ${on ? 'on the picture' : 'DETACHED'}, `
+        + `${q ? 'a question in it' : 'no question'}, ${n} picture element(s)`).join('; '));
 
     /**
      * ⚠️ THE RATE IS ASSERTED AS THE RECORDER'S OWN ANSWER, NOT AS THE NUMBER
@@ -4174,17 +4246,17 @@
     /**
      * 5. STAGE TWO, R2, asserted in BOTH modes with one count. A harness run
      * skips the upload (see `USE_R2`), and the claim is that it touched nobody's
-     * storage AND said so on screen, since a blank row reads as a stage that
-     * failed. With the upload, the claim is that the bytes are READABLE, which
+     * storage AND recorded that it was skipped, since a blank state reads as a
+     * stage that failed. With the upload, the claim is that the bytes are READABLE, which
      * a HEAD answers and a 200 on the PUT does not, and that the length R2
      * serves is the length that left this browser.
      */
     A(USE_R2 ? 'the recording that left this browser is in R2, byte for byte, and R2 serves it back'
-      : 'this run uploaded nothing, and the R2 row says it was skipped rather than staying blank',
+      : 'this run uploaded nothing, and the chain says R2 was off rather than staying blank',
     USE_R2 ? !!landed?.ok && landed.bytes > 0 && landed.bytes === landed.sent
-      : landed === null && stored === null && /^off/.test(chainV.r2.textContent),
+      : landed === null && stored === null && ch.r2 === 'off',
     USE_R2 ? `HEAD says ${landed?.bytes} bytes at ${landed?.key}, against ${landed?.sent} sent`
-      : `no session opened, no object written, and the row reads "${chainV.r2.textContent}"`);
+      : `no session opened, no object written, and the chain reads "${ch.r2}"`);
 
     /**
      * ⚠️ AND THE HANDOVER, WHICH IS THE OTHER HALF OF THE SAME CLAIM. A target
@@ -4205,18 +4277,33 @@
       `${recordedMs == null ? 'no duration' : `${(recordedMs / 1000).toFixed(1)}s`} in the archive panel`);
 
     /**
-     * 🔴 STAGE THREE: WHAT PLAYS IS WHAT THE ROW SAYS PLAYS. With the upload,
-     * the element's own `currentSrc` must be the R2 object and the row must
-     * link to that same address; without it, a `blob:` of this browser's copy
-     * and a row that says so. One assert in both modes.
+     * 🔴 WHEN THE SHOW STOPS THE VISIBLE CURSOR IS HOME AND THE PLAY BUTTON IS
+     * PAUSED AND PRESSABLE. Asked 2026-09-30. `showDeck` is the deck the
+     * control room's strip draws, and `data-state` is the glyph the kit's
+     * toggle paints, so both halves are what a person sees.
+     */
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const homePos = showDeck.position();
+    A('when the show stops, the control room cursor goes to the start and the play button sits paused',
+      !!av && homePos < 250 && playRecBtn.dataset.state === 'paused' && !playRecBtn.disabled
+        && showBar.el.contains(playRecBtn),
+      `cursor at ${(homePos / 1000).toFixed(2)}s of ${recordedMs == null ? '?' : (recordedMs / 1000).toFixed(1)}s, `
+      + `the button reads ${playRecBtn.dataset.state} and is ${playRecBtn.disabled ? 'disabled' : 'enabled'}`);
+
+    /**
+     * 🔴 STAGE THREE: WHAT PLAYS IS WHAT THE CHAIN SAYS PLAYS. With the
+     * upload, the element's own `currentSrc` must be the R2 object and the
+     * chain must name that same address; without it, a `blob:` of this
+     * browser's copy and a chain that says so. One assert in both modes.
      */
     const playing = av?.currentSrc || av?.src || '';
-    A(USE_R2 ? 'playback is the R2 object itself, and the playback row links to it'
-      : 'playback is this browser\u2019s own copy, and the playback row says so',
+    A(USE_R2 ? 'playback is the R2 object itself, and the chain names it'
+      : 'playback is this browser\u2019s own copy, and the chain says so',
     USE_R2
-      ? !!landed?.url && playing === landed.url && !!chainV.play.querySelector(`a[href="${landed.url}"]`)
-      : /^blob:/.test(playing) && /browser/.test(chainV.play.textContent),
-    `the archive element plays ${playing.slice(0, 96) || 'nothing'}, and the row reads "${chainV.play.textContent}"`);
+      ? !!landed?.url && playing === landed.url && ch.play === 'r2' && ch.url === landed.url
+      : /^blob:/.test(playing) && ch.play === 'local' && ch.url === null,
+    `the archive element plays ${playing.slice(0, 96) || 'nothing'}, and the chain reads `
+    + `"${ch.play}" ${ch.url || ''}`);
 
     /**
      * 7. 🔴 THE PLAYHEAD MOVES THE PICTURE, AND THE BURNED CLOCK IS WHAT MAKES
@@ -4227,7 +4314,7 @@
      * frame, which is indistinguishable from the row not being there.
      */
     let moved = null;
-    let asked = null;
+    let seekAskedMs = null;
     let wantedAt = null, landedAt = null;
     if (av && Number.isFinite(recordedMs) && recordedMs > 1200) {
       const scratch = document.createElement('canvas');
@@ -4282,7 +4369,7 @@
        */
       const fromMs = Math.round(recordedMs * 0.2);
       const toMs = Math.round(recordedMs * 0.8);
-      asked = toMs - fromMs;
+      seekAskedMs = toMs - fromMs;
       const a = await readAt(fromMs);
       const b = await readAt(toMs);
       if (Number.isFinite(a) && Number.isFinite(b)) moved = b - a;
@@ -4458,7 +4545,7 @@
          * something was put back; nothing being there says the recording went
          * and nothing took its place, which is what `clearRun` promises.
          */
-        empty: archive.panel.stage.childElementCount === 0,
+        empty: pictureIn(archive.panel).length === 0,
       };
       A('a new run clears the recording, the questions and the answers',
         before.video && before.questions > 0
@@ -4468,7 +4555,7 @@
         + `${before.options} option lane(s), a recording in the panel. `
         + `after one press: ${after.questions}, ${after.answers}, ${after.options}, `
         + `${after.video ? 'still a recording' : 'no recording'}, `
-        + `${archive.panel.stage.childElementCount} element(s) left in the panel, `
+        + `${pictureIn(archive.panel).length} picture element(s) left in the panel, `
         + `${polls.length} poll(s) left in a footer`);
       // Put the page back where the drill found it rather than leaving a show
       // running behind every other check's back.
@@ -4478,7 +4565,7 @@
        * second one was a STOP that closed the publisher hold, and this line
        * left the page in a state where that press released rather than
        * bought a show. With one button there is no trailing transport press
-       * (the only later one is `Play recording`), so the drill lets go of the
+       * (and the play button is not a press it makes), so the drill lets go of the
        * container itself.
        * ⚠️ `upload: false`: this second show exists to prove a new run clears
        * the old one, and a run with `?r2=1` must not spend a second of an
@@ -4590,11 +4677,11 @@
             note: 'Records the picture this control room receives over WHEP from Stream, the '
                 + 'same one the audience sees, in 2 s pieces.' },
           { id: 'idb', label: 'IndexedDB', sub: 'this device',
-            note: 'Each piece is committed here as it arrives, so the local copy grows '
-                + 'while the show runs. One show is kept at a time, and Clear removes it.' },
+            note: 'Keeps each 2 s piece while the show runs, so the local copy grows as it '
+                + 'goes. One show is kept at a time, and Clear removes it.' },
           { id: 'playback', label: 'playback', sub: 'from R2',
-            note: 'Plays the R2 object by its own public URL, with Play recording. A harness '
-                + 'run skips the upload and plays the local copy instead.' },
+            note: 'Plays the recording from R2 once it is there, by its public URL. When R2 '
+                + 'is off, as in a harness run, it plays this browser\u2019s copy instead.' },
         ] },
       /**
        * 🔴 ONE CLOUDFLARE MACHINE WITH ITS PARTS IN IT. Asked 2026-09-18 with a
@@ -4645,10 +4732,10 @@
       { from: 'recorder', to: 'idb',
         note: 'A 2 s piece at a time, each committed before it is counted.' },
       { from: 'idb', to: 'r2', label: 'one webm',
-        note: 'Read back out of IndexedDB when the show stops and uploaded as one object, '
-            + 'with its progress on screen.' },
+        note: 'Read back out of IndexedDB and uploaded as one object when the show stops, '
+            + 'with its progress in the log.' },
       { from: 'r2', to: 'playback', label: 'https', back: true,
-        note: 'The element plays the R2 URL itself, so the address on screen is the one '
+        note: 'The element plays the R2 URL itself, and the log names the address it is '
             + 'playing.' },
       { from: 'ctrl', to: 'relay', label: 'questions',
         note: 'One question at a time, repeated every 2s so somebody arriving late sees the '
