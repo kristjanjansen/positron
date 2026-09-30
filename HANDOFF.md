@@ -1,3 +1,107 @@
+# Handoff, 2026-09-30, session 58: collide, the code box, knobs under the code, und, Loop with the Evolution
+
+A THIRD thread in this checkout today, after session 57 and the /away/ thread
+below. Nineteen commits, `6e1498a` to `2250e10`, every one deployed.
+
+## Where it is right now
+
+- ✅ **Site: BUILD `2250e10-151431-e23e`**, confirmed on the edge, built from a
+  clean `git worktree` at HEAD. Every deploy this thread was built that way.
+- **Uncommitted, on purpose: `demo/shell/shell.css`, the secondary-button
+  capitals rule** (two hunks, lines 40 to 42 and 696 to 719 of the working
+  file). STILL waiting: all caps, or a capital first letter.
+  🔴 **IT WAS COMMITTED AND DEPLOYED BY ACCIDENT FOR ABOUT A MINUTE** in
+  `5e088ba`: `git commit -- demo/shell/shell.css` takes the WORKING file and
+  ignores a partial index. Reverted in `2250e10`, redeployed, the live
+  `shell/shell.css` greps 0 for `SECONDARY BUTTON`. With a partial index,
+  commit with a plain `git commit`, never a pathspec.
+- `workers/view/public/` is dirty from in-tree harness builds; generated.
+- **Nothing is pushed.** 57 commits ahead of `origin/main`. Push needs the
+  account switch in CLAUDE.md.
+- Counted at the end: **60 demos, 58 built, 2 unlisted**, **80 plans**,
+  **81 `### Open`** and **43 `### Done 2026-09-30`** in `BACKLOG.md`.
+- 🔴 **THE OWNER'S VPN BLOCKS THE LAN.** It routes 192.168.1.0/24 into its
+  tunnel (`utun4`), so ping and ssh to the Pi fail even bound to `en0`. Pages
+  still reach the Pi through the relay. **The Pi has NOT been updated** (below).
+
+## What landed, all deployed
+
+| commit | what | check at |
+| --- | --- | --- |
+| `6e1498a` | streaming toggles name their transport: WEBRTC / LL-HLS / MOQ OFF and ON, `streamSays(name)` in `presence.mjs` | https://positron.studio/webrtc/ |
+| `7f574f8` | no yellow focus ring round a knob's invisible hand button | https://positron.studio/knobs/ |
+| `9ccba93` | `/shape/` joins the Pi's Circuit through the board (keys, Listen) when no local Circuit; the board's MIDI gate widened to the 52 synth CCs on ch 1 and 2 (NOT ON THE PI YET); `/reel/` play with nothing picked starts the first mark at or after the playhead, and opens nothing under `?selfcheck=1`; `/knobs/` one sentence | https://positron.studio/shape/ , /reel/ |
+| `0b2a3d2` | `/nola/`: C#dim7 no longer offered after Fmaj Cmaj7 (the unigram column stored 46 jazz and 57 pop symbols as 0; slot B no longer offers dim chords); `CLASS_OF` all 26 qualities; `C+` is Caug | https://positron.studio/nola/?learn=1 |
+| `917c379` | **`sound` renamed `und`** (confirmed by asking; `/sound/` 404s, no redirect); `compile-idle.mjs`, compile 600 ms after the last key with a breathing COMPILING note; `/fau/` loses its Compile button (reverses 2026-09-28's "no autocompile"); `/und/` warmer, played from the transport, part lane slate | https://positron.studio/und/ |
+| `f993949`, `cb17146` | **new demo `collide`**: a subset of SuperCollider compiled in JavaScript (`sclang-lite.mjs`) to SynthDef bytes played by wasm scsynth; four readout cells go 2 + 2 on a phone (kit, also /knobs/ /away/) | https://positron.studio/collide/ |
+| `37317ca` | `plans/plan-code-editor.md`, relayed in full | |
+| `b739494`, `11aa47c` | **the code box**: `code-lang.mjs` (one tokenizer, Faust / sclang / Csound score tables, hue book) and `code-box.mjs` (coloured spans under the kit textarea); `/und/` on it, each score line in its lane's colour | https://positron.studio/und/ |
+| `9c683e2`, `6841e4a` | **Loop on every keyboard page while the Evolution is plugged in** (`midi.mjs` holds the one test; `loop: 'evolution'`); nola away evo instrument knobs shape collide fau. `/looper/` refused, it asks no MIDI by design | https://positron.studio/fau/ with the Evolution in |
+| `e76c6f8`, `6841e4a`, `dcd1674`, `8e44c96`, `5e088ba`, `4083d9b` | **knobs under the code**: `param-knobs.mjs` on the kit's control grid, rebuilt from each compile, a surviving value kept, an invisible hand per knob, a row that keeps its height empty; `\name.kr(v, lag, spec:)` in sclang-lite; `hslider` read from the Faust compile; one hue per knob shared by the knob (arc, name, number, lit hand) and its code (snippet, bound variable, every use); other code toned down, keywords off blue; knobs on every typed patch | https://positron.studio/fau/ pick Sweep |
+
+## The measurements worth keeping
+
+- **TURN relay, first run ever, VPN on:** `/webrtc/` 28/28, 22 page asserts,
+  footer `relay`, path `local relay, remote host, udp, relay over tcp`. The
+  first run that minute read 8/8 with 2 page asserts: the cold container.
+- **scsynth reference counts a GraphDef** (`SC_GraphDef.cpp` 371 to 387 at
+  19954900) and it was measured: a running synth keeps its old graph and
+  answers `/n_set` after its def is replaced. `/collide/` compiles everything
+  as `collide`.
+- **scsynth never gives back an audio output nobody reads**: 63 unread + 1
+  loads, 64 + 1 `/fail`s. `sclang-lite`'s wire count was wrong and is fixed.
+- **Knobs on the engine:** `rel` moved a HELD note's release 0.053 s to
+  1.044 s; `cutoff` took two held keys 0.0767 to 0.0153 rms; each hand drove
+  the engine to the value its knob shows.
+- **Per-patch knobs:** held-chord peak under 1.0 at every knob's min, default
+  and max. Four notes at velocity 127 go over at Sweep `res` 8 (1.18), Rhodes
+  `decay` 4 (1.002), and Pluck at its own default (1.40, as before).
+- **The harness ceiling bit twice:** `/nola/` and `/collide/` each lost a tail
+  of asserts past 24 s while the run read green. Caught only by the COUNT.
+- Last counts: collide 46 page asserts green, fau 70 (one old red, the
+  diagram's `notes` collision), kit 254, und 16, code-lang-test 53,
+  sclang-lite-test 84, param-knobs-test 14.
+
+## 🔴 WHAT IS WAITING, AND NONE OF IT MAY GO QUIET
+
+- **The capitals rule**, above.
+- **`/fau/`'s library instruments' sliders**: Clarinet (8), Djembe (3) and
+  Sweep's reverb (4) get no knobs because nothing is typed for them. Owner's
+  call.
+- **Update the Pi once the VPN is off**, or `/shape/`'s CCs stay refused:
+
+```sh
+scp rig/board/inputs.mjs positron@192.168.1.213:/tmp/inputs.mjs
+scp demo/shell/circuit-cc.mjs positron@192.168.1.213:/tmp/circuit-cc.mjs
+ssh positron@192.168.1.213 'sudo install -m 644 /tmp/inputs.mjs /opt/positron-board/rig/board/inputs.mjs && sudo install -d /opt/positron-board/demo/shell && sudo install -m 644 /tmp/circuit-cc.mjs /opt/positron-board/demo/shell/circuit-cc.mjs && sudo systemctl restart positron-board && md5sum /opt/positron-board/rig/board/inputs.mjs /opt/positron-board/demo/shell/circuit-cc.mjs'
+```
+  Expect `5263c9d0826c1482271d98693d3b9a82` and
+  `0f5dc26ca88f9e20c769456df2089a39` (re-measured at HEAD), then the board
+  rejoining through the relay.
+- **The WebRTC path for /away/** (`plans/plan-away-webrtc.md`) still needs a
+  go and a yes to `node-datachannel`; its Pi steps need the LAN.
+- **Nothing tried on an iPhone** (the code box's caret over transparent text,
+  selection handles, scroll to caret: parked on *"iphone: deal later"*), and
+  **no real Evolution plugged in** (Loop was driven by a faked port list).
+- Clipping above on three patches: cap the ranges or lower the levels, not
+  asked yet.
+- `/reel/`'s `pointing at a mark says what it is` is red and was red before.
+- Five or more knobs on one program would wrap the grid to two rows and change
+  the row's height.
+
+## Traps met in this thread
+
+- **A pathspec commit takes the working file** (the capitals incident).
+- **Agents in one checkout:** every new ask on a page an agent held went to
+  that agent by message; shared kit files were changed once. Commits staged
+  another agent's in-flight file only where checked first.
+- **`git apply --cached` after a failed filter**: a heredoc broke the `&&`
+  chain and the whole `shell.css` diff was staged once; caught by `--stat`
+  and unstaged before any commit.
+- **A kit lattice measured before it is attached reads 0 px**, and a forced
+  re-measure made a hued knob fade in from yellow; both fixed in
+  `param-knobs.mjs` and `shell.css`.
+
 # Handoff, 2026-09-30, the Circuit on the Pi: /away/, board inputs, and the WebRTC plan
 
 This is a SECOND thread in the same checkout on the same day as session 57
