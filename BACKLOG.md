@@ -62,6 +62,9 @@ yesterday: `burn()` and the filter generator in `demo/shell/pattern.mjs`, and
   side is still running the old `server.mjs`. The view deploys since then do
   not ship `workers/pub/`. Check what the pub worker and its container image
   are actually on before changing anything, and say which one was measured.
+  MEASURED 2026-09-30 10:2x: `wrangler deployments list` for `positron-pub`
+  shows the newest deploy at **2026-09-25T05:24:53Z**, four days before
+  `ea21ee4`. Confirmed: the stream runs the old `server.mjs`.
 - ⚠️ **AND THE ASK IS NOT WHAT YESTERDAY BUILT.** Yesterday's ask was *"put
   absolute and local below each other"*; today's is local to the RIGHT with no
   overlap. Either the owner is reacting to the undeployed old frame and the
@@ -74,6 +77,108 @@ yesterday: `burn()` and the filter generator in `demo/shell/pattern.mjs`, and
   side prints, not a constant.
 - Deploying the container is `positron-streaming` work and costs a restart of
   the live leg; load it first.
+
+### Open 2026-09-30: a new demo `cam`, one webcam through four paths in a 2x2 grid
+
+ASKED, VERBATIM: *"in bg make demo called cam. 2x2 videopanels, button: [Start
+camera] grid: Local camera LLHLS / WEBRTC MOQ. figure out how to to llhls from
+webcam to container and back. do that resaeach in parallel track, implement the
+rest first. add latency labes on all videopanel footers."*
+`demo/cam/index.html` (new), a `cam` row in `demo/manifest.mjs`, group
+`streaming`.
+- Four `video-panel.mjs` panels: top left the local camera, top right LL-HLS,
+  bottom left WebRTC (WHIP up, WHEP back), bottom right MoQ (browser to
+  Cloudflare's relay and back). Every footer carries a latency label.
+- **One button, `Start camera`, and nothing opens before it**, which is the
+  standing rule: a visit opens nothing.
+- **The LL-HLS leg is RESEARCH FIRST, in a parallel track**: how a webcam gets
+  to the container and out as LL-HLS. Cloudflare will not serve a WHIP input
+  as HLS (WHIP and WHEP must be used together), so the obvious route is closed
+  and the answer is not obvious. The panel ships as honest "not wired yet"
+  until the plan lands.
+- ⚠️ Every leg is ours (Cloudflare Stream, the relay, the pub worker) and each
+  one bills Stream minutes from 2026-10-15; the camera must stop every leg when
+  it stops.
+
+### Open 2026-09-30: webrtc and moq get stats like the llhls readout
+
+ASKED, VERBATIM: *"add some stats to webrtc and moq demo"*, with a screenshot of
+`/llhls/`'s readout row: `LATENCY ADVANCE BUFFER HOLES STALLS SWITCHES`.
+`demo/webrtc/index.html` (readout at `:41`), `demo/moq/index.html` (`:37`).
+- **What each has today, counted 2026-09-30:** `/llhls/` six cells (`latency s,
+  advance, buffer s, holes, stalls, switches`). `/webrtc/` TWO (`round trip ms,
+  state`). `/moq/` four declared (`latency ms, p95 ms, fps, frames`) and only
+  three ever `d.set`: **`p95` is declared and never written**, so it is an
+  empty cell today. Check that before adding more.
+- ⚠️ **NOT THE SAME SIX.** HLS words (holes, switches, advance) mean nothing on
+  a WebRTC or MoQ page. The stats worth having come from what each transport
+  exposes: WHEP has `getStats()` (`inbound-rtp`: `framesDecoded`,
+  `framesDropped`, `freezeCount`, `jitter`, `jitterBufferDelay`,
+  `packetsLost`, `nackCount`, `candidate-pair` RTT, and the chosen codec); MoQ
+  has what its player and the page already measure. Pick the ones that answer
+  *is it smooth and how late is it* on that transport, and say where each came
+  from.
+- ⚠️ **`candidate-pair` RTT IS NOT MEDIA LATENCY** (`positron-streaming`): WHEP's
+  `round trip` cell beside MoQ's glass-to-glass `latency` flatters WHEP about
+  3x. If both pages show a latency, the labels must say which kind.
+- Adding readout cells changes what the page asserts and says; load
+  `positron-ui` and `positron-verify`, and the page's `what` moves with it.
+- Overlaps the moq line below (the "llhls treatment" includes the video panel,
+  whose value row carries size, fps and spec). Do the moq readout in the same
+  pass as that ask, one agent per page, so the two do not fight over one file.
+
+### Open 2026-09-30: webrtc and moq move to the streaming section, at the top of the index
+
+ASKED, VERBATIM: *"move webrtc and moq to streaming section to top of index
+page"*. `demo/manifest.mjs`: `webrtc` (`:96`) and `moq` (`:100`) are both
+`group: 'technologies'` today; `streaming` holds `llhls` alone and is already
+the first section (`f8583ec`, 2026-09-29).
+- The moq half was already asked yesterday (the entry below); this adds webrtc
+  and settles it. One edit to two rows, done ONCE by the session before any page
+  agent starts, because it is the shared file.
+- Order inside the section: llhls, webrtc, moq is the story order (HLS, then
+  WHEP, then MoQ, latency falling). Confirm against how `byGroup()` sorts, since
+  the index is newest first.
+- `built` stays as it is; this is `group` only.
+
+### Open 2026-09-30: moq gets the llhls polish, and its canvas draws the ffmpeg picture 1:1
+
+ASKED, VERBATIM: *"do same ui polish moq as to llhls etc. try to generate 1:1
+same graphics + timecode bar as in container ffmpeg examples"*, then *"...and
+add diagram too"*. `demo/moq/index.html`, `demo/shell/moq.mjs`,
+`demo/shell/pattern.mjs`.
+- **The polish half is the 2026-09-29 entry just below**, restated today with a
+  diagram named explicitly: three state toggle, video panel, how it works
+  diagram, one sentence desc, plus the stats ask above. One agent owns the page.
+- **The picture half is new.** `/moq/` publishes from the BROWSER: `moq.mjs:124`
+  says the pattern is `burn()` from `pattern.mjs`, which paints a flat `FIELD`
+  (`#0d1017`) and the clock row. The ffmpeg legs paint `testsrc2` (colour bars,
+  the moving gradient line, the checker, the dot arc) with `drawFilters` over
+  it, which is what the 2026-09-30 frame grab shows. So *"1:1 same"* means a
+  canvas rendering of `testsrc2` plus the ABSOLUTE and LOCAL timecode blocks in
+  the same geometry the container uses.
+- ⚠️ **`testsrc2` IS NOT A SPEC, IT IS A C FUNCTION.** Read `libavfilter/
+  vsrc_testsrc.c` (`test2_fill_picture`) for the exact layout and motion rather
+  than eyeballing a screenshot, and compare by rendering both at 1280x720 on the
+  same frame number (ffmpeg is on this machine for a local render; nothing
+  external is opened). Say how close it got, in pixels or as a diff image,
+  rather than calling it 1:1.
+- ⚠️ **THE TIMECODE LAYOUT IS IN FLUX.** The test screen ask above (local to the
+  right, or stacked) decides where the two blocks go, and `burn()` and the
+  ffmpeg filter generator share `pattern.mjs` so they cannot drift. Settle that
+  ask FIRST, then the moq canvas takes whatever layout won.
+- ⚠️ **THE FROZEN ROW MUST SURVIVE.** `burn()`'s clock bits are what
+  `readBurned` decodes for glass to glass latency on `/moq/`; a busier picture
+  under them (bars, a gradient line crossing them) must not enter the black bed.
+  The p50 26 ms number depends on it being readable. Assert it still decodes.
+- ⚠️ **AND THE CONTAINER'S DEFAULT SOURCE IS A FILM**, per `server.mjs:34`
+  (`PUB_SOURCE` unset plays the MIMproject film, empty puts `testsrc2` back).
+  The grab shows `testsrc2` because the deployed container predates the film
+  as well: `positron-pub` was last deployed 2026-09-25 05:24Z and the film
+  landed in `3f9a230` at 17:29 that day. **So deploying the container for the
+  test screen ask would also swap the live picture to the film**, which is not
+  what anybody asked for today. Decide the source before that deploy, and the
+  moq canvas matches whichever it is.
 
 ### Open 2026-09-29: moq joins the streaming section and gets the same UI treatment
 
