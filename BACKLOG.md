@@ -1,16 +1,24 @@
 ## Open
 
+### Done 2026-09-30: the knobs under the code get invisible hands, a fixed-height row, and their code's colour
+
+ASKED, VERBATIM: *"add invisible hands to these cutoff buttons. make the area h for thise buttons fixed so no junmp. colorcode buttons and code"*. On `/collide/` and `/fau/`'s param knob row (`demo/shell/param-knobs.mjs`): each knob gets the kit knob's invisible hand (the `⇄` on the ring's lower edge, as on `/knobs/`, and it must drive the same path a turn does: `/n_set` or `setParamValue`); the row keeps one height whether it holds 0 or N knobs, so switching presets or recompiling never moves the keys; and the knob and its snippet share one hue, which the wiring agent is already doing. Handed to that agent.
+
+### Done 2026-09-30: `/collide/` loses its waveform
+
+ASKED, VERBATIM: *"rm waveform from collide"*. The live scope (`grain-scope.mjs`, the panel's picture row, added in cb17146 while "settling"; an empty 72 px band until the first sound). Its two asserts go with it, and the panel shape goes back to `controls keys plate` with the code box first. Handed to the agent wiring `/collide/` now.
+
 ### Done 2026-09-30: `/und/`'s score drawn in its lanes' colours
 
 ASKED, VERBATIM, with a screenshot of the score over the strip: *"can you mathc lane colors and code colors somehow"*. `code-lang.mjs`'s Csound table gained `lineKind`: an `i` line is `event`, `t` is `tempo`, `m`/`n` are `part`, and every coloured token but a comment carries `pos-ln-<kind>`. `/und/` paints them from its own `INK` and `DERIVED`: event lines between `INK.off` and `INK.on`, part and tempo lines the slate lifted 20% towards white. Found on the way: `.5` was drawn as a carry `.` and a `5`; fixed. `code-lang-test` 49/49, the two new negative controls each red on its sabotage. `verify und` 28/28.
 
-### Open 2026-09-30: Loop on the on-screen keyboard of EVERY keyboard page when the Evolution is plugged in
+### Done 2026-09-30: Loop on the on-screen keyboard of EVERY keyboard page when the Evolution is plugged in
 
 ASKED, VERBATIM: *"enable loop button and fucntioanly on onscreen keyboar when evolution is connceted"*, then chose *"Every keyboard page"* when asked. Today only `/nola/` does it: `createKeyboard({ loop: true })`, `keys.offerLoop(false)` at load and `keys.offerLoop(evoHere(names))` in `onPorts` (`demo/nola/index.html` ~1025 and ~1640, `EVO_PORT` there). The other keyboard pages: `away`, `collide`, `evo`, `fau`, `instrument`, `knobs`, `shape` (and `looper`, which has no MIDI). The Evolution test moves into the kit once, then each page gets it; `collide` and `fau` last, after the live-knobs and code-box agents are out of them. Each page must show the looped notes really SOUND, not only that the button appears.
 
-- ✅ **DONE on nola, away, evo, instrument, knobs, shape** (agent report). `midi.mjs` holds the one Evolution test (read from `instruments.mjs`), `offerLoopFor`, `createMidi({ loop: kb })` and `checkEvolutionLoop` (five asserts incl. a Circuit and a Fast Track Pro NOT bringing Loop); `keyboard.mjs` has `loop: 'evolution'`. Counts: instrument 17 to 22, shape 58 to 63, evo 64 to 70, nola 104 to 107, knobs 41 to 46, away 14 to 19; reds on nola (1) and knobs (2) are the pre-existing ones. Sabotage (every name is an Evolution) on away: 2 red. `/looper/` refused: it asks no MIDI permission by design. ⚠️ No real Evolution plugged in; no looped note heard at the Circuit or Yoshimi, only seen reaching the board's send path. `/nola/` sits near the harness's 24 s ceiling. **Still to wire: `/collide/` and `/fau/`**, after the live-knobs agent.
+- ✅ **DONE on nola, away, evo, instrument, knobs, shape** (agent report). `midi.mjs` holds the one Evolution test (read from `instruments.mjs`), `offerLoopFor`, `createMidi({ loop: kb })` and `checkEvolutionLoop` (five asserts incl. a Circuit and a Fast Track Pro NOT bringing Loop); `keyboard.mjs` has `loop: 'evolution'`. Counts: instrument 17 to 22, shape 58 to 63, evo 64 to 70, nola 104 to 107, knobs 41 to 46, away 14 to 19; reds on nola (1) and knobs (2) are the pre-existing ones. Sabotage (every name is an Evolution) on away: 2 red. `/looper/` refused: it asks no MIDI permission by design. ⚠️ No real Evolution plugged in; no looped note heard at the Circuit or Yoshimi, only seen reaching the board's send path. `/nola/` sits near the harness's 24 s ceiling. ✅ `/collide/` and `/fau/` wired too, 2026-09-30, each with the full timed check.
 
-### Open 2026-09-30: build the code box from `plans/plan-code-editor.md`
+### Done 2026-09-30: build the code box from `plans/plan-code-editor.md`
 
 ASKED, VERBATIM: *"just go"*, to the plan's recommendation (a hand-rolled overlay, `demo/shell/code-box.mjs` and `code-lang.mjs`, one hue per knob parameter). Order: the tokenizer and its node test, then the kit piece, then `/und/` (free now), then `/collide/` and `/fau/` AFTER the live-knobs agent lands, because it is editing both. Not tried on an iPhone; the plan names three things only a real iPhone settles. ⏸ **PARKED ON INSTRUCTION, 2026-09-30:** *"iphone: deal later"*. The three: the caret over transparent text, the selection handles, and whether WebKit scrolls the wrapper to follow the caret. It ships without them.
 

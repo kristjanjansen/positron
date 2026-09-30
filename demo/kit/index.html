@@ -524,7 +524,7 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
-  import { createParamKnobs } from '/shell/param-knobs.mjs';
+  import { createParamKnobs, NO_KNOBS } from '/shell/param-knobs.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
@@ -1251,8 +1251,9 @@ box.set(preset); box.params(); box.mark('cutoff', true)`,
    * adjust parameters in real time"*: `/collide/` and `/fau/` hand
    * `param-knobs.mjs` the parameters their compiler read out of the program,
    * and it draws one knob each, turning 0 to 1 through the parameter's warp.
-   * ⚠️ `--param-hue` IS SET ON THE MIDDLE ONE ONLY, to show the hook the code
-   * editor work will use; nothing on a real page sets one yet.
+   * ⚠️ `--param-hue` IS SET ON THE MIDDLE ONE ONLY, to show the hook;
+   * `/collide/` and `/fau/` set it on every knob from the hue book their code
+   * box reads, since 2026-09-30. Every knob here has an invisible hand.
    * ⚠️ `pkSpec` IS DECLARED ABOVE THE BLOCK, for the reason `cnoteSpec` is.
    */
   let pkSpec = null;
@@ -1266,13 +1267,13 @@ box.set(preset); box.params(); box.mark('cutoff', true)`,
     `const knobs = createParamKnobs({
   onChange: (name, value) => send(name, value),   // a person turned one
 })
-row.append(knobs.el)                              // hidden while it has none
+row.append(knobs.el)                              // one knob's height, even with none
 knobs.set([                                       // after every compile
   { name: 'rel', value: 1.5, min: 0.05, max: 6, warp: 'exp' },
   { name: 'cutoff', value: 8000, min: 100, max: 8000, warp: 'exp', step: 1 },
 ])                                                // answers every value it kept
 knobs.value('rel')
-// every knob wears data-param="<name>", and --param-hue on it or above it colours its arc`,
+// every knob wears data-param="<name>", and --param-hue on it or above it colours its arc, name and number`,
     (box) => {
       const turns = [];
       const knobs = createParamKnobs({ onChange: (name, v) => turns.push([name, v]) });
@@ -5488,10 +5489,26 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       kept.map((k) => `${k.name} ${k.value}`).join(', ') === 'rel 0.05, drive 2'
         && onRow().map((k) => k.dataset.param).join(' ') === 'rel drive' && num('rel') === '0.05',
       kept.map((k) => `${k.name} ${k.value}`).join(', '));
+    /* 🔴 SINCE 2026-09-30 AN EMPTY ROW KEEPS A KNOB'S HEIGHT AND SAYS SO
+       (*"make the area h for thise buttons fixed so no junmp"*), so the keys
+       under it on `/collide/` and `/fau/` never move. Measured against the
+       row with two knobs in it, and nothing in the reserve is focusable. */
+    const full = knobs.el.getBoundingClientRect().height;
     knobs.set([]);
-    d.assert('and a program with nothing to turn has no row: nothing drawn, no height',
-      getComputedStyle(knobs.el).display === 'none' && knobs.el.getBoundingClientRect().height === 0,
-      getComputedStyle(knobs.el).display);
+    const empty = knobs.el.getBoundingClientRect().height;
+    const focusable = knobs.el.querySelectorAll('[tabindex="0"], button:not([disabled])');
+    d.assert('and a program with nothing to turn keeps the row a knob tall, in words, with nothing to focus',
+      empty > 0 && Math.abs(empty - full) < 0.5 && knobs.el.textContent.includes(NO_KNOBS)
+        && [...focusable].every((e) => e.closest('[inert]')),
+      `${empty.toFixed(1)} px empty against ${full.toFixed(1)} px with knobs, "${knobs.el.textContent.trim()}"`);
+    /* The name and the number wear the hue as well as the arc, and only where one is set. */
+    knobs.set(PK_PARAMS);
+    knobs.knob('cutoff').el.style.setProperty('--param-hue', '200');
+    const ink = (n, c) => getComputedStyle(knobs.knob(n).el.querySelector(c)).color;
+    d.assert('a hued knob draws its name and number in the arc\'s ink, and an unhued one keeps its own',
+      ink('cutoff', '.pos-knob-lab') === arc('cutoff') && ink('cutoff', '.pos-knob-v') === arc('cutoff')
+        && ink('rel', '.pos-knob-lab') !== arc('rel') && ink('rel', '.pos-knob-v') !== arc('rel'),
+      `cutoff name ${ink('cutoff', '.pos-knob-lab')} arc ${arc('cutoff')}, rel name ${ink('rel', '.pos-knob-lab')}`);
     knobs.set(PK_PARAMS);
     knobs.knob('cutoff').el.style.setProperty('--param-hue', '200');
   }

@@ -545,9 +545,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    beat it and had never run in its life. MEASURED 2026-09-19. */
 @media (max-width: 560px) {
   .pos-readout[data-rows] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-/* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
-   nothing until this existed — the row stayed on screen while the page said it
   /* 🔴 FOUR CELLS ARE TWO AND TWO ON A PHONE, NEVER THREE AND ONE. MEASURED
      2026-09-30 on /collide/, and the same on /knobs/ and /away/: at 375 px
      the content is 343 px, three `96px` bases fit, and the fourth sat alone
@@ -556,6 +553,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
      and two, and a blanket half width would turn a three cell readout into
      two and one, which is the same defect made new. */
   .pos-readout:not([data-rows]):has(> :nth-child(4):last-child) > * { flex-basis: calc(50% - 1px); }
+}
+/* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
+   nothing until this existed — the row stayed on screen while the page said it
    was hidden */
 
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
@@ -2862,33 +2862,6 @@ button.pos-pg-lab:hover { color: var(--fg); }
   .pos-field, .pos-field.wide { flex: 1 1 100%; }
 }
 
-/* ── feedback ─────────────────────────────────────────────────────────────
-   demo/shell/feedback.mjs. A button beside every demo's title and the box it
-   opens.
-
-   🔴 THE BOX IS A FIXED OVERLAY AND THAT IS THE WHOLE REASON IT IS ONE.
-   CLAUDE.md: nothing that changes while somebody is looking at it may change
-   how much room it takes. A panel that unfolded under the title would push the
-   readout, the controls, a canvas, a transport bar and the log down the page
-   every time it opened, on a page whose subject is often a picture you were
-   watching. Fixed, it is drawn OVER the page and the page does not move a
-   pixel — measured, and asserted on the feedback page.
-
-   ⚠️ ONE IMPLEMENTATION, NOT A `<dialog>` WITH A FALLBACK. `showModal()` would
-   give focus handling and Escape for free, and it would also give this page a
-   second code path that no harness here would ever enter — which is the shape
-   of every "green suite, dead page" bug in CLAUDE.md. A fixed cover needs no
-   API, so there is nothing to feature-test and nothing to leave untested. */
-.pos-fb-btn {
-  margin-left: auto; align-self: center;
-  font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim2); background: transparent;
-  border: 1px solid var(--line2); border-radius: 4px;
-  padding: 0 10px; height: 26px; cursor: pointer; white-space: nowrap;
-  -webkit-touch-callout: none; touch-action: manipulation;
-}
-/* 🔴 IT LIGHTENS, IT DOES NOT LIGHT UP. Asked 2026-09-16: *"feedback hover:
-   ligtgray not yellow"*. `--hi` is this site's yellow and it means THE ONE
 /* ── the code box (.pos-code), demo/shell/code-box.mjs ────────────────────
    🔴 THE KIT FIELD'S OWN TEXTAREA, MADE TRANSPARENT, OVER A <pre> OF COLOURED
    SPANS. A person still types into a real textarea, so undo, IME, the iPhone
@@ -2950,6 +2923,33 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-tk-p[data-hue][data-active] { background: hsl(var(--param-hue) 72% 62% / .3); }
 .pos-tk-p[data-hue] .pos-tk-pname { color: hsl(var(--param-hue) 75% 72%); }
 
+/* ── feedback ─────────────────────────────────────────────────────────────
+   demo/shell/feedback.mjs. A button beside every demo's title and the box it
+   opens.
+
+   🔴 THE BOX IS A FIXED OVERLAY AND THAT IS THE WHOLE REASON IT IS ONE.
+   CLAUDE.md: nothing that changes while somebody is looking at it may change
+   how much room it takes. A panel that unfolded under the title would push the
+   readout, the controls, a canvas, a transport bar and the log down the page
+   every time it opened, on a page whose subject is often a picture you were
+   watching. Fixed, it is drawn OVER the page and the page does not move a
+   pixel — measured, and asserted on the feedback page.
+
+   ⚠️ ONE IMPLEMENTATION, NOT A `<dialog>` WITH A FALLBACK. `showModal()` would
+   give focus handling and Escape for free, and it would also give this page a
+   second code path that no harness here would ever enter — which is the shape
+   of every "green suite, dead page" bug in CLAUDE.md. A fixed cover needs no
+   API, so there is nothing to feature-test and nothing to leave untested. */
+.pos-fb-btn {
+  margin-left: auto; align-self: center;
+  font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); background: transparent;
+  border: 1px solid var(--line2); border-radius: 4px;
+  padding: 0 10px; height: 26px; cursor: pointer; white-space: nowrap;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+/* 🔴 IT LIGHTENS, IT DOES NOT LIGHT UP. Asked 2026-09-16: *"feedback hover:
+   ligtgray not yellow"*. `--hi` is this site's yellow and it means THE ONE
    THING THIS PAGE IS ABOUT: the record button, the armed rate, the grains a
    granulator is making. A feedback button is furniture beside the title, and
    painting it in the page's own accent on hover promoted it above whatever the
@@ -4853,33 +4853,6 @@ button[data-glyph="1"] {
 button.pos-sm { height: var(--ctl-sm); padding: 0 calc(var(--pad-btn) / 2); }
 button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; }
 
-/* ── loop: one button, three presses — shell/transport-bar.mjs ───────────── */
-/* 🔴 IT SHARES `.tbar-x`'s LOOK AND NOT ITS CLASS, and that is not tidiness —
-   `demo/verify.mjs` presses `.pos-controls button, .tbar-x` on every page,
-   because `.tbar-x` means "a button the PAGE put in the transport", like
-   `take`'s Record. The loop is shell furniture, the same as play/pause and the
-   rate row, neither of which is in that selector. Left as a `.tbar-x` it was
-   pressed on every demo in the suite: one press arms a loop start under
-   whatever else that page was measuring. Caught the day it was written, in the
-   harness's own "(pressed …, "LOOP")" line. */
-/* The word changes with the state because the NEXT press is what a reader
-   needs to know, not the current mode: `LOOP` when there is none, `END` when a
-   start is waiting for its other mark, `LOOP` lit while one is running. */
-/* 🔴 ONE SEGMENTED CONTROL: `[→|LOOP]`. The buttons keep their own sizes and
-   their own faces; what joins them is a shared edge and no gap. The overlap is
-   a NEGATIVE MARGIN rather than a dropped border, so the pair is the same total
-   width as two buttons minus one hairline and the seam is one line rather than
-   two stacked. `position: relative` on hover/focus lifts the pressed one over
-   its neighbour, or the shared edge belongs to whichever came last in source
-   order and a focused left button looks clipped. */
-/* 🔴 AN EMPTY MEMBER STILL EATS A GAP, AND THAT IS WHY THE LAST CONTROL SAT
-   FURTHER FROM THE EDGE THAN FROM THE TOP. MEASURED on `/videoradio/`, whose
-   bar ends in a ⛶: 9 px from the top, 9 from the bottom, 9 from the left and
-   **17 from the right**. Reported as *"eqal top righ bottom padding"*.
-   The bar is `display: flex; gap: 8px; padding: 8px`, and after the last real
-   control come `.tbar-rates` and `.tbar-badge`, both zero wide and both still
-   separated by a gap: 8 + 8 + 1 of border is the 17.
-   ⚠️ IT IS THE SAME FAULT AS AN EMPTY READOUT PAINTING ITS OWN BORDER, which
 /* ── the compile note (.pos-cnote), demo/shell/compile-idle.mjs ──────────
    🔴 A NOTE, NOT A BUTTON, IN THE CORNER WHERE `/fau/`'s COMPILE BUTTON SAT.
    Asked 2026-09-30: *"Small breating "Compiling" note (not button) on right
@@ -4933,6 +4906,33 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
   .pos-cnote[data-state="compiling"] { animation: none; color: color-mix(in oklab, var(--dim) 70%, var(--bg)); }
 }
 
+/* ── loop: one button, three presses — shell/transport-bar.mjs ───────────── */
+/* 🔴 IT SHARES `.tbar-x`'s LOOK AND NOT ITS CLASS, and that is not tidiness —
+   `demo/verify.mjs` presses `.pos-controls button, .tbar-x` on every page,
+   because `.tbar-x` means "a button the PAGE put in the transport", like
+   `take`'s Record. The loop is shell furniture, the same as play/pause and the
+   rate row, neither of which is in that selector. Left as a `.tbar-x` it was
+   pressed on every demo in the suite: one press arms a loop start under
+   whatever else that page was measuring. Caught the day it was written, in the
+   harness's own "(pressed …, "LOOP")" line. */
+/* The word changes with the state because the NEXT press is what a reader
+   needs to know, not the current mode: `LOOP` when there is none, `END` when a
+   start is waiting for its other mark, `LOOP` lit while one is running. */
+/* 🔴 ONE SEGMENTED CONTROL: `[→|LOOP]`. The buttons keep their own sizes and
+   their own faces; what joins them is a shared edge and no gap. The overlap is
+   a NEGATIVE MARGIN rather than a dropped border, so the pair is the same total
+   width as two buttons minus one hairline and the seam is one line rather than
+   two stacked. `position: relative` on hover/focus lifts the pressed one over
+   its neighbour, or the shared edge belongs to whichever came last in source
+   order and a focused left button looks clipped. */
+/* 🔴 AN EMPTY MEMBER STILL EATS A GAP, AND THAT IS WHY THE LAST CONTROL SAT
+   FURTHER FROM THE EDGE THAN FROM THE TOP. MEASURED on `/videoradio/`, whose
+   bar ends in a ⛶: 9 px from the top, 9 from the bottom, 9 from the left and
+   **17 from the right**. Reported as *"eqal top righ bottom padding"*.
+   The bar is `display: flex; gap: 8px; padding: 8px`, and after the last real
+   control come `.tbar-rates` and `.tbar-badge`, both zero wide and both still
+   separated by a gap: 8 + 8 + 1 of border is the 17.
+   ⚠️ IT IS THE SAME FAULT AS AN EMPTY READOUT PAINTING ITS OWN BORDER, which
    `shell.css` already fixes further up: a container with nothing in it must not
    take up room, and neither must a flex child. Both of these are empty on more
    pages than before, because a rate lattice of one now draws no buttons at all.
@@ -5820,6 +5820,36 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    both the row and this line before the bank could do either. */
 .pos-knob-div { align-self: stretch; width: 0; border-left: 1px solid var(--line2); }
 
+/* 🔴 A PARAMETER'S KNOB CAN WEAR THE PARAMETER'S HUE, AND NOTHING SETS ONE
+   YET. `param-knobs.mjs` stamps `data-param` on every knob it builds under a
+   program's text (`/collide/`, `/fau/`), so the editor work in
+   `plans/plan-code-editor.md` can colour a name in the text and its knob alike
+   by setting `--param-hue` on either the knob or anything above it.
+   ⚠️ UNSET MEANS THE ORDINARY `--hi`, AND IT IS THE CUSTOM PROPERTY'S OWN
+   RULE THAT DOES IT: a custom property whose value reads an unset `var()` is
+   invalid at computed value time, so `var(--param-ink, var(--hi))` takes its
+   fallback. No attribute and no JavaScript decide it.
+   ⚠️ ABOVE `.pos-knob[data-off] .pos-knob-arc` AT THE SAME WEIGHT, so a
+   switched off knob still goes grey. */
+.pos-knob[data-param] { --param-ink: hsl(var(--param-hue) 70% 62%); }
+.pos-knob[data-param] .pos-knob-arc { stroke: var(--param-ink, var(--hi)); }
+
+/* 🔴 THE NAME AND THE NUMBER WEAR THE HUE TOO, SINCE 2026-09-30. Asked:
+   *"colorcode buttons and code"*. The arc alone is a thin line under a
+   parameter's name, and the name is what a reader matches against the text.
+   Unset, `--param-ink` is invalid and each falls back to its own ink, so a knob
+   with no hue is drawn exactly as before.
+   🔴 AND THE ROW UNDER A PROGRAM KEEPS A KNOB'S HEIGHT WITH NOTHING IN IT
+   (`param-knobs.mjs`, *"make the area h for thise buttons fixed so no
+   junmp"*). The reserve is a hidden knob in the same grid cell as the words,
+   so the height is a knob's and no number here repeats it. */
+.pos-knob[data-param] .pos-knob-lab { color: var(--param-ink, var(--dim)); }
+.pos-knob[data-param] .pos-knob-v { color: var(--param-ink, var(--fg)); }
+.pos-pknobs-none { display: grid; }
+.pos-pknobs-none > * { grid-area: 1 / 1; }
+.pos-pknobs-ghost { visibility: hidden; }
+.pos-pknobs-say { align-self: center; font: 400 11px/1.4 var(--mono); color: var(--dim2); }
+
 /* ── pad: a square button that can be lit — shell/pad.mjs ───────────────────
    ⚠️ THE TINT IS A CUSTOM PROPERTY WITH A FALLBACK, never a colour written by
    the component onto the element. A component that sets the property itself
@@ -5847,20 +5877,6 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    which is a rendering fault rather than a signal. **An off pad says nothing
    about its colour now**, and the lane is carried by the pads that ARE on. If
    that turns out not to be enough, the answer is a tinted BORDER on all four
-/* 🔴 A PARAMETER'S KNOB CAN WEAR THE PARAMETER'S HUE, AND NOTHING SETS ONE
-   YET. `param-knobs.mjs` stamps `data-param` on every knob it builds under a
-   program's text (`/collide/`, `/fau/`), so the editor work in
-   `plans/plan-code-editor.md` can colour a name in the text and its knob alike
-   by setting `--param-hue` on either the knob or anything above it.
-   ⚠️ UNSET MEANS THE ORDINARY `--hi`, AND IT IS THE CUSTOM PROPERTY'S OWN
-   RULE THAT DOES IT: a custom property whose value reads an unset `var()` is
-   invalid at computed value time, so `var(--param-ink, var(--hi))` takes its
-   fallback. No attribute and no JavaScript decide it.
-   ⚠️ ABOVE `.pos-knob[data-off] .pos-knob-arc` AT THE SAME WEIGHT, so a
-   switched off knob still goes grey. */
-.pos-knob[data-param] { --param-ink: hsl(var(--param-hue) 70% 62%); }
-.pos-knob[data-param] .pos-knob-arc { stroke: var(--param-ink, var(--hi)); }
-
    sides, never a heavier edge on one.
    ⚠️ `position: relative` IS KEPT, because the face label is positioned
    against it. */

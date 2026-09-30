@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
-<!-- No page rules. The panel, the scope, the field, the keys and the compile
+<!-- No page rules. The panel, the code box, the knobs, the keys and the compile
      note are all the kit's. -->
 
 <script type="module">
@@ -105,14 +105,14 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createMidi } from '/shell/midi.mjs';
-  import { createField } from '/shell/field.mjs';
+  import { createMidi, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createPicker } from '/shell/picker.mjs';
-  import { createGrainScope } from '/shell/grain-scope.mjs';
-  import { createParamKnobs } from '/shell/param-knobs.mjs';
+  import { createParamKnobs, NO_KNOBS } from '/shell/param-knobs.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
   import { readSynthDef } from '/shell/synthdef.mjs';
@@ -164,7 +164,7 @@
     // Fired and not awaited: `resume()` waits on a gesture and never rejects.
     ctx.resume?.();
     booting = bootScsynth({ audioContext: ctx, log: d.log, onReply: heard })
-      .then((e) => { eng = e; startMidi(); watch(); return e; })
+      .then((e) => { eng = e; startMidi(); return e; })
       .catch((e) => { d.log(`SuperCollider did not start: ${e?.message || e}`, 'bad'); booting = null; throw e; });
     return booting;
   }
@@ -189,7 +189,11 @@
 
   /** How many `/n_set`s a turn has sent, so a check can tell a turn that reached the server. */
   let turned = 0;
-  const knobs = createParamKnobs({ onChange: (name, v) => turn(name, v) });
+  /* While a knob is held, its parameter's text in the box is lit. */
+  const knobs = createParamKnobs({
+    onChange: (name, v) => turn(name, v),
+    onHold: (name, on) => source.mark(name, on),
+  });
   /** A turn reaches every node still sounding on a program that has the control. */
   function turn(name, v) {
     if (!eng) return;
@@ -199,11 +203,29 @@
       turned++;
     }
   }
-  /** The row for a compile: its knobs, or no row at all. */
+  /**
+   * 🔴 ONE HUE BOOK FOR THE TEXT AND THE KNOBS, ASSIGNED ON A COMPILE THAT
+   * WORKED AND NEVER ON A KEYSTROKE (`code-lang.mjs`, `createHueBook`). The
+   * code box reads it for each parameter's snippet and this page writes the
+   * same number onto each knob as `--param-hue`, so a name in the text and its
+   * knob are one colour by construction. Only a parameter with a knob gets
+   * one: `freq`, `amp` and `gate` are set by a key and stay plain.
+   */
+  const book = createHueBook();
+  function paintHues() {
+    for (const n of knobs.names()) {
+      const h = book.hueOf(n);
+      const k = knobs.knob(n).el;
+      if (h === null) k.style.removeProperty('--param-hue');
+      else k.style.setProperty('--param-hue', String(h));
+    }
+  }
+  /** The row for a compile. It keeps its height with no knobs in it, see `param-knobs.mjs`. */
   let knobRow = null;
   function showKnobs(r) {
     knobs.set(r.knobs.map((k) => ({ name: k.name, value: k.value, ...k.spec })));
-    if (knobRow) knobRow.hidden = r.knobs.length === 0;
+    book.assign(knobs.names());
+    paintHues();
   }
 
   // ── compiling, and loading what compiled ────────────────────────────────────
@@ -273,14 +295,18 @@
   /* The box is as tall as the longest preset, read off the presets rather
      than typed, which is `/fau/`'s rule after its box cut a listing in half. */
   const ROWS = Math.max(...PRESETS.map((p) => p.code.split('\n').length));
-  const source = createField({
-    label: '',
+  /* 🔴 THE KIT'S CODE BOX SINCE 2026-09-30 (`demo/shell/code-box.mjs`,
+     `plans/plan-code-editor.md`): the same field textarea, transparent, over
+     the program drawn in SuperCollider's colours, with each knob's parameter
+     in the knob's own hue. */
+  const source = createCodeBox({
+    language: 'sclang',
     rows: ROWS,
-    code: true,
     value: PRESETS[0].code,
+    ariaLabel: 'the SuperCollider function this page compiles',
     onInput: () => matchPatch(),
+    hues: book,
   });
-  source.input.setAttribute('aria-label', 'the SuperCollider function this page compiles');
 
   // ── the keys ────────────────────────────────────────────────────────────────
 
@@ -288,7 +314,12 @@
     ...keyRange(),
     base: 48,
     minBase: 24, maxBase: 84,
-    onDown: (note) => press(note),
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN (`9c683e2`, asked for every
+       keyboard page). A looped note comes back through `onDown` marked `loop`,
+       with the velocity a MIDI key played it at when the take heard one. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
+    onDown: (note, how, vel) => press(note, vel),
     onUp: (note) => lift(note),
     onOctave: (b) => d.log(`the keys on screen now start at ${b}`),
     onPanic: () => allOff(),
@@ -300,29 +331,36 @@
   let nextNode = 2000;
   /** note -> node id, for the notes a finger is on. */
   const held = new Map();
-  /** Notes pressed while the engine was still coming up. */
-  const waiting = new Set();
+  /** Notes pressed while the engine was still coming up, and their velocity. */
+  const waiting = new Map();
+  /** Every `/s_new` a key has sent, which is what the Loop check counts as heard. */
+  let sounded = 0;
 
-  function sound(note) {
+  function sound(note, vel) {
     if (!eng || !current) return;
     const id = nextNode++;
     const args = ['freq', mtof(note)];
     if (current.gate) args.push('gate', 1);
+    // A velocity scales the program's own `amp`, 127 being the level it
+    // wrote. The keys on screen send none, so they play at that level.
+    const amp = current.controls.find((c) => c.name === 'amp');
+    if (amp && Number.isFinite(vel)) args.push('amp', amp.value * vel / 127);
     // Where the knob's name is a control of the program on the server, the
     // note starts at the knob and not at the default the program wrote.
     for (const [k, v] of knobs.values()) if (current.controls.some((c) => c.name === k)) args.push(k, v);
     eng.send('/s_new', current.name, id, 0, 0, ...args);
+    sounded++;
     held.set(note, { id, def: current });
     live.set(id, current);
     return id;
   }
 
-  function press(note) {
+  function press(note, vel) {
     keys.lightNote?.(note, true);
     if (held.has(note)) lift(note, true);
-    if (eng && current) { sound(note); return; }
+    if (eng && current) { sound(note, vel); return; }
     if (!good) { d.log('nothing has compiled yet, so there is nothing to play'); return; }
-    waiting.add(note);
+    waiting.set(note, vel);
     arm();
   }
 
@@ -358,7 +396,7 @@
         if (good && current !== good) await load(good);
         d.log(`SuperCollider is up and playing ${good?.name ?? 'nothing'}, `
             + `${(performance.now() - t0).toFixed(0)} ms after the first touch`, 'hi');
-        for (const n of waiting) sound(n);
+        for (const [n, v] of waiting) sound(n, v);
         waiting.clear();
         return true;
       }).catch(() => false).finally(() => { arming = null; });
@@ -369,9 +407,10 @@
   function startMidi() {
     if (midi) return;
     midi = createMidi({
-      onDown: (note) => press(note),
+      onDown: (note, vel) => press(note, vel),
       onUp: (note) => lift(note),
       log: d.log,
+      loop: keys,
     });
   }
 
@@ -407,6 +446,8 @@
   function applyPatch(i) {
     const p = PRESETS[i];
     idle?.cancel();
+    /* A preset opens with the same colours every time, in order of appearance. */
+    book.clear();
     source.set(p.code);
     showPatch(i);
     d.log(`${p.label}: ${p.what}`);
@@ -429,47 +470,18 @@
     compile: () => serial(() => build(source.value(), picked >= 0 ? PRESETS[picked].label : 'typing')),
   });
 
-  // ── the picture: what the engine is sending to the speakers ─────────────────
-  //
-  // 🔴 THE KIT'S SCROLLING SCOPE, FED THE WAY `/radio/` FEEDS IT: one read of
-  // the engine's own meter a frame, `scope.feed(samples, rate)`. The meter is
-  // `scsynth.mjs`'s AnalyserNode, which sits IN the path to the speakers, so
-  // the picture is what is heard and not what the page meant to play. Asked
-  // for on 2026-09-30 as a live scope; nothing new was built for it.
-  // ⚠️ `fullScale: 0.5` LOCKS THE HEIGHT TO A LEVEL, which is `grain-scope`'s
-  // own argument for a stream: normalised, a quiet note and a loud chord would
-  // draw the same height. MEASURED the same day, a single note of any preset
-  // peaks at 0.05 to 0.19 and a four note chord at 0.27 to 0.67, so half scale
-  // keeps a chord on the picture and a note visible.
-  // ⚠️ IT DRAWS NOTHING UNTIL THE ENGINE EXISTS, because a visit starts no
-  // sound device. It is fed from the first touch.
-  const scope = createGrainScope(el('div'), { seconds: 3, height: 72, fullScale: 0.5 });
-  let watching = false;
-  function watch() {
-    if (watching) return;
-    watching = true;
-    const buf = new Float32Array(eng.meter.fftSize);
-    const tick = () => {
-      eng.meter.getFloatTimeDomainData(buf);
-      scope.feed(buf, ctx.sampleRate);
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }
-
   // ── the page ────────────────────────────────────────────────────────────────
 
-  /* The scope is the picture row, edge to edge, and the text is a row of its
-     own under it with no inset, so the program still runs to both edges. */
+  /* The text is the picture row, edge to edge, as on `/fau/`. The live scope
+     that sat above it went on 2026-09-30, asked as *"rm waveform from
+     collide"*. */
   const panel = createInstrumentPanel({
-    viz: scope.el,
-    rows: [[[source.el], { pad: false }]],
+    viz: source.el,
     keys: keys.el,
     plate: { name: 'COLLIDE', patch },
   });
   /* The knobs are the row under the text, hidden until a compile has any. */
   knobRow = panel.addRow(knobs.el);
-  knobRow.hidden = knobs.names().length === 0;
   d.el.append(panel.el);
 
   /* Any gesture on the instrument starts the engine, not only a key, so the
@@ -549,23 +561,13 @@
     }
     return Math.sqrt(sum / n);
   }
-  /** Pixels on the scope's canvas brighter than its ground: the wave, measured off the screen. */
-  function ink() {
-    const c = scope.canvas;
-    if (!c.width || !c.height) return 0;
-    const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-    const g = [px[0], px[1], px[2]];
-    let n = 0;
-    for (let i = 0; i < px.length; i += 4) {
-      if (Math.abs(px[i] - g[0]) + Math.abs(px[i + 1] - g[1]) + Math.abs(px[i + 2] - g[2]) > 24) n++;
-    }
-    return n;
-  }
   const waitEnd = async (id, ms) => {
     const t = performance.now();
     while (!ended.has(id) && performance.now() - t < ms) await sleep(25);
     return ended.has(id);
   };
+  /** What the drawn layer holds for a text: the box adds one space after a final newline. */
+  const drawnAs = (t) => t + (t === '' || t.endsWith('\n') ? ' ' : '');
   const typeInto = (text) => {
     source.input.value = text;
     source.input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -584,9 +586,9 @@
         && d.api.readout.synthdef === String(good.bytes.length),
       good ? `${good.name}, ${good.bytes.length} B, the cell reads ${d.api.readout.synthdef}` : 'nothing compiled');
     d.assert('the readout is four cells, which is an even count', Object.keys(d.api.readout).length === 4);
-    d.assert('the panel is the scope, the text, the knobs, the keys and a foot, in that order',
-      panel.shape().join(' ') === 'viz controls controls keys plate' && panel.viz.contains(scope.el)
-        && panel.controls()[0].contains(source.el) && panel.controls()[1] === knobRow,
+    d.assert('the panel is the text, the knobs, the keys and a foot, in that order',
+      panel.shape().join(' ') === 'viz controls keys plate' && panel.viz.contains(source.el)
+        && panel.controls()[0] === knobRow,
       panel.shape().join(' '));
 
     /* ── the knob row, before any sound ──────────────────────────────────────
@@ -605,16 +607,47 @@
       /\\rel\.kr\(1\.5, spec: \[0\.05, 6, \\exp\]\)/.test(PRESETS[0].code)
         && relKnob()?.getAttribute('title') === 'rel, 0.05 to 6, exp',
       relKnob()?.getAttribute('title') ?? 'no knob');
+    /* 🔴 ONE HUE, READ OFF THE SCREEN ON BOTH SIDES. The snippet's
+       `--param-hue` is the code box's, the knob's is this page's, and the
+       two have to be the same number from the same book; the knob's name is
+       drawn in the ink its arc is. `freq` and `gate` are parameters in the
+       text and have no knob, so they carry no hue. */
+    /* The arc eases to a new stroke over 120 ms (`.pos-knob-arc`), so the hue
+       it was just given is read once that has run. */
+    await sleep(150);
+    const snip = (n) => source.ink.querySelector(`.pos-tk-p[data-param="${n}"]`);
+    const hueOn = (e) => (e ? getComputedStyle(e).getPropertyValue('--param-hue').trim() : '');
+    const kLab = () => getComputedStyle(relKnob().querySelector('.pos-knob-lab')).color;
+    const kArc = () => getComputedStyle(relKnob().querySelector('.pos-knob-arc')).stroke;
+    d.assert('rel\'s text in the box and its knob wear one hue from one book, name and arc alike, and freq and gate wear none',
+      hueOn(relKnob()) !== '' && hueOn(relKnob()) === hueOn(snip('rel')) && hueOn(snip('rel')) === String(book.hueOf('rel'))
+        && kLab() === kArc() && !!snip('freq') && !!snip('gate')
+        && !snip('freq').dataset.hue && !snip('gate').dataset.hue,
+      `knob ${hueOn(relKnob()) || 'none'}, text ${hueOn(snip('rel')) || 'none'}, book ${book.hueOf('rel')}, `
+      + `name ${kLab()} arc ${kArc()}, freq ${snip('freq')?.dataset.hue ?? 'plain'}, gate ${snip('gate')?.dataset.hue ?? 'plain'}`);
+    /* Held: a pointer down on the dial lights the snippet, and up puts it out.
+       Pointer 1 is the mouse, which is always a live pointer in Chrome, so the
+       knob's own capture does not throw on a synthetic press. */
+    const pe = (t) => new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true });
+    relKnob().querySelector('.pos-knob-dial').dispatchEvent(pe('pointerdown'));
+    const litHeld = snip('rel')?.dataset.active === '1' && !snip('freq')?.dataset.active;
+    relKnob().querySelector('.pos-knob-dial').dispatchEvent(pe('pointerup'));
+    const litAfter = snip('rel')?.dataset.active;
+    d.assert('holding the rel knob lights rel\'s text in the box and nothing else, and letting go puts it out',
+      litHeld && litAfter === undefined, `held ${litHeld ? 'lit' : 'not lit'}, after ${litAfter ?? 'out'}`);
+    /* 🔴 THE ROW DOES NOT MOVE THE KEYS. Asked 2026-09-30: *"make the area h
+       for thise buttons fixed so no junmp"*. The Growl has no knob; the keys'
+       top is read with the Pad's knob and without it. */
+    const keysTop = () => panel.keys.getBoundingClientRect().top;
+    const withKnob = keysTop();
     await applyPatch(PRESETS.findIndex((p) => p.id === 'growl'));
-    d.assert('a program with no control a knob could turn has no knob row at all, not an empty one',
-      !drawn() && onRow().length === 0 && knobRow.getBoundingClientRect().height === 0,
-      `${getComputedStyle(knobRow).display}, ${onRow().length} knobs`);
+    const withNone = keysTop();
+    d.assert('a program with no control a knob could turn keeps the row\'s height and says so, so the keys do not move',
+      drawn() && onRow().length === 0 && knobRow.textContent.includes(NO_KNOBS)
+        && Math.abs(withNone - withKnob) < 0.5 && book.names().length === 0,
+      `keys at ${withKnob.toFixed(1)} px with rel and ${withNone.toFixed(1)} px with none, `
+      + `${onRow().length} knobs, "${knobRow.textContent.trim()}"`);
     await applyPatch(0);
-    /* 🔴 THE NEGATIVE HALF OF THE SCOPE CHECK, AND IT HAS TO COME FIRST: a
-       picture that is painted whatever it is fed would pass "a note draws on
-       it" below. With no engine there is nothing to draw. */
-    d.assert('a visit draws nothing on the scope, because nothing is playing',
-      scope.canvas.width > 0 && ink() === 0, `${ink()} lit pixels on a ${scope.canvas.width} px canvas`);
     d.assert('the compile note sits in the text box, is not a button and is a status',
       source.el.contains(idle.el) && idle.el.tagName !== 'BUTTON' && idle.el.getAttribute('role') === 'status'
         && !source.el.querySelector('button'),
@@ -632,6 +665,20 @@
       idle.error());
     d.assert('and the corner says it did not compile, standing still with the reason in its title',
       idle.shown() === NOTE_SAYS.error && idle.el.title === idle.error(), `"${idle.shown()}"`);
+    /* 🔴 THE CODE BOX'S ONE INVARIANT, READ OFF THE RENDERED ELEMENTS, after a
+       typed edit: the coloured layer holds exactly the textarea's text, at
+       the textarea's metrics, and a refused compile gave no hue away. */
+    {
+      const cs = (e) => getComputedStyle(e);
+      const PROPS = ['font-size', 'line-height', 'padding-top', 'padding-left', 'white-space'];
+      const differ = PROPS.filter((p) => cs(source.ink).getPropertyValue(p) !== cs(source.input).getPropertyValue(p));
+      const classes = source.ink.querySelectorAll('.pos-tk-class').length;
+      d.assert('the program is drawn coloured over the box exactly as typed, at the box\'s own metrics',
+        source.ink.textContent === drawnAs(source.input.value) && differ.length === 0 && classes > 3
+          && book.names().join(' ') === 'rel',
+        `${source.input.value.length} characters, ${differ.length ? `differs in ${differ.join(' ')}` : 'metrics equal'}, `
+        + `${classes} class names coloured, hues for ${book.names().join(' ') || 'nothing'}`);
+    }
 
     // ── the engine ───────────────────────────────────────────────────────────
     // 🔴 WHAT GRADES THE COMPILER. Under `?selfcheck=1` only: this starts a
@@ -672,10 +719,6 @@
       d.assert(`${p.label}: the server took it and a key makes a sound`,
         current.name === good.name && current.bytes === good.bytes && loud > 0.001,
         `${s?.defs} definition loaded, ${loud.toFixed(4)} rms`);
-      if (i === 0) {
-        /* The scope is fed from the engine's own meter, so a held note is ink. */
-        d.assert('and the scope above the text draws it', ink() > 0, `${ink()} lit pixels`);
-      }
       lift(60);
       /* Letting go CLOSES THE GATE rather than cutting the note: 200 ms in, the
          synth is still alive and still sounding, quieter. A page that sent
@@ -747,11 +790,44 @@
     dial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     d.assert('and a double press puts it back where the program wrote it', knobs.value('rel') === 1.5,
       String(knobs.value('rel')));
+    /* 🔴 THE INVISIBLE HAND TURNS IT ON THE SERVER. Asked 2026-09-30: *"add
+       invisible hands to these cutoff buttons"*. From the bottom of the
+       travel, a held note, the hand's button pressed and pressed again, and
+       then the server is ASKED what `rel` is on that node with `/s_get`: its
+       answer is the knob's value, and the page counted `/n_set`s from the
+       hand. A hand that moved the dial and not `onChange` sends none, and the
+       server would still say 0.05. */
+    key('Home');
+    const handNode = sound(60);
+    await sleep(80);
+    const handBtn = () => relKnob().querySelector('.pos-knob-hand');
+    const turnedBefore = turned;
+    handBtn().click();
+    await sleep(500);
+    const handRan = knobs.handOn('rel');
+    handBtn().click();
+    const byHand = knobs.value('rel'), handSends = turned - turnedBefore;
+    const told = await eng.sendAndWait((m) => m[0] === '/n_set' && m[1] === handNode, 1000, '/s_get', handNode, 'rel');
+    lift(60);
+    const relOnServer = told ? Number(told[3]) : NaN;
+    d.assert('its invisible hand turns rel by itself, and the server holds the value the knob shows',
+      handRan && !knobs.handOn('rel') && byHand > 0.05 && handSends > 0
+        && Math.abs(relOnServer - byHand) < byHand * 1e-4,
+      `hand ${handRan ? 'ran' : 'did not run'}, rel ${byHand} after ${handSends} /n_set, server says ${relOnServer}`);
+    key('Home');
+    dial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    await waitEnd(handNode, 2000);
     /* 🔴 A LAG THAT REALLY LAGS. `\lvl.kr(0.1, 0.5)` is a LagControl on the
        server, so the level falls away over half a second (60 dB in the lag
        time) after the knob drops to 0 rather than at once. */
-    typeInto('{ SinOsc.ar(440, mul: \\lvl.kr(0.1, 0.5)) }');
-    await idle.settled();
+    /* ⚠️ FROM HERE ON A PROGRAM IS COMPILED STRAIGHT THROUGH THE QUEUE AND NOT
+       TYPED, since 2026-09-30. The idle compile is graded above; typed, each
+       of these three paid its 600 ms wait and the note's 800 ms showing, and
+       with the hand and the Loop checks added the tail of this block ran past
+       the harness's 24 s ceiling and was dropped with the run still green
+       (34 asserts where 46 were written). */
+    const compileNow = async (text) => { source.set(text); await serial(() => build(text, 'the check')); };
+    await compileNow('{ SinOsc.ar(440, mul: \\lvl.kr(0.1, 0.5)) }');
     const lagged = nextNode;
     sound(69);
     await sleep(150);
@@ -770,8 +846,7 @@
     /* 🔴 THE ARITHMETIC, GRADED BY THE ENGINE. A multiply written as an add
        is a well formed file that loads and plays (research §9.3b), and the
        node test cannot hear it. A sine at amplitude a has an RMS of a / sqrt 2. */
-    typeInto('{ |amp = 0.1| SinOsc.ar(440, mul: amp) }');
-    await idle.settled();
+    await compileNow('{ |amp = 0.1| SinOsc.ar(440, mul: amp) }');
     const tone = nextNode;
     sound(69);
     await sleep(120);
@@ -783,8 +858,7 @@
        tone must keep its level, and must still answer `amp`, which the new
        program does not have: if the node had moved to the new graph, amp 0
        would change nothing and it would go on reading 0.1414. */
-    typeInto('{ SinOsc.ar(440, 0, 0.05 + 0.05 * 2) }');
-    await idle.settled();
+    await compileNow('{ SinOsc.ar(440, 0, 0.05 + 0.05 * 2) }');
     const kept = await level();
     d.assert('a new program under the same name leaves the sounding note on its old graph, at the same level',
       !ended.has(tone) && current.name === DEF && Math.abs(kept - at1) < 0.007,
@@ -807,6 +881,14 @@
     held.delete(69);
     d.assert('the server hears operators left to right: 0.05 + 0.05 * 2 is an amplitude of 0.2',
       Math.abs(atLR - 0.2 / Math.SQRT2) < 0.01, `${atLR.toFixed(4)} rms against 0.1414, and 0.1061 would be precedence`);
+
+    /* `Loop` follows the Evolution, and a looped note is counted where it
+       reaches the server, as a `/s_new`. The program on the server is the
+       sine above, which has no gate, so every note is freed on its lift. */
+    await checkEvolutionLoop(d, {
+      keys, heard: () => sounded,
+      ports: (names) => offerLoopFor(keys, names, d.log), real: () => midi?.names() ?? [],
+    });
 
     const stuck = [...moved].filter(([, seen]) => seen.size < 2).map(([k]) => k);
     d.assert('every cell in the readout took more than one value',

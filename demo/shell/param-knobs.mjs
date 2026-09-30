@@ -30,18 +30,51 @@
 // gains and loses a decimal while it is turned is what `knob.mjs` was told to
 // stop doing.
 //
-// ⚠️ NO ROW WHEN THERE IS NOTHING TO TURN. The root is `hidden` with no knobs
-// in it, and a page puts it in a row that it hides with it (`hidden` on the
-// row, which `.pos-rows-r[hidden]` honours), because an empty box is a line.
+// 🔴 THE ROW KEEPS ONE KNOB'S HEIGHT WHEN THERE IS NOTHING TO TURN, SINCE
+// 2026-09-30. Asked: *"make the area h for thise buttons fixed so no junmp"*.
+// It was `hidden` with no knobs in it, so picking a preset with no parameter
+// (the Growl on `/collide/`, the Organ on `/fau/`) pulled the keyboard under
+// it up by a knob's height, and picking one with a parameter pushed it down
+// again, under the hand that was about to play it.
+// ⚠️ THE RESERVE IS A KNOB, NOT A NUMBER. An empty row holds a bank of one
+// knob that is `visibility: hidden`, `inert` and `aria-hidden`, in the same
+// grid cell as its words, so the height is whatever a knob is today and
+// cannot disagree with it when the knob grows a label. A typed `min-height`
+// would be a second copy of the knob's height in a second file.
+// ⚠️ AND IT SAYS SO IN WORDS, `no knobs in this program`, quietly. A band of
+// ground the height of a knob with nothing in it is an empty box, and an
+// empty box reads as something that failed to load. A sentence says it is a
+// state of the program, which is the true thing, and tells a reader where
+// knobs would appear.
+//
+// 🔴 EVERY KNOB HAS AN INVISIBLE HAND, SINCE THE SAME DAY. Asked: *"add
+// invisible hands to these cutoff buttons"*. It is `knob.mjs`'s own `hand`,
+// whose moves come out of the knob's `onInput` exactly as a drag does, so
+// they reach the page's `onChange` through the same warp and the same spec.
+// ⚠️ A RECOMPILE THAT KEEPS THE NAME KEEPS THE HAND RUNNING, and one that
+// drops the name stops it. Every knob is rebuilt on every `set()`, so the old
+// hand is STOPPED before its knob is thrown away (a hand on a detached knob
+// would go on calling `onChange` from a frame loop nobody can see), and the
+// new knob's hand is started with the same movement.
+//
+// ⚠️ `onHold(name, on)` IS A POINTER ON THE DIAL, so a page can light the
+// parameter's text in the code while a person holds its knob. It is here
+// rather than on the page because the knobs are rebuilt here, and a listener
+// a page attached would be on a knob that no longer exists after the next
+// compile.
 //
 // ⚠️ THE HOOK FOR COLOUR, AND NOTHING ELSE ABOUT COLOUR. Every knob carries
-// `data-param="<name>"`, and `shell.css` draws its arc in
-// `hsl(var(--param-hue) ...)` when a `--param-hue` is set on it or above it,
-// and in the ordinary `--hi` when not. That is for the editor work in
-// `plans/plan-code-editor.md`, which colours a parameter's text and its knob
-// alike. Nothing here sets a hue.
+// `data-param="<name>"`, and `shell.css` draws its arc, its name and its
+// number in `hsl(var(--param-hue) ...)` when a `--param-hue` is set on it or
+// above it, and in the ordinary inks when not. The page sets it, from the one
+// hue book the code box reads (`code-lang.mjs`, `createHueBook`), so a
+// parameter's text and its knob cannot disagree. Nothing here sets a hue.
 
 import { createKnob, createKnobBank, knobPlaces } from './knob.mjs';
+import { MOVES, MOVE_TURN } from './hand.mjs';
+
+/** What an empty row says. See the header. */
+export const NO_KNOBS = 'no knobs in this program';
 
 /** The warps this maps. A number is `CurveWarp`'s curve. */
 export const WARPS = ['lin', 'exp', 'sin', 'cos'];
@@ -105,15 +138,17 @@ export function placesFor({ min, max, warp = 'lin', step = 0 }) {
  * The row.
  *
  * @param {object} o
- * @param {(name:string, value:number) => void} o.onChange  a person turned one
+ * @param {(name:string, value:number) => void} o.onChange  a person, or a knob's
+ *   invisible hand, turned one
+ * @param {(name:string, on:boolean) => void} [o.onHold]  a pointer went down on a
+ *   dial, or came up
  * @returns {{el: HTMLElement, set: (params: object[]) => {name:string, value:number}[],
  *   values: () => Map<string, number>, value: (name:string) => number|undefined,
  *   knob: (name:string) => object|undefined, names: () => string[]}}
  */
-export function createParamKnobs({ onChange = () => {} } = {}) {
+export function createParamKnobs({ onChange = () => {}, onHold = null } = {}) {
   const root = document.createElement('div');
   root.className = 'pos-pknobs';
-  root.hidden = true;
   /** name -> { knob, spec, value } for what is on screen now. */
   let now = new Map();
 
@@ -130,6 +165,7 @@ export function createParamKnobs({ onChange = () => {} } = {}) {
       home: unmapSpec(p.value, spec),
       format: show,
       title: `${p.name}, ${spec.min} to ${spec.max}${spec.warp === 'lin' ? '' : `, ${typeof spec.warp === 'number' ? `curve ${spec.warp}` : spec.warp}`}`,
+      hand: true,
       onInput: (n) => {
         entry.value = mapSpec(n, spec);
         say();
@@ -139,18 +175,52 @@ export function createParamKnobs({ onChange = () => {} } = {}) {
     k.el.dataset.param = p.name;
     entry.knob = k;
     entry.dial = k.el.querySelector('.pos-knob-dial');
+    if (onHold) {
+      entry.dial.addEventListener('pointerdown', () => onHold(p.name, true));
+      for (const ev of ['pointerup', 'pointercancel']) entry.dial.addEventListener(ev, () => onHold(p.name, false));
+    }
     say();
     return entry;
   }
+
+  /** The reserve an empty row holds: a hidden knob for the height, and the words. */
+  function none() {
+    const wrap = document.createElement('div');
+    wrap.className = 'pos-pknobs-none';
+    const ghost = createKnobBank([createKnob({ label: 'none', min: 0, max: 1, value: 0 })]).el;
+    ghost.classList.add('pos-pknobs-ghost');
+    ghost.inert = true;
+    ghost.setAttribute('aria-hidden', 'true');
+    const say = document.createElement('span');
+    say.className = 'pos-pknobs-say';
+    say.textContent = NO_KNOBS;
+    wrap.append(ghost, say);
+    return wrap;
+  }
+
+  /** Which movement a running hand is making, as `start()` takes it, or -1. */
+  const moving = (k) => (k?.hand?.running
+    ? MOVE_TURN.findIndex((m) => MOVES[m][0] === k.hand.move) : -1);
 
   /**
    * Rebuild from a compile's parameters. A name that survives keeps its value,
    * held inside its new range. Answers with every value now on the row.
    */
   function set(params = []) {
+    const seen = new Set();
+    for (const p of params) {
+      if (seen.has(p.name)) throw new Error(`createParamKnobs: ${p.name} is listed twice`);
+      seen.add(p.name);
+    }
+    /* Every old hand stops before its knob goes, and remembers what it was doing. */
+    const was = new Map();
+    for (const [name, e] of now) {
+      const i = moving(e.knob);
+      if (i >= 0) was.set(name, i);
+      e.knob.hand?.stop('rebuilt');
+    }
     const next = new Map();
     for (const p of params) {
-      if (next.has(p.name)) throw new Error(`createParamKnobs: ${p.name} is listed twice`);
       const had = now.get(p.name);
       const lo = Math.min(p.min, p.max), hi = Math.max(p.min, p.max);
       const start = had ? Math.min(hi, Math.max(lo, had.value)) : p.value;
@@ -158,10 +228,14 @@ export function createParamKnobs({ onChange = () => {} } = {}) {
     }
     now = next;
     root.replaceChildren();
-    if (now.size) root.append(createKnobBank([...now.values()].map((e) => e.knob)).el);
-    root.hidden = now.size === 0;
+    root.append(now.size ? createKnobBank([...now.values()].map((e) => e.knob)).el : none());
+    for (const [name, i] of was) now.get(name)?.knob.hand?.start(i, 'rebuilt');
     return [...now].map(([name, e]) => ({ name, value: e.value }));
   }
+
+  /* The reserve from the start, so the first compile does not push the keys
+     down either: `/fau/`'s arrives behind a six megabyte download. */
+  root.append(none());
 
   return {
     el: root,
@@ -170,5 +244,7 @@ export function createParamKnobs({ onChange = () => {} } = {}) {
     value: (name) => now.get(name)?.value,
     knob: (name) => now.get(name)?.knob,
     names: () => [...now.keys()],
+    /** whether that parameter's invisible hand is moving it */
+    handOn: (name) => !!now.get(name)?.knob.hand?.running,
   };
 }
