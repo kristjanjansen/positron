@@ -19,7 +19,7 @@ ASKED, VERBATIM: *"webrtc demo: button labels: WEBRTC OFF / WEBRTC ON. analogue 
 Collected 2026-09-30 on *"collect todos"*. Each one was listed in `HANDOFF.md` under a "waiting" or "open" heading and had no line in this file.
 
 - **Rotate the TURN token.** `TURN_KEY_API_TOKEN` was visible as a secret name and is in a transcript. Suggested, not done.
-- **Test the TURN relay with the VPN on.** The relay branch has never run; every leg went `direct`. https://positron.studio/webrtc/ footer should read `relay` with a moving picture, and /cam/'s MoQ should stay black.
+- ~~**Test the TURN relay with the VPN on.**~~ ✅ DONE 2026-09-30, VPN on: `DEMO_BASE=https://positron.studio node demo/verify.mjs webrtc` **28/28, 22 page asserts**, `connected`, frames RENDERED 1280x720, ping 26 ms, footer `relay`, path `local relay, remote host, udp, relay over tcp`, 7 ICE urls of which 6 TURN. ⚠️ The first run the same minute read 8/8 with **2** page asserts, which is the cold container, not a pass. /cam/'s MoQ under the VPN is still unlooked at.
 - **`video-panel.mjs` has no way to REPLACE its picture.** A page emptying `panel.stage` loses the caption slot and the full screen exit (the /stage/ questions bug, 2026-09-30).
 - **`transport-bar.mjs` has no toggle that drives another deck.** /stage/'s play button is borrowed from the hidden archive bar.
 - **/stage/ streams the 253 MB film into an unseen canvas on every show.**
