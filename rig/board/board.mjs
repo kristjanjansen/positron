@@ -29,6 +29,7 @@ import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video
 import { parseInputs, createInputs } from './inputs.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
+import * as fsMod from 'node:fs';
 
 const arg = (k, dflt) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -1547,7 +1548,7 @@ const inputsCfg = parseInputs(process.env.BOARD_INPUTS || '');
 for (const p of inputsCfg.problems) log('inputs:', p);
 const hwInputs = createInputs({
   inputs: inputsCfg.inputs, room: ROOM, relay: RELAY, frame: FRAME, rate: RATE, name: NAME, id: BOARD_ID,
-  spawn, WebSocket, format, parse, randomId, log: (...a) => log('input', ...a),
+  spawn, WebSocket, format, parse, randomId, fs: fsMod, log: (...a) => log('input', ...a),
 });
 if (!DRY && !ONCE) hwInputs.start();
 

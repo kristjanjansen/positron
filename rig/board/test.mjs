@@ -8,7 +8,7 @@
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
 import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
 import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
-import { parseInputs, takeChannel, leaseExpired, createInputs } from './inputs.mjs';
+import { parseInputs, takeChannel, leaseExpired, createInputs, midiVerdict } from './inputs.mjs';
 import { EventEmitter } from 'node:events';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -275,7 +275,7 @@ is('a missing capture says which verbs raise it',
 console.log('inputs: a name, a room and a lease');
 {
   const good = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1}}');
-  is('a good entry is read whole', good.inputs.get('circuit'), { name: 'circuit', device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1 });
+  is('a good entry is read whole', good.inputs.get('circuit'), { name: 'circuit', device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1, midi: null });
   const bad = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":3},"Bad Name":{"device":"x"},"ok":{"device":"default"}}');
   is('a take past the channel count is refused', bad.inputs.has('circuit'), false);
   is('a name with spaces is refused', bad.inputs.has('Bad Name'), false);
@@ -338,6 +338,50 @@ console.log('inputs: a name, a room and a lease');
   c.handle({ type: 'audio.status', id: 's1' });
   const st = JSON.parse(sockets[0].sent.filter((x) => typeof x === 'string').at(-1));
   is('status in the input room says what is playing', [st.type, st.ok, st.source], ['audio.started', false, 'circuit']);
+  hw.close();
+}
+
+console.log('inputs: what a page may send the Circuit');
+{
+  const CH = [1, 2, 10];
+  is('a note on for synth 1 passes', midiVerdict([0x90, 60, 100], CH).ok, true);
+  is('a note off for drums passes', midiVerdict([0x89, 60, 0], CH).ok, true);
+  is('all notes off passes', midiVerdict([0xB1, 123, 0], CH).ok, true);
+  // negative controls, each the shape that could hurt the instrument
+  is('SysEx is refused, a Replace Patch writes flash', midiVerdict([0xF0, 0x00, 0x20], CH).ok, false);
+  is('a program change is refused', midiVerdict([0xC0, 5, 0], CH).ok, false);
+  is('an ordinary controller is refused', midiVerdict([0xB0, 7, 100], CH).ok, false);
+  is('CC 123 with a value is not all notes off', midiVerdict([0xB0, 123, 5], CH).ok, false);
+  is('a note on channel 16, the session channel, is refused', midiVerdict([0x9F, 60, 100], CH).ok, false);
+  is('a data byte past 127 is refused', midiVerdict([0x90, 200, 100], CH).ok, false);
+  is('four bytes is refused', midiVerdict([0x90, 60, 100, 0], CH).ok, false);
+  is('and the refusal says why', /channel 16/.test(midiVerdict([0x9F, 60, 100], CH).why), true);
+
+  const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
+  is('a midi port is read from config', cfg.inputs.get('circuit').midi, { port: 'Circuit', channels: [1, 2, 10] });
+  is('a midi port that is a path is refused', parseInputs('{"c":{"device":"x","midi":{"port":"/dev/snd/midiC0D0","channels":[1]}}}').inputs.has('c'), false);
+
+  let t = 0; const writes = []; const opened = [];
+  const fakeFs = { readlinkSync: () => 'card7', openSync: (pth) => { opened.push(pth); return 42; },
+    writeSync: (fd, buf) => writes.push([...buf]), closeSync: () => {} };
+  const sock = [];
+  class WS { constructor() { this.readyState = 1; this.sent = []; sock.push(this); } send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
+  const hw = createInputs({ inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 3, rate: 48000, name: 'pi', id: 'pi',
+    spawn: () => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => p.emit('exit'); return p; },
+    WebSocket: WS, format: (m, e) => JSON.stringify({ ...m, ...e }), parse: (x) => ({ kind: 'json', msg: JSON.parse(x) }),
+    randomId: () => 'x', now: () => t, fs: fakeFs, leaseMs: 60_000, beatMs: 5_000 });
+  const c = hw.get('circuit'); c.connect();
+  c.handle({ type: 'midi.send', id: 'a', bytes: [0x90, 60, 100] });
+  is('a note reaches the port the card name resolves to', opened, ['/dev/snd/midiC7D0']);
+  is('with exactly the bytes sent', writes, [[0x90, 60, 100]]);
+  c.handle({ type: 'midi.send', id: 'b', bytes: [0xF0, 0x7E, 0x7F] });
+  is('SysEx never reaches the port', writes.length, 1);
+  const refusedMsg = JSON.parse(sock[0].sent.filter((x) => typeof x === 'string').at(-1));
+  is('and the page is told it was refused', refusedMsg.type, 'midi.refused');
+  c.handle({ type: 'input.want', id: 'w' });
+  t += 61_000; c.s.lastHeard = t; c.beat();
+  is('when the lease runs out, a note left held is released', writes.at(-1), [0x80, 60, 0]);
+  is('and nothing is left held', c.s.held.size, 0);
   hw.close();
 }
 

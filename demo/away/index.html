@@ -30,6 +30,9 @@
   import { createBoard } from '/shell/board.mjs';
   import { createWaveView } from '/shell/wave-view.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
 
   const q = new URLSearchParams(location.search);
   const INPUT = q.get('input') || 'circuit';
@@ -44,7 +47,7 @@
 
   const d = mount({
     name: 'away',
-    what: 'Listen to a Novation Circuit in another building, captured by a Raspberry Pi and drawn as it arrives.',
+    what: 'Play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives.',
     readout: { playing: '', level: 'dBFS', clipped: '', buffer: 'ms' },
     controls: [
       { id: 'listen', label: 'Listen', primary: true },
@@ -76,6 +79,93 @@
   host.append(board.presence.el);
   d.stack.add(host);
   const wave = createWaveView(host, { height: 160, label: `the last ${SECONDS} seconds from the board` });
+
+  // ── playing it ───────────────────────────────────────────────────────────
+  //
+  // 🔴 A PART IS A CHANNEL, AND A DRUM IS ALSO A NOTE. `plans/plan-circuit-model12.md`
+  // §3.1 and §3.2: Synth 1 on channel 1, Synth 2 on channel 2, all four drums on
+  // channel 10 with Drum 1 at note 60 and Drum 2 at 62 (+2, +2, +1, not even).
+  // So on a drum part every key plays that one drum, and the key only chooses
+  // how hard.
+  // ⚠️ THE BOARD DECIDES WHAT REACHES THE INSTRUMENT, NOT THIS PAGE. It lets
+  // note on, note off and all notes off through on 1, 2 and 10 and refuses the
+  // rest (rig/board/inputs.mjs `midiVerdict`), because a room name is not a
+  // password and the Circuit has no factory reset.
+  const PARTS = {
+    s1: { ch: 1 }, s2: { ch: 2 },
+    d1: { ch: 10, note: 60 }, d2: { ch: 10, note: 62 },
+  };
+  let part = PARTS.s1;
+  const VEL = 100;
+  // What each key actually sent, so a key released after the part changed
+  // ends the note it started rather than one on the new part.
+  const sounding = new Map();
+  let notesSent = 0;
+  function noteOn(key, vel) {
+    const out = { ch: part.ch, note: part.note ?? key };
+    noteOff(key);
+    sounding.set(key, out);
+    if (board.send({ type: 'midi.send', bytes: [0x90 | (out.ch - 1), out.note, Math.max(1, Math.min(127, vel))] })) notesSent++;
+  }
+  function noteOff(key) {
+    const out = sounding.get(key);
+    if (!out) return;
+    sounding.delete(key);
+    board.send({ type: 'midi.send', bytes: [0x80 | (out.ch - 1), out.note, 0] });
+  }
+  function panic() {
+    for (const k of [...sounding.keys()]) noteOff(k);
+    board.send({ type: 'midi.panic' });
+  }
+
+  const partPick = createChoice({
+    label: 'part',
+    options: [['Synth 1', 's1'], ['Synth 2', 's2'], ['Drums 1', 'd1'], ['Drums 2', 'd2']],
+    at: 0,
+    onPick: (v, name) => { part = PARTS[v]; d.log(`playing ${name}`); },
+  });
+  const midiBtn = el('button', '', 'enable midi', { type: 'button' });
+  const playRow = el('div', 'away-play');
+  playRow.append(partPick.el, midiBtn);
+  d.stack.add(playRow);
+
+  const kbHost = el('div');
+  d.stack.add(kbHost);
+  const kb = createKeyboard(kbHost, {
+    ...keyRange(),
+    base: 48,
+    full: true,
+    onDown: (note) => { kb.lightNote(note, true); noteOn(note, VEL); },
+    onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
+    onPanic: () => panic(),
+  });
+
+  // ── MIDI in, from a keyboard on this machine ─────────────────────────────
+  // Asked for on a press, or opened by itself only when the browser has
+  // ALREADY said yes: `requestMIDIAccess` is a prompt, and a visit asks nothing.
+  // Every incoming note goes to the part chosen above, whatever channel the
+  // keyboard itself sends on.
+  let midi = null;
+  function openMidi() {
+    if (midi) return midi;
+    midi = createMidi({
+      onDown: (note, vel) => { kb.lightNote(note, true); noteOn(note, vel); },
+      onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
+      log: (line, kind) => d.log(line, kind),
+      onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} playing the Circuit`
+                               : 'no MIDI keyboard is plugged in yet, so nothing will arrive'),
+    });
+    midiBtn.remove();
+    return midi;
+  }
+  midiBtn.addEventListener('click', () => openMidi());
+  (async () => {
+    try {
+      const st = await navigator.permissions?.query({ name: 'midi' });
+      if (st?.state === 'granted') openMidi();
+    } catch { /* no Web MIDI here, so the button stays and says so when pressed */ }
+  })();
+  addEventListener('pagehide', () => panic());
 
   // ── the ring the picture reads ────────────────────────────────────────────
   const ring = new Float32Array(SECONDS * RATE);
@@ -172,6 +262,18 @@
     // another building, and board.mjs refuses every send under selfcheck.
     d.assert('a harness run cannot start the capture', board.driving() === false);
     d.assert('the page listens in the input room, not the instrument room', ROOM.endsWith(`-${INPUT}`), ROOM);
+    // A drum part turns every key into its one drum, and the key that started
+    // a note is the key that ends it even after the part changes. Driven
+    // through the real functions with the board refusing, so nothing is sent.
+    const was = part;
+    part = PARTS.d2; noteOn(70, 90);
+    const drum = sounding.get(70);
+    part = PARTS.s1; noteOff(70);
+    part = was;
+    d.assert('Drums 2 plays note 62 on channel 10 from any key', drum?.ch === 10 && drum?.note === 62, JSON.stringify(drum));
+    d.assert('a key released after the part changed ends its own note', !sounding.has(70));
+    d.assert('the four parts are Synth 1, Synth 2, Drums 1 and Drums 2',
+      JSON.stringify(Object.values(PARTS).map((p) => [p.ch, p.note ?? null])) === '[[1,null],[2,null],[10,60],[10,62]]');
     const t0 = performance.now();
     while (!frames && performance.now() - t0 < 6000) await new Promise((r) => setTimeout(r, 200));
     if (!frames) {
@@ -190,5 +292,6 @@
   /* The badge sits above the picture with the kit's own control gap. */
   .away-pic { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ctl-gap); }
   .away-pic > .pos-wave { align-self: stretch; }
+  .away-play { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); }
 </style>
 </html>
