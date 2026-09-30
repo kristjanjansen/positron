@@ -1,11 +1,14 @@
 ## Open
 
-### Open 2026-09-30: a new demo `collide`, SuperCollider typed and compiled in the tab, as `/fau/` does Faust
+### Done 2026-09-30: a new demo `collide`, SuperCollider typed and compiled in the tab, as `/fau/` does Faust
 
 ASKED, VERBATIM: *"can you do simple supercollider script browser compile demo as in fau called collide? do we have moving pieces?"*
 - **The moving pieces, checked 2026-09-30:** the engine is real wasm scsynth (SuperSonic, vendored, `demo/shell/scsynth.mjs`, used by `/grains/` and `/radio/`); the bytes are `demo/shell/synthdef.mjs`, whose `graph()` builds a version 2 SynthDef in JavaScript that scsynth plays. 🔴 **The LANGUAGE is missing**: sclang does not run in a browser (`research/supercollider-browser-2026-09.md` §1.3, PR #7440 open since 2026-04-01 and mid-design), and compiling on the Pi's sclang would run a visitor's code on the Pi, where sclang can shell out. Refused.
 - **So the demo is a small sclang subset compiled in JavaScript**: a function literal with UGen calls (`SinOsc.ar(440, 0, 0.1)`), arithmetic, arguments and `var`s, down to `graph()`, loaded with `/d_recv` and played. Anything outside the subset is refused with a line and column, never guessed.
 - Wait for the compile-on-idle kit module (entry below) and use it rather than a Compile button.
+
+- ✅ **DONE, from the agent's report.** `demo/shell/sclang-lite.mjs` compiles a subset (function literal with args, `var`, `.ar`/`.kr` calls with positional and keyword args, `+ - * /` strictly left to right as sclang does, multichannel arrays, `Mix`, `EnvGen` with `Env.adsr/perc/new`) to `graph()` bytes, and refuses everything else with a line and column. UGen defaults from `SCClassLibrary/Common/Audio` at commit 1995490. `sclang-lite-test.mjs` 50/50, eight sabotages each red. Real scsynth: boot 674 ms, every `/d_recv` answered `/done`, presets 0.0178 / 0.0961 / 0.0426 rms, `mul:` 0.0708 against 0.0707 expected. `verify collide` 29/29, 23 page asserts. One definition name per compile, so a held note keeps its old graph.
+- ⚠️ **Unsettled:** replacing a definition in place under a running synth, never measured; the 64 wire-buffer count matches the measured 64 loads / 65 refused but the C++ was not read; MIDI untested with a device; at 375 px the readout splits 3 + 1 (the kit's `/knobs/` problem).
 
 ### Done 2026-09-30: `/und/`'s part lane less yellow, in the colour the Csound score has on `/click/`
 
