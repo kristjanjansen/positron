@@ -208,6 +208,7 @@
   import { onChannel, param, ccBytes } from '/shell/circuit-cc.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { offerLoopFor, inputNames, checkEvolutionLoop } from '/shell/midi.mjs';
 
   /**
    * 🔴 EDITING A NOVATION CIRCUIT WHILE IT PLAYS, AND THE ANSWER TO WHETHER
@@ -848,6 +849,12 @@
     ...keyRange(),
     base: 48,
     full: true,
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. A looped note comes back through `onDown` marked `loop`, so
+       it meets the same route gate a finger does and goes to the Circuit on the
+       Raspberry Pi by the same door. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
     onDown: (note) => { if (route !== 'board') return; kb.lightNote(note, true); noteOn(note); },
     onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
     onPanic: () => panic(),
@@ -1413,8 +1420,12 @@
     /* Plugging an instrument in after the page loaded is the ordinary case, not
        an edge one. A page that only ever looks once is a page you have to
        reload, and reloading is how somebody concludes the page is broken. */
-    access.onstatechange = () => listOutputs('changed');
+    /* ⚠️ THE INPUT NAMES ARE READ AND NO INPUT IS OPENED. Nothing here sets
+       `onmidimessage`, so the Circuit's clock still arrives nowhere; the names
+       are only how `Loop` learns the Evolution is on this desk. */
+    access.onstatechange = () => { listOutputs('changed'); offerLoopFor(kb, inputNames(access), d.log); };
     listOutputs('press');
+    offerLoopFor(kb, inputNames(access), d.log);
     return !ports.length ? 'no outputs' : port ? 'sending' : 'no match';
   }
 
@@ -1481,7 +1492,10 @@
     return b;
   }
 
+  /** every message that reached this door, sent or refused, for the loop check */
+  let boardTries = 0;
   function toBoard(bytes) {
+    boardTries++;
     const id = board?.send({ type: 'midi.send', bytes });
     if (!id) return false;
     sentIds.add(id);
@@ -2479,6 +2493,19 @@
       traffic.count() > 0, `${traffic.count()} rows`);
 
     sink = null;
+
+    /* `Loop` follows the Evolution, and a loop reaches the board's door. The
+       keys only play on the board route, which a harness never takes, so the
+       route is set for the length of this check and put back: every note it
+       counts was refused by `createBoard` and nothing was heard. */
+    const wasRoute = route;
+    route = 'board';
+    try {
+      await checkEvolutionLoop(d, {
+        keys: kb, heard: () => boardTries,
+        ports: (names) => offerLoopFor(kb, names, d.log), real: () => inputNames(access),
+      });
+    } finally { route = wasRoute; }
   });
 
   grade();

@@ -360,7 +360,16 @@
      controls, for a keyboard somebody plays from a computer. This one is a
      picture of somebody else's instrument and the octave pair it really has is
      in the back strip, drawn separately and lit by nothing. */
-  .evo-keys .kbd .kpad { display: none; }
+  .evo-keys .kbd .kpad:not(:has(.pos-toggle)) { display: none; }
+  /* 🔴 AND THE ROW COMES BACK WITH `Loop` IN IT AND NOTHING ELSE, asked
+     2026-09-30 for every keyboard page: *"enable loop button and fucntioanly on
+     onscreen keyboar when evolution is connceted"*. The component puts `Loop`
+     in the row only while `midi.mjs` has seen the Evolution, so `:has` is the
+     whole condition and the octave pair and `Panic` stay hidden for the reason
+     above. The tempo and ratio cells arrive with `Loop` and say what it is
+     doing, so they stay. */
+  .evo-keys .kbd .kpad-grp-start > :not(.kpad-tempo):not(.kpad-ratio),
+  .evo-keys .kbd .kpad-grp-end > :not(.pos-toggle) { display: none; }
   /* 🔴 THE KEYS GROW TO THE DEPTH OF THE CASE, AND THAT IS FOUR OVERRIDES INTO
      A COMPONENT, SO HERE IS WHY. MEASURED on the first run of this rebuild: the
      left column came out 552 px deep, because a display over a four row pad
@@ -420,6 +429,7 @@
   import { createPresenceButton, WIRED } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode, noteName } from '/shell/midi-decode.mjs';
+  import { isEvolution, offerLoopFor, inputNames, checkEvolutionLoop } from '/shell/midi.mjs';
 
   /**
    * 🔴 AN EVOLUTION MK-425C ON SCREEN. The third hardware panel, and its two
@@ -1232,6 +1242,13 @@
     base: KEY_LO, map: keyMap, keys: keyNames, letters: false,
     sharps: new Set(keyNames.filter((_, i) => KEY_PATTERN[i] === 'B')),
     minBase: KEY_LO, maxBase: KEY_LO,
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. This panel has no sound engine, so what a loop plays back
+       here is the LAMP: a note the take heard off the wire, or a key pressed on
+       screen, comes back round lighting its key. It starts withdrawn and Listen
+       is what can bring it, because Listen is when this page opens MIDI. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
     /**
      * 🔴 THE PAGE LIGHTS THE KEY, AND TAKING `pointer-events` OFF WITHOUT THIS
      * WOULD HAVE SHIPPED A KEYBOARD THAT TOOK A PRESS AND DID NOTHING AT ALL.
@@ -1254,6 +1271,8 @@
       if (how === 'midi' || how === 'panic') return;
       handKey++;
       kbd.lightNote(note, true);
+      /* A looped note is not a hand on the screen, so it says nothing about one. */
+      if (how === 'loop') return;
       /* 🔴 THE DISPLAY SAYS NOTHING FOR A KEY PRESSED HERE, AND THAT IS THE
          RULE RATHER THAN AN OMISSION. A real key fills the three digits with
          how hard it was hit, and a mouse has no velocity to report. Nothing
@@ -1563,6 +1582,10 @@
         try { await p.open(); } catch { /* another client may hold it */ }
         p.onmidimessage = (e) => take(Array.from(e.data));
       }
+      /* `Loop` follows the Evolution from here on, including a cable plugged in
+         or pulled out after Listen. */
+      offerLoopFor(kbd, inputNames(access), d.log);
+      access.onstatechange = () => offerLoopFor(kbd, inputNames(access), d.log);
       return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
@@ -1592,7 +1615,7 @@
          desk, and reporting the first as the second says `online` about an
          empty room. */
       const seen = [...(access?.inputs?.values() ?? [])]
-        .filter((i) => /mk-?4\d\dc|evolution/i.test(i.name || ''));
+        .filter((i) => isEvolution(i.name));
       pres.set(seen.length ? 'online' : 'offline',
         seen.length ? null : 'nothing with MK-425C in its name is plugged in');
       d.log('this page only listens. Play a key, turn a knob, move either wheel, '
@@ -1812,7 +1835,7 @@
     d.assert('the only control the suite presses here is the presence button',
       pressedBySuite.length === 1 && pres.el.contains(pressedBySuite[0])
         && card.querySelectorAll('.pos-controls').length === 0
-        && !!hiddenPad && getComputedStyle(hiddenPad).display === 'none',
+        && !!hiddenPad && (kbd.loopOffered() || getComputedStyle(hiddenPad).display === 'none'),
       `${pressedBySuite.length} in the row the harness clicks, `
       + `${card.querySelectorAll('.pos-pad, .pos-knob, .pos-fdr').length} panel controls `
       + `outside it, the keyboard’s own pad ${hiddenPad ? 'hidden' : 'missing'}`);
@@ -2662,6 +2685,29 @@
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));
+
+    /* `Loop` follows the Evolution, and what comes back round on this page is
+       the lamp: `handKey` counts every note this page's own `onDown` lit. */
+    await checkEvolutionLoop(d, {
+      keys: kbd, heard: () => handKey,
+      ports: (names) => offerLoopFor(kbd, names, d.log), real: () => inputNames(access),
+    });
+
+    /* 🔴 AND ON THIS PANEL THE ROW COMES BACK WITH `Loop` ALONE IN IT. The kit's
+       octave pair and `Panic` stay hidden with the Evolution present, because
+       the instrument's own octave pair is in the back strip. MEASURED rather than
+       read off the stylesheet, since the whole rule is a `:has`. */
+    offerLoopFor(kbd, ['MK-425C USB MIDI Keyboard'], d.log);
+    const padRow = keysBox.querySelector('.kpad');
+    const shownBtns = [...padRow.querySelectorAll('button')]
+      .filter((b) => b.getClientRects().length > 0).map((b) => b.textContent.trim());
+    const rowShown = getComputedStyle(padRow).display !== 'none';
+    offerLoopFor(kbd, inputNames(access), d.log);
+    const rowGone = getComputedStyle(padRow).display === 'none' || kbd.loopOffered();
+    d.assert('with the Evolution here the keys grow a row holding Loop and no other button',
+      rowShown && shownBtns.length === 1 && shownBtns[0] === 'Loop' && rowGone,
+      `row ${rowShown ? 'drawn' : 'hidden'} holding ${JSON.stringify(shownBtns)}, and hidden again `
+      + `${rowGone ? 'once' : 'NOT once'} the ports are back to what is really plugged in`);
   });
 
   d.ready();

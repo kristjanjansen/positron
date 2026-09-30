@@ -14,6 +14,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { offerLoopFor, inputNames, checkEvolutionLoop } from '/shell/midi.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'instrument-demo';
   const ID = Math.random().toString(36).slice(2, 8);
@@ -42,6 +43,12 @@
   // from the other player lights the same key without a second code path.
   const kb = createKeyboard(d.el, {
     base: 60,
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. A looped note comes back through `onDown` marked `loop` and
+       goes through `press`, so it sounds here or at the far end and crosses the
+       relay exactly as a finger's would. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
     onDown: (note, how) => press(note, how),
     onUp: (note) => release(note),
   });
@@ -60,6 +67,7 @@
   let view = null;
 
   let ctx = null, voices = null, ws = null, sent = 0, received = 0, midiState = 'not yet';
+  let midiAccess = null;
   const lat = [];
 
   // ── the notes, on a line ───────────────────────────────────────────────
@@ -116,8 +124,11 @@
   }
 
   const live = new Map();
+  /** notes handed to the voices, which is the far side of `press` for a check */
+  let voiced = 0;
   function play(note, vel) {
     if (!voices) return;
+    voiced++;
     voices.monitorOn?.({ type: 'note-on', note, vel, layer: 'mon' });
     live.set(note, true);
   }
@@ -179,6 +190,14 @@
     addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
     setTimeout(assertStarted, 400);
     setTimeout(() => assertRelay(ws?.state?.() === 1), 6000);
+    /* Behind the press that makes the voices, because a loop can only be heard
+       once there is something to hear it with. */
+    if (SELFCHECK) {
+      await checkEvolutionLoop(d, {
+        keys: kb, heard: () => voiced,
+        ports: (names) => offerLoopFor(kb, names, d.log), real: () => inputNames(midiAccess),
+      });
+    }
   });
 
   /**
@@ -251,6 +270,11 @@
     if (!navigator.requestMIDIAccess) { midiState = 'no API'; d.set('midi', midiState, 'bad'); return; }
     try {
       const access = await navigator.requestMIDIAccess({ sysex: false });
+      midiAccess = access;
+      /* `Loop` follows the Evolution from here on, including a cable plugged in
+         or pulled out after this press. */
+      offerLoopFor(kb, inputNames(access), d.log);
+      access.onstatechange = () => offerLoopFor(kb, inputNames(access), d.log);
       const ins = [...access.inputs.values()];
       // one or two words, for the same reason `sound` is: the cell is one line
       // wide and the detail is in the log under it
