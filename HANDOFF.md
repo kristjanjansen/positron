@@ -10,7 +10,9 @@
   `/opt/positron-board/rig/board/node_modules`, via `push.sh`. Journal says
   `inputs: direct path available`. `test.mjs` **193/193 on the Pi**. `/shape/`'s
   52 synth CCs now pass the gate.
-- **Nothing is pushed.** 59 commits ahead of `origin/main`.
+- **Nothing is pushed.** 62 commits ahead of `origin/main` with this one. Push needs the account switch in CLAUDE.md.
+- Counted at the end: **60 demos, 58 built, 2 unlisted**, **80 plans**.
+- Uncommitted, on purpose: `demo/shell/shell.css`, the secondary-button capitals rule, still waiting on the owner.
 
 ## What landed
 
