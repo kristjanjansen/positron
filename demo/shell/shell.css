@@ -5847,6 +5847,20 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    which is a rendering fault rather than a signal. **An off pad says nothing
    about its colour now**, and the lane is carried by the pads that ARE on. If
    that turns out not to be enough, the answer is a tinted BORDER on all four
+/* 🔴 A PARAMETER'S KNOB CAN WEAR THE PARAMETER'S HUE, AND NOTHING SETS ONE
+   YET. `param-knobs.mjs` stamps `data-param` on every knob it builds under a
+   program's text (`/collide/`, `/fau/`), so the editor work in
+   `plans/plan-code-editor.md` can colour a name in the text and its knob alike
+   by setting `--param-hue` on either the knob or anything above it.
+   ⚠️ UNSET MEANS THE ORDINARY `--hi`, AND IT IS THE CUSTOM PROPERTY'S OWN
+   RULE THAT DOES IT: a custom property whose value reads an unset `var()` is
+   invalid at computed value time, so `var(--param-ink, var(--hi))` takes its
+   fallback. No attribute and no JavaScript decide it.
+   ⚠️ ABOVE `.pos-knob[data-off] .pos-knob-arc` AT THE SAME WEIGHT, so a
+   switched off knob still goes grey. */
+.pos-knob[data-param] { --param-ink: hsl(var(--param-hue) 70% 62%); }
+.pos-knob[data-param] .pos-knob-arc { stroke: var(--param-ink, var(--hi)); }
+
    sides, never a heavier edge on one.
    ⚠️ `position: relative` IS KEPT, because the face label is positioned
    against it. */

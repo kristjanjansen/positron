@@ -39,6 +39,30 @@
 // is a number or one of Env's own shape names written as a symbol (`\lin`).
 // `//` and `/* */` comments, nested the way sclang nests them.
 //
+// 🔴 NAMED CONTROLS, `\name.kr(value, lag, spec: ...)`, ADDED 2026-09-30 so a
+// program can say which of its numbers a knob under the text may turn. The
+// signature is sclang's own, `Symbol.kr { | val, lag, fixedLag = false, spec | }`
+// (`SCClassLibrary/Common/Core/Symbol.sc`), and what it builds is
+// `NamedControl.new` in `Common/Control/GraphBuilder.sc`, read at 19954900:
+//   `\rel.kr(1.5)`             a Control block of its own, one output, its
+//                               special index its slot in the value array
+//   `\rel.kr(1.5, 0.2)`        a LagControl whose one input is 0.2. A lag that
+//                               is a plain number is `\scalar` rate, and
+//                               `NamedControl.new` turns that into `fixedLag`,
+//                               so sclang builds a LagControl and NOT
+//                               `Control.kr(...).lag(0.2)`. A lag of 0 is nil
+//                               there, so no lag at all.
+//   `spec: [min, max, warp, step, default]`   `Array.asSpec` is
+//                               `ControlSpec(*this)`, so that is the order.
+//                               The warp is `\lin`, `\exp`, `\sin`, `\cos` or a
+//                               curve number. `spec: \freq` is one of
+//                               `Spec.specs`, copied from `Spec.sc`. With no
+//                               value, the spec's default is the value, which
+//                               is `ControlSpec`'s `default ? minval`.
+// The same name twice is one control, as in sclang, and two different values
+// for it is sclang's own error. The spec changes nothing in the sound; it is
+// what the knob under the text is drawn from, which is `controls` in the result.
+//
 // 🔴 THE OPERATORS ARE LEFT TO RIGHT WITH NO PRECEDENCE, BECAUSE sclang's ARE.
 // `1 + 2 * 3` is 9 in SuperCollider, not 7. A compiler that used ordinary
 // maths precedence would compile every preset here correctly and then play
@@ -59,7 +83,13 @@
 // its level). A positional argument after a keyword one. Strings, symbols
 // anywhere but an Env curve, `~environment` variables, nested functions,
 // `if`, `.play`, `SynthDef`, `Out`, `#[...]`, every operator but the five, a
-// variable used before it has a value, a default that is not a number. An
+// variable used before it has a value, a default that is not a number. A named
+// control that is `.ar`, `.ir` or `.tr`, whose value or lag is not a number,
+// that is given `fixedLag`, that shares a name with an argument, or whose spec
+// this subset cannot draw a knob for: `\amp` and `\db` warps (sclang's fader
+// warps), `\exp` across or touching zero, a range of nothing, a default
+// outside the range. The last three are TIGHTER than sclang, which builds such
+// a spec and only misbehaves when something maps through it. An
 // `.ar` filter or `Pan2` whose first input is not audio rate, which is
 // sclang's own `checkSameRateAsFirstInput` and `checkNInputs(1)`. A last line
 // that is a number or `.kr`, which `Out.ar` refuses in sclang too.
@@ -125,6 +155,51 @@ export const ENVS = {
 /** `Env.shapeNames`, from `Env.sc`'s `initClass`. A number is shape 5. */
 export const SHAPES = { step: 0, lin: 1, linear: 1, exp: 2, exponential: 2, sin: 3, sine: 3,
   wel: 4, welch: 4, sqr: 6, squared: 6, cub: 7, cubed: 7, hold: 8 };
+
+/**
+ * `Spec.specs` as `Spec.sc`'s `initClass` fills it, the entries a knob can be
+ * drawn from, verbatim: `[min, max, warp, step, default]`. Left out:
+ * `audiobus` and `controlbus`, which read a running server's options, and
+ * `db` and `amp`, whose warps are the fader curves this subset refuses.
+ */
+export const SPECS = {
+  unipolar: [0, 1, 'lin', 0, 0], bipolar: [-1, 1, 'lin', 0, 0],
+  freq: [20, 20000, 'exp', 0, 440], lofreq: [0.1, 100, 'exp', 0, 6],
+  midfreq: [25, 4200, 'exp', 0, 440], widefreq: [0.1, 20000, 'exp', 0, 440],
+  phase: [0, 2 * Math.PI, 'lin', 0, 0], rq: [0.001, 2, 'exp', 0, 0.707],
+  midi: [0, 127, 'lin', 0, 64], midinote: [0, 127, 'lin', 0, 60], midivelocity: [1, 127, 'lin', 0, 64],
+  boostcut: [-20, 20, 'lin', 0, 0], pan: [-1, 1, 'lin', 0, 0], detune: [-20, 20, 'lin', 0, 0],
+  rate: [0.125, 8, 'exp', 0, 1], beats: [0, 20, 'lin', 0, 0], delay: [0.0001, 1, 'exp', 0, 0.3],
+};
+/** Warp names `Warp.warps` knows, and what this subset calls each. `amp` and `db` are refused. */
+const WARPS = { lin: 'lin', linear: 'lin', exp: 'exp', exponential: 'exp', sin: 'sin', cos: 'cos' };
+
+/**
+ * The controls a KEY sets, so no knob is drawn for them: the page sends
+ * `freq` and `gate` in `/s_new`, and `amp` is the patch's own level.
+ */
+export const KEYED = ['freq', 'amp', 'gate'];
+
+/**
+ * A spec for a control that was given none, which is what an argument always
+ * is. `name.asSpec` first, the way sclang's own GUIs find one (`Symbol.asSpec`
+ * is `Spec.specs.at(this)`); then `ControlSpec.new`, 0 to 1, which is what
+ * `nil.asSpec` answers, when the value fits in it.
+ * ⚠️ AND THEN A GUESS THAT IS THIS FILE'S AND NOT sclang's: 0 to twice the
+ * value, or minus to plus twice it, because sclang has no answer past `nil`
+ * and a knob has to have two ends. `guessed` says so to the page.
+ */
+export function specFor(name, value) {
+  const named = SPECS[name];
+  if (named) {
+    const [min, max, warp, step] = named;
+    if (value >= Math.min(min, max) && value <= Math.max(min, max)) return { min, max, warp, step, guessed: false };
+  }
+  if (value >= 0 && value <= 1) return { min: 0, max: 1, warp: 'lin', step: 0, guessed: false };
+  const m = Math.abs(value) * 2;
+  return value > 0 ? { min: 0, max: m, warp: 'lin', step: 0, guessed: true }
+    : { min: -m, max: m, warp: 'lin', step: 0, guessed: true };
+}
 
 /** `BinaryOpUGens.cpp`: opAdd 0, opSub 1, opMul 2, opIDiv 3, opFDiv 4. */
 export const BINARY = { '+': 0, '-': 1, '*': 2, '/': 4 };
@@ -529,6 +604,111 @@ function compileOrThrow(src, name) {
     return sum;
   }
 
+  // ── named controls ──────────────────────────────────────────────────────────
+
+  /** name -> { value, lag, spec, ref, at }, one per name, as `NamedControl`'s dictionary is. */
+  const named = new Map();
+  /** Every control in the order the value array holds them: arguments, then named ones. */
+  const controls = [];
+
+  /** A spec written in the program: `\freq`, or `[min, max, warp, step, default]`. */
+  function readSpec(x, at) {
+    if (x.k === 'sym') {
+      if (!SPECS[x.v]) throw new SclError(`\\${x.v} is not a spec this subset knows; it knows ${Object.keys(SPECS).map((k) => `\\${k}`).join(' ')}`, x.at ?? at);
+      const [min, max, warp, step, dflt] = SPECS[x.v];
+      return { min, max, warp, step, default: dflt };
+    }
+    if (x.k !== 'arr') throw new SclError(`spec: is an array like [0.05, 6, \\exp] or a name like \\freq, not ${describe(x)}`, at);
+    const it = x.items;
+    if (it.length < 2 || it.length > 5) throw new SclError(`spec: [min, max, warp, step, default] has two to five things in it, not ${it.length}`, at);
+    for (const i of [0, 1, 3, 4]) {
+      if (it[i] && !isNum(it[i])) throw new SclError(`spec: its ${['min', 'max', '', 'step', 'default'][i]} has to be a number`, at);
+    }
+    let warp = 'lin';
+    const w = it[2];
+    if (w) {
+      if (w.k === 'sym') {
+        if (w.v === 'amp' || w.v === 'db') throw new SclError(`\\${w.v} is one of sclang's fader warps, which this subset cannot draw a knob for; use \\lin, \\exp or a curve number`, w.at ?? at);
+        if (!WARPS[w.v]) throw new SclError(`\\${w.v} is not a warp; sclang knows \\lin \\exp \\sin \\cos \\amp \\db or a curve number`, w.at ?? at);
+        warp = WARPS[w.v];
+      } else if (isNum(w)) {
+        // `CurveWarp.new` hands back a LinearWarp under 0.001, "to prevent math blow up".
+        warp = Math.abs(w.v) < 0.001 ? 'lin' : w.v;
+      } else throw new SclError(`spec: its warp is a symbol like \\exp or a curve number, not ${describe(w)}`, at);
+    }
+    const min = it[0].v, max = it[1].v;
+    const step = it[3] ? it[3].v : 0;
+    if (min === max) throw new SclError(`spec: a range from ${min} to ${max} is no range, so there is nothing for a knob to turn`, at);
+    if (warp === 'exp' && !(min * max > 0)) throw new SclError(`spec: \\exp needs both ends on one side of zero, and ${min} to ${max} is not`, at);
+    if (step < 0) throw new SclError('spec: a step below zero is not a step', at);
+    // `ControlSpec.new`'s `default ? minval`.
+    return { min, max, warp, step, default: it[4] ? it[4].v : min };
+  }
+
+  /**
+   * `\name.kr(val, lag, fixedLag, spec)`, which is `NamedControl.kr`. See the
+   * header for what sclang builds and what this refuses.
+   */
+  function namedControl(sym, m, got, at = sym.at ?? m) {
+    const nm = sym.v;
+    if (m.v !== 'kr') {
+      const why = { ar: 'an audio rate control', ir: 'a control read once when the note starts', tr: 'a trigger control' }[m.v];
+      throw new SclError(`\\${nm}.${m.v} is ${why}, which is not in this subset; \\${nm}.kr is`, m);
+    }
+    const names = ['val', 'lag', 'fixedLag', 'spec'];
+    const by = new Map();
+    let seenKey = false;
+    got.forEach((a, i) => {
+      if (a.key) {
+        seenKey = true;
+        if (!names.includes(a.key)) throw new SclError(`\\${nm}.kr has no argument called ${a.key}; it takes ${names.join(', ')}`, a.at);
+        if (by.has(a.key)) throw new SclError(`${a.key} is given twice to \\${nm}.kr`, a.at);
+        by.set(a.key, a);
+        return;
+      }
+      if (seenKey) throw new SclError(`a positional argument after a keyword one, in \\${nm}.kr`, a.at);
+      if (i >= names.length) throw new SclError(`\\${nm}.kr takes ${names.length} arguments and this is argument ${i + 1}`, a.at);
+      by.set(names[i], a);
+    });
+    if (by.has('fixedLag')) {
+      throw new SclError('fixedLag is not in this subset, and a lag that is a number is already fixed in sclang', by.get('fixedLag').at);
+    }
+    if (params.some((x) => x.name === nm)) throw new SclError(`${nm} is already an argument, and one name for two controls is refused here`, at);
+    const spec = by.has('spec') ? readSpec(by.get('spec').val, by.get('spec').at) : null;
+    let value;
+    if (by.has('val')) {
+      const v = by.get('val').val;
+      if (v.k === 'arr') throw new SclError(`an array as the value of \\${nm} makes several controls at once, which is not in this subset`, by.get('val').at);
+      if (!isNum(v)) throw new SclError(`the value of \\${nm} has to be a number, not ${describe(v)}`, by.get('val').at);
+      value = v.v;
+    } else value = named.has(nm) ? named.get(nm).value : spec ? spec.default : 0;
+    let lag = 0;
+    if (by.has('lag')) {
+      const l = by.get('lag').val;
+      if (!isNum(l)) throw new SclError(`the lag of \\${nm} has to be a number of seconds, not ${describe(l)}`, by.get('lag').at);
+      if (l.v < 0) throw new SclError(`a lag of ${l.v} seconds is less than none`, by.get('lag').at);
+      lag = l.v;
+    }
+    if (spec && !(value >= Math.min(spec.min, spec.max) && value <= Math.max(spec.min, spec.max))) {
+      throw new SclError(`\\${nm} starts at ${value}, outside its spec's ${spec.min} to ${spec.max}`, by.get('val')?.at ?? at);
+    }
+    const had = named.get(nm);
+    if (had) {
+      // `NamedControl.new`: one name is one control, and two values for it is its own error.
+      if (had.value !== value) throw new SclError(`NamedControl: cannot have more than one set of default values in the same control, and \\${nm} was ${had.value}`, at);
+      if (by.has('lag') && had.lag !== lag) throw new SclError(`NamedControl: cannot have more than one set of fixed lag values in the same control, and \\${nm} was ${had.lag}`, at);
+      // A later spec replaces the earlier one, which is `res.spec = spec` there.
+      if (spec) { had.spec = spec; controls.find((c) => c.name === nm).spec = { ...spec, guessed: false }; }
+      return { k: 'sig', rate: RATE.slow, ref: had.ref };
+    }
+    const ref = g.control(nm, value, lag);
+    blocks.push({ cls: lag ? 'LagControl' : 'Control', rate: RATE.slow, inputs: lag ? [g.value(lag)] : [], outs: 1, special: 0 });
+    named.set(nm, { value, lag, spec, ref });
+    controls.push({ name: nm, value, lag, from: 'named',
+      spec: spec ? { min: spec.min, max: spec.max, warp: spec.warp, step: spec.step, guessed: false } : specFor(nm, value) });
+    return { k: 'sig', rate: RATE.slow, ref };
+  }
+
   // ── the grammar ─────────────────────────────────────────────────────────────
 
   const scope = new Map();       // name -> value, or null while declared and unset
@@ -603,6 +783,10 @@ function compileOrThrow(src, name) {
       next();
       if (t.v === 'pi') return num(Math.PI);
       if (['var', 'arg'].includes(t.v)) throw new SclError(`${t.v} lines come first, before anything else in the function`, t);
+      // A boolean is a value only so a named control can name `fixedLag` in its
+      // refusal; anywhere else `describe` makes it an ordinary refusal.
+      if (t.v === 'true' || t.v === 'false') return { k: 'bool', v: t.v === 'true' };
+      if (t.v === 'nil') throw new SclError('nil is not in this subset', t);
       if (is('punc', '(')) throw new SclError(`${t.v}(...) is not in this subset`, t);
       if (!scope.has(t.v)) throw new SclError(`${t.v} is not declared; add it to the arguments or a var line`, t);
       const v = scope.get(t.v);
@@ -636,6 +820,7 @@ function compileOrThrow(src, name) {
     while (is('punc', '.')) {
       next();
       const m = expect('id', undefined, 'a method name');
+      if (v.k === 'sym' && ['kr', 'ar', 'ir', 'tr'].includes(m.v)) { v = namedControl(v, m, callArgs()); continue; }
       if (m.v in UNARY) { v = unop(m.v, v, m); continue; }
       if (m.v === 'dup') {
         const got = callArgs();
@@ -687,9 +872,10 @@ function compileOrThrow(src, name) {
   // One `Control` block, first in the graph, which is what `graph().params()`
   // writes and what sclang emits for plain arguments. None at all without any.
   if (params.length) {
-    const controls = g.params(params.map((x) => [x.name, x.value]));
+    const controls_ = g.params(params.map((x) => [x.name, x.value]));
     blocks.push({ cls: 'Control', rate: RATE.slow, inputs: [], outs: params.length, special: 0 });
-    params.forEach((x, i) => scope.set(x.name, { k: 'sig', rate: RATE.slow, ref: controls[i] }));
+    params.forEach((x, i) => scope.set(x.name, { k: 'sig', rate: RATE.slow, ref: controls_[i] }));
+    for (const x of params) controls.push({ name: x.name, value: x.value, lag: 0, from: 'arg', spec: specFor(x.name, x.value) });
   }
 
   while (is('id', 'var')) {
@@ -757,6 +943,15 @@ function compileOrThrow(src, name) {
   return {
     ok: true, bytes, name,
     params: params.map(({ name: n, value }) => ({ name: n, value })),
+    /**
+     * Every control, arguments first and then named ones in the order they
+     * were met, which is the order of the definition's value array. Each has
+     * its `spec` for a knob (min, max, warp, step, and `guessed` where
+     * neither the program nor `Spec.specs` gave one). `knobs` is the same list
+     * without the ones a key sets, see `KEYED`.
+     */
+    controls: controls.map((c) => ({ ...c, spec: { ...c.spec } })),
+    knobs: controls.filter((c) => !KEYED.includes(c.name)).map((c) => ({ ...c, spec: { ...c.spec } })),
     channels: last.k === 'arr' ? last.items.length : 1,
     blocks: g.count(), wires,
     gate: gateAt >= 0, gateUsed, freesItself,
@@ -816,5 +1011,5 @@ export function wirePeak(blocks) {
 
 function describe(x) {
   return { num: `the number ${x.v}`, sig: 'a signal', arr: 'an array', env: 'an Env',
-           sym: `the symbol \\${x.v}`, nil: 'nothing' }[x.k] ?? 'that';
+           sym: `the symbol \\${x.v}`, nil: 'nothing', bool: `${x.v}` }[x.k] ?? 'that';
 }

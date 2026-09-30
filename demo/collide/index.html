@@ -81,6 +81,26 @@
    *   no `doneAction: 2` anywhere                           ->  `/n_free`, a cut
    * The third is said in the log when it is compiled, because a cut is audible
    * and a visitor should know it is the program and not the page.
+   *
+   * ── THE KNOBS UNDER THE TEXT ────────────────────────────────────────────────
+   *
+   * 🔴 EVERY CONTROL THE PROGRAM DECLARES, EXCEPT THE ONES A KEY SETS, IS A
+   * KNOB IN ONE ROW UNDER THE TEXT, AND THE SYNTAX IS SuperCollider's OWN.
+   * Asked 2026-09-30 (*"variables in code ... that are under the code and
+   * adjust parameters in real time"*), and settled as real syntax so the text
+   * still runs in a real SuperCollider: an argument, or a NamedControl like
+   * `\rel.kr(1.5, spec: [0.05, 6, \exp])`, whose spec is the knob's range and
+   * warp. `sclang-lite.mjs` reports them as `knobs`, `param-knobs.mjs` draws
+   * them, and a turn sends `/n_set <node> <name> <value>` to every node that is
+   * still sounding on a program that has that control, released ones
+   * included, while a new key sends the knob's value in its `/s_new`.
+   * ⚠️ THE PAD'S `rel` IS A NAMED CONTROL AND NOT AN ARGUMENT ON PURPOSE. An
+   * argument carries no range in the language, so its knob would be drawn
+   * from a guess; a spec is written where the number is, and it is the form
+   * sclang's own GUIs read.
+   * ⚠️ AND A RELEASE IS READ WHEN THE GATE CLOSES. EnvGen takes a segment's
+   * time as the segment starts, so a turn changes the tail of a held note and
+   * of every note after it, and not a tail that has already begun.
    */
   import { mount, guard, el } from '/shell/shell.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
@@ -92,6 +112,7 @@
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
   import { readSynthDef } from '/shell/synthdef.mjs';
@@ -155,10 +176,34 @@
   // really finished rather than gone quiet. Freeing a replaced definition is
   // the server's own job, see the header.
   const ended = new Set();
+  /** Every node still on the server, held or releasing, and the program it runs. */
+  const live = new Map();
   function heard(m) {
     if (m[0] !== '/n_end') return false;
     ended.add(m[1]);
+    live.delete(m[1]);
     return true;
+  }
+
+  // ── the knobs under the text ────────────────────────────────────────────────
+
+  /** How many `/n_set`s a turn has sent, so a check can tell a turn that reached the server. */
+  let turned = 0;
+  const knobs = createParamKnobs({ onChange: (name, v) => turn(name, v) });
+  /** A turn reaches every node still sounding on a program that has the control. */
+  function turn(name, v) {
+    if (!eng) return;
+    for (const [id, def] of live) {
+      if (!def.controls.some((c) => c.name === name)) continue;
+      eng.send('/n_set', id, name, v);
+      turned++;
+    }
+  }
+  /** The row for a compile: its knobs, or no row at all. */
+  let knobRow = null;
+  function showKnobs(r) {
+    knobs.set(r.knobs.map((k) => ({ name: k.name, value: k.value, ...k.spec })));
+    if (knobRow) knobRow.hidden = r.knobs.length === 0;
   }
 
   // ── compiling, and loading what compiled ────────────────────────────────────
@@ -193,6 +238,7 @@
       return { ok: false, error: r.message };
     }
     good = r;
+    showKnobs(r);
     setCell('synthdef', String(r.bytes.length));
     setCell('blocks', String(r.blocks));
     d.log(`${label} compiled in ${ms.toFixed(2)} ms into ${r.bytes.length} B, ${r.blocks} building blocks, `
@@ -262,8 +308,12 @@
     const id = nextNode++;
     const args = ['freq', mtof(note)];
     if (current.gate) args.push('gate', 1);
+    // Where the knob's name is a control of the program on the server, the
+    // note starts at the knob and not at the default the program wrote.
+    for (const [k, v] of knobs.values()) if (current.controls.some((c) => c.name === k)) args.push(k, v);
     eng.send('/s_new', current.name, id, 0, 0, ...args);
     held.set(note, { id, def: current });
+    live.set(id, current);
     return id;
   }
 
@@ -289,6 +339,7 @@
 
   function allOff() {
     held.clear();
+    live.clear();
     waiting.clear();
     eng?.send('/g_freeAll', 0);
   }
@@ -416,6 +467,9 @@
     keys: keys.el,
     plate: { name: 'COLLIDE', patch },
   });
+  /* The knobs are the row under the text, hidden until a compile has any. */
+  knobRow = panel.addRow(knobs.el);
+  knobRow.hidden = knobs.names().length === 0;
   d.el.append(panel.el);
 
   /* Any gesture on the instrument starts the engine, not only a key, so the
@@ -473,7 +527,8 @@
             + '**1 + 2 * 3** is 9.' },
       { from: 'def', to: 'scs',
         note: 'Sent with **/d_recv** under one name, and **scsynth** keeps the old graph for a '
-            + 'note already sounding until that note ends.' },
+            + 'note already sounding until that note ends. A knob sends **/n_set** to every note '
+            + 'still sounding.' },
       { from: 'scs', to: 'spk',
         note: '**Out.ar(0, ...)** is added round the last line, which is why a program here never '
             + 'writes one.' },
@@ -529,10 +584,32 @@
         && d.api.readout.synthdef === String(good.bytes.length),
       good ? `${good.name}, ${good.bytes.length} B, the cell reads ${d.api.readout.synthdef}` : 'nothing compiled');
     d.assert('the readout is four cells, which is an even count', Object.keys(d.api.readout).length === 4);
-    d.assert('the panel is the scope, the text, the keys and a foot, in that order',
-      panel.shape().join(' ') === 'viz controls keys plate' && panel.viz.contains(scope.el)
-        && panel.controls()[0].contains(source.el),
+    d.assert('the panel is the scope, the text, the knobs, the keys and a foot, in that order',
+      panel.shape().join(' ') === 'viz controls controls keys plate' && panel.viz.contains(scope.el)
+        && panel.controls()[0].contains(source.el) && panel.controls()[1] === knobRow,
       panel.shape().join(' '));
+
+    /* ── the knob row, before any sound ──────────────────────────────────────
+       🔴 READ OFF THE SCREEN, NOT OFF THE COMPILE: the compiler's own list is
+       graded by `sclang-lite-test.mjs`, and what this page can get wrong is
+       drawing it. `display` rather than `hidden`, which is a fact about an
+       attribute and not about what is drawn. */
+    const drawn = () => getComputedStyle(knobRow).display !== 'none';
+    const onRow = () => [...knobRow.querySelectorAll('.pos-knob[data-param]')];
+    const relKnob = () => knobRow.querySelector('.pos-knob[data-param="rel"]');
+    d.assert('under the Pad\'s text is one row with exactly one knob, rel, starting where the code says, 1.50',
+      drawn() && onRow().length === 1 && !!relKnob()
+        && relKnob().querySelector('.pos-knob-v').textContent === '1.50' && knobs.value('rel') === 1.5,
+      `${drawn() ? 'drawn' : 'not drawn'}, ${onRow().map((k) => `${k.dataset.param} ${k.querySelector('.pos-knob-v').textContent}`).join(', ') || 'no knobs'}`);
+    d.assert('and its range is the spec in the code, 0.05 to 6 on an exponential warp',
+      /\\rel\.kr\(1\.5, spec: \[0\.05, 6, \\exp\]\)/.test(PRESETS[0].code)
+        && relKnob()?.getAttribute('title') === 'rel, 0.05 to 6, exp',
+      relKnob()?.getAttribute('title') ?? 'no knob');
+    await applyPatch(PRESETS.findIndex((p) => p.id === 'growl'));
+    d.assert('a program with no control a knob could turn has no knob row at all, not an empty one',
+      !drawn() && onRow().length === 0 && knobRow.getBoundingClientRect().height === 0,
+      `${getComputedStyle(knobRow).display}, ${onRow().length} knobs`);
+    await applyPatch(0);
     /* 🔴 THE NEGATIVE HALF OF THE SCOPE CHECK, AND IT HAS TO COME FIRST: a
        picture that is painted whatever it is fed would pass "a note draws on
        it" below. With no engine there is nothing to draw. */
@@ -616,6 +693,79 @@
       d.assert(`${p.label}: and it ended by itself, which /n_end from the server says, and the output is silent again`,
         done && after < 1e-4, `${done ? 'ended' : 'still running'}, ${after.toFixed(6)} after`);
     }
+
+    /* ── the knob, on the real engine ─────────────────────────────────────────
+       🔴 DRIVEN THROUGH THE KNOB'S OWN KEYS, NOT `knobs.set` AND NOT `turn()`:
+       a keydown on the dial is what a person's arrow key does, and it goes
+       through the component, the warp, `onChange` and the page's `/n_set`.
+       Home is the bottom of the range, and eight Page Ups are 80 of 127 steps
+       of the travel, which on 0.05 to 6 exponential is 1.02 s.
+       🔴 AND WHAT IS MEASURED IS THE SERVER'S OWN ANSWER: the time from the
+       gate closing to `/n_end`, which is how long the release really took. */
+    await applyPatch(0);
+    const dial = () => relKnob().querySelector('.pos-knob-dial');
+    const key = (k, n = 1) => {
+      for (let i = 0; i < n; i++) dial().dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+    };
+    /** Hold a note, let it go, and time its release to `/n_end`. `during` runs while it is held. */
+    const tail = async (during = () => {}) => {
+      const id = sound(60);
+      await sleep(250);
+      await during(id);
+      const t0 = performance.now();
+      lift(60);
+      const done = await waitEnd(id, 1800);
+      return done ? (performance.now() - t0) / 1000 : Infinity;
+    };
+    key('Home');
+    const short = await tail();
+    d.assert('the rel knob at the bottom of its travel reads 0.05, and a note let go ends within a quarter second',
+      knobs.value('rel') === 0.05 && relKnob().querySelector('.pos-knob-v').textContent === '0.05' && short < 0.25,
+      `rel ${knobs.value('rel')}, ended ${short.toFixed(3)} s after the key came up`);
+    const sentBeforeTurn = turned;
+    let turnedOnto = 0;
+    const long = await tail(async (id) => {
+      key('PageUp', 8);
+      turnedOnto = [...live.keys()].includes(id) ? turned - sentBeforeTurn : 0;
+      await sleep(50);
+    });
+    d.assert('turning it while a note is held sends /n_set to that note, and the same key let go now rings for about a second',
+      turnedOnto >= 8 && Math.abs(knobs.value('rel') - 1.02) < 0.05 && long > 0.7 && long < 1.4,
+      `${turnedOnto} /n_set to the held note, rel ${knobs.value('rel')}, ended ${long.toFixed(3)} s after, against ${short.toFixed(3)} s before`);
+    /* A recompile keeps the value: a comment typed under the program is a new
+       compile, a new definition on the server and the same knob. */
+    const relBefore = knobs.value('rel'), defBefore = current;
+    typeInto(`${PRESETS[0].code}\n// the same Pad, recompiled`);
+    await idle.settled();
+    d.assert('a recompile keeps the knob where the hand left it, on a new definition on the server',
+      current !== defBefore && current === good && knobs.value('rel') === relBefore
+        && relKnob()?.querySelector('.pos-knob-v').textContent === relBefore.toFixed(2),
+      `rel ${relBefore} before, ${knobs.value('rel')} after`);
+    const keptTail = await tail();
+    d.assert('and a new note on the new definition rings as long, because its /s_new carries the knob',
+      Math.abs(keptTail - long) < 0.3, `${keptTail.toFixed(3)} s against ${long.toFixed(3)} s`);
+    dial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    d.assert('and a double press puts it back where the program wrote it', knobs.value('rel') === 1.5,
+      String(knobs.value('rel')));
+    /* 🔴 A LAG THAT REALLY LAGS. `\lvl.kr(0.1, 0.5)` is a LagControl on the
+       server, so the level falls away over half a second (60 dB in the lag
+       time) after the knob drops to 0 rather than at once. */
+    typeInto('{ SinOsc.ar(440, mul: \\lvl.kr(0.1, 0.5)) }');
+    await idle.settled();
+    const lagged = nextNode;
+    sound(69);
+    await sleep(150);
+    const lvlKnob = knobRow.querySelector('.pos-knob[data-param="lvl"] .pos-knob-dial');
+    lvlKnob?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    await sleep(60);
+    const falling = await level(1);
+    d.assert('a lag in the code lags on the server: 60 ms after its knob drops to 0 the tone is still there',
+      knobs.value('lvl') === 0 && falling > 0.01, `${falling.toFixed(4)} rms at 60 ms`);
+    await sleep(1200);
+    const fallen = await level(1);
+    eng.send('/n_free', lagged);
+    held.delete(69);
+    d.assert('and 1.2 s later it is gone, so the knob did reach it', fallen < 1e-3, `${fallen.toFixed(6)} rms at 1.3 s`);
 
     /* 🔴 THE ARITHMETIC, GRADED BY THE ENGINE. A multiply written as an add
        is a well formed file that loads and plays (research §9.3b), and the

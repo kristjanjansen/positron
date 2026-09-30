@@ -23,8 +23,11 @@ export const PRESETS = [
     code: `// a key opens the gate and letting it go closes it
 { |freq = 220, amp = 0.12, gate = 1|
 
+    // the release in seconds, and the knob under this box turns it
+    var rel = \\rel.kr(1.5, spec: [0.05, 6, \\exp]);
+
     // attack, decay, sustain level, release, in seconds
-    var env = EnvGen.kr(Env.adsr(0.4, 0.3, 0.7, 1.5), gate, doneAction: 2);
+    var env = EnvGen.kr(Env.adsr(0.4, 0.3, 0.7, rel), gate, doneAction: 2);
 
     // two saws 0.6 per cent apart, so they beat slowly
     var sig = Saw.ar(freq * [1, 1.006], mul: amp);
@@ -33,46 +36,6 @@ export const PRESETS = [
     sig = LPF.ar(sig, LFNoise1.kr(0.3, 600, 1400));
 
     sig * env
-}`,
-  },
-  {
-    id: 'bell',
-    label: 'Bell',
-    what: 'one sine bending another at a ratio of 1.4, which is why it rings like metal rather than a string',
-    code: `// frequency modulation: the modulator bends the carrier's pitch
-{ |freq = 440, amp = 0.1, gate = 1|
-
-    // rings down to a quiet hum while the key is held, then lets go
-    var env = EnvGen.kr(Env.adsr(0.003, 2.5, 0.15, 1.5), gate, doneAction: 2);
-
-    // how hard the bending is, bright at the strike and gone after 1.5 s
-    var index = EnvGen.kr(Env.perc(0.003, 1.5)) * freq * 4;
-
-    // 1.4 is not a whole number, so the overtones are not harmonics
-    var mod = SinOsc.ar(freq * 1.4, mul: index);
-
-    // two carriers a hair apart, one in each speaker
-    SinOsc.ar(freq * [1, 1.002] + mod, mul: amp) * env
-}`,
-  },
-  {
-    id: 'glass',
-    label: 'Glass',
-    what: 'four sine partials at a struck bar\'s ratios, each fading in and out on its own on each side',
-    code: `// the partials of a struck bar, 1, 2.76, 5.4 and 8.93 times the note
-{ |freq = 440, amp = 0.2, gate = 1|
-
-    var env = EnvGen.kr(Env.adsr(0.02, 1, 0.6, 1.5), gate, doneAction: 2);
-    var parts = freq * [1, 2.76, 5.4, 8.93];
-    var level = [0.5, 0.25, 0.15, 0.1];
-
-    // every partial swells and fades at its own slow random pace
-    var left = Mix(SinOsc.ar(parts, mul: LFNoise1.kr([0.3, 0.5, 0.7, 1.1], 0.5, 0.5) * level));
-
-    // the right side is a hair sharper and wanders separately
-    var right = Mix(SinOsc.ar(parts * 1.003, mul: LFNoise1.kr([0.4, 0.6, 0.9, 1.3], 0.5, 0.5) * level));
-
-    [left, right] * env * amp
 }`,
   },
   {
@@ -97,28 +60,6 @@ export const PRESETS = [
 
     // and a high pass at 30 Hz takes out the offset a lopsided pulse leaves
     HPF.ar(sig, 30) * env * amp
-}`,
-  },
-  {
-    id: 'breath',
-    label: 'Breath',
-    what: 'white noise through a very narrow filter tuned to the key, so the noise itself has a pitch',
-    code: `// no oscillator at all, only noise
-{ |freq = 440, amp = 0.15, gate = 1|
-
-    var env = EnvGen.kr(Env.adsr(0.3, 0.5, 0.7, 1.2), gate, doneAction: 2);
-
-    // two separate noises, so the two speakers are not the same air
-    var noise = [WhiteNoise.ar, WhiteNoise.ar];
-
-    // the tuning wanders a quarter of a per cent either way
-    var pitch = freq * LFNoise1.kr([0.7, 0.9], 0.0025, 1);
-
-    // rq 0.01 is a filter one per cent wide, which is what makes a note
-    var sig = RLPF.ar(noise, pitch, 0.01);
-
-    // a higher note lets more noise through, so it is turned down to match
-    sig * (amp / (freq / 440 + 1)) * env
 }`,
   },
   {
