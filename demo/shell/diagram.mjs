@@ -281,6 +281,9 @@ const BOX_MIN_W     = 92;   // narrower than this and it becomes one column
 const BOX_MAX_W     = 190;
 const BOX_MAX_W_COL = 300;
 const COL_BREAK     = 560;  // below this, one column top to bottom
+// the width a picture gets on a 375 px iPhone mini, inside the page's two 16 px
+// gutters: what `createDiagram` lays out a second time to see the phone
+const PHONE_W       = 343;
 // 🔴 A LINK THAT CANNOT RUN STRAIGHT GETS A LANE OUTSIDE THE BOXES, and the
 // two kinds share these two numbers because they are one mechanism seen from
 // two sides: a return path runs UNDER the row (down the LEFT, in one column)
@@ -905,7 +908,24 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   };
   // in the order they were written, boxes inside a container included, so the
   // report reads down the description rather than by where the drawer got to
-  for (const n of nodes) { fit(n, inner); for (const c of n._kids) fit(c, kidInner); }
+  /**
+   * 🔴 A MACHINE'S OWN NAME STARTS CLEAR OF THE LANES THAT RUN DOWN ITS SIDE.
+   * In one column a dive runs down a container's left padding, and the second
+   * lane sits at `DIVE_EDGE + DIVE_LANE`, which is 14 px in: past the 10 px a
+   * name starts at. PHOTOGRAPHED 2026-09-30 at 375 px on /cam/, the `SDP offer`
+   * lane ran straight down through the C of `Cloudflare` and the w of `worker,
+   * Stream, relay`, and /fau/, /replay/ and /station/ did the same to theirs.
+   * So the head of every container moves right by the lanes past the first,
+   * which puts it the same 6 px clear of the innermost lane that one lane
+   * always left, and the words are wrapped to what is left.
+   * ⚠️ ONE COLUMN ONLY. In a row the lanes run in the gap between columns,
+   * outside every box, and nothing here moves.
+   */
+  const headInset = mode === 'column' ? Math.max(0, diveLanes - 1) * DIVE_LANE : 0;
+  for (const n of nodes) {
+    fit(n, n._kids.length ? inner - headInset : inner);
+    for (const c of n._kids) fit(c, kidInner);
+  }
 
   const own = (n) => n._lab.lines.length * m.labLh
                    + (n._sub.lines.length ? SUB_GAP + m.subLh : 0);
@@ -937,10 +957,11 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     ? placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
                                ...shared })
     : placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
-                           backBudget, skipBudget, m, measure, cuts,
+                           backBudget, skipBudget, m, measure, cuts, headInset,
                            dives, diveLevel, diveLanes, backLevel, skipLevel, ...shared });
 
   checkEnds(out, cuts);
+  checkOverlaps(out, cuts, measure, m);
 
   for (const n of nodes.concat(kids)) { delete n._lab; delete n._sub; }
   return { mode, boxW: w, boxH, cuts, cycle, gapX, ...out,
@@ -1009,6 +1030,145 @@ export function checkEnds(out, cuts) {
                   shown: `WRONG END: the line ${verb} a point ${Math.round(gap)} px off `
                        + `${id}, which is the box it names`,
                   width: Math.round(gap) });
+    }
+  }
+}
+
+/** the ink rectangle of a run of text, from where it is anchored */
+function inkRect(lines, x, baseline, anchor, size, lh, measure) {
+  if (!lines.length) return null;
+  const w = Math.max(...lines.map((s) => measure(s)));
+  const x0 = anchor === 'end' ? x - w : anchor === 'middle' ? x - w / 2 : x;
+  // ascenders reach about three quarters of the size above the baseline and a
+  // descender a fifth below it, which is the box a reader sees as the word
+  return { x: x0, y: baseline - size * 0.75, w,
+           h: (lines.length - 1) * lh + size * 0.95 };
+}
+
+// how far two things have to reach into each other before it is a collision
+// rather than rounding: a line that grazes the tip of a descender is not one
+const OVERLAP_SLACK = 1;
+
+function rectsMeet(a, b) {
+  const s = OVERLAP_SLACK;
+  return a.x + s < b.x + b.w && b.x + s < a.x + a.w
+      && a.y + s < b.y + b.h && b.y + s < a.y + a.h;
+}
+
+/** does the segment p to q pass through the rectangle, shrunk by the slack */
+function segmentMeets(p, q, r) {
+  const s = OVERLAP_SLACK;
+  const x0 = r.x + s, x1 = r.x + r.w - s, y0 = r.y + s, y1 = r.y + r.h - s;
+  if (x1 <= x0 || y1 <= y0) return false;
+  // Liang and Barsky: clip the segment's parameter range against each side
+  let t0 = 0, t1 = 1;
+  const dx = q[0] - p[0], dy = q[1] - p[1];
+  for (const [pp, qq] of [[-dx, p[0] - x0], [dx, x1 - p[0]], [-dy, p[1] - y0], [dy, y1 - p[1]]]) {
+    if (pp === 0) { if (qq < 0) return false; continue; }
+    const t = qq / pp;
+    if (pp < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+    else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return t0 < t1;
+}
+
+/**
+ * 🔴 IS ANY NAME IN THE PICTURE DRAWN OVER SOMETHING ELSE.
+ *
+ * NOTHING GRADED THIS, and on a phone it was wrong on two streaming pages at
+ * once. PHOTOGRAPHED 2026-09-30 at 375 px: on /moq/ the return path's name
+ * `frames` sat across the Browser's own edge with the `MoQT` lane running down
+ * through its middle; on /cam/ `WHEP` had the container edge and two lanes
+ * through it, and `SDP offer` printed over the MoQ link's name in the gap the
+ * two machines share, which is why that link lost its label as a workaround.
+ * `cuts` reported a name that was SHORTENED, so a name drawn whole on top of
+ * another read clean through it: nothing was cut.
+ *
+ * ⚠️ MEASURED OFF WHAT IS DRAWN, the same way `checkEnds` is. Every link's
+ * name becomes a rectangle from its anchor, its lines and the ruler that
+ * wrapped it, and that rectangle is asked about four things a reader sees:
+ *   - another link's name, overlapping it
+ *   - another link's line, running through it (its own line is left out,
+ *     because a name sits beside its own run by design)
+ *   - the edge of any box or machine, crossing it
+ *   - a box's own name or sub, which it is printed on top of
+ * and every line in the picture is asked whether it runs through a BOX's name,
+ * which is the one crossing a reader cannot read past.
+ * ⚠️ A PATH IS READ AS ITS CORNER POINTS. A rounded turn is a quadratic whose
+ * control point is the corner itself, so the polyline through them is the
+ * path to within the corner's radius, which is well under a name's height.
+ *
+ * ⚠️ AND IT GOES ON `cuts`, so every page that already asserts `cuts.length
+ * === 0` grades it with no page edit at all.
+ */
+export function checkOverlaps(out, cuts, measure, m = METRICS) {
+  const names = [];
+  for (const l of out.links || []) {
+    if (!l.lab || !l.lab.lines.length) continue;
+    const first = l.stack === 'up' ? l.ly - (l.lab.lines.length - 1) * m.linkLh : l.ly;
+    const r = inkRect(l.lab.lines, l.lx, first, l.anchor, m.linkSize, m.linkLh, measure.link);
+    if (r) names.push({ l, r, id: `${l.from} to ${l.to}`, text: l.lab.lines.join(' ') });
+  }
+  const boxes = [];
+  for (const n of out.nodes || []) {
+    boxes.push(n);
+    for (const k of (n.kids || [])) boxes.push(k);
+  }
+  const words = [];
+  for (const b of boxes) {
+    if (!b.label) continue;
+    b.label.lines.forEach((line, i) => {
+      const r = inkRect([line], b.tx, b.labY[i], b.anchor, m.labSize, m.labLh, measure.lab);
+      if (r) words.push({ b, r, text: line });
+    });
+    if (b.sub && b.sub.lines.length) {
+      const r = inkRect(b.sub.lines, b.tx, b.subY, b.anchor, m.subSize, m.subLh, measure.sub);
+      if (r) words.push({ b, r, text: b.sub.lines[0] });
+    }
+  }
+  const segs = (l) => {
+    const pts = pathPoints(l.d) || [];
+    const out = [];
+    for (let i = 0; i + 1 < pts.length; i++) out.push([pts[i], pts[i + 1]]);
+    return out;
+  };
+  const edges = (b) => {
+    const a = [b.x, b.y], c = [b.x + b.w, b.y], d = [b.x + b.w, b.y + b.h], e = [b.x, b.y + b.h];
+    return [[a, c], [c, d], [d, e], [e, a]];
+  };
+  const report = (id, full, shown) =>
+    cuts.push({ id, where: 'overlap', full, shown: `OVERLAP: ${shown}`, width: 0 });
+
+  names.forEach((a, i) => {
+    for (const b of names.slice(i + 1)) {
+      if (rectsMeet(a.r, b.r)) {
+        report(a.id, a.text, `the name \`${a.text}\` is drawn over \`${b.text}\` (${b.id})`);
+      }
+    }
+    for (const o of out.links || []) {
+      if (o === a.l) continue;
+      if (segs(o).some(([p, q]) => segmentMeets(p, q, a.r))) {
+        report(a.id, a.text, `the line of ${o.from} to ${o.to} runs through the name \`${a.text}\``);
+      }
+    }
+    for (const b of boxes) {
+      if (edges(b).some(([p, q]) => segmentMeets(p, q, a.r))) {
+        report(a.id, a.text, `the edge of ${b.id} runs through the name \`${a.text}\``);
+      }
+    }
+    for (const w of words) {
+      if (rectsMeet(a.r, w.r)) {
+        report(a.id, a.text, `the name \`${a.text}\` is drawn over \`${w.text}\` in ${w.b.id}`);
+      }
+    }
+  });
+  for (const l of out.links || []) {
+    const ss = segs(l);
+    for (const w of words) {
+      if (ss.some(([p, q]) => segmentMeets(p, q, w.r))) {
+        report(`${l.from} to ${l.to}`, l.lab?.full || `${l.from} to ${l.to}`,
+               `the line runs through \`${w.text}\` in ${w.b.id}`);
+      }
     }
   }
 }
@@ -1303,7 +1463,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
 }
 
 function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
-                             backBudget, skipBudget, m, measure, cuts,
+                             backBudget, skipBudget, m, measure, cuts, headInset = 0,
                              dives = [], diveLevel = [], diveLanes = 0,
                              backLevel = [], skipLevel = [],
                              sibs, kidIx, sibSpan, childGap, childInset }) {
@@ -1314,14 +1474,67 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   // runs down the right-hand one. Onward on the right, back on the left: two
   // gutters that cannot collide, and neither line is ever behind a box.
   const x = leftInset + PAD;
+  /**
+   * 🔴 A GAP THAT CARRIES SEVERAL NAMES GIVES EACH ONE A ROW OF ITS OWN.
+   * Every forward link that is not a skip crosses exactly one gap, the one
+   * under the higher of its two machines, and every name was written at that
+   * gap's middle. Two dives through one gap therefore printed their names at
+   * one height, ten pixels apart across: PHOTOGRAPHED 2026-09-30 on /cam/ at
+   * 375 px, `SDP offer` over the MoQ link's name, which is why that link was
+   * left unlabelled on purpose; /replay/ and /station/ did the same to theirs.
+   * So where a gap holds two or more names and at least one of them belongs to
+   * a dive, the gap grows by one line of type for each name past the first and
+   * the names stack in it. A gap with one name, or with names only on straight
+   * steps (which the pairs rule below already spreads), keeps its 30 px to the
+   * digit.
+   */
+  const overSet = new Set(links.filter((l) => skipsABox(l, rowOf)));
+  const diveSet = new Set(dives);
+  const gapOf = (l) => Math.min(rowOf.get(l.from), rowOf.get(l.to));
+  const inGap = new Map();
+  for (const l of links) {
+    if (l.back || overSet.has(l)) continue;
+    const g = gapOf(l);
+    if (!inGap.has(g)) inGap.set(g, []);
+    inGap.get(g).push(l);
+  }
+  const ROW_H = Math.round(m.linkLh) + 3;
+  const stacked = new Map();    // gap -> the labelled links in it, in row order
+  const jogs = new Map();       // gap -> whether it needs a jog row above, below
+  for (const [g, list] of inGap) {
+    const named = list.filter((l) => l.label);
+    if (named.length < 2 || !named.some((l) => diveSet.has(l))) continue;
+    // outer lanes first, then the straight steps, so the rows read left to
+    // right the way the lanes do
+    named.sort((a, b) => (diveSet.has(b) - diveSet.has(a))
+      || (diveLevel[dives.indexOf(b)] ?? 0) - (diveLevel[dives.indexOf(a)] ?? 0));
+    stacked.set(g, named);
+    // ⚠️ AND A DIVE THAT LEAVES OR REACHES A WHOLE MACHINE TURNS SIDEWAYS IN
+    // THE GAP, which used to be at its middle and is now a row of names:
+    // MEASURED on /stage/ at 375 px, the `questions` jog ran straight through
+    // `WebRTC`. So the jogs out of a machine get a row above the names and the
+    // jogs into one a row below them.
+    jogs.set(g, { top: list.some((l) => diveSet.has(l) && !owner.has(l.from)) ? 1 : 0,
+                  bot: list.some((l) => diveSet.has(l) && !owner.has(l.to)) ? 1 : 0 });
+  }
+  const gapH = (g) => GAP_Y_COL + (stacked.has(g)
+    ? (stacked.get(g).length - 1 + jogs.get(g).top + jogs.get(g).bot) * ROW_H : 0);
+  // the y a name row or a jog row is centred on, counted from the gap's top
+  const slotY = (g, i) => {
+    const rows = stacked.get(g), j = jogs.get(g);
+    const n = rows.length + j.top + j.bot;
+    return (gapH(g) - n * ROW_H) / 2 + (i + 0.5) * ROW_H;
+  };
+  const rowY = [];
+  for (let r = 0, y = PAD; r < order.length; r++) { rowY.push(y); y += boxH + gapH(r); }
   const placed = order.map((n, r) =>
-    box(n, x, PAD + r * (boxH + GAP_Y_COL), w, boxH, m, kidH, childGap, childInset));
+    box(n, x, rowY[r], w, boxH, m, kidH, childGap, childInset, headInset));
   const at = new Map();
   for (const p of placed) { at.set(p.id, p); for (const k of p.kids || []) at.set(k.id, k); }
   // the machine a box is drawn inside, or the box itself — see placeRow, where
   // the same two lines carry the same rule
   const outer = (id) => at.get(owner.get(id) || id);
-  const bottom = PAD + placed.length * boxH + (placed.length - 1) * GAP_Y_COL;
+  const bottom = rowY[rowY.length - 1] + boxH;
   const right = x + w;
 
   /**
@@ -1432,7 +1645,16 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
         // where the name goes, and it is always in the GAP between the two
         // machines, never beside the part of the run that is inside one: that
         // strip is a container's padding and a name in it sits on the boxes.
-        const nameX = dive ? bx + STEP_OFF : fm.cx + (stepLeft ? -STEP_OFF : STEP_OFF);
+        // ⚠️ A DIVE'S NAME STARTS PAST THE INNERMOST LANE IN ITS GAP, not
+        // past its own. Every lane through a gap runs its full height, so a
+        // name beside an OUTER lane had the inner ones through it: /moq/'s
+        // `frames` and /cam/'s `WHEP` both carried a lane through the middle.
+        // With one lane in the gap, or with this lane the innermost, the x is
+        // the one it always was.
+        const inner = dive
+          ? Math.max(...(inGap.get(gapOf(l)) || [l]).filter((o) => diveSet.has(o)).map(laneX))
+          : 0;
+        const nameX = dive ? inner + STEP_OFF : fm.cx + (stepLeft ? -STEP_OFF : STEP_OFF);
         const nameAnchor = dive ? 'start' : (stepLeft ? 'end' : 'start');
         const budget = dive
           ? Math.min(LINK_MAX, Math.max(0, Math.floor(laneL - nameX)))
@@ -1448,17 +1670,27 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
         let d;
         if (!dive) d = `M${r1(fm.cx)} ${r1(y1)} L${r1(fm.cx)} ${r1(y2)}`;
         else {
+          // a stacked gap keeps its middle for names, so the jogs go in the
+          // rows reserved for them above and below
+          const g = gapOf(l), st = stacked.has(g), gy0 = Math.min(fm.y + fm.h, tm.y + tm.h);
+          const jogOut = st ? gy0 + slotY(g, 0) : midY;
+          const jogIn = st ? gy0 + slotY(g, stacked.get(g).length + jogs.get(g).top) : midY;
           const pts = [];
           if (fKid) pts.push([f.x - EDGE_OUT, f.cy], [bx, f.cy]);
-          else pts.push([fm.cx, y1], [fm.cx, midY], [bx, midY]);
+          else pts.push([fm.cx, y1], [fm.cx, jogOut], [bx, jogOut]);
           if (tKid) pts.push([bx, t.cy], [t.x - EDGE_OUT - 1, t.cy]);
-          else pts.push([bx, midY], [tm.cx, midY], [tm.cx, y2]);
+          else pts.push([bx, jogIn], [tm.cx, jogIn], [tm.cx, y2]);
           d = roundedPath(pts, SIB_CORNER);
         }
-        drawn.push({ ...l, d,
-                     lab, lx: nameX,
-                     ly: (dive ? midY - 5 : (y1 + y2) / 2 + off) + m.linkSize * 0.35,
-                     anchor: nameAnchor, stack: 'none' });
+        // in a gap that stacks its names, this one's row; otherwise where a
+        // name has always gone
+        const rows = stacked.get(gapOf(l));
+        const k = rows ? rows.indexOf(l) : -1;
+        const gy = Math.min(fm.y + fm.h, tm.y + tm.h);
+        const ly = k >= 0
+          ? gy + slotY(gapOf(l), k + jogs.get(gapOf(l)).top) + m.linkSize * 0.35
+          : (dive ? midY - 5 : (y1 + y2) / 2 + off) + m.linkSize * 0.35;
+        drawn.push({ ...l, d, lab, lx: nameX, ly, anchor: nameAnchor, stack: 'none' });
         continue;
       }
       // 🔴 OUT OF THE RIGHT EDGE, DOWN THE RIGHT GUTTER, BACK IN AT THE RIGHT
@@ -1500,7 +1732,13 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
     // belonging to the run ARRIVING at it. Below is also where the row layout
     // puts a return's name, so the two layouts now agree.
     drawn.push({ ...l, d: sideLane(sx, sy, tx, ty, bx, 1), lab,
-                 lx: t.x - 6, ly: ty + 4 + m.linkSize * 0.85,
+                 // ⚠️ OFF THE MACHINE'S EDGE, NOT THE BOX'S. For a box inside a
+                 // container `t.x` is inset, so a name anchored 6 px short of it
+                 // sat across the container's own edge and over the dive lanes
+                 // in its padding: /moq/'s `frames`, /cam/'s `WHEP`, and five
+                 // more pages the same way at 375 px. For a whole box the two
+                 // are one x and nothing moves.
+                 lx: tm.x - 6, ly: ty + 4 + m.linkSize * 0.85,
                  anchor: 'end', stack: 'none', level: level[i], bx });
   }
 
@@ -1775,7 +2013,7 @@ export function captionTexts(spec, nodes) {
  * top-aligned its contents would sit differently from every other box in the
  * row for a reason a reader cannot see.
  */
-function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PAD) {
+function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PAD, headInset = 0) {
   const lab = n._lab, sub = n._sub;
   const ks = n._kids || [];
   const own = lab.lines.length * m.labLh + (sub.lines.length ? SUB_GAP + m.subLh : 0);
@@ -1791,7 +2029,10 @@ function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PA
     cx: x + w / 2, cy: y + h / 2,
     // Where a line of text STARTS, and what it is anchored by. One pair, read
     // by the renderer, so the switch above is the only place that decides.
-    tx: BOX_ALIGN === 'topleft' ? r1(x + BOX_PAD_X) : r1(x + w / 2),
+    // ⚠️ `headInset` moves a CONTAINER's words clear of the lanes down its
+    // side, in one column only; see `layout`, where the words are wrapped to it
+    tx: BOX_ALIGN === 'topleft' ? r1(x + BOX_PAD_X + (ks.length ? headInset : 0))
+                                : r1(x + w / 2),
     anchor: BOX_ALIGN === 'topleft' ? 'start' : 'middle',
     label: lab, sub,
     labY: lab.lines.map((_, i) => r1(top + i * m.labLh + m.labLh / 2 + m.labSize * 0.35)),
@@ -2148,6 +2389,29 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
         link: ruler('pos-dg-llab', m.linkSize),
       },
     });
+    /**
+     * 🔴 AND THE PHONE IS ASKED EVEN WHEN THE PICTURE IS NOT ON ONE. The
+     * harness lays every page out at desk width, where the picture is a row,
+     * so a collision that only exists in the one column layout was a defect no
+     * run could see: /cam/ and /moq/ both read `cuts` empty with names printed
+     * over each other at 375 px. The same description is laid out a second
+     * time at the width it gets on the narrowest current iPhone, off screen
+     * and drawing nothing, and only its OVERLAPS are added, marked with the
+     * width, because a name shortened at one width is that width's own report.
+     */
+    if (L.mode === 'row') {
+      const P = layout({ ...spec, cutsSink: [] }, {
+        width: PHONE_W, metrics: m,
+        measure: {
+          lab: ruler('pos-dg-lab', m.labSize),
+          sub: ruler('pos-dg-sub', m.subSize),
+          link: ruler('pos-dg-llab', m.linkSize),
+        },
+      });
+      for (const c of P.cuts) {
+        if (c.where === 'overlap') L.cuts.push({ ...c, shown: `at ${PHONE_W} px, ${c.shown}` });
+      }
+    }
     probe.textContent = '';
 
     // ⚠️ REBUILT ON EVERY LAYOUT, not once at construction. A re-layout can put
