@@ -1,6 +1,43 @@
 ## Open
 
-### Open 2026-09-30: TURN relay on /webrtc/, /stage/, /keep/, and say which path was taken
+### Open 2026-09-30: NEXT STEP, the Pi camera beside the Circuit audio, OFF by default
+
+ASKED, VERBATIM: *"note that next step would be using pi camera along with audio. off by default, toggled via env var (privacy)"*. Not started. The camera must be impossible to switch on from a page: an env var in `/etc/default/positron-board` enables it, and with it unset the board does not open the camera at all. The board already streams video to `<room>-video` (`rig/board/video.mjs`); check whether that path opens a camera today and gate it on the same variable. `/away/` would show the picture next to the waveform.
+
+### Done 2026-09-30: `/away/` uses the kit's waveform display, not a canvas in a video panel
+
+ASKED, VERBATIM: *"use stnd waverform display not video canvas on away"*. `demo/away/index.html` drops `createVideoPanel` and its hand-drawn canvas for `createWaveView` from `demo/shell/wave-view.mjs`, fed the last few seconds of the board's frames.
+
+### Done 2026-09-30: the board plays Yoshimi AND the Circuit at once
+
+ASKED, VERBATIM: *"can we support both yoshimi and circuit? current setup does not scale"*. Today `rig/board/board.mjs` has ONE audio slot (`audio` / `inst`), so `audio.start` of one source replaces the other, and both stream into the one room `studio-1`. A Yoshimi start from any page took `/away/`'s Circuit off the air on 2026-09-30. Design and cost in the reply; files `rig/board/board.mjs`, `demo/away/index.html`, maybe `demo/shell/board.mjs`.
+
+### Open 2026-09-30: cam, Start/Stop camera becomes a status button, CAMERA ON | CAMERA OFF
+
+ASKED, VERBATIM: *"stat / stop camera: convert to oline status button: CAMERA ON | CAMERA OFF"*. The same kit control /llhls/ uses for `stream off | starting | on`: `createPresenceButton` from `demo/shell/presence.mjs` (see `demo/llhls/index.html` ~line 66 and 111, and its `STREAM`/`STREAM_CAN` words), with a camera word set: `camera off`, a starting state while getUserMedia and the legs come up, `camera on`. It replaces the `Start camera` button; asserts that read `btn().textContent === 'Start camera'` move to the new state. `demo/cam/index.html`, maybe a word set in `presence.mjs`.
+
+### Open 2026-09-30: cam, state text goes in the panel footer, not on the picture
+
+ASKED, VERBATIM: *"do not draw on screen but on videopanel footer (llhls closed)"*, with a screenshot of https://positron.studio/cam/ (BUILD `e761c9d`) showing `LL-HLS closed` as a caption over the black LL-HLS picture and the footer reading only `LL-HLS`. Every state line on /cam/ (`LL-HLS closed`, `LL-HLS stopped`, `Another camera is on LL-HLS`, `WebRTC could not start`, the harness line, and the same on the other three panels) moves from `slots.caption` into a footer cell of that panel's `video-panel.mjs`. The picture carries only the picture. Check whether `video-panel.mjs` already has a footer status cell before adding one; if the kit gains one it is done once, for every page. Also find out WHY the owner's session read `closed`. `demo/cam/index.html`, maybe `demo/shell/video-panel.mjs`.
+
+### Open 2026-09-30: cam, one diagram per feed, four in total
+
+ASKED, VERBATIM: *"make separate diagrams on each feed (4 total) in cam in bg"*. Split `/cam/`'s one diagram into four, one per panel: Camera (local capture), LL-HLS (MediaRecorder, wss /cam, cam container, RTMPS, Stream, LL-HLS player), WebRTC (WHIP, Stream, WHEP, with the TURN relay), MoQ (WebCodecs, WebTransport, relay). Each diagram describes its own panel's path only. Load `positron-diagram` first. `demo/cam/index.html`. Given to the agent already editing that page, so two agents never write it at once.
+
+### Done 2026-09-30 (12cbb2b, BUILD 12cbb2b-111833-371b): `/away/`, listen to the Circuit through the Pi in a waveform, knobs untouched
+
+ASKED, VERBATIM: *"make other demo for this, 'away', do not touch knobs tdemo. allow me just to listen in circuit audio from pi in wave visualizer (use videoframe)"*. The board's capture source (Fast Track Pro input 1, `rig/board/board.mjs` since 17d48ec) streams on `studio-1`. New page `demo/away/index.html` with a `createVideoPanel` whose picture is a live waveform canvas fed from `createBoard`'s `onPcm`, one Listen control, and nothing sent to the board beyond `audio.status`. New row in `demo/manifest.mjs` with `room: 'fixed'`. `demo/knobs/` is NOT touched.
+
+### Open 2026-09-30: cam's WebRTC leg gets its own input, and its MoQ panel carries the camera
+
+ASKED, VERBATIM: *"do open issues"*, after the cam report listed them. Two things on `/cam/`:
+- **WebRTC borrows the whip-rig input (`WHIP_URL`)**, which is refused with 409 while anybody holds `/watch` on the main instance, so /cam/'s WebRTC panel goes red whenever somebody watches /llhls/ (4 reds in the agent's final run, 2026-09-30). Fix: its own WebRTC input, `CAM_WHIP_URL`, from `src/provision-cam-whip.sh`, which the OWNER runs (auto mode refuses secret writes). No busy rule tied to /watch; one camera at a time. `workers/pub/worker.mjs`, `demo/cam/index.html`, maybe `demo/shell/live.mjs`.
+- **MoQ carries the test pattern, not the camera.** `startMoq` takes `paint` now, so /cam/ passes its camera draw and the MoQ footer stops saying test pattern. `demo/cam/index.html`.
+- Measure while there: cold start of the `cam` container instance.
+
+### Done 2026-09-30: TURN relay on /webrtc/, /stage/, /keep/, and say which path was taken
+
+DONE: fetched on the press on all three, a `path` cell beside the ping, `readIcePath(pc)` in `live.mjs`. Every leg went DIRECT on this desk, so the relay branch has never run; it needs a UDP-blocking network or a forced `iceTransportPolicy: 'relay'` run. /webrtc/'s footer is still 14 px over at 360 px. The original entry follows.
 
 ASKED, VERBATIM: *"do in bg"*, after *"should they ask for relay servers? what it improves?"*. `TURN_KEY_ID` and `TURN_KEY_API_TOKEN` are on positron-pub since 2026-09-30 and `GET https://pub.positron.studio/ice` answers 200 with `turns:...:443?transport=tcp` among 7 servers. Pass them to every RTCPeerConnection on those pages, fetched on the PRESS and never on load, and show `direct` or `relay` from the selected candidate pair beside the latency, because a relayed latency is not comparable to a direct one. MoQ gets no help from TURN. `demo/webrtc/index.html`, `demo/stage/index.html`, `demo/keep/index.html`, maybe `demo/shell/live.mjs`.
 

@@ -322,6 +322,54 @@ export async function probeUdp({ timeoutMs = 3000, iceServers = STUN_ONLY } = {}
   });
 }
 
+/**
+ * Which path did ICE choose: `direct` or `relay`. Read off the SELECTED
+ * candidate pair, because a relay candidate being gathered says nothing about
+ * whether the media uses it.
+ *
+ * 🔴 A RELAYED LATENCY IS NOT COMPARABLE TO A DIRECT ONE, which is why a page
+ * shows this cell beside its latency. Through TURN the media takes an extra hop
+ * to Cloudflare's relay and, on the TCP route, pays head of line blocking too.
+ *
+ * The selected pair is the transport's `selectedCandidatePairId` where the
+ * browser reports it (Chrome, Safari), and otherwise the nominated succeeded
+ * pair (Firefox has no transport stats). The local candidate's `candidateType`
+ * of `relay` is the whole test.
+ *
+ * Never throws. `path: null` means the pair could not be read yet, which is not
+ * `direct`: "we did not look" must not read as an answer.
+ *   { path: 'direct'|'relay'|null, local, remote, protocol, relayProtocol, rttMs }
+ */
+export async function readIcePath(pc) {
+  const none = { path: null, local: null, remote: null, protocol: null, relayProtocol: null, rttMs: null };
+  if (!pc || pc.connectionState === 'closed') return none;
+  const stats = await pc.getStats().catch(() => null);
+  if (!stats) return none;
+  let pair = null;
+  for (const s of stats.values()) {
+    if (s.type === 'transport' && s.selectedCandidatePairId) {
+      pair = stats.get(s.selectedCandidatePairId) || pair;
+    }
+  }
+  if (!pair) {
+    for (const s of stats.values()) {
+      if (s.type === 'candidate-pair' && s.state === 'succeeded' && (s.nominated || s.selected)) { pair = s; break; }
+    }
+  }
+  if (!pair) return none;
+  const local = stats.get(pair.localCandidateId);
+  const remote = stats.get(pair.remoteCandidateId);
+  if (!local?.candidateType) return none;
+  return {
+    path: local.candidateType === 'relay' ? 'relay' : 'direct',
+    local: local.candidateType,
+    remote: remote?.candidateType ?? null,
+    protocol: local.protocol ?? null,
+    relayProtocol: local.relayProtocol ?? null,
+    rttMs: Number.isFinite(pair.currentRoundTripTime) ? pair.currentRoundTripTime * 1000 : null,
+  };
+}
+
 /** Where a browser asks OUR worker to publish for it. The worker holds the key. */
 export const WHIP_PROXY = 'https://pub.positron.studio/whip';
 

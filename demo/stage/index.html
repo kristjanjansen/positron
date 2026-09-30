@@ -38,7 +38,7 @@
   import { createCard } from '/shell/card.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
-  import { whepPlay, stageWhep, STAGE_PUB, STAGE_PUB_STATUS, holdPublisher, waitForWhip } from '/shell/live.mjs';
+  import { whepPlay, stageWhep, STAGE_PUB, STAGE_PUB_STATUS, holdPublisher, waitForWhip, fetchIceServers, readIcePath } from '/shell/live.mjs';
   import { INGEST, openSession, proveReadable } from '/shell/ingest.mjs';
   import { resolveDuration, waitForFirstFrame } from '/shell/media.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -406,6 +406,21 @@
          * controls on demand.
          */
         fullMode: t.id === 'controlroom' ? 'hover' : 'footer',
+        /**
+         * 🔴 THE PING AND THE ROUTE IT TOOK, ON THE TWO PANELS THAT CAN SHOW
+         * THE LIVE PICTURE, SINCE 2026-09-30. `direct` or `relay` off the
+         * selected candidate pair, beside the network round trip it qualifies,
+         * because a ping through Cloudflare's TURN relay is not comparable to a
+         * direct one. The kit hides the row until a cell is written, so a room
+         * with no show in it says nothing. The archive plays a file and has no
+         * route to report.
+         */
+        values: t.id === 'archive' ? null : [
+          // `ping`, not `network ping`: MEASURED at 360 px the longer label ran
+          // the row 8 px past its slot and cut the route word off.
+          { key: 'rtt', label: 'ping', reserve: 6 },
+          { key: 'path', label: '', reserve: 6 },
+        ],
       }),
     };
   });
@@ -855,6 +870,40 @@
   const sinceT0 = () => (T0 == null ? null : Math.round(performance.now() - T0));
 
   let live = null;                     // { pub, sub, stop() } once started
+  /**
+   * 🔴 RELAY SERVERS ARE ASKED FOR ON THE PRESS, NEVER ON LOAD. A visit opens
+   * nothing. `iceLoadAsks()` reads resource timing, so it counts every request
+   * the browser made to the relay route before the first press, not the ones
+   * this page remembered to count.
+   */
+  let ice = null, iceAsks = 0, pressAt = null, icePath = null, pathTimer = null;
+  const iceLoadAsks = () => performance.getEntriesByType('resource')
+    .filter((e) => /\/ice(\?|$)/.test(e.name) && (pressAt == null || e.startTime < pressAt)).length;
+  const pathPanels = () => panels.filter((p) => p.id !== 'archive');
+  function setPathCells(rtt, path) {
+    for (const p of pathPanels()) {
+      p.panel.values.set('rtt', rtt);
+      p.panel.values.set('path', path);
+    }
+  }
+  async function readPath() {
+    const pc = live?.sub?.pc;
+    if (!pc) return;
+    const ip = await readIcePath(pc);
+    if (pc !== live?.sub?.pc || phase === 'stopped') return;
+    if (ip.path && ip.path !== icePath?.path) {
+      d.log(ip.path === 'relay'
+        ? `the picture comes through the relay, over ${ip.relayProtocol || ip.protocol}`
+        : `the picture comes direct, ${ip.local} to ${ip.remote} over ${ip.protocol}`, 'hi');
+    }
+    icePath = ip;
+    setPathCells(ip.rttMs == null ? '' : `${Math.round(ip.rttMs)} ms`, ip.path || '');
+  }
+  function stopPath() {
+    clearInterval(pathTimer); pathTimer = null;
+    icePath = null;
+    setPathCells('', '');
+  }
   let rec = null;                      // the MediaRecorder
   const chunks = [];
   const QUESTIONS = [];                // { at, title, options }
@@ -2388,6 +2437,11 @@
       const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
       v.muted = true;
       armVideo(v);
+      // The relay is asked for in parallel with the publisher waking and
+      // awaited before the offer, because WHEP takes no trickle.
+      pressAt ??= performance.now();
+      iceAsks++;
+      const iceAsk = fetchIceServers({ log: d.log });
       if (!hold) hold = holdShow();
       /**
        * 🔴 WAIT FOR THE PUBLISHER BEFORE SUBSCRIBING, BECAUSE A COLD PRESS USED
@@ -2403,7 +2457,11 @@
       const up = await waitShow({ timeoutMs: 60000 });
       if (!up.ok) throw new Error(`the publisher did not come up in ${Math.round(up.waitedMs / 1000)} s`);
       if (up.waitedMs > 3000) d.log(`the publisher came up after ${(up.waitedMs / 1000).toFixed(1)} s`, 'hi');
-      live = { pub: null, sub: await whepPlay(showWhep(), v, { log: d.log }), kind: 'receiver' };
+      ice = await iceAsk;
+      live = { pub: null, sub: await whepPlay(showWhep(), v, { iceServers: ice.iceServers, log: d.log }), kind: 'receiver' };
+      clearInterval(pathTimer);
+      pathTimer = setInterval(readPath, 1000);
+      readPath();
 
       // The card goes, the picture arrives. One swap, at the moment there is
       // something true to show.
@@ -2532,6 +2590,7 @@
     await done;
     try { live?.pub?.stop?.(); } catch { /* the proxy may already have gone */ }
     for (const t of (live?.sub?.inbound?.getTracks?.() ?? [])) t.stop();
+    stopPath();
     setBadges('offline');
 
     const mime = chunks[0]?.type || 'video/webm';
@@ -3941,6 +4000,32 @@
     A('a peer connection carried the picture, rather than the page handing itself its own stream',
       !!live && !!live.sub?.pc && live.sub.inbound !== live.pub?.stream,
       `${live?.kind ?? 'nothing'} leg, receiver ice ${live?.sub?.pc?.iceConnectionState ?? 'none'}`);
+
+    /**
+     * 🔴 THE RELAY WAS ASKED FOR ON THE PRESS AND HANDED TO THE CONNECTION, AND
+     * THE ROUTE IS NAMED BESIDE THE PING. Three facts with three different
+     * failures: asked on load, never asked, and asked but not passed on, which
+     * is read off `getConfiguration()` because that is what the connection
+     * really holds.
+     */
+    const conf = (live?.sub?.pc?.getConfiguration?.().iceServers || []).flatMap((s) => [].concat(s.urls));
+    A('relay servers were asked for on the press and not on load',
+      iceAsks >= 1 && iceLoadAsks() === 0 && !!ice,
+      `${iceAsks} ask(s) after the press, ${iceLoadAsks()} before it by resource timing, `
+      + (ice ? (ice.relay ? 'a relay came back' : `no relay: ${ice.why}`) : 'nothing came back'));
+    A('the peer connection holds what the ask returned',
+      !!ice && conf.length > 0 && (!ice.relay || conf.some((u) => /^turns?:/.test(u))),
+      `${conf.length} url(s) in the connection, ${conf.filter((u) => /^turns?:/.test(u)).length} of them TURN`);
+    const pathTexts = pathPanels().map((p) => p.panel.values.cell('path').textContent.trim());
+    const pingTexts = pathPanels().map((p) => p.panel.values.cell('rtt').textContent.trim());
+    A('both live footers name the path the picture took, beside the ping',
+      (icePath?.path === 'direct' || icePath?.path === 'relay')
+      && pathTexts.every((t) => t === icePath.path) && pingTexts.every((t) => / ms$/.test(t)),
+      icePath?.path
+        ? `${icePath.path}: local ${icePath.local}, remote ${icePath.remote}, ${icePath.protocol}`
+          + `${icePath.relayProtocol ? `, relay over ${icePath.relayProtocol}` : ''}, `
+          + `footers ${JSON.stringify(pathTexts)} beside ${JSON.stringify(pingTexts)}`
+        : 'the selected candidate pair could not be read');
 
     /**
      * 3. 🔴 OBJECT IDENTITY, NEVER AN ID. A remote `MediaStream` carries the
