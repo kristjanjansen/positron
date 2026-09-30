@@ -5841,14 +5841,13 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    with no hue is drawn exactly as before.
    🔴 AND THE ROW UNDER A PROGRAM KEEPS A KNOB'S HEIGHT WITH NOTHING IN IT
    (`param-knobs.mjs`, *"make the area h for thise buttons fixed so no
-   junmp"*). The reserve is a hidden knob in the same grid cell as the words,
+   junmp"*). The reserve is a hidden knob, and the row says nothing,
    so the height is a knob's and no number here repeats it. */
 .pos-knob[data-param] .pos-knob-lab { color: var(--param-ink, var(--dim)); }
 .pos-knob[data-param] .pos-knob-v { color: var(--param-ink, var(--fg)); }
 .pos-pknobs-none { display: grid; }
 .pos-pknobs-none > * { grid-area: 1 / 1; }
 .pos-pknobs-ghost { visibility: hidden; }
-.pos-pknobs-say { align-self: center; font: 400 11px/1.4 var(--mono); color: var(--dim2); }
 
 /* ── pad: a square button that can be lit — shell/pad.mjs ───────────────────
    ⚠️ THE TINT IS A CUSTOM PROPERTY WITH A FALLBACK, never a colour written by

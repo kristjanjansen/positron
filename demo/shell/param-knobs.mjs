@@ -37,15 +37,13 @@
 // it up by a knob's height, and picking one with a parameter pushed it down
 // again, under the hand that was about to play it.
 // ⚠️ THE RESERVE IS A KNOB, NOT A NUMBER. An empty row holds a bank of one
-// knob that is `visibility: hidden`, `inert` and `aria-hidden`, in the same
-// grid cell as its words, so the height is whatever a knob is today and
+// knob that is `visibility: hidden`, `inert` and `aria-hidden`, alone in
+// the row, so the height is whatever a knob is today and
 // cannot disagree with it when the knob grows a label. A typed `min-height`
 // would be a second copy of the knob's height in a second file.
-// ⚠️ AND IT SAYS SO IN WORDS, `no knobs in this program`, quietly. A band of
-// ground the height of a knob with nothing in it is an empty box, and an
-// empty box reads as something that failed to load. A sentence says it is a
-// state of the program, which is the true thing, and tells a reader where
-// knobs would appear.
+// ⚠️ AND IT SAYS NOTHING. It carried the words `no knobs in this program`
+// for its first afternoon, and they went on *"rm no knobs in this program"*
+// (2026-09-30): the band stays a knob tall and empty.
 //
 // 🔴 EVERY KNOB HAS AN INVISIBLE HAND, SINCE THE SAME DAY. Asked: *"add
 // invisible hands to these cutoff buttons"*. It is `knob.mjs`'s own `hand`,
@@ -74,7 +72,6 @@ import { createKnob, createKnobBank, knobPlaces } from './knob.mjs';
 import { MOVES, MOVE_TURN } from './hand.mjs';
 
 /** What an empty row says. See the header. */
-export const NO_KNOBS = 'no knobs in this program';
 
 /** The warps this maps. A number is `CurveWarp`'s curve. */
 export const WARPS = ['lin', 'exp', 'sin', 'cos'];
@@ -183,7 +180,7 @@ export function createParamKnobs({ onChange = () => {}, onHold = null } = {}) {
     return entry;
   }
 
-  /** The reserve an empty row holds: a hidden knob for the height, and the words. */
+  /** The reserve an empty row holds: a hidden knob for the height, and nothing to read. */
   function none() {
     const wrap = document.createElement('div');
     wrap.className = 'pos-pknobs-none';
@@ -191,10 +188,7 @@ export function createParamKnobs({ onChange = () => {}, onHold = null } = {}) {
     ghost.classList.add('pos-pknobs-ghost');
     ghost.inert = true;
     ghost.setAttribute('aria-hidden', 'true');
-    const say = document.createElement('span');
-    say.className = 'pos-pknobs-say';
-    say.textContent = NO_KNOBS;
-    wrap.append(ghost, say);
+    wrap.append(ghost);
     return wrap;
   }
 

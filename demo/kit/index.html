@@ -524,7 +524,7 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
-  import { createParamKnobs, NO_KNOBS } from '/shell/param-knobs.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
@@ -5497,8 +5497,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     knobs.set([]);
     const empty = knobs.el.getBoundingClientRect().height;
     const focusable = knobs.el.querySelectorAll('[tabindex="0"], button:not([disabled])');
-    d.assert('and a program with nothing to turn keeps the row a knob tall, in words, with nothing to focus',
-      empty > 0 && Math.abs(empty - full) < 0.5 && knobs.el.textContent.includes(NO_KNOBS)
+    d.assert('and a program with nothing to turn keeps the row a knob tall, empty, with nothing to focus',
+      empty > 0 && Math.abs(empty - full) < 0.5 && (!!knobs.el.querySelector('.pos-pknobs-ghost') && !knobs.el.querySelector('.pos-pknobs-say'))
         && [...focusable].every((e) => e.closest('[inert]')),
       `${empty.toFixed(1)} px empty against ${full.toFixed(1)} px with knobs, "${knobs.el.textContent.trim()}"`);
     /* The name and the number wear the hue as well as the arc, and only where one is set. */
