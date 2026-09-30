@@ -1,5 +1,30 @@
 # Handoff, 2026-09-30, session 56: the streaming section grows to four pages, a camera demo, and a cafe network that drops UDP
 
+## ⏸ PAUSED AT THE OWNER'S REQUEST, 2026-09-30 ~12:25
+
+- **Site: BUILD `8c20c57-092424-e7f0`**, built from `8c20c57` so the unfinished
+  cam page did NOT ship. **pub: `dd677b0a`**, which carries BOTH the stage
+  container and the UNFINISHED cam LL-HLS routes (`/cam`).
+- **/stage/ is the point of this stretch**: its own container instance
+  (`stage`, input `c8c838fe...`, provisioned by the owner) plays the MIM film
+  from a WHIP shaped R2 copy with `-c copy`, WebRTC only, and the recording
+  goes IndexedDB to R2 to playback. https://positron.studio/stage/
+  ⚠️ **THE STAGE WHIP LEG DIED ONCE** with the known exit 245 (`Error muxing a
+  packet`, EAGAIN) about 25 s in. The R2 copy was then replaced with a strict
+  CBR encode (1200k, bufsize = bitrate, `nal-hrd=cbr`, 217 MB, same URL), and
+  that version has NOT been watched for more than a minute yet.
+- 🔴 **/llhls/ WAS STALLING in the owner's screenshot** (5 stalls, source stall
+  watchdog rebuilds) while the cam agent tested the camera on the SAME input
+  by handover. That agent is STOPPED. The cam leg's code is committed as
+  `de8326a` and marked unfinished; do not deploy the cam page until it is run
+  end to end, and consider giving the camera its own input instead of the
+  handover, which is exactly what made /llhls/ stall.
+- **Uncommitted, on purpose: `demo/shell/shell.css`**, the secondary button
+  caps rule, waiting on the owner's answer.
+- From the stage agent, unfixed: `hidden` does nothing on a
+  `createGlueRows({ grid: true })` surface (shell.css specificity), and the
+  page still streams the 253 MB film into an unseen canvas on every show.
+
 ## Where it is right now
 
 ✅ **DEPLOYED.** The site reads **BUILD `37fef98-081910-af06`**, read back off the
