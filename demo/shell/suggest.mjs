@@ -105,7 +105,8 @@
 // 150. ⚠️ The walk gains much less: held at the real songs' own cycle rate, the
 // vocabulary goes 7.15 to 7.32 against the music's 7.42 on jazz, and pop does not
 // gain at all. The table costs **18,237 bytes** against 12,789 at the old prune,
-// which is 0.48 per cent of what `/nola/` already asks a visitor for.
+// which is 0.48 per cent of what `/nola/` already asks a visitor for, and
+// **18,435** since 2026-09-30, when it gained a log scale unigram column.
 //
 // ── A TAKE ADAPTS TO WHAT IS BEING PLAYED NOW, AND FORGETS ─────────────────
 //
@@ -300,9 +301,33 @@ const fromNumeral = (numeral, key) => {
  * ⚠️ `5` IS A GUESS AND IS THE ONLY ONE HERE. A bare fifth has no third, so it
  * belongs to no class the corpus counted, and it is read as major because that
  * is what a power chord usually stands in for. Nothing measured it.
+ *
+ * 🔴 IT HELD ELEVEN ROWS UNTIL 2026-09-30 AND `parseChord` RETURNS TWENTY SIX
+ * QUALITIES, SO FIFTEEN FELL THROUGH `|| 'maj'` AND WERE READ AS MAJOR CHORDS.
+ * `dim7` was one of them: MEASURED, `Cmaj7 C#dim7` asked the table about
+ * `0maj|1maj`, a context of two major chords a semitone apart, instead of
+ * `0maj|1dim`, which is the passing chord to Dm7 the build's own round trip
+ * asks about by name. `9`, `11` and `13` were majors too, on a table where
+ * dominants are 40.6 per cent of jazz.
+ * ✅ EVERY ROW NOW AGREES WITH `classOf` IN `demo/resources/chord-corpus.mjs`,
+ * WHICH IS THE FUNCTION THE TABLE WAS COUNTED WITH, and `suggest-test.mjs` walks
+ * every quality `parseChord` can return against it rather than against this
+ * list. TWO ROWS DISAGREE ON PURPOSE AND ARE NAMED THERE: `2`, which that regex
+ * would call a dominant because it starts with a digit, is the notes of `sus2`
+ * and has no seventh at all; and `add9`, which it cannot class, is a major
+ * triad with a ninth. Neither is written anywhere in either corpus, so neither
+ * disagreement can move a count.
  */
-const CLASS_OF = { maj: 'maj', maj7: 'maj', min: 'min', min7: 'min', 7: 'dom',
-  dim: 'dim', min7b5: 'hdim', sus2: 'sus', sus4: 'sus', aug: 'aug', 5: 'maj' };
+const CLASS_OF = { maj: 'maj', maj6: 'maj', maj7: 'maj', maj9: 'maj', maj11: 'maj',
+  maj13: 'maj', 6: 'maj', add9: 'maj', 5: 'maj',
+  min: 'min', min6: 'min', min7: 'min', min9: 'min', min11: 'min', min13: 'min',
+  7: 'dom', 9: 'dom', 11: 'dom', 13: 'dom',
+  dim: 'dim', dim7: 'dim', min7b5: 'hdim',
+  sus2: 'sus', sus4: 'sus', 2: 'sus', aug: 'aug' };
+
+/** The class a quality is counted under, or `null` for one this file has no
+ *  row for. Exported so a check can walk it against the build's own classifier. */
+export const classOfQuality = (q) => (Object.hasOwn(CLASS_OF, q) ? CLASS_OF[q] : null);
 
 /**
  * 🔴 A SURFACE SPELLING THE PAGE CANNOT VOICE IS A LABEL THAT LIES ABOUT ITS OWN
@@ -364,7 +389,22 @@ export function useTables(json) {
   for (const id of Object.keys(json)) {
     const st = json[id];
     if (!st || typeof st !== 'object' || !st.bi || !st.tri) continue;
-    const uni = new Map(syms.map((s, i) => [s, rev.get(st.uni[i]) / STEPS]));
+    /* 🔴 THE UNIGRAM IS READ OFF THE LOG COLUMN WHEN THERE IS ONE, BECAUSE THE
+       LINEAR ONE STORES HALF THE ALPHABET AS ZERO. MEASURED 2026-09-30: 46 counted
+       jazz symbols and 57 pop ones sit below half a 1/89 step, `8dim` among them
+       at 70 of 52,924, and slot B divided by that zero. It read the `1e-6` below
+       as the chord's frequency and gave it about 17 bits of specificity, so
+       `Fmaj Cmaj7` offered `C#dim7` three draws in four. `build-chord-tables.mjs`
+       writes `ulog` at a fifth of a bit a step.
+       ⚠️ A TABLE WITHOUT IT STILL LOADS, and a zero there is read as HALF A STEP,
+       which is the most it can have been rounded down from, rather than as a
+       millionth. That is an upper bound on the frequency and so a lower bound on
+       how specific the chord is, which errs toward the ordinary answer. */
+    const ul = Number.isFinite(st.ul) && st.ul > 0 ? st.ul : 0;
+    const uni = new Map(syms.map((s, i) => [s,
+      (ul && typeof st.ulog === 'string' && st.ulog.length === syms.length)
+        ? (rev.get(st.ulog[i]) >= STEPS ? 0 : 2 ** (-rev.get(st.ulog[i]) / ul))
+        : Math.max(rev.get(st.uni[i]) / STEPS, 0.5 / STEPS)]));
     const spell = new Map(syms.map((s, i) => [s, st.spell[i] || '']));
     /* 🔴 THE TEMPERATURE TRAVELS WITH THE STYLE, and a table written before the
        field existed reads as 1, which is jazz's measured value rather than a
@@ -671,7 +711,25 @@ export function twoSlots(style, ctx, { temp = 1, rnd = null, bTemp = 0, take = n
   const rows = take ? adaptRows(got.rows, take, ctx, { weight }) : got.rows;
   if (!rows.length) return null;
   const A = sampleRow(rows, temp, rnd);
-  const pool = rows.slice(0, POOL).filter(([s]) => s !== A)
+  /* 🔴 A DIMINISHED CHORD IS NEVER SLOT B, BECAUSE IT IS A STEP ON THE WAY AND
+     SLOT B IS OFFERED ALONE. Reported 2026-09-30 as *"still not a good sounding
+     suggestion"* over `Fmaj`, `Cmaj7` and a proposal of `C#dim7`. That chord is
+     right: it is the corpus's own passing move from V to vi, and `8dim` goes on
+     to `9min` **54 per cent** of the time in jazz and **86** in pop. Heard on its
+     own after a major seventh it is a question with no answer, which is the
+     complaint.
+     ⚠️ AND PMI PICKS IT FOR THE SAME REASON IT IS A PASSING CHORD. Diminished
+     chords are **2.3 per cent** of jazz and **0.35** of pop, so wherever one
+     reaches the pool it is the most specific row in it. MEASURED over the 623
+     jazz trigram contexts at the argmax: a dim sits in the pool of 29, and slot
+     B took it in **22**, and in **21** with the unigram repaired. So the repair
+     above is right and is not this fix.
+     ✅ SO THE POOL LEAVES IT OUT AND SLOT A DOES NOT. It stays in the table, in
+     the walk and in the way home, where the chord after it is there too; what is
+     refused is offering the middle of a move as if it were a place to go.
+     `chord-corpus.mjs` already names the class this way: *"a passing chord is
+     `dim`"*. */
+  const pool = rows.slice(0, POOL).filter(([s]) => s !== A && !PASSING.test(s))
     .map(([s, p]) => [s, Math.log2(p / (style.uni.get(s) || 1e-6))]);
   let B = null;
   if (!pool.length) B = null;
@@ -691,8 +749,11 @@ export function twoSlots(style, ctx, { temp = 1, rnd = null, bTemp = 0, take = n
     B = pool[pool.length - 1][0];
     for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) { B = pool[i][0]; break; } }
   }
-  return { A, B: B ?? (rows.find(([s]) => s !== A)?.[0] ?? null), how, rows };
+  return { A, B: B ?? (rows.find(([s]) => s !== A && !PASSING.test(s))?.[0] ?? null), how, rows };
 }
+
+/** A table symbol whose class is a passing chord, which slot B never offers. */
+const PASSING = /^\d+dim$/;
 
 /**
  * 🔴 A PATH THAT HAS TO ARRIVE, WHICH IS A DIFFERENT QUESTION FROM A CHORD THAT

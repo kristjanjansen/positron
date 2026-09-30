@@ -1,5 +1,14 @@
 ## Open
 
+### Done 2026-09-30 (9ccba93): `/reel/`, play with nothing picked starts the first mark
+
+ASKED, VERBATIM: *"when i press play, reel demo short start from first (whaterver playing). no selection needed"*. The first film or radio mark at or after the playhead, which on a fresh visit is the 1965-01-07 newsreel the page opens on. Under `?selfcheck=1` it picks and opens nothing. `verify reel` 26/27, 0 ERR reaches.
+⚠️ **STILL RED, AND NOT FROM THIS: `pointing at a mark says what it is, under the line rather than over it`** reads `newsreels  1965-01-07, Arhitektide liidu näitus, 1965-01-07`, so the footer's first cell is the lane name where the assert wants the title. It fails identically on the file before this change.
+
+### Done 2026-09-30 (9ccba93): `/knobs/`, the description back to one sentence
+
+ASKED, VERBATIM: *"...shorten in both index and in page"*. Now *"Play and turn the knobs of a synthesizer on a Raspberry Pi in another building."*, the same words in `manifest.mjs`.
+
 ### Done 2026-09-30: `/knobs/`, no yellow circle round the invisible hand's button
 
 ASKED, VERBATIM: *"rm yellow circle aroind invisible hands button on knobs"*. MEASURED in Chrome: a mouse press leaves `.pos-knob-hand` matching `:focus-visible`, so the shell's `outline: 1px solid var(--hi)` drew a yellow circle round it (the ground's 50% radius shapes it) until focus moved. `demo/shell/shell.css` now gives that button `outline: none` on focus, with the ink stepping to `--fg` as the keyboard cue. The lit glyph is still yellow. ⚠️ `.sld-hand` on sliders was not looked at and may do the same.
@@ -4806,6 +4815,8 @@ unreachable row goes red.
 ⚠️ MEASURED in the corpora: `^` 62, `^9` 60, `+` 48. **Small, and `aug` already
 exists**, so this is about not lying rather than about coverage.
 
+✅ **`+` DONE 2026-09-30, UNCOMMITTED AT THE TIME OF WRITING: READ AS AUGMENTED, NOT REFUSED.** It is the ordinary spelling, the corpora write it, and `classOf` and `SPELL_ALIAS` already fold it onto `aug`. The splitter keeps `+` as a chord character (exported as `CHORD_GAP`), a `+` standing alone is still a gap so `C + G` is two chords, and `C+7` is refused in words. `C+` is `Caug`, notes 60 64 68. ⚠️ **`^` IS STILL EATEN**, so `C^` still reads as C major with nothing refused. `chords-test.mjs` 7i asserts that on purpose so it cannot change quietly.
+
 ### Open 2026-09-26: `CLASS_OF` files 14 of 26 qualities as major, `dim7` included
 
 🔴 **MEASURED 2026-09-26: 14 of the 26 qualities `parseChord` can return fall
@@ -4820,12 +4831,16 @@ would silently class them all `maj`. **Dominants are 40.6 per cent of jazz**, so
 ✅ **It is one line per row once the classes are right**, and that is the next
 thing, not a reason the rows are wrong.
 
+✅ **CLASSES DONE 2026-09-30, UNCOMMITTED AT THE TIME OF WRITING.** `CLASS_OF` has a row for all 26 qualities and `suggest-test.mjs` walks every quality `parseChord` or `name.mjs` can return against the build's own `classOf` in `chord-corpus.mjs`. MEASURED against the old code: **9 qualities** reached the table in the wrong class (`min6 min9 min11 min13` as major, `9 11 13` as major, `dim7` as major, `2` as major); the six `maj` extensions and `add9` were right by accident. Two named disagreements with `classOf`: `2` is `sus` (its regex says dominant) and `add9` is `maj` (it says nothing). **The 37 missing qualities are still not added**; that is now one row here plus one row in `chords.mjs` each.
+
 ### Open 2026-09-26: `2` can be typed and will never be suggested
 
 ⚠️ **MEASURED: `2` is written 0 times in 159,644 corpus chords**, so a table’s
 `spell` map has nothing to offer it. The SOUND is still reachable under the name
 `sus2`, written 264 times. **This is a fact to know rather than a defect**, and it
 is written down so nobody reports it later as one.
+
+⚠️ Since 2026-09-30 a played or typed `C2` at least reaches the table as `sus`, the class of the same three notes, rather than as a major chord.
 
 ### Done 2026-09-26: `C2` is a chord, and the parser was measured rather than patched
 
@@ -6096,6 +6111,13 @@ WITH `/kit/` RE-RUN.**
 
 
 🔴 **REPORTED AGAIN 2026-09-30, WITH A SCREENSHOT OF `/nola/`:** *"still not a good sounding suggestion"*. The lanes read `Fmaj`, `Cmaj7`, and the hollow suggestion `C#dim7`. ⚠️ **READ WITH `CLASS_OF` BELOW**: `dim7` is one of the 14 qualities `suggest.mjs` files as major, so the suggester may be scoring a diminished seventh as a major chord. C to C#dim7 is a real passing move towards Dm in the corpus, and on its own after Cmaj7 it sounds wrong, which is the complaint. Not yet worked: the research this entry asks for has still not started.
+
+✅ **WORKED 2026-09-30, UNCOMMITTED AT THE TIME OF WRITING. THE CLASS ERROR WAS NOT THE CAUSE OF `C#dim7`.** `Fmaj` and `Cmaj7` are both classed correctly, and name.mjs never returns `dim7` for a played chord. MEASURED instead, in F major the context is `0maj|7maj` and the jazz table holds `0maj 34%`, `9min 19%`, `8dim 15%`:
+- **The table's unigram was the first defect.** `uni` is one character on a 1/89 linear scale, so **46 counted jazz symbols and 57 pop ones were stored as exactly 0**, `8dim` among them at a real 70 of 52,924. Slot B ranks by `log2(p / u)` with a `1e-6` floor, so `C#dim7` scored about **17 bits** against `Dm7`'s 2.1 and was shown **75 per cent** of the time (2,000 seeded draws). `build-chord-tables.mjs` now writes a second column, `ulog`, one character at a fifth of a bit a step (worst error 7.1 per cent, no counted symbol zero), and the build refuses to write if the old column would pass the same check. `uni` is unchanged byte for byte, as are `bi`, `tri`, `spell`, `temp` and `mix`. 18,237 to **18,435 bytes**.
+- **The passing chord was the second, and the unigram repair alone does not fix it.** With the true count `C#dim7` still scores 6.8 bits and still wins, because diminished chords are 2.3 per cent of jazz and 0.35 of pop, so PMI prefers them wherever one reaches the pool: over the 623 jazz trigram contexts a dim sat in the pool of 29 and slot B took it in 22 (21 with the true unigram). `8dim` goes on to `9min` 54 per cent of the time in jazz and 86 in pop, so it is the middle of a move. **Slot B no longer offers a `dim` symbol.** Slot A still draws it (130 of 500 after `Fmaj Cmaj7`) and it stays in the table, the walk and the way home.
+- After: `Fmaj Cmaj7` shows `Dmin7` 58 per cent and `Fmaj7` 42, and `C#dim7` 0 of 2,000. `C G Am`, `Dm7 G7`, `Am F C`, `Cmaj7 Am7`, `C F` are essentially unchanged in jazz; pop moved a few points on `Am F C` (A#maj 61 to 71) from the unigram alone.
+
+⚠️ **WHAT THIS BEARS ON FOR THE RESEARCH, AND IT IS A WARNING RATHER THAN A RESULT.** PMI is "specific to this context", and the chords most specific to a context are the rare functional ones: passing diminished chords, and next in line half diminished chords (`Bmin7b5` is still 56 per cent after `Am F C` and 29 after `C F` in jazz). A slot ranked by specificity will keep finding the MIDDLE of a device, so a listening test must log which slot and which class every offered chord came from, or a bad sounding session cannot be attributed. The other half of the complaint, `dry`, is voicing and is untouched by any of this. A passing chord offered together with its resolution (`C#dim7` then `Dm7`, as a pair) is the obvious next experiment and is not built.
 
 ### Open 2026-09-25: `.panel-head-mid` overflows its own grid track at every width
 

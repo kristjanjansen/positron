@@ -18,7 +18,9 @@
 // sabotaged unigram, a style that does not exist, a sampler held at the argmax,
 // a way home to a chord nothing reaches, a beam narrowed until it is an argmax
 // again, a take of somebody else's chords and a take fed nothing but the page's
-// own suggestions.
+// own suggestions. Two more since 2026-09-30: the two named places the build's
+// own classifier is wrong, and a passing chord that must stay in the table while
+// slot B stops offering it alone.
 //
 // 🔴 AND THE SAMPLER'S CHECK IS TWO HALVES OR IT IS NOTHING. `suggest.mjs` draws
 // slot A rather than taking the maximum since 2026-09-25, so every number in
@@ -32,8 +34,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { suggest, useTables, tablesIn, styleNames, STYLES, keysFitting, pickKey, numeralIn,
-  mkRandom, routeTo, rowsFor, mkTake, adaptRows } from './suggest.mjs';
-import { parseChord } from './chords.mjs';
+  mkRandom, routeTo, rowsFor, mkTake, adaptRows, twoSlots } from './suggest.mjs';
+import { parseChord, QUALITIES } from './chords.mjs';
+import { RECOGNISED } from './name.mjs';
+import { classOf } from '../resources/chord-corpus.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TABLE_PATH = join(HERE, '..', 'resources', 'chord-tables.json');
@@ -687,6 +691,156 @@ ok('each style carries its own mixing weight, and they are not the same number',
     a.ok && b.ok && a.steps.map((c) => c.name).join(' ') !== b.steps.map((c) => c.name).join(' '),
     `${a.steps.map((c) => c.name).join(' ')} without it and `
     + `${b.steps.map((c) => c.name).join(' ')} with it`);
+}
+
+console.log('\n== what a chord is counted as, and what slot B may offer alone ==');
+
+// 🔴 REPORTED 2026-09-30 AS *"still not a good sounding suggestion"*, over the
+//    lanes `Fmaj`, `Cmaj7` and a proposal of `C#dim7`. Three defects were found
+//    under it and every check below was run against the code before the repair
+//    and went red there, except the two marked as controls that must stay green
+//    on both sides. The counts are in `BACKLOG.md` under the entry that asked.
+
+// 29. 🔴 EVERY QUALITY IS COUNTED UNDER THE CLASS THE TABLE WAS BUILT WITH, AND
+//     THE SOURCE IT IS GRADED AGAINST IS THE BUILD'S OWN `classOf`, NOT
+//     `suggest.mjs`'s MAP. That map held eleven rows for the twenty six qualities
+//     `parseChord` returns, and the other fifteen fell through to major. Read off
+//     `suggest().from`, which is the symbol the table was actually asked about,
+//     so it grades the path a played or typed chord takes rather than a lookup.
+{
+  const QS = [...new Set([...QUALITIES.map(([n]) => parseChord(`C${n}`)),
+    ...RECOGNISED.map(([n]) => parseChord(`C${n}`))].filter((c) => c.ok).map((c) => c.quality))];
+  /* The two rows where the build's regex is wrong and this file is right, named
+     rather than skipped. Neither is written once in either corpus. */
+  const OWN = { 2: 'sus', add9: 'maj' };
+  const wrong = [];
+  for (const q of QS) {
+    const want = OWN[q] ?? classOf(q);
+    /* `from` is only a table symbol when the table answered, so the chord is put
+       on whichever degree after C the table has rows for. */
+    let got = null;
+    for (let d = 0; d < 12 && got === null; d++) {
+      const r = suggest({ chords: [C(0, 'maj'), C(d, q)] }, { style: 'jazz', temp: 0 });
+      if (r.source === 'corpus') got = String(r.from).replace(/^\d+/, '');
+    }
+    if (got !== want) wrong.push(`${q} read as ${got}, counted as ${want}`);
+  }
+  ok('every quality a chord can have is read in the class the table was counted with',
+    QS.length >= 26 && wrong.length === 0,
+    wrong.join(', ') || `${QS.length} qualities, all agreeing with the build's classOf`);
+}
+
+// 30. NEGATIVE CONTROL for the exceptions above: they are exceptions because the
+//     build's classifier really does get them wrong, not because a row is missing
+//     here. `2` starts with a digit and that regex calls every such quality a
+//     dominant; `add9` it cannot class at all. And this file reads them as the
+//     chords they are.
+ok('NEGATIVE CONTROL: `2` and `add9` are the two places the build classifier is wrong, and this is not',
+  classOf('2') === 'dom' && classOf('add9') === null
+  && String(suggest({ chords: [C(0, 'maj'), C(2, '2')] }, { style: 'jazz', temp: 0 }).from) === '2sus'
+  && String(suggest({ chords: [C(0, 'maj'), C(2, 'add9')] }, { style: 'jazz', temp: 0 }).from) === '2maj',
+  `classOf says ${classOf('2')} and ${classOf('add9')}`);
+
+// 31. And the device the build's own round trip asks about by name reaches the
+//     table as that device. `C#dim7` after `Cmaj7` is the passing chord to Dm7,
+//     91 per cent of the time in the jazz table, and it was asked about as a
+//     second major chord a semitone up.
+{
+  const r = suggest({ chords: [C(0, 'maj7'), C(1, 'dim7')] }, { style: 'jazz', temp: 0, bTemp: 0 });
+  ok('Cmaj7 C#dim7 is read as a passing chord, so the table answers Dm7',
+    r.from === '1dim' && r.picks[0]?.name === 'Dmin7', `${r.from}, then ${names(r)}`);
+}
+
+// 32. 🔴 NO CHORD THE TABLE COUNTED HAS A FREQUENCY OF ZERO. Slot B divides by
+//     it. The linear column stores 46 jazz and 57 pop symbols as exactly 0, every
+//     diminished chord among them, and a zero read as a millionth gave each of
+//     them about 17 bits of specificity.
+{
+  const zero = [];
+  for (const st of ['jazz', 'pop']) {
+    const t = STYLES[st];
+    const seen = new Set();
+    for (const m of [t.bi, t.tri]) for (const rows of m.values()) for (const [s] of rows) seen.add(s);
+    for (const s of seen) if (!(t.uni.get(s) > 0)) zero.push(`${st} ${s}`);
+  }
+  ok('no chord that can be offered has a frequency of zero in the table',
+    zero.length === 0, zero.length ? `${zero.length}: ${zero.slice(0, 6).join(', ')}` : 'every offered symbol has one');
+}
+
+// 33. And the frequency it has is the counted one, which a floor would not give.
+//     `8dim` is 70 of 52,924 jazz chords, MEASURED 2026-09-30 off the cached iRb
+//     corpus; the log column holds it to a fifth of a bit.
+{
+  const u = STYLES.jazz.uni.get('8dim');
+  const want = 70 / 52924;
+  ok('the rarest chords carry their counted frequency, to within 8 per cent',
+    Math.abs(u / want - 1) < 0.08, `8dim ${u.toExponential(3)} against ${want.toExponential(3)} counted`);
+}
+
+// 34. 🔴 THE REPORT ITSELF. After `Fmaj Cmaj7` the page shows slot B, and it was
+//     `C#dim7` in 75 of 100 draws: a passing chord offered alone, which is the
+//     middle of a move and sounds like a question with no answer.
+{
+  const ctx = [C(5, 'maj'), C(0, 'maj7')];
+  const rnd = mkRandom(42);
+  let dim = 0; const seen = new Set();
+  for (let i = 0; i < 500; i++) {
+    const r = suggest({ chords: ctx }, { style: 'jazz', rnd });
+    const b = r.picks.find((p) => p.role === 'other');
+    if (b) seen.add(b.name);
+    if (b && /dim/.test(b.quality)) dim++;
+  }
+  ok('after Fmaj Cmaj7 the chord a player is shown is never the passing C#dim7',
+    dim === 0 && seen.size >= 2, `${dim} of 500, offering ${[...seen].join(', ')}`);
+}
+
+// 35. And across every context both tables hold, drawn and at the argmax.
+{
+  let n = 0, dim = 0;
+  const rnd = mkRandom(3);
+  for (const st of ['jazz', 'pop']) for (const k of STYLES[st].tri.keys()) {
+    for (const o of [{ temp: 0, bTemp: 0 }, { temp: STYLES[st].temp, bTemp: 1, rnd }]) {
+      /* The same two slots `suggest()` draws, read through its own export. */
+      const r = twoSlots(STYLES[st], k.split('|'), o);
+      if (!r) continue;
+      n++;
+      if (r?.B && /^\d+dim$/.test(r.B)) dim++;
+    }
+  }
+  ok('slot B never offers a diminished chord alone, in any context either table holds',
+    n > 1000 && dim === 0, `${dim} of ${n}`);
+}
+
+// 36. NEGATIVE CONTROL, AND IT IS WHAT KEEPS THE FIX NARROW. The chord is still
+//     in the table and slot A still draws it, so a walk and a way home can pass
+//     through it with the chord after it. A repair that deleted diminished rows
+//     would pass 34 and 35 and fail this.
+{
+  const ctx = [C(5, 'maj'), C(0, 'maj7')];
+  const rows = rowsFor(STYLES.jazz, ['0maj', '7maj']).rows.map(([s]) => s);
+  const rnd = mkRandom(9);
+  let a = 0;
+  for (let i = 0; i < 500; i++) {
+    const r = suggest({ chords: ctx }, { style: 'jazz', rnd });
+    if (r.picks[0]?.name === 'C#dim7') a++;
+  }
+  ok('NEGATIVE CONTROL: the passing chord stays in the table and slot A still draws it',
+    rows.includes('8dim') && a > 0, `rows ${rows.join(' ')}, slot A drew C#dim7 ${a} of 500`);
+}
+
+// 37. A table written before the log column still loads, and a zero in its
+//     linear column is read as half a step, the most it can have been rounded
+//     down from, rather than as a millionth.
+{
+  const raw = JSON.parse(readFileSync(TABLE_PATH, 'utf8'));
+  for (const st of ['jazz', 'pop']) { delete raw[st].ulog; delete raw[st].ul; }
+  useTables(raw);
+  const u = STYLES.jazz.uni.get('8dim');
+  const half = 0.5 / (raw.alpha.length - 1);
+  useTables(JSON.parse(readFileSync(TABLE_PATH, 'utf8')));
+  ok('an older table with no log column reads a zero as half a step, not a millionth',
+    Math.abs(u - half) < 1e-12 && STYLES.jazz.uni.get('8dim') > 0.001,
+    `8dim ${u.toFixed(5)} from the linear column alone`);
 }
 
 console.log(`\n${pass} ok, ${fail} failed`);
