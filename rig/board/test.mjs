@@ -390,7 +390,7 @@ console.log('inputs: what a page may send the Circuit');
   is('all notes off passes', midiVerdict([0xB1, 123, 0], CH).ok, true);
   // negative controls, each the shape that could hurt the instrument
   is('SysEx is refused, a Replace Patch writes flash', midiVerdict([0xF0, 0x00, 0x20], CH).ok, false);
-  is('a program change is refused', midiVerdict([0xC0, 5, 0], CH).ok, false);
+  is('a program change padded to three bytes is refused', midiVerdict([0xC0, 5, 0], CH).ok, false);
   is('an ordinary controller is refused', midiVerdict([0xB0, 7, 100], CH).ok, false);
   is('CC 123 with a value is not all notes off', midiVerdict([0xB0, 123, 5], CH).ok, false);
   is('a note on channel 16, the session channel, is refused', midiVerdict([0x9F, 60, 100], CH).ok, false);
@@ -418,7 +418,18 @@ console.log('inputs: what a page may send the Circuit');
   is('drum patch select, CC 8 on channel 10, is refused', midiVerdict([0xB9, 8, 3], CH).ok, false);
   is('a synth controller on the drum channel is refused', midiVerdict([0xB9, 74, 64], CH).ok, false);
   is('and on the session channel even if a config named it', midiVerdict([0xBF, 74, 64], [1, 2, 10, 16]).ok, false);
-  is('a program change is still refused on every channel', [0xC0, 0xC1, 0xC9, 0xCF].map((s) => midiVerdict([s, 5, 0], [1, 2, 10, 16]).ok), [false, false, false, false]);
+  is('a padded program change is refused on every channel', [0xC0, 0xC1, 0xC9, 0xCF].map((s) => midiVerdict([s, 5, 0], [1, 2, 10, 16]).ok), [false, false, false, false]);
+  // A synth patch, 0 to 63 on channels 1 and 2 (plan-circuit-model12 §3.7).
+  is('a synth patch change passes on 1 and 2, both ends of the bank',
+    [[0xC0, 0], [0xC0, 63], [0xC1, 0], [0xC1, 63]].map((b) => midiVerdict(b, CH).ok), [true, true, true, true]);
+  // negative controls: channel 16 selects a SESSION, instantly at 0 to 31
+  is('a program change on the session channel is refused even if a config named it',
+    [0, 5, 31, 64, 95].map((n) => midiVerdict([0xCF, n], [1, 2, 10, 16]).ok), [false, false, false, false, false]);
+  is('a program change on the drum channel is refused', midiVerdict([0xC9, 5], CH).ok, false);
+  is('64 and up is not a synth patch', [64, 95, 127].map((n) => midiVerdict([0xC0, n], CH).ok), [false, false, false]);
+  is('a program change on a channel this input does not play is refused', midiVerdict([0xC1, 5], [1, 10]).ok, false);
+  is('a data byte past 127 in a program change is refused', midiVerdict([0xC0, 200], CH).ok, false);
+  is('and two bytes of anything else is refused', [[0x90, 60], [0xB0, 74], [0xD0, 64]].map((b) => midiVerdict(b, CH).ok), [false, false, false]);
   is('pitch bend and aftertouch are refused', [0xE0, 0xD0, 0xA0].map((s) => midiVerdict([s, 0, 64], CH).ok), [false, false, false]);
   is('and a synth controller refusal on the drums says why', /not a synth/.test(midiVerdict([0xB9, 74, 64], CH).why), true);
 

@@ -1,6 +1,6 @@
 ## Open
 
-### Open 2026-09-30: `/away/` on the instrument panel, with a patch selector
+### Done 2026-09-30: `/away/` on the instrument panel, with a patch selector
 
 *"use instument panel for away and patch selector"*. Slug `away`; touches
 `demo/away/index.html`. Look at how `/shape/` and `/circuit/` sit in the kit's
@@ -9,6 +9,15 @@ selector means program change, and the board's MIDI gate lets only note on,
 note off and CC 123 through on `/away/`'s room, so it needs a decision about
 the gate: program change is RAM only (it picks a patch, it writes nothing),
 unlike a `Replace Patch` SysEx.
+DONE on *"ok go"*: `createInstrumentPanel` with the waveform, the part row
+(`enable midi` at its far end), the keys, and a plate reading `CIRCUIT`, the
+ONLINE button, and a `createPicker` of `Patch 1` to `Patch 64` at the far end.
+The gate passes a 2 byte program change 0 to 63 on channels 1 and 2 only;
+channel 16 (sessions) and 64 and up stay refused, with 8 new tests, 208/208 on
+the laptop and the Pi (md5 `09c477eb…`). `/away/` 25/25, five new page asserts.
+The picker opens empty because nothing reports the Circuit's current patch.
+NOT pressed against the real Circuit: a program change replaces the sound a
+synth holds, so an unsaved edit on the desk would go. The owner's press.
 
 ### Done 2026-09-30: `/away/` plays white noise on the direct path
 
