@@ -15,7 +15,8 @@
     {
       "class_name": "Pub",
       "image": "./container/Dockerfile",
-      "max_instances": 1,
+      // TWO: the test pattern instance (`p1`) and /stage/'s film (`stage`).
+      "max_instances": 2,
       // CUSTOM, not a predefined type, because the predefined ones are wrong in
       // both directions here.
       //

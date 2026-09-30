@@ -7,7 +7,10 @@
 //
 //   POST /start   {key, fps?, bitrate?}   -> begin publishing (idempotent)
 //   POST /stop                            -> kill ffmpeg
-//   GET  /status                          -> {publishing, uptimeS, pid, lastError}
+//   GET  /status                          -> {publishing, uptimeS, pid, lastError, whip, cam}
+//   POST /cam/open  {key, fmt, sid}       -> a camera's WebM rewrapped to RTMPS
+//   POST /cam/chunk?sid=                  -> one MediaRecorder chunk onto its stdin
+//   POST /cam/stop  {sid?, why?}          -> end the camera leg
 //
 // The stream key arrives in the POST body from the Worker, which reads it from
 // a Worker secret. It is never baked into the image and never logged.
@@ -15,7 +18,7 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 
-const PORT = 8080;
+const PORT = Number(process.env.PORT) || 8080;   // the image uses 8080; a laptop test may not
 const BOOT = Date.now();
 
 // TWO INDEPENDENT LEGS, because Cloudflare requires it. Its docs are explicit:
@@ -99,16 +102,16 @@ const BURN = process.env.PUB_BURN === '1';
  * concatenated with a filter, which means dropping the filter leaves it
  * dangling. Trimmed here, once, rather than at each call.
  */
-function vf(pre, draw) {
-  const chain = (BURN ? pre + draw : pre).replace(/,+$/, '');
+function vf(pre, draw, burn = BURN) {
+  const chain = (burn ? pre + draw : pre).replace(/,+$/, '');
   return chain ? ['-vf', chain] : [];
 }
 
 /** testsrc2's first bar edge: av_rescale(1, w, 6), rounding half up. */
 const bar1 = (w) => Math.floor((w + 3) / 6);
 
-function sourceArgs({ w, h, fps }) {
-  if (!SOURCE) {
+function sourceArgs({ w, h, fps }, source = SOURCE) {
+  if (!source) {
     return {
       input: ['-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`],
       // 🔴 THE "TOP LEFT COUNTERS" ARE testsrc2's OWN, NOT A drawtext HERE.
@@ -137,7 +140,7 @@ function sourceArgs({ w, h, fps }) {
     };
   }
   return {
-    input: ['-re', '-stream_loop', '-1', '-i', SOURCE],
+    input: ['-re', '-stream_loop', '-1', '-i', source],
     // Normalise to the encode budget BEFORE the burn is drawn, so the overlay is
     // the same size on every source and never scaled with the picture.
     pre: `scale=${w}:${h}:force_original_aspect_ratio=decrease,`
@@ -363,23 +366,58 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
  *    negotiation gate (run 1 of those notes proved it first try)
  *  · -bf 0 for the same reason as the RTMPS leg
  */
-function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
+/**
+ * 🔴 THE FILM, ALREADY WHIP SHAPED, SENT WITHOUT ENCODING. MEASURED 2026-09-30:
+ * the film re-encoded on the main box ran at about 0.6x realtime (`-re` lag
+ * 9.8 s growing to 29.3 s over 90 s), because the original is H.264 Main with
+ * B-frames, a 5.12 s GOP and AAC, none of which the whip muxer can pass
+ * through. This copy is baseline 3.1, no B-frames, a 2 s GOP at 25 fps and
+ * Opus 48 kHz, made once off the original, so the leg is a copy and costs a
+ * demux and a packetiser rather than an x264.
+ * ⚠️ NO BURN IS POSSIBLE HERE: a copied stream has no pixels to draw on.
+ */
+const FILM_WHIP = 'https://positron-station.kristjan-jansen.workers.dev'
+  + '/media/mimproject/mim-goes-sustainable-2011-kirikustseen-whip.mp4';
+function whipCopyArgs(url) {
+  return [
+    '-hide_banner', '-loglevel', 'warning',
+    '-re', '-stream_loop', '-1', '-i', FILM_WHIP,
+    '-map', '0:v:0', '-map', '0:a:0',
+    '-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy',
+    '-f', 'whip', url,
+  ];
+}
+
+/**
+ * A PER-REQUEST OVERRIDE, FOR /stage/'S OWN INSTANCE. That instance runs this
+ * image with the same container env as the main one (the test pattern and the
+ * clocks), so the WHIP leg takes `source` ('film-copy', 'film' or 'testsrc2', nothing
+ * else, so a body cannot point ffmpeg at an arbitrary URL) and `burn` (a
+ * boolean) in the /start-whip body. Both absent is the env, as before.
+ */
+const pickSource = (v) => (v === 'film' ? FILM : v === 'testsrc2' ? '' : SOURCE);
+
+function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720, source, burn }) {
+  const SRC = pickSource(source);
+  const BRN = typeof burn === 'boolean' ? burn : BURN;
+  // NOTHING ENCODED: the pre-transcoded film goes out as it is stored.
+  if (source === 'film-copy') return whipCopyArgs(url);
   const gop = fps * 2;
   const epoch = (Date.now() / 1000).toFixed(6);
   // A DIFFERENT hue from the RTMPS leg, deliberately. They are two ffmpeg
   // processes on two Cloudflare inputs — the page already says so — and any
   // page showing them side by side needs to tell them apart.
   const draw = drawFilters({ epoch, hue: 150, w, h });
-  const src = sourceArgs({ w, h, fps });
+  const src = sourceArgs({ w, h, fps }, SRC);
   return [
     '-hide_banner', '-loglevel', 'warning',
     // The film, or `testsrc2` when `PUB_SOURCE` is empty. See `sourceArgs`.
     ...src.input,
     // The 440 sine only when the source is silent, for the reason on the RTMPS
     // leg: a tone under a performance is a second thing happening.
-    ...(SOURCE ? [] : ['-re', '-f', 'lavfi', '-i', 'sine=frequency=440']),
-    ...(SOURCE ? ['-map', '0:v:0', '-map', '0:a:0?'] : ['-map', '0:v:0', '-map', '1:a:0']),
-    ...vf(src.pre, draw),
+    ...(SRC ? [] : ['-re', '-f', 'lavfi', '-i', 'sine=frequency=440']),
+    ...(SRC ? ['-map', '0:v:0', '-map', '0:a:0?'] : ['-map', '0:v:0', '-map', '1:a:0']),
+    ...vf(src.pre, draw, BRN),
     '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.1',
     '-bf', '0', '-pix_fmt', 'yuv420p', '-g', String(gop), '-b:v', bitrate,
     '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
@@ -509,6 +547,150 @@ function stop() {
   return { stopped: true };
 }
 
+// ── the camera leg ───────────────────────────────────────────────────────
+//
+// A THIRD LEG, AND IT RE-ENCODES NOTHING. `/cam/` records its burned camera
+// canvas with MediaRecorder (H.264 in WebM, a keyframe every 2 s, no
+// B-frames, which is Cloudflare's LL-HLS recipe arriving straight out of the
+// browser), the Pub Durable Object holds the page's socket and POSTs each
+// chunk here, and ffmpeg only REWRAPS WebM into FLV for RTMPS. MEASURED in
+// plans/plan-cam-llhls.md: a copy costs about 0.5 per cent of realtime where
+// a third x264 would not fit on this vCPU at all.
+//
+// 🔴 IT PUBLISHES TO THE SAME INPUT AS THE TEST PATTERN, with the same key,
+// because no second input or secret was to be made. Two publishers on one
+// input is one publisher and a fight, so THIS FILE refuses to run both: a
+// camera open waits for the pattern's ffmpeg to EXIT before spawning, and a
+// pattern /start ends the camera first. The Durable Object decides who gets
+// the input (viewers first); this is the floor under that decision, so a DO
+// that lost its state cannot put two encoders on one key.
+// ⚠️ INDEPENDENT OF `ff` AND `legs.whip`, so the viewer sweep's /stop never
+// touches it. /stop is about the pattern; /cam/stop is about the camera.
+const CAM_IDLE_MS = 5_000;      // no chunk for this long and the leg stops itself
+const CAM_MAX_MS = 330_000;     // the DO caps a session at 300 s; this is the floor under it
+const CAM_MAX_BUFFER = 8 << 20; // bytes queued on stdin before we call RTMPS stalled
+// ⚠️ TESTING ONLY. Points the camera leg's output somewhere other than Stream,
+// so the whole leg can be graded on a laptop with zero bytes to anybody's
+// server (plans/plan-cam-llhls.md section 6). Unset in the image.
+const CAM_OUT = process.env.PUB_CAM_OUT || '';
+let cam = null;
+let camLast = null;   // the last session's end, for /status after it is gone
+
+function camArgs({ key, fmt }) {
+  const out = CAM_OUT || `rtmps://live.cloudflare.com:443/live/${key}`;
+  return [
+    '-hide_banner', '-loglevel', 'warning',
+    // No probing: the first chunk carries the header and ffmpeg starts on it.
+    // No -re: the camera paces this input already.
+    // 🔴 AND NO `-fflags nobuffer`, WHICH THE PLAN'S RECIPE HAD. MEASURED
+    // 2026-09-30 on one MediaRecorder capture piped in three ways: with it the
+    // output began at 1.78 to 2.04 s and 115 of 171 frames came out, because
+    // the packets read while probing were thrown away, and they are the whole
+    // first GOP. Without it, frame 0 is a keyframe at 0.000 and all 171 arrive.
+    // The plan measured how SOON output appeared, which nobuffer does not hurt;
+    // it did not count what was missing.
+    '-probesize', '32', '-analyzeduration', '0',
+    '-f', fmt === 'mp4' ? 'mp4' : 'webm', '-i', 'pipe:0',
+    '-map', '0:v:0', '-c:v', 'copy', '-an',
+    '-f', 'flv', out,
+  ];
+}
+
+const exited = (p, ms) => new Promise((r) => {
+  if (!p || p.exitCode !== null || p.signalCode !== null) return r(true);
+  const t = setTimeout(() => r(false), ms);
+  p.once('exit', () => { clearTimeout(t); r(true); });
+});
+
+async function camOpen({ key, fmt, sid }) {
+  if (cam) await camStop('replaced by a new camera session');
+  // The pattern leg off this input, and GONE before the camera's ffmpeg opens it.
+  if (ff) {
+    const p = ff;
+    stop();
+    if (!(await exited(p, 4000))) { try { p.kill('SIGKILL'); } catch { /* gone */ } await exited(p, 1000); }
+  }
+  const p = spawn('ffmpeg', camArgs({ key, fmt }), { stdio: ['pipe', 'ignore', 'pipe'] });
+  const st = {
+    proc: p, sid: String(sid || ''), fmt, startedAt: Date.now(), lastChunkAt: Date.now(),
+    bytesIn: 0, chunks: 0, stderr: '', error: null, why: null, stopping: false,
+  };
+  cam = st;
+  p.stdin.on('error', () => { /* ffmpeg went away; the exit handler says why */ });
+  p.stderr.on('data', (b) => { st.stderr = redact(st.stderr + b.toString()).slice(-1200); });
+  p.on('exit', (code, sig) => {
+    const clean = st.stopping || code === 0 || code === null || sig === 'SIGTERM' || code === 255;
+    if (!clean) st.error = `exit ${code}${sig ? ' ' + sig : ''}`;
+    st.endedAt = Date.now();
+    camLast = st;
+    if (cam === st) cam = null;
+  });
+  return { started: true, sid: st.sid };
+}
+
+function camChunk(sid, buf) {
+  const st = cam;
+  if (!st || !st.proc) return { error: 'no camera session', status: 409 };
+  if (sid && st.sid && sid !== st.sid) return { error: 'not the current camera session', status: 409 };
+  st.lastChunkAt = Date.now();
+  st.bytesIn += buf.length;
+  st.chunks++;
+  try { st.proc.stdin.write(buf); } catch { /* the exit handler says why */ }
+  if (st.proc.stdin.writableLength > CAM_MAX_BUFFER) {
+    camStop('the RTMPS side stopped taking bytes');
+    return { error: 'stalled', status: 503 };
+  }
+  return { ok: true };
+}
+
+/** End stdin so ffmpeg flushes and closes RTMPS cleanly; SIGTERM if it will not. */
+async function camStop(why) {
+  const st = cam;
+  if (!st || !st.proc) return { already: true };
+  st.stopping = true;
+  st.why = why || 'stopped';
+  try { st.proc.stdin.end(); } catch { /* gone */ }
+  if (!(await exited(st.proc, 3000))) {
+    try { st.proc.kill('SIGTERM'); } catch { /* gone */ }
+    if (!(await exited(st.proc, 2000))) { try { st.proc.kill('SIGKILL'); } catch { /* gone */ } }
+  }
+  return { stopped: true, why: st.why };
+}
+
+function camState() {
+  const st = cam || camLast;
+  if (!st) return { publishing: false };
+  const now = Date.now();
+  return {
+    publishing: !!(cam && cam.proc),
+    sid: st.sid || null,
+    fmt: st.fmt,
+    uptimeS: Math.round(((cam ? now : st.endedAt || now) - st.startedAt) / 1000),
+    bytesIn: st.bytesIn,
+    chunks: st.chunks,
+    lastChunkAgoMs: now - st.lastChunkAt,
+    why: st.why,
+    error: st.error,
+    stderrTail: redact(st.stderr).slice(-300) || null,
+  };
+}
+
+// THE CONTAINER'S OWN WATCHDOG, the third of three independent stops. A DO that
+// lost its state, or a socket that went quiet without closing, cannot leave an
+// encoder publishing into Stream with nobody at the other end.
+setInterval(() => {
+  if (!cam || !cam.proc || cam.stopping) return;
+  const now = Date.now();
+  if (now - cam.lastChunkAt > CAM_IDLE_MS) camStop(`no chunk for ${Math.round((now - cam.lastChunkAt) / 1000)} s`);
+  else if (now - cam.startedAt > CAM_MAX_MS) camStop('the session reached its length cap');
+}, 1000).unref();
+
+const readBody = async (req) => {
+  const parts = [];
+  for await (const c of req) parts.push(c);
+  return Buffer.concat(parts);
+};
+
 const json = (res, obj, status = 200) => {
   const body = JSON.stringify(obj);
   res.writeHead(status, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) });
@@ -528,6 +710,7 @@ createServer(async (req, res) => {
       tracks: tracksMode,
       stderrTail: redact(lastStderr).slice(-400) || null,
       whip: legState('whip'),
+      cam: camState(),
     });
   }
 
@@ -538,6 +721,9 @@ createServer(async (req, res) => {
     try { opts = JSON.parse(body || '{}'); } catch { return json(res, { error: 'bad json' }, 400); }
     if (!opts.key) return json(res, { error: 'key required' }, 400);
     remember(opts.key);
+    // A viewer took the input back from a camera: the camera goes FIRST, and
+    // is gone before the pattern opens the same key.
+    if (cam) await camStop('a viewer took the input back');
     return json(res, start(opts));
   }
 
@@ -558,5 +744,24 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/stop-whip' && req.method === 'POST') return json(res, stopLeg('whip'));
 
-  return json(res, { error: 'use /start /stop /status' }, 404);
+  if (url.pathname === '/cam/open' && req.method === 'POST') {
+    let o = {};
+    try { o = JSON.parse((await readBody(req)).toString() || '{}'); } catch { return json(res, { error: 'bad json' }, 400); }
+    if (!o.key) return json(res, { error: 'key required' }, 400);
+    remember(o.key);
+    return json(res, await camOpen(o));
+  }
+  if (url.pathname === '/cam/chunk' && req.method === 'POST') {
+    const r = camChunk(url.searchParams.get('sid') || '', await readBody(req));
+    return json(res, r, r.status || 200);
+  }
+  if (url.pathname === '/cam/stop' && req.method === 'POST') {
+    let o = {};
+    try { o = JSON.parse((await readBody(req)).toString() || '{}'); } catch { /* a bare stop is fine */ }
+    // A stop for a session that is no longer current must not end the new one.
+    if (o.sid && cam && cam.sid && o.sid !== cam.sid) return json(res, { already: true, current: cam.sid });
+    return json(res, await camStop(o.why || 'stopped'));
+  }
+
+  return json(res, { error: 'use /start /stop /status /cam/open /cam/chunk /cam/stop' }, 404);
 }).listen(PORT, () => console.log(`pub container on :${PORT}`));

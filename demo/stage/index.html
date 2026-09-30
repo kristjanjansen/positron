@@ -16,6 +16,10 @@
                padding: 14px; display: flex; flex-direction: column; gap: 14px; }
   .stage-form { display: flex; flex-direction: column; gap: 12px; }
   .stage-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  /* The recording's path. The numbers are tabular so a size that grows every
+     2 s does not shuffle the words after it, and a long R2 key breaks rather
+     than pushing the page sideways on a phone. */
+  .stage-chain-v { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
 </style>
 
 <script type="module">
@@ -27,20 +31,19 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView, STRIP_MIN_H } from '/shell/strip.mjs';
-  import { createGlue } from '/shell/glue.mjs';
+  import { createGlue, createGlueRows } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { burn, readBurnedFrom, drawCamera, FRAME_W, FRAME_H, FIELD, videoHue, PAD } from '/shell/pattern.mjs';
   import { createCard } from '/shell/card.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
-  import { whipPublish, whepPlay, whep, llhls, holdPublisher, waitForWhip } from '/shell/live.mjs';
-  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
-  import { putWhole, proveReadable, fetchBack } from '/shell/ingest.mjs';
+  import { whepPlay, stageWhep, STAGE_PUB, STAGE_PUB_STATUS, holdPublisher, waitForWhip } from '/shell/live.mjs';
+  import { INGEST, openSession, proveReadable } from '/shell/ingest.mjs';
   import { resolveDuration, waitForFirstFrame } from '/shell/media.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
-  import { armVideo, recorderMime } from '/shell/shell.mjs';
+  import { armVideo, recorderMime, createReport } from '/shell/shell.mjs';
 
   /**
    * 🔴 THREE MODES, AND THE DEFAULT COSTS NOBODY ANYTHING. `plans/plan-stage-live.md`
@@ -56,12 +59,22 @@
    * `fake-tapes.mjs`, which took two pages from ungradable to green at zero
    * cost to anybody.
    *
-   * ⚠️ `?r2=1` IS SEPARATE AND OPT-IN FOR ITS OWN REASON: five sessions an hour
-   * per address, so two unguarded suite runs an hour would eat the cap and a
-   * working page would read red.
+   * 🔴 R2 IS ON FOR A PERSON AND OFF FOR THE HARNESS, SINCE 2026-09-30. Asked:
+   * *"i want so see local storaage -> r2 -> playback"*. It was `?r2=1`, opt in,
+   * so a person pressing Start saw a recording that never left the tab. The
+   * reason it was opt in still holds and now decides the OTHER side: the
+   * upload route allows five sessions an hour per address, so two suite runs
+   * an hour would eat a person's cap and a working page would read red.
+   * ⚠️ SO THE SWITCH IS `SELFCHECK`, WHICH IS THE FLAG THE HARNESS ALREADY
+   * APPENDS TO EVERY PAGE. A run with `?selfcheck=1` records into this
+   * browser and plays that copy back, and says in the readout that R2 was
+   * skipped. `?r2=1` still forces the upload (for a probe that wants the whole
+   * chain under selfcheck) and `?r2=0` turns it off for a person.
+   * ⚠️ NOTHING HAPPENS ON LOAD EITHER WAY. The upload runs when a show is
+   * stopped, which is a press.
    * ⚠️ BOTH MODES ASSERT THE SAME NUMBER OF TIMES. A check that exists only in
-   * one mode is the shape CLAUDE.md bans, and `capture`'s R2 asserts are inside
-   * an `if (useR2)` today, which is what it bans being done.
+   * one mode is the shape CLAUDE.md bans, so what changes with the mode is what
+   * each assert CLAIMS, never whether it runs.
    */
   const Q = new URLSearchParams(location.search);
   /**
@@ -103,8 +116,10 @@
   /** The link that puts somebody else's phone in this room. */
   const SHARE = `${location.origin}${location.pathname}?room=${ROOM}`;
   /**
-   * 🔴 THERE IS ONE LEG NOW AND IT IS THE REAL ONE. Asked 2026-09-25: *"go both
-   * real leg. we build gate later"* and *"rm loopback"*. This page used to
+   * 🔴 THERE IS ONE LEG NOW AND IT IS THE REAL ONE, OVER WebRTC ONLY. Asked
+   * 2026-09-30: *"can you have just webrtc transport?"*, which removed the
+   * `Start HLS` leg and everything that existed only for it. Asked 2026-09-25:
+   * *"go both real leg. we build gate later"* and *"rm loopback"*. This page used to
    * default to two peer connections talking to each other inside the same tab,
    * which is the right default for a harness and the wrong one for somebody who
    * was sent a link, and it meant the thing a visitor saw was not the thing the
@@ -115,8 +130,7 @@
    * by the minute DELIVERED with buffering counted, and `/stage/` is
    * `built: true` so a full suite pays it too.
    */
-  const LIVE = true;
-  const USE_R2 = Q.get('r2') === '1';
+  const USE_R2 = Q.get('r2') === '1' || (Q.get('r2') !== '0' && !SELFCHECK);
 
   const q = new URLSearchParams(location.search);
   // Reachable from a check, and from a probe: what the control room sent and
@@ -186,46 +200,27 @@
     // *"Pick how the show reaches its audience, over WebRTC or over low latency
     // HLS, ask them something, and keep every answer on the recording's own
     // timeline."*, which is three descriptions in a coat.
-    what: 'A church scene from a 2011 MIMproject performance goes out live to an '
-      + 'audience that answers back, over whichever transport you press.',
+    // 🔴 REWRITTEN 2026-09-30 WITH THE HLS LEG GONE. It said *"over whichever
+    // transport you press"*, which stopped being true when there was one, and
+    // the owner's ask for the day was the recording's path, so that is the
+    // second half of the sentence now.
+    what: 'A church scene from a 2011 MIMproject performance goes out live over '
+      + 'WebRTC and its recording travels from this browser to R2 to playback.',
     /**
-     * 🔴 ONE ROW, TWO WAYS OUT, AND ONLY ONE AT A TIME. Asked 2026-09-25:
-     * *"double play and start in stage control room is confusing. make just
-     * start primary button (or Start HLS | Start WebRTC?)"*, then *"no 2
-     * transports in same time"*. The two presses used to mean the film and the
-     * show, which is two verbs for one intention; they now mean WHICH TRANSPORT
-     * carries the show, which is the one decision a person actually makes here.
-     * ⚠️ **AND THE CHOICE IS REAL RATHER THAN COSMETIC.** Cloudflare will not
-     * serve an RTMPS input over WHEP or a WHIP input as HLS, so these are two
-     * different live inputs fed by two ffmpeg legs of one container, and the
-     * button picks which one this page subscribes to.
+     * 🔴 ONE BUTTON, AND IT IS ITS OWN STOP. There were two, `Start HLS` and
+     * `Start WebRTC`, from 2026-09-25 (*"no 2 transports in same time"*) to
+     * 2026-09-30 (*"can you have just webrtc transport?"*). Everything that
+     * existed only for the HLS leg went with it: hls.js on demand, the low
+     * latency player, the second publisher hold, the frame watcher that
+     * corrected a badge the HLS wait had given up on, and the array order that
+     * kept the harness from switching a live show to the other leg.
+     * ⚠️ **AND THAT LAST ONE CHANGES WHAT THE HARNESS PRESSES FIRST.**
+     * `demo/verify.mjs` presses `.tbar-x` in order and gives `settleMs` to
+     * control 0, which is now `Start WebRTC`. So the harness's own press can
+     * land on a cold container, and `startShow` waits for the publisher itself
+     * rather than failing, which is also what a person pressing it cold needs.
      */
-    /**
-     * 🔴 HLS IS FIRST IN THIS ARRAY AND WebRTC IS SECOND, AND THE ORDER IS
-     * LOAD-BEARING RATHER THAN A PREFERENCE. MEASURED 2026-09-25: with WebRTC
-     * first the page read **32/49**, because `demo/verify.mjs` presses every
-     * control in `.pos-controls` IN ORDER, 650 ms apart. It pressed Start
-     * WebRTC, the show came up, and then it pressed Start HLS, which SWITCHES,
-     * so `dropTransport()` tore the show down under seventeen asserts that are
-     * about a show being live.
-     * ⚠️ **THAT IS THIS PROJECT'S OWN RULE ARRIVING THROUGH NEW CODE**: a page
-     * that gains a control moves every other control's press, and `settleMs`
-     * only ever lands on control 0. What was new here is that the two controls
-     * are ALTERNATIVES rather than steps, which no drill can know by looking.
-     * ⚠️ **SO THE LAST ONE PRESSED IS THE ONE LEFT RUNNING**, and it is the one
-     * the rest of this page's checks are written about. A visitor is unaffected:
-     * both are one press and either may be pressed first.
-     * 🔴 **AND BOTH ARE `primary`, ASKED FOR 2026-09-25: *"both statt buttons
-     * primary"*.** The accent is a budget on this site and is normally spent on
-     * the one thing that is chosen or live, so two of them wants a reason. The
-     * reason is that these two are ALTERNATIVES of equal weight rather than an
-     * action and its lesser sibling: dimming one would say a show usually runs
-     * on the other, which is a recommendation nothing here has measured.
-     * ⚠️ **AND `primary` IS STYLING, NOT ORDER.** The array position is about
-     * the harness, for the reason above, and neither button outranks the other
-     * on screen.
-     */
-    // ⚠️ NO CONTROLS ROW. The two starts are on the control room's transport
+    // ⚠️ NO CONTROLS ROW. The start is on the control room's transport
     // bar, because starting a show is a transport verb and a page-level row
     // also showed them on the Audience tab, where they are nobody's business.
     controls: [],
@@ -864,7 +859,7 @@
   const chunks = [];
   const QUESTIONS = [];                // { at, title, options }
   let recordedMs = null;               // the real duration, once resolved
-  let stored = null;                   // what putWhole gave back
+  let stored = null;                   // what the upload gave back: { url, key, session, bytes }
   let landed = null;                   // the HEAD proof, displayed rather than only kept
   let recSource = 'received';          // 'received' or 'canvas', and it is DISPLAYED
   let recTrack = null;                 // the exact track object the recorder holds
@@ -1620,7 +1615,7 @@
      * clock is a duration against a nominal end nobody set, which is the exact
      * claim the chip existed to avoid making.
      */
-    // 🔴 ONE BAR: the two starts on the LEFT, the timers and PLAY RECORDING on
+    // 🔴 ONE BAR: the start on the LEFT, the timers and PLAY RECORDING on
     // the RIGHT, and no play glyph at all. Asked for across four messages.
     live: false, time: true, scrub: false, loop: false, absolute: false,
     toggle: false,
@@ -1628,8 +1623,9 @@
      * 🔴 `onClick`, AND IT IS `onClick` BECAUSE THIS PAGE'S TWO MAIN CONTROLS
      * DID NOTHING FOR A DAY. MEASURED 2026-09-25: `transport-bar.mjs` binds an
      * `extras` button with `x.onClick?.(b)`, this page passed `onPress`, and
-     * `?.` on an absent handler is silent. So `START HLS` and `START WEBRTC`
-     * were live buttons wired to nobody, for a visitor and for the harness
+     * `?.` on an absent handler is silent. So the two start buttons of the
+     * day (`START HLS` went on 2026-09-30) were live buttons wired to nobody,
+     * for a visitor and for the harness
      * alike, and the page reported *"clikced start webrtf, timelne playing, no
      * video"*.
      * 🔴 AND IT IS WHY WIDENING A WAIT NEVER HELPED. The check below presses
@@ -1648,12 +1644,9 @@
      * under the other seven.
      */
     extras: [
-      { id: 'hls', label: 'Start HLS', word: true,
-        aria: 'start or stop the show over low latency HLS',
-        onClick: () => toggleTransport('hls') },
       { id: 'webrtc', label: 'Start WebRTC', word: true,
         aria: 'start or stop the show over WebRTC',
-        onClick: () => toggleTransport('webrtc') },
+        onClick: () => toggleShow() },
     ],
     right: [playRecBtn],
     /**
@@ -1691,70 +1684,33 @@
   });
 
   /**
-   * ── the two ways a show reaches an audience ───────────────────────────────
+   * ── the one way a show reaches an audience ─────────────────────────────────
    *
-   * 🔴 ONE TRANSPORT AT A TIME, DECIDED 2026-09-25: *"no 2 transports in same
-   * time"*. Two at once costs two live inputs, two meters on a bill that
-   * charges per minute delivered on each protocol, and an audience split across
-   * a latency gap of several seconds that every question then has to straddle.
-   * So the second press SWITCHES rather than adding, and the page says which
-   * one is carrying.
-   *
-   * 🔴 AND THE HLS LEG IS GATED ON `?live=1` EXACTLY LIKE THE WebRTC ONE, WHICH
-   * IS A COST RULE AND NOT A CONVENIENCE. Without it a suite run would hold a
-   * Cloudflare live input open on every pass of this page, and Stream bills by
-   * the minute DELIVERED with buffering counted. The harness runs the loopback
-   * leg for WebRTC and is told, in words, why there is no picture on the HLS
-   * one rather than being shown an empty box.
+   * 🔴 WebRTC, AND ONLY WebRTC, SINCE 2026-09-30: *"can you have just webrtc
+   * transport?"*. The container publishes the picture over WHIP and this page
+   * subscribes over WHEP, and one button starts and stops that.
    */
-  let transport = null;            // 'webrtc' | 'hls' once something is carrying
-  let hlsPlayer = null;
-  let hlsHold = null;
+  let transport = null;     // 'webrtc' while a show is on, null otherwise
   let hold = null;          // the container stays awake while a show is on
-
   /**
-   * ⚠️ THE OTHER BUTTON IS BLOCKED ONLY WHILE ONE IS STARTING, NEVER AFTER.
-   * Asked 2026-09-25: *"shimmer when button starts (and block other until it
-   * has been started)"*. A control left disabled is a check the harness can no
-   * longer reach, which this project has measured twice in one day on two
-   * pages, so this is a transient state with a `finally` under it.
-   * ⚠️ **THE SHIMMER IS `shell.mjs`'s OWN `data-busy` SWEEP** and costs nothing
-   * here: the shell marks a running control busy for as long as its handler is
-   * awaited, which is also what makes the harness wait rather than walking off
-   * mid-start.
+   * 🔴 THE PAGE'S OWN CONTAINER AND INPUT SINCE 2026-09-30, AND EACH IS
+   * WRITTEN ONCE. The owner gave `/stage/` a container of its own, which plays
+   * the MIM film over WHIP with no overlay, so this page no longer shares a
+   * publisher (or its test pattern) with `/webrtc/` and `/llhls/`.
    */
-  let starting2 = false;
-  async function whileStarting(otherId, fn) {
-    if (starting2) return;
-    starting2 = true;
-    const other = d.button(otherId);
-    if (other) other.disabled = true;
-    try { await fn(); } finally {
-      starting2 = false;
-      if (other) other.disabled = false;
-    }
-  }
+  const holdShow = () => holdPublisher(() => {}, STAGE_PUB);
+  const showWhep = () => stageWhep();
+  const waitShow = (o = {}) => waitForWhip({ ...o, statusUrl: STAGE_PUB_STATUS });
 
-  /** Tear down whichever leg is carrying, so a switch never leaves two open. */
   /**
-   * 🔴 THE PUBLISHER HOLD SURVIVES A SWITCH. Closing it here dropped the
-   * container's viewer count to zero, stopped its ffmpeg legs, and the very
-   * next line asked it to wake again: the page then subscribed to an input
-   * whose publisher was still coming back up. **The hold is a reference count
-   * on the container, not a property of a transport**: both legs come from ONE
-   * container, so wanting either is wanting it awake. It is released when the
-   * show stops, which is `toggleTransport`'s business.
+   * Tear down the live picture, so a stop never leaves an element behind.
+   * 🔴 THE PUBLISHER HOLD IS NOT CLOSED HERE. It is a reference count on the
+   * container rather than a property of a picture, and it is released when the
+   * show stops, which is `toggleShow`'s business.
    */
   function dropTransport() {
-    if (hlsPlayer) { try { hlsPlayer.destroy(); } catch { /* already gone */ } hlsPlayer = null; }
-    if (hlsHold) { try { hlsHold.close(); } catch { /* already gone */ } hlsHold = null; }
-    // ⚠️ AND THE BADGE COMES BACK, on the HLS leg only. A recorded show has its
-    // own `stopped` handling and must not be overwritten here, so this is
-    // conditional on the phase rather than unconditional.
-    if (transport === 'hls' && phase === 'before') setBadges('offline');
     // ⚠️ NOTHING IS LEFT SHIMMERING. A pending state that outlives its wait is
     // a page claiming to be busy for ever, which is worse than no feedback.
-    pendTransport('hls', false);
     pendTransport('webrtc', false);
     // ⚠️ AND NOTHING HOLDS THE FINISHED ELEMENT. `audVideo` had five references
     // and no assignment back to null anywhere, which is what let a dead element
@@ -1763,162 +1719,45 @@
     audVideo = null;
   }
 
-  /**
-   * The HLS leg. Nothing here publishes: the container's RTMPS ffmpeg leg is
-   * what puts a picture on that input, and holding the socket is what wakes it.
-   * ⚠️ `createLowLatencyPlayer` AND NOT A BARE `new Hls()`. Its defaults are
-   * wrong in three directions for a live start and the file carries the
-   * measurements; see src/low-latency-player.js.
-   */
-  /**
-   * 🔴 hls.js IS FETCHED WHEN SOMEBODY ASKS FOR HLS, AND UNTIL 2026-09-25 IT
-   * WAS NEVER FETCHED AT ALL. `createLowLatencyPlayer` reads `window.Hls` and
-   * throws `HLS is not supported in this browser` without it, and this page
-   * loaded no such script, so `START HLS` was a button that threw. It went
-   * unseen because the same day's dead-handler defect meant nothing ever
-   * reached this function: two bugs in a row, the second hidden behind the
-   * first. MEASURED once the handler was wired: the harness's press took `no
-   * console errors` red with that exact message and this stack.
-   * ⚠️ IT IS NOT A `<script>` IN THE HEAD, WHICH IS WHAT `/llhls/` DOES. That
-   * file is **618 KB** and this page's other transport needs none of it, so a
-   * visitor who watches the show over WebRTC would be paying for a player
-   * nobody asked for. A visit fetches nothing here until a press.
-   * ⚠️ AND IT FAILS IN WORDS. A script tag that 404s fires `onerror` and
-   * nothing else, so without this the button would go back to doing nothing for
-   * a second reason.
-   */
-  async function needHls() {
-    if (window.Hls) return;
-    await new Promise((res, rej) => {
-      const s = el('script', '', '', { src: '/proto/remixer/hls.min.js' });
-      s.onload = res;
-      s.onerror = () => rej(new Error('hls.js did not load, so there is no HLS player'));
-      document.head.append(s);
-    });
-  }
-
-  async function startHls() {
-    dropTransport();
-    /**
-     * ⚠️ IT SAYS SO AND LEAVES THE PAGE ALONE, RATHER THAN THROWING OUT OF A
-     * CLICK HANDLER. `toggleTransport` has no catch around this, so a rejection
-     * here would escape into the listener as an unhandled error and the page
-     * would be left with a transport it thinks is starting. `startShow` already
-     * handles its own failure this way and this is the same contract.
-     */
-    try { await needHls(); } catch (err) {
-      d.log(`the HLS leg cannot start: ${err && err.message}`, 'bad');
-      return;
-    }
-    hlsHold = holdPublisher(() => {});
-    const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
-    v.muted = true;
-    armVideo(v);
-    audVideo = v;
-    // Straight to whichever tab the operator is on, not always the audience.
-    showPictureOn(showingTab());
-    hlsPlayer = createLowLatencyPlayer(v, llhls(), { preferNative: 'auto' });
-    transport = 'hls';
-    d.log('the audience is on low latency HLS', 'hi');
-    /**
-     * 🔴 THE BADGE MOVES ON THE HLS LEG TOO, AND IT NEVER DID. Reported
-     * 2026-09-25: *"when i push start hls i get no shimmer on button nor off
-     * air moves. is it gated?"* It is NOT gated. `startHls` built a player,
-     * logged a line and returned, and `setBadges` was called from the WebRTC
-     * path only, so a visitor pressing the one control that works everywhere
-     * got a page that said `OFF AIR` while a picture was on its way.
-     * ⚠️ AND THE SILENCE READ AS A DEAD BUTTON, which is exactly what the two
-     * controls on this bar HAD been for a day. A control with no feedback is
-     * indistinguishable from a control with nothing wired to it, and this page
-     * has now paid for that twice in one day: once in the handler, once here.
-     * ⚠️ `starting` FIRST, BECAUSE THE PUBLISHER HAS TO WAKE. The container is
-     * what puts a picture on that input and the wake is seconds of nothing.
-     * ⚠️ AND `online` BECAUSE FRAMES ARRIVED, NOT BECAUSE A PROMISE SETTLED,
-     * which is the same contract the WebRTC leg already states.
-     */
-    // ⚠️ `coming`, NOT `starting`. `presence.mjs` accepts exactly online,
-    // checking, coming, offline and unknown, and THROWS on anything else.
-    // MEASURED 2026-09-25: `starting` threw out of `setBadges` inside
-    // `startHls`, which `toggleTransport` does not catch, so pressing START HLS
-    // did nothing at all and said nothing either. The badge word the handoff
-    // records as `starting` is the transport bar's own badge, a different one.
-    setBadges('coming');
-    pendTransport('hls', true);
-    /**
-     * 🔴 A BADGE THAT GAVE UP WHILE A PICTURE WAS PLAYING. Reported 2026-09-25
-     * with a screenshot of the control room showing the test picture and the
-     * badge reading `CHECKING` underneath it. `waitForFirstFrame` resolves with
-     * `frames: false` on TIMEOUT, this leg passed 20000 ms, and the container's
-     * cold wake is of that order, so the wait expired a moment before the first
-     * frame landed and the page then said `checking` for ever about a picture
-     * anybody could see.
-     * ⚠️ SO THE TIMEOUT IS NOT THE FIX, AND RAISING IT WOULD ONLY MOVE THE
-     * RACE. The state has to be allowed to CHANGE AFTER the first answer: a
-     * wait that ran out is not evidence of an absence, it is the absence of
-     * evidence. This keeps looking, cheaply, and corrects itself the moment a
-     * frame exists.
-     * ⚠️ AND IT STOPS ON ITS OWN. A watcher that outlives its transport is a
-     * page reporting on something it is no longer doing, so it gives up when
-     * the leg changes, when the element is replaced, or after a bounded run.
-     */
-    const watchFrames = (el) => {
-      let ticks = 0;
-      const iv = setInterval(() => {
-        if (transport !== 'hls' || audVideo !== el || ++ticks > 120) { clearInterval(iv); return; }
-        if (el.videoWidth > 0 && el.readyState >= 2) {
-          clearInterval(iv);
-          setBadges('online');
-          pendTransport('hls', false);
-          d.log(`picture ${el.videoWidth}x${el.videoHeight} after the first wait ran out`, 'hi');
-        }
-      }, 500);
-    };
-    waitForFirstFrame(v, { timeoutMs: 20000 }).then((seen) => {
-      pendTransport('hls', false);
-      if (!seen.frames) watchFrames(v);
-      if (transport !== 'hls') return;   // switched away while we waited
-      setBadges(seen.frames ? 'online' : 'checking');
-      d.log(`picture ${seen.w}x${seen.h} by ${seen.how}`, seen.frames ? 'hi' : 'warn');
-    });
-  }
-
-  async function startWebrtc() {
-    dropTransport();
-    await startShow();
-    transport = 'webrtc';
-    d.log('the audience is on WebRTC', 'hi');
-  }
-
-  /**
-   * 🔴 ONE BUTTON PER TRANSPORT AND IT IS ITS OWN STOP. The running one ends
-   * the show; the other switches, because one input cannot serve both.
-   */
+  /** The one button reads what it will do next. */
   function paintTransport() {
-    for (const [id, name] of [['hls', 'HLS'], ['webrtc', 'WebRTC']]) {
-      const b = showBar?.extra(id);
-      if (!b) continue;
-      const on = transport === id;
-      b.textContent = on ? `Stop ${name}` : `Start ${name}`;
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    }
+    const b = showBar?.extra('webrtc');
+    if (!b) return;
+    const on = transport === 'webrtc';
+    b.textContent = on ? 'Stop WebRTC' : 'Start WebRTC';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 
+  /**
+   * 🔴 ONE BUTTON, AND IT IS ITS OWN STOP.
+   * ⚠️ `transport` IS SET ONLY WHEN THE SHOW REALLY WENT LIVE. It used to be set
+   * after `startShow` returned whatever happened inside it, so a start that
+   * failed left the button reading STOP over a show that did not exist, and
+   * the next press "stopped" nothing.
+   * ⚠️ AND THE BUTTON SHIMMERS WHILE IT STOPS, because a stop now uploads the
+   * recording and plays it back, which takes seconds a person should see.
+   */
   let switching = false;
-  async function toggleTransport(which) {
+  async function toggleShow() {
     if (switching) return;
     switching = true;
-    for (const id of ['hls', 'webrtc']) { const b = showBar?.extra(id); if (b) b.disabled = true; }
+    const b = showBar?.extra('webrtc');
+    if (b) b.disabled = true;
     try {
-      if (transport === which) {
+      if (transport === 'webrtc') {
+        pendTransport('webrtc', true);
         await stopShow(); dropTransport();
         if (hold) { try { hold.close(); } catch { /* gone */ } hold = null; }
         transport = null;
+      } else {
+        dropTransport();
+        await startShow();
+        if (phase === 'live') { transport = 'webrtc'; d.log('the audience is on WebRTC', 'hi'); }
       }
-      else if (which === 'hls') await startHls();
-      else await startWebrtc();
     } finally {
       switching = false;
-      for (const id of ['hls', 'webrtc']) { const b = showBar?.extra(id); if (b) b.disabled = false; }
+      pendTransport('webrtc', false);
+      if (b) b.disabled = false;
       paintTransport(); paintPlayRec();
     }
   }
@@ -2021,7 +1860,52 @@
     clearBtn.disabled = !(archiveMedia || QUESTIONS.length || T0 != null);
   }
   paintClear();
-  room.append(createGlue(showBar.el, roomStrip.el), clearBtn);
+
+  /**
+   * ── the recording's path: this browser, then R2, then playback ────────────
+   *
+   * 🔴 THE CHAIN IS SOMETHING A PERSON SEES, ONE ROW PER STAGE. Asked
+   * 2026-09-30: *"i want so see local storaage -> r2 -> playback"*. Every
+   * stage already happened, in the log, in words nobody reads during a show.
+   * Three rows under the timeline, in the order the bytes travel, each saying
+   * where the recording is and how big it is there.
+   * ⚠️ `grid`, SO THE THREE VALUES START ON ONE LINE whatever their labels'
+   * widths, which is what `createGlueRows({ grid })` is for.
+   * ⚠️ HIDDEN UNTIL A SHOW STARTS. Three rows saying nothing has happened are
+   * three rows of furniture on a visit, and a visit opens nothing.
+   * ⚠️ THE LOCAL ROW CHANGES EVERY 2 s WHILE A SHOW RUNS, which is a piece
+   * arriving rather than a clock, and its text is kept short enough that it
+   * does not wrap at 375 px, so the rows under it do not move.
+   */
+  const chain = createGlueRows({ grid: true, full: true, cls: 'stage-chain' });
+  /**
+   * ⚠️ HIDDEN ON A WRAPPER, NOT ON THE SURFACE. MEASURED 2026-09-30: `hidden`
+   * on the surface itself did nothing, because `.pos-rows.pos-rows-grid` sets
+   * `display: grid` at the same weight as `[hidden]` and later in `shell.css`,
+   * so three empty rows sat on the page at load. A kit rule to fix, not this
+   * page's; the wrapper is the page's way round it until then.
+   */
+  const chainBox = el('div', 'stage-chain-box');
+  chainBox.append(chain.el);
+  const chainV = {};
+  for (const [id, label] of [['local', 'local'], ['r2', 'R2'], ['play', 'playback']]) {
+    chainV[id] = el('span', 'stage-chain-v', '');
+    chain.row([el('div', 'panel-cap', label), chainV[id]], { align: 'start' });
+  }
+  chainBox.hidden = true;
+  /** Write one stage. A URL is a link, so the object a person is told about is one press away. */
+  function chainSay(id, text, href) {
+    const v = chainV[id];
+    v.textContent = text;
+    if (href) v.append(' ', el('a', '', href.replace(/^https?:\/\//, ''), { href, target: '_blank', rel: 'noopener' }));
+    chainBox.hidden = false;
+  }
+  function chainReset() {
+    for (const v of Object.values(chainV)) v.textContent = '';
+    chainBox.hidden = true;
+  }
+
+  room.append(createGlue(showBar.el, roomStrip.el), chainBox, clearBtn);
   paintTransport();
   paintPlayRec();
 
@@ -2160,24 +2044,6 @@
   setMuted(true);
 
   /**
-   * 🔴 THE DEFAULT IS AN IN-PAGE LOOPBACK AND IT IS A REAL WEBRTC HOP.
-   * `pcOut` and `pcIn` in this tab, negotiated against each other, so a track
-   * genuinely crosses a peer connection and comes back as a RECEIVED track.
-   * That matters beyond cost: the thing being proved downstream is that the
-   * recorder holds the RECEIVER's track, and a loopback that handed the local
-   * stream back would make that assert vacuous.
-   * ⚠️ IT IS `demo/show/index.html`'S TRICK AND IT IS ALREADY IN THE TREE.
-   * `plan-session` §7 calls it a deliberate determinism choice for the suite.
-   */
-
-  /** The real leg: out over WHIP, back over WHEP, with Cloudflare in the middle. */
-  async function cloudflare(stream, video) {
-    const pub = await whipPublish(stream, { log: d.log });
-    const sub = await whepPlay(whep(), video, { log: d.log });
-    return { pub, sub, kind: 'cloudflare' };
-  }
-
-  /**
    * 🔴 THE RECORDER TAKES THE TRACK THAT CAME BACK, NEVER THE CANVAS.
    * `plans/plan-stage-live.md` §4.1. What the audience saw is the RETURNED track; a
    * recording of the canvas is a recording of what we meant to send, and the
@@ -2246,6 +2112,113 @@
   const VIDEO_BPS = 700_000;
   const AUDIO_BPS = 96_000;
 
+  /**
+   * ── stage one: the recording lives in this browser ────────────────────────
+   *
+   * 🔴 IndexedDB, ONE RECORD PER PIECE, WRITTEN AS EACH PIECE ARRIVES. Asked
+   * 2026-09-30 as *"local storaage"*. Until then the pieces were an array in
+   * this tab's memory, which is local and is not storage: a reload lost the
+   * show, and nothing a person could open said it existed.
+   * ⚠️ WHY NOT OPFS: a `FileSystemWritableFileStream` commits on `close()`, so
+   * a file that grows every 2 s is either invisible until the show ends or
+   * closed and reopened every piece, which copies the whole file each time.
+   * The fast OPFS handle is worker-only. IndexedDB stores a Blob per record,
+   * commits each one on its own, and its size is the sum of what committed.
+   * ⚠️ WHAT IS UPLOADED IS READ BACK OUT OF IT, NOT TAKEN FROM MEMORY, so the
+   * chain on screen is the chain the bytes took. The memory copy stays as the
+   * fallback for a browser that refuses IndexedDB (a private window can), and
+   * the local row says which one it is.
+   * ⚠️ ONE SHOW IS KEPT, NEVER A PILE. A new show clears the store before it
+   * writes, and Clear clears it, so a visitor's disk holds at most the last
+   * recording. Nothing is opened, read or cleared on load.
+   */
+  const LOCAL_DB = 'positron-stage';
+  const LOCAL_STORE = 'pieces';
+  let localDb = null;                  // the IDBDatabase, or null when refused
+  let localWhere = null;               // 'IndexedDB' or 'memory', once a show starts
+  let localBytes = 0;                  // bytes that COMMITTED, not bytes handed over
+  let localPieces = 0;
+  let localChain = Promise.resolve();  // writes in order, so a read waits for all of them
+  const idbDone = (req) => new Promise((res, rej) => {
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error || new Error('IndexedDB refused'));
+  });
+  const txDone = (tx) => new Promise((res, rej) => {
+    tx.oncomplete = () => res();
+    tx.onerror = tx.onabort = () => rej(tx.error || new Error('IndexedDB transaction failed'));
+  });
+  async function openLocal() {
+    if (localDb) return localDb;
+    try {
+      const req = indexedDB.open(LOCAL_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(LOCAL_STORE, { autoIncrement: true });
+      localDb = await idbDone(req);
+    } catch (e) {
+      d.log(`IndexedDB refused (${e && e.message}), so the recording is kept in this tab's memory`, 'warn');
+      localDb = null;
+    }
+    return localDb;
+  }
+  async function localClear() {
+    localBytes = 0; localPieces = 0;
+    await localChain.catch(() => {});
+    localChain = Promise.resolve();
+    if (!localDb) return;
+    try {
+      const tx = localDb.transaction(LOCAL_STORE, 'readwrite');
+      tx.objectStore(LOCAL_STORE).clear();
+      await txDone(tx);
+    } catch { /* nothing to clear is the same answer */ }
+  }
+  function paintLocal() {
+    chainSay('local', `${localPieces} piece${localPieces === 1 ? '' : 's'}, `
+      + `${mib(localBytes)} in ${localWhere === 'IndexedDB' ? 'IndexedDB' : 'tab memory'}`);
+  }
+  /** Start a show's local copy: one store, emptied, and the row says where. */
+  async function localBegin() {
+    await openLocal();
+    await localClear();
+    localWhere = localDb ? 'IndexedDB' : 'memory';
+    paintLocal();
+  }
+  /** One piece in, committed before it is counted. */
+  function localPut(blob) {
+    localChain = localChain.then(async () => {
+      if (localWhere === 'IndexedDB' && localDb) {
+        try {
+          const tx = localDb.transaction(LOCAL_STORE, 'readwrite');
+          tx.objectStore(LOCAL_STORE).add(blob);
+          await txDone(tx);
+        } catch (e) {
+          // ⚠️ THE FALLBACK IS SAID, AND IT IS WHOLE: every piece is also in
+          // `chunks`, so switching mid show loses nothing.
+          localWhere = 'memory';
+          d.log(`IndexedDB stopped taking pieces (${e && e.message}), so the recording continues in memory`, 'warn');
+        }
+      }
+      localBytes += blob.size; localPieces++;
+      paintLocal();
+    });
+    return localChain;
+  }
+  /** The finished recording, read back out of where it was kept. */
+  async function localRead(mime) {
+    await localChain.catch(() => {});
+    if (localWhere === 'IndexedDB' && localDb) {
+      try {
+        const tx = localDb.transaction(LOCAL_STORE, 'readonly');
+        const parts = await idbDone(tx.objectStore(LOCAL_STORE).getAll());
+        if (parts.length === chunks.length) return new Blob(parts, { type: mime });
+        d.log(`IndexedDB holds ${parts.length} pieces against ${chunks.length} recorded, so the memory copy is used`, 'warn');
+      } catch (e) {
+        d.log(`IndexedDB would not give the recording back (${e && e.message}), so the memory copy is used`, 'warn');
+      }
+      localWhere = 'memory';
+    }
+    return new Blob(chunks, { type: mime });
+  }
+  const mib = (b) => `${(b / 1048576).toFixed(2)} MiB`;
+
   function startRecorder(track) {
     const mime = recorderMime(d);
     const stream = new MediaStream([track]);
@@ -2265,6 +2238,7 @@
       if (!e.data || !e.data.size) return;
       if (T0 == null) T0 = performance.now();
       chunks.push(e.data);
+      localPut(e.data);
     };
     r.start(SLICE_MS);
     /**
@@ -2323,6 +2297,10 @@
     for (const id of SHOWN_ON) byId.get(id).panel.slots.caption.textContent = '';
     T0 = null; recordedMs = null; stored = null; landed = null;
     recTrack = null; askedBps = null; recSource = 'received';
+    // ⚠️ AND THE LOCAL COPY GOES WITH IT, so a device keeps one recording at
+    // most, and the chain rows go back to hidden because there is no chain.
+    localClear();
+    chainReset();
     paintPlayRec();
     archiveDeck.setRange([0, SHOW_MS]);
     archiveDeck.seek(0);
@@ -2410,8 +2388,22 @@
       const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
       v.muted = true;
       armVideo(v);
-      if (!hold) hold = holdPublisher(() => {});
-      live = { pub: null, sub: await whepPlay(whep(), v, { log: d.log }), kind: 'receiver' };
+      if (!hold) hold = holdShow();
+      /**
+       * 🔴 WAIT FOR THE PUBLISHER BEFORE SUBSCRIBING, BECAUSE A COLD PRESS USED
+       * TO FAIL. The hold on the line above is what wakes the container, and a
+       * cold wake is about 22 s: `whepPlay` asked straight away, met a 409 for
+       * seven seconds of retries, and the show "did not start" for a person
+       * who had done nothing wrong. The page's own check already waited for
+       * this before pressing; the button now does what the check did.
+       * ⚠️ IT ALSO MATTERS TO THE HARNESS SINCE 2026-09-30, because with the
+       * HLS button gone this is control 0 and `demo/verify.mjs` presses it
+       * about a second after load, which is exactly the cold press.
+       */
+      const up = await waitShow({ timeoutMs: 60000 });
+      if (!up.ok) throw new Error(`the publisher did not come up in ${Math.round(up.waitedMs / 1000)} s`);
+      if (up.waitedMs > 3000) d.log(`the publisher came up after ${(up.waitedMs / 1000).toFixed(1)} s`, 'hi');
+      live = { pub: null, sub: await whepPlay(showWhep(), v, { log: d.log }), kind: 'receiver' };
 
       // The card goes, the picture arrives. One swap, at the moment there is
       // something true to show.
@@ -2497,6 +2489,10 @@
           + 'on a track that is still filling', 'warn');
       }
       if (!track) throw new Error('the WebRTC leg carried no video track');
+      await localBegin();
+      chainSay('r2', USE_R2 ? 'uploads when the show stops'
+        : 'off for this run (a harness run keeps the upload cap for people; ?r2=1 turns it on)');
+      chainSay('play', USE_R2 ? 'plays from R2 once it is there' : 'plays this browser\u2019s copy');
       rec = startRecorder(track);
       recTrack = track;
       followWriteHead();
@@ -2519,7 +2515,7 @@
    * carried `missing` since it was written and nothing has ever shown it, which
    * is the same shape as `/open` returning an expiry no demo displays.
    */
-  async function stopShow() {
+  async function stopShow({ upload = USE_R2 } = {}) {
     if (phase !== 'live') return;
     showDeck.pause();
     phase = 'stopped';
@@ -2539,35 +2535,114 @@
     setBadges('offline');
 
     const mime = chunks[0]?.type || 'video/webm';
-    const blob = new Blob(chunks, { type: mime });
-    d.log(`recorded ${(blob.size / 1048576).toFixed(2)} MiB in ${chunks.length} pieces`, 'hi');
+    /**
+     * 🔴 STAGE ONE ENDS: THE RECORDING IS READ BACK OUT OF WHERE IT WAS KEPT.
+     * The pieces were committed to IndexedDB as they arrived, and the file that
+     * goes to R2 is assembled from those records rather than from the array in
+     * memory, so the row that said where the recording lives was describing the
+     * bytes that actually travel.
+     */
+    const blob = await localRead(mime);
+    paintLocal();
+    d.log(`recorded ${mib(blob.size)} in ${chunks.length} pieces, read back out of `
+      + `${localWhere === 'IndexedDB' ? 'IndexedDB' : 'this tab\u2019s memory'}`, 'hi');
 
     /**
-     * ⚠️ THE ARCHIVE OPENS FROM THE LOCAL BLOB EITHER WAY. R2 is opt-in, and a
-     * page whose archive only worked with `?r2=1` would be a page whose default
-     * mode demonstrates nothing. What R2 adds is the claim that the bytes are
-     * somewhere else and readable, which is asserted separately.
+     * 🔴 STAGE TWO: R2, FOR A PERSON, WITH ITS PROGRESS ON SCREEN. See the note
+     * on `USE_R2` for why the harness skips it. "Uploaded" and "readable" are
+     * two claims, so a HEAD after the upload is what the R2 row reports, and
+     * its length has to be the length that left this browser.
+     * ⚠️ AND STAGE THREE PLAYS THE R2 URL ITSELF, NOT A BLOB MADE FROM IT. This
+     * used to fetch the object back into a Blob and play a `blob:` URL, which
+     * proved the bytes came from R2 and showed a person nothing of the sort.
+     * The element's `src` is the public object now, so the address on screen is
+     * the address playing. A refused or failed upload falls back to this
+     * browser's copy and the playback row says so.
      */
-    let src = URL.createObjectURL(blob);
-    // Kept so the NEXT run can revoke it. A blob URL holds its blob alive until
-    // it is revoked, and a page that records five shows would be holding five
-    // recordings in memory with four of them unreachable.
-    archiveUrl = src;
-    if (USE_R2) {
-      stored = await putWhole(blob, { log: d.log });
+    let src = null;
+    if (upload) {
+      /**
+       * ⚠️ A THROW HERE USED TO HANG THE STOP. MEASURED 2026-09-30: `/open`
+       * answered without a CORS header once, `fetch` threw, and the page sat
+       * on `opening an upload session` with the button disabled for good. A
+       * failed upload is a stage that failed, and playback falls back to the
+       * local copy and says so.
+       */
+      try { stored = await uploadToR2(blob); } catch (e) {
+        stored = null;
+        chainSay('r2', `the upload failed (${e && e.message}), so the recording stays in this browser`);
+        d.log(`the upload to R2 failed: ${e && e.message}`, 'bad');
+      }
       if (stored) {
         const head = await proveReadable(stored.url);
-        landed = { ok: head.ok, bytes: head.bytes, url: stored.url };
+        landed = { ok: head.ok, bytes: head.bytes, url: stored.url, key: stored.key, sent: blob.size };
+        chainSay('r2', head.ok
+          ? `${mib(head.bytes)} stored and served back, deleted in 6 h`
+          : `stored and not served back (HTTP ${head.status})`);
         d.log(head.ok
-          ? `R2 holds it and serves it back: ${head.bytes} bytes, gone in 6h`
+          ? `R2 holds it and serves it back: ${head.bytes} bytes at ${stored.key}, gone in 6h`
           : `R2 took it and will not serve it back (HTTP ${head.status})`,
         head.ok ? 'hi' : 'bad');
-        const back = await fetchBack(stored.url, mime, { log: d.log });
-        if (back) { URL.revokeObjectURL(archiveUrl); src = URL.createObjectURL(back); archiveUrl = src; }
+        if (head.ok) src = stored.url;
       }
+    }
+    if (!src) {
+      src = URL.createObjectURL(blob);
+      // Kept so the NEXT run can revoke it. A blob URL holds its blob alive
+      // until it is revoked, and a page that records five shows would be
+      // holding five recordings in memory with four of them unreachable.
+      archiveUrl = src;
     }
     await openArchive(src, mime);
     sayState();
+  }
+
+  /**
+   * One recording to R2 as ONE object, with the upload's progress on screen.
+   * ⚠️ IT IS `ingest.mjs`'s `putWhole` WITH AN `XMLHttpRequest` WHERE THE PUT
+   * WAS, because `fetch` reports no upload progress and a person asked to SEE
+   * this stage. Same session, same single segment, same close. The right home
+   * for it is an `onProgress` option on `putWhole`, which is a shared module
+   * and not this page's to change.
+   * @returns {Promise<{url: string, key: string, session: string, bytes: number}|null>}
+   */
+  async function uploadToR2(blob) {
+    chainSay('r2', 'opening an upload session');
+    const sess = await openSession({ log: d.log });
+    if (!sess) {
+      chainSay('r2', 'refused by the upload route (five sessions an hour per address), see the log');
+      return null;
+    }
+    if (blob.size > sess.limits.maxSegmentBytes) {
+      chainSay('r2', `${mib(blob.size)} is over the ${mib(sess.limits.maxSegmentBytes)} one upload may be`);
+      return null;
+    }
+    const put = await new Promise((res) => {
+      const x = new XMLHttpRequest();
+      x.open('PUT', `${INGEST}/seg/${sess.session}/0?fmt=webm`);
+      x.upload.onprogress = (e) => {
+        if (e.lengthComputable) chainSay('r2', `uploading ${Math.round((e.loaded / e.total) * 100)}% of ${mib(e.total)}`);
+      };
+      x.onload = () => {
+        let j = {};
+        try { j = JSON.parse(x.responseText); } catch { /* not json */ }
+        res({ ok: x.status >= 200 && x.status < 300, status: x.status, j });
+      };
+      x.onerror = () => res({ ok: false, status: 0, j: {} });
+      x.send(blob);
+    });
+    if (!put.ok || !put.j.key) {
+      chainSay('r2', `the upload was refused (HTTP ${put.status} ${put.j.error || ''})`);
+      return null;
+    }
+    const r = await fetch(`${INGEST}/close/${sess.session}?fmt=webm`, { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.base) {
+      chainSay('r2', `the upload would not close (HTTP ${r.status} ${j.error || ''})`);
+      return null;
+    }
+    const file = put.j.key.split('/').pop();
+    return { url: `${j.base}/${file}`, key: put.j.key, session: sess.session, bytes: blob.size };
   }
 
 
@@ -2599,6 +2674,12 @@
     },
     get questions() { return QUESTIONS.length; },
     get answers() { return ANSWERS.length; },
+    // The recording's path, as the three rows a person reads.
+    get chain() {
+      return { local: chainV.local.textContent, r2: chainV.r2.textContent, play: chainV.play.textContent,
+        where: localWhere, bytes: localBytes, pieces: localPieces, useR2: USE_R2,
+        playing: archiveMedia?.currentSrc || null };
+    },
     startShow, stopShow,
   };
 
@@ -2642,7 +2723,13 @@
     const v = el('video', 'stage-live', '', { playsinline: '', muted: '', preload: 'auto' });
     v.muted = true;
     armVideo(v);
+    const fromR2 = /^https?:/.test(src);
+    // ⚠️ `crossOrigin` BEFORE `src`, OR THE R2 COPY TAINTS EVERY CANVAS THE
+    // CHECKS DRAW IT INTO. The archive host answers `access-control-allow-origin:
+    // *`, and an element only asks for it when told to before it loads.
+    if (fromR2) v.crossOrigin = 'anonymous';
     v.src = src;
+    chainSay('play', fromR2 ? 'loading from R2' : 'loading this browser\u2019s copy');
     // The card goes and the real file takes its place. One swap, at the moment
     // there is something true to show.
     archive.panel.stage.textContent = '';
@@ -2650,7 +2737,11 @@
     playingBack = true;
 
     recordedMs = await resolveDuration(v);
-    if (recordedMs == null) {
+    // ⚠️ A ZERO IS NOT A LENGTH. `setRange([0, 0])` throws inside the deck, so
+    // a recording that resolves to nothing stops here rather than there.
+    if (!(recordedMs > 0)) {
+      recordedMs = null;
+      chainSay('play', 'the recording has no length that could be resolved');
       d.log('the recording has no duration that could be resolved, so there is nothing to scrub', 'bad');
       return null;
     }
@@ -2667,7 +2758,10 @@
     archiveMaster = mediaMaster(archiveDeck, v, { stallPolicy: 'hold' });
     archiveMedia = v;           // from here the bar and the strip drive the file
     paintPlayRec();
-    d.log(`the archive is playing ${(recordedMs / 1000).toFixed(1)}s back${USE_R2 ? ' from R2' : ''}`, 'hi');
+    if (fromR2) chainSay('play', `${(recordedMs / 1000).toFixed(1)} s from R2, press Play recording:`, src);
+    else chainSay('play', `${(recordedMs / 1000).toFixed(1)} s from this browser\u2019s copy, press Play recording`);
+    d.log(`the archive holds ${(recordedMs / 1000).toFixed(1)}s, playing from `
+      + `${fromR2 ? src : 'this browser\u2019s own copy'}`, 'hi');
     return { video: v, mime, ms: recordedMs };
   }
 
@@ -3078,15 +3172,15 @@
      * ⚠️ IT IS THE WHIP LEG AND NOT THE MANIFEST, because this page subscribes
      * over WHEP and those are two different Cloudflare inputs.
      */
-    if (!hold) hold = holdPublisher(() => {});
+    if (!hold) hold = holdShow();
     wokeAt = performance.now();
-    whipUp = waitForWhip({ timeoutMs: 60000 });
+    whipUp = waitShow({ timeoutMs: 60000 });
 
     /**
      * 🔴 READ FIRST, BEFORE ANY PRESS CAN HAVE HAPPENED, AND IT USED TO SIT
      * INSIDE THE DRILL. This is a claim about the page AT REST, and the drill
      * runs after `demo/verify.mjs` has already pressed `.tbar-x` control 0,
-     * which on this page is `START HLS`. While that button was inert the
+     * which on this page is `START WEBRTC`. While that button was inert the
      * distinction cost nothing; the moment it works, the harness's own press
      * puts a video in the audience panel and this assert would go red about a
      * page doing exactly what it promises.
@@ -3576,7 +3670,15 @@
           + `${wokeMs < 5000 ? 'so the container was already warm' : 'so this was a cold start'}`
         : `the container never reported a WHIP leg in ${wokeMs} ms, so nothing `
           + 'is publishing to the input this page subscribes to');
-    if (transport !== 'webrtc') showToggle?.click();
+    /**
+     * 🔴 THE HARNESS MAY ALREADY BE STARTING IT, AND SINCE 2026-09-30 IT
+     * USUALLY IS. `Start WebRTC` is control 0 now that `Start HLS` is gone, and
+     * `demo/verify.mjs` presses it about a second after load. So this waits
+     * for any start already in flight, and presses only if nothing got the
+     * show on air; a press while one is starting is ignored by `toggleShow`.
+     */
+    for (let i = 0; i < 400 && switching; i++) await new Promise((r) => setTimeout(r, 50));
+    if (phase !== 'live') showToggle?.click();
     // ⚠️ LONGER THAN THE FIRST-FRAME WAIT INSIDE `startShow`, DELIBERATELY.
     // Two waits for one event must be ordered, and the inner one is 12 s.
     // ⚠️ AND SHORTER THAN IT WAS, BECAUSE THE WAKE IS NO LONGER INSIDE IT. A
@@ -3938,6 +4040,23 @@
       `${chunks.length} pieces after 3.5s, recorder ${rec?.state ?? 'none'}`);
 
     /**
+     * 🔴 STAGE ONE OF THE CHAIN: THE RECORDING GROWS IN THIS BROWSER, AND THE
+     * ROW A PERSON READS SAYS SO. Committed pieces against recorded pieces and
+     * committed bytes against recorded bytes, because a store that took the
+     * first piece and dropped the rest would still hold "a recording".
+     * ⚠️ IT REQUIRES IndexedDB, NOT THE FALLBACK. The harness's Chrome has a
+     * real profile, so memory here would mean the store refused and the page
+     * quietly did the old thing.
+     */
+    await localChain.catch(() => {});
+    const memBytes = chunks.reduce((n, c) => n + c.size, 0);
+    A('the recording grows in this browser\u2019s IndexedDB while the show runs, and the row says so',
+      localWhere === 'IndexedDB' && localPieces >= 1 && localPieces === chunks.length
+        && localBytes === memBytes && !chainBox.hidden && /IndexedDB/.test(chainV.local.textContent),
+      `${localPieces} of ${chunks.length} pieces committed to ${localWhere}, ${localBytes} of `
+      + `${memBytes} bytes, and the row reads "${chainV.local.textContent}"`);
+
+    /**
      * ⚠️ THE RATE IS ASSERTED AS THE RECORDER'S OWN ANSWER, NOT AS THE NUMBER
      * THIS PAGE ASKED FOR. `videoBitsPerSecond` reads back what the browser will
      * actually use, so asserting it against the constant would be the page
@@ -3959,7 +4078,7 @@
      * before any of that, and the five asserts below it are all about the
      * archive: they would have read a page that had not finished stopping.
      */
-    await toggleTransport('webrtc');
+    await toggleShow();
     for (let i = 0; i < 300 && !(phase === 'stopped' && archiveMedia); i++) {
       await new Promise((r) => setTimeout(r, 50));
     }
@@ -3968,16 +4087,19 @@
       `the page is "${phase}" and the button reads "${showToggle?.textContent}"`);
 
     /**
-     * 5. R2, asserted in BOTH modes with one count. Without `?r2=1` the claim
-     * is that the page did not touch anybody's storage; with it, the claim is
-     * that the bytes are READABLE, which a HEAD answers and a 200 on the PUT
-     * does not.
+     * 5. STAGE TWO, R2, asserted in BOTH modes with one count. A harness run
+     * skips the upload (see `USE_R2`), and the claim is that it touched nobody's
+     * storage AND said so on screen, since a blank row reads as a stage that
+     * failed. With the upload, the claim is that the bytes are READABLE, which
+     * a HEAD answers and a 200 on the PUT does not, and that the length R2
+     * serves is the length that left this browser.
      */
-    A(USE_R2 ? 'the bytes are in R2 and R2 will serve them back'
-      : 'without ?r2=1 nothing was stored anywhere, and the page says so',
-    USE_R2 ? !!landed?.ok && landed.bytes > 0 : landed === null && stored === null,
-    USE_R2 ? `HEAD says ${landed?.bytes} bytes readable at ${landed?.url}`
-      : 'no session opened, no object written');
+    A(USE_R2 ? 'the recording that left this browser is in R2, byte for byte, and R2 serves it back'
+      : 'this run uploaded nothing, and the R2 row says it was skipped rather than staying blank',
+    USE_R2 ? !!landed?.ok && landed.bytes > 0 && landed.bytes === landed.sent
+      : landed === null && stored === null && /^off/.test(chainV.r2.textContent),
+    USE_R2 ? `HEAD says ${landed?.bytes} bytes at ${landed?.key}, against ${landed?.sent} sent`
+      : `no session opened, no object written, and the row reads "${chainV.r2.textContent}"`);
 
     /**
      * ⚠️ AND THE HANDOVER, WHICH IS THE OTHER HALF OF THE SAME CLAIM. A target
@@ -3996,6 +4118,20 @@
     A('the archive holds a recording with a duration that could be resolved',
       !!av && Number.isFinite(recordedMs) && recordedMs > 500,
       `${recordedMs == null ? 'no duration' : `${(recordedMs / 1000).toFixed(1)}s`} in the archive panel`);
+
+    /**
+     * 🔴 STAGE THREE: WHAT PLAYS IS WHAT THE ROW SAYS PLAYS. With the upload,
+     * the element's own `currentSrc` must be the R2 object and the row must
+     * link to that same address; without it, a `blob:` of this browser's copy
+     * and a row that says so. One assert in both modes.
+     */
+    const playing = av?.currentSrc || av?.src || '';
+    A(USE_R2 ? 'playback is the R2 object itself, and the playback row links to it'
+      : 'playback is this browser\u2019s own copy, and the playback row says so',
+    USE_R2
+      ? !!landed?.url && playing === landed.url && !!chainV.play.querySelector(`a[href="${landed.url}"]`)
+      : /^blob:/.test(playing) && /browser/.test(chainV.play.textContent),
+    `the archive element plays ${playing.slice(0, 96) || 'nothing'}, and the row reads "${chainV.play.textContent}"`);
 
     /**
      * 7. 🔴 THE PLAYHEAD MOVES THE PICTURE, AND THE BURNED CLOCK IS WHAT MAKES
@@ -4218,7 +4354,7 @@
         questions: QUESTIONS.length, answers: ANSWERS.length, options: OPTIONS.length,
         video: !!archive.panel.stage.querySelector('video'),
       };
-      await toggleTransport('webrtc');
+      await toggleShow();
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const polls = SHOWN_ON.filter((id) => byId.get(id).panel.slots.caption.children.length);
       const after = {
@@ -4252,19 +4388,22 @@
       // Put the page back where the drill found it rather than leaving a show
       // running behind every other check's back.
       /**
-       * 🔴 `stopShow()` AND NOT `toggleTransport()`, AND THE DIFFERENCE IS A
-       * BILL. This leaves `transport` at `webrtc`, so the two buttons read
-       * `STOP`, and `demo/verify.mjs`'s remaining `.tbar-x` presses land after
-       * this drill has finished. A press that says STOP stops a show that has
-       * already been stopped and CLOSES the publisher hold. Calling
-       * `toggleTransport` here would set `transport` back to null, the buttons
-       * would read `START`, and that same trailing press would put a show on a
-       * Cloudflare live input with every check already collected and nothing
-       * watching it until Chrome exits. **Leaving the page in its stopped state
-       * is what makes the harness's last press a release rather than a
-       * purchase.**
+       * 🔴 STOPPED AND RELEASED HERE, BECAUSE NO PRESS COMES AFTER THIS ANY
+       * MORE. With two transport buttons the harness's trailing press on the
+       * second one was a STOP that closed the publisher hold, and this line
+       * left the page in a state where that press released rather than
+       * bought a show. With one button there is no trailing transport press
+       * (the only later one is `Play recording`), so the drill lets go of the
+       * container itself.
+       * ⚠️ `upload: false`: this second show exists to prove a new run clears
+       * the old one, and a run with `?r2=1` must not spend a second of an
+       * address's five hourly upload sessions on it.
        */
-      await stopShow();
+      await stopShow({ upload: false });
+      dropTransport();
+      if (hold) { try { hold.close(); } catch { /* gone */ } hold = null; }
+      transport = null;
+      paintTransport();
       // ⚠️ AND THE FILM TOO, WHICH IS NEW AND IS THE COST OF INDEPENDENCE.
       // `stopShow` used to stop the picture as a side effect; it does not any
       // more, so a run that did not do this would leave a 22 minute film
@@ -4346,66 +4485,50 @@
    * picture reached them is the operator's question, and both panels that carry
    * it are the operator's.
    */
+  /**
+   * 🔴 REDRAWN 2026-09-30 FOR ONE TRANSPORT AND A RECORDING THAT TRAVELS.
+   * It still drew a canvas publishing over WHIP, which this page stopped doing
+   * on 2026-09-25 when it became a pure receiver, and an audience box choosing
+   * between WebRTC and HLS. The container publishes now, and the control
+   * room's three parts are the three stages a person watches: the recorder,
+   * the local copy, and the playback.
+   * ⚠️ `join: false` ON THE CONTROL ROOM, WITH ITS ONE REAL ARROW DECLARED.
+   * The default would draw an arrow from IndexedDB to playback, and playback
+   * comes from R2, not from the local copy, except in a harness run.
+   */
   const DIAGRAM_SPEC = {
-    caption: 'A picture arrives on one of two transports, and a question is timed against whichever one it came on.',
+    caption: 'The show arrives over WebRTC, and its recording goes from this browser to R2 and back.',
     nodes: [
-      { id: 'ctrl', label: 'Browser', sub: 'control room', kind: 'here', tech: 'browser',
+      { id: 'ctrl', label: 'Browser', sub: 'control room', kind: 'here', tech: 'browser', join: false,
         children: [
-          { id: 'canvas', label: 'canvas', sub: '720p, 25fps',
-            note: 'The picture the show is made of, drawn here and captured as a '
-                + '**MediaStream**. It carries a MIMproject recording with its own play '
-                + 'and stop, fetched only once one of them is pressed.' },
           { id: 'recorder', label: 'MediaRecorder', sub: '700k, 2s',
-            note: 'Records the track that came BACK, never the canvas. What the audience '
-                + 'saw is the returned track, and recording the source would make the '
-                + 'archive a better picture than the show.' },
+            note: 'Records the picture this control room receives over WHEP from Stream, the '
+                + 'same one the audience sees, in 2 s pieces.' },
+          { id: 'idb', label: 'IndexedDB', sub: 'this device',
+            note: 'Each piece is committed here as it arrives, so the local copy grows '
+                + 'while the show runs. One show is kept at a time, and Clear removes it.' },
+          { id: 'playback', label: 'playback', sub: 'from R2',
+            note: 'Plays the R2 object by its own public URL, with Play recording. A harness '
+                + 'run skips the upload and plays the local copy instead.' },
         ] },
       /**
-       * 🔴 ONE CLOUDFLARE MACHINE WITH THREE THINGS IN IT. Asked 2026-09-18 with
-       * a screenshot: *"put these 3 to cloudflare box"*. They were three
-       * top-level boxes, which drew them as three separate machines and left the
-       * page's one real division, here against there, spread over five columns.
-       * ⚠️ **ARROWHEADS BETWEEN THEM, NOT BRACKETS. ASKED ON SIGHT, 2026-09-18:**
-       * *"need arrows"*, against a screenshot of the bracket ties. `set: true`
-       * was tried here first on the argument that Stream, R2 and the relay do
-       * not feed each other, and that argument lost to the one CLAUDE.md already
-       * records: a headless tie between two boxes reads as a head that fell off,
-       * which has been reported twice on other pages. The default is an arrow.
-       * ⚠️ AND A CONTAINER TAKES NO `note`. The old `cf` box had one and it has
-       * moved onto `Stream`, which is the box that actually does that.
+       * 🔴 ONE CLOUDFLARE MACHINE WITH ITS PARTS IN IT. Asked 2026-09-18 with a
+       * screenshot: *"put these 3 to cloudflare box"*, and arrows between them
+       * rather than brackets (*"need arrows"*). The publisher is the fourth
+       * part since the page became a pure receiver.
        */
-      // ⚠️ A `sub` AND NO `note`. Asked 2026-09-18: *"add desc under cloudflare
-      // title"*. A container says what KIND of machine it is and the rule against
-      // a note on one is untouched: three services on one account, which is the
-      // fact the three boxes underneath do not state for themselves.
       { id: 'cf', label: 'Cloudflare', sub: 'one account', kind: 'cloud', tech: 'cloudflare',
         children: [
-          /**
-           * 🔴 THE TWO PROTOCOL NAMES LIVE HERE NOW, NOT ON THE ARROWS. Asked
-           * 2026-09-18: *"rm whip/whep from connector labels use webrtc. explain
-           * whip and whep in descs"*. An arrow's label is what TRAVELS, and what
-           * travels on all three of those is WebRTC; WHIP and WHEP are the two
-           * handshakes that set it up, which is a fact about this box.
-           */
+          { id: 'pub', label: 'Publisher', sub: 'container',
+            note: 'An ffmpeg in a container publishes the show over **WHIP** while somebody '
+                + 'holds its socket. Pressing Start holds it, and a cold wake takes about 22 s.' },
           { id: 'stream', label: 'Stream', sub: 'WebRTC',
-            note: 'Takes the picture in over **WHIP** and hands it back out over **WHEP**, '
-                + 'which are the publish and subscribe handshakes for one WebRTC connection. '
-                + 'It records nothing, which is why the control room has to.' },
-          // Named in full, asked for as `'R2 storage'` on 2026-09-18. `Stream`
-          // and `Relay object` both say what they are in the box; `R2` alone was
-          // an account-page abbreviation next to two things that read as words.
+            note: 'Takes the picture in over **WHIP** and hands it out over **WHEP**, which are '
+                + 'the publish and subscribe handshakes for one WebRTC connection. It records '
+                + 'nothing, which is why the control room has to.' },
           { id: 'r2', label: 'R2 storage', sub: '24MiB, 6h',
-            note: 'Holds the finished recording, and nothing else: no question and no answer '
-                + 'is ever written here. The archive tab reads it straight back out, and a '
-                + 'HEAD after the upload is what proves it can be.' },
-          /**
-           * ⚠️ THE `sub` NAMES THE TECHNOLOGY, LIKE ITS NEIGHBOURS. Asked
-           * 2026-09-18: *"see other diagrams. its webrtc or smth"*, against a
-           * sub reading `one room`. A sub says what KIND of thing a box is, and
-           * `Stream` beside it says `WebRTC`: a count of rooms is a property of
-           * this deployment rather than an answer to what the box is. The count
-           * moved into the note, which is where a fact with a number goes.
-           */
+            note: 'Holds the finished recording as one object, uploaded when the show stops. A '
+                + 'HEAD afterwards is what proves it is readable, and it is deleted after 6 hours.' },
           /**
            * 🔴 THE NOTE SAYS WHY THE QUESTION IS NOT IN THE VIDEO, BECAUSE THAT
            * IS THE ONE THING A READER ASSUMES AND IT IS WRONG. Asked 2026-09-25:
@@ -4417,95 +4540,38 @@
                 + 'in-band metadata**, so a question buried in the video would reach nobody.' },
         ] },
       /**
-       * 🔴 THE AUDIENCE IS A MACHINE WITH PARTS TOO. Asked 2026-09-18:
-       * *"audience broser is also boxes-inside-box"*. It was one box against the
-       * control room's two, which drew the two ends of the same page as two
-       * different kinds of thing. What it holds is exactly what the ask is
-       * about: a picture that arrives, and an answer that leaves.
        * 🔴 `join: false`, SO NOTHING IS DRAWN BETWEEN THEM. Asked on sight
-       * 2026-09-18: *"why video has arrow to answer"*, and the answer is that it
-       * should not: a picture arriving does not produce a press. This is the
-       * case CLAUDE.md names for the flag in as many words, about `/keys/`,
-       * where a browser holds a keyboard and a playout and a line between them
-       * adds no fact. The Browser's own box already says they are two parts of
-       * one page, and an arrow claims a direction the drawing cannot support.
+       * 2026-09-18: *"why video has arrow to answer"*: a picture arriving does
+       * not produce a press.
        */
       { id: 'aud', label: 'Browser', sub: 'audience', kind: 'here', tech: 'browser', join: false,
         children: [
-          { id: 'screen', label: 'video', sub: 'one transport',
-            note: 'WebRTC or low latency HLS, never both at once. Before a show starts there '
-                + 'is no video element here at all, only a card saying one is coming.' },
-          /**
-           * 🔴 THE WHOLE POINT OF THE PAGE GOT NO BOX UNTIL 2026-09-25. The
-           * question arrives on the relay in milliseconds and the PICTURE does
-           * not, so WHEN to show it is a decision, and it is a different
-           * decision per transport. That is the thing a reader most needs and
-           * the drawing said nothing about it.
-           */
-          { id: 'cue', label: 'when to ask', sub: 'per transport',
-            note: 'The question arrives at once and the picture does not. On **WebRTC** it is '
-                + 'shown straight away; on **HLS** it waits out this viewer\u2019s own latency, '
-                + 'so everybody is asked at the same moment of the show.' },
+          { id: 'screen', label: 'video', sub: 'WebRTC',
+            note: 'The show over WHEP. A question is shown the moment it arrives, because on '
+                + 'WebRTC the picture is only a fraction of a second behind it.' },
           { id: 'answer', label: 'answer', sub: 'one press',
-            note: 'One press per person, sent the moment it is made rather than gathered up '
-                + 'at the end. The control room times it on arrival, so an answer lands on '
-                + 'the recording where it really happened.' },
+            note: 'One press per person, sent the moment it is made. The control room times it '
+                + 'on arrival, so an answer lands on the recording where it really happened.' },
         ] },
     ],
     links: [
-      { from: 'canvas', to: 'stream', label: 'WebRTC',
-        note: 'The canvas is captured as a MediaStream and published over WHIP. Nothing '
-            + 'here is a file: the picture exists only as long as it is being sent.' },
       { from: 'stream', to: 'screen', label: 'WebRTC',
-        note: 'What the audience subscribes to over WHEP. It is the same connection the '
-            + 'control room publishes, handed back out.' },
-      /**
-       * 🔴 THIS ARROW IS THE PAGE'S WHOLE POINT AND IT HAS BEEN ASKED ABOUT
-       * TWICE: *"these wertc/arhive lower connectors are impossible to follow"*,
-       * then *"why webrtc goes back to control room"*. It stays, because what it
-       * says is the design: the recorder records the track that came BACK, so
-       * the archive is what the audience actually saw rather than a cleaner copy
-       * of the source. A note is what was missing, not the line.
-       */
-      { from: 'stream', to: 'recorder', label: 'WebRTC', back: true,
-        note: 'The returning track, subscribed to by the control room itself. Recording the '
-            + 'canvas instead would make the archive a better picture than the show was.' },
-      { from: 'recorder', to: 'r2', label: 'one webm',
-        note: 'The finished recording, written once when the show stops rather than streamed '
-            + 'while it runs. Without ?r2=1 nothing is stored at all.' },
-      /**
-       * 🔴 NO `archive` RETURN ARROW. Reported 2026-09-18 against a screenshot:
-       * *"these wertc/arhive lower connectors are impossible to follow"*. Three
-       * return paths were stacked in lanes under the whole picture, and two of
-       * them ran the full width, so following any one of them meant tracing a
-       * line past four boxes it had nothing to do with.
-       * ⚠️ **THE ONE THAT WENT IS THE ONE THE PICTURE COULD AFFORD TO LOSE.**
-       * `recorder -> R2` already says the recording is stored there, so an arrow
-       * back to the control room adds only that the page reads its own file
-       * again, which is a sentence in R2's note rather than a fact worth a line
-       * across the drawing. The two that stayed each carry something no other
-       * arrow says: the recorder records what came BACK, and an answer travels
-       * to the relay and not to R2.
-       */
+        note: 'What the audience subscribes to over WHEP.' },
+      { from: 'recorder', to: 'idb',
+        note: 'A 2 s piece at a time, each committed before it is counted.' },
+      { from: 'idb', to: 'r2', label: 'one webm',
+        note: 'Read back out of IndexedDB when the show stops and uploaded as one object, '
+            + 'with its progress on screen.' },
+      { from: 'r2', to: 'playback', label: 'https', back: true,
+        note: 'The element plays the R2 URL itself, so the address on screen is the one '
+            + 'playing.' },
       { from: 'ctrl', to: 'relay', label: 'questions',
         note: 'One question at a time, repeated every 2s so somebody arriving late sees the '
             + 'current one rather than nothing.' },
       { from: 'relay', to: 'screen', label: 'questions',
-        note: 'The question and its options, which the audience page draws as buttons under '
-            + 'the picture.' },
-      /**
-       * 🔴 ANSWERS GO TO THE RELAY AND NOWHERE NEAR R2. Reported 2026-09-18:
-       * *"anwsers do not go into r2!"*, and the reading was right off the
-       * picture: the return path was routed up through R2's box to reach the
-       * relay above it, so the only arrowhead anybody could see went into R2.
-       * ⚠️ IT IS A ROUTING FIX RATHER THAN A WIRING ONE. The link always said
-       * `to: 'relay'`; what was wrong was the lane it was drawn in. Naming the
-       * answer's own box as the source keeps it inside the audience machine and
-       * out of the column the recording occupies.
-       */
+        note: 'The question and its options, drawn as buttons over the picture.' },
       { from: 'answer', to: 'relay', label: 'answers', back: true,
-        note: 'One press, sent immediately. The control room stamps it on arrival, so it '
-            + 'lands on the recording where it really happened.' },
+        note: 'One press, sent immediately, and nowhere near R2.' },
     ],
   };
   /**

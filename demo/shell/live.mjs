@@ -39,6 +39,19 @@ export const WHEP_UID = '224558e8993d5a5efd234d9d3a320f87';   // "whep-rig"
 export const whep = () =>
   `https://${LIVE.customer}.cloudflarestream.com/${WHEP_UID}/webRTC/play`;
 
+/**
+ * /stage/'s OWN WebRTC input, fed the MIM film by its own container instance
+ * (held at wss://pub.positron.studio/stage/watch). Filled in from the
+ * `STAGE_UID=` line `src/provision-stage.sh` prints. While it is null the
+ * input does not exist and `stageWhep()` answers null rather than a URL.
+ */
+export const STAGE_UID = 'c8c838fed78bb43aa588d92ab92bd25f';   // "positron-stage"
+export const STAGE_PUB = 'wss://pub.positron.studio/stage/watch';
+export const STAGE_PUB_STATUS = 'https://pub.positron.studio/stage/status';
+export const stageWhep = () => (STAGE_UID
+  ? `https://${LIVE.customer}.cloudflarestream.com/${STAGE_UID}/webRTC/play`
+  : null);
+
 export const lifecycle = () =>
   `https://${LIVE.customer}.cloudflarestream.com/${LIVE.uid}/lifecycle`;
 
@@ -46,8 +59,8 @@ export const lifecycle = () =>
  * Hold the publisher up for as long as the page is open. The socket IS the
  * reference count: dropping it is how the container learns nobody is watching.
  */
-export function holdPublisher(onState) {
-  const ws = new WebSocket(LIVE.pub);
+export function holdPublisher(onState, url = LIVE.pub) {
+  const ws = new WebSocket(url);
   ws.onopen = () => onState?.({ held: true });
   ws.onclose = () => onState?.({ held: false });
   ws.onerror = () => onState?.({ held: false, error: true });
@@ -111,7 +124,7 @@ export function watchPresentedFps(video, onRate, everyMs = 1000) {
  * was about to play input B, so it asked for WHEP before the WHIP handshake had
  * finished and got a 409. The publisher's own status is the right signal.
  */
-export async function waitForWhip({ timeoutMs = 90000, onTick, signal } = {}) {
+export async function waitForWhip({ timeoutMs = 90000, onTick, signal, statusUrl = LIVE.pubStatus } = {}) {
   const t0 = Date.now();
   const ac = new AbortController();
   const stop = () => ac.abort();
@@ -125,7 +138,7 @@ export async function waitForWhip({ timeoutMs = 90000, onTick, signal } = {}) {
   signal?.addEventListener('abort', stop, { once: true });
   while (Date.now() - t0 < timeoutMs && !ac.signal.aborted) {
     try {
-      const s = await (await fetch(LIVE.pubStatus, { cache: 'no-store', signal: ac.signal })).json();
+      const s = await (await fetch(statusUrl, { cache: 'no-store', signal: ac.signal })).json();
       if (s?.container?.whip?.publishing) {
         removeEventListener('pagehide', stop);
         return { ok: true, waitedMs: Date.now() - t0 };
@@ -440,4 +453,96 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
   }
   if (waited) log(`attached after ${(waited / 1000).toFixed(1)} s of waiting for the publish to go live`, 'hi');
   return res;
+}
+
+/**
+ * A CAMERA ONTO THE LL-HLS INPUT, through the Pub Durable Object and the
+ * container, with the key never leaving the worker. plans/plan-cam-llhls.md.
+ *
+ *   page MediaRecorder (H.264 in WebM, 2 s keyframes, 100 ms slices)
+ *     -> wss://pub.positron.studio/cam -> one POST per chunk into the container
+ *     -> ffmpeg -c:v copy to RTMPS -> the SAME input `llhls()` plays
+ *
+ * 🔴 IT BORROWS THE TEST PATTERN'S INPUT, so it only gets it while nobody holds
+ * `/watch`, and a viewer arriving takes it back. Both arrive here as a state,
+ * with the worker's own words, and a page shows them rather than a black box.
+ * ⚠️ RECORDING STARTS ON `ready`, NEVER BEFORE. The first chunk carries the
+ * WebM header, and a header that reaches the container before ffmpeg exists
+ * is a stream ffmpeg can never start.
+ * ⚠️ WEBM ON CHROME, NOT MP4, EVEN THOUGH FLV LOOKS MORE LIKE MP4. MEASURED in
+ * the plan: Chrome's fragmented MP4 ignores the slice and waits for a whole
+ * 2 s GOP. The MP4 arm is for Safari and its cadence is NOT measured.
+ *
+ * onState({ t, why }): t is one of
+ *   ready     the container is publishing what this records
+ *   busy      refused, with the worker's reason (a viewer holds the input)
+ *   taken     a viewer arrived and took the input back
+ *   stopped   the worker ended it (idle, length cap, Stream stopped taking bytes)
+ *   closed    the socket closed with nothing said
+ *   unsupported  this browser cannot record H.264
+ */
+export const CAM_PROXY = 'wss://pub.positron.studio/cam';
+
+export function camFormat() {
+  if (typeof MediaRecorder === 'undefined') return null;
+  if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) return { fmt: 'webm', mimeType: 'video/webm;codecs=h264' };
+  if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01F')) return { fmt: 'mp4', mimeType: 'video/mp4;codecs=avc1.42E01F' };
+  return null;
+}
+
+export function camPublish(stream, { url = CAM_PROXY, log = () => {}, onState = () => {}, sliceMs = 100, bitrate = 2_500_000 } = {}) {
+  const f = camFormat();
+  const st = { t: 'opening', sid: null, chunks: 0, bytes: 0, readyAt: null, why: null };
+  let rec = null, ws = null, done = false;
+  const say = (t, why) => {
+    if (done && t !== 'closed') return;
+    st.t = t; st.why = why || null;
+    onState({ t, why: st.why, sid: st.sid });
+  };
+  const halt = () => {
+    try { if (rec && rec.state !== 'inactive') rec.stop(); } catch { /* gone */ }
+    rec = null;
+  };
+  if (!f) {
+    queueMicrotask(() => say('unsupported', 'this browser cannot record H.264, which the LL-HLS input needs without a server encode'));
+    return { state: st, stop: () => {} };
+  }
+  ws = new WebSocket(url);
+  ws.binaryType = 'arraybuffer';
+  ws.onmessage = (e) => {
+    let m = {};
+    try { m = JSON.parse(e.data); } catch { return; }
+    if (m.t === 'hello') {
+      st.sid = m.sid;
+      ws.send(JSON.stringify({ t: 'open', fmt: f.fmt }));
+      log(`asked the publisher for the input (${f.fmt})`);
+    } else if (m.t === 'ready') {
+      st.readyAt = performance.now();
+      rec = new MediaRecorder(stream, { mimeType: f.mimeType, videoBitsPerSecond: bitrate, videoKeyFrameIntervalDuration: 2000 });
+      rec.ondataavailable = (ev) => {
+        if (!ev.data?.size || ws.readyState !== 1) return;
+        st.chunks++; st.bytes += ev.data.size;
+        ws.send(ev.data);
+      };
+      rec.start(sliceMs);
+      say('ready');
+    } else if (m.t === 'busy' || m.t === 'taken' || m.t === 'stopped') {
+      halt();
+      say(m.t, m.error || m.why);
+      done = true;
+    }
+  };
+  ws.onclose = (e) => {
+    halt();
+    if (!done) { done = true; say('closed', e.reason || `the socket closed (${e.code})`); }
+  };
+  ws.onerror = () => { /* onclose follows and says it */ };
+  return {
+    state: st,
+    stop() {
+      done = true;
+      halt();
+      try { ws.close(1000, 'camera off'); } catch { /* gone */ }
+    },
+  };
 }
