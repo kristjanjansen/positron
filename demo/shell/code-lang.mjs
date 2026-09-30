@@ -287,6 +287,30 @@ export function render(src, language, { hueOf = () => null, active = null } = {}
     if (params.length && p.from < params[params.length - 1].to) continue;
     params.push(p);
   }
+  /* 🔴 THE VARIABLE A KNOB'S CONTROL IS BOUND TO WEARS THE KNOB'S HUE, AND SO
+     DOES EVERY USE OF IT. Asked 2026-09-30 with a crop of `/fau/`'s Sweep:
+     *"cutoff var should be blue"*. `cutoff = hslider(...)` coloured only the
+     quoted label, so `min(cutoff, ...)` three lines down, which is where the
+     knob actually acts, read as any other name. The binding is read off the
+     control's own line (`name = ` right before it, which is Faust's
+     definition and sclang's `var name = `); an argument is its own name.
+     Only a bare identifier token is matched, so `cutoffs`, a comment and a
+     string are never coloured. */
+  const bound = new Map();
+  for (const p of params) {
+    const hue = hueOf(p.name);
+    if (!(typeof hue === 'number' && Number.isFinite(hue))) continue;
+    if (p.kind === 'arg') { bound.set(p.name, { name: p.name, hue }); continue; }
+    const lineStart = src.lastIndexOf('\n', p.from - 1) + 1;
+    const m = /(?:^|[^\w.])([A-Za-z_]\w*)\s*=\s*$/.exec(src.slice(lineStart, p.from));
+    // ⚠️ ONLY WHEN IT IS THE ONLY CONTROL IN THAT DEFINITION. `q = hslider("a",
+    // ...) + hslider("b", ...)` makes `q` neither `a` nor `b`, and colouring it
+    // as the first would put one knob's ink on a mix of two.
+    const semi = src.indexOf(';', p.to);
+    const end = semi < 0 ? src.length : semi;
+    const alone = !params.some((o) => o !== p && o.from >= lineStart && o.from < end);
+    if (m && alone) bound.set(m[1], { name: p.name, hue });
+  }
   const cuts = new Set();
   for (const p of params) for (const k of [p.from, p.to, p.nameFrom, p.nameTo]) cuts.add(k);
   const pieces = [];
@@ -318,6 +342,12 @@ export function render(src, language, { hueOf = () => null, active = null } = {}
     const isName = open && t.from >= open.nameFrom && t.to <= open.nameTo;
     const kind = lang.lineKind && t.type && t.type !== 'comment' ? kindAt(t.from) : null;
     const cls = [t.type && tokenClass(t.type), isName && 'pos-tk-pname', kind && `pos-ln-${kind}`].filter(Boolean).join(' ');
+    const v = !t.type && !isName ? bound.get(src.slice(t.from, t.to)) : null;
+    if (v) {
+      html += `<span class="pos-tk-pvar" data-param="${esc(v.name)}" data-hue="${v.hue}" style="--param-hue:${v.hue}"`
+        + (active?.has(v.name) ? ' data-active="1"' : '') + `>${txt}</span>`;
+      continue;
+    }
     html += cls ? `<span class="${cls}">${txt}</span>` : txt;
   }
   if (open) html += '</span>';
