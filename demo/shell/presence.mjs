@@ -690,8 +690,13 @@ export function createPresence({
  * handed to `createPresence`. Returns the presence api with `el` being the
  * BUTTON, plus `badge` for the element inside it.
  */
-export function createPresenceButton({ of = '', press = () => {}, aria = '', ...rest } = {}) {
-  const badge = createPresence({ of, mode: 'badge', ...rest });
+export function createPresenceButton({ of = '', press = () => {}, aria = '', badge: given = null, ...rest } = {}) {
+  /* ⚠️ `badge` WRAPS A BADGE SOMEBODY ELSE ALREADY DRIVES, added 2026-09-30 for
+     `/away/`: *"listen + online is same button"*. That page's badge belongs to
+     `createBoard`, which moves it from the board's own messages, and a second
+     badge built here would be a second copy of one fact that could disagree
+     with the first. Omitted, this builds its own exactly as before. */
+  const badge = given || createPresence({ of, mode: 'badge', ...rest });
   const b = document.createElement('button');
   b.type = 'button';
   /* ⚠️ SECONDARY, NOT PRIMARY. Asked 2026-09-21: *"secodard button for

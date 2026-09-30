@@ -33,6 +33,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
+  import { createPresenceButton } from '/shell/presence.mjs';
 
   const q = new URLSearchParams(location.search);
   const INPUT = q.get('input') || 'circuit';
@@ -48,10 +49,13 @@
   const d = mount({
     name: 'away',
     what: 'Play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives.',
-    readout: { playing: '', level: 'dBFS', clipped: '', buffer: 'ms' },
-    controls: [
-      { id: 'listen', label: 'Listen', primary: true },
-    ],
+    readout: { level: 'dBFS', clipped: '', buffer: 'ms', lag: 'ms' },
+    // 🔴 LISTEN AND ONLINE ARE ONE BUTTON, asked 2026-09-30: *"listen + online
+    // is same button"*. The kit's presence button, wearing the badge
+    // `createBoard` already drives, so the face says whether the board is
+    // there and a press starts or stops listening. Built below, once the board
+    // exists, and appended to the control row where the harness presses.
+    controls: [],
   });
   guard(d);
 
@@ -60,10 +64,14 @@
     relay: q.get('relay') || undefined,
     of: 'Raspberry Pi',
     showName: false,
-    // The Circuit plays patterns and nobody here is pressing keys, so a
-    // cushion that never runs dry is worth more than the 60 ms it costs.
-    cushionMs: 160,
-    maxCushionMs: 400,
+    // 🔴 80 ms, DOWN FROM 160, BECAUSE THE LUMPS ARE GONE. MEASURED 2026-09-30:
+    // with arecord at its default 125 ms period the frames arrived in bursts
+    // (p90 gap 117 ms) and 160 was what rode them; at a 10 ms period the gaps
+    // read p50 19.9, p90 23.2, max 94.5. The playout raises its own floor when
+    // it runs dry, up to `maxCushionMs`, so a start that is too low costs one
+    // click and then corrects itself.
+    cushionMs: 80,
+    maxCushionMs: 250,
     log: (line, kind) => d.log(line, kind),
     onOpen: () => { d.log(`joined ${ROOM}`, 'hi'); askStatus(); },
     onPcm: (f32) => take(f32),
@@ -72,11 +80,24 @@
     },
   });
 
+  const listenBtn = createPresenceButton({
+    badge: board.presence,
+    aria: 'start or stop listening to the Circuit',
+    press: () => pressListen(),
+  });
+  // `data-busy` by hand, because this is not a declared control: verify.mjs
+  // waits on that mark before it reads the page, the same as on /cam/.
+  async function pressListen() {
+    const b = listenBtn.el;
+    b.dataset.busy = '1';
+    try { await d.run('listen'); } finally { delete b.dataset.busy; }
+  }
+  listenBtn.el.title = 'press to listen';
+  d.controls.append(listenBtn.el);
+  d.controls.hidden = false;
+
   // ── the picture ───────────────────────────────────────────────────────────
-  // The presence badge first, then the waveform: the fact about the source
-  // leads, the way it does in every footer in the kit.
   const host = el('div', 'away-pic');
-  host.append(board.presence.el);
   d.stack.add(host);
   const wave = createWaveView(host, { height: 160, label: `the last ${SECONDS} seconds from the board` });
 
@@ -105,7 +126,10 @@
     const out = { ch: part.ch, note: part.note ?? key };
     noteOff(key);
     sounding.set(key, out);
-    if (board.send({ type: 'midi.send', bytes: [0x90 | (out.ch - 1), out.note, Math.max(1, Math.min(127, vel))] })) notesSent++;
+    if (board.send({ type: 'midi.send', bytes: [0x90 | (out.ch - 1), out.note, Math.max(1, Math.min(127, vel))] })) {
+      notesSent++;
+      if (!pending) pending = { t0: performance.now(), base: recentRms(200) };
+    }
   }
   function noteOff(key) {
     const out = sounding.get(key);
@@ -167,6 +191,46 @@
   })();
   addEventListener('pagehide', () => panic());
 
+  // ── lag: key press to sound ──────────────────────────────────────────────
+  //
+  // 🔴 MEASURED ON THE SOUND, NOT ADDED UP FROM PARTS. Asked 2026-09-30:
+  // *"show lag"*. A press stamps the clock and remembers how loud the last
+  // 200 ms were; the first frame that comes back at least twice that loud (and
+  // above a floor) is the note arriving. Its arrival time plus the cushion the
+  // playout is holding is when it leaves the speakers, which is what a player
+  // feels. Adding a ping to a buffer would be a number about the pipe, not
+  // about this note.
+  // ⚠️ OVER A LOUD LOOP IT CAN MISS OR MISFIRE, and it says so rather than
+  // guessing: a Circuit pattern already playing can hide a quiet note or land
+  // its own beat inside the window. No onset in `ONSET_WAIT_MS` leaves the cell
+  // alone and says why in the log.
+  const ONSET_WAIT_MS = 1500;
+  const ONSET_FLOOR = 0.01;
+  const isOnset = (frameRms, baseRms) => frameRms > Math.max(ONSET_FLOOR, baseRms * 2);
+  let pending = null, lags = [];
+  function recentRms(ms) {
+    const n = Math.min(ring.length, Math.round(RATE * ms / 1000));
+    let ss = 0;
+    for (let i = 1; i <= n; i++) { const v = ring[(head - i + ring.length) % ring.length]; ss += v * v; }
+    return Math.sqrt(ss / n);
+  }
+  function watchOnset(f32) {
+    if (!pending) return;
+    const now = performance.now();
+    if (now - pending.t0 > ONSET_WAIT_MS) {
+      pending = null;
+      d.log(`no onset heard within ${ONSET_WAIT_MS} ms of that note, so no lag was measured. Is Listen on, and is the part audible over the pattern?`, 'dim');
+      return;
+    }
+    let ss = 0;
+    for (let i = 0; i < f32.length; i++) ss += f32[i] * f32[i];
+    if (!isOnset(Math.sqrt(ss / f32.length), pending.base)) return;
+    const lag = Math.round(now - pending.t0 + (board.ctx() ? board.stats().bufferedMs : 0));
+    pending = null;
+    lags.push(lag);
+    d.set('lag', lag);
+  }
+
   // ── the ring the picture reads ────────────────────────────────────────────
   const ring = new Float32Array(SECONDS * RATE);
   const ordered = new Float32Array(ring.length);
@@ -175,6 +239,7 @@
 
   function take(f32) {
     frames++;
+    watchOnset(f32);
     for (let i = 0; i < f32.length; i++) {
       const v = f32[i];
       ring[head] = v;
@@ -209,8 +274,13 @@
   requestAnimationFrame(redraw);
 
   // ── what the board says it is playing ────────────────────────────────────
+  // What the board is capturing goes in the log when it changes, not in a
+  // cell: asked 2026-09-30, *"rm playing from readout"*.
+  let saidSource;
   function showSource(s) {
-    d.set('playing', s ? s : 'nothing', s ? 'ok' : 'warn');
+    if (s === saidSource) return;
+    saidSource = s;
+    d.log(s ? `the board is capturing ${s}` : 'the board is capturing nothing. Press Listen to start it', s ? 'hi' : 'dim');
   }
 
   async function askStatus() {
@@ -242,14 +312,16 @@
     if (!listening) {
       listening = true;
       if (out) { try { out.connect(ctx.destination); } catch { /* already connected */ } }
-      d.button('listen').textContent = 'Mute';
+      listenBtn.el.dataset.on = '1';
+      listenBtn.el.title = 'listening. Press to mute';
       await want();
       renew = setInterval(want, RENEW_MS);
     } else {
       listening = false;
       clearInterval(renew); renew = null;
       if (out) { try { out.disconnect(ctx.destination); } catch { /* already off */ } }
-      d.button('listen').textContent = 'Listen';
+      delete listenBtn.el.dataset.on;
+      listenBtn.el.title = 'press to listen';
       d.log('muted. The board stops capturing a minute after the last listener');
     }
   });
@@ -272,6 +344,10 @@
     part = was;
     d.assert('Drums 2 plays note 62 on channel 10 from any key', drum?.ch === 10 && drum?.note === 62, JSON.stringify(drum));
     d.assert('a key released after the part changed ends its own note', !sounding.has(70));
+    // The onset rule, on made-up levels: a note out of quiet counts, the same
+    // level as before does not, and a whisper under the floor does not.
+    d.assert('lag starts at a sound twice as loud as the moment before it',
+      isOnset(0.2, 0.05) && !isOnset(0.2, 0.2) && !isOnset(0.008, 0.001));
     d.assert('the four parts are Synth 1, Synth 2, Drums 1 and Drums 2',
       JSON.stringify(Object.values(PARTS).map((p) => [p.ch, p.note ?? null])) === '[[1,null],[2,null],[10,60],[10,62]]');
     const t0 = performance.now();
@@ -290,8 +366,7 @@
 </script>
 <style>
   /* The badge sits above the picture with the kit's own control gap. */
-  .away-pic { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ctl-gap); }
-  .away-pic > .pos-wave { align-self: stretch; }
+  .away-pic > .pos-wave { width: 100%; }
   .away-play { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); }
 </style>
 </html>
