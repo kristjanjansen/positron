@@ -6,8 +6,8 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
-<!-- No page rules. The panel, the field, the keys and the compile note are the
-     kit's, laid out the way `/fau/` lays them out. -->
+<!-- No page rules. The panel, the scope, the field, the keys and the compile
+     note are all the kit's. -->
 
 <script type="module">
   /**
@@ -54,14 +54,23 @@
    * 🔴 A RECOMPILE DOES NOT CUT A HELD NOTE, SO THE IDLE COMPILE NEVER WAITS.
    * `/fau/` hands `compile-idle.mjs` a `notNow` because its recompile builds a
    * new worklet node and forgets every key. Here a compile is a new DEFINITION
-   * under a new name (`collide_1`, `collide_2`, ...): a synth already sounding
-   * keeps the graph it was started with and still answers its own `gate`, and
-   * only the next key uses the new one. So `notNow` is left at its default.
-   * ⚠️ A NEW NAME EVERY TIME, AND NOT FOR TIDINESS. Replacing a definition in
-   * place while a synth is running it is a question about scsynth's internals
-   * that nobody here has measured; a fresh name never asks it. The old ones are
-   * freed with `/d_free` once no node is using them, counted off the server's
-   * own `/n_end`.
+   * sent under the one name `collide`: a synth already sounding keeps the graph
+   * it was started with and still answers its own `gate`, and only the next key
+   * uses the new one. So `notNow` is left at its default.
+   * ✅ ONE NAME SINCE 2026-09-30, BECAUSE scsynth ALREADY DOES THE BOOKKEEPING.
+   * This page used a new name per compile (`collide_1`, `collide_2`, ...) and
+   * freed the old ones itself off `/n_end`, because replacing a definition
+   * under a running synth had never been measured. READ in
+   * `server/scsynth/SC_GraphDef.cpp` at commit 19954900: `GraphDef_Define`
+   * takes the old definition out of the table and decrements its `mRefCount`,
+   * every running synth holds one reference (`Graph_Ctor` increments it in
+   * `SC_Graph.cpp`), and `Graph_Dtor` frees the definition when the last synth
+   * on it ends. MEASURED on this engine the same day: a sine on `x` read
+   * 0.0707 rms before and 0.0707 after a filtered saw was sent as `x`, still
+   * answered `/n_set freq 880`, which the new program does not have, and a new
+   * `/s_new x` ran the saw beside it (6 UGens, then 13 with both). So the
+   * page's own copy of that reference counting went, and the checks below
+   * grade the property on every run.
    *
    * ── A KEY, AND LETTING IT GO ────────────────────────────────────────────────
    *
@@ -82,6 +91,7 @@
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createPicker } from '/shell/picker.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
   import { readSynthDef } from '/shell/synthdef.mjs';
@@ -133,7 +143,7 @@
     // Fired and not awaited: `resume()` waits on a gesture and never rejects.
     ctx.resume?.();
     booting = bootScsynth({ audioContext: ctx, log: d.log, onReply: heard })
-      .then((e) => { eng = e; startMidi(); return e; })
+      .then((e) => { eng = e; startMidi(); watch(); return e; })
       .catch((e) => { d.log(`SuperCollider did not start: ${e?.message || e}`, 'bad'); booting = null; throw e; });
     return booting;
   }
@@ -141,19 +151,13 @@
   // ── what the server says about its nodes ────────────────────────────────────
   //
   // `bootScsynth` sends `/notify 1`, so every node start and end comes back.
-  // `/n_end` is consumed here: it is what frees an old definition, and what a
-  // check reads to know a note has really finished rather than gone quiet.
-  const liveOn = new Map();       // node id -> the definition it runs
+  // `/n_end` is consumed here: it is what a check reads to know a note has
+  // really finished rather than gone quiet. Freeing a replaced definition is
+  // the server's own job, see the header.
   const ended = new Set();
   function heard(m) {
     if (m[0] !== '/n_end') return false;
-    const id = m[1];
-    ended.add(id);
-    const def = liveOn.get(id);
-    liveOn.delete(id);
-    if (def && def !== current?.name && ![...liveOn.values()].includes(def)) {
-      eng?.send('/d_free', def);
-    }
+    ended.add(m[1]);
     return true;
   }
 
@@ -167,7 +171,8 @@
     return run;
   }
 
-  let compiles = 0;
+  /** The one name every compile is sent under. See the header. */
+  const DEF = 'collide';
   /** The last program that compiled. What a key plays, and what reaches the engine. */
   let good = null;
   /** The last one the ENGINE took, which is the one `/s_new` names. */
@@ -180,7 +185,7 @@
    */
   async function build(code, label = 'typing') {
     const t0 = performance.now();
-    const r = compile(code, { name: `collide_${++compiles}` });
+    const r = compile(code, { name: DEF });
     const ms = performance.now() - t0;
     setCell('compile', ms.toFixed(2));
     if (!r.ok) {
@@ -212,10 +217,8 @@
       d.log(`SuperCollider did not take it: ${got ? got.slice(2).join(' ') : 'no answer'}`, 'bad');
       return { ok: false, error: 'the server did not take it' };
     }
-    const was = current;
     current = r;
     setCell('load', ms.toFixed(0));
-    if (was && ![...liveOn.values()].includes(was.name)) eng.send('/d_free', was.name);
     return { ok: true, ms };
   }
 
@@ -260,7 +263,6 @@
     const args = ['freq', mtof(note)];
     if (current.gate) args.push('gate', 1);
     eng.send('/s_new', current.name, id, 0, 0, ...args);
-    liveOn.set(id, current.name);
     held.set(note, { id, def: current });
     return id;
   }
@@ -376,10 +378,41 @@
     compile: () => serial(() => build(source.value(), picked >= 0 ? PRESETS[picked].label : 'typing')),
   });
 
+  // ── the picture: what the engine is sending to the speakers ─────────────────
+  //
+  // 🔴 THE KIT'S SCROLLING SCOPE, FED THE WAY `/radio/` FEEDS IT: one read of
+  // the engine's own meter a frame, `scope.feed(samples, rate)`. The meter is
+  // `scsynth.mjs`'s AnalyserNode, which sits IN the path to the speakers, so
+  // the picture is what is heard and not what the page meant to play. Asked
+  // for on 2026-09-30 as a live scope; nothing new was built for it.
+  // ⚠️ `fullScale: 0.5` LOCKS THE HEIGHT TO A LEVEL, which is `grain-scope`'s
+  // own argument for a stream: normalised, a quiet note and a loud chord would
+  // draw the same height. MEASURED the same day, a single note of any preset
+  // peaks at 0.05 to 0.19 and a four note chord at 0.27 to 0.67, so half scale
+  // keeps a chord on the picture and a note visible.
+  // ⚠️ IT DRAWS NOTHING UNTIL THE ENGINE EXISTS, because a visit starts no
+  // sound device. It is fed from the first touch.
+  const scope = createGrainScope(el('div'), { seconds: 3, height: 72, fullScale: 0.5 });
+  let watching = false;
+  function watch() {
+    if (watching) return;
+    watching = true;
+    const buf = new Float32Array(eng.meter.fftSize);
+    const tick = () => {
+      eng.meter.getFloatTimeDomainData(buf);
+      scope.feed(buf, ctx.sampleRate);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
   // ── the page ────────────────────────────────────────────────────────────────
 
+  /* The scope is the picture row, edge to edge, and the text is a row of its
+     own under it with no inset, so the program still runs to both edges. */
   const panel = createInstrumentPanel({
-    viz: source.el,
+    viz: scope.el,
+    rows: [[[source.el], { pad: false }]],
     keys: keys.el,
     plate: { name: 'COLLIDE', patch },
   });
@@ -425,8 +458,9 @@
             note: 'The format sclang writes and **scsynth** reads: constants, controls and a list '
                 + 'of **UGens**, each wired only to the ones before it.' },
           { id: 'scs', label: 'scsynth', sub: 'wasm, AudioWorklet', tech: 'sound',
-            note: 'SuperCollider\'s own server, the **SuperSonic** build, the same engine `/grains/` '
-                + 'runs. It answers **/done** to a definition, and a key starts a synth with **/s_new**.' },
+            note: 'SuperCollider\'s own server, the **SuperSonic** build, the same engine '
+                + '**positron.studio/grains** runs. It answers **/done** to a definition, and a key '
+                + 'starts a synth with **/s_new**.' },
           { id: 'spk', label: 'speakers', sub: 'or a phone', tech: 'device',
             note: 'One channel goes to both, and a two element array is left and right.' },
         ] },
@@ -438,8 +472,8 @@
         note: 'Operators run left to right with no precedence, as in SuperCollider, so '
             + '**1 + 2 * 3** is 9.' },
       { from: 'def', to: 'scs',
-        note: 'Sent with **/d_recv** under a new name each time, so a note already sounding keeps '
-            + 'the graph it started with.' },
+        note: 'Sent with **/d_recv** under one name, and **scsynth** keeps the old graph for a '
+            + 'note already sounding until that note ends.' },
       { from: 'scs', to: 'spk',
         note: '**Out.ar(0, ...)** is added round the last line, which is why a program here never '
             + 'writes one.' },
@@ -459,6 +493,18 @@
       await sleep(50);
     }
     return Math.sqrt(sum / n);
+  }
+  /** Pixels on the scope's canvas brighter than its ground: the wave, measured off the screen. */
+  function ink() {
+    const c = scope.canvas;
+    if (!c.width || !c.height) return 0;
+    const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const g = [px[0], px[1], px[2]];
+    let n = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (Math.abs(px[i] - g[0]) + Math.abs(px[i + 1] - g[1]) + Math.abs(px[i + 2] - g[2]) > 24) n++;
+    }
+    return n;
   }
   const waitEnd = async (id, ms) => {
     const t = performance.now();
@@ -483,8 +529,15 @@
         && d.api.readout.synthdef === String(good.bytes.length),
       good ? `${good.name}, ${good.bytes.length} B, the cell reads ${d.api.readout.synthdef}` : 'nothing compiled');
     d.assert('the readout is four cells, which is an even count', Object.keys(d.api.readout).length === 4);
-    d.assert('the panel is a picture, keys and a foot, in that order',
-      panel.shape().join(' ') === 'viz keys plate', panel.shape().join(' '));
+    d.assert('the panel is the scope, the text, the keys and a foot, in that order',
+      panel.shape().join(' ') === 'viz controls keys plate' && panel.viz.contains(scope.el)
+        && panel.controls()[0].contains(source.el),
+      panel.shape().join(' '));
+    /* 🔴 THE NEGATIVE HALF OF THE SCOPE CHECK, AND IT HAS TO COME FIRST: a
+       picture that is painted whatever it is fed would pass "a note draws on
+       it" below. With no engine there is nothing to draw. */
+    d.assert('a visit draws nothing on the scope, because nothing is playing',
+      scope.canvas.width > 0 && ink() === 0, `${ink()} lit pixels on a ${scope.canvas.width} px canvas`);
     d.assert('the compile note sits in the text box, is not a button and is a status',
       source.el.contains(idle.el) && idle.el.tagName !== 'BUTTON' && idle.el.getAttribute('role') === 'status'
         && !source.el.querySelector('button'),
@@ -525,32 +578,37 @@
     d.assert('with nothing playing, the meter on the engine\'s output reads silence',
       silent === 0, silent.toFixed(6));
 
-    /* ⚠️ ONE ASSERT PER STEP, AND THE PAD'S RELEASE IS SPLIT IN TWO. The
-       harness stops collecting after 2.0 s with no new assert, and the Pad's
-       release is 1.5 s on top of its hold, so a single assert at the end of
-       each preset lost everything after the first one on the first run here
-       (13 asserts, green, and the three presets never graded). */
+    /* ⚠️ ONE ASSERT PER STEP, AND EVERY RELEASE IS SPLIT IN TWO. The harness
+       stops collecting after 2.0 s with no new assert, and the longest release
+       here is 1.5 s on top of its hold, so a single assert at the end of each
+       preset lost everything after the first one on the first run here (13
+       asserts, green, and the presets never graded). Every preset is held
+       350 ms, let go, heard 200 ms later still sounding and quieter, and then
+       heard to end by itself: the owner's rule for these patches is that the
+       key opens and closes them. */
     for (const [i, p] of PRESETS.entries()) {
       if (i > 0) await applyPatch(i);
       const s = await eng.status();
       const id = sound(60);
-      await sleep(p.id === 'pad' ? 450 : 30);
-      const loud = await level(p.id === 'hat' ? 1 : 3);
+      await sleep(350);
+      const loud = await level(3);
       d.assert(`${p.label}: the server took it and a key makes a sound`,
-        current.name === good.name && loud > 0.001,
-        `${current.name}, ${s?.defs} definitions loaded, ${loud.toFixed(4)} rms`);
-      lift(60);
-      if (p.id === 'pad') {
-        /* Letting go CLOSES THE GATE rather than cutting the note: 300 ms in,
-           the synth is still alive and still sounding, quieter. A page that
-           sent `/n_free` would fail this and pass everything else. */
-        await sleep(300);
-        const fading = await level(2);
-        d.assert('Pad: letting go closes the gate, so 300 ms later it is still sounding, quieter',
-          !ended.has(id) && fading > 0.0005 && fading < loud,
-          `${fading.toFixed(4)} rms against ${loud.toFixed(4)} held, ${ended.has(id) ? 'already ended' : 'still alive'}`);
+        current.name === good.name && current.bytes === good.bytes && loud > 0.001,
+        `${s?.defs} definition loaded, ${loud.toFixed(4)} rms`);
+      if (i === 0) {
+        /* The scope is fed from the engine's own meter, so a held note is ink. */
+        d.assert('and the scope above the text draws it', ink() > 0, `${ink()} lit pixels`);
       }
-      const done = await waitEnd(id, 3000);
+      lift(60);
+      /* Letting go CLOSES THE GATE rather than cutting the note: 200 ms in, the
+         synth is still alive and still sounding, quieter. A page that sent
+         `/n_free` would fail this and pass everything else. */
+      await sleep(200);
+      const fading = await level(2);
+      d.assert(`${p.label}: letting go closes the gate, so 200 ms later it is still sounding, quieter`,
+        !ended.has(id) && fading > 0.0003 && fading < loud,
+        `${fading.toFixed(4)} rms against ${loud.toFixed(4)} held, ${ended.has(id) ? 'already ended' : 'still alive'}`);
+      const done = await waitEnd(id, 2500);
       /* The analyser holds the last 46 ms, which can still be the tail of the
          release the server just finished, so the silence is read after it. */
       await sleep(100);
@@ -568,18 +626,29 @@
     sound(69);
     await sleep(120);
     const at1 = await level();
+    d.assert('mul: multiplies: amp 0.1 reads 0.0707 rms',
+      Math.abs(at1 - 0.1 / Math.SQRT2) < 0.007, `${at1.toFixed(4)} at 0.1`);
+    /* 🔴 REPLACING THE DEFINITION UNDER A SOUNDING NOTE, graded on every run.
+       The next program is sent under the same name while the tone plays. The
+       tone must keep its level, and must still answer `amp`, which the new
+       program does not have: if the node had moved to the new graph, amp 0
+       would change nothing and it would go on reading 0.1414. */
+    typeInto('{ SinOsc.ar(440, 0, 0.05 + 0.05 * 2) }');
+    await idle.settled();
+    const kept = await level();
+    d.assert('a new program under the same name leaves the sounding note on its old graph, at the same level',
+      !ended.has(tone) && current.name === DEF && Math.abs(kept - at1) < 0.007,
+      `${kept.toFixed(4)} against ${at1.toFixed(4)} before, ${ended.has(tone) ? 'ended' : 'still alive'}`);
     eng.send('/n_set', tone, 'amp', 0);
     await sleep(150);
     const at0 = await level();
     eng.send('/n_free', tone);
     held.delete(69);
-    d.assert('mul: multiplies: amp 0.1 reads 0.0707 rms and amp 0 reads silence',
-      Math.abs(at1 - 0.1 / Math.SQRT2) < 0.007 && at0 < 1e-4,
-      `${at1.toFixed(4)} at 0.1, ${at0.toFixed(6)} at 0`);
+    d.assert('and that note still answers amp, which the new program has not got: amp 0 reads silence',
+      at0 < 1e-4, `${at0.toFixed(6)} at 0`);
     /* Left to right: 0.05 + 0.05 * 2 is 0.2 in SuperCollider and 0.15 with
-       ordinary precedence, and the difference is audible: 0.1414 against 0.1061. */
-    typeInto('{ SinOsc.ar(440, 0, 0.05 + 0.05 * 2) }');
-    await idle.settled();
+       ordinary precedence, and the difference is audible: 0.1414 against 0.1061.
+       It is already the program on the server, from the check above. */
     const lr = nextNode;
     sound(69);
     await sleep(120);

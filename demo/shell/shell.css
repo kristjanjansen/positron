@@ -548,6 +548,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
    nothing until this existed — the row stayed on screen while the page said it
+  /* 🔴 FOUR CELLS ARE TWO AND TWO ON A PHONE, NEVER THREE AND ONE. MEASURED
+     2026-09-30 on /collide/, and the same on /knobs/ and /away/: at 375 px
+     the content is 343 px, three `96px` bases fit, and the fourth sat alone
+     on a row of its own. The row rule above counts nothing, it only wraps.
+     ⚠️ ONLY FOUR, ON PURPOSE: six already wrap three and three, five three
+     and two, and a blanket half width would turn a three cell readout into
+     two and one, which is the same defect made new. */
+  .pos-readout:not([data-rows]):has(> :nth-child(4):last-child) > * { flex-basis: calc(50% - 1px); }
    was hidden */
 
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
