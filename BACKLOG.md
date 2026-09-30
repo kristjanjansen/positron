@@ -1,5 +1,17 @@
 ## Open
 
+### Done 2026-09-30: the dynamic knobs on the kit's knob grid
+
+ASKED, VERBATIM: *"use knob grid on those dynamic knobs and deploy"*. `param-knobs.mjs` lays its knobs (and the empty row's hidden knob) on `createControlGrid`, one row of up to four at `/knobs/`' gap, the old lattice destroyed on each rebuild. Found on the way: the lattice measures before it is attached, so it is re-measured after `set()`; and the arc's `.12s` stroke fade made a hued knob draw yellow for a beat on every compile, so a param knob's arc has no fade. ⚠️ Five or more knobs would wrap to a second row and change the row's height.
+
+### Done 2026-09-30: code colours, the knob's variable in its hue, the rest toned down, keywords not blue
+
+ASKED, VERBATIM, with a crop of `/fau/`'s Sweep: *"cutoff var should be blue"*, *"can you tone down other code a bit"*, *"import process effect they are all same blue"*. The variable a knob's control is bound to (`cutoff = hslider(...)`, `var rel = \rel.kr(...)`, an argument's own name) and every later use take the knob's hue; the other token colours lose chroma; keywords leave blue, which was `--code-kw` #7fb6e8 against the first knob hue 205.
+
+### Done 2026-09-30: knobs on every patch where one makes sense
+
+ASKED, VERBATIM: *"add knobs to all patches what mak sense"*. `/collide/` (Pad has `rel`; Growl, Wah none) and `/fau/` (Sweep has `cutoff`; the others none, and library instruments' built-in sliders are not typed in the box).
+
 ### Done 2026-09-30: the knobs under the code get invisible hands, a fixed-height row, and their code's colour
 
 ASKED, VERBATIM: *"add invisible hands to these cutoff buttons. make the area h for thise buttons fixed so no junmp. colorcode buttons and code"*. On `/collide/` and `/fau/`'s param knob row (`demo/shell/param-knobs.mjs`): each knob gets the kit knob's invisible hand (the `⇄` on the ring's lower edge, as on `/knobs/`, and it must drive the same path a turn does: `/n_set` or `setParamValue`); the row keeps one height whether it holds 0 or N knobs, so switching presets or recompiling never moves the keys; and the knob and its snippet share one hue, which the wiring agent is already doing. Handed to that agent.

@@ -337,8 +337,13 @@
    * IT, MEASURED RATHER THAN ASSUMED: the Organ source went 761 B to 765 B and
    * 14 lines to 18, and this compiled to 7,266 B before and after. Comments and
    * blank lines are gone by the time libfaust generates anything.
+   * ⚠️ 8,440 SINCE 2026-09-30, WHEN THE ORGAN GAINED THREE SLIDERS (`oct`,
+   * `quint`, `rel`, on *"add knobs to all patches what mak sense"*). That is a
+   * change to the instrument, so the fingerprint moved with it; the old source
+   * still compiles to 7,266 B under the vendored compiler in node, which is
+   * how the new figure was taken.
    */
-  const PINNED = { name: 'fau_pin', bytes: 7266 };
+  const PINNED = { name: 'fau_pin', bytes: 8440 };
 
   /**
    * ⚠️ EIGHT VOICES, WHICH IS A CHOICE ABOUT MEMORY RATHER THAN ABOUT MUSIC.
@@ -406,19 +411,25 @@
       id: 'organ',
       label: 'Organ',
       what: 'three partials and an envelope, which is the one to edit first',
-      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
+      code: `import("stdfaust.lib");   // brings in os, en and si, used below
 
 freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
 gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
 gate = button("gate");                         // 1 while a key is held down
 
+// the knobs: how loud the octave and the twelfth are, and the release
+
+oct   = hslider("oct", 0.5, 0, 0.6, 0.01) : si.polySmooth(gate, 0.999, 1);
+quint = hslider("quint", 0.25, 0, 0.5, 0.01) : si.polySmooth(gate, 0.999, 1);
+rel   = hslider("rel[scale:log]", 0.35, 0.02, 3, 0.01);
+
 // attack, decay, sustain, release. Seconds, except the 0.7 which is a level
 
-env  = en.adsr(0.005, 0.12, 0.7, 0.35, gate);
+env  = en.adsr(0.005, 0.12, 0.7, rel, gate);
 
-// three sine partials: the note, its octave, and its twelfth, each quieter
+// three sine partials: the note, its octave, and its twelfth
 
-tone = os.osc(freq) + 0.5 * os.osc(freq * 2) + 0.25 * os.osc(freq * 3);
+tone = os.osc(freq) + oct * os.osc(freq * 2) + quint * os.osc(freq * 3);
 
 // what you hear. <: splits one signal into the two the speakers want
 
@@ -436,11 +447,16 @@ effect  = _, _;   // runs once after the mixer. _ is a wire that changes nothing
       id: 'rhodes',
       label: 'Rhodes',
       what: 'a tine, a body and a carrier they both bend, which is the DX7 electric piano',
-      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
+      code: `import("stdfaust.lib");   // brings in os, en and si, used below
 
 freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
 gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
 gate = button("gate");                         // 1 while a key is held down
+
+// the knobs: how far the tine and the body bend the note, and how long it rings
+
+index = hslider("index", 0.02, 0, 1, 0.01) : si.polySmooth(gate, 0.999, 1);
+decay = hslider("decay[scale:log]", 1.4, 0.3, 4, 0.01);
 
 // the tine: 14 times the note, gone in 20 ms. This is the hammer hitting it
 
@@ -449,12 +465,12 @@ knock = os.osc(freq * 14) * en.ar(0.001, 0.02, gate) * 3.2 * gain;
 // the body: the note itself, ringing on for about a second
 
 body  = os.osc(freq) * en.ar(0.001, 0.9, gate) * 1.1;
-env   = en.adsr(0.002, 1.4, 0.0, 0.4, gate);   // 0.0 sustain, so it dies away
+env   = en.adsr(0.002, decay, 0.0, 0.4, gate);   // 0.0 sustain, so it dies away
 
 // both of them bend the carrier's pitch instead of being added to it,
 // which is FM, and it is what makes this a Rhodes and not three oscillators
 
-process = os.osc(freq + (knock + body) * freq * 0.02) * env * gain * 0.3 <: _, _;
+process = os.osc(freq + (knock + body) * freq * index) * env * gain * 0.3 <: _, _;
 effect  = _, _;
 `,
     },
@@ -503,11 +519,16 @@ gate = button("gate");                         // 1 while a key is held down
 
 burst = no.noise * en.ar(0.001, 0.012, gate) * gain;
 
+// the knobs: how bright the string is, and how much of each lap is lost
+
+cutoff = hslider("cutoff[scale:log]", 5000, 500, 12000, 1);
+damp   = hslider("damp[scale:log]", 0.001, 0.0003, 0.03, 0.0001);
+
 // one lap of the loop. How long the lap is IS the note, and how much of it
 // comes back is the decay, which drops to 0.9 when the key lifts
 
-keep = 0.9 + 0.099 * gate;
-lap  = de.fdelay(2048, ma.SR / freq - 1) : fi.lowpass(1, 5000) : *(keep);
+keep = 0.9 + (0.1 - damp) * gate;
+lap  = de.fdelay(2048, ma.SR / freq - 1) : fi.lowpass(1, cutoff) : *(keep);
 
 // ~ feeds the output back into the + it is written on, one sample later
 
@@ -548,16 +569,18 @@ freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
 gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
 gate = button("gate");                         // 1 while a key is held down
 cutoff = hslider("cutoff[scale:log]", 8000, 100, 8000, 1) : si.smoo;
+res    = hslider("res[scale:log]", 6, 0.7, 8, 0.01);
+depth  = hslider("depth", 11, 0, 24, 0.1) : si.polySmooth(gate, 0.999, 1);
 
 saw = os.sawtooth(freq);                     // every harmonic is in here already
 env = en.adsr(0.005, 0.2, 0.6, 0.3, gate);   // this envelope is on the volume
 
 // and this one is on the corner the filter cuts at, which is where the sound
-// is. It opens to twelve times the note, never past the cutoff, and shuts again
+// is. It opens depth times the note above it, never past the cutoff, and shuts
 
-cut = min(cutoff, freq * (1 + 11 * en.ar(0.002, 0.5, gate)));
+cut = min(cutoff, freq * (1 + depth * en.ar(0.002, 0.5, gate)));
 
-process = saw : fi.resonlp(cut, 6, 1) * env * gain * 0.12 <: _, _;
+process = saw : fi.resonlp(cut, res, 1) * env * gain * 0.12 <: _, _;
 
 // a real room, and it runs once on the mix rather than once per voice
 
@@ -1988,8 +2011,8 @@ effect  = _, _;
     /* 🔴 THE PAGE'S WHOLE CLAIM, AS ONE ASSERT. Editing the text has to change
        the bytes the audio thread is running. A page that compiled the same
        module whatever it was handed would pass every other check here. */
-    const edited = PRESETS[0].code.replace('0.25 * os.osc(freq * 3)',
-                                           '0.25 * os.osc(freq * 3) + 0.12 * os.osc(freq * 5)');
+    const edited = PRESETS[0].code.replace('quint * os.osc(freq * 3)',
+                                           'quint * os.osc(freq * 3) + 0.12 * os.osc(freq * 5)');
     const second = await build(edited, 'edited organ', 'fau_alt');
     d.assert('editing the text changes the machine code the audio thread is running',
       second.ok && second.bytes !== first.bytes,
@@ -2188,21 +2211,24 @@ effect  = _, _;
     const kDrawn = () => getComputedStyle(knobRow).display !== 'none';
     const kOnRow = () => [...knobRow.querySelectorAll('.pos-knob[data-param]')];
     const cutKnob = () => knobRow.querySelector('.pos-knob[data-param="cutoff"]');
-    await applyPatch(0);
     /* 🔴 THE ROW DOES NOT MOVE THE KEYS. Asked 2026-09-30: *"make the area h
-       for thise buttons fixed so no junmp"*. The keys' top is read with the
-       Organ, which has no knob, and again with the Sweep, which has one. */
+       for thise buttons fixed so no junmp"*. The keys' top is read with a
+       patch with no knob, and again with the Sweep, which has three.
+       ⚠️ THE EMPTY ONE WAS THE ORGAN UNTIL EVERY TYPED PATCH GOT KNOBS the same
+       day. The Djembe keeps none: its controls are the library's and none is
+       typed in the box, which is the rule `readKnobs` applies. */
+    await applyPatch(PRESETS.findIndex((p) => p.id === 'djembe'));
     const keysTop = () => panel.keys.getBoundingClientRect().top;
     const noneTop = keysTop();
-    d.assert('the Organ has no slider but the three a key sets, so the row keeps its height, empty',
+    d.assert('the Djembe types no slider, its five are the library\'s, so the row keeps its height, empty',
       kDrawn() && kOnRow().length === 0 && (!!knobRow.querySelector('.pos-pknobs-ghost') && !knobRow.querySelector('.pos-pknobs-say'))
         && knobRow.getBoundingClientRect().height > 0 && book.names().length === 0,
       `${getComputedStyle(knobRow).display}, ${kOnRow().length} knobs, `
       + `${knobRow.getBoundingClientRect().height.toFixed(1)} px, "${knobRow.textContent.trim()}"`);
     await applyPatch(PRESETS.findIndex((p) => p.id === 'sweep'));
-    d.assert('and the Sweep\'s knob takes the same room, so the keys under it do not move',
-      Math.abs(keysTop() - noneTop) < 0.5 && kOnRow().length === 1,
-      `keys at ${noneTop.toFixed(1)} px with no knob and ${keysTop().toFixed(1)} px with cutoff`);
+    d.assert('and the Sweep\'s knobs take the same room, so the keys under them do not move',
+      Math.abs(keysTop() - noneTop) < 0.5 && kOnRow().length === 3,
+      `keys at ${noneTop.toFixed(1)} px with no knob and ${keysTop().toFixed(1)} px with ${kOnRow().length}`);
     /* 🔴 ONE HUE, READ OFF THE SCREEN ON BOTH SIDES. The snippet's
        `--param-hue` is the code box's, the knob's is this page's, and the two
        have to be the same number from the same book; the knob's name is drawn
@@ -2244,8 +2270,8 @@ effect  = _, _;
         + `${libs} library names coloured`);
     }
     const cutAddr = onThread?.addr.get('cutoff');
-    d.assert('the Sweep has exactly one knob, cutoff, and not the room\'s four, which are the library\'s and not in the text',
-      kDrawn() && kOnRow().length === 1 && !!cutKnob()
+    d.assert('the Sweep has three knobs, cutoff, depth and res, and not the room\'s four, which are the library\'s and not in the text',
+      kDrawn() && kOnRow().map((k) => k.dataset.param).sort().join(' ') === 'cutoff depth res' && !!cutKnob()
         && cutKnob().querySelector('.pos-knob-v').textContent === '8000',
       kOnRow().map((k) => `${k.dataset.param} ${k.querySelector('.pos-knob-v').textContent}`).join(', ') || 'no knobs');
     d.assert('its range is the slider\'s own, 100 to 8000 on a log scale, and the live node knows that address',

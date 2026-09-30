@@ -266,8 +266,10 @@ const { KEYED } = M;
 {
   const pad = def(PRESETS[0].code);
   const knobs = pad.r.knobs ?? [];
-  ok('the Pad has exactly one knob, rel, from 0.05 to 6 on an exponential warp and starting at 1.5',
-    knobs.length === 1 && knobs[0].name === 'rel' && knobs[0].from === 'named' && knobs[0].value === 1.5
+  // Every preset has a knob since 2026-09-30 (*"add knobs to all patches what
+  // mak sense"*), so the Pad is read by name: rel first, then cutoff and detune.
+  ok('the Pad has three knobs, rel, cutoff and detune, and rel runs 0.05 to 6 on an exponential warp from 1.5',
+    knobs.map((k) => k.name).join(' ') === 'rel cutoff detune' && knobs[0].from === 'named' && knobs[0].value === 1.5
       && knobs[0].spec.min === 0.05 && knobs[0].spec.max === 6 && knobs[0].spec.warp === 'exp' && !knobs[0].spec.guessed,
     JSON.stringify(knobs));
   const slot = pad.d.paramNames.find((x) => x.name === 'rel')?.at;
@@ -279,9 +281,11 @@ const { KEYED } = M;
   ok('NEGATIVE CONTROL: rel is a Control of its own in the definition, 1.5 in the value array, and it is what the release reads',
     slot === 3 && close(pad.d.paramValues[slot], 1.5) && !!ctl && relIn?.from === pad.d.blocks.indexOf(ctl),
     `slot ${slot}, value ${pad.d.paramValues[slot]}, release input ${relIn ? inp(pad.d, relIn) : 'none'}`);
-  const others = PRESETS.slice(1).map((p) => `${p.label} ${compile(p.code).knobs?.length}`);
-  ok('and every other preset has no knob at all, so the page draws no row for it',
-    PRESETS.slice(1).every((p) => compile(p.code).knobs?.length === 0), others.join(', '));
+  const others = PRESETS.slice(1).map((p) => `${p.label} ${(compile(p.code).knobs ?? []).map((k) => k.name).join(' ')}`);
+  // ⚠️ AND EVERY KNOB IN EVERY PRESET HAS A SPEC WRITTEN IN THE CODE, because
+  // an argument's or a bare control's range is a guess.
+  ok('and every other preset has one to four knobs, each with a spec written in the code',
+    PRESETS.slice(1).every((p) => { const k = compile(p.code).knobs ?? []; return k.length >= 1 && k.length <= 4 && k.every((x) => !x.spec.guessed); }), others.join(', '));
 }
 {
   const { r, d } = def(String.raw`{ |a = 0.2, b = 3| SinOsc.ar(\x.kr(300) + \y.kr(0.5), mul: a * b * 0.01) }`);
