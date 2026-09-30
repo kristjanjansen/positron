@@ -104,6 +104,9 @@ function vf(pre, draw) {
   return chain ? ['-vf', chain] : [];
 }
 
+/** testsrc2's first bar edge: av_rescale(1, w, 6), rounding half up. */
+const bar1 = (w) => Math.floor((w + 3) / 6);
+
 function sourceArgs({ w, h, fps }) {
   if (!SOURCE) {
     return {
@@ -124,7 +127,13 @@ function sourceArgs({ w, h, fps }) {
       // session that runs for days.
       // ⚠️ ONLY ON THIS BRANCH. The film has no such overlay to hide, and
       // painting a black box over a corner of it would be a new defect.
-      pre: 'drawbox=x=0:y=0:w=240:h=48:color=black:t=fill,',
+      // 🔴 RED AND GREEN, NOT BLACK. Asked 2026-09-30 of the black box:
+      // *"what is this black box? put red and green on it with right widths"*.
+      // The cover is painted in the two bars it sits on, split where testsrc2
+      // splits them: av_rescale(1, w, 6), rounding half up, which is 213 at
+      // 1280. `demo/shell/testsrc2.mjs` paints the same so /moq/ stays equal.
+      pre: `drawbox=x=0:y=0:w=${bar1(w)}:h=48:color=0xFF0000:t=fill,`
+        + `drawbox=x=${bar1(w)}:y=0:w=${240 - bar1(w)}:h=48:color=0x00FF00:t=fill,`,
     };
   }
   return {
