@@ -1,6 +1,26 @@
 ## Open
 
-### Open 2026-09-30: stage, the recording chain readout goes, its fixed wording moves into the diagram
+### Open 2026-09-30: `/away/` shows lag, and `playing` leaves the readout
+
+ASKED, VERBATIM: *"show lag. rm playing from readout"*. `demo/away/index.html`: a `lag` cell, key press to sound leaving the speakers, measured by finding the note's onset in the frames that come back plus the playout cushion, blank when no onset is found. The readout goes `playing, level, clipped, buffer` to `level, clipped, buffer, lag`, still even.
+
+### Done 2026-09-30: `/away/` plays the Circuit: Synth 1 / Synth 2 / Drums 1 / Drums 2, a keyboard, and MIDI in
+
+ASKED, VERBATIM: *"add synth 1 / 2 / drums 1 / drums 2 readiobutton and jeyboard and allow me to drive it with midi"*. `demo/away/index.html` gets a choice of the four parts, the kit keyboard, and Web MIDI in (asked for on a press, never on load), all sent to the board in `studio-1-circuit`. `rig/board/inputs.mjs` writes them to the Circuit's own ALSA raw MIDI port, named in `BOARD_INPUTS`, and REFUSES everything but note on, note off and all notes off: the Circuit has no factory reset and a SysEx `Replace Patch` writes flash (CLAUDE.md).
+
+### Done 2026-09-30: stage control room, a standard play button, cursor home when the show stops, and questions that never appear
+
+DONE: questions rendered into a DETACHED caption slot, because the page emptied `panel.stage` with `textContent = ''` (four places, one at load); `setPicture()` keeps the slot. Play is the transport bar's toggle; the cursor goes to 0 and the button sits paused on stop. Kit gaps left open: `video-panel.mjs` has no way to replace its picture, `transport-bar.mjs` no toggle driving another deck.
+
+ASKED, VERBATIM: *"controlroom stage: play recording should be stn play button, when show stops, timeliune cursor should go to beginning and playback button should be on pause state. i can not see questions sent nor in audiene nor in control room"*. Three things on https://positron.studio/stage/ (BUILD `4ba5522`):
+1. `Play recording` becomes the kit's standard play button (the transport's play/pause, not a text button).
+2. When the show stops, the recording timeline's cursor goes to the start and the play button sits in its paused state.
+3. **A question sent from the audience appears nowhere**, neither in the audience panel nor in the control room. Find why (the send, the room, the Durable Object, the render) and fix it; an assert must SEND one and SEE it on both sides.
+`demo/stage/index.html`, maybe `workers/` for the questions route. Given to the agent already editing /stage/.
+
+### Done 2026-09-30: stage, the recording chain readout goes, its fixed wording moves into the diagram
+
+DONE: readout removed, state in `__demo.chain`, live states in the log, fixed wording in the IndexedDB, R2 and playback diagram notes.
 
 ASKED, VERBATIM: *"rm, put non-realtime versions to diagram"*, pasting the /stage/ readout `local 12 pieces, 1.79 MiB in IndexedDB / R2 uploads when the show stops / playback plays from R2 once it is there`. Remove the `stage-chain` glue rows (`demo/stage/index.html` ~1929 to 1950, every `chainSay` call). The fixed sentences (pieces kept in IndexedDB, uploaded to R2 when the show stops, played back from R2) become diagram boxes or notes. The live states (`uploading N%`, the refusals and failures) must still reach the log, and the R2 playback link must still be reachable if a visitor needs it to play. Also retires the `hidden` on a grid glue row problem for this surface. Asserts that read the chain move to `__demo`.
 
