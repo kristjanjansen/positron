@@ -205,6 +205,36 @@ export function drawCamera(ctx, src, w, h, opts = {}) {
 }
 
 /**
+ * Where the canvas's two clock columns go, from the widest string each prints.
+ *
+ * Column one starts at `PAD`. Column two ENDS at `w - PAD` and starts where
+ * its widest string would have to start to end there. The widest strings are
+ * templates of the same length as what is printed: a monospace face gives
+ * every digit one advance, so `0` stands for any digit. The epoch in ms is
+ * 13 digits until the year 2286; the wall clock is always `HH:MM:SS.mmm`; a
+ * POSITION past 99 minutes grows, so the real string is measured too.
+ * `gap` is the clear space between the two columns' widest strings, and a
+ * negative gap is an overlap, which is why it is returned rather than trusted.
+ */
+export function clockColumns(ctx, w, ms, second, { NUM = 64, LBL = 28 } = {}) {
+  const width = (font, ...strs) => {
+    ctx.font = font;
+    return Math.max(...strs.map((t) => ctx.measureText(t).width));
+  };
+  const num = `bold ${NUM}px ${MONO}`, lbl = `bold ${LBL}px ${MONO}`;
+  const w1 = Math.max(
+    width(num, '0'.repeat(String(ms).length), '0'.repeat(13)),
+    width(lbl, 'ABSOLUTE'),
+  );
+  const w2 = Math.max(
+    width(num, second.label === 'LOCAL' ? '00:00:00.000' : '00:00.000', second.text),
+    width(lbl, second.label),
+  );
+  const x2 = Math.round(w - PAD - w2);
+  return { x1: PAD, w1, x2, w2, gap: x2 - (PAD + w1) };
+}
+
+/**
  * Draw one frame of the pattern and return the epoch ms it burned.
  *
  * @param ctx    2d context
@@ -314,40 +344,40 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // "little bit" and not the near doubling the figures suggest.
   const LBL_Y = NUM_Y - 80;
   /**
-   * 🔴 ONE COLUMN, TWO PAIRS STACKED, SINCE 2026-09-29. Asked in these words:
-   * *"put absolute and local below each other"*, with a frame grab showing the
-   * two columns' VALUES colliding in the middle of the picture.
-   * 🔴 **AND THE TWO COLUMNS WERE NOT WRONG BY A LITTLE, THEY WERE WRONG BY
-   * CONSTRUCTION.** `COL2` was derived as `PAD + 13 * 0.6 * NUM + PAD`, which
-   * reserves the width of a THIRTEEN character number at 0.6 em a character.
-   * That is exactly the canvas's epoch in milliseconds and it is NOT what the
-   * ffmpeg rendering prints: `drawtext` cannot format epoch ms at all, so that
-   * side prints SECONDS with three decimals and a unit, `1790694135.607 s`,
-   * which is sixteen characters. The column was sized for one rendering and
-   * used by both, so the publisher's second column started 100 px inside its
-   * own first number. A derived constant that is derived from the wrong thing
-   * is worse than a typed one, because it reads as though it cannot be wrong.
-   * ✅ **STACKING REMOVES THE CONSTANT RATHER THAN CORRECTING IT.** There is no
-   * second column to collide with, so neither rendering has to know how wide
-   * the other one's number is.
-   * ⚠️ **AND IT COSTS THE MIDDLE, WHICH WAS LEFT EMPTY ON PURPOSE.** The note
-   * above says the centre is where `drawCamera` lays a picture in behind all of
-   * this. The block is 140 px taller now and reaches that far further up, so a
-   * camera behind it has that much less clear room. MEASURED on a 720 frame:
-   * the furniture's top edge goes from 402 to 262.
+   * 🔴 SIDE BY SIDE AGAIN, SINCE 2026-09-30, AND NEVER OVERLAPPING. Asked in
+   * these words: *"test screen: move local timecode to right not to overlap
+   * with absolute"*. ABSOLUTE on the left margin, the second clock on the
+   * right one, one row, at the baselines above.
+   * 🔴 **THE RIGHT COLUMN IS DERIVED FROM THE WIDEST STRING THIS RENDERER
+   * PRINTS, MEASURED, NOT FROM A CHARACTER COUNT.** The two column layout of
+   * 2026-09-18 reserved `13 * 0.6 * NUM` for the first column, which is the
+   * canvas epoch in ms and not what ffmpeg prints, and the ffmpeg picture put
+   * LOCAL on top of its own absolute number. Stacking on 2026-09-29 hid that
+   * instead of fixing it. So each renderer now sizes its own columns from its
+   * own widest string: here `measureText` on the real font, in the filter
+   * generator below the font's advance times ffmpeg's own format.
+   * ✅ **THE SECOND COLUMN HANGS FROM THE RIGHT MARGIN**, `PAD` in from the
+   * edge like every other side of this frame, and starts where its widest
+   * string would have to start to end there. The gap between the columns is
+   * whatever is left, and it is reported by `clockColumns()` rather than
+   * assumed. MEASURED 2026-09-30 at 1280 in headless Chrome at the widest
+   * epoch, `9999999999999`: column one is 501 px from x=60, LOCAL starts at
+   * x=758 and ends on the bed's right edge at 1220, a 197 px gap, and the
+   * inked digits end at 556 and start at 763. A POSITION past 99 minutes is
+   * one character wider and moves column two to x=835.
+   * ⚠️ **AND THE MIDDLE IS BACK.** One row instead of two gives the 140 px of
+   * height the stack took back to whatever `drawCamera` lays in behind this.
    */
-  const PAIR = 80 + PAD;
-  const LBL_Y_ABS = LBL_Y - PAIR;
-  const NUM_Y_ABS = NUM_Y - PAIR;
+  const cols = clockColumns(ctx, w, ms, second, { NUM, LBL });
   ctx.font = `bold ${LBL}px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText('ABSOLUTE', PAD, LBL_Y_ABS);
-  ctx.fillText(second.label, PAD, LBL_Y);
+  ctx.fillText('ABSOLUTE', PAD, LBL_Y);
+  ctx.fillText(second.label, cols.x2, LBL_Y);
   ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#fff';
-  ctx.fillText(String(ms), PAD, NUM_Y_ABS);
+  ctx.fillText(String(ms), PAD, NUM_Y);
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, PAD, NUM_Y);
+  ctx.fillText(second.text, cols.x2, NUM_Y);
 
   // ── motion, and it MEANS something ───────────────────────────────────────
   // The block has to move, or a rate-controlled encoder dedupes a near-static
@@ -493,6 +523,37 @@ const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
 // ffmpeg-drawn row is ever wanted; do not re-derive it from scratch.
 
 /**
+ * DejaVu Sans Mono Bold's advance, 1233 of 2048 units, read out of the font's
+ * `hmtx` table for `zero`, `colon`, `period`, `space` and `s` alike. drawtext
+ * cannot measure a string before it draws it, so this is the measurement.
+ */
+export const FFMPEG_ADVANCE = 1233 / 2048;
+
+/**
+ * Where the ffmpeg picture's two clock columns go, from the widest string
+ * drawtext actually prints on each side.
+ *
+ * 🔴 **THE ABSOLUTE CLOCK IS NINETEEN CHARACTERS, NOT SIXTEEN.**
+ * `%{pts:flt:…}` formats with `%.6f`, so it prints `1790752257.100333 s`:
+ * ten digits, a point, SIX decimals, a space and the unit. MEASURED
+ * 2026-09-30 by rendering testsrc2 through this filter on ffmpeg@7: the box
+ * is 760 px wide, 732 of text plus the 14 px border either side, which is
+ * 19 advances of 38.53. The comment that sized the 2026-09-29 stack said
+ * sixteen and three decimals, read off a grab whose tail was hidden under
+ * the LOCAL column.
+ * The wall clock is `%H:%M:%S`, eight characters, always.
+ * `gap` is between the two drawn BOXES, which is what an eye sees, so the
+ * 14 px `boxborderw` is taken off both sides of it.
+ */
+export function ffmpegColumns({ w = FRAME_W, NUM = 64, LBL = 28, border = 14 } = {}) {
+  const adv = (n, size) => n * FFMPEG_ADVANCE * size;
+  const w1 = Math.max(adv('0000000000.000000 s'.length, NUM), adv('ABSOLUTE'.length, LBL));
+  const w2 = Math.max(adv('00:00:00'.length, NUM), adv('LOCAL'.length, LBL));
+  const x2 = Math.round(w - PAD - w2);
+  return { x1: PAD, w1, x2, w2, gap: Math.floor(x2 - border - (PAD + w1 + border)) };
+}
+
+/**
  * The whole video filter chain for a generated ffmpeg source.
  *
  * @param epoch   seconds since the epoch at spawn, e.g. (Date.now()/1000).toFixed(6)
@@ -501,7 +562,7 @@ const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
  *                with different values look different, which is the requirement.
  * @param font    fontfile path — REQUIRED, see the trap above
  */
-export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
+export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, w = FRAME_W } = {}) {
   if (!epoch) throw new Error('ffmpegFilters: epoch required');
   if (!font) throw new Error('ffmpegFilters: fontfile required; drawtext without one fails silently');
   // SAME TYPOGRAPHY AS THE CANVAS: a small brand-yellow word over a big light
@@ -521,8 +582,8 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     `x=${x}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
-  // SAME SIZES AND SAME COLUMNS AS THE CANVAS. 13 characters of epoch at
-  // 0.6 x 64 is 499 px, plus PAD either side, which is where column two starts.
+  // SAME SIZES AND THE SAME TWO COLUMNS AS THE CANVAS, EACH SIZED FROM ITS
+  // OWN WIDEST STRING. See `ffmpegColumns` for the arithmetic and the numbers.
   const NUM = 64, LBL = 28;
   // 🔴 ffmpeg's `y` IS THE TOP OF THE TEXT BOX AND THE CANVAS'S IS THE
   // BASELINE, SO ONE HAS TO BE CONVERTED INTO THE OTHER. It was a pair of hand
@@ -534,13 +595,10 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
   // (a 32 px label offset 25, an 84 px number offset 65).
   const top = (baseline, size) => Math.round(baseline - 0.774 * size);
   // THE CANVAS'S OWN BASELINES, computed the same way, so the two renderings
-  // cannot drift apart again.
+  // cannot drift apart again. One row, since 2026-09-30.
   const NUM_Y = ROW.Y - 20 - PAD;
   const LBL_Y = NUM_Y - 80;
-  // The stack, and the same three lines as the canvas so the two cannot drift.
-  const PAIR = 80 + PAD;
-  const LBL_Y_ABS = LBL_Y - PAIR;
-  const NUM_Y_ABS = NUM_Y - PAIR;
+  const { x2 } = ffmpegColumns({ w, NUM, LBL });
   const LABEL = '0xFFD400';   // --hi
   const VALUE = '0xE9EEF7';   // the canvas's own near-white
   return [
@@ -554,7 +612,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // There is no source label any more: the hue says which publisher this is,
     // and a name burned into a picture is a small text that cannot be read at
     // the size a demo shows it.
-    text('ABSOLUTE', PAD, top(LBL_Y_ABS, LBL), LBL, LABEL),
+    text('ABSOLUTE', PAD, top(LBL_Y, LBL), LBL, LABEL),
     // pts-derived, and the same instant the row encodes.
     //
     // In SECONDS, not milliseconds, where the canvas prints ms. Not a choice:
@@ -562,8 +620,8 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of
     // floating-point result to int failed" — measured on ffmpeg@7. The unit is
     // therefore printed beside the number rather than left to be guessed.
-    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y_ABS, NUM), NUM, VALUE),
-    text('LOCAL', PAD, top(LBL_Y, LBL), LBL, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y, NUM), NUM, VALUE),
+    text('LOCAL', x2, top(LBL_Y, LBL), LBL, LABEL),
     // LEGIBLE — the publisher's own wall clock. %{pts:flt:…} is precise and
     // unreadable; this is the one a person checks against their own watch.
     // The two drifting apart is real information: it is encoder drift.
@@ -574,7 +632,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // one level deeper than the one separating `gmtime` from its argument.
     // Measured against ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors with
     // "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', PAD, top(NUM_Y, NUM), NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', x2, top(NUM_Y, NUM), NUM, VALUE),
   ].join(',');
 }
 
