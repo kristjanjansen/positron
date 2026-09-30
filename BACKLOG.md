@@ -1,5 +1,42 @@
 ## Open
 
+### Open 2026-09-30: `/away/` on the instrument panel, with a patch selector
+
+*"use instument panel for away and patch selector"*. Slug `away`; touches
+`demo/away/index.html`. Look at how `/shape/` and `/circuit/` sit in the kit's
+instrument panel (`.panel-case > .panel-plate`) before building. A patch
+selector means program change, and the board's MIDI gate lets only note on,
+note off and CC 123 through on `/away/`'s room, so it needs a decision about
+the gate: program change is RAM only (it picks a patch, it writes nothing),
+unlike a `Replace Patch` SysEx.
+
+### Done 2026-09-30: `/away/` plays white noise on the direct path
+
+*"its white noise. it was not case pre-webrtc"*. Slug `away`; touches
+`rig/board/rtc.mjs` and/or `demo/shell/board.mjs`. On the live page the
+picture showed full-height solid blocks once `via` read `direct`, which
+points at the frames being decoded wrong, not at the Circuit.
+MEASURED 2026-09-30 ~18:50, and it is NOT WebRTC: a bare `arecord -D
+hw:CARD=Pro,DEV=0 -f S16_LE` on the Pi, no board, no browser, returns samples
+whose low byte is ONLY 0x00 or 0xFF (6 of 6 fresh starts). Byte-swapped they
+read -65 to -80 dBFS with a peak of 18 to 65, i.e. a quiet Circuit; read as
+little endian they are -17 to -32 dBFS of hiss. With the Circuit sounding, of
+eight readings (offset 0 to 3, swapped or not) only big endian is smooth (lag-1
+correlation 0.986), a one byte shift reads 0.26. So the Fast Track Pro is
+sending S16_BE while ALSA says S16_LE. It was little endian earlier the same
+day (the -82 dBFS silence and the 4,108 full-scale clips in session 59's
+handoff are impossible otherwise), and it has not re-enumerated since 12:04.
+Relay and direct carry the same `takeChannel` output, so both paths hiss.
+DONE: `createByteOrder` in `rig/board/inputs.mjs` watches the high byte's
+step size both ways over a quarter second and swaps when the swapped reading is
+twice as steady, logging each change. On the Pi's own captures the two readings
+were 81,009 against 661. Installed on the Pi (md5 `b3ac7c37…`), 201/201 there;
+through `/away/`'s direct path the floor then read -80 dBFS peak 17 and a C4
+peaked at -21.7 dBFS. A USB re-authorize (sysfs) did NOT restore little endian;
+a physical power cycle of the Fast Track Pro is untried, and the fix follows it
+back if it does.
+
+
 ### Done 2026-09-30: update the Pi's MIDI gate (VPN off)
 
 ASKED, VERBATIM: *"read handoff. vpn off. do midi updates on pi and webrtc for away and other stuff"*. The handoff's waiting step: `rig/board/inputs.mjs` and `demo/shell/circuit-cc.mjs` onto `/opt/positron-board`, so `/shape/`'s CCs are let through.

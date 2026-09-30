@@ -8,7 +8,7 @@
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
 import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
 import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
-import { parseInputs, takeChannel, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
+import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { fresher, midiKey, MAX_PEERS } from './rtc.mjs';
 import { EventEmitter } from 'node:events';
@@ -292,6 +292,43 @@ console.log('inputs: a name, a room and a lease');
   // negative control: a downmix would read [53, 103, 153]
   ok('and never sums the open input in', takeChannel(inter, 2, 1, 3)[0] === 100);
   is('the other channel is reachable too', [...takeChannel(inter, 2, 2, 3)], [7, 7, 7]);
+
+  // The Fast Track Pro sent big endian under an S16_LE label (2026-09-30).
+  // Stereo tones at the levels measured that day: a quiet Circuit (peak 18,
+  // with a little noise), a loud one, and the open input beside it.
+  const tone = (amp, secs = 0.5) => {
+    const n = 48000 * secs, a = new Int16Array(n * 2);
+    let seed = 1;
+    const noise = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 6;
+    for (let i = 0; i < n; i++) {
+      a[i * 2] = Math.round(amp * Math.sin(2 * Math.PI * 220 * i / 48000) + noise());
+      a[i * 2 + 1] = Math.round(noise());
+    }
+    return a;
+  };
+  const swapped = (a) => new Int16Array(a.map((v) => ((v & 0xFF) << 8) | ((v >> 8) & 0xFF)));
+  const feed = (a) => {
+    const o = createByteOrder({ channels: 2 }), out = [];
+    for (let i = 0; i < a.length; i += 960) out.push(...o.fix(a.slice(i, i + 960)));
+    return { o, out };
+  };
+  for (const [name, amp] of [['a quiet Circuit', 18], ['a loud Circuit', 12000]]) {
+    const good = tone(amp);
+    // negative control: audio the right way round is never touched
+    const le = feed(good);
+    is(`${name} sent little endian is left alone`, le.o.swapped, false);
+    const be = feed(swapped(good));
+    is(`${name} sent big endian is found`, be.o.swapped, true);
+    // once decided, the tail comes out as it went in
+    const tail = good.length - 960;
+    is(`${name} sent big endian plays as it went in`, be.out.slice(tail).join(), [...good.slice(tail)].join());
+  }
+  ok('digital silence decides nothing', !feed(new Int16Array(48000)).o.swapped);
+  const q = tone(18, 0.3), said = [];
+  const flipLog = createByteOrder({ channels: 2, onChange: (s) => said.push(s) });
+  for (let i = 0; i < q.length; i += 960) flipLog.fix(swapped(q.slice(i, i + 960)));
+  for (let i = 0; i < q.length; i += 960) flipLog.fix(q.slice(i, i + 960));
+  is('a device that turns back is followed back, and each change is said once', said, [true, false]);
 
   is('a lease in the future holds', leaseExpired(10_000, 9_999), false);
   is('a lease at its end has run out', leaseExpired(10_000, 10_000), true);
