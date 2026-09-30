@@ -824,8 +824,8 @@ export const DEMOS = [
   // Listens only. The Circuit's left output into a Fast Track Pro on the Pi,
   // captured by `rig/board/board.mjs` and streamed into the Pi's own room.
   { name: 'away', group: 'instruments', act: 4, created: '2026-09-30', built: true, room: 'fixed',
-    one: 'listen to a Novation Circuit in another building, captured by a Raspberry Pi and drawn as it arrives',
-    tags: ['WS', 'relay', 'PCM', 'canvas', 'live board'] },
+    one: 'play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives',
+    tags: ['WS', 'relay', 'PCM', 'MIDI', 'canvas', 'live board'] },
 
   /**
    * 🔴 SOMEBODY ELSE'S FIRMWARE, COMPILED RATHER THAN REWRITTEN, AND THAT IS

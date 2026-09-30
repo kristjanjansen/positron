@@ -26,6 +26,28 @@
 // before anything is playing; only `arecord` comes and goes with the lease.
 
 export const LEASE_MS = 60_000;
+
+/**
+ * 🔴 WHAT A PAGE MAY SEND AN INSTRUMENT, AND IT IS AN ALLOWLIST OF THREE.
+ * Note on, note off, and CC 123 all notes off, on the channels the config
+ * names. Everything else is REFUSED, and the reason is the instrument on the
+ * desk: the Circuit has no factory reset, a SysEx `Replace Patch` writes flash,
+ * and a program change on channel 16 selects a session over whatever is being
+ * worked on (CLAUDE.md, `plans/plan-circuit-patches.md`). A relay room is
+ * reachable by anybody who knows its name, so what arrives over it is decided
+ * here and not by the page that sent it.
+ */
+export function midiVerdict(bytes, channels) {
+  if (!Array.isArray(bytes) || bytes.length !== 3) return { ok: false, why: 'three bytes, a channel voice message' };
+  if (!bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return { ok: false, why: 'bytes are 0 to 255' };
+  const [st, a, b] = bytes;
+  if (a > 127 || b > 127) return { ok: false, why: 'data bytes are 0 to 127' };
+  const kind = st & 0xF0, ch = (st & 0x0F) + 1;
+  const allowedKind = kind === 0x80 || kind === 0x90 || (kind === 0xB0 && a === 123 && b === 0);
+  if (!allowedKind) return { ok: false, why: 'only note on, note off and all notes off reach the instrument' };
+  if (!channels.includes(ch)) return { ok: false, why: `channel ${ch} is not one this input plays (${channels.join(', ')})` };
+  return { ok: true };
+}
 export const BEAT_MS = 5_000;
 const NAME_RE = /^[a-z0-9]{1,24}$/;
 
@@ -53,7 +75,17 @@ export function parseInputs(text) {
     if (!Number.isInteger(channels) || channels < 1 || channels > 8) { problems.push(`${name}: channels is 1 to 8`); continue; }
     const take = Number(v.take ?? 1);
     if (!Number.isInteger(take) || take < 1 || take > channels) { problems.push(`${name}: take is 1 to ${channels}`); continue; }
-    inputs.set(name, { name, device, channels, take });
+    let midi = null;
+    if (v.midi != null) {
+      const port = v.midi?.port;
+      const mch = v.midi?.channels;
+      if (typeof port !== 'string' || !/^[A-Za-z0-9_]{1,32}$/.test(port)) { problems.push(`${name}: midi.port is an ALSA card id`); continue; }
+      if (!Array.isArray(mch) || !mch.length || !mch.every((c) => Number.isInteger(c) && c >= 1 && c <= 16)) {
+        problems.push(`${name}: midi.channels is a list of 1 to 16`); continue;
+      }
+      midi = { port, channels: mch };
+    }
+    inputs.set(name, { name, device, channels, take, midi });
   }
   return { inputs, problems };
 }
@@ -81,7 +113,7 @@ export function leaseExpired(lease, now) {
  */
 export function createInputs({
   inputs, room, relay, frame, rate, name: boardName, id: boardId,
-  spawn, WebSocket, format, parse, randomId, log = () => {}, now = () => Date.now(),
+  spawn, WebSocket, format, parse, randomId, log = () => {}, now = () => Date.now(), fs = null,
   leaseMs = LEASE_MS, beatMs = BEAT_MS,
 }) {
   const live = new Map();
@@ -90,7 +122,7 @@ export function createInputs({
     const s = {
       cfg, room: `${room}-${cfg.name}`, from: `board-${cfg.name}-${randomId(6)}`,
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
-      backoff: 500, closed: false,
+      backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0,
     };
     const send = (msg) => {
       if (s.ws?.readyState !== 1) return false;
@@ -101,7 +133,8 @@ export function createInputs({
     const alive = () => ({ type: 'board.alive', ...shape(), audio: s.proc ? cfg.name : null, frames: s.frames,
                            leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0 });
     const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device,
-                            frames: s.frames, leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
+                            frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused } : null,
+                            leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
                             ...(s.proc ? {} : { reason: 'nothing playing' }) });
 
     function sendPcm(int16) {
@@ -148,6 +181,44 @@ export function createInputs({
       return true;
     }
 
+    // ── notes out, to the instrument's own raw MIDI port ────────────────────
+    // ⚠️ THE CARD IS RESOLVED BY NAME EVERY TIME IT IS OPENED. A card number is a
+    // position in a list that moves when anything is plugged in, which is the
+    // avfoundation-index lesson from rig/m1 in its ALSA costume.
+    function midiOpen() {
+      if (s.midiFd !== null) return s.midiFd;
+      const card = fs.readlinkSync(`/proc/asound/${cfg.midi.port}`);   // 'card7'
+      const n = /^card(\d+)$/.exec(card)?.[1];
+      if (n == null) throw new Error(`/proc/asound/${cfg.midi.port} is ${card}`);
+      s.midiFd = fs.openSync(`/dev/snd/midiC${n}D0`, 'w');
+      log(`${cfg.name}: notes go to /dev/snd/midiC${n}D0 (${cfg.midi.port})`);
+      return s.midiFd;
+    }
+    function midiWrite(bytes) {
+      try { fs.writeSync(midiOpen(), Buffer.from(bytes)); }
+      catch (e) {
+        log(`${cfg.name}: midi write failed, ${e.message}`);
+        if (s.midiFd !== null) { try { fs.closeSync(s.midiFd); } catch {} s.midiFd = null; }
+        return false;
+      }
+      const [st, a, b] = bytes, kind = st & 0xF0, key = `${st & 0x0F}:${a}`;
+      if (kind === 0x90 && b > 0) s.held.add(key); else if (kind === 0x80 || kind === 0x90) s.held.delete(key);
+      else if (kind === 0xB0) for (const k of [...s.held]) if (k.startsWith(`${st & 0x0F}:`)) s.held.delete(k);
+      s.notesOut++;
+      return true;
+    }
+    /** Every note this board started and nobody ended, ended. */
+    function midiPanic(why) {
+      if (!cfg.midi || !s.held.size) return 0;
+      const n = s.held.size;
+      for (const k of [...s.held]) {
+        const [ch, note] = k.split(':').map(Number);
+        midiWrite([0x80 | ch, note, 0]);
+      }
+      log(`${cfg.name}: released ${n} held note${n === 1 ? '' : 's'}, ${why}`);
+      return n;
+    }
+
     function handle(msg) {
       const reply = (type, body) => send({ type, re: msg.id, ...body });
       if (msg.type === 'input.want') {
@@ -161,6 +232,14 @@ export function createInputs({
         return reply('input.stopped', { ok: stopCapture('asked'), source: cfg.name });
       }
       if (msg.type === 'audio.status') return reply('audio.started', status());
+      if (msg.type === 'midi.send') {
+        if (!cfg.midi || !fs) return reply('midi.refused', { why: `${cfg.name} has no MIDI port configured` });
+        const v = midiVerdict(msg.bytes, cfg.midi.channels);
+        if (!v.ok) { s.refused++; return reply('midi.refused', { why: v.why }); }
+        if (!midiWrite(msg.bytes)) return reply('midi.refused', { why: 'the instrument port could not be written' });
+        return undefined;   // no reply per note: a keyboard is not a request/response
+      }
+      if (msg.type === 'midi.panic') return reply('midi.released', { n: midiPanic('asked') });
       return undefined;
     }
 
@@ -195,7 +274,7 @@ export function createInputs({
     // self-echo watchdog the main socket uses, because a dead socket does not
     // always close.
     function beat() {
-      if (s.proc && leaseExpired(s.lease, now())) stopCapture('nobody renewed the lease');
+      if (s.proc && leaseExpired(s.lease, now())) { stopCapture('nobody renewed the lease'); midiPanic('the lease ran out'); }
       if (s.ws?.readyState === 1 && now() - s.lastHeard > 3 * beatMs + 1000) {
         log(`${cfg.name}: no echo, reconnecting`);
         try { s.ws.close(); } catch { /* the point */ }
@@ -206,7 +285,11 @@ export function createInputs({
 
     return {
       s, connect, beat, handle, status, stopCapture,
-      close() { s.closed = true; stopCapture('shutting down'); try { s.ws?.close(); } catch {} },
+      close() {
+        s.closed = true; midiPanic('shutting down'); stopCapture('shutting down');
+        if (s.midiFd !== null) { try { fs.closeSync(s.midiFd); } catch {} s.midiFd = null; }
+        try { s.ws?.close(); } catch {}
+      },
     };
   }
 
