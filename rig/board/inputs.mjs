@@ -60,14 +60,27 @@ export const SYNTH_CHANNELS = [1, 2];
  * instrument on the desk: the Circuit has no factory reset, a SysEx `Replace
  * Patch` writes flash, and a program change on channel 16 selects a session
  * over whatever is being worked on (CLAUDE.md, `plans/plan-circuit-patches.md`).
- * No SysEx, no program change, no bank select, no NRPN or RPN (CC 98 to 101
- * and data entry 6 and 38 are not in the table), no channel mode message but
- * 123. A relay room is reachable by anybody who knows its name, so what
- * arrives over it is decided here and not by the page that sent it.
+ * No SysEx, no bank select, no NRPN or RPN (CC 98 to 101 and data entry 6
+ * and 38 are not in the table), no channel mode message but 123. A relay room
+ * is reachable by anybody who knows its name, so what arrives over it is
+ * decided here and not by the page that sent it.
+ * ⚠️ AND SINCE 2026-09-30 ONE PROGRAM CHANGE: patches 0 to 63 on channels 1
+ * and 2, asked for as a patch selector on `/away/` (*"ok go"*). 📄 The
+ * Circuit's own table (`plans/plan-circuit-model12.md` §3.7): on 1 and 2 it
+ * selects a synth patch, into RAM; on 16 it selects a SESSION, instantly from
+ * 0 to 31 and queued from 64 to 95, over whatever is being worked on. So it is
+ * the synth channels only and never 16, and 64 to 127 are refused as well,
+ * because they are not patches on 1 and 2 and ARE sessions on 16.
  */
 export function midiVerdict(bytes, channels) {
-  if (!Array.isArray(bytes) || bytes.length !== 3) return { ok: false, why: 'three bytes, a channel voice message' };
-  if (!bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return { ok: false, why: 'bytes are 0 to 255' };
+  if (!Array.isArray(bytes) || !bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return { ok: false, why: 'bytes are 0 to 255' };
+  if (bytes.length === 2 && (bytes[0] & 0xF0) === 0xC0) {
+    const ch = (bytes[0] & 0x0F) + 1, p = bytes[1];
+    if (!SYNTH_CHANNELS.includes(ch) || !channels.includes(ch)) return { ok: false, why: `a program change on channel ${ch} is not a synth patch` };
+    if (p > 63) return { ok: false, why: 'a synth patch is 0 to 63' };
+    return { ok: true };
+  }
+  if (bytes.length !== 3) return { ok: false, why: 'three bytes, a channel voice message' };
   const [st, a, b] = bytes;
   if (a > 127 || b > 127) return { ok: false, why: 'data bytes are 0 to 127' };
   const kind = st & 0xF0, ch = (st & 0x0F) + 1;

@@ -34,6 +34,8 @@
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createMidi, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
   import { createPresenceButton } from '/shell/presence.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
+  import { createPicker } from '/shell/picker.mjs';
 
   const q = new URLSearchParams(location.search);
   const INPUT = q.get('input') || 'circuit';
@@ -98,12 +100,9 @@
     try { await d.run('listen'); } finally { delete b.dataset.busy; }
   }
   listenBtn.el.title = 'press to listen';
-  d.controls.append(listenBtn.el);
-  d.controls.hidden = false;
 
   // ── the picture ───────────────────────────────────────────────────────────
   const host = el('div', 'away-pic');
-  d.stack.add(host);
   const wave = createWaveView(host, { height: 160, label: `the last ${SECONDS} seconds from the board` });
 
   // ── playing it ───────────────────────────────────────────────────────────
@@ -151,16 +150,57 @@
     label: 'part',
     options: [['Synth 1', 's1'], ['Synth 2', 's2'], ['Drums 1', 'd1'], ['Drums 2', 'd2']],
     at: 0,
-    onPick: (v, name) => { part = PARTS[v]; d.log(`playing ${name}`); },
+    onPick: (v, name) => { part = PARTS[v]; d.log(`playing ${name}`); showPatch(); },
   });
-  const midiBtn = el('button', '', 'enable midi', { type: 'button' });
-  const playRow = el('div', 'away-play');
-  playRow.append(partPick.el, midiBtn);
-  d.stack.add(playRow);
 
-  const kbHost = el('div');
-  d.stack.add(kbHost);
-  const kb = createKeyboard(kbHost, {
+  // ── the patch ────────────────────────────────────────────────────────────
+  //
+  // 🔴 A PROGRAM CHANGE ON CHANNEL 1 OR 2, AND ONLY THERE. Asked 2026-09-30:
+  // *"use instument panel for away and patch selector"*. 📄 The Circuit's own
+  // table (`plans/plan-circuit-model12.md` §3.7): on 1 and 2 a program change
+  // selects one of 64 synth patches into RAM; on 16 it selects a SESSION. The
+  // board's gate (`midiVerdict` in rig/board/inputs.mjs) is what enforces that,
+  // not this page. A drum part has no patch here: drums change by CC, which
+  // the gate refuses, so the picker is switched off on one.
+  // ⚠️ IT OPENS EMPTY, BECAUSE NOTHING SAYS WHICH PATCH THE CIRCUIT IS ON.
+  // The board sends nothing back about the instrument's state, so a name here
+  // before a choice would be a claim nobody measured. It shows what THIS page
+  // last sent to each synth.
+  const PATCHES = Array.from({ length: 64 }, (_, i) => `Patch ${i + 1}`);
+  const chosen = { 1: null, 2: null };
+  let lastPatchBytes = null;
+  const synthCh = () => (part.note == null ? part.ch : null);
+  function sendPatch(i) {
+    const ch = synthCh();
+    if (ch == null) return;
+    chosen[ch] = i;
+    lastPatchBytes = [0xC0 | (ch - 1), i];
+    showPatch();
+    if (board.send({ type: 'midi.send', bytes: lastPatchBytes })) d.log(`Synth ${ch} on ${PATCHES[i]}`);
+  }
+  function stepPatch(by) {
+    const ch = synthCh();
+    if (ch == null) return;
+    const at = chosen[ch];
+    sendPatch(at == null ? (by > 0 ? 0 : PATCHES.length - 1) : (at + by + PATCHES.length) % PATCHES.length);
+  }
+  const patchPick = createPicker({
+    what: 'patch',
+    prev: () => stepPatch(-1),
+    next: () => stepPatch(+1),
+    onPick: (i) => sendPatch(i),
+  });
+  patchPick.options(PATCHES, 0);
+  function showPatch() {
+    const ch = synthCh();
+    patchPick.disabled(ch == null);
+    const at = ch == null ? null : chosen[ch];
+    patchPick.show(at == null ? '' : PATCHES[at], at ?? undefined);
+  }
+  showPatch();
+  const midiBtn = el('button', '', 'enable midi', { type: 'button' });
+
+  const kb = createKeyboard(el('div'), {
     ...keyRange(),
     base: 48,
     full: true,
@@ -174,6 +214,18 @@
     onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
     onPanic: () => panic(),
   });
+
+  // ── the instrument ───────────────────────────────────────────────────────
+  // Asked 2026-09-30 with the patch selector. The kit's panel owns the order,
+  // the seams and the insets: the picture, the part row, the keys, and a plate
+  // with ONLINE beside the name and the patch at the far end, unlabelled.
+  const panel = createInstrumentPanel({
+    viz: host,
+    rows: [[[partPick.el, midiBtn], { align: 'between' }]],
+    keys: kb.el,
+    plate: { name: 'Circuit', status: listenBtn.el, patch: patchPick },
+  });
+  d.stack.add(panel.el);
 
   // ── MIDI in, from a keyboard on this machine ─────────────────────────────
   // Asked for on a press, or opened by itself only when the browser has
@@ -376,6 +428,18 @@
     // level as before does not, and a whisper under the floor does not.
     d.assert('lag starts at a sound twice as loud as the moment before it',
       isOnset(0.2, 0.05) && !isOnset(0.2, 0.2) && !isOnset(0.008, 0.001));
+    // The patch is a program change on the synth's own channel, and a drum
+    // part has none. Driven through the real functions; the board refuses.
+    const wasPart = part, refusedBefore = board.refusedToBoard();
+    part = PARTS.s2; showPatch(); sendPatch(4);
+    d.assert('Patch 5 on Synth 2 is program change 4 on channel 2', JSON.stringify(lastPatchBytes) === '[193,4]', JSON.stringify(lastPatchBytes));
+    d.assert('and it went to the board, which refused it under a harness', board.refusedToBoard() === refusedBefore + 1, `${board.refusedToBoard() - refusedBefore} refused`);
+    part = PARTS.s1; showPatch();
+    d.assert('each synth keeps its own patch, and Synth 1 was never sent one', chosen[1] == null && chosen[2] === 4 && patchPick.select.disabled === false);
+    part = PARTS.d1; showPatch();
+    d.assert('a drum part has no patch picker, because drums change by CC', patchPick.buttons.every((b) => b.disabled) && patchPick.select.disabled);
+    part = wasPart; chosen[2] = null; showPatch();
+    d.assert('the patch picker sits on the plate with no label', !!patchPick.el.closest('.pos-ipanel-plate') && !patchPick.el.querySelector('.pos-pick-l'));
     d.assert('the four parts are Synth 1, Synth 2, Drums 1 and Drums 2',
       JSON.stringify(Object.values(PARTS).map((p) => [p.ch, p.note ?? null])) === '[[1,null],[2,null],[10,60],[10,62]]');
     /* `Loop` follows the Evolution, and a loop reaches `board.send`, counted by
@@ -401,8 +465,7 @@
   }, { log: d.log });
 </script>
 <style>
-  /* The badge sits above the picture with the kit's own control gap. */
+  /* The picture fills its row of the panel. */
   .away-pic > .pos-wave { width: 100%; }
-  .away-play { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); }
 </style>
 </html>
