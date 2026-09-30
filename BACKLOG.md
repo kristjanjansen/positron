@@ -1,5 +1,35 @@
 ## Open
 
+### Open 2026-09-30: fix /stage/, the MIM film not the test screen, WebRTC only, local storage to R2 to playback. PRIORITY
+
+ASKED, VERBATIM: *"can you fix stage? do we need another container instace not
+to conflict to tohte? i still see test screen i want mim stuff. can you have
+just webrtc transport? i want so see local storaage -> r2 -> playback.
+prioritize it!"*. `demo/stage/index.html`, `workers/pub/container/server.mjs`,
+`workers/pub/wrangler.jsonc`.
+- 🔴 **WHY IT SHOWS THE TEST SCREEN: THIS SESSION DID IT.** `/stage/`'s WebRTC
+  show is a RECEIVER of the container's WHIP leg (`stage/index.html:2414`), and
+  the container's picture is `SOURCE`. `3f9a230` made the film the default for
+  exactly this page; `d8c95d3` set `PUB_SOURCE=testsrc2` today so the clock
+  layout would ship on the test pattern, and the film had never been deployed
+  before either. One container, one source, two pages that want different
+  pictures.
+- **No second container is needed.** The conflict is the SOURCE per Stream
+  input, not the instance. The container already runs two legs to two inputs:
+  RTMPS to the LL-HLS input and WHIP to the WebRTC input. Give each leg its own
+  source: the WHIP leg plays the film (no burn, as asked 2026-09-25), the RTMPS
+  leg keeps testsrc2 with the clocks. Then `/stage/` (WebRTC only) gets MIM,
+  `/llhls/` keeps the test screen, and `/webrtc/` shows the film, so its `what`
+  and `one` move with it. A second instance would still fight over the same
+  two inputs without new inputs and secrets.
+- **WebRTC only**: the `Start HLS` transport goes; `Start WebRTC` is the show.
+- **local storage to R2 to playback, visible**: today the page records the
+  RETURNED track, keeps no local storage, and uploads only with `?r2=1`, opt in
+  because the upload route allows five sessions an hour per address. The owner
+  wants to SEE the chain: recorded into the browser, uploaded to R2, played back
+  from R2. Make it the page's own path on a press (never on load), each stage
+  shown as it happens, and keep the harness off the cap.
+
 ### Open 2026-09-30: cam's LL-HLS leg, built on the existing input by handover
 
 ASKED, VERBATIM: *"cam hls solution?"*. Build `plans/plan-cam-llhls.md` with ONE
