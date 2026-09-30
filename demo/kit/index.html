@@ -520,6 +520,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
@@ -1199,6 +1200,58 @@
    * what these two show is where a rule lands and not what a band holds. The
    * PANEL block further down already shows a case full of real controls.
    */
+  /**
+   * 🔴 THE NEWEST BLOCK ON THIS PAGE, 2026-09-30, AND THE FIRST CALL TO
+   * `section()`, so it marks INPUT as the part with something new in it.
+   * Asked as *"unify compilation in ui logic on this and fau ant othes.
+   * trigger on inactivity? Small breating "Compiling" note (not button) on
+   * right bottom i the plae complile button is in fau. a kit comopnent?"*.
+   * `/fau/` and `/und/` use it.
+   * ⚠️ THE COMPILER HERE IS A STAND-IN THAT TAKES 350 ms, because what this
+   * block shows is the TIMING and the note, and a real compiler on the kit
+   * page would be six megabytes for a specimen. Type `error` anywhere in the
+   * box and it refuses, which is how the standing error is shown.
+   * ⚠️ `Hold a note` IS `notNow`: while it is down a due compile waits, and it
+   * runs the moment it comes up.
+   * ⚠️ `cnoteSpec` IS DECLARED BESIDE THE BLOCK AND ABOVE IT, because a block
+   * that moves on this page has left its `const` behind before.
+   */
+  let cnoteSpec = null;
+  section('input', 'COMPILE ON A PAUSE',
+    'A box that compiles what was typed once the typing stops, with a breathing note in its corner while it does.',
+    `const idle = createCompileIdle({
+  input: field.input,          // listens for input
+  host:  field.el,             // the note goes in its bottom right corner
+  compile: (text) => build(text),   // sync or async, { ok: false, error } fails
+  notNow: () => heldKeys > 0,  // a due compile waits while this is true
+})
+idle.track(loadCompile)        // show the note over a compile the page started
+idle.cancel()                  // the page replaced the text, drop what was due`,
+    (box) => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const compiled = [];
+      let holding = false;
+      const f = createField({ rows: 4, code: true, grow: 'wide',
+        value: 'process = os.osc(440) * 0.2;\n// type here, then stop' });
+      f.input.setAttribute('aria-label', 'a program the stand-in compiler reads');
+      const idle = createCompileIdle({
+        input: f.input,
+        host: f.el,
+        notNow: () => holding,
+        compile: async (text) => {
+          await wait(350);
+          compiled.push(text);
+          return text.includes('error')
+            ? { ok: false, error: 'the stand-in refuses any text with error in it' }
+            : { ok: true };
+        },
+      });
+      const hold = createToggle({ label: 'Hold a note', size: 'small',
+        onChange: (on) => { holding = on; } });
+      cnoteSpec = { f, idle, hold, compiled, setHolding: (on) => { holding = on; hold.set?.(on); } };
+      box.append(f.el, hold.el);
+    });
+
   /**
    * 🔴 THE NEWEST BLOCK ON THIS PAGE, AND THEREFORE THE FIRST CALL TO
    * `section()`. Asked for 2026-09-26 with a sketch: *"do a instrument panel
@@ -5256,6 +5309,79 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   settle();
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   measure();
+
+  /* ── the compile note, the newest block ────────────────────────────────────
+     🔴 THE STATIC HALF NOW, THE TIMED HALF IN THE BACKGROUND. `/kit/` has about
+     two seconds of room before the harness gives up waiting for `ready` (see
+     the loop block near the foot), and the timed half is four compiles of a
+     350 ms stand-in, so it is NOT awaited: its asserts land after `ready`,
+     never more than about 1.5 s apart, which is inside the harness's patience.
+     ⚠️ EACH HALF IS A NEGATIVE CONTROL FOR THE OTHER. A note that was always
+     drawn passes "it breathes while compiling" and fails "the corner is
+     empty"; a module that ignored `notNow` fails the held wait; one that
+     dropped the compile under the hold fails the release. */
+  {
+    const { f, idle } = cnoteSpec;
+    d.assert('a compile note with nothing to say draws nothing, and it is a status line rather than a control',
+      idle.shown() === '' && getComputedStyle(idle.el).display === 'none'
+        && idle.el.tagName !== 'BUTTON' && idle.el.tabIndex < 0 && idle.el.getAttribute('role') === 'status'
+        && getComputedStyle(f.el).position === 'relative',
+      `"${idle.shown()}", display ${getComputedStyle(idle.el).display}, a ${idle.el.tagName.toLowerCase()} `
+      + `with role ${idle.el.getAttribute('role')}, host ${getComputedStyle(f.el).position}`);
+  }
+  (async () => {
+    const { f, idle, hold, compiled } = cnoteSpec;
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    const typeInto = (t) => { f.input.value = t; f.input.dispatchEvent(new Event('input', { bubbles: true })); };
+    const r = (e) => e.getBoundingClientRect();
+    const tok = (k) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(k));
+    const base = f.input.value;
+
+    typeInto(`${base}\na`);
+    await nap(150);
+    typeInto(`${base}\nab`);
+    await nap(IDLE_MS + 100);
+    const nt = r(idle.el), ta = r(f.input);
+    const inR = +(ta.right - nt.right).toFixed(1), inB = +(ta.bottom - nt.bottom).toFixed(1);
+    const anim = getComputedStyle(idle.el).animationName;
+    d.assert('typing then a pause starts one compile, under a breathing Compiling note in the box\u2019s corner',
+      idle.runs() === 1 && idle.state() === 'compiling' && idle.shown() === NOTE_SAYS.compiling
+        && anim === 'pos-cnote-breathe' && Math.abs(inR - tok('--rows-gap')) <= 0.6
+        && Math.abs(inB - tok('--rows-gap')) <= 0.6 && Math.abs(nt.height - tok('--ctl-sm')) <= 0.6,
+      `${idle.runs()} compile ${idle.state()}, "${idle.shown()}" ${anim}, `
+      + `${inR} px in from the right and ${inB} up, ${nt.height.toFixed(1)} px tall`);
+    await idle.settled();
+    d.assert('and it compiled the last text typed, once, and then the corner is empty again',
+      idle.shown() === '' && getComputedStyle(idle.el).display === 'none'
+        && compiled.length === 1 && compiled[0].endsWith('ab'),
+      `${compiled.length} compile of "${(compiled[0] || '').split('\n').pop()}", "${idle.shown()}", `
+      + `display ${getComputedStyle(idle.el).display}`);
+
+    typeInto(`${base}\nerror`);
+    await idle.settled();
+    const errInk = getComputedStyle(idle.el).color;
+    const bad = getComputedStyle(document.documentElement).getPropertyValue('--bad').trim();
+    const probe = document.createElement('span'); probe.style.color = bad; document.body.append(probe);
+    const badInk = getComputedStyle(probe).color; probe.remove();
+    d.assert('a refused compile leaves Did not compile standing, still, in the bad ink, with the reason on hover',
+      idle.shown() === NOTE_SAYS.error && idle.el.title.includes('refuses')
+        && getComputedStyle(idle.el).animationName === 'none' && errInk === badInk,
+      `"${idle.shown()}", title "${idle.el.title}", ink ${errInk} against ${badInk}`);
+
+    hold.set(true);
+    const n0 = compiled.length;
+    typeInto(`${base}\nfixed`);
+    await nap(IDLE_MS + 300);
+    d.assert('while a note is held a due compile waits, and the note breathes over the wait',
+      compiled.length === n0 && idle.state() === 'waiting' && idle.shown() === NOTE_SAYS.compiling,
+      `${compiled.length - n0} compiles ${IDLE_MS + 300} ms after typing, ${idle.state()}, "${idle.shown()}"`);
+    hold.set(false);
+    await idle.settled();
+    d.assert('and the moment the note comes up it compiles, the error clears and the corner empties',
+      compiled.length === n0 + 1 && compiled[n0].endsWith('fixed') && idle.shown() === '' && idle.error() === '',
+      `${compiled.length - n0} compile of "${(compiled[n0] || '').split('\n').pop()}", "${idle.shown()}"`);
+    f.input.value = base;
+  })().catch((e) => d.assert('the compile note checks ran to the end', false, String(e?.message || e)));
 
   /* ── the glued rows and the instrument panel built on them ──────────────── */
   {

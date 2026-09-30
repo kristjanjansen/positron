@@ -76,6 +76,11 @@ and the URL form, never the word**, which is the `rig/board/` rule again.
 ⚠️ `PROGRESS.md` and `SUMMARY.md` keep `28 vclick` and `05 vclick`: those are
 dated records from the numbered era, and rewriting them would date-stamp a name
 onto a day it did not have.
+🔴 **AND `sound` IS NOW `und`, RENAMED 2026-09-30 ON INSTRUCTION** (*"rename
+sound demo to und"*, the letters confirmed by asking because the rename before
+it arrived as *"do ound"*). The deployed `/sound/` is GONE with no redirect,
+like `/vclick/` before it. The sweep matched `/sound/` and `demo/sound/`, never
+the word: `torvalds/linux/.../sound/usb/` and `ubu.com/sound/` are not ours.
 🔴 **AND `held` IS NOW `weight`, RENAMED 2026-09-19 ON INSTRUCTION, AND THIS ONE
 IS NOT LIKE THE OTHER TWO.** *"name the demo held, rename old held to weight"*,
 because the NAME is being given to a different demo. So the old URL is not a

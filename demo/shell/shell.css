@@ -790,7 +790,7 @@ button.pos-pri[data-busy="1"] {
    ⚠️ BOTH SIDES, AND THAT IS THE HALF THAT IS EASY TO SKIP. Owning the top
    margin as well is what makes the gap EXACTLY the gap: under the old rule a
    neighbour's larger bottom margin collapsed through and won, which is how
-   `/sound/` measured 53.5 px between its field and its transport bar while
+   `/und/` measured 53.5 px between its field and its transport bar while
    every other gap on it read 40.
 
    🔴 THE GAP IS WRITTEN ON THE BLOCK ABOVE IT, AND THE FIRST ATTEMPT PUT IT
@@ -4811,6 +4811,59 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    control come `.tbar-rates` and `.tbar-badge`, both zero wide and both still
    separated by a gap: 8 + 8 + 1 of border is the 17.
    ⚠️ IT IS THE SAME FAULT AS AN EMPTY READOUT PAINTING ITS OWN BORDER, which
+/* ── the compile note (.pos-cnote), demo/shell/compile-idle.mjs ──────────
+   🔴 A NOTE, NOT A BUTTON, IN THE CORNER WHERE `/fau/`'s COMPILE BUTTON SAT.
+   Asked 2026-09-30: *"Small breating "Compiling" note (not button) on right
+   bottom i the plae complile button is in fau"*. The host is the box the text
+   is typed in and is the containing block; the note is a `--ctl-sm` box
+   `--rows-gap` in from the right and the bottom, which is exactly the rect the
+   small button had, so the word sits where the button's word sat.
+   ⚠️ THE TEXT KEEPS ITS LAST LINES CLEAR OF IT WITH ITS OWN BOTTOM PADDING,
+   which scrolls with the text, the rule `/fau/` measured on a phone when the
+   button was there. Written twice: a bare textarea at (0,1,1), and a kit field
+   at (0,2,1), because `.pos-field.tall textarea`'s padding SHORTHAND is (0,2,1)
+   and would beat the bare one. This block sits after that rule, so the tie is
+   ours on order and nothing outruns it.
+   ⚠️ BREATHING IS THE INK'S COLOUR AND NOTHING ELSE, so the note cannot move a
+   pixel of anything near it (and not opacity, see the keyframes). 1.6 s a breath, slower than the 1.1 s button sweep on
+   purpose: a sweep says a press is being worked on, this says something is
+   happening that nobody pressed for. Reduced motion holds it half way.
+   An error stands still in `--bad`; a note with nothing to say is `hidden`,
+   and `display: flex` below needs its own `[hidden]` line to mean it.
+   🔴 IT PAINTS THE WELL'S GROUND, BECAUSE ON A PHONE IT SITS OVER CODE.
+   PHOTOGRAPHED at 375 on `/fau/`: the twenty-row box wraps the Organ past its
+   height, so it scrolls, the reserve above is at the END of the text, and a
+   transparent note laid `COMPILING` over `os.osc(freq` as one unreadable
+   string. The button it replaced never showed this because a button has a
+   face. So the note carries the well's ground, and the button's half-pill of
+   air either side, which makes its box the button's box again and lets the
+   word cover the line under it rather than mix. `--well` is for a page whose
+   text box is not the kit field's `--bg` (`/und/`'s is its own dark), set
+   once on the host and read by the box and the note alike. */
+.pos-cnote-host { position: relative; }
+.pos-cnote-host textarea,
+.pos-field.pos-cnote-host textarea { padding-bottom: calc(var(--ctl-sm) + 2 * var(--rows-gap)); }
+.pos-cnote {
+  position: absolute; right: var(--rows-gap); bottom: var(--rows-gap);
+  height: var(--ctl-sm); display: flex; align-items: center;
+  font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim); white-space: nowrap; pointer-events: none;
+  background: var(--well, var(--bg)); padding: 0 calc(var(--pad-btn) / 2);
+}
+.pos-cnote[hidden] { display: none; }
+.pos-cnote[data-state="compiling"] { animation: pos-cnote-breathe 1.6s ease-in-out infinite; }
+.pos-cnote[data-state="error"] { color: var(--bad); pointer-events: auto; cursor: default; }
+/* ⚠️ THE INK BREATHES AND THE GROUND DOES NOT. An opacity pulse would fade
+   the ground with the word and let the code under it show through two thirds
+   of every breath, so the pulse is on `color`, which changes no size either. */
+@keyframes pos-cnote-breathe {
+  0%, 100% { color: color-mix(in oklab, var(--dim) 35%, var(--bg)); }
+  50%      { color: var(--dim); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pos-cnote[data-state="compiling"] { animation: none; color: color-mix(in oklab, var(--dim) 70%, var(--bg)); }
+}
+
    `shell.css` already fixes further up: a container with nothing in it must not
    take up room, and neither must a flex child. Both of these are empty on more
    pages than before, because a rate lattice of one now draws no buttons at all.

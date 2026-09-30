@@ -1,5 +1,35 @@
 ## Open
 
+### Open 2026-09-30: a new demo `collide`, SuperCollider typed and compiled in the tab, as `/fau/` does Faust
+
+ASKED, VERBATIM: *"can you do simple supercollider script browser compile demo as in fau called collide? do we have moving pieces?"*
+- **The moving pieces, checked 2026-09-30:** the engine is real wasm scsynth (SuperSonic, vendored, `demo/shell/scsynth.mjs`, used by `/grains/` and `/radio/`); the bytes are `demo/shell/synthdef.mjs`, whose `graph()` builds a version 2 SynthDef in JavaScript that scsynth plays. 🔴 **The LANGUAGE is missing**: sclang does not run in a browser (`research/supercollider-browser-2026-09.md` §1.3, PR #7440 open since 2026-04-01 and mid-design), and compiling on the Pi's sclang would run a visitor's code on the Pi, where sclang can shell out. Refused.
+- **So the demo is a small sclang subset compiled in JavaScript**: a function literal with UGen calls (`SinOsc.ar(440, 0, 0.1)`), arithmetic, arguments and `var`s, down to `graph()`, loaded with `/d_recv` and played. Anything outside the subset is refused with a line and column, never guessed.
+- Wait for the compile-on-idle kit module (entry below) and use it rather than a Compile button.
+
+### Done 2026-09-30: `/und/`'s part lane less yellow, in the colour the Csound score has on `/click/`
+
+ASKED, VERBATIM: *"make pat lane less yellow, use same color as csound score in other demo (can not recall)"*. "pat" is the `part` lane (`demo/und/index.html`, `id: 'deck-span'`, `color: INK.on`, `#ffd400`). The other demo is `/click/`, where the Csound score's lane (`words`, `demo/click/index.html:650`) is `#6f7d94`, the slate `/und/` already calls `DERIVED` for its tempo lane. Only the part lane changes: `INK.on` also marks a note that sounded on the event lane and the current line in the document, and those stay yellow. Handed to the agent working on `/und/`.
+
+### Done 2026-09-30: `/und/` sounds nicer, and the transport's play plays with sound
+
+ASKED, VERBATIM: *"make und nicer-sounding. play button in strapsport should automatiically play with sound, rm 'play woth sound' button"*.
+- **The sound today** is one triangle oscillator per note, 8 ms attack, gone by 280 ms, gain 0.2 (`demo/und/index.html:249`). No filter, no body, no room. What "nicer" means was not specified; the brief is a warmer voice (two slightly detuned oscillators through a lowpass that closes over the note, a longer release, a little room) with the same timing, because the page's claim is WHERE the notes land and a sound that smears the onset would hide it.
+- **The button**: `{ id: 'sound', label: 'Play with sound', primary: true }` (`:102`) and `d.on('sound')` (`:453`), which creates and resumes the AudioContext and then `parent.play()`. The transport bar's own play must do that instead, inside the press, and the control goes. Removing a control moves the harness's presses, so assert counts are compared before and after.
+- Handed to the agent already working on `/und/` for the compile note, so one agent owns the page.
+
+### Done 2026-09-30: rename `sound`, and one compile-on-idle behaviour with a breathing "Compiling" note, for `/sound/` and `/fau/`, in the kit
+
+ASKED, VERBATIM: *"rename sound demo to und. unify compilation in ui logic on this and fau ant othes. trigger on inactivity? Small breating "Compiling" note (not button) on right bottom i the plae complile button is in fau. a kit comopnent?"*
+- ✅ **RENAMED TO `und`, CONFIRMED BY ASKING** (the last rename of this page, *"rname cvlick demo do ound"*, meant `sound`). `/sound/` 404s now, no redirect, the same as `/vclick/`, `/box/` and `/radio1965/`.
+- **Only two pages compile what a visitor types**: `/und/`, formerly `/sound/` (Csound, `demo/und/index.html:438`, recompiles 400 ms after typing stops, logs `recompiled`) and `/fau/` (Faust, a Compile button with the kit's busy shimmer, `demo/fau/index.html:1277`). `weight`, `typist` and `wish` have textareas that are not compiled; `floor`, `mirror`, `videoradio`, `weight` compile their own fixed shaders.
+- 🔴 **THIS REVERSES A DECISION ON `/fau/`**: 2026-09-28 *"replace it with compile (shimmer). no autocompile"*, and `/fau/` carries an assert that typing does not compile inside the old idle wait (`demo/fau/index.html:2112`). The new ask wins; the assert inverts.
+- ⚠️ **What the old fau idle compile got right and must survive**: it waited for a held note to come up, because a compile under a held key takes the note away. The kit component has to take a "not now" predicate.
+- Shape: a kit module in `demo/shell/` that owns the idle timer and a quiet status note (breathing `Compiling`, then nothing or the error) at the bottom right of the editor's foot, where `/fau/`'s button sits today. Not a button. Done once, then both pages wired to it.
+
+- ✅ **DONE, from the agent's report.** `demo/shell/compile-idle.mjs`, `createCompileIdle({ input, compile, notNow, host, delay })`: 600 ms after the last keystroke (/und/ used 400, the old /fau/ timer 800; keystroke gaps inside a word run 150 to 300 ms), one compile at a time and the last text wins, `notNow` delays and never drops. The note is a `role="status"` span, `Compiling` while a compile runs or is held back, shown at least 800 ms, and `Did not compile` in `--bad` with the reason on hover until one succeeds. /fau/ lost its Compile button; the "typing compiles nothing" assert is INVERTED (nothing inside the wait, then exactly one). /kit/ has a COMPILE ON A PAUSE block. Counts: und 23 to 27, fau 55/56 to 57/58 (the red is the pre-existing diagram one), kit 249 to 255. Sabotage, `notNow` ignored: 1 new red on each of fau and kit.
+- ⚠️ **Unsettled:** on a phone with the box scrolled the note covers the last visible line, as the button did. It reads `COMPILING` through the label style. /und/ typing while playing still pauses it.
+
 ### Done 2026-09-30 (9ccba93): `/reel/`, play with nothing picked starts the first mark
 
 ASKED, VERBATIM: *"when i press play, reel demo short start from first (whaterver playing). no selection needed"*. The first film or radio mark at or after the playhead, which on a fresh visit is the 1965-01-07 newsreel the page opens on. Under `?selfcheck=1` it picks and opens nothing. `verify reel` 26/27, 0 ERR reaches.
