@@ -821,6 +821,12 @@ export const DEMOS = [
       + 'MIDI and brings its sound back in 20 ms pieces',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
+  // Listens only. The Circuit's left output into a Fast Track Pro on the Pi,
+  // captured by `rig/board/board.mjs` and streamed into the Pi's own room.
+  { name: 'away', group: 'instruments', act: 4, created: '2026-09-30', built: true, room: 'fixed',
+    one: 'listen to a Novation Circuit in another building, captured by a Raspberry Pi and drawn as it arrives',
+    tags: ['WS', 'relay', 'PCM', 'canvas', 'live board'] },
+
   /**
    * 🔴 SOMEBODY ELSE'S FIRMWARE, COMPILED RATHER THAN REWRITTEN, AND THAT IS
    * THE WHOLE CLAIM. `LESSONS.md` #81: `/grains/` said *"the same granulator in

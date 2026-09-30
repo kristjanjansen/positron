@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  // demo/away/index.html: listen to the Circuit in another building.
+  //
+  // Asked 2026-09-30: *"make other demo for this, 'away', do not touch knobs
+  // tdemo. allow me just to listen in circuit audio from pi in wave visualizer
+  // (use videoframe)"*. The Circuit's left output goes into the Fast Track
+  // Pro's input 1, the Raspberry Pi captures it (`audio.start` with
+  // `source: "capture"`, rig/board/board.mjs), and the board streams 20 ms
+  // mono frames into `studio-1`. This page only LISTENS: it sends the board
+  // one `audio.status` question and never starts or stops anything, because
+  // there is one instrument slot on that board and another page may own it.
+  //
+  // ⚠️ THE PICTURE DRAWS WITHOUT THE SOUND. `createBoard`'s `onPcm` fires for
+  // every frame that arrives whether or not an AudioContext exists, so the
+  // waveform is live on a visit and Listen only adds the speakers. Nothing
+  // leaves this machine for anybody else's server: the frames come off our own
+  // relay, which the page joins on load exactly as /knobs/ does.
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { envelope } from '/shell/wave-view.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const RATE = 48000;
+  // How much sound the picture holds, left edge to right edge.
+  const SECONDS = 4;
+  // A sample at or past this is on the rail. 32767 / 32768.
+  const CLIP = 32767 / 32768;
+
+  const d = mount({
+    name: 'away',
+    what: 'Listen to a Novation Circuit in another building, captured by a Raspberry Pi and drawn as it arrives.',
+    readout: { playing: '', level: 'dBFS', clipped: '', buffer: 'ms' },
+    controls: [
+      { id: 'listen', label: 'Listen', primary: true },
+    ],
+  });
+  guard(d);
+
+  // ── the picture ───────────────────────────────────────────────────────────
+  const canvas = el('canvas', 'away-wave');
+  canvas.setAttribute('aria-label', `the last ${SECONDS} seconds of sound from the board`);
+  const board = createBoard({
+    room: ROOM,
+    relay: q.get('relay') || undefined,
+    of: 'Raspberry Pi',
+    showName: false,
+    // The Circuit plays patterns and nobody here is pressing keys, so a
+    // cushion that never runs dry is worth more than the 60 ms it costs.
+    cushionMs: 160,
+    maxCushionMs: 400,
+    log: (line, kind) => d.log(line, kind),
+    onOpen: () => { d.log(`joined ${ROOM}`, 'hi'); askStatus(); },
+    onPcm: (f32) => take(f32),
+    onMessage: (m) => {
+      if (m.type === 'audio.started' && 'source' in m) showSource(m.ok ? m.source : null);
+    },
+  });
+
+  const panel = createVideoPanel({
+    media: canvas,
+    left: board.presence,
+    fullMode: 'footer',
+  });
+  d.stack.add(panel.el);
+
+  // ── the ring the picture reads ────────────────────────────────────────────
+  const ring = new Float32Array(SECONDS * RATE);
+  const ordered = new Float32Array(ring.length);
+  let head = 0, filled = 0, dirty = false;
+  let clipped = 0, frames = 0, sumSq = 0, sumN = 0;
+
+  function take(f32) {
+    frames++;
+    for (let i = 0; i < f32.length; i++) {
+      const v = f32[i];
+      ring[head] = v;
+      head = (head + 1) % ring.length;
+      if (v >= CLIP || v <= -1) clipped++;
+      sumSq += v * v;
+    }
+    sumN += f32.length;
+    filled = Math.min(ring.length, filled + f32.length);
+    dirty = true;
+    // Five times a second: a readout cell is a fixed box, and nobody reads a
+    // number that changes fifty times a second.
+    if (frames % 10 === 0) {
+      const rms = Math.sqrt(sumSq / Math.max(1, sumN));
+      sumSq = 0; sumN = 0;
+      d.set('level', rms > 0 ? (20 * Math.log10(rms)).toFixed(1) : '', rms > 0.001 ? 'ok' : 'warn');
+      d.set('clipped', clipped, clipped ? 'warn' : 'ok');
+      const st = board.stats();
+      d.set('buffer', board.ctx() ? Math.round(st.bufferedMs) : '');
+    }
+  }
+
+  const ink = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  let colours = null;
+
+  function fit() {
+    const r = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(r.width * dpr));
+    const h = Math.max(1, Math.round(r.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+      dirty = true;
+    }
+  }
+  new ResizeObserver(fit).observe(canvas);
+
+  let drawn = 0, litLast = 0;
+  function draw() {
+    requestAnimationFrame(draw);
+    if (!dirty) return;
+    dirty = false;
+    if (!colours) colours = { wave: ink('--hi'), clip: ink('--bad'), line: ink('--line2') };
+    const g = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height, mid = H / 2;
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = colours.line;
+    g.fillRect(0, Math.floor(mid), W, 1);
+    if (!filled) return;
+    // Oldest on the left, newest at the right edge. Before the ring is full the
+    // picture starts part way across, so new sound always enters at the right.
+    const start = (head - filled + ring.length) % ring.length;
+    const tail = Math.min(filled, ring.length - start);
+    ordered.set(ring.subarray(start, start + tail), 0);
+    if (tail < filled) ordered.set(ring.subarray(0, filled - tail), tail);
+    const cols = Math.max(1, Math.round(W * filled / ring.length));
+    const env = envelope(ordered.subarray(0, filled), cols);
+    const x0 = W - cols;
+    for (let i = 0; i < cols; i++) {
+      const lo = env.min[i], hi = env.max[i];
+      const y1 = mid - hi * (mid - 1), y2 = mid - lo * (mid - 1);
+      g.fillStyle = (hi >= CLIP || lo <= -1) ? colours.clip : colours.wave;
+      g.fillRect(x0 + i, y1, 1, Math.max(1, y2 - y1));
+    }
+    drawn++;
+    litLast = env.lit;
+  }
+  requestAnimationFrame(draw);
+
+  // ── what the board says it is playing ────────────────────────────────────
+  let source = undefined;
+  function showSource(s) {
+    source = s;
+    d.set('playing', s === null ? 'nothing' : s, s === 'capture' ? 'ok' : 'warn');
+  }
+
+  async function askStatus() {
+    const r = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
+    if (!r) {
+      d.log(`no board answered in ${ROOM} within six seconds`, 'warn');
+      return null;
+    }
+    showSource(r.ok ? r.source : null);
+    if (r.ok && r.source !== 'capture') {
+      d.log(`the board is playing ${r.source}, not the Circuit. This page only listens and will not change it`, 'warn');
+    } else if (!r.ok) {
+      d.log('the board is playing nothing. The Circuit capture has to be started on the board', 'warn');
+    }
+    return r;
+  }
+
+  // ── Listen ───────────────────────────────────────────────────────────────
+  // ⚠️ MUTE DISCONNECTS THE SPEAKERS, IT DOES NOT SUSPEND THE CONTEXT.
+  // board.mjs reads a suspended context as the browser refusing sound and says
+  // "tap anywhere", which would be a false instruction after a deliberate mute.
+  let listening = false;
+  d.on('listen', async () => {
+    const ctx = await board.startAudio();
+    const out = board.playout();
+    if (!listening) {
+      listening = true;
+      if (out) { try { out.connect(ctx.destination); } catch { /* already connected */ } }
+      d.button('listen').textContent = 'Mute';
+      d.log('listening', 'hi');
+    } else {
+      listening = false;
+      if (out) { try { out.disconnect(ctx.destination); } catch { /* already off */ } }
+      d.button('listen').textContent = 'Listen';
+      d.log('muted. The picture keeps drawing');
+    }
+  });
+
+  d.ready();
+
+  // ── checks, for a harness only ───────────────────────────────────────────
+  ifSelfcheck(async () => {
+    d.assert('the page sends the board nothing but a status question',
+      board.refusedToBoard() <= 1, `${board.refusedToBoard()} refused`);
+    const t0 = performance.now();
+    while (!frames && performance.now() - t0 < 8000) await new Promise((r) => setTimeout(r, 200));
+    if (!frames) {
+      // Not a failure of this page: the board is in another building and may
+      // be off. Said in the log rather than asserted either way.
+      d.log('no frames arrived from the board, so the picture has nothing to show. The board may be off', 'warn');
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 600));
+    d.assert('frames from the board reach the picture', frames > 0 && drawn > 0, `${frames} frames, ${drawn} draws`);
+    d.assert('each frame is the 20 ms the board publishes',
+      board.stats().shapeWrong === 0, board.stats().shapeSaid || '');
+    d.assert('the picture has sound in it, not a flat line', litLast > 0, `${litLast} lit columns`);
+  }, { log: d.log });
+</script>
+<style>
+  /* The picture is a waveform, not a film: a black well reads as a screen that
+     has not started, so it keeps the stage's own ground. */
+  .away-wave { background: transparent; }
+</style>
+</html>
