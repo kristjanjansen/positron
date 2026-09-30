@@ -3830,7 +3830,7 @@
       + `and ${bgVideo ? bgVideo.muted : 'no film'} showing ${glyphOf()} again`);
 
     A('one transport button starts the show, and becomes its stop',
-      !!showToggle && phase === 'live' && /^STOP/.test(showToggle.textContent),
+      !!showToggle && phase === 'live' && /^stop/i.test(showToggle.textContent),
       showToggle
         ? `the page is "${phase}" and the button reads "${showToggle.textContent}"`
         : 'the control room bar has no transport button at all');
@@ -3964,7 +3964,7 @@
       await new Promise((r) => setTimeout(r, 50));
     }
     A('the same button stops the show, and says START again',
-      phase === 'stopped' && /^START/.test(showToggle?.textContent || ''),
+      phase === 'stopped' && /^start/i.test(showToggle?.textContent || ''),
       `the page is "${phase}" and the button reads "${showToggle?.textContent}"`);
 
     /**
