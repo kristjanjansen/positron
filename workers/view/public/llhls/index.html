@@ -12,6 +12,52 @@
      a `.hold` pill for the publisher badge that the stream toggle replaced. A
      `border-radius` and a `margin` on a video inside a `.pos-vp-stage` are a box
      drawn inside a box and a gap inside a picture. -->
+<!-- 🔴 ONE PAGE RULE SET AGAIN SINCE 2026-09-30, AND IT IS ABOUT THE TWO
+     REFERENCE TABLES UNDER THE PICTURE AND NOTHING ELSE. Asked, verbatim: *"do
+     not wrap optoins. have default and recommended cols with values. use sans
+     serif for comment (change col title)"*, with maxLiveSyncPlaybackRate and
+     initialLiveManifestSize broken mid word at desk width. `table.mjs` lets a
+     cell break anywhere, which is right for a file name and wrong for an
+     identifier somebody will paste into their own config, so the no-wrap is on
+     this column only and the component is untouched.
+     ⚠️ THE TRACKS ARE IN `ch`, NOT px. `.pos-tbl` is the mono face, where `ch`
+     is exactly one character, so 31ch is `manifestLoadingMaxRetryTimeout` with
+     one to spare and cannot drift when a name is added or the size changes.
+     Every row is its own grid, so the tracks have to be declared rather than
+     `max-content`, or the header and the rows would disagree.
+     ⚠️ THE PHONE IS DECIDED BY THE TABLE'S OWN WIDTH, NOT THE WINDOW'S. Below
+     640 px of table a no-wrap name, two values and a paragraph cannot share one
+     line, so the row stacks: the name on its own line, the two values under it
+     on two columns, and the comment under those at the full width. Nothing
+     scrolls sideways. The header stacks the same way, so it reads as the key to
+     every row under it.
+     ⚠️ THE COMMENT IS THE PAGE'S PROSE FACE AT THE SIZE OF THE CAPTION JUST
+     ABOVE IT (`.pos-dg-cap`), so the words under the picture and the words in
+     the table read as one voice. -->
+<style>
+/* ⚠️ REGISTERED, BECAUSE `ch` RESOLVES AGAINST EACH ELEMENT'S OWN FONT. The
+   header row is 10 px and the rows are 11 px, so `31ch` typed on the rows made
+   the header's columns ten per cent narrower than the body's and every heading
+   sat left of its column. A registered `<length>` computes ONCE, on `.hls-opts`
+   in the table's own 11 px mono, and every row inherits the same pixels. A
+   browser without `@property` gets the old per-row reading, which is a heading
+   a few pixels off, not a broken table. */
+@property --hls-c1 { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --hls-c2 { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --hls-c3 { syntax: '<length>'; inherits: true; initial-value: 0px; }
+.hls-tbl { container-type: inline-size; }
+.hls-opts { --hls-c1: 31ch; --hls-c2: 10ch; --hls-c3: 12ch; }
+.hls-opts .pos-tbl-row { grid-template-columns: var(--hls-c1) var(--hls-c2) var(--hls-c3) minmax(0, 1fr); }
+.hls-opts .pos-tbl-body .pos-tbl-c:first-child { white-space: nowrap; overflow-wrap: normal; }
+.hls-tbl .pos-tbl-body .pos-tbl-c:last-child { font: 400 12.5px/1.5 var(--sans); }
+@container (max-width: 640px) {
+  .hls-opts .pos-tbl-row { grid-template-columns: var(--hls-c2) minmax(0, 1fr); row-gap: 4px; }
+  .hls-opts .pos-tbl-c:first-child, .hls-opts .pos-tbl-c:last-child { grid-column: 1 / -1; }
+  /* The second table stacks the same way, for the same reason: at 375 its
+     prose column was 150 px beside a 150 px name, seven words to a line. */
+  .hls-loops .pos-tbl-row { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+}
+</style>
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
@@ -20,6 +66,8 @@
   import { createPresenceButton, STREAM, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createStack } from '/shell/stack.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
 
@@ -624,9 +672,10 @@
                 + 'holds it. That socket is the count: there is no start button on the far '
                 + 'side, only an arrival and a departure.' },
           { id: 'play', label: 'player', sub: 'hls.js or native', tech: 'browser',
-            note: 'Waits for two segments before it asks for anything, because Cloudflare '
-                + 'answers the master playlist with a 200 as soon as ingest starts and long '
-                + 'before a child playlist has a single **EXTINF** in it.' },
+            note: 'Waits until the child playlist lists two **EXTINF** segments, because '
+                + 'Cloudflare answers the master playlist with a 200 long before it has one. '
+                + 'Then hls.js 1.7.1 runs unpatched, with the options and watchdogs listed '
+                + 'under this picture.' },
         ] },
       { id: 'cf', label: 'Cloudflare', sub: 'worker, container, Stream', kind: 'cloud', tech: 'cloudflare',
         children: [
@@ -645,9 +694,17 @@
         ] },
     ],
     links: [
-      { from: 'ctl', to: 'pub', label: 'I am watching',
-        note: 'Nothing is sent up this socket. Being open is the whole message, and closing '
-            + 'it is the only way the far side ever learns that a viewer has gone.' },
+      // 🔴 WHAT THE SOCKET REALLY IS, asked 2026-09-30 as *"you can be more
+      // techincal on this connector label and desc"*. Read off
+      // `workers/pub/worker.mjs`: `/watch` is accepted with `acceptWebSocket`
+      // (hibernatable), `viewers()` is `getWebSockets().length`, the only thing
+      // ever sent is one `hello` down on connect, and `webSocketMessage` is
+      // empty, so nothing the page could send up is read. `/webrtc/` carries
+      // the same label on the same socket and must change with this one.
+      { from: 'ctl', to: 'pub', label: 'wss /watch',
+        note: 'A hibernatable WebSocket to **wss://pub.positron.studio/watch**. One hello with '
+            + 'the viewer count comes down and nothing goes up, because the count is '
+            + '**getWebSockets().length** and a close is the only departure the Pub object sees.' },
       { from: 'pub', to: 'ff',
         note: 'Start on the first viewer, stop on the sweep. A leg that dies while somebody '
             + 'is still watching is restarted by the same sweep 30 s later.' },
@@ -664,6 +721,111 @@
             + 'at the live edge is ordinary and the player retries rather than failing.' },
     ],
   }, { how: true, atEnd: true });
+
+  /**
+   * 🔴 WHAT IT TAKES TO GET LOW LATENCY OUT OF hls.js, IN FULL. Asked
+   * 2026-09-30: *"add longer desc how to patch hls.js to work right"* and then
+   * *"and get ll what we need"*.
+   * ⚠️ IT IS TWO TABLES UNDER THE PICTURE AND NOT A LONGER NOTE, AND THE LIMIT
+   * IS NOT TASTE. A note over forty words is reported on `dg.cuts`, which this
+   * page ASSERTS empty, and every note is measured into the height the caption
+   * line reserves, so one long note would grow the empty line under the picture
+   * for every other box as well. The full list is about thirty facts, and a row
+   * of facts is cells, not a paragraph with glue in it.
+   * ⚠️ EVERY VALUE IS WHAT `src/low-latency-player.js` (v14) PASSES: the
+   * `new Hls({...})` literal at lines 401 to 461 and the `DEFAULTS` above it,
+   * because this page passes only `preferNative`. Every hls.js default was read
+   * off the bundled 1.7.1 and is quoted from `positron-streaming`, section
+   * "hls.js and the native path: what each default costs". Three lines of that
+   * literal change nothing (`lowLatencyMode`, `levelLoadingMaxRetry`,
+   * `levelLoadingRetryDelay` are already the defaults) and are left out, so the
+   * table is the thirteen that move something.
+   */
+  const more = createStack();
+  const knobs = createTable({
+    columns: [
+      // The px widths are table.mjs's own fallback and are replaced below, in
+      // `ch`, by the page's stylesheet: see `.hls-opts` at the top of the page.
+      { key: 'k', label: 'option', width: 200, hi: true },
+      { key: 'def', label: 'default', width: 70 },
+      { key: 'rec', label: 'recommended', width: 90, hi: true },
+      { key: 'why', label: 'why', grow: true },
+    ],
+  });
+  knobs.set([
+    { k: 'maxLiveSyncPlaybackRate', def: '1', rec: '1.05',
+      why: 'At 1 the latency controller inside hls.js never runs, so a player that starts late stays late. The same stream parked at 7.6 s one run and 15.4 s the next.' },
+    { k: 'liveSyncDuration', def: '3 segments', rec: '3 s',
+      why: 'Cloudflare advertises a 1.5 s hold back on a 2 s keyframe interval, and a target inside one keyframe interval cannot be held. It only counts if passed to the constructor.' },
+    { k: 'startFragPrefetch', def: 'false', rec: 'true',
+      why: 'Loads the first fragment before the media element attaches, so both loaders are already moving when playback may begin.' },
+    { k: 'initialLiveManifestSize', def: '1', rec: '3',
+      why: 'Refuses to start before the playlist holds 3 segments. The audio playlist advances in lockstep with the video, so waiting for depth in one waits for both.' },
+    { k: 'startOnSegmentBoundary', def: 'false', rec: 'true',
+      why: 'Only one part per 2 s segment is independently decodable, so a boundary is the one place both tracks can start from scratch. It costs up to a segment of latency.' },
+    { k: 'capLevelOnFPSDrop', def: 'false', rec: 'true',
+      why: 'Steps down a rendition when frames are dropped. It misses the iPhone that crawls at 0.2x while dropping 3 frames of 507, which is why the wrapper also caps on advance.' },
+    { k: 'backBufferLength', def: 'Infinity', rec: '30 s',
+      why: 'Stops played media piling up in memory on a live player that stays open for hours.' },
+    { k: 'manifestLoadingMaxRetry', def: '1', rec: 'Infinity',
+      why: 'A stream that is not up yet is retried inside hls.js instead of ending the instance.' },
+    { k: 'manifestLoadingRetryDelay', def: '1000 ms', rec: '3000 ms',
+      why: 'The first manifest retry waits 3 s while the container and ffmpeg come up.' },
+    { k: 'manifestLoadingMaxRetryTimeout', def: '64000 ms', rec: '8000 ms',
+      why: 'Caps the backoff at 8 s, so a stream that comes up is found within seconds.' },
+    { k: 'fragLoadingMaxRetry', def: '6', rec: '4',
+      why: 'A part missing at the live edge is normal. One retry turned that into rebuild storms that crashed the tab, and the slow default took 3 to 5 minutes to notice a real change of stream.' },
+    { k: 'fragLoadingRetryDelay', def: '1000 ms', rec: '500 ms',
+      why: 'A part that is about to exist is asked for again quickly.' },
+    { k: 'fragLoadingMaxRetryTimeout', def: '64000 ms', rec: '4000 ms',
+      why: 'Keeps a missing fragment from holding the player for a minute. The three loading keys are deprecated in 1.7.1 and log a warning, and they still work.' },
+  ]);
+  const loops = createTable({
+    columns: [
+      { key: 'k', label: 'behaviour', width: 150, hi: true },
+      { key: 'why', label: 'why no option does it', grow: true },
+    ],
+  });
+  loops.set([
+    { k: 'native HLS on Safari and iPhone',
+      why: 'Chosen when ManagedMediaSource exists. On desktop Safari native played at 0.961x and 5.25 s, and hls.js at 0.344x and 7.71 s with 2 errors.' },
+    { k: 'play only once audio and video overlap',
+      why: 'At start Cloudflare lands audio seconds behind video, so the element had 0.05 s to play while video held 5 s. It waits for 1 s of both, 8 s at most.' },
+    { k: 'cap on rate of advance',
+      why: 'Below 0.8x for 6 ticks of 500 ms it steps the rendition down, because a phone can crawl with a full buffer and no dropped frames.' },
+    { k: 'drift seek governor',
+      why: 'At most one seek to the edge every 10 s and only with 1.5 s buffered, and after 3 refusals it raises its own target by 1 s, up to 6 s. A seek every 2 to 3 s aborted the very loads it needed.' },
+    { k: 'never seek backwards',
+      why: 'After Cloudflare swaps the video the live sync position can point behind the playhead, and obeying it makes things worse.' },
+    { k: 'no seek over missing audio',
+      why: 'Video ahead with nothing in the overlap means an audio segment is late. Seeking cannot make one and once opened a 5.5 s hole, so it waits 12 ticks instead.' },
+    { k: 'skip a hole',
+      why: 'The gap handling in hls.js took about 20 s. This skips to the next real range after 3 confirming ticks, once per target.' },
+    { k: 'rebuild on a fatal manifest error',
+      why: 'A page opened before the broadcast gets an empty manifest, and stopLoad, loadSource and startLoad leave the instance wedged. Only destroying it and building a new one recovers.' },
+    { k: 'media error recovery',
+      why: 'recoverMediaError twice, with swapAudioCodec on the second, before anything blunter.' },
+    { k: 'one rate limit on every rebuild',
+      why: 'A 3 s floor and a 4 s cooldown across every trigger, because rebuild storms crashed the tab.' },
+    { k: 'source watchdog',
+      why: 'An edge frozen for 12 s means the origin died, and Cloudflare mints a new video on every encoder reconnect, which no seek recovers. On the native path the playhead must be frozen too.' },
+    { k: 'player watchdog',
+      why: 'A playhead frozen for 6 s gets a seek, and after 2 failed seeks a rebuild.' },
+    { k: 'play again on a visible tab',
+      why: 'Chrome pauses muted video in a background tab and nothing in hls.js calls play() again.' },
+    { k: 'latency from PROGRAM-DATE-TIME',
+      why: 'hls.latency froze at 1.7 s against 8.4 s true during an ingest pause, so the wall clock in the playlist is the honest reading.' },
+  ]);
+  // Reference text is read top to bottom, not scrolled inside a box.
+  knobs.el.style.setProperty('--tbl-h', 'none');
+  loops.el.style.setProperty('--tbl-h', 'none');
+  // The column layout and the prose face live in the page's <style>, keyed on
+  // these two classes, so neither table.mjs nor any other page is touched.
+  knobs.el.classList.add('hls-tbl', 'hls-opts');
+  loops.el.classList.add('hls-tbl', 'hls-loops');
+  more.titled('hls.js options', knobs);
+  more.titled('what the wrapper adds', loops);
+  dg.el.after(more.el);
 
   d.log('nothing is publishing until you press the control. pressing it again lets go');
   d.ready();
