@@ -231,7 +231,7 @@
     const now = performance.now();
     if (now - pending.t0 > ONSET_WAIT_MS) {
       pending = null;
-      d.log(`no onset heard within ${ONSET_WAIT_MS} ms of that note, so no lag was measured. Is Listen on, and is the part audible over the pattern?`, 'dim');
+      d.log(`no onset heard within ${ONSET_WAIT_MS} ms of that note, so no lag was measured. Is ONLINE pressed, and is the part audible over the pattern?`, 'dim');
       return;
     }
     let ss = 0;
@@ -299,7 +299,7 @@
   function showSource(s) {
     if (s === saidSource) return;
     saidSource = s;
-    d.log(s ? `the board is capturing ${s}` : 'the board is capturing nothing. Press Listen to start it', s ? 'hi' : 'dim');
+    d.log(s ? `the board is capturing ${s}` : 'the board is capturing nothing. Press ONLINE to listen', s ? 'hi' : 'dim');
   }
 
   async function askStatus() {
