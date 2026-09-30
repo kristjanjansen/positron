@@ -32,7 +32,7 @@
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createMidi } from '/shell/midi.mjs';
+  import { createMidi, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
   import { createPresenceButton } from '/shell/presence.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -159,7 +159,13 @@
     ...keyRange(),
     base: 48,
     full: true,
-    onDown: (note) => { kb.lightNote(note, true); noteOn(note, VEL); },
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. A looped note comes back through `onDown` marked `loop`, so
+       it goes to the Circuit by exactly the route a finger does, and a note the
+       take heard over MIDI keeps the velocity it was played with. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
+    onDown: (note, how, vel) => { kb.lightNote(note, true); noteOn(note, vel ?? VEL); },
     onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
     onPanic: () => panic(),
   });
@@ -178,6 +184,7 @@
       log: (line, kind) => d.log(line, kind),
       onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} playing the Circuit`
                                : 'no MIDI keyboard is plugged in yet, so nothing will arrive'),
+      loop: kb,
     });
     midiBtn.remove();
     return midi;
@@ -350,6 +357,14 @@
       isOnset(0.2, 0.05) && !isOnset(0.2, 0.2) && !isOnset(0.008, 0.001));
     d.assert('the four parts are Synth 1, Synth 2, Drums 1 and Drums 2',
       JSON.stringify(Object.values(PARTS).map((p) => [p.ch, p.note ?? null])) === '[[1,null],[2,null],[10,60],[10,62]]');
+    /* `Loop` follows the Evolution, and a loop reaches `board.send`, counted by
+       the board module on the far side of this page: a harness run is refused
+       there, so this is every note that was on its way to the Circuit and
+       nothing was heard. */
+    await checkEvolutionLoop(d, {
+      keys: kb, heard: () => board.refusedToBoard(),
+      ports: (names) => offerLoopFor(kb, names, d.log), real: () => midi?.names() ?? [],
+    });
     const t0 = performance.now();
     while (!frames && performance.now() - t0 < 6000) await new Promise((r) => setTimeout(r, 200));
     if (!frames) {

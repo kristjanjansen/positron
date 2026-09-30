@@ -32,7 +32,7 @@
   import { createControlGrid } from '/shell/control-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
-  import { createMidi } from '/shell/midi.mjs';
+  import { createMidi, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
   // The hand's yield, from the module that owns it rather than from a
   // re-export: this page no longer builds a slider.
   import { HAND_YIELD_MS } from '/shell/hand-drive.mjs';
@@ -704,6 +704,7 @@
         d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
                 : 'no MIDI keyboard is plugged in yet, so nothing will arrive');
       },
+      loop: kb,
     });
     /* 🔴 THE FOOT LOSES ITS RIGHT HAND CONTROL HERE, WHICH IS THE WHOLE OF
        *"rm “midi is listening”"*. The row is measured on both sides of the one
@@ -863,9 +864,15 @@
     ...keyRange(),
     base: 48,
     full: true,
-    onDown: (note) => {
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. A looped note comes back through `onDown` marked `loop` and
+       goes to Yoshimi on the board by the route a finger takes, with the
+       velocity a MIDI key was played at when the take heard one. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
+    onDown: (note, how, vel) => {
       kb.lightNote(note, true);
-      ready().then(() => sendId({ type: 'note.on', note, vel: VEL, channel: 0 }));
+      ready().then(() => sendId({ type: 'note.on', note, vel: vel ?? VEL, channel: 0 }));
     },
     onUp: (note) => {
       kb.lightNote(note, false);
@@ -2410,6 +2417,14 @@
     freeChecks();
     checkAll();
     await panicCheck();
+    /* `Loop` follows the Evolution, and a loop reaches `board.send`, counted by
+       the board module: a harness run is refused there, so this counts notes on
+       their way to Yoshimi and nothing was heard. After the panic drill,
+       because `ready()` has resolved by then and a note is not held behind it. */
+    await checkEvolutionLoop(d, {
+      keys: kb, heard: () => board.refusedToBoard(),
+      ports: (names) => offerLoopFor(kb, names, d.log), real: () => midi?.names() ?? [],
+    });
   }
 
   /* The counter read at the LAST line of the module, which is the whole of a

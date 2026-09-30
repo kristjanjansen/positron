@@ -113,7 +113,7 @@
   import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createKeyboard, keyRange, KEY_SPAN_25, QWERTY_CHROMATIC }
     from '/shell/keyboard.mjs';
-  import { createMidi } from '/shell/midi.mjs';
+  import { createMidi, EVOLUTION, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC, damperSec } from '/shell/pedal.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createPicker } from '/shell/picker.mjs';
@@ -989,8 +989,10 @@
        ⚠️ `log` IS THE ONE LINE THIS PAGE DOES OWE IT, asked for as *"can you tell
        in log what is goin on with loopr"* after a take recorded over MIDI came
        back silent. The component knows what its loop is doing and this page owns
-       the log, so it lends it one rather than reporting on the loop itself. */
-    loop: true,
+       the log, so it lends it one rather than reporting on the loop itself.
+       ⚠️ `'evolution'` RATHER THAN `true` SINCE 2026-09-30: built, and withdrawn
+       until `createMidi({ loop: keys })` below sees the Evolution. */
+    loop: 'evolution',
     /* 🔴 TEN TAKES, DRIVEN BY THE NUMBER PAD ON THE MIDI KEYBOARD. Asked
        2026-09-23: *"num works. how come you can not add it to keyboard"*. The
        button is slot 1 and the pad reaches the other nine, so a take per number
@@ -1015,15 +1017,14 @@
    * ⚠️ SO A BROWSER WITH NO WEB MIDI NEVER SHOWS IT. Safari has none, and the
    * answer there is the true one: this keyboard is not connected and cannot be.
    *
-   * 🔴 THE TEST IS `/evo/`'s, CHARACTER FOR CHARACTER, RATHER THAN A SECOND
-   * SPELLING OF THE SAME QUESTION. That page filters its inputs with it, and
-   * `/wish/` records why a name test cannot just look for the word `Evolution`:
-   * CoreMIDI calls this port `MK-425C USB MIDI Keyboard`, so the maker's name is
-   * in nobody's port list. The model number is what is actually on the wire.
+   * 🔴 THE TEST LIVES IN `midi.mjs` SINCE 2026-09-30, when every keyboard page
+   * was asked for the same control. This page carried it as its own regular
+   * expression, `/evo/` as a second copy, and `instruments.mjs` as the third;
+   * `midi.mjs` now reads the one in `instruments.mjs`, which also records why a
+   * name test cannot just look for the word `Evolution`: CoreMIDI calls this
+   * port `MK-425C USB MIDI Keyboard`. `loop: 'evolution'` above is what starts
+   * the control withdrawn, and `createMidi({ loop: keys })` below offers it.
    */
-  const EVO_PORT = /mk-?4\d\dc|evolution/i;
-  const evoHere = (names) => names.some((n) => EVO_PORT.test(n));
-  keys.offerLoop(false);
 
   /**
    * 🔴 TRANSPOSE MOVES WHAT ARRIVES OVER MIDI AND NOTHING ELSE, AND THAT IS THE
@@ -1636,17 +1637,11 @@
     onPorts: (n, names = []) => {
       d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
               : 'no MIDI keyboard is plugged in, and the keys on screen still play');
-      const had = keys.loopOffered();
-      const now = keys.offerLoop(evoHere(names));
-      /* Only on a change, or a keyboard that reports itself twice says this
-         twice. A log line is for something that happened. */
-      if (now !== had) {
-        d.log(now
-          ? 'the Evolution is here, so Loop is back in the keyboard’s footer'
-          : 'the Evolution has gone, so Loop has left the footer and anything '
-            + 'it was playing has stopped. The takes are still on their slots');
-      }
+      /* The `Loop` half is `midi.mjs`'s now, through `loop: keys` below, with
+         the same two log lines this page used to write here, said only on a
+         change and after this one. */
     },
+    loop: keys,
   });
   /* 🔴 THE TAP IS READABLE FROM OUTSIDE THE PAGE, so a check can compare the two
      sides without the page summarising itself first, and so a person can read it
@@ -3662,9 +3657,18 @@
         d.assert('the Loop control is out of the footer until an Evolution is plugged in',
           keys.loopOffered() === false && keys.loop !== null
           && keys.el.querySelector('.kpad-grp-end').contains(keys.loop.el) === false,
-          `nothing on this desk matches ${EVO_PORT}, MIDI reads `
+          `nothing on this desk matches ${EVOLUTION.match}, MIDI reads `
           + `${midi.state()} with ${midi.ports()} input(s) named `
           + `${JSON.stringify(midi.names())}, so the control is built and out of the row`);
+        /* 🔴 THE SHARED CHECK EVERY KEYBOARD PAGE MAKES, driven through the same
+           `offerLoopFor` the port callback calls, with a Circuit as the negative
+           control. `timed: false`, because the full check cost this page its
+           last 16 asserts at the harness ceiling, and the loop sounding over MIDI
+           is graded just below. */
+        await checkEvolutionLoop(d, {
+          keys, heard: () => d.tap().voiced, timed: false,
+          ports: (names) => offerLoopFor(keys, names, d.log), real: () => midi.names(),
+        });
         keys.offerLoop(true);
 
         /* ⚠️ PRESSED, NOT CALLED. `keys.loop.set(true)` is the api and a person
