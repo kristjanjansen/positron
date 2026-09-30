@@ -1546,9 +1546,18 @@ sweepStrayEncoders((l) => log('video:', l));
 // taking the board down.
 const inputsCfg = parseInputs(process.env.BOARD_INPUTS || '');
 for (const p of inputsCfg.problems) log('inputs:', p);
+// 🔴 THE DIRECT PATH IS OPTIONAL, AND ITS ABSENCE IS NOT A FAULT. node-datachannel
+// is this board's first npm dependency (rig/board/package.json, installed by
+// push.sh and setup.sh), and a board without it runs exactly as before with the
+// relay only. rtc.mjs has the why and the P0 measurement.
+let PeerConnection = null;
+if (inputsCfg.inputs.size) {
+  try { PeerConnection = (await import('node-datachannel')).default.PeerConnection; log('inputs: direct path available (node-datachannel)'); }
+  catch (e) { log('inputs: no direct path, node-datachannel is not installed:', e.code || e.message); }
+}
 const hwInputs = createInputs({
   inputs: inputsCfg.inputs, room: ROOM, relay: RELAY, frame: FRAME, rate: RATE, name: NAME, id: BOARD_ID,
-  spawn, WebSocket, format, parse, randomId, fs: fsMod, log: (...a) => log('input', ...a),
+  spawn, WebSocket, format, parse, randomId, fs: fsMod, log: (...a) => log('input', ...a), PeerConnection,
 });
 if (!DRY && !ONCE) hwInputs.start();
 

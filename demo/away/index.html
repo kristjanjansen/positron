@@ -45,11 +45,14 @@
   const CLIP = 32767 / 32768;
   // Well inside the board's 60 s lease, so one lost message costs nothing.
   const RENEW_MS = 20_000;
+  // 10 ms frames on the direct path unless `?frame=20`, which is there to
+  // measure one against the other (plans/plan-away-webrtc.md §5.3, P3).
+  const DIRECT_FRAME_MS = q.get('frame') === '20' ? 20 : 10;
 
   const d = mount({
     name: 'away',
     what: 'Play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives.',
-    readout: { level: 'dBFS', clipped: '', buffer: 'ms', lag: 'ms' },
+    readout: { level: 'dBFS', clipped: '', buffer: 'ms', lag: 'ms', via: '', 'round trip': 'ms' },
     // 🔴 LISTEN AND ONLINE ARE ONE BUTTON, asked 2026-09-30: *"listen + online
     // is same button"*. The kit's presence button, wearing the badge
     // `createBoard` already drives, so the face says whether the board is
@@ -72,6 +75,8 @@
     // click and then corrects itself.
     cushionMs: 80,
     maxCushionMs: 250,
+    direct: true,
+    directCushionMs: Number(q.get('cushion')) || 40,
     log: (line, kind) => d.log(line, kind),
     onOpen: () => { d.log(`joined ${ROOM}`, 'hi'); askStatus(); },
     onPcm: (f32) => take(f32),
@@ -264,6 +269,7 @@
       d.set('level', rms > 0 ? (20 * Math.log10(rms)).toFixed(1) : '', rms > 0.001 ? 'ok' : 'warn');
       d.set('clipped', clipped, clipped ? 'warn' : 'ok');
       d.set('buffer', board.ctx() ? Math.round(board.stats().bufferedMs) : '');
+      showPath();
     }
   }
 
@@ -283,6 +289,12 @@
   // ── what the board says it is playing ────────────────────────────────────
   // What the board is capturing goes in the log when it changes, not in a
   // cell: asked 2026-09-30, *"rm playing from readout"*.
+  function showPath() {
+    const st = board.stats();
+    d.set('via', listening ? st.via : '', st.via === 'relay' ? 'warn' : 'ok');
+    d.set('round trip', listening && st.rttMs != null ? Math.round(st.rttMs) : '');
+  }
+
   let saidSource;
   function showSource(s) {
     if (s === saidSource) return;
@@ -321,11 +333,17 @@
       if (out) { try { out.connect(ctx.destination); } catch { /* already connected */ } }
       listenBtn.el.dataset.on = '1';
       listenBtn.el.title = 'listening. Press to mute';
+      // The relay starts the sound at once; the direct path, if it opens, takes
+      // over the frames and the sends without a gap in either.
+      board.goDirect({ frameMs: DIRECT_FRAME_MS }).then(showPath);
+      board.watchRtt(2000);
       await want();
       renew = setInterval(want, RENEW_MS);
     } else {
       listening = false;
       clearInterval(renew); renew = null;
+      board.watchRtt(0);
+      showPath();
       if (out) { try { out.disconnect(ctx.destination); } catch { /* already off */ } }
       delete listenBtn.el.dataset.on;
       listenBtn.el.title = 'press to listen';
@@ -340,6 +358,9 @@
     // A harness may not start the capture: the board is shared hardware in
     // another building, and board.mjs refuses every send under selfcheck.
     d.assert('a harness run cannot start the capture', board.driving() === false);
+    const path = await board.goDirect();
+    d.assert('a harness run opens no direct path to the board, because an offer is a send',
+      path === 'refused' && board.stats().via === 'relay', `${path}, via ${board.stats().via}`);
     d.assert('the page listens in the input room, not the instrument room', ROOM.endsWith(`-${INPUT}`), ROOM);
     // A drum part turns every key into its one drum, and the key that started
     // a note is the key that ends it even after the part changes. Driven

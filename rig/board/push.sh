@@ -55,11 +55,15 @@ echo "== shipping to $IP:$DEST"
 # ⚠️ rig/vis GOES TOO. The renderer is a C program that has to be COMPILED on
 # the board, and it lived in /tmp there until 2026-09-11 — one reboot from
 # taking every number in plan-visuals §3 with it.
-( cd "$SRC/../.." && tar cf - \
+( cd "$SRC/../.." && tar cf - --exclude=node_modules \
     rig/board rig/vis \
     $(cd rig/board && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
 ) | ssh "$USER_@$IP" "sudo tar xf - -C $DEST && sudo chown -R $USER_ $DEST && echo '   unpacked'"
 
+echo "== the one npm dependency, if package.json moved (rtc.mjs, node-datachannel)"
+# A prebuilt linux arm64 binary: 4 s, no compiler (plans/plan-away-webrtc.md §4).
+# Never installed on the laptop, which SIGKILLs a native module it did not build.
+ssh "$USER_@$IP" "cd $DEST/rig/board && if [ ! -d node_modules/node-datachannel ] || [ package.json -nt node_modules/.package-lock.json ]; then npm install --omit=dev --no-audit --no-fund 2>&1 | tail -1; else echo '   unchanged'; fi"
 echo "== building the renderer, if its source changed"
 # Cheap and idempotent: gcc is fast on two small files, and a binary older than
 # its source is the failure this avoids — it would run the PREVIOUS shader and

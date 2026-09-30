@@ -1,7 +1,7 @@
 # plan-away-webrtc: a direct path from the browser to the Pi for /away/
 
 > Asked 2026-09-30: *"write webrtc path to plan"*, after *"can we bring roundtrip
-> more down"*. **Nothing here is built.** The measurements marked MEASURED were
+> more down"*. **BUILT AND DEPLOYED 2026-09-30, see §9 for what it measured.** The measurements marked MEASURED were
 > taken on 2026-09-30 on this desk; everything else is marked as reasoning or as
 > read, and §7 lists what would have to be run to turn each one into a fact.
 
@@ -191,3 +191,30 @@ asserts cover the fallback logic with the board refusing.
   one network.
 - **Ordered reliable delivery for the audio.** §3: a p95 of 417 ms under 2%
   loss.
+
+## 9. Built, 2026-09-30, and what it measured
+
+Asked the same day: *"do midi updates on pi and webrtc for away"*, which was the
+go §1 waited on and the yes to `node-datachannel`.
+
+| step | result |
+|---|---|
+| P0 | ICE connects. Headless Chrome to `node-datachannel` 0.33.4 on the Pi, signalled through a relay room: **host to host over UDP**, open in **158 ms**, 200 of 200 frames of 1,932 bytes echoed at **p50 3.7 ms, p90 5.2, p99 8.8** round trip. libdatachannel resolved Chrome's `*.local` candidate itself, so §7's second unknown is settled: host to host, not peer-reflexive. |
+| P1 | `rig/board/rtc.mjs`, wired into `inputs.mjs`. `rig/board/package.json` pins `node-datachannel` 0.33.4; `push.sh` and `setup.sh` install it on the board and never on the laptop. The board says `direct: true` in `board.hello` and `board.alive`, and without the library it runs relay only and refuses an offer out loud. `node rig/board/test.mjs` **193/193** on the laptop and on the Pi; turning off the reorder guard takes 3 red, turning off the half-frame split 2. |
+| P2 | `createBoard({ direct: true })` in the kit, `goDirect()` on Listen, `/away/` gains `via` and `round trip` (six cells). Harness: `/away/` **20/20**, 14 page asserts, one of them that a harness run opens no peer. With no board in the room it falls back after 3 s and says so. |
+| P3 | 10 ms frames against 20, same probe, cushion 40 ms: at 20 ms the cushion ratcheted to **96 ms** and `lag` read **~115 ms**; at 10 ms it held **~35 ms** and `lag` read **~48 ms**. 10 is the default; `?frame=20` stays for measuring. |
+| P4 | `directCushionMs`, posted when the channel opens (which also undoes the ratchet the switchover causes) and put back on fallback. `/away/` starts it at 40 ms (`?cushion=` overrides). At 20 it ratcheted to 43 to 47 anyway with three dry-outs; at 40, one dry-out at the switchover. |
+
+**The numbers against §2, MEASURED on this desk, laptop and Pi on one network:**
+
+| | relay (before) | direct |
+|---|---|---|
+| board round trip | ~72 ms | **4 ms** |
+| key press to sound arriving back | ~93 ms | **~15 to 20 ms** (lag minus cushion) |
+| key press to speakers (`lag`) | ~175 ms | **~48 ms** |
+
+⚠️ **STILL NOT KNOWN**: everything in §7 about another network (the Pi really in
+another building, how often TURN is used), and whether the one dry-out at the
+switchover is audible enough to be worth starting the relay later. The probe that
+produced these numbers was a throwaway script driving `/away/?board=1` and is not
+kept.
