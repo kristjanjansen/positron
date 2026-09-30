@@ -137,6 +137,56 @@ export function takeChannel(all, channels, take, frame) {
   return one;
 }
 
+/**
+ * How far the high byte moves from one sample to the next, read as the device
+ * says (`le`) and byte swapped (`be`), summed over one interleaved block.
+ *
+ * 🔴 THE FAST TRACK PRO SENT BIG ENDIAN WHILE ALSA SAID S16_LE. MEASURED
+ * 2026-09-30 on the Pi, with a bare `arecord` and no board code: every sample's
+ * low byte was 0x00 or 0xFF, a quiet Circuit read -17 to -32 dBFS of hiss, and
+ * the same bytes swapped read -65 to -80 dBFS with a peak of 18. It had been
+ * little endian that morning, and a USB re-authorize did not bring it back.
+ * ⚠️ WHY THE HIGH BYTE: in audio read the right way round it is the slow part
+ * of a sample, so its steps are small at any level. Read the wrong way round it
+ * is the fast part. Lag-1 correlation of the whole sample could not tell them
+ * apart (0.986 both ways), because the sign byte dominates either reading.
+ */
+export function byteOrderSteps(all, channels) {
+  let le = 0, be = 0;
+  for (let i = channels; i < all.length; i++) {
+    const a = all[i], b = all[i - channels];
+    le += Math.abs((a >> 8) - (b >> 8));
+    be += Math.abs(((a << 24) >> 24) - ((b << 24) >> 24));
+  }
+  return { le, be };
+}
+
+/**
+ * Decides, and keeps deciding, whether a capture needs its bytes swapped. A
+ * verdict needs a quarter second of evidence and one reading at least twice as
+ * steady as the other, so digital silence and a close call change nothing.
+ * `fix(all)` swaps in place when it has decided so, and says when it changes.
+ */
+export function createByteOrder({ channels, windowSamples = 12_000, onChange = () => {} } = {}) {
+  let swap = false, le = 0, be = 0, n = 0;
+  return {
+    get swapped() { return swap; },
+    fix(all) {
+      const s = byteOrderSteps(all, channels);
+      le += s.le; be += s.be; n += all.length / channels;
+      if (n >= windowSamples) {
+        const was = swap;
+        if (!swap && be * 2 < le) swap = true;
+        else if (swap && le * 2 < be) swap = false;
+        if (swap !== was) onChange(swap, { le, be });
+        le = be = n = 0;
+      }
+      if (swap) for (let i = 0; i < all.length; i++) { const v = all[i]; all[i] = ((v & 0xFF) << 8) | ((v >> 8) & 0xFF); }
+      return all;
+    },
+  };
+}
+
 /** Has the lease run out. Pure, so the sweep's one decision is graded. */
 export function leaseExpired(lease, now) {
   return !(Number.isFinite(lease) && now < lease);
@@ -210,10 +260,12 @@ export function createInputs({
       // its 20 ms frame, at the same moment it always did, out of two halves.
       const IN = UNIT * 2 * cfg.channels;
       let carry = Buffer.alloc(0), halves = [];
+      const order = createByteOrder({ channels: cfg.channels, onChange: (swapped, s) =>
+        log(`${cfg.name}: ${swapped ? 'the device is sending big endian, swapping its bytes' : 'the device is little endian again'} (high byte steps ${s.le} as sent, ${s.be} swapped)`) });
       p.stdout.on('data', (chunk) => {
         carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
         while (carry.length >= IN) {
-          const all = new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + IN));
+          const all = order.fix(new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + IN)));
           const one = takeChannel(all, cfg.channels, cfg.take, UNIT);
           carry = carry.subarray(IN);
           s.rtc?.pcm(one);
