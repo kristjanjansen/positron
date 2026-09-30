@@ -1,3 +1,103 @@
+# Handoff, 2026-09-30, the Circuit on the Pi: /away/, board inputs, and the WebRTC plan
+
+This is a SECOND thread in the same checkout on the same day as session 57
+below. Session 57's handoff lists `17d48ec`, `53b595f`, `12cbb2b` and `907b3bf`
+as "a peer session's"; they are this thread's, and so are `bf0358c` and
+`2fe89a6`. Session 57's text is left as written.
+
+## Where it is right now
+
+- ✅ **Site: BUILD `bf0358c-114544-92f8`**, confirmed on the edge by
+  `deploy.mjs`. `2fe89a6` after it is a plan only and changes nothing served.
+- ✅ **The board (Pi 4, `192.168.1.213`, room `studio-1`)** runs this checkout's
+  `rig/board/board.mjs` and `rig/board/inputs.mjs`; md5s matched after the last
+  push (`inputs.mjs` `7dba107a…`). **Idle** at the end: instrument slot empty
+  (Yoshimi stopped on the owner's *"stop yoshimi"*), Circuit input not capturing,
+  no lease held.
+- `/etc/default/positron-board` on the Pi: `BOARD_AUDIO=default` and
+  `BOARD_INPUTS='{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}'`.
+- **Nothing is pushed** to GitHub.
+- Counted at the end: **59 demos, 57 built**, **79 plans**.
+
+## What is on the desk, measured on the Pi
+
+- The Fast Track Pro and the Circuit hang off the Pi's USB hub. Linux switched
+  the Fast Track Pro to its second configuration exactly as
+  `plans/plan-fasttrack-mk425c.md` §2.5 predicted (`Fast Track Pro switching to
+  config #2`, then `config OK`): card `Pro`, capture 16 bit stereo 8 to 48 kHz,
+  playback 44100 and 48000, **no ALSA mixer controls at all**.
+- ALSA names the Circuit client `Circuit`, port `Circuit MIDI 1`, which is what
+  the invented fixture in `rig/board/test.mjs` assumed. `/proc/asound/Circuit`
+  is `card7`.
+- The Circuit's LEFT output is on Fast Track Pro input 1; input 2 is open with
+  its gain up (its own noise, correlation with input 1 about 0.006). Only
+  channel 1 is streamed.
+- 🔴 **IT CLIPS.** Last reading with the Circuit playing: rms about -9 dBFS and
+  **4,108 of 467,520 samples at full scale**. The owner was told twice to turn
+  input 1's gain down about a third. Later readings were -82 dBFS, i.e. the
+  Circuit had stopped, so nobody has measured after a gain change.
+
+## What landed, all deployed
+
+| commit | what | check at |
+| --- | --- | --- |
+| `17d48ec` | board capture opens a stereo `hw:` device and keeps one channel (`arecord -c 1` on the Fast Track Pro fails with `Channels count non available`) | superseded by inputs, below |
+| `12cbb2b` | `/away/` created | |
+| `53b595f` | **`rig/board/inputs.mjs`: each hardware input streams into `<room>-<name>` on its own socket**, so the Circuit (`studio-1-circuit`) and Yoshimi (`studio-1`) run at once. A page names an input, never a device. Captures only while a 60 s lease is renewed (`input.want`) | `node rig/board/test.mjs` |
+| `907b3bf` | `/away/` plays the Circuit: Synth 1, Synth 2, Drums 1 (ch 10 note 60), Drums 2 (ch 10 note 62), the kit keyboard, Web MIDI in. **The board lets only note on, note off and CC 123 all notes off through, on channels 1, 2 and 10** (`midiVerdict`): the Circuit has no factory reset | https://positron.studio/away/ |
+| `bf0358c` | `arecord` period 480 frames in a 1920 buffer (ALSA's default was 6000 in 24000, 125 ms lumps); `/away/` cushion 160 to 80 ms; `lag` cell; Listen and ONLINE are one button (`createPresenceButton` gained a `badge` option) | https://positron.studio/away/ , press ONLINE, play a key, read `lag` |
+| `2fe89a6` | `plans/plan-away-webrtc.md` | read it |
+
+**Tests:** `node rig/board/test.mjs` **137/137**; sabotages: a downmix takes 4
+red, a lease that never expires 6, opening the MIDI gate to everything 5.
+`node demo/verify.mjs away` **17/17**, 11 page asserts.
+
+## The latency, measured 2026-09-30
+
+| | before `bf0358c` | after |
+| --- | --- | --- |
+| key press to note arriving back | 151 to 180 ms, median ~170 | **78 to 99 ms, median ~93** |
+| frame gaps p50 / p90 / max | 0.2 / 116.8 / 267 ms | 19.9 / 23.2 / 94.5 ms |
+| key press to speakers | ~330 ms | ~175 ms |
+
+Relay legs ~18 ms each way (round trips 36.6 from the laptop, 35.5 from the
+Pi); the laptop to Pi floor is **4.1 ms** by ping. So ~72 of the 93 ms is the
+relay, which is what the plan removes. The probes are throwaway scripts in the
+session scratchpad and are gone with it: the end to end one joins
+`studio-1-circuit`, sends `input.want`, plays six C4s on Synth 1 and times the
+onset in the returning frames.
+
+## Open, in order
+
+1. **The WebRTC path, `plans/plan-away-webrtc.md`.** Waiting on the owner for
+   two things: *go*, and whether `rig/board` may take its **first npm
+   dependency**, `node-datachannel` 0.33.4 (prebuilt arm64, installed in 4 s,
+   loopback echo p50 0.96 ms, MEASURED on the Pi and removed). Step P0 changes
+   nothing on the board.
+2. **The Pi camera beside the audio, off by default, enabled only by an env
+   var** (privacy). In `BACKLOG.md`; the owner said *"no need to do now"*. The
+   board's current `-video` stream is a generated picture and opens no camera.
+3. `/circuit/` reads 48/49: `the printed names sit the same distance from the
+   top and both sides`, top 41 against 21. **Pre-existing**: it fails the same
+   with this thread's `presence.mjs` change reverted.
+4. `/away/`'s readout wraps three and one on a phone, which `/knobs/` does too;
+   the readout's row rule counts cells, not width.
+
+## Traps met in this thread
+
+- **The board's single audio slot is shared by every page.** Something started
+  Yoshimi while `/away/` was capturing, which replaced the capture; that is what
+  `inputs.mjs` exists to prevent. `audio.start` still switches the one
+  instrument slot; inputs are separate.
+- **A deploy carries other sessions' uncommitted files**: every deploy in this
+  thread shipped another session's `demo/shell/shell.css` and
+  `demo/shell/live.mjs` edits. Session 57 later deployed from a clean worktree.
+- **Suspending an AudioContext to mute makes `board.mjs` log "tap anywhere"**;
+  `/away/` mutes by disconnecting the playout from the speakers instead.
+- **The harness cannot start the Circuit capture or send it notes**:
+  `createBoard` refuses every send under `?selfcheck=1`. `/away/`'s frame
+  asserts only fire when somebody else holds the lease.
+
 # Handoff, 2026-09-30, session 57: cam finished on its own inputs, the TURN relay live, stage questions fixed
 
 ## Where it is right now
