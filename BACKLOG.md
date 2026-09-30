@@ -10,9 +10,14 @@ ASKED, VERBATIM: *"read handoff. vpn off. do midi updates on pi and webrtc for a
 Same message: *"webrtc for away"*. Read as the go the plan waited on, and as yes to `node-datachannel` as `rig/board`'s first npm dependency. Order from the plan: P0 ICE between Chrome and `node-datachannel` on this network, P1 `rig/board/rtc.mjs`, P2 `/away/` direct with the relay as fallback and `via` / `round trip` cells, P3 10 ms frames, P4 the cushion. Each measured before the next.
 - ✅ **DONE, P0 to P4**, results in the plan's §9. Direct, host to host: board round trip 72 to **4 ms**, `lag` 175 to **~48 ms**, 10 ms frames beat 20 (115 ms), cushion starts at 40. Board has it (193/193 there), page has it behind `createBoard({ direct: true })`. Not known: behaviour off this network.
 
+### Open 2026-09-30: `/away/`'s second dry-out about 5 s after the direct path opens
+
+Found while measuring the direct path, not asked for. In five of seven runs the playout ran dry a second time 9.5 to 10.5 s into the page, about 5 s after the switch, which ratchets the cushion from ~35 to ~64 ms and puts `lag` at ~80 ms rather than ~48. Five seconds is the board's beat (`BEAT_MS`, `inputs.mjs`), so that is the first suspect; not measured. Files: `rig/board/inputs.mjs`, `demo/shell/board.mjs`.
+
 ### Open 2026-09-30: "other stuff" from the handoff's waiting list
 
 Same message: *"and other stuff"*. What can move without an owner decision: measure the Circuit input for clipping now the LAN is reachable (it read 4,108 samples at full scale before the gain was turned down, and nobody measured after); `/reel/`'s red `pointing at a mark says what it is`; `/circuit/` 48/49 name spacing. Owner's calls, NOT touched: the capitals rule, `/fau/`'s library sliders, the clipping ranges on three patches, the Pi camera.
+- ⚠️ **THE CIRCUIT INPUT STILL CLIPS, MEASURED THROUGH `/away/` 2026-09-30 ~15:45**: 8 to 29 samples at full scale per run of six to eight Synth 1 notes, rms about -33 dBFS. So the input 1 gain was not turned down enough, or not at all. Owner's hand on the Fast Track Pro; nothing in software can fix a clipped converter.
 - ✅ `/reel/` and `/circuit/` fixed by an agent: reel 26/27 to **27/27** (the hover text put a lane-and-date header over the mark's own lines and pushed its length out, `describeHit` now returns only the mark's lines); circuit 33/34 to **34/34** (a doubled top inset, 41 against 21, the page's own `.circ` top padding stacked on the kit's plate rule). Stale comment in `shell.css` above `.panel-case > .panel-plate` (it says `/circuit/` takes no case inset) left for whoever next holds that file.
 
 ### Done 2026-09-30: the dynamic knobs on the kit's knob grid
