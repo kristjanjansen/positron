@@ -1,6 +1,18 @@
 ## Open
 
-### Open 2026-09-30: research a minimal code editor with syntax highlighting for the synth languages
+### Open 2026-09-30: Loop on the on-screen keyboard of EVERY keyboard page when the Evolution is plugged in
+
+ASKED, VERBATIM: *"enable loop button and fucntioanly on onscreen keyboar when evolution is connceted"*, then chose *"Every keyboard page"* when asked. Today only `/nola/` does it: `createKeyboard({ loop: true })`, `keys.offerLoop(false)` at load and `keys.offerLoop(evoHere(names))` in `onPorts` (`demo/nola/index.html` ~1025 and ~1640, `EVO_PORT` there). The other keyboard pages: `away`, `collide`, `evo`, `fau`, `instrument`, `knobs`, `shape` (and `looper`, which has no MIDI). The Evolution test moves into the kit once, then each page gets it; `collide` and `fau` last, after the live-knobs and code-box agents are out of them. Each page must show the looped notes really SOUND, not only that the button appears.
+
+### Open 2026-09-30: build the code box from `plans/plan-code-editor.md`
+
+ASKED, VERBATIM: *"just go"*, to the plan's recommendation (a hand-rolled overlay, `demo/shell/code-box.mjs` and `code-lang.mjs`, one hue per knob parameter). Order: the tokenizer and its node test, then the kit piece, then `/und/` (free now), then `/collide/` and `/fau/` AFTER the live-knobs agent lands, because it is editing both. Not tried on an iPhone; the plan names three things only a real iPhone settles. ⏸ **PARKED ON INSTRUCTION, 2026-09-30:** *"iphone: deal later"*. The three: the caret over transparent text, the selection handles, and whether WebKit scrolls the wrapper to follow the caret. It ships without them.
+
+### Open 2026-09-30: `/collide/` keeps Pad, Growl and Wah only
+
+ASKED, VERBATIM: *"keep pad growl wah"*. Bell, Glass and Breath go from `demo/collide/presets.mjs`, with their per-patch asserts (three each), so the page count drops by nine. Handed to the live-knobs agent, which is in `demo/collide/` now.
+
+### Done 2026-09-30 (37317ca): research a minimal code editor with syntax highlighting for the synth languages
 
 ASKED, VERBATIM: *"in bg: invertigate minimal visual code editor with basic syntac hilite for our synths. they are rare languages so perhaps we need use some other templte"*. The languages: Faust (`/fau/`), the SuperCollider subset (`/collide/`), Csound score (`/und/`). Research only, a plan in `plans/`, reported in full when it lands. `/typist/` already pins a textarea over a drawn layer, which is prior art in this repo.
 

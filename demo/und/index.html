@@ -7,21 +7,16 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* ⚠️ `display: block` AND NO MARGIN SINCE 2026-09-30, because the box now
-     sits inside a host that carries the kit's compile note in its corner
-     (`demo/shell/compile-idle.mjs`). An inline textarea leaves a descender
-     strip under itself inside a block parent, and a margin inside the host
-     would put the note 8 px above the box's real corner. The stack gives the
-     host its gap. */
-  /* ⚠️ AND NO `min-height` SINCE THE SAME DAY. It was 150 px, and the kit's
-     reserve under the last line for the note (`--ctl-sm` and two row gaps)
-     left 83 px of it for the score. The height is the score's own line count,
-     set as `rows` below, so the whole default score shows and the reserve
-     sits under it. `--well` is the box's ground, read by the note as well. */
+  /* 🔴 THE SCORE BOX IS THE KIT'S CODE BOX SINCE 2026-09-30
+     (`demo/shell/code-box.mjs`, `plans/plan-code-editor.md`), coloured as a
+     Csound score. It was a hand-built textarea at 11.5 px, weight 500, line
+     height 1.65, and it now wears the kit field's 12.5 px mono face, which is
+     a visible change and a deliberate one: a second copy of a text box is the
+     drift `field.mjs` exists to end. Its height is still the score's own line
+     count, handed over as `rows`, with the compile note's reserve under it.
+     `--well` is the box's ground, read by the box and the note alike, and is
+     this page's darker one as before. */
   .und-editor { --well: #0d1117; }
-  textarea { display: block; width: 100%; background: var(--well); color: var(--fg);
-             border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px;
-             font: 500 11.5px/1.65 var(--mono); resize: vertical; margin: 0; }
   /* the compiled document, one record per line — 04's block, scrolled rather
      than padded, because a typed score has no fixed length */
   .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
@@ -53,6 +48,7 @@
   // repeat on arrival, so the page opened somewhere nobody had asked to be.
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
 
   // A WRITTEN SCORE, MADE SEEKABLE — demo/notes/uuu-positron.md §3, on the
   // container 04 introduces. vClick conducts an ensemble from a Csound score,
@@ -133,12 +129,16 @@
   const plays = new Map();
   let sounded = 0, ctx = null, soundAsserted = false;
 
-  const ta = el('textarea', '', DEFAULT_SCORE,
-    { spellcheck: 'false', rows: String(DEFAULT_SCORE.split('\n').length) });
-  ta.setAttribute('aria-label', 'the Csound score this page compiles');
+  const code = createCodeBox({
+    language: 'csound-sco',
+    rows: DEFAULT_SCORE.split('\n').length,
+    value: DEFAULT_SCORE,
+    ariaLabel: 'the Csound score this page compiles',
+  });
+  const ta = code.input;
   // The host is the box the compile note sits in the corner of. See below.
-  const editor = el('div', 'und-editor');
-  editor.append(ta);
+  const editor = code.el;
+  editor.classList.add('und-editor');
   d.el.append(editor);
   const warnEl = el('div', 'warn');
   d.el.append(warnEl);
@@ -671,8 +671,19 @@
       idle.shown() === '' && getComputedStyle(idle.el).display === 'none',
       `"${idle.shown()}", display ${getComputedStyle(idle.el).display}`);
     // Put the score back the way a visitor finds it, without the note.
-    ta.value = DEFAULT_SCORE;
+    code.set(DEFAULT_SCORE);
     compile();
+    // 🔴 THE CODE BOX'S ONE INVARIANT, READ OFF THE RENDERED ELEMENTS: the
+    // coloured layer holds exactly the textarea's text at its metrics, after
+    // two typed edits and a set(). A statement letter on every note line.
+    const cs = (e) => getComputedStyle(e);
+    const PROPS = ['font-size', 'line-height', 'padding-top', 'padding-left', 'white-space'];
+    const differ = PROPS.filter((p) => cs(code.ink).getPropertyValue(p) !== cs(ta).getPropertyValue(p));
+    const letters = code.ink.querySelectorAll('.pos-tk-keyword').length;
+    d.assert('the score is drawn coloured over the box exactly as typed, at the box\u2019s own metrics',
+      code.ink.textContent === ta.value && differ.length === 0 && letters === 10,
+      `${ta.value.length} characters, ${differ.length ? `differs in ${differ.join(' ')}` : 'metrics equal'}, `
+      + `${letters} statement letters`);
   }
 
   if (SELFCHECK) {

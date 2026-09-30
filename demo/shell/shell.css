@@ -2889,6 +2889,67 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 /* 🔴 IT LIGHTENS, IT DOES NOT LIGHT UP. Asked 2026-09-16: *"feedback hover:
    ligtgray not yellow"*. `--hi` is this site's yellow and it means THE ONE
+/* ── the code box (.pos-code), demo/shell/code-box.mjs ────────────────────
+   🔴 THE KIT FIELD'S OWN TEXTAREA, MADE TRANSPARENT, OVER A <pre> OF COLOURED
+   SPANS. A person still types into a real textarea, so undo, IME, the iPhone
+   keyboard, the loupe and every harness path are untouched.
+   `plans/plan-code-editor.md` is the spec and has the measurements.
+   ⚠️ GROW MODE: NEITHER LAYER SCROLLS. The textarea is as tall as its text
+   (`--code-h`, set by the component), the pre is the same height, and ONE
+   wrapper scrolls both, `--code-max` tall, which is `rows` lines. There is
+   nothing to keep in step, so there is no frame of lag and no edge where the
+   two clip differently (plan failure modes 4 to 6).
+   ⚠️ THE BORDER, RADIUS, GROUND AND FOCUS COLOUR ARE ON THE WRAPPER, because
+   inside a scroller the textarea's own bottom edge scrolled away with it
+   (failure mode 7, photographed at 375 on the prototype). It reads `--edge`
+   and `--r`, so a glue flattens it like any other surface, and it paints
+   `--well`, the ground the compile note already reads.
+   ⚠️ THE TEXTAREA RULE MATCHES `.pos-field.tall textarea`'s (0,2,1) AND
+   COMES AFTER IT, the smallest thing that wins. It does not touch padding:
+   the compile note's reserve under the last line is still the textarea's own
+   `padding-bottom`, and the pre copies every metric off the textarea's
+   COMPUTED style in JavaScript, so whatever rule wins there wins here.
+   ⚠️ TOKENS ARE COLOUR ONLY, never weight or style, which can change a
+   glyph's advance and walk every glyph after it off the caret (failure
+   mode 3). No token is `--hi`: the accent is spent on what is chosen or live. */
+:root {
+  --code-str: #9ecf8a; --code-num: #d9a0e0; --code-kw: #7fb6e8;
+  --code-cls: #79c9c0; --code-op: #e0a878;
+}
+/* A program fills the row it is in: `.pos-field`'s `flex: 0 1 150px` is a
+   basis for a word, and it held the kit specimen to 148 px. MEASURED. */
+.pos-field.pos-code { width: 100%; flex: 1 1 100%; }
+.pos-code-scroll {
+  position: relative; overflow: auto; max-height: var(--code-max, none);
+  background: var(--well, var(--bg));
+  border: var(--edge); border-color: var(--line2); border-radius: var(--r);
+}
+.pos-code-scroll:has(> textarea:focus-visible) { border-color: var(--hi); }
+.pos-field.pos-code textarea {
+  position: relative; display: block; height: var(--code-h, auto);
+  border: 0; border-radius: 0; background: transparent; resize: none; overflow: hidden;
+  color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--fg);
+}
+.pos-field.pos-code textarea::selection { background: color-mix(in oklab, var(--hi) 28%, transparent); }
+.pos-code-ink {
+  position: absolute; top: 0; left: 0; width: 100%; margin: 0;
+  color: var(--fg); background: transparent; pointer-events: none; overflow: hidden;
+}
+.pos-tk-comment { color: var(--dim2); }
+.pos-tk-string, .pos-tk-symbol { color: var(--code-str); }
+.pos-tk-number { color: var(--code-num); }
+.pos-tk-keyword { color: var(--code-kw); }
+.pos-tk-builtin, .pos-tk-class { color: var(--code-cls); }
+.pos-tk-lib { color: var(--dim); }
+.pos-tk-compose, .pos-tk-rate, .pos-tk-carry { color: var(--code-op); }
+.pos-tk-key, .pos-tk-label, .pos-tk-env { color: var(--fg2); }
+/* A parameter with a knob: the whole snippet tinted, its name in its hue.
+   `--param-hue` is the knob's own custom property too, so the two read one value.
+   One without a knob has the span and no `data-hue`, and nothing here draws it. */
+.pos-tk-p[data-hue] { background: hsl(var(--param-hue) 72% 62% / .13); border-radius: 2px; }
+.pos-tk-p[data-hue][data-active] { background: hsl(var(--param-hue) 72% 62% / .3); }
+.pos-tk-p[data-hue] .pos-tk-pname { color: hsl(var(--param-hue) 75% 72%); }
+
    THING THIS PAGE IS ABOUT: the record button, the armed rate, the grains a
    granulator is making. A feedback button is furniture beside the title, and
    painting it in the page's own accent on hover promoted it above whatever the
