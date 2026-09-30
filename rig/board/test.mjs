@@ -8,7 +8,8 @@
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
 import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
 import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
-import { parseInputs, takeChannel, leaseExpired, createInputs, midiVerdict } from './inputs.mjs';
+import { parseInputs, takeChannel, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
+import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { EventEmitter } from 'node:events';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -359,6 +360,30 @@ console.log('inputs: what a page may send the Circuit');
   is('four bytes is refused', midiVerdict([0x90, 60, 100, 0], CH).ok, false);
   is('and the refusal says why', /channel 16/.test(midiVerdict([0x9F, 60, 100], CH).why), true);
 
+  // ── the synth control changes, widened 2026-09-30 for /shape/ ──────────────
+  // Graded against the table /shape/ sends from, row by row, so a gate that
+  // lost a controller the page can move goes red here rather than as a silent
+  // slider in another building.
+  const synthRows = CIRCUIT_CC.filter((p) => p.ch === '1/2');
+  is('the synth allowlist is the 52 synth rows of the reference, no more', SYNTH_CC.size, 52);
+  is('every synth control change /shape/ can send passes on channel 1 and on channel 2',
+    synthRows.filter((p) => midiVerdict([0xB0, p.cc, 64], CH).ok && midiVerdict([0xB1, p.cc, 64], CH).ok).length, 52);
+  is('the filter at both ends of its travel passes', [midiVerdict([0xB0, 74, 0], CH).ok, midiVerdict([0xB1, 74, 127], CH).ok], [true, true]);
+  // negative controls, each one a class a gate that let every CC through would pass
+  const notSynth = [...Array(128).keys()].filter((n) => !SYNTH_CC.has(n) && n !== 123);
+  is('every other controller number is refused on a synth channel', notSynth.filter((n) => midiVerdict([0xB0, n, 0], CH).ok), []);
+  is('bank select, CC 0 and 32, is refused', [midiVerdict([0xB0, 0, 1], CH).ok, midiVerdict([0xB0, 32, 1], CH).ok], [false, false]);
+  is('NRPN and RPN, CC 98 to 101, and data entry, 6 and 38, are refused',
+    [98, 99, 100, 101, 6, 38].map((n) => midiVerdict([0xB0, n, 1], CH).ok), [false, false, false, false, false, false]);
+  is('all sound off, reset controllers, local off and omni, CC 120 to 127 but 123, are refused',
+    [120, 121, 122, 124, 125, 126, 127].map((n) => midiVerdict([0xB0, n, 0], CH).ok), [false, false, false, false, false, false, false]);
+  is('drum patch select, CC 8 on channel 10, is refused', midiVerdict([0xB9, 8, 3], CH).ok, false);
+  is('a synth controller on the drum channel is refused', midiVerdict([0xB9, 74, 64], CH).ok, false);
+  is('and on the session channel even if a config named it', midiVerdict([0xBF, 74, 64], [1, 2, 10, 16]).ok, false);
+  is('a program change is still refused on every channel', [0xC0, 0xC1, 0xC9, 0xCF].map((s) => midiVerdict([s, 5, 0], [1, 2, 10, 16]).ok), [false, false, false, false]);
+  is('pitch bend and aftertouch are refused', [0xE0, 0xD0, 0xA0].map((s) => midiVerdict([s, 0, 64], CH).ok), [false, false, false]);
+  is('and a synth controller refusal on the drums says why', /not a synth/.test(midiVerdict([0xB9, 74, 64], CH).why), true);
+
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
   is('a midi port is read from config', cfg.inputs.get('circuit').midi, { port: 'Circuit', channels: [1, 2, 10] });
   is('a midi port that is a path is refused', parseInputs('{"c":{"device":"x","midi":{"port":"/dev/snd/midiC0D0","channels":[1]}}}').inputs.has('c'), false);
@@ -384,6 +409,17 @@ console.log('inputs: what a page may send the Circuit');
   t += 61_000; c.s.lastHeard = t; c.beat();
   is('when the lease runs out, a note left held is released', writes.at(-1), [0x80, 60, 0]);
   is('and nothing is left held', c.s.held.size, 0);
+  // A control change under a held note must not forget the note, or the lease's
+  // panic leaves it sounding. Only CC 123 lets go.
+  c.handle({ type: 'input.want', id: 'w2' });
+  c.handle({ type: 'midi.send', id: 'n', bytes: [0x90, 64, 100] });
+  c.handle({ type: 'midi.send', id: 'f', bytes: [0xB0, 74, 20] });
+  is('a filter move reaches the port', writes.at(-1), [0xB0, 74, 20]);
+  is('and the note under it is still known to be held', c.s.held.size, 1);
+  c.handle({ type: 'midi.send', id: 'p', bytes: [0xC0, 3, 0] });
+  is('a program change never reaches the port', writes.at(-1), [0xB0, 74, 20]);
+  t += 61_000; c.s.lastHeard = t; c.beat();
+  is('so the lease still releases it', writes.at(-1), [0x80, 64, 0]);
   hw.close();
 }
 

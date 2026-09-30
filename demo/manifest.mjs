@@ -563,8 +563,8 @@ export const DEMOS = [
    * and that measurement is the first thing the checks make.
    */
   { name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
-    one: "edit a Novation Circuit's sound while it is playing, with sliders that can move themselves",
-    tags: ['WebMIDI', 'CoreMIDI'] },
+    one: "edit a Novation Circuit's sound while it is playing, plugged in here or on a Raspberry Pi in another building, with sliders that can move themselves",
+    tags: ['WebMIDI', 'CoreMIDI', 'WS', 'relay', 'PCM', 'live board'] },
 
   /**
    * 🔴 THE OTHER HALF OF THE CIRCUIT, AND THE TWO PAGES ARE DELIBERATELY NOT
@@ -816,9 +816,7 @@ export const DEMOS = [
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'play a synthesizer in another building, and turn its knobs while you do. '
-      + 'Over there a Raspberry Pi runs Yoshimi. A relay carries your knob turns out as '
-      + 'MIDI and brings its sound back in 20 ms pieces',
+    one: 'play and turn the knobs of a synthesizer on a Raspberry Pi in another building',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
   // Listens only. The Circuit's left output into a Fast Track Pro on the Pi,

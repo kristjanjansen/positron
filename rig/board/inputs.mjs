@@ -25,17 +25,44 @@
 // says `board.alive` every beat, so a page's presence badge reads `online`
 // before anything is playing; only `arecord` comes and goes with the lease.
 
+import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
+
 export const LEASE_MS = 60_000;
 
 /**
- * 🔴 WHAT A PAGE MAY SEND AN INSTRUMENT, AND IT IS AN ALLOWLIST OF THREE.
- * Note on, note off, and CC 123 all notes off, on the channels the config
- * names. Everything else is REFUSED, and the reason is the instrument on the
- * desk: the Circuit has no factory reset, a SysEx `Replace Patch` writes flash,
- * and a program change on channel 16 selects a session over whatever is being
- * worked on (CLAUDE.md, `plans/plan-circuit-patches.md`). A relay room is
- * reachable by anybody who knows its name, so what arrives over it is decided
- * here and not by the page that sent it.
+ * 🔴 THE SYNTH CONTROLLERS, READ FROM THE ONE TABLE `/shape/` SENDS FROM, AND
+ * ONLY ITS `1/2` ROWS. Asked 2026-09-30: *"make it work with pi circuit"*, so
+ * the gate below widened from note on, note off and CC 123 to those plus the
+ * 52 control changes Novation's Programmer's Reference documents for Synth 1
+ * and Synth 2. Imported rather than copied, because a second list is a second
+ * list that disagrees; `setup.sh` already carries every `../../demo/shell`
+ * import onto the board.
+ * 📄 READ, NOT MEASURED, AND THE SOURCE IS `plans/plan-circuit-patches.md` §5
+ * and its list of what destroys work: the Circuit's whole published SysEx
+ * surface is three messages and only `Replace Patch` writes flash; a program
+ * change and a `Replace Current Patch` replace the sound in RAM; a control
+ * change is on neither list. What it changes is the patch a synth is holding,
+ * which reloading the session puts back.
+ * ⚠️ AND THE DRUM AND SESSION ROWS STAY OUT ON PURPOSE. CC 8, 18, 44 and 50 on
+ * channel 10 are `drum N patch select`, and channel 16 holds the session's
+ * levels; neither was asked for, and a gate that grows with the table's other
+ * rows grows by accident.
+ */
+export const SYNTH_CC = new Set(CIRCUIT_CC.filter((p) => p.ch === '1/2').map((p) => p.cc));
+export const SYNTH_CHANNELS = [1, 2];
+
+/**
+ * 🔴 WHAT A PAGE MAY SEND AN INSTRUMENT, AND IT IS AN ALLOWLIST.
+ * Note on, note off and CC 123 all notes off, on the channels the config
+ * names, and since 2026-09-30 the synth control changes in `SYNTH_CC` on
+ * channels 1 and 2 only. Everything else is REFUSED, and the reason is the
+ * instrument on the desk: the Circuit has no factory reset, a SysEx `Replace
+ * Patch` writes flash, and a program change on channel 16 selects a session
+ * over whatever is being worked on (CLAUDE.md, `plans/plan-circuit-patches.md`).
+ * No SysEx, no program change, no bank select, no NRPN or RPN (CC 98 to 101
+ * and data entry 6 and 38 are not in the table), no channel mode message but
+ * 123. A relay room is reachable by anybody who knows its name, so what
+ * arrives over it is decided here and not by the page that sent it.
  */
 export function midiVerdict(bytes, channels) {
   if (!Array.isArray(bytes) || bytes.length !== 3) return { ok: false, why: 'three bytes, a channel voice message' };
@@ -43,9 +70,16 @@ export function midiVerdict(bytes, channels) {
   const [st, a, b] = bytes;
   if (a > 127 || b > 127) return { ok: false, why: 'data bytes are 0 to 127' };
   const kind = st & 0xF0, ch = (st & 0x0F) + 1;
-  const allowedKind = kind === 0x80 || kind === 0x90 || (kind === 0xB0 && a === 123 && b === 0);
-  if (!allowedKind) return { ok: false, why: 'only note on, note off and all notes off reach the instrument' };
+  const note = kind === 0x80 || kind === 0x90;
+  const allNotesOff = kind === 0xB0 && a === 123 && b === 0;
+  const synthCc = kind === 0xB0 && SYNTH_CC.has(a);
+  if (!note && !allNotesOff && !synthCc) {
+    return { ok: false, why: 'only notes, all notes off and the synth control changes reach the instrument' };
+  }
   if (!channels.includes(ch)) return { ok: false, why: `channel ${ch} is not one this input plays (${channels.join(', ')})` };
+  if (synthCc && !SYNTH_CHANNELS.includes(ch)) {
+    return { ok: false, why: `CC ${a} is a synth control and channel ${ch} is not a synth` };
+  }
   return { ok: true };
 }
 export const BEAT_MS = 5_000;
@@ -212,7 +246,11 @@ export function createInputs({
       }
       const [st, a, b] = bytes, kind = st & 0xF0, key = `${st & 0x0F}:${a}`;
       if (kind === 0x90 && b > 0) s.held.add(key); else if (kind === 0x80 || kind === 0x90) s.held.delete(key);
-      else if (kind === 0xB0) for (const k of [...s.held]) if (k.startsWith(`${st & 0x0F}:`)) s.held.delete(k);
+      // ⚠️ ONLY CC 123 LETS GO OF A CHANNEL'S NOTES. Every control change used
+      // to, which was harmless while 123 was the only one allowed; with the
+      // synth controls through, a filter sweep under a held note would have
+      // emptied this set and the lease's panic would have left the note on.
+      else if (kind === 0xB0 && a === 123) for (const k of [...s.held]) if (k.startsWith(`${st & 0x0F}:`)) s.held.delete(k);
       s.notesOut++;
       return true;
     }
