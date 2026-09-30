@@ -1,3 +1,91 @@
+# Handoff, 2026-09-30, session 57: cam finished on its own inputs, the TURN relay live, stage questions fixed
+
+## Where it is right now
+
+- ✅ **Site: BUILD `65232cd-114101-8bc7`**, confirmed on the edge, built from a
+  clean `git worktree` at HEAD so the dirty `shell.css` could not ship.
+- ✅ **positron-pub: version `fe81df0e`**, `max_instances` 3: `p1` (the /llhls/
+  pattern), `stage`, and `cam`, new today.
+- **Uncommitted, on purpose: `demo/shell/shell.css`**, the secondary buttons in
+  capitals, STILL waiting for the owner: all caps, or a capital first letter.
+  `workers/view/public/` is also dirty from an in-tree build by a harness run;
+  it is generated, and deploys build from a clean worktree.
+- **Nothing is pushed.** Push needs the account switch in CLAUDE.md.
+- ⚠️ **A PEER SESSION COMMITTED IN THIS CHECKOUT TODAY**: `17d48ec`, `53b595f`
+  (board), `12cbb2b`, `907b3bf` (a new demo, `away`). Not this session's work,
+  and ALL of it shipped in this session's deploys, because a build at HEAD
+  carries every commit.
+- MEASURED at the end, counted and not remembered: **59 demos, 57 built, 2
+  unlisted**, **78 plans**, **80 `### Open`** in `BACKLOG.md`, **20 `### Done
+  2026-09-30`**.
+- An agent left `node demo/server.mjs` running on :8890.
+
+## Secrets and inputs provisioned today
+
+| what | where | by |
+| --- | --- | --- |
+| RTMPS input `157863305ec9583187dfbb1c66c031ea`, `CAM_STREAM_KEY` | `src/provision-cam.sh` | the session, on the owner's "do it" |
+| WebRTC input `54791f4c5c73713859c5413eeb06a008`, `CAM_WHIP_URL`, recording off | `src/provision-cam-whip.sh` | the owner (auto mode refused) |
+| `TURN_KEY_ID`, `TURN_KEY_API_TOKEN` | Cloudflare dashboard, Realtime TURN | the owner |
+
+⚠️ **THE OWNER TWICE PASSED A VALUE AS THE SECRET NAME** (`wrangler secret put
+<value>`). Both were stored under the right name and the misnamed ones
+deleted. 🔴 **THE TURN TOKEN WAS VISIBLE AS A SECRET NAME AND IS IN THE
+TRANSCRIPT; ROTATING IT WAS SUGGESTED AND HAS NOT BEEN DONE.**
+`GET https://pub.positron.studio/ice` answers 200 with 7 servers, TTL 14400.
+
+## What landed, all deployed
+
+| commit | what | check at |
+| --- | --- | --- |
+| `e761c9d` | cam LL-HLS on its own `cam` container and input, handover removed | https://positron.studio/cam/ |
+| `4870361` | TURN relay fetched on the press, `path` cell `direct`/`relay` | https://positron.studio/webrtc/ , /stage/ , /keep/ |
+| `4ba5522` | cam WebRTC on its own input (`/cam/whip`), CAMERA OFF / ON presence button, state in the footer, four diagrams | https://positron.studio/cam/ |
+| `65232cd` | stage questions visible again, transport play button, cursor home on stop, chain readout into the diagram | https://positron.studio/stage/ |
+
+## The measurements worth keeping
+
+- **/cam/ with Chrome's fake camera**: LL-HLS first frame 14.3 to 18.0 s after
+  recording, glass to glass **5.3 to 7.9 s** (one run each, the rise
+  unexplained); WebRTC 65 to 74 ms; MoQ p50 25 to 30 ms. About 2.5 Stream
+  minutes of recording spent.
+- 🔴 **THE /llhls/ STALLS IN THE OWNER'S SCREENSHOT WERE THE OLD HANDOVER'S
+  TAKE-BACK**, not a camera holding the input under a watcher: the tab's
+  `/watch` ended a camera session that same second, and Stream answered **404 on
+  the new video's LL-HLS parts for about 70 s**. Why for so long is NOT settled.
+  With separate inputs it cannot recur. While a viewer watched /llhls/, its input
+  recorded one unbroken video across a camera session.
+- 🔴 **STAGE QUESTIONS WERE RENDERED INTO A DETACHED ELEMENT.** The page emptied
+  `panel.stage` with `textContent = ''` (four places, one at load), which took
+  `video-panel.mjs`'s caption slot with it, and the old assert read that same
+  detached slot and passed. A green assert on an element nobody can see.
+- **`/lifecycle` on a WebRTC input reads `live: true` with nothing publishing**,
+  so it cannot tell a live camera from a dead one; a tab that dies without its
+  DELETE blocks the next /cam/ WebRTC camera for up to 5 minutes.
+- **A pub deploy OR A SECRET CHANGE restarts the Durable Object** and cuts a
+  running camera session; the owner's `LL-HLS closed` was most likely that
+  (11:18 UTC secret write), likely and not proven. Nothing reconnects it.
+- **The relay branch has NEVER RUN.** Every leg went `direct` on this desk. The
+  owner asked to turn the VPN on at the end; with it on, /webrtc/ should read
+  `relay` with a moving picture, and /cam/'s MoQ should stay black.
+
+## 🔴 WHAT IS WAITING, AND NONE OF IT MAY GO QUIET
+
+- The `shell.css` caps question, above.
+- Rotate the TURN token.
+- Test the relay with the VPN on: https://positron.studio/webrtc/ footer should
+  read `relay`.
+- /webrtc/'s footer is 14 px over its slot at 360 px, so `direct` is cut.
+- Kit gaps found on /stage/: `video-panel.mjs` has no way to REPLACE its picture
+  (any page emptying `panel.stage` loses the caption slot and the full screen
+  exit), and `transport-bar.mjs` has no toggle that drives another deck (the
+  play button is borrowed from the hidden archive bar).
+- /stage/ at 375 px: long link lines through containers and stacked labels.
+  Not from today.
+- /stage/ still streams the 253 MB film into an unseen canvas on every show.
+- `cam` container cold start, a steady-state LL-HLS median, and Safari's MP4
+  arm are unmeasured.
+
 # Handoff, 2026-09-30, session 56: the streaming section grows to four pages, a camera demo, and a cafe network that drops UDP
 
 ## ⏸ PAUSED AT THE OWNER'S REQUEST, 2026-09-30 ~12:25
