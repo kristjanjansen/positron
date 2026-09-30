@@ -239,13 +239,14 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createKeyboard, QWERTY_CHROMATIC } from '/shell/keyboard.mjs';
-  import { createMidi } from '/shell/midi.mjs';
+  import { createMidi, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
   import { createPedal, PEDAL_SAYS, SUSTAIN_CC } from '/shell/pedal.mjs';
-  import { createField } from '/shell/field.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
-  import { createParamKnobs } from '/shell/param-knobs.mjs';
+  import { createParamKnobs, NO_KNOBS } from '/shell/param-knobs.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -397,7 +398,7 @@
    * the code is to its left and already read. A blank line under it would
    * separate two statements that belong together.
    * ⚠️ **AND IT COSTS FOUR TO SIX LINES A PRESET, WHICH IS WHY `rows` MOVED.**
-   * See `createField` below: the box is sized to the longest listing, MEASURED
+   * See the code box below: the box is sized to the longest listing, MEASURED
    * rather than guessed, and this ask changed which number that is.
    */
   const PRESETS = [
@@ -870,9 +871,27 @@ effect  = _, _;
       const a = onThread?.addr.get(name);
       if (node && a) { node.setParamValue(a, v); paramSends++; }
     },
+    /* While a knob is held, its parameter's text in the box is lit. */
+    onHold: (name, on) => source.mark(name, on),
   });
-  /** The panel row the knobs sit in, hidden while a program has none. */
+  /** The panel row the knobs sit in. It keeps its height with none, see `param-knobs.mjs`. */
   let knobRow = null;
+  /**
+   * 🔴 ONE HUE BOOK FOR THE TEXT AND THE KNOBS, ASSIGNED ON A COMPILE THAT
+   * WORKED AND NEVER ON A KEYSTROKE (`code-lang.mjs`, `createHueBook`). The
+   * code box reads it for each parameter's snippet and this page writes the
+   * same number onto each knob as `--param-hue`. Only a slider with a knob
+   * gets one: `freq`, `gain` and `gate` are set by a key and stay plain.
+   */
+  const book = createHueBook();
+  function paintHues() {
+    for (const n of knobs.names()) {
+      const h = book.hueOf(n);
+      const k = knobs.knob(n).el;
+      if (h === null) k.style.removeProperty('--param-hue');
+      else k.style.setProperty('--param-hue', String(h));
+    }
+  }
 
   // ── compiling ──────────────────────────────────────────────────────────────
   //
@@ -1008,7 +1027,8 @@ effect  = _, _;
     const kn = readKnobs(meta, gen.effectFactory ? JSON.parse(gen.effectFactory.json) : null, code);
     ready = { gen, name: uniq, addr: kn.addr };
     knobs.set(kn.list);
-    if (knobRow) knobRow.hidden = kn.list.length === 0;
+    book.assign(knobs.names());
+    paintHues();
     /* 🔴 A COMPILE DOES NOT OPEN A SOUND DEVICE. With the audio already open
        the new module goes straight onto the thread, which is what a recompile
        has always done; with it shut, this compile is what the first key press
@@ -1038,7 +1058,16 @@ effect  = _, _;
   // Only typing compiles, through the idle module below, and only once it
   // stops; `showSource()` fires no `input` event, so a preset loads without
   // arming it, and `applyPatch()` cancels anything already due.
-  const source = createField({
+  /* 🔴 THE KIT'S CODE BOX SINCE 2026-09-30 (`demo/shell/code-box.mjs`,
+     `plans/plan-code-editor.md`): the same field textarea, transparent, over
+     the program drawn in Faust's colours, with each knob's slider in the
+     knob's own hue. Everything below about the caption and the rows is the
+     field's and still holds. */
+  const source = createCodeBox({
+    language: 'faust',
+    hues: book,
+    /* 🔴 THE ACCESSIBLE NAME THE MISSING CAPTION WOULD HAVE CARRIED. */
+    ariaLabel: 'the Faust program this page compiles',
     /* 🔴 NO CAPTION. `label: ''` builds no span (`field.mjs`, `if (label)`),
        where this page used to build a FAUST label and hide it by rule: a caption
        over a box holding Faust names what a reader is already reading, and the
@@ -1062,14 +1091,9 @@ effect  = _, _;
        listing that does not fit is one a visitor has to scroll inside a box
        whose own scrollbar is the least visible thing on the page. */
     rows: 20,
-    code: true,
     value: PRESETS[0].code,
     onInput: onType,
   });
-  /* 🔴 THE NAME THE MISSING CAPTION WOULD HAVE CARRIED. `field.mjs` wires no
-     `aria-label`, `for` or `labelledby`, checked rather than assumed, so without
-     this the editor is an unnamed text box. */
-  source.input.setAttribute('aria-label', 'the Faust program this page compiles');
 
   function showSource() {
     setCell('source', kb(new TextEncoder().encode(source.value()).length));
@@ -1120,7 +1144,12 @@ effect  = _, _;
     base: 48,
     map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
     minBase: 24, maxBase: 84,
-    onDown: (note) => press(note, 100),
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN (`9c683e2`, asked for every
+       keyboard page). A looped note comes back through `onDown` marked `loop`,
+       with the velocity a MIDI key played it at when the take heard one. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
+    onDown: (note, how, vel) => press(note, vel ?? 100),
     onUp: (note) => lift(note),
     onOctave: (b) => d.log(`the keys on screen now start at ${b}`),
     onPanic: () => {
@@ -1186,11 +1215,13 @@ effect  = _, _;
     return arming;
   }
 
+  /** Every `keyOn` handed to a voice, which is what the Loop check counts as heard. */
+  let voiced = 0;
   /** @returns {Promise<unknown>|undefined} the arming, where this press started one. */
   function press(note, vel = 100) {
     keys.lightNote?.(note, true);
     pedal.keyDown(note);
-    if (node) { node.keyOn(0, note, vel); return undefined; }
+    if (node) { node.keyOn(0, note, vel); voiced++; return undefined; }
     const job = arm();
     if (!job) {
       d.log('nothing is compiled yet, the note in the corner of the text says when it is');
@@ -1198,7 +1229,7 @@ effect  = _, _;
     }
     waiting.set(note, vel);
     return job.then(() => {
-      for (const [k, v] of waiting) node?.keyOn(0, k, v);
+      for (const [k, v] of waiting) { node?.keyOn(0, k, v); voiced++; }
       waiting.clear();
     });
   }
@@ -1233,6 +1264,7 @@ effect  = _, _;
         keys.sustain.set(pedal.down(), true);
       },
       log: d.log,
+      loop: keys,
     });
     return midi;
   }
@@ -1296,6 +1328,8 @@ effect  = _, _;
   async function applyPatch(i) {
     const p = PRESETS[i];
     idle?.cancel();
+    /* A preset opens with the same colours every time, in order of appearance. */
+    book.clear();
     source.set(p.code);
     showSource();
     showPatch(i);
@@ -1367,7 +1401,6 @@ effect  = _, _;
   });
   /* The knobs are the row under the text, hidden until a compile has any. */
   knobRow = panel.addRow(knobs.el);
-  knobRow.hidden = knobs.names().length === 0;
   d.el.append(panel.el);
 
   /* 🔴 THE FIRST TOUCH ANYWHERE ON THE INSTRUMENT OPENS THE AUDIO, NOT THE
@@ -2156,10 +2189,60 @@ effect  = _, _;
     const kOnRow = () => [...knobRow.querySelectorAll('.pos-knob[data-param]')];
     const cutKnob = () => knobRow.querySelector('.pos-knob[data-param="cutoff"]');
     await applyPatch(0);
-    d.assert('the Organ has no slider but the three a key sets, so there is no knob row at all, not an empty one',
-      !kDrawn() && kOnRow().length === 0 && knobRow.getBoundingClientRect().height === 0,
-      `${getComputedStyle(knobRow).display}, ${kOnRow().length} knobs`);
+    /* 🔴 THE ROW DOES NOT MOVE THE KEYS. Asked 2026-09-30: *"make the area h
+       for thise buttons fixed so no junmp"*. The keys' top is read with the
+       Organ, which has no knob, and again with the Sweep, which has one. */
+    const keysTop = () => panel.keys.getBoundingClientRect().top;
+    const noneTop = keysTop();
+    d.assert('the Organ has no slider but the three a key sets, so the row keeps its height and says there are no knobs',
+      kDrawn() && kOnRow().length === 0 && knobRow.textContent.includes(NO_KNOBS)
+        && knobRow.getBoundingClientRect().height > 0 && book.names().length === 0,
+      `${getComputedStyle(knobRow).display}, ${kOnRow().length} knobs, `
+      + `${knobRow.getBoundingClientRect().height.toFixed(1)} px, "${knobRow.textContent.trim()}"`);
     await applyPatch(PRESETS.findIndex((p) => p.id === 'sweep'));
+    d.assert('and the Sweep\'s knob takes the same room, so the keys under it do not move',
+      Math.abs(keysTop() - noneTop) < 0.5 && kOnRow().length === 1,
+      `keys at ${noneTop.toFixed(1)} px with no knob and ${keysTop().toFixed(1)} px with cutoff`);
+    /* 🔴 ONE HUE, READ OFF THE SCREEN ON BOTH SIDES. The snippet's
+       `--param-hue` is the code box's, the knob's is this page's, and the two
+       have to be the same number from the same book; the knob's name is drawn
+       in the ink its arc is. `freq`, `gain` and `gate` are sliders in the text
+       with no knob, so they carry no hue. */
+    {
+      /* The arc eases to a new stroke over 120 ms (`.pos-knob-arc`), so the
+         hue it was just given is read once that has run. */
+      await sleep(150);
+      /* What the drawn layer holds: the box adds one space after a final newline. */
+      const drawnAs = (t) => t + (t === '' || t.endsWith('\n') ? ' ' : '');
+      const snip = (n) => source.ink.querySelector(`.pos-tk-p[data-param="${n}"]`);
+      const hueOn = (e) => (e ? getComputedStyle(e).getPropertyValue('--param-hue').trim() : '');
+      const lab = getComputedStyle(cutKnob().querySelector('.pos-knob-lab')).color;
+      const arc = getComputedStyle(cutKnob().querySelector('.pos-knob-arc')).stroke;
+      d.assert('cutoff\'s text in the box and its knob wear one hue from one book, name and arc alike, and freq and gate wear none',
+        hueOn(cutKnob()) !== '' && hueOn(cutKnob()) === hueOn(snip('cutoff'))
+          && hueOn(snip('cutoff')) === String(book.hueOf('cutoff')) && lab === arc
+          && !!snip('freq') && !!snip('gate') && !snip('freq').dataset.hue && !snip('gate').dataset.hue,
+        `knob ${hueOn(cutKnob()) || 'none'}, text ${hueOn(snip('cutoff')) || 'none'}, book ${book.hueOf('cutoff')}, `
+        + `name ${lab} arc ${arc}, freq ${snip('freq')?.dataset.hue ?? 'plain'}, gate ${snip('gate')?.dataset.hue ?? 'plain'}`);
+      const pe = (t) => new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true });
+      const dl = cutKnob().querySelector('.pos-knob-dial');
+      dl.dispatchEvent(pe('pointerdown'));
+      const litHeld = snip('cutoff')?.dataset.active === '1' && !snip('freq')?.dataset.active;
+      dl.dispatchEvent(pe('pointerup'));
+      const litAfter = snip('cutoff')?.dataset.active;
+      d.assert('holding the cutoff knob lights cutoff\'s text in the box and nothing else, and letting go puts it out',
+        litHeld && litAfter === undefined, `held ${litHeld ? 'lit' : 'not lit'}, after ${litAfter ?? 'out'}`);
+      /* 🔴 THE CODE BOX'S ONE INVARIANT, READ OFF THE RENDERED ELEMENTS: the
+         coloured layer holds exactly the textarea's text at its metrics. */
+      const cs = (e) => getComputedStyle(e);
+      const PROPS = ['font-size', 'line-height', 'padding-top', 'padding-left', 'white-space'];
+      const differ = PROPS.filter((p) => cs(source.ink).getPropertyValue(p) !== cs(source.input).getPropertyValue(p));
+      const libs = source.ink.querySelectorAll('.pos-tk-lib, .pos-tk-builtin').length;
+      d.assert('the program is drawn coloured over the box exactly as it is in the textarea, at the box\'s own metrics',
+        source.ink.textContent === drawnAs(source.input.value) && differ.length === 0 && libs > 3,
+        `${source.input.value.length} characters, ${differ.length ? `differs in ${differ.join(' ')}` : 'metrics equal'}, `
+        + `${libs} library names coloured`);
+    }
     const cutAddr = onThread?.addr.get('cutoff');
     d.assert('the Sweep has exactly one knob, cutoff, and not the room\'s four, which are the library\'s and not in the text',
       kDrawn() && kOnRow().length === 1 && !!cutKnob()
@@ -2218,6 +2301,30 @@ effect  = _, _;
     cutDial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     d.assert('and a double press puts it back where the program wrote it, 8000',
       knobs.value('cutoff') === 8000, String(knobs.value('cutoff')));
+    /* 🔴 THE INVISIBLE HAND TURNS IT ON THE NODE. Asked 2026-09-30: *"add
+       invisible hands to these cutoff buttons"*. From the bottom of the
+       travel, the hand's button pressed and pressed again, and then the live
+       node is ASKED what cutoff is: its answer is the knob's value, and the
+       page counted `setParamValue`s from the hand. A hand that moved the dial
+       and not `onChange` sends none, and the node would still say 100. */
+    {
+      cutDial().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+      const handBtn = () => cutKnob().querySelector('.pos-knob-hand');
+      const sendsBeforeHand = paramSends;
+      handBtn().click();
+      await sleep(1200);
+      const handRan = knobs.handOn('cutoff');
+      handBtn().click();
+      const byHand = knobs.value('cutoff');
+      const addr = onThread?.addr.get('cutoff');
+      const onNode = addr ? node.getParamValue(addr) : NaN;
+      d.assert('its invisible hand turns cutoff by itself, and the live node holds the value the knob shows',
+        handRan && !knobs.handOn('cutoff') && byHand > 100 && paramSends > sendsBeforeHand
+          && Math.abs(onNode - byHand) < 0.5,
+        `hand ${handRan ? 'ran' : 'did not run'}, cutoff ${byHand} after ${paramSends - sendsBeforeHand} `
+        + `setParamValue, the node says ${onNode}`);
+      cutDial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    }
 
     /* ── and typing into a LIVE instrument swaps the node after the pause ───
        🔴 INVERTED 2026-09-30, AND IT WAS THE STRONGER HALF OF *"no
@@ -2244,6 +2351,13 @@ effect  = _, _;
     source.set(PRESETS[0].code);
     showSource();
     showPatch(0);
+
+    /* `Loop` follows the Evolution, and a looped note is counted where it is
+       handed to a voice, as a `keyOn` on the live node. */
+    await checkEvolutionLoop(d, {
+      keys, heard: () => voiced,
+      ports: (names) => offerLoopFor(keys, names, d.log), real: () => midi?.names() ?? [],
+    });
 
     /* 🔴 EVERY CELL HAS MOVED BY NOW OR ONE OF THEM IS A CONSTANT. This is the
        only assert on the page that can say a readout row is worth looking at,
