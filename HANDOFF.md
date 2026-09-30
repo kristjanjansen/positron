@@ -87,6 +87,14 @@ anybody's memory.
   `node <scratch>/stun.mjs stun.cloudflare.com 3478` or equivalent. This is the
   VPN rule's sibling: the handshake is HTTPS and succeeds, the media is UDP and
   does not.
+  ⚠️ **CORRECTED THE SAME MORNING: IT WAS THE VPN, NOT THE HOTSPOT.** The owner
+  said *"vpn off"* and the same STUN request to `stun.cloudflare.com:3478` was
+  answered at once, same default route `172.20.10.1`. So this is the CLAUDE.md
+  VPN rule arriving again, and the routing table did not show it: the default
+  route stayed on en0 while five `utun` interfaces were up. **Check the VPN
+  before blaming the network, as CLAUDE.md says.** What stays true: a visitor
+  behind a UDP-blocking network meets exactly this, so the captions and the
+  TURN route are still worth having.
 - **Glass to glass on /cam/ with Chrome's fake camera, on a UDP network**:
   WebRTC median 104 ms, MoQ p50 46 ms, local capture to screen 83 ms.
 

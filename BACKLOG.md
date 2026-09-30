@@ -13,6 +13,14 @@ and `/moq/` (`All promises were rejected`).
   read `201`, `connecting`, 0 frames, 0 bytes. The same pages were green from
   this machine an hour earlier on another network. So it is the network, and
   it is also exactly what a visitor on a hotel or cafe network meets.
+  ⚠️ **CORRECTED THE SAME MORNING: IT WAS THE VPN, NOT THE HOTSPOT.** The owner
+  said *"vpn off"* and the same STUN request to `stun.cloudflare.com:3478` was
+  answered at once, same default route `172.20.10.1`. So this is the CLAUDE.md
+  VPN rule arriving again, and the routing table did not show it: the default
+  route stayed on en0 while five `utun` interfaces were up. **Check the VPN
+  before blaming the network, as CLAUDE.md says.** What stays true: a visitor
+  behind a UDP-blocking network meets exactly this, so the captions and the
+  TURN route are still worth having.
 - **WebRTC can be made to work**: TURN over TLS on 443 (Cloudflare Realtime
   TURN, `turns:turn.cloudflare.com:443?transport=tcp`) relays to Stream's UDP
   from the far side. Needs a TURN key, a worker route that mints short lived
