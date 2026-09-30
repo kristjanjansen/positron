@@ -37,9 +37,6 @@
                                                         reads this transform
                                                         back in `shown()` and
                                                         `/evo/` asserts on it.
-   🔴 AND SECONDARY BUTTONS WENT BACK TO CAPITALS ON 2026-09-30, asked as
-   *"cap: all secondary buttons"*. The primary keeps its own case. The rule and
-   its scope are beside `button.pos-pri`, below.
    ⚠️ `text-transform` IS A RENDERING PROPERTY AND CHANGES NO `textContent`, SO
    NO ASSERT THAT READS TEXT COULD BREAK. MEASURED: exactly two consumers read
    the property itself, `panel-layout.mjs`'s `shown()` and `/evo/`'s own `ink()`
@@ -692,30 +689,6 @@ button.pos-pri:hover {
    defect as a focus ring wearing the armed colour. */
 button.pos-pri:disabled, button.pos-pri[data-busy="1"] { box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { button.pos-pri { transition: none; } }
-
-/* 🔴 A SECONDARY BUTTON IS SET IN CAPITALS, AND THE PRIMARY IS NOT. Asked
-   2026-09-30: *"cap: all secondary buttons"*. It partly reverses the
-   2026-09-25 decision at the head of this file, for secondary buttons only:
-   the primary keeps the case it was written in, so the yellow button and the
-   capitals are two different ways of saying which one is which.
-   ⚠️ SECONDARY MEANS THE ORDINARY BUTTON FACE WITH A WORD ON IT: a bare
-   `<button>` (the shell's control row, a button group, a page's own), the
-   small variant, `.pos-btn`, the drop button, the feedback panel's Send and a
-   word on the transport bar.
-   A CHOICE is NOT one: its options are values being compared (`0.5`, a
-   station, a patch name), and a patch name is shown as it was written. Pads,
-   keys, tabs, toggles and badges carry their own classes and are not reached.
-   ⚠️ NO LETTER-SPACING, AND NO WIDTH MOVES. Every button here is set in the
-   mono face, where a capital and a lowercase letter have the same advance, so
-   a row is exactly as wide as it was. The primary carries no tracking either.
-   ⚠️ `:where()` SO THE LIST WEIGHS NOTHING, and the two `:not()` make it
-   (0,2,0): enough to be one rule, not enough to win a fight nobody started.
-   `text-transform` changes no `textContent`, and nothing in this repository
-   reads a button's `innerText`, so no assert that reads a label moves. */
-:where(button:not([class]), button[class=""], button.pos-sm, .pos-btn,
-       .pos-drop-btn, .pos-fb-send, .tbar-word):not(.pos-pri):not(.pos-choice *) {
-  text-transform: uppercase;
-}
 
 /* A CONTROL AT WORK. Set by the shell whenever a control's handler returns a
    promise, cleared when it settles. Paint only: no spinner, no label change, no
