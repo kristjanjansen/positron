@@ -197,6 +197,24 @@ const types = (src, lang) => {
     half === 'number:1 number:0 number:.5 carry:.', half);
 }
 
+{
+  // 🔴 THE BOUND VARIABLE WEARS THE KNOB'S HUE WHERE IT IS DEFINED AND WHERE
+  // IT IS USED (*"cutoff var should be blue"*), and nowhere it is not that
+  // variable.
+  const hueOf = (n) => ({ cutoff: 205, rel: 330 }[n] ?? null);
+  const pv = (html) => [...html.matchAll(/class="pos-tk-pvar" data-param="(\w+)"[^>]*>(\w+)</g)].map((m) => `${m[1]}:${m[2]}`);
+  const f = pv(render('cutoff = hslider("cutoff", 8000, 100, 8000, 1) : si.smoo;\n// cutoff\ncutoffs = 1;\nc = min(cutoff, x);', 'faust', { hueOf }).html);
+  ok('Faust: cutoff is coloured where it is bound and where it is used, not in a comment or inside cutoffs',
+    f.join(' ') === 'cutoff:cutoff cutoff:cutoff', f.join(' '));
+  const c = pv(render('{ |freq = 440, gate = 1|\n var rel = \\rel.kr(1.5);\n var e = Env.adsr(0.1, 0.1, 0.7, rel);\n}', 'sclang', { hueOf }).html);
+  ok('SuperCollider: var rel = \\rel.kr colours rel at its var and its use',
+    c.join(' ') === 'rel:rel rel:rel', c.join(' '));
+  const mix = pv(render('q = hslider("cutoff", 1, 0, 2, 1) + hslider("res", 1, 0, 2, 1);\nz = q;', 'faust', { hueOf }).html);
+  ok('NEGATIVE CONTROL: a definition mixing two controls binds neither', mix.length === 0, mix.join(' ') || 'none');
+  const none = pv(render('cutoff = hslider("cutoff", 1, 0, 2, 1);\nz = cutoff;', 'faust').html);
+  ok('NEGATIVE CONTROL: with no knob (no hue) the variable is plain', none.length === 0, none.join(' ') || 'none');
+}
+
 // ── parameters, graded against the compilers ────────────────────────────────
 
 let faustCompiler = null, tmp = null;
@@ -313,7 +331,7 @@ ok('a Csound score has no parameters, since p-fields are positions', findParams(
     half && half.to === 'q = hslider("cutoff"'.length, half && `${half.from} to ${half.to}`);
   const book = createHueBook().assign(['cutoff']);
   const h = render(src, 'faust', { hueOf: book.hueOf }).html;
-  const hued = [...h.matchAll(/data-param="(\w+)"( data-hue="[^"]*")?/g)].map((m) => [m[1], !!m[2]]);
+  const hued = [...h.matchAll(/class="pos-tk-p" data-param="(\w+)"( data-hue="[^"]*")?/g)].map((m) => [m[1], !!m[2]]);
   ok('a hue goes only on a parameter that has a knob, and the one a key plays is drawn without one',
     JSON.stringify(hued) === JSON.stringify([['cutoff', true], ['freq', false]]), JSON.stringify(hued));
 }

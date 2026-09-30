@@ -136,7 +136,7 @@ export function createCodeBox({ language, value = '', rows = 12, label = '', ari
     /** Raise one parameter's tint while its knob is held. */
     mark(name, on) {
       if (on) active.add(name); else active.delete(name);
-      for (const s of ink.querySelectorAll('.pos-tk-p')) {
+      for (const s of ink.querySelectorAll('.pos-tk-p, .pos-tk-pvar')) {
         if (s.dataset.param !== name) continue;
         if (on) s.dataset.active = '1'; else delete s.dataset.active;
       }

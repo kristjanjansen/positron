@@ -2885,9 +2885,16 @@ button.pos-pg-lab:hover { color: var(--fg); }
    ⚠️ TOKENS ARE COLOUR ONLY, never weight or style, which can change a
    glyph's advance and walk every glyph after it off the caret (failure
    mode 3). No token is `--hi`: the accent is spent on what is chosen or live. */
+/* 🔴 TONED DOWN, AND NO TOKEN IS BLUE, SINCE 2026-09-30. Asked with a crop of
+   `/fau/`: *"can you tone down other code a bit"* and *"import process effect
+   they are all same blue"*. The keyword ink was #7fb6e8, which is hue 207,
+   and the first knob hue is 205: `process` and a knob's `cutoff` were one
+   colour, so the one colour that MEANS something in the box meant nothing.
+   Every token now sits at low chroma, keywords are a neutral step off the
+   text, and the saturated inks belong to the knobs alone. */
 :root {
-  --code-str: #9ecf8a; --code-num: #d9a0e0; --code-kw: #7fb6e8;
-  --code-cls: #79c9c0; --code-op: #e0a878;
+  --code-str: #a7b89c; --code-num: #bca9c2; --code-kw: #c3c8d1;
+  --code-cls: #a3bab6; --code-op: #c6b297;
 }
 /* A program fills the row it is in: `.pos-field`'s `flex: 0 1 150px` is a
    basis for a word, and it held the kit specimen to 148 px. MEASURED. */
@@ -2906,7 +2913,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-field.pos-code textarea::selection { background: color-mix(in oklab, var(--hi) 28%, transparent); }
 .pos-code-ink {
   position: absolute; top: 0; left: 0; width: 100%; margin: 0;
-  color: var(--fg); background: transparent; pointer-events: none; overflow: hidden;
+  color: var(--fg2); background: transparent; pointer-events: none; overflow: hidden;
 }
 .pos-tk-comment { color: var(--dim2); }
 .pos-tk-string, .pos-tk-symbol { color: var(--code-str); }
@@ -2922,6 +2929,10 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-tk-p[data-hue] { background: hsl(var(--param-hue) 72% 62% / .13); border-radius: 2px; }
 .pos-tk-p[data-hue][data-active] { background: hsl(var(--param-hue) 72% 62% / .3); }
 .pos-tk-p[data-hue] .pos-tk-pname { color: hsl(var(--param-hue) 75% 72%); }
+/* and the variable it is bound to, wherever it is used, in the same ink
+   (*"cutoff var should be blue"*), lit with the snippet while its knob is held */
+.pos-tk-pvar[data-hue] { color: hsl(var(--param-hue) 75% 72%); border-radius: 2px; }
+.pos-tk-pvar[data-hue][data-active] { background: hsl(var(--param-hue) 72% 62% / .3); }
 
 /* ── feedback ─────────────────────────────────────────────────────────────
    demo/shell/feedback.mjs. A button beside every demo's title and the box it
@@ -5845,6 +5856,11 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    so the height is a knob's and no number here repeats it. */
 .pos-knob[data-param] .pos-knob-lab { color: var(--param-ink, var(--dim)); }
 .pos-knob[data-param] .pos-knob-v { color: var(--param-ink, var(--fg)); }
+/* 🔴 AND A LIT HAND WEARS THE HUE TOO, asked 2026-09-30: *"invisible hand
+   button on knowbs should have same accent color"*. `.pos-knob-hand[data-on]`
+   lights in `--hi` on every other knob; on a knob with a hue the yellow
+   would be the one thing on it that is not its colour. Unset, it is `--hi`. */
+.pos-knob[data-param] .pos-knob-hand[data-on="1"] { color: var(--param-ink, var(--hi)); }
 .pos-pknobs-none { display: grid; }
 .pos-pknobs-none > * { grid-area: 1 / 1; }
 .pos-pknobs-ghost { visibility: hidden; }
