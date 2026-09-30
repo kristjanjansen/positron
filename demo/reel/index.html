@@ -542,6 +542,13 @@
     // the half of the decision that needs nothing from ERR: driving `stripSeek`
     // itself opens a stream.
     onSeek: (at) => stripSeek(at),
+    // THE LANE'S OWN THREE LINES AND NOTHING ABOVE THEM. The strip's default
+    // block opens with the lane name and the time under the pointer, which
+    // here is `newsreels` (the gutter an inch to the left already says it) and
+    // the date (which `describeRow` already carries), and in a three line box
+    // that header pushed the length off the bottom. Off a mark, the default
+    // stands, so the box still says where the pointer is.
+    describeHit: (hit) => (hit.row && hit.lane.describeRow ? hit.lane.describeRow(hit.row) : null),
     /**
      * 🔴 WHAT YOU ARE POINTING AT GOES UNDER THE LINE, NOT OVER IT. Asked
      * 2026-09-19 with a photograph of this page on an iPhone: *"add feature to
