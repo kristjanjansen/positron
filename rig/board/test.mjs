@@ -324,6 +324,8 @@ console.log('inputs: a name, a room and a lease');
   is('asking starts arecord', spawned.length, 1);
   is('on the configured device, whatever the page sent', spawned[0].args[spawned[0].args.indexOf('-D') + 1], 'hw:CARD=Pro,DEV=0');
   is('at the configured channel count', spawned[0].args[spawned[0].args.indexOf('-c') + 1], '2');
+  // negative control: ALSA's own default here was 6000 frames, 125 ms of lump
+  is('with a 10 ms period, never the 125 ms default', spawned[0].args.includes('--period-size=480'), true);
   c.handle({ type: 'input.want', id: 'w2' });
   is('asking again renews rather than starting a second', spawned.length, 1);
   spawned[0].p.stdout.emit('data', Buffer.from(new Int16Array([100, 7, 200, 7, 300, 7]).buffer));

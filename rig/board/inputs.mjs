@@ -115,6 +115,8 @@ export function createInputs({
   inputs, room, relay, frame, rate, name: boardName, id: boardId,
   spawn, WebSocket, format, parse, randomId, log = () => {}, now = () => Date.now(), fs = null,
   leaseMs = LEASE_MS, beatMs = BEAT_MS,
+  // 10 ms a period, four periods of buffer. See the capture below.
+  periodFrames = 480, bufferFrames = 1920,
 }) {
   const live = new Map();
 
@@ -149,8 +151,15 @@ export function createInputs({
 
     function startCapture() {
       if (s.proc) return;
+      // 🔴 A SHORT PERIOD, OR THE AUDIO LEAVES IN 125 ms LUMPS. MEASURED
+      // 2026-09-30 on the Fast Track Pro: with no period asked for, ALSA gave
+      // arecord 6000 frames a period in a 24000 frame buffer, so a note waited
+      // up to 125 ms before this process saw it, the frames reached a browser
+      // in bursts (p90 gap 117 ms), and the page needed a 160 ms cushion to
+      // ride them. Press to arrival read 151 to 180 ms.
       const p = spawn('arecord', ['-D', cfg.device, '-f', 'S16_LE', '-r', String(rate),
-        '-c', String(cfg.channels), '-t', 'raw', '-q'], { stdio: ['ignore', 'pipe', 'pipe'] });
+        '-c', String(cfg.channels), '-t', 'raw', '-q',
+        `--period-size=${periodFrames}`, `--buffer-size=${bufferFrames}`], { stdio: ['ignore', 'pipe', 'pipe'] });
       const IN = frame * 2 * cfg.channels;
       let carry = Buffer.alloc(0);
       p.stdout.on('data', (chunk) => {
