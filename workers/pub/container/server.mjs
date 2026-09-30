@@ -557,15 +557,13 @@ function stop() {
 // plans/plan-cam-llhls.md: a copy costs about 0.5 per cent of realtime where
 // a third x264 would not fit on this vCPU at all.
 //
-// 🔴 IT PUBLISHES TO THE SAME INPUT AS THE TEST PATTERN, with the same key,
-// because no second input or secret was to be made. Two publishers on one
-// input is one publisher and a fight, so THIS FILE refuses to run both: a
-// camera open waits for the pattern's ffmpeg to EXIT before spawning, and a
-// pattern /start ends the camera first. The Durable Object decides who gets
-// the input (viewers first); this is the floor under that decision, so a DO
-// that lost its state cannot put two encoders on one key.
-// ⚠️ INDEPENDENT OF `ff` AND `legs.whip`, so the viewer sweep's /stop never
-// touches it. /stop is about the pattern; /cam/stop is about the camera.
+// 🔴 IT RUNS ON ITS OWN INSTANCE (`cam`) AND PUBLISHES TO ITS OWN INPUT
+// (CAM_STREAM_KEY). Until 2026-09-30 it borrowed the test pattern's input by
+// handover, and /llhls/ stalled while a camera was tested on it, because every
+// hand back is a new Stream video UID. So this leg and the pattern do not know
+// about each other: no waiting on `ff`, and /start does not end a camera.
+// ⚠️ INDEPENDENT OF `ff` AND `legs.whip`, so a /stop never touches it. /stop
+// is about the pattern; /cam/stop is about the camera.
 const CAM_IDLE_MS = 5_000;      // no chunk for this long and the leg stops itself
 const CAM_MAX_MS = 330_000;     // the DO caps a session at 300 s; this is the floor under it
 const CAM_MAX_BUFFER = 8 << 20; // bytes queued on stdin before we call RTMPS stalled
@@ -604,12 +602,6 @@ const exited = (p, ms) => new Promise((r) => {
 
 async function camOpen({ key, fmt, sid }) {
   if (cam) await camStop('replaced by a new camera session');
-  // The pattern leg off this input, and GONE before the camera's ffmpeg opens it.
-  if (ff) {
-    const p = ff;
-    stop();
-    if (!(await exited(p, 4000))) { try { p.kill('SIGKILL'); } catch { /* gone */ } await exited(p, 1000); }
-  }
   const p = spawn('ffmpeg', camArgs({ key, fmt }), { stdio: ['pipe', 'ignore', 'pipe'] });
   const st = {
     proc: p, sid: String(sid || ''), fmt, startedAt: Date.now(), lastChunkAt: Date.now(),
@@ -721,9 +713,6 @@ createServer(async (req, res) => {
     try { opts = JSON.parse(body || '{}'); } catch { return json(res, { error: 'bad json' }, 400); }
     if (!opts.key) return json(res, { error: 'key required' }, 400);
     remember(opts.key);
-    // A viewer took the input back from a camera: the camera goes FIRST, and
-    // is gone before the pattern opens the same key.
-    if (cam) await camStop('a viewer took the input back');
     return json(res, start(opts));
   }
 
