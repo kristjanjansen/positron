@@ -13,6 +13,8 @@
 //                                      OWN input (CAM_STREAM_KEY) out as LL-HLS
 //   GET  /cam                          is a camera on it, 409 when busy
 //   GET  /cam/status                   the camera instance's own state
+//   POST /cam/whip, DELETE /cam/whip/<id>  the camera's WebRTC publish, onto
+//                                      its OWN WebRTC input (CAM_WHIP_URL)
 //   /stage/watch /stage/status         the same four routes on /stage/'s own
 //   /stage/start /stop                 instance: the MIM film on WHIP, nothing else
 //
@@ -52,6 +54,16 @@ const CAM_PER_HOUR = 20;       // camera sessions per hour, DO-counted like /whi
 const CAM_MAX_MS = 300_000;
 const CAM_IDLE_MS = 5_000;     // no chunk this long and the DO ends the session
 const CAM_TICK_MS = 5_000;     // the alarm's cadence while a camera is live
+// /cam/'S WebRTC LEG HAS ITS OWN WebRTC INPUT TOO (CAM_WHIP_URL, "positron-cam-whip",
+// provisioned by src/provision-cam-whip.sh, recording off). It borrowed the test
+// pattern's WHIP_URL until 2026-09-30 and was refused with 409 whenever somebody
+// held /watch, so /cam/'s WebRTC panel went red while anybody watched /llhls/.
+// One camera at a time. ⚠️ A SESSION HELD BY A TAB THAT DIED WITHOUT ITS DELETE
+// cannot be told apart from a live one: MEASURED 2026-09-30, `/lifecycle` on a
+// WebRTC input answers `live: true` with nothing publishing to it, so it is no
+// signal here. Such a session blocks the next camera for at most CAM_MAX_MS and
+// is then replaced.
+const CAM_WHIP_MISSING = 'the camera WebRTC input is not provisioned: the owner runs src/provision-cam-whip.sh, which stores CAM_WHIP_URL';
 
 export class Pub extends Container {
   defaultPort = 8080;
@@ -369,8 +381,11 @@ export class Pub extends Container {
     // NEVER crosses this worker. A worker cannot carry media and does not have
     // to; it carries thirty lines of signalling.
     if (url.pathname === '/whip' && request.method === 'POST') {
-      const whip = this.env.WHIP_URL;
-      if (!whip) return json({ error: 'no WHIP_URL configured' }, 503);
+      // The camera instance publishes to ITS OWN input and knows nothing about
+      // /watch; every other instance keeps the test pattern's rules below.
+      const camRole = (await this.#getRole()) === CAM;
+      const whip = camRole ? this.env.CAM_WHIP_URL : this.env.WHIP_URL;
+      if (!whip) return json({ error: camRole ? CAM_WHIP_MISSING : 'no WHIP_URL configured' }, 503);
 
       // A tokenless publish proxy is an open door to our live input, so it gets
       // the same discipline `ingest` has: a small per-hour cap, counted here
@@ -396,13 +411,26 @@ export class Pub extends Container {
       // a browser holds the input starts the container's leg as before, and the
       // browser publish loses the input. The container has priority because the
       // pages that watch it have no other source; a camera page can say so.
-      if (this.viewers() > 0) {
-        return json({
-          error: 'input busy: the container is publishing to it for viewers',
-          viewers: this.viewers(),
-        }, 409);
+      if (camRole) {
+        // One camera at a time, and nothing to do with viewers.
+        const held = await this.#camWhipHeld();
+        if (held) {
+          if (now - held.at < CAM_MAX_MS) {
+            return json({ error: 'input busy: another camera is on the camera WebRTC input', sinceS: Math.round((now - held.at) / 1000) }, 409);
+          }
+          // Older than any session may be: a tab that left without its DELETE.
+          if (held.url) { try { await fetch(held.url, { method: 'DELETE' }); } catch { /* gone */ } }
+          await this.#camWhipSet(null);
+        }
+      } else {
+        if (this.viewers() > 0) {
+          return json({
+            error: 'input busy: the container is publishing to it for viewers',
+            viewers: this.viewers(),
+          }, 409);
+        }
+        await this.#stopPublish();
       }
-      await this.#stopPublish();
 
       const offer = await request.text();
       let up;
@@ -427,6 +455,7 @@ export class Pub extends Container {
       this.#whipRes.set(id, { url: loc ? new URL(loc, whip).toString() : null, at: now });
       this.#whipHits.push(now);
       for (const [k, v] of this.#whipRes) if (now - v.at > 6 * 3600_000) this.#whipRes.delete(k);
+      if (camRole) await this.#camWhipSet({ id, url: this.#whipRes.get(id).url, at: now });
 
       return new Response(await up.text(), {
         status: 201,
@@ -440,9 +469,13 @@ export class Pub extends Container {
     }
     if (url.pathname.startsWith('/whip/') && request.method === 'DELETE') {
       const id = url.pathname.slice('/whip/'.length);
-      const rec = this.#whipRes?.get(id);
+      // The camera's session is also in storage, so a DELETE still finds it
+      // after the object was evicted between the publish and the stop.
+      const held = (await this.#getRole()) === CAM ? await this.#camWhipHeld() : null;
+      const rec = this.#whipRes?.get(id) || (held?.id === id ? held : null);
       if (!rec) return json({ error: 'unknown publish' }, 404);
-      this.#whipRes.delete(id);
+      this.#whipRes?.delete(id);
+      if (held?.id === id) await this.#camWhipSet(null);
       if (rec.url) { try { await fetch(rec.url, { method: 'DELETE' }); } catch { /* gone */ } }
       return json({ ok: true }, 200);
     }
@@ -488,6 +521,15 @@ export class Pub extends Container {
     return this.ctx.getWebSockets().length
       - this.ctx.getWebSockets('cam').length
       - this.ctx.getWebSockets('cam-refused').length;
+  }
+
+  /** The camera's WebRTC session, { id, url, at }, or null. Kept in storage. */
+  async #camWhipHeld() {
+    try { return (await this.ctx.storage.get('camWhip')) || null; } catch { return null; }
+  }
+
+  async #camWhipSet(v) {
+    try { v ? await this.ctx.storage.put('camWhip', v) : await this.ctx.storage.delete('camWhip'); } catch { /* next publish re-reads */ }
   }
 
   /** Why a camera cannot have its input right now, or null. One at a time. */
@@ -674,10 +716,19 @@ export class Pub extends Container {
       try { m = JSON.parse(msg); } catch { return; }
       if (m.t !== 'open' || c.open) return;
       try {
-        const r = await super.fetch(new Request('http://c/cam/open', {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ key: this.env.CAM_STREAM_KEY, fmt: m.fmt === 'mp4' ? 'mp4' : 'webm', sid: c.sid }),
-        }));
+        // ⚠️ A 503 HERE IS THE PLATFORM, NOT FFMPEG. MEASURED 2026-09-30 right
+        // after a deploy: `There is no Container instance available at this
+        // time`, and the same instance up 30 s later. So a 503 is asked again,
+        // four times 3 s apart, while the page is still there to want it.
+        let r = null;
+        for (let i = 0; i < 5; i++) {
+          r = await super.fetch(new Request('http://c/cam/open', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ key: this.env.CAM_STREAM_KEY, fmt: m.fmt === 'mp4' ? 'mp4' : 'webm', sid: c.sid }),
+          }));
+          if (r.status !== 503 || this.#cam !== c) break;
+          await new Promise((ok) => setTimeout(ok, 3000));
+        }
         if (!r.ok) throw new Error(`container ${r.status}`);
       } catch (e) {
         return this.#endCam('stopped', `the publisher did not start: ${String(e.message || e).slice(0, 80)}`);
@@ -757,6 +808,16 @@ export default {
       const req = new Request(url, request);
       req.headers.set('x-pub-role', STAGE);
       return getContainer(env.PUB, STAGE).fetch(req);
+    }
+    // /cam/whip[/<id>] is the camera's WebRTC publish, on the camera instance,
+    // to the camera's own WebRTC input. The OPTIONS goes through whatever the
+    // secret, so a browser can read the 503 below rather than a CORS failure.
+    if (url.pathname === '/cam/whip' || url.pathname.startsWith('/cam/whip/')) {
+      if (!env.CAM_WHIP_URL && request.method !== 'OPTIONS') return json({ error: CAM_WHIP_MISSING }, 503);
+      url.pathname = url.pathname.slice('/cam'.length);
+      const req = new Request(url, request);
+      req.headers.set('x-pub-role', CAM);
+      return getContainer(env.PUB, CAM).fetch(req);
     }
     // /cam and /cam/status are the camera instance, and nothing else reaches it.
     if (url.pathname === '/cam' || url.pathname === '/cam/status') {
