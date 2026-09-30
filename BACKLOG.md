@@ -1,5 +1,21 @@
 ## Open
 
+### Open 2026-09-30: the hls.js options table, no wrapped names, default and recommended columns, sans serif comment
+
+ASKED, VERBATIM: *"do not wrap optoins. have default and recommended cols with
+values. use sans serif for comment (change col title)"*, with a screenshot of
+the `HLS.JS OPTIONS` table on `/llhls/` (from `9430464`) where
+`maxLiveSyncPlaybackRate` and `initialLiveManifestSize` break mid-word.
+`demo/llhls/index.html`, the table inserted after the diagram.
+- Four columns: option (never wraps), default, recommended, and the comment in
+  sans serif under a new title (the old `VALUE, AND WHAT IT BUYS` goes, since
+  the value has its own column now).
+- ⚠️ At 375 a no-wrap option column plus two value columns will not fit beside
+  prose. Decide the phone layout with `positron-compose` rather than letting the
+  table scroll sideways, and LOOK at both widths.
+- The wrapping comes from the kit's `overflow-wrap: anywhere` on table cells;
+  override it on this column only, not in `table.mjs`.
+
 ### Open 2026-09-30: the "I am watching" connector and its note should be more technical
 
 ASKED, VERBATIM: *"you can be more techincal on this connector label and desc
@@ -99,6 +115,26 @@ rest first. add latency labes on all videopanel footers."*
 - ⚠️ Every leg is ours (Cloudflare Stream, the relay, the pub worker) and each
   one bills Stream minutes from 2026-10-15; the camera must stop every leg when
   it stops.
+- **FOLLOW-UP, VERBATIM:** *"add diagram to cam demo as well"*. A how it works
+  diagram with `demo/shell/diagram.mjs`, one path per leg from the camera.
+  Load `positron-diagram`. The LL-HLS path is drawn as it is (not wired) until
+  the research lands.
+- **LANDED 2026-09-30 without two things, found by the agent that built it:**
+  1. **MoQ carries the test pattern, not the camera**, because `startMoq` in
+     `demo/shell/moq.mjs` draws its own pattern and takes no source. Kit
+     change: a `draw(ctx, w, h, i)` option used in place of `burn(...)`; then
+     `/cam/` passes its camera draw and loses the `test pattern` footer and
+     note. Wait for the `/moq/` agent to finish before touching `moq.mjs`.
+  2. **The `/whip` 409 is written and not deployed** (`workers/pub/worker.mjs`):
+     a camera publish is refused while anybody holds `/watch`, instead of
+     fighting the container's WHIP leg for the one input. The `Pub` box note
+     already describes it.
+  - Also found: `diagram.mjs` at 375 draws a cross-container link label over
+    another in the gap between stacked containers and `cuts` does not report
+    it; and `moq.mjs` log lines carry middots (`catalog ok · av01`).
+  - Graded: `verify.mjs cam` 15/15 (9 page) on the refused-camera path, since
+    the harness has no fake device; a probe with Chrome's fake camera read
+    21/21 twice, WebRTC glass to glass median 104 ms, MoQ p50 46 ms.
 
 ### Open 2026-09-30: webrtc and moq get stats like the llhls readout
 

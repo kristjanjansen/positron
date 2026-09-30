@@ -100,6 +100,14 @@ export const DEMOS = [
   { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
     one: 'browser to browser over MoQ',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
+  // One press starts every leg: getUserMedia, a WHIP publish through the pub
+  // worker, a WHEP play back and a MoQ loopback. The 409 retries on WHEP and
+  // the relay session together take seconds, and the checks then wait for 30
+  // timed frames on each leg, so the first page asserts land well after the
+  // harness's default settle.
+  { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, settleMs: 45000,
+    one: 'one webcam next to what comes back over WebRTC, MoQ and LL-HLS',
+    tags: ['getUserMedia', 'WebRTC', 'WHIP', 'MoQ'] },
 
   { name: 'room', group: 'technologies', act: 2, created: '2026-09-04', built: true,
     one: 'open this page twice and each window shows the other',
