@@ -8,6 +8,8 @@
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
 import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
 import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
+import { parseInputs, takeChannel, leaseExpired, createInputs } from './inputs.mjs';
+import { EventEmitter } from 'node:events';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
@@ -269,6 +271,75 @@ is('a healthy graph plans nothing at all', jackRebuild({ ...yosh, plan: true, gr
 is('with no instrument there is nothing to rebuild', jackRebuild({ plan: true, graph }).ok, false);
 is('a missing capture says which verbs raise it',
    /audio\.stop then audio\.start/.test(jackRebuild({ ...yosh, plan: true, graph: { graph: goneRows } }).reason ?? ''), true);
+
+console.log('inputs: a name, a room and a lease');
+{
+  const good = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1}}');
+  is('a good entry is read whole', good.inputs.get('circuit'), { name: 'circuit', device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1 });
+  const bad = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":3},"Bad Name":{"device":"x"},"ok":{"device":"default"}}');
+  is('a take past the channel count is refused', bad.inputs.has('circuit'), false);
+  is('a name with spaces is refused', bad.inputs.has('Bad Name'), false);
+  is('and a bad entry does not take the good one down', bad.inputs.has('ok'), true);
+  is('each refusal says why', bad.problems.length, 2);
+  is('nothing configured is no inputs, not an error', parseInputs('').problems.length, 0);
+  is('not JSON is one reason, not a throw', parseInputs('circuit=hw:0').problems.length, 1);
+
+  // Channel 1 is the Circuit and channel 2 is an open input with its gain up.
+  const inter = Int16Array.from([100, 7, 200, 7, 300, 7]);
+  is('it keeps the channel asked for', [...takeChannel(inter, 2, 1, 3)], [100, 200, 300]);
+  // negative control: a downmix would read [53, 103, 153]
+  ok('and never sums the open input in', takeChannel(inter, 2, 1, 3)[0] === 100);
+  is('the other channel is reachable too', [...takeChannel(inter, 2, 2, 3)], [7, 7, 7]);
+
+  is('a lease in the future holds', leaseExpired(10_000, 9_999), false);
+  is('a lease at its end has run out', leaseExpired(10_000, 10_000), true);
+  is('no lease at all is run out, not forever', leaseExpired(0, 1), true);
+  is('an unset lease is run out, not NaN-true', leaseExpired(undefined, 1), true);
+
+  // The live half against fakes: no relay, no ALSA.
+  let t = 1_000;
+  const spawned = [];
+  const fakeSpawn = (cmd, args) => {
+    const p = new EventEmitter();
+    p.stdout = new EventEmitter(); p.stderr = new EventEmitter();
+    p.kill = () => { p.killed = true; p.emit('exit', null); };
+    spawned.push({ cmd, args, p });
+    return p;
+  };
+  const sockets = [];
+  class FakeWS { constructor(url) { this.url = url; this.readyState = 1; this.sent = []; sockets.push(this); }
+    send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
+  const fmt = (m, env) => JSON.stringify({ ...m, ...env });
+  const prs = (x) => ({ kind: 'json', msg: JSON.parse(x) });
+  const hw = createInputs({
+    inputs: good.inputs, room: 'studio-1', relay: 'wss://relay', frame: 3, rate: 48000, name: 'pi', id: 'pi-1',
+    spawn: fakeSpawn, WebSocket: FakeWS, format: fmt, parse: prs, randomId: () => 'abc', now: () => t,
+    leaseMs: 60_000, beatMs: 5_000,
+  });
+  const c = hw.get('circuit');
+  c.connect();
+  is('an input joins a room of its own', sockets[0].url, 'wss://relay/room/studio-1-circuit/ws');
+  is('and nothing is captured until somebody asks', spawned.length, 0);
+  c.handle({ type: 'input.want', id: 'w1', device: 'hw:0' });
+  is('asking starts arecord', spawned.length, 1);
+  is('on the configured device, whatever the page sent', spawned[0].args[spawned[0].args.indexOf('-D') + 1], 'hw:CARD=Pro,DEV=0');
+  is('at the configured channel count', spawned[0].args[spawned[0].args.indexOf('-c') + 1], '2');
+  c.handle({ type: 'input.want', id: 'w2' });
+  is('asking again renews rather than starting a second', spawned.length, 1);
+  spawned[0].p.stdout.emit('data', Buffer.from(new Int16Array([100, 7, 200, 7, 300, 7]).buffer));
+  const bin = sockets[0].sent.find((x) => Buffer.isBuffer(x));
+  is('a frame goes out with one channel in it', bin && [...new Int16Array(bin.buffer.slice(bin.byteOffset + 12, bin.byteOffset + bin.length))], [100, 200, 300]);
+  // The relay echoes every message to its sender; the watchdog lives on that.
+  t += 59_000; c.s.lastHeard = t; c.beat();
+  is('inside the lease it keeps running', !!c.s.proc, true);
+  t += 2_000; c.s.lastHeard = t; c.beat();
+  is('past the lease it stops by itself', !!c.s.proc, false);
+  is('and the process was really killed', spawned[0].p.killed, true);
+  c.handle({ type: 'audio.status', id: 's1' });
+  const st = JSON.parse(sockets[0].sent.filter((x) => typeof x === 'string').at(-1));
+  is('status in the input room says what is playing', [st.type, st.ok, st.source], ['audio.started', false, 'circuit']);
+  hw.close();
+}
 
 console.log(`\n${pass}/${pass + fail} green`);
 process.exit(fail ? 1 : 0);
