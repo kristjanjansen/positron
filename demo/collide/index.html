@@ -112,7 +112,7 @@
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createPicker } from '/shell/picker.mjs';
-  import { createParamKnobs, NO_KNOBS } from '/shell/param-knobs.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
   import { readSynthDef } from '/shell/synthdef.mjs';
@@ -642,8 +642,8 @@
     const withKnob = keysTop();
     await applyPatch(PRESETS.findIndex((p) => p.id === 'growl'));
     const withNone = keysTop();
-    d.assert('a program with no control a knob could turn keeps the row\'s height and says so, so the keys do not move',
-      drawn() && onRow().length === 0 && knobRow.textContent.includes(NO_KNOBS)
+    d.assert('a program with no control a knob could turn keeps the row\'s height with nothing in it, so the keys do not move',
+      drawn() && onRow().length === 0 && (!!knobRow.querySelector('.pos-pknobs-ghost') && !knobRow.querySelector('.pos-pknobs-say'))
         && Math.abs(withNone - withKnob) < 0.5 && book.names().length === 0,
       `keys at ${withKnob.toFixed(1)} px with rel and ${withNone.toFixed(1)} px with none, `
       + `${onRow().length} knobs, "${knobRow.textContent.trim()}"`);

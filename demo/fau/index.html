@@ -246,7 +246,7 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
-  import { createParamKnobs, NO_KNOBS } from '/shell/param-knobs.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -2194,8 +2194,8 @@ effect  = _, _;
        Organ, which has no knob, and again with the Sweep, which has one. */
     const keysTop = () => panel.keys.getBoundingClientRect().top;
     const noneTop = keysTop();
-    d.assert('the Organ has no slider but the three a key sets, so the row keeps its height and says there are no knobs',
-      kDrawn() && kOnRow().length === 0 && knobRow.textContent.includes(NO_KNOBS)
+    d.assert('the Organ has no slider but the three a key sets, so the row keeps its height, empty',
+      kDrawn() && kOnRow().length === 0 && (!!knobRow.querySelector('.pos-pknobs-ghost') && !knobRow.querySelector('.pos-pknobs-say'))
         && knobRow.getBoundingClientRect().height > 0 && book.names().length === 0,
       `${getComputedStyle(knobRow).display}, ${kOnRow().length} knobs, `
       + `${knobRow.getBoundingClientRect().height.toFixed(1)} px, "${knobRow.textContent.trim()}"`);
