@@ -29,6 +29,27 @@ export class Pub extends Container {
   // A generous backstop only. The sweep below is what actually decides.
   sleepAfter = '10m';
 
+  /**
+   * 🔴 A WORKER VAR IS NOT IN THE CONTAINER'S ENVIRONMENT UNTIL IT IS PASSED.
+   * `server.mjs` reads `process.env.PUB_SOURCE` and `process.env.PUB_BURN`,
+   * and until 2026-09-30 nothing here forwarded either, so both were always
+   * undefined in the container: the film and no clocks, whatever wrangler.jsonc
+   * said. `PUB_W`/`PUB_H`/`PUB_FPS` never had this problem because they travel
+   * in the /start body. `envVars` is read when the container STARTS, so a
+   * change lands on the next cold start, not on a running publish.
+   * ⚠️ ONLY WHAT IS SET. An absent var must stay absent, because
+   * `PUB_SOURCE === undefined` is what selects the film, and `testsrc2`
+   * or `''` is the test pattern.
+   */
+  constructor(ctx, env) {
+    super(ctx, env);
+    const pass = {};
+    for (const k of ['PUB_SOURCE', 'PUB_BURN']) {
+      if (typeof env[k] === 'string') pass[k] = env[k];
+    }
+    this.envVars = pass;
+  }
+
   #idleTicks = 0;
   /** browser WHIP publishes: rate-limit stamps, and id -> resource URL */
   #whipHits = [];
@@ -201,7 +222,26 @@ export class Pub extends Container {
 
       // The container publishes to the SAME input. Two publishers is one
       // publisher and a fight, so hand the input over rather than race for it.
-      if (this.viewers() === 0) await this.#stopPublish();
+      //
+      // 🔴 AND WHILE SOMEBODY IS WATCHING, THE CONTAINER KEEPS IT. Until
+      // 2026-09-30 this line only handed the input over when nobody held
+      // /watch, and with a viewer present it went on to POST anyway, which is
+      // exactly the race the sentence above says not to run: a browser
+      // publish (/cam/, /keep/, /stage/) and the container's own WHIP leg on
+      // one input, and a /webrtc/ viewer's picture swapped for somebody's
+      // camera mid-play. A 409 with the count says why in words, and the page
+      // asking can say so rather than fight.
+      // ⚠️ THE OTHER DIRECTION IS UNCHANGED ON PURPOSE: a viewer arriving while
+      // a browser holds the input starts the container's leg as before, and the
+      // browser publish loses the input. The container has priority because the
+      // pages that watch it have no other source; a camera page can say so.
+      if (this.viewers() > 0) {
+        return json({
+          error: 'input busy: the container is publishing to it for viewers',
+          viewers: this.viewers(),
+        }, 409);
+      }
+      await this.#stopPublish();
 
       const offer = await request.text();
       let up;
