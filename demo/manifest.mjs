@@ -98,7 +98,7 @@ export const DEMOS = [
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
   { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
-    one: 'browser to browser over MoQ',
+    one: 'the same test picture the other streaming pages play, sent from this browser over MoQ and back',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
   // One press starts every leg: getUserMedia, a WHIP publish through the pub
   // worker, a WHEP play back and a MoQ loopback. The 409 retries on WHEP and

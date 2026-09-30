@@ -1,6 +1,8 @@
 ## Open
 
-### Open 2026-09-30: the hls.js options table, no wrapped names, default and recommended columns, sans serif comment
+### Done 2026-09-30: the hls.js options table, no wrapped names, default and recommended columns, sans serif comment
+
+DONE 2026-09-30, 2f82693.
 
 ASKED, VERBATIM: *"do not wrap optoins. have default and recommended cols with
 values. use sans serif for comment (change col title)"*, with a screenshot of
@@ -16,7 +18,9 @@ the `HLS.JS OPTIONS` table on `/llhls/` (from `9430464`) where
 - The wrapping comes from the kit's `overflow-wrap: anywhere` on table cells;
   override it on this column only, not in `table.mjs`.
 
-### Open 2026-09-30: the "I am watching" connector and its note should be more technical
+### Done 2026-09-30: the "I am watching" connector and its note should be more technical
+
+DONE 2026-09-30, 9430464.
 
 ASKED, VERBATIM: *"you can be more techincal on this connector label and desc
 below"*, with a screenshot of the `/llhls/` diagram, the `socket` to `Pub` arrow
@@ -36,7 +40,9 @@ the whole message..."*).
 - ⚠️ A connector label is short by the diagram's rules; the technical detail
   that does not fit goes in the note. Load `positron-diagram` first.
 
-### Open 2026-09-30: the player box's note should say how to patch hls.js to work right
+### Done 2026-09-30: the player box's note should say how to patch hls.js to work right
+
+DONE 2026-09-30, 9430464.
 
 ASKED, VERBATIM: *"add longer desc how to patch hls.js to work right"*, with a
 screenshot of the `/llhls/` diagram's `player` box (`hls.js or native`) and its
@@ -61,7 +67,9 @@ answers the master playlist with a 200..."*).
   real low latency (LL) out of hls.js, the full list rather than a sample. If
   it meant something else, the words are here to re-read.
 
-### Open 2026-09-30: test screen, local timecode to the right so it does not overlap absolute
+### Done 2026-09-30: test screen, local timecode to the right so it does not overlap absolute
+
+DONE 2026-09-30, d8c95d3, pub deployed as fa6c999e; the live picture changes on the container's next cold start.
 
 ASKED, VERBATIM: *"test screen: move local timecode to right not to overlap
 with absolute"*, with a frame grab from the live stream: `ABSOLUTE
@@ -136,7 +144,9 @@ rest first. add latency labes on all videopanel footers."*
     the harness has no fake device; a probe with Chrome's fake camera read
     21/21 twice, WebRTC glass to glass median 104 ms, MoQ p50 46 ms.
 
-### Open 2026-09-30: webrtc and moq get stats like the llhls readout
+### Done 2026-09-30: webrtc and moq get stats like the llhls readout
+
+DONE 2026-09-30, f0a1d18 (webrtc) and the moq commit.
 
 ASKED, VERBATIM: *"add some stats to webrtc and moq demo"*, with a screenshot of
 `/llhls/`'s readout row: `LATENCY ADVANCE BUFFER HOLES STALLS SWITCHES`.
@@ -163,7 +173,9 @@ ASKED, VERBATIM: *"add some stats to webrtc and moq demo"*, with a screenshot of
   whose value row carries size, fps and spec). Do the moq readout in the same
   pass as that ask, one agent per page, so the two do not fight over one file.
 
-### Open 2026-09-30: webrtc and moq move to the streaming section, at the top of the index
+### Done 2026-09-30: webrtc and moq move to the streaming section, at the top of the index
+
+DONE 2026-09-30, 4d7c062.
 
 ASKED, VERBATIM: *"move webrtc and moq to streaming section to top of index
 page"*. `demo/manifest.mjs`: `webrtc` (`:96`) and `moq` (`:100`) are both
@@ -177,7 +189,9 @@ the first section (`f8583ec`, 2026-09-29).
   the index is newest first.
 - `built` stays as it is; this is `group` only.
 
-### Open 2026-09-30: moq gets the llhls polish, and its canvas draws the ffmpeg picture 1:1
+### Done 2026-09-30: moq gets the llhls polish, and its canvas draws the ffmpeg picture 1:1
+
+DONE 2026-09-30, the moq commit.
 
 ASKED, VERBATIM: *"do same ui polish moq as to llhls etc. try to generate 1:1
 same graphics + timecode bar as in container ffmpeg examples"*, then *"...and
@@ -216,7 +230,9 @@ add diagram too"*. `demo/moq/index.html`, `demo/shell/moq.mjs`,
   what anybody asked for today. Decide the source before that deploy, and the
   moq canvas matches whichever it is.
 
-### Open 2026-09-29: moq joins the streaming section and gets the same UI treatment
+### Done 2026-09-29: moq joins the streaming section and gets the same UI treatment
+
+DONE 2026-09-30, 4d7c062 and the moq commit.
 
 ASKED, VERBATIM: *"Move moq to streaming as well and do same ui treatment"*.
 `demo/moq/index.html` and the `moq` row in `demo/manifest.mjs`.
