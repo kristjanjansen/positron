@@ -62,7 +62,7 @@ Which names the real hard problem, and it is not bandwidth or latency:
 **clock agreement between devices.** HANDOFF still lists min-RTT skew over a
 real link as the one unmeasured number; everything so far is loopback.
 
-A single device needs no network at all, and `demo/sound/` already is one — it
+A single device needs no network at all, and `demo/und/` already is one — it
 imports nothing but `/shell/` and `/timeline/` and makes no `fetch`, no
 `WebSocket`, no HTTP request of any kind. That is the existence proof for the
 derivation, not a proposal to play alone.
@@ -187,7 +187,7 @@ that at every cue boundary ±1 ms — **24 probes, 0 wrong**.
 
 ### One device: zero network
 
-`demo/sound/` is the existence proof. It imports `/shell/` and `/timeline/`
+`demo/und/` is the existence proof. It imports `/shell/` and `/timeline/`
 only, and makes no network call. A conductor with a laptop and a compiled score
 needs nothing else — no wifi, no server, no uplink.
 
@@ -245,7 +245,7 @@ that real scores do not use them.
 
 ### P2 — the offline claim, asserted rather than assumed
 
-`demo/sound/` makes no network call today. Nothing enforces that, so it is one
+`demo/und/` makes no network call today. Nothing enforces that, so it is one
 careless import from being untrue.
 
 **Done when** the page's offline-ness is a check rather than a property — a
@@ -284,7 +284,7 @@ positron does not address. This is a borrowing, not a build.
   a multi-section score with a tempo is wrong by 2 s in the oracle's case. The
   oracle reports it rather than omitting it.
 - **A repeat under a changing tempo is not the same material in time.** Found
-  and fixed in `demo/sound/` this session: the document keeps the repeat as one
+  and fixed in `demo/und/` this session: the document keeps the repeat as one
   line (authoring) while the deck is built from the expanded compile (trace),
   per `plan-timeline` C10. The last note had been **578 ms** early. A quotation
   replayed at `rate: 1` reproduces the stored spacing, not the stretched one,

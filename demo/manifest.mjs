@@ -80,8 +80,8 @@ export const DEMOS = [
   { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'one file format for scores written in different languages',
     tags: ['timeline'] },
-  { name: 'sound', group: 'vain', act: 0, created: '2026-09-07', built: true,
-    one: 'a Csound score, compiled as you type',
+  { name: 'und', group: 'vain', act: 0, created: '2026-09-07', built: true,
+    one: 'a Csound score, compiled whenever you stop typing',
     tags: ['timeline', 'Csound', 'WebAudio'] },
   { name: 'click', group: 'vain', act: 0, created: '2026-09-14', built: true,
     one: 'U:’s vClick is a click track with no earpieces, where every player watches a screen for the bar, the beat and a lamp',
@@ -686,7 +686,7 @@ export const DEMOS = [
    */
   { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
     one: 'a synthesiser you type in, compiled to machine code in this tab '
-       + 'as the page opens',
+       + 'whenever you stop typing',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
 
   // `able` was a demo and is archived at archive/demos/able-index.html, removed
