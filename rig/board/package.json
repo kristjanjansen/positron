@@ -1,0 +1,9 @@
+{
+  "name": "positron-board",
+  "private": true,
+  "type": "module",
+  "description": "The board's one npm dependency: node-datachannel, for the direct path in rtc.mjs. Everything else is node built-ins.",
+  "dependencies": {
+    "node-datachannel": "0.33.4"
+  }
+}

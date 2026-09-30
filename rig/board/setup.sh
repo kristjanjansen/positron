@@ -113,7 +113,12 @@ for rel in $(grep -ho "from '\.\./\.\./[^']*'" "$SRC"/*.mjs | sed "s|from '\.\./
   fi
 done
 [ "$MISSING" = 0 ] || { echo "refusing to install with an unresolved import"; exit 1; }
+install -m 644 "$SRC/package.json" "$BOXDIR/package.json"
 chown -R "$BOXUSER":"$BOXUSER" "$DEST"
+# The board's ONE npm dependency, node-datachannel, for the direct path to a
+# page (rtc.mjs). A prebuilt arm64 binary, no compiler. If it fails the board
+# still runs, relay only, and says so at start.
+sudo -u "$BOXUSER" sh -c "cd '$BOXDIR' && npm install --omit=dev --no-audit --no-fund" || echo "   node-datachannel did not install; the board will use the relay only"
 
 echo "== config"
 [ -f /etc/default/positron-board ] || cat > /etc/default/positron-board <<CFG

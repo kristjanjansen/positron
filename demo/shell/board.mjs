@@ -32,7 +32,7 @@
 // there. CLAUDE.md: a control that exists in one page and nowhere else is a
 // component that has not been noticed yet.
 
-import { openWire } from './wire.mjs';
+import { openWire, randomId } from './wire.mjs';
 import { createPresence } from './presence.mjs';
 
 /** The board fixes these (rig/board/synth.mjs) and NOTHING in the chain
@@ -142,6 +142,26 @@ export function createBoard({
    * passes it and the guard stands aside.
    */
   inSelfcheck = 'refuse',
+  /**
+   * 🔴 A DIRECT PATH TO THE BOARD, BESIDE THE RELAY, AND OFF UNLESS ASKED FOR.
+   * `plans/plan-away-webrtc.md`: the relay was ~72 of the 93 ms from a key
+   * press on `/away/` to its note arriving back. With this on, `goDirect()`
+   * offers two WebRTC data channels to the board through the relay room, and
+   * once they are open the audio arrives on `pcm` and every send leaves on
+   * `ctl`. The relay stays joined throughout, for presence, for signalling and
+   * as the fallback when no channel opens.
+   * MEASURED 2026-09-30, P0, headless Chrome to the Pi on one network: host to
+   * host over UDP, open in 158 ms, 200 of 200 frames echoed at p50 3.7 ms.
+   * ⚠️ AN OFFER IS A SEND, so under `?selfcheck=1` it is refused like any
+   * other: a harness never opens a peer on the board in another building.
+   */
+  direct = false,
+  /** The cushion once the direct path is open. The relay's jitter is what the
+   *  ordinary `cushionMs` is sized for; a channel four milliseconds away needs
+   *  far less, and re-posting the floor also undoes any ratchet the switchover
+   *  itself caused. Defaults to `cushionMs`, so nothing changes unless asked. */
+  directCushionMs = null,
+  iceUrl = 'https://pub.positron.studio/ice',
 } = {}) {
   if (!room) throw new Error('board: a room is required. `studio-1` is the address of the Raspberry Pi.');
   if (!['refuse', 'allow'].includes(inSelfcheck)) {
@@ -452,7 +472,7 @@ export function createBoard({
     onOpen: () => onOpen(),
     onClose: () => log('socket closed · reconnecting'),
     onMessage: (got) => {
-      if (got.kind === 'binary') { onBinary(got.data); return; }
+      if (got.kind === 'binary') { if (via === 'relay') onBinary(got.data); return; }
       if (got.kind !== 'json') return;
       if (got.msg.from === wire.stats().from) return;    // our own line, echoed back
       /**
@@ -495,7 +515,13 @@ export function createBoard({
         log(`the board says it sends ${chIn === 2 ? 'two channels' : 'one channel'} at ${m.frameMs} ms a frame`);
       }
     }
-    if (m.type === 'board.hello' || m.type === 'board.alive') boardFrom = m.from || boardFrom;
+    if (m.type === 'board.hello' || m.type === 'board.alive') {
+      boardFrom = m.from || boardFrom;
+      if ('direct' in m) boardDirect = !!m.direct;
+    }
+    // Addressed by the page's own random peer id, not by `boardFrom`, which a
+    // page learns only from the next `board.alive`, up to five seconds away.
+    if (dx && m.peer === dx.peer && /^rtc\.(answer|candidate|refused)$/.test(m.type)) onSignal(m);
     if (m.from && m.from === boardFrom) { pres.seen(); pres.checking(false); }
     onMessage(m);
   }
@@ -516,6 +542,14 @@ export function createBoard({
       }
       refused += 1;
       return null;
+    }
+    if (via !== 'relay' && dx?.ctl?.readyState === 'open') {
+      const id = randomId();
+      // ⚠️ NUMBERED, because `ctl` is unordered: the board refuses a note older
+      // than the last one it applied to the same key (rig/board/rtc.mjs).
+      const out = { ...msg, id, ...(msg.type === 'midi.send' ? { n: ++dxN } : {}) };
+      try { dx.ctl.send(JSON.stringify(out)); } catch { return null; }
+      return id;
     }
     const out = wire.send(msg);
     if (!out?.sent) return null;
@@ -544,6 +578,127 @@ export function createBoard({
     return waitFor(type, ms, id);
   }
 
+  // ── the direct path ───────────────────────────────────────────────────────
+  // `via` is 'relay' until a channel is open, then 'direct', or 'turn' when the
+  // selected pair runs through a TURN server. Read from getStats, because a lag
+  // measured over a TURN hop is not comparable with one measured direct.
+  let via = 'relay', boardDirect = null, dx = null, dxN = 0, rttMs = null, rttTimer = null;
+
+  function useRelay(why) {
+    if (via !== 'relay') log(`direct path closed, ${why}. Back on the relay`, 'warn');
+    via = 'relay';
+    const was = dx; dx = null;
+    try { was?.pc.close(); } catch { /* */ }
+    told = told && { ...told, frameMs };     // the relay's frame again
+    lastSeq = -1; shapeChecked = false;
+    playout?.port.postMessage({ cmd: 'floor', ms: cushionMs, adaptive: true, maxMs: maxCushionMs });
+  }
+
+  async function onSignal(m) {
+    const d = dx;
+    if (!d) return;
+    try {
+      if (m.type === 'rtc.answer') await d.pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+      else if (m.type === 'rtc.candidate' && m.cand) await d.pc.addIceCandidate({ candidate: m.cand, sdpMid: m.mid || '0' });
+      else if (m.type === 'rtc.refused') { d.refused = m.why || 'refused'; d.fail?.(d.refused); }
+    } catch (e) { log(`direct path: ${e.message}`, 'dim'); }
+  }
+
+  async function pairKind(pc) {
+    try {
+      const st = await pc.getStats();
+      let pair = null;
+      st.forEach((r) => { if (r.type === 'transport' && r.selectedCandidatePairId) pair = st.get(r.selectedCandidatePairId); });
+      if (!pair) st.forEach((r) => { if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') pair = r; });
+      if (!pair) return null;
+      const l = st.get(pair.localCandidateId), r = st.get(pair.remoteCandidateId);
+      return (l?.candidateType === 'relay' || r?.candidateType === 'relay') ? 'turn' : 'direct';
+    } catch { return null; }
+  }
+
+  /**
+   * Offer the board a direct path. Resolves 'direct', 'turn', 'relay' (no
+   * channel within `waitMs`, or the board has none) or 'refused' (this run may
+   * not drive the board). Never throws: the relay is always there to fall to.
+   */
+  async function goDirect({ frameMs: want = 10, waitMs = 3000 } = {}) {
+    if (!direct) return 'relay';
+    if (!driving) { send({ type: 'rtc.offer' }); return 'refused'; }   // counted and said once, like any send
+    if (dx) return via;
+    if (boardDirect === false) { log('this board has no direct path, so the relay carries everything', 'dim'); return 'relay'; }
+    if (typeof RTCPeerConnection === 'undefined') return 'relay';
+    // TURN credentials on the press, never on load (plan §5.5). A failure to
+    // fetch them costs only the case where direct needs TURN.
+    let iceServers = [{ urls: 'stun:stun.cloudflare.com:3478' }];
+    try { const r = await fetch(iceUrl); if (r.ok) iceServers = (await r.json()).iceServers || iceServers; } catch { /* stun only */ }
+    const d = dx = { peer: `p${randomId(10)}`, pc: new RTCPeerConnection({ iceServers }), pcm: null, ctl: null, refused: null };
+    dxN = 0;
+    d.pcm = d.pc.createDataChannel('pcm', { ordered: false, maxRetransmits: 0 });
+    d.ctl = d.pc.createDataChannel('ctl', { ordered: false });
+    d.pcm.binaryType = 'arraybuffer';
+    d.pc.onicecandidate = (e) => { if (e.candidate && dx === d) wire.send({ type: 'rtc.candidate', peer: d.peer, cand: e.candidate.candidate, mid: e.candidate.sdpMid }); };
+    d.pc.onconnectionstatechange = () => {
+      const st = d.pc.connectionState;
+      if (dx === d && (st === 'failed' || st === 'closed')) useRelay(`the connection ${st}`);
+    };
+    d.pcm.onmessage = (e) => { if (dx === d && via !== 'relay') onBinary(e.data); };
+    d.ctl.onmessage = (e) => {
+      if (dx !== d) return;
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.type === 'rtc.hello') {
+        told = { audioChannels: m.audioChannels || 1, frameMs: m.frameMs };
+        chIn = told.audioChannels === 2 ? 2 : 1; lastSeq = -1; shapeChecked = false;
+        playout?.port.postMessage({ cmd: 'inChannels', n: chIn });
+        return;
+      }
+      if (m.type === 'rtc.pong') { if (Number.isFinite(m.t)) rttMs = performance.now() - m.t; return; }
+      heard(m);
+    };
+    d.ctl.onclose = () => { if (dx === d) useRelay('the board closed it'); };
+    await d.pc.setLocalDescription(await d.pc.createOffer());
+    wire.send({ type: 'rtc.offer', peer: d.peer, sdp: d.pc.localDescription.sdp, frameMs: want });
+    const t0 = performance.now();
+    const opened = await new Promise((res) => {
+      const both = () => d.pcm.readyState === 'open' && d.ctl.readyState === 'open';
+      const timer = setTimeout(() => res(false), waitMs);
+      d.fail = () => { clearTimeout(timer); res(false); };
+      const check = () => { if (both()) { clearTimeout(timer); res(true); } };
+      d.pcm.onopen = check; d.ctl.onopen = check;
+    });
+    if (dx !== d) return via;
+    if (!opened) {
+      useRelay(d.refused || `no channel opened in ${waitMs} ms`);
+      log(`no direct path: ${d.refused || `nothing opened in ${(waitMs / 1000).toFixed(0)} s`}. The relay carries everything`, 'dim');
+      return 'relay';
+    }
+    via = (await pairKind(d.pc)) || 'direct';
+    lastSeq = -1; shapeChecked = false;
+    playout?.port.postMessage({ cmd: 'floor', ms: directCushionMs ?? cushionMs, adaptive: true, maxMs: maxCushionMs });
+    log(`direct path open in ${Math.round(performance.now() - t0)} ms, ${via === 'turn' ? 'through a TURN server' : 'straight to the board'}`, 'hi');
+    return via;
+  }
+
+  /** Board round trip on whichever path is in use: `rtc.ping` over ctl, or an
+   *  `audio.status` question over the relay. Both reach the board and come
+   *  back, so the two numbers are the same measurement. */
+  async function measureRtt() {
+    if (!driving) return null;
+    if (via !== 'relay' && dx?.ctl?.readyState === 'open') {
+      try { dx.ctl.send(JSON.stringify({ type: 'rtc.ping', id: randomId(), t: performance.now() })); } catch { /* */ }
+      return rttMs;
+    }
+    const t0 = performance.now();
+    const r = await ask({ type: 'audio.status' }, 'audio.started', 3000);
+    if (r && via === 'relay') rttMs = performance.now() - t0;
+    return rttMs;
+  }
+  function watchRtt(everyMs = 2000) {
+    clearInterval(rttTimer); rttTimer = null;
+    if (!everyMs) return;                  // 0 stops it
+    measureRtt();
+    rttTimer = setInterval(measureRtt, everyMs);
+  }
+
   return {
     /** the presence badge. `chip: board.presence.el` on a transport bar. */
     presence: pres,
@@ -558,6 +713,10 @@ export function createBoard({
     startAudio,
     ping: (ms) => wire.ping(ms),
     state: () => wire.state(),
+    /** Offer the direct path; see `direct` above. */
+    goDirect,
+    /** Keep `stats().rttMs` fresh on whichever path is in use. */
+    watchRtt,
     /** which socket in the room is the board, or null if it has not spoken. */
     boardFrom: () => boardFrom,
     ctx: () => ctx,
@@ -572,6 +731,8 @@ export function createBoard({
       bufferedMs, starved, trimmed, breaks,
       framesPerSec: firstFrameAt ? frames / Math.max(0.001, (performance.now() - firstFrameAt) / 1000) : 0,
       channels: chIn, shapeChecked, shapeWrong, shapeSaid,
+      /** 'relay', 'direct' or 'turn', and the board's own answer time on it. */
+      via, rttMs, boardDirect,
       told,
       /** Who else is driving the instrument: 'page', 'tool', or null. */
       driver: pres.driver,
@@ -592,6 +753,6 @@ export function createBoard({
 
     /** `peak` is a running maximum; a page timing one note resets it. */
     resetPeak: () => { peak = 0; },
-    close: () => { pres.stop(); wire.close(); },
+    close: () => { clearInterval(rttTimer); useRelay('closing'); pres.stop(); wire.close(); },
   };
 }

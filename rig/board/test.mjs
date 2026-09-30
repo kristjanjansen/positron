@@ -10,6 +10,7 @@ import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PRO
 import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
 import { parseInputs, takeChannel, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
+import { fresher, midiKey, MAX_PEERS } from './rtc.mjs';
 import { EventEmitter } from 'node:events';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -421,6 +422,132 @@ console.log('inputs: what a page may send the Circuit');
   t += 61_000; c.s.lastHeard = t; c.beat();
   is('so the lease still releases it', writes.at(-1), [0x80, 64, 0]);
   hw.close();
+}
+
+console.log('\nrtc: the direct path, against a fake peer');
+{
+  // ── the reorder guard, pure ────────────────────────────────────────────────
+  const last = new Map();
+  is('a note on is keyed by channel and note', midiKey([0x90, 60, 100]), '0:n:60');
+  is('and its note off shares the key', midiKey([0x80, 60, 0]), '0:n:60');
+  is('a numbered note on applies', fresher(last, [0x90, 60, 100], 1), true);
+  is('its note off, numbered after, applies', fresher(last, [0x80, 60, 0], 2), true);
+  // negative control: the reorder an unordered channel can deliver
+  const r = new Map();
+  is('a note off that overtook its note on applies', fresher(r, [0x80, 64, 0], 2), true);
+  is('and the late note on is refused, so nothing sticks', fresher(r, [0x90, 64, 100], 1), false);
+  is('another note is not held back by it', fresher(r, [0x90, 65, 100], 1), true);
+  is('an unnumbered message from an older page applies', fresher(r, [0x90, 64, 100], undefined), true);
+  is('a stale filter value is refused too', [fresher(r, [0xB0, 74, 90], 9), fresher(r, [0xB0, 74, 10], 8)], [true, false]);
+
+  // ── the live half ──────────────────────────────────────────────────────────
+  const pcs = [];
+  class FakeDC {
+    constructor(label) { this.label = label; this.out = []; this.open = true; this.backlog = 0; }
+    getLabel() { return this.label; } isOpen() { return this.open; } bufferedAmount() { return this.backlog; }
+    sendMessage(x) { this.out.push(JSON.parse(x)); } sendMessageBinary(b) { this.out.push(b); }
+    onMessage(f) { this.recv = f; } close() { this.open = false; }
+  }
+  class FakePC {
+    constructor(name, cfg) { this.name = name; this.cfg = cfg; this.cands = []; this.closed = false; pcs.push(this); }
+    onLocalDescription(f) { this.ld = f; } onLocalCandidate(f) { this.lc = f; }
+    onStateChange(f) { this.sc = f; } onDataChannel(f) { this.dcf = f; }
+    setRemoteDescription(sdp, kind) { this.remote = [sdp, kind]; this.ld('v=0 answer', 'answer'); this.lc('candidate:1 1 UDP 1 192.168.1.213 5000 typ host', '0'); }
+    addRemoteCandidate(c, mid) { this.cands.push([c, mid]); }
+    close() { this.closed = true; }
+    // what the page's two createDataChannel calls look like from here
+    channels() { const pcm = new FakeDC('pcm'), ctl = new FakeDC('ctl'); this.dcf(pcm); this.dcf(ctl); return { pcm, ctl }; }
+  }
+  let t = 0; const writes = [];
+  const fakeFs = { readlinkSync: () => 'card7', openSync: () => 42, writeSync: (fd, b) => writes.push([...b]), closeSync: () => {} };
+  const spawned = [];
+  const sock = [];
+  class WS { constructor() { this.readyState = 1; this.sent = []; sock.push(this); } send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
+  const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
+  const mk = (PeerConnection) => createInputs({ inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 4, rate: 200, name: 'pi', id: 'pi',
+    spawn: () => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => p.emit('exit'); spawned.push(p); return p; },
+    WebSocket: WS, format: (m, e) => JSON.stringify({ ...m, ...e }), parse: (x) => ({ kind: 'json', msg: JSON.parse(x) }),
+    randomId: () => 'x', now: () => t, fs: fakeFs, leaseMs: 60_000, beatMs: 5_000, PeerConnection });
+  const relayOut = (w) => w.sent.filter((x) => typeof x === 'string').map((x) => JSON.parse(x));
+
+  // a board with no library answers, rather than leaving a page waiting
+  const bare = mk(null); const b = bare.get('circuit'); b.connect(); sock[0].onopen();
+  is('a board with no library says so in its hello', relayOut(sock[0]).find((m) => m.type === 'board.hello').direct, false);
+  sock[0].onmessage({ data: JSON.stringify({ type: 'rtc.offer', peer: 'page1', sdp: 'v=0', from: 'p' }) });
+  is('and refuses an offer out loud', relayOut(sock[0]).at(-1).type, 'rtc.refused');
+  bare.close();
+
+  const hw = mk(FakePC); const c = hw.get('circuit'); c.connect();
+  const ws = sock[1]; ws.onopen();
+  is('a board with the library says so in its hello', relayOut(ws).find((m) => m.type === 'board.hello').direct, true);
+  ws.onmessage({ data: JSON.stringify({ type: 'rtc.offer', peer: 'page1', sdp: 'v=0 offer', from: 'p' }) });
+  is('an offer makes a peer', pcs.length, 1);
+  is('with a STUN server, so a board off the LAN has a public candidate', pcs[0].cfg.iceServers.some((x) => x.startsWith('stun:')), true);
+  const ans = relayOut(ws).find((m) => m.type === 'rtc.answer');
+  is('the answer goes back into the room, addressed to that peer', [ans?.peer, ans?.sdp], ['page1', 'v=0 answer']);
+  is('and so does the board\'s candidate', relayOut(ws).some((m) => m.type === 'rtc.candidate' && m.peer === 'page1'), true);
+  ws.onmessage({ data: JSON.stringify({ type: 'rtc.candidate', peer: 'page1', cand: 'candidate:9 1 udp 1 x.local 1 typ host', mid: '0', from: 'p' }) });
+  is('the page\'s candidate reaches its peer', pcs[0].cands.length, 1);
+  ws.onmessage({ data: JSON.stringify({ type: 'rtc.candidate', peer: 'other', cand: 'candidate:9', mid: '0', from: 'q' }) });
+  is('a candidate for nobody here is ignored', pcs[0].cands.length, 1);
+
+  const { pcm, ctl } = pcs[0].channels();
+  is('ctl opens with the frame length on this path', [ctl.out[0].type, ctl.out[0].frameMs], ['rtc.hello', 10]);
+  const before = relayOut(ws).length;
+  ctl.recv(JSON.stringify({ type: 'midi.send', id: 'a', n: 1, bytes: [0x90, 60, 100] }));
+  is('a note over ctl reaches the instrument', writes.at(-1), [0x90, 60, 100]);
+  ctl.recv(JSON.stringify({ type: 'midi.send', id: 'b', n: 2, bytes: [0xF0, 0x7E, 0x7F] }));
+  // negative control for the gate: the same message over the relay is refused too, above
+  is('SysEx over ctl never reaches the instrument', writes.length, 1);
+  is('and the refusal comes back on ctl', ctl.out.at(-1).type, 'midi.refused');
+  is('not into the relay room', relayOut(ws).length, before);
+  ctl.recv(JSON.stringify({ type: 'midi.send', id: 'c', n: 4, bytes: [0x80, 62, 0] }));
+  ctl.recv(JSON.stringify({ type: 'midi.send', id: 'd', n: 3, bytes: [0x90, 62, 100] }));
+  is('a note on that arrives after its own note off is dropped', writes.some((w) => w[0] === 0x90 && w[1] === 62), false);
+  ctl.recv(JSON.stringify({ type: 'rtc.offer', peer: 'sneaky', sdp: 'v=0' }));
+  is('ctl cannot open another peer', pcs.length, 1);
+  ctl.recv(JSON.stringify({ type: 'input.want', id: 'w' }));
+  is('input.want over ctl starts the capture', spawned.length, 1);
+  is('and answers on ctl', ctl.out.at(-1).type, 'input.wanted');
+
+  // frame 4 at 200 Hz: 20 ms a frame and a 10 ms unit, as on the board
+  const frame = (a) => spawned[0].stdout.emit('data', Buffer.from(new Int16Array(a.flatMap((x) => [x, 7])).buffer));
+  frame([1, 2]);
+  const bins = () => pcm.out.filter((x) => Buffer.isBuffer(x));
+  const relayBins = () => ws.sent.filter((x) => Buffer.isBuffer(x));
+  is('half a frame goes direct as soon as it exists', bins().length, 1);
+  is('and the relay waits for the whole frame', relayBins().length, 0);
+  frame([3, 4]);
+  is('the relay gets its whole frame from two halves', [...new Int16Array(relayBins()[0].buffer.slice(relayBins()[0].byteOffset + 12, relayBins()[0].byteOffset + relayBins()[0].length))], [1, 2, 3, 4]);
+  const d = bins()[1];
+  is('a direct frame carries one channel, the same 12 byte header', [d.readUInt32LE(0), ...new Int16Array(d.buffer.slice(d.byteOffset + 12, d.byteOffset + d.length))], [1, 3, 4]);
+  pcm.backlog = 1 << 20; frame([5, 6]);
+  is('a peer that is not draining loses the frame rather than queueing it', bins().length, 2);
+  pcm.backlog = 0;
+
+  // a second peer asking for 20 ms frames gets whole frames
+  ws.onmessage({ data: JSON.stringify({ type: 'rtc.offer', peer: 'page2', sdp: 'v=0', frameMs: 20, from: 'q' }) });
+  const two = pcs[1].channels();
+  is('a page may ask for the longer frame', two.ctl.out[0].frameMs, 20);
+
+  // the cap
+  for (const k of [3, 4]) ws.onmessage({ data: JSON.stringify({ type: 'rtc.offer', peer: `page${k}`, sdp: 'v=0', from: 'q' }) });
+  ws.onmessage({ data: JSON.stringify({ type: 'rtc.offer', peer: 'page5', sdp: 'v=0', from: 'q' }) });
+  is(`a peer past ${MAX_PEERS} is refused and told to use the relay`, [pcs.length, relayOut(ws).at(-1).type], [MAX_PEERS, 'rtc.refused']);
+
+  // a held note from a peer that goes quiet
+  ctl.recv(JSON.stringify({ type: 'midi.send', id: 'e', n: 5, bytes: [0x91, 67, 100] }));
+  c.handle({ type: 'midi.send', id: 'r', bytes: [0x92, 70, 100] });   // somebody on the relay
+  c.handle({ type: 'input.want', id: 'w' });
+  t += 61_000; c.s.lastHeard = t; two.ctl.recv(JSON.stringify({ type: 'rtc.ping', id: 'k', t: 1 }));
+  c.handle({ type: 'input.want', id: 'w2' });
+  c.beat();
+  is('a peer silent for a minute is closed', pcs[0].closed, true);
+  is('the peer that kept talking stays', pcs[1].closed, false);
+  is('the quiet peer\'s held note is released', writes.some((w) => w[0] === 0x81 && w[1] === 67), true);
+  is('and nobody else\'s is', writes.some((w) => w[0] === 0x82 && w[1] === 70), false);
+  hw.close();
+  is('closing the board closes every peer', pcs.every((p) => p.closed), true);
 }
 
 console.log(`\n${pass}/${pass + fail} green`);

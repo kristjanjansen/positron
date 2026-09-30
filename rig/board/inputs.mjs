@@ -26,6 +26,7 @@
 // before anything is playing; only `arecord` comes and goes with the lease.
 
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
+import { createRtc } from './rtc.mjs';
 
 export const LEASE_MS = 60_000;
 
@@ -148,29 +149,39 @@ export function leaseExpired(lease, now) {
 export function createInputs({
   inputs, room, relay, frame, rate, name: boardName, id: boardId,
   spawn, WebSocket, format, parse, randomId, log = () => {}, now = () => Date.now(), fs = null,
+  // node-datachannel's PeerConnection, or null. Null is a board with no npm
+  // install, and it is a board with the relay only, never a broken one.
+  PeerConnection = null,
   leaseMs = LEASE_MS, beatMs = BEAT_MS,
   // 10 ms a period, four periods of buffer. See the capture below.
   periodFrames = 480, bufferFrames = 1920,
 }) {
   const live = new Map();
+  // The capture's unit: half a frame when a frame halves, so the direct path
+  // can send 10 ms of a 20 ms frame. The relay's frame is unchanged.
+  const UNIT = frame % 2 === 0 ? frame / 2 : frame;
 
   function one(cfg) {
     const s = {
       cfg, room: `${room}-${cfg.name}`, from: `board-${cfg.name}-${randomId(6)}`,
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
-      backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0,
+      backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0, rtc: null,
     };
     const send = (msg) => {
       if (s.ws?.readyState !== 1) return false;
       s.ws.send(format(msg, { from: s.from, seq: s.seq++ }));
       return true;
     };
-    const shape = () => ({ name: boardName, id: boardId, input: cfg.name, audioChannels: 1, frameMs: 1000 * frame / rate });
+    // `direct` tells a page whether to offer at all, so a board without the
+    // library costs a page nothing rather than a three second wait.
+    const shape = () => ({ name: boardName, id: boardId, input: cfg.name, audioChannels: 1, frameMs: 1000 * frame / rate,
+                           direct: !!s.rtc });
     const alive = () => ({ type: 'board.alive', ...shape(), audio: s.proc ? cfg.name : null, frames: s.frames,
                            leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0 });
     const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device,
                             frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused } : null,
                             leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
+                            direct: s.rtc ? s.rtc.status() : null,
                             ...(s.proc ? {} : { reason: 'nothing playing' }) });
 
     function sendPcm(int16) {
@@ -194,14 +205,25 @@ export function createInputs({
       const p = spawn('arecord', ['-D', cfg.device, '-f', 'S16_LE', '-r', String(rate),
         '-c', String(cfg.channels), '-t', 'raw', '-q',
         `--period-size=${periodFrames}`, `--buffer-size=${bufferFrames}`], { stdio: ['ignore', 'pipe', 'pipe'] });
-      const IN = frame * 2 * cfg.channels;
-      let carry = Buffer.alloc(0);
+      // ⚠️ READ IN HALF FRAMES WHEN A FRAME HALVES. The direct path sends 10 ms
+      // as soon as 10 ms exists, which is the point of it; the relay still gets
+      // its 20 ms frame, at the same moment it always did, out of two halves.
+      const IN = UNIT * 2 * cfg.channels;
+      let carry = Buffer.alloc(0), halves = [];
       p.stdout.on('data', (chunk) => {
         carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
         while (carry.length >= IN) {
           const all = new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + IN));
-          sendPcm(takeChannel(all, cfg.channels, cfg.take, frame));
+          const one = takeChannel(all, cfg.channels, cfg.take, UNIT);
           carry = carry.subarray(IN);
+          s.rtc?.pcm(one);
+          if (UNIT === frame) { sendPcm(one); continue; }
+          halves.push(one);
+          if (halves.length < frame / UNIT) continue;
+          const whole = new Int16Array(frame);
+          halves.forEach((h, i) => whole.set(h, i * UNIT));
+          halves = [];
+          sendPcm(whole);
         }
       });
       // arecord's stderr is the only clue when a device is busy or gone.
@@ -266,8 +288,10 @@ export function createInputs({
       return n;
     }
 
-    function handle(msg) {
-      const reply = (type, body) => send({ type, re: msg.id, ...body });
+    // `answer` is how a reply leaves: the relay room by default, the peer's own
+    // `ctl` channel when the message came over one.
+    function handle(msg, answer = null) {
+      const reply = answer || ((type, body) => send({ type, re: msg.id, ...body }));
       if (msg.type === 'input.want') {
         s.lease = now() + leaseMs;
         const was = !!s.proc;
@@ -305,6 +329,14 @@ export function createInputs({
         if (typeof e.data !== 'string') return;
         const { kind, msg } = parse(e.data);
         if (kind !== 'json' || msg.from === s.from) return;
+        // Signalling for the direct path arrives here and ONLY here: a `ctl`
+        // channel cannot open another peer.
+        if (msg.type === 'rtc.offer') {
+          if (!s.rtc) return send({ type: 'rtc.refused', peer: msg.peer, why: 'this board has no direct path, use the relay' });
+          try { s.rtc.offer(msg); } catch (err) { log(`${cfg.name}: offer threw`, err.message); }
+          return;
+        }
+        if (msg.type === 'rtc.candidate') { try { s.rtc?.candidate(msg); } catch {} return; }
         try { handle(msg); } catch (err) { log(`${cfg.name}: handler threw`, err.message); }
       };
       ws.onclose = () => {
@@ -322,6 +354,7 @@ export function createInputs({
     // always close.
     function beat() {
       if (s.proc && leaseExpired(s.lease, now())) { stopCapture('nobody renewed the lease'); midiPanic('the lease ran out'); }
+      s.rtc?.sweep();
       if (s.ws?.readyState === 1 && now() - s.lastHeard > 3 * beatMs + 1000) {
         log(`${cfg.name}: no echo, reconnecting`);
         try { s.ws.close(); } catch { /* the point */ }
@@ -330,10 +363,27 @@ export function createInputs({
       send(alive());
     }
 
+    if (PeerConnection) {
+      s.rtc = createRtc({
+        PeerConnection, signal: send, handle, now, rate, unitMs: 1000 * UNIT / rate,
+        log: (...a) => log(`${cfg.name}:`, ...a),
+        // A direct listener that goes away lets go of the notes IT started.
+        // Everybody else's stay, which is why this is not `midiPanic`.
+        onGone: (p) => {
+          if (!cfg.midi || !fs) return;
+          for (const k of p.held) {
+            if (!s.held.has(k)) continue;
+            const [ch, note] = k.split(':').map(Number);
+            midiWrite([0x80 | ch, note, 0]);
+          }
+        },
+      });
+    }
+
     return {
       s, connect, beat, handle, status, stopCapture,
       close() {
-        s.closed = true; midiPanic('shutting down'); stopCapture('shutting down');
+        s.closed = true; midiPanic('shutting down'); stopCapture('shutting down'); s.rtc?.close();
         if (s.midiFd !== null) { try { fs.closeSync(s.midiFd); } catch {} s.midiFd = null; }
         try { s.ws?.close(); } catch {}
       },

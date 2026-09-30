@@ -1,5 +1,20 @@
 ## Open
 
+### Done 2026-09-30: update the Pi's MIDI gate (VPN off)
+
+ASKED, VERBATIM: *"read handoff. vpn off. do midi updates on pi and webrtc for away and other stuff"*. The handoff's waiting step: `rig/board/inputs.mjs` and `demo/shell/circuit-cc.mjs` onto `/opt/positron-board`, so `/shape/`'s CCs are let through.
+- ✅ **DONE 15:32.** md5s on the Pi `5263c9d0…` and `0f5dc26c…`, the same as HEAD; service restarted, rejoined `studio-1` and `studio-1-circuit`; `node rig/board/test.mjs` on the Pi **154/154**.
+
+### Done 2026-09-30: build the WebRTC path for `/away/` (plans/plan-away-webrtc.md), the go given
+
+Same message: *"webrtc for away"*. Read as the go the plan waited on, and as yes to `node-datachannel` as `rig/board`'s first npm dependency. Order from the plan: P0 ICE between Chrome and `node-datachannel` on this network, P1 `rig/board/rtc.mjs`, P2 `/away/` direct with the relay as fallback and `via` / `round trip` cells, P3 10 ms frames, P4 the cushion. Each measured before the next.
+- ✅ **DONE, P0 to P4**, results in the plan's §9. Direct, host to host: board round trip 72 to **4 ms**, `lag` 175 to **~48 ms**, 10 ms frames beat 20 (115 ms), cushion starts at 40. Board has it (193/193 there), page has it behind `createBoard({ direct: true })`. Not known: behaviour off this network.
+
+### Open 2026-09-30: "other stuff" from the handoff's waiting list
+
+Same message: *"and other stuff"*. What can move without an owner decision: measure the Circuit input for clipping now the LAN is reachable (it read 4,108 samples at full scale before the gain was turned down, and nobody measured after); `/reel/`'s red `pointing at a mark says what it is`; `/circuit/` 48/49 name spacing. Owner's calls, NOT touched: the capitals rule, `/fau/`'s library sliders, the clipping ranges on three patches, the Pi camera.
+- ✅ `/reel/` and `/circuit/` fixed by an agent: reel 26/27 to **27/27** (the hover text put a lane-and-date header over the mark's own lines and pushed its length out, `describeHit` now returns only the mark's lines); circuit 33/34 to **34/34** (a doubled top inset, 41 against 21, the page's own `.circ` top padding stacked on the kit's plate rule). Stale comment in `shell.css` above `.panel-case > .panel-plate` (it says `/circuit/` takes no case inset) left for whoever next holds that file.
+
 ### Done 2026-09-30: the dynamic knobs on the kit's knob grid
 
 ASKED, VERBATIM: *"use knob grid on those dynamic knobs and deploy"*. `param-knobs.mjs` lays its knobs (and the empty row's hidden knob) on `createControlGrid`, one row of up to four at `/knobs/`' gap, the old lattice destroyed on each rebuild. Found on the way: the lattice measures before it is attached, so it is re-measured after `set()`; and the arc's `.12s` stroke fade made a hued knob draw yellow for a beat on every compile, so a param knob's arc has no fade. ⚠️ Five or more knobs would wrap to a second row and change the row's height.
