@@ -13,7 +13,7 @@
 
 <script type="module">
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
-  import { whep, holdPublisher, waitForWhip, watchPresentedFps } from '/shell/live.mjs';
+  import { whep, holdPublisher, waitForWhip, watchPresentedFps, fetchIceServers, readIcePath } from '/shell/live.mjs';
   import { createPresenceButton, STREAM, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
@@ -134,7 +134,21 @@
       // cut the unit off the number. `ping` is the everyday word for exactly
       // this quantity, and `network` is what stops it reading as the picture's
       // own delay.
-      { key: 'rtt', label: 'network ping', reserve: 6 },
+      // 🔴 AND `ping` ALONE SINCE 2026-09-30, MEASURED AGAIN FOR THE SAME REASON.
+      // The route cell beside it made the row 303 px against 259 at 375 px, so
+      // `direct` scrolled out of sight, which is the one word the cell exists to
+      // show. Dropping `network` gives back 46 px and the row fits. The route
+      // word now does the job `network` did: `ping 20 ms direct` cannot be read
+      // as the picture's own delay.
+      { key: 'rtt', label: 'ping', reserve: 6 },
+      /**
+       * 🔴 WHICH ROUTE THE MEDIA TOOK, BESIDE THE PING, SINCE 2026-09-30.
+       * `direct` or `relay`, read off the selected candidate pair by
+       * `readIcePath`. A ping through Cloudflare's TURN relay is not comparable
+       * to a direct one, so the number is never shown without its route.
+       * No label: the word is the value and says what it is.
+       */
+      { key: 'path', label: '', reserve: 6 },
     ],
   });
   /**
@@ -170,9 +184,29 @@
   // land. See `/llhls/`, which took the same shape in the same sitting.
   let gen = 0;
 
+  /**
+   * 🔴 RELAY SERVERS ARE ASKED FOR ON THE PRESS, NEVER ON LOAD. A visit opens
+   * nothing. `fetchIceServers` never throws; with no relay it hands back STUN
+   * alone and says why, and ICE still chooses its route either way, so a
+   * network with working UDP keeps the direct path and costs no relay bytes.
+   * `iceLoadAsks()` reads resource timing, so it counts every request the
+   * browser made to the relay route before the first press rather than the
+   * ones this page remembered to count, and must read 0.
+   */
+  let ice = null, iceAsks = 0, pressAt = null, icePath = null;
+  const iceLoadAsks = () => performance.getEntriesByType('resource')
+    .filter((e) => /\/ice(\?|$)/.test(e.name) && (pressAt == null || e.startTime < pressAt)).length;
+  function askIce() {
+    iceAsks++;
+    return fetchIceServers({ log: (m) => d.log(m) });
+  }
+
   // A WHEP client is small: offer recvonly, POST the SDP, take the answer.
   async function whepPlay(url) {
-    pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
+    pc = new RTCPeerConnection({
+      bundlePolicy: 'max-bundle',
+      ...(ice?.iceServers?.length ? { iceServers: ice.iceServers } : {}),
+    });
     pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
     // A WEBRTC TRACK ARRIVES MUTED and unmutes only once media actually
@@ -259,6 +293,8 @@
     panel.values.set('fps', '');
     panel.values.set('size', '');
     panel.values.set('rtt', '');
+    panel.values.set('path', '');
+    icePath = null;
     clearStats();
     stream.set('offline').because('the publisher stops about a minute after the last viewer goes');
     d.log('let the publisher go. it stops about a minute after the last viewer goes');
@@ -266,6 +302,7 @@
 
   async function start() {
     if (pc) return;
+    pressAt ??= performance.now();
     const mine = ++gen;
     abort = new AbortController();
     stream.set('coming').because('press again to stop it');
@@ -294,6 +331,10 @@
       }
     });
     d.log('holding the publisher open');
+    // Asked now, in parallel with the container waking, and awaited before
+    // the first offer, because WHEP takes no trickle and the offer has to carry
+    // the relay candidates it is ever going to have.
+    const iceAsk = askIce();
 
     // Wait for the WHIP LEG, not the HLS manifest. They are different inputs.
     const w = await waitForWhip({
@@ -318,6 +359,8 @@
       return;
     }
     d.log(`whip leg publishing after ${(w.waitedMs / 1000).toFixed(1)}s`, 'hi');
+    ice = await iceAsk;
+    if (gen !== mine) return;
 
     // ffmpeg reaching DTLS state=10 is not the same as Cloudflare being ready
     // to answer a WHEP offer, so a 409 here is "not yet" rather than "no".
@@ -360,7 +403,7 @@
      */
     for (let i = 0; i < 8 && gen === mine; i++) {
       await readStats();
-      if (stat.buffer != null && stat.codec && stat.rtt != null) break;
+      if (stat.buffer != null && stat.codec && stat.rtt != null && icePath?.path) break;
       await new Promise((r) => setTimeout(r, 500));
     }
     if (gen !== mine) return;
@@ -470,6 +513,15 @@
     d.set('dropped', stat.dropped ?? '');
     d.set('freezes', stat.freezes ?? '');
     d.set('codec', stat.codec);
+    const ip = await readIcePath(p);
+    if (p !== pc) return;
+    if (ip.path && ip.path !== icePath?.path) {
+      d.log(ip.path === 'relay'
+        ? `the media goes through the relay, over ${ip.relayProtocol || ip.protocol || 'an unknown protocol'}`
+        : `the media goes direct, ${ip.local} to ${ip.remote} over ${ip.protocol}`, 'hi');
+    }
+    icePath = ip;
+    panel.values.set('path', ip.path || '');
   }
 
   setInterval(() => {
@@ -552,9 +604,9 @@
        * 2026-09-30, when it took `source`'s place), and `narrow > 0`
        * is a term of the assert rather than an assumption underneath it.
        */
-      write({ size: '', fps: '', rtt: '9 ms' });
+      write({ size: '', fps: '', rtt: '9 ms', path: 'relay' });
       const narrow = row.getBoundingClientRect().width;
-      write({ size: '1280x720', fps: '59.9', rtt: '999 ms' });
+      write({ size: '1280x720', fps: '59.9', rtt: '999 ms', path: 'direct' });
       const wide = row.getBoundingClientRect().width;
       for (const [k, v] of was) panel.values.set(k, v);
       d.assert('a footer number cannot shove the one beside it',
@@ -641,8 +693,30 @@
       const rttText = panel.values.cell('rtt').textContent.trim();
       d.assert('the footer ping is a network round trip in ms',
         Number.isFinite(stat.rtt) && stat.rtt > 0 && stat.rtt < 2000 && / ms$/.test(rttText)
-          && panel.values.el.textContent.includes('network ping'),
+          && panel.values.cell('rtt').previousElementSibling?.textContent === 'ping',
         `${stat.rtt == null ? 'never read' : stat.rtt.toFixed(1) + ' ms'}, footer ${JSON.stringify(panel.values.el.textContent.trim())}`);
+      /**
+       * 🔴 THE RELAY WAS ASKED FOR ON THE PRESS AND HANDED TO THE CONNECTION.
+       * Three facts, because each has a different failure: asked on load (a
+       * visit opened something), never asked (the press forgot), and asked but
+       * not passed on (the connection was built without it). The last is read
+       * off `getConfiguration()`, which is what the connection really holds.
+       */
+      const conf = (pc.getConfiguration().iceServers || []).flatMap((s) => [].concat(s.urls));
+      d.assert('relay servers were asked for on the press and not on load',
+        iceAsks >= 1 && iceLoadAsks() === 0 && !!ice,
+        `${iceAsks} ask(s) after the press, ${iceLoadAsks()} before it by resource timing, `
+        + (ice ? (ice.relay ? 'a relay came back' : `no relay: ${ice.why}`) : 'nothing came back'));
+      d.assert('the peer connection holds what the ask returned',
+        !!ice && conf.length > 0 && (!ice.relay || conf.some((u) => /^turns?:/.test(u))),
+        `${conf.length} url(s) in the connection, ${conf.filter((u) => /^turns?:/.test(u)).length} of them TURN`);
+      const pathText = panel.values.cell('path').textContent.trim();
+      d.assert('the footer names the path the media took, beside the ping',
+        (icePath?.path === 'direct' || icePath?.path === 'relay') && pathText === icePath.path,
+        icePath?.path
+          ? `${icePath.path}: local ${icePath.local}, remote ${icePath.remote}, ${icePath.protocol}`
+            + `${icePath.relayProtocol ? `, relay over ${icePath.relayProtocol}` : ''}, footer ${JSON.stringify(pathText)}`
+          : 'the selected candidate pair could not be read');
     }
     // The picture reports its own damage: every label it had to cut and every
     // link it could not route comes back on `cuts` rather than being ellipsised
@@ -661,7 +735,7 @@
    */
   const dg = createDiagram(d.el, {
     caption: 'One POST of an offer and one answer back, and then the frames come straight '
-      + 'from Cloudflare over UDP without touching a worker. It stops the same way the '
+      + 'from Cloudflare over UDP without touching a worker, or through a relay where UDP is blocked. It stops the same way the '
       + 'low latency HLS page stops, because both legs are one container counting the '
       + 'sockets that are holding it open.',
     nodes: [
