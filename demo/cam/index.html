@@ -22,11 +22,15 @@
   /* The path's name leads each footer. It is a name, not a readout key, so it
      wears the value ink rather than the key's dimmed one. */
   .cam-name { font: 500 11px/1.4 var(--mono); color: var(--fg); white-space: nowrap; }
+  /* Four pictures under one heading, one per panel. Each one after the first
+     opens its own part of that section, so it takes the page's block gap. */
+  .cam-dg + .cam-dg { margin-top: var(--pos-gap); }
 </style>
 
 <script type="module">
   import { mount, guard, el, armVideo } from '/shell/shell.mjs';
-  import { whipPublish, whepPlay, whep, fetchIceServers, probeUdp, camPublish, camLlhls, camLifecycle } from '/shell/live.mjs';
+  import { whepPlay, fetchIceServers, probeUdp, camPublish, camLlhls, camLifecycle, camWhipPublish, camWhep } from '/shell/live.mjs';
+  import { createPresenceButton, CAMERA, CAMERA_CAN } from '/shell/presence.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
   import { startMoq, moqSupport } from '/shell/moq.mjs';
   import { drawCamera, burn, readBurnedFrom, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
@@ -42,11 +46,34 @@
     // footer. A row above the grid repeating four of them would be the same
     // facts twice.
     readout: null,
-    controls: [
-      { id: 'cam', label: 'Start camera', primary: true },
-    ],
+    // 🔴 NO DECLARED CONTROL: the one control is a status button built below,
+    // asked for 2026-09-30 as *"stat / stop camera: convert to oline status
+    // button: CAMERA ON | CAMERA OFF"*. It is the /llhls/ control with the
+    // camera's words, and it lives in the same row verify.mjs presses.
+    controls: [],
   });
   guard(d);
+  const camBtn = createPresenceButton({
+    of: '', showName: false, state: 'offline', says: CAMERA, can: CAMERA_CAN,
+    aria: 'start or stop the camera',
+    press: () => pressCam(),
+  });
+  /**
+   * ⚠️ `data-busy` BY HAND, BECAUSE THIS IS NOT A DECLARED CONTROL. The shell
+   * marks a declared one busy while its handler runs, and verify.mjs waits on
+   * that mark before it reads the page; without it the harness would walk off
+   * mid check. NOT disabled, unlike the shell's: a press while starting stops.
+   */
+  let pressing = 0;
+  async function pressCam() {
+    const b = camBtn.el;
+    pressing++;
+    b.dataset.busy = '1';
+    try { await d.run('cam'); } finally { if (--pressing === 0) delete b.dataset.busy; }
+  }
+  camBtn.because('nothing is recorded or sent until you press');
+  d.controls.hidden = false;
+  d.controls.append(camBtn.el);
 
   /**
    * 🔴 THE LL-HLS LEG. The burned canvas is recorded with MediaRecorder and
@@ -59,13 +86,14 @@
    * ⚠️ EVERY SESSION IS A STREAM RECORDING. The input is RTMPS, where
    * recording cannot be turned off, and each session adds its length to the
    * account's 1000 minute cap. So the harness leaves this leg off unless it
-   * asks with `hls=1`, and a visitor gets it only by pressing Start camera.
+   * asks with `hls=1`, and a visitor gets it only by pressing the camera button.
    */
   const HLS_ON = !SELFCHECK || new URLSearchParams(location.search).get('hls') === '1';
   const HLS = { pub: null, player: null, st: null, err: null, readyAt: null, liveAt: null, uid: null, firstMs: null, rebuilds: 0, starts: [] };
+  // Said in the panel's own footer, after its name, so no word repeats it.
   const HLS_SAY = {
-    busy: 'Another camera is on LL-HLS', stopped: 'LL-HLS stopped',
-    closed: 'LL-HLS closed', unsupported: 'LL-HLS needs Chrome or Edge',
+    busy: 'another camera is on it', stopped: 'stopped',
+    closed: 'lost the publisher', unsupported: 'needs Chrome or Edge',
   };
   /**
    * Until Stream says the camera's input is live. A player built before that
@@ -98,7 +126,7 @@
   })));
   function startHls(mine) {
     if (!HLS_ON) {
-      P.hls.slots.caption.textContent = 'LL-HLS is left off under the harness';
+      sayOn(P.hls, 'left off under the harness');
       d.log('ll-hls: not run under the harness without hls=1, because every session is recorded on Stream');
       return;
     }
@@ -125,12 +153,12 @@
               .on('rebuild', ({ why: w }) => { HLS.rebuilds++; d.log(`ll-hls: player rebuilt (${w})`); })
               .on('start', () => HLS.starts.push(performance.now()));
             meters.hls = meter(hlsV);
-          }).catch((e) => { HLS.err = e.message; P.hls.slots.caption.textContent = 'LL-HLS could not play'; });
+          }).catch((e) => { HLS.err = e.message; sayOn(P.hls, 'could not play'); });
           return;
         }
         HLS.err = why || t;
         d.log(`ll-hls: ${HLS.err}`, 'bad');
-        P.hls.slots.caption.textContent = HLS_SAY[t] || 'LL-HLS stopped';
+        sayOn(P.hls, HLS_SAY[t] || 'stopped');
         P.hls.values.set('lat', '');
         try { HLS.player?.destroy(); } catch { /* gone */ }
         HLS.player = null;
@@ -157,10 +185,18 @@
   // What kind of latency each footer carries is the LABEL, so the four can be
   // compared without a legend: the local preview can only say capture to
   // screen, the three that went out and came back say glass to glass.
+  // 🔴 A PANEL'S STATE IS A FOOTER CELL, NOT A CAPTION ON THE PICTURE. Asked
+  // 2026-09-30: *"do not draw on screen but on videopanel footer (llhls
+  // closed)"*. `state` is the LAST cell, with no reserve, so a line arriving
+  // moves nothing to its left, and it changes only when something happened.
   const panel = (name, media, values) => {
-    const p = createVideoPanel({ media, left: el('span', 'cam-name', name), fullMode: 'hover', values });
+    const p = createVideoPanel({ media, left: el('span', 'cam-name', name), fullMode: 'hover',
+      values: [...values, { key: 'state', label: '' }] });
+    p.said = false;
     return p;
   };
+  const sayOn = (p, text) => p.values.set('state', text);
+  const saidOn = (p) => p.values.cell('state')?.textContent || '';
   const P = {
     local: panel('Camera', localV, [
       { key: 'lat', label: 'capture to screen', reserve: 6 },
@@ -264,11 +300,11 @@
   const OURS = /cloudflarestream\.com|pub\.positron\.studio|mediaoverquic\.com/;
   const oursOpened = () => performance.getEntriesByType('resource').filter((e) => OURS.test(e.name)).length;
 
-  const btn = () => d.button('cam');
   const running = () => !!cam;
 
+  // A press on `camera off` starts; a press while starting or on stops.
   d.on('cam', async () => {
-    if (running()) { await stop(); return; }
+    if (running() || camBtn.state() !== 'offline') { await stop(); return; }
     await start();
   });
 
@@ -279,6 +315,7 @@
     camErr = null; rtcErr = null; moqErr = null; ice = null; udp = null; udpAsk = null;
     moqPainted = 0;
     armVideo(localV); armVideo(rtcV); armVideo(hlsV);   // before any await, or iOS refuses later
+    camBtn.set('coming').because('press again to stop it');
     try {
       gumCalls++;
       cam = await navigator.mediaDevices.getUserMedia({
@@ -292,11 +329,11 @@
         : e?.name === 'NotFoundError' ? 'this machine has no camera'
         : `the camera did not start (${e?.name || e})`;
       d.log(`${camErr}, so nothing was sent anywhere`, 'bad');
+      camBtn.set('offline').because(camErr);
       if (SELFCHECK) await d.run('check');
       return;
     }
     if (gen !== mine) { cam.getTracks().forEach((t) => t.stop()); cam = null; return; }
-    btn().textContent = 'Stop camera';
     const track = cam.getVideoTracks()[0];
     const s = track.getSettings();
     d.log(`camera on: ${track.label || 'default'} at ${s.width}x${s.height}`, 'hi');
@@ -350,6 +387,7 @@
 
     await Promise.all([startRtc(mine), startMoqLeg(mine)]);
     if (gen !== mine) return;
+    camBtn.set('online').because('press to stop the camera and every leg');
     if (SELFCHECK) await d.run('check');
   }
 
@@ -367,28 +405,28 @@
 
   async function startRtc(mine) {
     try {
-      pub = await whipPublish(sendStream, { iceServers: ice?.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
+      pub = await camWhipPublish(sendStream, { iceServers: ice?.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
       if (gen !== mine) return;
       pub.pc.addEventListener('connectionstatechange', () => {
         const st = pub?.pc.connectionState;
         if (st === 'failed') rtcFailed(mine, 'the publish could not connect');
         else if (st === 'disconnected') {
-          d.log('webrtc: the publish dropped. Somebody may have opened a page that plays this input, and it takes it back', 'bad');
+          d.log('webrtc: the publish dropped', 'bad');
         }
       });
-      sub = await whepPlay(whep(), rtcV, { iceServers: ice?.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
+      sub = await whepPlay(camWhep(), rtcV, { iceServers: ice?.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
       sub.pc.addEventListener('connectionstatechange', () => {
         if (sub?.pc.connectionState === 'failed') rtcFailed(mine, 'the picture could not come back');
       });
       if (gen !== mine) return;
     } catch (e) {
-      // A 409 from the worker is the container holding the input for viewers.
-      rtcErr = /409/.test(e.message) && /busy/.test(e.message)
-        ? 'the WebRTC input is busy, because somebody is watching the test pattern on it'
-        : e.message;
-      if (/409/.test(e.message) && /busy/.test(e.message)) {
+      // A 409 from the worker is another camera on the camera's own input.
+      const busy = /409/.test(e.message) && /busy/.test(e.message);
+      rtcErr = busy ? 'another camera is on the camera WebRTC input' : e.message;
+      if (busy) {
         d.log(`webrtc: ${rtcErr}`, 'bad');
-        P.rtc.slots.caption.textContent = 'WebRTC could not start';
+        sayOn(P.rtc, 'another camera is on it');
+        P.rtc.said = true;
       } else await rtcFailed(mine, rtcErr);
     }
   }
@@ -404,8 +442,8 @@
    * reached at all, and if it is, it says the relay did not get through either.
    */
   async function rtcFailed(mine, why) {
-    if (gen !== mine || P.rtc.slots.caption.dataset.said) return;
-    P.rtc.slots.caption.dataset.said = '1';
+    if (gen !== mine || P.rtc.said) return;
+    P.rtc.said = true;
     const u = await (udpAsk || Promise.resolve(udp));
     if (gen !== mine) return;
     rtcErr = rtcErr || why;
@@ -413,9 +451,9 @@
       rtcErr = ice?.relay
         ? 'this network blocks UDP and the picture did not get through the relay over TCP either'
         : 'this network blocks UDP, which WebRTC media travels over, and no relay over TCP is set up yet';
-      P.rtc.slots.caption.textContent = NO_UDP;
+      sayOn(P.rtc, NO_UDP);
     } else {
-      P.rtc.slots.caption.textContent = 'WebRTC could not start';
+      sayOn(P.rtc, 'could not start');
     }
     d.log(`webrtc: ${rtcErr}`, 'bad');
   }
@@ -425,7 +463,7 @@
     if (!sup.ok) {
       moqErr = sup.why;
       d.log(`moq: ${sup.why}`, 'bad');
-      P.moq.slots.caption.textContent = 'MoQ needs Chrome or Edge';
+      sayOn(P.moq, 'needs Chrome or Edge');
       return;
     }
     try {
@@ -450,9 +488,9 @@
       if (u?.known && u.udp === false) {
         moqErr = 'this network blocks UDP, and MoQ runs over QUIC, which is UDP';
         d.log(`moq: ${moqErr}`, 'bad');
-        P.moq.slots.caption.textContent = NO_UDP;
+        sayOn(P.moq, NO_UDP);
       } else {
-        P.moq.slots.caption.textContent = 'MoQ could not reach the relay';
+        sayOn(P.moq, 'could not reach the relay');
       }
     }
   }
@@ -477,10 +515,9 @@
     for (const v of [localV, rtcV, hlsV]) { try { v.pause(); } catch { /* fine */ } v.srcObject = null; }
     for (const k of Object.keys(P)) {
       for (const key of P[k].values.keys()) P[k].values.set(key, '');
-      P[k].slots.caption.textContent = '';
-      delete P[k].slots.caption.dataset.said;
+      P[k].said = false;
     }
-    btn().textContent = 'Start camera';
+    camBtn.set('offline').because('nothing is recorded or sent until you press');
     d.log('camera off, and every leg closed');
   }
 
@@ -510,7 +547,7 @@
       d.assert('with no camera nothing was opened',
         !pub && !sub && !leg && oursOpened() === 0,
         `publish ${!!pub}, play ${!!sub}, moq ${!!leg}, ${oursOpened()} request(s) to our streaming hosts`);
-      d.assert('the control still offers to start', btn().textContent === 'Start camera', btn().textContent);
+      d.assert('the control still reads camera off', camBtn.state() === 'offline', camBtn.state());
       return;
     }
 
@@ -530,14 +567,14 @@
       ? `local capture to screen ${ms(median(meters.local.samples))} over ${meters.local.samples.length} frame(s)`
       : 'this browser reports no captureTime, so the local cell stays empty');
     if (!HLS_ON) {
-      d.assert('LL-HLS is left off under the harness and says so', !HLS.pub && /harness/.test(P.hls.slots.caption.textContent),
-        P.hls.slots.caption.textContent || 'nothing said');
+      d.assert('LL-HLS is left off under the harness and says so in its footer', !HLS.pub && /harness/.test(saidOn(P.hls)),
+        saidOn(P.hls) || 'nothing said');
     } else if (HLS.err) {
       // Refused because another camera is on the input is a fact about somebody
       // else, not a fault in this page, so the one assert is that it SAID so on
       // the picture.
-      d.assert('LL-HLS names why it is not running, on its own picture', !!P.hls.slots.caption.textContent,
-        `${HLS.st}: ${HLS.err}, caption "${P.hls.slots.caption.textContent}"`);
+      d.assert('LL-HLS names why it is not running, in its own footer', !!saidOn(P.hls),
+        `${HLS.st}: ${HLS.err}, footer "${saidOn(P.hls)}"`);
     } else {
       d.assert('LL-HLS: the container took the camera', HLS.st === 'ready',
         HLS.readyAt != null ? `ready ${((HLS.readyAt - HLS.askedAt) / 1000).toFixed(1)} s after asking` : (HLS.st || 'no answer'));
@@ -572,21 +609,24 @@
     // request got no answer that cause is the network blocking UDP.
     {
       const said = (err, p) => {
-        const cap = p.slots.caption.textContent;
+        const cap = saidOn(p);
         if (!err) return { ok: true, txt: 'ran' };
-        if (!cap) return { ok: false, txt: 'failed with nothing on the picture' };
+        if (!cap) return { ok: false, txt: 'failed with nothing in its footer' };
         return { ok: !(udp?.known && udp.udp === false) || cap === NO_UDP, txt: cap };
       };
       const r1 = said(rtcErr, P.rtc), r2 = said(moqErr, P.moq);
-      d.assert('a leg that failed says why on its own picture', r1.ok && r2.ok,
+      d.assert('a leg that failed says why in its own footer', r1.ok && r2.ok,
         `webrtc ${r1.txt}, moq ${r2.txt}, UDP ${udp?.known ? (udp.udp ? 'answered' : 'no answer') : 'not asked'}`
         + `, relay ${ice?.relay ? 'yes' : 'no'}`);
     }
 
+    d.assert('no state line is drawn on any picture', Object.values(P).every((p) => !p.slots.caption.textContent),
+      Object.entries(P).map(([k, p]) => `${k} "${p.slots.caption.textContent}"`).join(' / '));
+
     // And the stop, because a camera page that leaves a leg open bills Stream
     // minutes for as long as it is open. ⚠️ `stop()` and not a click: this runs
-    // inside the press that started it, and the shell holds that button
-    // disabled until the press settles, so a click here would land on nothing.
+    // inside the press that started it, and a click here would start a second
+    // press inside the first.
     const tracks = [...cam.getTracks()];
     const pcs = [pub?.pc, sub?.pc].filter(Boolean);
     const camWs = HLS.pub;
@@ -598,65 +638,122 @@
     d.assert('stop closes the MoQ leg and every timer', !leg && !draw && !paint);
     if (HLS_ON) d.assert('stop ends the LL-HLS leg', !HLS.pub && !HLS.player,
       camWs ? `${camWs.state.chunks} chunk(s), ${(camWs.state.bytes / 1e6).toFixed(1)} MB sent` : 'never opened');
-    d.assert('the control offers to start again', btn().textContent === 'Start camera', btn().textContent);
+    d.assert('the control reads camera off again', camBtn.state() === 'offline', camBtn.state());
   });
 
-  // ── how it works ─────────────────────────────────────────────────────────
-  const dg = createDiagram(d.el, {
+  // ── how it works, one picture per panel ─────────────────────────────────
+  // 🔴 FOUR PICTURES, IN THE PANELS' ORDER, EACH SHOWING ONLY ITS OWN PATH.
+  // Asked 2026-09-30: *"make separate diagrams on each feed (4 total) in cam"*.
+  // One standing `How it works` heading over the first, and each picture named
+  // by its panel in the diagram's own small title. The first cannot be handed a
+  // `title` beside `how` (refused, so two headings never stack), so its name is
+  // written into the same element after it is built.
+  const CAMERA_DG = {
     nodes: [
-      { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser', join: false,
+      { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser',
         children: [
           { id: 'cam', label: 'camera', sub: 'getUserMedia', tech: 'browser',
-            note: 'Asked for only when Start camera is pressed, and its preview is timed from '
-                + 'requestVideoFrameCallback, which reports when each frame was captured and when it will be shown.' },
-          { id: 'canvas', label: 'canvas', sub: '1280x720, 30fps', tech: 'browser',
-            note: 'The camera is drawn in without cropping and a row of 56 blocks encoding the time is burned over it. '
-                + 'Reading that row back off a returned frame gives glass to glass latency on one clock.' },
-          { id: 'moq', label: 'MoQ loop', sub: 'WebCodecs', tech: 'browser',
-            note: 'Draws the same camera frame and burned row into its own canvas, then publishes and subscribes '
-                + 'one namespace from this page, so both ends share one clock.' },
-          { id: 'player', label: 'player', sub: 'RTCPeerConnection', tech: 'browser',
-            note: 'Offers video and audio receive only, because Cloudflare refuses a single track offer, '
-                + 'and reads the burned row off every frame it presents.' },
-        ] },
-      { id: 'cf', label: 'Cloudflare', sub: 'worker, Stream, relay', kind: 'cloud', tech: 'cloudflare', set: true,
-        children: [
-          { id: 'pub', label: 'Pub', sub: 'Durable Object', tech: 'cloudflare',
-            note: 'Holds the stream key so the page never sees it, and proxies one offer and one answer. '
-                + 'It takes the input from the container only while nobody is watching the test pattern on it.' },
-          { id: 'hls', label: 'LL-HLS', sub: 'container to RTMPS', tech: 'cloudflare',
-            note: 'The canvas goes to the worker as H.264 and a container of the camera\'s own rewraps it, without encoding, onto the camera\'s own input. '
-                + 'Every session is recorded on Stream, so one is capped at five minutes.' },
-          { id: 'relay', label: 'MoQ relay', sub: 'draft-14', tech: 'cloudflare',
-            note: 'Cloudflare\'s relay, reached over WebTransport, hands each frame to whoever subscribed to the namespace. '
-                + 'Safari cannot use it yet, so this panel needs Chrome or Edge.' },
-          { id: 'stream', label: 'Stream', sub: 'WHIP in, WHEP out', tech: 'cloudflare',
-            note: 'The WebRTC live input, which records nothing, and media reaches it over UDP. '
-                + 'A network that blocks UDP needs a TURN relay over TCP, which the worker hands out.' },
+            note: 'Asked for only when the camera button is pressed, at 1280x720 and 30fps where the camera can.' },
+          { id: 'preview', label: 'preview', sub: 'video element', tech: 'browser',
+            note: 'The camera stream itself, never sent anywhere. Its latency is capture to screen, read from requestVideoFrameCallback, which reports when a frame was captured and when it will be shown.' },
         ] },
     ],
     links: [
-      { from: 'cam', to: 'canvas',
-        note: 'Thirty times a second the newest camera frame is drawn in, and the canvas is captured as a stream.' },
-      { from: 'canvas', to: 'pub', label: 'SDP offer',
-        note: 'One POST of a WHIP offer to **pub.positron.studio/whip** and one answer back. '
-            + 'Stop sends a DELETE the same way, so the session ends when the camera does.' },
-      { from: 'pub', to: 'stream',
-        note: 'The worker forwards the offer to the input\'s secret WHIP address and keeps the session address to itself.' },
-      { from: 'stream', to: 'player', back: true,
-        note: 'The same input played straight back over WHEP, asking again on a 409 while the publish is still going live.' },
-      { from: 'canvas', to: 'hls', label: 'WebM',
-        note: 'MediaRecorder starts only once the container is ready, so the first piece, which carries the header, is never lost. '
-            + 'The picture comes back through the same player /llhls/ uses.' },
-      { from: 'moq', to: 'relay',
-        note: 'Each frame is encoded with WebCodecs and published over WebTransport, and the same page subscribes to it again. '
-            + 'The row is read back on the clock that wrote it.' },
+      { from: 'cam', to: 'preview', note: 'The MediaStream goes straight into the element, with no canvas and no encoder in between.' },
     ],
-  }, { how: true, atEnd: true });
+  };
+  const LLHLS_DG = {
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'canvas', label: 'canvas', sub: '1280x720, 30fps', tech: 'browser',
+            note: 'The camera drawn in without cropping, with a row of blocks encoding the time burned over it. Reading that row off a returned frame gives glass to glass latency on one clock.' },
+          { id: 'rec', label: 'recorder', sub: 'MediaRecorder', tech: 'browser',
+            note: 'H.264 in WebM with a keyframe every 2s, sent in 100ms slices. It starts only once the container is ready, so the first slice, which carries the header, is never lost.' },
+          { id: 'player', label: 'player', sub: 'hls.js, tuned', tech: 'browser',
+            note: 'The same low latency player /llhls/ uses, built only once Stream says the camera input is live.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'worker, Stream', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'pub', label: 'Pub', sub: 'Durable Object', tech: 'cloudflare',
+            note: 'Takes the slices over a WebSocket and posts them in order into the camera container. One camera at a time.' },
+          { id: 'ffmpeg', label: 'ffmpeg', sub: 'cam container', tech: 'cloudflare',
+            note: 'Rewraps the video with -c copy, without encoding, and pushes it over RTMPS to the camera\'s own live input.' },
+          { id: 'stream', label: 'Stream', sub: 'LL-HLS input', tech: 'cloudflare',
+            note: 'Cuts the camera into low latency HLS. Every session is recorded here, so one is capped at five minutes.' },
+        ] },
+    ],
+    links: [
+      { from: 'canvas', to: 'rec', note: 'The canvas is captured as a stream thirty times a second.' },
+      { from: 'rec', to: 'pub', label: 'WebM', note: 'Binary WebSocket messages to pub.positron.studio/cam.' },
+      { from: 'stream', to: 'player', label: 'LL-HLS', back: true,
+        note: 'Playlists and half second parts over HTTPS, which is why this panel is seconds behind the others.' },
+    ],
+  };
+  const WEBRTC_DG = {
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'canvas', label: 'canvas', sub: '1280x720, 30fps', tech: 'browser',
+            note: 'The same burned camera frame the other two legs carry, captured as a stream.' },
+          { id: 'send', label: 'publisher', sub: 'WHIP', tech: 'browser',
+            note: 'An RTCPeerConnection that only sends, offered once through the worker with no trickle.' },
+          { id: 'recv', label: 'player', sub: 'WHEP', tech: 'browser',
+            note: 'An RTCPeerConnection that only receives, video and audio, because Stream refuses a single track offer.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'worker, Stream, TURN', kind: 'cloud', tech: 'cloudflare', set: true,
+        children: [
+          { id: 'turn', label: 'TURN', sub: 'relay over TCP', tech: 'cloudflare',
+            note: 'Handed out by the worker at /ice on the press. It carries the media only when a network blocks UDP.' },
+          { id: 'pub', label: 'Pub', sub: 'Durable Object', tech: 'cloudflare',
+            note: 'Holds the camera input\'s secret WHIP address so the page never sees it, and forwards one offer and one answer. One camera at a time.' },
+          { id: 'stream', label: 'Stream', sub: 'camera WebRTC', tech: 'cloudflare',
+            note: 'The camera\'s own WebRTC input, which records nothing. Media reaches it over UDP.' },
+        ] },
+    ],
+    links: [
+      { from: 'canvas', to: 'send', note: 'The captured canvas track is added to the sending connection.' },
+      { from: 'send', to: 'pub', label: 'SDP offer', note: 'One POST to pub.positron.studio/cam/whip, and a DELETE the same way when the camera stops.' },
+      { from: 'pub', to: 'stream', note: 'The worker forwards the offer to the input\'s secret address and keeps the session address to itself.' },
+      { from: 'stream', to: 'recv', label: 'WHEP', back: true,
+        note: 'The same input played straight back, asking again on a 409 while the publish is still going live.' },
+    ],
+  };
+  const MOQ_DG = {
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'enc', label: 'encoder', sub: 'WebCodecs', tech: 'browser',
+            note: 'Draws the burned camera frame into its own canvas and encodes it with VideoEncoder.' },
+          { id: 'dec', label: 'decoder', sub: 'WebCodecs', tech: 'browser',
+            note: 'Subscribes to the same namespace from this page and decodes with VideoDecoder, so both ends share one clock.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'MoQ relay', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'relay', label: 'MoQ relay', sub: 'draft-14', tech: 'cloudflare',
+            note: 'Hands each frame to whoever subscribed to the namespace. Safari cannot use it yet, so this panel needs Chrome or Edge.' },
+        ] },
+    ],
+    links: [
+      { from: 'enc', to: 'relay', label: 'frames', note: 'Published over WebTransport, which is QUIC and so UDP, with no fallback over TCP.' },
+      { from: 'relay', to: 'dec', label: 'frames', back: true, note: 'The subscription back, read off the burned row on the clock that wrote it.' },
+    ],
+  };
+  const dgs = [
+    ['Camera', CAMERA_DG], ['LL-HLS', LLHLS_DG], ['WebRTC', WEBRTC_DG], ['MoQ', MOQ_DG],
+  ].map(([name, spec], i) => {
+    const g = createDiagram(d.el, i === 0 ? spec : { ...spec, title: name }, { how: i === 0, atEnd: true });
+    if (i === 0) {
+      const t = g.el.querySelector('.pos-dg-t');
+      if (t) { t.textContent = name; t.hidden = false; }
+    }
+    g.el.classList.add('cam-dg');
+    return g;
+  });
 
   if (SELFCHECK) {
-    d.assert('nothing in the picture was cut or refused', dg.cuts.length === 0,
-      dg.cuts.map((c) => `${c.id}: ${c.shown || c.full || c.why || ''}`).join(' / ') || 'none');
+    const cuts = dgs.flatMap((g, i) => g.cuts.map((c) => `${['camera', 'll-hls', 'webrtc', 'moq'][i]} ${c.id}: ${c.shown || c.full || c.why || ''}`));
+    d.assert('nothing in the four pictures was cut or refused', cuts.length === 0, cuts.join(' / ') || 'none');
   }
 
   // Leave nothing open behind a navigation.

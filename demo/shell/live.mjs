@@ -538,6 +538,51 @@ export const camLlhls = () =>
 export const camLifecycle = () =>
   `https://${LIVE.customer}.cloudflarestream.com/${CAM_UID}/lifecycle`;
 
+/**
+ * /cam/'s WebRTC leg on its OWN WebRTC input ("positron-cam-whip",
+ * src/provision-cam-whip.sh, recording off), published through
+ * `pub.positron.studio/cam/whip` so the key stays in the worker. It borrowed the
+ * test pattern's WHIP input until 2026-09-30 and was refused with 409 whenever
+ * somebody held /watch. One camera at a time; a second gets 409 in words.
+ */
+export const CAM_WHIP_UID = '54791f4c5c73713859c5413eeb06a008';
+export const CAM_WHIP_PROXY = 'https://pub.positron.studio/cam/whip';
+export const camWhep = () =>
+  `https://${LIVE.customer}.cloudflarestream.com/${CAM_WHIP_UID}/webRTC/play`;
+
+/**
+ * `whipPublish` with the proxy named, for the camera's own input. A copy rather
+ * than a parameter, so the function other pages rely on is untouched.
+ * ⚠️ THE DELETE IS `keepalive`, because the worker holds the input for this
+ * session until it hears it, and `stop()` also runs from `pagehide`, where an
+ * ordinary fetch is cancelled with the page.
+ */
+export async function camWhipPublish(stream, { url = CAM_WHIP_PROXY, log = () => {}, iceServers = null } = {}) {
+  const pc = new RTCPeerConnection(rtcConfig(iceServers));
+  for (const t of stream.getTracks()) pc.addTrack(t, stream);
+  pc.onconnectionstatechange = () => log(`publish ${pc.connectionState}`);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await gathered(pc, iceServers);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/sdp' },
+    body: pc.localDescription.sdp,
+  });
+  const body = await res.text();
+  if (!res.ok) { pc.close(); throw new Error(`publish ${res.status}: ${body.slice(0, 120)}`); }
+  const id = res.headers.get('x-whip-id');
+  await pc.setRemoteDescription({ type: 'answer', sdp: body });
+  log(`publishing, id ${id}`, 'hi');
+  return {
+    pc, id,
+    async stop() {
+      try { pc.close(); } catch { /* already */ }
+      if (id) { try { await fetch(`${url}/${id}`, { method: 'DELETE', keepalive: true }); } catch { /* gone */ } }
+    },
+  };
+}
+
 export function camFormat() {
   if (typeof MediaRecorder === 'undefined') return null;
   if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) return { fmt: 'webm', mimeType: 'video/webm;codecs=h264' };

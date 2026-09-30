@@ -1,5 +1,9 @@
 ## Open
 
+### Open 2026-09-30: stage, the recording chain readout goes, its fixed wording moves into the diagram
+
+ASKED, VERBATIM: *"rm, put non-realtime versions to diagram"*, pasting the /stage/ readout `local 12 pieces, 1.79 MiB in IndexedDB / R2 uploads when the show stops / playback plays from R2 once it is there`. Remove the `stage-chain` glue rows (`demo/stage/index.html` ~1929 to 1950, every `chainSay` call). The fixed sentences (pieces kept in IndexedDB, uploaded to R2 when the show stops, played back from R2) become diagram boxes or notes. The live states (`uploading N%`, the refusals and failures) must still reach the log, and the R2 playback link must still be reachable if a visitor needs it to play. Also retires the `hidden` on a grid glue row problem for this surface. Asserts that read the chain move to `__demo`.
+
 ### Open 2026-09-30: NEXT STEP, the Pi camera beside the Circuit audio, OFF by default
 
 ASKED, VERBATIM: *"note that next step would be using pi camera along with audio. off by default, toggled via env var (privacy)"*. Not started. The camera must be impossible to switch on from a page: an env var in `/etc/default/positron-board` enables it, and with it unset the board does not open the camera at all. The board already streams video to `<room>-video` (`rig/board/video.mjs`); check whether that path opens a camera today and gate it on the same variable. `/away/` would show the picture next to the waveform.
@@ -12,15 +16,21 @@ ASKED, VERBATIM: *"use stnd waverform display not video canvas on away"*. `demo/
 
 ASKED, VERBATIM: *"can we support both yoshimi and circuit? current setup does not scale"*. Today `rig/board/board.mjs` has ONE audio slot (`audio` / `inst`), so `audio.start` of one source replaces the other, and both stream into the one room `studio-1`. A Yoshimi start from any page took `/away/`'s Circuit off the air on 2026-09-30. Design and cost in the reply; files `rig/board/board.mjs`, `demo/away/index.html`, maybe `demo/shell/board.mjs`.
 
-### Open 2026-09-30: cam, Start/Stop camera becomes a status button, CAMERA ON | CAMERA OFF
+### Done 2026-09-30: cam, Start/Stop camera becomes a status button, CAMERA ON | CAMERA OFF
+
+DONE: `createPresenceButton` with a `CAMERA` word set in `presence.mjs`: camera off, starting, camera on.
 
 ASKED, VERBATIM: *"stat / stop camera: convert to oline status button: CAMERA ON | CAMERA OFF"*. The same kit control /llhls/ uses for `stream off | starting | on`: `createPresenceButton` from `demo/shell/presence.mjs` (see `demo/llhls/index.html` ~line 66 and 111, and its `STREAM`/`STREAM_CAN` words), with a camera word set: `camera off`, a starting state while getUserMedia and the legs come up, `camera on`. It replaces the `Start camera` button; asserts that read `btn().textContent === 'Start camera'` move to the new state. `demo/cam/index.html`, maybe a word set in `presence.mjs`.
 
-### Open 2026-09-30: cam, state text goes in the panel footer, not on the picture
+### Done 2026-09-30: cam, state text goes in the panel footer, not on the picture
+
+DONE: a `state` cell last in each footer, assert `no state line is drawn on any picture`. `closed` was most likely a pub restart from a secret change (11:18 UTC), likely not proven; it now reads `lost the publisher`. The worker retries a container 503 four times.
 
 ASKED, VERBATIM: *"do not draw on screen but on videopanel footer (llhls closed)"*, with a screenshot of https://positron.studio/cam/ (BUILD `e761c9d`) showing `LL-HLS closed` as a caption over the black LL-HLS picture and the footer reading only `LL-HLS`. Every state line on /cam/ (`LL-HLS closed`, `LL-HLS stopped`, `Another camera is on LL-HLS`, `WebRTC could not start`, the harness line, and the same on the other three panels) moves from `slots.caption` into a footer cell of that panel's `video-panel.mjs`. The picture carries only the picture. Check whether `video-panel.mjs` already has a footer status cell before adding one; if the kit gains one it is done once, for every page. Also find out WHY the owner's session read `closed`. `demo/cam/index.html`, maybe `demo/shell/video-panel.mjs`.
 
-### Open 2026-09-30: cam, one diagram per feed, four in total
+### Done 2026-09-30: cam, one diagram per feed, four in total
+
+DONE: Camera, LL-HLS, WebRTC, MoQ, one `How it works` heading, cut check covers all four.
 
 ASKED, VERBATIM: *"make separate diagrams on each feed (4 total) in cam in bg"*. Split `/cam/`'s one diagram into four, one per panel: Camera (local capture), LL-HLS (MediaRecorder, wss /cam, cam container, RTMPS, Stream, LL-HLS player), WebRTC (WHIP, Stream, WHEP, with the TURN relay), MoQ (WebCodecs, WebTransport, relay). Each diagram describes its own panel's path only. Load `positron-diagram` first. `demo/cam/index.html`. Given to the agent already editing that page, so two agents never write it at once.
 
@@ -28,7 +38,9 @@ ASKED, VERBATIM: *"make separate diagrams on each feed (4 total) in cam in bg"*.
 
 ASKED, VERBATIM: *"make other demo for this, 'away', do not touch knobs tdemo. allow me just to listen in circuit audio from pi in wave visualizer (use videoframe)"*. The board's capture source (Fast Track Pro input 1, `rig/board/board.mjs` since 17d48ec) streams on `studio-1`. New page `demo/away/index.html` with a `createVideoPanel` whose picture is a live waveform canvas fed from `createBoard`'s `onPcm`, one Listen control, and nothing sent to the board beyond `audio.status`. New row in `demo/manifest.mjs` with `room: 'fixed'`. `demo/knobs/` is NOT touched.
 
-### Open 2026-09-30: cam's WebRTC leg gets its own input, and its MoQ panel carries the camera
+### Done 2026-09-30: cam's WebRTC leg gets its own input, and its MoQ panel carries the camera
+
+DONE: `/cam/whip` on the `cam` instance with `CAM_WHIP_URL` (input `54791f4c5c73713859c5413eeb06a008`, run by the owner), no tie to /watch, pub `fe81df0e`. WebRTC 65 ms, MoQ 30 ms p50 painted from the camera (MoQ already carried it since `1510d21`). Cam cold start NOT measured cleanly.
 
 ASKED, VERBATIM: *"do open issues"*, after the cam report listed them. Two things on `/cam/`:
 - **WebRTC borrows the whip-rig input (`WHIP_URL`)**, which is refused with 409 while anybody holds `/watch` on the main instance, so /cam/'s WebRTC panel goes red whenever somebody watches /llhls/ (4 reds in the agent's final run, 2026-09-30). Fix: its own WebRTC input, `CAM_WHIP_URL`, from `src/provision-cam-whip.sh`, which the OWNER runs (auto mode refuses secret writes). No busy rule tied to /watch; one camera at a time. `workers/pub/worker.mjs`, `demo/cam/index.html`, maybe `demo/shell/live.mjs`.
