@@ -688,6 +688,10 @@ export const DEMOS = [
     one: 'a synthesiser you type in, compiled to machine code in this tab '
        + 'whenever you stop typing',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
+  { name: 'collide', group: 'instruments', act: 4, created: '2026-09-30', built: true,
+    one: 'a synth typed in a small subset of SuperCollider, compiled in this tab '
+       + 'whenever you stop typing',
+    tags: ['SuperCollider', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
 
   // `able` was a demo and is archived at archive/demos/able-index.html, removed
   // 2026-09-25 on instruction. It played Ableton Live on a studio Mac from a
