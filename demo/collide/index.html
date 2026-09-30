@@ -599,8 +599,10 @@
     const drawn = () => getComputedStyle(knobRow).display !== 'none';
     const onRow = () => [...knobRow.querySelectorAll('.pos-knob[data-param]')];
     const relKnob = () => knobRow.querySelector('.pos-knob[data-param="rel"]');
-    d.assert('under the Pad\'s text is one row with exactly one knob, rel, starting where the code says, 1.50',
-      drawn() && onRow().length === 1 && !!relKnob()
+    /* Every preset has knobs since 2026-09-30 (*"add knobs to all patches what
+       mak sense"*): the Pad's are rel, cutoff and detune, in the code's order. */
+    d.assert('under the Pad\'s text is one row with three knobs, rel, cutoff and detune, and rel starts where the code says, 1.50',
+      drawn() && onRow().map((k) => k.dataset.param).join(' ') === 'rel cutoff detune' && !!relKnob()
         && relKnob().querySelector('.pos-knob-v').textContent === '1.50' && knobs.value('rel') === 1.5,
       `${drawn() ? 'drawn' : 'not drawn'}, ${onRow().map((k) => `${k.dataset.param} ${k.querySelector('.pos-knob-v').textContent}`).join(', ') || 'no knobs'}`);
     d.assert('and its range is the spec in the code, 0.05 to 6 on an exponential warp',
@@ -636,11 +638,19 @@
     d.assert('holding the rel knob lights rel\'s text in the box and nothing else, and letting go puts it out',
       litHeld && litAfter === undefined, `held ${litHeld ? 'lit' : 'not lit'}, after ${litAfter ?? 'out'}`);
     /* 🔴 THE ROW DOES NOT MOVE THE KEYS. Asked 2026-09-30: *"make the area h
-       for thise buttons fixed so no junmp"*. The Growl has no knob; the keys'
-       top is read with the Pad's knob and without it. */
+       for thise buttons fixed so no junmp"*. The keys' top is read with the
+       Pad's knobs and with a program that has none.
+       ⚠️ THE EMPTY ROW WAS THE GROWL UNTIL EVERY PRESET GOT KNOBS, the same
+       day, so the empty case is a program typed with no control a knob could
+       turn, compiled straight through the queue as the checks further down do. */
     const keysTop = () => panel.keys.getBoundingClientRect().top;
     const withKnob = keysTop();
-    await applyPatch(PRESETS.findIndex((p) => p.id === 'growl'));
+    {
+      const bare = '{ |freq = 220, amp = 0.1, gate = 1|\n    SinOsc.ar(freq, mul: amp) * EnvGen.kr(Env.adsr, gate, doneAction: 2)\n}';
+      book.clear();
+      source.set(bare);
+      await serial(() => build(bare, 'the check'));
+    }
     const withNone = keysTop();
     d.assert('a program with no control a knob could turn keeps the row\'s height with nothing in it, so the keys do not move',
       drawn() && onRow().length === 0 && (!!knobRow.querySelector('.pos-pknobs-ghost') && !knobRow.querySelector('.pos-pknobs-say'))
@@ -675,7 +685,7 @@
       const classes = source.ink.querySelectorAll('.pos-tk-class').length;
       d.assert('the program is drawn coloured over the box exactly as typed, at the box\'s own metrics',
         source.ink.textContent === drawnAs(source.input.value) && differ.length === 0 && classes > 3
-          && book.names().join(' ') === 'rel',
+          && book.names().join(' ') === 'rel cutoff detune',
         `${source.input.value.length} characters, ${differ.length ? `differs in ${differ.join(' ')}` : 'metrics equal'}, `
         + `${classes} class names coloured, hues for ${book.names().join(' ') || 'nothing'}`);
     }
