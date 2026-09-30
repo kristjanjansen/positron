@@ -24,8 +24,8 @@
     // *"shorten desc to 1 sentence"*. It was six, and each one of them has a
     // better home than the top of a page: what the handshake is and how the
     // stream stops are the picture at the foot of this page, what the control
-    // does is the control's own label, and what `round trip` means is the
-    // readout key's business. This project has cut this rule from four
+    // does is the control's own label, and what the round trip means is its
+    // footer label's business. This project has cut this rule from four
     // sentences to three to one and broken it every time within a few pages.
     what: 'The same live picture the HLS pages play, delivered over WHEP instead.',
     // 🔴 `rtt` WAS A KEY THAT READ AS A LATENCY CLAIM. Quoting this number
@@ -38,7 +38,38 @@
     // They are facts about the PICTURE and they now sit in the picture's own
     // footer, which is where the kit puts a number that belongs to one element.
     // A row above the panel repeating them would be the same fact twice.
-    readout: { 'round trip': 'ms', state: '' },
+    //
+    // 🔴 SIX CELLS OUT OF `getStats()` SINCE 2026-09-30, asked as *"add some
+    // stats to webrtc and moq demo"* against `/llhls/`'s six. NOT THE SAME SIX:
+    // holes, switches and advance are facts about segments and a playlist, and a
+    // WHEP receiver has neither. What it has is what the receiver itself counts,
+    // so every cell below is read off one `getStats()` a second, and they
+    // answer the two questions a visitor has: is it smooth, and how long does
+    // a frame wait here. Sources, all on the VIDEO `inbound-rtp` unless named:
+    //   buffer   delta jitterBufferDelay / delta jitterBufferEmittedCount, so
+    //            how long a frame sat in the receiver's buffer over the last
+    //            second. Cumulative average until there is a previous sample.
+    //   jitter   `jitter`, seconds on the wire, shown as ms
+    //   lost     `packetsLost` since the connection opened
+    //   dropped  `framesDropped`, decoded or received and never shown
+    //   freezes  `freezeCount`, the browser's own count of visible freezes
+    //   codec    the `codec` report the video `inbound-rtp`'s `codecId` points
+    //            at, which is what was NEGOTIATED rather than the
+    //            `H.264 + Opus` that used to be typed into the footer.
+    // 🔴 `round trip` LEFT THIS ROW FOR THE PICTURE'S FOOTER, LABELLED AS A
+    // NETWORK ROUND TRIP. It is `candidate-pair` RTT, which is not media latency
+    // (positron-streaming: beside MoQ's glass to glass it flattered WHEP about
+    // three times). No cell here claims glass to glass, because nothing on this
+    // page can measure it: the machine-readable clock row was taken out of the
+    // encoder on 2026-09-08, and the digits still burned into the picture are
+    // for a person's eye, not for this page to read.
+    // ⚠️ `codec` IS THE VIDEO CODEC ALONE. `H.264 + Opus` was cut to `H.264 …`
+    // at 375 px, MEASURED, and the audio side is not a choice anybody makes on
+    // this leg, so the log line carries both and the cell carries the one that
+    // decides the picture.
+    // ⚠️ `state` WENT TO MAKE ROOM, and nothing it said is lost: the toggle
+    // says whether the stream is on, and `element is playing` grades the element.
+    readout: { buffer: 'ms', jitter: 'ms', lost: '', dropped: '', freezes: '', codec: '' },
     // No primary button. See the note on the control below, and `/llhls/`,
     // which was asked for the same thing in the same sitting.
     controls: [],
@@ -86,7 +117,24 @@
     values: [
       { key: 'size', label: '', reserve: 9 },
       { key: 'fps', label: 'fps', reserve: 4 },
-      { key: 'source', label: '', reserve: 12 },
+      /**
+       * 🔴 THE ONE LATENCY ON THIS PAGE, AND ITS LABEL SAYS WHICH KIND. Asked
+       * 2026-09-30 with the readout: a latency in the footer that cannot be
+       * mistaken for glass to glass. It is `candidate-pair`
+       * `currentRoundTripTime`, a network round trip between this browser and
+       * Cloudflare, and says nothing about encode, the SFU, the buffer or the
+       * decoder.
+       * ⚠️ IT TOOK `source`'S PLACE RATHER THAN BECOMING A FOURTH CELL. At 375 px
+       * a fourth cell scrolled and cut the codec in half (see the viewer count
+       * below), and the codec is now MEASURED into the readout's `codec` cell
+       * instead of typed here.
+       */
+      // ⚠️ `network ping` AND NOT `network round trip`, MEASURED: at 375 px the
+      // longer label ran the value row 25 px past its box (284 against 259) and
+      // cut the unit off the number. `ping` is the everyday word for exactly
+      // this quantity, and `network` is what stops it reading as the picture's
+      // own delay.
+      { key: 'rtt', label: 'network ping', reserve: 6 },
     ],
   });
   /**
@@ -100,7 +148,6 @@
    * hides its row while every cell is empty, so all this page has to do is not
    * write a cell early. There is no `hide()` call here to forget.
    */
-  const SOURCE = 'H.264 + Opus';
   d.el.append(panel.el);
 
   // A custom property, never `video.style.aspectRatio`. See `/llhls/`: an
@@ -111,7 +158,6 @@
     const w = video.videoWidth, h = video.videoHeight;
     if (!w || !h) return;
     panel.values.set('size', `${w}x${h}`);
-    panel.values.set('source', SOURCE);
     panel.stage.style.setProperty('--vp-aspect', `${w} / ${h}`);
   };
   video.addEventListener('loadedmetadata', shape);
@@ -212,9 +258,8 @@
     video.srcObject = null;
     panel.values.set('fps', '');
     panel.values.set('size', '');
-    panel.values.set('source', '');
-    d.set('round trip', '');
-    d.set('state', '');
+    panel.values.set('rtt', '');
+    clearStats();
     stream.set('offline').because('the publisher stops about a minute after the last viewer goes');
     d.log('let the publisher go. it stops about a minute after the last viewer goes');
   }
@@ -305,6 +350,20 @@
     }
     if (gen !== mine) return;
     settle();
+    /**
+     * ⚠️ THE CELLS ARE READ ONCE MORE BEFORE THEY ARE GRADED, AND GIVEN UP TO
+     * 4 s TO HAVE SOMETHING TO SAY. The interval below reads `getStats()` once a
+     * second on its own clock, so at this line it may not have run since the
+     * answer came back, and `buffer` needs the receiver to have emitted at
+     * least one frame. Waiting here rather than inside the check keeps the
+     * check synchronous, which is what stops the harness walking off mid-check.
+     */
+    for (let i = 0; i < 8 && gen === mine; i++) {
+      await readStats();
+      if (stat.buffer != null && stat.codec && stat.rtt != null) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (gen !== mine) return;
     // The checks read what this control just produced, so this is the first
     // moment they can be true, and a button for them would make them optional.
     await d.run('check');
@@ -331,16 +390,37 @@
   video.addEventListener('loadeddata', settle);
   video.addEventListener('resize', settle);
 
-  setInterval(async () => {
-    if (!pc) return;
-    // the element's own view, which is where the black frame actually lives
-    shape();
-    d.set('state', video.paused ? 'paused' : 'playing', video.paused ? 'bad' : 'ok');
-    settle();
-    const stats = await pc.getStats().catch(() => null);
-    if (!stats) return;
+  /**
+   * What the readout and the footer's round trip were last written with, as
+   * numbers, so the check grades the reading rather than the cell's text.
+   * `jb` is the previous jitter buffer pair, for the one-second delta.
+   */
+  const stat = { buffer: null, jitter: null, lost: null, dropped: null, freezes: null, codec: '', rtt: null, nack: null };
+  let jb = null;
+  function clearStats() {
+    for (const k of Object.keys(stat)) stat[k] = k === 'codec' ? '' : null;
+    jb = null;
+    for (const k of ['buffer', 'jitter', 'lost', 'dropped', 'freezes', 'codec']) d.set(k, '');
+  }
+  // A mimeType is `video/H264` or `audio/opus`; the name a reader knows is
+  // `H.264` and `Opus`. Anything unlisted is shown as the browser said it.
+  const CODEC = { h264: 'H.264', opus: 'Opus', vp8: 'VP8', vp9: 'VP9', av1: 'AV1', pcmu: 'PCMU', pcma: 'PCMA' };
+  const codecName = (mime) => {
+    const n = String(mime || '').split('/').pop();
+    return CODEC[n.toLowerCase()] || n;
+  };
+
+  async function readStats() {
+    const p = pc;
+    if (!p) return;
+    const stats = await p.getStats().catch(() => null);
+    // Stopped while the reading was in flight: a closed connection's numbers
+    // must not land in cells that `stop()` has just emptied.
+    if (!stats || p !== pc) return;
+    let vin = null, ain = null;
     for (const s of stats.values()) {
       if (s.type === 'inbound-rtp' && s.kind === 'video') {
+        vin = s;
         // ⚠️ `framesPerSecond` IS NOT WHAT THE FOOTER SHOWS, AND THAT IS
         // DELIBERATE SINCE 2026-09-29. This is the DECODER's rate, and this page
         // is the one that measured 26 fps of it over a black rectangle. The
@@ -357,10 +437,47 @@
           decoder: s.decoderImplementation, keyframes: s.keyFramesDecoded,
         };
       }
-      if (s.type === 'candidate-pair' && s.state === 'succeeded' && Number.isFinite(s.currentRoundTripTime)) {
-        d.set('round trip', s.currentRoundTripTime * 1000);
+      if (s.type === 'inbound-rtp' && s.kind === 'audio') ain = s;
+      if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated !== false
+        && Number.isFinite(s.currentRoundTripTime)) {
+        stat.rtt = s.currentRoundTripTime * 1000;
+        panel.values.set('rtt', `${Math.round(stat.rtt)} ms`);
       }
     }
+    if (!vin) return;
+    // How long a frame waited in the receiver's buffer over the last second.
+    // The cumulative average is the fallback only until a previous sample
+    // exists, because it is mostly a report on the first second of the call.
+    const delay = vin.jitterBufferDelay, emitted = vin.jitterBufferEmittedCount;
+    if (Number.isFinite(delay) && emitted > 0) {
+      const dn = jb ? emitted - jb.emitted : 0;
+      stat.buffer = dn > 0 ? ((delay - jb.delay) / dn) * 1000 : jb ? stat.buffer : (delay / emitted) * 1000;
+      jb = { delay, emitted };
+    }
+    stat.jitter = Number.isFinite(vin.jitter) ? vin.jitter * 1000 : null;
+    stat.lost = Number.isFinite(vin.packetsLost) ? vin.packetsLost : null;
+    stat.dropped = Number.isFinite(vin.framesDropped) ? vin.framesDropped : null;
+    stat.freezes = Number.isFinite(vin.freezeCount) ? vin.freezeCount : null;
+    stat.nack = Number.isFinite(vin.nackCount) ? vin.nackCount : null;
+    const name = (s) => { const m = s && stats.get(s.codecId)?.mimeType; return m ? codecName(m) : ''; };
+    const codec = name(vin);
+    // One line, once the video side is known, naming both sides.
+    if (codec && codec !== stat.codec) d.log(`negotiated ${[codec, name(ain)].filter(Boolean).join(' + ')}`);
+    stat.codec = codec;
+    d.set('buffer', stat.buffer == null ? '' : Math.round(stat.buffer));
+    d.set('jitter', stat.jitter == null ? '' : Math.round(stat.jitter * 10) / 10);
+    d.set('lost', stat.lost ?? '');
+    d.set('dropped', stat.dropped ?? '');
+    d.set('freezes', stat.freezes ?? '');
+    d.set('codec', stat.codec);
+  }
+
+  setInterval(() => {
+    if (!pc) return;
+    // the element's own view, which is where the black frame actually lives
+    shape();
+    settle();
+    readStats();
   }, 1000);
 
   /**
@@ -426,17 +543,18 @@
       /**
        * 🔴 THE ROW IS HIDDEN BEFORE A PRESS SINCE 2026-09-29, AND THIS CHECK
        * HAD TO STOP RELYING ON IT BEING THERE. It used to empty `size` and
-       * `fps` and leave `source`, which held the row open. `source` is written
+       * `fps` and leave `source`, which held the row open. `source` was written
        * when a picture arrives now, so on a run with no press every cell is
        * empty, the kit hides the row, and both measurements would have read
        * **0 px** and the comparison would have passed having measured nothing.
        * That is this project's worst shape and it would have been green.
-       * ✅ So the check writes `source` ITSELF in both states, and `narrow > 0`
+       * ✅ So the check writes one cell ITSELF in both states (`rtt` since
+       * 2026-09-30, when it took `source`'s place), and `narrow > 0`
        * is a term of the assert rather than an assumption underneath it.
        */
-      write({ size: '', fps: '', source: SOURCE });
+      write({ size: '', fps: '', rtt: '9 ms' });
       const narrow = row.getBoundingClientRect().width;
-      write({ size: '1280x720', fps: '59.9' });
+      write({ size: '1280x720', fps: '59.9', rtt: '999 ms' });
       const wide = row.getBoundingClientRect().width;
       for (const [k, v] of was) panel.values.set(k, v);
       d.assert('a footer number cannot shove the one beside it',
@@ -462,7 +580,7 @@
       const keys = panel.values.keys();
       for (const k of keys) panel.values.set(k, '');
       const goneWhenEmpty = !panel.values.shown();
-      panel.values.set('source', SOURCE);
+      panel.values.set('rtt', '9 ms');
       const backWhenWritten = panel.values.shown();
       for (const [k, v] of was) panel.values.set(k, v);
       d.assert('the footer says nothing until something is coming in',
@@ -489,6 +607,42 @@
             ? `nothing presented. rtp says ${JSON.stringify(lastVideoRtp)}`
             : 'nothing presented and NO inbound video rtp at all');
       d.assert('element is playing', !video.paused, video.paused ? `paused rs${video.readyState}` : 'playing');
+      /**
+       * 🔴 EVERY STATS CELL IS GRADED AS WRITTEN, WITH A VALUE IT COULD REALLY
+       * HOLD. A cell that is declared and never written is an empty box that
+       * reads as a stat, which is exactly what `/moq/`'s `p95` was found to be
+       * on the day these were asked for. Each check reads BOTH the number this
+       * page computed and the cell's rendered text, so a reading that never
+       * reached the screen goes red as well as one that was never taken.
+       * ⚠️ THE RANGES ARE PLAUSIBILITY, NOT TARGETS: a jitter buffer over 2 s
+       * or a round trip over 2 s on a connected call means the arithmetic is
+       * wrong (seconds read as ms, a cumulative sum read as a mean), not that
+       * the network is slow.
+       */
+      const shown = (k) => {
+        const cell = [...d.readoutEl.querySelectorAll('.pos-cell')]
+          .find((c) => c.querySelector('.pos-k')?.textContent === k);
+        return (cell?.querySelector('.pos-v')?.textContent || '').trim();
+      };
+      const count = (v) => Number.isInteger(v) && v >= 0;
+      d.assert('buffer cell: ms a frame waited in the receiver',
+        Number.isFinite(stat.buffer) && stat.buffer >= 0 && stat.buffer < 2000 && shown('buffer') !== '',
+        `${stat.buffer == null ? 'never read' : stat.buffer.toFixed(1) + ' ms'}, cell ${JSON.stringify(shown('buffer'))}`);
+      d.assert('jitter cell: packet jitter in ms',
+        Number.isFinite(stat.jitter) && stat.jitter >= 0 && stat.jitter < 1000 && shown('jitter') !== '',
+        `${stat.jitter == null ? 'never read' : stat.jitter.toFixed(2) + ' ms'}, cell ${JSON.stringify(shown('jitter'))}`);
+      d.assert('lost, dropped and freezes cells are counts',
+        count(stat.lost) && count(stat.dropped) && count(stat.freezes)
+          && ['lost', 'dropped', 'freezes'].every((k) => shown(k) !== ''),
+        `lost ${stat.lost} (nacks ${stat.nack}), dropped ${stat.dropped}, freezes ${stat.freezes}`);
+      d.assert('codec cell names what was negotiated',
+        /^(H\.264|VP8|VP9|AV1)$/.test(stat.codec) && shown('codec') === stat.codec,
+        JSON.stringify(stat.codec));
+      const rttText = panel.values.cell('rtt').textContent.trim();
+      d.assert('the footer ping is a network round trip in ms',
+        Number.isFinite(stat.rtt) && stat.rtt > 0 && stat.rtt < 2000 && / ms$/.test(rttText)
+          && panel.values.el.textContent.includes('network ping'),
+        `${stat.rtt == null ? 'never read' : stat.rtt.toFixed(1) + ' ms'}, footer ${JSON.stringify(panel.values.el.textContent.trim())}`);
     }
     // The picture reports its own damage: every label it had to cut and every
     // link it could not route comes back on `cuts` rather than being ellipsised
@@ -539,9 +693,14 @@
         ] },
     ],
     links: [
-      { from: 'ctl', to: 'pub', label: 'I am watching',
-        note: 'Nothing travels up this socket. The publisher counts the sockets in the room '
-            + 'rather than watching for requests, because ffmpeg sending video makes none.' },
+      // Same socket, same label as `/llhls/`, both read off
+      // `workers/pub/worker.mjs`. What differs here is the leg: the first
+      // socket in makes the Pub object POST the container's `/start-whip` as
+      // well as `/start`, because one count holds both.
+      { from: 'ctl', to: 'pub', label: 'wss /watch',
+        note: 'The same hibernatable WebSocket to **wss://pub.positron.studio/watch** the low '
+            + 'latency HLS page holds, and nothing goes up it. The first one in starts the WHIP '
+            + 'leg and the RTMPS leg together, because one **getWebSockets()** count holds both.' },
       { from: 'pub', to: 'ff',
         note: 'Start on the first viewer, stop on the sweep. A leg that dies while somebody '
             + 'is still watching is restarted by the same sweep 30 s later.' },
