@@ -5574,6 +5574,13 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    a control that changes nothing under a pointer reads as a dead control, and
    this one is a glyph, so its ink IS its whole appearance. */
 .pos-knob-hand:hover { color: var(--fg); }
+/* 🔴 NO RING ON FOCUS EITHER, ASKED FOR 2026-09-30: *"rm yellow circle aroind
+   invisible hands button on knobs"*. MEASURED in Chrome: a mouse press leaves
+   this button matching `:focus-visible`, so the shell's `1px solid var(--hi)`
+   outline drew a yellow circle round it, shaped by the ground's radius, and it
+   stayed there until something else took focus. The ink carries focus instead,
+   the same step as hover, so a keyboard still sees where it is. */
+.pos-knob-hand:focus-visible { outline: none; color: var(--fg); }
 /* ⚠️ THE SYMBOL LIGHTS AND NOTHING ELSE CHANGES, which is `.sld-hand`'s rule
    verbatim and was instructed there: *"just color it yellow when enabled (the
    symbol)"*. A knob whose ring or needle changed while a hand held it would be

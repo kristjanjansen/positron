@@ -1,5 +1,9 @@
 ## Open
 
+### Done 2026-09-30: `/knobs/`, no yellow circle round the invisible hand's button
+
+ASKED, VERBATIM: *"rm yellow circle aroind invisible hands button on knobs"*. MEASURED in Chrome: a mouse press leaves `.pos-knob-hand` matching `:focus-visible`, so the shell's `outline: 1px solid var(--hi)` drew a yellow circle round it (the ground's 50% radius shapes it) until focus moved. `demo/shell/shell.css` now gives that button `outline: none` on focus, with the ink stepping to `--fg` as the keyboard cue. The lit glyph is still yellow. ⚠️ `.sld-hand` on sliders was not looked at and may do the same.
+
 ### Open 2026-09-30: `/shape/` works with the Circuit on the Pi, and makes a sound to hear the change
 
 ASKED, VERBATIM, ACROSS TWO MESSAGES: *"https://positron.studio/shape/ - make it work with pi circuit. test tone button?"*, then *"or keyboard?"*. Today `/shape/` edits a Circuit's synth over local Web MIDI (`demo/shell/circuit-cc.mjs`, 98 CC parameters) and needs the instrument on this USB port. The Circuit on the desk now hangs off the Pi (`studio-1`, input `circuit`, room `studio-1-circuit`), which `/away/` already reaches through `createBoard`: Listen via the `input.want` lease, notes through the board.
