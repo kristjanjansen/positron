@@ -29,10 +29,21 @@
 	// KV because "how long does a schedule change take to reach a listener" has
 	// to be a measurable number, and KV's propagation window is longer than the
 	// answer.
+	// One Schedule object per channel, `idFromName(<channel>)`, except `main`,
+	// which is the object that was the whole station before channels and is
+	// still `idFromName('station')`. One Library object, `idFromName('library')`,
+	// holds the programme records and the channel registry in SQLite: see the
+	// note above `class Library` in worker.mjs for why it is one object.
 	"durable_objects": {
-		"bindings": [{ "name": "SCHEDULE", "class_name": "Schedule" }]
+		"bindings": [
+			{ "name": "SCHEDULE", "class_name": "Schedule" },
+			{ "name": "LIBRARY", "class_name": "Library" }
+		]
 	},
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Schedule"] }],
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["Schedule"] },
+		{ "tag": "v2", "new_sqlite_classes": ["Library"] }
+	],
 	// Retention. A live show writes one 160 KB object every ten seconds and
 	// nothing deleted them, so an hour of broadcast left 57.6 MB in the bucket
 	// that no playlist could ever reference again. See `sweep()` in worker.mjs
