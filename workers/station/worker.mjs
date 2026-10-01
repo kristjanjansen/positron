@@ -186,6 +186,141 @@ export function buildIndex(bytes, target = SEG_TARGET) {
 
 const round6 = (n) => Math.round(n * 1e6) / 1e6;
 
+// ------------------------------------------------------------------- ID3 tags
+//
+// A programme's own words about itself, read once at ingest: the ID3v2 tag at
+// the head of the file and the 128-byte ID3v1 tag at its tail, whichever exist.
+// Asked 2026-10-01: a record is filled "from the file's ID3 tags on upload
+// (TIT2 title, TPE1 artist, COMM comment, and anything else useful)". So every
+// text frame, comment, user text frame and link is kept, under `meta.id3`, and
+// three of them become fixed fields: TIT2 the title, TPE1 (else TPE2) who, COMM
+// the description. A picture is recorded as its type and size, not its bytes:
+// a record is a row in a table, and a cover belongs in the bucket.
+//
+// ⚠️ WRITTEN FROM THE ID3v2.3 AND v2.4 SPECIFICATIONS AND TESTED HERE AGAINST
+// TAGS ffmpeg WRITES (v2.4, UTF-8 and ISO-8859-1). A v2.2 tag, a UTF-16 tag
+// from another tagger and unsynchronisation are handled by the same code and
+// were not measured on a real file.
+
+const ID3_KEEP = 2000;   // characters kept of any one value
+const ID3_V22 = { TT2: 'TIT2', TP1: 'TPE1', TP2: 'TPE2', TAL: 'TALB', TYE: 'TYER', TCO: 'TCON',
+	TRK: 'TRCK', COM: 'COMM', TXX: 'TXXX', WXX: 'WXXX', PIC: 'APIC', TCM: 'TCOM', TT3: 'TIT3', TEN: 'TENC', TSS: 'TSSE' };
+
+// Text in one of ID3's four encodings. Decoded by hand for ISO-8859-1 and
+// UTF-16, so nothing rests on which labels a runtime's TextDecoder knows.
+function id3Text(b, enc) {
+	if (enc === 3) return new TextDecoder().decode(b);
+	if (enc === 1 || enc === 2) {
+		let le = enc === 1, i = 0;
+		if (enc === 1 && b.length >= 2) {
+			if (b[0] === 0xff && b[1] === 0xfe) { le = true; i = 2; }
+			else if (b[0] === 0xfe && b[1] === 0xff) { le = false; i = 2; }
+		}
+		let s = '';
+		for (; i + 1 < b.length; i += 2) s += String.fromCharCode(le ? b[i] | (b[i + 1] << 8) : (b[i] << 8) | b[i + 1]);
+		return s;
+	}
+	let s = '';
+	for (const c of b) s += String.fromCharCode(c);
+	return s;
+}
+
+// Where the terminator of a string starting at `i` is: one zero byte, or two
+// on a two-byte boundary for UTF-16. Returns [end, next].
+function id3Term(b, i, enc) {
+	if (enc === 1 || enc === 2) {
+		for (let j = i; j + 1 < b.length; j += 2) if (b[j] === 0 && b[j + 1] === 0) return [j, j + 2];
+		return [b.length, b.length];
+	}
+	const j = b.indexOf(0, i);
+	return j < 0 ? [b.length, b.length] : [j, j + 1];
+}
+
+const id3Clean = (s) => s.replace(/\0+$/g, '').replace(/\0/g, ' / ').trim().slice(0, ID3_KEEP);
+const unsync = (b) => {
+	const out = [];
+	for (let i = 0; i < b.length; i++) { out.push(b[i]); if (b[i] === 0xff && b[i + 1] === 0) i++; }
+	return new Uint8Array(out);
+};
+const synchsafe = (b, i) => ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) | ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f);
+
+// `head` is the start of the file (the whole tag, at least); `tail` its last
+// 128 bytes, or null. Returns null when neither holds a tag.
+export function readId3(head, tail = null) {
+	const out = {};
+	const b0 = new Uint8Array(head);
+	if (b0.length >= 10 && b0[0] === 0x49 && b0[1] === 0x44 && b0[2] === 0x33) {
+		const ver = b0[3], flags = b0[5];
+		let tag = b0.subarray(10, Math.min(b0.length, 10 + synchsafe(b0, 6)));
+		if ((flags & 0x80) && ver < 4) tag = unsync(tag);
+		let p = 0;
+		if (flags & 0x40) p = ver === 3 ? 4 + ((tag[0] << 24) | (tag[1] << 16) | (tag[2] << 8) | tag[3]) : ver >= 4 ? synchsafe(tag, 0) : 0;
+		out.version = `2.${ver}`;
+		const idLen = ver === 2 ? 3 : 4, hdr = ver === 2 ? 6 : 10;
+		while (p + hdr <= tag.length && tag[p] !== 0) {
+			let id = id3Text(tag.subarray(p, p + idLen), 0);
+			const size = ver === 2 ? (tag[p + 3] << 16) | (tag[p + 4] << 8) | tag[p + 5]
+				: ver >= 4 ? synchsafe(tag, p + 4) : ((tag[p + 4] << 24) | (tag[p + 5] << 16) | (tag[p + 6] << 8) | tag[p + 7]) >>> 0;
+			const fmt = ver >= 3 ? tag[p + 9] : 0;
+			let d = tag.subarray(p + hdr, Math.min(tag.length, p + hdr + size));
+			p += hdr + size;
+			if (!/^[A-Z0-9]+$/.test(id) || size <= 0) break;
+			if (ver === 2) id = ID3_V22[id] || id;
+			// compressed or encrypted frames (v2.3 0x80/0x40, v2.4 0x08/0x04) are skipped
+			if ((ver === 3 && (fmt & 0xc0)) || (ver >= 4 && (fmt & 0x0c))) continue;
+			if (ver >= 4 && (fmt & 0x02)) d = unsync(d);
+			if (ver >= 4 && (fmt & 0x01)) d = d.subarray(4);
+			try { id3Frame(out, id, d); } catch { /* one bad frame is not a bad tag */ }
+		}
+	}
+	const t = tail ? new Uint8Array(tail) : null;
+	if (t && t.length >= 128 && t[t.length - 128] === 0x54 && t[t.length - 127] === 0x41 && t[t.length - 126] === 0x47) {
+		const v1 = t.subarray(t.length - 128);
+		const f = (a, n) => id3Clean(id3Text(v1.subarray(a, a + n), 0)).replace(/\s+$/, '');
+		const one = { title: f(3, 30), artist: f(33, 30), album: f(63, 30), year: f(93, 4), comment: f(97, v1[125] === 0 && v1[126] ? 28 : 30) };
+		for (const k of Object.keys(one)) if (!one[k]) delete one[k];
+		if (Object.keys(one).length) out.v1 = one;
+	}
+	return Object.keys(out).length > (out.version ? 1 : 0) || out.v1 ? out : null;
+}
+
+function id3Frame(out, id, d) {
+	const add = (k, v) => { if (v) out[k] = out[k] ? `${out[k]} / ${v}` : v; };
+	if (id === 'TXXX' || id === 'WXXX') {
+		const enc = d[0];
+		const [e, n] = id3Term(d, 1, enc);
+		const desc = id3Clean(id3Text(d.subarray(1, e), enc));
+		const val = id === 'TXXX' ? id3Clean(id3Text(d.subarray(n), enc)) : id3Clean(id3Text(d.subarray(n), 0));
+		add(`${id}:${desc}`, val);
+	} else if (id[0] === 'T') {
+		add(id, id3Clean(id3Text(d.subarray(1), d[0])));
+	} else if (id === 'COMM' || id === 'USLT') {
+		const enc = d[0];
+		const [e, n] = id3Term(d, 4, enc);
+		const desc = id3Clean(id3Text(d.subarray(4, e), enc));
+		add(desc ? `${id}:${desc}` : id, id3Clean(id3Text(d.subarray(n), enc)));
+	} else if (id[0] === 'W') {
+		add(id, id3Clean(id3Text(d, 0)));
+	} else if (id === 'APIC') {
+		const mEnd = d.indexOf(0, 1);
+		out.APIC = { mime: id3Text(d.subarray(1, mEnd), 0), type: d[mEnd + 1], bytes: d.length };
+	}
+}
+
+// The three fixed fields a tag can fill, from the frames above.
+function id3Fields(id3) {
+	if (!id3) return {};
+	// COMM is the frame the standard names; ffmpeg's `-metadata comment=` writes
+	// `TXXX:comment` instead (MEASURED here, ffmpeg 9.0.1), so both count.
+	const comm = id3.COMM || Object.entries(id3).find(([k]) => k.startsWith('COMM:'))?.[1]
+		|| id3['TXXX:comment'] || id3['TXXX:COMMENT'] || id3['TXXX:description'];
+	return {
+		title: id3.TIT2 || id3.v1?.title || null,
+		who: id3.TPE1 || id3.TPE2 || id3.v1?.artist || null,
+		description: comm || id3.v1?.comment || null,
+	};
+}
+
 // ------------------------------------------------------------ the schedule DO
 
 // One object owns the running order and the live segment lists. A Durable
@@ -480,6 +615,115 @@ export class Schedule {
 	}
 }
 
+// ------------------------------------------------------------ the library DO
+//
+// What the station plays, described, and which channels it has. Decided
+// 2026-10-01 with the owner: the station is ECCM's but "freeflowing stuff,
+// its sometimes randomly generated, user contributed, elastic medium", "no
+// link to fancy events eccm puts out", so its programme data lives HERE, with
+// the station, and not in eccm's D1. Then: "Note we run multiple channels",
+// and "Can be n channels".
+//
+// 🔴 ONE OBJECT, `idFromName('library')`, A SQLITE TABLE PER THING, AND THAT IS
+// THE DECISION RATHER THAN A DEFAULT. Three shapes were weighed:
+//   - a record inside each channel's Schedule object. Refused: one file plays
+//     on several channels, so a title edited on one channel would be stale on
+//     the other, and the copies would drift exactly where a listener reads them.
+//   - a JSON object in R2 beside each file. Refused: an edit is read, change,
+//     write with no lock, two writers lose one edit silently, and listing every
+//     programme is one GET per programme.
+//   - one object holding one table. Taken: an edit is one UPDATE, a list is one
+//     SELECT, the channel registry sits in the same place because a Durable
+//     Object namespace cannot be enumerated (positron-streaming says so, from
+//     `workers/store`), and it is read off the playlist path entirely: the
+//     playlist needs only the frame index in R2, so a slow library can stale a
+//     title and can never stop the sound.
+// ⚠️ ONE OBJECT IS ONE THREAD. Every /now.json asks it for a few rows; that is
+// why the worker holds what it read for LIB_TTL per isolate. A library of tens
+// of thousands of rows or hundreds of requests a second would want that cache
+// widened before it wanted another shape.
+const PROGRAMME_KINDS = ['file', 'live', 'relay', 'generated'];
+const FILL_ALWAYS = new Set(['id3', 'format', 'src']);
+
+export class Library {
+	constructor(state, env) {
+		this.state = state; this.env = env;
+		this.sql = state.storage.sql;
+		this.sql.exec(`CREATE TABLE IF NOT EXISTS programmes (
+			key TEXT PRIMARY KEY, title TEXT, who TEXT, kind TEXT NOT NULL DEFAULT 'file',
+			duration REAL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+			meta TEXT NOT NULL DEFAULT '{}')`);
+		this.sql.exec(`CREATE TABLE IF NOT EXISTS channels (
+			name TEXT PRIMARY KEY, title TEXT, created_at INTEGER NOT NULL)`);
+		// The channel that was the whole station until 2026-10-01. Registered from
+		// the start, so /channels.json is never empty and never omits it.
+		this.sql.exec(`INSERT OR IGNORE INTO channels (name, title, created_at) VALUES (?, NULL, 0)`, DEFAULT_CHANNEL);
+	}
+
+	async fetch(req) {
+		const op = new URL(req.url).pathname;
+		const body = req.method === 'POST' ? await req.json() : {};
+		if (op === '/programmes') return json(this.sql.exec('SELECT * FROM programmes ORDER BY key').toArray().map(rowOf));
+		if (op === '/pick') {
+			const keys = [...new Set(body.keys || [])];
+			if (!keys.length) return json([]);
+			return json(this.sql.exec(`SELECT * FROM programmes WHERE key IN (${keys.map(() => '?').join(',')})`, ...keys).toArray().map(rowOf));
+		}
+		if (op === '/write') return this.write(body);
+		if (op === '/channels') return json(this.sql.exec('SELECT name, title, created_at FROM channels ORDER BY created_at, name').toArray());
+		if (op === '/channel') {
+			const { name, title, create } = body;
+			const had = this.sql.exec('SELECT name FROM channels WHERE name = ?', name).toArray().length > 0;
+			if (!had && !create) return json({ error: `no channel ${name}` }, 404);
+			if (!had) this.sql.exec('INSERT INTO channels (name, title, created_at) VALUES (?, ?, ?)', name, title ?? null, Date.now());
+			else if (title !== undefined) this.sql.exec('UPDATE channels SET title = ? WHERE name = ?', title, name);
+			return json({ ...this.sql.exec('SELECT name, title, created_at FROM channels WHERE name = ?', name).one(), created: !had });
+		}
+		return new Response('no', { status: 404 });
+	}
+
+	// One record, created or changed. `mode` decides who wins over what is there:
+	//   'edit'  a person's PUT: every field given replaces the stored one, and a
+	//           `meta` key set to null is removed.
+	//   'fill'  an upload or the backfill: title and who are written only where
+	//           the record has none, so a hand edit is never undone by a file's
+	//           tags; kind and duration are the file's facts and always land.
+	write({ key, fields = {}, mode = 'edit' }) {
+		const now = Date.now();
+		const cur = this.sql.exec('SELECT * FROM programmes WHERE key = ?', key).toArray()[0];
+		const was = cur ? rowOf(cur) : { key, title: null, who: null, kind: 'file', duration: null, created_at: now, meta: {} };
+		const next = { ...was, meta: { ...was.meta } };
+		for (const f of ['title', 'who', 'kind', 'duration']) {
+			if (fields[f] === undefined) continue;
+			if (mode === 'fill' && was[f] != null && !(f === 'duration' || f === 'kind')) continue;
+			next[f] = fields[f];
+		}
+		for (const [k, v] of Object.entries(fields.meta || {})) {
+			// What the file or the slot says about itself (its tags, its format, a
+			// relay's source) is refreshed by every fill; anything else a fill
+			// brings, a description from a tag, only lands where there is none.
+			if (mode === 'fill' && !FILL_ALWAYS.has(k) && next.meta[k] !== undefined) continue;
+			if (v === null) delete next.meta[k]; else next.meta[k] = v;
+		}
+		const meta = JSON.stringify(next.meta);
+		if (meta.length > 65536) return json({ error: `meta is ${meta.length} bytes, the most is 65536`, key }, 413);
+		this.sql.exec(`INSERT INTO programmes (key, title, who, kind, duration, created_at, updated_at, meta)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(key) DO UPDATE SET title = excluded.title, who = excluded.who, kind = excluded.kind,
+			duration = excluded.duration, updated_at = excluded.updated_at, meta = excluded.meta`,
+			key, next.title, next.who, next.kind, next.duration, was.created_at, now, meta);
+		return json({ ...rowOf(this.sql.exec('SELECT * FROM programmes WHERE key = ?', key).one()), created: !cur });
+	}
+}
+
+// The free fields stay under `meta` rather than beside the fixed ones, so a
+// tag or a generator writing `title` into its free JSON can never shadow the
+// record's own title.
+const rowOf = (r) => ({
+	key: r.key, title: r.title, who: r.who, kind: r.kind, duration: r.duration,
+	created_at: r.created_at, updated_at: r.updated_at, meta: JSON.parse(r.meta || '{}'),
+});
+
 const concat = (parts) => {
 	const out = new Uint8Array(parts.reduce((a, p) => a + p.length, 0));
 	let o = 0;
@@ -520,6 +764,10 @@ const relayErr = (status, why) => new Response(`${why}\n`, { status, headers: { 
 function slotOf(s) {
 	const key = String(s.key);
 	const title = s.title ? String(s.title).slice(0, 120) : undefined;
+	// `who` beside `title`, a running order's own label for a slot. The
+	// programme's record wins over both when it has one (titleOf, whoOf).
+	const who = s.who ? String(s.who).slice(0, 120) : undefined;
+	const label = { ...(title ? { title } : {}), ...(who ? { who } : {}) };
 	if (s.kind === 'relay') {
 		let src;
 		try { src = new URL(String(s.src)); } catch { throw new Error(`relay slot ${key} needs src, an Icecast mount or an HLS playlist URL`); }
@@ -528,13 +776,13 @@ function slotOf(s) {
 		const dur = Number(s.dur) > 0 ? Number(s.dur) : RELAY_DUR;
 		const seg = Number(s.seg) > 0 ? Number(s.seg) : via === 'hls' ? RELAY_SEG_HLS : RELAY_SEG_MP3;
 		const bw = Number(s.bw) > 0 ? Number(s.bw) : RELAY_BW;
-		return { key, kind: 'relay', open: false, src: src.href, via, dur, seg, bw, ...(title ? { title } : {}) };
+		return { key, kind: 'relay', open: false, src: src.href, via, dur, seg, bw, ...label };
 	}
 	return {
 		key,
 		kind: s.kind === 'live' ? 'live' : 'file',
 		open: s.kind === 'live' ? s.open !== false : false,
-		...(title ? { title } : {}),
+		...label,
 		// A file slot may play a window of its file: `from` seconds in, `dur`
 		// seconds long. See clipOf().
 		...(s.kind !== 'live' && Number(s.from) > 0 ? { from: Number(s.from) } : {}),
@@ -679,7 +927,11 @@ async function flatten(env, sched) {
 	return { flat, spans, total: t, open, missing, disc, incl, discPerLoop: c };
 }
 
-function m3u8(env, sched, f, now) {
+// `pre` is the channel's route prefix: '' for the default channel, so its
+// relay URIs are exactly the ones it wrote before channels existed and no media
+// sequence number changes address across the deploy, and `/c/<name>` for every
+// other, so a relay segment is asked of the channel that listed it.
+function m3u8(env, sched, f, now, pre = '') {
 	const { flat, total, open, disc, incl, discPerLoop } = f;
 	if (!flat.length) return null;
 	// An epoch in the future is a station that has not started. Left unclamped
@@ -737,7 +989,7 @@ function m3u8(env, sched, f, now) {
 		if (s.len !== undefined) lines.push(`#EXT-X-BYTERANGE:${s.len}@${s.off}`);
 		// A relay entry's address carries its loop, so one media sequence number
 		// is one URI forever. hls.js calls a changed URI `media sequence mismatch`.
-		lines.push(s.relay !== undefined ? `/relay/${encodeURIComponent(s.relay)}/${l}/${s.k}.${s.ext}` : s.uri);
+		lines.push(s.relay !== undefined ? `${pre}/relay/${encodeURIComponent(s.relay)}/${l}/${s.k}.${s.ext}` : s.uri);
 	}
 	return lines.join('\n') + '\n';
 }
@@ -777,7 +1029,7 @@ function locate(flat, t) {
 	return lo;
 }
 
-// ------------------------------------------------------------------ the worker
+// ------------------------------------------------------------------ responses
 
 const CORS = {
 	'access-control-allow-origin': '*',
@@ -788,16 +1040,116 @@ const CORS = {
 const json = (v, status = 200) =>
 	new Response(JSON.stringify(v, null, 1), { status, headers: { 'content-type': 'application/json', ...CORS } });
 
-function desk(env) {
-	return env.SCHEDULE.get(env.SCHEDULE.idFromName('station'));
+// ------------------------------------------------------------------ channels
+//
+// 🔴 A CHANNEL IS A RUNNING ORDER WITH ITS OWN CLOCK, AND THE STATION HAS AS
+// MANY AS ANYBODY MAKES. Asked 2026-10-01: "Note we run multiple channels",
+// then "Can be n channels". Each one is its own Schedule object, with its own
+// running order, epoch, live lists and relay connection, so a channel changing
+// its order cannot move another's media sequence. What they share is the bucket
+// (every file and index under its one key) and the library below.
+//
+// 🔴 `main` IS THE STATION AS IT WAS, AND ITS OBJECT KEEPS ITS OLD NAME. Before
+// channels there was one object, `idFromName('station')`, holding a running
+// order that was on air. `main` is that object, not a new one, so nothing about
+// it was reset: same epoch, same rev, same media sequence. Every other channel
+// is `idFromName(<its name>)`, which is why `station` may not be a channel's
+// name: it would be a second door into `main`'s object.
+// The un-prefixed routes (`/station.m3u8`, `/now.json`, `/schedule.json`,
+// `/schedule`, `/relay/...`, `/live/...`) are `main`'s and answer exactly as they
+// did, so every player and page already pointed at them keeps working.
+//
+// A channel comes into being when its first running order is PUT, and it is
+// written into the library's registry then, because a Durable Object namespace
+// cannot be enumerated and /channels.json and the retention sweep both need
+// the list.
+const DEFAULT_CHANNEL = 'main';
+const CHANNEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
+const RESERVED = new Set(['station']);
+const validChannel = (ch) => CHANNEL_RE.test(ch) && !RESERVED.has(ch);
+const prefixOf = (ch) => (ch === DEFAULT_CHANNEL ? '' : `/c/${ch}`);
+
+function desk(env, ch = DEFAULT_CHANNEL) {
+	return env.SCHEDULE.get(env.SCHEDULE.idFromName(ch === DEFAULT_CHANNEL ? 'station' : ch));
 }
 
-async function call(env, op, body) {
-	const r = await desk(env).fetch(`https://schedule${op}`, {
+async function call(env, ch, op, body) {
+	const r = await desk(env, ch).fetch(`https://schedule${op}`, {
 		method: body === undefined ? 'GET' : 'POST',
 		body: body === undefined ? undefined : JSON.stringify(body),
 	});
 	return r.json();
+}
+
+// The library, as [status, value].
+async function lib(env, op, body) {
+	const r = await env.LIBRARY.get(env.LIBRARY.idFromName('library')).fetch(`https://library${op}`, {
+		method: body === undefined ? 'GET' : 'POST',
+		body: body === undefined ? undefined : JSON.stringify(body),
+	});
+	return [r.status, await r.json()];
+}
+
+// What the library said, held per isolate for LIB_TTL so a room of visitors
+// polling /now.json every two seconds is a read every ten seconds, not a
+// hundred a second. A write through this isolate drops what it changed; a
+// write through another shows here within LIB_TTL.
+const LIB_TTL = 10_000;
+const chanCache = { at: 0, v: null };
+const progCache = new Map();
+
+async function channelList(env, fresh = false) {
+	if (!fresh && chanCache.v && Date.now() - chanCache.at < LIB_TTL) return chanCache.v;
+	const [, v] = await lib(env, '/channels');
+	chanCache.v = v; chanCache.at = Date.now();
+	return v;
+}
+
+// A name not in the cached list is asked about once more, fresh, so a channel
+// created a second ago in another isolate is not refused for ten seconds.
+async function channelExists(env, ch) {
+	if (ch === DEFAULT_CHANNEL) return true;
+	if ((await channelList(env)).some((c) => c.name === ch)) return true;
+	return (await channelList(env, true)).some((c) => c.name === ch);
+}
+
+// The records for these keys, or {} when the library cannot answer: a title
+// can go stale or fall back to the slot's own, and nothing else depends on it.
+async function records(env, keys) {
+	const now = Date.now(), out = {}, want = [];
+	for (const k of new Set(keys)) {
+		const hit = progCache.get(k);
+		if (hit && now - hit.at < LIB_TTL) { if (hit.v) out[k] = hit.v; } else want.push(k);
+	}
+	if (want.length) {
+		try {
+			const [, rows] = await lib(env, '/pick', { keys: want });
+			const got = new Map(rows.map((r) => [r.key, r]));
+			for (const k of want) {
+				progCache.set(k, { at: now, v: got.get(k) || null });
+				if (got.get(k)) out[k] = got.get(k);
+			}
+		} catch { /* the titles wait for the next read */ }
+	}
+	return out;
+}
+
+// A slot's title and who: the programme's record first, the running order's
+// own label second, so an edit to a record reaches every channel that plays it.
+const titleOf = (slot, rec) => rec?.title || slot?.title || null;
+const whoOf = (slot, rec) => rec?.who || slot?.who || null;
+
+// Where a slot begins in the loop, read off the same spans the table is.
+const slotStart = (f, si) => f.spans.find((x) => x.i === si)?.start ?? 0;
+
+// Where one channel is now, for /channels.json and /now.json.
+async function onAir(env, ch) {
+	const sched = await call(env, ch, '/get');
+	const f = await flatten(env, sched);
+	if (!f.flat.length) return { sched, f, error: 'the schedule is empty' };
+	const at = position(sched, f, Date.now());
+	const s = f.flat[at.i];
+	return { sched, f, at, s, slot: sched.slots[s.si] };
 }
 
 function admitted(req, env) {
@@ -822,16 +1174,28 @@ async function listAll(env, prefix = '') {
 
 // The sweep. Returns what it did in both directions, because a cleanup nobody
 // is told about cannot be told apart from a leak.
+// 🔴 EVERY CHANNEL, AND ORPHANS ONLY WHEN EVERY CHANNEL ANSWERED. A chunk is an
+// orphan when no channel's lists mention it, and that is a claim about all of
+// them: a sweep that heard from one channel of two would read the other's live
+// show as unreferenced and delete it on air. So if any channel's /retain fails,
+// the expired chunks the others reported still go and no orphan does.
 async function sweep(env, now = Date.now()) {
 	const before = await listAll(env, 'live/');
-	const { drop, kept } = await call(env, '/retain', { keep: KEEP_SEGS });
+	const chans = (await channelList(env, true)).map((c) => c.name);
+	const drop = [], kept = [], failed = [];
+	for (const ch of chans) {
+		try {
+			const r = await call(env, ch, '/retain', { keep: KEEP_SEGS });
+			drop.push(...r.drop); kept.push(...r.kept);
+		} catch { failed.push(ch); }
+	}
 	// The DO speaks in playlist URIs (`/media/live/…`); R2 speaks in keys.
 	const toKey = (u) => u.replace(/^\/media\//, '');
 	const dropped = drop.map(toKey);
 	const referenced = new Set(kept.map(toKey));
 	let aged = 0;
 	const orphans = [];
-	for (const o of before) {
+	if (!failed.length) for (const o of before) {
 		if (referenced.has(o.key) || dropped.includes(o.key)) continue;
 		// ⚠️ The age guard. An object that appeared in the last minute may be a
 		// chunk whose /append has not reached the Durable Object yet.
@@ -845,8 +1209,10 @@ async function sweep(env, now = Date.now()) {
 	return {
 		at: new Date(now).toISOString(),
 		keep: KEEP_SEGS,
+		channels: chans.length,
+		unanswered: failed,               // channels whose lists could not be read: no orphan sweep
 		expired: dropped.length,          // past the tail window: bytes go, record stays
-		orphaned: orphans.length,         // no slot mentions them at all
+		orphaned: orphans.length,         // no slot on any channel mentions them
 		too_young: aged,                  // the guard held these back
 		deleted: gone.length,
 		live_objects: { before: before.length, after: after.length },
@@ -854,6 +1220,82 @@ async function sweep(env, now = Date.now()) {
 		referenced: referenced.size,
 	};
 }
+
+// ------------------------------------------------------------------ records
+//
+// A programme's record from what the station knows about it: the file's tags,
+// its frame index, and what the running orders call it. Written in 'fill' mode,
+// so a field somebody set by hand is never replaced by a tag.
+
+// The ID3v2 tag at the head of an object, read with two range GETs (the ten
+// byte header, then the tag), and the ID3v1 tag in its last 128 bytes.
+const ID3_MAX = 8 << 20;
+async function id3Of(env, key) {
+	const h = await env.MEDIA.get(key, { range: { offset: 0, length: 10 } });
+	if (!h) return null;
+	const hb = new Uint8Array(await h.arrayBuffer());
+	let head = hb;
+	if (hb.length === 10 && hb[0] === 0x49 && hb[1] === 0x44 && hb[2] === 0x33) {
+		const len = Math.min(ID3_MAX, 10 + synchsafe(hb, 6) + ((hb[5] & 0x10) ? 10 : 0));
+		head = new Uint8Array(await (await env.MEDIA.get(key, { range: { offset: 0, length: len } })).arrayBuffer());
+	}
+	const t = h.size >= 128 ? await env.MEDIA.get(key, { range: { suffix: 128 } }) : null;
+	return readId3(head, t ? await t.arrayBuffer() : null);
+}
+
+function fileFields(id3, idx, slot) {
+	const tag = id3Fields(id3);
+	return {
+		kind: 'file',
+		...(idx ? { duration: idx.dur } : {}),
+		title: slot?.title || tag.title || undefined,
+		who: tag.who || slot?.who || undefined,
+		meta: {
+			...(id3 ? { id3 } : {}),
+			...(tag.description ? { description: tag.description } : {}),
+			...(idx ? { format: { rate: idx.rate, channels: idx.ch, kbps: idx.kbps } } : {}),
+		},
+	};
+}
+
+async function writeRecord(env, key, fields, mode) {
+	const [status, v] = await lib(env, '/write', { key, fields, mode });
+	progCache.delete(key);
+	return [status, v];
+}
+
+// A PUT body, checked: the five fields a record has, and nothing else, so a
+// misspelt field is a 400 rather than a value silently dropped.
+function editOf(body) {
+	const fields = {};
+	for (const [k, v] of Object.entries(body || {})) {
+		if (k === 'title' || k === 'who') {
+			if (v !== null && typeof v !== 'string') throw new Error(`${k} is a string or null`);
+			fields[k] = v === null ? null : v.trim().slice(0, 200) || null;
+		} else if (k === 'kind') {
+			if (!PROGRAMME_KINDS.includes(v)) throw new Error(`kind is one of ${PROGRAMME_KINDS.join(', ')}`);
+			fields.kind = v;
+		} else if (k === 'duration') {
+			if (v !== null && !(Number(v) >= 0)) throw new Error('duration is seconds, or null');
+			fields.duration = v === null ? null : Number(v);
+		} else if (k === 'meta') {
+			if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('meta is an object; a key set to null is removed');
+			fields.meta = v;
+		} else {
+			throw new Error(`no field ${k}: a record has title, who, kind, duration and meta, and anything free goes in meta`);
+		}
+	}
+	return fields;
+}
+
+// Every channel's running order, for the backfill and the relay check.
+async function allSchedules(env) {
+	const out = [];
+	for (const c of await channelList(env, true)) out.push({ ch: c.name, sched: await call(env, c.name, '/get') });
+	return out;
+}
+
+// ------------------------------------------------------------------ the worker
 
 export default {
 	// Every five minutes. A live show writes six objects a minute, so the worst
@@ -864,21 +1306,66 @@ export default {
 
 	async fetch(req, env, ctx) {
 		const url = new URL(req.url);
-		const p = url.pathname;
+		let p = url.pathname;
 		if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
 		if (p === '/media' || p.startsWith('/media/')) return media(req, env, p.slice('/media/'.length));
 
+		// Every channel, its title and what it is playing now.
+		if (p === '/channels.json' && req.method === 'GET') {
+			const list = await channelList(env);
+			const now = await Promise.all(list.map((c) => onAir(env, c.name).catch((e) => ({ error: String(e.message || e) }))));
+			const recs = await records(env, now.filter((n) => n.slot).map((n) => n.slot.key));
+			return json({
+				default: DEFAULT_CHANNEL,
+				channels: list.map((c, i) => {
+					const n = now[i], pre = prefixOf(c.name);
+					return {
+						name: c.name, title: c.title || c.name, default: c.name === DEFAULT_CHANNEL,
+						playlist: `${pre}/station.m3u8`, now: `${pre}/now.json`, schedule: `${pre}/schedule.json`,
+						playing: n.slot ? {
+							programme: n.s.key, slot: n.s.si, kind: n.slot.kind,
+							title: titleOf(n.slot, recs[n.s.key]), who: whoOf(n.slot, recs[n.s.key]),
+							into: round6(n.at.t - slotStart(n.f, n.s.si)),
+						} : null,
+						...(n.error ? { error: n.error } : {}),
+					};
+				}),
+			});
+		}
+
+		// Every programme the library knows, with its free fields.
+		if (p === '/programmes.json' && req.method === 'GET') {
+			const [, rows] = await lib(env, '/programmes');
+			return json({ count: rows.length, programmes: rows });
+		}
+
+		// `/c/<channel>/...` is that channel; everything else is `main`'s, as it
+		// always was. A route that belongs to the whole station (uploads, the
+		// bucket, the library) does not answer under a channel's prefix.
+		let ch = DEFAULT_CHANNEL;
+		const cm = /^\/c\/([^/]+)(\/.*)$/.exec(p);
+		if (cm) {
+			ch = cm[1]; p = cm[2];
+			if (!validChannel(ch)) return json({ error: `a channel name is 1 to 32 of a-z, 0-9 and -, not starting or ending with -, and not ${[...RESERVED].join(', ')}` }, 404);
+			// A channel that does not exist yet answers 404 to everything except
+			// the PUT that creates it, which is checked for its token below.
+			if (!(p === '/schedule' && req.method === 'PUT') && !(await channelExists(env, ch))) {
+				return json({ error: `no channel ${ch}`, channels: '/channels.json' }, 404);
+			}
+		}
+		const pre = prefixOf(ch);
+
 		if (p === '/station.m3u8' || p === '/live.m3u8') {
-			const sched = await call(env, '/get');
+			const sched = await call(env, ch, '/get');
 			const f = await flatten(env, sched);
 			const now = Date.now();
-			const body = m3u8(env, sched, f, now);
+			const body = m3u8(env, sched, f, now, pre);
 			// A listener is reading the playlist, so an Icecast relay slot that
 			// is about to play, or playing, gets its mount opened or kept open.
 			// This is the only thing that opens one: no playlist, no connection.
 			for (const w of relaysDue(sched, f, now)) {
-				ctx.waitUntil(desk(env).fetch('https://schedule/warm', { method: 'POST', body: JSON.stringify(w) }).catch(() => {}));
+				ctx.waitUntil(desk(env, ch).fetch('https://schedule/warm', { method: 'POST', body: JSON.stringify(w) }).catch(() => {}));
 			}
 			if (!body) return new Response('# the schedule is empty\n', { status: 503, headers: { 'content-type': 'application/vnd.apple.mpegurl', ...CORS } });
 			return new Response(body, {
@@ -893,20 +1380,25 @@ export default {
 		}
 
 		if (p === '/now.json') {
-			const sched = await call(env, '/get');
-			const f = await flatten(env, sched);
-			if (!f.flat.length) return json({ error: 'the schedule is empty', missing: f.missing }, 503);
-			const { loop, t, i } = position(sched, f, Date.now());
-			const s = f.flat[i];
-			const slot = sched.slots[s.si];
+			const n = await onAir(env, ch);
+			if (n.error) return json({ channel: ch, error: n.error, missing: n.f.missing }, 503);
+			const { sched, f, at, s, slot } = n;
+			const recs = await records(env, sched.slots.map((x) => x.key));
 			return json({
+				channel: ch,
 				rev: sched.rev, epoch: sched.epoch, open: f.open, missing: f.missing,
-				programme: s.key, title: slot.title || null, kind: slot.kind, slot: s.si,
-				into: round6(t - s.start),
-				segment: i, segments: f.flat.length, loop,
-				total: round6(f.total), station_time: round6(t),
+				programme: s.key, title: titleOf(slot, recs[s.key]), who: whoOf(slot, recs[s.key]),
+				kind: slot.kind, slot: s.si,
+				// From the start of the programme, not of the ten second segment it
+				// is in: it was `t - s.start` with `s` the segment until 2026-10-01,
+				// so every page labelling it "into the programme" counted 0 to 10
+				// over and over (MEASURED on eccm's /station, the same 4,5 s three
+				// samples running).
+				into: round6(at.t - slotStart(f, s.si)),
+				segment: at.i, segments: f.flat.length, loop: at.loop,
+				total: round6(f.total), station_time: round6(at.t),
 				slots: sched.slots.map((x) => ({
-					key: x.key, kind: x.kind, open: x.open, title: x.title,
+					key: x.key, kind: x.kind, open: x.open, title: titleOf(x, recs[x.key]), who: whoOf(x, recs[x.key]),
 					segments: x.kind === 'live' ? (sched.live[x.key] || []).length : undefined,
 				})),
 			});
@@ -915,10 +1407,12 @@ export default {
 		// The running order of the loop that is playing now, with wall-clock
 		// times. Read off flatten(), the list the playlist is written from.
 		if (p === '/schedule.json') {
-			const sched = await call(env, '/get');
+			const sched = await call(env, ch, '/get');
 			const f = await flatten(env, sched);
 			const now = Date.now();
-			if (!f.flat.length) return json({ error: 'the schedule is empty', missing: f.missing, slots: f.spans, now }, 503);
+			const recs = await records(env, sched.slots.map((x) => x.key));
+			const dress = (s) => ({ ...s, title: titleOf(sched.slots[s.i], recs[s.key]), who: whoOf(sched.slots[s.i], recs[s.key]) });
+			if (!f.flat.length) return json({ channel: ch, error: 'the schedule is empty', missing: f.missing, slots: f.spans.map(dress), now }, 503);
 			const { loop, t, i } = position(sched, f, now);
 			const playing = f.flat[i].si;
 			// 🔴 WHAT IS COMING, NOT THE LOOP IN ITS OWN ORDER. Asked 2026-10-01,
@@ -933,12 +1427,13 @@ export default {
 			const order = f.open ? f.spans.slice(from)
 				: [...f.spans.slice(from), ...f.spans.slice(0, from)];
 			return json({
+				channel: ch,
 				rev: sched.rev, epoch: sched.epoch, now, open: f.open, loop,
 				total: round6(f.total), station_time: round6(t), playing,
 				slots: order.map((s) => {
 					const l = !f.open && s.i < playing ? loop + 1 : loop;
 					return {
-						...s, loop: l,
+						...dress(s), loop: l,
 						from: s.missing ? null : at(l, s.start),
 						// An open live slot has no end yet.
 						to: s.missing || s.open ? null : at(l, s.start + s.dur),
@@ -951,13 +1446,13 @@ export default {
 		const rel = /^\/relay\/([^/]+)\/(\d+)\/(\d+)\.(ts|mp3)$/.exec(p);
 		if (rel && req.method === 'GET') {
 			const key = decodeURIComponent(rel[1]), loop = Number(rel[2]), k = Number(rel[3]);
-			const sched = await call(env, '/get');
+			const sched = await call(env, ch, '/get');
 			const f = await flatten(env, sched);
 			const span = f.spans.find((s) => s.kind === 'relay' && s.key === key);
 			if (!span || k >= span.segments) return new Response('no such relay segment\n', { status: 404, headers: CORS });
 			const elapsed = (Date.now() - sched.epoch) / 1000;
 			const kNow = Math.floor((elapsed - loop * f.total - span.start) / span.seg);
-			const r = await desk(env).fetch('https://schedule/relay', {
+			const r = await desk(env, ch).fetch('https://schedule/relay', {
 				method: 'POST', body: JSON.stringify({ key, loop, k, kNow }),
 			});
 			const h = new Headers(CORS);
@@ -968,11 +1463,71 @@ export default {
 			return new Response(r.body, { status: r.status, headers: h });
 		}
 
-		if (p === '/schedule' && req.method === 'GET') return json(await call(env, '/get'));
+		if (p === '/schedule' && req.method === 'GET') return json({ channel: ch, ...(await call(env, ch, '/get')) });
 
 		// Everything below writes, and writing needs the token.
 		if (!admitted(req, env)) {
 			return json({ error: env.STATION_TOKEN ? 'bad token' : 'no STATION_TOKEN configured' }, env.STATION_TOKEN ? 401 : 503);
+		}
+
+		if (p === '/schedule' && req.method === 'PUT') {
+			const body = await req.json();
+			if (!body.epoch) body.epoch = Date.now();
+			// 🔴 ONE CHANNEL PER UPSTREAM MOUNT. Each channel's Schedule object
+			// holds its own relay connection, so two channels naming one mount
+			// would be two listeners at somebody else's server, and CLAUDE.md is
+			// explicit that every connection to an ERR mount is counted in a public
+			// broadcaster's audience figures. Refused here rather than shared,
+			// because the owner asked for the relay on one channel only.
+			const mine = new Set((body.slots || []).filter((s) => s.kind === 'relay').map((s) => { try { return new URL(String(s.src)).href; } catch { return null; } }).filter(Boolean));
+			if (mine.size) {
+				for (const o of await allSchedules(env)) {
+					if (o.ch === ch) continue;
+					const clash = (o.sched.slots || []).find((s) => s.kind === 'relay' && mine.has(s.src));
+					if (clash) return json({ error: `channel ${o.ch} already relays ${clash.src} (slot ${clash.key}); one mount is one connection, so it plays on one channel` }, 409);
+				}
+			}
+			const r = await call(env, ch, '/put', body);
+			if (r.error) return json({ channel: ch, ...r }, 400);
+			// Created by its first running order, titled by `title` when given.
+			const [, c] = await lib(env, '/channel', { name: ch, create: true, ...(typeof body.title === 'string' ? { title: body.title.slice(0, 80) } : {}) });
+			chanCache.v = null;
+			return json({ channel: ch, channel_title: c.title, created: c.created, ...r });
+		}
+
+		// One live chunk, as the recorder cuts it. The recorder is the segmenter:
+		// it is already running an ffmpeg against the mount, and a second output
+		// writing ten-second pieces costs it nothing it is not already paying.
+		// `main` keeps its chunks under `live/<key>/` as before; another channel's
+		// go under `live/<channel>/<key>/`, so two channels with a live slot of
+		// the same name never write the same object.
+		if (p.startsWith('/live/') && p.endsWith('/append') && req.method === 'POST') {
+			const key = p.slice('/live/'.length, -'/append'.length);
+			const bytes = await req.arrayBuffer();
+			const idx = buildIndex(bytes, 1e9);   // one piece, walked for its true duration
+			const seq = Number(url.searchParams.get('seq') ?? Date.now());
+			const uri = `live/${ch === DEFAULT_CHANNEL ? '' : `${ch}/`}${key}/${String(seq).padStart(6, '0')}.mp3`;
+			await env.MEDIA.put(uri, bytes, { httpMetadata: { contentType: 'audio/mpeg' } });
+			const r = await call(env, ch, '/append', { key, uri: `/media/${uri}`, dur: idx.dur });
+			return json({ channel: ch, ...r, dur: idx.dur, bytes: bytes.byteLength, uri: `/media/${uri}` });
+		}
+
+		if (p.startsWith('/live/') && p.endsWith('/close') && req.method === 'POST') {
+			return json({ channel: ch, ...(await call(env, ch, '/close', { key: p.slice('/live/'.length, -'/close'.length) })) });
+		}
+
+		// Below this line the routes belong to the whole station, not a channel.
+		if (cm) return json({ error: 'no such route on a channel', path: url.pathname }, 404);
+
+		// A channel's title, changed without touching its running order (a
+		// schedule PUT without an epoch restarts its clock).
+		const cn = /^\/channels\/([^/]+)$/.exec(p);
+		if (cn && req.method === 'PUT') {
+			const body = await req.json();
+			if (typeof body.title !== 'string') return json({ error: 'title is a string' }, 400);
+			const [status, c] = await lib(env, '/channel', { name: cn[1], title: body.title.slice(0, 80) });
+			chanCache.v = null;
+			return json(c, status);
 		}
 
 		// The bucket, as it is. Token-gated because it names every key.
@@ -986,14 +1541,12 @@ export default {
 		// waiting five minutes is one nobody measures.
 		if (p === '/sweep' && req.method === 'POST') return json(await sweep(env));
 
-		if (p === '/schedule' && req.method === 'PUT') {
-			const body = await req.json();
-			if (!body.epoch) body.epoch = Date.now();
-			return json(await call(env, '/put', body));
-		}
-
 		// Put a programme in the station: the bytes go to R2 and the frame walk
 		// goes beside them. One pass over the object, at ingest, once.
+		// Since 2026-10-01 the same request writes its record: the tags it
+		// carries (title, who, comment and every other frame), its duration and
+		// format, in 'fill' mode so a title somebody set by hand stays. `?title=`
+		// and `?who=` set them outright.
 		if (p.startsWith('/programme/') && req.method === 'POST') {
 			const key = p.slice('/programme/'.length);
 			const bytes = await req.arrayBuffer();
@@ -1001,7 +1554,12 @@ export default {
 			const idx = buildIndex(bytes);
 			await env.MEDIA.put(`index/${key}.json`, JSON.stringify(idx), { httpMetadata: { contentType: 'application/json' } });
 			indexCache.delete(key);
-			return json({ key, ...idx, seg: idx.seg.length });
+			const id3 = readId3(bytes, bytes.byteLength >= 128 ? bytes.slice(bytes.byteLength - 128) : null);
+			let [, record] = await writeRecord(env, key, fileFields(id3, idx, null), 'fill');
+			const asked = {};
+			for (const f of ['title', 'who']) if (url.searchParams.has(f)) asked[f] = url.searchParams.get(f).trim().slice(0, 200) || null;
+			if (Object.keys(asked).length) [, record] = await writeRecord(env, key, asked, 'edit');
+			return json({ key, ...idx, seg: idx.seg.length, record });
 		}
 
 		if (p.startsWith('/reindex/') && req.method === 'POST') {
@@ -1014,22 +1572,48 @@ export default {
 			return json({ key, ...idx, seg: idx.seg.length });
 		}
 
-		// One live chunk, as the recorder cuts it. The recorder is the segmenter:
-		// it is already running an ffmpeg against the mount, and a second output
-		// writing ten-second pieces costs it nothing it is not already paying.
-		if (p.startsWith('/live/') && p.endsWith('/append') && req.method === 'POST') {
-			const key = p.slice('/live/'.length, -'/append'.length);
-			const bytes = await req.arrayBuffer();
-			const idx = buildIndex(bytes, 1e9);   // one piece, walked for its true duration
-			const seq = Number(url.searchParams.get('seq') ?? Date.now());
-			const uri = `live/${key}/${String(seq).padStart(6, '0')}.mp3`;
-			await env.MEDIA.put(uri, bytes, { httpMetadata: { contentType: 'audio/mpeg' } });
-			const r = await call(env, '/append', { key, uri: `/media/${uri}`, dur: idx.dur });
-			return json({ ...r, dur: idx.dur, bytes: bytes.byteLength, uri: `/media/${uri}` });
+		// One record, edited by a person or written by a generator. Fields given
+		// replace what is there; a `meta` key set to null is removed.
+		if (p.startsWith('/programmes/') && req.method === 'PUT') {
+			const key = decodeURIComponent(p.slice('/programmes/'.length));
+			if (!key || key.length > 200) return json({ error: 'a programme key is 1 to 200 characters' }, 400);
+			let fields;
+			try { fields = editOf(await req.json()); } catch (e) { return json({ error: e.message }, 400); }
+			const [status, v] = await writeRecord(env, key, fields, 'edit');
+			return json(v, status);
 		}
 
-		if (p.startsWith('/live/') && p.endsWith('/close') && req.method === 'POST') {
-			return json(await call(env, '/close', { key: p.slice('/live/'.length, -'/close'.length) }));
+		// 🔴 THE BACKFILL, FOR WHAT WAS IN THE BUCKET BEFORE RECORDS EXISTED.
+		// Every object with a frame index gets a record from its tags, its index
+		// and the title a running order gives it; every relay and live slot on
+		// any channel gets one from the slot. 'fill' mode throughout, so running
+		// it twice changes nothing and running it after a hand edit undoes none.
+		if (p === '/backfill' && req.method === 'POST') {
+			const slots = new Map();
+			for (const { sched } of await allSchedules(env)) {
+				for (const s of sched.slots || []) {
+					const had = slots.get(s.key);
+					if (!had || (!had.title && s.title)) slots.set(s.key, s);
+				}
+			}
+			const out = [];
+			for (const o of await listAll(env, 'index/')) {
+				const key = o.key.slice('index/'.length, -'.json'.length);
+				const idx = await readIndex(env, key);
+				let id3 = null;
+				try { id3 = await id3Of(env, key); } catch { /* an unreadable head is a record without tags */ }
+				const [status, v] = await writeRecord(env, key, fileFields(id3, idx, slots.get(key)), 'fill');
+				out.push({ status, key, title: v.title, who: v.who, kind: v.kind, duration: v.duration, created: v.created, id3: !!id3 });
+			}
+			for (const s of slots.values()) {
+				if (s.kind !== 'relay' && s.kind !== 'live') continue;
+				const [status, v] = await writeRecord(env, s.key, {
+					kind: s.kind, title: s.title || undefined, who: s.who || undefined,
+					...(s.kind === 'relay' ? { meta: { src: s.src } } : {}),
+				}, 'fill');
+				out.push({ status, key: s.key, title: v.title, who: v.who, kind: v.kind, created: v.created });
+			}
+			return json({ count: out.length, records: out });
 		}
 
 		return json({ error: 'no such route', path: p }, 404);
