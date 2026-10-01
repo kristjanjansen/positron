@@ -247,27 +247,27 @@ here is worth re-checking before a plan is built on it.
   BEFORE the handler on a cold wake, so a `setAlarm()` in it overwrites the
   alarm that is about to fire. Cloudflare documents the resulting livelock,
   where the handler never runs at all. Arming happens where a due time actually
-  changes: on write, and at the end of a fire. (`workers/items/src/index.js`.)
+  changes: on write, and at the end of a fire. (`archive/items/README.md`, from the removed `workers/items/src/index.js`.)
 - **`getAlarm()` RETURNS NULL INSIDE A RUNNING HANDLER, and it means
   "running", not "unscheduled".** Reading it as the latter is how a schedule
   gets silently dropped, so `items` never consults it: it sets
   unconditionally, which is safe because one object has exactly one alarm and
   setting replaces. **Never schedule in the past** either: an alarm at a time
   already gone fires immediately and re-enters, which is a busy loop wearing a
-  schedule. (`workers/items/src/index.js`.)
+  schedule. (`archive/items/README.md`, from the removed `workers/items/src/index.js`.)
 - 🔴 **THE ALARM HANDLER CATCHES ITS OWN FAILURES RATHER THAN THROWING.**
   Cloudflare retries a throwing alarm about six times over roughly two minutes
   and then NEVER RE-RUNS IT until something calls `setAlarm()` again. Two
   minutes is nothing against an upstream outage, and the failure is silent: the
   schedule simply stops. So anything that can fail is caught, and the alarm is
-  re-armed before returning either way. (`workers/items/src/index.js`.)
+  re-armed before returning either way. (`archive/items/README.md`, from the removed `workers/items/src/index.js`.)
 - **An object that is first reached without its name stores the wrong one for
   ever, and the two diagnoses look identical from outside.** An `items` object
   first reached with no `?room=` stores `default` and then silently refuses to
   announce for ever, while every row it holds reads `announced_at: null` and
   looks like a failed send. Those are opposite diagnoses and they were
   indistinguishable until `/stats` reported the name the object remembers and
-  whether it may announce. (`workers/items/src/index.js`.)
+  whether it may announce. (`archive/items/README.md`, from the removed `workers/items/src/index.js`.)
 - ⚠️ **A DO STORAGE VALUE CAPS AT 128 KiB.** `pub`'s ring of device reports is
   `LOG_KEEP` 400 by `LOG_MAX_BODY` 2000, which is 800 KB in the worst case, so
   a busy device could make every write throw, which would look exactly like the
@@ -1415,12 +1415,12 @@ From `workers/view/analytics.mjs` and `workers/wish/src/index.js`.
   move into the Worker unchanged instead of being written a second time. ⚠️
   **THE PEM'S NEWLINES**: a secret read from an env var keeps its literal `\n`
   escapes, and `importKey` then fails with an opaque DataError that never
-  mentions newlines. (`workers/items/src/index.js`.)
+  mentions newlines. (`archive/items/README.md`, from the removed `workers/items/src/index.js`.)
 - ⚠️ **`results: [{}]` IS SUCCESS** from the FCM Instance ID API: an empty
   object per token is what it returns when it worked, and a failure carries an
   `error` key. Reading "empty" as "nothing happened" would report a working
   subscription as a broken one. ⚠️ **AND EVERY VALUE IN AN FCM DATA PAYLOAD
-  MUST BE A STRING**: FCM refuses nested objects. (`workers/items/src/index.js`.)
+  MUST BE A STRING**: FCM refuses nested objects. (`archive/items/README.md`, from the removed `workers/items/src/index.js`.)
 - ⚠️ **CLOUDFLARE RETRIES A FAILING `email` HANDLER THREE TIMES BEFORE BOUNCING
   THE SENDER**, so a grader that throws costs three invocations and a bounce.
   Wrap it, and report a failure to grade as a failure to grade.

@@ -687,9 +687,10 @@ for (const t of targets) {
    * room name is read by somebody looking at a store wondering what all these
    * rows are, and `items-test-4f2a` answers that where `v-items-4f2a` needs a
    * footnote. It also cannot be mistaken for the real room by a rule that has to
-   * tell them apart: `workers/items` will only announce from the room named
-   * `items`, because one FCM topic means one room may use it — a harness room
-   * that reached real phones is exactly how this came up.
+   * tell them apart: `workers/items` only announced from the room named
+   * `items` (archived 2026-10-01, `archive/items/README.md`), because one FCM
+   * topic means one room may use it — a harness room that reached real phones
+   * is exactly how this came up.
    */
   const own = t.room === 'fixed' ? '' : `room=${t.name}-test-${Math.random().toString(36).slice(2, 8)}`;
   // 🔴 THE HARNESS SAYS SO, SO A PAGE CAN KEEP ITS DESTRUCTIVE CHECKS OUT OF A

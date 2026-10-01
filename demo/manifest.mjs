@@ -115,25 +115,11 @@ export const DEMOS = [
   { name: 'cues', group: 'messages', act: 2, created: '2026-09-04', built: true,
     one: 'one press here and every open copy of this page shows the same cue name at the same moment',
     tags: ['DO', 'WS', 'relay'] },
-  // Act 2 with `cues` and for the same reason — one act reaching everybody —
-  // but on a delay instead of at once, and out to phones rather than to open
-  // tabs. The claim it demonstrates is that a store can wake AT a time from the
-  // same object that holds the state deciding it, with no machine polling in
-  // between, so `settleMs` has to cover the whole demonstration. It is carried
-  // by `Publish now`, which is control 0 and the only control the harness gives
-  // this budget to: it publishes at once and hands its item a moment four
-  // seconds out to put itself away at, which is the unattended wake. About five
-  // seconds of work, and the ten-second button asserts only what is true
-  // immediately, because an assert made behind that wait would never be read.
-  //
-  // ⚠️ IT IS ALSO THE ONE INSTALLABLE PAGE HERE, AND ONLY THIS ONE. Its
-  // manifest and its service worker are scoped to `/items/`; positron.studio is
-  // deliberately not a progressive web app, because a site-wide worker is a
-  // cache and this project's whole debugging discipline rests on the BUILD
-  // stamp saying which build is live.
-  { name: 'items', group: 'vain', act: 2, created: '2026-09-14', built: true, settleMs: 11000,
-    one: 'write an item. At the moment you named, it publishes itself and tells the phones',
-    tags: ['DO', 'alarms', 'push', 'PWA'] },
+  // `items` was a demo and is archived at archive/items/README.md, removed
+  // 2026-10-01 on instruction. It wrote an item, let a Durable Object alarm
+  // publish it at the moment named, and told installed phones over FCM. Its
+  // store and its push moved to the eccm repository, as plain Web Push.
+
   // The demo ABOUT the socket, rather than one that happens to use it: the
   // message shape written down, the exact bytes shown both ways, and the
   // history the relay refuses to keep. settleMs covers asking the recorder to

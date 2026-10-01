@@ -638,7 +638,8 @@ was obvious to nobody, asked in those words: *"What is v- prefix?"*. A room name
 is read by somebody looking at a store wondering what all these rows are, and
 `items-test-4f2a` answers that where `v-items-4f2a` needs a footnote. It also
 cannot be mistaken for the real room by a rule that has to tell them apart:
-`workers/items` will only announce from the room named `items`, and **a harness
+`workers/items` only announced from the room named `items` (archived
+2026-10-01, `archive/items/README.md`), and **a harness
 room that reached real phones is exactly how that came up.**
 ⚠️ **TWO ROOMS ARE NOT LIKE THAT AND MUST NOT BE OVERRIDDEN.** `room: 'fixed'`
 in the manifest means the name is not a rendezvous the page invented, it is the
