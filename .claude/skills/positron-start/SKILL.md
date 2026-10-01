@@ -1025,8 +1025,8 @@ Nearly every Worker binds a **Durable Object**; several add **R2**; exactly one
 uses **Containers** and one uses **Workers AI**. That distribution is the design.
 
 1. **ONE WORKER PER CAPABILITY, NAMED FOR WHAT IT IS.** Not a monolith, not
-   microservices with a service mesh: `view` serves the pages, `items` holds
-   items, `mail` reads mail, `pub` runs ffmpeg. A reader can guess which one to
+   microservices with a service mesh: `view` serves the pages, `store` keeps
+   the relay's history, `mail` reads mail, `pub` runs ffmpeg. A reader can guess which one to
    open, and any of them can be deployed without the others.
 2. **A DURABLE OBJECT IS A ROOM, AND THE ROOM IS ALSO THE DATABASE.**
    `idFromName(room)` per room, SQLite inside it, and therefore **no second

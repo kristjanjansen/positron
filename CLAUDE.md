@@ -417,12 +417,12 @@ claims in it were verified today.
 
 ## One shared resource with everything around it partitioned
 
-🔴 **ONE FCM TOPIC MEANS ONE ROOM MAY USE IT.** `workers/items` gives every room
-its own Durable Object — `idFromName(room)` — and `verify.mjs` gives every run
-its own room, so runs cannot see each other's rows. The one thing that was NOT
+🔴 **ONE FCM TOPIC MEANS ONE ROOM MAY USE IT.** `workers/items` (archived
+2026-10-01, `archive/items/README.md`) gave every room its own Durable Object
+— `idFromName(room)` — and `verify.mjs` gives every run its own room, so runs cannot see each other's rows. The one thing that was NOT
 partitioned was `env.FCM_TOPIC`, so **every run of the suite sent two real
 notifications to every real subscriber**, for a day, before anyone outside said
-so. Announcing is an allowlist of ONE room now (`items`) — ⚠️ not a prefix test,
+so. Announcing became an allowlist of ONE room (`items`) — ⚠️ not a prefix test,
 because refusing rooms that LOOK like test rooms lets the next non-real room
 through by default and the default has to be silence. ⚠️ The object has to be
 TOLD its own room and remember it: the alarm fires with no request, and

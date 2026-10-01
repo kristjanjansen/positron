@@ -1,5 +1,15 @@
 ## Open
 
+### Done 2026-10-01: `/items/` archived, its knowledge kept as markdown
+
+*"discard items demo from ../positron, keep the knowledge in .md's"*. Removed
+`demo/items/` and `workers/items/`; the row is out of `demo/manifest.mjs`, so
+the next build drops `/items/` from the deploy. Every lesson the comments
+carried is in `archive/items/README.md`, by topic. The infrastructure lives on
+in the eccm repository as plain Web Push with VAPID. ⚠️ The Worker
+`positron-items` is still deployed at `items.positron.studio`, with its
+`FIREBASE_SA` secret; deleting it is a separate decision.
+
 ### Done 2026-09-30: `/away/` on the instrument panel, with a patch selector
 
 *"use instument panel for away and patch selector"*. Slug `away`; touches
