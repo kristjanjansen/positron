@@ -2,6 +2,7 @@
 //
 //   node demo/fake-err.mjs                     # :8902, three channels
 //   node demo/fake-err.mjs --port 9300
+//   node demo/fake-err.mjs --radio             # and the radio channels over HLS, for /station/'s relay slot
 //
 // Then open either page against it:
 //   http://127.0.0.1:8890/now/?base=http://127.0.0.1:8902
@@ -245,6 +246,94 @@ function makeTone() {
   return readFileSync(TONE);
 }
 
+// ── the radio channels as live.err.ee serves them ──────────────────────────
+
+/**
+ * 🔴 AUDIO-ONLY HLS, THE SHAPE ERR'S RADIO HAS ON live.err.ee, FOR THE STATION'S
+ * RELAY SLOT. `research/err-live-feeds-2026-08.md` measured it: a master per
+ * channel that mints a session `?id=` and lists AAC rungs at 70, 130 and 260
+ * kbit/s, a variant that answers 400 without that id, MPEG-TS segments of
+ * exactly 1.92 s (90 AAC frames at 48 kHz) and a two hour window, 3750 of them.
+ * All of that is reproduced so `workers/station`'s relay can be built and run
+ * with zero requests to ERR.
+ *
+ * ⚠️ OFF UNLESS ASKED FOR (`--radio`, or `startErr({ radio: true })`). It is a
+ * second pool, about half a minute to build once, and `/now/` and `/flipper/`
+ * do not need it, so their harness runs do not pay for it.
+ * ⚠️ IT GRADES OUR CODE AND NOTHING ELSE, the same as everything in this file.
+ * Every rung is the same pool at 32 kbit/s mono; only the BANDWIDTH labels differ.
+ */
+const RADIO_SEG_MS = 1920;
+const RADIO_N = 3750;                      // 2 h, which is what ERR advertises
+const RADIO_POOL = join(CACHE, `radio-1920ms-${RADIO_N}`);
+const RADIO_RUNGS = [70000, 130000, 260000];
+
+function makeRadioPool(say) {
+  const have = (d) => existsSync(d) && readdirSync(d).filter((f) => f.endsWith('.ts')).length >= RADIO_N;
+  if (have(RADIO_POOL)) return true;
+  const tmp = `${RADIO_POOL}.building-${process.pid}`;
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true });
+  say(`building 2 h of radio once, about half a minute, in ${RADIO_POOL}`);
+  try {
+    // A tone with a slow swell, 550 Hz, so it is never mistaken for the
+    // station's own 220/330/440 Hz test programmes when somebody listens.
+    execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y',
+      '-f', 'lavfi', '-i', `sine=frequency=550:duration=${(RADIO_N * RADIO_SEG_MS) / 1000}`,
+      '-af', 'tremolo=f=0.5:d=0.6',
+      '-c:a', 'aac', '-b:a', '32k', '-ar', '48000', '-ac', '1',
+      '-f', 'hls', '-hls_time', String(RADIO_SEG_MS / 1000), '-hls_list_size', '0',
+      '-hls_segment_filename', join(tmp, 'r-%05d.ts'), join(tmp, 'pool.m3u8')],
+    { timeout: 10 * 60 * 1000 });
+  } catch (e) {
+    console.error('the radio pool needs ffmpeg, and ffmpeg did not run:');
+    console.error(`  ${String(e.message).split('\n')[0]}`);
+    rmSync(tmp, { recursive: true, force: true });
+    return false;
+  }
+  if (!have(tmp)) {
+    rmSync(tmp, { recursive: true, force: true });
+    console.error(`ffmpeg wrote fewer than ${RADIO_N} radio segments; not serving a window with a hole in it`);
+    return false;
+  }
+  rmSync(RADIO_POOL, { recursive: true, force: true });
+  renameSync(tmp, RADIO_POOL);
+  return true;
+}
+
+/** The newest complete radio segment; `sn * 1920` ms is when it began. */
+function radioEdge(atMs = Date.now()) {
+  const latest = Math.floor(atMs / RADIO_SEG_MS) - 1;
+  return { latest, first: latest - RADIO_N + 1 };
+}
+
+function radioMaster(mount) {
+  // A fresh session on every ask, fifteen digits, the way ERR mints one.
+  const id = String(Math.floor(1e14 + Math.random() * 9e14));
+  const out = ['#EXTM3U', '#EXT-X-VERSION:7', '#EXT-X-INDEPENDENT-SEGMENTS'];
+  for (const bw of RADIO_RUNGS) {
+    out.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bw},CODECS="mp4a.40.2"`, `${mount}/a${bw}.m3u8?id=${id}`);
+  }
+  out.push('');
+  return out.join('\n');
+}
+
+function radioMedia(now = Date.now()) {
+  const { first, latest } = radioEdge(now);
+  const out = ['#EXTM3U', '#EXT-X-VERSION:7',
+    `#EXT-X-TARGETDURATION:${Math.ceil(RADIO_SEG_MS / 1000)}`,
+    `#EXT-X-MEDIA-SEQUENCE:${first}`,
+    `#EXT-X-DISCONTINUITY-SEQUENCE:${Math.floor(first / RADIO_N)}`,
+    '#EXT-X-INDEPENDENT-SEGMENTS',
+    `#EXT-X-PROGRAM-DATE-TIME:${iso(first * RADIO_SEG_MS)}`];
+  for (let sn = first; sn <= latest; sn++) {
+    if (sn !== first && sn % RADIO_N === 0) out.push('#EXT-X-DISCONTINUITY');
+    out.push(`#EXTINF:${(RADIO_SEG_MS / 1000).toFixed(6)},`, `r-${sn}.ts`);
+  }
+  out.push('');
+  return out.join('\n');
+}
+
 // ── where the live edge is, right now ──────────────────────────────────────
 
 /**
@@ -393,8 +482,9 @@ function schedule(dayDate) {
  *
  * Returns the server, or `null` when there is no picture to serve.
  */
-export function startErr({ port = 8902, quiet = false } = {}) {
+export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
   const say = (...a) => { if (!quiet) console.log(...a); };
+  const radioHls = radio && makeRadioPool(console.log);
   // ⚠️ THE BUILD NOTICE IGNORES `quiet`, AND THAT IS NOT AN OVERSIGHT. Making
   // the pool blocks for about a minute the first time on a machine, and a
   // harness that goes silent for a minute before Chrome even starts is
@@ -450,6 +540,31 @@ export function startErr({ port = 8902, quiet = false } = {}) {
     }
 
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
+
+    // ── the radio channels over HLS, when asked for ────────────────────────
+    if (radioHls) {
+      const rm = /^\/live\/([a-z0-9]+)\.m3u8$/.exec(path);
+      if (rm && MOUNTS.includes(rm[1])) return text(res, radioMaster(rm[1]), 'application/vnd.apple.mpegurl');
+      const rv = /^\/live\/([a-z0-9]+)\/a\d+\.m3u8$/.exec(path);
+      if (rv && MOUNTS.includes(rv[1])) {
+        // What ERR answers a variant asked for without the master's session.
+        if (!/^\d{15}$/.test(url.searchParams.get('id') || '')) {
+          res.writeHead(400, { ...CORS, 'content-type': 'text/plain' });
+          return res.end('Failed to set session: not found\n');
+        }
+        return text(res, radioMedia(), 'application/vnd.apple.mpegurl');
+      }
+      const rs = /^\/live\/([a-z0-9]+)\/r-(\d+)\.ts$/.exec(path);
+      if (rs && MOUNTS.includes(rs[1])) {
+        const sn = Number(rs[2]);
+        const { first, latest } = radioEdge();
+        if (sn < first || sn > latest) {
+          res.writeHead(404, { ...CORS, 'content-type': 'text/plain' });
+          return res.end('not in the window\n');
+        }
+        return serveFile(req, res, join(RADIO_POOL, `r-${String(sn % RADIO_N).padStart(5, '0')}.ts`), 'video/mp2t');
+      }
+    }
 
     // ── the playlists ──────────────────────────────────────────────────────
     const master = /^\/live\/([a-z0-9]+)\.m3u8$/.exec(path);
@@ -549,7 +664,7 @@ function serveMount(req, res, tone, say) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const argv = process.argv.slice(2);
   const port = Number(argv[argv.indexOf('--port') + 1]) || 8902;
-  const server = startErr({ port });
+  const server = startErr({ port, radio: argv.includes('--radio') });
   if (!server) process.exit(1);
   server.on('listening', () => {
     const p = server.address().port;

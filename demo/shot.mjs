@@ -5,6 +5,7 @@
 //   node demo/shot.mjs kit --hash instrument-panel
 //   node demo/shot.mjs kit --base https://positron.studio
 //   node demo/shot.mjs kit --clip 2400          # stop the capture 2400 px down
+//   node demo/shot.mjs station --query base=http://127.0.0.1:8799   # a page's own query, e.g. a local worker
 //
 // 🔴 IT EXISTS BECAUSE THIS PROJECT CANNOT SEE ITS OWN PHONE LAYOUTS, AND THAT
 // IS WRITTEN DOWN IN THREE PLACES AS A KNOWN HOLE RATHER THAN AS A THING
@@ -81,12 +82,15 @@ const slug = bare.find((a) => !/^\d+$/.test(a));
 const widths = bare.filter((a) => /^\d+$/.test(a)).map(Number);
 const BASE = flag('base', process.env.DEMO_BASE || 'http://127.0.0.1:8890');
 const HASH = flag('hash', '');
+// The page's query string, without the `?`. Kept out of the file name, so a
+// URL in it cannot turn into directories.
+const QUERY = flag('query', '');
 const CLIP = Number(flag('clip', 0)) || 0;
 const WAIT = Number(flag('wait', 2500));
 const OUT = flag('out', 'tmp/shots');
 
 if (!slug) {
-  console.error('usage: node demo/shot.mjs <slug> [width ...] [--base URL] [--hash id] [--clip px] [--wait ms] [--out dir]');
+  console.error('usage: node demo/shot.mjs <slug> [width ...] [--base URL] [--query k=v] [--hash id] [--clip px] [--wait ms] [--out dir]');
   process.exit(2);
 }
 
@@ -170,7 +174,7 @@ for (const w of (widths.length ? widths : WIDTHS)) {
   // pass succeeded. MEASURED on the first run of this file.
   await S('Emulation.setTouchEmulationEnabled', mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
 
-  const url = `${BASE}/${slug}/${HASH ? `#${HASH}` : ''}`;
+  const url = `${BASE}/${slug}/${QUERY ? `?${QUERY}` : ''}${HASH ? `#${HASH}` : ''}`;
   await S('Page.navigate', { url });
   await sleep(WAIT);
   if (HASH) {
