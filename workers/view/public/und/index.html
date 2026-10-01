@@ -7,9 +7,27 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  textarea { width: 100%; min-height: 150px; background: #0d1117; color: var(--fg);
-             border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px;
-             font: 500 11.5px/1.65 var(--mono); resize: vertical; margin: 0 0 8px; }
+  /* 🔴 THE SCORE BOX IS THE KIT'S CODE BOX SINCE 2026-09-30
+     (`demo/shell/code-box.mjs`, `plans/plan-code-editor.md`), coloured as a
+     Csound score. It was a hand-built textarea at 11.5 px, weight 500, line
+     height 1.65, and it now wears the kit field's 12.5 px mono face, which is
+     a visible change and a deliberate one: a second copy of a text box is the
+     drift `field.mjs` exists to end. Its height is still the score's own line
+     count, handed over as `rows`, with the compile note's reserve under it.
+     `--well` is the box's ground, read by the box and the note alike, and is
+     this page's darker one as before. */
+  .und-editor { --well: #0d1117; }
+  /* 🔴 EACH LINE IN THE COLOUR OF THE LANE THAT DRAWS IT. Asked 2026-09-30,
+     *"can you mathc lane colors and code colors somehow"*: an `i` line is an
+     event tick, a `t` line is the tempo curve, an `m` or `n` line is a part
+     bar, and `code-lang.mjs` tags every coloured token with its line's kind.
+     The inks are the strip's own, set from `INK` and `DERIVED` below so there
+     is one source, and lifted towards their bright end only as far as text on
+     this ground needs: the event ticks are `INK.off` until they sound and
+     `INK.on` when they do, so their text sits between the two. */
+  .und-editor .pos-ln-event { color: color-mix(in oklab, var(--ln-on) 70%, var(--ln-off)); }
+  .und-editor .pos-ln-part, .und-editor .pos-ln-tempo { color: color-mix(in oklab, var(--ln-derived) 80%, #fff); }
+  .und-editor .pos-tk-carry[class*="pos-ln-"] { opacity: .7; }
   /* the compiled document, one record per line — 04's block, scrolled rather
      than padded, because a typed score has no fixed length */
   .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
@@ -40,6 +58,8 @@
   // except the last, which seeks. That one left the playhead parked inside the
   // repeat on arrival, so the page opened somewhere nobody had asked to be.
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
 
   // A WRITTEN SCORE, MADE SEEKABLE — demo/notes/uuu-positron.md §3, on the
   // container 04 introduces. vClick conducts an ensemble from a Csound score,
@@ -89,23 +109,25 @@
   ].join('\n');
 
   const d = mount({
-    name: 'sound',
-    what: 'A Csound score, compiled as you type. Csound counts in beats, not '
-      + 'seconds, so a slowing tempo spaces evenly numbered beats unevenly in '
-      + 'time; part 2 is part 1 again played slower, and dropping the playhead '
-      + 'anywhere still gives an exact count of what has sounded.',
+    name: 'und',
+    // 🔴 ONE SENTENCE SINCE 2026-09-30, when the page stopped compiling on
+    // every pause of 400 ms and took the kit's idle compile. It was three.
+    what: 'A Csound score that compiles whenever you stop typing and plays '
+      + 'every note where its slowing tempo puts it, even after a jump into the repeat.',
     readout: { rows: '', uses: '', bend: 'ms', beat: '', fold: '', sounded: '' },
     // the numbers sit under the lane that owns them; this row would repeat them
     // with less context. Still published for CDP.
     showReadout: false,
-    controls: [
-      { id: 'sound', label: 'Play with sound', primary: true },
-    ],
+    // 🔴 NO CONTROL ROW SINCE 2026-09-30, asked as *"play button in
+    // strapsport should automatiically play with sound, rm 'play woth sound'
+    // button"*. The transport bar's own play opens the sound, below.
   });
   guard(d);
 
 
-  // ── ink: one hue per part, the same in the strip and in the document ─────
+  // ── ink: the part is slate in the strip and in the document (since
+  // 2026-09-30, it was yellow), and yellow is kept for a note that has
+  // SOUNDED, with its dim twin for one that has not yet ─────────────────────
   const INK = { on: '#ffd400', off: '#6b5a12' };
   const DERIVED = '#6f7d94';        // 02 and 03's slate: shown, never measured
 
@@ -118,12 +140,44 @@
   const plays = new Map();
   let sounded = 0, ctx = null, soundAsserted = false;
 
-  const ta = el('textarea', '', DEFAULT_SCORE, { spellcheck: 'false' });
-  d.el.append(ta);
+  const code = createCodeBox({
+    language: 'csound-sco',
+    rows: DEFAULT_SCORE.split('\n').length,
+    value: DEFAULT_SCORE,
+    ariaLabel: 'the Csound score this page compiles',
+  });
+  const ta = code.input;
+  // The host is the box the compile note sits in the corner of. See below.
+  const editor = code.el;
+  editor.classList.add('und-editor');
+  editor.style.setProperty('--ln-on', INK.on);
+  editor.style.setProperty('--ln-off', INK.off);
+  editor.style.setProperty('--ln-derived', DERIVED);
+  d.el.append(editor);
   const warnEl = el('div', 'warn');
   d.el.append(warnEl);
 
-  createTransportBar(d.el, parent, { scrub: false });
+  /* 🔴 THE BAR'S PLAY IS THE SOUND'S GESTURE SINCE 2026-09-30. `command.play`
+     runs inside the click (or the space bar), so the AudioContext is made and
+     resumed in the gesture a browser asks for, and then the deck plays. The
+     resume is NOT awaited: a context resumed outside a gesture neither
+     resolves nor rejects, it waits, and awaiting it left the deck unbuilt
+     while the page looked fine. The sound may be late; the timeline is not. */
+  let playOpened = false;
+  createTransportBar(d.el, parent, { scrub: false,
+    command: { play: () => {
+      openAudio();
+      /* ⚠️ GRADED ON THE FIRST PRESS, INSIDE IT. Before 2026-09-30 a
+         `Play with sound` button did this and the harness pressed it; that
+         control is gone, so the claim is read where it now lives. */
+      if (!playOpened) {
+        playOpened = true;
+        d.assert('the transport\u2019s own play opens the sound inside its press, with no second button',
+          ctx !== null && bus !== null && ctx.state !== 'closed' && !d.el.querySelector('.pos-controls button'),
+          `context ${ctx?.state}, voice bus ${bus ? 'built' : 'missing'}`);
+      }
+      parent.play();
+    } } });
 
   const pre = el('pre', 'sc');
 
@@ -148,8 +202,12 @@
   const view = createStripView(d.el, parent, {
     size: 'auto', follow: false, gutter: 150,
     lanes: [
+      /* 🔴 SLATE, NOT YELLOW, SINCE 2026-09-30: *"make pat lane less yellow,
+         use same color as csound score in other demo"*, which is `/click/`'s
+         `words` lane, `#6f7d94`, already this page's DERIVED. Yellow stays on
+         what is lit NOW: a sounded note and the current line. */
       { id: 'deck-span', kind: 'deck-span', label: 'part', height: 46, barPad: 7,
-        as: 'spans', stack: false, barGap: 3, terse: true, color: INK.on,
+        as: 'spans', stack: false, barGap: 3, terse: true, color: DERIVED,
         // Each use measured THROUGH THE TEMPO MAP, so a part that falls under
         // the ramp draws wider than the one that does not — which is the whole
         // point and used to be invisible, because both were drawn from the
@@ -170,7 +228,7 @@
         describeRow: (r) => {
           const p = r.payload || {};
           const line = lineOfUse.get(p.use);
-          return [`${p.use} · ${Math.round(p.durMs)} ms`,
+          return [`${p.use}, ${Math.round(p.durMs)} ms`,
                   line === undefined ? 'a use' : `line ${line}`];
         } },
       { id: 'rows', kind: 'note', label: 'event', height: 42, width: 2, as: 'ticks',
@@ -183,7 +241,7 @@
           const p = r.payload || {};
           const line = lineOfRow.get(p.row);
           const n = plays.get(p.row) || 0;
-          return [`line ${line} · beat ${Math.round(p.beat * 100) / 100}`,
+          return [`line ${line}, beat ${Math.round(p.beat * 100) / 100}`,
                   n ? `played ${n}x` : 'not played yet'];
         } },
       // THE TEMPO, AND IT IS DERIVED. The map is a function; sampling it into
@@ -240,20 +298,69 @@
     if (i !== undefined) setState(i, 'now');
   }
 
-  /** One short tone per row, so a seek is audible as well as assertable. */
+  /**
+   * 🔴 A WARMER VOICE SINCE 2026-09-30, AND THE ONSET IS STILL A CLICK'S.
+   * Asked as *"make und nicer-sounding"*. It was one triangle, 8 ms up and gone
+   * by 280 ms, straight into the speakers. Now two sawtooths 7 cents either
+   * side of the note, through a lowpass that opens bright and closes over the
+   * note, a decay of about a second, and a short room made in the page.
+   * ⚠️ THE ATTACK STAYS 4 ms. This page's claim is WHERE each note lands under
+   * a changing tempo, and a soft attack would smear exactly the instant being
+   * claimed, so everything warmer happens after the onset.
+   * ⚠️ THE ROOM IS NOISE WITH A DECAY WRITTEN INTO A BUFFER, NO FETCH. An
+   * impulse off a server would be a visit costing somebody a request.
+   * ⚠️ QUIET ON PURPOSE: 0.09 a voice into a bus at 0.7 and a compressor at
+   * -10 dB, because the repeat under the ramp overlaps notes and eight
+   * sawtooths summed at the old 0.2 would clip.
+   */
+  let bus = null;
+  function openAudio() {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume().catch(() => {});
+    if (bus) return;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -10; comp.ratio.value = 4;
+    comp.connect(ctx.destination);
+    bus = ctx.createGain();
+    bus.gain.value = 0.7;
+    bus.connect(comp);
+    const room = ctx.createConvolver();
+    const len = Math.round(ctx.sampleRate * 1.1);
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const ch = ir.getChannelData(c);
+      for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+    room.buffer = ir;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.22;
+    bus.connect(room); room.connect(wet); wet.connect(comp);
+  }
+
+  /** One note per row, so a seek is audible as well as assertable. */
   function voice(p) {
-    if (!ctx) return;
+    if (!ctx || !bus) return;
     const freq = Number(p[4]);
     if (!Number.isFinite(freq) || freq <= 0) return;
     const t = ctx.currentTime;
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = 'triangle';
-    o.frequency.value = freq;
+    const g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 0.8;
+    lp.frequency.setValueAtTime(Math.min(freq * 8, 9000), t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.5, 300), t + 0.6);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.2, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-    o.connect(g); g.connect(ctx.destination);
-    o.start(t); o.stop(t + 0.3);
+    g.gain.linearRampToValueAtTime(0.09, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.03, t + 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    lp.connect(g); g.connect(bus);
+    for (const cents of [-7, 7]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = freq;
+      o.detune.value = cents;
+      o.connect(lp);
+      o.start(t); o.stop(t + 1.15);
+    }
     sounded++;
     d.set('sounded', sounded, 'ok');
     // Asserted WHEN THE EVIDENCE ARRIVES, not at load: at load nothing has
@@ -360,7 +467,8 @@
     lineEls = LINES.map((text, i) => {
       const rec = JSON.parse(text);
       const row = el('span', 'sc-l');
-      if (rec.t === 'row' || rec.t === 'part' || rec.t === 'use') row.style.borderLeftColor = INK.on;
+      // the part's hue, the same as its lane in the strip (slate since 2026-09-30)
+      if (rec.t === 'row' || rec.t === 'part' || rec.t === 'use') row.style.borderLeftColor = DERIVED;
       if (rec.t === 'row') lineOfRow.set(rec.id, i);
       else if (rec.t === 'use' && rec.id) lineOfUse.set(rec.id, i);
       row.append(el('span', 'sc-n', String(i).padStart(2, ' ') + '  '),
@@ -435,11 +543,24 @@
     return true;
   }
 
-  // compile as you type, debounced — the document is the output of the editor
-  let typing = null;
-  ta.addEventListener('input', () => {
-    clearTimeout(typing);
-    typing = setTimeout(() => { if (compile()) d.log(`recompiled · ${part.rows.length} rows`); }, 400);
+  // ── compiling what was typed, once the typing stops ─────────────────────
+  // 🔴 THE KIT'S IDLE COMPILE SINCE 2026-09-30, the same module `/fau/` uses
+  // (*"unify compilation in ui logic on this and fau"*). It replaces this
+  // page's own 400 ms timer and its log-only `recompiled` line: the module
+  // waits `IDLE_MS` after the last keystroke, never runs two at once, and
+  // breathes `Compiling` in the box's bottom right corner, then leaves
+  // `Did not compile` standing if the score is refused. The full reason is
+  // still this page's to print, in the warning line under the box.
+  // ⚠️ NO `notNow`. A compile here pauses the deck and rebuilds it, which is
+  // what it always did; there is no held note to take away.
+  const idle = createCompileIdle({
+    input: ta,
+    host: editor,
+    compile: () => {
+      if (!compile()) return { ok: false, error: warnEl.textContent };
+      d.log(`recompiled, ${part.rows.length} rows`);
+      return { ok: true };
+    },
   });
 
   setInterval(() => {
@@ -450,15 +571,6 @@
     d.set('fold', fold && Number.isFinite(fold.count) ? fold.count : '');
   }, 200);
 
-  d.on('sound', () => {
-    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-    // NOT awaited. A context created without a gesture starts suspended and
-    // resume() then neither resolves nor rejects — it waits. Awaiting it left
-    // the deck unbuilt while the page looked fine.
-    ctx.resume().catch(() => {});
-    parent.play();
-    d.log('playing with sound', 'hi');
-  });
 
   // No "jump into the repeat" button. Seeking into the score IS this page's
   // claim, but the button only did by hand what two asserts already do on
@@ -512,7 +624,7 @@
     const stretch = naive === null ? null : Math.round(late.at - naive);
     d.assert('every note is scheduled where the tempo map puts it', worst < 2,
       `worst ${worst.toFixed(2)} ms`
-      + (stretch === null ? '' : ` · the repeat is stretched ${stretch} ms, not merely moved`));
+      + (stretch === null ? '' : `, the repeat is stretched ${stretch} ms, not merely moved`));
   }
 
   d.assert('the deck spans the score', parent.range[1] > 0
@@ -542,13 +654,68 @@
   // page opened with the line already halfway through the second pass, for a
   // reason no visitor could see. The strip is a position surface and the
   // paragraph says so; dragging there is theirs.
+  // ── the idle compile, graded by typing into the real box ────────────────
+  // 🔴 BEFORE `ready` AND AWAITED, AND THAT IS NOT CAUTION. A compile pauses
+  // the deck, and `demo/verify.mjs` presses the transport's play after the
+  // page says it is ready and asserts the position moved. A compile landing
+  // inside that drill would stop it and take the drill red on a page doing
+  // what it should. So the typing happens first and costs the boot about
+  // 1.6 s, well inside the harness's wait for `ready`.
+  // ⚠️ TWO EDITS CLOSER THAN `IDLE_MS`, then ONE compile, and the rows it
+  // produced are the SECOND edit's: the count is what says the last text won.
+  if (SELFCHECK) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const typeInto = (text) => { ta.value = text; ta.dispatchEvent(new Event('input', { bubbles: true })); };
+    const rows0 = part.rows.length, runs0 = idle.runs();
+    typeInto(`${DEFAULT_SCORE}\ni 1 20   0.5  8000 660`);
+    await sleep(200);
+    typeInto(`${DEFAULT_SCORE}\ni 1 20   0.5  8000 660\ni 1 21   0.5  8000 550`);
+    await sleep(IDLE_MS / 2);
+    d.assert('typing compiles nothing while it goes on, and the corner stays empty until a compile starts',
+      idle.runs() === runs0 && idle.state() === 'due' && idle.shown() === '',
+      `${idle.runs() - runs0} compiles ${IDLE_MS / 2} ms after the last keystroke, ${idle.state()}, note "${idle.shown()}"`);
+    await sleep(IDLE_MS / 2 + 150);
+    const anim = getComputedStyle(idle.el).animationName;
+    d.assert('once the typing pauses the score compiles once, as it stood at the last keystroke, under a breathing Compiling note',
+      idle.runs() === runs0 + 1 && part.rows.length === rows0 + 2
+        && idle.shown() === NOTE_SAYS.compiling && anim === 'pos-cnote-breathe' && idle.el.tagName !== 'BUTTON',
+      `${idle.runs() - runs0} compile, ${rows0} rows became ${part.rows.length}, note "${idle.shown()}" ${anim}`);
+    await idle.settled();
+    d.assert('and then the note is gone, not drawn at all',
+      idle.shown() === '' && getComputedStyle(idle.el).display === 'none',
+      `"${idle.shown()}", display ${getComputedStyle(idle.el).display}`);
+    // Put the score back the way a visitor finds it, without the note.
+    code.set(DEFAULT_SCORE);
+    compile();
+    // 🔴 THE CODE BOX'S ONE INVARIANT, READ OFF THE RENDERED ELEMENTS: the
+    // coloured layer holds exactly the textarea's text at its metrics, after
+    // two typed edits and a set(). A statement letter on every note line.
+    const cs = (e) => getComputedStyle(e);
+    const PROPS = ['font-size', 'line-height', 'padding-top', 'padding-left', 'white-space'];
+    const differ = PROPS.filter((p) => cs(code.ink).getPropertyValue(p) !== cs(ta).getPropertyValue(p));
+    const letters = code.ink.querySelectorAll('.pos-tk-keyword').length;
+    d.assert('the score is drawn coloured over the box exactly as typed, at the box\u2019s own metrics',
+      code.ink.textContent === ta.value && differ.length === 0 && letters === 10,
+      `${ta.value.length} characters, ${differ.length ? `differs in ${differ.join(' ')}` : 'metrics equal'}, `
+      + `${letters} statement letters`);
+  }
+
   if (SELFCHECK) {
     const rep = structural.repeats[0];
     const use = rep && [...doc.uses]
       .filter((u) => Math.abs(Number(u.in) - rep.inBeat) < 1e-9
                   && Math.abs(Number(u.out) - rep.outBeat) < 1e-9)
       .sort((a, b) => Number(b.at) - Number(a.at))[0];
-    const mid = use ? tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in)) / 2) : null;
+    let mid = use ? tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in)) / 2) : null;
+    /* 🔴 JUST AHEAD OF A NOTE INSIDE THE REPEAT, NOT ON THE BARE MIDPOINT,
+       SINCE 2026-09-30. The harness plays from here for half a second, and the
+       midpoint had no note in that half second, so once `Play with sound`
+       stopped playing ahead of the drill, `notes actually sounded` never
+       fired. 120 ms before the next note, and only where that note is still
+       inside the repeat, so the claim below is unchanged. */
+    const end = use ? tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in))) : null;
+    const next = mid !== null && traceItems.find((x) => x.at > mid && x.at < end);
+    if (next) mid = Math.max(mid, next.at - 120);
     if (mid !== null) parent.seek(mid);
     const pos = parent.position();
     const want = traceItems.filter((x) => x.at <= pos).length;
@@ -557,7 +724,7 @@
       `at ${Math.round(pos)} ms, fold ${got && got.count} of ${want}`);
   }
 
-  d.log('edit the score · t bends the tempo lane, m/n becomes one use');
+  d.log('edit the score and it compiles when you stop, t bends the tempo lane and m/n becomes one use');
   d.ready();
 </script>
 </html>

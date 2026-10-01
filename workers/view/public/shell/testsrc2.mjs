@@ -23,10 +23,11 @@
 // `ff_draw_round_to_sub` is the identity.
 //
 // ⚠️ AND THE CORNER COUNTER IS COVERED, NOT DRAWN, BECAUSE THE CONTAINER COVERS
-// IT. `workers/pub/container/server.mjs` paints `drawbox=x=0:y=0:w=240:h=48`
-// black over testsrc2's own timecode and frame number (asked 2026-09-29 as
-// *"rm top left counters"*). Drawing the VGA font only to paint over it would
-// be work nobody sees, so this paints the same black box and stops.
+// IT. `workers/pub/container/server.mjs` paints a 240x48 box over testsrc2's
+// own timecode and frame number (asked 2026-09-29 as *"rm top left
+// counters"*), red then green at the first bar edge since 2026-09-30. Drawing
+// the VGA font only to paint over it would be work nobody sees, so this paints
+// the same box and stops.
 
 /** The container's cover over testsrc2's own counter, read off `server.mjs`. */
 export const CORNER = { w: 240, h: 48 };
@@ -171,7 +172,13 @@ export function testsrc2Pixels(px, w, h, pts, { rate = 30, corner = true } = {})
   // ── top left: testsrc2 prints a timecode and a frame number here ───────────
   // The container paints them out, so this paints the same box and draws no
   // text. `corner: false` leaves the bars showing instead.
-  if (corner) fill(0, 0, CORNER.w, CORNER.h, 0x000000);
+  // Red then green, split at the first bar edge, as server.mjs paints it since
+  // 2026-09-30. It used to be black.
+  if (corner) {
+    const b1 = rescale(1, w, 6);
+    fill(0, 0, b1, CORNER.h, 0xff0000);
+    fill(b1, 0, CORNER.w - b1, CORNER.h, 0x00ff00);
+  }
   return px;
 }
 

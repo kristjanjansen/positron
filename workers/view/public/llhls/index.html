@@ -63,7 +63,7 @@
 <script type="module">
   import { mount, guard, el, armVideo, playOrPrompt, BUILD } from '/shell/shell.mjs';
   import { llhls, holdPublisher, waitForManifest, watchPresentedFps } from '/shell/live.mjs';
-  import { createPresenceButton, STREAM, STREAM_CAN } from '/shell/presence.mjs';
+  import { createPresenceButton, streamSays, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createTable } from '/shell/table.mjs';
@@ -109,7 +109,7 @@
    * tooltip `presence.mjs` already builds.
    */
   const stream = createPresenceButton({
-    of: '', showName: false, state: 'offline', says: STREAM, can: STREAM_CAN,
+    of: '', showName: false, state: 'offline', says: streamSays('LL-HLS'), can: STREAM_CAN,
     // 🔴 ONE NAME FOR BOTH HALVES. The label a screen reader hears has to name
     // the ACTION, and this button's action changes with its state, so a name
     // that said only `start` would be wrong half the time and would go stale

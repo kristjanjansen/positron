@@ -397,6 +397,7 @@ export function createKeyboard(host, {
   onDown = () => {}, onUp = () => {}, keys: keyOpts = null,
   onPanic = null, onOctave = null, minBase = 24, maxBase = 96, letters = true,
   pad: wantPad = true, sustain: wantSustain = false, onSustain = null,
+  /** `true` offers `Loop`; `'evolution'` builds it withdrawn, for `midi.mjs` to offer */
   loop: wantLoop = false, onLoop = null,
   /** how many takes this keyboard can hold. One is the button on its own; ten is
    *  a number pad driving it. */
@@ -1739,6 +1740,18 @@ export function createKeyboard(host, {
     paintAt();
   }
   paintPad();
+  /**
+   * 🔴 `loop: 'evolution'` BUILDS THE CONTROL AND STARTS IT WITHDRAWN. Asked
+   * 2026-09-30 for every keyboard page: *"enable loop button and fucntioanly on
+   * onscreen keyboar when evolution is connceted"*. The word names what the page
+   * will be watching for and nothing here watches: `midi.mjs` decides whether a
+   * port is the Evolution and calls `offerLoop`, which keeps the division in the
+   * block above, where this file never learns a device name.
+   * ⚠️ WITHDRAWN FIRST BECAUSE THE ANSWER IS NOT KNOWN YET. A control on screen
+   * for the moment it takes `requestMIDIAccess` to resolve and then gone is a
+   * control vanishing under a hand; absent and then offered is one arriving.
+   */
+  if (wantLoop === 'evolution') offerLoop(false);
 
   // ⚠️ `z` AND `x` ARE THE OCTAVE, and they are part of the keyboard for the
   // same reason the pad is: the row `a`..`k` is an octave of notes, and the one

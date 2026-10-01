@@ -545,6 +545,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    beat it and had never run in its life. MEASURED 2026-09-19. */
 @media (max-width: 560px) {
   .pos-readout[data-rows] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* 🔴 FOUR CELLS ARE TWO AND TWO ON A PHONE, NEVER THREE AND ONE. MEASURED
+     2026-09-30 on /collide/, and the same on /knobs/ and /away/: at 375 px
+     the content is 343 px, three `96px` bases fit, and the fourth sat alone
+     on a row of its own. The row rule above counts nothing, it only wraps.
+     ⚠️ ONLY FOUR, ON PURPOSE: six already wrap three and three, five three
+     and two, and a blanket half width would turn a three cell readout into
+     two and one, which is the same defect made new. */
+  .pos-readout:not([data-rows]):has(> :nth-child(4):last-child) > * { flex-basis: calc(50% - 1px); }
 }
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
    nothing until this existed — the row stayed on screen while the page said it
@@ -790,7 +798,7 @@ button.pos-pri[data-busy="1"] {
    ⚠️ BOTH SIDES, AND THAT IS THE HALF THAT IS EASY TO SKIP. Owning the top
    margin as well is what makes the gap EXACTLY the gap: under the old rule a
    neighbour's larger bottom margin collapsed through and won, which is how
-   `/sound/` measured 53.5 px between its field and its transport bar while
+   `/und/` measured 53.5 px between its field and its transport bar while
    every other gap on it read 40.
 
    🔴 THE GAP IS WRITTEN ON THE BLOCK ABOVE IT, AND THE FIRST ATTEMPT PUT IT
@@ -2854,6 +2862,78 @@ button.pos-pg-lab:hover { color: var(--fg); }
   .pos-field, .pos-field.wide { flex: 1 1 100%; }
 }
 
+/* ── the code box (.pos-code), demo/shell/code-box.mjs ────────────────────
+   🔴 THE KIT FIELD'S OWN TEXTAREA, MADE TRANSPARENT, OVER A <pre> OF COLOURED
+   SPANS. A person still types into a real textarea, so undo, IME, the iPhone
+   keyboard, the loupe and every harness path are untouched.
+   `plans/plan-code-editor.md` is the spec and has the measurements.
+   ⚠️ GROW MODE: NEITHER LAYER SCROLLS. The textarea is as tall as its text
+   (`--code-h`, set by the component), the pre is the same height, and ONE
+   wrapper scrolls both, `--code-max` tall, which is `rows` lines. There is
+   nothing to keep in step, so there is no frame of lag and no edge where the
+   two clip differently (plan failure modes 4 to 6).
+   ⚠️ THE BORDER, RADIUS, GROUND AND FOCUS COLOUR ARE ON THE WRAPPER, because
+   inside a scroller the textarea's own bottom edge scrolled away with it
+   (failure mode 7, photographed at 375 on the prototype). It reads `--edge`
+   and `--r`, so a glue flattens it like any other surface, and it paints
+   `--well`, the ground the compile note already reads.
+   ⚠️ THE TEXTAREA RULE MATCHES `.pos-field.tall textarea`'s (0,2,1) AND
+   COMES AFTER IT, the smallest thing that wins. It does not touch padding:
+   the compile note's reserve under the last line is still the textarea's own
+   `padding-bottom`, and the pre copies every metric off the textarea's
+   COMPUTED style in JavaScript, so whatever rule wins there wins here.
+   ⚠️ TOKENS ARE COLOUR ONLY, never weight or style, which can change a
+   glyph's advance and walk every glyph after it off the caret (failure
+   mode 3). No token is `--hi`: the accent is spent on what is chosen or live. */
+/* 🔴 TONED DOWN, AND NO TOKEN IS BLUE, SINCE 2026-09-30. Asked with a crop of
+   `/fau/`: *"can you tone down other code a bit"* and *"import process effect
+   they are all same blue"*. The keyword ink was #7fb6e8, which is hue 207,
+   and the first knob hue is 205: `process` and a knob's `cutoff` were one
+   colour, so the one colour that MEANS something in the box meant nothing.
+   Every token now sits at low chroma, keywords are a neutral step off the
+   text, and the saturated inks belong to the knobs alone. */
+:root {
+  --code-str: #a7b89c; --code-num: #bca9c2; --code-kw: #c3c8d1;
+  --code-cls: #a3bab6; --code-op: #c6b297;
+}
+/* A program fills the row it is in: `.pos-field`'s `flex: 0 1 150px` is a
+   basis for a word, and it held the kit specimen to 148 px. MEASURED. */
+.pos-field.pos-code { width: 100%; flex: 1 1 100%; }
+.pos-code-scroll {
+  position: relative; overflow: auto; max-height: var(--code-max, none);
+  background: var(--well, var(--bg));
+  border: var(--edge); border-color: var(--line2); border-radius: var(--r);
+}
+.pos-code-scroll:has(> textarea:focus-visible) { border-color: var(--hi); }
+.pos-field.pos-code textarea {
+  position: relative; display: block; height: var(--code-h, auto);
+  border: 0; border-radius: 0; background: transparent; resize: none; overflow: hidden;
+  color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--fg);
+}
+.pos-field.pos-code textarea::selection { background: color-mix(in oklab, var(--hi) 28%, transparent); }
+.pos-code-ink {
+  position: absolute; top: 0; left: 0; width: 100%; margin: 0;
+  color: var(--fg2); background: transparent; pointer-events: none; overflow: hidden;
+}
+.pos-tk-comment { color: var(--dim2); }
+.pos-tk-string, .pos-tk-symbol { color: var(--code-str); }
+.pos-tk-number { color: var(--code-num); }
+.pos-tk-keyword { color: var(--code-kw); }
+.pos-tk-builtin, .pos-tk-class { color: var(--code-cls); }
+.pos-tk-lib { color: var(--dim); }
+.pos-tk-compose, .pos-tk-rate, .pos-tk-carry { color: var(--code-op); }
+.pos-tk-key, .pos-tk-label, .pos-tk-env { color: var(--fg2); }
+/* A parameter with a knob: the whole snippet tinted, its name in its hue.
+   `--param-hue` is the knob's own custom property too, so the two read one value.
+   One without a knob has the span and no `data-hue`, and nothing here draws it. */
+.pos-tk-p[data-hue] { background: hsl(var(--param-hue) 72% 62% / .13); border-radius: 2px; }
+.pos-tk-p[data-hue][data-active] { background: hsl(var(--param-hue) 72% 62% / .3); }
+.pos-tk-p[data-hue] .pos-tk-pname { color: hsl(var(--param-hue) 75% 72%); }
+/* and the variable it is bound to, wherever it is used, in the same ink
+   (*"cutoff var should be blue"*), lit with the snippet while its knob is held */
+.pos-tk-pvar[data-hue] { color: hsl(var(--param-hue) 75% 72%); border-radius: 2px; }
+.pos-tk-pvar[data-hue][data-active] { background: hsl(var(--param-hue) 72% 62% / .3); }
+
 /* ── feedback ─────────────────────────────────────────────────────────────
    demo/shell/feedback.mjs. A button beside every demo's title and the box it
    opens.
@@ -4784,6 +4864,59 @@ button[data-glyph="1"] {
 button.pos-sm { height: var(--ctl-sm); padding: 0 calc(var(--pad-btn) / 2); }
 button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; }
 
+/* ── the compile note (.pos-cnote), demo/shell/compile-idle.mjs ──────────
+   🔴 A NOTE, NOT A BUTTON, IN THE CORNER WHERE `/fau/`'s COMPILE BUTTON SAT.
+   Asked 2026-09-30: *"Small breating "Compiling" note (not button) on right
+   bottom i the plae complile button is in fau"*. The host is the box the text
+   is typed in and is the containing block; the note is a `--ctl-sm` box
+   `--rows-gap` in from the right and the bottom, which is exactly the rect the
+   small button had, so the word sits where the button's word sat.
+   ⚠️ THE TEXT KEEPS ITS LAST LINES CLEAR OF IT WITH ITS OWN BOTTOM PADDING,
+   which scrolls with the text, the rule `/fau/` measured on a phone when the
+   button was there. Written twice: a bare textarea at (0,1,1), and a kit field
+   at (0,2,1), because `.pos-field.tall textarea`'s padding SHORTHAND is (0,2,1)
+   and would beat the bare one. This block sits after that rule, so the tie is
+   ours on order and nothing outruns it.
+   ⚠️ BREATHING IS THE INK'S COLOUR AND NOTHING ELSE, so the note cannot move a
+   pixel of anything near it (and not opacity, see the keyframes). 1.6 s a breath, slower than the 1.1 s button sweep on
+   purpose: a sweep says a press is being worked on, this says something is
+   happening that nobody pressed for. Reduced motion holds it half way.
+   An error stands still in `--bad`; a note with nothing to say is `hidden`,
+   and `display: flex` below needs its own `[hidden]` line to mean it.
+   🔴 IT PAINTS THE WELL'S GROUND, BECAUSE ON A PHONE IT SITS OVER CODE.
+   PHOTOGRAPHED at 375 on `/fau/`: the twenty-row box wraps the Organ past its
+   height, so it scrolls, the reserve above is at the END of the text, and a
+   transparent note laid `COMPILING` over `os.osc(freq` as one unreadable
+   string. The button it replaced never showed this because a button has a
+   face. So the note carries the well's ground, and the button's half-pill of
+   air either side, which makes its box the button's box again and lets the
+   word cover the line under it rather than mix. `--well` is for a page whose
+   text box is not the kit field's `--bg` (`/und/`'s is its own dark), set
+   once on the host and read by the box and the note alike. */
+.pos-cnote-host { position: relative; }
+.pos-cnote-host textarea,
+.pos-field.pos-cnote-host textarea { padding-bottom: calc(var(--ctl-sm) + 2 * var(--rows-gap)); }
+.pos-cnote {
+  position: absolute; right: var(--rows-gap); bottom: var(--rows-gap);
+  height: var(--ctl-sm); display: flex; align-items: center;
+  font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim); white-space: nowrap; pointer-events: none;
+  background: var(--well, var(--bg)); padding: 0 calc(var(--pad-btn) / 2);
+}
+.pos-cnote[hidden] { display: none; }
+.pos-cnote[data-state="compiling"] { animation: pos-cnote-breathe 1.6s ease-in-out infinite; }
+.pos-cnote[data-state="error"] { color: var(--bad); pointer-events: auto; cursor: default; }
+/* ⚠️ THE INK BREATHES AND THE GROUND DOES NOT. An opacity pulse would fade
+   the ground with the word and let the code under it show through two thirds
+   of every breath, so the pulse is on `color`, which changes no size either. */
+@keyframes pos-cnote-breathe {
+  0%, 100% { color: color-mix(in oklab, var(--dim) 35%, var(--bg)); }
+  50%      { color: var(--dim); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pos-cnote[data-state="compiling"] { animation: none; color: color-mix(in oklab, var(--dim) 70%, var(--bg)); }
+}
+
 /* ── loop: one button, three presses — shell/transport-bar.mjs ───────────── */
 /* 🔴 IT SHARES `.tbar-x`'s LOOK AND NOT ITS CLASS, and that is not tidiness —
    `demo/verify.mjs` presses `.pos-controls button, .tbar-x` on every page,
@@ -5574,6 +5707,13 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    a control that changes nothing under a pointer reads as a dead control, and
    this one is a glyph, so its ink IS its whole appearance. */
 .pos-knob-hand:hover { color: var(--fg); }
+/* 🔴 NO RING ON FOCUS EITHER, ASKED FOR 2026-09-30: *"rm yellow circle aroind
+   invisible hands button on knobs"*. MEASURED in Chrome: a mouse press leaves
+   this button matching `:focus-visible`, so the shell's `1px solid var(--hi)`
+   outline drew a yellow circle round it, shaped by the ground's radius, and it
+   stayed there until something else took focus. The ink carries focus instead,
+   the same step as hover, so a keyboard still sees where it is. */
+.pos-knob-hand:focus-visible { outline: none; color: var(--fg); }
 /* ⚠️ THE SYMBOL LIGHTS AND NOTHING ELSE CHANGES, which is `.sld-hand`'s rule
    verbatim and was instructed there: *"just color it yellow when enabled (the
    symbol)"*. A knob whose ring or needle changed while a hand held it would be
@@ -5690,6 +5830,44 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    grouping true rather than saying it. Lifted from `/evo/`, which hand rolled
    both the row and this line before the bank could do either. */
 .pos-knob-div { align-self: stretch; width: 0; border-left: 1px solid var(--line2); }
+
+/* 🔴 A PARAMETER'S KNOB CAN WEAR THE PARAMETER'S HUE, AND NOTHING SETS ONE
+   YET. `param-knobs.mjs` stamps `data-param` on every knob it builds under a
+   program's text (`/collide/`, `/fau/`), so the editor work in
+   `plans/plan-code-editor.md` can colour a name in the text and its knob alike
+   by setting `--param-hue` on either the knob or anything above it.
+   ⚠️ UNSET MEANS THE ORDINARY `--hi`, AND IT IS THE CUSTOM PROPERTY'S OWN
+   RULE THAT DOES IT: a custom property whose value reads an unset `var()` is
+   invalid at computed value time, so `var(--param-ink, var(--hi))` takes its
+   fallback. No attribute and no JavaScript decide it.
+   ⚠️ ABOVE `.pos-knob[data-off] .pos-knob-arc` AT THE SAME WEIGHT, so a
+   switched off knob still goes grey. */
+.pos-knob[data-param] { --param-ink: hsl(var(--param-hue) 70% 62%); }
+.pos-knob[data-param] .pos-knob-arc { stroke: var(--param-ink, var(--hi)); transition: none; }
+/* ⚠️ NO FADE INTO THE HUE. The arc's `.12s` stroke transition is for a knob
+   whose SOURCE changes (hand, hardware); a param knob gets its hue once, after
+   the row is built and measured on the lattice, and with the fade it drew
+   yellow for a beat on every compile. MEASURED on `/kit/` 2026-09-30. */
+
+/* 🔴 THE NAME AND THE NUMBER WEAR THE HUE TOO, SINCE 2026-09-30. Asked:
+   *"colorcode buttons and code"*. The arc alone is a thin line under a
+   parameter's name, and the name is what a reader matches against the text.
+   Unset, `--param-ink` is invalid and each falls back to its own ink, so a knob
+   with no hue is drawn exactly as before.
+   🔴 AND THE ROW UNDER A PROGRAM KEEPS A KNOB'S HEIGHT WITH NOTHING IN IT
+   (`param-knobs.mjs`, *"make the area h for thise buttons fixed so no
+   junmp"*). The reserve is a hidden knob, and the row says nothing,
+   so the height is a knob's and no number here repeats it. */
+.pos-knob[data-param] .pos-knob-lab { color: var(--param-ink, var(--dim)); }
+.pos-knob[data-param] .pos-knob-v { color: var(--param-ink, var(--fg)); }
+/* 🔴 AND A LIT HAND WEARS THE HUE TOO, asked 2026-09-30: *"invisible hand
+   button on knowbs should have same accent color"*. `.pos-knob-hand[data-on]`
+   lights in `--hi` on every other knob; on a knob with a hue the yellow
+   would be the one thing on it that is not its colour. Unset, it is `--hi`. */
+.pos-knob[data-param] .pos-knob-hand[data-on="1"] { color: var(--param-ink, var(--hi)); }
+.pos-pknobs-none { display: grid; }
+.pos-pknobs-none > * { grid-area: 1 / 1; }
+.pos-pknobs-ghost { visibility: hidden; }
 
 /* ── pad: a square button that can be lit — shell/pad.mjs ───────────────────
    ⚠️ THE TINT IS A CUSTOM PROPERTY WITH A FALLBACK, never a colour written by

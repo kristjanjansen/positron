@@ -223,6 +223,32 @@ const ch = (s) => ALPHA[ID.get(s)];
 const STEPS = ALPHA.length - 1;
 const pch = (p) => ALPHA[Math.max(0, Math.min(STEPS, Math.round(p * STEPS)))];
 
+/**
+ * 🔴 THE UNIGRAM ON A LOG SCALE, BECAUSE ON THE LINEAR ONE ABOVE HALF THE
+ * ALPHABET IS ZERO. MEASURED 2026-09-30: `pch` steps at 1/89, about 1.1 per cent,
+ * and **46 counted jazz symbols and 57 counted pop symbols** are rarer than half a
+ * step, so `uni` stores them as exactly 0. Every diminished, augmented and
+ * suspended chord is in that list, `8dim` among them at a real **70 of 52,924**.
+ * `suggest.mjs` ranks slot B by `log2(p / u)`, so a zero read as `1e-6` gave
+ * every one of those chords about **17 bits** of specificity and it won slot B
+ * whenever it reached the pool: **10.9 per cent of jazz slot B answers and 18.7
+ * of pop** landed on a symbol whose unigram the table had thrown away.
+ * ✅ ONE CHARACTER, `round(-UL * log2(u))`, SO A STEP IS A FIFTH OF A BIT AND THE
+ * WORST ERROR IS 2^(1/10), ABOUT 7 PER CENT, AT ANY FREQUENCY. 88 steps reach
+ * 2^-17.6, which is below one chord in the larger corpus (1 of 82,321 is
+ * 2^-16.3), so no counted symbol can clamp and the build refuses if one does.
+ * ⚠️ `uni` IS KEPT BESIDE IT, UNCHANGED, because eleven measurement scripts and
+ * any table already cached read that field. `ulog` is new and a reader that
+ * does not know it simply never sees it.
+ */
+const UL = 5;
+const ulch = (n, total) => {
+  if (!n) return ALPHA[STEPS];
+  const code = Math.round(-UL * Math.log2(n / total));
+  if (code >= STEPS) throw new Error(`a unigram of ${n} in ${total} does not fit ${STEPS} log steps`);
+  return ALPHA[code];
+};
+
 /** Fixed width records, so there is nothing to split on. */
 function pack(m, ctxChars) {
   let out = '';
@@ -266,6 +292,8 @@ for (const which of ['jazz', 'pop']) {
     bi: pack(c.bi, 1),
     tri: pack(c.tri, 2),
     uni: SYMS.map((s) => pch((c.uni.get(s) || 0) / c.total)).join(''),
+    ulog: SYMS.map((s) => ulch(c.uni.get(s) || 0, c.total)).join(''),
+    ul: UL,
     spell: SYMS.map((s) => { const sp = c.spell.get(s); return sp ? ranked(sp)[0][0] : ''; }),
   };
 }
@@ -343,6 +371,30 @@ const broken = askAll(decode({ bi: table.jazz.bi.slice(0, 1 + 2 * KEEP), tri: ta
 console.log(`decoded: ${ok} of ${ASKS.length}.  the same check against a table truncated to one record: ${broken} of ${ASKS.length}.`);
 if (ok !== ASKS.length) { console.error('ROUND TRIP FAILED, nothing written.'); process.exit(1); }
 if (broken !== 0) { console.error('THE SABOTAGE DID NOT GO RED, so this check is decoration. Nothing written.'); process.exit(1); }
+
+/* 🔴 THE UNIGRAM ROUND TRIP, AND ITS SABOTAGE IS THE LINEAR COLUMN THIS FIELD
+   EXISTS TO REPLACE. Every counted symbol decodes to within 8 per cent of its
+   count, and the same check run over `uni` has to fail, or it is not looking. */
+const uniWorst = (which, dec) => {
+  const { c } = styles[which];
+  let worst = 0, zero = 0;
+  SYMS.forEach((s, i) => {
+    const n = c.uni.get(s) || 0;
+    if (!n) return;
+    const u = dec(i);
+    if (!(u > 0)) { zero++; return; }
+    worst = Math.max(worst, Math.abs(u / (n / c.total) - 1));
+  });
+  return { worst, zero };
+};
+for (const which of ['jazz', 'pop']) {
+  const lg = uniWorst(which, (i) => 2 ** (-REV.get(table[which].ulog[i]) / UL));
+  const ln = uniWorst(which, (i) => REV.get(table[which].uni[i]) / STEPS);
+  console.log(`${which.padEnd(6)} unigram: log column worst ${(100 * lg.worst).toFixed(1)}% off, ${lg.zero} counted symbols read as zero; `
+    + `the linear column ${ln.zero} read as zero`);
+  if (lg.zero || lg.worst > 0.08) { console.error('UNIGRAM ROUND TRIP FAILED, nothing written.'); process.exit(1); }
+  if (!ln.zero) { console.error('THE LINEAR COLUMN PASSED THE UNIGRAM CHECK, so the check is decoration. Nothing written.'); process.exit(1); }
+}
 
 if (CHECK) { console.log('\n--check, so nothing was written.'); process.exit(0); }
 

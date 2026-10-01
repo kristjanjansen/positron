@@ -21,7 +21,8 @@
 <script type="module">
   import { mount, guard, el, armVideo, recorderMime } from '/shell/shell.mjs';
   import { openSession, putWhole, fetchBack } from '/shell/ingest.mjs';
-  import { whipPublish, whepPlay, whep } from '/shell/live.mjs';
+  import { whipPublish, whepPlay, whep, fetchIceServers, readIcePath } from '/shell/live.mjs';
+  import { createPanelValues } from '/shell/video-panel.mjs';
   import { burn, readBurnedFrom, drawCamera, videoHue, FRAME_H } from '/shell/pattern.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
@@ -96,8 +97,20 @@
   // a property of THIS pane, so it goes in its caption rather than in a row of
   // figures somewhere else that the reader has to join up.
   const seqCap = el('figcaption', 'pos-cap', 'received');
-  const legText = () => (legs.length ? `received  +${Math.round(median(legs))} ms` : 'received');
-  seqFig.append(seq, seqCap);
+  /**
+   * 🔴 THE ROUND TRIP AND THE ROUTE IT TOOK, AS TWO CELLS, SINCE 2026-09-30.
+   * The round trip was glued into the caption as `received  +N ms`. It moved
+   * into the kit's panel value row so the route can sit beside it as its own
+   * cell: `direct`, or `relay` when either leg went through Cloudflare's TURN
+   * relay, because a relayed round trip is not comparable to a direct one.
+   * The row is hidden by the kit until a cell has something in it.
+   */
+  const legVals = createPanelValues([
+    { key: 'rt', label: 'round trip', reserve: 7 },
+    { key: 'path', label: '', reserve: 6 },
+  ]);
+  const legText = () => { legVals.set('rt', legs.length ? `+${Math.round(median(legs))} ms` : ''); };
+  seqFig.append(seq, seqCap, legVals.el);
   stage.append(srcFig, seqFig);
   d.el.append(stage);
 
@@ -129,7 +142,7 @@
     deck.setRange([0, CAP_MS]);
     deck.seek(0);
     live.hidden = false;
-    seqCap.textContent = legText();
+    legText();
     asserted = false; didClock = false;
     paint();
     forget();
@@ -154,20 +167,86 @@
   // ── the round trip ────────────────────────────────────────────────────────
   let pub = null, sub = null, legs = [], scratch = document.createElement('canvas');
 
+  /**
+   * 🔴 RELAY SERVERS ARE ASKED FOR ON THE PRESS, NEVER ON LOAD, and handed to
+   * both legs. `fetchIceServers` never throws: with no relay it returns STUN
+   * alone and says why. ICE still picks the route, so working UDP stays direct.
+   */
+  let ice = null, iceAsks = 0, pressAt = null;
+  // Measured, not counted by this page: every request the browser made to the
+  // relay route, from resource timing, and how many of them started before the
+  // first press. A page that asked on load goes red here whatever its code says.
+  const iceLoadAsks = () => performance.getEntriesByType('resource')
+    .filter((e) => /\/ice(\?|$)/.test(e.name) && (pressAt == null || e.startTime < pressAt)).length;
+  let paths = { out: null, back: null };
+  const routeOf = () => {
+    const { out, back } = paths;
+    if (!out?.path || !back?.path) return null;
+    return out.path === 'relay' || back.path === 'relay' ? 'relay' : 'direct';
+  };
+  async function readPaths() {
+    if (!pub || !sub) return;
+    const [out, back] = await Promise.all([readIcePath(pub.pc), readIcePath(sub.pc)]);
+    const was = routeOf();
+    paths = { out, back };
+    const now = routeOf();
+    legVals.set('path', now || '');
+    if (now && now !== was) {
+      const say = (p) => (p.path === 'relay' ? `relay over ${p.relayProtocol || p.protocol}` : `direct over ${p.protocol}`);
+      d.log(`out ${say(out)}, back ${say(back)}`, 'hi');
+    }
+  }
+
   d.on('go', async () => {
     if (pub) { d.log('already sending'); return; }
+    pressAt ??= performance.now();
+    iceAsks++;
+    ice = await fetchIceServers({ log: (m) => d.log(m) });
+    /**
+     * 🔴 GRADED HERE, RIGHT AFTER THE PRESS, AND NOT IN `runChecks`. Those wait
+     * for a take to land, which a harness run does not reach, so an assert put
+     * there would never run. The ask is graded before anything can fail, and
+     * the two facts that need a connection are graded red with the reason when
+     * there is none, so the count does not change with the network.
+     */
+    d.assert('relay servers were asked for on the press and not on load',
+      iceAsks >= 1 && iceLoadAsks() === 0 && !!ice,
+      `${iceAsks} ask(s) after the press, ${iceLoadAsks()} before it by resource timing, `
+      + (ice.relay ? 'a relay came back' : `no relay: ${ice.why}`));
+    const noLegs = (why) => {
+      d.assert('both legs hold what the ask returned', false, why);
+      d.assert('the path the media took is named beside the round trip', false, why);
+    };
     try {
-      pub = await whipPublish(canvas.captureStream(FPS), { log: (m, k) => d.log(m, k) });
-    } catch (e) { d.log(`send failed: ${e.message}`, 'bad'); return; }
+      pub = await whipPublish(canvas.captureStream(FPS), { iceServers: ice.iceServers, log: (m, k) => d.log(m, k) });
+    } catch (e) { d.log(`send failed: ${e.message}`, 'bad'); noLegs(`send failed: ${e.message}`); return; }
     try {
-      sub = await whepPlay(whep(), live, { log: (m, k) => d.log(m, k) });
-    } catch (e) { d.log(`receive failed: ${e.message}`, 'bad'); return; }
+      sub = await whepPlay(whep(), live, { iceServers: ice.iceServers, log: (m, k) => d.log(m, k) });
+    } catch (e) { d.log(`receive failed: ${e.message}`, 'bad'); noLegs(`receive failed: ${e.message}`); return; }
     armVideo(live);
     // Wait for a frame to actually arrive rather than for a promise to settle:
     // a WHEP track exists before it carries anything.
     for (let i = 0; i < 120 && !live.videoWidth; i++) await new Promise((r) => setTimeout(r, 250));
     d.log(live.videoWidth ? `receiving ${live.videoWidth}x${live.videoHeight}` : 'no picture arrived', live.videoWidth ? 'hi' : 'bad');
     legSampler();
+    for (let i = 0; i < 8 && !routeOf(); i++) {
+      await readPaths();
+      if (!routeOf()) await new Promise((r) => setTimeout(r, 500));
+    }
+    setInterval(readPaths, 2000);
+    // Asked but not handed on is read off `getConfiguration()`, which is what
+    // each connection really holds.
+    const conf = [pub, sub].map((x) => (x.pc.getConfiguration().iceServers || []).flatMap((s) => [].concat(s.urls)));
+    d.assert('both legs hold what the ask returned',
+      conf.every((c) => c.length > 0 && (!ice.relay || c.some((u) => /^turns?:/.test(u)))),
+      conf.map((c, i) => `${i ? 'back' : 'out'} ${c.length} url(s), ${c.filter((u) => /^turns?:/.test(u)).length} TURN`).join(', '));
+    const shownPath = legVals.cell('path').textContent.trim();
+    const route = routeOf();
+    d.assert('the path the media took is named beside the round trip',
+      (route === 'direct' || route === 'relay') && shownPath === route,
+      route
+        ? `${route}: out ${paths.out.local} over ${paths.out.protocol}, back ${paths.back.local} over ${paths.back.protocol}, cell ${JSON.stringify(shownPath)}`
+        : 'the selected candidate pairs could not be read');
   });
 
   /**
@@ -189,7 +268,7 @@
       if (ms > 0 && ms < 10000) legs.push(ms);
       if (legs.length > 200) legs = legs.slice(-200);
       d.set('leg', Math.round(median(legs)));
-      if (!active) seqCap.textContent = legText();
+      legText();
       d.set('clean', `${readable}/${readable + unreadable}`);
     }, 200);
   }

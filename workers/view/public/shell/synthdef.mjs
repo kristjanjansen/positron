@@ -189,13 +189,45 @@ export function graph(name) {
    */
   function params(pairs) {
     if (controlAt >= 0) throw new Error('synthdef: params() is called once, with every parameter');
-    for (const [k, v] of pairs) { paramNames.push(k); paramValues.push(v); }
+    // The special index is where this block's first value sits in the value
+    // array, which is 0 whenever params() comes first, as it always has.
+    const first = paramValues.length;
+    for (const [k, v] of pairs) { claim(k); paramNames.push(k); paramValues.push(v); }
     controlAt = blocks.length;
     blocks.push({
       name: 'Control', rate: RATE.slow, inputs: [],
-      outputs: pairs.map(() => RATE.slow), special: 0,
+      outputs: pairs.map(() => RATE.slow), special: first,
     });
     return pairs.map((_, i) => ({ from: controlAt, out: i }));
+  }
+
+  /** One name, one control. A second control under a name scsynth already has is refused. */
+  function claim(k) {
+    if (paramNames.includes(k)) throw new Error(`synthdef: a control called ${k} already exists`);
+  }
+
+  /**
+   * One more control of its own, which is what sclang's `NamedControl` makes
+   * for `\name.kr(value)`: a `Control` block with one output whose special
+   * index is its slot in the value array (`Control.init` in
+   * `SCClassLibrary/Common/Audio/InOut.sc`, `specialIndex =
+   * synthDef.controls.size`). With a lag it is a `LagControl` instead, whose
+   * inputs are the lag times as constants (`LagControl.kr` in the same file):
+   * sclang builds that for any lag that is a plain number, because
+   * `NamedControl.new` sets `fixedLag` whenever `lags.rate == \scalar`.
+   * Several of these in one graph is ordinary sclang output.
+   */
+  function control(k, v, lag = 0) {
+    claim(k);
+    const slot = paramValues.length;
+    paramNames.push(k);
+    paramValues.push(v);
+    const at = blocks.length;
+    blocks.push({
+      name: lag ? 'LagControl' : 'Control', rate: RATE.slow,
+      inputs: lag ? [value(lag)] : [], outputs: [RATE.slow], special: slot,
+    });
+    return { from: at, out: 0 };
   }
 
   /** One building block. Returns a reference to its first output. */
@@ -249,7 +281,7 @@ export function graph(name) {
     return w.done();
   }
 
-  return { name, value, params, block, out, bytes, count: () => blocks.length };
+  return { name, value, params, control, block, out, bytes, count: () => blocks.length };
 }
 
 // ── reading ─────────────────────────────────────────────────────────────────

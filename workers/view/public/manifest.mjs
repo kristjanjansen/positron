@@ -80,8 +80,8 @@ export const DEMOS = [
   { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'one file format for scores written in different languages',
     tags: ['timeline'] },
-  { name: 'sound', group: 'vain', act: 0, created: '2026-09-07', built: true,
-    one: 'a Csound score, compiled as you type',
+  { name: 'und', group: 'vain', act: 0, created: '2026-09-07', built: true,
+    one: 'a Csound score, compiled whenever you stop typing',
     tags: ['timeline', 'Csound', 'WebAudio'] },
   { name: 'click', group: 'vain', act: 0, created: '2026-09-14', built: true,
     one: 'U:’s vClick is a click track with no earpieces, where every player watches a screen for the bar, the beat and a lamp',
@@ -115,25 +115,11 @@ export const DEMOS = [
   { name: 'cues', group: 'messages', act: 2, created: '2026-09-04', built: true,
     one: 'one press here and every open copy of this page shows the same cue name at the same moment',
     tags: ['DO', 'WS', 'relay'] },
-  // Act 2 with `cues` and for the same reason — one act reaching everybody —
-  // but on a delay instead of at once, and out to phones rather than to open
-  // tabs. The claim it demonstrates is that a store can wake AT a time from the
-  // same object that holds the state deciding it, with no machine polling in
-  // between, so `settleMs` has to cover the whole demonstration. It is carried
-  // by `Publish now`, which is control 0 and the only control the harness gives
-  // this budget to: it publishes at once and hands its item a moment four
-  // seconds out to put itself away at, which is the unattended wake. About five
-  // seconds of work, and the ten-second button asserts only what is true
-  // immediately, because an assert made behind that wait would never be read.
-  //
-  // ⚠️ IT IS ALSO THE ONE INSTALLABLE PAGE HERE, AND ONLY THIS ONE. Its
-  // manifest and its service worker are scoped to `/items/`; positron.studio is
-  // deliberately not a progressive web app, because a site-wide worker is a
-  // cache and this project's whole debugging discipline rests on the BUILD
-  // stamp saying which build is live.
-  { name: 'items', group: 'vain', act: 2, created: '2026-09-14', built: true, settleMs: 11000,
-    one: 'write an item. At the moment you named, it publishes itself and tells the phones',
-    tags: ['DO', 'alarms', 'push', 'PWA'] },
+  // `items` was a demo and is archived at archive/items/README.md, removed
+  // 2026-10-01 on instruction. It wrote an item, let a Durable Object alarm
+  // publish it at the moment named, and told installed phones over FCM. Its
+  // store and its push moved to the eccm repository, as plain Web Push.
+
   // The demo ABOUT the socket, rather than one that happens to use it: the
   // message shape written down, the exact bytes shown both ways, and the
   // history the relay refuses to keep. settleMs covers asking the recorder to
@@ -563,8 +549,8 @@ export const DEMOS = [
    * and that measurement is the first thing the checks make.
    */
   { name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
-    one: "edit a Novation Circuit's sound while it is playing, with sliders that can move themselves",
-    tags: ['WebMIDI', 'CoreMIDI'] },
+    one: "edit a Novation Circuit's sound while it is playing, plugged in here or on a Raspberry Pi in another building, with sliders that can move themselves",
+    tags: ['WebMIDI', 'CoreMIDI', 'WS', 'relay', 'PCM', 'live board'] },
 
   /**
    * 🔴 THE OTHER HALF OF THE CIRCUIT, AND THE TWO PAGES ARE DELIBERATELY NOT
@@ -686,8 +672,12 @@ export const DEMOS = [
    */
   { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
     one: 'a synthesiser you type in, compiled to machine code in this tab '
-       + 'as the page opens',
+       + 'whenever you stop typing',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
+  { name: 'collide', group: 'instruments', act: 4, created: '2026-09-30', built: true,
+    one: 'a synth typed in a small subset of SuperCollider, compiled in this tab '
+       + 'whenever you stop typing',
+    tags: ['SuperCollider', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
 
   // `able` was a demo and is archived at archive/demos/able-index.html, removed
   // 2026-09-25 on instruction. It played Ableton Live on a studio Mac from a
@@ -812,15 +802,18 @@ export const DEMOS = [
     // 2026-09-25 transport rework made false twice over: the two presses are
     // now WHICH TRANSPORT carries the show, and the film lost its play button
     // in the same change, so there is no press for the picture at all.
-    one: 'a church scene from a 2011 MIMproject performance goes out live to an '
-      + 'audience that answers back, over whichever transport you press',
+    one: 'a church scene from a 2011 MIMproject performance goes out live over WebRTC and its recording travels from this browser to R2 to playback',
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'play a synthesizer in another building, and turn its knobs while you do. '
-      + 'Over there a Raspberry Pi runs Yoshimi. A relay carries your knob turns out as '
-      + 'MIDI and brings its sound back in 20 ms pieces',
+    one: 'play and turn the knobs of a synthesizer on a Raspberry Pi in another building',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
+
+  // Listens only. The Circuit's left output into a Fast Track Pro on the Pi,
+  // captured by `rig/board/board.mjs` and streamed into the Pi's own room.
+  { name: 'away', group: 'instruments', act: 4, created: '2026-09-30', built: true, room: 'fixed',
+    one: 'play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives',
+    tags: ['WS', 'relay', 'PCM', 'MIDI', 'canvas', 'live board'] },
 
   /**
    * 🔴 SOMEBODY ELSE'S FIRMWARE, COMPILED RATHER THAN REWRITTEN, AND THAT IS
