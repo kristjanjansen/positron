@@ -13,12 +13,16 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createTable } from '/shell/table.mjs';
   // Two things here cost a listener something and neither is the radio: a range
   // GET nobody plays, and a forty-two second wait held open after they pressed
   // play so a second round of checks has a programme boundary to find.
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
-  const STATION = 'https://positron-station.kristjan-jansen.workers.dev';
+  // `?base=` points the page at another copy of the station worker, which is
+  // how it is run against `wrangler dev` without touching the deployed one.
+  const STATION = (new URLSearchParams(location.search).get('base')
+    || 'https://positron-station.kristjan-jansen.workers.dev').replace(/\/+$/, '');
   const PLAYLIST = `${STATION}/station.m3u8`;
   const POLL_MS = 2000;          // how often the numbers are re-read
   const RATE_WINDOW_MS = 4000;   // over how long `advance` is measured
@@ -126,6 +130,60 @@
   onAir.follow({ everyMs: POLL_MS, misses: 2, since: Date.now() });
 
 
+  /**
+   * 🔴 WHAT IS COMING, AS A TABLE. Asked 2026-10-01: *"can i have a table
+   * with programme?"* and then *"i want table of uncoming shows/files + live
+   * stuff"*. One row per slot, the one on air first and marked, then the rest
+   * in the order they will play, wrapping into the next loop, each with its
+   * wall-clock start and end in Tallinn time and its kind.
+   * ⚠️ THE ROWS COME FROM `/schedule.json`, WHICH IS WRITTEN FROM THE SAME
+   * flatten() AS THE PLAYLIST, so the table cannot disagree with what plays.
+   * It is read once on load and again whenever `/now.json`, already polled
+   * every two seconds, reports a different slot, loop or running order.
+   */
+  const programme = createTable({
+    columns: [
+      // No `to` column: the rows are contiguous, so the next row's start is
+      // this row's end, and a fifth column dragged the table sideways at 375.
+      { key: 'from', label: 'from', width: 64 },
+      { key: 'length', label: 'length', width: 56, align: 'right' },
+      { key: 'name', label: 'title', grow: true, clip: true, hi: true },
+      { key: 'kind', label: 'kind', width: 48 },
+    ],
+    empty: '',
+  });
+  programme.el.style.setProperty('--tbl-h', 'none');
+  d.el.append(programme.el);
+  const CLOCK = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Tallinn', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  const clock = (ms) => (ms == null ? '' : CLOCK.format(new Date(ms)));
+  const span = (s) => {
+    const m = Math.floor(s / 60), r = Math.round(s - m * 60);
+    return r === 60 ? `${m + 1}:00` : `${m}:${String(r).padStart(2, '0')}`;
+  };
+  const order = { rev: null, loop: null, playing: null, busy: false };
+  async function readOrder() {
+    if (order.busy) return;
+    order.busy = true;
+    try {
+      const s = await fetch(`${STATION}/schedule.json`, { cache: 'no-store' }).then((r) => r.json());
+      if (!s.slots) return;
+      order.rev = s.rev; order.loop = s.loop; order.playing = s.playing;
+      programme.set(s.slots.map((x) => ({
+        i: x.i,
+        from: clock(x.from),
+        length: x.missing ? '' : span(x.dur),
+        name: x.title || x.key,
+        kind: x.missing ? 'missing' : x.kind,
+      })));
+      programme.mark((r) => r.i === order.playing);
+      d.api.programme = s.slots.length;
+    } catch { /* the station is allowed to be slow; the next poll asks again */ }
+    finally { order.busy = false; }
+  }
+  readOrder();
+
   let hls = null, engine = 'none';
   let stalls = 0, crossed = 0, lastProgramme = null, playing = false;
   let rateAt = 0, rateT = 0;
@@ -134,7 +192,7 @@
   // `stalls` lost its cell with the cut to four. It is still counted, still
   // asserted, and now reaches a person through the log, where a stall is an
   // event that HAPPENED rather than a number sitting at zero.
-  audio.addEventListener('waiting', () => { stalls++; d.log(`stalled · ${stalls} so far`, 'warn'); });
+  audio.addEventListener('waiting', () => { stalls++; d.log(`stalled, ${stalls} so far`, 'warn'); });
 
   // ── the artwork a lock screen shows ────────────────────────────────────────
   // Drawn rather than fetched: MediaMetadata wants an image URL and a station
@@ -239,7 +297,15 @@
       // the badge above makes. Stamped with THIS clock at the moment the reply
       // arrived, never with a time from inside the payload.
       onAir.seen();
-      nowLine.textContent = `${now_.programme} · ${now_.title || 'no title'}`;
+      // The slot's title when it has one, otherwise its key. This read
+      // the programme and then `no title`, and /now.json carried no title at
+      // all, so every visitor was told `no title` beside a file name.
+      nowLine.textContent = now_.title || now_.programme;
+      // The table lists what is coming, starting with the slot on air, so a
+      // new slot, a new loop or a new running order means it is read again.
+      if (now_.rev !== order.rev || now_.loop !== order.loop || now_.slot !== order.playing) readOrder();
+      order.playing = now_.slot;
+      programme.mark((r) => r.i === order.playing);
       d.set('into', Math.round(now_.into * 10) / 10);
       if (lastProgramme && now_.programme !== lastProgramme) {
         if (playing) { crossed++; d.set('crossed', crossed); }
@@ -251,7 +317,12 @@
     }
 
     // The playlist itself, which is what the claims below are about.
-    try {
+    // 🔴 ONLY WHILE PLAYING. A playlist request is what opens a relay slot's
+    // upstream mount (`relaysDue()` in the worker), so a visitor who never
+    // pressed play must not send one: that would put somebody else's radio on
+    // air for a page nobody is listening to. Paused counts as not listening,
+    // except for the one read the playlist checks need right after a press.
+    if (playing && (!audio.paused || !lastPlaylist)) try {
       const pl = await fetch(PLAYLIST, { cache: 'no-store' }).then((r) => r.text());
       discSeen.polls++;
       if (pl.includes('\n#EXT-X-DISCONTINUITY\n')) discSeen.withTag++;
@@ -311,7 +382,7 @@
     // browser and never rejects into anything useful, so awaiting it here is a
     // hang rather than an error, and CLAUDE.md records two demos lost to
     // exactly that. Sound is allowed to be late; the measurement is not.
-    audio.play().catch((e) => d.log(`play deferred · ${e.name}`));
+    audio.play().catch((e) => d.log(`play deferred, ${e.name}`));
     rateAt = 0; rateT = 0;   // the average starts at the first frame, not at the press
     await poll();
     clearInterval(timer); timer = setInterval(poll, POLL_MS);
@@ -400,7 +471,7 @@
     } else {
       d.log('no mediaSession in this browser, so nothing to check');
     }
-    d.log(`checked · ${d.api.asserts.filter((a) => a.pass).length}/${d.api.asserts.length}`, 'hi');
+    d.log(`checked ${d.api.asserts.filter((a) => a.pass).length}/${d.api.asserts.length}`, 'hi');
   });
 
   // 🔴 `ready()` MEANS THE PAGE HAS FINISHED BOOTING, NOT THAT ITS CHECKS ARE
@@ -463,9 +534,9 @@
       { id: 'onair', label: 'studio', sub: 'not ours', kind: 'device', tech: 'station', set: true,
         children: [
           { id: 'mount', label: 'mount', sub: 'endless http', tech: 'station',
-            note: 'One connection that never closes. Nothing downstream can seek in it, which '
-                + 'is exactly why the segments beside it have to exist. Built and not in use: '
-                + 'nothing is broadcasting into this station yet.' },
+            note: 'One connection that never closes, such as a public radio\'s Icecast stream. '
+                + 'Nothing downstream can seek in it, which is why the station cuts it into '
+                + 'pieces before a player sees it.' },
           { id: 'seg', label: 'ffmpeg', sub: '-f segment, 10s', tech: 'encoder',
             note: 'Cuts a broadcast into ten second files as it arrives, with **-c copy**, so '
                 + 'nothing is decoded and nothing is re-encoded. It runs as a hook on the '
@@ -492,8 +563,9 @@
                 + 'next ten seconds. It never reads or writes a sample of audio, so a live '
                 + 'show and a forty minute recording cost it the same.' },
           { id: 'sched', label: 'schedule', sub: 'Durable Object', tech: 'cloudflare',
-            note: 'What plays when: which recording, or which live slot, owns which minute. '
-                + 'A change takes effect in the playlist within a second.' },
+            note: 'What plays when: which recording, live show or relayed radio owns which '
+                + 'minute. During a relay slot it also holds the one connection to that radio '
+                + 'and cuts it into ten second pieces of whole frames.' },
         ] },
       /**
        * 🔴 THE FILES HAVE TO GET IN, AND NOTHING SHOWED THEM ARRIVING.
@@ -526,6 +598,9 @@
       // so the component draws direction only and reports any label written on
       // one. What travels is said on hover instead, in the line under the
       // picture. See CLAUDE.md.
+      { from: 'mount', to: 'sched', label: 'relay',
+        note: 'One connection for every listener, opened only while somebody is listening to a '
+            + 'relay slot. The pieces are mp3 like the recordings, so the player never changes codec.' },
       { from: 'mount', to: 'seg',
         note: 'The stream itself, on the broadcaster\'s own machine. It never crosses a '
             + 'network here: **ffmpeg** reads the mount over localhost.' },
@@ -605,7 +680,7 @@
    */
   d.assert('the diagram drew every name and every arrow whole',
     dg.cuts.length === 0,
-    dg.cuts.map((c) => `${c.where} ${c.id}`).join(' · ') || 'nothing cut, nothing refused');
+    dg.cuts.map((c) => `${c.where} ${c.id}`).join(', ') || 'nothing cut, nothing refused');
 
   /**
    * 🔴 AND EVERY LINE IN IT HAS A HEAD ON IT. A bracket between two boxes in a
