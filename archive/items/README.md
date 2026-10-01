@@ -26,13 +26,14 @@ commits from `0eef691` (2026-09-14) on.
 VAPID** instead of going through Firebase. No FCM topic, no service-account
 key, no Firebase SDK in the page.
 
-⚠️ **THE WORKER `positron-items` IS STILL DEPLOYED** at `items.positron.studio`.
-Only its source left this repository; nothing ran `wrangler delete`. MEASURED
-2026-10-01 with a read-only GET:
+⚠️ **THE WORKER `positron-items` WAS DELETED 2026-10-01**, by the owner with
+`wrangler delete --name positron-items`, its Durable Object and the secret
+`FIREBASE_SA` with it; `items.positron.studio` answers 530 since. Just before,
+MEASURED with a read-only GET:
 `GET https://items.positron.studio/punctuality?room=items` answered
 `fires: 0`, `room: "items"`, `announcing: true`, `has_key: true`,
 `has_topic: true`. So the real room is empty and the secret `FIREBASE_SA` is
-still on it. Deleting it is a separate decision with its own command.
+on it. Nothing of either survives the deletion.
 
 `proto/push/` (the FCM prototype the Worker grew out of: `send.mjs`,
 `index.html`, `firebase-messaging-sw.js`) was not part of this removal and is

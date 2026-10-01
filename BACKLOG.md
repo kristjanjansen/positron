@@ -6,9 +6,10 @@
 `demo/items/` and `workers/items/`; the row is out of `demo/manifest.mjs`, so
 the next build drops `/items/` from the deploy. Every lesson the comments
 carried is in `archive/items/README.md`, by topic. The infrastructure lives on
-in the eccm repository as plain Web Push with VAPID. ⚠️ The Worker
-`positron-items` is still deployed at `items.positron.studio`, with its
-`FIREBASE_SA` secret; deleting it is a separate decision.
+in the eccm repository as plain Web Push with VAPID. The Worker
+`positron-items` was deleted the same day (`wrangler delete`, by the owner),
+and the view was deployed from the commit, so `/items/` answers 404
+(BUILD d49ed54-125433-0d19).
 
 ### Done 2026-09-30: `/away/` on the instrument panel, with a patch selector
 
