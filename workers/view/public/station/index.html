@@ -21,9 +21,15 @@
 
   // `?base=` points the page at another copy of the station worker, which is
   // how it is run against `wrangler dev` without touching the deployed one.
-  const STATION = (new URLSearchParams(location.search).get('base')
+  const PARAMS = new URLSearchParams(location.search);
+  const STATION = (PARAMS.get('base')
     || 'https://positron-station.kristjan-jansen.workers.dev').replace(/\/+$/, '');
-  const PLAYLIST = `${STATION}/station.m3u8`;
+  // `?k=` picks a channel (the station has several since 2026-10-01). `main`,
+  // the channel that was the whole station before, keeps the un-prefixed
+  // routes, so with no `?k=` this page asks exactly what it always asked.
+  const CHANNEL = PARAMS.get('k') || 'main';
+  const ROUTES = CHANNEL === 'main' ? STATION : `${STATION}/c/${encodeURIComponent(CHANNEL)}`;
+  const PLAYLIST = `${ROUTES}/station.m3u8`;
   const POLL_MS = 2000;          // how often the numbers are re-read
   const RATE_WINDOW_MS = 4000;   // over how long `advance` is measured
 
@@ -77,7 +83,34 @@
   // station changes, which is human pace, so prose is the right shape for it.
   const nowLine = el('div', 'pos-t2', 'off air');
   nowLine.style.cssText = 'font: 400 12.5px/1.4 var(--mono); color: var(--dim);';
-  d.el.append(nowLine);
+  // Who made it, from the programme's record, on a line of its own under the
+  // title rather than glued to it. Held at one line while empty.
+  // ⚠️ ONE CHILD OF THE PAGE, NOT TWO: the shell's stack puts its whole gap
+  // between siblings, and a title and its maker forty pixels apart read as two
+  // unrelated lines (MEASURED in the 375 and 1280 shots, 2026-10-01).
+  const whoLine = el('div', 'pos-t2', '');
+  whoLine.style.cssText = 'font: 400 12.5px/1.4 var(--mono); color: var(--dim); min-height: 1.4em;';
+  const nowGroup = el('div', '', null);
+  nowGroup.append(nowLine, whoLine);
+
+  // The channels, as plain links that reload the page on another `?k=`. Not a
+  // control in the shell's row, so no harness press moves; drawn only when the
+  // station has more than one.
+  const chanLine = el('div', 'pos-t2', '');
+  chanLine.style.cssText = 'font: 400 12.5px/1.4 var(--mono); display: flex; flex-wrap: wrap; gap: 4px 16px;';
+  chanLine.hidden = true;
+  d.el.append(chanLine, nowGroup);
+  fetch(`${STATION}/channels.json`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((c) => {
+    if (!c || !c.channels || c.channels.length < 2) return;
+    chanLine.replaceChildren(...c.channels.map((x) => {
+      if (x.name === CHANNEL) return el('span', '', x.title || x.name);
+      const q = new URLSearchParams(PARAMS); q.set('k', x.name);
+      const a = el('a', '', x.title || x.name); a.href = `?${q}`;
+      return a;
+    }));
+    chanLine.hidden = false;
+    d.api.channels = c.channels.length;
+  }).catch(() => { /* a station from before channels has one, and no line */ });
 
   /**
    * 🔴 THE SAME TRANSPORT AS `/radio/`, AND FOR THE SAME REASON: this is a
@@ -167,7 +200,7 @@
     if (order.busy) return;
     order.busy = true;
     try {
-      const s = await fetch(`${STATION}/schedule.json`, { cache: 'no-store' }).then((r) => r.json());
+      const s = await fetch(`${ROUTES}/schedule.json`, { cache: 'no-store' }).then((r) => r.json());
       if (!s.slots) return;
       order.rev = s.rev; order.loop = s.loop; order.playing = s.playing;
       programme.set(s.slots.map((x) => ({
@@ -185,7 +218,7 @@
   readOrder();
 
   let hls = null, engine = 'none';
-  let stalls = 0, crossed = 0, lastProgramme = null, playing = false;
+  let stalls = 0, crossed = 0, lastProgramme = null, lastTitle = null, lastWho = null, playing = false;
   let rateAt = 0, rateT = 0;
   const discSeen = { polls: 0, withTag: 0, seq: new Set() };
 
@@ -217,11 +250,13 @@
   // programme change, because a station that keeps one title across four
   // programmes is lying on the one surface a listener sees with the screen off.
   const MEDIA_SESSION = 'mediaSession' in navigator;
-  function announce(programme) {
+  // Title and artist are the programme's record's title and who, since
+  // 2026-10-01; the key stands in where a programme has no title.
+  function announce(programme, by) {
     if (!MEDIA_SESSION) return;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: programme || 'positron station',
-      artist: 'positron',
+      artist: by || 'positron',
       album: 'one playlist, files and live shows in the same line',
       artwork: [{ src: ART, sizes: '512x512', type: 'image/png' }],
     });
@@ -291,7 +326,7 @@
     d.set('behind', b === null ? '' : Math.round(b * 10) / 10);
 
     let now_ = null;
-    try { now_ = await fetch(`${STATION}/now.json`, { cache: 'no-store' }).then((r) => r.json()); } catch { /* the station is allowed to be slow */ }
+    try { now_ = await fetch(`${ROUTES}/now.json`, { cache: 'no-store' }).then((r) => r.json()); } catch { /* the station is allowed to be slow */ }
     if (now_ && !now_.error) {
       // The station answered with a programme, which is the whole of the claim
       // the badge above makes. Stamped with THIS clock at the moment the reply
@@ -301,6 +336,7 @@
       // the programme and then `no title`, and /now.json carried no title at
       // all, so every visitor was told `no title` beside a file name.
       nowLine.textContent = now_.title || now_.programme;
+      whoLine.textContent = now_.who || '';
       // The table lists what is coming, starting with the slot on air, so a
       // new slot, a new loop or a new running order means it is read again.
       if (now_.rev !== order.rev || now_.loop !== order.loop || now_.slot !== order.playing) readOrder();
@@ -310,10 +346,12 @@
       if (lastProgramme && now_.programme !== lastProgramme) {
         if (playing) { crossed++; d.set('crossed', crossed); }
         d.log(`${lastProgramme} to ${now_.programme}`, 'hi');
-        announce(now_.programme);
+        announce(now_.title || now_.programme, now_.who);
       }
-      if (!lastProgramme) announce(now_.programme);
+      if (!lastProgramme) announce(now_.title || now_.programme, now_.who);
       lastProgramme = now_.programme;
+      lastTitle = now_.title || now_.programme;
+      lastWho = now_.who || null;
     }
 
     // The playlist itself, which is what the claims below are about.
@@ -335,7 +373,7 @@
 
   // ── going on air ───────────────────────────────────────────────────────────
   async function listen() {
-    if (playing) { audio.pause(); playing = false; announce(lastProgramme); return; }
+    if (playing) { audio.pause(); playing = false; announce(lastTitle, lastWho); return; }
     playing = true;
     if (NATIVE_HLS) {
       engine = 'native HLS';
@@ -466,8 +504,8 @@
 
     if (MEDIA_SESSION) {
       d.assert('the lock screen was told what is on',
-        navigator.mediaSession.metadata?.title === lastProgramme,
-        `${navigator.mediaSession.metadata?.title} against ${lastProgramme}`);
+        navigator.mediaSession.metadata?.title === lastTitle,
+        `${navigator.mediaSession.metadata?.title} against ${lastTitle}`);
     } else {
       d.log('no mediaSession in this browser, so nothing to check');
     }
