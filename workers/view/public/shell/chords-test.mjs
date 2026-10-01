@@ -16,7 +16,7 @@
 //
 //   grep -c 'NEGATIVE CONTROL' demo/shell/chords-test.mjs
 
-import { parseChord, parseChords, roman, voiceChord, VOICINGS, QUALITIES, QUALITY_SAYS, noteName, ROOT_OCTAVE }
+import { parseChord, parseChords, CHORD_GAP, roman, voiceChord, VOICINGS, QUALITIES, QUALITY_SAYS, noteName, ROOT_OCTAVE }
   from './chords.mjs';
 
 let pass = 0, fail = 0;
@@ -150,23 +150,47 @@ ok('2 and sus2 are the same three notes under two names',
 //     splitter's own character class rather than against a list, so it refuses
 //     the next unreachable row too.
 {
-  const CHORD_CHARS = /^[A-Za-z0-9#/♯♭]*$/;
-  const unreachable = QUALITIES.map(([n]) => n).filter((n) => !CHORD_CHARS.test(n));
+  /* The splitter's own class, read off the module rather than copied, so the
+     two cannot drift. A row survives the split only if no character of it is a
+     gap. */
+  const unreachable = QUALITIES.map(([n]) => n).filter((n) => n && CHORD_GAP.test(n));
   ok('no row is spelled with a character the line splitter throws away',
     unreachable.length === 0,
     unreachable.map((n) => JSON.stringify(n)).join(', ') || `${QUALITIES.length} rows`);
 }
 
-// 7g. And the measured behaviour the rule above rests on: the plus really is
-//     eaten, so `C+` is C major with NO bad token rather than a refusal a
-//     visitor could see. It is a defect in its own right and it was reported
-//     as one; this asserts what is true today so that widening the splitter
-//     cannot happen quietly.
+// 7g. 🔴 NEGATIVE CONTROL, AND IT IS THE DEFECT ITSELF: `C+` IS AN AUGMENTED
+//     TRIAD. Until 2026-09-30 the plus was the separator and `C+` came back as C
+//     major with nothing refused, a wrong chord a visitor could not see was wrong.
+//     Against that code this is red.
 {
-  const r = parseChords('C+ C^');
-  ok('a glyph quality is eaten by the splitter and read as a plain triad',
-    r.bad.length === 0 && r.chords.length === 2
-    && r.chords.every((c) => c.quality === 'maj' && c.notes.join() === '60,64,67'),
+  const r = parseChords('C+');
+  ok('C+ reads as an augmented triad rather than as C major',
+    r.bad.length === 0 && r.chords.length === 1 && r.chords[0].quality === 'aug'
+    && r.chords[0].notes.join() === '60,64,68',
+    `${r.chords.map((c) => `${c.name} ${c.notes.join(',')}`).join(' ')}, ${r.bad.length} refused`);
+}
+
+// 7h. And a plus standing on its own is still a gap, so a line typed with one
+//     between chords is not suddenly a refusal. `C+7` is refused in words,
+//     because it is not a spelling this table holds, rather than read as
+//     something it is not.
+{
+  const a = parseChords('C + G');
+  const b = parseChords('C+7');
+  ok('a lone plus separates two chords, and C+7 is refused rather than guessed',
+    a.bad.length === 0 && a.chords.map((c) => c.name).join(' ') === 'C G'
+    && b.chords.length === 0 && b.bad.length === 1,
+    `${a.chords.map((c) => c.name).join(' ')}, and C+7: ${b.bad[0]?.why}`);
+}
+
+// 7i. ⚠️ `^` IS STILL THE SEPARATOR AND THIS SAYS SO, so that widening it cannot
+//     happen quietly: `C^` is C major with nothing refused, the same lie `C+`
+//     told, left for its own decision because `^` means a major seventh in iRb.
+{
+  const r = parseChords('C^');
+  ok('a caret is still eaten by the splitter, which is a known lie and not a fix',
+    r.bad.length === 0 && r.chords.length === 1 && r.chords[0].quality === 'maj',
     `${r.chords.map((c) => c.name).join(' ')}, ${r.bad.length} refused`);
 }
 

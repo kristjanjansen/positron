@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  // demo/away/index.html: listen to the Circuit in another building.
+  //
+  // Asked 2026-09-30: *"make other demo for this, 'away', do not touch knobs
+  // tdemo. allow me just to listen in circuit audio from pi in wave visualizer"*,
+  // then *"use stnd waverform display not video canvas on away"*. The picture is
+  // the kit's `createWaveView`, handed the last few seconds of what arrived.
+  //
+  // 🔴 THE CIRCUIT IS AN INPUT IN A ROOM OF ITS OWN, NOT THE BOARD'S ONE SLOT.
+  // Asked the same day: *"can we support both yoshimi and circuit?"*. The board
+  // streams each hardware input into `<room>-<name>` (rig/board/inputs.mjs), so
+  // this page joins `studio-1-circuit` and Yoshimi in `studio-1` is untouched by
+  // anything here, and the other way round.
+  //
+  // 🔴 LISTEN HOLDS A LEASE, AND THAT IS WHAT RUNS THE CAPTURE. The board cannot
+  // see a listener, so while Listen is on this page says `input.want` every
+  // `RENEW_MS` and the board stops capturing a minute after the last one. A
+  // visit alone starts nothing; it joins the room and shows whether the board is
+  // there.
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { createWaveView } from '/shell/wave-view.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createMidi, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
+  import { createPresenceButton } from '/shell/presence.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+
+  const q = new URLSearchParams(location.search);
+  const INPUT = q.get('input') || 'circuit';
+  const ROOM = q.get('room') || `studio-1-${INPUT}`;
+  const RATE = 48000;
+  // How much sound the picture holds, left edge to right edge.
+  const SECONDS = 4;
+  // A sample at or past this is on the rail. 32767 / 32768.
+  const CLIP = 32767 / 32768;
+  // Well inside the board's 60 s lease, so one lost message costs nothing.
+  const RENEW_MS = 20_000;
+  // 10 ms frames on the direct path unless `?frame=20`, which is there to
+  // measure one against the other (plans/plan-away-webrtc.md §5.3, P3).
+  const DIRECT_FRAME_MS = q.get('frame') === '20' ? 20 : 10;
+
+  const d = mount({
+    name: 'away',
+    what: 'Play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives.',
+    readout: { level: 'dBFS', clipped: '', buffer: 'ms', lag: 'ms', via: '', 'round trip': 'ms' },
+    // 🔴 LISTEN AND ONLINE ARE ONE BUTTON, asked 2026-09-30: *"listen + online
+    // is same button"*. The kit's presence button, wearing the badge
+    // `createBoard` already drives, so the face says whether the board is
+    // there and a press starts or stops listening. Built below, once the board
+    // exists, and appended to the control row where the harness presses.
+    controls: [],
+  });
+  guard(d);
+
+  const board = createBoard({
+    room: ROOM,
+    relay: q.get('relay') || undefined,
+    of: 'Raspberry Pi',
+    showName: false,
+    // 🔴 80 ms, DOWN FROM 160, BECAUSE THE LUMPS ARE GONE. MEASURED 2026-09-30:
+    // with arecord at its default 125 ms period the frames arrived in bursts
+    // (p90 gap 117 ms) and 160 was what rode them; at a 10 ms period the gaps
+    // read p50 19.9, p90 23.2, max 94.5. The playout raises its own floor when
+    // it runs dry, up to `maxCushionMs`, so a start that is too low costs one
+    // click and then corrects itself.
+    cushionMs: 80,
+    maxCushionMs: 250,
+    direct: true,
+    directCushionMs: Number(q.get('cushion')) || 40,
+    log: (line, kind) => d.log(line, kind),
+    onOpen: () => { d.log(`joined ${ROOM}`, 'hi'); askStatus(); },
+    onPcm: (f32) => take(f32),
+    onMessage: (m) => {
+      if (m.type === 'board.alive' && 'audio' in m) showSource(m.audio);
+    },
+  });
+
+  const listenBtn = createPresenceButton({
+    badge: board.presence,
+    aria: 'start or stop listening to the Circuit',
+    press: () => pressListen(),
+  });
+  // `data-busy` by hand, because this is not a declared control: verify.mjs
+  // waits on that mark before it reads the page, the same as on /cam/.
+  async function pressListen() {
+    const b = listenBtn.el;
+    b.dataset.busy = '1';
+    try { await d.run('listen'); } finally { delete b.dataset.busy; }
+  }
+  listenBtn.el.title = 'press to listen';
+
+  // ── the picture ───────────────────────────────────────────────────────────
+  const host = el('div', 'away-pic');
+  const wave = createWaveView(host, { height: 160, label: `the last ${SECONDS} seconds from the board` });
+
+  // ── playing it ───────────────────────────────────────────────────────────
+  //
+  // 🔴 A PART IS A CHANNEL, AND A DRUM IS ALSO A NOTE. `plans/plan-circuit-model12.md`
+  // §3.1 and §3.2: Synth 1 on channel 1, Synth 2 on channel 2, all four drums on
+  // channel 10 with Drum 1 at note 60 and Drum 2 at 62 (+2, +2, +1, not even).
+  // So on a drum part every key plays that one drum, and the key only chooses
+  // how hard.
+  // ⚠️ THE BOARD DECIDES WHAT REACHES THE INSTRUMENT, NOT THIS PAGE. It lets
+  // note on, note off and all notes off through on 1, 2 and 10 and refuses the
+  // rest (rig/board/inputs.mjs `midiVerdict`), because a room name is not a
+  // password and the Circuit has no factory reset.
+  const PARTS = {
+    s1: { ch: 1 }, s2: { ch: 2 },
+    d1: { ch: 10, note: 60 }, d2: { ch: 10, note: 62 },
+  };
+  let part = PARTS.s1;
+  const VEL = 100;
+  // What each key actually sent, so a key released after the part changed
+  // ends the note it started rather than one on the new part.
+  const sounding = new Map();
+  let notesSent = 0;
+  function noteOn(key, vel) {
+    const out = { ch: part.ch, note: part.note ?? key };
+    noteOff(key);
+    sounding.set(key, out);
+    if (board.send({ type: 'midi.send', bytes: [0x90 | (out.ch - 1), out.note, Math.max(1, Math.min(127, vel))] })) {
+      notesSent++;
+      if (!pending) pending = { t0: performance.now(), base: recentRms(200) };
+    }
+  }
+  function noteOff(key) {
+    const out = sounding.get(key);
+    if (!out) return;
+    sounding.delete(key);
+    board.send({ type: 'midi.send', bytes: [0x80 | (out.ch - 1), out.note, 0] });
+  }
+  function panic() {
+    for (const k of [...sounding.keys()]) noteOff(k);
+    board.send({ type: 'midi.panic' });
+  }
+
+  const partPick = createChoice({
+    label: 'part',
+    options: [['Synth 1', 's1'], ['Synth 2', 's2'], ['Drums 1', 'd1'], ['Drums 2', 'd2']],
+    at: 0,
+    onPick: (v, name) => { part = PARTS[v]; d.log(`playing ${name}`); showPatch(); },
+  });
+
+  // ── the patch ────────────────────────────────────────────────────────────
+  //
+  // 🔴 A PROGRAM CHANGE ON CHANNEL 1 OR 2, AND ONLY THERE. Asked 2026-09-30:
+  // *"use instument panel for away and patch selector"*. 📄 The Circuit's own
+  // table (`plans/plan-circuit-model12.md` §3.7): on 1 and 2 a program change
+  // selects one of 64 synth patches into RAM; on 16 it selects a SESSION. The
+  // board's gate (`midiVerdict` in rig/board/inputs.mjs) is what enforces that,
+  // not this page. A drum part has no patch here: drums change by CC, which
+  // the gate refuses, so the picker is switched off on one.
+  // ⚠️ IT OPENS EMPTY, BECAUSE NOTHING SAYS WHICH PATCH THE CIRCUIT IS ON.
+  // The board sends nothing back about the instrument's state, so a name here
+  // before a choice would be a claim nobody measured. It shows what THIS page
+  // last sent to each synth.
+  const PATCHES = Array.from({ length: 64 }, (_, i) => `Patch ${i + 1}`);
+  const chosen = { 1: null, 2: null };
+  let lastPatchBytes = null;
+  const synthCh = () => (part.note == null ? part.ch : null);
+  function sendPatch(i) {
+    const ch = synthCh();
+    if (ch == null) return;
+    chosen[ch] = i;
+    lastPatchBytes = [0xC0 | (ch - 1), i];
+    showPatch();
+    if (board.send({ type: 'midi.send', bytes: lastPatchBytes })) d.log(`Synth ${ch} on ${PATCHES[i]}`);
+  }
+  function stepPatch(by) {
+    const ch = synthCh();
+    if (ch == null) return;
+    const at = chosen[ch];
+    sendPatch(at == null ? (by > 0 ? 0 : PATCHES.length - 1) : (at + by + PATCHES.length) % PATCHES.length);
+  }
+  const patchPick = createPicker({
+    what: 'patch',
+    prev: () => stepPatch(-1),
+    next: () => stepPatch(+1),
+    onPick: (i) => sendPatch(i),
+  });
+  patchPick.options(PATCHES, 0);
+  function showPatch() {
+    const ch = synthCh();
+    patchPick.disabled(ch == null);
+    const at = ch == null ? null : chosen[ch];
+    patchPick.show(at == null ? '' : PATCHES[at], at ?? undefined);
+  }
+  showPatch();
+  const midiBtn = el('button', '', 'enable midi', { type: 'button' });
+
+  const kb = createKeyboard(el('div'), {
+    ...keyRange(),
+    base: 48,
+    full: true,
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. A looped note comes back through `onDown` marked `loop`, so
+       it goes to the Circuit by exactly the route a finger does, and a note the
+       take heard over MIDI keeps the velocity it was played with. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
+    onDown: (note, how, vel) => { kb.lightNote(note, true); noteOn(note, vel ?? VEL); },
+    onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
+    onPanic: () => panic(),
+  });
+
+  // ── the instrument ───────────────────────────────────────────────────────
+  // Asked 2026-09-30 with the patch selector. The kit's panel owns the order,
+  // the seams and the insets: the picture, the part row, the keys, and a plate
+  // with ONLINE beside the name and the patch at the far end, unlabelled.
+  const panel = createInstrumentPanel({
+    viz: host,
+    rows: [[[partPick.el, midiBtn], { align: 'between' }]],
+    keys: kb.el,
+    plate: { name: 'Circuit', status: listenBtn.el, patch: patchPick },
+  });
+  d.stack.add(panel.el);
+
+  // ── MIDI in, from a keyboard on this machine ─────────────────────────────
+  // Asked for on a press, or opened by itself only when the browser has
+  // ALREADY said yes: `requestMIDIAccess` is a prompt, and a visit asks nothing.
+  // Every incoming note goes to the part chosen above, whatever channel the
+  // keyboard itself sends on.
+  let midi = null;
+  function openMidi() {
+    if (midi) return midi;
+    midi = createMidi({
+      onDown: (note, vel) => { kb.lightNote(note, true); noteOn(note, vel); },
+      onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
+      log: (line, kind) => d.log(line, kind),
+      onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} playing the Circuit`
+                               : 'no MIDI keyboard is plugged in yet, so nothing will arrive'),
+      loop: kb,
+    });
+    midiBtn.remove();
+    return midi;
+  }
+  midiBtn.addEventListener('click', () => openMidi());
+  (async () => {
+    try {
+      const st = await navigator.permissions?.query({ name: 'midi' });
+      if (st?.state === 'granted') openMidi();
+    } catch { /* no Web MIDI here, so the button stays and says so when pressed */ }
+  })();
+  addEventListener('pagehide', () => panic());
+
+  // ── lag: key press to sound ──────────────────────────────────────────────
+  //
+  // 🔴 MEASURED ON THE SOUND, NOT ADDED UP FROM PARTS. Asked 2026-09-30:
+  // *"show lag"*. A press stamps the clock and remembers how loud the last
+  // 200 ms were; the first frame that comes back at least twice that loud (and
+  // above a floor) is the note arriving. Its arrival time plus the cushion the
+  // playout is holding is when it leaves the speakers, which is what a player
+  // feels. Adding a ping to a buffer would be a number about the pipe, not
+  // about this note.
+  // ⚠️ OVER A LOUD LOOP IT CAN MISS OR MISFIRE, and it says so rather than
+  // guessing: a Circuit pattern already playing can hide a quiet note or land
+  // its own beat inside the window. No onset in `ONSET_WAIT_MS` leaves the cell
+  // alone and says why in the log.
+  const ONSET_WAIT_MS = 1500;
+  const ONSET_FLOOR = 0.01;
+  const isOnset = (frameRms, baseRms) => frameRms > Math.max(ONSET_FLOOR, baseRms * 2);
+  let pending = null, lags = [];
+  function recentRms(ms) {
+    const n = Math.min(ring.length, Math.round(RATE * ms / 1000));
+    let ss = 0;
+    for (let i = 1; i <= n; i++) { const v = ring[(head - i + ring.length) % ring.length]; ss += v * v; }
+    return Math.sqrt(ss / n);
+  }
+  function watchOnset(f32) {
+    if (!pending) return;
+    const now = performance.now();
+    if (now - pending.t0 > ONSET_WAIT_MS) {
+      pending = null;
+      d.log(`no onset heard within ${ONSET_WAIT_MS} ms of that note, so no lag was measured. Is ONLINE pressed, and is the part audible over the pattern?`, 'dim');
+      return;
+    }
+    let ss = 0;
+    for (let i = 0; i < f32.length; i++) ss += f32[i] * f32[i];
+    if (!isOnset(Math.sqrt(ss / f32.length), pending.base)) return;
+    const lag = Math.round(now - pending.t0 + (board.ctx() ? board.stats().bufferedMs : 0));
+    pending = null;
+    lags.push(lag);
+    d.set('lag', lag);
+  }
+
+  // ── the ring the picture reads ────────────────────────────────────────────
+  const ring = new Float32Array(SECONDS * RATE);
+  const ordered = new Float32Array(ring.length);
+  let head = 0, dirty = false;
+  let clipped = 0, frames = 0, sumSq = 0, sumN = 0, sets = 0, lastSet = null;
+
+  function take(f32) {
+    frames++;
+    watchOnset(f32);
+    for (let i = 0; i < f32.length; i++) {
+      const v = f32[i];
+      ring[head] = v;
+      head = (head + 1) % ring.length;
+      if (v >= CLIP || v <= -1) clipped++;
+      sumSq += v * v;
+    }
+    sumN += f32.length;
+    dirty = true;
+    // Five times a second: a readout cell is a fixed box, and nobody reads a
+    // number that changes fifty times a second.
+    if (frames % 10 === 0) {
+      const rms = Math.sqrt(sumSq / Math.max(1, sumN));
+      sumSq = 0; sumN = 0;
+      d.set('level', rms > 0 ? (20 * Math.log10(rms)).toFixed(1) : '', rms > 0.001 ? 'ok' : 'warn');
+      d.set('clipped', clipped, clipped ? 'warn' : 'ok');
+      d.set('buffer', board.ctx() ? Math.round(board.stats().bufferedMs) : '');
+      showPath();
+    }
+  }
+
+  // The whole ring, oldest first, so new sound always enters at the right and
+  // the axis is the same four seconds from the first frame on.
+  function redraw() {
+    requestAnimationFrame(redraw);
+    if (!dirty) return;
+    dirty = false;
+    ordered.set(ring.subarray(head), 0);
+    ordered.set(ring.subarray(0, head), ring.length - head);
+    lastSet = wave.set(ordered, RATE, { name: INPUT });
+    sets++;
+  }
+  requestAnimationFrame(redraw);
+
+  // ── what the board says it is playing ────────────────────────────────────
+  // What the board is capturing goes in the log when it changes, not in a
+  // cell: asked 2026-09-30, *"rm playing from readout"*.
+  function showPath() {
+    const st = board.stats();
+    d.set('via', listening ? st.via : '', st.via === 'relay' ? 'warn' : 'ok');
+    d.set('round trip', listening && st.rttMs != null ? Math.round(st.rttMs) : '');
+  }
+
+  let saidSource;
+  function showSource(s) {
+    if (s === saidSource) return;
+    saidSource = s;
+    d.log(s ? `the board is capturing ${s}` : 'the board is capturing nothing. Press ONLINE to listen', s ? 'hi' : 'dim');
+  }
+
+  async function askStatus() {
+    const r = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
+    if (!r) {
+      d.log(`no board answered in ${ROOM} within six seconds. Its ${INPUT} input may not be configured`, 'warn');
+      return null;
+    }
+    showSource(r.ok ? r.source : null);
+    return r;
+  }
+
+  // ── Listen ───────────────────────────────────────────────────────────────
+  // ⚠️ MUTE DISCONNECTS THE SPEAKERS, IT DOES NOT SUSPEND THE CONTEXT.
+  // board.mjs reads a suspended context as the browser refusing sound and says
+  // "tap anywhere", which would be a false instruction after a deliberate mute.
+  // ⚠️ AND MUTE STOPS RENEWING RATHER THAN SAYING `input.stop`, because somebody
+  // else may be listening to the same input; the lease lapses on its own.
+  let listening = false, renew = null;
+  async function want() {
+    const r = await board.ask({ type: 'input.want' }, 'input.wanted', 6000);
+    if (!r) { d.log(`the board did not answer for ${INPUT}`, 'warn'); return; }
+    if (r.started) d.log(`the board started capturing ${INPUT}`, 'hi');
+    showSource(r.ok ? r.source : null);
+  }
+  d.on('listen', async () => {
+    const ctx = await board.startAudio();
+    const out = board.playout();
+    if (!listening) {
+      listening = true;
+      if (out) { try { out.connect(ctx.destination); } catch { /* already connected */ } }
+      listenBtn.el.dataset.on = '1';
+      listenBtn.el.title = 'listening. Press to mute';
+      // The relay starts the sound at once; the direct path, if it opens, takes
+      // over the frames and the sends without a gap in either.
+      board.goDirect({ frameMs: DIRECT_FRAME_MS }).then(showPath);
+      board.watchRtt(2000);
+      await want();
+      renew = setInterval(want, RENEW_MS);
+    } else {
+      listening = false;
+      clearInterval(renew); renew = null;
+      board.watchRtt(0);
+      showPath();
+      if (out) { try { out.disconnect(ctx.destination); } catch { /* already off */ } }
+      delete listenBtn.el.dataset.on;
+      listenBtn.el.title = 'press to listen';
+      d.log('muted. The board stops capturing a minute after the last listener');
+    }
+  });
+
+  d.ready();
+
+  // ── checks, for a harness only ───────────────────────────────────────────
+  ifSelfcheck(async () => {
+    // A harness may not start the capture: the board is shared hardware in
+    // another building, and board.mjs refuses every send under selfcheck.
+    d.assert('a harness run cannot start the capture', board.driving() === false);
+    const path = await board.goDirect();
+    d.assert('a harness run opens no direct path to the board, because an offer is a send',
+      path === 'refused' && board.stats().via === 'relay', `${path}, via ${board.stats().via}`);
+    d.assert('the page listens in the input room, not the instrument room', ROOM.endsWith(`-${INPUT}`), ROOM);
+    // A drum part turns every key into its one drum, and the key that started
+    // a note is the key that ends it even after the part changes. Driven
+    // through the real functions with the board refusing, so nothing is sent.
+    const was = part;
+    part = PARTS.d2; noteOn(70, 90);
+    const drum = sounding.get(70);
+    part = PARTS.s1; noteOff(70);
+    part = was;
+    d.assert('Drums 2 plays note 62 on channel 10 from any key', drum?.ch === 10 && drum?.note === 62, JSON.stringify(drum));
+    d.assert('a key released after the part changed ends its own note', !sounding.has(70));
+    // The onset rule, on made-up levels: a note out of quiet counts, the same
+    // level as before does not, and a whisper under the floor does not.
+    d.assert('lag starts at a sound twice as loud as the moment before it',
+      isOnset(0.2, 0.05) && !isOnset(0.2, 0.2) && !isOnset(0.008, 0.001));
+    // The patch is a program change on the synth's own channel, and a drum
+    // part has none. Driven through the real functions; the board refuses.
+    const wasPart = part, refusedBefore = board.refusedToBoard();
+    part = PARTS.s2; showPatch(); sendPatch(4);
+    d.assert('Patch 5 on Synth 2 is program change 4 on channel 2', JSON.stringify(lastPatchBytes) === '[193,4]', JSON.stringify(lastPatchBytes));
+    d.assert('and it went to the board, which refused it under a harness', board.refusedToBoard() === refusedBefore + 1, `${board.refusedToBoard() - refusedBefore} refused`);
+    part = PARTS.s1; showPatch();
+    d.assert('each synth keeps its own patch, and Synth 1 was never sent one', chosen[1] == null && chosen[2] === 4 && patchPick.select.disabled === false);
+    part = PARTS.d1; showPatch();
+    d.assert('a drum part has no patch picker, because drums change by CC', patchPick.buttons.every((b) => b.disabled) && patchPick.select.disabled);
+    part = wasPart; chosen[2] = null; showPatch();
+    d.assert('the patch picker sits on the plate with no label', !!patchPick.el.closest('.pos-ipanel-plate') && !patchPick.el.querySelector('.pos-pick-l'));
+    d.assert('the four parts are Synth 1, Synth 2, Drums 1 and Drums 2',
+      JSON.stringify(Object.values(PARTS).map((p) => [p.ch, p.note ?? null])) === '[[1,null],[2,null],[10,60],[10,62]]');
+    /* `Loop` follows the Evolution, and a loop reaches `board.send`, counted by
+       the board module on the far side of this page: a harness run is refused
+       there, so this is every note that was on its way to the Circuit and
+       nothing was heard. */
+    await checkEvolutionLoop(d, {
+      keys: kb, heard: () => board.refusedToBoard(),
+      ports: (names) => offerLoopFor(kb, names, d.log), real: () => midi?.names() ?? [],
+    });
+    const t0 = performance.now();
+    while (!frames && performance.now() - t0 < 6000) await new Promise((r) => setTimeout(r, 200));
+    if (!frames) {
+      // Nobody is holding the lease, which is the normal state. Said, not failed.
+      d.log(`no frames in ${ROOM}: nobody is listening, so the board is not capturing`, 'dim');
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 600));
+    d.assert('frames from the board reach the standard waveform', sets > 0 && lastSet?.ok === true, `${frames} frames, ${sets} draws`);
+    d.assert('each frame is the 20 ms the board publishes',
+      board.stats().shapeWrong === 0, board.stats().shapeSaid || '');
+    d.assert('the picture has sound in it, not a flat line', (lastSet?.lit ?? 0) > 0, `${lastSet?.lit} lit columns`);
+  }, { log: d.log });
+</script>
+<style>
+  /* The picture fills its row of the panel. */
+  .away-pic > .pos-wave { width: 100%; }
+</style>
+</html>

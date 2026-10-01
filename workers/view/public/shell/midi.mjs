@@ -17,6 +17,131 @@
 // that reports a missing optional capability as an error teaches its reader that
 // red means nothing.
 
+import { DESK } from './instruments.mjs';
+
+/**
+ * 🔴 IS THIS PORT THE EVOLUTION, ASKED ONCE FOR EVERY KEYBOARD PAGE. Asked
+ * 2026-09-30: *"enable loop button and fucntioanly on onscreen keyboar when
+ * evolution is connceted"*, on every page that draws keys. `/nola/` carried the
+ * test as its own regular expression and `/evo/` as a second copy; both were
+ * spellings of the entry `instruments.mjs` already keeps for this keyboard, so
+ * the pattern is READ from there and nowhere else types it.
+ * ⚠️ THE MODEL NUMBER, NOT THE BRAND. CoreMIDI calls the port `MK-425C USB MIDI
+ * Keyboard`, so the word `Evolution` is in nobody's port list, and
+ * `instruments.mjs` records that measurement beside the pattern.
+ */
+export const EVOLUTION = DESK.find((e) => e.maker === 'Evolution');
+/** @param {string} name  a MIDI port name, possibly empty */
+export const isEvolution = (name) => EVOLUTION.match.test(name || '');
+/** @param {string[]} names  every input port name, as `createMidi` hands them over */
+export const evolutionIn = (names = []) => names.some(isEvolution);
+
+/**
+ * 🔴 OFFER A KEYBOARD'S `Loop` WHILE THE EVOLUTION IS PLUGGED IN, AND TAKE IT
+ * AWAY WHEN IT GOES. This is `/nola/`'s `onPorts` body lifted out whole, so
+ * every page answers the question with the same test and says it in the same
+ * two log lines. `createMidi({ loop: kb })` calls it on every port change; a
+ * page with MIDI of its own calls it with its own list of input names.
+ * ⚠️ AND IT IS THE PATH A CHECK DRIVES. Handing it a made up list is the same
+ * call a cable makes, so *an Evolution appeared* and *a Circuit appeared* are
+ * both reachable on a desk with nothing plugged in.
+ * ⚠️ IT LOGS ONLY ON A CHANGE, or a keyboard that reports itself twice says it
+ * twice. A log line is for something that happened.
+ * @param keys   a `createKeyboard` built with `loop` on
+ * @param names  input port names
+ * @param log    `d.log`, or nothing
+ * @returns {boolean} whether `Loop` is in the row now
+ */
+export function offerLoopFor(keys, names = [], log = null) {
+  const had = keys.loopOffered();
+  const now = keys.offerLoop(evolutionIn(names));
+  if (now !== had) {
+    log?.(now
+      ? 'the Evolution is here, so Loop is back in the keyboard’s footer'
+      : 'the Evolution has gone, so Loop has left the footer and anything '
+        + 'it was playing has stopped. The takes are still on their slots');
+  }
+  return now;
+}
+
+/** the input names off a `MIDIAccess`, for a page that opened MIDI itself */
+export const inputNames = (access) =>
+  [...(access?.inputs?.values?.() ?? [])].map((p) => p.name || '');
+
+/**
+ * 🔴 THE CHECK EVERY KEYBOARD PAGE MAKES ABOUT IT, WRITTEN ONCE. A page hands
+ * over its keyboard, its `d`, the call that answers a port change, and a counter
+ * of notes that reached ITS OWN sound path, which is the half only the page
+ * knows: the board on `/away/` and `/knobs/`, the synth voices on
+ * `/instrument/`, the lamp on `/evo/`, which has no sound at all.
+ * ⚠️ FIVE CLAIMS, AND THE SECOND IS THE NEGATIVE CONTROL THAT PROVES THE TEST.
+ * A pattern that matched every name would pass the second claim and fail this
+ * one, which is the sabotage it was proved with.
+ * ⚠️ `heard` IS COUNTED BY THE PAGE, ON THE FAR SIDE OF ITS OWN HANDLER, never
+ * by the keyboard, whose own counter would agree with itself whatever the page
+ * did with a note. `key` is a letter the keyboard draws, pressed the way a
+ * finger presses it.
+ * ⚠️ AND IT PUTS THE ROW BACK AS THE PORTS REALLY ARE, so a person with the
+ * Evolution plugged in is not left without `Loop` by a check.
+ * ⚠️ `timed: false` MAKES ONLY THE THREE CLAIMS THAT COST NO TIME. MEASURED
+ * 2026-09-30 on `/nola/`: the two timed claims add about a second, and that
+ * page's checks already run to within that of `verify.mjs`'s 24 s ceiling, so
+ * its last 16 asserts stopped arriving and the run still read green. `/nola/`
+ * grades a loop sounding over MIDI on its own and `/kit/` grades a withdrawn
+ * loop stopping with its take kept, so it takes the three and not the two.
+ * @returns {Promise<void>}
+ */
+export async function checkEvolutionLoop(d, { keys, ports, heard, real = () => [], key = null, timed = true }) {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const inRow = () => keys.loopOffered()
+    && !!keys.el.querySelector('.kpad-grp-end')?.contains(keys.loop.el);
+  /* the leftmost key, found by its note rather than by a letter a page may not bind */
+  const k = key ?? keys.keyOf(keys.base);
+  ports([]);
+  const none = inRow();
+  ports(['Circuit', 'Fast Track Pro']);
+  const others = inRow();
+  d.assert('with no Evolution plugged in the keyboard offers no Loop',
+    keys.loop !== null && none === false,
+    `no ports: Loop ${none ? 'in' : 'out of'} the row`);
+  d.assert('NEGATIVE CONTROL: a Circuit and a Fast Track Pro do not bring Loop',
+    others === false, `ports Circuit and Fast Track Pro: Loop ${others ? 'in' : 'out of'} the row`);
+  ports(['MK-425C USB MIDI Keyboard']);
+  const evo = inRow();
+  d.assert('an Evolution port brings Loop into the keyboard’s footer',
+    evo === true, `port "MK-425C USB MIDI Keyboard": Loop ${evo ? 'in' : 'out of'} the row`);
+  if (!timed) { ports(real()); return; }
+
+  /* A take of two presses of one key, closed, then a lap and a margin. The lap
+     floor is 250 ms, so 350 ms is a whole turn. */
+  keys.loops.clear(0); keys.loops.forget();
+  keys.loop.el.click(); keys.loops.settle(0);
+  keys.press(k, 'pointer'); await wait(40); keys.release(k, 'pointer');
+  await wait(60);
+  keys.press(k, 'pointer'); await wait(40); keys.release(k, 'pointer');
+  keys.loop.el.click(); keys.loops.settle(0);
+  const h0 = heard();
+  await wait(350);
+  const h1 = heard();
+  const going = keys.loops.state(0);
+  d.assert('a loop played on the on-screen keys comes back round through this page’s own note path',
+    going === 'looping' && h1 - h0 >= 1,
+    `${keys.taped(0)} movement(s) taped, state ${going}, and ${h1 - h0} note(s) reached `
+    + 'the page’s sound path in the lap after the take closed');
+
+  ports(['Circuit']);
+  const gone = { inRow: inRow(), state: keys.loops.state(0), taped: keys.taped(0) };
+  const h2 = heard();
+  await wait(350);
+  const h3 = heard();
+  d.assert('the Evolution going takes Loop away, stops the loop and keeps its take',
+    gone.inRow === false && gone.state === 'stopped' && gone.taped > 0 && h3 === h2,
+    `Loop ${gone.inRow ? 'in' : 'out of'} the row, slot ${gone.state} with ${gone.taped} `
+    + `movement(s) kept, and ${h3 - h2} note(s) sounded in the lap after`);
+  keys.loops.clear(0); keys.loops.forget();
+  ports(real());
+}
+
 /**
  * @param {object} o
  * @param {(note:number, vel:number, ch:number, at:number)=>void} o.onDown
@@ -54,7 +179,23 @@ export function createMidi({
    * it is for a page to say what arrived when what arrived was nothing it knows.
    */
   onAny = null,
+  /**
+   * 🔴 A KEYBOARD WHOSE `Loop` FOLLOWS THE EVOLUTION. Pass the `createKeyboard`
+   * and every port change runs `offerLoopFor` on it with this module's `log`,
+   * so a page writes one option instead of copying `/nola/`'s callback. It runs
+   * on the refused and unsupported paths too, with no names, because *this
+   * browser cannot see a MIDI port* is also *the Evolution is not here*.
+   * ⚠️ BUILD THE KEYBOARD WITH `loop: 'evolution'` AS WELL, which starts it
+   * withdrawn. A page that opens MIDI only on a press would otherwise show `Loop`
+   * until that press, and a control that vanishes under a hand is worse than
+   * one that arrives.
+   */
+  loop: loopKeys = null,
 } = {}) {
+  const ported = (n, list) => {
+    onPorts(n, list);
+    if (loopKeys) offerLoopFor(loopKeys, list, log);
+  };
   let ports = 0, state = 'asking', access = null;
   /** the input port names, rebuilt on every change, so a page can say which device */
   const names = [];
@@ -95,13 +236,13 @@ export function createMidi({
        rather than a `null` a caller's regular expression would throw on. */
     for (const p of access.inputs.values()) { wire(p); names.push(p.name || ''); ports++; }
     state = ports ? 'connected' : 'none plugged in';
-    onPorts(ports, [...names]);
+    ported(ports, [...names]);
   };
 
   (async () => {
     if (!navigator.requestMIDIAccess) {
       state = 'unsupported';
-      onPorts(0, []);
+      ported(0, []);
       log('this browser has no MIDI, but the keys on screen still play', 'warn');
       return;
     }
@@ -118,7 +259,7 @@ export function createMidi({
                 : 'no MIDI keyboard plugged in; the keys on screen still play');
     } catch (e) {
       state = 'refused';
-      onPorts(0, []);
+      ported(0, []);
       log(`MIDI was refused: ${e.message}`, 'warn');
     }
   })();

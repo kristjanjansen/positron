@@ -83,7 +83,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView, STRIP_FOOTER_EMPTY } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
-  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { ifSelfcheck, SELFCHECK } from '/shell/selfcheck.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { formatTime } from '/timeline/strip.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -430,9 +430,37 @@
        * can see needs words. This is the only honest thing left: there is
        * nothing to start.
        */
+      /**
+       * 🔴 AND SINCE 2026-09-30 A PRESS WITH NOTHING PICKED STARTS THE FIRST
+       * MARK ON THE LINE, film or radio, whichever went out first. Asked:
+       * *"when i press play, reel demo short start from first (whaterver
+       * playing). no selection needed"*. The rule above is about a VISIT and
+       * still holds: a load opens nothing. A person pressing play is a person
+       * asking to listen, which is exactly when a broadcaster's server may be
+       * reached.
+       * ⚠️ THE HARNESS PRESSES THIS BUTTON (`verify.mjs`, the transport
+       * toggle), SO UNDER `?selfcheck=1` IT PICKS AND DOES NOT OPEN. Otherwise
+       * every run of the suite would hold an ERR stream from a headless Chrome.
+       */
       if (!current) {
-        d.log('nothing is picked yet. Press a mark on the line, or step to a day with the arrows');
-        deck.play();
+        // ⚠️ FIRST FROM WHERE THE PLAYHEAD STANDS, NOT FROM THE YEAR'S START.
+        // The page opens on the first newsreel's day, and the radio archive
+        // has marks days before it, so "the first" measured from 1 January
+        // jumped the playhead BACK to a radio programme the reader never saw
+        // on screen, and `verify.mjs`'s "play advances position" caught the
+        // clock going backwards. Past the last mark, the very first one.
+        const all = [...items, ...radio];
+        const earliest = (xs) => xs.reduce((a, b) => (!a || b.at < a.at ? b : a), null);
+        const at = deck.position();
+        const first = earliest(all.filter((it) => it.at >= at)) || earliest(all);
+        if (!first) { d.log('nothing to play yet, the archive list has not arrived'); deck.play(); return; }
+        if (SELFCHECK) {
+          select(first);
+          d.log(`picked the first mark, ${first.date}, and opened nothing: a harness press never reaches ERR`);
+          deck.play();
+          return;
+        }
+        play(first);
         return;
       }
       // Picked but not open: THIS is the press that asks ERR for it, and it is
@@ -514,6 +542,13 @@
     // the half of the decision that needs nothing from ERR: driving `stripSeek`
     // itself opens a stream.
     onSeek: (at) => stripSeek(at),
+    // THE LANE'S OWN THREE LINES AND NOTHING ABOVE THEM. The strip's default
+    // block opens with the lane name and the time under the pointer, which
+    // here is `newsreels` (the gutter an inch to the left already says it) and
+    // the date (which `describeRow` already carries), and in a three line box
+    // that header pushed the length off the bottom. Off a mark, the default
+    // stands, so the box still says where the pointer is.
+    describeHit: (hit) => (hit.row && hit.lane.describeRow ? hit.lane.describeRow(hit.row) : null),
     /**
      * 🔴 WHAT YOU ARE POINTING AT GOES UNDER THE LINE, NOT OVER IT. Asked
      * 2026-09-19 with a photograph of this page on an iPhone: *"add feature to

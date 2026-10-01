@@ -166,10 +166,41 @@ export const STREAM = {
   unknown: 'stream off',
 };
 /**
+ * 🔴 AND EACH STREAMING PAGE NAMES ITS OWN TRANSPORT. Asked 2026-09-30:
+ * *"webrtc demo: button labels: WEBRTC OFF / WEBRTC ON. analogue titles form
+ * moq / llhls"*. The `CAMERA` shape below, with the transport's name in it, so
+ * `/webrtc/`, `/llhls/` and `/moq/` read differently while sharing one
+ * vocabulary. The badge uppercases by CSS, so `LL-HLS` is written as it is
+ * said and `MoQ` reads MOQ.
+ */
+export const streamSays = (name) => ({
+  online: `${name} on`,
+  checking: 'starting',
+  coming: 'starting',
+  offline: `${name} off`,
+  unknown: `${name} off`,
+});
+/**
  * Which of those a live stream badge can reach, which is what its width is
  * measured on. The same pairing `transport-bar.mjs` uses for `ON_AIR_CAN`.
  */
 export const STREAM_CAN = ['offline', 'coming', 'online'];
+
+/**
+ * 🔴 WHAT A CAMERA SAYS, THE SAME SHAPE AS `STREAM`. Asked 2026-09-30 against
+ * `/cam/`: *"stat / stop camera: convert to oline status button: CAMERA ON |
+ * CAMERA OFF"*. The badge uppercases by CSS, so the words are written as they
+ * are said. `starting` covers the camera permission and the legs coming up,
+ * which is the one stretch where a press means stop.
+ */
+export const CAMERA = {
+  online: 'camera on',
+  checking: 'starting',
+  coming: 'starting',
+  offline: 'camera off',
+  unknown: 'camera off',
+};
+export const CAMERA_CAN = ['offline', 'coming', 'online'];
 
 /** How many expected beats may be missed before it is called gone. */
 export const MISSES = 2;
@@ -674,8 +705,13 @@ export function createPresence({
  * handed to `createPresence`. Returns the presence api with `el` being the
  * BUTTON, plus `badge` for the element inside it.
  */
-export function createPresenceButton({ of = '', press = () => {}, aria = '', ...rest } = {}) {
-  const badge = createPresence({ of, mode: 'badge', ...rest });
+export function createPresenceButton({ of = '', press = () => {}, aria = '', badge: given = null, ...rest } = {}) {
+  /* ⚠️ `badge` WRAPS A BADGE SOMEBODY ELSE ALREADY DRIVES, added 2026-09-30 for
+     `/away/`: *"listen + online is same button"*. That page's badge belongs to
+     `createBoard`, which moves it from the board's own messages, and a second
+     badge built here would be a second copy of one fact that could disagree
+     with the first. Omitted, this builds its own exactly as before. */
+  const badge = given || createPresence({ of, mode: 'badge', ...rest });
   const b = document.createElement('button');
   b.type = 'button';
   /* ⚠️ SECONDARY, NOT PRIMARY. Asked 2026-09-21: *"secodard button for

@@ -82,6 +82,10 @@ export const QUALITIES = [
    * the missing `M` row below is a note about. Widening the splitter is a
    * change to the GRAMMAR rather than to this table, so it was reported and
    * deliberately not made here.
+   * ✅ `+` WAS MADE ON 2026-09-30, grammar and row together, and its row sits
+   * beside `aug`. ⚠️ `^` IS STILL A SEPARATOR, so `C^` still reads as C major
+   * with nothing refused. That is the same lie and it is left for its own
+   * decision, because `^` is a major seventh in iRb and nothing else.
    */
   ['hdim7', [0, 3, 6, 10]],
   ['h7', [0, 3, 6, 10]],
@@ -90,6 +94,14 @@ export const QUALITIES = [
   ['min', [0, 3, 7]],
   ['dim', [0, 3, 6]],
   ['aug', [0, 4, 8]],
+  /* 🔴 `+` IS AN AUGMENTED TRIAD AND UNTIL 2026-09-30 IT WAS A SEPARATOR, SO
+     `C+` READ AS C MAJOR WITH NOTHING REFUSED. A wrong chord is worse than a
+     refused one. It is READ rather than refused because it is the ordinary way
+     to write the chord: the corpora write it 48 times, `chord-corpus.mjs`'s
+     `classOf` and `suggest.mjs`'s `SPELL_ALIAS` already fold it onto `aug`, and
+     `aug` is already a row, so it adds no quality anywhere downstream. The
+     splitter keeps `+` as a chord character for exactly this row. */
+  ['+', [0, 4, 8]],
   ['sus', [0, 5, 7]],
   ['m13', [0, 3, 7, 10, 14, 21]],
   ['m11', [0, 3, 7, 10, 14, 17]],
@@ -161,7 +173,7 @@ export const QUALITY_SAYS = {
   '': 'maj', m: 'min', min: 'min', maj: 'maj',
   m6: 'min6', m7: 'min7', m9: 'min9', m11: 'min11', m13: 'min13',
   m7b5: 'min7b5', sus: 'sus4',
-  hdim7: 'min7b5', h7: 'min7b5', h: 'min7b5', o7: 'dim7', o: 'dim',
+  hdim7: 'min7b5', h7: 'min7b5', h: 'min7b5', o7: 'dim7', o: 'dim', '+': 'aug',
 };
 
 /** The default octave a chord is voiced in. C4 is 60, which is middle C. */
@@ -309,8 +321,13 @@ export function roman(chord, keyPc) {
  * @returns {{chords: object[], bad: object[]}} both halves, because a token that
  *   did not parse has to be shown back rather than silently missing.
  */
+/** What a typed line is split on: everything that cannot be part of a chord. */
+export const CHORD_GAP = /[^A-Za-z0-9#/♯♭+]+/;
+
 export function parseChords(line) {
-  const parts = String(line ?? '').split(/[^A-Za-z0-9#/♯♭]+/).filter(Boolean);
+  /* ⚠️ `+` IS A CHORD CHARACTER SINCE 2026-09-30, FOR `C+`, AND A `+` STANDING
+     ON ITS OWN IS STILL A GAP, so `C + G` is two chords rather than a refusal. */
+  const parts = String(line ?? '').split(CHORD_GAP).filter((p) => p && !/^\++$/.test(p));
   const chords = [], bad = [];
   for (const part of parts) {
     const c = parseChord(part);

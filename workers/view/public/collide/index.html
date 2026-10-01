@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<!-- No page rules. The panel, the code box, the knobs, the keys and the compile
+     note are all the kit's. -->
+
+<script type="module">
+  /**
+   * collide. A synth typed in SuperCollider, compiled in this tab, played by
+   * SuperCollider's own server running in the tab.
+   *
+   * Asked 2026-09-30: *"can you do simple supercollider script browser compile
+   * demo as in fau called collide? do we have moving pieces?"*. `/fau/` is the
+   * model, and this page is laid out the way that one is so the two read as a
+   * pair: type a program, it compiles when you stop typing, you play it from
+   * the keys.
+   *
+   * ── WHAT IS ACTUALLY HAPPENING ───────────────────────────────────────────────
+   *
+   * 🔴 THE TEXT IS A SMALL SUBSET OF THE SuperCollider LANGUAGE, AND THE PAGE
+   * SAYS SO IN ITS ONE SENTENCE. sclang, the real language, does not run in a
+   * browser (`research/supercollider-browser-2026-09.md` §1.3), and running it
+   * on the Raspberry Pi was refused because it would run a visitor's text on
+   * the board, where sclang can shell out. So `demo/shell/sclang-lite.mjs`
+   * reads the text and writes the bytes of a SynthDef in JavaScript, which is
+   * what sclang would have handed the server. Anything it does not know is
+   * refused with a line and a column, never guessed. Its header lists what it
+   * takes and what it refuses.
+   * ✅ THE SERVER IS THE REAL ONE. scsynth compiled to WebAssembly (SuperSonic,
+   * vendored in `demo/shell/vendor/`, booted by `demo/shell/scsynth.mjs`, the
+   * same engine `/grains/` and `/radio/` run) takes the bytes with `/d_recv`
+   * and plays a note per key with `/s_new`. So a wrong byte is heard or
+   * refused by SuperCollider itself, and the checks below grade the engine's
+   * answers rather than this page's opinion of its own output.
+   *
+   * ── WHEN THINGS HAPPEN ──────────────────────────────────────────────────────
+   *
+   * 🔴 THE COMPILE IS ON LOAD AND THE ENGINE IS ON THE FIRST TOUCH, WHICH IS
+   * `/fau/`'s SHAPE (*"fau: compile on loading so i can play"*). The compile
+   * here costs less than a millisecond and pulls nothing, so the box opens
+   * with its program already compiled and its size in the readout. The engine
+   * is a sound device (an AudioContext and an AudioWorklet) and 1.83 MB of
+   * this site's own files, so it is built by the first gesture on the
+   * instrument and not by a visit, as on every sound page here.
+   * ⚠️ A KEY PRESSED WHILE THE ENGINE IS STILL BOOTING IS KEPT AND SOUNDED WHEN
+   * IT IS UP, and a key let go inside that window is taken out again, which is
+   * `/fau/`'s `waiting` map for the same reason.
+   *
+   * 🔴 A RECOMPILE DOES NOT CUT A HELD NOTE, SO THE IDLE COMPILE NEVER WAITS.
+   * `/fau/` hands `compile-idle.mjs` a `notNow` because its recompile builds a
+   * new worklet node and forgets every key. Here a compile is a new DEFINITION
+   * sent under the one name `collide`: a synth already sounding keeps the graph
+   * it was started with and still answers its own `gate`, and only the next key
+   * uses the new one. So `notNow` is left at its default.
+   * ✅ ONE NAME SINCE 2026-09-30, BECAUSE scsynth ALREADY DOES THE BOOKKEEPING.
+   * This page used a new name per compile (`collide_1`, `collide_2`, ...) and
+   * freed the old ones itself off `/n_end`, because replacing a definition
+   * under a running synth had never been measured. READ in
+   * `server/scsynth/SC_GraphDef.cpp` at commit 19954900: `GraphDef_Define`
+   * takes the old definition out of the table and decrements its `mRefCount`,
+   * every running synth holds one reference (`Graph_Ctor` increments it in
+   * `SC_Graph.cpp`), and `Graph_Dtor` frees the definition when the last synth
+   * on it ends. MEASURED on this engine the same day: a sine on `x` read
+   * 0.0707 rms before and 0.0707 after a filtered saw was sent as `x`, still
+   * answered `/n_set freq 880`, which the new program does not have, and a new
+   * `/s_new x` ran the saw beside it (6 UGens, then 13 with both). So the
+   * page's own copy of that reference counting went, and the checks below
+   * grade the property on every run.
+   *
+   * ── A KEY, AND LETTING IT GO ────────────────────────────────────────────────
+   *
+   * A key sends `/s_new` with `freq` and, where the program declares one,
+   * `gate 1`. What letting go does depends on what the compiler reported:
+   *   a `gate` that an EnvGen reads and a `doneAction: 2`  ->  `/n_set gate 0`
+   *   no gate, and a `doneAction: 2`                       ->  nothing, it ends
+   *   no `doneAction: 2` anywhere                           ->  `/n_free`, a cut
+   * The third is said in the log when it is compiled, because a cut is audible
+   * and a visitor should know it is the program and not the page.
+   *
+   * ── THE KNOBS UNDER THE TEXT ────────────────────────────────────────────────
+   *
+   * 🔴 EVERY CONTROL THE PROGRAM DECLARES, EXCEPT THE ONES A KEY SETS, IS A
+   * KNOB IN ONE ROW UNDER THE TEXT, AND THE SYNTAX IS SuperCollider's OWN.
+   * Asked 2026-09-30 (*"variables in code ... that are under the code and
+   * adjust parameters in real time"*), and settled as real syntax so the text
+   * still runs in a real SuperCollider: an argument, or a NamedControl like
+   * `\rel.kr(1.5, spec: [0.05, 6, \exp])`, whose spec is the knob's range and
+   * warp. `sclang-lite.mjs` reports them as `knobs`, `param-knobs.mjs` draws
+   * them, and a turn sends `/n_set <node> <name> <value>` to every node that is
+   * still sounding on a program that has that control, released ones
+   * included, while a new key sends the knob's value in its `/s_new`.
+   * ⚠️ THE PAD'S `rel` IS A NAMED CONTROL AND NOT AN ARGUMENT ON PURPOSE. An
+   * argument carries no range in the language, so its knob would be drawn
+   * from a guess; a spec is written where the number is, and it is the form
+   * sclang's own GUIs read.
+   * ⚠️ AND A RELEASE IS READ WHEN THE GATE CLOSES. EnvGen takes a segment's
+   * time as the segment starts, so a turn changes the tail of a held note and
+   * of every note after it, and not a tail that has already begun.
+   */
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createMidi, offerLoopFor, checkEvolutionLoop } from '/shell/midi.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
+  import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
+  import { bootScsynth } from '/shell/scsynth.mjs';
+  import { compile } from '/shell/sclang-lite.mjs';
+  import { readSynthDef } from '/shell/synthdef.mjs';
+  import { PRESETS } from '/collide/presets.mjs';
+
+  const ONE = 'a synth typed in a small subset of SuperCollider, compiled in this tab '
+            + 'whenever you stop typing';
+
+  const d = mount({
+    name: 'collide',
+    // The index's own line, verbatim, because this page has a diagram.
+    what: ONE,
+    /**
+     * Four cells and every one moves: a compile takes a different time, a
+     * different program is a different size and a different number of blocks,
+     * and every load is timed. `load` stays empty until the engine exists,
+     * because nothing unmeasured prints as 0.
+     */
+    readout: {
+      compile: 'ms',
+      synthdef: 'B',
+      blocks: '',
+      load: 'ms',
+    },
+  });
+  guard(d);
+
+  /** What each cell has ever shown, so "every cell moves" is measured. `/fau/`'s idea. */
+  const moved = new Map(Object.keys(d.api.readout).map((k) => [k, new Set()]));
+  function setCell(k, v) {
+    moved.get(k)?.add(String(v));
+    d.set(k, v);
+  }
+
+  // ── the engine, on the first touch ──────────────────────────────────────────
+
+  let ctx = null, eng = null, booting = null, midi = null;
+  /** Every `/d_recv` this page has sent, so a refused program can be shown to send none. */
+  let sent = 0;
+
+  /**
+   * Bring scsynth up. The AudioContext is made HERE, synchronously, so a key
+   * press is the gesture that owns it; the boot after it is an await.
+   */
+  function boot() {
+    if (eng) return Promise.resolve(eng);
+    if (booting) return booting;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Fired and not awaited: `resume()` waits on a gesture and never rejects.
+    ctx.resume?.();
+    booting = bootScsynth({ audioContext: ctx, log: d.log, onReply: heard })
+      .then((e) => { eng = e; startMidi(); return e; })
+      .catch((e) => { d.log(`SuperCollider did not start: ${e?.message || e}`, 'bad'); booting = null; throw e; });
+    return booting;
+  }
+
+  // ── what the server says about its nodes ────────────────────────────────────
+  //
+  // `bootScsynth` sends `/notify 1`, so every node start and end comes back.
+  // `/n_end` is consumed here: it is what a check reads to know a note has
+  // really finished rather than gone quiet. Freeing a replaced definition is
+  // the server's own job, see the header.
+  const ended = new Set();
+  /** Every node still on the server, held or releasing, and the program it runs. */
+  const live = new Map();
+  function heard(m) {
+    if (m[0] !== '/n_end') return false;
+    ended.add(m[1]);
+    live.delete(m[1]);
+    return true;
+  }
+
+  // ── the knobs under the text ────────────────────────────────────────────────
+
+  /** How many `/n_set`s a turn has sent, so a check can tell a turn that reached the server. */
+  let turned = 0;
+  /* While a knob is held, its parameter's text in the box is lit. */
+  const knobs = createParamKnobs({
+    onChange: (name, v) => turn(name, v),
+    onHold: (name, on) => source.mark(name, on),
+  });
+  /** A turn reaches every node still sounding on a program that has the control. */
+  function turn(name, v) {
+    if (!eng) return;
+    for (const [id, def] of live) {
+      if (!def.controls.some((c) => c.name === name)) continue;
+      eng.send('/n_set', id, name, v);
+      turned++;
+    }
+  }
+  /**
+   * 🔴 ONE HUE BOOK FOR THE TEXT AND THE KNOBS, ASSIGNED ON A COMPILE THAT
+   * WORKED AND NEVER ON A KEYSTROKE (`code-lang.mjs`, `createHueBook`). The
+   * code box reads it for each parameter's snippet and this page writes the
+   * same number onto each knob as `--param-hue`, so a name in the text and its
+   * knob are one colour by construction. Only a parameter with a knob gets
+   * one: `freq`, `amp` and `gate` are set by a key and stay plain.
+   */
+  const book = createHueBook();
+  function paintHues() {
+    for (const n of knobs.names()) {
+      const h = book.hueOf(n);
+      const k = knobs.knob(n).el;
+      if (h === null) k.style.removeProperty('--param-hue');
+      else k.style.setProperty('--param-hue', String(h));
+    }
+  }
+  /** The row for a compile. It keeps its height with no knobs in it, see `param-knobs.mjs`. */
+  let knobRow = null;
+  function showKnobs(r) {
+    knobs.set(r.knobs.map((k) => ({ name: k.name, value: k.value, ...k.spec })));
+    book.assign(knobs.names());
+    paintHues();
+  }
+
+  // ── compiling, and loading what compiled ────────────────────────────────────
+
+  /** One queue: loads reach the server in the order the compiles were made. */
+  let chain = Promise.resolve();
+  function serial(fn) {
+    const run = chain.then(fn, fn);
+    chain = run.catch(() => {});
+    return run;
+  }
+
+  /** The one name every compile is sent under. See the header. */
+  const DEF = 'collide';
+  /** The last program that compiled. What a key plays, and what reaches the engine. */
+  let good = null;
+  /** The last one the ENGINE took, which is the one `/s_new` names. */
+  let current = null;
+
+  /**
+   * Compile the text. A failure leaves `good` alone, so the keys go on playing
+   * the last program that worked: a typo must not take the sound away.
+   * @returns {Promise<{ok: boolean, error?: string}>}
+   */
+  async function build(code, label = 'typing') {
+    const t0 = performance.now();
+    const r = compile(code, { name: DEF });
+    const ms = performance.now() - t0;
+    setCell('compile', ms.toFixed(2));
+    if (!r.ok) {
+      d.log(`that did not compile, ${r.message}`, 'bad');
+      return { ok: false, error: r.message };
+    }
+    good = r;
+    showKnobs(r);
+    setCell('synthdef', String(r.bytes.length));
+    setCell('blocks', String(r.blocks));
+    d.log(`${label} compiled in ${ms.toFixed(2)} ms into ${r.bytes.length} B, ${r.blocks} building blocks, `
+        + `${r.channels === 2 ? 'stereo' : 'one channel to both speakers'}`, 'hi');
+    for (const w of r.warnings) d.log(w);
+    if (eng) return load(r);
+    return { ok: true };
+  }
+
+  /**
+   * Hand the bytes to scsynth and wait for its own `/done`. Over its ceilings
+   * the engine answers nothing (`synthdef.mjs`, `sclang-lite.mjs`), so the
+   * timeout IS the answer, and it is reported rather than swallowed.
+   */
+  async function load(r) {
+    const t0 = performance.now();
+    sent++;
+    const got = await eng.sendAndWait(
+      (m) => (m[0] === '/done' || m[0] === '/fail') && m[1] === '/d_recv', 5000, '/d_recv', r.bytes);
+    const ms = performance.now() - t0;
+    if (!got || got[0] !== '/done') {
+      d.log(`SuperCollider did not take it: ${got ? got.slice(2).join(' ') : 'no answer'}`, 'bad');
+      return { ok: false, error: 'the server did not take it' };
+    }
+    current = r;
+    setCell('load', ms.toFixed(0));
+    return { ok: true, ms };
+  }
+
+  // ── the text ────────────────────────────────────────────────────────────────
+
+  /* The box is as tall as the longest preset, read off the presets rather
+     than typed, which is `/fau/`'s rule after its box cut a listing in half. */
+  const ROWS = Math.max(...PRESETS.map((p) => p.code.split('\n').length));
+  /* 🔴 THE KIT'S CODE BOX SINCE 2026-09-30 (`demo/shell/code-box.mjs`,
+     `plans/plan-code-editor.md`): the same field textarea, transparent, over
+     the program drawn in SuperCollider's colours, with each knob's parameter
+     in the knob's own hue. */
+  const source = createCodeBox({
+    language: 'sclang',
+    rows: ROWS,
+    value: PRESETS[0].code,
+    ariaLabel: 'the SuperCollider function this page compiles',
+    onInput: () => matchPatch(),
+    hues: book,
+  });
+
+  // ── the keys ────────────────────────────────────────────────────────────────
+
+  const keys = createKeyboard(el('div'), {
+    ...keyRange(),
+    base: 48,
+    minBase: 24, maxBase: 84,
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN (`9c683e2`, asked for every
+       keyboard page). A looped note comes back through `onDown` marked `loop`,
+       with the velocity a MIDI key played it at when the take heard one. */
+    loop: 'evolution',
+    log: (line, kind) => d.log(line, kind),
+    onDown: (note, how, vel) => press(note, vel),
+    onUp: (note) => lift(note),
+    onOctave: (b) => d.log(`the keys on screen now start at ${b}`),
+    onPanic: () => allOff(),
+  });
+  /* 44 px a key, as `/fau/` and `/nola/` do, so two octaves fit the page. */
+  keys.el.style.setProperty('--k-min', '44px');
+
+  const mtof = (n) => 440 * 2 ** ((n - 69) / 12);
+  let nextNode = 2000;
+  /** note -> node id, for the notes a finger is on. */
+  const held = new Map();
+  /** Notes pressed while the engine was still coming up, and their velocity. */
+  const waiting = new Map();
+  /** Every `/s_new` a key has sent, which is what the Loop check counts as heard. */
+  let sounded = 0;
+
+  function sound(note, vel) {
+    if (!eng || !current) return;
+    const id = nextNode++;
+    const args = ['freq', mtof(note)];
+    if (current.gate) args.push('gate', 1);
+    // A velocity scales the program's own `amp`, 127 being the level it
+    // wrote. The keys on screen send none, so they play at that level.
+    const amp = current.controls.find((c) => c.name === 'amp');
+    if (amp && Number.isFinite(vel)) args.push('amp', amp.value * vel / 127);
+    // Where the knob's name is a control of the program on the server, the
+    // note starts at the knob and not at the default the program wrote.
+    for (const [k, v] of knobs.values()) if (current.controls.some((c) => c.name === k)) args.push(k, v);
+    eng.send('/s_new', current.name, id, 0, 0, ...args);
+    sounded++;
+    held.set(note, { id, def: current });
+    live.set(id, current);
+    return id;
+  }
+
+  function press(note, vel) {
+    keys.lightNote?.(note, true);
+    if (held.has(note)) lift(note, true);
+    if (eng && current) { sound(note, vel); return; }
+    if (!good) { d.log('nothing has compiled yet, so there is nothing to play'); return; }
+    waiting.set(note, vel);
+    arm();
+  }
+
+  function lift(note, keepLight = false) {
+    if (!keepLight) keys.lightNote?.(note, false);
+    waiting.delete(note);
+    const h = held.get(note);
+    if (!h) return;
+    held.delete(note);
+    const r = h.def;
+    if (r.gateUsed && r.freesItself) eng.send('/n_set', h.id, 'gate', 0);
+    else if (!r.freesItself) eng.send('/n_free', h.id);
+  }
+
+  function allOff() {
+    held.clear();
+    live.clear();
+    waiting.clear();
+    eng?.send('/g_freeAll', 0);
+  }
+
+  /**
+   * The first touch: boot, then load the last good compile, then sound what
+   * was pressed meanwhile. One arming in flight, so eight fingers build one engine.
+   */
+  let arming = null;
+  function arm() {
+    if (eng && current) return Promise.resolve(true);
+    if (!arming) {
+      arming = serial(async () => {
+        const t0 = performance.now();
+        await boot();
+        if (good && current !== good) await load(good);
+        d.log(`SuperCollider is up and playing ${good?.name ?? 'nothing'}, `
+            + `${(performance.now() - t0).toFixed(0)} ms after the first touch`, 'hi');
+        for (const [n, v] of waiting) sound(n, v);
+        waiting.clear();
+        return true;
+      }).catch(() => false).finally(() => { arming = null; });
+    }
+    return arming;
+  }
+
+  function startMidi() {
+    if (midi) return;
+    midi = createMidi({
+      onDown: (note, vel) => press(note, vel),
+      onUp: (note) => lift(note),
+      log: d.log,
+      loop: keys,
+    });
+  }
+
+  // ── the patch selector ──────────────────────────────────────────────────────
+
+  const CUSTOM = 'custom';
+  const patch = createPicker({
+    what: 'patch',
+    prev: () => stepPatch(-1),
+    next: () => stepPatch(+1),
+    onPick: (i) => loadPatch(i),
+  });
+  patch.options(PRESETS.map((p) => p.label), 0);
+  let picked = 0, lastPatch = 0;
+  function showPatch(i) {
+    picked = i;
+    if (i >= 0) { lastPatch = i; patch.show(PRESETS[i].label, i); return; }
+    patch.show(CUSTOM);
+    // Nothing selected while the text is the visitor's, so picking the preset
+    // that was loaded a moment ago is still a change. `/fau/`'s rule.
+    patch.select.selectedIndex = -1;
+  }
+  function matchPatch() {
+    const i = PRESETS.findIndex((p) => p.code === source.value());
+    if (i !== picked) showPatch(i);
+  }
+  function stepPatch(n) {
+    const from = picked >= 0 ? picked : lastPatch;
+    loadPatch((from + n + PRESETS.length) % PRESETS.length);
+  }
+
+  let idle = null;
+  function applyPatch(i) {
+    const p = PRESETS[i];
+    idle?.cancel();
+    /* A preset opens with the same colours every time, in order of appearance. */
+    book.clear();
+    source.set(p.code);
+    showPatch(i);
+    d.log(`${p.label}: ${p.what}`);
+    return build(p.code, p.label);
+  }
+  const loadPatch = (i) => {
+    idle?.cancel();
+    const job = serial(() => applyPatch(i));
+    return idle ? idle.track(job) : job;
+  };
+
+  // ── compiling what was typed, once the typing stops ─────────────────────────
+  //
+  // The kit's idle compile, wired the way `/fau/` wires it: the timer, the
+  // queue and the breathing note in the corner of the text are the module's,
+  // and this page supplies what a compile is. No `notNow`, see the header.
+  idle = createCompileIdle({
+    input: source.input,
+    host: source.el,
+    compile: () => serial(() => build(source.value(), picked >= 0 ? PRESETS[picked].label : 'typing')),
+  });
+
+  // ── the page ────────────────────────────────────────────────────────────────
+
+  /* The text is the picture row, edge to edge, as on `/fau/`. The live scope
+     that sat above it went on 2026-09-30, asked as *"rm waveform from
+     collide"*. */
+  const panel = createInstrumentPanel({
+    viz: source.el,
+    keys: keys.el,
+    plate: { name: 'COLLIDE', patch },
+  });
+  /* The knobs are the row under the text, hidden until a compile has any. */
+  knobRow = panel.addRow(knobs.el);
+  d.el.append(panel.el);
+
+  /* Any gesture on the instrument starts the engine, not only a key, so the
+     first note is not the one that pays for the boot. `/fau/` measured why. */
+  const armOnTouch = () => {
+    if (!good) return;
+    arm();
+    panel.el.removeEventListener('pointerdown', armOnTouch, true);
+    panel.el.removeEventListener('keydown', armOnTouch, true);
+  };
+  panel.el.addEventListener('pointerdown', armOnTouch, true);
+  panel.el.addEventListener('keydown', armOnTouch, true);
+
+  d.log('the program in the box is compiled as the page opens, and SuperCollider starts on '
+      + 'your first touch of the instrument, because a browser wants a gesture for sound');
+
+  /* The compile a visit gets: the preset the box opens with, nothing else. */
+  const warm = idle.track(serial(() => build(PRESETS[0].code, PRESETS[0].label)));
+
+  // ── the picture ─────────────────────────────────────────────────────────────
+  const dg = createDiagram(d.el, {
+    caption: 'The text becomes a SuperCollider synth definition in this tab, and SuperCollider\'s '
+      + 'own server, compiled to WebAssembly, plays it.',
+    nodes: [
+      /* ⚠️ NO MIDI KEYBOARD MACHINE. It was drawn the way `/fau/` draws one and
+         came out as a slab the height of the Browser holding one box, and on a
+         phone a screen of nothing (shot 2026-09-30). The picture is about the
+         compile path; what a key sends is in the scsynth note. */
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'box', label: 'text box', sub: 'a function literal', tech: 'browser',
+            note: 'A SuperCollider function of the kind a **SynthDef** is written as. Only a small '
+                + 'subset of the language is understood, and anything else is refused with a line '
+                + 'and a column.' },
+          { id: 'lite', label: 'sclang-lite', sub: 'JavaScript', tech: 'browser',
+            note: 'Reads the text and builds the graph **sclang** would have built, with the '
+                + 'arguments and defaults copied from SuperCollider\'s own class files. It runs in '
+                + 'under a millisecond.' },
+          { id: 'def', label: 'SynthDef', sub: 'v2, under 1KB', tech: 'sound',
+            note: 'The format sclang writes and **scsynth** reads: constants, controls and a list '
+                + 'of **UGens**, each wired only to the ones before it.' },
+          { id: 'scs', label: 'scsynth', sub: 'wasm, AudioWorklet', tech: 'sound',
+            note: 'SuperCollider\'s own server, the **SuperSonic** build, the same engine '
+                + '**positron.studio/grains** runs. It answers **/done** to a definition, and a key '
+                + 'starts a synth with **/s_new**.' },
+          { id: 'spk', label: 'speakers', sub: 'or a phone', tech: 'device',
+            note: 'One channel goes to both, and a two element array is left and right.' },
+        ] },
+    ],
+    links: [
+      { from: 'box', to: 'lite',
+        note: 'Compiled once you stop typing, and on load for the program the box opens with.' },
+      { from: 'lite', to: 'def',
+        note: 'Operators run left to right with no precedence, as in SuperCollider, so '
+            + '**1 + 2 * 3** is 9.' },
+      { from: 'def', to: 'scs',
+        note: 'Sent with **/d_recv** under one name, and **scsynth** keeps the old graph for a '
+            + 'note already sounding until that note ends. A knob sends **/n_set** to every note '
+            + 'still sounding.' },
+      { from: 'scs', to: 'spk',
+        note: '**Out.ar(0, ...)** is added round the last line, which is why a program here never '
+            + 'writes one.' },
+    ],
+  }, { how: true, atEnd: true });
+
+  // ── what this page can say about itself ─────────────────────────────────────
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** RMS of what the engine is sending to the speakers, averaged over a few windows. */
+  async function level(windows = 4) {
+    const buf = new Float32Array(eng.meter.fftSize);
+    let sum = 0, n = 0;
+    for (let w = 0; w < windows; w++) {
+      eng.meter.getFloatTimeDomainData(buf);
+      for (const v of buf) { sum += v * v; n++; }
+      await sleep(50);
+    }
+    return Math.sqrt(sum / n);
+  }
+  const waitEnd = async (id, ms) => {
+    const t = performance.now();
+    while (!ended.has(id) && performance.now() - t < ms) await sleep(25);
+    return ended.has(id);
+  };
+  /** What the drawn layer holds for a text: the box adds one space after a final newline. */
+  const drawnAs = (t) => t + (t === '' || t.endsWith('\n') ? ' ' : '');
+  const typeInto = (text) => {
+    source.input.value = text;
+    source.input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  async function checks() {
+    // The cheap ones first: the harness gives up about two seconds after the
+    // last new assert, and the engine is a boot away.
+    d.assert('a visit opens no sound device, starts no engine and asks about no MIDI keyboard',
+      ctx === null && eng === null && midi === null,
+      `audio ${ctx ? 'open' : 'none'}, engine ${eng ? 'up' : 'none'}, MIDI ${midi ? 'asked' : 'not asked'}`);
+    await warm;
+    const parsed = good && readSynthDef(good.bytes);
+    d.assert('the box opens compiled, and the bytes read back as one version 2 definition',
+      !!good && parsed.version === 2 && parsed.defs.length === 1
+        && d.api.readout.synthdef === String(good.bytes.length),
+      good ? `${good.name}, ${good.bytes.length} B, the cell reads ${d.api.readout.synthdef}` : 'nothing compiled');
+    d.assert('the readout is four cells, which is an even count', Object.keys(d.api.readout).length === 4);
+    d.assert('the panel is the text, the knobs, the keys and a foot, in that order',
+      panel.shape().join(' ') === 'viz controls keys plate' && panel.viz.contains(source.el)
+        && panel.controls()[0] === knobRow,
+      panel.shape().join(' '));
+
+    /* ── the knob row, before any sound ──────────────────────────────────────
+       🔴 READ OFF THE SCREEN, NOT OFF THE COMPILE: the compiler's own list is
+       graded by `sclang-lite-test.mjs`, and what this page can get wrong is
+       drawing it. `display` rather than `hidden`, which is a fact about an
+       attribute and not about what is drawn. */
+    const drawn = () => getComputedStyle(knobRow).display !== 'none';
+    const onRow = () => [...knobRow.querySelectorAll('.pos-knob[data-param]')];
+    const relKnob = () => knobRow.querySelector('.pos-knob[data-param="rel"]');
+    /* Every preset has knobs since 2026-09-30 (*"add knobs to all patches what
+       mak sense"*): the Pad's are rel, cutoff and detune, in the code's order. */
+    d.assert('under the Pad\'s text is one row with three knobs, rel, cutoff and detune, and rel starts where the code says, 1.50',
+      drawn() && onRow().map((k) => k.dataset.param).join(' ') === 'rel cutoff detune' && !!relKnob()
+        && relKnob().querySelector('.pos-knob-v').textContent === '1.50' && knobs.value('rel') === 1.5,
+      `${drawn() ? 'drawn' : 'not drawn'}, ${onRow().map((k) => `${k.dataset.param} ${k.querySelector('.pos-knob-v').textContent}`).join(', ') || 'no knobs'}`);
+    d.assert('and its range is the spec in the code, 0.05 to 6 on an exponential warp',
+      /\\rel\.kr\(1\.5, spec: \[0\.05, 6, \\exp\]\)/.test(PRESETS[0].code)
+        && relKnob()?.getAttribute('title') === 'rel, 0.05 to 6, exp',
+      relKnob()?.getAttribute('title') ?? 'no knob');
+    /* 🔴 ONE HUE, READ OFF THE SCREEN ON BOTH SIDES. The snippet's
+       `--param-hue` is the code box's, the knob's is this page's, and the
+       two have to be the same number from the same book; the knob's name is
+       drawn in the ink its arc is. `freq` and `gate` are parameters in the
+       text and have no knob, so they carry no hue. */
+    /* The arc eases to a new stroke over 120 ms (`.pos-knob-arc`), so the hue
+       it was just given is read once that has run. */
+    await sleep(150);
+    const snip = (n) => source.ink.querySelector(`.pos-tk-p[data-param="${n}"]`);
+    const hueOn = (e) => (e ? getComputedStyle(e).getPropertyValue('--param-hue').trim() : '');
+    const kLab = () => getComputedStyle(relKnob().querySelector('.pos-knob-lab')).color;
+    const kArc = () => getComputedStyle(relKnob().querySelector('.pos-knob-arc')).stroke;
+    d.assert('rel\'s text in the box and its knob wear one hue from one book, name and arc alike, and freq and gate wear none',
+      hueOn(relKnob()) !== '' && hueOn(relKnob()) === hueOn(snip('rel')) && hueOn(snip('rel')) === String(book.hueOf('rel'))
+        && kLab() === kArc() && !!snip('freq') && !!snip('gate')
+        && !snip('freq').dataset.hue && !snip('gate').dataset.hue,
+      `knob ${hueOn(relKnob()) || 'none'}, text ${hueOn(snip('rel')) || 'none'}, book ${book.hueOf('rel')}, `
+      + `name ${kLab()} arc ${kArc()}, freq ${snip('freq')?.dataset.hue ?? 'plain'}, gate ${snip('gate')?.dataset.hue ?? 'plain'}`);
+    /* Held: a pointer down on the dial lights the snippet, and up puts it out.
+       Pointer 1 is the mouse, which is always a live pointer in Chrome, so the
+       knob's own capture does not throw on a synthetic press. */
+    const pe = (t) => new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true });
+    relKnob().querySelector('.pos-knob-dial').dispatchEvent(pe('pointerdown'));
+    const litHeld = snip('rel')?.dataset.active === '1' && !snip('freq')?.dataset.active;
+    relKnob().querySelector('.pos-knob-dial').dispatchEvent(pe('pointerup'));
+    const litAfter = snip('rel')?.dataset.active;
+    d.assert('holding the rel knob lights rel\'s text in the box and nothing else, and letting go puts it out',
+      litHeld && litAfter === undefined, `held ${litHeld ? 'lit' : 'not lit'}, after ${litAfter ?? 'out'}`);
+    /* 🔴 THE ROW DOES NOT MOVE THE KEYS. Asked 2026-09-30: *"make the area h
+       for thise buttons fixed so no junmp"*. The keys' top is read with the
+       Pad's knobs and with a program that has none.
+       ⚠️ THE EMPTY ROW WAS THE GROWL UNTIL EVERY PRESET GOT KNOBS, the same
+       day, so the empty case is a program typed with no control a knob could
+       turn, compiled straight through the queue as the checks further down do. */
+    const keysTop = () => panel.keys.getBoundingClientRect().top;
+    const withKnob = keysTop();
+    {
+      const bare = '{ |freq = 220, amp = 0.1, gate = 1|\n    SinOsc.ar(freq, mul: amp) * EnvGen.kr(Env.adsr, gate, doneAction: 2)\n}';
+      book.clear();
+      source.set(bare);
+      await serial(() => build(bare, 'the check'));
+    }
+    const withNone = keysTop();
+    d.assert('a program with no control a knob could turn keeps the row\'s height with nothing in it, so the keys do not move',
+      drawn() && onRow().length === 0 && (!!knobRow.querySelector('.pos-pknobs-ghost') && !knobRow.querySelector('.pos-pknobs-say'))
+        && Math.abs(withNone - withKnob) < 0.5 && book.names().length === 0,
+      `keys at ${withKnob.toFixed(1)} px with rel and ${withNone.toFixed(1)} px with none, `
+      + `${onRow().length} knobs, "${knobRow.textContent.trim()}"`);
+    await applyPatch(0);
+    d.assert('the compile note sits in the text box, is not a button and is a status',
+      source.el.contains(idle.el) && idle.el.tagName !== 'BUTTON' && idle.el.getAttribute('role') === 'status'
+        && !source.el.querySelector('button'),
+      `a ${idle.el.tagName.toLowerCase()} with role ${idle.el.getAttribute('role')}`);
+    d.assert('nothing cut and nothing refused in the picture', dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.id} ${c.where}: ${c.shown}`).join('; ') || 'none');
+
+    /* A refusal, typed: the note says so, the error carries a line and a
+       column, and the last good program is still the one the keys play. */
+    const before = good;
+    typeInto(`${PRESETS[0].code.replace('LPF.ar', 'MoogFF.ar')}`);
+    await idle.settled();
+    d.assert('a program outside the subset is refused with a line and a column, and the keys keep the last one that worked',
+      idle.error().includes('MoogFF') && /^line \d+, column \d+/.test(idle.error()) && good === before,
+      idle.error());
+    d.assert('and the corner says it did not compile, standing still with the reason in its title',
+      idle.shown() === NOTE_SAYS.error && idle.el.title === idle.error(), `"${idle.shown()}"`);
+    /* 🔴 THE CODE BOX'S ONE INVARIANT, READ OFF THE RENDERED ELEMENTS, after a
+       typed edit: the coloured layer holds exactly the textarea's text, at
+       the textarea's metrics, and a refused compile gave no hue away. */
+    {
+      const cs = (e) => getComputedStyle(e);
+      const PROPS = ['font-size', 'line-height', 'padding-top', 'padding-left', 'white-space'];
+      const differ = PROPS.filter((p) => cs(source.ink).getPropertyValue(p) !== cs(source.input).getPropertyValue(p));
+      const classes = source.ink.querySelectorAll('.pos-tk-class').length;
+      d.assert('the program is drawn coloured over the box exactly as typed, at the box\'s own metrics',
+        source.ink.textContent === drawnAs(source.input.value) && differ.length === 0 && classes > 3
+          && book.names().join(' ') === 'rel cutoff detune',
+        `${source.input.value.length} characters, ${differ.length ? `differs in ${differ.join(' ')}` : 'metrics equal'}, `
+        + `${classes} class names coloured, hues for ${book.names().join(' ') || 'nothing'}`);
+    }
+
+    // ── the engine ───────────────────────────────────────────────────────────
+    // 🔴 WHAT GRADES THE COMPILER. Under `?selfcheck=1` only: this starts a
+    // sound device and plays notes, which a visit never does.
+    await applyPatch(0);
+    await arm();
+    d.assert('SuperCollider came up and took the Pad, answering /done to /d_recv',
+      !!eng && current === good && current.name === good.name,
+      eng ? `${Math.round(eng.bootMs)} ms to boot, ${current?.name} on the server` : 'no engine');
+    /* ⚠️ ASKED WITH THE ENGINE UP, because before it exists nothing can be
+       sent at all and "a refusal sent nothing" would be true of any page. */
+    const sentBefore = sent, onServer = current;
+    typeInto(`${PRESETS[0].code.replace('gate, doneAction', 'gate, doneAction: 2, mull: 3, x')}`);
+    await idle.settled();
+    d.assert('with the engine up, a refused program sends the server nothing and the Pad stays on it',
+      sent === sentBefore && current === onServer && /mull/.test(idle.error()),
+      `${sent - sentBefore} sends, ${current?.name} still on the server, ${idle.error()}`);
+    /* 🔴 THE METER READS ZERO WITH NOTHING PLAYING, OR NOTHING BELOW MEANS
+       ANYTHING. A meter stuck at a level would pass every "it made a sound". */
+    const silent = await level();
+    d.assert('with nothing playing, the meter on the engine\'s output reads silence',
+      silent === 0, silent.toFixed(6));
+
+    /* ⚠️ ONE ASSERT PER STEP, AND EVERY RELEASE IS SPLIT IN TWO. The harness
+       stops collecting after 2.0 s with no new assert, and the longest release
+       here is 1.5 s on top of its hold, so a single assert at the end of each
+       preset lost everything after the first one on the first run here (13
+       asserts, green, and the presets never graded). Every preset is held
+       350 ms, let go, heard 200 ms later still sounding and quieter, and then
+       heard to end by itself: the owner's rule for these patches is that the
+       key opens and closes them. */
+    for (const [i, p] of PRESETS.entries()) {
+      if (i > 0) await applyPatch(i);
+      const s = await eng.status();
+      const id = sound(60);
+      await sleep(350);
+      const loud = await level(3);
+      d.assert(`${p.label}: the server took it and a key makes a sound`,
+        current.name === good.name && current.bytes === good.bytes && loud > 0.001,
+        `${s?.defs} definition loaded, ${loud.toFixed(4)} rms`);
+      lift(60);
+      /* Letting go CLOSES THE GATE rather than cutting the note: 200 ms in, the
+         synth is still alive and still sounding, quieter. A page that sent
+         `/n_free` would fail this and pass everything else. */
+      await sleep(200);
+      const fading = await level(2);
+      d.assert(`${p.label}: letting go closes the gate, so 200 ms later it is still sounding, quieter`,
+        !ended.has(id) && fading > 0.0003 && fading < loud,
+        `${fading.toFixed(4)} rms against ${loud.toFixed(4)} held, ${ended.has(id) ? 'already ended' : 'still alive'}`);
+      const done = await waitEnd(id, 2500);
+      /* The analyser holds the last 46 ms, which can still be the tail of the
+         release the server just finished, so the silence is read after it. */
+      await sleep(100);
+      const after = await level(2);
+      d.assert(`${p.label}: and it ended by itself, which /n_end from the server says, and the output is silent again`,
+        done && after < 1e-4, `${done ? 'ended' : 'still running'}, ${after.toFixed(6)} after`);
+    }
+
+    /* ── the knob, on the real engine ─────────────────────────────────────────
+       🔴 DRIVEN THROUGH THE KNOB'S OWN KEYS, NOT `knobs.set` AND NOT `turn()`:
+       a keydown on the dial is what a person's arrow key does, and it goes
+       through the component, the warp, `onChange` and the page's `/n_set`.
+       Home is the bottom of the range, and eight Page Ups are 80 of 127 steps
+       of the travel, which on 0.05 to 6 exponential is 1.02 s.
+       🔴 AND WHAT IS MEASURED IS THE SERVER'S OWN ANSWER: the time from the
+       gate closing to `/n_end`, which is how long the release really took. */
+    await applyPatch(0);
+    const dial = () => relKnob().querySelector('.pos-knob-dial');
+    const key = (k, n = 1) => {
+      for (let i = 0; i < n; i++) dial().dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+    };
+    /** Hold a note, let it go, and time its release to `/n_end`. `during` runs while it is held. */
+    const tail = async (during = () => {}) => {
+      const id = sound(60);
+      await sleep(250);
+      await during(id);
+      const t0 = performance.now();
+      lift(60);
+      const done = await waitEnd(id, 1800);
+      return done ? (performance.now() - t0) / 1000 : Infinity;
+    };
+    key('Home');
+    const short = await tail();
+    d.assert('the rel knob at the bottom of its travel reads 0.05, and a note let go ends within a quarter second',
+      knobs.value('rel') === 0.05 && relKnob().querySelector('.pos-knob-v').textContent === '0.05' && short < 0.25,
+      `rel ${knobs.value('rel')}, ended ${short.toFixed(3)} s after the key came up`);
+    const sentBeforeTurn = turned;
+    let turnedOnto = 0;
+    const long = await tail(async (id) => {
+      key('PageUp', 8);
+      turnedOnto = [...live.keys()].includes(id) ? turned - sentBeforeTurn : 0;
+      await sleep(50);
+    });
+    d.assert('turning it while a note is held sends /n_set to that note, and the same key let go now rings for about a second',
+      turnedOnto >= 8 && Math.abs(knobs.value('rel') - 1.02) < 0.05 && long > 0.7 && long < 1.4,
+      `${turnedOnto} /n_set to the held note, rel ${knobs.value('rel')}, ended ${long.toFixed(3)} s after, against ${short.toFixed(3)} s before`);
+    /* A recompile keeps the value: a comment typed under the program is a new
+       compile, a new definition on the server and the same knob. */
+    const relBefore = knobs.value('rel'), defBefore = current;
+    typeInto(`${PRESETS[0].code}\n// the same Pad, recompiled`);
+    await idle.settled();
+    d.assert('a recompile keeps the knob where the hand left it, on a new definition on the server',
+      current !== defBefore && current === good && knobs.value('rel') === relBefore
+        && relKnob()?.querySelector('.pos-knob-v').textContent === relBefore.toFixed(2),
+      `rel ${relBefore} before, ${knobs.value('rel')} after`);
+    const keptTail = await tail();
+    d.assert('and a new note on the new definition rings as long, because its /s_new carries the knob',
+      Math.abs(keptTail - long) < 0.3, `${keptTail.toFixed(3)} s against ${long.toFixed(3)} s`);
+    dial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    d.assert('and a double press puts it back where the program wrote it', knobs.value('rel') === 1.5,
+      String(knobs.value('rel')));
+    /* 🔴 THE INVISIBLE HAND TURNS IT ON THE SERVER. Asked 2026-09-30: *"add
+       invisible hands to these cutoff buttons"*. From the bottom of the
+       travel, a held note, the hand's button pressed and pressed again, and
+       then the server is ASKED what `rel` is on that node with `/s_get`: its
+       answer is the knob's value, and the page counted `/n_set`s from the
+       hand. A hand that moved the dial and not `onChange` sends none, and the
+       server would still say 0.05. */
+    key('Home');
+    const handNode = sound(60);
+    await sleep(80);
+    const handBtn = () => relKnob().querySelector('.pos-knob-hand');
+    const turnedBefore = turned;
+    handBtn().click();
+    await sleep(500);
+    const handRan = knobs.handOn('rel');
+    handBtn().click();
+    const byHand = knobs.value('rel'), handSends = turned - turnedBefore;
+    const told = await eng.sendAndWait((m) => m[0] === '/n_set' && m[1] === handNode, 1000, '/s_get', handNode, 'rel');
+    lift(60);
+    const relOnServer = told ? Number(told[3]) : NaN;
+    d.assert('its invisible hand turns rel by itself, and the server holds the value the knob shows',
+      handRan && !knobs.handOn('rel') && byHand > 0.05 && handSends > 0
+        && Math.abs(relOnServer - byHand) < byHand * 1e-4,
+      `hand ${handRan ? 'ran' : 'did not run'}, rel ${byHand} after ${handSends} /n_set, server says ${relOnServer}`);
+    key('Home');
+    dial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    await waitEnd(handNode, 2000);
+    /* 🔴 A LAG THAT REALLY LAGS. `\lvl.kr(0.1, 0.5)` is a LagControl on the
+       server, so the level falls away over half a second (60 dB in the lag
+       time) after the knob drops to 0 rather than at once. */
+    /* ⚠️ FROM HERE ON A PROGRAM IS COMPILED STRAIGHT THROUGH THE QUEUE AND NOT
+       TYPED, since 2026-09-30. The idle compile is graded above; typed, each
+       of these three paid its 600 ms wait and the note's 800 ms showing, and
+       with the hand and the Loop checks added the tail of this block ran past
+       the harness's 24 s ceiling and was dropped with the run still green
+       (34 asserts where 46 were written). */
+    const compileNow = async (text) => { source.set(text); await serial(() => build(text, 'the check')); };
+    await compileNow('{ SinOsc.ar(440, mul: \\lvl.kr(0.1, 0.5)) }');
+    const lagged = nextNode;
+    sound(69);
+    await sleep(150);
+    const lvlKnob = knobRow.querySelector('.pos-knob[data-param="lvl"] .pos-knob-dial');
+    lvlKnob?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    await sleep(60);
+    const falling = await level(1);
+    d.assert('a lag in the code lags on the server: 60 ms after its knob drops to 0 the tone is still there',
+      knobs.value('lvl') === 0 && falling > 0.01, `${falling.toFixed(4)} rms at 60 ms`);
+    await sleep(1200);
+    const fallen = await level(1);
+    eng.send('/n_free', lagged);
+    held.delete(69);
+    d.assert('and 1.2 s later it is gone, so the knob did reach it', fallen < 1e-3, `${fallen.toFixed(6)} rms at 1.3 s`);
+
+    /* 🔴 THE ARITHMETIC, GRADED BY THE ENGINE. A multiply written as an add
+       is a well formed file that loads and plays (research §9.3b), and the
+       node test cannot hear it. A sine at amplitude a has an RMS of a / sqrt 2. */
+    await compileNow('{ |amp = 0.1| SinOsc.ar(440, mul: amp) }');
+    const tone = nextNode;
+    sound(69);
+    await sleep(120);
+    const at1 = await level();
+    d.assert('mul: multiplies: amp 0.1 reads 0.0707 rms',
+      Math.abs(at1 - 0.1 / Math.SQRT2) < 0.007, `${at1.toFixed(4)} at 0.1`);
+    /* 🔴 REPLACING THE DEFINITION UNDER A SOUNDING NOTE, graded on every run.
+       The next program is sent under the same name while the tone plays. The
+       tone must keep its level, and must still answer `amp`, which the new
+       program does not have: if the node had moved to the new graph, amp 0
+       would change nothing and it would go on reading 0.1414. */
+    await compileNow('{ SinOsc.ar(440, 0, 0.05 + 0.05 * 2) }');
+    const kept = await level();
+    d.assert('a new program under the same name leaves the sounding note on its old graph, at the same level',
+      !ended.has(tone) && current.name === DEF && Math.abs(kept - at1) < 0.007,
+      `${kept.toFixed(4)} against ${at1.toFixed(4)} before, ${ended.has(tone) ? 'ended' : 'still alive'}`);
+    eng.send('/n_set', tone, 'amp', 0);
+    await sleep(150);
+    const at0 = await level();
+    eng.send('/n_free', tone);
+    held.delete(69);
+    d.assert('and that note still answers amp, which the new program has not got: amp 0 reads silence',
+      at0 < 1e-4, `${at0.toFixed(6)} at 0`);
+    /* Left to right: 0.05 + 0.05 * 2 is 0.2 in SuperCollider and 0.15 with
+       ordinary precedence, and the difference is audible: 0.1414 against 0.1061.
+       It is already the program on the server, from the check above. */
+    const lr = nextNode;
+    sound(69);
+    await sleep(120);
+    const atLR = await level();
+    eng.send('/n_free', lr);
+    held.delete(69);
+    d.assert('the server hears operators left to right: 0.05 + 0.05 * 2 is an amplitude of 0.2',
+      Math.abs(atLR - 0.2 / Math.SQRT2) < 0.01, `${atLR.toFixed(4)} rms against 0.1414, and 0.1061 would be precedence`);
+
+    /* `Loop` follows the Evolution, and a looped note is counted where it
+       reaches the server, as a `/s_new`. The program on the server is the
+       sine above, which has no gate, so every note is freed on its lift. */
+    await checkEvolutionLoop(d, {
+      keys, heard: () => sounded,
+      ports: (names) => offerLoopFor(keys, names, d.log), real: () => midi?.names() ?? [],
+    });
+
+    const stuck = [...moved].filter(([, seen]) => seen.size < 2).map(([k]) => k);
+    d.assert('every cell in the readout took more than one value',
+      stuck.length === 0, [...moved].map(([k, seen]) => `${k} ${seen.size}`).join(', '));
+
+    await applyPatch(0);
+  }
+
+  ifSelfcheck(checks, { log: d.log,
+    say: 'the checks this page runs on itself are off for a visitor, because they start '
+       + 'SuperCollider and play notes in front of you' });
+
+  d.ready();
+</script>
+</html>
