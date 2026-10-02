@@ -301,3 +301,20 @@ Stage-73 V2 to BlackHole, with a held chord reading -29.1 dB peak against a
 -91.0 dB silence baseline, 61.9 dB of separation. Its checkup also found the
 output clipping at full scale, which nothing else had noticed. `rig/m1/` and
 `plan-rack.md` hold the rest.
+
+## `crate-index.html`, and `archive/vain/` beside it, retired 2026-10-02
+
+Asked in eccm (https://github.com/kristjanjansen/eccm): *"what about creating a
+eccm-files worker and admin/files paeg and mimick crate/vain ... when
+implenented discard crate/vain"*. crate put one long recording into R2 in
+pieces of 16 MiB through `positron-vain` and played it back with byte ranges.
+That protocol now runs eccm's uploads, `workers/files` there and its page
+/admin/files, measured on eccm's staging the same day with a 43 MB file in
+three pieces read back byte for byte. So the row is out of `demo/manifest.mjs`,
+the page is here, and the Worker's two files are in `archive/vain/`. The
+deployed `positron-vain` Worker and its bucket `vain-archive` were deleted the
+same day; the bucket held one kept file, a generated 90-minute 440 Hz tone
+(*"90 minutes of 440 Hz, generated"*, by *"the repo"*), which was not carried
+over. `/crate/` 404s on positron.studio from the next build. `demo/verify.mjs`
+still names `positron-vain` in its list of expected console errors, which is
+now a line that matches nothing.

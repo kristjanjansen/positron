@@ -419,21 +419,9 @@ export const DEMOS = [
     gl: true, settleMs: 45000,
     one: 'a radio station fed through a granulator, playing itself',
     tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
-  // The other end of the same station: what it broadcast, kept. A broadcast at
-  // the bitrate their own server records is 57.6 MB an hour, which does not fit
-  // through a Worker in one request on this zone, so it goes in pieces of
-  // 16 MiB and comes back with byte ranges. `settleMs` covers an upload, a
-  // sidecar and a seek, all of which land in one burst at the end.
-  // ⚠️ `crate`, NOT `vain`. The slug named the ORGANISATION, and `vain` is
-  // already this file's group name for Väin's pages, so one word meant a demo
-  // and a group at once. A crate is what a long recording arrives in, and it is
-  // a THING rather than a transaction, which is how every other slug here reads:
-  // `tapes`, `blocks`, `reel`, `rack`. The group, the worker and the bucket keep
-  // the organisation's name, because those really are Väin's and this page is
-  // ours.
-  { name: 'crate', group: 'vain', act: 5, created: '2026-09-15', built: true, settleMs: 25000,
-    one: 'one audio file into R2 in pieces of 16 MiB, played back and scrubbed from where it landed',
-    tags: ['R2', 'Workers', 'uncertainty', 'archive'] },
+  // `crate` was here until 2026-10-02: one long recording into R2 in pieces of 16 MiB through
+  // positron-vain. Its protocol now runs eccm's uploads (workers/files in kristjanjansen/eccm), and the
+  // page and the Worker are in archive/ (archive/demos/README.md says why).
   // The far end of `crate`: once whole programmes are in R2, a running order is
   // a playlist of BYTE RANGES into them and the station needs no encoder at all.
   // ⚠️ `settleMs` is 50 s because the claim being checked is that the sound
