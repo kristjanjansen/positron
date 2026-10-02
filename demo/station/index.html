@@ -23,7 +23,7 @@
   // how it is run against `wrangler dev` without touching the deployed one.
   const PARAMS = new URLSearchParams(location.search);
   const STATION = (PARAMS.get('base')
-    || 'https://positron-station.kristjan-jansen.workers.dev').replace(/\/+$/, '');
+    || 'https://eccm-staging.kristjan-jansen.workers.dev/stream').replace(/\/+$/, '');
   // `?k=` picks a channel (the station has several since 2026-10-01). `main`,
   // the channel that was the whole station before, keeps the un-prefixed
   // routes, so with no `?k=` this page asks exactly what it always asked.
