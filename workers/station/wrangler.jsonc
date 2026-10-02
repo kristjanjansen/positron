@@ -1,5 +1,6 @@
 {
-	// positron-station: the schedule, as one continuous HLS source.
+	// positron-station: since 2026-10-02 only GET /media/ on its bucket; the station moved to eccm
+	// (see worker.mjs). Before that: the schedule, as one continuous HLS source.
 	//
 	// ITS OWN WORKER AND ITS OWN BUCKET. `workers/vain` holds one broadcaster's
 	// archive and a write path with per-session quotas; this one holds the
@@ -25,29 +26,12 @@
 	"r2_buckets": [
 		{ "binding": "MEDIA", "bucket_name": "positron-station" }
 	],
-	// The running order and the live segment lists. A Durable Object rather than
-	// KV because "how long does a schedule change take to reach a listener" has
-	// to be a measurable number, and KV's propagation window is longer than the
-	// answer.
-	// One Schedule object per channel, `idFromName(<channel>)`, except `main`,
-	// which is the object that was the whole station before channels and is
-	// still `idFromName('station')`. One Library object, `idFromName('library')`,
-	// holds the programme records and the channel registry in SQLite: see the
-	// note above `class Library` in worker.mjs for why it is one object.
-	"durable_objects": {
-		"bindings": [
-			{ "name": "SCHEDULE", "class_name": "Schedule" },
-			{ "name": "LIBRARY", "class_name": "Library" }
-		]
-	},
 	"migrations": [
 		{ "tag": "v1", "new_sqlite_classes": ["Schedule"] },
-		{ "tag": "v2", "new_sqlite_classes": ["Library"] }
+		{ "tag": "v2", "new_sqlite_classes": ["Library"] },
+		// 2026-10-02: the station moved to eccm, and its two objects with their running orders and records
+		// went with it (copied first, compared on all three channels), so they are deleted here
+		{ "tag": "v3", "deleted_classes": ["Schedule", "Library"] }
 	],
-	// Retention. A live show writes one 160 KB object every ten seconds and
-	// nothing deleted them, so an hour of broadcast left 57.6 MB in the bucket
-	// that no playlist could ever reference again. See `sweep()` in worker.mjs
-	// for what it keeps; `POST /sweep` runs the same function on demand.
-	"triggers": { "crons": ["*/5 * * * *"] },
 	"observability": { "enabled": true }
 }
