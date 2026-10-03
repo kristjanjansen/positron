@@ -1,0 +1,47 @@
+{
+  "name": "CC to CC with a range",
+  "about": "CC 1 becomes CC 74 and its value is scaled from 20..100 onto 0..127, clamped at both ends.",
+  "notes": [
+    "scale: out = lo2 + round((clamp(v, lo, hi) - lo) * (hi2 - lo2) / (hi - lo)), and round is to nearest with ties AWAY FROM ZERO.",
+    "Here lo 20, hi 100, lo2 0, hi2 127, so out = round((v - 20) * 127 / 80).",
+    "v 10 clamps to 20, out 0 = 00.",
+    "v 20 (0x14), out 0 = 00.",
+    "v 40 (0x28): 20 * 127 / 80 = 31.75, out 32 = 20.",
+    "v 60 (0x3C): 40 * 127 / 80 = 63.5, a TIE, away from zero, out 64 = 40.",
+    "v 100 (0x64): 80 * 127 / 80 = 127 = 7F.",
+    "v 120 (0x78) clamps to 100, out 7F.",
+    "NEGATIVE CONTROL: CC 7 is not CC 1, and scale names cc 74, so B0 07 64 passes unchanged.",
+    "NEGATIVE CONTROL: a note is not a CC and passes unchanged, velocity included."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "synth", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth", "ops": [
+      { "op": "cc", "from": 1, "to": 74 },
+      { "op": "scale", "cc": 74, "lo": 20, "hi": 100, "lo2": 0, "hi2": 127 }
+    ] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "B0 01 0A" },
+    { "port": "kbd", "t": 1, "bytes": "B0 01 14" },
+    { "port": "kbd", "t": 2, "bytes": "B0 01 28" },
+    { "port": "kbd", "t": 3, "bytes": "B0 01 3C" },
+    { "port": "kbd", "t": 4, "bytes": "B0 01 64" },
+    { "port": "kbd", "t": 5, "bytes": "B0 01 78" },
+    { "port": "kbd", "t": 6, "bytes": "B0 07 64" },
+    { "port": "kbd", "t": 7, "bytes": "90 3C 64" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "B0 4A 00" },
+    { "port": "synth", "t": 1, "bytes": "B0 4A 00" },
+    { "port": "synth", "t": 2, "bytes": "B0 4A 20" },
+    { "port": "synth", "t": 3, "bytes": "B0 4A 40" },
+    { "port": "synth", "t": 4, "bytes": "B0 4A 7F" },
+    { "port": "synth", "t": 5, "bytes": "B0 4A 7F" },
+    { "port": "synth", "t": 6, "bytes": "B0 07 64" },
+    { "port": "synth", "t": 7, "bytes": "90 3C 64" }
+  ]
+}

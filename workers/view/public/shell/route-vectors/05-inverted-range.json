@@ -1,0 +1,155 @@
+{
+  "name": "an inverted range",
+  "about": "A scale whose lo2 is above its hi2 turns the knob round, and rounds to nearest with ties away from zero.",
+  "notes": [
+    "out = 100 + round(v * (20 - 100) / 127) = 100 + round(-80 v / 127), ties away from zero.",
+    "v 0: 100 = 64.",
+    "v 127 (0x7F): 100 - 80 = 20 = 14.",
+    "v 64 (0x40): -5120 / 127 = -40.31, rounds to -40, out 60 = 3C.",
+    "v 32 (0x20): -2560 / 127 = -20.16, rounds to -20, out 80 = 50.",
+    "v 96 (0x60): -7680 / 127 = -60.47, rounds to -60, out 40 = 28.",
+    "v 100 (0x64): -8000 / 127 = -62.99, rounds to -63, out 37 = 25. Truncating would give -62 and 38, so this one tells rounding from truncation.",
+    "l2 from knob2 scales 0..10 onto 127..0. v 5: 5 * -127 / 10 = -63.5, a NEGATIVE TIE, away from zero is -64, out 63 = 3F. A round half up (JavaScript's Math.round) gives -63 and 64, so this one tells the two tie rules apart.",
+    "No cc argument on scale, so it applies to every CC on the link, CC 7 included: v 127 out 14.",
+    "NEGATIVE CONTROL: a note's velocity is not a CC value and is not scaled."
+  ],
+  "ports": [
+    {
+      "id": "kbd",
+      "dir": "in"
+    },
+    {
+      "id": "knob2",
+      "dir": "in"
+    },
+    {
+      "id": "synth",
+      "dir": "out"
+    }
+  ],
+  "links": [
+    {
+      "id": "l1",
+      "from": "kbd",
+      "to": "synth",
+      "ops": [
+        {
+          "op": "scale",
+          "lo": 0,
+          "hi": 127,
+          "lo2": 100,
+          "hi2": 20
+        }
+      ]
+    },
+    {
+      "id": "l2",
+      "from": "knob2",
+      "to": "synth",
+      "ops": [
+        {
+          "op": "scale",
+          "lo": 0,
+          "hi": 10,
+          "lo2": 127,
+          "hi2": 0
+        }
+      ]
+    }
+  ],
+  "refused": [],
+  "in": [
+    {
+      "port": "kbd",
+      "t": 0,
+      "bytes": "B0 4A 00"
+    },
+    {
+      "port": "kbd",
+      "t": 1,
+      "bytes": "B0 4A 7F"
+    },
+    {
+      "port": "kbd",
+      "t": 2,
+      "bytes": "B0 4A 40"
+    },
+    {
+      "port": "kbd",
+      "t": 3,
+      "bytes": "B0 4A 20"
+    },
+    {
+      "port": "kbd",
+      "t": 4,
+      "bytes": "B0 4A 60"
+    },
+    {
+      "port": "kbd",
+      "t": 5,
+      "bytes": "B0 4A 64"
+    },
+    {
+      "port": "kbd",
+      "t": 6,
+      "bytes": "B0 07 7F"
+    },
+    {
+      "port": "kbd",
+      "t": 7,
+      "bytes": "90 3C 64"
+    },
+    {
+      "port": "knob2",
+      "t": 8,
+      "bytes": "B0 4A 05"
+    }
+  ],
+  "out": [
+    {
+      "port": "synth",
+      "t": 0,
+      "bytes": "B0 4A 64"
+    },
+    {
+      "port": "synth",
+      "t": 1,
+      "bytes": "B0 4A 14"
+    },
+    {
+      "port": "synth",
+      "t": 2,
+      "bytes": "B0 4A 3C"
+    },
+    {
+      "port": "synth",
+      "t": 3,
+      "bytes": "B0 4A 50"
+    },
+    {
+      "port": "synth",
+      "t": 4,
+      "bytes": "B0 4A 28"
+    },
+    {
+      "port": "synth",
+      "t": 5,
+      "bytes": "B0 4A 25"
+    },
+    {
+      "port": "synth",
+      "t": 6,
+      "bytes": "B0 07 14"
+    },
+    {
+      "port": "synth",
+      "t": 7,
+      "bytes": "90 3C 64"
+    },
+    {
+      "port": "synth",
+      "t": 8,
+      "bytes": "B0 4A 3F"
+    }
+  ]
+}

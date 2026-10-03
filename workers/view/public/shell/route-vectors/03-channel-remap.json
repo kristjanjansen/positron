@@ -1,0 +1,36 @@
+{
+  "name": "channel remap",
+  "about": "channel from 2 to 1 moves every channel message on channel 2 onto channel 1 and leaves the rest alone.",
+  "notes": [
+    "Channels in op arguments are 1 to 16, as bay.mjs writes them. On the wire channel 2 is low nibble 1 and channel 1 is low nibble 0.",
+    "91 to 90, B1 to B0, E1 to E0, 81 to 80, D1 to D0: the status changes and the data bytes do not.",
+    "NEGATIVE CONTROL: 92 is channel 3, which the op does not match, so it passes as 92.",
+    "NEGATIVE CONTROL: F8 has no channel, so it passes as F8."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "circuit", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "circuit", "ops": [{ "op": "channel", "from": 2, "to": 1 }] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "91 3C 64" },
+    { "port": "kbd", "t": 1, "bytes": "B1 01 40" },
+    { "port": "kbd", "t": 2, "bytes": "E1 00 40" },
+    { "port": "kbd", "t": 3, "bytes": "81 3C 00" },
+    { "port": "kbd", "t": 4, "bytes": "92 3C 64" },
+    { "port": "kbd", "t": 5, "bytes": "F8" },
+    { "port": "kbd", "t": 6, "bytes": "D1 30" }
+  ],
+  "out": [
+    { "port": "circuit", "t": 0, "bytes": "90 3C 64" },
+    { "port": "circuit", "t": 1, "bytes": "B0 01 40" },
+    { "port": "circuit", "t": 2, "bytes": "E0 00 40" },
+    { "port": "circuit", "t": 3, "bytes": "80 3C 00" },
+    { "port": "circuit", "t": 4, "bytes": "92 3C 64" },
+    { "port": "circuit", "t": 5, "bytes": "F8" },
+    { "port": "circuit", "t": 6, "bytes": "D0 30" }
+  ]
+}
