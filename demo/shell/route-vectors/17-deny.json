@@ -1,0 +1,43 @@
+{
+  "name": "deny drops what the gate is holding",
+  "about": "A person saying no to a held Replace Patch drops it for good, a later confirm releases nothing, and the rest of a denied stream is dropped as it arrives.",
+  "notes": [
+    "circuit's profile is the one in 09: sysex allow, and a SysEx starting F0 00 20 29 01 60 01 (Replace Patch, writes flash) is confirm.",
+    "t 0: a whole Replace Patch is held at circuit. Nothing out. Held 1.",
+    "t 1: a note passes while it is held. A held SysEx does not block the port.",
+    "t 2: deny circuit. NEGATIVE CONTROL: nothing out, the held message is dropped. Held 0.",
+    "NEGATIVE CONTROL t 3: confirm circuit releases nothing, because what was denied is gone and not waiting.",
+    "t 4: a second Replace Patch, first chunk only (no F7, so the stream stays open). Held 1.",
+    "t 5: deny circuit while the stream is still open. Nothing out. Held 0.",
+    "NEGATIVE CONTROL t 6: the stream's last chunk (10 F7) arrives after the deny. The gate's decision on the first chunk holds for the whole stream, and that decision is now no, so it is dropped rather than delivered as loose data bytes.",
+    "NEGATIVE CONTROL t 7: confirm circuit again releases nothing.",
+    "t 8: a Replace Current Patch (byte 6 is 00, RAM only) passes. A deny is once per action, not a wall on the port.",
+    "End: circuit holds 0."
+  ],
+  "ports": [
+    { "id": "editor", "dir": "in" },
+    { "id": "circuit", "dir": "out",
+      "policy": { "sysex": "allow" },
+      "rules": [{ "match": "F0 00 20 29 01 60 01", "do": "confirm" }] }
+  ],
+  "links": [
+    { "id": "l1", "from": "editor", "to": "circuit", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "editor", "t": 0, "bytes": "F0 00 20 29 01 60 01 05 F7" },
+    { "port": "editor", "t": 1, "bytes": "90 3C 64" },
+    { "t": 2, "deny": "circuit" },
+    { "t": 3, "confirm": "circuit" },
+    { "port": "editor", "t": 4, "bytes": "F0 00 20 29 01 60 01 06" },
+    { "t": 5, "deny": "circuit" },
+    { "port": "editor", "t": 6, "bytes": "10 F7" },
+    { "t": 7, "confirm": "circuit" },
+    { "port": "editor", "t": 8, "bytes": "F0 00 20 29 01 60 00 07 F7" }
+  ],
+  "out": [
+    { "port": "circuit", "t": 1, "bytes": "90 3C 64" },
+    { "port": "circuit", "t": 8, "bytes": "F0 00 20 29 01 60 00 07 F7" }
+  ],
+  "held": { "circuit": 0 }
+}
