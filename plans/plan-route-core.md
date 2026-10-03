@@ -202,8 +202,11 @@ microcontroller can carry on alone.
 | ESP32-S3 | L0 and L1 | **no** in ESP-IDF's stock USB stack (plan-hardware) | wifi; reaches our relay over a TLS WebSocket, measured path (§7b) | BLE MIDI, DIN by UART |
 | Daisy Seed | as a node with a synth in it | no | none | hangs off a DIN cable |
 
-**Chosen 2026-10-03: a Raspberry Pi Pico 2 (RP2350), €8.20 at Oomipood, in
-stock.** The Teensy 4.1 was suggested first and turned down as overkill. The
+**Chosen 2026-10-03: a Raspberry Pi Pico 2 W (RP2350 with wifi and Bluetooth),
+€12.00 at Oomipood, in stock.** The W is needed, decided the same day: with a
+powered USB hub on its only USB socket (Circuit, MK-425C and more behind it, no
+DIN needed) the socket is a host, so wifi is the only way to send it a new
+table without reflashing. The plain Pico 2 is €8.20. The Teensy 4.1 was suggested first and turned down as overkill. The
 Pico 2's own USB socket is a host through a €4 OTG cable (TinyUSB host, one
 device, or several behind a hub), DIN in and out are a 6N139 optocoupler (the
 6N138 is not stocked) and two €1 sockets, and flashing is copying a `.uf2` to a
