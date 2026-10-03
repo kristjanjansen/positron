@@ -6,10 +6,10 @@
 steps 1 to 4 of HANDOFF's routing next steps were in flight: the one MIDI kind
 vocabulary (`demo/shell/midi-kinds.mjs`), the route vectors
 (`demo/shell/route-vectors/*.json`) and the JS core (`demo/shell/route-core.mjs`).
-Proposed slug `route` (free, counted). Waits on the core landing; the page runs
+Slug `rout`, as named 2026-10-03 (*"rename to rout"*). Waits on the core landing; the page runs
 the vectors visibly and lets a person build links between virtual and WebMIDI
 ports through `bay.mjs` in front of `route-core.mjs`. Loads `positron-ui`,
-`positron-compose`, `positron-verify` before building. Name not yet agreed.
+`positron-compose`, `positron-verify` before building. Built and deployed 2026-10-03, see the commit.
 
 ### Done 2026-10-01: `/items/` archived, its knowledge kept as markdown
 
