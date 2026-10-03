@@ -15,7 +15,7 @@
 // They are not the same question and conflating them is how a studio gets
 // damaged: the Circuit's input is shaped for perfectly ordinary MIDI and must
 // nevertheless never be sent SysEx, because one byte inside a SysEx message
-// overwrites a patch on a device with no factory reset.
+// overwrites a patch, and a factory reset never brings back the owner's own.
 //
 // 🔴 AND A SHAPE IS DECLARED, NEVER INFERRED. This repository has the scar
 // already: 960 int16s is a valid 20 ms mono frame AND a valid 10 ms stereo one,
@@ -24,6 +24,8 @@
 // senders declare `audioChannels` and `frameMs` and receivers check one against
 // the other. This checks the pair at CONNECT time instead of at play time.
 
+import { KINDS, kindOfDecoded } from './midi-kinds.mjs';
+
 /** What a link can carry. `clock` is its own medium: see the plan, §3.4. */
 export const MEDIA = ['midi', 'audio', 'clock'];
 
@@ -31,8 +33,12 @@ export const MEDIA = ['midi', 'audio', 'clock'];
  * The classes of MIDI message a port may consent to.
  * ⚠️ `sysex` IS IN THIS LIST SO THAT IT CAN BE REFUSED BY NAME. A class nobody
  * can name is a class nobody can exclude.
+ * 🔴 IT IS `KINDS` FROM `midi-kinds.mjs` SINCE 2026-10-03, the one list the
+ * board's ALSA patches and its input gate use too. That added `transport`:
+ * start, stop, continue, song position and song select, which this file used
+ * to call `clock`, so a port can take tempo without being started.
  */
-export const CLASSES = ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'sysex'];
+export const CLASSES = KINDS;
 
 /**
  * A decoded message from `midi-decode.mjs`, as one of the classes above.
@@ -41,16 +47,7 @@ export const CLASSES = ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'syse
  * wearing a different hat.
  */
 export function classOf(m) {
-  switch (m.kind) {
-    case 'note on': case 'note off': return 'note';
-    case 'control': return 'cc';
-    case 'pitch bend': return 'bend';
-    case 'poly touch': case 'channel touch': return 'touch';
-    case 'program': return 'program';
-    case 'sysex': return 'sysex';
-    case 'clock': case 'start': case 'stop': case 'continue': return 'clock';
-    default: return 'other';
-  }
+  return kindOfDecoded(m);
 }
 
 // ── transforms ────────────────────────────────────────────────────────────

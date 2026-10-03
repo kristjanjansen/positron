@@ -1,5 +1,10 @@
 # plan-wish-dawless: Wish without a laptop, the Pi as the hub
 
+> ⚠️ **§4 AND §9'S ROUTE TABLE ARE SUPERSEDED BY `plans/plan-route-core.md`**
+> (2026-10-03), which defines the routing engine for any board, the Pi included.
+> This plan stays as the plan for THIS desk: one Pi, a phone as ear and screen,
+> and voice as one way of writing routes.
+
 > Asked 2026-10-03: *"Giving the ideqa about wish and general mapp anything to
 > anywhere how it would fit it into dawless setups. What is hun? Pi? What
 > listens? A phone browser? Pi attached cheap mike? Camera interepting

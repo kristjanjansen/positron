@@ -349,7 +349,12 @@ console.log('\n== the patch bay ==');
   ok('a note off is a note, not a class of its own',
     classOf(decode([0x80, 60, 0])) === 'note' && classOf(decode([0x90, 60, 0])) === 'note');
   ok('every class a port can name is in CLASSES',
-    ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'sysex'].every((c) => CLASSES.includes(c)));
+    ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'transport', 'sysex'].every((c) => CLASSES.includes(c)));
+  // ⚠️ NEGATIVE CONTROL: a start used to be `clock`, so a port taking tempo was started too.
+  ok('start, stop and continue are transport and the clock tick is clock',
+    [0xFA, 0xFB, 0xFC].every((s) => classOf(decode([s])) === 'transport') && classOf(decode([0xF8])) === 'clock');
+  ok('a drop of transport keeps the clock running',
+    !checkTransforms([{ op: 'drop', cls: 'transport' }]) && !!checkTransforms([{ op: 'drop', cls: 'tempo' }]));
   ok('the media are the three the plan names', MEDIA.join(',') === 'midi,audio,clock');
 }
 

@@ -1,5 +1,16 @@
 ## Open
 
+### A demo page that shows off the routing core, asked 2026-10-03
+
+*"can we have a demo page to show off all this? propose a name"*, said while
+steps 1 to 4 of HANDOFF's routing next steps were in flight: the one MIDI kind
+vocabulary (`demo/shell/midi-kinds.mjs`), the route vectors
+(`demo/shell/route-vectors/*.json`) and the JS core (`demo/shell/route-core.mjs`).
+Proposed slug `route` (free, counted). Waits on the core landing; the page runs
+the vectors visibly and lets a person build links between virtual and WebMIDI
+ports through `bay.mjs` in front of `route-core.mjs`. Loads `positron-ui`,
+`positron-compose`, `positron-verify` before building. Name not yet agreed.
+
 ### Done 2026-10-01: `/items/` archived, its knowledge kept as markdown
 
 *"discard items demo from ../positron, keep the knowledge in .md's"*. Removed
