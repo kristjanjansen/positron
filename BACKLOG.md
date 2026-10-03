@@ -1,5 +1,20 @@
 ## Open
 
+### Route core: what the C port found, 2026-10-03
+
+`rig/route-core/` passes all 17 vectors (65/65 in Docker). It found five things
+the vectors do not yet decide:
+- No vector holds TWO notes at an unlink, so the release order (channel then
+  note ascending) is graded in neither language. Sorting descending was 0 red.
+- A SysEx chunk that is only `F7` is dropped and leaves the stream open, in
+  both. Probably a reference bug; write the vector, then fix both.
+- The JS reads a port policy key verbatim, so `{ pitchbend: 'deny' }` is
+  silently ignored; it should go through `canonKind`.
+- `velocity` in the JS is a float times `Math.round`, which rounds 28 scales
+  wrong on float ties (`45 * 0.7` gives 31, not 32). The C uses thousandths and
+  is right. Make the JS match and add a vector at 0.7.
+- `thin` with time going backwards keeps the event in C and drops it in JS.
+
 ### `midiOpen()` on the board can hang, found 2026-10-03
 
 MEASURED on the Pi: while any ALSA sequencer subscription into the Circuit
