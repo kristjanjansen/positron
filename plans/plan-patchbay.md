@@ -9,6 +9,11 @@
 > named in the ask: *MIDI keyboard → routing → Novation Circuit → audio capture
 > → stream or record*.
 >
+> ⚠️ **CORRECTED 2026-10-03: THE MODEL AND VALIDATOR ARE BUILT** as
+> `demo/shell/bay.mjs` (graded by `bay-test.mjs`, used by `/wish/`). The `/bay/`
+> page was archived 2026-09-25. Successors: `plans/plan-route-core.md` and
+> `plans/plan-universal-routing.md`. The line below is kept as it was written.
+>
 > 🔴 **NOTHING HERE IS BUILT.** No page, no module, no row in `manifest.mjs`.
 > It is a proposal, and it is written to be argued with.
 >
