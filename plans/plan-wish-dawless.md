@@ -199,6 +199,15 @@ What they agree on, which is the useful part:
   more than that. The Pi wins only if it does things a box cannot: wishes,
   audio-driven sources, a phone UI, `/away/`. It already does the last one.
 
+**CME's code is not available** (asked 2026-10-03). The firmware and the
+HxMIDI Tools editor are proprietary, with no repository. The one public account
+of the protocol is PatchForge's black box write-up of the sibling **U6MIDI Pro
+and U2MIDI Pro**: SysEx frames captured off the USB wire, frame, checksum,
+router and filter maps, the mapper unfinished, no code repository linked and no
+licence stated. Nothing covers the H4MIDI WC. So a CME box can be configured
+only through its app or by reverse engineering, and a wish could not write to
+it without that work.
+
 ### The Pi doing it
 
 - **`aconnect` is the baseline.** ALSA's sequencer connects ports in the kernel;
@@ -256,6 +265,8 @@ Sources: [CME H4MIDI WC](https://www.cme-pro.com/product/usb-host-midi-interface
 [MidiRouter](https://github.com/lzulauf/MidiRouter),
 [PiMidiBox](https://github.com/geeksunny/PiMidiBox),
 [rpi-usb-host-midi-hub](https://github.com/gdsports/rpi-usb-host-midi-hub),
-[Zynthian MIDI routing](https://discourse.zynthian.org/t/midi-routing/4708).
+[Zynthian MIDI routing](https://discourse.zynthian.org/t/midi-routing/4708),
+[HxMIDI Tools start guide](https://www.cme-pro.com/start-guide-for-uxmidi-tools-software-by-cme/),
+[PatchForge, reverse engineering the CME U6MIDI Pro](https://patchforge.nl/blog/reverse-engineering-the-cme-u6midi-pro-part-1).
 
 Nothing here touches somebody else's server, and nothing sends SysEx.
