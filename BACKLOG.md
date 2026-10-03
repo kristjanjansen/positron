@@ -1,5 +1,15 @@
 ## Open
 
+### `/rout/` says what is going on, with a diagram, asked 2026-10-03
+
+*"Make the root page clear what is going on. Maybe also add a diagram.
+Especially the lower level thing and why we're doing it. You can also add some
+more descriptions."* Read as `/rout/` (the page built minutes before). The
+lower level thing is that `route-core.mjs` is the reference for a core small
+enough for a microcontroller (`plans/plan-route-core.md`), and the vectors are
+the contract a C port must pass too. Files: `demo/rout/index.html`, maybe its
+manifest `one` line. Loads `positron-diagram`. Done 2026-10-03, see the commit.
+
 ### A demo page that shows off the routing core, asked 2026-10-03
 
 *"can we have a demo page to show off all this? propose a name"*, said while
