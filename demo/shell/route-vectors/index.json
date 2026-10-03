@@ -1,0 +1,12 @@
+[
+  "01-fan-out.json",
+  "02-merge.json",
+  "03-channel-remap.json",
+  "04-cc-range.json",
+  "05-inverted-range.json",
+  "06-note-to-cc-toggle.json",
+  "07-cycle-refused.json",
+  "08-unlink-releases.json",
+  "09-confirm-replace-patch.json",
+  "10-thin.json"
+]

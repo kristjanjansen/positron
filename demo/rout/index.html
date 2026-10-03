@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 ONE RESERVED HEIGHT, FLOOR AND CEILING THE SAME NUMBER, for the reason
+     `/wish/`'s answer box gives: a box that is 6 lines for one test case and 20
+     for the next moves everything under it on every press of a row. It
+     scrolls inside itself rather than clipping, because the line a reader came
+     for (the one that differs) can be anywhere in it. */
+  .rout-case {
+    margin: 0;
+    height: calc(16 * 1.6em + 2 * var(--inset, 12px));
+    overflow: auto;
+    padding: var(--inset, 12px);
+    background: var(--card);
+    border: var(--edge, 1px solid var(--line));
+    border-radius: var(--r, 4px);
+    font: 400 12px/1.6 var(--mono);
+    color: var(--dim);
+    white-space: pre;
+  }
+  .rout-case b { color: var(--fg); font-weight: 400; }
+  .rout-case i { color: var(--bad, #e66); font-style: normal; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createCore, fromHex, toHex } from '/shell/route-core.mjs';
+  import { kindOf } from '/shell/midi-kinds.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+
+  const WHAT = 'Ten test cases and a live keyboard run through the routing core that will carry MIDI on the Pi.';
+
+  const d = mount({
+    name: 'rout',
+    what: WHAT,
+    readout: { cases: '', passed: '', delivered: '', held: '' },
+    controls: [
+      { id: 'flash', label: 'Replace patch' },
+      { id: 'ram', label: 'Current patch' },
+      { id: 'confirm', label: 'Confirm' },
+      { id: 'deny', label: 'Deny' },
+      { id: 'unlink', label: 'Unlink upper' },
+    ],
+  });
+  guard(d);
+
+  // ── the ten test cases, the same files `route-core-test.mjs` runs ─────────
+  //
+  // 🔴 THE PAGE RUNS THE CONTRACT, IT DOES NOT RESTATE IT. Every expected byte
+  // comes from `demo/shell/route-vectors/*.json`, derived by hand there, and
+  // this page only compares what the core answers against it. `index.json` is
+  // the list because a browser cannot read a directory, and the node test
+  // asserts the list and the directory agree.
+
+  const BASE = '/shell/route-vectors/';
+  const matchOf = (s) => String(s).trim().split(/\s+/).map((h) => (h.toLowerCase() === 'xx' ? null : parseInt(h, 16)));
+
+  function run(v) {
+    const core = createCore();
+    for (const p of v.ports) core.addPort({ ...p, rules: (p.rules || []).map((r) => ({ match: matchOf(r.match), do: r.do })) });
+    const refused = [];
+    for (const l of v.links) {
+      const r = core.link(l);
+      if (!r.ok) refused.push(`${l.id}:${r.reason}`);
+    }
+    const out = [];
+    for (const s of v.in) {
+      const t = s.t ?? 0;
+      if (s.unlink !== undefined) out.push(...core.unlink(s.unlink, t));
+      else if (s.confirm !== undefined) out.push(...core.confirm(s.confirm, t));
+      else if (s.deny !== undefined) core.deny(s.deny);
+      else out.push(...core.input({ port: s.port, t, bytes: fromHex(s.bytes) }));
+    }
+    const held = {};
+    for (const p of v.ports) held[p.id] = core.held(p.id);
+    return { out, refused, held };
+  }
+
+  const line = (e) => `${e.port} @${e.t ?? 0}  ${typeof e.bytes === 'string' ? toHex(fromHex(e.bytes)) : toHex(e.bytes)}`;
+
+  function grade(v) {
+    const got = run(v);
+    const want = v.out.map(line), have = got.out.map(line);
+    const outOk = want.length === have.length && want.every((w, i) => w === have[i]);
+    const refOk = got.refused.join(' ') === (v.refused || []).map((r) => `${r.link}:${r.reason}`).join(' ');
+    const heldOk = !v.held || Object.entries(v.held).every(([k, n]) => got.held[k] === n);
+    return { got, want, have, ok: outOk && refOk && heldOk };
+  }
+
+  const cases = createTable({
+    columns: [
+      { key: 'n', label: 'no', width: 36 },
+      { key: 'name', label: 'case', grow: true, hi: true },
+      { key: 'ins', label: 'in', width: 40, align: 'right' },
+      { key: 'outs', label: 'out', width: 40, align: 'right' },
+      { key: 'res', label: 'result', width: 64 },
+    ],
+    empty: 'the test cases have not loaded',
+    note: 'about',
+    onPick: (r) => show(r.v),
+  });
+  d.el.append(cases.el);
+
+  const detail = el('pre', 'rout-case');
+  d.el.append(detail);
+
+  /** One case written out: what went in, what was expected, what came out. */
+  function show(v) {
+    const g = grade(v);
+    detail.textContent = '';
+    const put = (tag, text) => detail.append(tag ? el(tag, '', text) : document.createTextNode(text));
+    put('b', `${v.name}\n`);
+    put('', `ports  ${v.ports.map((p) => `${p.id} (${p.dir})`).join('  ')}\n`);
+    for (const l of v.links) put('', `link   ${l.id}  ${l.from} > ${l.to}${(l.ops || []).length ? '  ' + l.ops.map((o) => JSON.stringify(o)).join(' ') : ''}\n`);
+    if ((v.refused || []).length) put('', `refused ${v.refused.map((r) => `${r.link} ${r.reason}`).join('  ')}\n`);
+    put('b', '\nin\n');
+    for (const s of v.in) {
+      put('', s.bytes !== undefined ? `  ${s.port} @${s.t ?? 0}  ${s.bytes}\n`
+        : `  @${s.t ?? 0}  ${Object.entries(s).filter(([k]) => k !== 't').map(([k, x]) => `${k} ${x}`).join(' ')}\n`);
+    }
+    put('b', '\nexpected out\n');
+    for (const w of g.want) put('', `  ${w}\n`);
+    put('b', '\ncame out\n');
+    g.have.forEach((h, i) => put(h === g.want[i] ? '' : 'i', `  ${h}\n`));
+    if (!g.have.length) put('', '  nothing\n');
+  }
+
+  let vectors = [], passed = 0;
+  async function loadCases() {
+    const names = await (await fetch(`${BASE}index.json`, { cache: 'no-store' })).json();
+    vectors = await Promise.all(names.map(async (f) => ({ file: f, ...(await (await fetch(BASE + f, { cache: 'no-store' })).json()) })));
+    passed = 0;
+    cases.set(vectors.map((v, i) => {
+      const g = grade(v);
+      if (g.ok) passed++;
+      return { n: String(i + 1).padStart(2, '0'), name: v.name, ins: v.in.length, outs: v.out.length,
+        res: g.ok ? 'pass' : 'FAIL', about: v.about || '', v };
+    }));
+    d.set('cases', vectors.length);
+    d.set('passed', passed);
+    if (vectors.length) show(vectors.find((v) => !grade(v).ok) || vectors[vectors.length - 1]);
+  }
+
+  // ── the live desk ────────────────────────────────────────────────────────
+  //
+  // 🔴 NOTHING HERE LEAVES THE TAB. The two instruments are pretend ports and
+  // what reaches them is written into the table under the keys. A SysEx button
+  // aimed at a real Circuit is exactly the thing the gate below exists to
+  // hold, and this page has no business owning one.
+  //
+  // A split at middle C: below it goes to `synth` on channel 1, middle C and up
+  // goes to `circuit` on channel 2. The `circuit` port carries the profile the
+  // Circuit gets in `plans/plan-route-core.md` §6: a patch SysEx whose byte 6 is
+  // 01 writes flash and is held for a person, one whose byte 6 is 00 lands in
+  // RAM and passes, and clock is refused.
+
+  const PORTS = [
+    { id: 'keys', dir: 'in' },
+    { id: 'editor', dir: 'in' },
+    { id: 'synth', dir: 'out', accepts: ['note', 'cc'] },
+    { id: 'circuit', dir: 'out', policy: { sysex: 'allow', clock: 'deny' },
+      rules: [{ match: matchOf('F0 00 20 29 01 60 01'), do: 'confirm' }] },
+  ];
+  const LINKS = [
+    { id: 'lower', from: 'keys', to: 'synth', ops: [{ op: 'range', hi: 59 }, { op: 'channel', to: 1 }] },
+    { id: 'upper', from: 'keys', to: 'circuit', ops: [{ op: 'range', lo: 60 }, { op: 'channel', to: 2 }] },
+    { id: 'patch', from: 'editor', to: 'circuit', ops: [] },
+  ];
+  const REPLACE_PATCH = fromHex('F0 00 20 29 01 60 01 00 10 20 30 F7');
+  const CURRENT_PATCH = fromHex('F0 00 20 29 01 60 00 00 10 20 30 F7');
+
+  const core = createCore();
+  for (const p of PORTS) core.addPort(p);
+  for (const l of LINKS) core.link(l);
+  let linked = true, delivered = 0;
+  const T0 = performance.now();
+  const now = () => Math.round(performance.now() - T0);
+
+  const arrived = createTable({
+    columns: [
+      { key: 't', label: 'ms', width: 64, align: 'right' },
+      { key: 'link', label: 'link', width: 64 },
+      { key: 'to', label: 'to', width: 64, hi: true },
+      { key: 'kind', label: 'kind', width: 72 },
+      { key: 'bytes', label: 'bytes', grow: true },
+    ],
+    empty: 'play a key, or press one of the patch buttons',
+    stick: true,
+    cap: 400,
+  });
+
+  function deliver(out) {
+    for (const e of out) {
+      delivered++;
+      arrived.add({ t: e.t, link: e.link || 'confirm', to: e.port, kind: kindOf(e.bytes), bytes: toHex(e.bytes) });
+    }
+    d.set('delivered', delivered);
+    d.set('held', core.held('circuit'));
+    return out;
+  }
+  const send = (port, bytes) => deliver(core.input({ port, t: now(), bytes }));
+
+  const kb = createKeyboard(el('div'), {
+    ...keyRange(),
+    base: 48,
+    onDown: (note) => { kb.lightNote(note, true); send('keys', [0x90, note, 100]); },
+    onUp: (note) => { kb.lightNote(note, false); send('keys', [0x80, note, 0]); },
+  });
+  d.el.append(kb.el, arrived.el);
+
+  function replacePatch() {
+    const out = send('editor', REPLACE_PATCH);
+    d.log(`a Replace Patch writes flash, so the circuit holds it (${core.held('circuit')} waiting)`);
+    return out;
+  }
+  function currentPatch() {
+    const out = send('editor', CURRENT_PATCH);
+    d.log('a Replace Current Patch lands in RAM and passes');
+    return out;
+  }
+  function confirm() {
+    const n = core.held('circuit');
+    const out = deliver(core.confirm('circuit', now()));
+    d.log(n ? `confirmed, ${n} held message${n === 1 ? '' : 's'} released` : 'nothing was waiting');
+    return out;
+  }
+  function deny() {
+    const n = core.deny('circuit');
+    d.set('held', core.held('circuit'));
+    d.log(n ? `denied, ${n} held message${n === 1 ? '' : 's'} dropped` : 'nothing was waiting');
+    return n;
+  }
+  function toggleUpper() {
+    if (linked) {
+      const out = deliver(core.unlink('upper', now()));
+      linked = false;
+      d.log(`upper unlinked, ${out.length} release message${out.length === 1 ? '' : 's'} sent`);
+      return out;
+    }
+    core.link(LINKS[1]);
+    linked = true;
+    d.log('upper linked again');
+    return [];
+  }
+
+  d.on('flash', replacePatch);
+  d.on('ram', currentPatch);
+  d.on('confirm', confirm);
+  d.on('deny', deny);
+  d.on('unlink', toggleUpper);
+  d.set('held', 0);
+  d.set('delivered', 0);
+
+  try {
+    await loadCases();
+    d.log(`${passed} of ${vectors.length} test cases pass`, passed === vectors.length ? 'ok' : 'bad');
+  } catch (e) {
+    d.log(`the test cases did not load (${e.message || e})`, 'bad');
+  }
+
+  // ── checks ───────────────────────────────────────────────────────────────
+  // The test cases are graded on every visit, because they are data already in
+  // hand and cost nobody anything. The desk drive presses things, so it is the
+  // harness's alone.
+  d.assert('all ten test cases load', vectors.length === 10, `${vectors.length} loaded`);
+  for (const v of vectors) {
+    const g = grade(v);
+    d.assert(`${v.file.replace('.json', '')}: ${v.name}`, g.ok,
+      g.ok ? `${g.have.length} out` : `want [${g.want.join(' | ')}] got [${g.have.join(' | ')}]`);
+  }
+  // ⚠️ NEGATIVE CONTROL: a case whose expectation is changed by one byte has to
+  // read as failing, or every pass above is a comparison that cannot fail.
+  if (vectors.length) {
+    const v = vectors.find((x) => x.out.length) || vectors[0];
+    const bent = { ...v, out: v.out.map((e, i) => (i ? e : { ...e, bytes: toHex(fromHex(e.bytes).map((b, j) => (j === 0 ? b ^ 1 : b))) })) };
+    d.assert('a case with one expected byte changed reads as failing', !grade(bent).ok, v.file);
+  }
+  d.assert('the description is one sentence', !/[;:]/.test(WHAT) && WHAT.split('. ').length === 1, WHAT);
+
+  await ifSelfcheck(async () => {
+    // Fresh state, so a press the harness made first does not move the counts.
+    if (!linked) toggleUpper();
+    deny();
+    const low = send('keys', [0x90, 48, 100]);
+    send('keys', [0x80, 48, 0]);
+    d.assert('a key below middle C reaches the synth on channel 1 and nothing else',
+      low.length === 1 && low[0].port === 'synth' && toHex(low[0].bytes) === '90 30 64', low.map(line).join(' | '));
+    const high = send('keys', [0x90, 72, 100]);
+    d.assert('middle C and up reaches the circuit on channel 2 and nothing else',
+      high.length === 1 && high[0].port === 'circuit' && toHex(high[0].bytes) === '91 48 64', high.map(line).join(' | '));
+    const flash = replacePatch();
+    d.assert('a Replace Patch is held at the circuit, not delivered',
+      flash.length === 0 && core.held('circuit') === 1, `${flash.length} out, ${core.held('circuit')} held`);
+    const ram = currentPatch();
+    d.assert('a Replace Current Patch passes while the other waits',
+      ram.length === 1 && ram[0].bytes[6] === 0 && core.held('circuit') === 1, `${ram.length} out, byte 6 ${ram[0]?.bytes[6]}`);
+    const ok = confirm();
+    d.assert('confirm releases the held Replace Patch once',
+      ok.length === 1 && ok[0].bytes[6] === 1 && core.held('circuit') === 0, `${ok.length} out, ${core.held('circuit')} held`);
+    replacePatch();
+    d.assert('and the next Replace Patch is held again', core.held('circuit') === 1, `${core.held('circuit')} held`);
+    d.assert('deny drops it', deny() === 1 && core.held('circuit') === 0);
+    const rel = toggleUpper();
+    d.assert('unlinking with a key down sends its note off, then all notes off',
+      rel.map((e) => toHex(e.bytes)).join(' | ') === '81 48 00 | B1 7B 00', rel.map(line).join(' | '));
+    const after = send('keys', [0x90, 72, 100]);
+    d.assert('and an unlinked upper half reaches nothing', after.length === 0, `${after.length} out`);
+    toggleUpper();
+    send('keys', [0x80, 72, 0]);
+  }, { log: d.log, say: 'the desk checks press keys and patch buttons, so they run for the harness only' });
+
+  d.ready();
+</script>

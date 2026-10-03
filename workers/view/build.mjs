@@ -134,6 +134,10 @@ const FILES = [
   // because the dev server serves the repo directly and only the deploy strips
   // to public/. That is a silent break, so the list is gone.
   ...shellFiles(),
+  // ⚠️ THE ROUTE VECTORS ARE DATA, ENUMERATED ONE LEVEL DOWN AND JSON ONLY, so
+  // `/rout/` runs the same files `route-core-test.mjs` runs. Hand-written
+  // contract files with no secret in them; `index.json` is their list.
+  ...routeVectorFiles(),
   // 06 imports the v6 player UNCHANGED rather than reimplementing it
   ['src/low-latency-player.js', 'src/low-latency-player.js'],
 
@@ -435,6 +439,13 @@ const FILES = [
  * Same containment argument as demoFiles(): a single known subdirectory,
  * filtered to web extensions, so no secret can reach public/.
  */
+function routeVectorFiles() {
+  let names = [];
+  try { names = readdirSync(join(REPO, 'demo/shell/route-vectors')); } catch { return []; }
+  return names.filter((n) => extname(n) === '.json')
+    .map((n) => [`demo/shell/route-vectors/${n}`, `shell/route-vectors/${n}`]);
+}
+
 function shellFiles() {
   const out = [];
   const OK = new Set(['.mjs', '.js', '.css']);
