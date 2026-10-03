@@ -1,3 +1,69 @@
+# Handoff, 2026-10-03, session 60 continued: three routing plans, and the Circuit has a factory reset
+
+The second half of session 60. Plans and documentation only: **no page, no
+Worker and no rig file changed, so nothing was built or deployed.** Commits
+`f0c34ff`, then `9cacf81` to `e185873`.
+
+## Where it is right now
+
+- ✅ **Site: BUILD `fdc5677-081701-752c`**, unchanged since the first half, and
+  correct: nothing deployable changed.
+- **Nothing is pushed.** 85 commits ahead of `origin/main`, counted at the end.
+  Push needs the account switch in CLAUDE.md.
+- Counted at the end: **58 demos, 55 built, 2 unlisted**, **83 plans**.
+- Tree clean apart from this file.
+
+## What landed
+
+| commit | what |
+| --- | --- |
+| `f0c34ff`, `9cacf81`, `a58760f`, `0bb8133` | **`plans/plan-wish-dawless.md`**: Wish without a laptop, the Pi holds the routes and the phone is ear and screen; §10 cables (every instrument into the Pi over USB); §11 prior art (six hardware routers, CME's code is closed, six Pi projects); §12 **RaspiMIDIHub read in full** (`wamdam/raspimidihub` at `3a66112`, GPL-3.0, read for ideas, nothing copied) |
+| `d0f3e72` | **the Circuit HAS a factory reset**, corrected in CLAUDE.md and the plan; SysEx is a precaution, not a wall; three asks logged in BACKLOG |
+| `e7c9a7e` | **`plans/plan-route-core.md`**: one routing core under 8 KB of RAM for a Cortex-M, a Pi or a browser; universal (event, link, closed transform list, allow/confirm/deny gate) separated from particular (profiles, adapters, authoring methods); voice is one authoring method of many; test vectors are the contract between implementations |
+| `e185873` | **`plans/plan-universal-routing.md`**: one graph for audio, video, control, code, scenes and storage; heavy media become sessions `{transport, address, shape}`; a transport chooser filled from positron's measurements; the easiest five to adopt ranked. Also: `plan-patchbay.md` now says it is built as `bay.mjs` |
+
+## How the plans relate
+
+- `plan-patchbay` (2026-09-21) is the vocabulary and is **built** as
+  `demo/shell/bay.mjs` (899 lines, `bay-test.mjs`, used by `/wish/`). It had said
+  "nothing here is built" until today.
+- `plan-route-core` is the engine under `bay.mjs`; `plan-universal-routing` widens
+  the media from three to eight and sits above both.
+- `plan-hardware` (2026-09-10) supplies the boards and the conclusion route-core
+  builds on: a Linux board for the transport, a microcontroller for MIDI and sound.
+- `plan-wish-dawless` is now ONE setup on route-core (Pi plus phone plus voice).
+  Its §4 and §9 route table is superseded by route-core; a pointer at its top was
+  offered and not yet written.
+
+## Learned, worth keeping
+
+- **Read `plans/` before writing a plan.** `plan-wish-dawless` was written before
+  `plan-patchbay` and `plan-hardware` §8 were found, and both had already covered
+  the ground: `ls plans/ | grep -i` on the subject costs one command.
+- **The Circuit has a factory reset** (Novation, *"Using Components to reset a
+  product to Factory Settings"*). It restores Novation's content, never the
+  owner's sessions, which live in `kristjanjansen/packs`. **49 lines** in the repo
+  still say "no factory reset"; fixed per page as touched.
+- **A kernel ALSA route into the Circuit would bypass `rig/board/inputs.mjs`
+  entirely**, because the gate writes to the rawmidi device and a sequencer
+  subscription goes round it. A route-core rule: routes into a gated device run
+  in userspace.
+- **Three MIDI class vocabularies disagree**: `bay.mjs:35` `CLASSES`,
+  `rig/board/alsa.mjs:16` `CARRY`, the allowlist in `inputs.mjs`. Step 0 of both
+  new plans.
+- RaspiMIDIHub's 1 to 3 ms latency figure times only its own Python call; nobody
+  publishes wire latency for a Pi MIDI router.
+
+## Open, from this half
+
+- **Step 0 of both plans: one MIDI class vocabulary.** Offered, waiting for a go.
+- A pointer at the top of `plan-wish-dawless` to route-core. Offered.
+- The 49 "no factory reset" lines (BACKLOG).
+- Not settled and listed in the plans: USB MIDI host on an RP2040; whether an ALSA
+  sequencer client and our raw fd can share the Circuit's port; video over the data
+  channel; two writers on one graph; scene recall that includes heavy sessions.
+- Everything under the first half's **Open** below still stands.
+
 # Handoff, 2026-10-03, session 60: station and crate leave for eccm, items archived, capitals committed
 
 Commits `96d9250` to `0bbbbcc`, the thirteen after `79dbf24`.
