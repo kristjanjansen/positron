@@ -8,5 +8,12 @@
   "07-cycle-refused.json",
   "08-unlink-releases.json",
   "09-confirm-replace-patch.json",
-  "10-thin.json"
+  "10-thin.json",
+  "11-transpose.json",
+  "12-velocity.json",
+  "13-only-drop.json",
+  "14-range.json",
+  "15-vrange.json",
+  "16-fixed.json",
+  "17-deny.json"
 ]

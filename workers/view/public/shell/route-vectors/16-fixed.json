@@ -1,0 +1,41 @@
+{
+  "name": "fixed gives every note on one velocity",
+  "about": "fixed to 96 sets every note on's velocity to 96 on every channel and leaves a note off, a note on at velocity 0 and a poly touch alone.",
+  "notes": [
+    "A note on (9n, v > 0) keeps its status and note and its velocity byte becomes 60, since 96 = 0x60. Everything else passes unchanged.",
+    "t 0: v 1 becomes 96: 90 24 60.",
+    "t 1: v 127 becomes 96: 90 26 60.",
+    "t 2: channel 10 (99) is a note on like any other: 99 28 60.",
+    "NEGATIVE CONTROL t 3: the note off 80 24 40 keeps its release velocity 40.",
+    "NEGATIVE CONTROL t 4: 90 26 00 is a release and passes as 90 26 00. Fixed to 96 it would be a note on that never ends.",
+    "NEGATIVE CONTROL t 5: poly touch A0 24 50 carries a pressure, not a velocity, and passes unchanged.",
+    "NEGATIVE CONTROL: l2 asks for to 0, which would make every note on a release, and is refused bad-args."
+  ],
+  "ports": [
+    { "id": "pads", "dir": "in" },
+    { "id": "drums", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "pads", "to": "drums", "ops": [{ "op": "fixed", "to": 96 }] },
+    { "id": "l2", "from": "pads", "to": "drums", "ops": [{ "op": "fixed", "to": 0 }] }
+  ],
+  "refused": [
+    { "link": "l2", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "pads", "t": 0, "bytes": "90 24 01" },
+    { "port": "pads", "t": 1, "bytes": "90 26 7F" },
+    { "port": "pads", "t": 2, "bytes": "99 28 40" },
+    { "port": "pads", "t": 3, "bytes": "80 24 40" },
+    { "port": "pads", "t": 4, "bytes": "90 26 00" },
+    { "port": "pads", "t": 5, "bytes": "A0 24 50" }
+  ],
+  "out": [
+    { "port": "drums", "t": 0, "bytes": "90 24 60" },
+    { "port": "drums", "t": 1, "bytes": "90 26 60" },
+    { "port": "drums", "t": 2, "bytes": "99 28 60" },
+    { "port": "drums", "t": 3, "bytes": "80 24 40" },
+    { "port": "drums", "t": 4, "bytes": "90 26 00" },
+    { "port": "drums", "t": 5, "bytes": "A0 24 50" }
+  ]
+}
