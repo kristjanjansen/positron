@@ -104,11 +104,20 @@ const OPS = {
   /**
    * Scale note on velocity. ⚠️ ONLY A NOTE ON: bay tests `d2 === 0`, so it
    * would scale an 8n note off's release velocity. Harmless, and different.
+   * 🔴 IN EXACT INTEGER THOUSANDTHS, NOT A FLOAT, as `route_core.c` does it.
+   * `Math.round(45 * 0.7)` is 31, because the product is 31.499999999999996 in
+   * a double, and the tie 31.5 rounds to 32. MEASURED 2026-10-03: 28 scales
+   * from 0.001 to 4.000 disagreed with the C on a float tie, every one rounded
+   * down here. Vector 20 holds two of them. A scale that is under half a
+   * thousandth rounds to 0 and is refused, as the C refuses it.
    */
   velocity: {
-    ok: (a) => typeof a.scale === 'number' && a.scale > 0,
-    run: (b, a) => (isNoteOn(b)
-      ? [b[0], b[1], Math.max(1, Math.min(127, Math.round(b[2] * a.scale)))] : b),
+    ok: (a) => typeof a.scale === 'number' && int(Math.round(a.scale * 1000), 1, 65535),
+    run: (b, a) => {
+      if (!isNoteOn(b)) return b;
+      const v = Math.floor((b[2] * Math.round(a.scale * 1000) + 500) / 1000);
+      return [b[0], b[1], Math.max(1, Math.min(127, v))];
+    },
   },
   /** Keep one kind and drop the rest. bay names the argument `cls`. */
   only: {
@@ -189,12 +198,19 @@ const OPS = {
    * ⚠️ IT DROPS THE LAST VALUE OF A FAST SWEEP, which leaves the destination
    * short of where the knob stopped. A trailing send needs a tick, and the core
    * has no clock; that is an open question in the plan, not settled here.
+   * 🔴 A t EARLIER THAN THE LAST KEPT IS KEPT, AND THE BUDGET RESTARTS FROM IT
+   * (vector 22). Until 2026-10-03 this file dropped it and the C kept it. Read
+   * as "no time has passed" instead, a clock that restarts at 0 under a core
+   * that does not would silence every knob on the link until the new clock
+   * passed the old one, which could be hours. Kept, the worst case is one value
+   * too many. The C's unsigned difference, there for its 49 day wrap, already
+   * read it this way.
    */
   thin: {
     ok: (a) => int(a.hz, 1, 1000),
     run: (b, a, s, t, kind) => {
       if (!CONTINUOUS.has(kind)) return b;
-      if (s.kept !== undefined && (t - s.kept) * a.hz < 1000) return null;
+      if (s.kept !== undefined && t >= s.kept && (t - s.kept) * a.hz < 1000) return null;
       s.kept = t;
       return b;
     },
@@ -222,9 +238,18 @@ export function createCore() {
   function addPort(p) {
     const accepts = p.accepts ? new Set(p.accepts.map(canonKind)) : null;
     if (accepts?.has(null)) throw new Error(`route-core: ${p.id} accepts a kind that is not one of ${KINDS.join(', ')}`);
+    // ⚠️ A POLICY KEY GOES THROUGH `canonKind` TOO, so `{ pitchbend: 'deny' }`
+    // denies bend (vector 21). It was read verbatim until 2026-10-03, and the
+    // older spelling was silently ignored, which reads as a gate that works.
+    const policy = {};
+    for (const [k, verb] of Object.entries(p.policy || {})) {
+      const ck = canonKind(k);
+      if (ck === null) throw new Error(`route-core: ${p.id} has a policy for a kind that is not one of ${KINDS.join(', ')}`);
+      policy[ck] = verb;
+    }
     ports.set(p.id, {
       id: p.id, dir: p.dir, accepts,
-      policy: p.policy || {},
+      policy,
       rules: (p.rules || []).map((r) => ({ match: r.match, do: r.do })),
       held: [],                           // { chunks: [bytes], state: 'held'|'allowed'|'denied' }
     });
@@ -296,7 +321,12 @@ export function createCore() {
     const t = ev.t ?? 0;
     let kind = kindOf(bytes);
     let cont = false;
-    if (bytes[0] < 0x80) {
+    // 🔴 A CHUNK THAT IS ONLY F7, OR STARTS WITH ONE, IS THE OPEN STREAM'S LAST
+    // CHUNK (vector 19). F7 is a status byte, so it reads as kind 'other', and
+    // until 2026-10-03 such a chunk was dropped and left the stream open: the
+    // terminator never reached anyone and the next stray data bytes were taken
+    // as more of that stream. With no stream open it is still dropped.
+    if (bytes[0] < 0x80 || bytes[0] === 0xF7) {
       if (!openSx.get(ev.port)) return [];  // data with no status and no open SysEx
       kind = 'sysex'; cont = true;
     }

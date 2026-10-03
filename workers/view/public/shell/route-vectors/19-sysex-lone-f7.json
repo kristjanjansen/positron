@@ -1,0 +1,47 @@
+{
+  "name": "a chunk that is only F7 ends its stream",
+  "about": "A SysEx whose terminator arrives alone as F7 is closed by it, and the F7 goes wherever the stream went: delivered, or held and released with it.",
+  "notes": [
+    "F7 is a status byte, so a chunk that is only F7 is not a continuation by its first byte. It is the open stream's own last chunk, and it takes the gate's decision on that stream's first chunk, like any continuation.",
+    "synth's profile is sysex allow. circuit's is 09's: sysex allow, and F0 00 20 29 01 60 01 (Replace Patch, writes flash) is confirm. l1 to synth, l2 to circuit, outputs in link order.",
+    "t 0: F0 00 20 29 01 60 01 05, a first chunk with no F7, so the stream is open. synth allows it and gets it. circuit's rule matches its first 7 bytes, so it is held. circuit holds 1.",
+    "t 1: 11 22, a continuation. synth gets it. circuit appends it to the held stream.",
+    "t 2: F7 alone. synth gets F7, and circuit appends F7 to the held stream. The stream is now closed.",
+    "NEGATIVE CONTROL t 3: 33, a data byte. No stream is open, so it goes nowhere. Had the F7 been dropped and the stream left open, synth would get 33 and circuit would hold it as part of the patch.",
+    "NEGATIVE CONTROL t 4: F7 alone with no stream open goes nowhere.",
+    "t 5: confirm circuit releases the three held chunks, in order, at t 5: F0 00 20 29 01 60 01 05, then 11 22, then F7. circuit holds 0.",
+    "t 6: a whole SysEx F0 7D 01 F7. synth allows it. circuit's rule fails at byte 1 (7D is not 00), so its policy allows it. Both get it, so the port is not wedged."
+  ],
+  "ports": [
+    { "id": "editor", "dir": "in" },
+    { "id": "synth", "dir": "out", "policy": { "sysex": "allow" } },
+    { "id": "circuit", "dir": "out",
+      "policy": { "sysex": "allow" },
+      "rules": [{ "match": "F0 00 20 29 01 60 01", "do": "confirm" }] }
+  ],
+  "links": [
+    { "id": "l1", "from": "editor", "to": "synth", "ops": [] },
+    { "id": "l2", "from": "editor", "to": "circuit", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "editor", "t": 0, "bytes": "F0 00 20 29 01 60 01 05" },
+    { "port": "editor", "t": 1, "bytes": "11 22" },
+    { "port": "editor", "t": 2, "bytes": "F7" },
+    { "port": "editor", "t": 3, "bytes": "33" },
+    { "port": "editor", "t": 4, "bytes": "F7" },
+    { "t": 5, "confirm": "circuit" },
+    { "port": "editor", "t": 6, "bytes": "F0 7D 01 F7" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "F0 00 20 29 01 60 01 05" },
+    { "port": "synth", "t": 1, "bytes": "11 22" },
+    { "port": "synth", "t": 2, "bytes": "F7" },
+    { "port": "circuit", "t": 5, "bytes": "F0 00 20 29 01 60 01 05" },
+    { "port": "circuit", "t": 5, "bytes": "11 22" },
+    { "port": "circuit", "t": 5, "bytes": "F7" },
+    { "port": "synth", "t": 6, "bytes": "F0 7D 01 F7" },
+    { "port": "circuit", "t": 6, "bytes": "F0 7D 01 F7" }
+  ],
+  "held": { "synth": 0, "circuit": 0 }
+}
