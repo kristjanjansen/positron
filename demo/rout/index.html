@@ -24,6 +24,12 @@
     color: var(--dim);
     white-space: pre;
   }
+  /* The prose under a section heading. Same face, size and ink as the
+     page's own sentence under its title, so the page reads as one voice. */
+  .rout-say { margin: 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+  /* Two paragraphs under one heading are one block, so they sit a paragraph
+     apart rather than the page's 40 px between blocks. */
+  .rout-text { display: flex; flex-direction: column; gap: 10px; }
   .rout-case b { color: var(--fg); font-weight: 400; }
   .rout-case i { color: var(--bad, #e66); font-style: normal; }
 </style>
@@ -35,6 +41,7 @@
   import { createCore, fromHex, toHex } from '/shell/route-core.mjs';
   import { kindOf } from '/shell/midi-kinds.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
 
   const WHAT = 'Ten test cases and a live keyboard run through the routing core that will carry MIDI on the Pi.';
 
@@ -51,6 +58,27 @@
     ],
   });
   guard(d);
+
+  const say = (...texts) => {
+    const box = el('div', 'rout-text');
+    for (const t of texts) box.append(el('p', 'rout-say', t));
+    return box;
+  };
+
+  /* 🔴 WHY THIS PAGE EXISTS, ASKED FOR 2026-10-03: *"Make the root page clear
+     what is going on ... Especially the lower level thing and why we're doing
+     it. You can also add some more descriptions."* So the page carries three
+     short sections, each a heading and the few sentences that say what is
+     under it, and the one line `what` stays the index's own line. */
+  d.stack.titled('WHY',
+    say('Every setup on this desk moves MIDI from somewhere to somewhere: a keyboard to a synth, a knob to a '
+      + 'filter, a phone to the Circuit. The routing core is the one small piece that decides what crosses each '
+      + 'connection, which notes, on which channel, changed how, and whether a message that can overwrite a saved '
+      + 'sound is let through at all.',
+    'It is written to fit a microcontroller with a few kilobytes of memory, so the same rules can run in this '
+      + 'browser, on the Raspberry Pi in the studio, or on a small chip inside a box with MIDI sockets and no '
+      + 'computer attached. Two copies of one program in two languages only stay the same program if something '
+      + 'grades both, and that is what the ten test cases are for.'));
 
   // ── the ten test cases, the same files `route-core-test.mjs` runs ─────────
   //
@@ -107,10 +135,12 @@
     note: 'about',
     onPick: (r) => show(r.v),
   });
-  d.el.append(cases.el);
-
   const detail = el('pre', 'rout-case');
-  d.el.append(detail);
+  d.stack.titled('TEN TEST CASES',
+    say('Each case is a file of ports, connections and messages going in, with the exact bytes that must come out, '
+      + 'worked out by hand rather than by running any code. This browser runs the JavaScript core against all ten '
+      + 'on every visit. Click a row to see what went in, what was expected and what came out.'),
+    cases.el, detail);
 
   /** One case written out: what went in, what was expected, what came out. */
   function show(v) {
@@ -214,7 +244,14 @@
     onDown: (note) => { kb.lightNote(note, true); send('keys', [0x90, note, 100]); },
     onUp: (note) => { kb.lightNote(note, false); send('keys', [0x80, note, 0]); },
   });
-  d.el.append(kb.el, arrived.el);
+  d.stack.titled('PLAY THROUGH IT',
+    say('The keys are split at middle C. The lower half goes to a synth on channel 1 and the upper half to the '
+      + 'Circuit on channel 2, both pretend, so nothing leaves this tab. Every message that arrives is listed under '
+      + 'the keys.',
+    'The Circuit is gated. Replace patch overwrites a saved sound, so it waits until you press Confirm or Deny, '
+      + 'while Current patch only changes the sound being played and passes. Unlink upper, with a key held, shows '
+      + 'the core sending the note off and an all notes off, so nothing is left ringing.'),
+    kb.el, arrived.el);
 
   function replacePatch() {
     const out = send('editor', REPLACE_PATCH);
@@ -316,6 +353,50 @@
     toggleUpper();
     send('keys', [0x80, 72, 0]);
   }, { log: d.log, say: 'the desk checks press keys and patch buttons, so they run for the harness only' });
+
+  // ── the picture, last on the page ───────────────────────────────────────
+  const dg = createDiagram(d.el, {
+    caption: 'One set of routing rules, written once for each kind of machine, kept identical by grading every '
+      + 'copy against the same ten files.',
+    nodes: [
+      { id: 'cases', label: 'test cases', sub: '10 JSON files', tech: 'archive',
+        note: 'Messages in and the bytes that must come out, worked out by hand. No core writes its own answers.' },
+      { id: 'web', label: 'Browser', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'jscore', label: 'route-core', sub: 'JavaScript, live', tech: 'relay',
+            note: 'Runs each message through the transforms on every link, then asks the destination whether it may '
+              + 'pass. This is the reference every other copy is graded against.' },
+        ] },
+      { id: 'pi', label: 'Raspberry Pi', kind: 'device', tech: 'raspberry',
+        children: [
+          { id: 'picore', label: 'route-core', sub: 'Node, next', tech: 'relay',
+            note: 'The same JavaScript, run by the board program that already holds the Circuit over USB. Not '
+              + 'switched on yet.' },
+        ] },
+      { id: 'mcu', label: 'Microcontroller', kind: 'device', tech: 'device',
+        children: [
+          { id: 'ccore', label: 'route-core', sub: 'C, planned', tech: 'relay',
+            note: 'The same rules in fixed arrays with no heap, in under 8 KB of memory, for a Cortex-M. Not written '
+              + 'yet, and finished when it passes the same ten files.' },
+        ] },
+      { id: 'pretend', label: 'pretend ports', sub: 'synth, Circuit', tech: 'sound',
+        note: 'What the keys on this page play into. The pretend Circuit holds a Replace Patch until you confirm it.' },
+      { id: 'circuit', label: 'Circuit', sub: 'USB MIDI', tech: 'sound',
+        note: 'The real one on the desk. A Replace Patch writes its flash, which is why the gate asks first.' },
+      { id: 'din', label: 'MIDI sockets', sub: 'DIN, 5 pin', tech: 'device',
+        note: 'A box with sockets and no computer, routing between the instruments plugged into it.' },
+    ],
+    links: [
+      { from: 'cases', to: 'jscore', note: 'Run on every visit to this page, every byte compared.' },
+      { from: 'cases', to: 'picore', note: 'The same files, run by node on the board.' },
+      { from: 'cases', to: 'ccore', note: 'The same files, run by a C test on a laptop and then on the chip.' },
+      { from: 'jscore', to: 'pretend', label: 'MIDI' },
+      { from: 'picore', to: 'circuit', label: 'MIDI' },
+      { from: 'ccore', to: 'din', label: 'MIDI' },
+    ],
+  }, { how: true, atEnd: true });
+  d.assert('the picture drew every box and every arrow, and cut nothing',
+    !(dg.cuts || []).length, (dg.cuts || []).map((c) => `${c.id} ${c.where}: ${c.shown || c.full}`).join(' | ') || 'no cuts');
 
   d.ready();
 </script>
