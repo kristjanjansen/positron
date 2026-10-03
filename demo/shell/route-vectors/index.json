@@ -15,5 +15,10 @@
   "14-range.json",
   "15-vrange.json",
   "16-fixed.json",
-  "17-deny.json"
+  "17-deny.json",
+  "18-unlink-many.json",
+  "19-sysex-lone-f7.json",
+  "20-velocity-ties.json",
+  "21-policy-alias.json",
+  "22-thin-backwards.json"
 ]

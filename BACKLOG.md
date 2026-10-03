@@ -3,17 +3,18 @@
 ### Route core: what the C port found, 2026-10-03
 
 `rig/route-core/` passes all 17 vectors (65/65 in Docker). It found five things
-the vectors do not yet decide:
-- No vector holds TWO notes at an unlink, so the release order (channel then
-  note ascending) is graded in neither language. Sorting descending was 0 red.
-- A SysEx chunk that is only `F7` is dropped and leaves the stream open, in
-  both. Probably a reference bug; write the vector, then fix both.
-- The JS reads a port policy key verbatim, so `{ pitchbend: 'deny' }` is
-  silently ignored; it should go through `canonKind`.
-- `velocity` in the JS is a float times `Math.round`, which rounds 28 scales
-  wrong on float ties (`45 * 0.7` gives 31, not 32). The C uses thousandths and
-  is right. Make the JS match and add a vector at 0.7.
-- `thin` with time going backwards keeps the event in C and drops it in JS.
+the vectors do not yet decide. All five DONE 2026-10-03, vectors 18 to 22, JS
+99/99 and C 82/82, each sabotaged red in a scratch copy:
+- ~~Two notes at an unlink~~ DONE: `18-unlink-many` holds five on three
+  channels; descending is now 1 red in JS, 2 in C.
+- ~~A chunk that is only `F7`~~ DONE: `19-sysex-lone-f7`, the F7 closes the
+  open stream as its last chunk; fixed in both.
+- ~~Policy key verbatim~~ DONE: `21-policy-alias`, the JS reads keys through
+  `canonKind` and throws on an unknown one, as `accepts` does.
+- ~~`velocity` float ties~~ DONE: `20-velocity-ties` at 0.7 (45 to 32, 85 to
+  60); the JS uses the C's thousandths and refuses a scale that rounds to 0.
+- ~~`thin` backwards~~ DONE: `22-thin-backwards`, a backwards t is KEPT and
+  restarts the budget, in both, so a restarted clock cannot silence a link.
 
 ### ~~`midiOpen()` on the board can hang, found 2026-10-03~~ DONE the same day: `O_WRONLY | O_NONBLOCK`, on the Pi, and MEASURED there: EBUSY in 0 ms while subscribed
 

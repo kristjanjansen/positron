@@ -137,11 +137,12 @@ static int op_run(route_link_t *l, int i, msg *m, uint32_t t, route_kind k) {
       /*
        * The scale arrives in THOUSANDTHS, and Math.round of a positive product
        * is floor(x + 1/2), so this is the JS rounding done in integers.
-       * ⚠️ IT IS EXACT WHERE THE JS IS NOT. `45 * 0.7` is 31.499999999999996 in
-       * a double, so the JS sends 31 and this sends 32, which is what 31.5 rounds
-       * to. MEASURED over every scale 0.001 to 4.000 and every velocity: 28
-       * scales disagree, each on one to three velocities, each a float tie the
-       * JS rounds down. No vector uses one (12 uses 0.25 and 2).
+       * ⚠️ IT WAS EXACT WHERE THE JS WAS NOT. `45 * 0.7` is 31.499999999999996
+       * in a double, so the JS sent 31 and this sends 32, which is what 31.5
+       * rounds to. MEASURED over every scale 0.001 to 4.000 and every velocity:
+       * 28 scales disagreed, each on one to three velocities, each a float tie
+       * the JS rounded down. The JS does this in thousandths too since
+       * 2026-10-03, and vector 20 holds 45 and 85 at 0.7.
        * 1/256ths were tried first and disagreed on 13 of the 30 scales 0.1 to
        * 3.0, because 0.1 is not a sum of powers of two either.
        */
@@ -199,7 +200,9 @@ static int op_run(route_link_t *l, int i, msg *m, uint32_t t, route_kind k) {
        * more passes at any hz, and below that the product is under 1e6.
        * ⚠️ THE DIFFERENCE IS UNSIGNED, so a millisecond clock that wraps after
        * 49 days still thins correctly, and a t that goes BACKWARDS reads as a
-       * long gap and is kept, where the JS drops it. No vector has time go back.
+       * long gap and is kept, restarting the budget from it. That is the
+       * decided behaviour, in both languages since 2026-10-03 (vector 22): a
+       * clock that restarts must not silence the link until it catches up.
        */
       uint32_t hz = (uint32_t)(a[0] | (a[1] << 8)), d;
       if (k != ROUTE_CC && k != ROUTE_BEND && k != ROUTE_TOUCH) return 1;
@@ -452,12 +455,14 @@ int route_input(route_core *c, uint8_t port, uint32_t t, const uint8_t *bytes, u
   uint8_t i;
   if (len == 0 || port >= ROUTE_MAX_PORTS) return 0;
   kind = route_kind_of(bytes[0]);
-  if (bytes[0] < 0x80) {
+  /* 🔴 A CHUNK THAT IS ONLY F7, OR STARTS WITH ONE, IS THE OPEN STREAM'S LAST
+   * CHUNK (vector 19). Its kind reads 'other', and until 2026-10-03 it was
+   * dropped here and in the JS alike and left the stream open. With no stream
+   * open it is still dropped. */
+  if (bytes[0] < 0x80 || bytes[0] == F7) {
     if (!(c->open_sx[port >> 3] & (1u << (port & 7)))) return 0;   /* data with no status and no open SysEx */
     kind = ROUTE_SYSEX; cont = 1;
   }
-  /* ⚠️ A CHUNK THAT IS ONLY F7 HAS KIND 'other' AND NEVER GETS HERE, so it
-   * leaves the stream open, as in the JS. See the report in route_test.c. */
   if (kind == ROUTE_SYSEX) set_open(c, port, memchr(bytes, F7, len) == NULL);
   if (kind == ROUTE_OTHER) return 0;
   if (kind != ROUTE_SYSEX && len > 3) { c->stats.too_long++; return 0; }

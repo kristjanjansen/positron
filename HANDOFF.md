@@ -11,8 +11,6 @@
 - **Pushed to GitHub up to `3778f6b`**; the commits after it are not (counted at
   the end of this session, see the last line).
 - Counted: **59 demos, 56 built, 2 unlisted**, **83 plans**.
-- A fixes agent may still be running on the route core; its report is the last
-  section of this handoff if it landed.
 
 ## What landed
 
@@ -61,8 +59,11 @@ host; flashing is copying a `.uf2`, nothing native on the Mac.
 
 ## Next steps
 
-1. The route core fixes in BACKLOG (*Route core: what the C port found*), if the
-   agent below did not finish them.
+1. ~~The route core fixes the C port found~~ DONE the same session: vectors 18
+   to 22 (release order with six notes on four channels, a lone `F7` closing its
+   stream, velocity in exact thousandths, policy keys through `canonKind`,
+   `thin` keeping a backwards `t`), both languages fixed, JS 99/99, C 82/82 on
+   22 vectors, `/rout/` 43/43.
 2. **The Pico 2 build**: `rig/route-core/` cross compiled for the RP2350 in
    Docker with the Pico SDK and TinyUSB host, one USB MIDI device to one DIN out,
    graded by the vectors first and by ear second.
