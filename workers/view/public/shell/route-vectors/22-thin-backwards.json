@@ -1,0 +1,37 @@
+{
+  "name": "thin keeps a value whose time went backwards",
+  "about": "A continuous value stamped earlier than the last one thin kept is kept, and the budget restarts from it, so a clock that restarts never silences the link.",
+  "notes": [
+    "hz 10, so a value is kept when it is the first, when (t - t_kept) * 10 >= 1000, or when t is EARLIER than t_kept. Read as no time passed, a restarted clock would drop every value until it passed the old one.",
+    "t 1000: kept, the first. t_kept 1000.",
+    "NEGATIVE CONTROL t 1050: (1050 - 1000) * 10 = 500, dropped.",
+    "t 400: earlier than 1000, so kept. t_kept 400. Read as elapsed 0 it would be dropped, and so would everything below up to t 1100.",
+    "NEGATIVE CONTROL t 450: (450 - 400) * 10 = 500, dropped. The budget restarted from 400, not from 1000.",
+    "t 500: (500 - 400) * 10 = 1000, kept. t_kept 500.",
+    "NEGATIVE CONTROL t 500 again: (500 - 500) * 10 = 0, dropped. The same millisecond is not backwards.",
+    "t 600: a bend, (600 - 500) * 10 = 1000, kept."
+  ],
+  "ports": [
+    { "id": "knob", "dir": "in" },
+    { "id": "relay", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "knob", "to": "relay", "ops": [{ "op": "thin", "hz": 10 }] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "knob", "t": 1000, "bytes": "B0 4A 00" },
+    { "port": "knob", "t": 1050, "bytes": "B0 4A 01" },
+    { "port": "knob", "t": 400, "bytes": "B0 4A 02" },
+    { "port": "knob", "t": 450, "bytes": "B0 4A 03" },
+    { "port": "knob", "t": 500, "bytes": "B0 4A 04" },
+    { "port": "knob", "t": 500, "bytes": "B0 4A 05" },
+    { "port": "knob", "t": 600, "bytes": "E0 00 40" }
+  ],
+  "out": [
+    { "port": "relay", "t": 1000, "bytes": "B0 4A 00" },
+    { "port": "relay", "t": 400, "bytes": "B0 4A 02" },
+    { "port": "relay", "t": 500, "bytes": "B0 4A 04" },
+    { "port": "relay", "t": 600, "bytes": "E0 00 40" }
+  ]
+}

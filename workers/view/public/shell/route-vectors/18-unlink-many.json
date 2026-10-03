@@ -1,0 +1,53 @@
+{
+  "name": "removing a link releases many notes in order",
+  "about": "Removing a link that holds notes on three channels sends their note offs by channel then note ascending, then CC 123 on every channel it ever carried a note on, ascending.",
+  "notes": [
+    "l1 has no ops, so what kbd plays is what synth was sent and is tracked as such.",
+    "t 0 to 5: notes go on in an order that is sorted by nothing: channel 3 note 40 (92 28), channel 1 note 60 (90 3C), channel 3 note 30 (92 1E), channel 1 note 50 (90 32), channel 2 note 70 (91 46), channel 5 note 10 (94 0A). Each is delivered as played.",
+    "t 6: channel 5 note 10 released (84 0A 00), delivered. Nothing is left sounding on channel 5, but a note on was delivered there.",
+    "t 7: channel 1 note 60 pressed again with no release between (90 3C 50), delivered. It is still ONE held note, so it gets one note off.",
+    "t 8: unlink l1. Held, as key = channel index * 128 + note: ch index 0 note 50 = 50, ch 0 note 60 = 60, ch 1 note 70 = 198, ch 2 note 30 = 286, ch 2 note 40 = 296. Ascending, that is 80 32 00, 80 3C 00, 81 46 00, 82 1E 00, 82 28 00.",
+    "Then CC 123 (7B) on every channel a note on was delivered on, ascending by index: 0, 1, 2 and 4. So B0 7B 00, B1 7B 00, B2 7B 00, B4 7B 00. Channel 5 (index 4) is there although nothing is sounding on it.",
+    "Reversed, the note offs would start 82 28 00 and the CCs B4 7B 00. In play order they would start 82 28 00, 80 3C 00. Note first, they would start 82 1E 00 (note 30). Each reading differs from the one above at its first release.",
+    "NEGATIVE CONTROL t 9: after the unlink kbd reaches nothing, so 90 48 64 goes nowhere."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "synth", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "92 28 64" },
+    { "port": "kbd", "t": 1, "bytes": "90 3C 64" },
+    { "port": "kbd", "t": 2, "bytes": "92 1E 64" },
+    { "port": "kbd", "t": 3, "bytes": "90 32 64" },
+    { "port": "kbd", "t": 4, "bytes": "91 46 64" },
+    { "port": "kbd", "t": 5, "bytes": "94 0A 64" },
+    { "port": "kbd", "t": 6, "bytes": "84 0A 00" },
+    { "port": "kbd", "t": 7, "bytes": "90 3C 50" },
+    { "t": 8, "unlink": "l1" },
+    { "port": "kbd", "t": 9, "bytes": "90 48 64" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "92 28 64" },
+    { "port": "synth", "t": 1, "bytes": "90 3C 64" },
+    { "port": "synth", "t": 2, "bytes": "92 1E 64" },
+    { "port": "synth", "t": 3, "bytes": "90 32 64" },
+    { "port": "synth", "t": 4, "bytes": "91 46 64" },
+    { "port": "synth", "t": 5, "bytes": "94 0A 64" },
+    { "port": "synth", "t": 6, "bytes": "84 0A 00" },
+    { "port": "synth", "t": 7, "bytes": "90 3C 50" },
+    { "port": "synth", "t": 8, "bytes": "80 32 00" },
+    { "port": "synth", "t": 8, "bytes": "80 3C 00" },
+    { "port": "synth", "t": 8, "bytes": "81 46 00" },
+    { "port": "synth", "t": 8, "bytes": "82 1E 00" },
+    { "port": "synth", "t": 8, "bytes": "82 28 00" },
+    { "port": "synth", "t": 8, "bytes": "B0 7B 00" },
+    { "port": "synth", "t": 8, "bytes": "B1 7B 00" },
+    { "port": "synth", "t": 8, "bytes": "B2 7B 00" },
+    { "port": "synth", "t": 8, "bytes": "B4 7B 00" }
+  ]
+}
