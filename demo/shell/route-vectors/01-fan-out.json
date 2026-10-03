@@ -1,0 +1,34 @@
+{
+  "name": "fan out to two",
+  "about": "One source linked to two destinations delivers every event to both, in the order the links were made.",
+  "notes": [
+    "No ops, so every byte is unchanged.",
+    "Within one input event the outputs follow link order: l1 (synth1) before l2 (synth2).",
+    "NEGATIVE CONTROL: pad has no link, so its note goes nowhere."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "pad", "dir": "in" },
+    { "id": "synth1", "dir": "out" },
+    { "id": "synth2", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth1", "ops": [] },
+    { "id": "l2", "from": "kbd", "to": "synth2", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 3C 64" },
+    { "port": "kbd", "t": 10, "bytes": "B0 01 40" },
+    { "port": "kbd", "t": 20, "bytes": "80 3C 00" },
+    { "port": "pad", "t": 30, "bytes": "99 24 64" }
+  ],
+  "out": [
+    { "port": "synth1", "t": 0, "bytes": "90 3C 64" },
+    { "port": "synth2", "t": 0, "bytes": "90 3C 64" },
+    { "port": "synth1", "t": 10, "bytes": "B0 01 40" },
+    { "port": "synth2", "t": 10, "bytes": "B0 01 40" },
+    { "port": "synth1", "t": 20, "bytes": "80 3C 00" },
+    { "port": "synth2", "t": 20, "bytes": "80 3C 00" }
+  ]
+}
