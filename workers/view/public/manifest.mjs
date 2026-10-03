@@ -506,7 +506,7 @@ export const DEMOS = [
     one: 'say which instrument should play which, and a language model makes the connection on the desk',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
   { name: 'rout', group: 'instruments', act: 4, created: '2026-10-03', built: true,
-    one: 'Ten test cases and a live keyboard run through the routing core that will carry MIDI on the Pi.',
+    one: 'Hand-written test cases and a live keyboard run through the routing core that will carry MIDI on the Pi.',
     tags: [] },
 
   // `bay` was a demo and is archived at archive/demos/bay-index.html, removed

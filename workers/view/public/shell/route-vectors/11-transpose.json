@@ -1,0 +1,55 @@
+{
+  "name": "transpose drops what falls off the keyboard",
+  "about": "transpose moves a note on and its note off by the same number of semitones, and a note that lands outside 0..127 is dropped rather than clamped to the edge.",
+  "notes": [
+    "out note = in note + by. Kept when 0 <= out <= 127, dropped otherwise. Status and velocity unchanged.",
+    "l1 to up is by +12, l2 to down is by -12. Within one input the outputs follow link order, up before down.",
+    "t 0: note 60 (3C). up 72 = 48. down 48 = 30.",
+    "t 1: note 116 (74). up 128 is past 127 and DROPPED. down 104 = 68. NEGATIVE CONTROL: a clamping transpose would send 90 7F 64 to up, a note nobody played.",
+    "t 2: note 115 (73). up 127 = 7F, the top edge, kept. down 103 = 67.",
+    "t 3: note 11 (0B). up 23 = 17. down -1 is below 0 and DROPPED. NEGATIVE CONTROL: a clamp would send 90 00 64.",
+    "t 4: note 12 (0C). up 24 = 18. down 0 = 00, the bottom edge, kept.",
+    "t 5: the note off of 60 with release velocity 40 moves with it: up 80 48 40, down 80 30 40.",
+    "t 6: the note off of 116. up 128 is dropped, which matches the note on up never got. down 104: 80 68 40.",
+    "NEGATIVE CONTROL t 7: CC 60 (B0 3C 64) is not a note, its number is not a pitch, and it passes unchanged to both.",
+    "NEGATIVE CONTROL: l3 asks for by 128, outside -127..127, and is refused bad-args."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "up", "dir": "out" },
+    { "id": "down", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "up", "ops": [{ "op": "transpose", "by": 12 }] },
+    { "id": "l2", "from": "kbd", "to": "down", "ops": [{ "op": "transpose", "by": -12 }] },
+    { "id": "l3", "from": "kbd", "to": "up", "ops": [{ "op": "transpose", "by": 128 }] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 3C 64" },
+    { "port": "kbd", "t": 1, "bytes": "90 74 64" },
+    { "port": "kbd", "t": 2, "bytes": "90 73 64" },
+    { "port": "kbd", "t": 3, "bytes": "90 0B 64" },
+    { "port": "kbd", "t": 4, "bytes": "90 0C 64" },
+    { "port": "kbd", "t": 5, "bytes": "80 3C 40" },
+    { "port": "kbd", "t": 6, "bytes": "80 74 40" },
+    { "port": "kbd", "t": 7, "bytes": "B0 3C 64" }
+  ],
+  "out": [
+    { "port": "up", "t": 0, "bytes": "90 48 64" },
+    { "port": "down", "t": 0, "bytes": "90 30 64" },
+    { "port": "down", "t": 1, "bytes": "90 68 64" },
+    { "port": "up", "t": 2, "bytes": "90 7F 64" },
+    { "port": "down", "t": 2, "bytes": "90 67 64" },
+    { "port": "up", "t": 3, "bytes": "90 17 64" },
+    { "port": "up", "t": 4, "bytes": "90 18 64" },
+    { "port": "down", "t": 4, "bytes": "90 00 64" },
+    { "port": "up", "t": 5, "bytes": "80 48 40" },
+    { "port": "down", "t": 5, "bytes": "80 30 40" },
+    { "port": "down", "t": 6, "bytes": "80 68 40" },
+    { "port": "up", "t": 7, "bytes": "B0 3C 64" },
+    { "port": "down", "t": 7, "bytes": "B0 3C 64" }
+  ]
+}

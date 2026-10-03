@@ -1,0 +1,52 @@
+{
+  "name": "range keeps the notes between its bounds",
+  "about": "range passes notes whose number is in lo..hi, both ends included, an open end reaching 0 or 127, and drops a note off outside the range the same as its note on.",
+  "notes": [
+    "A note is kept when lo <= note <= hi. A missing lo is 0 and a missing hi is 127. Anything that is not a note passes.",
+    "l1 to low is lo 48 hi 59, both bounds. l2 to high is lo 60 and no hi, one open bound. Outputs follow link order, low before high.",
+    "NEGATIVE CONTROL t 0: note 47 (2F) is below 48 and below 60. Nothing out.",
+    "t 1: note 48 (30), the low edge of l1, kept by low. NEGATIVE CONTROL: below 60, dropped by high.",
+    "t 2: note 59 (3B), the top edge of l1, kept by low. Dropped by high.",
+    "t 3: note 60 (3C). NEGATIVE CONTROL: above 59, dropped by low. The low edge of l2, kept by high.",
+    "t 4: note 127 (7F). Dropped by low. Kept by high, whose open top reaches 127.",
+    "NEGATIVE CONTROL t 5: the note off of 47 (80 2F 00) is outside both ranges and dropped by both, as its note on was.",
+    "t 6: the note off of 48 reaches low only, where its note on went.",
+    "t 7: the note off of 60 reaches high only, where its note on went.",
+    "NEGATIVE CONTROL t 8: B0 01 7F is a CC, and CC number 1 is not a pitch, so it passes both unchanged.",
+    "NEGATIVE CONTROL: l3 names neither bound and is refused bad-args."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "low", "dir": "out" },
+    { "id": "high", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "low", "ops": [{ "op": "range", "lo": 48, "hi": 59 }] },
+    { "id": "l2", "from": "kbd", "to": "high", "ops": [{ "op": "range", "lo": 60 }] },
+    { "id": "l3", "from": "kbd", "to": "low", "ops": [{ "op": "range" }] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 2F 64" },
+    { "port": "kbd", "t": 1, "bytes": "90 30 64" },
+    { "port": "kbd", "t": 2, "bytes": "90 3B 64" },
+    { "port": "kbd", "t": 3, "bytes": "90 3C 64" },
+    { "port": "kbd", "t": 4, "bytes": "90 7F 64" },
+    { "port": "kbd", "t": 5, "bytes": "80 2F 00" },
+    { "port": "kbd", "t": 6, "bytes": "80 30 00" },
+    { "port": "kbd", "t": 7, "bytes": "80 3C 00" },
+    { "port": "kbd", "t": 8, "bytes": "B0 01 7F" }
+  ],
+  "out": [
+    { "port": "low", "t": 1, "bytes": "90 30 64" },
+    { "port": "low", "t": 2, "bytes": "90 3B 64" },
+    { "port": "high", "t": 3, "bytes": "90 3C 64" },
+    { "port": "high", "t": 4, "bytes": "90 7F 64" },
+    { "port": "low", "t": 6, "bytes": "80 30 00" },
+    { "port": "high", "t": 7, "bytes": "80 3C 00" },
+    { "port": "low", "t": 8, "bytes": "B0 01 7F" },
+    { "port": "high", "t": 8, "bytes": "B0 01 7F" }
+  ]
+}
