@@ -28,6 +28,7 @@
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { kindOf } from '../../demo/shell/midi-kinds.mjs';
 import { createRtc } from './rtc.mjs';
+import { constants as FS } from 'node:fs';
 
 export const LEASE_MS = 60_000;
 
@@ -328,7 +329,15 @@ export function createInputs({
       const card = fs.readlinkSync(`/proc/asound/${cfg.midi.port}`);   // 'card7'
       const n = /^card(\d+)$/.exec(card)?.[1];
       if (n == null) throw new Error(`/proc/asound/${cfg.midi.port} is ${card}`);
-      s.midiFd = fs.openSync(`/dev/snd/midiC${n}D0`, 'w');
+      // 🔴 NON-BLOCKING, MEASURED 2026-10-03 ON THIS BOARD: while any ALSA
+      // sequencer subscription into the Circuit exists, a plain open of its raw
+      // device for write does not fail, it WAITS, and a synchronous open here
+      // would freeze the whole board on its first note. With O_NONBLOCK a busy
+      // device is EBUSY at once, which the catch in `midiWrite` logs by name.
+      // ⚠️ It makes writes non-blocking too, so a full output buffer is EAGAIN
+      // and that message is dropped and logged rather than waited for. The
+      // buffer is 4 KB, about 1,300 note offs, so a panic still fits.
+      s.midiFd = fs.openSync(`/dev/snd/midiC${n}D0`, FS.O_WRONLY | FS.O_NONBLOCK);
       log(`${cfg.name}: notes go to /dev/snd/midiC${n}D0 (${cfg.midi.port})`);
       return s.midiFd;
     }
