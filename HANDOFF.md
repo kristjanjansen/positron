@@ -2,14 +2,12 @@
 
 ## Where it is right now
 
-- ✅ **Site: BUILD `94613c5-191239-4e42`**, confirmed on the edge. Later commits
-  touch `rig/` and `BACKLOG.md` only.
+- ✅ **Site: BUILD `393745f-192138-833a`**, confirmed on the edge.
 - ✅ **The Pi has today's board files** (`midi-kinds.mjs`, `alsa.mjs`,
   `inputs.mjs` with the non-blocking open), md5 checked on both sides, service
   active in `studio-1`. The Circuit is plugged into the Pi over USB as card 7,
   ALSA client 44.
-- **Pushed to GitHub up to `3778f6b`**; the commits after it are not (counted at
-  the end of this session, see the last line).
+- ✅ **Pushed to GitHub**, everything to the end of this session.
 - Counted: **59 demos, 56 built, 2 unlisted**, **83 plans**.
 
 ## What landed
