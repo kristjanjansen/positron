@@ -12,6 +12,7 @@ import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, 
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { fresher, midiKey, MAX_PEERS } from './rtc.mjs';
 import { EventEmitter } from 'node:events';
+import { constants as FS_C } from 'node:fs';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
@@ -447,7 +448,8 @@ console.log('inputs: what a page may send the Circuit');
   is('a midi port that is a path is refused', parseInputs('{"c":{"device":"x","midi":{"port":"/dev/snd/midiC0D0","channels":[1]}}}').inputs.has('c'), false);
 
   let t = 0; const writes = []; const opened = [];
-  const fakeFs = { readlinkSync: () => 'card7', openSync: (pth) => { opened.push(pth); return 42; },
+  const flags = [];
+  const fakeFs = { readlinkSync: () => 'card7', openSync: (pth, fl) => { opened.push(pth); flags.push(fl); return 42; },
     writeSync: (fd, buf) => writes.push([...buf]), closeSync: () => {} };
   const sock = [];
   class WS { constructor() { this.readyState = 1; this.sent = []; sock.push(this); } send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
@@ -459,6 +461,10 @@ console.log('inputs: what a page may send the Circuit');
   c.handle({ type: 'midi.send', id: 'a', bytes: [0x90, 60, 100] });
   is('a note reaches the port the card name resolves to', opened, ['/dev/snd/midiC7D0']);
   is('with exactly the bytes sent', writes, [[0x90, 60, 100]]);
+  // MEASURED on the board 2026-10-03: a blocking open waits forever while a
+  // sequencer subscription holds the Circuit. Asserted on the flags, not the
+  // name of a mode string, so a revert to 'w' goes red here.
+  is('the raw device is opened write only and non-blocking', flags[0], FS_C.O_WRONLY | FS_C.O_NONBLOCK);
   c.handle({ type: 'midi.send', id: 'b', bytes: [0xF0, 0x7E, 0x7F] });
   is('SysEx never reaches the port', writes.length, 1);
   const refusedMsg = JSON.parse(sock[0].sent.filter((x) => typeof x === 'string').at(-1));
@@ -467,6 +473,22 @@ console.log('inputs: what a page may send the Circuit');
   t += 61_000; c.s.lastHeard = t; c.beat();
   is('when the lease runs out, a note left held is released', writes.at(-1), [0x80, 60, 0]);
   is('and nothing is left held', c.s.held.size, 0);
+  {
+    // ⚠️ NEGATIVE CONTROL: a busy device is a logged failure, never a throw
+    // out of the handler and never a hang.
+    const lines = [];
+    const busyFs = { readlinkSync: () => 'card7', openSync: () => { const e = new Error('EBUSY: resource busy or locked'); e.code = 'EBUSY'; throw e; },
+      writeSync: () => { throw new Error('never reached'); }, closeSync: () => {} };
+    const hw2 = createInputs({ inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 3, rate: 48000, name: 'pi', id: 'pi',
+      spawn: () => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => p.emit('exit'); return p; },
+      WebSocket: WS, format: (m, e) => JSON.stringify({ ...m, ...e }), parse: (x) => ({ kind: 'json', msg: JSON.parse(x) }),
+      randomId: () => 'x', now: () => t, fs: busyFs, leaseMs: 60_000, beatMs: 5_000, log: (l) => lines.push(l) });
+    const c2 = hw2.get('circuit'); c2.connect();
+    let threw = false;
+    try { c2.handle({ type: 'midi.send', id: 'z', bytes: [0x90, 60, 100] }); } catch { threw = true; }
+    is('a busy device does not throw out of the handler', threw, false);
+    ok('and the log names it', lines.some((l) => /midi write failed, EBUSY/.test(l)));
+  }
   // A control change under a held note must not forget the note, or the lease's
   // panic leaves it sounding. Only CC 123 lets go.
   c.handle({ type: 'input.want', id: 'w2' });

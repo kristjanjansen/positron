@@ -15,7 +15,7 @@ the vectors do not yet decide:
   is right. Make the JS match and add a vector at 0.7.
 - `thin` with time going backwards keeps the event in C and drops it in JS.
 
-### `midiOpen()` on the board can hang, found 2026-10-03
+### ~~`midiOpen()` on the board can hang, found 2026-10-03~~ DONE the same day: `O_WRONLY | O_NONBLOCK`, on the Pi, and MEASURED there: EBUSY in 0 ms while subscribed
 
 MEASURED on the Pi: while any ALSA sequencer subscription into the Circuit
 exists, opening `/dev/snd/midiC7D0` for write BLOCKS rather than failing, and
