@@ -15,9 +15,9 @@
 // are checked against `route-core.mjs` and `midi-kinds.mjs` on every run, and a
 // drift exits 1 before a line is written.
 //
-// ⚠️ ONE PLACE THIS IS NOT A COPY OF THE JS: a policy key is read through
-// `canonKind`, so `{ pitchbend: 'deny' }` means bend. The JS looks the key up
-// verbatim and silently ignores the older spelling. No vector uses one.
+// ⚠️ A POLICY KEY IS READ THROUGH `canonKind`, so `{ pitchbend: 'deny' }`
+// means bend. This file did it first; the JS read the key verbatim until
+// 2026-10-03 and does the same now. Vector 21 uses one.
 //
 // The format, one record a line, fields split by spaces:
 //   V file name...                       a vector starts
@@ -63,8 +63,9 @@ function arg(op, field, v) {
   if (v === undefined) return ABSENT;
   if (field === 'cls') { const k = canonKind(v); return k === null ? INVALID : String(KINDS.indexOf(k)); }
   // ⚠️ velocity's scale is a fraction. The C takes it in THOUSANDTHS, so 0.5 is
-  // 500, a scale finer than 1/2000 rounds to 0 and is refused where the JS takes
-  // it, and a fourth decimal is lost. Why thousandths: `route_core.c`, the op.
+  // 500, a scale under 1/2000 rounds to 0 and is refused (the JS refuses it too
+  // since 2026-10-03, vector 20), and a fourth decimal is lost. Why thousandths:
+  // `route_core.c`, the op.
   if (op === 'velocity' && field === 'scale') return typeof v === 'number' ? int32(Math.round(v * 1000)) : INVALID;
   return int32(v);
 }

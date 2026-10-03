@@ -11,7 +11,8 @@
  * asserts the JS cannot have, about the limits only C has.
  *
  * MEASURED 2026-10-03: 17 vectors (01 to 17, all `index.json` listed that day),
- * 65/65 green, the JS reading 77/77 on the same vectors. sizeof(route_core) is
+ * 65/65 green, the JS reading 77/77 on the same vectors. Then 22 vectors (18 to
+ * 22 added for the five things below), 82/82 green, the JS reading 99/99. sizeof(route_core) is
  * 6064 bytes on x86_64 and 6052 on a Cortex-M4 with the default limits, under
  * the plan's 8 KB. `.text` is 4264 bytes at -Os for the M4, 8172 at -O2 on x86.
  *
@@ -21,23 +22,43 @@
  *   2. the gate's confirm treated as allow: 5 red (09 output and held, 17, and
  *      both C only held pool asserts).
  *   3. the cycle check removed from `route_link`: 2 red (07 refusals and output).
- *   4. the release on unlink sorted DESCENDING: 0 RED. 🔴 NO VECTOR HOLDS TWO
+ *   4. the release on unlink sorted DESCENDING: 0 RED. 🔴 NO VECTOR HELD TWO
  *      NOTES AT AN UNLINK. 08 leaves exactly one sounding, so "note offs by
- *      channel then note ascending" (the plan's §12) is a sentence, not a
- *      promise, in either language. A missing vector, found here.
+ *      channel then note ascending" (the plan's §12) was a sentence, not a
+ *      promise, in either language. A missing vector, found here, and 18 is
+ *      that vector.
  *   5. `thin` never records what it kept: 1 red (10).
  *   6. the destination's `accepts` not checked: 1 red (02).
  * And once by accident: the first version of this file compared the refusals
  * BEFORE running the vector, against the count left over from the vector
  * before, and went red on 07, 08, 11 and 17. So that comparison can fail too.
  *
- * ⚠️ A CHUNK THAT IS ONLY `F7` IS DROPPED AND LEAVES ITS STREAM OPEN, in the JS
- * and here alike. F7 is a status byte, so it is not a continuation; its kind is
- * 'other', so it returns before the open stream is closed. A sender that splits
- * a SysEx so its terminator travels alone loses the terminator at every
- * destination and the port then treats the next stray data bytes as more of
- * that stream. Matched rather than fixed, because the JS is the reference and no
- * vector says which is right. Worth a vector.
+ * 🔴 SABOTAGED AGAIN, 2026-10-03, AFTER 18 TO 22 LANDED, the same way, the
+ * copy restored and read 82/82. Red per sabotage, MEASURED:
+ *   7. the release on unlink DESCENDING, note offs and CC 123 both: 2 red (18,
+ *      and the C only sounding pool assert, which reads the last CC 123).
+ *      The same change was 0 red before 18.
+ *   8. the release in pool order, the selection sort's comparison removed:
+ *      1 red (18).
+ *   9. a chunk that is only F7 dropped and the stream left open, as it was:
+ *      1 red (19).
+ *  10. velocity truncated, the + 500 removed: 2 red (12, 20).
+ *  11. velocity's scale taken in 1/256ths, the first thing tried: 1 red (20).
+ *  12. thin dropping a backwards t, the difference read signed: 1 red (22).
+ * Two of these first failed to BUILD (8 left a variable unused under
+ * -Werror; 10 errored at the end of the file for a reason not found, and the
+ * same change made with sed built), and a build failure prints no FAIL line,
+ * so a count of FAIL lines read 0 red on both. Each was rebuilt and is counted
+ * from a run that printed its tally.
+ *
+ * ⚠️ A CHUNK THAT IS ONLY `F7` WAS DROPPED AND LEFT ITS STREAM OPEN, in the JS
+ * and here alike, until 2026-10-03. F7 is a status byte, so it is not a
+ * continuation by its first byte; its kind is 'other', so it returned before
+ * the open stream was closed. A sender that splits a SysEx so its terminator
+ * travels alone lost the terminator at every destination, and the port then
+ * took the next stray data bytes as more of that stream. Vector 19 decides it:
+ * the F7 is the open stream's last chunk, delivered, held or dropped with it.
+ * Fixed in both.
  */
 #define _POSIX_C_SOURCE 200809L  /* strtok_r, in the runner only */
 #include "route_core.h"

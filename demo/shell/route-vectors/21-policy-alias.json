@@ -1,0 +1,38 @@
+{
+  "name": "a policy written in the older spelling applies",
+  "about": "A port policy keyed pitchbend and aftertouch, the spellings rig/board/alsa.mjs used, governs bend and touch exactly as the current names would.",
+  "notes": [
+    "synth's policy is { pitchbend: deny, aftertouch: confirm }. Through canonKind that is bend deny and touch confirm. Every other kind takes the default, allow.",
+    "t 0: a note 90 3C 64 is allowed and delivered.",
+    "NEGATIVE CONTROL t 1: bend E0 00 40 is denied. Read verbatim, the key pitchbend matches no kind, so bend would fall to the default and be delivered.",
+    "t 2: channel pressure D0 30 is touch, so it is held. synth holds 1.",
+    "t 3: poly pressure A0 3C 20 is touch too, held. synth holds 2.",
+    "t 4: confirm synth releases both, oldest first, at t 4: D0 30, then A0 3C 20. synth holds 0.",
+    "t 5: CC B0 01 40 has no policy and is allowed.",
+    "NEGATIVE CONTROL t 6: bend E0 7F 7F is denied, so the deny holds after a confirm too."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "synth", "dir": "out", "policy": { "pitchbend": "deny", "aftertouch": "confirm" } }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 3C 64" },
+    { "port": "kbd", "t": 1, "bytes": "E0 00 40" },
+    { "port": "kbd", "t": 2, "bytes": "D0 30" },
+    { "port": "kbd", "t": 3, "bytes": "A0 3C 20" },
+    { "t": 4, "confirm": "synth" },
+    { "port": "kbd", "t": 5, "bytes": "B0 01 40" },
+    { "port": "kbd", "t": 6, "bytes": "E0 7F 7F" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "90 3C 64" },
+    { "port": "synth", "t": 4, "bytes": "D0 30" },
+    { "port": "synth", "t": 4, "bytes": "A0 3C 20" },
+    { "port": "synth", "t": 5, "bytes": "B0 01 40" }
+  ],
+  "held": { "synth": 0 }
+}

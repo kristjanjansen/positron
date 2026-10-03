@@ -10,22 +10,23 @@
 // against itself and passes every bug it already has.
 //
 // NEGATIVE CONTROLS, AND THE PROPORTION IS STATED BECAUSE A ROUTER PASSES A
-// NAIVE SUITE BY PASSING EVERYTHING THROUGH. Recounted 2026-10-03 after 11 to
-// 17 landed, one per op that ran in the core with no vector naming it:
-//   - Inside the vectors, 57 of the 165 input steps and link attempts (127
-//     steps, 38 links) are there to be dropped, held, refused or left alone,
+// NAIVE SUITE BY PASSING EVERYTHING THROUGH. Recounted 2026-10-03 after 18 to
+// 22 landed, one per thing the C port found that no vector decided:
+//   - Inside the vectors, 67 of the 210 input steps and link attempts (165
+//     steps, 45 links) are there to be dropped, held, refused or left alone,
 //     each one marked NEGATIVE CONTROL in its vector's `notes` or listed under
-//     `refused`. It was 24 of 91 across 01 to 10. Counted per step: a step
-//     dropped on one link and kept on the other counts once.
+//     `refused`. It was 24 of 91 across 01 to 10 and 57 of 165 across 01 to 17.
+//     Counted per step: a step dropped on one link and kept on the other
+//     counts once.
 //   - Every vector is also run against a COPY OF ITS OWN EXPECTATION WITH ITS
-//     LAST BYTE FLIPPED, and that comparison must FAIL. Seventeen asserts that
+//     LAST BYTE FLIPPED, and that comparison must FAIL. Twenty-two asserts that
 //     check the check can fail. ⚠️ The first version flipped only data bytes and
 //     went red on 10, whose last event is a one byte F8: the self check caught
 //     itself.
 //   - Five direct refusals at link time (unknown op, bad args, an input range
 //     written backwards, a duplicate id, a kind nobody named).
-//   So 22 of the 77 asserts are negative controls outright, 36 run the vectors
-//   (17 refusals, 17 outputs, 2 held counts) and 19 check that the vectors are
+//   So 27 of the 99 asserts are negative controls outright, 48 run the vectors
+//   (22 refusals, 22 outputs, 4 held counts) and 24 check that the vectors are
 //   well formed (the count, index.json, and one per vector naming only known
 //   ops, kinds, verbs and codes).
 //
@@ -67,6 +68,25 @@
 //      read): 14 red across 14 of the 17 vectors. Only 01, 02 and 07 have
 //      nothing for it to change. 09's held count survives this one, because the
 //      entry is still pushed onto the held list before it is delivered.
+//
+// 🔴 SABOTAGED A THIRD TIME, 2026-10-03, ONCE PER THING 18 TO 22 DECIDE, the
+// same way, the copy restored and read 99/99. Red asserts, MEASURED:
+//  23. the release on unlink sorted DESCENDING, note offs and CC 123 both:
+//      1 red (18). It was 0 red before 18, in both languages: 08 leaves one
+//      note sounding, so the order was a sentence and not a promise.
+//  24. only the note offs descending: 1 red (18).
+//  25. only the CC 123s descending: 1 red (18).
+//  26. the release in play order, no sort at all: 1 red (18).
+//  27. a chunk that is only F7 dropped and the stream left open, as it was:
+//      1 red (19).
+//  28. `velocity` as `Math.round(v * scale)`, as it was: 1 red (20, the tie
+//      45 at 0.7). 12 stays green, its scales are exact in binary.
+//  29. `velocity` taking any scale above 0, as it did: 2 red (20 refusals, and
+//      its output, since 0.0004 then links and floors every note on to 1).
+//  30. a policy key read verbatim, as it was: 1 red (21). Its held count stays
+//      green, because touch then falls to allow and nothing is held at the end
+//      either way.
+//  31. `thin` reading a backwards t as no time passed: 1 red (22).
 // ⚠️ ONE SABOTAGE WENT GREEN AND IS EQUIVALENT, NOT A HOLE: `deny()` emptying
 // its list without marking the entry denied. The entry is unreachable, the held
 // count reads from the list, and a later chunk of that stream is appended to
