@@ -126,7 +126,8 @@ phone is in a pocket.
 ## 9. Steps, in order
 
 1. **Route table on the board.** `rig/board/routes.mjs`: rows, persistence to a
-   file, a forwarding loop, every output through the existing gate. A test in
+   file, a forwarding loop, every output through the existing gate, changes
+   applied as a diff, Circuit routes never in the kernel (§12). A test in
    `rig/board/test.mjs` style, no device.
 2. **`/wish/` writes rows to the board** instead of holding them in the page,
    over the board's existing relay and direct paths. `×` deletes the row on the
@@ -268,5 +269,120 @@ Sources: [CME H4MIDI WC](https://www.cme-pro.com/product/usb-host-midi-interface
 [Zynthian MIDI routing](https://discourse.zynthian.org/t/midi-routing/4708),
 [HxMIDI Tools start guide](https://www.cme-pro.com/start-guide-for-uxmidi-tools-software-by-cme/),
 [PatchForge, reverse engineering the CME U6MIDI Pro](https://patchforge.nl/blog/reverse-engineering-the-cme-u6midi-pro-part-1).
+
+## 12. RaspiMIDIHub read in full: what to take, what to refuse
+
+Asked 2026-10-03: *"Read the code and get ideas"*. READ at
+`wamdam/raspimidihub` HEAD `3a66112` (2026-09-20), about 83,000 lines of
+Python and JavaScript, cloned to a scratchpad and read by two agents, one on the
+engine and one on the interface. **Nothing was run, nothing was copied** (GPL-3.0).
+Paths below are inside that repository's `src/raspimidihub/` unless named.
+Spot-checked by hand: the hotplug teardown, SysEx in the default filter, unknown
+types passing, MIDI-CI on by default, no cycle detection in the Python, the
+presets removal in `CHANGELOG.txt`, and the captive DNS line.
+
+### How it works
+
+- **Two paths per route.** A route with no filter and no mapping is one kernel
+  `subscribe(src, dst)`. Anything else goes to a Python loop with its own pair of
+  sequencer ports per route (`midi_engine.py:34`, `midi_filter.py:408`). Adding a
+  mapping silently moves a route to the slow path.
+- **A change is a diff.** `apply_edge_diff` (`midi_engine.py:1271`) keys routes by
+  `(src_stable_id, src_port, dst_stable_id, dst_port)` and leaves each untouched,
+  updates it in place, swaps, adds or removes it. Removing a route first sends
+  note-offs for the notes it carried and CC 123 on its channels (`:1388`).
+- **The row.** `{src_stable_id, src_port, dst_stable_id, dst_port,
+  filter: {channel_mask, msg_types}, mappings: [...]}`. Mapping types are
+  `note_to_cc`, `note_to_cc_toggle`, `note_to_note`, `cc_to_cc` (in and out
+  range) and `channel_map`, each with `dst_channel` and `pass_through`; inverted
+  means out min above out max; no curves (`midi_filter.py:45`).
+  `validate_new_mapping` (`:194`) refuses a mapping that changes nothing and an
+  exact duplicate.
+- **Device identity** (`device_id.py`): `vid:pid` plus the USB serial, refusing
+  placeholder serials (a Digitone II ships `000000000001`, `:76`); without a
+  serial, the USB port path; a soft VID:PID match only when exactly one saved
+  entry meets exactly one new device; identical units get `#N` and are never
+  guessed between (`:559`, `:569`).
+- **Persistence.** Read-only root, config on the boot partition written in a short
+  rw window with `sync`; two gzip autosave slots alternating, the checksum tells a
+  torn slot, the higher sequence wins (`config.py:45`). Rows for an absent device
+  are kept, drawn dimmed, and re-applied when it returns (`:674`).
+- **Interface.** REST plus one SSE stream with explicit subscriptions; a 100 event
+  queue per client that drops the oldest. Learn: arm, take the next message, 30 s
+  timeout, result over SSE (`api/plugins.py:43`, `api/__init__.py:93`).
+- **Scene-like things** exist only for plugins: 8 pattern slots recalled by a
+  trigger note and quantised to the bar (`slot_bank.py:250`), and controller
+  "drop" snapshots fired now or at the next 1 to 16 bars with a fade, held
+  0.5 s to capture (`controller_base.py`). **Routing presets were removed in
+  3.1.0** (`CHANGELOG.txt`, 2026-05-11). Program change recalls nothing.
+- **No internet**: its own wifi access point at `192.168.4.1`, every DNS name
+  answered by the Pi (`wifi.py:280`), a captive landing page, and USB tethering.
+- **Network MIDI** is AppleMIDI on the LAN only, journal ignored
+  (`apple_midi.py:35`), no NAT traversal. Nothing reaches another building.
+
+### Their latency numbers are not wire numbers
+
+The quoted 1 to 3 ms times only their own Python call around `process_event`
+(`midi_engine.py:1040`), and `perf_stats.py` says input to wire needs external
+capture and is out of scope. Worth taking anyway: `isolcpus=2,3 nohz_full=2,3`,
+the loop pinned to one core, `Nice=-5`, the input FIFO raised to the kernel's
+2000 events with overflows counted (`alsa_seq.py:149`). No SCHED_FIFO.
+
+### The traps, the Circuit's first
+
+1. **A kernel route into the Circuit bypasses `rig/board/inputs.mjs` entirely.**
+   Our gate writes raw bytes to the Circuit's rawmidi device; an ALSA
+   subscription carries SysEx past it. **Hard rule for `routes.mjs`: a route whose
+   destination is the Circuit always runs in userspace through the gate, never in
+   the kernel.** Unknown: whether a sequencer client and our raw fd can hold that
+   device at once. Measure before building.
+2. **SysEx is open by default** (`sysex` in the default `msg_types`,
+   `midi_filter.py:27`) and **unknown event types pass** (`:318`). Ours denies by
+   default.
+3. **A SysEx Sender plugin** streams any uploaded `.syx` with no check of byte 6.
+   **MIDI-CI probing is on by default** (`config.py:180`) and sends Universal
+   SysEx to every two-way device on connect. Port neither.
+4. **Any hotplug tears down every route** and rebuilds after 0.5 s
+   (`_scan_and_connect`). Plugging a pedal cuts held notes everywhere. Diff
+   instead.
+5. **Loop prevention is in the manual, not the Python.** Write cycle detection.
+6. **Port numbers as identity** break if a firmware reorders ports.
+7. **Their offline access point is plain http**, which is not a secure context,
+   so a phone browser will not give it the microphone, and the phone has no
+   internet for Workers AI. Voice cannot use that route. Keep
+   https://positron.studio plus the data channel.
+8. **Learn takes the first message that arrives.** On a Circuit sending clock and
+   CCs that is wrong. Filter by source and require movement.
+9. Phone faders over HTTP `PATCH` are too coarse for gestures; use the data
+   channel.
+
+### Ideas taken into this plan, ranked
+
+1. **Diff, never rebuild** (`midi_engine.py:1271`), with note-offs and CC 123 on
+   removal. It is what makes `×`, scene recall and hotplug safe. §9 step 1.
+2. **Device identity rules** as `rig/board/devid.mjs`, with the same refusals and
+   a test list modelled on `tests/test_device_id.py`. `inputs.mjs:320` finds the
+   card by `/proc/asound/<id>`, which collides for two identical units.
+3. **Their mapping types as the closed vocabulary a wish may produce**, plus a
+   curve, plus their no-op and duplicate refusal, checked before `/wish/` shows a
+   row.
+4. **The board publishes what exists**: ports, stable ids and the allowed row
+   vocabulary, and the wish prompt is built from that list, which attacks the
+   wrong-instrument failure head on (after their self-describing `/api/routes.json`).
+5. **Wish by demonstration** on a server-side learn (arm, take, time out, answer
+   with an id), done twice for source and target, filtered by source and needing
+   movement. §7, no model needed.
+6. **Scenes fire at the next bar** of the Circuit's clock, optional fade; a
+   footswitch tap fires, a 0.5 s hold captures or undoes (after their drops).
+7. **Two checksummed autosave slots** for `routes.json`; rows for an absent device
+   kept dimmed and re-applied.
+8. **Measure the wire.** Nobody publishes it; §8 already asks.
+9. **Publish only while watched** (`spectator.py`) for `/away/`'s state.
+
+### What they lack and this plan has
+
+Voice or any language input, audio as a source (no audio code at all), scenes
+tied to the Circuit's sessions (their presets were removed and program change
+triggers nothing), anything beyond one LAN, and a refusal gate on SysEx.
 
 Nothing here touches somebody else's server, and nothing sends SysEx.
