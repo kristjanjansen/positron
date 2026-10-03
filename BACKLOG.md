@@ -67,6 +67,10 @@ ASKED, VERBATIM: *"read handoff. vpn off. do midi updates on pi and webrtc for a
 Same message: *"webrtc for away"*. Read as the go the plan waited on, and as yes to `node-datachannel` as `rig/board`'s first npm dependency. Order from the plan: P0 ICE between Chrome and `node-datachannel` on this network, P1 `rig/board/rtc.mjs`, P2 `/away/` direct with the relay as fallback and `via` / `round trip` cells, P3 10 ms frames, P4 the cushion. Each measured before the next.
 - ✅ **DONE, P0 to P4**, results in the plan's §9. Direct, host to host: board round trip 72 to **4 ms**, `lag` 175 to **~48 ms**, 10 ms frames beat 20 (115 ms), cushion starts at 40. Board has it (193/193 there), page has it behind `createBoard({ direct: true })`. Not known: behaviour off this network.
 
+### Open 2026-10-03: Wish without a laptop, the Pi as the hub (plan written, nothing built)
+
+ASKED, VERBATIM: *"Giving the ideqa about wish and general mapp anything to anywhere how it would fit it into dawless setups. What is hun? Pi? What listens? A phone browser? Pi attached cheap mike? Camera interepting gestures? Random ideas"*, then *"Add plan etc"*. Plan: `plans/plan-wish-dawless.md`, all reasoning, nothing measured. Slug `wish` (https://positron.studio/wish/), files `rig/board/` (a new `routes.mjs`), `demo/wish/index.html`, `demo/wish-local.mjs`. Recommendation: the Pi owns the route table and forwards offline through the existing MIDI gate; the phone is hold to talk and the screen; the model only writes rows. Not started, waiting for a go on §9 step 1.
+
 ### Open 2026-09-30: `/away/`'s second dry-out about 5 s after the direct path opens
 
 Found while measuring the direct path, not asked for. In five of seven runs the playout ran dry a second time 9.5 to 10.5 s into the page, about 5 s after the switch, which ratchets the cushion from ~35 to ~64 ms and puts `lag` at ~80 ms rather than ~48. Five seconds is the board's beat (`BEAT_MS`, `inputs.mjs`), so that is the first suspect; not measured. Files: `rig/board/inputs.mjs`, `demo/shell/board.mjs`.
