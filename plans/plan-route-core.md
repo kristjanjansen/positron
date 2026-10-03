@@ -124,6 +124,12 @@ arpeggiator, a delay). Those are **nodes**, sources with an input, exactly as
 RaspiMIDIHub makes its plugins appear as devices. The core stays a pure
 function of the event and the link.
 
+⚠️ **TWO THINGS IN THIS SECTION DID NOT SURVIVE THE REFERENCE, 2026-10-03, see §12.**
+`range` here scales a value, and in `bay.mjs` it is the note number filter this
+table calls `split`; the reference kept bay's meaning and named the value op
+`scale`. And the core is NOT a pure function of the event and the link: `toggle`
+and `thin` keep state per link, and `thin` reads time.
+
 ## 5. Dispatch
 
 ```c
@@ -138,6 +144,9 @@ for (l = first_from[ev.port]; l; l = next_from[l]) {    // fan out is free
 Taken unchanged from plan-patchbay §3.2: a table, not a graph walk; fan out is
 links, fan in is merge; a link that closes a cycle is refused when it is made,
 and a hop counter on the event catches a cycle closed through hardware.
+⚠️ The reference refuses a cycle made of links and has no hop counter: what the
+core writes never re-enters its own inputs, so a loop can only close through a
+device, and nothing catches that yet (§12).
 
 **Changes are diffs** (plan-wish-dawless §12): a new table is compared with the
 live one; a link that stays is not touched, so clock and held notes keep
@@ -162,6 +171,11 @@ The policy lives in the **profile**, the check runs **at the destination**
 `Replace Current Patch` (byte 6 `00`, RAM only) is `allow`. The default for a
 port with no profile is `allow` for channel messages and `confirm` for SysEx,
 which is a precaution, not a wall.
+⚠️ **A POLICY PER KIND CANNOT SAY THE EXAMPLE IN THE TABLE ABOVE**, because the
+Circuit's `Replace Patch` and `Replace Current Patch` are both `sysex` and only
+byte 6 tells them apart. The reference adds a port's `rules`: byte prefixes
+(any byte may be a wildcard), the first match beating the per kind policy, read
+from a stream's first chunk only. The C struct needs a short rules list too.
 
 ## 7. Where each layer runs
 
@@ -187,6 +201,17 @@ microcontroller can carry on alone.
 | RP2040 / RP2350 | L0 and L1 | via a PIO USB host, TO VERIFY | wifi on the Pico W | cheap, two cores |
 | ESP32-S3 | L0 and L1 | **no** in ESP-IDF's stock USB stack (plan-hardware) | wifi; reaches our relay over a TLS WebSocket, measured path (§7b) | BLE MIDI, DIN by UART |
 | Daisy Seed | as a node with a synth in it | no | none | hangs off a DIN cable |
+
+**Recommended 2026-10-03: a Teensy 4.1**, for the one reason that decides it: a
+real USB host socket, so the Circuit and the MK-425C plug straight in. The
+Pico 2 (RP2350) is the cheap second board for DIN only routing and for proving
+the core fits a small chip. ⚠️ Read from plan-hardware and datasheets, nothing
+measured on a board here.
+⚠️ **AND THIS LAPTOP CANNOT RUN WHAT IT COMPILES.** ThreatLocker kills any
+native binary under the home directory (exit 137). MEASURED 2026-10-03: a C
+program compiled and run inside a `gcc:14` container under OrbStack printed and
+exited 0, so the C core is built and tested in Docker. Flashing a board needs a
+native loader on the Mac, which may be killed; the M1 is the fallback.
 
 The shape plan-hardware named in 2026-09 still holds and this plan makes it
 cheap: **a Linux board for the transport and the authoring, a microcontroller
@@ -241,6 +266,8 @@ already most of the Circuit's and the MK-425C's profiles.
 | --- | --- |
 | A USB MIDI host on an RP2040 or RP2350 that holds two devices at once | build one, plug the Circuit and the MK-425C in |
 | Whether an ALSA sequencer client and our raw fd can share the Circuit's port on the Pi | try it on the Pi |
+| A loop closed through a device (A to B by a link, B echoing to A by its own MIDI thru) | the hop counter §5 names needs a field the event does not carry yet |
+| `thin` drops the last value of a fast sweep, so the destination ends short of the knob | a trailing send needs a timer tick the core does not have; decide whether the core gets a tick or the adapter flushes |
 | Wire latency of the core on each board | a loopback with a scope or a second clock; nobody publishes this (plan-wish-dawless §12) |
 | One implementation compiled everywhere (C to wasm) vs a JS reference plus a C port sharing test vectors | decide after the JS reference exists; the vectors are needed either way |
 | The binary table format and its versioning | write it with the first C port |
@@ -258,3 +285,25 @@ already most of the Circuit's and the MK-425C's profiles.
 5. **Two authoring methods** on it: `/wish/` and learn by demonstration, to
    prove the interface takes more than one.
 6. **A C port** on one microcontroller, graded by the same vectors.
+
+## 12. What building the JS reference settled, 2026-10-03
+
+`demo/shell/route-core.mjs` and its vectors in `demo/shell/route-vectors/`,
+graded by `route-core-test.mjs` and shown on `https://positron.studio/rout/`.
+Steps 0, 1 and 2 of §11 are done. What the code had to decide that this plan
+left open, each now fixed by a vector:
+
+| question | decided | why |
+| --- | --- | --- |
+| `range` | bay's note filter keeps the name, the value op is `scale` | `bay.mjs` and `/wish/`'s model already use `range` |
+| policy granularity | per kind, plus byte prefix `rules` on the port | §6's own example needs byte 6 |
+| purity | the core is a function of the event, the link and the link's state | `toggle` and `thin` keep state |
+| rounding in `scale` | nearest, ties away from zero, integers only | so C does the same; vector 05 tells it apart from half up and from truncation |
+| CC 123 on unlink | on every channel the link ever delivered a note on | the plan's "on its channels" reads two ways |
+| release on unlink | note offs sorted by channel then note, then CC 123, skipping the gate | the safety message must reach a port that took the notes |
+| `thin` | counts only cc, bend and touch, one budget per link | thinning a note off leaves a note stuck |
+| SysEx | a chunk with no status byte continues the open stream; the gate's decision on the first chunk holds for the stream | the core never buffers a whole message |
+| a first chunk shorter than a rule | judged on what it has, so it is held rather than slipping past | a head too short to read byte 6 must not pass |
+| link order | outputs follow input order, then link creation order | part of the contract a C port has to match |
+
+**Not yet in the reference:** `curve`, `vel curve` and a plain `note->cc`.
