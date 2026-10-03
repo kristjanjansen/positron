@@ -126,10 +126,19 @@ nothing is asked of anybody by default. MEASURED after: `pack` and `tom`
 
 🔴 **A COMPLETE BACKUP OF THE NOVATION CIRCUIT ON THIS DESK**, taken 2026-09-20
 through Novation Components.
-🔴 **THE CIRCUIT HAS NO FACTORY RESET AND THEREFORE NO UNDO.** Three things
-replace its contents and all three are one press from the safe one: `Send to
-Circuit`, loading the Circuit Factory Pack, and a `Replace Patch` SysEx. If any
-of them is used and this file is gone, the work is gone.
+⚠️ **THE CIRCUIT DOES HAVE A FACTORY RESET. THIS LINE SAID IT DID NOT UNTIL
+2026-10-03**, when the owner said *"Don't be so protective about the circuit. It
+does have a factory reset. Look it up."* Novation's *"Using Components to reset
+a product to Factory Settings"* restores the factory content from Components
+(Send to Circuit on the Circuit Factory Pack, and a firmware reinstall). What a
+reset does NOT bring back is the owner's own sessions, and those live in
+`kristjanjansen/packs`. So the precaution stands at its real size: three things
+replace the contents (`Send to Circuit`, the Factory Pack, a `Replace Patch`
+SysEx), and before any of them the backup must exist. SysEx to the Circuit is
+an ordinary operation with that precaution, not a forbidden one: *"be careful,
+but don't be so afraid of sysacks. It's just any other device with some
+precautions"*. 49 older lines across the repository still say "no factory
+reset" and are corrected per page as each is touched (BACKLOG, 2026-10-03).
 ✅ **IT IS VERIFIED, NOT ASSUMED.** A `.circuitpack` is a zip. This one holds
 **164 files**: 32 sessions, 64 patches, 64 samples, and an `index.json` reading
 `product: circuit, version: 2.0`. `patch_0.syx` is exactly **350 bytes**
@@ -181,8 +190,8 @@ numbers above separate the two packs by two orders of magnitude and are what the
 check rests on. ⚠️ It is the `User Session` mistake one layer down, in a field
 that looks like content rather than like a label.
 🔴 **THE VENDOR'S INSTALL NOTE SAYS TO PRESS `Send to Circuit`**, which is one
-of the three operations listed above that replace the instrument's contents on a
-box with no factory reset. So the safe pack and the two that would wipe 32
+of the three operations listed above that replace the instrument's contents (a
+factory reset restores Novation's content, never the owner's sessions). So the safe pack and the two that would wipe 32
 real sessions are three identically labelled rows in Components.
 ⚠️ **READ THE `name` IN `index.json` BEFORE SENDING ANYTHING**, because the file
 name and the displayed name are both `New Pack` and neither tells them apart.

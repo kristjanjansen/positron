@@ -64,9 +64,11 @@ What it would gain:
   small forwarding loop in Node. Rows survive a reboot and work with no network.
 - **Scenes.** Named sets of rows, recalled by a footswitch or by a Circuit
   program change. Switching a Circuit session could switch the routes with it.
-- **The SysEx refusal stays at the hub, not at the page.** Every route ends in
-  the Pi's gate, so no wish, however worded, can send SysEx to the Circuit. That
-  is a hard rule: the Circuit has no factory reset (CLAUDE.md).
+- **Precautions live at the hub, not at the page.** Every route ends in the
+  Pi's gate. CORRECTED 2026-10-03: the Circuit DOES have a factory reset
+  (Components restores the factory content), and the owner's sessions are
+  backed up in `kristjanjansen/packs`, so SysEx is an ordinary message type with
+  a precaution (a flash-writing `Replace Patch` asks first), not a wall.
 
 ## 5. What listens
 
