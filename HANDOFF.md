@@ -1,3 +1,76 @@
+# Handoff, 2026-10-03, session 61: one MIDI vocabulary, the routing core in JS and C, /rout/, the Pi measured
+
+## Where it is right now
+
+- ✅ **Site: BUILD `94613c5-191239-4e42`**, confirmed on the edge. Later commits
+  touch `rig/` and `BACKLOG.md` only.
+- ✅ **The Pi has today's board files** (`midi-kinds.mjs`, `alsa.mjs`,
+  `inputs.mjs` with the non-blocking open), md5 checked on both sides, service
+  active in `studio-1`. The Circuit is plugged into the Pi over USB as card 7,
+  ALSA client 44.
+- **Pushed to GitHub up to `3778f6b`**; the commits after it are not (counted at
+  the end of this session, see the last line).
+- Counted: **59 demos, 56 built, 2 unlisted**, **83 plans**.
+- A fixes agent may still be running on the route core; its report is the last
+  section of this handoff if it landed.
+
+## What landed
+
+| commit | what | check at |
+| --- | --- | --- |
+| `bbb7073` | **one MIDI kind list**: `demo/shell/midi-kinds.mjs` feeds `bay.mjs` CLASSES, `alsa.mjs` CARRY (old spellings still accepted) and `midiVerdict`'s refusals; `transport` split from `clock`; the wish worker redeployed, its prompt now names `transport` | https://positron.studio/wish/ connect Model 12 to Circuit, the arrow drops `touch, program, clock, transport` |
+| `63b08a3` | **`route-core.mjs`** and the first ten vectors | `node demo/shell/route-core-test.mjs` |
+| `387f4b3`, `be72d84` | **`/rout/`** (named by the owner): the vectors as a table with a detail box, a keyboard split at middle C into two pretend ports, the SysEx confirm gate, unlink releases; then WHY / TEST CASES / PLAY THROUGH IT sections and a How it works picture | https://positron.studio/rout/ |
+| `edb906a` | `plans/plan-route-core.md` §12: every decision the reference made, the Docker build | |
+| `d5ab33d` | vectors 11 to 17 (transpose, velocity, only/drop, range, vrange, fixed, deny), `/rout/` counts from `index.json`, the Pi measurement and the Pico 2 in the plan | https://positron.studio/rout/ 17 rows, all pass |
+| `94613c5` | **`rig/route-core/`, the C core**: C99, no heap, 6064 bytes of state, 65/65 on all 17 vectors, built and run only in Docker (`bash rig/route-core/test.sh`) | |
+| `d8fc574` | **board opens the Circuit non-blocking** | see below |
+
+## Measured, worth keeping
+
+- **ThreatLocker and C: build in Docker.** A C program compiled and run in a
+  `gcc:14` container under OrbStack printed and exited 0. Nothing native is
+  compiled on the Mac. `rig/route-core/test.sh` is the pattern.
+- **A raw MIDI fd and an ALSA sequencer subscription cannot share the Circuit.**
+  Raw held first: `aconnect 14:0 44:0` is refused (`Resource temporarily
+  unavailable`), a read subscription still works. Subscription first: a plain
+  open for write BLOCKS forever. With `O_NONBLOCK` (now in `inputs.mjs`) it is
+  `EBUSY` in 0 ms. So routes into a gated device on the Pi stay in userspace.
+- ⚠️ **`pkill -f` matched its own ssh command again** while cleaning up that test,
+  LESSONS #39. Use `pgrep -x` and `/proc/<pid>/fd`.
+- **The C core found a JS bug**: `velocity` as a float times `Math.round` rounds
+  28 scales wrong on float ties (`45 * 0.7` gives 31). Logged in BACKLOG with four
+  other gaps the C port found.
+
+## The router board
+
+The owner turned the Teensy 4.1 down as overkill. **Raspberry Pi Pico 2**, all at
+Oomipood, all in stock 2026-10-03, every link checked 200:
+
+| part | price | link |
+| --- | --- | --- |
+| Pico 2 | €8.20 | https://www.oomipood.ee/product/raspberry_pi_pico_2_cortexm33 |
+| Pico 2 W, only if it should reach the relay | €12.00 | https://www.oomipood.ee/product/raspberry_pi_pico_2_w_wireless_arm_cortexm33 |
+| OTG cable, micro USB to USB A socket, 20 cm | €4.00 | https://www.oomipood.ee/product/usb20_otg_kaabel_usb_a_pesa_usb_micro_b_pistik_20cm_must |
+| 6N139 optocoupler, MIDI in | €1.50 | https://www.oomipood.ee/product/6n139_6n139_uis_6000v_uceo_18v_opt |
+| 5 pin DIN panel socket, x2 | €1.00 each | https://www.oomipood.ee/product/dnc_205_1_5_din_pesa_paneelil_180deg |
+
+Read from documentation, not measured: USB host on the Pico's own socket through
+TinyUSB, one device or several behind a hub; power on VSYS while the socket is a
+host; flashing is copying a `.uf2`, nothing native on the Mac.
+
+## Next steps
+
+1. The route core fixes in BACKLOG (*Route core: what the C port found*), if the
+   agent below did not finish them.
+2. **The Pico 2 build**: `rig/route-core/` cross compiled for the RP2350 in
+   Docker with the Pico SDK and TinyUSB host, one USB MIDI device to one DIN out,
+   graded by the vectors first and by ear second.
+3. **The Pi runs route-core** inside `rig/board` for its keyboard to Circuit
+   routes, in userspace (the measurement above).
+4. Still open from before: the 49 "no factory reset" lines, `/away/`'s dry out
+   about 5 s after the switch.
+
 # Handoff, 2026-10-03, session 60 continued: three routing plans, and the Circuit has a factory reset
 
 The second half of session 60. Plans and documentation only: **no page, no
