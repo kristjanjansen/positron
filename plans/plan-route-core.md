@@ -202,11 +202,16 @@ microcontroller can carry on alone.
 | ESP32-S3 | L0 and L1 | **no** in ESP-IDF's stock USB stack (plan-hardware) | wifi; reaches our relay over a TLS WebSocket, measured path (§7b) | BLE MIDI, DIN by UART |
 | Daisy Seed | as a node with a synth in it | no | none | hangs off a DIN cable |
 
-**Recommended 2026-10-03: a Teensy 4.1**, for the one reason that decides it: a
-real USB host socket, so the Circuit and the MK-425C plug straight in. The
-Pico 2 (RP2350) is the cheap second board for DIN only routing and for proving
-the core fits a small chip. ⚠️ Read from plan-hardware and datasheets, nothing
-measured on a board here.
+**Chosen 2026-10-03: a Raspberry Pi Pico 2 (RP2350), €8.20 at Oomipood, in
+stock.** The Teensy 4.1 was suggested first and turned down as overkill. The
+Pico 2's own USB socket is a host through a €4 OTG cable (TinyUSB host, one
+device, or several behind a hub), DIN in and out are a 6N139 optocoupler (the
+6N138 is not stocked) and two €1 sockets, and flashing is copying a `.uf2` to a
+drive, which needs nothing native on the Mac. About €16 for the whole router.
+The board must then be powered on VSYS, since its USB socket is busy being a
+host. ⚠️ Read from documentation and a shop page, nothing measured on a board
+here, and two USB instruments at once (a hub or a PIO second port) is still
+unverified.
 ⚠️ **AND THIS LAPTOP CANNOT RUN WHAT IT COMPILES.** ThreatLocker kills any
 native binary under the home directory (exit 137). MEASURED 2026-10-03: a C
 program compiled and run inside a `gcc:14` container under OrbStack printed and
@@ -265,7 +270,7 @@ already most of the Circuit's and the MK-425C's profiles.
 | question | how to settle |
 | --- | --- |
 | A USB MIDI host on an RP2040 or RP2350 that holds two devices at once | build one, plug the Circuit and the MK-425C in |
-| Whether an ALSA sequencer client and our raw fd can share the Circuit's port on the Pi | try it on the Pi |
+| ~~Whether an ALSA sequencer client and our raw fd can share the Circuit's port on the Pi~~ | **SETTLED 2026-10-03, MEASURED on the Pi (Circuit as card 7, ALSA client 44):** with the raw device open for write, `aconnect 14:0 44:0` is refused with `Resource temporarily unavailable`, and a read subscription (`aseqdump -p 44:0`) still works. The other way round, with a subscription in place, opening `/dev/snd/midiC7D0` for write does not fail, it BLOCKS. So every route into a gated device on the Pi runs in userspace through the board, never as a kernel subscription, and `inputs.mjs`'s `midiOpen()` (a plain `openSync`) would hang the board if anything ever subscribed first. |
 | A loop closed through a device (A to B by a link, B echoing to A by its own MIDI thru) | the hop counter §5 names needs a field the event does not carry yet |
 | `thin` drops the last value of a fast sweep, so the destination ends short of the knob | a trailing send needs a timer tick the core does not have; decide whether the core gets a tick or the adapter flushes |
 | Wire latency of the core on each board | a loopback with a scope or a second clock; nobody publishes this (plan-wish-dawless §12) |

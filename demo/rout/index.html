@@ -43,7 +43,7 @@
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
-  const WHAT = 'Ten test cases and a live keyboard run through the routing core that will carry MIDI on the Pi.';
+  const WHAT = 'Hand-written test cases and a live keyboard run through the routing core that will carry MIDI on the Pi.';
 
   const d = mount({
     name: 'rout',
@@ -78,7 +78,7 @@
     'It is written to fit a microcontroller with a few kilobytes of memory, so the same rules can run in this '
       + 'browser, on the Raspberry Pi in the studio, or on a small chip inside a box with MIDI sockets and no '
       + 'computer attached. Two copies of one program in two languages only stay the same program if something '
-      + 'grades both, and that is what the ten test cases are for.'));
+      + 'grades both, and that is what the test cases are for.'));
 
   // ── the ten test cases, the same files `route-core-test.mjs` runs ─────────
   //
@@ -136,9 +136,9 @@
     onPick: (r) => show(r.v),
   });
   const detail = el('pre', 'rout-case');
-  d.stack.titled('TEN TEST CASES',
+  d.stack.titled('TEST CASES',
     say('Each case is a file of ports, connections and messages going in, with the exact bytes that must come out, '
-      + 'worked out by hand rather than by running any code. This browser runs the JavaScript core against all ten '
+      + 'worked out by hand rather than by running any code. This browser runs the JavaScript core against all of them '
       + 'on every visit. Click a row to see what went in, what was expected and what came out.'),
     cases.el, detail);
 
@@ -307,7 +307,9 @@
   // The test cases are graded on every visit, because they are data already in
   // hand and cost nobody anything. The desk drive presses things, so it is the
   // harness's alone.
-  d.assert('all ten test cases load', vectors.length === 10, `${vectors.length} loaded`);
+  // The count is the index's, never typed here: the cases grow, and a page that
+  // said ten went red the day there were seventeen.
+  d.assert('every listed test case loads', vectors.length > 0 && vectors.every((v) => Array.isArray(v.out)), `${vectors.length} loaded`);
   for (const v of vectors) {
     const g = grade(v);
     d.assert(`${v.file.replace('.json', '')}: ${v.name}`, g.ok,
@@ -357,9 +359,9 @@
   // ── the picture, last on the page ───────────────────────────────────────
   const dg = createDiagram(d.el, {
     caption: 'One set of routing rules, written once for each kind of machine, kept identical by grading every '
-      + 'copy against the same ten files.',
+      + 'copy against the same files.',
     nodes: [
-      { id: 'cases', label: 'test cases', sub: '10 JSON files', tech: 'archive',
+      { id: 'cases', label: 'test cases', sub: 'JSON files', tech: 'archive',
         note: 'Messages in and the bytes that must come out, worked out by hand. No core writes its own answers.' },
       { id: 'web', label: 'Browser', kind: 'here', tech: 'browser',
         children: [
@@ -377,7 +379,7 @@
         children: [
           { id: 'ccore', label: 'route-core', sub: 'C, planned', tech: 'relay',
             note: 'The same rules in fixed arrays with no heap, in under 8 KB of memory, for a Cortex-M. Not written '
-              + 'yet, and finished when it passes the same ten files.' },
+              + 'yet, and finished when it passes the same files.' },
         ] },
       { id: 'pretend', label: 'pretend ports', sub: 'synth, Circuit', tech: 'sound',
         note: 'What the keys on this page play into. The pretend Circuit holds a Replace Patch until you confirm it.' },

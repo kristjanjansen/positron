@@ -1,5 +1,14 @@
 ## Open
 
+### `midiOpen()` on the board can hang, found 2026-10-03
+
+MEASURED on the Pi: while any ALSA sequencer subscription into the Circuit
+exists, opening `/dev/snd/midiC7D0` for write BLOCKS rather than failing, and
+`rig/board/inputs.mjs` `midiOpen()` uses a plain `fs.openSync(..., 'w')`. Nothing
+subscribes today, so it has not happened. Repair: open with `O_WRONLY |
+O_NONBLOCK` so a busy device is an error the log names, and grade it in
+`rig/board/test.mjs`. Needs a push to the Pi.
+
 ### `/rout/` says what is going on, with a diagram, asked 2026-10-03
 
 *"Make the root page clear what is going on. Maybe also add a diagram.

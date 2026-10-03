@@ -10,18 +10,24 @@
 // against itself and passes every bug it already has.
 //
 // NEGATIVE CONTROLS, AND THE PROPORTION IS STATED BECAUSE A ROUTER PASSES A
-// NAIVE SUITE BY PASSING EVERYTHING THROUGH. Counted 2026-10-03:
-//   - Inside the vectors, 24 of the 91 input steps and link attempts (71 steps,
-//     20 links) are there to be dropped, held, refused or left alone, each one
-//     marked NEGATIVE CONTROL in its vector's `notes` or listed under `refused`.
+// NAIVE SUITE BY PASSING EVERYTHING THROUGH. Recounted 2026-10-03 after 11 to
+// 17 landed, one per op that ran in the core with no vector naming it:
+//   - Inside the vectors, 57 of the 165 input steps and link attempts (127
+//     steps, 38 links) are there to be dropped, held, refused or left alone,
+//     each one marked NEGATIVE CONTROL in its vector's `notes` or listed under
+//     `refused`. It was 24 of 91 across 01 to 10. Counted per step: a step
+//     dropped on one link and kept on the other counts once.
 //   - Every vector is also run against a COPY OF ITS OWN EXPECTATION WITH ITS
-//     LAST BYTE FLIPPED, and that comparison must FAIL. Ten asserts that check
-//     the check can fail. ⚠️ The first version flipped only data bytes and went
-//     red on 10, whose last event is a one byte F8: the self check caught itself.
+//     LAST BYTE FLIPPED, and that comparison must FAIL. Seventeen asserts that
+//     check the check can fail. ⚠️ The first version flipped only data bytes and
+//     went red on 10, whose last event is a one byte F8: the self check caught
+//     itself.
 //   - Five direct refusals at link time (unknown op, bad args, an input range
 //     written backwards, a duplicate id, a kind nobody named).
-//   So 15 of the 47 asserts are negative controls outright, 21 run the vectors
-//   and 11 check that the vectors name only known ops, kinds, verbs and codes.
+//   So 22 of the 77 asserts are negative controls outright, 36 run the vectors
+//   (17 refusals, 17 outputs, 2 held counts) and 19 check that the vectors are
+//   well formed (the count, index.json, and one per vector naming only known
+//   ops, kinds, verbs and codes).
 //
 // 🔴 SABOTAGED ONCE, 2026-10-03, ON A SCRATCH COPY of `route-core.mjs`,
 // `midi-kinds.mjs`, this file and the vectors, so the live file was never
@@ -41,11 +47,32 @@
 //      9 red across 8 of the 10 vectors (only 01 and 07 have nothing to change).
 //   9. links dispatched newest first: 3 red (01, 08, 09, the interleaved ones).
 //  10. `accepts` not checked: 1 red (02).
-// ⚠️ WHAT NO SABOTAGE HERE TOUCHED: `transpose`, `velocity`, `only`, `drop`,
-// `range`, `vrange`, `fixed` and `deny()` have no vector yet. They are bay's
-// ops carried over so its transforms run here unchanged, and until a vector
-// names them they are code, not contract.
-
+//
+// 🔴 SABOTAGED AGAIN, 2026-10-03, ONCE PER OP THAT 11 TO 17 FIRST NAMED, the
+// same way: a scratch copy of the core, the test and the vectors, each change
+// alone, the copy restored and read 77/77. Red asserts, MEASURED:
+//  11. `transpose` clamps to 0..127 instead of dropping: 1 red (11).
+//  12. `velocity` scales every note, releases included: 1 red (12).
+//  13. `velocity` without its floor of 1: 1 red (12, where 0.25 of v 1 would
+//      become a release).
+//  14. `only` passes everything: 1 red (13).
+//  15. `drop` drops nothing: 1 red (13).
+//  16. `range` filters note ons only and lets every note off through: 1 red (14).
+//  17. `range` with its top bound exclusive: 1 red (14).
+//  18. `vrange` filters releases on their velocity too: 1 red (15).
+//  19. `fixed` sets the velocity of every note, releases included: 1 red (16).
+//  20. `deny()` does nothing: 1 red (17, the later confirm releases both).
+//  21. a denied SysEx stream delivers its later chunks: 1 red (17).
+//  22. ops skipped and the `allow` check removed from the gate (`accepts` still
+//      read): 14 red across 14 of the 17 vectors. Only 01, 02 and 07 have
+//      nothing for it to change. 09's held count survives this one, because the
+//      entry is still pushed onto the held list before it is delivered.
+// ⚠️ ONE SABOTAGE WENT GREEN AND IS EQUIVALENT, NOT A HOLE: `deny()` emptying
+// its list without marking the entry denied. The entry is unreachable, the held
+// count reads from the list, and a later chunk of that stream is appended to
+// the orphan and never delivered, so nothing a vector can observe differs.
+// ⚠️ `deny()`'s return value, how many it dropped, is not read by any vector:
+// the runner calls it and discards the answer.
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

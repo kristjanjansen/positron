@@ -1,0 +1,60 @@
+{
+  "name": "vrange keeps the note ons between two velocities",
+  "about": "vrange passes a note on whose velocity is in lo..hi, both ends included, and always passes a release, whatever its velocity.",
+  "notes": [
+    "A note on (9n, v > 0) is kept when lo <= v <= hi. A missing lo is 1 and a missing hi is 127. A note off, a note on at velocity 0, and anything not a note pass.",
+    "l1 to soft is hi 63 and no lo, one open bound. l2 to mid is lo 40 hi 100, both bounds. Outputs follow link order, soft before mid.",
+    "t 0: v 1 (01). soft keeps it, its open bottom reaches 1. NEGATIVE CONTROL: below 40, dropped by mid.",
+    "t 1: v 39 (27). soft keeps it. Dropped by mid, one below its edge.",
+    "t 2: v 40 (28). Both keep it, the low edge of mid.",
+    "t 3: v 63 (3F). Both keep it, the top edge of soft.",
+    "t 4: v 64 (40). NEGATIVE CONTROL: dropped by soft, one above its edge. mid keeps it.",
+    "t 5: v 100 (64). Dropped by soft. mid keeps it, its top edge.",
+    "NEGATIVE CONTROL t 6: v 101 (65), above both. Nothing out.",
+    "t 7: a note off with release velocity 127 (80 42 7F) passes both, though 127 is above both ranges. A release is never filtered on its velocity.",
+    "t 8: a note on at velocity 0 (90 41 00) is a release and passes both. Read as a note on, 0 is below every lo and it would be dropped, leaving note 65 sounding at mid.",
+    "NEGATIVE CONTROL t 9: B0 07 05 is a CC, its value is not a velocity, and it passes both.",
+    "NEGATIVE CONTROL: l3 asks for lo 0, outside 1..127, and is refused bad-args."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "soft", "dir": "out" },
+    { "id": "mid", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "soft", "ops": [{ "op": "vrange", "hi": 63 }] },
+    { "id": "l2", "from": "kbd", "to": "mid", "ops": [{ "op": "vrange", "lo": 40, "hi": 100 }] },
+    { "id": "l3", "from": "kbd", "to": "soft", "ops": [{ "op": "vrange", "lo": 0 }] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 3C 01" },
+    { "port": "kbd", "t": 1, "bytes": "90 3D 27" },
+    { "port": "kbd", "t": 2, "bytes": "90 3E 28" },
+    { "port": "kbd", "t": 3, "bytes": "90 3F 3F" },
+    { "port": "kbd", "t": 4, "bytes": "90 40 40" },
+    { "port": "kbd", "t": 5, "bytes": "90 41 64" },
+    { "port": "kbd", "t": 6, "bytes": "90 42 65" },
+    { "port": "kbd", "t": 7, "bytes": "80 42 7F" },
+    { "port": "kbd", "t": 8, "bytes": "90 41 00" },
+    { "port": "kbd", "t": 9, "bytes": "B0 07 05" }
+  ],
+  "out": [
+    { "port": "soft", "t": 0, "bytes": "90 3C 01" },
+    { "port": "soft", "t": 1, "bytes": "90 3D 27" },
+    { "port": "soft", "t": 2, "bytes": "90 3E 28" },
+    { "port": "mid", "t": 2, "bytes": "90 3E 28" },
+    { "port": "soft", "t": 3, "bytes": "90 3F 3F" },
+    { "port": "mid", "t": 3, "bytes": "90 3F 3F" },
+    { "port": "mid", "t": 4, "bytes": "90 40 40" },
+    { "port": "mid", "t": 5, "bytes": "90 41 64" },
+    { "port": "soft", "t": 7, "bytes": "80 42 7F" },
+    { "port": "mid", "t": 7, "bytes": "80 42 7F" },
+    { "port": "soft", "t": 8, "bytes": "90 41 00" },
+    { "port": "mid", "t": 8, "bytes": "90 41 00" },
+    { "port": "soft", "t": 9, "bytes": "B0 07 05" },
+    { "port": "mid", "t": 9, "bytes": "B0 07 05" }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "name": "only keeps one kind and drop removes one kind",
+  "about": "only note passes notes, note offs included, and nothing else, while drop clock removes the clock and passes every other kind, transport included.",
+  "notes": [
+    "Kinds are read from the status byte as in midi-kinds.mjs: 8n and 9n note, Bn cc, En bend, Dn touch, F8 clock, FA transport.",
+    "l1 to notes is only note. l2 to quiet is drop clock. Outputs follow link order, notes before quiet.",
+    "t 0: 90 3C 64 is a note. Both pass.",
+    "NEGATIVE CONTROL t 1: B0 01 40 is a cc, dropped by only note. quiet passes it.",
+    "NEGATIVE CONTROL t 2: F8 is clock, dropped by both, by only note because it is not a note and by drop clock because it is.",
+    "NEGATIVE CONTROL t 3: E0 00 40 is a bend, dropped by only note. quiet passes it.",
+    "t 4: 80 3C 00 is a note off, which is a note, so only note passes it. A note filter that kept the note on and dropped its release would leave it stuck. quiet passes it.",
+    "NEGATIVE CONTROL t 5: FA (start) is transport, not clock. only note drops it, drop clock passes it. A drop clock that took every F8..FF byte would lose it.",
+    "NEGATIVE CONTROL t 6: D0 20 is channel touch, dropped by only note. quiet passes it.",
+    "NEGATIVE CONTROL: l3 asks for only notes, a kind nobody named, and is refused bad-args."
+  ],
+  "ports": [
+    { "id": "src", "dir": "in" },
+    { "id": "notes", "dir": "out" },
+    { "id": "quiet", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "src", "to": "notes", "ops": [{ "op": "only", "cls": "note" }] },
+    { "id": "l2", "from": "src", "to": "quiet", "ops": [{ "op": "drop", "cls": "clock" }] },
+    { "id": "l3", "from": "src", "to": "notes", "ops": [{ "op": "only", "cls": "notes" }] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "src", "t": 0, "bytes": "90 3C 64" },
+    { "port": "src", "t": 1, "bytes": "B0 01 40" },
+    { "port": "src", "t": 2, "bytes": "F8" },
+    { "port": "src", "t": 3, "bytes": "E0 00 40" },
+    { "port": "src", "t": 4, "bytes": "80 3C 00" },
+    { "port": "src", "t": 5, "bytes": "FA" },
+    { "port": "src", "t": 6, "bytes": "D0 20" }
+  ],
+  "out": [
+    { "port": "notes", "t": 0, "bytes": "90 3C 64" },
+    { "port": "quiet", "t": 0, "bytes": "90 3C 64" },
+    { "port": "quiet", "t": 1, "bytes": "B0 01 40" },
+    { "port": "quiet", "t": 3, "bytes": "E0 00 40" },
+    { "port": "notes", "t": 4, "bytes": "80 3C 00" },
+    { "port": "quiet", "t": 4, "bytes": "80 3C 00" },
+    { "port": "quiet", "t": 5, "bytes": "FA" },
+    { "port": "quiet", "t": 6, "bytes": "D0 20" }
+  ]
+}

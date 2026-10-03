@@ -1,0 +1,55 @@
+{
+  "name": "velocity scales a note on and leaves a release alone",
+  "about": "velocity multiplies a note on's velocity, rounds to nearest with ties away from zero, clamps to 1..127, and never touches a note off or a note on at velocity 0.",
+  "notes": [
+    "out velocity = clamp(round(v * scale), 1, 127), only on a note on with v > 0. Round is to nearest, ties AWAY FROM ZERO, as everywhere in the core.",
+    "The scales are 0.25 and 2, both exact in binary, so the products are exact and a C port in fixed point gets the same ties.",
+    "l1 to soft is scale 0.25, l2 to loud is scale 2. Outputs follow link order, soft before loud.",
+    "t 0: v 100 (64). soft 25 = 19. loud 200 clamps to 127 = 7F.",
+    "t 1: v 102 (66). soft 25.5, a TIE, away from zero 26 = 1A. Truncating would give 25. loud 204 clamps to 7F.",
+    "t 2: v 1 (01). soft 0.25 rounds to 0 and CLAMPS UP to 1 = 01. Without the clamp it would be 90 3E 00, which is a release. loud 2 = 02.",
+    "t 3: v 40 (28). soft 10 = 0A. loud 80 = 50, unclamped.",
+    "NEGATIVE CONTROL t 4: a note off with release velocity 64 (80 3C 40) passes unchanged to both. Scaled it would read 80 3C 10 and 80 3C 7F.",
+    "NEGATIVE CONTROL t 5: a note on at velocity 0 is a release and passes unchanged as 90 3D 00. Scaled and clamped it would become 90 3D 01, a note on that never ends.",
+    "NEGATIVE CONTROL t 6: a CC value is not a velocity, B0 07 64 passes unchanged.",
+    "NEGATIVE CONTROL: l3 asks for scale 0 and is refused bad-args, since a scale must be above zero."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "soft", "dir": "out" },
+    { "id": "loud", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "soft", "ops": [{ "op": "velocity", "scale": 0.25 }] },
+    { "id": "l2", "from": "kbd", "to": "loud", "ops": [{ "op": "velocity", "scale": 2 }] },
+    { "id": "l3", "from": "kbd", "to": "soft", "ops": [{ "op": "velocity", "scale": 0 }] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 3C 64" },
+    { "port": "kbd", "t": 1, "bytes": "90 3D 66" },
+    { "port": "kbd", "t": 2, "bytes": "90 3E 01" },
+    { "port": "kbd", "t": 3, "bytes": "90 3F 28" },
+    { "port": "kbd", "t": 4, "bytes": "80 3C 40" },
+    { "port": "kbd", "t": 5, "bytes": "90 3D 00" },
+    { "port": "kbd", "t": 6, "bytes": "B0 07 64" }
+  ],
+  "out": [
+    { "port": "soft", "t": 0, "bytes": "90 3C 19" },
+    { "port": "loud", "t": 0, "bytes": "90 3C 7F" },
+    { "port": "soft", "t": 1, "bytes": "90 3D 1A" },
+    { "port": "loud", "t": 1, "bytes": "90 3D 7F" },
+    { "port": "soft", "t": 2, "bytes": "90 3E 01" },
+    { "port": "loud", "t": 2, "bytes": "90 3E 02" },
+    { "port": "soft", "t": 3, "bytes": "90 3F 0A" },
+    { "port": "loud", "t": 3, "bytes": "90 3F 50" },
+    { "port": "soft", "t": 4, "bytes": "80 3C 40" },
+    { "port": "loud", "t": 4, "bytes": "80 3C 40" },
+    { "port": "soft", "t": 5, "bytes": "90 3D 00" },
+    { "port": "loud", "t": 5, "bytes": "90 3D 00" },
+    { "port": "soft", "t": 6, "bytes": "B0 07 64" },
+    { "port": "loud", "t": 6, "bytes": "B0 07 64" }
+  ]
+}
