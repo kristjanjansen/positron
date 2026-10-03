@@ -45,8 +45,8 @@ Oomipood, all in stock 2026-10-03, every link checked 200:
 
 | part | price | link |
 | --- | --- | --- |
-| Pico 2 | €8.20 | https://www.oomipood.ee/product/raspberry_pi_pico_2_cortexm33 |
-| Pico 2 W, only if it should reach the relay | €12.00 | https://www.oomipood.ee/product/raspberry_pi_pico_2_w_wireless_arm_cortexm33 |
+| **Pico 2 W, the one to buy**: a powered USB hub takes its only USB socket, so wifi is how a new table arrives | €12.00 | https://www.oomipood.ee/product/raspberry_pi_pico_2_w_wireless_arm_cortexm33 |
+| a powered USB hub (Circuit, MK-425C behind it; DIN parts below become optional) | not looked up yet | |
 | OTG cable, micro USB to USB A socket, 20 cm | €4.00 | https://www.oomipood.ee/product/usb20_otg_kaabel_usb_a_pesa_usb_micro_b_pistik_20cm_must |
 | 6N139 optocoupler, MIDI in | €1.50 | https://www.oomipood.ee/product/6n139_6n139_uis_6000v_uceo_18v_opt |
 | 5 pin DIN panel socket, x2 | €1.00 each | https://www.oomipood.ee/product/dnc_205_1_5_din_pesa_paneelil_180deg |
