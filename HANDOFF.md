@@ -1,3 +1,50 @@
+# Handoff, 2026-10-03, session 60: station and crate leave for eccm, items archived, capitals committed
+
+Commits `96d9250` to `0bbbbcc`, the thirteen after `79dbf24`.
+
+## Where it is right now
+
+- ✅ **Site: BUILD `fdc5677-081701-752c`**, verified today: the edge and the
+  committed `workers/view/public/` carry the same stamp.
+- ✅ **Tree clean**, verified today.
+- **Nothing is pushed.** 77 commits ahead of `origin/main`, counted today. Push
+  needs the account switch in CLAUDE.md.
+- Counted today: **58 demos, 55 built, 2 unlisted**, **80 plans**.
+- ✅ **The capitals rule is no longer waiting on the owner.** Committed in
+  `e7f3fba` as asked 2026-09-30 (*"cap: all secondary buttons"*), and deployed
+  with every build since `54950bd`. Session 58 and 59's "uncommitted
+  `shell.css`" line is closed.
+
+## What landed
+
+| commit | what | check at |
+| --- | --- | --- |
+| `96d9250` | `/away/`'s log says press ONLINE; the Listen button is gone since the two merged | https://positron.studio/away/ |
+| `8b9fd61` | board inputs follow a capture that arrives byte swapped (`rig/board/inputs.mjs`, `test.mjs`) | https://positron.studio/away/ press ONLINE |
+| `631dcb6` | `/away/` gains the instrument panel and a patch picker for the two synths | https://positron.studio/away/ |
+| `d49ed54`, `b132ab9` | **`items` archived**: the demo and its Worker gone, the lessons in `archive/items/README.md`, the infra now in eccm | https://positron.studio/items/ should 404 |
+| `e7f3fba` | secondary buttons in capitals, the primary in its own case | https://positron.studio/webrtc/ |
+| `c6c1143`, `37001ab`, `29318f4` | station: upcoming-first programme table, 30 s clips, an ERR Klassikaraadio relay slot, the discontinuity fix; `live.mjs` recorder; channels and a shared programme library from ID3 | superseded by the move below |
+| `0ada490` | **station moved to eccm**: `positron-station` keeps only `GET /media` for the MIM and kristjanjansen media; the manifest row (`built: false`) links out; click and und move to the timeline group | https://eccm.positron.studio/radio |
+| `fdc5677` | **crate and vain retired**: eccm's uploads run their protocol now, the row is out of the manifest, page and Worker in `archive/`, `positron-vain` and `vain-archive` deleted | https://positron.studio/crate/ should 404 |
+| `54950bd`, `35f05bc`, `3c44a0c`, `0bbbbcc` | build commits; the last carries `fdc5677` | https://positron.studio/ |
+
+## Open
+
+All carried forward from sessions 58 and 59 and **not re-checked today**
+unless marked.
+
+- `/away/`'s second dry-out about 5 s after the switch (suspect the 5 s beat). https://positron.studio/away/
+- The Circuit input clips, 8 to 29 samples at full scale per few notes; the owner's hand on input 1's gain.
+- Nothing measured off this network: the Pi in another building, TURN use.
+- https://positron.studio/knobs/ reads 2 red (`relay delivered the control messages`, `this page makes no sound of its own`), pre-existing.
+- https://positron.studio/fau/ library instruments without knobs.
+- Clipping on three patches.
+- https://positron.studio/reel/ hover red.
+- Nothing tried on an iPhone.
+- No real Evolution plugged in for the Loop work.
+- The comment in `demo/shell/shell.css` above `.panel-case > .panel-plate` still names `/circuit/` (re-checked today: the comment is still there; whether it is stale was not re-judged).
+
 # Handoff, 2026-09-30, session 59: the Pi's MIDI gate, and the direct WebRTC path for /away/
 
 ## Where it is right now
