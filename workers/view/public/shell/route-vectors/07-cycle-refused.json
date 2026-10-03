@@ -1,0 +1,42 @@
+{
+  "name": "a cycle refused at link time",
+  "about": "A link that would close a loop is refused when it is made, and so are links to a port that does not exist or that points the wrong way.",
+  "notes": [
+    "Links are made in order. l1 a to b and l2 b to c are fine.",
+    "l3 c to a closes a, b, c, a and is refused: cycle.",
+    "l4 a to a is the smallest cycle there is and is refused: cycle.",
+    "l5 names port d, which was never declared: unknown-port.",
+    "l6 starts at out1, which is an output only: direction.",
+    "Events: a reaches b through l1, b reaches c through l2, and c reaches nothing because l3 does not exist.",
+    "The core does not feed what it writes to a port back in as that port's input, so the note at b does not travel on to c by itself."
+  ],
+  "ports": [
+    { "id": "a", "dir": "both" },
+    { "id": "b", "dir": "both" },
+    { "id": "c", "dir": "both" },
+    { "id": "out1", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "a", "to": "b", "ops": [] },
+    { "id": "l2", "from": "b", "to": "c", "ops": [] },
+    { "id": "l3", "from": "c", "to": "a", "ops": [] },
+    { "id": "l4", "from": "a", "to": "a", "ops": [] },
+    { "id": "l5", "from": "a", "to": "d", "ops": [] },
+    { "id": "l6", "from": "out1", "to": "a", "ops": [] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "cycle" },
+    { "link": "l4", "reason": "cycle" },
+    { "link": "l5", "reason": "unknown-port" },
+    { "link": "l6", "reason": "direction" }
+  ],
+  "in": [
+    { "port": "a", "t": 0, "bytes": "90 3C 64" },
+    { "port": "b", "t": 1, "bytes": "90 3E 64" },
+    { "port": "c", "t": 2, "bytes": "90 40 64" }
+  ],
+  "out": [
+    { "port": "b", "t": 0, "bytes": "90 3C 64" },
+    { "port": "c", "t": 1, "bytes": "90 3E 64" }
+  ]
+}

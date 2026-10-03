@@ -59,7 +59,10 @@ const ok = (name, cond, detail = '') => {
 };
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), 'route-vectors');
-const vectors = readdirSync(DIR).filter((f) => f.endsWith('.json')).sort()
+// `index.json` is the list a browser reads, because a page cannot list a directory.
+const FILES = readdirSync(DIR).filter((f) => f.endsWith('.json') && f !== 'index.json').sort();
+const INDEX = JSON.parse(readFileSync(join(DIR, 'index.json'), 'utf8'));
+const vectors = FILES
   .map((f) => ({ file: f, ...JSON.parse(readFileSync(join(DIR, f), 'utf8')) }));
 
 /** A rule's match in a vector is hex with `xx` for any byte. */
@@ -96,6 +99,8 @@ const heldOk = (got, want) => Object.entries(want).every(([k, n]) => got[k] === 
 console.log('\n== route-core: the vectors are well formed ==');
 
 ok(`at least ten vectors (${vectors.length})`, vectors.length >= 10);
+ok('index.json names exactly the vector files, so /rout/ runs every one',
+  JSON.stringify(INDEX) === JSON.stringify(FILES), `index ${INDEX.join(',')} files ${FILES.join(',')}`);
 for (const v of vectors) {
   const ops = v.links.flatMap((l) => (l.ops || []).map((o) => o.op));
   const kinds = v.ports.flatMap((p) => [...(p.accepts || []), ...Object.keys(p.policy || {})]);

@@ -1,0 +1,48 @@
+{
+  "name": "removing a link releases what it held",
+  "about": "Removing a link sends a note off for every note it left sounding, as it delivered them, then CC 123 on every channel it carried a note on.",
+  "notes": [
+    "l1 moves everything onto channel 2, so the held notes are tracked AFTER the ops: what synth was sent, not what kbd played.",
+    "t 0, 10, 20: notes 60, 64, 67 (3C, 40, 43) go on, to synth as 91 and to monitor as 90.",
+    "t 30: 60 released with 80, so synth gets 81 3C 00.",
+    "t 35: 64 released as a note on at velocity 0, which is a release: synth gets 91 40 00.",
+    "t 40: unlink l1. Still held at synth: 67 on channel 2. So 81 43 00, then B1 7B 00 (CC 123 is 7B), both at the unlink's time.",
+    "Order of the release: note offs by channel then note ascending, then CC 123 by channel ascending. A note off is 8n with velocity 0.",
+    "NEGATIVE CONTROL: l2 is not touched. monitor still holds 67 and gets no note off and no CC 123.",
+    "NEGATIVE CONTROL t 50: after the unlink kbd reaches monitor only."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "synth", "dir": "out" },
+    { "id": "monitor", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth", "ops": [{ "op": "channel", "to": 2 }] },
+    { "id": "l2", "from": "kbd", "to": "monitor", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 3C 64" },
+    { "port": "kbd", "t": 10, "bytes": "90 40 64" },
+    { "port": "kbd", "t": 20, "bytes": "90 43 64" },
+    { "port": "kbd", "t": 30, "bytes": "80 3C 00" },
+    { "port": "kbd", "t": 35, "bytes": "90 40 00" },
+    { "t": 40, "unlink": "l1" },
+    { "port": "kbd", "t": 50, "bytes": "90 48 64" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "91 3C 64" },
+    { "port": "monitor", "t": 0, "bytes": "90 3C 64" },
+    { "port": "synth", "t": 10, "bytes": "91 40 64" },
+    { "port": "monitor", "t": 10, "bytes": "90 40 64" },
+    { "port": "synth", "t": 20, "bytes": "91 43 64" },
+    { "port": "monitor", "t": 20, "bytes": "90 43 64" },
+    { "port": "synth", "t": 30, "bytes": "81 3C 00" },
+    { "port": "monitor", "t": 30, "bytes": "80 3C 00" },
+    { "port": "synth", "t": 35, "bytes": "91 40 00" },
+    { "port": "monitor", "t": 35, "bytes": "90 40 00" },
+    { "port": "synth", "t": 40, "bytes": "81 43 00" },
+    { "port": "synth", "t": 40, "bytes": "B1 7B 00" },
+    { "port": "monitor", "t": 50, "bytes": "90 48 64" }
+  ]
+}

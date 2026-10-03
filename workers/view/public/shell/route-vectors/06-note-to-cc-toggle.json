@@ -1,0 +1,40 @@
+{
+  "name": "note to CC toggle",
+  "about": "Each press of note 36 flips CC 80 between 127 and 0 on the note's own channel, and the release sends nothing.",
+  "notes": [
+    "toggle note 36 cc 80 on 127 off 0. The first press sends on. State is per link, per op and per channel.",
+    "t 0, 99 24 64, channel 10 note 36 pressed: B9 50 7F.",
+    "t 10, 89 24 00, its release: dropped.",
+    "t 20, pressed again: B9 50 00.",
+    "NEGATIVE CONTROL t 30, 99 24 00 is a note on at velocity 0, which is a RELEASE, so it is dropped and does not flip.",
+    "t 40, pressed again: B9 50 7F.",
+    "NEGATIVE CONTROL t 50 and t 60, note 38 is not note 36 and passes as a note.",
+    "NEGATIVE CONTROL t 70, note 36 on channel 1 has its own state, so its first press sends on: B0 50 7F, not off."
+  ],
+  "ports": [
+    { "id": "pads", "dir": "in" },
+    { "id": "synth", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "pads", "to": "synth", "ops": [{ "op": "toggle", "note": 36, "cc": 80, "on": 127, "off": 0 }] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "pads", "t": 0, "bytes": "99 24 64" },
+    { "port": "pads", "t": 10, "bytes": "89 24 00" },
+    { "port": "pads", "t": 20, "bytes": "99 24 64" },
+    { "port": "pads", "t": 30, "bytes": "99 24 00" },
+    { "port": "pads", "t": 40, "bytes": "99 24 50" },
+    { "port": "pads", "t": 50, "bytes": "99 26 64" },
+    { "port": "pads", "t": 60, "bytes": "89 26 00" },
+    { "port": "pads", "t": 70, "bytes": "90 24 64" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "B9 50 7F" },
+    { "port": "synth", "t": 20, "bytes": "B9 50 00" },
+    { "port": "synth", "t": 40, "bytes": "B9 50 7F" },
+    { "port": "synth", "t": 50, "bytes": "99 26 64" },
+    { "port": "synth", "t": 60, "bytes": "89 26 00" },
+    { "port": "synth", "t": 70, "bytes": "B0 50 7F" }
+  ]
+}
