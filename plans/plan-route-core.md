@@ -34,6 +34,22 @@ The contract between the implementations is not the code. It is **a file of
 test vectors**: a table, a stream of events in, the events that must come out.
 The JavaScript reference and any C port pass the same file or they disagree.
 
+### Half of it exists already: `demo/shell/bay.mjs`
+
+Found by the inventory for `plans/plan-universal-routing.md` the same day:
+**plan-patchbay's model and validator are BUILT**, as `demo/shell/bay.mjs` (899
+lines, pure, graded by `demo/shell/bay-test.mjs`): `createBay` at `:668`, the
+one-line text form at `:603`, links `{id, from, to, transforms, enabled, sent,
+dropped}`, and refusals with a reason and a fix. `/wish/` and
+`workers/wish/src/wish.mjs` import it. So **bay.mjs is this plan's L2 (registry
+and validator) and the JavaScript reference to start from**; what is missing is
+the L0 core underneath it, compiled to the binary table, and the test vectors.
+⚠️ **Three vocabularies disagree and must be one first**: `bay.mjs:35`
+`CLASSES` (`bend`, `touch`, no `transport`), `rig/board/alsa.mjs:16` `CARRY`
+(`pitchbend`, `aftertouch`, `transport`) and the allowlist in
+`rig/board/inputs.mjs` (`SYNTH_CC`, `midiVerdict`). The core's `kind` enum
+(§3) is the place to settle it.
+
 ## 2. Universal and particular, side by side
 
 | layer | universal (the core, same everywhere) | particular (one setup) |
@@ -58,7 +74,7 @@ register with it.
 ```c
 struct ev   { u8 port; u8 kind; u8 ch; u8 a; u16 b; u32 t; };   // 10 bytes
 struct port { u8 id; u8 dir; u8 medium; u32 accepts; u8 policy[KINDS]; };
-struct link { u8 from; u8 to; u8 on; u8 nops; u8 op[MAXOPS][4]; };
+struct link { u8 from; u8 to; u8 on; u8 nops; u8 op[MAXOPS][5]; };
 ```
 
 - **`kind`** is a small enum: note on, note off, cc, program, bend, pressure,
@@ -77,7 +93,7 @@ struct link { u8 from; u8 to; u8 on; u8 nops; u8 op[MAXOPS][4]; };
   vendor and product match only when exactly one saved entry meets exactly one
   new device.
 
-**Budget, as arithmetic.** 64 links of 4 ops each is 64 x 21 bytes, about 1.3 KB.
+**Budget, as arithmetic.** 64 links of 4 ops each is 64 x 24 bytes, about 1.5 KB.
 32 ports is about 0.5 KB with policies. A held-note table for safe removal
 (128 notes x 16 channels as bits per destination) is 256 bytes a destination.
 Eight scenes as diffs, a few KB. **The whole core fits in under 8 KB of RAM**,
@@ -86,7 +102,7 @@ which is comfortable on an RP2040 (264 KB), an ESP32-S3 (512 KB), a Teensy 4.1
 
 ## 4. The transforms are a closed list, so a model cannot invent one
 
-Each op is 4 bytes, an opcode and three arguments, run in order; any op may
+Each op is 5 bytes, an opcode and up to four one-byte arguments, run in order; any op may
 drop the event.
 
 | op | does | from |
@@ -231,10 +247,11 @@ already most of the Circuit's and the MK-425C's profiles.
 
 ## 11. Steps
 
+0. **One class vocabulary** for `bay.mjs`, `alsa.mjs` and `inputs.mjs`.
 1. **Test vectors first**: a folder of `{ table, events in, events out }` cases,
    including the safe removal, cycle refusal, gate policies and every op.
-2. **The JS reference core** passing them, no dependencies, usable in Node and
-   a browser.
+2. **The JS reference core** passing them, under `bay.mjs` (which stays the
+   validator), no dependencies, usable in Node and a browser.
 3. **The Pi** runs it in `rig/board` behind the existing adapters
    (plan-wish-dawless §9 step 1, now on this core).
 4. **Profiles** for the Circuit and the MK-425C, from the files that exist.
