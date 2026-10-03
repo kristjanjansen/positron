@@ -62,12 +62,18 @@ host; flashing is copying a `.uf2`, nothing native on the Mac.
    stream, velocity in exact thousandths, policy keys through `canonKind`,
    `thin` keeping a backwards `t`), both languages fixed, JS 99/99, C 82/82 on
    22 vectors, `/rout/` 43/43.
-2. **The Pico 2 build**: `rig/route-core/` cross compiled for the RP2350 in
-   Docker with the Pico SDK and TinyUSB host, one USB MIDI device to one DIN out,
-   graded by the vectors first and by ear second.
-3. **The Pi runs route-core** inside `rig/board` for its keyboard to Circuit
+2. **Buy the parts** (table above) and **find a powered USB hub** at Oomipood,
+   not looked up yet.
+3. **The first Pico 2 W firmware**: `rig/route-core/` cross compiled for the
+   RP2350 in Docker with the Pico SDK, TinyUSB host and `usb_midi_host`, the
+   Circuit and the MK-425C behind the hub, one fixed route in the firmware,
+   graded by the vectors first and by ear second. Flashing is dragging the
+   `.uf2` onto the `RP2350` drive with BOOTSEL held, nothing native on the Mac.
+   Wifi table changes from `/rout/` come after that. Unverified, and the first
+   thing to test: two USB MIDI devices behind one hub at once.
+4. **The Pi runs route-core** inside `rig/board` for its keyboard to Circuit
    routes, in userspace (the measurement above).
-4. Still open from before: the 49 "no factory reset" lines, `/away/`'s dry out
+5. Still open from before: the 49 "no factory reset" lines, `/away/`'s dry out
    about 5 s after the switch.
 
 # Handoff, 2026-10-03, session 60 continued: three routing plans, and the Circuit has a factory reset
