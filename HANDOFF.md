@@ -54,10 +54,88 @@ Worker and no rig file changed, so nothing was built or deployed.** Commits
 - RaspiMIDIHub's 1 to 3 ms latency figure times only its own Python call; nobody
   publishes wire latency for a Pi MIDI router.
 
+## Next steps, concrete, in order
+
+Baselines measured at the end of this session, so a change can be judged
+against them: `node demo/shell/bay-test.mjs` **69/69**, `node rig/board/test.mjs`
+**208/208**, `node workers/wish/src/wish-test.mjs` **22/22**.
+
+### 1. One MIDI class vocabulary (step 0 of both plans), about an hour, no device
+
+The three lists today:
+
+| file | list | used by |
+| --- | --- | --- |
+| `demo/shell/bay.mjs:35` | `CLASSES = note, cc, bend, touch, program, clock, sysex` | `bay-test.mjs`, `demo/wish/index.html:453` (via bay), **`workers/wish/src/wish.mjs:165`, which puts it in the model's prompt** |
+| `rig/board/alsa.mjs:16` | `CARRY = note, cc, pitchbend, aftertouch, program, clock, transport, sysex` | `rig/board/test.mjs:8`, `board.mjs` `patch.*` |
+| `rig/board/inputs.mjs:52`, `:75` | `SYNTH_CC`, `SYNTH_CHANNELS`, `midiVerdict(bytes, channels)` | the relay path and the `ctl` data channel |
+
+Do:
+1. New `demo/shell/midi-kinds.mjs`, pure, no imports: `KINDS` (`note, cc, bend,
+   touch, program, clock, transport, sysex`), `ALIASES` (`pitchbend` to `bend`,
+   `aftertouch` to `touch`), and `kindOf(bytes)` from a status byte.
+2. `bay.mjs` builds `CLASSES` from it and adds `transport`; `classOf` uses
+   `kindOf`. `alsa.mjs` builds `CARRY` from it and **keeps accepting the old
+   names through `ALIASES`**, so a saved patch does not break. `inputs.mjs`'s
+   `midiVerdict` names its refusals in the same kinds.
+3. Grade: the three tests above at their baselines or higher (add cases for the
+   aliases and for `transport`), plus a new `demo/shell/midi-kinds-test.mjs`.
+   `node demo/check-html.mjs demo/wish/index.html`. ONE targeted run:
+   `node demo/verify.mjs wish`, compare the page assert count.
+4. ⚠️ `wish.mjs` puts `CLASSES` in the prompt, so adding `transport` changes
+   what the model is told. Re-read `workers/wish/src/wish.mjs` around `:165`
+   and decide whether the prompt should name it.
+5. Ship: `cd workers/view && node build.mjs` then
+   `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN node workers/view/deploy.mjs`
+   (`/shell/bay.mjs` is served), quote the stamp. If `wish.mjs` changed, deploy
+   `workers/wish` too. The Pi: `rig/board/push.sh` ships rig/board plus every
+   `../../demo/shell/...` file a `rig/board/*.mjs` imports DIRECTLY
+   (`push.sh:57`). ⚠️ It does not follow imports of imports, so `alsa.mjs` and
+   `inputs.mjs` must import `midi-kinds.mjs` themselves, not through another
+   shell module. Needs the VPN off for the LAN.
+
+### 2. A pointer at the top of `plans/plan-wish-dawless.md`, five minutes
+
+Say that §4 and §9's route table is superseded by `plans/plan-route-core.md`,
+and that wish-dawless stays as the plan for this one desk.
+
+### 3. The test vectors (route-core step 1), no device
+
+`demo/shell/route-vectors/*.json`, each `{ ports, links, in: [events], out:
+[events] }`. Write these first ten: fan out to two; merge of two; channel remap;
+CC to CC with a range; an inverted range; note to CC toggle; a cycle refused at
+link time; removing a link sends note offs and CC 123 for held notes; a
+`confirm` policy holding a SysEx stream whose byte 6 is `01` and passing one
+whose byte 6 is `00`; `thin` dropping above its rate.
+
+### 4. The JS core (route-core step 2), no device
+
+`demo/shell/route-core.mjs` plus `route-core-test.mjs` that runs every vector.
+Pure, no dependencies; `bay.mjs` stays the validator in front of it.
+
+### 5. One measurement on the Pi before `rig/board/routes.mjs`
+
+Whether an ALSA sequencer client can open the Circuit's port while the board
+holds the raw device. With the board running: `aconnect -l` on the Pi, then try
+a subscription to the Circuit's port and note the error, if any. Decides whether
+the board's routes can mix kernel and userspace or must all be userspace. Needs
+the VPN off.
+
+### 6. Then universal-routing's first five
+
+Check before starting: `/wish/` already delivers live rows to WebMIDI
+(`demo/wish/index.html:1246`, `live ? { deliver: ... }`), so the first item
+("WebMIDI to WebMIDI through bay.mjs, live") may already be done. The next real
+one is the Pi's ALSA `patch.*` as bay links, which step 1 unblocks.
+
+### Waiting on the owner
+
+- A go on step 1.
+- Whether the model's prompt should name `transport`.
+
 ## Open, from this half
 
-- **Step 0 of both plans: one MIDI class vocabulary.** Offered, waiting for a go.
-- A pointer at the top of `plan-wish-dawless` to route-core. Offered.
+- Steps 1 and 2 above, waiting for a go.
 - The 49 "no factory reset" lines (BACKLOG).
 - Not settled and listed in the plans: USB MIDI host on an RP2040; whether an ALSA
   sequencer client and our raw fd can share the Circuit's port; video over the data
