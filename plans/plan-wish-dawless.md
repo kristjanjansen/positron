@@ -139,4 +139,123 @@ phone is in a pocket.
 5. **Scenes**, recalled by program change.
 6. Then pick from §7: wish by demonstration first, it needs no model.
 
+## 10. Instrument to instrument: the cables
+
+Asked 2026-10-03: *"How i strument to instrument? Cables?"*
+
+USB cables, every instrument into the Pi, none into each other. The Pi is the
+USB host and forwards between its own ports.
+
+```
+Evolution keyboard ──USB──┐
+                          ├── Pi (route table, gate) ──USB──► Circuit
+phone (wishes) ──wifi─────┘                        └─USB──► another synth
+```
+
+- **The Circuit is wired this way already.** Notes go to its own raw MIDI port
+  over USB (`rig/board/inputs.mjs:314`), and its audio comes in through a
+  separate USB audio card (`hw:CARD=Pro`, `inputs.mjs:103`).
+- **The Evolution is a USB keyboard**; CoreMIDI names it `MK-425C USB MIDI
+  Keyboard` (`demo/shell/midi.mjs:29`). It plugs into the laptop today and would
+  plug into the Pi.
+- **A route is the Pi reading one port and writing another**, rewritten on the
+  way: an Evolution knob's CC on ch 1 becomes the Circuit's filter CC on the
+  channel it listens to, through the existing gate.
+- **A plain DIN cable between two synths works for notes with no Pi** but is
+  fixed: the receiver only answers the CC numbers and channels it already
+  listens for. The Pi in the middle is what remaps, scales, curves, switches
+  scenes and takes wishes.
+- Limits: a Pi 4 has four USB ports, so more instruments need a powered hub. A
+  DIN-only instrument needs a USB-MIDI cable or a MIDI HAT (§11). MIDI only; the
+  audio still goes to a mixer. Two USB MIDI devices forwarding through this Pi
+  has never been measured (§8).
+
+## 11. Prior art: hardware MIDI routers, and a Pi doing the same
+
+READ 2026-10-03 from vendor pages, shops and GitHub. Prices are list prices seen
+that day and move. Nothing here was used on this desk.
+
+### The boxes
+
+| box | USB host | DIN | mapping | how it is edited | price |
+| --- | --- | --- | --- | --- | --- |
+| **CME H4MIDI WC** | yes, up to 8 in 8 out through a hub | 2 in 2 out | router, filter, mapper, 4 presets | free HxMIDI Tools app, saved to the box | ~$70 |
+| **Retrokits RK-006** | yes | 2 in, 10 out, outs switchable to gate/PWM | routing, clock, plays MIDI files from a stick | editor | ~$150 to 200 |
+| **Blokas Midihub** | **no**, USB device only | 4 in 4 out | "pipes", a chain of MIDI effects | Midihub Editor | ~$219 |
+| **BomeBox** | yes, plus Ethernet and wifi | 1 in 1 out | full MIDI Translator Pro rules | made on a computer, then runs standalone | ~$215 to 250 |
+| **iConnectivity mioXM** | 4 ports | 4 in 4 out | routing, filters, RTP-MIDI over Ethernet | Auracle app | ~$300 |
+| **Conductive Labs MRCC** | 4 ports | 5 in 10 out | routing matrix, filters, remaps on a front panel | the box itself, no computer | ~$439 to 499, quoted 1 to 3 ms added |
+
+What they agree on, which is the useful part:
+
+- **Every one keeps the routes in the box and runs with no computer.** That is
+  §4's route table, and it is the market's verdict on where routes belong.
+- **None of them takes a wish.** Routes are made in an editor app, on a front
+  panel, or by MIDI learn. Nothing found names a connection from speech or text.
+  That gap is `/wish/`'s whole reason to exist.
+- **Midihub cannot host a USB keyboard**, which rules it out for a desk of USB
+  instruments however good its effects are.
+- **The cheap end is ~$70 (CME).** A Pi 4 plus a case and a power supply costs
+  more than that. The Pi wins only if it does things a box cannot: wishes,
+  audio-driven sources, a phone UI, `/away/`. It already does the last one.
+
+### The Pi doing it
+
+- **`aconnect` is the baseline.** ALSA's sequencer connects ports in the kernel;
+  every Pi project below builds on it.
+- **Blokas Patchbox OS** ships `amidiauto`, which connects USB devices
+  automatically, and **`amidiminder`** (Blokas community), which remembers
+  connections by name, reconnects a device that comes back, and reads rules
+  from `/etc/amidiminder.rules`. That is a persisted route table with hotplug.
+- **Blokas Pimidi**, a DIN MIDI HAT on I2C, quoted loopback **1.28 ms**, the
+  answer for DIN-only instruments.
+- **RaspiMIDIHub** (`wamdam/raspimidihub`, GPL-3.0, ~41 stars): **the closest
+  thing to this plan that exists.** All-to-all routing with hotplug, plain routes
+  in the kernel ("virtually zero"), mapped routes in userspace at a quoted
+  1 to 3 ms, CC remapping with range and inversion, note to CC, channel remap,
+  MIDI learn, drawable curves, and a **phone web app over the Pi's own wifi
+  access point**, Python with no dependencies. No scenes. No voice.
+- **MidiRouter** (`lzulauf/MidiRouter`, Python), device to device mappers with
+  channel filters and remaps, Pi 3b/4/5.
+- **PiMidiBox** (`geeksunny/PiMidiBox`), Node.js, a configurable USB MIDI host
+  router. Same language as `rig/board`.
+- **rpi-usb-host-midi-hub** (`gdsports`) auto-patches two USB devices from a udev
+  rule plus a Python service and links Pis over ipMIDI; its README warns
+  **against wifi** for the link (delay and packet loss).
+- **Zynthian**, a Pi synth platform with MIDI routing in its web config and a
+  MIDI filter rule language.
+
+### What this changes in the plan
+
+- **§4's split is confirmed by prior art, not just reasoning**: RaspiMIDIHub does
+  exactly kernel routes for plain links and a userspace loop for mapped ones, and
+  quotes 1 to 3 ms for the second. Still to be measured here (§8).
+- **Read RaspiMIDIHub before writing `routes.mjs`.** Its row model (range,
+  inversion, curve, note to CC, MIDI learn) is a tested vocabulary for what a
+  wish should be allowed to produce. GPL-3.0, so read for ideas, do not copy code
+  into this repository without deciding on that.
+- **`amidiminder`'s rules file is the persistence format to beat**: by name,
+  survives replugging and reordering. Ours must too.
+- **What nobody has, and what positron would add**: a route made from speech, a
+  route whose source is the music itself (§7), scenes tied to the Circuit's
+  session, and the same table reachable from another building (`/away/`).
+
+Sources: [CME H4MIDI WC](https://www.cme-pro.com/product/usb-host-midi-interface/),
+[Retrokits RK-006](https://retrokits.com/rk006/),
+[RK-006 review, Sound On Sound](https://www.soundonsound.com/reviews/retrokits-rk-006),
+[Blokas Midihub](https://blokas.io/midihub/),
+[Midihub at Perfect Circuit](https://www.perfectcircuit.com/blokas-midihub.html),
+[BomeBox, Sonicstate](https://sonicstate.com/news/2016/09/27/whats-a-bomebox-and-why-would-i-need-it/),
+[iConnectivity mioXM](https://www.sweetwater.com/store/detail/mioXM--iconnectivity-mioxm-usb-midi-interface),
+[Conductive Labs MRCC](https://www.perfectcircuit.com/conductive-labs-mrcc.html),
+[MRCC FAQ](https://conductivelabs.com/faq/),
+[amidiminder](https://community.blokas.io/t/amidiminder-utility/2243),
+[Patchbox OS as a USB MIDI host](https://community.blokas.io/t/raspi-as-a-usb-midi-host-on-patchbox-os/2795),
+[Blokas Pimidi](https://blokas.io/pimidi/),
+[RaspiMIDIHub](https://github.com/wamdam/raspimidihub),
+[MidiRouter](https://github.com/lzulauf/MidiRouter),
+[PiMidiBox](https://github.com/geeksunny/PiMidiBox),
+[rpi-usb-host-midi-hub](https://github.com/gdsports/rpi-usb-host-midi-hub),
+[Zynthian MIDI routing](https://discourse.zynthian.org/t/midi-routing/4708).
+
 Nothing here touches somebody else's server, and nothing sends SysEx.
