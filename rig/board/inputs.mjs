@@ -26,6 +26,7 @@
 // before anything is playing; only `arecord` comes and goes with the lease.
 
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
+import { kindOf } from '../../demo/shell/midi-kinds.mjs';
 import { createRtc } from './rtc.mjs';
 
 export const LEASE_MS = 60_000;
@@ -57,7 +58,7 @@ export const SYNTH_CHANNELS = [1, 2];
  * Note on, note off and CC 123 all notes off, on the channels the config
  * names, and since 2026-09-30 the synth control changes in `SYNTH_CC` on
  * channels 1 and 2 only. Everything else is REFUSED, and the reason is the
- * instrument on the desk: the Circuit has no factory reset, a SysEx `Replace
+ * instrument on the desk: a factory reset brings back none of the owner's sessions, a SysEx `Replace
  * Patch` writes flash, and a program change on channel 16 selects a session
  * over whatever is being worked on (CLAUDE.md, `plans/plan-circuit-patches.md`).
  * No SysEx, no bank select, no NRPN or RPN (CC 98 to 101 and data entry 6
@@ -73,6 +74,13 @@ export const SYNTH_CHANNELS = [1, 2];
  * because they are not patches on 1 and 2 and ARE sessions on 16.
  */
 export function midiVerdict(bytes, channels) {
+  const v = verdict(bytes, channels);
+  // A refusal names its kind in the vocabulary `bay.mjs` and `alsa.mjs` use,
+  // so a log line and a patch talk about the same thing (2026-10-03).
+  return v.ok ? v : { ...v, kind: Array.isArray(bytes) ? kindOf(bytes) : 'other' };
+}
+
+function verdict(bytes, channels) {
   if (!Array.isArray(bytes) || !bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return { ok: false, why: 'bytes are 0 to 255' };
   if (bytes.length === 2 && (bytes[0] & 0xF0) === 0xC0) {
     const ch = (bytes[0] & 0x0F) + 1, p = bytes[1];
@@ -88,7 +96,7 @@ export function midiVerdict(bytes, channels) {
   const allNotesOff = kind === 0xB0 && a === 123 && b === 0;
   const synthCc = kind === 0xB0 && SYNTH_CC.has(a);
   if (!note && !allNotesOff && !synthCc) {
-    return { ok: false, why: 'only notes, all notes off and the synth control changes reach the instrument' };
+    return { ok: false, why: `${kindOf(bytes)} is refused, only notes, all notes off and the synth control changes reach the instrument` };
   }
   if (!channels.includes(ch)) return { ok: false, why: `channel ${ch} is not one this input plays (${channels.join(', ')})` };
   if (synthCc && !SYNTH_CHANNELS.includes(ch)) {

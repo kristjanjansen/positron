@@ -623,7 +623,7 @@
     + 'channel 10 at notes 60, 62, 64 and 65, and its master filter on channel 16. '
     + 'The Circuit has eight macro knobs on channel 1 sending CC 80 to 87 in order, so its '
     + 'FIRST macro knob is CC 80, and CC 86 and 87 are inferred rather than measured. The '
-    + 'Circuit has no factory reset, so it is never sent SysEx. '
+    + 'Circuit is never sent SysEx, because one SysEx message can overwrite a saved patch. '
     // 🔴 THE MODEL 12'S BUTTONS, AND THE ONE THAT CANNOT SAFELY PLAY A SYNTH.
     // ✅ MEASURED and recorded on `/twelve/`: REC is notes 0 to 7, SOLO 8 to 15,
     // MUTE 16 to 23, and **REC SENDS NO RELEASE while SOLO and MUTE do**. Two
@@ -662,7 +662,7 @@
    * 🔴 TWO LISTS, NOT ONE. `accepts` is what a port handles and anything else is
    * dropped at the boundary with the link saying so; `never` refuses the link
    * outright. The Circuit's SysEx line is on the second list because that device
-   * has no factory reset.
+   * keeps the owner's sessions, which no factory reset brings back.
    */
   const ACCEPTS = {
     'here:circuit:in': ['note', 'cc', 'bend'],
@@ -670,7 +670,7 @@
     'here:mk-425c-usb-midi-keyboard:in': [],
   };
   const NEVER = ['sysex'];
-  const EMITS = ['note', 'cc', 'bend', 'touch', 'program', 'clock'];
+  const EMITS = ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'transport'];
 
   /**
    * 🔴 ALL THREE OF THESE WORK, AND FOR A WHILE TWO OF THEM COULD NOT. Reported
@@ -1380,7 +1380,7 @@
    * them CAN BE EXPRESSED, whatever a link or a model says. The `never` list on
    * a port is a declaration and this is arithmetic, which is the second wall
    * `/bay/` put behind the first, and the reason it matters on this desk is in
-   * CLAUDE.md: the Circuit has no factory reset and therefore no undo.
+   * CLAUDE.md: a factory reset restores Novation's content and never the owner's sessions, so nothing undoes a patch overwrite.
    * ⚠️ IT IS THE ONE FUNCTION ON THIS PAGE THAT CAN PUT A BYTE ON A WIRE.
    */
   function toBytes(ev) {
@@ -4403,7 +4403,7 @@
       subs.length === 2 && subs.includes('MIDI IN') && subs.includes('in')
       && /^Model 12 MIDI IN to Circuit\./.test(arrowSays)
       && /It carries note, cc, bend, after channel 1\./.test(arrowSays)
-      && /Circuit will drop touch, program, clock\./.test(arrowSays),
+      && /Circuit will drop touch, program, clock, transport\./.test(arrowSays),
       `the boxes read ${JSON.stringify(subs)} and the arrow says ${JSON.stringify(arrowSays)}`);
 
     /* 🔴 AND A LINK THAT PASSES IS NOT SILENTLY COMPLETE. `allowed` on its own

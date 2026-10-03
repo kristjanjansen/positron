@@ -75,6 +75,13 @@ is('a subset is refused, not approximated', plan(full('circuit', 'digitakt', ['n
 ok('and it says why', /cannot filter/.test(plan(full('circuit', 'digitakt', ['note']), ports).problems[0] ?? ''));
 is('unknown carry name is a problem', plan(full('circuit', 'digitakt', ['notes']), ports).ok, false);
 is('every carry name is known', CARRY.filter((c) => typeof c !== 'string').length, 0);
+// 2026-10-03: one kind list with bay.mjs. The old spellings must still be
+// UNDERSTOOD (a saved patch), which a rename alone would have broken silently.
+is('carry is the bay vocabulary', CARRY.join(','), 'note,cc,bend,touch,program,clock,transport,sysex');
+ok('an old spelling is still a known kind, refused only for needing a filter',
+  /cannot filter/.test(plan(full('circuit', 'digitakt', ['pitchbend']), ports).problems[0] ?? ''));
+is('and the step reports the new name', plan(full('circuit', 'digitakt', ['aftertouch']), ports).steps[0].carry, ['touch']);
+is('a misspelling of an alias is still unknown', /unknown carry/.test(plan(full('circuit', 'digitakt', ['pitch-bend']), ports).problems[0] ?? ''), true);
 
 console.log('apply');
 is('a broken plan applies nothing', apply(plan(full('juno', 'microfreak'), ports)).ran, []);
@@ -431,6 +438,8 @@ console.log('inputs: what a page may send the Circuit');
   is('a data byte past 127 in a program change is refused', midiVerdict([0xC0, 200], CH).ok, false);
   is('and two bytes of anything else is refused', [[0x90, 60], [0xB0, 74], [0xD0, 64]].map((b) => midiVerdict(b, CH).ok), [false, false, false]);
   is('pitch bend and aftertouch are refused', [0xE0, 0xD0, 0xA0].map((s) => midiVerdict([s, 0, 64], CH).ok), [false, false, false]);
+  is('and each refusal names its kind in the bay vocabulary', [[0xE0, 0, 64], [0xD0, 0, 64], [0xF0, 0, 0x20], [0xFA]].map((b) => midiVerdict(b, CH).kind), ['bend', 'touch', 'sysex', 'transport']);
+  is('a pass carries no kind field, so nothing reads one as a refusal', midiVerdict([0x90, 60, 100], CH).kind, undefined);
   is('and a synth controller refusal on the drums says why', /not a synth/.test(midiVerdict([0xB9, 74, 64], CH).why), true);
 
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');

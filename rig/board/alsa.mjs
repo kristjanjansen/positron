@@ -12,8 +12,18 @@
 //           in for the port list only, and `apply` on it changes nothing.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+// ⚠️ IMPORTED DIRECTLY, NOT THROUGH ANOTHER SHELL MODULE: `push.sh` ships only
+// the `../../demo/shell` files a board module names itself.
+import { KINDS, ALIASES, canonKind } from '../../demo/shell/midi-kinds.mjs';
 
-export const CARRY = ['note', 'cc', 'pitchbend', 'aftertouch', 'program', 'clock', 'transport', 'sysex'];
+/**
+ * 🔴 THE ONE KIND LIST SINCE 2026-10-03, shared with `bay.mjs` and the input
+ * gate. This said `pitchbend` and `aftertouch` where the bay said `bend` and
+ * `touch`; both old spellings are still ACCEPTED through `ALIASES`, so a patch
+ * saved before the change still plans, and a step reports the new name.
+ */
+export const CARRY = KINDS;
+export const CARRY_ALIASES = ALIASES;
 
 export function backend() {
   try {
@@ -186,8 +196,9 @@ export function plan(doc, ports) {
     if (!a.ok) problems.push(`${where}: from — ${a.reason}`);
     if (!b.ok) problems.push(`${where}: to — ${b.reason}`);
 
-    const carry = link.carry ?? ['all'];
-    const bad = carry.filter((c) => c !== 'all' && !CARRY.includes(c));
+    const asked = link.carry ?? ['all'];
+    const bad = asked.filter((c) => c !== 'all' && !canonKind(c));
+    const carry = asked.map((c) => (c === 'all' ? c : canonKind(c) ?? c));
     if (bad.length) problems.push(`${where}: unknown carry ${bad.join(', ')} — known: all, ${CARRY.join(', ')}`);
 
     const full = carry.length === 1 && carry[0] === 'all';
