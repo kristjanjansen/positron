@@ -1,0 +1,48 @@
+{
+  "name": "confirm holds a Replace Patch and passes a Replace Current Patch",
+  "about": "A Circuit patch SysEx whose byte 6 is 01 writes flash and is held until a person confirms it, while one whose byte 6 is 00 lands in RAM and passes.",
+  "notes": [
+    "Circuit patch SysEx starts F0 00 20 29 01 60, and byte 6 (counting F0 as byte 0) is the command: 01 Replace Patch writes flash, 00 Replace Current Patch is RAM.",
+    "The bodies here are shortened. A real patch message is 350 bytes. The gate reads only the head.",
+    "circuit's profile: sysex allow, clock deny, and one rule, a SysEx starting F0 00 20 29 01 60 01 is confirm. Rules are byte prefixes and the first matching rule wins over the per kind policy.",
+    "bare has no profile, so it gets the default: allow for everything except sysex, which is confirm.",
+    "SysEx may arrive in chunks. A chunk that does not start with a status byte continues the open SysEx from the same port, and the gate's decision on the first chunk holds for the whole stream.",
+    "t 0 and t 1: a Replace Patch in two chunks. Held at circuit by the rule, held at bare by the default. Nothing out.",
+    "t 2: a note passes to both while the SysEx is held. Link order: l1 circuit, then l2 bare.",
+    "t 3: a Replace Current Patch, whole. circuit allows it. NEGATIVE CONTROL: bare holds it, because the default for an unknown port is confirm.",
+    "t 4: clock. NEGATIVE CONTROL: circuit denies it and it is dropped. bare allows it.",
+    "t 5: confirm circuit. The held stream is released in its chunks, at the confirm's time. bare is not touched.",
+    "NEGATIVE CONTROL t 6: a second Replace Patch is held again at circuit, because a confirm is once per action and not forever.",
+    "End: circuit holds 1 stream, bare holds 3 (the t 0 stream, the t 3 message and the t 6 message)."
+  ],
+  "ports": [
+    { "id": "editor", "dir": "in" },
+    { "id": "circuit", "dir": "out",
+      "policy": { "sysex": "allow", "clock": "deny" },
+      "rules": [{ "match": "F0 00 20 29 01 60 01", "do": "confirm" }] },
+    { "id": "bare", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "editor", "to": "circuit", "ops": [] },
+    { "id": "l2", "from": "editor", "to": "bare", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "editor", "t": 0, "bytes": "F0 00 20 29 01 60 01 05 10 20" },
+    { "port": "editor", "t": 1, "bytes": "30 40 F7" },
+    { "port": "editor", "t": 2, "bytes": "90 3C 64" },
+    { "port": "editor", "t": 3, "bytes": "F0 00 20 29 01 60 00 05 10 20 30 40 F7" },
+    { "port": "editor", "t": 4, "bytes": "F8" },
+    { "t": 5, "confirm": "circuit" },
+    { "port": "editor", "t": 6, "bytes": "F0 00 20 29 01 60 01 06 F7" }
+  ],
+  "out": [
+    { "port": "circuit", "t": 2, "bytes": "90 3C 64" },
+    { "port": "bare", "t": 2, "bytes": "90 3C 64" },
+    { "port": "circuit", "t": 3, "bytes": "F0 00 20 29 01 60 00 05 10 20 30 40 F7" },
+    { "port": "bare", "t": 4, "bytes": "F8" },
+    { "port": "circuit", "t": 5, "bytes": "F0 00 20 29 01 60 01 05 10 20" },
+    { "port": "circuit", "t": 5, "bytes": "30 40 F7" }
+  ],
+  "held": { "circuit": 1, "bare": 3 }
+}

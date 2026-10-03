@@ -1,0 +1,34 @@
+{
+  "name": "merge of two",
+  "about": "Two sources linked to one destination interleave in arrival order, and the destination's accepts list is checked at the destination.",
+  "notes": [
+    "synth accepts only note and cc.",
+    "NEGATIVE CONTROL: the clock F8 from kbd2 at t 10 is dropped at synth because clock is not in its accepts list.",
+    "Everything else passes unchanged and in the order it arrived."
+  ],
+  "ports": [
+    { "id": "kbd1", "dir": "in" },
+    { "id": "kbd2", "dir": "in" },
+    { "id": "synth", "dir": "out", "accepts": ["note", "cc"] }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd1", "to": "synth", "ops": [] },
+    { "id": "l2", "from": "kbd2", "to": "synth", "ops": [] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "kbd1", "t": 0, "bytes": "90 3C 64" },
+    { "port": "kbd2", "t": 5, "bytes": "90 40 50" },
+    { "port": "kbd2", "t": 10, "bytes": "F8" },
+    { "port": "kbd1", "t": 15, "bytes": "B0 4A 10" },
+    { "port": "kbd2", "t": 20, "bytes": "80 40 00" },
+    { "port": "kbd1", "t": 25, "bytes": "80 3C 00" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "90 3C 64" },
+    { "port": "synth", "t": 5, "bytes": "90 40 50" },
+    { "port": "synth", "t": 15, "bytes": "B0 4A 10" },
+    { "port": "synth", "t": 20, "bytes": "80 40 00" },
+    { "port": "synth", "t": 25, "bytes": "80 3C 00" }
+  ]
+}

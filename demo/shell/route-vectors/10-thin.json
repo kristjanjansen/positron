@@ -1,0 +1,49 @@
+{
+  "name": "thin drops above its rate",
+  "about": "thin hz 10 lets through at most one continuous value per 100 ms on a link and never touches a note, a clock or a SysEx.",
+  "notes": [
+    "t is in milliseconds. A continuous value (cc, bend, touch) is kept when it is the first, or when (t - t_kept) * hz >= 1000, where t_kept is the last one KEPT, not the last one seen.",
+    "One budget per link, shared by every continuous kind and channel, because the cap it models is a relay's per link cap.",
+    "t 0 cc kept, the first.",
+    "t 30 and t 60 dropped: 300 and 600 are below 1000.",
+    "NEGATIVE CONTROL t 40 and t 150: a note on and its note off pass. Thinning a note off leaves a note stuck.",
+    "t 100 kept: (100 - 0) * 10 = 1000.",
+    "t 130 dropped: 300.",
+    "t 199 dropped: (199 - 100) * 10 = 990, one millisecond short. Measured from the last KEPT, so had t 130 counted it would be 690 and still dropped, but t 200 below separates the two readings.",
+    "t 200 kept: (200 - 100) * 10 = 1000. Measured from the last SEEN (199) it would be 10 and dropped.",
+    "t 250 bend dropped: the budget is shared, (250 - 200) * 10 = 500.",
+    "t 310 bend kept: 1100.",
+    "NEGATIVE CONTROL t 320: clock is never thinned."
+  ],
+  "ports": [
+    { "id": "knob", "dir": "in" },
+    { "id": "relay", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "knob", "to": "relay", "ops": [{ "op": "thin", "hz": 10 }] }
+  ],
+  "refused": [],
+  "in": [
+    { "port": "knob", "t": 0, "bytes": "B0 4A 00" },
+    { "port": "knob", "t": 30, "bytes": "B0 4A 05" },
+    { "port": "knob", "t": 40, "bytes": "90 3C 64" },
+    { "port": "knob", "t": 60, "bytes": "B0 4A 0A" },
+    { "port": "knob", "t": 100, "bytes": "B0 4A 10" },
+    { "port": "knob", "t": 130, "bytes": "B0 4A 15" },
+    { "port": "knob", "t": 150, "bytes": "80 3C 00" },
+    { "port": "knob", "t": 199, "bytes": "B0 4A 20" },
+    { "port": "knob", "t": 200, "bytes": "B0 4A 25" },
+    { "port": "knob", "t": 250, "bytes": "E0 00 40" },
+    { "port": "knob", "t": 310, "bytes": "E0 00 41" },
+    { "port": "knob", "t": 320, "bytes": "F8" }
+  ],
+  "out": [
+    { "port": "relay", "t": 0, "bytes": "B0 4A 00" },
+    { "port": "relay", "t": 40, "bytes": "90 3C 64" },
+    { "port": "relay", "t": 100, "bytes": "B0 4A 10" },
+    { "port": "relay", "t": 150, "bytes": "80 3C 00" },
+    { "port": "relay", "t": 200, "bytes": "B0 4A 25" },
+    { "port": "relay", "t": 310, "bytes": "E0 00 41" },
+    { "port": "relay", "t": 320, "bytes": "F8" }
+  ]
+}
