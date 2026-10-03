@@ -377,9 +377,9 @@
         ] },
       { id: 'mcu', label: 'Microcontroller', kind: 'device', tech: 'device',
         children: [
-          { id: 'ccore', label: 'route-core', sub: 'C, planned', tech: 'relay',
-            note: 'The same rules in fixed arrays with no heap, in under 8 KB of memory, for a Cortex-M. Not written '
-              + 'yet, and finished when it passes the same files.' },
+          { id: 'ccore', label: 'route-core', sub: 'C, 6 KB', tech: 'relay',
+            note: 'The same rules in fixed arrays with no heap, about 6 KB of state on a Cortex-M. It passes every '
+              + 'case in a Linux container and has not run on a chip yet.' },
         ] },
       { id: 'pretend', label: 'pretend ports', sub: 'synth, Circuit', tech: 'sound',
         note: 'What the keys on this page play into. The pretend Circuit holds a Replace Patch until you confirm it.' },
@@ -391,7 +391,7 @@
     links: [
       { from: 'cases', to: 'jscore', note: 'Run on every visit to this page, every byte compared.' },
       { from: 'cases', to: 'picore', note: 'The same files, run by node on the board.' },
-      { from: 'cases', to: 'ccore', note: 'The same files, run by a C test on a laptop and then on the chip.' },
+      { from: 'cases', to: 'ccore', note: 'The same files, run by a C test in Docker today and on a Pico 2 next.' },
       { from: 'jscore', to: 'pretend', label: 'MIDI' },
       { from: 'picore', to: 'circuit', label: 'MIDI' },
       { from: 'ccore', to: 'din', label: 'MIDI' },
