@@ -73,7 +73,11 @@ USB CDC, mounts a RAM filesystem, writes `ssd1306.py` to it, starts
 `run-router.mjs` boots the C router of `../firmware/` (`build-pico/router.uf2`,
 built in Docker by `../firmware/build.sh pico`) with no MicroPython and no raw
 REPL. It feeds MIDI into UART0 RX with rp2040js `feedByte`, reads UART0 TX
-through `onByte`, presses K1 to K4, reads the screen back as text against the
-firmware's own font, and saves `router-0.png` to `router-5.png`. Every step
+through `onByte`, presses K1 to K4, reads the screen back against the fonts
+the firmware compiles (a phrase counts only when every pixel of its cells
+matches, lit on dark or dark on lit) and checks the bars, dots, arrow and meter
+as pixels. It saves `router-0.png` to `router-6.png` in the default font, then
+boots the same UF2 once per font with one flash byte patched and saves
+`router-font-<name>.png` and `router-font-<name>-hold.png`. Every step
 prints PASS or FAIL and the run exits 1 on any FAIL. `../firmware/README.md`
 has the steps and what the emulator does not cover.
