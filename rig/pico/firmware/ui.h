@@ -87,16 +87,22 @@ void ui_dot(int x, int y, int on);                      /* 5x5: a disc or a ring
 /* A full-width lit block from y, `h` high, `text` dark and centred; a '\n' in
  * `text` starts a second line. */
 void ui_banner(int y, int h, const char *text);
+/* The same block on ONE line, never two: the first of `n` wordings, longest
+ * first, that fits the area with 2 px each side, else the last. Returns which
+ * one it drew. */
+int ui_banner_fit(int y, int h, const char *const text[], int n);
 /* The bottom row, one cell per button. A set bit in `hot` fills that cell.
  * Returns the y of its top rule. */
 int ui_footer(const char *const label[4], unsigned hot);
 int ui_footer_h(void);
 /* The same four labels as a column down the RIGHT edge, for a module whose
- * buttons sit beside the screen: four cells 16 rows tall, label[0] at the top,
- * each centred level with its button. As wide as the widest label in `width`
- * (the labels this column will ever show, so it does not change width when one
- * of them does). Returns the x of its left rule. */
-int ui_keys_right(const char *const label[4], unsigned hot, const char *const width[4]);
+ * buttons sit beside the screen: four equal cells from row `top` to the
+ * bottom, label[0] at the top, each centred in its cell. `top` 0 puts each
+ * level with its button; under a full-width header it is the header's height.
+ * As wide as the widest label in `width` (the labels this column will ever
+ * show, so it does not change width when one of them does). Returns the x of
+ * its left rule. */
+int ui_keys_right(const char *const label[4], unsigned hot, const char *const width[4], int top);
 int ui_keys_right_w(const char *const width[4]);
 
 #endif

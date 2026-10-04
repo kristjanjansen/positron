@@ -61,4 +61,5 @@ EXPORT int footer(unsigned hot) { return ui_footer(labels(), hot); }
 EXPORT int footer_h(void) { return ui_footer_h(); }
 /* The column is sized by the labels it is given, which is what the router
  * does with its four words. */
-EXPORT int keys_right(unsigned hot) { return ui_keys_right(labels(), hot, labels()); }
+EXPORT int keys_right(unsigned hot, int top) { return ui_keys_right(labels(), hot, labels(), top); }
+EXPORT int banner_fit(int y, int h, int n) { return ui_banner_fit(y, h, labels(), n); }

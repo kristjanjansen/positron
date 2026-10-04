@@ -312,25 +312,26 @@ static void redraw(uint32_t t) {
   int top, bottom, avail, g, W;
 
   ui_clear();
-  /* The keys first, because where they go decides how wide everything else
-   * is. On the right the column holds the same width in every state, so OK
-   * stays OK while held (the filled cell and the hint line say the rest). */
+  /* The header first, across the whole screen, then the keys under it: a row
+   * along the bottom, or a column down the right that starts below the header
+   * (asked 2026-10-04 as *"Try to fit right buttons under header"*), which
+   * decides how wide the rest is. The column holds one width in every state,
+   * so OK stays OK while held (the filled cell and the hint say the rest). */
+  ui_area(UI_W);
+  snprintf(left, sizeof left, "SCENE %d/%d", scene + 1, NSCENES);
+  if (ui_text_w(left) + 6 + ui_text_w(S->name) > UI_W - 4)
+    snprintf(left, sizeof left, "%d/%d", scene + 1, NSCENES);
+  top = ui_header(left, S->name);
   if (KEYS_RIGHT) {
-    ui_area(UI_W);
-    W = ui_keys_right(label, held ? 8u : 0u, KEY_W) - 1;
+    W = ui_keys_right(label, held ? 8u : 0u, KEY_W, top) - 1;
     ui_area(W);
     bottom = UI_H - 1;
   } else {
-    ui_area(UI_W);
     W = UI_W;
     if (held) label[3] = ui_text_w("OK/NO") <= 29 ? "OK/NO" : "OK";
     bottom = ui_footer(label, held ? 8u : 0u) - 1;   /* the last free row */
   }
-
-  snprintf(left, sizeof left, "SCENE %d/%d", scene + 1, NSCENES);
-  if (ui_text_w(left) + 6 + ui_text_w(S->name) > W - 4)
-    snprintf(left, sizeof left, "%d/%d", scene + 1, NSCENES);
-  top = ui_header(left, S->name) + 1;
+  top += 1;
   avail = bottom - top + 1;
 
   if (!held) {
@@ -355,32 +356,37 @@ static void redraw(uint32_t t) {
     ui_text(ops_x, by + ops_rel, S->ops);
     draw_activity(by + bh + g, t);
   } else {
-    int lines, bh, sy, by;
-    if (held > 1) snprintf(banner, sizeof banner, "HOLD %d: REPLACE PATCH", held);
-    else snprintf(banner, sizeof banner, "HOLD: REPLACE PATCH");
-    if (ui_text_w(banner) > W - 4) {
-      if (held > 1) snprintf(banner, sizeof banner, "HOLD %d:\nREPLACE PATCH", held);
-      else snprintf(banner, sizeof banner, "HOLD:\nREPLACE PATCH");
-      if (ui_text_w("REPLACE PATCH") > W - 4) {
-        if (held > 1) snprintf(banner, sizeof banner, "HOLD %d:\nPATCH", held);
-        else snprintf(banner, sizeof banner, "HOLD:\nPATCH");
-      }
-      lines = 2;
-    } else lines = 1;
-    bh = lines * (T + 3) - 3 + 6;
+    /* ONE LINE, NEVER TWO: the first wording that fits, longest first.
+     * Asked 2026-10-04 as *"No wrapping on hold confirm, shoren words"*. */
+    char w2[24], w3[24], w4[24];
+    const char *say[4];
+    int bh, sy, by;
+    if (held > 1) {
+      snprintf(banner, sizeof banner, "HOLD %d: REPLACE PATCH", held);
+      snprintf(w2, sizeof w2, "HOLD %d: PATCHES", held);
+      snprintf(w3, sizeof w3, "%d PATCHES", held);
+      snprintf(w4, sizeof w4, "%d?", held);
+    } else {
+      snprintf(banner, sizeof banner, "HOLD: REPLACE PATCH");
+      snprintf(w2, sizeof w2, "HOLD: PATCH");
+      snprintf(w3, sizeof w3, "PATCH?");
+      snprintf(w4, sizeof w4, "?");
+    }
+    say[0] = banner; say[1] = w2; say[2] = w3; say[3] = w4;
+    bh = T + 6;
     g = (avail - (bh + 3 + T + T)) / 3;
     if (g < 2) {
-      /* No room for the hint line under the banner (a big font with a two
-       * line banner): leave it out, the filled K4 cell still says OK. */
+      /* No room for the hint line under the banner: leave it out, the filled
+       * OK cell still says what to press. */
       g = (avail - (bh + T)) / 3;
-      ui_banner(top + g, bh, banner);
+      ui_banner_fit(top + g, bh, say, 4);
       draw_activity(top + g + bh + g, t);
       ssd1306_show();
       return;
     }
     by = top + g;
     sy = by + bh + 3;
-    ui_banner(by, bh, banner);
+    ui_banner_fit(by, bh, say, 4);
     if (keys[3].down && !keys[3].long_fired) {
       /* K4 is down: release now is OK, keep holding and this fills to NO. */
       int nw = ui_text_w("NO");

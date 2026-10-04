@@ -1,5 +1,14 @@
 ## Open
 
+### OLED: the right key column under the header, and a hold banner that never wraps, asked 2026-10-04
+
+*"Try to fit right buttons under header. No wrapping on hold confirm, shoren
+words"*. The header goes back to full width with the four label cells under it
+(so they sit a little off level with the physical buttons, which is the trade
+asked for), and the hold banner picks the first of a ladder of shorter wordings
+that fits on one line instead of breaking onto two. `rig/pico/firmware/ui.c`,
+`main.c`, the wasm build, `run-router.mjs` and `/kit/`'s parts.
+
 ### Hardware kit: button labels on the right, and a finer breakdown, asked 2026-10-04
 
 *"Add oprion to hw kit to have button labels on right. Break down hw ui some
