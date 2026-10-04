@@ -969,5 +969,29 @@ function world() {
     said.map((s) => `${s.why} / ${s.fix}`).join(' | '));
 }
 
+{
+  /* L. A store at either end rides the `file` row, plan §10 item 5. A sound
+     into a store is a recording uploaded through ingest, at the store's
+     address, and it stays one writer however many already listen. */
+  const b = world();
+  b.addNode({ id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' });
+  b.addPort({ id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' });
+  b.addPort({ id: 'r2:recordings:out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' });
+  b.link('studio-1:circuit:audio', 'home:page:audio');
+  b.link('studio-1:circuit:audio', 'away:page:audio');
+  const rec = b.link('studio-1:circuit:audio', 'r2:recordings:in');
+  ok('a sound into a store is a recording through ingest, one writer, at the store’s address',
+    rec.ok && rec.session?.transport === 'ingest' && rec.session.where === 'internet-one'
+      && rec.session.address === 'ingest.positron.studio', JSON.stringify(rec.session || rec.why));
+  const play = b.link('r2:recordings:out', 'home:page:audio');
+  ok('and a sound out of a store is read back through ingest', play.ok && play.session?.transport === 'ingest',
+    JSON.stringify(play.session || play.why));
+  /* NEGATIVE CONTROL: the same sound to a page that is not a store keeps the
+     audio row, or the store rule would be true of every link. */
+  const page = b.link('studio-1:circuit:audio', 'm1:page:audio');
+  ok('NEGATIVE CONTROL: a sound to a page that is not a store keeps the audio row',
+    page.ok && page.session?.transport === 'datachannel', JSON.stringify(page.session || page.why));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

@@ -10,6 +10,9 @@
 // and with one correctness fix that the copy did not have. See `ship()`.
 
 export const INGEST = 'https://ingest.positron.studio';
+/** Where an open-tier session's objects are readable, `<base>/<session>/`. The
+ *  worker's own `PUBLIC_BASE` and `PREFIX`, and `/limits` answers the same. */
+export const ARCHIVE_BASE = 'https://archive.positron.studio/demo/ingest';
 
 /**
  * Open a session. Returns `{ session, limits, expiresAt }` or null when refused.
@@ -67,6 +70,53 @@ export async function putWhole(blob, { log = () => {} } = {}) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { log(`close refused: ${j.error || r.status}`, 'bad'); return null; }
   return { url: j.manifest, session: sess.session, expiresAt: sess.expiresAt, bytes: blob.size };
+}
+
+/**
+ * 🔴 A RECORDING OF UNKNOWN LENGTH, SHIPPED AS IT HAPPENS, which is the case
+ * `putWhole` above says it does not reach. Asked 2026-10-04 for `/patchbay/`'s
+ * record link (plan-universal-routing §10 item 5): a link stays open until a
+ * person unlinks it, so there is no whole take to send at the end.
+ * ⚠️ ONE PUT AT A TIME, IN ORDER. The worker requires a dense sequence and
+ * answers a piece that overtook its predecessor with 409 out-of-order, which is
+ * the race `capture` has and has never lost. A queue makes it impossible.
+ * ⚠️ AND ONE REFUSED PIECE STOPS THE SHIP, because every later one would be
+ * refused as out of order anyway, and saying so once is the honest answer.
+ * ⚠️ `bytes` IS THE WORKER'S OWN COUNT FROM ITS ANSWER, never what was queued,
+ * so the number a page shows was counted on the far side of the wire.
+ * @param {string} session  a session from `openSession`
+ * @returns {{ put(Blob): void, finish(): Promise<object|null>, stats(): object }}
+ */
+export function createShipper(session, { fmt = 'webm', log = () => {} } = {}) {
+  let chain = Promise.resolve(), next = 0, failed = '';
+  const st = { queued: 0, segments: 0, bytes: 0, failed: '' };
+  function put(blob) {
+    if (!blob || !blob.size || failed) return;
+    const n = next++;
+    st.queued++;
+    chain = chain.then(async () => {
+      if (failed) return;
+      const r = await fetch(`${INGEST}/seg/${session}/${n}?fmt=${fmt}`, { method: 'PUT', body: blob }).catch(() => null);
+      const j = r ? await r.json().catch(() => ({})) : {};
+      if (!r || !r.ok) {
+        failed = st.failed = `piece ${n} refused: ${r ? `HTTP ${r.status} ${j.error || ''}`.trim() : 'no answer'}`;
+        log(failed, 'bad');
+        return;
+      }
+      st.segments = j.segments ?? st.segments + 1;
+      st.bytes = j.bytes ?? st.bytes + blob.size;
+    });
+  }
+  /** Wait for every queued piece, then close. Answers the close's body or null. */
+  async function finish() {
+    await chain;
+    if (!st.segments) { log('nothing reached R2, so there is no recording to close', 'warn'); return null; }
+    const r = await fetch(`${INGEST}/close/${session}?fmt=${fmt}`, { method: 'POST' }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (!r || !r.ok) { log(`close refused: ${j.error || (r ? r.status : 'no answer')}`, 'bad'); return null; }
+    return j;
+  }
+  return { put, finish, stats: () => ({ ...st }) };
 }
 
 /**

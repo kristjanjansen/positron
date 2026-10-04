@@ -1039,11 +1039,23 @@ export function createBay({ now = () => Date.now() } = {}) {
    * carried its own transport could disagree with the table, and the table is
    * the measured half.
    */
+  /* 🔴 A LINK WITH A STORE AT EITHER END RIDES THE `file` ROW, WHATEVER IT
+     CARRIES, plan §10 item 5 (*"record is a link to R2 or the store object"*),
+     2026-10-04. `circuit:audio -> r2:recordings:in` is a sound, and the audio
+     row would have called it a relay leg, which is not how a recording reaches
+     R2: the page that hears the sound records it and uploads it through ingest.
+     ⚠️ AND A RECORDING IS ONE WRITER. A store's in port never turns a link into
+     `internet-many`, because however many people listen to the same sound, the
+     recording is one upload; `r2-hls` is the row for many READING a store.
+     ⚠️ THE ADDRESS IS THE STORE'S, so the row says where the recording lives
+     rather than the room the sound came from. */
   function sessionFor(a, b) {
     if (!HEAVY.includes(a.medium)) return null;
+    const into = nodeFor(b)?.kind === 'store', outOf = nodeFor(a)?.kind === 'store';
     const { where, receivers } = whereOf(a, b);
-    const t = chooseTransport(a.medium, where, receivers);
-    return { transport: t.transport, address: addressOf(a), shape: { ...(a.shape || {}) },
+    const w = into && where === 'internet-many' ? 'internet-one' : where;
+    const t = chooseTransport(into || outOf ? 'file' : a.medium, w, into ? 1 : receivers);
+    return { transport: t.transport, address: addressOf(into ? b : a), shape: { ...(a.shape || {}) },
              where: t.where, says: t.says, ...(t.or ? { or: t.or } : {}) };
   }
 
