@@ -511,6 +511,11 @@ export const DEMOS = [
   { name: 'partitur', group: 'timeline', act: 4, created: '2026-10-04', built: true,
     one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline with its light lane on the projection wall.',
     tags: [] },
+  // /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
+  // unlisted until every tab carries its old page's checks.
+  { name: 'time', group: 'timeline', act: 4, created: '2026-10-04', built: true, unlisted: true,
+    one: 'The clock every other page here runs on, set a moment ahead so it can still be stopped.',
+    tags: [] },
   { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true,
     one: 'Cues timed against a picture that arrives late, fired on arrival on one wall and following the picture on the other.',
     tags: [] },
