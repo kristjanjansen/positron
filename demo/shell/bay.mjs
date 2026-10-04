@@ -831,6 +831,9 @@ export function createBay({ now = () => Date.now() } = {}) {
    * not belong here.
    */
   function addressOf(a) {
+    // A port that knows where its stream really lives says so, and that wins:
+    // the board's input rooms are `<room>-<input>`, not a derivation of an id.
+    if (typeof a.address === 'string' && a.address) return a.address;
     const [, node = '', port = ''] = a.id.split(':');
     return [placeOf(a), node, port].filter(Boolean).join('-');
   }

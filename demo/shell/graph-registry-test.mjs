@@ -213,5 +213,28 @@ console.log('\n== into a bay ==');
     keys.ok && keys.session === null, keys.why);
 }
 
+{
+  // 2026-10-04, step 4: a session has to name the room the stream REALLY lives
+  // in, or a page opening it joins an empty room. The board's inputs stream to
+  // `<room>-<input>` and its video to `<room>-video`.
+  const g = boardGraph({ room: 'studio-1', inputs: [{ name: 'circuit', midi: null }], gpu: true });
+  const reg = createRegistry();
+  reg.ingest({ type: 'board.alive', from: 'b', graph: g });
+  reg.ingest({ type: 'graph.announce', from: 'p', graph: { v: 1, site: 'web', place: 'browser',
+    nodes: [{ id: 'web:screen', kind: 'screen', label: 'screen', place: 'browser' }],
+    ports: [{ id: 'web:screen:audio', label: 'screen', dir: 'in', medium: 'audio' },
+            { id: 'web:screen:video', label: 'screen', dir: 'in', medium: 'video' }] } });
+  const bay = reg.fill(createBay());
+  const a = bay.link('studio-1:circuit:audio', 'web:screen:audio');
+  const v = bay.link('studio-1:gpu:video', 'web:screen:video');
+  ok('an input\'s stream is addressed to the room the board really uses', a.session?.address === 'studio-1-circuit', a.session?.address);
+  ok('and the GPU\'s to its video room', v.session?.address === 'studio-1-video', v.session?.address);
+  // NEGATIVE CONTROL: a port with no declared address still gets the derived one.
+  const b2 = createBay();
+  b2.addPort({ id: 'x:n:out', label: 'n', dir: 'out', medium: 'audio' });
+  b2.addPort({ id: 'y:m:in', label: 'm', dir: 'in', medium: 'audio' });
+  ok('a port that declares nothing is still addressed by derivation', b2.link('x:n:out', 'y:m:in').session?.address === 'x-n-out');
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);
