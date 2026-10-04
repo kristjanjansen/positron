@@ -100,9 +100,6 @@ export const DEMOS = [
   { name: 'room', group: 'technologies', act: 2, created: '2026-09-04', built: true,
     one: 'open this page twice and each window shows the other',
     tags: ['getUserMedia', 'WebRTC', 'relay'] },
-  { name: 'cues', group: 'messages', act: 2, created: '2026-09-04', built: true,
-    one: 'one press here and every open copy of this page shows the same cue name at the same moment',
-    tags: ['DO', 'WS', 'relay'] },
   // `items` was a demo and is archived at archive/items/README.md, removed
   // 2026-10-01 on instruction. It wrote an item, let a Durable Object alarm
   // publish it at the moment named, and told installed phones over FCM. Its
@@ -191,18 +188,9 @@ export const DEMOS = [
   // assert, and every assert on this page sits behind a recording that runs to
   // a 10 s cap. Shrink it and the suite reads zero asserts and calls a working
   // page broken.
-  { name: 'take', group: 'capture', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
-    one: 'record, then record again, so each take lands on the line after the one before',
-    tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
-  { name: 'keep', group: 'capture', act: 3, created: '2026-09-08', built: true, settleMs: 30000, lightSettleMs: 2000,
-    one: 'the picture you send out is recorded as the copy that comes back',
-    tags: ['getUserMedia', 'WHIP', 'WHEP', 'timeline'] },
-  { name: 'record', group: 'capture', act: 3, created: '2026-09-04', built: true,
-    one: 'the bytes being held never grow past one segment, however long the show runs',
-    tags: ['MediaRecorder', 'R2'] },
   // 🔴 `settleMs` HERE IS NOT FOR A SLOW CONTROL, BECAUSE THIS PAGE HAS NO
   // CONTROLS. The Load button was removed on instruction and the transport's
   // own ▸ does the loading, so the page's checks hang off a press the harness
@@ -211,9 +199,6 @@ export const DEMOS = [
   // FIRST assert. Replay's first assert is the loop check, which has to let the
   // shared transport checks finish, then play two laps of a real picture and
   // watch where it gets to.
-  { name: 'replay', group: 'capture', act: 3, created: '2026-09-04', built: true, settleMs: 6000,
-    one: 'a 190 s show off R2, played with the eight cues it was recorded with',
-    tags: ['HLS', 'R2', 'timeline'] },
   // `seek` was a demo and is archived at archive/demos/seek-index.html, removed
   // 2026-09-16 on instruction. It played this same show and asked the timeline
   // which cues had happened by any position, 24 asks around the eight cues plus
@@ -221,9 +206,6 @@ export const DEMOS = [
   // its own moment as a retroactive burst. The loop button it graded is still
   // graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
 
-  { name: 'jam', group: 'messages', act: 4, created: '2026-09-04', built: true,
-    one: 'two machines counting the same eight beats with neither leading',
-    tags: ['WS', 'relay', 'WebAudio'] },
 
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
@@ -333,14 +315,14 @@ export const DEMOS = [
   // page unbuilt since 2026-08-26. `plans/plan-studio.md` still holds the argument
   // for it, which is where a proposal belongs. A row for a page that does not
   // exist makes the list longer and the reader's odds worse.
-  { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, settleMs: 26000,
-    one: 'a camera, or a generated picture if you would rather not be on one, is recorded in two-second segments and played back on the timeline below',
-    tags: ['getUserMedia', 'MediaRecorder', 'R2', 'timeline'] },
+  // TAKES, SEGMENTS, ROUND TRIP, FAR END since 2026-10-04 (plan-demo-structure
+  // §3.5). Its checks run before ready, MEASURED about 20 s ordinary and 33 s
+  // deep; bootMs is a ceiling and costs a working page nothing.
+  { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, bootMs: 70000, lightSettleMs: 2000,
+    one: 'Recording what came over a link, from a take on this machine to the far end of a live connection.',
+    tags: ['getUserMedia', 'MediaRecorder', 'R2', 'WHIP', 'WHEP', 'WebRTC', 'timeline'] },
   // the first page where all three legs meet: live over a real WebRTC hop, the
   // FAR END of that hop recorded, and the recording scrubbed on the deck
-  { name: 'show', group: 'capture', act: 3, created: '2026-09-05', built: true, settleMs: 9000,
-    one: 'what gets recorded is what the far end of a live WebRTC connection actually received',
-    tags: ['getUserMedia', 'WebRTC', 'MediaRecorder', 'timeline'] },
 
   // 26 is Act 5 with 19: both are ERR's live output, one television and one
   // radio, and both are here because the archive work needs the live end of the
@@ -502,9 +484,11 @@ export const DEMOS = [
   { name: 'time', group: 'timeline', act: 0, created: '2026-10-04', built: true, bootMs: 12000,
     one: 'The clock every other page here runs on, set a moment ahead so it can still be stopped.',
     tags: ['timeline', 'WebAudio', 'canvas'] },
-  { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true,
-    one: 'Cues timed against a picture that arrives late, fired on arrival on one wall and following the picture on the other.',
-    tags: [] },
+  // ARRIVAL, AHEAD, FOLLOW, AFTER since 2026-10-04 (plan-demo-structure §3.1).
+  // The check pass runs before ready, MEASURED 8.3 to 9.0 s locally.
+  { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true, bootMs: 14000,
+    one: 'Four ways two places agree on when something happens, from firing on arrival to lining up on a recording.',
+    tags: ['DO', 'WS', 'relay', 'HLS', 'R2', 'timeline'] },
 
   // `bay` was a demo and is archived at archive/demos/bay-index.html, removed
   // 2026-09-25 on instruction. It was the first page here that SENT to an
