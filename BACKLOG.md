@@ -1,5 +1,14 @@
 ## Open
 
+### One demo page for timing light signals against heavy ones, asked 2026-10-04
+
+*"Put to single demo"*, after plan-routing-time's step 2 was offered as
+`/partitur/` plus `/wall/`. One page instead: a stage picture behind a link with
+a measured lag (WebRTC 67 ms, LL-HLS 2 to 8 s with a jump, the Pi's audio 175
+ms), a score sending cues and lights, and two walls side by side, one firing on
+arrival and one following the picture through `demo/shell/timebase.mjs`.
+Opens nothing on load and asks no server for anything.
+
 ### Universal routing: syncing light signals to rich ones, asked 2026-10-04
 
 *"expand and work with universal router plan about those syncing stuff having
