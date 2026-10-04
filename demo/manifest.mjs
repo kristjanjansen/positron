@@ -92,12 +92,12 @@ export const DEMOS = [
     tags: ['LL-HLS', 'Stream', 'container'],
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
-    settleMs: 75000 },
+    settleMs: 75000, lightSettleMs: 1000 },
   { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true,
     one: 'the same live picture the HLS pages play, delivered over WHEP instead',
     tags: ['WebRTC', 'WHEP', 'Stream'],
-    settleMs: 75000 },
-  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
+    settleMs: 75000, lightSettleMs: 1000 },
+  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000, lightSettleMs: 1000,
     one: 'the same test picture the other streaming pages play, sent from this browser over MoQ and back',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
   // One press starts every leg: getUserMedia, a WHIP publish through the pub
@@ -105,7 +105,7 @@ export const DEMOS = [
   // the relay session together take seconds, and the checks then wait for 30
   // timed frames on each leg, so the first page asserts land well after the
   // harness's default settle.
-  { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, settleMs: 45000,
+  { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, settleMs: 45000, lightSettleMs: 3000,
     one: 'one webcam next to what comes back over WebRTC, MoQ and LL-HLS',
     tags: ['getUserMedia', 'WebRTC', 'WHIP', 'MoQ'] },
 
@@ -186,8 +186,10 @@ export const DEMOS = [
    * no third-party mount: it decoded from our own station Worker.
    */
 
-  { name: 'wire', group: 'messages', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
-    one: 'compose a message and watch the exact bytes travel out and come back as the relay\'s own echo',
+  // BYTES and NOTES tabs since 2026-10-04 (plans/plan-demo-structure.md §3.3); its
+  // checks run before ready, so the boot wait is the check pass, MEASURED 3.8 s.
+  { name: 'wire', group: 'messages', act: 2, created: '2026-09-10', built: true, bootMs: 20000, room: 'fixed',
+    one: 'A message as the exact bytes that travel, and a note as how late it lands on another machine.',
     tags: ['WS', 'DO', 'SQLite'] },
 
   // The only network-free row in Act 3, and the act's simplest complete
@@ -231,9 +233,6 @@ export const DEMOS = [
   // its own moment as a retroactive burst. The loop button it graded is still
   // graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
 
-  { name: 'instrument', group: 'messages', act: 4, created: '2026-09-04', built: true,
-    one: 'a keyboard whose sound may be coming out of a different machine',
-    tags: ['WebMIDI', 'relay', 'WebAudio', 'WebRTC'] },
   { name: 'jam', group: 'messages', act: 4, created: '2026-09-04', built: true,
     one: 'two machines counting the same eight beats with neither leading',
     tags: ['WS', 'relay', 'WebAudio'] },
@@ -249,7 +248,7 @@ export const DEMOS = [
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
-    settleMs: 26000 },
+    settleMs: 26000, lightSettleMs: 15000 },
   // `gl: true` and `xr: true` for the same reason mirror and blocks carry them:
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
@@ -263,7 +262,7 @@ export const DEMOS = [
   { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
     one: 'eight live ERR channels in equal cells',
     tags: ['HLS', 'icecast', 'DVR'],
-    settleMs: 14000 },
+    settleMs: 14000, lightSettleMs: 6000 },
   // Everything that could be reached about one artist, before anything is
   // played: 122 rows out of fourteen archives, saying when it is from, who
   // holds it, what it is, whether there is a file and what its licence allows.
@@ -382,7 +381,7 @@ export const DEMOS = [
   // not moved through any of it: a wasm scsynth boot, 31 buffer allocations, a
   // definition, an eight-second ring fill, a 2.5 s level, two 700 ms ink
   // samples and a 1.2 s deafness control before the page says anything at all.
-  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
+  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000, lightSettleMs: 15000,
     one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand, or by sliders that sweep themselves back and forth',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
@@ -413,7 +412,7 @@ export const DEMOS = [
   // scroll under a thumb any more, and a tag naming an API the page no longer
   // calls is a description that has drifted from the thing it describes.
   { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
-    gl: true, settleMs: 45000,
+    gl: true, settleMs: 45000, lightSettleMs: 2000,
     one: 'a radio station fed through a granulator, playing itself',
     tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
   // `crate` was here until 2026-10-02: one long recording into R2 in pieces of 16 MiB through
@@ -755,7 +754,7 @@ export const DEMOS = [
   // already wears it. The page is built, deployed and reachable at its URL;
   // only the card is gone.
   // ⚠️ TO BRING IT BACK: delete `unlisted: true` from this row. Nothing else.
-  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, unlisted: true, settleMs: 60000, room: 'fixed',
+  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, unlisted: true, settleMs: 60000, lightSettleMs: 10000, room: 'fixed',
     one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
     tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
 
@@ -801,7 +800,7 @@ export const DEMOS = [
   // ⚠️ IT IS NOT SIZING THE CONTAINER WAKE ANY MORE. The check waits for the
   // publisher itself (`waitForWhip`) before it presses, so the wake is paid
   // against the asserts before the press rather than against this number.
-  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000,
+  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000, lightSettleMs: 2000,
     // \ud83d\udd34 THE TWO PRESSES CHANGED WHAT THEY MEAN, SO THIS SENTENCE HAD TO. It
     // read *"two presses, one for the picture and one for the show"*, which the
     // 2026-09-25 transport rework made false twice over: the two presses are
