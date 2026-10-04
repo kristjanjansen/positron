@@ -340,3 +340,13 @@ second peer inside it, so *hear the other machine* is graded at last, and fixed
 a defect the old page carried: its "Hear the other machine" answered `offline`
 to every press because it read `ws.readyState`, which `openWire`'s handle does
 not have. No redirect; `/instrument/` 404s.
+
+## `transport`, `lanes`, `loops`, `score` and `strip`, retired 2026-10-04
+
+The five became the tabs of `/time/` (SCHEDULE, BEAT, LOOPS, SCORE, DATES,
+`demo/time/`), which grades 42 of their own checks against their 37 and drills
+the four bars the harness cannot reach as 24 page asserts. Two defects stayed
+behind with the old files: LOOPS' direction check worked the source position
+out through the same `mirror()` that builds the backwards copy, so an unmirrored
+copy still passed (the tab reads the event's own identity now); and DATES' checks
+ran on every press of Fit, for visitors too. No redirect; all five slugs 404.

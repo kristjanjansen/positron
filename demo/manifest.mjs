@@ -68,18 +68,6 @@ export const ACTS = new Map([
 ]);
 
 export const DEMOS = [
-  { name: 'transport', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'twenty things are set to happen, one a second',
-    tags: ['timeline'] },
-  { name: 'lanes', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one beat, sent several ways at once',
-    tags: ['timeline', 'WebAudio'] },
-  { name: 'loops', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one two-second recording placed three times, the last of them looping twice in whichever direction the button shows',
-    tags: ['timeline'] },
-  { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one file format for scores written in different languages',
-    tags: ['timeline'] },
   { name: 'und', group: 'timeline', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score, compiled whenever you stop typing',
     tags: ['timeline', 'Csound', 'WebAudio'] },
@@ -433,9 +421,6 @@ export const DEMOS = [
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
-  { name: 'strip', group: 'technologies', act: 0, created: '2026-09-04', built: true,
-    one: 'two thousand years on one line, where many of the dates are a bracket rather than a day',
-    tags: ['timeline', 'canvas'] },
   // The studio Mac as an instrument: the same page as /keys/, pointed at a
   // different machine. What crosses the relay is a note NUMBER, so neither end
   // knows what kind of computer the other one is.
@@ -511,10 +496,12 @@ export const DEMOS = [
     one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline with its light lane on the projection wall.',
     tags: [] },
   // /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
-  // unlisted until every tab carries its old page's checks.
-  { name: 'time', group: 'timeline', act: 4, created: '2026-10-04', built: true, unlisted: true,
+  // SCHEDULE, BEAT, LOOPS, SCORE, DATES from transport, lanes, loops, score and
+  // strip. Its checks and four bar drills run before ready: MEASURED 6.3 to 6.6 s
+  // locally against the 7.4 s default, so it declares its own wait.
+  { name: 'time', group: 'timeline', act: 0, created: '2026-10-04', built: true, bootMs: 12000,
     one: 'The clock every other page here runs on, set a moment ahead so it can still be stopped.',
-    tags: [] },
+    tags: ['timeline', 'WebAudio', 'canvas'] },
   { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true,
     one: 'Cues timed against a picture that arrives late, fired on arrival on one wall and following the picture on the other.',
     tags: [] },

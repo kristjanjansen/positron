@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* A tab's own controls, under its glued bar and strip. NOT `.pos-controls`:
+     the harness presses that row by position across the whole document, blind
+     to tabs (`tab-page.mjs`, rule 4). One gap, the controls' own token. */
+  .time-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); }
+
+  /* SCORE's block, from `/score/`. Twelve lines, and it HOLDS at twelve: the
+     longest of the five scores is eleven, so a shorter one is padded rather
+     than letting the block grow and move the strip above it. */
+  .sc { max-height: calc(12 * 1.75em + 22px); overflow-y: auto;
+        font: 400 11px/1.75 var(--mono); background: var(--card);
+        border: 1px solid var(--line); border-radius: 4px; padding: 10px 0;
+        overflow-x: auto; margin: 0; }
+  /* TWO CHANNELS, TWO FACTS: the LEFT BORDER says which part a line belongs
+     to, in the hue that part's slices and events use in the strip; the TEXT
+     says whether it has played. Hue never means played. */
+  .sc-pad { color: transparent; }
+  .sc-l { display: block; white-space: pre; color: var(--dim2);
+          border-left: 3px solid transparent; padding: 0 12px 0 9px; }
+  .sc-l[data-state="played"] { color: var(--dim); }
+  .sc-l[data-state="now"]    { color: var(--fg);
+                               background: color-mix(in oklab, var(--hi) 10%, transparent); }
+  .sc-n { color: var(--dim2); }
+  .sc-l[data-state="now"] .sc-n { color: var(--fg); }
+</style>
+
+<script type="module">
+  /*
+   * 🔴 FIVE OLD PAGES AS THE TABS OF ONE, decided by the owner 2026-10-04:
+   * *"names ok, looper retires, no redrect, capture is fine"*. SCHEDULE was
+   * `/transport/`, BEAT `/lanes/`, LOOPS `/loops/`, SCORE `/score/` and DATES
+   * `/strip/` (`plans/plan-demo-structure.md` §3.2). Each tab is a module
+   * beside this page; `createTabPage` builds a tab the first time it is
+   * opened, gives it its own log, and runs its checks and its bar's drill.
+   *
+   * ⚠️ ONE PUBLISHED BAR, SCHEDULE'S, because it is the tab the page opens on
+   * and the clock the other four are compared with. The other four build with
+   * `publish: false` and are drilled as page asserts by `bar-drill.mjs`.
+   * ⚠️ NOTHING SOUNDS OR OPENS ON LOAD OR ON A TAB'S BUILD. BEAT's sound card
+   * and MIDI wait for the press in its own tab.
+   */
+  import { mount, guard } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createTabPage } from '/shell/tab-page.mjs';
+  import * as schedule from './schedule.mjs';
+  import * as beat from './beat.mjs';
+  import * as loops from './loops.mjs';
+  import * as score from './score.mjs';
+  import * as dates from './dates.mjs';
+
+  const d = mount({
+    name: 'time',
+    what: 'The clock every other page here runs on, set a moment ahead so it can still be stopped.',
+    readout: null,
+    showLog: false,
+    controls: [],
+  });
+  guard(d);
+
+  const page = createTabPage(d, {
+    at: 'schedule',
+    tabs: [
+      { id: 'schedule', label: 'SCHEDULE', mod: schedule },
+      { id: 'beat', label: 'BEAT', mod: beat },
+      { id: 'loops', label: 'LOOPS', mod: loops },
+      { id: 'score', label: 'SCORE', mod: score },
+      { id: 'dates', label: 'DATES', mod: dates },
+    ],
+  });
+
+  if (SELFCHECK) await page.check();
+  d.ready();
+</script>
+</html>
