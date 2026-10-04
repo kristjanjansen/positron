@@ -60,6 +60,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
   import { createModulator } from '/shell/pappus-mod.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam,
@@ -124,7 +125,13 @@
    * really does run these checks, and this page rotates four ERR mounts, so
    * that command is not a development-loop command.
    */
-  const CHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
+  // ⚠️ EITHER TIER, SINCE 2026-10-04 (`demo/shell/selfcheck.mjs`). This read
+  // `=== '1'` raw, which would have switched every check off on a deep run.
+  // An ordinary run (`selfcheck=1`) grades the picture and the engine and stops
+  // before the five second darkening watch and the morph, the walking lanes,
+  // the loops, the station change and full screen, which together are most of
+  // this page's run; `DEMO_DEEP=1 node demo/verify-gl.mjs videoradio` runs them.
+  const CHECK = SELFCHECK;
 
   // ── the tour's clock ───────────────────────────────────────────────────────
   //
@@ -2959,7 +2966,7 @@
      * happened and was reported three times before it was measured.
      * Three reads five seconds apart is the smallest thing that can catch it.
      */
-    {
+    if (DEEP) {
       const meanOf = (r) => { const px = r?.px; if (!px?.length) return -1; let t = 0; for (let i = 0; i < px.length; i += 4) t += px[i]; return t / (px.length / 4); };
       const fld = () => meanOf(pic?.readField?.());
       const shw = () => meanOf(pic?.readShown?.());
@@ -3295,6 +3302,14 @@
         ? `a trusted press opened the gate and ${post.toFixed(4)} is leaving`
         : `a 440 Hz tone reads ${pre.toFixed(4)} inside the page and `
           + `${post.toFixed(4)} past the gate`);
+
+    if (!DEEP) {
+      d.log('left for the deep run: the darkening watch, the morph, the walking lanes, '
+        + 'the loops, the station change and full screen (DEMO_DEEP=1)');
+      tourFrom = performance.now();
+      checking = false;
+      return;
+    }
 
     // ── the morph ──────────────────────────────────────────────────────────
     //

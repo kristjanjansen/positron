@@ -552,7 +552,8 @@
    * drawn height, and the sound gate itself. What a visit cannot grade is
    * anything that needs a recording to be moving.
    */
-  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
+  // Either tier (`selfcheck=1` or the deep `selfcheck=2`, see `demo/shell/selfcheck.mjs`).
+  const SELFCHECK = ['1', '2'].includes(new URLSearchParams(location.search).get('selfcheck'));
 
   const REPORT = new URLSearchParams(location.search).get('report') === '1';
   const ship = (line) => {

@@ -199,7 +199,7 @@ export function openWire(room, {
   by = null,
 } = {}) {
   const KIND = by || (typeof location !== 'undefined'
-    && new URLSearchParams(location.search).get('selfcheck') === '1' ? 'tool' : 'page');
+    && ['1', '2'].includes(new URLSearchParams(location.search).get('selfcheck')) ? 'tool' : 'page');
   if (!KINDS.includes(KIND)) {
     throw new Error(`wire: by is one of ${KINDS.join(', ')}, not ${JSON.stringify(KIND)}.`);
   }

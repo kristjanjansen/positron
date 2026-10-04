@@ -102,7 +102,18 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
-  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { SELFCHECK, DEEP, ifSelfcheck } from '/shell/selfcheck.mjs';
+
+  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
+     *"i mean these long-running ones"*. Everything long here is the board: a
+     Raspberry Pi in another building compiling a 2,030-line engine for about
+     forty seconds, starting an instrument and having its material turned down
+     and back up by `probeSound`. An ORDINARY harness run (`selfcheck=1`) asks
+     the board for nothing, sends it no setting and grades the engine in this
+     tab, the picture and the relay; `DEMO_DEEP=1 node demo/verify.mjs grains`
+     does the rest, and may be red for the board's own reasons when the Pi is
+     down or busy. A visitor is never `LIGHT`. */
+  const LIGHT = SELFCHECK && !DEEP;
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -1009,12 +1020,12 @@
     // ⚠️ AN ARRAY IS STILL ONE SETTING. `gates` and `probs` are eight-element
     // control arrays; the box takes 1..48 numbers in `args`, and the engine in
     // this tab needs `/n_setn` rather than `/n_set` — see `engine.mjs`.
-    if (fxOn) send({ type: 'params.set', cmd, args: Array.isArray(value) ? value : [value] });
+    if (fxOn && !LIGHT) send({ type: 'params.set', cmd, args: Array.isArray(value) ? value : [value] });
     pap?.set(cmd, value);
   }
   /** Board only — the other end has no such command. See `setFixed()`. */
   function forBoard(cmd, value) {
-    if (fxOn) send({ type: 'params.set', cmd, args: Array.isArray(value) ? value : [value] });
+    if (fxOn && !LIGHT) send({ type: 'params.set', cmd, args: Array.isArray(value) ? value : [value] });
   }
   /** Replay the record into the engine in this tab, when it finally exists. */
   function flushSettings() { for (const [cmd, v] of SENT) pap?.set(cmd, v); }
@@ -1545,7 +1556,7 @@
       fxBy = m.fxBy ?? null;
     }
     // The board has spoken, so there is something to switch on. Once.
-    if (!enabledOnce) { enabledOnce = true; enable(); }
+    if (!enabledOnce && !LIGHT) { enabledOnce = true; enable(); }
     // The board says this every five seconds with nobody asking, which makes it
     // the cheapest liveness there is — and it names what is sounding, so an
     // instrument somebody else starts shows up here without this page polling
@@ -1893,11 +1904,21 @@
     // side by side it is the board's forty seconds and nothing else. This
     // control owns the page's whole settle budget for exactly that reason.
     const local = startLocal();
-    await enable();
+    if (LIGHT) d.log('left for the deep run: switching the granulator on on the board, '
+      + 'its forty second compile and the board deafness check (DEMO_DEEP=1)');
+    else await enable();
     // Wait out an enable that is already in flight — the page starts one the
     // moment the board answers, and the harness can press this before it ends.
     for (let i = 0; i < 160 && enabling; i++) await wait(500);
     await local;
+    // ⚠️ AN ORDINARY RUN HAS NOT SPENT THE BOARD'S WAIT, which is what used to
+    // give this tab's ring time to fill before its deafness check. MEASURED on
+    // the first ordinary run: `0.000000 playing against 0.000000`, a check of
+    // an engine that had not recorded anything yet. So it waits for sound,
+    // bounded, rather than for a number of seconds.
+    if (LIGHT && pap?.started) {
+      for (let i = 0; i < 20 && !(await levelOver(() => pap.level(), 500) > 0.0005); i++) { /* listening */ }
+    }
     // 🔴 BOTH PROBES TAKE THE SOUND AWAY AND PUT IT BACK, so they wait for a
     // harness. `probeSound` turns the material down to -60 dB on a Raspberry Pi
     // in another building, empties the ring and waits for the head to come
@@ -1913,7 +1934,7 @@
     // hand, so a visit still grades the engine, the material, the node order,
     // the movement, the grain rate and the picture.
     await ifSelfcheck(async () => {
-      if (fxOn) await probeSound();
+      if (fxOn && !LIGHT) await probeSound();
       await probeLocal();
     }, { log: d.log, say: 'the two deafness checks turn the sound down and back up, on this page '
       + 'and on the board, so they are left to the harness rather than made a hole in what '
@@ -2016,6 +2037,9 @@
         : 'nothing has been measured yet. Press “Switch it on”');
 
     d.assert('the page reached the relay', wire.state() === 1, `readyState ${wire.state()}`);
+    // An ordinary run asked the board for nothing (see `LIGHT`), so what follows
+    // would be grading a board this run never spoke to.
+    if (LIGHT) return;
     // ⚠️ ONE BRANCH PER NAMED STATE, AND THE COUNT MOVES WITH IT. This board is
     // shared and it keeps running with nobody connected, so "answering" is not
     // one condition: it can be compiling its engine, refusing the insert, or
