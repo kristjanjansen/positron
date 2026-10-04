@@ -47,8 +47,10 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
     if (!ok || k === 'pappusFx') continue;
     const n = slug(k);
     node(n, 'engine', k);
-    port(n, 'in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [] });
-    port(n, 'audio', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs } });
+    // A synth lives in the board's MAIN room: `audio.start` and `note.on` go
+    // there, and its sound comes back down the same socket.
+    port(n, 'in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [], address: room });
+    port(n, 'audio', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room });
   }
   if (gpu) {
     node('gpu', 'engine', 'GPU');
