@@ -401,6 +401,54 @@ is checkable in one command, so check it before repeating it.
   colour rather than borrowing green: colouring an unchecked thing as if it
   passed is an assertion nothing made.
 
+## A tabbed page: one old page per tab
+
+🔴 **A PAGE MADE OF SEVERAL OLD PAGES IS `createTabPage`, AND EACH TAB IS A
+MODULE.** Asked 2026-10-04 as *"Too many of thise demos, those old halfbroken
+but useful… peopose a new structure"* and decided the same day as *"names ok,
+looper retires, no redrect, capture is fine"*: twenty demos become tabs of
+`/sync/`, `/time/`, `/wire/` and `/capture/` (`plans/plan-demo-structure.md`
+§3, §5 step 1). The old page's body moves to
+`demo/<page>/<tab>.mjs`, exporting `readout` and `build({ panel, report,
+assert, log, set })`, which returns `{ show, hide, check({ A }), bars: [{
+name, bar, strip }] }`. `demo/shell/tab-page.mjs` does the rest, and `/kit/`'s
+TAB PAGE block is the specimen.
+- **Nothing is built for a tab nobody opened.** `build` runs on the tab's first
+  showing, and `build` itself opens nothing: a relay join, a fetch or a media
+  element waits for the first press in its own tab. The check pass asserts that
+  only the open tab was built before it ran.
+- **Each tab has its own report** (`createReport`), under its own blocks. The
+  page mounts with `readout: null, showLog: false`.
+- **Checks run once, from `if (SELFCHECK) await page.check(); d.ready();`.**
+  The pass OPENS each tab to check it, because a closed panel has no width and
+  takes no key; nobody is watching under `?selfcheck=1`. Before `ready`, never
+  after, or it races the harness's own drill.
+- **A tab's controls never go in `.pos-controls`.** The harness presses that row
+  by position across the document, blind to tabs.
+- **The hash selects the tab** (`/sync/#arrival`); `hash: false` only inside a
+  page that owns its own hash.
+
+🔴 **EVERY BAR BUT THE PUBLISHED ONE GETS THE HARNESS'S DRILL AS PAGE ASSERTS.**
+`verify.mjs` drills `__demo.transport` only, so a bar with `publish: false`
+was a bar nobody pressed. A tab lists its bars in `bars` and the check pass
+runs `assertBar` from `demo/shell/bar-drill.mjs` on each: has a position, rate
+lattice, play advances, pause holds, keyboard seek, and strip has ink when a
+`strip` canvas is given. ⚠️ **IT IS THE HARNESS'S OWN DRILL, NUMBER FOR
+NUMBER**, and `node demo/shell/bar-drill-test.mjs` reads `verify.mjs` and goes
+red when the two disagree. Change both. ⚠️ **AND IT CAN FAIL**: `/kit/` drills
+a bar whose clock never moves and requires exactly `play advances position`
+to go red.
+
+🔴 **A KEY BELONGS TO ONE BAR NOW, SAME DAY.** `transport-bar.mjs` listens on
+`window`, so every bar took every key and a space on one tab started decks on
+the others. A key whose target is inside a bar goes to that bar only, and a bar
+inside a hidden `[data-own-keys]` panel (every `createTabPage` panel) hears
+nothing. A key from the body still reaches every other bar, which is what the
+harness sends; `verify.mjs` presses the published bar's tab before its seek
+when that bar sits in a closed `data-own-keys` panel. MEASURED: taking the
+closed-tab line out turns `/kit/`'s *"a key from the page does not reach a bar
+in a closed tab"* red (294/294 to 293/294, 30000 -> 0) and nothing else.
+
 ## Lanes and colour
 
 - **A number belongs to the lane that can answer for it.** Report each lane's
