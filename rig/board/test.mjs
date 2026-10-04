@@ -11,6 +11,8 @@ import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
 import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { fresher, midiKey, MAX_PEERS } from './rtc.mjs';
+import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
+import { graphProblem, createRegistry } from '../../demo/shell/graph-registry.mjs';
 import { EventEmitter } from 'node:events';
 import { constants as FS_C } from 'node:fs';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
@@ -627,6 +629,52 @@ console.log('\nrtc: the direct path, against a fake peer');
   is('and nobody else\'s is', writes.some((w) => w[0] === 0x82 && w[1] === 70), false);
   hw.close();
   is('closing the board closes every peer', pcs.every((p) => p.closed), true);
+}
+
+// ── what the board says about itself ────────────────────────────────────────
+// `board.hello` and `board.alive` carry `graph` since 2026-10-04 (plans/
+// plan-universal-routing.md §11 step 3). Built from the board's own facts: the
+// aconnect fixture above, the BOARD_INPUTS in HANDOFF.md, and the instrument
+// map the hello sends.
+console.log('\nbeat: the graph on the hello and on every beat');
+{
+  const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
+  const graphFacts = { room: 'studio-1', net: null, ports,
+    instruments: { synth: true, pappusFx: true, yoshimi: true }, inputs: cfg.inputs, frameMs: 20, gpu: true };
+  const hello = helloMsg({ name: 'positron-board', id: 'b-7f3a', backend: 'alsa', ports, dry: false, since: 1,
+    frameMs: 20, instruments: graphFacts.instruments, error: null, hint: null, graphFacts });
+  const alive = aliveMsg({ name: 'positron-board', id: 'b-7f3a', upSec: 3600, audio: 'synth', voices: 2, frames: 180000,
+    insert: { fx: null, fxBy: null, fxAgoSec: null, fxHeld: false }, graphFacts });
+  is('the hello is still a board.hello with its old fields', [hello.type, hello.ports, hello.audioChannels, hello.instruments.yoshimi],
+    ['board.hello', 5, 1, true]);
+  is('the hello carries a graph graphProblem accepts', graphProblem(hello.graph), '');
+  is('the beat is still a board.alive with the insert at top level', [alive.type, alive.upSec, alive.fx, alive.fxHeld],
+    ['board.alive', 3600, null, false]);
+  is('the beat carries a graph graphProblem accepts', graphProblem(alive.graph), '');
+  is('and it is the same graph the hello sent', JSON.stringify(alive.graph), JSON.stringify(hello.graph));
+  is('the input from BOARD_INPUTS is a node, and its ALSA client is not a second one',
+    hello.graph.nodes.filter((n) => /circuit/.test(n.id)).map((n) => n.id), ['studio-1:circuit']);
+  ok('the ALSA name of an input does not ride on the beat', !JSON.stringify(alive).includes('hw:CARD'));
+  is('the virtual clients are not in it', hello.graph.nodes.some((n) => /Virtual/.test(n.label)), false);
+  is('no BOARD_NET means no net', 'net' in hello.graph, false);
+  is('BOARD_NET set is carried', graphOf({ ...graphFacts, net: 'studio-lan' }).net, 'studio-lan');
+  is('no video path means no GPU node', graphOf({ ...graphFacts, gpu: false }).nodes.some((n) => n.id === 'studio-1:gpu'), false);
+  is('a beat before the first hello carries no graph rather than an empty one',
+    'graph' in aliveMsg({ insert: {}, graphFacts: null }), false);
+  const errHello = helloMsg({ backend: 'alsa', ports: [], error: 'cannot open sequencer', hint: 'modprobe snd-seq',
+    instruments: {}, graphFacts: { ...graphFacts, ports: [] } });
+  is('an ALSA error still rides on the hello, next to a graph', [errHello.error, graphProblem(errHello.graph)],
+    ['cannot open sequencer', '']);
+  // What a page does with it. The registry is the page's half, and a hello
+  // it refuses would be a board nobody ever sees on /graph/.
+  const reg = createRegistry({ now: () => 0 });
+  is('a page registry takes the hello, and the beat after it changes nothing',
+    [reg.ingest({ ...hello, from: 'board-sock' }), reg.ingest({ ...alive, from: 'board-sock' })], [true, false]);
+  // 🔴 THE RELAY CARRIES THIS EVERY FIVE SECONDS, so its size is a number to
+  // watch. MEASURED 2026-10-04 on this fixture: see the line printed below.
+  const bytes = Buffer.byteLength(JSON.stringify(alive));
+  console.log(`         board.alive is ${bytes} bytes with the graph, ${Buffer.byteLength(JSON.stringify({ ...alive, graph: undefined }))} without`);
+  ok('the beat stays under 4 KB', bytes < 4096, `${bytes} bytes`);
 }
 
 console.log(`\n${pass}/${pass + fail} green`);

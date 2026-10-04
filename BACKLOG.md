@@ -1,5 +1,15 @@
 ## Open
 
+### Universal routing step 3, the registry, asked 2026-10-04
+
+*"U iversal router demo?"* then *"Yes"* to: the Pi's `board.hello` and
+`board.alive` announce its real nodes and ports, pages announce theirs, and
+`/graph/` draws what actually exists instead of a preset desk
+(`plans/plan-universal-routing.md` §11 step 3). Needs a push to the Pi. Step 4,
+links that really start things, comes after.
+DONE 2026-10-04: the Pi announces 5 nodes on every beat and answers `graph.ask` in
+64 ms; `/graph/` defaults to the live desk.
+
 ### Moholy-Nagy's score as positron data, and a page that plays it, asked 2026-10-04
 
 *"Do it. Better name"*, in reply to the ranked suggestions in

@@ -27,6 +27,7 @@ import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
+import { helloMsg, aliveMsg } from './beat.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import * as fsMod from 'node:fs';
@@ -57,6 +58,13 @@ const NAME = arg('name', process.env.BOARD_NAME || 'positron-board');
  * existed says so instead of claiming an identity it was never given.
  */
 const BOARD_ID = arg('id', process.env.BOARD_ID || null);
+/**
+ * The network this board is on, as `bay.mjs` reads a node's `net`: two nodes
+ * with the same one are on one LAN, and an unknown one is never read as the
+ * same. Unset by default, because a guess here would let a page choose a
+ * transport that two buildings cannot open. `/etc/default/positron-board`.
+ */
+const NET = arg('net', process.env.BOARD_NET || null);
 const DRY = flag('dry');
 const ONCE = flag('once');
 const AUDIO_DEV = arg('audio', process.env.BOARD_AUDIO || 'default');
@@ -76,6 +84,9 @@ const URL_ = `${RELAY}/room/${ROOM}/ws`;
 
 const FROM = `board-${randomId(6)}`;   // per SOCKET, per wire.mjs: `seq` counts a connection
 let seq = 0, ws = null, audio = null, since = Date.now();
+// What `graph` on the hello and on every beat is built from: gathered at each
+// hello, the port list refreshed by every `state()`. Null until the first one.
+let graphFacts = null;
 // ONE variable for whatever is making sound. There used to be two — one for a
 // pipe path and one for the JACK ones — and fourteen sites branched on which
 // was set, so every new source meant remembering both halves and every reviewer
@@ -439,7 +450,12 @@ const state = () => {
   // be sayable OVER THE RELAY. Zero ports on its own cannot distinguish a
   // broken sequencer from an empty rig.
   const { backend: be, clients, error, hint } = listPorts();
-  return { backend: be, ports: addressable(clients), error: error ?? null, hint: hint ?? null };
+  const ports = addressable(clients);
+  // The graph on the beat reads the last list asked for rather than asking
+  // again: `aconnect -l` is a blocking spawn and the beat runs while audio
+  // frames are going out. Every hello and every `ports.*` verb refreshes it.
+  if (graphFacts) graphFacts.ports = ports;
+  return { backend: be, ports, error: error ?? null, hint: hint ?? null };
 };
 
 // ---------------------------------------------------------------- audio out
@@ -735,6 +751,12 @@ const CTL_NAMES = {
 async function handle(msg) {
   const reply = (type, body) => send({ type, re: msg.id, ...body });
   switch (msg.type) {
+    // A page that joins late asks, and gets the beat now rather than up to five
+    // seconds from now. The beat already carries the graph (`beat.mjs`), so the
+    // answer is that, unchanged: one shape, one place.
+    case 'graph.ask':
+      send(alive());
+      return;
     case 'ports.get': {
       const s = state();
       return reply('ports.list', { backend: s.backend, ports: s.ports });
@@ -1394,15 +1416,15 @@ function connect() {
     const s = state();
     log(`joined ${ROOM} · backend ${s.backend} · ${s.ports.length} ports${DRY ? ' · DRY' : ''}`);
     if (s.error) log(`  ALSA: ${s.error}${s.hint ? `\n  -> ${s.hint}` : ''}`);
-    // ⚠️ `audioChannels` is NOT `channels` three lines down — that one is MIDI
-    // channels (16, multitimbral). The board captures `arecord -c 1`, so it says
-    // ONE, and `demo/able`'s Mac says two: both counts are on the relay at once
-    // and no page is left inferring which it is holding.
-    send({ type: 'board.hello', name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports.length, dry: DRY, since,
-           audioChannels: 1, frameMs: 1000 * FRAME / RATE,
-                 instruments: { synth: true, pappusFx: pappusAvailable(),
-                                ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) },
-                 ...(s.error ? { error: s.error, hint: s.hint } : {}) });
+    // `beat.mjs` has the shape and the `audioChannels` note. The facts are
+    // gathered HERE and kept, because each instrument check is a `which` spawn
+    // and the beat every five seconds should not be.
+    const instruments = { synth: true, pappusFx: pappusAvailable(),
+                          ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) };
+    graphFacts = { room: ROOM, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports,
+                   frameMs: 1000 * FRAME / RATE, gpu: videoAvailable() };
+    send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
+                    frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts }));
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
   };
   ws.onmessage = (e) => {
@@ -1471,10 +1493,13 @@ function connect() {
 // ⚠️ ONE SHAPE, ONE PLACE. `sweepInsert()` sends this too, the moment it drops
 // an insert, so a page does not wait up to five seconds to be told. Two copies
 // of this object is how a field ends up on one of them.
+// ✅ AND THE GRAPH SINCE 2026-10-04, so a page that joins between two hellos
+// can draw this board within one beat (plans/plan-universal-routing.md §11).
+// The shape itself is `beat.mjs`'s `aliveMsg`, where a test can read it.
 function alive() {
-  return { type: 'board.alive', name: NAME, id: BOARD_ID, upSec: Math.round((Date.now() - since) / 1000),
-           audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null,
-           voices: synth?.voices ?? 0, frames: sentFrames, ...insertState() };
+  return aliveMsg({ name: NAME, id: BOARD_ID, upSec: Math.round((Date.now() - since) / 1000),
+                    audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null,
+                    voices: synth?.voices ?? 0, frames: sentFrames, insert: insertState(), graphFacts });
 }
 setInterval(() => {
   // 🔴 SWEEP BEFORE THE BEAT, NOT AFTER IT. `sweepInsert` is async and sends

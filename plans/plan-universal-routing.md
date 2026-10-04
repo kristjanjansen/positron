@@ -225,6 +225,11 @@ last or never.
    `state`) and the `session` field on a link, with tests, no transport code.
 3. **The registry**: the Pi's `board.hello` and `board.alive` become node and
    port announcements with `seenAt`; pages announce theirs.
+   ✅ DONE 2026-10-04: `demo/shell/graph-registry.mjs` (`boardGraph`,
+   `createRegistry`), `rig/board/beat.mjs` puts the graph on every beat (about
+   2 KB), the board answers `graph.ask` at once (64 ms measured), and
+   `https://positron.studio/graph/` draws the live desk. Steps 1 and 2 are
+   done too: `midi-kinds.mjs` and the eight media in `bay.mjs`.
 4. **A routes page** that draws the live graph of the site and can make and break
    the first five kinds of link above.
 5. **`/wish/` over all of it**, building its prompt from the registry, so the
