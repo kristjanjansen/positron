@@ -4,6 +4,7 @@
 
 *"In bg research basic screens/panels for pi a ailable in est"*. A background
 research agent; result to `research/`.
+DONE 2026-10-04: `research/pi-screens-estonia-2026-10-04.md`.
 
 ### Universal routing step 4, links that really start things, asked 2026-10-04
 
