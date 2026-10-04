@@ -7,6 +7,7 @@ Exzentrik. Synthese von Form, Bewegung, Ton, Licht (Farbe) und Geruch*, a
 folding multi-lane score under museum glass, with *"In parallel reseach and
 assess this bauhaus work and give context relevance to our timelime work"*. The
 photos are in the session's uploads; the written result goes to `research/`.
+DONE 2026-10-04: `research/moholy-nagy-partiturskizze-2026-10-04.md`.
 
 ### Universal routing step 2, and a new demo for it, asked 2026-10-04
 
