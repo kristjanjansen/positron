@@ -579,7 +579,9 @@ export async function createOledUi(bytes) {
     fill: (x, y, w, h, c = 1) => U.fill(x, y, w, h, c),
     footer: (labels, hot = 0) => { four(labels); return U.footer(hot); },
     footerH: () => U.footer_h(),
-    keysRight: (labels, hot = 0) => { four(labels); return U.keys_right(hot); },
+    keysRight: (labels, hot = 0, top = 0) => { four(labels); return U.keys_right(hot, top); },
+    // one line, the first of up to four wordings (longest first) that fits
+    bannerFit: (y, h, words) => { four(words); return U.banner_fit(y, h, Math.min(4, words.length)); },
   };
   function screen(font, paint) {
     U.begin(font);
