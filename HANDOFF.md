@@ -1,3 +1,85 @@
+# Handoff, 2026-10-04, session 62: the universal patchbay, the Pico router and its screen, timing light against heavy, one time vocabulary
+
+## Where it is right now
+
+- ✅ **Site: BUILD `7a1c9fc-184324-66c9`**, confirmed on the edge.
+- ✅ **The Pi runs today's board** (pushed 18:44 with `rig/board/push.sh`, joined
+  `studio-1`), and a raw message read off it carries `sent` and no envelope `at`.
+- ✅ **`workers/store` and `workers/feedback` redeployed** with the rename.
+- ✅ **Pushed to GitHub**, everything to the end of this session.
+- Counted: **64 demos, 61 built, 4 unlisted** (graph, rout, grains, feedback),
+  **87 plans**.
+- ⚠️ **The Pico 2 W has run nothing.** Every Pico number below is the RP2040
+  emulator, a Linux build of the same C, or a link map.
+
+## What landed
+
+| commits | what | look at |
+| --- | --- | --- |
+| `b4e90a8` `965c67d` `da48e84` `2df5554` | universal routing steps 2 to 4: `bay.mjs` knows eight media and sessions; the Pi announces its graph on every beat and answers `graph.ask` in 64 ms; Open makes a real stream (an input's sound 708 frames in 8 s, a synth's sound, the GPU's video by WebCodecs, keys to a synth) | https://positron.studio/patchbay/ |
+| `e69d78c` `d7f8965` `29a952a` `07a9731` | **`/patchbay/`** replaces `/rout/` and `/graph/` (both unlisted): live and example desks, openers, the 26 routing contract cases, scenes saved and recalled as a diff, and storage as a sink (record any Pi audio link into R2 and play it back, 12 s, 139,585 B) | https://positron.studio/patchbay/ |
+| `9fc9cbd` `a9223b9` `0173a0f` | **`/partitur/`**, Moholy-Nagy's 1924 score as a timeline whose light lane drives **`/wall/`**, cues caption it, a scene lane | https://positron.studio/partitur/ |
+| `09500bf` | route-core `curve`, `velcurve`, `notecc` in JS and C, vectors 23 to 26; JS 115/115, C 98/98, a per-core table store keeps an op at 6 bytes | `bash rig/route-core/test.sh` |
+| `220a263` `ee12a17` `05da664` `51574fd` `98f62d3` | the Pico: rp2040js emulator in Node, the OLED module (pins read off the shop photo, GND VCC SCL SDA K4 K3 K2 K1), the C router firmware with route-core inside, a six-font OLED UI kit | `node rig/pico/sim/run-router.mjs`, 45 PASS |
+| `59d3734` `c0319ee` `eb9eeaa` `ed903c1` | `/kit/` HARDWARE runs the real UF2 in the browser; LABELS bottom or right (the module's buttons are a column right of the screen, ^ v # *); the column sits under a full-width header; the hold banner never wraps (HOLD: REPLACE PATCH, HOLD: PATCH, PATCH?); six OLED part blocks drawn by `ui.c` compiled to WebAssembly (7.7 KB, no imports, pixel-equal to the emulated board) | https://positron.studio/kit/#hardware |
+| `cf1bf9c` | **`rig/pico/net/`**, the Pico 2 W wifi node over wss: TLS 1.3, GTS Root R4 pinned, 16 KB in-buffer; from Linux 61 PASS, relay round trip p50 68 ms; the Pico image links at about 399 KB flash | `node rig/pico/net/test.mjs` |
+| `d146e3b` `4b26e52` `c4f2a8c` | research: Pico open issues and Eurorack boards, synths and CV on RP2040/RP2350; plan-pico, corrected (SDK #2633 closed but its SHA-384 cause is on our chain, Pico-DMX is BSD-3, the ST485 needs no divider) | `research/pico-*-2026-10-04.md` |
+| `11b4115` | **plan-xr-together**: Dance Tonite read from its source, the headset as a patchbay node, takes of 21 numbers a frame (10 KB per 8 s layer), tens of live dancers not 128, takes expire in 6 h | `plans/plan-xr-together.md` |
+| `ba508f3` `1dcdf3a` | **plan-routing-time** and **`/sync/`**: a light event names its moment on the peer clock, each receiver turns it into a local fire time from what it saw of the heavy link; `demo/shell/timebase.mjs`; the page shows a late picture and two walls, on arrival and following | https://positron.studio/sync/ |
+| `7a1c9fc` | **one time vocabulary**: `at` is when a thing happens, `when` the uncertainty around it, the envelope's send stamp is `sent`; `parse()` turns an old message's `at` into `sent` so a send time is never read as an event time | `node demo/shell/wire-test.mjs` |
+
+## Measured, worth keeping
+
+- **A file a page fetches is invisible to the build's import check.**
+  `oled-ui.wasm` shipped missing once: green locally (the dev server serves the
+  repo), 404 on the edge. `workers/view/build.mjs` lists resources by name.
+- **Paired panels sized off their own cell loop.** Two OLED canvases settled a
+  scale apart and dragged the page 154 px sideways at 756 px. They are sized off
+  the row now (`oledScreen(box, { across })`).
+- **The timing checks must time every surface the same way.** `/sync/` first
+  failed WebRTC by 2.7 ms because the picture was timed exactly and the wall by
+  its frame. Everything is timed by the frame it changes on.
+- **Peer clock** agrees to about 3 ms across machines; device wall clocks were
+  10 to 159 ms apart; Cloudflare strips in-band timing; LL-HLS `hls.latency`
+  froze at 1.7 s while the real lag was 8.4 s (all from plan-routing-time §3).
+
+## Decisions waiting on the owner
+
+1. **The demo structure**, `plans/plan-demo-structure.md`: twenty time,
+   message, sync and routing pages into five tabbed ones (`/sync/` ARRIVAL,
+   AHEAD, FOLLOW, AFTER; `/time/`; `/wire/` with NOTES; `/patchbay/`;
+   `/capture/` later). Needs: the names, whether `/looper/` retires, redirects or
+   404 for old slugs, and whether `/capture/` (a Stream round trip per check run)
+   is in scope. Its inventory: 905 of 905 green across 37 pages, but `/keep/`
+   runs 3 of its 14 checks and `/jam/`, `/instrument/`, `/cues/` never grade the
+   second machine they are about.
+2. **Eurorack and a synth**: the Workshop Computer (€235) was too dear; the
+   cheaper route offered is a Behringer Crave (€138, Thomann EE) plus a Pico 2
+   and an MCP4725 (€18.70, Oomipood). Not bought.
+3. **Cloudflare "Always Use HTTPS"**: off, which is why plain ws still works;
+   nobody decided that on purpose.
+4. **`adb`** on this managed laptop, the only way to drive the Quest.
+
+## Next steps
+
+1. Once the structure is decided: `/sync/` FOLLOW, ARRIVAL, AHEAD (two clocks
+   in one tab, the owner's ask), AFTER, in that order (plan-demo-structure §5).
+2. plan-routing-time step 3: follow an LL-HLS link by its own PDT, against
+   `fake-err.mjs`, with a +2 s PDT sabotage.
+3. **The Formanta drum machine** (searches find a UDS, 7 channels, 1/4 inch
+   trigger inputs, no MIDI; the owner wrote PDS, unconfirmed): a free test first,
+   a click from a Fast Track Pro output into one channel. If it fires, a
+   note-to-trigger output on the Pico (C1 to G1, 7 GPIOs). BACKLOG has it.
+4. **The real Pico 2 W**: flash `build-pico2_w/router.uf2`, press each button to
+   learn which K is which symbol (assumed K1 = ^ = PREV), time the TLS handshake
+   on the M33 (estimated 0.6 to 1.2 s with mbedTLS).
+5. **`mod-core`**, a pure C modulation library (LFO, ADSR, Turing machine,
+   Euclid, quantizer) as a patchbay `value` and `clock` source, ranked first in
+   `research/pico-synths-and-cv-2026-10-04.md`.
+6. Stale numbers: `bay.mjs` `TRANSPORTS` and plan-universal-routing §5 still say
+   the relay caps at 60 msg/s (it is 1000); CLAUDE.md's `build.mjs:532` pointer
+   is now line 566.
+
 # Handoff, 2026-10-03, session 61: one MIDI vocabulary, the routing core in JS and C, /rout/, the Pi measured
 
 ## Where it is right now
