@@ -231,9 +231,6 @@ export const DEMOS = [
   // its own moment as a retroactive burst. The loop button it graded is still
   // graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
 
-  { name: 'looper', group: 'technologies', act: 4, created: '2026-09-04', built: true,
-    one: 'a keyboard into a synthesiser made of WebAudio, with a loop pedal on it',
-    tags: ['WebAudio', 'AudioWorklet'] },
   { name: 'instrument', group: 'messages', act: 4, created: '2026-09-04', built: true,
     one: 'a keyboard whose sound may be coming out of a different machine',
     tags: ['WebMIDI', 'relay', 'WebAudio', 'WebRTC'] },
@@ -505,7 +502,7 @@ export const DEMOS = [
   { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
     one: 'say which instrument should play which, and a language model makes the connection on the desk',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
-  { name: 'wall', group: 'instruments', act: 4, created: '2026-10-04', built: true,
+  { name: 'wall', group: 'instruments', act: 4, created: '2026-10-04', built: true, unlisted: true,
     one: 'A screen that joins the studio\u2019s patchbay as a projection wall and shows whatever light and captions a timeline sends it.',
     tags: [] },
   { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true,
@@ -516,12 +513,6 @@ export const DEMOS = [
     tags: [] },
   { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true,
     one: 'Cues timed against a picture that arrives late, fired on arrival on one wall and following the picture on the other.',
-    tags: [] },
-  { name: 'graph', group: 'instruments', act: 4, created: '2026-10-04', built: true, unlisted: true,
-    one: 'One graph for everything positron moves, where a MIDI link carries the notes and a video link describes the stream both ends open.',
-    tags: [] },
-  { name: 'rout', group: 'instruments', act: 4, created: '2026-10-03', built: true, unlisted: true,
-    one: 'Hand-written test cases and a live keyboard run through the routing core that will carry MIDI on the Pi.',
     tags: [] },
 
   // `bay` was a demo and is archived at archive/demos/bay-index.html, removed
