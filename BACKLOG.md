@@ -1,5 +1,14 @@
 ## Open
 
+### `/rout/` and `/graph/` become one page, `/patchbay/`, asked 2026-10-04
+
+*"i am cofused over rout and graph demo. unify? better name?"*, then on the
+name *"Patchbay"*. One page: the live desk (today's `/graph/`), MIDI links that
+really run through `route-core.mjs` on their way to the board, an inside-a-link
+readout, `/rout/`'s test cases as the contract, and one picture of both layers.
+`/rout/` and `/graph/` leave the index (`unlisted: true`) and keep their URLs.
+DONE 2026-10-04: `/patchbay/`, 26/26, a real note through the core to the Circuit.
+
 ### The 4-button OLED on a Pico: a Wokwi project and a wiring diagram, asked 2026-10-04
 
 *"yes but i also want a wiring diagram. are there services that can render it
