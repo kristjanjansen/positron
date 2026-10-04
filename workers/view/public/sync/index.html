@@ -82,7 +82,9 @@
     // The picture's stamps are score times on the shared clock: offset 0.
     tb.link('stage', { stampOffsetMs: 0 });
     const S = (k) => start + 1000 + k * CUE_MS;
-    const cues = [];          // { k, sent, arrives, arrivedAt, picAt, followAt, held }
+    // `at` is the cue's moment on the shared clock, the same name it carries on
+    // the wire; `sent` is the envelope's send stamp and is not used here.
+    const cues = [];          // { k, at, arrives, arrivedAt, picAt, followAt, held }
     let next = 0, lastObs = -Infinity, lag = L.lag(0, r);
     const now = { picture: -1, arrival: -1, follow: -1, src: 0, lag: 0 };
     function step(t) {
@@ -96,16 +98,16 @@
       now.src = src - start; now.lag = lag;
       // Cues leave the score at their moment and arrive one leg later.
       while (S(next) <= t) {
-        cues.push({ k: next, sent: S(next), arrives: S(next) + LIGHT_MS + (r() - 0.5) * 8,
+        cues.push({ k: next, at: S(next), arrives: S(next) + LIGHT_MS + (r() - 0.5) * 8,
                     arrivedAt: null, picAt: null, followAt: null, held: '' });
         next++;
       }
       for (const c of cues) {
         // the frame the glass crossed it, or a drift-seek jumped past it
-        if (c.picAt == null && src >= c.sent) c.picAt = t;
+        if (c.picAt == null && src >= c.at) c.picAt = t;
         if (c.arrivedAt == null && t >= c.arrives) c.arrivedAt = t;
         if (c.arrivedAt != null && c.followAt == null) {
-          const v = tb.decide({ due: { shared: c.sent, follow: 'stage' } }, t);
+          const v = tb.decide({ at: c.at, follow: 'stage' }, t);
           if (v.act === 'fire' || v.act === 'missed') c.followAt = t;
           else if (v.act === 'hold') c.held = v.why;
         }

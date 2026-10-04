@@ -87,8 +87,10 @@
       if (m.type === 'here') { render(); return; }
       if (m.type === 'cue') {
         // THE SENDER STAMPS; the relay never re-stamps. So delivery time is
-        // honest even though the relay has no idea what time it is.
-        const deliveryMs = Date.now() - m.at;
+        // honest even though the relay has no idea what time it is. The stamp
+        // is `sent` since 2026-10-04 (`at` means when a thing happens now);
+        // a tab still open from before sends `at`, so read either.
+        const deliveryMs = Date.now() - (m.sent ?? m.at);
         const mine = m.from === ID;
         received++;
         times.push(deliveryMs);
@@ -106,7 +108,7 @@
 
   // The echo is the point: the relay sends every message back to the sender
   // too, so everyone — including whoever fired — sees the same order.
-  const fire = () => send({ type: 'cue', id: `CUE-${String(++seq).padStart(2, '0')}-${ID}`, at: Date.now() });
+  const fire = () => send({ type: 'cue', id: `CUE-${String(++seq).padStart(2, '0')}-${ID}`, sent: Date.now() });
 
   d.on('fire', () => { fired++; fire(); });
   // ⚠️ THE BURST IS SPREAD OVER 1.2 s, so the checks cannot run when the LOOP
