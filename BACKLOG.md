@@ -1,5 +1,10 @@
 ## Open
 
+### Kit in the first group on the index, asked 2026-10-04
+
+*"move kit to first group in index page"*. `demo/manifest.mjs`, the `kit` row's
+group.
+
 ### Do the demo restructure, decided 2026-10-04
 
 *"names ok, looper retires, no redrect, capture is fine"*, answering
