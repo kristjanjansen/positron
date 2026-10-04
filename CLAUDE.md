@@ -221,6 +221,7 @@ come from this repository.**
 node demo/server.mjs                     # :8890, serves the repo; / == deployed
 node demo/verify.mjs                     # every built demo (CDP, asserts on window.__demo)
 node demo/verify.mjs llhls ladder        # just these, by slug
+DEMO_DEEP=1 node demo/verify.mjs keep     # the deep tier: round trips, recordings, live streams
 node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
 node demo/fake-station.mjs               # an Icecast mount that is nobody's radio
 node demo/fake-tapes.mjs                 # an archive that is nobody's archive

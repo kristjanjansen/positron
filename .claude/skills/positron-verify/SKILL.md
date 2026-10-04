@@ -181,6 +181,20 @@ does not reset it.** Ask what has happened, not what is happening.
 
 ## A self-check never runs for a visitor
 
+🔴 **TWO TIERS SINCE 2026-10-04, AND THE LONG-RUNNING CHECKS ARE THE SECOND.**
+Asked as *"make checks way ligher (2 tiers?)"*, then *"i mean these long-running
+ones"*. `selfcheck=1` is the ordinary run; `selfcheck=2` is the DEEP run, which
+`DEMO_DEEP=1 node demo/verify.mjs <slug>` (or `--deep`) asks for. A check that
+holds a Cloudflare leg, records a take, waits on a live stream's frames, or
+needs another machine is a deep check: gate it on `DEEP` (or `ifDeep`) from
+`demo/shell/selfcheck.mjs`, and give the page a `lightSettleMs` in the manifest
+so the ordinary run does not wait the deep run's `settleMs`. MEASURED on
+`/keep/`: ordinary 10 s and 15/15, deep 37 s and 28/28.
+⚠️ **AN ORDINARY RUN SAYS WHAT IT LEFT OUT**, in the log, `left for the deep
+run: ...`, never as a pass. Its count is smaller and honest about why.
+⚠️ **IT IS A HARNESS TIER, NOT A VISIT.** A person's press runs the real thing
+whatever the tier; only `SELFCHECK && !DEEP` stops early.
+
 🔴 **A SELF-CHECK NEVER RUNS FOR A VISITOR. NOT ONE, NOT EVER, ON ANY PAGE.**
 Instructed 2026-09-16: *"rip those selfchecks out of user experience and make
 rule about it"*. It is gated on `?selfcheck=1`, which `demo/verify.mjs` appends

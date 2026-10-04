@@ -28,7 +28,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { ifSelfcheck, SELFCHECK } from '/shell/selfcheck.mjs';
+  import { ifSelfcheck, SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
 
   const W = 1280, H = FRAME_H;
   const CAP_MS = 10_000;   // a backstop, not the mechanism — stop is manual
@@ -214,6 +214,16 @@
       iceAsks >= 1 && iceLoadAsks() === 0 && !!ice,
       `${iceAsks} ask(s) after the press, ${iceLoadAsks()} before it by resource timing, `
       + (ice.relay ? 'a relay came back' : `no relay: ${ice.why}`));
+    /* 🔴 THE ROUND TRIP IS A DEEP CHECK, asked 2026-10-04: *"make checks way
+       ligher (2 tiers?)"*, *"i mean these long-running ones"*. Everything from
+       here holds a WHIP and a WHEP leg on Cloudflare for 20 to 30 s and records
+       two takes, so an ordinary harness run stops after the ask above and says
+       so; `DEMO_DEEP=1 node demo/verify.mjs keep` runs the rest. A person's
+       press is never affected: this is a harness tier, not a visit. */
+    if (SELFCHECK && !DEEP) {
+      d.log('left for the deep run: the round trip through Cloudflare and its two takes (DEMO_DEEP=1)');
+      return;
+    }
     const noLegs = async (why) => {
       d.assert('both legs hold what the ask returned', false, why);
       d.assert('the path the media took is named beside the round trip', false, why);

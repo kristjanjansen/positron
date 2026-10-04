@@ -207,7 +207,7 @@ export const DEMOS = [
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
-  { name: 'keep', group: 'capture', act: 3, created: '2026-09-08', built: true, settleMs: 30000,
+  { name: 'keep', group: 'capture', act: 3, created: '2026-09-08', built: true, settleMs: 30000, lightSettleMs: 2000,
     one: 'the picture you send out is recorded as the copy that comes back',
     tags: ['getUserMedia', 'WHIP', 'WHEP', 'timeline'] },
   { name: 'record', group: 'capture', act: 3, created: '2026-09-04', built: true,

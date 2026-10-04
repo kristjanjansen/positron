@@ -43,7 +43,7 @@ const CDP_PORT = 0;                       // 0 = let the OS pick; read back belo
 const { dir: PROFILE, swept: SWEPT } = claimProfile('demo-verify-udd');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const want = process.argv.slice(2);
+const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));   // `--deep` is a tier, not a slug
 // ⚠️ A `gl: true` DEMO IS NOT THIS HARNESS'S SUBJECT, AND FAILING IT HERE WOULD
 // BE A LIE. This file launches Chrome with `--disable-gpu` (see the flags
 // below), where `getContext('webgl2')` returns null — so a visual demo reports
@@ -217,7 +217,16 @@ const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
 // serve()'s comment about a dev server already holding it.
 const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
 // (`server` is null only when DEMO_BASE is set, and then it is not read.)
+// 🔴 TWO TIERS (demo/shell/selfcheck.mjs). The ordinary run is selfcheck=1 and
+// waits only a page's `lightSettleMs`; the deep run, `DEMO_DEEP=1` or
+// `--deep`, is selfcheck=2 and waits the full `settleMs` the long-running
+// checks need. A page that declares no `lightSettleMs` has not been split yet
+// and gets its full wait either way.
+const DEEP = process.env.DEMO_DEEP === '1' || process.argv.includes('--deep');
+const settleOf = (t) => (DEEP || t.lightSettleMs == null ? t.settleMs : t.lightSettleMs);
 console.log(`base ${BASE}`);
+console.log(DEEP ? 'tier: DEEP, the long-running checks included'
+  : 'tier: ordinary (DEMO_DEEP=1 node demo/verify.mjs ... adds the long-running checks)');
 if (SWEPT) console.log(`(swept ${SWEPT} profile dir(s) left by killed runs)`);
 
 // EMPTY CACHE EVERY RUN. A media element loading `video.src = <m3u8>` stores a
@@ -704,7 +713,7 @@ for (const t of targets) {
   // ⚠️ EVERY DEMO GETS IT AND ALMOST NONE READ IT, which is the point — the flag
   // is a fact about the run, not a per-demo setting to keep in step. A page that
   // needs it opts in by reading it.
-  const q = [process.env.DEMO_QUERY, own, 'selfcheck=1',
+  const q = [process.env.DEMO_QUERY, own, DEEP ? 'selfcheck=2' : 'selfcheck=1',
     standIn.has(t.name) ? `base=${standIn.get(t.name)}` : ''].filter(Boolean).join('&');
   const query = q ? `?${q}` : '';
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
@@ -767,6 +776,15 @@ for (const t of targets) {
     meta.readoutOptOut || meta.keys.length > 0,
     meta.readoutOptOut ? 'the page itself is the readout' : meta.keys.join(','));
 
+  /**
+   * 🔴 THIS DRILL HAS A TWIN IN `demo/shell/bar-drill.mjs`, AND THE TWO MUST
+   * STAY IN STEP. A tabbed page carries several bars and this block reaches
+   * only the published one, so the page runs the same drill as page asserts
+   * against the rest (2026-10-04, `plans/plan-demo-structure.md` §5 step 1).
+   * Its `DRILL` constants are the sleeps and thresholds below, and
+   * `node demo/shell/bar-drill-test.mjs` reads THIS FILE and fails when a
+   * number here has moved without that one. Change both, then run the test.
+   */
   if (meta.hasT) {
     const t0 = await ev('({ pos: __demo.transport.position, playing: __demo.transport.playing, seekable: __demo.transport.seekable, lattice: __demo.transport.lattice, rate: __demo.transport.rate, toggles: __demo.transport.toggles !== false })');
     ok('transport published', typeof t0.pos === 'number', `pos ${t0.pos}`);
@@ -817,8 +835,30 @@ for (const t of targets) {
 
     // seek via the keyboard table the component owns
     if (t0.seekable) {
+      /**
+       * 🔴 A BAR IN A CLOSED TAB OF A TAB PAGE HEARS NO KEY, SO OPEN ITS TAB
+       * THE WAY A PERSON WOULD, AND PUT THE PAGE BACK AFTER. 2026-10-04:
+       * `tab-page.mjs` marks its panels `data-own-keys` and `transport-bar.mjs`
+       * ignores keys for a bar inside one that is hidden, because on `/time/`
+       * five bars would otherwise all seek at once. A page that opens on a
+       * different tab from the one holding its published bar would read red
+       * here for a reason that is not the bar's. Only `data-own-keys` panels:
+       * `/kit/`'s bar sits in a plain closed tab, still hears the key, and is
+       * not touched. Panels and tab buttons are index-aligned in `tabs.mjs`.
+       */
+      const opened = await ev(`(() => {
+        const p = __demo.transport.el.closest('[data-own-keys][hidden]');
+        if (!p) return false;
+        const root = p.parentNode.parentNode;
+        const i = [...p.parentNode.children].indexOf(p);
+        window.__drillWas = root.querySelector(':scope > .pos-tabs-bar > [aria-selected="true"]');
+        root.querySelector(':scope > .pos-tabs-bar').children[i].click();
+        return true;
+      })()`);
+      if (opened) await sleep(100);
       await ev('document.body.focus(); window.dispatchEvent(new KeyboardEvent("keydown",{key:"5",bubbles:true}))');
       await sleep(250);
+      if (opened) await ev('window.__drillWas && window.__drillWas.click()');
       const mid = await ev('__demo.transport.position');
       const rng = await ev('__demo.transport.range');
       const target = rng[0] + (rng[1] - rng[0]) * 0.5;
@@ -884,7 +924,7 @@ for (const t of targets) {
     // ONLY — and that it now does a second job further down, sizing the wait for
     // a page's first assert. A demo whose slow control is not the first gets
     // nothing from it here and is carried entirely by that second use.
-    await sleep(i === 0 && t.settleMs ? t.settleMs : 650);
+    await sleep(i === 0 && settleOf(t) ? settleOf(t) : 650);
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
 
@@ -968,7 +1008,7 @@ for (const t of targets) {
    * fallback for a page that never calls it, so nothing hangs.
    */
   const isReady = () => ev('!!(window.__demo && window.__demo.ready)');
-  const firstBudget = Math.ceil(Math.min(t.settleMs || 0, FIRST_ASSERT_CEIL) / 400);
+  const firstBudget = Math.ceil(Math.min(settleOf(t) || 0, FIRST_ASSERT_CEIL) / 400);
   // ⚠️ ONE LOOP, NOT TWO. The old pair was a "wait while nothing has landed"
   // phase followed by a "stop when it stops growing" phase, and the handover
   // between them was the defect: the first fell through the instant ANY assert
