@@ -46,7 +46,10 @@ ws.onmessage = (e) => {
   if (VERB === 'listen') { console.log(`${msg.type.padEnd(16)} ${msg.from}  ${JSON.stringify(msg).slice(0, 150)}`); return; }
   if (msg.type === 'board.hello' || msg.type === 'board.alive') return;   // ambient, not a reply
   clearTimeout(timeout);
-  const { id, from, at, seq: _s, re, ...body } = msg;
+  // The envelope is stripped; `at`, if any, is the payload's own event time
+  // since 2026-10-04 and stays in the body. `parse()` has already turned an
+  // old board's envelope `at` into `sent`.
+  const { id, from, sent, seq: _s, re, ...body } = msg;
   console.log(JSON.stringify(body, null, 2));
   ws.close(); process.exit(0);
 };

@@ -113,7 +113,12 @@ export class Store {
       try { m = JSON.parse(data); } catch { /* an unreadable frame is a fact */ }
       if (m && typeof m === 'object' && m.store) {
         row = {
-          at: Number(m.at) || Date.now(),
+          // The column is called `at` and holds the SEND STAMP. The envelope
+          // renamed that stamp to `sent` on 2026-10-04 (`at` is an event's own
+          // time now); an old sender still writes `at`. The column keeps its
+          // name rather than migrating a Durable Object table, so read
+          // `sent` first and fall back to the old envelope field.
+          at: Number(m.sent ?? m.at) || Date.now(),
           sender: String(m.from ?? ''),
           seq: Number.isFinite(m.seq) ? m.seq : null,
           type: String(m.type ?? ''),
@@ -243,7 +248,7 @@ export class Store {
       const lines = rows.map((r) => (r.kind === 'json'
         ? r.body
         : JSON.stringify({
-            type: 'binary', at: r.at, bytes: r.raw?.byteLength ?? 0,
+            type: 'binary', sent: r.at, bytes: r.raw?.byteLength ?? 0,
             head: hex(r.raw, 8),
           }))).join('\n');
       // (a BLOB comes back as an ArrayBuffer, which has no .slice() worth

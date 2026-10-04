@@ -186,9 +186,9 @@
       if (got.kind === 'binary') { show('bytes in', got.bytes, hex(got.data)); lastBinaryIn = got.data; return; }
       if (got.kind === 'unreadable') { show('in', got.bytes, got.data); return; }
       const mine = got.msg.from === wire.stats().from;
-      // The sender stamps `at` and the relay never re-stamps, which is why this
+      // The sender stamps `sent` and the relay never re-stamps, which is why this
       // number is honest even though the relay has no idea what time it is.
-      if (mine) deliveries.push(Date.now() - got.msg.at);
+      if (mine) deliveries.push(Date.now() - got.msg.sent);
       show(mine ? 'echo' : 'in', got.bytes, got.data, mine, mine && stored.includes(got.data));
       render();
     },

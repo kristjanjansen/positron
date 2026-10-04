@@ -70,5 +70,6 @@ Copyright (c) 2010 Serge Zaitsev. sha256 of `jsmn.h`:
 - **Certificate dates on the Pico.** There is no calendar until SNTP is added,
   so an expired certificate from the right chain would be accepted. Linux checks
   the dates.
-- **`at` is 0 on the Pico**, for the same reason.
+- **`sent` is 0 on the Pico**, for the same reason (the envelope's send stamp,
+  called `at` until 2026-10-04).
 - **WS2812.** `light.set` is parsed, stored and logged; nothing lights.

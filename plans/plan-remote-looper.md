@@ -179,7 +179,7 @@ READ today:
   header calls the echo *"the loopback-through-server ordering point, not an
   accident"*, and says it **never re-stamps**, because a relay's idea of now
   measured plus or minus 50 ms of bias.
-- **`demo/shell/wire.mjs`**: the envelope `type`, `from`, `at`, `seq`, plus
+- **`demo/shell/wire.mjs`**: the envelope `type`, `from`, `sent` (`at` until 2026-10-04), `seq`, plus
   anything the sender wants. `openWire` reconnects, mints a NEW `from` per
   connection, counts gaps per `from`, and declares `by: 'tool'` automatically for
   any page opened with `?selfcheck=1`. It **throws** if a payload field is named
@@ -436,8 +436,8 @@ machine and no timer. It holds the last ten words it was told, and a lamp.
 
 ### 2.6 The messages, in full
 
-Five verbs. Every one rides `wire.mjs`'s envelope, so `from`, `at`, `seq` and `by`
-are already there and **must not be named in a payload or `format` throws**.
+Five verbs. Every one rides `wire.mjs`'s envelope, so `from`, `sent`, `seq` and `by`
+are already there (`sent` was `at` until 2026-10-04, and a payload may carry `at` now) and **must not be named in a payload or `format` throws**.
 
 | type | who sends it | payload | when |
 | --- | --- | --- | --- |

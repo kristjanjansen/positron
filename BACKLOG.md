@@ -1,5 +1,20 @@
 ## Open
 
+### Time fields, a two-clock demo, and the message format, asked 2026-10-04
+
+*"Can we cosolidate due at when? Can we do demo on synving thing and two clocks
+ehatever. Wonder ou our message format ties into all this"*. Three things: (1)
+`due` (timebase.mjs, when an event should happen), `at` (wire.mjs envelope, the
+sender's Date.now() at send) and `when` (transport.mjs uncertainty bracket):
+one vocabulary or a reason for three; (2) a demo of two clocks agreeing and
+firing together; (3) how the wire envelope relates to the timing model.
+Answered 2026-10-04: **rename**. `at` always means when the thing happens,
+`due` folds into it, `when` stays the uncertainty around an `at`, and the
+envelope's send stamp becomes `sent`. And instead of a two-clocks page:
+*"Too many of thise demos, those old halfbroken but useful... peopose a new
+structure of denis for this suff of times messages ayncs routes etc"*, so a
+proposal for regrouping the time, message, sync and routing demos comes first.
+
 ### One demo page for timing light signals against heavy ones, asked 2026-10-04
 
 *"Put to single demo"*, after plan-routing-time's step 2 was offered as

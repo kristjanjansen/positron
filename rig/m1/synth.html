@@ -106,7 +106,7 @@ function accept() {
     dc.onopen = () => log(`datachannel "${dc.label}" open`);
     dc.onmessage = (m) => {
       const msg = JSON.parse(m.data);
-      if (msg.type === 'note') { play(msg.note, msg.vel); dc.send(JSON.stringify({ type: 'ack', seq: msg.seq, at: msg.at })); }
+      if (msg.type === 'note') { play(msg.note, msg.vel); dc.send(JSON.stringify({ type: 'ack', seq: msg.seq, sent: msg.sent })); }
     };
   };
   return pc;
@@ -172,7 +172,7 @@ import('/shell/moq-audio.mjs').then(async ({ publishSynth }) => {
 });
 
 const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
-const send = (o) => ws.send(JSON.stringify({ from: 'synth', at: Date.now(), ...o }));
+const send = (o) => ws.send(JSON.stringify({ from: 'synth', sent: Date.now(), ...o }));
 ws.onopen = () => { log(`relay open (${ROOM})`); send({ type: 'here', ns: MOQ_NS, moqRelay: MOQ_RELAY_SUB, moqCert: MOQ_CERT }); };
 ws.onmessage = async (e) => {
   const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');

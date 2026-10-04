@@ -59,7 +59,7 @@ let ws = null, seq = 0, aseq = 0, sent = 0, held = new Set();
 let midi = null, tap = null, backoff = 500;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
-const send = (m) => { if (ws?.readyState === 1) { ws.send(JSON.stringify({ ...m, from: FROM, at: Date.now(), seq: seq++ })); return true; } return false; };
+const send = (m) => { if (ws?.readyState === 1) { ws.send(JSON.stringify({ ...m, from: FROM, sent: Date.now(), seq: seq++ })); return true; } return false; };
 
 // ── the instrument ───────────────────────────────────────────────────────
 function startMidi() {

@@ -1,11 +1,19 @@
 // demo/shell/wire.mjs — the message shape every positron page sends, written
 // down once. plan-ws §2.
 //
-//   { "type": "<verb>", "from": "<connection id>", "at": <epoch ms>,
+//   { "type": "<verb>", "from": "<connection id>", "sent": <epoch ms>,
 //     "seq": <per-connection counter>, ... }
 //
 // Four keys are the envelope; ANYTHING ELSE IS THE SENDER'S OWN BUSINESS and is
 // carried verbatim, which is the rule plan-score already settled for p-fields.
+//
+// `sent`, NOT `at`, SINCE 2026-10-04. One time vocabulary across the project,
+// decided by the owner that day: `at` always means WHEN THE THING HAPPENS (a
+// timeline row's position, an event's moment on the peer clock, see
+// `timebase.mjs`), and `when` is the uncertainty bracket around an `at`. The
+// envelope's stamp is none of those. It is the sender's own Date.now() at the
+// moment of sending, on no agreed clock, MEASURED up to 159 ms off between two
+// machines. So it is called what it is, and a payload may now carry `at`.
 //
 // `type`, not `t`, which five callers said until they were swept on
 // 2026-09-10: `t` means TIME everywhere else in this project
@@ -73,9 +81,10 @@ export const randomId = (n = 16) => {
  * it is to send every envelope key every time.
  */
 /**
- * ⚠️ `from`, `at` and `seq` BELONG TO THE ENVELOPE and are written AFTER the
+ * ⚠️ `from`, `sent` and `seq` BELONG TO THE ENVELOPE and are written AFTER the
  * message is spread, so a payload field with one of those names is silently
- * replaced. It has happened for real: `source.load` carried the excerpt's start
+ * replaced. It has happened for real, when the stamp was still called `at`:
+ * `source.load` carried the excerpt's start
  * offset as `at`, every send overwrote it with `Date.now()`, and the box asked
  * ffmpeg to seek to second 1,789,103,743,118 of a forty-five minute broadcast.
  * ffmpeg returned sixty seconds of real audio from wherever it decided that
@@ -85,9 +94,12 @@ export const randomId = (n = 16) => {
  * Throwing is the point. This is a programming error with no correct silent
  * behaviour, it fires on the first send rather than in the field, and the
  * alternative — the value quietly becoming a timestamp — is the failure that
- * cost the afternoon. Name the field something else: `atSec`, `sentBy`, `n`.
+ * cost the afternoon. Name the field something else: `sentSec`, `fromId`, `n`.
+ * (`at` is no longer one of them: since 2026-10-04 it is the payload's own
+ * event time. Pages that renamed theirs to `atSec` to dodge the old envelope
+ * keep the name; nothing is gained by churning them.)
  */
-const ENVELOPE = ['from', 'at', 'seq', 'by'];
+const ENVELOPE = ['from', 'sent', 'seq', 'by'];
 
 /**
  * 🔴 WHO IS SENDING THIS, IN THE ONLY SENSE THIS RELAY CAN ANSWER. Asked
@@ -112,7 +124,7 @@ const ENVELOPE = ['from', 'at', 'seq', 'by'];
  * already receives, not to keep anybody out.
  */
 export const KINDS = ['page', 'tool'];
-export function format(msg, { from, seq, at = Date.now(), id = randomId(), by = null }) {
+export function format(msg, { from, seq, sent = Date.now(), id = randomId(), by = null }) {
   for (const k of ENVELOPE) {
     if (Object.hasOwn(msg, k)) {
       throw new Error(`wire: "${k}" is an envelope field, so ${msg.type || 'this message'} would lose it. Rename the payload field (e.g. "${k}Sec", "${k}Value").`);
@@ -120,14 +132,35 @@ export function format(msg, { from, seq, at = Date.now(), id = randomId(), by = 
   }
   // `by` is left OUT when it is the default, so the common case costs no bytes
   // and an old reader sees exactly what it saw before.
-  return JSON.stringify({ id, type: '', ...msg, from, at, seq, ...(by && by !== 'page' ? { by } : {}) });
+  return JSON.stringify({ id, type: '', ...msg, from, sent, seq, ...(by && by !== 'page' ? { by } : {}) });
 }
 
 /**
  * What arrived, told apart rather than guessed at. Binary is a first-class
  * answer here: the relay carries `ArrayBuffer` unchanged, so a frame that is
  * not JSON is not necessarily broken.
+ *
+ * 🔴 AND AN OLD MESSAGE IS NORMALISED HERE, BEFORE ANY READER SEES IT. Until
+ * 2026-10-04 the envelope's send stamp was called `at`, and old senders keep
+ * existing for a while: the Pi board until it is redeployed, the Pico until it
+ * is reflashed, a tab left open, rows already in `workers/store`. A new reader
+ * reads `at` as WHEN THE EVENT HAPPENS, so an old message's `at` read that way
+ * would be a send time on nobody's clock, up to 159 ms off, scheduled as if
+ * somebody had agreed it. So: a message with no `sent` and a numeric `at` is
+ * the OLD shape, and its `at` becomes `sent` and is deleted. A message that has
+ * `sent` is the new shape and its `at`, if any, is the event time, kept.
+ * ⚠️ The one thing this cannot tell apart: a NEW-shape message hand-built
+ * without `sent` that carries an event `at`. Every sender that goes through
+ * `format()` writes `sent`, so that is a sender bypassing this module.
  */
+export function normalise(msg) {
+  if (msg && typeof msg === 'object' && !('sent' in msg) && typeof msg.at === 'number') {
+    msg.sent = msg.at;
+    delete msg.at;
+  }
+  return msg;
+}
+
 export function parse(data) {
   if (typeof data !== 'string') {
     const bytes = data.byteLength ?? data.size ?? 0;
@@ -135,7 +168,7 @@ export function parse(data) {
   }
   try {
     const msg = JSON.parse(data);
-    if (msg && typeof msg === 'object') return { kind: 'json', msg, data, bytes: utf8(data) };
+    if (msg && typeof msg === 'object') return { kind: 'json', msg: normalise(msg), data, bytes: utf8(data) };
   } catch { /* fall through — an unreadable frame is a fact, not an exception */ }
   return { kind: 'unreadable', msg: null, data, bytes: utf8(data) };
 }

@@ -174,9 +174,10 @@ data it parsed:
 - **Changes are diffs** on the Pico, which `main.c` already does for scenes.
 - **Liveness**: announce every 5 s like `board.alive`; the registry marks a
   site stale after 15 s (READ, `STALE_MS`).
-- ⚠️ The envelope (`from`, `at`, `seq`) is the sender's job (READ,
-  `demo/shell/wire.mjs`). `at` needs wall time, so SNTP at boot, or `at: 0`
-  and a page that tolerates it. Not checked which pages read `at`.
+- ⚠️ The envelope (`from`, `sent`, `seq`) is the sender's job (READ,
+  `demo/shell/wire.mjs`; the stamp was `at` until 2026-10-04 and `node.c`
+  writes `sent` since). `sent` needs wall time, so SNTP at boot, or `sent: 0`
+  and a page that tolerates it. Not checked which pages read `sent`.
 
 **Firmware work.** `pico2_w` only: `pico_cyw43_arch_lwip_poll` (or
 `threadsafe_background`), a WebSocket client over lwIP raw TCP (no Pico SDK C

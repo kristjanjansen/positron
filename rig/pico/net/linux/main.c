@@ -255,7 +255,7 @@ static int selftest(void) {
   snprintf(resp, sizeof resp, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nSec-WebSocket-Accept: %s\r\n\r\n", wn.accept);
   ws_feed(&wn, (const uint8_t *)resp, strlen(resp));
   CHECK(nd.st.announced == 1, "open sends graph.announce");
-  const char *lit = "{\"id\":\"q\",\"type\":\"light.set\",\"to\":\"pico-abc123:led:light\",\"hex\":\"#FF8000\",\"parts\":[{\"hex\":\"#0000ff\",\"across\":[0.2,0.4]},{\"hex\":\"#zz0000\",\"across\":[0,1]},{\"hex\":\"#00ff00\",\"across\":[0.5,1]}],\"from\":\"pagexx\",\"at\":1,\"seq\":3}";
+  const char *lit = "{\"id\":\"q\",\"type\":\"light.set\",\"to\":\"pico-abc123:led:light\",\"hex\":\"#FF8000\",\"parts\":[{\"hex\":\"#0000ff\",\"across\":[0.2,0.4]},{\"hex\":\"#zz0000\",\"across\":[0,1]},{\"hex\":\"#00ff00\",\"across\":[0.5,1]}],\"from\":\"pagexx\",\"sent\":1,\"seq\":3}";
   char buf[512];
   strcpy(buf, lit);
   node_on_text(&nd, buf, strlen(buf));

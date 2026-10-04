@@ -169,7 +169,7 @@ function report() {
 
 const note = (n, via = 'dc') => {
   const id = ++seq;
-  const body = { type: 'note', note: n, vel: 100, seq: id, at: Date.now() };
+  const body = { type: 'note', note: n, vel: 100, seq: id, sent: Date.now() };
   if (via === 'dc') {
     // A press that goes nowhere must say so. Before the direct link is up this
     // silently dropped the note and looked like a broken key.
@@ -262,7 +262,7 @@ setInterval(async () => {
 }, 1000);
 
 const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
-const send = (o) => ws.send(JSON.stringify({ from: 'play', at: Date.now(), ...o }));
+const send = (o) => ws.send(JSON.stringify({ from: 'play', sent: Date.now(), ...o }));
 ws.onopen = async () => {
   set('r', `open (${ROOM})`);
   send({ type: 'hello' });                       // ask the synth to announce itself

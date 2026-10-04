@@ -39,7 +39,7 @@ let last = null, lastAt = 0, running = null;
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const send = (msg) => {
   if (ws?.readyState !== 1) return false;
-  ws.send(JSON.stringify({ ...msg, from: FROM, at: Date.now(), seq: seq++ }));
+  ws.send(JSON.stringify({ ...msg, from: FROM, sent: Date.now(), seq: seq++ }));
   return true;
 };
 

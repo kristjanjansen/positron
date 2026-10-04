@@ -175,7 +175,8 @@ export class Feedback {
     this.sql.exec(
       'INSERT OR IGNORE INTO note(id, at, slug, page, name, text, sender, build) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       String(m.id || `${Date.now()}-${from}`),
-      Number(m.at) || Date.now(),
+      // the send stamp: `sent` since 2026-10-04, `at` from an older page
+      Number(m.sent ?? m.at) || Date.now(),
       String(m.slug ?? '').slice(0, 64),
       String(m.page ?? '').slice(0, 200),
       String(m.name ?? '').trim().slice(0, MAX_NAME),

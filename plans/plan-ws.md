@@ -279,7 +279,7 @@ const ws = new ReconnectingWebSocket(`wss://ws.positron.studio/room/${channel}/w
 format = (m) => JSON.stringify({
   id: randomString(16),
   type: "", value: "",                  // the same scar, kept
-  from: connectionId, at: Date.now(), seq: seq++,
+  from: connectionId, sent: Date.now(), seq: seq++,   // `at` until 2026-10-04
   ...m })
 
 send({ from: connectionId, userId, userName, type: "CHAT", value })
@@ -294,7 +294,7 @@ chatMessages = messages.filter((m) => m.type === receiveMessageType)
 | `value` | unchanged | past the four envelope keys it is carried verbatim — their nesting is not ours to have an opinion about |
 | `userId` / `userName` | **unchanged, and still theirs** | app data that rides along; `from` does not replace it, because they are not the same thing — see below |
 | `channel` | **removed**, becomes a URL path segment | the room is the channel |
-| `datetime` ISO | → `at`, epoch ms | `now` subtracts stamps; nothing should parse a string to do arithmetic |
+| `datetime` ISO | → `sent`, epoch ms (`at` until 2026-10-04, see §2) | `now` subtracts stamps; nothing should parse a string to do arithmetic |
 | — | **`from` added**, minted per socket | a CONNECTION id, which is what `seq` counts |
 | — | **`seq` added** | §2 |
 | `store: true` | **kept, and §3 has to honour it** | below |
@@ -321,9 +321,15 @@ the other.
 ## 2. The envelope
 
 ```
-{ "type": "<verb>", "from": "<connection id>", "at": <epoch ms, sender's clock>,
+{ "type": "<verb>", "from": "<connection id>", "sent": <epoch ms, sender's clock>,
   "seq": <per-connection counter>, ... }
 ```
+
+**`sent`, not `at`, since 2026-10-04**, decided by the owner: `at` always means
+when the thing happens, so a payload may carry an event's `at` and the send
+stamp is called what it is. `parse()` in `demo/shell/wire.mjs` renames an old
+sender's envelope `at` to `sent`, so no new reader takes a send stamp for an
+event time (`plans/plan-routing-time.md` §4.1).
 
 One line of JSON per message, `\n`-delimited when several are batched or
 written to the backlog — the same NDJSON the Csound and media work uses, so a
@@ -331,7 +337,7 @@ backlog file is `jq`-able and a `curl` of a room is readable without a tool.
 
 **`type`, not `t`** — decided 2026-09-09, against three demos that already say
 `t`. It costs three bytes a message, which at the relay's own 60 msg/s ceiling
-is 180 B/s against a 512 KiB/s budget. What it buys: `t` sits beside `at` in one
+is 180 B/s against a 512 KiB/s budget. What it buys: `t` sat beside `at` (now `sent`) in one
 object while everywhere else in this project `t` is TIME (`reduce(events ≤ t)`,
 `t0`, the strip's row `t`), so a key meaning *verb* and a key meaning *when* end
 up one letter apart with nothing to catch a misread; `wire`'s whole subject is

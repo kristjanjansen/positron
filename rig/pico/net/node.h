@@ -1,7 +1,7 @@
 // rig/pico/net/node.h: the Pico as a node in the positron graph, over a ws_t.
 //
 // Transport agnostic like ws.c: no SDK include, no heap, no clock of its own.
-// It speaks `demo/shell/wire.mjs`'s envelope ({"id","type",...,"from","at","seq"})
+// It speaks `demo/shell/wire.mjs`'s envelope ({"id","type",...,"from","sent","seq"})
 // and `demo/shell/graph-registry.mjs`'s graph, the same way `/wall/` does:
 //
 //   on open        graph.announce, a graph built ONCE at init from constants and the site id

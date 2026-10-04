@@ -127,7 +127,8 @@ async function variant({ label, scheme, bin, probe = true }) {
     check(ids.join() === [`${site}:din:in`, `${site}:din:out`, `${site}:led:light`].sort().join(), 'the registry lists the three ports', ids.join(' '));
     const light = m.ports.find((p) => p.id === `${site}:led:light`);
     check(light?.medium === 'value' && light?.shape?.channels === 3 && light?.dir === 'in', 'the light port is an input, medium value, three channels');
-    check(['id', 'type', 'from', 'at', 'seq'].every((k) => k in ann) && typeof ann.seq === 'number' && typeof ann.at === 'number', 'the envelope has id, type, from, at, seq', `at ${ann.at}, seq ${ann.seq}, by ${ann.by}`);
+    // `sent` whichever firmware is running: parse() renames an old build's `at`.
+    check(['id', 'type', 'from', 'sent', 'seq'].every((k) => k in ann) && typeof ann.seq === 'number' && typeof ann.sent === 'number', 'the envelope has id, type, from, sent, seq', `sent ${ann.sent}, seq ${ann.seq}, by ${ann.by}`);
     out.announceBytes = Buffer.byteLength(JSON.stringify(ann));
   }
 
