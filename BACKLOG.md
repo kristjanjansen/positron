@@ -1,5 +1,27 @@
 ## Open
 
+### Synth options around the Crave, and wiring a Formanta drum machine, asked 2026-10-04
+
+*"Other options aroond crave? I need ro wire formanta pds drum machine too"*.
+Searches find a Formanta **UDS** (Soviet analogue drum synth, 7 channels, one
+1/4 inch trigger input per channel, no MIDI as built, passive pads too weak to
+trigger it, a line-level audio pulse does) and no "PDS"; the model on the desk
+is to be confirmed by its label. Candidate: the Pico router grows a
+note-to-trigger output (C1 to G1, the retrofit convention) on 7 GPIOs. The
+threshold voltage is unmeasured. Audio back competes with the Circuit and a
+Crave for the Fast Track Pro's two inputs.
+
+### Plan: universal patchbay plus XR plus many people, after Dance Tonite, asked 2026-10-04
+
+*"Still need plan to univesral router and xp and multiuse. See lcd soundsystem
+and google cardboard interactive experiment"*. "xp" is read as XR. The reference
+is read as LCD Soundsystem's *Dance Tonite* (2017, Jonathan Puckey and Moniker
+with Google's Data Arts Team), a WebVR music video where room-scale headset
+users record dance takes that loop together and Cardboard or phone viewers
+watch the accumulated crowd. Output: one plan in `plans/` tying
+`plan-universal-routing.md` to `plan-xr*.md` and many simultaneous or
+asynchronous participants. Reported in full when it lands.
+
 ### Synths, effects, CV and modulation that run on the Pico chips, asked 2026-10-04
 
 *"look at the synths and general effect and CV and modulation stuff which can be
