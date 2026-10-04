@@ -1,5 +1,26 @@
 ## Open
 
+### `/kit/`: HARDWARE becomes DEVICES, the Pico tab is HARDWARE, asked 2026-10-04
+
+*"Rename hardware to devices in kit and pico to hardware"*. The existing tab
+(instrument panel parts) is renamed, id and label; the coming Pico firmware tab
+takes the name HARDWARE.
+
+### The hardware UI kit as a new tab in `/kit/`, asked 2026-10-04
+
+*"Can you make demo of hw kit in psoitron kit new tab?"*: the OLED UI kit
+(`rig/pico/firmware/ui.c`) shown on `/kit/` in a tab of its own. Best form: the
+real router firmware running in the browser in rp2040js (pure JS), its screen
+drawn live and its four buttons pressable. Waits on the UI kit agent.
+
+### A small UI kit for the 128x64 OLED, asked 2026-10-04
+
+*"Hard to undesramd ui. Block gfx? Do small ui kit for it"*, about the router
+screen (seven lines of 8x8 text). A C kit in `rig/pico/firmware/`: an inverted
+header, a small font, boxes and arrows for the link, activity meters, a held
+banner, a footer naming what the four buttons do. The router screen rebuilt on
+it, checked in the emulator, screenshots looked at.
+
 ### The C router firmware for the Pico, tested in the local emulator, asked 2026-10-04
 
 *"Do it. What is k1 k2 etc"*: Pico SDK firmware with `rig/route-core/`
