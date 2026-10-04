@@ -1,7 +1,8 @@
 # rig/pico/oled/wiring.yml - WireViz description of the OLED on a Pico 2 W.
 # Render: bash rig/pico/oled/render.sh  (WireViz in Docker, nothing on the Mac)
-# The module's pin order is the usual one for this part and is NOT read off a
-# datasheet: check the labels printed on your board before soldering.
+# The module's pin order is READ OFF ITS PRINTED LABELS in the shop's photo
+# (oomipood.ee, 2026-10-04): GND VCC SCL SDA K4 K3 K2 K1, buttons in REVERSE.
+# Wire each button by its printed name; the Pico side does not change.
 
 connectors:
   Pico:
@@ -12,7 +13,8 @@ connectors:
   OLED:
     type: 0.96 in OLED, 4 buttons
     subtype: SSD1306 128x64 I2C 0x3C
-    pinlabels: [VCC, GND, SDA, SCL, K1, K2, K3, K4]
+    pinlabels: [GND, VCC, SCL, SDA, K4, K3, K2, K1]
+    notes: "buttons marked ^ v # * top to bottom, which K is which symbol is not visible, press each and read the count"
 
 cables:
   W1:
@@ -30,8 +32,8 @@ connections:
   -
     - Pico: [36, 38, 6, 7]
     - W1: [1-4]
-    - OLED: [1-4]
+    - OLED: [2, 1, 4, 3]
   -
     - Pico: [14, 15, 16, 17]
     - W2: [1-4]
-    - OLED: [5-8]
+    - OLED: [8, 7, 6, 5]
