@@ -40,6 +40,10 @@ const ui_font *const UI_FONT_DEFAULT = &UI_FONT_GLCD5X7;
 static uint8_t *fb;
 static const ui_font *font = &UI_FONT_GLCD5X7;
 static int cx0, cy0, cx1 = UI_W, cy1 = UI_H;   /* clip, x1 and y1 exclusive */
+static int area_w = UI_W;                       /* what the furniture spans */
+
+void ui_area(int w) { area_w = w < 1 ? 1 : w > UI_W ? UI_W : w; }
+int ui_area_w(void) { return area_w; }
 
 void ui_bind(uint8_t *buffer) { fb = buffer; }
 void ui_font_set(const ui_font *f) { if (f) font = f; }
@@ -123,9 +127,14 @@ void ui_text_inv(int x, int y, int w, const char *s) {
 
 int ui_header(const char *left, const char *right) {
   int h = font->cap + 4;
-  ui_fill(0, 0, UI_W, h, UI_ON);
+  char r[32];
+  strncpy(r, right, sizeof r - 1);
+  r[sizeof r - 1] = 0;
+  /* cut, never overlap: one advance of air between the two */
+  while (r[0] && 2 + ui_text_w(left) + font->adv + ui_text_w(r) + 2 > area_w) r[strlen(r) - 1] = 0;
+  ui_fill(0, 0, area_w, h, UI_ON);
   ui_text_c(2, 2, left, UI_OFF);
-  ui_text_c(UI_W - 2 - ui_text_w(right), 2, right, UI_OFF);
+  ui_text_c(area_w - 2 - ui_text_w(r), 2, r, UI_OFF);
   return h;
 }
 
@@ -173,9 +182,9 @@ void ui_banner(int y, int h, const char *text) {
   }
   if (n < 2) line[n][k] = 0;
   n = line[1][0] ? 2 : 1;
-  ui_fill(0, y, UI_W, h, UI_ON);
+  ui_fill(0, y, area_w, h, UI_ON);
   top = y + (h - (n * lh - 3)) / 2;
-  for (i = 0; i < n; i++) ui_text_c((UI_W - ui_text_w(line[i])) / 2, top + i * lh, line[i], UI_OFF);
+  for (i = 0; i < n; i++) ui_text_c((area_w - ui_text_w(line[i])) / 2, top + i * lh, line[i], UI_OFF);
 }
 
 int ui_footer_h(void) { return font->cap + 4; }
@@ -200,4 +209,37 @@ int ui_footer(const char *const label[4], unsigned hot) {
     ui_unclip();
   }
   return y;
+}
+
+/* The column: a rule down its left edge, three rules across it between the
+ * cells, and each label centred in its cell. 3 px of air either side of the
+ * widest label, so a filled cell still has a dark margin round its word (2
+ * until asked 2026-10-04 for *"1px extra h padding around right buttons"*). */
+int ui_keys_right_w(const char *const width[4]) {
+  int i, w = 0;
+  for (i = 0; i < 4; i++) if (width[i] && ui_text_w(width[i]) > w) w = ui_text_w(width[i]);
+  if (w > UI_W / 3) w = UI_W / 3;                  /* the screen stays the screen */
+  return w + 7;                                     /* rule, 3, label, 3 */
+}
+
+int ui_keys_right(const char *const label[4], unsigned hot, const char *const width[4]) {
+  int w = ui_keys_right_w(width), x = UI_W - w, ch = UI_H / 4, i;
+  ui_vline(x, 0, UI_H, UI_ON);
+  for (i = 0; i < 4; i++) {
+    int y = i * ch;
+    char s[12];
+    strncpy(s, label[i] ? label[i] : "", sizeof s - 1);
+    s[sizeof s - 1] = 0;
+    while (s[0] && ui_text_w(s) > w - 7) s[strlen(s) - 1] = 0;
+    if (i) ui_hline(x + 1, y, w - 1, UI_ON);
+    ui_clip(x + 1, y + (i ? 1 : 0), w - 1, ch - (i ? 1 : 0));
+    if (hot >> i & 1) {
+      ui_fill(x + 1, y, w - 1, ch, UI_ON);
+      ui_text_c(x + 1 + (w - 1 - ui_text_w(s)) / 2, y + (ch - font->cap + 1) / 2, s, UI_OFF);
+    } else {
+      ui_text(x + 1 + (w - 1 - ui_text_w(s)) / 2, y + (ch - font->cap + 1) / 2, s);
+    }
+    ui_unclip();
+  }
+  return x;
 }

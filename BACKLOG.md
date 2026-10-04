@@ -1,5 +1,16 @@
 ## Open
 
+### Hardware kit: button labels on the right, and a finer breakdown, asked 2026-10-04
+
+*"Add oprion to hw kit to have button labels on right. Break down hw ui some
+more on kit"*. The module's photo (oomipood, IMG35801442160.jpg) shows the four
+buttons as a column on the RIGHT of the screen, ^ v # * top to bottom. So the
+OLED UI kit (`rig/pico/firmware/ui.c`) gets a label placement option that puts
+each key's label at the right edge level with its button, and `/kit/`'s
+HARDWARE tab shows the UI's parts as separate specimens rather than one screen.
+Then, mid-task: *"1px extra h padding around right buttons"*, so 3 px of air
+either side of a label in the right column instead of 2.
+
 ### Synth options around the Crave, and wiring a Formanta drum machine, asked 2026-10-04
 
 *"Other options aroond crave? I need ro wire formanta pds drum machine too"*.

@@ -156,13 +156,14 @@ function panel(px, F) {
 
 // ── one emulated board ──
 let pico, uart, tx = [], feeder, rxQueue = [];
-function start(fontIndex) {
+function start(fontIndex, keysRight = false) {
   pico = new Pico({ uf2: UF2, bootrom: bootromB1 });
-  if (fontIndex !== undefined) {
+  if (fontIndex !== undefined || keysRight) {
     const flash = Buffer.from(pico.mcu.flash.buffer, pico.mcu.flash.byteOffset, pico.mcu.flash.length);
     const at = flash.indexOf('UIFONT');
     if (at < 0 || flash.indexOf('UIFONT', at + 1) >= 0) throw new Error('FONT_PICK marker not found exactly once in flash');
-    flash[at + 6] = fontIndex;
+    if (fontIndex !== undefined) flash[at + 6] = fontIndex;
+    if (keysRight) flash[at + 7] = 1;   // the key labels in a column down the right
   }
   uart = pico.mcu.uart[0];
   tx = []; rxQueue = [];
@@ -321,6 +322,50 @@ try {
     const hint = s.has('TAP OK, HOLD NO', false);
     check(`font ${G.name}: hold banner (${one ? 'one line' : 'two lines'}), K4 cell ${k4} filled, hint ${hint ? 'shown' : 'left out for room'}`,
       (one || two) && (hint || two) && s.has(k4, true) && !s.has('DIN IN'));
+    stop();
+  }
+
+  // ── the key labels down the right, every font ──
+  // The module's four buttons sit in a column beside the screen, so byte 7
+  // moves the labels there. Graded as pixels: one full height rule, the four
+  // labels in top to bottom order inside the column, nothing of the link or
+  // the header reaching past the rule, and K4's cell filled while held.
+  // ⚠️ A NEGATIVE CONTROL FIRST: the default boot must have NO such rule, or a
+  // check that finds one proves nothing about byte 7.
+  const ruleAt = (px) => { for (let x = 127; x > 64; x--) { let n = 0; for (let y = 0; y < 64; y++) n += px[y * 128 + x]; if (n === 64) return x; } return -1; };
+  start();
+  pico.boot();
+  await pico.sleep(300);
+  await pico.sleep(80);
+  check('keys: the default boot draws no right hand column (the control for the checks below)', ruleAt(pico.oled.pixels()) === -1, `rule at ${ruleAt(pico.oled.pixels())}`);
+  stop();
+  for (let i = 0; i < FONTS.length; i++) {
+    const G = FONTS[i];
+    start(i, true);
+    pico.boot();
+    await pico.sleep(300);
+    await press(2);
+    await send('90 3C 64');
+    take();
+    s = await shot(`router-right-${G.name}.png`, G);
+    const px = pico.oled.pixels();
+    const rx = ruleAt(px);
+    const order = ['PREV', 'NEXT', 'STOP', 'OK'].map((t) => {
+      const h = s.find(t).find((q) => !q.inv && q.x > rx) || s.find(t.slice(0, 3)).find((q) => !q.inv && q.x > rx);
+      return h ? h.y : -1;
+    });
+    const ordered = order.every((y, k) => y >= 0 && (k === 0 || y > order[k - 1]));
+    // every label inside its own 16 row cell, level with its button
+    const level = order.every((y, k) => y >= k * 16 && y + G.cap <= (k + 1) * 16);
+    const right = s.find('DIN OUT').concat(s.find('OUT')).filter((h) => !h.inv);
+    const clear = right.length > 0 && right.every((h) => h.x + 3 * G.adv <= rx);
+    check(`keys right, font ${G.name}: rule at x ${rx}, labels top to bottom in their cells, the link stops before the rule`,
+      rx > 64 && ordered && level && clear && s.headerLit() > 0.4, `label tops ${order.join(' ')}, OUT at ${right.map((h) => h.x).join(' ')}`);
+    await send(REPLACE_PATCH);
+    s = await shot(`router-right-${G.name}-hold.png`, G);
+    const okCell = s.find('OK').find((q) => q.inv && q.x > rx && q.y >= 48);
+    const banner = s.has('HOLD: REPLACE PATCH', true) || (s.has('HOLD:', true) && (s.has('REPLACE PATCH', true) || s.has('PATCH', true)));
+    check(`keys right, font ${G.name}: hold banner left of the column, OK cell filled at the bottom`, !!okCell && banner && ruleAt(pico.oled.pixels()) === rx);
     stop();
   }
 

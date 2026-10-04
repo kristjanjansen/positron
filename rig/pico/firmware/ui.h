@@ -67,8 +67,17 @@ int ui_text_big(int x, int y, const char *s);           /* the current font at 2
  * with `s` dark inside it, left aligned after a two pixel inset. */
 void ui_text_inv(int x, int y, int w, const char *s);
 
+/* The width the furniture spans, from x 0. The screen by default; a page with
+ * its key labels in a column on the right narrows it to the column's rule, so
+ * the header and the banner stop where the keys begin. Pixels are not clipped
+ * by it: it is a layout width, not a clip. */
+void ui_area(int w);
+int ui_area_w(void);
+
 /* The furniture. Each returns or takes positions in pixels. */
-int ui_header(const char *left, const char *right);     /* returns its height */
+/* A lit bar across the area, `left` and `right` dark inside it. `right` is
+ * cut a letter at a time until the two cannot touch. Returns its height. */
+int ui_header(const char *left, const char *right);
 void ui_box(int x, int y, int w, int h, const char *label);  /* label centred */
 int ui_box_w(const char *label);                        /* the box ui_box needs */
 int ui_box_h(void);
@@ -82,5 +91,12 @@ void ui_banner(int y, int h, const char *text);
  * Returns the y of its top rule. */
 int ui_footer(const char *const label[4], unsigned hot);
 int ui_footer_h(void);
+/* The same four labels as a column down the RIGHT edge, for a module whose
+ * buttons sit beside the screen: four cells 16 rows tall, label[0] at the top,
+ * each centred level with its button. As wide as the widest label in `width`
+ * (the labels this column will ever show, so it does not change width when one
+ * of them does). Returns the x of its left rule. */
+int ui_keys_right(const char *const label[4], unsigned hot, const char *const width[4]);
+int ui_keys_right_w(const char *const width[4]);
 
 #endif

@@ -94,7 +94,12 @@ static bool drawn_in, drawn_out;       /* what the dots showed on the last redra
  * it, so a UF2 can be re-pointed at another font by patching ONE byte: the
  * emulator finds "UIFONT" in its flash image and writes the index of a
  * UI_FONTS entry into byte 6 (0xFF keeps UI_FONT_DEFAULT). volatile, so the
- * compiler reads the byte instead of folding the 0xFF it sees here. */
+ * compiler reads the byte instead of folding the 0xFF it sees here.
+ * Byte 7 is where the key labels go, by the same trick: 0 a row along the
+ * bottom, 1 a column down the right, which is where the four buttons sit on
+ * the 0.96 inch module (oomipood's photo: ^ v # * top to bottom, beside the
+ * screen). The emulator patches it as `patchKeys`. */
+#define KEYS_RIGHT (FONT_PICK[7] == 1)
 static const volatile uint8_t FONT_PICK[8] __attribute__((used)) = { 'U', 'I', 'F', 'O', 'N', 'T', 0xFF, 0 };
 
 /* RX: the UART interrupt empties the 32 byte FIFO into this ring, so an I2C
@@ -272,6 +277,7 @@ static bool dot_lit(uint32_t seen, uint32_t t) { return seen && t + 1 - seen < D
  * when something was dropped, so it reads as an alert and not as furniture. */
 static void draw_activity(int y, uint32_t t) {
   const ui_font *f = ui_font_get();
+  const int W = ui_area_w();
   char cin[16], cout[16], cdrop[16];
   int wi, wo, wd, dy = y + (f->cap - 5) / 2;
   snprintf(cin, sizeof cin, "IN %lu", (unsigned long)n_in);
@@ -279,7 +285,7 @@ static void draw_activity(int y, uint32_t t) {
   cdrop[0] = 0;
   if (n_dropped) snprintf(cdrop, sizeof cdrop, "DROP %lu", (unsigned long)n_dropped);
   wi = 8 + ui_text_w(cin); wo = 8 + ui_text_w(cout); wd = ui_text_w(cdrop);
-  if (cdrop[0] && wi + wo + wd + 12 > UI_W) {
+  if (cdrop[0] && wi + wo + wd + 12 > W) {
     /* A wide font: the drops matter more than the words IN and OUT, which
      * the boxes above already name. */
     snprintf(cin, sizeof cin, "%lu", (unsigned long)n_in);
@@ -290,9 +296,9 @@ static void draw_activity(int y, uint32_t t) {
   drawn_out = dot_lit(seen_out, t);
   ui_dot(0, dy, drawn_in);
   ui_text(8, y, cin);
-  ui_dot(UI_W - wo, dy, drawn_out);
-  ui_text(UI_W - wo + 8, y, cout);
-  if (cdrop[0]) ui_text(wi + (UI_W - wo - wi - wd) / 2, y, cdrop);   /* centred in the gap */
+  ui_dot(W - wo, dy, drawn_out);
+  ui_text(W - wo + 8, y, cout);
+  if (cdrop[0]) ui_text(wi + (W - wo - wi - wd) / 2, y, cdrop);   /* centred in the gap */
 }
 
 static void redraw(uint32_t t) {
@@ -302,33 +308,49 @@ static void redraw(uint32_t t) {
   int held = route_held(&core, PORT_DIN_OUT);
   char left[32], banner[40];
   const char *label[4] = { "PREV", "NEXT", "STOP", "OK" };
-  int top, bottom, avail, g;
+  static const char *const KEY_W[4] = { "PREV", "NEXT", "STOP", "OK" };
+  int top, bottom, avail, g, W;
 
   ui_clear();
+  /* The keys first, because where they go decides how wide everything else
+   * is. On the right the column holds the same width in every state, so OK
+   * stays OK while held (the filled cell and the hint line say the rest). */
+  if (KEYS_RIGHT) {
+    ui_area(UI_W);
+    W = ui_keys_right(label, held ? 8u : 0u, KEY_W) - 1;
+    ui_area(W);
+    bottom = UI_H - 1;
+  } else {
+    ui_area(UI_W);
+    W = UI_W;
+    if (held) label[3] = ui_text_w("OK/NO") <= 29 ? "OK/NO" : "OK";
+    bottom = ui_footer(label, held ? 8u : 0u) - 1;   /* the last free row */
+  }
 
   snprintf(left, sizeof left, "SCENE %d/%d", scene + 1, NSCENES);
-  if (ui_text_w(left) + 6 + ui_text_w(S->name) > UI_W - 4)
+  if (ui_text_w(left) + 6 + ui_text_w(S->name) > W - 4)
     snprintf(left, sizeof left, "%d/%d", scene + 1, NSCENES);
   top = ui_header(left, S->name) + 1;
-
-  if (held) label[3] = ui_text_w("OK/NO") <= 29 ? "OK/NO" : "OK";
-  bottom = ui_footer(label, held ? 8u : 0u) - 1;   /* the last free row */
   avail = bottom - top + 1;
 
   if (!held) {
     /* [DIN IN] ---ops---> [DIN OUT]: the ops ride just above the arrow
      * when they fit between the boxes, else on their own line above. */
-    int bh = ui_box_h(), wl = ui_box_w("DIN IN"), wr = ui_box_w("DIN OUT");
-    int ax1 = wl + 2, ax2 = UI_W - wr - 3, ow = ui_text_w(S->ops);
+    /* A wide font beside the key column: the boxes say IN and OUT, which
+     * is what DIN IN and DIN OUT mean on a board with one port each way. */
+    const bool short_ports = ui_box_w("DIN IN") + ui_box_w("DIN OUT") + 12 > W;
+    const char *pin = short_ports ? "IN" : "DIN IN", *pout = short_ports ? "OUT" : "DIN OUT";
+    int bh = ui_box_h(), wl = ui_box_w(pin), wr = ui_box_w(pout);
+    int ax1 = wl + 2, ax2 = W - wr - 3, ow = ui_text_w(S->ops);
     int ops_rel, ops_x, by, ay;
     if (ow <= ax2 - ax1 - 4) { ops_rel = bh / 2 - 2 - T; ops_x = ax1 + (ax2 - ax1 + 1 - ow) / 2; }
-    else { ops_rel = -2 - T; ops_x = (UI_W - ow) / 2; }
+    else { ops_rel = -2 - T; ops_x = (W - ow) / 2; }
     if (ops_rel > 0) ops_rel = 0;
     g = (avail - (bh + T - ops_rel)) / 3;
     by = top + g - ops_rel;
     ay = by + bh / 2;
-    ui_box(0, by, wl, bh, "DIN IN");
-    ui_box(UI_W - wr, by, wr, bh, "DIN OUT");
+    ui_box(0, by, wl, bh, pin);
+    ui_box(W - wr, by, wr, bh, pout);
     ui_arrow(ax1, ax2, ay);
     ui_text(ops_x, by + ops_rel, S->ops);
     draw_activity(by + bh + g, t);
@@ -336,9 +358,13 @@ static void redraw(uint32_t t) {
     int lines, bh, sy, by;
     if (held > 1) snprintf(banner, sizeof banner, "HOLD %d: REPLACE PATCH", held);
     else snprintf(banner, sizeof banner, "HOLD: REPLACE PATCH");
-    if (ui_text_w(banner) > UI_W - 4) {
+    if (ui_text_w(banner) > W - 4) {
       if (held > 1) snprintf(banner, sizeof banner, "HOLD %d:\nREPLACE PATCH", held);
       else snprintf(banner, sizeof banner, "HOLD:\nREPLACE PATCH");
+      if (ui_text_w("REPLACE PATCH") > W - 4) {
+        if (held > 1) snprintf(banner, sizeof banner, "HOLD %d:\nPATCH", held);
+        else snprintf(banner, sizeof banner, "HOLD:\nPATCH");
+      }
       lines = 2;
     } else lines = 1;
     bh = lines * (T + 3) - 3 + 6;
@@ -358,11 +384,11 @@ static void redraw(uint32_t t) {
     if (keys[3].down && !keys[3].long_fired) {
       /* K4 is down: release now is OK, keep holding and this fills to NO. */
       int nw = ui_text_w("NO");
-      ui_meter(0, sy - 1, UI_W - nw - 4, T + 2, (int)(t - keys[3].pressed_at), DENY_HOLD_MS);
-      ui_text(UI_W - nw, sy, "NO");
+      ui_meter(0, sy - 1, W - nw - 4, T + 2, (int)(t - keys[3].pressed_at), DENY_HOLD_MS);
+      ui_text(W - nw, sy, "NO");
     } else {
-      const char *hint = "TAP OK, HOLD NO";
-      ui_text((UI_W - ui_text_w(hint)) / 2, sy, hint);
+      const char *hint = ui_text_w("TAP OK, HOLD NO") <= W ? "TAP OK, HOLD NO" : "HOLD = NO";
+      ui_text((W - ui_text_w(hint)) / 2, sy, hint);
     }
     draw_activity(sy + T + g, t);
   }
