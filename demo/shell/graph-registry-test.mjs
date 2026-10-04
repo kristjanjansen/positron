@@ -204,8 +204,10 @@ console.log('\n== into a bay ==');
   ok('NEGATIVE CONTROL: audio into a MIDI in is refused, for the medium',
     !bad.ok && /audio/.test(bad.why) && /midi/.test(bad.why), bad.why);
   const good = b.link('studio-1:yoshimi:audio', 'home:page:audio');
-  ok('a valid audio link is made, and carries a session',
-    good.ok && good.session && good.session.address === 'studio-1-yoshimi-audio', JSON.stringify(good.session));
+  // A board synth's sound lives in the board's MAIN room (2026-10-04), so the
+  // session names that room, not a derivation of the port's id.
+  ok('a valid audio link is made, and carries a session in the board\'s own room',
+    good.ok && good.session && good.session.address === 'studio-1', JSON.stringify(good.session));
   ok('and the session knows the two ends are on different machines',
     /^internet/.test(good.session?.where || ''), good.session?.where);
   const keys = b.link('home:page:keys', 'studio-1:yoshimi:in');
