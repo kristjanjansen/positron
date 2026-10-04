@@ -1,5 +1,13 @@
 ## Open
 
+### The 4-button OLED on a Pico: a Wokwi project and a wiring diagram, asked 2026-10-04
+
+*"yes but i also want a wiring diagram. are there services that can render it
+and you can access?"*: a paste-ready Wokwi project (`diagram.json`, `main.py`)
+for a Pico with the SSD1306 OLED and four buttons on GP4/GP5 and GP10 to GP13,
+and a wiring diagram rendered with WireViz in Docker. Files under `rig/pico/`.
+DONE 2026-10-04: `rig/pico/oled/`.
+
 ### Screens and panels for the Pi, available in Estonia, asked 2026-10-04
 
 *"In bg research basic screens/panels for pi a ailable in est"*. A background

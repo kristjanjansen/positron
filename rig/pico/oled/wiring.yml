@@ -1,0 +1,37 @@
+# rig/pico/oled/wiring.yml - WireViz description of the OLED on a Pico 2 W.
+# Render: bash rig/pico/oled/render.sh  (WireViz in Docker, nothing on the Mac)
+# The module's pin order is the usual one for this part and is NOT read off a
+# datasheet: check the labels printed on your board before soldering.
+
+connectors:
+  Pico:
+    type: Raspberry Pi Pico 2 W
+    subtype: physical pins, pin 1 top left with USB up
+    pins: [36, 38, 6, 7, 14, 15, 16, 17]
+    pinlabels: [3V3(OUT), GND, GP4 I2C0 SDA, GP5 I2C0 SCL, GP10, GP11, GP12, GP13]
+  OLED:
+    type: 0.96 in OLED, 4 buttons
+    subtype: SSD1306 128x64 I2C 0x3C
+    pinlabels: [VCC, GND, SDA, SCL, K1, K2, K3, K4]
+
+cables:
+  W1:
+    wirecount: 4
+    colors: [RD, BK, BU, OG]
+    category: bundle
+    notes: display, 3.3 V only
+  W2:
+    wirecount: 4
+    colors: [VT, VT, VT, VT]
+    category: bundle
+    notes: buttons, pressed pulls the pin to ground
+
+connections:
+  -
+    - Pico: [36, 38, 6, 7]
+    - W1: [1-4]
+    - OLED: [1-4]
+  -
+    - Pico: [14, 15, 16, 17]
+    - W2: [1-4]
+    - OLED: [5-8]
