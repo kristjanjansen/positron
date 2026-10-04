@@ -13,6 +13,12 @@
 > each, nothing run, no external connection) and spot-checked by hand. It
 > extends `plans/plan-patchbay.md` (2026-09-21), whose model is built as
 > `demo/shell/bay.mjs`, and sits above `plans/plan-route-core.md`.
+>
+> **TIME ACROSS THE TWO PLANES IS `plans/plan-routing-time.md`** (2026-10-04):
+> how a cue, a light or a note lands on the right frame or beat of a heavy link,
+> live and in a recording, on every transport here. A light event carries
+> `due` on the peer clock, a session gains `timebase`, a light link gains
+> `{ ahead }` and `{ follow }`. Its step 1 is built as `demo/shell/timebase.mjs`.
 
 ## 1. The verdict
 
@@ -255,5 +261,7 @@ last or never.
 | Video over the data channel on one network | measure, as audio was (plan-away-webrtc §9) |
 | Two writers on one graph (two phones, one in another building) | plan-patchbay left it open; needs an owner per node and a rule for who wins. 🟡 PARTLY SETTLED 2026-10-04: a link from a page's port is opened only by asking that page (`link.request` / `link.state`), so the owner of a source port decides; two patchbays recalling one scene name each recall their own. No rule yet for two writers on the Pi's own ports |
 | ~~Whether `state` buses belong in the graph at all~~ | ✅ TRIED 2026-10-04: `/partitur/`'s cues are a `state` out port and `/wall/`'s captions a `state` in port with `shape.schema: 'cue'`; as a link between two named ports it says who feeds whom, which a room does not. A many-to-many bus (cues, jam) stays a room |
-| How a scene recall that includes heavy links behaves (a session takes seconds to open; a MIDI link takes nothing) | measure the slowest session against a bar at 122 bpm. 🟡 SIDESTEPPED 2026-10-04: a recall in `/patchbay/` is a diff that makes links DESCRIBED and never opens one, so no session opens on a bar line; the timing question returns when recall is allowed to open |
-| Time alignment across media in a recording (audio, video, the cue log) | `/replay/` already aligns a cue log to HLS; generalise or not |
+| How a scene recall that includes heavy links behaves (a session takes seconds to open; a MIDI link takes nothing) | measure the slowest session against a bar at 122 bpm. 🟡 SIDESTEPPED 2026-10-04: a recall in `/patchbay/` is a diff that makes links DESCRIBED and never opens one, so no session opens on a bar line; the timing question returns when recall is allowed to open. 🟡 HALF ANSWERED 2026-10-04 in `plan-routing-time.md` §9: the LIGHT half of a recall can be scheduled on a bar now, as `due: { beat, clock }` on the peer clock (~3 ms MEASURED); the heavy half still takes seconds to open and still cannot |
+| Time alignment across media in a recording (audio, video, the cue log) | `/replay/` already aligns a cue log to HLS; generalise or not. 🟡 DECIDED 2026-10-04, `plan-routing-time.md` §5d: GENERALISE. One `T0` on the peer clock per recording, a sidecar written last with each track's origin and a `[sample, ms]` anchor every 10 s (headless drift 1900 to 5200 ppm MEASURED is 52 ms between anchors at worst), cue and MIDI rows stored as peer-clock ms, playback on one media master. Built: the arithmetic only (step 1). Not built: the sidecar and the page (step 8) |
+| A light event landing on the right frame or beat of a LIVE heavy link | ✅ MODELLED 2026-10-04, `plan-routing-time.md`: as it happens on WebRTC and MoQ (WHEP lag p50 67 ms MEASURED, so a cue leads by ~30 to 50 ms), scheduled ahead on the peer clock for lights that must agree, following the link at each receiver for LL-HLS (2 to 8 s per viewer MEASURED) and relay PCM (~175 ms to the speaker MEASURED). Step 1 built and graded: `demo/shell/timebase.mjs`, 39 asserts, 11 negative controls, 7 sabotages. Open: Cloudflare's PDT against the peer clock, WebRTC sender reports, and the Pi's two headers (PCM carries a process-relative time nobody reads; H.264 carries none) |
+| The relay's cap in §5 and in `bay.mjs`'s `TRANSPORTS` | still says 60 msg/s, stay at 50; the relay has been 1000 msg/s with a 2000 burst (READ, `workers/relay/src/index.js`). Correct both, found 2026-10-04 while writing `plan-routing-time.md` |
