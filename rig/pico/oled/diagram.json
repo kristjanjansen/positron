@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "author": "positron",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-pi-pico-w", "id": "pico", "top": 0, "left": 0 },
+    { "type": "board-ssd1306", "id": "oled", "top": -140, "left": 160, "attrs": { "i2cAddress": "0x3c" } },
+    { "type": "wokwi-pushbutton", "id": "k1", "top": 40, "left": 220, "attrs": { "color": "red", "label": "K1" } },
+    { "type": "wokwi-pushbutton", "id": "k2", "top": 100, "left": 220, "attrs": { "color": "green", "label": "K2" } },
+    { "type": "wokwi-pushbutton", "id": "k3", "top": 160, "left": 220, "attrs": { "color": "blue", "label": "K3" } },
+    { "type": "wokwi-pushbutton", "id": "k4", "top": 220, "left": 220, "attrs": { "color": "yellow", "label": "K4" } }
+  ],
+  "connections": [
+    [ "pico:3V3", "oled:VCC", "red", [] ],
+    [ "pico:GND.8", "oled:GND", "black", [] ],
+    [ "pico:GP4", "oled:SDA", "blue", [] ],
+    [ "pico:GP5", "oled:SCL", "orange", [] ],
+    [ "pico:GP10", "k1:1.l", "violet", [] ],
+    [ "pico:GP11", "k2:1.l", "violet", [] ],
+    [ "pico:GP12", "k3:1.l", "violet", [] ],
+    [ "pico:GP13", "k4:1.l", "violet", [] ],
+    [ "k1:2.r", "pico:GND.5", "black", [] ],
+    [ "k2:2.r", "pico:GND.5", "black", [] ],
+    [ "k3:2.r", "pico:GND.5", "black", [] ],
+    [ "k4:2.r", "pico:GND.5", "black", [] ]
+  ],
+  "dependencies": {}
+}
