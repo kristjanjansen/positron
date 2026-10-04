@@ -27,6 +27,9 @@
   import { createChoice } from '/shell/choice.mjs';
   import { openWire } from '/shell/wire.mjs';
   import { createRegistry, boardGraph } from '/shell/graph-registry.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const WHAT = 'One graph for everything positron moves, where a MIDI link carries the notes and a video link describes the stream both ends open.';
 
@@ -36,6 +39,7 @@
     readout: { links: '', heavy: '', refused: '', heard: '' },
     controls: [
       { id: 'link', label: 'Link', primary: true },
+      { id: 'open', label: 'Open' },
       { id: 'example', label: 'Example' },
       { id: 'unlink', label: 'Unlink' },
       { id: 'clear', label: 'Clear' },
@@ -60,8 +64,9 @@
       'A light link, MIDI or a program, carries its bytes through the routing core. A heavy link, sound or '
       + 'video, only describes a stream, which transport, which address and what shape, and the two ends open it '
       + 'themselves. The transport is chosen from where the two ends are, out of latencies measured on this desk.',
-      'Nothing on this page opens a stream. It plans the graph and checks every link, and making the real '
-      + 'connections from it is the next step.'));
+      'A link is only described until you select it and press Open. Two kinds open for real today, an '
+      + 'instrument\u2019s sound from the Pi to this browser and these keys to that instrument, and Unlink closes '
+      + 'what Open opened.'));
 
   // ── the desk ─────────────────────────────────────────────────────────────
   //
@@ -214,23 +219,25 @@
       { key: 'medium', label: 'medium', width: 72 },
       { key: 'by', label: 'carried by', width: 120 },
       { key: 'where', label: 'where', width: 104 },
+      { key: 'state', label: 'state', width: 96 },
     ],
     empty: 'no links yet',
     note: 'says',
     onPick: (r) => { selected = r.id; d.log(`${r.id} selected, Unlink takes it away`); },
   });
 
+  const keysHost = el('div');
   const desk = createChoice({
     label: 'desk', options: [['studio, live', 'live'], ['example', 'example']], at: 0,
     title: (v) => (v === 'live' ? `what announces itself in ${ROOM} right now` : 'a typed desk with every kind of thing on it'),
-    onPick: (v) => { world = v; made = []; rebuild(); field.set(examples()[0]); step = 0;
+    onPick: (v) => { for (const line of [...opened.keys()]) closeLink(line); world = v; made = []; rebuild(); field.set(examples()[0]); step = 0;
       d.log(v === 'live' ? `the live desk: what announces itself in ${ROOM}` : 'the example desk'); },
   });
   d.stack.titled('THE GRAPH',
     say('The live desk is what announces itself in the studio\u2019s room right now, this browser included. '
       + 'The example desk has every kind of thing on it. Write a link as from, an arrow, then to, or press '
       + 'Example to step through what the desk allows, and press Link. A refusal says why in the log.'),
-    desk.el, host, write, rows.el);
+    desk.el, host, write, rows.el, keysHost);
 
   const mediumOf = (l) => bay.port(l.from)?.medium || '';
   /** What an arrow says: the name a reader can look up, short enough for the gap
@@ -262,6 +269,7 @@
       by: l.session ? l.session.transport : 'routing core',
       where: l.session ? l.session.where : 'bytes',
       says: l.session ? `${l.session.says}\naddress ${l.session.address}` : 'the bytes travel through the link itself',
+      state: stateOf(l),
     })));
     spec.links = all.map((l) => ({
       from: l.from.split(':').slice(0, 2).join('_'),
@@ -313,6 +321,7 @@
     const id = selected && all.some((l) => l.id === selected) ? selected : all.at(-1)?.id;
     if (!id) { d.log('nothing to unlink'); return; }
     const line = printLink(all.find((l) => l.id === id));
+    closeLink(line);
     bay.unlink(id);
     made = made.filter((m) => m.line !== line);
     selected = null;
@@ -320,7 +329,7 @@
     redraw();
   });
   d.on('clear', () => {
-    for (const l of bay.links()) bay.unlink(l.id);
+    for (const l of bay.links()) { closeLink(printLink(l)); bay.unlink(l.id); }
     made = [];
     selected = null;
     d.log('every link removed');
@@ -339,6 +348,99 @@
       if (bay.port(from) && bay.port(to)) makeLink(line);
     }
   }
+
+  // ── step 4: opening a link for real ──────────────────────────────────────
+  //
+  // 🔴 A DESCRIBED LINK OPENS NOTHING, AND ONLY A PERSON'S PRESS OPENS ONE.
+  // The starter links, a visit and the harness all leave the board alone: a
+  // lease starts a capture on hardware in another building, and the rule here
+  // is that a visit opens nothing. Under `?selfcheck=1` Open says so and stops.
+  // ⚠️ EACH OPENER IS THE BOARD'S OWN VERB, NOT A NEW PROTOCOL: `input.want`
+  // and its lease (`/away/`), `midi.send` through the board's gate. The room is
+  // the session's address, which the board itself announced.
+  const opened = new Map();          // link line -> { kind, close(), state() }
+  const RENEW_MS = 20_000;
+  function kindOf(l) {
+    const a = bay.port(l.from), b = bay.port(l.to);
+    if (!a || !b || !a.address && !b.address) return null;
+    if (a.medium === 'audio' && l.to === 'web:screen:audio' && a.address) return 'listen';
+    if (a.medium === 'midi' && l.from === 'web:keys:out' && b.address) return 'keys';
+    return null;
+  }
+  function stateOf(l) {
+    const o = opened.get(printLink(l));
+    if (o) return o.state();
+    return kindOf(l) ? 'described' : 'not built yet';
+  }
+  async function openListen(l) {
+    const room = bay.port(l.from).address;
+    // ⚠️ ASK ONLY ONCE THE SOCKET IS OPEN. Measured 2026-10-04: an `input.want`
+    // sent the moment the board was created went nowhere, the page logged
+    // `nothing answered`, and the stream stood open at 0 frames.
+    let joined;
+    const isOpen = new Promise((r) => { joined = r; });
+    const board = createBoard({ room, of: 'Raspberry Pi', showName: false, cushionMs: 80, maxCushionMs: 250,
+      direct: true, directCushionMs: 40, log: (line, kind) => d.log(line, kind), onOpen: () => joined() });
+    const ctx = await board.startAudio();
+    await Promise.race([isOpen, new Promise((r) => setTimeout(r, 6000))]);
+    const out = board.playout();
+    if (out) { try { out.connect(ctx.destination); } catch { /* already */ } }
+    board.goDirect({ frameMs: 10 });
+    const want = async () => {
+      const r = await board.ask({ type: 'input.want' }, 'input.wanted', 6000);
+      if (!r) d.log(`nothing answered in ${room}`, 'warn');
+      else if (r.started) d.log(`the board started the ${room} capture`, 'ok');
+    };
+    want();
+    const renew = setInterval(want, RENEW_MS);
+    return {
+      kind: 'listen',
+      state: () => `open, ${board.stats().frames} fr`,
+      close: () => { clearInterval(renew); try { out?.disconnect(); } catch { /* */ } board.close(); },
+    };
+  }
+  function openKeys(l) {
+    const to = bay.port(l.to);
+    const ch = (to.shape?.channels || [1])[0];
+    const board = createBoard({ room: to.address, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind) });
+    // A note pressed before the socket opens is not sent, and `sent` counts only
+    // what the socket took, so the row never claims a note that went nowhere.
+    let sent = 0;
+    const kb = createKeyboard(el('div'), {
+      ...keyRange(), base: 48,
+      onDown: (note) => { kb.lightNote(note, true); if (board.send({ type: 'midi.send', bytes: [0x90 | (ch - 1), note, 100] })) sent++; },
+      onUp: (note) => { kb.lightNote(note, false); board.send({ type: 'midi.send', bytes: [0x80 | (ch - 1), note, 0] }); },
+    });
+    keysHost.append(kb.el);
+    return {
+      kind: 'keys',
+      state: () => `open, ${sent} notes`,
+      close: () => { board.send({ type: 'midi.send', bytes: [0xB0 | (ch - 1), 123, 0] }); kb.el.remove(); board.close(); },
+    };
+  }
+  function closeLink(line) {
+    const o = opened.get(line);
+    if (!o) return;
+    o.close();
+    opened.delete(line);
+    d.log(`${line} closed`);
+  }
+  d.on('open', async () => {
+    const all = bay.links();
+    const l = all.find((x) => x.id === selected) || all.at(-1);
+    if (!l) { d.log('nothing to open, make a link first'); return; }
+    const line = printLink(l);
+    if (opened.has(line)) { d.log(`${line} is already open`); return; }
+    const kind = kindOf(l);
+    if (!kind) { d.log(`${line} cannot be opened yet: only an instrument’s sound to this screen and these keys to an instrument are built`, 'warn'); return; }
+    if (SELFCHECK) { d.log(`the harness opens no real stream, so ${line} stays described`); return; }
+    try {
+      opened.set(line, kind === 'listen' ? await openListen(l) : openKeys(l));
+      d.log(`${line} opened`, 'ok');
+    } catch (e) { d.log(`${line} did not open: ${e.message || e}`, 'bad'); }
+    redraw();
+  });
+  setInterval(() => { if (opened.size) redraw(); }, 1000);
 
   // ── listening to the studio's room ───────────────────────────────────────
   let me = null, lastSites = '';

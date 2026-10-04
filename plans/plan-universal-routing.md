@@ -232,6 +232,13 @@ last or never.
    done too: `midi-kinds.mjs` and the eight media in `bay.mjs`.
 4. **A routes page** that draws the live graph of the site and can make and break
    the first five kinds of link above.
+   🟡 PARTLY DONE 2026-10-04 on `/graph/`: a link carries the room its stream
+   really lives in (a port may declare `address`), and Open makes two kinds real
+   with the board's own verbs, an input's sound to the browser (`input.want` and
+   its lease, MEASURED 708 frames in 8 s, direct path 214 ms) and the browser's
+   keys to that input (`midi.send` through the gate). Open is a person's press
+   only. Still to build: a synth's sound (`audio.start`), the GPU's video
+   (`video.start`), and storage as a sink.
 5. **`/wish/` over all of it**, building its prompt from the registry, so the
    model can only name things that exist.
 

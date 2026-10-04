@@ -1,5 +1,21 @@
 ## Open
 
+### Screens and panels for the Pi, available in Estonia, asked 2026-10-04
+
+*"In bg research basic screens/panels for pi a ailable in est"*. A background
+research agent; result to `research/`.
+
+### Universal routing step 4, links that really start things, asked 2026-10-04
+
+*"Yes"* to: pressing a link on `/graph/` actually starts it, using the board's
+existing verbs (`input.want` and its lease for a hardware input's sound,
+`audio.start` for a synth, `video.start` for the GPU, `midi.send` for keys
+into the Circuit), and Unlink stops it. Described links stay described until a
+person opens one; a visit and the harness open nothing.
+PARTLY DONE 2026-10-04: an instrument's sound to this browser (708 frames in 8 s,
+measured against the real Pi, direct path 214 ms) and these keys to an instrument
+open for real. Synth audio, GPU video and recording still say `not built yet`.
+
 ### Universal routing step 3, the registry, asked 2026-10-04
 
 *"U iversal router demo?"* then *"Yes"* to: the Pi's `board.hello` and
