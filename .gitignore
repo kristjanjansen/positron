@@ -124,3 +124,6 @@ OG/ASMR_pack/
 # gives itself twice: a filename rule rots the moment the next tool arrives
 # under a different name.
 rig/m1/bin/
+
+# Pico firmware builds (rig/pico/firmware/build.sh)
+rig/pico/firmware/build-*/

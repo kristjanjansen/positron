@@ -1,5 +1,15 @@
 ## Open
 
+### The C router firmware for the Pico, tested in the local emulator, asked 2026-10-04
+
+*"Do it. What is k1 k2 etc"*: Pico SDK firmware with `rig/route-core/`
+inside, the SSD1306 screen and four buttons (K1 previous scene, K2 next, K3
+panic, K4 confirm a held message, held 1 s to deny), MIDI on UART for now
+(DIN, and the one path the emulator has), built in Docker for both the plain
+Pico (to emulate) and the Pico 2 W (to flash), and driven in `rig/pico/sim/`
+with bytes in, bytes out and screenshots. USB MIDI host comes after.
+DONE 2026-10-04: `rig/pico/firmware/`, all 14 emulator steps PASS.
+
 ### Drive the Pico emulation locally, asked 2026-10-04
 
 *"can you not drive wokwi itself / run locally or smth"*: rp2040js (Wokwi's open

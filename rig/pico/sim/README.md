@@ -34,6 +34,7 @@ USB CDC, mounts a RAM filesystem, writes `ssd1306.py` to it, starts
 | `ssd1306.mjs` | the display model on I2C0 at 0x3C, and a pure JS PNG encoder (`node:zlib`) |
 | `ssd1306.py` | the micropython-lib driver, unchanged, with its source URL and licence in a header |
 | `run.mjs` | the scripted run above |
+| `run-router.mjs` | the C router of `../firmware/`, graded over its MIDI UART |
 | `fetch.mjs` | downloads the firmware and the bootrom |
 
 ## What is emulated, and what is not
@@ -67,10 +68,12 @@ USB CDC, mounts a RAM filesystem, writes `ssd1306.py` to it, starts
   low while pressed, the same reading as a pull-up and a switch to ground.
   There is no bounce.
 
-## The C firmware, later
+## The C firmware
 
-Nothing here is MicroPython specific except `run.mjs`. A C build of the same
-board loads the same way: build its UF2 in Docker (the pico-sdk toolchain is
-native and will not run on this Mac), point `new Pico({ uf2 })` at it, skip the
-raw REPL, and use `pico.frame()`, `pico.hold()` and `pico.oled.png()` as
-`run.mjs` does. Built for the RP2040 target, not the RP2350.
+`run-router.mjs` boots the C router of `../firmware/` (`build-pico/router.uf2`,
+built in Docker by `../firmware/build.sh pico`) with no MicroPython and no raw
+REPL. It feeds MIDI into UART0 RX with rp2040js `feedByte`, reads UART0 TX
+through `onByte`, presses K1 to K4, reads the screen back as text against the
+firmware's own font, and saves `router-0.png` to `router-5.png`. Every step
+prints PASS or FAIL and the run exits 1 on any FAIL. `../firmware/README.md`
+has the steps and what the emulator does not cover.
