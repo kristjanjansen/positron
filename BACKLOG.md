@@ -1,5 +1,15 @@
 ## Open
 
+### Do the demo restructure, decided 2026-10-04
+
+*"names ok, looper retires, no redrect, capture is fine"*, answering
+`plans/plan-demo-structure.md`'s four questions: `/sync/`, `/time/`, `/wire/`,
+`/patchbay/`, `/capture/` as named; `/looper/` goes to the archive (the kit
+module `looper.mjs` stays); old slugs simply 404, no redirect table; `/capture/`
+is in scope, Stream cost per check run accepted. Work in the plan's §5 order:
+shared pieces once, then one agent per page, the session owns `manifest.mjs`,
+the archive moves and every commit.
+
 ### Time fields, a two-clock demo, and the message format, asked 2026-10-04
 
 *"Can we cosolidate due at when? Can we do demo on synving thing and two clocks
