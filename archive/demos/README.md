@@ -350,3 +350,15 @@ behind with the old files: LOOPS' direction check worked the source position
 out through the same `mirror()` that builds the backwards copy, so an unmirrored
 copy still passed (the tab reads the event's own identity now); and DATES' checks
 ran on every press of Fit, for visitors too. No redirect; all five slugs 404.
+
+## `take`, `record`, `keep`, `show`, `cues`, `jam` and `replay`, retired 2026-10-04
+
+`take`, `record`, `keep` and `show` became `/capture/`'s TAKES, SEGMENTS (with
+the old `/capture/`), ROUND TRIP and FAR END; `cues`, `jam` and `replay` became
+`/sync/`'s ARRIVAL, AHEAD and AFTER. Both pages grade more than the old ones did
+together: `/capture/` 59 own checks against 27 (72 on a deep run, keep's 14
+included), `/sync/` 50 against 29. Left behind in these files, found on the way:
+`jam`'s loop was 1750 ms rather than 2000 (it sought to 0 from beat 8) and its
+"shared clock" assert could not fail; `replay`'s headline "cues land within
+250 ms" never ran in the suite; `take` ran 6 of its 14 checks; `cues` and `jam`
+joined the relay on every visit. No redirects; all seven slugs 404.

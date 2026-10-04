@@ -7,317 +7,105 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* No vertical margins in here: the gap between the picture, the segment row
-     and the transport bar is `.pos-stack` in shell.css, one rhythm for every
-     page, and this page's blocks are in one because `.pos-body` is a stack. */
-  video, canvas.src { width: 100%; max-width: 440px; display: block; background: #000;
-                      border: 1px solid var(--line); border-radius: 3px; }
-  .segs { font: 500 10px/1.6 var(--mono); color: var(--dim2);
-          display: flex; flex-wrap: wrap; gap: 3px; }
-  /* A row with nothing in it still takes its 22 px, which reads as something
-     that failed to render. `display:flex` beats the UA's `[hidden]` rule, so
-     the hidden case has to be said here. */
-  .segs[hidden] { display: none; }
-  .segs i { font-style: normal; border: 1px solid var(--line2); border-radius: 2px; padding: 0 4px; }
-  .segs i.up { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
+  /* No vertical margins in here: the gap between blocks is `.pos-stack`, and
+     every tab panel is one (`tab-page.mjs` makes it so). */
+
+  /* SIDE BY SIDE, and stacked when there is no room. The source and what came
+     back are the two things compared, and a column puts one off the screen
+     while you look at the other. `min(100%, 300px)`: a bare 300 px floor is a
+     column wider than a 320 px phone's content box, which drags the page
+     sideways rather than stacking. */
+  .cap-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+              gap: 10px; align-items: start; }
+  .cap-pair figure { margin: 0; min-width: 0; }
+  .cap-pair canvas, .cap-pair video, canvas.cap-src {
+    display: block; width: 100%; background: var(--card);
+    border: 1px solid var(--line); border-radius: 4px; }
+  /* An empty received picture is the source's shape, not the browser's default
+     300 by 150: two boxes almost the same size side by side read as an error. */
+  .cap-pair figure > video { aspect-ratio: 16 / 9; }
+  canvas.cap-src, video.cap-back { max-width: 440px; }
+  video.cap-back { display: block; width: 100%; }
+  /* ONE VIEWPORT for a sequence of takes: only the one under the playhead is
+     shown, so a gallery would draw a claim the timeline does not make. */
+  /* The box draws the screen's edge itself, so before the first take it reads
+     as an empty screen beside the source rather than as a 16:9 hole in the
+     page (photographed at 375: a 230 px void between SOURCE and PLAYBACK). One
+     edge per object, so the videos inside it give up theirs. */
+  .cap-seq { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
+             background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+  .cap-seq video { position: absolute; inset: 0; width: 100%; height: 100%;
+                   border: 0; border-radius: 0; }
+  /* Every rule above that sets `display` beats the browser's own `[hidden]`,
+     so what hidden means is said here. */
+  .cap-pair[hidden], .cap-pair video[hidden], .cap-pair canvas[hidden],
+  canvas.cap-src[hidden], video.cap-back[hidden], .cap-row[hidden], .cap-segs[hidden] { display: none; }
+
+  /* A tab's own control row. NOT `.pos-controls`, which the harness presses by
+     position across the whole document (`tab-page.mjs` rule 4); laid out the
+     way the shell lays out that row. */
+  .cap-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .cap-row [data-end] { margin-left: auto; }
+
+  .cap-segs { display: flex; flex-wrap: wrap; gap: 3px; }
+  .cap-segs i { font: 500 10px/1.6 var(--mono); font-style: normal; color: var(--dim2);
+                border: 1px solid var(--line2); border-radius: 2px; padding: 0 4px; }
+  .cap-segs i.held { color: var(--hi); border-color: var(--hi); }
+  .cap-segs i.gone { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
 </style>
 
 <script type="module">
-  import { mount, guard, recorderMime, el, armVideo, playOrPrompt, createShipper } from '/shell/shell.mjs';
-  import { burn, hueFor, drawCamera } from '/shell/pattern.mjs';
-  import { createTransportBar } from '/shell/transport-bar.mjs';
-  import { createDeck } from '/timeline/transport.mjs';
-  import { mediaMaster } from '/timeline/media-master.mjs';
-  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
-
-  const INGEST = 'https://ingest.positron.studio';
-  const SEG_MS = 2000;
-
-  const q = new URLSearchParams(location.search);
-  // The R2 leg is OPT-IN. The ingest caps are real (5 sessions per address per
-  // hour) and demo/verify.mjs presses every control on every run, so an
-  // always-on upload would exhaust the quota and then fail the suite on a 429.
-  // Without ?r2=1 this records and replays locally, which is the whole story
-  // minus the round trip; with it, the bytes go to R2 and come back from there.
-  const useR2 = q.get('r2') === '1';
+  // /capture/, four old pages as the tabs of one (2026-10-04, decided by the
+  // owner as *"names ok, looper retires, no redrect, capture is fine"*,
+  // `plans/plan-demo-structure.md` §3.5): TAKES from `take`, SEGMENTS from the
+  // old `capture` and `record`, ROUND TRIP from `keep`, FAR END from `show`.
+  // Each tab is a module beside this file; `createTabPage` builds a tab the
+  // first time it is opened, gives it its own readout and log, and runs every
+  // tab's checks from the one SELFCHECK pass below.
+  //
+  // 🔴 NOTHING OPENS ON LOAD. Building the tab that is open opens nothing
+  // either: no camera, no recording, no ingest request, no WebRTC connection,
+  // no relay ask. Each tab asserts its own half of that before its first press.
+  //
+  // 🔴 ROUND TRIP IS THE ONE DEEP CHECK. It holds a WHIP and a WHEP leg on
+  // Cloudflare Stream, which is minutes billed on every run, so an ordinary run
+  // stops at the relay ask and logs `left for the deep run`;
+  // `DEMO_DEEP=1 node demo/verify.mjs capture` runs the rest.
+  //
+  // THE PUBLISHED BAR IS TAKES's, the tab the page opens on, so the harness
+  // drills it as it drilled `/take/`'s. The other three bars are `publish:
+  // false` and drilled as page asserts by `bar-drill.mjs`.
+  import { mount, guard } from '/shell/shell.mjs';
+  import { createTabPage } from '/shell/tab-page.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import * as takes from './takes.mjs';
+  import * as segments from './segments.mjs';
+  import * as roundtrip from './roundtrip.mjs';
+  import * as farend from './farend.mjs';
 
   const d = mount({
     name: 'capture',
-    what: 'A camera, or a generated picture if you would rather not be on one, '
-      + 'is recorded in two-second segments and played back on the timeline below. '
-      + 'Press Record 6 seconds, then Play it back and scrub it. Add ?r2=1 to the '
-      + 'address and every segment is uploaded to Cloudflare R2 and fetched back '
-      + 'again before it plays, which is what where reports.',
-    // `held: 'peak'` used to sit in this row: a key and a unit saying different
-    // things, over a number that was 1 on every run, because a segment is freed
-    // in the same handler that counts it. `biggest` is the same family of fact
-    // and it moves — segments are not all the same size.
-    readout: { source: '', segments: '', biggest: 'KiB', total: 'KiB', where: '', length: 's' },
-    controls: [
-      { id: 'rec', label: 'Record 6 seconds', primary: true },
-      { id: 'camera', label: 'Use the camera' },
-      { id: 'play', label: 'Play it back' },
-    ],
+    what: 'Recording what came over a link, from a take on this machine to the far end of a live connection.',
+    readout: null,
+    showLog: false,
   });
   guard(d);
-  const ship = createShipper();
 
-  // ── the source: a canvas by default, the camera on request ───────────────
-  // Canvas first so the page needs no permission and the suite is
-  // deterministic. The canvas carries a wall clock so a replay can be checked
-  // against the moment it was recorded.
-  const canvas = el('canvas', 'src');
-  // the shared pattern's machine-readable row is frozen on a 1280 grid
-  const W = 1280, H = 720;
-  canvas.width = W; canvas.height = H;
-  const g = canvas.getContext('2d');
-  const video = el('video', '', null, { playsinline: '', muted: '', controls: '' });
-  video.muted = true;
-  video.style.display = 'none';
-  d.el.append(canvas, video);
-  const segsEl = el('div', 'segs');
-  segsEl.hidden = true;                        // until there is a segment in it
-  d.el.append(segsEl);
-
-  let frame = 0;
-  setInterval(() => {
-    if (camStream) return;                     // the camera is its own picture
-    burn(g, W, H, frame++, { hue: hueFor('capture') });
-  }, 40);
-
-  let camStream = null;
-  d.set('source', 'canvas');
-
-  d.on('camera', async () => {
-    if (camStream) { d.log('camera already on'); return; }
-    try {
-      camStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 360, frameRate: 25 }, audio: false,
-      });
-      const t = camStream.getVideoTracks()[0];
-      d.set('source', 'camera');
-      d.log(`camera: ${t.label || 'default'} ${JSON.stringify(t.getSettings?.() || {}).slice(0, 80)}`, 'hi');
-      // draw the camera INTO the same canvas, so one recording path serves both
-      // sources and the segment behaviour below is identical either way
-      const pv = el('video', '', null, { playsinline: '', muted: '', autoplay: '' });
-      pv.muted = true; pv.srcObject = camStream;
-      await pv.play().catch(() => {});
-      // the camera goes UNDER the same pattern, scrimmed, so a camera frame and
-      // a generated one carry the same readable clock
-      const draw = () => {
-        if (!camStream) return;
-        drawCamera(g, pv, W, H);
-        burn(g, W, H, frame++, { hue: hueFor('capture'), field: false });
-        requestAnimationFrame(draw);
-      };
-      draw();
-    } catch (e) {
-      d.log(`camera refused: ${e.name} · staying on the canvas`, 'bad');
-    }
+  const page = createTabPage(d, {
+    tabs: [
+      { id: 'takes', label: 'TAKES', mod: takes },
+      { id: 'segments', label: 'SEGMENTS', mod: segments },
+      { id: 'roundtrip', label: 'ROUND TRIP', mod: roundtrip },
+      { id: 'farend', label: 'FAR END', mod: farend },
+    ],
+    at: 'takes',
   });
 
-  // ── recording: the timeslice IS the segmenter ────────────────────────────
-  let session = null, closed = 0, held = 0, peak = 0, bytes = 0, biggest = 0, mime = null;
-  let recording = false, manifestUrl = null;
-  const local = [];                            // kept for local playback
-  const uploaded = new Set();
-
-  function paint() {
-    // Blank, never 0: this runs on a reset as well as on a closed segment, and
-    // a zero there reads as a confident measurement of an empty recording.
-    d.set('segments', closed || '');
-    d.set('biggest', biggest ? Math.round(biggest / 1024) : '');
-    d.set('total', bytes ? Math.round(bytes / 1024) : '');
-    segsEl.hidden = local.length === 0;
-    segsEl.replaceChildren(...local.slice(-20).map((b, i) => {
-      const n = local.length - Math.min(20, local.length) + i;
-      return el('i', uploaded.has(n) ? 'up' : '', `${n}:${Math.round(b.size / 1024)}k`);
-    }));
+  if (SELFCHECK) {
+    const t0 = performance.now();
+    await page.check();
+    d.log(`the checks of all four tabs ran in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   }
-
-  async function openSession() {
-    const r = await fetch(`${INGEST}/open`, { method: 'POST' });
-    const j = await r.json();
-    if (!r.ok) { d.log(`ingest refused: ${j.error}${j.retryInS ? ` (retry in ${j.retryInS}s)` : ''}`, 'bad'); return null; }
-    d.log(`ingest session ${j.session} · caps ${j.limits.maxSegments} segs / ${Math.round(j.limits.maxSessionBytes / 1048576)} MiB`, 'hi');
-    return j.session;
-  }
-
-  /** Ship one closed segment and free it — the disk stays flat as the show grows. */
-  async function shipSeg(n, blob) {
-    if (!session) return;
-    const r = await fetch(`${INGEST}/seg/${session}/${n}?fmt=webm`, { method: 'PUT', body: blob });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      d.log(`segment ${n} refused: HTTP ${r.status} ${j.error || ''}`, 'bad');
-      return;
-    }
-    uploaded.add(n);
-    held = Math.max(0, held - 1);
-    paint();
-  }
-
-  d.on('rec', async () => {
-    if (recording) return;
-    closed = 0; held = 0; peak = 0; bytes = 0; biggest = 0;
-    local.length = 0; uploaded.clear();
-    manifestUrl = null;
-    session = useR2 ? await openSession() : null;
-    d.set('where', useR2 ? (session ? 'R2' : 'refused') : 'local');
-    if (useR2 && !session) return;
-
-    const stream = camStream ? canvas.captureStream(25) : canvas.captureStream(25);
-    mime = recorderMime(d);
-    if (!mime) return;
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 800_000 });
-    rec.ondataavailable = (e) => {
-      if (!e.data || !e.data.size) return;
-      const n = closed++;
-      held++; peak = Math.max(peak, held);
-      bytes += e.data.size;
-      biggest = Math.max(biggest, e.data.size);
-      local.push(e.data);
-      paint();
-      if (useR2) shipSeg(n, e.data);
-      else { held = Math.max(0, held - 1); paint(); }
-    };
-    rec.onerror = (e) => d.log(`recorder: ${e.error?.name ?? 'error'}`, 'bad');
-    recording = true;
-    rec.start(SEG_MS);
-    d.log(`recording ${mime}, ${SEG_MS / 1000}s segments, source ${camStream ? 'camera' : 'canvas'}`, 'hi');
-
-    // A fixed short show, so the demo is bounded and the suite deterministic.
-    await new Promise((r) => setTimeout(r, 6200));
-    rec.stop();
-    recording = false;
-    await new Promise((r) => setTimeout(r, 400));
-
-    if (useR2 && session) {
-      const r = await fetch(`${INGEST}/close/${session}?fmt=webm`, { method: 'POST' });
-      const j = await r.json();
-      if (r.ok) {
-        manifestUrl = j.manifest;
-        // The manifest address used to be its own line under the segment row —
-        // an element that was empty on every run without ?r2=1, carrying the
-        // page's rhythm gap to nothing. It is a thing that HAPPENED once, so it
-        // belongs in the log, which is selectable text just as that line was.
-        d.log(`closed: ${j.segments} segments, ${Math.round(j.bytes / 1024)} KiB in R2`, 'hi');
-        d.log(j.manifest);
-        ship(`CAPTURE ${j.segments} segs ${j.bytes}B ${j.manifest}`);
-      } else d.log(`close refused: ${j.error}`, 'bad');
-    } else {
-      d.log(`recorded ${closed} segments locally, ${Math.round(bytes / 1024)} KiB`);
-    }
-  });
-
-  // ── playback, on the timeline ───────────────────────────────────────────
-  let deck = null, master = null, playable = null;
-  // The length `play` resolved, kept so the check below can assert over it
-  // instead of assembling the recording a second time to ask again.
-  let lastDur = null;
-
-  /**
-   * MediaRecorder timeslice chunks concatenate into one playable WebM — the
-   * first chunk carries the header and the rest are continuation clusters.
-   *
-   * The catch: such a file often reports duration Infinity, which makes a
-   * transport bar useless because there is no range to scrub. The fix is the
-   * known one — seek far past the end, let the browser resolve the real
-   * duration, then come back.
-   */
-  async function assemble() {
-    let parts = local;
-    if (useR2 && manifestUrl) {
-      const m = await (await fetch(manifestUrl, { cache: 'no-store' })).json();
-      d.log(`fetching ${m.segments.length} segments back from R2`);
-      parts = [];
-      for (const name of m.segments) {
-        const r = await fetch(`${m.base}/${name}`, { cache: 'no-store' });
-        if (!r.ok) { d.log(`segment ${name} HTTP ${r.status}`, 'bad'); return null; }
-        parts.push(await r.blob());
-      }
-    }
-    if (!parts.length) { d.log('nothing recorded yet', 'bad'); return null; }
-    const blob = new Blob(parts, { type: mime || 'video/webm' });
-    video.src = URL.createObjectURL(blob);
-    await new Promise((res) => {
-      video.addEventListener('loadedmetadata', res, { once: true });
-      setTimeout(res, 4000);
-    });
-    if (!Number.isFinite(video.duration)) {
-      video.currentTime = 1e6;
-      await new Promise((res) => {
-        const on = () => { if (Number.isFinite(video.duration)) { video.removeEventListener('timeupdate', on); res(); } };
-        video.addEventListener('timeupdate', on);
-        setTimeout(res, 3000);
-      });
-      video.currentTime = 0;
-    }
-    return Number.isFinite(video.duration) ? video.duration : null;
-  }
-
-  d.on('play', async () => {
-    armVideo(video);
-    const dur = await assemble();
-    if (dur == null) { d.log('could not resolve a duration · no range to scrub', 'bad'); return; }
-    lastDur = dur;
-    d.set('length', Math.round(dur * 100) / 100);
-    video.style.display = '';
-    canvas.style.display = 'none';
-    if (!deck) {
-      deck = createDeck({ items: [], adapters: {}, range: [0, Math.round(dur * 1000)] });
-      createTransportBar(d.el, deck);
-      master = mediaMaster(deck, video, {});
-    }
-    await playOrPrompt(video, d);
-    deck.play?.();
-    d.log(`playing back ${dur.toFixed(2)}s on the deck · scrub it`, 'hi');
-    // The checks read what this control just produced, so this is the first
-    // moment they can be true — and a button for them would make them optional.
-    await d.run('check');
-  });
-
-  d.on('check', async () => {
-    d.assert('MediaRecorder available', typeof MediaRecorder !== 'undefined');
-    // d.readout does not exist: mount() returns { …, api }, and the readout
-    // values live on d.api.readout (which is also window.__demo.readout).
-    d.assert('a source is selected', ['canvas', 'camera'].includes(String(d.api.readout.source)),
-      String(d.api.readout.source));
-    for (let i = 0; i < 60 && closed === 0; i++) await new Promise((r) => setTimeout(r, 200));
-    d.assert('segments closed', closed > 0, `${closed} segment(s), ${Math.round(bytes / 1024)} KiB`);
-    d.assert('never holds more than two segments', peak <= 2, `${peak} at once`);
-    if (useR2) {
-      d.assert('ingest session opened', !!session, String(session));
-      d.assert('every segment reached R2', uploaded.size === closed, `${uploaded.size}/${closed}`);
-      d.assert('manifest is public', !!manifestUrl, String(manifestUrl));
-    }
-    // 🔴 THE COSTLY HALF, AND IT IS THE HALF A VISITOR WOULD WATCH HAPPEN.
-    // `assemble()` builds the blob again and hands `video.src` a fresh object
-    // URL, which snaps the picture back to the start of a recording somebody is
-    // in the middle of. With `?r2=1` it pulls every segment out of R2 a second
-    // time as well, for a number the page already has, and the seek after it
-    // drags the playhead to the middle of the take. Both wait for a harness.
-    //
-    // ⚠️ THE DURATION ITSELF IS NOT COSTLY, so its assert runs for everybody:
-    // `play` resolved it a moment ago and it is in the readout. Re-asking is
-    // the cost, not the claim.
-    const dur = SELFCHECK ? await assemble() : lastDur;
-    d.assert('the recording resolves a duration', dur != null && dur > 0,
-      dur == null ? 'Infinity' : `${dur.toFixed(2)}s`);
-    ifSelfcheck(() => {
-      if (dur == null || !deck) return;
-      const before = deck.position?.() ?? 0;
-      deck.seek(Math.round(dur * 500));
-      const after = deck.position?.() ?? 0;
-      d.assert('the deck seeks inside the recording', after !== before || after > 0,
-        `${before} -> ${after}`);
-    }, { log: d.log, say: 'the seek check would drag the playhead off what you are watching, '
-      + 'so it is left to the harness · drag the bar yourself and the picture follows' });
-  });
-
-  d.log(useR2
-    ? 'each closed segment is uploaded as it closes, then fetched back before it plays'
-    : 'recorded and played back inside this page · add ?r2=1 for the round trip');
   d.ready();
 </script>
 </html>
