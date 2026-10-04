@@ -1,0 +1,68 @@
+{
+  "name": "notecc turns one note into a CC, fixed or by velocity",
+  "about": "notecc makes a press of one note send CC cc at the on value, or at the note's velocity when on is vel, and its release send the off value, on the note's own channel, while every other note passes.",
+  "notes": [
+    "l1 pads to synth: note 36 (24) cc 64 (40), on and off left out, so 127 and 0. l2 keys to fx: note 60 (3C) cc 1, on vel, off 10 (0A). No state: every press sends on, unlike toggle.",
+    "t 0: 99 24 64, channel 10 note 36 pressed: B9 40 7F.",
+    "t 1: 89 24 40, its release: B9 40 00. The release velocity is not read.",
+    "t 2: 99 24 00 is a note on at velocity 0, a RELEASE, so it sends off: B9 40 00. Read as a press it would send B9 40 7F.",
+    "NEGATIVE CONTROL t 3: note 38 is not note 36 and passes as a note, 99 26 64.",
+    "t 4: 90 24 64, note 36 on channel 1, keeps channel 1: B0 40 7F.",
+    "NEGATIVE CONTROL t 5: a CC already on the link, B9 40 7F, passes unchanged.",
+    "t 6: on l2, 90 3C 2D: on is vel, so the value is the velocity 45 = 2D: B0 01 2D.",
+    "t 7: on l2, 80 3C 40: the off value 10: B0 01 0A, not the release velocity 40.",
+    "t 8: on l2, 90 3C 01: velocity 1: B0 01 01.",
+    "NEGATIVE CONTROL t 9: on l2, note 59 (3B) is not note 60 and passes, 90 3B 2D.",
+    "t 10: on l2, 9F 3C 7F, channel 16: BF 01 7F.",
+    "t 11: on l2, 9F 3C 00, a release on channel 16: BF 01 0A.",
+    "NEGATIVE CONTROL: l3 says on velocity, a word that is not vel, and is refused bad-args.",
+    "NEGATIVE CONTROL: l4 asks for note 128 and is refused bad-args.",
+    "NEGATIVE CONTROL: l5 asks for on 128 and is refused bad-args. In C the vel marker is not 128, so a number cannot be mistaken for it."
+  ],
+  "ports": [
+    { "id": "pads", "dir": "in" },
+    { "id": "keys", "dir": "in" },
+    { "id": "synth", "dir": "out" },
+    { "id": "fx", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "pads", "to": "synth", "ops": [{ "op": "notecc", "note": 36, "cc": 64 }] },
+    { "id": "l2", "from": "keys", "to": "fx", "ops": [{ "op": "notecc", "note": 60, "cc": 1, "on": "vel", "off": 10 }] },
+    { "id": "l3", "from": "keys", "to": "fx", "ops": [{ "op": "notecc", "note": 60, "cc": 1, "on": "velocity" }] },
+    { "id": "l4", "from": "keys", "to": "fx", "ops": [{ "op": "notecc", "note": 128, "cc": 1 }] },
+    { "id": "l5", "from": "keys", "to": "fx", "ops": [{ "op": "notecc", "note": 60, "cc": 1, "on": 128 }] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "bad-args" },
+    { "link": "l4", "reason": "bad-args" },
+    { "link": "l5", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "pads", "t": 0, "bytes": "99 24 64" },
+    { "port": "pads", "t": 1, "bytes": "89 24 40" },
+    { "port": "pads", "t": 2, "bytes": "99 24 00" },
+    { "port": "pads", "t": 3, "bytes": "99 26 64" },
+    { "port": "pads", "t": 4, "bytes": "90 24 64" },
+    { "port": "pads", "t": 5, "bytes": "B9 40 7F" },
+    { "port": "keys", "t": 6, "bytes": "90 3C 2D" },
+    { "port": "keys", "t": 7, "bytes": "80 3C 40" },
+    { "port": "keys", "t": 8, "bytes": "90 3C 01" },
+    { "port": "keys", "t": 9, "bytes": "90 3B 2D" },
+    { "port": "keys", "t": 10, "bytes": "9F 3C 7F" },
+    { "port": "keys", "t": 11, "bytes": "9F 3C 00" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "B9 40 7F" },
+    { "port": "synth", "t": 1, "bytes": "B9 40 00" },
+    { "port": "synth", "t": 2, "bytes": "B9 40 00" },
+    { "port": "synth", "t": 3, "bytes": "99 26 64" },
+    { "port": "synth", "t": 4, "bytes": "B0 40 7F" },
+    { "port": "synth", "t": 5, "bytes": "B9 40 7F" },
+    { "port": "fx", "t": 6, "bytes": "B0 01 2D" },
+    { "port": "fx", "t": 7, "bytes": "B0 01 0A" },
+    { "port": "fx", "t": 8, "bytes": "B0 01 01" },
+    { "port": "fx", "t": 9, "bytes": "90 3B 2D" },
+    { "port": "fx", "t": 10, "bytes": "BF 01 7F" },
+    { "port": "fx", "t": 11, "bytes": "BF 01 0A" }
+  ]
+}

@@ -20,5 +20,9 @@
   "19-sysex-lone-f7.json",
   "20-velocity-ties.json",
   "21-policy-alias.json",
-  "22-thin-backwards.json"
+  "22-thin-backwards.json",
+  "23-curve.json",
+  "24-curve-bend-touch.json",
+  "25-velcurve.json",
+  "26-notecc.json"
 ]

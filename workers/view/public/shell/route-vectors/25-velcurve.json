@@ -1,0 +1,56 @@
+{
+  "name": "velcurve reshapes a note on's velocity and leaves a release alone",
+  "about": "velcurve puts a note on's velocity through a table of points, as curve does a CC, then clamps to 1..127 so a note on never becomes a release.",
+  "notes": [
+    "points (0,0) (40,10) (100,120). The same interpolation and rounding as curve, on a note on with v > 0 only, then clamped to 1..127.",
+    "t 0: v 1, segment 0..40: 0 + 1 * 10 / 40 = 0.25, rounds to 0 and CLAMPS UP to 1 = 01. Without the clamp it would be 90 3C 00, a release.",
+    "t 1: v 10 (0A): 10 * 10 / 40 = 2.5, a TIE, away from zero 3 = 03. Truncating gives 2, ties to even gives 2.",
+    "t 2: v 40 (28) is a point: 10 = 0A.",
+    "t 3: v 43 (2B), segment 40..100: 10 + 3 * 110 / 60 = 10 + 5.5, a TIE, 10 + 6 = 16 = 10.",
+    "t 4: v 100 (64) is the last point: 120 = 78.",
+    "t 5: v 127 (7F) is above the last point and CLAMPS to its out, 120 = 78, not 127.",
+    "NEGATIVE CONTROL t 6: a note off with release velocity 64 (80 3C 40) passes unchanged. Curved it would read 80 3C 36, since 10 + 24 * 110 / 60 = 54.",
+    "NEGATIVE CONTROL t 7: 90 3D 00 is a release and passes unchanged. Curved and clamped it would become 90 3D 01, a note on that never ends.",
+    "NEGATIVE CONTROL t 8: a CC value is not a velocity, B0 07 0A passes unchanged.",
+    "NEGATIVE CONTROL t 9: a poly touch carries a pressure, not a velocity, A0 3C 0A passes unchanged.",
+    "NEGATIVE CONTROL: l2 has two points with the same input (0 and 0) and is refused bad-args. Inputs must rise strictly.",
+    "NEGATIVE CONTROL: l3 has no points at all and is refused bad-args."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "synth", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth", "ops": [{ "op": "velcurve", "points": [[0, 0], [40, 10], [100, 120]] }] },
+    { "id": "l2", "from": "kbd", "to": "synth", "ops": [{ "op": "velcurve", "points": [[0, 0], [0, 10], [127, 127]] }] },
+    { "id": "l3", "from": "kbd", "to": "synth", "ops": [{ "op": "velcurve" }] }
+  ],
+  "refused": [
+    { "link": "l2", "reason": "bad-args" },
+    { "link": "l3", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "90 3C 01" },
+    { "port": "kbd", "t": 1, "bytes": "90 3D 0A" },
+    { "port": "kbd", "t": 2, "bytes": "90 3E 28" },
+    { "port": "kbd", "t": 3, "bytes": "90 3F 2B" },
+    { "port": "kbd", "t": 4, "bytes": "90 40 64" },
+    { "port": "kbd", "t": 5, "bytes": "90 41 7F" },
+    { "port": "kbd", "t": 6, "bytes": "80 3C 40" },
+    { "port": "kbd", "t": 7, "bytes": "90 3D 00" },
+    { "port": "kbd", "t": 8, "bytes": "B0 07 0A" },
+    { "port": "kbd", "t": 9, "bytes": "A0 3C 0A" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "90 3C 01" },
+    { "port": "synth", "t": 1, "bytes": "90 3D 03" },
+    { "port": "synth", "t": 2, "bytes": "90 3E 0A" },
+    { "port": "synth", "t": 3, "bytes": "90 3F 10" },
+    { "port": "synth", "t": 4, "bytes": "90 40 78" },
+    { "port": "synth", "t": 5, "bytes": "90 41 78" },
+    { "port": "synth", "t": 6, "bytes": "80 3C 40" },
+    { "port": "synth", "t": 7, "bytes": "90 3D 00" },
+    { "port": "synth", "t": 8, "bytes": "B0 07 0A" },
+    { "port": "synth", "t": 9, "bytes": "A0 3C 0A" }
+  ]
+}

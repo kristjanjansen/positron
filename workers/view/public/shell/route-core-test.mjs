@@ -10,25 +10,26 @@
 // against itself and passes every bug it already has.
 //
 // NEGATIVE CONTROLS, AND THE PROPORTION IS STATED BECAUSE A ROUTER PASSES A
-// NAIVE SUITE BY PASSING EVERYTHING THROUGH. Recounted 2026-10-03 after 18 to
-// 22 landed, one per thing the C port found that no vector decided:
-//   - Inside the vectors, 67 of the 210 input steps and link attempts (165
-//     steps, 45 links) are there to be dropped, held, refused or left alone,
+// NAIVE SUITE BY PASSING EVERYTHING THROUGH. Recounted 2026-10-04 after 23 to
+// 26 landed, one per op the plan's §12 listed as not yet in the reference:
+//   - Inside the vectors, 92 of the 276 input steps and link attempts (214
+//     steps, 62 links) are there to be dropped, held, refused or left alone,
 //     each one marked NEGATIVE CONTROL in its vector's `notes` or listed under
-//     `refused`. It was 24 of 91 across 01 to 10 and 57 of 165 across 01 to 17.
+//     `refused`. It was 24 of 91 across 01 to 10, 57 of 165 across 01 to 17
+//     and 67 of 210 across 01 to 22; 23 to 26 bring 25 of 66.
 //     Counted per step: a step dropped on one link and kept on the other
 //     counts once.
 //   - Every vector is also run against a COPY OF ITS OWN EXPECTATION WITH ITS
-//     LAST BYTE FLIPPED, and that comparison must FAIL. Twenty-two asserts that
+//     LAST BYTE FLIPPED, and that comparison must FAIL. Twenty-six asserts that
 //     check the check can fail. ⚠️ The first version flipped only data bytes and
 //     went red on 10, whose last event is a one byte F8: the self check caught
 //     itself.
 //   - Five direct refusals at link time (unknown op, bad args, an input range
 //     written backwards, a duplicate id, a kind nobody named).
-//   So 27 of the 99 asserts are negative controls outright, 48 run the vectors
-//   (22 refusals, 22 outputs, 4 held counts) and 24 check that the vectors are
+//   So 31 of the 115 asserts are negative controls outright, 56 run the vectors
+//   (26 refusals, 26 outputs, 4 held counts) and 28 check that the vectors are
 //   well formed (the count, index.json, and one per vector naming only known
-//   ops, kinds, verbs and codes).
+//   ops, kinds, verbs and codes). It was 99 before 23 to 26.
 //
 // 🔴 SABOTAGED ONCE, 2026-10-03, ON A SCRATCH COPY of `route-core.mjs`,
 // `midi-kinds.mjs`, this file and the vectors, so the live file was never
@@ -87,7 +88,35 @@
 //      green, because touch then falls to allow and nothing is held at the end
 //      either way.
 //  31. `thin` reading a backwards t as no time passed: 1 red (22).
-// ⚠️ ONE SABOTAGE WENT GREEN AND IS EQUIVALENT, NOT A HOLE: `deny()` emptying
+//
+// 🔴 SABOTAGED A FOURTH TIME, 2026-10-04, ONCE OR MORE PER OP 23 TO 26 NAME
+// (`curve`, `velcurve`, `notecc`), the same way, the copy restored and read
+// 115/115. Red asserts, MEASURED:
+//  32. `curve` ignoring its `cc`: 1 red (23, CC 7 gets curved).
+//  33. `curve` ignoring its `cls`: 1 red (24). 🔴 IT WAS 0 RED ON THE FIRST RUN.
+//      24's l2 was a full identity table, so a CC curved by it came out
+//      unchanged and looked exactly like a CC skipped. l2 is now identity only
+//      from 64 up, which still grades a bend's exactness at and above centre.
+//  34. a bend's points read as plain p * 128, so 127 is 16256: 1 red (24).
+//  35. a bend curved on its MSB alone, the LSB kept: 1 red (24).
+//  36. a channel touch's pressure read from the third byte: 1 red (24).
+//  37. `curveAt` truncating: 3 red (23, 24, 25, it is shared by both curves).
+//  38. `curveAt` with `Math.round`: 1 red (24, the negative tie -1.5).
+//  39. `curveAt` extrapolating past both end points instead of clamping, then
+//      floored to the value's range: 2 red (23, 25). 🔴 THE SAME AT THE LOW END
+//      ALONE WAS 0 RED ON THE FIRST RUN. 23's first out was 0, so an
+//      extrapolation floored at 0 read as the clamp. Its first out is 4 now.
+//      23's top clamp is still blind to this (its last out is 127), and 25's
+//      is not (its last out is 120).
+//  40. points with equal inputs allowed: 2 red (25 refusals and output).
+//  41. no limit of 16 points: 2 red (23 refusals and output).
+//  42. `velcurve` without its floor of 1: 1 red (25).
+//  43. `velcurve` curving releases too: 1 red (25).
+//  44. `notecc` reading a note on at velocity 0 as a press: 1 red (26).
+//  45. `notecc` sending every CC on channel 1: 1 red (26).
+//  46. `notecc`'s `'vel'` read as a fixed 127: 1 red (26).
+//  47. `notecc` taking any word for `on`: 2 red (26 refusals and output).
+// ⚠️ ONE SABOTAGE OF THE THIRD RUN WENT GREEN AND IS EQUIVALENT, NOT A HOLE: `deny()` emptying
 // its list without marking the entry denied. The entry is unreachable, the held
 // count reads from the list, and a later chunk of that stream is appended to
 // the orphan and never delivered, so nothing a vector can observe differs.
