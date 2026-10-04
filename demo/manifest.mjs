@@ -1163,6 +1163,8 @@ export function shortDate(iso) {
  * some are phrases. Same rule as the diagram labels in CLAUDE.md.
  */
 export const GROUPS = new Map([
+  // The kit first, asked 2026-10-04: *"move kit to first group in index page"*.
+  ['kit', 'kit'],
   /**
    * 🔴 `TH` IS FIRST, ASKED 2026-09-24: *"move headset group first in
    * index. rename to 'TH'"*, with *"move making to TH"* and *"move typist to
@@ -1280,7 +1282,6 @@ export const GROUPS = new Map([
    */
   ['messages', 'messages'],
   ['technologies', 'technologies'],
-  ['kit', 'kit'],
 ]);
 
 /**
