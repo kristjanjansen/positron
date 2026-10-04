@@ -32,7 +32,25 @@
  * navigation and a page that re-reads it per assert invites a check that is
  * gated in one place and not in another.
  */
-export const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
+// 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*, then
+// *"i mean these long-running ones"*. `selfcheck=1` is the ordinary run and
+// grades what this machine can grade quickly; `selfcheck=2` is the DEEP run and
+// adds the long-running checks: a Cloudflare round trip, a recording, a live
+// stream waited on for its frames, anything that costs Stream minutes or holds
+// another machine. `node demo/verify.mjs` asks for 1, and `DEMO_DEEP=1` (or
+// `--deep`) for 2.
+// ⚠️ A DEEP CHECK THAT DID NOT RUN SAYS SO IN THE LOG, never as a pass: the
+// ordinary run's count is smaller and is honest about why.
+const LEVEL = new URLSearchParams(location.search).get('selfcheck');
+export const SELFCHECK = LEVEL === '1' || LEVEL === '2';
+export const DEEP = LEVEL === '2';
+
+/** Run `fn` on a deep run only; on an ordinary one, log what was left out. */
+export function ifDeep(fn, { log, say } = {}) {
+  if (DEEP) return fn();
+  if (SELFCHECK && log && say) log(`left for the deep run: ${say}`);
+  return undefined;
+}
 
 /**
  * Run `fn` only under a harness, and say so in the log when a person is

@@ -17,6 +17,7 @@
   import { createPresenceButton, streamSays, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
 
   const d = mount({
     name: 'webrtc',
@@ -300,8 +301,22 @@
     d.log('let the publisher go. it stops about a minute after the last viewer goes');
   }
 
+  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
+     *"i mean these long-running ones"*. This press holds the publisher, asks
+     for relay servers, waits out a cold container's WHIP leg and then a WHEP
+     handshake and its first frames: a minute of Stream on a cold day. An
+     ORDINARY harness run (`selfcheck=1`) starts none of it and grades the page
+     at rest; `DEMO_DEEP=1 node demo/verify.mjs webrtc` runs the rest. A visitor
+     is never `LIGHT`, so their press is unchanged. */
+  const LIGHT = SELFCHECK && !DEEP;
+
   async function start() {
     if (pc) return;
+    if (LIGHT) {
+      d.log('left for the deep run: the publisher, the relay servers, the WHIP leg and the WHEP picture (DEMO_DEEP=1)');
+      await d.run('check');
+      return;
+    }
     pressAt ??= performance.now();
     const mine = ++gen;
     abort = new AbortController();
@@ -568,7 +583,7 @@
      */
     const said = (stream.badge.textContent || '').trim();
     const state = stream.state();
-    d.assert('publisher held by this page',
+    if (!LIGHT) d.assert('publisher held by this page',
       held && typeof state === 'string' && state !== 'offline',
       `toggle reads ${JSON.stringify(said)}, state ${state}, socket ${held ? 'held' : 'let go'}`);
     /**
@@ -641,7 +656,8 @@
         + `and one cell later it was ${backWhenWritten ? 'back' : 'STILL ABSENT'}, `
         + `with the stream reading ${stream.state()} and ${keys.length} cells on the row`);
     }
-    d.assert('peer connection created', !!pc);
+    // Everything from here is about a connection, and an ordinary run made none.
+    if (!LIGHT) d.assert('peer connection created', !!pc);
     if (pc) {
       d.assert('peer connection connected', pc.connectionState === 'connected', pc.connectionState);
       const tracks = video.srcObject?.getTracks?.() || [];

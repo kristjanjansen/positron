@@ -1395,6 +1395,24 @@ export function createTransportBar(host, deck, {
     const tg = e.target;
     if (tg instanceof HTMLElement &&
         (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
+    /**
+     * 🔴 A KEY AIMED AT ANOTHER BAR IS THAT BAR'S, AND A BAR IN A CLOSED TAB
+     * HEARS NOTHING. 2026-10-04, for the tabbed pages (`/time/` will carry five
+     * bars, `plans/plan-demo-structure.md` §3.2). This table listens on
+     * `window`, so before this every bar on a page took every key: a space
+     * with the focus on one bar's toggle started all of them, and on a tabbed
+     * page that is decks running and sounding in tabs nobody is looking at.
+     * ⚠️ BOTH HALVES ARE NARROW ON PURPOSE. A key from the body still reaches
+     * every bar, which is what the harness sends and what every page before
+     * this was built against. The closed-tab half only applies inside a panel
+     * marked `data-own-keys`, which `tab-page.mjs` sets; `/kit/`, `/stage/`,
+     * `/making/` and `/pack/` hold bars in plain tabs and keep their behaviour,
+     * because `/kit/`'s published bar sits in a closed tab and the harness's
+     * seek would otherwise land on nothing. `bar-drill.mjs` sends its key at
+     * the bar's own element so it moves one bar and no other.
+     */
+    if (tg instanceof Element) { const owner = tg.closest('.tbar'); if (owner && owner !== bar) return; }
+    if (bar.closest('[data-own-keys][hidden]')) return;
     const [a, b] = range;
     const span = b - a;
     const cur = deck.position();

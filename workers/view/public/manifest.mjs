@@ -68,18 +68,6 @@ export const ACTS = new Map([
 ]);
 
 export const DEMOS = [
-  { name: 'transport', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'twenty things are set to happen, one a second',
-    tags: ['timeline'] },
-  { name: 'lanes', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one beat, sent several ways at once',
-    tags: ['timeline', 'WebAudio'] },
-  { name: 'loops', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one two-second recording placed three times, the last of them looping twice in whichever direction the button shows',
-    tags: ['timeline'] },
-  { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one file format for scores written in different languages',
-    tags: ['timeline'] },
   { name: 'und', group: 'timeline', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score, compiled whenever you stop typing',
     tags: ['timeline', 'Csound', 'WebAudio'] },
@@ -92,12 +80,12 @@ export const DEMOS = [
     tags: ['LL-HLS', 'Stream', 'container'],
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
-    settleMs: 75000 },
+    settleMs: 75000, lightSettleMs: 1000 },
   { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true,
     one: 'the same live picture the HLS pages play, delivered over WHEP instead',
     tags: ['WebRTC', 'WHEP', 'Stream'],
-    settleMs: 75000 },
-  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
+    settleMs: 75000, lightSettleMs: 1000 },
+  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000, lightSettleMs: 1000,
     one: 'the same test picture the other streaming pages play, sent from this browser over MoQ and back',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
   // One press starts every leg: getUserMedia, a WHIP publish through the pub
@@ -105,16 +93,13 @@ export const DEMOS = [
   // the relay session together take seconds, and the checks then wait for 30
   // timed frames on each leg, so the first page asserts land well after the
   // harness's default settle.
-  { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, settleMs: 45000,
+  { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, settleMs: 45000, lightSettleMs: 3000,
     one: 'one webcam next to what comes back over WebRTC, MoQ and LL-HLS',
     tags: ['getUserMedia', 'WebRTC', 'WHIP', 'MoQ'] },
 
   { name: 'room', group: 'technologies', act: 2, created: '2026-09-04', built: true,
     one: 'open this page twice and each window shows the other',
     tags: ['getUserMedia', 'WebRTC', 'relay'] },
-  { name: 'cues', group: 'messages', act: 2, created: '2026-09-04', built: true,
-    one: 'one press here and every open copy of this page shows the same cue name at the same moment',
-    tags: ['DO', 'WS', 'relay'] },
   // `items` was a demo and is archived at archive/items/README.md, removed
   // 2026-10-01 on instruction. It wrote an item, let a Durable Object alarm
   // publish it at the moment named, and told installed phones over FCM. Its
@@ -186,8 +171,10 @@ export const DEMOS = [
    * no third-party mount: it decoded from our own station Worker.
    */
 
-  { name: 'wire', group: 'messages', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
-    one: 'compose a message and watch the exact bytes travel out and come back as the relay\'s own echo',
+  // BYTES and NOTES tabs since 2026-10-04 (plans/plan-demo-structure.md §3.3); its
+  // checks run before ready, so the boot wait is the check pass, MEASURED 3.8 s.
+  { name: 'wire', group: 'messages', act: 2, created: '2026-09-10', built: true, bootMs: 20000, room: 'fixed',
+    one: 'A message as the exact bytes that travel, and a note as how late it lands on another machine.',
     tags: ['WS', 'DO', 'SQLite'] },
 
   // The only network-free row in Act 3, and the act's simplest complete
@@ -201,18 +188,9 @@ export const DEMOS = [
   // assert, and every assert on this page sits behind a recording that runs to
   // a 10 s cap. Shrink it and the suite reads zero asserts and calls a working
   // page broken.
-  { name: 'take', group: 'capture', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
-    one: 'record, then record again, so each take lands on the line after the one before',
-    tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
-  { name: 'keep', group: 'capture', act: 3, created: '2026-09-08', built: true, settleMs: 30000,
-    one: 'the picture you send out is recorded as the copy that comes back',
-    tags: ['getUserMedia', 'WHIP', 'WHEP', 'timeline'] },
-  { name: 'record', group: 'capture', act: 3, created: '2026-09-04', built: true,
-    one: 'the bytes being held never grow past one segment, however long the show runs',
-    tags: ['MediaRecorder', 'R2'] },
   // 🔴 `settleMs` HERE IS NOT FOR A SLOW CONTROL, BECAUSE THIS PAGE HAS NO
   // CONTROLS. The Load button was removed on instruction and the transport's
   // own ▸ does the loading, so the page's checks hang off a press the harness
@@ -221,9 +199,6 @@ export const DEMOS = [
   // FIRST assert. Replay's first assert is the loop check, which has to let the
   // shared transport checks finish, then play two laps of a real picture and
   // watch where it gets to.
-  { name: 'replay', group: 'capture', act: 3, created: '2026-09-04', built: true, settleMs: 6000,
-    one: 'a 190 s show off R2, played with the eight cues it was recorded with',
-    tags: ['HLS', 'R2', 'timeline'] },
   // `seek` was a demo and is archived at archive/demos/seek-index.html, removed
   // 2026-09-16 on instruction. It played this same show and asked the timeline
   // which cues had happened by any position, 24 asks around the eight cues plus
@@ -231,12 +206,6 @@ export const DEMOS = [
   // its own moment as a retroactive burst. The loop button it graded is still
   // graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
 
-  { name: 'instrument', group: 'messages', act: 4, created: '2026-09-04', built: true,
-    one: 'a keyboard whose sound may be coming out of a different machine',
-    tags: ['WebMIDI', 'relay', 'WebAudio', 'WebRTC'] },
-  { name: 'jam', group: 'messages', act: 4, created: '2026-09-04', built: true,
-    one: 'two machines counting the same eight beats with neither leading',
-    tags: ['WS', 'relay', 'WebAudio'] },
 
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
@@ -249,7 +218,7 @@ export const DEMOS = [
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
-    settleMs: 26000 },
+    settleMs: 26000, lightSettleMs: 15000 },
   // `gl: true` and `xr: true` for the same reason mirror and blocks carry them:
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
@@ -263,7 +232,7 @@ export const DEMOS = [
   { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
     one: 'eight live ERR channels in equal cells',
     tags: ['HLS', 'icecast', 'DVR'],
-    settleMs: 14000 },
+    settleMs: 14000, lightSettleMs: 6000 },
   // Everything that could be reached about one artist, before anything is
   // played: 122 rows out of fourteen archives, saying when it is from, who
   // holds it, what it is, whether there is a file and what its licence allows.
@@ -346,14 +315,14 @@ export const DEMOS = [
   // page unbuilt since 2026-08-26. `plans/plan-studio.md` still holds the argument
   // for it, which is where a proposal belongs. A row for a page that does not
   // exist makes the list longer and the reader's odds worse.
-  { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, settleMs: 26000,
-    one: 'a camera, or a generated picture if you would rather not be on one, is recorded in two-second segments and played back on the timeline below',
-    tags: ['getUserMedia', 'MediaRecorder', 'R2', 'timeline'] },
+  // TAKES, SEGMENTS, ROUND TRIP, FAR END since 2026-10-04 (plan-demo-structure
+  // §3.5). Its checks run before ready, MEASURED about 20 s ordinary and 33 s
+  // deep; bootMs is a ceiling and costs a working page nothing.
+  { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, bootMs: 70000, lightSettleMs: 2000,
+    one: 'Recording what came over a link, from a take on this machine to the far end of a live connection.',
+    tags: ['getUserMedia', 'MediaRecorder', 'R2', 'WHIP', 'WHEP', 'WebRTC', 'timeline'] },
   // the first page where all three legs meet: live over a real WebRTC hop, the
   // FAR END of that hop recorded, and the recording scrubbed on the deck
-  { name: 'show', group: 'capture', act: 3, created: '2026-09-05', built: true, settleMs: 9000,
-    one: 'what gets recorded is what the far end of a live WebRTC connection actually received',
-    tags: ['getUserMedia', 'WebRTC', 'MediaRecorder', 'timeline'] },
 
   // 26 is Act 5 with 19: both are ERR's live output, one television and one
   // radio, and both are here because the archive work needs the live end of the
@@ -382,7 +351,7 @@ export const DEMOS = [
   // not moved through any of it: a wasm scsynth boot, 31 buffer allocations, a
   // definition, an eight-second ring fill, a 2.5 s level, two 700 ms ink
   // samples and a 1.2 s deafness control before the page says anything at all.
-  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
+  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 60000, lightSettleMs: 15000,
     one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand, or by sliders that sweep themselves back and forth',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
@@ -413,7 +382,7 @@ export const DEMOS = [
   // scroll under a thumb any more, and a tag naming an API the page no longer
   // calls is a description that has drifted from the thing it describes.
   { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
-    gl: true, settleMs: 45000,
+    gl: true, settleMs: 45000, lightSettleMs: 2000,
     one: 'a radio station fed through a granulator, playing itself',
     tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
   // `crate` was here until 2026-10-02: one long recording into R2 in pieces of 16 MiB through
@@ -434,9 +403,6 @@ export const DEMOS = [
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
-  { name: 'strip', group: 'technologies', act: 0, created: '2026-09-04', built: true,
-    one: 'two thousand years on one line, where many of the dates are a bracket rather than a day',
-    tags: ['timeline', 'canvas'] },
   // The studio Mac as an instrument: the same page as /keys/, pointed at a
   // different machine. What crosses the relay is a note NUMBER, so neither end
   // knows what kind of computer the other one is.
@@ -511,9 +477,18 @@ export const DEMOS = [
   { name: 'partitur', group: 'timeline', act: 4, created: '2026-10-04', built: true,
     one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline with its light lane on the projection wall.',
     tags: [] },
-  { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true,
-    one: 'Cues timed against a picture that arrives late, fired on arrival on one wall and following the picture on the other.',
-    tags: [] },
+  // /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
+  // SCHEDULE, BEAT, LOOPS, SCORE, DATES from transport, lanes, loops, score and
+  // strip. Its checks and four bar drills run before ready: MEASURED 6.3 to 6.6 s
+  // locally against the 7.4 s default, so it declares its own wait.
+  { name: 'time', group: 'timeline', act: 0, created: '2026-10-04', built: true, bootMs: 12000,
+    one: 'The clock every other page here runs on, set a moment ahead so it can still be stopped.',
+    tags: ['timeline', 'WebAudio', 'canvas'] },
+  // ARRIVAL, AHEAD, FOLLOW, AFTER since 2026-10-04 (plan-demo-structure §3.1).
+  // The check pass runs before ready, MEASURED 8.3 to 9.0 s locally.
+  { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true, bootMs: 14000,
+    one: 'Four ways two places agree on when something happens, from firing on arrival to lining up on a recording.',
+    tags: ['DO', 'WS', 'relay', 'HLS', 'R2', 'timeline'] },
 
   // `bay` was a demo and is archived at archive/demos/bay-index.html, removed
   // 2026-09-25 on instruction. It was the first page here that SENT to an
@@ -750,7 +725,7 @@ export const DEMOS = [
   // already wears it. The page is built, deployed and reachable at its URL;
   // only the card is gone.
   // ⚠️ TO BRING IT BACK: delete `unlisted: true` from this row. Nothing else.
-  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, unlisted: true, settleMs: 60000, room: 'fixed',
+  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, unlisted: true, settleMs: 60000, lightSettleMs: 10000, room: 'fixed',
     one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
     tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
 
@@ -796,7 +771,7 @@ export const DEMOS = [
   // ⚠️ IT IS NOT SIZING THE CONTAINER WAKE ANY MORE. The check waits for the
   // publisher itself (`waitForWhip`) before it presses, so the wake is paid
   // against the asserts before the press rather than against this number.
-  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000,
+  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000, lightSettleMs: 2000,
     // \ud83d\udd34 THE TWO PRESSES CHANGED WHAT THEY MEAN, SO THIS SENTENCE HAD TO. It
     // read *"two presses, one for the picture and one for the show"*, which the
     // 2026-09-25 transport rework made false twice over: the two presses are

@@ -27,7 +27,7 @@
   // and the drill below opens thirty of them in two-byte range asks plus a
   // ten-minute back-seek that pulls a whole other stretch of the window off
   // their servers. A visitor gets the live edge and nothing else.
-  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { SELFCHECK, DEEP, ifDeep } from '/shell/selfcheck.mjs';
 
   const CHANNEL = CHANNELS[0];                 // ETV. One channel: see below.
   const REACH_MS = 120 * 60 * 1000;            // what ERR advertises; measured below
@@ -399,7 +399,14 @@
     // again about twenty seconds into a visit. Under a harness it is the whole
     // subject; for a person the line, the schedule and the live edge already
     // are.
-    await ifSelfcheck(async () => {
+    // 🔴 AND IT IS THE DEEP TIER SINCE 2026-10-04: *"make checks way ligher (2
+    // tiers?)"*, *"i mean these long-running ones"*. The pause, the 13-point
+    // sweep, the survey of three channels and the walk back and forward are
+    // most of this page's run time, so an ordinary harness run (`selfcheck=1`)
+    // grades the line, the window and the live gap and says what it left;
+    // `DEMO_DEEP=1 node demo/verify.mjs now` walks it. Both tiers run against
+    // `demo/fake-err.mjs`, never against ERR.
+    const walk = async () => {
       await pauseTest();          // a paused picture stops the line, not the present
       await sweep();
       await takeSurvey();
@@ -417,7 +424,10 @@
       await liveTest();
       d.log('walked back into the window and returned. The break in the top row is where that seek skipped');
       openView(deck.position());
-    }, { log: d.log, say: 'press anywhere on the line to walk back into the window' });
+    };
+    if (!SELFCHECK) d.log('press anywhere on the line to walk back into the window');
+    else await ifDeep(walk, { log: d.log,
+      say: 'the pause, the refusal sweep, the channel survey and the walk back into the window (DEMO_DEEP=1)' });
     checks();
   }
 
@@ -789,7 +799,7 @@
     // the back-seek above; left ungated they would read `evid.asked == null`
     // and write seven red FAIL lines into a visitor's log about checks that
     // were deliberately not run, which is worse than saying nothing.
-    if (SELFCHECK) {
+    if (DEEP) {
       d.assert('every probed instant was inside the playlist just read',
         probes.length > 0 && probes.every((p) => p.fromPlaylist),
         `${probes.length} points, all from the playlist just read`);

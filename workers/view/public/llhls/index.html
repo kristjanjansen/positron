@@ -68,7 +68,7 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createStack } from '/shell/stack.mjs';
-  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { ifSelfcheck, SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
 
   const d = mount({
@@ -319,8 +319,24 @@
     d.log('let the publisher go. it stops about a minute after the last viewer goes');
   }
 
+  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
+     *"i mean these long-running ones"*. Everything this press does is the long
+     kind: it holds the publisher, wakes a cold container, waits for Cloudflare
+     to serve a manifest and then for a player to settle, which is half a minute
+     to a minute of Stream minutes. So an ORDINARY harness run (`selfcheck=1`)
+     does not start it, and grades only what the page holds at rest: the one
+     control, the footer and the picture. `DEMO_DEEP=1 node demo/verify.mjs
+     llhls` runs the rest. A visitor is never `LIGHT`, so their press is
+     unchanged. */
+  const LIGHT = SELFCHECK && !DEEP;
+
   async function start() {
     if (player) return;
+    if (LIGHT) {
+      d.log('left for the deep run: the publisher, the cold container, the manifest and the player (DEMO_DEEP=1)');
+      await d.run('check');
+      return;
+    }
     const mine = ++gen;
     abort = new AbortController();
     stream.set('coming').because('press again to stop it');
@@ -536,7 +552,7 @@
      */
     const said = (stream.badge.textContent || '').trim();
     const state = stream.state();
-    d.assert('publisher held by this page',
+    if (!LIGHT) d.assert('publisher held by this page',
       held && typeof state === 'string' && state !== 'offline',
       `toggle reads ${JSON.stringify(said)}, state ${state}, socket ${held ? 'held' : 'let go'}`);
     /**
@@ -621,6 +637,12 @@
     // costs a listener nothing. This one is a second request for a playlist the
     // player is fetching every couple of seconds anyway, which is a small cost
     // and still a cost somebody else pays.
+    // The rest is about a stream, and an ordinary run started none (see `LIGHT`).
+    if (LIGHT) {
+      d.assert('nothing in the picture was cut or refused', dg.cuts.length === 0,
+        dg.cuts.map((c) => `${c.id}: ${c.full}`).join(' / ') || 'none');
+      return;
+    }
     await ifSelfcheck(async () => {
       const r = await fetch(llhls(), { cache: 'no-store' }).then((x) => x.status).catch(() => 0);
       d.assert('manifest is being served', r === 200, `HTTP ${r}`);

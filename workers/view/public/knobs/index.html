@@ -20,6 +20,7 @@
   // 🔴 NO GRANULATOR ANYWHERE IN HERE. It came out of the board's signal path
   // on 2026-09-16 (archive/box-pappus/), and this page has never had one.
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
   // 🔴 REAL ROTARIES SINCE 2026-09-25, AND THE PAGE CALLED `knobs` HAD NONE.
   // Asked as *"left to rotaries cutoff reseonance"*. It built both with
   // `createSlider` and paired them with `createSliderGroup`, so the one page in
@@ -81,7 +82,11 @@
    * ⚠️ A visitor is unaffected: neither flag is set, so pressing Play does the
    * whole thing.
    */
-  const SELFCHECK = q.get('selfcheck') === '1';
+  // ⚠️ FROM `demo/shell/selfcheck.mjs` SINCE 2026-10-04, which is either tier
+  // (`selfcheck=1` ordinary, `selfcheck=2` deep). It read `=== '1'` raw, and a
+  // deep run would then have been a VISIT: every check off and `MAY_PLAY` true,
+  // which is a suite run driving a shared Raspberry Pi. Neither tier drives it;
+  // that is still `?board=1` and nothing else.
   const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
 
   // The four controllers this page is about. 74 is Brightness and 71 is

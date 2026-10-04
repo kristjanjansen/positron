@@ -18,6 +18,7 @@
   import { createPresenceButton, streamSays, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
 
   const q = new URLSearchParams(location.search);
   // loopback publishes AND subscribes one namespace, so a single device measures
@@ -167,9 +168,23 @@
     d.log('closed the session. nothing is publishing');
   }
 
+  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
+     *"i mean these long-running ones"*. The press opens a WebTransport session
+     to Cloudflare's relay and waits for frames to come back through it, up to
+     fifteen seconds. An ORDINARY harness run (`selfcheck=1`) opens nothing and
+     grades the page at rest, plus the WebTransport capability, which is local;
+     `DEMO_DEEP=1 node demo/verify.mjs moq` runs the round trip. A visitor is
+     never `LIGHT`, so their press is unchanged. */
+  const LIGHT = SELFCHECK && !DEEP;
+
   async function start() {
     if (leg) return;
     const mine = ++gen;
+    if (LIGHT && support.ok) {
+      d.log('left for the deep run: the session to the relay and the frames that come back through it (DEMO_DEEP=1)');
+      await d.run('check');
+      return;
+    }
     ship(`MOQ-SUPPORT ${JSON.stringify(support)}`);
     if (!support.ok && !forceTransport) {
       d.log(`MoQ needs WebTransport: ${support.why}. Try Chrome or Edge.`, 'bad');
@@ -269,6 +284,20 @@
     // The toggle, read through the call and required to be a string, which is
     // what lets this go red on the `stream.state` bug `/webrtc/` shipped once.
     const state = stream.state();
+    if (LIGHT) {
+      const btns = [...d.controls.querySelectorAll('button')];
+      d.assert('one control, and it is the stream toggle',
+        btns.length === 1 && btns[0] === stream.el && !d.controls.querySelector('.pos-pri'),
+        `${btns.length} control(s)`);
+      d.assert('the toggle still reads stream off, because nothing was opened',
+        state === 'offline' && !leg, `state ${state}, ${leg ? 'a leg is open' : 'no leg'}`);
+      const lab = [...panel.values.el.querySelectorAll('.pos-vp-k')].map((k) => k.textContent);
+      d.assert('the latency under the picture is named glass to glass',
+        lab.includes('glass to glass'), `labels ${lab.join(', ')}`);
+      d.assert('nothing in the picture was cut or refused', dg.cuts.length === 0,
+        dg.cuts.map((c) => `${c.id}: ${c.full}`).join(' / ') || 'none');
+      return;
+    }
     d.assert('the stream toggle says the stream is on',
       typeof state === 'string' && state === 'online',
       `toggle reads ${JSON.stringify((stream.badge.textContent || '').trim())}, state ${state}`);

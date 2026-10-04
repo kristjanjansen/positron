@@ -507,6 +507,8 @@
   import { MOVE_GLYPH, MOVE_OFF, MOVE_SAYS } from '/shell/hand.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createTabs } from '/shell/tabs.mjs';
+  import { createTabPage } from '/shell/tab-page.mjs';
+  import { drillBar, DRILL } from '/shell/bar-drill.mjs';
   import { createNoteGrid } from '/shell/note-grid.mjs';
   import { createCard, createCardGrid } from '/shell/card.mjs';
   import { DEMOS } from '/manifest.mjs';
@@ -928,6 +930,7 @@
   // The four shapes a transport bar takes, and the message it refuses one pair
   // with. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the lines
   // above give: a `let` left beside a block that moves is read in its dead zone.
+  let tabSpec = null;         // { page }, the TAB PAGE specimen, checked last before ready
   let tbarSpec = null;        // { whole, noScrub, noToggle, refused, deck }
   let glueSpec = null;        // { panel, bar, deck, mute }
   let fsxSpec = null;         // { host, exit, out }, a cover with a way back
@@ -1499,6 +1502,114 @@
     }
     box.append(pair);
   }
+
+  /**
+   * 🔴 TAB PAGE, THE NEWEST BLOCK, 2026-10-04. The owner regrouped twenty demos
+   * into four tabbed pages that day (`/sync/`, `/time/`, `/wire/`,
+   * `/capture/`, no redirects), and the pieces every one of them needs are
+   * shared and were built once, before any page: `tab-page.mjs` and
+   * `bar-drill.mjs`. `plans/plan-demo-structure.md` §5 step 1.
+   * ⚠️ IT OPENS ON QUIET, SO BARS IS NOT BUILT UNTIL SOMEBODY OPENS IT. That is
+   * the component's first claim, and a specimen that opened on BARS would
+   * have nothing to show it with.
+   * ⚠️ AND IT CARRIES ITS OWN NEGATIVE CONTROL: a bar whose clock never moves.
+   * The drill must fail it on `play advances position` and on nothing else, or
+   * a drill that passed everything would read exactly like this one.
+   * ⚠️ `hash: false`, because this page owns its address and a specimen
+   * writing `#bars` into it would be one component reaching outside its box.
+   */
+  section('layout', 'TAB PAGE',
+    'Several old pages as the tabs of one: a tab is built the first time it is opened, '
+    + 'keeps its own readout and log, and every transport bar in it gets the harness’s '
+    + 'drill as page asserts. This one opens on QUIET, so BARS has not been built yet.',
+    `const page = createTabPage(d, { tabs: [
+  { id: 'arrival', label: 'ARRIVAL', mod: arrival },  // arrival: the tab's own module, imported by the page
+] });
+// a tab: export const readout; export function build({ panel, report, assert, log, set })
+//   returns { show, hide, check({ A }), bars: [{ name, bar, strip }] }
+if (SELFCHECK) await page.check();                   // and then d.ready()
+await assertBar(d.assert, bar, { name, strip });     // the drill verify.mjs runs on one bar`,
+    (box) => {
+      box.classList.add('kit-wide', 'kit-tabpage');
+      const hi = getComputedStyle(document.documentElement).getPropertyValue('--hi').trim() || '#ffd400';
+
+      /* QUIET stands in for a tab whose first press joins a relay or fetches a
+         file. The counter is the whole of what it opens, which is what lets the
+         check say "nothing until the first press" as a number. */
+      const quiet = {
+        readout: { presses: '', state: '' },
+        build({ panel, set, log }) {
+          let opened = 0;
+          const row = el('div', 'kit-row');
+          const btn = el('button', '', 'Open', { type: 'button' });
+          btn.onclick = () => {
+            opened++;
+            set('presses', opened);
+            set('state', 'open');
+            log(opened === 1 ? 'opened on the first press in this tab' : 'already open');
+          };
+          row.append(btn);
+          panel.add(row);
+          return {
+            opened: () => opened,
+            async check({ A }) {
+              A('nothing opened until the first press in this tab', opened === 0, `${opened} opening(s) before a press`);
+              btn.click();
+              A('the first press in the tab opens it', opened === 1, `${opened} opening(s) after one press`);
+            },
+          };
+        },
+      };
+
+      const bars = {
+        build({ panel }) {
+          const { adapter } = markAdapter({ rates: [1] });
+          const items = Array.from({ length: 8 }, (_, i) => ({
+            id: `tp${i}`, kind: 'mark', at: (i + 0.5) * 7500, payload: { label: `${i + 1}` } }));
+          const deck = createDeck({ items, adapters: { mark: adapter }, range: [0, 60_000] });
+          const shelf = el('div');
+          const view = createStripView(shelf, deck, { size: 'auto', lanes: [{ id: 'mark', kind: 'mark', color: hi }] });
+          const live = createTransportBar(shelf, deck, { publish: false, scrub: false, loop: false });
+          view.strip.fit?.();
+          // The strip sits on the bar that drives it, the one pair a glue is for.
+          const pair = createGlue(view.surface, live.el);
+
+          /* 🔴 THE NEGATIVE CONTROL. A wall clock that always answers 0: the
+             deck accepts play, says it is playing, and its position never
+             moves. Seeking still works, because a seek sets the position
+             directly, so the drill must fail exactly one row. */
+          const still = createDeck({ clock: { domain: 'wall', now: () => 0 }, range: [0, 60_000] });
+          const frozenHost = el('div');
+          const frozen = createTransportBar(frozenHost, still, { publish: false, loop: false, verb: ['start', 'stop'] });
+
+          panel.titled('A BAR AND THE STRIP IT DRIVES', pair);
+          panel.titled('A BAR WHOSE CLOCK NEVER MOVES', frozenHost);
+          return {
+            live, frozen,
+            bars: [{ name: 'live', bar: live, strip: view.el }],
+            // A deck left running in a tab nobody can see is a sound nobody
+            // chose; leaving the tab stops it.
+            hide() { if (live.api.playing) live.api.el.querySelector('.tbar-toggle').click(); },
+            async check({ A }) {
+              const rows = await drillBar(frozen);
+              const red = rows.filter((r) => !r.skipped && !r.pass).map((r) => r.label);
+              A('NEGATIVE: a bar whose clock is frozen fails the drill on play, and on nothing else',
+                red.length === 1 && red[0] === 'play advances position',
+                `${rows.filter((r) => !r.skipped).length} rows, failing: ${red.join(', ') || 'none'}`);
+            },
+          };
+        },
+      };
+
+      const page = createTabPage(d, {
+        host: box, hash: false, at: 'quiet',
+        tabs: [
+          { id: 'quiet', label: 'QUIET', mod: quiet },
+          { id: 'bars', label: 'BARS', mod: bars },
+        ],
+      });
+      tabSpec = { page };
+    });
 
   section('hardware', 'KEY LABELS',
     'What each of the four buttons does, in a row under the screen or in a column beside it '
@@ -8222,7 +8333,11 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
      * one; `/stage/` has already paid for that confusion. This compares the
      * published object against the specimen itself.
      */
-    const bars = [...document.querySelectorAll('.tbar')];
+    /* ⚠️ NOT THE TAB PAGE BLOCK'S, 2026-10-04. That specimen builds its bars
+       lazily, when its BARS tab is first opened, so whether they exist here
+       depends on whether its check pass has run yet. They are publish: false
+       and are graded there; this count is about the rest of the page. */
+    const bars = [...document.querySelectorAll('.tbar')].filter((b) => !b.closest('.kit-tabpage'));
     const published = d.api.transport || window.__demo?.transport;
     /* FIVE since 2026-09-22: the STEP GRID block gained a standard transport
        when its hand-rolled `Play` button was reported. It passes
@@ -11328,6 +11443,42 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       + `${wide.length ? ` (${wide[0].selectorText} at ${widthOf(wide[0])}px)` : ''}`
       + `, ${onPress.length} painting on plain :focus`
       + `${onPress.length ? ` (${onPress[0].selectorText})` : ''}`);
+  }
+
+  /**
+   * 🔴 THE TAB PAGE'S CHECK PASS, LAST BEFORE `d.ready()` AND NEVER AFTER IT.
+   * The harness drills `__demo.transport` the moment `ready` is true and sends
+   * its seek key at `window`, which every bar that is not in a closed tab
+   * hears; a drill of this block's own bars running at the same moment would
+   * have the harness's key land in the middle of its pause hold. So it runs
+   * here, where nothing else is pressing anything. It costs about three
+   * seconds of boot, measured in the report that came with it.
+   */
+  if (SELFCHECK && tabSpec) {
+    const { page } = tabSpec;
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      await page.check();
+      // After the pass the specimen is back on QUIET with BARS built and closed.
+      const { live, frozen } = page.built('bars');
+      const was = live.api.position;
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '0', bubbles: true }));
+      await nap(DRILL.keyMs);
+      d.assert('TAB PAGE: a key from the page does not reach a bar in a closed tab',
+        page.at() === 'quiet' && Math.abs(live.api.position - was) < 1,
+        `open on ${page.at()}, the BARS bar went ${was.toFixed(0)} -> ${live.api.position.toFixed(0)}`);
+      page.tabs.go('bars', { push: false });
+      const liveWas = live.api.position;
+      frozen.api.el.dispatchEvent(new KeyboardEvent('keydown', { key: '0', bubbles: true }));
+      await nap(DRILL.keyMs);
+      d.assert('TAB PAGE: a key aimed at one bar moves that bar and not its neighbour',
+        Math.abs(frozen.api.position) < 1 && Math.abs(live.api.position - liveWas) < 1,
+        `the aimed bar is at ${frozen.api.position.toFixed(0)}, its neighbour went `
+        + `${liveWas.toFixed(0)} -> ${live.api.position.toFixed(0)}`);
+      page.tabs.go('quiet', { push: false });
+    } catch (e) {
+      d.assert('TAB PAGE: its checks ran to the end', false, e.message);
+    }
   }
 
   d.ready();
