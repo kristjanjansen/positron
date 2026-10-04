@@ -1,5 +1,14 @@
 ## Open
 
+### A timeline lane as a patchbay source: `/partitur/`'s light lane on a real surface, asked 2026-10-04
+
+After *"how universl patchbay and timeline relate"*, *"Yea"* to trying the
+smallest step directly: a lane gets a `to` port and is linked through the
+patchbay, starting with `/partitur/`'s light lane driving the Pi's GPU or a
+phone's screen (Moholy's projection wall made real).
+DONE 2026-10-04: `/wall/` plus a wall choice on `/partitur/`, measured across two tabs.
+
+
 ### `/rout/` and `/graph/` become one page, `/patchbay/`, asked 2026-10-04
 
 *"i am cofused over rout and graph demo. unify? better name?"*, then on the
