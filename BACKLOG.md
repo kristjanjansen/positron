@@ -1,5 +1,14 @@
 ## Open
 
+### Moholy-Nagy's score as positron data, and a page that plays it, asked 2026-10-04
+
+*"Do it. Better name"*, in reply to the ranked suggestions in
+`research/moholy-nagy-partiturskizze-2026-10-04.md`: (1) the plate and
+Hirschfeld-Mack's light scores into the timeline prior-art research, (2) the
+plate transcribed as data from the public-domain 1925 scan, every row marked
+seen or inferred, and then (3) a page that plays it, which wants a better name
+than the agent's `exzentrik`. DONE 2026-10-04 as `/partitur/`, 21/21.
+
 ### Moholy-Nagy's Partiturskizze, researched against the timeline, asked 2026-10-04
 
 Four photographs of L. Moholy-Nagy, *Partiturskizze zu einer mechanischen
