@@ -24,13 +24,16 @@
   import { createCheck } from '/shell/check.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createBay, HEAVY, parseLink, printLink } from '/shell/bay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { openWire } from '/shell/wire.mjs';
+  import { createRegistry, boardGraph } from '/shell/graph-registry.mjs';
 
   const WHAT = 'One graph for everything positron moves, where a MIDI link carries the notes and a video link describes the stream both ends open.';
 
   const d = mount({
     name: 'graph',
     what: WHAT,
-    readout: { links: '', light: '', heavy: '', refused: '' },
+    readout: { links: '', heavy: '', refused: '', heard: '' },
     controls: [
       { id: 'link', label: 'Link', primary: true },
       { id: 'example', label: 'Example' },
@@ -114,45 +117,92 @@
     for (const p of PORTS) b.addPort(p);
     return b;
   }
-  const bay = deskBay();
 
-  // ── the picture, which redraws with every link ─────────────────────────
+  // ── the live desk: what announces itself in the studio's room ──────────
+  //
+  // 🔴 STEP 3 OF THE PLAN: `/graph/` draws what exists. The board puts its graph
+  // on every `board.alive` (`demo/shell/graph-registry.mjs`), this page sends
+  // its own as `graph.announce`, and anything else in the room that announces
+  // is drawn too. A board that stops answering is still drawn, marked stale.
+  // ⚠️ JOINING THE ROOM OPENS NOTHING BUT OUR OWN RELAY: no audio is asked for,
+  // no lease is taken, and the page only listens and says what it is.
+  const ROOM = 'studio-1';
+  const SELF = {
+    v: 1, site: 'web', place: 'browser',
+    nodes: [
+      { id: 'web:keys', kind: 'person', label: 'keys', place: 'browser' },
+      { id: 'web:screen', kind: 'screen', label: 'screen', place: 'browser' },
+    ],
+    ports: [
+      { id: 'web:keys:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+      { id: 'web:screen:audio', label: 'browser screen', dir: 'in', medium: 'audio' },
+      { id: 'web:screen:video', label: 'browser screen', dir: 'in', medium: 'video' },
+    ],
+  };
+  const registry = createRegistry();
+  registry.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+  function liveBay() { return registry.fill(createBay()); }
+
+  let world = 'live';
+  let bay = liveBay();
+  /** Every link made, as its text line, so a redraw can make them again. */
+  let made = [];
+
+  // ── the picture, built from whatever the bay holds ───────────────────────
   //
   // ⚠️ `atEnd: false`, the one exception `positron-diagram` allows: this
-  // picture changes when the reader presses something, so it is a reading of
-  // the graph and sits beside it rather than last on the page.
-  const box = (n, sub) => ({ id: n.id.replace(/:/g, '_'), label: n.label, sub, tech: TECH[n.kind] || 'device' });
+  // picture changes when the reader presses something, so it sits beside it.
+  // 🔴 A PLACE WITH SOURCES AND RECEIVERS IS DRAWN TWICE, BY ROLE. The first
+  // layout put the browser's screen beside its keys, so sound from the Pi came
+  // back right to left under the row, through other boxes. Split by role (the
+  // `/keys/` shape `positron-diagram` records), links read left to right.
+  const PLACE = { browser: 'Browser', phone: 'Phone', cloudflare: 'Cloudflare', err: 'ERR', pi: 'Raspberry Pi' };
   const TECH = { person: 'browser', screen: 'browser', device: 'sound', engine: 'graphics', store: 'cloudflare', external: 'station' };
-  const byId = (id) => NODES.find((n) => n.id === id);
-  const spec = {
-    caption: '',
-    // 🔴 SOURCES LEFT, RECEIVERS RIGHT, AND THE BROWSER DRAWN TWICE BY ROLE.
-    // The first layout put the browser's screen beside its keys, so sound from
-    // the Pi came back right to left and the return path was routed under the
-    // row, through the GPU's box and ERR's. Split by role (the `/keys/` shape
-    // `positron-diagram` records), every link reads left to right.
-    nodes: [
-      { id: 'm-web-in', label: 'Browser', kind: 'here', tech: 'browser', join: false,
-        children: [box(byId('web:keys'), 'MIDI out'), box(byId('web:editor'), 'shader code')] },
-      { id: 'err_klassika', label: 'Klassikaraadio', sub: 'ERR, asks consent', tech: 'station',
-        note: 'Somebody else\u2019s server. A link from it counts as a listener, so only a person who will listen may make one.' },
-      { id: 'm-pi', label: 'Raspberry Pi', kind: 'device', tech: 'raspberry', join: false,
-        children: [box(byId('studio-1:circuit'), 'MIDI in, sound out'), box(byId('studio-1:gpu'), 'code in, video out')] },
-      { id: 'm-web-out', label: 'Browser', kind: 'here', tech: 'browser',
-        children: [box(byId('web:screen'), 'sound, picture')] },
-      { id: 'm-phone', label: 'Phone', kind: 'device', tech: 'device',
-        children: [box(byId('phone:screen'), 'sound, picture')] },
-      { id: 'm-cf', label: 'Cloudflare', kind: 'cloud', tech: 'cloudflare',
-        children: [box(byId('r2:recordings'), 'R2, sound in')] },
-    ],
-    links: [],
-  };
+  const placeLabel = (p) => PLACE[p] || (/^studio/.test(p) ? 'Raspberry Pi' : p);
+  const placeTech = (p) => (p === 'browser' ? 'browser' : p === 'cloudflare' ? 'cloudflare' : p === 'err' ? 'station'
+    : (p === 'pi' || /^studio/.test(p)) ? 'raspberry' : 'device');
+  const boxId = (id) => id.replace(/:/g, '_');
+  function specFor(b) {
+    const ports = b.ports();
+    const groups = new Map();
+    for (const n of b.nodes()) {
+      const mine = ports.filter((p) => p.id.startsWith(`${n.id}:`));
+      const outs = mine.filter((p) => p.dir === 'out'), ins = mine.filter((p) => p.dir === 'in');
+      const role = ins.length && !outs.length ? 'in' : 'out';
+      const sub = [...new Set(outs.map((p) => `${p.medium} out`)), ...new Set(ins.map((p) => `${p.medium} in`))].join(', ');
+      const key = `${n.place}|${role}`;
+      if (!groups.has(key)) groups.set(key, { place: n.place, role, kids: [], stale: false });
+      const gr = groups.get(key);
+      gr.kids.push({ id: boxId(n.id), label: n.label, sub: n.stale ? `${sub}, not heard` : sub, tech: TECH[n.kind] || 'device' });
+      gr.stale ||= !!n.stale;
+    }
+    return [...groups.values()].map((gr) => ({
+      id: `m-${gr.place}-${gr.role}`, label: placeLabel(gr.place), tech: placeTech(gr.place),
+      kind: gr.place === 'browser' ? 'here' : gr.place === 'cloudflare' ? 'cloud' : 'device',
+      join: false, children: gr.kids,
+    }));
+  }
+  const spec = { caption: '', nodes: specFor(bay), links: [] };
   const host = el('div');
   const dg = createDiagram(host, spec, { how: false, atEnd: false });
 
   // ── writing a link ───────────────────────────────────────────────────────
+  /** In the live desk the examples are whatever this room makes possible: every
+   *  out port to an in port of the same medium on another node. */
+  function examples() {
+    if (world === 'example') return EXAMPLES;
+    const ports = bay.ports();
+    const out = [];
+    for (const a of ports.filter((p) => p.dir === 'out')) {
+      for (const b of ports.filter((p) => p.dir === 'in' && p.medium === a.medium)) {
+        if (a.id.split(':').slice(0, 2).join(':') === b.id.split(':').slice(0, 2).join(':')) continue;
+        out.push(`${a.id} -> ${b.id}`);
+      }
+    }
+    return out.length ? out : [''];
+  }
   let step = 0;
-  const field = createField({ label: 'link', value: EXAMPLES[step], placeholder: 'from -> to { channel 1 }', grow: 'wide' });
+  const field = createField({ label: 'link', value: examples()[0], placeholder: 'from -> to { channel 1 }', grow: 'wide' });
   const consent = createCheck({ label: 'I will listen', title: 'a link from somebody else’s server is made only by a person who will listen to it' });
   const write = el('div', 'gr-write');
   write.append(field.el, consent.el);
@@ -170,10 +220,17 @@
     onPick: (r) => { selected = r.id; d.log(`${r.id} selected, Unlink takes it away`); },
   });
 
+  const desk = createChoice({
+    label: 'desk', options: [['studio, live', 'live'], ['example', 'example']], at: 0,
+    title: (v) => (v === 'live' ? `what announces itself in ${ROOM} right now` : 'a typed desk with every kind of thing on it'),
+    onPick: (v) => { world = v; made = []; rebuild(); field.set(examples()[0]); step = 0;
+      d.log(v === 'live' ? `the live desk: what announces itself in ${ROOM}` : 'the example desk'); },
+  });
   d.stack.titled('THE GRAPH',
-    say('Each box is something positron already talks to. Write a link as from, an arrow, then to, or press '
-      + 'Example to step through the ones below, and press Link. A refusal says why in the log.'),
-    host, write, rows.el);
+    say('The live desk is what announces itself in the studio\u2019s room right now, this browser included. '
+      + 'The example desk has every kind of thing on it. Write a link as from, an arrow, then to, or press '
+      + 'Example to step through what the desk allows, and press Link. A refusal says why in the log.'),
+    desk.el, host, write, rows.el);
 
   const mediumOf = (l) => bay.port(l.from)?.medium || '';
   /** What an arrow says: the name a reader can look up, short enough for the gap
@@ -181,6 +238,20 @@
   const SHORT = { webaudio: 'local', datachannel: 'WebRTC', relay: 'relay', moq: 'MoQ', llhls: 'LL-HLS',
     page: 'local', whep: 'WHEP', 'relay-h264': 'relay', indexeddb: 'local', ingest: 'ingest', 'r2-hls': 'HLS', room: 'room' };
   const an = (w) => (/^[aeiou]/.test(w) ? `an ${w}` : `a ${w}`);
+
+  /** A new bay from the current desk, and every link made so far made again. */
+  function rebuild() {
+    bay = world === 'live' ? liveBay() : deskBay();
+    const keep = [];
+    for (const m of made) {
+      const l = parseLink(m.line);
+      const r = bay.link(l.from, l.to, l.transforms, { consent: m.consent });
+      if (r.ok) keep.push(m); else d.log(`${m.line} is gone: ${r.why}`, 'bad');
+    }
+    made = keep;
+    spec.nodes = specFor(bay);
+    redraw();
+  }
 
   function redraw() {
     const all = bay.links();
@@ -204,9 +275,10 @@
       : 'No links. Press Example, then Link.';
     dg.render();
     d.set('links', all.length);
-    d.set('light', all.length - heavy);
     d.set('heavy', heavy);
     d.set('refused', refused);
+    const sites = registry.merged().sites.filter((x) => x.site !== 'web');
+    d.set('heard', world === 'live' ? sites.filter((x) => !x.stale).length : '');
   }
 
   /** Make the link written in the field. Answers bay's result, or a parse error as one. */
@@ -216,10 +288,11 @@
     catch (e) { refused++; d.log(e.message.replace(/^bay: /, ''), 'bad'); redraw(); return { ok: false, why: e.message }; }
     const r = bay.link(l.from, l.to, l.transforms, { consent: consent.get() });
     if (r.ok) {
-      const made = bay.links().find((x) => x.id === r.id);
-      d.log(made?.session
-        ? `${r.id} ${line}: ${an(mediumOf(made))} stream over ${made.session.transport}, ${made.session.where}`
-        : `${r.id} ${line}: ${mediumOf(made)} through the routing core`, 'ok');
+      const lk = bay.links().find((x) => x.id === r.id);
+      made.push({ line: printLink(lk), consent: consent.get() });
+      d.log(lk?.session
+        ? `${r.id} ${line}: ${an(mediumOf(lk))} stream over ${lk.session.transport}, ${lk.session.where}`
+        : `${r.id} ${line}: ${mediumOf(lk)} through the routing core`, 'ok');
       if (r.warn) d.log(r.warn);
     } else {
       refused++;
@@ -231,37 +304,95 @@
 
   d.on('link', () => makeLink());
   d.on('example', () => {
-    step = (step + 1) % EXAMPLES.length;
-    field.set(EXAMPLES[step]);
+    const ex = examples();
+    step = (step + 1) % ex.length;
+    field.set(ex[step]);
   });
   d.on('unlink', () => {
     const all = bay.links();
     const id = selected && all.some((l) => l.id === selected) ? selected : all.at(-1)?.id;
     if (!id) { d.log('nothing to unlink'); return; }
+    const line = printLink(all.find((l) => l.id === id));
     bay.unlink(id);
+    made = made.filter((m) => m.line !== line);
     selected = null;
     d.log(`${id} unlinked`);
     redraw();
   });
   d.on('clear', () => {
     for (const l of bay.links()) bay.unlink(l.id);
+    made = [];
     selected = null;
     d.log('every link removed');
     redraw();
   });
 
-  // The first five examples are made at load, so the picture opens with a
-  // light link, a heavy one, code, video across the internet and a recording,
-  // which also puts every receiver on the right of the picture.
-  // Nothing opens anything: a link here is a description in memory.
-  const opening = EXAMPLES.slice(0, 5).map((line) => makeLink(line));
-  step = 5;
-  field.set(EXAMPLES[step]);
+  /* 🔴 THE FIRST BOARD HEARD GETS THREE LINKS, WHERE ITS PORTS EXIST. With no
+     links the picture has no left and right, so every machine stacked in one
+     column at one height and the browser's two boxes stood empty and tall. A
+     link here is a description in memory and opens nothing. */
+  function starter(site) {
+    const want = [`web:keys:out -> ${site}:circuit:in`, `${site}:circuit:audio -> web:screen:audio`,
+      `${site}:gpu:video -> web:screen:video`];
+    for (const line of want) {
+      const [from, to] = line.split(' -> ');
+      if (bay.port(from) && bay.port(to)) makeLink(line);
+    }
+  }
+
+  // ── listening to the studio's room ───────────────────────────────────────
+  let me = null, lastSites = '';
+  const wire = openWire(ROOM, {
+    onOpen: (from) => {
+      me = from;
+      wire.send({ type: 'graph.announce', graph: SELF });
+      wire.send({ type: 'graph.ask' });
+      d.log(`listening in ${ROOM}, and this browser said what it is`);
+    },
+    onMessage: (got) => {
+      if (got.kind !== 'json' || got.msg.from === me) return;
+      if (got.msg.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: SELF }); return; }
+      const fresh = !registry.graphs().some((x) => x.from === got.msg.from);
+      if (registry.ingest(got.msg)) {
+        if (fresh) d.log(`${got.msg.graph.site} announced ${got.msg.graph.nodes.length} things`, 'ok');
+        if (world === 'live') rebuild();
+        if (fresh && world === 'live' && !made.length) starter(got.msg.graph.site);
+      }
+    },
+  });
+  /* A board that stops answering stays drawn and is marked, so staleness is
+     checked on a slow clock rather than only when something arrives. */
+  setInterval(() => {
+    const now = JSON.stringify(registry.merged().sites);
+    if (now !== lastSites) { lastSites = now; if (world === 'live') rebuild(); }
+  }, 2000);
+  redraw();
 
   // ── checks ───────────────────────────────────────────────────────────────
   // All of them read data already in hand on a scratch graph, so they run for a
   // visitor too and change nothing on screen.
-  d.assert('the five opening links are made', opening.every((r) => r.ok), opening.map((r) => r.why || r.id).join(' | '));
+  {
+    const t = deskBay();
+    const opening = EXAMPLES.slice(0, 5).map((line) => { const l = parseLink(line); return t.link(l.from, l.to, l.transforms); });
+    d.assert('the example desk makes its five opening links', opening.every((r) => r.ok), opening.map((r) => r.why || r.id).join(' | '));
+  }
+  {
+    // The live desk is only as good as what a board says, so a board's graph is
+    // graded here from a fixture, with no board and no socket.
+    const reg = createRegistry();
+    reg.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+    reg.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1', instruments: { synth: true },
+      inputs: [{ name: 'circuit', midi: { port: 'Circuit', channels: [1, 2] } }] }) });
+    const t = reg.fill(createBay());
+    const toScreen = t.link('studio-1:circuit:audio', 'web:screen:audio');
+    const keys = t.link('web:keys:out', 'studio-1:circuit:in');
+    d.assert('a board\u2019s announced Circuit can be linked to this browser, as a stream', toScreen.ok && !!toScreen.session, toScreen.why || toScreen.session?.transport);
+    d.assert('and this browser\u2019s keys can be linked to the Circuit, as bytes', keys.ok && !keys.session, keys.why || keys.id);
+    // ⚠️ NEGATIVE CONTROL: a graph that is not on its own site is not heard.
+    const bad = createRegistry();
+    d.assert('a graph that lies about its site is not heard',
+      bad.ingest({ type: 'board.alive', from: 'x', graph: { v: 1, site: 'a', nodes: [{ id: 'b:n' }], ports: [] } }) === false);
+  }
   {
     const t = deskBay();
     const mk = (line, o = {}) => { const l = parseLink(line); return t.link(l.from, l.to, l.transforms, o); };
