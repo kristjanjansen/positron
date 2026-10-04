@@ -97,7 +97,7 @@ route tables, scenes and light from `/patchbay/` and `/partitur/`. It shows on
 | RAM for TLS | two record buffers default to 16 KB each (in and out); the pico-examples config cuts out to 2 KB and leaves in at 16 KB (READ, [mbedTLS API](https://mbed-tls.readthedocs.io/projects/api/en/v3.6.2/api/file/ssl_8h/), [pico-examples config](https://raw.githubusercontent.com/raspberrypi/pico-examples/master/pico_w/wifi/mbedtls_config_examples_common.h)). Roughly 20 to 40 KB with the handshake, INFERRED, against 520 KB | 0 | 0 |
 | handshake | **no RP2350 figure exists anywhere found.** RP2040 at 125 MHz: RSA-2048 about 3 s, EC P-256 about 18 s with mbedTLS 2.x (READ, [forum](https://forums.raspberrypi.com/viewtopic.php?t=362979)); newer mbedTLS about 1 s (SECONDHAND, [gershnik](https://gershnik.github.io/2024/04/17/fast-https-arduino-nano-rp2040.html)). Paid once per connection | 0 | 0 |
 | certificate | the relay presents an ECDSA P-256 leaf from **Google Trust Services WE1**, chain to **GTS Root R4**, cross-signed by GlobalSign Root CA; the leaf expires 2026-12-03 (**MEASURED**, `openssl s_client -showcerts` today). So pin the root, never the leaf, which rotates about every 90 days (INFERRED from the dates). The pico-examples pattern is one hardcoded root PEM (READ, [tls_verify.c](https://raw.githubusercontent.com/raspberrypi/pico-examples/master/pico_w/wifi/tls_client/tls_verify.c)); checking validity dates also needs the time, which needs SNTP | none | none |
-| known bug | SDK issue: TLS 1.2 handshakes failing `mbedtls_pk_verify() -0x4e00` after the move to mbedTLS 3, milestone 2.3.0, open (READ, [#2633](https://github.com/raspberrypi/pico-sdk/issues/2633)) | none | none |
+| known bug | SDK issue: TLS 1.2 handshakes failing `mbedtls_pk_verify() -0x4e00` after the move to mbedTLS 3, milestone 2.3.0. ⚠️ CORRECTED 2026-10-04: **CLOSED 2026-06-12**, cause a missing `MBEDTLS_SHA384_C`, and it applies to us: the relay's intermediate is signed by GTS Root R4 with ecdsa-with-SHA384 on P-384 (MEASURED with `openssl s_client`), so SHA-384 and the P-384 curve must both be on, as pico-examples' config already has them (READ, [#2633](https://github.com/raspberrypi/pico-sdk/issues/2633), `research/pico-open-issues-and-modular-2026-10-04.md`). `rig/pico/net/` builds with both | none | none |
 | RP2350 help | SHA-256 hardware is used **only if** `MBEDTLS_SHA256_ALT` is defined in our config; the TRNG feeds entropy by default (READ, [pico_mbedtls.c](https://raw.githubusercontent.com/raspberrypi/pico-sdk/2.2.0/src/rp2_common/pico_mbedtls/pico_mbedtls.c), [rand.h](https://raw.githubusercontent.com/raspberrypi/pico-sdk/2.2.0/src/rp2_common/pico_rand/include/pico/rand.h)) | | |
 | latency | relay round trip p50 36 ms (MEASURED 2026-09-10 in `plans/plan-hardware.md` §7b, from the M1, not from a Pico) | same | board round trip 4 ms on one network (MEASURED 2026-09-30, `plans/plan-away-webrtc.md` §9, data channel, not a Pico) |
 
@@ -259,7 +259,7 @@ needs it: the port is `medium: 'value'`, `shape: { channels: 3 }`, exactly
   universe is faster: 16 slots is about 0.9 ms of data (INFERRED).
 - **How**: UART1 at 250 kbaud 8N2 with the break as a GPIO held low for 100 µs
   before each frame (INFERRED, standard approach), or **Pico-DMX** (PIO and DMA,
-  in and out, MIT-ish, RP2040 only in its README; RP2350 is not mentioned)
+  in and out, **BSD-3-Clause** (this said "MIT-ish" until corrected 2026-10-04), RP2040 only in its README; RP2350 is not mentioned. Read rather than built: the OUT side uses only standard SDK claims and should work on an RP2350; the IN side sizes two arrays for 2 PIO blocks and hard-codes 12 DMA channels, both wrong on an RP2350)
   (READ, [jostlowe/Pico-DMX](https://github.com/jostlowe/Pico-DMX)). UART1 saves
   a PIO and the library saves writing the break; try the library first.
 - **Transceiver**: MAX3485 is the 3.3 V one, TME only, €5.10, 8 October (READ,
@@ -267,8 +267,12 @@ needs it: the port is `medium: 'value'`, `shape: { channels: 3 }`, exactly
   Own stock has **ST485CN DIP-8, €2.56, 10 at Peterburi tee** (READ,
   [link](https://www.oomipood.ee/product/st485cn_st485cn_dip8)), a 5 V part
   whose inputs take 3.3 V logic (INFERRED from the 485 family's TTL inputs, to
-  check in its datasheet) and whose RO output would need a divider if DMX in is
-  ever wanted. **No ready TTL to RS-485 module is in own stock.**
+  check in its datasheet; CHECKED 2026-10-04, DI, DE and RE read 2.0 V as high)
+  and whose RO output needs **no** divider into GP9, because GP0 to GP25 are 5 V
+  tolerant while IOVDD is 3.3 V (READ, RP2350 datasheet Tables 1674 and 1683;
+  this said a divider was needed until corrected). Not GP26 to GP29, the ADC
+  pins. A 1 kΩ series resistor if the transceiver can be powered while the Pico
+  is not. **No ready TTL to RS-485 module is in own stock.**
 - **Socket**: 3-pin XLR female panel, €2.00, 38 on the shelf (READ,
   [link](https://www.oomipood.ee/product/mic27_3_pin_xlr_pesa_paneelile_must_al1227));
   the 5-pin, the standard, is €16.89 with **one** left at Järve (READ). Most
@@ -735,7 +739,7 @@ HANDOFF's open item, still open).
 | question | how to settle |
 | --- | --- |
 | TLS handshake time and heap on the RP2350 with mbedTLS 3.6 | build pico-examples `tls_client` against `ws.positron.studio`, time it, read the heap high water mark |
-| Whether SDK issue #2633 bites our ECDSA chain | the same build |
+| ~~Whether SDK issue #2633 bites our ECDSA chain~~ | SETTLED 2026-10-04: closed upstream, and its cause (SHA-384) is on our chain; enable SHA-384 and P-384, which `rig/pico/net/` does |
 | Whether the relay ever sends records over 4 KB to a client | count on the Pico, or keep 16 KB |
 | Whether plain ws stays allowed | it works because "Always Use HTTPS" is off; nobody decided that for this. Ask the owner whether to keep it off on purpose |
 | Pico W round trip and jitter to the relay, and a long soak | §3 measure first |

@@ -1,5 +1,15 @@
 ## Open
 
+### Universal routing: syncing light signals to rich ones, asked 2026-10-04
+
+*"expand and work with universal router plan about those syncing stuff having
+lightweight signals sync to the rich signals like cues and messages to a video
+and audio stuff"*. Extend `plans/plan-universal-routing.md` (its §12 still lists
+"time alignment across media in a recording" as open) with how a light link
+(cue, state, value, midi) is timed against a heavy one (audio, video) on every
+transport positron uses, live and recorded, and start on the smallest piece
+that can be built and graded without a device.
+
 ### OLED: the right key column under the header, and a hold banner that never wraps, asked 2026-10-04
 
 *"Try to fit right buttons under header. No wrapping on hold confirm, shoren
