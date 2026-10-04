@@ -250,7 +250,7 @@ last or never.
 | question | how to settle |
 | --- | --- |
 | Video over the data channel on one network | measure, as audio was (plan-away-webrtc §9) |
-| Two writers on one graph (two phones, one in another building) | plan-patchbay left it open; needs an owner per node and a rule for who wins |
-| Whether `state` buses belong in the graph at all | try one (cues) and see if it says anything a room does not |
-| How a scene recall that includes heavy links behaves (a session takes seconds to open; a MIDI link takes nothing) | measure the slowest session against a bar at 122 bpm |
+| Two writers on one graph (two phones, one in another building) | plan-patchbay left it open; needs an owner per node and a rule for who wins. 🟡 PARTLY SETTLED 2026-10-04: a link from a page's port is opened only by asking that page (`link.request` / `link.state`), so the owner of a source port decides; two patchbays recalling one scene name each recall their own. No rule yet for two writers on the Pi's own ports |
+| ~~Whether `state` buses belong in the graph at all~~ | ✅ TRIED 2026-10-04: `/partitur/`'s cues are a `state` out port and `/wall/`'s captions a `state` in port with `shape.schema: 'cue'`; as a link between two named ports it says who feeds whom, which a room does not. A many-to-many bus (cues, jam) stays a room |
+| How a scene recall that includes heavy links behaves (a session takes seconds to open; a MIDI link takes nothing) | measure the slowest session against a bar at 122 bpm. 🟡 SIDESTEPPED 2026-10-04: a recall in `/patchbay/` is a diff that makes links DESCRIBED and never opens one, so no session opens on a bar line; the timing question returns when recall is allowed to open |
 | Time alignment across media in a recording (audio, video, the cue log) | `/replay/` already aligns a cue log to HLS; generalise or not |
