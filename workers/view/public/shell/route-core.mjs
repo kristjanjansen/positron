@@ -17,8 +17,8 @@
 // has no room for the words. The op names and arguments are bay's where the two
 // overlap (`channel`, `transpose`, `velocity`, `only`, `drop`, `range`,
 // `vrange`, `fixed`, `cc`), so a bay link's transforms are this core's ops
-// without translation. `scale`, `toggle` and `thin` are the plan's §4 ops that
-// bay does not have yet.
+// without translation. `scale`, `toggle`, `thin`, `curve`, `velcurve` and
+// `notecc` are the plan's §4 ops that bay does not have yet.
 //
 // ⚠️ TWO OPS CARRY STATE (`toggle`, `thin`) AND ONE READS TIME (`thin`), so the
 // core is a pure function of the event, the link AND that link's state. The
@@ -75,6 +75,40 @@ function divRound(num, den) {
 
 const int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 const opt = (v, lo, hi) => v === undefined || int(v, lo, hi);
+
+/** The most points a curve table holds, `ROUTE_CURVE_POINTS` in `route_core.h`. */
+export const CURVE_POINTS = 16;
+
+/** 2 to 16 `[in, out]` pairs, each 0..127, the inputs rising strictly. */
+const pointsOk = (p) => Array.isArray(p) && p.length >= 2 && p.length <= CURVE_POINTS
+  && p.every((q, i) => Array.isArray(q) && q.length === 2 && int(q[0], 0, 127) && int(q[1], 0, 127)
+    && (i === 0 || q[0] > p[i - 1][0]));
+
+/**
+ * A 7 bit point as a 14 bit bend value: p * 128, except 127, which is 16383.
+ * ⚠️ SO 64 IS THE BEND'S CENTRE 8192 AND 127 ITS TOP, and an identity table
+ * leaves every bend exactly as it was (vector 24). Read as a plain p * 128, a
+ * table's top would be 16256 and a bend at full could never get there.
+ */
+const wide = (p) => (p === 127 ? 16383 : p << 7);
+const narrow = (p) => p;
+
+/**
+ * `x` through the points by straight lines, rounded as `scale` rounds. Below
+ * the first point it is the first out, above the last the last out. `at` maps
+ * a point onto the value's own scale: `narrow` for 7 bits, `wide` for a bend.
+ */
+function curveAt(points, x, at) {
+  if (x <= at(points[0][0])) return at(points[0][1]);
+  for (let i = 1; i < points.length; i++) {
+    const x1 = at(points[i][0]);
+    if (x <= x1) {
+      const x0 = at(points[i - 1][0]), y0 = at(points[i - 1][1]), y1 = at(points[i][1]);
+      return y0 + divRound((x - x0) * (y1 - y0), x1 - x0);
+    }
+  }
+  return at(points[points.length - 1][1]);
+}
 
 // ── ops ───────────────────────────────────────────────────────────────────
 //
@@ -215,6 +249,61 @@ const OPS = {
       return b;
     },
   },
+  /**
+   * A CC, touch or bend value through `points`, a table of up to 16 `[in, out]`
+   * pairs (vectors 23 and 24). `cls` narrows it to one of the three kinds and
+   * `cc` to one CC number; with neither it curves all three.
+   * ⚠️ A BEND IS CURVED IN ITS OWN 14 BITS, with each point read through `wide`,
+   * so a table drawn once in 0..127 serves a knob and a wheel alike.
+   * ⚠️ A CHANNEL TOUCH (Dn) CARRIES ITS PRESSURE IN THE SECOND BYTE, a poly touch
+   * (An) in the third.
+   * ⚠️ THE TABLE IS COPIED WHEN THE LINK IS MADE, as `route_core.c` copies it
+   * into its table store, so changing the authored array later changes nothing.
+   */
+  curve: {
+    ok: (a) => pointsOk(a.points) && opt(a.cc, 0, 127)
+      && (a.cls === undefined || CONTINUOUS.has(canonKind(a.cls)))
+      && (a.cc === undefined || a.cls === undefined || canonKind(a.cls) === 'cc'),
+    run: (b, a, s, t, kind) => {
+      if (!CONTINUOUS.has(kind)) return b;
+      if (a.cls !== undefined && kind !== canonKind(a.cls)) return b;
+      if (a.cc !== undefined && (kind !== 'cc' || b[1] !== a.cc)) return b;
+      if (kind === 'bend') {
+        const v = curveAt(a.points, b[1] | (b[2] << 7), wide);
+        return [b[0], v & 127, v >> 7];
+      }
+      if ((b[0] & 0xF0) === 0xD0) return [b[0], curveAt(a.points, b[1], narrow)];
+      return [b[0], b[1], curveAt(a.points, b[2], narrow)];
+    },
+  },
+  /**
+   * A note on's velocity through `points`, the same table and arithmetic as
+   * `curve` (vector 25). 🔴 CLAMPED TO 1..127 AFTER, so a table that reaches 0
+   * cannot turn a note on into a release. A release is left alone.
+   */
+  velcurve: {
+    ok: (a) => pointsOk(a.points),
+    run: (b, a) => {
+      if (!isNoteOn(b)) return b;
+      return [b[0], b[1], Math.max(1, curveAt(a.points, b[2], narrow))];
+    },
+  },
+  /**
+   * Note `note` becomes CC `cc` on the note's own channel: a press sends `on`
+   * (127 when left out, the velocity when it is `'vel'`), a release sends `off`
+   * (0 when left out). Every other note passes (vector 26). No state, so every
+   * press sends on, which is what tells it from `toggle`.
+   */
+  notecc: {
+    ok: (a) => int(a.note, 0, 127) && int(a.cc, 0, 127)
+      && (a.on === undefined || a.on === 'vel' || int(a.on, 0, 127)) && opt(a.off, 0, 127),
+    run: (b, a) => {
+      if (!isNote(b) || b[1] !== a.note) return b;
+      const ch = chOf(b);
+      if (!isNoteOn(b)) return [0xB0 | ch, a.cc, a.off ?? 0];
+      return [0xB0 | ch, a.cc, a.on === 'vel' ? b[2] : (a.on ?? 127)];
+    },
+  },
 };
 
 export const OP_NAMES = Object.keys(OPS);
@@ -284,7 +373,8 @@ export function createCore() {
     // link is the smallest loop and `reaches(x, x)` says so at once.
     if (reaches(l.to, l.from)) return { ok: false, reason: 'cycle' };
     links.push({
-      id: l.id, from: l.from, to: l.to, ops: (l.ops || []).map((o) => ({ ...o })),
+      id: l.id, from: l.from, to: l.to,
+      ops: (l.ops || []).map((o) => (o.points ? { ...o, points: o.points.map((q) => [...q]) } : { ...o })),
       state: (l.ops || []).map(() => ({})),
       sounding: new Set(),                // ch * 128 + note, as delivered
       chans: new Set(),                   // channels a note on was delivered on

@@ -48,6 +48,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { RELAY_BASE } from '/shell/wire.mjs';
+  import { openSession, createShipper, fetchBack, ARCHIVE_BASE } from '/shell/ingest.mjs';
 
   const WHAT = 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.';
 
@@ -93,7 +94,11 @@
       + 'person says yes. The same core is written again in C, and both are graded against the test cases '
       + 'at the bottom of this page.',
       'A link is only described until you select it and press Open. Sound and video from the Pi to this '
-      + 'browser and these keys to an instrument or a synth open for real, and Unlink closes what Open opened.'));
+      + 'browser, sound into the recordings and back out of them, and these keys to an instrument or a synth '
+      + 'open for real, and Unlink closes what Open opened.',
+      'A recording is made by this browser from the sound it hears, uploaded to Cloudflare in four second pieces '
+      + 'while the link is open and kept for six hours, and a link from the recordings to this screen plays the '
+      + 'newest one back.'));
 
   // ── the desk ─────────────────────────────────────────────────────────────
   //
@@ -122,7 +127,8 @@
     { id: 'studio-1:circuit:audio', label: 'Circuit', dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 2, frameMs: 10 } },
     { id: 'studio-1:gpu:program', label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } },
     { id: 'studio-1:gpu:video', label: 'GPU', dir: 'out', medium: 'video', shape: { w: 1280, h: 720, fps: 30, codec: 'h264' } },
-    { id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio' },
+    { id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' },
+    { id: 'r2:recordings:out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' },
     { id: 'phone:screen:video', label: 'phone screen', dir: 'in', medium: 'video' },
     { id: 'phone:screen:audio', label: 'phone screen', dir: 'in', medium: 'audio', shape: { rate: 48000 } },
     { id: 'err:klassika:audio', label: 'Klassikaraadio', dir: 'out', medium: 'audio', shape: { rate: 48000 } },
@@ -141,6 +147,7 @@
     'studio-1:circuit:audio -> phone:screen:audio',
     'err:klassika:audio -> web:screen:audio',
     'studio-1:gpu:video -> web:screen:audio',
+    'r2:recordings:out -> web:screen:audio',
   ];
 
   function deskBay() {
@@ -171,8 +178,30 @@
       { id: 'web:screen:video', label: 'browser screen', dir: 'in', medium: 'video' },
     ],
   };
+  /* 🔴 THE STORE IS ANNOUNCED BY THIS PAGE, BECAUSE THIS PAGE IS WHAT WRITES
+     TO IT (plan-universal-routing §10 item 5). A recording is made by the
+     browser that hears the sound and uploaded through ingest, so the store's
+     ports exist exactly as long as a page that can use them does.
+     ⚠️ IT IS NOT SENT TO THE ROOM. A registry keeps one graph per socket and a
+     graph is one site, so a second `graph.announce` from this socket would
+     replace `web` in every other page's desk. It lives in this page's own
+     registry only, under a `from` of its own. */
+  const STORE = {
+    v: 1, site: 'r2', place: 'cloudflare', net: 'cloudflare',
+    nodes: [{ id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' }],
+    ports: [
+      { id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' },
+      { id: 'r2:recordings:out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' },
+    ],
+  };
   const registry = createRegistry();
-  registry.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+  /* Said again on the slow clock below, so this page's own nodes are never
+     drawn as a board that stopped answering. */
+  const sayOwn = () => {
+    registry.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+    registry.ingest({ type: 'graph.announce', from: 'self-store', graph: STORE });
+  };
+  sayOwn();
   function liveBay() { return registry.fill(createBay()); }
 
   let world = 'live';
@@ -415,7 +444,8 @@
       // relay H.264 path, and a row naming the plan's choice would be a claim.
       by: opened.get(printLink(l))?.via?.() || (l.session ? l.session.transport : 'routing core'),
       where: l.session ? l.session.where : 'bytes',
-      says: l.session ? `${l.session.says}\naddress ${l.session.address}` : 'the bytes travel through the link itself',
+      says: (l.session ? `${l.session.says}\naddress ${l.session.address}` : 'the bytes travel through the link itself')
+        + (opened.get(printLink(l))?.where ? `\n${opened.get(printLink(l)).where()}` : ''),
       state: stateOf(l),
     })));
     spec.links = all.map((l) => ({
@@ -516,27 +546,31 @@
   // the session's address, which the board itself announced.
   const opened = new Map();          // link line -> { kind, close(), state() }
   const RENEW_MS = 20_000;
-  const nodeKind = (portId) => bay.node(portId.split(':').slice(0, 2).join(':'))?.kind;
+  const nodeKind = (portId, b = bay) => b.node(portId.split(':').slice(0, 2).join(':'))?.kind;
   /** A port that another page announced, as opposed to the Pi or this browser. */
   const pageOwned = (id) => {
     const site = id.split(':')[0];
     return site !== 'web' && bay.node(id.split(':').slice(0, 2).join(':'))?.place === 'browser';
   };
-  function kindOf(l) {
+  function kindOf(l, on = bay) {
     // 🔴 A LINK FROM ANOTHER PAGE'S PORT IS OPENED BY THAT PAGE. `/partitur/`
     // owns its lanes, so the patchbay asks it with `link.request` and believes
     // its `link.state` answer, rather than pretending to drive a timeline it
     // does not hold.
-    if (pageOwned(l.from)) return 'remote';
-    const a = bay.port(l.from), b = bay.port(l.to);
+    if (on === bay && pageOwned(l.from)) return 'remote';
+    const a = on.port(l.from), b = on.port(l.to);
     if (!a || !b || !a.address && !b.address) return null;
-    if (a.medium === 'audio' && l.to === 'web:screen:audio' && a.address) return nodeKind(l.from) === 'engine' ? 'synth' : 'listen';
+    // A store at either end is a recording or a playback, and it is checked
+    // first because the store's out port has an address as well.
+    if (a.medium === 'audio' && nodeKind(l.to, on) === 'store' && a.address && nodeKind(l.from, on) !== 'store') return 'record';
+    if (a.medium === 'audio' && nodeKind(l.from, on) === 'store' && l.to === 'web:screen:audio') return 'play';
+    if (a.medium === 'audio' && l.to === 'web:screen:audio' && a.address) return nodeKind(l.from, on) === 'engine' ? 'synth' : 'listen';
     if (a.medium === 'video' && l.to === 'web:screen:video' && a.address) return 'video';
     if (a.medium === 'midi' && l.from === 'web:keys:out' && b.address) return nodeKind(l.to) === 'engine' ? 'notes' : 'keys';
     return null;
   }
   const OPENERS = { remote: (l) => openRemote(l), listen: (l) => openListen(l), synth: (l) => openSynth(l), video: (l) => openVideo(l),
-                    keys: (l) => openKeys(l), notes: (l) => openKeys(l, true) };
+                    keys: (l) => openKeys(l), notes: (l) => openKeys(l, true), record: (l) => openRecord(l), play: (l) => openPlay(l) };
   /** A board on `room`, resolved once its socket is open (or after 6 s). */
   async function boardOn(room, extra = {}) {
     let joined;
@@ -629,32 +663,167 @@
     if (o) return o.state();
     return kindOf(l) ? 'described' : 'not built yet';
   }
+  /**
+   * 🔴 ONE BOARD PER SOUND, HOWEVER MANY LINKS USE IT. Listening and recording
+   * the same input are two links and one capture: a second lease on the same
+   * room would be a second socket asking the Pi for what it already sends. So
+   * the source is held by count, and the last link to let go closes it.
+   * ⚠️ IT IS SILENT UNTIL A LINK SAYS OTHERWISE. The board's playout goes to
+   * the speakers by default, and a record link alone must not play a sound
+   * nobody linked to this screen, so the speaker edge is taken off here and the
+   * listen link puts it back.
+   */
+  const sources = new Map();          // room -> { users, ready, board, ctx, out, renew }
+  function holdSource(room) {
+    let s = sources.get(room);
+    if (s) { s.users++; return s.ready.then(() => s); }
+    s = { users: 1 };
+    sources.set(room, s);
+    s.ready = (async () => {
+      // ⚠️ ASK ONLY ONCE THE SOCKET IS OPEN. Measured 2026-10-04: an `input.want`
+      // sent the moment the board was created went nowhere, the page logged
+      // `nothing answered`, and the stream stood open at 0 frames.
+      let joined;
+      const isOpen = new Promise((r) => { joined = r; });
+      const board = createBoard({ room, of: 'Raspberry Pi', showName: false, cushionMs: 80, maxCushionMs: 250,
+        direct: true, directCushionMs: 40, log: (line, kind) => d.log(line, kind), onOpen: () => joined() });
+      const ctx = await board.startAudio();
+      await Promise.race([isOpen, new Promise((r) => setTimeout(r, 6000))]);
+      const out = board.playout();
+      if (!out) { board.close(); throw new Error('the board gave no sound to tap'); }
+      try { out.disconnect(ctx.destination); } catch { /* not connected */ }
+      board.goDirect({ frameMs: 10 });
+      const want = async () => {
+        const r = await board.ask({ type: 'input.want' }, 'input.wanted', 6000);
+        if (!r) d.log(`nothing answered in ${room}`, 'warn');
+        else if (r.started) d.log(`the board started the ${room} capture`, 'ok');
+      };
+      want();
+      Object.assign(s, { board, ctx, out, renew: setInterval(want, RENEW_MS) });
+    })();
+    return s.ready.then(() => s, (e) => { sources.delete(room); throw e; });
+  }
+  function dropSource(room) {
+    const s = sources.get(room);
+    if (!s || --s.users > 0) return;
+    sources.delete(room);
+    clearInterval(s.renew);
+    try { s.out?.disconnect(); } catch { /* */ }
+    s.board?.close();
+    s.ctx?.close().catch(() => { /* already closed */ });
+  }
   async function openListen(l) {
     const room = bay.port(l.from).address;
-    // ⚠️ ASK ONLY ONCE THE SOCKET IS OPEN. Measured 2026-10-04: an `input.want`
-    // sent the moment the board was created went nowhere, the page logged
-    // `nothing answered`, and the stream stood open at 0 frames.
-    let joined;
-    const isOpen = new Promise((r) => { joined = r; });
-    const board = createBoard({ room, of: 'Raspberry Pi', showName: false, cushionMs: 80, maxCushionMs: 250,
-      direct: true, directCushionMs: 40, log: (line, kind) => d.log(line, kind), onOpen: () => joined() });
-    const ctx = await board.startAudio();
-    await Promise.race([isOpen, new Promise((r) => setTimeout(r, 6000))]);
-    const out = board.playout();
-    if (out) { try { out.connect(ctx.destination); } catch { /* already */ } }
-    board.goDirect({ frameMs: 10 });
-    const want = async () => {
-      const r = await board.ask({ type: 'input.want' }, 'input.wanted', 6000);
-      if (!r) d.log(`nothing answered in ${room}`, 'warn');
-      else if (r.started) d.log(`the board started the ${room} capture`, 'ok');
-    };
-    want();
-    const renew = setInterval(want, RENEW_MS);
+    const s = await holdSource(room);
+    s.out.connect(s.ctx.destination);
     return {
       kind: 'listen',
-      via: () => board.stats().via || 'relay',
-      state: () => `open, ${board.stats().frames} fr`,
-      close: () => { clearInterval(renew); try { out?.disconnect(); } catch { /* */ } board.close(); },
+      via: () => s.board.stats().via || 'relay',
+      state: () => `open, ${s.board.stats().frames} fr`,
+      close: () => { try { s.out.disconnect(s.ctx.destination); } catch { /* */ } dropSource(room); },
+    };
+  }
+
+  // ── recording into the store, and playing it back ────────────────────────
+  //
+  // 🔴 PLAN-UNIVERSAL-ROUTING §10 ITEM 5, *"record is a link to R2 or the store
+  // object"*, 2026-10-04. A link into `r2:recordings:in` is opened by this page:
+  // it holds the source the way listening does, taps the decoded sound into a
+  // MediaRecorder, and ships four second pieces through ingest's existing
+  // tokenless protocol (`POST /open`, `PUT /seg/<session>/<n>?fmt=webm`,
+  // `POST /close`). Unlink stops the recorder, waits for the last piece and
+  // closes the session, which writes `manifest.json`.
+  // ⚠️ IT RECORDS OUR OWN PI AND NOBODY ELSE'S SERVER. A record link out of an
+  // `external` node is refused without consent by the bay, and an open-tier
+  // session lives six hours and is then deleted by ingest's sweep.
+  // ⚠️ WEBM HAS NO HLS. The worker writes a playlist only for MPEG-TS, so the
+  // playback link fetches every piece and joins them into one Blob, which plays
+  // because only the first piece carries the WebM header.
+  const SEG_MS = 4000;
+  const RECORDINGS_KEY = 'positron.patchbay.recordings';
+  function loadRecordings() {
+    try {
+      const got = JSON.parse(localStorage.getItem(RECORDINGS_KEY) || '[]');
+      return Array.isArray(got) ? got.filter((r) => r && typeof r.manifest === 'string' && !(r.expiresAt < Date.now())) : [];
+    } catch { return []; }
+  }
+  /** Newest first. A note this browser keeps to itself, and the harness keeps none. */
+  let recordings = SELFCHECK ? [] : loadRecordings();
+  function keepRecordings() {
+    if (SELFCHECK) return;
+    try { localStorage.setItem(RECORDINGS_KEY, JSON.stringify(recordings.slice(0, 20))); } catch { /* full, off or private */ }
+  }
+  const kb = (n) => `${Math.round(n / 1024)} KB`;
+  async function openRecord(l) {
+    const room = bay.port(l.from).address;
+    if (typeof MediaRecorder !== 'function') throw new Error('this browser has no MediaRecorder');
+    const pick = [['audio/webm;codecs=opus', 'webm'], ['audio/webm', 'webm'], ['audio/mp4', 'mp4']]
+      .find(([m]) => MediaRecorder.isTypeSupported(m));
+    if (!pick) throw new Error('this browser records neither WebM nor MP4 audio');
+    const [mime, fmt] = pick;
+    // The session first, so a refusal (five an hour per address) wakes nothing.
+    const sess = await openSession({ log: (m, k) => d.log(m, k) });
+    if (!sess) throw new Error('ingest gave no session, the line above says why');
+    const s = await holdSource(room);
+    const tap = s.ctx.createMediaStreamDestination();
+    s.out.connect(tap);
+    const ship = createShipper(sess.session, { fmt, log: (m, k) => d.log(m, k) });
+    const rec = new MediaRecorder(tap.stream, { mimeType: mime, audioBitsPerSecond: 96000 });
+    rec.ondataavailable = (e) => {
+      ship.put(e.data);
+      if (ship.stats().failed && rec.state === 'recording') rec.stop();
+    };
+    const startedAt = Date.now();
+    rec.start(SEG_MS);
+    const lives = `${ARCHIVE_BASE}/${sess.session}/`;
+    d.log(`recording ${room} into ${lives}, ${SEG_MS / 1000} s pieces, kept ${sess.limits.ttlHours ?? 6} h`, 'ok');
+    let stopping = false;
+    return {
+      kind: 'record',
+      via: () => 'ingest',
+      where: () => `recording to ${lives}`,
+      state: () => {
+        const st = ship.stats();
+        return st.failed ? 'stopped, refused' : `${stopping ? 'closing' : 'rec'} ${st.segments}, ${kb(st.bytes)}`;
+      },
+      close: () => {
+        stopping = true;
+        const stopped = new Promise((r) => { rec.addEventListener('stop', r, { once: true }); setTimeout(r, 3000); });
+        try { if (rec.state !== 'inactive') rec.stop(); } catch { /* */ }
+        stopped.then(async () => {
+          try { s.out.disconnect(tap); } catch { /* */ }
+          dropSource(room);
+          const seconds = Math.round((Date.now() - startedAt) / 1000);
+          const j = await ship.finish();
+          if (!j) return;
+          recordings.unshift({ session: sess.session, manifest: j.manifest, mime, seconds,
+            segments: j.segments, bytes: j.bytes, expiresAt: sess.expiresAt, from: l.from });
+          keepRecordings();
+          d.log(`recorded ${seconds} s of ${l.from}, ${j.segments} pieces, ${kb(j.bytes)}, lives at ${j.manifest} `
+            + `until ${new Date(sess.expiresAt).toLocaleTimeString()}`, 'ok');
+        });
+      },
+    };
+  }
+  /** The newest recording this page made, fetched back from R2 and played. */
+  async function openPlay() {
+    const r = recordings[0];
+    if (!r) throw new Error('this browser has made no recording yet, so open a link into r2:recordings:in and unlink it first');
+    const blob = await fetchBack(r.manifest, r.mime, { log: (m, k) => d.log(m, k) });
+    if (!blob) throw new Error(`${r.manifest} did not come back, and a recording older than six hours has been deleted`);
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio();
+    audio.src = url;
+    audio.play().catch(() => d.log('the browser wants a press before it plays, so press Open again', 'warn'));
+    d.log(`playing ${r.session}, ${r.seconds} s and ${kb(blob.size)} fetched back from R2`, 'ok');
+    return {
+      kind: 'play',
+      via: () => 'R2',
+      where: () => `playing ${r.manifest}`,
+      // A WebM joined from pieces has no duration in its header, so the length
+      // is the one measured while recording.
+      state: () => (audio.ended ? 'played' : `${audio.paused ? 'paused' : 'play'} ${Math.round(audio.currentTime)} of ${r.seconds} s`),
+      close: () => { audio.pause(); audio.removeAttribute('src'); URL.revokeObjectURL(url); },
     };
   }
   /**
@@ -716,19 +885,31 @@
     if (!quiet) d.log(`${line} closed`);
     return true;
   }
+  /**
+   * Open one link. The guard and the choice of opener are here and nowhere
+   * else, so the checks below can grade them with a scratch bay, a scratch map
+   * and openers that only count, and nothing real is reached.
+   * @returns {Promise<{ok: boolean, kind: string|null, why?: string, level?: string}>}
+   */
+  async function openLink(l, { on = bay, selfcheck = SELFCHECK, openers = OPENERS, into = opened } = {}) {
+    const line = printLink(l);
+    if (into.has(line)) return { ok: false, kind: null, why: `${line} is already open` };
+    const kind = kindOf(l, on);
+    if (!kind) return { ok: false, kind, level: 'warn',
+      why: `${line} cannot be opened yet: sound or video to this screen, sound into the recordings, and these keys to an instrument or a synth, are what is built` };
+    if (selfcheck) return { ok: false, kind, why: `the harness opens no real stream, so ${line} stays described` };
+    try {
+      into.set(line, await openers[kind](l));
+      return { ok: true, kind };
+    } catch (e) { return { ok: false, kind, level: 'bad', why: `${line} did not open: ${e.message || e}` }; }
+  }
   d.on('open', async () => {
     const all = bay.links();
     const l = all.find((x) => x.id === selected) || all.at(-1);
     if (!l) { d.log('nothing to open, make a link first'); return; }
-    const line = printLink(l);
-    if (opened.has(line)) { d.log(`${line} is already open`); return; }
-    const kind = kindOf(l);
-    if (!kind) { d.log(`${line} cannot be opened yet: sound or video to this screen, and these keys to an instrument or a synth, are what is built`, 'warn'); return; }
-    if (SELFCHECK) { d.log(`the harness opens no real stream, so ${line} stays described`); return; }
-    try {
-      opened.set(line, await OPENERS[kind](l));
-      d.log(`${line} opened`, 'ok');
-    } catch (e) { d.log(`${line} did not open: ${e.message || e}`, 'bad'); }
+    const r = await openLink(l);
+    if (r.ok) d.log(`${printLink(l)} opened`, 'ok');
+    else d.log(r.why, r.level);
     redraw();
   });
   setInterval(() => { if (opened.size) redraw(); }, 1000);
@@ -776,6 +957,7 @@
   /* A board that stops answering stays drawn and is marked, so staleness is
      checked on a slow clock rather than only when something arrives. */
   setInterval(() => {
+    sayOwn();
     const now = JSON.stringify(registry.merged().sites);
     if (now !== lastSites) { lastSites = now; if (world === 'live') rebuild(); }
   }, 2000);
@@ -898,6 +1080,41 @@
     const bad = createRegistry();
     d.assert('a graph that lies about its site is not heard',
       bad.ingest({ type: 'board.alive', from: 'x', graph: { v: 1, site: 'a', nodes: [{ id: 'b:n' }], ports: [] } }) === false);
+  }
+  {
+    // The store, on a scratch live desk with a board from a fixture: data only,
+    // so this runs for a visitor too, and the openers below only count.
+    const reg = createRegistry();
+    reg.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+    reg.ingest({ type: 'graph.announce', from: 'self-store', graph: STORE });
+    reg.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1',
+      inputs: [{ name: 'circuit', midi: { port: 'Circuit', channels: [1, 2] } }] }) });
+    const t = reg.fill(createBay());
+    const rec = t.link('studio-1:circuit:audio', 'r2:recordings:in');
+    d.assert('a sound linked into the recordings is accepted as an upload through ingest, at the store’s address',
+      rec.ok && rec.session?.transport === 'ingest' && rec.session.address === 'ingest.positron.studio',
+      JSON.stringify(rec.session || rec.why));
+    const play = t.link('r2:recordings:out', 'web:screen:audio');
+    const recL = t.links().find((x) => x.id === rec.id), playL = t.links().find((x) => x.id === play.id);
+    d.assert('and the two store links open as a recording and a playback',
+      !!recL && !!playL && kindOf(recL, t) === 'record' && kindOf(playL, t) === 'play',
+      `${recL && kindOf(recL, t)} ${playL && kindOf(playL, t)}`);
+    // ⚠️ NEGATIVE CONTROL: the store takes sound, so a picture is refused.
+    const vid = t.link('studio-1:gpu:video', 'r2:recordings:in');
+    d.assert('video into the sound recordings is refused', !vid.ok && /video/.test(vid.why || ''), vid.why);
+    // The guard, with openers that only count and a map that is not the page's.
+    let called = 0;
+    const counting = Object.fromEntries(Object.keys(OPENERS).map((k) => [k, () => { called++; return { close() {}, state: () => '' }; }]));
+    const into = new Map(), before = opened.size;
+    const held = await openLink(recL, { on: t, selfcheck: true, openers: counting, into });
+    d.assert('the record opener under the harness opens nothing',
+      !held.ok && held.kind === 'record' && called === 0 && into.size === 0 && opened.size === before && sources.size === 0,
+      held.why);
+    // ⚠️ NEGATIVE CONTROL: the same call without the guard reaches the opener,
+    // so the check above is the guard and not a link that never matched.
+    const reached = await openLink(recL, { on: t, selfcheck: false, openers: counting, into });
+    d.assert('and the same link without the guard reaches the record opener', reached.ok && called === 1 && into.size === 1,
+      reached.why || reached.kind);
   }
   {
     const t = deskBay();

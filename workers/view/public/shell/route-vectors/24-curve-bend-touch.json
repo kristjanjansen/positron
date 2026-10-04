@@ -1,0 +1,79 @@
+{
+  "name": "curve runs downhill on CC, touch and a 14 bit bend",
+  "about": "With no kind and no CC named, curve reshapes every CC, poly and channel touch and pitch bend, a falling segment's tie rounds away from zero, and a bend is curved in its own 14 bits.",
+  "notes": [
+    "l1 kbd to synth: points (0,100) (10,95) (127,0), no cls, no cc, so every CC, touch and bend is curved. l2 wheel to thru: points (0,0) (2,10) (64,64) (127,127), cls bend, an identity from 64 up that must leave a bend there exactly as it was, and a bump below it.",
+    "A CC's value is its third byte, a poly touch's pressure its third, a channel touch's pressure its SECOND (D0 has two bytes).",
+    "A BEND IS CURVED IN 14 BITS, value = lsb + 128 * msb, 0..16383, centre 8192 (00 40). Each point p is read as p * 128 in both coordinates, EXCEPT 127, which is read as 16383, so 64 lands on the bend's centre and 127 on its very top, and an identity table is exact. The arithmetic is the same rounding, on the bigger numbers.",
+    "l1 in 14 bits: (0,12800) (1280,12160) (16383,0).",
+    "t 0: CC x 3, segment 0..10: 100 + 3 * -5 / 10 = 100 + (-1.5), a NEGATIVE TIE, away from zero -2, so 98 = 62. Math.round would give -1, so 99, and truncation gives 99 too.",
+    "t 1: CC x 10 (0A) is a point: 95 = 5F.",
+    "t 2: CC x 50 (32), segment 10..127: 95 + 40 * -95 / 117 = 95 - 32.478, rounds to 95 - 32 = 63 = 3F.",
+    "t 3: CC x 127 (7F) is the last point: 0 = 00.",
+    "t 4: channel touch D0 0A, x 10: 95, so D0 5F.",
+    "t 5: poly touch A0 3C 03, x 3: 98 as at t 0, so A0 3C 62.",
+    "t 6: bend E0 00 40, x 8192, segment 1280..16383: 12160 + (8192 - 1280) * (0 - 12160) / 15103 = 12160 - 84049920 / 15103 = 12160 - 5565.11, rounds to 12160 - 5565 = 6595. 6595 = 51 * 128 + 67, so lsb 67 = 43, msb 51 = 33: E0 43 33.",
+    "t 7: bend E0 7F 7F, x 16383, the last point: 0, so E0 00 00.",
+    "t 8: bend E0 00 00, x 0, the first point: 12800 = 100 * 128, lsb 0, msb 100 = 64: E0 00 64.",
+    "NEGATIVE CONTROL t 9: a note on 90 3C 03 passes unchanged. Curved as a value it would read 90 3C 62.",
+    "NEGATIVE CONTROL t 10: a program change C0 03 passes unchanged.",
+    "l2 in 14 bits: (0,0) (256,1280) (8192,8192) (16383,16383).", "t 11: on l2, bend E0 00 40, x 8192 is the point 64, segment 256..8192: 1280 + 7936 * 6912 / 7936 = 8192, unchanged: E0 00 40.",
+    "t 12: on l2, bend E0 7F 7F, x 16383, segment 8192..16383: 8192 + 8191 * 8191 / 8191 = 16383, unchanged, E0 7F 7F. With 127 read as 127 * 128 = 16256 this would come out E0 00 7F.",
+    "t 13: on l2, bend E0 34 52, x 52 + 82 * 128 = 10548, segment 8192..16383: 8192 + 2356 * 8191 / 8191 = 10548, unchanged, E0 34 52.",
+    "NEGATIVE CONTROL t 14: on l2, a CC B0 01 03 passes unchanged because the op names bend. Curved by l2's table, segment 2..64, it would be 10 + 1 * 54 / 62 = 10.87, so 11 = B0 01 0B. Until the sabotage run of 2026-10-04 l2 was a full identity, and a core that ignored cls passed this step, since an identity leaves a CC alone too.",
+    "NEGATIVE CONTROL t 15: on l2, channel touch D0 0A passes unchanged. Curved it would be 10 + 8 * 54 / 62 = 16.97, so 17 = D0 11.", "t 16: on l2, bend E0 00 01, x 128, segment 0..256: 0 + 128 * 1280 / 256 = 640 = 5 * 128, so lsb 0, msb 5: E0 00 05. Below 64 l2 does reshape a bend.",
+    "NEGATIVE CONTROL: l3 asks for kind note, which carries no value to curve, and is refused bad-args."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "wheel", "dir": "in" },
+    { "id": "synth", "dir": "out" },
+    { "id": "thru", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[0, 100], [10, 95], [127, 0]] }] },
+    { "id": "l2", "from": "wheel", "to": "thru", "ops": [{ "op": "curve", "points": [[0, 0], [2, 10], [64, 64], [127, 127]], "cls": "bend" }] },
+    { "id": "l3", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[0, 0], [127, 127]], "cls": "note" }] }
+  ],
+  "refused": [
+    { "link": "l3", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "B0 01 03" },
+    { "port": "kbd", "t": 1, "bytes": "B0 01 0A" },
+    { "port": "kbd", "t": 2, "bytes": "B0 01 32" },
+    { "port": "kbd", "t": 3, "bytes": "B0 01 7F" },
+    { "port": "kbd", "t": 4, "bytes": "D0 0A" },
+    { "port": "kbd", "t": 5, "bytes": "A0 3C 03" },
+    { "port": "kbd", "t": 6, "bytes": "E0 00 40" },
+    { "port": "kbd", "t": 7, "bytes": "E0 7F 7F" },
+    { "port": "kbd", "t": 8, "bytes": "E0 00 00" },
+    { "port": "kbd", "t": 9, "bytes": "90 3C 03" },
+    { "port": "kbd", "t": 10, "bytes": "C0 03" },
+    { "port": "wheel", "t": 11, "bytes": "E0 00 40" },
+    { "port": "wheel", "t": 12, "bytes": "E0 7F 7F" },
+    { "port": "wheel", "t": 13, "bytes": "E0 34 52" },
+    { "port": "wheel", "t": 14, "bytes": "B0 01 03" },
+    { "port": "wheel", "t": 15, "bytes": "D0 0A" },
+    { "port": "wheel", "t": 16, "bytes": "E0 00 01" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "B0 01 62" },
+    { "port": "synth", "t": 1, "bytes": "B0 01 5F" },
+    { "port": "synth", "t": 2, "bytes": "B0 01 3F" },
+    { "port": "synth", "t": 3, "bytes": "B0 01 00" },
+    { "port": "synth", "t": 4, "bytes": "D0 5F" },
+    { "port": "synth", "t": 5, "bytes": "A0 3C 62" },
+    { "port": "synth", "t": 6, "bytes": "E0 43 33" },
+    { "port": "synth", "t": 7, "bytes": "E0 00 00" },
+    { "port": "synth", "t": 8, "bytes": "E0 00 64" },
+    { "port": "synth", "t": 9, "bytes": "90 3C 03" },
+    { "port": "synth", "t": 10, "bytes": "C0 03" },
+    { "port": "thru", "t": 11, "bytes": "E0 00 40" },
+    { "port": "thru", "t": 12, "bytes": "E0 7F 7F" },
+    { "port": "thru", "t": 13, "bytes": "E0 34 52" },
+    { "port": "thru", "t": 14, "bytes": "B0 01 03" },
+    { "port": "thru", "t": 15, "bytes": "D0 0A" },
+    { "port": "thru", "t": 16, "bytes": "E0 00 05" }
+  ]
+}
