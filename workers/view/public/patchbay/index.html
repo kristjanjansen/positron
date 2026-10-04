@@ -39,6 +39,7 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createBay, HEAVY, parseLink, printLink } from '/shell/bay.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createPicker } from '/shell/picker.mjs';
   import { openWire } from '/shell/wire.mjs';
   import { createRegistry, boardGraph } from '/shell/graph-registry.mjs';
   import { createCore, fromHex, toHex } from '/shell/route-core.mjs';
@@ -60,6 +61,7 @@
       { id: 'example', label: 'Example' },
       { id: 'unlink', label: 'Unlink' },
       { id: 'clear', label: 'Clear' },
+      { id: 'save', label: 'Save scene' },
     ],
   });
   guard(d);
@@ -258,11 +260,111 @@
     onPick: (v) => { for (const line of [...opened.keys()]) closeLink(line); world = v; made = []; rebuild(); field.set(examples()[0]); step = 0;
       d.log(v === 'live' ? `the live desk: what announces itself in ${ROOM}` : 'the example desk'); },
   });
+  // ── scenes: a set of links kept under a name ─────────────────────────────
+  //
+  // 🔴 A RECALL IS A DIFF, NOT A TEARDOWN (`plans/plan-route-core.md` §5,
+  // *"Changes are diffs"*). A link in both the current set and the scene is not
+  // touched, so a stream that is open stays open; a link only in the current set
+  // is closed and unlinked; a link only in the scene is made and DESCRIBED.
+  // ⚠️ AND A RECALL OPENS NOTHING, WHEREVER IT CAME FROM. Opening stays a
+  // person's press on Open, so a `scene.recall` from another page in the room,
+  // such as `/partitur/`'s scenes lane, can change what is described and close
+  // what a scene leaves out, and cannot start a stream on anybody's hardware.
+  // ⚠️ SCENES LIVE IN THIS BROWSER, in `localStorage`, which may throw or come
+  // back empty, so every read and write is wrapped and the page works without
+  // it. The harness keeps them in memory only, so a run leaves nothing behind.
+  const SCENES_KEY = 'positron.patchbay.scenes';
+  function loadScenes() {
+    try {
+      const got = JSON.parse(localStorage.getItem(SCENES_KEY) || '[]');
+      return Array.isArray(got) ? got.filter((x) => x && typeof x.name === 'string' && Array.isArray(x.lines)) : [];
+    } catch { return []; }
+  }
+  let scenes = SELFCHECK ? [] : loadScenes();
+  function keepScenes() {
+    if (SELFCHECK) return;
+    try { localStorage.setItem(SCENES_KEY, JSON.stringify(scenes)); } catch { /* full, off or private */ }
+  }
+  /** `scene 1`, `scene 2`, one past the highest number already used. */
+  const nextSceneName = (list) => `scene ${list.reduce((n, x) => Math.max(n, Number(/^scene (\d+)$/.exec(x.name)?.[1] || 0)), 0) + 1}`;
+
+  /**
+   * Make bay `b` hold `scene`'s links, starting from `current` ({line, consent}
+   * as `made` holds them). Pure apart from `b` and the `close` it is handed,
+   * which answers whether the line was open. It never opens anything: there is
+   * no opener in reach of this function. Answers `{ made, changes }`, where each
+   * change is `{ op: 'removed' | 'made' | 'refused', line, wasOpen?, why? }`.
+   */
+  function applyScene(b, current, scene, { close = () => false } = {}) {
+    const want = new Set(scene.lines.map((m) => m.line));
+    const have = new Set(current.map((m) => m.line));
+    const next = [], changes = [];
+    for (const m of current) {
+      if (want.has(m.line)) { next.push(m); continue; }
+      const wasOpen = !!close(m.line);
+      const lk = b.links().find((l) => printLink(l) === m.line);
+      if (lk) b.unlink(lk.id);
+      changes.push({ op: 'removed', line: m.line, wasOpen });
+    }
+    for (const m of scene.lines) {
+      if (have.has(m.line)) continue;
+      let l;
+      try { l = parseLink(m.line); } catch (e) { changes.push({ op: 'refused', line: m.line, why: e.message }); continue; }
+      const r = b.link(l.from, l.to, l.transforms, { consent: !!m.consent });
+      if (!r.ok) { changes.push({ op: 'refused', line: m.line, why: r.why }); continue; }
+      const line = printLink(b.links().find((x) => x.id === r.id));
+      next.push({ line, consent: !!m.consent });
+      changes.push({ op: 'made', line });
+    }
+    return { made: next, changes };
+  }
+
+  let sceneAt = -1;
+  const pick = createPicker({
+    label: 'scene', what: 'scene',
+    prev: () => stepScene(-1), next: () => stepScene(1),
+    onPick: (i) => { if (scenes[i]) recallScene(scenes[i].name); },
+  });
+  function drawScenes() {
+    pick.options(scenes.map((x) => x.name), Math.max(0, sceneAt));
+    if (!scenes.length) pick.show('none');
+    pick.disabled(!scenes.length);
+  }
+  function stepScene(dir) {
+    if (!scenes.length) return;
+    const i = sceneAt < 0 ? (dir > 0 ? 0 : scenes.length - 1) : (sceneAt + dir + scenes.length) % scenes.length;
+    recallScene(scenes[i].name);
+  }
+  /** Recall a saved scene into the page's own bay. One log line per change. */
+  function recallScene(name, by = '') {
+    const sc = scenes.find((x) => x.name === name);
+    if (!sc) { d.log(`${by ? `${by} asked for ${name}, which` : `${name}`} is not a scene saved in this browser`, 'warn'); return null; }
+    const r = applyScene(bay, made, sc, { close: (line) => closeLink(line, true) });
+    made = r.made;
+    for (const c of r.changes) {
+      if (c.op === 'made') d.log(`${name} made ${c.line}, described and not opened`, 'ok');
+      else if (c.op === 'removed') d.log(`${name} removed ${c.line}${c.wasOpen ? ', which was open and is closed' : ''}`);
+      else d.log(`${name} could not make ${c.line}: ${c.why}`, 'bad');
+    }
+    if (!r.changes.length) d.log(`${name}${by ? `, asked for by ${by},` : ''} is what is linked already, nothing changed`);
+    else if (by) d.log(`${name} recalled, asked for by ${by}`);
+    sceneAt = scenes.indexOf(sc);
+    pick.show(name, sceneAt);
+    selected = null;
+    redraw();
+    return r;
+  }
+  drawScenes();
+
+  const deskRow = el('div', 'gr-write');
+  deskRow.append(desk.el, pick.el);
   d.stack.titled('THE GRAPH',
     say('The live desk is what announces itself in the studio\u2019s room right now, this browser included. '
       + 'The example desk has every kind of thing on it. Write a link as from, an arrow, then to, or press '
-      + 'Example to step through what the desk allows, and press Link. A refusal says why in the log.'),
-    desk.el, host, write, rows.el, keysHost);
+      + 'Example to step through what the desk allows, and press Link. A refusal says why in the log.',
+      'Save scene keeps the links under a name in this browser, and picking a scene makes and removes links '
+      + 'until they match it, leaving the shared ones alone and opening nothing.'),
+    deskRow, host, write, rows.el, keysHost);
 
   // ── inside a link ─────────────────────────────────────────────────────────
   const inside = el('pre', 'rout-case');
@@ -372,6 +474,15 @@
     selected = null;
     d.log(`${id} unlinked`);
     redraw();
+  });
+  d.on('save', () => {
+    const name = nextSceneName(scenes);
+    scenes.push({ name, lines: made.map((m) => ({ line: m.line, consent: !!m.consent })) });
+    keepScenes();
+    sceneAt = scenes.length - 1;
+    drawScenes();
+    d.log(`${name} saved with ${made.length} link${made.length === 1 ? '' : 's'}`, 'ok');
+    announceScenes();
   });
   d.on('clear', () => {
     for (const l of bay.links()) { closeLink(printLink(l)); bay.unlink(l.id); }
@@ -596,12 +707,14 @@
       close: () => { for (const e of core.unlink('L', Math.round(performance.now()))) send(e.bytes); kb.el.remove(); board.close(); showInside(); },
     };
   }
-  function closeLink(line) {
+  /** Close an open link. Answers whether it was open. */
+  function closeLink(line, quiet = false) {
     const o = opened.get(line);
-    if (!o) return;
+    if (!o) return false;
     o.close();
     opened.delete(line);
-    d.log(`${line} closed`);
+    if (!quiet) d.log(`${line} closed`);
+    return true;
   }
   d.on('open', async () => {
     const all = bay.links();
@@ -622,16 +735,30 @@
 
   // ── listening to the studio's room ───────────────────────────────────────
   let me = null, lastSites = '';
+  /* The names only, so another page can offer them. The harness says nothing
+     here, so a run of the suite never puts a scene in front of a real page. */
+  function announceScenes() {
+    if (SELFCHECK || !me) return;
+    wire.send({ type: 'scene.list', scenes: scenes.map((x) => x.name) });
+  }
   const wire = openWire(ROOM, {
     onOpen: (from) => {
       me = from;
       wire.send({ type: 'graph.announce', graph: SELF });
       wire.send({ type: 'graph.ask' });
+      announceScenes();
       d.log(`listening in ${ROOM}, and this browser said what it is`);
     },
     onMessage: (got) => {
       if (got.kind !== 'json' || got.msg.from === me) return;
-      if (got.msg.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: SELF }); return; }
+      if (got.msg.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: SELF }); announceScenes(); return; }
+      // Another page, such as `/partitur/`'s scenes lane, asking for a scene.
+      // The recall makes and removes links and opens nothing.
+      if (got.msg.type === 'scene.recall') {
+        if (typeof got.msg.name === 'string') recallScene(got.msg.name, 'the room');
+        return;
+      }
+      if (got.msg.type === 'scene.list') return;
       if (got.msg.type === 'link.state') {
         const key = `${got.msg.source} ${got.msg.target}`;
         const resolve = pendingState.get(key);
@@ -797,6 +924,39 @@
     d.assert('video into a sound input is refused', !wrong.ok && /video/.test(wrong.why), wrong.why);
     d.assert('every link prints as the line it was written as',
       t.links().every((l) => { const p = parseLink(printLink(l)); return p.from === l.from && p.to === l.to; }));
+  }
+  {
+    // Scenes, on a scratch bay: data only, so this runs for a visitor too.
+    const t = deskBay();
+    const lineOf = (b, r) => printLink(b.links().find((x) => x.id === r.id));
+    const mk = (line) => { const l = parseLink(line); const r = t.link(l.from, l.to, l.transforms); return { id: r.id, line: lineOf(t, r) }; };
+    const A = mk(EXAMPLES[0]), B = mk(EXAMPLES[1]);
+    const other = deskBay(), l2 = parseLink(EXAMPLES[2]);
+    const C = lineOf(other, other.link(l2.from, l2.to, l2.transforms));
+    const now = [A, B].map((x) => ({ line: x.line, consent: false }));
+    // Both of the current links stand in as open, so the test can see which
+    // one the recall closes and that it opens nothing.
+    const open = new Set([A.line, B.line]), closed = [];
+    const before = opened.size;
+    const r = applyScene(t, now, { name: 'test', lines: [{ line: B.line, consent: false }, { line: C, consent: false }] },
+      { close: (line) => { closed.push(line); return open.delete(line); } });
+    const lines = t.links().map(printLink);
+    d.assert('a scene recall keeps the shared link, removes the one only now has and makes the one only the scene has',
+      lines.length === 2 && lines.includes(B.line) && lines.includes(C) && !lines.includes(A.line)
+        && t.links().find((x) => printLink(x) === B.line)?.id === B.id
+        && r.changes.map((c) => c.op).join(' ') === 'removed made' && r.made.length === 2,
+      r.changes.map((c) => `${c.op} ${c.line}`).join(' | '));
+    d.assert('and opens nothing, closing only the link it removed and leaving the shared one open',
+      closed.join(' | ') === A.line && open.has(B.line) && !open.has(C) && opened.size === before && !opened.has(C),
+      `closed ${closed.length}, open ${[...open].join(', ')}`);
+    // ⚠️ NEGATIVE CONTROL: a scene identical to now changes nothing at all.
+    const ids = t.links().map((x) => x.id).join(' ');
+    const same = applyScene(t, r.made, { name: 'same', lines: r.made }, { close: (line) => { closed.push(line); return true; } });
+    d.assert('a recall of a scene identical to now changes nothing',
+      same.changes.length === 0 && t.links().map((x) => x.id).join(' ') === ids && closed.length === 1,
+      `${same.changes.length} changes`);
+    d.assert('a new scene is named one past the highest number',
+      nextSceneName([{ name: 'scene 1' }, { name: 'scene 3' }, { name: 'mine' }]) === 'scene 4' && nextSceneName([]) === 'scene 1');
   }
   d.assert('the picture drew every box and every arrow, and cut nothing',
     !(dg.cuts || []).length, (dg.cuts || []).map((c) => `${c.id} ${c.where}: ${c.shown || c.full}`).join(' | ') || 'no cuts');
