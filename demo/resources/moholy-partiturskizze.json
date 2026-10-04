@@ -1,0 +1,2329 @@
+{
+ "meta": {
+  "what": "Moholy-Nagy's Partiturskizze zu einer mechanischen Exzentrik read off the archive.org scan as four lanes of spans and marks, every row marked seen or inferred.",
+  "title": "Partiturskizze zu einer mechanischen Exzentrik. Synthese von Form, Bewegung, Ton, Licht (Farbe) und Geruch",
+  "titleHow": "seen",
+  "author": "László Moholy-Nagy",
+  "date": "compiled by spring 1924, published 1925",
+  "dateHow": "read: the book's imprint says it was compiled in spring 1924 and delayed",
+  "measured": "2026-10-04",
+  "builtBy": "demo/resources/build-moholy-partiturskizze.mjs"
+ },
+ "source": {
+  "book": "Oskar Schlemmer, L. Moholy-Nagy, Farkas Molnár, Die Bühne im Bauhaus, Bauhausbücher 4, Albert Langen Verlag, München, 1925",
+  "keyPage": 44,
+  "platePage": 47,
+  "platePageHow": "read: the key says \"(siehe Seite 47)\"; the plate is also page 47 of the scan PDF",
+  "archive": "https://archive.org/details/schlemmer-et-al.-1925-die-buhne-am-bauhaus",
+  "file": "https://archive.org/download/schlemmer-et-al.-1925-die-buhne-am-bauhaus/Schlemmer%20et%20al.%20-%201925%20-%20Die%20B%C3%BChne%20am%20Bauhaus.pdf",
+  "image": "PDF page 47, its one embedded JPEG, 902 x 345 px, plate photographed flat and sideways",
+  "licence": "archive.org marks the item with the Public Domain Mark",
+  "key": "Nebenstehend die PARTITUR-SKIZZE einer MECHANISCHEN EXZENTRIK (siehe Seite 47) für ein Varieté. Die Bühne ist in drei Teile gegliedert. Der untere Teil für größere Formen und Bewegungen: I. BÜHNE. Die II. BÜHNE (oben) mit aufklappbarer Glasplatte für kleinere Formen und Bewegungen. (Die Glasplatte ist zugleich präparierte PROJEKTIONSWAND für von der Rückseite der Bühne projizierte Filmvorführungen.) Auf der III. (ZWISCHEN-)BÜHNE mechanische Musikapparate; meist ohne Resonanzkasten, nur mit Schalltrichtern (Schlag-, Geräusch- und Blas-Instrumente). Einzelne Wände der Bühne sind doppelt mit weißer Leinwand bespannt, die farbige Lichter aus Scheinwerfern und Lichtbäumen durchlassen und zerstreuen. Die 1. und 2. Kolonne der Partitur bedeuten in senkrecht abwärtsgehender Kontinuität Form- und Bewegungsvorgänge. Die 3. Kolonne zeigt nacheinander folgende Lichtwirkungen: Die Breite der Streifen bedeutet die Dauer. Schwarz = Finsternis. Die in den breiten Streifen vorhandenen schmalen vertikalen Streifen sind gleichzeitige Teilbeleuchtungen der Bühne. Die 4. Kolonne ist für Musik vorgesehen; hier nur in den Absichten angedeutet. Die farbigen Vertikalstreifen bedeuten verschiedenartig heulende Sirenentöne, die einen großen Teil der Vorgänge begleiten. Die Gleichzeitigkeit ist in der Partitur aus der Horizontale zu lesen.",
+  "keyCorrections": [
+   "OCR \"EXZENTERIK\" read as EXZENTRIK, as the plate title spells it",
+   "OCR \"Variet@\" read as Varieté",
+   "the book separates sentences with a square ornament, OCR \"@\"; given here as full stops",
+   "OCR \"ı.\" read as 1.; line-break hyphens joined; \"Teilder\", \"ausder Horizontalezulesen\" spaced"
+  ],
+  "folge": {
+   "1": [
+    "Pfeile stürzen",
+    "Lamellen öffnen sich",
+    "Kreise rotieren",
+    "Elektro-Apparate",
+    "Blitz Donner",
+    "Gittersysteme von Farben",
+    "schießen auf-ab hin-her",
+    "Phosphoreszenz",
+    "Riesen-Apparate schwingen",
+    "blitzen",
+    "Gitter weiter",
+    "Räder",
+    "Explosionen",
+    "Gerüche",
+    "Clownerie",
+    "Menschmechanik"
+   ],
+   "2": [
+    "Pfeile stürzen",
+    "Lamellen öffnen sich",
+    "Kreise rotieren",
+    "Kino auf Tageswand",
+    "rückwärts gedreht",
+    "Aktion",
+    "Tempo",
+    "wild"
+   ],
+   "3+4": [
+    "sind ohne Schlagworte deutlich"
+   ]
+  }
+ },
+ "frame": {
+  "orientation": "as printed and hung: title at the top, time running down, columns 1 to 4 left to right. The scan has it sideways with time running right",
+  "positions": "fractions of the scored length, 0 at the top of the lanes and 1 at the bottom",
+  "across": "fraction of a column's width, 0 at its left edge as hung",
+  "scoredLengthPx": [
+   177,
+   852
+  ],
+  "scoredLengthHow": "seen: the extent of column 3, the only column with a stated time scale; the others start and end within two pixels of it",
+  "resolution": 0.0015,
+  "resolutionNote": "one scan pixel; nothing on the plate is located more finely than this, and one pixel stripes are at the limit of what the scan shows"
+ },
+ "unit": {
+  "unit": "fraction",
+  "given": false,
+  "how": "seen",
+  "note": "Moholy gave no unit, no tempo and no total length, on the plate or in the key. A page that plays this must choose a total duration and say that it chose it.",
+  "suggested": {
+   "totalSeconds": 480,
+   "how": "inferred",
+   "reasoning": "It is a variety number (*\"für ein Varieté\"*), and an act of five to ten minutes is the usual size of one; that range is my assumption, not a source. At 480 s one scan pixel is 0.71 s, so the one pixel lines last under a second and still read as flashes, the six-stripe flicker near the end alternates at about 1.4 s, and the longest darkness (367 to 439) lasts 51 s. Anything from 300 s to 600 s keeps the thinnest stripe above 0.4 s and the longest darkness under 65 s. How Theater der Klänge timed it in 1987 is not known here and would be the better source."
+  }
+ },
+ "stage": {
+  "how": "seen",
+  "note": "the axonometric beside the title, part of the score: I. Bühne below, II. Bühne above with its glass Projektionswand, labelled on the plate. The III. (Zwischen-)Bühne with the music machines is in the key and not legible as a label in this scan"
+ },
+ "lanes": [
+  {
+   "n": 1,
+   "name": "Form + Bewegung (I. Bühne)",
+   "nameHow": "seen",
+   "stage": "I. Bühne",
+   "marks": [
+    {
+     "id": "c1-yellow-arrow",
+     "from": 0,
+     "to": 0.0578,
+     "px": [
+      176,
+      216
+     ],
+     "at": 0.0281,
+     "label": "yellow arrow pointing down the column",
+     "how": "seen",
+     "folge": {
+      "item": "Pfeile stürzen",
+      "how": "inferred"
+     },
+     "note": "an arrow pointing down with time; nearly the word itself"
+    },
+    {
+     "id": "c1-red-disc",
+     "from": 0.0193,
+     "to": 0.0489,
+     "px": [
+      190,
+      210
+     ],
+     "at": 0.0341,
+     "label": "red disc, a black arrow pointing up into it and a white hollow arrow entering from the right",
+     "how": "seen"
+    },
+    {
+     "id": "c1-ring",
+     "from": 0.0074,
+     "to": 0.0874,
+     "px": [
+      182,
+      236
+     ],
+     "at": 0.0474,
+     "label": "black ring with two opposed hollow grey arrows inside it",
+     "how": "seen",
+     "folge": {
+      "item": "Kreise rotieren",
+      "how": "inferred"
+     },
+     "note": "opposed arrows in a ring read as rotation"
+    },
+    {
+     "id": "c1-big-arrow",
+     "from": 0.0696,
+     "to": 0.0904,
+     "px": [
+      224,
+      238
+     ],
+     "at": 0.08,
+     "label": "large black arrow pointing across the column toward its left edge",
+     "how": "seen",
+     "folge": {
+      "item": "Pfeile stürzen",
+      "how": "inferred"
+     }
+    },
+    {
+     "id": "c1-starburst",
+     "from": 0.0904,
+     "to": 0.1822,
+     "px": [
+      238,
+      300
+     ],
+     "at": 0.1363,
+     "label": "starburst of grey rays around a black disc, a yellow hand pointing into it",
+     "how": "seen",
+     "folge": {
+      "item": "Elektro-Apparate",
+      "how": "inferred"
+     },
+     "note": "weak; Blitz Donner fits as well"
+    },
+    {
+     "id": "c1-crossing-bars",
+     "from": 0.1852,
+     "to": 0.2474,
+     "px": [
+      302,
+      344
+     ],
+     "at": 0.2163,
+     "label": "red, blue and black bars crossing over thin lines, small arrows up, down, to and fro",
+     "how": "seen",
+     "folge": {
+      "item": "schießen auf-ab hin-her",
+      "how": "inferred"
+     }
+    },
+    {
+     "id": "c1-grid",
+     "from": 0.2474,
+     "to": 0.3274,
+     "px": [
+      344,
+      398
+     ],
+     "at": 0.2874,
+     "label": "grey gridded square with concentric circles, crossed by red and blue bars",
+     "how": "seen",
+     "folge": {
+      "item": "Gittersysteme von Farben",
+      "how": "inferred"
+     },
+     "note": "the plainest match after the arrows"
+    },
+    {
+     "id": "c1-bars-on",
+     "from": 0.3274,
+     "to": 0.3896,
+     "px": [
+      398,
+      440
+     ],
+     "at": 0.3585,
+     "label": "red, blue and grey bars and small arrows continuing past the grid",
+     "how": "seen",
+     "folge": {
+      "item": "schießen auf-ab hin-her",
+      "how": "inferred"
+     }
+    },
+    {
+     "id": "c1-frame",
+     "from": 0.3896,
+     "to": 0.5081,
+     "px": [
+      440,
+      520
+     ],
+     "at": 0.4489,
+     "label": "frame of thin lines with diagonals converging, like a perspective drawing",
+     "how": "seen"
+    },
+    {
+     "id": "c1-blades",
+     "from": 0.4504,
+     "to": 0.5896,
+     "px": [
+      481,
+      575
+     ],
+     "at": 0.52,
+     "label": "two long black blade shapes, one above the other, a curved arrow at their tip",
+     "how": "seen",
+     "folge": {
+      "item": "Riesen-Apparate schwingen",
+      "how": "inferred"
+     },
+     "note": "the curved arrow reads as a swing"
+    },
+    {
+     "id": "c1-red-grid",
+     "from": 0.5022,
+     "to": 0.5644,
+     "px": [
+      516,
+      558
+     ],
+     "at": 0.5333,
+     "label": "grey grid with red cells, behind the blades",
+     "how": "seen",
+     "folge": {
+      "item": "Gitter weiter",
+      "how": "inferred"
+     }
+    },
+    {
+     "id": "c1-red-eye",
+     "from": 0.6519,
+     "to": 0.68,
+     "px": [
+      617,
+      636
+     ],
+     "at": 0.6659,
+     "label": "red target disc with a dark centre",
+     "how": "seen",
+     "folge": {
+      "item": "Räder",
+      "how": "inferred"
+     },
+     "note": "weak; wheels or lamps"
+    },
+    {
+     "id": "c1-small-arrows",
+     "from": 0.6889,
+     "to": 0.7126,
+     "px": [
+      642,
+      658
+     ],
+     "at": 0.7007,
+     "label": "small arrows pointing both ways between the red and blue discs",
+     "how": "seen"
+    },
+    {
+     "id": "c1-blue-eye",
+     "from": 0.723,
+     "to": 0.7526,
+     "px": [
+      665,
+      685
+     ],
+     "at": 0.7378,
+     "label": "blue target disc with a dark centre",
+     "how": "seen",
+     "folge": {
+      "item": "Räder",
+      "how": "inferred"
+     },
+     "note": "weak"
+    },
+    {
+     "id": "c1-cable",
+     "from": 0.757,
+     "to": 0.7807,
+     "px": [
+      688,
+      704
+     ],
+     "at": 0.7689,
+     "label": "black curved line from the column edge down to the yellow disc, like a cable or a whip",
+     "how": "seen"
+    },
+    {
+     "id": "c1-yellow-eye",
+     "from": 0.8044,
+     "to": 0.8311,
+     "px": [
+      720,
+      738
+     ],
+     "at": 0.8178,
+     "label": "yellow target disc with a black centre",
+     "how": "seen",
+     "folge": {
+      "item": "Räder",
+      "how": "inferred"
+     },
+     "note": "weak"
+    },
+    {
+     "id": "c1-rays",
+     "from": 0.8193,
+     "to": 0.923,
+     "px": [
+      730,
+      800
+     ],
+     "at": 0.8711,
+     "label": "fan of grey rays from the yellow disc toward the figure",
+     "how": "seen",
+     "folge": {
+      "item": "Explosionen",
+      "how": "inferred"
+     },
+     "note": "weak; it could as well be a beam of light"
+    },
+    {
+     "id": "c1-figure",
+     "from": 0.9141,
+     "to": 0.997,
+     "px": [
+      794,
+      850
+     ],
+     "at": 0.9556,
+     "label": "tumbling human figure in blue and white inside a circle with crosshairs",
+     "how": "seen",
+     "folge": {
+      "item": "Clownerie",
+      "how": "inferred"
+     },
+     "note": "equally Menschmechanik; the only human on the plate, and last"
+    }
+   ]
+  },
+  {
+   "n": 2,
+   "name": "Form + Bewegung + Kino (II. Bühne)",
+   "nameHow": "inferred",
+   "nameNote": "the column label is too small to read in this scan; the wording is from the museum photographs read earlier today and fits the key",
+   "stage": "II. Bühne",
+   "marks": [
+    {
+     "id": "c2-arrow",
+     "from": 0.0119,
+     "to": 0.0415,
+     "px": [
+      185,
+      205
+     ],
+     "at": 0.0267,
+     "label": "black arrow pointing down the column over an open half circle",
+     "how": "seen",
+     "folge": {
+      "item": "Pfeile stürzen",
+      "how": "inferred"
+     },
+     "note": "nearly the word itself"
+    },
+    {
+     "id": "c2-circle-bar",
+     "from": 0.0459,
+     "to": 0.1126,
+     "px": [
+      208,
+      253
+     ],
+     "at": 0.0793,
+     "label": "orange bar driven diagonally into a small grey circle with coloured ticks and two small inward arrows",
+     "how": "seen",
+     "folge": {
+      "item": "Kreise rotieren",
+      "how": "inferred"
+     },
+     "note": "weak"
+    },
+    {
+     "id": "c2-cue-line",
+     "from": 0.1185,
+     "to": 0.1244,
+     "px": [
+      257,
+      261
+     ],
+     "at": 0.1215,
+     "label": "black line with its arrowhead at the edge of column 3, pointing right into the light column",
+     "how": "seen",
+     "note": "it lands on the pale blue light stripe at 256 to 262: a cue from column 2 into the light is inferred"
+    },
+    {
+     "id": "c2-hollow-arrow",
+     "from": 0.1615,
+     "to": 0.1822,
+     "px": [
+      286,
+      300
+     ],
+     "at": 0.1719,
+     "label": "hollow white arrow pointing up the column, against time",
+     "how": "seen"
+    },
+    {
+     "id": "c2-ring-arrow",
+     "from": 0.3081,
+     "to": 0.3333,
+     "px": [
+      385,
+      402
+     ],
+     "at": 0.3207,
+     "label": "small black arrow pointing down with a small ring at its head",
+     "how": "seen"
+    },
+    {
+     "id": "c2-yellow-disc",
+     "from": 0.3215,
+     "to": 0.3733,
+     "px": [
+      394,
+      429
+     ],
+     "at": 0.3474,
+     "label": "yellow disc with a wedge cut out, a grey bar running down the column from it",
+     "how": "seen",
+     "folge": {
+      "item": "Kreise rotieren",
+      "how": "inferred"
+     }
+    },
+    {
+     "id": "c2-blue-disc",
+     "from": 0.4459,
+     "to": 0.4785,
+     "px": [
+      478,
+      500
+     ],
+     "at": 0.4622,
+     "label": "pale blue disc with a hollow arrow pointing right, on a grey stem",
+     "how": "seen"
+    },
+    {
+     "id": "c2-red-arrow",
+     "from": 0.5511,
+     "to": 0.5926,
+     "px": [
+      549,
+      577
+     ],
+     "at": 0.5719,
+     "label": "red arrow pointing up the column, against time",
+     "how": "seen",
+     "note": "an arrow against time before the cinema; rückwärts gedreht is possible but the list puts it after the cinema, so no match is made"
+    },
+    {
+     "id": "c2-lens",
+     "from": 0.6119,
+     "to": 0.6267,
+     "px": [
+      590,
+      600
+     ],
+     "at": 0.6193,
+     "label": "small black square with a white circle in it",
+     "how": "seen",
+     "folge": {
+      "item": "Kino auf Tageswand",
+      "how": "inferred"
+     },
+     "note": "read as the projector aperture"
+    },
+    {
+     "id": "c2-funnel",
+     "from": 0.6267,
+     "to": 0.9274,
+     "px": [
+      600,
+      803
+     ],
+     "at": 0.777,
+     "label": "grey funnel widening down the column from the square",
+     "how": "seen",
+     "folge": {
+      "item": "Kino auf Tageswand",
+      "how": "inferred"
+     },
+     "note": "a projection beam; the strongest match in column 2"
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "name": "Licht (Farbe)",
+   "nameHow": "seen",
+   "scale": "stripe width is duration (the key)",
+   "spans": [
+    {
+     "from": 0,
+     "to": 0.0133,
+     "px": [
+      177,
+      186
+     ],
+     "colour": "black",
+     "hex": "#050603",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.0133,
+     "to": 0.0222,
+     "px": [
+      186,
+      192
+     ],
+     "colour": "white",
+     "hex": "#deded7",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.0222,
+     "to": 0.0296,
+     "px": [
+      192,
+      197
+     ],
+     "colour": "grey",
+     "hex": "#6e6f6b",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "darker grey, with a darker line at its lower edge"
+    },
+    {
+     "from": 0.0296,
+     "to": 0.0459,
+     "px": [
+      197,
+      208
+     ],
+     "colour": "grey",
+     "hex": "#a8a9a3",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "lighter grey, slightly mottled"
+    },
+    {
+     "from": 0.0459,
+     "to": 0.0593,
+     "px": [
+      208,
+      217
+     ],
+     "colour": "yellow",
+     "hex": "#cabc5d",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.0593,
+     "to": 0.0637,
+     "px": [
+      217,
+      220
+     ],
+     "colour": "white",
+     "hex": "#d4caae",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.0637,
+     "to": 0.1007,
+     "px": [
+      220,
+      245
+     ],
+     "colour": "yellow",
+     "hex": "#ceb84b",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.1007,
+     "to": 0.1111,
+     "px": [
+      245,
+      252
+     ],
+     "colour": "black",
+     "hex": "#150d08",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.1111,
+     "to": 0.117,
+     "px": [
+      252,
+      256
+     ],
+     "colour": "white",
+     "hex": "#aba49c",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.117,
+     "to": 0.1259,
+     "px": [
+      256,
+      262
+     ],
+     "colour": "blue",
+     "hex": "#90a2aa",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "pale, mottled blue"
+    },
+    {
+     "from": 0.1259,
+     "to": 0.1289,
+     "px": [
+      262,
+      264
+     ],
+     "colour": "black",
+     "hex": "#3f342e",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.1289,
+     "to": 0.1407,
+     "px": [
+      264,
+      272
+     ],
+     "colour": "red",
+     "hex": "#cb4829",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "orange red"
+    },
+    {
+     "from": 0.1407,
+     "to": 0.1867,
+     "px": [
+      272,
+      303
+     ],
+     "colour": "white",
+     "hex": "#e4e3dd",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     },
+     "note": "the column is divided lengthwise here: see the three inside stripes"
+    },
+    {
+     "from": 0.1867,
+     "to": 0.2237,
+     "px": [
+      303,
+      328
+     ],
+     "colour": "black",
+     "hex": "#060404",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.2237,
+     "to": 0.24,
+     "px": [
+      328,
+      339
+     ],
+     "colour": "red",
+     "hex": "#c74b2b",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.24,
+     "to": 0.2459,
+     "px": [
+      339,
+      343
+     ],
+     "colour": "white",
+     "hex": "#dfcfbf",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.2459,
+     "to": 0.2504,
+     "px": [
+      343,
+      346
+     ],
+     "colour": "grey",
+     "hex": "#c1c0bf",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "thin grey line across the column, at the limit of the scan"
+    },
+    {
+     "from": 0.2504,
+     "to": 0.2533,
+     "px": [
+      346,
+      348
+     ],
+     "colour": "white",
+     "hex": "#dfcfbf",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.2533,
+     "to": 0.2548,
+     "px": [
+      348,
+      349
+     ],
+     "colour": "grey",
+     "hex": "#bec1b8",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "one pixel grey line, at the limit of the scan"
+    },
+    {
+     "from": 0.2548,
+     "to": 0.2563,
+     "px": [
+      349,
+      350
+     ],
+     "colour": "white",
+     "hex": "#dfcfbf",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.2563,
+     "to": 0.2578,
+     "px": [
+      350,
+      351
+     ],
+     "colour": "grey",
+     "hex": "#bec1b8",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "one pixel grey line, at the limit of the scan"
+    },
+    {
+     "from": 0.2578,
+     "to": 0.2637,
+     "px": [
+      351,
+      355
+     ],
+     "colour": "white",
+     "hex": "#dfcfbf",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.2637,
+     "to": 0.2815,
+     "px": [
+      355,
+      367
+     ],
+     "colour": "yellow",
+     "hex": "#d7c75d",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.2815,
+     "to": 0.3881,
+     "px": [
+      367,
+      439
+     ],
+     "colour": "black",
+     "hex": "#020202",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     },
+     "note": "the longest single stripe on the plate"
+    },
+    {
+     "from": 0.3881,
+     "to": 0.44,
+     "px": [
+      439,
+      474
+     ],
+     "colour": "yellow",
+     "hex": "#e0ce60",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.44,
+     "to": 0.4444,
+     "px": [
+      474,
+      477
+     ],
+     "colour": "black",
+     "hex": "#0e0604",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.4444,
+     "to": 0.4459,
+     "px": [
+      477,
+      478
+     ],
+     "colour": "grey",
+     "hex": "#515150",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "thin grey line across the black"
+    },
+    {
+     "from": 0.4459,
+     "to": 0.52,
+     "px": [
+      478,
+      528
+     ],
+     "colour": "black",
+     "hex": "#010101",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.52,
+     "to": 0.523,
+     "px": [
+      528,
+      530
+     ],
+     "colour": "yellow",
+     "hex": "#bfbd79",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "thin yellow line across the column"
+    },
+    {
+     "from": 0.523,
+     "to": 0.5289,
+     "px": [
+      530,
+      534
+     ],
+     "colour": "black",
+     "hex": "#280f0a",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.5289,
+     "to": 0.5363,
+     "px": [
+      534,
+      539
+     ],
+     "colour": "red",
+     "hex": "#ba5939",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.5363,
+     "to": 0.5393,
+     "px": [
+      539,
+      541
+     ],
+     "colour": "white",
+     "hex": "#eaded7",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.5393,
+     "to": 0.5467,
+     "px": [
+      541,
+      546
+     ],
+     "colour": "black",
+     "hex": "#141412",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.5467,
+     "to": 0.5496,
+     "px": [
+      546,
+      548
+     ],
+     "colour": "white",
+     "hex": "#eaded7",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.5496,
+     "to": 0.5511,
+     "px": [
+      548,
+      549
+     ],
+     "colour": "dark red",
+     "hex": "#684435",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "one pixel brownish line; colour uncertain at this resolution"
+    },
+    {
+     "from": 0.5511,
+     "to": 0.5556,
+     "px": [
+      549,
+      552
+     ],
+     "colour": "white",
+     "hex": "#eaded7",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.5556,
+     "to": 0.5674,
+     "px": [
+      552,
+      560
+     ],
+     "colour": "yellow",
+     "hex": "#cabb5c",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.5674,
+     "to": 0.597,
+     "px": [
+      560,
+      580
+     ],
+     "colour": "blue",
+     "hex": "#819cac",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "pale, mottled blue; its last pixel reads as a grey edge where it meets the yellow"
+    },
+    {
+     "from": 0.597,
+     "to": 0.6356,
+     "px": [
+      580,
+      606
+     ],
+     "colour": "yellow",
+     "hex": "#e0ce5c",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.6356,
+     "to": 0.6504,
+     "px": [
+      606,
+      616
+     ],
+     "colour": "black",
+     "hex": "#070403",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.6504,
+     "to": 0.6756,
+     "px": [
+      616,
+      633
+     ],
+     "colour": "yellow",
+     "hex": "#e0ca5c",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.6756,
+     "to": 0.6993,
+     "px": [
+      633,
+      649
+     ],
+     "colour": "black",
+     "hex": "#030204",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.6993,
+     "to": 0.7067,
+     "px": [
+      649,
+      654
+     ],
+     "colour": "white",
+     "hex": "#e0e2dd",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.7067,
+     "to": 0.7156,
+     "px": [
+      654,
+      660
+     ],
+     "colour": "blue",
+     "hex": "#39698b",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "strong blue, unlike the two pale ones"
+    },
+    {
+     "from": 0.7156,
+     "to": 0.7541,
+     "px": [
+      660,
+      686
+     ],
+     "colour": "yellow",
+     "hex": "#dfcd59",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.7541,
+     "to": 0.7748,
+     "px": [
+      686,
+      700
+     ],
+     "colour": "black",
+     "hex": "#040301",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.7748,
+     "to": 0.7763,
+     "px": [
+      700,
+      701
+     ],
+     "colour": "grey",
+     "hex": "#646462",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "thin light line across the black"
+    },
+    {
+     "from": 0.7763,
+     "to": 0.8267,
+     "px": [
+      701,
+      735
+     ],
+     "colour": "black",
+     "hex": "#040403",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.8267,
+     "to": 0.8681,
+     "px": [
+      735,
+      763
+     ],
+     "colour": "grey",
+     "hex": "#7c7c78",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "TEXTURED: white diagonal streaks on grey, ragged edge against the black before it, a dark rim at its end. Reading it as flashes or phosphorescence is inferred"
+    },
+    {
+     "from": 0.8681,
+     "to": 0.8711,
+     "px": [
+      763,
+      765
+     ],
+     "colour": "yellow",
+     "hex": "#cab76d",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.8711,
+     "to": 0.8815,
+     "px": [
+      765,
+      772
+     ],
+     "colour": "red",
+     "hex": "#c24f2a",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.8815,
+     "to": 0.8919,
+     "px": [
+      772,
+      779
+     ],
+     "colour": "white",
+     "hex": "#e8e7d8",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.8919,
+     "to": 0.9215,
+     "px": [
+      779,
+      799
+     ],
+     "colour": "yellow",
+     "hex": "#e1ce5a",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.9215,
+     "to": 0.9244,
+     "px": [
+      799,
+      801
+     ],
+     "colour": "black",
+     "hex": "#1e1410",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.9244,
+     "to": 0.9274,
+     "px": [
+      801,
+      803
+     ],
+     "colour": "white",
+     "hex": "#b6b6b0",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.9274,
+     "to": 0.9304,
+     "px": [
+      803,
+      805
+     ],
+     "colour": "black",
+     "hex": "#1e1410",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.9304,
+     "to": 0.9348,
+     "px": [
+      805,
+      808
+     ],
+     "colour": "white",
+     "hex": "#b6b6b0",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.9348,
+     "to": 0.9378,
+     "px": [
+      808,
+      810
+     ],
+     "colour": "black",
+     "hex": "#1e1410",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.9378,
+     "to": 0.9407,
+     "px": [
+      810,
+      812
+     ],
+     "colour": "white",
+     "hex": "#b6b6b0",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.9407,
+     "to": 0.9437,
+     "px": [
+      812,
+      814
+     ],
+     "colour": "black",
+     "hex": "#1e1410",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.9437,
+     "to": 0.9467,
+     "px": [
+      814,
+      816
+     ],
+     "colour": "white",
+     "hex": "#b6b6b0",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.9467,
+     "to": 0.9496,
+     "px": [
+      816,
+      818
+     ],
+     "colour": "black",
+     "hex": "#1e1410",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.9496,
+     "to": 0.9541,
+     "px": [
+      818,
+      821
+     ],
+     "colour": "white",
+     "hex": "#b6b6b0",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "unprinted paper, read as white light",
+      "how": "inferred"
+     }
+    },
+    {
+     "from": 0.9541,
+     "to": 0.957,
+     "px": [
+      821,
+      823
+     ],
+     "colour": "black",
+     "hex": "#1e1410",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "reading": {
+      "text": "Finsternis, darkness, by the key",
+      "how": "seen"
+     }
+    },
+    {
+     "from": 0.957,
+     "to": 1,
+     "px": [
+      823,
+      852
+     ],
+     "colour": "yellow",
+     "hex": "#e4d160",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.0593,
+     "to": 0.1111,
+     "px": [
+      217,
+      252
+     ],
+     "colour": "dark red",
+     "hex": "#461309",
+     "hexHow": "sampled",
+     "inside": true,
+     "across": [
+      0,
+      0.1333
+     ],
+     "over": [
+      "white 217-220",
+      "yellow 220-245",
+      "black 245-252"
+     ],
+     "how": "seen",
+     "note": "along the left edge of the column, under the yellow stripe and on into the black after it"
+    },
+    {
+     "from": 0.1422,
+     "to": 0.1867,
+     "px": [
+      273,
+      303
+     ],
+     "colour": "yellow",
+     "hex": "#ddc84c",
+     "hexHow": "sampled",
+     "inside": true,
+     "across": [
+      0,
+      0.4
+     ],
+     "over": [
+      "white 272-303"
+     ],
+     "how": "seen",
+     "note": "the left two fifths of the white stripe"
+    },
+    {
+     "from": 0.1407,
+     "to": 0.1867,
+     "px": [
+      272,
+      303
+     ],
+     "colour": "black",
+     "hex": "#0a0405",
+     "hexHow": "sampled",
+     "inside": true,
+     "across": [
+      0.4167,
+      0.4833
+     ],
+     "over": [
+      "white 272-303"
+     ],
+     "how": "seen",
+     "note": "narrow bar across the middle of the white stripe"
+    },
+    {
+     "from": 0.1407,
+     "to": 0.1867,
+     "px": [
+      272,
+      303
+     ],
+     "colour": "black",
+     "hex": "#0e0d0c",
+     "hexHow": "sampled",
+     "inside": true,
+     "across": [
+      0.6667,
+      0.7167
+     ],
+     "over": [
+      "white 272-303"
+     ],
+     "how": "seen",
+     "note": "second narrow bar, nearer the right edge"
+    },
+    {
+     "from": 0.2622,
+     "to": 0.2637,
+     "px": [
+      354,
+      355
+     ],
+     "colour": "black",
+     "hex": "#000000",
+     "hexHow": "chosen",
+     "inside": true,
+     "across": [
+      0.3667,
+      1
+     ],
+     "over": [
+      "white 351-355"
+     ],
+     "how": "seen",
+     "note": "one pixel line over the right three fifths only, at the end of the white; hex not sampled, too thin"
+    },
+    {
+     "from": 0.3911,
+     "to": 0.44,
+     "px": [
+      441,
+      474
+     ],
+     "colour": "black",
+     "hex": "#201d13",
+     "hexHow": "sampled",
+     "inside": true,
+     "across": [
+      0.7333,
+      0.8
+     ],
+     "over": [
+      "yellow 439-474"
+     ],
+     "how": "seen",
+     "note": "narrow bar near the right edge of the yellow stripe"
+    },
+    {
+     "from": 0.4756,
+     "to": 0.5289,
+     "px": [
+      498,
+      534
+     ],
+     "colour": "yellow",
+     "hex": "#b0a857",
+     "hexHow": "sampled",
+     "inside": true,
+     "across": [
+      0.1167,
+      0.1667
+     ],
+     "over": [
+      "black 478-528",
+      "yellow 528-530",
+      "black 530-534"
+     ],
+     "how": "seen",
+     "note": "narrow bar near the left edge of the long black, running on past the thin yellow line"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "name": "Ton (Musik)",
+   "nameHow": "seen",
+   "intent": true,
+   "intentNote": "the key: \"hier nur in den Absichten angedeutet\", only indicated as intentions. The coloured bars are the sirens; the staff fragments stand in for music not yet written",
+   "spans": [
+    {
+     "from": 0,
+     "to": 0.1822,
+     "px": [
+      177,
+      300
+     ],
+     "colour": "blue",
+     "hex": "#4b748e",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "starts with the lane; staff strips cross it"
+    },
+    {
+     "from": 0.1881,
+     "to": 0.4178,
+     "px": [
+      304,
+      459
+     ],
+     "colour": "yellow",
+     "hex": "#daca56",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.4178,
+     "to": 0.52,
+     "px": [
+      459,
+      528
+     ],
+     "colour": "outline",
+     "hex": "#e6e5e0",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "an EMPTY bar: two thin grey edges and no fill, continuing the yellow. A siren at rest, a held tone or a guide line: not readable"
+    },
+    {
+     "from": 0.5274,
+     "to": 0.6622,
+     "px": [
+      533,
+      624
+     ],
+     "colour": "yellow",
+     "hex": "#dccc59",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.6859,
+     "to": 0.7689,
+     "px": [
+      640,
+      696
+     ],
+     "colour": "red",
+     "hex": "#c34826",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.8563,
+     "to": 0.883,
+     "px": [
+      755,
+      773
+     ],
+     "colour": "yellow",
+     "hex": "#cfc05b",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen"
+    },
+    {
+     "from": 0.8933,
+     "to": 1,
+     "px": [
+      780,
+      852
+     ],
+     "colour": "grey",
+     "hex": "#747273",
+     "hexHow": "sampled",
+     "inside": false,
+     "how": "seen",
+     "note": "runs two pixels past the end of the light column, to 854; clipped to 1"
+    },
+    {
+     "from": 0.9289,
+     "to": 0.9348,
+     "px": [
+      804,
+      808
+     ],
+     "colour": "red",
+     "hex": "#b85139",
+     "hexHow": "sampled",
+     "inside": true,
+     "how": "seen",
+     "note": "a short red block inside the grey bar"
+    }
+   ],
+   "marks": [
+    {
+     "at": 0.0207,
+     "px": 191,
+     "kind": "staff fragment",
+     "group": "a",
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.0415,
+     "px": 205,
+     "kind": "staff fragment",
+     "group": "a",
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.08,
+     "px": 231,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.1067,
+     "px": 249,
+     "kind": "staff fragment",
+     "group": "b",
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.1156,
+     "px": 255,
+     "kind": "staff fragment",
+     "group": "b",
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.1348,
+     "px": 268,
+     "kind": "staff fragment",
+     "group": "b",
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.1467,
+     "px": 276,
+     "kind": "staff fragment",
+     "group": "b",
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.1689,
+     "px": 291,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.3496,
+     "px": 413,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.4059,
+     "px": 451,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.5215,
+     "px": 529,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.5422,
+     "px": 543,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.5585,
+     "px": 554,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.6459,
+     "px": 613,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.677,
+     "px": 634,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.7081,
+     "px": 655,
+     "kind": "staff fragment",
+     "group": "c",
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.7526,
+     "px": 685,
+     "kind": "staff fragment",
+     "group": "c",
+     "how": "seen",
+     "readable": false,
+     "note": "a yellow stepped figure joins it from the bar side, see the next table"
+    },
+    {
+     "at": 0.8593,
+     "px": 757,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.8785,
+     "px": 770,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.92,
+     "px": 798,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false,
+     "note": "carries a zigzag line on the far side of the bar"
+    },
+    {
+     "at": 0.957,
+     "px": 823,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.9763,
+     "px": 836,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "at": 0.9911,
+     "px": 846,
+     "kind": "staff fragment",
+     "group": null,
+     "how": "seen",
+     "readable": false
+    },
+    {
+     "from": 0.7333,
+     "to": 0.7985,
+     "px": [
+      672,
+      716
+     ],
+     "at": 0.7659,
+     "label": "yellow stepped figure above the red siren, joined to a staff strip",
+     "how": "seen",
+     "note": "what it denotes is not readable"
+    },
+    {
+     "from": 0.917,
+     "to": 0.923,
+     "px": [
+      796,
+      800
+     ],
+     "at": 0.92,
+     "label": "zigzag line along a staff strip",
+     "how": "seen",
+     "note": "a trill, a glissando or a siren howl drawn as a wave: inferred, unsettled"
+    }
+   ]
+  }
+ ],
+ "folgeMatches": [
+  {
+   "column": "1",
+   "items": [
+    {
+     "item": "Pfeile stürzen",
+     "matches": [
+      "c1-yellow-arrow",
+      "c1-big-arrow"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Lamellen öffnen sich",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Kreise rotieren",
+     "matches": [
+      "c1-ring"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Elektro-Apparate",
+     "matches": [
+      "c1-starburst"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Blitz Donner",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Gittersysteme von Farben",
+     "matches": [
+      "c1-grid"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "schießen auf-ab hin-her",
+     "matches": [
+      "c1-crossing-bars",
+      "c1-bars-on"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Phosphoreszenz",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Riesen-Apparate schwingen",
+     "matches": [
+      "c1-blades"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "blitzen",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Gitter weiter",
+     "matches": [
+      "c1-red-grid"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Räder",
+     "matches": [
+      "c1-red-eye",
+      "c1-blue-eye",
+      "c1-yellow-eye"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Explosionen",
+     "matches": [
+      "c1-rays"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Gerüche",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Clownerie",
+     "matches": [
+      "c1-figure"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Menschmechanik",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    }
+   ]
+  },
+  {
+   "column": "2",
+   "items": [
+    {
+     "item": "Pfeile stürzen",
+     "matches": [
+      "c2-arrow"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Lamellen öffnen sich",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Kreise rotieren",
+     "matches": [
+      "c2-circle-bar",
+      "c2-yellow-disc"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "Kino auf Tageswand",
+     "matches": [
+      "c2-lens",
+      "c2-funnel"
+     ],
+     "how": "inferred"
+    },
+    {
+     "item": "rückwärts gedreht",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Aktion",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "Tempo",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    },
+    {
+     "item": "wild",
+     "matches": [],
+     "how": null,
+     "note": "no glyph matched"
+    }
+   ]
+  },
+  {
+   "column": "3+4",
+   "items": [
+    {
+     "item": "sind ohne Schlagworte deutlich",
+     "matches": [],
+     "how": null
+    }
+   ]
+  }
+ ],
+ "unreadable": [
+  "every notehead, clef and pitch in the staff fragments of column 4: a notehead is one or two dark pixels",
+  "the column 2 label (taken from the museum photographs, marked inferred)",
+  "the small handwritten-looking annotations beside several column 1 and 2 glyphs",
+  "one pixel lines in column 3 (343 to 351, 354, 477, 548, 700): their presence is seen, their exact width and colour are not",
+  "whether the empty outline bar in column 4 (459 to 528) is a sound or a guide",
+  "what the yellow stepped figure and the zigzag in column 4 denote"
+ ],
+ "unmatched": {
+  "column1": [
+   "Lamellen öffnen sich",
+   "Blitz Donner",
+   "Phosphoreszenz",
+   "blitzen",
+   "Gerüche",
+   "Menschmechanik"
+  ],
+  "column2": [
+   "Lamellen öffnen sich",
+   "rückwärts gedreht",
+   "Aktion",
+   "Tempo",
+   "wild"
+  ],
+  "note": "Gerüche has no glyph I can identify: smell is a word in the running order and nothing on the plate"
+ },
+ "summary": {
+  "lightSpans": 65,
+  "lightInside": 7,
+  "lightOrder": [
+   "black",
+   "white",
+   "grey",
+   "grey",
+   "yellow",
+   "white",
+   "yellow",
+   "black",
+   "white",
+   "blue",
+   "black",
+   "red",
+   "white",
+   "black",
+   "red",
+   "white",
+   "grey",
+   "white",
+   "grey",
+   "white",
+   "grey",
+   "white",
+   "yellow",
+   "black",
+   "yellow",
+   "black",
+   "grey",
+   "black",
+   "yellow",
+   "black",
+   "red",
+   "white",
+   "black",
+   "white",
+   "dark red",
+   "white",
+   "yellow",
+   "blue",
+   "yellow",
+   "black",
+   "yellow",
+   "black",
+   "white",
+   "blue",
+   "yellow",
+   "black",
+   "grey",
+   "black",
+   "grey",
+   "yellow",
+   "red",
+   "white",
+   "yellow",
+   "black",
+   "white",
+   "black",
+   "white",
+   "black",
+   "white",
+   "black",
+   "white",
+   "black",
+   "white",
+   "black",
+   "yellow"
+  ],
+  "sirens": 7,
+  "sirenInside": 1,
+  "sirenOrder": [
+   "blue",
+   "yellow",
+   "outline",
+   "yellow",
+   "red",
+   "yellow",
+   "grey"
+  ],
+  "staffFragments": 23,
+  "column1Marks": 18,
+  "column2Marks": 10
+ }
+}

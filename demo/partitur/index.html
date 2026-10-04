@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .pt-text { display: flex; flex-direction: column; gap: 10px; }
+  .pt-say { margin: 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+  .pt-say q { color: var(--fg); }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+
+  /*
+   * 🔴 L. MOHOLY-NAGY, PARTITURSKIZZE ZU EINER MECHANISCHEN EXZENTRIK, 1924,
+   * the fold-out plate in Bauhausbücher 4 (1925), played as a positron timeline.
+   * Asked 2026-10-04 as *"Do it. Better name"* after
+   * `research/moholy-nagy-partiturskizze-2026-10-04.md`. The plate was
+   * transcribed from the public-domain scan by
+   * `demo/resources/build-moholy-partiturskizze.mjs`, every row marked `seen`
+   * or `inferred`, and this page only draws and plays what that file holds.
+   *
+   * ⚠️ NOTHING HERE IS TYPED IN SECONDS. Every position is a fraction of the
+   * plate, because Moholy gave no unit, no tempo and no total length. The total
+   * is a choice this page makes and says it made: the length control is the
+   * only place a duration enters, and everything scales from it.
+   * ⚠️ AND IT OPENS NOTHING. The data is a file in this repository and the
+   * sirens are oscillators in this tab, started only by pressing play.
+   */
+  const SRC = '/resources/moholy-partiturskizze.json';
+  const WHAT = 'Moholy-Nagy’s 1924 score for a mechanical variety act, played as a timeline with its light lane on the projection wall.';
+
+  const d = mount({
+    name: 'partitur',
+    what: WHAT,
+    readout: { light: '', sirens: '', cue: '', length: 'min' },
+    controls: [],
+  });
+  guard(d);
+
+  const say = (...texts) => {
+    const box = el('div', 'pt-text');
+    for (const t of texts) box.append(el('p', 'pt-say', t));
+    return box;
+  };
+
+  const data = await (await fetch(SRC)).json();
+  const [c1, c2, light, music] = data.lanes;
+
+  d.stack.titled('THE SCORE',
+    say('A fold-out plate in Die Bühne im Bauhaus, 1925, for a variety stage of three levels, a floor for large '
+      + 'forms, a glass plate above that doubles as a projection wall, and a small stage between for music '
+      + 'machines. Four columns run downward in time and whatever stands level across them happens together.',
+      'Moholy’s key says stripe width is duration in the light column and black is darkness, and that the '
+      + 'music column shows only intentions. He gave no tempo and no length, so the length below is this '
+      + 'page’s choice, and the picture above the timeline is the light column at the playhead.'));
+
+  // ── time ───────────────────────────────────────────────────────────────────
+  const LENGTHS = [['5 min', 300], ['8 min', 480], ['10 min', 600]];
+  let totalS = data.unit.suggested.totalSeconds;
+  const ms = (f) => f * totalS * 1000;
+
+  const deck = createDeck({ items: [], adapters: {}, range: [0, ms(1)] });
+
+  const lightSpans = light.spans.filter((s) => !s.inside);
+  const lightInside = light.spans.filter((s) => s.inside);
+  const sirens = music.spans.filter((s) => !s.inside);
+  const sirensInside = music.spans.filter((s) => s.inside);
+  const spanAt = (list, f) => list.find((s) => f >= s.from && f < s.to) || null;
+  const markText = (m) => m.folge ? `${m.folge.item} (${m.folge.how})` : m.label;
+
+  // ── the picture: the light column at the playhead, on the projection wall ─
+  //
+  // ⚠️ WHITE PAPER READ AS WHITE LIGHT IS AN INFERENCE, AND THE TRANSCRIPTION
+  // SAYS SO. The colours are the scan's sampled means, so they are the colour
+  // of a 2014 JPEG of a 1925 print, not of any lamp.
+  const canvas = document.createElement('canvas');
+  const g = canvas.getContext('2d');
+  const panel = createVideoPanel({ media: canvas, left: false });
+  let W = 0, H = 0, dpr = 1, lastKey = '';
+  function size() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    const r = panel.stage.getBoundingClientRect();
+    W = Math.max(240, Math.round(r.width));
+    H = Math.max(140, Math.round(r.height));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    lastKey = '';
+  }
+  /** Paint the wall at fraction `f` into any context. Answers what it drew. */
+  function paint(ctx, w, h, f) {
+    const s = spanAt(lightSpans, f) || lightSpans[lightSpans.length - 1];
+    ctx.fillStyle = s.hex;
+    ctx.fillRect(0, 0, w, h);
+    // A narrow stripe inside a wide one is a partial light at the same moment,
+    // by the key. It is drawn where it stands across the column, as a band.
+    const parts = lightInside.filter((x) => f >= x.from && f < x.to);
+    for (const x of parts) {
+      const [a, b] = x.across || [0, 0.1];
+      ctx.fillStyle = x.hex;
+      ctx.fillRect(Math.round(a * w), 0, Math.max(2, Math.round((b - a) * w)), h);
+    }
+    return { colour: s.colour, hex: s.hex, parts: parts.length };
+  }
+  let drawn = null;
+  function draw() {
+    const f = deck.position() / ms(1);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawn = { f, ...paint(g, W, H, f) };
+  }
+
+  // ── lanes ──────────────────────────────────────────────────────────────────
+  const markRows = (lane, kind) => () => lane.marks.map((m, i) => ({
+    at: ms(m.at ?? m.from), id: `${kind}-${m.id ?? i}`, kind, payload: m,
+  }));
+  const spanRows = (list, kind) => () => list.map((s, i) => ({
+    at: ms(s.from), id: `${kind}-${i}`, kind, payload: { ...s, durMs: ms(s.to - s.from) },
+  }));
+  const bands = (list, inside) => (ctx, L, C) => {
+    const top = L.y + 3, h = L.height - 6;
+    for (const s of list) {
+      const xa = C.x(ms(s.from)), xb = C.x(ms(s.to));
+      if (xb < 0 || xa > C.width) continue;
+      ctx.fillStyle = s.hex || '#888';
+      ctx.fillRect(xa, top, Math.max(1, xb - xa), h);
+    }
+    for (const s of inside) {
+      const xa = C.x(ms(s.from)), xb = C.x(ms(s.to));
+      const [a, b] = s.across || [0, 0.15];
+      ctx.fillStyle = s.hex || '#888';
+      ctx.fillRect(xa, top + a * h, Math.max(1, xb - xa), Math.max(2, (b - a) * h));
+    }
+  };
+  const lanes = [
+    { id: 'c1', kind: 'c1', label: 'I. Bühne', subLabel: 'form, motion', height: 30, as: 'ticks',
+      rows: markRows(c1, 'c1') },
+    { id: 'c2', kind: 'c2', label: 'II. Bühne', subLabel: 'and film', height: 30, as: 'ticks',
+      rows: markRows(c2, 'c2') },
+    { id: 'light', kind: 'light', label: 'Licht', subLabel: `${lightSpans.length} stripes`, height: 34, as: 'spans',
+      rows: spanRows(lightSpans, 'light'), render: bands(lightSpans, lightInside) },
+    { id: 'sirens', kind: 'sirens', label: 'Ton', subLabel: 'intentions only', height: 26, as: 'spans',
+      rows: spanRows(sirens, 'sirens'), render: (ctx, L, C) => {
+        bands(sirens, sirensInside)(ctx, L, C);
+        ctx.fillStyle = C.theme.ink;
+        for (const m of music.marks) {
+          const x = C.x(ms(m.at));
+          if (x >= 0 && x <= C.width) ctx.fillRect(x, L.y + L.height - 5, 1, 4);
+        }
+      } },
+  ];
+
+  const bar = createTransportBar(d.el, deck, { scrub: false, loop: false });
+  const view = createStripView(d.el, deck, {
+    size: 'auto', follow: false, gutter: 110, lanes,
+    footer: { lines: 1, empty: '' },
+    describeHit: (hit) => {
+      const p = hit?.row?.payload;
+      if (!p) return '';
+      if (hit.lane?.id === 'light') return `${p.colour}, ${p.reading?.text || ''} (${p.how})`.replace(', ()', '');
+      if (hit.lane?.id === 'sirens') return `siren band, ${p.colour} (${p.how})`;
+      return `${markText(p)}, ${p.how}`;
+    },
+  });
+  const afterStrip = view.surface.nextSibling;
+  const surface = createGlue(bar.el, view.surface);
+  d.el.insertBefore(surface, afterStrip);
+  d.el.insertBefore(panel.el, surface);
+
+  const length = createChoice({
+    label: 'length', options: LENGTHS, at: LENGTHS.findIndex(([, s]) => s === totalS),
+    title: () => 'Moholy gave no length; this page chooses one',
+    onPick: (s) => setLength(s),
+  });
+  d.el.insertBefore(length.el, panel.el);
+
+  /** Rescale everything from fractions. The playhead keeps its place on the plate. */
+  function setLength(s, quiet = false) {
+    const f = deck.position() / ms(1);
+    totalS = s;
+    deck.setRange([0, ms(1)]);
+    deck.seek(ms(f));
+    view.strip?.invalidate?.();
+    d.set('length', Math.round(s / 60));
+    if (!quiet) d.log(`length ${Math.round(s / 60)} min, chosen here, because the score gives none`);
+  }
+
+  // ── sirens, only while playing ─────────────────────────────────────────────
+  //
+  // ⚠️ SOUND NEVER GATES THE WORK. The context is made on the first play press
+  // and its resume is not awaited; the picture and the line run without it.
+  let ac = null, voice = null;
+  const SIREN_HZ = { blue: 330, yellow: 440, red: 550, grey: 262 };
+  function siren(on, colour) {
+    if (!on) { if (voice) { voice.g.gain.setTargetAtTime(0, ac.currentTime, 0.08); voice = null; } return; }
+    if (!ac) return;
+    if (voice?.colour === colour) return;
+    if (voice) voice.g.gain.setTargetAtTime(0, ac.currentTime, 0.08);
+    const o = ac.createOscillator(), lfo = ac.createOscillator(), depth = ac.createGain(), gn = ac.createGain();
+    const base = SIREN_HZ[colour] || 392;
+    o.type = 'sawtooth'; o.frequency.value = base;
+    lfo.frequency.value = 0.4; depth.gain.value = base * 0.35;
+    lfo.connect(depth).connect(o.frequency);
+    gn.gain.value = 0; gn.gain.setTargetAtTime(0.05, ac.currentTime, 0.2);
+    o.connect(gn).connect(ac.destination);
+    o.start(); lfo.start();
+    o.stop(ac.currentTime + 600); lfo.stop(ac.currentTime + 600);
+    voice = { g: gn, colour };
+  }
+  bar.el.addEventListener('click', () => {
+    if (!ac) { try { ac = new AudioContext(); ac.resume(); } catch { ac = null; } }
+  }, true);
+
+  // ── one loop for the wall, the readout and the sirens ─────────────────────
+  let lastCue = '';
+  (function follow() {
+    const f = deck.position() / ms(1);
+    const key = `${Math.round(deck.position())}|${W}|${H}`;
+    if (key !== lastKey) {
+      lastKey = key;
+      draw();
+      d.set('light', drawn.colour);
+      const sr = spanAt(sirens, f);
+      d.set('sirens', sr ? sr.colour : '');
+      const cue = [...c1.marks, ...c2.marks].filter((m) => m.folge && (m.at ?? m.from) <= f)
+        .sort((a, b) => (b.at ?? b.from) - (a.at ?? a.from))[0];
+      const cueText = cue ? cue.folge.item : '';
+      if (cueText !== lastCue) { lastCue = cueText; d.set('cue', cueText); }
+      siren(deck.playing?.() && !!sr, sr?.colour);
+    }
+    requestAnimationFrame(follow);
+  })();
+  size();
+  new ResizeObserver(size).observe(panel.stage);
+  d.set('length', Math.round(totalS / 60));
+
+  // ── checks, all on data in hand, so they run for a visitor too ────────────
+  d.assert('the light column covers the plate end to end with no gap',
+    lightSpans[0].from === 0 && lightSpans.at(-1).to === 1
+      && lightSpans.every((s, i) => i === 0 || Math.abs(s.from - lightSpans[i - 1].to) < 1e-9),
+    `${lightSpans.length} stripes, ${lightInside.length} inside`);
+  d.assert('every row says whether it was seen or inferred',
+    [...c1.marks, ...c2.marks, ...light.spans, ...music.spans, ...music.marks].every((r) => r.how === 'seen' || r.how === 'inferred'));
+  d.assert('the music lane is marked as intentions, as Moholy marked it', music.intent === true);
+  d.assert('the score gives no length and the page says it chose one',
+    data.unit.given === false && LENGTHS.some(([, s]) => s === totalS), `${totalS} s`);
+  {
+    // ⚠️ NEGATIVE CONTROL: the wall at the start is the first stripe, black,
+    // and at the longest darkness is black, and at a yellow stripe is not.
+    const off = document.createElement('canvas').getContext('2d');
+    const first = paint(off, 10, 10, 0);
+    const yellow = lightSpans.find((s) => s.colour === 'yellow');
+    const atYellow = paint(off, 10, 10, (yellow.from + yellow.to) / 2);
+    d.assert('the wall shows the light stripe at the playhead', first.hex === lightSpans[0].hex && atYellow.colour === 'yellow',
+      `${first.colour} at 0, ${atYellow.colour} at a yellow stripe`);
+  }
+  {
+    const before = deck.position();
+    deck.seek(ms(0.5));
+    const f0 = deck.position() / ms(1);
+    setLength(300, true);
+    const f1 = deck.position() / ms(1);
+    setLength(data.unit.suggested.totalSeconds, true);
+    deck.seek(before);
+    d.assert('changing the length keeps the playhead on the same place in the score', Math.abs(f0 - f1) < 0.001, `${f0.toFixed(3)} then ${f1.toFixed(3)}`);
+  }
+  d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
+
+  d.ready();
+</script>

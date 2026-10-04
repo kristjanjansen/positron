@@ -58,6 +58,30 @@ the next such work costs a score, not an engineering project.
   OPERATIVE machine ("dynarchive"), not storage; the thesis of this whole plan,
   stated academically.
 
+## Graphic and multimedia scores (lanes drawn before there was a timeline)
+Added 2026-10-04; the full reading is research/moholy-nagy-partiturskizze-2026-10-04.md.
+- **László Moholy-Nagy, Partiturskizze zu einer mechanischen Exzentrik**
+  (compiled by spring 1924, a fold-out plate in *Die Bühne im Bauhaus*,
+  Bauhausbücher 4, 1925, key on p. 44): four columns read downward, form and
+  motion on two stages, light, music. Simultaneity is read along the
+  horizontal, the width of a light stripe is its duration, black is darkness,
+  and the music column is *"hier nur in den Absichten angedeutet"*. No unit and
+  no total length. Never staged by its author; Theater der Klänge made a new
+  piece from it in 1987. Transcribed as data in
+  `demo/resources/moholy-partiturskizze.json`. Source: the
+  [archive.org scan](https://archive.org/details/schlemmer-et-al.-1925-die-buhne-am-bauhaus)
+  (public domain mark), read.
+- **Ludwig Hirschfeld-Mack, Reflektorische Farblichtspiele** (Weimar 1922 with
+  Schwerdtfeger and Hartwig; his version at the Bauhauswoche 1923 and the
+  Berlin Sturm evenings 1924): lamps and stencils moved by players *"nach einer
+  Partitur"*, so a light score that WAS performed, the working counterpart of
+  Moholy's light column. He rewrote the scores from notes and memory in 1963 at
+  Wingler's request: a reconstruction by the author at a declared tier, forty
+  years on. Sources (read 2026-10-04 for the research note above):
+  [LIFA](https://lifa-research.org/de/artworks/reflektorische-farblichtspiele/),
+  [Wikipedia](https://en.wikipedia.org/wiki/Ludwig_Hirschfeld_Mack),
+  [bauhaus imaginista](http://www.bauhaus-imaginista.org/articles/6211/on-the-reconstruction-of-kurt-schwerdtfeger-s-reflektorische-farblichtspiele-reflective-colored-light-plays-from-1922/).
+
 ## Closest system-builders
 - **Forensic Architecture** (+ Timemap): event-timeline reconstruction
   platforms built per investigation — timeline-as-instrument, used forensically.
