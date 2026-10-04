@@ -306,7 +306,7 @@ const FILES = [
   // are enumerated. The emulator is rp2040js 1.4.0 bundled into one module
   // (MIT); the boot ROM is the RP2040 B1's, which the firmware calls into, and
   // its terms are in the licence file beside it. The UF2 is
-  // `rig/pico/firmware/build-pico/router.uf2`, byte for byte, 53,760 bytes:
+  // `rig/pico/firmware/build-pico/router.uf2`, byte for byte, 57,856 bytes:
   // the owner's own firmware, published because the HARDWARE tab was asked for
   // as *"Can you make demo of hw kit in psoitron kit new tab?"*.
   ['demo/shell/vendor/rp2040js.mjs', 'shell/vendor/rp2040js.mjs'],
@@ -314,6 +314,11 @@ const FILES = [
   ['demo/shell/vendor/pico-bootrom.mjs', 'shell/vendor/pico-bootrom.mjs'],
   ['demo/shell/vendor/LICENSE-pico-bootrom', 'shell/vendor/LICENSE-pico-bootrom'],
   ['demo/resources/pico/router-pico.uf2', 'resources/pico/router-pico.uf2'],
+  // ui.c alone as WebAssembly, for the OLED part blocks (rig/pico/firmware/wasm/).
+  // ⚠️ IT SHIPPED MISSING ONCE, 2026-10-04: green locally, because the dev
+  // server serves the whole repository, and a 404 on the edge. A file the page
+  // FETCHES is invisible to the import check above.
+  ['demo/resources/pico/oled-ui.wasm', 'resources/pico/oled-ui.wasm'],
 
   // ── the typeface `/weight/` is made of, vendored ────────────────────────────
   //
