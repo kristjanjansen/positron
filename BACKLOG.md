@@ -1,5 +1,13 @@
 ## Open
 
+### Checks way lighter, two tiers, asked 2026-10-04
+
+*"make checks way ligher (2 tiers?)"*, after `/keep/`'s fix made every harness
+run of it hold a Cloudflare WHEP leg for 20 to 30 s and record two takes. Two
+tiers: the default run grades what can be graded from this machine alone and
+quickly; the deep tier, asked for by name, does the round trips, recordings and
+anything that costs Stream minutes or another machine's attention.
+
 ### Kit in the first group on the index, asked 2026-10-04
 
 *"move kit to first group in index page"*. `demo/manifest.mjs`, the `kit` row's
