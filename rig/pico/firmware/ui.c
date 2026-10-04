@@ -187,6 +187,13 @@ void ui_banner(int y, int h, const char *text) {
   for (i = 0; i < n; i++) ui_text_c((area_w - ui_text_w(line[i])) / 2, top + i * lh, line[i], UI_OFF);
 }
 
+int ui_banner_fit(int y, int h, const char *const text[], int n) {
+  int i;
+  for (i = 0; i < n - 1; i++) if (ui_text_w(text[i]) <= area_w - 4) break;
+  ui_banner(y, h, text[i]);
+  return i;
+}
+
 int ui_footer_h(void) { return font->cap + 4; }
 
 int ui_footer(const char *const label[4], unsigned hot) {
@@ -222,22 +229,28 @@ int ui_keys_right_w(const char *const width[4]) {
   return w + 7;                                     /* rule, 3, label, 3 */
 }
 
-int ui_keys_right(const char *const label[4], unsigned hot, const char *const width[4]) {
-  int w = ui_keys_right_w(width), x = UI_W - w, ch = UI_H / 4, i;
-  ui_vline(x, 0, UI_H, UI_ON);
+int ui_keys_right(const char *const label[4], unsigned hot, const char *const width[4], int top) {
+  int w = ui_keys_right_w(width), x = UI_W - w, i;
+  if (top < 0) top = 0;
+  ui_vline(x, top, UI_H - top, UI_ON);
   for (i = 0; i < 4; i++) {
-    int y = i * ch;
+    /* equal cells, the spare rows spread rather than all on the last */
+    int y = top + i * (UI_H - top) / 4, ch = top + (i + 1) * (UI_H - top) / 4 - y;
     char s[12];
     strncpy(s, label[i] ? label[i] : "", sizeof s - 1);
     s[sizeof s - 1] = 0;
     while (s[0] && ui_text_w(s) > w - 7) s[strlen(s) - 1] = 0;
+    /* a rule between two cells; under a header the header's edge is the first */
     if (i) ui_hline(x + 1, y, w - 1, UI_ON);
-    ui_clip(x + 1, y + (i ? 1 : 0), w - 1, ch - (i ? 1 : 0));
-    if (hot >> i & 1) {
-      ui_fill(x + 1, y, w - 1, ch, UI_ON);
-      ui_text_c(x + 1 + (w - 1 - ui_text_w(s)) / 2, y + (ch - font->cap + 1) / 2, s, UI_OFF);
-    } else {
-      ui_text(x + 1 + (w - 1 - ui_text_w(s)) / 2, y + (ch - font->cap + 1) / 2, s);
+    {
+      int rule = i ? 1 : 0, ty = y + rule + (ch - rule - font->cap) / 2;
+      ui_clip(x + 1, y + rule, w - 1, ch - rule);
+      if (hot >> i & 1) {
+        ui_fill(x + 1, y + rule, w - 1, ch - rule, UI_ON);
+        ui_text_c(x + 1 + (w - 1 - ui_text_w(s)) / 2, ty, s, UI_OFF);
+      } else {
+        ui_text(x + 1 + (w - 1 - ui_text_w(s)) / 2, ty, s);
+      }
     }
     ui_unclip();
   }

@@ -34,7 +34,11 @@ const pixels = () => {   // page major bytes to 128x64 ones and zeros
 const names = Array.from({ length: U.nfonts() }, (_, i) => { const a = U.font_name(i); let s = ''; for (let k = a; mem()[k]; k++) s += String.fromCharCode(mem()[k]); return s; });
 check('six fonts, in UI_FONTS order', names.join(' ') === 'misc4x6 misc5x7 spleen5x8 tomthumb glcd5x7 petme8x8', names.join(' '));
 
-const drawKeys = (hot) => { U.begin(-1); ['PREV', 'NEXT', 'STOP', 'OK'].forEach((t, i) => put(i, t)); const x = U.keys_right(hot); return { x, px: pixels() }; };
+// the board's own boot screen: the header, then the column under it
+const drawKeys = (hot) => {
+  U.begin(-1); put(0, 'SCENE 1/2'); put(1, 'THRU'); const hh = U.header();
+  ['PREV', 'NEXT', 'STOP', 'OK'].forEach((t, i) => put(i, t)); const x = U.keys_right(hot, hh); return { x, px: pixels() };
+};
 const drawFoot = () => { U.begin(-1); ['PREV', 'NEXT', 'STOP', 'OK'].forEach((t, i) => put(i, t)); const y = U.footer(0); return { y, px: pixels() }; };
 
 await fetchAll();

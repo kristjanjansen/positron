@@ -1471,6 +1471,8 @@
    * ⚠️ FETCHED WITH THE FIRMWARE, WHEN HARDWARE IS OPENED, NEVER ON A VISIT.
    */
   const KEY_WORDS = ['PREV', 'NEXT', 'STOP', 'OK'];
+  // main.c's ladder for one held message, longest first, never two lines
+  const HOLD_WORDS = ['HOLD: REPLACE PATCH', 'HOLD: PATCH', 'PATCH?', '?'];
   async function hwPartsLoad() {
     if (hw.oled || hw.partsFetched) return;
     try {
@@ -1502,23 +1504,22 @@
     'What each of the four buttons does, in a row under the screen or in a column beside it '
     + 'where the module has its buttons, with a held key shown filled.',
     `ui_footer(label, hot)                 // returns the y of its top rule
-ui_keys_right(label, hot, width)      // returns the x of its left rule, cells 16 rows tall
-ui_area(x)                            // the header and the banner stop at the rule`,
+ui_keys_right(label, hot, width, top) // returns the x of its left rule, 4 cells from top down
+ui_area(x)                            // the link and the banner stop at the rule`,
     (box) => hwPart(box, [
       ['keys-bottom', 'a row along the bottom, OK held', (u) => { u.footer(KEY_WORDS, 8); }],
-      ['keys-right', 'a column down the right, OK held', (u) => { u.keysRight(KEY_WORDS, 8); }],
+      ['keys-right', 'a column down the right under the header, OK held', (u) => {
+        u.keysRight(KEY_WORDS, 8, u.header('SCENE 1/2', 'THRU'));
+      }],
     ]));
 
   section('hardware', 'HEADER',
     'A lit bar with the scene on the left and its name on the right, which loses letters '
     + 'from the name rather than letting the two touch.',
-    `ui_header("SCENE 1/2", "THRU")       // returns its height
-ui_area(ui_keys_right(...) - 1)       // narrower beside the key column`,
+    `ui_header("SCENE 1/2", "THRU")       // returns its height, which is where the key column starts`,
     (box) => hwPart(box, [
-      ['header', 'the full width', (u) => { u.header('SCENE 1/2', 'THRU'); }],
-      ['header-cut', 'beside the key column, the name cut', (u) => {
-        u.area(u.keysRight(KEY_WORDS, 0) - 1); u.header('SCENE 2/2', 'OCTAVE UP');
-      }],
+      ['header', 'scene and name', (u) => { u.header('SCENE 1/2', 'THRU'); }],
+      ['header-cut', 'a name too long, cut rather than touching', (u) => { u.header('SCENE 2/2', 'OCTAVE DOWN SLOWLY'); }],
     ]));
 
   section('hardware', 'LINK',
@@ -1558,18 +1559,20 @@ ui_text(x + 8, y, "IN 4")`,
   section('hardware', 'HOLD',
     'A message the router will not pass without asking, shown as a banner, with a meter '
     + 'that fills while OK is held toward the one second that refuses it.',
-    `ui_banner(y, h, "HOLD: REPLACE PATCH")   // a '\\n' makes it two lines
+    `ui_banner_fit(y, h, words, n)       // one line: the first wording that fits
 ui_meter(x, y, w, h, held_ms, 1000)`,
     (box) => hwPart(box, [
       ['hold', 'OK held for 0.6 s of the 1 s', (u) => {
-        const T = u.cap, bh = T + 9;
-        u.banner(12, bh, 'HOLD: REPLACE PATCH');
+        const T = u.cap, bh = T + 6;
+        u.bannerFit(12, bh, HOLD_WORDS);
         const sy = 12 + bh + 6, nw = u.textW('NO');
         u.meter(0, sy - 1, 128 - nw - 4, T + 2, 600, 1000);
         u.text(128 - nw, sy, 'NO');
       }],
-      ['hold-two', 'two lines, when one does not fit', (u) => {
-        u.banner(12, 2 * (u.cap + 3) - 3 + 6, 'HOLD 2:\nREPLACE PATCH');
+      ['hold-short', 'beside the key column, a shorter wording', (u) => {
+        const hh = u.header('SCENE 2/2', 'OCTAVE UP');
+        u.area(u.keysRight(KEY_WORDS, 8, hh) - 1);
+        u.bannerFit(hh + 8, u.cap + 6, HOLD_WORDS);
       }],
     ]));
 
@@ -11476,11 +11479,12 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       `labels from x ${colX}, tops at ${order.join(' ')}`);
 
     // The labels option is the byte after the font's, and a reboot.
-    const column = (px) => { for (let x = OLED_W - 1; x > 64; x--) { let n = 0; for (let y = 0; y < OLED_H; y++) n += px[y * OLED_W + x]; if (n === OLED_H) return x; } return -1; };
+    // the column's rule runs from under the header to the foot: rows 16 to 63 all lit
+    const column = (px) => { for (let x = OLED_W - 1; x > 64; x--) { let n = 0; for (let y = 16; y < OLED_H; y++) n += px[y * OLED_W + x]; if (n === OLED_H - 16) return x; } return -1; };
     const ruleBefore = hw.px ? column(hw.px) : -2;
     hw.ui.labels.set(1);
     const moved2 = await until(() => !!hw.px && column(hw.px) > 64 && readScreen(hw.px, F).has('PREV', false), 2400);
-    const want = hw.oled ? hw.oled.screen(-1, (u) => u.keysRight(KEY_WORDS, 0)) : null;
+    const want = hw.oled ? hw.oled.screen(-1, (u) => u.keysRight(KEY_WORDS, 0, u.header('SCENE 1/2', 'THRU'))) : null;
     const rx = hw.px ? column(hw.px) : -1;
     let differ = -1;
     if (want && hw.px && rx > 0) { differ = 0; for (let y = 0; y < OLED_H; y++) for (let x = rx; x < OLED_W; x++) differ += want[y * OLED_W + x] !== hw.px[y * OLED_W + x]; }

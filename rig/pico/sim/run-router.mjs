@@ -210,6 +210,8 @@ const missing = (m) => (m.length ? `not on the panel: ${m.join(', ')}` : '');
 const REPLACE_PATCH = 'F0 00 20 29 01 60 01 05 10 20 30 40 50 60 70 F7';
 const ALL_OFF = Array.from({ length: 16 }, (_, ch) => `${(0xb0 | ch).toString(16).toUpperCase()} 7B 00`).join(' ');
 const FOOTER = [['PREV', false], ['NEXT', false], ['STOP', false]];
+// main.c's ladder, longest first: the banner draws the first that fits on one line.
+const HOLD_WORDS = ['HOLD: REPLACE PATCH', 'HOLD: PATCH', 'PATCH?'];
 
 try {
   // ── the default font, every behaviour ──
@@ -316,12 +318,12 @@ try {
       s.headerLit() > 0.6 && s.arrow() >= 8 && !m.length && ins && s.dot(ins) === 'on', `${missing(m)} arrow ${s.arrow()} px`);
     await send(REPLACE_PATCH);
     s = await shot(`router-font-${G.name}-hold.png`, G);
-    const one = s.has('HOLD: REPLACE PATCH', true);
-    const two = s.has('HOLD:', true) && s.has('REPLACE PATCH', true);
+    // ONE LINE, NEVER TWO: whichever wording fitted, and no second banner line.
+    const said = HOLD_WORDS.find((t) => s.has(t, true));
     const k4 = s.has('OK/NO', true) ? 'OK/NO' : 'OK';
-    const hint = s.has('TAP OK, HOLD NO', false);
-    check(`font ${G.name}: hold banner (${one ? 'one line' : 'two lines'}), K4 cell ${k4} filled, hint ${hint ? 'shown' : 'left out for room'}`,
-      (one || two) && (hint || two) && s.has(k4, true) && !s.has('DIN IN'));
+    const hint = s.has('TAP OK, HOLD NO', false) || s.has('HOLD = NO', false);
+    check(`font ${G.name}: hold banner on one line reading ${said}, K4 cell ${k4} filled, hint ${hint ? 'shown' : 'left out for room'}`,
+      !!said && !s.has('REPLACE PATCH', true) === (said !== 'HOLD: REPLACE PATCH') && s.has(k4, true) && !s.has('DIN IN'));
     stop();
   }
 
@@ -332,7 +334,9 @@ try {
   // the header reaching past the rule, and K4's cell filled while held.
   // ⚠️ A NEGATIVE CONTROL FIRST: the default boot must have NO such rule, or a
   // check that finds one proves nothing about byte 7.
-  const ruleAt = (px) => { for (let x = 127; x > 64; x--) { let n = 0; for (let y = 0; y < 64; y++) n += px[y * 128 + x]; if (n === 64) return x; } return -1; };
+  // The column's rule runs from under the header to the foot: every row from
+  // 16 down lit, which no box side, arrow or footer divider is.
+  const ruleAt = (px) => { for (let x = 127; x > 64; x--) { let n = 0; for (let y = 16; y < 64; y++) n += px[y * 128 + x]; if (n === 48) return x; } return -1; };
   start();
   pico.boot();
   await pico.sleep(300);
@@ -355,17 +359,22 @@ try {
       return h ? h.y : -1;
     });
     const ordered = order.every((y, k) => y >= 0 && (k === 0 || y > order[k - 1]));
-    // every label inside its own 16 row cell, level with its button
-    const level = order.every((y, k) => y >= k * 16 && y + G.cap <= (k + 1) * 16);
+    // every label inside its own cell, four equal cells under the header
+    const hh = G.cap + 4, cell = (k) => hh + Math.floor((k * (64 - hh)) / 4);
+    const level = order.every((y, k) => y >= cell(k) && y + G.cap <= cell(k + 1));
     const right = s.find('DIN OUT').concat(s.find('OUT')).filter((h) => !h.inv);
     const clear = right.length > 0 && right.every((h) => h.x + 3 * G.adv <= rx);
-    check(`keys right, font ${G.name}: rule at x ${rx}, labels top to bottom in their cells, the link stops before the rule`,
-      rx > 64 && ordered && level && clear && s.headerLit() > 0.4, `label tops ${order.join(' ')}, OUT at ${right.map((h) => h.x).join(' ')}`);
+    // the header runs the full width, over the column
+    let over = 0; for (let x = rx; x < 128; x++) over += px[1 * 128 + x];
+    check(`keys right, font ${G.name}: header across the top, rule at x ${rx} under it, labels top to bottom in their cells, the link stops before the rule`,
+      rx > 64 && ordered && level && clear && s.headerLit() > 0.6 && over === 128 - rx, `label tops ${order.join(' ')}, OUT at ${right.map((h) => h.x).join(' ')}`);
     await send(REPLACE_PATCH);
     s = await shot(`router-right-${G.name}-hold.png`, G);
     const okCell = s.find('OK').find((q) => q.inv && q.x > rx && q.y >= 48);
-    const banner = s.has('HOLD: REPLACE PATCH', true) || (s.has('HOLD:', true) && (s.has('REPLACE PATCH', true) || s.has('PATCH', true)));
-    check(`keys right, font ${G.name}: hold banner left of the column, OK cell filled at the bottom`, !!okCell && banner && ruleAt(pico.oled.pixels()) === rx);
+    const said = HOLD_WORDS.find((t) => s.has(t, true));
+    const wrapped = s.has('REPLACE PATCH', true) && said !== 'HOLD: REPLACE PATCH';
+    check(`keys right, font ${G.name}: hold banner on one line left of the column (${said}), OK cell filled at the bottom`,
+      !!okCell && !!said && !wrapped && ruleAt(pico.oled.pixels()) === rx);
     stop();
   }
 
