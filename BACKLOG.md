@@ -1,5 +1,23 @@
 ## Open
 
+### Moholy-Nagy's Partiturskizze, researched against the timeline, asked 2026-10-04
+
+Four photographs of L. Moholy-Nagy, *Partiturskizze zu einer mechanischen
+Exzentrik. Synthese von Form, Bewegung, Ton, Licht (Farbe) und Geruch*, a
+folding multi-lane score under museum glass, with *"In parallel reseach and
+assess this bauhaus work and give context relevance to our timelime work"*. The
+photos are in the session's uploads; the written result goes to `research/`.
+
+### Universal routing step 2, and a new demo for it, asked 2026-10-04
+
+*"What about route-anything work?"* then *"Do it. Pico hold. Nee demo, suggest
+name"* and *"New"*: `plans/plan-universal-routing.md` §11 step 2, `bay.mjs`
+learns the new media (`value`, `video`, `program`, `file`, `state`) and a
+`session` field on a link, pure, with tests, no transport code. Then a NEW page
+(not `/rout/`), slug `graph`, that draws the graph and makes and breaks
+links across media. The Pico firmware is ON HOLD by instruction.
+DONE 2026-10-04: bay.mjs 71 to 112, /graph/ 19/19, deployed.
+
 ### Route core: what the C port found, 2026-10-03
 
 `rig/route-core/` passes all 17 vectors (65/65 in Docker). It found five things

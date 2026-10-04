@@ -26,8 +26,102 @@
 
 import { KINDS, kindOfDecoded } from './midi-kinds.mjs';
 
-/** What a link can carry. `clock` is its own medium: see the plan, §3.4. */
-export const MEDIA = ['midi', 'audio', 'clock'];
+/**
+ * What a link can carry. `clock` is its own medium: see plan-patchbay, §3.4.
+ * 🔴 EIGHT SINCE 2026-10-04, AND THE FIRST THREE KEEP THEIR PLACES IN ORDER.
+ * The five that arrived are `plans/plan-universal-routing.md` §3: `value` is a
+ * gesture, an envelope, a tilt or a fader; `video` is frames; `program` is code
+ * that arrives whole (a shader, a Faust file, a Csound score); `file` is
+ * something a store records or plays; `state` is a room used as a bus.
+ * ⚠️ A PAGE THAT INDEXES THIS LIST BY POSITION READS THE SAME THREE AS BEFORE,
+ * which is why the new ones went on the end rather than into a tidier order.
+ */
+export const MEDIA = ['midi', 'audio', 'clock', 'value', 'video', 'program', 'file', 'state'];
+
+/**
+ * 🔴 THE MEDIA A LINK CARRIES A SESSION FOR INSTEAD OF BYTES, which is plan
+ * §4's whole idea: the router never copies a frame. A heavy link resolves to
+ * `{ transport, address, shape, where, says }` and the two ends open it with
+ * code they already have.
+ * ⚠️ `program` IS LIGHT AND THAT IS NOT AN OVERSIGHT. A shader is one message
+ * and arrives whole (`video.shader` on `/mirror/` is exactly that), so it rides
+ * the router like a note does. A patch bay that opened a session for forty
+ * lines of GLSL would be the mixer plan-patchbay §3.1 refuses to become.
+ */
+export const HEAVY = ['audio', 'video', 'file', 'state'];
+
+/**
+ * What a node IS, plan §3's table. A node is optional: a port with no node
+ * still works exactly as it did, and takes its place from its own id.
+ * ⚠️ `external` IS THE ONE KIND THE VALIDATOR READS. A link out of it opens
+ * somebody else's server, see `validate`.
+ */
+export const NODE_KINDS = ['device', 'engine', 'endpoint', 'store', 'external', 'screen', 'person'];
+
+/** How far apart the two ends of a link are, nearest first. */
+export const WHERE = ['machine', 'network', 'internet-one', 'internet-many'];
+
+/**
+ * 🔴 PLAN §5 AS DATA: positron's own measurements choosing a transport, and the
+ * table is the part of that plan nobody else has. Keyed by medium, then by how
+ * far apart the ends are.
+ * 🔴 `says` IS ONLY EVER A NUMBER THE PLAN QUOTES, AND NOTHING HERE WAS ROUNDED
+ * TOWARDS A NICER ONE. Where the plan names a transport and gives no figure,
+ * `says` says there is none, in those words. Where the plan says TO MEASURE,
+ * `says` is exactly `'to measure'`, so a page can find every open question in
+ * this table with one comparison. A plausible number typed into a cell nobody
+ * measured is the confident sentence this project keeps paying for.
+ * ⚠️ `or` IS THE PLAN'S SECOND CHOICE IN THE SAME CELL (*MoQ, or LL-HLS*). The
+ * chooser always returns the first; the second is kept so it is not lost.
+ * ⚠️ `state` IS NOT IN THE §5 TABLE. Plan §3 says a room carries it, as a bus,
+ * so every distance gets the relay room, and the one number on it is the
+ * relay's cap, which is plan §5's own figure for the same relay.
+ */
+export const TRANSPORTS = {
+  audio: {
+    'machine':       { transport: 'webaudio', says: 'WebAudio or Core Audio, no number measured' },
+    'network':       { transport: 'datachannel', says: 'board round trip 4 ms' },
+    'internet-one':  { transport: 'relay', says: 'relay round trip p50 36 ms, cap 60 msg/s, stay at 50' },
+    'internet-many': { transport: 'moq', or: 'llhls', says: 'MoQ or LL-HLS, no number measured' },
+  },
+  video: {
+    'machine':       { transport: 'page', says: 'the page itself, nothing crosses a wire' },
+    'network':       { transport: 'datachannel', says: 'to measure' },
+    'internet-one':  { transport: 'whep', or: 'relay-h264',
+                       says: 'a VPN passes the WHEP handshake and drops the media, so count frames' },
+    'internet-many': { transport: 'llhls', says: 'LL-HLS, no number measured' },
+  },
+  file: {
+    'machine':       { transport: 'indexeddb', says: 'IndexedDB, no number measured' },
+    'network':       { transport: 'ingest', says: 'R2 through ingest, no number measured' },
+    'internet-one':  { transport: 'ingest', says: 'R2 through ingest, no number measured' },
+    'internet-many': { transport: 'r2-hls', says: 'R2 plus HLS, no number measured' },
+  },
+  state: {
+    'machine':       { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
+    'network':       { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
+    'internet-one':  { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
+    'internet-many': { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
+  },
+};
+
+/**
+ * Which transport a heavy link rides, from plan §5's table.
+ * ⚠️ `internet-one` WITH MORE THAN ONE RECEIVER IS `internet-many`. That is
+ * the whole reason the column exists: a relay leg that suits one listener is
+ * the wrong shape for twenty, and the count is what decides it.
+ * 🔴 A LIGHT MEDIUM ANSWERS NULL, AND AN UNKNOWN ONE THROWS. A typo answering
+ * null would read as *that medium is light*, which is a wrong fact rather than
+ * a missing one.
+ * @returns {null|{transport:string, where:string, says:string, or?:string}}
+ */
+export function chooseTransport(medium, where, receivers = 1) {
+  if (!MEDIA.includes(medium)) throw new Error(`bay: medium is one of ${MEDIA.join(', ')}, not ${medium}`);
+  if (!HEAVY.includes(medium)) return null;
+  if (!WHERE.includes(where)) throw new Error(`bay: where is one of ${WHERE.join(', ')}, not ${where}`);
+  const w = (where === 'internet-one' && receivers > 1) ? 'internet-many' : where;
+  return { where: w, ...TRANSPORTS[medium][w] };
+}
 
 /**
  * The classes of MIDI message a port may consent to.
@@ -603,6 +697,12 @@ export function delivers(emits, transforms) {
 // line round trips to a link and back, and `bay-test.mjs` asserts that it does.
 // The moment the text can say something the graph cannot, there are two models
 // and they will disagree, which is this project's most expensive defect class.
+//
+// ⚠️ A HEAVY LINK PRINTS AS THE SAME `from -> to` LINE AND ITS SESSION IS NOT
+// IN IT. The session is derived from the two ends and the table, so writing it
+// down would be the second source of truth this paragraph forbids. Reading the
+// line back into a bay with the same nodes derives the same session, which
+// `bay-test.mjs` asserts. A consent is not in it either, on purpose.
 
 /** One link as one line: `from -> to { op arg, op arg }` */
 /**
@@ -665,7 +765,75 @@ export const STALE_MS = 30_000;
 export function createBay({ now = () => Date.now() } = {}) {
   const ports = new Map();          // id -> port
   const links = new Map();          // id -> link
+  const nodes = new Map();          // id -> node
   let nextLink = 1;
+
+  /**
+   * A thing that owns ports: an instrument, an engine, a store, a page.
+   * @param {object} n
+   * @param {string} n.id      `site:node`, the first two segments of its ports'
+   *                           ids, which is how a port finds its node.
+   * @param {string} n.kind    one of NODE_KINDS
+   * @param {string} [n.label] what a person reads
+   * @param {string} [n.place] the MACHINE it runs on. Defaults to the site.
+   * @param {string} [n.net]   the NETWORK that machine is on. Unknown when left
+   *                           out, and unknown is never read as the same network.
+   * @param {boolean} [n.consent] links OUT of this node need a person to ask for
+   *                           them. Always true for `external`, see `validate`.
+   * 🔴 OPTIONAL, AND A PORT WITH NO NODE BEHAVES EXACTLY AS IT DID BEFORE
+   * 2026-10-04. Its place is its id's first segment and its network is unknown.
+   */
+  function addNode(n) {
+    const parts = String(n?.id || '').split(':');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new Error(`bay: a node id is "site:node", not ${JSON.stringify(n?.id)}`);
+    }
+    if (!NODE_KINDS.includes(n.kind)) {
+      throw new Error(`bay: kind is one of ${NODE_KINDS.join(', ')}, not ${n.kind}`);
+    }
+    nodes.set(n.id, { label: n.id, place: parts[0], seenAt: now(), ...n,
+      consent: n.kind === 'external' || n.consent === true });
+    return nodes.get(n.id);
+  }
+  /* A port names its node with `node`, or by the first two segments of its id. */
+  const nodeFor = (p) => nodes.get(p.node ?? nodeOf(p.id));
+  const placeOf = (p) => nodeFor(p)?.place ?? p.id.split(':')[0];
+  const netOf = (p) => nodeFor(p)?.net;
+
+  /**
+   * How far apart two ports are, as one of WHERE.
+   * ⚠️ AN UNKNOWN NETWORK IS THE INTERNET, because that is the case every
+   * transport in the far columns survives. Guessing *same network* would pick a
+   * data channel that two machines in different buildings cannot open.
+   * 🔴 `internet-many` COUNTS THE RECEIVERS THAT ARE ALSO OVER THE INTERNET,
+   * NOT EVERY LINK OUT OF THE PORT. A page on the same machine listening as well
+   * does not make a relay leg into a broadcast, and plan §5's column is about
+   * how many receive across the internet.
+   */
+  function whereOf(a, b) {
+    if (placeOf(a) === placeOf(b)) return { where: 'machine', receivers: 1 };
+    const na = netOf(a), nb = netOf(b);
+    if (na && nb && na === nb) return { where: 'network', receivers: 1 };
+    const far = [...links.values()].filter((l) => l.from === a.id
+      && /^internet/.test(l.session?.where || '')).length;
+    return { where: far ? 'internet-many' : 'internet-one', receivers: far + 1 };
+  }
+
+  /**
+   * 🔴 THE ADDRESS IS DERIVED FROM THE LINK, NEVER CHOSEN, the way the Pi
+   * already derives `<room>-video` and `<room>-<input>` (plan §8): one port,
+   * one room. It is `${place of the source}-${source node name}-${port name}`,
+   * so `studio-1:circuit:audio` on a node placed at `studio-1` is
+   * `studio-1-circuit-audio`.
+   * ⚠️ IT IS AN ADDRESS AND NOT A RENDEZVOUS. Two links out of one port share
+   * it, which is what lets the second receiver join the first one's session
+   * rather than starting another. `stage-<rand6>` is the other kind and does
+   * not belong here.
+   */
+  function addressOf(a) {
+    const [, node = '', port = ''] = a.id.split(':');
+    return [placeOf(a), node, port].filter(Boolean).join('-');
+  }
 
   /**
    * @param {object} p
@@ -704,7 +872,15 @@ export function createBay({ now = () => Date.now() } = {}) {
    * would read as a sentence that failed to load.
    * @returns {{ok:boolean, why:string, fix?:string, warn?:string}}
    */
-  function validate(fromId, toId, transforms = []) {
+  /**
+   * ⚠️ THE FOURTH ARGUMENT IS THE SAME `opts` THAT `link` TAKES, SINCE
+   * 2026-10-04, so a page can ask the question before making the link and get
+   * the same answer. `{ consent: true }` is the only key it reads.
+   * ✅ AND AN ALLOWED HEAVY LINK ANSWERS WITH THE SESSION IT WOULD OPEN, before
+   * the link exists, which is plan §6's *the validator prints it before the
+   * link exists*.
+   */
+  function validate(fromId, toId, transforms = [], opts = {}) {
     const a = ports.get(fromId), b = ports.get(toId);
     const NO_PORT = 'Nothing on this desk answers to that name, so this link cannot be made.';
     if (!a) return { ok: false, why: `there is no port called ${fromId}.`, fix: NO_PORT };
@@ -726,6 +902,37 @@ export function createBay({ now = () => Date.now() } = {}) {
                fix: 'Name a different instrument at one end of the link.' };
     }
 
+    /**
+     * 🔴 CONSENT ON THE SOURCE, WHICH IS NEW AND IS PLAN §6. A link out of an
+     * `external` node opens a connection to somebody else's server, and ERR said
+     * on 2026-09-16 that every one of ours lands in their listener statistics,
+     * which is what a broadcaster reports to its board. Stopping does not undo
+     * it. So only a person who is going to listen may make one: never a page
+     * load, never a harness, never `?selfcheck=1`.
+     * ⚠️ IT IS `=== true` AND NOTHING LOOSER. A truthy string from a query
+     * parameter or a form is exactly the road a check would arrive by.
+     * ⚠️ AND IT IS A PROPERTY OF THE NODE, so no page can forget to ask it.
+     */
+    const src = nodeFor(a);
+    if (src?.consent && opts?.consent !== true) {
+      return { ok: false,
+               why: `${src.label} is somebody else's server, and this link would open a connection to it that they count as a listener.`,
+               fix: 'Only a person who is going to listen can make this link, by asking for it themselves.' };
+    }
+
+    /**
+     * 🔴 TRANSFORMS ARE MIDI OPERATIONS, SO ON ANY OTHER MEDIUM THEY ARE
+     * REFUSED RATHER THAN IGNORED. `transpose` on a video link would be stored,
+     * printed in the text form and do nothing, which is a link that reads as
+     * configured and is not.
+     */
+    if (a.medium !== 'midi' && (transforms || []).length) {
+      const names = transforms.map((t) => t?.op).filter(Boolean);
+      return { ok: false,
+               why: `${a.label} carries ${a.medium}, and ${names.length ? names.join(', ') : 'a transform'} only works on MIDI notes and controllers.`,
+               fix: 'Make the link with no transforms, and put any change to the notes on the MIDI link that feeds it.' };
+    }
+
     /* Before anything about the ports: is the list of transforms even well
        formed. See `checkTransforms`, which exists because a model produced a
        schema valid transform with its argument under the wrong key. */
@@ -734,9 +941,14 @@ export function createBay({ now = () => Date.now() } = {}) {
 
     // Shape. ⚠️ THE FIELD THAT DISAGREES IS NAMED. "incompatible" is a refusal
     // somebody has to debug; "48000 against 44100" is one they can fix.
+    /* ⚠️ COMPARED BY VALUE SINCE 2026-10-04, because `value` declares a range
+       and a range is a pair: `[0, 1] !== [0, 1]` would refuse two identical
+       faders for being two arrays. */
+    const same = (x, y) => x === y
+      || (typeof x === 'object' && x !== null && JSON.stringify(x) === JSON.stringify(y));
     for (const k of Object.keys(b.shape || {})) {
       if (a.shape?.[k] === undefined) continue;
-      if (a.shape[k] !== b.shape[k]) {
+      if (!same(a.shape[k], b.shape[k])) {
         return { ok: false,
                  why: `${k} does not match: ${a.label} is ${a.shape[k]} and ${b.label} wants ${b.shape[k]}.`,
                  fix: 'Nothing here can change what either end speaks, so this link cannot be made.' };
@@ -802,7 +1014,7 @@ export function createBay({ now = () => Date.now() } = {}) {
     }
 
     // Cycles, at node level, because hardware THRU can close one outside our view.
-    if (reachesNode(nodeOf(b.id), nodeOf(a.id))) {
+    if (reachesNode(nodeOf(b.id), nodeOf(a.id), a.medium)) {
       return { ok: false, why: `that closes a loop: ${b.label} already reaches ${a.label}.`,
                fix: `Remove the link that already joins them, and then this one can be made.` };
     }
@@ -812,7 +1024,24 @@ export function createBay({ now = () => Date.now() } = {}) {
       warns.push(`${p.label} has not been heard from for ${Math.round((now() - (p.seenAt ?? 0)) / 1000)}s`);
     }
     if (dropped.length) warns.push(`${b.label} will drop ${dropped.join(', ')}`);
-    return { ok: true, why: '', ...(warns.length ? { warn: warns.join('. ') } : {}) };
+    return { ok: true, why: '', ...(warns.length ? { warn: warns.join('. ') } : {}),
+             session: sessionFor(a, b) };
+  }
+
+  /**
+   * 🔴 WHAT A HEAVY LINK IS INSTEAD OF BYTES, plan §4: `{ transport, address,
+   * shape, where, says }`, and each end opens it with code it already has.
+   * Null for a light medium, whose link carries the bytes itself.
+   * ⚠️ DERIVED EVERY TIME AND NEVER WRITTEN DOWN IN THE TEXT FORM. A line that
+   * carried its own transport could disagree with the table, and the table is
+   * the measured half.
+   */
+  function sessionFor(a, b) {
+    if (!HEAVY.includes(a.medium)) return null;
+    const { where, receivers } = whereOf(a, b);
+    const t = chooseTransport(a.medium, where, receivers);
+    return { transport: t.transport, address: addressOf(a), shape: { ...(a.shape || {}) },
+             where: t.where, says: t.says, ...(t.or ? { or: t.or } : {}) };
   }
 
   /**
@@ -825,7 +1054,12 @@ export function createBay({ now = () => Date.now() } = {}) {
    * **The test caught it, which is what the test is for**: an arriving event is
    * at a NODE, and it leaves again through any output that node has.
    */
-  function reachesNode(startNode, targetNode) {
+  /* 🔴 AND IT WALKS ONE MEDIUM SINCE 2026-10-04. A loop is an echo at wire
+     speed, and only a link of the same medium can echo: a phone sending `value`
+     to an engine and hearing its `audio` back is the most ordinary patch plan
+     §3 describes, and walking every medium refused it as a loop. With MIDI
+     alone on the desk the answer is unchanged. */
+  function reachesNode(startNode, targetNode, medium) {
     const seenNodes = new Set();
     const walk = (n) => {
       if (n === targetNode) return true;
@@ -833,6 +1067,7 @@ export function createBay({ now = () => Date.now() } = {}) {
       seenNodes.add(n);
       for (const l of links.values()) {
         if (nodeOf(l.from) !== n) continue;
+        if (medium && ports.get(l.from)?.medium !== medium) continue;
         if (walk(nodeOf(l.to))) return true;
       }
       return false;
@@ -841,12 +1076,24 @@ export function createBay({ now = () => Date.now() } = {}) {
   }
   const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
 
-  function link(fromId, toId, transforms = []) {
-    const v = validate(fromId, toId, transforms);
+  /**
+   * @param {object} [opts] `{ consent }`, see `validate`. Never stored: a
+   *        consent is a person asking once, not a property of the link.
+   * ⚠️ `session` IS NULL ON A LIGHT LINK AND AN OBJECT ON A HEAVY ONE, on the
+   * stored link and on the answer alike, so a page can test it without knowing
+   * which media are heavy.
+   * ⚠️ AN EARLIER LINK KEEPS THE SESSION IT WAS MADE WITH. A second internet
+   * receiver makes the NEW link `internet-many`; the first one is already open
+   * and moving it is a decision for the code that opens sessions, which this
+   * file is not.
+   */
+  function link(fromId, toId, transforms = [], opts = {}) {
+    const v = validate(fromId, toId, transforms, opts);
     if (!v.ok) return { ok: false, why: v.why, fix: v.fix || '' };
     const id = `L${nextLink++}`;
-    links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0 });
-    return { ok: true, id, why: '', warn: v.warn };
+    links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0,
+                    session: v.session });
+    return { ok: true, id, why: '', warn: v.warn, session: v.session };
   }
   function unlink(id) { return links.delete(id); }
 
@@ -877,17 +1124,21 @@ export function createBay({ now = () => Date.now() } = {}) {
   }
 
   return {
-    addPort, validate, link, unlink, send, seen,
+    addPort, addNode, validate, link, unlink, send, seen,
     port: (id) => ports.get(id),
     ports: () => [...ports.values()],
+    node: (id) => nodes.get(id),
+    nodes: () => [...nodes.values()],
     links: () => [...links.values()],
     stale,
     text: () => printPatch([...links.values()]),
-    /** Load a text patch. Returns every line that was refused, with its reason. */
-    load(text) {
+    /** Load a text patch. Returns every line that was refused, with its reason.
+     *  ⚠️ A CONSENT IS NEVER IN THE TEXT, so a line out of an `external` node is
+     *  refused here unless the person loading it passes `{ consent: true }`. */
+    load(text, opts = {}) {
       const bad = [];
       for (const l of parsePatch(text)) {
-        const r = link(l.from, l.to, l.transforms);
+        const r = link(l.from, l.to, l.transforms, opts);
         if (!r.ok) bad.push({ line: printLink(l), why: r.why, fix: r.fix || '' });
       }
       return bad;
