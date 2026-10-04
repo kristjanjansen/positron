@@ -1,5 +1,13 @@
 ## Open
 
+### `/kit/` opened at `#hardware` logs two red checks, found 2026-10-04
+
+"two blocks in one part sit the project's one gap apart" and "typing then a
+pause starts one compile" assume the page opened on its default tab; opened at
+`#hardware` they measure blocks in a closed tab and log FAIL to a visitor. They
+pass in `verify kit` (277/277). Make them say "not measured, its tab is closed"
+rather than fail.
+
 ### Plan everything the Pico could do for positron, asked 2026-10-04
 
 *"Plan all of them"*: the Pico 2 W as a patchbay node over wifi, light output
@@ -18,6 +26,7 @@ takes the name HARDWARE.
 (`rig/pico/firmware/ui.c`) shown on `/kit/` in a tab of its own. Best form: the
 real router firmware running in the browser in rp2040js (pure JS), its screen
 drawn live and its four buttons pressable. Waits on the UI kit agent.
+DONE 2026-10-04: the HARDWARE tab, 277/277.
 
 ### A small UI kit for the 128x64 OLED, asked 2026-10-04
 

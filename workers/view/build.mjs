@@ -297,6 +297,24 @@ const FILES = [
   ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
   ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
 
+  // ── the Pico router firmware and the emulator it runs in, for `/kit/` ─────
+  //
+  // ⚠️ LISTED BY NAME FOR THE REASON EVERY LINE IN THIS BLOCK IS: `shellFiles()`
+  // enumerates ONE directory level, so nothing under `shell/vendor/` ships
+  // unless it is here, and `.uf2` is on no extension list at all.
+  // `demo/shell/pico.mjs` and `pico-worker.mjs` are flat in `demo/shell/` and
+  // are enumerated. The emulator is rp2040js 1.4.0 bundled into one module
+  // (MIT); the boot ROM is the RP2040 B1's, which the firmware calls into, and
+  // its terms are in the licence file beside it. The UF2 is
+  // `rig/pico/firmware/build-pico/router.uf2`, byte for byte, 53,760 bytes:
+  // the owner's own firmware, published because the HARDWARE tab was asked for
+  // as *"Can you make demo of hw kit in psoitron kit new tab?"*.
+  ['demo/shell/vendor/rp2040js.mjs', 'shell/vendor/rp2040js.mjs'],
+  ['demo/shell/vendor/LICENSE-rp2040js', 'shell/vendor/LICENSE-rp2040js'],
+  ['demo/shell/vendor/pico-bootrom.mjs', 'shell/vendor/pico-bootrom.mjs'],
+  ['demo/shell/vendor/LICENSE-pico-bootrom', 'shell/vendor/LICENSE-pico-bootrom'],
+  ['demo/resources/pico/router-pico.uf2', 'resources/pico/router-pico.uf2'],
+
   // ── the typeface `/weight/` is made of, vendored ────────────────────────────
   //
   // ⚠️ LISTED BY NAME, and this one would have been missed by looking: a font
