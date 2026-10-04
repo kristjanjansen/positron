@@ -1422,6 +1422,7 @@ function connect() {
     const instruments = { synth: true, pappusFx: pappusAvailable(),
                           ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) };
     graphFacts = { room: ROOM, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports,
+                   midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable() };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
                     frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts }));

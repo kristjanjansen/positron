@@ -34,14 +34,26 @@ import { boardGraph } from '../../demo/shell/graph-registry.mjs';
  * @param {Array} f.ports           `addressable()` rows, `state().ports`
  * @param {number} f.frameMs
  * @param {boolean} f.gpu           `videoAvailable()`
+ * @param {function} [f.midiPresent] `(port) => boolean`, is that ALSA card there now
  */
+const present = (f, port) => (typeof f.midiPresent === 'function'
+  ? f.midiPresent(port)
+  : (f.ports || []).some((p) => String(p.client).toLowerCase() === String(port).toLowerCase()));
+
 export function graphOf(f) {
   const inputs = f.inputs instanceof Map ? [...f.inputs.values()] : (f.inputs || []);
   return boardGraph({
     room: f.room, net: f.net || null, instruments: f.instruments || {},
     // Only what the graph reads. `device` is an ALSA name on the board and
     // means nothing to a page, so it does not ride on every beat.
-    inputs: inputs.map((i) => ({ name: i.name, channels: i.channels, midi: i.midi ?? null })),
+    // 🔴 AN INPUT'S MIDI IS ANNOUNCED ONLY WHILE ITS DEVICE IS THERE. MEASURED
+    // 2026-10-04: the Circuit was unplugged, the board went on announcing its
+    // MIDI input from the config, `/patchbay/` offered the link and every note
+    // failed with ENOENT on `/proc/asound/Circuit`. `midiPresent` is asked on
+    // every beat (one lookup), so a replug shows up within five seconds; with
+    // no answer to ask, the ALSA list from the last hello decides.
+    inputs: inputs.map((i) => ({ name: i.name, channels: i.channels,
+      midi: i.midi && present(f, i.midi.port) ? i.midi : null })),
     alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false,
   });
 }
