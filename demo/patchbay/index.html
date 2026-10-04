@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The prose under a section heading, the same voice as the page's own
+     sentence under its title. Two paragraphs under one heading are one block,
+     so they sit a paragraph apart rather than the page's 40 px. */
+  .gr-text { display: flex; flex-direction: column; gap: 10px; }
+  .gr-say { margin: 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+  /* The line being written and the consent beside it are one row. */
+  .gr-write { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
+  .gr-write > .pos-field { flex: 1 1 320px; min-width: 0; }
+  .rout-case {
+    margin: 0;
+    height: calc(16 * 1.6em + 2 * var(--inset, 12px));
+    overflow: auto;
+    padding: var(--inset, 12px);
+    background: var(--card);
+    border: var(--edge, 1px solid var(--line));
+    border-radius: var(--r, 4px);
+    font: 400 12px/1.6 var(--mono);
+    color: var(--dim);
+    white-space: pre;
+  }
+  .rout-case b { color: var(--fg); font-weight: 400; }
+  .rout-case i { color: var(--bad, #e66); font-style: normal; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createCheck } from '/shell/check.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  import { createBay, HEAVY, parseLink, printLink } from '/shell/bay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { openWire } from '/shell/wire.mjs';
+  import { createRegistry, boardGraph } from '/shell/graph-registry.mjs';
+  import { createCore, fromHex, toHex } from '/shell/route-core.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { RELAY_BASE } from '/shell/wire.mjs';
+
+  const WHAT = 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.';
+
+  const d = mount({
+    name: 'patchbay',
+    what: WHAT,
+    readout: { links: '', heavy: '', refused: '', heard: '' },
+    controls: [
+      { id: 'link', label: 'Link', primary: true },
+      { id: 'open', label: 'Open' },
+      { id: 'example', label: 'Example' },
+      { id: 'unlink', label: 'Unlink' },
+      { id: 'clear', label: 'Clear' },
+    ],
+  });
+  guard(d);
+
+  const say = (...texts) => {
+    const box = el('div', 'gr-text');
+    for (const t of texts) box.append(el('p', 'gr-say', t));
+    return box;
+  };
+
+  /* 🔴 `/rout/` AND `/graph/` AS ONE PAGE, asked 2026-10-04: *"i am cofused
+     over rout and graph demo. unify? better name?"*, named *"Patchbay"*. The
+     graph decides what exists and how a link travels; the routing core decides
+     what happens to each MIDI message inside a link, and here a MIDI link from
+     the keys really runs through it. Both old pages stay at their URLs.
+     🔴 WHY THIS PAGE EXISTS: `plans/plan-universal-routing.md`, asked
+     2026-10-04 as *"What about route-anything work?"* then *"Do it ... Nee
+     demo"*. It is step 2 of that plan made visible: `bay.mjs` knows eight
+     media, and a link of a heavy one carries a session instead of bytes. */
+  d.stack.titled('WHY',
+    say('positron moves notes, sound, video, shader code and recordings between browsers, a Raspberry Pi, '
+      + 'Cloudflare and other people’s servers, and until now every pair had code of its own. Here each of '
+      + 'them is a link in one graph of things, the ports on them and the links between ports.',
+      'A light link, MIDI or a program, carries its bytes through the routing core. A heavy link, sound or '
+      + 'video, only describes a stream, which transport, which address and what shape, and the two ends open it '
+      + 'themselves. The transport is chosen from where the two ends are, out of latencies measured on this desk.',
+      'A MIDI link runs through the routing core, the part small enough for a microcontroller, which moves '
+      + 'notes onto channels, keeps ranges and holds anything that could overwrite a saved sound until a '
+      + 'person says yes. The same core is written again in C, and both are graded against the test cases '
+      + 'at the bottom of this page.',
+      'A link is only described until you select it and press Open. Sound and video from the Pi to this '
+      + 'browser and these keys to an instrument or a synth open for real, and Unlink closes what Open opened.'));
+
+  // ── the desk ─────────────────────────────────────────────────────────────
+  //
+  // ⚠️ A DESCRIPTION OF THINGS THAT EXIST, NOT A SIMULATION OF THEM. Every node
+  // is something positron already talks to, named the way the plan names it,
+  // and every shape is the one the wire already declares (the board's
+  // `audioChannels` and `frameMs`, the GPU's video). `place` is the machine,
+  // `net` the network it is on, and the transport is chosen from those two.
+
+  const NODES = [
+    { id: 'web:keys', kind: 'person', label: 'keys', place: 'browser', net: 'home' },
+    { id: 'web:editor', kind: 'person', label: 'editor', place: 'browser', net: 'home' },
+    { id: 'web:screen', kind: 'screen', label: 'screen', place: 'browser', net: 'home' },
+    { id: 'studio-1:circuit', kind: 'device', label: 'Circuit', place: 'pi', net: 'home' },
+    { id: 'studio-1:gpu', kind: 'engine', label: 'GPU', place: 'pi', net: 'home' },
+    { id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' },
+    { id: 'phone:screen', kind: 'screen', label: 'screen', place: 'phone', net: 'cell' },
+    { id: 'err:klassika', kind: 'external', label: 'Klassikaraadio', place: 'err', net: 'err' },
+  ];
+  const PORTS = [
+    { id: 'web:keys:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+    { id: 'web:editor:program', label: 'editor', dir: 'out', medium: 'program', shape: { language: 'glsl' } },
+    { id: 'web:screen:audio', label: 'browser screen', dir: 'in', medium: 'audio', shape: { rate: 48000 } },
+    { id: 'web:screen:video', label: 'browser screen', dir: 'in', medium: 'video' },
+    { id: 'studio-1:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] },
+    { id: 'studio-1:circuit:audio', label: 'Circuit', dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 2, frameMs: 10 } },
+    { id: 'studio-1:gpu:program', label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } },
+    { id: 'studio-1:gpu:video', label: 'GPU', dir: 'out', medium: 'video', shape: { w: 1280, h: 720, fps: 30, codec: 'h264' } },
+    { id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio' },
+    { id: 'phone:screen:video', label: 'phone screen', dir: 'in', medium: 'video' },
+    { id: 'phone:screen:audio', label: 'phone screen', dir: 'in', medium: 'audio', shape: { rate: 48000 } },
+    { id: 'err:klassika:audio', label: 'Klassikaraadio', dir: 'out', medium: 'audio', shape: { rate: 48000 } },
+  ];
+
+  /* The lines a visitor can step through, in the order they teach: a light
+     link, a heavy one on one network, code to an engine, video across the
+     internet, a recording, the same sound to a second listener, then the two
+     a validator exists for. */
+  const EXAMPLES = [
+    'web:keys:out -> studio-1:circuit:in { channel 1 }',
+    'studio-1:circuit:audio -> web:screen:audio',
+    'web:editor:program -> studio-1:gpu:program',
+    'studio-1:gpu:video -> phone:screen:video',
+    'studio-1:circuit:audio -> r2:recordings:in',
+    'studio-1:circuit:audio -> phone:screen:audio',
+    'err:klassika:audio -> web:screen:audio',
+    'studio-1:gpu:video -> web:screen:audio',
+  ];
+
+  function deskBay() {
+    const b = createBay();
+    for (const n of NODES) b.addNode(n);
+    for (const p of PORTS) b.addPort(p);
+    return b;
+  }
+
+  // ── the live desk: what announces itself in the studio's room ──────────
+  //
+  // 🔴 STEP 3 OF THE PLAN: `/graph/` draws what exists. The board puts its graph
+  // on every `board.alive` (`demo/shell/graph-registry.mjs`), this page sends
+  // its own as `graph.announce`, and anything else in the room that announces
+  // is drawn too. A board that stops answering is still drawn, marked stale.
+  // ⚠️ JOINING THE ROOM OPENS NOTHING BUT OUR OWN RELAY: no audio is asked for,
+  // no lease is taken, and the page only listens and says what it is.
+  const ROOM = 'studio-1';
+  const SELF = {
+    v: 1, site: 'web', place: 'browser',
+    nodes: [
+      { id: 'web:keys', kind: 'person', label: 'keys', place: 'browser' },
+      { id: 'web:screen', kind: 'screen', label: 'screen', place: 'browser' },
+    ],
+    ports: [
+      { id: 'web:keys:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+      { id: 'web:screen:audio', label: 'browser screen', dir: 'in', medium: 'audio' },
+      { id: 'web:screen:video', label: 'browser screen', dir: 'in', medium: 'video' },
+    ],
+  };
+  const registry = createRegistry();
+  registry.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+  function liveBay() { return registry.fill(createBay()); }
+
+  let world = 'live';
+  let bay = liveBay();
+  /** Every link made, as its text line, so a redraw can make them again. */
+  let made = [];
+
+  // ── the picture, built from whatever the bay holds ───────────────────────
+  //
+  // ⚠️ `atEnd: false`, the one exception `positron-diagram` allows: this
+  // picture changes when the reader presses something, so it sits beside it.
+  // 🔴 A PLACE WITH SOURCES AND RECEIVERS IS DRAWN TWICE, BY ROLE. The first
+  // layout put the browser's screen beside its keys, so sound from the Pi came
+  // back right to left under the row, through other boxes. Split by role (the
+  // `/keys/` shape `positron-diagram` records), links read left to right.
+  const PLACE = { browser: 'Browser', phone: 'Phone', cloudflare: 'Cloudflare', err: 'ERR', pi: 'Raspberry Pi' };
+  const TECH = { person: 'browser', screen: 'browser', device: 'sound', engine: 'graphics', store: 'cloudflare', external: 'station' };
+  const placeLabel = (p) => PLACE[p] || (/^studio/.test(p) ? 'Raspberry Pi' : p);
+  const placeTech = (p) => (p === 'browser' ? 'browser' : p === 'cloudflare' ? 'cloudflare' : p === 'err' ? 'station'
+    : (p === 'pi' || /^studio/.test(p)) ? 'raspberry' : 'device');
+  const boxId = (id) => id.replace(/:/g, '_');
+  function specFor(b) {
+    const ports = b.ports();
+    const groups = new Map();
+    for (const n of b.nodes()) {
+      const mine = ports.filter((p) => p.id.startsWith(`${n.id}:`));
+      const outs = mine.filter((p) => p.dir === 'out'), ins = mine.filter((p) => p.dir === 'in');
+      const role = ins.length && !outs.length ? 'in' : 'out';
+      const sub = [...new Set(outs.map((p) => `${p.medium} out`)), ...new Set(ins.map((p) => `${p.medium} in`))].join(', ');
+      const key = `${n.place}|${role}`;
+      if (!groups.has(key)) groups.set(key, { place: n.place, role, kids: [], stale: false });
+      const gr = groups.get(key);
+      gr.kids.push({ id: boxId(n.id), label: n.label, sub: n.stale ? `${sub}, not heard` : sub, tech: TECH[n.kind] || 'device' });
+      gr.stale ||= !!n.stale;
+    }
+    return [...groups.values()].map((gr) => ({
+      id: `m-${gr.place}-${gr.role}`, label: placeLabel(gr.place), tech: placeTech(gr.place),
+      kind: gr.place === 'browser' ? 'here' : gr.place === 'cloudflare' ? 'cloud' : 'device',
+      join: false, children: gr.kids,
+    }));
+  }
+  const spec = { caption: '', nodes: specFor(bay), links: [] };
+  const host = el('div');
+  const dg = createDiagram(host, spec, { how: false, atEnd: false });
+
+  // ── writing a link ───────────────────────────────────────────────────────
+  /** In the live desk the examples are whatever this room makes possible: every
+   *  out port to an in port of the same medium on another node. */
+  function examples() {
+    if (world === 'example') return EXAMPLES;
+    const ports = bay.ports();
+    const out = [];
+    for (const a of ports.filter((p) => p.dir === 'out')) {
+      for (const b of ports.filter((p) => p.dir === 'in' && p.medium === a.medium)) {
+        if (a.id.split(':').slice(0, 2).join(':') === b.id.split(':').slice(0, 2).join(':')) continue;
+        out.push(`${a.id} -> ${b.id}`);
+      }
+    }
+    return out.length ? out : [''];
+  }
+  let step = 0;
+  const field = createField({ label: 'link', value: examples()[0], placeholder: 'from -> to { channel 1 }', grow: 'wide' });
+  const consent = createCheck({ label: 'I will listen', title: 'a link from somebody else’s server is made only by a person who will listen to it' });
+  const write = el('div', 'gr-write');
+  write.append(field.el, consent.el);
+
+  let selected = null, refused = 0;
+  const rows = createTable({
+    columns: [
+      { key: 'line', label: 'link', grow: true, hi: true },
+      { key: 'medium', label: 'medium', width: 72 },
+      { key: 'by', label: 'carried by', width: 120 },
+      { key: 'where', label: 'where', width: 104 },
+      { key: 'state', label: 'state', width: 96 },
+    ],
+    empty: 'no links yet',
+    note: 'says',
+    onPick: (r) => { selected = r.id; d.log(`${r.id} selected, Unlink takes it away`); },
+  });
+
+  const keysHost = el('div');
+  const desk = createChoice({
+    label: 'desk', options: [['studio, live', 'live'], ['example', 'example']], at: 0,
+    title: (v) => (v === 'live' ? `what announces itself in ${ROOM} right now` : 'a typed desk with every kind of thing on it'),
+    onPick: (v) => { for (const line of [...opened.keys()]) closeLink(line); world = v; made = []; rebuild(); field.set(examples()[0]); step = 0;
+      d.log(v === 'live' ? `the live desk: what announces itself in ${ROOM}` : 'the example desk'); },
+  });
+  d.stack.titled('THE GRAPH',
+    say('The live desk is what announces itself in the studio\u2019s room right now, this browser included. '
+      + 'The example desk has every kind of thing on it. Write a link as from, an arrow, then to, or press '
+      + 'Example to step through what the desk allows, and press Link. A refusal says why in the log.'),
+    desk.el, host, write, rows.el, keysHost);
+
+  // ── inside a link ─────────────────────────────────────────────────────────
+  const inside = el('pre', 'rout-case');
+  inside.style.height = 'auto';
+  inside.style.whiteSpace = 'pre-wrap';
+  function showInside() {
+    const midi = [...opened.entries()].filter(([, o]) => o.core);
+    inside.textContent = midi.length
+      ? midi.map(([line, o]) => `${line}\n  ops       ${o.ops.length ? o.ops.map((x) => JSON.stringify(x)).join(' ') : 'none'}\n`
+          + `  in ${o.stats.in}   out ${o.stats.out}   dropped ${o.stats.dropped}\n  last      ${o.stats.last || 'nothing yet'}`).join('\n\n')
+      : 'Open a link from the keys to an instrument and play. Each note shows here as it went in and as it came out of the routing core.';
+  }
+  inside.textContent = 'Open a link from the keys to an instrument and play. Each note shows here as it went in and as it came out of the routing core.';
+  d.stack.titled('INSIDE A LINK',
+    say('What the routing core did to every note on an open MIDI link, including what it dropped. A transform on '
+      + 'the link, like { channel 2 } or { transpose 12 }, changes the note on its way to the instrument.'),
+    inside);
+
+  const mediumOf = (l) => bay.port(l.from)?.medium || '';
+  /** What an arrow says: the name a reader can look up, short enough for the gap
+   *  between two columns. The table keeps `bay.mjs`'s own id. */
+  const SHORT = { webaudio: 'local', datachannel: 'WebRTC', relay: 'relay', moq: 'MoQ', llhls: 'LL-HLS',
+    page: 'local', whep: 'WHEP', 'relay-h264': 'relay', indexeddb: 'local', ingest: 'ingest', 'r2-hls': 'HLS', room: 'room' };
+  const an = (w) => (/^[aeiou]/.test(w) ? `an ${w}` : `a ${w}`);
+
+  /** A new bay from the current desk, and every link made so far made again. */
+  function rebuild() {
+    bay = world === 'live' ? liveBay() : deskBay();
+    const keep = [];
+    for (const m of made) {
+      const l = parseLink(m.line);
+      const r = bay.link(l.from, l.to, l.transforms, { consent: m.consent });
+      if (r.ok) keep.push(m); else d.log(`${m.line} is gone: ${r.why}`, 'bad');
+    }
+    made = keep;
+    spec.nodes = specFor(bay);
+    redraw();
+  }
+
+  function redraw() {
+    const all = bay.links();
+    rows.set(all.map((l) => ({
+      id: l.id,
+      line: printLink(l),
+      medium: mediumOf(l),
+      // ⚠️ WHILE A LINK IS OPEN ITS ROW SAYS WHAT IS REALLY CARRYING IT. The
+      // plan's table chose WHEP for the Pi's video; the opener uses the board's
+      // relay H.264 path, and a row naming the plan's choice would be a claim.
+      by: opened.get(printLink(l))?.via?.() || (l.session ? l.session.transport : 'routing core'),
+      where: l.session ? l.session.where : 'bytes',
+      says: l.session ? `${l.session.says}\naddress ${l.session.address}` : 'the bytes travel through the link itself',
+      state: stateOf(l),
+    })));
+    spec.links = all.map((l) => ({
+      from: l.from.split(':').slice(0, 2).join('_'),
+      to: l.to.split(':').slice(0, 2).join('_'),
+      label: l.session ? (SHORT[l.session.transport] || l.session.transport) : mediumOf(l),
+      note: l.session ? `${mediumOf(l)}, ${l.session.where}: ${l.session.says}.` : `${mediumOf(l)}, carried by the routing core.`,
+    }));
+    const heavy = all.filter((l) => HEAVY.includes(mediumOf(l))).length;
+    spec.caption = all.length
+      ? `${all.length} link${all.length === 1 ? '' : 's'}, ${all.length - heavy} carrying bytes and ${heavy} describing a stream.`
+      : 'No links. Press Example, then Link.';
+    dg.render();
+    d.set('links', all.length);
+    d.set('heavy', heavy);
+    d.set('refused', refused);
+    const sites = registry.merged().sites.filter((x) => x.site !== 'web');
+    d.set('heard', world === 'live' ? sites.filter((x) => !x.stale).length : '');
+  }
+
+  /** Make the link written in the field. Answers bay's result, or a parse error as one. */
+  function makeLink(line = field.value()) {
+    let l;
+    try { l = parseLink(line); }
+    catch (e) { refused++; d.log(e.message.replace(/^bay: /, ''), 'bad'); redraw(); return { ok: false, why: e.message }; }
+    const r = bay.link(l.from, l.to, l.transforms, { consent: consent.get() });
+    if (r.ok) {
+      const lk = bay.links().find((x) => x.id === r.id);
+      made.push({ line: printLink(lk), consent: consent.get() });
+      d.log(lk?.session
+        ? `${r.id} ${line}: ${an(mediumOf(lk))} stream over ${lk.session.transport}, ${lk.session.where}`
+        : `${r.id} ${line}: ${mediumOf(lk)} through the routing core`, 'ok');
+      if (r.warn) d.log(r.warn);
+    } else {
+      refused++;
+      d.log(`refused ${line}: ${r.why} ${r.fix || ''}`.trim(), 'bad');
+    }
+    redraw();
+    return r;
+  }
+
+  d.on('link', () => makeLink());
+  d.on('example', () => {
+    const ex = examples();
+    step = (step + 1) % ex.length;
+    field.set(ex[step]);
+  });
+  d.on('unlink', () => {
+    const all = bay.links();
+    const id = selected && all.some((l) => l.id === selected) ? selected : all.at(-1)?.id;
+    if (!id) { d.log('nothing to unlink'); return; }
+    const line = printLink(all.find((l) => l.id === id));
+    closeLink(line);
+    bay.unlink(id);
+    made = made.filter((m) => m.line !== line);
+    selected = null;
+    d.log(`${id} unlinked`);
+    redraw();
+  });
+  d.on('clear', () => {
+    for (const l of bay.links()) { closeLink(printLink(l)); bay.unlink(l.id); }
+    made = [];
+    selected = null;
+    d.log('every link removed');
+    redraw();
+  });
+
+  /* 🔴 THE FIRST BOARD HEARD GETS THREE LINKS, WHERE ITS PORTS EXIST. With no
+     links the picture has no left and right, so every machine stacked in one
+     column at one height and the browser's two boxes stood empty and tall. A
+     link here is a description in memory and opens nothing. */
+  function starter(site) {
+    const want = [`web:keys:out -> ${site}:circuit:in`, `${site}:circuit:audio -> web:screen:audio`,
+      `${site}:gpu:video -> web:screen:video`];
+    for (const line of want) {
+      const [from, to] = line.split(' -> ');
+      if (bay.port(from) && bay.port(to)) makeLink(line);
+    }
+  }
+
+  // ── step 4: opening a link for real ──────────────────────────────────────
+  //
+  // 🔴 A DESCRIBED LINK OPENS NOTHING, AND ONLY A PERSON'S PRESS OPENS ONE.
+  // The starter links, a visit and the harness all leave the board alone: a
+  // lease starts a capture on hardware in another building, and the rule here
+  // is that a visit opens nothing. Under `?selfcheck=1` Open says so and stops.
+  // ⚠️ EACH OPENER IS THE BOARD'S OWN VERB, NOT A NEW PROTOCOL: `input.want`
+  // and its lease (`/away/`), `midi.send` through the board's gate. The room is
+  // the session's address, which the board itself announced.
+  const opened = new Map();          // link line -> { kind, close(), state() }
+  const RENEW_MS = 20_000;
+  const nodeKind = (portId) => bay.node(portId.split(':').slice(0, 2).join(':'))?.kind;
+  function kindOf(l) {
+    const a = bay.port(l.from), b = bay.port(l.to);
+    if (!a || !b || !a.address && !b.address) return null;
+    if (a.medium === 'audio' && l.to === 'web:screen:audio' && a.address) return nodeKind(l.from) === 'engine' ? 'synth' : 'listen';
+    if (a.medium === 'video' && l.to === 'web:screen:video' && a.address) return 'video';
+    if (a.medium === 'midi' && l.from === 'web:keys:out' && b.address) return nodeKind(l.to) === 'engine' ? 'notes' : 'keys';
+    return null;
+  }
+  const OPENERS = { listen: (l) => openListen(l), synth: (l) => openSynth(l), video: (l) => openVideo(l),
+                    keys: (l) => openKeys(l), notes: (l) => openKeys(l, true) };
+  /** A board on `room`, resolved once its socket is open (or after 6 s). */
+  async function boardOn(room, extra = {}) {
+    let joined;
+    const isOpen = new Promise((r) => { joined = r; });
+    const board = createBoard({ room, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => joined(), ...extra });
+    await Promise.race([isOpen, new Promise((r) => setTimeout(r, 6000))]);
+    return board;
+  }
+  async function openSynth(l) {
+    const room = bay.port(l.from).address, source = bay.node(l.from.split(':').slice(0, 2).join(':'))?.label;
+    const board = await boardOn(room, { cushionMs: 160, maxCushionMs: 300 });
+    const ctx = await board.startAudio();
+    const out = board.playout();
+    if (out) { try { out.connect(ctx.destination); } catch { /* already */ } }
+    // A cold synth takes seconds to start, so the wait is long and says so.
+    board.ask({ type: 'audio.start', source }, 'audio.started', 20000).then((r) => {
+      if (!r) d.log(`${source} did not answer within 20 s`, 'warn');
+      else d.log(r.ok ? `${source} is playing on the board` : `the board said ${r.reason}`, r.ok ? 'ok' : 'warn');
+    });
+    return {
+      kind: 'synth',
+      via: () => board.stats().via || 'relay',
+      state: () => `open, ${board.stats().frames} fr`,
+      close: () => { try { out?.disconnect(); } catch { /* */ } board.send({ type: 'audio.stop' }); board.close(); },
+    };
+  }
+  async function openVideo(l) {
+    const site = l.from.split(':')[0];
+    if (typeof VideoDecoder !== 'function') throw new Error('this browser has no WebCodecs, so the board’s video cannot be decoded here');
+    const board = await boardOn(site);
+    const r = await board.ask({ type: 'video.start', w: 1280, h: 720, fps: 30 }, 'video.started', 20000);
+    if (!r || !r.ok) { board.close(); throw new Error(r ? (r.reason || 'the board refused') : 'the board did not answer within 20 s'); }
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280; canvas.height = 720;
+    const panel = createVideoPanel({ media: canvas, left: false });
+    keysHost.append(panel.el);
+    const g = canvas.getContext('2d');
+    let frames = 0;
+    const decoder = new VideoDecoder({
+      output: (vf) => { g.drawImage(vf, 0, 0, canvas.width, canvas.height); vf.close(); frames++; },
+      error: (e) => d.log(`decode error ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
+    });
+    decoder.configure({ codec: r.codec ?? 'avc1.42E01E', optimizeForLatency: true });
+    // ⚠️ THE FRAME HEADER IS THE BOARD'S: a sequence number and a flags word,
+    // eight bytes, and nothing decodes until a keyframe, as on `/mirror/`.
+    let waitKey = true;
+    const vws = new WebSocket(`${RELAY_BASE}/room/${r.room}/ws`);
+    vws.binaryType = 'arraybuffer';
+    vws.onmessage = (e) => {
+      if (typeof e.data === 'string') return;
+      const dv = new DataView(e.data);
+      const seq = dv.getUint32(0, true), key = (dv.getUint32(4, true) & 1) === 1;
+      if (waitKey) { if (!key) return; waitKey = false; }
+      try { decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: seq * 1e6 / (r.fps ?? 30), data: new Uint8Array(e.data, 8) })); }
+      catch { waitKey = true; }
+    };
+    // The board stops drawing when nobody says they are watching.
+    const watch = setInterval(() => board.send({ type: 'video.watching' }), 10000);
+    board.send({ type: 'video.watching' });
+    return {
+      kind: 'video',
+      via: () => 'relay-h264',
+      state: () => `open, ${frames} fr`,
+      close: () => { clearInterval(watch); try { vws.close(); } catch { /* */ } try { decoder.close(); } catch { /* */ } panel.el.remove(); board.close(); },
+    };
+  }
+  function stateOf(l) {
+    const o = opened.get(printLink(l));
+    if (o) return o.state();
+    return kindOf(l) ? 'described' : 'not built yet';
+  }
+  async function openListen(l) {
+    const room = bay.port(l.from).address;
+    // ⚠️ ASK ONLY ONCE THE SOCKET IS OPEN. Measured 2026-10-04: an `input.want`
+    // sent the moment the board was created went nowhere, the page logged
+    // `nothing answered`, and the stream stood open at 0 frames.
+    let joined;
+    const isOpen = new Promise((r) => { joined = r; });
+    const board = createBoard({ room, of: 'Raspberry Pi', showName: false, cushionMs: 80, maxCushionMs: 250,
+      direct: true, directCushionMs: 40, log: (line, kind) => d.log(line, kind), onOpen: () => joined() });
+    const ctx = await board.startAudio();
+    await Promise.race([isOpen, new Promise((r) => setTimeout(r, 6000))]);
+    const out = board.playout();
+    if (out) { try { out.connect(ctx.destination); } catch { /* already */ } }
+    board.goDirect({ frameMs: 10 });
+    const want = async () => {
+      const r = await board.ask({ type: 'input.want' }, 'input.wanted', 6000);
+      if (!r) d.log(`nothing answered in ${room}`, 'warn');
+      else if (r.started) d.log(`the board started the ${room} capture`, 'ok');
+    };
+    want();
+    const renew = setInterval(want, RENEW_MS);
+    return {
+      kind: 'listen',
+      via: () => board.stats().via || 'relay',
+      state: () => `open, ${board.stats().frames} fr`,
+      close: () => { clearInterval(renew); try { out?.disconnect(); } catch { /* */ } board.close(); },
+    };
+  }
+  /**
+   * 🔴 THE NOTES RUN THROUGH THE ROUTING CORE, WHICH IS WHAT MAKES THIS ONE
+   * PATCHBAY RATHER THAN TWO DEMOS. Each open MIDI link gets its own core: the
+   * keys are its input, the instrument its output, the link's transforms are its
+   * ops, and the instrument's `never` list is its gate. What comes out is what
+   * goes to the board, so a transform on the link really changes the note.
+   */
+  function openKeys(l, notes = false) {
+    const to = bay.port(l.to);
+    const ch = (to.shape?.channels || [1])[0];
+    const core = createCore();
+    core.addPort({ id: 'keys', dir: 'in' });
+    core.addPort({ id: 'out', dir: 'out', accepts: to.accepts?.length ? to.accepts : undefined,
+      policy: Object.fromEntries((to.never || []).map((k) => [k, 'deny'])) });
+    // The link's own transforms, then the instrument's channel if none set one.
+    const ops = [...(l.transforms || [])];
+    if (!notes && !ops.some((o) => o.op === 'channel')) ops.push({ op: 'channel', to: ch });
+    const made = core.link({ id: 'L', from: 'keys', to: 'out', ops });
+    if (!made.ok) throw new Error(`the routing core refused the link: ${made.reason}`);
+    const stats = { in: 0, out: 0, dropped: 0, last: '' };
+    const send = (bytes) => {
+      if (notes) {
+        const on = (bytes[0] & 0xF0) === 0x90 && bytes[2] > 0;
+        return board.send(on ? { type: 'note.on', note: bytes[1], vel: bytes[2], channel: 0 } : { type: 'note.off', note: bytes[1], channel: 0 });
+      }
+      return board.send({ type: 'midi.send', bytes });
+    };
+    const through = (bytes) => {
+      stats.in++;
+      const out = core.input({ port: 'keys', t: Math.round(performance.now()), bytes });
+      if (!out.length) stats.dropped++;
+      for (const e of out) { if (send(e.bytes)) stats.out++; stats.last = `${toHex(bytes)} became ${toHex(e.bytes)}`; }
+      showInside();
+    };
+    const board = createBoard({ room: to.address, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind) });
+    const kb = createKeyboard(el('div'), {
+      ...keyRange(), base: 48,
+      onDown: (note) => { kb.lightNote(note, true); through([0x90, note, 100]); },
+      onUp: (note) => { kb.lightNote(note, false); through([0x80, note, 0]); },
+    });
+    keysHost.append(kb.el);
+    return {
+      kind: 'keys', core, ops, stats,
+      via: () => 'relay',
+      state: () => `open, ${stats.out} out`,
+      // Unlinking asks the core to release what it is holding: note offs, then
+      // all notes off, which is vector 08 and 18 doing their job on a real wire.
+      close: () => { for (const e of core.unlink('L', Math.round(performance.now()))) send(e.bytes); kb.el.remove(); board.close(); showInside(); },
+    };
+  }
+  function closeLink(line) {
+    const o = opened.get(line);
+    if (!o) return;
+    o.close();
+    opened.delete(line);
+    d.log(`${line} closed`);
+  }
+  d.on('open', async () => {
+    const all = bay.links();
+    const l = all.find((x) => x.id === selected) || all.at(-1);
+    if (!l) { d.log('nothing to open, make a link first'); return; }
+    const line = printLink(l);
+    if (opened.has(line)) { d.log(`${line} is already open`); return; }
+    const kind = kindOf(l);
+    if (!kind) { d.log(`${line} cannot be opened yet: sound or video to this screen, and these keys to an instrument or a synth, are what is built`, 'warn'); return; }
+    if (SELFCHECK) { d.log(`the harness opens no real stream, so ${line} stays described`); return; }
+    try {
+      opened.set(line, await OPENERS[kind](l));
+      d.log(`${line} opened`, 'ok');
+    } catch (e) { d.log(`${line} did not open: ${e.message || e}`, 'bad'); }
+    redraw();
+  });
+  setInterval(() => { if (opened.size) redraw(); }, 1000);
+
+  // ── listening to the studio's room ───────────────────────────────────────
+  let me = null, lastSites = '';
+  const wire = openWire(ROOM, {
+    onOpen: (from) => {
+      me = from;
+      wire.send({ type: 'graph.announce', graph: SELF });
+      wire.send({ type: 'graph.ask' });
+      d.log(`listening in ${ROOM}, and this browser said what it is`);
+    },
+    onMessage: (got) => {
+      if (got.kind !== 'json' || got.msg.from === me) return;
+      if (got.msg.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: SELF }); return; }
+      const fresh = !registry.graphs().some((x) => x.from === got.msg.from);
+      if (registry.ingest(got.msg)) {
+        if (fresh) d.log(`${got.msg.graph.site} announced ${got.msg.graph.nodes.length} things`, 'ok');
+        if (world === 'live') rebuild();
+        if (fresh && world === 'live' && !made.length) starter(got.msg.graph.site);
+      }
+    },
+  });
+  /* A board that stops answering stays drawn and is marked, so staleness is
+     checked on a slow clock rather than only when something arrives. */
+  setInterval(() => {
+    const now = JSON.stringify(registry.merged().sites);
+    if (now !== lastSites) { lastSites = now; if (world === 'live') rebuild(); }
+  }, 2000);
+  redraw();
+
+  // ── the contract: the same test cases the C core passes ─────────────────
+  const BASE = '/shell/route-vectors/';
+  const matchOf = (s) => String(s).trim().split(/\s+/).map((h) => (h.toLowerCase() === 'xx' ? null : parseInt(h, 16)));
+
+  function run(v) {
+    const core = createCore();
+    for (const p of v.ports) core.addPort({ ...p, rules: (p.rules || []).map((r) => ({ match: matchOf(r.match), do: r.do })) });
+    const refused = [];
+    for (const l of v.links) {
+      const r = core.link(l);
+      if (!r.ok) refused.push(`${l.id}:${r.reason}`);
+    }
+    const out = [];
+    for (const s of v.in) {
+      const t = s.t ?? 0;
+      if (s.unlink !== undefined) out.push(...core.unlink(s.unlink, t));
+      else if (s.confirm !== undefined) out.push(...core.confirm(s.confirm, t));
+      else if (s.deny !== undefined) core.deny(s.deny);
+      else out.push(...core.input({ port: s.port, t, bytes: fromHex(s.bytes) }));
+    }
+    const held = {};
+    for (const p of v.ports) held[p.id] = core.held(p.id);
+    return { out, refused, held };
+  }
+
+  const line = (e) => `${e.port} @${e.t ?? 0}  ${typeof e.bytes === 'string' ? toHex(fromHex(e.bytes)) : toHex(e.bytes)}`;
+
+  function grade(v) {
+    const got = run(v);
+    const want = v.out.map(line), have = got.out.map(line);
+    const outOk = want.length === have.length && want.every((w, i) => w === have[i]);
+    const refOk = got.refused.join(' ') === (v.refused || []).map((r) => `${r.link}:${r.reason}`).join(' ');
+    const heldOk = !v.held || Object.entries(v.held).every(([k, n]) => got.held[k] === n);
+    return { got, want, have, ok: outOk && refOk && heldOk };
+  }
+
+  const cases = createTable({
+    columns: [
+      { key: 'n', label: 'no', width: 36 },
+      { key: 'name', label: 'case', grow: true, hi: true },
+      { key: 'ins', label: 'in', width: 40, align: 'right' },
+      { key: 'outs', label: 'out', width: 40, align: 'right' },
+      { key: 'res', label: 'result', width: 64 },
+    ],
+    empty: 'the test cases have not loaded',
+    note: 'about',
+    onPick: (r) => show(r.v),
+  });
+  const detail = el('pre', 'rout-case');
+  d.stack.titled('THE CONTRACT',
+    say('Each case is a file of ports, connections and messages going in, with the exact bytes that must come out, '
+      + 'worked out by hand rather than by running any code. This browser runs the JavaScript core against all of them '
+      + 'on every visit. Click a row to see what went in, what was expected and what came out.'),
+    cases.el, detail);
+
+  /** One case written out: what went in, what was expected, what came out. */
+  function show(v) {
+    const g = grade(v);
+    detail.textContent = '';
+    const put = (tag, text) => detail.append(tag ? el(tag, '', text) : document.createTextNode(text));
+    put('b', `${v.name}\n`);
+    put('', `ports  ${v.ports.map((p) => `${p.id} (${p.dir})`).join('  ')}\n`);
+    for (const l of v.links) put('', `link   ${l.id}  ${l.from} > ${l.to}${(l.ops || []).length ? '  ' + l.ops.map((o) => JSON.stringify(o)).join(' ') : ''}\n`);
+    if ((v.refused || []).length) put('', `refused ${v.refused.map((r) => `${r.link} ${r.reason}`).join('  ')}\n`);
+    put('b', '\nin\n');
+    for (const s of v.in) {
+      put('', s.bytes !== undefined ? `  ${s.port} @${s.t ?? 0}  ${s.bytes}\n`
+        : `  @${s.t ?? 0}  ${Object.entries(s).filter(([k]) => k !== 't').map(([k, x]) => `${k} ${x}`).join(' ')}\n`);
+    }
+    put('b', '\nexpected out\n');
+    for (const w of g.want) put('', `  ${w}\n`);
+    put('b', '\ncame out\n');
+    g.have.forEach((h, i) => put(h === g.want[i] ? '' : 'i', `  ${h}\n`));
+    if (!g.have.length) put('', '  nothing\n');
+  }
+
+  let vectors = [], passed = 0;
+  async function loadCases() {
+    const names = await (await fetch(`${BASE}index.json`, { cache: 'no-store' })).json();
+    vectors = await Promise.all(names.map(async (f) => ({ file: f, ...(await (await fetch(BASE + f, { cache: 'no-store' })).json()) })));
+    passed = 0;
+    cases.set(vectors.map((v, i) => {
+      const g = grade(v);
+      if (g.ok) passed++;
+      return { n: String(i + 1).padStart(2, '0'), name: v.name, ins: v.in.length, outs: v.out.length,
+        res: g.ok ? 'pass' : 'FAIL', about: v.about || '', v };
+    }));
+    if (vectors.length) show(vectors.find((v) => !grade(v).ok) || vectors[vectors.length - 1]);
+  }
+
+  try { await loadCases(); d.log(`${passed} of ${vectors.length} test cases pass`, passed === vectors.length ? 'ok' : 'bad'); }
+  catch (e) { d.log(`the test cases did not load (${e.message || e})`, 'bad'); }
+
+  // ── checks ───────────────────────────────────────────────────────────────
+  // All of them read data already in hand on a scratch graph, so they run for a
+  // visitor too and change nothing on screen.
+  {
+    const t = deskBay();
+    const opening = EXAMPLES.slice(0, 5).map((line) => { const l = parseLink(line); return t.link(l.from, l.to, l.transforms); });
+    d.assert('the example desk makes its five opening links', opening.every((r) => r.ok), opening.map((r) => r.why || r.id).join(' | '));
+  }
+  {
+    // The live desk is only as good as what a board says, so a board's graph is
+    // graded here from a fixture, with no board and no socket.
+    const reg = createRegistry();
+    reg.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+    reg.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1', instruments: { synth: true },
+      inputs: [{ name: 'circuit', midi: { port: 'Circuit', channels: [1, 2] } }] }) });
+    const t = reg.fill(createBay());
+    const toScreen = t.link('studio-1:circuit:audio', 'web:screen:audio');
+    const keys = t.link('web:keys:out', 'studio-1:circuit:in');
+    d.assert('a board\u2019s announced Circuit can be linked to this browser, as a stream', toScreen.ok && !!toScreen.session, toScreen.why || toScreen.session?.transport);
+    d.assert('and this browser\u2019s keys can be linked to the Circuit, as bytes', keys.ok && !keys.session, keys.why || keys.id);
+    // ⚠️ NEGATIVE CONTROL: a graph that is not on its own site is not heard.
+    const bad = createRegistry();
+    d.assert('a graph that lies about its site is not heard',
+      bad.ingest({ type: 'board.alive', from: 'x', graph: { v: 1, site: 'a', nodes: [{ id: 'b:n' }], ports: [] } }) === false);
+  }
+  {
+    const t = deskBay();
+    const mk = (line, o = {}) => { const l = parseLink(line); return t.link(l.from, l.to, l.transforms, o); };
+    const find = (r) => t.links().find((l) => l.id === r.id);
+    const midi = mk(EXAMPLES[0]);
+    d.assert('a MIDI link carries its bytes and has no session', midi.ok && !find(midi)?.session);
+    const near = mk(EXAMPLES[1]);
+    d.assert('sound from the Pi to the browser on one network is a stream, not bytes',
+      near.ok && find(near)?.session?.where === 'network', JSON.stringify(find(near)?.session || near.why));
+    const far = mk(EXAMPLES[3]);
+    d.assert('video from the Pi to a phone on another network crosses the internet',
+      far.ok && /^internet/.test(find(far)?.session?.where || ''), JSON.stringify(find(far)?.session || far.why));
+    mk(EXAMPLES[4]);
+    const second = mk(EXAMPLES[5]);
+    d.assert('a third listener to the same sound is many receivers',
+      second.ok && find(second)?.session?.where === 'internet-many', JSON.stringify(find(second)?.session || second.why));
+    // ⚠️ NEGATIVE CONTROLS: the two links this graph exists to refuse.
+    const noConsent = mk(EXAMPLES[6]);
+    d.assert('somebody else’s server is refused without a person who will listen', !noConsent.ok, noConsent.why);
+    const withConsent = mk(EXAMPLES[6], { consent: true });
+    d.assert('and allowed with one', withConsent.ok, withConsent.why || withConsent.id);
+    const wrong = mk(EXAMPLES[7]);
+    d.assert('video into a sound input is refused', !wrong.ok && /video/.test(wrong.why), wrong.why);
+    d.assert('every link prints as the line it was written as',
+      t.links().every((l) => { const p = parseLink(printLink(l)); return p.from === l.from && p.to === l.to; }));
+  }
+  d.assert('the picture drew every box and every arrow, and cut nothing',
+    !(dg.cuts || []).length, (dg.cuts || []).map((c) => `${c.id} ${c.where}: ${c.shown || c.full}`).join(' | ') || 'no cuts');
+  d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
+  d.assert('every listed test case loads and passes', vectors.length > 0 && passed === vectors.length, `${passed} of ${vectors.length}`);
+  {
+    // ⚠️ NEGATIVE CONTROL: the test-case comparison has to be able to fail.
+    const v = vectors.find((x) => x.out.length) || vectors[0];
+    const bent = v && { ...v, out: v.out.map((e, i) => (i ? e : { ...e, bytes: toHex(fromHex(e.bytes).map((b, j) => (j === 0 ? b ^ 1 : b))) })) };
+    d.assert('a case with one expected byte changed reads as failing', !!v && !grade(bent).ok, v?.file);
+  }
+  {
+    // The keys' path through the core, with no board: a link with a transpose
+    // changes the note, and a link to an instrument that refuses SysEx drops it.
+    const core = createCore();
+    core.addPort({ id: 'keys', dir: 'in' });
+    core.addPort({ id: 'out', dir: 'out', policy: { sysex: 'deny' } });
+    core.link({ id: 'L', from: 'keys', to: 'out', ops: [{ op: 'transpose', by: 12 }, { op: 'channel', to: 2 }] });
+    const up = core.input({ port: 'keys', t: 0, bytes: [0x90, 60, 100] });
+    const sx = core.input({ port: 'keys', t: 1, bytes: [0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x01, 0xF7] });
+    d.assert('a note on a link with { transpose 12, channel 2 } leaves the core moved and on channel 2',
+      up.length === 1 && toHex(up[0].bytes) === '91 48 64', up.map((e) => toHex(e.bytes)).join(' | '));
+    d.assert('and SysEx to an instrument that refuses it does not leave at all', sx.length === 0, `${sx.length} out`);
+  }
+
+  d.ready();
+</script>
