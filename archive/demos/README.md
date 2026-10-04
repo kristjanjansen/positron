@@ -331,3 +331,12 @@ Evolution Loop, 2026-09-30) and the kit module `demo/shell/looper.mjs`, which
 `/radio/` and `/tapes/` use, did not move. **No redirects, on the owner's
 word**: all three slugs 404 from the next build, the house default since
 `/seek/` and `/able/`.
+
+## `instrument-index.html`, retired 2026-10-04
+
+Became the NOTES tab of `/wire/` (`demo/wire/notes.mjs`), on the owner's
+*"names ok, looper retires, no redrect, capture is fine"*. The tab gained a
+second peer inside it, so *hear the other machine* is graded at last, and fixed
+a defect the old page carried: its "Hear the other machine" answered `offline`
+to every press because it read `ws.readyState`, which `openWire`'s handle does
+not have. No redirect; `/instrument/` 404s.
