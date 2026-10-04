@@ -11,10 +11,24 @@
 // refused, and each asserts the REASON as well as the refusal, because a
 // validator that refuses everything for one reason is the same bug from the
 // other side.
+//
+// 🔴 THE UNIVERSAL MEDIA SECTIONS (A TO K, 2026-10-04) WERE PROVED BY BREAKING
+// `bay.mjs` ON A SCRATCH COPY, ONE FAULT AT A TIME, against 112 green:
+//
+//   sabotage                                        red
+//   consent check removed (`if (false)`)            4 of 112
+//   where always 'machine'                          5 of 112
+//   transforms allowed on non-MIDI links            3 of 112
+//   video on one network says 'round trip 12 ms'    2 of 112
+//   audio on one network says 'board round trip 3 ms'  2 of 112
+//
+// ⚠️ THE FOURTH ROW WAS 1 OF 112 THE FIRST TIME, AND THAT IS WHY IT IS HERE.
+// The check that no cell invents a number looked for bare digits, and `12`
+// is in the plan as `12 byte header`. It compares number and unit now.
 
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
   classOf, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP,
-  OP_SAYS } from './bay.mjs';
+  OP_SAYS, HEAVY, NODE_KINDS, WHERE, TRANSPORTS, chooseTransport } from './bay.mjs';
 import { decode } from './midi-decode.mjs';
 
 /**
@@ -355,7 +369,10 @@ console.log('\n== the patch bay ==');
     [0xFA, 0xFB, 0xFC].every((s) => classOf(decode([s])) === 'transport') && classOf(decode([0xF8])) === 'clock');
   ok('a drop of transport keeps the clock running',
     !checkTransforms([{ op: 'drop', cls: 'transport' }]) && !!checkTransforms([{ op: 'drop', cls: 'tempo' }]));
-  ok('the media are the three the plan names', MEDIA.join(',') === 'midi,audio,clock');
+  /* ⚠️ EIGHT SINCE 2026-10-04 (plan-universal-routing §3), and the first three
+     are asserted IN ORDER because a page may index them by position. */
+  ok('the media are the eight the plan names, the first three where they were',
+    MEDIA.join(',') === 'midi,audio,clock,value,video,program,file,state', MEDIA.join(','));
 }
 
 // ── the three transforms added 2026-09-21, and the two traps in them ────────
@@ -674,6 +691,282 @@ console.log('\n== the patch bay ==');
   ok('every operator and every argument of it has words a visitor can read',
     thin.length === 0 && Object.keys(OP_SAYS).length === OP_NAMES.length,
     `${thin.join(', ') || 'none'} silent, ${Object.keys(OP_SAYS).length} of ${OP_NAMES.length}`);
+}
+
+// ── the universal media, plan-universal-routing §3 to §8, 2026-10-04 ───────
+//
+// 🔴 EVERYTHING BELOW IS ARITHMETIC ABOUT A DESCRIPTION. No session is opened,
+// nothing is fetched, no transport code exists in `bay.mjs` to call. So a green
+// here says the bay NAMES the right session, never that one would work.
+
+const SHAPE = { rate: 48000, channels: 2, frameMs: 20 };
+/** A small world with every distance in it, and the facts that decide them. */
+function world() {
+  const b = createBay();
+  b.addNode({ id: 'studio-1:circuit', kind: 'device', label: 'Circuit', place: 'studio-1', net: 'studio-lan' });
+  b.addNode({ id: 'studio-1:pi', kind: 'engine', label: 'board', place: 'studio-1', net: 'studio-lan' });
+  b.addNode({ id: 'm1:page', kind: 'screen', label: 'the M1', place: 'm1', net: 'studio-lan' });
+  b.addNode({ id: 'home:page', kind: 'screen', label: 'a page at home', place: 'home', net: 'home-lan' });
+  b.addNode({ id: 'away:page', kind: 'screen', label: 'a page away', place: 'away', net: 'cafe' });
+  b.addNode({ id: 'err:vikerraadio', kind: 'external', label: 'Vikerraadio', place: 'err' });
+  b.addPort({ id: 'studio-1:circuit:audio', label: 'Circuit audio', dir: 'out', medium: 'audio', shape: SHAPE });
+  b.addPort({ id: 'err:vikerraadio:audio', label: 'Vikerraadio audio', dir: 'out', medium: 'audio', shape: SHAPE });
+  for (const [id, label] of [['studio-1:pi:audio', 'board in'], ['m1:page:audio', 'M1 audio'],
+                             ['home:page:audio', 'home audio'], ['away:page:audio', 'away audio']]) {
+    b.addPort({ id, label, dir: 'in', medium: 'audio', shape: SHAPE });
+  }
+  return b;
+}
+
+{
+  // A. Every medium a port can declare, and one it cannot.
+  const b = createBay();
+  const took = MEDIA.filter((m, i) => {
+    try { b.addPort({ id: `here:m${i}:out`, label: m, dir: 'out', medium: m }); return true; }
+    catch { return false; }
+  });
+  ok('every one of the eight media is accepted by addPort', took.length === 8, took.join(', '));
+  /* NEGATIVE CONTROL: or `accepted` would be true of a bay that checks nothing. */
+  let threw = '';
+  try { b.addPort({ id: 'here:smell:out', label: 'smell', dir: 'out', medium: 'smell' }); }
+  catch (e) { threw = e.message; }
+  ok('NEGATIVE CONTROL: a medium nobody declared is refused and the refusal lists the real ones',
+    threw.includes('smell') && threw.includes('program') && threw.includes('state'), threw);
+  ok('the heavy media are audio, video, file and state, and program is light',
+    HEAVY.join(',') === 'audio,video,file,state' && !HEAVY.includes('program'), HEAVY.join(','));
+}
+
+{
+  // B. The chooser is plan §5's table, cell by cell.
+  const cells = [];
+  for (const m of HEAVY) for (const w of WHERE) {
+    const c = chooseTransport(m, w);
+    cells.push(c && c.where === w && c.transport === TRANSPORTS[m][w].transport
+      && typeof c.says === 'string' && c.says.length > 0);
+  }
+  ok('every heavy medium has a transport at every distance, from the table',
+    cells.length === 16 && cells.every(Boolean), `${cells.filter(Boolean).length} of ${cells.length}`);
+  ok('the cells that carry a number carry the plan\'s number',
+    chooseTransport('audio', 'network').says === 'board round trip 4 ms'
+    && chooseTransport('audio', 'internet-one').says.includes('p50 36 ms')
+    && chooseTransport('audio', 'internet-one').says.includes('cap 60 msg/s')
+    && chooseTransport('audio', 'internet-one').transport === 'relay',
+    `${chooseTransport('audio', 'network').says} | ${chooseTransport('audio', 'internet-one').says}`);
+  ok('and the cell the plan says is not measured says exactly "to measure"',
+    chooseTransport('video', 'network').says === 'to measure', chooseTransport('video', 'network').says);
+  ok('a second receiver over the internet is the many column',
+    chooseTransport('audio', 'internet-one', 2).where === 'internet-many'
+    && chooseTransport('video', 'internet-one', 2).transport === 'llhls');
+  /* NEGATIVE CONTROL: or `null for light` would pass on a chooser that always
+     answers null. Every light medium, by name. */
+  const light = MEDIA.filter((m) => !HEAVY.includes(m));
+  ok('NEGATIVE CONTROL: a light medium has no transport, because its link carries the bytes',
+    light.join(',') === 'midi,clock,value,program'
+    && light.every((m) => chooseTransport(m, 'internet-one') === null),
+    light.map((m) => `${m}: ${JSON.stringify(chooseTransport(m, 'internet-one'))}`).join(', '));
+  let t1 = '', t2 = '';
+  try { chooseTransport('smell', 'machine'); } catch (e) { t1 = e.message; }
+  try { chooseTransport('audio', 'moon'); } catch (e) { t2 = e.message; }
+  ok('NEGATIVE CONTROL: an unknown medium or distance throws rather than reading as light',
+    t1.includes('smell') && t2.includes('moon'), `${t1} | ${t2}`);
+
+  /**
+   * 🔴 NO CELL SAYS A NUMBER THE PLAN DOES NOT. Every number in every `says` is
+   * looked for in `plans/plan-universal-routing.md` WITH ITS UNIT, so a
+   * plausible figure typed into a cell nobody measured goes red here.
+   * ⚠️ THE UNIT IS THE CHECK, AND THE FIRST WRITING OF THIS LOOKED FOR BARE
+   * DIGITS AND MISSED THE SABOTAGE IT WAS WRITTEN FOR: `round trip 12 ms` passed
+   * because the plan says `12 byte header`. The plan's bold is stripped first.
+   */
+  const { readFileSync } = await import('node:fs');
+  const plan = readFileSync(new URL('../../plans/plan-universal-routing.md', import.meta.url), 'utf8')
+    .replace(/\*\*/g, '');
+  const NUM = /\d+(?:\.\d+)?(?: ?(?:ms|msg\/s|s|kbit\/s|KB\/s|%))?\b/g;
+  const invented = Object.values(TRANSPORTS).flatMap((row) => Object.values(row))
+    .flatMap((c) => (c.says.match(NUM) || []).filter((n) => !plan.includes(n)).map((n) => `${n} in "${c.says}"`));
+  ok('NEGATIVE CONTROL: no cell quotes a number the plan does not',
+    invented.length === 0, invented.join(' | ') || 'every number found in the plan');
+}
+
+{
+  // C. Where the two ends are, which picks the column.
+  const b = world();
+  const mach = b.link('studio-1:circuit:audio', 'studio-1:pi:audio');
+  const net = b.link('studio-1:circuit:audio', 'm1:page:audio');
+  const one = b.link('studio-1:circuit:audio', 'home:page:audio');
+  const many = b.link('studio-1:circuit:audio', 'away:page:audio');
+  ok('one machine is machine, and the transport is the machine\'s',
+    mach.session?.where === 'machine' && mach.session.transport === 'webaudio', JSON.stringify(mach.session));
+  ok('two machines on one network is network, a data channel at 4 ms',
+    net.session?.where === 'network' && net.session.transport === 'datachannel', JSON.stringify(net.session));
+  ok('the first receiver across the internet is internet-one, on the relay',
+    one.session?.where === 'internet-one' && one.session.transport === 'relay', JSON.stringify(one.session));
+  ok('and the second receiver of the same port is internet-many',
+    many.session?.where === 'internet-many' && many.session.transport === 'moq', JSON.stringify(many.session));
+  /* NEGATIVE CONTROL: the two local links before `one` did not make it many,
+     because the column counts receivers across the internet. */
+  ok('NEGATIVE CONTROL: links on the same machine and network do not count towards many',
+    one.session.where === 'internet-one', `${b.links().length - 1} links existed before the fourth`);
+
+  /* With no nodes at all, the place is the id's first segment and the network
+     is unknown, and unknown is never read as the same network. */
+  const bare = createBay();
+  bare.addPort({ id: 'x:a:video', label: 'a', dir: 'out', medium: 'video', shape: { fps: 30 } });
+  bare.addPort({ id: 'x:b:video', label: 'b', dir: 'in', medium: 'video', shape: { fps: 30 } });
+  bare.addPort({ id: 'y:c:video', label: 'c', dir: 'in', medium: 'video', shape: { fps: 30 } });
+  const near = bare.link('x:a:video', 'x:b:video');
+  const far = bare.link('x:a:video', 'y:c:video');
+  ok('NEGATIVE CONTROL: a port with no node takes its place from its id, and an unknown network is the internet',
+    near.session?.where === 'machine' && far.session?.where === 'internet-one',
+    `${near.session?.where}, ${far.session?.where}`);
+}
+
+{
+  // D. The address is derived from the link, the way the Pi derives rooms.
+  const b = world();
+  const r = b.link('studio-1:circuit:audio', 'home:page:audio');
+  ok('a session\'s address is the source\'s place, node and port',
+    r.session?.address === 'studio-1-circuit-audio', r.session?.address);
+  ok('and its shape is the source port\'s shape',
+    JSON.stringify(r.session.shape) === JSON.stringify(SHAPE), JSON.stringify(r.session.shape));
+  b.addNode({ id: 'rig:gpu', kind: 'engine', label: 'GPU', place: 'studio-1', net: 'studio-lan' });
+  b.addPort({ id: 'rig:gpu:video', label: 'GPU video', dir: 'out', medium: 'video', shape: { w: 1280, h: 720 } });
+  b.addPort({ id: 'home:page:video', label: 'home video', dir: 'in', medium: 'video', shape: { w: 1280, h: 720 } });
+  const g = b.link('rig:gpu:video', 'home:page:video');
+  /* NEGATIVE CONTROL: the PLACE is the node's, not the id's first segment, or
+     the address above would pass on a bay that only splits strings. */
+  ok('NEGATIVE CONTROL: the place in an address is the node\'s place, not the id\'s site',
+    g.session?.address === 'studio-1-gpu-video', g.session?.address);
+  const again = b.link('studio-1:circuit:audio', 'away:page:audio');
+  ok('two links out of one port share one address, so the second joins the first',
+    again.session?.address === r.session.address, `${again.session?.address}`);
+}
+
+{
+  // E. Consent on the source, plan §6, and the reason is ERR's listener statistics.
+  const b = world();
+  const no = b.link('err:vikerraadio:audio', 'home:page:audio');
+  ok('a link out of an external node with no consent is refused, naming whose server it is',
+    !no.ok && no.why.includes('Vikerraadio') && /somebody else's server/.test(no.why)
+    && /person who is going to listen/.test(no.fix), `${no.why} / ${no.fix}`);
+  const loose = b.link('err:vikerraadio:audio', 'home:page:audio', [], { consent: 'yes' });
+  ok('NEGATIVE CONTROL: a truthy string is not consent, only true is',
+    !loose.ok, loose.why);
+  const v = b.validate('err:vikerraadio:audio', 'home:page:audio', [], { consent: true });
+  const yes = b.link('err:vikerraadio:audio', 'home:page:audio', [], { consent: true });
+  ok('NEGATIVE CONTROL: with a person\'s consent the same link is made, with its session',
+    yes.ok && yes.session?.address === 'err-vikerraadio-audio' && v.ok && v.session?.address === yes.session.address,
+    yes.why || JSON.stringify(yes.session));
+  ok('and the consent is not stored on the link',
+    !('consent' in b.links().find((l) => l.id === yes.id)), 'no consent field');
+  ok('a node of another kind needs no consent',
+    b.link('studio-1:circuit:audio', 'home:page:audio').ok);
+  ok('NEGATIVE CONTROL: an external node cannot be declared out of needing consent',
+    b.addNode({ id: 'icecast:mount', kind: 'external', consent: false }).consent === true);
+
+  /* A text patch never carries consent, so a load of the same line is refused
+     unless the person loading it says so. */
+  const fresh = world();
+  const bad = fresh.load('err:vikerraadio:audio -> home:page:audio');
+  const fresh2 = world();
+  const good = fresh2.load('err:vikerraadio:audio -> home:page:audio', { consent: true });
+  ok('a text patch out of an external node is refused on load, and allowed when a person loads it',
+    bad.length === 1 && /somebody else's server/.test(bad[0].why) && good.length === 0,
+    `${bad.length} refused, then ${good.length}`);
+}
+
+{
+  // F. Transforms are MIDI operations.
+  const b = world();
+  const r = b.link('studio-1:circuit:audio', 'home:page:audio', [{ op: 'transpose', by: 1 }]);
+  ok('transforms on an audio link are refused, naming the medium and the transform',
+    !r.ok && r.why.includes('audio') && r.why.includes('transpose') && /MIDI/.test(r.why), `${r.why} / ${r.fix}`);
+  b.addPort({ id: 'home:page:tilt', label: 'tilt', dir: 'out', medium: 'value', shape: { range: [0, 1] } });
+  b.addPort({ id: 'studio-1:pi:cutoff', label: 'cutoff', dir: 'in', medium: 'value', shape: { range: [0, 1] } });
+  const v = b.link('home:page:tilt', 'studio-1:pi:cutoff', [{ op: 'channel', to: 1 }]);
+  ok('and on a value link too', !v.ok && v.why.includes('value'), v.why);
+  /* NEGATIVE CONTROL: the same two links with no transforms are made, or the
+     refusals above would be a bay that refuses those ports. The value link also
+     proves a range is compared by value, since `[0, 1] !== [0, 1]`. */
+  ok('NEGATIVE CONTROL: the same audio and value links with no transforms are made',
+    b.link('studio-1:circuit:audio', 'home:page:audio').ok && b.link('home:page:tilt', 'studio-1:pi:cutoff').ok);
+}
+
+{
+  // G. A light link carries its bytes, so it has no session.
+  const b = world();
+  b.addPort({ id: 'home:keys:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+  b.addPort({ id: 'studio-1:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi', accepts: ['note'] });
+  b.addPort({ id: 'm1:mirror:program', label: 'mirror', dir: 'out', medium: 'program', shape: { language: 'glsl' } });
+  b.addPort({ id: 'studio-1:pi:program', label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
+  const m = b.link('home:keys:out', 'studio-1:circuit:in');
+  const p = b.link('m1:mirror:program', 'studio-1:pi:program');
+  ok('a MIDI link across the internet has no session, on the answer or the stored link',
+    m.ok && m.session === null && b.links().find((l) => l.id === m.id).session === null);
+  ok('and neither does a program, which is one message',
+    p.ok && p.session === null, JSON.stringify(p.session));
+}
+
+{
+  // H. The text form of a heavy link is the same line, and the session comes back.
+  const b = world();
+  const r = b.link('studio-1:circuit:audio', 'home:page:audio');
+  const line = b.text();
+  const back = world();
+  const refused = back.load(line);
+  ok('a heavy link prints as a plain from -> to line with nothing about its session in it',
+    line === 'studio-1:circuit:audio -> home:page:audio', line);
+  ok('and read back into the same world it derives the same session',
+    refused.length === 0 && JSON.stringify(back.links()[0].session) === JSON.stringify(r.session),
+    JSON.stringify(back.links()[0]?.session));
+  ok('and prints the same line again', back.text() === line, back.text());
+}
+
+{
+  // I. A loop is an echo of ONE medium. Value out and audio back is a patch.
+  const b = world();
+  b.addPort({ id: 'home:page:tilt', label: 'tilt', dir: 'out', medium: 'value', shape: {} });
+  b.addPort({ id: 'studio-1:pi:cutoff', label: 'cutoff', dir: 'in', medium: 'value', shape: {} });
+  b.addPort({ id: 'studio-1:pi:out', label: 'board out', dir: 'out', medium: 'audio', shape: SHAPE });
+  b.link('home:page:tilt', 'studio-1:pi:cutoff');
+  const r = b.link('studio-1:pi:out', 'home:page:audio');
+  ok('a phone that sends a value to an engine may hear its audio back', r.ok, r.why);
+  /* NEGATIVE CONTROL: a loop in one medium is still a loop. */
+  b.addPort({ id: 'studio-1:pi:level', label: 'level', dir: 'out', medium: 'value', shape: {} });
+  b.addPort({ id: 'home:page:knob', label: 'knob', dir: 'in', medium: 'value', shape: {} });
+  const loop = b.link('studio-1:pi:level', 'home:page:knob');
+  ok('NEGATIVE CONTROL: a value loop between the same two nodes is still refused',
+    !loop.ok && /loop/.test(loop.why), loop.why);
+}
+
+{
+  // J. Nodes are optional, listed, and refuse what they cannot be.
+  const b = world();
+  ok('nodes are listed and found by id',
+    b.nodes().length === 6 && b.node('studio-1:circuit')?.kind === 'device' && b.node('nope:x') === undefined,
+    `${b.nodes().length} nodes`);
+  ok('every kind in the plan is a kind here',
+    NODE_KINDS.join(',') === 'device,engine,endpoint,store,external,screen,person');
+  let k = '', i = '';
+  try { b.addNode({ id: 'here:toaster', kind: 'toaster' }); } catch (e) { k = e.message; }
+  try { b.addNode({ id: 'here:toaster:port', kind: 'device' }); } catch (e) { i = e.message; }
+  ok('NEGATIVE CONTROL: an unknown kind and a three part id are both refused',
+    k.includes('toaster') && k.includes('external') && i.includes('site:node'), `${k} | ${i}`);
+}
+
+{
+  /* K. The new refusals are held to the old standard: two sentences, each
+     ending, neither an echo of the other. */
+  const b = world();
+  b.addPort({ id: 'here:k:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+  const said = [
+    b.link('err:vikerraadio:audio', 'home:page:audio'),
+    b.link('studio-1:circuit:audio', 'home:page:audio', [{ op: 'channel', to: 1 }]),
+  ];
+  ok('NEGATIVE CONTROL: the consent and transform refusals are a problem and something to do, not one said twice',
+    said.every((s) => !s.ok && /\.$/.test(s.why) && /\.$/.test(s.fix)
+      && !s.why.toLowerCase().includes(s.fix.toLowerCase()) && !s.fix.toLowerCase().includes(s.why.toLowerCase())),
+    said.map((s) => `${s.why} / ${s.fix}`).join(' | '));
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
