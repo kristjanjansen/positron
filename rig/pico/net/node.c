@@ -64,9 +64,10 @@ int node_send(node_t *n, const char *type, const char *body) {
   if (!n->open) return -1;
   char id[17];
   rand_id(n, id, 16);
-  uint64_t at = n->c.now_ms ? n->c.now_ms(n->c.user) : 0;
-  int w = snprintf(n->out, sizeof n->out, "{\"id\":\"%s\",\"type\":\"%s\",%s\"from\":\"%s\",\"at\":%llu,\"seq\":%lu%s%s%s}",
-                   id, type, body, n->from, (unsigned long long)at, (unsigned long)n->seq,
+  // `sent`, the envelope's send stamp, called `at` until 2026-10-04 (wire.mjs).
+  uint64_t sent = n->c.now_ms ? n->c.now_ms(n->c.user) : 0;
+  int w = snprintf(n->out, sizeof n->out, "{\"id\":\"%s\",\"type\":\"%s\",%s\"from\":\"%s\",\"sent\":%llu,\"seq\":%lu%s%s%s}",
+                   id, type, body, n->from, (unsigned long long)sent, (unsigned long)n->seq,
                    n->c.by ? ",\"by\":\"" : "", n->c.by ? n->c.by : "", n->c.by ? "\"" : "");
   if (w < 0 || (size_t)w >= sizeof n->out) return -2;
   n->seq++;                                   // advances even on a refusal, as wire.mjs's does

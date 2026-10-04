@@ -8,19 +8,28 @@
 // because a test that recomputes the module's formula catches a typo and never
 // a misreading (the `timeline/csound.mjs` lesson).
 //
-// ELEVEN OF THE 39 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL` and counted
-// at the end. They are written so the bug they name fails them.
+// FOURTEEN OF THE 43 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL` and
+// counted at the end. They are written so the bug they name fails them.
 //
-// SEVEN SABOTAGES, MEASURED 2026-10-04, each run on a copy of the module in a
-// scratch directory with this file beside it, 39/39 before every one:
+// TWELVE SABOTAGES, each run on a copy of the module (and of `wire.mjs`) in a
+// scratch directory with this file beside it, 43/43 before every one. S1 to S7
+// were first measured 2026-10-04 against the 39 of the `due` shape and were
+// RE-RUN the same day after `due` folded into `at`; S8 to S12 are the shape's
+// own and the wire's:
 //
 //   S1  the median replaced by the last observation         2 red
-//   S2  the peer offset's sign flipped                      8 red
+//   S2  the peer offset's sign flipped                      9 red (8 before the wire round trip)
 //   S3  a step never confirmed, so the line never moves     2 red
 //   S4  an unknown stamp clock read as 0 when following     1 red
 //   S5  the rate ignored when anchoring a recording         1 red
 //   S6  `decide` firing now when it cannot tell             1 red
-//   S7  deviants pushed straight into the median window     3 red
+//   S7  deviants pushed into the median window as well      1 red (the first
+//       run's 3 was a different way of writing the same bug, not kept)
+//   S8  `follow` ignored, scheduled on the peer clock       4 red
+//   S9  any `on` read as a link id, `on: true` included     1 red
+//   S10 `parse()` not normalising an old envelope           1 red
+//   S11 an event still carrying `due` not refused           1 red
+//   S12 normalising sets `sent` and keeps the old `at`      1 red
 //
 // ⚠️ S2 HAS A SURVIVOR AND IT IS RIGHT TO SURVIVE. `following the video,
 // shared 60000 fires at local 59929.5` stays green with the sign flipped,
@@ -35,6 +44,7 @@
 // Grading against a real stream is plan step 3 and later.
 
 import { createTimebase, beatToShared, nextBeat } from './timebase.mjs';
+import { format, parse } from './wire.mjs';
 
 let pass = 0, fail = 0, neg = 0;
 const ok = (name, cond, detail = '') => {
@@ -55,7 +65,7 @@ console.log('\n== the peer clock ==');
   const none = createTimebase();
   ok('NEGATIVE CONTROL: no peer clock is null, not zero',
     none.toShared(1000) === null && none.toLocal(1000) === null);
-  const r = none.fireAt({ due: { shared: 60_000 } }, 59_000);
+  const r = none.fireAt({ at: 60_000 }, 59_000);
   ok('NEGATIVE CONTROL: a scheduled event holds without a peer clock',
     r.local === null && /peer clock/.test(r.why), r.why);
   none.setOffset(0);
@@ -72,7 +82,7 @@ console.log('\n== a link read by its own stamps (LL-HLS PDT, a recording) ==');
   tb.link('hls');
   const polls = [[10_000, 6_000], [10_100, 6_090], [10_200, 6_210], [10_300, 6_295], [10_400, 6_405]];
   for (const [local, stamp] of polls) tb.observe('hls', { local, stamp });
-  const t = tb.fireAt({ due: { stamp: 7_500, on: 'hls' } }, 10_400);
+  const t = tb.fireAt({ stamp: 7_500, on: 'hls' }, 10_400);
   ok('a cue stamped 7500 fires at local 11500', near(t.local, 11_500), `${t.local}, ${t.why}`);
   ok('a stamp-on-link cue needs no peer clock (none was given)', tb.offsetMs === null && t.local !== null);
 
@@ -80,7 +90,7 @@ console.log('\n== a link read by its own stamps (LL-HLS PDT, a recording) ==');
   // It is one deviant of the three a step needs, so nothing moves: still 11500.
   const one = tb.observe('hls', { local: 10_500, stamp: 7_500 });
   ok('NEGATIVE CONTROL: one late read does not move the cue',
-    near(tb.fireAt({ due: { stamp: 7_500, on: 'hls' } }, 10_500).local, 11_500) && one.moved === false,
+    near(tb.fireAt({ stamp: 7_500, on: 'hls' }, 10_500).local, 11_500) && one.moved === false,
     one.why);
 
   // A normal read after it clears the deviant: d = 10_600 -> stamp 6_600, d -4000.
@@ -94,8 +104,8 @@ console.log('\n== a link read by its own stamps (LL-HLS PDT, a recording) ==');
   let moved = null;
   for (const local of [11_000, 11_100, 11_200]) moved = tb.observe('hls', { local, stamp: local - 6_000 });
   ok('three reads 2 s later move the line', moved.moved === true && tb.stats('hls').moves === 1, moved.why);
-  ok('and the same cue now fires at local 13500', near(tb.fireAt({ due: { stamp: 7_500, on: 'hls' } }, 11_200).local, 13_500),
-    String(tb.fireAt({ due: { stamp: 7_500, on: 'hls' } }, 11_200).local));
+  ok('and the same cue now fires at local 13500', near(tb.fireAt({ stamp: 7_500, on: 'hls' }, 11_200).local, 13_500),
+    String(tb.fireAt({ stamp: 7_500, on: 'hls' }, 11_200).local));
 }
 {
   // Two deviants then a normal read: no step (pending cleared), line unchanged.
@@ -139,13 +149,13 @@ console.log('\n== a link whose stamps are on the shared clock (follow) ==');
   ok('the lag is 67 ms', near(tb.lag('whep', 49_929.5), 67), String(tb.lag('whep', 49_929.5)));
   // A light event that happened at shared 60000, following the video:
   // shared 60000 is local 59862.5, plus 67 = 59929.5.
-  const f = tb.fireAt({ due: { shared: 60_000, follow: 'whep' } }, 59_000);
+  const f = tb.fireAt({ at: 60_000, follow: 'whep' }, 59_000);
   ok('following the video, shared 60000 fires at local 59929.5', near(f.local, 59_929.5), `${f.local}, ${f.why}`);
   // Without follow it fires on the peer clock: local 59862.5.
-  ok('without follow it fires at local 59862.5', near(tb.fireAt({ due: { shared: 60_000 } }, 59_000).local, 59_862.5));
+  ok('without follow it fires at local 59862.5', near(tb.fireAt({ at: 60_000 }, 59_000).local, 59_862.5));
   // A sound sink with Quest's MEASURED 24 ms output latency leaves 24 ms early.
   ok('a 24 ms output latency fires 24 ms earlier, local 59838.5',
-    near(tb.fireAt({ due: { shared: 60_000 } }, 59_000, { leadMs: 24 }).local, 59_838.5));
+    near(tb.fireAt({ at: 60_000 }, 59_000, { leadMs: 24 }).local, 59_838.5));
 }
 {
   // LL-HLS by PDT: the stamps are Cloudflare's ingest clock, which nobody has put
@@ -153,21 +163,21 @@ console.log('\n== a link whose stamps are on the shared clock (follow) ==');
   const tb = createTimebase({ offsetMs: 0 });
   tb.link('hls');
   tb.observe('hls', { local: 10_000, stamp: 6_000 });
-  const r = tb.fireAt({ due: { shared: 20_000, follow: 'hls' } }, 10_000);
+  const r = tb.fireAt({ at: 20_000, follow: 'hls' }, 10_000);
   ok('NEGATIVE CONTROL: following a link with an unknown stamp clock holds', r.local === null, r.why);
   // Calibrated later (plan step 4 measures it): stamp + 250 = shared.
   // d = -4000, lag = L - (L - 4000 + 250) = 3750, so shared 20000 lands at 23750.
   tb.link('hls', { stampOffsetMs: 250 });
   ok('once calibrated at +250 ms the lag is 3750', near(tb.lag('hls', 10_000), 3_750), String(tb.lag('hls', 10_000)));
   ok('and shared 20000 following it fires at local 23750',
-    near(tb.fireAt({ due: { shared: 20_000, follow: 'hls' } }, 10_000).local, 23_750));
+    near(tb.fireAt({ at: 20_000, follow: 'hls' }, 10_000).local, 23_750));
   ok('calibrating kept the observation', tb.stats('hls').n === 1);
 }
 
 console.log('\n== the scheduler verdict ==');
 {
   const tb = createTimebase({ offsetMs: 137.5 });
-  const ev = { due: { shared: 60_000 } };                        // local 59862.5
+  const ev = { at: 60_000 };                        // local 59862.5
   ok('before it is due: wait', tb.decide(ev, 59_800).act === 'wait');
   ok('within a 100 ms horizon: fire, with the exact local time',
     tb.decide(ev, 59_800, { horizonMs: 100 }).act === 'fire' && near(tb.decide(ev, 59_800, { horizonMs: 100 }).local, 59_862.5));
@@ -195,7 +205,7 @@ console.log('\n== a recording, and its rate ==');
     String(tb.localForStamp('rec', 30_000)));
   ok('a rate change counts as a move', r.moved === true && tb.stats('rec').moves === 1, r.why);
   tb.observe('rec', { local: 6_000, stamp: 10_000, rate: 0 });
-  const p = tb.fireAt({ due: { stamp: 30_000, on: 'rec' } }, 6_000);
+  const p = tb.fireAt({ stamp: 30_000, on: 'rec' }, 6_000);
   ok('NEGATIVE CONTROL: a paused recording holds its cues', p.local === null, p.why);
 }
 
@@ -213,24 +223,58 @@ console.log('\n== the loop clock ==');
   const tb = createTimebase({ offsetMs: -9.85 });                  // the Pi correction /jam/ MEASURED
   // beat 4 shared 1001967.2131 is local 1001967.2131 + 9.85 = 1001977.0631.
   ok('a beat due on the loop clock fires on the peer clock',
-    near(tb.fireAt({ due: { beat: 4, clock } }, 1_000_000).local, 1_001_977.0631148, 1e-4));
+    near(tb.fireAt({ beat: 4, clock }, 1_000_000).local, 1_001_977.0631148, 1e-4));
   ok('NEGATIVE CONTROL: a clock with no tempo is not a clock', beatToShared({ bpm: 0, epoch: 0 }, 1) === null
-    && tb.fireAt({ due: { beat: 1, clock: { bpm: 0, epoch: 0 } } }, 0).local === null);
+    && tb.fireAt({ beat: 1, clock: { bpm: 0, epoch: 0 } }, 0).local === null);
 }
 
 console.log('\n== malformed input from the wire ==');
 {
   const tb = createTimebase({ offsetMs: 0 });
   const bad = [
-    { due: 'soon' },
-    { due: { stamp: 'x', on: 'hls' } },
-    { due: { stamp: 5, on: 'nobody' } },
-    { due: { shared: 5, follow: 'nobody' } },
-    { due: {} },
+    { at: 'soon' },
+    { stamp: 'x', on: 'hls' },
+    { stamp: 5, on: 'nobody' },
+    { at: 5, follow: 'nobody' },
+    { follow: 'hls' },
+    { on: 'hls' },
   ];
   const got = bad.map((e) => tb.fireAt(e, 0));
-  ok('NEGATIVE CONTROL: five malformed events all hold and none throws',
+  ok('NEGATIVE CONTROL: six malformed events all hold and none throws',
     got.every((g) => g.local === null), got.map((g) => g.why).join(' | '));
+}
+
+console.log('\n== the shape on the wire: `at` is when it happens, `sent` is when it left ==');
+{
+  // The decision of 2026-10-04: an event carries `at` (shared ms) flat, and the
+  // envelope's send stamp is `sent`. Offset 137.5, so shared 60000 is local 59862.5.
+  const tb = createTimebase({ offsetMs: 137.5 });
+
+  // A light's payload may say `on: true`. With no `at`, `beat` or `stamp` it is
+  // as it happens, and `true` is never looked up as a link.
+  const lit = tb.fireAt({ type: 'light.set', on: true, hex: '#ff8000' }, 5_000);
+  ok('NEGATIVE CONTROL: a payload `on: true` is not a link id, it fires as it happens',
+    near(lit.local, 5_000) && lit.why === 'as it happens', lit.why);
+
+  // The one-day-old shape. Its sender wanted it scheduled; firing it on
+  // arrival would be the wrong moment, and a wrong moment cannot be taken back.
+  const old = tb.fireAt({ due: { shared: 60_000 } }, 5_000);
+  ok('NEGATIVE CONTROL: an event still carrying `due` holds rather than firing now', old.local === null, old.why);
+
+  // Through the real wire module. A new sender's `at` survives format and parse
+  // and is scheduled: 60000 shared is 59862.5 local.
+  const line = format({ type: 'light.set', at: 60_000 }, { from: 'f', seq: 0, sent: 1_000 });
+  const fresh = parse(line).msg;
+  ok('a new message keeps its event `at` through the wire and is scheduled at local 59862.5',
+    fresh.sent === 1_000 && near(tb.fireAt(fresh, 5_000).local, 59_862.5), `sent ${fresh.sent}, at ${fresh.at}`);
+
+  // An OLD sender's envelope `at` is a send stamp on nobody's clock. If a new
+  // reader took it as an event time this would WAIT until 60000 shared; it has
+  // to fire as it happens, because parse() renamed that `at` to `sent`.
+  const stale = parse(JSON.stringify({ id: 'x', type: 'light.set', from: 'pi', at: 60_000, seq: 4 })).msg;
+  const v = tb.decide(stale, 5_000);
+  ok('NEGATIVE CONTROL: an old envelope `at` is never scheduled as an event time',
+    v.act === 'fire' && near(v.local, 5_000) && stale.sent === 60_000 && !('at' in stale), `${v.act}, ${v.why}`);
 }
 
 console.log(`\n${pass} ok, ${fail} failed, ${neg} of them negative controls`);

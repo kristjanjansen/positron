@@ -90,7 +90,7 @@ ws.onopen = async () => {
     console.log(`room ${ROOM}\n`);
     console.log('the board answers');
     // ⚠️ IT DID NOT, FROM 2026-09-16 TO 2026-09-18, AND THE REASON WAS THE
-    // BOARD. Its pong carried an `at` field, which is an envelope field, so the
+    // BOARD. Its pong carried an `at` field, which was then an envelope field, so the
     // board's own `format()` threw and the handler answered `board.error`. This
     // line therefore read as "no board in the room" about a board that was
     // answering every other verb. The field is `pongAt` now and is not read.

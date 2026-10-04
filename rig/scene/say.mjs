@@ -41,7 +41,7 @@ else {
 
 const ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
 ws.onopen = () => {
-  ws.send(JSON.stringify({ ...msg, from: ID, at: Date.now(), seq: 0 }));
+  ws.send(JSON.stringify({ ...msg, from: ID, sent: Date.now(), seq: 0 }));
   console.log(`-> ${ROOM}: ${msg.type}${msg.text ? ` "${msg.text}"` : ''}`);
   // ⚠️ A CLOSE CAN OUTRUN THE FRAME. Closing straight after send has dropped
   // the message before now — the relay is a hop away and the socket does not

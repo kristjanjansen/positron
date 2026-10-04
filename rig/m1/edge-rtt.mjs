@@ -23,7 +23,7 @@ const once = (send) => new Promise((r) => { resolve = r; t0 = performance.now();
 
 for (let i = 0; i < N; i++) { await once(() => ws.send('ping')); await new Promise((r) => setTimeout(r, 60)); }
 mode = 'echo';
-for (let i = 0; i < N; i++) { await once(() => ws.send(JSON.stringify({ type: 'probe', from: 'rtt', at: Date.now(), i }))); await new Promise((r) => setTimeout(r, 60)); }
+for (let i = 0; i < N; i++) { await once(() => ws.send(JSON.stringify({ type: 'probe', from: 'rtt', sent: Date.now(), i }))); await new Promise((r) => setTimeout(r, 60)); }
 ws.close();
 
 const pad = (s, n) => String(s).padEnd(n);

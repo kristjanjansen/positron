@@ -103,7 +103,7 @@ server.on('upgrade', (req, sock) => {
   sock.setNoDelay(true);
   clients.add(sock);
   log(`client joined ${req.url} — ${clients.size} here`);
-  sendText(sock, { type: 'rack.hello', ...describe(), from: 'pace', at: Date.now(), seq: 0 });
+  sendText(sock, { type: 'rack.hello', ...describe(), from: 'pace', sent: Date.now(), seq: 0 });
 
   let buf = Buffer.alloc(0);
   sock.on('data', (chunk) => {
@@ -135,7 +135,7 @@ server.on('upgrade', (req, sock) => {
 function onMessage(sock, m) {
   switch (m.type) {
     case 'rack.status':
-      return sendText(sock, { type: 'rack.state', ok: true, ...describe(), held: held.size, from: 'pace', at: Date.now(), seq: 0 });
+      return sendText(sock, { type: 'rack.state', ok: true, ...describe(), held: held.size, from: 'pace', sent: Date.now(), seq: 0 });
     case 'note.on':
       if (!Number.isInteger(m.note)) return;
       held.add(m.note); hz = noteHz(m.note);
@@ -146,7 +146,7 @@ function onMessage(sock, m) {
       return;
     case 'note.panic':
       held.clear(); hz = 0;
-      return sendText(sock, { type: 'note.panic', ok: true, from: 'pace', at: Date.now(), seq: 0 });
+      return sendText(sock, { type: 'note.panic', ok: true, from: 'pace', sent: Date.now(), seq: 0 });
   }
 }
 

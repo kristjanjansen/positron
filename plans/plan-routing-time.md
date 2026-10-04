@@ -80,7 +80,7 @@ follow it with, and §4 is the model.
 | `/replay/` | a cue log in media ms from `T0`, the deck following the video | `demo/replay/index.html`, `demo/shell/archive.mjs` | READ |
 | the archive's `T0` | native anchor (`Date.now()` at the first frame into ffmpeg) measured -15 ms against the content anchor | `demo/shell/archive.mjs:5-7` | MEASURED |
 | the burned clock | 48-bit epoch ms plus 8-bit checksum in the picture; the ffmpeg row is `spawn epoch + pts`, the canvas row the drawing machine's wall clock | `demo/shell/pattern.mjs:13-20, 514-519` | READ |
-| the wire envelope | `at` is the SENDER's `Date.now()` at send, not on the peer clock; a payload field named `at` throws | `demo/shell/wire.mjs:76-123` | READ |
+| the wire envelope | the send stamp is the SENDER's `Date.now()` at send, not on the peer clock. It was called `at` until 2026-10-04 and is `sent` since (§4.1); a payload field named `sent` throws | `demo/shell/wire.mjs` | READ |
 | `/partitur/` lanes | three out ports (`value` light, `midi` sirens, `state` cues); sends `light.set` and `cue.set` when the playhead crosses a span, with no time in the message | `demo/partitur/index.html:253-330` | READ |
 | `/wall/` | paints `light.set` and `cue.set` the moment they arrive | `demo/wall/index.html:72-86` | READ |
 | `bay.mjs` sessions | `{ transport, address, shape, where, says }`, nothing about time; `state` is in `HEAVY` | `demo/shell/bay.mjs:50, 1052-1059` | READ |
@@ -109,7 +109,7 @@ cheaper.
 | **relay H.264 from the Pi GPU** | 8-byte header: uint32 `seq`, uint32 keyframe flag. **No time** (READ, `board.mjs` `sendFrame`) | WebCodecs decode | none. A frame index at a declared fps is a guess about a renderer that drops frames | 209 frames in 9 s (MEASURED, plan §11), lag never measured |
 | **MediaRecorder chunks** | WebM cluster timecodes from the recorder's start; `duration: Infinity` (MEASURED, positron-streaming) | the blob | `T0firstDataPerf` and `T0firstDataDate` already recorded beside the chunks (READ, `plan-stage-live.md:676-680`); add `T0firstDataShared` | the recorder start to first data gap is unmeasured |
 | **WebAudio output** | `currentTime`; `getOutputTimestamp()` returns `contextTime` with the `performanceTime` at which it was being rendered; `outputLatency` "interval between the time the UA requests the host system to play a buffer and the time the first sample is processed by the output device" (READ, Web Audio spec) | the same | `shared = performanceTime + timeOrigin + offset` for `contextTime`; heard = scheduled + `outputLatency` | Quest out latency **24 ms** (MEASURED, `/earshot/`); headless 32 ms (MEASURED, `rig/moq/RUNBOOK.md:716`); `outputLatency` moves when the device changes, so read it every tick (READ, `demo/looper/index.html:258`) |
-| **the light plane itself** (relay JSON) | envelope `at`: the sender's `Date.now()` at send | the message | not on the peer clock: two machines' system clocks differed by ~10.4 ms (MEASURED, `plan-jam.md:124`) and this Mac's once by +159 ms (MEASURED, `rig/whep/NOTES.md`) | one way ~18 ms; pub to DO to sub 27 to 38 ms; DO hop 1 to 2 ms p50; a full room +8 ms p50 (MEASURED, positron-streaming) |
+| **the light plane itself** (relay JSON) | envelope `sent` (`at` before 2026-10-04): the sender's `Date.now()` at send | the message | not on the peer clock: two machines' system clocks differed by ~10.4 ms (MEASURED, `plan-jam.md:124`) and this Mac's once by +159 ms (MEASURED, `rig/whep/NOTES.md`) | one way ~18 ms; pub to DO to sub 27 to 38 ms; DO hop 1 to 2 ms p50; a full room +8 ms p50 (MEASURED, positron-streaming) |
 
 ### 3.2 What the table says, in three sentences
 
@@ -134,17 +134,25 @@ offset's sign and left exactly that assert green (§8).
 
 ### 4.1 How a light event names its time
 
-A field called **`due`** on the light message. Not `at`: the envelope owns `at`,
-it means *sent*, and a payload `at` throws (READ, `wire.mjs:90-123`). Not `when`:
-`timeline/transport.mjs` uses it for an uncertainty bracket (READ, `:575`).
+**`at`, flat on the message. DECIDED BY THE OWNER 2026-10-04**: one time
+vocabulary across the project. `at` always means when the thing happens (a
+timeline row's position in `timeline/transport.mjs`, and on the wire an event's
+moment in shared ms). `when` stays the uncertainty bracket around an `at`. The
+wire envelope's send stamp, which owned `at` until that day, became `sent`, and
+`parse()` renames an old sender's envelope `at` to `sent` so no new reader takes
+a send stamp for an event time. For one day this field was a nested `due`; it
+folded into `at` and an event still carrying `due` HOLDS.
 
 ```js
-{ type: 'cue.set', to, text }                                 // as it happens: no due
-{ type: 'light.set', to, hex, due: { shared: S } }            // scheduled ahead on the peer clock
-{ type: 'cue.set', to, text, due: { shared: S, follow: L } }  // S as it reaches THIS glass on link L
-{ type: 'cue.set', to, text, due: { stamp: M, on: L } }       // when link L presents its own stamp M
-{ type: 'light.set', to, hex, due: { beat: 16, clock: { bpm, epoch } } }   // a loop clock beat
+{ type: 'cue.set', to, text }                                 // as it happens: no at
+{ type: 'light.set', to, hex, at: S }                         // scheduled ahead on the peer clock
+{ type: 'cue.set', to, text, at: S, follow: L }               // S as it reaches THIS glass on link L
+{ type: 'cue.set', to, text, stamp: M, on: L }                // when link L presents its own stamp M
+{ type: 'light.set', to, hex, beat: 16, clock: { bpm, epoch } }   // a loop clock beat
 ```
+
+⚠️ `on` is a link id only when it is a string, because a light's payload may say
+`on: true`.
 
 `S` is always a peer-clock millisecond. `M` is always in the heavy link's own
 clock (a PDT, a recording's media ms). The receiver holds a **timebase** per heavy
@@ -154,12 +162,12 @@ link and turns any of these into a local time; null means hold, never fire.
 
 | mode | sender does | receiver does | right for |
 | --- | --- | --- | --- |
-| **as it happens** | sends on the event, no `due` | fires on arrival | anything on WebRTC or MoQ; a person pressing a button; a light nobody compares to anything |
-| **scheduled ahead** | sends `due.shared` at least the light plane's p95 early (§4.4) | fires at `toLocal(S) - leadMs` | lights on several walls agreeing; a note and a light on the same beat; a scene recall on a bar line; anything a timeline already knows before it happens (`/partitur/` knows its whole score) |
-| **aligned after** | the recorder writes `due.shared` (or the arrival time on the shared clock) into the log beside a `T0` | playback maps everything to `shared - T0` against one media master | every recording, generalising `/replay/` (§5d) |
+| **as it happens** | sends on the event, no `at` | fires on arrival | anything on WebRTC or MoQ; a person pressing a button; a light nobody compares to anything |
+| **scheduled ahead** | sends `at` at least the light plane's p95 early (§4.4) | fires at `toLocal(S) - leadMs` | lights on several walls agreeing; a note and a light on the same beat; a scene recall on a bar line; anything a timeline already knows before it happens (`/partitur/` knows its whole score) |
+| **aligned after** | the recorder writes `at` (or the arrival time on the shared clock) into the log beside a `T0` | playback maps everything to `shared - T0` against one media master | every recording, generalising `/replay/` (§5d) |
 
 `follow` composes with the first two: a scheduled event can follow a heavy link,
-and an as-it-happens event can be given `due.shared = sharedNow()` at its source
+and an as-it-happens event can be given `at = sharedNow()` at its source
 and then follow.
 
 ### 4.3 Where it sits in Node, Port, Link, Session
@@ -323,8 +331,8 @@ Generalising `/replay/`, which has one video, one cue log and one `T0`:
     "tracks": [
       { "id": "cam", "kind": "video", "origin": 12.0, "how": "native", "errMs": 15 },
       { "id": "circuit", "kind": "audio", "origin": -4.0, "rate": 48000, "anchors": [[0, 0], [480000, 10000.3]] },
-      { "id": "cues", "kind": "state", "rows": "due.shared, or arrival on the peer clock" },
-      { "id": "keys", "kind": "midi", "rows": "due.shared per message" } ] }
+      { "id": "cues", "kind": "state", "rows": "at, or arrival on the peer clock" },
+      { "id": "keys", "kind": "midi", "rows": "at per message" } ] }
   ```
 
   `origin` is the track's first sample in ms from `T0`. `anchors` are `[sample
@@ -339,7 +347,7 @@ Generalising `/replay/`, which has one video, one cue log and one `T0`:
 - **Playback**: one media master (`mediaMaster` on the video, or the audio
   element if there is no picture), the deck on the recording's ms, every other
   track scheduled at its `origin` and slaved with `sync()` at the existing 40 ms
-  tolerance. Cue and MIDI rows are `due.shared - T0`. The timebase's `{ stamp, on
+  tolerance. Cue and MIDI rows are `at - T0`. The timebase's `{ stamp, on
   }` with the recording as a link handles rate changes and seeks (two asserts in
   §8).
 - **What exists**: `/patchbay/` records any Pi audio link into R2 through ingest,
@@ -357,8 +365,8 @@ Generalising `/replay/`, which has one video, one cue log and one `T0`:
 - **One loop late**: a remote body stamped at S is drawn at S + loop. With an 8 s
   loop and a 36 ms relay round trip it arrives with **7.96 s to spare**
   (COMPUTED, as the XR plan says).
-- **A light on the beat on every wall and in the headset**: `due: { beat, clock
-  }` fires within the peer clock's ~3 ms everywhere, plus a display frame
+- **A light on the beat on every wall and in the headset**: `beat, clock` on the
+  event fires within the peer clock's ~3 ms everywhere, plus a display frame
   (11.1 ms at 90 fps in the headset, COMPUTED).
 - **The sound in the headset** is scheduled at `B - outputLatency`, 24 ms early
   on a Quest (MEASURED), so it is HEARD on B. Dance Tonite's own tolerance is
@@ -372,7 +380,7 @@ Generalising `/replay/`, which has one video, one cue log and one `T0`:
 | --- | --- |
 | route frames, or compute delays, in the router | a patch bay that moves everything is a mixer (plan-patchbay §3.1), and the delay is per receiver: two viewers of one LL-HLS link are 2 to 8 s apart (MEASURED) |
 | trust a device's wall clock without peer agreement | Mac against Pi system clocks ~10.4 ms apart (MEASURED); this Mac once +159 ms (MEASURED); a Worker `/time` ±50 ms of bias (MEASURED); a DO's `Date.now()` ±70 ms (MEASURED) |
-| use the envelope's `at` as the event's time | it is the sender's unagreed `Date.now()` at SEND, and `source.load` already lost an afternoon to an `at` that meant something else (READ, `wire.mjs:76-88`) |
+| use the envelope's send stamp (`sent`, `at` before 2026-10-04) as the event's time | it is the sender's unagreed `Date.now()` at SEND, and `source.load` already lost an afternoon to an `at` that meant something else (READ, `wire.mjs:76-88`) |
 | use candidate-pair RTT as media latency | WHEP's 25 ms RTT against MoQ's glass to glass flattered WHEP ~3x; measured the same way WHEP is p50 67.0 (MEASURED) |
 | use `hls.latency` as a lag | it freezes stale, 1.7 s against 8.4 s true (MEASURED); PDT is the honest signal |
 | use `AudioData.timestamp` | browsers regenerate it, so a join skip becomes a permanent offset (MEASURED, `plan-m2m.md:158`) |
@@ -388,8 +396,8 @@ Generalising `/replay/`, which has one video, one cue log and one `T0`:
 
 | # | step | needs | graded by |
 | --- | --- | --- | --- |
-| 1 | **`demo/shell/timebase.mjs`**: the peer clock, observations per heavy link, median plus step detection, `due` to local time, the scheduler verdict, loop clock arithmetic | **no device** | ✅ DONE 2026-10-04: `node demo/shell/timebase-test.mjs`, 39 ok, 11 negative controls, seven sabotages (§8) |
-| 2 | **`/partitur/` sends `due.shared` 250 ms ahead, `/wall/` honours it**: both pages run `createPeer` in a clock room of their own (`studio-1-clock`, so no ping traffic lands in the Pi's room), `/wall/` schedules through a timebase and reports per event `fired - due` in a readout cell; without an agreed clock it HOLDS and says so | **no device** for one machine; a phone for two | `node demo/check-html.mjs` on both; `node demo/verify.mjs partitur wall`, diffing the assert counts; a wall assert that a `due` event fired within 20 ms of its local due on one machine (offset exactly 0 there, so this grades the scheduler, never the clock); a negative control that an event sent with no peer clock is held. Two machines' agreement is the phone's half and is reported, not asserted |
+| 1 | **`demo/shell/timebase.mjs`**: the peer clock, observations per heavy link, median plus step detection, `at` to local time, the scheduler verdict, loop clock arithmetic | **no device** | ✅ DONE 2026-10-04: `node demo/shell/timebase-test.mjs`, 43 ok, 14 negative controls, twelve sabotages (§8) |
+| 2 | **`/partitur/` sends `at` 250 ms ahead, `/wall/` honours it**: both pages run `createPeer` in a clock room of their own (`studio-1-clock`, so no ping traffic lands in the Pi's room), `/wall/` schedules through a timebase and reports per event `fired - at` in a readout cell; without an agreed clock it HOLDS and says so | **no device** for one machine; a phone for two | `node demo/check-html.mjs` on both; `node demo/verify.mjs partitur wall`, diffing the assert counts; a wall assert that an `at` event fired within 20 ms of its local time on one machine (offset exactly 0 there, so this grades the scheduler, never the clock); a negative control that an event sent with no peer clock is held. Two machines' agreement is the phone's half and is reported, not asserted |
 | 3 | **Follow an HLS link by its own stamps**: a screen page plays an HLS, observes `{ local: expectedDisplayTime, stamp: PDT of mediaTime }` per rVFC frame, places captions by `{ stamp, on }`, resets the link on the player's `resync`, `rebuild` and `mediaMaster`'s `jump` | **no device**; graded against `demo/fake-err.mjs`, never a broadcaster | verify with the stand-in; SABOTAGE the stand-in's PDT by +2 s and the captions must move by 2 s, which proves the page reads PDT rather than arrival |
 | 4 | **Calibrate Cloudflare's PDT against the peer clock**: the publisher burns PEER time (`pattern.mjs` burn with `peer.now()`), the viewer reads the burned row and the PDT of the same frame through rVFC; the distribution of `burned - PDT` is `stampOffsetMs` | **no device**; the pub container and Stream minutes (RTMPS records, ~225 storage minutes a day cap, MEASURED) | n of at least 500 checksum-clean frames, p50 and p95 reported, a second run on another day to see whether the constant holds |
 | 5 | **WebRTC's sender reports**: `estimatedPlayoutTimestamp` against the burned clock on WHEP, answering `plan-stage-hls-webrtc.md`'s three questions (does Cloudflare emit SRs, does the browser expose it, how noisy) | **no device**; desktop Safari through `verify-safari.mjs` for the WebKit half | the burned clock as ground truth, n of at least 500; Safari's answer reported as present or absent in words |
@@ -409,28 +417,39 @@ manifest was touched.
 agreed, and null is not zero); `link(id, { stampOffsetMs })` declares a heavy
 link and how its stamps sit on the peer clock; `observe(id, { local, stamp, rate
 })` feeds a presentation; `lag`, `stampAt`, `localForStamp` read the line;
-`fireAt(ev, now, { leadMs })` turns any `due` into a local time or a hold with a
+`fireAt(ev, now, { leadMs })` turns any `at`, `beat` or `stamp` into a local time or a hold with a
 reason; `decide` gives `fire`, `wait`, `hold` or `missed`; `beatToShared` and
 `nextBeat` do the loop clock.
 
-**The test**: `node demo/shell/timebase-test.mjs` reads **39 ok, 0 failed, 11 of
-them negative controls**. Expected values are worked by hand in the comment above
+**The test**: `node demo/shell/timebase-test.mjs` reads **43 ok, 0 failed, 14 of
+them negative controls** (39 and 11 before `due` folded into `at`; the four new
+ones are the shape's: `on: true` is not a link, `due` holds, a new `at` survives
+the wire, an old envelope `at` is never scheduled). Expected values are worked by hand in the comment above
 each assert. The figures fed in are positron's own: WHEP's 67 ms, the 137.5 ms
 skew `rig/peer.mjs` injects, the Pi's -9.85 ms correction from `/jam/`, Quest's
 24 ms output latency, the Circuit's 122 bpm, a 2 s LL-HLS step.
 
-**Seven sabotages, MEASURED 2026-10-04**, each on a copy of the module in a
-scratch directory, 39/39 before every one:
+**Sabotages, MEASURED 2026-10-04**, each on a copy of the module (and of
+`wire.mjs`) in a scratch directory. S1 to S7 first against the 39 of the `due`
+shape, then RE-RUN against the 43 of the flat one; this table is the re-run:
 
 | sabotage | red |
 | --- | --- |
 | S1 the median replaced by the last observation | 2 |
-| S2 the peer offset's sign flipped | 8 |
+| S2 the peer offset's sign flipped | 9 (8 before the wire round trip assert) |
 | S3 a step never confirmed, so the line never moves | 2 |
 | S4 an unknown stamp clock read as 0 when following | 1 |
 | S5 the rate ignored when anchoring a recording | 1 |
 | S6 `decide` firing now when it cannot tell | 1 |
-| S7 deviants pushed straight into the median window | 3 |
+| S7 deviants pushed into the median window as well | 1 (3 the first time, written a different way) |
+| S8 `follow` ignored, scheduled on the peer clock | 4 |
+| S9 any `on` read as a link id, `on: true` included | 1 |
+| S10 `parse()` not normalising an old envelope | 1 |
+| S11 an event still carrying `due` not refused | 1 |
+| S12 normalising sets `sent` and keeps the old `at` | 1 |
+
+`node demo/shell/wire-test.mjs` grades the envelope half on its own: 16 ok, 8
+negative controls, six sabotages taking 1 to 5 red.
 
 ⚠️ **S2 left one assert green and it is right to.** Following a shared-stamped
 link does not depend on the receiver's own offset (§3.3). Reported, not tuned
@@ -453,7 +472,7 @@ the ones typed in. That is steps 2 to 5.
 | whether a person notices a caption 30 to 50 ms early on WHEP | people, in a room; nothing here can answer it |
 | projector and television input lag | step 10, a phone filming |
 | the Circuit's MIDI in to sound out time | the onset method of step 6 with a note the page sends, compared with the Circuit's own clock-out |
-| whether a scene recall that opens heavy links can land on a bar | unchanged from plan §12: the light half of a recall can be scheduled on a bar now (`due.beat`), the heavy half takes seconds to open and still cannot |
+| whether a scene recall that opens heavy links can land on a bar | unchanged from plan §12: the light half of a recall can be scheduled on a bar now (`beat` and `clock` on the event), the heavy half takes seconds to open and still cannot |
 | whether `src/timed-messages.js` should become a thin user of the timebase or stay separate | decided when step 3 is built: if the page needs both, one wins |
 
 ## 10. Sources

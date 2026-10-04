@@ -282,7 +282,9 @@ function videoShape() {
     // ⚠️ SENT, not delivered. This is the near side of the wire and the relay
     // drops silently, so a client MUST compare it against the counter in the
     // payload. A number counted here is not evidence about the far end.
-    sent: vsent, ...st,
+    // `framesSent`, not `sent`: since 2026-10-04 `sent` is the wire envelope's
+    // send stamp and `format()` throws on a payload field of that name.
+    framesSent: vsent, ...st,
   };
 }
 
@@ -432,7 +434,8 @@ function startGrainPump() {
     if (Date.now() > grainUntil) { stopGrainPump(); pap?.report(false); return; }
     const g = pap?.takeGrains?.();
     if (!g || (!g.list.length && !g.seen)) return;
-    // ⚠️ `heardAt`, NOT `at`. `at` is an ENVELOPE field and `format()` THROWS
+    // ⚠️ `heardAt`, NOT `at`. `at` WAS an envelope field until 2026-10-04 (it is
+    // `sent` now, and a payload may carry `at` again) and `format()` THREW
     // on the collision — which it did, here, and took the whole board down with
     // it until systemd restarted it. That throw is LESSONS #45: `at` once ate
     // a payload field silently and ffmpeg was asked to seek to second
@@ -1255,7 +1258,8 @@ async function handle(msg) {
       log(`video params: ${p.seg} mirrors · grain ${p.scale} · hue ${p.hue}`);
       // ⚠️ REPORTED AS SENT, NOT AS APPLIED. The control channel is one-way —
       // the renderer has no way to answer — so this is what went down the pipe.
-      return reply('video.params', { ok: n > 0, sent: n, mirrors: p.seg, grain: p.scale, hue: p.hue });
+      // `paramsSent`, not `sent`, which is an envelope field since 2026-10-04.
+      return reply('video.params', { ok: n > 0, paramsSent: n, mirrors: p.seg, grain: p.scale, hue: p.hue });
     }
     // ⚠️ A VIEWER SAYING IT IS WATCHING. Cheap on purpose: no reply, so a room
     // of viewers costs the relay one message each per ten seconds and nothing
@@ -1292,8 +1296,8 @@ async function handle(msg) {
         : audio ? { ok: true, source: 'capture', ...insertState() }
         : { ok: false, reason: 'nothing playing', ...insertState() }), inputs: hwInputs.status() });
     // 🔴 `pongAt`, NOT `at`, AND THIS VERB HAD REPLIED TO NOBODY SINCE IT WAS
-    // WRITTEN. `at` is an ENVELOPE field (`wire.mjs`), `format()` throws on the
-    // collision by design, the throw was caught by the handler wrapper below and
+    // WRITTEN. `at` WAS an envelope field (`wire.mjs`, `sent` since 2026-10-04),
+    // `format()` throws on the collision by design, the throw was caught by the handler wrapper below and
     // answered as `board.error`. So the obvious round trip verb on this board
     // answered an error to every caller, and `/keys/` timed it into a variable
     // no cell showed. Found 2026-09-16, fixed 2026-09-18. It is the same

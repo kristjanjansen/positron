@@ -56,7 +56,7 @@ ws.onopen = async () => {
     console.log('the board answers');
     // ⚠️ THIS CHECK COULD NOT PASS BETWEEN 2026-09-16 AND 2026-09-18, AND IT
     // WAS NOT THIS FILE'S FAULT. The board's pong carried an `at` field, `at`
-    // is an envelope field, `format()` throws on the collision, and the handler
+    // was then an envelope field, `format()` threw on the collision, and the handler
     // answered `board.error` instead. So the reply never arrived and this read
     // as a board that was not there. The board sends `pongAt` now.
     // ⚠️ THE FIELD IS NOT READ HERE AND MUST NOT BE. The board's clock and this

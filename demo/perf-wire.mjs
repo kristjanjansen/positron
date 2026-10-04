@@ -43,7 +43,7 @@ const room = () => `perf-${Math.random().toString(36).slice(2, 8)}`;
   }
   for (let i = 0; i < 200; i++) {
     const t0 = performance.now();
-    const t1 = await new Promise((r) => { waiting = r; ws.send(JSON.stringify({ type: 'p', from: 'a', at: Date.now(), seq: i })); });
+    const t1 = await new Promise((r) => { waiting = r; ws.send(JSON.stringify({ type: 'p', from: 'a', sent: Date.now(), seq: i })); });
     echoes.push(t1 - t0); await sleep(8);
   }
   say('1. round trip, one socket, sequential');
@@ -63,11 +63,11 @@ for (const N of [1, 2, 4, 8, 15]) {
   let seen = 0, gaps = 0, last = -1;
   for (const s of socks) s.onmessage = (e) => {
     const m = JSON.parse(e.data); seen++;
-    if (s === socks[0]) { deliv.push(Date.now() - m.at); if (last >= 0 && m.seq > last + 1) gaps += m.seq - last - 1; last = m.seq; }
+    if (s === socks[0]) { deliv.push(Date.now() - m.sent); if (last >= 0 && m.seq > last + 1) gaps += m.seq - last - 1; last = m.seq; }
   };
   const sender = socks[0];
   const COUNT = 60;
-  for (let i = 0; i < COUNT; i++) { sender.send(JSON.stringify({ type: 'f', from: 'a', at: Date.now(), seq: i, value: 'x'.repeat(200) })); await sleep(50); }
+  for (let i = 0; i < COUNT; i++) { sender.send(JSON.stringify({ type: 'f', from: 'a', sent: Date.now(), seq: i, value: 'x'.repeat(200) })); await sleep(50); }
   await sleep(700);
   say(`   N=${String(N).padStart(2)}  delivery ${stat(deliv)}  received ${seen}/${COUNT * N}  lost ${gaps}`);
   for (const s of socks) s.close();
@@ -84,7 +84,7 @@ for (const KiB of [1, 8, 64, 200, 256]) {
   const pad = 'x'.repeat(KiB * 1024 - 120);
   let refused = 0;
   for (let i = 0; i < 10; i++) {
-    const line = JSON.stringify({ type: 's', from: 'a', at: Date.now(), seq: i, value: pad });
+    const line = JSON.stringify({ type: 's', from: 'a', sent: Date.now(), seq: i, value: pad });
     const bytes = Buffer.byteLength(line);
     if (bytes > 256 * 1024) { refused++; continue; }
     const t0 = Date.now();
@@ -106,7 +106,7 @@ for (const RATE of [30, 60, 120, 300]) {
   const gap = 1000 / RATE;
   const t0 = Date.now();
   for (let i = 0; i < total; i++) {
-    ws.send(JSON.stringify({ type: 'r', from: 'a', at: Date.now(), seq: i, value: 'x'.repeat(100) }));
+    ws.send(JSON.stringify({ type: 'r', from: 'a', sent: Date.now(), seq: i, value: 'x'.repeat(100) }));
     const due = t0 + (i + 1) * gap; const wait = due - Date.now(); if (wait > 0) await sleep(wait);
   }
   await sleep(900);
@@ -122,7 +122,7 @@ say('\n5. backlog, local wrangler dev — write path and read path');
   await fetch(`${STORE}/room/${R}/record`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cap: 1000 }) });
   const ws = await open(R);
   const N = 300, t0 = Date.now();
-  for (let i = 0; i < N; i++) { ws.send(JSON.stringify({ type: 'w', from: 'a', at: Date.now(), seq: i, store: true, value: 'x'.repeat(120) })); await sleep(16); }
+  for (let i = 0; i < N; i++) { ws.send(JSON.stringify({ type: 'w', from: 'a', sent: Date.now(), seq: i, store: true, value: 'x'.repeat(120) })); await sleep(16); }
   await sleep(1500);
   const wrote = Date.now() - t0;
   const reads = [];

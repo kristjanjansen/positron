@@ -10,7 +10,7 @@
 //   ping    board.ping -> board.pong. The control plane: what steering costs.
 //           ⚠️ THIS NUMBER WAS UNMEASURABLE FROM 2026-09-16 TO 2026-09-18 and
 //           the failure looked like a dead room. The board's pong carried an
-//           `at` field, `at` is an envelope field, `format()` throws on the
+//           `at` field, `at` was then an envelope field, `format()` threw on the
 //           collision, and the board answered `board.error`. So `await
 //           reply('board.pong')` timed out and this file exited saying `no
 //           board.pong`. The board sends `pongAt` now. The timestamp in it is
