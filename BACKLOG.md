@@ -1,5 +1,15 @@
 ## Open
 
+### Found 2026-10-04 by the tab groundwork agent, not fixed
+
+- **`/pack/` is 29/31**, with or without that agent's change (it swapped in
+  HEAD's `transport-bar.mjs` to confirm): "every tab keeps its bare word until it
+  has something to count" and the plain-wav zip check are red.
+- **`/kit/`'s range-slider checks run for visitors.** No `SELFCHECK` around
+  them, and they dispatch `ArrowRight`, which bubbles to `window` and moves every
+  visible transport bar on the page by 2 per cent (why kit shots show bars at
+  0:01.200). Breaks *"a self-check never runs for a visitor"*.
+
 ### Checks way lighter, two tiers, asked 2026-10-04
 
 *"make checks way ligher (2 tiers?)"*, after `/keep/`'s fix made every harness
