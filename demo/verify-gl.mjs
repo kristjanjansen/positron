@@ -47,6 +47,7 @@ import { rm, readFile } from 'node:fs/promises';
 import { serve } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
 import { claimProfile } from './harness-profile.mjs';
+import { startStation } from './fake-station.mjs';
 
 const CHROME = process.env.CHROME
   || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -78,8 +79,41 @@ const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}
 // it exists for — CAN this machine grade a picture — and it read `0 green` on a
 // box with no GPU at all, which is the same thing it reads on a box with one.
 const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+// 🔴 TWO TIERS, the same switch `verify.mjs` reads (demo/shell/selfcheck.mjs):
+// `DEMO_DEEP=1` or `--deep` asks for `selfcheck=2` and waits the full
+// `settleMs`; an ordinary run asks for `selfcheck=1` and waits `lightSettleMs`
+// where a page declares one. `--deep` is a tier, not a slug, and the filter on
+// the line above already keeps it out of `want`.
+const DEEP = process.env.DEMO_DEEP === '1' || process.argv.includes('--deep');
+const settleOf = (t) => (DEEP || t.lightSettleMs == null ? t.settleMs : t.lightSettleMs);
+console.log(DEEP ? 'tier: DEEP, the long-running checks included'
+  : 'tier: ordinary (DEMO_DEEP=1 node demo/verify-gl.mjs ... adds the long-running checks)');
 const targets = DEMOS.filter((d) => d.built !== false && d.gl)
   .filter((d) => !want.length || want.includes(d.name));
+
+// 🔴 `videoradio` ROTATES ERR MOUNTS, SO IT GETS THE STAND-IN `verify.mjs`
+// GIVES `/radio/`, STARTED HERE RATHER THAN REMEMBERED. Every connection this
+// repository opens to an ERR mount is counted in a public broadcaster's
+// listener statistics (CLAUDE.md), and until 2026-10-04 `node
+// demo/verify-gl.mjs videoradio` opened four of them. `demo/fake-station.mjs`
+// answers any mount name with real MP3 frames and ICY headers, and the page
+// takes `?base=` exactly as `/radio/` does. ⚠️ `DEMO_QUERY=base=...` still wins
+// (it is first in the query, and `URLSearchParams.get` returns the first), and
+// a stand-in on 127.0.0.1 cannot be reached from a `DEMO_BASE` deploy, so none
+// is started then.
+const standIn = new Map();
+if (!process.env.DEMO_BASE && targets.some((t) => t.name === 'videoradio')) {
+  const station = startStation({ port: 0, quiet: true });
+  if (!station) {
+    console.log('⚠️  the stand-in station needs ffmpeg and could not be built, so `videoradio` '
+      + 'is graded against nothing rather than against ERR.');
+    standIn.set('videoradio', 'http://127.0.0.1:9');
+  } else {
+    await new Promise((r) => station.on('listening', r));
+    standIn.set('videoradio', `http://127.0.0.1:${station.address().port}`);
+    console.log(`stand-in station ${standIn.get('videoradio')} (nobody's radio)`);
+  }
+}
 
 await rm(`${PROFILE}/Default/Cache`, { recursive: true, force: true }).catch(() => {});
 // ⚠️ BEFORE the spawn, not after: Chrome writes this file as it starts, and
@@ -221,7 +255,8 @@ for (const t of targets) {
   // visitor's controls"* — and the gate meant its checks ran nowhere at all.
   // ⚠️ AFTER `DEMO_QUERY`, because `URLSearchParams.get` returns the first
   // occurrence and an override has to win, which is how verify.mjs orders it.
-  const q = [process.env.DEMO_QUERY, 'selfcheck=1'].filter(Boolean).join('&');
+  const q = [process.env.DEMO_QUERY, DEEP ? 'selfcheck=2' : 'selfcheck=1',
+    standIn.has(t.name) ? `base=${standIn.get(t.name)}` : ''].filter(Boolean).join('&');
   const query = `?${q}`;
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1500);
@@ -240,10 +275,24 @@ for (const t of targets) {
   // Press every control, in order — the same contract as verify.mjs, and for
   // the same stated reason: a control the harness cannot press is a subject the
   // suite cannot reach.
-  const n = await evalIn(`document.querySelectorAll('.pos-controls button').length`);
+  // 🔴 AND A PAGE WHOSE ONLY CONTROL IS ITS TRANSPORT BAR'S PLAY GETS THAT
+  // PRESSED, AS `verify.mjs`'s drill does. `/videoradio/` moved its play onto
+  // `createTransportBar` and its row went empty, so this loop pressed nothing,
+  // the page sat at *"Press play."*, and every one of its checks went unrun
+  // behind `the page asserted something  2`, which is the shell's two. MEASURED
+  // 2026-10-04: 7/7 green with no page check run. Only when the row is empty,
+  // so a page that has controls is pressed exactly as before.
+  const SEL = `'.pos-controls button'`;
+  const n = await evalIn(`document.querySelectorAll(${SEL}).length`);
+  const onlyBar = n === 0 && await evalIn(`!!document.querySelector('.tbar-toggle')`);
+  if (onlyBar) {
+    await evalIn(`document.querySelector('.tbar-toggle').click()`);
+    console.log('         (pressed the transport bar\'s play, the only control on the page)');
+    await sleep(settleOf(t) ?? 4000);
+  }
   for (let i = 0; i < n; i++) {
-    await evalIn(`document.querySelectorAll('.pos-controls button')[${i}].click()`);
-    await sleep(i === 0 ? (t.settleMs ?? 4000) : 1200);
+    await evalIn(`document.querySelectorAll(${SEL})[${i}].click()`);
+    await sleep(i === 0 ? (settleOf(t) ?? 4000) : 1200);
   }
   // ⚠️ AND A PAGE WITH NO CONTROLS MUST STILL BE WAITED FOR. `mirror` starts
   // itself and runs its own checks, so there is nothing to press — pressing
@@ -253,6 +302,14 @@ for (const t of targets) {
   for (let i = 0; i < 60; i++) {
     if (await evalIn(`!!window.__demo?.ready`)) break;
     await sleep(500);
+  }
+  // ⚠️ A PAGE THAT NEVER SAID READY IS SAID SO, WITH ITS OWN LAST WORDS, because
+  // `the page asserted something  2` alone cannot tell a slow check from a hung
+  // one, and `verify.mjs` learned that on 2026-09-22. Printed, never asserted,
+  // so no page's total moves with it.
+  if (!(await evalIn(`!!window.__demo?.ready`))) {
+    const tail = await evalIn(`JSON.stringify((window.__demo?.logs ?? []).slice(-8).map((l) => l.msg ?? String(l)))`);
+    console.log(`         not ready after 30 s; its last log lines:\n           ${JSON.parse(tail || '[]').join('\n           ')}`);
   }
   const asserts = await evalIn(`JSON.stringify(window.__demo?.asserts ?? [])`);
   const list = JSON.parse(asserts || '[]');

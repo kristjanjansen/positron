@@ -214,6 +214,7 @@
 <script type="module">
   import { mount, guard, el, createShipper, BUILD } from '/shell/shell.mjs';
   import { icyDemuxer } from '/shell/icy.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { createGlue } from '/shell/glue.mjs';
@@ -614,7 +615,14 @@
    * it has to not run. `verify.mjs` appends `selfcheck=1`, so the suite still
    * gets every assert and a visitor gets an unbroken stream.
    */
-  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
+  // 🔴 TWO TIERS SINCE 2026-10-04 (`demo/shell/selfcheck.mjs`), asked as *"make
+  // checks way ligher (2 tiers?)"*, *"i mean these long-running ones"*.
+  // `SELFCHECK` is either harness run, `DEEP` only `DEMO_DEEP=1`. This line read
+  // `=== '1'` raw until then, which would have switched every check off on a
+  // deep run (`selfcheck=2`). An ordinary run skips the ring fill, the probe
+  // block (ink, sink, patch A/B, modulation, LFO, lock) and the loop check, and
+  // says so; the station and transport checks stay, because they are seconds.
+  const LIGHT = SELFCHECK && !DEEP;
   const ship = REPORTING ? createShipper() : () => {};
   if (REPORTING) {
     ship(`--- radio BUILD ${BUILD} ---`);
@@ -2371,7 +2379,7 @@
     // whose measurement was skipped must be ABSENT rather than passed on a
     // default — `G.inkWet` is 0 when nobody moved the fader, which reads exactly
     // like a picture that never drew.
-    if (SELFCHECK) {
+    if (DEEP) {
       // 🔴 THE WHOLE PATCH, ASKED OF THE ENGINE RATHER THAN READ BACK OFF THIS
       // PAGE. Every `/n_set` here is fire-and-forget, so `PATCHES[patch]` proves
       // nothing about what scsynth holds — and a patch is forty messages, any one
@@ -4704,11 +4712,13 @@
     // only while sound is actually playing, so a pause — which is exactly what
     // the harness does here — falls out for free rather than being counted as
     // recording time.
-    for (let i = 0; i < 150 && (played() - ringFrom) < BUF_SECONDS; i++) {
+    if (LIGHT) d.log('left for the deep run: the ring fill, the ink and sink probes, the patch A/B, '
+      + 'the modulation and lock checks and the audible loop (DEMO_DEEP=1)');
+    for (let i = 0; i < 150 && !LIGHT && (played() - ringFrom) < BUF_SECONDS; i++) {
       await new Promise((r) => setTimeout(r, 100));
     }
     ringFilled = true;
-    d.log(`the granulator's ${BUF_SECONDS} s ring has been filled once `
+    if (!LIGHT) d.log(`the granulator's ${BUF_SECONDS} s ring has been filled once `
       + `(${(played() - ringFrom).toFixed(1)} s of radio recorded into it)`);
 
     // 🔴 WHAT THE CHORD COSTS, MEASURED RATHER THAN REASONED ABOUT. `glitchCount`
@@ -4747,7 +4757,7 @@
     // ⚠️ WHAT STAYS OUTSIDE THIS GUARD IS THE PART A VISITOR WANTS: the ring
     // warm-up, the grain-rate measurement and the `grains` readout are passive
     // and they are the page reporting on itself, not experimenting on itself.
-    if (SELFCHECK) {
+    if (DEEP) {
       // 🔴 DOES A GRAIN ACTUALLY LAND ON THE PICTURE, AND DOES THE FADER MOVE IT?
       // Both halves are here because either alone is passable by a broken page.
       //
@@ -5637,7 +5647,7 @@
     // wait was silently lost and the run still read green, which is the failure
     // shape this repo keeps paying for. Slow work goes at the end, behind every
     // assert that does not need it.
-    if (SELFCHECK) {
+    if (DEEP) {
       /**
        * 🔴 THE LOOP HAS TO BE AUDIBLE, AND THAT IS MEASURED AT THE DESTINATION.
        * REPORTED as *"i can not hear radio looping only viz"*: the bar owned

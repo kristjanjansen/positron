@@ -36,7 +36,7 @@
   import { drawCamera, burn, readBurnedFrom, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
-  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
 
   const d = mount({
     name: 'cam',
@@ -301,6 +301,15 @@
   const oursOpened = () => performance.getEntriesByType('resource').filter((e) => OURS.test(e.name)).length;
 
   const running = () => !!cam;
+  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
+     *"i mean these long-running ones"*. The camera, its preview and the frame
+     that would leave the page are this machine's own and stay in an ORDINARY
+     harness run (`selfcheck=1`). What leaves it does not: the relay servers,
+     the UDP probe, the WHIP publish and WHEP play back through Stream, and the
+     MoQ loopback through the relay, each waited on for thirty timed frames.
+     `DEMO_DEEP=1 node demo/verify.mjs cam` runs those. A visitor is never
+     `LIGHT`, so their press is unchanged. */
+  const LIGHT = SELFCHECK && !DEEP;
 
   // A press on `camera off` starts; a press while starting or on stops.
   d.on('cam', async () => {
@@ -374,6 +383,13 @@
     // two legs should not wait on it.
     Object.assign(HLS, { st: null, err: null, readyAt: null, liveAt: null, uid: null, firstMs: null, rebuilds: 0, starts: [] });
     startHls(mine);
+
+    if (LIGHT) {
+      d.log('left for the deep run: the relay servers, the UDP probe, WebRTC through Stream and MoQ through the relay (DEMO_DEEP=1)');
+      camBtn.set('online').because('press to stop the camera and every leg');
+      await d.run('check');
+      return;
+    }
 
     // Both asked in parallel and only now, after the press: a relay from our
     // worker for the two peer connections, and whether UDP leaves at all.
@@ -554,7 +570,11 @@
     // Give each leg time to carry enough frames to time.
     // LL-HLS gets up to a minute: a container that was asleep, Stream bringing
     // a new broadcast up and the player's first segments are all in it.
-    for (let t = 0; t < 120; t++) {
+    for (let t = 0; t < 120 && LIGHT; t++) {
+      if ((meters.local?.frames ?? 0) > 0) break;
+      await wait(250);
+    }
+    for (let t = 0; t < 120 && !LIGHT; t++) {
       const rtcDone = rtcErr || (meters.rtc?.all ?? 0) >= 30;
       const moqDone = moqErr || (leg?.stats.samples ?? 0) >= 30;
       const hlsDone = !HLS_ON || HLS.err || (meters.hls?.all ?? 0) >= 30;
@@ -587,6 +607,7 @@
       if (hp != null) d.assert('LL-HLS in seconds, and more than WebRTC', hp > 500 && hp < 20000, ms(hp));
     }
 
+    if (!LIGHT) {
     d.assert('WebRTC published through the worker', !!pub, rtcErr || (pub ? `id ${pub.id}` : 'no publish'));
     d.assert('WebRTC frames came back and were shown', (meters.rtc?.frames ?? 0) > 0, `${meters.rtc?.frames ?? 0} frame(s)`);
     const rp = median(meters.rtc?.samples || []);
@@ -603,6 +624,7 @@
       d.assert('the MoQ leg carries the camera, not its own test pattern', moqPainted > 0,
         moqPainted ? `${moqPainted} frame(s) painted from the camera` : 'startMoq never called paint, so it drew its own pattern');
     }
+    }   // !LIGHT
 
     // ONE assert whatever the network, so the total does not move with it:
     // a leg that failed names its cause on its own picture, and where one STUN

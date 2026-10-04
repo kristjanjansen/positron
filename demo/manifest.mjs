@@ -351,7 +351,7 @@ export const DEMOS = [
   // not moved through any of it: a wasm scsynth boot, 31 buffer allocations, a
   // definition, an eight-second ring fill, a 2.5 s level, two 700 ms ink
   // samples and a 1.2 s deafness control before the page says anything at all.
-  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000, lightSettleMs: 15000,
+  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 60000, lightSettleMs: 15000,
     one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand, or by sliders that sweep themselves back and forth',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
