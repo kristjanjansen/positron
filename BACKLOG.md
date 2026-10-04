@@ -1,5 +1,20 @@
 ## Open
 
+### Drive the Pico emulation locally, asked 2026-10-04
+
+*"can you not drive wokwi itself / run locally or smth"*: rp2040js (Wokwi's open
+emulator core, plain JS in Node) running MicroPython plus `rig/pico/oled/main.py`,
+with an SSD1306 model on its I2C and the four buttons pressed from a script, the
+screen written out as a PNG. RP2040 only; the RP2350 is not emulated.
+
+### Scenes: saved sets of links in `/patchbay/`, then a scene lane, asked 2026-10-04
+
+*"go"* to (a) then (b): (a) `/patchbay/` saves the current links as a named
+scene and recalls one (unlink what is not in it, link what is, the routing core
+releasing held notes); (b) a scene lane in `/partitur/` whose events recall
+scenes at points in the score.
+DONE 2026-10-04: patchbay 30/30, partitur 27/27.
+
 ### More lanes as patchbay sources, asked 2026-10-04
 
 *"Do"* to: `/patchbay/` able to open a lane's link itself (a `link.request`

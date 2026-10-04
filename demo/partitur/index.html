@@ -10,6 +10,8 @@
   .pt-text { display: flex; flex-direction: column; gap: 10px; }
   .pt-say { margin: 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
   .pt-say q { color: var(--fg); }
+  /* The scene picked and the button that marks it are one row. */
+  .pt-mark { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
 </style>
 
 <script type="module">
@@ -122,6 +124,46 @@
     drawn = { f, ...paint(g, W, H, f) };
   }
 
+  // ── the scenes lane: marks that recall a `/patchbay/` scene ───────────────
+  //
+  // 🔴 A MARK IS A RECALL AT A FRACTION OF THE SCORE, asked 2026-10-04. The
+  // patchbay keeps scenes and lists their names in the room as `scene.list`;
+  // a mark here sends `scene.recall` with one of those names when the playhead
+  // passes it while PLAYING forward. A seek, a scrub or a length change moves the
+  // playhead without passing anything, so it fires nothing.
+  // ⚠️ MARKS LIVE IN THIS BROWSER, in `localStorage`, which may throw or come
+  // back empty, so every read and write is wrapped and the lane works without it.
+  const MARKS_KEY = 'positron.partitur.sceneMarks';
+  function loadMarks() {
+    try {
+      const got = JSON.parse(localStorage.getItem(MARKS_KEY) || '[]');
+      return Array.isArray(got) ? got.filter((m) => m && Number.isFinite(m.at) && m.at >= 0 && m.at <= 1 && typeof m.name === 'string') : [];
+    } catch { return []; }
+  }
+  const sceneMarks = loadMarks();
+  function keepMarks() {
+    try { localStorage.setItem(MARKS_KEY, JSON.stringify(sceneMarks)); } catch { /* full, off or private */ }
+  }
+  /**
+   * Which marks the playhead passed. Pure: it holds only the last fraction it
+   * was told. `seek(f)` moves the playhead without passing anything; `at(f,
+   * playing)` answers the marks in (last, f], and only while playing forward.
+   */
+  function createCrosser(marksOf) {
+    let last = null;
+    return {
+      seek(f) { last = f; },
+      at(f, playing) {
+        const from = last;
+        last = f;
+        if (!playing || from === null || !(f > from)) return [];
+        return marksOf().filter((m) => m.at > from && m.at <= f);
+      },
+    };
+  }
+  const crosser = createCrosser(() => sceneMarks);
+  const marksSub = () => (sceneMarks.length ? `${sceneMarks.length} mark${sceneMarks.length === 1 ? '' : 's'}` : 'no marks');
+
   // ── lanes ──────────────────────────────────────────────────────────────────
   const markRows = (lane, kind) => () => lane.marks.map((m, i) => ({
     at: ms(m.at ?? m.from), id: `${kind}-${m.id ?? i}`, kind, payload: m,
@@ -160,6 +202,8 @@
           if (x >= 0 && x <= C.width) ctx.fillRect(x, L.y + L.height - 5, 1, 4);
         }
       } },
+    { id: 'scenes', kind: 'scenes', label: 'scenes', subLabel: marksSub(), height: 26, as: 'ticks',
+      rows: () => sceneMarks.map((m, i) => ({ at: ms(m.at), id: `scenes-${i}`, kind: 'scenes', payload: m })) },
   ];
 
   const bar = createTransportBar(d.el, deck, { scrub: false, loop: false });
@@ -171,6 +215,7 @@
       if (!p) return '';
       if (hit.lane?.id === 'light') return `${p.colour}, ${p.reading?.text || ''} (${p.how})`.replace(', ()', '');
       if (hit.lane?.id === 'sirens') return `siren band, ${p.colour} (${p.how})`;
+      if (hit.lane?.id === 'scenes') return `recalls ${p.name}`;
       return `${markText(p)}, ${p.how}`;
     },
   });
@@ -291,6 +336,10 @@
       if (got.kind !== 'json' || got.msg.from === me) return;
       const m = got.msg;
       if (m.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: GRAPH }); return; }
+      if (m.type === 'scene.list') {
+        if (Array.isArray(m.scenes)) { heardScenes.set(m.from, m.scenes.filter((n) => typeof n === 'string')); drawMarkRow(); }
+        return;
+      }
       // `/patchbay/` asking for one of this page's links.
       if (m.type === 'link.request' && kindOfPort(m.source)) {
         const r = setLink(kindOfPort(m.source), m.open ? m.target : '');
@@ -302,6 +351,58 @@
   });
   drawChoices();
   setInterval(drawChoices, 15_000);
+
+  // The scene names each patchbay in the room last listed, by sender.
+  const heardScenes = new Map();
+  const sceneNames = () => [...new Set([...heardScenes.values()].flat())];
+  let markWith = '';
+  const markHost = el('div', 'pt-text');
+  d.el.insertBefore(markHost, panel.el);
+  function drawMarkRow() {
+    const names = sceneNames();
+    if (!names.includes(markWith)) markWith = names[0] || '';
+    const options = names.length ? names.map((n) => [n, n]) : [['none heard', '']];
+    const choice = createChoice({ label: 'mark scene', options, at: Math.max(0, names.indexOf(markWith)),
+      title: (v) => (v ? `a scene saved in a patchbay in ${ROOM}` : `no patchbay in ${ROOM} has listed a scene`),
+      onPick: (v) => { markWith = v; } });
+    const here = el('button', '', 'Mark here', { type: 'button', title: 'a mark at the playhead that recalls this scene' });
+    here.onclick = () => markHere();
+    const clear = el('button', '', 'Clear marks', { type: 'button', title: 'remove every mark from the scenes lane' });
+    clear.onclick = () => clearMarks();
+    clear.disabled = !sceneMarks.length;
+    const row = el('div', 'pt-mark');
+    row.append(choice.el, here, clear);
+    markHost.replaceChildren(el('p', 'pt-say', 'The scenes lane recalls a scene saved in /patchbay/ whenever the playhead '
+      + 'passes its mark while playing, and a seek or a scrub passes nothing.'), row);
+  }
+  function marksChanged() {
+    keepMarks();
+    const L = view.strip.lanes().find((x) => x.id === 'scenes');
+    if (L) L.subLabel = marksSub();
+    view.strip?.invalidate?.();
+    drawMarkRow();
+  }
+  function markHere() {
+    if (!markWith) { d.log(`no scene heard yet, save one in a patchbay in ${ROOM} first`, 'warn'); return; }
+    const f = deck.position() / ms(1);
+    sceneMarks.push({ at: f, name: markWith });
+    sceneMarks.sort((a, b) => a.at - b.at);
+    // The mark is under the playhead now, so it is not passed until it is passed.
+    crosser.seek(f);
+    marksChanged();
+    d.log(`a mark at ${(f * 100).toFixed(1)} per cent of the score recalls ${markWith}`, 'ok');
+  }
+  function clearMarks() {
+    sceneMarks.length = 0;
+    marksChanged();
+    d.log('every scene mark removed');
+  }
+  function sendRecall(m) {
+    if (!me) { d.log(`passed the mark for ${m.name}, and this page is not in ${ROOM} to ask for it`, 'warn'); return; }
+    wire.send({ type: 'scene.recall', name: m.name });
+    d.log(`passed the mark for ${m.name}, the room was asked to recall it`);
+  }
+  drawMarkRow();
   window.addEventListener('pagehide', () => sirenOff());
 
   /** Rescale everything from fractions. The playhead keeps its place on the plate. */
@@ -355,8 +456,17 @@
      on waiting. A timer still runs there, about once a second, so a wall keeps
      following a score that nobody is looking at. Each send is a no-op unless
      its value changed, so running it from both is free. */
+  /* A seek or a scrub resets where the scenes lane last saw the playhead, so a
+     mark it jumped over is not passed. A play starts just behind the playhead,
+     so a mark exactly under it is passed on the way out. */
+  deck.transport.onState((st) => {
+    const f = deck.position() / ms(1);
+    if (st.reason === 'seek' || st.reason === 'sync') crosser.seek(f);
+    else if (st.reason === 'play') crosser.seek(f - 1e-9);
+  });
   function drive() {
     const f = deck.position() / ms(1);
+    for (const m of crosser.at(f, !!deck.playing?.())) sendRecall(m);
     sendLight(f);
     sendCue(cueAt(f));
     sendSiren(!!deck.playing?.(), spanAt(sirens, f));
@@ -437,6 +547,25 @@
     const toCaps = b2.validate(SOURCES.cues.port, 'desk:wall:cue');
     d.assert('the Ton lane can be linked to an instrument\u2019s MIDI input', toSynth.ok, toSynth.why);
     d.assert('and the stage cues to a wall\u2019s captions', toCaps.ok, toCaps.why);
+  }
+  {
+    // The scenes lane's crossing, as a pure helper on fixtures, no deck and no room.
+    const marks = [{ at: 0.3, name: 'a' }];
+    const play = createCrosser(() => marks);
+    play.seek(0.29);
+    const first = play.at(0.31, true), again = play.at(0.32, true);
+    d.assert('a scene mark passed while playing fires once', first.length === 1 && first[0].name === 'a' && again.length === 0,
+      `${first.length} then ${again.length}`);
+    // ⚠️ NEGATIVE CONTROLS: a seek over the mark, and a scrub over it while paused.
+    const jump = createCrosser(() => marks);
+    jump.seek(0.1);
+    jump.seek(0.5);
+    const afterSeek = jump.at(0.51, true);
+    const scrub = createCrosser(() => marks);
+    scrub.seek(0.29);
+    const paused = scrub.at(0.31, false);
+    d.assert('a seek or a paused scrub over the mark fires nothing', afterSeek.length === 0 && paused.length === 0,
+      `${afterSeek.length} after a seek, ${paused.length} scrubbing`);
   }
   d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
 
