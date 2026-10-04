@@ -31,11 +31,12 @@
 // same side. That is the drift-seek, the rebuild, the jitter buffer growing,
 // a seek in a recording. MEASURED shapes it has to survive are in the plan §3.
 //
-// WHAT A LIGHT EVENT CARRIES: `due`, and nothing else is read.
+// WHAT A LIGHT EVENT CARRIES: `at` and its siblings, flat on the event, and
+// nothing else is read.
 //
-//   no due                         as it happens: fire on arrival
-//   { shared: S }                  scheduled ahead: fire when the peer clock reads S
-//   { shared: S, follow: id }      fire when the moment S reaches THIS glass on link id,
+//   no at, beat or stamp           as it happens: fire on arrival
+//   { at: S }                      scheduled ahead: fire when the peer clock reads S
+//   { at: S, follow: id }          fire when the moment S reaches THIS glass on link id,
 //                                  i.e. S plus that link's lag here. Needs the link's
 //                                  stamps to be convertible to shared time.
 //   { stamp: M, on: id }           fire when link id PRESENTS the moment stamped M.
@@ -44,10 +45,14 @@
 //                                  a beat on a loop clock (plan-xr-together), which
 //                                  is a shared time by arithmetic
 //
-// ⚠️ `due`, NOT `at`. `at` is the wire envelope's own field (`demo/shell/wire.mjs`),
-// it is the SENDER'S Date.now() at the moment of sending, it is not on the peer
-// clock, and a payload field called `at` throws there on purpose. `when` is
-// taken too: `timeline/transport.mjs` uses it for an uncertainty bracket.
+// `at` ALWAYS MEANS WHEN THE THING HAPPENS, decided by the owner 2026-10-04: a
+// timeline row's position (`timeline/transport.mjs`) and, on the wire, an
+// event's moment in shared ms. `when` stays the uncertainty bracket around an
+// `at`. The wire envelope's send stamp, which used to be called `at`, is `sent`
+// now, and `parse()` in `wire.mjs` renames an old sender's envelope `at` to
+// `sent` before anything here can mistake it for an event time.
+// ⚠️ `on` IS A LINK ID ONLY WHEN IT IS A STRING. A light's payload may say
+// `on: true`, and that is not a request to wait for a link called true.
 //
 // 🔴 CANNOT TELL HOLDS, IT NEVER FIRES. Every method answers null when the
 // inputs do not determine an answer (no peer clock, no observation yet, a link
@@ -162,9 +167,9 @@ export function createTimebase({ offsetMs = null, windowN = 9, stepMs = 120, ste
     return s == null || now == null ? null : now - (s + L.stampOffsetMs);
   }
 
-  function sharedOfDue(due) {
-    if (finite(due.shared)) return due.shared;
-    if (finite(due.beat) && due.clock) return beatToShared(due.clock, due.beat);
+  function sharedOfEvent(ev) {
+    if (ev.at != null) return finite(ev.at) ? ev.at : null;
+    if (finite(ev.beat) && ev.clock) return beatToShared(ev.clock, ev.beat);
     return null;
   }
 
@@ -176,28 +181,32 @@ export function createTimebase({ offsetMs = null, windowN = 9, stepMs = 120, ste
    * @returns {{ local: number|null, why: string }}
    */
   function fireAt(ev, nowLocal, { leadMs = 0 } = {}) {
-    const due = ev?.due;
+    const e = ev && typeof ev === 'object' ? ev : {};
     const lead = finite(leadMs) ? leadMs : 0;
-    if (due == null) return finite(nowLocal) ? { local: nowLocal, why: 'as it happens' } : { local: null, why: 'no local time' };
-    if (typeof due !== 'object') return { local: null, why: 'malformed due' };
+    // A sender still writing the shape this module had for one day wanted the
+    // event scheduled. Firing it on arrival would be the wrong moment, so hold.
+    if (e.due != null) return { local: null, why: 'malformed: due was folded into at on 2026-10-04' };
+    const byStamp = e.stamp != null || typeof e.on === 'string';
+    const timed = byStamp || e.at != null || e.beat != null || e.clock != null || e.follow != null;
+    if (!timed) return finite(nowLocal) ? { local: nowLocal, why: 'as it happens' } : { local: null, why: 'no local time' };
 
-    if (due.on !== undefined || due.stamp !== undefined) {
-      if (!finite(due.stamp) || typeof due.on !== 'string') return { local: null, why: 'malformed due: stamp needs a finite stamp and a link id in on' };
-      if (!links.has(due.on)) return { local: null, why: `no link ${due.on}` };
-      const t = localForStamp(due.on, due.stamp);
-      return t == null ? { local: null, why: `${due.on} has no line to read a stamp off (unobserved or paused)` }
-        : { local: t - lead, why: `when ${due.on} presents ${due.stamp}` };
+    if (byStamp) {
+      if (!finite(e.stamp) || typeof e.on !== 'string') return { local: null, why: 'malformed: stamp needs a finite stamp and a link id in on' };
+      if (!links.has(e.on)) return { local: null, why: `no link ${e.on}` };
+      const t = localForStamp(e.on, e.stamp);
+      return t == null ? { local: null, why: `${e.on} has no line to read a stamp off (unobserved or paused)` }
+        : { local: t - lead, why: `when ${e.on} presents ${e.stamp}` };
     }
 
-    const S = sharedOfDue(due);
-    if (S == null) return { local: null, why: 'malformed due: needs shared, beat with clock, or stamp with on' };
+    const S = sharedOfEvent(e);
+    if (S == null) return { local: null, why: 'malformed: needs a finite at, beat with clock, or stamp with on' };
     const base = toLocal(S);
     if (base == null) return { local: null, why: 'no peer clock agreed yet' };
-    if (due.follow === undefined) return { local: base - lead, why: 'scheduled on the peer clock' };
-    if (!links.has(due.follow)) return { local: null, why: `no link ${due.follow}` };
-    const g = lag(due.follow, nowLocal);
-    return g == null ? { local: null, why: `the lag of ${due.follow} here cannot be told` }
-      : { local: base + g - lead, why: `following ${due.follow}, ${Math.round(g)} ms behind` };
+    if (e.follow == null) return { local: base - lead, why: 'scheduled on the peer clock' };
+    if (!links.has(e.follow)) return { local: null, why: `no link ${e.follow}` };
+    const g = lag(e.follow, nowLocal);
+    return g == null ? { local: null, why: `the lag of ${e.follow} here cannot be told` }
+      : { local: base + g - lead, why: `following ${e.follow}, ${Math.round(g)} ms behind` };
   }
 
   /**

@@ -95,7 +95,7 @@
   let pc = null, remoteAudio = null;
   const ears = [];                  // key press -> sound arriving, one clock
   let earPending = null;
-  // ⚠️ NO `from` AND NO `at` HERE ANY MORE — `wire.mjs` stamps both, and a
+  // ⚠️ NO `from` AND NO `sent` HERE. `wire.mjs` stamps both, and a
   // payload field of the same name as an envelope field is LESSONS #45: the
   // envelope wins and the payload one vanishes silently.
   const send = (o) => { if (ws && ws.state() === 1) ws.send(o); };
@@ -172,7 +172,9 @@
       }
       if (m.type === 'on') {
         received++;
-        if (Number.isFinite(m.at)) { lat.push(Date.now() - m.at); d.set('note in', lat[lat.length - 1]); }
+        // `sent` is the sender's stamp; `parse()` has already renamed an old
+        // tab's envelope `at` to it, so this one name covers both.
+        if (Number.isFinite(m.sent)) { lat.push(Date.now() - m.sent); d.set('note in', lat[lat.length - 1]); }
         d.set('received', received);
         play(m.note, m.vel ?? 100);
         kb.lightNote(m.note, true, 'remote');
