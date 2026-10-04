@@ -14,7 +14,9 @@ into the Circuit), and Unlink stops it. Described links stay described until a
 person opens one; a visit and the harness open nothing.
 PARTLY DONE 2026-10-04: an instrument's sound to this browser (708 frames in 8 s,
 measured against the real Pi, direct path 214 ms) and these keys to an instrument
-open for real. Synth audio, GPU video and recording still say `not built yet`.
+open for real. Later the same day: a board synth's sound (424 frames in 9 s), the
+GPU's video (209 decoded frames in 9 s) and these keys to a synth open too.
+Recording to storage is the one kind left.
 
 ### Universal routing step 3, the registry, asked 2026-10-04
 

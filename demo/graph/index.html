@@ -30,6 +30,8 @@
   import { createBoard } from '/shell/board.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { RELAY_BASE } from '/shell/wire.mjs';
 
   const WHAT = 'One graph for everything positron moves, where a MIDI link carries the notes and a video link describes the stream both ends open.';
 
@@ -64,9 +66,8 @@
       'A light link, MIDI or a program, carries its bytes through the routing core. A heavy link, sound or '
       + 'video, only describes a stream, which transport, which address and what shape, and the two ends open it '
       + 'themselves. The transport is chosen from where the two ends are, out of latencies measured on this desk.',
-      'A link is only described until you select it and press Open. Two kinds open for real today, an '
-      + 'instrument\u2019s sound from the Pi to this browser and these keys to that instrument, and Unlink closes '
-      + 'what Open opened.'));
+      'A link is only described until you select it and press Open. Sound and video from the Pi to this '
+      + 'browser and these keys to an instrument or a synth open for real, and Unlink closes what Open opened.'));
 
   // ── the desk ─────────────────────────────────────────────────────────────
   //
@@ -266,7 +267,10 @@
       id: l.id,
       line: printLink(l),
       medium: mediumOf(l),
-      by: l.session ? l.session.transport : 'routing core',
+      // ⚠️ WHILE A LINK IS OPEN ITS ROW SAYS WHAT IS REALLY CARRYING IT. The
+      // plan's table chose WHEP for the Pi's video; the opener uses the board's
+      // relay H.264 path, and a row naming the plan's choice would be a claim.
+      by: opened.get(printLink(l))?.via?.() || (l.session ? l.session.transport : 'routing core'),
       where: l.session ? l.session.where : 'bytes',
       says: l.session ? `${l.session.says}\naddress ${l.session.address}` : 'the bytes travel through the link itself',
       state: stateOf(l),
@@ -360,12 +364,83 @@
   // the session's address, which the board itself announced.
   const opened = new Map();          // link line -> { kind, close(), state() }
   const RENEW_MS = 20_000;
+  const nodeKind = (portId) => bay.node(portId.split(':').slice(0, 2).join(':'))?.kind;
   function kindOf(l) {
     const a = bay.port(l.from), b = bay.port(l.to);
     if (!a || !b || !a.address && !b.address) return null;
-    if (a.medium === 'audio' && l.to === 'web:screen:audio' && a.address) return 'listen';
-    if (a.medium === 'midi' && l.from === 'web:keys:out' && b.address) return 'keys';
+    if (a.medium === 'audio' && l.to === 'web:screen:audio' && a.address) return nodeKind(l.from) === 'engine' ? 'synth' : 'listen';
+    if (a.medium === 'video' && l.to === 'web:screen:video' && a.address) return 'video';
+    if (a.medium === 'midi' && l.from === 'web:keys:out' && b.address) return nodeKind(l.to) === 'engine' ? 'notes' : 'keys';
     return null;
+  }
+  const OPENERS = { listen: (l) => openListen(l), synth: (l) => openSynth(l), video: (l) => openVideo(l),
+                    keys: (l) => openKeys(l), notes: (l) => openKeys(l, true) };
+  /** A board on `room`, resolved once its socket is open (or after 6 s). */
+  async function boardOn(room, extra = {}) {
+    let joined;
+    const isOpen = new Promise((r) => { joined = r; });
+    const board = createBoard({ room, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => joined(), ...extra });
+    await Promise.race([isOpen, new Promise((r) => setTimeout(r, 6000))]);
+    return board;
+  }
+  async function openSynth(l) {
+    const room = bay.port(l.from).address, source = bay.node(l.from.split(':').slice(0, 2).join(':'))?.label;
+    const board = await boardOn(room, { cushionMs: 160, maxCushionMs: 300 });
+    const ctx = await board.startAudio();
+    const out = board.playout();
+    if (out) { try { out.connect(ctx.destination); } catch { /* already */ } }
+    // A cold synth takes seconds to start, so the wait is long and says so.
+    board.ask({ type: 'audio.start', source }, 'audio.started', 20000).then((r) => {
+      if (!r) d.log(`${source} did not answer within 20 s`, 'warn');
+      else d.log(r.ok ? `${source} is playing on the board` : `the board said ${r.reason}`, r.ok ? 'ok' : 'warn');
+    });
+    return {
+      kind: 'synth',
+      via: () => board.stats().via || 'relay',
+      state: () => `open, ${board.stats().frames} fr`,
+      close: () => { try { out?.disconnect(); } catch { /* */ } board.send({ type: 'audio.stop' }); board.close(); },
+    };
+  }
+  async function openVideo(l) {
+    const site = l.from.split(':')[0];
+    if (typeof VideoDecoder !== 'function') throw new Error('this browser has no WebCodecs, so the board’s video cannot be decoded here');
+    const board = await boardOn(site);
+    const r = await board.ask({ type: 'video.start', w: 1280, h: 720, fps: 30 }, 'video.started', 20000);
+    if (!r || !r.ok) { board.close(); throw new Error(r ? (r.reason || 'the board refused') : 'the board did not answer within 20 s'); }
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280; canvas.height = 720;
+    const panel = createVideoPanel({ media: canvas, left: false });
+    keysHost.append(panel.el);
+    const g = canvas.getContext('2d');
+    let frames = 0;
+    const decoder = new VideoDecoder({
+      output: (vf) => { g.drawImage(vf, 0, 0, canvas.width, canvas.height); vf.close(); frames++; },
+      error: (e) => d.log(`decode error ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
+    });
+    decoder.configure({ codec: r.codec ?? 'avc1.42E01E', optimizeForLatency: true });
+    // ⚠️ THE FRAME HEADER IS THE BOARD'S: a sequence number and a flags word,
+    // eight bytes, and nothing decodes until a keyframe, as on `/mirror/`.
+    let waitKey = true;
+    const vws = new WebSocket(`${RELAY_BASE}/room/${r.room}/ws`);
+    vws.binaryType = 'arraybuffer';
+    vws.onmessage = (e) => {
+      if (typeof e.data === 'string') return;
+      const dv = new DataView(e.data);
+      const seq = dv.getUint32(0, true), key = (dv.getUint32(4, true) & 1) === 1;
+      if (waitKey) { if (!key) return; waitKey = false; }
+      try { decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: seq * 1e6 / (r.fps ?? 30), data: new Uint8Array(e.data, 8) })); }
+      catch { waitKey = true; }
+    };
+    // The board stops drawing when nobody says they are watching.
+    const watch = setInterval(() => board.send({ type: 'video.watching' }), 10000);
+    board.send({ type: 'video.watching' });
+    return {
+      kind: 'video',
+      via: () => 'relay-h264',
+      state: () => `open, ${frames} fr`,
+      close: () => { clearInterval(watch); try { vws.close(); } catch { /* */ } try { decoder.close(); } catch { /* */ } panel.el.remove(); board.close(); },
+    };
   }
   function stateOf(l) {
     const o = opened.get(printLink(l));
@@ -395,27 +470,33 @@
     const renew = setInterval(want, RENEW_MS);
     return {
       kind: 'listen',
+      via: () => board.stats().via || 'relay',
       state: () => `open, ${board.stats().frames} fr`,
       close: () => { clearInterval(renew); try { out?.disconnect(); } catch { /* */ } board.close(); },
     };
   }
-  function openKeys(l) {
+  function openKeys(l, notes = false) {
     const to = bay.port(l.to);
     const ch = (to.shape?.channels || [1])[0];
+    // A board synth takes `note.on` in its main room; a hardware input takes raw
+    // MIDI through the gate in its own room. Two verbs, one keyboard.
+    const on = (note) => (notes ? { type: 'note.on', note, vel: 100, channel: 0 } : { type: 'midi.send', bytes: [0x90 | (ch - 1), note, 100] });
+    const off = (note) => (notes ? { type: 'note.off', note, channel: 0 } : { type: 'midi.send', bytes: [0x80 | (ch - 1), note, 0] });
     const board = createBoard({ room: to.address, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind) });
     // A note pressed before the socket opens is not sent, and `sent` counts only
     // what the socket took, so the row never claims a note that went nowhere.
     let sent = 0;
     const kb = createKeyboard(el('div'), {
       ...keyRange(), base: 48,
-      onDown: (note) => { kb.lightNote(note, true); if (board.send({ type: 'midi.send', bytes: [0x90 | (ch - 1), note, 100] })) sent++; },
-      onUp: (note) => { kb.lightNote(note, false); board.send({ type: 'midi.send', bytes: [0x80 | (ch - 1), note, 0] }); },
+      onDown: (note) => { kb.lightNote(note, true); if (board.send(on(note))) sent++; },
+      onUp: (note) => { kb.lightNote(note, false); board.send(off(note)); },
     });
     keysHost.append(kb.el);
     return {
       kind: 'keys',
+      via: () => 'relay',
       state: () => `open, ${sent} notes`,
-      close: () => { board.send({ type: 'midi.send', bytes: [0xB0 | (ch - 1), 123, 0] }); kb.el.remove(); board.close(); },
+      close: () => { if (!notes) board.send({ type: 'midi.send', bytes: [0xB0 | (ch - 1), 123, 0] }); kb.el.remove(); board.close(); },
     };
   }
   function closeLink(line) {
@@ -432,10 +513,10 @@
     const line = printLink(l);
     if (opened.has(line)) { d.log(`${line} is already open`); return; }
     const kind = kindOf(l);
-    if (!kind) { d.log(`${line} cannot be opened yet: only an instrument’s sound to this screen and these keys to an instrument are built`, 'warn'); return; }
+    if (!kind) { d.log(`${line} cannot be opened yet: sound or video to this screen, and these keys to an instrument or a synth, are what is built`, 'warn'); return; }
     if (SELFCHECK) { d.log(`the harness opens no real stream, so ${line} stays described`); return; }
     try {
-      opened.set(line, kind === 'listen' ? await openListen(l) : openKeys(l));
+      opened.set(line, await OPENERS[kind](l));
       d.log(`${line} opened`, 'ok');
     } catch (e) { d.log(`${line} did not open: ${e.message || e}`, 'bad'); }
     redraw();

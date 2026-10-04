@@ -237,8 +237,11 @@ last or never.
    with the board's own verbs, an input's sound to the browser (`input.want` and
    its lease, MEASURED 708 frames in 8 s, direct path 214 ms) and the browser's
    keys to that input (`midi.send` through the gate). Open is a person's press
-   only. Still to build: a synth's sound (`audio.start`), the GPU's video
-   (`video.start`), and storage as a sink.
+   only. Later the same day: a synth's sound (`audio.start`, 424 frames in
+   9 s), the GPU's video (`video.start`, relay H.264 decoded by WebCodecs, 209
+   frames in 9 s) and keys to a synth (`note.on`). While a link is open its row
+   names the transport really in use, which for video is the board's relay path
+   and not the WHEP the transport table chose. Still to build: storage as a sink.
 5. **`/wish/` over all of it**, building its prompt from the registry, so the
    model can only name things that exist.
 
