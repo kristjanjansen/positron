@@ -506,7 +506,7 @@ export const DEMOS = [
     one: 'say which instrument should play which, and a language model makes the connection on the desk',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
   { name: 'wall', group: 'instruments', act: 4, created: '2026-10-04', built: true,
-    one: 'A screen that joins the studio\u2019s patchbay as a projection wall and shows whatever light a timeline sends it.',
+    one: 'A screen that joins the studio\u2019s patchbay as a projection wall and shows whatever light and captions a timeline sends it.',
     tags: [] },
   { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true,
     one: 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.',

@@ -406,7 +406,17 @@
   const opened = new Map();          // link line -> { kind, close(), state() }
   const RENEW_MS = 20_000;
   const nodeKind = (portId) => bay.node(portId.split(':').slice(0, 2).join(':'))?.kind;
+  /** A port that another page announced, as opposed to the Pi or this browser. */
+  const pageOwned = (id) => {
+    const site = id.split(':')[0];
+    return site !== 'web' && bay.node(id.split(':').slice(0, 2).join(':'))?.place === 'browser';
+  };
   function kindOf(l) {
+    // 🔴 A LINK FROM ANOTHER PAGE'S PORT IS OPENED BY THAT PAGE. `/partitur/`
+    // owns its lanes, so the patchbay asks it with `link.request` and believes
+    // its `link.state` answer, rather than pretending to drive a timeline it
+    // does not hold.
+    if (pageOwned(l.from)) return 'remote';
     const a = bay.port(l.from), b = bay.port(l.to);
     if (!a || !b || !a.address && !b.address) return null;
     if (a.medium === 'audio' && l.to === 'web:screen:audio' && a.address) return nodeKind(l.from) === 'engine' ? 'synth' : 'listen';
@@ -414,7 +424,7 @@
     if (a.medium === 'midi' && l.from === 'web:keys:out' && b.address) return nodeKind(l.to) === 'engine' ? 'notes' : 'keys';
     return null;
   }
-  const OPENERS = { listen: (l) => openListen(l), synth: (l) => openSynth(l), video: (l) => openVideo(l),
+  const OPENERS = { remote: (l) => openRemote(l), listen: (l) => openListen(l), synth: (l) => openSynth(l), video: (l) => openVideo(l),
                     keys: (l) => openKeys(l), notes: (l) => openKeys(l, true) };
   /** A board on `room`, resolved once its socket is open (or after 6 s). */
   async function boardOn(room, extra = {}) {
@@ -424,6 +434,26 @@
       onOpen: () => joined(), ...extra });
     await Promise.race([isOpen, new Promise((r) => setTimeout(r, 6000))]);
     return board;
+  }
+  const pendingState = new Map();     // `${source} ${target}` -> resolve
+  function remoteAsk(source, target, open) {
+    return new Promise((resolve) => {
+      const key = `${source} ${target}`;
+      pendingState.set(key, resolve);
+      wire.send({ type: 'link.request', source, target, open });
+      setTimeout(() => { if (pendingState.get(key) === resolve) { pendingState.delete(key); resolve(null); } }, 8000);
+    });
+  }
+  async function openRemote(l) {
+    const r = await remoteAsk(l.from, l.to, true);
+    if (!r) throw new Error(`the page that owns ${l.from} did not answer`);
+    if (!r.open) throw new Error(`the page that owns ${l.from} refused: ${r.why || 'no reason given'}`);
+    return {
+      kind: 'remote',
+      via: () => 'its page',
+      state: () => 'open, by its page',
+      close: () => { remoteAsk(l.from, l.to, false); },
+    };
   }
   async function openSynth(l) {
     const room = bay.port(l.from).address, source = bay.node(l.from.split(':').slice(0, 2).join(':'))?.label;
@@ -602,6 +632,12 @@
     onMessage: (got) => {
       if (got.kind !== 'json' || got.msg.from === me) return;
       if (got.msg.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: SELF }); return; }
+      if (got.msg.type === 'link.state') {
+        const key = `${got.msg.source} ${got.msg.target}`;
+        const resolve = pendingState.get(key);
+        if (resolve) { pendingState.delete(key); resolve(got.msg); }
+        return;
+      }
       const fresh = !registry.graphs().some((x) => x.from === got.msg.from);
       if (registry.ingest(got.msg)) {
         if (fresh) d.log(`${got.msg.graph.site} announced ${got.msg.graph.nodes.length} things`, 'ok');
