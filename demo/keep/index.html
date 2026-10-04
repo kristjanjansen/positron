@@ -28,7 +28,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { ifSelfcheck, SELFCHECK } from '/shell/selfcheck.mjs';
 
   const W = 1280, H = FRAME_H;
   const CAP_MS = 10_000;   // a backstop, not the mechanism — stop is manual
@@ -136,6 +136,7 @@
   });
 
   d.on('clear', () => {
+    if (checking) { d.log('the checks are using the takes, so they stay until those finish'); return; }
     if (recording) { d.log('stop recording first'); return; }
     for (const p of parts) { try { p.video.remove(); URL.revokeObjectURL(p.url); } catch { /* gone */ } }
     parts.length = 0; totalMs = 0; active = null; handovers = [];
@@ -213,16 +214,19 @@
       iceAsks >= 1 && iceLoadAsks() === 0 && !!ice,
       `${iceAsks} ask(s) after the press, ${iceLoadAsks()} before it by resource timing, `
       + (ice.relay ? 'a relay came back' : `no relay: ${ice.why}`));
-    const noLegs = (why) => {
+    const noLegs = async (why) => {
       d.assert('both legs hold what the ask returned', false, why);
       d.assert('the path the media took is named beside the round trip', false, why);
+      // Red with the reason rather than missing, so the count does not move
+      // with the network.
+      if (SELFCHECK) await roundTripChecks();
     };
     try {
       pub = await whipPublish(canvas.captureStream(FPS), { iceServers: ice.iceServers, log: (m, k) => d.log(m, k) });
-    } catch (e) { d.log(`send failed: ${e.message}`, 'bad'); noLegs(`send failed: ${e.message}`); return; }
+    } catch (e) { d.log(`send failed: ${e.message}`, 'bad'); await noLegs(`send failed: ${e.message}`); return; }
     try {
       sub = await whepPlay(whep(), live, { iceServers: ice.iceServers, log: (m, k) => d.log(m, k) });
-    } catch (e) { d.log(`receive failed: ${e.message}`, 'bad'); noLegs(`receive failed: ${e.message}`); return; }
+    } catch (e) { d.log(`receive failed: ${e.message}`, 'bad'); await noLegs(`receive failed: ${e.message}`); return; }
     armVideo(live);
     // Wait for a frame to actually arrive rather than for a promise to settle:
     // a WHEP track exists before it carries anything.
@@ -247,6 +251,12 @@
       route
         ? `${route}: out ${paths.out.local} over ${paths.out.protocol}, back ${paths.back.local} over ${paths.back.protocol}, cell ${JSON.stringify(shownPath)}`
         : 'the selected candidate pairs could not be read');
+    // 🔴 THE REST OF THE CHECKS RUN FROM HERE, INSIDE THE PRESS, AND ONLY UNDER
+    // A HARNESS. They used to fire only from the recorder's onstop, and a
+    // harness press of ● starts a take that nothing stops for ten seconds, by
+    // which time the harness had seen two quiet seconds and left: 3 of 14 ran.
+    // Inside this handler the button stays busy, which the harness waits on.
+    if (SELFCHECK) await roundTripChecks();
   });
 
   /**
@@ -309,16 +319,20 @@
       part.bytes += e.data.size;
       paint();
     };
+    let landed;
+    part.done = new Promise((r) => { landed = r; });
     rec.onstop = async () => {
-      landing = { ...part, lenMs: Math.round(performance.now() - t0) };
-      recording = null;
-      setRecUI(false);
-      view.strip.state.wallAnchor = null;
-      deck.setRange([0, Math.round(totalMs + landing.lenMs)]);
-      await new Promise((r) => setTimeout(r, 250));
-      await landPart(part);
-      landing = null;
-      runChecks();
+      try {
+        landing = { ...part, lenMs: Math.round(performance.now() - t0) };
+        recording = null;
+        setRecUI(false);
+        view.strip.state.wallAnchor = null;
+        deck.setRange([0, Math.round(totalMs + landing.lenMs)]);
+        await new Promise((r) => setTimeout(r, 250));
+        await landPart(part);
+        landing = null;
+        await runChecks();
+      } finally { landed(); }
     };
     recording = { rec, part, t0 };
     rec.start(SLICE_MS);
@@ -328,6 +342,7 @@
     recording.capTimer = setTimeout(() => {
       if (recording?.rec === rec) { d.log(`take ${part.n}: hit the cap`); stopRecording(); }
     }, CAP_MS);
+    return part.done;
   }
   function stopRecording() {
     if (!recording) return;
@@ -520,7 +535,10 @@
     scrub: false,
     extras: [{ id: 'rec', label: '\u25CF', aria: 'Record', primary: true,
                title: `stop when you like. ${CAP_MS / 1000}s cap`,
-               onClick: () => (recording ? stopRecording() : startRecording()) }],
+               onClick: () => {
+                 if (checking) { d.log('the checks are recording, this press waits for them'); return; }
+                 return recording ? stopRecording() : startRecording();
+               } }],
   });
   const view = createStripView(d.el, deck, {
     size: 'auto', follow: false, gutter: 150, wallStyle: 'head',
@@ -534,7 +552,46 @@
   setInterval(() => { if (recording) { paint(); view.strip.invalidate(); } }, 40);
 
   // ── the checks ────────────────────────────────────────────────────────────
-  let asserted = false, didClock = false;
+  let asserted = false, didClock = false, checking = false;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /**
+   * 🔴 EVERY CHECK THIS PAGE HAS, DRIVEN TO THE END, FROM ONE PLACE.
+   *
+   * Called after the round trip is up (or has failed), under `SELFCHECK` only:
+   * it records two short takes of what came back, lets each land, and that is
+   * what `runChecks` and `clockChecks` need. A person never sees it, because it
+   * records, seeks and moves the picture. When this page becomes the ROUND TRIP
+   * tab of `/capture/`, this is the one function the tab calls.
+   *
+   * Every assert is made exactly once whatever happens, red with the reason
+   * when the network gave nothing to record, so the count is the same on a run
+   * where WHEP media never arrived.
+   *
+   * ⚠️ IT WAITS FOR A READABLE FRAME BEFORE RECORDING. Cloudflare ramps WHEP up
+   * from 640x360, where the burned row cannot be read, so a take recorded in the
+   * first seconds is a take whose clock cannot be checked. 20 s at most.
+   */
+  async function roundTripChecks() {
+    if (checking) return;
+    checking = true;
+    try {
+      if (sub && live.videoWidth && sub.inbound.getVideoTracks().length) {
+        for (let i = 0; i < 80 && readable === 0; i++) await wait(250);
+        d.log(`checks: recording two takes, ${readable} clean frame(s) read so far`);
+        for (const ms of [3000, 2500]) {
+          const done = startRecording();
+          if (!done) break;
+          await wait(ms);
+          stopRecording();
+          await Promise.race([done, wait(15000)]);
+        }
+      }
+      if (!asserted) await runChecks();
+      if (!didClock) { didClock = true; await clockChecks(); }
+    } finally { checking = false; }
+  }
+
   async function runChecks() {
     if (!asserted) {
       asserted = true;
@@ -587,6 +644,13 @@
    * of the pixels at each, and assert it advanced by as much as the playhead did.
    */
   async function clockChecks() {
+    if (parts.length < 2) {
+      const why = `${parts.length} take(s) landed, the clock check needs two`;
+      d.assert('takes are laid end to end: no gap, no overlap', false, why);
+      d.assert('exactly one take is under the playhead', false, why);
+      d.assert('the clock in the picture moved with the playhead', false, why);
+      return;
+    }
     d.assert('takes are laid end to end: no gap, no overlap',
       parts.every((p, i) => (i === 0 ? p.startMs === 0 : p.startMs === parts[i - 1].startMs + parts[i - 1].lenMs)),
       parts.map((p) => `${p.n}@${p.startMs}+${p.lenMs}`).join(' '));
