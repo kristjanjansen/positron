@@ -50,7 +50,7 @@
   // `findServedEdge` is the same arithmetic in `err-live.mjs`, called by both.
   import { CHANNELS, errUrl, readPlaylist, findServedEdge, surveyChannels, describeSurvey }
     from '/shell/err-live.mjs';
-  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
 
   const DVR_MS = 2 * 60 * 60 * 1000;          // ERR keeps ~2 h
 
@@ -294,8 +294,17 @@
   // probe per channel on a public broadcaster's server. The channel that IS
   // open is not asked twice: its answer came from `open()`.
   let survey = null;
+  // ⚠️ AND SINCE 2026-10-04 IT IS THE DEEP TIER: *"make checks way ligher (2
+  // tiers?)"*, *"i mean these long-running ones"*. Two more channels' playlists
+  // and a probe sweep each are the long half of this page's run, so an ordinary
+  // harness run (`selfcheck=1`) grades the grid and the channel it opened and
+  // says what it left; `DEMO_DEEP=1 node demo/verify.mjs flipper` surveys. Both
+  // tiers run against `demo/fake-err.mjs`, never against ERR.
   async function takeSurvey() {
-    if (!SELFCHECK) return;
+    if (!DEEP) {
+      if (SELFCHECK) d.log('left for the deep run: the refusal survey of the other two channels (DEMO_DEEP=1)');
+      return;
+    }
     const c = chans[sel];
     const own = c.kind === 'tv' && c.served ? { id: c.id, name: c.name, ...c.served } : null;
     const rows = await surveyChannels(TV.filter((ch) => ch.id !== own?.id),
@@ -401,7 +410,7 @@
     // is not an assert: sabotaging the stand-in to serve every segment left
     // this page fully green, because nothing here named a refusal, a 403 or a
     // served segment. These three are what the page cannot work without.
-    if (SELFCHECK && survey) {
+    if (DEEP && survey) {
       const reachable = survey.filter((r) => r && !r.unreachable);
       const walled = reachable.filter((r) => r.position != null);
       const open = reachable.filter((r) => r.edgeServed);

@@ -172,7 +172,10 @@ export function createBoard({
    *  does not change under a running page, and re-reading it per message would
    *  make the answer depend on when it was asked. */
   const q = new URLSearchParams(location.search);
-  const driving = !(q.get('selfcheck') === '1') || q.get('board') === '1' || inSelfcheck === 'allow';
+  // ⚠️ BOTH TIERS ARE A HARNESS (`selfcheck=1` ordinary, `selfcheck=2` deep, see
+  // `demo/shell/selfcheck.mjs`), and a deep run is NOT permission to drive the
+  // board: that is still `?board=1` and nothing else.
+  const driving = !['1', '2'].includes(q.get('selfcheck')) || q.get('board') === '1' || inSelfcheck === 'allow';
   let refused = 0;
 
   // ── the badge ─────────────────────────────────────────────────────────────

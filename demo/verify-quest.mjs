@@ -115,6 +115,13 @@ const argv = process.argv.slice(2);
 const SELF_TEST = argv.includes('--self-test');
 const RUN_ALL = argv.includes('--all');
 const want = argv.filter((a) => !a.startsWith('--'));
+// 🔴 TWO TIERS, the same switch `verify.mjs` reads (demo/shell/selfcheck.mjs):
+// `DEMO_DEEP=1` or `--deep` asks for `selfcheck=2` and waits the full
+// `settleMs`; an ordinary run asks for `selfcheck=1` and waits `lightSettleMs`
+// where a page declares one. `--deep` is a tier, not a slug: `want` above
+// already drops every `--` argument.
+const DEEP = process.env.DEMO_DEEP === '1' || argv.includes('--deep');
+const settleOf = (t) => (DEEP || t.lightSettleMs == null ? t.settleMs : t.lightSettleMs);
 
 // ── the probe, defined ONCE ─────────────────────────────────────────────────
 // Parameterised over the property name so the self-test below can run the very
@@ -514,6 +521,8 @@ if (!BASE) {
 } else {
   console.log(`\nbase ${BASE}`);
 }
+console.log(DEEP ? 'tier: DEEP, the long-running checks included'
+  : 'tier: ordinary (DEMO_DEEP=1 node demo/verify-quest.mjs ... adds the long-running checks)');
 
 // ── ASSERT 2: reach the Quest Browser's devtools socket ─────────────────────
 // ⚠️ THE SOCKET NAME IS NOT STABLE. Three are in the wild:
@@ -779,7 +788,7 @@ for (const t of targets) {
   // anything that opens a file, makes a sound, presses a control or moves the
   // picture behind that flag, so a harness that does not set it grades a page
   // with its checks switched off. ⚠️ DEMO_QUERY goes first, so an override wins.
-  const q = [process.env.DEMO_QUERY, 'selfcheck=1'].filter(Boolean).join('&');
+  const q = [process.env.DEMO_QUERY, DEEP ? 'selfcheck=2' : 'selfcheck=1'].filter(Boolean).join('&');
   const query = `?${q}`;
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   // A headset over USB is slower to first paint than a local Chrome; the wait
@@ -818,7 +827,7 @@ for (const t of targets) {
   const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
     await ev(`document.querySelectorAll(${JSON.stringify(SEL)})[${i}].click()`, { gesture: true });
-    await sleep(i === 0 && t.settleMs ? t.settleMs : 900);
+    await sleep(i === 0 && settleOf(t) ? settleOf(t) : 900);
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
 
@@ -829,7 +838,7 @@ for (const t of targets) {
   const FIRST_ASSERT_CEIL = 30000;
   const countAsserts = () => ev('(window.__demo && __demo.asserts.length) || 0');
   let n = await countAsserts();
-  const firstBudget = Math.ceil(Math.min(t.settleMs || 0, FIRST_ASSERT_CEIL) / 400);
+  const firstBudget = Math.ceil(Math.min(settleOf(t) || 0, FIRST_ASSERT_CEIL) / 400);
   for (let i = 0; i < firstBudget && n === 0; i++) { await sleep(400); n = await countAsserts(); }
   let prev = -1;
   for (let i = 0; i < 12 && n !== prev; i++) { prev = n; await sleep(400); n = await countAsserts(); }

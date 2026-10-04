@@ -37,7 +37,7 @@
   import { whepPlay, stageWhep, STAGE_PUB, STAGE_PUB_STATUS, holdPublisher, waitForWhip, fetchIceServers, readIcePath } from '/shell/live.mjs';
   import { INGEST, openSession, proveReadable } from '/shell/ingest.mjs';
   import { resolveDuration, waitForFirstFrame } from '/shell/media.mjs';
-  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
   import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { armVideo, recorderMime, createReport } from '/shell/shell.mjs';
 
@@ -127,6 +127,15 @@
    * `built: true` so a full suite pays it too.
    */
   const USE_R2 = Q.get('r2') === '1' || (Q.get('r2') !== '0' && !SELFCHECK);
+  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
+     *"i mean these long-running ones"*. The show is the long part: a held
+     publisher, a cold container's WHIP leg (about 22 s), a WHEP handshake, the
+     film, a recording and its playback. An ORDINARY harness run (`selfcheck=1`)
+     starts none of it, so its press of `Start WebRTC` says so and does nothing,
+     and `checks()` grades the page at rest and stops before the drill.
+     `DEMO_DEEP=1 node demo/verify.mjs stage` runs the show. A visitor is never
+     `LIGHT`, so their press is unchanged. */
+  const LIGHT = SELFCHECK && !DEEP;
 
   const q = new URLSearchParams(location.search);
   // Reachable from a check, and from a probe: what the control room sent and
@@ -1824,6 +1833,10 @@
   let switching = false;
   async function toggleShow() {
     if (switching) return;
+    if (LIGHT) {
+      d.log('left for the deep run: the show, its publisher, the WHEP picture, the recording and its playback (DEMO_DEEP=1)');
+      return;
+    }
     switching = true;
     const b = showBar?.extra('webrtc');
     if (b) b.disabled = true;
@@ -3233,7 +3246,9 @@
   });
 
   async function checks() {
-    if (q.get('selfcheck') !== '1') return;
+    // ⚠️ EITHER TIER. This read `q.get('selfcheck') !== '1'` until 2026-10-04,
+    // which would have skipped every check on a deep run (`selfcheck=2`).
+    if (!SELFCHECK) return;
 
     /**
      * 🔴 WAKE THE CONTAINER FIRST, SO IT IS WARM BY THE TIME A SHOW IS ASKED
@@ -3268,9 +3283,11 @@
      * ⚠️ IT IS THE WHIP LEG AND NOT THE MANIFEST, because this page subscribes
      * over WHEP and those are two different Cloudflare inputs.
      */
-    if (!hold) hold = holdShow();
-    wokeAt = performance.now();
-    whipUp = waitShow({ timeoutMs: 60000 });
+    if (!LIGHT) {
+      if (!hold) hold = holdShow();
+      wokeAt = performance.now();
+      whipUp = waitShow({ timeoutMs: 60000 });
+    }
 
     /**
      * 🔴 READ FIRST, BEFORE ANY PRESS CAN HAVE HAPPENED, AND IT USED TO SIT
@@ -3700,6 +3717,12 @@
       laneCount >= 3 && lum.length > 20 && median - darkest < 8,
       `${laneCount} lanes, and over ${lum.length} rows the lane ground reads ${median} and the darkest row ${darkest}, a drop of ${median - darkest}`);
 
+    if (LIGHT) {
+      for (const [label, pass, detail] of held) d.assert(label, pass, detail);
+      d.log('left for the deep run: the publisher, the show over WebRTC, the film playing under it, '
+        + 'the recording, its trip to the archive and the diagram measure (DEMO_DEEP=1)');
+      return;
+    }
     await showDrill();
   }
 
