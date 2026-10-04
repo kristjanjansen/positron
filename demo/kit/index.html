@@ -5881,12 +5881,19 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     const nt = r(idle.el), ta = r(f.input);
     const inR = +(ta.right - nt.right).toFixed(1), inB = +(ta.bottom - nt.bottom).toFixed(1);
     const anim = getComputedStyle(idle.el).animationName;
+    // ⚠️ A BOX IN A CLOSED TAB HAS NO LAYOUT, SO ITS CORNER CANNOT BE MEASURED.
+    // Opened at #hardware this read 0 px in and 0 tall and went red on a page
+    // that was fine. The behaviour is still graded; the geometry says it was
+    // not looked at rather than failing.
+    const laidOut = ta.width > 0;
+    const placed = !laidOut || (Math.abs(inR - tok('--rows-gap')) <= 0.6
+      && Math.abs(inB - tok('--rows-gap')) <= 0.6 && Math.abs(nt.height - tok('--ctl-sm')) <= 0.6);
     d.assert('typing then a pause starts one compile, under a breathing Compiling note in the box\u2019s corner',
       idle.runs() === 1 && idle.state() === 'compiling' && idle.shown() === NOTE_SAYS.compiling
-        && anim === 'pos-cnote-breathe' && Math.abs(inR - tok('--rows-gap')) <= 0.6
-        && Math.abs(inB - tok('--rows-gap')) <= 0.6 && Math.abs(nt.height - tok('--ctl-sm')) <= 0.6,
+        && anim === 'pos-cnote-breathe' && placed,
       `${idle.runs()} compile ${idle.state()}, "${idle.shown()}" ${anim}, `
-      + `${inR} px in from the right and ${inB} up, ${nt.height.toFixed(1)} px tall`);
+      + (laidOut ? `${inR} px in from the right and ${inB} up, ${nt.height.toFixed(1)} px tall`
+        : 'its tab is closed, so where it sits was not measured'));
     await idle.settled();
     d.assert('and it compiled the last text typed, once, and then the corner is empty again',
       idle.shown() === '' && getComputedStyle(idle.el).display === 'none'
@@ -10403,7 +10410,9 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       - secs[i].getBoundingClientRect().bottom).toFixed(1));
     const worst = gaps.length ? Math.max(...gaps.map((g) => Math.abs(g - want))) : -1;
     d.assert('two blocks in one part sit the project’s one gap apart, not the panel’s own',
-      open.classList.contains('pos-stack') && gaps.length > 1 && worst <= 0.5,
+      // ⚠️ ONE GAP IS A MEASUREMENT. This said `> 1` and went red on a page
+      // opened at #hardware, whose part holds two blocks and so one gap.
+      open.classList.contains('pos-stack') && gaps.length >= 1 && worst <= 0.5,
       `${gaps.length} gap(s) in ${kitTabs.at()} against --pos-gap ${want} px, worst ${worst} px out`);
   }
 

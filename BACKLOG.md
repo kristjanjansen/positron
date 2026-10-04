@@ -1,5 +1,40 @@
 ## Open
 
+### Synths, effects, CV and modulation that run on the Pico chips, asked 2026-10-04
+
+*"look at the synths and general effect and CV and modulation stuff which can be
+built on that chip maybe in the eurorack context or those DX7 style stuff ...
+what could we compile into it and somehow get the sound out of it or maybe some
+kind of wave"*: a survey of open sound engines for RP2040/RP2350 (FM, wavetable,
+Mutable ports, effects, modulation and CV generators), what we could compile into
+our firmware, the ways sound gets out (PWM, I2S DAC, USB audio, Eurorack), and
+whether the emulator could produce audible sound in the browser.
+
+### Universal patchbay: the rest of the plan, asked 2026-10-04
+
+*"Continue also work on the universal patch bay, whatever was there in a plan or
+to do."* What was left: storage as a sink (record a link into R2 and play it
+back), route-core's `curve`, `vel curve` and plain `note->cc` in JS and C with
+vectors, the plan's open table updated with what was settled this week, and the
+`/kit/#hardware` check bug.
+
+### Pico wifi patchbay node, secure by default, asked 2026-10-04
+
+*"Maybe it's just something that you can try and would be nice to have it always
+secured. You can start the item one"*: plan-pico §1, the Pico 2 W joining
+`studio-1` over **wss** (TLS) as the aim, plain ws only as a fallback, testable
+before the board arrives.
+
+### Research the plan's open issues, and modular-ready boards, asked 2026-10-04
+
+*"regarding those open issues to do some research and in general would be cool to
+have some kind of modular support maybe there are boards which are ready at the
+right voltage for modular that can be programmed this way ... remember this play
+my synth idea was to support modular synths"*: settle what research can settle
+in plan-pico's open list, and survey Eurorack-ready programmable boards (RP2040 /
+RP2350 first, at modular voltages) for playing a modular remotely
+(`research/music-jamming-2026-08.md`, playasynth).
+
 ### `/kit/` opened at `#hardware` logs two red checks, found 2026-10-04
 
 "two blocks in one part sit the project's one gap apart" and "typing then a
@@ -7,6 +42,8 @@ pause starts one compile" assume the page opened on its default tab; opened at
 `#hardware` they measure blocks in a closed tab and log FAIL to a visitor. They
 pass in `verify kit` (277/277). Make them say "not measured, its tab is closed"
 rather than fail.
+DONE 2026-10-04: the gap check takes one gap, the compile-note check grades
+behaviour and says its geometry was not measured when its tab is closed.
 
 ### Plan everything the Pico could do for positron, asked 2026-10-04
 
