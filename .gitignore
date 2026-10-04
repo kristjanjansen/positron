@@ -127,3 +127,7 @@ rig/m1/bin/
 
 # Pico firmware builds (rig/pico/firmware/build.sh)
 rig/pico/firmware/build-*/
+# The Pico network node (rig/pico/net/build.sh), and its wifi credentials, which
+# are a secret in a public repository and live only in the working tree.
+rig/pico/net/build-*/
+rig/pico/net/pico/wifi_secrets.h
