@@ -197,55 +197,112 @@
   const ROOM = 'studio-1';
   const SITE = `partitur-${Math.random().toString(36).slice(2, 6)}`;
   const OUT = `${SITE}:light:out`;
+  /*
+   * 🔴 THREE LANES, THREE OUT PORTS, asked 2026-10-04 (*"Do"*): the light lane
+   * to a wall's light, the Ton lane's siren bands to any MIDI input in the room
+   * (a board input like the Circuit, or a board synth), and the stage cues to a
+   * wall's captions. Each pick is a link `bay.mjs` checks, and `/patchbay/` can
+   * ask for the same link with `link.request`, which this page answers.
+   */
+  const SOURCES = {
+    light: { port: OUT, label: 'Licht lane', dir: 'out', medium: 'value', shape: { channels: 3 }, choice: 'wall' },
+    sirens: { port: `${SITE}:light:sirens`, label: 'Ton lane', dir: 'out', medium: 'midi', emits: ['note'], choice: 'sirens to' },
+    cues: { port: `${SITE}:light:cues`, label: 'stage cues', dir: 'out', medium: 'state', shape: { schema: 'cue' }, choice: 'cues to' },
+  };
   const GRAPH = {
     v: 1, site: SITE, place: 'browser',
-    nodes: [{ id: `${SITE}:light`, kind: 'person', label: 'Licht lane', place: 'browser' }],
-    ports: [{ id: OUT, label: 'Licht lane', dir: 'out', medium: 'value', shape: { channels: 3 } }],
+    nodes: [{ id: `${SITE}:light`, kind: 'person', label: 'Partiturskizze', place: 'browser' }],
+    ports: Object.values(SOURCES).map(({ port, label, dir, medium, shape, emits }) =>
+      ({ id: port, label, dir, medium, ...(shape ? { shape } : {}), ...(emits ? { emits } : {}) })),
   };
+
   const registry = createRegistry();
   registry.ingest({ type: 'graph.announce', from: 'self', graph: GRAPH });
-  let wallTo = '', lastSent = '', me = null;
-  const wallHost = el('div');
+  const linked = { light: '', sirens: '', cues: '' };
+  let lastSent = '', me = null, lastCueSent = '', sirenOut = null, sirenNote = null;
+  const wallHost = el('div', 'pt-text');
   d.el.insertBefore(wallHost, panel.el);
-  const wallsHeard = () => registry.merged().ports.filter((p) => p.medium === 'value' && p.dir === 'in' && !p.stale);
-  function drawWallChoice() {
-    const walls = wallsHeard();
-    const options = [['none', ''], ...walls.map((p) => [p.label, p.id])];
-    const at = Math.max(0, options.findIndex(([, v]) => v === wallTo));
-    const c = createChoice({
-      label: 'wall', options, at,
-      title: (v) => (v ? `send the light lane to ${v}` : 'the light lane goes only to the picture above'),
-      onPick: (v) => linkWall(v),
-    });
-    wallHost.replaceChildren(c.el);
+  const kindOfPort = (id) => Object.keys(SOURCES).find((k) => SOURCES[k].port === id);
+  const targets = (k) => registry.merged().ports.filter((p) => p.dir === 'in' && !p.stale && !p.id.startsWith(`${SITE}:`)
+    && p.medium === SOURCES[k].medium && (k !== 'cues' || p.shape?.schema === 'cue'));
+  function drawChoices() {
+    wallHost.replaceChildren(...Object.keys(SOURCES).map((k) => {
+      const options = [['none', ''], ...targets(k).map((p) => [p.label, p.id])];
+      const at = Math.max(0, options.findIndex(([, v]) => v === linked[k]));
+      return createChoice({ label: SOURCES[k].choice, options, at, onPick: (v) => setLink(k, v) }).el;
+    }));
   }
-  function linkWall(to) {
-    if (!to) { wallTo = ''; d.log('the light lane is linked to nothing'); return; }
+  /** Make or break one lane's link. Answers bay's result, or `{ ok: true }` for a break. */
+  function setLink(k, to) {
+    const src = SOURCES[k];
+    if (k === 'sirens') { sirenOff(); try { sirenOut?.wire.close(); } catch { /* */ } sirenOut = null; }
+    if (!to) { linked[k] = ''; d.log(`${src.label} is linked to nothing`); drawChoices(); return { ok: true }; }
     const bay = registry.fill(createBay());
-    const r = bay.link(OUT, to);
-    if (!r.ok) { d.log(`refused ${OUT} -> ${to}: ${r.why}`, 'bad'); return; }
-    wallTo = to; lastSent = ''; lastKey = '';
-    d.log(`${OUT} -> ${to}, linked through the patchbay`, 'ok');
+    const r = bay.link(src.port, to);
+    if (!r.ok) { d.log(`refused ${src.port} -> ${to}: ${r.why}`, 'bad'); return r; }
+    linked[k] = to;
+    if (k === 'light') { lastSent = ''; lastKey = ''; }
+    if (k === 'cues') { lastCueSent = ''; lastKey = ''; }
+    if (k === 'sirens') {
+      // A board synth takes `note.on` in the board's main room; a hardware input
+      // takes raw MIDI through the gate in its own room (`/patchbay/` does the same).
+      const dest = bay.port(to), engine = bay.node(to.split(':').slice(0, 2).join(':'))?.kind === 'engine';
+      const ch = (dest.shape?.channels || [1])[0];
+      const w = openWire(dest.address || to.split(':')[0], {});
+      sirenOut = { wire: w, engine, ch };
+    }
+    d.log(`${src.port} -> ${to}, linked through the patchbay`, 'ok');
+    drawChoices();
+    return r;
   }
   function sendLight(f) {
-    if (!wallTo || !me) return;
+    if (!linked.light || !me) return;
     const s1 = spanAt(lightSpans, f) || lightSpans[lightSpans.length - 1];
     const parts = lightInside.filter((x) => f >= x.from && f < x.to).map((x) => ({ hex: x.hex, across: x.across }));
     const key = `${s1.hex}|${parts.map((x) => x.hex).join(',')}`;
     if (key === lastSent) return;
     lastSent = key;
-    wire.send({ type: 'light.set', to: wallTo, hex: s1.hex, name: s1.colour, parts, sender: 'partitur' });
+    wire.send({ type: 'light.set', to: linked.light, hex: s1.hex, name: s1.colour, parts, sender: 'partitur' });
+  }
+  /* The siren bands as held notes, one at a time, only while playing. The pitch
+     is per colour and is this page's reading: Moholy's sirens have no pitch. */
+  const SIREN_NOTE = { blue: 48, yellow: 55, red: 60, grey: 43, 'dark red': 52 };
+  function sirenMsg(on, note) {
+    const { engine, ch } = sirenOut;
+    return engine ? (on ? { type: 'note.on', note, vel: 90, channel: 0 } : { type: 'note.off', note, channel: 0 })
+      : { type: 'midi.send', bytes: [(on ? 0x90 : 0x80) | (ch - 1), note, on ? 90 : 0] };
+  }
+  function sirenOff() { if (sirenOut && sirenNote !== null) sirenOut.wire.send(sirenMsg(false, sirenNote)); sirenNote = null; }
+  function sendSiren(playing, sr) {
+    if (!sirenOut) return;
+    const want = playing && sr ? (SIREN_NOTE[sr.colour] ?? 50) : null;
+    if (want === sirenNote) return;
+    sirenOff();
+    if (want !== null) { sirenOut.wire.send(sirenMsg(true, want)); sirenNote = want; }
+  }
+  function sendCue(text) {
+    if (!linked.cues || !me || text === lastCueSent) return;
+    lastCueSent = text;
+    wire.send({ type: 'cue.set', to: linked.cues, text, sender: 'partitur' });
   }
   const wire = openWire(ROOM, {
     onOpen: (from) => { me = from; wire.send({ type: 'graph.announce', graph: GRAPH }); wire.send({ type: 'graph.ask' }); },
     onMessage: (got) => {
       if (got.kind !== 'json' || got.msg.from === me) return;
-      if (got.msg.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: GRAPH }); return; }
-      if (registry.ingest(got.msg)) drawWallChoice();
+      const m = got.msg;
+      if (m.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: GRAPH }); return; }
+      // `/patchbay/` asking for one of this page's links.
+      if (m.type === 'link.request' && kindOfPort(m.source)) {
+        const r = setLink(kindOfPort(m.source), m.open ? m.target : '');
+        wire.send({ type: 'link.state', source: m.source, target: m.target, open: !!m.open && r.ok, why: r.why || '' });
+        return;
+      }
+      if (registry.ingest(m)) drawChoices();
     },
   });
-  drawWallChoice();
-  setInterval(drawWallChoice, 15_000);
+  drawChoices();
+  setInterval(drawChoices, 15_000);
+  window.addEventListener('pagehide', () => sirenOff());
 
   /** Rescale everything from fractions. The playhead keeps its place on the plate. */
   function setLength(s, quiet = false) {
@@ -286,6 +343,25 @@
 
   // ── one loop for the wall, the readout and the sirens ─────────────────────
   let lastCue = '';
+  const cueAt = (f) => {
+    const cue = [...c1.marks, ...c2.marks].filter((m) => m.folge && (m.at ?? m.from) <= f)
+      .sort((a, b) => (b.at ?? b.from) - (a.at ?? a.from))[0];
+    return cue ? cue.folge.item : '';
+  };
+  /* 🔴 THE LANES' DESTINATIONS ARE DRIVEN FROM A TIMER TOO, NOT ONLY FROM THE
+     ANIMATION FRAME. MEASURED 2026-10-04 with three tabs: /partitur/ behind
+     another tab stopped sending entirely, because a browser pauses
+     `requestAnimationFrame` in a hidden tab, while a wall in another room went
+     on waiting. A timer still runs there, about once a second, so a wall keeps
+     following a score that nobody is looking at. Each send is a no-op unless
+     its value changed, so running it from both is free. */
+  function drive() {
+    const f = deck.position() / ms(1);
+    sendLight(f);
+    sendCue(cueAt(f));
+    sendSiren(!!deck.playing?.(), spanAt(sirens, f));
+  }
+  setInterval(drive, 250);
   (function follow() {
     const f = deck.position() / ms(1);
     const key = `${Math.round(deck.position())}|${W}|${H}`;
@@ -295,12 +371,10 @@
       d.set('light', drawn.colour);
       const sr = spanAt(sirens, f);
       d.set('sirens', sr ? sr.colour : '');
-      const cue = [...c1.marks, ...c2.marks].filter((m) => m.folge && (m.at ?? m.from) <= f)
-        .sort((a, b) => (b.at ?? b.from) - (a.at ?? a.from))[0];
-      const cueText = cue ? cue.folge.item : '';
+      const cueText = cueAt(f);
       if (cueText !== lastCue) { lastCue = cueText; d.set('cue', cueText); }
       siren(deck.playing?.() && !!sr, sr?.colour);
-      sendLight(f);
+      drive();
     }
     requestAnimationFrame(follow);
   })();
@@ -352,6 +426,17 @@
     const no = b.validate(OUT, 'wall-test:wall:sound');
     d.assert('the light lane can be linked to a wall\u2019s light input', ok.ok, ok.why);
     d.assert('and is refused into a sound input', !no.ok && /value/.test(no.why), no.why);
+    const reg2 = createRegistry();
+    reg2.ingest({ type: 'graph.announce', from: 'self', graph: GRAPH });
+    reg2.ingest({ type: 'graph.announce', from: 'i', graph: { v: 1, site: 'desk', place: 'pi',
+      nodes: [{ id: 'desk:synth', kind: 'engine', label: 'synth', place: 'pi' }, { id: 'desk:wall', kind: 'screen', label: 'wall', place: 'browser' }],
+      ports: [{ id: 'desk:synth:in', label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'], never: [] },
+              { id: 'desk:wall:cue', label: 'wall', dir: 'in', medium: 'state', shape: { schema: 'cue' } }] } });
+    const b2 = reg2.fill(createBay());
+    const toSynth = b2.validate(SOURCES.sirens.port, 'desk:synth:in');
+    const toCaps = b2.validate(SOURCES.cues.port, 'desk:wall:cue');
+    d.assert('the Ton lane can be linked to an instrument\u2019s MIDI input', toSynth.ok, toSynth.why);
+    d.assert('and the stage cues to a wall\u2019s captions', toCaps.ok, toCaps.why);
   }
   d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
 

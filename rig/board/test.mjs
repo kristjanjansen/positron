@@ -658,6 +658,13 @@ console.log('\nbeat: the graph on the hello and on every beat');
   is('the virtual clients are not in it', hello.graph.nodes.some((n) => /Virtual/.test(n.label)), false);
   is('no BOARD_NET means no net', 'net' in hello.graph, false);
   is('BOARD_NET set is carried', graphOf({ ...graphFacts, net: 'studio-lan' }).net, 'studio-lan');
+  // 2026-10-04: an unplugged Circuit was still offered as a MIDI input. The
+  // input's sound stays (the audio interface is there); its MIDI in goes.
+  const gone = graphOf({ ...graphFacts, midiPresent: () => false });
+  const there = graphOf({ ...graphFacts, midiPresent: () => true });
+  is('an input whose MIDI device is unplugged announces no MIDI in', gone.ports.some((p) => p.id === 'studio-1:circuit:in'), false);
+  is('and still announces its sound', gone.ports.some((p) => p.id === 'studio-1:circuit:audio'), true);
+  is('NEGATIVE CONTROL: plugged in, the MIDI in is back', there.ports.some((p) => p.id === 'studio-1:circuit:in'), true);
   is('no video path means no GPU node', graphOf({ ...graphFacts, gpu: false }).nodes.some((n) => n.id === 'studio-1:gpu'), false);
   is('a beat before the first hello carries no graph rather than an empty one',
     'graph' in aliveMsg({ insert: {}, graphFacts: null }), false);

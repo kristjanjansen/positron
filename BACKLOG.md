@@ -1,5 +1,14 @@
 ## Open
 
+### More lanes as patchbay sources, asked 2026-10-04
+
+*"Do"* to: `/patchbay/` able to open a lane's link itself (a `link.request`
+to the page that owns the source port, answered by `link.state`), the siren
+lane as a MIDI source that plays a real instrument through the board, the
+stage cues as a source a `/wall/` shows, and scenes as a lane (held for a
+decision, see the reply).
+DONE 2026-10-04 except scenes: /patchbay/ opens a lane link by asking its page, the Ton lane plays any MIDI input, cues go to a wall's captions; measured across three tabs. Found on the way: the Circuit was unplugged and still offered, now announced only when present.
+
 ### A timeline lane as a patchbay source: `/partitur/`'s light lane on a real surface, asked 2026-10-04
 
 After *"how universl patchbay and timeline relate"*, *"Yea"* to trying the
