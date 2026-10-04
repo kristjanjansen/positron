@@ -1,0 +1,13 @@
+{
+  "name": "positron-pico-sim",
+  "private": true,
+  "type": "module",
+  "description": "An emulated Raspberry Pi Pico (RP2040) with the 4 button SSD1306 OLED, driven from a script.",
+  "scripts": {
+    "fetch": "node fetch.mjs",
+    "run": "node run.mjs"
+  },
+  "dependencies": {
+    "rp2040js": "1.4.0"
+  }
+}

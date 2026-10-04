@@ -6,6 +6,7 @@
 emulator core, plain JS in Node) running MicroPython plus `rig/pico/oled/main.py`,
 with an SSD1306 model on its I2C and the four buttons pressed from a script, the
 screen written out as a PNG. RP2040 only; the RP2350 is not emulated.
+DONE 2026-10-04: `rig/pico/sim/`, end to end in about 2 s.
 
 ### Scenes: saved sets of links in `/patchbay/`, then a scene lane, asked 2026-10-04
 
