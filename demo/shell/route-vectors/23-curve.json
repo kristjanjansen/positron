@@ -1,0 +1,66 @@
+{
+  "name": "curve bends one CC through a table of points",
+  "about": "curve on CC 74 maps its value through four points by straight lines between them, ties away from zero, and holds the end values outside the first and last point.",
+  "notes": [
+    "points (16,4) (32,9) (96,120) (112,127), cc 74 (4A). For x between two points (x0,y0) and (x1,y1): y0 + round((x - x0) * (y1 - y0) / (x1 - x0)), round to nearest with ties AWAY FROM ZERO, in integers, as `scale` does it.",
+    "Below the first point the value is the first point's out, above the last it is the last point's out. x is found in the first segment whose right end is at or above it, so a value ON a point gives that point's out from either side.",
+    "t 0: x 8 (08) is below 16, CLAMPS to the first out 4 = 04. THE FIRST OUT WAS 0 UNTIL THE SABOTAGE RUN OF 2026-10-04, and then a core that extrapolated below the first point (4 - 8 * 5 / 16 = 1.5 here) floored at 0 and read the same as the clamp, so the clamp was not graded.",
+    "t 1: x 16 (10) is the first point: 4 = 04.",
+    "t 2: x 24 (18), segment 16..32: 4 + 8 * 5 / 16 = 4 + 2.5, a TIE, away from zero 4 + 3 = 7 = 07. Truncating gives 6, ties to even gives 6.",
+    "t 3: x 32 (20) is a point: 4 + 16 * 5 / 16 = 9 = 09.",
+    "t 4: x 64 (40), segment 32..96: 9 + 32 * 111 / 64 = 9 + 55.5, a TIE, 9 + 56 = 65 = 41. Truncating gives 64 = 40.",
+    "t 5: x 100 (64), segment 96..112: 120 + 4 * 7 / 16 = 120 + 1.75, rounds to 122 = 7A.",
+    "t 6: x 120 (78) is above 112, CLAMPS to the last out 127 = 7F. An extrapolating core floors this at 127 too, so this step does not grade the top clamp. Vector 25 does, where the last out is 120.",
+    "NEGATIVE CONTROL t 7: CC 7 is not CC 74 and passes unchanged, B0 07 18. Curved it would read B0 07 07.",
+    "NEGATIVE CONTROL t 8: a note is not a value, 90 3C 18 passes unchanged.",
+    "NEGATIVE CONTROL t 9: a bend passes unchanged because the op names a CC, E0 00 18.",
+    "NEGATIVE CONTROL: l2 lists its points with the inputs going DOWN (64 then 32) and is refused bad-args. Inputs must rise strictly.",
+    "NEGATIVE CONTROL: l3 has 17 points, inputs 0, 7, 14 up to 112, each one valid, and is refused bad-args, since a table holds at most 16.",
+    "NEGATIVE CONTROL: l4 has one point and is refused bad-args. A curve needs two.",
+    "NEGATIVE CONTROL: l5 asks for kind bend AND cc 74, which cannot both hold, and is refused bad-args.",
+    "NEGATIVE CONTROL: l6 has an out of 128 and is refused bad-args. Every in and out is 0..127."
+  ],
+  "ports": [
+    { "id": "kbd", "dir": "in" },
+    { "id": "synth", "dir": "out" }
+  ],
+  "links": [
+    { "id": "l1", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[16, 4], [32, 9], [96, 120], [112, 127]], "cc": 74 }] },
+    { "id": "l2", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[64, 0], [32, 127]] }] },
+    { "id": "l3", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[0, 0], [7, 7], [14, 14], [21, 21], [28, 28], [35, 35], [42, 42], [49, 49], [56, 56], [63, 63], [70, 70], [77, 77], [84, 84], [91, 91], [98, 98], [105, 105], [112, 112]] }] },
+    { "id": "l4", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[64, 64]] }] },
+    { "id": "l5", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[0, 0], [127, 127]], "cls": "bend", "cc": 74 }] },
+    { "id": "l6", "from": "kbd", "to": "synth", "ops": [{ "op": "curve", "points": [[0, 0], [127, 128]] }] }
+  ],
+  "refused": [
+    { "link": "l2", "reason": "bad-args" },
+    { "link": "l3", "reason": "bad-args" },
+    { "link": "l4", "reason": "bad-args" },
+    { "link": "l5", "reason": "bad-args" },
+    { "link": "l6", "reason": "bad-args" }
+  ],
+  "in": [
+    { "port": "kbd", "t": 0, "bytes": "B0 4A 08" },
+    { "port": "kbd", "t": 1, "bytes": "B0 4A 10" },
+    { "port": "kbd", "t": 2, "bytes": "B0 4A 18" },
+    { "port": "kbd", "t": 3, "bytes": "B0 4A 20" },
+    { "port": "kbd", "t": 4, "bytes": "B0 4A 40" },
+    { "port": "kbd", "t": 5, "bytes": "B0 4A 64" },
+    { "port": "kbd", "t": 6, "bytes": "B0 4A 78" },
+    { "port": "kbd", "t": 7, "bytes": "B0 07 18" },
+    { "port": "kbd", "t": 8, "bytes": "90 3C 18" },
+    { "port": "kbd", "t": 9, "bytes": "E0 00 18" }
+  ],
+  "out": [
+    { "port": "synth", "t": 0, "bytes": "B0 4A 04" },
+    { "port": "synth", "t": 1, "bytes": "B0 4A 04" },
+    { "port": "synth", "t": 2, "bytes": "B0 4A 07" },
+    { "port": "synth", "t": 3, "bytes": "B0 4A 09" },
+    { "port": "synth", "t": 4, "bytes": "B0 4A 41" },
+    { "port": "synth", "t": 5, "bytes": "B0 4A 7A" },
+    { "port": "synth", "t": 6, "bytes": "B0 4A 7F" },
+    { "port": "synth", "t": 7, "bytes": "B0 07 18" },
+    { "port": "synth", "t": 8, "bytes": "90 3C 18" },
+    { "port": "synth", "t": 9, "bytes": "E0 00 18" }
+  ]
+}

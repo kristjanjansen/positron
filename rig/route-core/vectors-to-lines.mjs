@@ -23,7 +23,9 @@
 //   V file name...                       a vector starts
 //   P index name dir accepts v0..v7      a port; verbs 0 allow 1 confirm 2 deny 3 unset
 //   R port verb len b0 b1 ...            a rule on that port; `xx` is any byte
-//   L id from to nops (code a0..a4)*     a link to make; `-` absent, `?` not an integer
+//   L id from to nops (code a0..a4)*     a link to make; `-` absent, `?` not an integer,
+//                                        `v` notecc's on 'vel', and a curve's points as
+//                                        one token `in,out,in,out,...` in its a0
 //   I port t hex...                      an input
 //   U id t | C port t | D port           unlink, confirm, deny
 //   X id code                            an expected refusal, code as in route_status
@@ -45,6 +47,7 @@ const ARGS = {
   channel: ['to', 'from'], transpose: ['by'], velocity: ['scale'], only: ['cls'], drop: ['cls'],
   range: ['lo', 'hi'], vrange: ['lo', 'hi'], fixed: ['to'], cc: ['from', 'to', 'ch'],
   scale: ['lo', 'hi', 'lo2', 'hi2', 'cc'], toggle: ['note', 'cc', 'on', 'off'], thin: ['hz'],
+  curve: ['points', 'cls', 'cc'], velcurve: ['points'], notecc: ['note', 'cc', 'on', 'off'],
 };
 const OPCODES = Object.keys(ARGS);
 const C_KINDS = ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'transport', 'sysex'];
@@ -67,6 +70,15 @@ function arg(op, field, v) {
   // since 2026-10-03, vector 20), and a fourth decimal is lost. Why thousandths:
   // `route_core.c`, the op.
   if (op === 'velocity' && field === 'scale') return typeof v === 'number' ? int32(Math.round(v * 1000)) : INVALID;
+  // ⚠️ A CURVE'S TABLE IS ONE TOKEN, its pairs flattened with commas, so the
+  // fixed five slots of an L line still hold it. Anything that is not a list of
+  // integer pairs is `?`. How many points, their range and their order are the
+  // C's to refuse, not this file's: 17 points go across as 34 numbers.
+  if (field === 'points') {
+    const ok = Array.isArray(v) && v.length > 0 && v.every((q) => Array.isArray(q) && q.length === 2 && q.every((x) => int32(x) !== INVALID));
+    return ok ? v.flat().join(',') : INVALID;
+  }
+  if (op === 'notecc' && field === 'on' && v === 'vel') return 'v';
   return int32(v);
 }
 

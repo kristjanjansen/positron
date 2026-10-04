@@ -8,13 +8,19 @@
  * at link time, the output, and what is held at the end when the vector says;
  * then each vector against its own expectation with the last byte flipped,
  * which must FAIL; then the five refusals made directly. After those, a few
- * asserts the JS cannot have, about the limits only C has.
+ * asserts the JS cannot have, about the limits only C has, the curve table
+ * store among them.
  *
  * MEASURED 2026-10-03: 17 vectors (01 to 17, all `index.json` listed that day),
  * 65/65 green, the JS reading 77/77 on the same vectors. Then 22 vectors (18 to
  * 22 added for the five things below), 82/82 green, the JS reading 99/99. sizeof(route_core) is
  * 6064 bytes on x86_64 and 6052 on a Cortex-M4 with the default limits, under
  * the plan's 8 KB. `.text` is 4264 bytes at -Os for the M4, 8172 at -O2 on x86.
+ * MEASURED 2026-10-04 after `curve`, `velcurve` and `notecc` (23 to 26) and
+ * the curve table store: 26 vectors, 98/98 green, the JS reading 115/115. The
+ * 16 new asserts are 3 per new vector and 4 about the table store, which only C
+ * has. sizeof(route_core) 6352 on x86_64 and 6340 on the M4, both 288 bytes
+ * more: 8 slots of 36. `.text` 5400 at -Os for the M4, 10230 at -O2 on x86.
  *
  * 🔴 SABOTAGED SIX TIMES, 2026-10-03, ON SCRATCH COPIES, never on this
  * checkout, each change alone through `SRC=<copy> test.sh`. Red per sabotage:
@@ -50,6 +56,24 @@
  * same change made with sed built), and a build failure prints no FAIL line,
  * so a count of FAIL lines read 0 red on both. Each was rebuilt and is counted
  * from a run that printed its tally.
+ *
+ * 🔴 SABOTAGED A THIRD TIME, 2026-10-04, ONCE OR MORE PER NEW OP AND THE TABLE
+ * STORE, the same way, the copy restored and read 98/98. Each counted from a run
+ * that printed its tally. Red per sabotage, MEASURED:
+ *  13. `curve` ignoring its cc: 1 red (23).
+ *  14. `curve` ignoring its cls: 1 red (24). It was 0 red in the JS before 24's
+ *      l2 stopped being a full identity; this run came after the repair.
+ *  15. a bend's point 127 read as 16256: 1 red (24).
+ *  16. `curve_at` truncating: 3 red (23, 24, 25).
+ *  17. `curve_at` extrapolating below the first point, floored at 0: 1 red
+ *      (23, since its first out became 4 instead of 0).
+ *  18. `velcurve` without its floor of 1: 1 red (25).
+ *  19. `notecc` reading a note on at velocity 0 as a press: 1 red (26).
+ *  20. `notecc`'s ROUTE_VEL packed as 127 instead of 0x80: 1 red (26).
+ *  21. the store never sharing an equal table: 3 red, all table store asserts.
+ *  22. `route_unlink` never freeing a table: 1 red (the slot is not free again).
+ *  23. a link refused full keeping the counts it took: 2 red (the store asserts
+ *      that read slot 0's count).
  *
  * ⚠️ A CHUNK THAT IS ONLY `F7` WAS DROPPED AND LEFT ITS STREAM OPEN, in the JS
  * and here alike, until 2026-10-03. F7 is a status byte, so it is not a
@@ -120,7 +144,8 @@ static void line_of(char *dst, size_t cap, const ev *e, int n) {
 /* ── one vector, as read ─────────────────────────────────────────────── */
 
 typedef struct { int id; int dir; int accepts; uint8_t policy[ROUTE_KINDS]; route_rule rule[ROUTE_MAX_RULES]; int nrules; } tport;
-typedef struct { int id, from, to, nops; route_opdef op[8]; } tlink;
+#define MAX_TPTS 32               /* pairs a vector's table may list; more reads as 255, refused */
+typedef struct { int id, from, to, nops; route_opdef op[8]; int32_t pts[8][2 * MAX_TPTS]; } tlink;
 typedef struct { char what; int a; long t; int len; uint8_t b[MAX_BYTES]; } tstep;
 
 typedef struct {
@@ -148,7 +173,23 @@ static int32_t arg_of(char *tok) {
   if (!tok) return ROUTE_INVALID;
   if (!strcmp(tok, "-")) return ROUTE_ABSENT;
   if (!strcmp(tok, "?")) return ROUTE_INVALID;
+  if (!strcmp(tok, "v")) return ROUTE_VEL;
   return (int32_t)strtol(tok, NULL, 10);
+}
+
+/* A curve's table, `in,out,in,out,...`, into `dst`. Answers the pairs read. */
+static uint16_t pts_of(const char *tok, int32_t *dst) {
+  int n = 0;
+  const char *p = tok;
+  for (;;) {
+    char *end;
+    long v = strtol(p, &end, 10);
+    if (n < 2 * MAX_TPTS) dst[n] = (int32_t)v;
+    n++;
+    if (*end != ',') break;
+    p = end + 1;
+  }
+  return n > 2 * MAX_TPTS ? 255 : (uint16_t)(n % 2 ? 0 : n / 2);   /* an odd count is no table */
 }
 
 /* Reads up to the next E. Answers 0 at the end of input. */
@@ -194,7 +235,14 @@ static int read_vector(FILE *in) {
         l->id = num(&save); l->from = num(&save); l->to = num(&save); l->nops = num(&save);
         for (i = 0; i < l->nops && i < 8; i++) {
           l->op[i].code = (uint8_t)num(&save);
-          for (j = 0; j < ROUTE_OP_ARGS; j++) l->op[i].arg[j] = arg_of(strtok_r(NULL, " \n", &save));
+          for (j = 0; j < ROUTE_OP_ARGS; j++) {
+            char *tok = strtok_r(NULL, " \n", &save);
+            if (tok && strchr(tok, ',')) {
+              l->op[i].npts = pts_of(tok, l->pts[i]);
+              l->op[i].pts = l->pts[i];
+              l->op[i].arg[j] = ROUTE_ABSENT;
+            } else l->op[i].arg[j] = arg_of(tok);
+          }
         }
         break;
       }
@@ -256,6 +304,7 @@ static void run(void) {
 static route_opdef op(uint8_t code, int32_t a0, int32_t a1, int32_t a2, int32_t a3, int32_t a4) {
   route_opdef o;
   o.code = code; o.arg[0] = a0; o.arg[1] = a1; o.arg[2] = a2; o.arg[3] = a3; o.arg[4] = a4;
+  o.pts = NULL; o.npts = 0;
   return o;
 }
 
@@ -327,6 +376,40 @@ static void direct(void) {
     route_unlink(&core, 1, 9);
     ok("", "and the unlink releases the tracked ones, then CC 123 on both channels",
        ngot == ROUTE_MAX_SOUNDING + 2 && got[ngot - 1].b[0] == 0xB1 && got[ngot - 1].b[1] == 123, "");
+  }
+  /* The curve table store: shared when equal, refused whole when full, freed on unlink. */
+  {
+    static int32_t tab[ROUTE_MAX_CURVES + 1][4];
+    route_opdef two[2];
+    uint8_t cc[3] = { 0xB0, 1, 64 };
+    int free_n = 0;
+    route_init(&core, emit, NULL);
+    route_port(&core, 0, ROUTE_IN, 0xFF, NULL, NULL, 0);
+    route_port(&core, 1, ROUTE_OUT, 0xFF, NULL, NULL, 0);
+    for (n = 0; n <= ROUTE_MAX_CURVES; n++) { tab[n][0] = 0; tab[n][1] = n; tab[n][2] = 127; tab[n][3] = 127; }
+    o = op(ROUTE_OP_CURVE, A, A, A, A, A); o.pts = tab[0]; o.npts = 2;
+    route_link(&core, 1, 0, 1, &o, 1);
+    route_link(&core, 2, 0, 1, &o, 1);
+    for (n = 0; n < ROUTE_MAX_CURVES; n++) free_n += core.curve[n].refs == 0;
+    ok("", "two links with an equal curve table share one slot in the store",
+       core.curve[0].refs == 2 && free_n == ROUTE_MAX_CURVES - 1, "");
+    for (n = 1; n < ROUTE_MAX_CURVES; n++) {
+      o.pts = tab[n];
+      route_link(&core, (uint16_t)(10 + n), 0, 1, &o, 1);
+    }
+    /* Store full. A link with one table already there and one new: refused, and the shared one's count is put back. */
+    two[0] = op(ROUTE_OP_CURVE, A, A, A, A, A); two[0].pts = tab[0]; two[0].npts = 2;
+    two[1] = op(ROUTE_OP_VELCURVE, A, A, A, A, A); two[1].pts = tab[ROUTE_MAX_CURVES]; two[1].npts = 2;
+    ok("", "a link whose new table finds the store full is refused: full, and takes nothing",
+       route_link(&core, 3, 0, 1, two, 2) == ROUTE_FULL && core.curve[0].refs == 2 && core.nlinks == ROUTE_MAX_CURVES + 1, "");
+    route_unlink(&core, 11, 0);
+    ok("", "and once a link using its own table is removed, the slot is free and the same link fits",
+       route_link(&core, 3, 0, 1, two, 2) == ROUTE_OK && core.curve[0].refs == 3, "");
+    tab[0][1] = 99;                                            /* the caller's array changes after linking */
+    ngot = 0;
+    route_input(&core, 0, 0, cc, 3);
+    ok("", "the table was copied at link time: changing the caller's array changes nothing",
+       ngot >= 1 && got[0].b[2] == 64, "");
   }
 }
 

@@ -58,12 +58,46 @@ static int32_t div_round(int32_t num, int32_t den) {
   return num < 0 ? -q : q;
 }
 
+/*
+ * The JS `curveAt`: `x` through a table by straight lines, rounded by
+ * `div_round`. Below the first point it is the first out, above the last the
+ * last out. With `wide` each point is a 14 bit bend value, p * 128 except 127,
+ * which is 16383, so 64 is the bend's centre and an identity table is exact.
+ * ⚠️ THE WIDEST PRODUCT IS 16383 * 16383, ABOUT 2.7e8, and `div_round` doubles
+ * it, so it stays inside an int32 with room to spare.
+ */
+static int32_t at(uint8_t p, int wide) { return !wide ? p : p == 127 ? 16383 : (int32_t)p << 7; }
+
+static int32_t curve_at(const route_curve_t *cv, int32_t x, int wide) {
+  uint8_t i;
+  if (x <= at(cv->in[0], wide)) return at(cv->out[0], wide);
+  for (i = 1; i < cv->n; i++) {
+    int32_t x1 = at(cv->in[i], wide);
+    if (x <= x1) {
+      int32_t x0 = at(cv->in[i - 1], wide), y0 = at(cv->out[i - 1], wide), y1 = at(cv->out[i], wide);
+      return y0 + div_round((x - x0) * (y1 - y0), x1 - x0);
+    }
+  }
+  return at(cv->out[cv->n - 1], wide);
+}
+
 /* ── ops, link time ───────────────────────────────────────────────────── */
 
 /* ROUTE_ABSENT and ROUTE_INVALID sit far below every range, so one test serves. */
 static int is_int(int32_t v, int32_t lo, int32_t hi) { return v >= lo && v <= hi; }
 static int opt(int32_t v, int32_t lo, int32_t hi) { return v == ROUTE_ABSENT || is_int(v, lo, hi); }
 static uint8_t pack(int32_t v) { return v == ROUTE_ABSENT ? NONE : (uint8_t)v; }
+
+/* The JS `pointsOk`: 2 to 16 pairs, each 0..127, the inputs rising strictly. */
+static int points_ok(const route_opdef *o) {
+  uint16_t i;
+  if (!o->pts || o->npts < 2 || o->npts > ROUTE_CURVE_POINTS) return 0;
+  for (i = 0; i < o->npts; i++) {
+    if (!is_int(o->pts[2 * i], 0, 127) || !is_int(o->pts[2 * i + 1], 0, 127)) return 0;
+    if (i > 0 && o->pts[2 * i] <= o->pts[2 * i - 2]) return 0;
+  }
+  return 1;
+}
 
 /* The JS `ok(args)`, one op. */
 static int op_ok(const route_opdef *o) {
@@ -82,14 +116,22 @@ static int op_ok(const route_opdef *o) {
                                && is_int(a[2], 0, 127) && is_int(a[3], 0, 127) && opt(a[4], 0, 127);
     case ROUTE_OP_TOGGLE:    return is_int(a[0], 0, 127) && is_int(a[1], 0, 127) && opt(a[2], 0, 127) && opt(a[3], 0, 127);
     case ROUTE_OP_THIN:      return is_int(a[0], 1, 1000);
+    case ROUTE_OP_CURVE:     return points_ok(o) && opt(a[2], 0, 127)
+                               && (a[1] == ROUTE_ABSENT || a[1] == ROUTE_CC || a[1] == ROUTE_BEND || a[1] == ROUTE_TOUCH)
+                               && (a[2] == ROUTE_ABSENT || a[1] == ROUTE_ABSENT || a[1] == ROUTE_CC);
+    case ROUTE_OP_VELCURVE:  return points_ok(o);
+    case ROUTE_OP_NOTECC:    return is_int(a[0], 0, 127) && is_int(a[1], 0, 127)
+                               && (a[2] == ROUTE_VEL || opt(a[2], 0, 127)) && opt(a[3], 0, 127);
     default:                 return 0;
   }
 }
 
 /*
  * Authored arguments to the 5 stored bytes. Validated already, so every value
- * fits. ⚠️ TOGGLE'S DEFAULTS ARE RESOLVED HERE, NOT ON THE HOT PATH, and the two
- * u16 arguments (velocity's scale, thin's hz) go low byte first.
+ * fits. ⚠️ TOGGLE'S AND NOTECC'S DEFAULTS ARE RESOLVED HERE, NOT ON THE HOT
+ * PATH, notecc's ROUTE_VEL becomes 0x80, which no 7 bit value can be, and the
+ * two u16 arguments (velocity's scale, thin's hz) go low byte first. A curve's
+ * a[0] is its slot in the table store, written by `route_link` after this.
  */
 static void op_pack(route_op *dst, const route_opdef *o) {
   const int32_t *a = o->arg;
@@ -101,11 +143,38 @@ static void op_pack(route_op *dst, const route_opdef *o) {
     case ROUTE_OP_VELOCITY:
     case ROUTE_OP_THIN:      dst->a[0] = (uint8_t)(a[0] & 0xFF); dst->a[1] = (uint8_t)(a[0] >> 8); break;
     case ROUTE_OP_TOGGLE:
+    case ROUTE_OP_NOTECC:
       if (a[2] == ROUTE_ABSENT) dst->a[2] = 127;
+      if (a[2] == ROUTE_VEL) dst->a[2] = 0x80;
       if (a[3] == ROUTE_ABSENT) dst->a[3] = 0;
       break;
     default: break;
   }
+}
+
+static int is_curve(uint8_t code) { return code == ROUTE_OP_CURVE || code == ROUTE_OP_VELCURVE; }
+
+/*
+ * A slot in the table store holding `o`'s table: an equal one already there,
+ * counted once more, or a free one filled. NONE when the store is full.
+ */
+static uint8_t curve_take(route_core *c, const route_opdef *o) {
+  uint8_t s, i, free_at = NONE;
+  for (s = 0; s < ROUTE_MAX_CURVES; s++) {
+    route_curve_t *cv = &c->curve[s];
+    int same = cv->refs && cv->n == o->npts;
+    for (i = 0; same && i < cv->n; i++) same = cv->in[i] == o->pts[2 * i] && cv->out[i] == o->pts[2 * i + 1];
+    if (same) { cv->refs++; return s; }
+    if (!cv->refs && free_at == NONE) free_at = s;
+  }
+  if (free_at == NONE) return NONE;
+  c->curve[free_at].refs = 1;
+  c->curve[free_at].n = (uint8_t)o->npts;
+  for (i = 0; i < o->npts; i++) {
+    c->curve[free_at].in[i] = (uint8_t)o->pts[2 * i];
+    c->curve[free_at].out[i] = (uint8_t)o->pts[2 * i + 1];
+  }
+  return free_at;
 }
 
 /* ── ops, the hot path ────────────────────────────────────────────────── */
@@ -117,7 +186,7 @@ static void op_pack(route_op *dst, const route_opdef *o) {
  * every other op in the JS passes one through untouched, so `dispatch` asks
  * only those two and a SysEx is never copied into the 3 byte `msg`.
  */
-static int op_run(route_link_t *l, int i, msg *m, uint32_t t, route_kind k) {
+static int op_run(const route_core *c, route_link_t *l, int i, msg *m, uint32_t t, route_kind k) {
   const uint8_t *a = l->op[i].a;
   switch (l->op[i].code) {
     case ROUTE_OP_CHANNEL:
@@ -212,6 +281,36 @@ static int op_run(route_link_t *l, int i, msg *m, uint32_t t, route_kind k) {
       }
       l->has = (uint8_t)(l->has | (1u << i));
       l->st[i] = t;
+      return 1;
+    }
+    case ROUTE_OP_CURVE: {
+      /* ⚠️ A BEND IN ITS OWN 14 BITS, a channel touch (Dn) in its SECOND byte. */
+      const route_curve_t *cv = &c->curve[a[0]];
+      int32_t v;
+      if (k != ROUTE_CC && k != ROUTE_BEND && k != ROUTE_TOUCH) return 1;
+      if (a[1] != NONE && k != a[1]) return 1;
+      if (a[2] != NONE && (k != ROUTE_CC || m->b[1] != a[2])) return 1;
+      if (k == ROUTE_BEND) {
+        v = curve_at(cv, m->b[1] | (m->b[2] << 7), 1);
+        m->b[1] = (uint8_t)(v & 127); m->b[2] = (uint8_t)(v >> 7);
+      } else if ((m->b[0] & 0xF0) == 0xD0) m->b[1] = (uint8_t)curve_at(cv, m->b[1], 0);
+      else m->b[2] = (uint8_t)curve_at(cv, m->b[2], 0);
+      return 1;
+    }
+    case ROUTE_OP_VELCURVE: {
+      /* 🔴 CLAMPED UP TO 1, so a table that reaches 0 never makes a release. */
+      int32_t v;
+      if (!is_note_on(m)) return 1;
+      v = curve_at(&c->curve[a[0]], m->b[2], 0);
+      m->b[2] = (uint8_t)(v < 1 ? 1 : v); m->len = 3;
+      return 1;
+    }
+    case ROUTE_OP_NOTECC: {
+      uint8_t ch;
+      if (!is_note(m) || m->b[1] != a[0]) return 1;
+      ch = ch_of(m);
+      m->b[2] = is_note_on(m) ? (a[2] == 0x80 ? m->b[2] : a[2]) : a[3];   /* read before b[0] changes */
+      m->b[0] = (uint8_t)(0xB0 | ch); m->b[1] = a[1]; m->len = 3;
       return 1;
     }
     default: return 1;
@@ -337,7 +436,7 @@ static int find_link(const route_core *c, uint16_t id) {
 route_status route_link(route_core *c, uint16_t id, uint8_t from, uint8_t to,
                         const route_opdef *ops, uint8_t nops) {
   route_link_t *l;
-  uint8_t i, slot;
+  uint8_t i, slot, cv[ROUTE_MAX_OPS];
   if (find_link(c, id) >= 0) return ROUTE_DUPLICATE;
   if (from >= ROUTE_MAX_PORTS || to >= ROUTE_MAX_PORTS || !c->port[from].used || !c->port[to].used)
     return ROUTE_UNKNOWN_PORT;
@@ -351,12 +450,20 @@ route_status route_link(route_core *c, uint16_t id, uint8_t from, uint8_t to,
   if (reaches(c, to, from)) return ROUTE_CYCLE;
   /* ⚠️ LAST ON PURPOSE: every refusal the JS makes, this makes first. */
   if (nops > ROUTE_MAX_OPS || c->nlinks >= ROUTE_MAX_LINKS) return ROUTE_FULL;
+  /* The tables last of all, and a link that cannot have every one takes none. */
+  for (i = 0; i < nops; i++) {
+    cv[i] = NONE;
+    if (is_curve(ops[i].code) && (cv[i] = curve_take(c, &ops[i])) == NONE) {
+      while (i--) if (cv[i] != NONE) c->curve[cv[i]].refs--;
+      return ROUTE_FULL;
+    }
+  }
   for (slot = 0; c->used[slot]; slot++) {}
   l = &c->link[slot];
   memset(l, 0, sizeof *l);
   l->id = id; l->from = from; l->to = to; l->nops = nops;
   l->sx_mode = SX_NONE; l->sx_verb = ROUTE_UNSET; l->sx_slot = NONE;
-  for (i = 0; i < nops; i++) op_pack(&l->op[i], &ops[i]);
+  for (i = 0; i < nops; i++) { op_pack(&l->op[i], &ops[i]); if (cv[i] != NONE) l->op[i].a[0] = cv[i]; }
   c->used[slot] = 1;
   c->order[c->nlinks++] = slot;
   return ROUTE_OK;
@@ -369,7 +476,7 @@ route_status route_link(route_core *c, uint16_t id, uint8_t from, uint8_t to,
  * safety message, and a port that took the notes takes their release.
  */
 int route_unlink(route_core *c, uint16_t id, uint32_t t) {
-  int i = find_link(c, id), n = 0;
+  int i = find_link(c, id), n = 0, o;
   uint8_t slot, ch;
   route_link_t *l;
   if (i < 0) return 0;
@@ -378,6 +485,7 @@ int route_unlink(route_core *c, uint16_t id, uint32_t t) {
   memmove(&c->order[i], &c->order[i + 1], (size_t)(c->nlinks - i - 1));
   c->nlinks--;
   c->used[slot] = 0;
+  for (o = 0; o < l->nops; o++) if (is_curve(l->op[o].code)) c->curve[l->op[o].a[0]].refs--;
   /* Smallest key first, each emitted entry freed, so this is a selection sort
    * over a pool of ROUTE_MAX_SOUNDING. Not the hot path. */
   for (;;) {
@@ -482,7 +590,7 @@ int route_input(route_core *c, uint8_t port, uint32_t t, const uint8_t *bytes, u
       /* A continuation chunk has no status byte, so its kind is carried, not read. */
       k = kind == ROUTE_SYSEX ? ROUTE_SYSEX : route_kind_of(m.b[0]);
       if (k == ROUTE_SYSEX && l->op[j].code != ROUTE_OP_ONLY && l->op[j].code != ROUTE_OP_DROP) continue;
-      keep = op_run(l, j, &m, t, k);
+      keep = op_run(c, l, j, &m, t, k);
     }
     if (!keep) continue;
     k = kind == ROUTE_SYSEX ? ROUTE_SYSEX : route_kind_of(m.b[0]);
