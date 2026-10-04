@@ -653,7 +653,7 @@
     ['status', 'STATUS'],
     ['timeline', 'TIMELINE'],
     ['layout', 'LAYOUT'],
-    ['hardware', 'HARDWARE'],
+    ['devices', 'DEVICES'],
     ['panel', 'PANEL'],
     ['diagram', 'DIAGRAM'],
   ];
@@ -1635,7 +1635,7 @@ ROW_ALIGN  // start, center, end, between`,
         stripFull, fullBetween, settingsFull, stripNarrow, narrowBetween, clusterNarrow, clusterRow, narrow };
     }, { bare: true });
 
-  section('hardware', 'PANEL SEAM',
+  section('devices', 'PANEL SEAM',
     'A rule across a panel from one inner edge of its case to the other.',
     `const p = createPanelLayout({ side: null, plate: { lines: ['SEAM'], place: 'side' } });
 p.seam()                      // a rule, edge to edge of the case
@@ -2017,7 +2017,7 @@ createToggle({ label: 'Board', checked: true, disabled: true })`,
    * `shell.css`, which answers the failure this repo has actually measured. The
    * layout itself is read and not measured.
    */
-  section('hardware', 'INSTRUMENT HEADER',
+  section('devices', 'INSTRUMENT HEADER',
     'A status control at one end and the nameplate at the other, with the patch '
     + 'selector sitting on the case’s own centre rather than between them.',
     `createInstrument({
@@ -2106,7 +2106,7 @@ inst.head                     // the row, a 1fr auto 1fr grid on the case`,
    * graded with no browser by `node demo/shell/knob-test.mjs`, 19 asserts, and
    * one deliberate sabotage of the accumulator takes it red.
    */
-  section('hardware', 'STEPPED KNOB',
+  section('devices', 'STEPPED KNOB',
     'A knob that lands only on whole steps, with the needle on the step rather than '
     + 'between two of them.',
     `createKnob({ label: 'VOICES', min: 1, max: 8, step: 1, value: 4 })
@@ -2140,7 +2140,7 @@ k.value()        // always on a step, whatever moved it`,
       box.append(createKnobBank([stepped, quarters, free], {}).el, o);
     });
 
-  section('hardware', 'CONTROL GRID',
+  section('devices', 'CONTROL GRID',
     'Any number of controls across by any number down, with the column pitch widened '
     + 'to the row pitch so the working surfaces land on a square lattice.',
     `createControlGrid({ cols: 3, gap: 10, items: knobs })
@@ -2226,7 +2226,7 @@ grid.centres()      // where each dial really is, for a check`,
    * arrangement any more; `instrument-test.mjs` keeps the decision that a lone
    * line takes `end`, which is the part a browser was never needed for.
    */
-  section('hardware', 'INSTRUMENT',
+  section('devices', 'INSTRUMENT',
     'A cased panel with the maker at one end of its plate and the model at the other, '
     + 'built out of the two components that already draw those.',
     `createInstrument({ name: 'PLAI', panel: { side: 'left' } })
@@ -2285,7 +2285,7 @@ inst.add(row)                     // the flow that does`,
    * The three callbacks are gone with the line rather than left writing to a
    * detached node.
    */
-  section('hardware', 'STEP GRID',
+  section('devices', 'STEP GRID',
     'Rows of square pads over a ruler, with the standard transport glued above them '
     + 'and a second grid carrying no labels on either axis.',
     `const grid = createStepGrid({
@@ -2577,7 +2577,7 @@ createCheckGroup({ label: 'parts', options: [...], orient: 'column' })`,
    * ⚠️ **THE FOURTH FIGURE HAS NO LENGTHS AT ALL**, which is a real setting and
    * is also the divide by zero this component had to be written around.
    */
-  section('hardware', 'ENVELOPE',
+  section('devices', 'ENVELOPE',
     'The four stages drawn from their own settings, with the one envelope a '
     + 'controller number can reach wired to four sliders and the two it cannot '
     + 'standing still beside it.',
@@ -2649,7 +2649,7 @@ env.set({ attack: v })      // redraws, and nothing here sends anything`,
    * refuses in words instead of drawing the default low pass under somebody
    * else's label.
    */
-  section('hardware', 'FILTER RESPONSE',
+  section('devices', 'FILTER RESPONSE',
     'A drawn response with the corner where the cutoff says and the slope the type '
     + 'name claims, marked as a schematic on its own face because nothing here has '
     + 'measured a real one.',
@@ -2776,7 +2776,7 @@ filt.set({ freq: v })     // the type name is read, and a name it cannot read is
    * and `OSC_WAVES.slice(14)` is 16 rows long. Two halves of one split written
    * down the wrong way round. The conclusion does not move.
    */
-  section('hardware', 'WAVEFORM',
+  section('devices', 'WAVEFORM',
     'One cycle shape drawn from its own definition, and a name that does not name a '
     + 'shape refused in words rather than drawn as a plausible squiggle.',
     `createWaveShape({ name: 'sawtooth' })              // drawn
@@ -2890,7 +2890,7 @@ box.append(drop.el)     // the area is the resting state, the cover is the drag`
       box.append(kitDrop.el, jpeg);
     });
 
-  section('hardware', 'PANEL',
+  section('devices', 'PANEL',
     'A fixed column that does not scroll beside a strip of controls that does, in '
     + 'a case, with the instrument’s name printed on it. The column drives the depth '
     + 'and one child of the strip absorbs whatever is left, which the second panel '
@@ -2979,7 +2979,7 @@ createNameplate({ lines: ['POSITRON', 'PANEL-1'], place: 'mid' })`,
          `BACKLOG.md` carries this as open. */
     });
 
-  section('hardware', 'SEGMENT DISPLAY',
+  section('devices', 'SEGMENT DISPLAY',
     'A field of digits drawn from its own parts, with every unlit bar still '
     + 'faintly there, which is what makes it read as a display rather than as '
     + 'coloured text. Nothing measured is blank and never a zero, and a value too '
@@ -4972,7 +4972,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
    * because parts then whole is one argument read in one direction and breaking
    * it to satisfy an ordering rule would leave the conclusion above its premise.
    */
-  section('hardware', 'KNOB',
+  section('devices', 'KNOB',
     'Dragged up and down rather than turned, with its controller under it.',
     `createKnob({ label: 'M1', sub: 'CC 80', min: 0, max: 127, value: 18 })
 createKnob({ label: 'M4', hand: true })        // an invisible hand, on the ring
@@ -5014,7 +5014,7 @@ k.set(96, { from: 'hardware', quiet: true })   // moved at the desk, not here`,
       handKnobs = ks;
     });
 
-  section('hardware', 'PAD',
+  section('devices', 'PAD',
     'Square, half height or round, and the shape is one property rather than three components.',
     `createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ tint, top, on }) })
 createPadGrid({ cols: 8, pad: (x) => ({ half: true, label: String(x + 1) }) })
@@ -5067,7 +5067,7 @@ createPadGrid({ cols: 5, pad: (x) => ({ round: true, bottom: 'play' }) })`,
       box.append(stack.el);
     });
 
-  section('hardware', 'FADER',
+  section('devices', 'FADER',
     'The slider turned ninety degrees, with its value above the lane and its name under it.',
     `createFader({ label: 'CH1', value: 30 })
 createFaderBank([f1, f2, f3])
@@ -5101,7 +5101,7 @@ f.set(104, { from: 'hardware', quiet: true })`,
    * all four and draws what it was told. A number typed here would be a second
    * copy of a measurement and this project's rule is that two copies disagree.
    */
-  section('hardware', 'HEAD, GAP AND FOOT',
+  section('devices', 'HEAD, GAP AND FOOT',
     'The distance between two stacked controls is three things, and only the middle one is a gap.',
     `--ctl-head   the slot above the working surface, reserved even when empty
 --ctl-foot   the slot below it
@@ -5257,7 +5257,7 @@ f.set(104, { from: 'hardware', quiet: true })`,
    * them were 17 px apart. The checks below read the DIAL, the BUTTON and the
    * LANE, never a wrapper.
    */
-  section('hardware', 'CHANNEL STRIP',
+  section('devices', 'CHANNEL STRIP',
     'Four channels as four vertical lanes, each control in a lane centred on one line '
     + 'and each lane divided from the next by the panel’s own border.',
     `const lane = el('div', 'kit-chan')
