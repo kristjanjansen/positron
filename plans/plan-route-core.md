@@ -314,4 +314,29 @@ left open, each now fixed by a vector:
 | a first chunk shorter than a rule | judged on what it has, so it is held rather than slipping past | a head too short to read byte 6 must not pass |
 | link order | outputs follow input order, then link creation order | part of the contract a C port has to match |
 
-**Not yet in the reference:** `curve`, `vel curve` and a plain `note->cc`.
+~~**Not yet in the reference:** `curve`, `vel curve` and a plain `note->cc`.~~
+**All three landed 2026-10-04**, in both languages, as `curve`, `velcurve` and
+`notecc` (§4's `curve n`, `vel curve n` and `note->cc`), with vectors 23 to 26.
+JS 99/99 to 115/115, C 82/82 to 98/98. What they had to decide:
+
+| question | decided | why |
+| --- | --- | --- |
+| what a curve is | 2 to 16 `[in, out]` points, each 0..127, inputs rising strictly; straight lines between them, rounded as `scale` rounds (nearest, ties away from zero, integers) | one rounding rule in the core, and integers so the C matches; vector 23 has a positive tie, 24 a negative one |
+| outside the points | the end point's out, at both ends | a table drawn from 16 to 112 means "flat outside", not "keep the slope"; 23 grades the low end, 25 the top |
+| which values `curve` reshapes | every cc, bend and touch, or one kind with `cls`, or one CC with `cc` | the same three kinds `thin` counts; `cls` other than cc with a `cc` is refused |
+| a bend through a 0..127 table | in its own 14 bits, each point read as p * 128 except 127, which is 16383 | 64 lands on the bend's centre, 127 on its top, and an identity table is exact; plain p * 128 would never reach 16383 (vector 24) |
+| a channel touch | its pressure is the SECOND byte (Dn has two), a poly touch's the third | vector 24 |
+| `velcurve` on a note on | the curve, then clamped up to 1 | a table that reaches 0 must not turn a note on into a release (vector 25) |
+| `notecc` | `{ note, cc, on?, off? }`: a press sends `on` (127 if left out, the velocity if `'vel'`), a release sends `off` (0 if left out), on the note's own channel; other notes pass; no state | 127 and 0 are `toggle`'s defaults; stateless is what tells it from `toggle` (vector 26) |
+| a table in the C op encoding | ops stay 6 bytes; a table lives in a per core store of `ROUTE_MAX_CURVES` (8) slots of 16 points, copied in at link time, an equal table shared and counted, freed when its last op is unlinked; the op holds the slot | 32 bytes inline on every op is 8 KB at 64 links of 4 ops, the whole budget; the store costs 288 bytes. A link whose tables do not fit is refused `ROUTE_FULL`, checked last, and takes nothing |
+| `'vel'` in C | `ROUTE_VEL`, a sentinel far below every range, packed as 0x80 | so `on: 128`, which the JS refuses, cannot be read as `'vel'` in C |
+
+MEASURED the same day: `sizeof(route_core)` 6064 to 6352 bytes on x86_64 and
+6052 to 6340 on a Cortex-M4, still under §3's 8 KB; the M4's `.text` 4264 to
+5400 at -Os. Every new op was sabotaged in both languages and went red; two
+sabotages went GREEN on the first run and were holes in the new vectors, both
+repaired (`cls` ignored, and extrapolating below the first point), recorded in
+`route-core-test.mjs`. ⚠️ Not settled: whether a profile wants more than 16
+points or more than 8 distinct tables, and whether a 14 bit CC pair (MSB plus
+LSB on CC n + 32) should be curved as one value. Today `curve` sees only the
+7 bit CC it is given.

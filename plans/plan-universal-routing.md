@@ -241,7 +241,10 @@ last or never.
    9 s), the GPU's video (`video.start`, relay H.264 decoded by WebCodecs, 209
    frames in 9 s) and keys to a synth (`note.on`). While a link is open its row
    names the transport really in use, which for video is the board's relay path
-   and not the WHEP the transport table chose. Still to build: storage as a sink.
+   and not the WHEP the transport table chose. Storage as a sink landed in
+   `07a9731` (`/patchbay/` record and play): any Pi audio link recorded into R2
+   through ingest, MEASURED 12 s and 139,585 bytes, then played back.
+   `/rout/` and `/graph/` are now one page, `/patchbay/`.
 5. **`/wish/` over all of it**, building its prompt from the registry, so the
    model can only name things that exist.
 

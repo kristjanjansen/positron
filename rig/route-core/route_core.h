@@ -28,6 +28,19 @@
  *   - Held notes are a shared pool of entries, not 256 bytes of bits per
  *     destination. The vectors need them PER LINK (08: removing one link must
  *     not release the other's notes), and 256 bytes a link is 16 KB at 64 links.
+ *   - 🔴 A CURVE TABLE DOES NOT FIT IN AN OP, SO IT LIVES IN A TABLE STORE AND
+ *     THE OP CARRIES ITS INDEX. Decided 2026-10-04 with `curve` and `velcurve`.
+ *     A table is up to ROUTE_CURVE_POINTS `[in, out]` pairs, 32 bytes, and an op
+ *     stays 6 bytes, so every link keeps the same size whether it curves or not.
+ *     The caller hands the table in with the op (`route_opdef.pts`) and
+ *     `route_link` COPIES it into one of ROUTE_MAX_CURVES slots, so the caller's
+ *     array may go away. An identical table already in the store is SHARED and
+ *     counted, since a profile's curve is drawn once and used by many links;
+ *     `route_unlink` gives the slot back when the last op using it goes. A link
+ *     whose tables do not fit is refused ROUTE_FULL, checked last like the
+ *     other limits, and takes nothing.
+ *     The rejected alternative was the table inline in the link: 32 bytes on
+ *     every op of every link is 8 KB at 64 links of 4 ops, the whole budget.
  *
  * ⚠️ WHERE THIS IS SMALLER THAN THE JS, ON PURPOSE, AND WHAT IT DOES WHEN FULL:
  *   - A link past ROUTE_MAX_LINKS, or with more than ROUTE_MAX_OPS ops, is
@@ -74,10 +87,16 @@
 #ifndef ROUTE_HELD_BYTES
 #define ROUTE_HELD_BYTES 1024     /* their bytes; two whole 350 byte Circuit patches fit */
 #endif
+#ifndef ROUTE_MAX_CURVES
+#define ROUTE_MAX_CURVES 8        /* distinct curve tables across ALL links, shared when equal */
+#endif
+
+#define ROUTE_CURVE_POINTS 16     /* the plan's §4 table; `route-core.mjs` CURVE_POINTS */
 
 #define ROUTE_OP_ARGS 5
 
-#if ROUTE_MAX_PORTS > 254 || ROUTE_MAX_LINKS > 255 || ROUTE_MAX_HELD > 255 || ROUTE_RULE_LEN > 8
+#if ROUTE_MAX_PORTS > 254 || ROUTE_MAX_LINKS > 255 || ROUTE_MAX_HELD > 255 || ROUTE_RULE_LEN > 8 \
+    || ROUTE_MAX_CURVES > 254
 #error "route_core: a limit outgrew the u8 that indexes it"
 #endif
 
@@ -104,6 +123,9 @@ typedef enum {
   ROUTE_OP_SCALE,     /* lo, hi, lo2, hi2, cc?  lo < hi; lo2 above hi2 inverts */
   ROUTE_OP_TOGGLE,    /* note, cc, on?, off?  on defaults 127, off 0 */
   ROUTE_OP_THIN,      /* hz                   1..1000 */
+  ROUTE_OP_CURVE,     /* (pts), cls?, cc?     cls cc, bend or touch; cc only with cls cc or none */
+  ROUTE_OP_VELCURVE,  /* (pts)                note on velocity, then 1..127 */
+  ROUTE_OP_NOTECC,    /* note, cc, on?, off?  on 0..127 or ROUTE_VEL, default 127; off default 0 */
   ROUTE_OPS
 } route_opcode;
 
@@ -124,15 +146,22 @@ typedef enum {
 #define ROUTE_ABSENT  INT32_MIN
 /* A value the edge could not read as an integer (1.5, a word). Refused as bad-args. */
 #define ROUTE_INVALID (INT32_MIN + 1)
+/* `notecc`'s on: the note's own velocity, the JS `'vel'`. Not 128, so a number
+ * the JS refuses cannot be read here as this. */
+#define ROUTE_VEL     (INT32_MIN + 2)
 
 #define ROUTE_NO_LINK 0xFFFFu     /* the link field of what confirm() releases */
 
 /* ── what the caller hands in at table time ────────────────────────────── */
 
-/* One op as authored: an opcode and its arguments in the order listed above. */
+/* One op as authored: an opcode and its arguments in the order listed above.
+ * `curve` and `velcurve` also carry their table: `npts` pairs at `pts`, in then
+ * out, copied at link time. Every other op leaves `pts` NULL and `npts` 0. */
 typedef struct {
   uint8_t code;
   int32_t arg[ROUTE_OP_ARGS];
+  const int32_t *pts;
+  uint16_t npts;
 } route_opdef;
 
 /* A byte prefix rule. Bit i of `any` set means byte i matches anything. */
@@ -184,6 +213,14 @@ typedef struct {
   uint8_t note;
 } route_sounding_t;
 
+/* A curve table in the store. Points rise strictly in `in`, validated at link time. */
+typedef struct {
+  uint16_t refs;                  /* ops using it; 0 is a free slot */
+  uint8_t n;                      /* points, 2 .. ROUTE_CURVE_POINTS */
+  uint8_t in[ROUTE_CURVE_POINTS];
+  uint8_t out[ROUTE_CURVE_POINTS];
+} route_curve_t;
+
 typedef struct {
   uint32_t untracked, held_lost, too_long;
 } route_stats;
@@ -203,6 +240,7 @@ typedef struct {
   uint32_t seq;
   uint16_t pool_used;
   uint8_t pool[ROUTE_HELD_BYTES];              /* records: slot, len lo, len hi, bytes */
+  route_curve_t curve[ROUTE_MAX_CURVES];       /* the table store; an op holds a slot */
   route_stats stats;
   route_emit_fn emit;
   void *ctx;
