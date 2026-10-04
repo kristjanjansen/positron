@@ -247,6 +247,10 @@
               border: 1px solid var(--line); border-radius: 4px; }
   .kit-oled canvas { display: block; image-rendering: pixelated;
                      width: calc(128px * var(--oled-k, 2)); height: calc(64px * var(--oled-k, 2)); }
+  /* Two panels side by side when there is room for both at a whole scale, and
+     one under the other on a phone, each sized by `oledScreen` off its own box. */
+  .kit-oled-pair { display: flex; flex-wrap: wrap; gap: 18px; }
+  .kit-oled-fig { flex: 0 0 auto; max-width: 100%; }
   .kit-cut { font: 400 11px/1.6 var(--mono); color: var(--dim); margin-top: 8px;
              white-space: pre-wrap; }
   .kit-cut b { color: var(--warn); font-weight: 500; }
@@ -531,7 +535,7 @@
   import { createGlue, createGlueRows } from '/shell/glue.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { parseUF2, fontsIn, patchFont, createPico, createPicoRunner, readScreen, litCount,
+  import { parseUF2, fontsIn, patchFont, patchKeys, createOledUi, createPico, createPicoRunner, readScreen, litCount,
            createMidiFramer, KEYS as PICO_KEYS, REPLACE_PATCH, DEFAULT_FONT, DENY_HOLD_MS,
            hex as picoHex, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
@@ -1277,6 +1281,11 @@
     framer: null,
     ui: null,               // the controls, for the checks
     pointerUp: new Map(),   // key -> when a pointer last let go of it
+    keys: 'bottom',         // where the firmware puts its key labels, byte 7
+    fontAt: -1,             // the UI_FONTS index booted last
+    oled: null,             // ui.c as WebAssembly, for the parts blocks
+    partsFetched: 0,        // how many times this page asked for it
+    parts: [],              // { name, cv, paint, px }, drawn when it arrives
   };
   let hwFontCv = null;      // the OLED FONTS specimen's canvas
 
@@ -1299,7 +1308,7 @@
    * ⚠️ AND A BOX WITH NO WIDTH YET IS NOT A NARROW BOX: inside a closed tab the
    * stack measures 0, and that is skipped rather than read as a phone.
    */
-  function oledScreen(fitTo) {
+  function oledScreen(fitTo, { across = 1, gap = 18 } = {}) {
     const screen = el('div', 'kit-oled');
     const cv = document.createElement('canvas');
     cv.width = OLED_W; cv.height = OLED_H;
@@ -1318,7 +1327,13 @@
       const sc = getComputedStyle(screen);
       const chrome = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
         .reduce((n, k) => n + parseFloat(sc[k]), 0);
-      const k = Math.max(1, Math.min(4, Math.floor((w - chrome) / OLED_W)));
+      /* ⚠️ SEVERAL PANELS IN ONE ROW SHARE THE ROW, so each is sized off the
+         row and not off its own cell: a cell sized by the canvas inside it is a
+         loop, and MEASURED at 756 px it settled with the second panel a scale
+         larger than the first and 154 px of the page dragged sideways. Two to a
+         row only while both fit at 2x, else one under the other. */
+      const n = across > 1 && w >= across * (2 * OLED_W + chrome) + (across - 1) * gap ? across : 1;
+      const k = Math.max(1, Math.min(4, Math.floor(((w - (n - 1) * gap) / n - chrome) / OLED_W)));
       screen.style.setProperty('--oled-k', String(k));
     };
     new ResizeObserver(fit).observe(fitTo);
@@ -1350,14 +1365,17 @@
   function hwBoot(index) {
     const F = hw.fonts[index] || null;
     hw.font = F;
+    hw.fontAt = index;
     // The default is booted UNPATCHED, which is the byte for byte UF2. Any
-    // other font is that UF2 with the one byte after UIFONT changed.
-    const image = !F || index === hw.defaultFont ? hw.image : patchFont(hw.image, index);
+    // other font is that UF2 with the one byte after UIFONT changed, and the
+    // labels down the right are the byte after that.
+    let image = !F || index === hw.defaultFont ? hw.image : patchFont(hw.image, index);
+    if (hw.keys === 'right') image = patchKeys(image, 'right');
     hw.runner.boot(image, { font: index, run: hw.state === 'running' });
     hw.boots++;
     const name = F ? F.name : DEFAULT_FONT;
-    hw.ui.o.textContent = `booted ${hw.image.length.toLocaleString('en')} bytes of flash, font ${name}`;
-    d.log(`router firmware booted, font ${name}`);
+    hw.ui.o.textContent = `booted ${hw.image.length.toLocaleString('en')} bytes of flash, font ${name}, labels ${hw.keys}`;
+    d.log(`router firmware booted, font ${name}, key labels ${hw.keys === 'right' ? 'down the right' : 'along the bottom'}`);
   }
 
   function hwFontsDraw() {
@@ -1392,6 +1410,7 @@
     }
     hw.image = image;
     hw.fonts = fontsIn(image);
+    hwPartsLoad();
     hw.defaultFont = hw.fonts.findIndex((f) => f.name === DEFAULT_FONT);
     hwFontsDraw();
     /* ⚠️ A PICKER AND NOT A SEGMENTED CHOICE. Six names side by side are 440 px
@@ -1440,6 +1459,132 @@
   document.addEventListener('visibilitychange', () => {
     if (hw.state === 'running') hw.runner.run(!document.hidden);
   });
+
+  /**
+   * 🔴 THE ROUTER'S SCREEN, ONE PART AT A TIME, 2026-10-04. Asked as *"Break
+   * down hw ui some more on kit"*. Every picture below is drawn by
+   * `rig/pico/firmware/ui.c` itself, compiled a second time to WebAssembly
+   * (`/resources/pico/oled-ui.wasm`, 7.7 KB, no imports), not by a JavaScript
+   * copy of it. `rig/pico/firmware/wasm/test.mjs` compares the two compilations
+   * with the emulated board pixel for pixel, and a check at the foot of this
+   * file does it again here.
+   * ⚠️ FETCHED WITH THE FIRMWARE, WHEN HARDWARE IS OPENED, NEVER ON A VISIT.
+   */
+  const KEY_WORDS = ['PREV', 'NEXT', 'STOP', 'OK'];
+  async function hwPartsLoad() {
+    if (hw.oled || hw.partsFetched) return;
+    try {
+      hw.partsFetched++;
+      const res = await fetch('/resources/pico/oled-ui.wasm');
+      if (!res.ok) throw new Error(`oled-ui.wasm answered ${res.status}`);
+      hw.oled = await createOledUi(await res.arrayBuffer());
+    } catch (e) {
+      d.log(`the screen parts did not load: ${e.message}`, 'bad');
+      return;
+    }
+    for (const p of hw.parts) { p.px = hw.oled.screen(-1, p.paint); drawOled(p.cv, p.px); }
+  }
+  // One or two panels in a row, each with a line under it saying which case it is.
+  function hwPart(box, specs) {
+    const pair = el('div', 'kit-oled-pair');
+    for (const [name, note, paint] of specs) {
+      const fig = el('div', 'kit-oled-fig');
+      // every part at one scale, whether its block shows one panel or two
+      const { screen, cv } = oledScreen(box, { across: 2 });
+      fig.append(screen, el('div', 'kit-cut', note));
+      pair.append(fig);
+      hw.parts.push({ name, cv, paint, px: null });
+    }
+    box.append(pair);
+  }
+
+  section('hardware', 'KEY LABELS',
+    'What each of the four buttons does, in a row under the screen or in a column beside it '
+    + 'where the module has its buttons, with a held key shown filled.',
+    `ui_footer(label, hot)                 // returns the y of its top rule
+ui_keys_right(label, hot, width)      // returns the x of its left rule, cells 16 rows tall
+ui_area(x)                            // the header and the banner stop at the rule`,
+    (box) => hwPart(box, [
+      ['keys-bottom', 'a row along the bottom, OK held', (u) => { u.footer(KEY_WORDS, 8); }],
+      ['keys-right', 'a column down the right, OK held', (u) => { u.keysRight(KEY_WORDS, 8); }],
+    ]));
+
+  section('hardware', 'HEADER',
+    'A lit bar with the scene on the left and its name on the right, which loses letters '
+    + 'from the name rather than letting the two touch.',
+    `ui_header("SCENE 1/2", "THRU")       // returns its height
+ui_area(ui_keys_right(...) - 1)       // narrower beside the key column`,
+    (box) => hwPart(box, [
+      ['header', 'the full width', (u) => { u.header('SCENE 1/2', 'THRU'); }],
+      ['header-cut', 'beside the key column, the name cut', (u) => {
+        u.area(u.keysRight(KEY_WORDS, 0) - 1); u.header('SCENE 2/2', 'OCTAVE UP');
+      }],
+    ]));
+
+  section('hardware', 'LINK',
+    'The route the router is applying, two ports with an arrow between them and what happens '
+    + 'to the notes written on the arrow.',
+    `ui_box(x, y, ui_box_w("DIN IN"), ui_box_h(), "DIN IN")
+ui_arrow(x1, x2, y)                   // the head at x2
+ui_text(x, y, "+12 CH2")              // y is the top of the capitals`,
+    (box) => hwPart(box, [
+      ['link', 'scene 2, an octave up onto channel 2', (u) => {
+        const bh = u.boxH(), wl = u.boxW('DIN IN'), wr = u.boxW('DIN OUT'), y = 26;
+        u.box(0, y, wl, bh, 'DIN IN');
+        u.box(128 - wr, y, wr, bh, 'DIN OUT');
+        const ax1 = wl + 2, ax2 = 128 - wr - 3, ops = '+12 CH2', ow = u.textW(ops);
+        u.arrow(ax1, ax2, y + (bh >> 1));
+        // main.c's rule: on the arrow when it fits between the boxes, else on a line of its own above
+        if (ow <= ax2 - ax1 - 4) u.text(ax1 + ((ax2 - ax1 + 1 - ow) >> 1), y + Math.min(0, (bh >> 1) - 2 - u.cap), ops);
+        else u.text((128 - ow) >> 1, y - 2 - u.cap, ops);
+      }],
+    ]));
+
+  section('hardware', 'ACTIVITY',
+    'A dot per port that lights for 150 ms when a message passes, with a running count, '
+    + 'and a drop count that only appears once something was dropped.',
+    `ui_dot(x, y, 1)                       // 5x5, a disc lit or a ring
+ui_text(x + 8, y, "IN 4")`,
+    (box) => hwPart(box, [
+      ['activity', 'IN just passed a note, OUT is quiet, two dropped', (u) => {
+        const y = 28, wo = 8 + u.textW('OUT 4'), dy = y + ((u.cap - 5) >> 1);
+        u.dot(0, dy, true); u.text(8, y, 'IN 4');
+        u.dot(128 - wo, dy, false); u.text(128 - wo + 8, y, 'OUT 4');
+        const wi = 8 + u.textW('IN 4'), wd = u.textW('DROP 2');
+        u.text(wi + ((128 - wo - wi - wd) >> 1), y, 'DROP 2');
+      }],
+    ]));
+
+  section('hardware', 'HOLD',
+    'A message the router will not pass without asking, shown as a banner, with a meter '
+    + 'that fills while OK is held toward the one second that refuses it.',
+    `ui_banner(y, h, "HOLD: REPLACE PATCH")   // a '\\n' makes it two lines
+ui_meter(x, y, w, h, held_ms, 1000)`,
+    (box) => hwPart(box, [
+      ['hold', 'OK held for 0.6 s of the 1 s', (u) => {
+        const T = u.cap, bh = T + 9;
+        u.banner(12, bh, 'HOLD: REPLACE PATCH');
+        const sy = 12 + bh + 6, nw = u.textW('NO');
+        u.meter(0, sy - 1, 128 - nw - 4, T + 2, 600, 1000);
+        u.text(128 - nw, sy, 'NO');
+      }],
+      ['hold-two', 'two lines, when one does not fit', (u) => {
+        u.banner(12, 2 * (u.cap + 3) - 3 + 6, 'HOLD 2:\nREPLACE PATCH');
+      }],
+    ]));
+
+  section('hardware', 'TEXT',
+    'Three ways the screen sets a word, lit on dark, dark on a lit bar, and at twice the size.',
+    `ui_text(x, y, "LIT")
+ui_text_inv(x, y, w, "INVERSE")
+ui_text_big(x, y, "BIG")`,
+    (box) => hwPart(box, [
+      ['text', 'the current font, glcd5x7 unless patched', (u) => {
+        u.text(2, 6, 'LIT ON DARK');
+        u.textInv(0, 20, u.textW('DARK ON LIT') + 4, 'DARK ON LIT');
+        u.textBig(2, 38, 'BIG 2X');
+      }],
+    ]));
 
   section('hardware', 'ROUTER FIRMWARE',
     'The MIDI router firmware of the Pico on the desk, the very same UF2 file, running in an '
@@ -1504,8 +1649,15 @@ pico.send([0x90, 60, 100])         // into UART0, the DIN in`,
           onPress: () => hwSend(REPLACE_PATCH),
         }],
       });
+      /* ⚠️ THE MODULE'S BUTTONS ARE A COLUMN BESIDE THE SCREEN, ^ v # * top to
+         bottom, so the firmware can put its labels there: one byte of flash,
+         read at power on, so a pick reboots the board like a font does. */
+      const labels = createChoice({
+        label: 'labels', options: [['bottom', 'bottom'], ['right', 'right']], at: 0,
+        onPick: (v) => { hw.keys = v; if (hw.runner) hwBoot(hw.fontAt); },
+      });
       const row = el('div', 'kit-row');
-      row.append(keys.el, send.el);
+      row.append(keys.el, send.el, labels.el);
 
       const kbHost = el('div');
       const kb = createKeyboard(kbHost, {
@@ -1523,7 +1675,7 @@ pico.send([0x90, 60, 100])         // into UART0, the DIN in`,
       stack.add(screen, row, kbHost, ro.foot);
       stack.titled('DIN OUT', log.el);
       box.append(stack.el, o);
-      hw.ui = { cv, screen, keys, send, row, kb, ro, log, o, font: null };
+      hw.ui = { cv, screen, keys, send, row, kb, ro, log, o, labels, font: null };
     });
 
   section('hardware', 'OLED FONTS',
@@ -11211,8 +11363,9 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     // ── a visit ───────────────────────────────────────────────────────────
     const away = kitTabs.at() !== 'hardware';
     d.assert('a visit that does not open HARDWARE fetches no firmware and starts no emulator',
-      away && hw.fetched === 0 && !hw.runner && hw.state === 'idle',
+      away && hw.fetched === 0 && hw.partsFetched === 0 && !hw.runner && hw.state === 'idle',
       `the open part is ${kitTabs.at()}, the UF2 was asked for ${hw.fetched} time(s), `
+      + `the screen parts ${hw.partsFetched} time(s), `
       + `the board is ${hw.state}${hw.runner ? ' with a worker' : ' with no worker'}`);
 
     // ── the firmware, on a board of the check's own ───────────────────────
@@ -11306,6 +11459,36 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       held && heldQuiet && passed,
       `banner ${held ? 'shown' : 'not shown'}, ${heldQuiet ? 'nothing' : 'the patch'} out while held, `
       + `after OK: ${passed ? patchHex : `[${hw.out.slice(outWas).join(' | ')}]`}`);
+
+    // ── the screen, one part at a time, by ui.c compiled to WebAssembly ──
+    const partsUp = await until(() => hw.parts.length > 0 && hw.parts.every((p) => p.px), 3000);
+    const empty = hw.parts.filter((p) => !p.px || !litCount(p.px)).map((p) => p.name);
+    d.assert('every screen part is drawn by the firmware’s own ui.c, fetched once when HARDWARE opened',
+      partsUp && !empty.length && hw.partsFetched === 1,
+      `${hw.parts.length} parts, ${empty.length ? `blank: ${empty.join(', ')}` : 'none blank'}, `
+      + `the module asked for ${hw.partsFetched} time(s)`);
+    const right = hw.parts.find((p) => p.name === 'keys-right');
+    const rs = right?.px ? readScreen(right.px, F) : null;
+    const colX = rs ? Math.min(...['PREV', 'NEXT', 'STOP'].map((t) => (rs.find(t).find((h) => !h.inv) || { x: -1 }).x)) : -1;
+    const order = rs ? ['PREV', 'NEXT', 'STOP'].map((t) => (rs.find(t).find((h) => !h.inv) || { y: -1 }).y) : [];
+    d.assert('KEY LABELS: the right column reads PREV, NEXT, STOP top to bottom past x 90, and OK filled at the foot',
+      !!rs && colX > 90 && order.every((y, i) => y >= 0 && (!i || y > order[i - 1])) && rs.find('OK').some((h) => h.inv && h.y >= 48),
+      `labels from x ${colX}, tops at ${order.join(' ')}`);
+
+    // The labels option is the byte after the font's, and a reboot.
+    const column = (px) => { for (let x = OLED_W - 1; x > 64; x--) { let n = 0; for (let y = 0; y < OLED_H; y++) n += px[y * OLED_W + x]; if (n === OLED_H) return x; } return -1; };
+    const ruleBefore = hw.px ? column(hw.px) : -2;
+    hw.ui.labels.set(1);
+    const moved2 = await until(() => !!hw.px && column(hw.px) > 64 && readScreen(hw.px, F).has('PREV', false), 2400);
+    const want = hw.oled ? hw.oled.screen(-1, (u) => u.keysRight(KEY_WORDS, 0)) : null;
+    const rx = hw.px ? column(hw.px) : -1;
+    let differ = -1;
+    if (want && hw.px && rx > 0) { differ = 0; for (let y = 0; y < OLED_H; y++) for (let x = rx; x < OLED_W; x++) differ += want[y * OLED_W + x] !== hw.px[y * OLED_W + x]; }
+    d.assert('labels right reboots the board with its key labels in a column, pixel for pixel what the WebAssembly ui.c draws',
+      ruleBefore === -1 && moved2 && differ === 0,
+      `no column before (${ruleBefore}), the column rule at x ${rx}, ${differ} pixels differ from the module`);
+    hw.ui.labels.set(0);
+    await until(() => !!hw.px && column(hw.px) === -1, 2400);
 
     // Put the reader back where they were, and the board back to sleep.
     kitTabs.go(home, { push: false });

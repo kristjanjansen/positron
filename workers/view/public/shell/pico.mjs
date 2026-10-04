@@ -109,6 +109,24 @@ export function patchFont(image, index) {
   return out;
 }
 
+/**
+ * 🔴 WHERE THE KEY LABELS GO IS THE NEXT BYTE, BY THE SAME TRICK. Byte 7 after
+ * UIFONT: 0 a row along the bottom (the default), 1 a column down the right,
+ * which is where the four buttons sit on the 0.96 inch module.
+ * @param {Uint8Array} image   from `parseUF2` or `patchFont`, not modified
+ * @param {'bottom'|'right'} where
+ * @returns {Uint8Array} a patched copy
+ */
+export function patchKeys(image, where) {
+  const at = findAscii(image, 'UIFONT');
+  if (at < 0 || findAscii(image, 'UIFONT', at + 1) >= 0) {
+    throw new Error('the FONT_PICK marker UIFONT is not in this image exactly once');
+  }
+  const out = image.slice();
+  out[at + 7] = where === 'right' ? 1 : 0;
+  return out;
+}
+
 function findAscii(bytes, text, from = 0) {
   const want = [...text].map((c) => c.charCodeAt(0));
   outer: for (let i = from; i + want.length <= bytes.length; i++) {
@@ -515,3 +533,60 @@ export function createPicoRunner({ onFrame, onTx, onStats, onBoot } = {}) {
 }
 
 export const hex = (bytes) => [...bytes].map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+
+/**
+ * 🔴 THE FIRMWARE'S OWN DRAWING CODE, WITHOUT THE FIRMWARE. `rig/pico/firmware/
+ * ui.c` compiled a second time, to WebAssembly (`rig/pico/firmware/wasm/`), so
+ * a page can draw one part of the router's screen at a time: a header, a box,
+ * the key labels. Not a JavaScript copy of ui.c, which would be a second
+ * implementation drifting from the first. `rig/pico/firmware/wasm/test.mjs`
+ * proves the two compilations agree pixel for pixel with the emulated board.
+ * ⚠️ THE MODULE IMPORTS NOTHING, so it is instantiated with `{}` and costs no
+ * glue script. Fetch it when it is needed and not on a visit.
+ * @param {ArrayBuffer|Uint8Array} bytes   `/resources/pico/oled-ui.wasm`
+ * @returns {Promise<{fonts:string[], screen:(font:number, paint:(u:object)=>void)=>Uint8Array}>}
+ *   `screen` clears a 128x64 panel in that font (-1 the default), hands
+ *   `paint` the drawing calls, and returns the panel as ones and zeros.
+ */
+export async function createOledUi(bytes) {
+  const { instance } = await WebAssembly.instantiate(bytes, {});
+  const U = instance.exports;
+  const mem = () => new Uint8Array(U.memory.buffer);
+  const put = (i, s = '') => {
+    const at = U.str(i), b = new TextEncoder().encode(String(s).slice(0, 63));
+    mem().set(b, at); mem()[at + b.length] = 0;
+  };
+  const cstr = (at) => { let s = ''; for (let k = at; mem()[k]; k++) s += String.fromCharCode(mem()[k]); return s; };
+  const fonts = Array.from({ length: U.nfonts() }, (_, i) => cstr(U.font_name(i)));
+  const four = (labels) => { for (let i = 0; i < 4; i++) put(i, labels[i] ?? ''); };
+  const u = {
+    get cap() { return U.font_cap(); },
+    get adv() { return U.font_adv(); },
+    area: (w) => U.area(w),
+    textW: (s) => { put(0, s); return U.text_w(); },
+    text: (x, y, s) => { put(0, s); return U.text(x, y); },
+    textBig: (x, y, s) => { put(0, s); return U.text_big(x, y); },
+    textInv: (x, y, w, s) => { put(0, s); U.text_inv(x, y, w); },
+    header: (l, r) => { put(0, l); put(1, r); return U.header(); },
+    boxW: (s) => { put(0, s); return U.box_w(); },
+    boxH: () => U.box_h(),
+    box: (x, y, w, h, s) => { put(0, s); U.box(x, y, w, h); },
+    arrow: (x1, x2, y) => U.arrow(x1, x2, y),
+    meter: (x, y, w, h, level, max) => U.meter(x, y, w, h, level, max),
+    dot: (x, y, on) => U.dot(x, y, on ? 1 : 0),
+    banner: (y, h, s) => { put(0, s); U.banner(y, h); },
+    rect: (x, y, w, h) => U.rect(x, y, w, h),
+    fill: (x, y, w, h, c = 1) => U.fill(x, y, w, h, c),
+    footer: (labels, hot = 0) => { four(labels); return U.footer(hot); },
+    footerH: () => U.footer_h(),
+    keysRight: (labels, hot = 0) => { four(labels); return U.keys_right(hot); },
+  };
+  function screen(font, paint) {
+    U.begin(font);
+    paint(u);
+    const f = mem().subarray(U.fb(), U.fb() + (W * H) / 8), px = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px[y * W + x] = (f[(y >> 3) * W + x] >> (y & 7)) & 1;
+    return px;
+  }
+  return { fonts, screen };
+}
