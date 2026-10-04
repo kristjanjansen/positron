@@ -13,6 +13,7 @@ rather than fail.
 *"Plan all of them"*: the Pico 2 W as a patchbay node over wifi, light output
 (WS2812 and DMX) for the timeline's light lane, sound (PWM, I2S DAC, USB audio),
 a clock box, BLE MIDI, physical controls and CV. One plan in `plans/`.
+DONE 2026-10-04: `plans/plan-pico.md`.
 
 ### `/kit/`: HARDWARE becomes DEVICES, the Pico tab is HARDWARE, asked 2026-10-04
 
