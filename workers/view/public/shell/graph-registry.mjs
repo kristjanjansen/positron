@@ -53,7 +53,7 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
   if (gpu) {
     node('gpu', 'engine', 'GPU');
     port('gpu', 'program', { label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
-    port('gpu', 'video', { label: 'GPU', dir: 'out', medium: 'video', shape: { codec: 'h264' } });
+    port('gpu', 'video', { label: 'GPU', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-video` });
   }
   // A hardware input is an instrument on the desk: its sound comes in through
   // the board's audio interface, and its MIDI goes out through the gate.
@@ -61,12 +61,14 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
   for (const i of inputs) {
     const n = slug(i.name);
     node(n, 'device', i.name);
+    // The address is the room the board's input really streams into, which
+    // `rig/board/inputs.mjs` names `<room>-<input>`.
     port(n, 'audio', { label: i.name, dir: 'out', medium: 'audio',
-      shape: { rate: 48000, channels: 1, frameMs } });
+      shape: { rate: 48000, channels: 1, frameMs }, address: `${room}-${i.name}` });
     if (i.midi) {
       inputPorts.add(String(i.midi.port).toLowerCase());
       port(n, 'in', { label: i.name, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], never: ['sysex'],
-        shape: { channels: i.midi.channels } });
+        shape: { channels: i.midi.channels }, address: `${room}-${i.name}` });
     }
   }
   // Every other MIDI device the board sees. A device already described as an
