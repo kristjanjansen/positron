@@ -1,5 +1,11 @@
 ## Open
 
+### Plan everything the Pico could do for positron, asked 2026-10-04
+
+*"Plan all of them"*: the Pico 2 W as a patchbay node over wifi, light output
+(WS2812 and DMX) for the timeline's light lane, sound (PWM, I2S DAC, USB audio),
+a clock box, BLE MIDI, physical controls and CV. One plan in `plans/`.
+
 ### `/kit/`: HARDWARE becomes DEVICES, the Pico tab is HARDWARE, asked 2026-10-04
 
 *"Rename hardware to devices in kit and pico to hardware"*. The existing tab
@@ -20,6 +26,7 @@ screen (seven lines of 8x8 text). A C kit in `rig/pico/firmware/`: an inverted
 header, a small font, boxes and arrows for the link, activity meters, a held
 banner, a footer naming what the four buttons do. The router screen rebuilt on
 it, checked in the emulator, screenshots looked at.
+DONE 2026-10-04: `ui.c`, six fonts, glcd5x7 default, 32 checks PASS.
 
 ### The C router firmware for the Pico, tested in the local emulator, asked 2026-10-04
 

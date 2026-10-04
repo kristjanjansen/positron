@@ -8,11 +8,9 @@
 
 #include <string.h>
 
-#include "font8x8.h"
-
 static i2c_inst_t *bus;
 static uint8_t address;
-static uint8_t fb[SSD1306_W * SSD1306_LINES];  /* page major: byte = 8 vertical pixels */
+static uint8_t fb[SSD1306_W * SSD1306_PAGES];  /* page major: byte = 8 vertical pixels */
 static int next_page = -1;                     /* -1: nothing on its way */
 
 static void cmd(uint8_t c) {
@@ -48,16 +46,7 @@ void ssd1306_init(i2c_inst_t *i2c, uint8_t addr) {
 
 void ssd1306_clear(void) { memset(fb, 0, sizeof fb); }
 
-void ssd1306_text(int line, const char *s) {
-  int col;
-  if (line < 0 || line >= SSD1306_LINES) return;
-  memset(&fb[line * SSD1306_W], 0, SSD1306_W);
-  for (col = 0; col < SSD1306_COLS && s[col]; col++) {
-    uint8_t ch = (uint8_t)s[col];
-    if (ch < 32 || ch > 127) ch = '?';
-    memcpy(&fb[line * SSD1306_W + col * 8], &font_petme128_8x8[(ch - 32) * 8], 8);
-  }
-}
+uint8_t *ssd1306_buffer(void) { return fb; }
 
 void ssd1306_show(void) { next_page = 0; }
 
@@ -69,6 +58,6 @@ bool ssd1306_step(void) {
   buf[0] = 0x40;                               /* Co=0, D/C=1: data to the end */
   memcpy(&buf[1], &fb[next_page * SSD1306_W], SSD1306_W);
   i2c_write_blocking(bus, address, buf, sizeof buf, false);
-  if (++next_page >= SSD1306_LINES) next_page = -1;
+  if (++next_page >= SSD1306_PAGES) next_page = -1;
   return next_page >= 0;
 }

@@ -15,6 +15,7 @@ add_executable(router
   main.c
   midi_parse.c
   ssd1306.c
+  ui.c
   ${ROUTE_CORE}/route_core.c
 )
 target_include_directories(router PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${ROUTE_CORE})
