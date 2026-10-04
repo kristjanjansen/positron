@@ -236,6 +236,17 @@
   /* the phone case. A fixed width so the one-column layout can be seen on a
      desktop, `max-width` so it is never wider than a real phone. */
   .kit-phone { width: 320px; max-width: 100%; }
+  /* 🔴 THE OLED, 2026-10-04, FOR THE HARDWARE PART. A black panel in a thin
+     frame, as wide as the panel and no wider, holding a 128x64 canvas drawn at
+     a WHOLE NUMBER scale, `--oled-k`, which the page works out from the box it
+     is in (1 to 4). `pixelated`, so a panel pixel is a square of screen pixels
+     and never a blur, and the 128 and 64 are the panel's, not a layout's.
+     ⚠️ A CUSTOM PROPERTY AND NOT `style.width`, because a component that varies
+     a property per instance sets a custom property, never the property. */
+  .kit-oled { width: fit-content; max-width: 100%; padding: 10px; background: #000;
+              border: 1px solid var(--line); border-radius: 4px; }
+  .kit-oled canvas { display: block; image-rendering: pixelated;
+                     width: calc(128px * var(--oled-k, 2)); height: calc(64px * var(--oled-k, 2)); }
   .kit-cut { font: 400 11px/1.6 var(--mono); color: var(--dim); margin-top: 8px;
              white-space: pre-wrap; }
   .kit-cut b { color: var(--warn); font-weight: 500; }
@@ -520,6 +531,9 @@
   import { createGlue, createGlueRows } from '/shell/glue.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { parseUF2, fontsIn, patchFont, createPico, createPicoRunner, readScreen, litCount,
+           createMidiFramer, KEYS as PICO_KEYS, REPLACE_PATCH, DEFAULT_FONT, DENY_HOLD_MS,
+           hex as picoHex, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
@@ -655,6 +669,7 @@
     ['layout', 'LAYOUT'],
     ['devices', 'DEVICES'],
     ['panel', 'PANEL'],
+    ['hardware', 'HARDWARE'],
     ['diagram', 'DIAGRAM'],
   ];
 
@@ -674,7 +689,18 @@
   const sectionTab = new Map();       // section id -> the part holding it
   const wanted = decodeURIComponent((location.hash || '').replace(/^#/, ''));
 
-  const kitTabs = createTabs({ tabs: GROUPS.map(([id, label]) => ({ id, label })) });
+  /* 🔴 `hardware` IS THE ONE PART THAT COSTS SOMETHING TO OPEN, SO THE TAB ROW
+     TELLS IT WHEN IT IS LOOKED AT. Added 2026-10-04 with the router firmware:
+     an emulated RP2040 is a worker running flat out, and *"a visit, a step and
+     a scrub must open nothing"*. So nothing in that part is fetched or booted
+     until its tab is pressed, and it pauses again when another one is. Placed
+     after `panel` and not first, for the reason the block above gives about
+     the opening tab. `hwOpen` and `hwClose` are function declarations further
+     down, hoisted, so the order of this file does not matter to them. */
+  const kitTabs = createTabs({
+    tabs: GROUPS.map(([id, label]) => ({ id, label })),
+    onPick: (id) => { if (id === 'hardware') hwOpen(); else hwClose(); },
+  });
   kitTabs.el.classList.add('kit-tabs');
   body.append(kitTabs.el);
 
@@ -1204,8 +1230,316 @@
    * PANEL block further down already shows a case full of real controls.
    */
   /**
-   * 🔴 THE NEWEST BLOCK, 2026-09-30, ABOVE KNOBS UNDER THE CODE, AND THE FIRST
-   * CALL TO `section()`. `plans/plan-code-editor.md`, asked as *"a hand-rolled
+   * 🔴 THE NEWEST BLOCKS, 2026-10-04, AND THE FIRST CALLS TO `section()`. Asked
+   * as *"Can you make demo of hw kit in psoitron kit new tab?"* and then
+   * *"Rename hardware to devices in kit and pico to hardware"*. The part is
+   * HARDWARE and what is in it is the REAL thing: `rig/pico/firmware/`'s router,
+   * the UF2 built in Docker by `build.sh pico`, copied byte for byte to
+   * `demo/resources/pico/router-pico.uf2` and run in rp2040js, with the screen,
+   * the four keys and the MIDI UART wired to the page.
+   *
+   * 🔴 NOTHING HERE RUNS ON A VISIT TO ANY OTHER PART. An emulated RP2040 is a
+   * core running flat out, and *"a visit, a step and a scrub must open
+   * nothing"*. The blocks build their controls on load, which is cheap and
+   * synchronous (the measuring window holds no `await`); the UF2 is fetched
+   * and the worker started only when the HARDWARE tab is pressed, and the board
+   * pauses when another tab is, or when the page is hidden. The checks at the
+   * foot of this file grade both halves: a visit fetched nothing, and opening
+   * the tab drew the board's own screen.
+   *
+   * ⚠️ IT RUNS SLOWER THAN THE REAL BOARD AND SAYS SO. MEASURED 2026-10-04 in
+   * Node: about 0.6 x real time flat out, because the router's main loop polls
+   * and never sleeps, so every one of its 125 million cycles a second is
+   * emulated. The readout shows the speed the board is getting and the speed
+   * it could get. A key is held for as long in BOARD time as it was held here,
+   * so a one second press on OK is a deny whatever the speed; see
+   * `demo/shell/pico-worker.mjs`.
+   *
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the blocks
+   * below give: both harnesses press that row by position, so a new top block
+   * with a control in it moves every other block's press. The keys are in the
+   * box, and the checks press them on purpose.
+   */
+  const HW_UF2 = '/resources/pico/router-pico.uf2';
+  // The panel's two inks, rig/pico/sim/ssd1306.mjs's: the cyan blue of a blue
+  // SSD1306, and an unlit panel that is not quite black.
+  const OLED_LIT = [0x4f, 0xc3, 0xff], OLED_DARK = [0x05, 0x07, 0x0c];
+  /* ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason this page has
+     written down six times: these are the topmost blocks, and a `let` left
+     where a block used to be is read in its dead zone. */
+  const hw = {
+    state: 'idle',          // idle, loading, running, paused, failed
+    fetched: 0,             // how many times this page asked for the UF2
+    image: null, fonts: [], defaultFont: -1, font: null,
+    runner: null, px: null, frames: 0, boots: 0,
+    out: [],                // every message off DIN OUT, as hex
+    stats: null,
+    framer: null,
+    ui: null,               // the controls, for the checks
+    pointerUp: new Map(),   // key -> when a pointer last let go of it
+  };
+  let hwFontCv = null;      // the OLED FONTS specimen's canvas
+
+  // 128x64 ones and zeros into a 128x64 canvas, one canvas pixel per panel pixel.
+  function drawOled(cv, px) {
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(OLED_W, OLED_H);
+    for (let i = 0; i < px.length; i++) {
+      const c = px[i] ? OLED_LIT : OLED_DARK;
+      img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  /**
+   * 🔴 PIXEL EXACT, SO THE SCALE IS A WHOLE NUMBER. The canvas holds 128x64
+   * and is drawn `image-rendering: pixelated` at k times that, where k is the
+   * largest whole number that fits the box, 1 to 4. A fractional scale would
+   * make some panel pixels one screen pixel wider than their neighbours, which
+   * on a 5 pixel glyph is a letter visibly wider on one side.
+   * ⚠️ AND A BOX WITH NO WIDTH YET IS NOT A NARROW BOX: inside a closed tab the
+   * stack measures 0, and that is skipped rather than read as a phone.
+   */
+  function oledScreen(fitTo) {
+    const screen = el('div', 'kit-oled');
+    const cv = document.createElement('canvas');
+    cv.width = OLED_W; cv.height = OLED_H;
+    screen.append(cv);
+    drawOled(cv, new Uint8Array(OLED_W * OLED_H));
+    const fit = () => {
+      // the CONTENT width: `clientWidth` carries the host's padding as well
+      const cs = getComputedStyle(fitTo);
+      const w = fitTo.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (!(w > 0)) return;
+      // ⚠️ THE FRAME'S OWN PADDING AND BORDER, READ AS STYLE AND NOT AS
+      // `screen.offsetWidth - cv.offsetWidth`: the frame is `max-width: 100%`,
+      // so once the canvas is wider than the box that difference goes
+      // negative and asks for a BIGGER scale. MEASURED at 375 px: a 512 px
+      // panel in a 310 px box, 179 px of the page dragged sideways.
+      const sc = getComputedStyle(screen);
+      const chrome = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+        .reduce((n, k) => n + parseFloat(sc[k]), 0);
+      const k = Math.max(1, Math.min(4, Math.floor((w - chrome) / OLED_W)));
+      screen.style.setProperty('--oled-k', String(k));
+    };
+    new ResizeObserver(fit).observe(fitTo);
+    return { screen, cv };
+  }
+  // Text into a 128x64 buffer in a firmware font. `y` is the top of the
+  // capitals, as ui.h has it, so two fonts line up on the same y.
+  function oledText(px, F, x, y, text) {
+    for (const ch of text) {
+      const g = F.glyph(ch.charCodeAt(0));
+      for (let i = 0; i < F.w; i++) {
+        for (let j = 0; j < F.h; j++) {
+          if (!((g[i] >> j) & 1)) continue;
+          const X = x + i, Y = y - F.top + j;
+          if (X >= 0 && X < OLED_W && Y >= 0 && Y < OLED_H) px[Y * OLED_W + X] = 1;
+        }
+      }
+      x += F.adv;
+    }
+    return x;
+  }
+
+  function hwSend(bytes) { hw.runner?.send(bytes); }
+
+  // A tap: down and straight up. The worker holds it for 40 ms of board time,
+  // which clears the firmware's 20 ms debounce.
+  function hwTap(k) { if (!hw.runner) return; hw.runner.key(k, true); hw.runner.key(k, false, 0); }
+
+  function hwBoot(index) {
+    const F = hw.fonts[index] || null;
+    hw.font = F;
+    // The default is booted UNPATCHED, which is the byte for byte UF2. Any
+    // other font is that UF2 with the one byte after UIFONT changed.
+    const image = !F || index === hw.defaultFont ? hw.image : patchFont(hw.image, index);
+    hw.runner.boot(image, { font: index, run: hw.state === 'running' });
+    hw.boots++;
+    const name = F ? F.name : DEFAULT_FONT;
+    hw.ui.o.textContent = `booted ${hw.image.length.toLocaleString('en')} bytes of flash, font ${name}`;
+    d.log(`router firmware booted, font ${name}`);
+  }
+
+  function hwFontsDraw() {
+    if (!hwFontCv || !hw.fonts.length) return;
+    const px = new Uint8Array(OLED_W * OLED_H);
+    let y = 1;
+    for (const F of hw.fonts) {
+      oledText(px, F, 0, y, F.name);
+      const sample = 'OK 1/2';
+      oledText(px, F, OLED_W - (sample.length * F.adv - 1), y, sample);
+      y += F.cap + 4;
+    }
+    drawOled(hwFontCv, px);
+  }
+
+  async function hwOpen() {
+    if (hw.state === 'paused') { hw.state = 'running'; hw.runner.run(!document.hidden); return; }
+    if (hw.state !== 'idle' || !hw.ui) return;
+    hw.state = 'loading';
+    hw.ui.o.textContent = 'loading the firmware';
+    let image;
+    try {
+      hw.fetched++;
+      const res = await fetch(HW_UF2);
+      if (!res.ok) throw new Error(`${HW_UF2} answered ${res.status}`);
+      image = parseUF2(await res.arrayBuffer());
+    } catch (e) {
+      hw.state = 'failed';
+      hw.ui.o.textContent = `the firmware did not load: ${e.message}`;
+      d.log(`router firmware did not load: ${e.message}`, 'bad');
+      return;
+    }
+    hw.image = image;
+    hw.fonts = fontsIn(image);
+    hw.defaultFont = hw.fonts.findIndex((f) => f.name === DEFAULT_FONT);
+    hwFontsDraw();
+    /* ⚠️ A PICKER AND NOT A SEGMENTED CHOICE. Six names side by side are 440 px
+       and a phone's box is about 310, so the choice ran off the right edge at
+       375 px; a picker is one name wide at any count. Stepping reboots, and
+       that is the point: the font is a byte in flash, read once at power on. */
+    if (hw.fonts.length) {
+      const names = hw.fonts.map((f) => f.name);
+      let at = Math.max(0, hw.defaultFont);
+      const pick = (i) => {
+        at = ((i % names.length) + names.length) % names.length;
+        hw.ui.font.show(names[at], at);
+        hwBoot(at);
+      };
+      hw.ui.font = createPicker({
+        label: 'font', what: 'font',
+        prev: () => pick(at - 1), next: () => pick(at + 1), onPick: (i) => pick(i),
+      });
+      hw.ui.font.options(names, at);
+      hw.ui.font.show(names[at], at);
+      hw.ui.row.append(hw.ui.font.el);
+    }
+    hw.framer = createMidiFramer((m) => { hw.out.push(picoHex(m)); hw.ui.log.add(decode(m)); });
+    hw.runner = createPicoRunner({
+      onFrame: (px) => { hw.px = px; hw.frames++; drawOled(hw.ui.cv, px); },
+      onTx: (bytes) => { for (const b of bytes) hw.framer(b); },
+      onStats: (s) => {
+        hw.stats = s;
+        hw.ui.ro.set('speed', +s.speed.toFixed(2));
+        hw.ui.ro.set('flat out', s.flatOut === null ? '' : +s.flatOut.toFixed(2));
+        hw.ui.ro.set('bytes in', s.rx);
+        hw.ui.ro.set('bytes out', s.tx);
+      },
+    });
+    // Somebody may have left the tab while the file was on its way.
+    hw.state = kitTabs.at() === 'hardware' ? 'running' : 'paused';
+    hwBoot(hw.defaultFont);
+    if (document.hidden) hw.runner.run(false);
+  }
+
+  function hwClose() {
+    if (hw.state !== 'running') return;
+    hw.state = 'paused';
+    hw.runner.run(false);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (hw.state === 'running') hw.runner.run(!document.hidden);
+  });
+
+  section('hardware', 'ROUTER FIRMWARE',
+    'The MIDI router firmware of the Pico on the desk, the very same UF2 file, running in an '
+    + 'emulated RP2040 in this tab with its screen, its four keys and its MIDI port.',
+    `const image = parseUF2(await (await fetch(UF2)).arrayBuffer())
+const pico = createPicoRunner({ onFrame, onTx, onStats })   // a worker, paced to real time
+pico.boot(patchFont(image, i))     // the font is the one byte after UIFONT in flash
+pico.key(4, true); pico.key(4, false, heldMs)   // OK, and held 1 s it denies
+pico.send([0x90, 60, 100])         // into UART0, the DIN in`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+      const { screen, cv } = oledScreen(stack.el);
+      const o = out('opens when this tab is opened');
+
+      const keys = createButtonGroup({
+        label: 'keys',
+        buttons: PICO_KEYS.map((s) => ({
+          id: `k${s.k}`, label: s.glyph, aria: `${s.does}, key ${s.k}`,
+          title: s.k === 4 ? `${s.does}, K4\nhold ${DENY_HOLD_MS / 1000} s to deny` : `${s.does}, K${s.k}`,
+        })),
+        // A click that a pointer already pressed and let go of is not a second
+        // press. What is left is the keyboard's Enter and Space, and a check's
+        // `.click()`, and each of those is a tap.
+        onPress: (id) => {
+          if (performance.now() - (hw.pointerUp.get(id) || 0) < 500) return;
+          hwTap(Number(id.slice(1)));
+        },
+      });
+      /* 🔴 A KEY IS DOWN FOR AS LONG AS THE POINTER IS, NOT FOR A CLICK. The
+         firmware reads the pin, so pressing is holding: OK held for a second
+         is a deny and the screen fills a meter while you hold it. `click` fires
+         only after the pointer is gone, so it could only ever be a tap. */
+      for (const s of PICO_KEYS) {
+        const id = `k${s.k}`, b = keys.button(id);
+        let downAt = 0;
+        b.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0 || !hw.runner) return;
+          downAt = performance.now();
+          // ⚠️ CAPTURE IS AN IMPROVEMENT, NOT A REQUIREMENT: it throws for a
+          // pointer the browser never saw, and the press must not go with it.
+          try { b.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+          hw.runner.key(s.k, true);
+        });
+        const up = () => {
+          if (!downAt) return;
+          const held = performance.now() - downAt;
+          downAt = 0;
+          hw.pointerUp.set(id, performance.now());
+          hw.runner?.key(s.k, false, held);
+        };
+        b.addEventListener('pointerup', up);
+        b.addEventListener('pointercancel', up);
+        b.addEventListener('lostpointercapture', up);
+      }
+
+      const send = createButtonGroup({
+        label: 'din in',
+        buttons: [{
+          id: 'patch', label: 'Send Replace Patch',
+          title: 'F0 00 20 29 01 60 01 … F7, a Circuit patch write\nan emulator, so nothing leaves the page',
+          onPress: () => hwSend(REPLACE_PATCH),
+        }],
+      });
+      const row = el('div', 'kit-row');
+      row.append(keys.el, send.el);
+
+      const kbHost = el('div');
+      const kb = createKeyboard(kbHost, {
+        base: 60, letters: false, chord: false,
+        onDown: (n) => { kb.lightNote(n, true); hwSend([0x90, n, 100]); },
+        onUp: (n) => { kb.lightNote(n, false); hwSend([0x80, n, 0]); },
+      });
+
+      const ro = createReport({
+        readout: { speed: 'x', 'flat out': 'x', 'bytes in': '', 'bytes out': '' },
+        showLog: false,
+      });
+      const log = createMidiLog({ empty: '', reserve: 5 });
+
+      stack.add(screen, row, kbHost, ro.foot);
+      stack.titled('DIN OUT', log.el);
+      box.append(stack.el, o);
+      hw.ui = { cv, screen, keys, send, row, kb, ro, log, o, font: null };
+    });
+
+  section('hardware', 'OLED FONTS',
+    'Every font compiled into the router firmware, read out of the same UF2 the emulator '
+    + 'runs and drawn here without running it.',
+    `fontsIn(parseUF2(bytes))   // [{ name, w, h, adv, top, cap, glyph(code) }], in FONT_PICK order
+patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
+    (box) => {
+      const { screen, cv } = oledScreen(box);
+      hwFontCv = cv;
+      box.append(screen);
+    });
+
+  /**
+   * 🔴 THE BLOCK UNDER THE HARDWARE PAIR, 2026-09-30, ABOVE KNOBS UNDER THE CODE, AND
+   * ONCE THE FIRST CALL TO `section()`. `plans/plan-code-editor.md`, asked as *"a hand-rolled
    * overlay - maybe not that bad idea"* and *"coloring slider code snippets
    * would be nice, perhaps each on its own hue"*. The box is the kit field's
    * own textarea, transparent, over a pre of coloured spans.
@@ -10833,6 +11167,142 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   }
 
   d.ready();
+
+  /**
+   * 🔴 THE ROUTER FIRMWARE'S CHECKS, AFTER `d.ready()` AND NOT BEFORE IT. This
+   * page becomes ready about 5.9 s after navigation against a harness that
+   * waits about 7.4 s (see the keyboard looper's block), and booting a board
+   * is half a second of emulation, twice. After `ready` the harness keeps
+   * collecting while the count grows and tolerates 2 s of silence, so every
+   * wait below is shorter than that and each step asserts as it lands.
+   *
+   * 🔴 THE FIRMWARE IS GRADED ON A BOARD OF ITS OWN, ON THIS THREAD, AND THE
+   * PAGE'S WIRING ON THE PAGE'S OWN BOARD IN ITS WORKER. The first half is the
+   * three claims the firmware makes (it boots to SCENE 1/2, a note goes
+   * through, NEXT moves it an octave up to channel 2) and is the same reading
+   * `rig/pico/sim/run-router.mjs` does: a phrase is on the panel only when
+   * every pixel of its cells matches the firmware's own font. The second half
+   * is that pressing the tab, the keys and the button on this page reaches it.
+   * ⚠️ BOTH BEHIND `?selfcheck=1`. A visitor's board starts when they open the
+   * tab and not before, and nothing here presses anything for them.
+   */
+  if (SELFCHECK) {
+    hwChecks().catch((e) => d.assert('the router firmware checks ran to the end', false,
+      `${e.message}`));
+  }
+
+  async function hwChecks() {
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    const until = async (test, ms) => {
+      const end = performance.now() + ms;
+      while (performance.now() < end) { if (test()) return true; await nap(40); }
+      return !!test();
+    };
+
+    // ── a visit ───────────────────────────────────────────────────────────
+    const away = kitTabs.at() !== 'hardware';
+    d.assert('a visit that does not open HARDWARE fetches no firmware and starts no emulator',
+      away && hw.fetched === 0 && !hw.runner && hw.state === 'idle',
+      `the open part is ${kitTabs.at()}, the UF2 was asked for ${hw.fetched} time(s), `
+      + `the board is ${hw.state}${hw.runner ? ' with a worker' : ' with no worker'}`);
+
+    // ── the firmware, on a board of the check's own ───────────────────────
+    const image = parseUF2(await (await fetch(HW_UF2)).arrayBuffer());
+    const fonts = fontsIn(image);
+    const F = fonts.find((f) => f.name === DEFAULT_FONT);
+    d.assert('the fonts are read out of the firmware itself, in the order its one patched byte picks them',
+      fonts.length >= 2 && !!F && new Set(fonts.map((f) => f.name)).size === fonts.length
+        && fonts.every((f, i) => f.index === i),
+      `${fonts.length} in ${image.length} bytes of flash: `
+      + fonts.map((f) => `${f.name} ${f.w}x${f.h}`).join(', '));
+    if (!F) return;
+
+    const tx = [];
+    const take = () => picoHex(tx.splice(0));
+    const board = createPico({ image, onTx: (b) => tx.push(b) });
+    const t0 = performance.now();
+    await board.sleep(300);
+    const bootWall = performance.now() - t0;
+    let s = readScreen(board.pixels(), F);
+    d.assert('the firmware boots and its header reads SCENE 1/2, read back pixel for pixel in its own font',
+      s.has('SCENE 1/2', true) && s.has('THRU', true) && s.headerLit() > 0.6,
+      `300 ms of board time took ${bootWall.toFixed(0)} ms here, ${(300 / bootWall).toFixed(2)} x real time; `
+      + `header ${(s.headerLit() * 100).toFixed(0)} per cent lit; TX at boot [${take()}]`);
+
+    // ⚠️ THE NEGATIVE CONTROL. A reader that found what it was asked for
+    // whatever the pixels said would pass the assert above perfectly.
+    const Other = fonts.find((f) => f !== F && f.w !== F.w);
+    d.assert('NEGATIVE CONTROL: the same screen read in another font finds no SCENE 1/2',
+      !!Other && !readScreen(board.pixels(), Other).has('SCENE 1/2'),
+      `read in ${Other ? Other.name : 'nothing'}`);
+
+    board.send([0x90, 0x3C, 0x64]);
+    await board.sleep(20);
+    const thru = take();
+    d.assert('a note into DIN IN comes out of DIN OUT unchanged in scene 1',
+      thru === '90 3C 64', `90 3C 64 in, [${thru}] out`);
+
+    board.key(2, true); await board.sleep(60);
+    board.key(2, false); await board.sleep(60);
+    const unlinked = take();
+    board.send([0x90, 0x3C, 0x64]);
+    await board.sleep(20);
+    const up = take();
+    await board.sleep(60);
+    s = readScreen(board.pixels(), F);
+    d.assert('NEXT, then the same note comes out 12 higher on channel 2',
+      up === '91 48 64' && unlinked === '80 3C 00 B0 7B 00' && s.has('SCENE 2/2', true),
+      `the scene change released the held note and sent [${unlinked}], 90 3C 64 in came out as [${up}], `
+      + `and the header ${s.has('SCENE 2/2', true) ? 'reads' : 'does not read'} SCENE 2/2`);
+
+    // The font switch, which is one byte of flash and a reboot.
+    const P = fonts.at(-1) === F ? fonts[0] : fonts.at(-1);
+    const other = createPico({ image: patchFont(image, P.index) });
+    await other.sleep(300);
+    const sp = readScreen(other.pixels(), P);
+    d.assert('the one byte after UIFONT boots the same firmware drawing in another font',
+      (sp.has('SCENE 1/2', true) || sp.has('1/2', true)) && sp.has('THRU', true)
+        && !readScreen(other.pixels(), F).has('SCENE 1/2'),
+      `patched to ${P.index}, ${P.name}: its header reads in ${P.name} and not in ${F.name}`);
+
+    // ── the page's own board, through its own controls ────────────────────
+    const addressWas = location.hash, home = kitTabs.at();
+    kitTabs.go('hardware');
+    const lit = (cv) => {
+      const data = cv.getContext('2d').getImageData(0, 0, OLED_W, OLED_H).data;
+      let n = 0;
+      for (let i = 0; i < data.length; i += 4) if (data[i] === OLED_LIT[0] && data[i + 2] === OLED_LIT[2]) n++;
+      return n;
+    };
+    const reads = (t, inv = true) => !!hw.px && readScreen(hw.px, F).has(t, inv);
+    const upUi = await until(() => reads('SCENE 1/2'), 1800);
+    d.assert('opening the HARDWARE tab boots the board, and the canvas draws its screen pixel for pixel',
+      upUi && hw.fetched === 1 && hw.state === 'running' && lit(hw.ui.cv) === litCount(hw.px),
+      `the UF2 asked for ${hw.fetched} time(s), ${hw.frames} screen(s) drawn, `
+      + `${hw.px ? litCount(hw.px) : 0} pixels lit on the board and ${lit(hw.ui.cv)} on the canvas`);
+
+    hw.ui.keys.button('k2').click();
+    const moved = await until(() => reads('SCENE 2/2'), 1800);
+    d.assert('the page’s NEXT key is a press the firmware sees: the header moves to SCENE 2/2',
+      moved, `the header ${moved ? 'reads' : 'does not read'} SCENE 2/2`);
+
+    const outWas = hw.out.length;
+    const patchHex = picoHex(REPLACE_PATCH);
+    hw.ui.send.button('patch').click();
+    const held = await until(() => reads('HOLD: REPLACE PATCH'), 1800);
+    const heldQuiet = !hw.out.slice(outWas).includes(patchHex);
+    hw.ui.keys.button('k4').click();
+    const passed = await until(() => hw.out.slice(outWas).includes(patchHex), 1800);
+    d.assert('Send Replace Patch is held on the screen, and the page’s OK lets it out whole',
+      held && heldQuiet && passed,
+      `banner ${held ? 'shown' : 'not shown'}, ${heldQuiet ? 'nothing' : 'the patch'} out while held, `
+      + `after OK: ${passed ? patchHex : `[${hw.out.slice(outWas).join(' | ')}]`}`);
+
+    // Put the reader back where they were, and the board back to sleep.
+    kitTabs.go(home, { push: false });
+    try { history.replaceState(null, '', `${location.pathname}${location.search}${addressWas}`); } catch { /* file:// */ }
+    d.assert('leaving the tab pauses the board', hw.state === 'paused', `the board is ${hw.state}`);
+  }
 
 </script>
 </html>
