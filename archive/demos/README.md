@@ -318,3 +318,16 @@ same day; the bucket held one kept file, a generated 90-minute 440 Hz tone
 over. `/crate/` 404s on positron.studio from the next build. `demo/verify.mjs`
 still names `positron-vain` in its list of expected console errors, which is
 now a line that matches nothing.
+
+## `graph-index.html`, `rout-index.html` and `looper-index.html`, retired 2026-10-04
+
+Decided by the owner with *"names ok, looper retires, no redrect, capture is
+fine"*, answering `plans/plan-demo-structure.md`. `/graph/` and `/rout/` were
+folded into `/patchbay/` the same day and had been unlisted since: the live
+desk, the openers and the routing contract (all 26 vectors, still graded by
+`node demo/shell/route-core-test.mjs`) all run there. `/looper/` was a keyboard
+into a WebAudio synth with a loop pedal; the pedal is on every keyboard now (the
+Evolution Loop, 2026-09-30) and the kit module `demo/shell/looper.mjs`, which
+`/radio/` and `/tapes/` use, did not move. **No redirects, on the owner's
+word**: all three slugs 404 from the next build, the house default since
+`/seek/` and `/able/`.
