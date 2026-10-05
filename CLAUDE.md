@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. R&D, not a product. 57 demo rows of which
-55 are shelled, a Raspberry Pi in another building, a Novation Circuit on the
+Live at **https://positron.studio**. R&D, not a product. 49 demo rows of which
+46 are built, a Raspberry Pi in another building, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
@@ -17,7 +17,7 @@ here?*; `DEMOS` is the story order and answers *where do I start?*, and
 `byNewest()` copies it. 🔴 **`unlisted: true` HIDES A ROW FROM THE INDEX, AND
 `built: false` DOES NOT.** This line said `built: false` until 2026-09-28 and it
 was acted on and DEPLOYED before one `curl` measured it: `built: false` takes
-the page out of the deploy entirely, because `workers/view/build.mjs:532` reads
+the page out of the deploy entirely, because `workers/view/build.mjs:566` reads
 `if (!d.built) continue` while enumerating directories, so `/grains/` answered
 **404** while the front page went on drawing a `grains` card with no link behind
 it. The front page never looks at `built`. `byGroup()` filters on `unlisted`,
@@ -32,7 +32,7 @@ once, so the two index renderers cannot disagree.
 | `LESSONS.md` | why the rules exist, at length |
 | `PROGRESS.md` | what was measured, when |
 | `LAYOUT.md` | where a new file goes, and the two renames that were priced and rejected |
-| `plans/` | every plan, 75 of them today (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
+| `plans/` | every plan, 87 of them on 2026-10-05 (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
 
 ## The skills, and when to load one
 

@@ -1,3 +1,69 @@
+# Handoff, 2026-10-05, session 62 continued: twenty demos became four tabbed pages, checks in two tiers, one time vocabulary live
+
+## Where it is right now
+
+- ✅ **Site: BUILD `a9292cf-200356-7b4b`**, confirmed on the edge, pushed.
+- ✅ **The Pi, `workers/store` and `workers/feedback`** run the `sent`/`at`
+  rename (a raw message off the Pi carries `sent` and no envelope `at`).
+- Counted: **49 demos, 46 built, 3 unlisted** (wall, grains, feedback),
+  **87 plans**. CLAUDE.md's top line recounted to match.
+- The working tree is clean; no agent is running.
+
+## What landed
+
+| commits | what | look at |
+| --- | --- | --- |
+| `7a1c9fc` | **one time vocabulary**: `at` is when a thing happens, `when` the uncertainty around it, the envelope stamps `sent`; `parse()` turns an old message's `at` into `sent`; board fields `framesSent`, `paramsSent` | `node demo/shell/wire-test.mjs` |
+| `9e3ed76` `f403a3d` | `/graph/`, `/rout/`, `/looper/` archived (owner: *"names ok, looper retires, no redrect, capture is fine"*), `/wall/` unlisted, the kit group first on the index | https://positron.studio/ |
+| `fefede0` | `/keep/` runs all 14 of its checks (3 before) | |
+| `c5f4e98` `a9292cf` | **two check tiers**: `selfcheck=1` ordinary, `selfcheck=2` deep (`DEMO_DEEP=1` or `--deep`), `DEEP` and `ifDeep` in `selfcheck.mjs`, `lightSettleMs` in the manifest; eleven long pages split (llhls, webrtc, stage now 5 to 7 s ordinary instead of about 80) | `DEMO_DEEP=1 node demo/verify.mjs keep` |
+| `8df953c` | `demo/shell/tab-page.mjs` (a tab built when first opened, its own report, one check pass before ready) and `bar-drill.mjs` (the harness's bar drill as page asserts); bars in a hidden tab ignore keys; convention in `positron-ui` | https://positron.studio/kit/#tab-page |
+| `af06ec5` | **`/wire/`** BYTES and NOTES (was `/instrument/`, which now gets a second peer and a fixed "hear the other machine") | https://positron.studio/wire/#notes |
+| `6670d8f` | **`/time/`** SCHEDULE, BEAT, LOOPS, SCORE, DATES (was transport, lanes, loops, score, strip) | https://positron.studio/time/ |
+| `d2075b7` | **`/sync/`** ARRIVAL, AHEAD, FOLLOW, AFTER (was cues, jam, the old sync, replay) and **`/capture/`** TAKES, SEGMENTS, ROUND TRIP, FAR END (was take, capture with record, keep, show) | https://positron.studio/sync/#ahead, https://positron.studio/capture/ |
+
+Checks carried over and grown, own page asserts old pages to new: `/sync/` 29
+to 50, `/time/` 37 to 42 plus 24 bar drills, `/wire/` 32 to 38 (one page now),
+`/capture/` 27 to 59 (72 deep). One sabotage per tab, every one red.
+
+## Measured, worth keeping
+
+- **AHEAD, the two-clocks demo**: a peer 137 ms fast over a 20 ms hop, offset
+  found to 0.00 ms, beats fired a median 1.8 ms apart (worst 6.9), and a peer that
+  hears nothing plays 137 ms early.
+- **A path-limited commit takes the whole working file**, twice this session:
+  `c5f4e98` swept the tab agent's `verify.mjs` change and `af06ec5` the tier
+  agent's `lightSettleMs` values. Both carry a `git notes` entry saying so.
+- **Seven files read `selfcheck === '1'` directly**, so a deep run would have
+  switched their checks off or let `/knobs/` drive the shared Pi. All read
+  `selfcheck.mjs` now.
+- **`verify-gl.mjs` never pressed `/videoradio/`'s play** (it moved onto the bar)
+  and opened four ERR mounts every run; it presses the bar and uses
+  `fake-station.mjs` now: 22/22 ordinary, 37/37 deep.
+- **The build scans text for imports**: a code example in `/kit/` reading
+  `import * as arrival from './arrival.mjs'` refused the deploy.
+
+## Open, from this half
+
+1. **`/radio/` deep collected 4 of its own checks**: its slow ones arrived after
+   `settleMs` 30 s. Raised to 60000, NOT re-run (owner asked to stop re-verifying
+   the radio).
+2. **A diagram rule fails on `/radio/` and `/grains/`** in both tiers ("container
+   holds at least one box"), present before today.
+3. **`/pack/` 29/31** and **`/kit/`'s slider checks running for visitors** (BACKLOG).
+4. **`/capture/`'s ordinary check pass takes about 19 s** (it records real takes);
+   offered to move each second take to the deep tier, not yet asked for.
+5. **Shared fixes the page agents worked around**: a strip built into a detached
+   element fits to 300 px and never re-fits; `verify.mjs` "strip has ink" reads
+   the first strip in the document; `keyboard.mjs` still hears keys in a hidden
+   tab; `createHardware` always appends into `.pos-controls`; `createButtonRow`
+   (in `demo/capture/common.mjs`) belongs in `demo/shell/`.
+6. **`rig/m1/synth.html` cannot answer NOTES** (listens for `note`, room
+   `proinst`), so the studio Mac has never played that tab.
+7. Still from the first half: the Formanta click test, flashing the real Pico 2 W,
+   `mod-core`, the relay cap still written as 60 msg/s in `bay.mjs` and
+   plan-universal-routing §5, and the Crave decision.
+
 # Handoff, 2026-10-04, session 62: the universal patchbay, the Pico router and its screen, timing light against heavy, one time vocabulary
 
 ## Where it is right now
