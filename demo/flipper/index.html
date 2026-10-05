@@ -73,6 +73,7 @@
   import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { formatTime } from '/timeline/strip.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -113,7 +114,9 @@
 
   const d = mount({
     name: 'flipper',
-    what: 'Press play on ETV or ETV2, or both, and each picture runs over its own line whose right end is the present moment.',
+    // ONE LINE, AND IT IS THE INDEX'S `one`: the picture at the foot of the
+    // page explains the machinery, so the sentence does not try to.
+    what: 'ETV and ETV2 live in two pictures that can play together, each over its own line whose right end is the present moment.',
     // NOT DRAWN. The headline number, how far behind a picture is, sits in its
     // live row's gutter beside the marks it is about; these are for `__demo`,
     // and they follow the channel pressed last.
@@ -159,6 +162,43 @@
     .filter((e) => /\.m3u8|\/live\/|tvSchedule/.test(e.name)).length;
   let askedBeforePlay = null;
 
+  /** ERR's schedule endpoint. One constant, read by the fetch and by the
+   *  diagram's box for it, so the picture cannot name a host the page does not
+   *  ask. */
+  const SCHEDULE_API = 'https://www.err.ee/api/tvSchedule/getTimelineSchedule';
+  /** The live origin as ERR publishes it. `CHANNELS` carries it already moved
+   *  by `?base=` under a harness, so the diagram's host is written once here
+   *  and checked against `CHANNELS` when there is no base. */
+  const LIVE_HOST = 'live.err.ee';
+
+  /**
+   * 🔴 WHAT THE BROWSER ACTUALLY ASKED ERR FOR, SORTED INTO THE DIAGRAM'S
+   * BOXES. A `PerformanceObserver` only listens, so it opens nothing and cannot
+   * change what a visit fetches. `buffered: true` takes the entries already
+   * there and it keeps counting after the resource buffer's 250 entry ceiling,
+   * which `getEntriesByType` does not. A request to an ERR path that fits no
+   * box is counted too, because that is the picture missing a part.
+   */
+  const ASK_BOX = [
+    ['master', /\/live\/[a-z0-9]+\.m3u8(\?|$)/],
+    ['variant', /\/live\/[a-z0-9]+\/[^?]+\.m3u8(\?|$)/],
+    ['segments', /\/live\/[a-z0-9]+\/[^?]+\.(m4s|mp4|ts|aac)(\?|$)/],
+    ['schedule', /\/api\/tvSchedule\//],
+  ];
+  const asks = { byBox: {}, origins: {}, unplaced: [] };
+  try {
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) {
+        if (!/\/live\/|tvSchedule/.test(e.name)) continue;
+        const u = new URL(e.name);
+        const hit = ASK_BOX.find(([, re]) => re.test(u.pathname + u.search));
+        if (!hit) { asks.unplaced.push(u.pathname); continue; }
+        asks.byBox[hit[0]] = (asks.byBox[hit[0]] || 0) + 1;
+        (asks.origins[hit[0]] ||= new Set()).add(u.origin);
+      }
+    }).observe({ type: 'resource', buffered: true });
+  } catch { /* no observer: the assert below then says nothing was seen */ }
+
   // 🔴 FETCHED ONCE PER CHANNEL AND DAY, AND KEPT. A schedule for a day that has
   // been read does not change while somebody stops and starts a channel, so a
   // second play reuses the answer and nothing refetches it on a timer. A failed
@@ -170,7 +210,7 @@
     if (!scheduleCache.has(key)) {
       scheduleFetches++;
       // THROUGH `errUrl` LIKE EVERY OTHER ERR ADDRESS ON THIS PAGE.
-      const u = errUrl('https://www.err.ee/api/tvSchedule/getTimelineSchedule')
+      const u = errUrl(SCHEDULE_API)
         + `?day=${day.getDate()}&month=${day.getMonth() + 1}&year=${day.getFullYear()}&channel=${c.id}`;
       scheduleCache.set(key, fetch(u).then((r) => r.json()).then((j) => {
         const rows = [];
@@ -958,6 +998,37 @@
   const glyphOf = (b) => b.querySelector('.pos-sym')?.textContent ?? b.textContent;
   async function checks() {
     const [A, B] = chans;
+    // ── the picture at the foot of the page ─────────────────────────────────
+    const groups = dg.svg.querySelectorAll('.pos-dg-n').length;
+    const log = document.querySelector('.pos-log');
+    d.assert('the how it works diagram is built, after the log, one group per box',
+      dg.svg.isConnected && groups === dgBoxes.length
+        && (!log || !!(log.compareDocumentPosition(dg.el) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      `${groups} of ${dgBoxes.length} boxes drawn, ${log ? 'log above it' : 'no log'}`);
+    for (let i = 0; i < 40 && !dg.measured; i++) await new Promise((r) => requestAnimationFrame(r));
+    const svgW = dg.svg.getBoundingClientRect().width, hostW = dg.el.clientWidth;
+    d.assert('the diagram is laid out at its real width, from measured type',
+      dg.measured && hostW > 200 && Math.abs(svgW - hostW) <= 2,
+      `${dg.mode}, svg ${svgW.toFixed(0)} px in a ${hostW} px host, measured ${dg.measured}`);
+    d.assert('nothing in the diagram was cut or refused', dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.id}: its ${c.where} was cut to "${c.shown}"`).join(', ') || 'none');
+    // 🔴 THE BOXES AGAINST THE REQUESTS. Every kind of ask the page made has a
+    // box, every ERR box was asked, nothing went to an ERR path the picture
+    // does not show, and the live boxes and the schedule box went to the
+    // origins the page holds for them. Under a harness both are the stand-in.
+    const ids = new Set(dgBoxes.map((n) => n.id));
+    const seen = Object.keys(asks.byBox);
+    const liveOrigin = new URL(A.c.url).origin, schedOrigin = new URL(errUrl(SCHEDULE_API)).origin;
+    const originsOk = seen.every((k) => [...asks.origins[k]].every((o) =>
+      o === (k === 'schedule' ? schedOrigin : liveOrigin)));
+    const hostsOk = location.search.includes('base=')
+      || chans.every((S) => new URL(S.c.url).host === LIVE_HOST);
+    d.assert('the diagram\'s boxes are the hosts and the asks this page makes',
+      ASK_BOX.every(([k]) => ids.has(k) && asks.byBox[k] > 0) && asks.unplaced.length === 0
+        && originsOk && hostsOk,
+      `${ASK_BOX.map(([k]) => `${k} ${asks.byBox[k] || 0}`).join(', ')}, `
+      + `${asks.unplaced.length} unplaced, live at ${liveOrigin}, schedule at ${schedOrigin}`);
+
     // the page, before anything was opened
     d.assert('nothing was asked of the broadcaster before a play press',
       askedBeforePlay === 0, `${askedBeforePlay} requests before the press`);
@@ -1263,6 +1334,61 @@
       `${chans.filter((S) => S.playing).map((S) => S.c.name).join(', ') || 'nothing'} playing, ${hlsAlive} engines, `
       + `${chans.filter(sourced).length} pictures with a source`);
   }
+
+  // ── how it works ──────────────────────────────────────────────────────────
+  // Read off this file: what the browser runs, the three things it asks ERR's
+  // live origin for and how often, the schedule endpoint, and where a refusal
+  // comes from. Drawing it fetches nothing.
+  const DIAGRAM_SPEC = {
+    caption: 'Nothing is asked of ERR until a play is pressed. Each channel then reads one master, its playlist every 10 s and segments as it plays.',
+    nodes: [
+      // ONE MACHINE, ERR, WITH ITS TWO HOSTS NAMED IN THE NOTES. Drawn as two
+      // machines the schedule ranked under the live origin as a tall empty box.
+      // `join: false`: master, variant and segments are linked by name below,
+      // and nothing feeds the schedule from the segments beside it.
+      { id: 'err', label: 'ERR', sub: 'err.ee', kind: 'cloud', tech: 'archive', join: false,
+        children: [
+          { id: 'master', label: 'master', sub: 'once per play',
+            note: `The channel's address on ${LIVE_HOST}, which hands back a variant URL carrying a fresh **?id=** `
+                + 'session on every read. So it is read once per press, and again only if the variant stops answering.' },
+          { id: 'variant', label: 'variant', sub: 'every 10s',
+            note: 'The media playlist for that session, about 218 KB covering 2 h, with one '
+                + '**PROGRAM-DATE-TIME** on its first segment. It is re-read on the same URL, so the session is reused.' },
+          { id: 'segments', label: 'segments', sub: 'fMP4, 1.92s',
+            note: 'ERR refuses some by programme with a 403 and no CORS header, which reaches the browser as a CORS failure. '
+                + 'The page asks first with a two byte Range request and starts behind the refusal.' },
+          { id: 'schedule', label: 'schedule', sub: 'once per day',
+            note: `The tvSchedule endpoint on ${new URL(SCHEDULE_API).host}, asked once per channel and day on the `
+                + 'first play and then kept. A window reaching back past midnight asks for the day before too.' },
+        ] },
+      { id: 'browser', label: 'Browser', sub: 'two channels', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'hls', label: 'hls.js', sub: 'one per channel',
+            note: 'Built by a press on a panel\u2019s play and destroyed by the next one. Three refused '
+                + 'segments in a row stop its loading rather than asking ERR again.' },
+          { id: 'video', label: 'video', sub: 'ETV and ETV2',
+            note: 'Two video elements fed through Media Source Extensions, each with its own play, '
+                + 'back to live, loop and mute, and both able to play at once.' },
+          { id: 'line', label: 'timeline', sub: 'wall clock',
+            note: 'One line per picture, positioned by the **PROGRAM-DATE-TIME** and moved once a second. '
+                + 'Its right end is the present, and the schedule is the grey row under it.' },
+        ] },
+    ],
+    links: [
+      { from: 'master', to: 'variant', note: 'The variant URL, with the session in it.' },
+      { from: 'variant', to: 'segments', note: 'Every segment in the last 2 h, each from one PDT plus the durations before it.' },
+      { from: 'variant', to: 'hls', label: 'playlist',
+        note: 'Re-read every 10 s on the variant the master handed over, so one press is one session.' },
+      { from: 'segments', to: 'hls', label: 'fMP4',
+        note: 'Fetched as the picture plays. A refused one is a 403 with no CORS header.' },
+      { from: 'hls', to: 'video', note: 'Decoded picture and sound through Media Source Extensions.' },
+      { from: 'video', to: 'line', note: 'The line follows the picture\u2019s clock, so a seek moves both.' },
+      { from: 'schedule', to: 'line',
+        note: 'Programme names and start times, drawn as the grey row under each picture.' },
+    ],
+  };
+  const dg = createDiagram(d.el, DIAGRAM_SPEC, { how: true, atEnd: true });
+  const dgBoxes = DIAGRAM_SPEC.nodes.flatMap((n) => [n, ...(n.children || [])]);
 
   for (const S of chans) { openView(S); paintPlay(S); }
   d.set('channel', chans[0].c.name);
