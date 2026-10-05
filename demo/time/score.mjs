@@ -22,6 +22,7 @@ import {
   scoreDocToJSON, parseScoreDoc, scoreDocToJSONL, parseScoreDocJSONL,
 } from '/timeline/score.mjs';
 import { csoundPart, tempoMap } from '/timeline/csound.mjs';
+import { tabDiagram } from './how.mjs';
 
 // ── five documents, each adding exactly one idea to the one before ───────
 const cs = (lines) => csoundPart(lines.join('\n'));
@@ -355,10 +356,58 @@ export function build({ panel, log }) {
   panel.add(pick.el, pair, pre);
   load(0);
 
+  /**
+   * HOW IT WORKS, read off this file, `timeline/csound.mjs` and
+   * `timeline/score.mjs`: Csound text compiled into rows, a MIDI part written
+   * as rows, both into one document, the document loaded into a nest of one
+   * deck per part, and the deck's `actuate()` lighting the document's lines.
+   */
+  const how = tabDiagram(panel, () => ({
+    caption: 'A score is compiled once into one document, and the document is what plays.',
+    nodes: [
+      // `join: false`: two neighbours with no declared link between them do
+      // not feed each other here, and an undeclared gap would draw an arrow.
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'cs', label: 'Csound text', sub: 'i and t lines', tech: 'sound',
+            note: 'Every score starts as **Csound** score lines, **i** for a note in beats and **t** '
+                + 'for the tempo. Csound itself never runs here.' },
+          { id: 'comp', label: 'compiler', sub: 'csoundPart', tech: 'browser',
+            note: 'Turns each line into a row that keeps its p-fields as written. A line with no '
+                + 'place on a timeline, such as an **f** table, becomes a warning in the document.' },
+          { id: 'midi', label: 'MIDI rows', sub: 'ch, note, vel', tech: 'device',
+            note: 'The two languages score adds a MIDI part as plain rows. Nothing in this tab '
+                + 'makes a sound, Csound or MIDI: every row only lights its line.' },
+          { id: 'doc', label: 'document', sub: 'JSONL', tech: 'browser',
+            note: '**scoreDoc** holds each part in its own language and the uses that place a part '
+                + 'at a beat, with a repeat. It is printed below one record per line and '
+                + 'round-trips byte for byte.' },
+          { id: 'nest', label: 'nest', sub: '1 deck per part', tech: 'browser',
+            note: '**loadScoreDoc** turns beats into milliseconds with **tempoMap**, which '
+                + 'interpolates seconds per beat the way Csound does. Each part gets its own deck '
+                + 'under one **createNest**.' },
+          { id: 'lines', label: 'score lines', sub: `${SCORE_LINES} lines`, tech: 'graphics',
+            note: 'A row\'s **actuate()** lights its own line as it plays, and a use line stays '
+                + 'lit for as long as its part is sounding.' },
+        ] },
+    ],
+    links: [
+      { from: 'cs', to: 'comp', note: 'Plain text, the same lines Csound would read.' },
+      { from: 'comp', to: 'doc', note: 'Rows in beats with their p-fields untouched, and the tempo points.' },
+      { from: 'midi', to: 'doc', note: 'Rows of channel, note and velocity, kept as they are.' },
+      { from: 'doc', to: 'nest',
+        note: 'Parts and uses, all in beats. Only here does anything become milliseconds.' },
+      { from: 'nest', to: 'lines', note: 'Which row just fired, and which use is sounding.' },
+    ],
+  }));
+
   return {
     deck: parent, bar,
     // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
-    show() { requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit(); view.strip.invalidate(); })); },
+    show() {
+      how.draw();
+      requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit(); view.strip.invalidate(); }));
+    },
     hide() { if (parent.playing()) parent.pause(); },
     bars: [{ name: 'score', bar, strip: view.el }],
     async check({ A }) {
@@ -422,6 +471,21 @@ export function build({ panel, log }) {
       A('picking each of the five scores leaves the score block the same height',
         heights.length === 5 && heights.every((h) => h > 0 && Math.abs(h - heights[0]) < 0.5) && lines === SCORE_LINES,
         `${heights.map((h) => h.toFixed(1)).join(', ')} px, ${lines} lines on score 1`);
+      // Read on score 1, which `pick.set(0)` just put back.
+      const shownLines = pre.querySelectorAll('.sc-l:not(.sc-pad)').length;
+      how.check(A, [
+        ['Csound text', DOCS.every((x) => Object.values(x.parts).some((q) => q.lang === 'csound')),
+          `in all ${DOCS.length} scores`],
+        ['compiler', two.parts.verse.warnings.length === 1, `${two.parts.verse.warnings.length} warning kept`],
+        ['MIDI rows', two.parts.pulse.lang === 'midi' && two.parts.pulse.rows.length === 3,
+          `${two.parts.pulse.rows.length} rows in score 5`],
+        ['document', shownLines === scoreDocToJSONL(doc).split('\n').length, `${shownLines} records printed`],
+        ['nest', !!nest && nest.spans().length === doc.uses.length
+          && Object.keys(decks).length === Object.keys(doc.parts).length,
+          `${nest ? nest.spans().length : 0} uses over ${Object.keys(decks).length} deck`],
+        ['score lines', panel.el.contains(pre) && pre.querySelectorAll('.sc-l').length === SCORE_LINES,
+          `${pre.querySelectorAll('.sc-l').length} lines`],
+      ]);
     },
   };
 }

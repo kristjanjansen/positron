@@ -22,6 +22,7 @@ import { createStripView } from '/shell/strip.mjs';
 import { createGlue } from '/shell/glue.mjs';
 import { createDeck } from '/timeline/transport.mjs';
 import { markAdapter, marks } from '/shell/fixture.mjs';
+import { tabDiagram } from './how.mjs';
 
 const DURATION = 20000;
 // Handed to createDeck below AND printed in the lane's tooltip, from these same
@@ -166,10 +167,56 @@ export function build({ panel, assert, log }) {
 
   log(`${DURATION / 1000}s, 20 events, speeds ${adapter.caps.rates.join('/')}x`);
 
+  /**
+   * HOW IT WORKS, read off this file and `timeline/transport.mjs`: the bar
+   * moves a deck, the deck's scheduler is woken by a Worker, arms a one-shot
+   * for each event inside `HORIZON`, and the strip colours what came back.
+   * Every number in it is one of the constants handed to `createDeck` above.
+   */
+  const how = tabDiagram(panel, () => ({
+    caption: 'One deck keeps the time. Everything else in this tab asks it where it has got to.',
+    nodes: [
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'bar', label: 'transport bar', sub: 'play, pause, seek', tech: 'browser',
+            note: 'Play and pause set the **deck** rate to 1 or 0, and a press on the strip is a '
+                + 'seek. The bar keeps no time of its own.' },
+          { id: 'deck', label: 'deck', sub: `${HORIZON}ms ahead`, tech: 'browser',
+            note: `**createDeck** holds ${deck.items.length} events and works out the position from `
+                + '**performance.now()**, the start plus the time since, times the rate. A pause or '
+                + 'a seek cancels every timer it has set.' },
+          { id: 'worker', label: 'Worker', sub: `${TICK}ms tick`, tech: 'browser',
+            note: 'A **Web Worker** runs the **setInterval** and every one-shot **setTimeout**, '
+                + 'because timers in a worker are not slowed to once a second in a background tab.' },
+          { id: 'events', label: 'events', sub: `${deck.items.length}, 1s apart`, tech: 'browser',
+            note: `An event no timer caught is fired by the next tick, up to ${GRACE} ms late. `
+                + 'Each **actuate()** writes down when it really ran.' },
+          { id: 'strip', label: 'strip', sub: 'canvas', tech: 'graphics',
+            note: 'One tick per event on a **canvas**, coloured by lateness against its own way of '
+                + `firing: 5 ms for a timer, one ${TICK} ms tick for a caught one.` },
+        ] },
+    ],
+    links: [
+      { from: 'bar', to: 'deck',
+        note: '**play()**, **pause()** and **seek()**, which change a rate and a starting point '
+            + 'and nothing else.' },
+      { from: 'deck', to: 'worker',
+        note: `Every ${TICK} ms the deck looks ${HORIZON} ms ahead and asks the worker for one `
+            + '**setTimeout** per event it finds there.' },
+      { from: 'worker', to: 'events',
+        note: 'A **postMessage** from the worker wakes the page at the moment, and the event fires.' },
+      { from: 'events', to: 'strip',
+        note: 'Its lateness in milliseconds, which is the number under the lane name.' },
+    ],
+  }));
+
   return {
     deck, bar,
     // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
-    show() { requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate(); })); },
+    show() {
+      how.draw();
+      requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate(); }));
+    },
     // A deck left running in a tab nobody can see is a sound nobody chose.
     hide() { if (deck.playing()) deck.pause(); },
     // No `bars`: this one is published and the harness drills it.
@@ -190,6 +237,14 @@ export function build({ panel, assert, log }) {
       A('this is the bar the page publishes, so the harness drills it',
         !!window.__demo && window.__demo.transport === bar.api,
         window.__demo?.transport === bar.api ? '__demo.transport is SCHEDULE\'s' : 'another bar is published');
+      how.check(A, [
+        ['transport bar', panel.el.contains(bar.el), 'in this tab'],
+        ['deck', deck.items.length === 20 && deck.range[1] === DURATION,
+          `${deck.items.length} events over ${deck.range[1]} ms`],
+        ['Worker', deck.hostName === 'worker', `host ${deck.hostName}`],
+        ['events', deck.adapter('mark') === adapter, 'the mark adapter'],
+        ['strip', panel.el.contains(view.el) && view.el.tagName === 'CANVAS', 'a canvas'],
+      ]);
     },
   };
 }
