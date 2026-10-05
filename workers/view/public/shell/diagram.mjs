@@ -752,6 +752,13 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     ? backLevels(dives.map((l) => [rank(l.from) * 100, rank(l.to) * 100])) : [];
   const diveLanes = diveLevel.length ? Math.max(...diveLevel) + 1 : 0;
   const childInset = CHILD_PAD + maxLanes * SIB_LANE + diveLanes * DIVE_LANE;
+  // ⚠️ THE DIVE LANES ARE BOUGHT ON THE RIGHT ONLY, since they moved there on
+  // 2026-10-05 (see `placeColumn`). Bought on both sides, the left copy was an
+  // empty strip that pushed every box off centre under its machine's name.
+  // The lanes a container keeps for its own children are on the right too
+  // (see `placeSibs`), so in one column the left inset is the padding alone.
+  // In a row nothing here moves.
+  const insetL = mode === 'column' ? CHILD_PAD : childInset;
   // one gap for every container in the picture, because gaps of two sizes
   // would read as a difference that means something
   const childGap = sibs.some((l) => sibSpan(l) === 1) ? SIB_GAP : CHILD_GAP;
@@ -838,7 +845,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     for (const n of nodes) boxNeed = Math.max(boxNeed, measure.sub(n.sub || ''));
     // a box INSIDE a container is inset, so what it needs is what it needs
     // plus the room its container holds around it
-    for (const c of kids) boxNeed = Math.max(boxNeed, measure.sub(c.sub || '') + childInset * 2);
+    for (const c of kids) boxNeed = Math.max(boxNeed, measure.sub(c.sub || '') + childInset + insetL);
     boxNeed = Math.min(Math.ceil(boxNeed) + BOX_PAD_X * 2, BOX_MAX_W_COL);
     const room = avail - PAD * 2 - boxNeed;
     if (leftInset + rightInset > room) {
@@ -869,7 +876,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   // container is taller than a plain box by what it holds — and it hands that
   // height to every other box in the picture rather than keeping it, for the
   // same reason: a row of unequal panels ranks them.
-  const kidInner = Math.max(20, w - childInset * 2 - BOX_PAD_X * 2);
+  const kidInner = Math.max(20, w - childInset - insetL - BOX_PAD_X * 2);
   // ⚠️ ASSIGNED IN READING ORDER, PARENTS AND CHILDREN ALIKE, so neighbouring
   // boxes never share a hue and the order is the one a reader meets them in.
   // A node may state its own; that is what a page reaches for when two pictures
@@ -920,8 +927,15 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
    * always left, and the words are wrapped to what is left.
    * ⚠️ ONE COLUMN ONLY. In a row the lanes run in the gap between columns,
    * outside every box, and nothing here moves.
+   * 🔴 SINCE 2026-10-05 THE LANES RUN DOWN THE RIGHT PADDING, so the head no
+   * longer MOVES: it starts where every box's words start and is only WRAPPED
+   * short of the lanes, by the same amount it used to move. See `placeColumn`.
    */
-  const headInset = mode === 'column' ? Math.max(0, diveLanes - 1) * DIVE_LANE : 0;
+  // 6 px short of the innermost lane, which sits `DIVE_EDGE + DIVE_LANE` off
+  // the boxes' right edge: with no child lanes that is the old
+  // `(diveLanes - 1) * DIVE_LANE` to the digit
+  const headInset = mode === 'column' && diveLanes
+    ? Math.max(0, childInset - BOX_PAD_X - DIVE_EDGE - DIVE_LANE + 6) : 0;
   for (const n of nodes) {
     fit(n, n._kids.length ? inner - headInset : inner);
     for (const c of n._kids) fit(c, kidInner);
@@ -940,6 +954,19 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
       : own(n) + BOX_PAD_Y * 2);
   }
   boxH = Math.round(boxH);
+  /**
+   * 🔴 IN ONE COLUMN EVERY MACHINE IS ITS OWN HEIGHT. The shared height above
+   * is a rule about a ROW, where unequal panels side by side rank each other.
+   * Stacked, nothing stands beside anything, and the shared height only handed
+   * every short machine the tallest one's empty floor. PHOTOGRAPHED 2026-10-05
+   * at 375 px: /stage/'s audience Browser, two boxes in it, drawn as tall as
+   * Cloudflare's four, and /moq/'s one-box Cloudflare a third empty, with the
+   * lines beside them running the length of that nothing.
+   */
+  const colH = new Map(nodes.map((n) => [n.id, Math.round(n._kids.length
+    ? own(n) + HEAD_GAP + n._kids.length * kidH
+      + (n._kids.length - 1) * childGap + CHILD_PAD * 2
+    : own(n) + BOX_PAD_Y * 2)]));
 
   /**
    * ⚠️ AN UNKNOWN `align` IS REPORTED RATHER THAN IGNORED, which is this
@@ -957,7 +984,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     ? placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
                                ...shared })
     : placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
-                           backBudget, skipBudget, m, measure, cuts, headInset,
+                           backBudget, skipBudget, m, measure, cuts, colH, insetL,
                            dives, diveLevel, diveLanes, backLevel, skipLevel, ...shared });
 
   checkEnds(out, cuts);
@@ -1463,7 +1490,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
 }
 
 function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
-                             backBudget, skipBudget, m, measure, cuts, headInset = 0,
+                             backBudget, skipBudget, m, measure, cuts, colH = new Map(), insetL = null,
                              dives = [], diveLevel = [], diveLanes = 0,
                              backLevel = [], skipLevel = [],
                              sibs, kidIx, sibSpan, childGap, childInset }) {
@@ -1526,15 +1553,17 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
     return (gapH(g) - n * ROW_H) / 2 + (i + 0.5) * ROW_H;
   };
   const rowY = [];
-  for (let r = 0, y = PAD; r < order.length; r++) { rowY.push(y); y += boxH + gapH(r); }
+  // each machine its own height, see `colH` in `layout`
+  const hOf = (n) => colH.get(n.id) ?? boxH;
+  for (let r = 0, y = PAD; r < order.length; r++) { rowY.push(y); y += hOf(order[r]) + gapH(r); }
   const placed = order.map((n, r) =>
-    box(n, x, rowY[r], w, boxH, m, kidH, childGap, childInset, headInset));
+    box(n, x, rowY[r], w, hOf(n), m, kidH, childGap, childInset, insetL ?? childInset));
   const at = new Map();
   for (const p of placed) { at.set(p.id, p); for (const k of p.kids || []) at.set(k.id, k); }
   // the machine a box is drawn inside, or the box itself — see placeRow, where
   // the same two lines carry the same rule
   const outer = (id) => at.get(owner.get(id) || id);
-  const bottom = rowY[rowY.length - 1] + boxH;
+  const bottom = rowY[rowY.length - 1] + hOf(order[order.length - 1]);
   const right = x + w;
 
   /**
@@ -1571,8 +1600,26 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   // gutter's rule one level in, and it leaves the innermost lane `DIVE_LANE`
   // plus `DIVE_EDGE` clear of the box it arrives at — four for the corner and
   // six for the arrowhead.
+  //
+  // 🔴 DOWN THE RIGHT PADDING, NOT THE LEFT, SINCE 2026-10-05. The left was
+  // already the return paths' side, so on /stage/ at 375 px six vertical lines
+  // shared the left 70 px of the picture, two going up and four going down,
+  // and a reader could not tell which was which without following each one to
+  // its head. Reported from a UX review as *"a tangle of long return lines
+  // running down the left side"*. The right padding was already bought, because
+  // `childInset` insets the boxes on BOTH sides, and it sat empty. Now the
+  // picture has one rule a reader can learn from one line: a line on the left
+  // goes back up, a line on the right goes on down. That is the rule this
+  // function's opening comment already states for the gutters, carried one
+  // level in.
   const diveOf = new Map(dives.map((l, i) => [l, diveLevel[i]]));
-  const laneX = (l) => x + DIVE_EDGE + (diveLanes - 1 - (diveOf.get(l) || 0)) * DIVE_LANE;
+  // ⚠️ COUNTED OUT FROM THE BOXES' RIGHT EDGE, with any lane a container
+  // keeps for its own children OUTSIDE these. The other way round, MEASURED
+  // on /station/ at 375 px, the `chunks -> Worker` lane ran straight through
+  // the base of every arrowhead arriving at `programmes`. With no such lane
+  // this is the old left-hand spacing mirrored: the innermost lane 14 px off
+  // the box, the outermost `DIVE_EDGE` in from the container's edge.
+  const laneX = (l) => x + w - childInset + DIVE_EDGE + (1 + (diveOf.get(l) || 0)) * DIVE_LANE;
   // 🔴 A STEP'S NAME TAKES THE ROW IT SITS IN, NOT HALF A BOX. Between two
   // stacked boxes is a gap that is EMPTY right across the picture, and the
   // only thing in it is one short vertical arrow. The budget used to be "the
@@ -1651,13 +1698,15 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
         // `frames` and /cam/'s `WHEP` both carried a lane through the middle.
         // With one lane in the gap, or with this lane the innermost, the x is
         // the one it always was.
+        // ⚠️ AND WITH THE LANES ON THE RIGHT THE INNERMOST IS THE LEFTMOST, so
+        // the name ENDS short of it and reads leftward into the empty gap.
         const inner = dive
-          ? Math.max(...(inGap.get(gapOf(l)) || [l]).filter((o) => diveSet.has(o)).map(laneX))
+          ? Math.min(...(inGap.get(gapOf(l)) || [l]).filter((o) => diveSet.has(o)).map(laneX))
           : 0;
-        const nameX = dive ? inner + STEP_OFF : fm.cx + (stepLeft ? -STEP_OFF : STEP_OFF);
-        const nameAnchor = dive ? 'start' : (stepLeft ? 'end' : 'start');
+        const nameX = dive ? inner - STEP_OFF : fm.cx + (stepLeft ? -STEP_OFF : STEP_OFF);
+        const nameAnchor = dive ? 'end' : (stepLeft ? 'end' : 'start');
         const budget = dive
-          ? Math.min(LINK_MAX, Math.max(0, Math.floor(laneL - nameX)))
+          ? Math.min(LINK_MAX, Math.max(0, Math.floor(nameX - x - STEP_OFF)))
           : fwdBudget;
         const lab = wrapLines(l.label, budget, 1, measure.link);
         if (lab.cut) {
@@ -1676,9 +1725,17 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
           const jogOut = st ? gy0 + slotY(g, 0) : midY;
           const jogIn = st ? gy0 + slotY(g, stacked.get(g).length + jogs.get(g).top) : midY;
           const pts = [];
-          if (fKid) pts.push([f.x - EDGE_OUT, f.cy], [bx, f.cy]);
+          // ⚠️ A BOX A DIVE BOTH REACHES AND LEAVES TAKES THEM AT TWO HEIGHTS,
+          // the arrival above and the departure below, the way the left gutter
+          // spaces a return path's two ends by ATTACH_OFF. MEASURED on /stage/
+          // at 375 px: `questions` arriving at Relay object and `questions`
+          // leaving it for video met at one point and read as one line.
+          const both = (id) => dives.some((o) => o.to === id) && dives.some((o) => o.from === id);
+          const fy = f.cy + (both(l.from) ? ATTACH_OFF / 2 : 0);
+          const ty = t.cy - (both(l.to) ? ATTACH_OFF / 2 : 0);
+          if (fKid) pts.push([f.x + f.w + EDGE_OUT, fy], [bx, fy]);
           else pts.push([fm.cx, y1], [fm.cx, jogOut], [bx, jogOut]);
-          if (tKid) pts.push([bx, t.cy], [t.x - EDGE_OUT - 1, t.cy]);
+          if (tKid) pts.push([bx, ty], [t.x + t.w + EDGE_OUT + 1, ty]);
           else pts.push([bx, jogIn], [tm.cx, jogIn], [tm.cx, y2]);
           d = roundedPath(pts, SIB_CORNER);
         }
@@ -1875,6 +1932,8 @@ function placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }) {
     const inTo = sibs.filter((x) => x.to === l.to && sibSpan(x) > 1);
     const k = inTo.length > 1 ? inTo.indexOf(l) - (inTo.length - 1) / 2 : 0;
     const ty0 = t.cy + k * ATTACH_OFF;
+    // ⚠️ OUTSIDE THE DIVE LANES, which share this right padding in one column
+    // since 2026-10-05 and sit next to the boxes; see `laneX` in placeColumn
     const bx = c.x + c.w - CHILD_PAD - SIB_LANE * (i + 0.5);
     // ⚠️ THE HEAD LANDS ON THE BOX'S EDGE, not three pixels short of it. Those
     // three were the last of the four the corner needed; see `SIB_LANE`.
@@ -2013,7 +2072,7 @@ export function captionTexts(spec, nodes) {
  * top-aligned its contents would sit differently from every other box in the
  * row for a reason a reader cannot see.
  */
-function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PAD, headInset = 0) {
+function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PAD, insetL = childInset) {
   const lab = n._lab, sub = n._sub;
   const ks = n._kids || [];
   const own = lab.lines.length * m.labLh + (sub.lines.length ? SUB_GAP + m.subLh : 0);
@@ -2029,9 +2088,11 @@ function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PA
     cx: x + w / 2, cy: y + h / 2,
     // Where a line of text STARTS, and what it is anchored by. One pair, read
     // by the renderer, so the switch above is the only place that decides.
-    // ⚠️ `headInset` moves a CONTAINER's words clear of the lanes down its
-    // side, in one column only; see `layout`, where the words are wrapped to it
-    tx: BOX_ALIGN === 'topleft' ? r1(x + BOX_PAD_X + (ks.length ? headInset : 0))
+    // ⚠️ A CONTAINER's words used to move right by `headInset`, clear of the
+    // dive lanes down its left side. The lanes run down the right since
+    // 2026-10-05, so the words start where every box's do and are only wrapped
+    // short of them; see `layout`
+    tx: BOX_ALIGN === 'topleft' ? r1(x + BOX_PAD_X)
                                 : r1(x + w / 2),
     anchor: BOX_ALIGN === 'topleft' ? 'start' : 'middle',
     label: lab, sub,
@@ -2049,7 +2110,7 @@ function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PA
   if (ks.length) {
     let ky = top + own + HEAD_GAP;
     out.kids = ks.map((c) => {
-      const p = box(c, x + childInset, ky, w - childInset * 2, kidH, m, 0);
+      const p = box(c, x + insetL, ky, w - insetL - childInset, kidH, m, 0);
       ky += kidH + childGap;
       return p;
     });

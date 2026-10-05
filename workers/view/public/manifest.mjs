@@ -68,10 +68,10 @@ export const ACTS = new Map([
 ]);
 
 export const DEMOS = [
-  { name: 'und', group: 'timeline', act: 0, created: '2026-09-07', built: true,
+  { name: 'und', group: 'technologies', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score, compiled whenever you stop typing',
     tags: ['timeline', 'Csound', 'WebAudio'] },
-  { name: 'click', group: 'timeline', act: 0, created: '2026-09-14', built: true,
+  { name: 'click', group: 'technologies', act: 0, created: '2026-09-14', built: true,
     one: 'U:’s vClick is a click track with no earpieces, where every player watches a screen for the bar, the beat and a lamp',
     tags: ['timeline', 'Csound'] },
 
@@ -97,9 +97,10 @@ export const DEMOS = [
     one: 'one webcam next to what comes back over WebRTC, MoQ and LL-HLS',
     tags: ['getUserMedia', 'WebRTC', 'WHIP', 'MoQ'] },
 
-  { name: 'room', group: 'technologies', act: 2, created: '2026-09-04', built: true,
-    one: 'open this page twice and each window shows the other',
-    tags: ['getUserMedia', 'WebRTC', 'relay'] },
+  // `room` was a demo (open this page twice and each window shows the other,
+  // WebRTC peer to peer with the relay only introducing) and is archived at
+  // archive/demos/room-index.html, removed 2026-10-05 on *"arvhice it"* after
+  // *"what is the point of room demo?"*. No redirect.
   // `items` was a demo and is archived at archive/items/README.md, removed
   // 2026-10-01 on instruction. It wrote an item, let a Durable Object alarm
   // publish it at the moment named, and told installed phones over FCM. Its
@@ -173,7 +174,7 @@ export const DEMOS = [
 
   // BYTES and NOTES tabs since 2026-10-04 (plans/plan-demo-structure.md §3.3); its
   // checks run before ready, so the boot wait is the check pass, MEASURED 3.8 s.
-  { name: 'wire', group: 'messages', act: 2, created: '2026-09-10', built: true, bootMs: 20000, room: 'fixed',
+  { name: 'wire', group: 'technologies', act: 2, created: '2026-09-10', built: true, bootMs: 20000, room: 'fixed',
     one: 'A message as the exact bytes that travel, and a note as how late it lands on another machine.',
     tags: ['WS', 'DO', 'SQLite'] },
 
@@ -305,9 +306,12 @@ export const DEMOS = [
   // a second, larger step — four entries out of the build's allowlist and a URL
   // that starts 404ing — and it is decided on purpose rather than as a side
   // effect of tidying the front page.
-  { name: 'remixer', group: 'technologies', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
-    one: 'stack archive recordings from any year on one playhead',
-    tags: ['HLS', 'timeline', 'not shelled'] },
+  // `remixer` (stack archive recordings from any year on one playhead) was
+  // ARCHIVED 2026-10-05 on *"archvie remixer demo"*: the page is in
+  // archive/remixer/ and /proto/remixer/ no longer answers. ⚠️ EXCEPT
+  // `proto/remixer/hls.min.js`, which stays put and stays built, because eight
+  // pages load hls.js from that path (reel, llhls, flipper, cam, now, station,
+  // floor, sync). Moving it is a separate change across those eight.
 
   // ⚠️ `studio` IS GONE FROM THE LIST AND THERE WAS NOTHING TO ARCHIVE. It never
   // had a page: the row was a placeholder carrying `why: 'consumes 10 through
@@ -473,19 +477,19 @@ export const DEMOS = [
   { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true,
     one: 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.',
     tags: ['WebCodecs'] },
-  { name: 'partitur', group: 'timeline', act: 4, created: '2026-10-04', built: true,
+  { name: 'partitur', group: 'bauhaus', act: 4, created: '2026-10-04', built: true,
     one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline whose light any other screen can show as a projection wall.',
     tags: [] },
   // /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
   // SCHEDULE, BEAT, LOOPS, SCORE, DATES from transport, lanes, loops, score and
   // strip. Its checks and four bar drills run before ready: MEASURED 6.3 to 6.6 s
   // locally against the 7.4 s default, so it declares its own wait.
-  { name: 'time', group: 'timeline', act: 0, created: '2026-10-04', built: true, bootMs: 12000,
+  { name: 'time', group: 'technologies', act: 0, created: '2026-10-04', built: true, bootMs: 12000,
     one: 'The clock every page here runs on, and what is built on it, from beats and loops to scores and dates two thousand years long.',
     tags: ['timeline', 'WebAudio', 'canvas'] },
   // ARRIVAL, AHEAD, FOLLOW, AFTER since 2026-10-04 (plan-demo-structure §3.1).
   // The check pass runs before ready, MEASURED 8.3 to 9.0 s locally.
-  { name: 'sync', group: 'timeline', act: 4, created: '2026-10-04', built: true, bootMs: 14000,
+  { name: 'sync', group: 'technologies', act: 4, created: '2026-10-04', built: true, bootMs: 14000,
     one: 'Four ways two places agree on when something happens, from firing on arrival to lining up on a recording.',
     tags: ['DO', 'WS', 'relay', 'HLS', 'R2', 'timeline'] },
 
@@ -1208,6 +1212,9 @@ export const GROUPS = new Map([
    */
   ['vain', 'u:'],
   ['kurenniemi', 'kurenniemi'],
+  // 🔴 `bauhaus`, ASKED 2026-10-05: *"bauhaus: partitur"*, Moholy-Nagy's score
+  // on its own heading beside the other archival subject, kurenniemi.
+  ['bauhaus', 'bauhaus'],
   // `mim` IS GONE, EMPTIED 2026-09-24 BY *"move making to TH"*: `making` was its
   // only row. `byGroup` drops a section with no rows, so leaving the id here
   // would have rendered nothing and been invisible. It is removed because a
@@ -1224,7 +1231,8 @@ export const GROUPS = new Map([
    * a reading: the four that stay are the ones whose SUBJECT is the timeline,
    * and `strip` and `draw` went to `technologies`.
    */
-  ['timeline', 'timeline'],
+  // `timeline` WAS A GROUP HERE until 2026-10-05, folded into `technologies`
+  // with `messages`: *"tehnologies: timelines + messages + technologies"*.
   /**
    * 🔴 `transports` BECAME THREE SECTIONS, ASKED 2026-09-24: *"split onto
    * streamig (who steam smth) and messages (relyng messages etc but not
@@ -1260,7 +1268,6 @@ export const GROUPS = new Map([
    * `instruments` group was emptied, and since 2026-09-29 the six streaming
    * pages that are not `llhls`.
    */
-  ['messages', 'messages'],
   ['technologies', 'technologies'],
 ]);
 

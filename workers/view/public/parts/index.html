@@ -13,7 +13,23 @@
      their own ground and scroll sideways on a phone rather than shrink to
      unreadable holes. */
   .pa-pic { overflow-x: auto; border: var(--edge); border-radius: var(--r); background: #f4f1ea; }
-  .pa-pic img { display: block; width: 1352px; max-width: none; height: auto; }
+  .pa-pic img { display: block; max-width: none; height: auto; }
+  /* The USB chain, drawn with boxes: a plug is a filled tag, a socket an
+     outlined one, and each joint between two parts names the connector. The
+     parts stack at every width, because four in a row leave no room for the
+     tags at the desk either. */
+  .pa-chain { display: flex; flex-direction: column; gap: var(--ctl-gap); }
+  .pa-legend { display: flex; gap: var(--ctl-gap); }
+  .pa-part { display: flex; flex-direction: column; gap: 10px;
+    padding: 10px 12px; border: var(--edge); border-radius: var(--r); background: var(--card); }
+  .pa-name { color: var(--fg); font-size: 13.5px; }
+  .pa-ends { display: flex; justify-content: space-between; gap: var(--ctl-gap); margin-top: auto; }
+  .pa-ends.pa-r { justify-content: flex-end; }
+  .pa-end { font: 12px var(--mono); padding: 3px 6px; border-radius: var(--r); white-space: nowrap; }
+  .pa-plug { background: var(--fg2); color: var(--bg); border: 1px solid var(--fg2); }
+  .pa-sock { color: var(--fg2); border: 1px dashed var(--fg2); }
+  .pa-joint { align-self: center; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font: 12px var(--mono); color: var(--dim); white-space: nowrap; }
 </style>
 
 <script type="module">
@@ -24,7 +40,7 @@
    * 🔴 A BUILD SHEET, NOT A DEMO, AND UNLISTED. Asked 2026-10-05 as *"write
    * into not-in-index positron page"*, after a session of shopping list,
    * breadboard drawings and power questions for the Pico router. It opens
-   * nothing: two pictures from this directory and a table of shop links.
+   * nothing: three pictures from this directory and tables of shop links.
    * The drawings are `rig/pico/oled/breadboard.mjs`'s output, copied here
    * because the deploy serves only `demo/`. Re-draw there and copy again.
    * ⚠️ PRICES AND STOCK WERE READ ON OOMIPOOD 2026-10-04 AND 2026-10-05, not
@@ -46,11 +62,19 @@
     { part: 'Breadboard, 830 holes, MB-102', qty: '1', price: '€5.00', url: `${OOMI}/en/product/oky0008_maketeerimislaud_60_170mm_830_punkti_mb_102` },
     { part: 'Jumper wires, male to male, 15 cm, 40', qty: '1', price: '€3.50', url: `${OOMI}/en/product/oky0070_maketeerimislaua_juhtmed_40tk_isa_isa_15cm_2_54mm` },
     { part: 'OTG cable, micro USB to USB-A socket, Pico to the hub', qty: '1', price: '€4.00', url: `${OOMI}/product/usb20_otg_kaabel_usb_a_pesa_usb_micro_b_pistik_20cm_must` },
+    { part: 'Printer cable, USB-A plug to USB-B plug, 2 m, OTG cable to the hub', qty: '1', price: '€5.00', url: `${OOMI}/product/ccgl60100bk20_usb_2_0_kaabel_a_b_2m_printer_must_vaskkaabel` },
     { part: 'USB-A plug to screw terminals, power from a hub port', qty: '1', price: '€1.00', url: `${OOMI}/product/oky3447_2_leminek_usb_a_pistikult_klemmribale` },
   ];
   const SWAPS = [
     { part: 'Breadboard, 400 holes, dongle power only', qty: 'instead', price: '€4.00', url: `${OOMI}/en/product/maketeerimislaud_5483mm_400_punkti` },
     { part: 'MB102 power module, plus a 9 V adapter, 830 board only', qty: 'instead', price: '€3.50', url: `${OOMI}/en/product/oky0026_toitemoodul_maketeerimislauale_mb102_3_3v_5v_700ma_6_5_12v` },
+  ];
+  // For the MB102 only: any one of these, set to 9 V before it is plugged in.
+  // Read 2026-10-05, the middle one out of stock that day.
+  const ADAPTERS = [
+    { part: 'Universal adapter, 3 to 12 V, 1 A, 11 tips with 5.5 x 2.1 mm', qty: 'in stock', price: '€17.50', url: `${OOMI}/en/product/universaalne_toiteadapter_312v_1a_12w` },
+    { part: 'Universal stabilised adapter, 3 to 12 V, 12 W', qty: 'sold out', price: '€11.00', url: `${OOMI}/product/p_sup_eu1000_universaalne_stab_adapter_3_12vdc_12w` },
+    { part: 'Universal adapter, 3 to 12 V, 2.25 A, 6 tips with 5.5 x 2.1 mm', qty: 'in stock', price: '€16.00', url: `${OOMI}/product/mw3ip25gs_impulsstoide_3_12v_2_25a_25w_6_pistikut` },
   ];
   const cols = [
     { key: 'part', label: 'part', grow: true, link: 'url' },
@@ -61,24 +85,67 @@
   list.set(PARTS);
   const swaps = createTable({ columns: cols });
   swaps.set(SWAPS);
+  const adapters = createTable({ columns: [cols[0], { key: 'qty', label: 'stock', width: 80 }, cols[2]] });
+  adapters.set(ADAPTERS);
   const total = PARTS.reduce((n, p) => n + parseFloat(p.price.slice(1)), 0);
 
   d.stack.titled('SHOPPING LIST', list.el,
-    say(`€${total.toFixed(2)} at Oomipood, read on 2026-10-04 and 2026-10-05, plus the hub’s own A to B cable and a small flat screwdriver.`));
+    say(`€${total.toFixed(2)} at Oomipood, read on 2026-10-04 and 2026-10-05, plus a small flat screwdriver, and the printer cable can stay on the shelf if the hub came with one.`));
   d.stack.titled('SWAPS', swaps.el);
 
-  const pic = (src, alt) => {
+  // The Pico's micro USB socket to the hub's USB-B upstream socket. Oomipood
+  // sells no micro USB to USB-B cable, so it is two parts, and the words
+  // "USB-A male to USB-B female" were the confusing part, hence the picture.
+  const tag = (word, plug) => el('span', `pa-end ${plug ? 'pa-plug' : 'pa-sock'}`, word);
+  const part = (name, left, right) => {
+    const box = el('div', 'pa-part');
+    const ends = el('div', left ? 'pa-ends' : 'pa-ends pa-r');
+    for (const e of [left, right]) if (e) ends.append(tag(...e));
+    box.append(el('div', 'pa-name', name), ends);
+    return box;
+  };
+  const joint = (word, toLeft) => {
+    const box = el('div', 'pa-joint');
+    box.append(el('span', '', word), el('span', '', toLeft ? '↑ plugs in' : 'plugs in ↓'));
+    return box;
+  };
+  const chain = el('div', 'pa-chain');
+  chain.append(
+    part('Pico 2 WH', null, ['micro USB socket', false]),
+    joint('micro USB', true),
+    part('OTG cable, on the list', ['micro USB plug', true], ['USB-A socket', false]),
+    joint('USB-A', true),
+    part('Printer cable, 2 m', ['USB-A plug', true], ['USB-B plug', true]),
+    joint('USB-B', false),
+    part('Powered hub', ['USB-B socket', false], null),
+  );
+  const legend = el('div', 'pa-legend');
+  legend.append(tag('plug', true), tag('socket', false));
+  d.stack.titled('PICO TO THE HUB', chain, legend,
+    say('The OTG cable’s micro USB plug goes into the Pico, and the printer cable’s USB-A plug goes into the OTG cable’s USB-A socket.',
+      'The printer cable’s USB-B plug, the square one, goes into the hub’s USB-B socket, the port meant for a computer.',
+      'A plug is the end that goes in and a socket is the end with the hole, so the printer cable is plug at both ends and the hub is the socket.'));
+
+  const pic = (src, alt, width) => {
     const box = el('div', 'pa-pic');
     // A tap opens the picture alone, where a phone can pinch it.
     const a = el('a', '', '', { href: src, target: '_blank', rel: 'noopener' });
-    a.append(el('img', '', '', { src, alt, loading: 'lazy' }));
+    const img = el('img', '', '', { src, alt, loading: 'lazy' });
+    img.style.width = `${width}px`;           // the PNG's own width, 1:1
+    a.append(img);
     box.append(a);
     return box;
   };
-  d.stack.titled('BREADBOARD, HUB POWER', pic('breadboard.png', 'Pico 2 WH, OLED module and the USB-A power dongle on an 830 hole breadboard'),
+  d.stack.titled('BREADBOARD, HUB POWER', pic('breadboard.png', 'Pico 2 WH, OLED module and the USB-A power dongle on an 830 hole breadboard', 1352),
     say('The Pico straddles the centre gap in columns 1 to 20 with its USB to the left. The screen’s header sits in row f, columns 40 to 47, and the module lies flat over the empty top half, so its eight wires go into rows g to j below it.'));
-  d.stack.titled('BREADBOARD, MB102 POWER', pic('breadboard-mb102.png', 'the same board powered by an MB102 module on the right hand end'),
+  d.stack.titled('BREADBOARD, 400 HOLES', pic('breadboard-400.png', 'the same build on a 400 hole breadboard, the OLED module overhanging its right hand end', 914),
+    say('The Pico keeps columns 1 to 20 and the screen’s header moves to row f, columns 22 to 29, with the module overhanging the board’s right hand end.',
+      'Every wire still lands in rows g to j, so none shares a hole with the module’s own pins, and the power is the hub dongle only.'));
+  d.stack.titled('BREADBOARD, MB102 POWER', pic('breadboard-mb102.png', 'the same board powered by an MB102 module on the right hand end', 1412),
     say('Top jumper on 5 V feeds the Pico’s pin 40, bottom jumper on 3.3 V feeds the screen, and the Pico’s own 3V3 out is wired to nothing. Bridge the rails at columns 29 to 35 only if your board splits them.'));
+  d.stack.titled('9 V ADAPTER, MB102 ONLY', adapters.el,
+    say('Turn it to 9 V, fit the 5.5 x 2.1 mm tip with the centre positive, and do both before it goes into the module.',
+      'None of these is needed with the hub dongle, and the stabilised one’s page lists no tips.'));
 
   d.stack.titled('POWER',
     say('The Pico’s only USB socket goes to the hub as the host, and a host powers the line, so nothing powers the Pico through that cable.',
@@ -86,7 +153,8 @@
       'The dongle plugs into a spare hub port and two jumpers run from its 5V and GND terminals to hole a1 and the top minus rail. Loosen each screw, push the jumper’s metal pin in, tighten, and tug to check, because a loose 5 V wire restarts the Pico at random.',
       'Read from the USB and Pico documentation and not yet tried with this hub.'));
 
-  d.assert('every part has a shop link', [...PARTS, ...SWAPS].every((p) => p.url.startsWith(OOMI)));
+  d.assert('every part has a shop link', [...PARTS, ...SWAPS, ...ADAPTERS].every((p) => p.url.startsWith(OOMI)));
+  d.assert('every price was read', [...PARTS, ...SWAPS, ...ADAPTERS].every((p) => /^€\d+\.\d\d$/.test(p.price)));
   d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
   d.ready();
 </script>
