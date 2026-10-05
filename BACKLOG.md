@@ -1,6 +1,6 @@
 ## Open
 
-- **Three leftovers from the tabbed-page review** (2026-10-05, *"do all"*): `/time/` manifest `one` describes only the clock tab; the DATES aggregate lane note is jargon (`strip.mjs`, shared); `/partitur/` SCORE link picks do not share a label column. Plus the standing reds: `/wire/` KEYBOARD onset, `/capture/` RECEIVER WebRTC never connects, `/capture/` seek 1334 vs 1391.
+- ~~**Three leftovers from the tabbed-page review** (2026-10-05, *"do all"*): `/time/` manifest `one` describes only the clock tab; the DATES aggregate lane note is jargon (`strip.mjs`, shared); `/partitur/` SCORE link picks do not share a label column. Plus the standing reds: `/wire/` KEYBOARD onset, `/capture/` RECEIVER WebRTC never connects, `/capture/` seek 1334 vs 1391.~~ Done 2026-10-05: all three fixed; the WebRTC reds were the Check Point tunnel being the only host candidate, worked around in `verify.mjs` with an audio-only permission grant for `wire` and `capture`; the seek red did not reproduce alone.
 
 - ~~**Tabbed pages, critical UX review** (2026-10-05): *"do critical user experience review of new demost with many tabs. its hard to understand what they do. have a fixed height descriptions under tabs to explain. rm top desriptions. rething labelling. in bg"*. `/sync/` `/time/` `/wire/` `/capture/` (+ `/partitur/` once it is tabbed), `demo/shell/tab-page.mjs`.~~ Done 2026-10-05: fixed-height `about` box under the tab row, `what` removed, 9 of 15 tabs renamed.
 
