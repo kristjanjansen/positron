@@ -190,7 +190,7 @@ for (const w of (widths.length ? widths : WIDTHS)) {
 
   const { result } = await S('Runtime.evaluate', {
     expression: `JSON.stringify({
-      w: innerWidth, h: Math.min(document.documentElement.scrollHeight, 6000),
+      w: innerWidth, h: document.documentElement.scrollHeight,
       // 🔴 AGAINST clientWidth, NOT innerWidth. MEASURED 2026-09-26 on /eccm/ at
       // 375: a title with no break opportunity ran the page to 404 px, and
       // mobile Chrome widened the LAYOUT viewport to match, so innerWidth read
@@ -201,8 +201,12 @@ for (const w of (widths.length ? widths : WIDTHS)) {
     })`, returnByValue: true,
   });
   const page = JSON.parse(result.value);
-  // with --hash the capture starts AT the block, not at the top of the page
-  const height = Math.min(CLIP || page.h, page.h - page.top);
+  // with --hash the capture starts AT the block, not at the top of the page,
+  // and the 6000 px ceiling is counted FROM the block. It was a cap on the
+  // whole page's height, so a block more than 6000 px down came out as a
+  // NEGATIVE height (MEASURED 2026-10-05: /kit/'s SLIDES blocks at -348 to
+  // -8453 px). With no hash the top is 0 and nothing changes.
+  const height = Math.min(CLIP || 6000, page.h - page.top);
 
   const { data } = await S('Page.captureScreenshot', {
     format: 'png', captureBeyondViewport: true,

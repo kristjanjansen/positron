@@ -690,3 +690,115 @@ A Stream bill in dollars is not quoted: the figure that matters is the cap.
 with their words under each column, the table's columns and decimals in line,
 the yellow on the figures that carry the point, no sideways drag at either
 width.
+
+## 13. The slide is a kit component, and `/kit/` has a SLIDES tab
+
+Asked 2026-10-05: *"keep slides as it was for an archive with font picker and
+sample content etc let it be then let's focus on the kit make a new tab there
+slides and methodically slide by slide"*, then *"Also work on the actual
+components, interactive elements on a page"*. `/slides/` and everything under
+`demo/slides/` are an archive and were not touched; nothing in the kit imports
+`deck.mjs`.
+
+**The component (DECIDED).** `demo/shell/slide.mjs` renders ONE slide from a
+plain spec, and `demo/shell/slide.css` styles it. A file of its own rather than
+a block in `shell.css`, because every page parses `shell.css` and one page
+draws slides; `slide.mjs` adds the link itself if a page forgot it. The scale
+is declared once, as `SCALE` in the module (base 4, ratio 1.5, six steps with
+their line height and tracking, the section 3 numbers unchanged), and written
+onto `.sl` as custom properties by `scaleCss()`, so the stylesheet, the
+captions (`stepCaption`) and the node test all read one source. The face is
+JetBrains Mono, its two woff2 files and licence COPIED into `demo/shell/vendor/`
+and listed by name in `workers/view/build.mjs`.
+
+| export | what |
+| --- | --- |
+| `createSlide(spec, { host, slots })` | one 16:9 slide, sized off its container (`.sl-frame` is an inline size container, `.sl` a size container, type in `cqh`); returns `{ el, frame, spec, parts, ctl, start, stop }` |
+| `createSlidePlayer(specs, { slots, onStep })` | the slides in a `createVideoPanel`, stepper left, count centre, ⛶ right; returns `{ el, panel, slides, go, at, next, prev, keys, start, stop }` |
+| `fitBox(host, w)` | a px component laid out at `w` logical px and scaled into its slot with `--fit-k` |
+| `slideDiagram(spec, { w })` | a slot builder: names only in the boxes, each outer box's `desc` under it at step 1 |
+| `SCALE`, `STEPS`, `stepSize`, `stepOf`, `stepCaption`, `scaleCss` | the scale |
+| `parseMarks`, `rich`, `plain`, `lintWords`, `padRows`, `evStep`, `wordsStep`, `normalise`, `LAYOUTS` | the pure parts, graded by `node demo/shell/slide-test.mjs` (40 ok, 13 of them negative controls) |
+
+Spec keys: `say`, `statement`, `big` + `under`, `text` (+ `textStep`), `list`,
+`stack`, `rows`, `lines` (`[[step, text]]`), `cap`, `slot`, `layout` (`stack`,
+`top`, `left`, `right`, `split`), `side` (split only), `name`, `notes`.
+`normalise` throws on an unknown key, layout or step, a split with no slot or
+side, a side on anything else, and a statement carrying evidence.
+
+**Keys belong to the player's panel (DECIDED, asserted).** The listener is on
+the panel root, which takes focus on a press; a key it uses is
+`stopPropagation`ed there, so `transport-bar.mjs`'s `window` listener and a
+keyboard's letter row never hear it. A key from the page body does not step it.
+This answers open item 3 of section 7 for the kit; the archive deck still
+listens on `document`.
+
+**In a split the words go one step down (DECIDED, MEASURED).** Half a slide
+holds 9 characters a line at step 4. The first run of the spill assert went red
+on four splits whose headlines took four lines; `wordsStep()` now sets a
+split's headline at 3 and its evidence one step lower, while `big` and declared
+`lines` keep their step.
+
+**The tab.** `['slides', 'SLIDES']` is the last part, so the opening tab is
+unchanged. 31 blocks, one static slide each, in reading order:
+THE PLAYER (three slides); STEP 6 to STEP 1 (each step alone, its numbers in
+its caption); THE SCALE (all six: steps 6 and 5 in the slot, 4 to 1 in the
+words, because six lines in one column need 90.9 per cent of the height against
+the 86 the inset leaves); seven combinations (headline over text, over a
+number, statement, over a stack, over a table, with a caption, yellow and hue
+marks); seven layouts (title on top with text at the bottom, left, right,
+illustration left and right, interactive left with a stepper walking a word up
+the scale, interactive right with a knob setting the figure); eight components
+(OLED, slider, knob, waveform, video, diagram, step grid, readout). Every
+number on a slide is reused from section 10 with its source in a comment.
+Nothing runs until the tab is opened: the tab row calls `slidesOpen()` and
+`slidesClose()`, the way HARDWARE boots its board.
+
+**How each component is scaled onto a slide (MEASURED at 1280, slide 686 x 385).**
+
+| component | how | why |
+| --- | --- | --- |
+| OLED | `.kit-oled` frame, `--oled-k` a whole number from the slot (2x here), a fraction only when 1x does not fit | pixel exact, the HARDWARE part's own rule. A STAND-IN frame (canvas font thresholded) until HARDWARE is opened, because ui.c's WebAssembly is fetched with it; the slide canvas is pushed into `hw.parts`, so after that it is ui.c's LINK screen |
+| slider | `fitBox` at 150 logical px, 1.87x | px sized; its pointer maths reads the lane's transformed rect, so a press at 80 per cent read 0.8 |
+| knob | `fitBox` at 140 and 130 | px sized; dragged vertically by `movementY`, so scale does not change the gesture |
+| stepper | `fitBox` at 220 | px sized |
+| waveform | its own `--wave-h` set to `30cqh` on the instance, width from its column | the component already reads its size from CSS; MEASURED 116 px against 115.5 |
+| video | `createVideoPanel` stretched across the slot, playing `pattern.mjs` at 1280 x 720 through `captureStream(25)` | already container relative; 18 frames presented in 0.7 s |
+| diagram | `slideDiagram`, 640 logical px | the diagram breaks to one column below its row width |
+| step grid | `fitBox` at 480 | as the archive did |
+| readout | `fitBox` at 360 | as the archive did |
+
+**Size options worth adding (REPORTED, not built):** `createWaveView` could take
+`height` as a CSS length so a caller need not overwrite its custom property;
+`createSlider`, `createKnob` and `createStepper` could take a `scale` (or read a
+`--ctl-k`) so a slide need not transform them; `createVideoPanel` could take
+`stage: 'size'` (section 7 item 5). `burn()` positions are in 1280 x 720
+pixels, so a smaller canvas shows a blank field (found on the first shot).
+
+**Asserts (MEASURED).** `/kit/` was 294/294 and is **320/320**, 26 new, all
+behind `?selfcheck=1`, run after `ready` and chained before the router checks
+because both open a tab: the face loaded; each of six steps computes its size,
+line height and tracking to within 0.5, 0.5 and 0.05 px of its token (step 6
+116.94 px in a 385 px slide); THE SCALE in order at 1.5x; every slide 16:9;
+20 captions on the bottom left within 1 px; nothing spills on 30 slides; 9
+splits on their sides; left, right and top on their edges; 25 headlines pass
+`lintWords` and the marks paint; the player's keys and clamping and that a
+used key never reaches `window`; the player's slide fills its stage; slider,
+knobs, stepper, wave, OLED, video, step grid, readout and diagram respond; no
+request while the tab was open (the shell's own `/_log` POST excluded, which
+was the one red on the first run); leaving stops everything.
+
+**Slide sets as data, and what a set page would need (NOT BUILT).** Every key
+but `slot` is plain JSON, and `slot` may be `{ kind, ...options }` resolved
+through a `slots` map, so a talk can be a JSON array plus one map of builders.
+What is missing: (1) the slot builders used here live in the kit page and
+would move to a shared `slide-slots.mjs` keyed by kind; (2) the player has no
+address (`#n`), notes, blank or face picker, which the archive deck has; (3) a
+set page (one page reading `?set=<name>`, or one page per set) and where sets live
+(`demo/talks/*.json`, read at build, so no fetch on a step); (4) a
+`checkSlides(player)` carrying the generic asserts out of the kit so every set
+is graded the same way.
+
+`demo/shot.mjs` was fixed in passing: its 6000 px ceiling capped the whole
+page, so `--hash` on a block more than 6000 px down captured a NEGATIVE height;
+it is now counted from the block.

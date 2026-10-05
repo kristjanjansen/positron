@@ -401,6 +401,22 @@ is checkable in one command, so check it before repeating it.
   colour rather than borrowing green: colouring an unchecked thing as if it
   passed is an assertion nothing made.
 
+## A slide is `slide.mjs`, and `/slides/` is an archive
+
+✅ **ONE SLIDE FROM PLAIN DATA IS `createSlide(spec)` IN `demo/shell/slide.mjs`,
+2026-10-05**, with `slide.css` beside it and a small `createSlidePlayer(specs)`
+that puts several in a video panel. The six step type scale lives in `SCALE`
+in that module and nowhere else; `/kit/`'s SLIDES tab shows every step, every
+combination, five layouts and the kit's controls at slide scale, and grades
+them (`plans/plan-slides.md` section 13). Do not import `demo/slides/deck.mjs`
+into anything new: it is the archive's.
+⚠️ **THE PLAYER'S KEYS ARE ITS PANEL'S, NEVER `window`'S**, and a key it uses
+is stopped there, because a page with a transport bar or a keyboard row would
+otherwise step slides and seek a deck on one press.
+⚠️ **A px CONTROL ON A SLIDE GOES IN `fitBox`**, a logical width scaled by
+`--fit-k`; a component that already reads its size from CSS (a wave view's
+`--wave-h`, a video panel's width) is sized in the slide's own `cqh` instead.
+
 ## A tabbed page: one old page per tab
 
 🔴 **A PAGE MADE OF SEVERAL OLD PAGES IS `createTabPage`, AND EACH TAB IS A

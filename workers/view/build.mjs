@@ -293,6 +293,17 @@ const FILES = [
   ['demo/shell/vendor/bravura-text-accidentals.woff2', 'shell/vendor/bravura-text-accidentals.woff2'],
   ['demo/shell/vendor/LICENSE-bravura', 'shell/vendor/LICENSE-bravura'],
 
+  // ── the slide face, JetBrains Mono, for `demo/shell/slide.mjs` ──────────
+  //
+  // COPIED from `demo/slides/vendor/`, not moved: `/slides/` is an archive and
+  // keeps its own seven. Under `shell/` for the reason the accidentals above
+  // are: the consumer is a kit component, and a kit module loading a font out
+  // of one demo's folder is the cross-page import this file refuses. 400 and
+  // 600, Latin subset, @fontsource 5.3.0, SIL OFL 1.1, licence beside them.
+  ['demo/shell/vendor/jetbrains-mono-latin-400-normal.woff2', 'shell/vendor/jetbrains-mono-latin-400-normal.woff2'],
+  ['demo/shell/vendor/jetbrains-mono-latin-600-normal.woff2', 'shell/vendor/jetbrains-mono-latin-600-normal.woff2'],
+  ['demo/shell/vendor/LICENSE-jetbrains-mono', 'shell/vendor/LICENSE-jetbrains-mono'],
+
   ['demo/shell/vendor/meta-quest-touch-plus-left.glb', 'shell/vendor/meta-quest-touch-plus-left.glb'],
   ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
   ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
