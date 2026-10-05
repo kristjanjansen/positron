@@ -39,15 +39,20 @@
 
 - ~~**`/kit/` OLED FONTS** (2026-10-05): *"to columns. longer uppercase saples"*. One 128x64 panel listing six fonts with a short `OK 1/2` each; wanted two columns and a longer uppercase sample per font. `demo/kit/index.html` `hwFontsDraw`.~~ Done 2026-10-05: two panels, three fonts each, name then the longest whole-word run of `SCENE 1/2 THRU PATCH 64 SENT OK` that fits.
 
+### Found 2026-10-05 by the kit selfcheck agent, not fixed
+
+- **`/kit/` turns a specimen knob on every visit**: around `demo/kit/index.html:6096` a `Home` keydown goes to the `rel` knob with no `SELFCHECK` gate, leaving it at 0.05 instead of 1.50. The asserts after it may lean on that state.
+- **A real arrow key on any slider handle on `/kit/` seeks every transport bar** (`transport-bar.mjs` window listener, about line 1429). Making bars ignore already-handled keys would break the step grid, whose space deliberately bubbles to the bar as play. A decision about the shared bar, not a page fix.
+
 ### Found 2026-10-04 by the tab groundwork agent, not fixed
 
-- **`/pack/` is 29/31**, with or without that agent's change (it swapped in
+- ~~**`/pack/` is 29/31**, with or without that agent's change (it swapped in
   HEAD's `transport-bar.mjs` to confirm): "every tab keeps its bare word until it
-  has something to count" and the plain-wav zip check are red.
-- **`/kit/`'s range-slider checks run for visitors.** No `SELFCHECK` around
+  has something to count" and the plain-wav zip check are red.~~ Done 2026-10-05 `10a7d07`: the checks expected uppercase after the labels went sentence case, 31/31.
+- ~~**`/kit/`'s range-slider checks run for visitors.** No `SELFCHECK` around
   them, and they dispatch `ArrowRight`, which bubbles to `window` and moves every
   visible transport bar on the page by 2 per cent (why kit shots show bars at
-  0:01.200). Breaks *"a self-check never runs for a visitor"*.
+  0:01.200). Breaks *"a self-check never runs for a visitor"*.~~ Done 2026-10-05 `97a3ccf`: gated and the keys no longer bubble, 294/294.
 
 ### Checks way lighter, two tiers, asked 2026-10-04
 

@@ -397,9 +397,9 @@ requires. Agents do not commit.
 | 2 | `demo/shell/pattern.mjs` | `readBurned(ctx, { y })` and a strip-aware `readBurnedFrom`, graded against today's 600/600 burn-and-read loop so nothing existing moves | 45 min |
 | 3 | NEW `demo/shell/video-open.mjs`, `video-open-test.mjs` | the eight openers, the schedule, lag and catch-up per transport; the Pi opener moved in from `/patchbay/` | 4 to 5 h |
 | 4 | `demo/patchbay/index.html` | F2: dispatch on `session.transport` through `video-open.mjs`; its own asserts read once before and after | 1 h |
-| 5 | NEW `demo/fake-flip.mjs`; `demo/verify.mjs` | the stand-in and its hook; the `ERR_PAGES` block out | 1.5 h |
+| 5 | NEW `demo/fake-flip.mjs`; `demo/verify.mjs` | the stand-in and its hook. `ERR_PAGES` STAYS: /now/ is not merged (refused 2026-10-05) | 1.5 h |
 | 6 | `demo/flipper/index.html` | the page: eight cells, play and `>>` per cell, the deck from `/now/`, the links table, readouts, checks | 4 to 5 h |
-| 7 | `demo/manifest.mjs`, `archive/` | `/now/`, `err-live.mjs`, `fake-err.mjs` archived; the row's `one` and tags; `positron-history` line | 30 min |
+| 7 | `demo/manifest.mjs`, `archive/` | the row's `one` and tags only. NOTHING IS ARCHIVED: /now/, `err-live.mjs` and `fake-err.mjs` stay (the merge was refused 2026-10-05) | 15 min |
 | 8 | | ONE deep run, deploy, build stamp, URL | 30 min |
 
 **About 14 to 17 agent hours**, one session with a parallel split after step 3
