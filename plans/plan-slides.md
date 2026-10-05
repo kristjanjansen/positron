@@ -23,10 +23,13 @@ centre slot the count, its right slot the ⛶ that turns the panel into the
 presenting mode. Type comes in exactly two sizes, both fractions of the slide's
 own height: **LARGE = 9 per cent** for headlines and short lists, **EXTRA LARGE
 = 18 per cent** for one number or one word. The face is no longer the system
-mono: it is one of five self-hosted faces, **Atkinson Hyperlegible Next by
-default** (section 9), switchable under the panel and carried in the address.
-Everything under a headline is centred in the space below it. `node
-demo/verify.mjs slides` reads **34/34** (28 page asserts), up from 29/29.
+mono: it is one of eight self-hosted monospaced faces, **JetBrains Mono by
+default** since 2026-10-05 (section 9), switchable under the panel and carried
+in the address. Everything under a headline is centred in the space below it,
+and a caption sits at SMALL in the bottom left corner. Since 2026-10-05 the
+deck is a real talk about positron, sixteen slides, every number measured and
+sourced (section 10). `node demo/verify.mjs slides` reads **45/45** (39 page
+asserts), up from 36/36.
 
 ## 2. What the research says
 
@@ -321,7 +324,13 @@ the slide ground.
 | Source Code Pro | Adobe, `adobe-fonts/source-code-pro` | 23,284 | 28 | the classic, lighter colour than the rest at 600 | dotted zero | the quiet one |
 | Martian Mono | Evil Martians, `evilmartians/mono` | 20,980 | **24** | wide and heavy, the most character; I l 1 unmistakable | slashed zero, largest glyphs on the slide | the loud one; sets the headline budget |
 
-**Recommendation: Atkinson Hyperlegible Mono (DECIDED).** It is drawn for low
+**Default: JetBrains Mono, the owner's choice (DECIDED 2026-10-05).** Asked in
+those words: *"jetbrains default"*. It is the site's own code voice, and at 28
+characters a line it costs nothing against Atkinson's 27. The paragraph below
+is the earlier recommendation, kept as the reasoning it was, and Atkinson stays
+one press away on the picker.
+
+**Earlier recommendation: Atkinson Hyperlegible Mono.** It is drawn for low
 vision, which is the back row's problem (READ: Braille Institute,
 `brailleinstitute.org/freefont`), its `0O` pair is the one nobody can confuse
 (slashed zero beside a round O, where JetBrains and Plex tell a dotted zero
@@ -357,3 +366,55 @@ follow it by inheritance. Asserted: all eight load at 400 and 600; all eight
 are monospaced; the specimen shows all eight with their names; picking one
 puts it in the address and every slide and the specimen follow; every headline
 is two lines or fewer in all eight; nothing spills past the inset in any face.
+
+## 10. The talk, and where every number comes from
+
+Asked 2026-10-05: *"add actual slides content on out stuff we are building.
+jetbrains default"*. The sample slides and the specimen slide are gone; the
+deck is a talk in the order what this is, what it measured, how it is built,
+what it learned, what is next. Every number on a slide has its source in a
+comment beside the slide in `demo/slides/index.html`. A caption is SMALL, in
+the chosen face, the last child of the slide's column so its left and bottom
+edges are the inset (asserted within 2 px at both widths in all eight faces),
+and links the demo by full URL. A link is not a fetch.
+
+| # | headline | evidence | number and source | live |
+| --- | --- | --- | --- | --- |
+| 1 | Positron is a lab for live media in a browser | `44` | 46 rows, 44 built: the manifest count command, run 2026-10-05 | |
+| 2 | Cloudflare carries the streams in between | diagram | relay hop 1 to 2 ms in a note: PROGRESS.md:3472 | `diagram.mjs`, a lit box walking |
+| 3 | Latency is read off a clock burned into pixels | test picture | 600 of 600: positron-ui skill, "The test picture" | `pattern.mjs` `burn()` |
+| 4 | MoQ wins the middle and WebRTC wins the tail | character table, p50 p95 p99 | MoQ 26.2 / 42.4 / 104.8, WHEP 67.0 / 76.9 / 84.1 ms: PROGRESS.md:4712-4719, n PROGRESS.md:6624 | |
+| 5 | Stock hls.js parks where its start left it | decimal stack | 7.60, 15.41, 1.87, 3.05 s: plans/plan.md:54-57 | |
+| 6 | Playing the Pi directly skips the relay | `48 ms` | 48 against 175 ms, one network: plans/plan-away-webrtc.md:212-217 | |
+| 7 | The Circuit holds 29 sessions of real work | character columns | 32, 29: research/circuit-archive-2026-09-21.md:253-256; 64 of 350 bytes: plans/plan-circuit-editor.md:65 | |
+| 8 | A step on screen waits for the next frame | step grid and a live decimal stack | measured on the screen it runs on | `step-grid.mjs`, its frame clock |
+| 9 | Two clocks agree once the offset is measured | `1.8 ms` | 1.8 ms, 137 ms fast: HANDOFF.md:133-135 | |
+| 10 | Every demo is built from one kit of parts | readout | 167 modules: `ls demo/shell/*.mjs \| wc -l`, 2026-10-05 | `createReport` readout |
+| 11 | A stand-in replaces somebody else's server | character columns | 48/48, 39/39, 52/52: positron-verify skill lines 29, 70, 90-92 | |
+| 12 | The Pico router runs the routing core in C | character columns | 115/115, 98/98: HANDOFF.md:190; 45 pass: HANDOFF.md:191; nothing run on the board: HANDOFF.md:180-181 | |
+| 13 | ERR refuses live TV by programme, not age | character columns | 45 and 78 min, 13 points: positron-streaming skill 228-230; 2 h: plans/plan-live-timeline.md:42 | |
+| 14 | A check counts only once it has failed | `38/38` | positron-verify skill lines 78-80 | |
+| 15 | The model was faster with a loose schema | decimal stack | 1.6 and 10.2 s: research/cf-models-speech-to-patch-2026-09-21.md:243-244 | |
+| 16 | Next is the hardware nobody has run yet | list | HANDOFF.md:165-167, plans/plan-away-webrtc.md:216-217 | |
+
+**What mono does, asserted rather than shown off.** Five tables are lines of
+text padded with spaces, so a column is a character position; three stacks are
+a grid with the figure right aligned in `tabular-nums` and the same count of
+decimals. The page measures every column edge and every decimal point from the
+glyphs themselves (a `Range` per character) and requires them within 0.5 px, in
+all eight faces, with the panel at 686 px (a 1280 page) and at 343 px (a 375
+page). The stack on slide 8 is live. MEASURED by sabotage: a left aligned
+figure, 1 px of letter spacing on one table row and a 5 px caption margin take
+exactly the six new alignment and caption asserts red (39/45), and nothing else.
+
+**The check pass got cheaper, not slower.** Every slide is laid out at once and
+unseen (`.sl-measure`), so each face at each width is one synchronous layout;
+the pass is about **72 ms** for 16 slides, 8 faces and 2 widths, and the whole
+check about **2.2 s**, inside the harness's boot wait with no `DEEP` tier and
+no manifest change. The live check looks at each live slide once and requires
+its own value to move and every other live value to stand still.
+
+**Weighed and not built.** The OLED from `/kit/` needs the router's UF2 fetched
+to draw, which is a request on a slide change, so it is not on a slide. A
+transport bar would take the space bar from the deck (section 5), so the step
+grid runs on its own clock with no bar.
