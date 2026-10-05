@@ -98,14 +98,20 @@ export function build({ panel, set, log }) {
     zoomReadout: false,
     lanes: [
       // The mark becomes its character where the zoom has made room.
+      // `gutterReserve` is the widest line each lane can show, so the gutter
+      // is sized for `22 of 22` and does not narrow at `0 of 0`, which moved
+      // the plot's left edge under a reader zooming in.
       { id: 'sure', kind: 'era', label: 'how sure', height: 26, as: 'ticks',
-        color: HI, width: 2, glyphOf: (r) => GLYPH[r.payload?.sure] || '' },
+        color: HI, width: 2, glyphOf: (r) => GLYPH[r.payload?.sure] || '',
+        gutterReserve: `${items.length} of ${items.length} legible` },
       { id: 'span', kind: 'era', label: 'brackets', height: 30, as: 'spans',
-        color: HI, stack: false, labels: false },
+        color: HI, stack: false, labels: false,
+        gutterReserve: `${items.length} bracketed` },
       // The bracketed rows only: a written date is a point mass and would
       // flatten every bracket's smear to half a pixel.
       { id: 'spread', kind: 'era', label: 'spread out', height: 46, as: 'spans',
-        filter: (r) => !!r.when, bars: false, aggregate: true },
+        filter: (r) => !!r.when, bars: false, aggregate: true,
+        gutterReserve: `${bracketed} of ${bracketed} counted` },
     ],
   });
   const { strip } = view;
@@ -160,6 +166,30 @@ export function build({ panel, set, log }) {
     strip.invalidate();
   }
 
+  /**
+   * ZOOM ABOUT THE PLAYHEAD, NOT ABOUT THE MIDDLE OF THE PLOT. `zoomIn()` holds
+   * the plot's centre still, which is the playhead only if nothing has moved
+   * it by a pixel, and every pixel off is multiplied by each press after it.
+   * MEASURED 2026-10-05: after 28 presses the view was 9 to 18 Feb 1100 with
+   * the playhead on 1 Jan 1100, off the left edge. So the playhead's own x is
+   * the anchor and stays where it is on screen; if it is already off screen it
+   * is brought to the middle first, because zooming about a point nobody can
+   * see is zooming away from it.
+   */
+  function zoom(f) {
+    const t = deck.position();
+    const [a, b] = strip.visible();
+    const w = strip.timeToX(b) - strip.timeToX(a);
+    let px = strip.timeToX(t);
+    if (!(px >= 0 && px <= w)) {
+      const v = strip.view();
+      strip.setView({ scrollX: v.scrollX + px - w / 2 });
+      px = w / 2;
+    }
+    strip.zoomAt(f, px);
+    refresh();
+  }
+
   const btn = (label, onclick, cls = '') => {
     const b = el('button', cls, label, { type: 'button' });
     b.onclick = onclick;
@@ -167,8 +197,8 @@ export function build({ panel, set, log }) {
   };
   const row = el('div', 'time-row');
   row.append(
-    btn('Zoom in', () => { strip.zoomIn(); refresh(); }),
-    btn('Zoom out', () => { strip.zoomOut(); refresh(); }),
+    btn('Zoom in', () => zoom(1.5)),
+    btn('Zoom out', () => zoom(1 / 1.5)),
     // Primary: it is the one that puts the whole subject in view.
     btn('Fit', () => { strip.fit(); refresh(); }, 'pos-pri'),
   );

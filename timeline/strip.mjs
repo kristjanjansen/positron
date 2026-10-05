@@ -333,10 +333,14 @@ export function calendarTicks(r, t0, t1, max = 4096) {
   } else {
     // Days of the month 1, 1 + n, 1 + 2n, and none closer than half a step to
     // the next month's first, so a 31st never crowds the 1st beside it.
+    // ⚠️ The next first is day `len + 1`, not day `len`, and closer means
+    // strictly closer: that is the old rule for every step but one day. `len`
+    // dropped the LAST DAY OF EVERY MONTH at a one day step (`30 Dec`, then
+    // `Jan 1100` two steps on), seen on a 1280 shot 2026-10-05.
     for (; out.length < max; m++) {
       const first = utc(y, m); if (first > t1) break;
       const len = Math.round((utc(y, m + 1) - first) / DAY);
-      for (let d = 1; d <= len - r.n / 2 || d === 1; d += r.n) {
+      for (let d = 1; d < len + 1 - r.n / 2 || d === 1; d += r.n) {
         const t = first + (d - 1) * DAY;
         if (t > t1 || out.length >= max) break;
         if (t >= t0) out.push(t);
@@ -1062,8 +1066,18 @@ function drawAoristic(ctx, L, C, spans) {
     // Plain words on the canvas, asked 2026-10-05 (*"rething labelling"*): the
     // legend read `aoristic Σ 1/(b−a) · 1 bin/px ...`. The formula is still
     // `a.method`, published and asserted, for a reader who asks.
+    // ⚠️ MEASURED, AND A CLAUSE DROPS RATHER THAN THE LINE BEING CUT. At 375 px
+    // the whole sentence ran off the right edge mid-word (2026-10-05). So the
+    // clauses go from the end, least needed first, until the line fits; the
+    // first one alone is the floor, and below that nothing is written.
+    const head = 'how likely each moment is';
+    const from = `, from ${a.counted} dated ranges`;
+    const per = `, ${C.calendar ? calendarSpan(a.colMs) : fmtDur(a.colMs)} a pixel`;
     const drop = a.open ? `, ${a.open} with no end left out` : '';
-    ctx.fillText(`how likely each moment is, from ${a.counted} dated ranges, ${C.calendar ? calendarSpan(a.colMs) : fmtDur(a.colMs)} a pixel${drop}`, 3, base - h - 2);
+    const room = C.width - 6;
+    const line = [head + from + per + drop, head + from + per, head + from, head]
+      .find((s) => ctx.measureText(s).width <= room);
+    if (line) ctx.fillText(line, 3, base - h - 2);
   }
   ctx.restore();
 }
@@ -1277,7 +1291,7 @@ export function createStrip(canvas, deck, opts = {}) {
     // indistinguishable from one that is never taken.
     // ⚠️ Cached on the TEXT, not on a dirty flag, because nothing tells us when
     // a client mutates a label — the only honest trigger is the text changing.
-    const key = `${S.width}|${S.lanes.map((L) => (L.show ? `${L.label ?? L.id}\u0001${subLabelsOf(L).join('\u0002')}` : '')).join('\u0003')}`;
+    const key = `${S.width}|${S.lanes.map((L) => (L.show ? `${L.label ?? L.id}\u0001${subLabelsOf(L).join('\u0002')}\u0001${[].concat(L.gutterReserve ?? []).join('\u0002')}` : '')).join('\u0003')}`;
     if (key !== S.gutterKey) { S.gutterKey = key; S.gutterPx = gutterWidthFor(S.width); }
     let y = S.axisH;
     for (const L of S.lanes) { L.y = y; if (L.show) y += L.height; }
@@ -1646,6 +1660,25 @@ export function createStrip(canvas, deck, opts = {}) {
   // ladder's old ceiling of 100 y turned a 13.8 Gyr view into 138,000,000
   // fillText calls. The clamp is reported, never silent.
   const MAX_TICKS = 4096;
+  /**
+   * A RULER LABEL SITS RIGHT OF ITS TICK, UNLESS THAT RUNS PAST THE PLOT'S
+   * RIGHT EDGE. Then it sits LEFT of the tick, ending 3 px before it, and if
+   * that would land on the previous label it is not drawn at all. Until
+   * 2026-10-05 the last label of every strip was simply cut by the canvas edge
+   * on both rulers, `/time/` DATES among them. The tick line is
+   * drawn either way; only the words move or go.
+   */
+  let labelEnd = -Infinity;
+  function tickLabel(s, px) {
+    const w = ctx.measureText(s).width;
+    let lx = px + 3;
+    if (lx + w > plotW()) {
+      lx = px - 3 - w;
+      if (lx < 0 || lx < labelEnd + 6) return;
+    }
+    ctx.fillText(s, lx, 10);
+    labelEnd = lx + w;
+  }
   function drawAxis() {
     const t0 = tAt(0), t1 = tAt(plotW());
     if (calOn(t0, t1)) { drawCalendarAxis(t0, t1); return; }
@@ -1666,13 +1699,14 @@ export function createStrip(canvas, deck, opts = {}) {
     ctx.stroke();
     ctx.strokeStyle = T.axis; ctx.beginPath();
     ctx.font = '10px ui-monospace, Menlo, monospace'; ctx.fillStyle = T.dim;
+    labelEnd = -Infinity;
     const firstMajor = Math.ceil(t0 / major) * major;
     const nMajor = Math.floor((t1 - firstMajor) / major) + 1;
     for (let i = 0; i < nMajor && i < MAX_TICKS; i++) {
       const t = firstMajor + i * major;
       const px = Math.round(x(t)) + 0.5;
       ctx.moveTo(px, 0); ctx.lineTo(px, S.contentH);
-      ctx.fillText(fmt(t, S.absolute), px + 3, 10);
+      tickLabel(fmt(t, S.absolute), px);
     }
     ctx.stroke();
     ctx.restore();
@@ -1698,10 +1732,11 @@ export function createStrip(canvas, deck, opts = {}) {
     ctx.stroke();
     ctx.strokeStyle = T.axis; ctx.beginPath();
     ctx.font = '10px ui-monospace, Menlo, monospace'; ctx.fillStyle = T.dim;
+    labelEnd = -Infinity;
     for (const t of majors.slice(0, MAX_TICKS)) {
       const px = Math.round(x(t)) + 0.5;
       ctx.moveTo(px, 0); ctx.lineTo(px, S.contentH);
-      ctx.fillText(calendarLabel(t, major), px + 3, 10);
+      tickLabel(calendarLabel(t, major), px);
     }
     ctx.stroke();
     ctx.restore();
@@ -1823,6 +1858,11 @@ export function createStrip(canvas, deck, opts = {}) {
       if (!L.show) continue;
       need = Math.max(need, GUT_TEXT_X + ctx.measureText(String(L.label ?? L.id)).width);
       for (const s of subLabelsOf(L)) need = Math.max(need, GUT_TEXT_X + ctx.measureText(s).width);
+      // `gutterReserve`: lines the lane CAN show and is not showing now, measured
+      // and never drawn, so a count falling from `22 of 22` to `0 of 0` does not
+      // narrow the gutter and slide the plot's left edge (`/time/` DATES,
+      // 2026-10-05). Opt in per lane; a lane without it sizes as before.
+      for (const s of [].concat(L.gutterReserve ?? [])) need = Math.max(need, GUT_TEXT_X + ctx.measureText(String(s)).width);
     }
     ctx.restore();
     // ⚠️ The cap is `max(base, frac)`, never the fraction alone: on a very
