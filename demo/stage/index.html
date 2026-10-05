@@ -30,7 +30,7 @@
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { burn, readBurnedFrom, drawCamera, FRAME_W, FRAME_H, FIELD, videoHue, PAD } from '/shell/pattern.mjs';
+  import { burn, readBurnedFrom, FRAME_W, FRAME_H, FIELD, videoHue, PAD } from '/shell/pattern.mjs';
   import { createCard } from '/shell/card.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
@@ -127,8 +127,8 @@
   const USE_R2 = Q.get('r2') === '1' || (Q.get('r2') !== '0' && !SELFCHECK);
   /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
      *"i mean these long-running ones"*. The show is the long part: a held
-     publisher, a cold container's WHIP leg (about 22 s), a WHEP handshake, the
-     film, a recording and its playback. An ORDINARY harness run (`selfcheck=1`)
+     publisher, a cold container's WHIP leg (about 22 s), a WHEP handshake, a
+     recording and its playback. An ORDINARY harness run (`selfcheck=1`)
      starts none of it, so its press of `Start WebRTC` says so and does nothing,
      and `checks()` grades the page at rest and stops before the drill.
      `DEMO_DEEP=1 node demo/verify.mjs stage` runs the show. A visitor is never
@@ -152,16 +152,16 @@
    * pattern that `readBurned` can read back, so a panel showing it is a panel
    * whose picture can be GRADED rather than merely looked at.
    *
-   * ⚠️ AND SINCE *"rm video overlay"* ON 2026-09-18 IT IS THE FALLBACK RATHER
-   * THAN THE FEED. What a show puts out is the film alone, cropped to fill,
-   * with nothing drawn over it; the generated picture is what a visit gets when
-   * the film 404s, stalls or will not decode.
-   * ⚠️ **AND SINCE 2026-09-19 NEITHER IS ON SCREEN UNTIL SOMEBODY PRESSES
-   * RECORD.** The film is a 253 MB recording in our own R2 rather than 4 MB on
-   * this origin, so nothing is fetched on a visit and the stage is a flat field
-   * until a show starts. Both pictures are still this project's own bytes off
-   * this project's own servers, which is the only respect the paragraph above
-   * was written about.
+   * ⚠️ AND SINCE *"rm video overlay"* ON 2026-09-18 IT IS NOT DRAWN ON SCREEN
+   * AT ALL. The canvas that paints it is a monitor nobody sees, kept for the
+   * pixel checks below, and it holds one flat colour.
+   * 🔴 **NO LOCAL FILM SINCE 2026-10-05, ASKED AS *"drop"*.** This page used to
+   * play the 253 MB church scene from R2 into that canvas on every Start show,
+   * a leftover from when it published its own picture. As a pure receiver it
+   * sent nobody that picture, so every press downloaded the film a second time
+   * for a canvas nobody could see, and the mute button unmuted that copy while
+   * the live picture stayed silent. The film now reaches this page once, from
+   * the container, over WHEP.
    */
   const TABS = [
     /**
@@ -304,7 +304,7 @@
      * was two different vocabularies in one slot, so the two states could not be
      * read as the two halves of one fact.
      */
-    const pres = t.id === 'archive' ? null : createPresence({
+    const pres = createPresence({
       of: '', mode: 'badge', state: 'offline',
       // ⚠️ `coming` SAYS `starting`, ASKED 2026-09-25: *"coming online =>
       // starting"*. `presence.mjs` names this override in its own docs and uses
@@ -398,19 +398,10 @@
          * have to agree or one of them is lying.
          */
         aspect: `${STAGE_W} / ${STAGE_H}`,
-        /**
-         * ⚠️ AND THE ARCHIVE GETS NO BADGE AT ALL. Asked 2026-09-18: *"Rm live
-         * badge from arcive videofooter"*. That tab plays a RECORDING of a show
-         * that finished, so a badge reading `live` on it is a status that
-         * cannot ever be false, which is the shape of control this project
-         * calls a lie. `false` is the panel's own way of saying a slot has
-         * nothing to put in it, and the footer keeps its other two.
-         * ⚠️ NOT `says: { online: 'archive' }` INSTEAD. A presence badge
-         * answers whether the thing feeding the picture is ANSWERING, and
-         * nothing is feeding this one: a recording has no liveness to report,
-         * so a re-worded badge would be the same lie in a better costume.
-         */
-        left: t.id === 'archive' ? false : pres.el,
+        // Every tab carries the badge since the Archive tab went on 2026-09-25.
+        // It took `false` here on 2026-09-18 (*"Rm live badge from arcive
+        // videofooter"*), because a recording has no liveness to report.
+        left: pres.el,
         /**
          * 🔴 EVERY SCREEN GOES FULL, AND KEEPS A FOOTER WHILE IT IS. Asked
          * 2026-09-18: *"all stage videoscreens need to go to fullscreeen with
@@ -436,7 +427,7 @@
          * with no show in it says nothing. The archive plays a file and has no
          * route to report.
          */
-        values: t.id === 'archive' ? null : [
+        values: [
           // `ping`, not `network ping`: MEASURED at 360 px the longer label ran
           // the row 8 px past its slot and cut the route word off.
           { key: 'rtt', label: 'ping', reserve: 6 },
@@ -532,7 +523,7 @@
    * would show the log to precisely the reader it is being taken from, until
    * they touched a tab. It is applied once, by hand, below.
    */
-  const LOG_TABS = ['controlroom', 'archive'];
+  const LOG_TABS = ['controlroom'];
   /**
    * 🔴 AND THE BOX AROUND THE LOG GOES WITH IT. MEASURED 2026-10-05: hiding
    * only the `<pre>` left its `.pos-glue.pos-report` on the audience tab with
@@ -647,329 +638,15 @@
   let audVideo = null;
 
   /**
-   * 🔴 AN ERR ARCHIVE CLIP BEHIND THE STAGE PICTURE. Asked 2026-09-18 with a
-   * link and a range: *"can you stream this to the feed?
-   * https://arhiiv.err.ee/video/vaata/op-489 from 10:40 15:39"*, corrected a
-   * minute later to *"from 11:01"*, then *"i mean to the stage as bg overlay"*.
-   *
-   * 🔴 IT IS OPT-IN, IT IS NEVER THE DEFAULT, AND NO HARNESS CAN SELECT IT.
-   * CLAUDE.md's rule about ERR is not about which harm has been named: it is
-   * that every connection this repo opens to ERR is somebody else's server, and
-   * the one shape the rule expressly allows is a person opening it on purpose.
-   * `?bg=` is that person saying so. A suite run never passes it, so the
-   * default picture stays the one this project generates itself.
-   *
-   * ⚠️ IT REPLACES THE PICTURE RATHER THAN SITTING BEHIND IT, AND THIS COMMENT
-   * SAID THE OPPOSITE FOR A DAY. The test pattern stopped drawing on top on
-   * 2026-09-18, at *"rm video overlay"*, so there is no burned clock over a
-   * `?bg=` clip and nothing downstream reads one.
-   * ⚠️ AND RE-PUBLISHING AN ARCHIVE THROUGH OUR OWN FEED IS REDISTRIBUTION
-   * RATHER THAN VIEWING. That is a rights question rather than a load one, it
-   * belongs to whoever owns this project, and it is written here rather than
-   * left for somebody to discover in a network tab.
+   * 🔴 NO BACKGROUND PICTURE OF THIS PAGE'S OWN SINCE 2026-10-05, ASKED AS
+   * *"drop"*. What stood here was the church scene read off
+   * `/resources/mimproject.json` by id and played from R2 on Start show, plus
+   * an opt-in `?bg=` that could put an ERR archive clip in its place. Both
+   * drew into a canvas a pure receiver shows nobody, so a press cost a second
+   * download of a 253 MB film and `?bg=` cost a broadcaster a listener for a
+   * picture nobody saw. The container plays the same film and this page
+   * receives it over WHEP, which is the only copy anybody watches.
    */
-  /**
-   * 🔴 AND THE DEFAULT BACKGROUND IS NOT ERR, SINCE 2026-09-18. Asked as
-   * *"turn on the err feed in the bg"*, then settled with *"i just need some
-   * video there"*. That second sentence dissolves the problem: the ask was
-   * never ERR, it was a picture, and a picture we hold ourselves costs a
-   * broadcaster nothing and raises no rights question to hand back to anybody.
-   *
-   * 🔴 AND SINCE 2026-09-19 THE PICTURE IS OURS OUTRIGHT. Asked as *"rm going
-   * to the moon video in stage, video win to 16:9 and replace with mim
-   * sustsinable kirikutseen"*. It is the church scene from `MIM goes
-   * Sustainable`, staged in a temporary theatre container at the end of
-   * Kultuurikilomeeter in Tallinn's European Capital of Culture year, in a
-   * theatre built from construction warming boxes that the audience powered.
-   * 720p25, 22 minutes, and the recording is MIMproject's own.
-   * ⚠️ **IT REPLACES A PUBLIC DOMAIN FILM AND THE ARGUMENT FOR THAT ONE IS
-   * FINISHED, NOT OVERTURNED.** `Le Voyage dans la Lune` was chosen because a
-   * 1902 print raises no rights question. Material we made ourselves raises
-   * none either, and it is about the thing the page now asks the audience.
-   *
-   * 🔴 **THE ROW IS TAKEN BY `id`, NEVER BY FILE NAME, AND THAT IS NOT A
-   * PREFERENCE.** A re-encode changed a file name on 2026-09-19 and a lookup
-   * keyed by name re-credited one recording to another holder while every file
-   * was present and correct. An `id` is what the corpus promises to keep.
-   * ⚠️ **AND TWO ROWS IN THAT CORPUS ARE NOT OURS.** Kanuti Gildi SAAL filmed
-   * two co-productions and holds those recordings. This one is not one of
-   * them, and nothing below hard-codes that: the holder, the licence and the
-   * title are read off whichever row is named, so pointing this page at a
-   * different one credits that row rather than this one.
-   */
-  const FILM_ID = 'mim:mim-goes-sustainable-2011-kirikustseen';
-  const FILM_CORPUS = '/resources/mimproject.json';
-  /** The corpus row behind the stage, once it has been read. */
-  let film = null;
-
-  /**
-   * 🔴 THE LENGTH IS READ, NOT MEASURED. `durationMs` is in the corpus,
-   * ffprobed off the file when it was pulled, so this page knows how long the
-   * recording is before a byte of it arrives. Asking the element would mean
-   * loading enough of a 253 MB file to answer a question somebody has already
-   * answered.
-   */
-  async function readFilm() {
-    try {
-      const r = await fetch(FILM_CORPUS);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const c = await r.json();
-      const row = (c.items || []).find((it) => it.id === FILM_ID);
-      if (!row || !row.file) throw new Error(`no row ${FILM_ID}`);
-      return row;
-    } catch (e) {
-      d.log(`the film could not be looked up: ${e.message}`, 'bad');
-      return null;
-    }
-  }
-  const secs = (t) => {
-    if (!t) return null;
-    const parts = String(t).split(':').map(Number);
-    if (parts.some((n) => !Number.isFinite(n))) return null;
-    return parts.reduce((a, n) => a * 60 + n, 0);
-  };
-  const BG_FROM = secs(Q.get('from'));
-  const BG_TO = secs(Q.get('to'));
-  let bgVideo = null;
-  let bgHls = null;
-
-  /** A path or a full URL is a FILE; anything else is an ERR archive slug. */
-  const isFileSource = (s) => /^https?:\/\/|^\//.test(s);
-
-  async function loadBackground(slug) {
-    const v = document.createElement('video');
-    /**
-     * 🔴 MUTED, ASKED 2026-09-19: *"muted my default"*. It used to be moot: the
-     * film this replaced was a 1902 print with no sound at all. The church
-     * scene was recorded in a room with an audience in it, so there is
-     * something to hear and a visitor should not be made to hear it on arrival.
-     * ⚠️ **MUTED AND STOPPED ARE TWO DECISIONS, AND NOTHING HERE DEPENDS ON THE
-     * FIRST TO GET THE SECOND.** A muted element may autoplay where an unmuted
-     * one is refused, which is exactly the coupling that makes a later unmute
-     * break playback silently. This film plays only from `startShow`, which is
-     * a press, so the gesture is what allows it and mute is free to be turned
-     * off by the control under the picture.
-     */
-    v.muted = true; v.playsInline = true; v.crossOrigin = 'anonymous';
-    /**
-     * 🔴 `preload = 'none'`, AND IT REPLACES AN `auto` THAT WAS RIGHT ABOUT A
-     * DIFFERENT FILE. The old comment here said the film loads in the harness
-     * with or without it, which was true of 4 MB on this origin and is not true
-     * of 253 MB from R2. Nothing is fetched until somebody presses play.
-     * ⚠️ `crossOrigin` IS NOT OPTIONAL NOW THE FILE IS ON ANOTHER HOST. The
-     * master canvas is read back by `getImageData` and captured by
-     * `captureStream`, and a canvas that has drawn a cross-origin video without
-     * CORS is TAINTED: both stop working with a security error rather than a
-     * blank picture. MEASURED on the file: `access-control-allow-origin: *` and
-     * `accept-ranges: bytes`.
-     */
-    v.preload = 'none';
-    try {
-      /**
-       * ⚠️ THE FILE ROUTE IS FIVE LINES AND THE ERR ROUTE IS SIXTY, which is
-       * the clearest argument for the default there is. No archive API, no
-       * HLS, no 618 KB of hls.js and no tainted canvas: a `<video>` with a
-       * `src`, which R2 serves by the range that is being played.
-       * 🔴 IT NO LONGER LOOPS. It looped because the old film was 2 m 45 s and
-       * a show is longer than that. At 22 m 12 s the show is the shorter of the
-       * two, so a loop is a wrap nobody will ever reach, and a film that
-       * restarted mid-show would put the same minute out twice.
-       */
-      if (isFileSource(slug)) {
-        v.src = slug;
-        v.loop = false;
-        /**
-         * 🔴 NO `load()`, NO `play()`, NO WAIT FOR A FRAME. The old shape here
-         * started the film and stopped it again to have one decoded frame to
-         * put on screen, which is a fine trick on a 4 MB file and a quarter of
-         * a gigabyte of somebody's bandwidth on this one. Nothing is asked for
-         * until `startShow` presses play.
-         * ⚠️ **SO A VISIT THAT PRESSES NOTHING SHOWS A FLAT FIELD, AND THAT IS
-         * THE TRADE.** The drawing loop already had that arm, from *"i get
-         * blinkig on-screen timecode etc stuff. rm it"*: what a visit gets
-         * before a press is one flat colour rather than a clock and a counter
-         * blinking at somebody who has not asked for anything.
-         * ⚠️ **AND A SEEK BEFORE METADATA IS NOT A FETCH.** Setting
-         * `currentTime` with `readyState` at 0 records a default playback start
-         * position and asks for nothing, so `?from=` still works without
-         * costing a visit who never presses.
-         */
-        if (BG_FROM != null) v.currentTime = BG_FROM;
-        bgVideo = v;
-        /**
-         * ⚠️ THE CONTROL IS THE STATE, NOT THIS ELEMENT. The lookup takes a
-         * moment and the mute button is on screen before it lands, so somebody
-         * who turns the sound on in that second would otherwise be overruled by
-         * an element created afterwards: the button would show a note and the
-         * film would be silent, which is a control that lies.
-         */
-        v.muted = muted;
-        /**
-         * ⚠️ AND THE FILM'S OWN TRANSPORT IS JOINED TO IT HERE, which is the
-         * first moment there is an element to join. `mediaMaster` makes the
-         * ELEMENT the master and the deck follow, so the bar's clock, its
-         * slider and its two words are all reading the film rather than a timer
-         * that agrees with it by luck.
-         */
-        filmMaster = mediaMaster(filmDeck, v, { stallPolicy: 'hold' });
-        const mins = film?.durationMs
-          ? `${Math.floor(film.durationMs / 60000)}:${String(Math.round(film.durationMs % 60000 / 1000)).padStart(2, '0')}`
-          : 'unknown length';
-        /**
-         * ⚠️ WHOSE RECORDING THIS IS, IN THE LOG, READ OFF THE ROW RATHER THAN
-         * TYPED HERE. A page showing somebody's work says whose it is, and two
-         * rows in this corpus belong to a different holder, so the credit is
-         * whatever the row says rather than a sentence that happens to be true
-         * of today's default.
-         */
-        d.log(film
-          ? `the stage picture is ${film.title}, ${film.source}, ${mins}, `
-            + `${(film.bytes / 1048576).toFixed(0)} MiB, ${film.licence}. Nothing of it is `
-            + 'fetched until a show starts'
-          : `background: ${slug.split('/').pop()}, nothing fetched until a show starts`, 'hi');
-        return;
-      }
-      /**
-       * ⚠️ THE ERR ROUTE KEEPS `auto`, AND THAT IS NOT AN INCONSISTENCY. It is
-       * reached only by a person who typed `?bg=` for a clip they want to
-       * watch, and it waits for a decoded frame below, which `none` would never
-       * deliver. The default route is the one every visit takes and the one
-       * that has to cost nothing.
-       */
-      v.preload = 'auto';
-      const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(slug)}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      const raw = (j?.data?.media || j?.media)?.src?.hls;
-      if (!raw) throw new Error('no stream offered');
-      const url = raw.startsWith('//') ? `https:${raw}` : raw;
-      /**
-       * ⚠️ `crossOrigin` AND A TAINTED CANVAS ARE THE WHOLE RISK HERE. The
-       * master canvas is read back by `readBurned` and captured by
-       * `captureStream`, and a canvas that has drawn a cross-origin video
-       * without CORS is TAINTED: both stop working, silently, with a security
-       * error rather than a blank picture. If ERR does not send the header this
-       * has to fail loudly rather than take the stage down with it.
-       */
-      /**
-       * 🔴 NATIVE HLS WHERE THERE IS NATIVE HLS, AND hls.js ONLY WHERE THERE IS
-       * NOT. Asked directly: *"why hls js ?"*. The answer is that Chrome has no
-       * native HLS at all, so without hls.js this plays nothing there. But the
-       * first version of this line read `if (Hls.isSupported())` and would have
-       * used hls.js on Safari and iPhone TOO, which is the exact defect
-       * CLAUDE.md records: iOS 17.1 added `ManagedMediaSource`, so
-       * `Hls.isSupported()` is now TRUE on an iPhone and every fallback written
-       * that way silently stopped firing.
-       * ⚠️ AND THE TEST IS `ManagedMediaSource`, NEVER `canPlayType` ALONE.
-       * That returns "maybe" in BOTH Safari and Chrome, so it cannot tell them
-       * apart, and gating on its truthiness put Chrome on a path it cannot
-       * play. Three demos read red for this.
-       * ⚠️ IT IS NOT A PREFERENCE EITHER. MEASURED on desktop Safari, same
-       * page, same 40 s: native advance 0.961x, latency 5.25 s, 0 errors,
-       * against hls.js 0.344x, 7.71 s, 2 errors.
-       */
-      const NATIVE_HLS = 'ManagedMediaSource' in window
-        && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
-      /**
-       * 🔴 AND IT IS FETCHED HERE RATHER THAN IN THE HEAD, BECAUSE HLS IS NOT
-       * WHAT THIS PAGE IS. Asked directly: *"but why hls when we play
-       * webrtc??"*. It is not in the streaming path at all. The chain is ERR's
-       * HLS into a `<video>`, that video into the canvas, and the CANVAS over
-       * WebRTC: hls.js stops at the video element and nothing downstream of the
-       * canvas has heard of it. ERR publishes its archive as HLS and offers
-       * nothing else, so it is the source's format rather than a choice.
-       *
-       * ⚠️ IT WAS A BLOCKING `<script>` IN THE HEAD AND THAT WAS WRONG:
-       * **618 KB** on every visit to a page where it is used only behind
-       * `?bg=`. Loaded on demand it costs nothing to anybody who does not ask
-       * for an ERR background, and on Safari and iPhone it is never fetched at
-       * all, because `ManagedMediaSource` means WebKit plays the playlist
-       * itself.
-       */
-      if (!NATIVE_HLS && !window.Hls) {
-        await new Promise((res, rej) => {
-          const tag = document.createElement('script');
-          tag.src = '/proto/remixer/hls.min.js';
-          tag.onload = res;
-          tag.onerror = () => rej(new Error('hls.js did not load'));
-          document.head.append(tag);
-        });
-      }
-      if (NATIVE_HLS) {
-        v.src = url;
-      } else if (window.Hls && window.Hls.isSupported()) {
-        bgHls = new window.Hls({ enableWorker: true, xhrSetup: (x) => { x.withCredentials = false; } });
-        bgHls.loadSource(url);
-        bgHls.attachMedia(v);
-      } else {
-        // Neither path available. Say so rather than leave a silent black box.
-        throw new Error('this browser has neither native HLS nor hls.js');
-      }
-      await new Promise((res) => {
-        v.addEventListener('loadeddata', res, { once: true });
-        setTimeout(res, 12000);
-      });
-      if (BG_FROM != null) v.currentTime = BG_FROM;
-      // Stopped until somebody presses play, the same as the file route. An HLS
-      // source has to be told the same thing or the two routes would disagree
-      // about when a picture begins moving.
-      v.pause();
-      // The out point, watched rather than timed: a timer would drift against
-      // a stream that buffered, and the number that matters is the position.
-      if (BG_TO != null) {
-        v.addEventListener('timeupdate', () => {
-          if (v.currentTime >= BG_TO) { v.pause(); d.log(`background reached ${Q.get('to')}`, 'hi'); }
-        });
-      }
-      bgVideo = v;
-      // The control is the state here too, for the reason written on the file
-      // route: two paths that can disagree about mute is one of them lying.
-      v.muted = muted;
-      filmMaster = mediaMaster(filmDeck, v, { stallPolicy: 'hold' });
-      d.log(`background: ERR ${slug}${BG_FROM != null ? ` from ${Q.get('from')}` : ''}`
-        + `${BG_TO != null ? ` to ${Q.get('to')}` : ''}`, 'hi');
-    } catch (e) {
-      d.log(`could not put ${slug} behind the stage: ${e.message}`, 'bad');
-      bgVideo = null;
-    }
-  }
-  /**
-   * 🔴 THE GATE IS ABOUT WHOSE SERVER IT IS, AND THE FILM IS NOT GATED BECAUSE
-   * IT COSTS NOTHING TO SET UP. This used to say the film loads for everybody
-   * including a harness, ON PURPOSE, because it was 4 MB on this origin and
-   * gating it would leave the one thing a visitor always sees graded by
-   * nothing. The first half of that reasoning died with the file: 253 MB from
-   * R2 is not something to pull on a page load, for a visitor or for a suite
-   * run. **The second half is intact and is why nothing here is gated**: the
-   * element is prepared and asks for nothing, so a visit costs the corpus
-   * lookup and no more, and the checks still grade the real film by pressing
-   * the real control.
-   * ⚠️ THE ERR ROUTE STAYS EXACTLY AS IT WAS, opt-in and never reachable by a
-   * suite run, because that one is somebody else's server.
-   * ⚠️ AND THE LOOKUP IS SKIPPED ENTIRELY WHEN `?bg=` NAMES A SOURCE. A visitor
-   * who has said which picture they want should not pay for a table of the one
-   * they did not.
-   */
-  const BG_ASKED = Q.get('bg');
-  (async () => {
-    if (BG_ASKED) {
-      if (isFileSource(BG_ASKED) || !SELFCHECK) await loadBackground(BG_ASKED);
-      return;
-    }
-    film = await readFilm();
-    if (!film) return;
-    /**
-     * 🔴 THE TRANSPORT LEARNS THE LENGTH HERE, FROM THE CORPUS, BEFORE A BYTE
-     * OF THE FILM IS ASKED FOR. `durationMs` was ffprobed off the file when it
-     * was pulled, so the bar can draw a real slider and a real clock over a
-     * file nothing has opened. Asking the element would mean loading a quarter
-     * of a gigabyte to answer a question that is written down.
-     * ⚠️ IT RUNS BEFORE `loadBackground`, not after, so there is no instant
-     * where a visitor sees a transport claiming a one second film.
-     */
-    filmDeck.setRange([0, film.durationMs]);
-    await loadBackground(film.file);
-  })();
 
   /**
    * 🔴 ONE ORIGIN FOR EVERY MARK ON THE STRIP, AND IT IS THE RECORDER'S FIRST
@@ -995,7 +672,7 @@
   let ice = null, iceAsks = 0, pressAt = null, icePath = null, pathTimer = null;
   const iceLoadAsks = () => performance.getEntriesByType('resource')
     .filter((e) => /\/ice(\?|$)/.test(e.name) && (pressAt == null || e.startTime < pressAt)).length;
-  const pathPanels = () => panels.filter((p) => p.id !== 'archive');
+  const pathPanels = () => panels;
   function setPathCells(rtt, path) {
     for (const p of pathPanels()) {
       p.panel.values.set('rtt', rtt);
@@ -1142,7 +819,7 @@
     && c !== panel.slots.tag && !c.classList.contains('pos-fsx'));
 
   function showPictureOn(id) {
-    if (!audVideo || id === 'archive') return;
+    if (!audVideo) return;
     /**
      * 🔴 NOT OVER A RECORDING. Reported 2026-09-25: *"in webrtc i see not
      * recording lane nor playback does anyting"*, with `Play recording`
@@ -1855,7 +1532,32 @@
   playRecBtn.disabled = true;
   const paintPlayRec = () => { playRecBtn.disabled = !archiveMedia; };
 
+  /**
+   * 🔴 WHOLE SECONDS AND NO NOMINAL END, ASKED 2026-10-05 AS *"rm ms"*. The bar
+   * read `0:00.000 / 3:00.000`: thousandths nobody reads on a show that runs for
+   * minutes, and a `3:00` that is `SHOW_MS`, a range this page gave the deck so
+   * it has one, which no show has ever been told to stop at. The `live: true`
+   * note above already says a bar counting toward a nominal end claims a finish
+   * time nobody set, and the clock went on claiming it.
+   * ⚠️ SO IT IS THE ELAPSED TIME WHILE A SHOW IS ON, AND `elapsed / length`
+   * ONLY ONCE THERE IS A LENGTH. After Stop, `recordedMs` is the recording's
+   * resolved duration and the deck is driven by its playback, so `0:12 / 0:45`
+   * is then a real position in a real file.
+   * ⚠️ `SHOW_MS` STAYS AS THE DECK'S RANGE. The harness transport drill reads
+   * `__demo.transport.range` to pick a seek target, and that reads the deck,
+   * not this text, so the clock can stop showing the number without anything
+   * that grades the transport moving.
+   * ⚠️ A PAGE FORMATTER, NOT A KIT CHANGE. `fmt` is `transport-bar.mjs`'s own
+   * option for how a position reads, and it gets the whole line.
+   */
+  const mss = (ms) => {
+    const t = Math.max(0, Math.floor(ms / 1000));
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  };
+  const showClock = (pos) => (recordedMs != null ? `${mss(pos)} / ${mss(recordedMs)}` : mss(pos));
+
   const showBar = createTransportBar(room, showDeck, {
+    fmt: showClock,
     /**
      * 🔴 NO `LIVE` CHIP, ASKED 2026-09-18: *"rm 'live' from transport bar in
      * controlroom"*. It said one thing, this source has no end, and the page now
@@ -1975,6 +1677,7 @@
     // be re-parented over an archive recording. A stale pointer to a removed
     // node is indistinguishable from a live one until something appends it.
     audVideo = null;
+    paintMute();
   }
 
   /** The one button reads what it will do next. */
@@ -2087,7 +1790,6 @@
     if (id === 'controlroom' && phase === 'before') {
       roomStrip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
     }
-    if (id === 'archive' && recordedMs == null) strip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
   };
   refit(tabs.at());
   /**
@@ -2148,91 +1850,10 @@
   paintTransport();
   paintPlayRec();
 
-  /**
-   * 🔴 THE FILM HAS ITS OWN TRANSPORT, AND IT IS GLUED UNDER THE PICTURE IT
-   * DRIVES. Asked 2026-09-19: *"move video play / stop to videopanel footer"*
-   * and *"make transportbar glueable to videopanel footer"*. Play and stop
-   * belong to the picture, and the panel's footer is the row under the picture:
-   * glued, the two are one object with one edge, which is `createStripView`'s
-   * own arrangement for a strip and its footer.
-   *
-   * 🔴 AND THE FILM IS NOT THE SHOW. Asked in the same line: *"make video
-   * transport indepencent of when show starts"*. Until now the film played only
-   * from `startShow`, so there was no way to look at the picture without
-   * recording a show, and two different things were behind one press. They are
-   * two presses now: this one moves the picture, the one under the timeline puts
-   * it on air. Starting a show no longer touches the film, and stopping one no
-   * longer stops it.
-   * ⚠️ **SO A SHOW CAN GO OUT WITH A STILL IN IT**, which is a real state and
-   * the page says so in the log rather than quietly starting the film for you.
-   *
-   * 🔴 IT IS PLAY, STOP AND A CLOCK, AND IT GIVES UP THE SLIDER. That is the
-   * standing rule about one position surface per page, and this tab already has
-   * a strip: a 22 minute axis stacked 40 px above a 30 second one, at different
-   * scales with different origins, is the contradiction that rule is written
-   * about rather than a convenience. It is also exactly what was asked for,
-   * which was *"video play / stop"* and not a way to cue.
-   * ⚠️ **THE CLOCK IS NOT A SECOND AXIS.** `0:00.000 / 22:11.850` is a readout
-   * of one position and one length, in a fixed box, which is the shape this
-   * project puts changing numbers in. The length in it arrives from the corpus
-   * before a byte of the film does.
-   */
-  const filmDeck = createDeck({
-    // 0 until the corpus says otherwise, which is a moment later and still
-    // before a byte of the film is asked for. See `readFilm`.
-    range: [0, 1000],
-    // One item and one adapter, so the bar has a kind to read rates off, and
-    // ONE rate so it draws no rate row: a film has one speed.
-    items: [{ at: 0, kind: 'film', id: 'film', payload: {} }],
-    adapters: { film: { caps: { rates: [1] }, actuate: () => {} } },
-  });
-  let filmMaster = null;               // the mediaMaster, once there is a film
+  // 🔴 THE FILM'S DECK, ITS COMMAND AND ITS `mediaMaster` WENT ON 2026-10-05
+  // WITH THE FILM (*"drop"*). Its bar had gone on 2026-09-25, which left a
+  // mechanism whose only job was to start a local copy nobody could see.
 
-  /**
-   * ⚠️ EVERY VERB GOES TO THE ELEMENT, AND THE DECK FOLLOWS IT. `mediaMaster`
-   * reads `currentTime` and bends the playhead onto it, so a seek written to
-   * the DECK is undone by the next tick. This is the same wiring the archive
-   * already has on this page, and the same reason.
-   */
-  const filmCommand = {
-    play: () => {
-      if (!bgVideo) { d.log('there is no film to play', 'warn'); return; }
-      bgVideo.play().catch((e) => d.log(`the film would not play: ${e.message}`, 'bad'));
-    },
-    pause: () => bgVideo?.pause(),
-    seek: (ms) => { if (bgVideo) bgVideo.currentTime = ms / 1000; else filmDeck.seek(ms); },
-  };
-
-  /**
-   * ⚠️ `publish: false`, LIKE THE SHOW'S BAR. There are three bars on this page
-   * now and `__demo.transport` is one name: the archive keeps it, because it is
-   * the one that can answer "where are we in the recording this page made".
-   * This one is a monitor control for the operator, and a harness that drove it
-   * would be pulling a quarter of a gigabyte to press play on somebody's film.
-   * ⚠️ AND IT CARRIES A CLOCK, which is the point of knowing the length before
-   * the file: `22:11.850` is on screen with nothing fetched.
-   */
-  /**
-   * 🔴 NO PLAY BUTTON ON THIS BAR SINCE 2026-09-25. Asked: *"double play and
-   * start in stage control room is confusing. make just start primary button
-   * ... and rm play button under video"*. There were two presses that both read
-   * as "begin": the show's, and this one under the picture. The show's is the
-   * controls row now, and the film follows the show rather than being a second
-   * thing to start.
-   * ⚠️ **THE BAR STAYS, BECAUSE IT IS NOT A PLAY BUTTON.** It carries the
-   * film's CLOCK, and `22:11.850` is on screen with nothing fetched, which is
-   * the whole point of knowing the length before the file.
-   * ⚠️ **AND `toggle: false` DISARMS THE HARNESS DRILL RATHER THAN BREAKING
-   * IT.** `transport-bar.mjs` forces `api.playing` false and says so through
-   * `api.toggles`, which `demo/verify.mjs` reads before it presses anything.
-   */
-  // 🔴 THE FILM BAR IS GONE, 2026-09-25, AND THE CLOCK WENT WITH IT. It was the
-  // second footer. `filmDeck` and `filmCommand` STAY: they are what plays the
-  // film, and the film still starts with the show, which the owner chose to keep
-  // when asked. What left is the ROW, not the mechanism.
-  // ⚠️ SO `22:11.850` BEFORE A FETCH IS A FACT THIS PAGE NO LONGER SHOWS. If it
-  // is wanted back it belongs in the one footer as a readout cell, not as a
-  // whole transport bar with a clock in it.
 
   /**
    * 🔴 MUTE IS A GLYPH BESIDE THE FULLSCREEN BUTTON, NOT A ROW OF ITS OWN.
@@ -2253,27 +1874,38 @@
    * ⚠️ IT IS CENTRED ON ITS INK with `setSymbol`, which is the module that
    * exists because writing `textContent` silently undoes the centring. Two
    * glyphs of different heights in one 34 px box is exactly the case it names.
-   * ⚠️ AND THE SOUND GOES NO FURTHER THAN THIS BROWSER. `captureStream` takes
-   * the canvas, which is a picture: there is no audio track on the feed, so
-   * this is monitoring for the person running the show rather than sound for
-   * the audience, and the log says so in words.
+   * 🔴 IT MUTES THE LIVE PICTURE SINCE 2026-10-05, ASKED AS *"drop"*. It used
+   * to reach only the local film, so the note glyph made a copy nobody could
+   * see audible while the WHEP picture, the one thing on screen, stayed silent.
+   * The container's WHIP leg maps an audio track beside the picture
+   * (`workers/pub/container/server.mjs`), so the WHEP element has sound to
+   * give. Read off the ffmpeg arguments, not heard on this desk.
+   * ⚠️ EVERY SHOW ARRIVES MUTED AND THE PRESS IS WHAT UNMUTES IT. A muted
+   * element may start without a gesture where an unmuted one is refused, and
+   * the WHEP picture starts up to half a minute after Start show, long after
+   * that press stopped counting as a gesture. Unmuting is its own press, so it
+   * is always allowed.
+   * ⚠️ DISABLED WHILE THERE IS NO LIVE PICTURE, because a sound control with
+   * nothing to sound is a control that does nothing. The recording is picture
+   * only (see `startRecorder`), so its playback has nothing for it either.
    */
   const MUTE_ON = '\u266b';
   const MUTE_OFF = '\u2298';
   let muted = true;
-  const muteBtn = el('button', 'ico', MUTE_OFF, { type: 'button', 'aria-label': 'the film\u2019s sound' });
+  const muteBtn = el('button', 'ico', MUTE_OFF, { type: 'button', 'aria-label': 'the live show\u2019s sound' });
   centreSymbol(muteBtn);
   function setMuted(next, say = false) {
     muted = !!next;
-    if (bgVideo) bgVideo.muted = muted;
+    if (audVideo) audVideo.muted = muted;
+    paintMute();
+    if (say) d.log(muted ? 'the live show is muted' : 'the live show is audible in this room');
+  }
+  function paintMute() {
     setSymbol(muteBtn, muted ? MUTE_OFF : MUTE_ON);
     muteBtn.setAttribute('aria-pressed', String(!muted));
-    muteBtn.title = muted ? 'the film is muted' : 'the film is audible in this room';
-    if (say) {
-      d.log(muted
-        ? 'the film is muted'
-        : 'the film is audible in this room. The audience gets the picture and no sound');
-    }
+    muteBtn.disabled = !audVideo;
+    muteBtn.title = !audVideo ? 'sound, once a show is on air'
+      : muted ? 'the live show is muted' : 'the live show is audible in this room';
   }
   muteBtn.onclick = () => setMuted(!muted, true);
   // ⚠️ PREPENDED, SO THE ⛶ STAYS WHERE IT IS. Overriding the slot would take the
@@ -2575,40 +2207,14 @@
     pictureStart();
     pendTransport('webrtc', true);
     /**
-     * 🔴 THE FILM IS NOT STARTED HERE, SINCE 2026-09-19: *"make video transport
-     * indepencent of when show starts"*. This line used to be
-     * `bgVideo?.play()`, which made one press mean two things and left no way to
-     * look at the picture without recording a show. The film has its own
-     * transport under the panel now.
-     * ⚠️ **WHAT THE 2026-09-18 ASK BEHIND THE OLD LINE WANTED IS UNTOUCHED.**
-     * *"video sthould stop in control room in beginning"* is about a film that
-     * does not run to nobody before anybody asks, and it still does not: the
-     * film starts when somebody presses play and never on its own.
-     * ⚠️ **AND A SHOW WITH A STOPPED FILM IN IT IS A REAL STATE.** It is said in
-     * the log rather than quietly fixed, because starting somebody's film for
-     * them is the page deciding what they meant.
+     * 🔴 NOTHING LOCAL STARTS WITH THE SHOW SINCE 2026-10-05, ASKED AS *"drop"*.
+     * This used to call `filmCommand.play()`, which fetched the church scene
+     * from R2 into a canvas nobody saw while the same film arrived over WHEP.
+     * The only picture a press asks for now is the one the container publishes.
+     * ⚠️ AND THE SHOW ARRIVES MUTED, whatever the glyph said last show. See the
+     * mute button for why the sound is its own press.
      */
-    /**
-     * 🔴 THE SHOW STARTS THE FILM AGAIN SINCE 2026-09-25, AND IT IS A REVERSAL
-     * OF 2026-09-19 THAT THE SAME DAY'S OTHER CHANGE FORCED. *"make video
-     * transport indepencent of when show starts"* was right while the film had
-     * a play button of its own: one press meant two things and there was no way
-     * to look at the picture without recording a show. **Removing that button
-     * on 2026-09-25 removed the only way a person could start the film at
-     * all**, so the independence became a show that can only ever go out over a
-     * still, which is what was reported within the hour: *"clikced start webrtf,
-     * timelne playing, no video"*.
-     * ⚠️ **THE 2026-09-18 ASK BEHIND ALL OF IT IS STILL HONOURED**: *"video
-     * sthould stop in control room in beginning"*. The film does not run to
-     * nobody. It starts when a show starts and not before, which is the only
-     * press left that could mean it.
-     */
-    if (bgVideo) {
-      filmCommand.play();
-      d.log('the film starts with the show, since it has no press of its own', 'hi');
-    } else {
-      d.log('the show is on air with no film loaded, so what is going out is the pattern', 'warn');
-    }
+    setMuted(true);
     // The window starts chasing the show now that there is one.
     roomStrip.strip.setFollow(true);
     try {
@@ -2669,6 +2275,7 @@
       // second Stream meter for one picture.
       audVideo = v;
       showPictureOn(showingTab());
+      paintMute();
 
       /**
        * ⚠️ THE LOOPBACK DEADLINE IS SHORT ON PURPOSE AND IT IS A HARNESS
@@ -2779,10 +2386,6 @@
     phase = 'stopped';
     // Before the tracks stop, so a stop never reads as a stall.
     pictureReset();
-    // ⚠️ THE FILM IS NOT STOPPED HERE EITHER, and that is the other half of the
-    // same ask. A show ending is not a reason for the picture to stop: the
-    // operator may be cueing the next one, and the control they used to start it
-    // is the control that stops it.
     // And the control room's window stops chasing, so what is on screen is the
     // show that just happened rather than a window sliding past its end.
     roomStrip.strip.setFollow(false);
@@ -3193,92 +2796,22 @@
   let frames = 0;
   function tick() {
     /**
-     * 🔴 THE FILM IS THE PICTURE, AND NOTHING IS DRAWN ON TOP OF IT. Asked
-     * 2026-09-18: *"make 4:3 video win and crop"*, then *"rm video overlay"*.
-     * It used to be a BACKGROUND with the test pattern over it, which is the
-     * arrangement `/take/` uses for a camera, and both halves of that are gone:
-     * `fit: 'cover'` lets the film win the frame instead of gaining two black
-     * pillars, and `burn` is not drawn over it at all, so there is no clock, no
-     * counter and no frozen row on the picture.
-     * 🔴 **AND SINCE THE BOX WENT 16:9 ON 2026-09-19, `cover` AND `contain`
-     * AGREE TO THE PIXEL HERE.** The film is 1280x720 into a 1280x720 box, so
-     * neither crops anything and the setting changes no pixel on this page
-     * today. It stays `cover` for two reasons that are not taste: a film is
-     * composed to fill its own frame, which is the standing rule, and `?bg=`
-     * can point this page at a corpus row that is 4:3 or 480x272, where
-     * `contain` would lay flat field down the sides of it.
-     * ⚠️ `scrim: 0` GOES WITH IT AND IS NOT A SEPARATE TASTE DECISION. The 55%
-     * scrim exists to keep a burned clock readable on top of a picture; with
-     * nothing on top it is a page dimming itself by more than half for the sake
-     * of furniture that is not there.
-     *
-     * 🔴 AND THE GENERATED PICTURE IS THE FALLBACK, WHICH IS WHY `burn` IS
-     * STILL HERE. A film that 404s, stalls or fails to decode leaves `bgReady`
-     * false, and that visit gets the full test picture exactly as before rather
-     * than a black rectangle. The two arms are the same one line they always
-     * were; what changed is that the film arm now draws the film alone.
-     * ⚠️ SO THE BURNED CLOCK IS NO LONGER IN THE FEED WHEN A FILM IS UP, and
-     * two things downstream read it: `readBurned` on a panel, and
-     * `readBurnedFrom` on the archive's recording. The first is rehomed onto a
-     * claim that holds in both arms and is checked below; the second degrades
-     * to `null`, which its own assert already tolerates because it grades the
-     * PLAYHEAD rather than the picture.
+     * 🔴 ONE FLAT COLOUR, BECAUSE THERE IS NOTHING LEFT TO DRAW. The film used
+     * to be drawn here with `drawCamera` and went on 2026-10-05 (*"drop"*); the
+     * generated test picture was taken off screen on 2026-09-18 (*"i get
+     * blinkig on-screen timecode etc stuff. rm it"*). The live picture is the
+     * WHEP `<video>` itself, moved to the showing tab by `showPictureOn`, and
+     * never a copy in this canvas: a canvas mirror was tried on 2026-09-25 and
+     * drew into a panel that shows no canvas.
+     * ⚠️ THE LOOP STAYS BECAUSE IT TICKS THE TWO `mediaMaster`s BELOW, and the
+     * flat field is what the at-rest check reads to prove nothing started on
+     * its own.
      */
-    /**
-     * ⚠️ `readyState`, AND NOT `!paused`, SINCE *"video sthould stop in control
-     * room in beginning"* ON 2026-09-18. The film is STOPPED on its first frame
-     * until somebody starts the show, and a `bgReady` that required playback
-     * would have read a stopped film as no film at all and painted the test
-     * picture over it. What the drawing loop needs to know is whether there is a
-     * frame to draw, which is what `readyState >= 2` means.
-     */
-    const bgReady = bgVideo && bgVideo.readyState >= 2;
-    /**
-     * 🔴 THE CONTROL ROOM SHOWS WHAT IS GOING OUT, AND IT SHOWED NOTHING.
-     * Reported twice, 2026-09-25: *"audience shows video but not control
-     * room"*, then *"still no video on control room"*. Both legs append the
-     * received `<video>` to the AUDIENCE panel only (`aud.panel.stage`), and
-     * this loop fed every other panel from the film. So the operator, whose one
-     * job is to watch what the audience is getting, had a flat field while the
-     * audience had a picture.
-     * ⚠️ THE MIRROR IS A CANVAS DRAW, NOT A SECOND PLAYER, AND THAT IS THE
-     * WHOLE POINT. A second `<video>` on the same source is a second delivery:
-     * Stream bills by the minute DELIVERED, so two elements is two meters for
-     * one picture. One decode in the audience panel, copied into the master
-     * canvas the control room already paints from, costs nothing extra.
-     * ⚠️ LIVE BEATS THE FILM. When a show is on, the live picture IS the truth
-     * about the page; the film is what plays when nothing is.
-     * ⚠️ AND A CROSS-ORIGIN VIDEO CAN TAINT THE CANVAS, which is why the draw
-     * is guarded. `MediaStream` from a peer connection and an MSE-backed
-     * hls.js element both draw clean; a NATIVE HLS element playing a
-     * cross-origin manifest, which is the Safari path, taints it and makes
-     * `getImageData` throw. The readers of those pixels are checks rather than
-     * visitors, and `readBurnedFrom` already tolerates a null, so the cost of
-     * the Safari case is a check that cannot read the burn, not a broken page.
-     */
-    // ⚠️ NO LIVE MIRROR HERE ANY MORE. A canvas copy of the live element was
-    // tried on 2026-09-25 and was the wrong fix: the control room has no
-    // picture canvas on screen at all, so it drew into nothing. The element
-    // itself moves to the showing tab instead, in `showPictureOn`.
-    if (bgReady) drawCamera(mctx, bgVideo, STAGE_W, STAGE_H, { fit: 'cover', scrim: 0 });
-    else {
-      /**
-       * 🔴 NO TEST PICTURE ON SCREEN, EVER. Asked 2026-09-18: *"i get blinkig
-       * on-screen timecode etc stuff. rm it"*. It was the FALLBACK arm, and it
-       * was showing for the second or so between the page opening and the film
-       * decoding its first frame: a clock and a counter appearing and vanishing,
-       * which reads as a fault rather than as a picture waiting.
-       * ⚠️ **SO A FILM THAT NEVER ARRIVES LEAVES A FLAT FIELD, AND THE PAGE SAYS
-       * SO IN THE LOG RATHER THAN IN THE PICTURE.** That is the trade and it is
-       * the one asked for. The check below still goes red on a blank canvas, so
-       * the failure is graded even though it is no longer drawn.
-       */
-      mctx.fillStyle = FIELD;
-      mctx.fillRect(0, 0, STAGE_W, STAGE_H);
-    }
+    mctx.fillStyle = FIELD;
+    mctx.fillRect(0, 0, STAGE_W, STAGE_H);
     // ⚠️ THE ARCHIVE IS NOT FED FROM HERE. It is a recording: its picture comes
     // from wherever its transport is, which is what makes scrubbing visible.
-    for (const p of panels) if (p.id !== 'archive') p.ctx.drawImage(master, 0, 0);
+    for (const p of panels) p.ctx.drawImage(master, 0, 0);
     /**
      * 🔴 AND THE ARCHIVE'S MASTER IS DRIVEN FROM HERE, BECAUSE `mediaMaster`
      * DOES NOT RUN ITSELF. Its own docstring says to call it from the rAF loop
@@ -3298,10 +2831,6 @@
      */
     archiveMaster?.tick();
     roomMaster?.tick();
-    // ⚠️ AND THE FILM'S, FOR THE REASON WRITTEN ABOVE: a `mediaMaster` that is
-    // built and never ticked is an object that does nothing, which this page has
-    // already paid for once on the archive.
-    filmMaster?.tick();
     frames++;
     requestAnimationFrame(tick);
   }
@@ -3398,6 +2927,14 @@
    */
   const held = [];
   const A = (label, pass, detail) => held.push([label, pass, detail]);
+  /**
+   * Every request this page made for the film, by the browser's own list. Read
+   * in both tiers: at rest, and again once a show is live. See the at-rest
+   * check for the pattern.
+   */
+  const filmAsks = () => performance.getEntriesByType('resource')
+    .filter((e) => /mimproject|\.mp4(\?|#|$)/i.test(e.name))
+    .map((e) => e.name.split('/').pop());
 
   /**
    * ⚠️ THE WAKE IS DECLARED BESIDE THE HELD ASSERTS BECAUSE IT IS READ IN A
@@ -3457,7 +2994,7 @@
      * outer one.**
      * ⚠️ **THE PROMISE IS STARTED HERE AND AWAITED AT THE PRESS**, so the wake
      * is paid against the asserts in between rather than against a stopwatch.
-     * Every read only check, the film load and the question lanes all run while
+     * Every read only check and the question lanes all run while
      * ffmpeg comes up, which is the same trick `settleMs` plays for control 0.
      * ⚠️ IT IS THE WHIP LEG AND NOT THE MANIFEST, because this page subscribes
      * over WHEP and those are two different Cloudflare inputs.
@@ -3643,75 +3180,43 @@
       + `${recordedMs == null ? ' (no recording yet, so the bound is the nominal show)' : ''}`);
 
     /**
-     * 🔴 NOTHING OF THE FILM IS FETCHED UNTIL SOMEBODY PRESSES RECORD, AND
-     * THAT REPLACES A CHECK THAT READ THE PICTURE BEFORE A PRESS. Until
-     * 2026-09-19 the film was 4 MB on this origin, it was loaded on sight, and
-     * what this asserted was that a frame of it was on screen and stopped.
-     * The file is 253 MB from R2 now, so the thing worth grading before a press
-     * is the opposite one: that the page has asked for none of it.
-     *
-     * 🔴 IT IS ONE CLAIM IN TWO HALVES, PREPARED AND NOT FETCHED, AND NEITHER
-     * IS WORTH ANYTHING ALONE. A page that fetched nothing because it never
-     * resolved a source would pass the second half perfectly, so the element
-     * has to be pointed at the row named by `id` as well. That is the lookup
-     * this page must not get wrong: a re-encode changed a file name on the day
-     * this was written, and a table keyed by name re-credited a recording.
-     * ⚠️ AND WHAT THE PICTURE IS BEFORE A PRESS IS ASSERTED HERE TOO. With no
-     * decoded frame the loop paints `FIELD`, one flat colour edge to edge, so a
-     * frame with SPREAD in it before anybody has pressed anything would mean
-     * something had started on its own.
+     * 🔴 NO FILM ON THE PAGE AND NONE ASKED FOR, SINCE 2026-10-05 (*"drop"*).
+     * This used to grade a prepared film element that had fetched nothing yet,
+     * and the claim worth grading now is the stronger one: nothing on this
+     * page asks for the film at all, and before a press the monitor is one
+     * flat colour, so nothing has started on its own.
+     * ⚠️ IT READS RESOURCE TIMING, NOT A VARIABLE THIS PAGE KEEPS. A request the
+     * page forgot to count is still in the browser's own list, which is the
+     * reason `iceLoadAsks` reads the same list.
+     * ⚠️ THE PATTERN COVERS BOTH WAYS IT USED TO ARRIVE: the corpus lookup
+     * (`/resources/mimproject.json`) and the file itself (an `.mp4` in R2).
      */
-    for (let i = 0; i < 100 && !bgVideo; i++) {
-      await new Promise((r) => setTimeout(r, 40));
-    }
-    const bufBefore = bgVideo && bgVideo.buffered.length
-      ? bgVideo.buffered.end(bgVideo.buffered.length - 1) : 0;
     const lumIdle = lumAtOf(mctx);
     const idleSpread = Math.max(...lumIdle) - Math.min(...lumIdle);
-    /**
-     * ⚠️ ONE ASSERT IN BOTH MODES, WHICH IS THIS PAGE'S OWN RULE ABOUT `?r2=1`
-     * applied to the source: what changes with `?bg=` is what the label CLAIMS,
-     * never whether a claim is made. The default names the corpus row and the
-     * override names what the person typed.
-     */
-    const wantSrc = BG_ASKED
-      ? (isFileSource(BG_ASKED) ? new URL(BG_ASKED, location.href).href : null)
-      : (film ? film.file : null);
-    A(BG_ASKED
-      ? 'the film is the source ?bg= named, and none of it is fetched before a press'
-      : 'the film is the corpus row named by id, and none of it is fetched before a press',
-    !!bgVideo && !!wantSrc && bgVideo.src === wantSrc
-      && (BG_ASKED ? true : film.id === FILM_ID)
-      && bgVideo.preload === 'none' && bgVideo.readyState === 0
-      && bgVideo.networkState !== 2 && bufBefore === 0 && idleSpread <= 2,
-    bgVideo
-      ? `${BG_ASKED ? '?bg=' : (film ? film.id : 'no row')} -> `
-        + `${bgVideo.src.split('/').pop()}, preload ${bgVideo.preload}, readyState `
-        + `${bgVideo.readyState}, networkState ${bgVideo.networkState}, `
-        + `${bufBefore.toFixed(2)}s buffered, and the picture spans ${idleSpread} of 255 `
-        + 'where a flat field spans 0'
-      : 'no background element was ever created');
+    const asksBefore = filmAsks();
+    const srcVideos = [...document.querySelectorAll('video')]
+      .filter((v) => v.getAttribute('src') || v.currentSrc);
+    A('no film is on the page and none of one is asked for before a press',
+      asksBefore.length === 0 && srcVideos.length === 0 && idleSpread <= 2,
+      `${asksBefore.length} film request(s)${asksBefore.length ? ` (${asksBefore.join(', ')})` : ''}, `
+      + `${srcVideos.length} video element(s) with a file source, and the monitor spans `
+      + `${idleSpread} of 255 where a flat field spans 0`);
 
     /**
-     * 🔴 THE TRANSPORT KNOWS HOW LONG THE FILM IS BEFORE A BYTE OF IT ARRIVES,
-     * WHICH IS THE COROLLARY OF THE ASSERT ABOVE. Nothing is fetched, and the
-     * bar still draws a slider over 22 minutes and a clock that ends at
-     * 22:11.850, because `durationMs` was measured with ffprobe when the file
-     * was pulled and lives in the corpus.
-     * ⚠️ IT COMPARES THE DECK AGAINST THE ROW, NOT AGAINST A NUMBER TYPED HERE.
-     * A constant in this check would agree with a constant in the page and
-     * neither would be reading the file.
+     * 🔴 THE SHOW CLOCK READS WHOLE SECONDS AND NO NOMINAL END, ASKED
+     * 2026-10-05 AS *"rm ms"*. It read `0:00.000 / 3:00.000`, and the `3:00`
+     * was `SHOW_MS`, a range nobody set. It replaces a check on the film's
+     * deck knowing its length from the corpus, which went with the film.
+     * ⚠️ IT READS THE TEXT ON SCREEN, because the formatter is the thing that
+     * changed and a check on `showClock` itself would grade a function the
+     * bar might not be calling.
      */
-    // ⚠️ `durationMs` IS THE DECK'S GETTER, not a number read once: `setRange`
-    // moves it in place, and a captured copy would be the value from before the
-    // corpus landed, which is exactly what this is checking happened.
-    const filmSpan = filmDeck.durationMs;
-    A('the film\u2019s transport knows its length before a byte of it is fetched',
-      !!film && filmSpan === film.durationMs && bgVideo?.readyState === 0,
-      film
-        ? `the bar spans ${(filmSpan / 1000).toFixed(2)}s against ${(film.durationMs / 1000).toFixed(2)}s `
-          + `in the corpus, with the element at readyState ${bgVideo ? bgVideo.readyState : 'none'}`
-        : 'there is no corpus row to compare against');
+    const clockNow = (showBar.el.querySelector('.tbar-now')?.textContent || '').trim();
+    const clockAll = (showBar.el.querySelector('.tbar-all')?.textContent || '').trim();
+    A('the show clock reads whole seconds and claims no end before there is a recording',
+      /^\d+:\d\d$/.test(clockNow) && clockAll === '' && recordedMs == null,
+      `it reads "${clockNow}"${clockAll ? ` then "${clockAll}"` : ''}, while the deck still `
+      + `spans ${Math.round(showDeck.durationMs / 1000)}s for the harness and the clock does not print it`);
 
     /**
      * 🔴 THE FILM'S BAR AND THE PICTURE ARE ONE SURFACE, AND THE PANEL GAVE UP
@@ -3741,13 +3246,12 @@
 
     /**
      * 🔴 WHICH BAR THE HARNESS DRIVES, ASSERTED RATHER THAN LEFT TO SOURCE
-     * ORDER. There are THREE on this page now: the film's, the show's and the
-     * archive's. `__demo.transport` is one name, and CLAUDE.md records this
-     * page handing it to whichever bar was built last, which is a fact about
-     * where a line sits in a file rather than a statement about the page.
-     * ⚠️ THE ARCHIVE KEEPS IT because it is the one that can answer "where are
-     * we in the recording this page made". The film's bar would have the
-     * harness pressing play on a quarter of a gigabyte of somebody's film.
+     * ORDER. There are TWO on this page: the show's and the off-screen
+     * archive's (the film's went with the film on 2026-10-05). `__demo.transport`
+     * is one name, and CLAUDE.md records this page handing it to whichever bar
+     * was built last, which is a fact about where a line sits in a file rather
+     * than a statement about the page. The show's bar holds it, because it is
+     * the one a person sees and presses.
      */
     A('the published transport is the control room\u2019s one bar',
       window.__demo?.transport === showBar.api && window.__demo?.transport !== bar.api,
@@ -3913,7 +3417,7 @@
 
     if (LIGHT) {
       for (const [label, pass, detail] of held) d.assert(label, pass, detail);
-      d.log('left for the deep run: the publisher, the show over WebRTC, the film playing under it, '
+      d.log('left for the deep run: the publisher, the show over WebRTC and its sound, '
         + 'the recording, its trip to the archive and the diagram measure (DEMO_DEEP=1)');
       return;
     }
@@ -4123,245 +3627,114 @@
       await new Promise((r) => setTimeout(r, 50));
     }
     /**
-     * 🔴 STARTING A SHOW DOES NOT START THE FILM, WHICH IS THE WHOLE OF *"make
-     * video transport indepencent of when show starts"*. It did until
-     * 2026-09-19, and the assert here used to be the opposite one.
-     * ⚠️ **IT IS ONE HALF OF A PAIR AND WORTHLESS ALONE.** A film that cannot
-     * play at all passes this perfectly, which is why the next assert presses
-     * the film's own control and requires it to move. Held still by a show
-     * above, moving on its own press below.
-     * ⚠️ AND IT READS THE ELEMENT RATHER THAN THE DECK. The deck follows the
-     * element through `mediaMaster`, so the element is the side that would
-     * still be honest if the join were broken.
+     * 🔴 FIVE CLAIMS ABOUT THE LIVE PICTURE, AND THEY REPLACE FIVE ABOUT THE
+     * FILM, 2026-10-05 (*"drop"*). The page played the church scene from R2 on
+     * every Start show and graded that copy: that the show started it, that it
+     * moved and the canvas followed, that it filled the frame, that the canvas
+     * blitted it, and that mute reached it. The copy is gone, so each claim
+     * moves to the one picture left, the WHEP `<video>`, and the count stays
+     * where it was in this tier as the page's rule asks.
+     * ⚠️ **NONE OF THESE FIVE HAS RUN YET.** They are written against the code,
+     * not against a run: the deep tier needs a woken publisher and was not run
+     * when they were written. The first `DEMO_DEEP=1` run is their first test.
      */
     /**
-     * 🔴 IT ASKS WHETHER THE FILM IS RUNNING, NOT WHERE IT IS SITTING, AND IT
-     * ASKED THE SECOND THING UNTIL 2026-09-25. The old form required
-     * `at === 0`, which was true only because nothing had ever moved the film
-     * before this point. The controls row changed the order the harness works
-     * in, a strip drag now seeks first, and the film sat at **665.92s, exactly
-     * half of its 1331.85s length**, paused, with the show live. **Every word of
-     * the claim held and the assert went red**, because it was grading a
-     * starting position it had been handed for free.
-     * ⚠️ **NOT STARTED IS A PAIR: STILL PAUSED, AND NOT ADVANCING.** Two samples
-     * apart, because `paused` alone would pass on a film that a stall had
-     * stopped, and a position alone says nothing without a second reading.
+     * 1. A SHOW FETCHES NO FILM EITHER. The at-rest check proves a visit asks
+     * for none; this is the same list read once a show is live, which is the
+     * moment the old code fetched 253 MB of it.
      */
-    const filmAt0 = bgVideo ? bgVideo.currentTime : null;
-    await new Promise((r) => setTimeout(r, 300));
-    const showLive = bgVideo
-      ? { at: bgVideo.currentTime, was: filmAt0, paused: bgVideo.paused } : null;
-    A('starting a show starts the film, because nothing else can',
-      !!showLive && showLive.paused === false && showLive.at > showLive.was
-        && phase === 'live',
-      showLive
-        ? `the show is "${phase}" and the film went ${showLive.was.toFixed(2)}s to `
-          + `${showLive.at.toFixed(2)}s in 300 ms, paused ${showLive.paused}`
-        : 'there was no film to start');
+    const asksLive = filmAsks();
+    A('a live show fetches no film, so the only picture is the one over WHEP',
+      phase === 'live' && asksLive.length === 0,
+      `the show is "${phase}" and the page has made ${asksLive.length} film request(s)`
+      + `${asksLive.length ? ` (${asksLive.join(', ')})` : ''}`);
 
     /**
-     * 🔴 NOW PRESS THE FILM'S OWN PLAY, WHICH IS A DIFFERENT BUTTON UNDER A
-     * DIFFERENT PICTURE. Pressing it rather than calling `filmCommand.play()`
-     * is the same rule the show's press already follows: a bar wired to the
-     * wrong command, or never glued into the panel, would leave every assert
-     * below it green.
-     * 🔴 AND THE FIRST FRAME IS WAITED FOR HERE, BECAUSE THIS PRESS IS WHAT
-     * STARTS THE FETCH. Nothing was loaded before it, so `currentTime` cannot
-     * advance until R2 has answered and a frame has decoded. A fixed 500 ms
-     * window would have graded the network rather than the page.
-     * ⚠️ IT IS BOUNDED AND THE WAIT IS PRINTED, so a slow one is attributable
-     * rather than mysterious, and a film that never arrives fails here rather
-     * than three asserts later.
+     * 2. THE LIVE PICTURE MOVES, IN THE TAB THAT IS SHOWING. Two readings of
+     * `currentTime` apart, because `paused` alone passes on a stalled leg, and
+     * the parent is checked because `showPictureOn` moves one element between
+     * tabs and a picture in a hidden panel is a picture nobody sees.
      */
-    /**
-     * 🔴 THE DECK IS DRIVEN DIRECTLY NOW, BECAUSE THE BUTTON THIS USED TO PRESS
-     * IS GONE. Removing a control is coverage lost at a count that does not
-     * move unless what it was proving is rehomed, which is what the `/fau/`
-     * compile button cost on 2026-09-24. **The claim was never about a button.**
-     * It is that the film has a transport of its own, that pressing play on it
-     * moves the decoder, and that the room's picture follows: all three survive
-     * the press moving from a DOM click to the command the button drove.
-     * 🔴 **AND IT IS `filmCommand.play()`, NOT `filmDeck.play()`. MEASURED
-     * 2026-09-25, FOUR ASSERTS RED ON THE FIRST TRY.** The deck ran and the
-     * film did not: `currentTime` sat at 665.92s across the whole window, the
-     * panel moved 0 of 255, and the detail line said `its deck is running`,
-     * which is the deck reporting honestly that it was the only thing that was.
-     * **The toggle never drove the deck, it drove the command**, and the
-     * command is the half that reaches `bgVideo.play()`. Driving the deck
-     * directly is a press on the side of the join that cannot fail.
-     */
-    filmCommand.play();
     const pressedAt = performance.now();
-    for (let i = 0; i < 75 && !(bgVideo && bgVideo.readyState >= 2); i++) {
+    for (let i = 0; i < 75 && !(audVideo && audVideo.readyState >= 2); i++) {
       await new Promise((r) => setTimeout(r, 80));
     }
     const firstFrameMs = Math.round(performance.now() - pressedAt);
-    const runA = bgVideo ? bgVideo.currentTime : null;
-    const panelA = lumAtOf(panels[1].ctx);
+    const runA = audVideo ? audVideo.currentTime : null;
     await new Promise((r) => setTimeout(r, 500));
-    const runB = bgVideo ? bgVideo.currentTime : null;
-    const panelB = lumAtOf(panels[1].ctx);
-    const panelMoved = Math.max(...panelA.map((v, i) => Math.abs(v - panelB[i])));
-    /**
-     * ⚠️ TWO SIDES OF ONE JOIN, AND THE ELEMENT'S SIDE IS THE HALF THAT LIES.
-     * `currentTime` advancing proves the decoder is running; the PANEL changing
-     * proves the drawing loop is still picking that up and blitting it. This
-     * page has already paid for the difference once, in the archive caret, where
-     * every assert sat on the side of the join that worked.
-     */
-    A('the film plays from its own transport, and the picture in the room follows it',
-      runA != null && runB > runA && !bgVideo.paused && panelMoved > 0
-      && filmDeck.playing(),
-      bgVideo
-        ? `one press on the bar under the picture, first frame ${firstFrameMs} ms later, `
-          + `then the film went ${runA.toFixed(2)}s to ${runB.toFixed(2)}s `
-          + `and the panel changed by ${panelMoved} of 255 with it `
-          + `(its deck ${filmDeck.playing() ? 'is running' : 'is stopped'})`
-        : 'there was no film to start');
+    const runB = audVideo ? audVideo.currentTime : null;
+    const showingStage = byId.get(showingTab())?.panel?.stage ?? null;
+    A('the live picture moves, in the tab that is showing',
+      runA != null && runB > runA && !audVideo.paused && audVideo.parentElement === showingStage,
+      audVideo
+        ? `ready ${firstFrameMs} ms into this check, then ${runA.toFixed(2)}s to ${runB.toFixed(2)}s `
+          + `in 500 ms, paused ${audVideo.paused}, in the ${showingTab()} panel `
+          + `${audVideo.parentElement === showingStage ? 'as it should be' : 'NOT, it is elsewhere'}`
+        : 'there is no live picture');
 
     /**
-     * 🔴 THE FILM FILLS THE FRAME, AND THE BOX IS THE FILM'S OWN SHAPE. This
-     * used to read *"the 4:3 film wins the 16:9 frame rather than sitting in
-     * pillars"*, from *"make 4:3 video win and crop"*, and it ran before a
-     * press because the film was loaded on sight. Both halves moved: it runs
-     * after the press now, and the shape it grades is the one asked for on
-     * 2026-09-19, *"video win to 16:9"*.
-     * ⚠️ **IT MEASURES THE EDGE COLUMN, WHICH IS THE ONLY PLACE THE TWO
-     * ARRANGEMENTS DIFFER.** A source of the wrong shape contained in this box
-     * leaves a pillar of flat `FIELD` down each side and the middle of the
-     * frame looks identical either way, so a check that sampled the centre
-     * would pass under both and grade nothing.
-     * ⚠️ **A PICTURE CAN BE FLAT AND STILL BE A PICTURE, WHICH IS WHY THERE ARE
-     * TWO WAYS TO PASS.** A film frame that is dark at the edge reads as one
-     * value, the same shape as a pillar; what it cannot do is read as one value
-     * that is `FIELD` to within a point.
-     * ⚠️ **AND THE SHAPE IS COMPARED AGAINST THE FILE, NOT AGAINST ITSELF.**
-     * `cover` and `contain` agree to the pixel while the two shapes match, so
-     * the column alone would go on passing if the box drifted and the picture
-     * were quietly cropped. The aspect term is what notices that, and it reads
-     * the element rather than the corpus.
+     * 3. THE LIVE PICTURE IS THE BOX'S OWN SHAPE. The box is `STAGE_W` by
+     * `STAGE_H`, 16:9, and the container publishes 1280x720. Cloudflare ramps
+     * WHEP resolution over the first ~30 s (640x360 first), which keeps the
+     * shape, so the ASPECT is compared and never the size.
      */
-    let edgeSpread = null, edgeLum = null;
-    if (bgVideo && bgVideo.readyState >= 2) {
-      const col = mctx.getImageData(6, 0, 1, STAGE_H).data;
-      let clo = 255, chi = 0, sum = 0;
-      for (let i = 0; i < col.length; i += 4) {
-        const l = col[i] * 0.299 + col[i + 1] * 0.587 + col[i + 2] * 0.114;
-        if (l < clo) clo = l; if (l > chi) chi = l;
-        sum += l;
-      }
-      edgeSpread = Math.round(chi - clo);
-      edgeLum = Math.round(sum / (col.length / 4));
-    }
-    // `FIELD` is '#0d1017', which is luminance 16. A pillar is that value with
-    // no spread at all, read straight off the constant rather than typed twice.
-    const fieldLum = Math.round(13 * 0.299 + 16 * 0.587 + 23 * 0.114);
-    const filmAspect = bgVideo && bgVideo.videoHeight
-      ? bgVideo.videoWidth / bgVideo.videoHeight : null;
-    A('the film fills the frame, and the frame is the film\u2019s own shape',
-      edgeSpread != null && (edgeSpread > 2 || Math.abs(edgeLum - fieldLum) > 6)
-      && filmAspect != null && Math.abs(filmAspect - STAGE_W / STAGE_H) < 0.01,
-      edgeSpread == null
-        ? 'there was no film to measure'
-        : `${bgVideo.videoWidth}x${bgVideo.videoHeight} into ${STAGE_W}x${STAGE_H}, `
-          + `${filmAspect.toFixed(3)} against ${(STAGE_W / STAGE_H).toFixed(3)}, and the `
-          + `column 6 px in spans ${edgeSpread} of 255 and averages ${edgeLum} against a `
-          + `flat field at ${fieldLum}`);
+    const liveAspect = audVideo && audVideo.videoHeight
+      ? audVideo.videoWidth / audVideo.videoHeight : null;
+    A('the live picture is the box’s own shape',
+      liveAspect != null && Math.abs(liveAspect - STAGE_W / STAGE_H) < 0.01,
+      liveAspect == null
+        ? 'the live picture has no size yet'
+        : `${audVideo.videoWidth}x${audVideo.videoHeight} into ${STAGE_W}x${STAGE_H}, `
+          + `${liveAspect.toFixed(3)} against ${(STAGE_W / STAGE_H).toFixed(3)}`);
 
     /**
-     * ⚠️ IT READS THE AUDIENCE, NOT THE ARCHIVE. The archive is a recording now:
-     * its frame is drawn for wherever the playhead is, so its burned clock is
-     * the show's time rather than the wall's, and asserting it against `now`
-     * measured the wrong thing. It went red at `nothing decoded` the moment the
-     * archive stopped following the live loop, which is the check noticing a
-     * change in meaning rather than a defect.
+     * 4. WHAT THE ROOM SHOWS IS THE RECEIVED STREAM ITSELF. It replaces a check
+     * that the canvas blitted the film, and the claim underneath is the same:
+     * the picture on screen is the picture that arrived, not a copy of it. By
+     * object identity, for the reason the recorder check below gives: an id
+     * survives a hop and proves nothing.
      */
-    /**
-     * ⚠️ AND IT READS THE CONTROL ROOM, NOT THE AUDIENCE, SINCE 2026-09-18. The
-     * audience panel no longer holds a canvas at all before a show: it holds a
-     * card, and then the `<video>` that carries what came back. Its canvas is
-     * still blitted to and would still have answered, which is exactly the trap
-     * this project keeps meeting: a check that passes by reading something the
-     * page has stopped showing anybody.
-     */
-    /**
-     * 🔴 AND IT NO LONGER READS A BURNED CLOCK, SINCE *"rm video overlay"* ON
-     * 2026-09-18. This asserted `readBurned(panels[1].ctx)` against `now`, which
-     * grades the blit only while the thing being blitted is the generated
-     * pattern. With a film in the feed there is no clock in the picture at all,
-     * so that check would have gone red on a page that is working, which is the
-     * worst kind of red there is.
-     * ⚠️ **IT IS ONE CLAIM ACROSS BOTH ARMS RATHER THAN A BRANCH.** Whatever is
-     * being drawn, the same eight points must read the SAME in the panel as in
-     * the master, and the picture must MOVE. That is the blit and the loop,
-     * which is what the old check was really about: its own comment says *"the
-     * blit between them is exactly the step that could be missing"*.
-     * ⚠️ **BOTH HALVES OR NEITHER, AND EACH CATCHES WHAT THE OTHER CANNOT.** A
-     * match alone passes when the master is blank, because a blank panel
-     * matches a blank master perfectly. Movement alone passes when the panel is
-     * showing an old picture of its own. Neither is worth anything on its own.
-     * ⚠️ **AND IT SAMPLES LUMINANCE AT FIXED FRACTIONS, NOT A SUM.** A sum over
-     * the frame is the statistic CLAUDE.md records `/mirror/` being blinded by:
-     * three cosines 120 degrees apart sum to a constant. Eight points that each
-     * have to agree cannot be satisfied by a coincidence in the aggregate.
-     */
-    /**
-     * ⚠️ THE TWO READS ARE IN ONE TASK, WHICH IS WHAT MAKES THE MATCH EXACT.
-     * `tick` writes the master and blits it inside one animation frame, and no
-     * frame can run between two synchronous `getImageData` calls, so the panel
-     * is holding precisely the master frame being read. A tolerance here would
-     * be hiding a real difference rather than absorbing jitter.
-     * 🔴 **AND IT MOVED HERE FROM BEFORE THE PRESS ON 2026-09-19, BECAUSE
-     * THERE IS NOTHING IN THE PICTURE BEFORE ONE ANY MORE.** It used to run
-     * while the film stood on its first frame, and with the film no longer
-     * loaded on sight it read `spanning 0 of 255` and went red on a page that
-     * was working: a flat field is what a control room correctly shows before
-     * a show. MEASURED that way once rather than reasoned about.
-     * ⚠️ **AND THE MOVE IS WHAT KEEPS THE CHECK WORTH ANYTHING.** Its own note
-     * already said a match alone passes when the master is blank, because a
-     * blank panel matches a blank master perfectly. Before the press both
-     * halves were satisfiable by a page drawing nothing at all; here there is
-     * a film in the frame, so the match has something to be a match OF.
-     */
-    const roomCtx = panels[1].ctx;
-    const roomA = lumAtOf(roomCtx);
-    const masterA = lumAtOf(mctx);
-    const blitted = roomA.every((v, i) => v === masterA[i]);
-    const worst = Math.max(...roomA.map((v, i) => Math.abs(v - masterA[i])));
-    const roomSpread = Math.max(...roomA) - Math.min(...roomA);
-    A('the control room shows what the loop drew, and the canvas is not blank',
-      blitted && roomSpread > 4,
-      `eight points read ${blitted ? 'identical' : `${worst} apart at worst`} in the panel and `
-      + `the master, spanning ${roomSpread} of 255 between them `
-      + `(${bgVideo && bgVideo.readyState >= 2 ? 'the film' : 'the generated picture'})`);
+    const stageVideos = panels.flatMap((p) => pictureIn(p.panel)).filter((n) => n.tagName === 'VIDEO');
+    A('the room shows the received stream itself, as the one video on any panel',
+      !!audVideo && !!live?.sub && audVideo.srcObject === live.sub.inbound
+      && stageVideos.length === 1 && stageVideos[0] === audVideo,
+      `${stageVideos.length} video element(s) across the panels, `
+      + `${audVideo && live?.sub && audVideo.srcObject === live.sub.inbound
+        ? 'playing the WHEP inbound stream' : 'NOT playing the WHEP inbound stream'}`);
 
     /**
-     * 🔴 MUTED WHEN IT STARTS, AND THE GLYPH BESIDE THE ⛶ REALLY UNMUTES IT.
-     * Asked 2026-09-19 as *"muted my default"*, and a default is half a claim:
-     * a page that could never be unmuted would satisfy it perfectly. Both
-     * halves are one press apart, so both are here.
-     * ⚠️ IT PRESSES THE BUTTON RATHER THAN CALLING `setMuted()`. A control
-     * wired to nothing looks identical from the outside to one wired correctly,
-     * and this page has already paid for a setting that read as correct and did
-     * nothing.
-     * ⚠️ AND IT READS THE GLYPH, WHICH IS THE OTHER HALF OF THE SAME CONTROL.
-     * The element being unmuted while the button still shows a slashed circle
-     * is the exact failure `setSymbol` exists for: writing `textContent`
-     * throws away the span this module centres, so a check that only read
-     * `muted` would pass over a button that had stopped saying anything.
+     * 5. 🔴 THE SHOW ARRIVES MUTED, AND THE GLYPH BESIDE THE ⛶ UNMUTES IT.
+     * Asked 2026-09-19 as *"muted my default"*, and pointed at the live picture
+     * 2026-10-05. A default is half a claim: a page that could never be
+     * unmuted would satisfy it perfectly, so both halves are one press apart.
+     * ⚠️ IT PRESSES THE BUTTON RATHER THAN CALLING `setMuted()`, and reads the
+     * glyph, for the reasons this check always had: a control wired to nothing
+     * looks identical to one wired correctly, and `setSymbol` exists because
+     * writing `textContent` throws the centring away.
+     * ⚠️ AND IT REQUIRES AN AUDIO TRACK TO HAVE ARRIVED. A mute button over a
+     * leg with no sound is a control that does nothing, and that would be the
+     * publisher's fault, but it is still red: the button would be lying.
+     * ⚠️ AND THE PICTURE MUST STILL BE PLAYING AFTER. Unmuting without a gesture
+     * can pause an element in a browser that enforces autoplay rules; the
+     * harness turns that rule off, so this half is graded only for a visitor
+     * by the click being a real press.
      */
     const glyphOf = () => (muteBtn.textContent || '').trim();
-    const mutedAtStart = bgVideo ? bgVideo.muted : null;
+    const audioTracks = live?.sub?.inbound?.getAudioTracks?.().length ?? 0;
+    const enabled = !muteBtn.disabled;
+    const mutedAtStart = audVideo ? audVideo.muted : null;
     const glyphMuted = glyphOf();
     muteBtn.click();
-    const mutedAfter = bgVideo ? bgVideo.muted : null;
+    const mutedAfter = audVideo ? audVideo.muted : null;
     const glyphLoud = glyphOf();
     muteBtn.click();
-    A('the film starts muted, and the glyph beside the \u26f6 is what turns that off',
-      mutedAtStart === true && mutedAfter === false && bgVideo.muted === true
+    A('the live show arrives muted, and the glyph beside the ⛶ is what turns its sound on',
+      audioTracks >= 1 && enabled && mutedAtStart === true && mutedAfter === false
+      && audVideo.muted === true && !audVideo.paused
       && glyphMuted === MUTE_OFF && glyphLoud === MUTE_ON,
-      `muted ${mutedAtStart} showing ${glyphMuted}, then ${mutedAfter} showing ${glyphLoud}, `
-      + `and ${bgVideo ? bgVideo.muted : 'no film'} showing ${glyphOf()} again`);
+      `${audioTracks} audio track(s) on the leg, button ${enabled ? 'enabled' : 'DISABLED'}, `
+      + `muted ${mutedAtStart} showing ${glyphMuted}, then ${mutedAfter} showing ${glyphLoud}, `
+      + `and ${audVideo ? audVideo.muted : 'no picture'} showing ${glyphOf()} again`);
 
     A('one transport button starts the show, and becomes its stop',
       !!showToggle && phase === 'live' && /^stop/i.test(showToggle.textContent),
@@ -4903,11 +4276,6 @@
       if (hold) { try { hold.close(); } catch { /* gone */ } hold = null; }
       transport = null;
       paintTransport();
-      // ⚠️ AND THE FILM TOO, WHICH IS NEW AND IS THE COST OF INDEPENDENCE.
-      // `stopShow` used to stop the picture as a side effect; it does not any
-      // more, so a run that did not do this would leave a 22 minute film
-      // streaming from R2 behind every check after it.
-      filmCommand.pause();
     }
 
     /**
