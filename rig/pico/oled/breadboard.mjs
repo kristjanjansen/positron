@@ -3,6 +3,7 @@
 //
 //   node rig/pico/oled/breadboard.mjs           # hub powered: breadboard.svg
 //   node rig/pico/oled/breadboard.mjs mb102     # MB102 power module: breadboard-mb102.svg
+//   node rig/pico/oled/breadboard.mjs 400       # 400 hole board, hub powered: breadboard-400.svg
 //
 // wiring.yml (WireViz) says WHICH pin goes to which; this says WHERE each wire
 // goes on the board, hole by hole, so the board can be built by copying it.
@@ -25,14 +26,21 @@
 // bottom rails feed the OLED), so the Pico's own 3V3 out is wired to nothing.
 // ⚠️ The module's layout is the common MB102's, INFERRED: the shop page gives
 // only 6.5 to 12 V in, 3.3 V or 5 V out, 700 mA.
+// `400`: the half size board, 30 columns, hub powered like the default. The
+// Pico keeps columns 1 to 20, the OLED header moves to row f, columns 22 to
+// 29, and the module (15 holes wide) overhangs the board's right hand end.
+// Every wire still lands in rows g to j, never in a hole the module's own
+// header pins use.
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const MB102 = process.argv[2] === 'mb102';
+const MODE = process.argv[2] || '';
+const MB102 = MODE === 'mb102';
+const B400 = MODE === '400';
 
 const P = 16;                         // one hole pitch, 0.1 inch, in px
-const COLS = 63;
+const COLS = B400 ? 30 : 63;
 const X0 = 150, Y0 = 150;             // the board's top left corner
 const holeX = (c) => X0 + 30 + (c - 1) * P;
 // rows top to bottom: rail +, rail -, a..e, gap, f..j, rail -, rail +
@@ -51,7 +59,9 @@ const at = (row, col) => [holeX(col), ROW_Y[row]];
 
 const C = { v5: '#e0457b', v3: '#d63b3b', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#8a4fd1' };
 const out = [];
-const svgW = X0 * 2 + W + (MB102 ? 60 : 0), svgH = Y0 + H + 300;
+// the key under the board: two columns of wires on the wide boards, one on 400
+const KEY_PER_ROW = B400 ? 1 : 2;
+const svgW = X0 * 2 + W + (MB102 ? 60 : 0) + (B400 ? 90 : 0), svgH = Y0 + H + (B400 ? 440 : 300);
 out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" font-family="ui-monospace, Menlo, monospace">`);
 out.push(`<rect width="100%" height="100%" fill="#f4f1ea"/>`);
 
@@ -72,7 +82,7 @@ for (const r of Object.keys(ROW_Y)) {
     out.push(`<text x="${X0 + W - 12}" y="${ROW_Y[r] + 4}" font-size="10" fill="#9a968c" text-anchor="middle">${r}</text>`);
   }
 }
-for (const c of [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]) {
+for (const c of [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].filter((n) => n <= COLS)) {
   out.push(`<text x="${holeX(c)}" y="${ROW_Y.a - 11}" font-size="9" fill="#9a968c" text-anchor="middle">${c}</text>`);
   out.push(`<text x="${holeX(c)}" y="${ROW_Y.j + 17}" font-size="9" fill="#9a968c" text-anchor="middle">${c}</text>`);
 }
@@ -102,8 +112,9 @@ for (const c of [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]) {
 // the right. If the picture reads upside down from where you sit, the SSD1306
 // flips in firmware; nothing about the wiring changes.
 const OLED = ['GND', 'VCC', 'SCL', 'SDA', 'K4', 'K3', 'K2', 'K1'];
+const OC = B400 ? 22 : 40;            // the OLED header's first column, its GND pin
 {
-  const x1 = holeX(39) - 2, x2 = x1 + 15 * P, y2 = ROW_Y.f + 7, y1 = y2 - 11 * P;
+  const x1 = holeX(OC - 1) - 2, x2 = x1 + 15 * P, y2 = ROW_Y.f + 7, y1 = y2 - 11 * P;
   out.push(`<rect x="${x1}" y="${y1}" width="${x2 - x1}" height="${y2 - y1}" rx="5" fill="#25456e" opacity="0.95"/>`);
   const sx = x1 + 10, sy = y1 + 10, sw = 9.5 * P, sh = (y2 - 40) - sy;
   out.push(`<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="#0b0e14"/>`);
@@ -114,7 +125,7 @@ const OLED = ['GND', 'VCC', 'SCL', 'SDA', 'K4', 'K3', 'K2', 'K1'];
     out.push(`<text x="${cx}" y="${cy + 3.5}" font-size="9" fill="#333" text-anchor="middle">${g}</text>`);
   });
   OLED.forEach((name, i) => {
-    const x = holeX(40 + i);
+    const x = holeX(OC + i);
     out.push(`<circle cx="${x}" cy="${ROW_Y.f}" r="3.6" fill="#e8c35a"/>`);
     out.push(`<text x="${x}" y="${ROW_Y.f - 9}" font-size="7" fill="#fff" text-anchor="start" transform="rotate(-90 ${x} ${ROW_Y.f - 9})">${name}</text>`);
   });
@@ -156,13 +167,14 @@ if (!MB102) {
 
 // wires: [from, to, colour, label]; a point is [x, y] or [row, col]
 const pt = (p) => (typeof p[0] === 'string' ? at(p[0], p[1]) : p);
+// column OC + k holds the module's k-th header pin, GND VCC SCL SDA K4 K3 K2 K1
 const SIGNALS = [
-  [['i', 7], ['h', 42], C.scl, 'GP5 SCL, pin 7'],
-  [['j', 6], ['g', 43], C.sda, 'GP4 SDA, pin 6'],
-  [['i', 17], ['h', 44], C.key, 'GP13 to K4, pin 17'],
-  [['j', 16], ['g', 45], C.key, 'GP12 to K3, pin 16'],
-  [['i', 15], ['h', 46], C.key, 'GP11 to K2, pin 15'],
-  [['j', 14], ['g', 47], C.key, 'GP10 to K1, pin 14'],
+  [['i', 7], ['h', OC + 2], C.scl, 'GP5 SCL, pin 7'],
+  [['j', 6], ['g', OC + 3], C.sda, 'GP4 SDA, pin 6'],
+  [['i', 17], ['h', OC + 4], C.key, 'GP13 to K4, pin 17'],
+  [['j', 16], ['g', OC + 5], C.key, 'GP12 to K3, pin 16'],
+  [['i', 15], ['h', OC + 6], C.key, 'GP11 to K2, pin 15'],
+  [['j', 14], ['g', OC + 7], C.key, 'GP10 to K1, pin 14'],
 ];
 const WIRES = MB102 ? [
   [['T+', 1], ['a', 1], C.v5, '5 V into VBUS, pin 40'],
@@ -179,14 +191,17 @@ const WIRES = MB102 ? [
   [pwrG, ['T-', 2], C.gnd, 'ground'],
   [['a', 3], ['T-', 3], C.gnd, 'pin 38 GND'],
   [['i', 18], ['B-', 18], C.gnd, 'pin 18 GND to the bottom rail'],
-  [['i', 40], ['B-', 37], C.gnd, 'OLED GND'],
-  [['b', 5], ['j', 41], C.v3, 'pin 36 3V3 out to OLED VCC'],
+  [['i', OC], ['B-', B400 ? 21 : 37], C.gnd, 'OLED GND'],
+  [['b', 5], ['j', OC + 1], C.v3, 'pin 36 3V3 out to OLED VCC'],
   ...SIGNALS,
 ];
 for (const [a, b, col] of WIRES) {
   const [x1, y1] = pt(a), [x2, y2] = pt(b);
   // a gentle arc so crossing wires stay tellable apart
-  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - Math.min(60, Math.abs(x2 - x1) / 6);
+  // On 400 the signal wires are short and would arc over the Pico's pin
+  // numbers, so a wire that stays in rows g to j sags below the board instead.
+  const sag = B400 && [a, b].every((p) => typeof p[0] === 'string' && 'ghij'.includes(p[0])) ? -1.4 : 1;
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - sag * Math.min(60, Math.abs(x2 - x1) / 6);
   out.push(`<path d="M${x1} ${y1} Q${mx} ${my} ${x2} ${y2}" fill="none" stroke="${col}" stroke-width="3.2" stroke-linecap="round" opacity="0.9"/>`);
   for (const [x, y] of [[x1, y1], [x2, y2]]) out.push(`<circle cx="${x}" cy="${y}" r="3" fill="${col}" stroke="#fff" stroke-width="1"/>`);
 }
@@ -199,7 +214,7 @@ for (const [a, b, col] of WIRES) {
   const hole = (p) => (typeof p[0] === 'string' ? `${p[0]}${p[1]}` : 'adapter')
     .replace(/^T-/, 'top - rail ').replace(/^T\+/, 'top + rail ').replace(/^B-/, 'bottom - rail ').replace(/^B\+/, 'bottom + rail ');
   WIRES.forEach(([a, b, col, label], i) => {
-    const cx = X0 + (i % 2) * 470, cy = y + 22 + Math.floor(i / 2) * 22;
+    const cx = X0 + (i % KEY_PER_ROW) * 470, cy = y + 22 + Math.floor(i / KEY_PER_ROW) * 22;
     out.push(`<rect x="${cx}" y="${cy - 9}" width="22" height="6" rx="3" fill="${col}"/>`);
     const from = hole(a), to = hole(b);
     out.push(`<text x="${cx + 30}" y="${cy - 2}" font-size="11" fill="#333">${from} to ${to}   ${label}</text>`);
@@ -207,6 +222,6 @@ for (const [a, b, col] of WIRES) {
 }
 out.push('</svg>');
 
-const file = fileURLToPath(new URL(MB102 ? './breadboard-mb102.svg' : './breadboard.svg', import.meta.url));
+const file = fileURLToPath(new URL(MB102 ? './breadboard-mb102.svg' : B400 ? './breadboard-400.svg' : './breadboard.svg', import.meta.url));
 writeFileSync(file, out.join('\n'));
 console.log(`wrote ${file}`);
