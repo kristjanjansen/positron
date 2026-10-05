@@ -3914,6 +3914,24 @@ button.pos-pg-lab:hover { color: var(--fg); }
    six. The keys are the thing being looked at and the row under them is
    machinery. */
 .kbd .keys { margin-bottom: 10px; }
+/* 🔴 A KEYBOARD THAT SCROLLS SCROLLS TO THE EDGE OF WHAT HOLDS IT. Asked
+   2026-10-05 with a crop of keys cut off a row's width short of the panel's
+   edge: *"allow keyboaed overflor reach to the edge (general rule of keyb and
+   panels)"*. The scroller takes back its holder's inline padding as a negative
+   margin and gives it back as its own padding, so a keyboard that FITS sits
+   exactly where it did, and one that overflows runs under the padding to the
+   edge. Two holders: a keyboard's own box (`--kbd-pad`, its border is the
+   edge) and a glued row in a panel (`--rows-pad`, the panel's edge). */
+.kbd .keys {
+  margin-inline: calc(-1 * var(--kbd-pad));
+  padding-inline: var(--kbd-pad); scroll-padding-inline: var(--kbd-pad);
+}
+.pos-rows-r .kbd .keys {
+  --keys-bleed: calc(var(--rows-pad, 0px) + var(--kbd-pad));
+  margin-inline: calc(-1 * var(--keys-bleed));
+  padding-inline: var(--keys-bleed); scroll-padding-inline: var(--keys-bleed);
+}
+.pos-rows-r[data-pad="off"] .kbd .keys { --keys-bleed: var(--kbd-pad); }
 /* 🔴 INSIDE A GLUE IT GIVES UP ITS OWN EDGE, which is what makes a glue ONE
    surface rather than two boxes touching. Same contract every other glued child
    keeps, and it is why the wrapper exists at all: a piano roll sitting on the
