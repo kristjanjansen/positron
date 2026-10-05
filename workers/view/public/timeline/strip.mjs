@@ -1771,7 +1771,51 @@ export function createStrip(canvas, deck, opts = {}) {
       L._gutterFit = { lines: all.length, shown, dropped: all.length - shown };
       ctx.globalAlpha = 1;
     }
+    // HOW WIDE THE VIEW IS, in the gutter's ruler row, which holds no lane
+    // name, set against the plot edge on the tick labels' own baseline so it
+    // reads as a fact about the ruler beside it. See `zoomText()`.
+    const zt = zoomText();
+    if (zt) {
+      ctx.font = '9px ui-monospace, Menlo, monospace';
+      const w = ctx.measureText(zt).width;
+      if (w <= S.gutterPx - SWATCH_X - GUT_PAD) {
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = T.dim || '#8b93a1';
+        ctx.fillText(zt, S.gutterPx - GUT_PAD - w, 10);
+      }
+    }
     ctx.restore();
+  }
+
+  /**
+   * HOW WIDE THE VIEW IS. Not decoration: every question about this component
+   * so far (why is a clip one pixel, why do the ticks land on the 27th, is this
+   * a week or a year) is a question about the span on screen, and answering it
+   * meant reading numbers out of the console. `zoomReadout: false` turns it off.
+   *
+   * 🔴 IT IS DRAWN IN THE GUTTER, AND FOR A WHILE IT WAS NOT, WHILE ITS OWN
+   * COMMENT SAID IT WAS. It was written in `drawCursors()`, which runs inside
+   * `draw()`'s `translate(S.gutterPx, 0)`, so its `(8, 11)` was PLOT space: the
+   * readout sat on the first major tick's label, and every strip on the site
+   * showed `0:00` printed over `3.1 min` (or `0` over `35 s`) at the left end
+   * of the ruler. Reported 2026-10-05 from `/partitur/` and seen the same day
+   * on `/sync/` and `/time/`. Drawn after the gutter's own fill, with the
+   * transform reset, it lands where the comment always said. A gutter too
+   * narrow for it gets no readout rather than one over the plot.
+   * ⚠️ AND IT SAYS `in view`, RIGHT ALIGNED, SINCE THE SAME DAY. A bare
+   * `1.2 min` at the gutter's left edge sat directly above the first lane's
+   * name and was read on `/stage/` as a stray lane label. Against the plot
+   * edge, on the ruler's baseline, with the two words that say what the
+   * number measures, it belongs to the ruler.
+   */
+  function zoomText() {
+    if (opts.zoomReadout === false) return '';
+    const span = (plotW() * 1000) / S.view.pxPerSecond;
+    const U = [[31556952e3, 'y'], [2629746e3, 'mo'], [604800e3, 'w'], [86400e3, 'd'],
+               [3600e3, 'h'], [60e3, 'min'], [1000, 's']];
+    const [div, unit] = U.find(([n]) => span >= n) || [1, 'ms'];
+    const n = span / div;
+    return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${unit} in view`;
   }
 
   /**
@@ -1886,27 +1930,8 @@ export function createStrip(canvas, deck, opts = {}) {
         }
       }
     }
-    // HOW WIDE THE VIEW IS, top left. Not decoration: every question about this
-    // component so far — why is a clip one pixel, why do the ticks land on the
-    // 27th, is this a week or a year — is a question about the span on screen,
-    // and answering it meant reading numbers out of the console. `zoom: false`
-    // turns it off.
-    if (opts.zoomReadout !== false) {
-      const span = (plotW() * 1000) / S.view.pxPerSecond;
-      const U = [[31556952e3, 'y'], [2629746e3, 'mo'], [604800e3, 'w'], [86400e3, 'd'],
-                 [3600e3, 'h'], [60e3, 'min'], [1000, 's']];
-      const [div, unit] = U.find(([n]) => span >= n) || [1, 'ms'];
-      const n = span / div;
-      const txt = `${n < 10 ? n.toFixed(1) : Math.round(n)} ${unit}`;
-      // IN THE GUTTER, not over the plot. Drawn at the plot's left edge it sat
-      // exactly on top of the marks — and the first thing it was used for was
-      // hunting a clip that turned out to be underneath it. A readout that
-      // hides the thing it is describing is worse than no readout.
-      ctx.font = '9px ui-monospace, Menlo, monospace';
-      ctx.globalAlpha = 0.75;
-      ctx.fillStyle = T.dim || '#8b93a1';
-      ctx.fillText(txt, 8, 11);
-    }
+    // The span readout is drawn by `drawGutter()`, in the gutter's axis row.
+    // See `zoomText()` for why it moved out of here.
 
     /**
      * 🔴 `playhead: false` — A STRIP THAT IS A MAP HAS NO POSITION IN IT.

@@ -4,10 +4,15 @@
 // in whichever direction the button shows. The page's body moved here; the
 // history of each decision is in git under `demo/loops/index.html`.
 //
-// 🔴 THE DIRECTION BUTTON IS THIS TAB'S OWN, NOT A `.pos-controls` ONE. The
+// 🔴 THE DIRECTION CHOICE IS THIS TAB'S OWN, NOT A `.pos-controls` ONE. The
 // harness pressed it by position on the old page, which is how the old page's
 // count included one direction change. Here the check presses it, inside the
 // open tab, and asserts what the press did.
+// ⚠️ IT IS THREE WORDS NOW, NOT ONE ARROW THAT CYCLES. Reviewed 2026-10-05:
+// a lone `→` under the strip said nothing to a visitor about what it turned or
+// what the other faces were. A cycling glyph is right where it is glued to a
+// LOOP button that already names its subject (`looper.mjs`); out here on its
+// own it was a riddle, and `createChoice` shows all three directions at once.
 // ⚠️ THE DRIFT CHECKS STILL RIDE THE FIRST PLAY. They need the parent's first
 // mark to fire, and the bar drill `createTabPage` runs right after this tab's
 // `check` presses play for 500 ms, which is that mark. So they land during the
@@ -15,7 +20,7 @@
 
 import { el } from '/shell/shell.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
-import { setSymbol, createSymbolButton } from '/shell/symbol.mjs';
+import { createChoice } from '/shell/choice.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
 import { createStripView } from '/shell/strip.mjs';
 import { createGlue } from '/shell/glue.mjs';
@@ -34,7 +39,7 @@ const WAY_WORD = { round: 'forwards', back: 'backwards', pingpong: 'there and ba
 
 /** No readout: the numbers live under the lane they describe. */
 // What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
-export const about = `One ${CHILD / 1000} second recording placed three times, the last of them looping twice. Press play, and the arrow button turns the direction of that loop.`;
+export const about = `One ${CHILD / 1000} second recording placed three times, the last of them looping twice in the direction you pick under the timeline.`;
 
 export const readout = null;
 
@@ -121,20 +126,18 @@ export function build({ panel, assert, log }) {
 
   let wayIx = 0;
   const way = () => WAYS[wayIx];
-  // ⚠️ `setSymbol`, NEVER `textContent`, or the glyph loses the span that
-  // centres it, and the three faces are not the same shape.
-  const wayBtn = createSymbolButton({
-    glyph: WAY_GLYPH[way()], aria: WAY_SAYS[way()],
-    onPress: () => {
-      wayIx = (wayIx + 1) % WAYS.length;
-      setSymbol(wayBtn, WAY_GLYPH[way()]);
-      wayBtn.setAttribute('aria-label', WAY_SAYS[way()]);
-      wayBtn.title = WAY_SAYS[way()];
+  // The words are the kit's own (`WAY_SAYS`), so the tooltip and the face say
+  // the same thing a screen reader hears.
+  const wayPick = createChoice({
+    label: 'the loop plays',
+    options: WAYS.map((w) => [WAY_WORD[w], w]),
+    title: (w) => WAY_SAYS[w],
+    onPick: (w) => {
+      wayIx = WAYS.indexOf(w);
       buildNest(way());
       log(`loop ${way()}`, 'hi');
     },
   });
-  wayBtn.setAttribute('data-glyph', '1');
 
   buildNest(way());
 
@@ -215,7 +218,7 @@ export function build({ panel, assert, log }) {
   // them in this tab's own row.
   const pair = createGlue(bar.el, view.surface);
   const row = el('div', 'time-row');
-  row.append(wayBtn);
+  row.append(wayPick.el);
   panel.add(pair, row);
   view.strip.fit();
 
@@ -319,13 +322,14 @@ export function build({ panel, assert, log }) {
       // The press the harness used to make, made here and graded: the face,
       // the name and the arrangement all move to the next direction together.
       const was = way();
-      wayBtn.click();
+      const back = wayPick.buttons[WAYS.indexOf('back')];
+      back.click();
       const loopSpan = nest.span('loop');
-      A('the button turns the loop to the next direction, face and arrangement together',
+      const lit = wayPick.buttons.filter((b) => b.getAttribute('aria-pressed') === 'true');
+      A('pressing backwards turns the loop round, the lit word and the arrangement together',
         was === 'round' && way() === 'back' && isBack(loopSpan)
-          && wayBtn.getAttribute('aria-label') === WAY_SAYS.back
-          && wayBtn.textContent.includes(WAY_GLYPH.back),
-        `${was} -> ${way()}, the loop quotes the ${isBack(loopSpan) ? 'mirrored' : 'forward'} copy, face ${wayBtn.textContent}`);
+          && lit.length === 1 && lit[0] === back && back.textContent === WAY_WORD.back,
+        `${was} -> ${way()}, the loop quotes the ${isBack(loopSpan) ? 'mirrored' : 'forward'} copy, lit ${lit.map((b) => b.textContent).join(',') || 'nothing'}`);
     },
   };
 }

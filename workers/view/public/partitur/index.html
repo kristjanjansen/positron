@@ -9,6 +9,10 @@
 <style>
   .pt-text { display: flex; flex-direction: column; gap: 10px; }
   .pt-say { margin: 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+  .pt-say a { color: inherit; }
+  /* The link picks and the scene marks wait for the room, and `display: flex`
+     or `grid` below beats the browser's own [hidden] (positron-ui). */
+  .pt-text[hidden] { display: none; }
   /* The three link picks share one label column, so every row's options start
      on one x (positron-compose section 2: label and control rows are one grid).
      Each pick is a subgrid row of it. Above the phone width only: below it the
@@ -26,7 +30,6 @@
   import { mount, guard } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createTabPage } from '/shell/tab-page.mjs';
-  import * as score from './score.mjs';
   import * as wall from './wall.mjs';
 
   /*
@@ -52,6 +55,12 @@
     controls: [],
   });
   guard(d);
+  // ⚠️ IMPORTED AFTER `mount()`, NOT AT THE TOP. `score.mjs` awaits the score
+  // file while it loads, and a static import holds the whole script, `mount()`
+  // and its inline favicon included, until that fetch lands. MEASURED
+  // 2026-10-05: in that gap Chrome sometimes asked for /favicon.ico, and the
+  // 404 turned `no console errors` red on one run in three.
+  const score = await import('./score.mjs');
 
   const page = createTabPage(d, {
     at: 'score',

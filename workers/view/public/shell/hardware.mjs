@@ -27,8 +27,13 @@
 import { el } from './shell.mjs';
 
 export function createHardware(d, {
-  label = 'Enable soundcard / MIDI and play', onAudio, onMidi, onMidiIn,
+  label = 'Play with sound and MIDI', onAudio, onMidi, onMidiIn,
 } = {}) {
+  // ⚠️ THE LABEL WAS `Enable soundcard / MIDI and play` UNTIL 2026-10-05, and a
+  // review of `/time/` called it unclear: `enable` and `soundcard` are the
+  // machine's words, and the slash glued two clauses into one. What a visitor
+  // gets from the press is the beat played out loud and a MIDI prompt, so the
+  // label says that. Nothing reads it back: callers hold `button`.
   const btn = el('button', 'pos-pri', label, { type: 'button' });
   // TWO pickers, each labelled in the UI with its direction. MIDI in and MIDI
   // out are different devices doing different jobs — one is told when to act,
@@ -87,7 +92,7 @@ export function createHardware(d, {
     if (enabled) return;
     enabled = true;
     btn.disabled = true;
-    btn.textContent = 'Enabled';
+    btn.textContent = 'Sound and MIDI on';
 
     // --- audio, synchronously inside the gesture ---------------------------
     try {

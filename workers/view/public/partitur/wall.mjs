@@ -28,7 +28,7 @@ import { openWire } from '/shell/wire.mjs';
 export const ROOM = new URLSearchParams(location.search).get('room') || 'studio-1';
 
 /** Under the tab row, in the page's one fixed box. */
-export const about = 'Press Become a wall on the screen that should show the light, then pick it in SCORE from any browser.';
+export const about = 'Press Become a wall on the screen that should show the light, then pick that wall under light to in SCORE from any browser.';
 
 export const readout = { colour: '', from: '' };
 
@@ -36,6 +36,7 @@ export function build({ panel, log, set }) {
   const SITE = `wall-${Math.random().toString(36).slice(2, 6)}`;
   const PORT = `${SITE}:wall:light`;
   const CUE = `${SITE}:wall:cue`;
+  const NAME = `wall ${SITE.slice(5)}`;
 
   const canvas = document.createElement('canvas');
   const g = canvas.getContext('2d');
@@ -43,8 +44,13 @@ export function build({ panel, log, set }) {
   let now = { hex: '#000000', parts: [] }, caption = '', heard = 0;
   function paint() {
     const r = video.stage.getBoundingClientRect();
-    const W = canvas.width = Math.max(160, Math.round(r.width));
-    const H = canvas.height = Math.max(90, Math.round(r.height));
+    // Drawn at the screen's own density, so the words below are not soft on a phone.
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = Math.max(160, Math.round(r.width));
+    const H = Math.max(90, Math.round(r.height));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = now.hex;
     g.fillRect(0, 0, W, H);
     for (const p of now.parts || []) {
@@ -59,6 +65,21 @@ export function build({ panel, log, set }) {
       g.fillStyle = (rr * 299 + gg * 587 + bb * 114) / 1000 > 128 ? '#000000' : '#ffffff';
       g.font = `${Math.max(14, Math.round(H / 14))}px ui-monospace, Menlo, monospace`;
       g.fillText(caption, Math.round(W * 0.04), Math.round(H * 0.92));
+    }
+    // 🔴 UNTIL A LIGHT ARRIVES THE WALL SAYS WHAT IT IS AND WHAT IT IS CALLED,
+    // added 2026-10-05. It was a black box either side of the press, and the
+    // name SCORE lists it under (`wall ab12`) was written nowhere on the wall,
+    // so with two walls open nobody could tell which one to pick.
+    if (!heard) {
+      g.fillStyle = '#8a93a6';
+      g.font = `${Math.max(13, Math.round(H / 22))}px ui-monospace, Menlo, monospace`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      const px = Math.max(13, Math.round(H / 22));
+      const lines = onAir ? [`${NAME} in ${ROOM}`, 'waiting for SCORE to link its light here'] : ['not a wall yet'];
+      lines.forEach((t, i) => g.fillText(t, W / 2, H / 2 + (i - (lines.length - 1) / 2) * px * 1.6));
+      g.textAlign = 'start';
+      g.textBaseline = 'alphabetic';
     }
   }
   new ResizeObserver(paint).observe(video.stage);
@@ -82,6 +103,7 @@ export function build({ panel, log, set }) {
           announce();
           log(`on the patchbay in ${ROOM} as ${PORT}`, 'ok');
           btns.button('join').disabled = true;
+          paint();
           resolve();
         },
         onMessage: (got) => {
@@ -112,6 +134,7 @@ export function build({ panel, log, set }) {
     try { wire?.close(); } catch { /* already gone */ }
     wire = null; me = null; onAir = null;
     btns.button('join').disabled = false;
+    paint();
   }
 
   const btns = createButtonGroup({ buttons: [

@@ -1718,7 +1718,10 @@ pico.send([0x90, 60, 100])         // into UART0, the DIN in`,
     (box) => {
       box.classList.add('kit-wide');
       const stack = createStack(undefined, 'kit-col');
-      const { screen, cv } = oledScreen(stack.el);
+      // Sized off the BOX as a two-across row, like every other OLED block on
+      // this page, so the emulator's screen is the same scale as theirs
+      // (asked 2026-10-05: *"same screen size as othters"*).
+      const { screen, cv } = oledScreen(box, { across: 2 });
       const o = out('opens when this tab is opened');
 
       const keys = createButtonGroup({
