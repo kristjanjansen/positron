@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. R&D, not a product. 45 demo rows of which
-43 are built, a Raspberry Pi in another building, a Novation Circuit on the
+Live at **https://positron.studio**. R&D, not a product. 46 demo rows of which
+44 are built, a Raspberry Pi in another building, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
