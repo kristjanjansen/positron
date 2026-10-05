@@ -7,22 +7,15 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* THE FIVE FACES, SELF-HOSTED. Latin subset, 400 and 600 only, from the
-     @fontsource 5.3.0 packages, each with its SIL OFL 1.1 licence beside it in
-     vendor/. plans/plan-slides.md section 9 has why these five and what each
-     measured. Nothing on this page is fetched from another host. */
-  @font-face { font-family: 'SL Space Grotesk'; font-weight: 400; font-style: normal; font-display: block;
-    src: url('/slides/vendor/space-grotesk-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'SL Space Grotesk'; font-weight: 600; font-style: normal; font-display: block;
-    src: url('/slides/vendor/space-grotesk-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'SL IBM Plex Sans'; font-weight: 400; font-style: normal; font-display: block;
-    src: url('/slides/vendor/ibm-plex-sans-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'SL IBM Plex Sans'; font-weight: 600; font-style: normal; font-display: block;
-    src: url('/slides/vendor/ibm-plex-sans-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'SL Atkinson Hyperlegible Next'; font-weight: 400; font-style: normal; font-display: block;
-    src: url('/slides/vendor/atkinson-hyperlegible-next-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'SL Atkinson Hyperlegible Next'; font-weight: 600; font-style: normal; font-display: block;
-    src: url('/slides/vendor/atkinson-hyperlegible-next-latin-600-normal.woff2') format('woff2'); }
+  /* THE EIGHT FACES, SELF-HOSTED, AND EVERY ONE IS MONOSPACED. Latin subset,
+     400 and 600 only, from the @fontsource 5.3.0 packages, each with its SIL
+     OFL 1.1 licence beside it in vendor/. plans/plan-slides.md section 9 has
+     why these eight and what each measured. Nothing on this page is fetched
+     from another host. */
+  @font-face { font-family: 'SL Atkinson Hyperlegible Mono'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Atkinson Hyperlegible Mono'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-600-normal.woff2') format('woff2'); }
   @font-face { font-family: 'SL JetBrains Mono'; font-weight: 400; font-style: normal; font-display: block;
     src: url('/slides/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
   @font-face { font-family: 'SL JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
@@ -31,6 +24,26 @@
     src: url('/slides/vendor/geist-mono-latin-400-normal.woff2') format('woff2'); }
   @font-face { font-family: 'SL Geist Mono'; font-weight: 600; font-style: normal; font-display: block;
     src: url('/slides/vendor/geist-mono-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL IBM Plex Mono'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/ibm-plex-mono-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Intel One Mono'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/intel-one-mono-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Intel One Mono'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/intel-one-mono-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Fira Code'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/fira-code-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Fira Code'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/fira-code-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Source Code Pro'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/source-code-pro-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Source Code Pro'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/source-code-pro-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Martian Mono'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/martian-mono-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Martian Mono'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/martian-mono-latin-600-normal.woff2') format('woff2'); }
 
   /* A slide lives inside a video panel's stage. The stage is the size
      container, so the slide is sized off the panel's box and never off the
@@ -64,15 +77,18 @@
 
   /* THE TWO SIZES, AND THEY ARE FRACTIONS OF THE SLIDE'S OWN HEIGHT.
      LARGE is 9 per cent of the slide's height: the 36 pt title of a 405 pt tall
-     16:9 deck, four and a half times the 1/50 floor of the 8H rule. A line holds
-     38 characters in Atkinson and Plex, 36 in Grotesk and 28 in the two monos,
-     MEASURED off the deck's own headlines, so two lines hold 56 to 76.
-     EXTRA LARGE is twice that, 18 per cent, for one number or one short word. */
+     16:9 deck, four and a half times the 1/50 floor of the 8H rule. Every face
+     is monospaced, so a line holds a fixed count of characters per face: 28 in
+     the six at 0.6 em, 27 in Atkinson and 24 in Martian, MEASURED, and Martian
+     is what every headline is written to.
+     EXTRA LARGE is twice that, 18 per cent, for one number or one short word.
+     SMALL is half of LARGE, 4.5 per cent, for a label under a specimen. */
   /* The face is a custom property on the panel, so the switcher changes one
      declaration and every slide, full screen included, follows by inheritance.
      A specimen column sets its own. */
   .sl-l  { font: 600 9cqh/1.15 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
   .sl-xl { font: 600 18cqh/1 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
+  .sl-s  { font: 400 4.5cqh/1.2 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
   .sl-dim { color: var(--dim); font-weight: 400; }
   /* Two lines of a headline are kept even, so no word is left alone. */
   .sl-say { text-wrap: balance; }
@@ -94,15 +110,19 @@
      own picture inside it, so they stretch rather than shrink to nothing. */
   .sl-ev canvas { display: block; width: 100%; height: 100%; object-fit: contain; align-self: stretch; }
 
-  /* The specimen: five columns, one per face, the same letters in each. */
+  /* The specimen: eight faces in two rows of four, the same letters in each
+     and the face's name under them. Eight columns of `Il1` at LARGE do not fit
+     a slide's width (Martian needs 2.1 em a column), so it is two rows, and
+     both pairs are at LARGE because EXTRA LARGE in two rows overflows the
+     height. */
   .sl-spec {
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
-    column-gap: 2cqh; align-self: stretch; text-align: center;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 2cqh; row-gap: 3cqh; align-self: stretch; text-align: center;
   }
   .sl-spec > div { min-width: 0; }
-  .sl-spec .sl-xl { white-space: nowrap; }
-  .sl-spec .sl-l { white-space: nowrap; margin-top: 3cqh; }
-  .sl-spec > [data-on] .sl-xl { color: var(--hi); }
+  .sl-spec p { white-space: nowrap; }
+  .sl-spec .sl-name { margin-top: 1cqh; }
+  .sl-spec > [data-on] .sl-l { color: var(--hi); }
 
   /* A component sized in px (a readout, a diagram) is laid out at a fixed
      logical width and scaled to the region, the way a projector scales it.
@@ -134,7 +154,7 @@
   import { mount, guard, el, createReport } from '/shell/shell.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createChoice } from '/shell/choice.mjs';
+  import { createPicker } from '/shell/picker.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { burn, videoHue, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -265,19 +285,23 @@
   }
 
   // ── the faces ─────────────────────────────────────────────────────────────
-  // Five self-hosted faces, in the order the switcher shows them. `id` is what
-  // the address carries (`?face=plex`), `name` is the button. The first is the
-  // default and plans/plan-slides.md section 9 says why.
+  // Eight self-hosted monospaced faces, in the order the switcher steps them.
+  // `id` is what the address carries (`?face=plex`), `name` is what the picker
+  // and the specimen show. The first is the default and plans/plan-slides.md
+  // section 9 says why.
   const FACES = [
-    { id: 'atkinson',  name: 'Atkinson',  family: 'SL Atkinson Hyperlegible Next' },
-    { id: 'jetbrains', name: 'JetBrains', family: 'SL JetBrains Mono' },
-    { id: 'plex',      name: 'Plex',      family: 'SL IBM Plex Sans' },
-    { id: 'geist',     name: 'Geist',     family: 'SL Geist Mono' },
-    { id: 'grotesk',   name: 'Grotesk',   family: 'SL Space Grotesk' },
+    { id: 'atkinson',  name: 'Atkinson',    family: 'SL Atkinson Hyperlegible Mono' },
+    { id: 'jetbrains', name: 'JetBrains',   family: 'SL JetBrains Mono' },
+    { id: 'geist',     name: 'Geist',       family: 'SL Geist Mono' },
+    { id: 'plex',      name: 'Plex',        family: 'SL IBM Plex Mono' },
+    { id: 'intel',     name: 'Intel One',   family: 'SL Intel One Mono' },
+    { id: 'fira',      name: 'Fira Code',   family: 'SL Fira Code' },
+    { id: 'source',    name: 'Source Code', family: 'SL Source Code Pro' },
+    { id: 'martian',   name: 'Martian',     family: 'SL Martian Mono' },
   ];
   const stackOf = (f) => `'${f.family}', var(--mono)`;
   // What the specimen sets in every face: the pairs a back row confuses first.
-  const SPEC_XL = '0O', SPEC_L = 'Il1';
+  const SPEC = ['0O', 'Il1'];
 
   // ── the deck ──────────────────────────────────────────────────────────────
   // `say` is the headline, one sentence and no full stop. `big` is one number
@@ -291,10 +315,10 @@
     { name: 'back row',
       say: 'Text must be big enough for the back row',
       big: '1/50', under: 'of the screen height' },
-    { name: 'readout', say: "The readout is the page's own, measuring this screen", live: liveReadout },
-    { name: 'picture', say: 'The test picture draws itself here, frame by frame', live: livePicture },
-    { name: 'panel', say: 'A slide sits in a panel, and full screen is the talk', live: liveDiagram },
-    { name: 'faces', say: 'Five faces, the same letters at both sizes', specimen: true },
+    { name: 'readout', say: 'The readout is live, measuring this screen', live: liveReadout },
+    { name: 'picture', say: 'The test picture draws itself, frame by frame', live: livePicture },
+    { name: 'panel', say: 'A slide sits in a panel that fills the screen', live: liveDiagram },
+    { name: 'faces', say: 'Eight faces, all mono', specimen: true },
   ];
 
   const nodes = SLIDES.map((s, i) => {
@@ -319,7 +343,7 @@
         const col = el('div', '', null, { title: f.family.replace(/^SL /, '') });
         col.dataset.face = f.id;
         col.style.setProperty('--sl-face', stackOf(f));
-        col.append(el('p', 'sl-xl', SPEC_XL), el('p', 'sl-l', SPEC_L));
+        col.append(...SPEC.map((t) => el('p', 'sl-l', t)), el('p', 'sl-s sl-dim sl-name', f.name));
         grid.append(col);
       }
       ev.append(grid);
@@ -355,15 +379,23 @@
     if (!quiet) d.log(`face: ${f.family.replace(/^SL /, '')}`);
     return document.fonts.load(`600 20px '${f.family}'`);
   }
-  const faceChoice = createChoice({
-    label: 'face',
-    options: FACES.map((f) => [f.name, f]),
-    at: FACES.indexOf(face),
-    title: (f) => f.family.replace(/^SL /, ''),
-    onPick: (f) => setFace(f),
+  // ⚠️ A PICKER AND NOT A SEGMENTED CHOICE, for the reason `/kit/`'s font row
+  // gives: eight names side by side do not fit a phone, and a picker is one
+  // name wide at any count.
+  const pickFace = (i, quiet = false) => {
+    const f = FACES[((i % FACES.length) + FACES.length) % FACES.length];
+    facePick.show(f.name, FACES.indexOf(f));
+    return setFace(f, quiet);
+  };
+  const facePick = createPicker({
+    label: 'face', what: 'face',
+    prev: () => pickFace(FACES.indexOf(face) - 1),
+    next: () => pickFace(FACES.indexOf(face) + 1),
+    onPick: (i) => pickFace(i),
   });
-  d.stack.add(faceChoice.el);
-  setFace(face, true);
+  facePick.options(FACES.map((f) => f.name), FACES.indexOf(face));
+  d.stack.add(facePick.el);
+  pickFace(FACES.indexOf(face), true);
 
   let at = -1;
   function go(i) {
@@ -435,12 +467,12 @@
   async function check() {
     const A = d.assert;
     // Every face in before counting requests, because the specimen slide and
-    // the switcher fetch the four that were not chosen, from this origin.
+    // the switcher fetch the seven that were not chosen, from this origin.
     const loaded = await Promise.all(FACES.map((f) => Promise.all([
       document.fonts.load(`600 20px '${f.family}'`), document.fonts.load(`400 20px '${f.family}'`)])));
     const missing = FACES.filter((f, i) => !loaded[i].every((l) => l.length)
       || !document.fonts.check(`600 20px '${f.family}'`));
-    A('all five faces load, at 400 and 600, from this page\'s own vendor folder',
+    A('all eight faces load, at 400 and 600, from this page\'s own vendor folder',
       missing.length === 0, missing.map((f) => f.family).join(', ') || FACES.map((f) => f.id).join(' '));
     const resBefore = performance.getEntriesByType('resource')
       .filter((r) => new URL(r.name).pathname !== '/_log').length;
@@ -500,7 +532,9 @@
       await setFace(f, true); await frame();
       const lines = [];
       for (let i = 0; i < SLIDES.length; i++) {
-        go(i); await frame(); await frame();
+        // One frame, not two: reading a rect forces layout, and eight faces
+        // at two frames a slide pushed the page past the harness's boot wait.
+        go(i); await frame();
         const n = nodes[i].node, say = n.querySelector('.sl-say');
         const lh = px(say, 'line-height');
         lines.push(Math.round(say.getBoundingClientRect().height / lh));
@@ -522,7 +556,7 @@
     }
     await setFace(was, true);
     d.log(`characters a LARGE line holds: ${budgets.join(', ')}`);
-    A('every headline is two lines or fewer, in all five faces',
+    A('every headline is two lines or fewer, in all eight faces',
       perFace.every((p) => /^\S+ [12]+$/.test(p)), `${perFace.join(', ')}; budget a line ${budgets.join(', ')}`);
     A('nothing on any slide runs past its inset, in any face', spill.length === 0, spill.join(', ') || 'all inside');
 
@@ -555,16 +589,33 @@
 
     // The face is in the address and every slide follows it.
     const plex = FACES.find((f) => f.id === 'plex');
-    faceChoice.set(FACES.indexOf(plex)); await frame();
+    await pickFace(FACES.indexOf(plex)); await frame();
     const inUrl = new URLSearchParams(location.search).get('face');
     const fam = getComputedStyle(nodes[0].node.querySelector('.sl-say')).fontFamily;
     const specOn = panel.stage.querySelector('.sl-spec > [data-on]')?.dataset.face;
-    faceChoice.set(FACES.indexOf(was)); await frame();
+    await pickFace(FACES.indexOf(was), true); await frame();
     A('picking a face puts it in the address and every slide and the specimen follow',
-      inUrl === 'plex' && fam.includes('IBM Plex Sans') && specOn === 'plex', `${inUrl}, ${fam}, ${specOn}`);
+      inUrl === 'plex' && fam.includes('IBM Plex Mono') && specOn === 'plex', `${inUrl}, ${fam}, ${specOn}`);
+
+    // Every face really is monospaced: `i` and `m` take one advance each.
+    const notMono = FACES.filter((f) => {
+      meas.font = `600 100px '${f.family}'`;
+      return Math.abs(meas.measureText('i').width - meas.measureText('m').width) > 0.01;
+    });
+    A('every face on the switcher is monospaced, i as wide as m',
+      notMono.length === 0, notMono.map((f) => f.id).join(', ') || `${FACES.length} of ${FACES.length}`);
+    const cols = [...panel.stage.querySelectorAll('.sl-spec > div')];
+    const named = cols.map((c) => {
+      const f = FACES.find((x) => x.id === c.dataset.face);
+      const p0 = c.querySelector('p');
+      return f && getComputedStyle(p0).fontFamily.includes(f.family)
+        && c.querySelector('.sl-name')?.textContent === f.name;
+    });
+    A('the specimen shows all eight, each in its own face with its name under it',
+      cols.length === FACES.length && named.every(Boolean), `${cols.length} columns, ${named.filter(Boolean).length} named`);
 
     go(0); await frame();
-    const ink = getComputedStyle(nodes[0].node.querySelector('.sl-say')).color;
+    const ink =getComputedStyle(nodes[0].node.querySelector('.sl-say')).color;
     const ground = getComputedStyle(panel.stage).backgroundColor;
     const cr = ratio(ink, ground);
     A('the headline is at least 7:1 against the slide ground', cr >= 7, `${cr.toFixed(1)}:1`);
