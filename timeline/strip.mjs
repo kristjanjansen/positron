@@ -254,6 +254,155 @@ export function formatTime(ms, major = SEC, absolute) {
 }
 
 // ---------------------------------------------------------------------------
+// CALENDAR AXIS, opt in with `calendar: true`. Asked 2026-10-05 as *"fix
+// time"* about /time/#dates: two thousand years of dates were ruled in `-1.0
+// ka` and `0.0 ka` (thousands of years from 1970) while the cell beside them
+// said `1100`. The ms ladder above is right for a position domain and wrong
+// for a calendar: its steps are multiples of 365.2425 days counted from 1970,
+// so a year tick never lands on a 1 January and a millennium tick lands on
+// 970. These rungs are CALENDAR UNITS, and each tick is a real 1 January, a
+// real first of the month or a real midnight, in UTC. Every other strip keeps
+// the ms ladder untouched; only a strip that declares `calendar` comes here.
+// ---------------------------------------------------------------------------
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MO = YR / 12;
+const rung = (u, n, ms) => ({ u, n, ms });
+/** Coarsest last. `u` is y (years), m (months), d (days) or t (a ms step
+ *  inside a day, taken off TICK_LADDER so midnight is always on the grid). */
+export const CALENDAR_LADDER = [
+  ...TICK_LADDER.filter((t) => t < DAY && DAY % t === 0).map((t) => rung('t', t, t)),
+  ...[1, 2, 5, 10, 15].map((n) => rung('d', n, n * DAY)),
+  ...[1, 2, 3, 6].map((n) => rung('m', n, n * MO)),
+  ...[1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000]
+    .map((n) => rung('y', n, n * YR)),
+];
+// A label's width decides the major spacing, so a ruler of bare years is not
+// held to the room a time of day needs. Measured on 10px ui-monospace at about
+// 6 px a character: `1500` is 24 px, `Mar 1850` 48, `12:30:05` 48.
+const CAL_LABEL_PX = { y: 44, m: 60, d: 60, t: 68 };
+
+/** A year as a visitor reads it: `1500`, and a minus sign before year 1
+ *  (`-500`), counted the astronomical way so year 0 exists and a ruler of
+ *  centuries stays round across it. `BC` was priced and refused: there is no
+ *  year 0 in it, so the century ticks either side of it would read `1101 BC`,
+ *  `1001 BC`, which is a ruler nobody can read either. */
+export function calendarYear(y) { return String(y); }
+
+function utc(y, m = 0, d = 1) {
+  // NOT Date.UTC: it reads years 0 to 99 as 1900 to 1999.
+  const D = new Date(0); D.setUTCFullYear(y, m, d); D.setUTCHours(0, 0, 0, 0);
+  return D.getTime();
+}
+
+/** Which calendar step labels the ruler at this zoom, and which marks between. */
+export function calendarLOD(pxPerSecond, { minMinorPx = 7 } = {}) {
+  const px = (ms) => (ms / 1000) * pxPerSecond;
+  let major = CALENDAR_LADDER[CALENDAR_LADDER.length - 1];
+  for (const r of CALENDAR_LADDER) if (px(r.ms) >= CAL_LABEL_PX[r.u]) { major = r; break; }
+  const divides = (a, b) => (a.u === b.u ? b.n % a.n === 0
+    : a.u === 'm' && b.u === 'y' ? 12 % a.n === 0
+    : a.u === 'd' ? a.n === 1 || b.u === 'd'
+    : a.u === 't' ? true : false);
+  let minor = null;
+  for (const r of CALENDAR_LADDER) {
+    if (r.ms >= major.ms) break;
+    if (px(r.ms) >= minMinorPx && divides(r, major)) { minor = r; break; }
+  }
+  return { major, minor: minor || major };
+}
+
+/** Every tick of one rung between t0 and t1, at most `max` of them. */
+export function calendarTicks(r, t0, t1, max = 4096) {
+  const out = [];
+  if (r.u === 't') {
+    for (let t = Math.ceil(t0 / r.n) * r.n; t <= t1 && out.length < max; t += r.n) out.push(t);
+    return out;
+  }
+  const D = new Date(t0);
+  let y = D.getUTCFullYear(), m = D.getUTCMonth();
+  if (r.u === 'y') {
+    for (let yy = Math.floor(y / r.n) * r.n; out.length < max; yy += r.n) {
+      const t = utc(yy); if (t > t1) break; if (t >= t0) out.push(t);
+    }
+  } else if (r.u === 'm') {
+    m = Math.floor(m / r.n) * r.n;
+    for (; out.length < max; m += r.n) {
+      const t = utc(y, m); if (t > t1) break; if (t >= t0) out.push(t);
+    }
+  } else {
+    // Days of the month 1, 1 + n, 1 + 2n, and none closer than half a step to
+    // the next month's first, so a 31st never crowds the 1st beside it.
+    for (; out.length < max; m++) {
+      const first = utc(y, m); if (first > t1) break;
+      const len = Math.round((utc(y, m + 1) - first) / DAY);
+      for (let d = 1; d <= len - r.n / 2 || d === 1; d += r.n) {
+        const t = first + (d - 1) * DAY;
+        if (t > t1 || out.length >= max) break;
+        if (t >= t0) out.push(t);
+      }
+    }
+  }
+  return out;
+}
+
+const p2 = (n) => String(n).padStart(2, '0');
+// Below a second the hour is dropped, so a label still fits its 68 px.
+const hhmm = (D, sec, ms) => (ms
+  ? `${p2(D.getUTCMinutes())}:${p2(D.getUTCSeconds())}.${String(D.getUTCMilliseconds()).padStart(3, '0')}`
+  : `${p2(D.getUTCHours())}:${p2(D.getUTCMinutes())}` + (sec ? `:${p2(D.getUTCSeconds())}` : ''));
+
+/** The ruler's label for one tick: as short as the step allows, with the
+ *  coarser unit printed only where it turns over (a year at 1 January, a month
+ *  at its first, a day at midnight). */
+export function calendarLabel(t, r) {
+  if (!Number.isFinite(t) || Math.abs(t) > DATE_WALL_MS) return '';
+  const D = new Date(t);
+  const y = D.getUTCFullYear(), m = D.getUTCMonth(), d = D.getUTCDate();
+  if (r.u === 'y') return calendarYear(y);
+  if (r.u === 'm') return m === 0 ? calendarYear(y) : `${MONTHS[m]} ${calendarYear(y)}`;
+  const midnight = D.getUTCHours() === 0 && D.getUTCMinutes() === 0 && D.getUTCSeconds() === 0 && D.getUTCMilliseconds() === 0;
+  if (r.u === 'd' || midnight) return d === 1 ? `${MONTHS[m]} ${calendarYear(y)}` : `${d} ${MONTHS[m]}`;
+  return hhmm(D, r.n < MIN, r.n < SEC);
+}
+
+/** One whole date, written to the precision of a step: `1100`, `Mar 1100`,
+ *  `3 Mar 1100`, `3 Mar 1100 14:20`. For a readout, a clock or a tooltip. */
+export function calendarDate(t, r = rung('d', 1, DAY)) {
+  if (!Number.isFinite(t) || Math.abs(t) > DATE_WALL_MS) return '';
+  const D = new Date(t);
+  const y = calendarYear(D.getUTCFullYear()), m = MONTHS[D.getUTCMonth()], d = D.getUTCDate();
+  if (r.u === 'y') return y;
+  if (r.u === 'm') return `${m} ${y}`;
+  if (r.u === 'd') return `${d} ${m} ${y}`;
+  return `${d} ${m} ${y} ${hhmm(D, r.n < MIN, false)}${r.n < SEC ? '.' + String(D.getUTCMilliseconds()).padStart(3, '0') : ''}`;
+}
+
+/** A length of time in the calendar's own words: `2000 years`, `3 months`,
+ *  `1 day`, `6 hours`. Rounded, because it answers *how long*, not *exactly*. */
+export function calendarSpan(ms) {
+  const a = Math.abs(ms);
+  if (!Number.isFinite(a)) return '';
+  const say = (v, one) => {
+    const n = v >= 10 ? Math.round(v) : +v.toPrecision(2);
+    return `${n.toLocaleString('en-US')} ${one}${n === 1 ? '' : 's'}`;
+  };
+  if (a >= YR * 0.995) return say(a / YR, 'year');
+  if (a >= MO * 0.995) return say(a / MO, 'month');
+  if (a >= DAY) return say(a / DAY, 'day');
+  if (a >= HR) return say(a / HR, 'hour');
+  if (a >= MIN) return say(a / MIN, 'minute');
+  if (a >= SEC) return say(a / SEC, 'second');
+  return say(a, 'millisecond');
+}
+/** A rung in words, for a readout: `200 years`, `1 month`, `6 hours`. */
+export const calendarStep = (r) => {
+  if (r.u === 't') return calendarSpan(r.n);
+  const one = { y: 'year', m: 'month', d: 'day' }[r.u];
+  return `${r.n.toLocaleString('en-US')} ${one}${r.n === 1 ? '' : 's'}`;
+};
+
+// ---------------------------------------------------------------------------
 // AORISTIC AGGREGATE — §8.4.2 / §9.1 / M4 (Jugel 2014). One bin per PIXEL
 // COLUMN, each item contributing total mass 1 spread as 1/(b−a) per ms, drawn
 // as HEIGHT (height does not clip the way `globalAlpha = min(0.4, …)` did).
@@ -914,7 +1063,7 @@ function drawAoristic(ctx, L, C, spans) {
     // legend read `aoristic Σ 1/(b−a) · 1 bin/px ...`. The formula is still
     // `a.method`, published and asserted, for a reader who asks.
     const drop = a.open ? `, ${a.open} with no end left out` : '';
-    ctx.fillText(`how likely each moment is, from ${a.counted} dated ranges, ${fmtDur(a.colMs)} a pixel${drop}`, 3, base - h - 2);
+    ctx.fillText(`how likely each moment is, from ${a.counted} dated ranges, ${C.calendar ? calendarSpan(a.colMs) : fmtDur(a.colMs)} a pixel${drop}`, 3, base - h - 2);
   }
   ctx.restore();
 }
@@ -1090,6 +1239,9 @@ export function createStrip(canvas, deck, opts = {}) {
     axisH: opts.axisHeight ?? 20,
     // is the position domain absolute wall ms (replay-grid) or 0-based (jam)?
     absolute: opts.absolute !== undefined ? opts.absolute : !!(deck.range && deck.range[0] > 1e12),
+    // CALENDAR AXIS: ruled in real years, months and days rather than in ms
+    // multiples (see `calendarLOD`). Opt in, and only for an absolute domain.
+    calendar: !!opts.calendar,
   };
   const T = S.theme;
 
@@ -1495,8 +1647,9 @@ export function createStrip(canvas, deck, opts = {}) {
   // fillText calls. The clamp is reported, never silent.
   const MAX_TICKS = 4096;
   function drawAxis() {
-    const { minor, major, fmt } = tickLOD(S.view.pxPerSecond);
     const t0 = tAt(0), t1 = tAt(plotW());
+    if (calOn(t0, t1)) { drawCalendarAxis(t0, t1); return; }
+    const { minor, major, fmt } = tickLOD(S.view.pxPerSecond);
     ctx.save();
     ctx.strokeStyle = T.axisMinor; ctx.lineWidth = 1; ctx.beginPath();
     const firstMinor = Math.ceil(t0 / minor) * minor;
@@ -1525,6 +1678,35 @@ export function createStrip(canvas, deck, opts = {}) {
     ctx.restore();
     S.axisTicks = { minor: Math.max(0, nMinor), major: Math.max(0, nMajor), clamped: nMinor > MAX_TICKS || nMajor > MAX_TICKS };
     if (S.axisTicks.clamped) note('axis', `tick LOD asked for ${Math.max(nMinor, nMajor)} ticks; drew ${MAX_TICKS}. The ladder does not reach this zoom.`);
+  }
+
+  // The calendar ruler holds only inside the Date wall. Past it the ms ladder's
+  // deep-time regime is the only reading there is, so it falls back to that.
+  const calOn = (t0, t1) => S.calendar && Math.abs(t0) <= DATE_WALL_MS && Math.abs(t1) <= DATE_WALL_MS;
+  function drawCalendarAxis(t0, t1) {
+    const { minor, major } = calendarLOD(S.view.pxPerSecond);
+    const majors = calendarTicks(major, t0, t1, MAX_TICKS + 1);
+    const minors = minor === major ? [] : calendarTicks(minor, t0, t1, MAX_TICKS + 1);
+    const on = new Set(majors);
+    ctx.save();
+    ctx.strokeStyle = T.axisMinor; ctx.lineWidth = 1; ctx.beginPath();
+    for (const t of minors.slice(0, MAX_TICKS)) {
+      if (on.has(t)) continue;
+      const px = Math.round(x(t)) + 0.5;
+      ctx.moveTo(px, S.axisH - 4); ctx.lineTo(px, S.axisH);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = T.axis; ctx.beginPath();
+    ctx.font = '10px ui-monospace, Menlo, monospace'; ctx.fillStyle = T.dim;
+    for (const t of majors.slice(0, MAX_TICKS)) {
+      const px = Math.round(x(t)) + 0.5;
+      ctx.moveTo(px, 0); ctx.lineTo(px, S.contentH);
+      ctx.fillText(calendarLabel(t, major), px + 3, 10);
+    }
+    ctx.stroke();
+    ctx.restore();
+    S.axisTicks = { minor: minors.length, major: majors.length, clamped: minors.length > MAX_TICKS || majors.length > MAX_TICKS, calendar: calendarStep(major) };
+    if (S.axisTicks.clamped) note('axis', `calendar ruler asked for more than ${MAX_TICKS} ticks; drew ${MAX_TICKS}.`);
   }
 
   // 🔴 ONE RIGHT-HAND INSET, READ BY BOTH THE SIZER AND THE CLIPPER. They had
@@ -1965,6 +2147,9 @@ export function createStrip(canvas, deck, opts = {}) {
       // the palette, so a renderer that needs to paint a backing uses the
       // lane's OWN background rather than guessing a hex that is right today
       theme: T,
+      // so a renderer that states a length (the aggregate's legend) says it
+      // in the same units as the ruler above it
+      calendar: S.calendar,
     };
     const as = L.as || autoKind(L);
     if (as === 'spans') C.spans = spansFor(L).filter((s) => (Number.isFinite(s.to) ? s.to : t1) >= t0 && s.from <= t1);
@@ -2222,15 +2407,18 @@ export function createStrip(canvas, deck, opts = {}) {
   function describe(hit) {
     if (!hit) return null;
     const L = hit.lane, r = hit.row;
-    const out = [`${L.label ?? L.id}  ${formatTime(hit.t, tickLOD(S.view.pxPerSecond).major, S.absolute)}`];
+    // A calendar strip says a date the way its ruler does, at the ruler's step.
+    const fmtAt = calOn(tAt(0), tAt(plotW()))
+      ? ((t) => calendarDate(t, calendarLOD(S.view.pxPerSecond).major))
+      : ((t) => formatTime(t, tickLOD(S.view.pxPerSecond).major, S.absolute));
+    const out = [`${L.label ?? L.id}  ${fmtAt(hit.t)}`];
     if (hit.span) {
       const s = hit.span;
-      const M = tickLOD(S.view.pxPerSecond).major;
       // `spanLine: false` — for a lane whose bars are already labelled with
       // their own extent. Repeating it in the tooltip spends the reader's
       // attention on something the picture has already said.
       if (L.spanLine !== false) {
-        out.push(`span ${formatTime(s.from, M, S.absolute)} → ${Number.isFinite(s.to) ? formatTime(s.to, M, S.absolute) : '(open)'}`);
+        out.push(`span ${fmtAt(s.from)} → ${Number.isFinite(s.to) ? fmtAt(s.to) : '(open)'}`);
       }
       // the hover says WHICH OF THE THREE ANSWERS this row gives to "certainly
       // in view", in words, because the mark alone cannot carry the reason.
@@ -2623,6 +2811,8 @@ export function createStrip(canvas, deck, opts = {}) {
     hover: () => S.hover,
     readout, invalidate, draw,
     timeToX: x, xToTime: tAt, tickLOD: () => tickLOD(S.view.pxPerSecond),
+    /** the times at the plot's left and right edges, gutter excluded */
+    visible: () => [tAt(0), tAt(plotW())],
     /** per-lane painted-pixel probe: render ONE lane alone offscreen and count.
      *  The evidence-only toggle is verified with this — a restored lane must
      *  paint exactly 0 px, not a faint one. */
