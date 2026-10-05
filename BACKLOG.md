@@ -1,13 +1,13 @@
 ## Open
 
 - **`diagram.mjs`: a return path into a box that is not the bottom one in its container is drawn behind the box under it** (2026-10-05, found by the /wire/ diagram agent). `cuts` stays empty because the overlap check tests text only. Worked around on /wire/ by box order.
-- **`/kit/` BRAND tab with a LOGO block** (2026-10-05): *"add kit tab: brand and logo sectop slide engine to draw β+ in large type and positron studio under it"*. Drawn with the slide engine; check β is in the vendored JetBrains subset. Handed to the kit slides agent.
-- **`/kit/` DEVICES and PANEL as one tab** (2026-10-05): *"unify devices and panel in kit"*. Block ids kept. Handed to the kit slides agent.
+- ~~**`/kit/` BRAND tab with a LOGO block** (2026-10-05): *"add kit tab: brand and logo sectop slide engine to draw β+ in large type and positron studio under it"*. Drawn with the slide engine; check β is in the vendored JetBrains subset. Handed to the kit slides agent.~~ Done 2026-10-05.
+- ~~**`/kit/` DEVICES and PANEL as one tab** (2026-10-05): *"unify devices and panel in kit"*. Block ids kept. Handed to the kit slides agent.~~ Done 2026-10-05.
 - ~~**`/kit/` HARDWARE tab labelled HW** (2026-10-05): *"rename hardware tab to hw in kit"*. Label only, id `hardware` kept for links. Handed to the kit slides agent.~~ Reverted on *"revert hw to harware"*.
-- **Kit slides: two half-width players side by side** (2026-10-05): *"add 1/2 w slide palyer to kit, scale accordingly. put 2 side by side"*. Handed to the kit slides agent.
+- ~~**Kit slides: two half-width players side by side** (2026-10-05): *"add 1/2 w slide palyer to kit, scale accordingly. put 2 side by side"*. Handed to the kit slides agent.~~ Done 2026-10-05.
 - ~~**`/und/` renamed `/csound/`** (2026-10-05): *"rename und to csound"*.~~ Done, no redirect; csound 50/50; `code-lang-test.mjs` had been broken since 396ca4b (read the score from the page after it moved to `score.mjs`), 53 ok now.
-- **How-it-works diagrams on every technologies page** (2026-10-05): *"add how it works diagrams to all tenchilogies. parallelize"*. csound, wire, flipper, time, sync, draw; one agent per page.
-- **Kit slides: title slide, a big number alone, the real OLED, touch** (2026-10-05): *"so slide title. big number. oled. and 11."*, items 1, 3, 7 and 11 of the missing list.
+- ~~**How-it-works diagrams on every technologies page** (2026-10-05): *"add how it works diagrams to all tenchilogies. parallelize"*. csound, wire, flipper, time, sync, draw; one agent per page.~~ Done 2026-10-05.
+- ~~**Kit slides: title slide, a big number alone, the real OLED, touch** (2026-10-05): *"so slide title. big number. oled. and 11."*, items 1, 3, 7 and 11 of the missing list.~~ Done 2026-10-05.
 - ~~**Kit slides: TOM slide with 32 steps, no tempo arrows, drawable** (2026-10-05): *"more lines on slide tom, 32?. no prev next. drawable"*.~~ Done 2026-10-05: 6 rows of 32 steps at 18 px pads scrolling in the panel, drawable, kit 350/350.
 - ~~**Kit slides: STEP GRID ON A SLIDE as a split with the /tom/ instrument, no labels** (2026-10-05): *"STEP GRID ON A SLIDE - convert to col layout with tom instrument (no labels)"*.~~ Done 2026-10-05, kit 345/345.
 - ~~**A scrolling keyboard reaches its holder's edge** (2026-10-05): *"allow keyboaed overflor reach to the edge (general rule of keyb and panels)"*.~~ Done in shell.css, a keyboard that fits does not move. kit 340/340.

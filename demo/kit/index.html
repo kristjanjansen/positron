@@ -229,6 +229,12 @@
      box (the PANEL part's `bare` argument, for a block that keeps its heading
      and its note beside it). (0,2,0) against `.kit-box`. */
   .kit-box.kit-sl { display: block; padding: 0; border: 0; background: none; }
+  /* HALF WIDTH PLAYERS: two columns that ask the block's OWN width, never the
+     window's, and become one below 560 px of it, as `/cam/` and `/flipper/`
+     do. The gap is the control gap twice, theirs too. */
+  .kit-sl-pair { container-type: inline-size; }
+  .kit-sl-pair-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(2 * var(--ctl-gap)); }
+  @container (max-width: 560px) { .kit-sl-pair-in { grid-template-columns: minmax(0, 1fr); } }
   /* Half of whatever the box gives it, for a specimen that does not need the
      full width. A fraction rather than a pixel count, so the layout keeps
      owning the width and this page has no second opinion about it to defend.
@@ -257,6 +263,8 @@
      between the lines, nothing above them. Same weight as the slide's own rules. */
   .kit-sl .sl[aria-label="the scale"] .sl-ev { gap: 0; margin-top: 0; justify-content: center; }
   .kit-sl .sl[aria-label="the scale"] .sl-line { line-height: 1; margin: 0; }
+  /* THE LOGO set solid, the three lines one mark: no gap between them. */
+  .kit-sl .sl[aria-label="logo"] .sl-ev { gap: 0; }
   .kit-oled { width: fit-content; max-width: 100%; padding: 10px; background: #000;
               border: 1px solid var(--line); border-radius: 4px; }
   .kit-oled canvas { display: block; image-rendering: pixelated;
@@ -684,6 +692,14 @@
    * answers *how is a whole instrument put together*.
    * ⚠️ IT IS `PANEL` AND NOT `PANELS`, matching every other label here, all of
    * which name a family in the singular.
+   * 🔴 AND IT IS GONE AS A TAB SINCE 2026-10-05, MERGED INTO `devices`. Asked:
+   * *"unify devices and panel in kit"*. Its two blocks (INSTRUMENT PANEL and
+   * GLUED ROWS) are `section('devices', ...)` now and still sit above the
+   * device blocks, because they are the newer two. `devices` kept the id: no
+   * link anywhere in the repository names `#devices` or `#panel` (grepped the
+   * day of the merge), each block keeps its own id so `#instrument-panel` and
+   * `#segment-display` still land, and `devices` already held sixteen blocks
+   * against two. The opening tab is still `input`, first in the list.
    */
   const GROUPS = [
     ['input', 'INPUT'],
@@ -691,10 +707,15 @@
     ['timeline', 'TIMELINE'],
     ['layout', 'LAYOUT'],
     ['devices', 'DEVICES'],
-    ['panel', 'PANEL'],
     ['hardware', 'HARDWARE'],
     ['diagram', 'DIAGRAM'],
     ['slides', 'SLIDES'],
+    // 🔴 BRAND, 2026-10-05, asked as *"add kit tab: brand and logo sectop slide
+    // engine to draw β+ in large type and positron studio under it"*. LAST, the
+    // way SLIDES went last before it: the opening tab is load-bearing for the
+    // checks that predate the row (see `panel` above), and the newest-first
+    // rule is about BLOCKS, which LOGO satisfies by being the first `section()`.
+    ['brand', 'BRAND'],
   ];
 
   /**
@@ -1310,6 +1331,7 @@
     fontAt: -1,             // the UI_FONTS index booted last
     oled: null,             // ui.c as WebAssembly, for the parts blocks
     partsFetched: 0,        // how many times this page asked for it
+    partsFrom: '',          // which tab asked: 'slides' or 'hardware'
     parts: [],              // { name, cv, paint, px }, drawn when it arrives
   };
   let hwFontCv = [];        // the OLED FONTS specimen's two canvases
@@ -1442,7 +1464,7 @@
     }
     hw.image = image;
     hw.fonts = fontsIn(image);
-    hwPartsLoad();
+    hwPartsLoad('hardware');
     hw.defaultFont = hw.fonts.findIndex((f) => f.name === DEFAULT_FONT);
     hwFontsDraw();
     /* ⚠️ A PICKER AND NOT A SEGMENTED CHOICE. Six names side by side are 440 px
@@ -1501,14 +1523,20 @@
    * with the emulated board pixel for pixel, and a check at the foot of this
    * file does it again here.
    * ⚠️ FETCHED WITH THE FIRMWARE, WHEN HARDWARE IS OPENED, NEVER ON A VISIT.
+   * 🔴 OR WHEN SLIDES IS OPENED, SINCE 2026-10-05, because the OLED slide shows
+   * ui.c's LINK screen (*"oled"*, from the slides list, item 7). A tab press is
+   * a person's press either way. Once, whichever tab asks first: the second
+   * caller finds `partsFetched` set and returns, and the first one's arrival
+   * draws every registered part, the slide's included. `partsFrom` says which.
    */
   const KEY_WORDS = ['PREV', 'NEXT', 'STOP', 'OK'];
   // main.c's ladder for one held message, longest first, never two lines
   const HOLD_WORDS = ['HOLD: REPLACE PATCH', 'HOLD: PATCH', 'PATCH?', '?'];
-  async function hwPartsLoad() {
+  async function hwPartsLoad(from) {
     if (hw.oled || hw.partsFetched) return;
     try {
       hw.partsFetched++;
+      hw.partsFrom = from;
       const res = await fetch('/resources/pico/oled-ui.wasm');
       if (!res.ok) throw new Error(`oled-ui.wasm answered ${res.status}`);
       hw.oled = await createOledUi(await res.arrayBuffer());
@@ -1533,6 +1561,43 @@
   }
 
   /**
+   * 🔴 THE LOGO, THE NEWEST BLOCK, 2026-10-05, in its own part, BRAND. Asked:
+   * *"add kit tab: brand and logo sectop slide engine to draw β+ in large type
+   * and positron studio under it"*, the two words on two lines. A positron is
+   * the particle of beta plus decay, so the mark is `β+`.
+   * DRAWN BY THE SLIDE ENGINE, NOT BY HAND: one `createSlide` with three
+   * `lines` at declared steps, so the mark is the slide face at the slide's
+   * scale and every rule a slide obeys (16:9, inset, the ⛶) is the logo's too.
+   *   β+        step 6, the largest step the scale declares; there is no 7 and
+   *             a mark does not get a private size.
+   *   positron  step 4 and studio on the line under it. Two steps down, 2.25
+   *   studio    times smaller, so the words read as the name under a symbol and
+   *             not as a second headline; at step 3 `positron` would be 43 cqh
+   *             wide against the symbol's 36, almost the same width, which is
+   *             the nervous kind of difference; at step 4 it is 65, clearly
+   *             wider.
+   * Left on the inset (`layout: 'left'`), the three lines set solid with no
+   * gap between them, so they are one mark rather than three paragraphs.
+   * ⚠️ ONE COLOUR, THE ACCENT, AND ONLY ON THE `+`. It is the charge, the one
+   * thing that makes it a positron rather than an electron, which is what the
+   * accent is for on a slide: the part that carries the point.
+   * ⚠️ THE β IS NOT IN THE LATIN FILE. JetBrains Mono's Latin subset stops at
+   * U+00FF plus a few marks, so `slide.css` declares the Greek subset at 600
+   * with its `unicode-range`, from the same @fontsource 5.3.0 package; the
+   * browser fetches it only when a β is laid out, which is this tab opened.
+   */
+  const brand = { logo: null };
+  section('brand', 'LOGO',
+    'The mark, drawn by the slide engine: β+ at step 6 and positron and studio under it at step 4, '
+    + 'left on the inset, the accent on the + alone. Set in the slide face, the β from its Greek subset.',
+    `createSlide({ layout: 'left', lines: [[6, 'β*+*'], [4, 'positron'], [4, 'studio']] }, { full: true })`,
+    (box) => {
+      box.classList.add('kit-sl');
+      brand.logo = createSlide({ name: 'logo', layout: 'left',
+        lines: [[6, 'β*+*'], [4, 'positron'], [4, 'studio']] }, { host: box, full: true });
+    });
+
+  /**
    * 🔴 SLIDES, THE NEWEST PART, 2026-10-05. Asked as *"let's focus on the kit
    * make a new tab there slides and methodically slide by slide you don't have
    * to be a slide player there it's player is maybe a first component but the
@@ -1549,23 +1614,30 @@
    * ⚠️ NOTHING RUNS UNTIL THE TAB IS OPENED. The video's canvas, the readout's
    * frame loop and the step grid's clock start in `slidesOpen()` and stop in
    * `slidesClose()`, which the tab row calls, the way HARDWARE boots its board.
-   * Nothing in the part fetches anything: the face is two files of this
-   * origin, the picture is drawn here, the samples are made here.
+   * Nothing in the part fetches anything but ONE file, the router's screen
+   * code (`/resources/pico/oled-ui.wasm`) for the OLED slide, and that on the
+   * tab press: the face is two files of this origin, every other picture is
+   * drawn here, the samples are made here.
    * ⚠️ DECLARED HERE, before the first block, for the dead zone reason this
    * file gives four times over.
    */
-  const slideKit = { blocks: [], player: null, comps: {}, open: false, specs: [] };
+  const slideKit = { blocks: [], player: null, halves: [], comps: {}, open: false, specs: [] };
   function slidesOpen() {
     if (slideKit.open) return;
     slideKit.open = true;
     for (const b of slideKit.blocks) b.s.start();
     slideKit.player?.start();
+    for (const p of slideKit.halves) p.start();
+    // the OLED slide's real screen: ui.c as WebAssembly, the one request this
+    // tab makes, on this press and never on a visit (see `hwPartsLoad`)
+    hwPartsLoad('slides');
   }
   function slidesClose() {
     if (!slideKit.open) return;
     slideKit.open = false;
     for (const b of slideKit.blocks) b.s.stop();
     slideKit.player?.stop();
+    for (const p of slideKit.halves) p.stop();
   }
   /** One static slide in one block, its box giving up its chrome to the slide's own. */
   const slideBlock = (title, note, src, spec) => section('slides', title, note, src, (box) => {
@@ -1637,6 +1709,57 @@
       box.append(slideKit.player.el);
     });
 
+  // ── HALF WIDTH PLAYERS ────────────────────────────────────────────────────
+  // 🔴 TWO PLAYERS SIDE BY SIDE, asked 2026-10-05: *"add 1/2 w slide palyer to
+  // kit, scale accordingly. put 2 side by side"*. Nothing about a slide is
+  // typed in px, so a player half as wide is the same slides at half the size:
+  // every step is a share of ITS slide's height, and the inset and the rules
+  // are too. The footer is the video panel's and stays at its px sizes, which
+  // fit at half width (asserted). One column below 560 px of the block's own
+  // width, the container query `/cam/` and `/flipper/` use, so a phone stacks
+  // them; each player's keys stay on its own panel.
+  // Every figure is sourced where it first appears above or below: the WHEP
+  // and MoQ table PROGRESS.md:4712-4719, the clocks HANDOFF.md:133-135, the
+  // refusals positron-streaming SKILL.md:228-230.
+  const HALF_A = [
+    { name: 'half a title', title: 'Latency off a burned clock', by: 'Kristjan Jansen', date: '2026-10-05',
+      cap: 'positron.studio' },
+    { name: 'half a figure', big: '*26.2*', under: 'ms glass to glass, MoQ p50',
+      cap: 'browser to [Cloudflare|cloudflare] to browser' },
+    { name: 'half a table', say: 'MoQ is quicker, WebRTC steadier',
+      rows: { head: ['', 'p50', 'p99'], body: [['MoQ', '*26.2*', '104.8'], ['WHEP', '67.0', '*84.1*']], align: 'lrr', frame: 'none' },
+      cap: 'ms, read off burned pixels' },
+  ];
+  const HALF_B = [
+    { name: 'half a statement', say: '*Break* the check first', statement: true,
+      cap: '38/38 still green with every recording silent' },
+    { name: 'half the clocks', say: 'Two clocks agree after measuring',
+      cap: 'median 1.8 ms between beats, one peer 137 ms fast' },
+    { name: 'half the refusals', layout: 'top', say: 'ERR refuses by programme, not age',
+      text: 'etv refused its newest 45 min, etv2 its oldest 78 min', textStep: 2 },
+  ];
+  section('slides', 'HALF WIDTH PLAYERS',
+    'Two players side by side, each half the block, each with slides of its own. Type, inset and '
+    + 'rules are shares of each player’s own slide, so half the width is the same slides at half '
+    + 'the size. Below 560 px of block they stack. A key pressed in one never steps the other.',
+    `const a = createSlidePlayer(talkA), b = createSlidePlayer(talkB);
+pair.append(a.el, b.el);   // .kit-sl-pair, two columns, one under 560 px of its own width`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const pair = el('div', 'kit-sl-pair');
+      const grid = el('div', 'kit-sl-pair-in');
+      pair.append(grid);
+      slideKit.halves = [HALF_A, HALF_B].map((specs) => {
+        const p = createSlidePlayer(specs);
+        p.stop();
+        slideKit.specs.push(...p.slides.map((s) => s.spec));
+        grid.append(p.el);
+        return p;
+      });
+      slideKit.comps.halves = { pair, grid };
+      box.append(pair);
+    });
+
   // ── STEP 6 DOWN TO STEP 1 ─────────────────────────────────────────────────
   // One slide a step, the step alone, its three numbers in the caption from
   // `stepCaption`, which reads `SCALE`, so the words cannot disagree with the
@@ -1672,6 +1795,32 @@
     // all scales. no colors"*. It was a split with 6 and 5 in the slot.
     { name: 'the scale', layout: 'left',
       lines: [[6, 'step 6'], [5, 'step 5'], [4, 'step 4'], [3, 'step 3'], [2, 'step 2'], [1, 'step 1']] });
+
+  // ── TITLE SLIDE ───────────────────────────────────────────────────────────
+  // 🔴 THE OPENING OF A TALK, asked 2026-10-05 from the slides list as *"so
+  // slide title"*. The talk's name at step 5, the speaker at step 3, the date
+  // at step 2 (TITLE_STEPS in slide.mjs says why each), laid out `top`: the
+  // name where every headline sits, who and when on the bottom edge. The
+  // speaker is the owner of this repository; the date is the day it was built.
+  // No place: nobody has said where this talk is given, so none is invented.
+  slideBlock('TITLE SLIDE',
+    'The opening of a talk: its name at step 5 top left, who speaks at step 3 and the date at '
+    + 'step 2 on the bottom edge. A title slide carries nothing else, and `place` is the fourth key.',
+    `{ title: 'Latency off a burned clock', by: 'Kristjan Jansen', date: '2026-10-05' }`,
+    { name: 'title', title: 'Latency off a burned clock', by: 'Kristjan Jansen', date: '2026-10-05' });
+
+  // ── BIG NUMBER ────────────────────────────────────────────────────────────
+  // 🔴 ONE FIGURE ALONE, asked 2026-10-05 from the slides list as *"big
+  // number"*: step 6, centred, a short line under it at step 3. The figure is
+  // PROGRESS.md:4712-4713, re-read for this block: the WHEP rig re-run the same
+  // day as MoQ, n=17,501 over 300 s, *p50 67.0 / p95 76.9 / p99 84.1 ms*,
+  // browser to Cloudflare to browser off burned pixels.
+  slideBlock('BIG NUMBER',
+    'One figure alone at step 6, centred, with one short line under it at step 3 saying what it '
+    + 'counts. Nothing else on the slide but the caption.',
+    `{ big: '*67.0*', under: 'ms glass to glass, WHEP p50', cap: 'n = 17,501 over 300 s ...' }`,
+    { name: 'big number', big: '*67.0*', under: 'ms glass to glass, WHEP p50',
+      cap: 'n = 17,501 over 300 s, browser to [Cloudflare|cloudflare] to browser' });
 
   // ── COMBINATIONS ──────────────────────────────────────────────────────────
   // CLAUDE.md, the stand-ins paragraph: three fake servers make four pages
@@ -1817,25 +1966,26 @@
       say: 'A knob turned on the slide', big: '120', under: 'bpm, specimen' });
 
   // ── COMPONENTS ON A SLIDE ─────────────────────────────────────────────────
-  /* 🔴 THE OLED, AND WHAT IS MISSING FROM IT. The HARDWARE part draws every
-     screen with `rig/pico/firmware/ui.c` compiled to WebAssembly, and that
-     module is FETCHED when HARDWARE is opened, never on a visit. A slide that
-     fetched it would break this part's own rule, so until then it shows a
-     STAND-IN frame: the same 128x64 panel, the same two colours and the same
-     `drawOled`, with the words rasterised from a canvas font rather than the
-     firmware's glcd5x7. The slide's canvas is registered as one more screen
-     part, so once HARDWARE has been opened it is redrawn by ui.c itself with
-     the LINK part's own paint, and the stand-in is gone. */
+  /* 🔴 THE OLED, DRAWN BY THE FIRMWARE. The HARDWARE part draws every screen
+     with `rig/pico/firmware/ui.c` compiled to WebAssembly. Since 2026-10-05
+     (*"oled"*, the slides list's item 7) pressing SLIDES fetches that module
+     too, the one request this tab makes, because a tab press is a person's
+     press exactly as HARDWARE's is; a visit still fetches nothing. Until it
+     arrives the slide shows a STAND-IN: the same 128x64 panel, the same two
+     colours and `drawOled`, lettered in the firmware's default font from
+     `oled-font.mjs`. The slide's canvas is registered as one more screen part,
+     so the module's arrival redraws it with the LINK part's own paint and the
+     stand-in is gone. */
   section('slides', 'OLED ON A SLIDE',
     'The router’s 128 by 64 screen at slide scale, a whole number of screen pixels per panel '
-    + 'pixel. A stand-in frame until HARDWARE is opened, because the firmware’s own drawing '
-    + 'arrives with it; after that this is ui.c’s LINK screen.',
+    + 'pixel, drawn by the firmware’s own ui.c: its LINK screen. That code is fetched when this '
+    + 'tab is opened, and a stand-in frame holds the place for the moment it takes.',
     `slot: (host) => oledScreen at a whole scale, drawOled(cv, px)   // registered in hw.parts`,
     (box) => {
       box.classList.add('kit-sl');
       const s = createSlide({ name: 'oled', layout: 'split', side: 'right',
         say: 'The Pico router draws its own screen', text: 'scene 2, an octave up onto channel 2',
-        cap: 'stand-in frame until HARDWARE is opened',
+        cap: 'drawn by ui.c, the router firmware’s own screen code',
         slot: (host) => {
           const screen = el('div', 'kit-oled');
           const cv = document.createElement('canvas');
@@ -1876,7 +2026,7 @@
             screen.style.setProperty('--oled-k', String(k));
           };
           new ResizeObserver(fit).observe(host);
-          slideKit.comps.oled = { cv, screen, px };
+          slideKit.comps.oled = { cv, screen, px, standIn: px.slice() };
           return null;
         } }, { host: box, full: true });
       slideKit.blocks.push({ title: 'OLED ON A SLIDE', s });
@@ -2820,7 +2970,7 @@ idle.cancel()                  // the page replaced the text, drop what was due`
    * sandbox that writes `#sketch` while a reader scrolls past it is one
    * component reaching outside its own box.
    */
-  section('panel', 'INSTRUMENT PANEL',
+  section('devices', 'INSTRUMENT PANEL',
     'A picture, rows of controls, a keyboard and a nameplate, glued into one object, in five shapes, the last with a switch and a picker on its foot.',
     `createInstrumentPanel({
   viz:   filter.el,                                 // edge to edge
@@ -2949,7 +3099,7 @@ p.shape()                     // ['viz','controls','keys','plate']`,
    * up with no orphan rule left behind. **That is the REASON the deleted GLUE
    * block failed to show.**
    */
-  section('panel', 'GLUED ROWS',
+  section('devices', 'GLUED ROWS',
     'Rows on one surface with a hairline between them, in six shapes: a station strip, a settings list, a display with its buttons, a form, the strip with a row hidden, and three pictures.',
     `const g = createGlueRows();
 g.row([station], { align: 'start' })
@@ -11559,8 +11709,12 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     d.assert('two blocks in one part sit the project’s one gap apart, not the panel’s own',
       // ⚠️ ONE GAP IS A MEASUREMENT. This said `> 1` and went red on a page
       // opened at #hardware, whose part holds two blocks and so one gap.
-      open.classList.contains('pos-stack') && gaps.length >= 1 && worst <= 0.5,
-      `${gaps.length} gap(s) in ${kitTabs.at()} against --pos-gap ${want} px, worst ${worst} px out`);
+      // ⚠️ AND A PART OF ONE BLOCK HAS NO GAP AT ALL: BRAND holds only LOGO
+      // since 2026-10-05, and a page opened at #logo has nothing to measure,
+      // which is said rather than read as a gap of the wrong size
+      open.classList.contains('pos-stack') && (secs.length === 1 || (gaps.length >= 1 && worst <= 0.5)),
+      secs.length === 1 ? `${kitTabs.at()} holds one block, so there is no gap between two to measure`
+        : `${gaps.length} gap(s) in ${kitTabs.at()} against --pos-gap ${want} px, worst ${worst} px out`);
   }
 
   /**
@@ -12413,6 +12567,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   if (SELFCHECK) {
     slideChecks()
       .catch((e) => d.assert('SLIDES: the checks ran to the end', false, `${e.message}`))
+      .then(() => brandChecks())
+      .catch((e) => d.assert('BRAND: the checks ran to the end', false, `${e.message}`))
       .then(() => hwChecks())
       .catch((e) => d.assert('the router firmware checks ran to the end', false,
         `${e.message}`));
@@ -12434,13 +12590,16 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
     const addressWas = location.hash, home = kitTabs.at();
     const resBefore = performance.getEntriesByType('resource').length;
+    // a plain visit has asked for no firmware drawing code: nothing here has
+    // pressed SLIDES or HARDWARE yet
+    const partsAtVisit = hw.partsFetched;
     kitTabs.go('slides', { push: false });
     await document.fonts.ready;
     await frames(3);
     const blocks = slideKit.blocks;
-    // the static slides and the one slide the player is showing; its other
-    // two are hidden on purpose and have no box to measure
-    const all = [...blocks.map((b) => b.s), ...slideKit.player.slides.filter((s) => !s.el.hidden)];
+    // the static slides and the one slide each player is showing; the others
+    // are hidden on purpose and have no box to measure
+    const all = [...blocks.map((b) => b.s), ...[slideKit.player, ...slideKit.halves].flatMap((p) => p.slides.filter((s) => !s.el.hidden))];
     const tol = (a, b, e) => Math.abs(a - b) <= e;
 
     // ── the face ──────────────────────────────────────────────────────────
@@ -12584,6 +12743,130 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       d.assert('SLIDES: the player’s slide fills its stage at 16:9',
         tol(r.height, r.width * 9 / 16, 1) && tol(r.width, p.panel.stage.clientWidth, 1),
         `${r.width.toFixed(1)} x ${r.height.toFixed(1)} in a ${p.panel.stage.clientWidth} px stage`);
+
+      // ── a tap steps it in full screen on a screen with no hover ─────────
+      // `(hover: none)` cannot be emulated from inside the page, so the player
+      // is told it is on one (`touchMode`), which is the code path a phone
+      // takes; the media query itself is graded by `shot.mjs` at 375.
+      p.go(0);
+      const sr = () => p.panel.stage.getBoundingClientRect();
+      const tap = (fx) => { const b = sr(); p.slides[p.at()].el.dispatchEvent(new MouseEvent('click', { clientX: b.left + fx * b.width, clientY: b.top + b.height / 2, bubbles: true, cancelable: true })); return p.at(); };
+      const t0 = p.taps();
+      p.touchMode(() => true);
+      const flat = tap(5 / 6);                  // not full: a press is a press
+      await p.panel.full(true);
+      await frames(6);
+      const full = p.panel.isFull();
+      const fwd = tap(5 / 6), mid = tap(1 / 2), back = tap(1 / 6);
+      p.touchMode(() => false);
+      const desk = tap(5 / 6);                  // full, but a screen with hover
+      p.touchMode(() => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches);
+      await p.panel.full(false);
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      await frames(6);
+      d.assert('SLIDES: in full screen on a touch screen a tap on the right third steps forward and the left third back, the middle and a desk do nothing',
+        full && flat === 0 && fwd === 1 && mid === 1 && back === 0 && desk === 0 && p.taps() - t0 === 2 && !p.panel.isFull(),
+        `${full ? 'full' : 'NOT full'}; not full ${flat}, right ${fwd}, middle ${mid}, left ${back}, with hover ${desk}; `
+        + `${p.taps() - t0} taps stepped, ${p.panel.isFull() ? 'STILL full' : 'out again'}`);
+      p.go(0);
+    }
+
+    // ── the ⛶ on a touch screen, top right ────────────────────────────────
+    {
+      // The rule, read off the stylesheet the slide links, because no harness
+      // here can make `(hover: none)` match: both corners declared, the touch
+      // one in a media block AFTER the plain rule of the same weight (a media
+      // query adds no specificity, so order is what lets it win).
+      const sheet = [...document.styleSheets].find((x) => /\/shell\/slide\.css$/.test(x.href || ''));
+      const rules = sheet ? [...sheet.cssRules] : [];
+      const baseAt = rules.findIndex((r) => r.selectorText === '.sl .sl-full');
+      const mediaAt = rules.findIndex((r, i) => i > baseAt && r instanceof CSSMediaRule && /hover:\s*none/.test(r.media.mediaText)
+        && [...r.cssRules].some((q) => q.selectorText === '.sl .sl-full' && q.style.top === '12px' && q.style.bottom === 'auto'));
+      const base = rules[baseAt]?.style;
+      const live = matchMedia('(hover: none)').matches;
+      const b0 = slideKit.blocks[0].s.fullBtn, sl0 = slideKit.blocks[0].s.el.getBoundingClientRect(), br = b0.getBoundingClientRect();
+      const corner = live ? tol(br.top - sl0.top, 12 + 1, 2) : tol(sl0.bottom - br.bottom, 12 + 1, 2);
+      d.assert('SLIDES: the slide’s ⛶ sits bottom right with a pointer and top right on a screen with no hover, so it never covers a caption',
+        baseAt >= 0 && base.bottom === '12px' && mediaAt > baseAt && corner,
+        `the plain rule at ${baseAt} (bottom ${base?.bottom}), the touch rule at ${mediaAt} (top 12px, bottom auto); `
+        + `this screen ${live ? 'has no hover' : 'hovers'} and the button sits ${(br.top - sl0.top).toFixed(1)} px from the top, `
+        + `${(sl0.bottom - br.bottom).toFixed(1)} from the bottom`);
+    }
+
+    // ── the title slide and the big number ────────────────────────────────
+    {
+      const T = slideKit.blocks.find((b) => b.s.spec.name === 'title').s;
+      const h = T.el.clientHeight;
+      const px = (e) => parseFloat(getComputedStyle(e).fontSize);
+      const share = (e, n) => tol(px(e), stepOf(n).size / 100 * h, 0.5);
+      const ir = T.el.querySelector('.sl-in').getBoundingClientRect(), ics = getComputedStyle(T.el.querySelector('.sl-in'));
+      const tr = T.parts.title.getBoundingClientRect(), byr = T.parts.by.getBoundingClientRect(), wr = T.parts.when.getBoundingClientRect();
+      const top = tol(tr.top, ir.top + parseFloat(ics.paddingTop), 1);
+      const foot = tol(wr.bottom, ir.bottom - parseFloat(ics.paddingBottom), 1) && byr.bottom <= wr.top + 1;
+      const lefts = tol(byr.left, tr.left, 1) && tol(wr.left, tr.left, 1);
+      d.assert('SLIDES: the title slide sets the talk’s name at step 5 top left, the speaker at step 3 and the date at step 2 on the bottom edge',
+        share(T.parts.title, 5) && share(T.parts.by, 3) && share(T.parts.when, 2) && top && foot && lefts
+          && T.parts.when.textContent === '5 October 2026' && T.parts.by.textContent === 'Kristjan Jansen' && lintWords(T.spec.title).length === 0
+          && getComputedStyle(T.parts.when).color !== getComputedStyle(T.parts.by).color,
+        `name ${px(T.parts.title).toFixed(1)} px, speaker ${px(T.parts.by).toFixed(1)}, date ${px(T.parts.when).toFixed(1)} on a ${h} px slide; `
+        + `name ${top ? 'on' : 'OFF'} the inset top, who and when ${foot ? 'on' : 'OFF'} the foot, ${lefts ? 'one left edge' : 'LEFT EDGES DIFFER'}; `
+        + `"${T.parts.when.textContent}"`);
+      const B = slideKit.blocks.find((b) => b.s.spec.name === 'big number').s;
+      const big = B.el.querySelector('.sl-big'), under = B.el.querySelector('.sl-under');
+      const sr0 = B.el.getBoundingClientRect(), bgr = big.getBoundingClientRect(), ur = under.getBoundingClientRect();
+      const range = document.createRange(); range.selectNodeContents(big);
+      const ink = range.getBoundingClientRect();
+      const mid = (r) => r.left + r.width / 2;
+      d.assert('SLIDES: the big number is one figure at step 6, centred on the slide, its line under it at step 3',
+        share(big, 6) && share(under, 3) && tol(mid(ink), mid(sr0), 1.5) && ur.top >= bgr.top + bgr.height / 2 && tol(mid(ur), mid(sr0), 1.5)
+          && big.textContent === '67.0' && !!big.querySelector('.sl-hi'),
+        `"${big.textContent}" ${px(big).toFixed(1)} px and the line ${px(under).toFixed(1)} px on a ${B.el.clientHeight} px slide, `
+        + `the figure ${(mid(ink) - mid(sr0)).toFixed(1)} px and the line ${(mid(ur) - mid(sr0)).toFixed(1)} px off the slide's centre`);
+    }
+
+    // ── two half width players ────────────────────────────────────────────
+    {
+      const [pa, pb] = slideKit.halves, { pair, grid } = slideKit.comps.halves;
+      const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+      const measure = () => {
+        const W = grid.clientWidth, ra = pa.el.getBoundingClientRect(), rb = pb.el.getBoundingClientRect();
+        const side = tol(ra.top, rb.top, 1) && tol(ra.width, (W - gap) / 2, 1.5) && tol(rb.width, (W - gap) / 2, 1.5) && rb.left > ra.right;
+        const stacked = tol(ra.width, W, 1.5) && tol(rb.width, W, 1.5) && rb.top >= ra.bottom;
+        const steps = [pa, pb].flatMap((p) => {
+          const s = p.slides[p.at()], h = s.el.clientHeight;
+          return [...s.el.querySelectorAll('.sl-t')].filter((t) => t.getClientRects().length).map((t) => {
+            const n = +(t.className.match(/\bsl-t(\d)\b/) || [])[1];
+            return { ok: tol(parseFloat(getComputedStyle(t).fontSize), stepOf(n).size / 100 * h, 0.5), n };
+          });
+        });
+        const feet = [pa, pb].map((p) => { const f = p.panel.el.querySelector('.pos-vp-foot'); return f.scrollWidth <= f.clientWidth + 1; });
+        const spill = [pa, pb].map((p) => { const i = p.slides[p.at()].el.querySelector('.sl-in'); return i.scrollHeight > i.clientHeight + 1 || i.scrollWidth > i.clientWidth + 1; });
+        return { W: pair.clientWidth, side, stacked, wa: ra.width, wb: rb.width, steps, feet, spill };
+      };
+      const native = measure();
+      // and the other arrangement, by giving the block the other width: the
+      // grid asks its own box, so this is the phone's case at any viewport
+      pair.style.width = native.W > 560 ? '343px' : '900px';
+      await frames(4);
+      const other = measure();
+      pair.style.removeProperty('width');
+      await frames(2);
+      const wide = native.W > 560 ? native : other, narrow = native.W > 560 ? other : native;
+      const stepsOk = [...native.steps, ...other.steps].every((x) => x.ok);
+      const feetOk = [...native.feet, ...other.feet].every(Boolean), spillOk = ![...native.spill, ...other.spill].some(Boolean);
+      d.assert('SLIDES: two half width players sit side by side above 560 px of block and stack below it, every step a share of its own player’s slide, the footers fitting, nothing spilling',
+        wide.side && narrow.stacked && stepsOk && feetOk && spillOk && wide.steps.length >= 4,
+        `${wide.W} px block: ${wide.side ? 'side by side' : 'NOT side by side'}, ${wide.wa.toFixed(1)} and ${wide.wb.toFixed(1)} px; `
+        + `${narrow.W} px block: ${narrow.stacked ? 'stacked' : 'NOT stacked'}; ${[...native.steps, ...other.steps].filter((x) => x.ok).length} of `
+        + `${native.steps.length + other.steps.length} text boxes at their step; footers ${feetOk ? 'fit' : 'OVERFLOW'}; ${spillOk ? 'no spill' : 'SPILL'}`);
+      pa.go(0); pb.go(0);
+      const key = (target, k) => target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+      key(pa.el, 'ArrowRight'); const a1 = pa.at(), b1 = pb.at();
+      key(pb.el, 'End'); const a2 = pa.at(), b2 = pb.at();
+      d.assert('SLIDES: a key pressed in one half width player steps that player and leaves the other’s slide where it was',
+        a1 === 1 && b1 === 0 && a2 === 1 && b2 === pb.slides.length - 1,
+        `right in the first: ${a1} and ${b1}; End in the second: ${a2} and ${b2}`);
+      pa.go(0); pb.go(0);
     }
 
     // ── the components, at slide scale ───────────────────────────────────
@@ -12635,7 +12918,27 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const k = parseFloat(o.screen.style.getPropertyValue('--oled-k'));
       d.assert('SLIDES: the OLED on a slide is drawn at a whole scale, never between',
         lit > 100 && Number.isInteger(k) && k >= 1 && hw.parts.some((p) => p.name === 'slide-oled'),
-        `${lit} panel pixels lit, ${k}x, registered for ui.c when HARDWARE opens`);
+        `${lit} panel pixels lit, ${k}x, registered as a screen part for ui.c`);
+      // the real screen: opening the tab asked for ui.c once, and its arrival
+      // redrew the slide's canvas with the LINK part's own paint
+      const end = performance.now() + 1500;
+      const part = hw.parts.find((p) => p.name === 'slide-oled');
+      while (performance.now() < end && !part.px) await nap(40);
+      let same = 0, diffStand = 0, litReal = 0;
+      if (part.px) {
+        const dt2 = o.cv.getContext('2d').getImageData(0, 0, OLED_W, OLED_H).data;
+        const want = hw.oled.screen(-1, hw.parts.find((p) => p.name === 'link').paint);
+        for (let i = 0; i < want.length; i++) {
+          const on = dt2[i * 4] === OLED_LIT[0] && dt2[i * 4 + 2] === OLED_LIT[2];
+          if (on === !!want[i]) same++;
+          if (!!want[i] !== !!o.standIn[i]) diffStand++;
+          if (want[i]) litReal++;
+        }
+      }
+      d.assert('SLIDES: opening the tab fetched ui.c once and the OLED slide shows its real LINK screen, pixel for pixel, not the stand-in',
+        partsAtVisit === 0 && hw.partsFetched === 1 && hw.partsFrom === 'slides' && !!part.px && same === OLED_W * OLED_H && diffStand > 0 && litReal > 100,
+        `before the press the module had been asked for ${partsAtVisit} time(s), after it ${hw.partsFetched} by ${hw.partsFrom || 'nobody'}; `
+        + `${same} of ${OLED_W * OLED_H} canvas pixels match ui.c's LINK screen, ${litReal} lit, ${diffStand} differ from the stand-in`);
     }
     {
       const v = C.video, g = C.grid, r = C.readout;
@@ -13086,13 +13389,21 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       // to the dev server's `/_log` (shell.mjs), which is the page talking to
       // the desk and not the tab opening anything; MEASURED as the one request
       // in the first run. Anything else counts.
+      // ⚠️ AND ONE FILE IS ALLOWED, BY NAME, SINCE 2026-10-05: the router's
+      // screen code for the OLED slide, asked for once on the tab press.
+      const WASM = '/resources/pico/oled-ui.wasm';
       const during = after.slice(resBefore).map((e) => e.name)
         .filter((n) => !(new URL(n).origin === location.origin && new URL(n).pathname === '/_log'));
+      const wasm = during.filter((n) => new URL(n).origin === location.origin && new URL(n).pathname === WASM);
+      const other = during.filter((n) => !wasm.includes(n));
       const faces = after.filter((e) => /\/shell\/vendor\/jetbrains-mono/.test(e.name));
       const foreign = faces.filter((e) => new URL(e.name).origin !== location.origin);
-      d.assert('SLIDES: opening and grading the tab fetched nothing, and the face came from this origin',
-        during.length === 0 && faces.length <= 2 && foreign.length === 0,
-        `${during.length} request(s) while the tab was open${during.length ? `: ${during.slice(0, 3).join(', ')}` : ''}, `
+      d.assert(`SLIDES: opening and grading the tab fetched exactly one file, ${WASM} from this origin, and the face came from this origin`,
+        // three face files since 2026-10-05: Latin 400 and 600, and the Greek
+        // 600 for BRAND's β, which the build's measuring window lays out and
+        // so loads, the way it already loaded the two Latin ones
+        wasm.length === 1 && other.length === 0 && new Set(faces.map((e) => e.name)).size <= 3 && foreign.length === 0,
+        `${wasm.length} request(s) for the screen code, ${other.length} other${other.length ? `: ${other.slice(0, 3).join(', ')}` : ''}, `
         + `the face ${faces.length} file(s), ${foreign.length} from another host`);
     }
 
@@ -13127,6 +13438,98 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   }
 
 
+  /**
+   * 🔴 THE BRAND PART'S CHECKS, chained after SLIDES and before the router's,
+   * for the same reason those two are chained: each presses a tab. The β is
+   * the thing most likely to be wrong and least likely to look it: a missing
+   * glyph falls back to another face silently, and a fallback β beside a
+   * JetBrains `+` is a mark in two typefaces. So the Greek face is asked for
+   * by name, and so is the request that fetched it.
+   */
+  async function brandChecks() {
+    const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+    const tol = (a, b, e) => Math.abs(a - b) <= e;
+    const addressWas = location.hash, home = kitTabs.at();
+    const resBefore = performance.getEntriesByType('resource').length;
+    const tabThere = GROUPS.some(([id, label]) => id === 'brand' && label === 'BRAND') && !!panels.get('brand');
+    kitTabs.go('brand', { push: false });
+    await frames(2);
+    await document.fonts.ready;
+    await frames(3);
+    const L = brand.logo;
+    const lines = L.parts.lines;
+    const texts = lines.map((p) => p.textContent);
+    const h = L.el.clientHeight;
+    const steps = lines.map((p) => +p.dataset.step);
+    const sized = lines.every((p) => tol(parseFloat(getComputedStyle(p).fontSize), stepOf(+p.dataset.step).size / 100 * h, 0.5));
+    const order = lines.every((p, i) => i === 0 || p.getBoundingClientRect().top >= lines[i - 1].getBoundingClientRect().bottom - 1);
+    d.assert('BRAND: the tab exists and its LOGO draws β+, then positron, then studio, top to bottom, at declared steps 6, 4 and 4',
+      tabThere && texts.join('|') === 'β+|positron|studio' && order && steps.join() === '6,4,4' && sized,
+      `${tabThere ? 'BRAND in the row' : 'NO BRAND TAB'}; ${texts.map((t) => `"${t}"`).join(', ')} ${order ? 'in order' : 'OUT OF ORDER'}, `
+      + `steps ${steps.join(', ')}, sizes ${sized ? 'at their step' : 'OFF THEIR STEP'} on a ${h} px slide`);
+
+    // the β in the slide face: the Greek face of 'Slide JetBrains Mono' is
+    // loaded, which happens only because a β was laid out, and the β takes
+    // the face's one mono advance (0.6 em) plus step 6's tracking, the same
+    // as the + beside it from the Latin file. A fallback face's β would not.
+    const greek = [...document.fonts].find((f) => f.family.replace(/["']/g, '') === 'Slide JetBrains Mono' && /U\+370/i.test(f.unicodeRange));
+    const span = lines[0];
+    const range = document.createRange(); range.setStart(span.firstChild, 0); range.setEnd(span.firstChild, 1);
+    const betaW = range.getBoundingClientRect().width, em = parseFloat(getComputedStyle(span).fontSize);
+    const plus = span.querySelector('.sl-hi');
+    const plusW = plus?.getBoundingClientRect().width ?? 0, advance = 0.6 + stepOf(6).ls;
+    // ⚠️ AN ADVANCE ALONE CANNOT TELL TWO MONO FACES APART (most are 0.6 em),
+    // so the INK is compared too: the β's box drawn in the slide face against
+    // the same β in the page's own mono stack, which is where it would fall.
+    const ink = (font) => {
+      const c = document.createElement('canvas').getContext('2d');
+      c.font = font;
+      const m = c.measureText('β');
+      return [m.actualBoundingBoxAscent, m.actualBoundingBoxDescent, m.actualBoundingBoxLeft, m.actualBoundingBoxRight];
+    };
+    const monoStack = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
+    const inSlide = ink(`600 100px 'Slide JetBrains Mono'`), inFallback = ink(`600 100px ${monoStack}`);
+    const differs = inSlide.some((v, i) => Math.abs(v - inFallback[i]) > 0.5);
+    d.assert('BRAND: the β is drawn in the slide face from its Greek subset, at the face’s own advance, and only the + wears the accent',
+      greek?.status === 'loaded' && differs && tol(betaW / em, advance, 0.005) && tol(betaW, plusW, 0.5) && !!plus && plus.textContent === '+'
+        && getComputedStyle(plus).color !== getComputedStyle(span).color,
+      `the Greek face ${greek ? greek.status : 'NOT DECLARED'}; the β's ink at 100 px ${inSlide.map((v) => v.toFixed(1)).join('/')} `
+      + `against ${inFallback.map((v) => v.toFixed(1)).join('/')} in the page's mono, ${differs ? 'a different glyph' : 'THE SAME GLYPH, A FALLBACK'}; `
+      + `${(betaW / em).toFixed(3)} em wide against the face's ${advance.toFixed(3)} (0.600 less step 6's tracking) and the + ${(plusW / em).toFixed(3)}, `
+      + `the + ${plus ? 'in the accent' : 'NOT MARKED'}`);
+
+    const inn = L.el.querySelector('.sl-in'), ir = inn.getBoundingClientRect(), ics = getComputedStyle(inn);
+    const spill = inn.scrollHeight > inn.clientHeight + 1 || inn.scrollWidth > inn.clientWidth + 1
+      || lines.some((p) => { const r = p.getBoundingClientRect(); return r.right > ir.right - parseFloat(ics.paddingRight) + 1 || r.bottom > ir.bottom + 1; });
+    const left = lines.every((p) => tol(p.getBoundingClientRect().left, ir.left + parseFloat(ics.paddingLeft), 1));
+    d.assert('BRAND: the logo is left on the inset and nothing spills',
+      !spill && left && tol(h, L.el.clientWidth * 9 / 16, 1),
+      `${spill ? 'SPILLS' : 'inside the inset'}, ${left ? 'every line on the left inset' : 'LEFT EDGES OFF'}, ${L.el.clientWidth}x${h}`);
+
+    // the ⛶, as on every slide
+    L.fullBtn.click();
+    await frames(10);
+    const full = L.isFull(), fr = L.el.getBoundingClientRect();
+    const sizedFull = lines.every((p) => tol(parseFloat(getComputedStyle(p).fontSize), stepOf(+p.dataset.step).size / 100 * L.el.clientHeight, 0.5));
+    await L.full(false);
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    await frames(6);
+    d.assert('BRAND: the ⛶ fills the screen with the logo at its steps and gives it back',
+      full && fr.width > L.el.clientWidth && sizedFull && !L.isFull(),
+      `${full ? 'full' : 'NOT full'} at ${fr.width.toFixed(0)} px wide, the steps ${sizedFull ? 'held' : 'NOT held'}, ${L.isFull() ? 'STILL full' : 'back'}`);
+
+    const during = performance.getEntriesByType('resource').slice(resBefore).map((e) => e.name)
+      .filter((n) => !(new URL(n).origin === location.origin && new URL(n).pathname === '/_log'));
+    const fonts = during.filter((n) => new URL(n).origin === location.origin && /^\/shell\/vendor\/jetbrains-mono-[a-z]+-\d+-normal\.woff2$/.test(new URL(n).pathname));
+    const other = during.filter((n) => !fonts.includes(n));
+    d.assert('BRAND: opening the tab fetched nothing but the vendored Greek face, from this origin',
+      other.length === 0 && fonts.length <= 1 && fonts.every((n) => /greek-600/.test(n)),
+      `${fonts.length} face file(s)${fonts.length ? `: ${fonts.map((n) => new URL(n).pathname).join(', ')}` : ''}, ${other.length} other`
+      + `${other.length ? `: ${other.slice(0, 3).join(', ')}` : ''}`);
+    kitTabs.go(home, { push: false });
+    try { history.replaceState(null, '', `${location.pathname}${location.search}${addressWas}`); } catch { /* file:// */ }
+  }
+
   async function hwChecks() {
     const nap = (ms) => new Promise((r) => setTimeout(r, ms));
     const until = async (test, ms) => {
@@ -13137,10 +13540,12 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
 
     // ── a visit ───────────────────────────────────────────────────────────
     const away = kitTabs.at() !== 'hardware';
+    // the screen code may have been asked for once already, by the SLIDES
+    // press in the checks before these (its OLED slide); never by a visit
     d.assert('a visit that does not open HARDWARE fetches no firmware and starts no emulator',
-      away && hw.fetched === 0 && hw.partsFetched === 0 && !hw.runner && hw.state === 'idle',
+      away && hw.fetched === 0 && (hw.partsFetched === 0 || (hw.partsFetched === 1 && hw.partsFrom === 'slides')) && !hw.runner && hw.state === 'idle',
       `the open part is ${kitTabs.at()}, the UF2 was asked for ${hw.fetched} time(s), `
-      + `the screen parts ${hw.partsFetched} time(s), `
+      + `the screen parts ${hw.partsFetched} time(s)${hw.partsFrom ? ` by ${hw.partsFrom}` : ''}, `
       + `the board is ${hw.state}${hw.runner ? ' with a worker' : ' with no worker'}`);
 
     // ── the firmware, on a board of the check's own ───────────────────────
@@ -13238,7 +13643,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     // ── the screen, one part at a time, by ui.c compiled to WebAssembly ──
     const partsUp = await until(() => hw.parts.length > 0 && hw.parts.every((p) => p.px), 3000);
     const empty = hw.parts.filter((p) => !p.px || !litCount(p.px)).map((p) => p.name);
-    d.assert('every screen part is drawn by the firmware’s own ui.c, fetched once when HARDWARE opened',
+    d.assert('every screen part is drawn by the firmware’s own ui.c, fetched once, by whichever of SLIDES and HARDWARE opened first',
       partsUp && !empty.length && hw.partsFetched === 1,
       `${hw.parts.length} parts, ${empty.length ? `blank: ${empty.join(', ')}` : 'none blank'}, `
       + `the module asked for ${hw.partsFetched} time(s)`);
