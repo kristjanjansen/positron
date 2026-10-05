@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* A slide lives inside a video panel's stage. The stage is the size
+     container, so the slide is sized off the panel's box and never off the
+     window: a panel in a page column on a desk, a panel on a phone and a panel
+     filling a projector all get the same slide at a different scale.
+     plans/plan-slides.md has the research behind every number here. */
+  .sl-panel .pos-vp-stage { container-type: size; }
+
+  /* 16:9 and letterboxed. In the panel the stage is already 16:9 so the slide
+     fills it exactly; full screen on a screen of another shape centres a 16:9
+     slide in it rather than stretching the type to the screen's shape. */
+  .sl-slide {
+    position: absolute; inset: 0; margin: auto;
+    width: min(100cqw, calc(100cqh * 16 / 9));
+    height: min(100cqh, calc(100cqw * 9 / 16));
+    container-type: size;
+    overflow: hidden;
+    color: var(--fg);
+  }
+  .sl-slide[hidden] { display: none; }
+  /* The inset is on a box inside the slide and never on the slide itself,
+     because a container's query units measure its CONTENT box. MEASURED with
+     the padding on the slide: LARGE came out at 7.7 per cent of the slide
+     rather than 9, at both widths, because 14 per cent of the height was
+     padding the units could not see. */
+  .sl-in {
+    height: 100%;
+    display: flex; flex-direction: column;
+    padding: 7cqh 6cqw;
+  }
+
+  /* THE TWO SIZES, AND THEY ARE FRACTIONS OF THE SLIDE'S OWN HEIGHT.
+     LARGE is 9 per cent of the slide's height: the 36 pt title of a 405 pt tall
+     16:9 deck, four and a half times the 1/50 floor of the 8H rule, and about
+     28 mono characters across the slide, so a two line headline holds about 56.
+     EXTRA LARGE is twice that, 18 per cent, for one number or one short word. */
+  .sl-l  { font: 600 9cqh/1.15 var(--mono); letter-spacing: 0; margin: 0; }
+  .sl-xl { font: 600 18cqh/1 var(--mono); letter-spacing: 0; margin: 0; }
+  .sl-dim { color: var(--dim); font-weight: 400; }
+
+  /* The headline sits top left, every slide, same place. What proves it goes
+     in the evidence region under it, which takes whatever height is left. */
+  .sl-ev {
+    flex: 1 1 auto; min-height: 0;
+    margin-top: 6cqh;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .sl-ev.sl-top { justify-content: flex-start; }
+  .sl-list { list-style: none; padding: 0; margin: 0; }
+  .sl-list li { margin: 0; }
+
+  /* A display is its own width, not the region's. */
+  .sl-ev > .pos-disp { align-self: flex-start; }
+  /* A canvas fits the region by its own shape. */
+  .sl-ev canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+  /* A component sized in px (a readout, a diagram) is laid out at a fixed
+     logical width and scaled to the region, the way a projector scales it.
+     The scale is a custom property the page writes, never the transform. */
+  .sl-fit { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .sl-fit-in {
+    position: absolute; left: 0; top: 0;
+    width: var(--fit-w, 640px);
+    transform-origin: 0 0;
+    transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit-k, 1));
+  }
+  .sl-fit-in > .pos-dg { margin: 0; }
+
+  /* Blank, the way a clicker's blank button asks for: the slide goes away and
+     the panel stays. */
+  .sl-panel .pos-vp-stage[data-blank] .sl-slide { visibility: hidden; }
+
+  .sl-count {
+    font: 500 12px/1 var(--mono); color: var(--dim);
+    font-variant-numeric: tabular-nums; min-width: 7ch; text-align: center;
+  }
+</style>
+
+<script type="module">
+  import { mount, guard, el, createReport } from '/shell/shell.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { createSegment } from '/shell/segment.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  import { burn, videoHue, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+
+  const d = mount({
+    name: 'slides',
+    what: 'A talk made of slides that hold running parts of this site, stepped inside a panel that fills the screen when you present.',
+    readout: null,
+    controls: [],
+  });
+  guard(d);
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+  // ── live elements ─────────────────────────────────────────────────────────
+  // Each one is built the first time its slide is shown, because a box in a
+  // hidden slide measures 0, and runs only while its slide is the one on
+  // screen. None of them opens a connection: they are drawn from this page.
+
+  /** A component laid out at `w` logical px and scaled into `host`. */
+  function fitBox(host, w) {
+    const outer = el('div', 'sl-fit');
+    const inner = el('div', 'sl-fit-in');
+    inner.style.setProperty('--fit-w', `${w}px`);
+    outer.append(inner);
+    host.append(outer);
+    const fit = () => {
+      const ow = outer.clientWidth, oh = outer.clientHeight;
+      const ih = inner.offsetHeight || 1;
+      if (!ow || !oh) return;
+      const k = Math.min(ow / w, oh / ih);
+      inner.style.setProperty('--fit-k', String(k));
+      inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
+      inner.style.setProperty('--fit-y', `${(oh - ih * k) / 2}px`);
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(outer); ro.observe(inner);
+    return { inner, fit };
+  }
+
+  function liveSegment(host) {
+    const seg = createSegment({ digits: 3, decimals: 1, size: '36cqh' });
+    host.append(seg.el);
+    let t0 = 0, raf = 0, n = 0;
+    const tick = () => {
+      seg.set(Math.min(99.9, (performance.now() - t0) / 1000));
+      n++;
+      raf = requestAnimationFrame(tick);
+    };
+    return {
+      start() { t0 = performance.now(); tick(); },
+      stop() { cancelAnimationFrame(raf); raf = 0; },
+      value: () => seg.text(),
+    };
+  }
+
+  function liveReadout(host) {
+    const { inner } = fitBox(host, 360);
+    const r = createReport({ readout: { fps: '', frames: '' }, showLog: false, joined: false });
+    inner.append(r.readoutEl);
+    // `frames` is there because `fps` alone does not move on a screen locked to
+    // its refresh rate: MEASURED in headless Chrome, 60.0 for a whole second.
+    let raf = 0, last = 0, times = [], shown = 0, count = 0;
+    const tick = (t) => {
+      count++;
+      if (last) times.push(t - last);
+      if (times.length > 60) times.shift();
+      last = t;
+      if (t - shown > 250 && times.length > 4) {
+        const mean = times.reduce((a, b) => a + b, 0) / times.length;
+        r.set('fps', (1000 / mean).toFixed(1));
+        r.set('frames', count);
+        shown = t;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    return {
+      start() { last = 0; times = []; shown = 0; raf = requestAnimationFrame(tick); },
+      stop() { cancelAnimationFrame(raf); raf = 0; },
+      value: () => r.readoutEl.textContent,
+    };
+  }
+
+  function livePicture(host) {
+    const c = el('canvas');
+    c.width = FRAME_W; c.height = FRAME_H;
+    host.append(c);
+    const ctx = c.getContext('2d');
+    let raf = 0, n = 0;
+    const tick = () => {
+      burn(ctx, FRAME_W, FRAME_H, n++, { hue: videoHue(1) });
+      raf = requestAnimationFrame(tick);
+    };
+    return {
+      start() { tick(); },
+      stop() { cancelAnimationFrame(raf); raf = 0; },
+      value: () => n,
+    };
+  }
+
+  function liveDiagram(host) {
+    const { inner, fit } = fitBox(host, 600);
+    const dg = createDiagram(inner, {
+      nodes: [
+        { id: 'br', label: 'Browser', sub: 'laptop or phone', kind: 'here', tech: 'browser',
+          children: [
+            { id: 'arr', label: 'slides', sub: 'array of objects', tech: 'browser',
+              note: 'Each slide is a headline sentence and, optionally, a function that builds a '
+                  + 'running element. Nothing is built for a slide nobody has reached.' },
+            { id: 'vp', label: 'video panel', sub: 'createVideoPanel', tech: 'browser',
+              note: 'The same panel a page plays video in. The slide is its picture, and '
+                  + 'previous and next sit in its footer.' },
+          ] },
+        { id: 'proj', label: 'projector', sub: 'HDMI, 16:9', tech: 'device',
+          note: 'Full screen hands the panel to the whole display. The slide keeps its 16:9 '
+              + 'shape and its type keeps its share of the slide height.' },
+      ],
+      links: [
+        { from: 'vp', to: 'proj', label: 'full screen',
+          note: 'The **Fullscreen API** where the browser has one, and a fixed cover where it '
+              + 'does not, which is every iPhone.' },
+      ],
+    });
+    requestAnimationFrame(fit);
+    let timer = 0, at = -1;
+    const step = () => {
+      const boxes = [...dg.svg.querySelectorAll('.pos-dg-n')]
+        .filter((g) => !g.querySelector('.pos-dg-cbox'));
+      boxes.forEach((g) => { delete g.dataset.on; });
+      if (!boxes.length) return;
+      at = (at + 1) % boxes.length;
+      boxes[at].dataset.on = '1';
+    };
+    return {
+      start() { step(); timer = setInterval(step, 900); },
+      stop() { clearInterval(timer); timer = 0; },
+      value: () => at,
+      dg,
+    };
+  }
+
+  // ── the deck ──────────────────────────────────────────────────────────────
+  // `say` is the headline, one sentence and no full stop. `big` is one number
+  // or word at EXTRA LARGE. `list` is up to three short lines at LARGE.
+  // `live` builds a running element into the evidence region and returns
+  // { start, stop, value }. `name` is what the log and the hash use.
+  const SLIDES = [
+    { name: 'one thing',
+      say: 'A slide says one thing, in one sentence',
+      list: ['two lines at most', 'evidence under it', 'three seconds to read'] },
+    { name: 'back row',
+      say: 'Text must be big enough for the back row',
+      big: '1/50', under: 'of the screen height' },
+    { name: 'counter', say: 'This number is counting live on the slide', live: liveSegment },
+    { name: 'readout', say: "The readout is the page's own, measuring this screen", live: liveReadout },
+    { name: 'picture', say: 'The test picture draws itself here, frame by frame', live: livePicture },
+    { name: 'panel', say: 'A slide sits in a panel, and full screen is the talk', live: liveDiagram },
+  ];
+
+  const nodes = SLIDES.map((s, i) => {
+    const node = el('section', 'sl-slide', null, { 'aria-label': `slide ${i + 1}`, 'aria-roledescription': 'slide' });
+    node.hidden = true;
+    const box = el('div', 'sl-in');
+    node.append(box);
+    box.append(el('h2', 'sl-l sl-say', s.say));
+    const ev = el('div', 'sl-ev');
+    if (s.list) {
+      ev.classList.add('sl-top');
+      const ul = el('ul', 'sl-list sl-l sl-dim');
+      for (const t of s.list) ul.append(el('li', '', t));
+      ev.append(ul);
+    }
+    if (s.big) {
+      ev.append(el('p', 'sl-xl sl-big', s.big));
+      if (s.under) ev.append(el('p', 'sl-l sl-dim', s.under));
+    }
+    box.append(ev);
+    return { spec: s, node, box, ev, ctl: null };
+  });
+
+  const stepper = createStepper({ prev: () => go(at - 1), next: () => go(at + 1), what: 'slide' });
+  const count = el('span', 'sl-count', '');
+  const panel = createVideoPanel({
+    left: stepper,
+    centre: count,
+    fullMode: 'hover',
+    onFull: (full) => d.log(full ? 'presenting, full screen' : 'back in the page'),
+  });
+  panel.el.classList.add('sl-panel');
+  for (const n of nodes) panel.stage.append(n.node);
+  d.stack.add(panel.el);
+
+  let at = -1;
+  function go(i) {
+    const next = Math.max(0, Math.min(SLIDES.length - 1, i));
+    if (next === at) return at;
+    const was = nodes[at];
+    if (was) { was.node.hidden = true; was.ctl?.stop(); }
+    at = next;
+    const n = nodes[at];
+    n.node.hidden = false;
+    if (n.spec.live && !n.ctl) n.ctl = n.spec.live(n.ev);
+    n.ctl?.start();
+    count.textContent = `${at + 1} / ${SLIDES.length}`;
+    stepper.buttons[0].disabled = at === 0;
+    stepper.buttons[stepper.buttons.length - 1].disabled = at === SLIDES.length - 1;
+    history.replaceState(null, '', `#${at + 1}`);
+    return at;
+  }
+
+  const blank = (on) => {
+    const s = panel.stage;
+    const want = on ?? !s.hasAttribute('data-blank');
+    if (want) s.dataset.blank = '1'; else delete s.dataset.blank;
+    return want;
+  };
+
+  // Keys. A clicker sends PageUp and PageDown (Logitech R400), F5 and Escape
+  // from its play button, and a full stop from its blank button.
+  const NEXT = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ']);
+  const PREV = new Set(['ArrowLeft', 'ArrowUp', 'PageUp']);
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (t && t.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;
+    let did = true;
+    if (NEXT.has(e.key)) go(at + 1);
+    else if (PREV.has(e.key)) go(at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(SLIDES.length - 1);
+    else if (e.key === '.' || e.key === 'b' || e.key === 'B') blank();
+    else if (e.key === 'f' || e.key === 'F' || e.key === 'F5') panel.full(!panel.isFull());
+    else did = false;
+    if (did) e.preventDefault();
+  });
+
+  const fromHash = Number((location.hash.match(/^#(\d+)$/) || [])[1]) || 1;
+  go(fromHash - 1);
+
+  window.__demo.slides = {
+    count: SLIDES.length, index: () => at, go, blank, names: SLIDES.map((s) => s.name),
+  };
+
+  // ── checks ────────────────────────────────────────────────────────────────
+  const lum = (c) => {
+    const m = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2];
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const px = (node, prop = 'font-size') => parseFloat(getComputedStyle(node).getPropertyValue(prop));
+  const key = (k) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+
+  async function check() {
+    const A = d.assert;
+    const resBefore = performance.getEntriesByType('resource')
+      .filter((r) => new URL(r.name).pathname !== '/_log').length;
+
+    A('the deck has six slides and the panel holds six',
+      SLIDES.length === 6 && panel.stage.querySelectorAll('.sl-slide').length === 6,
+      `${SLIDES.length} declared, ${panel.stage.querySelectorAll('.sl-slide').length} drawn`);
+
+    go(0);
+    const [prevB] = stepper.buttons, nextB = stepper.buttons[stepper.buttons.length - 1];
+    nextB.click();
+    const a1 = at;
+    prevB.click();
+    const a0 = at;
+    prevB.click();
+    A('next moves forward one and previous moves back one', a1 === 1 && a0 === 0, `${a1}, ${a0}`);
+    A('previous on the first slide stays there and is switched off',
+      at === 0 && prevB.disabled, `at ${at}, disabled ${prevB.disabled}`);
+    go(SLIDES.length - 1);
+    nextB.click();
+    A('next on the last slide stays there and is switched off',
+      at === SLIDES.length - 1 && nextB.disabled, `at ${at}, disabled ${nextB.disabled}`);
+    A('the footer counts the slide it is on', count.textContent === `${SLIDES.length} / ${SLIDES.length}`, count.textContent);
+
+    go(0);
+    const seen = [];
+    for (const k of ['ArrowRight', 'PageDown', ' ', 'ArrowLeft', 'PageUp', 'End', 'Home', 'ArrowDown', 'ArrowUp']) {
+      key(k); seen.push(at);
+    }
+    A('arrows, PageUp and PageDown, space, Home and End all move the deck',
+      seen.join() === '1,2,3,2,1,5,0,1,0', seen.join());
+    go(2);
+    A('the address carries the slide, so a reload lands on it', location.hash === '#3', location.hash);
+
+    // The two sizes, measured against the slide's own height.
+    go(0); await frame();
+    const s0 = nodes[0].node, h0 = s0.getBoundingClientRect().height;
+    const L = px(s0.querySelector('.sl-say'));
+    A('LARGE renders at 9 per cent of the slide height',
+      Math.abs(L - 0.09 * h0) < 0.5, `${L.toFixed(2)} px in a ${h0.toFixed(1)} px slide at ${innerWidth} px wide`);
+    go(1); await frame();
+    const s1 = nodes[1].node, h1 = s1.getBoundingClientRect().height;
+    const XL = px(s1.querySelector('.sl-xl'));
+    A('EXTRA LARGE renders at 18 per cent of the slide height',
+      Math.abs(XL - 0.18 * h1) < 0.5, `${XL.toFixed(2)} px in a ${h1.toFixed(1)} px slide`);
+    const vp = panel.stage.getBoundingClientRect();
+    A('in the page the slide is the panel picture, 16:9 and edge to edge',
+      Math.abs(h1 - vp.height) < 1 && Math.abs(s1.getBoundingClientRect().width - vp.width) < 1,
+      `slide ${s1.getBoundingClientRect().width.toFixed(1)} x ${h1.toFixed(1)}, stage ${vp.width.toFixed(1)} x ${vp.height.toFixed(1)}`);
+
+    // Every slide: two lines of headline at most, and nothing past its edge.
+    const lines = [], spill = [];
+    for (let i = 0; i < SLIDES.length; i++) {
+      go(i); await frame(); await frame();
+      const n = nodes[i].node, say = n.querySelector('.sl-say');
+      const lh = px(say, 'line-height');
+      lines.push(Math.round(say.getBoundingClientRect().height / lh));
+      const box = n.getBoundingClientRect();
+      const pad = px(nodes[i].box, 'padding-bottom');
+      const deepest = Math.max(...[...n.querySelectorAll('.sl-say, .sl-ev > *')]
+        .map((c) => c.getBoundingClientRect().bottom));
+      if (deepest > box.bottom - pad + 1) spill.push(`${i + 1}: ${(deepest - (box.bottom - pad)).toFixed(1)} px`);
+    }
+    A('every headline is two lines or fewer', lines.every((n) => n <= 2), lines.join(' '));
+    A('nothing on any slide runs past its inset', spill.length === 0, spill.join(', ') || 'all inside');
+
+    go(0); await frame();
+    const ink = getComputedStyle(nodes[0].node.querySelector('.sl-say')).color;
+    const ground = getComputedStyle(panel.stage).backgroundColor;
+    const cr = ratio(ink, ground);
+    A('the headline is at least 7:1 against the slide ground', cr >= 7, `${cr.toFixed(1)}:1`);
+
+    // Live elements run while their slide is shown and stop when it is not.
+    const live = nodes.map((n, i) => (n.spec.live ? i : -1)).filter((i) => i >= 0);
+    const moved = [], stopped = [];
+    for (const i of live) {
+      go(i); await sleep(150);
+      const v0 = nodes[i].ctl.value();
+      await sleep(1100);
+      const v1 = nodes[i].ctl.value();
+      moved.push(`${SLIDES[i].name} ${v0 !== v1 ? 'moved' : 'STILL'} (${v0} to ${v1})`);
+      go(i === 0 ? 1 : 0); await sleep(80);
+      const w0 = nodes[i].ctl.value();
+      await sleep(400);
+      if (nodes[i].ctl.value() !== w0) stopped.push(SLIDES[i].name);
+    }
+    A('at least three slides carry a live element', live.length >= 3, `${live.length}`);
+    A('every live element changes while its slide is shown',
+      moved.every((m) => !m.includes('STILL')), moved.join(', '));
+    A('and stops when the slide is left', stopped.length === 0, stopped.join(', ') || 'all stopped');
+    const dgc = nodes[5].ctl?.dg;
+    A('the diagram on the panel slide drew in a row and cut nothing',
+      dgc && dgc.mode === 'row' && dgc.cuts.length === 0,
+      dgc ? `${dgc.mode}, ${dgc.cuts.length} cut ${JSON.stringify(dgc.cuts)}` : 'not built');
+
+    go(0);
+    key('.');
+    const blanked = panel.stage.hasAttribute('data-blank')
+      && getComputedStyle(nodes[0].node).visibility === 'hidden';
+    key('b');
+    A('a full stop blanks the slide and b brings it back',
+      blanked && !panel.stage.hasAttribute('data-blank'), `${blanked}`);
+
+    // Presenting: full screen, by whichever route this browser has.
+    await panel.full(true); await frame(); await frame();
+    const fs = nodes[0].node.getBoundingClientRect();
+    const fsL = px(nodes[0].node.querySelector('.sl-say'));
+    const fullOk = panel.isFull() && Math.abs(fs.width / fs.height - 16 / 9) < 0.01
+      && fs.width <= innerWidth + 1 && fs.height <= innerHeight + 1
+      && Math.abs(fsL - 0.09 * fs.height) < 0.5;
+    await panel.full(false); await frame();
+    A('full screen keeps the slide 16:9 inside the screen and LARGE at 9 per cent of it',
+      fullOk, `${panel.support?.() ?? ''} ${fs.width.toFixed(0)} x ${fs.height.toFixed(0)} in ${innerWidth} x ${innerHeight}, LARGE ${fsL.toFixed(1)} px`);
+    A('and leaving it gives the panel its own shape back',
+      !panel.isFull() && Math.abs(nodes[0].node.getBoundingClientRect().height - panel.stage.getBoundingClientRect().height) < 1);
+
+    // `/_log` is the shell's own mirror of the log to the dev server, posted
+    // only on 127.0.0.1, and is the shell's request rather than this page's.
+    const mine = (list) => list.filter((r) => new URL(r.name).pathname !== '/_log');
+    const res = mine(performance.getEntriesByType('resource'));
+    const foreign = res.filter((r) => new URL(r.name).origin !== location.origin);
+    A('stepping every slide fetched nothing, and nothing came from another host',
+      res.length === resBefore && foreign.length === 0,
+      `${resBefore} before, ${res.length} after, ${foreign.length} foreign`
+        + (res.length !== resBefore ? `: ${res.slice(resBefore).map((r) => new URL(r.name).pathname).join(' ')}` : ''));
+    go(0);
+  }
+
+  if (SELFCHECK) {
+    try { await check(); } catch (e) { d.assert('the checks ran to the end', false, String(e?.stack || e)); }
+  }
+  d.ready();
+</script>
+</html>
