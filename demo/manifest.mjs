@@ -468,14 +468,13 @@ export const DEMOS = [
   { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
     one: 'say which instrument should play which, and a language model makes the connection on the desk',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
-  { name: 'wall', group: 'instruments', act: 4, created: '2026-10-04', built: true, unlisted: true,
-    one: 'A screen that joins the studio\u2019s patchbay as a projection wall and shows whatever light and captions a timeline sends it.',
-    tags: [] },
+  // `wall` was its own unlisted page 2026-10-04 and is the WALL tab of
+  // /partitur/ since 2026-10-05, no redirect.
   { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true,
     one: 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.',
     tags: ['WebCodecs'] },
   { name: 'partitur', group: 'timeline', act: 4, created: '2026-10-04', built: true,
-    one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline with its light lane on the projection wall.',
+    one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline whose light any other screen can show as a projection wall.',
     tags: [] },
   // /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
   // SCHEDULE, BEAT, LOOPS, SCORE, DATES from transport, lanes, loops, score and
