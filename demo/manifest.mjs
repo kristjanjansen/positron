@@ -213,12 +213,9 @@ export const DEMOS = [
   { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
     one: 'every 1965 newsreel in ERR\'s archive is a mark on one line at the day it was broadcast',
     tags: ['archive', 'timeline'] },
-  { name: 'now', group: 'technologies', act: 5, created: '2026-09-08', built: true,
-    one: 'one ERR television channel on a line whose right-hand end is the present moment',
-    tags: ['HLS', 'live', 'timeline', 'DVR'],
-    // master + a 218 KB media playlist + first fragments + first PDT + one EPG
-    // fetch + a 13-point two-byte sweep, all behind control 0
-    settleMs: 26000, lightSettleMs: 15000 },
+  // `now` (one ERR television channel on a line whose right-hand end is the
+  // present moment) merged into `flipper` 2026-10-05 on *"you promised to merge
+  // flipper and now"*. The old page is archive/demos/now-index.html. No redirect.
   // `gl: true` and `xr: true` for the same reason mirror and blocks carry them:
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
@@ -230,9 +227,11 @@ export const DEMOS = [
     // of fetching before there is much to see
     settleMs: 4000 },
   { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
-    one: 'eight live ERR channels in equal cells',
-    tags: ['HLS', 'icecast', 'DVR'],
-    settleMs: 14000, lightSettleMs: 6000 },
+    one: 'three live ERR television channels on a line whose right-hand end is the present moment',
+    tags: ['HLS', 'live', 'timeline', 'DVR'],
+    // Start opens one channel and, under a harness, runs the line's checks and a
+    // switch away and back; the Start button stays busy until they finish
+    settleMs: 26000, lightSettleMs: 8000 },
   // Everything that could be reached about one artist, before anything is
   // played: 122 rows out of fourteen archives, saying when it is from, who
   // holds it, what it is, whether there is a file and what its licence allows.
@@ -308,9 +307,9 @@ export const DEMOS = [
   // `remixer` (stack archive recordings from any year on one playhead) was
   // ARCHIVED 2026-10-05 on *"archvie remixer demo"*: the page is in
   // archive/remixer/ and /proto/remixer/ no longer answers. ⚠️ EXCEPT
-  // `proto/remixer/hls.min.js`, which stays put and stays built, because eight
-  // pages load hls.js from that path (reel, llhls, flipper, cam, now, station,
-  // floor, sync). Moving it is a separate change across those eight.
+  // `proto/remixer/hls.min.js`, which stays put and stays built, because seven
+  // pages load hls.js from that path (reel, llhls, flipper, cam, station,
+  // floor, sync). Moving it is a separate change across those seven.
 
   // ⚠️ `studio` IS GONE FROM THE LIST AND THERE WAS NOTHING TO ARCHIVE. It never
   // had a page: the row was a placeholder carrying `why: 'consumes 10 through
