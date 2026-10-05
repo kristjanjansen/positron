@@ -265,6 +265,10 @@
   .kit-sl .sl[aria-label="the scale"] .sl-line { line-height: 1; margin: 0; }
   /* THE LOGO set solid, the three lines one mark: no gap between them. */
   .kit-sl .sl[aria-label="logo"] .sl-ev { gap: 0; }
+  /* THE + AS A SUPERSCRIPT, as the positron is written, β⁺. Asked 2026-10-05:
+     *"+ as superscript?"*. A span raised and made smaller rather than U+207A,
+     which the vendored subsets do not carry. */
+  .kit-sl .sl[aria-label="logo"] .sl-line .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
   .kit-oled { width: fit-content; max-width: 100%; padding: 10px; background: #000;
               border: 1px solid var(--line); border-radius: 4px; }
   .kit-oled canvas { display: block; image-rendering: pixelated;
@@ -1570,12 +1574,10 @@
    * scale and every rule a slide obeys (16:9, inset, the ⛶) is the logo's too.
    *   β+        step 6, the largest step the scale declares; there is no 7 and
    *             a mark does not get a private size.
-   *   positron  step 4 and studio on the line under it. Two steps down, 2.25
-   *   studio    times smaller, so the words read as the name under a symbol and
-   *             not as a second headline; at step 3 `positron` would be 43 cqh
-   *             wide against the symbol's 36, almost the same width, which is
-   *             the nervous kind of difference; at step 4 it is 65, clearly
-   *             wider.
+   *   positron  step 3 and studio on the line under it, three steps down.
+   *   studio    It was step 4 until the owner asked the same evening: *"1 step
+   *             smalle for 'positron studio'"*. At step 3 `positron` is about
+   *             as wide as the symbol, so the words sit under it as its name.
    * Left on the inset (`layout: 'left'`), the three lines set solid with no
    * gap between them, so they are one mark rather than three paragraphs.
    * ⚠️ ONE COLOUR, THE ACCENT, AND ONLY ON THE `+`. It is the charge, the one
@@ -1588,13 +1590,13 @@
    */
   const brand = { logo: null };
   section('brand', 'LOGO',
-    'The mark, drawn by the slide engine: β+ at step 6 and positron and studio under it at step 4, '
+    'The mark, drawn by the slide engine: β+ at step 6 and positron and studio under it at step 3, '
     + 'left on the inset, the accent on the + alone. Set in the slide face, the β from its Greek subset.',
-    `createSlide({ layout: 'left', lines: [[6, 'β*+*'], [4, 'positron'], [4, 'studio']] }, { full: true })`,
+    `createSlide({ layout: 'left', lines: [[6, 'β*+*'], [3, 'positron'], [3, 'studio']] }, { full: true })`,
     (box) => {
       box.classList.add('kit-sl');
       brand.logo = createSlide({ name: 'logo', layout: 'left',
-        lines: [[6, 'β*+*'], [4, 'positron'], [4, 'studio']] }, { host: box, full: true });
+        lines: [[6, 'β*+*'], [3, 'positron'], [3, 'studio']] }, { host: box, full: true });
     });
 
   /**
@@ -13463,8 +13465,13 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     const steps = lines.map((p) => +p.dataset.step);
     const sized = lines.every((p) => tol(parseFloat(getComputedStyle(p).fontSize), stepOf(+p.dataset.step).size / 100 * h, 0.5));
     const order = lines.every((p, i) => i === 0 || p.getBoundingClientRect().top >= lines[i - 1].getBoundingClientRect().bottom - 1);
-    d.assert('BRAND: the tab exists and its LOGO draws β+, then positron, then studio, top to bottom, at declared steps 6, 4 and 4',
-      tabThere && texts.join('|') === 'β+|positron|studio' && order && steps.join() === '6,4,4' && sized,
+    // the + is a superscript, as in the physics notation: smaller than the β and
+    // its foot above the β's baseline
+    const sup = lines[0].querySelector('.sl-hi');
+    const raised = !!sup && parseFloat(getComputedStyle(sup).fontSize) < parseFloat(getComputedStyle(lines[0]).fontSize) * 0.7
+      && sup.getBoundingClientRect().bottom < lines[0].getBoundingClientRect().bottom - 0.2 * parseFloat(getComputedStyle(lines[0]).fontSize);
+    d.assert('BRAND: the tab exists and its LOGO draws β+, then positron, then studio, top to bottom, at declared steps 6, 3 and 3, the + raised',
+      tabThere && texts.join('|') === 'β+|positron|studio' && order && steps.join() === '6,3,3' && sized && raised,
       `${tabThere ? 'BRAND in the row' : 'NO BRAND TAB'}; ${texts.map((t) => `"${t}"`).join(', ')} ${order ? 'in order' : 'OUT OF ORDER'}, `
       + `steps ${steps.join(', ')}, sizes ${sized ? 'at their step' : 'OFF THEIR STEP'} on a ${h} px slide`);
 
@@ -13491,7 +13498,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     const inSlide = ink(`600 100px 'Slide JetBrains Mono'`), inFallback = ink(`600 100px ${monoStack}`);
     const differs = inSlide.some((v, i) => Math.abs(v - inFallback[i]) > 0.5);
     d.assert('BRAND: the β is drawn in the slide face from its Greek subset, at the face’s own advance, and only the + wears the accent',
-      greek?.status === 'loaded' && differs && tol(betaW / em, advance, 0.005) && tol(betaW, plusW, 0.5) && !!plus && plus.textContent === '+'
+      greek?.status === 'loaded' && differs && tol(betaW / em, advance, 0.005) && plusW > 0.4 * betaW && plusW < 0.7 * betaW && !!plus   // the + is a superscript at 0.55 em now
+        && plus.textContent === '+'
         && getComputedStyle(plus).color !== getComputedStyle(span).color,
       `the Greek face ${greek ? greek.status : 'NOT DECLARED'}; the β's ink at 100 px ${inSlide.map((v) => v.toFixed(1)).join('/')} `
       + `against ${inFallback.map((v) => v.toFixed(1)).join('/')} in the page's mono, ${differs ? 'a different glyph' : 'THE SAME GLYPH, A FALLBACK'}; `
