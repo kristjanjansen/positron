@@ -82,8 +82,9 @@ and one serving SILENCE reads 38/38 too. Both are in `BACKLOG.md`.
 ✅ **AND `/now/` AND `/flipper/` HAVE THEIRS SINCE 2026-09-18, WHICH WAS THE
 LAST PAIR STILL POINTED AT A BROADCASTER.** `demo/fake-err.mjs` is an HLS live
 edge that is nobody's broadcaster: a master, a media playlist sliding with wall
-clock at 2 s a segment over a 2 h window, one `PROGRAM-DATE-TIME`, MPEG-TS that
-really decodes, Range, `#EXT-X-DISCONTINUITY` at the pool's one seam, the
+clock at 1.92 s a segment over a 2 h window (3750 of them), one
+`PROGRAM-DATE-TIME`, fMP4 behind one `#EXT-X-MAP` that really decodes, a
+`?id=` session the master mints and the variant insists on, Range, `#EXT-X-DISCONTINUITY` at the pool's one seam, the
 schedule endpoint and the five radio mounts. `demo/shell/err-live.mjs` gained
 `errUrl()` and a `?base=`, and `/flipper/` now imports `CHANNELS` from it rather
 than holding a fourth copy. **MEASURED, AND RE-RUN INDEPENDENTLY: `now` and
@@ -1271,10 +1272,17 @@ on every segment would let a page be sloppy about accumulating `EXTINF` and stil
 look correct here.** The schedule is contiguous across midnight for the same
 reason: **a grid that stopped at 23:30 and started again at 00:30 would fail
 `/now/`'s "every programme starts where the previous one ended" on a page that is
-working.** And the segment duration is read off ERR rather than chosen: **at 2 s a
-two hour window is 3600 segments and about a 218 KB playlist, where a stand-in at
-6 s would hand the page a 73 KB playlist and quietly remove two thirds of the
-parsing work it is supposed to be grading.**
+working.** And the segment duration is read off ERR rather than chosen: **1.92 s
+and 3750 segments, MEASURED twice; a stand-in at 6 s would hand the page a
+playlist a third the length and quietly remove two thirds of the parsing work it
+is supposed to be grading.**
+🔴 **AND FOR A MONTH IT WAS NOT READ OFF ERR, WHILE A COMMENT SAID IT WAS.**
+Until 2026-10-05 the television half was 2 s, 3600 segments, MPEG-TS and no
+session, against a record that measured 1.92 s, 3750, fMP4 and a `?id=` the
+variant 400s without. The missing session is the one that cost something: `/now/`
+re-read the master once a second, opening a new session at ERR every second, and
+a stand-in with no sessions could not tell that from opening one. **Check a
+stand-in against the measurement it claims, not against its own comment.**
 
 ⚠️ **THE BUILD NOTICE IGNORES `quiet`, AND THAT IS NOT AN OVERSIGHT.** Making the
 pool blocks for about a minute the first time on a machine, **and a harness that

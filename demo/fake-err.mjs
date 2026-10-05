@@ -83,16 +83,19 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 /**
- * 🔴 TWO SECONDS A SEGMENT, AND IT IS READ OFF ERR RATHER THAN CHOSEN.
- * `/flipper/`'s own comment prices its wall backoff as *"three segments left six
- * seconds of material"*, and `/now/`'s manifest entry budgets its settle for
- * *"a 218 KB media playlist"*. Both only make sense at 2 s: a two hour window is
- * then 3600 segments, and 3600 lines of `#EXTINF` plus a filename comes to about
- * 218 KB. A stand-in at 6 s would hand the page a 73 KB playlist and quietly
- * remove two thirds of the parsing work it is supposed to be grading.
+ * 🔴 1.92 SECONDS A SEGMENT AND 3750 OF THEM, BECAUSE THAT IS WHAT WAS MEASURED.
+ * This said two seconds and 3600 until 2026-10-05, under a heading claiming
+ * the number was read off ERR. It was not: `research/err-live-feeds-2026-08.md`
+ * and `plans/plan-live-timeline.md` both MEASURED `#EXTINF:1.92` on every one
+ * of 3750 segments, 7200.00 s exactly, on TV and radio alike, and the radio
+ * half of this file already used 1920 ms. A stand-in on a round number lets a
+ * page get away with assuming one.
+ * 1.92 s is 48 frames at ERR's 25 fps and 90 AAC frames at 48 kHz, so every
+ * segment cuts on a keyframe and on an audio frame boundary.
  */
-const SEG_S = 2;
-const WINDOW_N = 3600;                    // 2 h, which is what ERR advertises
+const SEG_MS = 1920;
+const SEG_S = SEG_MS / 1000;
+const WINDOW_N = 3750;                    // 2 h exactly, measured
 /**
  * 🔴 THE POOL IS AS LONG AS THE WINDOW, WHICH BUYS EXACTLY ONE SEAM.
  * Segment `sn` is served from pool file `sn % WINDOW_N`, so a playlist of
@@ -101,10 +104,11 @@ const WINDOW_N = 3600;                    // 2 h, which is what ERR advertises
  * discontinuity every few minutes across a window a page seeks around inside.
  */
 const POOL_N = WINDOW_N;
-const FPS = 10;
+const FPS = 25;                           // ERR's frame rate, measured
+const GOP = Math.round((FPS * SEG_MS) / 1000);   // 48
 const SIZE = '320x180';
 const CACHE = join(tmpdir(), 'positron-fake-err');
-const POOL = join(CACHE, `pool-${SIZE}-${FPS}-${SEG_S}s-${POOL_N}`);
+const POOL = join(CACHE, `pool-fmp4-${SIZE}-${FPS}-${SEG_MS}ms-${POOL_N}`);
 const TONE = join(CACHE, 'tone-128.mp3');
 
 const IDS = ['etv', 'etv2', 'etvpluss'];
@@ -166,12 +170,20 @@ const MOUNTS = ['vikerraadio', 'raadio2', 'klassikaraadio', 'raadio4', 'raadiota
 // ── the picture ────────────────────────────────────────────────────────────
 
 /**
- * Two hours of segmented MPEG-TS, generated once and kept.
+ * Two hours of segmented fMP4, generated once and kept.
  *
- * 🔴 EVERY SEGMENT IS EXACTLY 2.000000 s, WHICH IS WHAT MAKES A SEQUENCE NUMBER
- * A CLOCK. `-g 20` at 10 fps puts a keyframe on every two second boundary and
- * `-sc_threshold 0` stops the encoder inserting its own, so `-hls_time 2` cuts
- * where it is told: verified over 60 segments, one distinct `#EXTINF` value.
+ * 🔴 fMP4, NOT MPEG-TS, BECAUSE ERR's TELEVISION IS fMP4. MEASURED twice
+ * (`research/err-live-feeds-2026-08.md`, `plans/plan-live-timeline.md`):
+ * CMAF `.m4s` segments behind one `#EXT-X-MAP` init segment. hls.js takes a
+ * different path for each (it transmuxes TS and passes fMP4 through), so a TS
+ * stand-in graded a path ERR's picture never takes. This was TS until
+ * 2026-10-05.
+ *
+ * 🔴 EVERY SEGMENT IS EXACTLY 1.92 s, WHICH IS WHAT MAKES A SEQUENCE NUMBER
+ * A CLOCK. `-g 48` at 25 fps puts a keyframe on every 1.92 s boundary and
+ * `-sc_threshold 0` stops the encoder inserting its own, so `-hls_time 1.92`
+ * cuts where it is told. The build refuses a pool whose playlist carries any
+ * other `#EXTINF` value.
  * Without that, segment `sn` would not start at `sn * 2000` and the sliding
  * window's arithmetic would drift against wall time by a few milliseconds per
  * segment, which over a two hour window is minutes.
@@ -182,7 +194,8 @@ const MOUNTS = ['vikerraadio', 'raadio2', 'klassikaraadio', 'raadio4', 'raadiota
  * down. The rename is the commit.
  */
 function makePool(say) {
-  if (existsSync(POOL) && readdirSync(POOL).filter((f) => f.endsWith('.ts')).length === POOL_N) return true;
+  const count = (d) => readdirSync(d).filter((f) => f.endsWith('.m4s')).length;
+  if (existsSync(POOL) && count(POOL) === POOL_N && existsSync(join(POOL, 'init.mp4'))) return true;
   const tmp = `${POOL}.building-${process.pid}`;
   rmSync(tmp, { recursive: true, force: true });
   rmSync(POOL, { recursive: true, force: true });
@@ -194,12 +207,13 @@ function makePool(say) {
       '-f', 'lavfi', '-i', `testsrc2=size=${SIZE}:rate=${FPS}:duration=${secs}`,
       '-f', 'lavfi', '-i', `sine=frequency=330:duration=${secs}`,
       '-c:v', 'libx264', '-preset', 'veryfast',
-      '-g', String(FPS * SEG_S), '-keyint_min', String(FPS * SEG_S), '-sc_threshold', '0',
+      '-g', String(GOP), '-keyint_min', String(GOP), '-sc_threshold', '0',
       '-pix_fmt', 'yuv420p', '-b:v', '70k', '-maxrate', '90k', '-bufsize', '180k',
-      '-c:a', 'aac', '-b:a', '24k', '-ar', '44100', '-ac', '1',
+      '-c:a', 'aac', '-b:a', '24k', '-ar', '48000', '-ac', '1',
       '-f', 'hls', '-hls_time', String(SEG_S), '-hls_list_size', '0',
       '-hls_flags', 'independent_segments',
-      '-hls_segment_filename', join(tmp, 'seg-%05d.ts'), join(tmp, 'pool.m3u8')],
+      '-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4',
+      '-hls_segment_filename', join(tmp, 'seg-%05d.m4s'), join(tmp, 'pool.m3u8')],
       { timeout: 10 * 60 * 1000 });
   } catch (e) {
     // ⚠️ IT SAYS WHY AND RETURNS FALSE RATHER THAN EXITING, the same as the
@@ -215,10 +229,19 @@ function makePool(say) {
   // written fewer segments than asked would give a window with a hole in it
   // that answers exactly like a rights refusal, which is the one thing this
   // file exists to be able to tell apart.
-  const got = readdirSync(tmp).filter((f) => f.endsWith('.ts')).length;
-  if (got !== POOL_N) {
+  const got = count(tmp);
+  if (got !== POOL_N || !existsSync(join(tmp, 'init.mp4'))) {
     rmSync(tmp, { recursive: true, force: true });
     console.error(`ffmpeg wrote ${got} segments and ${POOL_N} were asked for; not serving a window with a hole in it`);
+    return false;
+  }
+  // A sequence number is only a clock if every segment is the length the
+  // playlist says. Ask ffmpeg's own playlist rather than trusting the flags.
+  const lens = new Set((readFileSync(join(tmp, 'pool.m3u8'), 'utf8').match(/#EXTINF:[\d.]+/g) || [])
+    .map((l) => Number(l.slice(8)).toFixed(3)));
+  if (lens.size !== 1 || !lens.has(SEG_S.toFixed(3))) {
+    rmSync(tmp, { recursive: true, force: true });
+    console.error(`ffmpeg cut segments of ${[...lens].join(', ')} s and ${SEG_S} was asked for; not serving a clock that drifts`);
     return false;
   }
   renameSync(tmp, POOL);
@@ -345,7 +368,7 @@ function radioMedia(now = Date.now()) {
  * is still being written is not offered by anybody.
  */
 function edge(atMs = Date.now()) {
-  const latest = Math.floor(atMs / (SEG_S * 1000)) - 1;
+  const latest = Math.floor(atMs / SEG_MS) - 1;
   return { latest, first: latest - WINDOW_N + 1 };
 }
 
@@ -361,7 +384,7 @@ function serves(arrangement, id, sn, now = Date.now()) {
   const { first, latest } = edge(now);
   if (sn < first || sn > latest) return false;
   const ch = ARRANGEMENTS[arrangement][id];
-  const n = Math.round((ch.minutes * 60) / SEG_S);
+  const n = Math.round((ch.minutes * 60 * 1000) / SEG_MS);
   if (ch.refuse === 'newest') return sn <= latest - n;
   if (ch.refuse === 'oldest') return sn >= first + n;
   return true;
@@ -402,13 +425,33 @@ function parseRange(header, total) {
 
 const iso = (ms) => new Date(ms).toISOString().replace('Z', '+00:00');
 
+/**
+ * 🔴 A FRESH SESSION ON EVERY READ OF THE MASTER, AND A VARIANT THAT REFUSES TO
+ * ANSWER WITHOUT ONE IT MINTED. MEASURED (`research/err-live-feeds-2026-08.md`):
+ * the master mints `?id=<15 digits>`, a bare variant answers 400, and a stale
+ * or foreign id answers `Failed to set session: not found`. Until 2026-10-05 the
+ * television half of this file had no session at all, so a page that re-read
+ * the master every second, opening a new session at ERR each time, looked
+ * exactly like one that opened one.
+ * ⚠️ SESSIONS HERE NEVER EXPIRE. How long ERR keeps one is NOT measured, so a
+ * page's recovery from an expired session is not graded by this file.
+ */
+const SESSIONS = new Set();
+const SESSION_CAP = 10000;
+function mint() {
+  const id = String(Math.floor(1e14 + Math.random() * 9e14));
+  SESSIONS.add(id);
+  if (SESSIONS.size > SESSION_CAP) SESSIONS.delete(SESSIONS.values().next().value);
+  return id;
+}
+
 function masterPlaylist(id) {
   return ['#EXTM3U',
-    '#EXT-X-VERSION:6',
+    '#EXT-X-VERSION:7',
     '#EXT-X-INDEPENDENT-SEGMENTS',
     '#EXT-X-STREAM-INF:BANDWIDTH=180000,AVERAGE-BANDWIDTH=120000,'
-    + `RESOLUTION=${SIZE},CODECS="avc1.4d400d,mp4a.40.2",FRAME-RATE=${FPS}.000`,
-    `${id}/index.m3u8`, ''].join('\n');
+    + `RESOLUTION=${SIZE},CODECS="avc1.64000c,mp4a.40.2",FRAME-RATE=${FPS}.000`,
+    `${id}/index.m3u8?id=${mint()}`, ''].join('\n');
 }
 
 /**
@@ -426,15 +469,16 @@ function masterPlaylist(id) {
 function mediaPlaylist(id, now = Date.now()) {
   const { first, latest } = edge(now);
   const out = ['#EXTM3U',
-    '#EXT-X-VERSION:6',
-    `#EXT-X-TARGETDURATION:${SEG_S}`,
+    '#EXT-X-VERSION:7',
+    `#EXT-X-TARGETDURATION:${Math.ceil(SEG_S)}`,
     `#EXT-X-MEDIA-SEQUENCE:${first}`,
     `#EXT-X-DISCONTINUITY-SEQUENCE:${Math.floor(first / POOL_N)}`,
     '#EXT-X-INDEPENDENT-SEGMENTS',
-    `#EXT-X-PROGRAM-DATE-TIME:${iso(first * SEG_S * 1000)}`];
+    '#EXT-X-MAP:URI="init.mp4"',
+    `#EXT-X-PROGRAM-DATE-TIME:${iso(first * SEG_MS)}`];
   for (let sn = first; sn <= latest; sn++) {
     if (sn !== first && sn % POOL_N === 0) out.push('#EXT-X-DISCONTINUITY');
-    out.push(`#EXTINF:${SEG_S}.000000,`, `seg-${sn}.ts`);
+    out.push(`#EXTINF:${SEG_S.toFixed(6)},`, `seg-${sn}.m4s`);
   }
   out.push('');
   return out.join('\n');
@@ -491,7 +535,7 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
   // indistinguishable from a harness that has hung. Everything after it is
   // ordinary chatter and stays quiet.
   if (!makePool(console.log)) return null;
-  const poolSize = readdirSync(POOL).filter((f) => f.endsWith('.ts'))
+  const poolSize = readdirSync(POOL).filter((f) => f.endsWith('.m4s'))
     .reduce((n, f) => n + statSync(join(POOL, f)).size, 0);
   const tone = makeTone();
   say(`${POOL_N} segments of ${SEG_S}s, ${(poolSize / 1048576).toFixed(0)} MB · ${POOL}`);
@@ -512,7 +556,7 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
     const path = pre ? pre[2] : url.pathname;
 
     // ── a segment ──────────────────────────────────────────────────────────
-    const seg = /^\/live\/([a-z0-9]+)\/seg-(\d+)\.ts$/.exec(path);
+    const seg = /^\/live\/([a-z0-9]+)\/seg-(\d+)\.m4s$/.exec(path);
     if (seg && IDS.includes(seg[1])) {
       const [, id, snText] = seg;
       const sn = Number(snText);
@@ -534,10 +578,14 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
         res.writeHead(403, { 'content-type': 'text/plain' });
         return res.end('rights\n');
       }
-      const file = join(POOL, `seg-${String(sn % POOL_N).padStart(5, '0')}.ts`);
+      const file = join(POOL, `seg-${String(sn % POOL_N).padStart(5, '0')}.m4s`);
       if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
-      return serveFile(req, res, file, 'video/mp2t');
+      return serveFile(req, res, file, 'video/mp4');
     }
+    // The one init segment every `.m4s` decodes against. ⚠️ Whether ERR ever
+    // refuses its init segment is NOT measured; here it is always served.
+    const init = /^\/live\/([a-z0-9]+)\/init\.mp4$/.exec(path);
+    if (init && IDS.includes(init[1])) return serveFile(req, res, join(POOL, 'init.mp4'), 'video/mp4');
 
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
 
@@ -570,7 +618,13 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
     const master = /^\/live\/([a-z0-9]+)\.m3u8$/.exec(path);
     if (master && IDS.includes(master[1])) return text(res, masterPlaylist(master[1]), 'application/vnd.apple.mpegurl');
     const media = /^\/live\/([a-z0-9]+)\/index\.m3u8$/.exec(path);
-    if (media && IDS.includes(media[1])) return text(res, mediaPlaylist(media[1]), 'application/vnd.apple.mpegurl');
+    if (media && IDS.includes(media[1])) {
+      if (!SESSIONS.has(url.searchParams.get('id') || '')) {
+        res.writeHead(400, { ...CORS, 'content-type': 'text/plain' });
+        return res.end('Failed to set session: not found\n');
+      }
+      return text(res, mediaPlaylist(media[1]), 'application/vnd.apple.mpegurl');
+    }
 
     // ── what was on ────────────────────────────────────────────────────────
     if (path === '/api/tvSchedule/getTimelineSchedule') {
