@@ -1,5 +1,6 @@
 ## Open
 
+- **Kit slides: full screen fills the background, keeps the border** (2026-10-05, screenshot with black letterbox bands): *"fill full bg but keep border"*. Handed to the same agent.
 - **Kit slides: remove ILLUSTRATION ON THE RIGHT** (2026-10-05): *"rm ILLUSTRATION ON THE RIGHT slide"*. Handed to the same agent.
 - **Kit slides: thicker diagram borders, spacing to match** (2026-10-05): *"make diagrams thinker borders in slides, adjust spacing accordinglu"*. Slides only. Handed to the same agent.
 - **Kit slides: a full screen button on every sample, shown on hover** (2026-10-05): *"add go to fullscreen button (active when mouseover) on all kit slide samples"*. Handed to the tables and logs agent, same files.
