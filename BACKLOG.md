@@ -1,5 +1,7 @@
 ## Open
 
+- **`/kit/` ROUTER FIRMWARE screen size** (2026-10-05): *"ROUTER FIRMWARE - same screen size as othters"*. `demo/kit/index.html`, the router block's `oledScreen`.
+
 - **UX review and fix, round 2** (2026-10-05, *"review and fix all"*): review `/partitur/` and `/stage/` like the tabbed pages, and fix the five left from round 1: REPLAY empty black box before play (`demo/sync/after.mjs`), LOOPS arrow-only button (`demo/time/loops.mjs`), shared `createHardware` "Enable soundcard / MIDI and play" label, KEYBOARD readout keys (`demo/wire/notes.mjs`, checks read them by key), primary buttons in sentence case beside uppercase siblings (`.pos-pri`, kit-wide).
 
 - ~~**Three leftovers from the tabbed-page review** (2026-10-05, *"do all"*): `/time/` manifest `one` describes only the clock tab; the DATES aggregate lane note is jargon (`strip.mjs`, shared); `/partitur/` SCORE link picks do not share a label column. Plus the standing reds: `/wire/` KEYBOARD onset, `/capture/` RECEIVER WebRTC never connects, `/capture/` seek 1334 vs 1391.~~ Done 2026-10-05: all three fixed; the WebRTC reds were the Check Point tunnel being the only host candidate, worked around in `verify.mjs` with an audio-only permission grant for `wire` and `capture`; the seek red did not reproduce alone.
