@@ -83,22 +83,14 @@
      demo"*. It is step 2 of that plan made visible: `bay.mjs` knows eight
      media, and a link of a heavy one carries a session instead of bytes. */
   d.stack.titled('WHY',
-    say('positron moves notes, sound, video, shader code and recordings between browsers, a Raspberry Pi, '
-      + 'Cloudflare and other people’s servers, and until now every pair had code of its own. Here each of '
-      + 'them is a link in one graph of things, the ports on them and the links between ports.',
-      'A light link, MIDI or a program, carries its bytes through the routing core. A heavy link, sound or '
-      + 'video, only describes a stream, which transport, which address and what shape, and the two ends open it '
-      + 'themselves. The transport is chosen from where the two ends are, out of latencies measured on this desk.',
-      'A MIDI link runs through the routing core, the part small enough for a microcontroller, which moves '
-      + 'notes onto channels, keeps ranges and holds anything that could overwrite a saved sound until a '
-      + 'person says yes. The same core is written again in C, and both are graded against the test cases '
-      + 'at the bottom of this page.',
-      'A link is only described until you select it and press Open. Sound and video from the Pi to this '
-      + 'browser, sound into the recordings and back out of them, and these keys to an instrument or a synth '
-      + 'open for real, and Unlink closes what Open opened.',
-      'A recording is made by this browser from the sound it hears, uploaded to Cloudflare in four second pieces '
-      + 'while the link is open and kept for six hours, and a link from the recordings to this screen plays the '
-      + 'newest one back.'));
+    say('positron moves notes, sound, video, code and recordings between browsers, a Raspberry Pi and '
+      + 'Cloudflare, and every pair used to have code of its own. Here each is a link between two ports.',
+      'A light link, MIDI or a program, carries its bytes through the routing core, which also runs on a '
+      + 'microcontroller and holds anything that could overwrite a saved sound until a person says yes. A heavy '
+      + 'link, sound or video, only describes the stream, and the ends open it over a transport chosen from '
+      + 'where they are.',
+      'A link opens for real only when you select it and press Open. Recordings go to Cloudflare in four '
+      + 'second pieces and are kept for six hours.'));
 
   // ── the desk ─────────────────────────────────────────────────────────────
   //
