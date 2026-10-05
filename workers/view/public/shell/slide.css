@@ -65,7 +65,17 @@
 .sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-side="right"]:not([hidden])) {
   background: linear-gradient(to right, var(--card) 50%, var(--bg) 50%);
 }
-.sl-player[data-full] .sl { border: var(--edge); border-radius: var(--r); }
+.sl-player[data-full] .sl {
+  border: var(--edge); border-radius: var(--r);
+  width: min(100cqw - 2 * var(--sl-full-m), calc((100cqh - 2 * var(--sl-full-m)) * 16 / 9));
+  height: min(100cqh - 2 * var(--sl-full-m), calc((100cqw - 2 * var(--sl-full-m)) * 9 / 16));
+}
+/* 🔴 AND THE EDGE STANDS OFF THE SCREEN'S EDGE. Asked 2026-10-05 with a
+   screenshot of the edge running along both sides of a 16:10 screen: *"border
+   is on edges of screen"*. A 16:9 slide on a wider-than-tall screen fills the
+   width, so a kept edge lands on the bezel. The slide is fitted inside the
+   screen less this margin on every side, so the edge is always visible. */
+.sl-player, .sl-frame { --sl-full-m: 4cqmin; }
 .sl-player:focus { outline: none; }
 .sl-player:focus-visible { outline: 1px solid var(--hi); outline-offset: 2px; }
 
@@ -84,8 +94,8 @@
 .sl-frame.pos-full:has(> .sl[data-layout="split"][data-side="left"]) { background: linear-gradient(to right, var(--bg) 50%, var(--card) 50%); }
 .sl-frame.pos-full:has(> .sl[data-layout="split"][data-side="right"]) { background: linear-gradient(to right, var(--card) 50%, var(--bg) 50%); }
 .sl-frame.pos-full > .sl {
-  width: min(100cqw, calc(100cqh * 16 / 9));
-  height: min(100cqh, calc(100cqw * 9 / 16));
+  width: min(100cqw - 2 * var(--sl-full-m), calc((100cqh - 2 * var(--sl-full-m)) * 16 / 9));
+  height: min(100cqh - 2 * var(--sl-full-m), calc((100cqw - 2 * var(--sl-full-m)) * 9 / 16));
 }
 /* THE ⛶, the video panel's square (`.pos-vp button.ico`), bottom right where
    the panel keeps its own. Hidden until a pointer is on the slide or the slide

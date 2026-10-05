@@ -1692,22 +1692,6 @@
     `{ say: '*Break* the check first', statement: true, cap: '38/38 still green ...' }`,
     { name: 'sabotage', say: '*Break* the check first', statement: true,
       cap: '38/38 still green with every recording silent' });
-  // plans/plan.md:54-57, hls.latency behind the live edge, same stream, same
-  // configuration: stock 7.60 and 15.41 s, with the seek correction 1.87 and 3.05 s.
-  slideBlock('HEADLINE OVER A STACK',
-    'A combination: figures whose decimal points fall in one column. Four rows drop to step 2, '
-    + 'because four at step 3 do not fit under a two line headline.',
-    `{ say: 'Stock hls.js parks where it starts', stack: [['stock, run A', '7.60', 's'], ...] }`,
-    { name: 'llhls', say: 'Stock hls.js parks where it starts',
-      stack: [['stock, run A', '7.60', 's'], ['stock, run B', '15.41', 's'],
-        ['tuned, run A', '*1.87*', 's'], ['tuned, run B', '*3.05*', 's']] });
-  // PROGRESS.md:4712-4719, as on the player's third slide.
-  slideBlock('HEADLINE OVER A TABLE',
-    'A combination: a table of text padded with spaces, so a column is a character position.',
-    `{ say: 'MoQ is quicker, WebRTC steadier', rows: { head: ['', 'p50', 'p95', 'p99'], body, align: 'lrrr' } }`,
-    { name: 'transports', say: 'MoQ is quicker, WebRTC steadier',
-      rows: { head: ['', 'p50', 'p95', 'p99'],
-        body: [['MoQ', '*26.2*', '42.4', '104.8'], ['WHEP', '67.0', '76.9', '*84.1*']], align: 'lrrr' } });
   // ── TABLES WITH ROW LINES ─────────────────────────────────────────────────
   // Asked 2026-10-05: *"i do not see tables layout. horiz lines but try with
   // rounded corner outer border and not"*. HEADLINE OVER A TABLE above stays
@@ -12426,7 +12410,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const off = align.filter((a) => a.worst > 0.5);
       const dotCols = align.reduce((n, a) => n + a.dots.length, 0);
       d.assert('SLIDES: every table keeps its character columns and decimal points within 0.5 px, lines and padding included',
-        off.length === 0 && dotCols >= 6 && align.some((a) => a.frame === 'box') && align.some((a) => a.frame === 'none'),
+        // 4 since HEADLINE OVER A TABLE was removed on the owner's word, 2026-10-05
+        off.length === 0 && dotCols >= 4 && align.some((a) => a.frame === 'box') && align.some((a) => a.frame === 'none'),
         `${align.length} tables, ${dotCols} decimal columns, worst ${Math.max(...align.map((a) => a.worst)).toFixed(2)} px`
         + `${off.length ? `, off: ${off.map((a) => `${a.name} ${a.worst.toFixed(2)}`).join(', ')}` : ''}`);
     }
@@ -12484,18 +12469,22 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       await frames(10);
       const fr = target.frame, fcs = getComputedStyle(fr), r = target.el.getBoundingClientRect(), scs = getComputedStyle(target.el);
       const vw = fr.clientWidth, vh = fr.clientHeight;
-      const wantW = Math.min(vw, vh * 16 / 9);
+      // the edge stands off the screen's edge by 4 per cent of its short side
+      const m = 0.04 * Math.min(vw, vh);
+      const wantW = Math.min(vw - 2 * m, (vh - 2 * m) * 16 / 9);
+      const frR = fr.getBoundingClientRect();
+      const gap = Math.min(r.left - frR.left, frR.right - r.right, r.top - frR.top, frR.bottom - r.bottom);
       const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim();
       const probe = document.createElement('div'); probe.style.background = card; document.body.append(probe);
       const cardRgb = getComputedStyle(probe).backgroundColor; probe.remove();
       const sayPx = parseFloat(getComputedStyle(say).fontSize), sayWant = stepOf(4).size / 100 * target.el.clientHeight;
       const rootR = getComputedStyle(document.documentElement).getPropertyValue('--r').trim();
       const centred = tol(r.left + r.width / 2, fr.getBoundingClientRect().left + vw / 2, 1) && tol(r.top + r.height / 2, fr.getBoundingClientRect().top + vh / 2, 1);
-      d.assert('SLIDES: the ⛶ fills the screen with the slide letterboxed 16:9 and centred on its own ground, edge kept, type at its step',
-        target.isFull() && vw >= innerWidth - 1 && tol(r.width, wantW, 1.5) && tol(r.height, r.width * 9 / 16, 1.5) && centred
+      d.assert('SLIDES: the ⛶ fills the screen with the slide 16:9, centred on its own ground, its edge standing off the screen edge, type at its step',
+        target.isFull() && vw >= innerWidth - 1 && tol(r.width, wantW, 1.5) && tol(r.height, r.width * 9 / 16, 1.5) && centred && gap >= m - 1
           && fcs.backgroundColor === cardRgb && parseFloat(scs.borderTopWidth) === 1 && scs.borderTopLeftRadius === rootR
           && tol(sayPx, sayWant, 0.5),
-        `${target.isFull() ? 'full' : 'NOT full'} on a ${vw}x${vh} screen, the slide ${r.width.toFixed(1)}x${r.height.toFixed(1)} ${centred ? 'centred' : 'OFF CENTRE'}, `
+        `${target.isFull() ? 'full' : 'NOT full'} on a ${vw}x${vh} screen, the slide ${r.width.toFixed(1)}x${r.height.toFixed(1)} ${centred ? 'centred' : 'OFF CENTRE'}, ${gap.toFixed(1)} px off the nearest screen edge against ${m.toFixed(1)}, `
         + `ground ${fcs.backgroundColor} against the card ${cardRgb}, edge ${scs.borderTopWidth} radius ${scs.borderTopLeftRadius} against --r ${rootR}, `
         + `headline ${sayPx.toFixed(2)} px against ${sayWant.toFixed(2)} (step 4 of ${target.el.clientHeight} px)`);
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
