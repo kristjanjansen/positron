@@ -40,10 +40,10 @@ const CYCLE_NS = 1e9 / 125e6;          // what rp2040js's own Simulator charges
  * draws on the buttons. K4 acts on RELEASE, and held for 1 s it denies instead.
  */
 export const KEYS = [
-  { k: 1, pin: 10, glyph: '^', does: 'PREV' },
-  { k: 2, pin: 11, glyph: 'v', does: 'NEXT' },
-  { k: 3, pin: 12, glyph: '#', does: 'STOP' },
-  { k: 4, pin: 13, glyph: '*', does: 'OK' },
+  { k: 1, pin: 10, glyph: '1', does: 'PREV' },
+  { k: 2, pin: 11, glyph: '2', does: 'NEXT' },
+  { k: 3, pin: 12, glyph: '3', does: 'STOP' },
+  { k: 4, pin: 13, glyph: '4', does: 'OK' },
 ];
 export const DENY_HOLD_MS = 1000;      // main.c DENY_HOLD_MS
 export const DEBOUNCE_MS = 20;         // main.c DEBOUNCE_MS
