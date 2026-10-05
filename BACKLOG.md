@@ -4,7 +4,7 @@
 
 - ~~**Index groups regrouped** (2026-10-05): *"groups. kureniemi: stays as is. bauhaus: partitur. tehnologies: timelines + messages + technologies"*. `demo/manifest.mjs` GROUPS and rows.~~ Done 2026-10-05: kurenniemi unchanged, `bauhaus` holds partitur, `technologies` holds time sync click draw wire now und room flipper.
 - **`/now/` merges into `/flipper/`** (2026-10-05, *"acually merge now and flipper"*): folded into the flipper plan.
-- **What is the point of `/room/`?** (2026-10-05) asked, answered in chat, waiting on the owner.
+- ~~**What is the point of `/room/`?** (2026-10-05) asked, answered in chat, waiting on the owner.~~ Archived 2026-10-05 on *"arvhice it"*: `archive/demos/room-index.html`, row off the manifest.
 
 - **`/flipper/` re-architected** (2026-10-05): *"can you architect flipper to use onlu videos and use new pachbay architeture. different transports to each videopnel"*. Plan first: `plans/plan-flipper-patchbay.md`. `demo/flipper/index.html`, `demo/shell/bay.mjs`. Added the same day: *"play buttons start channel, add >> to catch up"*: each panel's play button starts that channel, and a `>>` jumps a lagging panel back to its live edge.
 
