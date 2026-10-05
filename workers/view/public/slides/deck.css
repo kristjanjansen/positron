@@ -1,0 +1,297 @@
+/* demo/slides/deck.css, the stylesheet of the slide deck engine.
+
+   Both `/slides/` (the sample and the system) and `/talk/` (the talk about
+   positron) link this file and import `/slides/deck.mjs`. Everything a slide
+   looks like is here; a page carries no slide CSS of its own.
+   plans/plan-slides.md has the research behind every number. */
+
+/* THE SEVEN FACES, SELF-HOSTED, AND EVERY ONE IS MONOSPACED. Latin subset,
+   400 and 600 only, from the @fontsource 5.3.0 packages, each with its SIL
+   OFL 1.1 licence beside it in vendor/. plans/plan-slides.md section 9 has
+   why these seven (Martian Mono was an eighth and was removed on the owner's
+   word, *"rm martian mono"*, 2026-10-05). Nothing on a deck is fetched from
+   another host. */
+@font-face { font-family: 'SL Atkinson Hyperlegible Mono'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Atkinson Hyperlegible Mono'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL JetBrains Mono'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/slides/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/slides/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Geist Mono'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/slides/vendor/geist-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Geist Mono'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/slides/vendor/geist-mono-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/slides/vendor/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL IBM Plex Mono'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/slides/vendor/ibm-plex-mono-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Intel One Mono'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/slides/vendor/intel-one-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Intel One Mono'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/slides/vendor/intel-one-mono-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Fira Code'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/slides/vendor/fira-code-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Fira Code'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/slides/vendor/fira-code-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Source Code Pro'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/slides/vendor/source-code-pro-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'SL Source Code Pro'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/slides/vendor/source-code-pro-latin-600-normal.woff2') format('woff2'); }
+
+/* THE DECK: the panel and, under it, the speaker notes. It is an inline size
+   container so the notes, which sit outside the slide, can still be set at
+   the slide's own step 1: in the page the slide is 16:9 and as wide as this
+   box, so 4 per cent of its height is 4 x 9 / 16 = 2.25 per cent of this
+   box's width. */
+.sl-deck { container-type: inline-size; }
+
+/* A slide lives inside a video panel's stage. The stage is the size
+   container, so the slide is sized off the panel's box and never off the
+   window: a panel in a page column on a desk, a panel on a phone and a panel
+   filling a projector all get the same slide at a different scale. */
+.sl-panel .pos-vp-stage { container-type: size; }
+
+/* 16:9 and letterboxed. In the panel the stage is already 16:9 so the slide
+   fills it exactly; full screen on a screen of another shape centres a 16:9
+   slide in it rather than stretching the type to the screen's shape. */
+.sl-slide {
+  position: absolute; inset: 0; margin: auto;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(100cqh, calc(100cqw * 9 / 16));
+  container-type: size;
+  overflow: hidden;
+  color: var(--fg);
+}
+.sl-slide[hidden] { display: none; }
+/* Used only by the self-check: every slide is laid out at once, unseen, so
+   seven faces at two widths are one synchronous layout each rather than a
+   frame per slide. Same weight as the rule above and after it. */
+.sl-measure .sl-slide[hidden] { display: block; visibility: hidden; }
+/* The inset is on a box inside the slide and never on the slide itself,
+   because a container's query units measure its CONTENT box. MEASURED with
+   the padding on the slide: LARGE came out at 7.7 per cent of the slide
+   rather than 9, at both widths, because 14 per cent of the height was
+   padding the units could not see. */
+.sl-in {
+  height: 100%;
+  display: flex; flex-direction: column;
+  padding: 7cqh 6cqw;
+}
+
+/* THE TYPE SCALE: ONE BASE, ONE RATIO, SIX STEPS, AND NO SIZE TYPED TWICE.
+   Asked 2026-10-05: *"big type headers / sentences words. figure out type
+   scale"*. Every step is the base times the ratio to a power, so each one is
+   1.5 times the one under it, well clear of the 25 per cent floor below which
+   two neighbouring sizes read as almost the same. The base is 4 per cent of
+   the slide's height, twice the 8H rule's 1/50 floor, and the ratio puts the
+   old LARGE, 9, exactly on step 3, so evidence keeps the size it had.
+   plans/plan-slides.md section 3 has each step's measured px.
+     step   size   line   track     use
+     --sl-1  4.00  1.45   0         caption, bottom left
+     --sl-2  6.00  1.30  -0.005em   evidence with four rows, which does not fit at step 3
+     --sl-3  9.00  1.20  -0.01em    evidence: tables, stacks, a list
+     --sl-4 13.50  1.10  -0.02em    the headline
+     --sl-5 20.25  1.05  -0.03em    a statement slide, the words are the slide
+     --sl-6 30.38  1.00  -0.04em    one number
+   The two numbers are read back by the self-check, which derives every step
+   from them and requires every size on a slide to be one of them.
+   THE LINE HEIGHT IS PART OF THE STEP, and it opens as the size drops. Asked
+   2026-10-05: *"bit more line height on smaller font"*. A big line is read
+   as a shape and its leading is mostly empty ascender room, so it closes up;
+   a small line is read as words across a wide measure, and the eye needs
+   the extra room to find the start of the next one.
+   THE TRACKING IS PART OF THE STEP TOO, and it closes as the size grows.
+   Asked 2026-10-05: *"add biit negative letter spaing as bigger we go with
+   slides type"*. A face's own spacing is drawn for reading sizes, so at a
+   headline the gaps between letters grow with the letters and the word comes
+   apart. In em so it scales with the step. A mono face closes up fast, so the
+   steps are small: at step 6 the gap is 0.04 of the size, and the letters do
+   not touch in any of the seven faces (LOOKED AT in the screenshots). Every
+   row of a step gets the same tracking, so a character column still lines up,
+   and the self-check measures that from the glyphs. The two scale tokens and
+   the three per step are declared on the deck, so the notes under the panel
+   read them as well. */
+.sl-deck {
+  --sl-base: 4; --sl-ratio: 1.5;
+  --sl-1: calc(var(--sl-base) * 1cqh);
+  --sl-2: calc(var(--sl-1) * var(--sl-ratio));
+  --sl-3: calc(var(--sl-2) * var(--sl-ratio));
+  --sl-4: calc(var(--sl-3) * var(--sl-ratio));
+  --sl-5: calc(var(--sl-4) * var(--sl-ratio));
+  --sl-6: calc(var(--sl-5) * var(--sl-ratio));
+  --sl-1-lh: 1.45; --sl-2-lh: 1.3; --sl-3-lh: 1.2;
+  --sl-4-lh: 1.1; --sl-5-lh: 1.05; --sl-6-lh: 1;
+  --sl-1-ls: 0em; --sl-2-ls: -0.005em; --sl-3-ls: -0.01em;
+  --sl-4-ls: -0.02em; --sl-5-ls: -0.03em; --sl-6-ls: -0.04em;
+}
+/* The face is a custom property on the deck, so the switcher changes one
+   declaration and every slide, full screen and the notes included, follows by
+   inheritance. A step is a custom property and `cqh` in it resolves where it
+   is used, so every step is a share of the slide it sits on. */
+.sl-t { font-family: var(--sl-face, var(--mono)); margin: 0; }
+.sl-t1 { font-size: var(--sl-1); font-weight: 400; line-height: var(--sl-1-lh); letter-spacing: var(--sl-1-ls); }
+.sl-t2 { font-size: var(--sl-2); font-weight: 600; line-height: var(--sl-2-lh); letter-spacing: var(--sl-2-ls); }
+.sl-t3 { font-size: var(--sl-3); font-weight: 600; line-height: var(--sl-3-lh); letter-spacing: var(--sl-3-ls); }
+.sl-t4 { font-size: var(--sl-4); font-weight: 600; line-height: var(--sl-4-lh); letter-spacing: var(--sl-4-ls); }
+.sl-t5 { font-size: var(--sl-5); font-weight: 600; line-height: var(--sl-5-lh); letter-spacing: var(--sl-5-ls); }
+.sl-t6 { font-size: var(--sl-6); font-weight: 600; line-height: var(--sl-6-lh); letter-spacing: var(--sl-6-ls); }
+.sl-dim { color: var(--dim); font-weight: 400; }
+/* THE ACCENT: a word or a number that carries the slide's point, and not on
+   every slide. Same face, same size, same advance, so a character column
+   through it still lines up. MEASURED 12.8:1 on the slide ground and asserted
+   at 7:1. */
+.sl-hi { color: var(--hi); }
+/* A HUE JOINS A WORD TO A BOX IN A DIAGRAM ON THE DECK. Same hue, same
+   strength as the diagram's own bold run naming a box (diagram.mjs,
+   `tint(hue, TEXT_TINT, 'var(--fg)')`, 62 per cent into the ink), so
+   `Cloudflare` in a headline is the colour of the Cloudflare box and of the
+   word Cloudflare under it. The hue is a custom property per span; the
+   formula is copied from diagram.mjs, which does not export it, and the
+   self-check compares every span against the diagram's rendered word, so a
+   change there goes red here rather than drifting. */
+.sl-hue { color: color-mix(in oklab, hsl(var(--sl-hue) 72% 62%) 62%, var(--fg)); }
+/* Two lines of a headline are kept even, so no word is left alone. */
+.sl-say { text-wrap: balance; }
+
+/* The headline sits top left, every slide, same place. What proves it goes
+   in the evidence region under it, which takes whatever height is left, and
+   it is CENTRED in that region on both axes: the headline is read first and
+   left aligned, the evidence is looked at and sits in the middle. */
+.sl-ev {
+  flex: 1 1 auto; min-height: 0;
+  margin-top: 4cqh;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  text-align: center;
+}
+/* MORE AIR ABOVE A DIAGRAM. Asked 2026-10-05 with a screenshot of the
+   machines slide: *"bit more space on top of diagram"*. A diagram is boxes
+   and lines with no ink of its own at the top edge, so the 4 per cent that
+   is plenty above a line of text read as the picture touching the headline.
+   The gap is ONE LINE OF STEP 2, `--sl-2` times its line height, 7.8 per cent
+   of the slide: derived from the scale and not typed, and nearly twice the
+   ordinary 4. The self-check measures headline bottom to picture top. */
+.sl-ev.sl-ev-dg { margin-top: calc(var(--sl-2) * var(--sl-2-lh)); }
+/* A STATEMENT SLIDE HAS NO EVIDENCE: its sentence is the slide, at step 5,
+   in the middle of the height the evidence would have taken and still left
+   aligned like every headline. Three lines are allowed here and nowhere
+   else, because the room a headline gives to evidence is the room a third
+   line of a statement takes: 3 x 20.25 x 1.05 is 63.8 per cent of the
+   slide, inside the 86 the inset leaves with a caption under it. */
+.sl-ev > .sl-st { align-self: stretch; text-align: left; }
+.sl-list { list-style: none; padding: 0; margin: 0; text-align: left; }
+.sl-list li { margin: 0; }
+
+/* THE CAPTION, AT STEP 1, IN THE CHOSEN FACE, PINNED BOTTOM LEFT. Asked with
+   a screenshot of the diagram slide: *"desc seems off. perhaps write it with
+   slide's smallest text font and align to bottom left?"*. It is the last
+   child of the column, so the evidence region above it shrinks to make room
+   and the caption's left and bottom edges ARE the inset; nothing is
+   positioned and no number says where the corner is. */
+.sl-cap { flex: 0 0 auto; margin-top: 3cqh; align-self: stretch; text-align: left; color: var(--dim); }
+.sl-cap a { color: inherit; text-decoration: underline; text-underline-offset: 0.15em; }
+
+/* MONO DOING WHAT ONLY MONO CAN. A table here is lines of text padded with
+   spaces, so a column is a character position and lines up in every face
+   with no grid behind it. `white-space: pre` keeps the padding. */
+.sl-rows { text-align: left; white-space: pre; }
+.sl-rows > div { margin: 0; }
+/* A stack of numbers: label left, figure right, the same count of decimals
+   in every row, so the decimal points fall in one column. `tabular-nums` is
+   the half that matters in a proportional face and is said anyway. */
+.sl-stack {
+  display: grid; grid-template-columns: auto auto auto; column-gap: 0.6em;
+  align-items: baseline; text-align: left;
+}
+.sl-stack .sl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: pre; }
+.sl-stack .sl-unit { color: var(--dim); font-weight: 400; }
+
+/* A canvas and a scaled component take the whole region and centre their
+   own picture inside it, so they stretch rather than shrink to nothing. A
+   direct child only: a canvas a kit component sizes itself (the wave view's,
+   the step grid's) is inside `.sl-fit-in` and keeps its own px. */
+.sl-ev > canvas { display: block; width: 100%; height: 100%; object-fit: contain; align-self: stretch; }
+
+/* A component sized in px (a readout, a diagram, a step grid) is laid out
+   at a fixed logical width and scaled to the region, the way a projector
+   scales it. The scale is a custom property the page writes, never the
+   transform. */
+.sl-fit { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; align-self: stretch; }
+.sl-fit-in {
+  position: absolute; left: 0; top: 0;
+  width: var(--fit-w, 640px);
+  transform-origin: 0 0;
+  transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit-k, 1));
+}
+.sl-fit-in > .pos-dg { margin: 0; }
+/* A picture over a stack on one slide: the picture takes what is left. */
+.sl-ev > .sl-stack + .sl-fit, .sl-ev > .sl-fit + .sl-stack { margin-top: 3cqh; }
+
+/* WHAT A DIAGRAM BOX IS, WRITTEN AS SLIDE TEXT UNDER ITS COLUMN. Asked
+   2026-10-05: *"do not use diagram native descs below but use slides text
+   and postion"*. A diagram on a slide carries box names and nothing else:
+   no `sub` inside a box and no label on a line, because the diagram's own
+   small text is set in px for a page and comes out at a size on no step.
+   What the boxes are goes here instead, in the chosen face at step 1, one
+   line under each top level box, centred on that box. The x is a custom
+   property per line, written by the deck from the box's own rectangle after
+   the picture is fitted, never the property itself. */
+/* The diagram's own caption line, where it writes a box's note on hover, is
+   the same small page text and is not shown on a slide either. (0,2,0)
+   against shell.css's `.pos-dg-cap` at (0,1,0), which sets no display. */
+.sl-fit-in .pos-dg-cap { display: none; }
+.sl-dgd { position: absolute; left: 0; right: 0; top: var(--dgd-y, 0px); height: 0; }
+.sl-dgd > span {
+  position: absolute; left: var(--dgd-x, 0px); top: 0;
+  width: var(--dgd-w, 10em);
+  transform: translateX(-50%);
+  text-align: center; text-wrap: balance;
+  color: var(--dim);
+}
+
+/* Blank, the way a clicker's blank button asks for: the slide goes away and
+   the panel stays. */
+.sl-panel .pos-vp-stage[data-blank] .sl-slide { visibility: hidden; }
+
+/* NO WAY-OUT BUTTON OVER A SLIDE ON A DESKTOP. Asked 2026-10-05: *"do not
+   show back-from-fullscreen button in desktop"*. In full screen the panel
+   draws `.pos-fsx` over the picture on any movement, and on a projected
+   slide it is a button on the talk. A desktop has a keyboard: Escape, `f`
+   and F5 leave full screen (the deck's own keys, and the browser's Escape on
+   the real API), so the button is not the only way out there.
+   ⚠️ ONLY WHERE A FINE POINTER CAN HOVER. On a phone or a tablet the button
+   IS the way out: an iPhone has no Escape and no element full screen at all,
+   so the fallback cover would be a trap without it.
+   (0,2,0), matching `.pos-fsx[data-on="1"]` in shell.css rather than
+   outrunning it; that rule sets opacity, not display, so nothing it says is
+   contested and the tie is never reached. */
+@media (hover: hover) and (pointer: fine) {
+  .sl-panel .pos-fsx { display: none; }
+}
+
+/* Used only by the self-check, to lay the panel out at the width it has in
+   a 1280 page and in a 375 page (less the 16 px gutters), without either. */
+.sl-deck.sl-w686 { max-width: 686px; }
+.sl-deck.sl-narrow { max-width: 343px; }
+
+.sl-count {
+  font: 500 12px/1 var(--mono); color: var(--dim);
+  font-variant-numeric: tabular-nums; min-width: 7ch; text-align: center;
+}
+
+/* SPEAKER NOTES, UNDER THE PANEL, SHOWN NOWHERE UNLESS ASKED FOR. `?notes=1`
+   in the address shows them; without it the box is `hidden` and takes no
+   room. Set at the slide's step 1 in the chosen face (the arithmetic is on
+   `.sl-deck` above), so a note reads at the size of the caption it sits
+   under. A presenter's laptop shows the page and the projector the full
+   screen panel; the notes are never inside the slide. */
+.sl-notes {
+  margin-top: 12px;
+  font-family: var(--sl-face, var(--mono));
+  font-size: calc(var(--sl-base) * 9 / 16 * 1cqw);
+  line-height: var(--sl-1-lh); letter-spacing: var(--sl-1-ls);
+  color: var(--dim);
+}
+.sl-notes[hidden] { display: none; }
+.sl-notes p { margin: 0; }
