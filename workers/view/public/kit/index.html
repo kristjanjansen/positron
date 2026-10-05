@@ -1956,7 +1956,7 @@
         const panel = createInstrumentPanel({
           viz: wv.el,
           rows: [[knob('PITCH', 64), knob('SWELL', 90)]],
-          plate: { name: 'POSITRON', patch: 'Two tones' },
+          plate: { name: 'POSITRON' },   // no patch line: *"rm Two tones"*
         });
         panel.el.classList.add('kit-sl-fill');
         fb.inner.append(panel.el);
