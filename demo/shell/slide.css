@@ -150,6 +150,20 @@
 .sl[data-layout="split"] .sl-slot { grid-area: slot; }
 .sl[data-layout="split"] .sl-cap { grid-area: cap; }
 .sl[data-layout="split"] .sl-ev { align-items: flex-start; text-align: left; }
+/* THE INTERACTIVE SIDE OF A SPLIT IS DARKER, EDGE TO EDGE. Asked
+   2026-10-05: *"use darker bg on columned layout on the interactive side"*.
+   The page's `--bg` under the slot's half, so the thing you work sits in a
+   well and the words sit on the card. A pseudo element rather than a
+   background on `.sl-slot`, because the slot sits inside the slide's inset and
+   the darker half has to reach the slide's edges. The columns are equal and
+   their gap is centred, so the half ends exactly at 50 per cent. */
+.sl[data-layout="split"]::before {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 50%;
+  background: var(--bg); pointer-events: none;
+}
+.sl[data-layout="split"][data-side="left"]::before { left: 0; }
+.sl[data-layout="split"][data-side="right"]::before { right: 0; }
+.sl[data-layout="split"] .sl-in { position: relative; }
 
 /* THE SLOT: any element. In a split it is a whole column; anywhere else it
    takes what the evidence region has left. Its child is centred in it. */
