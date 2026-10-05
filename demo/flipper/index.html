@@ -38,23 +38,30 @@
   // The old `/now/` is at archive/demos/now-index.html. The five radio cells
   // went on the owner's word and the stand-in still serves their mounts.
   //
-  // 🔴 TWO VIDEO PANELS, ETV AND ETV2, AND NO START BUTTON, SINCE 2026-10-05.
-  // Asked as *"no start button. etv and etv2 only, use videopanels"*. ETV+ is
-  // filtered out HERE and not from `CHANNELS`, which other code reads. Each
-  // panel's own play is the press that opens its channel, and one plays at a
-  // time: pressing play on the other closes the first, and the bar, the lanes
-  // and the mute follow whichever is playing. The picker went with the third
-  // channel, because two panels each carrying a name already say which is which.
+  // 🔴 TWO VIDEO PANELS, ETV AND ETV2, BOTH PLAYABLE AT ONCE, AND NO SHARED
+  // TRANSPORT, SINCE 2026-10-05. Asked first as *"no start button. etv and etv2
+  // only, use videopanels"*, then as *"make them work on same time or is it
+  // blocked?. no common transport lane"*. Nothing blocked it: the one-at-a-time
+  // rule was the page's own. So every piece of state that used to be a page
+  // global (the engine, the clock, the deck, the line, the playlist, what ERR
+  // refused) is now one CHANNEL object per panel, built by `makeChannel`, and
+  // each panel carries its own play, LIVE, mute and full screen in its footer
+  // and its own line glued under it. ETV+ is filtered out HERE and not from
+  // `CHANNELS`, which other code reads.
+  // ⚠️ TWO CHANNELS AUDIBLE AT ONCE IS NOISE, so a play press makes that channel
+  // audible and mutes whichever other one was audible, which keeps playing.
+  // Each mute glyph still works on its own after that.
+  // ⚠️ THE LINE IS GLUED UNDER THE PANEL WITH `glue()`, NOT HANDED TO `under`.
+  // `under` is the second storey that is only drawn while the panel is full in
+  // `footer` mode (see its header); a line that vanished off full screen would
+  // be no line at all.
   //
   // 🔴 THE SELF-CHECK PRESSES THOSE PLAY BUTTONS ITSELF, BEFORE `d.ready()`,
   // and closes what it opened before it says ready. With no `.pos-controls`
-  // button the harness has nothing of ours to press, and its bar drill runs
-  // the moment the page is ready, so checks running after `ready` would race
-  // it (the same reason `tab-page.mjs` checks before `ready`). Leaving nothing
-  // open puts the bar back where the drill always met it: a deck and no
-  // picture. Hence `bootMs` in the manifest.
+  // button and no published transport the harness has nothing of ours to press,
+  // so the page drives itself the way a person would. Hence `bootMs` in the
+  // manifest.
   import { mount, guard, el, armVideo } from '/shell/shell.mjs';
-  import { createTransportBar } from '/shell/transport-bar.mjs';
   import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
@@ -78,14 +85,15 @@
    * 2026-09-08, `plans/plan-live-timeline.md`), and `/now/` used to fetch it
    * AND the master once a second: about 1.7 Mbit/s of playlist per open tab,
    * and a new ERR session every second, because the master mints one per read.
-   * Between reads both ends are carried forward by the wall clock.
+   * Between reads both ends are carried forward by the wall clock. Per OPEN
+   * CHANNEL now, so two channels playing are two playlists every ten seconds.
    */
   const PLAYLIST_EVERY_MS = 10000;
   const OPEN_SPAN_MS = 12 * 60 * 1000;         // the opening view
   const PROBE_POINTS = 13;
   /** Every two-byte ask in one open of one channel, capped. Up to 8 at open,
    *  up to 8 more per LIVE on a walled channel (never twice inside 20 s), 13
-   *  for the deep sweep and up to 9 for the deep survey of the other two. */
+   *  for the deep sweep and up to 9 for the deep survey of the other one. */
   const PROBE_CAP = 40;
   const PROBE_STEPS = 8;                       // how far back the edge sweep walks
   const WALL_BACKOFF_S = 90;                   // where to start behind a boundary
@@ -97,543 +105,38 @@
 
   const d = mount({
     name: 'flipper',
-    what: 'Press play on ETV or ETV2 and watch that channel on a line whose right end is the present moment.',
-    // NOT DRAWN. The headline number, how far behind the picture is, sits in the
-    // live row's gutter beside the marks it is about; these are for `__demo`.
+    what: 'Press play on ETV or ETV2, or both, and each picture runs over its own line whose right end is the present moment.',
+    // NOT DRAWN. The headline number, how far behind a picture is, sits in its
+    // live row's gutter beside the marks it is about; these are for `__demo`,
+    // and they follow the channel pressed last.
     readout: { channel: '', state: '', behind: 's', 'first frame': 'ms' },
     showReadout: false,
   });
   guard(d);
 
-  // ── two panels, one per channel ──────────────────────────────────────────
-  // Each is a kit video panel: the name in the left slot, its own play just
-  // left of the panel's full screen square, the way `/kit/` puts a mute there.
-  const PLAY = '\u25ba';                // no emoji form, unlike U+25B6
-  const STOP = '\u25a0';
-  let ch = ON_PAGE[0];
-  const panels = ON_PAGE.map((c) => {
-    const video = el('video', '', null, { playsinline: '', muted: '' });
-    video.muted = true;
-    const play = el('button', 'ico', PLAY, { type: 'button', 'aria-label': `play ${c.name}` });
-    centreSymbol(play);
-    const panel = createVideoPanel({ media: video, left: el('span', 'fl-name', c.name), fullMode: 'hover' });
-    panel.slots.right.prepend(play);
-    const p = { c, video, play, panel };
-    play.onclick = () => { pressPlay(c); };
-    return p;
-  });
-  const panelOf = (c) => panels.find((p) => p.c === c);
-  const wrap = el('div', 'fl-wrap');
-  const grid = el('div', 'fl-grid');
-  grid.append(...panels.map((p) => p.panel.el));
-  wrap.append(grid);
-  d.el.append(wrap);
-  /** The picture of the channel that is playing, or was last. */
-  let glass = panels[0].video;
-  let openVideo = null;          // the one element that has a source, if any
-  let playingId = null;
+  const PLAY = '►';                // no emoji form, unlike U+25B6
+  const STOP = '■';
+  const MUTE_ON = '♫';             // the same two glyphs as /stage/'s mute
+  const MUTE_OFF = '⊘';
 
-  // ── the line ──────────────────────────────────────────────────────────────
-  // ABSOLUTE WALL MILLISECONDS, from ERR's own PDT rather than from this
-  // device's clock.
-  const now0 = Date.now();
-  const deck = createDeck({ items: [], adapters: {}, range: [now0 - REACH_MS, now0] });
-  deck.seek(now0);
+  const hms = (ms) => new Date(ms).toTimeString().slice(0, 8);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const MUTE_ON = '\u266b';             // the same two glyphs as /stage/'s mute
-  const MUTE_OFF = '\u2298';
-  let started = false, muted = true;
-  let hls = null, master = null, clock = null, loadStopped = false, hlsAlive = 0;
-  let edgeMs = now0, pdtMs = null, windowS = 0, playlist = null;
-  let served = null, servedAt = 0, survey = null;
-  let watched = [];              // stretches actually seen: [{from, to}]
-  let probes = [];               // {at, state}, one per two-byte ask
-  let programmes = [];           // {at, end, name} from ERR's schedule
-  let probesIssued = 0, frags = 0, fragBytes = 0;
-  // Sessions opened at ERR (master reads) and playlist reads, counted per open
-  // of a channel, so the page can assert it is not minting one a second.
-  let mastersRead = 0, playlistsRead = 0, variantUrl = null, readAt = 0, readEdge = null, openedAt = 0;
-  const onRead = (pl) => {
-    playlistsRead++;
-    if (pl.masterRead) mastersRead++;
-    variantUrl = pl.variant;
-    readAt = Date.now(); readEdge = pl.edge;
-    return pl;
-  };
-  const jumpEvents = [];
+  // Engines alive across BOTH channels, and the channel pressed last, which is
+  // what the readout cells describe.
+  let hlsAlive = 0;
+  let focus = null;
 
-  const hms = (ms) => {
-    const t = Math.max(0, Math.round(ms / 1000));
-    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
-    const mm = String(m).padStart(2, '0'), ss = String(sec).padStart(2, '0');
-    return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-  };
-
-  const behindMs = () => {
-    const p = clock?.now();
-    return p == null ? null : Date.now() - p;
-  };
-  const stateWord = () => {
-    if (!clock || !clock.now()) return playingId ? 'opening' : started ? 'stopped' : 'not started';
-    if (glass.paused) return loadStopped ? 'blocked' : 'paused';
-    const b = behindMs();
-    if (stalledFor > 1500) return loadStopped ? 'blocked' : 'stalled';
-    return b != null && b > BAND.amber ? 'behind live' : 'playing';
-  };
-
-  // ── lanes ─────────────────────────────────────────────────────────────────
-  // A LANE ANSWERS FOR ITS OWN NUMBER AND NO OTHER, and both follow the
-  // selected channel: switching empties the live row and swaps the schedule.
-  const laneBase = (id, label, height) => ({
-    id, kind: 'part', label, height, barPad: 6, as: 'spans',
-    stack: false, barGap: 1, terse: true, alpha: 0.9, spanLine: false,
-  });
-  const lanes = [
-    {
-      // One row for the live channel: what you watched, with what ERR refused
-      // as a number in its gutter rather than a second row of small marks.
-      ...laneBase('seen', `${ch.name} live`, 56),
-      // GREEN = shown. SLATE = shown, and this row cannot say how well.
-      colorOf: () => (glass.getVideoPlaybackQuality ? '#3fb950' : '#6a7280'),
-      labelOf: () => '',
-      rows: () => watched.map((w, i) => ({ at: w.from, id: `w${i}`, kind: 'part',
-        payload: { durMs: Math.max(1, w.to - w.from), title: 'watched' } })),
-      describeRow: (r) => [`${((r.payload.durMs) / 1000).toFixed(1)} s`,
-        'you watched this stretch', 'a gap is where a seek skipped'],
-    },
-    {
-      // GREY, because it is not a measurement: ERR telling us what was on.
-      ...laneBase('epg', `${ch.name} schedule`, 34),
-      colorOf: () => '#5a6474',
-      labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
-      rows: () => programmes.map((p, i) => ({ at: p.at, id: `e${i}`, kind: 'part',
-        payload: { durMs: p.end - p.at, title: p.name, repeat: p.repeat } })),
-      describeRow: (r) => [r.payload.title?.slice(0, 46) ?? '',
-        new Date(r.at).toTimeString().slice(0, 5) + (r.payload.repeat ? ' (repeat)' : ''),
-        "from ERR's schedule"],
-    },
-  ];
-
-  function gutters() {
-    const L = (id) => view.strip.lanes().find((l) => l.id === id);
-    const seen = L('seen'), epg = L('epg');
-    if (seen) {
-      seen.label = `${ch.name} live`;
-      const total = watched.reduce((a, w) => a + (w.to - w.from), 0);
-      const b = behindMs();
-      const no = probes.filter((p) => p.state === 'refused').length;
-      const walledMin = served?.position != null ? Math.round(served.blockedMin) : 0;
-      seen.subLabel = [
-        b == null ? 'not playing' : `${(b / 1000).toFixed(1)} s behind`,
-        watched.length ? `${(total / 1000).toFixed(0)} s seen` : 'none seen yet',
-        walledMin ? `${walledMin} min refused`
-          : probes.length ? (no ? `${no} refused` : 'none refused') : '',
-      ].filter(Boolean);
-    }
-    if (epg) {
-      epg.label = `${ch.name} schedule`;
-      const now = deck.position();
-      const next = programmes.find((p) => p.at > now) || null;
-      epg.subLabel = programmes.length
-        ? [`${programmes.length} over ${(windowS / 3600).toFixed(0)} h`,
-           next ? `next ${new Date(next.at).toTimeString().slice(0, 5)}` : '']
-          .filter(Boolean)
-        : '';
-    }
-  }
-
-  // ── the bar, ABOVE the line ───────────────────────────────────────────────
-  // endStop:false because this window's right-hand end is the present.
-  // command:{} because the deck is a FOLLOWER of the picture here.
-  const bar = createTransportBar(d.el, deck, {
-    absolute: true, scrub: false, endStop: false,
-    fmt: (pos, range) => `${new Date(pos).toTimeString().slice(0, 8)}`
-      + `    ${hms(range[1] - pos)} behind the edge`,
-    extras: [
-      { id: 'live', label: 'live', word: true, aria: 'Return to the live edge',
-        title: 'back to the live edge', onPress: () => liveButton() },
-      // THE SAME GLYPHS AS `/stage/`'s MUTE, LEFT OF LOOP (*"we have unmute
-      // buttons, look them up. left from loop"*). Muted until a play press,
-      // because a page may not make a sound before somebody asks it to.
-      { id: 'mute', label: MUTE_OFF, end: true, aria: 'sound of the playing channel',
-        onPress: () => setMuted(!muted, true) },
-    ],
-    command: {
-      // WITH NOTHING PLAYING THE BAR MOVES THE LINE AND OPENS NOTHING. A
-      // channel's own play is the one control that reaches the broadcaster.
-      play: () => {
-        deck.play();
-        if (clock) return glass.play().catch(() => {});
-        return undefined;
-      },
-      pause: () => (clock ? glass.pause() : deck.pause()),
-      seek: (pos) => seekTo(pos),
-    },
-  });
-
-  // ── mute ─────────────────────────────────────────────────────────────────
-  const muteBtn = bar.extra('mute');
-  centreSymbol(muteBtn);
-  function paintMute() {
-    setSymbol(muteBtn, muted ? MUTE_OFF : MUTE_ON);
-    muteBtn.setAttribute('aria-pressed', String(!muted));
-    muteBtn.title = muted ? 'muted\npress for sound' : 'audible\npress to mute';
-  }
-  function setMuted(next, say = false) {
-    muted = !!next;
-    glass.muted = muted;
-    paintMute();
-    if (say) d.log(muted ? `${ch.name} is muted` : `${ch.name} is audible`);
-  }
-  paintMute();
-
-  // THE PRESENT IS A DOTTED LINE WITH A LABELLED GAP, not a second playhead.
-  const view = createStripView(d.el, deck, {
-    size: 'auto', absolute: true, follow: true, lanes,
-    wallDash: [1, 3],
-    wallLabel: false,
-  });
-
-  // PRESS THE LINE TO GO THERE. Read the POINTER, not the deck: on a
-  // media-mastered deck the master puts the line straight back within a tick.
-  const instantAt = (clientX) => {
-    const r = view.strip.canvas.getBoundingClientRect();
-    const st = view.strip.state;
-    const px = (clientX - r.left) * (st.width / r.width) - st.gutterPx;
-    return px < 0 ? null : view.strip.xToTime(px);
-  };
-  view.strip.canvas.addEventListener('pointerup', (e) => {
-    if (!clock) return;
-    const at = instantAt(e.clientX);
-    if (at == null) return;                       // the gutter is not the line
-    const want = Math.min(deck.range[1], Math.max(deck.range[0], at));
-    if (loadStopped && hls) { hls.startLoad(glass.currentTime + (want - clock.now()) / 1000); loadStopped = false; }
-    seekTo(want);
-    d.log(`watching from ${new Date(want).toTimeString().slice(0, 8)}`);
-  });
-
-  // ── the picture ───────────────────────────────────────────────────────────
-  let stalledFor = 0, lastSeenPos = null, lastSeenAt = 0;
-  let seekTarget = null, seekUntil = 0, caughtUpMs = null, seekSeq = 0;
-
-  /** THE ONE WAY TO ASK FOR A POSITION. The line goes where you asked at once
-   *  and the picture catches up; while the seek is in flight the master does
-   *  not drive, and the catch-up is measured. */
-  function seekTo(want) {
-    if (!clock) return deck.seek(want);
-    seekTarget = want;
-    seekUntil = performance.now() + 4000;
-    caughtUpMs = null;
-    const t0 = performance.now();
-    const seq = ++seekSeq;
-    deck.seek(want);
-    clock.seek(want);
-    if (glass.requestVideoFrameCallback) {
-      const wantMedia = glass.currentTime;
-      const onFrame = (_now, meta) => {
-        if (seq !== seekSeq || caughtUpMs !== null) return;
-        if (Math.abs((meta?.mediaTime ?? wantMedia) - wantMedia) > 1) {
-          if (performance.now() - t0 < 4000) glass.requestVideoFrameCallback(onFrame);
-          return;
-        }
-        caughtUpMs = Math.round(performance.now() - t0);
-        d.set('first frame', caughtUpMs, caughtUpMs < 500 ? 'ok' : '');
-      };
-      glass.requestVideoFrameCallback(onFrame);
-    } else {
-      glass.addEventListener('seeked', () => {
-        if (seq === seekSeq && caughtUpMs === null) caughtUpMs = Math.round(performance.now() - t0);
-      }, { once: true });
-    }
-    return { ok: true };
-  }
-
-  /** Play with sound when sound is wanted, and fall back to a muted picture
-   *  rather than a black one if the browser refuses. */
-  async function playPicture() {
-    glass.muted = muted;
-    try { await glass.play(); } catch (e) {
-      if (e?.name === 'NotAllowedError' && !glass.muted) {
-        setMuted(true);
-        d.log('the browser refused sound without a press here, so the picture plays muted', 'bad');
-        await glass.play().catch(() => {});
-      }
-    }
-  }
-
-  /** Close whatever is open, on whichever panel it is. */
-  function closeChannel() {
-    if (hls) { try { hls.destroy(); } catch { /* already gone */ } hlsAlive--; }
-    hls = null; clock = null; window.__hls = null;
-    const v = openVideo;
-    openVideo = null;
-    if (v) { v.muted = true; v.pause(); v.removeAttribute('src'); v.load(); }
-  }
-
-  let openGen = 0, scheduleDone = Promise.resolve();
-  /** Open the selected channel: one master read, one probe at the edge, one
-   *  engine. Everything per channel starts again from nothing. */
-  async function openChannel() {
-    const c = ch, gen = ++openGen;
-    closeChannel();
-    playlist = null; variantUrl = null; readAt = 0; readEdge = null;
-    mastersRead = 0; playlistsRead = 0; openedAt = Date.now();
-    served = null; servedAt = 0; probes = []; watched = []; programmes = [];
-    loadStopped = false; lastSeenPos = null; frags = 0; fragBytes = 0; probesIssued = 0;
-    d.set('channel', c.name);
-    let pl;
-    try { pl = await readPlaylist(c.url); } catch (e) {
-      d.log(`${c.name}: the playlist did not come (${e.message})`, 'bad');
-      return false;
-    }
-    if (gen !== openGen) return false;
-    playlist = onRead(pl);
-    pdtMs = playlist.pdt; windowS = playlist.windowS; edgeMs = playlist.edge ?? Date.now();
-    setRange();
-    scheduleDone = loadSchedule(c);
-
-    // 🔴 ASK WHERE THE LIVE EDGE IS BEFORE PLAYING IT. ERR blocks live segments
-    // by PROGRAMME and was MEASURED refusing ETV's newest forty-five minutes.
-    // One request on a channel that serves its edge, which is the common case.
-    await askWhatIsServed(true);
-    if (gen !== openGen) return false;
-
-    openVideo = glass;
-    if (NATIVE_HLS) {
-      glass.src = c.url;
-    } else if (window.Hls?.isSupported()) {
-      // START BEHIND THE BOUNDARY WHEN THERE IS ONE. NO CATCH-UP AND NO LATENCY
-      // TARGET: being behind is the medium here, and a back-seek must stick.
-      hls = window.__hls = new window.Hls({ enableWorker: true,
-        ...(served?.position != null ? { startPosition: served.position } : {}) });
-      hlsAlive++;
-      hls.loadSource(c.url);
-      hls.attachMedia(glass);
-      // BYTES THAT ARRIVED, counted on the far side of the wire. An object
-      // existing says nothing about whether a broadcaster answered.
-      hls.on(window.Hls.Events.FRAG_LOADED, (_e, data) => {
-        frags++;
-        fragBytes += data?.frag?.stats?.total || data?.stats?.total || 0;
-      });
-      wallHandler(hls, window.Hls, () => {
-        loadStopped = true;
-        d.log(`${c.name}: ERR refused three fragments in a row. Stopped loading rather than hammering it`, 'bad');
-      });
-    } else { d.log('this browser cannot play HLS', 'bad'); return false; }
-
-    clock = clockOf(glass, hls);
-    if (!master) {
-      master = mediaMaster(deck, () => {
-        const p = clock?.now();
-        return p == null ? null : { el: glass, pos: p, key: ch.id };
-      }, { stallPolicy: 'hold', autoPlayPause: true,
-           onEvent: (e) => { if (e.reason === 'jump') jumpEvents.push(e); } });
-    }
-    await playPicture();
-    return gen === openGen;
-  }
-
-  /** Paint each panel's play: a square on the one that is playing. */
-  function paintPlays() {
-    for (const p of panels) {
-      const on = p.c.id === playingId;
-      setSymbol(p.play, on ? STOP : PLAY);
-      p.play.setAttribute('aria-pressed', String(on));
-      p.play.setAttribute('aria-label', `${on ? 'stop' : 'play'} ${p.c.name}`);
-      p.play.title = on ? `stop ${p.c.name}` : `play ${p.c.name}`;
-    }
-  }
-
-  // ── a press on a panel's play, the only thing that opens anything ─────────
   // Requests to the broadcaster's addresses the browser has made so far. Read
   // at the first press, it says whether the visit opened anything first.
   const broadcasterAsks = () => performance.getEntriesByType('resource')
     .filter((e) => /\.m3u8|\/live\/|tvSchedule/.test(e.name)).length;
-  let askedBeforePlay = null, audibleAtPlay = null;
-  let opening = null;
+  let askedBeforePlay = null;
 
-  function pressPlay(c) {
-    if (playingId === c.id) { stopChannel(); return opening; }
-    if (askedBeforePlay === null) askedBeforePlay = broadcasterAsks();
-    const p = panelOf(c);
-    // INSIDE THE PRESS: the activation is spent on this element now, so the
-    // picture may start with sound once its first fragment arrives.
-    armVideo(p.video);
-    closeChannel();
-    ch = c; glass = p.video; playingId = c.id;
-    started = true;
-    paintPlays();
-    setMuted(false);
-    tickLoop();
-    d.log(`opening ${c.name}`);
-    opening = playChannel(c);
-    return opening;
-  }
-
-  async function playChannel(c) {
-    if (!await openChannel()) return false;
-    if (c === ch) audibleAtPlay = !glass.muted;
-    d.log(`playing ${c.name}`);
-    await settle();
-    if (c !== ch) return false;
-    await toLive();
-    return true;
-  }
-
-  function stopChannel() {
-    const was = ch;
-    openGen++;
-    closeChannel();
-    playingId = null; playlist = null;
-    deck.pause();
-    paintPlays();
-    d.set('state', stateWord());
-    d.log(`${was.name} stopped`);
-  }
-
-  // BOTH ENDS MOVE, once a second, and the playlist is re-read every ten on
-  // the variant the master already handed over.
-  function setRange() {
-    const reach = windowS ? windowS * 1000 : REACH_MS;
-    deck.setRange([edgeMs - reach, edgeMs]);
-  }
-  let reading = false, triedAt = 0;
-  setInterval(async () => {
-    if (!playlist) return;
-    const c = ch;
-    try {
-      if (!reading && Date.now() - Math.max(readAt, triedAt) >= PLAYLIST_EVERY_MS) {
-        reading = true; triedAt = Date.now();
-        try {
-          const pl = await readPlaylist(c.url, { variant: variantUrl });
-          if (c === ch && playlist) { onRead(pl); playlist = pl; windowS = pl.windowS || windowS; }
-        } finally { reading = false; }
-      }
-      if (readEdge != null) edgeMs = readEdge + (Date.now() - readAt);
-      const reach = windowS ? windowS * 1000 : REACH_MS;
-      const pos = deck.position();
-      const outside = pos < edgeMs - reach || pos > edgeMs;
-      setRange();
-      if (outside && clock)
-        d.log(`the window ate your position. Moved to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
-    } catch { /* one missed refresh is not an event */ }
-  }, 1000 / RANGE_HZ);
-
-  // The page's own frame loop: the master's tick, the watched lane growing at
-  // frame rate, and the present line moving while the deck is paused.
-  let ticking = false;
-  function tickLoop() {
-    if (ticking) return;
-    ticking = true;
-    const step = () => {
-      if (seekTarget != null && (caughtUpMs !== null || performance.now() > seekUntil)) seekTarget = null;
-      if (seekTarget == null) master?.tick();
-      const p = clock?.now();
-      if (p != null) {
-        if (lastSeenPos != null && !glass.paused) {
-          const dt = p - lastSeenPos;
-          if (dt > 0 && dt < 2000) {
-            const last = watched[watched.length - 1];
-            if (last && Math.abs(p - last.to) < 2000) last.to = Math.max(last.to, p);
-            else watched.push({ from: lastSeenPos, to: p });
-            stalledFor = 0;
-          } else if (dt === 0) stalledFor = performance.now() - lastSeenAt;
-        }
-        if (p !== lastSeenPos) { lastSeenPos = p; lastSeenAt = performance.now(); }
-      }
-      const b = behindMs();
-      if (b != null) d.set('behind', (b / 1000).toFixed(1),
-        b >= BAND.green[0] && b <= BAND.green[1] ? 'ok' : b <= BAND.amber ? '' : 'bad');
-      d.set('state', stateWord());
-      gutters();
-      view.strip.invalidate();
-      requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }
-
-  const resume = async () => {
-    if (glass.paused) await glass.play().catch(() => {});
-    await new Promise((r) => setTimeout(r, 200));
-  };
-
-  const settle = () => new Promise((r) => {
-    const t0 = performance.now();
-    const check = () => {
-      if (clock?.now() != null || performance.now() - t0 > 12000) return r();
-      setTimeout(check, 200);
-    };
-    check();
-  });
-
-  // ── what ERR will hand over ───────────────────────────────────────────────
-  // MEMBERSHIP IS THE DISCRIMINATOR: only segments in the playlist just read
-  // are ever asked about, because an expired one answers like a refused one.
-  async function askWhatIsServed(force = false) {
-    if (!playlist) return served;
-    if (!force && served && performance.now() - servedAt < SERVED_FRESH_MS) return served;
-    const found = await findServedEdge(playlist,
-      { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
-    if (!found) return served;
-    const wasWall = served?.position != null;
-    served = found; servedAt = performance.now();
-    probesIssued += found.probes.length;
-    if (found.none) {
-      d.log(`${ch.name}: ERR refuses every point asked across the whole window (rights)`, 'bad');
-    } else if (found.position != null && !wasWall) {
-      d.log(`${ch.name}: ERR refuses the newest ${Math.round(found.blockedMin)} min (rights). `
-        + `Starting ${WALL_BACKOFF_S} s behind that boundary`, 'bad');
-    } else if (found.edgeServed && wasWall) {
-      d.log(`${ch.name}: ERR serves to the live edge again`);
-    }
-    return served;
-  }
-
-  async function servedLiveTarget() {
-    if (served?.position == null) return null;
-    await askWhatIsServed();
-    return served?.position != null && Number.isFinite(served.startAt) ? served.startAt : null;
-  }
-
-  async function sweep() {
-    const pl = playlist;
-    if (!pl?.segs?.length) return;
-    const n = Math.min(PROBE_POINTS, pl.segs.length);
-    const picked = [];
-    for (let k = 0; k < n; k++) picked.push(Math.round((k * (pl.segs.length - 1)) / (n - 1)));
-    const asking = picked.filter(() => probesIssued++ < PROBE_CAP).map((i) => {
-      const seg = pl.segs[i];
-      return probeSegment(seg).then((state) => ({ at: seg.at ?? edgeMs, state, i,
-        fromPlaylist: pl.segs.includes(seg), sn: seg.sn }));
-    });
-    probes = (await Promise.all(asking)).sort((a, b) => a.at - b.at);
-    const refused = probes.filter((p) => p.state === 'refused');
-    d.log(refused.length
-      ? `${ch.name}: ERR refused ${refused.length} of ${probes.length} points asked`
-      : `${ch.name}: ERR served every one of the ${probes.length} points asked`,
-      refused.length ? 'bad' : 'ok');
-    view.strip.invalidate();
-  }
-
-  // 🔴 THE OTHER CHANNEL, ASKED THE SAME QUESTION ONCE, DEEP TIER ONLY. Two
-  // shapes in one run is what separates a boundary finder from one that
-  // answers the same way whatever it is asked.
-  async function takeSurvey() {
-    const own = served ? { id: ch.id, name: ch.name, ...served } : null;
-    const rows = await surveyChannels(ON_PAGE.filter((c) => c.id !== own?.id),
-      { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
-    probesIssued += rows.reduce((n, r) => n + (r.probes?.length || 0), 0);
-    survey = ON_PAGE
-      .map((c) => (own && c.id === own.id ? own : rows.find((r) => r.id === c.id)))
-      .filter(Boolean);
-    d.log(`what ERR will serve: ${describeSurvey(survey)}`);
-  }
-
-  // ── what was on ───────────────────────────────────────────────────────────
-  // 🔴 FETCHED ONCE PER CHANNEL AND DAY, AND KEPT. A schedule for a day that
-  // has been read does not change while somebody flips channels, so switching
-  // back reuses the answer and nothing refetches it on a timer. A failed fetch
-  // is forgotten, so the next visit to that channel asks again.
+  // 🔴 FETCHED ONCE PER CHANNEL AND DAY, AND KEPT. A schedule for a day that has
+  // been read does not change while somebody stops and starts a channel, so a
+  // second play reuses the answer and nothing refetches it on a timer. A failed
+  // fetch is forgotten, so the next open of that channel asks again.
   const scheduleCache = new Map();
   let scheduleFetches = 0;
   function scheduleDay(c, day) {
@@ -656,231 +159,727 @@
     }
     return scheduleCache.get(key);
   }
-  async function loadSchedule(c) {
+
+  // ── one channel: a panel, its footer controls, its line and its engine ────
+  function makeChannel(c) {
+    const S = { c, playing: false, muted: true, audibleAtPlay: null, opening: null,
+      scheduleDone: Promise.resolve() };
+
+    // the picture and its panel
+    const video = el('video', '', null, { playsinline: '', muted: '' });
+    video.muted = true;
+    S.video = video;
+    const play = el('button', 'ico', PLAY, { type: 'button', 'aria-label': `play ${c.name}` });
+    centreSymbol(play);
+    const live = el('button', '', 'LIVE', { type: 'button', 'aria-label': `${c.name} back to the live edge`,
+      title: 'back to the live edge' });
+    const mute = el('button', 'ico', MUTE_OFF, { type: 'button', 'aria-label': `${c.name} sound` });
+    centreSymbol(mute);
+    Object.assign(S, { play, live, mute });
+    const panel = createVideoPanel({ media: video, left: el('span', 'fl-name', c.name), fullMode: 'hover' });
+    // ► LIVE ♫ ⛶, the panel's own full screen square staying last.
+    panel.slots.right.prepend(play, live, mute);
+    S.panel = panel;
+
+    // the line, in ABSOLUTE WALL MILLISECONDS, from ERR's own PDT rather than
+    // from this device's clock
+    const now0 = Date.now();
+    const deck = createDeck({ items: [], adapters: {}, range: [now0 - REACH_MS, now0] });
+    deck.seek(now0);
+    S.deck = deck;
+
+    S.reset = () => {
+      Object.assign(S, {
+        hls: null, clock: null, loadStopped: false, edgeMs: Date.now(), pdtMs: null, windowS: 0,
+        playlist: null, served: null, servedAt: 0, survey: null,
+        watched: [], probes: [], programmes: [],
+        probesIssued: 0, frags: 0, fragBytes: 0,
+        mastersRead: 0, playlistsRead: 0, variantUrl: null, readAt: 0, readEdge: null, openedAt: 0,
+        stalledFor: 0, lastSeenPos: null, lastSeenAt: 0,
+        seekTarget: null, seekUntil: 0, caughtUpMs: null,
+      });
+    };
+    S.reset();
+    S.master = null; S.openGen = 0; S.seekSeq = 0; S.jumpEvents = [];
+    S.reading = false; S.triedAt = 0;
+
+    const laneBase = (id, label, height) => ({
+      id, kind: 'part', label, height, barPad: 5, as: 'spans',
+      stack: false, barGap: 1, terse: true, alpha: 0.9, spanLine: false,
+    });
+    // A LANE ANSWERS FOR ITS OWN NUMBER AND NO OTHER, and both belong to this
+    // channel and no other.
+    const lanes = [
+      {
+        // What you watched, with what ERR refused as a number in its gutter
+        // rather than a second row of small marks.
+        ...laneBase('seen', `${c.name} live`, 40),
+        // GREEN = shown. SLATE = shown, and this row cannot say how well.
+        colorOf: () => (video.getVideoPlaybackQuality ? '#3fb950' : '#6a7280'),
+        labelOf: () => '',
+        rows: () => S.watched.map((w, i) => ({ at: w.from, id: `w${i}`, kind: 'part',
+          payload: { durMs: Math.max(1, w.to - w.from), title: 'watched' } })),
+        describeRow: (r) => [`${((r.payload.durMs) / 1000).toFixed(1)} s`,
+          'you watched this stretch', 'a gap is where a seek skipped'],
+      },
+      {
+        // GREY, because it is not a measurement: ERR telling us what was on.
+        ...laneBase('epg', `${c.name} schedule`, 28),
+        colorOf: () => '#5a6474',
+        labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
+        rows: () => S.programmes.map((p, i) => ({ at: p.at, id: `e${i}`, kind: 'part',
+          payload: { durMs: p.end - p.at, title: p.name, repeat: p.repeat } })),
+        describeRow: (r) => [r.payload.title?.slice(0, 46) ?? '',
+          new Date(r.at).toTimeString().slice(0, 5) + (r.payload.repeat ? ' (repeat)' : ''),
+          "from ERR's schedule"],
+      },
+    ];
+    // Built detached and glued under the panel, so picture, footer and line are
+    // one object with one edge. THE PRESENT IS A DOTTED LINE WITH A LABELLED
+    // GAP, not a second playhead.
+    const view = createStripView(el('div'), deck, {
+      size: 'auto', absolute: true, follow: true, lanes, wallDash: [1, 3], wallLabel: false,
+    });
+    S.view = view;
+    panel.glue(view.surface);
+    view.strip.armWall(Date.now());
+
+    // PRESS THE LINE TO GO THERE, ON THIS CHANNEL ONLY. Read the POINTER, not
+    // the deck: on a media-mastered deck the master puts the line straight back
+    // within a tick.
+    view.strip.canvas.addEventListener('pointerup', (e) => {
+      if (!S.clock) return;
+      const r = view.strip.canvas.getBoundingClientRect();
+      const st = view.strip.state;
+      const px = (e.clientX - r.left) * (st.width / r.width) - st.gutterPx;
+      if (px < 0) return;                         // the gutter is not the line
+      const want = Math.min(deck.range[1], Math.max(deck.range[0], view.strip.xToTime(px)));
+      if (S.loadStopped && S.hls) {
+        S.hls.startLoad(video.currentTime + (want - S.clock.now()) / 1000); S.loadStopped = false;
+      }
+      seekTo(S, want);
+      d.log(`${c.name}: watching from ${hms(want)}`);
+    });
+
+    play.onclick = () => { pressPlay(S); };
+    live.onclick = () => { liveButton(S); };
+    mute.onclick = () => setMuted(S, !S.muted, true);
+    paintMute(S);
+    return S;
+  }
+
+  const chans = ON_PAGE.map(makeChannel);
+  const wrap = el('div', 'fl-wrap');
+  const grid = el('div', 'fl-grid');
+  grid.append(...chans.map((S) => S.panel.surface));
+  wrap.append(grid);
+  d.el.append(wrap);
+  window.__strips = chans.map((S) => S.view.strip);
+
+  // ── state words, mute and the play glyph ─────────────────────────────────
+  const behindMs = (S) => {
+    const p = S.clock?.now();
+    return p == null ? null : Date.now() - p;
+  };
+  const stateWord = (S) => {
+    if (!S.clock || !S.clock.now()) return S.playing ? 'opening' : S.openedAt ? 'stopped' : 'not started';
+    if (S.video.paused) return S.loadStopped ? 'blocked' : 'paused';
+    const b = behindMs(S);
+    if (S.stalledFor > 1500) return S.loadStopped ? 'blocked' : 'stalled';
+    return b != null && b > BAND.amber ? 'behind live' : 'playing';
+  };
+  function paintMute(S) {
+    setSymbol(S.mute, S.muted ? MUTE_OFF : MUTE_ON);
+    S.mute.setAttribute('aria-pressed', String(!S.muted));
+    S.mute.title = S.muted ? 'muted\npress for sound' : 'audible\npress to mute';
+  }
+  function setMuted(S, next, say = false) {
+    S.muted = !!next;
+    S.video.muted = S.muted;
+    paintMute(S);
+    if (say) d.log(S.muted ? `${S.c.name} is muted` : `${S.c.name} is audible`);
+  }
+  function paintPlay(S) {
+    setSymbol(S.play, S.playing ? STOP : PLAY);
+    S.play.setAttribute('aria-pressed', String(S.playing));
+    S.play.setAttribute('aria-label', `${S.playing ? 'stop' : 'play'} ${S.c.name}`);
+    S.play.title = S.playing ? `stop ${S.c.name}` : `play ${S.c.name}`;
+  }
+
+  function gutters(S) {
+    const L = (id) => S.view.strip.lanes().find((l) => l.id === id);
+    const seen = L('seen'), epg = L('epg');
+    if (seen) {
+      const total = S.watched.reduce((a, w) => a + (w.to - w.from), 0);
+      const b = behindMs(S);
+      const no = S.probes.filter((p) => p.state === 'refused').length;
+      const walledMin = S.served?.position != null ? Math.round(S.served.blockedMin) : 0;
+      seen.subLabel = [
+        b == null ? 'not playing' : `${(b / 1000).toFixed(1)} s behind`,
+        S.watched.length ? `${(total / 1000).toFixed(0)} s seen` : 'none seen yet',
+        walledMin ? `${walledMin} min refused`
+          : S.probes.length ? (no ? `${no} refused` : 'none refused') : '',
+      ].filter(Boolean);
+    }
+    if (epg) {
+      const now = S.deck.position();
+      const next = S.programmes.find((p) => p.at > now) || null;
+      epg.subLabel = S.programmes.length
+        ? [`${S.programmes.length} over ${(S.windowS / 3600).toFixed(0)} h`,
+           next ? `next ${new Date(next.at).toTimeString().slice(0, 5)}` : '']
+          .filter(Boolean)
+        : '';
+    }
+  }
+
+  // ── the picture ───────────────────────────────────────────────────────────
+  /** THE ONE WAY TO ASK FOR A POSITION. The line goes where you asked at once
+   *  and the picture catches up; while the seek is in flight the master does
+   *  not drive, and the catch-up is measured. */
+  function seekTo(S, want) {
+    if (!S.clock) return S.deck.seek(want);
+    const v = S.video;
+    S.seekTarget = want;
+    S.seekUntil = performance.now() + 4000;
+    S.caughtUpMs = null;
+    const t0 = performance.now();
+    const seq = ++S.seekSeq;
+    S.deck.seek(want);
+    S.clock.seek(want);
+    if (v.requestVideoFrameCallback) {
+      const wantMedia = v.currentTime;
+      const onFrame = (_now, meta) => {
+        if (seq !== S.seekSeq || S.caughtUpMs !== null) return;
+        if (Math.abs((meta?.mediaTime ?? wantMedia) - wantMedia) > 1) {
+          if (performance.now() - t0 < 4000) v.requestVideoFrameCallback(onFrame);
+          return;
+        }
+        S.caughtUpMs = Math.round(performance.now() - t0);
+        if (S === focus) d.set('first frame', S.caughtUpMs, S.caughtUpMs < 500 ? 'ok' : '');
+      };
+      v.requestVideoFrameCallback(onFrame);
+    } else {
+      v.addEventListener('seeked', () => {
+        if (seq === S.seekSeq && S.caughtUpMs === null) S.caughtUpMs = Math.round(performance.now() - t0);
+      }, { once: true });
+    }
+    return { ok: true };
+  }
+
+  /** Play with sound when sound is wanted, and fall back to a muted picture
+   *  rather than a black one if the browser refuses. */
+  async function playPicture(S) {
+    S.video.muted = S.muted;
+    try { await S.video.play(); } catch (e) {
+      if (e?.name === 'NotAllowedError' && !S.video.muted) {
+        setMuted(S, true);
+        d.log(`the browser refused sound without a press here, so ${S.c.name} plays muted`, 'bad');
+        await S.video.play().catch(() => {});
+      }
+    }
+  }
+
+  /** Close this channel's engine and picture, and nothing else. */
+  function closeChannel(S) {
+    if (S.hls) { try { S.hls.destroy(); } catch { /* already gone */ } hlsAlive--; }
+    S.hls = null; S.clock = null;
+    const v = S.video;
+    if (v.hasAttribute('src') || v.src) { v.muted = true; v.pause(); v.removeAttribute('src'); v.load(); }
+  }
+
+  /** Open one channel: one master read, one probe at the edge, one engine.
+   *  Everything about this channel starts again from nothing. */
+  async function openChannel(S) {
+    const c = S.c, gen = ++S.openGen, v = S.video;
+    closeChannel(S);
+    S.reset();
+    S.openedAt = Date.now();
+    let pl;
+    try { pl = await readPlaylist(c.url); } catch (e) {
+      d.log(`${c.name}: the playlist did not come (${e.message})`, 'bad');
+      return false;
+    }
+    if (gen !== S.openGen) return false;
+    S.playlist = onRead(S, pl);
+    S.pdtMs = pl.pdt; S.windowS = pl.windowS; S.edgeMs = pl.edge ?? Date.now();
+    setRange(S);
+    S.scheduleDone = loadSchedule(S);
+
+    // 🔴 ASK WHERE THE LIVE EDGE IS BEFORE PLAYING IT. ERR blocks live segments
+    // by PROGRAMME and was MEASURED refusing ETV's newest forty-five minutes.
+    // One request on a channel that serves its edge, which is the common case.
+    await askWhatIsServed(S, true);
+    if (gen !== S.openGen) return false;
+
+    if (NATIVE_HLS) {
+      v.src = c.url;
+    } else if (window.Hls?.isSupported()) {
+      // START BEHIND THE BOUNDARY WHEN THERE IS ONE. NO CATCH-UP AND NO LATENCY
+      // TARGET: being behind is the medium here, and a back-seek must stick.
+      const hls = S.hls = new window.Hls({ enableWorker: true,
+        ...(S.served?.position != null ? { startPosition: S.served.position } : {}) });
+      window.__hls = hls;
+      hlsAlive++;
+      hls.loadSource(c.url);
+      hls.attachMedia(v);
+      // BYTES THAT ARRIVED, counted on the far side of the wire. An object
+      // existing says nothing about whether a broadcaster answered.
+      hls.on(window.Hls.Events.FRAG_LOADED, (_e, data) => {
+        S.frags++;
+        S.fragBytes += data?.frag?.stats?.total || data?.stats?.total || 0;
+      });
+      wallHandler(hls, window.Hls, () => {
+        S.loadStopped = true;
+        d.log(`${c.name}: ERR refused three fragments in a row. Stopped loading rather than hammering it`, 'bad');
+      });
+    } else { d.log('this browser cannot play HLS', 'bad'); return false; }
+
+    S.clock = clockOf(v, S.hls);
+    if (!S.master) {
+      S.master = mediaMaster(S.deck, () => {
+        const p = S.clock?.now();
+        return p == null ? null : { el: v, pos: p, key: c.id };
+      }, { stallPolicy: 'hold', autoPlayPause: true,
+           onEvent: (e) => { if (e.reason === 'jump') S.jumpEvents.push(e); } });
+    }
+    await playPicture(S);
+    return gen === S.openGen;
+  }
+
+  // Sessions opened at ERR (master reads) and playlist reads, counted per open
+  // of a channel, so the page can assert it is not minting one a second.
+  function onRead(S, pl) {
+    S.playlistsRead++;
+    if (pl.masterRead) S.mastersRead++;
+    S.variantUrl = pl.variant;
+    S.readAt = Date.now(); S.readEdge = pl.edge;
+    return pl;
+  }
+
+  // ── a press on a panel's play, the only thing that opens anything ─────────
+  function pressPlay(S) {
+    if (S.playing) { stopChannel(S); return S.opening; }
+    if (askedBeforePlay === null) askedBeforePlay = broadcasterAsks();
+    // INSIDE THE PRESS: the activation is spent on this element now, so the
+    // picture may start with sound once its first fragment arrives.
+    armVideo(S.video);
+    // TWO CHANNELS AUDIBLE AT ONCE IS NOISE. The other one keeps playing.
+    for (const O of chans) {
+      if (O !== S && O.playing && !O.muted) {
+        setMuted(O, true);
+        d.log(`${O.c.name} muted so ${S.c.name} can be heard. ${O.c.name} keeps playing`);
+      }
+    }
+    S.playing = true;
+    focus = S;
+    paintPlay(S);
+    setMuted(S, false);
+    d.set('channel', S.c.name);
+    tickLoop();
+    d.log(`opening ${S.c.name}`);
+    S.opening = playChannel(S);
+    return S.opening;
+  }
+
+  async function playChannel(S) {
+    if (!await openChannel(S)) return false;
+    S.audibleAtPlay = !S.video.muted;
+    d.log(`playing ${S.c.name}`);
+    await settle(S);
+    if (!S.playing) return false;
+    await toLive(S);
+    return true;
+  }
+
+  function stopChannel(S) {
+    S.openGen++;
+    closeChannel(S);
+    S.playing = false; S.playlist = null;
+    S.deck.pause();
+    paintPlay(S);
+    if (S === focus) d.set('state', stateWord(S));
+    d.log(`${S.c.name} stopped`);
+  }
+
+  // BOTH ENDS MOVE, once a second, and the playlist is re-read every ten on
+  // the variant the master already handed over. Per open channel.
+  function setRange(S) {
+    const reach = S.windowS ? S.windowS * 1000 : REACH_MS;
+    S.deck.setRange([S.edgeMs - reach, S.edgeMs]);
+  }
+  async function refresh(S) {
+    if (!S.playlist) return;
+    const gen = S.openGen;
+    try {
+      if (!S.reading && Date.now() - Math.max(S.readAt, S.triedAt) >= PLAYLIST_EVERY_MS) {
+        S.reading = true; S.triedAt = Date.now();
+        try {
+          const pl = await readPlaylist(S.c.url, { variant: S.variantUrl });
+          if (gen === S.openGen && S.playlist) { onRead(S, pl); S.playlist = pl; S.windowS = pl.windowS || S.windowS; }
+        } finally { S.reading = false; }
+      }
+      if (S.readEdge != null) S.edgeMs = S.readEdge + (Date.now() - S.readAt);
+      const reach = S.windowS ? S.windowS * 1000 : REACH_MS;
+      const pos = S.deck.position();
+      const outside = pos < S.edgeMs - reach || pos > S.edgeMs;
+      setRange(S);
+      if (outside && S.clock)
+        d.log(`${S.c.name}: the window ate your position. Moved to ${hms(S.deck.position())}`, 'bad');
+    } catch { /* one missed refresh is not an event */ }
+  }
+  setInterval(() => { for (const S of chans) refresh(S); }, 1000 / RANGE_HZ);
+
+  // The page's own frame loop: each master's tick, each watched lane growing
+  // at frame rate, and each present line moving while its deck is paused.
+  let ticking = false;
+  function tickLoop() {
+    if (ticking) return;
+    ticking = true;
+    const step = () => {
+      for (const S of chans) {
+        if (S.seekTarget != null && (S.caughtUpMs !== null || performance.now() > S.seekUntil)) S.seekTarget = null;
+        if (S.seekTarget == null) S.master?.tick();
+        const p = S.clock?.now();
+        if (p != null) {
+          if (S.lastSeenPos != null && !S.video.paused) {
+            const dt = p - S.lastSeenPos;
+            if (dt > 0 && dt < 2000) {
+              const last = S.watched[S.watched.length - 1];
+              if (last && Math.abs(p - last.to) < 2000) last.to = Math.max(last.to, p);
+              else S.watched.push({ from: S.lastSeenPos, to: p });
+              S.stalledFor = 0;
+            } else if (dt === 0) S.stalledFor = performance.now() - S.lastSeenAt;
+          }
+          if (p !== S.lastSeenPos) { S.lastSeenPos = p; S.lastSeenAt = performance.now(); }
+        }
+        gutters(S);
+        S.view.strip.invalidate();
+      }
+      if (focus) {
+        const b = behindMs(focus);
+        if (b != null) d.set('behind', (b / 1000).toFixed(1),
+          b >= BAND.green[0] && b <= BAND.green[1] ? 'ok' : b <= BAND.amber ? '' : 'bad');
+        d.set('state', stateWord(focus));
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  const resume = async (S) => {
+    if (S.video.paused) await S.video.play().catch(() => {});
+    await wait(200);
+  };
+
+  const settle = (S) => new Promise((r) => {
+    const t0 = performance.now();
+    const check = () => {
+      if (S.clock?.now() != null || performance.now() - t0 > 12000) return r();
+      setTimeout(check, 200);
+    };
+    check();
+  });
+
+  // ── what ERR will hand over ───────────────────────────────────────────────
+  // MEMBERSHIP IS THE DISCRIMINATOR: only segments in the playlist just read
+  // are ever asked about, because an expired one answers like a refused one.
+  async function askWhatIsServed(S, force = false) {
+    if (!S.playlist) return S.served;
+    if (!force && S.served && performance.now() - S.servedAt < SERVED_FRESH_MS) return S.served;
+    const found = await findServedEdge(S.playlist, { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
+    if (!found) return S.served;
+    const wasWall = S.served?.position != null;
+    S.served = found; S.servedAt = performance.now();
+    S.probesIssued += found.probes.length;
+    if (found.none) {
+      d.log(`${S.c.name}: ERR refuses every point asked across the whole window (rights)`, 'bad');
+    } else if (found.position != null && !wasWall) {
+      d.log(`${S.c.name}: ERR refuses the newest ${Math.round(found.blockedMin)} min (rights). `
+        + `Starting ${WALL_BACKOFF_S} s behind that boundary`, 'bad');
+    } else if (found.edgeServed && wasWall) {
+      d.log(`${S.c.name}: ERR serves to the live edge again`);
+    }
+    return S.served;
+  }
+
+  async function servedLiveTarget(S) {
+    if (S.served?.position == null) return null;
+    await askWhatIsServed(S);
+    return S.served?.position != null && Number.isFinite(S.served.startAt) ? S.served.startAt : null;
+  }
+
+  async function sweep(S) {
+    const pl = S.playlist;
+    if (!pl?.segs?.length) return;
+    const n = Math.min(PROBE_POINTS, pl.segs.length);
+    const picked = [];
+    for (let k = 0; k < n; k++) picked.push(Math.round((k * (pl.segs.length - 1)) / (n - 1)));
+    const asking = picked.filter(() => S.probesIssued++ < PROBE_CAP).map((i) => {
+      const seg = pl.segs[i];
+      return probeSegment(seg).then((state) => ({ at: seg.at ?? S.edgeMs, state, i,
+        fromPlaylist: pl.segs.includes(seg), sn: seg.sn }));
+    });
+    S.probes = (await Promise.all(asking)).sort((a, b) => a.at - b.at);
+    const refused = S.probes.filter((p) => p.state === 'refused');
+    d.log(refused.length
+      ? `${S.c.name}: ERR refused ${refused.length} of ${S.probes.length} points asked`
+      : `${S.c.name}: ERR served every one of the ${S.probes.length} points asked`,
+      refused.length ? 'bad' : 'ok');
+    S.view.strip.invalidate();
+  }
+
+  // 🔴 THE OTHER CHANNEL, ASKED THE SAME QUESTION ONCE, DEEP TIER ONLY. Two
+  // shapes in one run is what separates a boundary finder from one that
+  // answers the same way whatever it is asked.
+  async function takeSurvey(S) {
+    const own = S.served ? { id: S.c.id, name: S.c.name, ...S.served } : null;
+    const rows = await surveyChannels(ON_PAGE.filter((c) => c.id !== own?.id),
+      { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
+    S.probesIssued += rows.reduce((n, r) => n + (r.probes?.length || 0), 0);
+    S.survey = ON_PAGE
+      .map((c) => (own && c.id === own.id ? own : rows.find((r) => r.id === c.id)))
+      .filter(Boolean);
+    d.log(`what ERR will serve: ${describeSurvey(S.survey)}`);
+  }
+
+  // ── what was on ───────────────────────────────────────────────────────────
+  async function loadSchedule(S) {
+    const gen = S.openGen;
     // ERR's broadcast day starts at 05:45 local, so a two-hour window that
     // reaches back past midnight needs yesterday's schedule too.
-    const days = [new Date(edgeMs - windowS * 1000), new Date(edgeMs)]
+    const days = [new Date(S.edgeMs - S.windowS * 1000), new Date(S.edgeMs)]
       .filter((day, i, all) => all.findIndex((x) => x.toDateString() === day.toDateString()) === i);
-    const out = (await Promise.all(days.map((day) => scheduleDay(c, day)))).flat()
+    const out = (await Promise.all(days.map((day) => scheduleDay(S.c, day)))).flat()
       .map((p) => ({ ...p })).sort((a, b) => a.at - b.at);
-    if (c !== ch) return;
+    if (gen !== S.openGen) return;
     // CONTIGUOUS BY CONSTRUCTION: a programme runs until the next one starts.
     for (let i = 0; i < out.length; i++) out[i].end = out[i + 1] ? out[i + 1].at : out[i].at + 3600e3;
-    const from = edgeMs - windowS * 1000;
-    programmes = out.filter((p) => p.end > from && p.at < edgeMs);
-    view.strip.invalidate();
+    const from = S.edgeMs - S.windowS * 1000;
+    S.programmes = out.filter((p) => p.end > from && p.at < S.edgeMs);
+    S.view.strip.invalidate();
   }
 
   // ── the two position controls ─────────────────────────────────────────────
-  function stepBack(ms) {
-    const asked = Math.max(deck.range[0] + 5000, (clock?.now() ?? Date.now()) - ms);
+  function stepBack(S, ms) {
+    const asked = Math.max(S.deck.range[0] + 5000, (S.clock?.now() ?? Date.now()) - ms);
     // LAND WHERE ERR SAID IT WOULD SERVE: seeking into a refused stretch does
     // not move the picture at all.
-    const ok = probes.filter((p) => p.state === 'served' && p.at <= asked);
+    const ok = S.probes.filter((p) => p.state === 'served' && p.at <= asked);
     const want = ok.length ? ok[ok.length - 1].at : asked;
-    if (probes.length && !ok.length) {
-      d.log('ERR served nothing older than the live edge', 'bad');
+    if (S.probes.length && !ok.length) {
+      d.log(`${S.c.name}: ERR served nothing older than the live edge`, 'bad');
     } else if (Math.abs(want - asked) > 60000) {
       d.log(`asked for ${new Date(asked).toTimeString().slice(0, 5)}. The nearest instant ERR agreed to serve is `
         + `${new Date(want).toTimeString().slice(0, 5)}`);
     }
-    if (loadStopped && clock) {
-      hls?.startLoad(glass.currentTime + (want - clock.now()) / 1000);
-      loadStopped = false;
+    if (S.loadStopped && S.clock) {
+      S.hls?.startLoad(S.video.currentTime + (want - S.clock.now()) / 1000);
+      S.loadStopped = false;
     }
-    const sought = seekTo(want);
-    d.log(`walking back to ${new Date(want).toTimeString().slice(0, 8)}`
-      + `${sought == null ? ' with no clock yet' : ''}`);
+    const sought = seekTo(S, want);
+    d.log(`${S.c.name}: walking back to ${hms(want)}${sought == null ? ' with no clock yet' : ''}`);
     return want;
   }
 
-  async function toLive() {
-    if (loadStopped) { hls?.startLoad(); loadStopped = false; }
-    if (glass.paused) await glass.play().catch(() => {});
+  // THE PAST FILLS THE VIEW: 70% of the opening span behind the present.
+  const openView = (S, at = Date.now()) =>
+    S.view.strip.fit(at - OPEN_SPAN_MS * 0.70, at + OPEN_SPAN_MS * 0.30);
+
+  async function toLive(S) {
+    if (S.loadStopped) { S.hls?.startLoad(); S.loadStopped = false; }
+    if (S.video.paused) await S.video.play().catch(() => {});
     // 🔴 LIVE MEANS THE NEWEST FRAME ERR WILL SERVE, NOT THE NEWEST ONE IT LISTS.
-    const wall = await servedLiveTarget();
+    const wall = await servedLiveTarget(S);
     for (let i = 0; i < 20; i++) {
-      const l = wall ?? clock?.live();
+      const l = wall ?? S.clock?.live();
       if (l != null) {
-        seekTo(l);
-        openView(l);
-        view.strip.setFollow(true);
+        seekTo(S, l);
+        openView(S, l);
+        S.view.strip.setFollow(true);
         return l;
       }
-      await new Promise((r) => setTimeout(r, 100));
+      await wait(100);
     }
-    d.log('the engine offered no live position within two seconds', 'bad');
+    d.log(`${S.c.name}: the engine offered no live position within two seconds`, 'bad');
     return null;
   }
 
-  // LIVE waits for whatever the play press is still doing, so a press in the
-  // middle of the opening cannot pull the picture out from under it.
-  async function liveButton() {
-    if (!playingId) { d.log('nothing is playing. Press play on a channel'); return; }
-    await opening;
-    if (playingId) await toLive();
+  // LIVE waits for whatever this channel's play press is still doing, so a
+  // press in the middle of the opening cannot pull the picture out from under it.
+  async function liveButton(S) {
+    if (!S.playing) { d.log(`${S.c.name} is not playing. Press its play first`); return; }
+    await S.opening;
+    if (S.playing) await toLive(S);
   }
 
   // ── the three things a live line has to prove ────────────────────────────
   const evid = { paused: null, wallKeptGoing: null, asked: null, landed: null,
                  jumpsBefore: 0, behindAfterLive: null };
 
-  async function pauseTest() {
-    if (!clock) return;
-    const w0 = view.strip.wallPos();
-    glass.pause();
-    await new Promise((r) => setTimeout(r, 400));
-    evid.paused = deck.playing() === false;
-    evid.wallKeptGoing = view.strip.wallPos() > w0;
-    glass.play().catch(() => {});
-    await new Promise((r) => setTimeout(r, 300));
+  async function pauseTest(S) {
+    if (!S.clock) return;
+    const w0 = S.view.strip.wallPos();
+    S.video.pause();
+    await wait(400);
+    evid.paused = S.deck.playing() === false;
+    evid.wallKeptGoing = S.view.strip.wallPos() > w0;
+    S.video.play().catch(() => {});
+    await wait(300);
   }
 
-  function backTest(ms) {
-    evid.jumpsBefore = jumpEvents.length;
-    const want = stepBack(ms);
+  function backTest(S, ms) {
+    evid.jumpsBefore = S.jumpEvents.length;
+    const want = stepBack(S, ms);
     evid.asked = want;
-    evid.landed = clock?.now();          // synchronous: the REQUEST, not the effect
-    evid.lineAt = deck.position();
+    evid.landed = S.clock?.now();        // synchronous: the REQUEST, not the effect
+    evid.lineAt = S.deck.position();
   }
 
-  async function waitForCatchUp() {
+  async function waitForCatchUp(S) {
     const t0 = performance.now();
-    while (caughtUpMs === null && performance.now() - t0 < 4500)
-      await new Promise((r) => setTimeout(r, 50));
-    evid.caughtUp = caughtUpMs;
+    while (S.caughtUpMs === null && performance.now() - t0 < 4500) await wait(50);
+    evid.caughtUp = S.caughtUpMs;
   }
 
-  async function liveTest() {
+  async function liveTest(S) {
     const t0 = performance.now();
-    while (jumpEvents.length <= evid.jumpsBefore && performance.now() - t0 < 3000)
-      await new Promise((r) => setTimeout(r, 100));
-    await new Promise((r) => setTimeout(r, 1200));
-    evid.behindAfterLive = behindMs();
+    while (S.jumpEvents.length <= evid.jumpsBefore && performance.now() - t0 < 3000) await wait(100);
+    await wait(1200);
+    evid.behindAfterLive = behindMs(S);
   }
 
   const rangeIdentity = { same: false, movedLeft: false, movedRight: false, dLeft: 0, dRight: 0 };
   const advance = { moved: 0, wall: 0 };
-  async function sampleMovement() {
-    await resume();
+  async function sampleMovement(S) {
+    await resume(S);
     const waitFrom = performance.now();
-    while (seekTarget != null && performance.now() - waitFrom < 4500)
-      await new Promise((r) => setTimeout(r, 100));
-    const ref = deck.range, l0 = ref[0], r0 = ref[1];
-    await new Promise((r) => setTimeout(r, 5000));
-    rangeIdentity.same = deck.range === ref;
-    rangeIdentity.dLeft = Math.round(deck.range[0] - l0);
-    rangeIdentity.dRight = Math.round(deck.range[1] - r0);
+    while (S.seekTarget != null && performance.now() - waitFrom < 4500) await wait(100);
+    const ref = S.deck.range, l0 = ref[0], r0 = ref[1];
+    await wait(5000);
+    rangeIdentity.same = S.deck.range === ref;
+    rangeIdentity.dLeft = Math.round(S.deck.range[0] - l0);
+    rangeIdentity.dRight = Math.round(S.deck.range[1] - r0);
     rangeIdentity.movedLeft = rangeIdentity.dLeft > 0;
     rangeIdentity.movedRight = rangeIdentity.dRight > 0;
-    const p0 = clock?.now();
+    const p0 = S.clock?.now();
     const t0 = performance.now();
-    await new Promise((r) => setTimeout(r, 1500));
-    const p1 = clock?.now();
+    await wait(1500);
+    const p1 = S.clock?.now();
     advance.wall = Math.round(performance.now() - t0);
     advance.moved = p0 != null && p1 != null ? Math.round(p1 - p0) : 0;
   }
 
+  /** Frames this picture has EVER decoded. Cumulative, so a seek cannot reset
+   *  it the way it empties `readyState`. */
+  const framesOf = (S) => S.video.getVideoPlaybackQuality?.()?.totalVideoFrames
+    ?? S.video.webkitDecodedFrameCount ?? 0;
+  const sourced = (S) => S.video.hasAttribute('src') || !!S.video.src;
+
   // ── the self-check, the harness's and never a visitor's ──────────────────
-  // It presses ETV's play the way a person would and then runs what Start used
-  // to run behind it. See the note at the top for why this is before `ready`.
+  // It presses ETV's play the way a person would and runs the line's checks on
+  // that channel, then presses ETV2 and grades the two running together.
   async function selfcheck() {
-    const home = panels[0];
-    home.play.click();
-    if (!await opening) { d.log(`${home.c.name} did not open`, 'bad'); }
-    await resume();
-    await toLive();
-    await waitForCatchUp();
-    await sampleMovement();     // both ends move, and the playhead tracks the picture
+    const A = chans[0];
+    A.play.click();
+    if (!await A.opening) { d.log(`${A.c.name} did not open`, 'bad'); }
+    await resume(A);
+    await toLive(A);
+    await waitForCatchUp(A);
+    await sampleMovement(A);    // both ends move, and the playhead tracks the picture
     // THE WALK, DEEP TIER ONLY: it pauses the picture, asks ERR for thirteen
     // instants, surveys the other channel and yanks the view ten minutes back
     // and forward again. It leaves the live row with a GAP, which is that
     // row's whole subject.
     const walk = async () => {
-      await pauseTest();
-      await sweep();
-      await takeSurvey();
-      backTest(10 * 60 * 1000);
-      await waitForCatchUp();
-      await toLive();
-      await liveTest();
+      await pauseTest(A);
+      await sweep(A);
+      await takeSurvey(A);
+      backTest(A, 10 * 60 * 1000);
+      await waitForCatchUp(A);
+      await toLive(A);
+      await liveTest(A);
       d.log('walked back into the window and returned. The break in the top row is where that seek skipped');
-      openView(deck.position());
+      openView(A, A.deck.position());
     };
     await ifDeep(walk, { log: d.log,
       say: 'the pause, the refusal sweep, the channel survey and the walk back into the window (DEMO_DEEP=1)' });
     // The session assert is about the REFRESH, so wait for one.
     const r0 = performance.now();
-    while (playlistsRead < 2 && performance.now() - r0 < PLAYLIST_EVERY_MS + 2000)
-      await new Promise((r) => setTimeout(r, 250));
-    await scheduleDone;
+    while (A.playlistsRead < 2 && performance.now() - r0 < PLAYLIST_EVERY_MS + 2000) await wait(250);
+    await A.scheduleDone;
     await checks();
   }
 
   // ── checks ────────────────────────────────────────────────────────────────
   async function checks() {
+    const [A, B] = chans;
     // the page, before anything was opened
     d.assert('nothing was asked of the broadcaster before a play press',
       askedBeforePlay === 0, `${askedBeforePlay} requests before the press`);
-    const names = panels.map((p) => p.panel.el.querySelector('.fl-name')?.textContent ?? '');
+    const names = chans.map((S) => S.panel.el.querySelector('.fl-name')?.textContent ?? '');
     d.assert('two video panels, ETV and ETV2 and no other, each with its own play',
-      panels.length === 2 && document.querySelectorAll('.pos-vp').length === 2
+      chans.length === 2 && document.querySelectorAll('.pos-vp').length === 2
         && names.join(' ') === 'ETV ETV2'
-        && panels.every((p) => p.panel.slots.right.contains(p.play)),
+        && chans.every((S) => S.panel.slots.right.contains(S.play)),
       `${document.querySelectorAll('.pos-vp').length} panels: ${names.join(', ')}`);
-    const [r0, r1] = panels.map((p) => p.panel.el.getBoundingClientRect());
+    // 🔴 NO COMMON TRANSPORT LANE. Each footer reads play, LIVE, mute, full
+    // screen, and each panel has its own line glued under it.
+    const order = chans.map((S) => [...S.panel.slots.right.children]);
+    d.assert('each footer carries its own play, LIVE, mute and full screen, in that order',
+      order.every((kids, i) => kids.length === 4 && kids[0] === chans[i].play && kids[1] === chans[i].live
+        && kids[2] === chans[i].mute && kids[3].classList.contains('pos-vp-full')),
+      order.map((kids, i) => `${chans[i].c.name}: ${kids.map((k) => k.textContent.trim() || '?').join(' ')}`).join(', '));
+    const strips = document.querySelectorAll('canvas.pos-strip');
+    d.assert('no shared transport bar and no shared line, one line under each picture',
+      !document.querySelector('.tbar') && !window.__demo?.transport && strips.length === 2
+        && chans.every((S) => S.panel.surface.contains(S.view.strip.canvas) && S.panel.footers() === 2)
+        && A.deck !== B.deck,
+      `${document.querySelectorAll('.tbar').length} bars, ${strips.length} lines, `
+      + chans.map((S) => `${S.c.name} ${S.panel.footers()} rows`).join(', '));
+    const [r0, r1] = chans.map((S) => S.panel.surface.getBoundingClientRect());
     const gw = grid.getBoundingClientRect().width;
     const side = Math.abs(r0.top - r1.top) < 1 && r1.left > r0.right;
     d.assert('the two pictures sit side by side when there is room and stack when there is not',
       gw > 560 ? side : (!side && r1.top >= r0.bottom),
       `${side ? 'side by side' : 'stacked'} in a ${gw.toFixed(0)} px grid`);
-    const sourced = panels.filter((p) => p.video.hasAttribute('src')).map((p) => p.c.name);
-    d.assert('only the playing channel\'s picture has a source',
-      sourced.length === 1 && sourced[0] === ch.name, `${sourced.join(', ') || 'none'} sourced, ${ch.name} playing`);
-    d.assert('no channel but the playing one is loaded',
+    d.assert('before the second press only the pressed channel\'s picture has a source',
+      sourced(A) && !sourced(B), `${chans.filter(sourced).map((S) => S.c.name).join(', ') || 'none'} sourced`);
+    d.assert('before the second press only the pressed channel is loaded',
       hlsAlive === (NATIVE_HLS ? 0 : 1), `${hlsAlive} engine${hlsAlive === 1 ? '' : 's'} alive`);
     // 🔴 EVIDENCE THAT A BROADCASTER ANSWERED, NOT THAT AN OBJECT EXISTS.
-    // `totalVideoFrames` is cumulative, so the seek one line earlier cannot
-    // reset it the way it empties `readyState`.
-    const q = glass.getVideoPlaybackQuality?.();
-    const framesSeen = q?.totalVideoFrames ?? glass.webkitDecodedFrameCount ?? 0;
     d.assert('the pressed channel received picture, not just an object',
-      (NATIVE_HLS || frags > 0) && framesSeen > 0,
-      `${ch.id} ${frags} fragments, ${Math.round(fragBytes / 1024)} KB, ${framesSeen} frames decoded`);
+      (NATIVE_HLS || A.frags > 0) && framesOf(A) > 0,
+      `${A.c.id} ${A.frags} fragments, ${Math.round(A.fragBytes / 1024)} KB, ${framesOf(A)} frames decoded`);
     d.assert('a play press makes that channel audible',
-      audibleAtPlay === true, audibleAtPlay ? 'unmuted by the press' : 'still muted after the press');
+      A.audibleAtPlay === true, A.audibleAtPlay ? 'unmuted by the press' : 'still muted after the press');
 
     // M: mechanism, deterministic, no network
     d.assert('the line is positioned in the present, not at zero',
-      deck.position() >= deck.range[0] && deck.position() <= deck.range[1],
-      new Date(deck.position()).toTimeString().slice(0, 8));
+      A.deck.position() >= A.deck.range[0] && A.deck.position() <= A.deck.range[1],
+      hms(A.deck.position()));
     d.assert('the position domain is absolute wall milliseconds',
-      view.strip.state.absolute === true && deck.range[0] > 1.7e12,
-      `${deck.range[0]}`);
+      A.view.strip.state.absolute === true && A.deck.range[0] > 1.7e12, `${A.deck.range[0]}`);
     d.assert('the axis reads as a clock, not a duration',
-      /^\d{2}:\d{2}$/.test(formatTime(deck.range[1], 60000, true)),
-      formatTime(deck.range[1], 60000, true));
+      /^\d{2}:\d{2}$/.test(formatTime(A.deck.range[1], 60000, true)),
+      formatTime(A.deck.range[1], 60000, true));
     d.assert('the window keeps its identity while both ends move',
       rangeIdentity.same && rangeIdentity.movedLeft && rangeIdentity.movedRight,
       `left +${rangeIdentity.dLeft} ms, right +${rangeIdentity.dRight} ms, same array ${rangeIdentity.same}`);
     d.assert('the present is not inside the seekable window',
-      (view.strip.readout().wall ?? 0) > deck.range[1] - 1,
-      `${(((view.strip.readout().wall ?? 0) - deck.range[1]) / 1000).toFixed(1)} s past the edge`);
-    d.assert('the bar does not stop this deck at the end of the window',
-      bar.endStop === false && bar.commanded === true,
-      'endStop false, position commands go to the picture');
+      (A.view.strip.readout().wall ?? 0) > A.deck.range[1] - 1,
+      `${(((A.view.strip.readout().wall ?? 0) - A.deck.range[1]) / 1000).toFixed(1)} s past the edge`);
 
     // E: needs the broadcaster (the stand-in, under a harness)
     d.assert('the playlist carries a start date',
-      Number.isFinite(pdtMs) && Math.abs(Date.now() - pdtMs) < 3 * 3600e3,
-      pdtMs ? new Date(pdtMs).toTimeString().slice(0, 8) : 'none');
+      Number.isFinite(A.pdtMs) && Math.abs(Date.now() - A.pdtMs) < 3 * 3600e3,
+      A.pdtMs ? hms(A.pdtMs) : 'none');
     d.assert('the window is about the advertised two hours',
-      windowS > 3600 && windowS < 9000, `${(windowS / 60).toFixed(1)} min`);
+      A.windowS > 3600 && A.windowS < 9000, `${(A.windowS / 60).toFixed(1)} min`);
     // TWO BANDS, BECAUSE THE PAGE HAS TWO HONEST ANSWERS: a live picture's
     // worth on a channel that serves its edge, and what ERR refuses on one
     // that does not.
-    const bNow = behindMs();
-    const wallNow = served?.position != null ? served : null;
+    const bNow = behindMs(A);
+    const wallNow = A.served?.position != null ? A.served : null;
     d.assert('the playhead is behind the present by what ERR leaves open',
       bNow != null && (wallNow
         ? Math.abs(bNow / 1000 - wallNow.blockedMin * 60) < 180
@@ -891,32 +890,32 @@
         : `${((bNow ?? 0) / 1000).toFixed(1)} s, live edge served`);
     // 🔴 ONE SESSION AT ERR PER CHANNEL OPEN, NOT ONE PER REFRESH.
     d.assert('the broadcaster is asked for one session, not one per refresh',
-      mastersRead === 1 && playlistsRead >= 2,
-      `${mastersRead} master read${mastersRead === 1 ? '' : 's'}, ${playlistsRead} playlist reads `
-      + `in ${Math.round((Date.now() - openedAt) / 1000)} s`);
+      A.mastersRead === 1 && A.playlistsRead >= 2,
+      `${A.mastersRead} master read${A.mastersRead === 1 ? '' : 's'}, ${A.playlistsRead} playlist reads `
+      + `in ${Math.round((Date.now() - A.openedAt) / 1000)} s`);
     d.assert('the playhead advances with the picture',
-      advance.moved > 1000 && advance.moved < 2500 && (master?.stats().syncs ?? 0) > 0,
-      `${advance.moved} ms over ${advance.wall} ms, ${master?.stats().syncs ?? 0} syncs`);
+      advance.moved > 1000 && advance.moved < 2500 && (A.master?.stats().syncs ?? 0) > 0,
+      `${advance.moved} ms over ${advance.wall} ms, ${A.master?.stats().syncs ?? 0} syncs`);
     d.assert('the programme spans are contiguous and named',
-      programmes.length > 0 && programmes.every((p, i) =>
-        p.name && (i === 0 || programmes[i - 1].end === p.at)),
-      `${programmes.length} programmes`);
+      A.programmes.length > 0 && A.programmes.every((p, i) =>
+        p.name && (i === 0 || A.programmes[i - 1].end === p.at)),
+      `${A.programmes.length} programmes`);
 
     // These go with the walk: their evidence comes from the pause, the sweep
     // and the back-seek, which only the deep tier runs.
     if (DEEP) {
       d.assert('every probed instant was inside the playlist just read',
-        probes.length > 0 && probes.every((p) => p.fromPlaylist),
-        `${probes.length} points, all from the playlist just read`);
+        A.probes.length > 0 && A.probes.every((p) => p.fromPlaylist),
+        `${A.probes.length} points, all from the playlist just read`);
       d.assert('the probe stayed under its own cap',
-        probesIssued <= PROBE_CAP, `${probesIssued} of ${PROBE_CAP}`);
+        A.probesIssued <= PROBE_CAP, `${A.probesIssued} of ${PROBE_CAP}`);
       d.assert('pausing the picture stops the line and not the present',
         evid.paused === true && evid.wallKeptGoing === true,
         `deck paused ${evid.paused}, present still moving ${evid.wallKeptGoing}`);
       d.assert('a back-seek is expressed as an instant inside the window',
-        evid.asked != null && evid.asked >= deck.range[0] && evid.asked <= deck.range[1]
+        evid.asked != null && evid.asked >= A.deck.range[0] && evid.asked <= A.deck.range[1]
           && Math.abs((evid.landed ?? 0) - evid.asked) < 1500,
-        evid.asked ? `asked ${new Date(evid.asked).toTimeString().slice(0, 8)}, clock read ${new Date(evid.landed).toTimeString().slice(0, 8)}` : 'not asked');
+        evid.asked ? `asked ${hms(evid.asked)}, clock read ${hms(evid.landed)}` : 'not asked');
       d.assert('a back-seek moves the line at once, not by drifting',
         evid.lineAt != null && evid.asked != null && Math.abs(evid.lineAt - evid.asked) < 1500,
         evid.lineAt == null ? 'no line reading'
@@ -936,15 +935,15 @@
       // 🔴 THE REFUSAL BOUNDARY, ASSERTED. Sabotaging the stand-in to serve
       // every segment used to leave both old pages fully green. Points no
       // longer in the freshest playlist are dropped rather than counted.
-      const live = new Set((playlist?.segs || []).map((s) => s.sn));
-      const inWindow = probes.filter((p) => p.sn == null || live.has(p.sn));
+      const live = new Set((A.playlist?.segs || []).map((s) => s.sn));
+      const inWindow = A.probes.filter((p) => p.sn == null || live.has(p.sn));
       const seq = inWindow.map((p) => p.state);
       const flips = seq.filter((s, i) => i > 0 && s !== seq[i - 1]).length;
       d.assert('the refusals are one unbroken run at one end of the window',
         seq.includes('refused') && seq.includes('served') && flips === 1,
         `${seq.map((s) => (s === 'served' ? '.' : '#')).join('')}, oldest on the left`
-        + `${inWindow.length < probes.length ? `, ${probes.length - inWindow.length} expired since` : ''}`);
-      const reachable = (survey || []).filter((r) => r && !r.unreachable);
+        + `${inWindow.length < A.probes.length ? `, ${A.probes.length - inWindow.length} expired since` : ''}`);
+      const reachable = (A.survey || []).filter((r) => r && !r.unreachable);
       const walled = reachable.filter((r) => r.position != null);
       const open = reachable.filter((r) => r.edgeServed);
       const asked = reachable.flatMap((r) => r.probes || []);
@@ -964,71 +963,88 @@
     }
 
     // ── mute, pressed for real: twice, so it ends where it started ──────────
-    const glyph = () => muteBtn.querySelector('.pos-sym')?.textContent ?? muteBtn.textContent;
-    const m0 = glass.muted, w0 = glyph();
-    muteBtn.click();
-    const m1 = glass.muted, w1 = glyph();
-    muteBtn.click();
-    const m2 = glass.muted;
+    const glyph = (S) => S.mute.querySelector('.pos-sym')?.textContent ?? S.mute.textContent;
+    const m0 = A.video.muted, w0 = glyph(A);
+    A.mute.click();
+    const m1 = A.video.muted, w1 = glyph(A);
+    A.mute.click();
+    const m2 = A.video.muted;
     const shows = (m) => (m ? MUTE_OFF : MUTE_ON);
-    d.assert('a press of the mute button toggles the sound of the playing channel',
+    d.assert('a press of a panel\'s mute toggles that channel\'s sound',
       m1 === !m0 && m2 === m0, `muted ${m0} then ${m1} then ${m2}`);
     d.assert('the mute button shows the state of the sound',
       w0 === shows(m0) && w1 === shows(m1) && w0 !== w1, `${w0} then ${w1}`);
-    const loopBtn = bar.el?.querySelector?.('.tbar-loop') ?? null;
-    d.assert('the mute button sits just left of LOOP',
-      !!loopBtn && muteBtn.nextElementSibling === loopBtn,
-      loopBtn ? `next to ${muteBtn.nextElementSibling?.className || 'nothing'}` : 'no LOOP button found');
 
-    // ── the other panel, and back ────────────────────────────────────────────
+    // ── the second channel, playing beside the first ─────────────────────────
     // Through the real play buttons, so this is the path a person takes. It
     // opens the second channel at the stand-in, which is why it is harness only.
-    const home = panelOf(ch), away = panels.find((p) => p !== home);
     const f0 = scheduleFetches;
-    away.play.click();
-    await opening; await scheduleDone;
-    const f1 = scheduleFetches, awayRows = programmes.length;
-    const awayEpg = view.strip.lanes().find((l) => l.id === 'epg')?.label;
-    const homeStopped = !home.video.hasAttribute('src') && home.video.paused && home.video.muted;
-    const awayOn = away.video.hasAttribute('src') && playingId === away.c.id;
-    d.assert('playing the second channel stops the first',
-      homeStopped && awayOn && hlsAlive === (NATIVE_HLS ? 0 : 1)
-        && home.play.getAttribute('aria-pressed') === 'false' && away.play.getAttribute('aria-pressed') === 'true',
-      `${home.c.name} ${homeStopped ? 'closed' : 'still open'}, ${away.c.name} ${awayOn ? 'playing' : 'not playing'}, `
-      + `${hlsAlive} engine alive`);
-    home.play.click();
-    await opening; await scheduleDone;
-    const f2 = scheduleFetches;
-    d.assert('switching away and back does not fetch the schedule again',
-      f1 > f0 && f2 === f1,
-      `${f0} fetches before, ${f1} after ${away.c.name}, ${f2} after ${home.c.name} again`);
-    d.assert('the lanes follow the playing channel',
-      awayRows > 0 && programmes.length > 0 && hlsAlive === (NATIVE_HLS ? 0 : 1)
-        && awayEpg === `${away.c.name} schedule`
-        && view.strip.lanes().find((l) => l.id === 'epg')?.label === `${ch.name} schedule`,
-      `${away.c.name} ${awayRows} programmes, ${ch.name} ${programmes.length}, ${hlsAlive} engine alive`);
+    const framesA0 = framesOf(A);
+    B.play.click();
+    await B.opening; await B.scheduleDone;
+    await resume(B);
+    const t0 = performance.now();
+    while (framesOf(B) === 0 && performance.now() - t0 < 4000) await wait(100);
+    const fa = framesOf(A), fb = framesOf(B);
+    await wait(1000);
+    const fa1 = framesOf(A), fb1 = framesOf(B);
+    const f1 = scheduleFetches;
+    d.assert('both channels play at once, two engines alive and both pictures decoding',
+      A.playing && B.playing && sourced(A) && sourced(B)
+        && hlsAlive === (NATIVE_HLS ? 0 : 2) && (NATIVE_HLS || B.frags > 0)
+        && fa1 > fa && fb1 > fb && fa > framesA0,
+      `${hlsAlive} engines, ${A.c.name} ${fa} then ${fa1} frames, ${B.c.name} ${fb} then ${fb1} frames`);
+    d.assert('pressing the second mutes the first, which keeps playing',
+      A.muted && A.video.muted && !A.video.paused && B.audibleAtPlay === true && !B.video.muted
+        && glyph(A) === MUTE_OFF && glyph(B) === MUTE_ON,
+      `${A.c.name} muted ${A.video.muted} paused ${A.video.paused}, ${B.c.name} muted ${B.video.muted}`);
+    // Each mute still answers alone: B's mute leaves A alone, and back.
+    const aBefore = A.video.muted;
+    B.mute.click();
+    const bMuted = B.video.muted, aAfter = A.video.muted;
+    B.mute.click();
+    d.assert('each mute works on its own channel only',
+      bMuted === true && !B.video.muted && aAfter === aBefore,
+      `${B.c.name} muted ${bMuted} then ${B.video.muted}, ${A.c.name} stayed ${aAfter}`);
+    const label = (S, id) => S.view.strip.lanes().find((l) => l.id === id)?.label;
+    d.assert('each line follows its own channel',
+      A.programmes.length > 0 && B.programmes.length > 0 && A.programmes !== B.programmes
+        && label(A, 'epg') === `${A.c.name} schedule` && label(B, 'epg') === `${B.c.name} schedule`
+        && A.watched.length > 0 && B.watched.length > 0 && f1 > f0,
+      `${A.c.name} ${A.programmes.length} programmes ${A.watched.length} watched, `
+      + `${B.c.name} ${B.programmes.length} programmes ${B.watched.length} watched, ${f1 - f0} schedule fetches for ${B.c.name}`);
 
-    // ── and the self-check closes what it opened, by the same press ─────────
-    home.play.click();
-    await new Promise((r) => setTimeout(r, 100));
-    d.assert('a second press on the playing channel stops it, and nothing stays open',
-      playingId === null && hlsAlive === 0 && panels.every((p) => !p.video.hasAttribute('src')),
-      `${playingId ?? 'nothing'} playing, ${hlsAlive} engines, `
-      + `${panels.filter((p) => p.video.hasAttribute('src')).length} pictures with a source`);
+    // ── each ■ stops only its own ───────────────────────────────────────────
+    A.play.click();
+    await wait(300);
+    const bFrames = framesOf(B);
+    await wait(700);
+    d.assert('each stop press stops only its own channel',
+      !A.playing && !sourced(A) && B.playing && sourced(B) && framesOf(B) > bFrames
+        && hlsAlive === (NATIVE_HLS ? 0 : 1)
+        && A.play.getAttribute('aria-pressed') === 'false' && B.play.getAttribute('aria-pressed') === 'true',
+      `${A.c.name} ${sourced(A) ? 'still open' : 'closed'}, ${B.c.name} ${B.playing ? 'playing' : 'stopped'} `
+      + `(${bFrames} then ${framesOf(B)} frames), ${hlsAlive} engine alive`);
+    A.play.click();
+    await A.opening; await A.scheduleDone;
+    const f2 = scheduleFetches;
+    d.assert('playing a channel again does not fetch its schedule again',
+      f2 === f1, `${f0} fetches before ${B.c.name}, ${f1} after it, ${f2} after ${A.c.name} again`);
+
+    // ── and the self-check closes what it opened, by the same presses ───────
+    A.play.click(); B.play.click();
+    await wait(100);
+    d.assert('a second press on each playing channel stops it, and nothing stays open',
+      chans.every((S) => !S.playing && !sourced(S)) && hlsAlive === 0,
+      `${chans.filter((S) => S.playing).map((S) => S.c.name).join(', ') || 'nothing'} playing, ${hlsAlive} engines, `
+      + `${chans.filter(sourced).length} pictures with a source`);
   }
 
-  view.strip.armWall(Date.now());
-  // THE PAST FILLS THE VIEW: 70% of the opening span behind the present.
-  const openView = (at = Date.now()) =>
-    view.strip.fit(at - OPEN_SPAN_MS * 0.70, at + OPEN_SPAN_MS * 0.30);
-  openView();
-  window.__strip = view.strip;
-
-  d.set('channel', ch.name);
+  for (const S of chans) { openView(S); paintPlay(S); }
+  d.set('channel', chans[0].c.name);
   d.set('state', 'not started');
-  paintPlays();
   if (SELFCHECK) await selfcheck();
-  else d.log('press play on a channel. Nothing is opened before that');
+  else d.log('press play on a channel, or on both. Nothing is opened before that');
   d.ready();
 </script>
 </html>
