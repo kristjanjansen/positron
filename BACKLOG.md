@@ -1,5 +1,6 @@
 ## Open
 
+- **Kit slides: thicker diagram borders, spacing to match** (2026-10-05): *"make diagrams thinker borders in slides, adjust spacing accordinglu"*. Slides only. Handed to the same agent.
 - **Kit slides: a full screen button on every sample, shown on hover** (2026-10-05): *"add go to fullscreen button (active when mouseover) on all kit slide samples"*. Handed to the tables and logs agent, same files.
 - **Kit slides: real tables, and live logs in two columns** (2026-10-05): *"i do not see tables layout. horiz lines but try with rounded corner outer border and not"*, then *"show 2col layout with live logs / live tabular logs"*. Table slides with a line between rows, one with a rounded outer border and one without; split slides with a live scrolling log and a live tabular log in one column. `demo/shell/slide.mjs`, `slide.css`, `demo/kit/index.html`.
 - **`/talk/` archived, work in the kit, then slide sets and talks** (2026-10-05): *"There is no need for a talk slide. Keep the slides and let's work inside the kit only. And then let's see how we actually can make different slide sets and talks, etc."*. `/talk/` archived with no redirect; `/slides/` kept; the SLIDES tab in `/kit/` first; after it, a plan for how several slide sets and talks are made from the kit component.
