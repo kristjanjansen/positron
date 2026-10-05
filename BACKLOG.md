@@ -1,6 +1,6 @@
 ## Open
 
-- **Kit slides: TOM slide with 32 steps, no tempo arrows, drawable** (2026-10-05): *"more lines on slide tom, 32?. no prev next. drawable"*.
+- ~~**Kit slides: TOM slide with 32 steps, no tempo arrows, drawable** (2026-10-05): *"more lines on slide tom, 32?. no prev next. drawable"*.~~ Done 2026-10-05: 6 rows of 32 steps at 18 px pads scrolling in the panel, drawable, kit 350/350.
 - ~~**Kit slides: STEP GRID ON A SLIDE as a split with the /tom/ instrument, no labels** (2026-10-05): *"STEP GRID ON A SLIDE - convert to col layout with tom instrument (no labels)"*.~~ Done 2026-10-05, kit 345/345.
 - ~~**A scrolling keyboard reaches its holder's edge** (2026-10-05): *"allow keyboaed overflor reach to the edge (general rule of keyb and panels)"*.~~ Done in shell.css, a keyboard that fits does not move. kit 340/340.
 - **`/kit/` runs two checks for visitors and prints them as FAIL in the log**: "a pad with nothing above it still reserves the slot" and "a waveform on both sides is two different pictures", seen in screenshots taken without `?selfcheck`. Breaks *"a self-check never runs for a visitor"*. Found 2026-10-05, not fixed.
