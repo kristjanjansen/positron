@@ -7,6 +7,31 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
+  /* THE FIVE FACES, SELF-HOSTED. Latin subset, 400 and 600 only, from the
+     @fontsource 5.3.0 packages, each with its SIL OFL 1.1 licence beside it in
+     vendor/. plans/plan-slides.md section 9 has why these five and what each
+     measured. Nothing on this page is fetched from another host. */
+  @font-face { font-family: 'SL Space Grotesk'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/space-grotesk-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Space Grotesk'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/space-grotesk-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL IBM Plex Sans'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/ibm-plex-sans-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL IBM Plex Sans'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/ibm-plex-sans-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Atkinson Hyperlegible Next'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/atkinson-hyperlegible-next-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Atkinson Hyperlegible Next'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/atkinson-hyperlegible-next-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL JetBrains Mono'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Geist Mono'; font-weight: 400; font-style: normal; font-display: block;
+    src: url('/slides/vendor/geist-mono-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'SL Geist Mono'; font-weight: 600; font-style: normal; font-display: block;
+    src: url('/slides/vendor/geist-mono-latin-600-normal.woff2') format('woff2'); }
+
   /* A slide lives inside a video panel's stage. The stage is the size
      container, so the slide is sized off the panel's box and never off the
      window: a panel in a page column on a desk, a panel on a phone and a panel
@@ -39,33 +64,50 @@
 
   /* THE TWO SIZES, AND THEY ARE FRACTIONS OF THE SLIDE'S OWN HEIGHT.
      LARGE is 9 per cent of the slide's height: the 36 pt title of a 405 pt tall
-     16:9 deck, four and a half times the 1/50 floor of the 8H rule, and about
-     28 mono characters across the slide, so a two line headline holds about 56.
+     16:9 deck, four and a half times the 1/50 floor of the 8H rule. A line holds
+     38 characters in Atkinson and Plex, 36 in Grotesk and 28 in the two monos,
+     MEASURED off the deck's own headlines, so two lines hold 56 to 76.
      EXTRA LARGE is twice that, 18 per cent, for one number or one short word. */
-  .sl-l  { font: 600 9cqh/1.15 var(--mono); letter-spacing: 0; margin: 0; }
-  .sl-xl { font: 600 18cqh/1 var(--mono); letter-spacing: 0; margin: 0; }
+  /* The face is a custom property on the panel, so the switcher changes one
+     declaration and every slide, full screen included, follows by inheritance.
+     A specimen column sets its own. */
+  .sl-l  { font: 600 9cqh/1.15 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
+  .sl-xl { font: 600 18cqh/1 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
   .sl-dim { color: var(--dim); font-weight: 400; }
+  /* Two lines of a headline are kept even, so no word is left alone. */
+  .sl-say { text-wrap: balance; }
 
   /* The headline sits top left, every slide, same place. What proves it goes
-     in the evidence region under it, which takes whatever height is left. */
+     in the evidence region under it, which takes whatever height is left, and
+     it is CENTRED in that region on both axes: the headline is read first and
+     left aligned, the evidence is looked at and sits in the middle. */
   .sl-ev {
     flex: 1 1 auto; min-height: 0;
     margin-top: 6cqh;
-    display: flex; flex-direction: column; justify-content: center;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center;
   }
-  .sl-ev.sl-top { justify-content: flex-start; }
-  .sl-list { list-style: none; padding: 0; margin: 0; }
+  .sl-list { list-style: none; padding: 0; margin: 0; text-align: left; }
   .sl-list li { margin: 0; }
 
-  /* A display is its own width, not the region's. */
-  .sl-ev > .pos-disp { align-self: flex-start; }
-  /* A canvas fits the region by its own shape. */
-  .sl-ev canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+  /* A canvas and a scaled component take the whole region and centre their
+     own picture inside it, so they stretch rather than shrink to nothing. */
+  .sl-ev canvas { display: block; width: 100%; height: 100%; object-fit: contain; align-self: stretch; }
+
+  /* The specimen: five columns, one per face, the same letters in each. */
+  .sl-spec {
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    column-gap: 2cqh; align-self: stretch; text-align: center;
+  }
+  .sl-spec > div { min-width: 0; }
+  .sl-spec .sl-xl { white-space: nowrap; }
+  .sl-spec .sl-l { white-space: nowrap; margin-top: 3cqh; }
+  .sl-spec > [data-on] .sl-xl { color: var(--hi); }
 
   /* A component sized in px (a readout, a diagram) is laid out at a fixed
      logical width and scaled to the region, the way a projector scales it.
      The scale is a custom property the page writes, never the transform. */
-  .sl-fit { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .sl-fit { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; align-self: stretch; }
   .sl-fit-in {
     position: absolute; left: 0; top: 0;
     width: var(--fit-w, 640px);
@@ -78,6 +120,10 @@
      the panel stays. */
   .sl-panel .pos-vp-stage[data-blank] .sl-slide { visibility: hidden; }
 
+  /* Used only by the self-check, to lay the panel out at a phone's width
+     (375 less the 16 px gutters) without needing a phone. */
+  .sl-panel.sl-narrow { max-width: 343px; }
+
   .sl-count {
     font: 500 12px/1 var(--mono); color: var(--dim);
     font-variant-numeric: tabular-nums; min-width: 7ch; text-align: center;
@@ -88,7 +134,7 @@
   import { mount, guard, el, createReport } from '/shell/shell.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createSegment } from '/shell/segment.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { burn, videoHue, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -130,22 +176,6 @@
     return { inner, fit };
   }
 
-  function liveSegment(host) {
-    const seg = createSegment({ digits: 3, decimals: 1, size: '36cqh' });
-    host.append(seg.el);
-    let t0 = 0, raf = 0, n = 0;
-    const tick = () => {
-      seg.set(Math.min(99.9, (performance.now() - t0) / 1000));
-      n++;
-      raf = requestAnimationFrame(tick);
-    };
-    return {
-      start() { t0 = performance.now(); tick(); },
-      stop() { cancelAnimationFrame(raf); raf = 0; },
-      value: () => seg.text(),
-    };
-  }
-
   function liveReadout(host) {
     const { inner } = fitBox(host, 360);
     const r = createReport({ readout: { fps: '', frames: '' }, showLog: false, joined: false });
@@ -170,6 +200,7 @@
       start() { last = 0; times = []; shown = 0; raf = requestAnimationFrame(tick); },
       stop() { cancelAnimationFrame(raf); raf = 0; },
       value: () => r.readoutEl.textContent,
+      subject: () => r.readoutEl,
     };
   }
 
@@ -187,6 +218,7 @@
       start() { tick(); },
       stop() { cancelAnimationFrame(raf); raf = 0; },
       value: () => n,
+      subject: () => c,
     };
   }
 
@@ -227,9 +259,25 @@
       start() { step(); timer = setInterval(step, 900); },
       stop() { clearInterval(timer); timer = 0; },
       value: () => at,
+      subject: () => dg.svg,
       dg,
     };
   }
+
+  // ── the faces ─────────────────────────────────────────────────────────────
+  // Five self-hosted faces, in the order the switcher shows them. `id` is what
+  // the address carries (`?face=plex`), `name` is the button. The first is the
+  // default and plans/plan-slides.md section 9 says why.
+  const FACES = [
+    { id: 'atkinson',  name: 'Atkinson',  family: 'SL Atkinson Hyperlegible Next' },
+    { id: 'jetbrains', name: 'JetBrains', family: 'SL JetBrains Mono' },
+    { id: 'plex',      name: 'Plex',      family: 'SL IBM Plex Sans' },
+    { id: 'geist',     name: 'Geist',     family: 'SL Geist Mono' },
+    { id: 'grotesk',   name: 'Grotesk',   family: 'SL Space Grotesk' },
+  ];
+  const stackOf = (f) => `'${f.family}', var(--mono)`;
+  // What the specimen sets in every face: the pairs a back row confuses first.
+  const SPEC_XL = '0O', SPEC_L = 'Il1';
 
   // ── the deck ──────────────────────────────────────────────────────────────
   // `say` is the headline, one sentence and no full stop. `big` is one number
@@ -243,10 +291,10 @@
     { name: 'back row',
       say: 'Text must be big enough for the back row',
       big: '1/50', under: 'of the screen height' },
-    { name: 'counter', say: 'This number is counting live on the slide', live: liveSegment },
     { name: 'readout', say: "The readout is the page's own, measuring this screen", live: liveReadout },
     { name: 'picture', say: 'The test picture draws itself here, frame by frame', live: livePicture },
     { name: 'panel', say: 'A slide sits in a panel, and full screen is the talk', live: liveDiagram },
+    { name: 'faces', say: 'Five faces, the same letters at both sizes', specimen: true },
   ];
 
   const nodes = SLIDES.map((s, i) => {
@@ -257,7 +305,6 @@
     box.append(el('h2', 'sl-l sl-say', s.say));
     const ev = el('div', 'sl-ev');
     if (s.list) {
-      ev.classList.add('sl-top');
       const ul = el('ul', 'sl-list sl-l sl-dim');
       for (const t of s.list) ul.append(el('li', '', t));
       ev.append(ul);
@@ -265,6 +312,17 @@
     if (s.big) {
       ev.append(el('p', 'sl-xl sl-big', s.big));
       if (s.under) ev.append(el('p', 'sl-l sl-dim', s.under));
+    }
+    if (s.specimen) {
+      const grid = el('div', 'sl-spec');
+      for (const f of FACES) {
+        const col = el('div', '', null, { title: f.family.replace(/^SL /, '') });
+        col.dataset.face = f.id;
+        col.style.setProperty('--sl-face', stackOf(f));
+        col.append(el('p', 'sl-xl', SPEC_XL), el('p', 'sl-l', SPEC_L));
+        grid.append(col);
+      }
+      ev.append(grid);
     }
     box.append(ev);
     return { spec: s, node, box, ev, ctl: null };
@@ -281,6 +339,31 @@
   panel.el.classList.add('sl-panel');
   for (const n of nodes) panel.stage.append(n.node);
   d.stack.add(panel.el);
+
+  // The face. A page setting, so it sits under the panel and not in its
+  // footer, and the address carries it so a slide can be sent in a given face.
+  let face = FACES.find((f) => f.id === new URLSearchParams(location.search).get('face')) || FACES[0];
+  function setFace(f, quiet = false) {
+    face = f;
+    panel.el.style.setProperty('--sl-face', stackOf(f));
+    for (const col of panel.stage.querySelectorAll('.sl-spec > div')) {
+      if (col.dataset.face === f.id) col.dataset.on = '1'; else delete col.dataset.on;
+    }
+    const u = new URL(location.href);
+    if (f === FACES[0]) u.searchParams.delete('face'); else u.searchParams.set('face', f.id);
+    history.replaceState(null, '', u);
+    if (!quiet) d.log(`face: ${f.family.replace(/^SL /, '')}`);
+    return document.fonts.load(`600 20px '${f.family}'`);
+  }
+  const faceChoice = createChoice({
+    label: 'face',
+    options: FACES.map((f) => [f.name, f]),
+    at: FACES.indexOf(face),
+    title: (f) => f.family.replace(/^SL /, ''),
+    onPick: (f) => setFace(f),
+  });
+  d.stack.add(faceChoice.el);
+  setFace(face, true);
 
   let at = -1;
   function go(i) {
@@ -351,6 +434,14 @@
 
   async function check() {
     const A = d.assert;
+    // Every face in before counting requests, because the specimen slide and
+    // the switcher fetch the four that were not chosen, from this origin.
+    const loaded = await Promise.all(FACES.map((f) => Promise.all([
+      document.fonts.load(`600 20px '${f.family}'`), document.fonts.load(`400 20px '${f.family}'`)])));
+    const missing = FACES.filter((f, i) => !loaded[i].every((l) => l.length)
+      || !document.fonts.check(`600 20px '${f.family}'`));
+    A('all five faces load, at 400 and 600, from this page\'s own vendor folder',
+      missing.length === 0, missing.map((f) => f.family).join(', ') || FACES.map((f) => f.id).join(' '));
     const resBefore = performance.getEntriesByType('resource')
       .filter((r) => new URL(r.name).pathname !== '/_log').length;
 
@@ -400,21 +491,77 @@
       Math.abs(h1 - vp.height) < 1 && Math.abs(s1.getBoundingClientRect().width - vp.width) < 1,
       `slide ${s1.getBoundingClientRect().width.toFixed(1)} x ${h1.toFixed(1)}, stage ${vp.width.toFixed(1)} x ${vp.height.toFixed(1)}`);
 
-    // Every slide: two lines of headline at most, and nothing past its edge.
-    const lines = [], spill = [];
-    for (let i = 0; i < SLIDES.length; i++) {
-      go(i); await frame(); await frame();
-      const n = nodes[i].node, say = n.querySelector('.sl-say');
-      const lh = px(say, 'line-height');
-      lines.push(Math.round(say.getBoundingClientRect().height / lh));
-      const box = n.getBoundingClientRect();
-      const pad = px(nodes[i].box, 'padding-bottom');
-      const deepest = Math.max(...[...n.querySelectorAll('.sl-say, .sl-ev > *')]
-        .map((c) => c.getBoundingClientRect().bottom));
-      if (deepest > box.bottom - pad + 1) spill.push(`${i + 1}: ${(deepest - (box.bottom - pad)).toFixed(1)} px`);
+    // Every slide in every face: two lines of headline at most, and nothing
+    // past its inset on any side. The budget is measured per face: the mean
+    // advance of the deck's own headlines at LARGE, into the inset width.
+    const was = face, perFace = [], spill = [], budgets = [];
+    const meas = document.createElement('canvas').getContext('2d');
+    for (const f of FACES) {
+      await setFace(f, true); await frame();
+      const lines = [];
+      for (let i = 0; i < SLIDES.length; i++) {
+        go(i); await frame(); await frame();
+        const n = nodes[i].node, say = n.querySelector('.sl-say');
+        const lh = px(say, 'line-height');
+        lines.push(Math.round(say.getBoundingClientRect().height / lh));
+        const r = nodes[i].box.getBoundingClientRect(), cs = getComputedStyle(nodes[i].box);
+        const inL = r.left + parseFloat(cs.paddingLeft), inR = r.right - parseFloat(cs.paddingRight);
+        const inB = r.bottom - parseFloat(cs.paddingBottom);
+        for (const c of n.querySelectorAll('.sl-say, .sl-ev > *, .sl-spec p')) {
+          const b = c.getBoundingClientRect();
+          if (b.bottom > inB + 1 || b.left < inL - 1 || b.right > inR + 1
+            || c.scrollWidth > c.clientWidth + 1) spill.push(`${f.id} ${i + 1}`);
+        }
+        if (i === 0) {
+          meas.font = `600 ${px(say)}px '${f.family}'`;
+          const text = SLIDES.map((s) => s.say).join(' ');
+          budgets.push(`${f.id} ${Math.floor((inR - inL) / (meas.measureText(text).width / text.length))}`);
+        }
+      }
+      perFace.push(`${f.id} ${lines.join('')}`);
     }
-    A('every headline is two lines or fewer', lines.every((n) => n <= 2), lines.join(' '));
-    A('nothing on any slide runs past its inset', spill.length === 0, spill.join(', ') || 'all inside');
+    await setFace(was, true);
+    d.log(`characters a LARGE line holds: ${budgets.join(', ')}`);
+    A('every headline is two lines or fewer, in all five faces',
+      perFace.every((p) => /^\S+ [12]+$/.test(p)), `${perFace.join(', ')}; budget a line ${budgets.join(', ')}`);
+    A('nothing on any slide runs past its inset, in any face', spill.length === 0, spill.join(', ') || 'all inside');
+
+    // What is under a headline sits in the middle of the slide's inset, at a
+    // desk width and at a phone's.
+    const subjectOf = (n) => n.ctl?.subject?.() || n.ev.querySelector('.sl-list, .sl-big, .sl-spec');
+    const centring = async (label) => {
+      const off = [];
+      for (let i = 0; i < SLIDES.length; i++) {
+        go(i); await frame(); await frame(); await frame();
+        const sub = subjectOf(nodes[i]);
+        if (!sub) { off.push(`${i + 1} none`); continue; }
+        const r = nodes[i].box.getBoundingClientRect(), cs = getComputedStyle(nodes[i].box);
+        const mid = (r.left + parseFloat(cs.paddingLeft) + r.right - parseFloat(cs.paddingRight)) / 2;
+        const b = sub.getBoundingClientRect();
+        off.push(Math.abs((b.left + b.right) / 2 - mid));
+      }
+      return { label, off, ok: off.every((o) => typeof o === 'number' && o <= 2) };
+    };
+    const wide = await centring(`${Math.round(panel.el.getBoundingClientRect().width)} px panel`);
+    panel.el.classList.add('sl-narrow'); await frame(); await frame();
+    const narrow = await centring(`${Math.round(panel.el.getBoundingClientRect().width)} px panel`);
+    panel.el.classList.remove('sl-narrow'); await frame();
+    for (const c of [wide, narrow]) {
+      A(`everything under a headline is centred in the slide within 2 px, ${c.label}`, c.ok,
+        c.off.map((o, i) => `${SLIDES[i].name} ${typeof o === 'number' ? o.toFixed(1) : o}`).join(', '));
+    }
+    const left = nodes.every((n) => getComputedStyle(n.node.querySelector('.sl-say')).textAlign !== 'center');
+    A('and the headline itself stays left aligned', left);
+
+    // The face is in the address and every slide follows it.
+    const plex = FACES.find((f) => f.id === 'plex');
+    faceChoice.set(FACES.indexOf(plex)); await frame();
+    const inUrl = new URLSearchParams(location.search).get('face');
+    const fam = getComputedStyle(nodes[0].node.querySelector('.sl-say')).fontFamily;
+    const specOn = panel.stage.querySelector('.sl-spec > [data-on]')?.dataset.face;
+    faceChoice.set(FACES.indexOf(was)); await frame();
+    A('picking a face puts it in the address and every slide and the specimen follow',
+      inUrl === 'plex' && fam.includes('IBM Plex Sans') && specOn === 'plex', `${inUrl}, ${fam}, ${specOn}`);
 
     go(0); await frame();
     const ink = getComputedStyle(nodes[0].node.querySelector('.sl-say')).color;
@@ -440,7 +587,7 @@
     A('every live element changes while its slide is shown',
       moved.every((m) => !m.includes('STILL')), moved.join(', '));
     A('and stops when the slide is left', stopped.length === 0, stopped.join(', ') || 'all stopped');
-    const dgc = nodes[5].ctl?.dg;
+    const dgc = nodes[SLIDES.findIndex((s) => s.name === 'panel')].ctl?.dg;
     A('the diagram on the panel slide drew in a row and cut nothing',
       dgc && dgc.mode === 'row' && dgc.cuts.length === 0,
       dgc ? `${dgc.mode}, ${dgc.cuts.length} cut ${JSON.stringify(dgc.cuts)}` : 'not built');
@@ -471,7 +618,7 @@
     const mine = (list) => list.filter((r) => new URL(r.name).pathname !== '/_log');
     const res = mine(performance.getEntriesByType('resource'));
     const foreign = res.filter((r) => new URL(r.name).origin !== location.origin);
-    A('stepping every slide fetched nothing, and nothing came from another host',
+    A('with the faces in, stepping every slide fetched nothing, and nothing came from another host',
       res.length === resBefore && foreign.length === 0,
       `${resBefore} before, ${res.length} after, ${foreign.length} foreign`
         + (res.length !== resBefore ? `: ${res.slice(resBefore).map((r) => new URL(r.name).pathname).join(' ')}` : ''));
