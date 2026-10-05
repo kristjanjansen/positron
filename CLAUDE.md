@@ -259,6 +259,35 @@ Clear with `POST /logs/clear`. `GET /status` blocks on the container's cold star
 
 ## The VPN passes the handshake and drops the media
 
+🔴 **THERE IS A VPN ON THIS MACHINE AND IT IS SWITCHED ON AND OFF. CORRECTED
+2026-10-05**, the owner's words: *"vpn in on and off"*. It is Check Point
+`Endpoint Security VPN`, and when it is up the default route is its tunnel,
+`utun4`. Two sentences further down say there is no VPN here; they record
+what was said on 2026-09-25 and are wrong about the machine, not about the
+measurements beside them.
+⚠️ **SO ASK THE MACHINE, NEVER THIS FILE, WHICH STATE IT IS IN TODAY:**
+
+```sh
+pgrep -fl Endpoint_Security_VPN; route -n get 8.8.8.8 | grep interface   # utun4 means the tunnel is up
+```
+
+🔴 **IT BREAKS A SECOND THING, AND THIS ONE IS INSIDE ONE PAGE.** MEASURED
+2026-10-05: with no capture permission, headless Chrome offers a peer
+connection exactly ONE host candidate, the interface that routes to the
+internet, which with the tunnel up is `utun4`, and UDP sent to that address
+never comes back to this machine. So two `RTCPeerConnection`s in the SAME tab
+sit in `checking` for ever. That was `/capture/` RECEIVER (8 reds) and
+`/wire/` KEYBOARD's sound back (1 red) for a day, read as page bugs. Granting
+`audioCapture` makes Chrome list every interface and the loopback connects in
+about 100 ms. `demo/verify.mjs` grants it to `wire` and `capture` only
+(`PEER_IN_PAGE`), audio only, reset before every page. ⚠️ A visitor behind a
+tunnel like this one with no microphone permission still meets the stall;
+the page-side cures are asking for the microphone or a TURN relay, and
+neither has been chosen.
+⚠️ **AND IT EXPLAINS WHY WebRTC PAGES PASS ON SOME DAYS AND FAIL ON OTHERS.**
+A red on any page with a peer connection is a question about the tunnel
+before it is a question about the code.
+
 🔴 **BEFORE DEBUGGING ANY WebRTC FAILURE, CHECK THE VPN. IT COST MOST OF A
 SESSION ON 2026-09-25 AND IT LOOKED LIKE CODE EVERY SINGLE TIME.** `/stage/` was
 rewritten five different ways, the harness was blamed, then headless Chrome was
