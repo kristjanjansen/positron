@@ -1,5 +1,6 @@
 ## Open
 
+- **`/kit/` BRAND tab with a LOGO block** (2026-10-05): *"add kit tab: brand and logo sectop slide engine to draw β+ in large type and positron studio under it"*. Drawn with the slide engine; check β is in the vendored JetBrains subset. Handed to the kit slides agent.
 - **`/kit/` DEVICES and PANEL as one tab** (2026-10-05): *"unify devices and panel in kit"*. Block ids kept. Handed to the kit slides agent.
 - ~~**`/kit/` HARDWARE tab labelled HW** (2026-10-05): *"rename hardware tab to hw in kit"*. Label only, id `hardware` kept for links. Handed to the kit slides agent.~~ Reverted on *"revert hw to harware"*.
 - **Kit slides: two half-width players side by side** (2026-10-05): *"add 1/2 w slide palyer to kit, scale accordingly. put 2 side by side"*. Handed to the kit slides agent.
