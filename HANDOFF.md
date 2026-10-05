@@ -4,7 +4,7 @@
 
 - ✅ **Site: BUILD `d2edd61-095114-cc46`**, confirmed on the edge. Not pushed
   (the push needs the personal account, see CLAUDE.md).
-- Counted: **48 demos, 45 built** (`/wall/` retired into `/partitur/`),
+- Counted: **49 demos, 46 built** (`parts` added unlisted after this was first written) (`/wall/` retired into `/partitur/`),
   **88 plans**. CLAUDE.md's top line recounted to match.
 - The working tree is clean apart from `workers/view/public/shell/shell.mjs`,
   which `deploy.mjs` rewrites after every deploy. No agent is running.
@@ -27,7 +27,7 @@
 Counts after the last runs: partitur 36, stage 35 (25 page asserts), sync 66,
 time 88, wire 47 (was 46/47), capture 75 (was 62/70), kit 294.
 
-## The shopping list, Oomipood, for the Pico router (no MIDI DIN, owner has a powered USB-B hub)
+## The shopping list, Oomipood, for the Pico router (also at https://positron.studio/parts/, unlisted, build `a2c539f-103833-f28e`) (no MIDI DIN, owner has a powered USB-B hub)
 
 | part | price | link |
 | --- | --- | --- |
