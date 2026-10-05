@@ -22,6 +22,13 @@
   /* The channel's name leads its footer. A name, not a readout key, so it wears
      the value ink. */
   .fl-name { font: 500 11px/1.4 var(--mono); color: var(--fg); white-space: nowrap; }
+  /* Each footer's Loop wears the transport bar's own classes, `tbar-loop
+     tbar-word`, so it is the bar's button in look and in its three states.
+     ⚠️ THOSE RULES SIZE IT FROM `--tbar-btn`, WHICH ONLY `.tbar` DECLARES.
+     Outside a bar the var is undefined, `height` falls back to `auto` and the
+     button collapses to its text. 34 px is the bar's own value and the base
+     button's, so this restates one number rather than inventing one. */
+  .fl-wrap { --tbar-btn: 34px; }
 </style>
 <script src="/proto/remixer/hls.min.js"></script>
 <script type="module">
@@ -116,6 +123,24 @@
 
   const PLAY = '►';                // no emoji form, unlike U+25B6
   const STOP = '■';
+  const TO_LIVE = '►►';            // two of the same ►, never ⏩, which has an emoji form
+  /**
+   * 🔴 LOOP MEANS WHAT THE TRANSPORT BAR'S LOOP MEANS ON A LIVE DECK.
+   * `demo/shell/transport-bar.mjs`: the first press marks the start and OPENS
+   * a window that the live edge fills, a second press closes it early (or the
+   * window closes itself at the ceiling), the stretch then plays round, and a
+   * third press takes the loop off and goes back to the live edge. The ceiling
+   * is the bar's own default `liveWindowMs`, and the last quarter of a filling
+   * window blinks, as the bar's does.
+   * ⚠️ PAGE-LOCAL, AND WHAT SHOULD MOVE TO THE KIT IS NAMED IN THE REPORT. The
+   * bar's loop lives inside its own paint loop and seeks through `deck.seek`,
+   * and on this page that is the wrong verb: the deck FOLLOWS the picture
+   * through `mediaMaster`, so a wrap has to move the picture (`seekTo`), and the
+   * line follows it.
+   */
+  const LOOP_WINDOW_MS = 20000;
+  const LOOP_WARN_FRAC = 0.25;
+  const LOOP_BLINK_MS = 640;
   const MUTE_ON = '♫';             // the same two glyphs as /stage/'s mute
   const MUTE_OFF = '⊘';
 
@@ -171,14 +196,22 @@
     S.video = video;
     const play = el('button', 'ico', PLAY, { type: 'button', 'aria-label': `play ${c.name}` });
     centreSymbol(play);
-    const live = el('button', '', 'LIVE', { type: 'button', 'aria-label': `${c.name} back to the live edge`,
+    const live = el('button', 'ico', TO_LIVE, { type: 'button', 'aria-label': `${c.name} back to the live edge`,
       title: 'back to the live edge' });
+    centreSymbol(live);
+    // The bar's own Loop: same word, same classes, same `data-loop` states.
+    const loopBtn = el('button', 'tbar-loop tbar-word', 'Loop', { type: 'button', 'aria-label': `${c.name} loop` });
+    loopBtn.dataset.loop = 'off';
+    loopBtn.title = 'press to hold the live picture, again to end the loop, again to take it off';
     const mute = el('button', 'ico', MUTE_OFF, { type: 'button', 'aria-label': `${c.name} sound` });
     centreSymbol(mute);
-    Object.assign(S, { play, live, mute });
+    Object.assign(S, { play, live, loopBtn, mute });
+    S.loop = { a: null, b: null, filling: false, ends: null, lastWrap: 0, wraps: 0, wrapEvid: null,
+      blinking: false, blinkAnim: null };
     const panel = createVideoPanel({ media: video, left: el('span', 'fl-name', c.name), fullMode: 'hover' });
-    // ► LIVE ♫ ⛶, the panel's own full screen square staying last.
-    panel.slots.right.prepend(play, live, mute);
+    // ► ►► Loop ♫ ⛶: what plays, where in time, then the sound, and the panel's
+    // own full screen square staying last.
+    panel.slots.right.prepend(play, live, loopBtn, mute);
     S.panel = panel;
 
     // the line, in ABSOLUTE WALL MILLISECONDS, from ERR's own PDT rather than
@@ -263,6 +296,7 @@
 
     play.onclick = () => { pressPlay(S); };
     live.onclick = () => { liveButton(S); };
+    loopBtn.onclick = () => { pressLoop(S); };
     mute.onclick = () => setMuted(S, !S.muted, true);
     paintMute(S);
     return S;
@@ -393,6 +427,7 @@
     const c = S.c, gen = ++S.openGen, v = S.video;
     closeChannel(S);
     S.reset();
+    clearLoop(S);
     S.openedAt = Date.now();
     let pl;
     try { pl = await readPlaylist(c.url); } catch (e) {
@@ -495,6 +530,7 @@
     S.openGen++;
     closeChannel(S);
     S.playing = false; S.playlist = null;
+    clearLoop(S);
     S.deck.pause();
     paintPlay(S);
     if (S === focus) d.set('state', stateWord(S));
@@ -552,6 +588,7 @@
           }
           if (p !== S.lastSeenPos) { S.lastSeenPos = p; S.lastSeenAt = performance.now(); }
         }
+        loopTick(S);
         gutters(S);
         S.view.strip.invalidate();
       }
@@ -706,10 +743,123 @@
 
   // LIVE waits for whatever this channel's play press is still doing, so a
   // press in the middle of the opening cannot pull the picture out from under it.
+  // ►► is the way out of a loop as well: the live edge is not inside one.
   async function liveButton(S) {
     if (!S.playing) { d.log(`${S.c.name} is not playing. Press its play first`); return; }
     await S.opening;
-    if (S.playing) await toLive(S);
+    if (!S.playing) return;
+    clearLoop(S);
+    await toLive(S);
+  }
+
+  // ── the loop, one per channel ─────────────────────────────────────────────
+  function drawLoop(S) {
+    const L = S.loop, name = S.c.name;
+    const on = L.a != null && L.b != null;
+    // THE WORD NEVER CHANGES, as on the bar: state is `data-loop` and the label.
+    S.loopBtn.dataset.loop = on ? 'on' : L.a != null ? 'armed' : 'off';
+    // The line draws the loop from `deck.loopView`, the one object the button
+    // and the strip share.
+    S.deck.setLoopView(L.a == null ? null
+      : { a: L.a, b: L.b, state: on ? 'on' : 'armed', filling: L.filling });
+    S.loopBtn.setAttribute('aria-label',
+      on ? `${name} looping. press to take the loop off`
+        : L.filling ? `${name} holding the live picture. press to end the loop here` : `${name} loop`);
+    S.view.strip.invalidate();
+  }
+
+  // The bar's warning: opacity only, so nothing beside the button moves, and
+  // a steady dim for somebody who asked for less motion.
+  const lessMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function setLoopBlink(S, on) {
+    const L = S.loop;
+    if (on === L.blinking) return;
+    L.blinking = on;
+    L.blinkAnim?.cancel();
+    L.blinkAnim = null;
+    S.loopBtn.style.opacity = '';
+    if (!on) return;
+    if (!lessMotion?.matches) {
+      L.blinkAnim = S.loopBtn.animate?.([
+        { opacity: 1, offset: 0 }, { opacity: 1, offset: 0.49 },
+        { opacity: 0.24, offset: 0.5 }, { opacity: 0.24, offset: 1 },
+      ], { duration: LOOP_BLINK_MS, iterations: Infinity }) ?? null;
+    }
+    if (!L.blinkAnim) S.loopBtn.style.opacity = '0.62';
+  }
+
+  /** Both marks are known: arm the loop and play it from its start. */
+  function startLoop(S, a, b) {
+    const L = S.loop;
+    Object.assign(L, { a, b, filling: false, ends: null });
+    setLoopBlink(S, false);
+    drawLoop(S);
+    seekTo(S, a);
+    if (S.video.paused) S.video.play().catch(() => {});
+    d.log(`${S.c.name}: looping ${((b - a) / 1000).toFixed(1)} s from ${hms(a)}`);
+  }
+
+  /** Take the loop off. Only the button's third press goes back to live; a stop
+   *  or a reopen just forgets it. */
+  function clearLoop(S) {
+    const L = S.loop;
+    if (!L) return false;
+    const had = L.a != null;
+    Object.assign(L, { a: null, b: null, filling: false, ends: null });
+    setLoopBlink(S, false);
+    if (S.view) drawLoop(S);
+    return had;
+  }
+
+  async function pressLoop(S) {
+    if (!S.playing) { d.log(`${S.c.name} is not playing. Press its play first`); return; }
+    await S.opening;
+    const L = S.loop;
+    const pos = S.clock?.now();
+    if (!S.playing || pos == null) return;
+    if (L.a == null) {
+      // A LIVE CHANNEL HAS NOTHING BEHIND THIS PRESS, SO THE WINDOW IS AHEAD
+      // OF IT, and the picture arriving fills it.
+      Object.assign(L, { a: pos, b: null, filling: true, ends: pos + LOOP_WINDOW_MS });
+      drawLoop(S);
+      d.log(`${S.c.name}: holding up to ${LOOP_WINDOW_MS / 1000} s from ${hms(pos)}`);
+      return;
+    }
+    if (L.b == null) {
+      // A backwards mark is still a loop somebody meant; a zero length one is
+      // a double press and is ignored, as on the bar.
+      const a = Math.min(L.a, pos), b = Math.max(L.a, pos);
+      if (b - a < 1) return;
+      startLoop(S, a, b);
+      return;
+    }
+    clearLoop(S);
+    d.log(`${S.c.name}: loop off, back to the live edge`);
+    await toLive(S);
+  }
+
+  /** On the page's frame loop: the window closing itself, the wrap, and the
+   *  loop being outrun by the back of the window. */
+  function loopTick(S) {
+    const L = S.loop;
+    if (L.a == null) return;
+    const p = S.clock?.now();
+    if (L.filling && p != null && p >= L.ends) { startLoop(S, L.a, L.ends); return; }
+    // THE WRAP MOVES THE PICTURE, and the line follows it through the master.
+    // Rate-limited like the bar's, because a seek is not instant everywhere and
+    // a frame after one can still read past the end.
+    if (L.b != null && p != null && !S.video.paused && p >= L.b) {
+      const t = performance.now();
+      if (t - L.lastWrap > 150) {
+        L.lastWrap = t;
+        const ct0 = S.video.currentTime;
+        seekTo(S, L.a);
+        L.wraps++;
+        L.wrapEvid = { from: p, ct0, ct1: S.video.currentTime, a: L.a, b: L.b };
+      }
+    }
+    if (L.a < S.deck.range[0]) { clearLoop(S); d.log(`${S.c.name}: the loop ran off the back of the window`, 'bad'); return; }
+    setLoopBlink(S, L.filling && p != null && p >= L.ends - LOOP_WINDOW_MS * LOOP_WARN_FRAC);
   }
 
   // ── the three things a live line has to prove ────────────────────────────
@@ -811,6 +961,7 @@
   }
 
   // ── checks ────────────────────────────────────────────────────────────────
+  const glyphOf = (b) => b.querySelector('.pos-sym')?.textContent ?? b.textContent;
   async function checks() {
     const [A, B] = chans;
     // the page, before anything was opened
@@ -822,12 +973,12 @@
         && names.join(' ') === 'ETV ETV2'
         && chans.every((S) => S.panel.slots.right.contains(S.play)),
       `${document.querySelectorAll('.pos-vp').length} panels: ${names.join(', ')}`);
-    // 🔴 NO COMMON TRANSPORT LANE. Each footer reads play, LIVE, mute, full
-    // screen, and each panel has its own line glued under it.
+    // 🔴 NO COMMON TRANSPORT LANE. Each footer reads play, back to live, loop,
+    // mute, full screen, and each panel has its own line glued under it.
     const order = chans.map((S) => [...S.panel.slots.right.children]);
-    d.assert('each footer carries its own play, LIVE, mute and full screen, in that order',
-      order.every((kids, i) => kids.length === 4 && kids[0] === chans[i].play && kids[1] === chans[i].live
-        && kids[2] === chans[i].mute && kids[3].classList.contains('pos-vp-full')),
+    d.assert('each footer carries its own play, back to live, loop, mute and full screen, in that order',
+      order.every((kids, i) => kids.length === 5 && kids[0] === chans[i].play && kids[1] === chans[i].live
+        && kids[2] === chans[i].loopBtn && kids[3] === chans[i].mute && kids[4].classList.contains('pos-vp-full')),
       order.map((kids, i) => `${chans[i].c.name}: ${kids.map((k) => k.textContent.trim() || '?').join(' ')}`).join(', '));
     const strips = document.querySelectorAll('canvas.pos-strip');
     d.assert('no shared transport bar and no shared line, one line under each picture',
@@ -963,7 +1114,7 @@
     }
 
     // ── mute, pressed for real: twice, so it ends where it started ──────────
-    const glyph = (S) => S.mute.querySelector('.pos-sym')?.textContent ?? S.mute.textContent;
+    const glyph = (S) => glyphOf(S.mute);
     const m0 = A.video.muted, w0 = glyph(A);
     A.mute.click();
     const m1 = A.video.muted, w1 = glyph(A);
@@ -1013,6 +1164,85 @@
         && A.watched.length > 0 && B.watched.length > 0 && f1 > f0,
       `${A.c.name} ${A.programmes.length} programmes ${A.watched.length} watched, `
       + `${B.c.name} ${B.programmes.length} programmes ${B.watched.length} watched, ${f1 - f0} schedule fetches for ${B.c.name}`);
+
+    // ── ►► on one channel, pressed for real ──────────────────────────────────
+    // Walk A a minute back, then press its ►►. A channel ERR walls is "live" at
+    // its boundary, so the measure is the gap it had at live before the walk.
+    const behindLive = behindMs(A);
+    A.caughtUpMs = null;
+    seekTo(A, A.clock.now() - 60000);
+    await waitForCatchUp(A);
+    await wait(300);
+    const behindBack = behindMs(A);
+    const liveSeq = A.seekSeq;
+    A.live.click();
+    const tl = performance.now();
+    while (A.seekSeq === liveSeq && performance.now() - tl < 4000) await wait(50);
+    await wait(800);
+    const behindAgain = behindMs(A);
+    // The edge `toLive` aims at: the served start on a walled channel (an
+    // instant that ages until it is asked again), the engine's live otherwise.
+    const edgeAt = () => (A.served?.position != null ? A.served.startAt : A.clock?.live());
+    const offEdge = (A.clock?.now() ?? 0) - (edgeAt() ?? 0);
+    d.assert('a press of ►► returns that channel to its live edge',
+      behindBack - behindLive > 40000 && behindBack - behindAgain > 30000 && Math.abs(offEdge) < 3000
+        && A.seekSeq > liveSeq && glyphOf(A.live) === TO_LIVE,
+      `${(behindLive / 1000).toFixed(1)} s behind at live, ${(behindBack / 1000).toFixed(1)} s after the walk, `
+      + `${(behindAgain / 1000).toFixed(1)} s after the press, ${(offEdge / 1000).toFixed(1)} s from the edge it aims at`);
+
+    // ── Loop on one channel, three presses, with the other one playing ──────
+    // It reads the bar's three states off the button and the line's loop off
+    // `deck.loopView`, and the wrap off the picture's own currentTime.
+    const L = A.loop;
+    const bSeq0 = B.seekSeq, bFrames0 = framesOf(B);
+    const pressed = async (fn, until) => {
+      A.loopBtn.click();
+      const t = performance.now();
+      while (!until() && performance.now() - t < 4000) await wait(30);
+      fn?.();
+    };
+    let s1 = null, s2 = null;
+    await pressed(() => { s1 = { btn: A.loopBtn.dataset.loop, view: A.deck.loopView?.state,
+      filling: L.filling, a: L.a, ends: L.ends }; }, () => L.a != null);
+    d.assert('a first press of Loop on a playing channel opens a window the live edge fills',
+      s1.btn === 'armed' && s1.view === 'armed' && s1.filling === true && s1.ends - s1.a === LOOP_WINDOW_MS,
+      `button ${s1.btn}, line ${s1.view}, filling ${s1.filling}, ceiling ${((s1.ends - s1.a) / 1000).toFixed(0)} s`);
+    await wait(1500);
+    await pressed(() => { s2 = { btn: A.loopBtn.dataset.loop, view: A.deck.loopView, a: L.a, b: L.b }; },
+      () => L.b != null);
+    const len = s2.b != null ? s2.b - s2.a : null;
+    d.assert('a second press closes the loop at the length that was measured',
+      s2.btn === 'on' && s2.view?.state === 'on' && s2.view.a === s2.a && s2.view.b === s2.b
+        && len > 900 && len < 2600,
+      `button ${s2.btn}, line ${s2.view?.state}, ${len == null ? 'no' : (len / 1000).toFixed(2) + ' s'} loop`);
+    const tw = performance.now();
+    while (L.wraps < 1 && performance.now() - tw < 5000) await wait(50);
+    await wait(400);
+    const w = L.wrapEvid, pAfter = A.clock?.now();
+    const jumpedS = w ? w.ct0 - w.ct1 : null, wantS = w ? (w.from - w.a) / 1000 : null;
+    d.assert('the picture wraps back to the loop start',
+      L.wraps >= 1 && w && Math.abs(jumpedS - wantS) < 0.25 && pAfter >= w.a - 500 && pAfter <= w.b + 500,
+      w ? `${L.wraps} wrap${L.wraps === 1 ? '' : 's'}, currentTime ${w.ct0.toFixed(2)} to ${w.ct1.toFixed(2)} s `
+        + `(${jumpedS.toFixed(2)} s back for ${wantS.toFixed(2)} s past the start), `
+        + `${((pAfter - w.a) / 1000).toFixed(2)} s into the loop 0.4 s later` : 'no wrap within 5 s');
+    d.assert('a loop on one channel leaves the other alone',
+      B.loop.a == null && B.deck.loopView == null && B.loopBtn.dataset.loop === 'off'
+        && B.seekSeq === bSeq0 && framesOf(B) > bFrames0 && !B.video.paused,
+      `${B.c.name} loop ${B.loopBtn.dataset.loop}, ${B.seekSeq - bSeq0} seeks, `
+      + `${bFrames0} then ${framesOf(B)} frames`);
+    const offSeq = A.seekSeq;
+    await pressed(null, () => L.a == null && A.seekSeq > offSeq);
+    await wait(800);
+    const wraps0 = L.wraps;
+    await wait(1200);
+    const behindOff = behindMs(A);
+    const offEdge2 = (A.clock?.now() ?? 0) - (edgeAt() ?? 0);
+    d.assert('a third press leaves the loop and goes back to the live edge',
+      L.a == null && A.loopBtn.dataset.loop === 'off' && A.deck.loopView == null && L.wraps === wraps0
+        && Math.abs(offEdge2) < 3500,
+      `button ${A.loopBtn.dataset.loop}, line ${A.deck.loopView ? 'still looped' : 'clear'}, `
+      + `${L.wraps - wraps0} wraps since, ${(behindOff / 1000).toFixed(1)} s behind, `
+      + `${(offEdge2 / 1000).toFixed(1)} s from the edge it aims at`);
 
     // ── each ■ stops only its own ───────────────────────────────────────────
     A.play.click();
