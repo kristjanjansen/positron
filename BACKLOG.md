@@ -1,5 +1,6 @@
 ## Open
 
+- **`/kit/` HARDWARE tab labelled HW** (2026-10-05): *"rename hardware tab to hw in kit"*. Label only, id `hardware` kept for links. Handed to the kit slides agent.
 - **Kit slides: two half-width players side by side** (2026-10-05): *"add 1/2 w slide palyer to kit, scale accordingly. put 2 side by side"*. Handed to the kit slides agent.
 - ~~**`/und/` renamed `/csound/`** (2026-10-05): *"rename und to csound"*.~~ Done, no redirect; csound 50/50; `code-lang-test.mjs` had been broken since 396ca4b (read the score from the page after it moved to `score.mjs`), 53 ok now.
 - **How-it-works diagrams on every technologies page** (2026-10-05): *"add how it works diagrams to all tenchilogies. parallelize"*. csound, wire, flipper, time, sync, draw; one agent per page.
