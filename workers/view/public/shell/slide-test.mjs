@@ -8,16 +8,16 @@
 // player's keys are not window-wide, the face files exist and ship).
 //
 // 🔴 NEGATIVE CONTROLS, per positron-verify's convention for this directory:
-// 13 of the checks below, named NEGATIVE, are written so that the bug they name fails them
+// 15 of the checks below, named NEGATIVE, are written so that the bug they name fails them
 // (a scale that is too flat, a headline with each banned mark, a full stop
 // inside a number that must NOT be flagged, a hue typo, a bad layout, a split
-// with no side, and the key detector pointed at a file known to listen on
-// `document`), because a checker that passes everything and one that refuses
+// with no side, the key detector pointed at a file known to listen on
+// `document`, a table frame nobody declared, and a cell wider than its column), because a checker that passes everything and one that refuses
 // everything both look green against valid input alone.
 //
 // NOT GRADED HERE, and graded on `/kit/`'s SLIDES tab instead: anything that
-// needs a document. `createSlide`, `createSlidePlayer`, `fitBox` and
-// `slideDiagram` are never called; the computed size, line height and
+// needs a document. `createSlide`, `createSlidePlayer`, `createSlideLog`,
+// `fitBox` and `slideDiagram` are never called; the computed size, line height and
 // tracking of every step, the 16:9 box, the caption corner, the split sides,
 // spills, the components responding at slide scale and the player's keys are
 // all measured there.
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   SCALE, STEPS, stepSize, stepOf, stepCaption, scaleCss, plain, parseMarks, lintWords,
-  evStep, wordsStep, padRows, normalise, LAYOUTS,
+  evStep, wordsStep, padRows, padRow, colStarts, tableStep, FRAMES, COL_GAP, normalise, LAYOUTS,
 } from './slide.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -71,9 +71,9 @@ ok('NEGATIVE: a scale whose line height closes as it drops is refused',
 ok('step 3 is the archive\'s 9 per cent, exactly', near(stepSize(3), 9));
 ok('step 6 is 30.375 per cent, and steps outside 1 to 6 throw',
   near(stepSize(6), 30.375) && throws(() => stepSize(0)) && throws(() => stepSize(7)) && throws(() => stepSize(2.5)));
-ok('stepOf carries the three numbers', JSON.stringify(stepOf(4)) === JSON.stringify({ n: 4, size: 13.5, lh: 1.1, ls: -0.02 }));
+ok('stepOf carries the three numbers', JSON.stringify(stepOf(4)) === JSON.stringify({ n: 4, size: 13.5, lh: 1.1, ls: -0.03 }));
 ok('a step caption names its size, line height and tracking',
-  stepCaption(6) === 'step 6 30.38 cqh, line 1.00, tracking -0.040 em' && stepCaption(1) === 'step 1 4.00 cqh, line 1.45, tracking 0 em',
+  stepCaption(6) === 'step 6 30.38 cqh, line 1.00, tracking -0.060 em' && stepCaption(1) === 'step 1 4.00 cqh, line 1.45, tracking 0 em',
   `"${stepCaption(6)}" and "${stepCaption(1)}"`);
 
 const css = scaleCss('.sl');
@@ -111,6 +111,22 @@ ok('a right column ends in one character position, and a mark takes no column',
   ends[0] === ends[1] && plain(t.lines[1]).indexOf('26.2') === plain(t.lines[2]).indexOf('67.0'),
   t.lines.map((l) => JSON.stringify(plain(l))).join(' '));
 ok('evidence drops to step 2 at four rows', evStep(3) === 3 && evStep(4) === 2);
+// a live log pads each row against DECLARED widths, so a row on its own must
+// land in the same character columns as the same row inside a whole table
+const W = [6, 5, 6, 3];
+const r1 = padRow(['0.3', 'timer', '2.30', 'ms'], W, 'rlrl'), r2 = padRow(['12.5', 'frame', '104.80', 'ms'], W, 'rlrl');
+ok('a row padded on its own keeps its decimal point in the column of every other',
+  r1.lastIndexOf('.') === r2.lastIndexOf('.') && r1.indexOf('timer') === r2.indexOf('frame'), `${JSON.stringify(r1)} ${JSON.stringify(r2)}`);
+ok('padRows is padRow over the widest cell, with starts every width plus the gap',
+  t.lines[1] === padRow(['MoQ', '*26.2*', '104.8'], t.widths, 'lrr') && colStarts([3, 4]).join() === `0,${3 + COL_GAP}`);
+ok('NEGATIVE: a cell wider than its column is never cut and never throws, it pushes its row along',
+  !throws(() => padRow(['1234567'], [3])) && padRow(['1234567'], [3]) === '1234567');
+ok('a framed table drops to step 2 at three lines, a plain one at four',
+  tableStep(3, 'none') === 2 && tableStep(2, 'box') === 3 && tableStep(3, '') === 3 && tableStep(4, '') === 2);
+ok('the two frames are box and none, and a table may have either or neither',
+  FRAMES.join() === 'box,none' && !throws(() => normalise({ rows: { body: [['a']], frame: 'box' } }))
+  && !throws(() => normalise({ rows: { body: [['a']] } })));
+ok('NEGATIVE: a frame nobody declared throws', throws(() => normalise({ rows: { body: [['a']], frame: 'rounded' } })));
 ok('in a split the words go one step down, never below step 1',
   wordsStep(4, 'split') === 3 && wordsStep(4, 'stack') === 4 && wordsStep(1, 'split') === 1 && wordsStep(3, 'left') === 3);
 

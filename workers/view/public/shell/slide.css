@@ -52,8 +52,55 @@
   border: 0; border-radius: 0;
 }
 .sl-player .sl[hidden] { display: none; }
+/* 🔴 FULL SCREEN FILLS THE SCREEN WITH THE SLIDE'S GROUND AND KEEPS ITS EDGE.
+   Asked 2026-10-05 with a 16:10 laptop full of black bands: *"fill full bg but
+   keep border"*. The panel's own full stage is `#000` (0,2,0); a slide's is
+   its card, and a split's darker half runs on to the screen edge on its side.
+   The slide is centred, so its middle is the screen's middle and a hard stop at
+   50 per cent meets the half inside the slide exactly. */
+.sl-player[data-full] .pos-vp-stage { background: var(--card); }
+.sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-side="left"]:not([hidden])) {
+  background: linear-gradient(to right, var(--bg) 50%, var(--card) 50%);
+}
+.sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-side="right"]:not([hidden])) {
+  background: linear-gradient(to right, var(--card) 50%, var(--bg) 50%);
+}
+.sl-player[data-full] .sl { border: var(--edge); border-radius: var(--r); }
 .sl-player:focus { outline: none; }
 .sl-player:focus-visible { outline: 1px solid var(--hi); outline-offset: 2px; }
+
+/* ONE SLIDE FILLING THE SCREEN, `createSlide(spec, { full: true })`. The
+   frame is what goes full, by the real API or the cover in `fullscreen.mjs`,
+   both of which set `.pos-full`; a class, never `:fullscreen` (shell.css says
+   why). It becomes a SIZE container so the slide letterboxes 16:9 in it and
+   every step stays a share of the slide, not of the screen; the ground behind
+   is the slide's own, and the slide keeps its edge. (0,2,0). */
+.sl-frame.pos-full {
+  container-type: size;
+  display: grid; place-items: center;
+  width: 100%; height: 100%;
+  background: var(--card);
+}
+.sl-frame.pos-full:has(> .sl[data-layout="split"][data-side="left"]) { background: linear-gradient(to right, var(--bg) 50%, var(--card) 50%); }
+.sl-frame.pos-full:has(> .sl[data-layout="split"][data-side="right"]) { background: linear-gradient(to right, var(--card) 50%, var(--bg) 50%); }
+.sl-frame.pos-full > .sl {
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(100cqh, calc(100cqw * 9 / 16));
+}
+/* THE ⛶, the video panel's square (`.pos-vp button.ico`), bottom right where
+   the panel keeps its own. Hidden until a pointer is on the slide or the slide
+   holds focus, and unpressable while hidden, so the corner of a slide is never
+   a control nobody can see. On a screen with no hover it is always there,
+   because a phone has no other way back out. */
+.sl .sl-full {
+  position: absolute; right: 12px; bottom: 12px; z-index: 2;
+  width: 34px; height: 34px; padding: 0; font-size: 15px; line-height: 1;
+  opacity: 0; pointer-events: none;
+  transition: opacity 140ms ease;
+  touch-action: manipulation; -webkit-touch-callout: none;
+}
+.sl:hover .sl-full, .sl:focus-within .sl-full { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .sl .sl-full { opacity: 1; pointer-events: auto; } }
 
 /* THE INSET IS ON A BOX INSIDE THE SLIDE AND NEVER ON THE SLIDE, because a
    container's query units measure its CONTENT box. MEASURED on the archive:
@@ -116,6 +163,48 @@
 /* MONO DOING WHAT ONLY MONO CAN: a table of lines padded with spaces, so a
    column is a character position. */
 .sl-rows { text-align: left; white-space: pre; }
+/* 🔴 ROW LINES, `rows.frame` 'none' or 'box'. A 1 px `--line` rule between
+   rows and under the header, never between columns. The air inside a row is
+   from the table's own step, in em: 0.3 above and below so a rule never
+   touches a glyph, and 0.6 either side, which is one character of this face,
+   so the padding sits on the same grid the columns do. Every row carries the
+   same inset, so the character columns line up exactly as in a plain table.
+   `box` adds the site's own edge and corner, read from the tokens. */
+.sl-rows[data-frame] > .sl-row,
+.sl-log .sl-row { padding: 0.3em 0.6em; }
+.sl-rows[data-frame] > .sl-row + .sl-row,
+.sl-log-body > .sl-row + .sl-row { border-top: 1px solid var(--line); }
+.sl-rows[data-frame="box"] { border: var(--edge); border-radius: var(--r); }
+
+/* 🔴 A LIVE LOG IS A FIXED BOX. It takes the height of its slot and never of
+   its rows, so a row arriving moves nothing on the slide; the body scrolls to
+   its foot, so the newest row is at the bottom and the oldest leave the top.
+   The header stays put and its rule is its own bottom edge, so the line under
+   it does not depend on which row happens to be first in view. */
+.sl-log {
+  align-self: stretch; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+  white-space: pre; text-align: left; font-weight: 400;
+}
+.sl-log-head { flex: 0 0 auto; border-bottom: 1px solid var(--line); }
+.sl-log-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+/* THE SHELL'S OWN LOG AT SLIDE SCALE. `.pos-log` is px type in a bordered
+   card with a 150 px ceiling; in a slot it is the slide's face at step 1, on
+   the darker half with no box of its own, as tall as the slot and no taller.
+   (0,2,0) against its (0,1,0) font shorthand. `addLine` scrolls it to its
+   foot, which is what makes the oldest line leave the top. */
+.sl-slot > .pos-log {
+  align-self: stretch; flex: 1 1 auto; min-height: 0; max-height: none;
+  font-family: inherit; font-weight: 400;
+  font-size: var(--sl-1); line-height: var(--sl-1-lh); letter-spacing: var(--sl-1-ls);
+  background: none; border: 0; border-radius: 0; padding: 0;
+  overflow: hidden; column-gap: 1.2em;
+  /* NEWEST AT THE FOOT FROM THE FIRST LINE, not only once the box is full:
+     with a few short lines the grid packed them at the top and the newest sat
+     118.6 px above the foot (MEASURED, kit 328/329). Overflow then leaves by
+     the top, which is the oldest line leaving. */
+  align-content: end;
+}
 .sl-stack {
   display: grid; grid-template-columns: auto auto auto; column-gap: 0.6em;
   align-items: baseline; text-align: left;
@@ -150,6 +239,20 @@
 .sl[data-layout="split"] .sl-slot { grid-area: slot; }
 .sl[data-layout="split"] .sl-cap { grid-area: cap; }
 .sl[data-layout="split"] .sl-ev { align-items: flex-start; text-align: left; }
+/* THE INTERACTIVE SIDE OF A SPLIT IS DARKER, EDGE TO EDGE. Asked
+   2026-10-05: *"use darker bg on columned layout on the interactive side"*.
+   The page's `--bg` under the slot's half, so the thing you work sits in a
+   well and the words sit on the card. A pseudo element rather than a
+   background on `.sl-slot`, because the slot sits inside the slide's inset and
+   the darker half has to reach the slide's edges. The columns are equal and
+   their gap is centred, so the half ends exactly at 50 per cent. */
+.sl[data-layout="split"]::before {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 50%;
+  background: var(--bg); pointer-events: none;
+}
+.sl[data-layout="split"][data-side="left"]::before { left: 0; }
+.sl[data-layout="split"][data-side="right"]::before { right: 0; }
+.sl[data-layout="split"] .sl-in { position: relative; }
 
 /* THE SLOT: any element. In a split it is a whole column; anywhere else it
    takes what the evidence region has left. Its child is centred in it. */
@@ -179,6 +282,23 @@
 /* The diagram's own caption line is page text in px; on a slide its words go
    under the boxes instead. */
 .sl-fit-in .pos-dg-cap { display: none; }
+/* 🔴 THICKER LINES ON A SLIDE, asked 2026-10-05 as *"make diagrams thinker
+   borders in slides, adjust spacing accordinglu"*. The picture is laid out at
+   a fixed logical width and scaled, so a width here is a share of the slide:
+   a box edge and an arrow at 2 logical px against the page's 1 and 1.1. The
+   hue stays on the edge, only the width moves.
+   THE SPACING, WITHOUT TOUCHING `diagram.mjs`, whose padding and gaps are its
+   own constants: the names go from 12 to 11 px here, which the diagram
+   measures before it lays anything out, and `slideDiagram` lays the picture
+   out at 580 logical px rather than 640 (the narrowest that keeps one row of
+   columns, `COL_BREAK` is 560). Scaled back up by 640 over 580, a name prints
+   at the size it had, while every edge, box padding, gap and arrow run is 10
+   per cent larger than it was, and the edges about 2.2 times as thick.
+   (0,4,0) against the kinds' (0,3,0). */
+.sl { --sl-dg-edge: 2px; --sl-dg-link: 2px; --sl-dg-air: 8px; }
+.sl .pos-dg .pos-dg-n .pos-dg-box { stroke-width: var(--sl-dg-edge); }
+.sl .pos-dg .pos-dg-svg .pos-dg-link { stroke-width: var(--sl-dg-link); }
+.sl .pos-dg .pos-dg-svg .pos-dg-lab { font-size: 11px; }
 .sl-dgd { position: absolute; left: 0; right: 0; top: var(--dgd-y, 0px); height: 0; }
 .sl-dgd > span {
   position: absolute; left: var(--dgd-x, 0px); top: 0;
