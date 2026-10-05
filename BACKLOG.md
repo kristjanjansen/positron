@@ -15,10 +15,10 @@
 
 ### Logged 2026-10-05 evening on *"log bunch of tasks then go"*, from the session's open ends
 
-- **`/parts/` gains the cable chain, the brick and the 400 board**: Pico to the hub's USB-B (OTG adapter then printer cable, a plug and socket picture), the adjustable 3 to 12 V brick for the MB102 (9 V, 5.5x2.1, centre positive), and a 400 hole layout. `demo/parts/index.html`, `rig/pico/oled/breadboard.mjs` (new `400` mode).
-- **Empty message lists reserve about 115 px of blank**: `/sync/` INSTANT and `/wire/` MESSAGES, the reserve is in the shared list (`demo/shell/messages.mjs` or shell.css).
-- **DATES leftovers**: zoom does not stay on the playhead; the spread-out legend is cut at 375; the rightmost ruler label is cut at the plot edge; the gutter narrows at `0 of 0` and moves the plot. `demo/time/dates.mjs`, `timeline/strip.mjs`.
-- **`/stage/` leftovers**: the diagram at 375 is a tangle of long return lines (`demo/shell/diagram.mjs` stacked layout); `Send in 10s` is unexplained.
+- ~~**`/parts/` gains the cable chain, the brick and the 400 board**: Pico to the hub's USB-B (OTG adapter then printer cable, a plug and socket picture), the adjustable 3 to 12 V brick for the MB102 (9 V, 5.5x2.1, centre positive), and a 400 hole layout. `demo/parts/index.html`, `rig/pico/oled/breadboard.mjs` (new `400` mode).~~ Done 2026-10-05: `ea647f3`.
+- ~~**Empty message lists reserve about 115 px of blank**: `/sync/` INSTANT and `/wire/` MESSAGES, the reserve is in the shared list (`demo/shell/messages.mjs` or shell.css).~~ Done 2026-10-05: `a230787`, a framed box at the list's floor.
+- ~~**DATES leftovers**: zoom does not stay on the playhead; the spread-out legend is cut at 375; the rightmost ruler label is cut at the plot edge; the gutter narrows at `0 of 0` and moves the plot. `demo/time/dates.mjs`, `timeline/strip.mjs`.~~ Done 2026-10-05: `377b1bc`.
+- ~~**`/stage/` leftovers**: the diagram at 375 is a tangle of long return lines (`demo/shell/diagram.mjs` stacked layout); `Send in 10s` is unexplained.~~ Done 2026-10-05: `2eaae3b`, stacked diagram and the button reads Test in Audience.
 
 - ~~**`/stage/` drop the local film, clock without ms** (2026-10-05, *"drop. rm ms"*): Start show no longer downloads the 253 MB film into the page (`filmCommand.play()` in `startShow`), mute acts on the live stream, deep film/mute asserts rewritten; the bar clock loses its milliseconds. `demo/stage/index.html`.~~ Done 2026-10-05: film, `?bg=` route and dead archive branches removed (864 lines out), mute on the live picture, clock elapsed only; 5 deep asserts rewritten and UNRUN.
 - ~~**`/time/` DATES readable** (2026-10-05, *"fix time"*): `zoom left 7.0e13 ×`, `finest 0.004 ms`, ruler `-1.0 ka` against a year cell `1100`. `demo/time/dates.mjs`, maybe the deep-time ruler format in `timeline/strip.mjs`.~~ Done 2026-10-05: calendar ruler and cells (`calendar: true` on the strip, opt in), fit bug at 1280 fixed.
