@@ -723,7 +723,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   server.on('listening', () => {
     const p = server.address().port;
     console.log(`stand-in broadcaster on http://127.0.0.1:${p}`);
-    console.log(`  http://127.0.0.1:8890/now/?base=http://127.0.0.1:${p}`);
+    console.log(`  http://127.0.0.1:8890/flipper/?base=http://127.0.0.1:${p}`);
     console.log(`  http://127.0.0.1:8890/flipper/?base=http://127.0.0.1:${p}/wall`);
   });
 }

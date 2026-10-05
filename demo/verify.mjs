@@ -176,40 +176,29 @@ if (all.some((t) => t.name === 'tapes')) {
     console.log(`stand-in archive ${standIn.get('tapes')} (nobody's archive)`);
   }
 }
-// ⚠️ ONE SERVER FOR BOTH PAGES, because it is one broadcaster. Two would build
-// the same hundred megabytes of picture twice and hold two copies of it open.
-const ERR_PAGES = ['now', 'flipper'];
+// ⚠️ ONE PAGE ON THIS BROADCASTER SINCE 2026-10-05, when `/now/` merged into
+// `/flipper/`. `errAt` is kept beside it because the refusal classifier below
+// recognises the stand-in by its own address.
+const ERR_PAGES = ['flipper'];
+let errAt = null;
 if (all.some((t) => ERR_PAGES.includes(t.name))) {
   const err = startErr({ port: 0, quiet: true });
   if (!err) {
-    console.log('⚠️  the stand-in broadcaster needs ffmpeg and could not be built, so `now` '
-      + 'and `flipper` will be graded against nothing rather than against ERR.');
+    console.log('⚠️  the stand-in broadcaster needs ffmpeg and could not be built, so `flipper` '
+      + 'will be graded against nothing rather than against ERR.');
   } else {
     await new Promise((r) => err.on('listening', r));
-    const at = `http://127.0.0.1:${err.address().port}`;
+    errAt = `http://127.0.0.1:${err.address().port}`;
     /**
-     * 🔴 THE TWO PAGES ARE POINTED AT TWO ARRANGEMENTS OF THE SAME BROADCASTER,
-     * BECAUSE THEY WANT OPPOSITE THINGS FROM IT AND BOTH OPEN CHANNEL 0.
-     *
-     * `/flipper/` is about finding where the rights refusals start: it sweeps
-     * back from the live edge, starts the picture ninety seconds behind the
-     * boundary and stops loading when it reaches it. None of that runs on a
-     * channel whose edge is served, so it gets `/wall`, which is the
-     * arrangement ERR was measured wearing on 2026-09-06.
-     *
-     * `/now/` is about a live picture on a line, and it has NO path for a
-     * refused live edge. Pointed at `/wall` it shows black and takes six
-     * asserts red, all downstream of a clock that never starts. So it gets the
-     * default arrangement, where channel 0 plays and the refusals are at the
-     * old end of the window where its sweep still finds them.
-     *
-     * ⚠️ THAT ASYMMETRY IS A FINDING ABOUT `/now/`, NOT A SETTING. It is in
-     * `BACKLOG.md`; the fix is `/flipper/`'s `servedStart` at startup.
+     * 🔴 `/wall` IS THE ARRANGEMENT ERR WAS MEASURED WEARING ON 2026-09-06, AND
+     * IT IS THE ONE WHERE CHANNEL 0 REFUSES ITS NEWEST MINUTES. That is the only
+     * way the page's start behind the boundary runs at all; the old `/now/` was
+     * pointed at the default arrangement because it had no such path, and the
+     * merged page has it from `err-live.mjs`'s `findServedEdge`.
      */
-    standIn.set('now', at);
-    standIn.set('flipper', `${at}/wall`);
+    standIn.set('flipper', `${errAt}/wall`);
     standIns.push(err);
-    console.log(`stand-in broadcaster ${at} (nobody's ERR)`);
+    console.log(`stand-in broadcaster ${errAt} (nobody's ERR)`);
   }
 }
 
@@ -341,7 +330,7 @@ let hostHits = new Map();
  * red, which reads as one bug and was two.
  */
 const errRefusal = (s) => /live\.err\.ee/.test(s)
-  || (standIn.has('now') && s.includes(standIn.get('now'))
+  || (errAt && s.includes(errAt)
       && /\/live\/[a-z0-9]+\/seg-\d+\.(?:ts|m4s)/.test(s));
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
@@ -1125,12 +1114,16 @@ for (const t of targets) {
   // assert would make the suite total vary run to run, and a shrinking total
   // is exactly how four asserts went missing unnoticed earlier.
   const EDGE_CEILING = 25;
-  // TWO DEMOS ASK ERR FOR SEGMENTS ON PURPOSE, and an unexplained ceiling is
-  // how the next reader mistakes a real outage for expected churn:
-  //   flipper  sweeps 8 points per probe, twice
-  //   now      sweeps 13 points across the window, once, capped at 30 in-page
-  // plus hls.js's own retries on whatever comes back refused.
-  const PROBE_CEILING = 60;
+  // ONE DEMO ASKS ERR FOR SEGMENTS ON PURPOSE, and an unexplained ceiling is
+  // how the next reader mistakes a real outage for expected churn. `flipper`
+  // is the old `/flipper/` and `/now/` in one page since 2026-10-05, so it
+  // pays both pages' asking: up to 8 points at each open of a channel (three
+  // opens in a run, ETV, another, ETV again), 13 for the deep sweep, the deep
+  // survey of the other two, all capped at 40 per open in-page, plus hls.js's
+  // own retries on whatever comes back refused. MEASURED against the stand-in
+  // the day it merged: 45 ordinary, 72 deep. It was 60 while the two were
+  // separate pages, which each stayed under it.
+  const PROBE_CEILING = 90;
   // ⚠️ AND THE LINE HAS TO SAY WHICH KIND, or a reader sees a number with no
   // meaning. `keep` and `take` ask WHEP for an input the rig feeds; when the
   // rig is off that is a 409 every time, and an unexplained ceiling is how the

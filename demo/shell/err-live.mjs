@@ -3,7 +3,8 @@
  *  answer to "will ERR hand this segment over?".
  *
  *  Promoted out of `demo/flipper/` on 2026-09-08, where every one of these
- *  lived inline. Both `flipper` and `now` import it — a promotion that leaves
+ *  lived inline. `now` imported it too until it merged into `flipper` on
+ *  2026-10-05. A promotion that leaves
  *  the original as the only caller is not a promotion (LESSONS #30).
  *
  *  THREE FACTS THIS MODULE EXISTS TO CARRY, each paid for once already:
