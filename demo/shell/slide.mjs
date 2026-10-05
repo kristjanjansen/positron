@@ -25,7 +25,8 @@
 //   lines      [[step, text], ...], each line at its own step, for specimens
 //   cap        the caption, step 1, bottom left, always
 //   slot       any element: a kit component, a picture, a diagram
-//   layout     'stack' (default), 'top', 'left', 'right', 'split'
+//   layout     'stack' (default), 'top', 'left', 'split' (no 'right',
+//              removed 2026-10-05: *"no right align needed"*)
 //   side       for 'split', which side the slot is on: 'left' or 'right'
 //
 // Marks in any string: `*x*` paints x in `--hi`, `[x|tech]` paints x in the
@@ -231,7 +232,7 @@ export const FRAMES = ['none'];
 export const tableStep = (lines, frame) => (frame ? (lines > 2 ? 2 : 3) : evStep(lines));
 
 // ── the slide model ─────────────────────────────────────────────────────────
-export const LAYOUTS = ['stack', 'top', 'left', 'right', 'split'];
+export const LAYOUTS = ['stack', 'top', 'left', 'split'];
 const KEYS = new Set(['name', 'layout', 'side', 'say', 'statement', 'big', 'under', 'text', 'textStep',
   'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes']);
 

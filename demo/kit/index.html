@@ -249,6 +249,8 @@
      and never a blur, and the 128 and 64 are the panel's, not a layout's.
      ⚠️ A CUSTOM PROPERTY AND NOT `style.width`, because a component that varies
      a property per instance sets a custom property, never the property. */
+  /* a kit component filling a slide's fit box edge to edge (the instrument panel) */
+  .sl-fit-in > .kit-sl-fill { width: 100%; box-sizing: border-box; }
   .kit-oled { width: fit-content; max-width: 100%; padding: 10px; background: #000;
               border: 1px solid var(--line); border-radius: 4px; }
   .kit-oled canvas { display: block; image-rendering: pixelated;
@@ -1813,15 +1815,6 @@
     `{ layout: 'left', say: 'The Circuit holds *29* real sessions', rows: { body, align: 'lr' } }`,
     { name: 'circuit', layout: 'left', say: 'The Circuit holds *29* real sessions',
       rows: { body: [['sessions', '32'], ['with notes', '29'], ['patches', '64']], align: 'lr' } });
-  // research/cf-models-speech-to-patch-2026-09-21.md:243-244: a loose schema
-  // 1.6 s, one branch per operation 10.2 s.
-  slideBlock('RIGHT ALIGNED',
-    'A layout: the headline and the evidence on the right edge. The caption stays bottom left, '
-    + 'because a caption is in one place on every slide.',
-    `{ layout: 'right', say: 'A loose schema made it faster', stack: [['loose', '*1.6*', 's'], ['strict', '10.2', 's']] }`,
-    { name: 'schema', layout: 'right', say: 'A loose schema made it faster',
-      stack: [['loose', '*1.6*', 's'], ['strict', '10.2', 's']],
-      cap: 'Workers AI proposing patch links from a sentence' });
   slideBlock('INTERACTIVE ON THE RIGHT',
     'The mirror: the words on the left and a knob on the right whose value is the figure, '
     + 'so turning it changes the slide.',
@@ -1932,9 +1925,9 @@
   /* The stand-in station's signal, made here: two tones a fifth apart, 220 and
      330 Hz, the second swelling at 2 Hz (demo/fake-station.mjs:50-69). */
   slideBlock('WAVEFORM ON A SLIDE',
-    'The kit’s wave view, sized in the slide’s own units: its height is a custom property '
-    + 'it already reads, set to 30 per cent of the slide, and its width is its column.',
-    `slot: (host) => { const wv = createWaveView(host); wv.el.style.setProperty('--wave-h', '30cqh'); wv.set(samples, rate) }`,
+    'The kit’s wave view as the picture of a real instrument panel, with a row of knobs and a '
+    + 'nameplate, laid out at 360 logical px and scaled into its column.',
+    `slot: (host) => { const fb = fitBox(host, 360); fb.inner.append(createInstrumentPanel({ viz: waveView.el, rows: [[pitch, swell]], plate }).el) }`,
     { name: 'tone', layout: 'split', side: 'right',
       slot: (host) => {
         const rate = 8000, n = rate * 1.5;
@@ -1944,11 +1937,33 @@
           const swell = 0.55 + 0.45 * Math.sin(2 * Math.PI * 2 * t);
           s[i] = 0.4 * Math.sin(2 * Math.PI * 220 * t) + 0.4 * swell * Math.sin(2 * Math.PI * 330 * t);
         }
-        const wv = createWaveView(host, { label: 'two tones a fifth apart' });
-        wv.el.style.setProperty('--wave-h', '30cqh');
+        // THE REAL INSTRUMENT PANEL, asked 2026-10-05: *"WAVEFORM ON A SLIDE use
+        // actual instument panel"*. The wave view is the panel's picture, two
+        // knobs its row, a nameplate its foot; the panel is px furniture, so it
+        // is laid out at 360 logical px and scaled into the column like the
+        // other kit controls here.
+        // SCALED LIKE THE KNOBS AND FILLING ITS FIT BOX, asked with a crop of a
+        // small panel adrift in its column: *"scale instrument as you do with
+        // knobs. equal padding. uppercase proper instrument nameplate"*. The
+        // panel takes the fit box's whole logical width, so the slot's own
+        // inset is the air on every side and the plate's name and patch sit at
+        // its two ends rather than run together.
+        const fb = fitBox(host, 300);
+        const tmp = el('div');
+        const wv = createWaveView(tmp, { label: 'two tones a fifth apart' });
+        wv.el.style.setProperty('--wave-h', '120px');
+        const knob = (label, value) => createKnob({ label, min: 0, max: 127, value });
+        const panel = createInstrumentPanel({
+          viz: wv.el,
+          rows: [[knob('PITCH', 64), knob('SWELL', 90)]],
+          plate: { name: 'POSITRON', patch: 'Two tones' },
+        });
+        panel.el.classList.add('kit-sl-fill');
+        fb.inner.append(panel.el);
         wv.set(s, rate, { name: 'tone' });
         wv.head(0.5);
         slideKit.comps.wave = wv;
+        slideKit.comps.wavePanel = panel;
         return null;
       },
       say: 'A stand-in plays a tone, not silence', text: '220 and 330 Hz, a 2 Hz swell',
@@ -12187,10 +12202,11 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       };
       const top = all.find((x) => x.spec.name === 'refusals');
       const tb = top.parts.text.getBoundingClientRect(), cb = top.parts.ev.getBoundingClientRect();
-      const l = edge('circuit', 'left'), r = edge('schema', 'right');
-      d.assert('SLIDES: left, right and top layouts put the evidence on their edge',
-        tol(l, 0, 1) && tol(r, 0, 1) && tol(tb.bottom, cb.bottom, 1),
-        `left ${l.toFixed(1)} px off its edge, right ${r.toFixed(1)}, the top layout's words end ${(cb.bottom - tb.bottom).toFixed(1)} px above the region's foot`);
+      // no right layout since 2026-10-05, *"no right align needed"*
+      const l = edge('circuit', 'left');
+      d.assert('SLIDES: left and top layouts put the evidence on their edge',
+        tol(l, 0, 1) && tol(tb.bottom, cb.bottom, 1),
+        `left ${l.toFixed(1)} px off its edge, the top layout's words end ${(cb.bottom - tb.bottom).toFixed(1)} px above the region's foot`);
     }
 
     // ── words ────────────────────────────────────────────────────────────
@@ -12267,9 +12283,10 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const ink = wv.ink();
       const slideH = slideKit.blocks.find((b) => b.s.spec.name === 'tone').s.el.clientHeight;
       const ch = wv.canvas.clientHeight;
-      d.assert('SLIDES: the wave view draws on a slide, 30 per cent of the slide tall',
-        ink.measured && ink.ink > 100 && tol(ch, 0.3 * slideH, 1.5),
-        `${ink.ink} pixels of ink, the canvas ${ch} px tall against ${(0.3 * slideH).toFixed(1)}`);
+      const inPanel = !!wv.el.closest('.pos-glue, .panel, [class*="instr"]') && !!C.wavePanel?.el?.contains(wv.el);
+      d.assert('SLIDES: the wave view draws on a slide as the picture of an instrument panel',
+        ink.measured && ink.ink > 100 && ch > 0 && inPanel,
+        `${ink.ink} pixels of ink, the canvas ${ch} px tall on a ${slideH} px slide, ${inPanel ? 'inside' : 'NOT inside'} the instrument panel`);
     }
     {
       const o = C.oled;
@@ -12348,8 +12365,11 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       for (const t of framed) {
         const rows = [...t.children];
         const cs = getComputedStyle(t);
-        // the slide's one rule width, 0.52 per cent of its height, never under 1 px
-        const rule = Math.max(1, 0.0052 * t.closest('.sl').clientHeight);
+        // the slide's one rule width, 0.4 per cent of its height, never under 1 px
+        // what the browser DRAWS: a border is snapped down to whole device
+        // pixels and never under one, so 1.54 px is 1 px on a 1x screen
+        const dpr = devicePixelRatio || 1;
+        const rule = Math.max(1 / dpr, Math.floor(Math.max(1, 0.004 * t.closest('.sl').clientHeight) * dpr) / dpr);
         const ev = t.parentElement.getBoundingClientRect(), tr = t.getBoundingClientRect();
         if (!tol(tr.width, ev.width, 1)) bad.push(`${t.dataset.frame} table ${tr.width.toFixed(1)} wide in ${ev.width.toFixed(1)}`);
         rows.forEach((r, i) => {
@@ -12399,7 +12419,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const col = columns(vis, T.log.starts, T.log.widths, 'rlrl');
       // the rule is UNDER each row but the newest, never over one, so a row
       // leaving the top never stacks its rule under the header's
-      const ruleW = Math.max(1, 0.0052 * T.log.el.closest('.sl').clientHeight);
+      const dprL = devicePixelRatio || 1;
+      const ruleW = Math.max(1 / dprL, Math.floor(Math.max(1, 0.004 * T.log.el.closest('.sl').clientHeight) * dprL) / dprL);
       const ruled = vis.slice(0, -1).every((r) => tol(parseFloat(getComputedStyle(r).borderBottomWidth), ruleW, 0.5))
         && vis.every((r) => parseFloat(getComputedStyle(r).borderTopWidth) === 0)
         && parseFloat(getComputedStyle(vis.at(-1)).borderBottomWidth) === 0;
@@ -12485,7 +12506,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       }).filter(Number.isFinite);
       const least = Math.min(...clear);
       d.assert('SLIDES: a diagram on a slide draws its edges and arrows at the slide width and keeps the declared air inside every box',
-        edge === 2 && link === 2 && boxesEls.length >= 6 && links.length >= 2 && !wrongBox.length && !wrongLink.length
+        edge === 1.5 && link === 1.5 && boxesEls.length >= 6 && links.length >= 2 && !wrongBox.length && !wrongLink.length
           && hued >= 1 && clear.length >= 6 && least >= air,
         `${boxesEls.length} edges at ${edge} px (${wrongBox.length} not), ${links.length} arrows at ${link} px (${wrongLink.length} not), `
         + `${hued} edges keep a hue of their own, the tightest name ${least.toFixed(1)} logical px inside its edge against ${air}`);

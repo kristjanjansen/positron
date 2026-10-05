@@ -114,7 +114,13 @@
 .sl-in {
   height: 100%;
   display: flex; flex-direction: column;
-  padding: 7cqh 6cqw;
+  /* ONE INSET, THE SAME ON ALL FOUR SIDES. Asked 2026-10-05 with a crop of a
+     split's words column, more air at the sides than at the top: *"same w and
+     h padding"*. It was 7 per cent of the height against 6 per cent of the
+     width, which at 16:9 is 10.7 per cent of the height. One number in cqh
+     now, and a split's gap is twice it, so the words stand the same distance
+     off the divide as off the edges. */
+  padding: var(--sl-pad);
 }
 /* The words column: the headline and what proves it. */
 .sl-words { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
@@ -185,9 +191,9 @@
 /* 🔴 ONE RULE WIDTH ON A SLIDE, A SHARE OF ITS HEIGHT, SO IT SCALES WITH THE
    SLIDE IN FULL SCREEN. Asked 2026-10-05: *"thicker table lines, same as
    other lines. when on fullsc scale all borders proportionally"*. The diagram's
-   2 logical px edge prints at about 2 px on the kit's 386 px slide, so 0.52
+   1.5 logical px edge prints at about 1.5 px on the kit's 386 px slide, so 0.4
    per cent of the slide's height is the same line; never under 1 px. */
-.sl { --sl-rule: max(1px, 0.52cqh); }
+.sl { --sl-rule: max(1px, 0.4cqh); --sl-pad: 8cqh; }
 .sl-rows[data-frame] > .sl-row,
 .sl-log .sl-row { padding: 0.3em 0.6em; }
 .sl-rows[data-frame] > .sl-row + .sl-row { border-top: var(--sl-rule) solid var(--line); }
@@ -250,25 +256,19 @@
    `top`: headline on top, the words at the bottom, left aligned, the air
      between them.
    `left`: everything on the left edge, the evidence vertically centred.
-   `right`: everything on the right edge; the caption stays bottom left,
-     because a caption is in one place on every slide.
    `split`: two columns, the slot on `data-side` and the words on the other,
      the caption across the foot. */
 .sl[data-layout="top"] .sl-ev { justify-content: flex-end; align-items: flex-start; text-align: left; }
 .sl[data-layout="left"] .sl-ev { align-items: flex-start; text-align: left; }
-.sl[data-layout="right"] .sl-say { text-align: right; }
-.sl[data-layout="right"] .sl-ev { align-items: flex-end; text-align: right; }
-.sl[data-layout="right"] .sl-ev .sl-list,
-.sl[data-layout="right"] .sl-ev .sl-text { text-align: right; }
 
 .sl[data-layout="split"] .sl-in {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   /* MORE AIR EITHER SIDE OF THE DIVIDE, asked 2026-10-05 with a crop of the
      log's ruled rows running almost into the words: *"more x padding around
-     central divider"*. 12 per cent of the width, so 6 either side of the
-     middle, which is where the darker half ends. */
-  column-gap: 12cqw;
+     central divider"*. Twice the slide's one inset, so each column stands the
+     inset off the middle, which is where the darker half ends. */
+  column-gap: calc(2 * var(--sl-pad));
 }
 .sl[data-layout="split"][data-side="left"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "slot words" "slot cap"; }
 .sl[data-layout="split"][data-side="right"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "words slot" "cap slot"; }
@@ -332,7 +332,8 @@
    at the size it had, while every edge, box padding, gap and arrow run is 10
    per cent larger than it was, and the edges about 2.2 times as thick.
    (0,4,0) against the kinds' (0,3,0). */
-.sl { --sl-dg-edge: 2px; --sl-dg-link: 2px; --sl-dg-air: 8px; }
+.sl { --sl-dg-edge: 1.5px; --sl-dg-link: 1.5px; --sl-dg-air: 8px; }
+/* 1.5, down from 2 on 2026-10-05: *"make borders bit thinner of slide diagrams"*. */
 .sl .pos-dg .pos-dg-n .pos-dg-box { stroke-width: var(--sl-dg-edge); }
 .sl .pos-dg .pos-dg-svg .pos-dg-link { stroke-width: var(--sl-dg-link); }
 .sl .pos-dg .pos-dg-svg .pos-dg-lab { font-size: 11px; }
