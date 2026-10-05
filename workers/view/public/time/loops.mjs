@@ -33,6 +33,9 @@ const WAYS = LOOP_TURN.map((i) => LOOP_WAYS[i][0]);      // round, back, pingpon
 const WAY_WORD = { round: 'forwards', back: 'backwards', pingpong: 'there and back' };
 
 /** No readout: the numbers live under the lane they describe. */
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = `One ${CHILD / 1000} second recording placed three times, the last of them looping twice. Press play, and the arrow button turns the direction of that loop.`;
+
 export const readout = null;
 
 export function build({ panel, assert, log }) {

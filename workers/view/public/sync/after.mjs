@@ -55,7 +55,10 @@ const NATIVE_HLS = 'ManagedMediaSource' in window
 
 // `media` is not a cell: the picture's own clock is printed on the bar beside
 // the duration. `worst` is, because a median on its own hides the one bad fire.
-export const readout = { fired: '', 'late by': 'ms', worst: 'ms', apart: 'ms' };
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'A recorded show with eight cues, where the video itself is the clock so every cue lands on its own moment of the picture. Press play, or drag along the timeline.';
+
+export const readout = { 'cues fired': '', 'late by': 'ms', worst: 'ms', drift: 'ms' };
 
 export function build({ panel, log, set, d }) {
   const video = el('video', 'sync-video', null, { playsinline: '', muted: '', preload: 'auto' });
@@ -152,7 +155,7 @@ export function build({ panel, log, set, d }) {
   shelf.append(createGlue(bar.el, strip.el));
 
   function render() {
-    set('fired', fires.length);
+    set('cues fired', fires.length);
     if (!fires.length) return;
     const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
     set('late by', errs[errs.length >> 1]);
@@ -166,7 +169,7 @@ export function build({ panel, log, set, d }) {
   const watch = setInterval(() => {
     if (!master || video.readyState < 2) return;
     const off = video.currentTime * 1000 - deck.position();
-    set('apart', off, Math.abs(off) > 250 ? 'bad' : 'ok');
+    set('drift', off, Math.abs(off) > 250 ? 'bad' : 'ok');
     if (deck.playing?.() && Math.abs(off) > 250) {
       deck.seek(video.currentTime * 1000);
       log(`pulled the timeline back ${off.toFixed(0)} ms onto the picture`, 'bad');

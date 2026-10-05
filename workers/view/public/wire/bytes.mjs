@@ -23,6 +23,9 @@ import { createTable } from '/shell/table.mjs';
 
 // A page with no numbers: the list is the readout. `null` gives the tab's own
 // report a log and no cells.
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'Type a message and send it to see the exact bytes that go out to the relay and come back. Send and keep also stores it, so the next visitor finds it here.';
+
 export const readout = null;
 
 export function build({ panel, log, d }) {
@@ -56,7 +59,7 @@ export function build({ panel, log, d }) {
   // sending and storing, and lighting one says the other is a variant.
   const SPECS = [
     { id: 'send', label: 'Send' },
-    { id: 'store', label: 'Send & store' },
+    { id: 'store', label: 'Send and keep' },
     { id: 'bytes', label: 'Send the same as bytes', check: true },
     { id: 'toobig', label: 'Try one that is too big', check: true },
     { id: 'overfill', label: 'Overfill the history', check: true },

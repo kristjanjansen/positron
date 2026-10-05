@@ -37,6 +37,9 @@ const SLICE_MS = 500;
 const FPS = 25, FRAME_MS = 1000 / FPS;
 
 // No readout: see the header.
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'The clock goes out to Cloudflare and comes back, and what you record is the copy that came back. Press Send and receive, then record with the red button.';
+
 export const readout = null;
 
 export function build({ panel, assert, log }) {

@@ -40,6 +40,9 @@ import { el } from '/shell/shell.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
 import { offerLoopFor, inputNames, checkEvolutionLoop } from '/shell/midi.mjs';
 
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'Play the keyboard and every note travels through the relay to anyone else in the room. Open this tab in a second browser to play into this one and see how late the notes land.';
+
 export const readout = { midi: '', sound: '', sent: '', received: '', 'note in': 'ms', 'sound back': 'ms' };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -69,7 +72,7 @@ export function build({ panel, log, set, d }) {
   };
   for (const s of [
     { id: 'start', label: 'Start audio and join', primary: true },
-    { id: 'midi', label: 'Ask for MIDI' },
+    { id: 'midi', label: 'Use a MIDI keyboard' },
     { id: 'remote', label: 'Hear the other machine' },
   ]) {
     const b = el('button', s.primary ? 'pos-pri' : '', s.label, { type: 'button' });

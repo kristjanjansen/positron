@@ -58,7 +58,9 @@
 
   const d = mount({
     name: 'time',
-    what: 'The clock every other page here runs on, set a moment ahead so it can still be stopped.',
+    // No `what` under the title: each tab says what it is in the box under the
+    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
+    // The manifest's `one` line still describes the page on the index.
     readout: null,
     showLog: false,
     controls: [],
@@ -68,8 +70,8 @@
   const page = createTabPage(d, {
     at: 'schedule',
     tabs: [
-      { id: 'schedule', label: 'SCHEDULE', mod: schedule },
-      { id: 'beat', label: 'BEAT', mod: beat },
+      { id: 'schedule', label: 'CLOCK', mod: schedule },
+      { id: 'beat', label: 'OUTPUTS', mod: beat },
       { id: 'loops', label: 'LOOPS', mod: loops },
       { id: 'score', label: 'SCORE', mod: score },
       { id: 'dates', label: 'DATES', mod: dates },

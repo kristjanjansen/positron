@@ -35,7 +35,10 @@ const SEG_MS = 2000;
 const SHOW_MS = 6200;      // three segments, a fixed short show
 const STAND_IN_MS = 300;   // the stood-in hand-off, `record`'s number
 
-export const readout = { segments: '', holding: 'KiB', worst: 'KiB', sent: 'KiB', where: '', length: 's' };
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = `A short show recorded in ${SEG_MS / 1000} second pieces, each sent off as soon as it closes, so what this page holds never grows. Press Record, then Play it back.`;
+
+export const readout = { segments: '', holding: 'KiB', 'most held': 'KiB', sent: 'KiB', 'sent to': '', length: 's' };
 
 export function build({ panel, assert, log, set }) {
   // The R2 leg is OPT-IN. The ingest caps are real (5 sessions per address per
@@ -74,7 +77,7 @@ export function build({ panel, assert, log, set }) {
     // confident measurement of nothing.
     set('segments', closed || '');
     set('holding', closed ? Math.round(heldBytes / 1024) : '');
-    set('worst', peakBytes ? Math.round(peakBytes / 1024) : '', peak <= 2 ? 'ok' : 'bad');
+    set('most held', peakBytes ? Math.round(peakBytes / 1024) : '', peak <= 2 ? 'ok' : 'bad');
     set('sent', sentBytes ? Math.round(sentBytes / 1024) : '');
     segsEl.hidden = segs.length === 0;
     segsEl.replaceChildren(...segs.slice(-20).map((s) =>
@@ -124,7 +127,7 @@ export function build({ panel, assert, log, set }) {
     closed = 0; held = 0; peak = 0; heldBytes = 0; peakBytes = 0; sentBytes = 0; recordedBytes = 0;
     segs.length = 0; pile.length = 0; manifestUrl = null;
     session = useR2 ? await openSession() : null;
-    set('where', useR2 ? (session ? 'R2' : 'refused') : 'local');
+    set('sent to', useR2 ? (session ? 'R2' : 'refused') : 'local');
     set('length', '');
     paint();
     if (useR2 && !session) return;

@@ -29,6 +29,9 @@ const DURATION = 20000;
 const TICK = 25, HORIZON = 100, GRACE = 150;
 
 /** No readout: the numbers live under the lane they describe, in its gutter. */
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = `${DURATION / 1000} events a second apart, each timer set only a moment ahead, so pause really stops and dragging really skips. Press play and the lane shows how late each one fired.`;
+
 export const readout = null;
 
 export function build({ panel, assert, log }) {
@@ -75,12 +78,12 @@ export function build({ panel, assert, log }) {
     lanes: [{
       // NO `latch`: a mark's colour is a fact about what was observed, and
       // scrubbing back is not an observation, so colour comes from `measured`.
-      id: 'mark', kind: 'mark', label: 'marks', height: 72, width: 2,
+      id: 'mark', kind: 'mark', label: 'events', height: 72, width: 2,
       color: '#6a7280',
       // 🔴 A LINE UNDER THE NAME FROM THE FIRST FRAME, which is what stops the
       // label block jumping 29 px up when the numbers arrive (reported
       // 2026-09-25, measured 51 then 22). The numbers replace it in place.
-      subLabel: 'no marks measured yet',
+      subLabel: 'nothing fired yet',
       terse: true,
       colorOfRow: (r) => {
         const m = measured.get(r.id);
@@ -161,7 +164,7 @@ export function build({ panel, assert, log }) {
     requestAnimationFrame(sampleAtRest);
   })();
 
-  log(`${DURATION / 1000}s, 20 marks, speeds ${adapter.caps.rates.join('/')}x`);
+  log(`${DURATION / 1000}s, 20 events, speeds ${adapter.caps.rates.join('/')}x`);
 
   return {
     deck, bar,
