@@ -21,7 +21,8 @@ import { createTransportBar } from '/shell/transport-bar.mjs';
 import { createStripView } from '/shell/strip.mjs';
 import { createGlue } from '/shell/glue.mjs';
 import { createDeck } from '/timeline/transport.mjs';
-import { zoomCeilingPps, ulpMs, DATE_WALL_MS, tickLOD } from '/timeline/strip.mjs';
+import { zoomCeilingPps, ulpMs, DATE_WALL_MS, calendarLOD, calendarDate, calendarSpan, calendarStep,
+  calendarLabel, calendarTicks } from '/timeline/strip.mjs';
 import { markAdapter } from '/shell/fixture.mjs';
 
 const YEAR = 365.2425 * 24 * 3600 * 1000;
@@ -30,12 +31,18 @@ const t0 = Date.UTC(100, 0, 1);
 const yr = (year) => t0 + (year - 100) * YEAR;
 const GLYPH = { exact: '·', ignorance: '?', vagueness: '~' };
 
-/** Four cells, on show: the year under the playhead, the tick step, and the
- *  two floating-point limits this tab is about. */
+/** Four cells, all in calendar words (asked 2026-10-05 as *"fix time"*):
+ *  the date under the playhead at the ruler's own precision, how much time is
+ *  in view, the ruler's step, and how many of the dates are on screen. They
+ *  were `year`, `grid`, `finest 0.004 ms` and `zoom left 7.0e13 ×`, and the
+ *  last two measured the float behind the axis, which no visitor can use: at
+ *  year 1100 the float allows a 256th of a millisecond, so the calendar runs
+ *  out of meaning long before the number does. Those limits are still
+ *  asserted, in `check`. */
 // What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
 export const about = 'Two thousand years on one line, where many dates are a range rather than a day. Zoom in until each mark shows how sure its date is.';
 
-export const readout = { year: '', grid: '', finest: 'ms', 'zoom left': '×' };
+export const readout = { date: '', 'in view': '', grid: '', 'dates shown': '' };
 
 export function build({ panel, set, log }) {
   // SHAPED LIKE AN ARCHIVE: dates crowd towards the present and get vaguer
@@ -71,8 +78,7 @@ export function build({ panel, set, log }) {
   // number nobody can read. `publish: false`: SCHEDULE's bar is the page's.
   const bar = createTransportBar(host, deck, {
     scrub: false, publish: false,
-    fmt: (pos, range) => `${new Date(pos).toISOString().slice(0, 10)}`
-      + ` / ${fmtNum((range[1] - range[0]) / YEAR)} y`,
+    fmt: (pos, range) => `${calendarDate(pos)} / ${calendarSpan(range[1] - range[0])}`,
   });
 
   const HI = getComputedStyle(document.documentElement).getPropertyValue('--hi').trim() || '#ffd400';
@@ -83,6 +89,13 @@ export function build({ panel, set, log }) {
     follow: false,
     // DATES on the axis, not a distance from 1970.
     absolute: true,
+    // ...and ruled in real years, months and days, as a calendar is, rather
+    // than in thousands of years counted from 1970 (`-1.0 ka`), which is
+    // what the ms ladder printed here until 2026-10-05.
+    calendar: true,
+    // The `in view` cell says it, in a box that is there at every width; the
+    // strip's own gutter copy dropped out at 375 and repeated it at 1280.
+    zoomReadout: false,
     lanes: [
       // The mark becomes its character where the zoom has made room.
       { id: 'sure', kind: 'era', label: 'how sure', height: 26, as: 'ticks',
@@ -110,25 +123,39 @@ export function build({ panel, set, log }) {
     for (const L of strip.lanes()) if (by[L.id]) L.subLabel = by[L.id];
   }
 
-  const spanWords = (ms) =>
-    ms >= YEAR ? `${fmtNum(ms / YEAR)} y`
-    : ms >= 864e5 ? `${fmtNum(ms / 864e5)} d`
-    : ms >= 36e5 ? `${fmtNum(ms / 36e5)} h`
-    : ms >= 6e4 ? `${fmtNum(ms / 6e4)} min`
-    : ms >= 1000 ? `${fmtNum(ms / 1000)} s`
-    : `${fmtNum(ms)} ms`;
-  const times = (x) => (!Number.isFinite(x) || x <= 0 ? ''
-    : x >= 1e5 ? x.toExponential(1).replace('e+', 'e') : fmtNum(x));
+  /** How many of the dates touch the view, bracket and all. */
+  const shown = (t0, t1) => items.filter((r) =>
+    (r.when ? r.when.latest : r.at) >= t0 && (r.when ? r.when.earliest : r.at) <= t1).length;
+
+  // 🔴 THE PLOT CAN WIDEN AFTER THE FIT, AND THEN THE VIEW SHOWS MORE TIME THAN
+  // WAS FITTED. MEASURED 2026-10-05 on the 1280 shot: fitted to 2000 years,
+  // drawn as 4,862, every date in the left third, because the fit ran before
+  // the panel had its final width. So a change of plot width with the view
+  // otherwise untouched keeps the SPAN, not the scale. A zoom or a pan changes
+  // the view and is left alone.
+  let last = null;
+  function keepSpan() {
+    const v = strip.view();
+    const [a, b] = strip.visible();
+    const w = ((b - a) * v.pxPerSecond) / 1000;
+    if (last && Math.abs(w - last.w) > 1 && v.pxPerSecond === last.pps
+        && v.originTime === last.origin && v.scrollX === last.scroll) {
+      strip.fit(last.a, last.b, { pad: 0 });
+      return keepSpan();
+    }
+    last = { w, a, b, pps: v.pxPerSecond, origin: v.originTime, scroll: v.scrollX };
+    return [a, b];
+  }
 
   function refresh() {
+    const [a, b] = keepSpan();
     const v = strip.view();
     const t = deck.position();
-    const lod = tickLOD(v.pxPerSecond);
-    set('year', Math.abs(t) <= DATE_WALL_MS ? new Date(t).getUTCFullYear() : '');
-    set('grid', spanWords(lod.major));
-    // The step is BLANK, never 0, at the origin.
-    set('finest', Math.abs(t) > 0 ? ulpMs(t) : '');
-    set('zoom left', Math.abs(t) > 0 ? times(Math.min(1e7, zoomCeilingPps(t)) / v.pxPerSecond) : '');
+    const { major } = calendarLOD(v.pxPerSecond);
+    set('date', calendarDate(t, major));
+    set('in view', calendarSpan(b - a));
+    set('grid', calendarStep(major));
+    set('dates shown', `${shown(a, b)} of ${items.length}`);
     gutters();
     strip.invalidate();
   }
@@ -189,8 +216,19 @@ export function build({ panel, set, log }) {
           + ` added nothing ${a.open}, cut by the edge ${a.clipped}` : 'none');
       A('it names the method it used', !!a && typeof a.method === 'string' && a.method.length > 0,
         a ? a.method : 'none');
-      const lod = tickLOD(strip.view().pxPerSecond);
-      A('the ticks pick a labelled step off the ladder', lod && Number.isFinite(lod.major), spanWords(lod.major));
+      // THE RULER IS A CALENDAR: fitted, every label is a whole year on a
+      // round step, the same writing the `date` cell uses. It read `-1.0 ka`
+      // and `0.0 ka` beside a cell reading `1100` until 2026-10-05.
+      const cal = calendarLOD(strip.view().pxPerSecond).major;
+      const [v0, v1] = strip.visible();
+      const labels = calendarTicks(cal, v0, v1).map((x) => calendarLabel(x, cal));
+      // `ticks.calendar` is set only by the calendar ruler's own draw, so this
+      // goes red if the strip fell back to the ms ladder.
+      const drawn = strip.readout().ticks?.calendar;
+      A('the ruler reads whole years on a round step when the whole span is in view',
+        drawn === calendarStep(cal) && cal.u === 'y' && labels.length >= 2
+          && labels.every((l) => /^-?\d+$/.test(l) && +l % cal.n === 0),
+        `every ${drawn || '(ms ladder drew it)'}: ${labels.join(' ')}`);
 
       // A RELATIONSHIP, NOT A COUNT: zoom in and more characters appear, zoom
       // out and they go. Saved and restored inside one task.
