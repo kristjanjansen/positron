@@ -1,5 +1,9 @@
 ## Open
 
+- **`/flipper/` re-architected** (2026-10-05): *"can you architect flipper to use onlu videos and use new pachbay architeture. different transports to each videopnel"*. Plan first: `plans/plan-flipper-patchbay.md`. `demo/flipper/index.html`, `demo/shell/bay.mjs`.
+
+- ~~**Archive the remixer demo** (2026-10-05, *"archvie remixer demo"*)~~ Done 2026-10-05: row off the manifest, `proto/remixer/` moved to `archive/remixer/` except `hls.min.js`, which eight pages load.
+
 ### Logged 2026-10-05 evening on *"log bunch of tasks then go"*, from the session's open ends
 
 - **`/parts/` gains the cable chain, the brick and the 400 board**: Pico to the hub's USB-B (OTG adapter then printer cable, a plug and socket picture), the adjustable 3 to 12 V brick for the MB102 (9 V, 5.5x2.1, centre positive), and a 400 hole layout. `demo/parts/index.html`, `rig/pico/oled/breadboard.mjs` (new `400` mode).
