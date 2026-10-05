@@ -2,7 +2,7 @@
 
 ## Where it is right now
 
-- ✅ **Site: BUILD `87d977a-200659-657f`**, confirmed on the edge. **Not pushed** past `b5cd89f`; the push needs the personal account (CLAUDE.md).
+- ✅ **Site: BUILD `87d977a-200659-657f`**, confirmed on the edge, and **pushed** with this handoff.
 - Counted: **46 demos, 44 built**. No agent is running. The tree is clean apart from `workers/view/public/shell/shell.mjs`.
 
 ## What landed since the first half of this session, all deployed
