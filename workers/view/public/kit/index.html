@@ -2002,55 +2002,9 @@
     { name: 'machines', say: '[Cloudflare|cloudflare] carries the streams',
       slot: (host) => { const ctl = slideDiagram(SLIDE_MACHINES)(host); slideKit.comps.diagram = ctl; return ctl; },
       cap: 'notes from the page through the relay to the [Pi|raspberry]' });
-  slideBlock('STEP GRID ON A SLIDE',
-    'The kit’s step grid on its own frame clock at 120 bpm, laid out at 480 logical px and '
-    + 'scaled. It plays only while this tab is open.',
-    `slot: (host) => { const fb = fitBox(host, 480); createStepGrid({ strip: fb.inner, rows: 2, steps: 16, readOnly: true, rate }) }`,
-    { name: 'steps', say: 'A step waits for the next frame',
-      slot: (host) => {
-        const fb = fitBox(host, 480);
-        const strip = el('div');
-        fb.inner.append(strip);
-        const grid = createStepGrid({ strip, rows: 2, steps: 16, readOnly: true,
-          rate: { bpm: 120, whose: 'this slide, which made it up' } });
-        for (const [r, st] of [[0, 0], [0, 4], [0, 8], [0, 12], [1, 2], [1, 6], [1, 10], [1, 14]]) grid.set(r, st, true, 'quiet');
-        let steps = 0;
-        grid.clock.onStep(() => { steps++; });
-        slideKit.comps.grid = { grid, steps: () => steps };
-        return { start() { grid.clock.play(); }, stop() { grid.clock.stop(); } };
-      },
-      cap: 'specimen tempo, 120 bpm' });
-  slideBlock('READOUT ON A SLIDE',
-    'The kit’s readout at 360 logical px and scaled, counting this screen’s frames while '
-    + 'the tab is open. `frames` is there because `fps` alone stands still on a locked screen.',
-    `slot: (host) => { const fb = fitBox(host, 360); fb.inner.append(createReport({ readout: { fps: '', frames: '' } }).readoutEl) }`,
-    { name: 'readout', say: 'The readout is live, measuring this screen',
-      slot: (host) => {
-        const fb = fitBox(host, 360);
-        const r = createReport({ readout: { fps: '', frames: '' }, showLog: false, joined: false });
-        fb.inner.append(r.readoutEl);
-        let last = 0, times = [], shown = 0, count = 0;
-        const loop = looped((t) => {
-          count++;
-          if (last) times.push(t - last);
-          if (times.length > 60) times.shift();
-          last = t;
-          if (t - shown > 250 && times.length > 4) {
-            r.set('fps', (1000 / (times.reduce((a, b) => a + b, 0) / times.length)).toFixed(1));
-            r.set('frames', count);
-            shown = t;
-          }
-        });
-        slideKit.comps.readout = { r, count: () => count };
-        return { start() { last = 0; times = []; loop.start(); }, stop() { loop.stop(); } };
-      },
-      cap: 'this screen, now' });
-
-  /* 🔴 THE TIME WORK ON A SLIDE, 2026-10-05. Asked as *"do 6 and 7"*, from a
-     list whose sixth item was a timeline or strip view on a slide and whose
-     seventh was a transport bar on a slide, left out before because a bar takes
-     Space. Both are fed by this tab alone: a deck with its own marks, no
-     network, playing only between `slidesOpen()` and `slidesClose()`.
+  /* ⚠️ DECLARED HERE, ABOVE STEP GRID ON A SLIDE, because that slot is the first
+     to call `slideCommand` while it is built, and a `const` read above its own
+     line throws.
      🔴 A KEY FOR A BAR ON A SLIDE IS A KEY PRESSED INSIDE THAT SLIDE. The bar
      listens on `window` and hears a key from the body, which is right for a
      page's one transport and wrong for a specimen among thirty others: Space on
@@ -2084,6 +2038,110 @@
       refused: () => refused,
     };
   };
+
+  /* STEP GRID ON A SLIDE, asked 2026-10-05 as *"STEP GRID ON A SLIDE - convert
+     to col layout with tom instrument (no labels)"*. `/tom/`'s drum machine
+     from the same kit parts `/tom/` uses (demo/tom/index.html, the bar at
+     ~620, the grid at ~750, the instrument at ~836): a transport bar with the
+     stop verb and the tempo arrows in its right slot, glued over a step grid in
+     a panel case, with the TOM plate at the foot's right end. On the darker
+     side of a split, scaled like the waveform and FAU panels (`fitBox`,
+     `.kit-sl-fill`).
+     🔴 NO LABELS, AND THE PLATE IS KEPT. No row names (no `fixed`, so no label
+     column is built), no beat numbers (`ticks` off), no clock (`time: false`),
+     and the tempo is `‹` and `›` with no `120 bpm` cell between them. The plate
+     stays: it is the instrument's name, not a label on one of its controls.
+     Glyphs stay too, because a play button with no glyph is a blank square.
+     🔴 NO SAMPLES, NO AUDIO, NO FETCH. The grid plays its pattern on its own
+     frame clock while the tab is open and stops when it closes; the bar's
+     toggle stops and plays it, the arrows walk the tempo in fives the way
+     `/tom/`'s stepper does. Read only, as the block it replaces was.
+     ⚠️ THE BAR'S KEYS ARE THE SLIDE'S, by `slideCommand`, for the reason the
+     TRANSPORT BAR block gives: Space from the page must not start it. */
+  section('slides', 'STEP GRID ON A SLIDE',
+    'The TOM drum machine at slide scale on the darker side of a split: its bar, a step grid '
+    + 'playing on its own clock while this tab is open, and its plate, with no labels on the '
+    + 'rows, the steps or the tempo. Nothing sounds here.',
+    `slot: (host) => { const fb = fitBox(host, 420); fb.inner.append(createInstrumentPanel({ rows: [[[bar.el], { pad: false }], [[layout.el], { pad: false }]], plate: { name: 'TOM', place: 'end' }, full: true }).el) }`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const s = createSlide({ name: 'tom', layout: 'split', side: 'right',
+        say: 'A drum machine is built from kit parts', text: 'a bar, a step grid and its plate',
+        cap: 'a picture, it plays at',
+        slot: (host) => {
+          const fb = fitBox(host, 420);
+          const STEPS = 16, BPM_MIN = 60, BPM_MAX = 200, BPM_STEP = 5;
+          const kase = createPanelLayout({ side: null, flow: false, strip: { role: 'group', label: 'steps' } });
+          const grid = createStepGrid({ strip: kase.strip, rows: 6, steps: STEPS, readOnly: true,
+            rate: { bpm: 120, whose: 'this slide, which made it up' } });
+          // kick, snare, closed hat, open hat, clap, tom
+          const PATTERN = [[0, 4, 8, 12], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [14], [12], [10, 11]];
+          PATTERN.forEach((row, r) => row.forEach((st) => grid.set(r, st, true, 'quiet')));
+          let steps = 0;
+          grid.clock.onStep(() => { steps++; });
+          /* The deck is a follower with nothing on it, so the toggle's face can
+             say playing or stopped; the grid's clock is what moves. A stop goes
+             back to the first column, which is `/tom/`'s stop and the clock's. */
+          const deck = createDeck({ items: [], adapters: {}, range: [0, 3_600_000] });
+          const run = (on) => {
+            if (on) { grid.clock.play(); deck.play(); } else { grid.clock.stop(); deck.pause(); deck.seek(0); }
+          };
+          // the gate drives this facade, so a key from outside the slide moves nothing
+          const gate = slideCommand({ play: () => run(true), pause: () => run(false), seek: () => {} },
+            () => host.closest('.sl-frame'));
+          const tempo = createStepper({ what: 'tempo',
+            prev: () => grid.clock.setBpm(Math.max(BPM_MIN, grid.clock.bpm() - BPM_STEP)),
+            next: () => grid.clock.setBpm(Math.min(BPM_MAX, grid.clock.bpm() + BPM_STEP)) });
+          const bar = createTransportBar(el('div'), deck, {
+            publish: false, scrub: false, loop: false, time: false, endStop: false, verb: 'stop', right: [tempo.el],
+            command: gate.command,
+          });
+          const panel = createInstrumentPanel({
+            rows: [[[bar.el], { pad: false }], [[kase.el], { pad: false }]],
+            plate: { name: 'TOM', place: 'end' },
+            full: true,
+          });
+          panel.el.classList.add('kit-sl-fill');
+          fb.inner.append(panel.el);
+          slideKit.comps.grid = { grid, steps: () => steps, panel, bar, deck, tempo, kase, fb, column: host, refused: gate.refused };
+          return { start() { run(true); }, stop() { run(false); } };
+        } }, { host: box, full: true });
+      const a = el('a', '', 'positron.studio/tom/', { href: 'https://positron.studio/tom/' });
+      s.parts.cap.append(' ', a);
+      slideKit.blocks.push({ title: 'STEP GRID ON A SLIDE', s });
+      slideKit.specs.push(s.spec);
+    });
+  slideBlock('READOUT ON A SLIDE',
+    'The kit’s readout at 360 logical px and scaled, counting this screen’s frames while '
+    + 'the tab is open. `frames` is there because `fps` alone stands still on a locked screen.',
+    `slot: (host) => { const fb = fitBox(host, 360); fb.inner.append(createReport({ readout: { fps: '', frames: '' } }).readoutEl) }`,
+    { name: 'readout', say: 'The readout is live, measuring this screen',
+      slot: (host) => {
+        const fb = fitBox(host, 360);
+        const r = createReport({ readout: { fps: '', frames: '' }, showLog: false, joined: false });
+        fb.inner.append(r.readoutEl);
+        let last = 0, times = [], shown = 0, count = 0;
+        const loop = looped((t) => {
+          count++;
+          if (last) times.push(t - last);
+          if (times.length > 60) times.shift();
+          last = t;
+          if (t - shown > 250 && times.length > 4) {
+            r.set('fps', (1000 / (times.reduce((a, b) => a + b, 0) / times.length)).toFixed(1));
+            r.set('frames', count);
+            shown = t;
+          }
+        });
+        slideKit.comps.readout = { r, count: () => count };
+        return { start() { last = 0; times = []; loop.start(); }, stop() { loop.stop(); } };
+      },
+      cap: 'this screen, now' });
+
+  /* 🔴 THE TIME WORK ON A SLIDE, 2026-10-05. Asked as *"do 6 and 7"*, from a
+     list whose sixth item was a timeline or strip view on a slide and whose
+     seventh was a transport bar on a slide, left out before because a bar takes
+     Space. Both are fed by this tab alone: a deck with its own marks, no
+     network, playing only between `slidesOpen()` and `slidesClose()`. */
 
   /* TIMELINE ON A SLIDE. HANDOFF.md:133-135, AHEAD on /sync/: a peer 137 ms
      fast over a 20 ms hop, offset found to 0.00 ms, beats fired a median 1.8 ms
@@ -9139,9 +9197,11 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
        when its hand-rolled `Play` button was reported. It passes
        `publish: false` like the other specimens, so the claim below is
        unchanged and only the count moved. SIX since 2026-10-05: TRANSPORT
-       BAR ON A SLIDE, `publish: false` and drilled in the SLIDES checks. */
-    d.assert('of the six bars here exactly one claims the page\u2019s playhead, and it is the whole row',
-      bars.length === 6 && !!published && published === tbarSpec.whole.api
+       BAR ON A SLIDE, `publish: false` and drilled in the SLIDES checks.
+       SEVEN since the same day: STEP GRID ON A SLIDE became `/tom/`'s
+       instrument, whose bar is `publish: false` and graded in SLIDES. */
+    d.assert('of the seven bars here exactly one claims the page\u2019s playhead, and it is the whole row',
+      bars.length === 7 && !!published && published === tbarSpec.whole.api
       && published.el === tbarSpec.whole.api.el
       && bars.filter((b) => b === published.el).length === 1,
       `${bars.length} bars on the page · the handle holds ${published ? 'one of them' : 'NOTHING'}`
@@ -12883,6 +12943,54 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         `lit ${down}, out after ${up}, ${F.presses() - p0} press(es) heard`);
     }
 
+    {
+      // TOM on a slide: the split, the words it may carry, the clock, the spill
+      const G = C.grid;
+      const sl = G.column.closest('.sl');
+      const slot = G.panel.el.closest('.sl-slot');
+      const slr = sl.getBoundingClientRect(), str = slot?.getBoundingClientRect();
+      const onDark = !!str && (str.left + str.right) / 2 > (slr.left + slr.right) / 2;
+      d.assert('SLIDES: the TOM slide is a split with the instrument on the slot side, the darker half',
+        sl.dataset.layout === 'split' && sl.dataset.side === 'right' && !!slot && onDark
+          && G.panel.el.contains(G.grid.el) && G.panel.el.contains(G.bar.el),
+        `${sl.dataset.layout} on the ${sl.dataset.side}, the panel ${slot ? 'in the slot' : 'NOT in a slot'}, `
+        + `the slot ${onDark ? 'on the darker half' : 'on the WORDS half'}`);
+      // every text node with a letter or a digit in it, outside the plate
+      const plate = G.panel.el.querySelector('.panel-plate');
+      const w = document.createTreeWalker(G.panel.el, NodeFilter.SHOW_TEXT);
+      const words = [];
+      let n;
+      while ((n = w.nextNode())) {
+        if (!/[\p{L}\p{N}]/u.test(n.data)) continue;
+        if (plate && plate.contains(n)) continue;
+        words.push(n.data.trim());
+      }
+      const plateText = (plate?.textContent || '').trim();
+      d.assert('SLIDES: the TOM instrument carries no text labels, only its plate',
+        words.length === 0 && plateText === 'TOM' && G.grid.labels.length === 0
+          && G.grid.ticks.every((t) => t.textContent === ''),
+        `${words.length} text node(s) outside the plate${words.length ? `: ${words.slice(0, 4).join(', ')}` : ''}, `
+        + `the plate reads ${JSON.stringify(plateText)}, ${G.grid.labels.length} row label(s)`);
+      const s0 = G.steps(), at0 = G.grid.step();
+      await nap(400);
+      d.assert('SLIDES: the TOM grid walks its pattern while the tab is open, the toggle saying so',
+        G.steps() > s0 && G.grid.clock.playing() && G.deck.playing() && G.grid.count() > 0,
+        `${G.steps() - s0} steps in 0.4 s from step ${at0} at ${G.grid.clock.bpm()} bpm, `
+        + `${G.grid.count()} pads lit, the bar's deck ${G.deck.playing() ? 'playing' : 'STOPPED'}`);
+      const inn = sl.querySelector('.sl-in');
+      const spill = inn.scrollWidth > inn.clientWidth + 1 || inn.scrollHeight > inn.clientHeight + 1;
+      const col = G.column.getBoundingClientRect(), pr = G.panel.el.getBoundingClientRect();
+      const inCol = pr.left >= col.left - 1 && pr.right <= col.right + 1 && pr.top >= col.top - 1 && pr.bottom <= col.bottom + 1;
+      const strip = G.kase.strip;
+      const over = strip.scrollWidth > strip.clientWidth + 1;
+      const scrolls = /auto|scroll/.test(getComputedStyle(strip).overflowX);
+      d.assert('SLIDES: the TOM panel stays inside its column, and the steps only ever spill into their own scroll',
+        !spill && inCol && (!over || scrolls),
+        `the panel ${inCol ? 'inside' : 'OUTSIDE'} a ${col.width.toFixed(0)} px column at ${G.fb.k().toFixed(2)}x, `
+        + `steps ${strip.scrollWidth} in ${strip.clientWidth} logical px (${over ? (scrolls ? 'scrolling' : 'SPILLING') : 'fit'})`
+        + `${spill ? ', the slide OVERFLOWS' : ''}`);
+    }
+
     // ── nothing fetched ──────────────────────────────────────────────────
     {
       const after = performance.getEntriesByType('resource');
@@ -12909,9 +13017,16 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     const logsStill = C.liveLog.lines() === logsAt[0] && C.liveTable.log.count() === logsAt[1]
       && !C.liveLog.running() && !C.liveTable.running();
     d.assert('SLIDES: leaving the tab stops everything it started, the live logs included',
-      !slideKit.open && C.video.video.paused && !C.grid.grid.clock.playing() && logsStill,
+      !slideKit.open && C.video.video.paused && !C.grid.grid.clock.playing() && !C.grid.deck.playing() && logsStill,
       `open ${slideKit.open}, the video ${C.video.video.paused ? 'paused' : 'playing'}, `
       + `the logs ${logsStill ? 'still' : 'STILL WRITING'} at ${logsAt.join(' and ')} over 0.6 s`);
+    {
+      const G = C.grid, s0 = G.steps();
+      await nap(300);
+      d.assert('SLIDES: leaving the tab stops the TOM grid on its first column and it stays there',
+        G.steps() === s0 && G.grid.step() === 0 && !G.grid.clock.playing() && !G.deck.playing(),
+        `${G.steps() - s0} steps in 0.3 s after closing, the head at step ${G.grid.step()}`);
+    }
     {
       const T = C.timeline, B = C.bar;
       const at = T.deck.position();
