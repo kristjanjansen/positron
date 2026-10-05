@@ -372,7 +372,20 @@ export function createVideoPanel({
    * remember and no page that has to opt in to being able to say something.
    */
   const capSlot = el('div', 'pos-vp-cap');
-  stage.append(capSlot);
+  /**
+   * 🔴 THE TAG SLOT, ON THE PICTURE, TOP LEFT, FOR ONE SHORT STATUS ABOUT THE
+   * PICTURE ITSELF. Added 2026-10-05 for `/stage/`, asked as *"perhaps just
+   * visual indication of picture happening"*. The footer badge says whether a
+   * show is on air; whether frames are actually reaching this screen is a fact
+   * about the picture, and it belongs on the picture, where it stays visible
+   * when `hover` has taken the footer away in full screen.
+   * ⚠️ TOP LEFT, BECAUSE THE OTHER THREE PLACES ARE TAKEN. `.pos-fsx` owns the
+   * bottom right and the caption owns the bottom edge.
+   * ⚠️ ALWAYS BUILT, AND EMPTY DRAWS NOTHING, the caption's own rule: the five
+   * other pages that build a panel get one empty element with `display: none`.
+   */
+  const tagSlot = el('div', 'pos-vp-tag');
+  stage.append(capSlot, tagSlot);
   root.append(stage);
 
   // ── the default left slot: is the thing feeding this answering ────────────
@@ -471,6 +484,8 @@ export function createVideoPanel({
      */
     slots: {
       left: leftSlot, centre: centreSlot, right: rightSlot, caption: capSlot,
+      /** On the picture, top left: one short status about the picture. */
+      tag: tagSlot,
     },
     /**
      * How many full-width rows are stacked under the picture: the panel's own
