@@ -251,6 +251,8 @@
      a property per instance sets a custom property, never the property. */
   /* a kit component filling a slide's fit box edge to edge (the instrument panel) */
   .sl-fit-in > .kit-sl-fill { width: 100%; box-sizing: border-box; }
+  /* a link in a slide caption keeps the caption's ink; the underline says it is one */
+  .kit-sl .sl-cap a { color: inherit; }
   /* THE SCALE set solid so all six steps fit one column: line height 1, no gap
      between the lines, nothing above them. Same weight as the slide's own rules. */
   .kit-sl .sl[aria-label="the scale"] .sl-ev { gap: 0; margin-top: 0; justify-content: center; }
@@ -520,11 +522,11 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createTabPage } from '/shell/tab-page.mjs';
-  import { drillBar, DRILL } from '/shell/bar-drill.mjs';
+  import { drillBar, assertBar, countInk, DRILL } from '/shell/bar-drill.mjs';
   import { createNoteGrid } from '/shell/note-grid.mjs';
   import { createCard, createCardGrid } from '/shell/card.mjs';
   import { DEMOS } from '/manifest.mjs';
-  import { createKeyboard, QWERTY_CHROMATIC, SHARP_KEYS } from '/shell/keyboard.mjs';
+  import { createKeyboard, keyRange, QWERTY_CHROMATIC, SHARP_KEYS } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createField } from '/shell/field.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
@@ -1604,29 +1606,31 @@
   // ── THE PLAYER ────────────────────────────────────────────────────────────
   // 46 rows and 44 built: CLAUDE.md's count command over the manifest, run
   // 2026-10-05 for this block, printed `46 44`. Counted, never remembered.
-  // 600 of 600: positron-ui SKILL.md, "The test picture", burn then
-  // readBurned exact through three moves of the clock row.
-  // MoQ p50 26.2 / p99 104.8 ms and WHEP 67.0 / 84.1 ms: PROGRESS.md:4712-4719,
-  // browser to Cloudflare to browser off burned pixels.
+  // 🔴 TWO SLIDES, asked 2026-10-05 as *"rm slide 3 from THE PLAYER and
+  // replace slide 2 from something below"*: the transports table went, and the
+  // 600/600 figure became the DIAGRAM slide from further down this tab, built a
+  // second time from the same `slideDiagram(SLIDE_MACHINES)`. It can be: every
+  // diagram takes its own `uid` for its arrow markers, so two on one page do not
+  // share an id. It has nothing running, so the player's start and stop on a
+  // step reach no loop; a slot that had one (a `{ start, stop }`) would run only
+  // while its slide is the one shown, because `go()` stops the slide it leaves
+  // and starts the one it shows.
   section('slides', 'THE PLAYER',
     'Slides in a video panel: previous and next on the left, the count in the middle, full '
     + 'screen on the right. Press the slide and the arrows, space, Page Up and Page Down, Home, '
     + 'End and f are its, and no other control on this page hears them.',
     `const player = createSlidePlayer([
   { say: 'Positron is a lab for *live* media', statement: true, cap: '44 demos built' },
-  { say: 'Latency is read off a burned clock', big: '*600/600*', under: 'clock rows read back' },
-  { say: 'MoQ is quicker, WebRTC steadier', rows: { head, body, align: 'lrr' } },
+  { say: '[Cloudflare|cloudflare] carries the streams', slot: slideDiagram(SLIDE_MACHINES) },
 ]);   // keys are heard on player.el only, and stopped there`,
     (box) => {
       box.classList.add('kit-sl');
       slideKit.player = createSlidePlayer([
         { name: 'lab', say: 'Positron is a lab for *live* media', statement: true,
           cap: '44 demos built, of 46 in the manifest' },
-        { name: 'clock', say: 'Latency is read off a burned clock', big: '*600/600*', under: 'clock rows read back',
-          cap: 'the test picture, burned into pixels and read off them' },
-        { name: 'transports', say: 'MoQ is quicker, WebRTC steadier',
-          rows: { head: ['', 'p50', 'p99'], body: [['MoQ', '*26.2*', '104.8'], ['WHEP', '67.0', '*84.1*']], align: 'lrr' },
-          cap: 'ms, frame drawn to frame shown, both through [Cloudflare|cloudflare]' },
+        { name: 'machines in the player', say: '[Cloudflare|cloudflare] carries the streams',
+          slot: slideDiagram(SLIDE_MACHINES),
+          cap: 'notes from the page through the relay to the [Pi|raspberry]' },
       ]);
       slideKit.player.stop();
       slideKit.specs.push(...slideKit.player.slides.map((s) => s.spec));
@@ -2041,6 +2045,241 @@
         return { start() { last = 0; times = []; loop.start(); }, stop() { loop.stop(); } };
       },
       cap: 'this screen, now' });
+
+  /* 🔴 THE TIME WORK ON A SLIDE, 2026-10-05. Asked as *"do 6 and 7"*, from a
+     list whose sixth item was a timeline or strip view on a slide and whose
+     seventh was a transport bar on a slide, left out before because a bar takes
+     Space. Both are fed by this tab alone: a deck with its own marks, no
+     network, playing only between `slidesOpen()` and `slidesClose()`.
+     🔴 A KEY FOR A BAR ON A SLIDE IS A KEY PRESSED INSIDE THAT SLIDE. The bar
+     listens on `window` and hears a key from the body, which is right for a
+     page's one transport and wrong for a specimen among thirty others: Space on
+     this page would start it from anywhere. `data-own-keys` does not answer it,
+     because that attribute silences a bar only while its panel is HIDDEN, and
+     an open tab is not. So the bar is handed `command` (its documented seam for
+     who owns position, `transport-bar.mjs`) and refuses play, pause and seek
+     while a keydown is being dispatched whose target is outside the slide's
+     frame. A click or a drag is not a keydown and goes straight through; a key
+     aimed at the bar is inside the frame, and the bar's own rule already keeps
+     it from every other bar. `transport-bar.mjs` is unchanged.
+     ⚠️ `slideKeys.ev` IS READ BY ITS PHASE, NOT CLEARED. A window capture
+     listener sees every keydown first; `eventPhase` is NONE once the dispatch is
+     over, so a later click never inherits the last key. A microtask clear would
+     run between listeners on a real key and lose it. */
+  const slideKeys = { ev: null };
+  addEventListener('keydown', (e) => { slideKeys.ev = e; }, true);
+  /** `command` for a bar on a slide: only a key whose target is inside `frameOf()` moves it. */
+  const slideCommand = (deck, frameOf) => {
+    let refused = 0;
+    const ok = () => {
+      const e = slideKeys.ev;
+      if (!e || e.eventPhase === Event.NONE) return true;
+      const f = frameOf(), t = e.target;
+      if (f && t instanceof Node && f.contains(t)) return true;
+      refused++;
+      return false;
+    };
+    return {
+      command: { play: () => ok() && deck.play(), pause: () => ok() && deck.pause(), seek: (p) => ok() && deck.seek(p) },
+      refused: () => refused,
+    };
+  };
+
+  /* TIMELINE ON A SLIDE. HANDOFF.md:133-135, AHEAD on /sync/: a peer 137 ms
+     fast over a 20 ms hop, offset found to 0.00 ms, beats fired a median 1.8 ms
+     apart (worst 6.9). The strip under it is this tab's own: one beat every
+     500 ms, handed on three ways, each mark coloured by how late it landed, in
+     the one colour meaning `/time/`'s BEAT tab uses (`demo/time/beat.mjs`):
+     grey not landed yet, green inside 5 ms, amber inside 20, red past it.
+       deck   the deck's own scheduler, which looks 100 ms ahead (its drift)
+       timer  a timer re-armed from the last one, so its lateness adds up
+       frame  the deck's beat, drawn on the next frame after it fired
+     🔴 SIZED OFF THE SLOT, NOT `fitBox`. The strip measures its own rect with
+     `getBoundingClientRect`, which is the TRANSFORMED box, and draws in that
+     many pixels; inside a scaled box its own `autoHeight` then writes a CSS
+     height in visual pixels onto an element that is scaled again, and the
+     lanes fill a 1/k share of their canvas. So the canvas is the slot's width,
+     and the lanes split the slot's height between them, re-split whenever the
+     slot changes size (full screen included). Its gutter and ruler type stay
+     at the strip's own px size, which is the one thing that does not grow with
+     the slide. */
+  const BEAT_MS = 500, BEATS = 16, TL_SPAN = BEAT_MS * BEATS;
+  slideBlock('TIMELINE ON A SLIDE',
+    'A strip on a deck of this tab’s own, the playhead running while the tab is open: one beat '
+    + 'every 500 ms handed on three ways, each mark coloured by how late it landed, grey until it '
+    + 'has. The canvas is the slot’s width and the lanes share its height.',
+    `slot: (host) => createStripView(host, deck, { size: 'auto', follow: false, lanes: [{ id: 'deck', latch: true, colorOfRow }, ...] })`,
+    // a no-break space holds the figure to its unit
+    { name: 'timeline', say: 'Beats land *1.8\u00a0ms* apart',
+      slot: (host) => {
+        const tok = (n, f) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
+        const OK = tok('--ok', '#8fd6a8'), WARN = tok('--warn', '#e0b060'), BAD = tok('--bad', '#e0908a');
+        const NOT_YET = '#3b424e', SWATCH = tok('--dim', '#9aa3b2');
+        const band = (ms) => (Math.abs(ms) < 5 ? OK : Math.abs(ms) < 20 ? WARN : BAD);
+        const driftOf = new Map(), hopOf = new Map(), chainOf = new Map();
+        const at0 = (r) => Math.round(r.at);
+        const { adapter } = markAdapter({ rates: [1], onFire: (_p, ev) => {
+          // the frame lane: the deck's beat, painted on the next frame after it fired
+          const at = Math.round(ev?.at ?? -1), t = performance.now();
+          requestAnimationFrame(() => hopOf.set(at, performance.now() - t));
+        } });
+        const items = Array.from({ length: BEATS }, (_, i) => ({ id: `tl${i}`, kind: 'mark', at: i * BEAT_MS + BEAT_MS / 2, payload: { i } }));
+        const deck = createDeck({ items, adapters: { mark: adapter }, range: [0, TL_SPAN],
+          onDrift: (rows) => { for (const r of rows) if (r.deltaMs != null) driftOf.set(Math.round(r.at), r.deltaMs); } });
+        const late = {
+          deck: (r) => driftOf.get(at0(r)),
+          timer: (r) => chainOf.get(at0(r)),
+          frame: (r) => (hopOf.has(at0(r)) ? (driftOf.get(at0(r)) ?? 0) + hopOf.get(at0(r)) : undefined),
+        };
+        const LANES = [['deck', 'deck'], ['timer', 'timer'], ['frame', 'frame']];
+        let laneH = 24;
+        const spec = ([id, label]) => ({
+          id, kind: 'mark', label, height: laneH, width: 2, latch: true, color: SWATCH, terse: true,
+          colorOfRow: (r, fired) => { const m = late[id](r); return !fired || m === undefined ? NOT_YET : band(m); },
+          describeRow: (r) => { const m = late[id](r); return m === undefined ? 'not landed yet' : `${Math.abs(m).toFixed(2)} ms ${m < 0 ? 'early' : 'late'}`; },
+        });
+        const view = createStripView(host, deck, { size: 'auto', follow: false, minHeight: 1, lanes: LANES.map(spec) });
+        let lastW = 0;
+        const sizeLanes = () => {
+          const h = host.clientHeight, w = host.clientWidth;
+          if (!h || !w) return;
+          const axis = view.strip.state.axisH ?? 20;
+          // the canvas's own 1 px edge top and bottom comes out of the slot too
+          const lh = Math.max(6, Math.floor((h - axis - 4) / LANES.length));
+          if (lh === laneH && w === lastW) return;
+          laneH = lh; lastW = w;
+          view.strip.setLanes(LANES.map(spec));
+          view.strip.fit();
+        };
+        new ResizeObserver(sizeLanes).observe(host);
+
+        /* the timer lane: armed for the first beat ahead, then re-armed BEAT_MS
+           from whenever the last one fired, never corrected, which is the
+           mistake a deck exists to avoid */
+        let chainId = 0;
+        const chainFrom = (pos) => {
+          clearTimeout(chainId);
+          const wall0 = performance.now() - pos;
+          let i = items.findIndex((it) => it.at > pos);
+          if (i < 0) return;
+          const tick = () => {
+            chainOf.set(items[i].at, performance.now() - (wall0 + items[i].at));
+            if (++i < items.length) chainId = setTimeout(tick, BEAT_MS);
+          };
+          chainId = setTimeout(tick, items[i].at - pos);
+        };
+        // round and round while the tab is open: back to the top past the last beat
+        const lap = looped(() => {
+          if (deck.position() < TL_SPAN - 1) return;
+          driftOf.clear(); hopOf.clear(); chainOf.clear();
+          deck.seek(0);
+          chainFrom(0);
+        });
+        slideKit.comps.timeline = { view, deck, late, items, chainOf, driftOf, hopOf, NOT_YET, lanes: LANES.map(([id]) => id),
+          chainRunning: () => !!chainId, slot: host };
+        return {
+          start() { deck.play(); chainFrom(deck.position()); lap.start(); },
+          stop() { lap.stop(); clearTimeout(chainId); chainId = 0; deck.pause(); },
+        };
+      },
+      cap: 'a beat every 500 ms here, coloured by how late it landed' });
+
+  /* TRANSPORT BAR ON A SLIDE. The kit's bar on a deck of this tab's own,
+     `publish: false`, scaled like the other px controls (`fitBox`, 560 logical
+     px). No strip glued under it: a strip in a scaled box draws in the wrong
+     pixels (the note above), so the bar keeps its own scrub as the one
+     position surface. Its keys are the slide's, by `slideCommand` above. */
+  slideBlock('TRANSPORT BAR ON A SLIDE',
+    'The kit’s transport bar on a deck of this tab’s own, scaled to its slot. A key pressed inside '
+    + 'the slide drives this bar and no other; a key from the rest of the page, Space included, '
+    + 'moves nothing here.',
+    `const { command } = slideCommand(deck, () => host.closest('.sl-frame'));
+createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
+    { name: 'bar', say: 'A key belongs to the bar it was pressed on',
+      slot: (host) => {
+        const fb = fitBox(host, 560);
+        const { adapter } = markAdapter({ rates: [0.5, 1, 2] });
+        const items = Array.from({ length: 12 }, (_, i) => ({ id: `sb${i}`, kind: 'mark', at: (i + 0.5) * 2000, payload: { i } }));
+        const deck = createDeck({ items, adapters: { mark: adapter }, range: [0, 24_000] });
+        const gate = slideCommand(deck, () => host.closest('.sl-frame'));
+        const bar = createTransportBar(fb.inner, deck, { publish: false, command: gate.command });
+        slideKit.comps.bar = { bar, deck, fb, refused: gate.refused };
+        return {
+          start() {},
+          // leaving the tab stops it, past the gate: nobody's key is involved
+          stop() { if (deck.playing()) deck.pause(); },
+        };
+      },
+      cap: 'a key from the page moves nothing here' });
+
+  /* FAU ON A SLIDE, asked 2026-10-05 as *"build fau into slide. overflow
+     keyboard. col layout"*. `/fau/`'s instrument from the same kit parts: the
+     code box holding a Faust program, its knobs, two octaves of keys and the
+     FAU plate, on the darker side of a split, scaled like the waveform panel
+     (`fitBox`, `.kit-sl-fill`).
+     🔴 A PICTURE OF THE INSTRUMENT, NOT THE INSTRUMENT. No libfaust, no
+     compile, no audio, on a visit or on the tab opening: a key lights under a
+     press and the log says once where it plays. The caption links `/fau/`.
+     🔴 THE KEYS OVERFLOW AND ARE NOT SHRUNK. 25 keys at `/fau/`'s 44 px a white
+     are wider than the panel, and the keys row scrolls sideways inside it,
+     which is what `.keys` does on every page (`overflow-x: auto`).
+     ⚠️ `letters: false`, so the keyboard binds nothing on `window`: arrows,
+     Space and the letter row stay the rest of the page's. */
+  section('slides', 'FAU ON A SLIDE',
+    'The FAU instrument at slide scale on the darker side of a split: its program, its knobs, two '
+    + 'octaves of keys running wider than the column and scrolling inside the panel, and its plate. '
+    + 'A picture: a press lights a key, nothing compiles and nothing sounds here.',
+    `slot: (host) => { const fb = fitBox(host, 420); fb.inner.append(createInstrumentPanel({ viz: code.el, keys: keys.el, plate: { name: 'FAU' } }).el) }`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const s = createSlide({ name: 'fau', layout: 'split', side: 'right',
+        say: 'Faust is compiled in the page and played', text: 'the program, its knobs and two octaves of keys',
+        cap: 'a picture, it plays at',
+        slot: (host) => {
+          const fb = fitBox(host, 420);
+          const book = createHueBook();
+          // `/fau/`'s Organ preset, cut to the lines a slide can hold
+          const code = createCodeBox({
+            language: 'faust', rows: 7, hues: book, label: '',
+            ariaLabel: 'a Faust program, shown and not compiled',
+            value: 'import("stdfaust.lib");\n'
+              + 'freq = hslider("freq", 440, 40, 8000, 0.01);\n'
+              + 'gate = button("gate");\n'
+              + 'oct = hslider("oct", 0.5, 0, 0.6, 0.01);\n'
+              + 'rel = hslider("rel[scale:log]", 0.35, 0.02, 3, 0.01);\n'
+              + 'tone = os.osc(freq) + oct * os.osc(freq * 2);\n'
+              + 'process = tone * en.adsr(0.005, 0.12, 0.7, rel, gate) * 0.2 <: _, _;',
+          });
+          const knobs = createParamKnobs({ onChange: () => {} });
+          knobs.set([
+            { name: 'oct', value: 0.5, min: 0, max: 0.6 },
+            { name: 'rel', value: 0.35, min: 0.02, max: 3, warp: 'exp' },
+          ]);
+          book.assign(['oct', 'rel']);
+          for (const n of knobs.names()) knobs.knob(n).el.style.setProperty('--param-hue', String(book.hueOf(n)));
+          let told = false, presses = 0;
+          const keys = createKeyboard(el('div'), {
+            ...keyRange(24), base: 48, letters: false, chord: false,
+            onDown: (n) => {
+              keys.lightNote(n, true);
+              presses++;
+              if (!told) { told = true; d.log('FAU ON A SLIDE is a picture, the instrument plays at https://positron.studio/fau/'); }
+            },
+            onUp: (n) => keys.lightNote(n, false),
+          });
+          keys.el.style.setProperty('--k-min', '44px');
+          const panel = createInstrumentPanel({ viz: code.el, keys: keys.el, plate: { name: 'FAU' } });
+          panel.addRow(knobs.el);
+          panel.el.classList.add('kit-sl-fill');
+          fb.inner.append(panel.el);
+          slideKit.comps.fau = { panel, code, knobs, keys, fb, column: host, presses: () => presses };
+          return null;
+        } }, { host: box, full: true });
+      const a = el('a', '', 'positron.studio/fau/', { href: 'https://positron.studio/fau/' });
+      s.parts.cap.append(' ', a);
+      slideKit.blocks.push({ title: 'FAU ON A SLIDE', s });
+      slideKit.specs.push(s.spec);
+    });
 
   /**
    * 🔴 TAB PAGE, 2026-10-04. The owner regrouped twenty demos
@@ -8899,9 +9138,10 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     /* FIVE since 2026-09-22: the STEP GRID block gained a standard transport
        when its hand-rolled `Play` button was reported. It passes
        `publish: false` like the other specimens, so the claim below is
-       unchanged and only the count moved. */
-    d.assert('of the five bars here exactly one claims the page\u2019s playhead, and it is the whole row',
-      bars.length === 5 && !!published && published === tbarSpec.whole.api
+       unchanged and only the count moved. SIX since 2026-10-05: TRANSPORT
+       BAR ON A SLIDE, `publish: false` and drilled in the SLIDES checks. */
+    d.assert('of the six bars here exactly one claims the page\u2019s playhead, and it is the whole row',
+      bars.length === 6 && !!published && published === tbarSpec.whole.api
       && published.el === tbarSpec.whole.api.el
       && bars.filter((b) => b === published.el).length === 1,
       `${bars.length} bars on the page · the handle holds ${published ? 'one of them' : 'NOTHING'}`
@@ -12038,6 +12278,38 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     }
   }
 
+  /**
+   * 🔴 A KEY FROM THE PAGE DOES NOT REACH THE SLIDES' BAR OR KEYS, BEFORE
+   * `d.ready()` FOR THE TAB PAGE'S REASON: a key from the body reaches the
+   * PUBLISHED bar as well, and after `ready` the harness is drilling it. So
+   * the four keys go in pairs that undo each other on that bar (play then
+   * pause, right then left), and the assert says it came back.
+   * ⚠️ THE REFUSAL COUNT IS THE HALF THAT PROVES IT. A bar that never heard the
+   * keys would also stand still; four refusals say it heard every one and the
+   * gate said no.
+   */
+  if (SELFCHECK && slideKit.comps.bar && slideKit.comps.fau) {
+    const { bar, deck: sbDeck, refused } = slideKit.comps.bar;
+    const kb = slideKit.comps.fau.keys;
+    const pub = window.__demo?.transport ?? null;
+    const was = { pos: bar.api.position, playing: bar.api.playing, refused: refused() };
+    const pubWas = pub ? { pos: pub.position, playing: pub.playing } : null;
+    const notes = kb.notes().join();
+    for (const k of [' ', 'ArrowRight', ' ', 'ArrowLeft']) {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    }
+    const lit = slideKit.comps.fau.panel.el.querySelectorAll('.k.down').length;
+    const n = refused() - was.refused;
+    d.assert('SLIDES: Space and the arrows from the page leave the slide’s bar and the FAU keys alone, and __demo.transport is the page’s',
+      bar.api.position === was.pos && bar.api.playing === was.playing && !sbDeck.playing() && n === 4
+        && lit === 0 && kb.notes().join() === notes
+        && !!pub && pub !== bar.api && window.__demo.transport === pub
+        && Math.abs(pub.position - pubWas.pos) < 1 && pub.playing === pubWas.playing,
+      `the slide's bar ${was.pos.toFixed(0)} -> ${bar.api.position.toFixed(0)}, ${bar.api.playing ? 'PLAYING' : 'stopped'}, `
+      + `${n} of 4 keys heard and refused; ${lit} FAU key(s) lit; the published bar `
+      + `${pub ? `${pubWas.pos.toFixed(0)} -> ${pub.position.toFixed(0)} and ${pub.playing ? 'playing' : 'stopped'}, ${pub === bar.api ? 'the SLIDE’S' : 'its own'}` : 'MISSING'}`);
+  }
+
   d.ready();
 
   /**
@@ -12212,18 +12484,21 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const spy = () => { leaked++; };
       window.addEventListener('keydown', spy);
       const key = (target, k) => target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+      // two slides since 2026-10-05: right to the second, Home back, space
+      // forward again, and right at the end stays there
       key(p.el, 'ArrowRight'); const a = p.at();
+      key(p.el, 'Home'); const e0 = p.at();
       key(p.el, ' '); const b = p.at();
       key(p.el, 'ArrowRight'); const c = p.at();
-      key(p.el, 'Home'); const e0 = p.at();
+      key(p.el, 'Home');
       key(document.body, 'PageDown'); const body = p.at();
       window.removeEventListener('keydown', spy);
       p.panel.el.querySelector('.step button:last-child')?.click();
       const btn = p.at();
       p.go(0);
       d.assert('SLIDES: the player steps on its own keys, clamps at the end, and no key it uses leaves its panel',
-        a === 1 && b === 2 && c === 2 && e0 === 0 && body === 0 && btn === 1 && leaked === 1 && p.keys() === 4,
-        `right ${a}, space ${b}, right at the end ${c}, Home ${e0}, a key from the page leaves it at ${body}, `
+        p.slides.length === 2 && a === 1 && e0 === 0 && b === 1 && c === 1 && body === 0 && btn === 1 && leaked === 1 && p.keys() === 5,
+        `${p.slides.length} slides, right ${a}, Home ${e0}, space ${b}, right at the end ${c}, a key from the page leaves it at ${body}, `
         + `the next button ${btn}; ${leaked} key(s) reached window (the page's own), ${p.keys()} heard`);
       const r = p.slides[0].el.getBoundingClientRect();
       d.assert('SLIDES: the player’s slide fills its stage at 16:9',
@@ -12496,6 +12771,118 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         + `${hued} edges keep a hue of their own, the tightest name ${least.toFixed(1)} logical px inside its edge against ${air}`);
     }
 
+    // ── the time work on a slide: a strip, a bar, and FAU ────────────────
+    {
+      const T = C.timeline;
+      const cv = T.view.el;
+      const ink = () => countInk(cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data);
+      const p0 = T.view.strip.state.pos, d0 = T.deck.position();
+      await nap(400);
+      await frames(2);
+      const p1 = T.view.strip.state.pos, d1 = T.deck.position();
+      const lit = ink();
+      // a playhead that wrapped in the wait is still a playhead that moved
+      const moved = T.deck.playing() && (p1 > p0 + 100 || p1 < p0 - TL_SPAN / 2) && d1 !== d0;
+      d.assert('SLIDES: the strip on a slide draws ink and its playhead runs while the tab is open',
+        lit > 0 && moved,
+        `${lit} lit samples, the playhead ${p0.toFixed(0)} -> ${p1.toFixed(0)} ms over 0.4 s, the deck ${T.deck.playing() ? 'playing' : 'STOPPED'}`);
+      // every mark the playhead has passed and that has landed takes a band; the rest are grey
+      const pos = T.deck.position();
+      const lanes = T.view.strip.lanes();
+      let landed = 0, greyAhead = 0, ahead = 0, wrong = 0;
+      const bands = new Set();
+      for (const L of lanes) {
+        for (const r of T.items) {
+          const c = L.colorOfRow(r, r.at <= pos), m = T.late[L.id](r);
+          if (r.at > pos) { ahead++; if (c === T.NOT_YET) greyAhead++; else wrong++; continue; }
+          if (m === undefined) { if (c !== T.NOT_YET) wrong++; continue; }
+          landed++; bands.add(c);
+          if (c === T.NOT_YET) wrong++;
+        }
+      }
+      const cs = getComputedStyle(cv), slotH = T.slot.clientHeight;
+      const lanesH = lanes.reduce((a, L) => a + L.height, 0);
+      d.assert('SLIDES: the strip’s marks are grey until they land and take the colour of how late they landed, its lanes sharing the slot',
+        lanes.length === 3 && landed >= 3 && wrong === 0 && greyAhead === ahead
+          && tol(cv.getBoundingClientRect().width, T.slot.clientWidth, 1) && cv.getBoundingClientRect().height <= slotH + 0.5 && lanesH > slotH * 0.6,
+        `${landed} landed in ${bands.size} colour(s), ${greyAhead} of ${ahead} ahead grey, ${wrong} wrong; `
+        + `the canvas ${cv.getBoundingClientRect().width.toFixed(0)}x${parseFloat(cs.height).toFixed(0)} in a ${T.slot.clientWidth}x${slotH} slot, lanes ${lanesH} px`);
+    }
+    {
+      const B = C.bar;
+      await assertBar(d.assert, B.bar, { name: 'on a slide' });
+      const pub = window.__demo?.transport;
+      const pubWas = pub?.position;
+      B.bar.api.el.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true, cancelable: true }));
+      await nap(DRILL.keyMs);
+      const want = B.bar.api.range[0] + 0.2 * (B.bar.api.range[1] - B.bar.api.range[0]);
+      const pubNow = pub?.position;
+      d.assert('SLIDES: a key aimed at the slide’s bar moves it and not the page’s published bar',
+        tol(B.bar.api.position, want, 1) && pub && pub !== B.bar.api && Math.abs(pubNow - pubWas) < 1,
+        `the slide's bar at ${B.bar.api.position.toFixed(0)} against ${want.toFixed(0)}, the published bar ${pubWas?.toFixed(0)} -> ${pubNow?.toFixed(0)}`);
+    }
+    {
+      // full screen: the strip takes the slide's width and the bar is pressed through its scale
+      const tl = blocks.find((b) => b.s.spec.name === 'timeline').s, bs = blocks.find((b) => b.s.spec.name === 'bar').s;
+      const T = C.timeline, B = C.bar;
+      const w0 = T.view.el.getBoundingClientRect().width;
+      tl.fullBtn.click();
+      await frames(10);
+      const w1 = T.view.el.getBoundingClientRect().width, s1 = T.slot.getBoundingClientRect().width;
+      const lanes1 = T.view.strip.lanes().reduce((a, L) => a + L.height, 0), slotH1 = T.slot.clientHeight;
+      const full1 = tl.isFull();
+      await tl.full(false);
+      await frames(6);
+      bs.fullBtn.click();
+      await frames(10);
+      const k = B.fb.k(), full2 = bs.isFull();
+      const tg = B.bar.api.el.querySelector('.tbar-toggle');
+      const at0 = B.bar.api.position;
+      tg.click();
+      await nap(350);
+      const played = B.bar.api.playing && B.bar.api.position > at0;
+      tg.click();
+      await bs.full(false);
+      await frames(6);
+      d.assert('SLIDES: in full screen the strip spans the slide and splits its height, and the bar’s own button plays it',
+        full1 && w1 > w0 + 50 && tol(w1, s1, 1) && lanes1 > slotH1 * 0.6 && full2 && k > 1 && played && !B.bar.api.playing,
+        `the strip ${w0.toFixed(0)} -> ${w1.toFixed(0)} px in a ${s1.toFixed(0)} px slot with ${lanes1} of ${slotH1} px in lanes; `
+        + `the bar drawn at ${k.toFixed(2)}x ${played ? 'played' : 'DID NOT PLAY'} from its toggle and stopped again`);
+    }
+    {
+      const F = C.fau;
+      const has = !!F.panel.el.contains(F.code.el) && !!F.panel.el.contains(F.knobs.el) && F.knobs.names().length === 2
+        && !!F.panel.el.contains(F.keys.el) && /FAU/.test(F.panel.el.querySelector('.panel-plate')?.textContent || '');
+      const row = F.keys.el.querySelector('.keys');
+      const col = F.column.getBoundingClientRect();
+      const keysWide = row.scrollWidth * F.fb.k();
+      const sl = F.column.closest('.sl');
+      const inn = sl.querySelector('.sl-in');
+      const spill = inn.scrollWidth > inn.clientWidth + 1 || inn.scrollHeight > inn.clientHeight + 1;
+      const pr = F.panel.el.getBoundingClientRect();
+      const inCol = pr.left >= col.left - 1 && pr.right <= col.right + 1 && pr.top >= col.top - 1 && pr.bottom <= col.bottom + 1;
+      d.assert('SLIDES: FAU on a slide has its program, two knobs, keys and FAU plate, the keys wider than the column and nothing else past it',
+        has && keysWide > col.width && row.scrollWidth > row.clientWidth && !spill && inCol,
+        `${has ? 'all four parts' : 'a part MISSING'}, keys ${keysWide.toFixed(0)} px of content in a ${col.width.toFixed(0)} px column, `
+        + `scrolling ${row.scrollWidth} in ${row.clientWidth} logical px, the panel ${inCol ? 'inside' : 'OUTSIDE'} the column${spill ? ', the slide OVERFLOWS' : ''}`);
+      // a pointer press on the first white key, which has to be on screen for the hit test
+      const scrollWas = scrollY;
+      sl.scrollIntoView({ block: 'center' });
+      await frames(2);
+      const key = row.querySelector('.k:not(.sharp)') || row.querySelector('.k');
+      const kr = key.getBoundingClientRect();
+      const x = kr.left + kr.width / 2, y = kr.bottom - kr.height * 0.2;
+      const p0 = F.presses();
+      row.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, bubbles: true, pointerId: 31, pointerType: 'mouse', button: 0 }));
+      const down = key.classList.contains('down');
+      row.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, bubbles: true, pointerId: 31, pointerType: 'mouse', button: 0 }));
+      const up = !key.classList.contains('down');
+      scrollTo(0, scrollWas);
+      d.assert('SLIDES: a pointer press on a FAU key lights it and letting go puts it out',
+        down && up && F.presses() === p0 + 1,
+        `lit ${down}, out after ${up}, ${F.presses() - p0} press(es) heard`);
+    }
+
     // ── nothing fetched ──────────────────────────────────────────────────
     {
       const after = performance.getEntriesByType('resource');
@@ -12513,6 +12900,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         + `the face ${faces.length} file(s), ${foreign.length} from another host`);
     }
 
+    // the slide's bar is left PLAYING as the tab closes, so the close has something to stop
+    C.bar.bar.api.el.querySelector('.tbar-toggle').click();
     kitTabs.go(home, { push: false });
     try { history.replaceState(null, '', `${location.pathname}${location.search}${addressWas}`); } catch { /* file:// */ }
     const logsAt = [C.liveLog.lines(), C.liveTable.log.count()];
@@ -12523,6 +12912,15 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       !slideKit.open && C.video.video.paused && !C.grid.grid.clock.playing() && logsStill,
       `open ${slideKit.open}, the video ${C.video.video.paused ? 'paused' : 'playing'}, `
       + `the logs ${logsStill ? 'still' : 'STILL WRITING'} at ${logsAt.join(' and ')} over 0.6 s`);
+    {
+      const T = C.timeline, B = C.bar;
+      const at = T.deck.position();
+      await nap(300);
+      d.assert('SLIDES: leaving the tab stops the strip’s deck, its timer and the slide’s bar',
+        !T.deck.playing() && T.deck.position() === at && !T.chainRunning() && !B.deck.playing(),
+        `the strip's deck ${T.deck.playing() ? 'PLAYING' : 'stopped'} at ${at.toFixed(0)}, its timer ${T.chainRunning() ? 'ARMED' : 'off'}, `
+        + `the bar's deck ${B.deck.playing() ? 'PLAYING' : 'stopped'}`);
+    }
   }
 
 

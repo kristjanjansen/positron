@@ -841,3 +841,36 @@ ON THE RIGHT slide"*.
   16:9 centred on the card with the edge kept and the headline at step 4, Escape
   restoring the block, and the diagram's widths and the air inside every box
   (tightest 8.4 logical px against 8). `slide-test.mjs` 40 to 46.
+
+**A strip, a transport bar and FAU on a slide; the player at two slides
+(2026-10-05, evening).** Asked as *"do 6 and 7"* (a timeline on a slide, a
+transport bar on a slide), *"build fau into slide. overflow keyboard. col
+layout"* and *"rm slide 3 from THE PLAYER and replace slide 2 from something
+below"*.
+- TIMELINE ON A SLIDE: `createStripView` on a deck of the tab's own, one beat
+  every 500 ms handed on three ways (the deck's own scheduler, a timer re-armed
+  from the last one, the next frame after the deck fired), each mark grey until
+  it lands and then green under 5 ms, amber under 20, red past it, as on
+  `/time/` BEAT. Headline from HANDOFF.md:133-135 (AHEAD, median 1.8 ms).
+  SIZED OFF THE SLOT, NOT `fitBox`: the strip draws in pixels of its transformed
+  rect and its `autoHeight` then writes that number as a CSS height on a scaled
+  element, so the lanes would fill a 1/k share of the canvas. The canvas is the
+  slot's width and the three lanes split its height, re-split on every resize,
+  full screen included. Its gutter and ruler type stay at the strip's px size.
+- TRANSPORT BAR ON A SLIDE: `createTransportBar` on a local deck, `publish:
+  false`, in `fitBox` at 560 logical px, no strip glued (the reason above). KEYS:
+  `data-own-keys` silences a bar only while its panel is hidden, so it cannot
+  keep a key from the body off an open tab's bar. The bar is handed `command`,
+  which refuses play, pause and seek while a keydown is being dispatched whose
+  target is outside the slide's frame (a window capture listener records the
+  event; its `eventPhase` says whether the dispatch is still going). Clicks,
+  drags and keys inside the slide go through; `transport-bar.mjs` unchanged.
+- FAU ON A SLIDE: a split with the instrument (code box, two param knobs, 25
+  keys at 44 px, FAU plate) in `fitBox` at 420 on the darker side; the keys row
+  is wider than the column and scrolls inside the panel. A picture: no libfaust,
+  no compile, no audio, `letters: false`; a press lights a key and logs once that
+  it plays at https://positron.studio/fau/, which the caption links.
+- THE PLAYER: the statement and the diagram slide (`slideDiagram(SLIDE_MACHINES)`
+  a second time; each diagram has its own marker uid, so two on a page share no
+  id). Nothing in it runs, so `go()`'s start and stop reach no loop.
+- MEASURED: `/kit/` 327/327 to 340/340.
