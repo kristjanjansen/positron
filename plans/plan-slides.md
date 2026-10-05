@@ -121,16 +121,15 @@ ratio is the signage rule's *"headline = 2 x body"* applied one step up, and a
 step nobody can mistake for "almost the same" (the composition skill's own
 rule). Weight 600 for the headline, 400 and `--dim` for a list, no tracking.
 
-**Line budget (MEASURED and asserted, per face).** At 9 per cent and a 6 per
-cent side inset, measured as the inset width over the mean advance of the deck's
-own six headlines at weight 600: **Atkinson 38, Plex 38, Grotesk 36, JetBrains
-28, Geist 28** characters a line, so two lines hold 56 to 76. The figure the
-first version quoted (28) was SF Mono's and is now the floor, held by the two
-monos. Every headline measures exactly 2 lines in all five faces (`222222` per
-face), and the page asserts `every headline is two lines or fewer, in all five
-faces`, so the budget is a check rather than advice. No wording had to change.
-Headlines carry `text-wrap: balance`, so the second line is not one word.
-EXTRA LARGE holds half of each figure.
+**Line budget (MEASURED and asserted, per face).** Every face is monospaced,
+so a line holds a fixed count: **28** characters in the six faces at 0.600 em,
+**27** in Atkinson Hyperlegible Mono, **24** in Martian Mono, at 9 per cent and
+a 6 per cent side inset. Martian sets the budget, so two lines hold 48 and the
+headlines are written to it (section 9 lists the three that were shortened).
+The page asserts `every headline is two lines or fewer, in all eight faces`,
+so the budget is a check rather than advice. Headlines carry `text-wrap:
+balance`, so the second line is not one word. EXTRA LARGE holds half of each
+figure.
 
 **Contrast (MEASURED).** Headline `--fg` on the stage's `--card`: **14.6:1**,
 asserted at 7:1 or better. The list's `--dim` is lower and is not asserted.
@@ -280,49 +279,81 @@ Verification was `check-html.mjs`, one CDP script at two widths (the harness
 refuses a slug not in the manifest: `nothing for this harness to verify`) and
 `shot.mjs` at 375 and 1280.
 
-## 9. Five faces, and the one by default
+## 9. Eight faces, all monospaced, and the one by default
 
-The system mono did not work on a slide: at 9 per cent it holds 28 characters a
-line, it is a different face on every machine, and it has no voice of its own.
-Five faces replace it, all **SIL Open Font License 1.1**, all self-hosted from
-the `@fontsource` 5.3.0 packages (`cdn.jsdelivr.net/npm/@fontsource/<id>@5.3.0`,
+**The first round was wrong and is replaced.** It mixed three proportional
+faces (Atkinson Hyperlegible Next, IBM Plex Sans, Space Grotesk) in with two
+monos because the brief read "mono or not". The owner had asked for large
+MONOTYPE, and said so again on 2026-10-05: *"is atkinson monospace!?"* then
+*"all monos. add more"*. All three proportional faces, their files and their
+licences are gone.
+
+Eight faces, every one monospaced (asserted: `i` measures as wide as `m` in
+all eight), all **SIL Open Font License 1.1**, all self-hosted from the
+`@fontsource` 5.3.0 packages (`cdn.jsdelivr.net/npm/@fontsource/<id>@5.3.0`,
 downloaded once), Latin subset, weights **400 and 600** only, a `LICENSE-<id>`
-beside each pair in `demo/slides/vendor/`. The page loads one face's two files
-for the chosen face; the other four arrive only when the specimen slide is shown
-or the switcher is pressed (the browser's font loading rule, READ, not measured
-on a cold visit). All five together are **161,316 bytes** (158 KB).
+beside each pair in `demo/slides/vendor/`. All eight together are **238,024
+bytes** (232 KB). The page loads the chosen face's two files; the others arrive
+when the specimen slide is shown or the picker is stepped.
 
-The test that decided it is the specimen: `0O` at EXTRA LARGE and `Il1` at
-LARGE in every face, because a zero read as a letter, or a one as an l, is what
-a back row gets wrong first. LOOKED AT in `shot.mjs` at 1280 and 375.
+**Budget.** In a mono face every character is one advance, so a LARGE line
+holds `0.88 / (0.09 x 0.5625 x advance)` characters: the inset width over one
+advance at 9 per cent of a 16:9 slide's height. MEASURED by the page with
+`measureText` and printed in the log: **28** for the six faces at 0.600 em,
+**27** for Atkinson (0.632 em), **24** for Martian (0.700 em). Martian sets the
+deck's budget, so every headline is written to fit two lines of 24. Three
+headlines were shortened to get there, and are listed under the table.
+
+The test that decided the set is the specimen slide: `0O` over `Il1` at LARGE
+in every face, the face's name under each column at SMALL (4.5 per cent, half
+of LARGE) in that face, two rows of four. LOOKED AT in `shot.mjs` at 1280 and
+375, and before that on a twelve face sheet at 44 px and 90 px, weight 600, on
+the slide ground.
 
 | face | source | bytes (400 + 600) | LARGE line | at 9 % | at 18 % | verdict |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Atkinson Hyperlegible Next** | Braille Institute and Applied Design, 2025, `googlefonts/atkinson-hyperlegible-next` | 24,768 | **38** | open, plain humanist; I, l and 1 all distinct (tailed l, flagged 1) | slashed zero, so `0O` never collides; heavy round figures | **default** |
-| JetBrains Mono | JetBrains, `JetBrains/JetBrainsMono` | 43,028 | 28 | the site's mono voice, tall x-height, slab I, tailed l; but only 28 a line, so headlines spread | dotted zero, distinct; a figure looks like code | the mono choice |
-| IBM Plex Sans | IBM, `IBM/plex` | 46,840 | 38 | engineered grotesk with real character, I l 1 distinct | zero has no slash or dot, told from O by width only, side by side and not alone | strong for words, weak for figures; heaviest file |
-| Geist Mono | Vercel, `vercel/geist-font` | 20,008 | 28 | clean, slab I and 1, smallest file | slashed zero | close to JetBrains at a distance, lighter at 600; redundant as a second mono |
-| Space Grotesk | Florian Karsten, `floriankarsten/space-grotesk` | 26,672 | 36 | the most character, the technical feel the site has | **zero and O are the same shape, and I and l are the same stroke**, MEASURED by eye in the specimen | headlines only; fails the back-row test for any slide with a number |
+| **Atkinson Hyperlegible Mono** | Braille Institute, `googlefonts/atkinson-hyperlegible-mono` | 20,096 | **27** | humanist, drawn for low vision; tailed l, flagged 1, slab I | slashed zero against a round O, the clearest pair of the eight | **default** |
+| JetBrains Mono | JetBrains, `JetBrains/JetBrainsMono` | 43,028 | 28 | tall x-height, rectangular; I l 1 distinct | dotted zero, O a tall rounded box | the code voice |
+| Geist Mono | Vercel, `vercel/geist-font` | 20,008 | 28 | clean geometric, slab I and 1 | slashed zero | neutral and light on bytes |
+| IBM Plex Mono | IBM, `IBM/plex` | 30,328 | 28 | serifed slab I, l with a foot, the most typographic | dotted zero | the bookish one |
+| Intel One Mono | Intel, `intel/intel-one-mono` | 33,672 | 28 | made for low vision like Atkinson but chunkier and quirkier; tailed l | dotted zero, heavy at 600 | strongest on a washed out projector |
+| Fira Code | Mozilla lineage, `tonsky/FiraCode` | 46,628 | 28 | humanist, open counters; I l 1 distinct | slashed zero | heaviest file; ligatures unused here |
+| Source Code Pro | Adobe, `adobe-fonts/source-code-pro` | 23,284 | 28 | the classic, lighter colour than the rest at 600 | dotted zero | the quiet one |
+| Martian Mono | Evil Martians, `evilmartians/mono` | 20,980 | **24** | wide and heavy, the most character; I l 1 unmistakable | slashed zero, largest glyphs on the slide | the loud one; sets the headline budget |
 
-**Recommendation: Atkinson Hyperlegible Next (DECIDED).** It is the only one
-of the five that passes every pair in the specimen AND is proportional, so it
-gets the wide budget (38) with none of Plex's or Grotesk's figure collisions.
-It was drawn for low vision, which is the same problem as the back row of a
-room (READ: Braille Institute, `brailleinstitute.org/freefont`; the Next
-release of 2025-02-10 added seven weights and a mono). Its cost is voice: it
-reads as a neutral humanist sans rather than as this site's technical mono, and
-JetBrains Mono is the switch for a talk that wants that voice at the price of
-28 characters a line. Weighed and not picked: Inter Display (0 and O collide
-like Plex), Martian Mono (wide, a budget under 28), DM Mono (too light to
-project), Commit Mono and Recursive (monos with nothing JetBrains does not
-already give), Space Mono (28 a line and the Grotesk zero).
+**Recommendation: Atkinson Hyperlegible Mono (DECIDED).** It is drawn for low
+vision, which is the back row's problem (READ: Braille Institute,
+`brailleinstitute.org/freefont`), its `0O` pair is the one nobody can confuse
+(slashed zero beside a round O, where JetBrains and Plex tell a dotted zero
+from a squarer O), and its I, l and 1 are three different shapes. It costs one
+character a line against the 0.6 em faces (27 against 28), which Martian's 24
+already outweighs. JetBrains Mono is the switch for the site's code voice.
 
-**On the page.** A `createChoice` labelled FACE under the panel, outside
-`.pos-controls`, in the order above. The choice is `?face=<id>` in the address
-(absent for the default), the slide number stays the hash, so `/slides/?face=jetbrains#4`
-is a slide in a face. The face is a custom property, `--sl-face`, on the panel,
-so every slide and the full screen follow it by inheritance. Asserted: all five
-load at 400 and 600; picking one puts it in the address and every slide and the
-specimen follow; every headline is two lines or fewer in all five; nothing
-spills past the inset in any face.
+**Weighed and not picked.** Iosevka: about 1 MB a weight from fontsource,
+forty times the others. Commit Mono: 48 KB a weight and near JetBrains and
+Geist to look at. Red Hat Mono: a second geometric slashed zero beside Geist.
+Victor Mono: too light at 600 on a dark ground. Fira Mono, Space Mono, DM Mono
+and Ubuntu Mono: no 600 weight in fontsource. Ubuntu Sans Mono: the narrowest
+(0.56 em, 31 a line) but Ubuntu Font Licence rather than OFL. Recursive was not
+downloaded or looked at.
 
+**Headlines shortened for Martian's 24** (the other seven would have held the
+old wording): *"The readout is the page's own, measuring this screen"* became
+*"The readout is live, measuring this screen"*; *"The test picture draws itself
+here, frame by frame"* became *"The test picture draws itself, frame by frame"*;
+*"A slide sits in a panel, and full screen is the talk"* became *"A slide sits
+in a panel that fills the screen"*; and the specimen's *"Five faces, the same
+letters at both sizes"* became *"Eight faces, all mono"*. MEASURED: every
+headline 2 lines or fewer in all eight faces (`222221` per face).
+
+**On the page.** A `createPicker` labelled FACE under the panel, outside
+`.pos-controls`, stepping the eight in the order above with the platform list
+behind the name. It replaced `createChoice` because eight names side by side
+do not fit a phone, the same reason `/kit/`'s font row is a picker. The choice
+is `?face=<id>` in the address (absent for the default), the slide number stays
+the hash, so `/slides/?face=jetbrains#4` is a slide in a face. The face is a
+custom property, `--sl-face`, on the panel, so every slide and the full screen
+follow it by inheritance. Asserted: all eight load at 400 and 600; all eight
+are monospaced; the specimen shows all eight with their names; picking one
+puts it in the address and every slide and the specimen follow; every headline
+is two lines or fewer in all eight; nothing spills past the inset in any face.
