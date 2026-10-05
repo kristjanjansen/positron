@@ -1,0 +1,574 @@
+// demo/shell/slide.mjs, ONE SLIDE, drawn from plain data, and a small player.
+//
+// 🔴 A SLIDE IS A KIT COMPONENT NOW, AND `/slides/` IS AN ARCHIVE. Asked
+// 2026-10-05: *"keep slides as it was for an archive with font picker and
+// sample content etc let it be then let's focus on the kit make a new tab
+// there slides and methodically slide by slide"*. The engine in
+// `demo/slides/deck.mjs` stays where it is and nothing imports it from here;
+// what moved is the IDEA, rebuilt as one component that renders one slide and
+// knows nothing about a talk. plans/plan-slides.md section 13 has the record.
+//
+// WHAT IT DRAWS. A 16:9 box sized off its container with container units, the
+// six step type scale (size, line height and tracking per step, declared ONCE
+// in `SCALE` below and written into the stylesheet as custom properties by
+// `scaleCss()`), and the parts a slide is made of:
+//
+//   say        the headline, step 4 (3 in a split), top left, one sentence, no full stop
+//   statement  the sentence is the slide, step 5, up to three lines
+//   big        one figure, step 6, with `under` at step 3 beneath it
+//   text       a paragraph, step 3 (or `textStep`)
+//   list       up to three lines, dimmed
+//   stack      [label, value, unit] rows, decimal points in one column
+//   rows       { head, body, align }, a table padded into character columns
+//   lines      [[step, text], ...], each line at its own step, for specimens
+//   cap        the caption, step 1, bottom left, always
+//   slot       any element: a kit component, a picture, a diagram
+//   layout     'stack' (default), 'top', 'left', 'right', 'split'
+//   side       for 'split', which side the slot is on: 'left' or 'right'
+//
+// Marks in any string: `*x*` paints x in `--hi`, `[x|tech]` paints x in the
+// hue `diagram.mjs` gives that technology (`[Cloudflare|cloudflare]`), at the
+// strength the diagram names a box in, so a word and a box can be joined by
+// colour.
+//
+// 🔴 A SLIDE SET IS PLAIN DATA. Every key above is a string, a number or an
+// array of them, except `slot`, which may be a function `(host) => ctl` or a
+// plain `{ kind, ...options }` resolved through a `slots` map the caller
+// passes (`createSlide(spec, { slots })`). So a talk can be a JSON file of
+// specs plus one map from kind to builder, and the same specs render as static
+// slides or inside `createSlidePlayer`. What is missing for a set page is
+// written in plans/plan-slides.md section 13.
+//
+// THE FACE IS JETBRAINS MONO, self-hosted under `shell/vendor/` (copied from
+// the archive's own vendor folder, which keeps its seven). One face, no picker:
+// the picker is the archive's.
+//
+// 🔴 KEYS BELONG TO THE PLAYER'S OWN PANEL, NEVER TO `window`. `/kit/` has
+// transport bars, a keyboard with a letter row and step grids, all of which
+// take arrows or space, and `deck.mjs` listened on `document`. The player
+// listens on its panel's root, which takes focus, and a key it handles is
+// stopped there so it never reaches a bar's `window` listener as well.
+//
+// px COMPONENTS ON A SLIDE. A control sized in px is either laid out at a
+// fixed logical width and scaled into its slot (`fitBox`, the way a projector
+// scales a picture; pointer maths survives it because every kit control reads
+// its own `getBoundingClientRect`, which is the transformed box), or given a
+// size in the slide's own container units where the component already reads
+// its size from CSS (a wave view's `--wave-h`, a video panel's width).
+
+import { el } from './shell.mjs';
+import { createVideoPanel } from './video-panel.mjs';
+import { createStepper } from './stepper.mjs';
+import { createDiagram, TECH_HUE } from './diagram.mjs';
+
+// ── the scale, declared once ────────────────────────────────────────────────
+/**
+ * 🔴 ONE BASE, ONE RATIO, SIX STEPS, the scale `plans/plan-slides.md` section 3
+ * settled and measured on `/slides/`. Size is a share of the slide's HEIGHT in
+ * per cent (so `cqh`), line height is unitless and OPENS as the size drops, and
+ * tracking is in em and CLOSES as the size grows. Every other number about type
+ * in this file and in `slide.css` is derived from these.
+ *   step 1  caption, box words under a diagram
+ *   step 2  evidence with four rows
+ *   step 3  evidence, a paragraph, a list
+ *   step 4  the headline
+ *   step 5  a statement
+ *   step 6  one figure
+ */
+export const SCALE = Object.freeze({
+  base: 4,
+  ratio: 1.5,
+  steps: Object.freeze([
+    Object.freeze({ n: 1, lh: 1.45, ls: 0 }),
+    Object.freeze({ n: 2, lh: 1.3, ls: -0.005 }),
+    Object.freeze({ n: 3, lh: 1.2, ls: -0.01 }),
+    Object.freeze({ n: 4, lh: 1.1, ls: -0.02 }),
+    Object.freeze({ n: 5, lh: 1.05, ls: -0.03 }),
+    Object.freeze({ n: 6, lh: 1, ls: -0.04 }),
+  ]),
+});
+export const STEPS = SCALE.steps.map((s) => s.n);
+
+/** A step's size as a share of the slide's height, in per cent. */
+export function stepSize(n, scale = SCALE) {
+  if (!Number.isInteger(n) || n < 1 || n > scale.steps.length) throw new Error(`no step ${n}`);
+  return scale.base * scale.ratio ** (n - 1);
+}
+/** A step's three numbers, size in per cent of the slide's height. */
+export function stepOf(n, scale = SCALE) {
+  const s = scale.steps[n - 1];
+  if (!s) throw new Error(`no step ${n}`);
+  return { n, size: stepSize(n, scale), lh: s.lh, ls: s.ls };
+}
+/** What a step is, in words, for a caption: the three numbers the slide is set to. */
+export function stepCaption(n, scale = SCALE) {
+  const { size, lh, ls } = stepOf(n, scale);
+  return `step ${n} ${size.toFixed(2)} cqh, line ${lh.toFixed(2)}, tracking ${ls === 0 ? '0' : ls.toFixed(3)} em`;
+}
+/**
+ * The scale as custom properties on `sel`, which is the only place they are
+ * written. Each size is `calc` off the one below so nothing is typed twice, and
+ * `cqh` in it resolves where it is USED, inside the slide, which is the size
+ * container, so every step is a share of the slide it sits on.
+ */
+export function scaleCss(sel = '.sl', scale = SCALE) {
+  const p = [`--sl-base: ${scale.base}`, `--sl-ratio: ${scale.ratio}`, '--sl-1: calc(var(--sl-base) * 1cqh)'];
+  for (let n = 2; n <= scale.steps.length; n++) p.push(`--sl-${n}: calc(var(--sl-${n - 1}) * var(--sl-ratio))`);
+  for (const s of scale.steps) p.push(`--sl-${s.n}-lh: ${s.lh}`, `--sl-${s.n}-ls: ${s.ls}em`);
+  return `${sel} { ${p.join('; ')}; }`;
+}
+
+// ── words ───────────────────────────────────────────────────────────────────
+/** The text with the marks taken out. */
+export const plain = (t) => String(t ?? '').replace(/\*/g, '').replace(/\[([^|\]]+)\|[^\]]+\]/g, '$1');
+
+/** The marks in a string as runs: `{ text }`, `{ text, hi: true }`, `{ text, hue, tech }`. */
+export function parseMarks(t, hues = TECH_HUE) {
+  const out = [];
+  for (const part of String(t ?? '').split(/(\*[^*]+\*|\[[^|\]]+\|[^\]]+\])/)) {
+    if (!part) continue;
+    let m;
+    if (/^\*[^*]+\*$/.test(part)) out.push({ text: part.slice(1, -1), hi: true });
+    else if ((m = part.match(/^\[([^|\]]+)\|([^\]]+)\]$/))) {
+      const tech = m[2].trim().toLowerCase();
+      // A name with no hue throws, so a typo cannot quietly print a plain word.
+      if (hues[tech] == null) throw new Error(`no hue called ${tech}`);
+      out.push({ text: m[1], hue: hues[tech], tech });
+    } else out.push({ text: part });
+  }
+  return out;
+}
+
+/**
+ * 🔴 WHAT A HEADLINE MAY NOT CARRY, from plans/plan-slides.md section 2: one
+ * sentence, so no colon, semicolon, dash or middot buying a second clause, and
+ * no full stop at the end. Returns the problems, empty when there are none.
+ * A REPORT, not a throw, because the kit grades it and a page author should
+ * see every problem at once rather than the first.
+ */
+export function lintWords(t) {
+  const s = plain(t);
+  const bad = [];
+  if (/[:;]/.test(s)) bad.push('a colon or semicolon');
+  if (/[\u2013\u2014]|\s-\s/.test(s)) bad.push('a dash');
+  if (/\u00b7/.test(s)) bad.push('a middot');
+  if (/\.\s*$/.test(s)) bad.push('a full stop at the end');
+  if (!s.trim()) bad.push('no words');
+  return bad;
+}
+
+/** Evidence is at step 3, or step 2 at four rows or more, because four rows at
+ *  step 3 do not fit under a two line headline (plans/plan-slides.md 3). */
+export const evStep = (rows) => (rows > 3 ? 2 : 3);
+
+/**
+ * 🔴 IN A SPLIT THE WORDS GO ONE STEP DOWN, AND IT IS A RULE IN CODE, NOT A
+ * CHOICE PER SLIDE. Half a slide is 41 per cent of its width, which is 72.9
+ * per cent of its height, and a mono advance is 0.6 em: step 4 holds 9
+ * characters a line there, so `Latency is read off a burned clock` took four
+ * lines and pushed its caption off the slide (MEASURED by the kit's spill
+ * assert, four splits red). Step 3 holds 13 and step 2 holds 20. A `big`
+ * figure and declared `lines` keep their step, because they name it.
+ */
+export const wordsStep = (step, layout) => Math.max(1, layout === 'split' ? step - 1 : step);
+
+/** Pad `rows` into lines of text whose columns are character positions. */
+export function padRows({ head = null, body = [], align = '' }) {
+  const all = head ? [head, ...body] : body;
+  const n = Math.max(0, ...all.map((r) => r.length));
+  const w = Array.from({ length: n }, (_, c) => Math.max(...all.map((r) => plain(r[c]).length)));
+  const gap = '  ';
+  // Padded on the VISIBLE length, so an accent mark takes no column.
+  const line = (r) => w.map((cw, c) => {
+    const t = String(r[c] ?? ''), fill = ' '.repeat(cw - plain(t).length);
+    return align[c] === 'r' ? fill + t : t + fill;
+  }).join(gap).replace(/\s+$/, '');
+  const starts = []; let x = 0;
+  for (const cw of w) { starts.push(x); x += cw + gap.length; }
+  return { lines: all.map(line), starts, widths: w, head: !!head };
+}
+
+// ── the slide model ─────────────────────────────────────────────────────────
+export const LAYOUTS = ['stack', 'top', 'left', 'right', 'split'];
+const KEYS = new Set(['name', 'layout', 'side', 'say', 'statement', 'big', 'under', 'text', 'textStep',
+  'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes']);
+
+/**
+ * A spec checked and filled in, with no document. Throws on a shape that
+ * cannot be drawn (an unknown key, layout or step, a split with no slot or no
+ * side), because those are the author's mistakes and are said where the spec
+ * is written. Words are graded by `lintWords`, not here.
+ */
+export function normalise(spec) {
+  if (!spec || typeof spec !== 'object') throw new Error('a slide is an object');
+  for (const k of Object.keys(spec)) if (!KEYS.has(k)) throw new Error(`a slide has no key called ${k}`);
+  const layout = spec.layout || 'stack';
+  if (!LAYOUTS.includes(layout)) throw new Error(`no layout called ${layout}`);
+  if (layout === 'split') {
+    if (!spec.slot) throw new Error('a split slide needs a slot, the thing beside the words');
+    if (spec.side !== 'left' && spec.side !== 'right') throw new Error('a split slide says which side its slot is on, left or right');
+  } else if (spec.side) throw new Error(`side is for a split slide, not ${layout}`);
+  if (spec.statement && (spec.big || spec.rows || spec.stack || spec.list)) {
+    throw new Error('a statement is the whole slide, so it carries no evidence');
+  }
+  for (const [n] of spec.lines || []) stepOf(n);
+  if (spec.textStep != null) stepOf(spec.textStep);
+  if (spec.list && spec.list.length > 4) throw new Error('a list is two to four lines');
+  return { ...spec, layout };
+}
+
+// ── the stylesheet ──────────────────────────────────────────────────────────
+// `slide.css` holds every rule; the scale is written here from `SCALE`, once.
+const CSS_HREF = '/shell/slide.css';
+const SCALE_ID = 'pos-slide-scale';
+function ensureCss() {
+  if (typeof document === 'undefined') return;
+  // A page links slide.css itself; one that forgot still gets it, because a
+  // slide drawn with no stylesheet is a column of unstyled words.
+  if (![...document.querySelectorAll('link[rel="stylesheet"]')].some((l) => l.getAttribute('href') === CSS_HREF)) {
+    document.head.append(el('link', '', null, { rel: 'stylesheet', href: CSS_HREF }));
+  }
+  if (!document.getElementById(SCALE_ID)) {
+    const s = el('style', '', scaleCss('.sl'));
+    s.id = SCALE_ID;
+    document.head.append(s);
+  }
+}
+
+/** A fragment of `t` with each mark as a span. */
+export function rich(t) {
+  const f = document.createDocumentFragment();
+  for (const r of parseMarks(t)) {
+    if (r.hi) f.append(el('span', 'sl-hi', r.text));
+    else if (r.hue != null) {
+      const sp = el('span', 'sl-hue', r.text);
+      sp.dataset.tech = r.tech;
+      // per instance, so a custom property and never the property itself
+      sp.style.setProperty('--sl-hue', String(r.hue));
+      f.append(sp);
+    } else f.append(document.createTextNode(r.text));
+  }
+  return f;
+}
+
+/**
+ * A component sized in px, laid out at `w` logical px and scaled into `host`.
+ * The scale is a custom property, never the transform written by hand.
+ */
+export function fitBox(host, w) {
+  const outer = el('div', 'sl-fit');
+  const inner = el('div', 'sl-fit-in');
+  inner.style.setProperty('--fit-w', `${w}px`);
+  outer.append(inner);
+  host.append(outer);
+  let k = 0;
+  const fit = () => {
+    const ow = outer.clientWidth, oh = outer.clientHeight;
+    const ih = inner.offsetHeight || 1;
+    if (!ow || !oh) return k;
+    k = Math.min(ow / w, oh / ih);
+    inner.style.setProperty('--fit-k', String(k));
+    inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
+    inner.style.setProperty('--fit-y', `${(oh - ih * k) / 2}px`);
+    return k;
+  };
+  const ro = new ResizeObserver(fit);
+  ro.observe(outer); ro.observe(inner);
+  return { outer, inner, fit, k: () => k, w };
+}
+
+/**
+ * A diagram on a slide: BOX NAMES ONLY, and what each top level box is goes
+ * under its column as slide text at step 1. The archive's rule, asked
+ * 2026-10-05: *"do not use diagram native descs below but use slides text and
+ * postion"*. Every `sub` and link `label` is taken out before the diagram sees
+ * the spec, and a top level node's `desc` is set under that box.
+ * Returns a slot builder.
+ */
+export function slideDiagram(spec, { w = 640 } = {}) {
+  const tops = spec.nodes;
+  const clean = {
+    ...spec,
+    nodes: tops.map(function strip(n) {
+      const { desc, sub, ...rest } = n;
+      return rest.children ? { ...rest, children: rest.children.map(strip) } : rest;
+    }),
+    links: (spec.links || []).map(({ label, ...rest }) => rest),
+  };
+  return (host) => {
+    const outer = el('div', 'sl-fit');
+    const inner = el('div', 'sl-fit-in');
+    inner.style.setProperty('--fit-w', `${w}px`);
+    outer.append(inner);
+    host.append(outer);
+    const dg = createDiagram(inner, clean);
+    const row = el('div', 'sl-dgd sl-t sl-t1');
+    outer.append(row);
+    const descs = tops.map((n) => {
+      if (!n.desc) return null;
+      const sp = el('span');
+      sp.append(rich(n.desc));
+      sp.dataset.box = n.label;
+      row.append(sp);
+      return sp;
+    });
+    const flat = (t) => String(t ?? '').replace(/\s+/g, '');
+    const boxes = () => {
+      const groups = [...dg.svg.querySelectorAll('.pos-dg-n')];
+      const out = []; let j = 0;
+      for (const n of tops) {
+        while (j < groups.length && flat(groups[j].querySelector('.pos-dg-lab')?.textContent) !== flat(n.label)) j++;
+        out.push(groups[j++] || null);
+      }
+      return out;
+    };
+    const fit = () => {
+      const ow = outer.clientWidth, oh = outer.clientHeight;
+      const ih = inner.offsetHeight || 1;
+      if (!ow || !oh) return;
+      const lh = parseFloat(getComputedStyle(row).lineHeight) || 0;
+      const any = descs.some(Boolean);
+      const gap = any ? lh / 2 : 0;
+      // two lines of words reserved before the picture is fitted, so the
+      // picture and its words are centred together
+      const resv = any ? gap + 2 * lh : 0;
+      const k = Math.min(ow / w, Math.max(1, oh - resv) / ih);
+      inner.style.setProperty('--fit-k', String(k));
+      inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
+      inner.style.setProperty('--fit-y', `${(oh - ih * k - resv) / 2}px`);
+      if (!any) return;
+      const ob = outer.getBoundingClientRect();
+      const rects = boxes().map((g) => g?.querySelector('.pos-dg-box')?.getBoundingClientRect() || null);
+      const cx = rects.map((r) => (r ? r.left + r.width / 2 - ob.left : NaN));
+      let bottom = 0;
+      rects.forEach((r, i) => {
+        if (!r || !descs[i]) return;
+        bottom = Math.max(bottom, r.bottom - ob.top);
+        const prev = i > 0 && Number.isFinite(cx[i - 1]) ? (cx[i] - cx[i - 1]) / 2 : cx[i];
+        const next = i < cx.length - 1 && Number.isFinite(cx[i + 1]) ? (cx[i + 1] - cx[i]) / 2 : ow - cx[i];
+        const half = Math.max(r.width / 2, Math.min(prev, next, cx[i], ow - cx[i]) - gap / 2);
+        descs[i].style.setProperty('--dgd-x', `${cx[i]}px`);
+        descs[i].style.setProperty('--dgd-w', `${2 * half}px`);
+      });
+      row.style.setProperty('--dgd-y', `${bottom + gap}px`);
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(outer); ro.observe(inner);
+    return { dg, fit, descs, boxes, subject: () => dg.svg };
+  };
+}
+
+/**
+ * ONE SLIDE.
+ *
+ * @param spec       see the top of this file
+ * @param o.host     where to put it; omitted, the caller appends `el`
+ * @param o.slots    { kind: (host, options) => ctl } for a `slot: { kind }`
+ * @returns { el, frame, spec, parts, ctl, start, stop }
+ *   `frame` is the inline size container the slide is sized off; `el` is the
+ *   slide. `ctl` is whatever the slot builder returned (its `start` and `stop`
+ *   are called by `start()` and `stop()`, and by the player on show and hide).
+ */
+export function createSlide(spec, { host = null, slots = {} } = {}) {
+  ensureCss();
+  const s = normalise(spec);
+  const frame = el('div', 'sl-frame');
+  const node = el('section', 'sl', null, { 'aria-roledescription': 'slide' });
+  if (s.name) node.setAttribute('aria-label', s.name);
+  node.dataset.layout = s.layout;
+  if (s.side) node.dataset.side = s.side;
+  frame.append(node);
+  const box = el('div', 'sl-in');
+  node.append(box);
+
+  const parts = { say: null, words: null, ev: null, slot: null, cap: null, table: null, stack: null, lines: [] };
+  // The text column: the headline and what proves it. In a split it is one
+  // grid cell and the slot is the other; otherwise it is the whole column.
+  const words = el('div', 'sl-words');
+  parts.words = words;
+  box.append(words);
+
+  if (s.say) {
+    const say = el('h2', s.statement ? 'sl-t sl-t5 sl-say sl-st' : `sl-t sl-t${wordsStep(4, s.layout)} sl-say`);
+    say.append(rich(s.say));
+    parts.say = say;
+  }
+  const ev = el('div', 'sl-ev');
+  parts.ev = ev;
+  if (parts.say && !s.statement) words.append(parts.say);
+  if (s.statement && parts.say) ev.append(parts.say);
+  for (const [n, t] of s.lines || []) {
+    const p = el('p', `sl-t sl-t${n} sl-line`);
+    p.dataset.step = String(n);
+    p.append(rich(t));
+    parts.lines.push(p);
+    ev.append(p);
+  }
+  if (s.big) {
+    const p = el('p', 'sl-t sl-t6 sl-big');
+    p.append(rich(s.big));
+    ev.append(p);
+    if (s.under) { const u = el('p', 'sl-t sl-t3 sl-dim sl-under'); u.append(rich(s.under)); ev.append(u); }
+  }
+  if (s.text) {
+    const p = el('p', `sl-t sl-t${wordsStep(s.textStep || 3, s.layout)} sl-text`);
+    p.append(rich(s.text));
+    parts.text = p;
+    ev.append(p);
+  }
+  if (s.list) {
+    const ul = el('ul', `sl-list sl-t sl-t${wordsStep(evStep(s.list.length), s.layout)} sl-dim`);
+    for (const t of s.list) { const li = el('li'); li.append(rich(t)); ul.append(li); }
+    ev.append(ul);
+  }
+  if (s.stack) {
+    const g = el('div', `sl-stack sl-t sl-t${wordsStep(evStep(s.stack.length), s.layout)}`);
+    for (const [label, value, unit] of s.stack) {
+      const n = el('span', 'sl-num');
+      n.append(rich(value));
+      g.append(el('span', 'sl-dim', label), n, el('span', 'sl-unit', unit || ''));
+    }
+    parts.stack = g;
+    ev.append(g);
+  }
+  if (s.rows) {
+    const p = padRows(s.rows);
+    const table = el('div', `sl-rows sl-t sl-t${wordsStep(evStep(p.lines.length), s.layout)}`);
+    p.lines.forEach((t, r) => {
+      const row = el('div', r === 0 && p.head ? 'sl-dim' : '');
+      row.append(rich(t));
+      table.append(row);
+    });
+    table.layout = p;
+    table.align = s.rows.align || '';
+    parts.table = table;
+    ev.append(table);
+  }
+  words.append(ev);
+
+  let ctl = null;
+  if (s.slot) {
+    const slot = el('div', 'sl-slot');
+    parts.slot = slot;
+    // In a split the slot is its own column; otherwise it is part of the
+    // evidence, under whatever words there are, taking the height left.
+    if (s.layout === 'split') {
+      if (s.side === 'left') box.prepend(slot); else box.append(slot);
+    } else ev.append(slot);
+    const build = typeof s.slot === 'function' ? s.slot
+      : s.slot instanceof Element ? (h) => { h.append(s.slot); return null; }
+      : (s.slot.kind && slots[s.slot.kind]) ? (h) => slots[s.slot.kind](h, s.slot)
+      : null;
+    if (!build) throw new Error(`no slot builder for ${s.slot.kind || 'that slot'}`);
+    ctl = build(slot) || null;
+  }
+
+  if (s.cap) {
+    const cap = el('p', 'sl-t sl-t1 sl-cap');
+    cap.append(rich(s.cap));
+    parts.cap = cap;
+    box.append(cap);
+  }
+
+  if (host) host.append(frame);
+  let running = false;
+  return {
+    el: node, frame, spec: s, parts, ctl,
+    start() { if (!running) { running = true; ctl?.start?.(); } },
+    stop() { if (running) { running = false; ctl?.stop?.(); } },
+    running: () => running,
+  };
+}
+
+/**
+ * A PLAYER: slides inside a `createVideoPanel`, previous and next in its left
+ * slot, the count in the middle, the panel's own ⛶ on the right.
+ *
+ * 🔴 THE KEYS ARE THE PANEL'S. The panel root takes focus (a press anywhere on
+ * it gives it), and keydown is heard on that root only: Right, Down, PageDown
+ * and Space for next, Left, Up and PageUp for previous (a Logitech clicker
+ * sends PageUp and PageDown), Home and End, `f` and F5 for full screen, Escape
+ * to leave it. A key it uses is stopped there, so a transport bar's `window`
+ * listener and a keyboard's letter row never hear it. A key aimed at a field,
+ * a slider lane or a knob inside a slide is left to that control.
+ *
+ * @param specs        the slides, plain data
+ * @param o.slots      as for `createSlide`
+ * @param o.onStep     (index) after every move
+ * @returns { el, panel, slides, go, at, count, next, prev, keys }
+ */
+export function createSlidePlayer(specs, { slots = {}, onStep = () => {} } = {}) {
+  ensureCss();
+  if (!Array.isArray(specs) || !specs.length) throw new Error('a player needs at least one slide');
+  let at = -1;
+  const stepper = createStepper({ prev: () => go(at - 1), next: () => go(at + 1), what: 'slide' });
+  const count = el('span', 'sl-count', '');
+  const panel = createVideoPanel({ left: stepper, centre: count, fullMode: 'hover' });
+  panel.el.classList.add('sl-player');
+  panel.el.tabIndex = 0;
+  panel.el.setAttribute('aria-roledescription', 'slide player');
+  const slides = specs.map((spec) => {
+    const s = createSlide(spec, { slots });
+    s.el.hidden = true;
+    // The stage is the size container in a player, so the slide letterboxes
+    // in full screen; the frame wrapper is not used here.
+    panel.stage.append(s.el);
+    return s;
+  });
+
+  function go(i) {
+    const next = Math.max(0, Math.min(slides.length - 1, i));
+    if (next === at) return at;
+    const was = slides[at];
+    if (was) { was.el.hidden = true; was.stop(); }
+    at = next;
+    slides[at].el.hidden = false;
+    slides[at].start();
+    count.textContent = `${at + 1} / ${slides.length}`;
+    stepper.buttons[0].disabled = at === 0;
+    stepper.buttons[stepper.buttons.length - 1].disabled = at === slides.length - 1;
+    onStep(at);
+    return at;
+  }
+
+  const NEXT = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ']);
+  const PREV = new Set(['ArrowLeft', 'ArrowUp', 'PageUp']);
+  let heard = 0;
+  panel.el.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t instanceof Element) {
+      if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (t.closest('[role="slider"]')) return;
+      if (/^(BUTTON|A)$/.test(t.tagName) && (e.key === ' ' || e.key === 'Enter')) return;
+    }
+    let did = true;
+    if (NEXT.has(e.key)) go(at + 1);
+    else if (PREV.has(e.key)) go(at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(slides.length - 1);
+    else if (e.key === 'f' || e.key === 'F' || e.key === 'F5') panel.full(!panel.isFull());
+    else if (e.key === 'Escape' && panel.isFull()) panel.full(false);
+    else did = false;
+    if (!did) return;
+    heard++;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  // A press on the slide gives the panel the keys, the way clicking a video
+  // player does; a press on one of its buttons focuses the button, which is
+  // inside the root and so still heard.
+  panel.stage.addEventListener('pointerdown', () => panel.el.focus({ preventScroll: true }));
+
+  go(0);
+  return {
+    el: panel.el, panel, slides, go, count,
+    at: () => at,
+    next: () => go(at + 1),
+    prev: () => go(at - 1),
+    /** how many keys this player has acted on, for an assert */
+    keys: () => heard,
+    stop() { slides[at]?.stop(); },
+    start() { slides[at]?.start(); },
+  };
+}

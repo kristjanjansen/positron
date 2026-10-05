@@ -1,0 +1,194 @@
+/* demo/shell/slide.css, the stylesheet of `slide.mjs`.
+
+   🔴 A FILE OF ITS OWN AND NOT A BLOCK IN `shell.css`, AND A PAGE LINKS IT.
+   `shell.css` is read by every page on the site and a slide is drawn by one
+   (`/kit/`); two `@font-face` rules and forty slide rules there would be parsed
+   by forty-five pages that never draw one. A component stylesheet beside its
+   module is what `wave-view.mjs` does with an injected block, and this is too
+   long to live in a string. `slide.mjs` adds the link itself when a page forgot
+   it, so forgetting costs one late stylesheet and never an unstyled slide.
+
+   THE SCALE IS NOT HERE. Its six steps (size, line height, tracking) are
+   declared once, in `SCALE` in `slide.mjs`, and written onto `.sl` as custom
+   properties by `scaleCss()`. Every rule below reads them. */
+
+/* THE FACE: JetBrains Mono, 400 and 600, Latin subset, from @fontsource 5.3.0,
+   SIL OFL 1.1 with its licence beside it. COPIED from the archive's vendor
+   folder rather than moved, because `/slides/` keeps its seven faces.
+   `workers/view/build.mjs` lists the three files by name. */
+@font-face { font-family: 'Slide JetBrains Mono'; font-weight: 400; font-style: normal; font-display: block;
+  src: url('/shell/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Slide JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/shell/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
+
+/* ONE SLIDE, 16:9, SIZED OFF ITS CONTAINER. The frame is an inline size
+   container, so the slide is as wide as whatever holds it and nine sixteenths
+   as tall, and the slide is a SIZE container, so every step in `cqh` is a
+   share of this slide's height and of nothing else: a slide in a kit column,
+   on a phone and filling a projector is one slide at three scales. */
+.sl-frame { container-type: inline-size; }
+.sl {
+  position: relative;
+  width: 100cqw; height: calc(100cqw * 9 / 16);
+  container-type: size;
+  overflow: hidden;
+  color: var(--fg);
+  background: var(--card);
+  border: var(--edge); border-radius: var(--r);
+  font-family: 'Slide JetBrains Mono', var(--mono);
+}
+.sl[hidden] { display: none; }
+
+/* IN A PLAYER the panel's stage is the size container and the slide fills it,
+   letterboxed: in the page the stage is 16:9 already, and full screen on a
+   screen of another shape centres a 16:9 slide rather than stretching the type
+   to the screen's shape. The stage draws the edge, so the slide gives up its
+   own. (0,2,0) against `.sl` at (0,1,0). */
+.sl-player .pos-vp-stage { container-type: size; }
+.sl-player .sl {
+  position: absolute; inset: 0; margin: auto;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(100cqh, calc(100cqw * 9 / 16));
+  border: 0; border-radius: 0;
+}
+.sl-player .sl[hidden] { display: none; }
+.sl-player:focus { outline: none; }
+.sl-player:focus-visible { outline: 1px solid var(--hi); outline-offset: 2px; }
+
+/* THE INSET IS ON A BOX INSIDE THE SLIDE AND NEVER ON THE SLIDE, because a
+   container's query units measure its CONTENT box. MEASURED on the archive:
+   with the padding on the slide, a 9 per cent step came out at 7.7. */
+.sl-in {
+  height: 100%;
+  display: flex; flex-direction: column;
+  padding: 7cqh 6cqw;
+}
+/* The words column: the headline and what proves it. */
+.sl-words { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+
+/* THE STEPS. Size, line height and tracking are one decision per step, so
+   they are one class per step. 400 at step 1, which is read as words; 600
+   from step 2 up, which is read as a shape. */
+.sl-t { margin: 0; font-family: inherit; }
+.sl-t1 { font-size: var(--sl-1); font-weight: 400; line-height: var(--sl-1-lh); letter-spacing: var(--sl-1-ls); }
+.sl-t2 { font-size: var(--sl-2); font-weight: 600; line-height: var(--sl-2-lh); letter-spacing: var(--sl-2-ls); }
+.sl-t3 { font-size: var(--sl-3); font-weight: 600; line-height: var(--sl-3-lh); letter-spacing: var(--sl-3-ls); }
+.sl-t4 { font-size: var(--sl-4); font-weight: 600; line-height: var(--sl-4-lh); letter-spacing: var(--sl-4-ls); }
+.sl-t5 { font-size: var(--sl-5); font-weight: 600; line-height: var(--sl-5-lh); letter-spacing: var(--sl-5-ls); }
+.sl-t6 { font-size: var(--sl-6); font-weight: 600; line-height: var(--sl-6-lh); letter-spacing: var(--sl-6-ls); }
+.sl-dim { color: var(--dim); }
+.sl-t3.sl-dim, .sl-t2.sl-dim { font-weight: 400; }
+/* THE ACCENT, on what carries the point. Same face, size and advance, so a
+   character column through it still lines up. */
+.sl-hi { color: var(--hi); }
+/* A HUE JOINS A WORD TO A BOX. The diagram names a box in
+   `tint(hue, TEXT_TINT, 'var(--fg)')`, 62 per cent into the ink; this is the
+   same formula, so `Cloudflare` on a slide is the colour of the Cloudflare
+   box. The hue is a custom property per span. */
+.sl-hue { color: color-mix(in oklab, hsl(var(--sl-hue) 72% 62%) 62%, var(--fg)); }
+/* Two lines of a headline, or of a specimen line, are kept even, so no word
+   is left alone. */
+.sl-say, .sl-line { text-wrap: balance; }
+
+/* THE EVIDENCE REGION takes the height the headline leaves and centres what
+   is in it on both axes: the headline is read first and sits top left, the
+   evidence is looked at and sits in the middle. */
+.sl-ev {
+  flex: 1 1 auto; min-height: 0;
+  margin-top: 4cqh;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 3cqh;
+  text-align: center;
+}
+.sl-ev:first-child { margin-top: 0; }
+/* A STATEMENT is the whole slide, left aligned like every headline. */
+.sl-ev > .sl-st { align-self: stretch; text-align: left; }
+.sl-list { list-style: none; padding: 0; margin: 0; text-align: left; }
+.sl-list li { margin: 0; }
+.sl-text { max-width: 100%; text-wrap: pretty; }
+.sl-big + .sl-under { margin-top: -2cqh; }
+
+/* THE CAPTION, STEP 1, BOTTOM LEFT, EVERY SLIDE. The last child of the inset
+   column, so its left and bottom edges ARE the inset; nothing is positioned
+   and no number says where the corner is. */
+.sl-cap { flex: 0 0 auto; margin-top: 3cqh; align-self: stretch; text-align: left; color: var(--dim); }
+
+/* MONO DOING WHAT ONLY MONO CAN: a table of lines padded with spaces, so a
+   column is a character position. */
+.sl-rows { text-align: left; white-space: pre; }
+.sl-stack {
+  display: grid; grid-template-columns: auto auto auto; column-gap: 0.6em;
+  align-items: baseline; text-align: left;
+}
+.sl-stack .sl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: pre; }
+.sl-stack .sl-unit { color: var(--dim); font-weight: 400; }
+
+/* ── LAYOUTS ─────────────────────────────────────────────────────────────────
+   `stack`, the default: headline top left, evidence centred under it.
+   `top`: headline on top, the words at the bottom, left aligned, the air
+     between them.
+   `left`: everything on the left edge, the evidence vertically centred.
+   `right`: everything on the right edge; the caption stays bottom left,
+     because a caption is in one place on every slide.
+   `split`: two columns, the slot on `data-side` and the words on the other,
+     the caption across the foot. */
+.sl[data-layout="top"] .sl-ev { justify-content: flex-end; align-items: flex-start; text-align: left; }
+.sl[data-layout="left"] .sl-ev { align-items: flex-start; text-align: left; }
+.sl[data-layout="right"] .sl-say { text-align: right; }
+.sl[data-layout="right"] .sl-ev { align-items: flex-end; text-align: right; }
+.sl[data-layout="right"] .sl-ev .sl-list,
+.sl[data-layout="right"] .sl-ev .sl-text { text-align: right; }
+
+.sl[data-layout="split"] .sl-in {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 6cqw;
+}
+.sl[data-layout="split"][data-side="left"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "slot words" "cap cap"; }
+.sl[data-layout="split"][data-side="right"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "words slot" "cap cap"; }
+.sl[data-layout="split"] .sl-words { grid-area: words; }
+.sl[data-layout="split"] .sl-slot { grid-area: slot; }
+.sl[data-layout="split"] .sl-cap { grid-area: cap; }
+.sl[data-layout="split"] .sl-ev { align-items: flex-start; text-align: left; }
+
+/* THE SLOT: any element. In a split it is a whole column; anywhere else it
+   takes what the evidence region has left. Its child is centred in it. */
+.sl-slot {
+  position: relative; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+}
+.sl-ev > .sl-slot { flex: 1 1 auto; align-self: stretch; }
+.sl-slot > canvas { display: block; max-width: 100%; max-height: 100%; }
+/* A component that takes its width from its box (a wave view, a video panel)
+   is stretched across the slot rather than shrunk to its content. */
+.sl-slot > .pos-wave, .sl-slot > .pos-vp { align-self: stretch; }
+
+/* A component sized in px, laid out at a fixed logical width and scaled into
+   the slot. The scale is a custom property `fitBox` writes. */
+.sl-fit { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; align-self: stretch; }
+.sl-fit-in {
+  position: absolute; left: 0; top: 0;
+  width: var(--fit-w, 640px);
+  transform-origin: 0 0;
+  transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit-k, 1));
+}
+.sl-fit-in > .pos-dg { margin: 0; }
+/* A control narrower than its logical width sits in the middle of it, so the
+   scaled box centres the control and not an empty margin beside it. */
+.sl-fit-in > .sl-mid { display: flex; justify-content: center; }
+/* The diagram's own caption line is page text in px; on a slide its words go
+   under the boxes instead. */
+.sl-fit-in .pos-dg-cap { display: none; }
+.sl-dgd { position: absolute; left: 0; right: 0; top: var(--dgd-y, 0px); height: 0; }
+.sl-dgd > span {
+  position: absolute; left: var(--dgd-x, 0px); top: 0;
+  width: var(--dgd-w, 10em);
+  transform: translateX(-50%);
+  text-align: center; text-wrap: balance;
+  color: var(--dim);
+}
+
+.sl-count {
+  font: 500 12px/1 var(--mono); color: var(--dim);
+  font-variant-numeric: tabular-nums; min-width: 7ch; text-align: center;
+}
