@@ -1053,6 +1053,16 @@ button.pos-pri[data-busy="1"] {
 /* `display: flex` beats the UA's `[hidden]` rule, the same patch the readout,
    the control row and the report all already carry. */
 .pos-glue[hidden] { display: none; }
+/* 🔴 AND A GLUE WHOSE PARTS ARE ALL HIDDEN HIDES ITSELF. MEASURED on `/stage/`
+   2026-10-05: a page hid its log after `mount()` had decided the report was
+   worth drawing, and the `.pos-glue.pos-report` left behind, with both
+   children `hidden`, painted its own two edges as a 2 px full-width line 40 px
+   under the picture. That is the empty-box-is-a-line defect a fourth time, and
+   the page had to hide the box itself. Answered here for every glue, so no page
+   has to remember. ⚠️ IT READS `[hidden]` ONLY, which is how every component
+   in this kit hides a part; a part hidden by some other class still counts as
+   shown and the glue still draws, which is the safe way round to be wrong. */
+.pos-glue:not(:has(> :not([hidden]))) { display: none; }
 .pos-glue.pos-glue > * { --edge: 0; --r: 0; border: 0; border-radius: 0; margin: 0; }
 
 /* ── a glued surface built out of ROWS (.pos-rows) ───────────────────────────

@@ -164,7 +164,15 @@
    * was written about.
    */
   const TABS = [
-    { id: 'audience', label: 'Audience' },
+    /**
+     * 🔴 ONE PLAIN SENTENCE PER TAB, ASKED 2026-10-05 FOR THE TABBED PAGES:
+     * one sentence a tab, no long description at the top, plain words. The
+     * audience tab was an empty box reading OFF AIR with nothing saying why or
+     * where the show comes from, and the control room's one press opens a real
+     * stream without the page ever saying so.
+     */
+    { id: 'audience', label: 'Audience',
+      about: 'What a viewer sees, which stays dark until somebody starts the show in the control room.' },
     // 🔴 TWO WORDS SINCE 2026-09-25: *"control room is 2 words"*. THIS REVERSES
     // THE ASK BELOW AND THE ASK BELOW IS KEPT, because a rule that loses its
     // reason comes back: on 2026-09-17 it was *"controlroom -> single word"*,
@@ -175,7 +183,9 @@
     // `CONTROLROOM` in tracked caps was one legible token. `Controlroom` in
     // sentence case reads as a typo, because English does not join those two
     // words. The width argument was true and is now the smaller cost.
-    { id: 'controlroom', label: 'Control room' },
+    { id: 'controlroom', label: 'Control room',
+      about: 'Start show opens a real paid stream that takes up to half a minute to arrive '
+        + 'and is recorded until you press Stop.' },
     /**
      * 🔴 NO ARCHIVE TAB SINCE 2026-09-25: *"rm archive for now. add play
      * recording button to transport what is enabled when shows have ended and
@@ -207,8 +217,16 @@
     // transport you press"*, which stopped being true when there was one, and
     // the owner's ask for the day was the recording's path, so that is the
     // second half of the sentence now.
-    what: 'A church scene from a 2011 MIMproject performance goes out live over '
-      + 'WebRTC and its recording travels from this browser to R2 to playback.',
+    // 🔴 REWRITTEN 2026-10-05 ON *"review and fix all"*. It said the show
+    // *"goes out live over WebRTC and its recording travels from this browser
+    // to R2 to playback"*: two facts joined by an `and`, three insider words
+    // (WebRTC, R2, playback), and nothing about where a visitor should go. The
+    // transport and the recording's path are the diagram's job, and each tab
+    // now carries its own sentence, so this names the thing and the tab to
+    // open. ⚠️ `manifest.mjs`'s `one` line still carries the old wording and
+    // is not this agent's to edit this round, so the two disagree until it is.
+    what: 'A church scene from a 2011 MIMproject performance, broadcast live from '
+      + 'the control room tab.',
     /**
      * 🔴 ONE BUTTON, AND IT IS ITS OWN STOP. There were two, `Start HLS` and
      * `Start WebRTC`, from 2026-09-25 (*"no 2 transports in same time"*) to
@@ -515,7 +533,22 @@
    * they touched a tab. It is applied once, by hand, below.
    */
   const LOG_TABS = ['controlroom', 'archive'];
-  const logFor = (id) => { if (d.logEl) d.logEl.hidden = !LOG_TABS.includes(id); };
+  /**
+   * 🔴 AND THE BOX AROUND THE LOG GOES WITH IT. MEASURED 2026-10-05: hiding
+   * only the `<pre>` left its `.pos-glue.pos-report` on the audience tab with
+   * both children hidden, painting its own two edges as a 2 px full-width line
+   * 40 px under the picture. That is the empty-box-is-a-line defect, arriving
+   * because the log is hidden after `mount()` decided the box was worth drawing.
+   * The kit could hide a glue whose children are all hidden; until it does,
+   * the page hides the box it emptied.
+   */
+  const logFor = (id) => {
+    if (!d.logEl) return;
+    const off = !LOG_TABS.includes(id);
+    d.logEl.hidden = off;
+    const box = d.logEl.closest('.pos-report');
+    if (box) box.hidden = off;
+  };
 
   /**
    * 🔴 A STRIP IN A HIDDEN PANEL HAS NO WIDTH, SO ITS OPENING VIEW IS NOT THE
@@ -547,9 +580,32 @@
      * keeps the media state, which is the whole reason this is cheaper than
      * rebuilding a player per tab.
      */
-    onPick: (id) => { logFor(id); refit(id); showPictureOn(id); },
+    onPick: (id) => { showAbout(id); logFor(id); refit(id); showPictureOn(id); },
   });
   logFor(tabs.at());
+  /**
+   * 🔴 EACH TAB'S SENTENCE, IN ONE CELL, THE OPEN ONE VISIBLE. This is the
+   * markup `tab-page.mjs` builds (its rule 6) and the kit's own classes, so the
+   * look is the kit's and nothing is typed here. All the sentences share one
+   * grid cell and the hidden ones keep their room, so the picture under them
+   * sits at the same height on every tab instead of jumping when a longer
+   * sentence wraps to another line.
+   * ⚠️ NOT `createTabPage`, on instruction: this page keeps `tabs.mjs`.
+   */
+  const aboutBox = el('div', 'pos-tabs-about');
+  const abouts = new Map(TABS.map((t) => {
+    const p = el('p', 'pos-tabs-about-t', t.about);
+    aboutBox.append(p);
+    return [t.id, p];
+  }));
+  tabs.el.insertBefore(aboutBox, tabs.panels);
+  const showAbout = (id) => {
+    for (const [k, p] of abouts) {
+      p.classList.toggle('on', k === id);
+      p.setAttribute('aria-hidden', String(k !== id));
+    }
+  };
+  showAbout(tabs.at());
   for (const p of panels) tabs.panel(p.id).append(p.panel.el);
   d.stack.add(tabs.el);
 
@@ -769,8 +825,8 @@
         d.log(film
           ? `the stage picture is ${film.title}, ${film.source}, ${mins}, `
             + `${(film.bytes / 1048576).toFixed(0)} MiB, ${film.licence}. Nothing of it is `
-            + 'fetched until somebody presses play under it'
-          : `background: ${slug.split('/').pop()}, nothing fetched until somebody presses play`, 'hi');
+            + 'fetched until a show starts'
+          : `background: ${slug.split('/').pop()}, nothing fetched until a show starts`, 'hi');
         return;
       }
       /**
@@ -1794,6 +1850,8 @@
    */
   const playRecBtn = bar.el.querySelector('.tbar-toggle');
   playRecBtn.setAttribute('aria-label', 'play or pause the recording this show made');
+  // A disabled ▶ with no word beside it says nothing about when it will work.
+  playRecBtn.title = 'plays the recording once a show has stopped';
   playRecBtn.disabled = true;
   const paintPlayRec = () => { playRecBtn.disabled = !archiveMedia; };
 
@@ -1838,8 +1896,12 @@
      * under the other seven.
      */
     extras: [
-      { id: 'webrtc', label: 'Start WebRTC', word: true,
-        aria: 'start or stop the show over WebRTC',
+      // 🔴 `Start show`, NOT `Start WebRTC`, SINCE 2026-10-05. There is one
+      // transport now, so naming it on the button tells a visitor a protocol
+      // instead of what happens. The tab's sentence says the press costs a
+      // real stream. The asserts read `^start` and `^stop`, which still hold.
+      { id: 'webrtc', label: 'Start show', word: true,
+        aria: 'start the live show, which opens a real stream and records it, or stop it',
         onClick: () => toggleShow() },
     ],
     right: [playRecBtn],
@@ -1920,7 +1982,7 @@
     const b = showBar?.extra('webrtc');
     if (!b) return;
     const on = transport === 'webrtc';
-    b.textContent = on ? 'Stop WebRTC' : 'Start WebRTC';
+    b.textContent = on ? 'Stop show' : 'Start show';
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 
@@ -2055,7 +2117,10 @@
    * mid-drill would wipe the run it is grading. `clearRun` is still reached in
    * the checks the way it always was, through the record press.
    */
-  const clearBtn = el('button', 'pos-btn', 'Clear', { type: 'button' });
+  // `Clear show`, not a bare `Clear`, since 2026-10-05: alone under a timeline
+  // the word did not say what it would throw away.
+  const clearBtn = el('button', 'pos-btn', 'Clear show', { type: 'button' });
+  clearBtn.title = 'removes the recording, the question and its answers';
   clearBtn.addEventListener('click', () => { clearRun(); paintClear(); });
   /** Nothing to clear means nothing to press. */
   function paintClear() {
@@ -3420,6 +3485,19 @@
       vidsBefore === 0 && !aud.panel.stage.querySelector('video'),
       `${vidsBefore} video elements in the page, and the audience panel holds `
       + `${aud.panel.stage.children.length} child element(s), none of them a video`);
+
+    // Each tab says what it is in one sentence, only the open tab's sentence is
+    // visible, and no tab sentence is stretched with a colon, semicolon or dash.
+    {
+      const shown = [...abouts].filter(([, p]) => getComputedStyle(p).visibility === 'visible');
+      const stretched = [...abouts].filter(([, p]) => /[:;—–·]/.test(p.textContent));
+      A('each tab carries one plain sentence, and only the open tab shows its own',
+        abouts.size === TABS.length && shown.length === 1 && shown[0][0] === tabs.at()
+        && !stretched.length && [...abouts].every(([, p]) => p.textContent.trim().length > 0),
+        `${abouts.size} sentences for ${TABS.length} tabs, visible: `
+        + `${shown.map(([k]) => k).join(', ') || 'none'} on tab ${tabs.at()}`
+        + `${stretched.length ? `, stretched: ${stretched.map(([k]) => k).join(', ')}` : ''}`);
+    }
 
     /**
      * ⚠️ IT COUNTS AGAINST `TABS`, NOT AGAINST A TYPED NUMBER. It said `three`
@@ -4938,11 +5016,19 @@
        * rather than brackets (*"need arrows"*). The publisher is the fourth
        * part since the page became a pure receiver.
        */
-      { id: 'cf', label: 'Cloudflare', sub: 'one account', kind: 'cloud', tech: 'cloudflare',
+      /**
+       * 🔴 `set: true` WITH ITS ONE REAL ARROW DECLARED, SINCE 2026-10-05. The
+       * default chain drew Publisher to Stream to R2 to Relay as one pipeline,
+       * so the picture claimed Stream writes into R2 a box after Stream's own
+       * note said it records nothing, and that R2 feeds the relay. Only the
+       * first step is real. The rest are parts of one account, which is what
+       * a bracket says.
+       */
+      { id: 'cf', label: 'Cloudflare', sub: 'one account', kind: 'cloud', tech: 'cloudflare', set: true,
         children: [
-          { id: 'pub', label: 'Publisher', sub: 'container',
-            note: 'An ffmpeg in a container publishes the show over **WHIP** while somebody '
-                + 'holds its socket. Pressing Start holds it, and a cold wake takes about 22 s.' },
+          { id: 'pub', label: 'ffmpeg', sub: 'container',
+            note: 'Publishes the show over **WHIP** while somebody holds its socket. Pressing '
+                + 'Start show holds it, and a cold wake takes about 22 s.' },
           { id: 'stream', label: 'Stream', sub: 'WebRTC',
             note: 'Takes the picture in over **WHIP** and hands it out over **WHEP**, which are '
                 + 'the publish and subscribe handshakes for one WebRTC connection. It records '
@@ -4976,6 +5062,8 @@
         ] },
     ],
     links: [
+      { from: 'pub', to: 'stream',
+        note: 'The film, published as one WebRTC leg.' },
       { from: 'stream', to: 'screen', label: 'WebRTC',
         note: 'What the audience subscribes to over WHEP.' },
       { from: 'recorder', to: 'idb',
