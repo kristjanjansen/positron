@@ -1,5 +1,6 @@
 ## Open
 
+- **Slides: no way-out button in full screen on a desktop** (2026-10-05): *"do not show back-from-fullscreen button in desktop"*. Hidden under `(hover: hover) and (pointer: fine)` in the deck module, kept on touch where it is the only way out. Handed to the deck agent.
 - **A real positron deck, in the background** (2026-10-05): *"in bg do some actual slides on positron"*. A full presentation on its own page (`/talk/`, unlisted) on the slides system, with `/slides/` kept as the reference for faces and the scale; the deck engine moves into a module both pages import.
 - **`diagram.mjs` colours only top-level box names in notes** (2026-10-05, found by the slides agent): `page`, `relay`, `synths` stay plain bold, so a slide word joined to an inner box has no hue to match; and box edges at 52 per cent mix read faint beside a strongly coloured word. Defect or unwritten rule, not decided.
 - ~~**`/slides/` more line height on the small sizes** (2026-10-05): *"bit more line height on smaller font"*. Line height as part of the scale, opening up as size drops. Handed to the type scale agent.~~ Done 2026-10-05: six-step scale at ratio 1.5, statements, yellow and diagram hues on 9 of 16 slides, seven faces. 51/51.
