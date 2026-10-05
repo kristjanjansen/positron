@@ -86,8 +86,8 @@ const FILES = [
   // down; those calls are gone too, so the build no longer writes nine search
   // results and one item that had no reader. The source is under `archive/`.
 
-  // 2. remixer
-  ['proto/remixer/index.html', 'proto/remixer/index.html'],
+  // 2. remixer, ARCHIVED 2026-10-05 (archive/remixer/). Only its hls.js stays:
+  //    eight pages load /proto/remixer/hls.min.js, so the path keeps answering.
   ['proto/remixer/hls.min.js', 'proto/remixer/hls.min.js'],
 
   // 3. deck — renamed from `aikajana` 2026-09-15; the corpus plus archive.org
@@ -599,7 +599,6 @@ const BACK = '<a href="/" style="position:fixed;left:8px;bottom:8px;z-index:9999
 
 const APPEND = {
   'proto/deck/index.html': BACK,
-  'proto/remixer/index.html': BACK,
 };
 /**
  * A digest of the bytes about to be copied — four hex, enough to tell two

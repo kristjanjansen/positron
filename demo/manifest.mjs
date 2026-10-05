@@ -305,9 +305,12 @@ export const DEMOS = [
   // a second, larger step — four entries out of the build's allowlist and a URL
   // that starts 404ing — and it is decided on purpose rather than as a side
   // effect of tidying the front page.
-  { name: 'remixer', group: 'technologies', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
-    one: 'stack archive recordings from any year on one playhead',
-    tags: ['HLS', 'timeline', 'not shelled'] },
+  // `remixer` (stack archive recordings from any year on one playhead) was
+  // ARCHIVED 2026-10-05 on *"archvie remixer demo"*: the page is in
+  // archive/remixer/ and /proto/remixer/ no longer answers. ⚠️ EXCEPT
+  // `proto/remixer/hls.min.js`, which stays put and stays built, because eight
+  // pages load hls.js from that path (reel, llhls, flipper, cam, now, station,
+  // floor, sync). Moving it is a separate change across those eight.
 
   // ⚠️ `studio` IS GONE FROM THE LIST AND THERE WAS NOTHING TO ARCHIVE. It never
   // had a page: the row was a placeholder carrying `why: 'consumes 10 through
