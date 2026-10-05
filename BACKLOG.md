@@ -1,5 +1,6 @@
 ## Open
 
+- **Kit slides: THE PLAYER drops slide 3, slide 2 becomes a component slide** (2026-10-05): *"rm slide 3 from THE PLAYER and replace slide 2 from something below"*. Diagram slide proposed. Handed to the running slides agent.
 - **Kit slides: FAU on a slide, split, keyboard overflowing** (2026-10-05): *"build fau into slide. overflow keyboard. col layout"*. The /fau/ instrument from kit parts, no compiler load. Handed to the strip and bar agent.
 - **Kit slides: a timeline strip and a transport bar on slides** (2026-10-05): *"do 6 and 7"*, from the list of what is missing: a strip view on a slide, and a transport bar on a slide with its keys scoped so Space does not leave the deck.
 - ~~**Kit slides: plate without patch, OLED whole scale in full screen, subtler log fade, THE SCALE in one column, HEADLINE OVER A NUMBER and LEFT ALIGNED removed** (2026-10-05).~~ Done, kit 327/327.
