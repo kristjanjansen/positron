@@ -15,7 +15,6 @@ import { el } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
 import { createStripView } from '/shell/strip.mjs';
 import { createVideoPanel } from '/shell/video-panel.mjs';
-import { createGlue } from '/shell/glue.mjs';
 import { createChoice } from '/shell/choice.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
 import { createDeck } from '/timeline/transport.mjs';
@@ -46,9 +45,12 @@ const data = await (await fetch(SRC)).json();
 const [c1, c2, light, music] = data.lanes;
 
 /** Under the tab row, in the page's one fixed box. */
-export const about = 'Moholy-Nagy\u2019s 1924 stage score as a timeline, and Find walls sends its light column to any screen in the WALL tab.';
+export const about = 'Moholy-Nagy\u2019s 1924 stage score as a timeline, with the picture showing its light at the playhead. Press play to run it, or Find walls to send the light to a screen in the WALL tab.';
 
-export const readout = { light: '', sirens: '', cue: '', length: 'min' };
+// `length` was a cell until 2026-10-05 and repeated the length control two
+// blocks up; `links` says what the visitor cannot otherwise see, whether any
+// lane is reaching anything.
+export const readout = { light: '', sirens: '', cue: '', links: '' };
 
 export function build({ panel, log, set }) {
 
@@ -173,13 +175,15 @@ export function build({ panel, log, set }) {
     }
   };
   const lanes = [
-    { id: 'c1', kind: 'c1', label: 'I. Bühne', subLabel: 'form, motion', height: 30, as: 'ticks',
+    // Plain English since 2026-10-05: the plate's own words (I. Bühne, II.
+    // Bühne, Licht, Ton) stay in the transcription and in the hit text.
+    { id: 'c1', kind: 'c1', label: 'stage 1', subLabel: 'form, motion', height: 30, as: 'ticks',
       rows: markRows(c1, 'c1') },
-    { id: 'c2', kind: 'c2', label: 'II. Bühne', subLabel: 'and film', height: 30, as: 'ticks',
+    { id: 'c2', kind: 'c2', label: 'stage 2', subLabel: 'and film', height: 30, as: 'ticks',
       rows: markRows(c2, 'c2') },
-    { id: 'light', kind: 'light', label: 'Licht', subLabel: `${lightSpans.length} stripes`, height: 34, as: 'spans',
+    { id: 'light', kind: 'light', label: 'light', subLabel: `${lightSpans.length} stripes`, height: 34, as: 'spans',
       rows: spanRows(lightSpans, 'light'), render: bands(lightSpans, lightInside) },
-    { id: 'sirens', kind: 'sirens', label: 'Ton', subLabel: 'intentions only', height: 26, as: 'spans',
+    { id: 'sirens', kind: 'sirens', label: 'sirens', subLabel: 'intended only', height: 26, as: 'spans',
       rows: spanRows(sirens, 'sirens'), render: (ctx, L, C) => {
         bands(sirens, sirensInside)(ctx, L, C);
         ctx.fillStyle = C.theme.ink;
@@ -206,7 +210,6 @@ export function build({ panel, log, set }) {
       return `${markText(p)}, ${p.how}`;
     },
   });
-  const surface = createGlue(bar.el, view.surface);
 
   const length = createChoice({
     label: 'length', options: LENGTHS, at: LENGTHS.findIndex(([, s]) => s === totalS),
@@ -232,8 +235,8 @@ export function build({ panel, log, set }) {
    * ask for the same link with `link.request`, which this page answers.
    */
   const SOURCES = {
-    light: { port: OUT, label: 'Licht lane', dir: 'out', medium: 'value', shape: { channels: 3 }, choice: 'wall' },
-    sirens: { port: `${SITE}:light:sirens`, label: 'Ton lane', dir: 'out', medium: 'midi', emits: ['note'], choice: 'sirens to' },
+    light: { port: OUT, label: 'light lane', dir: 'out', medium: 'value', shape: { channels: 3 }, choice: 'light to' },
+    sirens: { port: `${SITE}:light:sirens`, label: 'siren lane', dir: 'out', medium: 'midi', emits: ['note'], choice: 'sirens to' },
     cues: { port: `${SITE}:light:cues`, label: 'stage cues', dir: 'out', medium: 'state', shape: { schema: 'cue' }, choice: 'cues to' },
   };
   const GRAPH = {
@@ -262,11 +265,12 @@ export function build({ panel, log, set }) {
   function setLink(k, to) {
     const src = SOURCES[k];
     if (k === 'sirens') { sirenOff(); try { sirenOut?.wire.close(); } catch { /* */ } sirenOut = null; }
-    if (!to) { linked[k] = ''; log(`${src.label} is linked to nothing`); drawChoices(); return { ok: true }; }
+    if (!to) { linked[k] = ''; showLinks(); log(`${src.label} is linked to nothing`); drawChoices(); return { ok: true }; }
     const bay = registry.fill(createBay());
     const r = bay.link(src.port, to);
     if (!r.ok) { log(`refused ${src.port} -> ${to}: ${r.why}`, 'bad'); return r; }
     linked[k] = to;
+    showLinks();
     if (k === 'light') { lastSent = ''; lastKey = ''; }
     if (k === 'cues') { lastCueSent = ''; lastKey = ''; }
     if (k === 'sirens') {
@@ -280,6 +284,10 @@ export function build({ panel, log, set }) {
     log(`${src.port} -> ${to}, linked through the patchbay`, 'ok');
     drawChoices();
     return r;
+  }
+  function showLinks() {
+    const n = Object.values(linked).filter(Boolean).length;
+    set('links', n ? `${n} of 3` : 'none');
   }
   function sendLight(f) {
     if (!linked.light || !me) return;
@@ -326,6 +334,7 @@ export function build({ panel, log, set }) {
           wire.send({ type: 'graph.announce', graph: GRAPH });
           wire.send({ type: 'graph.ask' });
           find.button('find').disabled = true;
+          showJoined();
           log(`in ${ROOM}, listening for walls and instruments`, 'ok');
           resolve();
         },
@@ -354,6 +363,7 @@ export function build({ panel, log, set }) {
     try { wire?.close(); } catch { /* already gone */ }
     wire = null; me = null; joined = null;
     find.button('find').disabled = false;
+    showJoined();
   }
   const find = createButtonGroup({ buttons: [
     { id: 'find', label: 'Find walls', onPress: () => join() },
@@ -370,7 +380,7 @@ export function build({ panel, log, set }) {
     const names = sceneNames();
     if (!names.includes(markWith)) markWith = names[0] || '';
     const options = names.length ? names.map((n) => [n, n]) : [['none heard', '']];
-    const choice = createChoice({ label: 'mark scene', options, at: Math.max(0, names.indexOf(markWith)),
+    const choice = createChoice({ label: 'scene', options, at: Math.max(0, names.indexOf(markWith)),
       title: (v) => (v ? `a scene saved in a patchbay in ${ROOM}` : `no patchbay in ${ROOM} has listed a scene`),
       onPick: (v) => { markWith = v; } });
     const here = el('button', '', 'Mark here', { type: 'button', title: 'a mark at the playhead that recalls this scene' });
@@ -380,11 +390,13 @@ export function build({ panel, log, set }) {
     clear.disabled = !sceneMarks.length;
     const row = el('div', 'pt-mark');
     row.append(choice.el, here, clear);
-    markHost.replaceChildren(el('p', 'pt-say', 'The scenes lane recalls a scene saved in /patchbay/ whenever the playhead '
-      + 'passes its mark while playing, and a seek or a scrub passes nothing.'), row);
+    const say = el('p', 'pt-say', 'A mark on the scenes lane recalls a scene saved in ');
+    say.append(el('a', '', '/patchbay/', { href: '/patchbay/' }), ' when playback passes it.');
+    markHost.replaceChildren(say, row);
   }
   function marksChanged() {
     keepMarks();
+    showJoined();
     const L = view.strip.lanes().find((x) => x.id === 'scenes');
     if (L) L.subLabel = marksSub();
     view.strip?.invalidate?.();
@@ -413,10 +425,25 @@ export function build({ panel, log, set }) {
   drawMarkRow();
   window.addEventListener('pagehide', () => sirenOff());
 
-  // Find walls heads the three link picks it fills, as one block.
+  /*
+   * 🔴 THE PICTURE AND THE TIMELINE FIRST, ONE SURFACE, AND THE LINKING UNDER
+   * THEM. Until 2026-10-05 the tab stacked the length, Find walls, three link
+   * picks, a sentence about scenes and the mark row ABOVE the picture, about
+   * 650 px at the desk and 960 on a phone before the thing a visitor came to
+   * see, and the three picks read `none` with nothing to pick until the room
+   * was joined. Now the picks and the scene marks appear when the room is
+   * joined (or when this browser already keeps marks), so what a first visit
+   * shows is the score, its length, and one button.
+   */
   const links = el('div', 'pt-text');
-  links.append(find.el, wallHost);
-  panel.add(length.el, links, markHost, video.el, surface);
+  links.append(find.el, wallHost, markHost);
+  function showJoined() {
+    wallHost.hidden = !joined;
+    markHost.hidden = !joined && !sceneMarks.length;
+  }
+  showJoined();
+  showLinks();
+  panel.add(video.glue(bar.el, view.surface), length.el, links);
 
   /** Rescale everything from fractions. The playhead keeps its place on the plate. */
   function setLength(s, quiet = false) {
@@ -425,7 +452,6 @@ export function build({ panel, log, set }) {
     deck.setRange([0, ms(1)]);
     deck.seek(ms(f));
     view.strip?.invalidate?.();
-    set('length', Math.round(s / 60));
     if (!quiet) log(`length ${Math.round(s / 60)} min, chosen here, because the score gives none`);
   }
 
@@ -504,7 +530,6 @@ export function build({ panel, log, set }) {
   })();
   size();
   new ResizeObserver(size).observe(video.stage);
-  set('length', Math.round(totalS / 60));
 
   return {
     deck, bar, join, leave, setLink, drive, linked, registry,
@@ -568,7 +593,7 @@ export function build({ panel, log, set }) {
         const b2 = reg2.fill(createBay());
         const toSynth = b2.validate(SOURCES.sirens.port, 'desk:synth:in');
         const toCaps = b2.validate(SOURCES.cues.port, 'desk:wall:cue');
-        A('the Ton lane can be linked to an instrument\u2019s MIDI input', toSynth.ok, toSynth.why);
+        A('the siren lane can be linked to an instrument\u2019s MIDI input', toSynth.ok, toSynth.why);
         A('and the stage cues to a wall\u2019s captions', toCaps.ok, toCaps.why);
       }
       {
