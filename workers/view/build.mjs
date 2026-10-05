@@ -350,13 +350,14 @@ const FILES = [
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
-  // ── the eight monospaced faces `/slides/` can be set in, vendored ──────────
+  // ── the seven monospaced faces `/slides/` can be set in, vendored ──────────
   //
   // Listed by name for the same reason as Gabarito above. Latin subset, 400 and
   // 600, from the @fontsource 5.3.0 packages, SIL OFL 1.1, licence beside each.
-  // plans/plan-slides.md section 9 has why these eight.
+  // plans/plan-slides.md section 9 has why these seven (Martian Mono was the
+  // eighth, removed on the owner's word 2026-10-05).
   ...['atkinson-hyperlegible-mono', 'jetbrains-mono', 'geist-mono', 'ibm-plex-mono',
-    'intel-one-mono', 'fira-code', 'source-code-pro', 'martian-mono']
+    'intel-one-mono', 'fira-code', 'source-code-pro']
     .flatMap((f) => [
       [`demo/slides/vendor/${f}-latin-400-normal.woff2`, `slides/vendor/${f}-latin-400-normal.woff2`],
       [`demo/slides/vendor/${f}-latin-600-normal.woff2`, `slides/vendor/${f}-latin-600-normal.woff2`],
