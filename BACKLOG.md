@@ -1,5 +1,6 @@
 ## Open
 
+- **`/slides/` more line height on the small sizes** (2026-10-05): *"bit more line height on smaller font"*. Line height as part of the scale, opening up as size drops. Handed to the type scale agent.
 - **`/slides/` highlights not limited to one** (2026-10-05): *"do not have be on single one"*. More than one yellow or hue highlight per slide where it helps, colour coding across the talk. Handed to the type scale agent.
 - **`/slides/` colour coding in the diagram's hues** (2026-10-05): *"use also colorcoding slide with some hilited text and numbers in same hue ang also diagram colors"*. Words and numbers coloured with the hue of the diagram box they name (`TECH_HUE` in `diagram.mjs`), yellow stays the one point per slide. Handed to the type scale agent.
 - **`/slides/` remove Martian Mono** (2026-10-05): *"rm martian mono"*. Handed to the type scale agent, same file; seven faces remain.
