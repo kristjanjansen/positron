@@ -1,5 +1,6 @@
 ## Open
 
+- **Kit slides: STEP GRID ON A SLIDE as a split with the /tom/ instrument, no labels** (2026-10-05): *"STEP GRID ON A SLIDE - convert to col layout with tom instrument (no labels)"*.
 - ~~**A scrolling keyboard reaches its holder's edge** (2026-10-05): *"allow keyboaed overflor reach to the edge (general rule of keyb and panels)"*.~~ Done in shell.css, a keyboard that fits does not move. kit 340/340.
 - **`/kit/` runs two checks for visitors and prints them as FAIL in the log**: "a pad with nothing above it still reserves the slot" and "a waveform on both sides is two different pictures", seen in screenshots taken without `?selfcheck`. Breaks *"a self-check never runs for a visitor"*. Found 2026-10-05, not fixed.
 - **`/fau/` reads 75/76**: its own diagram reports a cut label, `notes` (`demo/fau/index.html:1729`). Present before the keyboard change, cause not looked at.
