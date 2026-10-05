@@ -247,7 +247,7 @@ export function build({ panel, log, set }) {
   registry.ingest({ type: 'graph.announce', from: 'self', graph: GRAPH });
   const linked = { light: '', sirens: '', cues: '' };
   let lastSent = '', me = null, lastCueSent = '', sirenOut = null, sirenNote = null;
-  const wallHost = el('div', 'pt-text');
+  const wallHost = el('div', 'pt-text pt-links');
   const kindOfPort = (id) => Object.keys(SOURCES).find((k) => SOURCES[k].port === id);
   const targets = (k) => registry.merged().ports.filter((p) => p.dir === 'in' && !p.stale && !p.id.startsWith(`${SITE}:`)
     && p.medium === SOURCES[k].medium && (k !== 'cues' || p.shape?.schema === 'cue'));

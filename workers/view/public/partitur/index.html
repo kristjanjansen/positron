@@ -9,6 +9,15 @@
 <style>
   .pt-text { display: flex; flex-direction: column; gap: 10px; }
   .pt-say { margin: 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+  /* The three link picks share one label column, so every row's options start
+     on one x (positron-compose section 2: label and control rows are one grid).
+     Each pick is a subgrid row of it. Above the phone width only: below it the
+     kit stacks a pick's label over its options and there is no column to share. */
+  @media (min-width: 561px) {
+    .pt-links { display: grid; grid-template-columns: max-content minmax(0, 1fr); row-gap: 10px; column-gap: 8px; }
+    .pt-links > .pos-choice { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; height: auto; }
+    .pt-links > .pos-choice > .pos-choice-seg { justify-self: start; }
+  }
   /* The scene picked and the button that marks it are one row. */
   .pt-mark { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
 </style>
