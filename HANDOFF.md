@@ -1,3 +1,46 @@
+# Handoff, 2026-10-05, session 64: /now/ into /flipper/, two channels on video panels, slides from a sample to a kit component
+
+## Where it is right now
+
+- ✅ **Site: BUILD `df741d7-183851-34c3`**, confirmed on the edge. **Pushed** to `kristjanjansen/positron` at `9e5fa43` (the account switched back after).
+- Counted: **46 demos, 44 built**, **90 plans**. CLAUDE.md's top line matches.
+- ⚠️ **ONE AGENT IS RUNNING** on the kit SLIDES tab: TIMELINE ON A SLIDE, TRANSPORT BAR ON A SLIDE (keys scoped so Space on the page body moves no bar) and FAU ON A SLIDE (split, keyboard overflowing its column, no libfaust load). It touches `demo/kit/index.html`, maybe `demo/shell/slide.mjs`/`slide.css`, and `plans/plan-slides.md`. Nothing of it is committed. Commit path-limited when it reports; it does not commit.
+- The working tree is otherwise clean apart from `workers/view/public/shell/shell.mjs`, which `deploy.mjs` rewrites.
+
+## What landed, all deployed
+
+| commits | what | look at |
+| --- | --- | --- |
+| `97a3ccf` `10a7d07` | `/kit/` range check gated on SELFCHECK, keys no longer bubble (bars sat at 0:01.200 for visitors); `/pack/` checks read sentence case, 31/31 | https://positron.studio/kit/ |
+| `29e52e0` | `/now/` opened a new ERR session every second (master re-read at 1 Hz, 217 KB playlist): one per open now, playlist every 10 s on a reused variant; `fake-err.mjs` matches the measured record (1.92 s, 3750, fMP4, `?id=` sessions) | |
+| `3fc1a23` | `research/free-live-tv-sources-2026-10-05.md`, docs only: own films as a synthetic live channel first, own Stream DVR second, iReplay.tv best external, EbS only after asking | |
+| `f2f15d5` ... `3aff057` `2b14c5a` | **`/flipper/` is `/now/` folded in**, then ETV and ETV2 only, each on its own `createVideoPanel` with ► ►► Loop ⊘ ⛶ in its footer and its own strip line; both play at once, starting one no longer mutes the other; no Start, nothing opens before a press. `/now/` archived, no redirect. 44/44, deep 55/55 against the stand-in | https://positron.studio/flipper/ |
+| `3fe5c9f` | `transport-bar.mjs` extras take `end: true` (the button sits left of LOOP); opt in, no other page moves | |
+| `6551903` ... `c556750` `7ffe9be` | **`/slides/`** (unlisted), now an ARCHIVE: the sample deck with seven self-hosted OFL mono faces and a picker, the six-step scale, and `plans/plan-slides.md` | https://positron.studio/slides/ |
+| `ccb84c5` `75db8fa` | `/talk/` (34 slides) built and then archived on *"There is no need for a talk slide"*, `archive/demos/talk-index.html` | |
+| `2f6c6e0` ... `df741d7` | **`demo/shell/slide.mjs` + `slide.css`, and a SLIDES tab on `/kit/`**: one static slide per block, the player first. Scale base 4 ratio 1.5, line height and tracking per step, JetBrains Mono for slides only. One inset (`--sl-pad` 8cqh) and twice it across a split, the split's slot half darker, captions under their words, full screen fills the screen with the slide ground and draws no edge, one rule width (`--sl-rule`, 0.4cqh) for tables, logs and 1.5 px diagram lines, logs fade one line at the top, words left under headlines. Components on slides: OLED (firmware glcd5x7 glyphs via `demo/shell/oled-font.mjs`, whole scale), slider, knob, waveform in a real instrument panel, video in a real video panel, diagram, step grid, readout, live log, live tabular log. kit 327/327, `slide-test.mjs` 47 ok | https://positron.studio/kit/ then SLIDES |
+
+## Decisions recorded today
+
+- `/flipper/` films page REFUSED (*"no films page"*), `plans/plan-flipper-patchbay.md` shelved. Radio removed from `/flipper/`.
+- Slide face JetBrains Mono, **slides only**; the site keeps `--mono`.
+- Removed from the SLIDES tab on the owner's word: ILLUSTRATION ON THE RIGHT and LEFT, INTERACTIVE ON THE LEFT, RIGHT ALIGNED (and the `right` layout), HEADLINE OVER A STACK, OVER A TABLE, OVER A NUMBER, LEFT ALIGNED, the rounded table box, Martian Mono.
+
+## Open
+
+- **Slide sets and talks**: a slide is plain data; what a set page needs is in `plans/plan-slides.md` section 13 (slot builders in a shared module, `#n` and notes and blank in the player, where sets live, a `checkSlides`). Not planned yet; the owner asked *"let's see how we actually can make different slide sets and talks"*.
+- **"hw screen"**: asked whether it meant the HARDWARE tab's OLEDs growing in full screen or the real firmware screen on the slide (load firmware on SLIDES); unanswered.
+- **⛶ always visible on a phone** sits over the end of a long caption; offered to move it top right on touch, unanswered.
+- From the kit: the deck's loop logic belongs in one shared helper (`/flipper/` carries a page copy); `diagram.mjs` colours only top-level box names; `/kit/` turns a specimen knob on every visit; a real arrow on a `/kit/` slider seeks every bar.
+- Not tested anywhere today: real ERR, Safari, iPhone.
+
+## Learned, worth keeping
+
+- **A stand-in can only catch a bug it can represent.** `fake-err.mjs` had no sessions, so `/now/` opening one per second at ERR read as correct for a month while a comment claimed the stand-in was "read off ERR".
+- **The build reads `import(` in a comment as an import** and refused a deploy over a quoted shell command.
+- **Chrome draws a 1.54 px border as 1 px on a 1x screen**; assert the drawn width, not the declared one.
+- **A check's count floor goes stale when blocks are removed**; three asserts went red today for that alone.
+
 # Handoff, 2026-10-05, session 63: UX passes on the tabbed pages, partitur and wall as one page, stage receives only, the Pico on a breadboard
 
 ## Where it is right now
