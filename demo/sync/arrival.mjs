@@ -29,6 +29,7 @@ import { el } from '/shell/shell.mjs';
 import { openWire } from '/shell/wire.mjs';
 import { createMessageList } from '/shell/messages.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
+import { tabDiagram } from './how.mjs';
 
 const ROOM = new URLSearchParams(location.search).get('room') || 'cues-demo';
 const BURST = 10, BURST_GAP_MS = 100;
@@ -38,6 +39,47 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const about = 'A cue goes through the relay and shows on every open screen the moment it lands. Press Send a cue and both screens change together.';
 
 export const readout = { screens: '', received: '', typical: 'ms', slowest: 'ms' };
+
+/**
+ * THE PICTURE, READ OFF THIS FILE. One Browser holding the two sockets this
+ * tab opens, and the relay's Durable Object between them. `join: false`: the
+ * two screens do not feed each other, and every line between them goes
+ * through the relay, which is the whole point of the tab.
+ * ⚠️ ONE BROWSER, NOT TWO. The second screen is a second socket in this same
+ * tab standing in for another phone, and a drawing may split a thing by role
+ * but may not invent a second machine.
+ * ⚠️ ONE RETURN ARROW, NOT TWO. The echo back to `this screen` was drawn as
+ * well and `createDiagram` reported it on `cuts`: a return path to the upper
+ * box runs through the lower one. Its fact is in the forward arrow's note.
+ */
+export const diagramSpec = () => ({
+  caption: 'A cue has no time of its own, so every screen shows it the moment the relay hands it over.',
+  nodes: [
+    { id: 'br', label: 'Browser', sub: 'this tab', kind: 'here', tech: 'browser', join: false,
+      children: [
+        { id: 'mine', label: 'this screen', sub: 'WebSocket',
+          note: `Sends a **cue.set** on every press, ${BURST} of them ${BURST_GAP_MS} ms apart for the burst. `
+              + 'It shows its own cue only when the relay hands it back, the same as every other screen.' },
+        { id: 'theirs', label: 'second screen', sub: 'WebSocket',
+          note: 'A second socket in the same room, standing in for another phone. It never sends, and the check '
+              + 'requires it to show every cue in the order this screen saw them.' },
+      ] },
+    { id: 'cf', label: 'Cloudflare', kind: 'cloud', tech: 'cloudflare',
+      children: [
+        { id: 'relay', label: 'Relay object', sub: 'Durable Object',
+          note: 'One room, every socket in it, and each message handed to all of them verbatim, the sender '
+              + 'included. It never stamps or stores anything, so it has no idea what time it is.' },
+      ] },
+  ],
+  links: [
+    { from: 'mine', to: 'relay', label: 'cue.set',
+      note: 'JSON in the shared envelope, stamped **sent** with this clock as it leaves. The relay hands it '
+          + 'straight back too, and arrival less **sent** is the delivery time in the readout.' },
+    { from: 'relay', to: 'theirs', label: 'cue.set', back: true,
+      note: 'The same bytes again, to every other socket in the room at once. Nothing is scheduled, so the '
+          + 'cue shows the instant it lands.' },
+  ],
+});
 
 export function build({ panel, log, set }) {
   /**
@@ -147,7 +189,10 @@ export function build({ panel, log, set }) {
 
   addEventListener('pagehide', () => { here.wire?.close(); other.wire?.close(); });
 
+  const how = tabDiagram(panel, diagramSpec);
+
   return {
+    show() { how.draw(); },
     async check({ A }) {
       A('nothing joined the relay before the first press in this tab',
         !here.wire && !other.wire, here.wire ? 'a socket was already open' : 'no socket yet');
@@ -182,6 +227,11 @@ export function build({ panel, log, set }) {
         + `${same ? 'the same order' : 'a DIFFERENT order'}, showing ${here.big.textContent} and ${other.big.textContent}`);
       A('the two copies are two sockets, not one read twice', !!here.from && !!other.from && here.from !== other.from
         && peers.has(other.from), `${here.from} and ${other.from}, this copy heard ${peers.size} other(s)`);
+      // Written out here rather than read off the spec, so the picture is
+      // graded against a second statement of what this tab opened: two
+      // sockets, both graded open above, and the one relay room.
+      await how.check(A, ['Browser, this tab', 'this screen, WebSocket', 'second screen, WebSocket',
+        'Cloudflare', 'Relay object, Durable Object']);
     },
   };
 }

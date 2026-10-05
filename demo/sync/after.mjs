@@ -26,7 +26,7 @@ import { el, armVideo, playOrPrompt } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
 import { createStripView } from '/shell/strip.mjs';
 import { createGlue } from '/shell/glue.mjs';
-import { createDiagram } from '/shell/diagram.mjs';
+import { tabDiagram } from './how.mjs';
 import { createDeck } from '/timeline/transport.mjs';
 import { mediaMaster } from '/timeline/media-master.mjs';
 import { ARCHIVE, CUES, cueItems } from '/shell/archive.mjs';
@@ -189,12 +189,8 @@ export function build({ panel, log, set, d }) {
    * diagram laid out inside a closed panel is laid out for a width nobody has,
    * and because by then the tab's readout and log are already in place above.
    */
-  let dg = null, fitted = false;
-  function drawDiagram() {
-    if (dg) return;
-    const host = el('div');
-    panel.add(host);
-    dg = createDiagram(host, {
+  let fitted = false;
+  const how = tabDiagram(panel, () => ({
       caption: 'The picture is the clock. Everything else in this tab follows where it has got to.',
       nodes: [
         { id: 'cf', label: 'Cloudflare', sub: 'R2 bucket', kind: 'cloud', tech: 'cloudflare',
@@ -208,7 +204,7 @@ export function build({ panel, log, set, d }) {
           ] },
         // `set: true`: these four are not one chain, and `cue log` is a file
         // this page ships rather than something upstream produces.
-        { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser', set: true,
+        { id: 'you', label: 'Browser', sub: 'this tab', kind: 'here', tech: 'browser', set: true,
           children: [
             { id: 'hls', label: 'hls.js', sub: 'MediaSource',
               note: 'Fetches the files the playlist names and appends them to a '
@@ -246,8 +242,7 @@ export function build({ panel, log, set, d }) {
         // NO ARROW FROM `cue log` TO `timeline`: `createDiagram` refused it on
         // `cuts` in both orderings, and its note carries what it would have said.
       ],
-    }, { how: true });
-  }
+  }));
 
   /** The loop, pressed the way a finger presses it, around the first cue. */
   async function gradeLoop() {
@@ -285,7 +280,7 @@ export function build({ panel, log, set, d }) {
 
   return {
     show() {
-      drawDiagram();
+      how.draw();
       // the strip fits the whole show to its width once it has one
       if (!fitted) { fitted = true; requestAnimationFrame(() => strip.strip.fit()); }
     },
@@ -317,8 +312,6 @@ export function build({ panel, log, set, d }) {
       } else {
         A('cues land within 250 ms of the picture', false, `no cue fired inside a loop laid around ${CUES[0].id}`);
       }
-      A('the diagram drew every name and every arrow whole', !!dg && dg.cuts.length === 0,
-        dg ? (dg.cuts.map((c) => `${c.where} ${c.id}`).join(', ') || 'nothing cut, nothing refused') : 'no diagram');
       // the MANIFEST, not the element's readiness, which depends on how fast
       // R2 answered. A second request, made only to grade, so only here.
       let mOk = false, mStatus = 0;
@@ -341,6 +334,11 @@ export function build({ panel, log, set, d }) {
         bar.api.lattice === null && rateBtns === 0, `lattice ${JSON.stringify(bar.api.lattice)}, ${rateBtns} buttons`);
       A('this is the page’s one published transport', window.__demo?.transport === bar.api,
         window.__demo?.transport === bar.api ? 'the harness drills this bar' : 'another bar is published');
+      // Written out here rather than read off the spec: the bucket the show is
+      // fetched from, and the four parts of this tab that play and follow it.
+      await how.check(A, ['Cloudflare, R2 bucket', 'playlist, m3u8 text', 'segments, 4s each',
+        'Browser, this tab', 'hls.js, MediaSource', 'video, one element', `cue log, ${CUES.length}, in the page`,
+        `timeline, ${CUES.length} cues, 1 loop`]);
     },
   };
 }
