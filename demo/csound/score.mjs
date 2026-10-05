@@ -52,6 +52,7 @@ import { scoreDoc, quotation, scoreDocToJSONL } from '/timeline/score.mjs';
 import { csoundPart, compileCsound, tempoMap } from '/timeline/csound.mjs';
 import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
 import { createCodeBox } from '/shell/code-box.mjs';
+import { createDiagram } from '/shell/diagram.mjs';
 
 /** Under the tab row, in the page's one fixed box. */
 export const about = 'A Csound score you can edit, compiled when you stop typing, whose every note plays where its slowing tempo puts it, even after a jump into the repeat.';
@@ -521,6 +522,48 @@ export function build({ panel, d, assert, log, set }) {
     set('fold', fold && Number.isFinite(fold.count) ? fold.count : '');
   }, 200);
 
+  /**
+   * 🔴 HOW IT WORKS, LAST IN THE TAB, ADDED 2026-10-05 on *"add how it works
+   * diagrams to all tenchilogies"*. Read off this file: nothing here talks to
+   * any server, so the picture has ONE machine, the Browser.
+   * ⚠️ NO `speakers` BOX. It was drawn and MEASURED at 1280 px: the drawer gives
+   * every top-level box the container's height, so a speaker beside a Browser
+   * of four boxes was a 300 px empty slab. The output is in the AudioContext's
+   * note instead. Drawn on the first showing, the way `/sync/`'s
+   * AFTER tab does it, because a diagram laid out in a closed panel is laid out
+   * for a width nobody has, and because by then the tab's report is already in
+   * place above it. CLICK carries its own picture: it makes no sound and its
+   * score is carried in the page, so the two tabs do not share one.
+   */
+  const DIAGRAM = {
+    caption: 'Everything happens in the page: the score is compiled, scheduled and played without a request to any server.',
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'score', label: 'score', sub: 'code box',
+            note: `The Csound score you type, coloured line by line in the ink of the lane that draws it. It goes to the **compiler** ${IDLE_MS} ms after the last keystroke, never while you are still typing.` },
+          { id: 'compiler', label: 'compiler', sub: 'Csound in JS',
+            note: 'Reads Csound\u2019s score format in JavaScript, bending seconds per beat linearly in beat the way Csound does. It writes the document with the repeat as one line, and expands the repeat into real notes for playing.' },
+          { id: 'timeline', label: 'timeline', sub: 'Worker clock',
+            note: 'Every expanded note at the millisecond the tempo map gives it, so a jump into the slower repeat lands where it should. A Web Worker wakes it every 25 ms, which keeps time in a background tab.' },
+          { id: 'audio', label: 'AudioContext', sub: 'WebAudio', tech: 'sound',
+            note: 'Two sawtooths seven cents apart through a closing lowpass and a room built from a noise buffer, compressed at -10 dB into this device\u2019s own output. The 4 ms attack keeps each onset where the **timeline** puts it.' },
+        ] },
+    ],
+    links: [
+      { from: 'score', to: 'compiler', note: 'The text as it stood at the last keystroke, once the typing has paused.' },
+      { from: 'compiler', to: 'timeline', note: 'Each note with its time in milliseconds, scheduled once per compile.' },
+      { from: 'timeline', to: 'audio', note: 'One voice per note, started the moment the timeline fires it, and the line it was written on lights.' },
+    ],
+  };
+  let dg = null;
+  function drawDiagram() {
+    if (dg) return;
+    const box = el('div');
+    host.append(box);
+    dg = createDiagram(box, DIAGRAM, { how: true });
+  }
+
   // No "jump into the repeat" button. Seeking into the score IS this tab's
   // claim, but the button only did by hand what two asserts already do on
   // their own, and the strip is a position surface you can drag there yourself.
@@ -529,7 +572,10 @@ export function build({ panel, d, assert, log, set }) {
 
   return {
     deck: parent,
-    show() { requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate?.(); })); },
+    show() {
+      drawDiagram();
+      requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate?.(); }));
+    },
     // Leaving the tab stops the notes: nothing new is scheduled once the deck
     // is paused, and a voice already sounding decays inside 1.15 s.
     hide() { parent.pause(); },
@@ -670,6 +716,37 @@ export function build({ panel, d, assert, log, set }) {
         const got = parent.reduceAt('note', pos);
         A('a seek into the repeat folds correctly', !!got && got.count === want,
           `at ${Math.round(pos)} ms, fold ${got && got.count} of ${want}`);
+      }
+
+      // ── the picture, graded the way /sync/'s AFTER tab grades its own ─────
+      {
+        const w = dg ? Number(dg.svg.getAttribute('width')) : 0;
+        const room = dg ? Math.floor(dg.el.clientWidth) : 0;
+        A('the diagram is built, last in the tab, and laid out at the width it is shown at, measured rather than estimated',
+          !!dg && dg.el.isConnected && dg.measured && room > 0 && Math.abs(w - room) <= 1
+            && host.lastElementChild?.contains(dg.el),
+          dg ? `${w} px drawn in ${room} px, ${dg.mode}, ${dg.measured ? 'text measured' : 'text ESTIMATED'}` : 'never drawn');
+        A('the diagram drew every name and every arrow whole, with no headless line in it',
+          !!dg && dg.cuts.length === 0 && dg.ties === 0,
+          dg ? (dg.cuts.map((c) => `${c.where} ${c.id}: ${c.shown}`).join(', ') || `nothing cut, nothing refused, ${dg.ties} ties`) : 'no diagram');
+        // A box per machine the tab talks to. It talks to none, so the only
+        // machine is the Browser, and that is checked against what the page
+        // really requested rather than against the description of it.
+        const own = new URL('.', import.meta.url).pathname;
+        const res = performance.getEntriesByType('resource');
+        const away = res.filter((r) => {
+          const p = new URL(r.name, location.href).pathname;
+          return !(p.startsWith('/shell/') || p.startsWith('/timeline/') || p.startsWith(own)
+            || (p === '/_log' && /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname)));
+        });
+        const machines = DIAGRAM.nodes.filter((n) => n.children).map((n) => n.label);
+        const boxes = DIAGRAM.nodes.reduce((k, n) => k + 1 + (n.children?.length || 0), 0);
+        const drawn = dg ? dg.svg.querySelectorAll('.pos-dg-n').length : 0;
+        const kids = DIAGRAM.nodes[0].children.map((c) => c.label);
+        A('the diagram boxes are what the tab uses: one machine, the Browser, because the tab asks no server for anything',
+          away.length === 0 && machines.length === 1 && machines[0] === 'Browser' && drawn === boxes,
+          away.length ? `the page asked for ${away.map((r) => r.name).join(', ')}, which has no box`
+            : `${drawn} of ${boxes} boxes drawn, machines ${machines.join(', ')}, inside it ${kids.join(', ')}, ${res.length} requests all local code`);
       }
 
       A('this is the page’s one published transport', window.__demo?.transport === bar.api,
