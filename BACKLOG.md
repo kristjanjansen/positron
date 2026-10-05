@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Kit slides, the evening's round** (2026-10-05): *"thicker table lines, same as other lines. when on fullsc scale all borders proportionally. rm doublw underline on LIVE TABULAR LOG ON A SLIDE"*, *"what is this???? just all bg is slide bg and border is screens border"*, *"HEADLINE OVER TEXT align texts to left"*, *"tables full w. no roundex box"*, *"ugly cut / crrop"*, *"more x padding around central divider"*, *"align left the same"*, *"rm INTERACTIVE ON THE LEFT"*, *"still broken sceren bitmap. no text going over to other column, wrap!"*, *"use actual videopanel VIDEO ON A SLIDE"*, *"rm ILLUSTRATION ON THE LEFT"*.~~ Done, kit 327/327.
+- **Kit slides: WAVEFORM ON A SLIDE in a real instrument panel** (2026-10-05): *"WAVEFORM ON A SLIDE use actual instument panel"*. `createInstrumentPanel` around the wave view.
 - ~~**Kit slides: the full screen edge off the screen's edge; remove HEADLINE OVER A STACK and HEADLINE OVER A TABLE** (2026-10-05): *"border is on edges of screen"*, *"rm HEADLINE OVER A STACK"*, *"rm HEADLINE OVER A TABLE"*.~~ Done, 329/329.
 - ~~**Kit slides: more negative tracking on the large steps** (2026-10-05): *"biit more negat tracking on large sizes"*. Handed to the same agent.~~ Done 2026-10-05, kit 329/329.
 - ~~**Kit slides: full screen fills the background, keeps the border** (2026-10-05, screenshot with black letterbox bands): *"fill full bg but keep border"*. Handed to the same agent.~~ Done 2026-10-05, kit 329/329.
