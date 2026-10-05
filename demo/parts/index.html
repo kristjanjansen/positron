@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .pa-say { margin: 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+  .pa-text { display: flex; flex-direction: column; gap: 10px; }
+  /* The drawings are light on purpose (they are build sheets), so they sit on
+     their own ground and scroll sideways on a phone rather than shrink to
+     unreadable holes. */
+  .pa-pic { overflow-x: auto; border: var(--edge); border-radius: var(--r); background: #f4f1ea; }
+  .pa-pic img { display: block; width: 1352px; max-width: none; height: auto; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+
+  /*
+   * 🔴 A BUILD SHEET, NOT A DEMO, AND UNLISTED. Asked 2026-10-05 as *"write
+   * into not-in-index positron page"*, after a session of shopping list,
+   * breadboard drawings and power questions for the Pico router. It opens
+   * nothing: two pictures from this directory and a table of shop links.
+   * The drawings are `rig/pico/oled/breadboard.mjs`'s output, copied here
+   * because the deploy serves only `demo/`. Re-draw there and copy again.
+   * ⚠️ PRICES AND STOCK WERE READ ON OOMIPOOD 2026-10-04 AND 2026-10-05, not
+   * live. The page says so.
+   */
+  const WHAT = 'The parts, the breadboard and the power for the Pico router with its screen and four keys.';
+  const d = mount({ name: 'parts', what: WHAT, readout: null, showLog: false, controls: [] });
+  guard(d);
+
+  const say = (...texts) => {
+    const box = el('div', 'pa-text');
+    for (const t of texts) box.append(el('p', 'pa-say', t));
+    return box;
+  };
+  const OOMI = 'https://www.oomipood.ee';
+  const PARTS = [
+    { part: 'Raspberry Pi Pico 2 WH, headers fitted', qty: '1', price: '€14.00', url: `${OOMI}/en/product/raspberry_pi_pico_2wh_wireless_arm_cortexm33` },
+    { part: '0.96" OLED with 4 buttons, SSD1306 I2C', qty: '1', price: '€10.50', url: `${OOMI}/product/oled_display_4_nuppu_096_128x64_33v_i2c_ssd1306` },
+    { part: 'Breadboard, 830 holes, MB-102', qty: '1', price: '€5.00', url: `${OOMI}/en/product/oky0008_maketeerimislaud_60_170mm_830_punkti_mb_102` },
+    { part: 'Jumper wires, male to male, 15 cm, 40', qty: '1', price: '€3.50', url: `${OOMI}/en/product/oky0070_maketeerimislaua_juhtmed_40tk_isa_isa_15cm_2_54mm` },
+    { part: 'OTG cable, micro USB to USB-A socket, Pico to the hub', qty: '1', price: '€4.00', url: `${OOMI}/product/usb20_otg_kaabel_usb_a_pesa_usb_micro_b_pistik_20cm_must` },
+    { part: 'USB-A plug to screw terminals, power from a hub port', qty: '1', price: '€1.00', url: `${OOMI}/product/oky3447_2_leminek_usb_a_pistikult_klemmribale` },
+  ];
+  const SWAPS = [
+    { part: 'Breadboard, 400 holes, dongle power only', qty: 'instead', price: '€4.00', url: `${OOMI}/en/product/maketeerimislaud_5483mm_400_punkti` },
+    { part: 'MB102 power module, plus a 9 V adapter, 830 board only', qty: 'instead', price: '€3.50', url: `${OOMI}/en/product/oky0026_toitemoodul_maketeerimislauale_mb102_3_3v_5v_700ma_6_5_12v` },
+  ];
+  const cols = [
+    { key: 'part', label: 'part', grow: true, link: 'url' },
+    { key: 'qty', label: 'qty', width: 64 },
+    { key: 'price', label: 'price', width: 72 },
+  ];
+  const list = createTable({ columns: cols });
+  list.set(PARTS);
+  const swaps = createTable({ columns: cols });
+  swaps.set(SWAPS);
+  const total = PARTS.reduce((n, p) => n + parseFloat(p.price.slice(1)), 0);
+
+  d.stack.titled('SHOPPING LIST', list.el,
+    say(`€${total.toFixed(2)} at Oomipood, read on 2026-10-04 and 2026-10-05, plus the hub’s own A to B cable and a small flat screwdriver.`));
+  d.stack.titled('SWAPS', swaps.el);
+
+  const pic = (src, alt) => {
+    const box = el('div', 'pa-pic');
+    // A tap opens the picture alone, where a phone can pinch it.
+    const a = el('a', '', '', { href: src, target: '_blank', rel: 'noopener' });
+    a.append(el('img', '', '', { src, alt, loading: 'lazy' }));
+    box.append(a);
+    return box;
+  };
+  d.stack.titled('BREADBOARD, HUB POWER', pic('breadboard.png', 'Pico 2 WH, OLED module and the USB-A power dongle on an 830 hole breadboard'),
+    say('The Pico straddles the centre gap in columns 1 to 20 with its USB to the left. The screen’s header sits in row f, columns 40 to 47, and the module lies flat over the empty top half, so its eight wires go into rows g to j below it.'));
+  d.stack.titled('BREADBOARD, MB102 POWER', pic('breadboard-mb102.png', 'the same board powered by an MB102 module on the right hand end'),
+    say('Top jumper on 5 V feeds the Pico’s pin 40, bottom jumper on 3.3 V feeds the screen, and the Pico’s own 3V3 out is wired to nothing. Bridge the rails at columns 29 to 35 only if your board splits them.'));
+
+  d.stack.titled('POWER',
+    say('The Pico’s only USB socket goes to the hub as the host, and a host powers the line, so nothing powers the Pico through that cable.',
+      'So 5 V goes into VBUS, pin 40, which powers the Pico through its own diode and also puts 5 V on the cable to the hub, which many hubs need before they see a host.',
+      'The dongle plugs into a spare hub port and two jumpers run from its 5V and GND terminals to hole a1 and the top minus rail. Loosen each screw, push the jumper’s metal pin in, tighten, and tug to check, because a loose 5 V wire restarts the Pico at random.',
+      'Read from the USB and Pico documentation and not yet tried with this hub.'));
+
+  d.assert('every part has a shop link', [...PARTS, ...SWAPS].every((p) => p.url.startsWith(OOMI)));
+  d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
+  d.ready();
+</script>
+</html>
