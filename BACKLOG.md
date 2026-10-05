@@ -1,5 +1,6 @@
 ## Open
 
+- **Kit slides: FAU on a slide, split, keyboard overflowing** (2026-10-05): *"build fau into slide. overflow keyboard. col layout"*. The /fau/ instrument from kit parts, no compiler load. Handed to the strip and bar agent.
 - **Kit slides: a timeline strip and a transport bar on slides** (2026-10-05): *"do 6 and 7"*, from the list of what is missing: a strip view on a slide, and a transport bar on a slide with its keys scoped so Space does not leave the deck.
 - ~~**Kit slides: plate without patch, OLED whole scale in full screen, subtler log fade, THE SCALE in one column, HEADLINE OVER A NUMBER and LEFT ALIGNED removed** (2026-10-05).~~ Done, kit 327/327.
 - ~~**Kit slides: no right layout, equal inset, the instrument panel scaled with a proper plate, thinner diagram lines** (2026-10-05): *"no right align needed"*, *"same w and h padding"*, *"scale instrument as you do with knobs. equal padding. uppercase proper instrument nameplate"*, *"make borders bit thinner of slide diagrams"*.~~ Done, kit 327/327.
