@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**Kit slides: the full screen edge off the screen's edge; remove HEADLINE OVER A STACK and HEADLINE OVER A TABLE** (2026-10-05): *"border is on edges of screen"*, *"rm HEADLINE OVER A STACK"*, *"rm HEADLINE OVER A TABLE"*.~~ Done, 329/329.
 - ~~**Kit slides: more negative tracking on the large steps** (2026-10-05): *"biit more negat tracking on large sizes"*. Handed to the same agent.~~ Done 2026-10-05, kit 329/329.
 - ~~**Kit slides: full screen fills the background, keeps the border** (2026-10-05, screenshot with black letterbox bands): *"fill full bg but keep border"*. Handed to the same agent.~~ Done 2026-10-05, kit 329/329.
 - ~~**Kit slides: remove ILLUSTRATION ON THE RIGHT** (2026-10-05): *"rm ILLUSTRATION ON THE RIGHT slide"*. Handed to the same agent.~~ Done 2026-10-05, kit 329/329.
