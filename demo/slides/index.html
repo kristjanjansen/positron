@@ -405,9 +405,9 @@
   // character position. Rows are written to Martian's 24 characters.
   const SLIDES = [
     // ── what this is ──
-    // 46 rows and 44 built: `node -e "import('./demo/manifest.mjs').then(m =>
-    // console.log(m.DEMOS.length, m.DEMOS.filter(d => d.built).length))"`, run
-    // 2026-10-05, printed `46 44`. Counted, never remembered (CLAUDE.md).
+    // 46 rows and 44 built: CLAUDE.md's count command over the manifest, run
+    // 2026-10-05, printed `46 44`. Counted, never remembered. (The command is
+    // not quoted here because the build reads an import in a comment as real.)
     { name: 'lab', say: 'Positron is a lab for live media in a browser',
       big: '44', cap: 'demos built, of 46 in the manifest', link: '' },
     { name: 'machines', say: 'Cloudflare carries the streams in between',
