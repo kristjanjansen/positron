@@ -1,5 +1,6 @@
 ## Open
 
+- **Slides: negative tracking growing with size** (2026-10-05): *"add biit negative letter spaing as bigger we go with slides type"*. Letter spacing per scale step, 0 at the smallest. Handed to the deck agent.
 - **Slides: diagram air and descriptions as slide text** (2026-10-05, screenshot of the Cloudflare slide): *"bit more space on top of diagram. do not use diagram native descs below but use slides text and postion"*. Larger gap above a diagram; box sub lines out of the diagram and set as slide text under each box column. Handed to the deck agent.
 - **Slides: no way-out button in full screen on a desktop** (2026-10-05): *"do not show back-from-fullscreen button in desktop"*. Hidden under `(hover: hover) and (pointer: fine)` in the deck module, kept on touch where it is the only way out. Handed to the deck agent.
 - **A real positron deck, in the background** (2026-10-05): *"in bg do some actual slides on positron"*. A full presentation on its own page (`/talk/`, unlisted) on the slides system, with `/slides/` kept as the reference for faces and the scale; the deck engine moves into a module both pages import.
