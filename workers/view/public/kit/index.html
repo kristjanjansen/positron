@@ -7518,19 +7518,30 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
      * page in a state they did not ask for, and this block holds no `await`, so
      * no frame is rendered in the middle of it.
      */
-    const was = rangeSpec.gap.get();
-    const key = (node, k) => node.dispatchEvent(
-      new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
-    key(rangeSpec.gap.knobs[0], 'ArrowRight');
-    const stepped = rangeSpec.gap.get().from;
-    key(rangeSpec.gap.knobs[0], 'End');
-    const ended = rangeSpec.gap.get();
-    rangeSpec.gap.set(was.from, was.to, true);
-    d.assert('an arrow moves one handle by a step and End takes it to its own limit, not the scale’s',
-      stepped === was.from + 1 && ended.from === ended.to - 20 && ended.to === was.to
-      && rangeSpec.gap.get().from === was.from,
-      `${was.from} stepped to ${stepped}, End landed on ${ended.from} against an end at `
-      + `${ended.to} with a gap of 20, and the pair is back at ${was.from} and ${was.to}`);
+    /*
+     * 🔴 AND IT RUNS UNDER `?selfcheck=1` ONLY, FOUND 2026-10-04. This block sits
+     * at the top level of the module with no gate, so the keys went out on every
+     * visit, and with `bubbles: true` each one reached `transport-bar.mjs`'s
+     * `window` listener, which moves every bar a key from outside a bar reaches.
+     * `ArrowRight` is a 2 per cent seek, so a plain load showed every visible bar
+     * at 0:01.200 rather than 0:00. The handle's listener is on the knob itself,
+     * so the key does not need to bubble to be graded, and it no longer does.
+     */
+    if (SELFCHECK) {
+      const was = rangeSpec.gap.get();
+      const key = (node, k) => node.dispatchEvent(
+        new KeyboardEvent('keydown', { key: k, bubbles: false, cancelable: true }));
+      key(rangeSpec.gap.knobs[0], 'ArrowRight');
+      const stepped = rangeSpec.gap.get().from;
+      key(rangeSpec.gap.knobs[0], 'End');
+      const ended = rangeSpec.gap.get();
+      rangeSpec.gap.set(was.from, was.to, true);
+      d.assert('an arrow moves one handle by a step and End takes it to its own limit, not the scale’s',
+        stepped === was.from + 1 && ended.from === ended.to - 20 && ended.to === was.to
+        && rangeSpec.gap.get().from === was.from,
+        `${was.from} stepped to ${stepped}, End landed on ${ended.from} against an end at `
+        + `${ended.to} with a gap of 20, and the pair is back at ${was.from} and ${was.to}`);
+    }
   }
 
   /**
