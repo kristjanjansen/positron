@@ -28,8 +28,10 @@ default** since 2026-10-05 (section 9), switchable under the panel and carried
 in the address. Everything under a headline is centred in the space below it,
 and a caption sits at SMALL in the bottom left corner. Since 2026-10-05 the
 deck is a real talk about positron, sixteen slides, every number measured and
-sourced (section 10). `node demo/verify.mjs slides` reads **45/45** (39 page
-asserts), up from 36/36.
+sourced (section 10). `node demo/verify.mjs slides` reads **60/60** (54 page
+asserts), up from 51/51 (45). Since the same evening the engine is a module,
+`demo/slides/deck.mjs` and `deck.css` (section 11), and `/talk/` is the real
+presentation built on it, 34 slides (section 12).
 
 ## 2. What the research says
 
@@ -141,14 +143,34 @@ drops: a big line is read as a shape and its leading is mostly empty ascender
 room, a small line is read across a wide measure and the eye needs the room to
 find the next one. Declared beside each step as `--sl-<n>-lh`.
 
-| step | cqh | line | x next | 686 px panel (1280 page) | 343 px panel (375 page) | full screen 1280x720 | use |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `--sl-1` | 4.00 | 1.45 | 1.5 | 15.44 px | 7.67 px | 28.8 px | caption, bottom left |
-| `--sl-2` | 6.00 | 1.30 | 1.5 | 23.15 px | 11.51 px | 43.2 px | evidence with four rows |
-| `--sl-3` | 9.00 | 1.20 | 1.5 | 34.73 px | 17.26 px | 64.8 px | evidence: tables, stacks, a list |
-| `--sl-4` | 13.50 | 1.10 | 1.5 | **52.09 px MEASURED** | 25.89 px | 97.2 px | the headline |
-| `--sl-5` | 20.25 | 1.05 | 1.5 | 78.14 px | 38.84 px | 145.8 px | a statement slide |
-| `--sl-6` | 30.38 | 1.00 | (top) | **117.21 px MEASURED** | 58.26 px | 218.7 px | one number |
+| step | cqh | line | tracking | x next | 686 px panel (1280 page) | 343 px panel (375 page) | full screen 1280x720 | use |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `--sl-1` | 4.00 | 1.45 | 0 | 1.5 | 15.44 px | 7.67 px | 28.8 px | caption, bottom left, diagram box words, notes |
+| `--sl-2` | 6.00 | 1.30 | -0.005em | 1.5 | 23.15 px | 11.51 px | 43.2 px | evidence with four rows |
+| `--sl-3` | 9.00 | 1.20 | -0.01em | 1.5 | 34.73 px | 17.26 px | 64.8 px | evidence: tables, stacks, a list |
+| `--sl-4` | 13.50 | 1.10 | -0.02em | 1.5 | **52.09 px MEASURED** | 25.89 px | 97.2 px | the headline |
+| `--sl-5` | 20.25 | 1.05 | -0.03em | 1.5 | 78.14 px | 38.84 px | **145.8 px MEASURED** | a statement slide |
+| `--sl-6` | 30.38 | 1.00 | -0.04em | (top) | **117.21 px MEASURED** | 58.26 px | 218.7 px | one number |
+
+**Tracking is part of the step (DECIDED 2026-10-05, asked for):** *"add biit
+negative letter spaing as bigger we go with slides type"*. `--sl-<n>-ls`
+beside each size and line height, in em so it scales, 0 at step 1 and closing
+as the size grows. LOOKED AT in the shots at 375 and 1280: no two letters
+touch at step 6 in JetBrains. Asserted at both widths: every text element's
+computed letter spacing equals its step's declared em times its size, within
+0.05 px. The character grid survives it, because every row of a step gets the
+same tracking: MEASURED after, tables worst 0.03 px and decimal points worst
+0.02 px, all seven faces, both widths. **Budgets re-measured with the
+tracking in**, characters a line at steps 4/5/3: JetBrains, Geist, Plex,
+Fira and Source 19/13/29 (were 19/12/28), Intel 19/13/28, Atkinson 18/12/27
+unchanged, so Atkinson still sets the deck's budget at 18 and 12.
+
+**More air above a diagram (DECIDED 2026-10-05, asked for):** *"bit more
+space on top of diagram"*. The evidence region of a diagram slide opens with
+one step 2 line, `--sl-2` times `--sl-2-lh`, 7.8 per cent of the slide,
+against the ordinary 4. MEASURED headline bottom to picture top: 30.0 px at
+686 and 15.0 px at 343, exactly the value, because the diagram is height
+bound and centring has no slack to add.
 
 The slide is 385.9 px tall in the 1280 page and 191.8 px in the 375 page. The
 two bold figures are what the harness printed; the rest are the step times the
@@ -261,7 +283,9 @@ const SLIDES = [
 | `under` | one LARGE line under `big` | the unit or what the number is of |
 | `live(host)` | builds a running element, returns `{ start, stop, value, subject }` | built on first show, started on show, stopped on leave, opens nothing; `subject` is what the centring assert measures |
 | `specimen` | the five-face specimen | `0O` at EXTRA LARGE over `Il1` at LARGE, one column per face in switcher order, the chosen one in `--hi` |
-| `notes` | speaker notes (not in the sample) | see section 7 |
+| `notes` | speaker notes, shown under the panel only with `?notes=1` | step 1, the chosen face, follows the slide (built for `/talk/`, section 12) |
+| `link` | the caption's demo, written out as `https://positron.studio/<slug>/` | `''` is the front page |
+| `desc` (on a top level diagram node) | what that box is, set as slide text under its column | step 1, centred on the box, two lines at most |
 
 The address carries the slide (`/slides/#3`), so a reload or a dropped
 projector cable lands back on it.
@@ -330,16 +354,28 @@ come with them:
   ignored in a text field or a select, with a modifier, and Space or Enter on a
   focused button stays the button's. MEASURED: the sequence of nine keys lands
   on `1,2,3,2,1,5,0,1,0`.
+- Escape leaves full screen too (the deck's own key, so the fallback cover
+  leaves on it as well as the real API).
+- **No way-out button over a slide on a desktop** (asked 2026-10-05: *"do not
+  show back-from-fullscreen button in desktop"*). `deck.css` hides `.pos-fsx`
+  inside `.sl-panel` under `@media (hover: hover) and (pointer: fine)`, at
+  (0,2,0), the weight of the component's own `[data-on]` rule, which sets
+  opacity and not display. Escape, `f` and F5 are the way out there. A phone
+  or tablet keeps the button, because an iPhone has no Escape and no element
+  full screen. Asserted under the harness (a fine pointer): the button
+  computes `display: none` in full screen, and Escape and `f` each leave it.
 - Full screen is `video-panel.mjs` `full()`, `fullMode: 'hover'`: the footer goes,
-  the shared ⛶ exit appears on movement. MEASURED in headless Chrome: the real
+  the shared ⛶ exit appears on movement (touch only, above). MEASURED in headless Chrome: the real
   element API ran, slide 16:9 and inside the screen, and leaving gives the
   panel its shape back.
 
 ## 7. What is open
 
-1. **Speaker notes.** Cheapest real version: a `notes` key, and `s` opens a
-   second window fed by `BroadcastChannel` (local, no network) showing the
-   notes, the next headline and a clock, the reveal.js shape. Not built.
+1. **Speaker notes.** BUILT 2026-10-05 in its smallest form: a `notes` key,
+   shown under the panel at step 1 only with `?notes=1`. Still open: `s`
+   opening a second window fed by `BroadcastChannel` (local, no network) with
+   the next headline and a clock, the reveal.js shape, so the notes are on
+   the laptop and not on the projector.
 2. **Touch in full screen.** `hover` mode hides the footer, so a phone in full
    screen can only leave, not step. Options: `fullMode: 'footer'` (the slots stay,
    a bar on the projection), or tap halves of the slide (collides with a live
@@ -349,8 +385,9 @@ come with them:
    the panel is full or at least half visible.
 4. **A light variant for lit rooms**, per the Tufte thread. Would need every
    live element to read its colours from tokens, which most do.
-5. **Kit change, not made (shared files were off limits):** a `createSlideDeck`
-   in `demo/shell/` taking `SLIDES` and a panel, so a talk is a data file. And
+5. **Kit change, half made:** the deck is a module since 2026-10-05, but in
+   `demo/slides/`, not in `demo/shell/` (section 11 says why and when it
+   should move). And
    `createVideoPanel` could take `stage: 'size'` to declare the container
    instead of a page rule reaching into `.pos-vp-stage`.
 6. **Projected size is reasoned, not measured.** No projector was plugged in.
@@ -518,3 +555,138 @@ its own value to move and every other live value to stand still.
 to draw, which is a request on a slide change, so it is not on a slide. A
 transport bar would take the space bar from the deck (section 5), so the step
 grid runs on its own clock with no bar.
+
+## 11. The engine is a module: `deck.mjs` and `deck.css`
+
+Asked 2026-10-05: *"in bg do some actual slides on positron"*, with `/slides/`
+kept as the sample and the system. So the engine left the page.
+
+| file | holds |
+| --- | --- |
+| `demo/slides/deck.css` | the seven `@font-face` pairs, the slide box and inset, the six step scale with line height and tracking, the marks (`.sl-hi`, `.sl-hue`), evidence types, the diagram gap and box words, the caption, blank, the desktop rule for the way-out button, the notes, the measuring classes |
+| `demo/slides/deck.mjs` | `FACES`, `rich` and `plain` (the `*x*` and `[x\|box]` marks), `stackOf`, `fitBox`, the live builders `liveReadout`, `livePicture`, `liveDiagram(spec)`, `liveSteps`, `createDeck(d, { slides, hues })` (slides, panel, stepper, count, face picker, keys, hash, blank, full screen, notes) and `checkDeck(deck, opts)` (every generic assert) |
+| `demo/slides/index.html` | the sample talk (16 slides), its diagram, one `createDeck` and one `checkDeck` call; 214 lines, was 1194 |
+| `demo/talk/index.html` | the talk (34 slides), two diagrams, three live builders of its own (`liveSlots`, `liveRoute`, `liveTone`), its own asserts |
+
+Both pages link `/slides/deck.css` and import `/slides/deck.mjs` by absolute
+path. `build.mjs` copies both with `/slides/`, because `demoFiles()`
+enumerates `.css` and `.mjs` in a built demo's folder; nothing in the build
+had to change. `/talk/` ships only once its manifest row exists.
+
+**`liveDiagram` (DECIDED, asked for):** *"do not use diagram native descs
+below but use slides text and postion"*. The spec handed to `createDiagram`
+has every `sub` and every link `label` taken out, `deck.css` hides the
+diagram's own caption line, and a top level node's `desc` is set at step 1 in
+the chosen face under that box, centred on it, as wide as half way to each
+neighbour. Two lines of room are reserved before the picture is fitted, so
+the picture and its words are centred together. Asserted at both widths in
+all seven faces: no `.pos-dg-sub` or `.pos-dg-llab` on any slide and no
+caption line shown, every word line within 2 px of its box's centre, at
+step 1, in the face, two lines at most, below the box. MEASURED worst
+0.0 px. The hued words still match the diagram's colours, read off the
+caption's bold runs while the caption is hidden (a computed colour does not
+need the element to be drawn).
+
+**Sabotage (MEASURED):** hiding nothing for `.pos-fsx`, tracking step 4 at 0
+and the diagram gap at 4cqh took `/talk/` from 58/58 to 53/58, and the five
+reds were exactly the new asserts (tracking and gap at both widths, the
+button), nothing else.
+
+**Should it move to `demo/shell/`? Not yet (DECIDED).** Two callers is the
+point at which a component is noticed, not the point at which it is settled:
+the slide model changed four times in one day (sizes, faces, marks, notes),
+and the fonts are vendored under `slides/vendor/` and listed by name in
+`build.mjs`. Move it when a third page wants slides or the model holds still
+for a week, and take the fonts with it into `shell/vendor/` in the same
+change, because a module in `shell/` that loads fonts from a demo's folder is
+the cross-page import the build check was written to refuse.
+
+**Counts (MEASURED 2026-10-05).** `node demo/verify.mjs slides`: **60/60**,
+54 page asserts, up from 51/51 and 45. The new nine: tracking at two widths,
+the diagram gap at two widths, the box words at two widths, no native diagram
+text, no way-out button on a desktop, Escape and `f` leave. The renamed: the
+first-slide full screen assert now reads the first slide's own step (a
+statement at 5), and "every diagram drew in a row" covers every diagram.
+The check pass is about 2.3 s on `/slides/` and 4.3 s on `/talk/`, ready at
+4.4 s after navigation, inside the harness's 7.4 s boot wait with no `bootMs`
+needed.
+
+## 12. `/talk/`: a talk about positron, slide by slide
+
+`demo/talk/index.html`, not in the manifest (the harness refuses a slug that is
+not), graded with a CDP script at 1280 and 375: **58/58 at both**, no
+exceptions, one host (the dev server). Its row, to be added by hand:
+
+```js
+{ name: 'talk', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
+  one: 'A talk about positron, what it measured and what it learned, with running parts of the site on its slides.',
+  tags: [] },
+```
+
+Seven sections, each opened by a statement slide. Every number has its source
+in a comment above the slide; this table is the same list. Statements are
+marked S, live elements L.
+
+| # | name | headline | evidence | number and source | link |
+| --- | --- | --- | --- | --- | --- |
+| 1 | lab | S Positron is a lab for *live* media | | 46 rows, 44 built: CLAUDE.md's count command, run 2026-10-05 | front page |
+| 2 | archive | ERR's archive opens back to 1908 | table | audio 133,718, video 79,422, photo 234,478: research/err-archives-2026-08.md:12, :223-226 | reel |
+| 3 | kurenniemi | Kurenniemi plays from archive.org | table | 12 tracks, Finna blocked, Active Archives gone: research/kurenniemi-archive-2026-08.md:10-13, :35-37 | tapes |
+| 4 | slots | Radio 1965 runs in fixed slots | L strip on a local deck | 28, 56, 112 min: research/radio-tallinn-1965-2026-08.md:7 | radio |
+| 5 | stack | S It runs on Cloudflare and a Pi | | | patchbay |
+| 6 | machines | Cloudflare carries the streams | L diagram, words under columns | relay 1 to 2 ms in a note: PROGRESS.md:3468-3472 | patchbay |
+| 7 | hop | The relay hop costs 1 to 2 ms | stack | +1.0, +1.6, +0.8 ms: PROGRESS.md:3468-3472 | wire |
+| 8 | minutes | Stream bills minutes, not bytes | table | 1000 min cap, 225 a day, 4.4 days: positron-streaming SKILL.md:93-95, :104-107 | llhls |
+| 9 | clock | Latency is read off a burned clock | L test picture | 600 of 600: positron-ui SKILL.md:333 | webrtc |
+| 10 | measured | S Every number here was measured | | | front page |
+| 11 | transports | MoQ is quicker, WebRTC steadier | table | 26.2/42.4/104.8 and 67.0/76.9/84.1 ms: PROGRESS.md:4711-4719, n PROGRESS.md:6624 | moq |
+| 12 | path | The clock goes out and comes back | L diagram of the measurement path | p50 26.2 ms, 2740 frames, 0 errors: PROGRESS.md:6622-6624 | moq |
+| 13 | llhls | Stock hls.js parks where it starts | stack | 7.60, 15.41, 1.87, 3.05 s: plans/plan.md:54-57 | llhls |
+| 14 | config | Most of the player is not config | table | 1,070, 17, 13 lines: positron-streaming SKILL.md:598-600, :639 | llhls |
+| 15 | pi | Direct to the Pi skips the relay | table | 72 and 4, 175 and 48 ms: plans/plan-away-webrtc.md:210-214; another network unmeasured :216-217 | away |
+| 16 | clocks | Two clocks agree after measuring | `1.8 ms` | 1.8 ms, 137 ms fast: HANDOFF.md:133-135 | sync |
+| 17 | frames | A step waits for the next frame | L step grid, live stack | measured on the screen it runs on | time |
+| 18 | hardware | S Hardware is on the desk | | CLAUDE.md, the opening paragraph | away |
+| 19 | circuit | The Circuit holds 29 real sessions | table | 32, 29: research/circuit-archive-2026-09-21.md:253-256; 64 of 350 bytes: plans/plan-circuit-editor.md:65 | circuit |
+| 20 | pico | The Pico router runs its core in C | table | 115/115, 98/98: HANDOFF.md:190; 45 pass: :191; nothing run on the board: :180 | parts |
+| 21 | route | A patch is one line of text | L `bay.mjs` parse, print, `apply` | none quoted | patchbay |
+| 22 | kit | Every demo uses one kit of parts | L readout | 167 modules: `ls demo/shell/*.mjs \| wc -l`, 2026-10-05 | kit |
+| 23 | checks | S The site checks itself | | | kit |
+| 24 | stand-ins | Stand-ins replace other servers | table | 48/48, 39/39, 52/52: positron-verify SKILL.md:29, :70, :91 | tapes |
+| 25 | tone | A stand-in plays a tone, not silence | L wave view | 220 and 330 Hz, 2 Hz swell: demo/fake-station.mjs:50-69 | radio |
+| 26 | green | A green run can cover nothing | `261/261` | LESSONS.md:609-614 | llhls |
+| 27 | count | Only the count said so | table | 34, 2, 13/13: positron-verify SKILL.md:826-830 | radio |
+| 28 | sabotage | S Break the check first | | 38/38 in the caption: positron-verify SKILL.md:78-80 | tapes |
+| 29 | ours | S Most faults were our own | | one fault was hls.js: LESSONS.md:819-823 | llhls |
+| 30 | vpn | A VPN passes the handshake only | table | 201 and 0 frames, 201 and 489: CLAUDE.md:302-305 | webrtc |
+| 31 | refusals | ERR refuses by programme, not age | table | 45 and 78 min, 13 points: positron-streaming SKILL.md:228-230; 2 h: plans/plan-live-timeline.md:42 | flipper |
+| 32 | listeners | One connection per mount, not per tab | table | about 100, then 1: positron-streaming SKILL.md:941-948 | radio |
+| 33 | schema | A loose schema made it faster | stack | 1.6 and 10.2 s: research/cf-models-speech-to-patch-2026-09-21.md:243-244 | patchbay |
+| 34 | next | Next is untested hardware | list | HANDOFF.md:165, plans/plan-away-webrtc.md:216-217 | parts |
+
+Every number reused from `/slides/` was re-read at its source on 2026-10-05
+and still says what the slide says; the 167 and the 46 and 44 were counted
+again the same day.
+
+**Live elements (8, MEASURED moving and stopping):** slots (a strip over a
+local `timeline/transport.mjs` deck on the main thread tick, so no worker),
+machines and path (`liveDiagram`), clock (`pattern.mjs`), frames
+(`step-grid.mjs`), route (`bay.mjs`), kit (`createReport`), tone
+(`wave-view.mjs`). `/talk/`'s own asserts on top of the deck's: every caption
+links the full address of a built manifest row (34 captions, 16 pages); each
+section opens on a statement (7); every slide has notes, hidden unless
+`?notes=1`; asked for, they sit under the panel at the slide's step 1 in its
+face and follow the slide (MEASURED 15.44 against 15.44 px). Nothing is
+fetched across a full step through, and nothing from another host.
+
+**Weighed and not on a slide.** WHEP's 41 freezes in 300 s against none for
+MoQ went into the transports notes rather than a slide of its own, because a
+two row table of one column said less than the line under it. The Circuit's
+three stock template sessions (one byte apart) are in the notes, not a slide.
+A Stream bill in dollars is not quoted: the figure that matters is the cap.
+
+**Looked at** with `node demo/shot.mjs talk 375 1280 --hash N` on slides 1,
+4, 6, 11, 12, 21 and 25: headlines two lines, the statement three, diagrams
+with their words under each column, the table's columns and decimals in line,
+the yellow on the figures that carry the point, no sideways drag at either
+width.
