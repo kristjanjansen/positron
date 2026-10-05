@@ -32,7 +32,24 @@
   .sync-pulse i.on { background: var(--hi); border-color: var(--hi); }
 
   /* AFTER. */
-  .sync-video { width: 100%; display: block; background: #000; border-radius: var(--r); }
+  /* ⚠️ THE PICTURE BOX HAS ITS SHAPE BEFORE IT HAS A PICTURE, AND SAYS WHAT
+     WILL BE IN IT. Reviewed 2026-10-05: before play it was a 2:1 black strip
+     (a bare <video> with no source is 300 by 150) that read as a player that
+     had failed. The box is the recording's 16:9 from the start, so nothing
+     under it moves when the first frame lands, and a line in it says what will
+     appear and when. Nothing is fetched for it: it is a sentence, not a poster. */
+  .sync-screen { display: grid; }
+  .sync-screen > * { grid-area: 1 / 1; }
+  .sync-video {
+    width: 100%; aspect-ratio: 16 / 9; height: auto; object-fit: contain;
+    background: #000; border-radius: var(--r);
+  }
+  .sync-say {
+    align-self: center; justify-self: center; margin: 0; padding: 0 16px;
+    font: 500 13px/1.5 var(--mono); color: var(--dim); text-align: center;
+    text-wrap: balance; pointer-events: none;
+  }
+  .sync-say[hidden] { display: none; }
 </style>
 <script src="/proto/remixer/hls.min.js"></script>
 
