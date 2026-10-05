@@ -193,7 +193,13 @@
    other lines. when on fullsc scale all borders proportionally"*. The diagram's
    1.5 logical px edge prints at about 1.5 px on the kit's 386 px slide, so 0.4
    per cent of the slide's height is the same line; never under 1 px. */
-.sl { --sl-rule: max(1px, 0.4cqh); --sl-pad: 8cqh; }
+.sl { --sl-rule: max(1px, 0.4cqh); --sl-pad: 8cqh;
+  /* SUBTLER, asked 2026-10-05 on the tabular log: *"subtler gradiend undert
+     hable header and trans to bg color"*. It was a full fade over two lines,
+     which read as a dark band under the header. One line now, from a third
+     strength to full, so the top row is dimmed into the ground rather than
+     dissolved. */
+  --sl-log-fade: linear-gradient(to bottom, rgb(0 0 0 / 0.35), #000 1lh); }
 .sl-rows[data-frame] > .sl-row,
 .sl-log .sl-row { padding: 0.3em 0.6em; }
 .sl-rows[data-frame] > .sl-row + .sl-row { border-top: var(--sl-rule) solid var(--line); }
@@ -219,8 +225,8 @@
 .sl-log-head { flex: 0 0 auto; border-bottom: var(--sl-rule) solid var(--line); }
 .sl-log-body { flex: 1 1 auto; min-height: 0; overflow: hidden;
   /* the same fade as the plain log's, so a row leaving is never cut in half */
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2lh);
-  mask-image: linear-gradient(to bottom, transparent, #000 2lh); }
+  -webkit-mask-image: var(--sl-log-fade);
+  mask-image: var(--sl-log-fade); }
 /* THE SHELL'S OWN LOG AT SLIDE SCALE. `.pos-log` is px type in a bordered
    card with a 150 px ceiling; in a slot it is the slide's face at step 1, on
    the darker half with no box of its own, as tall as the slot and no taller.
@@ -241,8 +247,8 @@
      through its middle: *"ugly cut / crrop"*. The slot is not a whole number
      of lines tall, so the oldest line in view is always partly clipped; it
      fades out over the top two lines instead of ending on a hard cut. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2lh);
-  mask-image: linear-gradient(to bottom, transparent, #000 2lh);
+  -webkit-mask-image: var(--sl-log-fade);
+  mask-image: var(--sl-log-fade);
 }
 .sl-stack {
   display: grid; grid-template-columns: auto auto auto; column-gap: 0.6em;
