@@ -1,4 +1,4 @@
-// demo/und/click.mjs: the CLICK tab of /und/, from the old /click/ page,
+// demo/csound/click.mjs: the CLICK tab of /csound/, from the old /click/ page,
 // which retired on 2026-10-05 with no redirect when *"merge click and und, no
 // need for 'mobile screen' / theme"* made it this tab.
 //
@@ -14,7 +14,7 @@
 //      No assert read the screen or the theme, so none went with them.
 //   2  The checks moved from load into the page's one SELFCHECK pass
 //      (`tab-page.mjs` rule 3), word for word, and the offline check now also
-//      allows `/und/`, where this module and its page are served from.
+//      allows `/csound/`, where this module and its page are served from.
 //   3  🔴 ITS BAR IS `publish: false`. SCORE owns the page's one published
 //      transport; this one is listed in `bars` and drilled as page asserts.
 //   4  `hide()` pauses the deck, so a click track does not run on in a tab

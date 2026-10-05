@@ -149,7 +149,7 @@
    * road to a second compile. Reversed on *"unify compilation in ui logic on
    * this and fau ant othes. trigger on inactivity? Small breating "Compiling"
    * note (not button)"*: `demo/shell/compile-idle.mjs` owns the timer, the
-   * queue and the note, and `/und/` uses the same module.
+   * queue and the note, and `/csound/` uses the same module.
    * 🔴 WHAT THE OLD TIMER GOT RIGHT SURVIVES AS `notNow`. A compile blocks the
    * thread it runs on, builds a WHOLE NEW `AudioWorkletNode` and calls
    * `pedal.forgetKeys()`, so a compile under a held key takes the note away.

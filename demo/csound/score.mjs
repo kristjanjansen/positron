@@ -1,4 +1,4 @@
-// demo/und/score.mjs: the SCORE tab of /und/, the page as it was until
+// demo/csound/score.mjs: the SCORE tab of /csound/, the page as it was until
 // 2026-10-05, when *"merge click and und, no need for 'mobile screen' /
 // theme"* made `/click/` its second tab (`./click.mjs`).
 //
