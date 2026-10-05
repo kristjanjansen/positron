@@ -481,7 +481,7 @@ export const DEMOS = [
   // strip. Its checks and four bar drills run before ready: MEASURED 6.3 to 6.6 s
   // locally against the 7.4 s default, so it declares its own wait.
   { name: 'time', group: 'timeline', act: 0, created: '2026-10-04', built: true, bootMs: 12000,
-    one: 'The clock every other page here runs on, set a moment ahead so it can still be stopped.',
+    one: 'The clock every page here runs on, and what is built on it, from beats and loops to scores and dates two thousand years long.',
     tags: ['timeline', 'WebAudio', 'canvas'] },
   // ARRIVAL, AHEAD, FOLLOW, AFTER since 2026-10-04 (plan-demo-structure §3.1).
   // The check pass runs before ready, MEASURED 8.3 to 9.0 s locally.
