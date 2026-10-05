@@ -211,7 +211,7 @@ export const sclang = {
 };
 
 // ── Csound score ────────────────────────────────────────────────────────────
-// What `/und/` holds is a SCORE, not an orchestra: one statement letter at the
+// What `/csound/` holds is a SCORE, not an orchestra: one statement letter at the
 // start of a line, then p-fields. Borrowed shape: the csound VS Code plugin's
 // `csound-sco.tmLanguage.json` (MIT). No parameters: p-fields are positions,
 // not names.
@@ -230,7 +230,7 @@ export const csoundSco = {
   ],
   /**
    * 🔴 WHAT A LINE IS, SO A PAGE CAN DRAW IT IN THE COLOUR OF THE LANE THAT
-   * SHOWS IT. Asked 2026-09-30 on `/und/` with a screenshot of the score over
+   * SHOWS IT. Asked 2026-09-30 on `/csound/` with a screenshot of the score over
    * its strip: *"can you mathc lane colors and code colors somehow"*. The strip
    * has three lanes, `part`, `event` and `tempo`, and the score has exactly
    * those three kinds of line, so the statement letter decides the kind and

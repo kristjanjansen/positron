@@ -5,7 +5,7 @@
 // 2026-09-30: *"unify compilation in ui logic on this and fau ant othes.
 // trigger on inactivity? Small breating "Compiling" note (not button) on right
 // bottom i the plae complile button is in fau. a kit comopnent?"*. Two pages
-// did it two ways: `/und/` recompiled 400 ms after typing stopped and said so
+// did it two ways: `/csound/` recompiled 400 ms after typing stopped and said so
 // only in the log, and `/fau/` compiled only when a Compile button was pressed.
 // This module owns the timer, the wait under a held note, the queue and the
 // note; a page owns what compiling MEANS and when it must not happen.
@@ -54,7 +54,7 @@
 import { el } from './shell.mjs';
 
 /**
- * 🔴 600 ms, ONE NUMBER FOR BOTH PAGES. `/und/` used 400 and `/fau/`'s old idle
+ * 🔴 600 ms, ONE NUMBER FOR BOTH PAGES. `/csound/` used 400 and `/fau/`'s old idle
  * compile used 800. The gap between keystrokes inside a word, for somebody
  * typing at 40 to 80 words a minute, is about 150 to 300 ms, so 400 was close
  * enough to fire inside a hesitation on a long identifier; 800 made a changed

@@ -68,10 +68,11 @@ export const ACTS = new Map([
 ]);
 
 export const DEMOS = [
-  { name: 'und', group: 'technologies', act: 0, created: '2026-09-07', built: true,
+  // `und` until 2026-10-05, renamed on "rename und to csound", no redirect.
+  { name: 'csound', group: 'technologies', act: 0, created: '2026-09-07', built: true,
     one: 'Csound scores turned into timelines you can start anywhere, whether typed here or written for U:\u2019s vClick click track.',
     tags: ['timeline', 'Csound', 'WebAudio'] },
-  // `click` was its own page 2026-09-14 and is the CLICK tab of /und/ since
+  // `click` was its own page 2026-09-14 and is the CLICK tab of /csound/ since
   // 2026-10-05, no redirect.
 
   { name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true,
