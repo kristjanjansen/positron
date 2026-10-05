@@ -2770,7 +2770,16 @@
    */
   const now = el('button', '', 'Send', { type: 'button' });
   now.onclick = () => send(0);
-  const later = el('button', '', 'Send in 10s', { type: 'button' });
+  /**
+   * ⚠️ NAMED FOR WHAT IT IS FOR, SINCE 2026-10-05. A UX review of the page
+   * found `Send in 10s` unexplained: nothing said why anybody would want to
+   * wait. It exists so one person can test the whole loop in one browser tab,
+   * by sending and then switching to Audience before the question goes out.
+   * The label says the purpose and the `title` carries the delay, in two short
+   * lines per the tooltip rule.
+   */
+  const later = el('button', '', 'Test in Audience', { type: 'button',
+    title: 'Sends in 10s\ntime to open the Audience tab' });
   later.onclick = () => send(10_000);
   row.append(now, later);
   /**
