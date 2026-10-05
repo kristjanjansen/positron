@@ -23,6 +23,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck, observePosition } from '/timeline/transport.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
 
   const d = mount({
     name: 'draw',
@@ -36,7 +37,9 @@
     // nobody could read is not a paragraph anybody skipped. 65 words, the
     // shell's own 13.5px. What went is the sentence about the numbers, because
     // the numbers are on the pad in front of you.
-    what: 'Press record, then draw a line with a finger or a mouse. The page keeps every sample the browser gave it and a thinned-out record of it: yours is the only line while your hand is down, and blue fades in when you lift it, rebuilt from that record. The knobs set how often a sample is kept and how much a player may invent between them.',
+    // ONE SENTENCE, the manifest's `one`, since the page has a diagram
+    // (2026-10-05); what the paragraph explained is in the diagram's notes.
+    what: 'Press record, then draw a line with a finger or a mouse.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     //
@@ -1008,6 +1011,54 @@
   // page's single harness press by thirty seconds.
   d.el.append(row, pad.el, bar.el, view.el);
 
+  // ── how it works ─────────────────────────────────────────────────────────
+  // One machine, because nothing here leaves the tab: no relay, no upload, no
+  // storage. The boxes are the five things built above, in the order a sample
+  // travels through them, and the check at the end of `check()` holds the
+  // picture to that list. `atEnd` puts it under the log on `document.body`, so
+  // the pad the harness drags on does not move by a pixel.
+  // The record's sub is read off the knob's opening value rather than typed,
+  // so the picture and the knob cannot disagree about where the page starts.
+  const DG_BOXES = ['Browser', 'xy pad', 'record', 'Catmull-Rom', 'transport', 'timeline'];
+  const dg = createDiagram(d.el, {
+    caption: 'Every sample the browser hands over is kept, a sparse record is taken from it on a '
+      + 'clock, and the blue line is rebuilt from that record alone.',
+    nodes: [
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'pad', label: 'xy pad', sub: 'pointer events', tech: 'browser',
+            note: 'Reads **getCoalescedEvents** on every pointermove, so a fast stroke keeps the '
+                + 'samples the screen delivered between frames, each stamped with its own '
+                + 'event.timeStamp. All of them are kept, and they are the white line.' },
+          { id: 'rec', label: 'record', sub: `1 per ${storeMs}ms`, tech: 'browser',
+            note: 'The same stroke thinned on a clock, one sample per interval on the knob, and '
+                + 'always the last one. Most of the line you see was never recorded.' },
+          { id: 'spline', label: 'Catmull-Rom', sub: 'time-knotted', tech: 'graphics',
+            note: 'A spline knotted on each sample\'s time, which eases to straight lines and then '
+                + 'to holding the last sample as smoothing falls. The blue line and the playhead '
+                + 'are both read through this one function.' },
+          { id: 'deck', label: 'transport', sub: 'play, loop, seek', tech: 'browser',
+            note: 'Plays the record at a quarter speed to double, loops it either way and seeks '
+                + 'anywhere, asking **Catmull-Rom** where the hand was at that instant.' },
+          { id: 'strip', label: 'timeline', sub: 'x and y lanes', tech: 'graphics',
+            note: 'The record\'s x and y as two lanes against time, opened at twice the zoom that '
+                + 'fits it. Pressing or dragging it seeks the **transport**.' },
+        ] },
+    ],
+    links: [
+      { from: 'pad', to: 'rec',
+        note: 'Every coalesced sample, thinned again whenever the hand comes up or a knob moves.' },
+      { from: 'rec', to: 'spline',
+        note: 'The kept samples, each with the time it was taken.' },
+      { from: 'spline', to: 'deck',
+        note: 'A position for any instant between two kept samples.' },
+      { from: 'deck', to: 'strip',
+        note: 'The playhead, and the record drawn as two lanes under it.' },
+      { from: 'deck', to: 'pad', back: true,
+        note: 'Where the playhead is, so both lines on the pad are drawn only up to it.' },
+    ],
+  }, { how: true, atEnd: true });
+
   // ── the page checks itself, once, on the first line you finish ───────────
   // Not on every `pointerup`: `d.assert` appends, so checking on each one would
   // grow the count without end and make "diff the per-demo assert count" —
@@ -1404,6 +1455,36 @@
     // and the crossover goes back to wherever it had got to, so a check that
     // ran inside a quarter of a second does not leave the picture finished
     settleAt = fadeFrom;
+
+    // ── the picture of how it works ──────────────────────────────────────
+    // Read off the drawn SVG, not off the spec, so a box that failed to draw
+    // or was drawn under another name is a red line rather than a pass.
+    const dgSvg = dg.svg.getBoundingClientRect();
+    const dgHost = dg.el.getBoundingClientRect();
+    d.assert('the how it works picture is built and on the page',
+      dg.el.isConnected && dg.svg.querySelectorAll('.pos-dg-n').length === DG_BOXES.length,
+      `${dg.svg.querySelectorAll('.pos-dg-n').length} boxes, ${dg.mode} layout`);
+    d.assert('it is laid out at its real width, measured rather than estimated',
+      dg.measured && dgSvg.width > 0 && Math.abs(dgSvg.width - dgHost.width) <= 2,
+      `svg ${dgSvg.width.toFixed(1)} px in a ${dgHost.width.toFixed(1)} px host, measured ${dg.measured}`);
+    d.assert('nothing cut and nothing refused in the picture', dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.id} ${c.where}: ${c.shown}`).join('; ') || `none, ${dg.ties} tie(s)`);
+    // The boxes against the page: each name drawn, and each one standing for
+    // a thing this page really built and put on screen.
+    const drawnNames = [...dg.svg.querySelectorAll('.pos-dg-lab')].map((t) => t.textContent.trim());
+    const behind = {
+      'xy pad': pad.el.isConnected && (pad.el.matches('[data-gesture]') || !!pad.el.querySelector('[data-gesture]')),
+      record: stored.length >= 2,
+      'Catmull-Rom': pointer.mode === 'catmull' && typeof pointer.interpolate === 'function',
+      transport: bar.el.isConnected && deck.sched != null,
+      timeline: view.el.isConnected,
+    };
+    const missing = DG_BOXES.filter((n) => !drawnNames.includes(n));
+    const unbacked = Object.entries(behind).filter(([, ok]) => !ok).map(([n]) => n);
+    d.assert('the boxes are the parts this page uses',
+      missing.length === 0 && unbacked.length === 0 && drawnNames.length === DG_BOXES.length,
+      `drawn ${drawnNames.join(', ')}; missing ${missing.join(', ') || 'none'}; `
+      + `not on the page ${unbacked.join(', ') || 'none'}`);
   }
 
   /**
