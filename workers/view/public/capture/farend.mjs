@@ -26,7 +26,10 @@ import { createButtonRow, createSource, resolveDuration, slot, wait } from './co
 const SEG_MS = 1000;
 const REC_MS = 3200;       // four segments, a scrubbable archive, a short show
 
-export const readout = { source: '', live: 'ms', fps: '', segments: '', total: 'KiB', length: 's' };
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'The clock goes live over WebRTC to a second connection in this page, and that receiving end records what it got. Press Go live and record, then Play it back.';
+
+export const readout = { source: '', 'to live': 'ms', fps: '', segments: '', total: 'KiB', length: 's' };
 
 export function build({ panel, log, set }) {
   const ROOM = new URLSearchParams(location.search).get('room');
@@ -106,7 +109,7 @@ export function build({ panel, log, set }) {
     await new Promise((res) => {
       let iv = null;
       const done = () => {
-        if (liveAt == null) { liveAt = performance.now() - t0; set('live', Math.round(liveAt)); }
+        if (liveAt == null) { liveAt = performance.now() - t0; set('to live', Math.round(liveAt)); }
         clearInterval(iv); res();
       };
       liveVideo.requestVideoFrameCallback?.(done);

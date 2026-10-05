@@ -49,7 +49,9 @@
    */
   const d = mount({
     name: 'wire',
-    what: 'A message as the exact bytes that travel, and a note as how late it lands on another machine.',
+    // No `what` under the title: each tab says what it is in the box under the
+    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
+    // The manifest's `one` line still describes the page on the index.
     readout: null,
     showLog: false,
   });
@@ -57,8 +59,8 @@
 
   const page = createTabPage(d, {
     tabs: [
-      { id: 'bytes', label: 'BYTES', mod: bytes },
-      { id: 'notes', label: 'NOTES', mod: notes },
+      { id: 'bytes', label: 'MESSAGES', mod: bytes },
+      { id: 'notes', label: 'KEYBOARD', mod: notes },
     ],
     at: 'bytes',
   });

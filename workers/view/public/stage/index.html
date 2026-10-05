@@ -22,7 +22,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createPresence } from '/shell/presence.mjs';
+  import { createPresence, presenceOf } from '/shell/presence.mjs';
   import { createField } from '/shell/field.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -42,18 +42,16 @@
   import { armVideo, recorderMime, createReport } from '/shell/shell.mjs';
 
   /**
-   * 🔴 THREE MODES, AND THE DEFAULT COSTS NOBODY ANYTHING. `plans/plan-stage-live.md`
-   * §7.1 is the argument and it is short: the harness presses every control on
-   * every run, `/keep/` already publishes WHIP on every run, and a second
-   * publishing page doubles that against a budget of **20 an hour**. From
-   * 2026-10-15 WebRTC delivery bills as well.
-   *
-   * So the DEFAULT is an in-page loopback: `pcOut` and `pcIn` in this same tab,
-   * a real `RTCPeerConnection` hop with no Cloudflare in it. That is
-   * `demo/show/index.html`'s trick, already in the tree. `?live=1` is the real
-   * leg, opt-in, for a person. It is the same shape as `fake-station.mjs` and
-   * `fake-tapes.mjs`, which took two pages from ungradable to green at zero
-   * cost to anybody.
+   * 🔴 ONE LEG, THE REAL ONE, AND THE ORDINARY HARNESS TIER NEVER STARTS IT.
+   * This comment described an in-page loopback (`pcOut` and `pcIn` in one tab)
+   * and a `?live=1` opt in until 2026-10-05. Both went on 2026-09-25 (*"rm
+   * loopback"*, *"go both real leg"*), and the comment stayed behind
+   * describing a default that no longer existed. What is true now: the page
+   * only RECEIVES. Start holds the stage publisher's socket, which wakes its
+   * container (about 22 s cold), waits for its WHIP leg and subscribes over
+   * WHEP. `plans/plan-stage-live.md` §7.1's cost argument still decides who
+   * may press it: an ordinary run (`?selfcheck=1`, see `LIGHT` below) says so
+   * in the log and starts nothing, and only `DEMO_DEEP=1` runs the show.
    *
    * 🔴 R2 IS ON FOR A PERSON AND OFF FOR THE HARNESS, SINCE 2026-09-30. Asked:
    * *"i want so see local storaage -> r2 -> playback"*. It was `?r2=1`, opt in,
@@ -429,6 +427,63 @@
       }),
     };
   });
+
+  /**
+   * 🔴 IS A PICTURE ACTUALLY ARRIVING: A TAG ON THE PICTURE, DRIVEN BY FRAMES.
+   * Asked 2026-10-05: *"perhaps just visual indication of picture happening"*.
+   * The footer badge says the SHOW is on air, and it went `on air` once, on the
+   * first frame, and never looked again: a picture that froze a minute later
+   * went on reading `on air` under a still. This tag answers the other
+   * question, whether frames are reaching THIS screen now.
+   * ⚠️ OUTCOME, NEVER INTENT. The press only makes it `starting`; `receiving`
+   * comes from `requestVideoFrameCallback`, once per frame the compositor
+   * actually showed, and `stalled` is two seconds without one while the show
+   * is meant to be live. The rule is `presenceOf`, the kit's own pure function
+   * (`node demo/shell/presence-test.mjs`): a frame is a heartbeat, `everyMs`
+   * is the stall window and one miss is gone. It is not a second rule typed
+   * here.
+   * ⚠️ HIDDEN WHEN THERE IS NOTHING TO RECEIVE. The footer already says `off
+   * air`, and a second phrase for the same moment on the same panel is the
+   * thing this page refused once already for `checking` and `coming`.
+   * ⚠️ `starting`, THE FOOTER'S OWN WORD FOR THE WAIT, for the same reason.
+   */
+  const PIC_STALL_MS = 2000;
+  /** How long a start may say `starting` before it is called nothing. Longer
+   *  than the publisher wait (60 s) plus the first frame wait (12 s). */
+  const PIC_START_MS = 90000;
+  const PIC_SAYS = { unknown: 'not receiving', coming: 'starting', checking: 'starting',
+    online: 'receiving', offline: 'stalled' };
+  const PIC_CAN = ['coming', 'online', 'offline'];
+  /** The rule, as a pure function of three times, so a check can feed it fixtures. */
+  const pictureOf = ({ now, lastFrameAt = null, startedAt = null }) => presenceOf({
+    now, everyMs: PIC_STALL_MS, misses: 1, lastSeenAt: lastFrameAt,
+    comingSince: startedAt, comingMs: PIC_START_MS, since: null,
+  });
+  // The stall is logged once each way, off the first tag only: every tag is
+  // fed the same frames, so a second line would be the same fact twice.
+  let picWas = 'unknown';
+  const picLog = (st) => {
+    if (st === 'offline' && picWas === 'online') {
+      d.log(`the picture stalled: no frame for ${PIC_STALL_MS / 1000} s`, 'warn');
+    } else if (st === 'online' && picWas === 'offline') {
+      d.log('the picture is moving again', 'hi');
+    }
+    picWas = st;
+  };
+  for (const p of panels) {
+    if (!p.pres) continue;
+    const first = !panels.some((x) => x.picTag);
+    p.picTag = createPresence({
+      mode: 'badge', state: 'unknown', says: PIC_SAYS, can: PIC_CAN,
+      onChange: (st) => {
+        p.panel.slots.tag.hidden = st === 'unknown';
+        if (first) picLog(st);
+      },
+    });
+    p.panel.slots.tag.append(p.picTag.el);
+    p.panel.slots.tag.hidden = true;
+  }
+  const picTags = () => panels.map((p) => p.picTag).filter(Boolean);
 
   /**
    * ⚠️ `createTabs` BUILDS ITS OWN PANELS AND HANDS THEM BACK. A page fills
@@ -941,6 +996,52 @@
   }
 
   /**
+   * The picture tag's three verbs. `pictureStart` at the press, `pictureWatch`
+   * on the element the frames will land in, `pictureReset` when there is
+   * nothing to receive any more. See `PIC_STALL_MS` for the rule.
+   * ⚠️ `follow()` IS THE BADGE'S OWN CLOCK (a tick every 500 ms here), so a
+   * stall is noticed between 2.0 and 2.5 s after the last frame, and nothing
+   * runs at all while the tag is hidden.
+   */
+  const pic = { frames: 0, how: null, video: null, off: null, lastAt: null };
+  function pictureStart() {
+    pictureReset();
+    for (const t of picTags()) {
+      t.follow({ everyMs: PIC_STALL_MS, misses: 1, since: null, comingMs: PIC_START_MS });
+      t.coming(true);
+    }
+  }
+  function pictureWatch(v) {
+    pic.off?.();
+    pic.video = v;
+    let on = true;
+    const frame = () => {
+      pic.frames++;
+      pic.lastAt = Date.now();
+      for (const t of picTags()) t.seen(pic.lastAt);
+    };
+    if (typeof v.requestVideoFrameCallback === 'function') {
+      pic.how = 'requestVideoFrameCallback';
+      const tick = () => { if (!on) return; frame(); v.requestVideoFrameCallback(tick); };
+      v.requestVideoFrameCallback(tick);
+      pic.off = () => { on = false; };
+    } else {
+      // ⚠️ AN ENGINE WITHOUT IT GETS THE CLOCK OF THE ELEMENT, which advances
+      // only while it is playing something. Weaker, and named in `__stage`.
+      pic.how = 'currentTime';
+      let t = -1;
+      const id = setInterval(() => {
+        if (v.readyState >= 2 && v.currentTime !== t) { t = v.currentTime; frame(); }
+      }, 250);
+      pic.off = () => { on = false; clearInterval(id); };
+    }
+  }
+  function pictureReset() {
+    pic.off?.(); pic.off = null; pic.video = null; pic.lastAt = null; pic.frames = 0;
+    for (const t of picTags()) t.stop().set('unknown');
+  }
+
+  /**
    * Put the one live `<video>` in the panel that is showing. Called on every
    * tab change and by both legs the moment they have an element.
    * ⚠️ THE ARCHIVE IS NOT A LIVE PANEL and must keep its own recording, so it
@@ -972,7 +1073,7 @@
    * gap. This is the page's way round it until the kit has one.
    */
   function setPicture(panel, node) {
-    const keep = (c) => c === panel.slots.caption
+    const keep = (c) => c === panel.slots.caption || c === panel.slots.tag
       || (c.nodeType === 1 && c.classList.contains('pos-fsx'));
     for (const c of [...panel.stage.childNodes]) if (!keep(c)) c.remove();
     if (node) panel.stage.insertBefore(node, panel.slots.caption);
@@ -982,7 +1083,7 @@
     && panel.slots.caption.parentElement === panel.stage;
   /** The picture in a panel's stage, which is everything but the panel's own parts. */
   const pictureIn = (panel) => [...panel.stage.children].filter((c) => c !== panel.slots.caption
-    && !c.classList.contains('pos-fsx'));
+    && c !== panel.slots.tag && !c.classList.contains('pos-fsx'));
 
   function showPictureOn(id) {
     if (!audVideo || id === 'archive') return;
@@ -1805,6 +1906,8 @@
     // ⚠️ NOTHING IS LEFT SHIMMERING. A pending state that outlives its wait is
     // a page claiming to be busy for ever, which is worse than no feedback.
     pendTransport('webrtc', false);
+    // A start that was never live is over too: the tag goes with the element.
+    if (phase !== 'live') pictureReset();
     // ⚠️ AND NOTHING HOLDS THE FINISHED ELEMENT. `audVideo` had five references
     // and no assignment back to null anywhere, which is what let a dead element
     // be re-parented over an archive recording. A stale pointer to a removed
@@ -2404,6 +2507,7 @@
      * wake reads as a dead control, which this page has paid for twice today.
      */
     setBadges('coming');
+    pictureStart();
     pendTransport('webrtc', true);
     /**
      * 🔴 THE FILM IS NOT STARTED HERE, SINCE 2026-09-19: *"make video transport
@@ -2462,6 +2566,8 @@
       const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
       v.muted = true;
       armVideo(v);
+      // Watched from before the subscribe, so the first frame is counted.
+      pictureWatch(v);
       // The relay is asked for in parallel with the publisher waking and
       // awaited before the offer, because WHEP takes no trickle.
       pressAt ??= performance.now();
@@ -2587,6 +2693,7 @@
     } catch (err) {
       d.log(`the show did not start: ${err && err.message}`, 'bad');
       showDeck.pause();   // it never got on air, so the bar goes back to start
+      pictureReset();     // and nothing is on its way, so the tag goes
     } finally { starting = false; }
   }
 
@@ -2605,6 +2712,8 @@
     if (phase !== 'live') return;
     showDeck.pause();
     phase = 'stopped';
+    // Before the tracks stop, so a stop never reads as a stall.
+    pictureReset();
     // ⚠️ THE FILM IS NOT STOPPED HERE EITHER, and that is the other half of the
     // same ask. A show ending is not a reason for the picture to stop: the
     // operator may be cueing the next one, and the control they used to start it
@@ -2776,6 +2885,11 @@
     get answers() { return ANSWERS.length; },
     // The recording's path, the same object `__demo.chain` carries.
     get chain() { return window.__demo.chain; },
+    // What the picture tag says and what it was told: presented frames, by which clock.
+    get picture() {
+      return { state: picTags()[0]?.state() ?? 'none', frames: pic.frames, how: pic.how,
+        lastFrameAgoMs: pic.lastAt == null ? null : Date.now() - pic.lastAt };
+    },
     startShow, stopShow,
   };
 
@@ -3717,6 +3831,8 @@
       laneCount >= 3 && lum.length > 20 && median - darkest < 8,
       `${laneCount} lanes, and over ${lum.length} rows the lane ground reads ${median} and the darkest row ${darkest}, a drop of ${median - darkest}`);
 
+    await pictureDrill();
+
     if (LIGHT) {
       for (const [label, pass, detail] of held) d.assert(label, pass, detail);
       d.log('left for the deep run: the publisher, the show over WebRTC, the film playing under it, '
@@ -3724,6 +3840,116 @@
       return;
     }
     await showDrill();
+  }
+
+  /**
+   * 🔴 THE PICTURE TAG FOLLOWS FRAMES, PROVED WITH FRAMES, IN BOTH TIERS. The
+   * ordinary tier never starts a show, so a real WHEP picture is not available
+   * to grade it on. A canvas in this tab, captured into a `<video>`, is: it is
+   * the same element type, the same `requestVideoFrameCallback`, and the same
+   * three verbs the show calls, and it costs nobody anything.
+   * ⚠️ THE DRAWING IS THE SOURCE OF FRAMES, AND STOPPING IT IS THE STALL.
+   * `captureStream` emits a frame when the canvas changes, so a canvas nobody
+   * paints is a picture that has stopped arriving, which is what a frozen WHEP
+   * leg looks like from this side.
+   * ⚠️ THREE NEGATIVE CONTROLS, because a tag that says `receiving` on a timer
+   * would pass a check that only looked for `receiving`: a press with no frames
+   * must stay `starting`, frames that keep coming past the stall window must
+   * NOT read `stalled`, and the pure rule is fed fixtures for both directions.
+   */
+  async function pictureDrill() {
+    const now = 1e6;
+    const fx = [
+      ['nothing pressed, no frame', pictureOf({ now }), 'unknown'],
+      ['pressed, no frame yet', pictureOf({ now, startedAt: now - 5000 }), 'coming'],
+      ['pressed 80 s ago, still no frame', pictureOf({ now, startedAt: now - 80000 }), 'coming'],
+      ['pressed 100 s ago, never a frame', pictureOf({ now, startedAt: now - 100000 }), 'unknown'],
+      ['a frame 0.1 s ago', pictureOf({ now, lastFrameAt: now - 100 }), 'online'],
+      ['a frame 1.9 s ago', pictureOf({ now, lastFrameAt: now - 1900 }), 'online'],
+      ['a frame 2.1 s ago', pictureOf({ now, lastFrameAt: now - 2100 }), 'offline'],
+    ];
+    const bad = fx.filter(([, got, want]) => got !== want);
+    A('the picture rule goes live only on a frame and stalls 2 s after the last one',
+      bad.length === 0,
+      bad.length ? bad.map(([n, got, want]) => `${n}: ${got}, wanted ${want}`).join(', ')
+        : fx.map(([n, got]) => `${n}: ${PIC_SAYS[got]}`).join(', '));
+
+    const tags = picTags();
+    const says = () => tags.map((t) => t.state());
+    const shown = () => panels.filter((p) => p.picTag)
+      .map((p) => getComputedStyle(p.panel.slots.tag).display !== 'none');
+    const all = (st) => tags.length > 0 && says().every((x) => x === st);
+    const wait = async (ok, ms) => {
+      const t0 = performance.now();
+      while (!ok() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50));
+      return ok();
+    };
+    A('the picture tag is hidden while nothing is being received',
+      all('unknown') && shown().every((x) => !x),
+      `${tags.length} tags, saying ${says().join(', ')}, shown ${shown().join(', ')}`);
+
+    // A source of frames that exists only while somebody paints it.
+    const src = document.createElement('canvas');
+    src.width = 64; src.height = 36;
+    const sctx = src.getContext('2d');
+    let painting = true, n = 0;
+    const paint = () => {
+      if (!painting) return;
+      sctx.fillStyle = `hsl(${(n++ * 37) % 360} 60% 50%)`;
+      sctx.fillRect(0, 0, 64, 36);
+      requestAnimationFrame(paint);
+    };
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true;
+    // ⚠️ IN THE DOCUMENT AND NOT `opacity: 0`, because a frame is counted when it
+    // is PRESENTED and an element that is never composited presents nothing.
+    Object.assign(v.style, { position: 'fixed', left: '0', top: '0', width: '16px',
+      height: '9px', opacity: '0.01', pointerEvents: 'none' });
+    document.body.append(v);
+    try {
+      // The press, with an element that has nothing in it yet.
+      pictureStart();
+      pictureWatch(v);
+      await new Promise((r) => setTimeout(r, 700));
+      A('a press with no frames says starting, never receiving',
+        all('coming') && pic.frames === 0 && shown().every(Boolean),
+        `${pic.frames} frames, the tags say ${says().map((x) => PIC_SAYS[x]).join(', ')}`);
+
+      paint();
+      v.srcObject = src.captureStream(30);
+      v.play().catch(() => {});
+      const live = await wait(() => all('online'), 3000);
+      const atLive = pic.frames;
+      A('frames arriving turn the tag to receiving',
+        live && atLive > 0,
+        `${atLive} frames by ${pic.how}, the tags say ${says().map((x) => PIC_SAYS[x]).join(', ')}`);
+
+      // Held past the stall window with frames still coming: it must not stall.
+      await new Promise((r) => setTimeout(r, PIC_STALL_MS + 400));
+      A('frames that keep coming past the stall window stay receiving',
+        all('online') && pic.frames > atLive,
+        `${pic.frames - atLive} more frames over ${(PIC_STALL_MS + 400) / 1000} s, `
+        + `the tags say ${says().map((x) => PIC_SAYS[x]).join(', ')}`);
+
+      painting = false;
+      const t0 = performance.now();
+      const stalled = await wait(() => all('offline'), PIC_STALL_MS + 1500);
+      const tookMs = Math.round(performance.now() - t0);
+      A('frames stopping turn the tag to stalled, about 2 s later',
+        stalled && tookMs >= PIC_STALL_MS - 600 && shown().every(Boolean),
+        `${stalled ? 'stalled' : 'NOT stalled'} after ${tookMs} ms, `
+        + `the last frame ${pic.lastAt == null ? 'never' : `${Date.now() - pic.lastAt} ms ago`}, `
+        + `the tags say ${says().map((x) => PIC_SAYS[x]).join(', ')}`);
+    } finally {
+      painting = false;
+      pictureReset();
+      for (const t of v.srcObject?.getTracks?.() ?? []) t.stop();
+      v.srcObject = null;
+      v.remove();
+    }
+    A('and it goes away again when there is nothing to receive',
+      all('unknown') && shown().every((x) => !x),
+      `the tags say ${says().join(', ')}, shown ${shown().join(', ')}`);
   }
 
   /**

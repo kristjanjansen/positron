@@ -30,6 +30,9 @@ const DURATION = 16000;
 const BEAT = 500;
 const AHEAD = 100;          // how far ahead every lane hands its work over
 
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'One beat sent several ways at once, where code fires it a little late and the sound card and MIDI port, told in advance, hit it exactly. Press the yellow button for sound and MIDI, then watch each lane.';
+
 export const readout = null;
 
 const nap = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -58,7 +61,7 @@ export function build({ panel, d, log }) {
   //   amber/red   later than that
   const UNMEASURED = '#6f7d94', NOT_YET = '#3b424e';
   const LANES = [
-    { id: 'worker', label: 'bg worker', swatch: '#ffd400', note: 'code ran here' },
+    { id: 'worker', label: 'code', swatch: '#ffd400', note: 'code ran here' },
     { id: 'sound', label: 'sound card', swatch: '#8fd6a8', note: 'the card played here' },
     { id: 'midi', label: 'midi out', swatch: '#7fb8e0', note: 'the port sent here' },
     { id: 'midiin', label: 'midi in', swatch: '#c9a0ff', note: 'a note arrived here',
