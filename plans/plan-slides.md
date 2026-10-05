@@ -802,3 +802,42 @@ is graded the same way.
 `demo/shot.mjs` was fixed in passing: its 6000 px ceiling capped the whole
 page, so `--hash` on a block more than 6000 px down captured a NEGATIVE height;
 it is now counted from the block.
+
+**Tables with row lines, live logs, full screen, thicker diagram lines
+(2026-10-05, later the same day).** Asked as *"horiz lines but try with rounded
+corner outer border and not"*, *"show 2col layout with live logs / live
+tabular logs"*, *"add go to fullscreen button (active when mouseover) on all kit
+slide samples"*, *"make diagrams thinker borders in slides"*, *"fill full bg but
+keep border"*, *"biit more negat tracking on large sizes"* and *"rm ILLUSTRATION
+ON THE RIGHT slide"*.
+- `rows.frame`: absent is the plain padded lines; `'none'` rules a 1 px
+  `--line` between rows and under the header with nothing outside; `'box'` adds
+  `--edge` and `--r` around them. Rows carry 0.3 em above and below and 0.6 em
+  (one character) either side, so the columns stay character positions. A
+  framed table drops to step 2 at three lines (`tableStep`), because the
+  padding costs about a row. `padRow` and `colStarts` came out of `padRows` so a
+  live log pads one row against declared widths.
+- `createSlideLog({ head, widths, align, step })`: a slide-native tabular log
+  for a slot, a fixed box whose body scrolls to its foot, newest row at the
+  bottom, oldest leaving the top, the header's rule its own. The plain live log
+  is the SHELL'S log (`createReport().logEl`, `addLine`) scaled to step 1 by a
+  `.sl-slot > .pos-log` rule; it fits, so no copy was made. It does post each
+  line to the dev server's `/_log` on 127.0.0.1, as every shell log does.
+- `createSlide(spec, { full: true })`: the video panel's ⛶ on the slide, shown
+  on hover or focus and always where there is no hover; the frame fills the
+  screen through `fullscreen.mjs`, letterboxed 16:9 on the slide's own ground
+  (a split's darker half runs to the screen edge), edge and corner kept;
+  Escape leaves. The player's full stage got the same ground and edge.
+- Diagrams on a slide: edges and arrows 2 logical px, names 11 px, laid out at
+  580 rather than 640, so padding and gaps come out about 10 per cent larger
+  around a name printed at the size it had. `diagram.mjs` untouched.
+- Tracking: 0, -0.005, -0.01, -0.02, -0.03, -0.04 em became 0, -0.005, -0.012,
+  -0.03, -0.045, -0.06.
+- MEASURED: `/kit/` 320/320 to **329/329**, 9 new: framed table rules and
+  padding, the box's radius equal to `--r`, columns and decimals of 4 tables
+  within 0.5 px (worst 0.03), both logs growing at a constant height over two
+  0.65 s waits, the newest row at each foot with the tabular decimals at 0.00 px
+  spread, the ⛶ on 32 slides hidden at rest and shown on focus, full screen
+  16:9 centred on the card with the edge kept and the headline at step 4, Escape
+  restoring the block, and the diagram's widths and the air inside every box
+  (tightest 8.4 logical px against 8). `slide-test.mjs` 40 to 46.
