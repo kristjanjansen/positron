@@ -40,6 +40,7 @@ import { createStripView } from '/shell/strip.mjs';
 import { createDeck } from '/timeline/transport.mjs';
 import { scoreDoc, quotation, scoreDocToJSONL, parseScoreDocJSONL } from '/timeline/score.mjs';
 import { csoundPart, tempoMap } from '/timeline/csound.mjs';
+import { createDiagram } from '/shell/diagram.mjs';
 
 const SCORES = {
   'test.sco': `; vClick score - for test and demo
@@ -516,6 +517,44 @@ export function build({ panel, log, set }) {
     log(`bar ${startBar} is ${Math.round(at)} ms in`, 'hi');
   }
 
+  /**
+   * 🔴 HOW IT WORKS, LAST IN THE TAB, ADDED 2026-10-05 on *"add how it works
+   * diagrams to all tenchilogies"*. Its own picture rather than SCORE's,
+   * because the two tabs differ in the two things a picture shows: this one's
+   * score is carried in the page instead of typed, and it ends in the readout
+   * rather than in sound. One machine, because the tab asks no server for
+   * anything, which its last check already proves. Drawn on the first
+   * showing, into a panel that has a width, under the tab's report.
+   */
+  const DIAGRAM = {
+    caption: 'Nothing on this tab reaches a network: the piece is worked out once in the page and played off its own clock.',
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'score', label: 'vClick score', sub: 'in the page',
+            note: 'U:\u2019s own test.sco and simple-4-4.sco from tarmoj/vclick, copied verbatim with their tabs and comments. They are carried rather than fetched, so no beat waits on the network.' },
+          { id: 'compiler', label: 'compiler', sub: 'Csound in JS',
+            note: 'Expands each bar statement into its beats by the rule in vClick\u2019s own orchestra, and writes the score document. That document\u2019s size is the **bytes** cell, the only thing that would ever need to cross.' },
+          { id: 'timeline', label: 'timeline', sub: 'Worker clock',
+            note: 'The whole piece is scheduled at once, so starting from any bar is a seek rather than a rewrite of the score text. A Web Worker wakes it every 25 ms, so a background tab keeps time.' },
+          { id: 'readout', label: 'readout', sub: 'bar, beat, tempo',
+            note: 'Each beat writes the bar, beat and tempo cells and lights its line in both scores. This tab makes no sound.' },
+        ] },
+    ],
+    links: [
+      { from: 'score', to: 'compiler', note: 'The score text exactly as the composer typed it.' },
+      { from: 'compiler', to: 'timeline', note: 'Every beat, count-in click and cue word with its time in milliseconds, scheduled once.' },
+      { from: 'timeline', to: 'readout', note: 'One flash per beat, and the late cell is how far each one landed from the millisecond the score asks for.' },
+    ],
+  };
+  let dg = null;
+  function drawDiagram() {
+    if (dg) return;
+    const box = el('div');
+    host.append(box);
+    dg = createDiagram(box, DIAGRAM, { how: true });
+  }
+
   compileScore();
   seekBar();
   log('press \u25b6 on the bar, or step the bar number to start anywhere', 'hi');
@@ -523,7 +562,10 @@ export function build({ panel, log, set }) {
   return {
     deck,
     bars: [{ name: 'the click', bar, strip: view.el }],
-    show() { requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate?.(); })); },
+    show() {
+      drawDiagram();
+      requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate?.(); }));
+    },
     hide() { deck.pause(); },
 
     check({ A }) {
@@ -605,6 +647,37 @@ export function build({ panel, log, set }) {
         });
         A('the page asked the network for nothing', away.length === 0,
           away.length ? `asked for ${away.map((r) => r.name).join(', ')}` : `${res.length} resources, all local code`);
+      }
+
+      // ── the picture, graded the way /sync/'s AFTER tab grades its own ─────
+      {
+        const w = dg ? Number(dg.svg.getAttribute('width')) : 0;
+        const room = dg ? Math.floor(dg.el.clientWidth) : 0;
+        A('the diagram is built, last in the tab, and laid out at the width it is shown at, measured rather than estimated',
+          !!dg && dg.el.isConnected && dg.measured && room > 0 && Math.abs(w - room) <= 1
+            && host.lastElementChild?.contains(dg.el),
+          dg ? `${w} px drawn in ${room} px, ${dg.mode}, ${dg.measured ? 'text measured' : 'text ESTIMATED'}` : 'never drawn');
+        A('the diagram drew every name and every arrow whole, with no headless line in it',
+          !!dg && dg.cuts.length === 0 && dg.ties === 0,
+          dg ? (dg.cuts.map((c) => `${c.where} ${c.id}: ${c.shown}`).join(', ') || `nothing cut, nothing refused, ${dg.ties} ties`) : 'no diagram');
+        // A box per machine the tab talks to: none but the Browser, read off
+        // the same request list as the check above. And no sound box, because
+        // nothing on this tab builds an AudioContext.
+        const own = new URL('.', import.meta.url).pathname;
+        const away = performance.getEntriesByType('resource').filter((r) => {
+          const p = new URL(r.name, location.href).pathname;
+          return !(p.startsWith('/shell/') || p.startsWith('/timeline/') || p.startsWith(own)
+            || (p === '/_log' && /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname)));
+        });
+        const machines = DIAGRAM.nodes.filter((n) => n.children).map((n) => n.label);
+        const boxes = DIAGRAM.nodes.reduce((k, n) => k + 1 + (n.children?.length || 0), 0);
+        const drawn = dg ? dg.svg.querySelectorAll('.pos-dg-n').length : 0;
+        const kids = DIAGRAM.nodes[0].children.map((c) => c.label);
+        A('the diagram boxes are what the tab uses: one machine, the Browser, and no sound box, because it asks no server for anything and makes no sound',
+          away.length === 0 && machines.length === 1 && machines[0] === 'Browser'
+            && DIAGRAM.nodes.length === 1 && !kids.includes('AudioContext') && drawn === boxes,
+          away.length ? `the page asked for ${away.map((r) => r.name).join(', ')}, which has no box`
+            : `${drawn} of ${boxes} boxes drawn, machines ${machines.join(', ')}, inside it ${kids.join(', ')}`);
       }
     },
   };
