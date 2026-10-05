@@ -227,12 +227,13 @@ export const DEMOS = [
     // of fetching before there is much to see
     settleMs: 4000 },
   { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
-    one: 'ETV and ETV2 live in two pictures over one line whose right end is the present moment',
+    one: 'ETV and ETV2 live in two pictures that can play together, each over its own line whose right end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // No control opens anything. Under a harness the page presses its own ETV
-    // play, runs the line's checks and a switch away and back, then closes what
-    // it opened, all BEFORE it says ready, so it cannot race the bar drill.
-    // bootMs is a ceiling for that and costs a working page nothing.
+    // play, runs the line's checks, plays ETV2 beside it, stops each one, then
+    // closes what it opened, all BEFORE it says ready. There is no shared bar,
+    // so the harness has no drill to race. bootMs is a ceiling for that and
+    // costs a working page nothing.
     bootMs: 70000 },
   // Everything that could be reached about one artist, before anything is
   // played: 122 rows out of fourteen archives, saying when it is from, who
@@ -933,6 +934,9 @@ export const DEMOS = [
   // A build sheet for the Pico router, unlisted, asked 2026-10-05 (*"write into
   // not-in-index positron page"*): the Oomipood list, the breadboard drawings
   // from rig/pico/oled/breadboard.mjs and the power notes. Opens nothing.
+  { name: 'slides', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
+    one: 'A talk made of slides that hold running parts of this site, stepped inside a panel that fills the screen when you present.',
+    tags: [] },
   { name: 'parts', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
     one: 'The parts, the breadboard and the power for the Pico router with its screen and four keys.',
     tags: [] },
