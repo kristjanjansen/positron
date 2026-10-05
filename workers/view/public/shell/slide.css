@@ -65,17 +65,12 @@
 .sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-side="right"]:not([hidden])) {
   background: linear-gradient(to right, var(--card) 50%, var(--bg) 50%);
 }
-.sl-player[data-full] .sl {
-  border: var(--edge); border-radius: var(--r);
-  width: min(100cqw - 2 * var(--sl-full-m), calc((100cqh - 2 * var(--sl-full-m)) * 16 / 9));
-  height: min(100cqh - 2 * var(--sl-full-m), calc((100cqw - 2 * var(--sl-full-m)) * 9 / 16));
-}
-/* 🔴 AND THE EDGE STANDS OFF THE SCREEN'S EDGE. Asked 2026-10-05 with a
-   screenshot of the edge running along both sides of a 16:10 screen: *"border
-   is on edges of screen"*. A 16:9 slide on a wider-than-tall screen fills the
-   width, so a kept edge lands on the bezel. The slide is fitted inside the
-   screen less this margin on every side, so the edge is always visible. */
-.sl-player, .sl-frame { --sl-full-m: 4cqmin; }
+.sl-player[data-full] .sl { border: 0; border-radius: 0; }
+/* 🔴 THE SCREEN'S EDGE IS THE BORDER. Asked 2026-10-05, after a version that
+   drew the slide's edge inset from the screen: *"what is this???? just all bg
+   is slide bg and border is screens border"*. In full screen the slide's
+   ground fills the screen and no edge is drawn; the 16:9 box only keeps the
+   type and the caption where they are on every slide. */
 .sl-player:focus { outline: none; }
 .sl-player:focus-visible { outline: 1px solid var(--hi); outline-offset: 2px; }
 
@@ -94,8 +89,9 @@
 .sl-frame.pos-full:has(> .sl[data-layout="split"][data-side="left"]) { background: linear-gradient(to right, var(--bg) 50%, var(--card) 50%); }
 .sl-frame.pos-full:has(> .sl[data-layout="split"][data-side="right"]) { background: linear-gradient(to right, var(--card) 50%, var(--bg) 50%); }
 .sl-frame.pos-full > .sl {
-  width: min(100cqw - 2 * var(--sl-full-m), calc((100cqh - 2 * var(--sl-full-m)) * 16 / 9));
-  height: min(100cqh - 2 * var(--sl-full-m), calc((100cqw - 2 * var(--sl-full-m)) * 9 / 16));
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(100cqh, calc(100cqw * 9 / 16));
+  border: 0; border-radius: 0;
 }
 /* THE ⛶, the video panel's square (`.pos-vp button.ico`), bottom right where
    the panel keeps its own. Hidden until a pointer is on the slide or the slide
@@ -118,7 +114,13 @@
 .sl-in {
   height: 100%;
   display: flex; flex-direction: column;
-  padding: 7cqh 6cqw;
+  /* ONE INSET, THE SAME ON ALL FOUR SIDES. Asked 2026-10-05 with a crop of a
+     split's words column, more air at the sides than at the top: *"same w and
+     h padding"*. It was 7 per cent of the height against 6 per cent of the
+     width, which at 16:9 is 10.7 per cent of the height. One number in cqh
+     now, and a split's gap is twice it, so the words stand the same distance
+     off the divide as off the edges. */
+  padding: var(--sl-pad);
 }
 /* The words column: the headline and what proves it. */
 .sl-words { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
@@ -163,6 +165,12 @@
 .sl-list { list-style: none; padding: 0; margin: 0; text-align: left; }
 .sl-list li { margin: 0; }
 .sl-text { max-width: 100%; text-wrap: pretty; }
+/* WORDS UNDER A HEADLINE START WHERE THE HEADLINE STARTS. Asked 2026-10-05,
+   twice: *"HEADLINE OVER TEXT align texts to left"*, then on the marks slide
+   *"align left the same"*. A sentence or a list is read, so it goes on the
+   headline's left edge; a number, a stack, a table or a picture is looked at
+   and stays centred. */
+.sl[data-layout="stack"] .sl-ev:has(> .sl-list, > .sl-text) { align-items: flex-start; text-align: left; }
 .sl-big + .sl-under { margin-top: -2cqh; }
 
 /* THE CAPTION, STEP 1, BOTTOM LEFT, EVERY SLIDE. The last child of the inset
@@ -180,11 +188,23 @@
    so the padding sits on the same grid the columns do. Every row carries the
    same inset, so the character columns line up exactly as in a plain table.
    `box` adds the site's own edge and corner, read from the tokens. */
+/* 🔴 ONE RULE WIDTH ON A SLIDE, A SHARE OF ITS HEIGHT, SO IT SCALES WITH THE
+   SLIDE IN FULL SCREEN. Asked 2026-10-05: *"thicker table lines, same as
+   other lines. when on fullsc scale all borders proportionally"*. The diagram's
+   1.5 logical px edge prints at about 1.5 px on the kit's 386 px slide, so 0.4
+   per cent of the slide's height is the same line; never under 1 px. */
+.sl { --sl-rule: max(1px, 0.4cqh); --sl-pad: 8cqh; }
 .sl-rows[data-frame] > .sl-row,
 .sl-log .sl-row { padding: 0.3em 0.6em; }
-.sl-rows[data-frame] > .sl-row + .sl-row,
-.sl-log-body > .sl-row + .sl-row { border-top: 1px solid var(--line); }
-.sl-rows[data-frame="box"] { border: var(--edge); border-radius: var(--r); }
+.sl-rows[data-frame] > .sl-row + .sl-row { border-top: var(--sl-rule) solid var(--line); }
+/* A LOG'S RULE IS UNDER EACH ROW, NOT OVER IT. Over it, the first row in view
+   after the oldest had scrolled away drew its rule straight under the
+   header's, two lines together (*"rm doublw underline on LIVE TABULAR LOG ON
+   A SLIDE"*). Under it, the newest row has none and the header's is alone. */
+.sl-log-body > .sl-row:not(:last-child) { border-bottom: var(--sl-rule) solid var(--line); }
+/* FULL WIDTH, asked 2026-10-05: *"tables full w. no roundex box"*. A ruled
+   table spans the evidence region edge to edge, so its rules do too. */
+.sl-rows[data-frame] { align-self: stretch; }
 
 /* 🔴 A LIVE LOG IS A FIXED BOX. It takes the height of its slot and never of
    its rows, so a row arriving moves nothing on the slide; the body scrolls to
@@ -196,8 +216,11 @@
   display: flex; flex-direction: column;
   white-space: pre; text-align: left; font-weight: 400;
 }
-.sl-log-head { flex: 0 0 auto; border-bottom: 1px solid var(--line); }
-.sl-log-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.sl-log-head { flex: 0 0 auto; border-bottom: var(--sl-rule) solid var(--line); }
+.sl-log-body { flex: 1 1 auto; min-height: 0; overflow: hidden;
+  /* the same fade as the plain log's, so a row leaving is never cut in half */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2lh);
+  mask-image: linear-gradient(to bottom, transparent, #000 2lh); }
 /* THE SHELL'S OWN LOG AT SLIDE SCALE. `.pos-log` is px type in a bordered
    card with a 150 px ceiling; in a slot it is the slide's face at step 1, on
    the darker half with no box of its own, as tall as the slot and no taller.
@@ -214,6 +237,12 @@
      118.6 px above the foot (MEASURED, kit 328/329). Overflow then leaves by
      the top, which is the oldest line leaving. */
   align-content: end;
+  /* NO HALF LINE AT THE TOP. Reported 2026-10-05 with a crop of a line cut
+     through its middle: *"ugly cut / crrop"*. The slot is not a whole number
+     of lines tall, so the oldest line in view is always partly clipped; it
+     fades out over the top two lines instead of ending on a hard cut. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2lh);
+  mask-image: linear-gradient(to bottom, transparent, #000 2lh);
 }
 .sl-stack {
   display: grid; grid-template-columns: auto auto auto; column-gap: 0.6em;
@@ -227,24 +256,22 @@
    `top`: headline on top, the words at the bottom, left aligned, the air
      between them.
    `left`: everything on the left edge, the evidence vertically centred.
-   `right`: everything on the right edge; the caption stays bottom left,
-     because a caption is in one place on every slide.
    `split`: two columns, the slot on `data-side` and the words on the other,
      the caption across the foot. */
 .sl[data-layout="top"] .sl-ev { justify-content: flex-end; align-items: flex-start; text-align: left; }
 .sl[data-layout="left"] .sl-ev { align-items: flex-start; text-align: left; }
-.sl[data-layout="right"] .sl-say { text-align: right; }
-.sl[data-layout="right"] .sl-ev { align-items: flex-end; text-align: right; }
-.sl[data-layout="right"] .sl-ev .sl-list,
-.sl[data-layout="right"] .sl-ev .sl-text { text-align: right; }
 
 .sl[data-layout="split"] .sl-in {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  column-gap: 6cqw;
+  /* MORE AIR EITHER SIDE OF THE DIVIDE, asked 2026-10-05 with a crop of the
+     log's ruled rows running almost into the words: *"more x padding around
+     central divider"*. Twice the slide's one inset, so each column stands the
+     inset off the middle, which is where the darker half ends. */
+  column-gap: calc(2 * var(--sl-pad));
 }
-.sl[data-layout="split"][data-side="left"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "slot words" "cap cap"; }
-.sl[data-layout="split"][data-side="right"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "words slot" "cap cap"; }
+.sl[data-layout="split"][data-side="left"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "slot words" "slot cap"; }
+.sl[data-layout="split"][data-side="right"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "words slot" "cap slot"; }
 .sl[data-layout="split"] .sl-words { grid-area: words; }
 .sl[data-layout="split"] .sl-slot { grid-area: slot; }
 .sl[data-layout="split"] .sl-cap { grid-area: cap; }
@@ -305,7 +332,8 @@
    at the size it had, while every edge, box padding, gap and arrow run is 10
    per cent larger than it was, and the edges about 2.2 times as thick.
    (0,4,0) against the kinds' (0,3,0). */
-.sl { --sl-dg-edge: 2px; --sl-dg-link: 2px; --sl-dg-air: 8px; }
+.sl { --sl-dg-edge: 1.5px; --sl-dg-link: 1.5px; --sl-dg-air: 8px; }
+/* 1.5, down from 2 on 2026-10-05: *"make borders bit thinner of slide diagrams"*. */
 .sl .pos-dg .pos-dg-n .pos-dg-box { stroke-width: var(--sl-dg-edge); }
 .sl .pos-dg .pos-dg-svg .pos-dg-link { stroke-width: var(--sl-dg-link); }
 .sl .pos-dg .pos-dg-svg .pos-dg-lab { font-size: 11px; }

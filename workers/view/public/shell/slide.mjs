@@ -20,12 +20,13 @@
 //   list       up to three lines, dimmed
 //   stack      [label, value, unit] rows, decimal points in one column
 //   rows       { head, body, align, frame }, a table padded into character
-//              columns; `frame` 'none' rules a line between rows, 'box' adds
-//              the rounded edge, absent is plain lines
+//              columns; `frame` 'none' rules a line between rows across
+//              the full width, absent is plain lines
 //   lines      [[step, text], ...], each line at its own step, for specimens
 //   cap        the caption, step 1, bottom left, always
 //   slot       any element: a kit component, a picture, a diagram
-//   layout     'stack' (default), 'top', 'left', 'right', 'split'
+//   layout     'stack' (default), 'top', 'left', 'split' (no 'right',
+//              removed 2026-10-05: *"no right align needed"*)
 //   side       for 'split', which side the slot is on: 'left' or 'right'
 //
 // Marks in any string: `*x*` paints x in `--hi`, `[x|tech]` paints x in the
@@ -215,12 +216,13 @@ export function padRows({ head = null, body = [], align = '' }) {
  * 🔴 A TABLE'S FRAME, CHOSEN PER SLIDE. Asked 2026-10-05: *"i do not see
  * tables layout. horiz lines but try with rounded corner outer border and
  * not"*. Absent, a table is plain padded lines. `none` draws a 1 px `--line`
- * rule between rows (the header's included) and nothing outside them; `box`
- * draws the same rules inside the site's own rounded edge (`--edge`, `--r`).
- * No vertical lines in either: a column is a character position, and a rule
- * between columns would say twice what the alignment already says.
+ * rule between rows (the header's included) and nothing outside them, across
+ * the full width of the evidence. No vertical lines: a column is a character
+ * position, and a rule between columns would say twice what the alignment
+ * already says. ⚠️ `box`, a rounded outer edge, was removed the same evening:
+ * *"tables full w. no roundex box"*.
  */
-export const FRAMES = ['box', 'none'];
+export const FRAMES = ['none'];
 
 /**
  * A framed row carries 0.3 em of air above and below its glyphs, so a table
@@ -230,7 +232,7 @@ export const FRAMES = ['box', 'none'];
 export const tableStep = (lines, frame) => (frame ? (lines > 2 ? 2 : 3) : evStep(lines));
 
 // ── the slide model ─────────────────────────────────────────────────────────
-export const LAYOUTS = ['stack', 'top', 'left', 'right', 'split'];
+export const LAYOUTS = ['stack', 'top', 'left', 'split'];
 const KEYS = new Set(['name', 'layout', 'side', 'say', 'statement', 'big', 'under', 'text', 'textStep',
   'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes']);
 
@@ -256,7 +258,7 @@ export function normalise(spec) {
   if (spec.textStep != null) stepOf(spec.textStep);
   if (spec.list && spec.list.length > 4) throw new Error('a list is two to four lines');
   if (spec.rows && spec.rows.frame != null && !FRAMES.includes(spec.rows.frame)) {
-    throw new Error(`a table frame is box or none, not ${spec.rows.frame}`);
+    throw new Error(`a table frame is none, not ${spec.rows.frame}`);
   }
   return { ...spec, layout };
 }
