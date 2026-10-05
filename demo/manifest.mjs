@@ -97,9 +97,10 @@ export const DEMOS = [
     one: 'one webcam next to what comes back over WebRTC, MoQ and LL-HLS',
     tags: ['getUserMedia', 'WebRTC', 'WHIP', 'MoQ'] },
 
-  { name: 'room', group: 'technologies', act: 2, created: '2026-09-04', built: true,
-    one: 'open this page twice and each window shows the other',
-    tags: ['getUserMedia', 'WebRTC', 'relay'] },
+  // `room` was a demo (open this page twice and each window shows the other,
+  // WebRTC peer to peer with the relay only introducing) and is archived at
+  // archive/demos/room-index.html, removed 2026-10-05 on *"arvhice it"* after
+  // *"what is the point of room demo?"*. No redirect.
   // `items` was a demo and is archived at archive/items/README.md, removed
   // 2026-10-01 on instruction. It wrote an item, let a Durable Object alarm
   // publish it at the moment named, and told installed phones over FCM. Its
