@@ -1,7 +1,8 @@
 // rig/pico/oled/breadboard.mjs - draw the Pico 2 WH, the OLED module and the
 // hub power on an 830 hole breadboard, as breadboard.svg.
 //
-//   node rig/pico/oled/breadboard.mjs        # writes breadboard.svg beside this file
+//   node rig/pico/oled/breadboard.mjs           # hub powered: breadboard.svg
+//   node rig/pico/oled/breadboard.mjs mb102     # MB102 power module: breadboard-mb102.svg
 //
 // wiring.yml (WireViz) says WHICH pin goes to which; this says WHERE each wire
 // goes on the board, hole by hole, so the board can be built by copying it.
@@ -17,11 +18,18 @@
 // in row h and pin 41-n in row c.
 // THE OLED MODULE's 8 pin header sits in row j, columns 40 to 47, its body
 // hanging off the bottom edge: GND VCC SCL SDA K4 K3 K2 K1, as printed.
-// POWER comes from a spare port of the powered hub through a USB-A plug to
-// screw terminal adapter: 5 V into VBUS (pin 40) and ground to the rail.
+// POWER, two ways. Default: a spare port of the powered hub through a USB-A
+// plug to screw terminal adapter, 5 V into VBUS (pin 40) and ground to the
+// rail. `mb102`: the breadboard power module on the right hand end, its top
+// jumper on 5 V (the top rails feed VBUS) and its bottom jumper on 3.3 V (the
+// bottom rails feed the OLED), so the Pico's own 3V3 out is wired to nothing.
+// ⚠️ The module's layout is the common MB102's, INFERRED: the shop page gives
+// only 6.5 to 12 V in, 3.3 V or 5 V out, 700 mA.
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+const MB102 = process.argv[2] === 'mb102';
 
 const P = 16;                         // one hole pitch, 0.1 inch, in px
 const COLS = 63;
@@ -43,7 +51,7 @@ const at = (row, col) => [holeX(col), ROW_Y[row]];
 
 const C = { v5: '#e0457b', v3: '#d63b3b', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#8a4fd1' };
 const out = [];
-const svgW = X0 * 2 + W, svgH = Y0 + H + 300;
+const svgW = X0 * 2 + W + (MB102 ? 60 : 0), svgH = Y0 + H + 300;
 out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" font-family="ui-monospace, Menlo, monospace">`);
 out.push(`<rect width="100%" height="100%" fill="#f4f1ea"/>`);
 
@@ -111,19 +119,61 @@ const OLED = ['GND', 'VCC', 'SCL', 'SDA', 'K4', 'K3', 'K2', 'K1'];
   });
 }
 
-// the hub power adapter, off the board on the left
-const PWR = { x: X0 - 110, y: ROW_Y.a - 120 };
-out.push(`<rect x="${PWR.x}" y="${PWR.y}" width="86" height="54" rx="4" fill="#2b2b2b"/>`);
-out.push(`<rect x="${PWR.x - 34}" y="${PWR.y + 14}" width="36" height="26" rx="2" fill="#b9bcc2" stroke="#7b7f86"/>`);
-out.push(`<text x="${PWR.x + 43}" y="${PWR.y - 8}" font-size="10" fill="#333" text-anchor="middle">USB-A to screw terminals,</text>`);
-out.push(`<text x="${PWR.x + 43}" y="${PWR.y - 20}" font-size="10" fill="#333" text-anchor="middle">plugged into a hub port</text>`);
-out.push(`<text x="${PWR.x + 30}" y="${PWR.y + 32}" font-size="10" fill="#fff" text-anchor="middle">5V</text>`);
-out.push(`<text x="${PWR.x + 64}" y="${PWR.y + 32}" font-size="10" fill="#fff" text-anchor="middle">GND</text>`);
-const pwr5 = [PWR.x + 30, PWR.y + 54], pwrG = [PWR.x + 64, PWR.y + 54];
+// the power, either the hub dongle on the left or the MB102 on the right end
+let pwr5 = null, pwrG = null;
+if (!MB102) {
+  // the hub power adapter, off the board on the left
+  const PWR = { x: X0 - 110, y: ROW_Y.a - 120 };
+  out.push(`<rect x="${PWR.x}" y="${PWR.y}" width="86" height="54" rx="4" fill="#2b2b2b"/>`);
+  out.push(`<rect x="${PWR.x - 34}" y="${PWR.y + 14}" width="36" height="26" rx="2" fill="#b9bcc2" stroke="#7b7f86"/>`);
+  out.push(`<text x="${PWR.x + 43}" y="${PWR.y - 8}" font-size="10" fill="#333" text-anchor="middle">USB-A to screw terminals,</text>`);
+  out.push(`<text x="${PWR.x + 43}" y="${PWR.y - 20}" font-size="10" fill="#333" text-anchor="middle">plugged into a hub port</text>`);
+  out.push(`<text x="${PWR.x + 30}" y="${PWR.y + 32}" font-size="10" fill="#fff" text-anchor="middle">5V</text>`);
+  out.push(`<text x="${PWR.x + 64}" y="${PWR.y + 32}" font-size="10" fill="#fff" text-anchor="middle">GND</text>`);
+  pwr5 = [PWR.x + 30, PWR.y + 54]; pwrG = [PWR.x + 64, PWR.y + 54];
+} else {
+  const x1 = holeX(59) - 8, x2 = X0 + W + 70, y1 = Y0 - 14, y2 = Y0 + H + 14;
+  out.push(`<rect x="${x1}" y="${y1}" width="${x2 - x1}" height="${y2 - y1}" rx="5" fill="#1d4f8f" opacity="0.93"/>`);
+  out.push(`<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 8}" font-size="11" fill="#fff" text-anchor="middle">MB102</text>`);
+  out.push(`<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 + 8}" font-size="9" fill="#cfe0f5" text-anchor="middle">power module</text>`);
+  // barrel jack, switch, USB socket, on the overhanging end
+  out.push(`<rect x="${x2 - 30}" y="${(y1 + y2) / 2 - 46}" width="40" height="26" rx="3" fill="#111"/>`);
+  out.push(`<text x="${x2 + 16}" y="${(y1 + y2) / 2 - 30}" font-size="10" fill="#333">9 V adapter in</text>`);
+  out.push(`<rect x="${x2 - 24}" y="${(y1 + y2) / 2 + 24}" width="18" height="14" rx="2" fill="#ddd" stroke="#888"/>`);
+  out.push(`<text x="${x2 + 16}" y="${(y1 + y2) / 2 + 35}" font-size="10" fill="#333">on/off</text>`);
+  // the two rail jumpers
+  for (const [r, word] of [['T+', '5 V'], ['B+', '3.3 V']]) {
+    const y = r === 'T+' ? (ROW_Y['T+'] + ROW_Y['T-']) / 2 : (ROW_Y['B+'] + ROW_Y['B-']) / 2;
+    out.push(`<rect x="${holeX(60)}" y="${y - 7}" width="26" height="14" rx="2" fill="#f2c94c"/>`);
+    out.push(`<text x="${holeX(60) + 34}" y="${y + 4}" font-size="11" fill="#fff">jumper on ${word}</text>`);
+  }
+  // its pins in the four rails
+  for (const r of ['T+', 'T-', 'B-', 'B+']) for (const c of [61, 62]) out.push(`<circle cx="${holeX(c)}" cy="${ROW_Y[r]}" r="3.4" fill="#e8c35a"/>`);
+  out.push(`<text x="${X0 + 14}" y="${ROW_Y['T+'] - 12}" font-size="10" fill="${C.v5}">top + rail is 5 V</text>`);
+  out.push(`<text x="${X0 + 14}" y="${ROW_Y['B+'] + 20}" font-size="10" fill="${C.v3}">bottom + rail is 3.3 V</text>`);
+}
 
 // wires: [from, to, colour, label]; a point is [x, y] or [row, col]
 const pt = (p) => (typeof p[0] === 'string' ? at(p[0], p[1]) : p);
-const WIRES = [
+const SIGNALS = [
+  [['i', 7], ['h', 42], C.scl, 'GP5 SCL, pin 7'],
+  [['j', 6], ['g', 43], C.sda, 'GP4 SDA, pin 6'],
+  [['i', 17], ['h', 44], C.key, 'GP13 to K4, pin 17'],
+  [['j', 16], ['g', 45], C.key, 'GP12 to K3, pin 16'],
+  [['i', 15], ['f', 46], C.key, 'GP11 to K2, pin 15'],
+  [['j', 14], ['f', 47], C.key, 'GP10 to K1, pin 14'],
+];
+const WIRES = MB102 ? [
+  [['T+', 1], ['a', 1], C.v5, '5 V into VBUS, pin 40'],
+  [['a', 3], ['T-', 3], C.gnd, 'pin 38 GND'],
+  [['i', 18], ['B-', 18], C.gnd, 'pin 18 GND to the bottom rail'],
+  [['i', 40], ['B-', 37], C.gnd, 'OLED GND'],
+  [['i', 41], ['B+', 36], C.v3, 'OLED VCC, 3.3 V'],
+  // ⚠️ only if the board's rails are split in the middle: bridge each one
+  ...['T+', 'T-', 'B-', 'B+'].map((r) => [[r, 29], [r, 35], r.endsWith('+') ? (r[0] === 'T' ? C.v5 : C.v3) : C.gnd,
+    'only if the rail is split']),
+  ...SIGNALS,
+] : [
   [pwr5, ['a', 1], C.v5, '5 V into VBUS, pin 40'],
   [pwrG, ['T-', 2], C.gnd, 'ground'],
   [['a', 3], ['T-', 3], C.gnd, 'pin 38 GND'],
@@ -131,12 +181,7 @@ const WIRES = [
   [['i', 18], ['B-', 18], C.gnd, 'pin 18 GND to the bottom rail'],
   [['i', 40], ['B-', 37], C.gnd, 'OLED GND'],
   [['i', 41], ['T+', 41], C.v3, 'OLED VCC, 3.3 V only'],
-  [['i', 7], ['h', 42], C.scl, 'GP5 SCL, pin 7'],
-  [['j', 6], ['g', 43], C.sda, 'GP4 SDA, pin 6'],
-  [['i', 17], ['h', 44], C.key, 'GP13 to K4, pin 17'],
-  [['j', 16], ['g', 45], C.key, 'GP12 to K3, pin 16'],
-  [['i', 15], ['f', 46], C.key, 'GP11 to K2, pin 15'],
-  [['j', 14], ['f', 47], C.key, 'GP10 to K1, pin 14'],
+  ...SIGNALS,
 ];
 for (const [a, b, col] of WIRES) {
   const [x1, y1] = pt(a), [x2, y2] = pt(b);
@@ -151,16 +196,17 @@ for (const [a, b, col] of WIRES) {
   let y = Y0 + H + 110;
   out.push(`<text x="${X0}" y="${y}" font-size="13" fill="#222">Every wire, hole to hole (row letter, column number)</text>`);
   y += 8;
-  const hole = (p) => (typeof p[0] === 'string' ? `${p[0]}${p[1]}` : 'adapter');
+  const hole = (p) => (typeof p[0] === 'string' ? `${p[0]}${p[1]}` : 'adapter')
+    .replace(/^T-/, 'top - rail ').replace(/^T\+/, 'top + rail ').replace(/^B-/, 'bottom - rail ').replace(/^B\+/, 'bottom + rail ');
   WIRES.forEach(([a, b, col, label], i) => {
     const cx = X0 + (i % 2) * 470, cy = y + 22 + Math.floor(i / 2) * 22;
     out.push(`<rect x="${cx}" y="${cy - 9}" width="22" height="6" rx="3" fill="${col}"/>`);
-    const from = hole(a), to = hole(b).replace('T-', 'top - rail ').replace('T+', 'top + rail ').replace('B-', 'bottom - rail ');
+    const from = hole(a), to = hole(b);
     out.push(`<text x="${cx + 30}" y="${cy - 2}" font-size="11" fill="#333">${from} to ${to}   ${label}</text>`);
   });
 }
 out.push('</svg>');
 
-const file = fileURLToPath(new URL('./breadboard.svg', import.meta.url));
+const file = fileURLToPath(new URL(MB102 ? './breadboard-mb102.svg' : './breadboard.svg', import.meta.url));
 writeFileSync(file, out.join('\n'));
 console.log(`wrote ${file}`);
