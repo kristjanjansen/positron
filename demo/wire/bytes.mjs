@@ -315,7 +315,9 @@ export function build({ panel, log, d }) {
     try { opening = await readHistory(); } catch { openOk = false; msgs.clear('the history did not answer'); }
     A('the history is on the page before anything is sent', openOk && recording,
       openOk ? `${opening.held} held on arrival, ${recordNote}` : recordNote);
-    log(`room ${ROOM}: open a second copy to see both sides, ?checks=1 shows the checks`, 'hi');
+    // `?checks=1` is not advertised here: a visitor's log is not where a page
+    // documents its own test switches, and the header above already does.
+    log(`room ${ROOM}: open this page in a second browser to see both sides`, 'hi');
   })();
 
   return {

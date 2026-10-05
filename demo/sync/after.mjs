@@ -63,6 +63,13 @@ export const readout = { 'cues fired': '', 'late by': 'ms', worst: 'ms', drift: 
 export function build({ panel, log, set, d }) {
   const video = el('video', 'sync-video', null, { playsinline: '', muted: '', preload: 'auto' });
   video.muted = true;
+  // What the empty box says until the first frame is decoded. Words, not a
+  // poster: a poster is a fetch, and a visit opens nothing.
+  const len = `${Math.floor(ARCHIVE.durationMs / 60000)}:${String(Math.round(ARCHIVE.durationMs / 1000) % 60).padStart(2, '0')}`;
+  const say = el('p', 'sync-say', `The ${len} recording plays here when you press play.`);
+  const screen = el('div', 'sync-screen');
+  screen.append(video, say);
+  video.addEventListener('loadeddata', () => { say.hidden = true; }, { once: true });
 
   // ── the cue lane: the media is the master, the deck is the score ─────────
   const fires = [];
@@ -146,7 +153,7 @@ export function build({ panel, log, set, d }) {
   // ⚠️ IN THE PAGE BEFORE THE STRIP IS MADE, or it fits itself to the 300 px
   // a detached canvas measures and never fits again.
   const shelf = el('div');
-  panel.add(video, shelf);
+  panel.add(screen, shelf);
   const bar = createTransportBar(shelf, deck, { scrub: false, command });
   const strip = createStripView(shelf, deck, { size: 'default', lanes: [{
     id: 'cue', kind: 'cue', height: 44, as: 'ticks',
@@ -287,9 +294,19 @@ export function build({ panel, log, set, d }) {
     async check({ A }) {
       A('nothing was fetched and no picture was asked for before the first press of play',
         !loaded && !hls && !video.currentSrc, loaded ? 'already attached' : 'the element has no source yet');
+      {
+        const r = video.getBoundingClientRect();
+        const shown = getComputedStyle(say).display !== 'none' && say.textContent.length > 0;
+        A('before play the picture box is the recording\'s shape and says what will appear in it',
+          shown && Math.abs(r.width / r.height - 16 / 9) < 0.05,
+          `${r.width.toFixed(0)} by ${r.height.toFixed(0)}, ${shown ? `"${say.textContent}"` : 'NO WORDS IN THE BOX'}`);
+      }
       bar.api.el.querySelector('.tbar-toggle').click();
       const lp = await gradeLoop();
       A('the picture stays inside the loop', lp.pass, lp.detail);
+      A('the words in the box leave once a frame is there',
+        video.readyState >= 2 && getComputedStyle(say).display === 'none',
+        `readyState ${video.readyState}, words ${getComputedStyle(say).display === 'none' ? 'gone' : 'still showing'}`);
       const toggle = bar.api.el.querySelector('.tbar-toggle');
       if (bar.api.playing) toggle.click();
       if (fires.length) {
