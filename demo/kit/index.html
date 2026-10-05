@@ -2043,25 +2043,35 @@
      to col layout with tom instrument (no labels)"*. `/tom/`'s drum machine
      from the same kit parts `/tom/` uses (demo/tom/index.html, the bar at
      ~620, the grid at ~750, the instrument at ~836): a transport bar with the
-     stop verb and the tempo arrows in its right slot, glued over a step grid in
-     a panel case, with the TOM plate at the foot's right end. On the darker
-     side of a split, scaled like the waveform and FAU panels (`fitBox`,
-     `.kit-sl-fill`).
+     stop verb, glued over a step grid in a panel case, with the TOM plate at
+     the foot's right end. On the darker side of a split, scaled like the
+     waveform and FAU panels (`fitBox`, `.kit-sl-fill`).
+     🔴 32 STEPS, NO TEMPO ARROWS, DRAWABLE, asked the same day as *"more lines
+     on slide tom, 32?. no prev next. drawable"*. Two bars of four beats at four
+     steps a beat. The arrows are gone from the bar's right slot, so the tempo
+     is the clock's 120 and nothing on the slide changes it. The grid is the
+     editable one: a press toggles a pad and a drag carries that press's value
+     across the pads it crosses, which is `step-grid.mjs`'s own stroke, and
+     Enter on a focused pad toggles it, the component's own key.
+     ⚠️ THE STEPS SCROLL RATHER THAN SHRINK. A pad is never smaller than
+     `PAD_DRAW` (above `PAD_MIN`), and the case's strip is already its own x
+     scroller (`.panel-strip`), so 32 steps scroll inside the panel.
      🔴 NO LABELS, AND THE PLATE IS KEPT. No row names (no `fixed`, so no label
-     column is built), no beat numbers (`ticks` off), no clock (`time: false`),
-     and the tempo is `‹` and `›` with no `120 bpm` cell between them. The plate
-     stays: it is the instrument's name, not a label on one of its controls.
-     Glyphs stay too, because a play button with no glyph is a blank square.
+     column is built), no beat numbers (`ticks` off), no clock (`time: false`).
+     The plate stays: it is the instrument's name, not a label on one of its
+     controls. Glyphs stay too, because a play button with no glyph is a blank
+     square.
      🔴 NO SAMPLES, NO AUDIO, NO FETCH. The grid plays its pattern on its own
      frame clock while the tab is open and stops when it closes; the bar's
-     toggle stops and plays it, the arrows walk the tempo in fives the way
-     `/tom/`'s stepper does. Read only, as the block it replaces was.
+     toggle stops and plays it.
      ⚠️ THE BAR'S KEYS ARE THE SLIDE'S, by `slideCommand`, for the reason the
-     TRANSPORT BAR block gives: Space from the page must not start it. */
+     TRANSPORT BAR block gives: Space from the page must not start it. The
+     grid listens on its own rows only, so a key from the body never reaches
+     a pad. */
   section('slides', 'STEP GRID ON A SLIDE',
-    'The TOM drum machine at slide scale on the darker side of a split: its bar, a step grid '
-    + 'playing on its own clock while this tab is open, and its plate, with no labels on the '
-    + 'rows, the steps or the tempo. Nothing sounds here.',
+    'The TOM drum machine at slide scale on the darker side of a split: its bar, a 32 step grid '
+    + 'you can draw on, playing on its own clock while this tab is open, and its plate, with no '
+    + 'labels on the rows or the steps. Nothing sounds here.',
     `slot: (host) => { const fb = fitBox(host, 420); fb.inner.append(createInstrumentPanel({ rows: [[[bar.el], { pad: false }], [[layout.el], { pad: false }]], plate: { name: 'TOM', place: 'end' }, full: true }).el) }`,
     (box) => {
       box.classList.add('kit-sl');
@@ -2070,12 +2080,24 @@
         cap: 'a picture, it plays at',
         slot: (host) => {
           const fb = fitBox(host, 420);
-          const STEPS = 16, BPM_MIN = 60, BPM_MAX = 200, BPM_STEP = 5;
+          /* ⚠️ A PAD A FINGER CAN DRAW ON, NOT THE GRID'S FLOOR. MEASURED at
+             `PAD_MIN`: 32 steps in the 378 logical px strip are 10 px pads, and at
+             this slot's 0.67x to 0.75x that is about 7 screen px, which nobody
+             can hit. 18 logical px is about 13 screen px, and the steps scroll
+             inside the strip past the panel edge, as FAU's keys do. */
+          const STEPS = 32, PAD_DRAW = 18;
           const kase = createPanelLayout({ side: null, flow: false, strip: { role: 'group', label: 'steps' } });
-          const grid = createStepGrid({ strip: kase.strip, rows: 6, steps: STEPS, readOnly: true,
+          const grid = createStepGrid({ strip: kase.strip, rows: 6, steps: STEPS, minCell: PAD_DRAW,
             rate: { bpm: 120, whose: 'this slide, which made it up' } });
-          // kick, snare, closed hat, open hat, clap, tom
-          const PATTERN = [[0, 4, 8, 12], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [14], [12], [10, 11]];
+          // two bars: kick, snare, closed hat, open hat, clap, tom, the second bar with a fill
+          const PATTERN = [
+            [0, 8, 10, 16, 24, 27],
+            [4, 12, 20, 28],
+            [0, 2, 4, 6, 8, 10, 12, 16, 18, 20, 22, 24, 26],
+            [14, 30],
+            [12, 28],
+            [25, 29, 31],
+          ];
           PATTERN.forEach((row, r) => row.forEach((st) => grid.set(r, st, true, 'quiet')));
           let steps = 0;
           grid.clock.onStep(() => { steps++; });
@@ -2089,11 +2111,8 @@
           // the gate drives this facade, so a key from outside the slide moves nothing
           const gate = slideCommand({ play: () => run(true), pause: () => run(false), seek: () => {} },
             () => host.closest('.sl-frame'));
-          const tempo = createStepper({ what: 'tempo',
-            prev: () => grid.clock.setBpm(Math.max(BPM_MIN, grid.clock.bpm() - BPM_STEP)),
-            next: () => grid.clock.setBpm(Math.min(BPM_MAX, grid.clock.bpm() + BPM_STEP)) });
           const bar = createTransportBar(el('div'), deck, {
-            publish: false, scrub: false, loop: false, time: false, endStop: false, verb: 'stop', right: [tempo.el],
+            publish: false, scrub: false, loop: false, time: false, endStop: false, verb: 'stop',
             command: gate.command,
           });
           const panel = createInstrumentPanel({
@@ -2103,7 +2122,8 @@
           });
           panel.el.classList.add('kit-sl-fill');
           fb.inner.append(panel.el);
-          slideKit.comps.grid = { grid, steps: () => steps, panel, bar, deck, tempo, kase, fb, column: host, refused: gate.refused };
+          slideKit.comps.grid = { grid, steps: () => steps, panel, bar, deck, kase, fb, column: host, refused: gate.refused,
+            pattern: PATTERN };
           return { start() { run(true); }, stop() { run(false); } };
         } }, { host: box, full: true });
       const a = el('a', '', 'positron.studio/tom/', { href: 'https://positron.studio/tom/' });
@@ -12977,6 +12997,74 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         G.steps() > s0 && G.grid.clock.playing() && G.deck.playing() && G.grid.count() > 0,
         `${G.steps() - s0} steps in 0.4 s from step ${at0} at ${G.grid.clock.bpm()} bpm, `
         + `${G.grid.count()} pads lit, the bar's deck ${G.deck.playing() ? 'playing' : 'STOPPED'}`);
+      {
+        // 32 steps, two bars, and no tempo arrows in the bar
+        const g = G.grid, rows = g.pads;
+        const cell = parseFloat(g.el.style.getPropertyValue('--pg-cell'));
+        const glyphs = [...G.bar.el.querySelectorAll('button')].filter((b) => /[‹›]/.test(b.textContent));
+        d.assert('SLIDES: the TOM grid is 32 steps on every row at a drawable pad size, and its bar carries no tempo arrows',
+          g.steps === 32 && rows.length === 6 && rows.every((r) => r.length === 32)
+            && !G.bar.el.querySelector('.step') && glyphs.length === 0 && cell >= 18,
+          `${g.steps} steps, ${rows.length} rows of ${[...new Set(rows.map((r) => r.length))].join('/')}, `
+          + `pads ${cell} logical px, `
+          + `${G.bar.el.querySelectorAll('.step').length} stepper(s) and ${glyphs.length} arrow button(s) in the bar`);
+      }
+      {
+        // drawable: a press toggles, a second press toggles back, a drag paints, a body key reaches nothing
+        const g = G.grid, saved = g.pattern();
+        const fire = (c, type) => c.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, pointerId: 41, pointerType: 'mouse', button: 0 }));
+        const up = () => dispatchEvent(new PointerEvent('pointerup', { pointerId: 41, pointerType: 'mouse', button: 0 }));
+        const pad = g.pads[3][1];                         // open hat, step 2: dark in the pattern
+        const was = g.get(3, 1);
+        fire(pad, 'pointerdown'); up();
+        const onAfter = g.get(3, 1);
+        fire(pad, 'pointerdown'); up();
+        const offAfter = g.get(3, 1);
+        d.assert('SLIDES: a pointer press on a TOM pad lights it and a second press puts it out',
+          g.readOnly === false && pad.tagName === 'BUTTON' && !was && onAfter && !offAfter,
+          `${pad.tagName.toLowerCase()} pad, ${was ? 'lit' : 'dark'} before, ${onAfter ? 'lit' : 'DARK'} after one press, `
+          + `${offAfter ? 'STILL LIT' : 'dark'} after the second`);
+        // a drag along the clap row from a dark pad paints, then one from a lit pad erases
+        const row = g.pads[4], run = [0, 1, 2, 3, 4, 5];
+        fire(row[run[0]], 'pointerdown');
+        for (const s of run.slice(1)) fire(row[s], 'pointerover');
+        up();
+        const painted = run.filter((s) => g.get(4, s)).length;
+        fire(row[run[0]], 'pointerdown');
+        for (const s of run.slice(1)) fire(row[s], 'pointerover');
+        up();
+        const erased = run.filter((s) => !g.get(4, s)).length;
+        // a hover after the drag ended must paint nothing
+        fire(row[7], 'pointerover');
+        const stray = g.get(4, 7);
+        d.assert('SLIDES: a drag across a TOM row paints every pad it crosses, and one starting on a lit pad erases them',
+          painted === run.length && erased === run.length && !stray,
+          `${painted} of ${run.length} lit by the first drag, ${erased} of ${run.length} dark after the second, `
+          + `a hover after letting go ${stray ? 'PAINTED' : 'painted nothing'}`);
+        // Enter on a focused pad toggles it, as the component does
+        const k = g.pads[5][0];
+        const kWas = g.get(5, 0);
+        k.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        const kNow = g.get(5, 0);
+        // Space, an arrow and Enter from the body reach neither the grid nor the bar
+        const before = JSON.stringify(g.pattern()), refused0 = G.refused();
+        for (const key of [' ', 'ArrowRight', 'Enter']) {
+          document.body.dispatchEvent(new KeyboardEvent('keydown', { key, code: key === ' ' ? 'Space' : key, bubbles: true, cancelable: true }));
+        }
+        const bodyQuiet = JSON.stringify(g.pattern()) === before && g.clock.playing() && G.deck.playing();
+        d.assert('SLIDES: Enter on a TOM pad toggles it, and Space, an arrow or Enter from the page reach neither the grid nor its bar',
+          kNow === !kWas && bodyQuiet,
+          `Enter turned the pad ${kNow ? 'on' : 'off'} from ${kWas ? 'on' : 'off'}, the body's keys left the pattern `
+          + `${bodyQuiet ? 'unchanged and the grid playing' : 'CHANGED or the grid STOPPED'}, `
+          + `${G.refused() - refused0} refused by the bar's gate`);
+        // put the pattern back the way the slide drew it
+        saved.forEach((r, ri) => r.forEach((v, si) => { if (g.get(ri, si) !== !!v) g.set(ri, si, !!v, 'quiet'); }));
+        const back = JSON.stringify(g.pattern()) === JSON.stringify(saved)
+          && G.pattern.every((r, ri) => r.every((st) => g.get(ri, st)));
+        d.assert('SLIDES: the TOM pattern is put back after the drawing checks',
+          back, back ? `${g.count()} pads lit, as the slide drew them` : 'the pattern DIFFERS from the one the slide drew');
+      }
       const inn = sl.querySelector('.sl-in');
       const spill = inn.scrollWidth > inn.clientWidth + 1 || inn.scrollHeight > inn.clientHeight + 1;
       const col = G.column.getBoundingClientRect(), pr = G.panel.el.getBoundingClientRect();
