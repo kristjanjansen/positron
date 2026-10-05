@@ -1,5 +1,9 @@
 ## Open
 
+- ~~**`/patchbay/` WHY text, shorten 2x** (2026-10-05): *"shorten 2x"* on the five WHY paragraphs. `demo/patchbay/index.html`.~~ Done 2026-10-05, five paragraphs to three, 176 words to 84.
+
+- **`/stage/` onto the patchbay** (2026-10-05): *"can we rework stage to new patchbay stuff"*. `demo/stage/index.html` (4788 lines) against `demo/shell/bay.mjs`, `graph-registry.mjs`, `/patchbay/`. Plan first: `plans/plan-stage-patchbay.md`.
+
 - ~~**`/kit/` OLED FONTS** (2026-10-05): *"to columns. longer uppercase saples"*. One 128x64 panel listing six fonts with a short `OK 1/2` each; wanted two columns and a longer uppercase sample per font. `demo/kit/index.html` `hwFontsDraw`.~~ Done 2026-10-05: two panels, three fonts each, name then the longest whole-word run of `SCENE 1/2 THRU PATCH 64 SENT OK` that fits.
 
 ### Found 2026-10-04 by the tab groundwork agent, not fixed
