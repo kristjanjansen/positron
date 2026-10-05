@@ -48,6 +48,30 @@ Pico pin 36 wired to nothing, bridge the rails if the board splits them.
 ⚠️ The firmware on `/kit/` still talks DIN on its UART; USB host is the next
 firmware (the router board's step 3 below).
 
+## Asked after the list, answers given (not yet on /parts/)
+
+- **Pico to the hub's USB-B socket**: no direct micro-USB to USB-B cable found
+  at Oomipood. Chain: Pico micro socket <- OTG adapter (micro plug, USB-A
+  socket) <- printer cable (USB-A plug ... USB-B plug) -> hub's USB-B socket.
+  The printer cable usually comes with the hub; else
+  https://www.oomipood.ee/product/ccgl60100bk20_usb_2_0_kaabel_a_b_2m_printer_must_vaskkaabel
+  (price not read). The owner found the A-to-B step confusing; the plug and
+  socket picture is the answer that landed.
+- **Powered breadboards**: none at Oomipood; the 830 board plus the MB102
+  module is the equivalent.
+- **Adjustable power brick for the MB102**: universal 3 to 12 V adapters,
+  roughly 12 to 27 EUR (not read each): Goobay 1 A
+  https://www.oomipood.ee/en/product/universaalne_toiteadapter_312v_1a_12w ,
+  HQ 1 A https://www.oomipood.ee/product/p_sup_eu1000_universaalne_stab_adapter_3_12vdc_12w ,
+  MINWA 2.25 A https://www.oomipood.ee/product/mw3ip25gs_impulsstoide_3_12v_2_25a_25w_6_pistikut .
+  Set 9 V, 5.5x2.1 tip, centre positive, BEFORE plugging in. Not needed with
+  the hub dongle.
+- **400 hole board** fits the dongle build (screen overhangs the right end
+  about 1.3 cm), not the MB102 build. Offered a 400 layout in
+  `breadboard.mjs`; not drawn.
+- Next obvious step if asked: put the cable chain and the brick on
+  https://positron.studio/parts/ .
+
 ## Open
 
 - **Deep tier on `/stage/` has not run since the film went.** Five deep asserts
