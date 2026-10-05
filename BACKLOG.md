@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**`/kit/` OLED FONTS** (2026-10-05): *"to columns. longer uppercase saples"*. One 128x64 panel listing six fonts with a short `OK 1/2` each; wanted two columns and a longer uppercase sample per font. `demo/kit/index.html` `hwFontsDraw`.~~ Done 2026-10-05: two panels, three fonts each, name then the longest whole-word run of `SCENE 1/2 THRU PATCH 64 SENT OK` that fits.
+
 ### Found 2026-10-04 by the tab groundwork agent, not fixed
 
 - **`/pack/` is 29/31**, with or without that agent's change (it swapped in

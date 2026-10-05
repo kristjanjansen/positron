@@ -1290,7 +1290,7 @@
     partsFetched: 0,        // how many times this page asked for it
     parts: [],              // { name, cv, paint, px }, drawn when it arrives
   };
-  let hwFontCv = null;      // the OLED FONTS specimen's canvas
+  let hwFontCv = [];        // the OLED FONTS specimen's two canvases
 
   // 128x64 ones and zeros into a 128x64 canvas, one canvas pixel per panel pixel.
   function drawOled(cv, px) {
@@ -1381,17 +1381,24 @@
     d.log(`router firmware booted, font ${name}, key labels ${hw.keys === 'right' ? 'down the right' : 'along the bottom'}`);
   }
 
+  // Two panels, three fonts each in FONT_PICK order, every font its name and
+  // then as much of one uppercase line as fits whole words across 128 px.
+  const HW_FONT_SAMPLE = 'SCENE 1/2 THRU PATCH 64 SENT OK';
   function hwFontsDraw() {
-    if (!hwFontCv || !hw.fonts.length) return;
-    const px = new Uint8Array(OLED_W * OLED_H);
-    let y = 1;
-    for (const F of hw.fonts) {
-      oledText(px, F, 0, y, F.name);
-      const sample = 'OK 1/2';
-      oledText(px, F, OLED_W - (sample.length * F.adv - 1), y, sample);
-      y += F.cap + 4;
-    }
-    drawOled(hwFontCv, px);
+    if (!hwFontCv.length || !hw.fonts.length) return;
+    const per = Math.ceil(hw.fonts.length / hwFontCv.length);
+    hwFontCv.forEach((cv, c) => {
+      const px = new Uint8Array(OLED_W * OLED_H);
+      let y = 1;
+      for (const F of hw.fonts.slice(c * per, (c + 1) * per)) {
+        oledText(px, F, 0, y, F.name);
+        const words = HW_FONT_SAMPLE.split(' ');
+        while (words.length > 1 && words.join(' ').length * F.adv - 1 > OLED_W) words.pop();
+        oledText(px, F, 0, y + F.cap + 3, words.join(' '));
+        y += 2 * F.cap + 9;
+      }
+      drawOled(cv, px);
+    });
   }
 
   async function hwOpen() {
@@ -1798,9 +1805,13 @@ pico.send([0x90, 60, 100])         // into UART0, the DIN in`,
     `fontsIn(parseUF2(bytes))   // [{ name, w, h, adv, top, cap, glyph(code) }], in FONT_PICK order
 patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
     (box) => {
-      const { screen, cv } = oledScreen(box);
-      hwFontCv = cv;
-      box.append(screen);
+      const pair = el('div', 'kit-oled-pair');
+      hwFontCv = [0, 1].map(() => {
+        const { screen, cv } = oledScreen(box, { across: 2 });
+        pair.append(screen);
+        return cv;
+      });
+      box.append(pair);
     });
 
   /**
