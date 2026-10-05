@@ -147,6 +147,8 @@ if (peersAtStart.length) {
  * first: that is the escape hatch for somebody who has been ASKED to check the
  * real relay or the real archive.
  */
+/** Pages that hold both ends of a WebRTC leg in this one browser. See the grant before `Page.navigate`. */
+const PEER_IN_PAGE = new Set(['capture', 'wire']);
 /** slug -> the `?base=` its page is pointed at, filled in as each one comes up. */
 const standIn = new Map();
 const standIns = [];
@@ -716,6 +718,23 @@ for (const t of targets) {
   const q = [process.env.DEMO_QUERY, own, DEEP ? 'selfcheck=2' : 'selfcheck=1',
     standIn.has(t.name) ? `base=${standIn.get(t.name)}` : ''].filter(Boolean).join('&');
   const query = q ? `?${q}` : '';
+  // 🔴 A PAGE WITH BOTH ENDS OF A WebRTC LEG IN ONE BROWSER NEEDS EVERY HOST
+  // INTERFACE, AND CHROME ONLY OFFERS ONE UNTIL A MICROPHONE IS ALLOWED.
+  // MEASURED 2026-10-05: with no capture permission Chrome gathers a single
+  // host candidate, on the interface that routes to 8.8.8.8. On this desk that
+  // is `utun4` (Check Point Endpoint Security VPN, 10.100.6.22), and UDP sent
+  // to that address never comes back to the same machine, so `/capture/`'s
+  // RECEIVER and `/wire/`'s far-end sound sat in `checking` for good. Granting
+  // audioCapture alone makes Chrome enumerate 127.0.0.1, en0 and the bridges,
+  // and the same two connections reach `connected` in about 100 ms.
+  // ⚠️ SCOPED TO THESE SLUGS AND AUDIO ONLY, ON PURPOSE. Video stays
+  // ungranted so no camera page publishes, and `/wish/` asks for the real
+  // microphone, which a run must never open. Reset first so a grant never
+  // outlives the page it was for.
+  await send('Browser.resetPermissions').catch(() => {});
+  if (PEER_IN_PAGE.has(t.name)) {
+    await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissions: ['audioCapture'] });
+  }
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1400);
 
