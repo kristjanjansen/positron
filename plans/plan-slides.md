@@ -107,35 +107,126 @@ built for that ground. A light variant is open (section 7).
   in a second window with the next slide and a timer; Escape for overview;
   `B`, `V` or `.` for a black screen; Space for next.
 
-## 3. The two sizes, chosen and measured
+## 3. The type scale: one base, one ratio, six steps
 
-| size | share of slide height | read against | 1280 px page | 375 px page | 1280x720 full screen |
-| --- | --- | --- | --- | --- | --- |
-| LARGE | **9 %** | pptx title 8.9 to 10.9 %, 4.5x the 8H floor | **34.73 px** | **17.26 px** | **64.8 px** |
-| EXTRA LARGE | **18 %** | pptx stat callout 14.8 to 17.8 %, 2x LARGE | **69.46 px** | **34.53 px** | (2x LARGE) |
+Asked 2026-10-05, after looking at the deployed talk: *"big type headers /
+sentences words. figure out type scale. use accent yellow on some"*, then *"bit
+more line height on smaller font"*. The three ad hoc sizes (SMALL 4.5, LARGE 9,
+EXTRA LARGE 18 per cent of the slide height) are replaced by a modular scale.
 
-All MEASURED as computed `font-size` against the slide's measured height, tolerance
-0.5 px. The slide in the 1280 page is 686 x 385.9 px; in the 375 page 341 x 191.8.
+**The reasoning (READ, then DECIDED).** A modular scale is one base times one
+ratio to a power, and the harmony is in sticking to it (Every Layout; Tim
+Brown's modular scale). Which ratio matters less than having one, but two
+neighbouring steps must be at least about 25 per cent apart or nobody can say
+when to use which (Refactoring UI; positron-compose section 1). Projection
+pushes the other way from print: the Takahashi method sets a few words as
+large as the slide allows and lets the words BE the slide, and Lessig style is
+the same idea paced fast, one short phrase or number a slide. Read against
+section 2's figures: the pptx title band is 8.9 to 10.9 per cent, a stat
+callout 14.8 to 17.8, and the 8H floor is 2.
 
-**Why those two (DECIDED, from the READ numbers).** LARGE sits inside the
-pptx title band and above Alley's 5.2 per cent, because a mono face is wider
-than Calibri and needs the extra height to read at the same distance. The 2:1
-ratio is the signage rule's *"headline = 2 x body"* applied one step up, and a
-step nobody can mistake for "almost the same" (the composition skill's own
-rule). Weight 600 for the headline, 400 and `--dim` for a list, no tracking.
+**DECIDED: base 4 per cent of the slide's height, ratio 1.5.** The base is
+twice the 8H floor, so the smallest text on a slide is still comfortably above
+what the back row can read. 1.5 is far above the 25 per cent floor, and it
+lands the old LARGE, 9, exactly on step 3, so the evidence keeps the size the
+deck was measured at and only the headline and the big words move. 1.333 made
+seven steps between 4 and 30 with two nobody needed; 1.618 put the headline at
+10.5 (not clearly bigger than 9) or at 16.9, where a line holds 13 characters.
+Declared once on `.sl-panel` as `--sl-base: 4; --sl-ratio: 1.5` and
+`--sl-1` .. `--sl-6`, each `calc` off the one below, so nothing types a size
+twice; the self-check reads the two numbers back and derives the steps itself.
 
-**Line budget (MEASURED and asserted, per face).** Every face is monospaced,
-so a line holds a fixed count: **28** characters in the six faces at 0.600 em,
-**27** in Atkinson Hyperlegible Mono, **24** in Martian Mono, at 9 per cent and
-a 6 per cent side inset. Martian sets the budget, so two lines hold 48 and the
-headlines are written to it (section 9 lists the three that were shortened).
-The page asserts `every headline is two lines or fewer, in all eight faces`,
-so the budget is a check rather than advice. Headlines carry `text-wrap:
-balance`, so the second line is not one word. EXTRA LARGE holds half of each
-figure.
+**Line height is part of the step (DECIDED, asked for).** It opens as the size
+drops: a big line is read as a shape and its leading is mostly empty ascender
+room, a small line is read across a wide measure and the eye needs the room to
+find the next one. Declared beside each step as `--sl-<n>-lh`.
+
+| step | cqh | line | x next | 686 px panel (1280 page) | 343 px panel (375 page) | full screen 1280x720 | use |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `--sl-1` | 4.00 | 1.45 | 1.5 | 15.44 px | 7.67 px | 28.8 px | caption, bottom left |
+| `--sl-2` | 6.00 | 1.30 | 1.5 | 23.15 px | 11.51 px | 43.2 px | evidence with four rows |
+| `--sl-3` | 9.00 | 1.20 | 1.5 | 34.73 px | 17.26 px | 64.8 px | evidence: tables, stacks, a list |
+| `--sl-4` | 13.50 | 1.10 | 1.5 | **52.09 px MEASURED** | 25.89 px | 97.2 px | the headline |
+| `--sl-5` | 20.25 | 1.05 | 1.5 | 78.14 px | 38.84 px | 145.8 px | a statement slide |
+| `--sl-6` | 30.38 | 1.00 | (top) | **117.21 px MEASURED** | 58.26 px | 218.7 px | one number |
+
+The slide is 385.9 px tall in the 1280 page and 191.8 px in the 375 page. The
+two bold figures are what the harness printed; the rest are the step times the
+measured slide height, and the page asserts every size it draws is one of
+these within 0.5 px (step 1 x35, step 2 x16, step 3 x30, step 4 x18, step 5 x4,
+step 6 x2, at both widths). The full screen column is arithmetic for a 720 px
+slide; the harness's own full screen is 756 x 425 and measured step 5 at
+86.1 px, which is 20.25 per cent of 425.
+
+**Why four rows drop to step 2 (MEASURED by the spill assert).** The inset
+leaves 86 per cent of the height. A two line headline takes 2 x 13.5 x 1.1 =
+29.7, the caption 2 x 4 x 1.45 = 11.6, and the gaps 7, which leaves 37.7 for
+evidence. Three rows at step 3 are 32.4 and fit; four are 43.2 and do not, so
+a table or stack of four rows is set at step 2 (31.2). The rule is in code
+(`evStep`), not chosen per slide.
+
+**Statement slides, and why three lines (DECIDED).** Two slides are a sentence
+and nothing else, at step 5: *"Positron is a lab for live media"* (three lines)
+and *"Break the check first"* (two). A statement has no evidence under it, so
+the room a headline leaves for evidence is the room a third line takes: 3 x
+20.25 x 1.05 = 63.8, plus the caption, inside 86. Headlines stay at two.
+
+**Line budget (MEASURED and asserted).** Martian Mono was removed on the
+owner's word (*"rm martian mono"*, section 9), so the widest face is Atkinson
+at 0.632 em and it sets the budget: **18** characters a line at step 4,
+**12** at step 5, **27** at step 3. The six faces at 0.600 em hold 19, 12 and 28.
+Every headline is written to wrap greedily into two lines of 18, and the page
+asserts two lines or fewer (three for a statement) in all seven faces at both
+widths: MEASURED `3222222222222222` in every face.
+
+**Headlines rewritten for the bigger step** (meaning and every source comment
+kept): *"Positron is a lab for live media in a browser"* became the statement
+*"Positron is a lab for live media"*; *"Cloudflare carries the streams in
+between"* became *"Cloudflare carries the streams"*; *"Latency is read off a
+clock burned into pixels"* became *"Latency is read off a burned clock"*;
+*"MoQ wins the middle and WebRTC wins the tail"* became *"MoQ is quicker,
+WebRTC steadier"*; *"Stock hls.js parks where its start left it"* became
+*"Stock hls.js parks where it starts"*; *"Playing the Pi directly skips the
+relay"* became *"Direct to the Pi skips the relay"*; *"The Circuit holds 29
+sessions of real work"* became *"The Circuit holds 29 real sessions"*; *"A step
+on screen waits for the next frame"* became *"A step waits for the next
+frame"*; *"Two clocks agree once the offset is measured"* became *"Two clocks
+agree after measuring"*; *"Every demo is built from one kit of parts"* became
+*"Every demo uses one kit of parts"*; *"A stand-in replaces somebody else's
+server"* became *"Stand-ins replace other servers"*; *"The Pico router runs the
+routing core in C"* became *"The Pico router runs its core in C"*; *"ERR
+refuses live TV by programme, not age"* became *"ERR refuses by programme, not
+age"*; *"A check counts only once it has failed"* became the statement *"Break
+the check first"* with 38/38 moved into its caption; *"The model was faster
+with a loose schema"* became *"A loose schema made it faster"*; *"Next is the
+hardware nobody has run yet"* became *"Next is untested hardware"*.
+
+**Yellow and the diagram hues (DECIDED, asked for).** `*x*` in any slide string
+paints it `--hi`, on what carries the point: `live` (lab), `26.2` and `84.1`
+(transports, the two winning figures), `1.87` and `3.05` (llhls, the tuned
+runs), `48 ms` (pi), `29` (circuit), `Break` (sabotage), `1.6` (schema). The
+first ask was one per slide; the owner then said *"do not have be on single
+one"*, so the assert counts rather than caps, and fails only when colour
+covers half a slide's words or every slide. `[x|box]` paints a word in the hue
+the diagram of the machines gives the box called `box` (*"use also colorcoding
+slide with some hilited text and numbers in same hue ang also diagram
+colors"*): `Cloudflare` on the machines headline and in the transports and
+llhls captions, `Pi` in the machines caption, the pi headline and the next
+list. The hue comes from `diagram.mjs`'s `TECH_HUE` through the page's own
+diagram spec, at the diagram's text strength, and is asserted equal to the
+colour the diagram itself draws that box's name in. MEASURED: 9 of 16 slides
+carry colour; contrast on the slide ground yellow **12.8:1**, Cloudflare
+**10.1:1**, Raspberry Pi **8.0:1**.
+⚠️ **ONLY THE TWO OUTER BOXES CAN LEND A HUE TODAY.** MEASURED: a bold `page`,
+`relay` or `synths` in a diagram note comes back plain bold, so the diagram
+does not colour the name of a box inside a container, and a slide word joined
+to one would have nothing on screen to match. Not fixed here (`demo/shell/` was
+out of scope); it is either a defect in `diagram.mjs`'s name map or a rule
+nobody wrote down. MoQ and WHEP get no hue: `TECH_HUE` has nothing that tells
+two transports apart, and inventing one is what that table exists to stop.
 
 **Contrast (MEASURED).** Headline `--fg` on the stage's `--card`: **14.6:1**,
-asserted at 7:1 or better. The list's `--dim` is lower and is not asserted.
+asserted at 7:1 or better. The yellow at 7:1 and each hue at 4.5:1, above. The list's `--dim` is lower and is not asserted.
 
 **Scaling (DECIDED, MEASURED).** The stage is a size container (`container-type:
 size`, page-local), the slide is a second size container, and type is in `cqh`.
@@ -282,7 +373,16 @@ Verification was `check-html.mjs`, one CDP script at two widths (the harness
 refuses a slug not in the manifest: `nothing for this harness to verify`) and
 `shot.mjs` at 375 and 1280.
 
-## 9. Eight faces, all monospaced, and the one by default
+## 9. Seven faces, all monospaced, and the one by default
+
+**Martian Mono is gone, on the owner's word (2026-10-05): *"rm martian
+mono"*.** Its `@font-face` pair, its picker entry, its two files and its
+licence are deleted, and `workers/view/build.mjs` no longer lists it. It was
+the widest face (0.700 em) and set the headline budget; Atkinson (0.632 em)
+sets it now, at 18 characters a line at the new headline step (section 3). The
+seven together are **217,044 bytes**. What follows below is the eight face
+round as it was written, kept as the record; Martian's row and its budget
+figures describe a face no longer on the page.
 
 **The first round was wrong and is replaced.** It mixed three proportional
 faces (Atkinson Hyperlegible Next, IBM Plex Sans, Space Grotesk) in with two
@@ -295,8 +395,8 @@ Eight faces, every one monospaced (asserted: `i` measures as wide as `m` in
 all eight), all **SIL Open Font License 1.1**, all self-hosted from the
 `@fontsource` 5.3.0 packages (`cdn.jsdelivr.net/npm/@fontsource/<id>@5.3.0`,
 downloaded once), Latin subset, weights **400 and 600** only, a `LICENSE-<id>`
-beside each pair in `demo/slides/vendor/`. All eight together are **238,024
-bytes** (232 KB). The page loads the chosen face's two files; the others arrive
+beside each pair in `demo/slides/vendor/`. All eight together were **238,024
+bytes** (232 KB), seven are 217,044. The page loads the chosen face's two files; the others arrive
 when the specimen slide is shown or the picker is stepped.
 
 **Budget.** In a mono face every character is one advance, so a LARGE line
@@ -322,7 +422,7 @@ the slide ground.
 | Intel One Mono | Intel, `intel/intel-one-mono` | 33,672 | 28 | made for low vision like Atkinson but chunkier and quirkier; tailed l | dotted zero, heavy at 600 | strongest on a washed out projector |
 | Fira Code | Mozilla lineage, `tonsky/FiraCode` | 46,628 | 28 | humanist, open counters; I l 1 distinct | slashed zero | heaviest file; ligatures unused here |
 | Source Code Pro | Adobe, `adobe-fonts/source-code-pro` | 23,284 | 28 | the classic, lighter colour than the rest at 600 | dotted zero | the quiet one |
-| Martian Mono | Evil Martians, `evilmartians/mono` | 20,980 | **24** | wide and heavy, the most character; I l 1 unmistakable | slashed zero, largest glyphs on the slide | the loud one; sets the headline budget |
+| ~~Martian Mono~~ | Evil Martians, `evilmartians/mono` | 20,980 | **24** | wide and heavy, the most character; I l 1 unmistakable | slashed zero, largest glyphs on the slide | REMOVED 2026-10-05, *"rm martian mono"* |
 
 **Default: JetBrains Mono, the owner's choice (DECIDED 2026-10-05).** Asked in
 those words: *"jetbrains default"*. It is the site's own code voice, and at 28
