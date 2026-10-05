@@ -55,9 +55,10 @@
   // each panel carries its own play, LIVE, mute and full screen in its footer
   // and its own line glued under it. ETV+ is filtered out HERE and not from
   // `CHANNELS`, which other code reads.
-  // ⚠️ TWO CHANNELS AUDIBLE AT ONCE IS NOISE, so a play press makes that channel
-  // audible and mutes whichever other one was audible, which keeps playing.
-  // Each mute glyph still works on its own after that.
+  // ⚠️ A PLAY PRESS MAKES ITS OWN CHANNEL AUDIBLE AND TOUCHES NO OTHER. It used
+  // to mute whichever channel was already audible, and the owner said
+  // *"do not mute first when startic second"* (2026-10-05). Two at once is the
+  // listener's call, made with each panel's own mute glyph.
   // ⚠️ THE LINE IS GLUED UNDER THE PANEL WITH `glue()`, NOT HANDED TO `under`.
   // `under` is the second storey that is only drawn while the panel is full in
   // `footer` mode (see its header); a line that vanished off full screen would
@@ -498,13 +499,6 @@
     // INSIDE THE PRESS: the activation is spent on this element now, so the
     // picture may start with sound once its first fragment arrives.
     armVideo(S.video);
-    // TWO CHANNELS AUDIBLE AT ONCE IS NOISE. The other one keeps playing.
-    for (const O of chans) {
-      if (O !== S && O.playing && !O.muted) {
-        setMuted(O, true);
-        d.log(`${O.c.name} muted so ${S.c.name} can be heard. ${O.c.name} keeps playing`);
-      }
-    }
     S.playing = true;
     focus = S;
     paintPlay(S);
@@ -1145,9 +1139,9 @@
         && hlsAlive === (NATIVE_HLS ? 0 : 2) && (NATIVE_HLS || B.frags > 0)
         && fa1 > fa && fb1 > fb && fa > framesA0,
       `${hlsAlive} engines, ${A.c.name} ${fa} then ${fa1} frames, ${B.c.name} ${fb} then ${fb1} frames`);
-    d.assert('pressing the second mutes the first, which keeps playing',
-      A.muted && A.video.muted && !A.video.paused && B.audibleAtPlay === true && !B.video.muted
-        && glyph(A) === MUTE_OFF && glyph(B) === MUTE_ON,
+    d.assert('pressing the second leaves the first audible and playing',
+      !A.muted && !A.video.muted && !A.video.paused && B.audibleAtPlay === true && !B.video.muted
+        && glyph(A) === MUTE_ON && glyph(B) === MUTE_ON,
       `${A.c.name} muted ${A.video.muted} paused ${A.video.paused}, ${B.c.name} muted ${B.video.muted}`);
     // Each mute still answers alone: B's mute leaves A alone, and back.
     const aBefore = A.video.muted;
