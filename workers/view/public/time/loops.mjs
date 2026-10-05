@@ -29,6 +29,7 @@ import { createDeck, workerTickHost } from '/timeline/transport.mjs';
 import { createNest, nestedDrift } from '/timeline/nested.mjs';
 import { refDeck, quotation } from '/timeline/score.mjs';
 import { markAdapter, marks } from '/shell/fixture.mjs';
+import { tabDiagram } from './how.mjs';
 
 const PARENT = 12000, CHILD = 2000;
 
@@ -301,10 +302,54 @@ export function build({ panel, assert, log }) {
 
   log(`${PARENT / 1000}s long, one ${CHILD / 1000}s recording of ${childItems.length} marks, used three ways`);
 
+  /**
+   * HOW IT WORKS, read off this file and `timeline/nested.mjs`: a parent deck,
+   * a nest quoting one child deck three times, and the mirrored second deck a
+   * backwards pass quotes, because no quotation runs a child at a negative
+   * rate. The Worker that commits the wrap is in the nest's note rather than a
+   * box, so the chain stays one line a reader can follow.
+   */
+  const how = tabDiagram(panel, () => ({
+    caption: 'One recording, placed three times. Every placement quotes the same deck and none '
+      + 'of them copies its marks.',
+    nodes: [
+      // `join: false`: two neighbours with no declared link between them do
+      // not feed each other here, and an undeclared gap would draw an arrow.
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'parent', label: 'parent deck', sub: `${PARENT / 1000}s, ${parent.items.length} marks`, tech: 'browser',
+            note: 'The timeline the bar plays. Its scheduler fires its own marks, and the '
+                + '**nest** hangs every placement off its position.' },
+          { id: 'nest', label: 'nest', sub: 'createNest', tech: 'browser',
+            note: '**createNest** maps the parent\'s position into each placement, by modulo where '
+                + 'it loops. The turn round is a one-shot **setTimeout** in a **Web Worker**, armed '
+                + 'for the exact instant like any event.' },
+          { id: 'rec', label: 'recording', sub: `${CHILD / 1000}s, ${childItems.length} marks`, tech: 'sound',
+            note: `One child deck with marks at ${SRC_AT.map((t) => t / 1000).join(', ')} s, uneven on `
+                + 'purpose so a backwards pass cannot look like a forwards one.' },
+          { id: 'mirror', label: 'mirrored copy', sub: 'backwards', tech: 'sound',
+            note: 'A second deck holding the same four marks in reverse order. A backwards loop, '
+                + 'and the second half of there and back, quote this one.' },
+        ] },
+    ],
+    links: [
+      { from: 'parent', to: 'nest',
+        note: 'The parent\'s position, read on every tick, is the only clock a placement has.' },
+      { from: 'nest', to: 'rec',
+        note: 'Plain at 1 s, at 2x from 4 s, and looped from 6 s: each a **quotation** of a few '
+            + 'numbers, a start, an in and out point, a speed and a repeat.' },
+      { from: 'nest', to: 'mirror',
+        note: 'Quoted only when the loop plays backwards, or there and back.' },
+    ],
+  }));
+
   return {
     deck: parent, bar,
     // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
-    show() { requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit(); view.strip.invalidate(); })); },
+    show() {
+      how.draw();
+      requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit(); view.strip.invalidate(); }));
+    },
     hide() { if (parent.playing()) parent.pause(); },
     bars: [{ name: 'loops', bar, strip: view.el }],
     async check({ A }) {
@@ -330,6 +375,18 @@ export function build({ panel, assert, log }) {
         was === 'round' && way() === 'back' && isBack(loopSpan)
           && lit.length === 1 && lit[0] === back && back.textContent === WAY_WORD.back,
         `${was} -> ${way()}, the loop quotes the ${isBack(loopSpan) ? 'mirrored' : 'forward'} copy, lit ${lit.map((b) => b.textContent).join(',') || 'nothing'}`);
+      // Read while the loop is backwards, so the mirrored copy is in use.
+      how.check(A, [
+        ['parent deck', parent.items.length === 8 && parent.range[1] === PARENT,
+          `${parent.items.length} marks over ${parent.range[1]} ms`],
+        ['nest', nest.spans().length === 3 && nest.boundary() === 'lookahead',
+          `${nest.spans().length} placements, wrap ${nest.boundary()}`],
+        ['recording', nest.quotationsOf(child).length === 2 && child.range[1] === CHILD,
+          `quoted ${nest.quotationsOf(child).length} times`],
+        ['mirrored copy', nest.quotationsOf(rewound).length === 1
+          && rewoundItems.map((m) => m.payload.i).join() === '3,2,1,0',
+          `quoted ${nest.quotationsOf(rewound).length} time, marks ${rewoundItems.map((m) => m.payload.i).join(' ')}`],
+      ]);
     },
   };
 }

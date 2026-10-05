@@ -20,6 +20,14 @@
   src: url('/shell/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Slide JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
   src: url('/shell/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
+/* THE GREEK SUBSET AT 600, for the β of the logo (`/kit/` BRAND), which the
+   Latin file does not hold. Same package, same licence; its `unicode-range`
+   is @fontsource's own, so the browser asks for it only when a Greek letter is
+   laid out, and a page with none never fetches it. Declared AFTER the Latin
+   face, because faces of one family are tried last declared first. */
+@font-face { font-family: 'Slide JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
+  src: url('/shell/vendor/jetbrains-mono-greek-600-normal.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF; }
 
 /* ONE SLIDE, 16:9, SIZED OFF ITS CONTAINER. The frame is an inline size
    container, so the slide is as wide as whatever holds it and nine sixteenths
@@ -97,7 +105,12 @@
    the panel keeps its own. Hidden until a pointer is on the slide or the slide
    holds focus, and unpressable while hidden, so the corner of a slide is never
    a control nobody can see. On a screen with no hover it is always there,
-   because a phone has no other way back out. */
+   because a phone has no other way back out.
+   🔴 AND ON A SCREEN WITH NO HOVER IT IS TOP RIGHT, asked 2026-10-05 from the
+   slides list as item 11, *"the ⛶ sitting over long captions on a phone"*.
+   Always visible there, bottom right, it sat on the caption's line, and on a
+   phone's slide a caption is long enough to reach the corner. The top right
+   is where a headline is shortest: it is balanced and starts on the left. */
 .sl .sl-full {
   position: absolute; right: 12px; bottom: 12px; z-index: 2;
   width: 34px; height: 34px; padding: 0; font-size: 15px; line-height: 1;
@@ -106,7 +119,10 @@
   touch-action: manipulation; -webkit-touch-callout: none;
 }
 .sl:hover .sl-full, .sl:focus-within .sl-full { opacity: 1; pointer-events: auto; }
-@media (hover: none) { .sl .sl-full { opacity: 1; pointer-events: auto; } }
+@media (hover: none) { .sl .sl-full { opacity: 1; pointer-events: auto; top: 12px; bottom: auto; } }
+/* A tap on a player's stage in full screen steps it (`tapZone` in slide.mjs),
+   so the stage drops the 300 ms double tap wait and the iOS loupe. */
+.sl-player .pos-vp-stage { touch-action: manipulation; -webkit-touch-callout: none; }
 
 /* THE INSET IS ON A BOX INSIDE THE SLIDE AND NEVER ON THE SLIDE, because a
    container's query units measure its CONTENT box. MEASURED on the archive:
@@ -172,6 +188,10 @@
    and stays centred. */
 .sl[data-layout="stack"] .sl-ev:has(> .sl-list, > .sl-text) { align-items: flex-start; text-align: left; }
 .sl-big + .sl-under { margin-top: -2cqh; }
+/* THE TITLE SLIDE: the talk's name top left at step 5, who and when on the
+   bottom edge (`top` layout), the date a step under the speaker and held to
+   it, because the two are one fact about the talk. */
+.sl[data-kind="title"] .sl-by + .sl-when { margin-top: -1.5cqh; }
 
 /* THE CAPTION, STEP 1, BOTTOM LEFT, EVERY SLIDE. The last child of the inset
    column, so its left and bottom edges ARE the inset; nothing is positioned

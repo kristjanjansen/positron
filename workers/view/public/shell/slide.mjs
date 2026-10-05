@@ -24,6 +24,9 @@
 //              the full width, absent is plain lines
 //   lines      [[step, text], ...], each line at its own step, for specimens
 //   cap        the caption, step 1, bottom left, always
+//   title      THE OPENING OF A TALK, step 5, with `by` at step 3 and `date`
+//              and `place` at step 2 under it, on the bottom edge (see
+//              TITLE_STEPS); a title slide carries nothing else
 //   slot       any element: a kit component, a picture, a diagram
 //   layout     'stack' (default), 'top', 'left', 'split' (no 'right',
 //              removed 2026-10-05: *"no right align needed"*)
@@ -234,7 +237,54 @@ export const tableStep = (lines, frame) => (frame ? (lines > 2 ? 2 : 3) : evStep
 // ── the slide model ─────────────────────────────────────────────────────────
 export const LAYOUTS = ['stack', 'top', 'left', 'split'];
 const KEYS = new Set(['name', 'layout', 'side', 'say', 'statement', 'big', 'under', 'text', 'textStep',
-  'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes']);
+  'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes', 'title', 'by', 'date', 'place']);
+
+/**
+ * 🔴 THE TITLE SLIDE'S STEPS, CHOSEN ONCE AND NOT PER TALK. Asked 2026-10-05
+ * from the slides list as *"so slide title"*: the opening of a talk, its name,
+ * who speaks and when.
+ *   title  step 5, the statement step. A talk's name is one sentence read from
+ *          the back of the room, and step 5 holds 13 characters a line (a mono
+ *          advance is 0.6 em, 20.25 cqh of a 177.8 cqh wide slide less its
+ *          inset), so a name of up to about 26 characters is two balanced
+ *          lines. Step 6 is spent on one figure and holds 8 a line, which
+ *          breaks any title into a column of words.
+ *   by     step 3, the evidence step: read second, and still read at a glance.
+ *   date and place  step 2, dimmed, the quietest words a talk opens with and
+ *          the last thing anybody looks for.
+ * The title sits top left where every headline sits; who and when sit on the
+ * bottom edge, the `top` layout's own arrangement, so the air between them is
+ * the slide's and no number places either.
+ */
+export const TITLE_STEPS = Object.freeze({ title: 5, by: 3, date: 2 });
+const TITLE_ONLY = ['title', 'by', 'date', 'place', 'cap', 'name', 'notes', 'layout'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+  'September', 'October', 'November', 'December'];
+/**
+ * A talk's date as people say it: `2026-10-05` is `5 October 2026`. Anything
+ * that is not an ISO day is printed as it was written, so `autumn 2026` is
+ * allowed; an ISO day that is not a real day throws.
+ */
+export function talkDate(t) {
+  const s = String(t ?? '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return s;
+  const [y, mo, d] = [+m[1], +m[2], +m[3]];
+  const real = new Date(Date.UTC(y, mo - 1, d));
+  if (real.getUTCMonth() !== mo - 1 || real.getUTCDate() !== d) throw new Error(`no day called ${s}`);
+  return `${d} ${MONTHS[mo - 1]} ${y}`;
+}
+
+/**
+ * 🔴 WHERE A TAP STEPS A PLAYER, from the x of the tap across the slide's
+ * width: the left third is back (-1), the right third is forward (1), the
+ * middle third is nothing (0), so a stray tap on a phone does not turn a page
+ * and the middle stays free for the panel's own way out.
+ */
+export function tapZone(x, w) {
+  if (!(w > 0) || !Number.isFinite(x)) return 0;
+  return x < w / 3 ? -1 : x > (2 * w) / 3 ? 1 : 0;
+}
 
 /**
  * A spec checked and filled in, with no document. Throws on a shape that
@@ -245,7 +295,13 @@ const KEYS = new Set(['name', 'layout', 'side', 'say', 'statement', 'big', 'unde
 export function normalise(spec) {
   if (!spec || typeof spec !== 'object') throw new Error('a slide is an object');
   for (const k of Object.keys(spec)) if (!KEYS.has(k)) throw new Error(`a slide has no key called ${k}`);
-  const layout = spec.layout || 'stack';
+  if ((spec.by || spec.date || spec.place) && !spec.title) throw new Error('who, when and where open a talk, so they need a title');
+  if (spec.title) {
+    for (const k of Object.keys(spec)) if (!TITLE_ONLY.includes(k)) throw new Error(`a title slide is the talk's name, who, when and where, not ${k}`);
+    if (spec.layout && spec.layout !== 'top') throw new Error('a title slide is laid out top, its name above and who and when on the bottom edge');
+    if (spec.date != null) talkDate(spec.date);
+  }
+  const layout = spec.layout || (spec.title ? 'top' : 'stack');
   if (!LAYOUTS.includes(layout)) throw new Error(`no layout called ${layout}`);
   if (layout === 'split') {
     if (!spec.slot) throw new Error('a split slide needs a slot, the thing beside the words');
@@ -442,13 +498,23 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
   const box = el('div', 'sl-in');
   node.append(box);
 
-  const parts = { say: null, words: null, ev: null, slot: null, cap: null, table: null, stack: null, lines: [] };
+  const parts = { say: null, words: null, ev: null, slot: null, cap: null, table: null, stack: null, lines: [],
+    title: null, by: null, when: null };
   // The text column: the headline and what proves it. In a split it is one
   // grid cell and the slot is the other; otherwise it is the whole column.
   const words = el('div', 'sl-words');
   parts.words = words;
   box.append(words);
 
+  if (s.title) {
+    // a title slide is the opening of a talk, so its name is the page's
+    // heading level of a slide, and its own class (TITLE_STEPS)
+    node.dataset.kind = 'title';
+    const t = el('h2', `sl-t sl-t${TITLE_STEPS.title} sl-say sl-title`);
+    t.append(rich(s.title));
+    parts.title = t;
+    words.append(t);
+  }
   if (s.say) {
     const say = el('h2', s.statement ? 'sl-t sl-t5 sl-say sl-st' : `sl-t sl-t${wordsStep(4, s.layout)} sl-say`);
     say.append(rich(s.say));
@@ -506,6 +572,19 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
     table.align = s.rows.align || '';
     parts.table = table;
     ev.append(table);
+  }
+  if (s.by) {
+    const p = el('p', `sl-t sl-t${TITLE_STEPS.by} sl-by`);
+    p.append(rich(s.by));
+    parts.by = p;
+    ev.append(p);
+  }
+  if (s.date || s.place) {
+    // one line, date then place, joined by a comma as a person would say it
+    const p = el('p', `sl-t sl-t${TITLE_STEPS.date} sl-dim sl-when`);
+    p.append(rich([s.date ? talkDate(s.date) : '', s.place || ''].filter(Boolean).join(', ')));
+    parts.when = p;
+    ev.append(p);
   }
   words.append(ev);
 
@@ -626,12 +705,28 @@ export function createSlideLog({ head, widths, align = '', step = 1, cap = 40 } 
  * listener and a keyboard's letter row never hear it. A key aimed at a field,
  * a slider lane or a knob inside a slide is left to that control.
  *
+ * 🔴 IN FULL SCREEN ON A PHONE A TAP STEPS IT, asked 2026-10-05 from the
+ * slides list as item 11, *"touch: stepping a player in full screen on a
+ * phone"*. Full screen hides the footer (`fullMode: 'hover'`) and a phone has
+ * no keys, so there was no way to the next slide at all. A tap on the left
+ * third goes back and on the right third goes forward (`tapZone`); the middle
+ * does nothing. Chosen over keeping the footer in full screen (`'footer'`),
+ * because the footer is a 54 px row taken out of a phone's landscape height,
+ * which is already the short side of a 16:9 slide, and because the edges of
+ * the screen are where every reader on a phone already turns a page. A tap on
+ * a control inside a slide (a knob, a button, a link) is the control's.
+ * ⚠️ ONLY ON A SCREEN WITH NO HOVER AND ONLY WHILE FULL. On a desk the slide is
+ * pressed to give the panel its keys and a press there must not turn a page.
+ *
  * @param specs        the slides, plain data
  * @param o.slots      as for `createSlide`
  * @param o.onStep     (index) after every move
- * @returns { el, panel, slides, go, at, count, next, prev, keys }
+ * @param o.touch      () => true when this is a screen with no hover; the
+ *                     default asks `(hover: none)`, and `touchMode(fn)` swaps it
+ * @returns { el, panel, slides, go, at, count, next, prev, keys, taps, touchMode }
  */
-export function createSlidePlayer(specs, { slots = {}, onStep = () => {} } = {}) {
+export function createSlidePlayer(specs, { slots = {}, onStep = () => {},
+  touch = () => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches } = {}) {
   ensureCss();
   if (!Array.isArray(specs) || !specs.length) throw new Error('a player needs at least one slide');
   let at = -1;
@@ -693,6 +788,17 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {} } = {})
   // player does; a press on one of its buttons focuses the button, which is
   // inside the root and so still heard.
   panel.stage.addEventListener('pointerdown', () => panel.el.focus({ preventScroll: true }));
+  let tapped = 0;
+  panel.stage.addEventListener('click', (e) => {
+    if (!panel.isFull() || !touch()) return;
+    const c = e.target instanceof Element ? e.target.closest('button, a, input, select, textarea, [role="slider"], [contenteditable]') : null;
+    if (c && panel.stage.contains(c)) return;
+    const r = panel.stage.getBoundingClientRect();
+    const z = tapZone(e.clientX - r.left, r.width);
+    if (!z) return;
+    tapped++;
+    go(at + z);
+  });
 
   go(0);
   return {
@@ -702,6 +808,10 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {} } = {})
     prev: () => go(at - 1),
     /** how many keys this player has acted on, for an assert */
     keys: () => heard,
+    /** how many taps this player has stepped on, for an assert */
+    taps: () => tapped,
+    /** swap what says this is a screen with no hover, for a check */
+    touchMode(fn) { touch = fn; },
     stop() { slides[at]?.stop(); },
     start() { slides[at]?.start(); },
   };
