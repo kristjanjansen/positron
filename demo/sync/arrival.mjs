@@ -63,7 +63,7 @@ export function build({ panel, log, set }) {
   ] });
 
   // The shared list (demo/shell/messages.mjs), the same renderer `wire` uses.
-  const msgs = createMessageList({ cap: 40, empty: 'no cues yet', mark: 'mine' });
+  const msgs = createMessageList({ cap: 40, empty: 'cues land here with their delivery time', mark: 'mine' });
   panel.add(btns.el, pair, msgs.el);
 
   let seq = 0, fired = 0;
