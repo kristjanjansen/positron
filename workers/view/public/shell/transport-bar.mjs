@@ -484,6 +484,15 @@ export function createTransportBar(host, deck, {
   }
 
   const extraEls = new Map();
+  /**
+   * 🔴 `end: true` PUTS AN EXTRA AT THE START OF THE RIGHT GROUP, JUST LEFT OF
+   * LOOP. Asked 2026-10-05 on `/flipper/`: *"we have unmute buttons, look them
+   * up. left from loop"*. Sound is a state of the playing thing, like the loop
+   * and the rate beside it, not a verb by the play toggle. Same declaration,
+   * same `extra(id)`, only the position differs, and it takes the `data-end`
+   * marker so the gap in the middle of the bar opens to its left.
+   */
+  const endExtraEls = [];
   for (const x of extras) {
     // `word: true` says the label is a WORD, not a glyph — it gets width from
     // its text instead of the 38px square, and the uppercase treatment the
@@ -518,6 +527,7 @@ export function createTransportBar(host, deck, {
     // siblings. Both names work here now and `onPress` is the one to write.
     b.addEventListener('click', () => (x.onPress ?? x.onClick)?.(b));
     extraEls.set(x.id, b);
+    if (x.end) endExtraEls.push(b);
   }
 
   // ⚠️ TWO LINES, NOT ONE. `0:00.902 / 3:55.076` is thirteen mono characters of
@@ -659,11 +669,13 @@ export function createTransportBar(host, deck, {
    * which is the `/reel/` measurement recorded above: LOOP at 57 px with 375 px
    * of empty bar to its right.
    */
-  if (endSide[0]) endSide[0].dataset.end = '1';
+  const endRow = [...endExtraEls, ...endSide];
+  if (endRow[0]) endRow[0].dataset.end = '1';
   else if (right[0]) right[0].dataset.end = '1';
-  bar.append(...(wantToggle ? [toggle] : []), ...extraEls.values(), scrub,
+  bar.append(...(wantToggle ? [toggle] : []),
+    ...[...extraEls.values()].filter((x) => !endExtraEls.includes(x)), scrub,
     ...(chip ? [chip] : live ? [liveChip.el] : wantTime ? [time] : []),
-    ...endSide, rates, ...right, badge);
+    ...endRow, rates, ...right, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
