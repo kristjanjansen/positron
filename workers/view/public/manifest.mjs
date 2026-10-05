@@ -934,9 +934,7 @@ export const DEMOS = [
   // A build sheet for the Pico router, unlisted, asked 2026-10-05 (*"write into
   // not-in-index positron page"*): the Oomipood list, the breadboard drawings
   // from rig/pico/oled/breadboard.mjs and the power notes. Opens nothing.
-  { name: 'talk', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
-    one: 'A talk about positron, what it measured and what it learned, with running parts of the site on its slides.',
-    tags: [] },
+  // talk: archived 2026-10-05 on "There is no need for a talk slide", archive/demos/talk-index.html, no redirect.
   { name: 'slides', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
     one: 'A talk made of slides that hold running parts of this site, stepped inside a panel that fills the screen when you present.',
     tags: [] },
