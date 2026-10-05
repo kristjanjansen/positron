@@ -16,8 +16,8 @@
 // left. With USB left, pins 1 to 20 run along the BOTTOM (pin 1 by the USB)
 // and pins 40 to 21 along the TOP (pin 40 by the USB), so column n holds pin n
 // in row h and pin 41-n in row c.
-// THE OLED MODULE's 8 pin header sits in row j, columns 40 to 47, its body
-// hanging off the bottom edge: GND VCC SCL SDA K4 K3 K2 K1, as printed.
+// THE OLED MODULE's 8 pin header sits in row f, columns 40 to 47, its body
+// lying over the empty top half: GND VCC SCL SDA K4 K3 K2 K1, as printed.
 // POWER, two ways. Default: a spare port of the powered hub through a USB-A
 // plug to screw terminal adapter, 5 V into VBUS (pin 40) and ground to the
 // rail. `mb102`: the breadboard power module on the right hand end, its top
@@ -93,18 +93,19 @@ for (const c of [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]) {
   }
 }
 
-// the OLED module, header in row j, columns 40..47, body off the BOTTOM edge,
-// so its wires stay in the f-j half with the Pico's GPIO pins and none of them
-// crosses the centre gap. ⚠️ AT ITS REAL SIZE, about 37 by 27 mm (15 by 11
-// holes, INFERRED from the shop photo, not measured): an 8 pin header on one
-// edge of a board that size cannot lie on a breadboard without covering the
-// holes its own wires need, so it overhangs the edge by about 1.5 cm. The
-// screen is on the left and the four keys ^ v # * are a column on the right.
+// the OLED module ON the board: header in row f, columns 40..47, body lying
+// flat over the centre gap, rows a to e and the top rails, which this build
+// leaves empty in those columns. Its wires plug into g to j of the same
+// columns, which the body does not cover, so none of them crosses the gap.
+// ⚠️ AT ITS REAL SIZE, about 37 by 27 mm (15 by 11 holes, INFERRED from the
+// shop photo, not measured). Screen on the far side, keys ^ v # * a column on
+// the right. If the picture reads upside down from where you sit, the SSD1306
+// flips in firmware; nothing about the wiring changes.
 const OLED = ['GND', 'VCC', 'SCL', 'SDA', 'K4', 'K3', 'K2', 'K1'];
 {
-  const x1 = holeX(39) - 2, x2 = x1 + 15 * P, y1 = ROW_Y.j - 7, y2 = y1 + 11 * P;
-  out.push(`<rect x="${x1}" y="${y1}" width="${x2 - x1}" height="${y2 - y1}" rx="5" fill="#25456e" opacity="0.93"/>`);
-  const sx = x1 + 10, sy = y1 + 46, sw = 9.5 * P, sh = (y2 - sy) - 10;
+  const x1 = holeX(39) - 2, x2 = x1 + 15 * P, y2 = ROW_Y.f + 7, y1 = y2 - 11 * P;
+  out.push(`<rect x="${x1}" y="${y1}" width="${x2 - x1}" height="${y2 - y1}" rx="5" fill="#25456e" opacity="0.95"/>`);
+  const sx = x1 + 10, sy = y1 + 10, sw = 9.5 * P, sh = (y2 - 40) - sy;
   out.push(`<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="#0b0e14"/>`);
   out.push(`<text x="${sx + sw / 2}" y="${sy + sh / 2 + 4}" font-size="10" fill="#5cc8ff" text-anchor="middle">0.96" OLED</text>`);
   ['^', 'v', '#', '*'].forEach((g, i) => {
@@ -114,8 +115,8 @@ const OLED = ['GND', 'VCC', 'SCL', 'SDA', 'K4', 'K3', 'K2', 'K1'];
   });
   OLED.forEach((name, i) => {
     const x = holeX(40 + i);
-    out.push(`<circle cx="${x}" cy="${ROW_Y.j}" r="3.6" fill="#e8c35a"/>`);
-    out.push(`<text x="${x}" y="${ROW_Y.j + 13}" font-size="7" fill="#fff" text-anchor="start" transform="rotate(90 ${x} ${ROW_Y.j + 13})">${name}</text>`);
+    out.push(`<circle cx="${x}" cy="${ROW_Y.f}" r="3.6" fill="#e8c35a"/>`);
+    out.push(`<text x="${x}" y="${ROW_Y.f - 9}" font-size="7" fill="#fff" text-anchor="start" transform="rotate(-90 ${x} ${ROW_Y.f - 9})">${name}</text>`);
   });
 }
 
@@ -160,8 +161,8 @@ const SIGNALS = [
   [['j', 6], ['g', 43], C.sda, 'GP4 SDA, pin 6'],
   [['i', 17], ['h', 44], C.key, 'GP13 to K4, pin 17'],
   [['j', 16], ['g', 45], C.key, 'GP12 to K3, pin 16'],
-  [['i', 15], ['f', 46], C.key, 'GP11 to K2, pin 15'],
-  [['j', 14], ['f', 47], C.key, 'GP10 to K1, pin 14'],
+  [['i', 15], ['h', 46], C.key, 'GP11 to K2, pin 15'],
+  [['j', 14], ['g', 47], C.key, 'GP10 to K1, pin 14'],
 ];
 const WIRES = MB102 ? [
   [['T+', 1], ['a', 1], C.v5, '5 V into VBUS, pin 40'],
@@ -177,10 +178,9 @@ const WIRES = MB102 ? [
   [pwr5, ['a', 1], C.v5, '5 V into VBUS, pin 40'],
   [pwrG, ['T-', 2], C.gnd, 'ground'],
   [['a', 3], ['T-', 3], C.gnd, 'pin 38 GND'],
-  [['b', 5], ['T+', 5], C.v3, 'pin 36 3V3 out'],
   [['i', 18], ['B-', 18], C.gnd, 'pin 18 GND to the bottom rail'],
   [['i', 40], ['B-', 37], C.gnd, 'OLED GND'],
-  [['i', 41], ['T+', 41], C.v3, 'OLED VCC, 3.3 V only'],
+  [['b', 5], ['j', 41], C.v3, 'pin 36 3V3 out to OLED VCC'],
   ...SIGNALS,
 ];
 for (const [a, b, col] of WIRES) {
