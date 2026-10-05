@@ -1,6 +1,6 @@
 ## Open
 
-- **`/click/` and `/und/` as one page** (2026-10-05): *"merge click and und, no need for 'mobile screen' / theme"*. Tabbed page at `/und/` (SCORE from und, CLICK from click), `/click/` retired with no redirect, click loses its mobile screen view and its theme switch.
+- ~~**`/click/` and `/und/` as one page** (2026-10-05): *"merge click and und, no need for 'mobile screen' / theme"*. Tabbed page at `/und/` (SCORE from und, CLICK from click), `/click/` retired with no redirect, click loses its mobile screen view and its theme switch.~~ Done 2026-10-05: SCORE and CLICK tabs, the player screen and its theme switch removed (about 150 lines), 50/50.
 
 - ~~**Index groups regrouped** (2026-10-05): *"groups. kureniemi: stays as is. bauhaus: partitur. tehnologies: timelines + messages + technologies"*. `demo/manifest.mjs` GROUPS and rows.~~ Done 2026-10-05: kurenniemi unchanged, `bauhaus` holds partitur, `technologies` holds time sync click draw wire now und room flipper.
 - **`/now/` merges into `/flipper/`** (2026-10-05, *"acually merge now and flipper"*): folded into the flipper plan.
