@@ -470,7 +470,7 @@ listeners.push((m) => {
       // requests are expected from both. Capped, not ignored: past the ceiling
       // this is an outage, not rights.
       probed.push(e.url);
-    } else errors.push(e.text);
+    } else errors.push(e.url && !(e.text || "").includes(e.url) ? `${e.text} (${e.url})` : e.text);   // the address, or a 404 cannot be found
   }
   if (m.method === 'Network.loadingFailed') {
     // ERR_ABORTED is what a media element's in-flight segment requests do

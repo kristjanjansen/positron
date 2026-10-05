@@ -28,6 +28,9 @@ const SLICE_MS = 500;      // the timeslice we ask MediaRecorder for
 const FPS      = 25;
 
 // No readout: see the header.
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'Record the moving clock in several takes, each placed after the last on one line that plays and scrubs as a single recording. Press the red button on the bar to record a take.';
+
 export const readout = null;
 
 export function build({ panel, assert, log }) {

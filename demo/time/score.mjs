@@ -126,6 +126,9 @@ function bpmAtBeat(points, beat) {
 const tempoVaries = (points) => points.length > 1
   && points.some(([, m]) => Math.abs(m - points[0][1]) > 1e-9);
 
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'Five small scores in one file format, where each line below is one instruction and lights up while it sounds. Pick a score and press play.';
+
 export const readout = null;
 
 export function build({ panel, log }) {
@@ -344,6 +347,7 @@ export function build({ panel, log }) {
   }
 
   const pick = createChoice({
+    label: 'score',
     options: SCORES.map((s, i) => [s.label, i]),
     at: 0,
     onPick: (i) => load(i),

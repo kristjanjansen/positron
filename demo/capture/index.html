@@ -85,7 +85,9 @@
 
   const d = mount({
     name: 'capture',
-    what: 'Recording what came over a link, from a take on this machine to the far end of a live connection.',
+    // No `what` under the title: each tab says what it is in the box under the
+    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
+    // The manifest's `one` line still describes the page on the index.
     readout: null,
     showLog: false,
   });
@@ -94,9 +96,9 @@
   const page = createTabPage(d, {
     tabs: [
       { id: 'takes', label: 'TAKES', mod: takes },
-      { id: 'segments', label: 'SEGMENTS', mod: segments },
+      { id: 'segments', label: 'UPLOAD', mod: segments },
       { id: 'roundtrip', label: 'ROUND TRIP', mod: roundtrip },
-      { id: 'farend', label: 'FAR END', mod: farend },
+      { id: 'farend', label: 'RECEIVER', mod: farend },
     ],
     at: 'takes',
   });

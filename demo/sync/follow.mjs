@@ -130,7 +130,10 @@ const med = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ?
 const worst = (xs) => xs.reduce((m, x) => Math.max(m, Math.abs(x)), 0);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const readout = { lag: 'ms', early: 'ms', off: 'ms', steps: '' };
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'A modelled picture arrives late, and two walls get the same cues, one firing on arrival and one waiting for the picture. Pick how the picture travels to change how late it is.';
+
+export const readout = { 'picture late': 'ms', 'cue early': 'ms', 'off by': 'ms', 'delay jumps': '' };
 
 export function build({ panel, log, set }) {
   const canvas = document.createElement('canvas');
@@ -139,7 +142,7 @@ export function build({ panel, log, set }) {
 
   let key = 'whep', run = createRun(key, performance.now());
   const link = createChoice({
-    label: 'link', options: Object.entries(LINKS).map(([k, l]) => [l.name, k]), at: 0,
+    label: 'picture over', options: Object.entries(LINKS).map(([k, l]) => [l.name, k]), at: 0,
     title: (k) => `${LINKS[k].name}, ${LINKS[k].note} behind, as measured`,
     onPick: (k) => { key = k; run = createRun(key, performance.now()); log(`the picture now arrives over ${LINKS[k].name}, ${LINKS[k].note} behind`); },
   });
@@ -200,11 +203,11 @@ export function build({ panel, log, set }) {
     frames++;
     if (frames % 6 === 0) {
       const lag = run.tb.lag('stage', t);
-      set('lag', lag == null ? '' : Math.round(lag));
+      set('picture late', lag == null ? '' : Math.round(lag));
       const e = last(run.early()), o = last(run.off());
-      set('early', e == null ? '' : Math.round(e));
-      set('off', o == null ? '' : Math.round(o));
-      set('steps', run.moves());
+      set('cue early', e == null ? '' : Math.round(e));
+      set('off by', o == null ? '' : Math.round(o));
+      set('delay jumps', run.moves());
     }
     raf = requestAnimationFrame(tick);
   }
