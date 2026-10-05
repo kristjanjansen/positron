@@ -1,5 +1,6 @@
 ## Open
 
+- **`diagram.mjs`: a return path into a box that is not the bottom one in its container is drawn behind the box under it** (2026-10-05, found by the /wire/ diagram agent). `cuts` stays empty because the overlap check tests text only. Worked around on /wire/ by box order.
 - **`/kit/` BRAND tab with a LOGO block** (2026-10-05): *"add kit tab: brand and logo sectop slide engine to draw β+ in large type and positron studio under it"*. Drawn with the slide engine; check β is in the vendored JetBrains subset. Handed to the kit slides agent.
 - **`/kit/` DEVICES and PANEL as one tab** (2026-10-05): *"unify devices and panel in kit"*. Block ids kept. Handed to the kit slides agent.
 - ~~**`/kit/` HARDWARE tab labelled HW** (2026-10-05): *"rename hardware tab to hw in kit"*. Label only, id `hardware` kept for links. Handed to the kit slides agent.~~ Reverted on *"revert hw to harware"*.
