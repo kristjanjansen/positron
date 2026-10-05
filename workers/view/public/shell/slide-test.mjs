@@ -122,17 +122,18 @@ ok('padRows is padRow over the widest cell, with starts every width plus the gap
 ok('NEGATIVE: a cell wider than its column is never cut and never throws, it pushes its row along',
   !throws(() => padRow(['1234567'], [3])) && padRow(['1234567'], [3]) === '1234567');
 ok('a framed table drops to step 2 at three lines, a plain one at four',
-  tableStep(3, 'none') === 2 && tableStep(2, 'box') === 3 && tableStep(3, '') === 3 && tableStep(4, '') === 2);
-ok('the two frames are box and none, and a table may have either or neither',
-  FRAMES.join() === 'box,none' && !throws(() => normalise({ rows: { body: [['a']], frame: 'box' } }))
+  tableStep(3, 'none') === 2 && tableStep(2, 'none') === 3 && tableStep(3, '') === 3 && tableStep(4, '') === 2);
+ok('the one frame is none, and a table may have it or not',
+  FRAMES.join() === 'none' && !throws(() => normalise({ rows: { body: [['a']], frame: 'none' } }))
   && !throws(() => normalise({ rows: { body: [['a']] } })));
+ok('NEGATIVE: the rounded box is gone and throws now', throws(() => normalise({ rows: { body: [['a']], frame: 'box' } })));
 ok('NEGATIVE: a frame nobody declared throws', throws(() => normalise({ rows: { body: [['a']], frame: 'rounded' } })));
 ok('in a split the words go one step down, never below step 1',
   wordsStep(4, 'split') === 3 && wordsStep(4, 'stack') === 4 && wordsStep(1, 'split') === 1 && wordsStep(3, 'left') === 3);
 
 /* ── the spec ──────────────────────────────────────────────────────────── */
 ok('a bare spec is a stack', normalise({ say: 'x' }).layout === 'stack');
-ok('all five layouts are known', LAYOUTS.join() === 'stack,top,left,right,split');
+ok('all four layouts are known, right was removed', LAYOUTS.join() === 'stack,top,left,split');
 ok('a split with a slot and a side is fine',
   !throws(() => normalise({ layout: 'split', side: 'left', slot: () => null, say: 'x' })));
 ok('NEGATIVE: an unknown layout throws', throws(() => normalise({ layout: 'centre' })));
