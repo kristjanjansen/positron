@@ -1,3 +1,33 @@
+# Handoff, 2026-10-05 late, session 64 continued: kit slides grown, csound, diagrams on every technologies page, BRAND
+
+## Where it is right now
+
+- ✅ **Site: BUILD `87d977a-200659-657f`**, confirmed on the edge. **Not pushed** past `b5cd89f`; the push needs the personal account (CLAUDE.md).
+- Counted: **46 demos, 44 built**. No agent is running. The tree is clean apart from `workers/view/public/shell/shell.mjs`.
+
+## What landed since the first half of this session, all deployed
+
+| commits | what | look at |
+| --- | --- | --- |
+| `592108a` | **`/und/` is `/csound/`**, no redirect (`/und/` 404). `code-lang-test.mjs` had read the score from the page since 396ca4b moved it to `score.mjs`, so it was broken; reads `score.mjs` now, 53 ok | https://positron.studio/csound/ |
+| `cc9c83c` `2dd6cdc` `82b1e8b` `d4fbd9f` `d4eab9c` `46df074` | **how it works diagrams** on every technologies page, one per tab where tabs differ, each graded: laid out at its real width, nothing cut, boxes matched to what the page really uses (`/flipper/`'s against the requests it made). csound 56, draw 31, flipper 48, wire 55, time 108, sync 81 (sync's CLOCKS "pulse on the grid" went red twice beside another Chrome, 81/81 alone). `/draw/` and `/flipper/` descriptions cut to their one sentence | https://positron.studio/time/ |
+| `021e1c2` ... `87d977a` | **`/kit/`**: SLIDES gained title slide, big number alone, two half width players, TIMELINE, TRANSPORT BAR (keys gated to the slide), FAU (keys scroll to the panel edge), TOM drum machine (32 steps, drawable, no labels), the real OLED (opening SLIDES loads `/resources/pico/oled-ui.wasm`), tap zones and the ⛶ top right on touch. DEVICES and PANEL are one tab, DEVICES. New **BRAND** tab: LOGO, β+ at step 6 with the + a yellow superscript, positron and studio at step 3, β from a vendored Greek subset of JetBrains Mono. kit 362/362 | https://positron.studio/kit/ |
+| `1c07938` | shell.css: a keyboard that scrolls runs to its box's or panel row's edge; one that fits does not move | |
+
+## Open
+
+- **`/kit/` runs some checks for visitors** and prints FAIL in its log (pad label slot, waveform both sides, loop timing): breaks *"a self-check never runs for a visitor"*.
+- **`/kit/` is at 11.4 to 11.8 s to ready against a 12 s `bootMs`**; two runs failed on it. Not raised, per the manifest's note.
+- **`/fau/` 75/76**, its own diagram cuts `notes`.
+- `diagram.mjs`: a return path into a box that is not the bottom one is drawn behind the box under it; only top level box names take a hue.
+- Slide sets and talks (plan-slides section 13), the player's `#n`, notes and blank, a code slide, a picture slide: asked about, not started.
+
+## Learned, worth keeping
+
+- **A deploy ships every agent's half edit**, so with seven agents out the deploy waited for all of them; commits went in path-limited as each reported.
+- **A red beside another Chrome is not a red**: `/sync/` CLOCKS twice, then 81/81 alone.
+- **A test can be broken for days by a move it reads across**: `code-lang-test.mjs` read a constant out of a page after it moved to a module.
+
 # Handoff, 2026-10-05, session 64: /now/ into /flipper/, two channels on video panels, slides from a sample to a kit component
 
 ## Where it is right now
