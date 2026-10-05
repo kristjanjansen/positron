@@ -1,5 +1,6 @@
 ## Open
 
+- **`/slides/` colour coding in the diagram's hues** (2026-10-05): *"use also colorcoding slide with some hilited text and numbers in same hue ang also diagram colors"*. Words and numbers coloured with the hue of the diagram box they name (`TECH_HUE` in `diagram.mjs`), yellow stays the one point per slide. Handed to the type scale agent.
 - **`/slides/` remove Martian Mono** (2026-10-05): *"rm martian mono"*. Handed to the type scale agent, same file; seven faces remain.
 - **`/slides/` bigger headlines, a type scale, yellow accents** (2026-10-05): *"big type headers / sentences words. figure out type scale. use accent yellow on some"*. Headlines and key words bigger than LARGE 9%, a worked-out scale replacing the three ad hoc sizes, `--hi` on the one word or number per slide that carries the point. `demo/slides/index.html`, `plans/plan-slides.md`.
 - ~~**`/slides/` real content about positron, JetBrains Mono default** (2026-10-05): *"add actual slides content on out stuff we are building. jetbrains default"*. A talk about what is being built here, every number a MEASURED one from PROGRESS.md, plans or research, live kit elements where they carry the point. Folds in the two waiting items above (caption at bottom left, mono features as the vehicle for tables and numbers).~~ Done 2026-10-05 in the 16-slide talk, 45/45.
