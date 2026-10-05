@@ -18,8 +18,9 @@
 // `data-busy` wait did.
 
 import { el } from '/shell/shell.mjs';
-import { openWire, LIMITS } from '/shell/wire.mjs';
+import { openWire, LIMITS, RELAY_BASE } from '/shell/wire.mjs';
 import { createTable } from '/shell/table.mjs';
+import { howIn, gradeHow } from './how.mjs';
 
 // A page with no numbers: the list is the readout. `null` gives the tab's own
 // report a log and no cells.
@@ -320,13 +321,84 @@ export function build({ panel, log, d }) {
     log(`room ${ROOM}: open this page in a second browser to see both sides`, 'hi');
   })();
 
+  // ── how it works, last in the tab, drawn on its first showing ─────────────
+  // Read off this file: `openWire` to the relay, `startRecording` and
+  // `readHistory` against the store, `put` listing a line the moment it goes.
+  const kept = `${CAP} kept`;
+  const SPEC = {
+    caption: 'One WebSocket to a relay that keeps nothing, and a recorder beside it that keeps what you ask it to.',
+    // ⚠️ THE ORDER IS LAYOUT, AND IT WAS SEARCHED RATHER THAN GUESSED. A
+    // return path runs under the row and climbs into its box from below, so
+    // with both workers in one Cloudflare box one of the three lines into the
+    // list was always drawn behind the box above it or over another's name.
+    // Two workers are two machines anyway (`workers/relay`, `workers/store`),
+    // and of the twelve orders of three machines and two Browser boxes, Store,
+    // Browser, Relay is the one clean at desk width and on a phone.
+    nodes: [
+      { id: 'cfs', label: 'Cloudflare', sub: 'store worker', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'store', label: 'Store', sub: `SQLite, ${kept}`, tech: 'relay',
+            note: 'Joins the room as one more WebSocket and writes each message marked **store** into its '
+                + `SQLite table. This tab asks it to keep the newest ${CAP}, and nothing older than 24 hours.` },
+        ] },
+      { id: 'you', label: 'Browser', sub: 'this tab', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'composer', label: 'composer', sub: 'one JSON line',
+            note: 'Wraps what you type in the envelope every page here sends, with **type**, **from**, '
+                + `**sent** and **seq**. A line over ${LIMITS.maxBytes.toLocaleString('en')} bytes is refused here and never leaves.` },
+          { id: 'list', label: 'message list', sub: 'out, echo, in',
+            note: 'Every line as the exact text that went out or came back, with its size in UTF-8 bytes. '
+                + 'On arrival it is filled from the history, so you see what other people left.' },
+        ] },
+      { id: 'cfr', label: 'Cloudflare', sub: 'relay worker', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'relay', label: 'Relay', sub: 'Durable Object', tech: 'relay',
+            note: 'One object per room holding every WebSocket in it, and it sends each message to all of '
+                + 'them, the sender included. It parses nothing and keeps nothing.' },
+        ] },
+    ],
+    links: [
+      { from: 'composer', to: 'list',
+        note: 'Your line is listed as out the moment it is sent, before the relay has answered.' },
+      { from: 'composer', to: 'relay', label: 'JSON line',
+        note: 'Text over one WebSocket, in the room called wire. Send the same as bytes goes as a binary '
+            + 'frame instead, which has nowhere to carry the counter.' },
+      { from: 'relay', to: 'list', label: 'echo', back: true,
+        note: 'The same bytes back to every socket in the room. Your own echo is how this tab knows the '
+            + 'relay had it, and how long that took.' },
+      { from: 'relay', to: 'store', label: 'every line', back: true,
+        note: 'The recorder is a member of the room like you, so the relay sends it every message, and it '
+            + 'keeps only the ones marked store.' },
+      { from: 'store', to: 'list', label: 'history',
+        note: 'An ordinary HTTPS GET answered with one JSON line per message, oldest first, when the tab '
+            + 'opens and after each press.' },
+    ],
+  };
+  const how = howIn(panel);
+
   return {
     wire,
+    show() { how.draw(SPEC); },
     async check({ A: tabA }) {
       A = tabA;
       await booted;
       // The order the harness pressed `.pos-controls` in, each one awaited.
       for (const s of SPECS) await run(s.id);
+
+      await gradeHow(A, how, SPEC);
+      // The boxes are the parts this tab really uses, each read off the thing
+      // it stands for rather than off the picture.
+      const relayHost = new URL(RELAY_BASE).host;
+      const parts = {
+        composer: panel.el.contains(compose),
+        list: panel.el.contains(msgs.el),
+        relay: wire.state() === 1,
+        store: recording,
+      };
+      const missing = Object.entries(parts).filter(([, ok]) => !ok).map(([k]) => k);
+      A('its boxes are the parts this tab uses: the composer, the list, an open relay socket and a recording store',
+        missing.length === 0,
+        missing.length ? `not true of ${missing.join(', ')}` : `socket open to ${relayHost}, store at ${new URL(STORE).host} recording`);
     },
   };
 }

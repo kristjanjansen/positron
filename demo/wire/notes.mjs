@@ -39,6 +39,7 @@ import { createDeck } from '/timeline/transport.mjs';
 import { el } from '/shell/shell.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
 import { offerLoopFor, inputNames, checkEvolutionLoop } from '/shell/midi.mjs';
+import { howIn, gradeHow } from './how.mjs';
 
 // What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
 export const about = 'Play the keyboard and every note travels through the relay to anyone else in the room. Open this tab in a second browser to play into this one and see how late the notes land.';
@@ -330,8 +331,71 @@ export function build({ panel, log, set, d }) {
   set('sound from', 'here');
   log(`room ${ROOM}: open /wire/?notes=${ROOM}#notes in another browser to play into this one`);
 
+  // ── how it works, last in the tab, drawn on its first showing ─────────────
+  // Read off this file: `press` and `play` here, `openWire` to the relay, and
+  // `remote`'s offer and answer over the same room with the sound coming back
+  // as a WebRTC track (`startStandIn` speaks the other machine's half).
+  const SPEC = {
+    caption: 'Notes go through the relay as numbers, and sound from another machine comes back peer to peer.',
+    // ⚠️ THE ORDER IS LAYOUT, SEARCHED OVER ALL 72 ARRANGEMENTS RATHER THAN
+    // GUESSED. A return path runs under the row and climbs into its box from
+    // below, so it has to leave and land on the BOTTOM box of each machine or it
+    // is drawn behind the box above (`notes` ran behind audio into voices, and
+    // the WebRTC line behind the far keyboard). The far machine on the left
+    // leaves exactly two return paths, both bottom to bottom.
+    nodes: [
+      { id: 'far', label: 'Browser', sub: 'second machine', tech: 'browser', join: false,
+        children: [
+          { id: 'fkeys', label: 'keyboard', sub: 'notes in',
+            note: 'Anybody else playing in the same room. Each note carries the moment it was sent, which '
+                + 'is the arrived after cell.' },
+          { id: 'synth', label: 'synth', sub: 'offers sound',
+            note: 'Says it is here, makes a tone for every note the room sends, and answers an offer with '
+                + 'that sound as a WebRTC track.' },
+        ] },
+      { id: 'you', label: 'Browser', sub: 'this tab', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'keys', label: 'keyboard', sub: 'keys or MIDI',
+            note: 'The drawn keys, the letter row, or a device through **Web MIDI**. Raw MIDI bytes never '
+                + 'leave this page, only the note number.' },
+          { id: 'audio', label: 'audio', sub: 'WebRTC track', tech: 'sound',
+            note: 'The other machine\u2019s sound, played by an audio element once you ask for it. An '
+                + '**AudioWorklet** hears each onset, so press to sound is timed on this clock alone.' },
+          { id: 'voices', label: 'voices', sub: 'Web Audio', tech: 'sound',
+            note: 'A synth on an **AudioContext** that sounds your own notes at once and plays the notes '
+                + 'arriving from the room.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'one worker', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'relay', label: 'Relay', sub: 'Durable Object', tech: 'relay',
+            note: 'Sends each note to every socket in the room and keeps none. It also carries the WebRTC '
+                + 'offer and answer, which is how the two machines find each other.' },
+        ] },
+    ],
+    links: [
+      { from: 'keys', to: 'voices',
+        note: 'Your note sounds here at once, unless the other machine is making the sound.' },
+      { from: 'keys', to: 'relay', label: 'note number',
+        note: 'One JSON line of type on with the note and a velocity, in the envelope with sent and seq. '
+            + 'A release is a second line, of type off.' },
+      { from: 'relay', to: 'synth', label: 'notes', back: true,
+        note: 'The same line, unchanged, to every other socket in the room.' },
+      { from: 'fkeys', to: 'relay', label: 'notes',
+        note: 'Their notes, in the same shape as yours.' },
+      { from: 'relay', to: 'voices', label: 'notes', back: true,
+        note: 'Played on the voices here and drawn on the over the relay lane, with how late each one '
+            + 'arrived.' },
+      { from: 'synth', to: 'audio', label: 'WebRTC',
+        note: 'Audio straight between the two machines once the offer and answer have crossed the relay. '
+            + 'Nothing in Cloudflare carries it.' },
+    ],
+  };
+  const how = howIn(panel);
+  // What the check found each box doing, filled in as it goes.
+  const real = { keys: false, voices: false, relay: false, synth: false, fkeys: false, audio: false };
+
   return {
-    show() { visible = true; },
+    show() { visible = true; how.draw(SPEC); },
     hide() { visible = false; },
     async check({ A }) {
       A('nothing is joined and no audio is made until a press in this tab',
@@ -360,6 +424,7 @@ export function build({ panel, log, set, d }) {
       A('audio running', !!ctx && ctx.state === 'running', ctx?.state ?? 'none');
       const open = await until(() => ws?.state() === 1, 6000);
       A('relay open', open, open ? `1, room ${ROOM}` : `readyState ${ws?.state?.() ?? 'none'} after 6 s`);
+      real.relay = open;
 
       await checkEvolutionLoop({ assert: A }, {
         keys: kb, heard: () => voiced,
@@ -374,6 +439,7 @@ export function build({ panel, log, set, d }) {
         try { m = JSON.parse(lastLine || 'null'); } catch { /* asserted */ }
         const ok = !!m && m.type === 'on' && Number.isInteger(m.note) && m.note >= 0 && m.note < 128
           && !('data' in m) && !('status' in m) && !('bytes' in m);
+        real.keys = ok && panel.el.contains(kb.keysEl);
         A('the wire carries note numbers, not MIDI bytes', ok,
           m ? `{${Object.keys(m).filter((x) => !['id', 'from', 'sent', 'seq', 'by'].includes(x)).join(', ')}} note ${m.note}` : 'no line went out');
       }
@@ -393,6 +459,8 @@ export function build({ panel, log, set, d }) {
         const offered = await until(() => !!synth, 4000);
         await run('remote');
         const heard = await until(() => source === 'remote', 6000);
+        real.synth = offered && heard;
+        real.audio = heard && !!remoteAudio?.srcObject;
         A('a second peer offering sound is heard: its audio arrives and the page stops making its own',
           offered && heard && !!remoteAudio?.srcObject && (source === 'remote') === !!(pc && remoteAudio),
           `${offered ? 'offered' : 'nobody offered'}, ${heard ? 'track arrived' : 'no track'}, `
@@ -411,6 +479,7 @@ export function build({ panel, log, set, d }) {
         const r0 = received;
         far.playInto(67);
         const came = await until(() => received > r0, 3000);
+        real.fkeys = came;
         A('a note from the other machine lands here, with how late it was',
           came && Number.isFinite(lat[lat.length - 1]) && lat[lat.length - 1] >= 0
             && played.some((p) => p.who === 'there'),
@@ -424,6 +493,13 @@ export function build({ panel, log, set, d }) {
         if (remoteAudio) remoteAudio.srcObject = null;
         set('sound from', 'here');
       }
+
+      await gradeHow(A, how, SPEC);
+      real.voices = voiced > 0 && !!voices;
+      const missing = Object.entries(real).filter(([, ok]) => !ok).map(([k]) => k);
+      A('its boxes are the parts this tab used: keys, voices, an open relay, and a second peer whose notes and sound arrived',
+        missing.length === 0,
+        missing.length ? `not seen doing its job: ${missing.join(', ')}` : `${voiced} note(s) voiced here, relay room ${ROOM}, peer sound over WebRTC`);
     },
   };
 
