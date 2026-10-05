@@ -1,5 +1,7 @@
 ## Open
 
+- **Three leftovers from the tabbed-page review** (2026-10-05, *"do all"*): `/time/` manifest `one` describes only the clock tab; the DATES aggregate lane note is jargon (`strip.mjs`, shared); `/partitur/` SCORE link picks do not share a label column. Plus the standing reds: `/wire/` KEYBOARD onset, `/capture/` RECEIVER WebRTC never connects, `/capture/` seek 1334 vs 1391.
+
 - ~~**Tabbed pages, critical UX review** (2026-10-05): *"do critical user experience review of new demost with many tabs. its hard to understand what they do. have a fixed height descriptions under tabs to explain. rm top desriptions. rething labelling. in bg"*. `/sync/` `/time/` `/wire/` `/capture/` (+ `/partitur/` once it is tabbed), `demo/shell/tab-page.mjs`.~~ Done 2026-10-05: fixed-height `about` box under the tab row, `what` removed, 9 of 15 tabs renamed.
 
 - ~~**`/patchbay/` WHY text, shorten 2x** (2026-10-05): *"shorten 2x"* on the five WHY paragraphs. `demo/patchbay/index.html`.~~ Done 2026-10-05, five paragraphs to three, 176 words to 84.

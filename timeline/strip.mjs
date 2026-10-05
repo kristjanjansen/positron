@@ -910,8 +910,11 @@ function drawAoristic(ctx, L, C, spans) {
   if (L.aggregateLegend !== false && L.height >= 26 && C.width > 210) {
     ctx.globalAlpha = 0.8; ctx.fillStyle = '#8f9bb0';
     ctx.font = '9px ui-monospace, Menlo, monospace';
-    const drop = a.open ? ` · ${a.open} open→0` : '';
-    ctx.fillText(`${a.method} · peak ${a.max.toFixed(3)} · n=${a.counted}${drop}`, 3, base - h - 2);
+    // Plain words on the canvas, asked 2026-10-05 (*"rething labelling"*): the
+    // legend read `aoristic Σ 1/(b−a) · 1 bin/px ...`. The formula is still
+    // `a.method`, published and asserted, for a reader who asks.
+    const drop = a.open ? `, ${a.open} with no end left out` : '';
+    ctx.fillText(`how likely each moment is, from ${a.counted} dated ranges, ${fmtDur(a.colMs)} a pixel${drop}`, 3, base - h - 2);
   }
   ctx.restore();
 }
