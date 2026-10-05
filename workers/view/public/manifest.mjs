@@ -69,11 +69,10 @@ export const ACTS = new Map([
 
 export const DEMOS = [
   { name: 'und', group: 'technologies', act: 0, created: '2026-09-07', built: true,
-    one: 'a Csound score, compiled whenever you stop typing',
+    one: 'Csound scores turned into timelines you can start anywhere, whether typed here or written for U:\u2019s vClick click track.',
     tags: ['timeline', 'Csound', 'WebAudio'] },
-  { name: 'click', group: 'technologies', act: 0, created: '2026-09-14', built: true,
-    one: 'U:’s vClick is a click track with no earpieces, where every player watches a screen for the bar, the beat and a lamp',
-    tags: ['timeline', 'Csound'] },
+  // `click` was its own page 2026-09-14 and is the CLICK tab of /und/ since
+  // 2026-10-05, no redirect.
 
   { name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true,
     one: 'the tuned low-latency player against a live input',
