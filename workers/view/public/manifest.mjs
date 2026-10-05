@@ -926,6 +926,12 @@ export const DEMOS = [
   // one of those now and it is in this file.
   // ⚠️ UNLISTED IS NOT SECRET, and the page says so on itself. Anything else
   // would be a token, and a token pasted into a public page is a published one.
+  // A build sheet for the Pico router, unlisted, asked 2026-10-05 (*"write into
+  // not-in-index positron page"*): the Oomipood list, the breadboard drawings
+  // from rig/pico/oled/breadboard.mjs and the power notes. Opens nothing.
+  { name: 'parts', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
+    one: 'The parts, the breadboard and the power for the Pico router with its screen and four keys.',
+    tags: [] },
   { name: 'feedback', group: 'kit', act: 0, created: '2026-09-15', built: true, unlisted: true,
     // Its first assert sits behind an arm, a socket, an echo and a read back,
     // and `verify.mjs` walks off 400 ms after a count stops growing — which for
