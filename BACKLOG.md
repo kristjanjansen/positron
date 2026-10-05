@@ -1,5 +1,6 @@
 ## Open
 
+- **`/slides/` slides that show what mono does** (2026-10-05): *"show more mono features off in slides? text colums, tables, numbers below each other"*. Character-aligned columns, a table aligned by character width, stacked numbers with aligned decimals, live where possible, alignment asserted by measurement in every face. Handed to the faces agent, same file.
 - **`/slides/` description at bottom left, smallest size** (2026-10-05, with a screenshot of the diagram slide): *"desc seems off. perhaps write it with slide's smallest text font and align to bottom left?"*. The caption under the diagram is in the sans face, centred, with a lone second line. Handed to the faces agent, same file.
 - **`/slides/` faces all monospace, and more of them** (2026-10-05): *"is atkinson monospace!?"*, then *"all monos. add more"*. The first five mixed in three proportional faces because the brief said "mono or not", against the original ask for monotype. Default Atkinson Hyperlegible Mono, every face on the switcher monospace, more than five. `demo/slides/index.html`, `demo/slides/vendor/`, `workers/view/build.mjs`, `plans/plan-slides.md`.
 - ~~**`/flipper/` do not mute the first when starting the second** (2026-10-05): *"do not mute first when startic second"*.~~ Done `2b14c5a`, 44/44.
