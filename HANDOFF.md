@@ -1,3 +1,81 @@
+# Handoff, 2026-10-05, session 63: UX passes on the tabbed pages, partitur and wall as one page, stage receives only, the Pico on a breadboard
+
+## Where it is right now
+
+- ✅ **Site: BUILD `d2edd61-095114-cc46`**, confirmed on the edge. Not pushed
+  (the push needs the personal account, see CLAUDE.md).
+- Counted: **48 demos, 45 built** (`/wall/` retired into `/partitur/`),
+  **88 plans**. CLAUDE.md's top line recounted to match.
+- The working tree is clean apart from `workers/view/public/shell/shell.mjs`,
+  which `deploy.mjs` rewrites after every deploy. No agent is running.
+
+## What landed, all deployed
+
+| commits | what | look at |
+| --- | --- | --- |
+| `f22cc27` `cd9ad3f` `c0669a1` | `/kit/`: Pico keys read `1 2 3 4`; OLED FONTS on two panels with long uppercase samples; ROUTER FIRMWARE screen at the same 2x scale as the other OLED blocks | https://positron.studio/kit/#oled-fonts |
+| `bf6e411` | `/patchbay/` WHY text at half the length | https://positron.studio/patchbay/ |
+| `c296c5b` `7d12e9d` | **`/partitur/` is SCORE and WALL tabs**, `/wall/` gone with no redirect. Both join the room on a press (not on load) and use `?room=` when the harness gives one, so suite runs no longer put fake walls on the owner's patchbay. New check: SCORE links its light to WALL through the run's room and a yellow stripe arrives. Round 2: picture and timeline first, link picks hidden until the room is joined, English lane names (stage 1, stage 2, light, sirens), the wall says what it is waiting for, `score.mjs` imported after `mount()` (its top-level fetch delayed the inline favicon and a `/favicon.ico` 404 went red one run in three) | https://positron.studio/partitur/ |
+| `805ab85` | **tabbed pages**: `tab-page.mjs` rule 6, one `about` sentence per tab in a fixed-height box under the tab row; the `what` line under the title removed on all five tabbed pages (owner: *"rm top desriptions"*); 9 of 15 tabs renamed: sync INSTANT CLOCKS LATE VIDEO REPLAY, time CLOCK OUTPUTS LOOPS SCORE DATES, wire MESSAGES KEYBOARD, capture TAKES UPLOAD ROUND TRIP RECEIVER (tab ids and hashes unchanged) | https://positron.studio/sync/ |
+| `8bdf4c1` | round 2: REPLAY box captioned before play, LOOPS direction a labelled choice, `hardware.mjs` button "Play with sound and MIDI", KEYBOARD readout keys plain, the strip's "N in view" label moved into the gutter (it printed over `0:00` on every strip), `.pos-glue` with all parts hidden hides itself | https://positron.studio/time/#loops |
+| `2d85610` | **`/time/` DATES in calendar terms**: `calendar: true` on `createStrip` (opt in, only dates.mjs), ruler `200 400 ... 2000` down to months, days, hours; cells date, grid, in view, dates shown; fit bug at 1280 fixed (drew 4,862 years for a 2,000 fit) | https://positron.studio/time/#dates |
+| `e14842b` `dcac652` `39d206b` | **`/stage/`**: a tag on the picture driven by frames arriving (STARTING, RECEIVING, STALLED, `slots.tag` in `video-panel.mjs`); Start show / Stop show and one sentence per tab; the diagram no longer claims Stream writes to R2; **the local 253 MB film is gone** (and the `?bg=` ERR route, 864 lines out), mute acts on the live WHEP picture, the clock reads elapsed time with no ms and no nominal 3:00 | https://positron.studio/stage/ |
+| `dd48fa7` `0f5dba5` | **the VPN is real and comes and goes** (owner: *"vpn in on and off"*, Check Point, `utun4`). With it up and no capture permission, headless Chrome offers ONE host candidate (the tunnel) and two peer connections in one tab never connect. `verify.mjs` grants `audioCapture` to `wire` and `capture` only. CLAUDE.md corrected | `pgrep -fl Endpoint_Security_VPN; route -n get 8.8.8.8 \| grep interface` |
+| `0495550` ... `4db1c0d` | **`rig/pico/oled/breadboard.mjs`**: the Pico 2 WH, the OLED module and power drawn hole by hole on an 830 breadboard, two ways: hub dongle (`breadboard.png`) and MB102 module (`node ... mb102`, `breadboard-mb102.png`) | `rig/pico/oled/breadboard-mb102.png` |
+| `5291380` | `plans/plan-stage-patchbay.md`, written and then **shelved by the owner**: *"i do not about patchbay, perhaps just visual indication of picture happening"* | |
+
+Counts after the last runs: partitur 36, stage 35 (25 page asserts), sync 66,
+time 88, wire 47 (was 46/47), capture 75 (was 62/70), kit 294.
+
+## The shopping list, Oomipood, for the Pico router (no MIDI DIN, owner has a powered USB-B hub)
+
+| part | price | link |
+| --- | --- | --- |
+| Raspberry Pi Pico 2 WH (headers fitted) | €14.00 | https://www.oomipood.ee/en/product/raspberry_pi_pico_2wh_wireless_arm_cortexm33 |
+| 0.96" OLED with 4 buttons (SSD1306 I2C) | €10.50 | https://www.oomipood.ee/product/oled_display_4_nuppu_096_128x64_33v_i2c_ssd1306 |
+| Breadboard 830, MB-102 | €5.00 | https://www.oomipood.ee/en/product/oky0008_maketeerimislaud_60_170mm_830_punkti_mb_102 |
+| Jumper wires male-male 15 cm, 40 | €3.50 | https://www.oomipood.ee/en/product/oky0070_maketeerimislaua_juhtmed_40tk_isa_isa_15cm_2_54mm |
+| OTG cable micro-USB to USB-A socket (Pico to the hub's upstream, with the hub's own A-B cable) | €4.00 | https://www.oomipood.ee/product/usb20_otg_kaabel_usb_a_pesa_usb_micro_b_pistik_20cm_must |
+| power, EITHER USB-A plug to screw terminals from a hub port | €1.00 | https://www.oomipood.ee/product/oky3447_2_leminek_usb_a_pistikult_klemmribale |
+| OR the MB102 breadboard power module (+ a 9 V barrel adapter, not looked up) | €3.50 | https://www.oomipood.ee/en/product/oky0026_toitemoodul_maketeerimislauale_mb102_3_3v_5v_700ma_6_5_12v |
+
+⚠️ **POWER GOES INTO VBUS (PIN 40), NOT VSYS.** The Pico's only USB socket is
+the host, and a host powers the line: 5 V on VBUS powers the Pico through its
+diode AND appears on the cable to the hub, which many self-powered hubs need
+before they see a host. READ from the USB and Pico docs, untried with this hub.
+With the MB102: top jumper 5 V (top rail to pin 40), bottom jumper 3.3 V (OLED),
+Pico pin 36 wired to nothing, bridge the rails if the board splits them.
+⚠️ The firmware on `/kit/` still talks DIN on its UART; USB host is the next
+firmware (the router board's step 3 below).
+
+## Open
+
+- **Deep tier on `/stage/` has not run since the film went.** Five deep asserts
+  were rewritten, including one that needs an audio track on the WHEP leg and
+  the picture still playing after unmute. The first real Start show is the first
+  test of sound.
+- **Button casing**: refused, a recorded owner decision of 2026-09-30 (*"cap:
+  all secondary buttons"*, the yellow primary keeps its case). One line if the
+  owner changes it.
+- **A visitor behind a VPN** like this one with no microphone permission still
+  meets the stall on `/capture/` RECEIVER and `/wire/`'s sound back. Page cures
+  are asking for the mic or a TURN relay; neither chosen.
+- From the reviews, not fixed: `/sync/` INSTANT and `/wire/` MESSAGES reserve
+  about 115 px of empty list; DATES zoom does not stay on the playhead, its
+  legend is cut at 375; the diagram at 375 on `/stage/` is a tangle of return
+  lines; `Send in 10s` on `/stage/` is unexplained.
+
+## Learned, worth keeping
+
+- **A top-level `await` in a tab module delays `mount()`** when the module is
+  imported statically, and the shell's inline favicon goes in late. Import such
+  a module after `mount()`.
+- **Two peer connections in one headless tab need a capture grant on this
+  machine whenever the tunnel is up.** Whether a WebRTC page is red is a question
+  about `utun4` before it is a question about code.
+- **`zsh` does not word-split `$P`**: a path list in a variable reached `git
+  commit --` as one pathspec. Use `${=P}` or list the paths.
+
 # Handoff, 2026-10-05, session 62 continued: twenty demos became four tabbed pages, checks in two tiers, one time vocabulary live
 
 ## Where it is right now
