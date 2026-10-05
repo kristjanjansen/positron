@@ -251,6 +251,10 @@
      a property per instance sets a custom property, never the property. */
   /* a kit component filling a slide's fit box edge to edge (the instrument panel) */
   .sl-fit-in > .kit-sl-fill { width: 100%; box-sizing: border-box; }
+  /* THE SCALE set solid so all six steps fit one column: line height 1, no gap
+     between the lines, nothing above them. Same weight as the slide's own rules. */
+  .kit-sl .sl[aria-label="the scale"] .sl-ev { gap: 0; margin-top: 0; justify-content: center; }
+  .kit-sl .sl[aria-label="the scale"] .sl-line { line-height: 1; margin: 0; }
   .kit-oled { width: fit-content; max-width: 100%; padding: 10px; background: #000;
               border: 1px solid var(--line); border-radius: 4px; }
   .kit-oled canvas { display: block; image-rendering: pixelated;
@@ -1656,23 +1660,14 @@
   // biggest stand in the slot and the four below them in the words column:
   // a split whose slot holds slide text, which is a slot holding any element.
   slideBlock('THE SCALE',
-    'All six steps on one slide, each 1.5 times the one under it. Six lines in one column '
-    + 'do not fit a 16:9 slide, so steps 6 and 5 stand on the left and 4 to 1 on the right.',
-    `{ layout: 'split', side: 'left', slot: (host) => /* steps 6 and 5 */,
-  lines: [[4, 'clock'], [3, '26.2 ms'], [2, '1.8 ms'], [1, '1 to 2 ms']] }`,
-    { name: 'the scale', layout: 'split', side: 'left',
-      slot: (host) => {
-        for (const [n, t] of [[6, '*44*'], [5, 'live']]) {
-          const p = el('p', `sl-t sl-t${n} sl-line`, t.replace(/\*/g, ''));
-          p.dataset.step = String(n);
-          if (t.includes('*')) p.classList.add('sl-hi');
-          host.append(p);
-        }
-        host.classList.add('sl-scale-big');
-        return null;
-      },
-      lines: [[4, 'clock'], [3, '26.2 ms'], [2, '1.8 ms'], [1, '1 to 2 ms']],
-      cap: 'six steps, base 4 per cent of the height, ratio 1.5' });
+    'All six steps on one slide, largest first, each 1.5 times the one under it. One column, no '
+    + 'colour, set solid: six lines at their own line heights need 91 per cent of the height and '
+    + 'the inset leaves 84, at line height 1 they need 83.',
+    `{ layout: 'left', lines: [[6, 'step 6'], [5, 'step 5'], [4, 'step 4'], [3, 'step 3'], [2, 'step 2'], [1, 'step 1']] }`,
+    // ONE COLUMN, NO COLOUR, asked 2026-10-05: *"THE SCALE no col layout. just
+    // all scales. no colors"*. It was a split with 6 and 5 in the slot.
+    { name: 'the scale', layout: 'left',
+      lines: [[6, 'step 6'], [5, 'step 5'], [4, 'step 4'], [3, 'step 3'], [2, 'step 2'], [1, 'step 1']] });
 
   // ── COMBINATIONS ──────────────────────────────────────────────────────────
   // CLAUDE.md, the stand-ins paragraph: three fake servers make four pages
@@ -1685,12 +1680,6 @@
     // headline starts rather than floating centred under it.
     { name: 'stand-ins', layout: 'left', say: 'Stand-ins replace other servers',
       text: 'Three fake servers make four pages runnable with no bytes from anybody else' });
-  // plans/plan-away-webrtc.md:212-214, laptop and Pi on one network: key
-  // press to speakers ~175 ms over the relay, ~48 ms over a direct channel.
-  slideBlock('HEADLINE OVER A NUMBER',
-    'A combination: one figure at step 6 under the headline, with what it is of at step 3.',
-    `{ say: 'Direct to the [Pi|raspberry] skips the relay', big: '*48 ms*', under: 'was 175 over the relay' }`,
-    { name: 'pi', say: 'Direct to the [Pi|raspberry] skips the relay', big: '*48 ms*', under: 'was 175 over the relay' });
   // positron-verify SKILL.md:78-80: a stand-in serving silence still read
   // 38/38 on /tapes/, a hole found only by breaking the stand-in.
   slideBlock('STATEMENT',
@@ -1808,13 +1797,6 @@
     `{ layout: 'top', say: 'ERR refuses by programme, not age', text: '...' }`,
     { name: 'refusals', layout: 'top', say: 'ERR refuses by programme, not age',
       text: 'etv refused its newest 45 min, etv2 its oldest 78 min, etvpluss nothing', textStep: 2 });
-  // research/circuit-archive-2026-09-21.md:253-256: 32 sessions, 29 with
-  // notes; plans/plan-circuit-editor.md:65: 64 patches of 350 bytes.
-  slideBlock('LEFT ALIGNED',
-    'A layout: everything on the left edge, the evidence still centred in the height.',
-    `{ layout: 'left', say: 'The Circuit holds *29* real sessions', rows: { body, align: 'lr' } }`,
-    { name: 'circuit', layout: 'left', say: 'The Circuit holds *29* real sessions',
-      rows: { body: [['sessions', '32'], ['with notes', '29'], ['patches', '64']], align: 'lr' } });
   slideBlock('INTERACTIVE ON THE RIGHT',
     'The mirror: the words on the left and a knob on the right whose value is the figure, '
     + 'so turning it changes the slide.',
@@ -12190,7 +12172,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       return s.spec.side === 'left' ? !(sl < wd) : !(sl > wd);
     });
     d.assert('SLIDES: a split puts its slot on the side it declares and the words on the other',
-      splits.length >= 8 && splits.some((s) => s.spec.side === 'left') && splits.some((s) => s.spec.side === 'right') && wrong.length === 0,
+      // floors follow the blocks the owner keeps removing: at least two splits, one each way
+      splits.length >= 2 && splits.some((s) => s.spec.side === 'left') && splits.some((s) => s.spec.side === 'right') && wrong.length === 0,
       `${splits.length} splits, ${splits.filter((s) => s.spec.side === 'left').length} slot left, `
       + `${wrong.length ? `wrong: ${wrong.map((s) => s.spec.name).join(', ')}` : 'every one on its side'}`);
     {
@@ -12204,7 +12187,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const top = all.find((x) => x.spec.name === 'refusals');
       const tb = top.parts.text.getBoundingClientRect(), cb = top.parts.ev.getBoundingClientRect();
       // no right layout since 2026-10-05, *"no right align needed"*
-      const l = edge('circuit', 'left');
+      const l = edge('stand-ins', 'left');
       d.assert('SLIDES: left and top layouts put the evidence on their edge',
         tol(l, 0, 1) && tol(tb.bottom, cb.bottom, 1),
         `left ${l.toFixed(1)} px off its edge, the top layout's words end ${(cb.bottom - tb.bottom).toFixed(1)} px above the region's foot`);
@@ -12446,7 +12429,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const focused = op(target.fullBtn), focusedPe = getComputedStyle(target.fullBtn).pointerEvents;
       target.fullBtn.blur();
       d.assert('SLIDES: every static slide has its ⛶, hidden at rest and shown when the slide holds focus',
-        missing.length === 0 && btns.length === blocks.length + 0 * 0 && btns.length >= 25 && rest.every((o) => o === (noHover ? 1 : 0)) && focused === 1 && focusedPe === 'auto'
+        missing.length === 0 && btns.length >= 20 && rest.every((o) => o === (noHover ? 1 : 0)) && focused === 1 && focusedPe === 'auto'
           && btns.every((b) => b.textContent.includes('⛶') && b.classList.contains('ico')),
         `${btns.length} slides${missing.length ? `, missing on ${missing.join(', ')}` : ''}, at rest ${[...new Set(rest)].join('/')} opacity`
         + `${noHover ? ' (a screen with no hover shows it always)' : ''}, focused ${focused} and ${focusedPe}`);
