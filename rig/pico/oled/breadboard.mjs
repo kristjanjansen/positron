@@ -43,7 +43,7 @@ const at = (row, col) => [holeX(col), ROW_Y[row]];
 
 const C = { v5: '#e0457b', v3: '#d63b3b', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#8a4fd1' };
 const out = [];
-const svgW = X0 * 2 + W, svgH = Y0 + H + 340;
+const svgW = X0 * 2 + W, svgH = Y0 + H + 300;
 out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" font-family="ui-monospace, Menlo, monospace">`);
 out.push(`<rect width="100%" height="100%" fill="#f4f1ea"/>`);
 
@@ -87,17 +87,27 @@ for (const c of [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]) {
 
 // the OLED module, header in row j, columns 40..47, body off the BOTTOM edge,
 // so its wires stay in the f-j half with the Pico's GPIO pins and none of them
-// crosses the centre gap
+// crosses the centre gap. ⚠️ AT ITS REAL SIZE, about 37 by 27 mm (15 by 11
+// holes, INFERRED from the shop photo, not measured): an 8 pin header on one
+// edge of a board that size cannot lie on a breadboard without covering the
+// holes its own wires need, so it overhangs the edge by about 1.5 cm. The
+// screen is on the left and the four keys ^ v # * are a column on the right.
 const OLED = ['GND', 'VCC', 'SCL', 'SDA', 'K4', 'K3', 'K2', 'K1'];
 {
-  const x1 = holeX(39) - 4, x2 = holeX(48) + 4, y1 = ROW_Y.j - 6, y2 = Y0 + H + 120;
+  const x1 = holeX(39) - 2, x2 = x1 + 15 * P, y1 = ROW_Y.j - 7, y2 = y1 + 11 * P;
   out.push(`<rect x="${x1}" y="${y1}" width="${x2 - x1}" height="${y2 - y1}" rx="5" fill="#25456e" opacity="0.93"/>`);
-  out.push(`<rect x="${x1 + 12}" y="${y2 - 82}" width="${x2 - x1 - 24}" height="70" fill="#0b0e14"/>`);
-  out.push(`<text x="${(x1 + x2) / 2}" y="${y2 - 42}" font-size="11" fill="#5cc8ff" text-anchor="middle">0.96" OLED, 4 keys</text>`);
+  const sx = x1 + 10, sy = y1 + 46, sw = 9.5 * P, sh = (y2 - sy) - 10;
+  out.push(`<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="#0b0e14"/>`);
+  out.push(`<text x="${sx + sw / 2}" y="${sy + sh / 2 + 4}" font-size="10" fill="#5cc8ff" text-anchor="middle">0.96" OLED</text>`);
+  ['^', 'v', '#', '*'].forEach((g, i) => {
+    const cy = sy + 8 + i * (sh - 16) / 3, cx = x2 - 22;
+    out.push(`<circle cx="${cx}" cy="${cy}" r="7" fill="#d9d9d9" stroke="#888"/>`);
+    out.push(`<text x="${cx}" y="${cy + 3.5}" font-size="9" fill="#333" text-anchor="middle">${g}</text>`);
+  });
   OLED.forEach((name, i) => {
     const x = holeX(40 + i);
     out.push(`<circle cx="${x}" cy="${ROW_Y.j}" r="3.6" fill="#e8c35a"/>`);
-    out.push(`<text x="${x}" y="${ROW_Y.j + 14}" font-size="8" fill="#fff" text-anchor="start" transform="rotate(90 ${x} ${ROW_Y.j + 14})">${name}</text>`);
+    out.push(`<text x="${x}" y="${ROW_Y.j + 13}" font-size="7" fill="#fff" text-anchor="start" transform="rotate(90 ${x} ${ROW_Y.j + 13})">${name}</text>`);
   });
 }
 
@@ -138,7 +148,7 @@ for (const [a, b, col] of WIRES) {
 
 // the key, under the board
 {
-  let y = Y0 + H + 150;
+  let y = Y0 + H + 110;
   out.push(`<text x="${X0}" y="${y}" font-size="13" fill="#222">Every wire, hole to hole (row letter, column number)</text>`);
   y += 8;
   const hole = (p) => (typeof p[0] === 'string' ? `${p[0]}${p[1]}` : 'adapter');
