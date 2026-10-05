@@ -3,7 +3,8 @@
  *  answer to "will ERR hand this segment over?".
  *
  *  Promoted out of `demo/flipper/` on 2026-09-08, where every one of these
- *  lived inline. Both `flipper` and `now` import it — a promotion that leaves
+ *  lived inline. `now` imported it too until it merged into `flipper` on
+ *  2026-10-05. A promotion that leaves
  *  the original as the only caller is not a promotion (LESSONS #30).
  *
  *  THREE FACTS THIS MODULE EXISTS TO CARRY, each paid for once already:
@@ -71,15 +72,42 @@ export const NATIVE_HLS = typeof window !== 'undefined'
  *  and it is what makes an absolute-wall-clock position domain possible at
  *  all: segment i covers `pdt + Σ EXTINF[0..i)`. `date` is the server's own
  *  clock off the response header, which is how a page can measure the
- *  visitor's clock without ever silently correcting it. */
-export async function readPlaylist(masterUrl) {
+ *  visitor's clock without ever silently correcting it.
+ *
+ *  🔴 PASS `variant` BACK IN TO REFRESH, OR EVERY REFRESH IS A NEW SESSION AT
+ *  ERR. MEASURED 2026-08-27 (`research/err-live-feeds-2026-08.md`): the master
+ *  mints a fresh `?id=<15 digits>` session on every fetch, a bare variant
+ *  answers 400 and a stale or foreign id answers `Failed to set session: not
+ *  found`. `/now/` used to re-read the master once a second to move its window,
+ *  which is 3600 sessions an hour per open tab in the books of a broadcaster
+ *  that has already said our traffic corrupts its audience figures. With
+ *  `variant` the master is skipped, and it is read again only when the variant
+ *  stops answering, which is what an expired session looks like.
+ *
+ *  🔴 A REFUSED PLAYLIST THROWS. It used to be parsed: a 400 body has no
+ *  `#EXTINF`, so a stale session came back as a playlist with no segments, no
+ *  PDT and a zero window, and every caller took that for a real answer.
+ *
+ *  `masterRead` says whether this call went to the master, so a page can
+ *  count sessions rather than claim it opens one. */
+export async function readPlaylist(masterUrl, { variant = null } = {}) {
   const t0 = performance.now();
-  const mres = await fetch(masterUrl, { cache: 'no-store' });
-  const master = await mres.text();
-  const variant = master.split(/\r?\n/).find((l) => l && !l.startsWith('#'));
-  if (!variant) throw new Error('master has no variant');
-  const plUrl = new URL(variant, masterUrl).href;
-  const pres = await fetch(plUrl, { cache: 'no-store' });
+  let plUrl = variant, pres = null, masterRead = false;
+  if (plUrl) {
+    pres = await fetch(plUrl, { cache: 'no-store' }).catch(() => null);
+    if (!pres?.ok) { pres = null; plUrl = null; }
+  }
+  if (!pres) {
+    const mres = await fetch(masterUrl, { cache: 'no-store' });
+    if (!mres.ok) throw new Error(`master ${mres.status}`);
+    masterRead = true;
+    const master = await mres.text();
+    const line = master.split(/\r?\n/).find((l) => l && !l.startsWith('#'));
+    if (!line) throw new Error('master has no variant');
+    plUrl = new URL(line, masterUrl).href;
+    pres = await fetch(plUrl, { cache: 'no-store' });
+    if (!pres.ok) throw new Error(`variant ${pres.status}`);
+  }
   const rtt = performance.now() - t0;
   const text = await pres.text();
   const lines = text.split(/\r?\n/);
@@ -88,21 +116,29 @@ export async function readPlaylist(masterUrl) {
   let dur = 0, pdt = null, mediaSeq = 0;
   for (const line of lines) {
     if (line.startsWith('#EXTINF:')) dur = Number(line.slice(8).split(',')[0]) || 0;
-    else if (line.startsWith('#EXT-X-PROGRAM-DATE-TIME:')) pdt = Date.parse(line.slice(25));
+    else if (line.startsWith('#EXT-X-PROGRAM-DATE-TIME:')) pdt ??= Date.parse(line.slice(25));
     else if (line.startsWith('#EXT-X-MEDIA-SEQUENCE:')) mediaSeq = Number(line.slice(22)) || 0;
     else if (line && !line.startsWith('#')) {
-      segs.push({ url: new URL(line, plUrl).href, durS: dur,
-                  sn: Number(line.match(/-(\d+)\.[a-z0-9]+$/)?.[1]) });
+      // 🔴 THE SEQUENCE NUMBER IS `MEDIA-SEQUENCE + index`, WHICH IS WHAT THE
+      // HLS SPEC SAYS AND WHAT hls.js CALLS `frag.sn`. It used to be read out
+      // of the file NAME with `/-(\d+)\.[a-z0-9]+$/`, which held for the
+      // stand-in's `seg-<sn>.ts` and is a guess about ERR's `.m4s` names: a
+      // name without that shape, or one carrying a `?id=`, gives NaN, and
+      // `/flipper/`'s jump to the newest served frame looks a fragment up by
+      // this number. Counting is right whatever the names are.
+      segs.push({ url: new URL(line, plUrl).href, durS: dur, sn: mediaSeq + segs.length });
       dur = 0;
     }
   }
   // start times, cumulative from the one PDT on the first segment
+  // (`??=` keeps the FIRST, so a playlist with a PDT on every segment would
+  // still be anchored at its head rather than two hours in the future)
   let acc = 0;
   for (const s of segs) { s.at = pdt == null ? null : pdt + acc * 1000; acc += s.durS; }
 
   const serverDate = Date.parse(pres.headers.get('date') || '');
   return {
-    url: plUrl, segs, mediaSeq, pdt,
+    url: plUrl, variant: plUrl, masterRead, segs, mediaSeq, pdt,
     windowS: acc,
     edge: pdt == null ? null : pdt + acc * 1000,   // newest instant offered
     // the server's clock, and the round trip it was learned over — a caller

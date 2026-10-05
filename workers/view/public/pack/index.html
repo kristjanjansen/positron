@@ -328,15 +328,19 @@
   //
   // 🔴 TABS, AND THE COUNTS ARE IN THEIR TITLES. Asked as *"patches and sessions
   // are in separte tabs"* and *"add num of patches / sessions to tab title"*.
-  // Typed uppercase though the stylesheet would do it, so the source reads like
-  // the page, which is the same rule `/kit/` states about its own headings.
+  // 🔴 SENTENCE CASE IN THE SOURCE SINCE SESSION 50 (2026-09-25), WHICH MADE
+  // tab labels sentence case on every page and let `.pos-tabs-t` decide how
+  // they render. It changed `label` here and left `one` and five asserts in
+  // capitals, so `/pack/` read 29/31 on a page that was working: the asserts
+  // compare `textContent`, which is the source string, never the rendered
+  // case. All of it is one case now, 2026-10-05.
   // ⚠️ A TAB IS `#links`, NEVER A SUBPAGE: a subpage is a navigation, and the
   // sound stops, the service worker hands over and an installed web app flashes
   // white. `tabs.mjs` owns that and this page does not have to think about it.
   const TABS = [
-    { id: 'patches', label: 'Patches', one: 'PATCH' },
-    { id: 'sessions', label: 'Sessions', one: 'SESSION' },
-    { id: 'samples', label: 'Samples', one: 'SAMPLE' },
+    { id: 'patches', label: 'Patches', one: 'Patch' },
+    { id: 'sessions', label: 'Sessions', one: 'Session' },
+    { id: 'samples', label: 'Samples', one: 'Sample' },
   ];
   const tabs = createTabs({ tabs: TABS });
   /**
@@ -2204,7 +2208,7 @@
   }
 
   d.assert('every tab keeps its bare word until it has something to count',
-    tabs.buttons.map((b) => b.textContent).join(' ') === 'PATCHES SESSIONS SAMPLES',
+    tabs.buttons.map((b) => b.textContent).join(' ') === 'Patches Sessions Samples',
     tabs.buttons.map((b) => b.textContent).join(' '));
 
   /**
@@ -2460,7 +2464,7 @@
         && samples[0].row.seconds === 0.1 && samples[1].row.seconds === 0.5
         && cells[0] === 'Kick.wav' && cells[1] === '0.10 s' && cells[4] === '0.60'
         && patches.length === 0 && sessions.length === 0
-        && tabs.buttons[2].textContent === '5 SAMPLES'
+        && tabs.buttons[2].textContent === '5 Samples'
         && tabs.enabled('samples') === true
         && tabs.enabled('patches') === false && tabs.enabled('sessions') === false
         && tabs.at() === 'samples'
@@ -2620,7 +2624,7 @@
       // ⚠️ THE COUNT LEADS, WHICH IS THE WHOLE OF THE CHANGE AND IS THE ONLY
       // PART OF IT A CHECK CAN SEE. It read `PATCHES 64` until 2026-09-21.
       d.assert('and the counts lead the tab titles',
-        tabs.buttons.map((b) => b.textContent).join(' ') === '64 PATCHES 32 SESSIONS 64 SAMPLES',
+        tabs.buttons.map((b) => b.textContent).join(' ') === '64 Patches 32 Sessions 64 Samples',
         tabs.buttons.map((b) => b.textContent).join(' '));
 
       d.assert('every patch in it lands in RAM rather than in flash',
@@ -3247,7 +3251,7 @@
         && away(whyRow) === false
         && /0 of 1 samples read, 1 refused/.test(said)
         && /did not read/.test(sampleTable.scroller().querySelector('.pos-tbl-row')?.title || '')
-        && tabs.buttons[2].textContent === '1 SAMPLE'
+        && tabs.buttons[2].textContent === '1 Sample'
         && tabs.enabled('samples') === true
         && tabs.enabled('patches') === false && tabs.enabled('sessions') === false,
         `${sampleTable.count()} row saying `
@@ -3324,7 +3328,7 @@
             && patches.length === 0 && sessions.length === 0
             && all.rates.length === 1 && all.rates[0] === 48000
             && all.seconds.toFixed(2) === '17.31'
-            && tabs.buttons.map((b) => b.textContent).join(' ').includes('64 SAMPLES'),
+            && tabs.buttons.map((b) => b.textContent).join(' ').includes('64 Samples'),
             `${samples.length} slots, ${empty} empty, ${all.seconds.toFixed(2)} s, `
             + `tabs "${tabs.buttons.map((b) => b.textContent).join(' ')}"`);
 
