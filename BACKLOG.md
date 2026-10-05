@@ -1,5 +1,6 @@
 ## Open
 
+- **Slides: diagram air and descriptions as slide text** (2026-10-05, screenshot of the Cloudflare slide): *"bit more space on top of diagram. do not use diagram native descs below but use slides text and postion"*. Larger gap above a diagram; box sub lines out of the diagram and set as slide text under each box column. Handed to the deck agent.
 - **Slides: no way-out button in full screen on a desktop** (2026-10-05): *"do not show back-from-fullscreen button in desktop"*. Hidden under `(hover: hover) and (pointer: fine)` in the deck module, kept on touch where it is the only way out. Handed to the deck agent.
 - **A real positron deck, in the background** (2026-10-05): *"in bg do some actual slides on positron"*. A full presentation on its own page (`/talk/`, unlisted) on the slides system, with `/slides/` kept as the reference for faces and the scale; the deck engine moves into a module both pages import.
 - **`diagram.mjs` colours only top-level box names in notes** (2026-10-05, found by the slides agent): `page`, `relay`, `synths` stay plain bold, so a slide word joined to an inner box has no hue to match; and box edges at 52 per cent mix read faint beside a strongly coloured word. Defect or unwritten rule, not decided.
