@@ -64,6 +64,10 @@
     color: var(--fg);
   }
   .sl-slide[hidden] { display: none; }
+  /* Used only by the self-check: every slide is laid out at once, unseen, so
+     eight faces at two widths are one synchronous layout each rather than a
+     frame per slide. Same weight as the rule above and after it. */
+  .sl-measure .sl-slide[hidden] { display: block; visibility: hidden; }
   /* The inset is on a box inside the slide and never on the slide itself,
      because a container's query units measure its CONTENT box. MEASURED with
      the padding on the slide: LARGE came out at 7.7 per cent of the slide
@@ -75,17 +79,16 @@
     padding: 7cqh 6cqw;
   }
 
-  /* THE TWO SIZES, AND THEY ARE FRACTIONS OF THE SLIDE'S OWN HEIGHT.
+  /* THE THREE SIZES, AND THEY ARE FRACTIONS OF THE SLIDE'S OWN HEIGHT.
      LARGE is 9 per cent of the slide's height: the 36 pt title of a 405 pt tall
      16:9 deck, four and a half times the 1/50 floor of the 8H rule. Every face
      is monospaced, so a line holds a fixed count of characters per face: 28 in
      the six at 0.6 em, 27 in Atkinson and 24 in Martian, MEASURED, and Martian
-     is what every headline is written to.
+     is what every headline, row and column is written to.
      EXTRA LARGE is twice that, 18 per cent, for one number or one short word.
-     SMALL is half of LARGE, 4.5 per cent, for a label under a specimen. */
+     SMALL is half of LARGE, 4.5 per cent, for the caption at the foot. */
   /* The face is a custom property on the panel, so the switcher changes one
-     declaration and every slide, full screen included, follows by inheritance.
-     A specimen column sets its own. */
+     declaration and every slide, full screen included, follows by inheritance. */
   .sl-l  { font: 600 9cqh/1.15 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
   .sl-xl { font: 600 18cqh/1 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
   .sl-s  { font: 400 4.5cqh/1.2 var(--sl-face, var(--mono)); letter-spacing: 0; margin: 0; }
@@ -106,27 +109,38 @@
   .sl-list { list-style: none; padding: 0; margin: 0; text-align: left; }
   .sl-list li { margin: 0; }
 
+  /* THE CAPTION, AT SMALL, IN THE CHOSEN FACE, PINNED BOTTOM LEFT. Asked with
+     a screenshot of the diagram slide: *"desc seems off. perhaps write it with
+     slide's smallest text font and align to bottom left?"*. It is the last
+     child of the column, so the evidence region above it shrinks to make room
+     and the caption's left and bottom edges ARE the inset; nothing is
+     positioned and no number says where the corner is. */
+  .sl-cap { flex: 0 0 auto; margin-top: 3cqh; align-self: stretch; text-align: left; color: var(--dim); }
+  .sl-cap a { color: inherit; text-decoration: underline; text-underline-offset: 0.15em; }
+
+  /* MONO DOING WHAT ONLY MONO CAN. A table here is lines of text padded with
+     spaces, so a column is a character position and lines up in every face
+     with no grid behind it. `white-space: pre` keeps the padding. */
+  .sl-rows { text-align: left; white-space: pre; }
+  .sl-rows > div { margin: 0; }
+  /* A stack of numbers: label left, figure right, the same count of decimals
+     in every row, so the decimal points fall in one column. `tabular-nums` is
+     the half that matters in a proportional face and is said anyway. */
+  .sl-stack {
+    display: grid; grid-template-columns: auto auto auto; column-gap: 0.6em;
+    align-items: baseline; text-align: left;
+  }
+  .sl-stack .sl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: pre; }
+  .sl-stack .sl-unit { color: var(--dim); font-weight: 400; }
+
   /* A canvas and a scaled component take the whole region and centre their
      own picture inside it, so they stretch rather than shrink to nothing. */
   .sl-ev canvas { display: block; width: 100%; height: 100%; object-fit: contain; align-self: stretch; }
 
-  /* The specimen: eight faces in two rows of four, the same letters in each
-     and the face's name under them. Eight columns of `Il1` at LARGE do not fit
-     a slide's width (Martian needs 2.1 em a column), so it is two rows, and
-     both pairs are at LARGE because EXTRA LARGE in two rows overflows the
-     height. */
-  .sl-spec {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-    column-gap: 2cqh; row-gap: 3cqh; align-self: stretch; text-align: center;
-  }
-  .sl-spec > div { min-width: 0; }
-  .sl-spec p { white-space: nowrap; }
-  .sl-spec .sl-name { margin-top: 1cqh; }
-  .sl-spec > [data-on] .sl-l { color: var(--hi); }
-
-  /* A component sized in px (a readout, a diagram) is laid out at a fixed
-     logical width and scaled to the region, the way a projector scales it.
-     The scale is a custom property the page writes, never the transform. */
+  /* A component sized in px (a readout, a diagram, a step grid) is laid out
+     at a fixed logical width and scaled to the region, the way a projector
+     scales it. The scale is a custom property the page writes, never the
+     transform. */
   .sl-fit { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; align-self: stretch; }
   .sl-fit-in {
     position: absolute; left: 0; top: 0;
@@ -135,13 +149,16 @@
     transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit-k, 1));
   }
   .sl-fit-in > .pos-dg { margin: 0; }
+  /* A picture over a stack on one slide: the picture takes what is left. */
+  .sl-ev > .sl-stack + .sl-fit, .sl-ev > .sl-fit + .sl-stack { margin-top: 3cqh; }
 
   /* Blank, the way a clicker's blank button asks for: the slide goes away and
      the panel stays. */
   .sl-panel .pos-vp-stage[data-blank] .sl-slide { visibility: hidden; }
 
-  /* Used only by the self-check, to lay the panel out at a phone's width
-     (375 less the 16 px gutters) without needing a phone. */
+  /* Used only by the self-check, to lay the panel out at the width it has in
+     a 1280 page and in a 375 page (less the 16 px gutters), without either. */
+  .sl-panel.sl-w686 { max-width: 686px; }
   .sl-panel.sl-narrow { max-width: 343px; }
 
   .sl-count {
@@ -156,6 +173,7 @@
   import { createStepper } from '/shell/stepper.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+  import { createStepGrid } from '/shell/step-grid.mjs';
   import { burn, videoHue, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
@@ -174,6 +192,8 @@
   // Each one is built the first time its slide is shown, because a box in a
   // hidden slide measures 0, and runs only while its slide is the one on
   // screen. None of them opens a connection: they are drawn from this page.
+  // Each returns { start, stop, value, subject }, and `windowMs` when its
+  // value moves slower than every frame, so the check knows how long to look.
 
   /** A component laid out at `w` logical px and scaled into `host`. */
   function fitBox(host, w) {
@@ -193,9 +213,10 @@
     };
     const ro = new ResizeObserver(fit);
     ro.observe(outer); ro.observe(inner);
-    return { inner, fit };
+    return { outer, inner, fit };
   }
 
+  /** The kit's own readout, measuring this screen. */
   function liveReadout(host) {
     const { inner } = fitBox(host, 360);
     const r = createReport({ readout: { fps: '', frames: '' }, showLog: false, joined: false });
@@ -224,6 +245,7 @@
     };
   }
 
+  /** The site's test picture, `pattern.mjs`, burning its clock row live. */
   function livePicture(host) {
     const c = el('canvas');
     c.width = FRAME_W; c.height = FRAME_H;
@@ -242,27 +264,38 @@
     };
   }
 
-  function liveDiagram(host) {
-    const { inner, fit } = fitBox(host, 600);
+  /** The machines, drawn by `diagram.mjs`, a lit box walking through them. */
+  function liveStack(host) {
+    const { inner, fit } = fitBox(host, 760);
     const dg = createDiagram(inner, {
       nodes: [
-        { id: 'br', label: 'Browser', sub: 'laptop or phone', kind: 'here', tech: 'browser',
+        { id: 'br', label: 'Browser', kind: 'here', tech: 'browser',
           children: [
-            { id: 'arr', label: 'slides', sub: 'array of objects', tech: 'browser',
-              note: 'Each slide is a headline sentence and, optionally, a function that builds a '
-                  + 'running element. Nothing is built for a slide nobody has reached.' },
-            { id: 'vp', label: 'video panel', sub: 'createVideoPanel', tech: 'browser',
-              note: 'The same panel a page plays video in. The slide is its picture, and '
-                  + 'previous and next sit in its footer.' },
+            { id: 'pg', label: 'page', sub: 'built from the kit', tech: 'browser',
+              note: 'Every demo is one HTML page that mounts the shell and the kit, and grades '
+                  + 'itself when the harness asks.' },
           ] },
-        { id: 'proj', label: 'projector', sub: 'HDMI, 16:9', tech: 'device',
-          note: 'Full screen hands the panel to the whole display. The slide keeps its 16:9 '
-              + 'shape and its type keeps its share of the slide height.' },
+        { id: 'cf', label: 'Cloudflare', tech: 'cloudflare', set: true,
+          children: [
+            // 1 to 2 ms: PROGRESS.md:3472, the DO hop MEASURED +1.0, +1.6 and
+            // +0.8 ms over three runs against the runtime's own ping.
+            { id: 'rl', label: 'relay', sub: 'Durable Object', tech: 'relay',
+              note: 'One **Durable Object** per room carries notes and sound between machines. '
+                  + 'The hop through it measured 1 to 2 ms.' },
+            { id: 'st', label: 'Stream', sub: 'LL-HLS, WHEP', tech: 'cloudflare',
+              note: 'Cloudflare Stream serves the same picture as **LL-HLS** and as **WHEP**, '
+                  + 'which is how the two were measured side by side.' },
+          ] },
+        { id: 'pi', label: 'Raspberry Pi', tech: 'raspberry',
+          children: [
+            { id: 'sy', label: 'synths', sub: 'Yoshimi, Circuit', tech: 'sound',
+              note: 'The board plays **Yoshimi** and the **Novation Circuit** and sends their '
+                  + 'sound back over the same room.' },
+          ] },
       ],
       links: [
-        { from: 'vp', to: 'proj', label: 'full screen',
-          note: 'The **Fullscreen API** where the browser has one, and a fixed cover where it '
-              + 'does not, which is every iPhone.' },
+        { from: 'pg', to: 'rl', label: 'notes', note: 'Note on and note off as small WebSocket messages.' },
+        { from: 'rl', to: 'sy', label: 'notes', note: 'The relay hands them to the board, which plays them.' },
       ],
     });
     requestAnimationFrame(fit);
@@ -276,22 +309,76 @@
       boxes[at].dataset.on = '1';
     };
     return {
-      start() { step(); timer = setInterval(step, 900); },
+      start() { step(); timer = setInterval(step, 700); },
       stop() { clearInterval(timer); timer = 0; },
       value: () => at,
       subject: () => dg.svg,
+      windowMs: 760,
       dg,
+    };
+  }
+
+  /**
+   * A stack of figures, label and number and unit per row. `rows` is
+   * [label, value, unit]; a value may be a string or, for a live stack, set
+   * later through the returned `set(i, text)`.
+   */
+  function stackOf(rows) {
+    const g = el('div', 'sl-stack sl-l');
+    const nums = [];
+    for (const [label, value, unit] of rows) {
+      const n = el('span', 'sl-num', value);
+      nums.push(n);
+      g.append(el('span', 'sl-dim', label), n, el('span', 'sl-unit', unit || ''));
+    }
+    return { el: g, nums, set: (i, t) => { nums[i].textContent = t; } };
+  }
+
+  /**
+   * A step grid from the kit at a tempo this slide made up, and the time each
+   * step lands behind its own mark, in ms, under it. The grid's clock is a
+   * frame clock (`step-grid.mjs`: the step is a function of the clock, read
+   * once a frame), so a step can only appear on the first frame after its
+   * time, and what the stack prints is how long after.
+   */
+  function liveSteps(host) {
+    const { inner } = fitBox(host, 480);
+    const strip = el('div');
+    inner.append(strip);
+    const grid = createStepGrid({
+      strip, rows: 2, steps: 16,
+      readOnly: true,
+      rate: { bpm: 120, whose: 'this slide, which made it up' },
+    });
+    for (const [r, s] of [[0, 0], [0, 4], [0, 8], [0, 12], [1, 2], [1, 6], [1, 10], [1, 14]]) grid.set(r, s, true, 'quiet');
+    const st = stackOf([['late', '0.00', 'ms'], ['worst', '0.00', 'ms']]);
+    host.append(st.el);
+    const ms = grid.clock.stepMs();
+    let t0 = 0, steps = 0, worst = 0;
+    grid.clock.onStep(() => {
+      const late = (performance.now() - t0) % ms;
+      steps++;
+      if (steps > 1 && late > worst) worst = late;
+      st.set(0, late.toFixed(2).padStart(5));
+      st.set(1, worst.toFixed(2).padStart(5));
+    });
+    return {
+      start() { steps = 0; worst = 0; t0 = performance.now(); grid.clock.play(); },
+      stop() { grid.clock.stop(); },
+      value: () => steps,
+      subject: () => st.el,
+      stack: st.el,
     };
   }
 
   // ── the faces ─────────────────────────────────────────────────────────────
   // Eight self-hosted monospaced faces, in the order the switcher steps them.
   // `id` is what the address carries (`?face=plex`), `name` is what the picker
-  // and the specimen show. The first is the default and plans/plan-slides.md
-  // section 9 says why.
+  // shows. The first is the default: JetBrains Mono since 2026-10-05, the
+  // owner's choice (*"jetbrains default"*), plans/plan-slides.md section 9.
   const FACES = [
-    { id: 'atkinson',  name: 'Atkinson',    family: 'SL Atkinson Hyperlegible Mono' },
     { id: 'jetbrains', name: 'JetBrains',   family: 'SL JetBrains Mono' },
+    { id: 'atkinson',  name: 'Atkinson',    family: 'SL Atkinson Hyperlegible Mono' },
     { id: 'geist',     name: 'Geist',       family: 'SL Geist Mono' },
     { id: 'plex',      name: 'Plex',        family: 'SL IBM Plex Mono' },
     { id: 'intel',     name: 'Intel One',   family: 'SL Intel One Mono' },
@@ -299,27 +386,132 @@
     { id: 'source',    name: 'Source Code', family: 'SL Source Code Pro' },
     { id: 'martian',   name: 'Martian',     family: 'SL Martian Mono' },
   ];
-  const stackOf = (f) => `'${f.family}', var(--mono)`;
-  // What the specimen sets in every face: the pairs a back row confuses first.
-  const SPEC = ['0O', 'Il1'];
+  const faceStack = (f) => `'${f.family}', var(--mono)`;
 
-  // ── the deck ──────────────────────────────────────────────────────────────
-  // `say` is the headline, one sentence and no full stop. `big` is one number
-  // or word at EXTRA LARGE. `list` is up to three short lines at LARGE.
-  // `live` builds a running element into the evidence region and returns
-  // { start, stop, value }. `name` is what the log and the hash use.
+  // ── the talk ──────────────────────────────────────────────────────────────
+  // `say` is the headline: one sentence, no full stop, no colon, semicolon,
+  // dash or middot, two lines in every face (asserted). What proves it is ONE
+  // of: `big` (one figure at EXTRA LARGE), `list` (up to three lines at
+  // LARGE), `rows` (a table of text padded into character columns), `stack`
+  // (figures whose decimal points line up) or `live` (a running part).
+  // `cap` is the caption at SMALL, bottom left, and `link` the slug it points
+  // at, written out as a full URL. A link is not a fetch.
+  //
+  // 🔴 EVERY NUMBER ON A SLIDE IS A MEASURED ONE, AND ITS SOURCE IS THE
+  // COMMENT ABOVE IT. A number with no comment is a defect.
+  //
+  // `rows` is { head, body, align }: `align` is one letter a column, l or r,
+  // and the widths are worked out from the longest cell, so a column is a
+  // character position. Rows are written to Martian's 24 characters.
   const SLIDES = [
-    { name: 'one thing',
-      say: 'A slide says one thing, in one sentence',
-      list: ['two lines at most', 'evidence under it', 'three seconds to read'] },
-    { name: 'back row',
-      say: 'Text must be big enough for the back row',
-      big: '1/50', under: 'of the screen height' },
-    { name: 'readout', say: 'The readout is live, measuring this screen', live: liveReadout },
-    { name: 'picture', say: 'The test picture draws itself, frame by frame', live: livePicture },
-    { name: 'panel', say: 'A slide sits in a panel that fills the screen', live: liveDiagram },
-    { name: 'faces', say: 'Eight faces, all mono', specimen: true },
+    // ── what this is ──
+    // 46 rows and 44 built: CLAUDE.md's count command over the manifest, run
+    // 2026-10-05, printed `46 44`. Counted, never remembered. (The command is
+    // not quoted here because the build reads an import in a comment as real.)
+    { name: 'lab', say: 'Positron is a lab for live media in a browser',
+      big: '44', cap: 'demos built, of 46 in the manifest', link: '' },
+    { name: 'machines', say: 'Cloudflare carries the streams in between',
+      live: liveStack, cap: 'what runs where, drawn by the site itself', link: 'patchbay' },
+
+    // ── what it measured ──
+    // 600 of 600: positron-ui SKILL.md, "The test picture": burn then
+    // readBurned, 600/600 exact through three moves of the clock row.
+    { name: 'clock', say: 'Latency is read off a clock burned into pixels',
+      live: livePicture, cap: 'the test picture, live, its clock read 600 of 600', link: 'webrtc' },
+    // PROGRESS.md:4712-4719, both browser to Cloudflare to browser, burned
+    // pixels: MoQ p50 26.2 / p95 42.4 / p99 104.8 ms (n=2740, PROGRESS.md:6624),
+    // WHEP p50 67.0 / p95 76.9 / p99 84.1 ms (n=17,501, PROGRESS.md:4712).
+    { name: 'transports', say: 'MoQ wins the middle and WebRTC wins the tail',
+      rows: { head: ['', 'p50', 'p95', 'p99'],
+        body: [['MoQ', '26.2', '42.4', '104.8'], ['WHEP', '67.0', '76.9', '84.1']], align: 'lrrr' },
+      cap: 'ms from frame drawn to frame shown, p50 the median', link: 'moq' },
+    // plans/plan.md:54-57, `hls.latency` behind the live edge, two runs, same
+    // stream, same configuration: stock 7.60 and 15.41 s, with the seek
+    // correction 1.87 and 3.05 s.
+    { name: 'llhls', say: 'Stock hls.js parks where its start left it',
+      stack: [['stock, run A', '7.60', 's'], ['stock, run B', '15.41', 's'],
+        ['tuned, run A', '1.87', 's'], ['tuned, run B', '3.05', 's']],
+      cap: 'behind live, same stream, same settings', link: 'llhls' },
+    // plans/plan-away-webrtc.md:212-214, laptop and Pi on one network: key
+    // press to speakers ~175 ms over the relay, ~48 ms over a direct WebRTC
+    // data channel. Another network is NOT measured (:216-217), which the
+    // caption says.
+    { name: 'pi', say: 'Playing the Pi directly skips the relay',
+      big: '48 ms', cap: 'key to speakers, was 175, one network so far', link: 'away' },
+    // research/circuit-archive-2026-09-21.md:253-256: 3 sessions with no note
+    // events and 29 with, so 32; plans/plan-circuit-editor.md:65: 64 patches,
+    // all 350 bytes.
+    { name: 'circuit', say: 'The Circuit holds 29 sessions of real work',
+      rows: { body: [['sessions', '32'], ['with notes', '29'], ['patches', '64'], ['bytes each', '350']],
+        align: 'lr' },
+      cap: 'read from the backup file, no device needed', link: 'circuit' },
+    // Live: lateness is measured on this screen as it runs, nothing quoted.
+    { name: 'frames', say: 'A step on screen waits for the next frame',
+      live: liveSteps, cap: 'ms each step lands behind its own time, here', link: 'time' },
+    // HANDOFF.md:133-135, AHEAD on /sync/: a peer 137 ms fast over a 20 ms
+    // hop, offset found to 0.00 ms, beats a median 1.8 ms apart (worst 6.9).
+    { name: 'clocks', say: 'Two clocks agree once the offset is measured',
+      big: '1.8 ms', cap: 'median gap between beats, one peer 137 ms fast', link: 'sync' },
+
+    // ── how it is built ──
+    // 167: `ls demo/shell/*.mjs | wc -l`, 2026-10-05.
+    { name: 'kit', say: 'Every demo is built from one kit of parts',
+      live: liveReadout, cap: 'a readout from the kit, 167 modules in it', link: 'kit' },
+    // positron-verify SKILL.md:29 (radio 48/48, zero bytes from anybody's
+    // radio), :70 (tapes 39/39, only the dev server and the stand-in), :90-92
+    // (now and flipper together 52/52, only the dev server and the stand-in).
+    { name: 'stand-ins', say: 'A stand-in replaces somebody else\'s server',
+      rows: { body: [['radio', '48/48'], ['tapes', '39/39'], ['flipper, now', '52/52']], align: 'lr' },
+      cap: 'checks passed, nothing asked of the real server', link: 'tapes' },
+    // HANDOFF.md:190 (route-core JS 115/115, C 98/98), :191 (rp2040js
+    // emulator, the router, 45 PASS), :180-181 (the Pico 2 W has run nothing).
+    { name: 'pico', say: 'The Pico router runs the routing core in C',
+      rows: { body: [['core in JS', '115/115'], ['core in C', '98/98'], ['emulated Pico', '45 pass']],
+        align: 'lr' },
+      cap: 'the board itself has run nothing yet', link: 'kit/#hardware' },
+
+    // ── what it learned ──
+    // positron-streaming SKILL.md:228-230, a 13 point sweep of each 2 h window
+    // on 2026-09-06: etv refused its newest ~45 min, etv2 its oldest ~78 min,
+    // etvpluss nothing. The 2 h is plans/plan-live-timeline.md:42, 3750
+    // segments of 1.92 s.
+    { name: 'refusals', say: 'ERR refuses live TV by programme, not age',
+      rows: { body: [['etv', 'newest 45 min'], ['etv2', 'oldest 78 min'], ['etvpluss', 'none']], align: 'll' },
+      cap: 'refused part of each 2 h window, 13 points', link: 'flipper' },
+    // positron-verify SKILL.md:78-80: a stand-in serving silence still read
+    // 38/38 on /tapes/, a hole found only by breaking the stand-in.
+    { name: 'sabotage', say: 'A check counts only once it has failed',
+      big: '38/38', cap: 'still green with every recording silent', link: 'tapes' },
+    // research/cf-models-speech-to-patch-2026-09-21.md:243-244: Workers AI,
+    // llama 3.3 70B, a patch from a sentence: loose schema 1.6 s, one branch
+    // per operation 10.2 to 11.6 s and looping until the tokens ran out.
+    { name: 'schema', say: 'The model was faster with a loose schema',
+      stack: [['loose', '1.6', 's'], ['strict', '10.2', 's']],
+      cap: 'Workers AI proposing patch links from a sentence', link: 'patchbay' },
+
+    // ── what is next ──
+    // HANDOFF.md:165-167 (flashing the real Pico 2 W, the Formanta click
+    // test) and plans/plan-away-webrtc.md:216-217 (another network unmeasured).
+    { name: 'next', say: 'Next is the hardware nobody has run yet',
+      list: ['flash the Pico 2 W', 'Pi on another network', 'a drum machine click'],
+      cap: 'carried over in the handoff', link: '' },
   ];
+
+  /** Pad `rows` into lines of text whose columns are character positions. */
+  function padRows({ head, body, align }) {
+    const all = head ? [head, ...body] : body;
+    const n = Math.max(...all.map((r) => r.length));
+    const w = Array.from({ length: n }, (_, c) => Math.max(...all.map((r) => String(r[c] ?? '').length)));
+    const gap = '  ';
+    const line = (r) => w.map((cw, c) => {
+      const t = String(r[c] ?? '');
+      return align[c] === 'r' ? t.padStart(cw) : t.padEnd(cw);
+    }).join(gap).replace(/\s+$/, '');
+    // Where each column starts, in characters, and where it ends.
+    const starts = []; let x = 0;
+    for (const cw of w) { starts.push(x); x += cw + gap.length; }
+    return { lines: all.map(line), starts, widths: w, head: !!head };
+  }
 
   const nodes = SLIDES.map((s, i) => {
     const node = el('section', 'sl-slide', null, { 'aria-label': `slide ${i + 1}`, 'aria-roledescription': 'slide' });
@@ -328,28 +520,36 @@
     node.append(box);
     box.append(el('h2', 'sl-l sl-say', s.say));
     const ev = el('div', 'sl-ev');
+    let table = null, stack = null;
     if (s.list) {
       const ul = el('ul', 'sl-list sl-l sl-dim');
       for (const t of s.list) ul.append(el('li', '', t));
       ev.append(ul);
     }
-    if (s.big) {
-      ev.append(el('p', 'sl-xl sl-big', s.big));
-      if (s.under) ev.append(el('p', 'sl-l sl-dim', s.under));
+    if (s.big) ev.append(el('p', 'sl-xl sl-big', s.big));
+    if (s.rows) {
+      const p = padRows(s.rows);
+      table = el('div', 'sl-rows sl-l');
+      p.lines.forEach((t, r) => table.append(el('div', r === 0 && p.head ? 'sl-dim' : '', t)));
+      table.layout = p;
+      table.align = s.rows.align;
+      ev.append(table);
     }
-    if (s.specimen) {
-      const grid = el('div', 'sl-spec');
-      for (const f of FACES) {
-        const col = el('div', '', null, { title: f.family.replace(/^SL /, '') });
-        col.dataset.face = f.id;
-        col.style.setProperty('--sl-face', stackOf(f));
-        col.append(...SPEC.map((t) => el('p', 'sl-l', t)), el('p', 'sl-s sl-dim sl-name', f.name));
-        grid.append(col);
-      }
-      ev.append(grid);
+    if (s.stack) {
+      stack = stackOf(s.stack).el;
+      ev.append(stack);
     }
     box.append(ev);
-    return { spec: s, node, box, ev, ctl: null };
+    let cap = null;
+    if (s.cap) {
+      cap = el('p', 'sl-s sl-cap', s.cap);
+      if (s.link !== undefined) {
+        const url = `https://positron.studio/${s.link}${s.link && !s.link.includes('#') ? '/' : ''}`;
+        cap.append(el('br'), el('a', '', url, { href: url }));
+      }
+      box.append(cap);
+    }
+    return { spec: s, node, box, ev, cap, table, stack, ctl: null };
   });
 
   const stepper = createStepper({ prev: () => go(at - 1), next: () => go(at + 1), what: 'slide' });
@@ -369,10 +569,7 @@
   let face = FACES.find((f) => f.id === new URLSearchParams(location.search).get('face')) || FACES[0];
   function setFace(f, quiet = false) {
     face = f;
-    panel.el.style.setProperty('--sl-face', stackOf(f));
-    for (const col of panel.stage.querySelectorAll('.sl-spec > div')) {
-      if (col.dataset.face === f.id) col.dataset.on = '1'; else delete col.dataset.on;
-    }
+    panel.el.style.setProperty('--sl-face', faceStack(f));
     const u = new URL(location.href);
     if (f === FACES[0]) u.searchParams.delete('face'); else u.searchParams.set('face', f.id);
     history.replaceState(null, '', u);
@@ -430,7 +627,7 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-    if (t && t.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;
+    if (t && /^(BUTTON|A)$/.test(t.tagName) && (e.key === ' ' || e.key === 'Enter')) return;
     let did = true;
     if (NEXT.has(e.key)) go(at + 1);
     else if (PREV.has(e.key)) go(at - 1);
@@ -442,8 +639,10 @@
     if (did) e.preventDefault();
   });
 
-  const fromHash = Number((location.hash.match(/^#(\d+)$/) || [])[1]) || 1;
-  go(fromHash - 1);
+  const fromHash = () => Number((location.hash.match(/^#(\d+)$/) || [])[1]) || 1;
+  go(fromHash() - 1);
+  // A typed or linked `#7` lands on slide 7 without a reload.
+  addEventListener('hashchange', () => go(fromHash() - 1));
 
   window.__demo.slides = {
     count: SLIDES.length, index: () => at, go, blank, names: SLIDES.map((s) => s.name),
@@ -464,10 +663,60 @@
   const px = (node, prop = 'font-size') => parseFloat(getComputedStyle(node).getPropertyValue(prop));
   const key = (k) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
 
+  /** The x of one character's left or right edge, from the text itself. */
+  const charX = (elm, i, side = 'left') => {
+    const t = elm.firstChild;
+    if (!t || t.nodeType !== 3 || i < 0 || i >= t.length) return NaN;
+    const r = document.createRange();
+    r.setStart(t, i); r.setEnd(t, i + 1);
+    return r.getBoundingClientRect()[side];
+  };
+  const spread = (xs) => Math.max(...xs) - Math.min(...xs);
+
+  /**
+   * Every column of a padded table, measured from the glyphs. A left column is
+   * its first character's left edge, a right column its last character's
+   * right edge, and a figure with a decimal point is that point's left edge.
+   * Returns the worst spread in px and what it was.
+   */
+  function tableSpread(n) {
+    const rows = [...n.table.children];
+    const { starts, widths, head } = n.table.layout;
+    let worst = 0, what = '';
+    starts.forEach((s, c) => {
+      const right = n.table.align[c] === 'r';
+      const xs = [], dots = [];
+      rows.forEach((row, r) => {
+        const txt = row.textContent;
+        const cell = txt.slice(s, s + widths[c]);
+        if (!cell.trim()) return;
+        const i = right ? s + widths[c] - 1 : s + cell.search(/\S/);
+        // a left column is compared at its own start, which is `s` only
+        // where the cell is not indented; padEnd never indents
+        xs.push(charX(row, right ? i : s, right ? 'right' : 'left'));
+        const dot = cell.indexOf('.');
+        if (!(head && r === 0) && dot >= 0) dots.push(charX(row, s + dot));
+      });
+      for (const [list, kind] of [[xs, right ? 'right edge' : 'left edge'], [dots, 'decimal point']]) {
+        if (list.length < 2) continue;
+        const sp = spread(list);
+        if (!(sp <= worst)) { worst = sp; what = `column ${c + 1} ${kind}`; }
+      }
+    });
+    return { worst, what };
+  }
+
+  /** The decimal points of a stack of figures, from the glyphs. */
+  function stackSpread(stackEl) {
+    const xs = [...stackEl.querySelectorAll('.sl-num')].map((nEl) => charX(nEl, nEl.textContent.indexOf('.')));
+    return { worst: spread(xs), n: xs.length, nan: xs.some((x) => Number.isNaN(x)) };
+  }
+
   async function check() {
     const A = d.assert;
-    // Every face in before counting requests, because the specimen slide and
-    // the switcher fetch the seven that were not chosen, from this origin.
+    const t0 = performance.now();
+    // Every face in before counting requests, because the switcher fetches
+    // the seven that were not chosen, from this origin.
     const loaded = await Promise.all(FACES.map((f) => Promise.all([
       document.fonts.load(`600 20px '${f.family}'`), document.fonts.load(`400 20px '${f.family}'`)])));
     const missing = FACES.filter((f, i) => !loaded[i].every((l) => l.length)
@@ -477,9 +726,22 @@
     const resBefore = performance.getEntriesByType('resource')
       .filter((r) => new URL(r.name).pathname !== '/_log').length;
 
-    A('the deck has six slides and the panel holds six',
-      SLIDES.length === 6 && panel.stage.querySelectorAll('.sl-slide').length === 6,
+    const noFace = new URLSearchParams(location.search).get('face');
+    const famNow = getComputedStyle(nodes[0].node.querySelector('.sl-say')).fontFamily;
+    A('with no face in the address the talk is set in JetBrains Mono',
+      FACES[0].id === 'jetbrains' && (noFace !== null || famNow.includes('JetBrains Mono')),
+      `${noFace ?? 'no ?face'}, ${famNow}`);
+
+    A('the talk is 12 to 16 slides and the panel holds every one',
+      SLIDES.length >= 12 && SLIDES.length <= 16 && panel.stage.querySelectorAll('.sl-slide').length === SLIDES.length,
       `${SLIDES.length} declared, ${panel.stage.querySelectorAll('.sl-slide').length} drawn`);
+
+    // The wording rules, read off the deck itself.
+    // A dot inside a name (`hls.js`) is not a full stop; one at the end is.
+    const badSay = SLIDES.filter((s) => /[:;\u2014\u2013\u00b7]|\s-\s|\.$|\.\s/.test(s.say));
+    const badAny = SLIDES.filter((s) => /[\u2014\u00b7]/.test([s.say, s.cap, ...(s.list || [])].join(' ')));
+    A('no headline carries a colon, semicolon, dash, middot or full stop, and nothing carries an em dash or middot',
+      badSay.length === 0 && badAny.length === 0, [...badSay, ...badAny].map((s) => s.name).join(', ') || `${SLIDES.length} clean`);
 
     go(0);
     const [prevB] = stepper.buttons, nextB = stepper.buttons[stepper.buttons.length - 1];
@@ -502,87 +764,128 @@
     for (const k of ['ArrowRight', 'PageDown', ' ', 'ArrowLeft', 'PageUp', 'End', 'Home', 'ArrowDown', 'ArrowUp']) {
       key(k); seen.push(at);
     }
+    const last = SLIDES.length - 1;
     A('arrows, PageUp and PageDown, space, Home and End all move the deck',
-      seen.join() === '1,2,3,2,1,5,0,1,0', seen.join());
+      seen.join() === `1,2,3,2,1,${last},0,1,0`, seen.join());
     go(2);
     A('the address carries the slide, so a reload lands on it', location.hash === '#3', location.hash);
 
-    // The two sizes, measured against the slide's own height.
+    // Every live element is built once, by showing its slide, so the measuring
+    // pass below has every box to measure.
+    for (let i = 0; i < SLIDES.length; i++) go(i);
+
+    // The two big sizes, measured against the slide's own height.
     go(0); await frame();
     const s0 = nodes[0].node, h0 = s0.getBoundingClientRect().height;
     const L = px(s0.querySelector('.sl-say'));
     A('LARGE renders at 9 per cent of the slide height',
       Math.abs(L - 0.09 * h0) < 0.5, `${L.toFixed(2)} px in a ${h0.toFixed(1)} px slide at ${innerWidth} px wide`);
-    go(1); await frame();
-    const s1 = nodes[1].node, h1 = s1.getBoundingClientRect().height;
-    const XL = px(s1.querySelector('.sl-xl'));
+    const XL = px(s0.querySelector('.sl-xl'));
     A('EXTRA LARGE renders at 18 per cent of the slide height',
-      Math.abs(XL - 0.18 * h1) < 0.5, `${XL.toFixed(2)} px in a ${h1.toFixed(1)} px slide`);
+      Math.abs(XL - 0.18 * h0) < 0.5, `${XL.toFixed(2)} px in a ${h0.toFixed(1)} px slide`);
     const vp = panel.stage.getBoundingClientRect();
     A('in the page the slide is the panel picture, 16:9 and edge to edge',
-      Math.abs(h1 - vp.height) < 1 && Math.abs(s1.getBoundingClientRect().width - vp.width) < 1,
-      `slide ${s1.getBoundingClientRect().width.toFixed(1)} x ${h1.toFixed(1)}, stage ${vp.width.toFixed(1)} x ${vp.height.toFixed(1)}`);
+      Math.abs(h0 - vp.height) < 1 && Math.abs(s0.getBoundingClientRect().width - vp.width) < 1,
+      `slide ${s0.getBoundingClientRect().width.toFixed(1)} x ${h0.toFixed(1)}, stage ${vp.width.toFixed(1)} x ${vp.height.toFixed(1)}`);
 
-    // Every slide in every face: two lines of headline at most, and nothing
-    // past its inset on any side. The budget is measured per face: the mean
-    // advance of the deck's own headlines at LARGE, into the inset width.
-    const was = face, perFace = [], spill = [], budgets = [];
+    // ── the measuring pass: every slide, every face, two widths ──
+    // Every slide is laid out at once, unseen, so each face at each width is
+    // one synchronous layout. A frame was spent per slide per face before, and
+    // sixteen slides in eight faces would not fit the harness's boot wait.
+    const was = face, wasAt = at;
+    const tm = performance.now();
     const meas = document.createElement('canvas').getContext('2d');
-    for (const f of FACES) {
-      await setFace(f, true); await frame();
-      const lines = [];
-      for (let i = 0; i < SLIDES.length; i++) {
-        // One frame, not two: reading a rect forces layout, and eight faces
-        // at two frames a slide pushed the page past the harness's boot wait.
-        go(i); await frame();
-        const n = nodes[i].node, say = n.querySelector('.sl-say');
-        const lh = px(say, 'line-height');
-        lines.push(Math.round(say.getBoundingClientRect().height / lh));
-        const r = nodes[i].box.getBoundingClientRect(), cs = getComputedStyle(nodes[i].box);
-        const inL = r.left + parseFloat(cs.paddingLeft), inR = r.right - parseFloat(cs.paddingRight);
-        const inB = r.bottom - parseFloat(cs.paddingBottom);
-        for (const c of n.querySelectorAll('.sl-say, .sl-ev > *, .sl-spec p')) {
-          const b = c.getBoundingClientRect();
-          if (b.bottom > inB + 1 || b.left < inL - 1 || b.right > inR + 1
-            || c.scrollWidth > c.clientWidth + 1) spill.push(`${f.id} ${i + 1}`);
+    const widths = [['sl-w686', 'a 1280 page'], ['sl-narrow', 'a 375 page']];
+    const R = Object.fromEntries(widths.map(([, w]) => [w, {
+      lines: [], spill: [], capOff: [], capFace: [], off: [], cols: [], dots: [], budgets: [],
+    }]));
+    panel.stage.classList.add('sl-measure');
+    for (const [cls, w] of widths) {
+      panel.el.classList.add(cls);
+      await frame(); await frame();   // the fitted pictures re-fit on resize
+      const r = R[w];
+      r.panel = Math.round(panel.el.getBoundingClientRect().width);
+      for (const f of FACES) {
+        setFace(f, true);
+        const lines = [];
+        for (let i = 0; i < SLIDES.length; i++) {
+          const n = nodes[i], say = n.node.querySelector('.sl-say');
+          const h = n.node.getBoundingClientRect().height;
+          lines.push(Math.round(say.getBoundingClientRect().height / px(say, 'line-height')));
+          const b0 = n.box.getBoundingClientRect(), cs = getComputedStyle(n.box);
+          const inL = b0.left + parseFloat(cs.paddingLeft), inR = b0.right - parseFloat(cs.paddingRight);
+          const inB = b0.bottom - parseFloat(cs.paddingBottom), inT = b0.top + parseFloat(cs.paddingTop);
+          for (const c of n.node.querySelectorAll('.sl-say, .sl-ev > *, .sl-cap, .sl-rows > div, .sl-stack > *')) {
+            const b = c.getBoundingClientRect();
+            if (b.bottom > inB + 1 || b.top < inT - 1 || b.left < inL - 1 || b.right > inR + 1
+              || c.scrollWidth > c.clientWidth + 1) r.spill.push(`${f.id} ${n.spec.name}`);
+          }
+          // The caption: SMALL, the chosen face, its left and bottom edges on
+          // the inset.
+          if (n.cap) {
+            const b = n.cap.getBoundingClientRect();
+            const size = px(n.cap);
+            if (Math.abs(b.left - inL) > 2 || Math.abs(b.bottom - inB) > 2 || Math.abs(size - 0.045 * h) > 0.5) {
+              r.capOff.push(`${f.id} ${n.spec.name} left ${(b.left - inL).toFixed(1)} bottom ${(b.bottom - inB).toFixed(1)} size ${size.toFixed(2)}`);
+            }
+            if (!getComputedStyle(n.cap).fontFamily.includes(f.family)) r.capFace.push(`${f.id} ${n.spec.name}`);
+          }
+          // What is under a headline sits in the middle of the inset.
+          const sub = n.ctl?.subject?.() || n.ev.querySelector('.sl-list, .sl-big, .sl-rows, .sl-stack');
+          if (sub) {
+            const b = sub.getBoundingClientRect();
+            r.off.push([n.spec.name, Math.abs((b.left + b.right) / 2 - (inL + inR) / 2)]);
+          } else r.off.push([n.spec.name, NaN]);
+          // The character columns and the decimal points, from the glyphs.
+          if (n.table) {
+            const t = tableSpread(n);
+            r.cols.push([`${f.id} ${n.spec.name} ${t.what}`, t.worst]);
+          }
+          const st = n.stack || n.ctl?.stack;
+          if (st) {
+            const s = stackSpread(st);
+            r.dots.push([`${f.id} ${n.spec.name}`, s.nan ? NaN : s.worst, s.n]);
+          }
+          if (i === 0) {
+            meas.font = `600 ${px(say)}px '${f.family}'`;
+            const adv = meas.measureText('0').width;
+            r.budgets.push(`${f.id} ${Math.floor((inR - inL) / adv)}`);
+          }
         }
-        if (i === 0) {
-          meas.font = `600 ${px(say)}px '${f.family}'`;
-          const text = SLIDES.map((s) => s.say).join(' ');
-          budgets.push(`${f.id} ${Math.floor((inR - inL) / (meas.measureText(text).width / text.length))}`);
-        }
+        r.lines.push(`${f.id} ${lines.join('')}`);
       }
-      perFace.push(`${f.id} ${lines.join('')}`);
+      panel.el.classList.remove(cls);
     }
+    panel.stage.classList.remove('sl-measure');
     await setFace(was, true);
-    d.log(`characters a LARGE line holds: ${budgets.join(', ')}`);
-    A('every headline is two lines or fewer, in all eight faces',
-      perFace.every((p) => /^\S+ [12]+$/.test(p)), `${perFace.join(', ')}; budget a line ${budgets.join(', ')}`);
-    A('nothing on any slide runs past its inset, in any face', spill.length === 0, spill.join(', ') || 'all inside');
+    go(wasAt);
+    await frame();
+    d.log(`measuring pass ${(performance.now() - tm).toFixed(0)} ms; characters a LARGE line holds at ${widths[0][1]}: ${R[widths[0][1]].budgets.join(', ')}`);
 
-    // What is under a headline sits in the middle of the slide's inset, at a
-    // desk width and at a phone's.
-    const subjectOf = (n) => n.ctl?.subject?.() || n.ev.querySelector('.sl-list, .sl-big, .sl-spec');
-    const centring = async (label) => {
-      const off = [];
-      for (let i = 0; i < SLIDES.length; i++) {
-        go(i); await frame(); await frame(); await frame();
-        const sub = subjectOf(nodes[i]);
-        if (!sub) { off.push(`${i + 1} none`); continue; }
-        const r = nodes[i].box.getBoundingClientRect(), cs = getComputedStyle(nodes[i].box);
-        const mid = (r.left + parseFloat(cs.paddingLeft) + r.right - parseFloat(cs.paddingRight)) / 2;
-        const b = sub.getBoundingClientRect();
-        off.push(Math.abs((b.left + b.right) / 2 - mid));
-      }
-      return { label, off, ok: off.every((o) => typeof o === 'number' && o <= 2) };
-    };
-    const wide = await centring(`${Math.round(panel.el.getBoundingClientRect().width)} px panel`);
-    panel.el.classList.add('sl-narrow'); await frame(); await frame();
-    const narrow = await centring(`${Math.round(panel.el.getBoundingClientRect().width)} px panel`);
-    panel.el.classList.remove('sl-narrow'); await frame();
-    for (const c of [wide, narrow]) {
-      A(`everything under a headline is centred in the slide within 2 px, ${c.label}`, c.ok,
-        c.off.map((o, i) => `${SLIDES[i].name} ${typeof o === 'number' ? o.toFixed(1) : o}`).join(', '));
+    for (const [, w] of widths) {
+      const r = R[w], tag = `in ${r.panel} px, the panel in ${w}`;
+      A(`every headline is two lines or fewer in all eight faces, ${tag}`,
+        r.lines.every((p) => /^\S+ [12]+$/.test(p)), r.lines.join(', '));
+      A(`nothing on any slide runs past its inset in any face, ${tag}`, r.spill.length === 0,
+        [...new Set(r.spill)].join(', ') || 'all inside');
+      A(`every caption is SMALL, in the chosen face, its left and bottom edges on the inset within 2 px, ${tag}`,
+        r.capOff.length === 0 && r.capFace.length === 0,
+        [...r.capOff, ...r.capFace.map((x) => `${x} wrong face`)].slice(0, 6).join(', ')
+          || `${nodes.filter((n) => n.cap).length} captions in ${FACES.length} faces`);
+      const offBad = r.off.filter(([, o]) => !(o <= 2));
+      A(`everything under a headline is centred in the slide within 2 px, ${tag}`, offBad.length === 0,
+        offBad.length ? offBad.slice(0, 6).map(([nm, o]) => `${nm} ${Number.isNaN(o) ? 'none' : o.toFixed(1)}`).join(', ')
+          : `worst ${Math.max(...r.off.map(([, o]) => o)).toFixed(2)} px over ${r.off.length}`);
+      const colBad = r.cols.filter(([, s]) => !(s <= 0.5));
+      A(`every character column in every table lines up within 0.5 px in all eight faces, ${tag}`,
+        r.cols.length >= FACES.length * 3 && colBad.length === 0,
+        colBad.length ? colBad.slice(0, 4).map(([k, s]) => `${k} ${s.toFixed(2)}`).join(', ')
+          : `${r.cols.length} tables, worst ${Math.max(...r.cols.map(([, s]) => s)).toFixed(2)} px`);
+      const dotBad = r.dots.filter(([, s]) => !(s <= 0.5));
+      A(`every stack of figures has its decimal points within 0.5 px in all eight faces, the live one included, ${tag}`,
+        r.dots.length >= FACES.length * 3 && dotBad.length === 0,
+        dotBad.length ? dotBad.slice(0, 4).map(([k, s]) => `${k} ${Number.isNaN(s) ? 'unread' : s.toFixed(2)}`).join(', ')
+          : `${r.dots.length} stacks, worst ${Math.max(...r.dots.map(([, s]) => s)).toFixed(2)} px`);
     }
     const left = nodes.every((n) => getComputedStyle(n.node.querySelector('.sl-say')).textAlign !== 'center');
     A('and the headline itself stays left aligned', left);
@@ -592,10 +895,10 @@
     await pickFace(FACES.indexOf(plex)); await frame();
     const inUrl = new URLSearchParams(location.search).get('face');
     const fam = getComputedStyle(nodes[0].node.querySelector('.sl-say')).fontFamily;
-    const specOn = panel.stage.querySelector('.sl-spec > [data-on]')?.dataset.face;
+    const capFam = getComputedStyle(nodes[0].cap).fontFamily;
     await pickFace(FACES.indexOf(was), true); await frame();
-    A('picking a face puts it in the address and every slide and the specimen follow',
-      inUrl === 'plex' && fam.includes('IBM Plex Mono') && specOn === 'plex', `${inUrl}, ${fam}, ${specOn}`);
+    A('picking a face puts it in the address and every headline and caption follows',
+      inUrl === 'plex' && fam.includes('IBM Plex Mono') && capFam.includes('IBM Plex Mono'), `${inUrl}, ${fam}, ${capFam}`);
 
     // Every face really is monospaced: `i` and `m` take one advance each.
     const notMono = FACES.filter((f) => {
@@ -604,42 +907,37 @@
     });
     A('every face on the switcher is monospaced, i as wide as m',
       notMono.length === 0, notMono.map((f) => f.id).join(', ') || `${FACES.length} of ${FACES.length}`);
-    const cols = [...panel.stage.querySelectorAll('.sl-spec > div')];
-    const named = cols.map((c) => {
-      const f = FACES.find((x) => x.id === c.dataset.face);
-      const p0 = c.querySelector('p');
-      return f && getComputedStyle(p0).fontFamily.includes(f.family)
-        && c.querySelector('.sl-name')?.textContent === f.name;
-    });
-    A('the specimen shows all eight, each in its own face with its name under it',
-      cols.length === FACES.length && named.every(Boolean), `${cols.length} columns, ${named.filter(Boolean).length} named`);
 
     go(0); await frame();
-    const ink =getComputedStyle(nodes[0].node.querySelector('.sl-say')).color;
+    const ink = getComputedStyle(nodes[0].node.querySelector('.sl-say')).color;
     const ground = getComputedStyle(panel.stage).backgroundColor;
     const cr = ratio(ink, ground);
     A('the headline is at least 7:1 against the slide ground', cr >= 7, `${cr.toFixed(1)}:1`);
 
     // Live elements run while their slide is shown and stop when it is not.
+    // One look per live slide: its own value has to move across the window
+    // and every other live element's must not, which proves the stop as well.
     const live = nodes.map((n, i) => (n.spec.live ? i : -1)).filter((i) => i >= 0);
     const moved = [], stopped = [];
     for (const i of live) {
-      go(i); await sleep(150);
-      const v0 = nodes[i].ctl.value();
-      await sleep(1100);
-      const v1 = nodes[i].ctl.value();
-      moved.push(`${SLIDES[i].name} ${v0 !== v1 ? 'moved' : 'STILL'} (${v0} to ${v1})`);
-      go(i === 0 ? 1 : 0); await sleep(80);
-      const w0 = nodes[i].ctl.value();
-      await sleep(400);
-      if (nodes[i].ctl.value() !== w0) stopped.push(SLIDES[i].name);
+      go(i); await sleep(60);
+      const v0 = live.map((j) => nodes[j].ctl.value());
+      await sleep(nodes[i].ctl.windowMs || 320);
+      const v1 = live.map((j) => nodes[j].ctl.value());
+      live.forEach((j, k) => {
+        if (j === i) moved.push(`${SLIDES[i].name} ${v0[k] !== v1[k] ? 'moved' : 'STILL'} (${v0[k]} to ${v1[k]})`);
+        else if (v0[k] !== v1[k]) stopped.push(`${SLIDES[j].name} ran while ${SLIDES[i].name} was shown`);
+      });
     }
-    A('at least three slides carry a live element', live.length >= 3, `${live.length}`);
+    const kitLive = ['machines', 'clock', 'frames', 'kit'];
+    A('at least four slides carry a live part of the kit',
+      live.length >= 4 && kitLive.every((nm) => live.some((i) => SLIDES[i].name === nm)),
+      live.map((i) => SLIDES[i].name).join(', '));
     A('every live element changes while its slide is shown',
       moved.every((m) => !m.includes('STILL')), moved.join(', '));
     A('and stops when the slide is left', stopped.length === 0, stopped.join(', ') || 'all stopped');
-    const dgc = nodes[SLIDES.findIndex((s) => s.name === 'panel')].ctl?.dg;
-    A('the diagram on the panel slide drew in a row and cut nothing',
+    const dgc = nodes[SLIDES.findIndex((s) => s.name === 'machines')].ctl?.dg;
+    A('the diagram of the machines drew in a row and cut nothing',
       dgc && dgc.mode === 'row' && dgc.cuts.length === 0,
       dgc ? `${dgc.mode}, ${dgc.cuts.length} cut ${JSON.stringify(dgc.cuts)}` : 'not built');
 
@@ -674,6 +972,7 @@
       `${resBefore} before, ${res.length} after, ${foreign.length} foreign`
         + (res.length !== resBefore ? `: ${res.slice(resBefore).map((r) => new URL(r.name).pathname).join(' ')}` : ''));
     go(0);
+    d.log(`checks took ${(performance.now() - t0).toFixed(0)} ms`);
   }
 
   if (SELFCHECK) {
