@@ -26,6 +26,7 @@
   // went on the owner's word and the stand-in still serves their mounts.
   import { mount, guard, el, armVideo } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -99,6 +100,8 @@
   const deck = createDeck({ items: [], adapters: {}, range: [now0 - REACH_MS, now0] });
   deck.seek(now0);
 
+  const MUTE_ON = '\u266b';             // the same two glyphs as /stage/'s mute
+  const MUTE_OFF = '\u2298';
   let started = false, muted = true;
   let hls = null, master = null, clock = null, loadStopped = false, hlsAlive = 0;
   let edgeMs = now0, pdtMs = null, windowS = 0, playlist = null;
@@ -209,10 +212,11 @@
     extras: [
       { id: 'live', label: 'live', word: true, aria: 'Return to the live edge',
         title: 'back to the live edge', onPress: () => liveButton() },
-      // THE WORD SAYS WHAT A PRESS WILL DO. Muted until Start, because a page
-      // may not make a sound before somebody asks it to.
-      { id: 'mute', label: 'Unmute', word: true, aria: 'Unmute',
-        title: 'sound of the playing channel', onPress: () => setMuted(!muted, true) },
+      // THE SAME GLYPHS AS `/stage/`'s MUTE, LEFT OF LOOP (*"we have unmute
+      // buttons, look them up. left from loop"*). Muted until Start, because a
+      // page may not make a sound before somebody asks it to.
+      { id: 'mute', label: MUTE_OFF, end: true, aria: 'sound of the playing channel',
+        onPress: () => setMuted(!muted, true) },
     ],
     command: {
       // BEFORE START THE BAR MOVES THE LINE AND OPENS NOTHING. Start is the one
@@ -229,13 +233,11 @@
 
   // ── mute ─────────────────────────────────────────────────────────────────
   const muteBtn = bar.extra('mute');
-  // Same width in both states: the button is measured holding the longer word,
-  // so the bar does not shift under the pointer that just pressed it.
-  muteBtn.style.minWidth = `${muteBtn.getBoundingClientRect().width}px`;
+  centreSymbol(muteBtn);
   function paintMute() {
-    const word = muted ? 'Unmute' : 'Mute';
-    muteBtn.textContent = word;
-    muteBtn.setAttribute('aria-label', word);
+    setSymbol(muteBtn, muted ? MUTE_OFF : MUTE_ON);
+    muteBtn.setAttribute('aria-pressed', String(!muted));
+    muteBtn.title = muted ? 'muted\npress for sound' : 'audible\npress to mute';
   }
   function setMuted(next, say = false) {
     muted = !!next;
@@ -888,16 +890,21 @@
     }
 
     // ── mute, pressed for real: twice, so it ends where it started ──────────
-    const m0 = glass.muted, w0 = muteBtn.textContent;
+    const glyph = () => muteBtn.querySelector('.pos-sym')?.textContent ?? muteBtn.textContent;
+    const m0 = glass.muted, w0 = glyph();
     muteBtn.click();
-    const m1 = glass.muted, w1 = muteBtn.textContent;
+    const m1 = glass.muted, w1 = glyph();
     muteBtn.click();
     const m2 = glass.muted;
-    const says = (m) => (m ? 'Unmute' : 'Mute');
+    const shows = (m) => (m ? MUTE_OFF : MUTE_ON);
     d.assert('a press of the mute button toggles the sound of the playing channel',
       m1 === !m0 && m2 === m0, `muted ${m0} then ${m1} then ${m2}`);
-    d.assert('the mute button names what the next press will do',
-      w0 === says(m0) && w1 === says(m1) && w0 !== w1, `${w0} then ${w1}`);
+    d.assert('the mute button shows the state of the sound',
+      w0 === shows(m0) && w1 === shows(m1) && w0 !== w1, `${w0} then ${w1}`);
+    const loopBtn = bar.el?.querySelector?.('.tbar-loop') ?? null;
+    d.assert('the mute button sits just left of LOOP',
+      !!loopBtn && muteBtn.nextElementSibling === loopBtn,
+      loopBtn ? `next to ${muteBtn.nextElementSibling?.className || 'nothing'}` : 'no LOOP button found');
 
     // ── the schedule cache: away to another channel and back ────────────────
     // Through the real picker, so this is the path a person takes. It opens a
