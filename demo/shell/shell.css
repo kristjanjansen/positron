@@ -3541,9 +3541,20 @@ button.pos-pg-lab:hover { color: var(--fg); }
    it also said was `min-width: 560px`, and that is the half that had to go:
    see the note on `.pos-tbl-row`. */
 
+/* 🔴 THE FLOOR IS DECLARED ONCE AND THE EMPTY STATE FILLS ALL OF IT. The list
+   kept its 132 px floor before anything had arrived and drew one dim line of
+   caption at the top of it, so the rest was about 115 px of borderless blank.
+   REPORTED 2026-10-05 from the UX review against `/sync/` INSTANT as blank air.
+   The floor stays, because a burst of cues lands while the readout and the log
+   under the list are being read, and without it they jump on the first press.
+   So the empty caption takes the whole floor in the table's own frame, and
+   reads as a box waiting for rows, which is what `table.mjs` draws on `/wire/`.
+   ⚠️ `box-sizing: border-box` ON THE CAPTION, so the frame sits inside the
+   floor and the first row lands in a box of exactly the same height. */
+:root { --msgs-floor: 132px; }
 .pos-msgs {
   font: 400 11px/1.55 var(--mono);
-  min-height: 132px;
+  min-height: var(--msgs-floor);
   max-height: 300px;
   overflow-y: auto;
 }
@@ -3579,7 +3590,12 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 .pos-msgs-txt { flex: 1; min-width: 0; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
 .pos-msgs-txt[data-hi] { color: var(--fg); }
-.pos-msgs-empty { color: var(--dim2); padding: 3px 0; }
+.pos-msgs-empty {
+  box-sizing: border-box; min-height: var(--msgs-floor);
+  display: grid; align-content: center; padding: 8px 10px;
+  border: var(--edge); border-radius: var(--r); background: var(--card);
+  color: var(--dim2);
+}
 
 /* ── picker: step, or jump straight to one by name ────────────────────────
    demo/shell/picker.mjs. ‹ | Brass 1 ▾ | ›   ⚅
