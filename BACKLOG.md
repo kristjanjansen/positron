@@ -1,5 +1,8 @@
 ## Open
 
+- **`/stage/` drop the local film, clock without ms** (2026-10-05, *"drop. rm ms"*): Start show no longer downloads the 253 MB film into the page (`filmCommand.play()` in `startShow`), mute acts on the live stream, deep film/mute asserts rewritten; the bar clock loses its milliseconds. `demo/stage/index.html`.
+- **`/time/` DATES readable** (2026-10-05, *"fix time"*): `zoom left 7.0e13 ×`, `finest 0.004 ms`, ruler `-1.0 ka` against a year cell `1100`. `demo/time/dates.mjs`, maybe the deep-time ruler format in `timeline/strip.mjs`.
+
 - ~~**`/kit/` ROUTER FIRMWARE screen size** (2026-10-05): *"ROUTER FIRMWARE - same screen size as othters"*. `demo/kit/index.html`, the router block's `oledScreen`.~~ Done 2026-10-05: same 2x scale as the other OLED blocks.
 
 - ~~**UX review and fix, round 2** (2026-10-05, *"review and fix all"*): review `/partitur/` and `/stage/` like the tabbed pages, and fix the five left from round 1: REPLAY empty black box before play (`demo/sync/after.mjs`), LOOPS arrow-only button (`demo/time/loops.mjs`), shared `createHardware` "Enable soundcard / MIDI and play" label, KEYBOARD readout keys (`demo/wire/notes.mjs`, checks read them by key), primary buttons in sentence case beside uppercase siblings (`.pos-pri`, kit-wide).~~ Done 2026-10-05: partitur and stage reviewed and fixed, REPLAY box captioned, LOOPS direction a labelled choice, hardware button plain, KEYBOARD keys plain, strip ruler label moved to the gutter, empty glue hides itself. Button casing REFUSED: recorded owner decision 2026-09-30 *"cap: all secondary buttons"*, primary keeps its case.
