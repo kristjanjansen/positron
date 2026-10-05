@@ -1,5 +1,6 @@
 ## Open
 
+- **A real positron deck, in the background** (2026-10-05): *"in bg do some actual slides on positron"*. A full presentation on its own page (`/talk/`, unlisted) on the slides system, with `/slides/` kept as the reference for faces and the scale; the deck engine moves into a module both pages import.
 - **`diagram.mjs` colours only top-level box names in notes** (2026-10-05, found by the slides agent): `page`, `relay`, `synths` stay plain bold, so a slide word joined to an inner box has no hue to match; and box edges at 52 per cent mix read faint beside a strongly coloured word. Defect or unwritten rule, not decided.
 - ~~**`/slides/` more line height on the small sizes** (2026-10-05): *"bit more line height on smaller font"*. Line height as part of the scale, opening up as size drops. Handed to the type scale agent.~~ Done 2026-10-05: six-step scale at ratio 1.5, statements, yellow and diagram hues on 9 of 16 slides, seven faces. 51/51.
 - ~~**`/slides/` highlights not limited to one** (2026-10-05): *"do not have be on single one"*. More than one yellow or hue highlight per slide where it helps, colour coding across the talk. Handed to the type scale agent.~~ Done 2026-10-05: six-step scale at ratio 1.5, statements, yellow and diagram hues on 9 of 16 slides, seven faces. 51/51.
