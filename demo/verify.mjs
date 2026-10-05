@@ -342,7 +342,7 @@ let hostHits = new Map();
  */
 const errRefusal = (s) => /live\.err\.ee/.test(s)
   || (standIn.has('now') && s.includes(standIn.get('now'))
-      && /\/live\/[a-z0-9]+\/seg-\d+\.ts/.test(s));
+      && /\/live\/[a-z0-9]+\/seg-\d+\.(?:ts|m4s)/.test(s));
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
   if (m.method === 'Network.requestWillBeSent') {

@@ -32,6 +32,17 @@
   const CHANNEL = CHANNELS[0];                 // ETV. One channel: see below.
   const REACH_MS = 120 * 60 * 1000;            // what ERR advertises; measured below
   const RANGE_HZ = 1;                          // both ends move, once a second
+  /**
+   * 🔴 THE LINE MOVES ONCE A SECOND AND THE PLAYLIST IS READ EVERY TEN.
+   * ERR's media playlist is 217,851 bytes with no delta updates (MEASURED
+   * 2026-09-08, `plans/plan-live-timeline.md`), and this page used to fetch it
+   * AND the master once a second on top of what hls.js already fetches: about
+   * 1.7 Mbit/s of playlist per open tab, and a new ERR session every second,
+   * because the master mints one per read. The window slides at 1.0x (measured
+   * the same day: 15.36 s of head PDT over 16.4 s of wall), so between reads
+   * both ends are carried forward by the wall clock, and each read corrects them.
+   */
+  const PLAYLIST_EVERY_MS = 10000;
   const OPEN_SPAN_MS = 12 * 60 * 1000;         // the opening view
   const PROBE_POINTS = 13;
   /**
@@ -84,6 +95,7 @@
   // device's clock — a visitor whose clock is ten minutes out still gets a
   // correct line, and the disagreement is printed instead of silently applied.
   const now0 = Date.now();
+  const pageAt = now0;
   const deck = createDeck({ items: [], adapters: {}, range: [now0 - REACH_MS, now0] });
   deck.seek(now0);
 
@@ -97,6 +109,16 @@
   let probes = [];               // {at, state} — one per two-byte ask
   let programmes = [];           // {at, end, name} from ERR's schedule
   let probesIssued = 0, sweepAt = null;
+  // Sessions opened at ERR (master reads) and playlist reads, counted where
+  // they happen so the page can assert it is not minting one a second.
+  let mastersRead = 0, playlistsRead = 0, variantUrl = null, readAt = 0, readEdge = null;
+  const onRead = (pl) => {
+    playlistsRead++;
+    if (pl.masterRead) mastersRead++;
+    variantUrl = pl.variant;
+    readAt = Date.now(); readEdge = pl.edge;
+    return pl;
+  };
   const jumpEvents = [];
 
   /** mm:ss, or hh:mm:ss once there is an hour of it — the shape a video
@@ -329,7 +351,7 @@
   const goLive = () => (starting ||= startLive());
 
   async function startLive() {
-    playlist = await readPlaylist(CHANNEL.url);
+    playlist = onRead(await readPlaylist(CHANNEL.url));
     pdtMs = playlist.pdt; windowS = playlist.windowS; edgeMs = playlist.edge ?? Date.now();
     // THE VISITOR'S CLOCK, measured and printed, never applied. Minimum round
     // trip kept rather than an average: an average is dragged by every slow
@@ -428,6 +450,11 @@
     if (!SELFCHECK) d.log('press anywhere on the line to walk back into the window');
     else await ifDeep(walk, { log: d.log,
       say: 'the pause, the refusal sweep, the channel survey and the walk back into the window (DEMO_DEEP=1)' });
+    // The session assert is about the REFRESH, so wait for one (at most one
+    // refresh interval) rather than grading a page that has read once.
+    const r0 = performance.now();
+    while (playlistsRead < 2 && performance.now() - r0 < PLAYLIST_EVERY_MS + 2000)
+      await new Promise((r) => setTimeout(r, 250));
     checks();
   }
 
@@ -439,11 +466,22 @@
     const reach = windowS ? windowS * 1000 : REACH_MS;
     deck.setRange([edgeMs - reach, edgeMs]);
   }
+  // Gated on when a read was last TRIED, so a broadcaster that stops answering
+  // is asked every ten seconds rather than every second.
+  let reading = false, triedAt = 0;
   setInterval(async () => {
     if (!playlist) return;
     try {
-      const pl = await readPlaylist(CHANNEL.url);
-      playlist = pl; edgeMs = pl.edge ?? edgeMs; windowS = pl.windowS || windowS;
+      if (!reading && Date.now() - Math.max(readAt, triedAt) >= PLAYLIST_EVERY_MS) {
+        reading = true; triedAt = Date.now();
+        try {
+          const pl = onRead(await readPlaylist(CHANNEL.url, { variant: variantUrl }));
+          playlist = pl; windowS = pl.windowS || windowS;
+        } finally { reading = false; }
+      }
+      // The newest instant offered, carried forward by the wall clock since the
+      // last read. A failed read leaves the last answer moving rather than frozen.
+      if (readEdge != null) edgeMs = readEdge + (Date.now() - readAt);
       // ASK WHETHER THE POSITION WAS OUTSIDE, do not compare it with itself.
       // `deck.position()` is derived from the transport vector and the clock,
       // so while the picture is playing it advances between any two reads —
@@ -791,6 +829,12 @@
         ? `${(bNow / 60000).toFixed(1)} min behind, and ERR refuses the newest `
           + `${wallNow.blockedMin.toFixed(1)} min`
         : `${((bNow ?? 0) / 1000).toFixed(1)} s, live edge served`);
+    // 🔴 ONE SESSION AT ERR, NOT ONE A SECOND. The master mints a session per
+    // read, and this page used to read it every second it was open.
+    d.assert('the broadcaster is asked for one session, not one per refresh',
+      mastersRead === 1 && playlistsRead >= 2,
+      `${mastersRead} master read${mastersRead === 1 ? '' : 's'}, ${playlistsRead} playlist reads `
+      + `in ${Math.round((Date.now() - pageAt) / 1000)} s`);
     d.assert('the playhead advances with the picture',
       advance.moved > 1000 && advance.moved < 2500 && (master?.stats().syncs ?? 0) > 0,
       `${advance.moved} ms over ${advance.wall} ms, ${master?.stats().syncs ?? 0} syncs`);
