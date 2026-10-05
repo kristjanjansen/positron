@@ -8,11 +8,13 @@
 // player's keys are not window-wide, the face files exist and ship).
 //
 // 🔴 NEGATIVE CONTROLS, per positron-verify's convention for this directory:
-// 15 of the checks below, named NEGATIVE, are written so that the bug they name fails them
+// 22 of the checks below, named NEGATIVE, are written so that the bug they name fails them
 // (a scale that is too flat, a headline with each banned mark, a full stop
 // inside a number that must NOT be flagged, a hue typo, a bad layout, a split
 // with no side, the key detector pointed at a file known to listen on
-// `document`, a table frame nobody declared, and a cell wider than its column), because a checker that passes everything and one that refuses
+// `document`, a table frame nobody declared, a cell wider than its column, a
+// title slide carrying a headline, a speaker with no title, a date that is not
+// a day, and a tap in the middle or on a box with no width), because a checker that passes everything and one that refuses
 // everything both look green against valid input alone.
 //
 // NOT GRADED HERE, and graded on `/kit/`'s SLIDES tab instead: anything that
@@ -28,6 +30,7 @@ import { dirname, join } from 'node:path';
 import {
   SCALE, STEPS, stepSize, stepOf, stepCaption, scaleCss, plain, parseMarks, lintWords,
   evStep, wordsStep, padRows, padRow, colStarts, tableStep, FRAMES, COL_GAP, normalise, LAYOUTS,
+  TITLE_STEPS, talkDate, tapZone,
 } from './slide.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -144,6 +147,31 @@ ok('a misspelt key throws rather than drawing nothing', throws(() => normalise({
 ok('a statement carrying evidence throws', throws(() => normalise({ say: 'x', statement: true, big: '1' })));
 ok('a line at step 7 throws', throws(() => normalise({ lines: [[7, 'x']] })));
 
+/* ── the title slide ───────────────────────────────────────────────────── */
+ok('a title slide is the talk at step 5, who at step 3, when at step 2, each a declared step and in that order',
+  TITLE_STEPS.title === 5 && TITLE_STEPS.by === 3 && TITLE_STEPS.date === 2
+  && Object.values(TITLE_STEPS).every((n) => STEPS.includes(n)), JSON.stringify(TITLE_STEPS));
+ok('a title slide is laid out top unless it says so, and carries a caption',
+  normalise({ title: 'x', by: 'y', date: '2026-10-05', place: 'z', cap: 'c' }).layout === 'top');
+ok('NEGATIVE: a title slide carrying a headline or a figure throws',
+  throws(() => normalise({ title: 'x', say: 'y' })) && throws(() => normalise({ title: 'x', big: '1' })));
+ok('NEGATIVE: a speaker with no title throws', throws(() => normalise({ by: 'y' })));
+ok('NEGATIVE: a title slide in a split or stack layout throws',
+  throws(() => normalise({ title: 'x', layout: 'stack' })));
+ok('an ISO day is said as a person says it, anything else is printed as written',
+  talkDate('2026-10-05') === '5 October 2026' && talkDate('2026-01-31') === '31 January 2026' && talkDate('autumn 2026') === 'autumn 2026',
+  `${talkDate('2026-10-05')}, ${talkDate('2026-01-31')}`);
+ok('NEGATIVE: an ISO date that is not a day throws, in talkDate and in the spec',
+  throws(() => talkDate('2026-02-30')) && throws(() => normalise({ title: 'x', date: '2026-13-01' })));
+
+/* ── a tap on a player ─────────────────────────────────────────────────── */
+ok('a tap on the left third is back, on the right third forward',
+  tapZone(10, 300) === -1 && tapZone(290, 300) === 1 && tapZone(99, 300) === -1 && tapZone(201, 300) === 1);
+ok('NEGATIVE: a tap in the middle third steps nowhere, its edges included',
+  tapZone(150, 300) === 0 && tapZone(100, 300) === 0 && tapZone(200, 300) === 0);
+ok('NEGATIVE: a box with no width, or no x, steps nowhere',
+  tapZone(10, 0) === 0 && tapZone(NaN, 300) === 0 && tapZone(10, -5) === 0);
+
 /* ── the source ────────────────────────────────────────────────────────── */
 const SRC = readFileSync(join(HERE, 'slide.mjs'), 'utf8');
 const C = code(SRC);
@@ -159,8 +187,8 @@ ok('NEGATIVE: the same detector finds the archive deck\'s document-wide listener
 const CSS = readFileSync(join(HERE, 'slide.css'), 'utf8');
 const urls = [...CSS.matchAll(/url\('\/shell\/(vendor\/[^']+)'\)/g)].map((m) => m[1]);
 const BUILD = readFileSync(join(HERE, '../../workers/view/build.mjs'), 'utf8');
-ok('the face files exist under shell/vendor and the build lists each one, licence included',
-  urls.length === 2 && urls.every((u) => existsSync(join(HERE, u)) && BUILD.includes(`'shell/${u}'`))
+ok('the face files exist under shell/vendor and the build lists each one, licence included, the Greek 600 for the logo\'s β among them',
+  urls.length === 3 && urls.some((u) => /greek-600/.test(u)) && urls.every((u) => existsSync(join(HERE, u)) && BUILD.includes(`'shell/${u}'`))
   && BUILD.includes("'shell/vendor/LICENSE-jetbrains-mono'") && existsSync(join(HERE, 'vendor/LICENSE-jetbrains-mono')),
   urls.join(', '));
 ok('no em dash and no middot in the module or its stylesheet',

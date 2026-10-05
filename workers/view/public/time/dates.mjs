@@ -24,6 +24,7 @@ import { createDeck } from '/timeline/transport.mjs';
 import { zoomCeilingPps, ulpMs, DATE_WALL_MS, calendarLOD, calendarDate, calendarSpan, calendarStep,
   calendarLabel, calendarTicks } from '/timeline/strip.mjs';
 import { markAdapter } from '/shell/fixture.mjs';
+import { tabDiagram } from './how.mjs';
 
 const YEAR = 365.2425 * 24 * 3600 * 1000;
 const SPAN = 2000 * YEAR;
@@ -208,10 +209,53 @@ export function build({ panel, set, log }) {
   refresh();
   log(`${(SPAN / YEAR).toFixed(0)} years, ${bracketed} of ${items.length} dates carry a bracket`);
 
+  /**
+   * HOW IT WORKS, read off this file and `timeline/strip.mjs`: dated rows, some
+   * with a `when` bracket, on a deck whose positions are epoch milliseconds,
+   * drawn by the strip in three lanes under a calendar ruler, and the zoom
+   * buttons that move the strip's view about the playhead.
+   */
+  const how = tabDiagram(panel, () => ({
+    caption: 'Two thousand years on one ordinary timeline. What changes is how sure each date is '
+      + 'and how the ruler counts.',
+    nodes: [
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'dates', label: 'dates', sub: `${items.length}, ${bracketed} brackets`, tech: 'archive',
+            note: 'A bracketed date carries a **when** with an earliest and a latest. **ignorance** '
+                + 'means it was one day and nobody knows which, **vagueness** that it never was '
+                + 'one day.' },
+          { id: 'deck', label: 'deck', sub: 'ms since 1970', tech: 'browser',
+            note: 'Positions are milliseconds since 1970 in an ordinary **Float64**, so year 100 is '
+                + 'a large negative number. The further from 1970, the coarser the smallest step '
+                + 'it can hold.' },
+          { id: 'strip', label: 'strip', sub: '3 lanes, canvas', tech: 'graphics',
+            note: 'A mark per date, a bar per bracket, and each bracket\'s weight spread across its '
+                + 'pixels. The ruler steps in real years, months and days, picked from how many '
+                + 'pixels a second gets.' },
+          { id: 'zoom', label: 'zoom', sub: 'in, out, Fit', tech: 'browser',
+            note: '**zoomAt()** holds the playhead\'s own pixel still, so press after press stays on '
+                + 'the date you started from. **Fit** puts every year back in view.' },
+        ] },
+    ],
+    links: [
+      { from: 'dates', to: 'deck',
+        note: 'Each row at its earliest bound, so a position claims no precision the date '
+            + 'does not have.' },
+      { from: 'deck', to: 'strip',
+        note: 'The playhead and the rows in view, read on every frame.' },
+      { from: 'zoom', to: 'strip', back: true,
+        note: 'A new number of pixels per second and a scroll, and nothing else.' },
+    ],
+  }));
+
   return {
     deck, bar,
     // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
-    show() { requestAnimationFrame(() => requestAnimationFrame(() => { strip.fit(); refresh(); })); },
+    show() {
+      how.draw();
+      requestAnimationFrame(() => requestAnimationFrame(() => { strip.fit(); refresh(); }));
+    },
     hide() { if (deck.playing()) deck.pause(); },
     bars: [{ name: 'dates', bar, strip: view.el }],
     async check({ A }) {
@@ -278,6 +322,15 @@ export function build({ panel, set, log }) {
           `${wide.drawn} of ${wide.had} legible across 2000 years, `
           + `${close.drawn} of ${close.had} across the last hundred`);
       }
+      how.check(A, [
+        ['dates', items.length === 22 && bracketed > 0 && items.filter((r) => r.when).length === bracketed,
+          `${bracketed} of ${items.length} carry a when`],
+        ['deck', deck.range[0] === t0 && t0 < 0, `from ${new Date(t0).getUTCFullYear()}, ${t0} ms`],
+        ['strip', panel.el.contains(view.el) && strip.lanes().length === 3 && !!strip.readout().ticks?.calendar,
+          `${strip.lanes().length} lanes, ruler every ${strip.readout().ticks?.calendar}`],
+        ['zoom', panel.el.contains(row) && row.querySelectorAll('button').length === 3,
+          `${row.querySelectorAll('button').length} buttons`],
+      ]);
       const st = strip.spanStates('span');
       log(`${st.smeared} of ${items.length} dates are a bracket, ${st.ignorance} unknown, ${st.vagueness} vague`);
     },

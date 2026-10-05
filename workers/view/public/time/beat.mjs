@@ -25,6 +25,7 @@ import { createGlue } from '/shell/glue.mjs';
 import { createHardware } from '/shell/hardware.mjs';
 import { createDeck, createAudioLane, createMidiLane } from '/timeline/transport.mjs';
 import { markAdapter, marks } from '/shell/fixture.mjs';
+import { tabDiagram } from './how.mjs';
 
 const DURATION = 16000;
 const BEAT = 500;
@@ -320,10 +321,68 @@ export function build({ panel, d, log }) {
 
   log(`${DURATION / 1000}s, one beat every ${BEAT} ms`);
 
+  /**
+   * HOW IT WORKS, read off this file and `timeline/transport.mjs`: one deck,
+   * its own Worker-timed `code` lane, and two lanes that hand the same beats
+   * over AHEAD of time to the AudioContext and to a MIDI port. The speakers
+   * and the port are drawn inside the Browser, as `/fau/` and `/collide/` draw
+   * their speakers, because a top level box with nothing in it beside a
+   * machine is drawn as a tall empty slab.
+   * ⚠️ THE MIDI HALF IS DRAWN AND NOT ALWAYS RUN. Headless Chrome has no MIDI
+   * permission, so its fact below is the picker being in this tab and what it
+   * said, not a note sent.
+   */
+  const how = tabDiagram(panel, () => ({
+    caption: 'One beat, sent three ways. Code runs it on time as best it can, and the sound card '
+      + 'and the MIDI port are told in advance and play it themselves.',
+    nodes: [
+      // `join: false`: two neighbours with no declared link between them do
+      // not feed each other here, and an undeclared gap would draw an arrow.
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'deck', label: 'deck', sub: `${deck.items.length} beats, ${BEAT}ms`, tech: 'browser',
+            note: 'The **code** lane: a **Web Worker** timer wakes the page just before each beat '
+                + 'and JavaScript runs it, about a millisecond late. Both lanes below read this '
+                + 'deck\'s clock.' },
+          { id: 'audio', label: 'audio lane', sub: 'AudioContext', tech: 'sound',
+            note: `Every 25 ms it hands the **AudioContext** the clicks due in the next ${AHEAD} ms, `
+                + 'each with **start(t)** at its exact time. An **AudioWorklet** hears every click '
+                + 'to the sample.' },
+          { id: 'spk', label: 'speakers', sub: 'sound card', tech: 'device',
+            note: 'The sound card plays each click on its own clock, so the page never has to be '
+                + 'on time, only early.' },
+          { id: 'midi', label: 'MIDI lane', sub: 'Web MIDI', tech: 'device',
+            note: `**MIDIOutput.send()** takes a timestamp, so each note leaves the page ${AHEAD} ms `
+                + 'early and the browser sends it on the beat.' },
+          { id: 'port', label: 'MIDI port', sub: 'IAC or USB', tech: 'device',
+            note: 'Whatever the out picker names. A loopback such as the macOS **IAC** bus hands '
+                + 'every note back on the in picker, which is the only way to time this lane.' },
+        ] },
+    ],
+    links: [
+      { from: 'deck', to: 'audio',
+        note: 'The same **deck.transport**, so a pause or a seek cancels every click already '
+            + 'handed over.' },
+      { from: 'audio', to: 'spk',
+        note: 'Oscillator starts scheduled in the audio clock\'s own seconds, never in the page\'s.' },
+      { from: 'deck', to: 'midi',
+        note: 'The same **deck.transport**, so a pause clears the port\'s queue and sends '
+            + 'all-notes-off.' },
+      { from: 'midi', to: 'port',
+        note: 'Note on and note off queued together, each with its own **send()** timestamp.' },
+      { from: 'port', to: 'midi', back: true,
+        note: '**onmidimessage** on the in port. When it arrives is an upper bound on when the '
+            + 'note left.' },
+    ],
+  }));
+
   return {
     deck, bar,
     // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
-    show() { requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate(); })); },
+    show() {
+      how.draw();
+      requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate(); }));
+    },
     hide() { if (deck.playing()) deck.pause(); },
     bars: [{ name: 'beat', bar, strip: view.el }],
     async check({ A }) {
@@ -351,6 +410,16 @@ export function build({ panel, d, log }) {
         `${verdict ? verdict.sched : 0} committed`);
       A('both lanes advanced', !!verdict && verdict.fired > 0 && verdict.sched > 0,
         `worker ${verdict ? verdict.fired : 0} / sound card ${verdict ? verdict.sched : 0}`);
+      // After the press, so the sound half is a reading rather than a promise.
+      how.check(A, [
+        ['deck', deck.hostName === 'worker' && deck.items.length === DURATION / BEAT,
+          `${deck.items.length} beats on a ${deck.hostName} timer`],
+        ['audio lane', !!audio && audio.scheduled().length > 0,
+          `${audio ? audio.scheduled().length : 0} clicks handed over`],
+        ['speakers', !!ctxOf, ctxOf ? `AudioContext ${ctxOf.state} at ${ctxOf.sampleRate} Hz` : 'no AudioContext'],
+        ['MIDI lane', row.contains(hw.outPick), `out picker here, ${hw.state.midi}`],
+        ['MIDI port', row.contains(hw.inPick), `in picker here, ${hw.state.midiIn}`],
+      ]);
     },
   };
 }

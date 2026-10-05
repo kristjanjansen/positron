@@ -41,6 +41,7 @@ import { beatToShared } from '/shell/timebase.mjs';
 import { createDeck } from '/timeline/transport.mjs';
 import { scoreDoc, quotation } from '/timeline/score.mjs';
 import { createPeer, pairTransports, wsTransport, epochNow } from '/proto/looper/peer.mjs';
+import { tabDiagram } from './how.mjs';
 
 const Q = new URLSearchParams(location.search);
 // The Pi's rig joins `jam-demo` by default, so that is this tab's default
@@ -86,6 +87,54 @@ function mux(first) {
 export const about = `Two clocks, the second set ${SKEW_MS} ms fast on purpose, agree on the time and then play the same beats without a message per beat. Press play and both rows light together.`;
 
 export const readout = { correction: 'ms', apart: 'ms', 'round trip': 'ms', beat: '' };
+
+/**
+ * THE PICTURE, READ OFF THIS FILE. Both clocks, both decks and the click live
+ * in this one Browser, and the relay is a side leg that only `Open to other
+ * devices` adds. The chain inside the Browser is the path to the sound: the
+ * second clock corrects itself against this one, this clock's deck plays the
+ * grid, and its beats click. Every number in it is this file's constant.
+ */
+export const diagramSpec = () => ({
+  caption: 'Two clocks agree once on what time it is, and after that every beat is worked out at each end and never sent.',
+  nodes: [
+    { id: 'br', label: 'Browser', sub: 'this tab', kind: 'here', tech: 'browser',
+      children: [
+        { id: 'other', label: 'second clock', sub: `${SKEW_MS}ms fast`,
+          note: `Reads **epochNow()** plus ${SKEW_MS} ms and is not told so. It finds the error itself and `
+              + 'carries the correction in the readout, which should come to the same number with the sign flipped.' },
+        { id: 'here', label: 'this clock', sub: 'reference',
+          note: 'The peer with the lowest id is the reference, so it corrects by exactly zero. Both clocks are '
+              + '**peer.mjs** peers, the same code that runs between two machines.' },
+        { id: 'decks', label: 'two decks', sub: `${BEATS} beats, ${LOOP / 1000}s`,
+          note: `One deck per clock, each holding the same ${BEATS} beats. A beat is due when its own clock `
+              + 'reads the grid time **beatToShared** gives, so the two decks light their rows together.' },
+        { id: 'audio', label: 'AudioContext', sub: 'click',
+          note: 'An 880 Hz square wave 50 ms long on each beat of this clock\u2019s deck. It is made only once '
+              + 'Sound on is pressed, so a visit makes no sound.' },
+      ] },
+    { id: 'cf', label: 'Cloudflare', kind: 'cloud', tech: 'cloudflare',
+      children: [
+        { id: 'relay', label: 'Relay object', sub: 'Durable Object',
+          note: 'Hands both clocks\u2019 messages to every socket in the room, so a phone or the Raspberry Pi can '
+              + 'join the count. It is never asked the time, because a server clock measured 50 ms of bias.' },
+      ] },
+  ],
+  links: [
+    { from: 'other', to: 'here',
+      note: `Pings in bursts of five every 2 s over an in-tab hop of ${HOP_MS} ms with ${HOP_JITTER_MS} ms of `
+          + 'jitter. Only the reply with the shortest round trip is kept, which is how NTP filters a path.' },
+    { from: 'here', to: 'decks',
+      note: 'The shared clock, epoch time plus the correction, is what each deck schedules on. Play joins the '
+          + 'grid where the shared clock has got to, never at zero.' },
+    { from: 'decks', to: 'audio',
+      note: 'Each beat this clock\u2019s deck plays starts one click, 20 ms after the beat fires, on the '
+          + '**AudioContext**\u2019s own clock.' },
+    { from: 'br', to: 'relay', label: 'ping, pong',
+      note: 'Only after Open to other devices is pressed. Both clocks then send their pings into the room as '
+          + 'well as to each other, and nothing per beat.' },
+  ],
+});
 
 export function build({ panel, log, set }) {
   // ── the score, as a document ──────────────────────────────────────────────
@@ -285,8 +334,11 @@ export function build({ panel, log, set }) {
   }, 500);
   addEventListener('pagehide', () => { clearInterval(timer); here.dispose(); other.dispose(); });
 
+  const how = tabDiagram(panel, diagramSpec);
+
   return {
     bars: [{ name: 'the pulse', bar, strip: view.el }],
+    show() { how.draw(); },
     hide() { if (A1.deck.playing?.()) { A1.deck.pause(); B1.deck.pause(); } },
 
     async check({ A }) {
@@ -365,6 +417,11 @@ export function build({ panel, log, set }) {
       } else {
         log('left for the deep run: joining the relay room with both clocks');
       }
+      // Written out here rather than read off the spec: two clocks, one of
+      // them SKEW_MS fast, a deck each, the click, and the room the join opens.
+      await how.check(A, ['Browser, this tab', `second clock, ${SKEW_MS}ms fast`, 'this clock, reference',
+        `two decks, ${BEATS} beats, ${LOOP / 1000}s`, 'AudioContext, click',
+        'Cloudflare', 'Relay object, Durable Object']);
     },
   };
 }

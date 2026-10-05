@@ -828,7 +828,7 @@ button.pos-pri[data-busy="1"] {
    ⚠️ BOTH SIDES, AND THAT IS THE HALF THAT IS EASY TO SKIP. Owning the top
    margin as well is what makes the gap EXACTLY the gap: under the old rule a
    neighbour's larger bottom margin collapsed through and won, which is how
-   `/und/` measured 53.5 px between its field and its transport bar while
+   `/csound/` measured 53.5 px between its field and its transport bar while
    every other gap on it read 40.
 
    🔴 THE GAP IS WRITTEN ON THE BLOCK ABOVE IT, AND THE FIRST ATTEMPT PUT IT
@@ -4978,7 +4978,7 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    face. So the note carries the well's ground, and the button's half-pill of
    air either side, which makes its box the button's box again and lets the
    word cover the line under it rather than mix. `--well` is for a page whose
-   text box is not the kit field's `--bg` (`/und/`'s is its own dark), set
+   text box is not the kit field's `--bg` (`/csound/`'s is its own dark), set
    once on the host and read by the box and the note alike. */
 .pos-cnote-host { position: relative; }
 .pos-cnote-host textarea,

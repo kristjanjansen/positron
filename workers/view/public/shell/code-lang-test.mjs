@@ -4,7 +4,7 @@
 //   node demo/shell/code-lang-test.mjs
 //
 // 🔴 GRADED AGAINST THE COMPILERS, NOT AGAINST ITSELF. Every current preset of
-// `/fau/`, `/collide/` and `/und/` is read from the page or module that ships
+// `/fau/`, `/collide/` and `/csound/` is read from the page or module that ships
 // it (never a copy here), and what the finder calls a parameter is compared
 // with what a compiler this file did not write reports:
 //   Faust          libfaust 2.89.2 out of `demo/fau/vendor/`, compiled in node,
@@ -80,11 +80,13 @@ function fauPresets() {
   while ((m = re.exec(html)) && m.index < end) out.push({ id: m[1], code: eval('`' + m[2] + '`') });
   return out;
 }
-/** `/und/`'s one score, also inside its page, as an array joined with newlines. */
+/** `/csound/`'s one score, in its SCORE tab's module since the page got tabs
+ *  (396ca4b), as an array joined with newlines. Read from the page before that
+ *  and broken from then until 2026-10-05. */
 function undScore() {
-  const html = readFileSync(join(HERE, '../und/index.html'), 'utf8');
+  const html = readFileSync(join(HERE, '../csound/score.mjs'), 'utf8');
   const m = html.match(/const DEFAULT_SCORE = (\[[\s\S]*?\])\.join\('\\n'\);/);
-  if (!m) throw new Error('no DEFAULT_SCORE in demo/und/index.html');
+  if (!m) throw new Error('no DEFAULT_SCORE in demo/csound/score.mjs');
   return eval(m[1]).join('\n');
 }
 
@@ -96,7 +98,7 @@ ok('the presets were found where they ship', FAU.length >= 4 && SC_PRESETS.lengt
 const texts = [
   ...FAU.map((p) => ['faust', `fau ${p.id}`, p.code]),
   ...SC_PRESETS.map((p) => ['sclang', `collide ${p.id}`, p.code]),
-  ['csound-sco', 'und score', UND],
+  ['csound-sco', 'csound score', UND],
 ];
 
 // ── the round trip ──────────────────────────────────────────────────────────
@@ -174,7 +176,7 @@ const types = (src, lang) => {
 }
 
 {
-  // 🔴 LINE KINDS, so `/und/` can draw a line in the colour of its lane. The
+  // 🔴 LINE KINDS, so `/csound/` can draw a line in the colour of its lane. The
   // second source is again `csound.mjs`: every line it read a note from is an
   // event line, and nothing else is.
   const { html } = render(UND, 'csound-sco');
