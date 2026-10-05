@@ -28,6 +28,7 @@
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createChoice } from '/shell/choice.mjs';
 import { createTimebase } from '/shell/timebase.mjs';
+import { tabDiagram } from './how.mjs';
 
 const CUE_MS = 2000;           // one cue every two seconds of the score
 const LIGHT_MS = 30;           // the relay leg a cue message rides, MEASURED 27 to 38 ms
@@ -135,6 +136,55 @@ export const about = 'A modelled picture arrives late, and two walls get the sam
 
 export const readout = { 'picture late': 'ms', 'cue early': 'ms', 'off by': 'ms', 'delay jumps': '' };
 
+/**
+ * THE PICTURE, READ OFF THIS FILE. Six plain boxes and no machine around them,
+ * because every one of them runs inside this tab: the two links are models,
+ * and the caption says so.
+ * ⚠️ NO `Browser` CONTAINER, AND IT WAS TRIED. With the score and the links
+ * outside it and the four surfaces inside, every plain box was drawn to the
+ * container's height, three tall empty slabs; and the links are not outside
+ * the Browser anyway. With nothing nested every box is its own size.
+ * ⚠️ `cue link` IS LISTED FIRST SO IT SITS ON TOP: its long arrow to
+ * `following` then leaves over the row instead of through `picture link`,
+ * which `createDiagram` reported as an overlap.
+ */
+export const diagramSpec = () => ({
+  caption: 'Both links are modelled in this page on measured lags, so nothing is opened.',
+  nodes: [
+    { id: 'clink', label: 'cue link', sub: `${LIGHT_MS}ms, modelled`,
+      note: `A cue every ${CUE_MS / 1000} s over the relay\u2019s measured leg, 27 to 38 ms. Each carries **at**, `
+          + 'the moment of the picture it belongs to.' },
+    { id: 'plink', label: 'picture link', sub: 'modelled lag',
+      note: `${Object.values(LINKS).map((l) => `${l.name} ${l.note.split(',')[0]}`).join(', ')}, as measured. `
+          + 'The choice above the picture picks one, and LL-HLS steps by 2 s on a stall and back.' },
+    { id: 'arrival', label: 'on arrival', sub: 'fires at once',
+      note: 'Fires each cue the moment its message lands. Next to a late picture it is early by the whole lag.' },
+    { id: 'pic', label: 'picture', sub: 'canvas',
+      note: 'The top half of the canvas, showing whichever cue the late picture has reached. Every frame it '
+          + 'reports which moment of the score is on the glass.' },
+    { id: 'tb', label: 'timebase', sub: 'median lag',
+      note: 'Keeps the median of the last nine lag readings, so one late frame moves nothing, and moves only '
+          + 'after three readings in a row agree on a step.' },
+    { id: 'follow', label: 'following', sub: 'waits for it',
+      note: 'Holds each cue until **timebase** says the picture here has reached its moment, then fires. '
+          + 'With no agreed peer clock it holds every cue and says why.' },
+  ],
+  links: [
+    { from: 'plink', to: 'pic', label: 'frames',
+      note: 'The score\u2019s frames, each arriving as late as the chosen link makes it.' },
+    { from: 'clink', to: 'arrival', label: 'cue.set',
+      note: 'The cue, fired as it lands.' },
+    { from: 'pic', to: 'tb', label: 'readings',
+      note: 'One per frame: the local time it was shown and the score time it carried.' },
+    { from: 'tb', to: 'follow', label: 'fire',
+      note: 'For each held cue, wait, fire or hold, asked again on every frame until it fires.' },
+    // No label: a second `cue.set` sat across the other arrow, reported as an
+    // overlap. The note says what travels.
+    { from: 'clink', to: 'follow',
+      note: 'The same **cue.set**, held here until the picture catches up.' },
+  ],
+});
+
 export function build({ panel, log, set }) {
   const canvas = document.createElement('canvas');
   const g = canvas.getContext('2d');
@@ -212,11 +262,13 @@ export function build({ panel, log, set }) {
     raf = requestAnimationFrame(tick);
   }
 
+  const how = tabDiagram(panel, diagramSpec);
+
   return {
     // The model keeps its own time, so a tab nobody is looking at stops
     // drawing and loses nothing: the score is wall-clock, and the next frame
     // shows wherever it has got to.
-    show() { if (!raf) raf = requestAnimationFrame(tick); },
+    show() { if (!raf) raf = requestAnimationFrame(tick); how.draw(); },
     hide() { cancelAnimationFrame(raf); raf = 0; },
 
     async check({ A }) {
@@ -257,6 +309,10 @@ export function build({ panel, log, set }) {
       const hex = '#' + [...px.slice(0, 3)].map((v) => v.toString(16).padStart(2, '0')).join('');
       A('the live tab draws: the picture shows a cue colour once it reaches cue 1',
         frames > 10 && PALETTE.includes(hex), `${frames} frames, the picture reads ${hex}`);
+      // Written out here rather than read off the spec: the two modelled
+      // links, and the canvas's three surfaces with the timebase between.
+      await how.check(A, ['picture link, modelled lag', `cue link, ${LIGHT_MS}ms, modelled`,
+        'picture, canvas', 'timebase, median lag', 'following, waits for it', 'on arrival, fires at once']);
     },
   };
 }
