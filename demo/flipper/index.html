@@ -7,8 +7,21 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .glass { width: 100%; aspect-ratio: 16 / 9; background: #000;
-           border: 1px solid var(--line); border-radius: 4px; display: block; }
+  /* Two pictures side by side, one under the other on a phone. The grid asks
+     its OWN width, never the window's, which is /cam/'s rule for the same
+     shape. */
+  .fl-wrap { container-type: inline-size; }
+  .fl-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: calc(2 * var(--ctl-gap));
+  }
+  @container (max-width: 560px) {
+    .fl-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  /* The channel's name leads its footer. A name, not a readout key, so it wears
+     the value ink. */
+  .fl-name { font: 500 11px/1.4 var(--mono); color: var(--fg); white-space: nowrap; }
 </style>
 <script src="/proto/remixer/hls.min.js"></script>
 <script type="module">
@@ -16,19 +29,35 @@
   // promised to merge flipper and now. featch schedule once or optimize, do not
   // overthink"*, with *"add (un)mute buttons"* and *"no radio. 3 tvs"*. What
   // came from where, so nobody has to diff two archives to find out:
-  //   from `/flipper/`  the channel picker, Start as the only thing that opens
-  //                     anything, the fragment count as evidence of picture,
-  //                     and the refusal survey's first assert
-  //   from `/now/`      the picture, the line in wall clock time, both lanes,
-  //                     LIVE, the walk back into the window, the 10 s playlist
-  //                     refresh on a reused variant, and every check of those
+  //   from `/flipper/`  a press as the only thing that opens anything, the
+  //                     fragment count as evidence of picture, and the refusal
+  //                     survey's first assert
+  //   from `/now/`      the line in wall clock time, both lanes, LIVE, the
+  //                     walk back into the window, the 10 s playlist refresh on
+  //                     a reused variant, and every check of those
   // The old `/now/` is at archive/demos/now-index.html. The five radio cells
   // went on the owner's word and the stand-in still serves their mounts.
+  //
+  // 🔴 TWO VIDEO PANELS, ETV AND ETV2, AND NO START BUTTON, SINCE 2026-10-05.
+  // Asked as *"no start button. etv and etv2 only, use videopanels"*. ETV+ is
+  // filtered out HERE and not from `CHANNELS`, which other code reads. Each
+  // panel's own play is the press that opens its channel, and one plays at a
+  // time: pressing play on the other closes the first, and the bar, the lanes
+  // and the mute follow whichever is playing. The picker went with the third
+  // channel, because two panels each carrying a name already say which is which.
+  //
+  // 🔴 THE SELF-CHECK PRESSES THOSE PLAY BUTTONS ITSELF, BEFORE `d.ready()`,
+  // and closes what it opened before it says ready. With no `.pos-controls`
+  // button the harness has nothing of ours to press, and its bar drill runs
+  // the moment the page is ready, so checks running after `ready` would race
+  // it (the same reason `tab-page.mjs` checks before `ready`). Leaving nothing
+  // open puts the bar back where the drill always met it: a deck and no
+  // picture. Hence `bootMs` in the manifest.
   import { mount, guard, el, armVideo } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { createStripView } from '/shell/strip.mjs';
-  import { createChoice } from '/shell/choice.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { formatTime } from '/timeline/strip.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -37,8 +66,8 @@
     from '/shell/err-live.mjs';
   // 🔴 THIS PAGE IS POINTED AT A PUBLIC BROADCASTER, SO THE GATE IS NOT ABOUT
   // TIDINESS. Every connection opened here lands in ERR's listener statistics.
-  // A visit opens NOTHING until Start is pressed, and a visitor then gets one
-  // channel at its live edge and nothing else.
+  // A visit opens NOTHING until a channel's play is pressed, and a visitor then
+  // gets that channel at its live edge and nothing else.
   import { SELFCHECK, DEEP, ifDeep } from '/shell/selfcheck.mjs';
 
   const REACH_MS = 120 * 60 * 1000;            // what ERR advertises; measured below
@@ -63,35 +92,46 @@
   const SERVED_FRESH_MS = 20000;
   const BAND = { green: [5000, 10000], amber: 20000 };
 
+  /** The two channels this page shows. `CHANNELS` itself is shared. */
+  const ON_PAGE = CHANNELS.filter((c) => c.id === 'etv' || c.id === 'etv2');
+
   const d = mount({
     name: 'flipper',
-    what: 'Pick one of three ERR television channels and watch it on a line whose '
-      + 'right-hand end is the present moment.',
+    what: 'Press play on ETV or ETV2 and watch that channel on a line whose right end is the present moment.',
     // NOT DRAWN. The headline number, how far behind the picture is, sits in the
     // live row's gutter beside the marks it is about; these are for `__demo`.
     readout: { channel: '', state: '', behind: 's', 'first frame': 'ms' },
     showReadout: false,
-    controls: [{ id: 'start', label: 'Start', primary: true }],
   });
   guard(d);
 
-  // ── the channel picker ────────────────────────────────────────────────────
-  // A segmented row from the kit, and OUTSIDE `.pos-controls` on purpose: the
-  // harness presses every button in that row, and pressing every channel in
-  // turn would open all three at a public broadcaster.
-  let ch = CHANNELS[0];
-  let selecting = Promise.resolve();
-  const pick = createChoice({
-    label: 'channel',
-    options: CHANNELS.map((c) => [c.name, c.id]),
-    at: 0,
-    onPick: (id) => { selecting = select(id); },
+  // ── two panels, one per channel ──────────────────────────────────────────
+  // Each is a kit video panel: the name in the left slot, its own play just
+  // left of the panel's full screen square, the way `/kit/` puts a mute there.
+  const PLAY = '\u25ba';                // no emoji form, unlike U+25B6
+  const STOP = '\u25a0';
+  let ch = ON_PAGE[0];
+  const panels = ON_PAGE.map((c) => {
+    const video = el('video', '', null, { playsinline: '', muted: '' });
+    video.muted = true;
+    const play = el('button', 'ico', PLAY, { type: 'button', 'aria-label': `play ${c.name}` });
+    centreSymbol(play);
+    const panel = createVideoPanel({ media: video, left: el('span', 'fl-name', c.name), fullMode: 'hover' });
+    panel.slots.right.prepend(play);
+    const p = { c, video, play, panel };
+    play.onclick = () => { pressPlay(c); };
+    return p;
   });
-  d.el.append(pick.el);
-
-  const glass = el('video', 'glass', null, { playsinline: '', muted: '' });
-  glass.muted = true;
-  d.el.append(glass);
+  const panelOf = (c) => panels.find((p) => p.c === c);
+  const wrap = el('div', 'fl-wrap');
+  const grid = el('div', 'fl-grid');
+  grid.append(...panels.map((p) => p.panel.el));
+  wrap.append(grid);
+  d.el.append(wrap);
+  /** The picture of the channel that is playing, or was last. */
+  let glass = panels[0].video;
+  let openVideo = null;          // the one element that has a source, if any
+  let playingId = null;
 
   // ── the line ──────────────────────────────────────────────────────────────
   // ABSOLUTE WALL MILLISECONDS, from ERR's own PDT rather than from this
@@ -134,7 +174,7 @@
     return p == null ? null : Date.now() - p;
   };
   const stateWord = () => {
-    if (!clock || !clock.now()) return started ? 'opening' : 'not started';
+    if (!clock || !clock.now()) return playingId ? 'opening' : started ? 'stopped' : 'not started';
     if (glass.paused) return loadStopped ? 'blocked' : 'paused';
     const b = behindMs();
     if (stalledFor > 1500) return loadStopped ? 'blocked' : 'stalled';
@@ -184,7 +224,7 @@
       const no = probes.filter((p) => p.state === 'refused').length;
       const walledMin = served?.position != null ? Math.round(served.blockedMin) : 0;
       seen.subLabel = [
-        b == null ? 'not started' : `${(b / 1000).toFixed(1)} s behind`,
+        b == null ? 'not playing' : `${(b / 1000).toFixed(1)} s behind`,
         watched.length ? `${(total / 1000).toFixed(0)} s seen` : 'none seen yet',
         walledMin ? `${walledMin} min refused`
           : probes.length ? (no ? `${no} refused` : 'none refused') : '',
@@ -213,14 +253,14 @@
       { id: 'live', label: 'live', word: true, aria: 'Return to the live edge',
         title: 'back to the live edge', onPress: () => liveButton() },
       // THE SAME GLYPHS AS `/stage/`'s MUTE, LEFT OF LOOP (*"we have unmute
-      // buttons, look them up. left from loop"*). Muted until Start, because a
-      // page may not make a sound before somebody asks it to.
+      // buttons, look them up. left from loop"*). Muted until a play press,
+      // because a page may not make a sound before somebody asks it to.
       { id: 'mute', label: MUTE_OFF, end: true, aria: 'sound of the playing channel',
         onPress: () => setMuted(!muted, true) },
     ],
     command: {
-      // BEFORE START THE BAR MOVES THE LINE AND OPENS NOTHING. Start is the one
-      // control that reaches the broadcaster.
+      // WITH NOTHING PLAYING THE BAR MOVES THE LINE AND OPENS NOTHING. A
+      // channel's own play is the one control that reaches the broadcaster.
       play: () => {
         deck.play();
         if (clock) return glass.play().catch(() => {});
@@ -321,12 +361,13 @@
     }
   }
 
+  /** Close whatever is open, on whichever panel it is. */
   function closeChannel() {
     if (hls) { try { hls.destroy(); } catch { /* already gone */ } hlsAlive--; }
     hls = null; clock = null; window.__hls = null;
-    glass.pause();
-    glass.removeAttribute('src');
-    glass.load();
+    const v = openVideo;
+    openVideo = null;
+    if (v) { v.muted = true; v.pause(); v.removeAttribute('src'); v.load(); }
   }
 
   let openGen = 0, scheduleDone = Promise.resolve();
@@ -357,6 +398,7 @@
     await askWhatIsServed(true);
     if (gen !== openGen) return false;
 
+    openVideo = glass;
     if (NATIVE_HLS) {
       glass.src = c.url;
     } else if (window.Hls?.isSupported()) {
@@ -391,17 +433,62 @@
     return gen === openGen;
   }
 
-  async function select(id) {
-    const next = CHANNELS.find((c) => c.id === id);
-    if (!next || next === ch) return;
-    ch = next;
-    d.set('channel', ch.name);
-    if (!started) { d.log(`${ch.name} chosen. Start opens it`); return; }
-    d.log(`switching to ${ch.name}`);
-    if (await openChannel()) {
-      openView(Date.now());
-      view.strip.setFollow(true);
+  /** Paint each panel's play: a square on the one that is playing. */
+  function paintPlays() {
+    for (const p of panels) {
+      const on = p.c.id === playingId;
+      setSymbol(p.play, on ? STOP : PLAY);
+      p.play.setAttribute('aria-pressed', String(on));
+      p.play.setAttribute('aria-label', `${on ? 'stop' : 'play'} ${p.c.name}`);
+      p.play.title = on ? `stop ${p.c.name}` : `play ${p.c.name}`;
     }
+  }
+
+  // ── a press on a panel's play, the only thing that opens anything ─────────
+  // Requests to the broadcaster's addresses the browser has made so far. Read
+  // at the first press, it says whether the visit opened anything first.
+  const broadcasterAsks = () => performance.getEntriesByType('resource')
+    .filter((e) => /\.m3u8|\/live\/|tvSchedule/.test(e.name)).length;
+  let askedBeforePlay = null, audibleAtPlay = null;
+  let opening = null;
+
+  function pressPlay(c) {
+    if (playingId === c.id) { stopChannel(); return opening; }
+    if (askedBeforePlay === null) askedBeforePlay = broadcasterAsks();
+    const p = panelOf(c);
+    // INSIDE THE PRESS: the activation is spent on this element now, so the
+    // picture may start with sound once its first fragment arrives.
+    armVideo(p.video);
+    closeChannel();
+    ch = c; glass = p.video; playingId = c.id;
+    started = true;
+    paintPlays();
+    setMuted(false);
+    tickLoop();
+    d.log(`opening ${c.name}`);
+    opening = playChannel(c);
+    return opening;
+  }
+
+  async function playChannel(c) {
+    if (!await openChannel()) return false;
+    if (c === ch) audibleAtPlay = !glass.muted;
+    d.log(`playing ${c.name}`);
+    await settle();
+    if (c !== ch) return false;
+    await toLive();
+    return true;
+  }
+
+  function stopChannel() {
+    const was = ch;
+    openGen++;
+    closeChannel();
+    playingId = null; playlist = null;
+    deck.pause();
+    paintPlays();
+    d.set('state', stateWord());
+    d.log(`${was.name} stopped`);
   }
 
   // BOTH ENDS MOVE, once a second, and the playlist is re-read every ten on
@@ -528,15 +615,15 @@
     view.strip.invalidate();
   }
 
-  // 🔴 THE OTHER TWO CHANNELS, ASKED THE SAME QUESTION ONCE, DEEP TIER ONLY.
-  // Three shapes in one run is what separates a boundary finder from one that
+  // 🔴 THE OTHER CHANNEL, ASKED THE SAME QUESTION ONCE, DEEP TIER ONLY. Two
+  // shapes in one run is what separates a boundary finder from one that
   // answers the same way whatever it is asked.
   async function takeSurvey() {
     const own = served ? { id: ch.id, name: ch.name, ...served } : null;
-    const rows = await surveyChannels(CHANNELS.filter((c) => c.id !== own?.id),
+    const rows = await surveyChannels(ON_PAGE.filter((c) => c.id !== own?.id),
       { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
     probesIssued += rows.reduce((n, r) => n + (r.probes?.length || 0), 0);
-    survey = CHANNELS
+    survey = ON_PAGE
       .map((c) => (own && c.id === own.id ? own : rows.find((r) => r.id === c.id)))
       .filter(Boolean);
     d.log(`what ERR will serve: ${describeSurvey(survey)}`);
@@ -626,13 +713,12 @@
     return null;
   }
 
-  // LIVE waits for whatever Start is still doing, so a press in the middle of
-  // the opening cannot pull the picture out from under it.
-  let opening = null;
+  // LIVE waits for whatever the play press is still doing, so a press in the
+  // middle of the opening cannot pull the picture out from under it.
   async function liveButton() {
-    if (!started) { d.log('nothing is open yet. Start opens the channel'); return; }
+    if (!playingId) { d.log('nothing is playing. Press play on a channel'); return; }
     await opening;
-    await toLive();
+    if (playingId) await toLive();
   }
 
   // ── the three things a live line has to prove ────────────────────────────
@@ -695,40 +781,20 @@
     advance.moved = p0 != null && p1 != null ? Math.round(p1 - p0) : 0;
   }
 
-  // ── Start, the only thing that opens anything ─────────────────────────────
-  // Requests to the broadcaster's addresses the browser has made so far. Read
-  // at the press of Start, it says whether the visit opened anything first.
-  const broadcasterAsks = () => performance.getEntriesByType('resource')
-    .filter((e) => /\.m3u8|\/live\/|tvSchedule/.test(e.name)).length;
-  let askedBeforeStart = null, audibleAtStart = null;
-
-  d.on('start', () => {
-    if (started) return liveButton();
-    started = true;
-    askedBeforeStart = broadcasterAsks();
-    // INSIDE THE PRESS: the activation is spent on this element now, so the
-    // picture may start with sound once its first fragment arrives.
-    armVideo(glass);
-    setMuted(false);
-    opening = startLive();
-    return opening;
-  });
-
-  async function startLive() {
-    tickLoop();
-    if (!await openChannel()) return;
-    audibleAtStart = !glass.muted;
-    d.log(`playing ${ch.name}`);
-    await settle();
-    if (!SELFCHECK) { await toLive(); return; }
-    // ── everything below is the harness's, never a visitor's ───────────────
+  // ── the self-check, the harness's and never a visitor's ──────────────────
+  // It presses ETV's play the way a person would and then runs what Start used
+  // to run behind it. See the note at the top for why this is before `ready`.
+  async function selfcheck() {
+    const home = panels[0];
+    home.play.click();
+    if (!await opening) { d.log(`${home.c.name} did not open`, 'bad'); }
     await resume();
     await toLive();
     await waitForCatchUp();
     await sampleMovement();     // both ends move, and the playhead tracks the picture
     // THE WALK, DEEP TIER ONLY: it pauses the picture, asks ERR for thirteen
-    // instants, surveys the other two channels and yanks the view ten minutes
-    // back and forward again. It leaves the live row with a GAP, which is that
+    // instants, surveys the other channel and yanks the view ten minutes back
+    // and forward again. It leaves the live row with a GAP, which is that
     // row's whole subject.
     const walk = async () => {
       await pauseTest();
@@ -754,27 +820,35 @@
   // ── checks ────────────────────────────────────────────────────────────────
   async function checks() {
     // the page, before anything was opened
-    d.assert('nothing was asked of the broadcaster before Start',
-      askedBeforeStart === 0, `${askedBeforeStart} requests before the press`);
-    d.assert('three channels to choose from, one of them chosen',
-      pick.buttons.length === CHANNELS.length
-        && pick.buttons.filter((b) => b.getAttribute('aria-pressed') === 'true').length === 1,
-      pick.buttons.map((b) => `${b.textContent}${b.getAttribute('aria-pressed') === 'true' ? '*' : ''}`).join(' '));
-    d.assert('one picture element, so only one channel can ever be heard',
-      document.querySelectorAll('video, audio').length === 1,
-      `${document.querySelectorAll('video, audio').length} media elements`);
-    d.assert('no channel but the selected one is loaded',
+    d.assert('nothing was asked of the broadcaster before a play press',
+      askedBeforePlay === 0, `${askedBeforePlay} requests before the press`);
+    const names = panels.map((p) => p.panel.el.querySelector('.fl-name')?.textContent ?? '');
+    d.assert('two video panels, ETV and ETV2 and no other, each with its own play',
+      panels.length === 2 && document.querySelectorAll('.pos-vp').length === 2
+        && names.join(' ') === 'ETV ETV2'
+        && panels.every((p) => p.panel.slots.right.contains(p.play)),
+      `${document.querySelectorAll('.pos-vp').length} panels: ${names.join(', ')}`);
+    const [r0, r1] = panels.map((p) => p.panel.el.getBoundingClientRect());
+    const gw = grid.getBoundingClientRect().width;
+    const side = Math.abs(r0.top - r1.top) < 1 && r1.left > r0.right;
+    d.assert('the two pictures sit side by side when there is room and stack when there is not',
+      gw > 560 ? side : (!side && r1.top >= r0.bottom),
+      `${side ? 'side by side' : 'stacked'} in a ${gw.toFixed(0)} px grid`);
+    const sourced = panels.filter((p) => p.video.hasAttribute('src')).map((p) => p.c.name);
+    d.assert('only the playing channel\'s picture has a source',
+      sourced.length === 1 && sourced[0] === ch.name, `${sourced.join(', ') || 'none'} sourced, ${ch.name} playing`);
+    d.assert('no channel but the playing one is loaded',
       hlsAlive === (NATIVE_HLS ? 0 : 1), `${hlsAlive} engine${hlsAlive === 1 ? '' : 's'} alive`);
     // 🔴 EVIDENCE THAT A BROADCASTER ANSWERED, NOT THAT AN OBJECT EXISTS.
     // `totalVideoFrames` is cumulative, so the seek one line earlier cannot
     // reset it the way it empties `readyState`.
     const q = glass.getVideoPlaybackQuality?.();
     const framesSeen = q?.totalVideoFrames ?? glass.webkitDecodedFrameCount ?? 0;
-    d.assert('the selected channel received picture, not just an object',
+    d.assert('the pressed channel received picture, not just an object',
       (NATIVE_HLS || frags > 0) && framesSeen > 0,
       `${ch.id} ${frags} fragments, ${Math.round(fragBytes / 1024)} KB, ${framesSeen} frames decoded`);
-    d.assert('Start makes the selected channel audible',
-      audibleAtStart === true, audibleAtStart ? 'unmuted by the press' : 'still muted after Start');
+    d.assert('a play press makes that channel audible',
+      audibleAtPlay === true, audibleAtPlay ? 'unmuted by the press' : 'still muted after the press');
 
     // M: mechanism, deterministic, no network
     d.assert('the line is positioned in the present, not at zero',
@@ -906,25 +980,41 @@
       !!loopBtn && muteBtn.nextElementSibling === loopBtn,
       loopBtn ? `next to ${muteBtn.nextElementSibling?.className || 'nothing'}` : 'no LOOP button found');
 
-    // ── the schedule cache: away to another channel and back ────────────────
-    // Through the real picker, so this is the path a person takes. It opens a
-    // second channel at the stand-in, which is why it is harness only.
-    const home = CHANNELS.indexOf(ch);
-    const away = (home + 1) % CHANNELS.length;
+    // ── the other panel, and back ────────────────────────────────────────────
+    // Through the real play buttons, so this is the path a person takes. It
+    // opens the second channel at the stand-in, which is why it is harness only.
+    const home = panelOf(ch), away = panels.find((p) => p !== home);
     const f0 = scheduleFetches;
-    pick.set(away);
-    await selecting; await scheduleDone;
+    away.play.click();
+    await opening; await scheduleDone;
     const f1 = scheduleFetches, awayRows = programmes.length;
-    pick.set(home);
-    await selecting; await scheduleDone;
+    const awayEpg = view.strip.lanes().find((l) => l.id === 'epg')?.label;
+    const homeStopped = !home.video.hasAttribute('src') && home.video.paused && home.video.muted;
+    const awayOn = away.video.hasAttribute('src') && playingId === away.c.id;
+    d.assert('playing the second channel stops the first',
+      homeStopped && awayOn && hlsAlive === (NATIVE_HLS ? 0 : 1)
+        && home.play.getAttribute('aria-pressed') === 'false' && away.play.getAttribute('aria-pressed') === 'true',
+      `${home.c.name} ${homeStopped ? 'closed' : 'still open'}, ${away.c.name} ${awayOn ? 'playing' : 'not playing'}, `
+      + `${hlsAlive} engine alive`);
+    home.play.click();
+    await opening; await scheduleDone;
     const f2 = scheduleFetches;
     d.assert('switching away and back does not fetch the schedule again',
       f1 > f0 && f2 === f1,
-      `${f0} fetches before, ${f1} after ${CHANNELS[away].name}, ${f2} after ${CHANNELS[home].name} again`);
-    d.assert('the lanes follow the selected channel',
+      `${f0} fetches before, ${f1} after ${away.c.name}, ${f2} after ${home.c.name} again`);
+    d.assert('the lanes follow the playing channel',
       awayRows > 0 && programmes.length > 0 && hlsAlive === (NATIVE_HLS ? 0 : 1)
+        && awayEpg === `${away.c.name} schedule`
         && view.strip.lanes().find((l) => l.id === 'epg')?.label === `${ch.name} schedule`,
-      `${CHANNELS[away].name} ${awayRows} programmes, ${ch.name} ${programmes.length}, ${hlsAlive} engine alive`);
+      `${away.c.name} ${awayRows} programmes, ${ch.name} ${programmes.length}, ${hlsAlive} engine alive`);
+
+    // ── and the self-check closes what it opened, by the same press ─────────
+    home.play.click();
+    await new Promise((r) => setTimeout(r, 100));
+    d.assert('a second press on the playing channel stops it, and nothing stays open',
+      playingId === null && hlsAlive === 0 && panels.every((p) => !p.video.hasAttribute('src')),
+      `${playingId ?? 'nothing'} playing, ${hlsAlive} engines, `
+      + `${panels.filter((p) => p.video.hasAttribute('src')).length} pictures with a source`);
   }
 
   view.strip.armWall(Date.now());
@@ -936,7 +1026,9 @@
 
   d.set('channel', ch.name);
   d.set('state', 'not started');
-  if (!SELFCHECK) d.log('choose a channel and press Start. Nothing is opened before that');
+  paintPlays();
+  if (SELFCHECK) await selfcheck();
+  else d.log('press play on a channel. Nothing is opened before that');
   d.ready();
 </script>
 </html>

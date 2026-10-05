@@ -227,11 +227,13 @@ export const DEMOS = [
     // of fetching before there is much to see
     settleMs: 4000 },
   { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
-    one: 'three live ERR television channels on a line whose right-hand end is the present moment',
+    one: 'ETV and ETV2 live in two pictures over one line whose right end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
-    // Start opens one channel and, under a harness, runs the line's checks and a
-    // switch away and back; the Start button stays busy until they finish
-    settleMs: 26000, lightSettleMs: 8000 },
+    // No control opens anything. Under a harness the page presses its own ETV
+    // play, runs the line's checks and a switch away and back, then closes what
+    // it opened, all BEFORE it says ready, so it cannot race the bar drill.
+    // bootMs is a ceiling for that and costs a working page nothing.
+    bootMs: 70000 },
   // Everything that could be reached about one artist, before anything is
   // played: 122 rows out of fourteen archives, saying when it is from, who
   // holds it, what it is, whether there is a file and what its licence allows.
