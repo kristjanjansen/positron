@@ -302,6 +302,7 @@ const FILES = [
   // 600, Latin subset, @fontsource 5.3.0, SIL OFL 1.1, licence beside them.
   ['demo/shell/vendor/jetbrains-mono-latin-400-normal.woff2', 'shell/vendor/jetbrains-mono-latin-400-normal.woff2'],
   ['demo/shell/vendor/jetbrains-mono-latin-600-normal.woff2', 'shell/vendor/jetbrains-mono-latin-600-normal.woff2'],
+  ['demo/shell/vendor/jetbrains-mono-greek-600-normal.woff2', 'shell/vendor/jetbrains-mono-greek-600-normal.woff2'],
   ['demo/shell/vendor/LICENSE-jetbrains-mono', 'shell/vendor/LICENSE-jetbrains-mono'],
 
   ['demo/shell/vendor/meta-quest-touch-plus-left.glb', 'shell/vendor/meta-quest-touch-plus-left.glb'],
