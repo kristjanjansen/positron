@@ -774,7 +774,7 @@
     d.assert('Start makes the selected channel audible',
       audibleAtStart === true, audibleAtStart ? 'unmuted by the press' : 'still muted after Start');
 
-    // M — mechanism, deterministic, no network
+    // M: mechanism, deterministic, no network
     d.assert('the line is positioned in the present, not at zero',
       deck.position() >= deck.range[0] && deck.position() <= deck.range[1],
       new Date(deck.position()).toTimeString().slice(0, 8));
@@ -794,7 +794,7 @@
       bar.endStop === false && bar.commanded === true,
       'endStop false, position commands go to the picture');
 
-    // E — needs the broadcaster (the stand-in, under a harness)
+    // E: needs the broadcaster (the stand-in, under a harness)
     d.assert('the playlist carries a start date',
       Number.isFinite(pdtMs) && Math.abs(Date.now() - pdtMs) < 3 * 3600e3,
       pdtMs ? new Date(pdtMs).toTimeString().slice(0, 8) : 'none');
