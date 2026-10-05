@@ -34,7 +34,10 @@ const ROOM = new URLSearchParams(location.search).get('room') || 'cues-demo';
 const BURST = 10, BURST_GAP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const readout = { copies: '', arrived: '', delivery: 'ms', slowest: 'ms' };
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'A cue goes through the relay and shows on every open screen the moment it lands. Press Send a cue and both screens change together.';
+
+export const readout = { screens: '', received: '', typical: 'ms', slowest: 'ms' };
 
 export function build({ panel, log, set }) {
   /**
@@ -49,14 +52,14 @@ export function build({ panel, log, set }) {
     zone.append(cap, big);
     return { label, zone, big, wire: null, from: null, got: [], names: new Set() };
   }
-  const here = receiver('this copy');
-  const other = receiver('another copy');
+  const here = receiver('this screen');
+  const other = receiver('a second screen');
   const pair = el('div', 'sync-zones');
   pair.append(here.zone, other.zone);
 
   const btns = createButtonGroup({ buttons: [
-    { id: 'fire', label: 'Fire a cue', primary: true, onPress: () => run(fireOne) },
-    { id: 'burst', label: `Fire ${BURST}`, onPress: () => run(fireBurst) },
+    { id: 'fire', label: 'Send a cue', primary: true, onPress: () => run(fireOne) },
+    { id: 'burst', label: `Send ${BURST}`, onPress: () => run(fireBurst) },
   ] });
 
   // The shared list (demo/shell/messages.mjs), the same renderer `wire` uses.
@@ -68,11 +71,11 @@ export function build({ panel, log, set }) {
   const peers = new Set();     // other `from`s this copy has heard say hello
 
   function render() {
-    set('copies', here.from ? peers.size + 1 : '');
-    set('arrived', here.got.length || '');
+    set('screens', here.from ? peers.size + 1 : '');
+    set('received', here.got.length || '');
     if (times.length) {
       const s = times.slice().sort((a, b) => a - b);
-      set('delivery', s[Math.floor(s.length / 2)]);
+      set('typical', s[Math.floor(s.length / 2)]);
       set('slowest', s[s.length - 1]);
     }
   }

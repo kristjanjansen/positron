@@ -65,7 +65,9 @@
    */
   const d = mount({
     name: 'sync',
-    what: 'Four ways two places agree on when something happens, from firing on arrival to lining up on a recording.',
+    // No `what` under the title: each tab says what it is in the box under the
+    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
+    // The manifest's `one` line still describes the page on the index.
     readout: null,
     showLog: false,
     controls: [],
@@ -75,10 +77,10 @@
   const page = createTabPage(d, {
     at: 'arrival',
     tabs: [
-      { id: 'arrival', label: 'ARRIVAL', mod: arrival },
-      { id: 'ahead', label: 'AHEAD', mod: ahead },
-      { id: 'follow', label: 'FOLLOW', mod: follow },
-      { id: 'after', label: 'AFTER', mod: after },
+      { id: 'arrival', label: 'INSTANT', mod: arrival },
+      { id: 'ahead', label: 'CLOCKS', mod: ahead },
+      { id: 'follow', label: 'LATE VIDEO', mod: follow },
+      { id: 'after', label: 'REPLAY', mod: after },
     ],
   });
 

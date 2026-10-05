@@ -82,7 +82,10 @@ function mux(first) {
   };
 }
 
-export const readout = { offset: 'ms', apart: 'ms', 'round trip': 'ms', beat: '' };
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = `Two clocks, the second set ${SKEW_MS} ms fast on purpose, agree on the time and then play the same beats without a message per beat. Press play and both rows light together.`;
+
+export const readout = { correction: 'ms', apart: 'ms', 'round trip': 'ms', beat: '' };
 
 export function build({ panel, log, set }) {
   // ── the score, as a document ──────────────────────────────────────────────
@@ -213,7 +216,7 @@ export function build({ panel, log, set }) {
   // again, so the two laps came out a seventh of the width with fourteen
   // seconds of empty lane after them.
   const btns = createButtonGroup({ buttons: [
-    { id: 'join', label: 'Join the room', onPress: () => joinRoom() },
+    { id: 'join', label: 'Open to other devices', onPress: () => joinRoom() },
     { id: 'sound', label: 'Sound on', onPress: () => {
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
       // NOT awaited: a context made without a gesture waits rather than rejects
@@ -241,7 +244,7 @@ export function build({ panel, log, set }) {
   });
   {
     const lane = view.strip.lanes().find((l) => l.id === 'beats');
-    if (lane) lane.subLabel = [`${BEATS} of them, twice,`, `${LOOP / 1000} s around`];
+    if (lane) lane.subLabel = [`${BEATS} beats in ${LOOP / 1000} s,`, 'played twice'];
   }
 
   // ── the relay, from a press only ─────────────────────────────────────────
@@ -268,7 +271,7 @@ export function build({ panel, log, set }) {
     return X.fires.filter((f) => byK.has(f.k)).map((f) => f[key] - byK.get(f.k)[key]);
   }
   const timer = setInterval(() => {
-    set('offset', other.peers().length ? Math.round(other.offsetMs() * 10) / 10 : '');
+    set('correction', other.peers().length ? Math.round(other.offsetMs() * 10) / 10 : '');
     const g = gaps(A1, B1);
     set('apart', g.length ? Math.round(g[g.length - 1] * 10) / 10 : '');
     const ps = other.peers().filter((p) => Number.isFinite(p.rttMs));

@@ -34,10 +34,10 @@
    * across. `demo/shell/tab-page.mjs` does the rest. SCORE owns the page's one
    * published transport bar.
    */
-  const WHAT = 'Moholy-Nagy’s 1924 score for a mechanical variety act, played as a timeline whose light any other screen can show as a projection wall.';
   const d = mount({
     name: 'partitur',
-    what: WHAT,
+    // No `what` under the title: each tab says what it is in the box under the
+    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
     readout: null,
     showLog: false,
     controls: [],
@@ -52,7 +52,6 @@
     ],
   });
 
-  d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
   // Before `ready` and never after it: the harness drills the published bar
   // the moment `ready` is true, and a tab switch under it would race it.
   if (SELFCHECK) {

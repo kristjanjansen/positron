@@ -10,7 +10,7 @@
 //
 // THE CONVENTION. A tab is the old page's body moved into a module beside the
 // new page (`demo/sync/arrival.mjs`), exporting `build(ctx)` and, optionally,
-// `readout`. The page lists its tabs and this does the rest:
+// `readout` and `about` (rule 6). The page lists its tabs and this does the rest:
 //
 //   1  🔴 NOTHING IS BUILT FOR A TAB NOBODY OPENED. A tab's `build` runs the
 //      first time its tab is shown, by a press, by the hash, or by the check
@@ -48,6 +48,26 @@
 //   5  🔴 THE HASH SELECTS THE TAB, `/sync/#arrival`, through `tabs.mjs`, which
 //      already reads and writes it. `hash: false` only for a specimen inside a
 //      page that owns its own hash (`/kit/`).
+//   6  🔴 A TAB SAYS WHAT IT IS IN ONE FIXED BOX UNDER THE ROW, NOT AT THE TOP
+//      OF ITS PANEL. Asked 2026-10-05: *"do critical user experience review of
+//      new demost with many tabs. its hard to understand what they do. have a
+//      fixed height descriptions under tabs to explain. rm top desriptions"*.
+//      The text is the module's `export const about = '...'`, or `about` on
+//      the page's tab entry, and THE ENTRY WINS, so a page can reword a module
+//      it borrows without editing it. One or two short sentences: what you are
+//      looking at and what to press.
+//      ⚠️ ONE BOX FOR THE PAGE, SWAPPED ON A TAB CHANGE, AND IT NEVER CHANGES
+//      HEIGHT (positron-compose §7: anything that changes lives in a fixed box
+//      sized from the widest thing it can say). Every tab's text is in the box
+//      at once, stacked in ONE grid cell, and only the open tab's is visible,
+//      so the cell is as tall as the longest of them AT THE CURRENT WIDTH, a
+//      phone included, with no number typed and nothing measured in script.
+//      Switching tabs therefore moves nothing below the box. The check pass
+//      asserts it: the box's height and the panels' top are read on every tab
+//      and must not differ.
+//      ⚠️ EMPTY PAINTS NOTHING. A page none of whose tabs carries an `about`
+//      gets no box at all; a tab with none shows blank inside the reserve,
+//      because the reserve is what keeps the panel still.
 //
 // AND TWO THINGS THE OTHER SHARED FILES DO FOR IT, SAME DAY:
 //   - every panel here carries `data-own-keys`, and `transport-bar.mjs` sends no
@@ -64,7 +84,7 @@
 // tab walk in the checks) and is left as it is.
 
 import { createTabs } from './tabs.mjs';
-import { createReport } from './shell.mjs';
+import { createReport, el } from './shell.mjs';
 import { createStack } from './stack.mjs';
 import { assertBar } from './bar-drill.mjs';
 
@@ -73,7 +93,8 @@ const twoFrames = () => new Promise((r) => requestAnimationFrame(() => requestAn
 /**
  * @param {object} d  what `mount()` returned
  * @param {object} o
- * @param {Array<{id:string, label:string, mod:{build:Function, readout?:object|null, log?:boolean}}>} o.tabs
+ * @param {Array<{id:string, label:string, about?:string, mod:{build:Function, about?:string, readout?:object|null, log?:boolean}}>} o.tabs
+ *   `about` on the entry wins over the module's `export const about`.
  * @param {string} [o.at]      the tab to open on when the hash names none
  * @param {boolean} [o.hash]   default true; false inside a page that owns the hash
  * @param {object} [o.host]    a stack or an element to put the row in; default `d.stack`
@@ -95,6 +116,28 @@ export function createTabPage(d, { tabs, at, hash = true, host, onPick } = {}) {
   for (const t of tabs) row.panel(t.id).dataset.ownKeys = '';
   const into = host || d.stack;
   if (into.add) into.add(row.el); else into.append(row.el);
+
+  // Rule 6: every tab's explanation in one cell, the open one visible.
+  const aboutOf = (t) => String(t.about ?? t.mod.about ?? '').trim();
+  const abouts = new Map();
+  let aboutBox = null;
+  if (tabs.some((t) => aboutOf(t))) {
+    aboutBox = el('div', 'pos-tabs-about');
+    for (const t of tabs) {
+      const p = el('p', 'pos-tabs-about-t', aboutOf(t));
+      p.setAttribute('aria-hidden', 'true');
+      aboutBox.append(p);
+      abouts.set(t.id, p);
+    }
+    row.el.insertBefore(aboutBox, row.panels);
+  }
+  function showAbout(id) {
+    for (const [k, p] of abouts) {
+      const on = k === id;
+      p.classList.toggle('on', on);
+      p.setAttribute('aria-hidden', String(!on));
+    }
+  }
 
   /** A tab's assert: its label in front, so the harness output says which tab. */
   const assertFor = (id) => {
@@ -144,6 +187,7 @@ export function createTabPage(d, { tabs, at, hash = true, host, onPick } = {}) {
       const prev = built.get(shown);
       try { prev?.handle.hide?.(); } catch (e) { d.log(`${shown} hide: ${e.message}`, 'bad'); }
     }
+    showAbout(id);
     const entry = ensure(id);
     shown = id;
     try { entry.handle.show?.(); } catch (e) { d.log(`${id} show: ${e.message}`, 'bad'); }
@@ -166,10 +210,17 @@ export function createTabPage(d, { tabs, at, hash = true, host, onPick } = {}) {
       before.length === 1 && before[0] === was,
       `built ${before.join(', ') || 'none'}, open ${was}`);
 
+    const still = [];   // [label, box height, panels top, the text on show]
     for (const t of tabs) {
       row.go(t.id, { push: false });
       if (row.at() !== t.id) { assertFor(t.id)('could be opened', false, `the row is on ${row.at()}`); continue; }
       await twoFrames();
+      if (aboutBox) {
+        const on = abouts.get(t.id);
+        still.push([t.label, aboutBox.getBoundingClientRect().height,
+          row.panels.getBoundingClientRect().top + scrollY,
+          on.classList.contains('on') && getComputedStyle(on).visibility === 'visible' ? on.textContent : null]);
+      }
       const entry = built.get(t.id);
       const A = entry.assert;
       A('built', !entry.error, entry.error ? entry.error.message : 'its build() returned');
@@ -189,11 +240,25 @@ export function createTabPage(d, { tabs, at, hash = true, host, onPick } = {}) {
       await Promise.all(bars.map(({ name, bar, strip }) => assertBar(A, bar, { name, strip })));
     }
     row.go(was, { push: false });
+
+    if (aboutBox) {
+      const hs = still.map((r) => r[1]), tops = still.map((r) => r[2]);
+      const spread = (a) => Math.max(...a) - Math.min(...a);
+      d.assert('tabs: the explanation under the tab row keeps one height on every tab, so switching tabs moves nothing below it',
+        hs[0] > 0 && spread(hs) < 0.5 && spread(tops) < 0.5,
+        still.map(([l, h, top]) => `${l} ${h.toFixed(1)} px, panel at ${top.toFixed(1)}`).join(', '));
+      const wrong = tabs.filter((t, i) => still[i] && still[i][3] !== aboutOf(t)).map((t) => t.label);
+      d.assert('tabs: each tab shows its own explanation and only its own',
+        !wrong.length && aboutBox.querySelectorAll('.pos-tabs-about-t.on').length === 1,
+        wrong.length ? `wrong text on ${wrong.join(', ')}` : `${still.length} tabs, one explanation visible at a time`);
+    }
   }
 
   const page = {
     el: row.el,
     tabs: row,
+    /** the one explanation box under the row, or null when no tab has an `about` */
+    about: aboutBox,
     at: () => row.at(),
     /** open a tab as a press would: builds it if needed, writes the hash */
     go: (id) => row.go(id),

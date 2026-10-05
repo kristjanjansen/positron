@@ -32,7 +32,10 @@ const GLYPH = { exact: '·', ignorance: '?', vagueness: '~' };
 
 /** Four cells, on show: the year under the playhead, the tick step, and the
  *  two floating-point limits this tab is about. */
-export const readout = { year: '', ticks: '', step: 'ms', 'more zoom': '×' };
+// What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
+export const about = 'Two thousand years on one line, where many dates are a range rather than a day. Zoom in until each mark shows how sure its date is.';
+
+export const readout = { year: '', grid: '', finest: 'ms', 'zoom left': '×' };
 
 export function build({ panel, set, log }) {
   // SHAPED LIKE AN ARCHIVE: dates crowd towards the present and get vaguer
@@ -122,10 +125,10 @@ export function build({ panel, set, log }) {
     const t = deck.position();
     const lod = tickLOD(v.pxPerSecond);
     set('year', Math.abs(t) <= DATE_WALL_MS ? new Date(t).getUTCFullYear() : '');
-    set('ticks', spanWords(lod.major));
+    set('grid', spanWords(lod.major));
     // The step is BLANK, never 0, at the origin.
-    set('step', Math.abs(t) > 0 ? ulpMs(t) : '');
-    set('more zoom', Math.abs(t) > 0 ? times(Math.min(1e7, zoomCeilingPps(t)) / v.pxPerSecond) : '');
+    set('finest', Math.abs(t) > 0 ? ulpMs(t) : '');
+    set('zoom left', Math.abs(t) > 0 ? times(Math.min(1e7, zoomCeilingPps(t)) / v.pxPerSecond) : '');
     gutters();
     strip.invalidate();
   }

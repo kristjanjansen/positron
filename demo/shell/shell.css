@@ -470,7 +470,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .pos-name {
   font: 600 17px/1.2 var(--mono); letter-spacing: .01em; margin: 0;
 }
-.pos-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+/* One look for the sentence that says what a page is and the one that says
+   what a tab is (`.pos-tabs-about-t`, below), so the two cannot drift apart. */
+.pos-what, .pos-tabs-about-t { color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+.pos-what { margin: 6px 0 0; }
 
 /* how it works — one plain paragraph */
 
@@ -3294,6 +3297,19 @@ button.pos-pg-lab:hover { color: var(--fg); }
 /* ⚠️ The panels carry the shell's own vertical rhythm INSIDE them, because a
    panel is a `.pos-body` child's child and the `* + *` rule does not reach it. */
 .pos-tabs-p > * + * { margin-top: 22px; }
+/* 🔴 WHAT THE OPEN TAB IS, IN ONE BOX UNDER THE ROW THAT NEVER CHANGES HEIGHT.
+   Asked 2026-10-05: *"have a fixed height descriptions under tabs to explain"*.
+   `tab-page.mjs` (rule 6) puts EVERY tab's sentence in here at once and marks
+   the open one `.on`. They share one grid cell, so the box is as tall as the
+   longest of them at whatever width the page is, and switching tabs moves
+   nothing under it: the reserve is computed by the layout, never typed.
+   ⚠️ `visibility`, NOT `display` OR `hidden`, because a sentence that is not
+   laid out reserves nothing and the box would size to the open tab again.
+   ⚠️ The air under it is the tab row's own `--pos-tabs-air`, so the panel sits
+   as far below the sentence as the sentence sits below the row. */
+.pos-tabs-about { display: grid; margin-bottom: var(--pos-tabs-air); }
+.pos-tabs-about-t { grid-area: 1 / 1; margin: 0; visibility: hidden; }
+.pos-tabs-about-t.on { visibility: visible; }
 
 /* ── table: rows in columns the caller declares — shell/table.mjs ───────── */
 /* 🔴 A BOX, BECAUSE A TABLE IS A THING AND NOT A REGION OF THE PAGE. `/wire/`
@@ -5530,6 +5546,32 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
 .pos-vp-cap:empty, .pos-vp-cap[hidden] { display: none; }
 .pos-vp[data-full] .pos-vp-cap {
   padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── the tag on the picture: `slots.tag` in video-panel.mjs ──────────────────
+   🔴 ONE SHORT STATUS ABOUT THE PICTURE, TOP LEFT, ON THE CAPTION'S OWN PLATE.
+   Added 2026-10-05 for `/stage/`, which puts a presence badge in it that says
+   whether frames are reaching this screen. The plate is `.pos-vp-cap > *`'s
+   numbers, because a picture is not a colour you can design against and one
+   backing for everything written on a picture is one look rather than two.
+   ⚠️ 12 px IN, THE SAME AS `.pos-fsx`, so the two corners that carry anything
+   sit at one inset. In full screen the safe area is added, as it is there.
+   ⚠️ NOT A TARGET. A badge is a status and nobody presses it, so a finger on
+   the corner of the picture reaches the picture.
+   ⚠️ EMPTY OR HIDDEN DRAWS NOTHING, both halves said, because `display: flex`
+   beats the UA's `[hidden]` (the caption's rule, a few lines up). */
+.pos-vp-tag {
+  position: absolute; top: 12px; left: 12px; z-index: 3;
+  display: flex; align-items: center;
+  background: rgba(0, 0, 0, .7);
+  border-radius: 3px;
+  padding: 5px 10px;
+  pointer-events: none;
+}
+.pos-vp-tag:empty, .pos-vp-tag[hidden] { display: none; }
+.pos-vp[data-full] .pos-vp-tag {
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
 }
 
 /* ⚠️ THE CLOSE BUTTON IS `.pos-fsx` NOW AND ITS RULES ARE WITH THE REST OF
