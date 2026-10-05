@@ -5,8 +5,11 @@ page placement and prev next. Investigate and make sample page for extra large
 and large monotype. On page live examples. Look for slide design skills for
 wording etc but keep our live elements edge"*.
 
-Sample page: `demo/slides/index.html`, served at `/slides/` (not in the manifest
-yet, not built, not deployed). Every claim below is marked **READ** (with its
+Sample page: `demo/slides/index.html`, served at `/slides/` (in the manifest as
+`unlisted`). Revised the same evening on the owner's verdict on the first
+version: *"look for type alternatives. 5 of them. this one dos not work. center
+content below titles (diagram). no backlit lcs example."* Section 9 is the
+typefaces; sections 1, 3, 4 and 5 carry the other two changes. Every claim below is marked **READ** (with its
 source), **MEASURED** (on this machine, 2026-10-05, headless Chrome through a
 CDP script at 1280 and 375 px) or **DECIDED** (a choice made here, open to
 argument).
@@ -17,10 +20,13 @@ A slide here is a **headline sentence over evidence**, and the evidence is
 allowed to be a running part of the site. It lives inside `createVideoPanel`:
 the panel's stage is the slide, its left slot carries previous and next, its
 centre slot the count, its right slot the ⛶ that turns the panel into the
-presenting mode. Type comes in exactly two mono sizes, both fractions of the
-slide's own height: **LARGE = 9 per cent** for headlines and short lists,
-**EXTRA LARGE = 18 per cent** for one number or one word. The sample page grades
-all of it: 21 page asserts plus the shell's 2, **23/23 at 1280 and at 375**.
+presenting mode. Type comes in exactly two sizes, both fractions of the slide's
+own height: **LARGE = 9 per cent** for headlines and short lists, **EXTRA LARGE
+= 18 per cent** for one number or one word. The face is no longer the system
+mono: it is one of five self-hosted faces, **Atkinson Hyperlegible Next by
+default** (section 9), switchable under the panel and carried in the address.
+Everything under a headline is centred in the space below it. `node
+demo/verify.mjs slides` reads **34/34** (28 page asserts), up from 29/29.
 
 ## 2. What the research says
 
@@ -115,12 +121,16 @@ ratio is the signage rule's *"headline = 2 x body"* applied one step up, and a
 step nobody can mistake for "almost the same" (the composition skill's own
 rule). Weight 600 for the headline, 400 and `--dim` for a list, no tracking.
 
-**Line budget (MEASURED and asserted).** At 9 per cent and a 6 per cent side
-inset, the face gives about **28 characters a line**, so two lines hold about
-**56 characters**. Every headline in the sample measures exactly 2 lines at both
-widths, and the page asserts `every headline is two lines or fewer`, so the word
-budget is a check rather than advice. EXTRA LARGE holds about 14 characters,
-which is a number with its unit.
+**Line budget (MEASURED and asserted, per face).** At 9 per cent and a 6 per
+cent side inset, measured as the inset width over the mean advance of the deck's
+own six headlines at weight 600: **Atkinson 38, Plex 38, Grotesk 36, JetBrains
+28, Geist 28** characters a line, so two lines hold 56 to 76. The figure the
+first version quoted (28) was SF Mono's and is now the floor, held by the two
+monos. Every headline measures exactly 2 lines in all five faces (`222222` per
+face), and the page asserts `every headline is two lines or fewer, in all five
+faces`, so the budget is a check rather than advice. No wording had to change.
+Headlines carry `text-wrap: balance`, so the second line is not one word.
+EXTRA LARGE holds half of each figure.
 
 **Contrast (MEASURED).** Headline `--fg` on the stage's `--card`: **14.6:1**,
 asserted at 7:1 or better. The list's `--dim` is lower and is not asserted.
@@ -143,8 +153,9 @@ const SLIDES = [
     list: ['two lines at most', 'evidence under it', 'three seconds to read'] },
   { name: 'back row', say: 'Text must be big enough for the back row',
     big: '1/50', under: 'of the screen height' },
-  { name: 'counter', say: 'This number is counting live on the slide', live: liveSegment },
+  { name: 'readout', say: "The readout is the page's own, measuring this screen", live: liveReadout },
   ...
+  { name: 'faces', say: 'Five faces, the same letters at both sizes', specimen: true },
 ];
 ```
 
@@ -155,7 +166,8 @@ const SLIDES = [
 | `list` | up to three lines at LARGE, dimmed | Alley's two to four items |
 | `big` | one number or word at EXTRA LARGE | about 14 characters |
 | `under` | one LARGE line under `big` | the unit or what the number is of |
-| `live(host)` | builds a running element, returns `{ start, stop, value }` | built on first show, started on show, stopped on leave, opens nothing |
+| `live(host)` | builds a running element, returns `{ start, stop, value, subject }` | built on first show, started on show, stopped on leave, opens nothing; `subject` is what the centring assert measures |
+| `specimen` | the five-face specimen | `0O` at EXTRA LARGE over `Il1` at LARGE, one column per face in switcher order, the chosen one in `--hi` |
 | `notes` | speaker notes (not in the sample) | see section 7 |
 
 The address carries the slide (`/slides/#3`), so a reload or a dropped
@@ -163,11 +175,26 @@ projector cable lands back on it.
 
 ## 5. Live elements: what goes on a slide
 
+The slide list since the revision: `one thing` (list), `back row` (`1/50` at
+EXTRA LARGE), `readout`, `picture`, `panel` (diagram), `faces` (specimen). The
+**seven-segment counter is gone** on *"no backlit lcs example"*: an LCD
+imitation is a costume, not a running part. Three live slides remain, which is
+the asserted minimum, so no replacement was needed.
+
+**Centred (MEASURED and asserted).** `.sl-ev` is `align-items: center` and
+`text-align: center`; the headline stays left aligned (asserted). A list
+centres as a block with its lines left aligned inside it. The canvas and the
+scaled readout and diagram stretch across the region and centre their own
+picture. Asserted: the centre of what is under every headline sits within 2 px
+of the inset's centre, in a 688 px panel and in a 343 px one (375 less the
+gutters, set by the check on the panel itself). MEASURED: 0.0 to 0.2 px at
+both. Proved by sabotage: `align-items: flex-start` takes both asserts red, the
+list 115.7 px off and `1/50` 229.8 px off at 688.
+
 On the sample, MEASURED moving and then stopping when left:
 
 | slide | kit piece | moving value |
 | --- | --- | --- |
-| counter | `segment.mjs` `createSegment` at `size: '36cqh'` | seconds since shown, 0.1 to 1.2 in 1.1 s |
 | readout | `createReport` readout (`fps`, `frames`) | frames 8 to 71 |
 | picture | `pattern.mjs` `burn()` into a 1280x720 canvas | frame 14 to 80 |
 | panel | `diagram.mjs` `createDiagram`, row mode, 0 cuts, a lit box walking | box 0 to 1 |
@@ -191,8 +218,9 @@ sample, a knob that the audience sees turn, the synth view's envelope. Two rules
 come with them:
 
 - **Nothing opens anybody's stream on a slide change.** The sample asserts
-  `stepping every slide fetched nothing` (14 resources before, 14 after, 0
-  foreign). A slide that plays a real stream needs a press on the slide, and
+  `with the faces in, stepping every slide fetched nothing, and nothing came
+  from another host` (24 before, 24 after, 0 foreign), and `DEMO_HOSTS=1`
+  counted one host only, the dev server, 28 requests. A slide that plays a real stream needs a press on the slide, and
   the existing external-source rules apply unchanged.
 - **The space bar is contested.** `transport-bar.mjs` listens on `window` and
   owns space as play. A slide with a bar on it must either use `toggle: false`
@@ -235,13 +263,66 @@ come with them:
 6. **Projected size is reasoned, not measured.** No projector was plugged in.
    On a 3 m wide 16:9 screen LARGE would be about 15 cm tall per em, far over
    the 8H floor; checking it means standing at the back of a real room.
-7. **Fonts.** `--mono` is `ui-monospace`, so the line budget of about 28
-   characters is SF Mono's. Menlo or another fallback will shift it; the
-   two-line assert is what catches that, per machine.
+7. **Fonts.** Settled in section 9: five self-hosted faces, so the budget no
+   longer depends on which mono a machine has. Still open: a face's own
+   OpenType features (Plex has a slashed zero behind `zero`) are not switched
+   on, and the specimen does not name the faces, it relies on the switcher's
+   order under it.
 
 ## 8. Cost
 
-One page, 0 shared files touched, no network on load or on any slide change.
+First version: one page, 0 shared files touched, no network on load or on any
+slide change. Revision: the page, ten woff2 files and five licences in
+`demo/slides/vendor/`, and one block in `workers/view/build.mjs` listing them
+(a font is not an import, so the build copies it only by name, and
+`checkVendorUrls()` would refuse the build without it).
 Verification was `check-html.mjs`, one CDP script at two widths (the harness
 refuses a slug not in the manifest: `nothing for this harness to verify`) and
 `shot.mjs` at 375 and 1280.
+
+## 9. Five faces, and the one by default
+
+The system mono did not work on a slide: at 9 per cent it holds 28 characters a
+line, it is a different face on every machine, and it has no voice of its own.
+Five faces replace it, all **SIL Open Font License 1.1**, all self-hosted from
+the `@fontsource` 5.3.0 packages (`cdn.jsdelivr.net/npm/@fontsource/<id>@5.3.0`,
+downloaded once), Latin subset, weights **400 and 600** only, a `LICENSE-<id>`
+beside each pair in `demo/slides/vendor/`. The page loads one face's two files
+for the chosen face; the other four arrive only when the specimen slide is shown
+or the switcher is pressed (the browser's font loading rule, READ, not measured
+on a cold visit). All five together are **161,316 bytes** (158 KB).
+
+The test that decided it is the specimen: `0O` at EXTRA LARGE and `Il1` at
+LARGE in every face, because a zero read as a letter, or a one as an l, is what
+a back row gets wrong first. LOOKED AT in `shot.mjs` at 1280 and 375.
+
+| face | source | bytes (400 + 600) | LARGE line | at 9 % | at 18 % | verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Atkinson Hyperlegible Next** | Braille Institute and Applied Design, 2025, `googlefonts/atkinson-hyperlegible-next` | 24,768 | **38** | open, plain humanist; I, l and 1 all distinct (tailed l, flagged 1) | slashed zero, so `0O` never collides; heavy round figures | **default** |
+| JetBrains Mono | JetBrains, `JetBrains/JetBrainsMono` | 43,028 | 28 | the site's mono voice, tall x-height, slab I, tailed l; but only 28 a line, so headlines spread | dotted zero, distinct; a figure looks like code | the mono choice |
+| IBM Plex Sans | IBM, `IBM/plex` | 46,840 | 38 | engineered grotesk with real character, I l 1 distinct | zero has no slash or dot, told from O by width only, side by side and not alone | strong for words, weak for figures; heaviest file |
+| Geist Mono | Vercel, `vercel/geist-font` | 20,008 | 28 | clean, slab I and 1, smallest file | slashed zero | close to JetBrains at a distance, lighter at 600; redundant as a second mono |
+| Space Grotesk | Florian Karsten, `floriankarsten/space-grotesk` | 26,672 | 36 | the most character, the technical feel the site has | **zero and O are the same shape, and I and l are the same stroke**, MEASURED by eye in the specimen | headlines only; fails the back-row test for any slide with a number |
+
+**Recommendation: Atkinson Hyperlegible Next (DECIDED).** It is the only one
+of the five that passes every pair in the specimen AND is proportional, so it
+gets the wide budget (38) with none of Plex's or Grotesk's figure collisions.
+It was drawn for low vision, which is the same problem as the back row of a
+room (READ: Braille Institute, `brailleinstitute.org/freefont`; the Next
+release of 2025-02-10 added seven weights and a mono). Its cost is voice: it
+reads as a neutral humanist sans rather than as this site's technical mono, and
+JetBrains Mono is the switch for a talk that wants that voice at the price of
+28 characters a line. Weighed and not picked: Inter Display (0 and O collide
+like Plex), Martian Mono (wide, a budget under 28), DM Mono (too light to
+project), Commit Mono and Recursive (monos with nothing JetBrains does not
+already give), Space Mono (28 a line and the Grotesk zero).
+
+**On the page.** A `createChoice` labelled FACE under the panel, outside
+`.pos-controls`, in the order above. The choice is `?face=<id>` in the address
+(absent for the default), the slide number stays the hash, so `/slides/?face=jetbrains#4`
+is a slide in a face. The face is a custom property, `--sl-face`, on the panel,
+so every slide and the full screen follow it by inheritance. Asserted: all five
+load at 400 and 600; picking one puts it in the address and every slide and the
+specimen follow; every headline is two lines or fewer in all five; nothing
+spills past the inset in any face.
+

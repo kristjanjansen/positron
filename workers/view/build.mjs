@@ -350,6 +350,18 @@ const FILES = [
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
+  // ── the five faces `/slides/` can be set in, vendored ───────────────────────
+  //
+  // Listed by name for the same reason as Gabarito above. Latin subset, 400 and
+  // 600, from the @fontsource 5.3.0 packages, SIL OFL 1.1, licence beside each.
+  // plans/plan-slides.md section 9 has why these five.
+  ...['atkinson-hyperlegible-next', 'jetbrains-mono', 'ibm-plex-sans', 'geist-mono', 'space-grotesk']
+    .flatMap((f) => [
+      [`demo/slides/vendor/${f}-latin-400-normal.woff2`, `slides/vendor/${f}-latin-400-normal.woff2`],
+      [`demo/slides/vendor/${f}-latin-600-normal.woff2`, `slides/vendor/${f}-latin-600-normal.woff2`],
+      [`demo/slides/vendor/LICENSE-${f}`, `slides/vendor/LICENSE-${f}`],
+    ]),
+
   // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
   //
   // ⚠️ LISTED BY NAME FOR THE THIRD REASON IN A ROW AND IT IS THE SAME ONE:
