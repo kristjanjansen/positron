@@ -543,8 +543,8 @@
   import { createGlue, createGlueRows } from '/shell/glue.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createSlide, createSlidePlayer, fitBox, slideDiagram, stepOf, stepCaption, plain, lintWords,
-           SCALE, STEPS } from '/shell/slide.mjs';
+  import { createSlide, createSlidePlayer, createSlideLog, fitBox, slideDiagram, stepOf, stepCaption, plain, lintWords,
+           SCALE } from '/shell/slide.mjs';
   import { parseUF2, fontsIn, patchFont, patchKeys, createOledUi, createPico, createPicoRunner, readScreen, litCount,
            createMidiFramer, KEYS as PICO_KEYS, REPLACE_PATCH, DEFAULT_FONT, DENY_HOLD_MS,
            hex as picoHex, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
@@ -1561,7 +1561,7 @@
   /** One static slide in one block, its box giving up its chrome to the slide's own. */
   const slideBlock = (title, note, src, spec) => section('slides', title, note, src, (box) => {
     box.classList.add('kit-sl');
-    const s = createSlide(spec, { host: box });
+    const s = createSlide(spec, { host: box, full: true });
     slideKit.blocks.push({ title, s });
     slideKit.specs.push(spec);
   });
@@ -1708,6 +1708,102 @@
     { name: 'transports', say: 'MoQ is quicker, WebRTC steadier',
       rows: { head: ['', 'p50', 'p95', 'p99'],
         body: [['MoQ', '*26.2*', '42.4', '104.8'], ['WHEP', '67.0', '76.9', '*84.1*']], align: 'lrrr' } });
+  // ── TABLES WITH ROW LINES ─────────────────────────────────────────────────
+  // Asked 2026-10-05: *"i do not see tables layout. horiz lines but try with
+  // rounded corner outer border and not"*. HEADLINE OVER A TABLE above stays
+  // the plain one; these two are the same component with `rows.frame`.
+  // PROGRESS.md:4712-4719 again: WHEP vs MoQ, browser to Cloudflare to
+  // browser off burned pixels, n=17,501 for WHEP over 300 s.
+  slideBlock('TABLE WITH ROW LINES',
+    'A table with a 1 px rule between rows and under the header and no line outside them: '
+    + '`frame: \'none\'`. The air in each row is from the table’s own step, so a rule never touches a glyph.',
+    `{ say: 'MoQ is quicker, WebRTC steadier', rows: { head: ['', 'p50', 'p95', 'p99'], body, align: 'lrrr', frame: 'none' } }`,
+    { name: 'transports lined', say: 'MoQ is quicker, WebRTC steadier',
+      rows: { head: ['', 'p50', 'p95', 'p99'],
+        body: [['MoQ', '*26.2*', '*42.4*', '104.8'], ['WHEP', '67.0', '76.9', '*84.1*']], align: 'lrrr', frame: 'none' },
+      cap: 'ms, browser to [Cloudflare|cloudflare] to browser, read off burned pixels' });
+  // PROGRESS.md:3005-3008, rig/m1: notes from this desk to the M1, typical
+  // and worst 1 in 20, over 100 presses each.
+  slideBlock('TABLE IN A ROUNDED BOX',
+    'The same rules inside the site’s own edge and corner, `frame: \'box\'`, read from `--edge` and `--r`.',
+    `{ say: 'A direct link skips the relay', rows: { head: ['', 'typical', 'worst'], body, align: 'lrr', frame: 'box' } }`,
+    { name: 'control path', say: 'A direct link skips the relay',
+      rows: { head: ['', 'typical', 'worst'],
+        body: [['direct', '*6.00*', '*8.20*'], ['relay', '68.90', '94.80']], align: 'lrr', frame: 'box' },
+      cap: 'ms, a key on this desk to the M1, worst is 1 in 20 of 100' });
+
+  // ── LIVE LOGS ─────────────────────────────────────────────────────────────
+  // Asked 2026-10-05: *"show 2col layout with live logs / live tabular logs"*.
+  // Both are fed by this tab and nothing else: a timer asked to fire every
+  // 250 ms reports how late it fired, and the frame loop reports this
+  // screen's frames. Both start in `slidesOpen()` and stop in `slidesClose()`.
+  /** A timer asked for every `ms`, reporting how late each one fired. */
+  const lateTimer = (ms, onBeat) => {
+    let id = 0, due = 0, beat = 0;
+    const fire = () => {
+      const now = performance.now();
+      onBeat(++beat, now - due, now);
+      due += ms;
+      id = setTimeout(fire, Math.max(0, due - performance.now()));
+    };
+    return {
+      start() { if (id) return; beat = 0; due = performance.now() + ms; id = setTimeout(fire, ms); },
+      stop() { clearTimeout(id); id = 0; },
+      running: () => !!id,
+    };
+  };
+  slideBlock('LIVE LOG ON A SLIDE',
+    'Two columns: the words on the card, a live log on the darker side. It is the shell’s own '
+    + 'log at the slide’s step 1, newest line at the bottom, oldest leaving the top, in a box that '
+    + 'never changes height. A timer here asked to fire every 250 ms writes how late it fired.',
+    `slot: (host) => { const r = createReport({ readout: {}, showReadout: false, joined: false }); host.append(r.logEl); r.line(...) }`,
+    { name: 'live log', layout: 'split', side: 'right',
+      say: 'A timer is never on time', text: 'each line is one beat and how late it fired',
+      slot: (host) => {
+        const r = createReport({ readout: {}, showReadout: false, joined: false });
+        host.append(r.logEl);
+        let lines = 0;
+        const t = lateTimer(250, (n, late, now) => {
+          // short enough for one line in half a phone's slide; a timer can
+          // fire a fraction of a millisecond early, which is said as early
+          r.line(`beat ${n}, ${Math.abs(late).toFixed(1)} ms ${late < 0 ? 'early' : 'late'}`, late > 4 ? 'warn' : 'info', now);
+          lines++;
+          // the shell's log keeps every line; a slide keeps the last forty
+          while (r.logEl.children.length > 40) r.logEl.firstElementChild.remove();
+        });
+        slideKit.comps.liveLog = { el: r.logEl, lines: () => lines, running: t.running };
+        return t;
+      },
+      cap: 'this tab, now, nothing fetched' });
+  slideBlock('LIVE TABULAR LOG ON A SLIDE',
+    'The same, as rows of a table: time, source, value and unit, values right aligned with their '
+    + 'decimal points in one column and the row lines of `frame: \'none\'`. The widths are declared, '
+    + 'so a longer value never moves a column.',
+    `slot: (host) => { const log = createSlideLog({ head: ['s', 'from', 'value', 'unit'], widths: [6, 5, 6, 3], align: 'rlrl' }); host.append(log.el); log.add([...]) }`,
+    { name: 'live table', layout: 'split', side: 'left',
+      say: 'Read four times a second', text: 'how late the timer fired and how long a frame took',
+      slot: (host) => {
+        const log = createSlideLog({ head: ['s', 'from', 'value', 'unit'], widths: [6, 5, 6, 3], align: 'rlrl' });
+        host.append(log.el);
+        let t0 = 0, last = 0, gaps = [];
+        const frames = looped((t) => { if (last) gaps.push(t - last); last = t; });
+        const t = lateTimer(250, (n, late, now) => {
+          const s = ((now - t0) / 1000).toFixed(1);
+          log.add([s, 'timer', late.toFixed(2), 'ms']);
+          if (gaps.length) {
+            const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+            log.add([s, 'frame', mean.toFixed(2), 'ms']);
+            gaps = [];
+          }
+        });
+        slideKit.comps.liveTable = { log, running: t.running };
+        return {
+          start() { t0 = performance.now(); last = 0; gaps = []; frames.start(); t.start(); },
+          stop() { frames.stop(); t.stop(); },
+        };
+      },
+      cap: 'this tab, now, nothing fetched' });
+
   // HANDOFF.md:133-135, AHEAD on /sync/: a peer 137 ms fast, beats a median
   // 1.8 ms apart once the offset is found.
   slideBlock('HEADLINE WITH A CAPTION',
@@ -1763,26 +1859,6 @@
         return null;
       },
       say: 'Latency is read off a burned clock', text: 'the clock row read back 600 of 600' });
-  slideBlock('ILLUSTRATION ON THE RIGHT',
-    'The mirror: the words on the left and a picture on the right, here the six steps of the '
-    + 'scale drawn as bars at their real proportions.',
-    `{ layout: 'split', side: 'right', slot: (host) => canvas, say, text }`,
-    { name: 'scale bars', layout: 'split', side: 'right',
-      slot: (host) => {
-        const c = el('canvas');
-        c.width = 480; c.height = 360;
-        const g = c.getContext('2d');
-        const css = getComputedStyle(document.documentElement);
-        const top = stepOf(6).size;
-        STEPS.forEach((n, i) => {
-          const h = 320 * stepOf(n).size / top;
-          g.fillStyle = (css.getPropertyValue(n === 4 ? '--hi' : '--dim2') || '#6a7280').trim();
-          g.fillRect(16 + i * 76, 340 - h, 56, h);
-        });
-        host.append(c);
-        return null;
-      },
-      say: 'Each step is 1.5 times the last', text: 'six sizes, from the caption to one figure' });
   slideBlock('INTERACTIVE ON THE LEFT',
     'A layout: a kit control on the left and what it moves on the right. The stepper walks the '
     + 'word from step 1 to step 4, which is as large as a word fits in half a slide, and the '
@@ -1882,7 +1958,7 @@
           new ResizeObserver(fit).observe(host);
           slideKit.comps.oled = { cv, screen, px };
           return null;
-        } }, { host: box });
+        } }, { host: box, full: true });
       slideKit.blocks.push({ title: 'OLED ON A SLIDE', s });
       slideKit.specs.push(s.spec);
     });
@@ -1966,7 +2042,7 @@
       },
       say: 'The test picture draws itself', cap: 'pattern.mjs, a canvas stream, a video element' });
   slideBlock('DIAGRAM ON A SLIDE',
-    'The diagram with box names only, laid out at 640 logical px and scaled; what each outer box '
+    'The diagram with box names only and 2 px edges, laid out at 580 logical px and scaled; what each outer box '
     + 'is goes under it as slide text at step 1, the archive’s rule.',
     `slot: slideDiagram({ nodes: [{ label: 'Browser', desc: 'one page from the kit', children }, ...] })`,
     { name: 'machines', say: '[Cloudflare|cloudflare] carries the streams',
@@ -12285,6 +12361,184 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         `${off.map((o) => o.toFixed(1)).join(', ')} px off centre, ${native} native subs or labels`);
     }
 
+    // ── tables with row lines ────────────────────────────────────────────
+    /** The rect of character `i` of a row, walking its text nodes, so a mark's span counts. */
+    const charRect = (row, i) => {
+      const w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      let n, at = 0;
+      while ((n = w.nextNode())) {
+        if (i < at + n.length) {
+          const r = document.createRange();
+          r.setStart(n, i - at); r.setEnd(n, i - at + 1);
+          return r.getBoundingClientRect();
+        }
+        at += n.length;
+      }
+      return null;
+    };
+    /** Spread in px of each column's left edge, and of the decimal points in each right column. */
+    const columns = (rows, starts, widths, align) => {
+      const spread = (xs) => (xs.length > 1 ? Math.max(...xs) - Math.min(...xs) : 0);
+      const lefts = starts.map((st) => spread(rows.map((r) => charRect(r, st)?.left).filter(Number.isFinite)));
+      const dots = [];
+      starts.forEach((st, c) => {
+        if (align[c] !== 'r') return;
+        const xs = rows.map((r) => {
+          const i = r.textContent.slice(st, st + widths[c]).indexOf('.');
+          return i < 0 ? NaN : charRect(r, st + i)?.left;
+        }).filter(Number.isFinite);
+        if (xs.length > 1) dots.push(spread(xs));
+      });
+      return { lefts: Math.max(0, ...lefts), dots, worst: Math.max(0, ...lefts, ...dots) };
+    };
+    {
+      const tables = all.map((s) => s.parts.table).filter(Boolean);
+      const framed = tables.filter((t) => t.dataset.frame);
+      const bad = [];
+      let rules = 0;
+      for (const t of framed) {
+        const rows = [...t.children];
+        const cs = getComputedStyle(t);
+        rows.forEach((r, i) => {
+          const rc = getComputedStyle(r);
+          const fs = parseFloat(rc.fontSize);
+          if (i > 0) { if (parseFloat(rc.borderTopWidth) === 1 && rc.borderTopStyle === 'solid') rules++; else bad.push(`${t.dataset.frame} row ${i} has no rule above it`); }
+          else if (parseFloat(rc.borderTopWidth) !== 0) bad.push(`${t.dataset.frame} first row has a rule above it`);
+          if (parseFloat(rc.borderBottomWidth) !== 0) bad.push(`${t.dataset.frame} row ${i} has a rule under it`);
+          if (!tol(parseFloat(rc.paddingTop), 0.3 * fs, 0.5) || !tol(parseFloat(rc.paddingLeft), 0.6 * fs, 0.5)) bad.push(`${t.dataset.frame} row ${i} padding ${rc.paddingTop} ${rc.paddingLeft}`);
+        });
+        if (t.dataset.frame === 'none' && ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(cs[`border${k}Width`]) !== 0)) bad.push('the none table has an outer border');
+        if (t.dataset.frame === 'box' && ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(cs[`border${k}Width`]) !== 1)) bad.push('the box table has no 1 px edge');
+      }
+      const box = framed.find((t) => t.dataset.frame === 'box'), none = framed.find((t) => t.dataset.frame === 'none');
+      const rootR = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--r'));
+      const boxR = box ? parseFloat(getComputedStyle(box).borderTopLeftRadius) : NaN;
+      const lineCol = box ? getComputedStyle(box).borderTopColor : '';
+      const ruleCol = none ? getComputedStyle(none.children[1]).borderTopColor : '';
+      d.assert('SLIDES: a framed table rules a 1 px line between every row and none outside them, with air from its step inside each row',
+        !!box && !!none && bad.length === 0 && rules >= 4 && lineCol === ruleCol,
+        `${framed.length} framed tables, ${rules} rules between rows${bad.length ? `, wrong: ${bad.join('; ')}` : ''}, the rule ${ruleCol} against the edge ${lineCol}`);
+      d.assert('SLIDES: the boxed table’s corner is the site’s --r',
+        Number.isFinite(rootR) && boxR === rootR,
+        `${boxR} px against --r ${rootR} px`);
+      const align = tables.map((t) => ({ name: t.closest('.sl').getAttribute('aria-label'), frame: t.dataset.frame || 'plain',
+        ...columns([...t.children].slice(t.layout.head ? 1 : 0), t.layout.starts, t.layout.widths, t.align) }));
+      const off = align.filter((a) => a.worst > 0.5);
+      const dotCols = align.reduce((n, a) => n + a.dots.length, 0);
+      d.assert('SLIDES: every table keeps its character columns and decimal points within 0.5 px, lines and padding included',
+        off.length === 0 && dotCols >= 6 && align.some((a) => a.frame === 'box') && align.some((a) => a.frame === 'none'),
+        `${align.length} tables, ${dotCols} decimal columns, worst ${Math.max(...align.map((a) => a.worst)).toFixed(2)} px`
+        + `${off.length ? `, off: ${off.map((a) => `${a.name} ${a.worst.toFixed(2)}`).join(', ')}` : ''}`);
+    }
+
+    // ── live logs ────────────────────────────────────────────────────────
+    {
+      const L = C.liveLog, T = C.liveTable;
+      const lb = () => L.el.getBoundingClientRect().height, tb = () => T.log.el.getBoundingClientRect().height;
+      const sl = (x) => x.el.closest('.sl').getBoundingClientRect().height;
+      const h0 = [lb(), tb(), sl(L), sl(T.log)], n0 = [L.lines(), T.log.count()];
+      await nap(650);
+      const h1 = [lb(), tb(), sl(L), sl(T.log)], n1 = [L.lines(), T.log.count()];
+      await nap(650);
+      const h2 = [lb(), tb(), sl(L), sl(T.log)], n2 = [L.lines(), T.log.count()];
+      const still = h0.every((h, i) => h === h1[i] && h === h2[i]);
+      d.assert('SLIDES: both live logs append rows over time and their boxes do not change height while they do',
+        n1[0] > n0[0] && n2[0] > n1[0] && n1[1] > n0[1] && n2[1] > n1[1] && still && h0[0] > 0 && h0[1] > 0,
+        `the log ${n0[0]} -> ${n1[0]} -> ${n2[0]} lines, the table ${n0[1]} -> ${n1[1]} -> ${n2[1]} rows, `
+        + `heights ${h0.map((h) => h.toFixed(1)).join('/')} then ${h2.map((h) => h.toFixed(1)).join('/')}`);
+      // the newest at the bottom: the last row's foot is inside the body's, and the body has scrolled
+      const body = T.log.body.getBoundingClientRect(), lastRow = T.log.rows().at(-1).getBoundingClientRect();
+      const logBox = L.el.getBoundingClientRect(), lastLine = L.el.lastElementChild?.lastElementChild?.getBoundingClientRect();
+      const vis = T.log.rows().filter((r) => { const b = r.getBoundingClientRect(); return b.top >= body.top - 0.5 && b.bottom <= body.bottom + 0.5; });
+      const col = columns(vis, T.log.starts, T.log.widths, 'rlrl');
+      const ruled = vis.slice(1).every((r) => parseFloat(getComputedStyle(r).borderTopWidth) === 1);
+      d.assert('SLIDES: the newest row is at the foot of each log, and the tabular log’s decimal points align within 0.5 px under its row lines',
+        tol(lastRow.bottom, body.bottom, 1) && !!lastLine && lastLine.bottom <= logBox.bottom + 0.5 && lastLine.bottom > logBox.bottom - 2 * lastLine.height
+          && vis.length >= 3 && col.dots.length === 2 && col.worst <= 0.5 && ruled,
+        `the last row ends ${(body.bottom - lastRow.bottom).toFixed(1)} px from the table's foot, the last line ${(logBox.bottom - (lastLine?.bottom ?? 0)).toFixed(1)} px from the log's, `
+        + `${vis.length} rows in view, decimal spread ${col.dots.map((x) => x.toFixed(2)).join(' and ')} px, ${ruled ? 'every one ruled' : 'a rule missing'}`);
+    }
+
+    // ── full screen, on every static slide ──────────────────────────────
+    {
+      const noHover = matchMedia('(hover: none)').matches;
+      const btns = blocks.map((b) => b.s.fullBtn);
+      const op = (b) => parseFloat(getComputedStyle(b).opacity);
+      const missing = blocks.filter((b) => !b.s.fullBtn).map((b) => b.title);
+      // nobody's pointer is on a slide under the harness, so each reads as it does at rest
+      const rest = btns.filter(Boolean).map(op);
+      const target = blocks.find((b) => b.s.spec.name === 'stand-ins').s;
+      target.fullBtn.focus({ preventScroll: true });
+      await frames(10);   // past the 140 ms fade
+      const focused = op(target.fullBtn), focusedPe = getComputedStyle(target.fullBtn).pointerEvents;
+      target.fullBtn.blur();
+      d.assert('SLIDES: every static slide has its ⛶, hidden at rest and shown when the slide holds focus',
+        missing.length === 0 && btns.length >= 30 && rest.every((o) => o === (noHover ? 1 : 0)) && focused === 1 && focusedPe === 'auto'
+          && btns.every((b) => b.textContent.includes('⛶') && b.classList.contains('ico')),
+        `${btns.length} slides${missing.length ? `, missing on ${missing.join(', ')}` : ''}, at rest ${[...new Set(rest)].join('/')} opacity`
+        + `${noHover ? ' (a screen with no hover shows it always)' : ''}, focused ${focused} and ${focusedPe}`);
+
+      const was = target.el.getBoundingClientRect();
+      const say = target.parts.say;
+      target.fullBtn.click();
+      await frames(10);
+      const fr = target.frame, fcs = getComputedStyle(fr), r = target.el.getBoundingClientRect(), scs = getComputedStyle(target.el);
+      const vw = fr.clientWidth, vh = fr.clientHeight;
+      const wantW = Math.min(vw, vh * 16 / 9);
+      const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim();
+      const probe = document.createElement('div'); probe.style.background = card; document.body.append(probe);
+      const cardRgb = getComputedStyle(probe).backgroundColor; probe.remove();
+      const sayPx = parseFloat(getComputedStyle(say).fontSize), sayWant = stepOf(4).size / 100 * target.el.clientHeight;
+      const rootR = getComputedStyle(document.documentElement).getPropertyValue('--r').trim();
+      const centred = tol(r.left + r.width / 2, fr.getBoundingClientRect().left + vw / 2, 1) && tol(r.top + r.height / 2, fr.getBoundingClientRect().top + vh / 2, 1);
+      d.assert('SLIDES: the ⛶ fills the screen with the slide letterboxed 16:9 and centred on its own ground, edge kept, type at its step',
+        target.isFull() && vw >= innerWidth - 1 && tol(r.width, wantW, 1.5) && tol(r.height, r.width * 9 / 16, 1.5) && centred
+          && fcs.backgroundColor === cardRgb && parseFloat(scs.borderTopWidth) === 1 && scs.borderTopLeftRadius === rootR
+          && tol(sayPx, sayWant, 0.5),
+        `${target.isFull() ? 'full' : 'NOT full'} on a ${vw}x${vh} screen, the slide ${r.width.toFixed(1)}x${r.height.toFixed(1)} ${centred ? 'centred' : 'OFF CENTRE'}, `
+        + `ground ${fcs.backgroundColor} against the card ${cardRgb}, edge ${scs.borderTopWidth} radius ${scs.borderTopLeftRadius} against --r ${rootR}, `
+        + `headline ${sayPx.toFixed(2)} px against ${sayWant.toFixed(2)} (step 4 of ${target.el.clientHeight} px)`);
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      await frames(6);
+      const back = target.el.getBoundingClientRect();
+      d.assert('SLIDES: Escape gives the screen back and the slide its place in the block',
+        !target.isFull() && tol(back.width, was.width, 0.5) && tol(back.height, was.height, 0.5)
+          && !document.documentElement.classList.contains('pos-faux-host'),
+        `${target.isFull() ? 'STILL full' : 'out'}, ${back.width.toFixed(1)}x${back.height.toFixed(1)} against ${was.width.toFixed(1)}x${was.height.toFixed(1)} before`);
+    }
+
+    // ── the diagram's lines on a slide ───────────────────────────────────
+    {
+      const dg = C.diagram;
+      const sl = dg.subject().closest('.sl');
+      const edge = parseFloat(getComputedStyle(sl).getPropertyValue('--sl-dg-edge'));
+      const link = parseFloat(getComputedStyle(sl).getPropertyValue('--sl-dg-link'));
+      const air = parseFloat(getComputedStyle(sl).getPropertyValue('--sl-dg-air'));
+      const boxesEls = [...dg.subject().querySelectorAll('.pos-dg-box')];
+      const links = [...dg.subject().querySelectorAll('.pos-dg-link')];
+      const wrongBox = boxesEls.filter((b) => parseFloat(getComputedStyle(b).strokeWidth) !== edge);
+      const wrongLink = links.filter((l) => parseFloat(getComputedStyle(l).strokeWidth) !== link);
+      const hued = boxesEls.filter((b) => getComputedStyle(b).stroke !== getComputedStyle(boxesEls[0]).stroke).length;
+      // the clearance between a name and the inside of its box's edge, in the
+      // diagram's own logical px: the screen distance over the fit's scale
+      const fitIn = dg.subject().closest('.sl-fit-in');
+      const k = parseFloat(fitIn.style.getPropertyValue('--fit-k')) || 1;
+      const clear = [...dg.subject().querySelectorAll('.pos-dg-n')].map((g) => {
+        const box = g.querySelector('.pos-dg-box'), lab = g.querySelector('.pos-dg-lab');
+        if (!box || !lab) return Infinity;
+        const b = box.getBoundingClientRect(), t = lab.getBoundingClientRect();
+        const inner = edge / 2 * k;
+        return Math.min(t.left - (b.left + inner), t.top - (b.top + inner), (b.right - inner) - t.right) / k;
+      }).filter(Number.isFinite);
+      const least = Math.min(...clear);
+      d.assert('SLIDES: a diagram on a slide draws its edges and arrows at the slide width and keeps the declared air inside every box',
+        edge === 2 && link === 2 && boxesEls.length >= 6 && links.length >= 2 && !wrongBox.length && !wrongLink.length
+          && hued >= 1 && clear.length >= 6 && least >= air,
+        `${boxesEls.length} edges at ${edge} px (${wrongBox.length} not), ${links.length} arrows at ${link} px (${wrongLink.length} not), `
+        + `${hued} edges keep a hue of their own, the tightest name ${least.toFixed(1)} logical px inside its edge against ${air}`);
+    }
+
     // ── nothing fetched ──────────────────────────────────────────────────
     {
       const after = performance.getEntriesByType('resource');
@@ -12304,9 +12558,14 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
 
     kitTabs.go(home, { push: false });
     try { history.replaceState(null, '', `${location.pathname}${location.search}${addressWas}`); } catch { /* file:// */ }
-    d.assert('SLIDES: leaving the tab stops everything it started',
-      !slideKit.open && C.video.video.paused && !C.grid.grid.clock.playing(),
-      `open ${slideKit.open}, the video ${C.video.video.paused ? 'paused' : 'playing'}`);
+    const logsAt = [C.liveLog.lines(), C.liveTable.log.count()];
+    await nap(600);
+    const logsStill = C.liveLog.lines() === logsAt[0] && C.liveTable.log.count() === logsAt[1]
+      && !C.liveLog.running() && !C.liveTable.running();
+    d.assert('SLIDES: leaving the tab stops everything it started, the live logs included',
+      !slideKit.open && C.video.video.paused && !C.grid.grid.clock.playing() && logsStill,
+      `open ${slideKit.open}, the video ${C.video.video.paused ? 'paused' : 'playing'}, `
+      + `the logs ${logsStill ? 'still' : 'STILL WRITING'} at ${logsAt.join(' and ')} over 0.6 s`);
   }
 
 

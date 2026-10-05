@@ -19,7 +19,9 @@
 //   text       a paragraph, step 3 (or `textStep`)
 //   list       up to three lines, dimmed
 //   stack      [label, value, unit] rows, decimal points in one column
-//   rows       { head, body, align }, a table padded into character columns
+//   rows       { head, body, align, frame }, a table padded into character
+//              columns; `frame` 'none' rules a line between rows, 'box' adds
+//              the rounded edge, absent is plain lines
 //   lines      [[step, text], ...], each line at its own step, for specimens
 //   cap        the caption, step 1, bottom left, always
 //   slot       any element: a kit component, a picture, a diagram
@@ -60,6 +62,8 @@ import { el } from './shell.mjs';
 import { createVideoPanel } from './video-panel.mjs';
 import { createStepper } from './stepper.mjs';
 import { createDiagram, TECH_HUE } from './diagram.mjs';
+import { toggle as fsToggle, exit as fsExit, isFull, watch as fsWatch } from './fullscreen.mjs';
+import { centreSymbol } from './symbol.mjs';
 
 // ── the scale, declared once ────────────────────────────────────────────────
 /**
@@ -81,12 +85,16 @@ export const SCALE = Object.freeze({
   steps: Object.freeze([
     Object.freeze({ n: 1, lh: 1.45, ls: 0 }),
     Object.freeze({ n: 2, lh: 1.3, ls: -0.005 }),
-    Object.freeze({ n: 3, lh: 1.2, ls: -0.01 }),
-    Object.freeze({ n: 4, lh: 1.1, ls: -0.02 }),
-    Object.freeze({ n: 5, lh: 1.05, ls: -0.03 }),
-    Object.freeze({ n: 6, lh: 1, ls: -0.04 }),
+    Object.freeze({ n: 3, lh: 1.2, ls: -0.012 }),
+    Object.freeze({ n: 4, lh: 1.1, ls: -0.03 }),
+    Object.freeze({ n: 5, lh: 1.05, ls: -0.045 }),
+    Object.freeze({ n: 6, lh: 1, ls: -0.06 }),
   ]),
 });
+// ⚠️ THE TRACKING CLOSED FURTHER ON THE LARGE STEPS, 2026-10-05, asked as
+// *"biit more negat tracking on large sizes"*: it was 0, -0.005, -0.01, -0.02,
+// -0.03 and -0.04 em, and it is the values above. Step 1 stays at 0, because
+// it is read as words; a mono face at display size reads loose without it.
 export const STEPS = SCALE.steps.map((s) => s.n);
 
 /** A step's size as a share of the slide's height, in per cent. */
@@ -172,21 +180,54 @@ export const evStep = (rows) => (rows > 3 ? 2 : 3);
  */
 export const wordsStep = (step, layout) => Math.max(1, layout === 'split' ? step - 1 : step);
 
+/** The two spaces between character columns, in every table and log. */
+export const COL_GAP = 2;
+
+/**
+ * One row padded into columns of the given widths, `align[c]` 'r' or left.
+ * Padded on the VISIBLE length, so an accent mark takes no column. A cell
+ * wider than its column is never cut and pushes the rest of its row along,
+ * which a live log avoids by declaring widths that hold its widest value.
+ */
+export function padRow(r, widths, align = '') {
+  return widths.map((cw, c) => {
+    const t = String(r[c] ?? ''), fill = ' '.repeat(Math.max(0, cw - plain(t).length));
+    return align[c] === 'r' ? fill + t : t + fill;
+  }).join(' '.repeat(COL_GAP)).replace(/\s+$/, '');
+}
+
+/** Where each column starts, in characters, for these widths. */
+export function colStarts(widths) {
+  const starts = []; let x = 0;
+  for (const cw of widths) { starts.push(x); x += cw + COL_GAP; }
+  return starts;
+}
+
 /** Pad `rows` into lines of text whose columns are character positions. */
 export function padRows({ head = null, body = [], align = '' }) {
   const all = head ? [head, ...body] : body;
   const n = Math.max(0, ...all.map((r) => r.length));
   const w = Array.from({ length: n }, (_, c) => Math.max(...all.map((r) => plain(r[c]).length)));
-  const gap = '  ';
-  // Padded on the VISIBLE length, so an accent mark takes no column.
-  const line = (r) => w.map((cw, c) => {
-    const t = String(r[c] ?? ''), fill = ' '.repeat(cw - plain(t).length);
-    return align[c] === 'r' ? fill + t : t + fill;
-  }).join(gap).replace(/\s+$/, '');
-  const starts = []; let x = 0;
-  for (const cw of w) { starts.push(x); x += cw + gap.length; }
-  return { lines: all.map(line), starts, widths: w, head: !!head };
+  return { lines: all.map((r) => padRow(r, w, align)), starts: colStarts(w), widths: w, head: !!head };
 }
+
+/**
+ * 🔴 A TABLE'S FRAME, CHOSEN PER SLIDE. Asked 2026-10-05: *"i do not see
+ * tables layout. horiz lines but try with rounded corner outer border and
+ * not"*. Absent, a table is plain padded lines. `none` draws a 1 px `--line`
+ * rule between rows (the header's included) and nothing outside them; `box`
+ * draws the same rules inside the site's own rounded edge (`--edge`, `--r`).
+ * No vertical lines in either: a column is a character position, and a rule
+ * between columns would say twice what the alignment already says.
+ */
+export const FRAMES = ['box', 'none'];
+
+/**
+ * A framed row carries 0.3 em of air above and below its glyphs, so a table
+ * of three lines is about one line taller than a plain one, and at three lines
+ * or more it drops to step 2 rather than spilling under a two line headline.
+ */
+export const tableStep = (lines, frame) => (frame ? (lines > 2 ? 2 : 3) : evStep(lines));
 
 // ── the slide model ─────────────────────────────────────────────────────────
 export const LAYOUTS = ['stack', 'top', 'left', 'right', 'split'];
@@ -214,6 +255,9 @@ export function normalise(spec) {
   for (const [n] of spec.lines || []) stepOf(n);
   if (spec.textStep != null) stepOf(spec.textStep);
   if (spec.list && spec.list.length > 4) throw new Error('a list is two to four lines');
+  if (spec.rows && spec.rows.frame != null && !FRAMES.includes(spec.rows.frame)) {
+    throw new Error(`a table frame is box or none, not ${spec.rows.frame}`);
+  }
   return { ...spec, layout };
 }
 
@@ -283,9 +327,12 @@ export function fitBox(host, w) {
  * 2026-10-05: *"do not use diagram native descs below but use slides text and
  * postion"*. Every `sub` and link `label` is taken out before the diagram sees
  * the spec, and a top level node's `desc` is set under that box.
+ * ⚠️ 580 LOGICAL px, NOT 640, since the edges went thick (`slide.css` has the
+ * arithmetic): the narrowest width that keeps a row of columns, so the box
+ * padding and gaps come out larger against a name drawn one size down.
  * Returns a slot builder.
  */
-export function slideDiagram(spec, { w = 640 } = {}) {
+export function slideDiagram(spec, { w = 580 } = {}) {
   const tops = spec.nodes;
   const clean = {
     ...spec,
@@ -364,12 +411,24 @@ export function slideDiagram(spec, { w = 640 } = {}) {
  * @param spec       see the top of this file
  * @param o.host     where to put it; omitted, the caller appends `el`
  * @param o.slots    { kind: (host, options) => ctl } for a `slot: { kind }`
- * @returns { el, frame, spec, parts, ctl, start, stop }
+ * @param o.full     a ⛶ on the slide that fills the screen with it
+ * @returns { el, frame, spec, parts, ctl, start, stop, fullBtn, full(want), isFull() }
+ *
+ * 🔴 `full: true`, asked 2026-10-05 as *"add go to fullscreen button (active
+ * when mouseover) on all kit slide samples"*. The ⛶ is the video panel's
+ * (the same glyph, `ico` look and ink centring), shown while a pointer is on
+ * the slide or the slide holds focus, and always on a screen with no hover,
+ * where it is also the way back out. The FRAME goes full through
+ * `fullscreen.mjs` (the real API, else the `position: fixed` cover), so the
+ * slide inside it stays a size container and every step keeps its share of the
+ * slide's height. Escape leaves on both paths: the real API takes it itself and
+ * `watch` handles the cover. Then *"fill full bg but keep border"*: the whole
+ * screen takes the slide's ground and the 16:9 box keeps its edge and corner.
  *   `frame` is the inline size container the slide is sized off; `el` is the
  *   slide. `ctl` is whatever the slot builder returned (its `start` and `stop`
  *   are called by `start()` and `stop()`, and by the player on show and hide).
  */
-export function createSlide(spec, { host = null, slots = {} } = {}) {
+export function createSlide(spec, { host = null, slots = {}, full = false } = {}) {
   ensureCss();
   const s = normalise(spec);
   const frame = el('div', 'sl-frame');
@@ -433,9 +492,11 @@ export function createSlide(spec, { host = null, slots = {} } = {}) {
   }
   if (s.rows) {
     const p = padRows(s.rows);
-    const table = el('div', `sl-rows sl-t sl-t${wordsStep(evStep(p.lines.length), s.layout)}`);
+    const frame = s.rows.frame || '';
+    const table = el('div', `sl-rows sl-t sl-t${wordsStep(tableStep(p.lines.length, frame), s.layout)}`);
+    if (frame) table.dataset.frame = frame;
     p.lines.forEach((t, r) => {
-      const row = el('div', r === 0 && p.head ? 'sl-dim' : '');
+      const row = el('div', r === 0 && p.head ? 'sl-row sl-dim' : 'sl-row');
       row.append(rich(t));
       table.append(row);
     });
@@ -470,13 +531,84 @@ export function createSlide(spec, { host = null, slots = {} } = {}) {
     box.append(cap);
   }
 
+  let fullBtn = null;
+  if (full) {
+    fullBtn = el('button', 'ico sl-full', '⛶', { type: 'button', title: 'fill the screen', 'aria-label': 'fill the screen' });
+    centreSymbol(fullBtn);
+    node.append(fullBtn);
+    fullBtn.addEventListener('click', () => flip());
+  }
+  let watched = false;
+  const flip = async () => {
+    // the class has to follow an exit nobody drove, so it is watched, once,
+    // from the first press; a slide nobody fills adds no listener at all
+    if (!watched) { fsWatch(frame); watched = true; }
+    return fsToggle(frame);
+  };
+
   if (host) host.append(frame);
   let running = false;
   return {
-    el: node, frame, spec: s, parts, ctl,
+    el: node, frame, spec: s, parts, ctl, fullBtn,
+    async full(want = true) {
+      if (want === isFull(frame)) return want;
+      if (want) await flip(); else await fsExit(frame);
+      return isFull(frame);
+    },
+    isFull: () => isFull(frame),
     start() { if (!running) { running = true; ctl?.start?.(); } },
     stop() { if (running) { running = false; ctl?.stop?.(); } },
     running: () => running,
+  };
+}
+
+/**
+ * A LIVE TABULAR LOG for a slot: a header row and rows under it, padded into
+ * character columns like a `rows` table and ruled like a `frame: 'none'` one.
+ * Asked 2026-10-05: *"show 2col layout with live logs / live tabular logs"*.
+ *
+ * 🔴 A FIXED BOX, AND THE NEWEST ROW AT THE BOTTOM. The log takes the height
+ * its slot gives it and never its content's, so nothing on the slide moves
+ * while it fills (positron-ui: a live surface is a fixed box). A new row is
+ * appended at the foot and the body is scrolled to it, so the oldest rows
+ * leave the top; past `cap` rows the oldest are removed from the document too.
+ * 🔴 THE WIDTHS ARE DECLARED, NOT MEASURED, because a live log's widest value
+ * has not arrived yet: a column sized to the rows so far would widen when a
+ * longer one came and every column right of it would jump.
+ *
+ * @param o.head    the column names, the header row
+ * @param o.widths  characters per column; a column is never narrower than its name
+ * @param o.align   'r' or 'l' per column, numbers right so their decimals line up
+ * @param o.step    the type step, 1 or 2 (a slot is half a slide)
+ * @param o.cap     rows kept in the document
+ * @returns { el, add(cells), count(), rows(), clear() }
+ */
+export function createSlideLog({ head, widths, align = '', step = 1, cap = 40 } = {}) {
+  ensureCss();
+  if (!Array.isArray(head) || !Array.isArray(widths) || head.length !== widths.length) {
+    throw new Error('a slide log names its columns and gives each a width');
+  }
+  if (step !== 1 && step !== 2) throw new Error('a slide log is at step 1 or 2');
+  const w = widths.map((n, c) => Math.max(n, plain(head[c]).length));
+  const root = el('div', `sl-log sl-t sl-t${step}`);
+  const top = el('div', 'sl-row sl-dim sl-log-head', padRow(head, w, align));
+  const body = el('div', 'sl-log-body');
+  root.append(top, body);
+  let added = 0;
+  return {
+    el: root, head: top, body, widths: w, starts: colStarts(w),
+    add(cells) {
+      const row = el('div', 'sl-row');
+      row.append(rich(padRow(cells, w, align)));
+      body.append(row);
+      while (body.children.length > cap) body.firstElementChild.remove();
+      body.scrollTop = body.scrollHeight;
+      added++;
+      return row;
+    },
+    count: () => added,
+    rows: () => [...body.children],
+    clear() { body.replaceChildren(); },
   };
 }
 
