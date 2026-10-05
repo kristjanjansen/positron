@@ -1,5 +1,8 @@
 ## Open
 
+- **`/now/` with ERR, if we try** (2026-10-05): *"Can you make now work with err? No need but if we try?"*. Diagnose against `demo/fake-err.mjs` only; no request to ERR from here (CLAUDE.md, their audience statistics). The owner opens the real one.
+- **Other free live TV-like sources** (2026-10-05): *"Also look into oher free live tvlike sources"*. Research from documentation only, no stream opened: `research/free-live-tv-sources-2026-10-05.md`.
+
 - ~~**`/click/` and `/und/` as one page** (2026-10-05): *"merge click and und, no need for 'mobile screen' / theme"*. Tabbed page at `/und/` (SCORE from und, CLICK from click), `/click/` retired with no redirect, click loses its mobile screen view and its theme switch.~~ Done 2026-10-05: SCORE and CLICK tabs, the player screen and its theme switch removed (about 150 lines), 50/50.
 
 - ~~**Index groups regrouped** (2026-10-05): *"groups. kureniemi: stays as is. bauhaus: partitur. tehnologies: timelines + messages + technologies"*. `demo/manifest.mjs` GROUPS and rows.~~ Done 2026-10-05: kurenniemi unchanged, `bauhaus` holds partitur, `technologies` holds time sync click draw wire now und room flipper.
