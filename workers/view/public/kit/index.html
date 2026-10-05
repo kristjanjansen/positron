@@ -1873,19 +1873,20 @@
           drawOled(cv, px);
           hw.parts.push({ name: 'slide-oled', cv, px: null,
             paint: (u) => hw.parts.find((p) => p.name === 'link').paint(u) });
-          // WHOLE NUMBERS ONLY, 1x OR 2x. Asked 2026-10-05 with a screenshot:
+          // WHOLE NUMBERS ONLY. Asked 2026-10-05 with a screenshot:
           // *"do not scale screen this way. just 1x 2x etc"*. It used to grow to
           // fill the half slide and fall to a FRACTION on a phone, which is the
-          // one thing `oledScreen` above exists to refuse. 2x where it fits, 1x
-          // where it does not, never between and never bigger than the panel
-          // reads on the HARDWARE tab.
+          // one thing `oledScreen` above exists to refuse. The largest whole
+          // number that fits the column, 1x at least, never between.
           const fit = () => {
             const sc = getComputedStyle(screen);
             const chrome = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
               .reduce((n, k) => n + parseFloat(sc[k]), 0);
             const w = Math.min(host.clientWidth - chrome, 2 * (host.clientHeight - chrome));
             if (!(w > 0)) return;
-            const k = w >= 2 * OLED_W ? 2 : 1;
+            // and in full screen as many whole times as fit (*"2x on
+            // fullscreen?"*): still whole numbers, never a fraction
+            const k = Math.max(1, Math.floor(w / OLED_W));
             screen.style.setProperty('--oled-k', String(k));
           };
           new ResizeObserver(fit).observe(host);
@@ -12294,8 +12295,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const dt = o.cv.getContext('2d').getImageData(0, 0, OLED_W, OLED_H).data;
       for (let i = 0; i < dt.length; i += 4) if (dt[i] === OLED_LIT[0] && dt[i + 2] === OLED_LIT[2]) lit++;
       const k = parseFloat(o.screen.style.getPropertyValue('--oled-k'));
-      d.assert('SLIDES: the OLED on a slide is drawn at 1x or 2x, never between',
-        lit > 100 && (k === 1 || k === 2) && hw.parts.some((p) => p.name === 'slide-oled'),
+      d.assert('SLIDES: the OLED on a slide is drawn at a whole scale, never between',
+        lit > 100 && Number.isInteger(k) && k >= 1 && hw.parts.some((p) => p.name === 'slide-oled'),
         `${lit} panel pixels lit, ${k}x, registered for ui.c when HARDWARE opens`);
     }
     {
