@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. R&D, not a product. 49 demo rows of which
-46 are built, a Raspberry Pi in another building, a Novation Circuit on the
+Live at **https://positron.studio**. R&D, not a product. 48 demo rows of which
+45 are built, a Raspberry Pi in another building, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
@@ -32,7 +32,7 @@ once, so the two index renderers cannot disagree.
 | `LESSONS.md` | why the rules exist, at length |
 | `PROGRESS.md` | what was measured, when |
 | `LAYOUT.md` | where a new file goes, and the two renames that were priced and rejected |
-| `plans/` | every plan, 87 of them on 2026-10-05 (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
+| `plans/` | every plan, 88 of them on 2026-10-05 evening (`ls plans/*.md \| wc -l`, counted and never remembered). A new one goes here and nowhere else |
 
 ## The skills, and when to load one
 
