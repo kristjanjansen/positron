@@ -109,7 +109,7 @@ export const FULL_SCALE = [0.05, 0.1, 0.2, 0.5, 1, 2];
  * 48 kHz), so an idle scope says what it will measure. 2026-10-06, *"show
  * labels when no signal on waveform?"*. */
 const IDLE = Object.freeze({ points: null, name: '', reason: null,
-  axes: { y: '\u00b11', x: `${((WINDOW / 48000) * 1000).toFixed(1)} ms` } });
+  axes: { y: '\u00b12', x: `${((WINDOW / 48000) * 1000).toFixed(1)} ms` } });
 
 /* 🔴 NO NOTE ON THE PLATE, AND AN EDIT COMPILES ITSELF, since 2026-10-06:
    *"rm labels from footer about compiling. autocompile, show compiling... as
@@ -231,8 +231,19 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
 
     const panel = createInstrumentPanel({ viz: scope.el, plate: { name: 'FAU', patch: tone }, full: true });
     const codeRow = panel.addRow(code.el, { pad: false });
+    // ONE PANEL HEIGHT ON EVERY SLIDE, THE KNOBS TAKING IT FROM THE CODE,
+    // 2026-10-06: *"keep same fau size!!! knobs condense code area"*. The
+    // panel is `PANEL_H` tall and the code row has what the scope, the knob
+    // row and the plate leave; the code scrolls inside it when it must
+    panel.el.classList.add('sl-synth-panel');
+    panel.el.style.setProperty('--synth-h', `${PANEL_H}px`);
+    codeRow.classList.add('sl-synth-code');
     const mid = el('div', 'sl-mid');
     mid.append(panel.el);
+    // more room either side of the panel than above and below it, asked
+    // 2026-10-06 as *"add x padding on fau area"*: the slot's own inset again
+    // on the left and right
+    host.classList.add('sl-synth-slot');
     const fb = fitBox(host, PANEL_PX, { h: PANEL_H, top: true, fill: true });
     fb.inner.append(mid);
 
@@ -292,8 +303,6 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     const say = () => {};
     let parts = null, partsText = null;
 
-    let shownFs = 0;
-    const REDUCED = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const buf = new Float32Array(2048);
     function frame() {
       raf = 0;
@@ -303,19 +312,13 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       let i0 = 0;
       for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
       const win = buf.subarray(i0, i0 + WINDOW);
-      let peak = 0;
-      for (const v of win) if (Math.abs(v) > peak) peak = Math.abs(v);
-      // drawn against the smallest round full scale above the peak, so a 0.1
-      // sine fills half the box and its label is a number somebody would type
-      const fs = FULL_SCALE.find((f) => f >= peak * 1.25) || FULL_SCALE[FULL_SCALE.length - 1];
-      // THE SCALE GLIDES, 2026-10-06 (*"can scale change be animated?"*): the
-      // drawn scale eases a fifth of the way to the chosen one each frame, on a
-      // log scale so a step up and a step down take the same time, and the
-      // label names where it is going; reduced motion jumps
-      shownFs = !shownFs || REDUCED() ? fs : Math.exp(Math.log(shownFs) + (Math.log(fs) - Math.log(shownFs)) * 0.2);
-      if (Math.abs(Math.log(shownFs / fs)) < 0.005) shownFs = fs;
+      // ONE FIXED SCALE, 2026-10-06: *"can we keep y scale same?"* and then
+      // *"keep +- 2"*, after the auto range and its glide. With the scale fixed a
+      // turn of the volume knob changes the wave's height, which is the point
+      // of the knob; a range that followed the peak hid it
+      const fs = 2;
       scope.set({
-        points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / shownFs))), reason: '', name: '',
+        points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / fs))), reason: '', name: '',
         axes: { y: `\u00b1${fs}`, x: `${((WINDOW / ctx.sampleRate) * 1000).toFixed(1)} ms` },
       });
       draws++;
