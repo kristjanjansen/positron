@@ -43,6 +43,8 @@ const SYNTHS = [
     name: st.name, layout: 'split', side: 'right', say: 'A sine in two lines',
     text: 'A short Faust program, compiled ahead of time, makes this tone. '
       + 'Edit it and the browser compiles yours.',
+    // one step down, asked 2026-10-06 as *"use smaller text size"*
+    textStep: 2,
     slot: synthSlot(st),
   })),
 ];
