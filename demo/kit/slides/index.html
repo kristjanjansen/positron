@@ -2334,7 +2334,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         vIdx === 2 && !!row && getComputedStyle(row).display !== 'none' && shape === 'viz controls controls plate' && v.panel.controls()[1] === row
           && kr.top >= cr.bottom - 1 && kr.bottom <= pr.top + 1 && v.knobs.names().join() === 'volume' && v.knobs.value('volume') === 0.5 && shows() === '0.50'
           && /volume = hslider\("volume", 0\.5, 0, 1, 0\.01\);/.test(v.shipped) && v.code.value() === v.shipped
-          && volFetched().length === 0 && stepRes.length === 0 && !v.sounding() && V.parts.say?.textContent === 'A slider becomes a knob',
+          && volFetched().length === 0 && stepRes.length === 0 && !v.sounding() && V.parts.say?.textContent === 'A volume knob',
         `slide ${vIdx + 1}, rows ${shape}, the knob row ${kr ? `${kr.top.toFixed(0)} to ${kr.bottom.toFixed(0)} px under code ending ${cr.bottom.toFixed(0)}, over the plate at ${pr.top.toFixed(0)}` : 'MISSING'}, `
         + `knobs ${v.knobs.names().join(', ') || 'none'} showing "${shows()}", ${volFetched().length} volume file(s), ${stepRes.length} request(s) on the step`);
 
@@ -2352,6 +2352,17 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
           `the divide at ${divide.toFixed(1)} of ${sr.width.toFixed(1)} px (a third is ${(sr.width / 3).toFixed(1)}), the darker ground ${dark.toFixed(1)} px, `
           + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start ${(sayR.top - wr.top).toFixed(1)} px down it, `
           + `the gap ${(xr.left - wr.right).toFixed(1)} px against an inset of ${(wr.left - sr.left).toFixed(1)}`);
+      }
+
+      // slides 2 and 3 draw the instrument at ONE scale (*"2 and 3 use same
+      // size of fau"*): slide 3 is on screen, so its scale is read live, and
+      // slide 2's fit box is asked to fit at the same slot size
+      {
+        const k3 = v.fb.fit(), k2 = c.fb.fit();
+        const h2 = c.fb.inner.offsetHeight, h3 = v.fb.inner.offsetHeight;
+        d.assert('SYNTHS: slides 2 and 3 draw the FAU panel at one scale, the shorter one centred rather than grown',
+          k3 > 0 && Math.abs(k2 - k3) < 0.001 && h2 < h3,
+          `slide 2 at ${k2.toFixed(4)} (panel ${h2} px), slide 3 at ${k3.toFixed(4)} (panel ${h3} px)`);
       }
 
       // a turn before Start is kept and is what Start plays: Home, the bottom, 0
