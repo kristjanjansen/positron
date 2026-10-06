@@ -18,6 +18,7 @@ import { plain, lintWords } from './slide.mjs';
 import { PANEL_H } from './slide-synth.mjs';
 import { contexts as audioContexts, audioOwner } from './audio.mjs';
 import { unmapSpec } from './param-knobs.mjs';
+import { SYNTH_STEPS } from './synth-steps.mjs';
 
 export async function synthChecks(d, p) {
   const nap = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -44,6 +45,8 @@ export async function synthChecks(d, p) {
   const engine = () => names().filter((n) => ENGINE.test(new URL(n).pathname));
   const compiler = () => performance.getEntriesByType('resource').filter((e) => COMPILER.test(new URL(e.name).pathname));
   const toneIdx = p.slides.findIndex((s) => s.ctl && s.ctl.tone);
+  // every slide with an instrument on it, read off the deck rather than typed
+  const inst = p.slides.map((s, i) => (s.ctl ? i : -1)).filter((i) => i >= 0);
   const FLOOR = 0.01;
 
   // 1. a visit loaded no engine and made no sound device, and the title is two lines at the top step
@@ -51,7 +54,7 @@ export async function synthChecks(d, p) {
   const intro = p.slides[0];
   const lines = intro.parts.lines;
   d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 6 with a caption and no body',
-    atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 6 && toneIdx === 1 && p.at() === 0
+    atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 1 + SYNTH_STEPS.filter((st) => !st.hidden).length && toneIdx === 1 && p.at() === 0
       && lines.length === 2 && lines.every((l) => l.dataset.step === '6') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
       && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
     `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
@@ -247,7 +250,7 @@ export async function synthChecks(d, p) {
       // ⚠️ THE HEADLINE'S TOP ON EVERY INSTRUMENT SLIDE, each read while it
       // is shown: the longest words are the ones that climb out of the column
       let sayTop = Infinity;
-      for (const i of [1, 2, 3, 4, 5]) {
+      for (const i of inst) {
         p.go(i);
         await frames(2);
         const S2 = p.slides[i];
@@ -256,12 +259,12 @@ export async function synthChecks(d, p) {
       p.go(vIdx);
       await frames(2);
       const sayR = { top: wr.top + sayTop };
-      const both = [1, 2, 3, 4, 5].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
-      d.assert('SYNTHS: slides 2 to 6 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
+      const both = inst.every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
+      d.assert('SYNTHS: every instrument slide split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
         both && Math.abs(divide - sr.width / 3) < 1 && Math.abs(dark - (sr.width * 2) / 3) < 1 && Math.abs(tr.bottom - wr.bottom) < 1.5
           && sayR.top >= wr.top - 0.5 && Math.abs((xr.left - wr.right) - 2 * (wr.left - sr.left)) < 1,
         `the divide at ${divide.toFixed(1)} of ${sr.width.toFixed(1)} px (a third is ${(sr.width / 3).toFixed(1)}), the darker ground ${dark.toFixed(1)} px, `
-        + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start at least ${sayTop.toFixed(1)} px down it on slides 2 to 6, `
+        + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start at least ${sayTop.toFixed(1)} px down it on every instrument slide, `
         + `the gap ${(xr.left - wr.right).toFixed(1)} px against an inset of ${(wr.left - sr.left).toFixed(1)}`);
     }
 
@@ -272,7 +275,7 @@ export async function synthChecks(d, p) {
     // passes
     {
       const ks = [], hs = [];
-      for (const i of [1, 2, 3, 4, 5]) {
+      for (const i of inst) {
         p.go(i);
         await frames(2);
         ks.push(p.slides[i].ctl.fb.fit());
@@ -283,9 +286,9 @@ export async function synthChecks(d, p) {
       // ONE PANEL HEIGHT since 2026-10-06 (*"keep same fau size!!! knobs
       // condense code area"*): every panel is PANEL_H tall, a knob row
       // takes its height from the code row
-      d.assert('SYNTHS: slides 2 to 6 draw the FAU panel at one scale and one height, PANEL_H, the knobs taking room from the code',
+      d.assert('SYNTHS: every instrument slide draw the FAU panel at one scale and one height, PANEL_H, the knobs taking room from the code',
         ks[0] > 0 && ks.every((k) => Math.abs(k - ks[0]) < 0.001) && hs.every((h) => Math.abs(h - PANEL_H) <= 1),
-        hs.map((h, j) => `slide ${j + 2} at ${ks[j].toFixed(4)} (panel ${h} px)`).join(', ') + `, PANEL_H ${PANEL_H}`);
+        hs.map((h, j) => `slide ${inst[j] + 1} at ${ks[j].toFixed(4)} (panel ${h} px)`).join(', ') + `, PANEL_H ${PANEL_H}`);
     }
 
     // a turn before Start is kept and is what Start plays: Home, the bottom, 0
@@ -432,8 +435,9 @@ export async function synthChecks(d, p) {
   // order, wave in its own hue. Every level is read off the analyser, every
   // value the node holds off the node itself. A sine of amplitude 0.5 is
   // RMS 0.354 and the band limited saw 0.286 (`build-faust-aot.mjs` EXPECT).
-  {
-    const wIdx = p.slides.findIndex((s) => s.ctl?.step?.id === 'wave');
+  // ⚠️ ONLY WHILE THE SLIDE IS IN THE DECK: `wave` is hidden since 2026-10-06
+  const wIdx = p.slides.findIndex((s) => s.ctl?.step?.id === 'wave');
+  if (wIdx >= 0) {
     const W = p.slides[wIdx], w = W.ctl;
     const WAVE = /\/resources\/faust\/wave\.(json|wasm)$/;
     const waveFetched = () => names().filter((n) => WAVE.test(new URL(n).pathname));

@@ -91,6 +91,9 @@ process = os.osc(freq) * volume;
     id: 'saw',
     name: 'a sawtooth',
     mono: true,
+    // HIDDEN 2026-10-06, asked as *"hide sawtooth and its selection"*: out of
+    // the deck, kept here with its artefact so it can come back by one line
+    hidden: true,
     // slide 5, asked 2026-10-06 as *"sawtooth"* from four offered next steps:
     // slide 4's program with one word changed, `os.osc` to `os.sawtooth`, so
     // the step is the wave's shape and the scope shows it
@@ -110,6 +113,8 @@ process = os.sawtooth(freq) * volume;
     id: 'wave',
     name: 'a wave to choose',
     mono: true,
+    // HIDDEN with `saw`, the same ask
+    hidden: true,
     // slide 6, asked 2026-10-06 as *"how to make it a radio (sawtooth?)"*:
     // slide 4's program with a third control, an `nentry` whose
     // `[style:radio{...}]` the slide draws as a choice of sine and saw
