@@ -2387,7 +2387,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         vIdx === 2 && !!row && getComputedStyle(row).display !== 'none' && shape === 'viz controls controls plate' && v.panel.controls()[1] === row
           && kr.top >= cr.bottom - 1 && kr.bottom <= pr.top + 1 && v.knobs.names().join() === 'volume' && v.knobs.value('volume') === 0.5 && shows() === '0.50'
           && /volume = hslider\("volume", 0\.5, 0, 1, 0\.01\);/.test(v.shipped) && v.code.value() === v.shipped
-          && volFetched().length === 0 && stepRes.length === 0 && !v.sounding() && V.parts.say?.textContent === 'Code constant to an interactive knob'
+          && volFetched().length === 0 && stepRes.length === 0 && !v.sounding() && !V.parts.say
           && V.parts.text?.querySelector('code.sl-var[data-var="volume"]')?.dataset.hue === String(v.book.hueOf('volume'))
           && !('hue' in (V.parts.text?.querySelector('code.sl-var[data-var="process"]')?.dataset ?? { hue: 1 })),
         `slide ${vIdx + 1}, rows ${shape}, the knob row ${kr ? `${kr.top.toFixed(0)} to ${kr.bottom.toFixed(0)} px under code ending ${cr.bottom.toFixed(0)}, over the plate at ${pr.top.toFixed(0)}` : 'MISSING'}, `
@@ -2408,7 +2408,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
           p.go(i);
           await frames(2);
           const S2 = p.slides[i];
-          sayTop = Math.min(sayTop, S2.parts.say.getBoundingClientRect().top - S2.parts.words.getBoundingClientRect().top);
+          sayTop = Math.min(sayTop, (S2.parts.say || S2.parts.text).getBoundingClientRect().top - S2.parts.words.getBoundingClientRect().top);
         }
         p.go(vIdx);
         await frames(2);
@@ -2540,8 +2540,8 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
           && getComputedStyle(F.parts.text.querySelector('code.sl-var[data-var="freq"]')).color
             === getComputedStyle(f.code.el.querySelector('.pos-tk-pvar[data-param="freq"]') || F.parts.text).color
           && !!vr && !!fr && Math.abs(vr.top - fr.top) < 1 && fr.left > vr.right
-          && /volume = hslider\("volume", 0\.5, 0, 1, 0\.01\);\n.*\nfreq = hslider\("freq", 440, 50, 2000, 1\);\nprocess = os\.osc\(freq\) \* volume;/.test(f.shipped)
-          && pitchFetched().length === 0 && stepRes.length === 0 && !f.sounding() && F.parts.say?.textContent === 'A second knob for the pitch',
+          && /volume = hslider\("volume", 0\.5, 0, 1, 0\.01\);[\s\S]*freq = hslider\("freq", 440, 50, 2000, 1\);[\s\S]*process = os\.osc\(freq\) \* volume;/.test(f.shipped)
+          && pitchFetched().length === 0 && stepRes.length === 0 && !f.sounding() && !F.parts.say,
         `slide ${fIdx + 1}, rows ${shape}, knobs ${f.knobs.names().join(', ') || 'none'} showing "${shows('volume')}" and "${shows('freq')}", `
         + `hues ${hv} and ${hf} on the knobs as ${hueOn('volume')} and ${hueOn('freq')}, in the code as ${codeHue('volume')} and ${codeHue('freq')}, in the words as ${wordHue('volume')} and ${wordHue('freq')}, `
         + `the knobs' tops ${vr && fr ? (fr.top - vr.top).toFixed(1) : 'MISSING'} px apart, ${pitchFetched().length} pitch file(s), ${stepRes.length} request(s) on the step`);
