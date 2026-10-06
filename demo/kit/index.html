@@ -263,12 +263,14 @@
      between the lines, nothing above them. Same weight as the slide's own rules. */
   .kit-sl .sl[aria-label="the scale"] .sl-ev { gap: 0; margin-top: 0; justify-content: center; }
   .kit-sl .sl[aria-label="the scale"] .sl-line { line-height: 1; margin: 0; }
-  /* THE LOGO set solid, the three lines one mark: no gap between them. */
-  .kit-sl .sl[aria-label="logo"] .sl-ev { gap: 0; }
-  /* THE + AS A SUPERSCRIPT, as the positron is written, β⁺. Asked 2026-10-05:
-     *"+ as superscript?"*. A span raised and made smaller rather than U+207A,
-     which the vendored subsets do not carry. */
-  .kit-sl .sl[aria-label="logo"] .sl-line .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
+  /* SCREEN AND KEYS ON A SLIDE: the screen and the standing key group side by
+     side, centred in the slot, the keys as tall as they are and no taller. */
+  .kit-sl-hw { display: flex; align-items: center; justify-content: center; column-gap: 4cqh; height: 100%; }
+  /* the keys: four separate buttons a gap apart, sized in the slide's own
+     units so they shrink with it on a phone the way its type does: 9cqh is
+     the 34 px of a button on a 385 px slide at the desk */
+  .kit-sl-keys { display: flex; flex-direction: column; align-items: stretch; gap: 2.6cqh; }
+  .kit-sl-keys button { height: 9cqh; font-size: 3.4cqh; padding: 0 4cqh; border-radius: 1cqh; }
   .kit-oled { width: fit-content; max-width: 100%; padding: 10px; background: #000;
               border: 1px solid var(--line); border-radius: 4px; }
   .kit-oled canvas { display: block; image-rendering: pixelated;
@@ -564,7 +566,7 @@
   import { createGlue, createGlueRows } from '/shell/glue.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createSlide, createSlidePlayer, createSlideLog, fitBox, slideDiagram, stepOf, stepCaption, plain, lintWords,
+  import { createSlide, createSlidePlayer, createSlideLog, fitBox, slideDiagram, stepOf, stepCaption, plain, lintWords, wordsStep,
            SCALE } from '/shell/slide.mjs';
   import { parseUF2, fontsIn, patchFont, patchKeys, createOledUi, createPico, createPicoRunner, readScreen, litCount,
            createMidiFramer, KEYS as PICO_KEYS, REPLACE_PATCH, DEFAULT_FONT, DENY_HOLD_MS,
@@ -714,12 +716,6 @@
     ['hardware', 'HARDWARE'],
     ['diagram', 'DIAGRAM'],
     ['slides', 'SLIDES'],
-    // 🔴 BRAND, 2026-10-05, asked as *"add kit tab: brand and logo sectop slide
-    // engine to draw β+ in large type and positron studio under it"*. LAST, the
-    // way SLIDES went last before it: the opening tab is load-bearing for the
-    // checks that predate the row (see `panel` above), and the newest-first
-    // rule is about BLOCKS, which LOGO satisfies by being the first `section()`.
-    ['brand', 'BRAND'],
   ];
 
   /**
@@ -1564,40 +1560,6 @@
     box.append(pair);
   }
 
-  /**
-   * 🔴 THE LOGO, THE NEWEST BLOCK, 2026-10-05, in its own part, BRAND. Asked:
-   * *"add kit tab: brand and logo sectop slide engine to draw β+ in large type
-   * and positron studio under it"*, the two words on two lines. A positron is
-   * the particle of beta plus decay, so the mark is `β+`.
-   * DRAWN BY THE SLIDE ENGINE, NOT BY HAND: one `createSlide` with three
-   * `lines` at declared steps, so the mark is the slide face at the slide's
-   * scale and every rule a slide obeys (16:9, inset, the ⛶) is the logo's too.
-   *   β+        step 6, the largest step the scale declares; there is no 7 and
-   *             a mark does not get a private size.
-   *   positron  step 3 and studio on the line under it, three steps down.
-   *   studio    It was step 4 until the owner asked the same evening: *"1 step
-   *             smalle for 'positron studio'"*. At step 3 `positron` is about
-   *             as wide as the symbol, so the words sit under it as its name.
-   * Left on the inset (`layout: 'left'`), the three lines set solid with no
-   * gap between them, so they are one mark rather than three paragraphs.
-   * ⚠️ ONE COLOUR, THE ACCENT, AND ONLY ON THE `+`. It is the charge, the one
-   * thing that makes it a positron rather than an electron, which is what the
-   * accent is for on a slide: the part that carries the point.
-   * ⚠️ THE β IS NOT IN THE LATIN FILE. JetBrains Mono's Latin subset stops at
-   * U+00FF plus a few marks, so `slide.css` declares the Greek subset at 600
-   * with its `unicode-range`, from the same @fontsource 5.3.0 package; the
-   * browser fetches it only when a β is laid out, which is this tab opened.
-   */
-  const brand = { logo: null };
-  section('brand', 'LOGO',
-    'The mark, drawn by the slide engine: β+ at step 6 and positron and studio under it at step 3, '
-    + 'left on the inset, the accent on the + alone. Set in the slide face, the β from its Greek subset.',
-    `createSlide({ layout: 'left', lines: [[6, 'β*+*'], [3, 'positron'], [3, 'studio']] }, { full: true })`,
-    (box) => {
-      box.classList.add('kit-sl');
-      brand.logo = createSlide({ name: 'logo', layout: 'left',
-        lines: [[6, 'β*+*'], [3, 'positron'], [3, 'studio']] }, { host: box, full: true });
-    });
 
   /**
    * 🔴 SLIDES, THE NEWEST PART, 2026-10-05. Asked as *"let's focus on the kit
@@ -1724,7 +1686,7 @@
   // and MoQ table PROGRESS.md:4712-4719, the clocks HANDOFF.md:133-135, the
   // refusals positron-streaming SKILL.md:228-230.
   const HALF_A = [
-    { name: 'half a title', title: 'Latency off a burned clock', by: 'Kristjan Jansen', date: '2026-10-05',
+    { name: 'half a title', title: 'Latency off a burned clock',
       cap: 'positron.studio' },
     { name: 'half a figure', big: '*26.2*', under: 'ms glass to glass, MoQ p50',
       cap: 'browser to [Cloudflare|cloudflare] to browser' },
@@ -1803,13 +1765,13 @@ pair.append(a.el, b.el);   // .kit-sl-pair, two columns, one under 560 px of its
   // slide title"*. The talk's name at step 5, the speaker at step 3, the date
   // at step 2 (TITLE_STEPS in slide.mjs says why each), laid out `top`: the
   // name where every headline sits, who and when on the bottom edge. The
-  // speaker is the owner of this repository; the date is the day it was built.
-  // No place: nobody has said where this talk is given, so none is invented.
+  // sample carries the name only since 2026-10-06, asked as *"rm Kristjan
+  // Jansen 5 October 2026"*; `by` and `date` stay graded in slide-test.mjs.
   slideBlock('TITLE SLIDE',
-    'The opening of a talk: its name at step 5 top left, who speaks at step 3 and the date at '
-    + 'step 2 on the bottom edge. A title slide carries nothing else, and `place` is the fourth key.',
-    `{ title: 'Latency off a burned clock', by: 'Kristjan Jansen', date: '2026-10-05' }`,
-    { name: 'title', title: 'Latency off a burned clock', by: 'Kristjan Jansen', date: '2026-10-05' });
+    'The opening of a talk: its name at step 5 top left. `by`, `date` and `place` are the optional '
+    + 'keys for who, when and where, and a title slide carries nothing else.',
+    `{ title: 'Latency off a burned clock' }`,
+    { name: 'title', title: 'Latency off a burned clock' });
 
   // ── BIG NUMBER ────────────────────────────────────────────────────────────
   // 🔴 ONE FIGURE ALONE, asked 2026-10-05 from the slides list as *"big
@@ -1818,10 +1780,10 @@ pair.append(a.el, b.el);   // .kit-sl-pair, two columns, one under 560 px of its
   // day as MoQ, n=17,501 over 300 s, *p50 67.0 / p95 76.9 / p99 84.1 ms*,
   // browser to Cloudflare to browser off burned pixels.
   slideBlock('BIG NUMBER',
-    'One figure alone at step 6, centred, with one short line under it at step 3 saying what it '
-    + 'counts. Nothing else on the slide but the caption.',
-    `{ big: '*67.0*', under: 'ms glass to glass, WHEP p50', cap: 'n = 17,501 over 300 s ...' }`,
-    { name: 'big number', big: '*67.0*', under: 'ms glass to glass, WHEP p50',
+    'One figure alone at step 6, centred in the darker top two thirds (the band layout), with one '
+    + 'short line under it on the lighter third saying what it counts, and the caption.',
+    `{ layout: 'band', big: '*67.0*', under: 'ms glass to glass, WHEP p50', cap: 'n = 17,501 over 300 s ...' }`,
+    { name: 'big number', layout: 'band', big: '*67.0*', under: 'ms glass to glass, WHEP p50',
       cap: 'n = 17,501 over 300 s, browser to [Cloudflare|cloudflare] to browser' });
 
   // ── COMBINATIONS ──────────────────────────────────────────────────────────
@@ -2032,6 +1994,72 @@ pair.append(a.el, b.el);   // .kit-sl-pair, two columns, one under 560 px of its
           return null;
         } }, { host: box, full: true });
       slideKit.blocks.push({ title: 'OLED ON A SLIDE', s });
+      slideKit.specs.push(s.spec);
+    });
+  // ── SCREEN AND KEYS ON A SLIDE ────────────────────────────────────────────
+  // 🔴 Asked 2026-10-06 as *"to the slides kit add example with hw screen on
+  // left and 4 buttons vertcally grouped on the right (mix of our primary and
+  // secodary buttons, shimmering on push)"*, rebuilt as a split on *"not good.
+  // use columned layout ... buttons on top right, not grouped, vert gap,
+  // separate, all secondary, additional desc"*, and then laid out `band` on
+  // *"its better to use vertical sections here. top 2/3 is darker, centered
+  // screen and buttons ton the right, below in lighter area title an desc"*.
+  // So the well holds the router's screen at a whole scale with its four keys
+  // to its right, four separate secondary buttons a gap apart, sized in slide
+  // units so they shrink with it; the headline and the sentence are under it.
+  // A press gives the button the one busy sweep every button here has, for
+  // 0.9 s, and is bound to nothing.
+  section('slides', 'SCREEN AND KEYS ON A SLIDE',
+    'The band layout: the router’s screen and its four keys centred in the darker top two thirds, '
+    + 'the keys separate secondary buttons, and the title and a sentence on the lighter third under them.',
+    `{ layout: 'band', slot: screen and four buttons, say: 'The Pico router', text: '...' }`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const s = createSlide({ name: 'screen and keys', layout: 'band',
+        say: 'The Pico router',
+        text: 'Its screen drawn by the firmware’s ui.c, its four keys bound to nothing here.',
+        textStep: 2,
+        slot: (host) => {
+          const row = el('div', 'kit-sl-hw');
+          const screen = el('div', 'kit-oled');
+          const cv = document.createElement('canvas');
+          cv.width = OLED_W; cv.height = OLED_H;
+          screen.append(cv);
+          const keys = el('div', 'kit-sl-keys');
+          const buttons = PICO_KEYS.map((k) => {
+            const b = el('button', '', k.does, { type: 'button', 'aria-label': `${k.does}, key ${k.k}` });
+            b.dataset.id = k.does;
+            b.addEventListener('click', () => {
+              if (b.disabled) return;
+              b.dataset.busy = '1'; b.disabled = true; b.setAttribute('aria-busy', 'true');
+              setTimeout(() => { delete b.dataset.busy; b.disabled = false; b.removeAttribute('aria-busy'); }, 900);
+            });
+            keys.append(b);
+            return b;
+          });
+          row.append(screen, keys);
+          host.append(row);
+          // the stand-in the slide above drew, until the firmware's own screen code loads
+          const px = slideKit.comps.oled ? slideKit.comps.oled.standIn.slice() : new Uint8Array(OLED_W * OLED_H);
+          drawOled(cv, px);
+          hw.parts.push({ name: 'slide-hw', cv, px: null,
+            paint: (u) => hw.parts.find((p) => p.name === 'link').paint(u) });
+          // WHOLE NUMBERS ONLY, as above: the largest that fits beside the keys
+          const fit = () => {
+            const sc = getComputedStyle(screen), rs = getComputedStyle(row);
+            const chrome = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+              .reduce((n, k) => n + parseFloat(sc[k]), 0);
+            const w = Math.min(host.clientWidth - keys.offsetWidth - parseFloat(rs.columnGap || 0) - chrome,
+              2 * (host.clientHeight - chrome));
+            if (!(w > 0)) return;
+            screen.style.setProperty('--oled-k', String(Math.max(1, Math.floor(w / OLED_W))));
+          };
+          new ResizeObserver(fit).observe(host);
+          slideKit.comps.hwKeys = { screen, cv, keys, buttons };
+          return null;
+        } }, { host: box, full: true });
+      slideKit.comps.hwKeys.slide = s;
+      slideKit.blocks.push({ title: 'SCREEN AND KEYS ON A SLIDE', s });
       slideKit.specs.push(s.spec);
     });
   slideBlock('SLIDER ON A SLIDE',
@@ -11711,9 +11739,9 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     d.assert('two blocks in one part sit the project’s one gap apart, not the panel’s own',
       // ⚠️ ONE GAP IS A MEASUREMENT. This said `> 1` and went red on a page
       // opened at #hardware, whose part holds two blocks and so one gap.
-      // ⚠️ AND A PART OF ONE BLOCK HAS NO GAP AT ALL: BRAND holds only LOGO
-      // since 2026-10-05, and a page opened at #logo has nothing to measure,
-      // which is said rather than read as a gap of the wrong size
+      // ⚠️ AND A PART OF ONE BLOCK HAS NO GAP AT ALL (BRAND was one, LOGO,
+      // until the logo moved to /brand/ on 2026-10-06), which is said rather
+      // than read as a gap of the wrong size
       open.classList.contains('pos-stack') && (secs.length === 1 || (gaps.length >= 1 && worst <= 0.5)),
       secs.length === 1 ? `${kitTabs.at()} holds one block, so there is no gap between two to measure`
         : `${gaps.length} gap(s) in ${kitTabs.at()} against --pos-gap ${want} px, worst ${worst} px out`);
@@ -12569,8 +12597,6 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   if (SELFCHECK) {
     slideChecks()
       .catch((e) => d.assert('SLIDES: the checks ran to the end', false, `${e.message}`))
-      .then(() => brandChecks())
-      .catch((e) => d.assert('BRAND: the checks ran to the end', false, `${e.message}`))
       .then(() => hwChecks())
       .catch((e) => d.assert('the router firmware checks ran to the end', false,
         `${e.message}`));
@@ -12802,28 +12828,30 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const px = (e) => parseFloat(getComputedStyle(e).fontSize);
       const share = (e, n) => tol(px(e), stepOf(n).size / 100 * h, 0.5);
       const ir = T.el.querySelector('.sl-in').getBoundingClientRect(), ics = getComputedStyle(T.el.querySelector('.sl-in'));
-      const tr = T.parts.title.getBoundingClientRect(), byr = T.parts.by.getBoundingClientRect(), wr = T.parts.when.getBoundingClientRect();
+      const tr = T.parts.title.getBoundingClientRect();
       const top = tol(tr.top, ir.top + parseFloat(ics.paddingTop), 1);
-      const foot = tol(wr.bottom, ir.bottom - parseFloat(ics.paddingBottom), 1) && byr.bottom <= wr.top + 1;
-      const lefts = tol(byr.left, tr.left, 1) && tol(wr.left, tr.left, 1);
-      d.assert('SLIDES: the title slide sets the talk’s name at step 5 top left, the speaker at step 3 and the date at step 2 on the bottom edge',
-        share(T.parts.title, 5) && share(T.parts.by, 3) && share(T.parts.when, 2) && top && foot && lefts
-          && T.parts.when.textContent === '5 October 2026' && T.parts.by.textContent === 'Kristjan Jansen' && lintWords(T.spec.title).length === 0
-          && getComputedStyle(T.parts.when).color !== getComputedStyle(T.parts.by).color,
-        `name ${px(T.parts.title).toFixed(1)} px, speaker ${px(T.parts.by).toFixed(1)}, date ${px(T.parts.when).toFixed(1)} on a ${h} px slide; `
-        + `name ${top ? 'on' : 'OFF'} the inset top, who and when ${foot ? 'on' : 'OFF'} the foot, ${lefts ? 'one left edge' : 'LEFT EDGES DIFFER'}; `
-        + `"${T.parts.when.textContent}"`);
+      const left = tol(tr.left, ir.left + parseFloat(ics.paddingLeft), 1);
+      d.assert('SLIDES: the title slide sets the talk’s name at step 5 top left, with no speaker and no date',
+        share(T.parts.title, 5) && top && left && !T.parts.by && !T.parts.when && lintWords(T.spec.title).length === 0,
+        `name ${px(T.parts.title).toFixed(1)} px on a ${h} px slide, ${top && left ? 'on' : 'OFF'} the inset corner; `
+        + `speaker ${T.parts.by ? 'PRESENT' : 'none'}, date ${T.parts.when ? 'PRESENT' : 'none'}`);
       const B = slideKit.blocks.find((b) => b.s.spec.name === 'big number').s;
       const big = B.el.querySelector('.sl-big'), under = B.el.querySelector('.sl-under');
       const sr0 = B.el.getBoundingClientRect(), bgr = big.getBoundingClientRect(), ur = under.getBoundingClientRect();
       const range = document.createRange(); range.selectNodeContents(big);
       const ink = range.getBoundingClientRect();
       const mid = (r) => r.left + r.width / 2;
-      d.assert('SLIDES: the big number is one figure at step 6, centred on the slide, its line under it at step 3',
-        share(big, 6) && share(under, 3) && tol(mid(ink), mid(sr0), 1.5) && ur.top >= bgr.top + bgr.height / 2 && tol(mid(ur), mid(sr0), 1.5)
-          && big.textContent === '67.0' && !!big.querySelector('.sl-hi'),
+      // laid out `band` since 2026-10-06: the figure centred in the darker top
+      // two thirds, its line on the lighter third under it, on the left inset
+      const well = B.parts.well.getBoundingClientRect(), dark = sr0.top + B.el.clientHeight * 2 / 3;
+      const inn = B.el.querySelector('.sl-in'), padL = parseFloat(getComputedStyle(inn).paddingLeft);
+      d.assert('SLIDES: the big number is one figure at step 6 centred in the band’s darker top two thirds, its line at step 3 on the lighter third under it',
+        share(big, 6) && share(under, 3) && tol(mid(ink), mid(well), 1.5) && bgr.bottom <= dark && ur.top >= dark - 2
+          && tol(ur.left, inn.getBoundingClientRect().left + padL, 1)
+          && big.textContent === '67.0' && !!big.querySelector('.sl-hi') && B.el.dataset.layout === 'band',
         `"${big.textContent}" ${px(big).toFixed(1)} px and the line ${px(under).toFixed(1)} px on a ${B.el.clientHeight} px slide, `
-        + `the figure ${(mid(ink) - mid(sr0)).toFixed(1)} px and the line ${(mid(ur) - mid(sr0)).toFixed(1)} px off the slide's centre`);
+        + `the figure ${(mid(ink) - mid(well)).toFixed(1)} px off the well's centre and ending ${(dark - bgr.bottom).toFixed(1)} px above the divide, `
+        + `the line ${(ur.top - dark).toFixed(1)} px below it`);
     }
 
     // ── two half width players ────────────────────────────────────────────
@@ -12911,6 +12939,33 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       d.assert('SLIDES: the wave view draws on a slide as the picture of an instrument panel',
         ink.measured && ink.ink > 100 && ch > 0 && inPanel,
         `${ink.ink} pixels of ink, the canvas ${ch} px tall on a ${slideH} px slide, ${inPanel ? 'inside' : 'NOT inside'} the instrument panel`);
+    }
+    {
+      // SCREEN AND KEYS, laid out `band`: in the darker top two thirds the
+      // screen at a whole scale with four separate secondary keys a gap apart
+      // to its right; the headline and the sentence on the lighter third under
+      // them; a press sweeps the key busy and gives it back
+      const H = C.hwKeys, S = H.slide;
+      const btns = H.buttons, sr = H.screen.getBoundingClientRect(), slr = S.el.getBoundingClientRect();
+      const dark = slr.top + S.el.clientHeight * 2 / 3;
+      const rs = btns.map((x) => x.getBoundingClientRect());
+      const gaps = rs.slice(1).map((r, i) => r.top - rs[i].bottom);
+      const column = rs.every((r) => Math.abs(r.left - rs[0].left) < 1) && gaps.every((g) => g > 1);
+      const separate = btns.every((x) => !x.closest('.pos-bgroup, .pos-seg')) && btns.every((x) => !x.classList.contains('pos-pri'));
+      const inWell = sr.bottom <= dark && rs[rs.length - 1].bottom <= dark && sr.right <= rs[0].left;
+      const words = [S.parts.say, S.parts.text].every((e) => e.getBoundingClientRect().top >= dark - 2);
+      const k = parseFloat(H.screen.style.getPropertyValue('--oled-k'));
+      const b = btns.find((x) => x.dataset.id === 'NEXT');
+      b.click();
+      await nap(60);
+      const busy = b.dataset.busy === '1' && getComputedStyle(b).animationName === 'pos-sweep';
+      await nap(1000);
+      const back = !b.dataset.busy && !b.disabled;
+      d.assert('SLIDES: screen and keys is a band, the screen and four separate secondary keys a gap apart in the darker top, the words on the lighter third, a pressed key sweeping and coming back',
+        btns.length === 4 && column && separate && inWell && words && S.el.dataset.layout === 'band' && Number.isInteger(k) && k >= 1 && busy && back,
+        `${btns.map((x) => x.dataset.id).join(' ')} ${column ? `stacked, gaps ${gaps.map((g) => g.toFixed(1)).join('/')} px` : 'NOT STACKED APART'}, `
+        + `${separate ? 'separate and secondary' : 'GROUPED OR PRIMARY'}; the screen at ${k}x ${inWell ? 'left of the keys in the well' : 'NOT IN THE WELL BESIDE THE KEYS'}, `
+        + `the words ${words ? 'under the divide' : 'ABOVE THE DIVIDE'}; NEXT ${busy ? 'swept' : 'DID NOT SWEEP'} and ${back ? 'came back' : 'STAYED BUSY'}`);
     }
     {
       const o = C.oled;
@@ -13401,9 +13456,8 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       const faces = after.filter((e) => /\/shell\/vendor\/jetbrains-mono/.test(e.name));
       const foreign = faces.filter((e) => new URL(e.name).origin !== location.origin);
       d.assert(`SLIDES: opening and grading the tab fetched exactly one file, ${WASM} from this origin, and the face came from this origin`,
-        // three face files since 2026-10-05: Latin 400 and 600, and the Greek
-        // 600 for BRAND's β, which the build's measuring window lays out and
-        // so loads, the way it already loaded the two Latin ones
+        // at most three face files: Latin 400 and 600, and the Greek 600 that
+        // BRAND's β loaded until the logo moved to /brand/ on 2026-10-06
         wasm.length === 1 && other.length === 0 && new Set(faces.map((e) => e.name)).size <= 3 && foreign.length === 0,
         `${wasm.length} request(s) for the screen code, ${other.length} other${other.length ? `: ${other.slice(0, 3).join(', ')}` : ''}, `
         + `the face ${faces.length} file(s), ${foreign.length} from another host`);
@@ -13440,103 +13494,6 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   }
 
 
-  /**
-   * 🔴 THE BRAND PART'S CHECKS, chained after SLIDES and before the router's,
-   * for the same reason those two are chained: each presses a tab. The β is
-   * the thing most likely to be wrong and least likely to look it: a missing
-   * glyph falls back to another face silently, and a fallback β beside a
-   * JetBrains `+` is a mark in two typefaces. So the Greek face is asked for
-   * by name, and so is the request that fetched it.
-   */
-  async function brandChecks() {
-    const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
-    const tol = (a, b, e) => Math.abs(a - b) <= e;
-    const addressWas = location.hash, home = kitTabs.at();
-    const resBefore = performance.getEntriesByType('resource').length;
-    const tabThere = GROUPS.some(([id, label]) => id === 'brand' && label === 'BRAND') && !!panels.get('brand');
-    kitTabs.go('brand', { push: false });
-    await frames(2);
-    await document.fonts.ready;
-    await frames(3);
-    const L = brand.logo;
-    const lines = L.parts.lines;
-    const texts = lines.map((p) => p.textContent);
-    const h = L.el.clientHeight;
-    const steps = lines.map((p) => +p.dataset.step);
-    const sized = lines.every((p) => tol(parseFloat(getComputedStyle(p).fontSize), stepOf(+p.dataset.step).size / 100 * h, 0.5));
-    const order = lines.every((p, i) => i === 0 || p.getBoundingClientRect().top >= lines[i - 1].getBoundingClientRect().bottom - 1);
-    // the + is a superscript, as in the physics notation: smaller than the β and
-    // its foot above the β's baseline
-    const sup = lines[0].querySelector('.sl-hi');
-    const raised = !!sup && parseFloat(getComputedStyle(sup).fontSize) < parseFloat(getComputedStyle(lines[0]).fontSize) * 0.7
-      && sup.getBoundingClientRect().bottom < lines[0].getBoundingClientRect().bottom - 0.2 * parseFloat(getComputedStyle(lines[0]).fontSize);
-    d.assert('BRAND: the tab exists and its LOGO draws β+, then positron, then studio, top to bottom, at declared steps 6, 3 and 3, the + raised',
-      tabThere && texts.join('|') === 'β+|positron|studio' && order && steps.join() === '6,3,3' && sized && raised,
-      `${tabThere ? 'BRAND in the row' : 'NO BRAND TAB'}; ${texts.map((t) => `"${t}"`).join(', ')} ${order ? 'in order' : 'OUT OF ORDER'}, `
-      + `steps ${steps.join(', ')}, sizes ${sized ? 'at their step' : 'OFF THEIR STEP'} on a ${h} px slide`);
-
-    // the β in the slide face: the Greek face of 'Slide JetBrains Mono' is
-    // loaded, which happens only because a β was laid out, and the β takes
-    // the face's one mono advance (0.6 em) plus step 6's tracking, the same
-    // as the + beside it from the Latin file. A fallback face's β would not.
-    const greek = [...document.fonts].find((f) => f.family.replace(/["']/g, '') === 'Slide JetBrains Mono' && /U\+370/i.test(f.unicodeRange));
-    const span = lines[0];
-    const range = document.createRange(); range.setStart(span.firstChild, 0); range.setEnd(span.firstChild, 1);
-    const betaW = range.getBoundingClientRect().width, em = parseFloat(getComputedStyle(span).fontSize);
-    const plus = span.querySelector('.sl-hi');
-    const plusW = plus?.getBoundingClientRect().width ?? 0, advance = 0.6 + stepOf(6).ls;
-    // ⚠️ AN ADVANCE ALONE CANNOT TELL TWO MONO FACES APART (most are 0.6 em),
-    // so the INK is compared too: the β's box drawn in the slide face against
-    // the same β in the page's own mono stack, which is where it would fall.
-    const ink = (font) => {
-      const c = document.createElement('canvas').getContext('2d');
-      c.font = font;
-      const m = c.measureText('β');
-      return [m.actualBoundingBoxAscent, m.actualBoundingBoxDescent, m.actualBoundingBoxLeft, m.actualBoundingBoxRight];
-    };
-    const monoStack = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
-    const inSlide = ink(`600 100px 'Slide JetBrains Mono'`), inFallback = ink(`600 100px ${monoStack}`);
-    const differs = inSlide.some((v, i) => Math.abs(v - inFallback[i]) > 0.5);
-    d.assert('BRAND: the β is drawn in the slide face from its Greek subset, at the face’s own advance, and only the + wears the accent',
-      greek?.status === 'loaded' && differs && tol(betaW / em, advance, 0.005) && plusW > 0.4 * betaW && plusW < 0.7 * betaW && !!plus   // the + is a superscript at 0.55 em now
-        && plus.textContent === '+'
-        && getComputedStyle(plus).color !== getComputedStyle(span).color,
-      `the Greek face ${greek ? greek.status : 'NOT DECLARED'}; the β's ink at 100 px ${inSlide.map((v) => v.toFixed(1)).join('/')} `
-      + `against ${inFallback.map((v) => v.toFixed(1)).join('/')} in the page's mono, ${differs ? 'a different glyph' : 'THE SAME GLYPH, A FALLBACK'}; `
-      + `${(betaW / em).toFixed(3)} em wide against the face's ${advance.toFixed(3)} (0.600 less step 6's tracking) and the + ${(plusW / em).toFixed(3)}, `
-      + `the + ${plus ? 'in the accent' : 'NOT MARKED'}`);
-
-    const inn = L.el.querySelector('.sl-in'), ir = inn.getBoundingClientRect(), ics = getComputedStyle(inn);
-    const spill = inn.scrollHeight > inn.clientHeight + 1 || inn.scrollWidth > inn.clientWidth + 1
-      || lines.some((p) => { const r = p.getBoundingClientRect(); return r.right > ir.right - parseFloat(ics.paddingRight) + 1 || r.bottom > ir.bottom + 1; });
-    const left = lines.every((p) => tol(p.getBoundingClientRect().left, ir.left + parseFloat(ics.paddingLeft), 1));
-    d.assert('BRAND: the logo is left on the inset and nothing spills',
-      !spill && left && tol(h, L.el.clientWidth * 9 / 16, 1),
-      `${spill ? 'SPILLS' : 'inside the inset'}, ${left ? 'every line on the left inset' : 'LEFT EDGES OFF'}, ${L.el.clientWidth}x${h}`);
-
-    // the ⛶, as on every slide
-    L.fullBtn.click();
-    await frames(10);
-    const full = L.isFull(), fr = L.el.getBoundingClientRect();
-    const sizedFull = lines.every((p) => tol(parseFloat(getComputedStyle(p).fontSize), stepOf(+p.dataset.step).size / 100 * L.el.clientHeight, 0.5));
-    await L.full(false);
-    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-    await frames(6);
-    d.assert('BRAND: the ⛶ fills the screen with the logo at its steps and gives it back',
-      full && fr.width > L.el.clientWidth && sizedFull && !L.isFull(),
-      `${full ? 'full' : 'NOT full'} at ${fr.width.toFixed(0)} px wide, the steps ${sizedFull ? 'held' : 'NOT held'}, ${L.isFull() ? 'STILL full' : 'back'}`);
-
-    const during = performance.getEntriesByType('resource').slice(resBefore).map((e) => e.name)
-      .filter((n) => !(new URL(n).origin === location.origin && new URL(n).pathname === '/_log'));
-    const fonts = during.filter((n) => new URL(n).origin === location.origin && /^\/shell\/vendor\/jetbrains-mono-[a-z]+-\d+-normal\.woff2$/.test(new URL(n).pathname));
-    const other = during.filter((n) => !fonts.includes(n));
-    d.assert('BRAND: opening the tab fetched nothing but the vendored Greek face, from this origin',
-      other.length === 0 && fonts.length <= 1 && fonts.every((n) => /greek-600/.test(n)),
-      `${fonts.length} face file(s)${fonts.length ? `: ${fonts.map((n) => new URL(n).pathname).join(', ')}` : ''}, ${other.length} other`
-      + `${other.length ? `: ${other.slice(0, 3).join(', ')}` : ''}`);
-    kitTabs.go(home, { push: false });
-    try { history.replaceState(null, '', `${location.pathname}${location.search}${addressWas}`); } catch { /* file:// */ }
-  }
 
   async function hwChecks() {
     const nap = (ms) => new Promise((r) => setTimeout(r, ms));
