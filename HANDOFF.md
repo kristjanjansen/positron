@@ -1,3 +1,43 @@
+# Handoff, 2026-10-06 evening, session 67: the synths deck grows a filter and an LFO, the front page frames its decks
+
+## Where it is right now
+
+- ✅ **Site: BUILD `4c400d9-170511-7a6c`**, confirmed on the edge, build output in `267b315`. **Not pushed** (needs the personal account, see CLAUDE.md).
+- Counted: **56 demos, 54 built**, **93 plans**. No agent and no workflow is running. The tree is clean.
+
+## What landed, all deployed
+
+| commits | what | check it at |
+| --- | --- | --- |
+| `dbb5770` `a58d4f6` | the sawtooth and the sine/saw choice slides hidden (*"hide sawtooth and its selection"*): `hidden: true` in `synth-steps.mjs`, filtered in `decks.mjs`. `deck-checks.mjs` reads the instrument slides and the slide count off the deck instead of typing 1 to 5 and 6; the wave checks run only while that slide is in the deck | https://positron.studio/slides/synths/ |
+| `8d827af` `141fa5c` | **the saw back, then a filter slide, then an LFO on the filter** (*"what abut filter? see some synth building tutorials what is rigth order?"*, *"do filter, lfo (for filter?)"*). Order from the tutorials (subtractive guides, Sonic Pi, ciechanow.ski/sound): source, filter, envelope, modulation; a filter needs overtones, so the saw is its source. `filter` adds `cutoff` and `fi.lowpass(2, cutoff)`; `lfo` adds `rate` and `depth` and `sweep = cutoff * (1 + depth * os.osc(rate))`. The deck is 7 slides; `wave` stays hidden | slide 6: Start, turn cutoff down; slide 7: turn rate and depth |
+| same | `param-knobs.mjs` takes `cols` (default 4, so `/fau/` and `/collide/` unchanged); the slide asks for 6, so the LFO's five knobs are one row. MEASURED before: the fifth wrapped and the knob row was 210 px instead of 116 | |
+| same | the code box fills its row and SCROLLS (`height: 100%` on `.sl-synth-code > .pos-code`). MEASURED before: a 418 px box in a 292 px row, the overflow painted over the knob row. The LFO slide's last two lines (`sweep`, `process`) scroll, chosen: *"Leave it scrolling"* | slide 7 |
+| same | `demo/shot.mjs --eval` prints what the expression returns, so a shot can also measure rects | |
+| `7e7b28d` | `build-faust-aot.mjs --check` predicts the filter and LFO RMS from the harmonic series (saw harmonics 1/(pi n), Butterworth 1/sqrt(1+(f/fc)^4)): 0.26637 against a render of 0.26628, LFO 0.26275 against 0.26266. 54 ok | |
+| `c6fdb2d` `5ccb3a9` | **reported as *"does no compile"*: `filter.*` and `lfo.*` were 404 on the edge**, because `workers/view/build.mjs` copied the synth artefacts from a hand list. Local runs were green because the dev server serves `demo/`. The list is read off `SYNTH_STEPS` now. `DEMO_BASE=https://positron.studio` slides/synths 34/34 | |
+| `4c400d9` `267b315` | **front page deck frames** (*"slides "pop in" in frontpage. show the frame, lazyload ocntents"*): `groupHTML` in `manifest.mjs` writes one empty player box per `slides/<name>` row (`deckFrameHTML`, the player's own `pos-vp` classes), `mountDecks` builds the player when the frame is within a screen of the viewport and puts it in the frame's place. MEASURED, frame beside player: 336.00x244.88 both at 1280, 343.00x248.81 both at 375. The filter slide's words say *"the buzz fades to a dull hum"* (*"the saw goes dark - what"*) | https://positron.studio/ |
+
+Verify: `slides/synths kit/slides` **113/113** locally (110 before, the 3 new filter/LFO checks: filter RMS 0.265 from its artefact with no compile, cutoff to 100 Hz drops the level 21x, LFO five knobs and sounding).
+
+## Decided along the way, and why
+
+- **Saw before filter, square not first.** A saw has every overtone, so a filter sweep is most audible on it; a square is odd overtones only and earns its slide later through pulse width. Ableton's Learning Synths playground offers only saw and square (no sine), read secondhand; `learningsynths.ableton.com` did not answer from this machine, so its chapter order is unread.
+- **The LFO slide scrolls** rather than shortening the program (owner's blank-line layout kept) or growing `PANEL_H` (every slide smaller).
+
+## Mistakes worth knowing
+
+- ⚠️ **A deploy went out past a failing `--check`** because `| grep | tail` hid the exit code. The files were right; the check lacked predictions. Read the exit status, not a tail.
+- ⚠️ **Local green said nothing about the edge**: a hand-listed copy in `build.mjs` left two artefacts behind. `DEMO_BASE=https://positron.studio node demo/verify.mjs slides/synths` is the check that caught it, and it is cheap (no external source).
+
+## Open
+
+- **Start carries the sound across slides** (BACKLOG, asked earlier today).
+- **A gate and envelope slide** was offered as the next step after the filter; not asked for yet. It needs a hold button drawn from Faust's `button`, which the slide does not draw today.
+- ⚠️ **The knob-row band in screenshots** (BACKLOG): possibly the code overflow fixed today; not re-measured. The full screen plate cut on a desk is still undiagnosed.
+- **A Pico running the same synth** was asked as a theory question: Faust `-lang c` into Pico firmware is plausible; `rig/pico/sim/` is rp2040js (JavaScript, RP2040 only, no FPU) and whether it keeps up in real time is unmeasured. Nothing built.
+- Everything from the sections below still stands.
+
 # Handoff, 2026-10-06 late afternoon, session 66: kit/slides reordered, the split in phone full screen, KEY LABELS in two
 
 ## Where it is right now
