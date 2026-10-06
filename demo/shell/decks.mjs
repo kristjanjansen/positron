@@ -23,6 +23,7 @@
 import { createSlidePlayer } from './slide.mjs';
 import { SYNTH_STEPS } from './synth-steps.mjs';
 import { synthSlot } from './slide-synth.mjs';
+import { deckFrameHTML } from '../manifest.mjs';
 
 /**
  * SYNTHS IN CODE, asked 2026-10-06: *"do slide deck Synths in code in the fau
@@ -55,7 +56,7 @@ const WORDS = {
   saw: { text: '`os.sawtooth` puts a sawtooth where the sine was, brighter and buzzier. '
       + 'Watch the scope change shape' },
   filter: { text: '`fi.lowpass` lets through what is under `cutoff` and takes the rest away. '
-      + 'Turn `cutoff` down and the saw goes dark' },
+      + 'Turn `cutoff` down and the buzz fades to a dull hum' },
   lfo: { text: 'An LFO is a sine too slow to hear, and `sweep` moves `cutoff` with it. '
       + 'Turn `rate` and `depth` while it plays' },
   // slide 6, asked as *"how to make it a radio (sawtooth?)"*
@@ -102,17 +103,42 @@ export const deckHref = (deck) => `/slides/${deck.name}/`;
 export function mountDecks(root = document) {
   const players = [];
   for (const host of root.querySelectorAll('[data-decks]')) {
-    const row = document.createElement('div');
-    row.className = 'pos-decks-in';
-    for (const deck of DECKS) {
-      const p = createSlidePlayer(deck.slides, { title: { text: deck.title, href: deckHref(deck) } });
-      p.el.dataset.deck = deck.name;
-      row.append(p.el);
-      players.push(p);
+    // the frames `groupHTML` drew; a holder with none gets them here
+    let row = host.querySelector(':scope > .pos-decks-in');
+    if (!row) { row = document.createElement('div'); row.className = 'pos-decks-in'; host.replaceChildren(row); }
+    for (const f of row.querySelectorAll('[data-deck-frame]')) {
+      if (!DECKS.some((d) => d.name === f.dataset.deckFrame)) f.remove();
     }
-    host.replaceChildren(row);
+    for (const deck of DECKS) {
+      let frame = row.querySelector(`[data-deck-frame="${deck.name}"]`);
+      if (!frame) {
+        row.insertAdjacentHTML('beforeend', deckFrameHTML(deck.name));
+        frame = row.lastElementChild;
+      }
+      // 🔴 BUILT WHEN IT NEARS THE SCREEN, NOT ON LOAD, 2026-10-06 (*"show the
+      // frame, lazyload ocntents"*): a deck is every slide's code box, knobs
+      // and scope, and a visitor who never scrolls to it pays for none of it
+      const build = () => {
+        const p = createSlidePlayer(deck.slides, { title: { text: deck.title, href: deckHref(deck) } });
+        p.el.dataset.deck = deck.name;
+        frame.replaceWith(p.el);
+        players.push(p);
+      };
+      whenNear(frame, build);
+    }
   }
   return players;
+}
+
+/** `fn` once, when `el` comes within a screen's height of the viewport; at once where nothing can tell. */
+function whenNear(el, fn) {
+  if (typeof IntersectionObserver !== 'function') { fn(); return; }
+  const io = new IntersectionObserver((es) => {
+    if (!es.some((e) => e.isIntersecting)) return;
+    io.disconnect();
+    fn();
+  }, { rootMargin: '100% 0px' });
+  io.observe(el);
 }
 
 /**
