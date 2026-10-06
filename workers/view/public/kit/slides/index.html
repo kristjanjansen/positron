@@ -197,6 +197,9 @@
   // 🔴 TWO SLIDES SINCE 2026-10-06 (*"rm fau slides c-f"*): the title, and a
   // split whose slot is one instrument panel, a live scope, the program in an
   // editable code box and a FAU plate with `Start` / `Stop` at its right end.
+  // THREE THE SAME DAY (*"slode 3: make 0.5 into knob 0..1"*): the same
+  // instrument with the sine's 0.5 as a slider, drawn as a knob between the
+  // code and the plate.
   // 🔴 ITS CHECKS ARE `plans/plan-live-slides.md` SECTION 7 AND RUN LAST, behind
   // `?selfcheck=1` like every check here, because they are the only ones on
   // this page that fetch anything: `Start` imports the Faust runtime and
@@ -205,7 +208,7 @@
   // asserted before the press.
   section('SYNTHS DECK',
     'The deck the front page plays, mounted the same way, its title in the footer linking to its own page. It is a title and one '
-    + 'instrument, a sine written in Faust. Start plays the program compiled ahead of time, and '
+    + 'instrument, a sine written in Faust, then the same sine with its volume on a knob. Start plays the program compiled ahead of time, and '
     + 'after an edit the next press loads the compiler once and plays your version.',
     `mountDecks(holder);   // holder carries data-decks, as on the front page; one player per deck, titled`,
     (box) => {
@@ -2136,7 +2139,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     const intro = p.slides[0];
     const lines = intro.parts.lines;
     d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 6 with a caption and no body',
-      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 2 && toneIdx === 1 && p.at() === 0
+      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 3 && toneIdx === 1 && p.at() === 0
         && lines.length === 2 && lines.every((l) => l.dataset.step === '6') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
         && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
       `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
@@ -2304,6 +2307,109 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       c.code.set(c.shipped);
       c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
       c.stop();
+    }
+
+    // 9. SLIDE 3, the sine's 0.5 as a slider, drawn as a knob between the code
+    // and the plate (*"slode 3: make 0.5 into knob 0..1"*). Every level is read
+    // off the analyser, every value the node holds off the node itself.
+    {
+      const vIdx = p.slides.findIndex((s) => s.ctl?.step?.id === 'volume');
+      const V = p.slides[vIdx], v = V.ctl;
+      const VOL = /\/resources\/faust\/volume\.(json|wasm)$/;
+      const volFetched = () => names().filter((n) => VOL.test(new URL(n).pathname));
+      const comp0 = compiler().length;
+      const res0 = performance.getEntriesByType('resource').length;
+      p.go(vIdx);
+      await frames(3);
+      p.el.scrollIntoView({ block: 'center' });
+      await frames(2);
+      const stepRes = performance.getEntriesByType('resource').slice(res0).map((e) => e.name)
+        .filter((n) => !(new URL(n).pathname === '/_log' || /^\/shell\/vendor\/[^/]+\.woff2$/.test(new URL(n).pathname)));
+      const row = v.knobRow();
+      const dial = () => row?.querySelector('.pos-knob[data-param="volume"] .pos-knob-dial');
+      const shows = () => row?.querySelector('.pos-knob[data-param="volume"] .pos-knob-v')?.textContent;
+      const shape = v.panel.shape().join(' ');
+      const cr = v.codeRow.getBoundingClientRect(), kr = row?.getBoundingClientRect(), pr = v.panel.plateRow.getBoundingClientRect();
+      d.assert('SYNTHS: slide 3 draws its volume knob from the text between the code and the plate, at 0.50, and the visit and the step fetched nothing',
+        vIdx === 2 && !!row && getComputedStyle(row).display !== 'none' && shape === 'viz controls controls plate' && v.panel.controls()[1] === row
+          && kr.top >= cr.bottom - 1 && kr.bottom <= pr.top + 1 && v.knobs.names().join() === 'volume' && v.knobs.value('volume') === 0.5 && shows() === '0.50'
+          && /volume = hslider\("volume", 0\.5, 0, 1, 0\.01\);/.test(v.shipped) && v.code.value() === v.shipped
+          && volFetched().length === 0 && stepRes.length === 0 && !v.sounding() && V.parts.say?.textContent === 'A slider becomes a knob',
+        `slide ${vIdx + 1}, rows ${shape}, the knob row ${kr ? `${kr.top.toFixed(0)} to ${kr.bottom.toFixed(0)} px under code ending ${cr.bottom.toFixed(0)}, over the plate at ${pr.top.toFixed(0)}` : 'MISSING'}, `
+        + `knobs ${v.knobs.names().join(', ') || 'none'} showing "${shows()}", ${volFetched().length} volume file(s), ${stepRes.length} request(s) on the step`);
+
+      // the synths deck's splits are 1:2 with the words on the foot of their
+      // column (*"use 1:2 cols layout"*, *"align text to bottom of slide"*)
+      {
+        const sr = V.el.getBoundingClientRect(), wr = V.parts.words.getBoundingClientRect(), xr = V.parts.slot.getBoundingClientRect();
+        const divide = (wr.right + xr.left) / 2 - sr.left;
+        const dark = parseFloat(getComputedStyle(V.el, '::before').width);
+        const tr = (V.parts.text || V.parts.say).getBoundingClientRect(), sayR = V.parts.say.getBoundingClientRect();
+        const both = [1, 2].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
+        d.assert('SYNTHS: slides 2 and 3 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
+          both && Math.abs(divide - sr.width / 3) < 1 && Math.abs(dark - (sr.width * 2) / 3) < 1 && Math.abs(tr.bottom - wr.bottom) < 1.5
+            && sayR.top >= wr.top - 0.5 && Math.abs((xr.left - wr.right) - 2 * (wr.left - sr.left)) < 1,
+          `the divide at ${divide.toFixed(1)} of ${sr.width.toFixed(1)} px (a third is ${(sr.width / 3).toFixed(1)}), the darker ground ${dark.toFixed(1)} px, `
+          + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start ${(sayR.top - wr.top).toFixed(1)} px down it, `
+          + `the gap ${(xr.left - wr.right).toFixed(1)} px against an inset of ${(wr.left - sr.left).toFixed(1)}`);
+      }
+
+      // a turn before Start is kept and is what Start plays: Home, the bottom, 0
+      const at0 = p.at();
+      dial().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }));
+      const before = v.knobs.value('volume'), shownBefore = shows(), sendsBefore = v.paramSends();
+      v.tone.click();
+      await until(() => v.sounding() || v.error(), 3000);
+      await nap(300);
+      const silent = v.level();
+      d.assert('SYNTHS: on slide 3 the knob turned to 0 before Start is kept, and Start plays that from the volume artefact with no compile, silent',
+        before === 0 && shownBefore === '0.00' && sendsBefore === 0 && p.at() === at0 && v.sounding() && silent < 1e-4 && v.nodeValue('volume') === 0
+          && volFetched().some((n) => /volume\.wasm$/.test(n)) && compiler().length === comp0 && v.compiles() === 0 && audioOwner() === v,
+        `${v.error() ? `it FAILED: ${v.error()}, ` : ''}the knob at ${before} showing "${shownBefore}" with ${sendsBefore} sends before, the deck on slide ${p.at() + 1}, `
+        + `RMS ${silent.toFixed(5)}, the node holds ${v.nodeValue('volume')}, ${volFetched().length} volume file(s), ${compiler().length - comp0} new compiler file(s), ${v.compiles()} compile(s)`);
+
+      // 0.5, then the top, 1: the RMS doubles; then the bottom again silences it
+      v.knobs.knob('volume').set(0.5);
+      await until(() => Math.abs(v.level() - 0.3536) < 0.01, 1500);
+      await nap(100);
+      const half = v.level(), hz = v.hz();
+      dial().dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
+      await until(() => Math.abs(v.level() - 0.7071) < 0.01, 1500);
+      await nap(100);
+      const full = v.level(), fullShows = shows(), fullNode = v.nodeValue('volume');
+      dial().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }));
+      await until(() => v.level() < 1e-4, 1500);
+      const zero = v.level();
+      d.assert('SYNTHS: turning slide 3’s knob to 1 while it plays doubles the measured RMS against 0.5, and turning it to 0 silences it',
+        Math.abs(half - 0.3536) < 0.01 && Math.abs(hz - 440) < 5 && Math.abs(full - 0.7071) < 0.01 && Math.abs(full / half - 2) < 0.05
+          && fullShows === '1.00' && fullNode === 1 && zero < 1e-4 && v.sounding() && p.at() === vIdx,
+        `RMS ${half.toFixed(4)} at 0.5 (${hz.toFixed(1)} Hz), ${full.toFixed(4)} at 1 showing "${fullShows}" with the node at ${fullNode}, `
+        + `${(full / half).toFixed(3)}x, ${zero.toFixed(5)} at 0, ${v.paramSends()} setParamValue in all`);
+
+      // an edit that takes the slider out takes the knob row out; putting it back brings the row back.
+      // ⚠️ TWO ASSERTS AND NOT ONE: each edit is 600 ms of idle and a compile,
+      // and two of them before one assert was more silence than the harness
+      // waits (2.0 s), so the first run lost this check without a word
+      v.knobs.knob('volume').set(0.5);
+      v.code.set('import("stdfaust.lib"); // has os.osc\n\nprocess = os.osc(440) * 0.5;');
+      v.code.input.dispatchEvent(new Event('input', { bubbles: true }));
+      await v.idle.settled();
+      await until(() => Math.abs(v.level() - 0.3536) < 0.01, 1500);
+      const goneDisplay = getComputedStyle(row).display, goneKnobs = v.knobs.names().length, goneLvl = v.level();
+      const goneFound = !!v.panel.el.querySelector('.pos-knob[data-param]');
+      d.assert('SYNTHS: an edit on slide 3 that takes the slider out takes the knob row out, and the tone it compiles plays at 0.5',
+        !v.error() && goneDisplay === 'none' && goneKnobs === 0 && !goneFound && Math.abs(goneLvl - 0.3536) < 0.01 && v.compiles() === 1,
+        `${v.error() ? `it FAILED: ${v.error()}, ` : ''}with no slider the row ${goneDisplay === 'none' ? 'is not drawn' : `IS DRAWN (${goneDisplay})`}, ${goneKnobs} knob(s), `
+        + `RMS ${goneLvl.toFixed(4)}, ${v.compiles()} compile(s)`);
+      v.code.set(v.shipped);
+      v.code.input.dispatchEvent(new Event('input', { bubbles: true }));
+      await v.idle.settled();
+      await frames(2);
+      const backDisplay = getComputedStyle(row).display, backShows = shows();
+      d.assert('SYNTHS: putting slide 3’s slider back brings its knob row back, at 0.50',
+        !v.error() && backDisplay !== 'none' && v.knobs.names().join() === 'volume' && backShows === '0.50' && v.compiles() === 1,
+        `${v.error() ? `it FAILED: ${v.error()}, ` : ''}the row ${backDisplay === 'none' ? 'STILL GONE' : 'drawn'} showing "${backShows}", ${v.compiles()} compile(s)`);
+      v.stop();
       p.go(0);
     }
   }
