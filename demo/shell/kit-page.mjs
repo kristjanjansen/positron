@@ -44,6 +44,13 @@ export function createKitPage({ part, what, controls = [] }) {
      readout on these pages is a SPECIMEN rather than the page's own
      instrument (the monolith's mount carries the whole argument). */
   const d = mount({ name: `kit/${part}`, what, readout: null, controls });
+  /* 🔴 THE HEADING IS THE PART ALONE, ASKED 2026-10-06: *"no need to "kit/..."
+     in titles"*. `mount()` takes no display title, so the heading it drew is
+     re-worded here; `__demo.name`, `document.title` and the feedback slug keep
+     `kit/<part>`, because the name is the identity `verify.mjs` checks
+     against the manifest row and the address the feedback is filed under. */
+  const h1 = d.head.querySelector('.pos-name');
+  if (h1) h1.textContent = part;
   const body = d.el;
   const stack = createStack(body);
   const out = (t) => { const o = el('div', 'kit-out', t); return o; };
