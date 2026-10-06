@@ -1441,9 +1441,19 @@ export function demoCardHTML(d) {
   });
 }
 
+/** One deck's player box before the deck is built: the player's own classes, nothing in them. */
+export const deckFrameHTML = (name) => `<div class="pos-vp pos-deck-frame" data-deck-frame="${name}" aria-hidden="true">`
+  + '<div class="pos-vp-stage"></div><div class="pos-vp-foot"><span class="pos-deck-ph"></span></div></div>';
+
 /** A whole section: its name and its cards. */
 export function groupHTML(g) {
-  if (DECK_GROUPS.has(g.id)) return `<h2 class="pos-act-h">${g.title}</h2><div class="pos-decks" data-decks></div>`;
+  // a deck is drawn as its empty frame first, one per `slides/<name>` row,
+  // which `mountDecks` replaces with the player (see `.pos-deck-ph`)
+  if (DECK_GROUPS.has(g.id)) {
+    const frames = DEMOS.filter((d) => d.group === g.id && d.built && d.name.startsWith('slides/'))
+      .map((d) => deckFrameHTML(d.name.slice('slides/'.length))).join('');
+    return `<h2 class="pos-act-h">${g.title}</h2><div class="pos-decks" data-decks><div class="pos-decks-in">${frames}</div></div>`;
+  }
   return `<h2 class="pos-act-h">${g.title}</h2>`
     + `<div class="pos-cards" style="--card-min:210px">`
     + g.rows.map(demoCardHTML).join('') + '</div>';
