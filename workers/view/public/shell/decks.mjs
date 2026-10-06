@@ -36,13 +36,25 @@ import { synthSlot } from './slide-synth.mjs';
  * (`demo/resources/build-faust-aot.mjs`), so `Test tone` costs a few kB and no
  * compiler until somebody edits the code.
  */
+/** Each program's words on its slide, by `id`: what a line of the code does
+ * and what to try, asked 2026-10-06 as *"make useful slide texts"*. The third
+ * slide the same day: *"slode 3: make 0.5 into knob 0..1"*. */
+const WORDS = {
+  sine: { say: '*process* is the sound',
+    text: 'os.osc(440) is a sine at 440 Hz and times 0.5 plays it at half volume. '
+      + 'Change a number and press Start to hear yours' },
+  volume: { say: 'A slider becomes a knob',
+    text: 'hslider gives the 0.5 a name and a range from 0 to 1. '
+      + 'Turn the knob while the tone plays' },
+};
 const SYNTHS = [
   { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in *code*']],
-    cap: 'a few lines of Faust become a sound in this page' },
+    cap: 'a few lines of Faust you can edit and hear in this page' },
   ...SYNTH_STEPS.map((st) => ({
-    name: st.name, layout: 'split', side: 'right', say: 'A sine in two lines',
-    text: 'A short Faust program, compiled ahead of time, makes this tone. '
-      + 'Edit it and the browser compiles yours.',
+    // a third for the words and two for the instrument, the words on the
+    // foot of their column, asked 2026-10-06 as *"use 1:2 cols layout"* and
+    // *"align text to bottom of slide"*
+    name: st.name, layout: 'split', side: 'right', cols: '1:2', bottom: true, ...WORDS[st.id],
     // one step down, asked 2026-10-06 as *"use smaller text size"*
     textStep: 2,
     slot: synthSlot(st),

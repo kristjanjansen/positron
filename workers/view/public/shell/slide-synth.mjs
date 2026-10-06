@@ -15,7 +15,20 @@
 //   controls  the code box, EDITABLE, edge to edge like `/fau/`'s
 //   plate     FAU, and `Start` / `Stop` at the right end; `Compiling` breathes in the code box's corner
 //
-// No keyboard and no knobs: the program has no `freq`, `gain` or `gate`.
+// No keyboard: the program has no `freq`, `gain` or `gate`.
+//
+// 🔴 A SLIDER IN THE PROGRAM IS A KNOB IN A ROW BETWEEN THE CODE AND THE PLATE,
+// since 2026-10-06, asked as *"slode 3: make 0.5 into knob 0..1"*. The row is
+// `createParamKnobs`, the one `/fau/` puts under its text, and only appears
+// for a program that declares an `hslider`, `vslider` or `nentry`: the sine
+// has none and shows no row. On a VISIT nothing is compiled, so the first row
+// is read off the shipped TEXT (`readSliders`), which is the text the ahead of
+// time file was compiled from (`checkFaustAot` refuses a build where they
+// differ). From the first press on, and after every compile, it is rebuilt
+// from the compiled program's own JSON (`slidersOf`), and a knob whose name
+// survives keeps where a hand left it. A turn is `setParamValue` on the
+// sounding node; a turn before Start is kept by the knob and handed to the
+// node when it is made, before it is heard.
 // Until 2026-10-06 this module put a read only listing on the words side and
 // one octave of keys and the step's knobs in the slot, one slide per step of a
 // growing polyphonic voice; those steps left the deck the same day.
@@ -62,9 +75,14 @@ import { createInstrumentPanel } from './instrument-panel.mjs';
 import { sharedAudio, claim, release } from './audio.mjs';
 import { synthUrl } from './synth-steps.mjs';
 import { createCompileIdle } from './compile-idle.mjs';
+import { createParamKnobs } from './param-knobs.mjs';
 
-/** The panel's logical width, which the fitted box scales into the slot. */
-const PANEL_PX = 340;
+/** The panel's logical width, which the fitted box scales into the slot.
+ * 400 since 2026-10-06, when the deck's splits went 1:2 and the slot two
+ * thirds of the slide: the fit is bound by the slot's height, so a wider
+ * logical panel is a wider panel on screen at the same type size, and it holds
+ * slide 3's `hslider` line on one line (it wrapped at 340). */
+const PANEL_PX = 400;
 /** The scope's height in logical px, `/muta/`'s 140 less a little for half a slide. */
 const WAVE_PX = 120;
 /** Samples shown per frame: about 10.7 ms at 48 kHz, four and a bit cycles of 440 Hz. */
@@ -97,6 +115,50 @@ export function firstLine(msg) {
     .filter((l) => !/^Aborted\(/.test(l));
   const one = lines.find((l) => /error/i.test(l)) || lines[0] || 'the compiler refused it';
   return one.replace(/^\S+?:(\d+)\s*:\s*ERROR\s*:\s*/i, 'line $1, ').slice(0, 160);
+}
+
+const SLIDERS = ['hslider', 'vslider', 'nentry'];
+const num = String.raw`\s*(-?[\d.]+(?:e-?\d+)?)\s*`;
+const SLIDER_RE = new RegExp(String.raw`\b(?:hslider|vslider|nentry)\s*\(\s*"([^"]*)"\s*,${num},${num},${num},${num}\)`, 'g');
+
+/**
+ * The sliders written in a program's text, as `createParamKnobs` takes them,
+ * for a visit, which has compiled nothing. Only literal numbers are read; the
+ * compiled program's own list (`slidersOf`) replaces this on the first press.
+ * A label's `[...]` metadata is not part of its name.
+ */
+export function readSliders(code) {
+  const list = [];
+  for (const m of String(code).matchAll(SLIDER_RE)) {
+    const name = m[1].replace(/\[[^\]]*\]/g, '').trim();
+    if (!name || list.some((p) => p.name === name)) continue;
+    const [value, min, max, step] = m.slice(2, 6).map(Number);
+    list.push({ name, value, min, max, step, warp: /\[scale:log\]/.test(m[1]) && min > 0 ? 'exp' : 'lin' });
+  }
+  return list;
+}
+
+/**
+ * The sliders a compiled mono program declares, read off its JSON the way
+ * `/fau/` reads them (`readKnobs`), with the address each is set at. The
+ * address carries the compile's name, so it is kept per compiled program.
+ * @returns {{list: object[], addr: Map<string, string>}}
+ */
+export function slidersOf(parts) {
+  const list = [], addr = new Map();
+  let ui = [];
+  try { ui = JSON.parse(parts?.factory?.json || '{}').ui || []; } catch { /* no UI */ }
+  const walk = (items) => {
+    for (const it of items || []) {
+      if (it.items) { walk(it.items); continue; }
+      if (!SLIDERS.includes(it.type) || addr.has(it.shortname)) continue;
+      const log = (it.meta || []).some((m) => m.scale === 'log') && it.min > 0;
+      addr.set(it.shortname, it.address);
+      list.push({ name: it.shortname, value: it.init, min: it.min, max: it.max, step: it.step, warp: log ? 'exp' : 'lin' });
+    }
+  };
+  walk(ui);
+  return { list, addr };
 }
 
 /**
@@ -146,6 +208,35 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     let on = false, want = false, busy = null, err = null, raf = 0;
     let presses = 0, stops = 0, compiles = 0, draws = 0, lastCompileMs = null, lastArmMs = null;
     let compilerHere = false;
+
+    // ── the knobs: one per slider, in a row between the code and the plate ──
+    const uiOf = new WeakMap();
+    const ui = (p) => { if (!uiOf.has(p)) uiOf.set(p, slidersOf(p)); return uiOf.get(p); };
+    let nodeAddr = new Map(), paramSends = 0, knobRow = null;
+    const knobs = createParamKnobs({
+      onChange: (name, v) => {
+        const a = nodeAddr.get(name);
+        if (node && a) { node.setParamValue(a, v); paramSends++; }
+      },
+    });
+    /** Every knob's value onto `n`, before it is heard. */
+    function applyKnobs(n) {
+      for (const [k, v] of knobs.values()) {
+        const a = nodeAddr.get(k);
+        if (a) { n.setParamValue(a, v); paramSends++; }
+      }
+    }
+    /** The row from a list: made the first time there is a slider, hidden when there is none. */
+    function showKnobs(list) {
+      if (!list.length) {
+        if (knobRow) { knobRow.hidden = true; knobs.set([]); }
+        return;
+      }
+      if (!knobRow) knobRow = panel.addRow(knobs.el);
+      knobRow.hidden = false;
+      knobs.set(list);
+    }
+    showKnobs(readSliders(shipped));
 
     const text = () => code.value().replace(/\n$/, '');
     const edited = () => text() !== shipped;
@@ -206,6 +297,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       }
       parts = p;
       partsText = t;
+      showKnobs(ui(p).list);
       return p;
     }
 
@@ -217,6 +309,8 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       if (node) { try { node.disconnect(); node.destroy?.(); } catch { /* already gone */ } }
       node = n;
       nodeText = t;
+      nodeAddr = ui(p).addr;
+      applyKnobs(n);
       return n;
     }
 
@@ -296,6 +390,15 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       /** `Test tone`, the way a click on it does it. Returns the start in flight, or null for an off. */
       press,
       sounding: () => on,
+      /** The knob row, or null for a program that never had a slider. */
+      knobRow: () => knobRow,
+      /** How many `setParamValue`s a turn or a new node has sent. */
+      paramSends: () => paramSends,
+      /** The sounding node's own value for a slider, by name, or null. */
+      nodeValue(name) {
+        const a = nodeAddr.get(name);
+        return node && a ? node.getParamValue(a) : null;
+      },
       /** What the scope last said in words, or null. */
       error: () => err,
       edited,
@@ -325,7 +428,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         return n > 1 ? ((n - 1) * ctx.sampleRate) / (last - first) : 0;
       },
       context: () => ctx,
-      step, code, scope, tone, idle, panel, codeRow, fb, url, shipped,
+      step, code, scope, tone, idle, panel, codeRow, fb, url, shipped, knobs,
     };
     return ctl;
   };

@@ -97,7 +97,9 @@ const PROGRAMS = [
  * control (no key, silence) has nothing to say about it; this is its control
  * instead, from arithmetic rather than from the compiler that made the file.
  */
-const EXPECT = { sine: 0.5 / Math.SQRT2 };
+// ⚠️ `volume` is the same sine with its 0.5 on a slider whose default is 0.5,
+// so the render, which turns no slider, predicts the same figure.
+const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2 };
 {
   const ids = PROGRAMS.map((p) => p.id);
   const twice = ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -208,7 +210,7 @@ if (!CHECK) {
   mkdirSync(OUT, { recursive: true });
   for (const [f, b] of Object.entries(all)) writeFileSync(join(OUT, f), b);
   const prov = {
-    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the mono sine of the synths deck on the front page.',
+    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the two mono programs of the synths deck on the front page, a sine and the same sine with its volume on a slider.',
     howToRemake: 'node demo/resources/build-faust-aot.mjs (and --check to compare without writing)',
     compiledOn: new Date().toISOString().slice(0, 10),
     compiler: {

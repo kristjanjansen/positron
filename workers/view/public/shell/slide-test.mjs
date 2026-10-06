@@ -131,6 +131,15 @@ ok('the one frame is none, and a table may have it or not',
   && !throws(() => normalise({ rows: { body: [['a']] } })));
 ok('NEGATIVE: the rounded box is gone and throws now', throws(() => normalise({ rows: { body: [['a']], frame: 'box' } })));
 ok('NEGATIVE: a frame nobody declared throws', throws(() => normalise({ rows: { body: [['a']], frame: 'rounded' } })));
+{
+  // a split's columns and where its words sit, 2026-10-06 (*"use 1:2 cols layout"*, *"align text to bottom of slide"*)
+  const sp = { layout: 'split', side: 'right', slot: () => null, say: 'x' };
+  ok('a split takes cols 1:1 or 1:2 and bottom true',
+    !throws(() => normalise({ ...sp, cols: '1:2', bottom: true })) && !throws(() => normalise({ ...sp, cols: '1:1' })));
+  ok('NEGATIVE: a split ratio nobody declared throws, and so does cols or bottom on a slide that is not a split',
+    throws(() => normalise({ ...sp, cols: '2:1' })) && throws(() => normalise({ ...sp, bottom: 'yes' }))
+      && throws(() => normalise({ say: 'x', cols: '1:2' })) && throws(() => normalise({ say: 'x', bottom: true })));
+}
 ok('in a split the words go one step down, never below step 1',
   wordsStep(4, 'split') === 3 && wordsStep(4, 'stack') === 4 && wordsStep(1, 'split') === 1 && wordsStep(3, 'left') === 3);
 

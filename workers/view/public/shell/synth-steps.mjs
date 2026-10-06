@@ -8,7 +8,10 @@
 // whose artefact was compiled from a different text, so the program on the
 // slide and the program in the speaker cannot drift apart.
 //
-// 🔴 ONE PROGRAM SINCE 2026-10-06, AND IT IS MONO WITH ITS NUMBERS TYPED IN.
+// 🔴 TWO PROGRAMS SINCE 2026-10-06, BOTH MONO. The second is the first with its
+// 0.5 turned into a slider (*"slode 3: make 0.5 into knob 0..1"*), which the
+// slide draws as a knob. What follows is about the first.
+// 🔴 ONE PROGRAM UNTIL THEN, AND IT IS MONO WITH ITS NUMBERS TYPED IN.
 // Asked: *"rm fau slides c-f ... editable code, hardcoded params for minimal
 // sine and then fau nameplate and test tone button on right"*. The deck was an
 // intro and five steps that grew a polyphonic voice by one element a slide
@@ -37,6 +40,20 @@ export const SYNTH_STEPS = [
 
 // 440 Hz at half volume
 process = os.osc(440) * 0.5;
+`,
+  },
+  {
+    id: 'volume',
+    name: 'the volume on a knob',
+    mono: true,
+    // the sine's 0.5 as a slider, asked 2026-10-06 as *"slode 3: make 0.5
+    // into knob 0..1"*; it starts at 0.5, where the slide before left it, and
+    // `slide-synth.mjs` draws every slider the program declares as a knob
+    code: `import("stdfaust.lib"); // has os.osc
+
+// 440 Hz, its volume on a knob
+volume = hslider("volume", 0.5, 0, 1, 0.01);
+process = os.osc(440) * volume;
 `,
   },
 ];

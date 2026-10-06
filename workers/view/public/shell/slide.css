@@ -316,6 +316,24 @@
 .sl[data-layout="split"][data-side="left"]::before { left: 0; }
 .sl[data-layout="split"][data-side="right"]::before { right: 0; }
 .sl[data-layout="split"] .sl-in { position: relative; }
+/* `cols: '1:2'`, A THIRD FOR THE WORDS AND TWO FOR THE SLOT, asked 2026-10-06
+   for the synths deck: *"use 1:2 cols layout"*. The DIVIDE is put at exactly
+   one third of the slide from the words' edge, so the darker part is exactly
+   two thirds and the full screen ground below can say where it ends. The grid
+   is the content box C = W - 2 pad, so the words column is the third, less
+   the inset on its outer edge and half the gap on the divide:
+   (C + 2 pad) / 3 - 2 pad. A plain split writes no `data-cols` and keeps the
+   two equal columns above. */
+.sl[data-layout="split"][data-cols="1:2"][data-side="right"] .sl-in {
+  grid-template-columns: calc((100% + 2 * var(--sl-pad)) / 3 - 2 * var(--sl-pad)) minmax(0, 1fr);
+}
+.sl[data-layout="split"][data-cols="1:2"][data-side="left"] .sl-in {
+  grid-template-columns: minmax(0, 1fr) calc((100% + 2 * var(--sl-pad)) / 3 - 2 * var(--sl-pad));
+}
+.sl[data-layout="split"][data-cols="1:2"]::before { width: calc(200% / 3); }
+/* `bottom`: the headline and the words together on the foot of their column. */
+.sl[data-layout="split"][data-bottom] .sl-words { justify-content: flex-end; }
+.sl[data-layout="split"][data-bottom] .sl-ev { flex: 0 0 auto; }
 
 /* `band`: TWO ROWS, 2:1, asked 2026-10-06 with a screenshot of a split: *"its
    better to use vertical sections here. top 2/3 is darker, centered screen and
@@ -459,6 +477,21 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 }
 .sl-frame.pos-full:has(> .sl[data-layout="band"]) {
   background: linear-gradient(to bottom, var(--bg) calc(50% + 0.1133 * min(100vh, 56.25vw)), var(--card) 0);
+}
+/* A 1:2 split's darker two thirds run on to the screen's edge on the slot's
+   side, ending where the slide's own does: the slide is w = min(100vw,
+   177.78vh) wide and centred, so its divide is the screen's middle less w / 6
+   with the words on the left, and plus w / 6 with them on the right. After
+   the plain split rules above, at their weight plus the attribute. */
+.sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="right"]:not([hidden])),
+.sl-player.pos-full .pos-vp-stage:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="right"]:not([hidden])),
+.sl-frame.pos-full:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="right"]) {
+  background: linear-gradient(to right, var(--card) calc(50% - min(100vw, 177.78vh) / 6), var(--bg) 0);
+}
+.sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="left"]:not([hidden])),
+.sl-player.pos-full .pos-vp-stage:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="left"]:not([hidden])),
+.sl-frame.pos-full:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="left"]) {
+  background: linear-gradient(to right, var(--bg) calc(50% + min(100vw, 177.78vh) / 6), var(--card) 0);
 }
 
 /* A SWIPE ON A PHONE (slide.mjs `swipeStep`): the stage lets the browser keep
