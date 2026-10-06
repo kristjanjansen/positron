@@ -432,7 +432,7 @@ export function rich(t) {
  * A component sized in px, laid out at `w` logical px and scaled into `host`.
  * The scale is a custom property, never the transform written by hand.
  */
-export function fitBox(host, w, { h = 0 } = {}) {
+export function fitBox(host, w, { h = 0, top = false } = {}) {
   const outer = el('div', 'sl-fit');
   const inner = el('div', 'sl-fit-in');
   inner.style.setProperty('--fit-w', `${w}px`);
@@ -449,7 +449,9 @@ export function fitBox(host, w, { h = 0 } = {}) {
     k = Math.min(ow / w, oh / Math.max(ih, h));
     inner.style.setProperty('--fit-k', String(k));
     inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
-    inner.style.setProperty('--fit-y', `${(oh - ih * k) / 2}px`);
+    // `top`: anchored to the top rather than centred, so content that grows
+    // (a knob row appearing) grows downward and nothing above it moves
+    inner.style.setProperty('--fit-y', `${top ? Math.max(0, (oh - Math.max(ih, h) * k) / 2) : (oh - ih * k) / 2}px`);
     return k;
   };
   const ro = new ResizeObserver(fit);

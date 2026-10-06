@@ -38,7 +38,7 @@ export const SYNTH_STEPS = [
     // single line comments in the code, asked 2026-10-06 as *"add comments to
     // fau code (single line ones)"* and *"why we multily with 0.1?"*
     // each comment kept short enough not to wrap in the half width panel
-    code: `import("stdfaust.lib"); // has os.osc
+    code: `import("stdfaust.lib");
 
 // 440 Hz at half volume
 process = os.osc(440) * 0.5;
@@ -51,10 +51,11 @@ process = os.osc(440) * 0.5;
     // the sine's 0.5 as a slider, asked 2026-10-06 as *"slode 3: make 0.5
     // into knob 0..1"*; it starts at 0.5, where the slide before left it, and
     // `slide-synth.mjs` draws every slider the program declares as a knob
-    code: `import("stdfaust.lib"); // has os.osc
+    code: `import("stdfaust.lib");
 
-// 440 Hz, its volume on a knob
+// volume knob
 volume = hslider("volume", 0.5, 0, 1, 0.01);
+
 process = os.osc(440) * volume;
 `,
   },
@@ -69,12 +70,18 @@ process = os.osc(440) * volume;
     // line carries a comment short enough not to wrap in the panel.
     // ⚠️ NO `[scale:log]`, although `param-knobs.mjs` honours it (warp
     // `exp`): the line is the owner's, written linear, and it stays short
-    code: `import("stdfaust.lib"); // has os.osc
+    // THE OWNER'S LAYOUT, 2026-10-06, from a screenshot of their own edit:
+    // *"use this layout as i pointed"*. No comment on the import, a short
+    // comment over each knob, a blank line between the blocks; slides 2 and
+    // 3 follow it
+    code: `import("stdfaust.lib");
 
-// the volume knob from slide 3
+// volume knob
 volume = hslider("volume", 0.5, 0, 1, 0.01);
-// new: the pitch on a knob, 440 Hz to start
+
+// freq knob
 freq = hslider("freq", 440, 50, 2000, 1);
+
 process = os.osc(freq) * volume;
 `,
   },

@@ -86,11 +86,18 @@ import { createParamKnobs } from './param-knobs.mjs';
 const PANEL_PX = 400;
 /** The logical height every synth panel is scaled by, the tallest of them, so
  * every instrument slide draws it at one scale and one type size (*"2 and 3
- * use same size of fau"*). Slide 4's since 2026-10-06, MEASURED 562 px: its
- * two knobs share slide 3's one row (544 px), and its seven lines of code take
- * the box from nine rows to ten. A panel shorter than this is centred in its
- * slot; one taller still fits, at a smaller scale, and the kit's check says so. */
-export const PANEL_H = 562;
+ * use same size of fau"*). Slide 4's, MEASURED 599 px on 2026-10-06 after
+ * the owner's code layout (a blank line between blocks) took its nine lines
+ * of code to a twelve row box; slide 3 is 544 and slide 2 427. A panel
+ * shorter than this is centred in its slot; one taller still fits, at a
+ * smaller scale, and the kit's check says so. */
+export const PANEL_H = 599;
+/** ONE CODE BOX HEIGHT ON EVERY SLIDE, 2026-10-06: *"keep fau size the same.
+ * just knobs panel appears"*. Twelve rows hold the longest program (nine
+ * lines) with room to type; the panel is anchored to the top of its slot, so
+ * a slide with knobs differs from one without only by the knob row under the
+ * code, and every slide shares one scale (`PANEL_H`). */
+export const CODE_ROWS = 12;
 /** The scope's height in logical px, `/muta/`'s 140 less a little for half a slide. */
 const WAVE_PX = 120;
 /** Samples shown per frame: about 10.7 ms at 48 kHz, four and a bit cycles of 440 Hz. */
@@ -152,6 +159,18 @@ export function readSliders(code) {
  * address carries the compile's name, so it is kept per compiled program.
  * @returns {{list: object[], addr: Map<string, string>}}
  */
+/**
+ * The knobs in the order their sliders are DECLARED in the text. Faust lists
+ * its controls in the order `process` uses them (`os.osc(freq) * volume` puts
+ * freq first), so a row read off the compiled program reordered itself after
+ * a compile. Asked 2026-10-06 with a screenshot: *"why feq comes first?"*.
+ */
+export function inTextOrder(list, code) {
+  const order = readSliders(code).map((p) => p.name);
+  const at = (n) => { const i = order.indexOf(n); return i < 0 ? order.length : i; };
+  return [...list].sort((a, b) => at(a.name) - at(b.name));
+}
+
 export function slidersOf(parts) {
   const list = [], addr = new Map();
   let ui = [];
@@ -192,7 +211,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     // the slider's name and written onto the knob as `--param-hue`
     const book = createHueBook();
     const code = createCodeBox({
-      language: 'faust', hues: book, rows: Math.max(9, lines + 3), label: '', value: shipped,
+      language: 'faust', hues: book, rows: CODE_ROWS, label: '', value: shipped,
       ariaLabel: `the Faust program Start plays, ${lines} lines, editable`,
     });
     // START AND STOP, ONE WIDTH, asked 2026-10-06 as *"Test tone -> Start Stop
@@ -214,7 +233,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     const codeRow = panel.addRow(code.el, { pad: false });
     const mid = el('div', 'sl-mid');
     mid.append(panel.el);
-    const fb = fitBox(host, PANEL_PX, { h: PANEL_H });
+    const fb = fitBox(host, PANEL_PX, { h: PANEL_H, top: true });
     fb.inner.append(mid);
 
     let ctx = null, out = null, meter = null, node = null, nodeText = null;
@@ -335,7 +354,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       }
       parts = p;
       partsText = t;
-      showKnobs(ui(p).list);
+      showKnobs(inTextOrder(ui(p).list, t));
       return p;
     }
 
