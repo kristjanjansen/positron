@@ -429,8 +429,11 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .sl-player .sl[aria-label="synths in code"] .sl-ev { gap: 0; }
 /* THE SYNTHS DECK'S PLATE (slide-synth.mjs): the note beside FAU says what a
    press will cost, in the plate's own small dim type, and never wraps. */
-.sl-tone-note { font: 500 11px/1 var(--mono); color: var(--dim); white-space: nowrap; }
 .sl-tone { flex: 0 0 auto; }
+/* Start and Stop in one cell, the absent one hidden but still sizing it */
+.sl-tone-w { display: inline-grid; }
+.sl-tone-w > span { grid-area: 1 / 1; text-align: center; }
+.sl-tone[data-state="start"] .sl-tone-stop, .sl-tone[data-state="stop"] .sl-tone-start { visibility: hidden; }
 /* ── FULL SCREEN IS THE SLIDE AND NOTHING ELSE ─────────────────────────────
    Asked 2026-10-06 with two screenshots of a deck in full screen: *"rm pseudo
    app frame, paint all bg properly. where is border of screen?"* and *"what
