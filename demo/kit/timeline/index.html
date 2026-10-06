@@ -1,0 +1,1703 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/timeline</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<script type="module">
+  import { el } from '/shell/shell.mjs';
+  import { createStack } from '/shell/stack.mjs';
+  import { createNoteGrid } from '/shell/note-grid.mjs';
+  import { createStripView, createStripFooter, STRIP_FOOTER_EMPTY } from '/shell/strip.mjs';
+  import { createFullscreenExit, EXIT_IDLE_MS, toggle as fsToggle, isFull as fsIsFull }
+    from '/shell/fullscreen.mjs';
+  import { createVideoPanel, FULL_MODES } from '/shell/video-panel.mjs';
+  import { createLocalRemote, NARROW_PX, KINDS } from '/shell/local-remote.mjs';
+  import { createWaveView } from '/shell/wave-view.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
+  import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
+  import { createPresence } from '/shell/presence.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { markAdapter } from '/shell/fixture.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+
+  /**
+   * 🔴 kit/timeline, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
+   * (plans/plan-kit-split.md). Every block, holder and check below is copied
+   * VERBATIM from `demo/kit/index.html`, in that file's order, so the newest
+   * block is still the first. What changed is mechanical: `section()` lost its
+   * first argument, the holders sit here rather than at the top of the
+   * monolith, the measuring window and the tab row are gone, and every check
+   * is behind `?selfcheck=1`.
+   */
+  const { d, out, section, land, checkPage } = createKitPage({
+    part: 'timeline',
+    what: "Transport bars, strips and video panels for watching something play out over time.",
+  });
+
+  // The video panels, for the checks that their slots and their picture are real.
+  let vpSpec = null;
+
+  // The way out of full screen, and the strip that says what is under the
+  // pointer. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
+  // comments above give: these two blocks are the newest and therefore the
+  // topmost, and a `let` left where a block used to be is read in its dead zone
+  // and swallowed by `section()` into `failed`.
+  // The panel with a transport glued under it, held for the two checks that
+  // measure it. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
+  // comments above give: this is the newest block and therefore the topmost,
+  // and a `let` left where a block used to be is read in its dead zone.
+  // The four shapes a transport bar takes, and the message it refuses one pair
+  // with. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the lines
+  // above give: a `let` left beside a block that moves is read in its dead zone.
+  let tbarSpec = null;        // { whole, noScrub, noToggle, refused, deck }
+  let glueSpec = null;        // { panel, bar, deck, mute }
+  let fsxSpec = null;         // { host, exit, out }, a cover with a way back
+  let footSpec = null;        // the strip whose footer says what is hovered
+  let vpUnder = null;         // the control row a panel lifts while full
+  let vpStorey = null;        // the off-screen panel that row is graded against
+  // The three panel specimens, for the checks at the foot of this file: one
+  // with an absorber, one without as the negative control, and one at a phone's
+  // width. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
+  // lines above give: this is the newest block and therefore the topmost one,
+  // and a `let` left where a block used to be is read in its dead zone,
+  // swallowed by `section()` into `failed`, and reported much later with a
+  // message about a different line.
+  /* 🔴 THE THREE `local and remote` SPECIMENS, DECLARED UP HERE WITH EVERY
+     OTHER HOLDER. This is the newest block and therefore the topmost one, and a
+     `let` left where a block used to be is read in its temporal dead zone,
+     swallowed by `section()` into `failed`, and reported much later with a
+     message about a different line. That has happened on this page three times
+     and it is the first thing to check when a block below reports that it did
+     not build. */
+  let lrWide = null;          // audio on one side, video on the other
+  let lrPair = null;          // a waveform on both sides
+  let lrMissing = null;       // the far end not answering, which is the ordinary case
+  let lrGone = null;          // nothing coming back on the LEFT, a waveform on the right
+  let lrPhone = null;         // the same component pinned to the phone arrangement
+  let lrWaves = null;         // every wave view in that block, for the pixel readback
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Local and remote, as of
+   * 2026-09-23, asked for as *"make general 'local and remote' component that
+   * can be used for video and audio"* with a drawing, and then *"some kind of
+   * scope?"*, *"viz can be audio (waveforms), video or missing."* and *"its
+   * 'glue' thing"*.
+   *
+   * 🔴 FIVE SPECIMENS, AND EACH ONE IS HERE FOR A CLAIM RATHER THAN FOR A
+   * LOOK. A waveform against a picture, a waveform against a waveform, a
+   * picture against nothing at all, nothing at all against a waveform, and the
+   * phone arrangement, which is a DIFFERENT STRUCTURE rather than a reflow:
+   * the labels move out of the shared bar and into their own panes' footers.
+   * `missing` is the state this component was designed around first, because a
+   * remote with nothing coming back is the ordinary case on this desk and a
+   * pane that draws nothing and says nothing is indistinguishable from one that
+   * is broken.
+   *
+   * 🔴 AND IT WAS THREE UNTIL 2026-09-23, WHICH LEFT TWO OF THE THREE KINDS
+   * VISIBLE ON ONE SIDE ONLY. Asked for as *"add waveform examples and no
+   * viz/wave examples"*. `KINDS` is `['video', 'audio', 'missing']` and this
+   * block is what a reader checks the component against, so a kind only ever
+   * drawn on the left is a kind whose right hand shape nobody can see. Before
+   * the two new rows, `audio` had never been on the right, `missing` had never
+   * been on the left, and `missing` had never been shown beside a waveform at
+   * all. The check at the foot of this file walks the specimens and asserts
+   * that every kind now appears on BOTH sides, so removing one takes it red.
+   *
+   * 🔴 AND THE PHONE ONE IS GRADED HERE, AT DESKTOP WIDTH, WHICH NO OTHER
+   * PHONE LAYOUT IN THIS REPOSITORY IS. `demo/verify.mjs` runs at 756 px with
+   * no viewport override, so every assert on every page passes without ever
+   * entering a media query, and `.pos-pick`'s entire phone layout sat dead in
+   * `shell.css` for weeks with every line of it correct. This component decides
+   * its arrangement in JavaScript, off its own box's width, so both
+   * arrangements are reachable and measurable at any window size.
+   *
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the blocks
+   * below give: both harnesses press that row by position, so a new top block
+   * with a control in it moves every other block's press. The fader lives
+   * inside the component's own footer band, which is where it belongs anyway.
+   *
+   * ⚠️ AND THE PICTURE IS DRAWN ONCE RATHER THAN ANIMATED. `pattern.mjs` into a
+   * canvas, this project's own image, from nobody's server. What this block is
+   * about is the arrangement and the fader, and a second frame loop on a page
+   * that already runs several would cost a reader something for nothing.
+   */
+
+
+  section('LOCAL AND REMOTE',
+    'One thing running here and the same thing running somewhere else, side by '
+    + 'side, with one fader between them.',
+    `const lr = createLocalRemote({
+  local:  { label: 'this page', kind: 'audio', media: wave.el },
+  remote: { label: 'the board', kind: 'video', media: canvas, of: 'the Raspberry Pi' },
+  onFade: (v, g) => { /* g.local and g.remote are equal power */ },
+});
+lr.gain({ local: pageGain, remote: boardGain });    // once the graph exists
+lr.remote.kind('missing', { say: 'the board has not answered yet' });`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      // One master frame, drawn once, blitted into every picture well that
+      // wants one. A canvas cannot be in two places, which is why `/stage/` and
+      // the VIDEO PANEL block below both do it this way.
+      const master = document.createElement('canvas');
+      master.width = FRAME_W; master.height = FRAME_H;
+      burn(master.getContext('2d', { alpha: false }), FRAME_W, FRAME_H, 0,
+        { hue: videoHue(1) });
+      const picture = () => {
+        const c = document.createElement('canvas');
+        c.width = FRAME_W; c.height = FRAME_H;
+        c.getContext('2d', { alpha: false }).drawImage(master, 0, 0);
+        return c;
+      };
+
+      /**
+       * 🔴 THE AUDIO CASE IS A WAVE VIEW, WHICH IS THE KIT'S ANSWER TO *"viz
+       * can be audio (waveforms)"*. The material is made here rather than
+       * fetched: a decaying sine is enough to show a shape, and a gallery is
+       * the last place to ask somebody else's server for a sound.
+       *
+       * 🔴 AND `set()` TAKES THREE ARGUMENTS, WHICH THIS BLOCK GOT WRONG AND
+       * NOTHING SAID SO UNTIL 2026-09-23. It was called as
+       * `wave.set({ samples, rate, name })`, so the component read `s.length`
+       * off an object, found `undefined`, and returned
+       * `{ ok: false, why: 'no samples in that, so there is nothing to draw' }`
+       * to a caller that read nothing back. The wrapper stayed `hidden` and was
+       * on screen anyway, because `.pos-lr .pos-vp-stage > .pos-wave` is
+       * (0,3,0) and `wave-view.mjs`'s own `.pos-wave[hidden]` is (0,2,0).
+       * MEASURED on the live page: a 328 by 150 canvas with **0 of 49,200
+       * pixels painted**, sitting in the gallery that exists to show what a
+       * waveform looks like. Both halves are repaired: the call here, and a
+       * rule in `shell.css` so `hidden` means hidden inside a pane too.
+       * ⚠️ THE CHECKS AT THE FOOT OF THIS FILE READ THE PIXELS NOW rather than
+       * the envelope's own numbers, which is `wave-view.mjs`'s own note about
+       * `ink()`: every field in `facts()` would read exactly the same if the
+       * fill were the field colour or the scale were zero.
+       * ⚠️ AND NO FRAME LOOP, WHICH IS WHAT `follow()` WOULD START AND NOTHING
+       * HERE CALLS. `set()` draws once and `stopLoop()` is the first thing it
+       * does. This block is about the arrangement and the fader, and a second
+       * loop on a page that already runs several costs a reader something for
+       * nothing.
+       */
+      const RATE = 22050;
+      /** One decaying sine, as the mono floats `set()` takes. */
+      const pluck = (hz, decay, secs) => {
+        const s = new Float32Array(Math.round(secs * RATE));
+        for (let i = 0; i < s.length; i++) {
+          const t = i / RATE;
+          s[i] = Math.sin(2 * Math.PI * hz * t) * Math.exp(-decay * t);
+        }
+        return s;
+      };
+      /**
+       * An empty wave view. One per pane, because a canvas cannot be in two
+       * places, which is the same reason `picture()` above blits a fresh copy
+       * of the master frame per well.
+       */
+      const waveView = () => createWaveView(document.createElement('div'), { height: 150 });
+      /**
+       * 🔴 THE PICTURE GOES IN AFTER THE PANE IS IN THE PAGE, WHICH IS
+       * ARITHMETIC RATHER THAN TIDINESS. `set()` reads `clientWidth` and paints
+       * ONCE, so a wave view filled while its wrapper is still detached
+       * measures 0 wide, paints nothing at all, and waits for a
+       * `ResizeObserver` to deliver a width on the next frame. The checks at
+       * the foot of this file run before that frame, so `ink()` would report
+       * `the bitmap is empty` about a picture a reader can see perfectly well.
+       * ⚠️ AND THE RETURN VALUE IS READ, WHICH IS THE HALF THAT WAS MISSING
+       * ABOVE. A block that will not draw reports itself through `section()` as
+       * `this block did not build`, which is a sentence on the page, rather
+       * than as an empty box nobody can tell from a picture that has not
+       * arrived yet.
+       */
+      const fill = (v, hz, decay, secs, name) => {
+        const r = v.set(pluck(hz, decay, secs), RATE, { name });
+        if (!r.ok) throw new Error(`the ${name} wave did not draw: ${r.why}`);
+        return r;
+      };
+
+      // ── the two viz kinds the ask names, side by side ────────────────────
+      stack.add(el('p', 'kit-cap', 'audio on one side, video on the other'));
+      const wave = waveView();
+      lrWide = createLocalRemote({
+        local: { label: 'this page', kind: 'audio', media: wave.el },
+        remote: { label: 'the board', kind: 'video', media: picture(),
+          of: 'the Raspberry Pi' },
+      });
+      lrWide.remote.presence.set('online');
+      stack.add(lrWide.el);
+      fill(wave, 220, 2.1, 1.5, 'a plucked string');
+
+      /**
+       * ── a waveform against a waveform ──────────────────────────────
+       * 🔴 TWO DIFFERENT SOUNDS, NOT ONE PICTURE TWICE. The claim a pair makes
+       * is that two wells of the same kind read as two views of one subject,
+       * and two identical envelopes would read as one picture that had been
+       * copied. A short bright pluck against a long low note is visibly two
+       * things, and the check reads the ink off both canvases rather than the
+       * column counts, which would agree whatever was drawn.
+       */
+      stack.add(el('p', 'kit-cap', 'a waveform on both sides'));
+      const pairNear = waveView(), pairFar = waveView();
+      lrPair = createLocalRemote({
+        local: { label: 'this page', kind: 'audio', media: pairNear.el },
+        remote: { label: 'the board', kind: 'audio', media: pairFar.el,
+          of: 'the Raspberry Pi' },
+        value: 0.5,
+      });
+      lrPair.remote.presence.set('online');
+      stack.add(lrPair.el);
+      fill(pairNear, 220, 2.1, 1.5, 'a plucked string');
+      fill(pairFar, 70, 0.7, 3, 'a long low note');
+
+      // ── missing, which is the state this was designed around first ───────
+      stack.add(el('p', 'kit-cap', 'and the far end not answering'));
+      lrMissing = createLocalRemote({
+        local: { label: 'this page', kind: 'video', media: picture() },
+        remote: { label: 'the board', kind: 'missing', of: 'the Raspberry Pi',
+          say: 'the board has not answered since you opened this page' },
+        value: 0.35,
+      });
+      lrMissing.remote.presence.set('offline', 'no socket has been opened');
+      stack.add(lrMissing.el);
+
+      /**
+       * ⚠️ THE FADER IS STILL ENABLED IN THAT SECOND SPECIMEN, AND THAT IS THE
+       * DECISION RATHER THAN AN OVERSIGHT. It was asked as *"if one is missing,
+       * disabled xfade?"*, answered yes, and reversed by the fact that decides
+       * it: *"remote can come and go ... or perhaps just always enabled. just
+       * goes into silece when no source"*. A control whose enabled state
+       * follows a socket dies under your finger, and the pane beside it already
+       * says the far end is gone, so fading into silence is the truthful output
+       * rather than a control lying.
+       */
+
+      /**
+       * ── nothing at all on the LEFT, against a waveform ─────────────────
+       * 🔴 THE SIDE IS THE POINT OF THIS ONE. Every other specimen puts the
+       * absent pane on the RIGHT, because the far end is what comes and goes on
+       * this desk, and a reader checking the component against this block could
+       * not see what `missing` looks like on the near side. It is a real state
+       * of the near side too, and the module's own header names both sentences:
+       * *"the board has not answered yet"* and *"no camera on this machine"*
+       * are different facts and only the page knows which it has.
+       * ⚠️ NO PRESENCE DOT ON THIS PANE, AND THAT IS THE DEFAULT RATHER THAN AN
+       * OMISSION. Only a side that can be absent gets a badge; a dot under the
+       * near picture is a badge about the browser you are reading this in,
+       * which can never say anything but online.
+       * ⚠️ AND THE FADER OPENS AT THE END THAT HAS SOMETHING. It is still
+       * enabled, for the reason above, and starting it at 0 would make the one
+       * specimen whose near side is empty also the one specimen that is silent,
+       * which is two facts in one picture.
+       */
+      stack.add(el('p', 'kit-cap', 'a pane with no picture at all, beside a waveform'));
+      const goneWave = waveView();
+      lrGone = createLocalRemote({
+        local: { label: 'this page', kind: 'missing',
+          say: 'no microphone on this machine' },
+        remote: { label: 'the board', kind: 'audio', media: goneWave.el,
+          of: 'the Raspberry Pi' },
+        value: 1,
+      });
+      lrGone.remote.presence.set('online');
+      stack.add(lrGone.el);
+      fill(goneWave, 330, 1.2, 1.2, 'what the far end is sending');
+
+      lrWaves = { wide: wave, pairNear, pairFar, gone: goneWave };
+
+      // ── the phone arrangement, at a phone's width ────────────────────────
+      stack.add(el('p', 'kit-cap', 'the same component at 375 px'));
+      const frame = el('div');
+      frame.style.width = '375px'; frame.style.maxWidth = '100%';
+      lrPhone = createLocalRemote({
+        local: { label: 'this page', kind: 'video', media: picture() },
+        remote: { label: 'the board', kind: 'missing', of: 'the Raspberry Pi',
+          say: 'the board has not answered since you opened this page' },
+      });
+      /**
+       * ⚠️ PINNED RATHER THAN LEFT TO ITS OBSERVER, AND ONLY FOR THE SPECIMEN.
+       * A `ResizeObserver` answers on the frame AFTER the box exists, and the
+       * checks at the foot of this file run in the same task as the build, so a
+       * specimen relying on the observer would be graded while it was still
+       * wide. That the observer works at all is a separate claim and is
+       * measured on its own throwaway, with the frames waited for.
+       */
+      lrPhone.arrange('narrow');
+      frame.append(lrPhone.el);
+      stack.add(frame);
+
+      box.append(stack.el);
+    });
+
+  /**
+   * 🔴 THE SHAPES A TRANSPORT BAR TAKES, AND EVERY ONE OF THEM IS A RULE THAT
+   * WAS PAID FOR. Asked 2026-09-21 as *"time: add transport examples"*, because
+   * the most configurable component in the kit was demonstrated in exactly one
+   * of its shapes on the page whose job is to make drift visible.
+   *
+   * ⚠️ FOUR VIEWS OF ONE DECK, NOT FOUR DECKS. Nothing on this page may move
+   * unless a reader asked it to, and four decks would be four clocks running
+   * behind a gallery. One idle deck with no adapters offers no rates, so the
+   * bars draw no rate row and what is on show is the shape of the row itself.
+   *
+   * 🔴 AND EXACTLY ONE OF THEM PUBLISHES. `__demo.transport` is the only handle
+   * a CDP check has, and every bar used to claim it unconditionally, so which
+   * bar the harness graded was decided by SOURCE ORDER rather than by the page:
+   * `/stage/` grew a second bar and the wrong one won by being further down the
+   * file. This page now holds four, which makes it the worst case in the
+   * repository, so the whole row claims the handle and every other specimen
+   * passes `publish: false`. Asserted both ways, because a page where nothing
+   * claimed it and a page where two did would look the same from the count.
+   */
+  /**
+   * 🔴 THE NEWEST COMPONENT, AT THE TOP OF ITS GROUP, WHICH IS THIS PAGE'S OWN
+   * RULE. Built 2026-09-21 after `/pack/` was asked twice for it: *"can we see
+   * actual notes on timeline"*, then *"so can you show notes in timeline in
+   * pack?"*.
+   * 🔴 AND IT IS DELIBERATELY NOT `strip.mjs`, which is the component directly
+   * below it and the reason this specimen sits here rather than anywhere else.
+   * A strip draws marks against a DECK, in milliseconds, and its mark colour is
+   * reserved for HOW A MARK LANDED. A Circuit pattern has no milliseconds in it
+   * and the thing worth seeing is PITCH, which a strip has no axis for.
+   */
+  section('NOTE GRID',
+    'Note events where they fall in a pattern: one row per pattern, sixteen steps '
+    + 'across, pitch up the row on one scale for the whole picture and velocity as alpha.',
+    `const grid = createNoteGrid(host)
+grid.set(notesIn(sessionBytes))   // [{ region, step, note, velocity }]`,
+    (box) => {
+      /* Two patterns a reader can check by eye: a rising line and a falling
+         one, at the same steps, so the axis is provable from the picture
+         rather than only from the caption. */
+      const ev = [];
+      for (let i = 0; i < 8; i++) {
+        ev.push({ region: 0, step: i * 2, note: 52 + i * 3, velocity: 20 + i * 15 });
+        ev.push({ region: 4, step: i * 2 + 1, note: 73 - i * 3, velocity: 127 - i * 14 });
+      }
+      const grid = createNoteGrid(box, { label: 'one rising pattern and one falling' });
+      grid.set(ev);
+      /* 🔴 THE AXIS IS ASSERTED RATHER THAN DESCRIBED, which is what this page
+         is for: a specimen nothing grades is a picture of a component that may
+         already have stopped working. A higher note must sit higher, and two
+         patterns must be two rows. */
+      const f = grid.facts();
+      const first = grid.place(ev[0]), last = grid.place(ev[14]);
+      // ⚠️ GATED HERE, 2026-10-06: it ran for every visitor of `/kit/`, and on
+      // these pages every check is behind `?selfcheck=1`.
+      if (SELFCHECK) d.assert('a higher note sits higher, and two patterns are two rows',
+        f.regions === 2 && f.count === 16 && last.y < first.y && last.row === first.row,
+        `${f.count} notes in ${f.regions} rows, ${f.lo} to ${f.hi}, `
+        + `note ${ev[14].note} at y ${last.y.toFixed(1)} above note ${ev[0].note} at `
+        + `y ${first.y.toFixed(1)}`);
+    });
+
+  section('TRANSPORT BAR',
+    'The whole row, the two things a page can take off it, and the one pair it refuses.',
+    `createTransportBar(host, deck)                       // everything
+createTransportBar(host, deck, { scrub: false })      // a page with a strip
+createTransportBar(host, deck, { toggle: false, chip: badge.el })
+createTransportBar(host, deck, { chip, live: true })  // throws: one position, two claims`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+      // ⚠️ ONE DECK. See the note above: four would be four clocks.
+      const deck = createDeck({ range: [0, 60_000] });
+      tbarSpec = {};
+
+      const at = (cap, opts) => {
+        const host = el('div', 'kit-half');
+        const bar = createTransportBar(host, deck, { publish: false, ...opts });
+        stack.titled(cap, host);
+        return bar;
+      };
+
+      /**
+       * 🔴 THE WHOLE ROW, AND IT IS THE ONE BAR ON THIS PAGE THAT PUBLISHES.
+       * `publish` defaults to true, so this passes nothing, and that is the
+       * point: shown in only one of its two states the option is a rule with no
+       * specimen, which is the drift this page exists to catch and is exactly
+       * what `CONTROL ROW` records about a primary button that is working.
+       * ⚠️ AND IT GIVES THE HARNESS A DEFINED PLAYHEAD INSTEAD OF AN ACCIDENTAL
+       * ONE. `__demo.transport` is the only handle a CDP check has; with four
+       * other bars on the page the winner would otherwise be whichever was
+       * built LAST, which is a fact about source order rather than a statement
+       * about the page, and is how `/stage/` handed the suite the wrong bar.
+       * `verify.mjs` will press this toggle and seek this deck, on a deck with
+       * no adapters whose only job is to have a position.
+       */
+      tbarSpec.whole = at('EVERYTHING, AND THE ONE BAR HERE THAT PUBLISHES',
+        { verb: ['start', 'stop'], publish: true });
+
+      /**
+       * 🔴 ONE POSITION SURFACE PER PAGE. A page with a strip passes this,
+       * because two horizontal time axes at different scales stacked is not a
+       * redundancy, it is a contradiction: the strip already seeks on press AND
+       * on drag, which the bar's slider never did.
+       */
+      tbarSpec.noScrub = at('SCRUB: FALSE, WHICH IS WHAT A PAGE WITH A STRIP PASSES',
+        { scrub: false, verb: ['start', 'stop'] });
+
+      /**
+       * 🔴 A BAR WITH NO PLAY BUTTON AT ALL, AND WHAT IT CARRIES INSTEAD. Play,
+       * pause and seek are all claims about a POSITION INSIDE A SOUND, and
+       * `/knobs/` has none: a note sounds while a key is held, so there is
+       * nothing to start or resume and a toggle whose only honest behaviour is
+       * to do nothing is the shape of control this project calls a lie. What
+       * such a bar keeps is the chip, and on both board pages that is the
+       * presence badge, because the fact worth having about an instrument in
+       * another building is whether it is answering.
+       * ⚠️ IT DISARMS WHAT DEPENDED ON PLAYING rather than leaving it to read
+       * false by luck: `api.playing` is forced false, the space bar stops being
+       * a play key, the end stop never arms, and `api.toggles` says so in one
+       * boolean that `demo/verify.mjs` reads before its play drill.
+       */
+      tbarSpec.noToggle = at('TOGGLE: FALSE, WITH A PRESENCE BADGE IN THE CHIP\u2019S PLACE', {
+        toggle: false, scrub: false, loop: false,
+        chip: createPresence({ of: 'Raspberry Pi', mode: 'badge', state: 'online' }).el,
+      });
+
+      /**
+       * 🔴 AND THE ONE PAIR IT REFUSES, SHOWN AS THE REFUSAL. A chip and a live
+       * badge want the same position in the row, so asking for both is asking
+       * the bar to draw two things in one place; it throws rather than picking.
+       * A specimen showing a refusal is worth as much as one showing a shape,
+       * which this page already does for a readout with an odd number of cells
+       * and for a table with two growing columns.
+       */
+      let refused = 'IT WAS ACCEPTED';
+      try {
+        createTransportBar(el('div', ''), deck, {
+          publish: false, live: true,
+          chip: createPresence({ of: '', mode: 'badge', state: 'online' }).el,
+        });
+      } catch (e) { refused = e.message; }
+      tbarSpec.refused = refused;
+      const say = el('div', 'kit-cut', `a chip and a live badge: ${refused}`);
+      stack.add(say);
+
+      tbarSpec.deck = deck;
+      box.append(stack.el);
+    });
+
+  section('GLUED TRANSPORT BAR',
+    'A panel and its transport bar wrapped in one edge with a 1 px seam. The toggle holds '
+    + 'both of its words at once, so it cannot change width when it changes state.',
+    `panel.glue(bar.el)   // wraps in place, so the pair stays where the panel was
+createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      // 🔴 HALF THE WIDTH THE BOX GIVES IT, asked 2026-09-20: *"make it half
+      // w"*. `.kit-half` is `max-width: 50%` rather than a number of pixels,
+      // because the box already owns this width and a figure typed here would
+      // be a second opinion about it. MEASURED after the change: the seam, the
+      // edges and the toggle's two states are all unmoved.
+      const glued = el('div', 'kit-half');
+      box.append(glued);
+      const c = document.createElement('canvas');
+      c.width = FRAME_W; c.height = FRAME_H;
+      const ctx = c.getContext('2d', { alpha: false });
+      const panel = createVideoPanel({
+        media: c,
+        left: createPresence({ of: '', mode: 'badge', state: 'online',
+                               says: { online: 'live' } }).el,
+      });
+      /**
+       * 🔴 A SECOND GLYPH BESIDE THE ⛶, WHICH IS WHAT THE RIGHT SLOT LOOKS LIKE
+       * WITH TWO THINGS IN IT. `/stage/` puts the film's mute there. The
+       * glyphs are `♫` U+266B and `⊘` U+2298, chosen by looking: the text style
+       * speakers U+1F568 to U+1F56A are an empty tofu box in this font stack,
+       * and U+1F507 and U+1F50A are emoji presentation, 21 px of colour beside
+       * a ⛶ whose ink is 9.86 px of grey.
+       * ⚠️ `setSymbol`, NEVER `textContent`. The centring lives in a span that
+       * writing `textContent` throws away, which is the defect that module was
+       * written for and is invisible until somebody looks closely at a button
+       * whose glyph swaps.
+       */
+      let muted = true;
+      const mute = el('button', 'ico', '\u2298',
+        { type: 'button', 'aria-label': 'the sound', 'aria-pressed': 'false', title: 'muted' });
+      centreSymbol(mute);
+      mute.onclick = () => {
+        muted = !muted;
+        setSymbol(mute, muted ? '\u2298' : '\u266b');
+        mute.setAttribute('aria-pressed', String(!muted));
+        mute.title = muted ? 'muted' : 'audible';
+      };
+      panel.slots.right.prepend(mute);
+      glued.append(panel.el);
+
+      // A deck with no adapters offers no rates, so the bar draws no rate row:
+      // what is on show here is the toggle, the clock and the seam.
+      const deck = createDeck({ range: [0, 60_000] });
+      const bar = createTransportBar(glued, deck, {
+        verb: ['start', 'stop'], live: false, loop: false, scrub: true, absolute: false,
+        /**
+         * 🔴 `publish: false`, AND SINCE 2026-09-21 THAT REALLY IS A TIE BREAK
+         * BETWEEN BARS. This comment used to say `/kit/` had no transport of
+         * its own and never had one, which stopped being true the moment the
+         * block above it landed: there are four bars on this page now and the
+         * whole row is the one that claims `__demo.transport`. Whichever bar
+         * claims it has to be a decision, because the alternative is source
+         * order deciding, and this one is further down the file than that one.
+         */
+        publish: false,
+      });
+      // ⚠️ THE PANEL IS ALREADY IN THE BOX AND THE BAR IS APPENDED AFTER IT, so
+      // this is the realistic order and the one the method is for: a page has
+      // its picture on screen before it has built the bar that belongs to it.
+      panel.glue(bar.el);
+      glueSpec = { panel, bar, deck, mute, half: glued };
+
+      let n = 0;
+      const draw = () => { burn(ctx, FRAME_W, FRAME_H, n++, { hue: videoHue(1) }); requestAnimationFrame(draw); };
+      requestAnimationFrame(draw);
+
+      /**
+       * 🔴 THE WAY BACK OUT OF FULL SCREEN, BUILT AND NEVER SHOWN. Reported
+       * 2026-09-19 from an iPhone: *"I can not leave fullscreen on mobile"*,
+       * asked for as *"make permanett squaer button with fullscreen icon on
+       * bottom right when going to fullscreen in mobile. fade out it when no
+       * activity"*, and its specimen was taken off this page on 2026-09-20.
+       *
+       * 🔴 IT IS KEPT BECAUSE TWO CHECKS PRESS IT. `/blocks/` shipped a way out
+       * that was built, compiled and drawn every frame and never once updated,
+       * so there was no way out of that page at all while every line of it read
+       * correct. Reading that a control is wired is not the same claim as
+       * pressing it, and a piece deleted with its specimen is a check that stops
+       * running rather than one that fails.
+       * ⚠️ OFF SCREEN AND LAID OUT, the same shape as the video panel's second
+       * storey above and the faded probe at the foot of this file: the checks
+       * read `getBoundingClientRect`, so `display: none` is not available and
+       * `left: -9999px` is.
+       * ⚠️ AND THE HOLDER TAKES NO INLINE `position` THE COVER WOULD HAVE TO
+       * BEAT. `.pos-faux` is `position: fixed; inset: 0` from the stylesheet, a
+       * fixed ancestor is not a containing block for a fixed child, and an
+       * inline style on the host itself would have won against the class and
+       * left the cover parked off the left edge of the screen.
+       * ⚠️ NOTHING HERE SITS IN A `.pos-controls` ROW, ON PURPOSE. Both
+       * harnesses press every button in that row, by position, so an invisible
+       * button in one would be a press landing on nothing a visitor can see.
+       * The way in is pressed by the checks at the bottom instead, which is also
+       * the only way to prove the way out by pressing it.
+       */
+      const o = out('not filling the screen');
+      const host = el('div', 'kit-cover');
+      host.append(el('div', 'kit-cover-p', 'a picture'));
+      // ⚠️ THE PIECE IS BUILT BEFORE THE HANDLER THAT READS IT. A `const`
+      // declared under the closure that closes over it is this page's most
+      // repeated defect, and it has already taken this file out once.
+      const exit = createFullscreenExit(host, {
+        onExit: () => { o.textContent = 'came back'; },
+      });
+      // ⚠️ AN ORDINARY BUTTON, NOT A SHELL CONTROL, for the reason in the note
+      // above. It is pressed from the checks rather than by the harness.
+      const go = el('button', '', 'Fill the screen', { type: 'button' });
+      go.onclick = async () => {
+        const how = await fsToggle(host);
+        exit.sync();
+        o.textContent = `filling the screen the ${how} way`;
+      };
+      fsxSpec = { host, exit, out: o, go };
+
+      const probe = el('div', '');
+      probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:320px';
+      probe.append(host, go, o);
+      document.body.append(probe);
+    });
+
+  /**
+   * 🔴 ONE SECTION FOR ONE COMPONENT, MERGED 2026-09-20 on instruction: *"merge
+   * STRIP VIEW + footer"*. They were `STRIP VIEW` and `STRIP FOOTER`, twenty
+   * sections apart on the page, and the footer is an OPTION on the same call
+   * rather than a second component. A reader meeting `createStripView` twice
+   * has to work out that it is the same thing.
+   *
+   * The footer was asked for 2026-09-19 with a photograph of `/reel/` on an
+   * iPhone: *"add feature to timeline: footer section, looks like glued that
+   * shows hovered info below timeline"*. The photograph shows the sticky tap
+   * tooltip covering the right half of the strip, four lines deep, over the
+   * marks it is describing.
+   *
+   * ⚠️ THE STACK GOES INTO THE BOX BEFORE EITHER STRIP IS BUILT. `fit()`
+   * measures the width it has been given, and a strip built into an element
+   * that is not in the document yet measures nothing.
+   */
+  section('STRIP VIEW',
+    'Marks on a lane over the deck\u2019s range. An optional box under it says what the '
+    + 'pointer is over, at one height whatever it is saying.',
+    `createStripView(host, deck, { lanes })
+createStripView(host, deck, { lanes, footer: true })
+createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen' } })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+      const bare = stack.titled('MARKS ON A LANE');
+      const footed = stack.titled('AND THE BOX THAT SAYS WHAT IS UNDER THE POINTER');
+      box.append(stack.el);
+
+      const { adapter } = markAdapter({ rates: [1] });
+      const SPAN = 8000;
+      const marks = (n, tag) => {
+        const items = [];
+        for (let i = 0; i < n; i++) {
+          items.push({ id: `${tag}${i}`, kind: 'mark', at: (i + 0.5) * (SPAN / (n + 1)),
+                       payload: { label: `${i + 1}` } });
+        }
+        // ⚠️ A DECK NEEDS AN ADAPTER PER KIND, and without one the lane draws
+        // NOTHING: a tall empty box, no error, no warning. That is what this
+        // section was on its first attempt, and an empty component in a sandbox
+        // is worse than an absent one, because it reads as the component being
+        // broken.
+        return createDeck({ items, adapters: { mark: adapter }, range: [0, SPAN] });
+      };
+      // The swatch on the lane's left border AND the marks themselves take the
+      // page's primary colour. `L.color` is the one place it is set, and
+      // `styleFor` hands it to both.
+      const hi = getComputedStyle(document.documentElement)
+                   .getPropertyValue('--hi').trim() || '#ffd400';
+
+      // ⚠️ NO SUBLABEL ON THE BARE ONE. `14 marks · 8 s` still ellipsized, the
+      // gutter being narrower than fourteen characters at this width, and an
+      // ellipsis means the content is in the wrong place rather than that the
+      // box wants widening. A lane's own name is enough in a sandbox.
+      // 'auto' takes exactly the height its lanes need. 'default' left a band
+      // of empty canvas under a single lane.
+      const { strip } = createStripView(bare, marks(14, 'n'), {
+        size: 'auto',
+        lanes: [{ id: 'mark', kind: 'mark', color: hi }],
+      });
+      strip.fit?.();
+
+      footSpec = createStripView(footed, marks(9, 'f'), {
+        size: 'auto',
+        // 🔴 ONE LINE. Asked 2026-09-20 with a screenshot: *"1 line footer
+        // here"*. The default is three, which is right on a page whose marks
+        // carry a name, a time and a verdict; this specimen's marks carry a
+        // number, so two of the three rows were reserved air under a single
+        // sentence. **The specimen should show the component doing its job,
+        // not its widest possible job.**
+        footer: { lines: 1 },
+        lanes: [{ id: 'mark', kind: 'mark', label: 'takes', color: hi }],
+      });
+      footSpec.strip.fit?.();
+    });
+
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE TWO PRESENCE BLOCKS ARE ONE. Asked 2026-09-17:
+   * *"bring online offline up in kit and merge busy/test into it"*. They were
+   * two sections because the busy words were built second, and that is a fact
+   * about the order the work happened in rather than about the component: one
+   * badge answers both questions, so a reader meeting it twice has to work out
+   * that it is the same thing.
+   *
+   * ⚠️ A SECTION TITLE IS UPPERCASE, and `.kit-h` renders it so whatever is
+   * typed. Type it uppercase anyway, so the source reads like the page.
+   * ⚠️ AND MOVING A BLOCK MOVES EVERY BUTTON AFTER IT. `verify.mjs` presses by
+   * position, so re-run `node demo/verify.mjs kit` and diff the assert count
+   * after any reorder.
+   */
+  section('VIDEO PANEL',
+    'A picture, with a status on the left, an empty middle and a fullscreen button under it.',
+    `createVideoPanel({ media: canvas, of: 'the board' })
+createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      /**
+       * 🔴 THE PICTURE IS THIS PROJECT'S OWN AND COMES FROM NOBODY'S SERVER.
+       * `pattern.mjs` is drawn into a canvas here, so the specimen needs no
+       * network, cannot 403, and looks the same on every run. CLAUDE.md's rule
+       * about external sources has been broken twice; a gallery is the last
+       * place to break it a third time.
+       * ⚠️ ONE CANVAS PER PANEL AND ONE LOOP. A canvas cannot be in two places,
+       * so the master is drawn once a frame and blitted, which is what `/stage/`
+       * does with three of them.
+       */
+      const master = document.createElement('canvas');
+      master.width = FRAME_W; master.height = FRAME_H;
+      const mctx = master.getContext('2d', { alpha: false });
+
+      /**
+       * ⚠️ THREE ACROSS, NOT THREE DOWN. A panel is 16 by 9 and a page wide, so
+       * three of them stacked is three screens of scrolling to compare things
+       * that differ in one row of controls. Side by side they are compared at a
+       * glance, which is what a gallery is for, and they wrap to one column on a
+       * phone where the full width is what a panel actually gets.
+       */
+      const row = el('div', 'kit-row kit-vps');
+      const made = [];
+      const add = (heading, panel, ctx) => {
+        const cell = el('div', 'kit-vp');
+        cell.append(el('p', 'kit-cap', heading), panel.el);
+        row.append(cell);
+        made.push({ ctx, panel });
+      };
+      for (const [mode, heading] of [['hover', 'the defaults'],
+                                     ['footer', 'footer in fullscreen']]) {
+        const c = document.createElement('canvas');
+        c.width = FRAME_W; c.height = FRAME_H;
+        /**
+         * ⚠️ THE BADGE SAYS `LIVE` RATHER THAN SHOWING A LONE DOT. Asked
+         * 2026-09-17: *"add LIVE to green bullet on footer"*. A coloured dot
+         * with nothing beside it is a mark whose whole meaning is its hue, which
+         * this project already has a rule about, and the panel's own default is
+         * the dot mode because a footer usually holds several small things. Here
+         * it holds one.
+         */
+        const p = createVideoPanel({
+          media: c, fullMode: mode,
+          left: createPresence({ of: '', mode: 'badge', state: 'online',
+                                 says: { online: 'live' } }).el,
+        });
+        add(heading, p, c.getContext('2d', { alpha: false }));
+      }
+
+      /**
+       * 🔴 THE SECOND STOREY IS STILL GRADED AND IS NO LONGER SHOWN. The
+       * specimen came off 2026-09-20 on instruction: *"rm a second storey under
+       * the footer"*. It was asked for on 2026-09-19 with a photograph of
+       * `/mirror/` filling an iPhone: *"extend videopanel footer in fullscreen
+       * so it can have section below the footer bar (separaet with line). put
+       * controlgroup there"*.
+       *
+       * 🔴 THE MECHANISM IS LIVE AND THIS IS THE ONLY THING THAT GRADES IT.
+       * `/mirror/` calls `panel.under(knobRow)`, and in real element fullscreen
+       * nothing outside the full subtree is on screen, so on a phone that row is
+       * only reachable from inside the picture. Deleting the piece as well as the
+       * specimen would take the check with it, which is this project's own rule
+       * about a control you switch off. So it stays as an off-screen probe.
+       * ⚠️ OFF SCREEN AND LAID OUT, the same shape as the way-out probe at the
+       * foot of this file: the check reads `gridTemplateRows`, so `display:
+       * none` is not available and `left: -9999px` is.
+       * 🔴 IT IS THE SAME ELEMENT, MOVED. Two rows that can disagree about which
+       * option is chosen would be a readout living in two files, so the check
+       * grades that there is exactly ONE of them in the document.
+       */
+      {
+        const probe = el('div', '');
+        probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:480px';
+        const c = document.createElement('canvas');
+        c.width = FRAME_W; c.height = FRAME_H;
+        vpUnder = el('div', 'kit-row');
+        vpUnder.append(el('div', '', 'a control row'));
+        vpStorey = createVideoPanel({ media: c, fullMode: 'footer' });
+        probe.append(vpStorey.el, vpUnder);
+        document.body.append(probe);
+        // ⚠️ HANDED OVER AFTER IT IS ON THE PAGE, which is the realistic order
+        // and the one that matters: the panel records where the element lives
+        // at the moment it is given it, so an element with no parent yet has no
+        // home to be put back to. The constructor's `under` option is for a page
+        // that builds its controls before it builds its panel.
+        vpStorey.under(vpUnder);
+      }
+
+      vpSpec = made;
+      stack.add(row);
+
+      let n = 0;
+      const draw = () => {
+        burn(mctx, FRAME_W, FRAME_H, n++, { hue: videoHue(0) });
+        for (const m of made) m.ctx.drawImage(master, 0, 0);
+        requestAnimationFrame(draw);
+      };
+      requestAnimationFrame(draw);
+      box.append(stack.el);
+    });
+
+  // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
+  land();
+
+  /* ── what a machine can say about this page ─────────────────────────────
+     🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
+     included (CLAUDE.md: a self-check never runs for a visitor). The checks
+     below are copied from `demo/kit/index.html` VERBATIM and keep that
+     file's indent, so a diff against it reads clean; the one line taken out
+     of each is a `settle()` or `measure()`, the measuring window a page with
+     no closed tab has no use for. Their comments still name it.
+     ⚠️ THEY RUN AFTER A FRAME, because `getBoundingClientRect` before the
+     first paint answers about a page that has not been arranged yet. */
+  if (SELFCHECK) {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  checkPage();
+
+
+  /**
+   * 🔴 THE NEWEST BLOCK'S TWO CLAIMS, AND BOTH ARE MEASUREMENTS RATHER THAN
+   * LOOKS. A bar UNDER a panel and a bar GLUED to one are the same order of
+   * elements: what differs is whether there is one edge round the pair or two
+   * edges and a gap, which is three numbers.
+   * ⚠️ IT IS THE SAME SHAPE AS THE STRIP'S CHECK BELOW, on purpose. Two
+   * components reach `.pos-glue` and the rule that zeroes a child's border is
+   * double-classed precisely because a component can otherwise win the
+   * specificity fight, so both callers grade it the same way.
+   */
+  if (glueSpec) {
+    const surf = glueSpec.panel.surface;
+    const edge = (n) => Math.round(parseFloat(getComputedStyle(n).borderTopWidth) || 0);
+    const pb = glueSpec.panel.el.getBoundingClientRect();
+    const bb = glueSpec.bar.el.getBoundingClientRect();
+    const seam = bb.top - pb.bottom;
+    /**
+     * 🔴 AND HALF THE WIDTH OF ITS BOX, MEASURED RATHER THAN READ OFF THE
+     * STYLESHEET. Asked 2026-09-20 as *"make it half w"*, and a rule that is
+     * present and inert reads exactly like one that works: this file already
+     * records three dead CSS rules found only by computing a value, and
+     * `.kit-half` sits on a child of a box whose `display` another class
+     * decides.
+     * ⚠️ AGAINST THE BOX'S OWN CONTENT WIDTH, NEVER A PIXEL COUNT TYPED HERE. A
+     * figure would be a second opinion about a width the layout owns, and it
+     * would have to be retyped every time the page's column changes.
+     * ⚠️ AND THE NEGATIVE HALF IS IN IT: a specimen still taking the whole box
+     * would satisfy every other clause in this check.
+     */
+    const half = glueSpec.half;
+    const hb = half.parentElement;
+    const hcs = getComputedStyle(hb);
+    const room = hb.clientWidth - parseFloat(hcs.paddingLeft) - parseFloat(hcs.paddingRight);
+    const took = half.getBoundingClientRect().width;
+    d.assert('a transport glued under a picture is one surface with one edge, at half its box',
+      surf !== glueSpec.panel.el && surf.classList.contains('pos-glue')
+      && surf.contains(glueSpec.panel.el) && surf.contains(glueSpec.bar.el)
+      && Math.abs(seam - 1) <= 0.6 && edge(surf) === 1
+      && edge(glueSpec.panel.el) === 0 && edge(glueSpec.bar.el) === 0
+      && took < room - 1 && Math.abs(took - room / 2) <= 1,
+      `seam ${seam.toFixed(1)} px, one edge of ${edge(surf)} px round both, `
+      + `${edge(glueSpec.panel.el)} and ${edge(glueSpec.bar.el)} inside, `
+      + `taking ${took.toFixed(1)} px of the ${room.toFixed(1)} px the box gives it`);
+
+    /**
+     * 🔴 THE TWO WORDS ARE THE SAME WIDTH, MEASURED IN BOTH STATES RATHER THAN
+     * ASSERTED FROM THE STYLESHEET. Asked as *"start | stop text labels (same
+     * w)"*, and the reason is the project's standing one about a control that
+     * resizes under the pointer that just pressed it.
+     * ⚠️ **AND THE WIDTH ALONE WOULD PASS ON A BUTTON SHOWING NEITHER WORD.**
+     * `visibility: hidden` on both is the same width as `visibility: hidden` on
+     * one, so the check reads which span is visible in each state as well. That
+     * is the half that would catch the `::before` glyph rule winning the
+     * specificity fight and a word never appearing at all.
+     * ⚠️ IT PRESSES THE TOGGLE AND WAITS FOR THE STATE TO LAND rather than
+     * setting `data-state` by hand, which would grade the stylesheet against
+     * itself and say nothing about the bar.
+     */
+    const t = glueSpec.bar.el.querySelector('.tbar-toggle');
+    const vis = (cls) => {
+      const n = t?.querySelector(`.${cls}`);
+      return n ? getComputedStyle(n).visibility : 'no span';
+    };
+    const w = () => (t ? +t.getBoundingClientRect().width.toFixed(2) : null);
+    const wIdle = w();
+    const seenIdle = [vis('tbar-w0'), vis('tbar-w1')];
+    t?.click();
+    // ⚠️ THE MEASURING WINDOW SHUTS ACROSS THIS WAIT AND OPENS AGAIN AFTER IT.
+    // Both widths are read with every part laid out, which is the only state
+    // either of them is a real number in; what may not happen is a frame being
+    // rendered with all parts open, and this loop is one of the two places
+    // on the page that gives the browser the chance. See `measure()` above.
+    for (let i = 0; i < 40 && t?.dataset.state !== 'playing'; i++) {
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const wBusy = w();
+    const seenBusy = [vis('tbar-w0'), vis('tbar-w1')];
+    t?.click();
+    glueSpec.deck.pause();
+    d.assert('a toggle that says two words is the same width in both of its states',
+      wIdle != null && wBusy != null && Math.abs(wIdle - wBusy) < 0.01
+      && seenIdle[0] === 'visible' && seenIdle[1] === 'hidden'
+      && seenBusy[0] === 'hidden' && seenBusy[1] === 'visible',
+      `${wIdle} px showing "${t?.querySelector('.tbar-w0')?.textContent}" `
+      + `(${seenIdle.join('/')}), ${wBusy} px showing `
+      + `"${t?.querySelector('.tbar-w1')?.textContent}" (${seenBusy.join('/')})`);
+  }
+
+  /**
+   * 🔴 A BAR WITH NO PLAY BUTTON HAS NO PLAY BUTTON, AND SAYS SO IN A BOOLEAN A
+   * HARNESS CAN READ. Two independent sources, which is the whole check: the
+   * DOM says whether `.tbar-toggle` was ever appended, and `api.toggles` says
+   * what the page asked for, so the two can disagree. Without the boolean
+   * `demo/verify.mjs` clicks `.tbar-toggle` and asserts the position advanced,
+   * which takes a `toggle: false` page red for a reason that is not its fault.
+   * ⚠️ AND THE COMPARISON IS AGAINST THE WHOLE ROW BESIDE IT, never against a
+   * count typed here. A page that had lost its toggle everywhere would satisfy
+   * "this one has none".
+   */
+  if (tbarSpec) {
+    const has = (b) => !!b.api.el.querySelector('.tbar-toggle');
+    d.assert('a bar told to leave the play button off has none, and says so in one boolean',
+      has(tbarSpec.whole) && tbarSpec.whole.api.toggles !== false
+      && !has(tbarSpec.noToggle) && tbarSpec.noToggle.api.toggles === false
+      && tbarSpec.noToggle.api.playing === false,
+      `the whole row: toggle ${has(tbarSpec.whole) ? 'drawn' : 'MISSING'}, `
+      + `toggles ${tbarSpec.whole.api.toggles} · with it off: `
+      + `${has(tbarSpec.noToggle) ? 'STILL DRAWN' : 'no toggle'}, `
+      + `toggles ${tbarSpec.noToggle.api.toggles}, playing ${tbarSpec.noToggle.api.playing}`);
+
+    /**
+     * 🔴 ONE POSITION SURFACE PER PAGE, WHICH IS WHAT `scrub: false` IS FOR.
+     * ⚠️ AND IT IS NOT AN ELEMENT THAT GOES MISSING, WHICH IS WHAT THIS CHECK
+     * FIRST ASSUMED AND WHY IT WENT RED ON A BAR THAT WAS RIGHT. The slider is
+     * always built; `scrub: false` sets `data-scrub="0"` on the bar and
+     * `shell.css` hides it from there. So the question is which rule won, and
+     * the only thing that knows that is the COMPUTED style. A presence test
+     * read `STILL HAS ONE` about a bar with no visible slider at all.
+     * ⚠️ BOTH SIDES, because `data-scrub` is `seekable && wantScrub`: a deck
+     * that could not be seeked would hide the slider on every bar here and a
+     * one-sided check would have called that a success.
+     */
+    const shows = (b) => getComputedStyle(b.api.el.querySelector('.tbar-scrub')).display;
+    const flag = (b) => b.api.el.dataset.scrub;
+    d.assert('and a bar told to leave the slider off draws no second time axis',
+      shows(tbarSpec.whole) !== 'none' && flag(tbarSpec.whole) === '1'
+      && shows(tbarSpec.noScrub) === 'none' && flag(tbarSpec.noScrub) === '0',
+      `the whole row is data-scrub=${flag(tbarSpec.whole)} showing `
+      + `${shows(tbarSpec.whole)}, the one with scrub off is `
+      + `data-scrub=${flag(tbarSpec.noScrub)} showing ${shows(tbarSpec.noScrub)}`);
+
+    /**
+     * 🔴 WHAT SUCH A BAR CARRIES INSTEAD, AND IT IS A BADGE RATHER THAN A WORD.
+     * The chip's position held `LIVE` once: a word drawn because a page passed
+     * `live: true` at BUILD time, so it said LIVE whether or not a byte had
+     * arrived. On both board pages the chip is the presence badge, because the
+     * fact worth having about an instrument in another building is whether it
+     * is answering, which is a thing that can change.
+     */
+    const chip = tbarSpec.noToggle.api.el.querySelector('.pos-pres');
+    d.assert('the chip on a bar with no toggle is a badge that can change, not a word',
+      !!chip && chip.querySelector('.pos-pres-dot')
+      && chip.querySelector('.pos-pres-w').textContent.trim().length > 0,
+      chip ? `it says "${chip.querySelector('.pos-pres-w').textContent.trim()}" beside a dot`
+           : 'there is nothing in the chip position');
+
+    /**
+     * 🔴 NEGATIVE CONTROL: A CHIP AND A LIVE BADGE WANT THE SAME POSITION AND
+     * THE BAR REFUSES RATHER THAN PICKING. A specimen showing a refusal is
+     * worth as much as one showing a shape, and this page already does it for a
+     * readout with an odd number of cells and a table with two growing columns.
+     */
+    d.assert('NEGATIVE CONTROL: a chip and a live badge are refused rather than drawn over each other',
+      typeof tbarSpec.refused === 'string' && tbarSpec.refused !== 'IT WAS ACCEPTED'
+      && tbarSpec.refused.includes('same position'),
+      tbarSpec.refused);
+
+    /**
+     * 🔴 EXACTLY ONE BAR ON THIS PAGE CLAIMS THE PAGE'S PLAYHEAD, AND THE COUNT
+     * ALONE CANNOT SEE IT. `__demo.transport` is the only handle a CDP check
+     * has; with four bars here, a page where NOTHING claimed it and a page
+     * where two did would both read green, because the handle is not something
+     * an assert count knows about. So both halves are graded: the handle is
+     * filled, and it is filled by the bar this page chose rather than by
+     * whichever was built last.
+     * ⚠️ IDENTITY, NOT A SELECTOR. `document.querySelector('.tbar')` is the
+     * first bar in DOM order, which is the same object only while a page has
+     * one; `/stage/` has already paid for that confusion. This compares the
+     * published object against the specimen itself.
+     */
+    /* ⚠️ NOT THE TAB PAGE BLOCK'S, 2026-10-04. That specimen builds its bars
+       lazily, when its BARS tab is first opened, so whether they exist here
+       depends on whether its check pass has run yet. They are publish: false
+       and are graded there; this count is about the rest of the page. */
+    const bars = [...document.querySelectorAll('.tbar')].filter((b) => !b.closest('.kit-tabpage'));
+    const published = d.api.transport || window.__demo?.transport;
+    /* FIVE since 2026-09-22: the STEP GRID block gained a standard transport
+       when its hand-rolled `Play` button was reported. It passes
+       `publish: false` like the other specimens, so the claim below is
+       unchanged and only the count moved. SIX since 2026-10-05: TRANSPORT
+       BAR ON A SLIDE, `publish: false` and drilled in the SLIDES checks.
+       SEVEN since the same day: STEP GRID ON A SLIDE became `/tom/`'s
+       instrument, whose bar is `publish: false` and graded in SLIDES.
+       FOUR on `/kit/timeline/`, 2026-10-06: the STEP GRID's bar is on
+       `/kit/devices/` and the two slide bars stay in `/kit/` with SLIDES, so
+       the count is this page's four and the claim is unchanged. */
+    d.assert('of the four bars here exactly one claims the page\u2019s playhead, and it is the whole row',
+      bars.length === 4 && !!published && published === tbarSpec.whole.api
+      && published.el === tbarSpec.whole.api.el
+      && bars.filter((b) => b === published.el).length === 1,
+      `${bars.length} bars on the page · the handle holds ${published ? 'one of them' : 'NOTHING'}`
+      + `${published && published === tbarSpec.whole.api ? ', the whole row' : ''}`);
+  }
+
+  // 🔴 GLUED, WHICH IS THE WORD THE ASK USED: *"footer section, looks like
+  // glued that shows hovered info below timeline"*. So it is not enough that
+  // the box is under the strip, it has to READ as the same surface, and that is
+  // three measurements rather than a look: one border round the pair, nothing
+  // between them but the 1 px seam `.pos-glue` shows through, and neither child
+  // painting an edge of its own. `.pos-strip` and `.pos-glue.pos-glue > *` both
+  // declare `border`, at (0,1,0) and (0,2,0), and which of them wins is the
+  // specificity trap this stylesheet already records three times.
+  if (footSpec) {
+    const box = footSpec.surface;
+    const cb = footSpec.el.getBoundingClientRect();
+    const fb = footSpec.footer.el.getBoundingClientRect();
+    const seam = fb.top - cb.bottom;
+    const edge = (n) => Math.round(parseFloat(getComputedStyle(n).borderTopWidth) || 0);
+    d.assert('the strip and the box saying what is under the pointer are one surface',
+      box.classList.contains('pos-glue') && Math.abs(seam - 1) <= 0.6
+      && edge(box) === 1 && edge(footSpec.el) === 0 && edge(footSpec.footer.el) === 0,
+      `seam ${seam.toFixed(1)} px, one edge of ${edge(box)} px round both, `
+      + `${edge(footSpec.el)} and ${edge(footSpec.footer.el)} inside`);
+  }
+  {
+    /**
+     * 🔴 THE PANEL'S DEFAULTS ARE THE COMPONENT'S WHOLE ARGUMENT, so they are
+     * what is checked: a page that writes neither still gets something that says
+     * whether its source is answering and something that fills the screen.
+     * ⚠️ AND THE PICTURE IS READ BACK OUT OF THE PANEL'S OWN CANVAS. A canvas
+     * that is blank and one that is painting look identical to every counter,
+     * and `pattern.mjs` burns a clock into the frame precisely so a page can ask.
+     */
+    if (vpSpec) {
+      const first = vpSpec[0].panel;
+      const btn = first.slots.right.querySelector('button');
+      const r = btn?.getBoundingClientRect();
+      d.assert('a panel comes with a status on the left and a square control on the right',
+        !!first.slots.left.querySelector('.pos-pres') && !!r && Math.abs(r.width - r.height) <= 0.5
+        && first.slots.centre.childElementCount === 0,
+        r ? `the button is ${r.width.toFixed(1)} by ${r.height.toFixed(1)} px and the centre holds ${first.slots.centre.childElementCount}`
+          : 'there is no control in the right slot');
+
+      const ms = readBurned(vpSpec[0].ctx);
+      d.assert('the picture in a panel is really being drawn, read back out of its own canvas',
+        Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000,
+        Number.isFinite(ms) ? `the burned clock is ${Math.abs(Date.now() - ms)} ms from now`
+          : 'nothing decoded, so the canvas is not showing the picture');
+
+      let threw = false;
+      try { first.mode('enormous'); } catch { threw = true; }
+      d.assert(`a fullscreen mode outside ${FULL_MODES.join(', ')} is refused rather than ignored`,
+        threw, threw ? 'it throws' : 'it accepted a mode that does not exist');
+    }
+
+  }
+
+  if (SELFCHECK) {
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    /**
+     * 🔴 THE FOOTER UNDER THE STRIP, WRITTEN AT IT AND MEASURED. Everything
+     * below this line puts words in a box a visitor is looking at, moves a row
+     * of buttons between two parents, or covers the screen, so it is behind
+     * `?selfcheck=1` with the rest. The claim is the one the ask is about: it is
+     * rewritten on every hover change, so it must not be able to change its own
+     * height while somebody reads it.
+     * ⚠️ IT IS FED THE STRIP'S OWN `hit` SHAPE, `{ detail: [...] }`, which is
+     * what `describe()` hands `onHover`. A check that called some other entry
+     * point would grade a path no pointer ever takes.
+     */
+    if (footSpec?.footer) {
+      /**
+       * 🔴 THE CHECK BUILDS ITS OWN FOOTER RATHER THAN GRADING THE SPECIMEN.
+       * The specimen was asked to be ONE line on 2026-09-20, *"1 line footer
+       * here"*, and both checks below read the SECOND row: one asserts six
+       * things are cut to `lines`, the other that a name too long for row 0
+       * does not push row 1 out of a box that is still the same height. Against
+       * a one line footer the second row is `undefined`, so the check did not
+       * fail, it THREW, and took the whole page down with a TypeError about
+       * `startsWith` that named no block.
+       * ⚠️ **A CHECK MUST NOT DECIDE WHAT A SPECIMEN LOOKS LIKE.** That is this
+       * project's rule about a check that mutates, arriving from the other
+       * side: there a check destroyed the thing it graded, here it would have
+       * dictated it. Three lines is what the BEHAVIOUR needs, so the check
+       * makes three lines and puts them back.
+       * ⚠️ IT IS APPENDED AND THEN REMOVED, because both asserts measure a
+       * height and a detached element has none.
+       */
+      const f = createStripFooter({ lines: 3 });
+      footSpec.el.parentElement.append(f.el);
+      const h = () => f.el.getBoundingClientRect().height;
+      const idle = h();
+      f.set({ detail: ['takes  0:03.2'] });
+      const one = h();
+      f.set({ detail: ['a', 'b', 'c', 'd', 'e', 'f'] });
+      const six = h();
+      const shown = f.says();
+      f.set(null);
+      const back = h();
+      const empty = f.says()[0];
+      d.assert('the box under the strip is one height saying six things, one thing, or nothing',
+        idle > 0 && Math.abs(one - idle) < 0.5 && Math.abs(six - idle) < 0.5
+        && Math.abs(back - idle) < 0.5 && shown.length === f.lines
+        && shown[0] === 'a' && shown[1] === 'b' && empty === STRIP_FOOTER_EMPTY,
+        `${idle.toFixed(1)} px empty, ${one.toFixed(1)} with one line, ${six.toFixed(1)} with six, `
+        + `${back.toFixed(1)} back to nothing, ${f.lines} lines kept of six, and it says "${empty}"`);
+
+      // 🔴 A NAME TOO LONG ELLIPSISES RATHER THAN WRAPPING, and that is the
+      // half a height check cannot see: a wrapped first line pushes the second
+      // one out of a box that is still exactly as tall as it was. Photographed
+      // on `/reel/`, where a title was cut mid word inside the tooltip.
+      // ⚠️ LONG ENOUGH ON ANY SCREEN, not long enough on this one. The real
+      // title that was photographed being cut is about seventy characters and
+      // FITS a laptop's box, so a check built on it would have passed here and
+      // failed nowhere while the defect it is about lives on a phone.
+      const long = `${'PÄEVAKAJA. Kaevanduse miiti ja muud, '.repeat(8)}lõpp`;
+      f.set({ detail: [long, 'the second line, which must survive it'] });
+      const row0 = f.el.firstElementChild;
+      const cut = row0.scrollWidth - row0.clientWidth;
+      const tall = h();
+      const second = f.says()[1];
+      f.set(null);
+      d.assert('a name too long for the box is cut off at the edge, not wrapped onto the line below',
+        cut > 0 && Math.abs(tall - idle) < 0.5 && second.startsWith('the second line'),
+        `${long.length} characters running ${cut} px past a ${row0.clientWidth} px line, still `
+        + `${tall.toFixed(1)} px tall, and the line under it reads "${second}"`);
+      f.el.remove();
+
+      // And the specimen on the page really is the one line that was asked for.
+      d.assert('the footer on show is one line, which is what this specimen was asked to be',
+        footSpec.footer.lines === 1, `${footSpec.footer.lines} line(s)`);
+    }
+
+    /**
+     * 🔴 THE SECOND STOREY IS THE PAGE'S OWN ROW, MOVED, AND THERE IS ONE OF IT.
+     * Asked 2026-09-19: *"extend videopanel footer in fullscreen so it can have
+     * section below the footer bar (separaet with line). put controlgroup
+     * there"*, and the thing that would quietly go wrong is a second copy, which
+     * is two rows of buttons that can disagree about which option is chosen.
+     * ⚠️ IT GOES FULL BY THE CLASS, NOT BY ASKING THE BROWSER. `.pos-full` is
+     * what BOTH real paths set and what `isFull` reads, so this is the state
+     * itself rather than a stand-in for it. Asking for real would put a cover
+     * over the page in the middle of the checks that follow.
+     */
+    if (vpStorey && vpUnder) {
+      const p = vpStorey;
+      const home = vpUnder.parentNode;
+      vpUnder.dataset.kit = 'storey';
+      p.el.classList.add('pos-full');
+      p.mode('footer');                       // re-applies, which syncs the move
+      const lifted = vpUnder.parentNode;
+      const rows = getComputedStyle(p.el).gridTemplateRows.split(/\s+/).filter(Boolean).length;
+      const copies = document.querySelectorAll('[data-kit="storey"]').length;
+      p.el.classList.remove('pos-full');
+      p.mode('footer');
+      const returned = vpUnder.parentNode;
+      delete vpUnder.dataset.kit;
+      d.assert('the second storey holds the page’s own control row, moved, and puts it back',
+        lifted?.classList.contains('pos-vp-under') && p.el.contains(lifted)
+        && rows === 3 && copies === 1 && returned === home,
+        `${copies} of it in the document, ${rows} storeys while full, `
+        + `and it came back to the ${returned === home ? 'same' : 'wrong'} parent`);
+    }
+
+    /**
+     * 🔴 THE WAY BACK OUT, AND IT IS LAST ON PURPOSE. Two of the three checks
+     * below really cover the screen: the faux path puts `overflow: hidden` on
+     * the document and lays a fixed cover over everything, which is a state no
+     * geometry check above would be measuring a visitor's page in. So they run
+     * after every other check has had its answer.
+     *
+     * 🔴 AND THE EXIT IS PROVED BY PRESSING IT. `/blocks/` had a way out that
+     * was built, compiled and drawn every frame and never once updated, so
+     * there was no way out at all while every line of it read correct. Reading
+     * that a control is wired is not the same claim as pressing it.
+     */
+    {
+      /**
+       * 🔴 FADED MUST MEAN UNPRESSABLE, WHICH IS THE ONE THING `opacity: 0`
+       * DOES NOT SAY. Without `pointer-events: none` the bottom right corner of
+       * a picture exits full screen for somebody reaching past it, on a control
+       * they cannot see. MEASURED HERE RATHER THAN READ OUT OF THE STYLESHEET,
+       * because a rule that is present and inert reads exactly like one that
+       * works.
+       * ⚠️ PROVED BY BREAKING IT, 2026-09-19: with `pointer-events: none` taken
+       * off the faded rule in shell.css this reads `up auto, faded auto at
+       * opacity 0` and goes red, while everything else on the page stays green.
+       * ⚠️ AND IT IS A THROWAWAY PIECE WITH A SHORT IDLE, off screen, rather
+       * than the specimen. The shipped wait is EXIT_IDLE_MS, and a check that
+       * sat still for that long mid-block would fall off the end of the
+       * harness's collector, which stops 400 ms after the last assert.
+       * `.pos-full` is what both real paths set and what `isFull` reads, so the
+       * button is in the state it is graded in.
+       */
+      const probeHost = el('div', 'pos-full');
+      probeHost.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:120px';
+      document.body.append(probeHost);
+      const probe = createFullscreenExit(probeHost, { idleMs: 90 });
+      const upPE = getComputedStyle(probe.el).pointerEvents;
+      await nap(320);                       // the idle, then the 140 ms fade
+      const faded = getComputedStyle(probe.el);
+      const fadedPE = faded.pointerEvents, fadedOp = Number(faded.opacity);
+      document.dispatchEvent(new PointerEvent('pointermove'));
+      const backPE = getComputedStyle(probe.el).pointerEvents;
+      probe.destroy();
+      probeHost.remove();
+      d.assert('a faded way out cannot be pressed, and any movement brings it back',
+        upPE === 'auto' && fadedPE === 'none' && fadedOp === 0 && backPE === 'auto',
+        `up ${upPE}, faded ${fadedPE} at opacity ${fadedOp}, ${backPE} again after a pointer moved, `
+        + `on a 90 ms idle against the ${EXIT_IDLE_MS} ms a page gets`);
+    }
+
+    if (fsxSpec) {
+      const { host, exit, out } = fsxSpec;
+      await fsxSpec.go.onclick();
+      await nap(200);                       // the 140 ms fade, on its way up
+      const hb = host.getBoundingClientRect();
+      const bb = exit.el.getBoundingClientRect();
+      const cs = getComputedStyle(exit.el);
+      const gapR = hb.right - bb.right, gapB = hb.bottom - bb.bottom;
+      d.assert('the way out is inside the thing that went full, square, and off its bottom right corner',
+        host.contains(exit.el) && Math.abs(bb.width - bb.height) <= 0.6
+        /* 🔴 A THRESHOLD, BECAUSE `=== '1'` IS AN EXACT EQUALITY ON AN
+           ANIMATING PROPERTY AND THAT IS A RACE THE CHECK WILL EVENTUALLY
+           LOSE. MEASURED 2026-09-22, when a busier page put a 140 ms fade at
+           **0.998744** after a 200 ms nap. The claim is that the way out is
+           VISIBLE, and 0.998744 is visible; nothing here ever wanted the
+           difference between that and 1. The faded state it has to be told
+           apart from is 0, which no threshold near 1 can reach. */
+        && parseFloat(cs.opacity) > 0.9 && cs.pointerEvents === 'auto'
+        && gapR >= 10 && gapR < hb.width / 2 && gapB >= 10 && gapB < hb.height / 2,
+        /* 🔴 THE DETAIL COULD NOT NAME ITS OWN FAILING CLAUSE AND THE WORDS
+           `inside the cover` WERE PRINTED WHETHER OR NOT IT WAS. Measured
+           2026-09-22: this went red reporting a square button at the right
+           inset, which is every clause it prints, so the fault was in one of
+           the two it did not. Six clauses, six facts. */
+        `${bb.width.toFixed(1)} by ${bb.height.toFixed(1)} px, ${gapR.toFixed(1)} px off the right edge `
+        + `and ${gapB.toFixed(1)} off the bottom, contained ${host.contains(exit.el)}, `
+        + `opacity ${cs.opacity}, pointer-events ${cs.pointerEvents}`);
+
+      exit.el.click();
+      await nap(160);
+      const stillFull = fsIsFull(host);
+      const stillHost = document.documentElement.classList.contains('pos-faux-host');
+      d.assert('pressing it gives the screen back, which is the half that cannot be read off the source',
+        !stillFull && !stillHost && out.textContent === 'came back',
+        stillFull ? 'it was pressed and the cover is still there'
+          : `the cover is gone, the page scrolls again, and the specimen says "${out.textContent}"`);
+    }
+  }
+
+
+  // ── local and remote ──────────────────────────────────────────────────────
+  //
+  // 🔴 EVERY CLAIM HERE IS A COMPARISON OR A LEVEL, WHICH IS WHAT ONLY THIS
+  // PAGE CAN MAKE. The three specimens differ in exactly one thing each, so a
+  // check reads one against another rather than against a number typed into it.
+  if (lrWide && lrPair && lrMissing && lrGone && lrPhone && lrWaves) {
+    const px = (n) => +n.toFixed(1);
+    const rect = (n) => n.getBoundingClientRect();
+
+    /**
+     * 🔴 ONE SURFACE, WHICH IS WHAT *"its 'glue' thing"* ASKED FOR. A box drawn
+     * round a child that already has one is the doubled edge `.pos-glue` and
+     * `.pos-report` both exist to avoid, and here it would be drawn three deep:
+     * the surface, then each panel, then each panel's own footer seam. So the
+     * claim is that the panels have given their edges up and that what is left
+     * between the two pictures is a hairline rather than a gap with the page
+     * showing through it.
+     */
+    {
+      const surf = getComputedStyle(lrWide.el);
+      const pane = getComputedStyle(lrWide.local.panel.el);
+      const a = rect(lrWide.local.el), b = rect(lrWide.remote.el);
+      const bar = rect(lrWide.bar);
+      const across = px(b.left - a.right), down = px(bar.top - a.bottom);
+      d.assert('the two panes and the row under them are one box with hairline seams, not three boxes',
+        surf.borderTopWidth === '1px' && pane.borderTopWidth === '0px'
+        && pane.borderTopLeftRadius === '0px' && across === 1 && down === 1,
+        `surface border ${surf.borderTopWidth}, a panel inside it ${pane.borderTopWidth} `
+        + `and radius ${pane.borderTopLeftRadius}, ${across} px between the two pictures `
+        + `and ${down} px between them and the row under them`);
+    }
+
+    /**
+     * 🔴 TWO ARRANGEMENTS, MEASURED AT ONE WIDTH, AND THAT IS THE POINT RATHER
+     * THAN A CONVENIENCE. `demo/verify.mjs` runs at 756 px with no viewport
+     * override, so every assert on every page in this repository passes without
+     * ever entering a media query: `.pos-pick`'s entire phone layout sat dead in
+     * `shell.css` for weeks with every line of it correct, and nothing could
+     * have caught it. This component decides its arrangement in JavaScript off
+     * its own box's width, so the phone one is a rect here rather than a
+     * reading of source order.
+     * ⚠️ AND BOTH HALVES ARE ASSERTED. Side by side means the tops AGREE and the
+     * lefts DIFFER; stacked means the opposite. A check on one of the two would
+     * pass on a component that had collapsed to a single column at both widths.
+     */
+    {
+      const w = [rect(lrWide.local.el), rect(lrWide.remote.el)];
+      const n = [rect(lrPhone.local.el), rect(lrPhone.remote.el)];
+      const sideBySide = px(w[0].top) === px(w[1].top) && w[1].left > w[0].right - 2;
+      const stacked = px(n[0].left) === px(n[1].left) && n[1].top > n[0].bottom - 2;
+      d.assert('side by side when there is room and stacked when there is not, both measured at this width',
+        lrWide.arrange() === 'wide' && lrPhone.arrange() === 'narrow'
+        && sideBySide && stacked,
+        `wide: tops ${px(w[0].top)} and ${px(w[1].top)}, lefts ${px(w[0].left)} and ${px(w[1].left)} `
+        + `over ${px(w[0].width)} px panes, narrow: lefts ${px(n[0].left)} and ${px(n[1].left)}, `
+        + `tops ${px(n[0].top)} and ${px(n[1].top)} over ${px(n[0].width)} px panes`);
+    }
+
+    /**
+     * 🔴 THE LABELS MOVE HOUSE, AND THERE IS STILL ONLY ONE OF EACH. Given as
+     * two drawings: wide is one footer holding two labels with the fader
+     * between them, narrow is a footer per pane with the fader as a band under
+     * both. The cheap way to build that is two label elements, one per
+     * arrangement, with the other hidden, and that is a readout living in two
+     * files: two rows that can disagree. `video-panel.mjs` settled the same
+     * question the same way with `under()`, which MOVES the page's own control
+     * row into the panel and puts it back.
+     * ⚠️ THE COUNT IS THE HALF THAT CATCHES THE COPY. A component that drew a
+     * second label in the pane's footer would place it in exactly the right
+     * spot and pass every geometric check here.
+     */
+    {
+      const homes = (lr) => ['local', 'remote'].map((k) =>
+        lr[k].labelEl.parentElement.className.split(' ').find((c) => c.startsWith('pos-')));
+      const counts = [lrWide, lrPhone].map((lr) => lr.el.querySelectorAll('.pos-lr-lab').length);
+      const wideHomes = homes(lrWide), narrowHomes = homes(lrPhone);
+      d.assert('a label is one element with two homes, and moving it never makes a second one',
+        wideHomes.every((h) => h === 'pos-lr-bar')
+        && narrowHomes.every((h) => h === 'pos-vp-slot')
+        && counts.every((c) => c === 2),
+        `wide puts both in ${wideHomes.join(' and ')}, narrow puts them in `
+        + `${narrowHomes.join(' and ')}, and each component holds ${counts.join(' and ')} labels`);
+    }
+
+    /**
+     * 🔴 `missing` IS THE STATE THIS COMPONENT WAS DESIGNED AROUND FIRST. A
+     * remote with nothing coming back is the ordinary case on this desk, and a
+     * pane that draws nothing and says nothing is indistinguishable from one
+     * that is broken. So the pane keeps the SIZE of the pane beside it, because
+     * two panes of one size say these are two views of one subject and a
+     * collapsed one says the page failed, and it carries the CALLER's sentence
+     * rather than a generic one.
+     * ⚠️ THE NEGATIVE CONTROL IS THE OTHER PANE. A component that drew its note
+     * over every well would pass everything above and cover a picture.
+     */
+    {
+      const mine = lrMissing.remote;
+      const note = rect(mine.sayEl);
+      const wells = [rect(lrMissing.local.panel.stage), rect(mine.panel.stage)];
+      const other = getComputedStyle(lrMissing.local.sayEl).display;
+      const words = mine.say();
+      d.assert('a pane with nothing coming back says so, in the caller’s words, and keeps its size',
+        mine.kind() === 'missing' && note.width > 0 && note.height > 0
+        && /has not answered/.test(words)
+        && px(wells[0].height) === px(wells[1].height) && other === 'none',
+        `it says "${words}" in a ${px(note.width)} by ${px(note.height)} px box, the two wells are `
+        + `${px(wells[0].height)} and ${px(wells[1].height)} px tall, and the pane with a picture in `
+        + `it draws its note at display ${other}`);
+    }
+
+    /**
+     * 🔴 THE FADER IS ENABLED WITH THE FAR END MISSING, AND THAT REVERSES THE
+     * FIRST ANSWER THIS COMPONENT WAS GIVEN. Asked as *"if one is missing,
+     * disabled xfade?"*, answered yes on the rule that a control which cannot
+     * do the thing it names is the defect, and then corrected: *"remote can
+     * come and go ... or perhaps just always enabled. just goes into silece
+     * when no source"*.
+     * ⚠️ IT IS READ AGAINST THE SPECIMEN WHOSE FAR END IS PRESENT, so the claim
+     * is that the two are the SAME rather than that one of them looks alive.
+     * A component with both faders dead would pass a check on one of them.
+     * 🔴 AND THE BILL THE OTHER ANSWER WOULD HAVE CARRIED IS THE REASON THIS IS
+     * CHECKED AT ALL: `disabled` is not a style, it is a `return` in front of
+     * the handler, and every harness here drives a page by clicking controls.
+     * Switching two buttons off took ten asserts out of `/mirror/` and six out
+     * of `/blocks/` in one day. The board is unreachable from a harness, so a
+     * fader disabled on a missing remote is disabled on EVERY run.
+     */
+    {
+      const lane = (lr) => lr.fade.el.querySelector('.sld-lane');
+      const live = lane(lrWide), gone = lane(lrMissing);
+      d.assert('the fader stays live with the far end missing, exactly as it is with the far end present',
+        !gone.hasAttribute('aria-disabled') && gone.getAttribute('tabindex') === '0'
+        && !live.hasAttribute('aria-disabled') && live.getAttribute('tabindex') === '0'
+        && lrMissing.remote.kind() === 'missing' && lrWide.remote.kind() === 'video',
+        `far end ${lrMissing.remote.kind()}: disabled ${gone.hasAttribute('aria-disabled')}, `
+        + `tab stop ${gone.getAttribute('tabindex')}. far end ${lrWide.remote.kind()}: `
+        + `disabled ${live.hasAttribute('aria-disabled')}, tab stop ${live.getAttribute('tabindex')}`);
+    }
+
+    /**
+     * 🔴 EVERY KIND ON BOTH SIDES, WHICH IS EXACTLY WHAT *"add waveform
+     * examples and no viz/wave examples"* BOUGHT AND IS THE CHECK THAT KEEPS
+     * IT. `KINDS` is `['video', 'audio', 'missing']` and this block is what a
+     * reader checks the component against, so a kind only ever drawn on the
+     * left is a kind whose right hand shape nobody here can see. Until
+     * 2026-09-23 `audio` was never on the right and `missing` was never on the
+     * left, over three specimens that all looked deliberate.
+     * ⚠️ IT IS READ OFF THE SPECIMENS RATHER THAN OFF A LIST TYPED HERE. A
+     * table of what this block is supposed to contain would agree with itself
+     * forever, which is the two-numbers-from-one-field defect this repository
+     * has already paid for; `kind()` asks each pane what it is actually
+     * holding, and dropping a specimen from the array above takes this red.
+     */
+    {
+      const specimens = [lrWide, lrPair, lrMissing, lrGone, lrPhone];
+      const seen = { local: new Set(), remote: new Set() };
+      for (const lr of specimens) {
+        seen.local.add(lr.local.kind());
+        seen.remote.add(lr.remote.kind());
+      }
+      const short = KINDS.filter((k) => !seen.local.has(k) || !seen.remote.has(k));
+      d.assert('every kind this component knows is drawn on both sides of the block',
+        short.length === 0,
+        `over ${specimens.length} specimens the near side shows `
+        + `${[...seen.local].sort().join(', ')} and the far side shows `
+        + `${[...seen.remote].sort().join(', ')}`
+        + (short.length ? `, so ${short.join(' and ')} is on one side only` : ''));
+    }
+
+    /**
+     * 🔴 A WAVEFORM PAIR IS TWO PICTURES DRAWN ONCE, AND THIS READS THE PIXELS
+     * RATHER THAN THE ENVELOPE. `wave-view.mjs` says why in its own comment on
+     * `ink()`: every number in `facts()` reads exactly the same if the fill
+     * colour were the field colour, if the scale were zero, or if `paint()`
+     * returned early. That is not hypothetical here. This block called
+     * `set({ samples, rate, name })` against a `set(samples, rate, opts)`
+     * signature until 2026-09-23, so the component refused the material and
+     * said so in a return value nobody read, and the gallery showed **0 of
+     * 49,200 pixels painted** inside a box that was on screen anyway.
+     * ⚠️ AND THE TWO ARE REQUIRED TO DIFFER, which is the half that catches one
+     * picture drawn twice: two identical envelopes would pass every other claim
+     * here and would say a pair of wells is one view copied.
+     * 🔴 NO FRAME LOOP, WHICH IS THE CONSTRAINT THE ASK CAME WITH. `follow()`
+     * is the only thing in that component that starts one and nothing in this
+     * block calls it, so `moving` is false and `ticks` has never run. A counter
+     * that has never moved is the claim; a boolean asked whether it thinks it
+     * has stopped is not.
+     */
+    {
+      const near = lrWaves.pairNear, far = lrWaves.pairFar;
+      const ia = near.ink(), ib = far.ink();
+      const fa = near.facts(), fb = far.facts();
+      const pc = (x) => `${(x * 100).toFixed(1)} per cent`;
+      const still = !fa.moving && !fb.moving && fa.ticks === 0 && fb.ticks === 0;
+      d.assert('a waveform on both sides is two different pictures, drawn once, read off the canvas',
+        ia.measured && ib.measured && ia.share > 0.05 && ib.share > 0.05
+        && Math.abs(ia.share - ib.share) > 0.02 && still
+        && lrPair.local.kind() === 'audio' && lrPair.remote.kind() === 'audio',
+        ia.measured && ib.measured
+          ? `the near canvas is ${pc(ia.share)} ink over ${fa.frames} frames and the far one `
+            + `${pc(ib.share)} over ${fb.frames}, and between them they have asked for `
+            + `${fa.ticks + fb.ticks} animation frames`
+          : `nothing to measure: ${ia.why || ib.why}`);
+    }
+
+    /**
+     * 🔴 THE SENTENCE IN AN EMPTY PANE IS BALANCED, MEASURED AS LINE BOXES AND
+     * NOT READ OFF THE STYLESHEET. Asked for 2026-09-23 as *"the board has not
+     * answered since you opened this page - add balanced text wrapping on all
+     * similar cenered h w texts"*.
+     * 🔴 A PROPERTY SET ON A RULE THAT LOSES TO ANOTHER RULE IS THIS PROJECT'S
+     * SECOND MOST EXPENSIVE DEFECT, and this one had a second way to be inert
+     * on top of that: `.pos-lr-say` is a flex box, so the sentence is an
+     * anonymous block nothing can name, and whether an inherited property
+     * reaches it is a question for a browser rather than for a reader.
+     * MEASURED before the change: **297.7 px over 62.3 px** in a 327.5 px box,
+     * and **332.3 over 27.7** in the phone specimen, which is one word on its
+     * own under a full line. After: 180.0 and 180.0 in both.
+     * ⚠️ THE CLAIM IS A RATIO RATHER THAN A WIDTH, so it survives a font or a
+     * pane getting wider, and it is the quantity the property is about: how
+     * uneven the lines are. Greedy wrapping reads 0.21 and 0.08 here.
+     */
+    {
+      const lineWidths = (node) => {
+        const walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+        const rows = new Map();
+        let t;
+        while ((t = walk.nextNode())) {
+          if (!t.nodeValue.trim()) continue;
+          const r = document.createRange();
+          r.selectNodeContents(t);
+          for (const b of r.getClientRects()) {
+            if (!(b.width > 0)) continue;
+            const key = Math.round(b.top * 2) / 2;
+            const cur = rows.get(key);
+            if (!cur) rows.set(key, { l: b.left, r: b.right });
+            else { cur.l = Math.min(cur.l, b.left); cur.r = Math.max(cur.r, b.right); }
+          }
+        }
+        return [...rows.entries()].sort((a, b) => a[0] - b[0])
+          .map(([, v]) => +(v.r - v.l).toFixed(1));
+      };
+      const notes = [lrMissing.remote.sayEl, lrPhone.remote.sayEl];
+      const read = notes.map((n) => {
+        const w = lineWidths(n);
+        return {
+          style: getComputedStyle(n).textWrapStyle,
+          lines: w,
+          ratio: w.length > 1 ? +(Math.min(...w) / Math.max(...w)).toFixed(2) : 1,
+        };
+      });
+      d.assert('a note that wraps is balanced across its lines rather than left with a stub under a full one',
+        read.every((r) => r.style === 'balance' && r.lines.length > 1 && r.ratio >= 0.5),
+        read.map((r, i) => `${i ? 'at 375 px' : 'side by side'} it lays out `
+          + `${r.lines.join(' and ')} px, a ratio of ${r.ratio}, at text-wrap-style `
+          + `${r.style}`).join('. '));
+    }
+  }
+
+  /**
+   * 🔴 THE CROSSFADE MOVES REAL GAIN, AND THIS MEASURES THE LEVEL RATHER THAN
+   * THE NUMBER IN THE CONTROL. A fader that only redraws is the shape this
+   * project calls a lie, and reading `slider.get()` back would grade the slider
+   * against itself. So two constant sources go through the two gains the
+   * component is holding, one into each channel of a merger, and an offline
+   * render says what came out. The two ends are measured independently, which
+   * is what makes "the middle is BOTH" a measurement rather than a sum.
+   *
+   * ⚠️ OFFLINE, SILENT, 128 FRAMES, AND NO GESTURE. `AudioContext.resume()`
+   * waits on a user gesture and never rejects, which has cost this project two
+   * demos in one session; an `OfflineAudioContext` needs neither and renders in
+   * no time at all.
+   * ⚠️ ONE CONTEXT PER POSITION, because an offline context renders once and
+   * the component writes `gain.value` immediately rather than scheduling it.
+   * That is also why `gain()` is a setter rather than an option: a page's audio
+   * graph does not exist until somebody has pressed something.
+   *
+   * ⚠️ EVERYTHING IN HERE IS BEHIND `?selfcheck=1` because it drives a control
+   * and builds audio nodes. A visitor gets none of it, which is the standing
+   * rule rather than a judgement about how cheap this particular block is.
+   */
+  if (SELFCHECK && typeof OfflineAudioContext === 'function') {
+
+    const probe = el('div', '');
+    probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px';
+    document.body.append(probe);
+    const lines = [];
+    const spare = createLocalRemote({
+      local: { label: 'this page', kind: 'audio' },
+      remote: { label: 'the board', kind: 'missing', of: 'the board',
+        say: 'the board has not answered yet' },
+      onLog: (line) => lines.push(line),
+    });
+    probe.append(spare.el);
+
+    /** Render one position and hand back what each channel really carried. */
+    const levelAt = async (b) => {
+      const ctx = new OfflineAudioContext(2, 128, 44100);
+      const gl = ctx.createGain(), gr = ctx.createGain();
+      const sl = ctx.createConstantSource(), sr = ctx.createConstantSource();
+      sl.offset.value = 1; sr.offset.value = 1;
+      const merge = ctx.createChannelMerger(2);
+      sl.connect(gl); gl.connect(merge, 0, 0);
+      sr.connect(gr); gr.connect(merge, 0, 1);
+      merge.connect(ctx.destination);
+      spare.gain({ local: gl, remote: gr });
+      spare.value(b);
+      sl.start(); sr.start();
+      const out = await ctx.startRendering();
+      return { local: out.getChannelData(0)[64], remote: out.getChannelData(1)[64] };
+    };
+
+    const at0 = await levelAt(0), at5 = await levelAt(0.5), at1 = await levelAt(1);
+    const f = (x) => x.toFixed(4);
+    const near = (a, b, eps = 2e-4) => Math.abs(a - b) <= eps;
+
+    d.assert('driven to one end the near side is whole and the far side is silent, measured out of the graph',
+      near(at0.local, 1) && near(at0.remote, 0)
+      && near(at1.local, 0) && near(at1.remote, 1),
+      `at 0 the levels are ${f(at0.local)} and ${f(at0.remote)}, at 1 they are `
+      + `${f(at1.local)} and ${f(at1.remote)}`);
+
+    /**
+     * 🔴 EQUAL POWER, WHICH IS THE CLAIM A LINEAR FADE FAILS IN EXACTLY ONE
+     * PLACE. Two uncorrelated sources at 0.5 each carry half the power, which
+     * is 3.01 dB down, and the middle of the lane is the one position a
+     * listener stops at to compare the two ends. `/grains/` wrote this line
+     * first and it was lifted rather than rewritten.
+     * ⚠️ THE ARITHMETIC IS ALSO GRADED WITH NO BROWSER AT ALL: `node
+     * demo/shell/local-remote-test.mjs` is 13 checks, four of them negative
+     * controls, and one of those runs a linear pair through the same property.
+     */
+    {
+      const power = (g) => g.local * g.local + g.remote * g.remote;
+      const ps = [at0, at5, at1].map(power);
+      d.assert('the middle is both sides at once and the power is the same all the way across',
+        near(at5.local, at5.remote) && near(at5.local, Math.SQRT1_2)
+        && ps.every((p) => near(p, 1)),
+        `the middle measured ${f(at5.local)} and ${f(at5.remote)} against ${f(Math.SQRT1_2)}, `
+        + `and the power at 0, the middle and 1 is ${ps.map(f).join(', ')}`);
+    }
+
+    /**
+     * 🔴 AND WITH THE FAR END MISSING IT STILL MOVES, INTO SILENCE. That is the
+     * reversed answer doing its job: the fader is live, the near side really
+     * goes quiet, and the thing that stops it being a lie is the pane saying in
+     * words that there is nothing over there.
+     */
+    {
+      const far = await levelAt(1);
+      const lane = spare.fade.el.querySelector('.sld-lane');
+      d.assert('with nothing at the far end the fader still moves, and what it moves into is silence',
+        spare.remote.kind() === 'missing' && !lane.hasAttribute('aria-disabled')
+        && near(far.local, 0) && /has not answered/.test(spare.remote.say()),
+        `the far end is ${spare.remote.kind()} and says "${spare.remote.say()}", the lane is live, `
+        + `and the near side measured ${f(far.local)}`);
+    }
+
+    /**
+     * 🔴 THE SAME NODE CAME BACK. The two visitor-safe checks above read two
+     * different components in two arrangements, which cannot tell a move from
+     * two elements built the same way. This one holds the node and follows it.
+     */
+    {
+      const node = spare.local.labelEl;
+      spare.arrange('narrow');
+      const narrowHome = node.parentElement.className;
+      const sameAfterNarrow = spare.local.labelEl === node;
+      spare.arrange('wide');
+      const wideHome = node.parentElement.className;
+      d.assert('the label that went into the pane’s footer is the one that came back to the bar',
+        sameAfterNarrow && spare.local.labelEl === node
+        && /pos-vp-c/.test(narrowHome) && /pos-lr-bar/.test(wideHome)
+        && spare.el.querySelectorAll('.pos-lr-lab').length === 2,
+        `it went to "${narrowHome.trim()}" and came back to "${wideHome.trim()}", `
+        + `still one node, and the component holds `
+        + `${spare.el.querySelectorAll('.pos-lr-lab').length} labels`);
+    }
+
+    /**
+     * 🔴 IT WATCHES ITS OWN BOX, NOT THE WINDOW. A component in a half page
+     * column on a 1280 px screen has 600 px, and a viewport query would tell it
+     * it has room it does not have. This is measured by changing the HOLDER's
+     * width at a fixed window size, which is the thing a media query cannot be
+     * asked.
+     * ⚠️ THE SECOND HALF IS THE NEGATIVE CONTROL. A component that answered
+     * `narrow` to everything would pass the first reading perfectly.
+     */
+    {
+      const frames = (n) => new Promise((r) => {
+        const step = () => (--n <= 0 ? r() : requestAnimationFrame(step));
+        requestAnimationFrame(step);
+      });
+      spare.arrange(null);
+      probe.style.width = '320px';
+      await frames(3);
+      const small = spare.arrange();
+      probe.style.width = '900px';
+      await frames(3);
+      const large = spare.arrange();
+      d.assert('the arrangement follows the width of its own box rather than the window’s',
+        small === 'narrow' && large === 'wide' && window.innerWidth > NARROW_PX,
+        `in a 320 px holder it went ${small} and in a 900 px one it went ${large}, `
+        + `with the window at ${window.innerWidth} px throughout`);
+    }
+
+    /**
+     * 🔴 A CHANGE OF KIND IS A STATE CHANGE, SO IT GOES IN THE LOG WHEN IT
+     * CHANGES AND NEVER ON A TICK. This project's rule about where a fact
+     * lives: a figure goes in a readout cell, a claim goes in an assert, a
+     * state change goes in the log. The second half is the negative control:
+     * setting the same kind again says nothing, because a log that repeats
+     * itself is a log nobody reads.
+     */
+    {
+      const was = lines.length;
+      spare.remote.kind('video', { say: '' });
+      const after = lines.length;
+      spare.remote.kind('video');
+      d.assert('a side coming back is one line in the log, and saying it again is none',
+        after === was + 1 && lines.length === after
+        && /the board/.test(lines[after - 1]),
+        `it logged "${lines[after - 1]}" once, and a second call to the same kind logged nothing`);
+    }
+
+    probe.remove();
+  }
+  } // if (SELFCHECK)
+
+  d.ready();
+</script>

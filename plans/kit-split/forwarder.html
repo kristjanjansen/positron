@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { KIT_PARTS, whereIs } from '/shell/kit-parts.mjs';
+
+  /**
+   * 🔴 THE NEXT `/kit/`, WRITTEN AND NOT YET IN USE, 2026-10-06. It replaces
+   * `demo/kit/index.html` in step 4 of plans/plan-kit-split.md, when the
+   * monolith becomes `demo/kit/slides/index.html` with `git mv` so the file the
+   * owner has been editing keeps its history. Until then `/kit/` is still the
+   * whole monolith and this file is a page nobody links to.
+   * ⚠️ WHAT IT DOES: an old address naming a block, `/kit/#keyboard`, replaces
+   * itself with the part page holding that block, `/kit/input/#keyboard`; one
+   * naming a part, `/kit/#hardware`, goes to `/kit/hardware/`; anything else
+   * stays here and reads a list of the parts. The map is
+   * `demo/shell/kit-parts.mjs`, and every part page asserts its own row of it,
+   * so this page builds nothing and grades only the lookup.
+   * ⚠️ `replace`, NOT `assign`, so the back button skips the address that only
+   * existed to be forwarded.
+   */
+  const target = whereIs(decodeURIComponent((location.hash || '').replace(/^#/, '')));
+  if (target && !SELFCHECK) location.replace(target);
+
+  const d = mount({
+    name: 'kit',
+    what: 'Every reusable control in the shell, one part to a page, wired to nothing.',
+    readout: null,
+  });
+
+  const list = el('ul', 'kit-parts');
+  for (const p of KIT_PARTS) {
+    const li = el('li');
+    li.append(el('a', '', `kit/${p.part}`, { href: `/kit/${p.part}/` }),
+      document.createTextNode(` ${p.ids.length} blocks`));
+    list.append(li);
+  }
+  d.el.append(list);
+
+  if (SELFCHECK) {
+    d.assert('an old block address goes to the part page that holds it, and an old part address to the part',
+      whereIs('keyboard') === '/kit/input/#keyboard' && whereIs('hardware') === '/kit/hardware/'
+        && whereIs('segment-display') === '/kit/devices/#segment-display',
+      `keyboard to ${whereIs('keyboard')}, hardware to ${whereIs('hardware')}`);
+    d.assert('NEGATIVE CONTROL: a name no block or part has goes nowhere',
+      whereIs('no-such-block') === null && whereIs('') === null, `${whereIs('no-such-block')}`);
+  }
+  d.ready();
+</script>
