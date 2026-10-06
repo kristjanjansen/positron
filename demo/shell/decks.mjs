@@ -52,11 +52,11 @@ const SYNTHS = [
  * *"add kit/logo page and use individual slides from the brand slides. rm brand
  * slids after it"*: its six slides are blocks of `/kit/logo/` now, drawn by
  * `brand-slides.mjs`. `title` is the name a half width player shows in its
- * footer and `what` is the one sentence under the deck page's heading.
+ * footer. A deck page has NO sentence under its heading, asked the same day as
+ * *"no desc on slides pages"*: the deck is the page.
  */
 export const DECKS = [
-  { name: 'synths', title: 'Synths in code', slides: SYNTHS,
-    what: 'A slide deck that turns a few lines of Faust into a sound in this page.' },
+  { name: 'synths', title: 'Synths in code', slides: SYNTHS },
 ];
 
 /** Where a deck's own page is: `/slides/<name>/`. */
@@ -101,7 +101,7 @@ export async function deckPage(name) {
   const { mount } = await import('./shell.mjs');
   const { createStack } = await import('./stack.mjs');
   const { SELFCHECK } = await import('./selfcheck.mjs');
-  const d = mount({ name: `slides/${name}`, what: deck.what, readout: null });
+  const d = mount({ name: `slides/${name}`, readout: null });
   const h1 = d.head.querySelector('.pos-name');
   if (h1) h1.textContent = name;
   const p = createSlidePlayer(deck.slides);
