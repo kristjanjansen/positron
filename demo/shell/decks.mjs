@@ -40,23 +40,17 @@ import { synthSlot } from './slide-synth.mjs';
  * and what to try, asked 2026-10-06 as *"make useful slide texts"*. The third
  * slide the same day: *"slode 3: make 0.5 into knob 0..1"*, and the fourth:
  * *"slide 4 is freq"*. */
-// TITLES NAME WHAT THE STEP MAKES, 2026-10-06: *"slide titles make no sense.
-// its educational step by step material. if you can not come up with to the
-// point titles drop them"*.
+// NO TITLES ON THE STEPS, 2026-10-06: *"rm titles from 2-4, not useful"*,
+// after *"slide titles make no sense. its educational step by step
+// material"*. The sentence is the slide. A name or a piece of code in
+// backticks is set in mono, and a knob's name wears its knob's hue
+// (`hueVars` in slide.mjs, called by the slot from its hue book).
 const WORDS = {
-  sine: { say: 'A sine',
-    text: 'os.osc(440) is a sine at 440 Hz and times 0.5 plays it at half volume. '
+  sine: { text: '`os.osc(440)` is a sine at 440 Hz and `* 0.5` plays it at half volume. '
       + 'Change a number and press Start to hear yours' },
-  // the owner's title, 2026-10-06: *"A volume knob -> Code constant to a
-  // interactive knob. in the text use variable name with colorcoding"*; a
-  // name in backticks is set in mono and wears its knob's hue
-  // (`hueVars` in slide.mjs, called by the slot from its hue book)
-  volume: { say: 'Code constant to an interactive knob',
-    // one sentence and three lines: at half width the owner's five line
-    // title and four lines of words climbed 7.5 px out of the column
-    text: 'hslider makes the 0.5 in `process` a knob named `volume`' },
-  pitch: { say: 'A second knob for the pitch',
-    text: '`freq` puts the 440 on a knob beside `volume`, from 50 to 2000 Hz. '
+  volume: { text: '`hslider` makes the 0.5 in `process` a knob named `volume`. '
+      + 'Turn it while the tone plays' },
+  pitch: { text: '`freq` puts the 440 on a knob beside `volume`, from 50 to 2000 Hz. '
       + 'Turn it to 880 and the tone goes up an octave' },
 };
 const SYNTHS = [
