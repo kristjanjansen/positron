@@ -10,8 +10,15 @@
 //
 // ⚠️ NOTHING HERE OPENS ANYTHING. A slide is drawn from its data; the only
 // files a deck costs are the slide face's, from this origin.
+// ⚠️ AND THE `synths` DECK KEEPS THAT ON A VISIT. Its slides draw keys, knobs
+// and code; the Faust runtime and a step's compiled instrument are fetched by
+// the first key pressed on that slide and by nothing else, and the only
+// AudioContext is the page's shared one, made by that press
+// (`demo/shell/slide-synth.mjs`).
 
 import { createSlidePlayer } from './slide.mjs';
+import { SYNTH_STEPS } from './synth-steps.mjs';
+import { synthSlot } from './slide-synth.mjs';
 
 /**
  * THE BRAND DECK, the first one. Its first slide is the logo, moved out of
@@ -178,6 +185,24 @@ function logoRow(host) {
   return null;
 }
 
+/**
+ * SYNTHS IN CODE, asked 2026-10-06: *"do slide deck Synths in code in the fau
+ * examples. intro, basic osc (2 col view, synth in side), osc paramters, ...add
+ * elements to synth... keep it simple. add to frontpage"*. An intro, then one
+ * split slide per step of `SYNTH_STEPS`: the Faust program on the words side,
+ * growing by one element a slide, and the instrument it compiles to on the
+ * darker side, playable. The programs are compiled ahead of time
+ * (`demo/resources/build-faust-aot.mjs`), so a press costs a few kB and no
+ * compiler; the caption of the intro links `/fau/`, where the same language is
+ * typed and compiled live.
+ */
+const SYNTHS = [
+  { name: 'synths in code', layout: 'left', say: 'Synths in *code*',
+    text: 'A few lines of Faust grow by one thing a slide, and every slide plays',
+    cap: 'the same language compiles live at positron.studio/fau/' },
+  ...SYNTH_STEPS.map((st) => ({ name: st.name, layout: 'split', side: 'right', say: st.say, cap: st.cap, slot: synthSlot(st) })),
+];
+
 export const DECKS = [
   { name: 'brand', slides: [
     { name: 'logo', layout: 'left', lines: [[6, 'β*+*'], [4, 'positron'], [4, 'studio']] },
@@ -187,6 +212,7 @@ export const DECKS = [
     { name: 'favicon', slot: favicon, cap: 'the favicon at 16 and 32 px' },
     { name: 'app icon', slot: appIcon, cap: 'the installed app, as iOS rounds it and Android masks it' },
   ] },
+  { name: 'synths', slides: SYNTHS },
 ];
 
 /** One player per deck into every `[data-decks]` holder under `root`. */
