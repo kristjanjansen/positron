@@ -46,11 +46,14 @@
    * and every font from them, and puts one still frame of the router's boot
    * screen on its panel from half a second of emulation on this thread, once.
    * Start runs the board live. `hwLoad()` is the visit, `hwOpen()` the press.
+   * 🔴 AND THERE IS NO START BUTTON SINCE THE SAME DAY: *"rm start the board
+   * btton ?"*. The board boots on a visit, the way the HARDWARE tab booted it
+   * on its press in `/kit/`, and pauses while the page is hidden. So the still
+   * frame went too: the live board draws its own boot screen half a second in.
    */
   const { d, out, section, land, checkPage } = createKitPage({
     part: 'hardware',
     what: "The Pico router’s small screen and four keys, drawn by its real firmware running in the browser.",
-    controls: [{ id: 'start', label: 'Start the board', primary: true }],
   });
 
   /**
@@ -178,13 +181,6 @@
       hwPartsLoad('hardware');
       hw.defaultFont = hw.fonts.findIndex((f) => f.name === DEFAULT_FONT);
       hwFontsDraw();
-      // the still: the same firmware booted for half a second on this thread
-      try {
-        const still = createPico({ image });
-        await still.sleep(500);
-        hw.stillPx = still.pixels();
-        if (!hw.px) drawOled(hw.ui.cv, hw.stillPx);
-      } catch (e) { d.log(`the boot screen still did not draw: ${e.message}`, 'warn'); }
       return true;
     })();
     return hw.loadP;
@@ -246,21 +242,6 @@
     if (hw.state === 'running') hw.runner.run(!document.hidden);
   });
 
-  /* 🔴 THE START BUTTON, AND IT SAYS WHAT THE BOARD IS DOING. Its press is
-     `hwOpen()`, the function the HARDWARE tab used to call; once the board
-     runs there is nothing left for it to start, so it says so and stands
-     down rather than reading Start over a running board. The handler
-     returns nothing on purpose: the shell marks a control busy while a
-     returned promise is pending and switches it back on after, and this
-     one decides for itself when it is on. */
-  const startBtn = d.button('start');
-  const STARTS = { idle: 'Start the board', loading: 'Starting', running: 'Board running',
-    paused: 'Start the board', failed: 'The firmware did not load' };
-  const showState = () => {
-    startBtn.textContent = STARTS[hw.state] || STARTS.idle;
-    startBtn.disabled = hw.state === 'loading' || hw.state === 'running' || hw.state === 'failed';
-  };
-  d.on('start', () => { hwOpen().then(showState); showState(); });
 
   const KEY_WORDS = ['PREV', 'NEXT', 'STOP', 'OK'];
   // main.c's ladder for one held message, longest first, never two lines
@@ -468,8 +449,9 @@ patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
 
   // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
   land();
-  // The screens draw on a visit; the board runs on Start (see the header).
-  hwLoad();
+  // The screens draw and the board boots on a visit, and it pauses while the
+  // page is hidden (see the header).
+  hwOpen();
 
   /* ── what a machine can say about this page ─────────────────────────────
      🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
@@ -525,16 +507,14 @@ patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
     };
 
     // ── a visit ───────────────────────────────────────────────────────────
-    // ⚠️ ON ITS OWN PAGE A VISIT IS EVERYTHING BEFORE THE START PRESS, and
-    // since 2026-10-06 (*"screens empty"*) it draws: each file fetched once,
-    // the boot screen's still on the board's panel, and no emulator running.
+    // ⚠️ A VISIT BOOTS THE BOARD SINCE 2026-10-06 (*"rm start the board
+    // btton ?"*): each file fetched once, the screens drawn, the board running.
     await hwLoad();
-    const stillLit = hw.stillPx ? litCount(hw.stillPx) : 0;
-    d.assert('a visit draws the screens from one fetch of each file and a still of the boot screen, and runs no emulator',
-      hw.fetched === 1 && hw.partsFetched === 1 && stillLit > 100 && !hw.runner && hw.state === 'idle',
-      `the start control reads "${startBtn.textContent}", the UF2 was asked for ${hw.fetched} time(s), `
-      + `the screen parts ${hw.partsFetched} time(s)${hw.partsFrom ? ` by ${hw.partsFrom}` : ''}, `
-      + `the still has ${stillLit} pixels lit, the board is ${hw.state}${hw.runner ? ' with a worker' : ' with no worker'}`);
+    const booted = await until(() => hw.state === 'running' && !!hw.runner, 3000);
+    d.assert('a visit draws the screens and boots the board, from one fetch of each file',
+      booted && hw.fetched === 1 && hw.partsFetched === 1,
+      `the UF2 was asked for ${hw.fetched} time(s), the screen parts ${hw.partsFetched} time(s)`
+      + `${hw.partsFrom ? ` by ${hw.partsFrom}` : ''}, the board is ${hw.state}${hw.runner ? ' with a worker' : ' with no worker'}`);
 
     // ── the firmware, on a board of the check's own ───────────────────────
     const image = parseUF2(await (await fetch(HW_UF2)).arrayBuffer());
@@ -596,12 +576,9 @@ patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
       `patched to ${P.index}, ${P.name}: its header reads in ${P.name} and not in ${F.name}`);
 
     // ── the page's own board, through its own controls ────────────────────
-    // ⚠️ THROUGH THE PAGE'S OWN CONTROL, the handler the start button runs,
-    // rather than the tab press it replaces. Run as a handler and not as a
-    // click, so it is the same call whether or not the harness has already
-    // pressed the button: a second `hwOpen()` on a board that is loading or
-    // running does nothing.
-    d.run('start');
+    // ⚠️ THE VISIT BOOTED IT; a second `hwOpen()` on a board that is loading
+    // or running does nothing, which this call also proves.
+    hwOpen();
     const lit = (cv) => {
       const data = cv.getContext('2d').getImageData(0, 0, OLED_W, OLED_H).data;
       let n = 0;
@@ -668,9 +645,11 @@ patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
     // cannot do to itself, so the pause is driven through `hwClose()`, the
     // same function, and the `visibilitychange` listener that calls it is
     // read rather than run.
-    hwClose(); showState();
-    d.assert('pausing the board stops it, and the start control offers it again',
-      hw.state === 'paused' && !startBtn.disabled && startBtn.textContent === STARTS.paused,
-      `the board is ${hw.state}, the control reads "${startBtn.textContent}"${startBtn.disabled ? ', switched off' : ''}`);
+    hwClose();
+    const paused = hw.state === 'paused';
+    hwOpen();
+    d.assert('pausing the board stops it, and opening it again runs it',
+      paused && hw.state === 'running',
+      `paused ${paused ? 'yes' : 'NO'}, then the board is ${hw.state}`);
   }
 </script>
