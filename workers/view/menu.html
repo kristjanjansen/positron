@@ -13,6 +13,7 @@
      place a reader cannot see it change. -->
 <title>positron</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/slide.css">
 <link rel="icon" href="/favicon.ico">
 
 <div class="pos-head pos-index">
@@ -77,5 +78,7 @@
   // markIndex also puts the headset offer at the top when there is one —
   // one copy, in caps.mjs, because both index pages need it.
   await markIndex(document);
+  // The decks under `slides`, one player each, the same call on both front pages.
+  (await import('/shell/decks.mjs')).mountDecks(document);
 </script>
 </html>

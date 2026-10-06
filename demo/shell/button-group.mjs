@@ -66,19 +66,24 @@ import { el } from './shell.mjs';
  * @param {Array<{id: string, label: string, aria?: string, title?: string,
  *                primary?: boolean, onPress?: (btn: HTMLButtonElement) => any}>} o.buttons
  * @param {(id: string, btn: HTMLButtonElement) => any} [o.onPress]  fires for any button
+ * @param {'row'|'column'} [o.orient]  which way the buttons run, default across;
+ *                     `column` stacks them, the join and the corners turning with
+ *                     them, the way `createChoice` stands up
  * @returns {{el: HTMLElement, buttons: HTMLButtonElement[],
  *            button: (id: string) => HTMLButtonElement,
  *            enable: (id: string, yes: boolean, reason?: string) => void,
  *            enabled: (id: string) => boolean,
  *            enableAll: (yes: boolean, reason?: string) => void}}
  */
-export function createButtonGroup({ label, buttons = [], onPress } = {}) {
+export function createButtonGroup({ label, buttons = [], onPress, orient = 'row' } = {}) {
   // A group with nothing in it is a label pointing at an empty row, which is
   // the kind of control that reads as a page that failed to render. Say so
   // here, where the author is, rather than drawing it.
   if (!buttons.length) throw new Error('a button group needs at least one button');
 
   const wrap = el('span', 'pos-bgroup');
+  // asked 2026-10-06 for a slide: *"4 buttons vertcally grouped on the right"*
+  if (orient === 'column') wrap.dataset.orient = 'column';
   if (label) wrap.append(el('span', 'pos-bgroup-l', label));
   // ⚠️ `step pos-seg` IS THE JOIN, AND IT IS REUSED RATHER THAN REIMPLEMENTED.
   // The 1 px border overlap, the outer-only corners and the raise on hover all
