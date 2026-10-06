@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/diagram</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<script type="module">
+  import { el } from '/shell/shell.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+
+  /**
+   * 🔴 kit/diagram, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
+   * (plans/plan-kit-split.md). Every block, holder and check below is copied
+   * VERBATIM from `demo/kit/index.html`, in that file's order, so the newest
+   * block is still the first. What changed is mechanical: `section()` lost its
+   * first argument, the holders sit here rather than at the top of the
+   * monolith, the measuring window and the tab row are gone, and every check
+   * is behind `?selfcheck=1`.
+   */
+  const { d, section, land, checkPage } = createKitPage({
+    part: 'diagram',
+    what: "Boxes and arrows drawn from plain data, down to a label that will not fit.",
+  });
+
+
+
+
+  // ── the flow diagram ────────────────────────────────────────────────────
+  // 🔴 THE ONLY WAY TO KNOW THE WRAPPING IS RIGHT IS TO SEE FOUR AWKWARD ONES
+  // SIDE BY SIDE. Every other component on this page can be judged from one
+  // example; this one cannot, because what it does well or badly is decided by
+  // strings nobody has typed yet. So the four cases below are the deliberately
+  // difficult ones — a clean round trip, a label too long for its box, two
+  // return paths that would sit on top of each other, and the whole thing at
+  // the width of a phone.
+  //
+  // ⚠️ AND EACH ONE REPORTS WHAT IT HAD TO CUT. A drawer that quietly shortens
+  // a label leaves the author believing the label fits: the picture looks
+  // fine, and the missing half is only found by somebody reading the page on a
+  // narrower screen. The line under each picture names every label that was
+  // shortened and the width it had to fit — because a cut label is a label
+  // that is too long, which is a thing to go and fix, not a feature.
+  //
+  // 🔴 AND THIS REPORT IS NOW THE ONLY PLACE A CUT SHOWS. The full string used
+  // to sit in an svg `<title>`, i.e. in the browser's own tooltip, which is
+  // gone: a tooltip drew the box's name ON TOP of the box while the line under
+  // the picture was saying the same words, three channels for one fact. The
+  // whole string is still in `aria-label` for a screen reader; nothing draws
+  // it. So a cut that nobody reads here is a cut nobody reads at all.
+  //
+  // It also says whether the type was MEASURED or estimated. `getComputedText-
+  // Length()` answers 0 inside a hidden ancestor, and every string then
+  // "fits" — one line per box, no wrapping, no cuts. That failure reads as a
+  // wrapping bug and is an attachment bug, so it gets its own word here rather
+  // than being inferred from a picture that looks a bit too tidy.
+  // Every diagram's own report, kept so the checks at the bottom can grade the
+  // ones meant to fit against the one deliberately built not to.
+  const drawn = new Map();
+  const drew = new Map();
+  function diagramCase(box, spec, { phone = false, id = null } = {}) {
+    box.classList.add('kit-wide');
+    const holder = el('div', phone ? 'kit-phone' : null);
+    const report = el('div', 'kit-cut');
+    box.append(holder, report);
+    const made = createDiagram(holder, spec, {
+      onRender: (i) => {
+        const tag = id || spec.__id;
+        if (tag) drawn.set(tag, i);
+        report.textContent =
+          `${i.mode === 'row' ? 'left to right' : 'one column'}, ${i.width} px wide` +
+          `, boxes ${i.boxW} by ${i.boxH} px, ` +
+          (i.measured ? 'type measured in the page' : 'TYPE ESTIMATED (nothing was measured)');
+        if (!i.cuts.length) { report.append(', nothing cut'); return; }
+        report.append(el('b', '', `, ${i.cuts.length} shortened to fit:`));
+        for (const c of i.cuts) {
+          report.append(`\n    ${c.id}, its ${c.where} at ${Math.round(c.width)} px` +
+                        `\n      ${c.full}\n      became  ${c.shown}`);
+        }
+      },
+    });
+    // 🔴 KEPT, BECAUSE `onRender` CANNOT ANSWER "WAS THIS ARROW DRAWN". It
+    // reports sizes and cuts; whether a link reached the picture at all is a
+    // question about the svg, and the one defect this page exists to catch here
+    // is a link that is quietly not there.
+    if (id) drew.set(id, made);
+    return made;
+  }
+
+  section('DIAGRAM',
+    'Where the signal goes, laid out from a list of boxes and a list of arrows.',
+    `createDiagram(host, {
+  title: 'a key press, and what it costs',
+  caption: 'one line under the picture',
+  nodes: [{ id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+            note: 'What this box does here. **Two asterisks** is the only mark it takes.' }, …],
+  links: [{ from: 'you', to: 'relay', label: 'note number' },
+          { from: 'relay', to: 'you', label: 'PCM', back: true,
+            note: 'What crosses this arrow, and what that costs.' }],
+})`,
+    (box) => diagramCase(box, {
+      title: 'a key press, and what it costs',
+      __id: 'fits',
+      caption: 'A key press leaves this browser, crosses a computer rented from ' +
+               'Cloudflare and arrives at a Raspberry Pi in the studio. The board ' +
+               'plays the note and the sound comes back the same way.',
+      nodes: [
+        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+          note: 'The browser you are reading this in. It sends **one number** and '
+              + 'waits.' },
+        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud',
+          note: 'A computer rented by the hour, so the two ends never have to find '
+              + 'each other. It **changes nothing** on the way through.' },
+        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device',
+          note: 'A small board in the studio with **a speaker and a microphone** on '
+              + 'it, reached only through the rented computer.' },
+      ],
+      links: [
+        { from: 'you', to: 'relay', label: 'note number' },
+        { from: 'relay', to: 'box', label: 'note number' },
+        /**
+         * 🔴 `PCM` IS THE PROJECT'S NAME FOR SOUND COMING BACK, AND A PICTURE
+         * COMING BACK IS `H.264`. Settled 2026-09-19: *"h.264 - unify label and
+         * longer desc on all diagrams where stream back pcm or mp4 video"*.
+         * This specimen said `sound` on one half and `sound back` on the other,
+         * which is two names for one journey, and the code sample above it is
+         * what an author copies, so the wrong word here spreads.
+         * ⚠️ AND THE RETURN CARRIES A NOTE, BECAUSE THAT IS THE OTHER HALF OF
+         * THE CONVENTION: a label is WHAT TRAVELS and the note is what that
+         * actually is. It says nothing that could be a measurement, because
+         * this picture is a made-up studio and a number invented here would be
+         * copied into a real page as though somebody had taken it.
+         */
+        { from: 'box', to: 'relay', label: 'PCM', back: true },
+        { from: 'relay', to: 'you', label: 'PCM', back: true,
+          note: 'Raw samples, uncompressed, in slices of a few milliseconds each. Nothing '
+              + 'is encoded on the way out, so nothing has to be decoded at this end.' },
+      ],
+    }));
+
+  section('DIAGRAM, A LABEL THAT DOES NOT FIT',
+    'A word never runs past a border, and the line underneath names what was cut.',
+    '',
+    (box) => diagramCase(box, {
+      title: 'four boxes, three of them badly written',
+      __id: 'too-long',
+      caption: 'Three of these labels are too long and one of them has no spaces ' +
+               'in it at all. Nothing overflows; the report says what it cost.',
+      nodes: [
+        { id: 'mic', label: 'microphone on a stand in the corner of the studio',
+          sub: 'this line is much too long to fit as well', kind: 'device' },
+        { id: 'wifi', label: 'StudioBackRoom2GHz', sub: 'the studio Wi-Fi' },
+        { id: 'pi', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device' },
+        { id: 'you', label: 'your browser', sub: 'listening', kind: 'here' },
+      ],
+      links: [
+        { from: 'mic', to: 'wifi', label: 'sound' },
+        { from: 'wifi', to: 'pi', label: 'name for this arrow that will never fit' },
+        { from: 'pi', to: 'you', label: 'sound' },
+      ],
+    }));
+
+  // ── a box inside a box ──────────────────────────────────────────────────
+  // 🔴 THE SAME SPEC AT BOTH WIDTHS, BECAUSE THE TWO ANSWER A LINK INTO A
+  // BOX INSIDE A CONTAINER DIFFERENTLY — and that is the whole of what there
+  // is to look at here. A container's own name is at the TOP of it with its
+  // boxes under, so the ground between its edge and a box inside it is empty
+  // SIDEWAYS and full DOWNWARDS. Left to right an arrow reaches the box it
+  // names; stacked, the same arrow would cross the words `Raspberry Pi` on
+  // the way in, so it stops at the machine.
+  section('DIAGRAM, CONTAINERS',
+    'A machine and the programs on it are not one thing, so a box holds boxes.',
+    `nodes: [{ id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
+            { id: 'synth', label: 'synthesiser', sub: 'plays the note' },
+            { id: 'rec',   label: 'recorder',    sub: 'keeps a minute' }] }]
+links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSIDE it
+        { from: 'rec', to: 'you',   label: 'last minute', back: true }]`,
+    (box) => {
+      const nested = {
+        title: 'one board, two programs on it',
+        caption: 'The board runs two programs and the picture says which one each ' +
+                 'arrow reaches: the note goes to the synthesiser, and it is the ' +
+                 'recorder that answers.',
+        nodes: [
+          { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+            note: 'The browser you are reading this in. It sends **one number** and '
+                + 'waits.' },
+          { id: 'pi', label: 'Raspberry Pi', kind: 'device',
+            note: 'One board, in a room, running **two programs at once**. That '
+                + 'is why it is drawn as a box with boxes in it.',
+            children: [
+              { id: 'synth', label: 'synthesiser', sub: 'plays the note',
+                note: 'Makes the sound. It is **this** box the note number reaches, '
+                    + 'not the board in general.' },
+              { id: 'rec', label: 'recorder', sub: 'keeps a minute',
+                note: 'Keeps **the last sixty seconds** of whatever the board is '
+                    + 'making, and sends it when it is asked.' },
+            ] },
+        ],
+        links: [
+          { from: 'you', to: 'synth', label: 'note number' },
+          { from: 'rec', to: 'you', label: 'last minute', back: true },
+        ],
+      };
+      diagramCase(box, nested);
+      diagramCase(box, nested, { phone: true });
+    });
+
+  // ── two boxes in one machine, with an arrow between them ────────────────
+  // 🔴 THE PICTURE THAT PROVES THE TIE GIVES WAY. A tie is a bracket with no
+  // head, because a head would claim an order between the parts of one machine
+  // that the drawing does not know. Where the author has DECLARED a link that
+  // order IS known, so the arrow takes the tie's place rather than being drawn
+  // on top of it: one line down that gap, never two. The gap between the two
+  // boxes nothing was declared between still has its tie, which is what makes
+  // this a picture of the rule rather than of a special case.
+  section('DIAGRAM, INNER ARROWS',
+    'A declared arrow between two boxes in one machine takes the tie\'s place rather than '
+    + 'being drawn over it.',
+    `children: [{ id: 'in',    label: 'capture' },
+           { id: 'synth', label: 'synthesiser' },
+           { id: 'rec',   label: 'recorder' }]
+links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
+        { from: 'in', to: 'rec',   note: 'The same sound...' }] // past a box`,
+    (box) => {
+      const sibs = {
+        title: 'one board, and what moves between the programs on it',
+        caption: 'The capture feeds the synthesiser next to it and the recorder past ' +
+                 'it, so one arrow runs in the gap and one runs in a lane. The line ' +
+                 'between the last two boxes is a tie: nothing was declared there. ' +
+                 'Hover an arrow for what travels along it.',
+        nodes: [
+          { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+            note: 'The browser you are reading this in. It sends **one number** and '
+                + 'waits.' },
+          { id: 'pi', label: 'Raspberry Pi', kind: 'device',
+            note: 'One board running **three programs at once**, with sound moving '
+                + 'between them and never leaving the machine.',
+            children: [
+              { id: 'in', label: 'capture', sub: 'the microphone',
+                note: 'Reads the room. What it hears goes **two ways at once**, which '
+                    + 'is why one arrow is in the gap and one is in a lane.' },
+              { id: 'synth', label: 'synthesiser', sub: 'plays the note',
+                note: 'Makes the sound. It is **this** box the note number reaches, '
+                    + 'not the board in general.' },
+              { id: 'rec', label: 'recorder', sub: 'keeps a minute',
+                note: 'Keeps **the last sixty seconds** of the room, and sends it when '
+                    + 'it is asked.' },
+            ] },
+        ],
+        links: [
+          { from: 'you', to: 'synth', label: 'note number' },
+          // 🔴 A NOTE AND NO LABEL, WHICH IS WHAT THE COMPONENT ASKS FOR HERE.
+          // A name in a sixteen pixel gap runs under both boxes; the arrow says
+          // which way, and this says what.
+          { from: 'in', to: 'synth',
+            note: 'The room, as the microphone hears it. It is **this** arrow the '
+                + 'synthesiser answers, and it never leaves the board.' },
+          { from: 'in', to: 'rec',
+            note: 'The same sound again, on its way past the synthesiser to be kept. '
+                + 'It runs in a lane because down the middle it would cross a box '
+                + 'it never visits.' },
+        ],
+      };
+      diagramCase(box, sibs, { id: 'siblings' });
+      diagramCase(box, sibs, { phone: true, id: 'siblings-phone' });
+    });
+
+  section('DIAGRAM, RETURN PATHS',
+    'A return path runs under the row, and two of them go at different depths.',
+    '',
+    (box) => diagramCase(box, {
+      title: 'sound out, and two things sent back',
+      caption: 'One return path covers the whole picture and one covers a single ' +
+               'step, so they would cross. They are drawn at two depths instead.',
+      nodes: [
+        { id: 'mic', label: 'microphone', sub: 'in the studio', kind: 'device' },
+        { id: 'pi', label: 'Raspberry Pi', sub: 'packs the sound', kind: 'device' },
+        { id: 'cf', label: 'Cloudflare', sub: 'passes it on', kind: 'cloud' },
+        { id: 'you', label: 'your browser', sub: 'plays it back', kind: 'here' },
+      ],
+      links: [
+        { from: 'mic', to: 'pi', label: 'what it heard' },
+        { from: 'pi', to: 'cf', label: 'small pieces' },
+        { from: 'cf', to: 'you', label: 'same pieces' },
+        { from: 'you', to: 'mic', label: 'how far behind', back: true },
+        { from: 'cf', to: 'pi', label: 'slow down', back: true },
+      ],
+    }));
+
+  // ── the fork, which is the case that was not drawable at all ────────────
+  // 🔴 THE SAME SPEC TWICE, AT BOTH WIDTHS, BECAUSE ONE OF THEM USED TO LIE.
+  // Every other block on this page draws its case once; this one cannot, since
+  // a branch was correct left to right and FALSE in one column — a forward
+  // link was a straight vertical at its source's centre and routed around
+  // nothing, so the second branch ran behind the box between its two ends and
+  // came out underneath it with an arrowhead in the next one. A phone read a
+  // path the page does not have, and the name that tells the two branches
+  // apart was drawn at the midpoint, i.e. under that box. Seeing one width
+  // could not have caught it, so the block shows both.
+  section('DIAGRAM, ROUTING',
+    'An arrow that reaches past a box is routed round it, never through it.',
+    '',
+    (box) => {
+      const branch = {
+        title: 'the same settings, in two buildings',
+        caption: 'Two copies of one machine, fed the same four numbers. One arrow ' +
+                 'goes to the copy in this page and one reaches past it, out to the ' +
+                 'board, and the sound of the far one comes back.',
+        // ⚠️ SHORT SUBS, MEASURED RATHER THAN PREFERRED. These were 17 to 19
+        // characters and at 258 px the drawer reported ALL FOUR of them cut —
+        // a picture shortening the names of the things it is about. The
+        // shortening is the signal, not a width to tune around, so the words
+        // went instead: nothing is cut anywhere from 258 px up.
+        nodes: [
+          { id: 'you', label: 'this page', sub: 'one copy here', kind: 'here' },
+          { id: 'near', label: 'copy here', sub: 'same settings' },
+          { id: 'cf', label: 'Cloudflare', sub: 'passes it on', kind: 'cloud' },
+          { id: 'pi', label: 'Raspberry Pi', sub: 'a copy there', kind: 'device' },
+        ],
+        links: [
+          { from: 'you', to: 'near', label: 'settings' },
+          { from: 'you', to: 'cf', label: 'and out' },
+          // ⚠️ `the same` RATHER THAN `the same sound`, MEASURED. A gutter is
+          // sized by the widest name in it, so a longer one here would take
+          // the width straight out of the boxes — and this block's subs were
+          // already cut down once for exactly that. Eight characters is under
+          // `the sound`, so the picture is the same size it was with two of
+          // these five arrows unnamed.
+          { from: 'cf', to: 'pi', label: 'four settings' },
+          // 🔴 `PCM` ON BOTH HALVES, the settled name for sound coming back.
+          // See the note on the first block in this page for why, and
+          // `/grains/`, which is the real page this picture is a sketch of.
+          { from: 'pi', to: 'cf', label: 'PCM', back: true },
+          { from: 'cf', to: 'you', label: 'PCM', back: true,
+            note: 'Raw samples, uncompressed, in slices of a few milliseconds each. The far '
+                + 'copy is heard the moment it arrives; the near one was never sent anywhere.' },
+        ],
+      };
+      diagramCase(box, branch);
+      diagramCase(box, branch, { phone: true });
+    });
+
+  section('DIAGRAM ON A PHONE',
+    'Below 560 px it becomes one column, in the order the signal takes.',
+    '',
+    (box) => diagramCase(box, {
+      title: 'a key press, and what it costs',
+      caption: 'The same four links as the first block, at 320 px.',
+      nodes: [
+        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+          note: 'The browser you are reading this in. It sends **one number** and '
+              + 'waits.' },
+        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud',
+          note: 'A computer rented by the hour. It **changes nothing** on the way '
+              + 'through.' },
+        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device',
+          note: 'A small board in the studio, reached **only through the rented '
+              + 'computer**.' },
+      ],
+      links: [
+        { from: 'you', to: 'relay', label: 'note number' },
+        { from: 'relay', to: 'box', label: 'note number' },
+        // 🔴 THE SAME FOUR LINKS AS THE FIRST BLOCK, WHICH IS WHAT THE CAPTION
+        // CLAIMS, so the labels and the note track it exactly.
+        { from: 'box', to: 'relay', label: 'PCM', back: true },
+        { from: 'relay', to: 'you', label: 'PCM', back: true,
+          note: 'Raw samples, uncompressed, in slices of a few milliseconds each. Nothing '
+              + 'is encoded on the way out, so nothing has to be decoded at this end.' },
+      ],
+    }, { phone: true }));
+
+  // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
+  land();
+
+  /* ── what a machine can say about this page ─────────────────────────────
+     🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
+     included (CLAUDE.md: a self-check never runs for a visitor). The checks
+     below are copied from `demo/kit/index.html` VERBATIM and keep that
+     file's indent, so a diff against it reads clean; the one line taken out
+     of each is a `settle()` or `measure()`, the measuring window a page with
+     no closed tab has no use for. Their comments still name it.
+     ⚠️ THEY RUN AFTER A FRAME, because `getBoundingClientRect` before the
+     first paint answers about a page that has not been arranged yet. */
+  if (SELFCHECK) {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  checkPage();
+
+
+  // the diagram grades both directions. A cuts report that can only ever
+  // say "nothing cut" is not a measurement of anything: the picture built out
+  // of deliberately unwritable labels has to come back with cuts, and the one
+  // written properly has to come back with none.
+  const fits = drawn.get('fits');
+  const tooLong = drawn.get('too-long');
+  d.assert('a diagram whose labels fit reports nothing shortened',
+    !!fits && fits.measured && fits.cuts.length === 0,
+    fits ? `${fits.width} px, type ${fits.measured ? 'measured' : 'ESTIMATED'}, ${fits.cuts.length} cut`
+         : 'that picture never rendered');
+  d.assert('NEGATIVE CONTROL: and one written too long reports every label it shortened',
+    !!tooLong && tooLong.cuts.length > 0,
+    tooLong ? `${tooLong.cuts.length} shortened: ${tooLong.cuts.map((c) => c.id).join(', ')}`
+            : 'that picture never rendered');
+
+  // 🔴 A LINK ASKED FOR AND NOT DRAWN, WHICH IS THE ONE DEFECT A PICTURE
+  // CANNOT SHOW YOU. An arrow between two boxes in one container used to be
+  // thrown away: the diagram still looked complete, because the plain tie
+  // between those boxes stood exactly where the arrow should have been, and
+  // /station/ lost three real arrows that way without anybody noticing. So this
+  // counts the lines rather than looking at them — three links declared must be
+  // three arrows on the picture, and the ONE gap nothing was declared across
+  // must still have its tie. Both numbers matter: three arrows and two ties
+  // would mean the arrow had been drawn on top of the bracket it replaces.
+  const arrowsAndTies = (a) => a && {
+    arrows: a.svg.querySelectorAll('.pos-dg-link').length,
+    ties: a.svg.querySelectorAll('.pos-dg-tie').length,
+  };
+  const wide = arrowsAndTies(drew.get('siblings'));
+  const narrow = arrowsAndTies(drew.get('siblings-phone'));
+  const tally = (x) => (x ? `${x.arrows} arrows, ${x.ties} ties` : 'never rendered');
+  d.assert('an arrow between two boxes in one machine is drawn, and it replaces their tie',
+    !!wide && !!narrow && wide.arrows === 3 && wide.ties === 1
+    && narrow.arrows === 3 && narrow.ties === 1,
+    `left to right: ${tally(wide)} · one column: ${tally(narrow)}`);
+  } // if (SELFCHECK)
+
+  d.ready();
+</script>

@@ -910,7 +910,7 @@ export const DEMOS = [
   // fixed 7.4 s, because it builds and grades every specimen before ready and
   // its measuring window forbids deferring any of them. Re-measure before
   // raising this again; a page past 12 s has a build problem, not a budget one.
-  { name: 'kit', group: 'kit', act: 0, bootMs: 12000, created: '2026-09-12', // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
+  { name: 'kit', group: 'kit', act: 0, bootMs: 12000, created: '2026-09-12', unlisted: true, // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
     // double duty: hide this from the index, and skip it in `verify.mjs`, which
     // filters on the same field. So the one page whose entire job is to make
     // component drift visible was the one page the suite could not look at, and
@@ -920,6 +920,41 @@ export const DEMOS = [
     built: true, page: '/kit/',
     src: 'demo/kit/index.html',
     one: 'every reusable control in the shell, on one page, wired to nothing',
+    tags: ['shell', 'no network'] },
+
+  // 🔴 THE KIT, ONE PAGE PER PART, 2026-10-06 (plans/plan-kit-split.md). Each
+  // row deploys `demo/kit/<part>/` to `/kit/<part>/` and is opened by
+  // `verify.mjs` there, through code that already handles a slash in a name
+  // (the plan's section 2.3 reads every consumer). In the tab order `/kit/`
+  // had, with one `created`, so `byNewest()` keeps that order by array position.
+  // ✅ LISTED 2026-10-06 (step 3 of the plan, asked as *"go"*); the `kit` row
+  // below went unlisted the same moment, so the front page shows seven cards
+  // and `/kit/` stays reachable at its address until SLIDES moves (step 4).
+  // SLIDES has no row: it is still the part being edited inside `/kit/` and
+  // moves last, with the owner (step 4).
+  // ⚠️ NO `bootMs` ON ANY OF THEM. The monolith needed 12 s because two of
+  // INPUT's timed checks and LAYOUT's tab page pass ran before `ready`; on
+  // their own pages INPUT's run after it and LAYOUT's fits the default wait.
+  { name: 'kit/input', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'buttons, sliders, knobs, keys and fields that a visitor presses, drags or types into',
+    tags: ['shell', 'no network'] },
+  { name: 'kit/status', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'readout cells, logs, tables and badges that say how a page is doing',
+    tags: ['shell', 'no network'] },
+  { name: 'kit/timeline', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'transport bars, strips and video panels for watching something play out over time',
+    tags: ['shell', 'no network'] },
+  { name: 'kit/layout', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'how blocks stack, sit in tabs and fall into cards from a wide screen down to a phone',
+    tags: ['shell', 'no network'] },
+  { name: 'kit/devices', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'instrument panels and the knobs, pads, faders and displays they are built from',
+    tags: ['shell', 'no network'] },
+  { name: 'kit/hardware', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'the Pico router’s small screen and four keys, drawn by its real firmware running in the browser',
+    tags: ['shell', 'no network'] },
+  { name: 'kit/diagram', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'boxes and arrows drawn from plain data, down to a label that will not fit',
     tags: ['shell', 'no network'] },
 
   // 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
@@ -1338,7 +1373,11 @@ export const DECK_GROUPS = new Set(['slides']);
  * the visible `h1` only.
  */
 export function indexTitle(list = DEMOS) {
-  const n = byGroup(list).reduce((total, g) => total + g.rows.length, 0);
+  // ⚠️ THE KIT IS NOT COUNTED, 2026-10-06. Splitting `/kit/` into one page per
+  // part (plans/plan-kit-split.md) puts seven cards where there was one, and
+  // seven parts of a component sandbox are not six new experiments. Decided as
+  // the plan's default and reported so the owner can overrule it.
+  const n = byGroup(list).filter((g) => g.id !== 'kit').reduce((total, g) => total + g.rows.length, 0);
   return `positron: ${n} media art experiments`;
 }
 

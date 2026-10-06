@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/status</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<script type="module">
+  import { mount, el, createReport } from '/shell/shell.mjs';
+  import { createStack } from '/shell/stack.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createMidiLog } from '/shell/midi-log.mjs';
+  import { decode } from '/shell/midi-decode.mjs';
+  import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+
+  /**
+   * 🔴 kit/status, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
+   * (plans/plan-kit-split.md). Every block, holder and check below is copied
+   * VERBATIM from `demo/kit/index.html`, in that file's order, so the newest
+   * block is still the first. What changed is mechanical: `section()` lost its
+   * first argument, the holders sit here rather than at the top of the
+   * monolith, the measuring window and the tab row are gone, and every check
+   * is behind `?selfcheck=1`.
+   */
+  const { d, section, land, checkPage } = createKitPage({
+    part: 'status',
+    what: "Readout cells, logs, tables and badges that say how a page is doing.",
+  });
+
+
+  // The MIDI log specimen's own state, declared out here for the reason the
+  // comment below gives: a block that moves must not leave its `const` behind.
+  let kitMidi = [], kitMidiListed = 0, kitMidiLog = null;
+  // The four specimen badges, by state, so the geometry asserts at the bottom
+  // can measure them. ⚠️ DECLARED HERE RATHER THAN BESIDE THE BLOCK: this
+  // section moved to the top of the page and its `const` stayed behind, so the
+  // build read it in its dead zone, `section()` swallowed the throw into
+  // `failed`, and the page died much later on an empty map. A block that moves
+  // takes what it needs with it.
+  // ⚠️ DECLARED HERE, NOT INSIDE THE BLOCKS. A block that moved on this page
+  // once left its `const` behind, the build read it in its dead zone,
+  // `section()` swallowed the throw into `failed`, and the page died much
+  // later with a message about a different line.
+  const presSpec = new Map();
+  // ⚠️ DECLARED WITH THE OTHERS, NOT INSIDE THE BLOCK. A block that moved to the
+  // top of this page once left its `const` behind, the build read it in its dead
+  // zone, `section()` swallowed the throw, and the page died much later on an
+  // empty map with a message about a different line.
+  const busySpec = new Map();
+  let presLive = null;        // one badge that can change, measured over time
+  // The three arrangements of the readout and the log, for the geometry checks
+  // at the bottom. ⚠️ SAME REASON AS THE LINE ABOVE: the block that fills these
+  // is the newest one and so it is the topmost one, and a `const` left where
+  // the block used to be is read in its dead zone.
+  let joinedSpec = null;      // the default: a readout on top of a log, one surface
+  let logOnlySpec = null;     // joined, with no readout declared
+  let roOnlySpec = null;      // joined, with the log switched off
+  let neitherSpec = null;     // joined, with neither — there is nothing to draw
+  let splitSpec = null;       // the opt-out: two surfaces, the page between them
+  // the two `.pos-body` stand-ins, held rather than queried: the gaps this
+  // block grades are measured FROM them, and `querySelector` would find
+  // whichever came first and grade the wrong arrangement
+  let joinedPage = null, splitPage = null;
+  let kitRoFlex = null, kitRoGrid = null;
+
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Asked 2026-09-19 for
+   * `/stage/`, in one line with four other things: *"move video play / stop to
+   * videopanel footer"*, *"make transportbar glueable to videopanel footer"*
+   * and *"replace timeline-glued transport record button with start | stop text
+   * labels (same w)"*.
+   *
+   * ⚠️ ONE BLOCK FOR TWO COMPONENTS, because they are one arrangement: a film's
+   * transport belongs to the picture it drives, and the words are what that bar
+   * says. Shown apart they would be specimens of nothing in particular.
+   * 🔴 THE WAY OUT OF FULL SCREEN WAS THE SECOND HALF OF THIS BLOCK AND ITS
+   * SPECIMEN IS GONE, 2026-09-20, asked for by quoting the page back: *"rm this
+   * part AND THE WAY BACK OUT OF FULL SCREEN / a picture / not filling the
+   * screen"*. The PIECE is still built, off screen, because two checks at the
+   * foot of this file press it and read its geometry. Deleting it as well as
+   * the specimen would have taken both with it while the page stayed green,
+   * which is this project's rule about a control you switch off.
+   * ⚠️ AND NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the block
+   * below gives: both harnesses press that row by position, so a new top block
+   * with controls in it moves every other block's press.
+   */
+  /**
+   * 🔴 NEWEST AT THE TOP, WHICH IS THE RULE. Somebody reading this page is
+   * checking what the kit has, and what they do not know about is what arrived
+   * since they last looked.
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the block below
+   * gives: both harnesses press that row by position.
+   */
+  section('MIDI LOG',
+    'What arrived on the wire, in columns, under the panel it moved. The raw bytes are a '
+    + 'column of their own and are never replaced by the reading beside them, because a '
+    + 'relative encoder reads as a position if all you have is an interpretation. A clock '
+    + 'byte is counted and never listed.',
+    `const log = createMidiLog({ empty: 'press Listen, then play something' })
+log.add(decode(bytes))     // false if it was a flood and was not listed`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const log = createMidiLog({ empty: 'nothing has arrived yet' });
+      box.append(log.el);
+      // A known stream, so the specimen shows real readings rather than a shape.
+      // ⚠️ THE LAST TWO ARE FLOODS AND MUST NOT APPEAR. The checks at the foot
+      // of this file read that back, which is what makes this a specimen rather
+      // than a picture of one.
+      kitMidi = [[0x90, 60, 100], [0x80, 60, 0], [0xb0, 74, 64],
+                 [0xe0, 0x00, 0x40], [0xb0, 80, 127], [0xf8], [0xfe]];
+      kitMidiListed = kitMidi.filter((b) => log.add(decode(b))).length;
+      kitMidiLog = log;
+    });
+
+  /* ⚠️ THE WORDS ARE AN OPTION AND THERE IS A NAMED MAP FOR INSTRUMENTS ON A
+     CABLE. `SAYS` is network language and suits a board answering over a relay;
+     `WIRED` says `connected`, `connecting` and `not connected`, and five pages
+     take it (`/circuit/`, `/twelve/`, `/shape/`, `/bay/`, `/evo/`). The
+     specimens below keep `SAYS`, because what they demonstrate is the five
+     STATES rather than one vocabulary, and because the width check at the
+     bottom is calibrated on the default phrases. */
+  section('PRESENCE',
+    'Five states, and whether a person or a harness is holding it.',
+    `createPresence({ of: 'the board' }).set('online')
+createPresence({ of: 'the Circuit', says: WIRED })   // connected / connecting / not connected
+createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
+createPresence({ of: 'the board', mode: 'dot', state: 'online' })
+presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      // ⚠️ `can: [s]` IS WHAT MAKES THIS ROW EVENLY SPACED. Each of these will
+      // only ever say its own word, so holding room for `coming online` put a
+      // different amount of empty space after each one and the gaps read as
+      // arbitrary. A badge that can really change says nothing here and keeps
+      // the full reserve, which is what the width check below drives.
+      const states = el('div', 'kit-row');
+      for (const s of PRESENCE_STATES) {
+        const p = createPresence({ state: s, can: [s] });
+        presSpec.set(s, p.el);
+        states.append(p.el);
+      }
+      // One badge that CAN change, for the check at the bottom: the claim is
+      // that a badge does not twitch as ITS OWN state moves, which is about one
+      // badge over time and not about five badges side by side.
+      presLive = createPresence({ state: 'online' });
+      presLive.el.style.position = 'absolute';
+      presLive.el.style.visibility = 'hidden';
+      states.append(presLive.el);
+
+      const busy = el('div', 'kit-row');
+      for (const [kind, label] of [[null, 'nobody'], ['page', 'a person'], ['tool', 'a harness']]) {
+        // Born in its state rather than switched into it: `busy()` fades over
+        // 90 ms, and a fixed specimen has nothing to fade from.
+        const p = createPresence({ of: 'Raspberry Pi', state: 'online', can: ['online'],
+                                   busyWords: { page: 'in use', tool: 'under test' }, busy: kind });
+        busySpec.set(label, p.el);
+        busy.append(p.el);
+      }
+
+      /**
+       * The same component with `mode: 'dot'`: the ring alone, with the words
+       * CLIPPED rather than removed, so the accessible name is still the whole
+       * sentence and a change is still announced. It is an inline box with no
+       * margins, so it drops into a button, a readout key or a row of machines
+       * without any of them knowing what it is.
+       */
+      const inButton = el('button', '', null, { type: 'button' });
+      inButton.append(createPresence({ of: 'the board', mode: 'dot', state: 'online' }).el,
+        document.createTextNode(' switch it on'));
+      inButton.style.cssText = 'display:inline-flex;align-items:center;gap:7px';
+
+      // In a readout key, where a page already prints what a machine is doing.
+      const inReadout = el('div', 'pos-readout');
+      for (const [k, v, u, st] of [['relay', '1', '/16', 'online'], ['board', '', 'ms', 'unknown']]) {
+        const c = el('div', 'pos-cell');
+        const key = el('div', 'pos-k');
+        key.style.cssText = 'display:flex;align-items:center;gap:5px';
+        key.append(createPresence({ of: k, mode: 'dot', state: st }).el, document.createTextNode(k));
+        const val = el('span', 'pos-v', v || null);
+        if (st === 'unknown') val.dataset.state = 'pending';
+        if (u) val.append(el('span', 'pos-u', u));
+        c.append(key, val); inReadout.append(c);
+      }
+
+      // A row of machines, which is the shape /knobs/, /grains/ and /able/ all
+      // want and all draw differently today.
+      const machines = el('div', '');
+      machines.style.cssText = 'display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
+      for (const [name, st] of [['studio-1', 'online'], ['the board', 'coming'],
+        ['the Mac', 'offline'], ['the headset', 'unknown']]) {
+        const row = el('div', '');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px';
+        row.append(createPresence({ of: name, mode: 'dot', state: st }).el, document.createTextNode(name));
+        machines.append(row);
+      }
+      // ⚠️ THE READOUT NEEDS A WIDTH OR ITS CELLS STACK. `.pos-readout` is a
+      // flex row whose cells grow, so in a narrow box two cells sit on top of
+      // each other and stop looking like a readout at all. It had `flex: 1 1
+      // 100%` when it lived in a section of its own; inside a row of three
+      // specimens it takes a basis instead.
+      inReadout.style.flex = '1 1 300px';
+      const dots = el('div', 'kit-row');
+      // Top, not centre: three specimens of different heights centred on each
+      // other reads as three things floating rather than three things in a row.
+      dots.style.alignItems = 'flex-start';
+      dots.append(inButton, inReadout, machines);
+
+      // ⚠️ `stack.titled`, NOT A HAND-ROLLED CAPTION. That is what this section
+      // is demonstrating three times over: the heading and what it labels are
+      // ONE block, and the component owns both distances.
+      stack.titled('IS IT ANSWERING', states);
+      stack.titled('AND HAS SOMEBODY ELSE GOT HOLD OF IT', busy);
+      stack.titled('THE SAME BADGE AS A DOT, INSIDE SOMETHING ELSE', dots);
+      box.append(stack.el);
+    });
+
+  section('READOUT AND LOG',
+    'The numbers now and the record of what happened, glued into one surface at the foot of the page.',
+    `mount({ readout: { sent: '/s', lost: '' } })                 // one surface at the foot, the default
+mount({ readout: { sent: '/s', lost: '' }, joined: false })  // two surfaces, the opt-out
+createReport({ readout, showLog: false })                    // the same pair, standalone
+createReport({ readout, rows: 2, size: 'sm', joined: false }) // 1 x n, 2 x n. The count must be even
+// size: 'sm' is a 15px value instead of 19. The KEY does not shrink with it`,
+    (box) => {
+      box.classList.add('kit-wide');
+
+      // ── joined ──────────────────────────────────────────────────────────
+      // No `joined` flag: it is the default since 2026-09-28, and a flag
+      // repeating a default is a flag that will be left behind when the default
+      // moves. The opt-out is spelled out on the split specimen below.
+      joinedSpec = createReport({ readout: { sent: '/s', lost: '' } });
+      joinedSpec.set('sent', 48);
+      joinedSpec.set('lost', 0, 'ok');
+      // A fixed time on every line, so this block draws the same picture on
+      // every visit. `performance.now()` here would put the age of the page
+      // into a specimen, which is a number that says nothing about the
+      // component and changes every time anybody looks at it.
+      joinedSpec.line('the board answered', 'hi', 1240);
+      joinedSpec.line('holding a note', null, 2480);
+      // ⚠️ THE PAGE IS PART OF THE SPECIMEN, because "at the foot" is half of
+      // what joined MEANS and because the gap under it is the thing the shell
+      // declares: 44 px, the diagram's number, rather than the 22 px between
+      // two ordinary rows. Without a `.pos-body` here there is nothing for that
+      // distance to be measured from.
+      joinedPage = el('div', 'pos-body kit-mid', 'page');
+      box.append(el('p', 'kit-cap', 'joined'), joinedPage, joinedSpec.foot);
+
+      // ── joined, with only one of the two ────────────────────────────────
+      // `readout: null` on a real page, which is the `/typist/` case: the
+      // document IS the readout and cells repeating it would be the same facts
+      // twice. The surface is still one box, and there is no seam in it.
+      logOnlySpec = createReport();
+      logOnlySpec.line('nothing to count on this page', null, 1240);
+      box.append(el('p', 'kit-cap', 'joined, with no readout declared'), logOnlySpec.foot);
+
+      // ── joined, with the log switched off ───────────────────────────────
+      // 🔴 `showLog: false` ON A PAGE THAT HAS A READOUT, WHICH IS
+      // `/videoradio/`'S SHAPE AND WAS GRADED NOWHERE UNTIL 2026-09-28. That
+      // page is `gl: true` and rotates four ERR mounts, so it is the one page
+      // this project may not run to find out, and the arrangement it gets was
+      // changed on the day joined became the default. A glue of one block is
+      // that block, unwrapped, so what comes back here is the READOUT itself
+      // wearing `.pos-report`: one border, its own, and no wrapper to hide.
+      // That last part is the whole reason the unwrap matters rather than being
+      // tidy — `/videoradio/` hides `.pos-readout` by name for full screen, and
+      // a wrapper round it would have stayed on screen as a band of its own two
+      // edges, which is the `/typist/` defect arriving by a new road.
+      roOnlySpec = createReport({ readout: { sent: '/s', lost: '' }, showLog: false });
+      roOnlySpec.set('sent', 48);
+      roOnlySpec.set('lost', 0, 'ok');
+      box.append(el('p', 'kit-cap', 'joined, with the log switched off'), roOnlySpec.foot);
+
+      // ⚠️ AND WITH NEITHER THERE IS NOTHING TO APPEND, which is the point:
+      // `foot` comes back null rather than an empty box drawing its own two
+      // borders as a 2 px band. Nothing goes in the page for this one.
+      neitherSpec = createReport({ showLog: false });
+
+      // ── split ───────────────────────────────────────────────────────────
+      splitSpec = createReport({ readout: { sent: '/s', lost: '' }, joined: false });
+      splitSpec.set('sent', 48);
+      splitSpec.set('lost', 0, 'ok');
+      splitSpec.line('the board answered', 'hi', 1240);
+      splitSpec.line('holding a note', null, 2480);
+      // a real `.pos-body` again, because the gap under a split log belongs to
+      // the body rather than to the log; a plain div here would measure nothing
+      splitPage = el('div', 'pos-body kit-mid', 'page');
+      /**
+       * 🔴 IN A STACK, BECAUSE A REAL PAGE IS ONE. The gaps this block measures
+       * used to come from the components' own margins, and those came off on
+       * 2026-09-17 so that a component cannot impose a gap on whoever places it.
+       * A specimen assembled by hand in a box then had no gaps at all and its
+       * own check said so, at `0.0 px above the page`. The fix is not to give
+       * the margins back: it is for the specimen to be arranged the way the
+       * thing it depicts is arranged.
+       */
+      const splitStack = createStack(undefined, 'kit-col');
+      splitStack.add(splitSpec.top, splitPage, splitSpec.foot);
+      box.append(el('p', 'kit-cap', 'split, the opt-out, which no page asks for'), splitStack.el);
+
+      /**
+       * 🔴 THE CELLS THEMSELVES, FOLDED IN FROM A SECTION OF THEIR OWN. Asked
+       * 2026-09-17: *"rm separate readout cells, merge with newer one"*. A
+       * readout was shown twice on this page: once as half of a surface and once
+       * as a row of cells two screens away, so a reader met the same component
+       * twice and had to work out they were the same thing. Same defect as the
+       * presence badge, in the other half of the page.
+       */
+      const cells = el('div', 'pos-readout');
+      for (const [k, v, u, state] of [['latency', '26.2', 'ms', 'ok'], ['holes', '3', '', 'warn'],
+                                      ['lost', '0', '', ''], ['worst', '', 'ms', 'pending']]) {
+        const c = el('div', 'pos-cell');
+        c.append(el('div', 'pos-k', k));
+        // ⚠️ THE UNIT GOES INSIDE THE VALUE, which is what shell.mjs does:
+        // `.pos-v` is display:block, so a unit beside it as a SIBLING drops to a
+        // line of its own with the value's whole line-height between them. The
+        // sandbox existing to catch drift and then drifting itself is the joke
+        // that writes itself.
+        const val = el('span', 'pos-v', v);
+        if (state) val.dataset.state = state;
+        if (u) val.append(el('span', 'pos-u', u));
+        c.append(val); cells.append(c);
+      }
+      box.append(el('p', 'kit-cap', 'the cells on their own, an even number of them'), cells);
+
+      /**
+       * 🔴 THE SHAPE, FOLDED IN HERE RATHER THAN GIVEN A SECTION, ASKED FOR
+       * 2026-09-21 AS *"READOUT, FIXED COLUMNS - inegrate into readout docs"*.
+       * It HAD a section of its own at the top of this page for about twenty
+       * minutes, which is the same defect the block above records being fixed in
+       * 2026-09-17: a reader met the readout twice and had to work out they were
+       * the same component. The newest thing goes at the top of this page; a new
+       * OPTION on an old component goes where that component already is.
+       *
+       * 🔴 AND IT IS WHY THE EVEN RULE EARNS ITS KEEP TWICE. The rule above was
+       * demoted to EDITORIAL when the row became flex and the hole it described
+       * stopped existing. `rows: 2` brings it back as structural: an even count
+       * divides by two exactly, so a shape is always a full rectangle and never
+       * a gap in the last row.
+       */
+      const ten = () => ({
+        head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
+        filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
+      });
+      const fillTen = (r) => {
+        r.set('head', 'USER'); r.set('marker', 'DC BB'); r.set('written', '10,620');
+        r.set('not erasure', '9,206'); r.set('payload', '1,054'); r.set('filled', '84.7');
+        r.set('entropy', '0.83'); r.set('nearest', '262');
+        r.set('synth 1', 'SpaceRadio'); r.set('synth 2', 'SpooKey');
+        return r;
+      };
+      // ⚠️ THE SAME TEN CELLS AND THE SAME TEN VALUES IN BOTH, so the only thing
+      // that can differ on screen is the arrangement. Two specimens differing in
+      // their content would be demonstrating the content.
+      // ⚠️ `joined: false` BECAUSE THESE TWO ARE READOUTS, NOT REPORTS. They are
+      // appended as `.readoutEl`, and a joined report with no log is that
+      // readout wearing `.pos-report`, which carries the page's 40 px foot gap.
+      // Two specimens about the SHAPE of a row of cells would have arrived with
+      // a gap above them that is a fact about where a report sits.
+      kitRoFlex = fillTen(createReport({ readout: ten(), showLog: false, joined: false }));
+      kitRoGrid = fillTen(createReport({ readout: ten(), rows: 2, size: 'sm', showLog: false, joined: false }));
+      box.append(
+        el('p', 'kit-cap', 'ten cells with no shape asked for, which is the default'),
+        kitRoFlex.readoutEl,
+        el('p', 'kit-cap', 'the same ten as two rows, with a quieter value'),
+        kitRoGrid.readoutEl,
+      );
+    });
+
+  // ── table ───────────────────────────────────────────────────────────────
+  // 🔴 IT WAS NOT IN HERE, AND IT IS USED ON FOUR PAGES. REPORTED in those
+  // words. A component the sandbox does not show is a component nobody can
+  // check against another page's copy of it, which is the one thing this page
+  // exists to make possible.
+  section('TABLE',
+    'Every column is named by the caller, and exactly one of them must grow.',
+    `createTable({ columns: [
+  { key: 'dir',  width: 52, hi: true },
+  { key: 'text', grow: true },
+  { key: 'sent', width: 42, align: 'right' }] })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const t = createTable({
+        /**
+         * 🔴 A MIDDOT JOINING TWO FACTS IN ONE CELL IS TWO COLUMNS. Asked
+         * 2026-09-17: *"make rule not to middot in tables. its a separate col"*.
+         * This specimen read `14:42:24 · Rehearsal moved to Thursday`, which is
+         * a time and a message glued together, and a table that does that gives
+         * up everything a table is for: the times no longer line up with each
+         * other, nothing can be right-aligned, and a long message pushes its own
+         * timestamp off the screen.
+         */
+        columns: [
+          { key: 'dir', width: 52, label: 'state', hi: true },
+          { key: 'at', width: 62, label: 'at' },
+          { key: 'text', grow: true, label: 'what happened' },
+          { key: 'sent', width: 42, label: 'sent', align: 'right' },
+        ],
+        empty: 'nothing yet',
+      });
+      t.set([
+        { dir: 'live', at: '14:42:24', text: 'Rehearsal moved to Thursday', sent: 'sent' },
+        { dir: 'away', at: '13:29:16', text: 'Doors at seven, not half past', sent: '' },
+        { dir: 'wait', at: '13:02:09', text: 'A title long enough to show what a growing column does with it', sent: '' },
+      ]);
+      box.append(t.el);
+      // 🔴 THE NEGATIVE CONTROL, ON THE PAGE. The throw is this component's one
+      // real rule, and a sandbox that only ever shows it working cannot tell you
+      // it still refuses.
+      let refused = 'IT WAS ACCEPTED';
+      try { createTable({ columns: [{ key: 'a', grow: true }, { key: 'b', grow: true }] }); }
+      catch (e) { refused = e.message; }
+      box.append(el('div', 'kit-cut', `two growing columns: ${refused}`));
+    });
+
+  // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
+  land();
+
+  /* ── what a machine can say about this page ─────────────────────────────
+     🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
+     included (CLAUDE.md: a self-check never runs for a visitor). The checks
+     below are copied from `demo/kit/index.html` VERBATIM and keep that
+     file's indent, so a diff against it reads clean; the one line taken out
+     of each is a `settle()` or `measure()`, the measuring window a page with
+     no closed tab has no use for. Their comments still name it.
+     ⚠️ THEY RUN AFTER A FRAME, because `getBoundingClientRect` before the
+     first paint answers about a page that has not been arranged yet. */
+  if (SELFCHECK) {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  checkPage();
+
+
+  /**
+   * 🔴 THE NEW BLOCK'S ONE CLAIM, AND IT IS A MEASUREMENT RATHER THAN A LOOK.
+   * Two readouts with the SAME ten cells and the SAME ten values, so the only
+   * thing that can differ between them is the arrangement. The flex row wraps
+   * wherever the width lets it; the grid puts five in a row whatever happens,
+   * which is the whole of what was asked for.
+   * ⚠️ IT COMPARES ROW TOPS, NOT COLUMN COUNTS. A cell's column is not a thing
+   * the DOM knows; how many distinct tops the ten cells have is, and it is the
+   * same fact a reader sees.
+   */
+  {
+    const tops = (r) => new Set([...r.readoutEl.children]
+      .map((c) => Math.round(c.getBoundingClientRect().top)));
+    const rowOf = (r, k) => Math.round([...r.readoutEl.children][k].getBoundingClientRect().top);
+    const gridRows = tops(kitRoGrid);
+    // ⚠️ AND IT IS FULL WIDTH, WHICH IT WAS NOT. MEASURED 2026-09-21 with a
+    // throwaway probe at 1280 px: 557.6 px inside a 660 px content box, short by
+    // 102.4. `.kit-box` is a flex row, so a readout in it is a flex ITEM and
+    // takes its content width rather than the line. This section already carries
+    // `kit-wide`, which makes the box `display: block`, and that is the fix the
+    // page had already found for the same component once.
+    const roBox = kitRoGrid.readoutEl.getBoundingClientRect();
+    const host = kitRoGrid.readoutEl.parentElement;
+    /**
+     * ⚠️ `clientWidth` AND NOT A RECT MINUS PADDING, AND THE FIRST TRY WAS THE
+     * SECOND. It read `rect.width - paddingLeft - paddingRight` and answered
+     * `658.0 px of a 660.0 px content box`, so the assert went red by exactly
+     * 2 px on a layout that was perfect: the box has a 1 px border each side and
+     * the arithmetic forgot it. EVERY sibling in that box measured 658, which is
+     * what said the layout was right and the ruler was wrong.
+     * ⚠️ AND `clientWidth` ALONE WAS THE SECOND WRONG RULER, WHICH IS WORTH
+     * WRITING DOWN BECAUSE IT SOUNDS LIKE THE RIGHT ONE. It is content PLUS
+     * PADDING, with only the border and the scrollbar taken off, so it answered
+     * 686 and the assert went red again by 28 px. The content box is
+     * `clientWidth` minus the padding: 688 less 2 of border is 686, less 28 of
+     * padding is 658, which is what every child in that box measures.
+     * 🔴 THREE RULERS FOR ONE DISTANCE AND TWO OF THEM WERE WRONG. The thing
+     * that told me the LAYOUT was fine both times was that every sibling
+     * measured the same 658, which is a fact about the page rather than about
+     * my arithmetic.
+     */
+    const hp = getComputedStyle(host);
+    const content = host.clientWidth - parseFloat(hp.paddingLeft) - parseFloat(hp.paddingRight);
+    const sibs = [...host.children].map((c) => Math.round(c.getBoundingClientRect().width));
+    d.assert('a readout fills the width it is given rather than shrinking to its cells',
+      Math.abs(roBox.width - content) < 1 && new Set(sibs).size === 1,
+      `${roBox.width.toFixed(1)} px of a ${content.toFixed(1)} px content box, `
+      + `and all ${sibs.length} children of that box measure ${[...new Set(sibs)].join(', ')}`);
+    const vSize = (r) => parseFloat(getComputedStyle(r.readoutEl.querySelector('.pos-v')).fontSize);
+    d.assert('asked for two rows it lays ten cells out five and five, whatever the flex row does',
+      gridRows.size === 2
+      && rowOf(kitRoGrid, 0) === rowOf(kitRoGrid, 4)
+      && rowOf(kitRoGrid, 5) === rowOf(kitRoGrid, 9)
+      && rowOf(kitRoGrid, 0) !== rowOf(kitRoGrid, 5),
+      `${gridRows.size} row(s) of cells in the grid against ${tops(kitRoFlex).size} in the flex row`);
+
+    d.assert('and the quieter value is smaller while the key it sits under is not',
+      vSize(kitRoGrid) < vSize(kitRoFlex)
+      && parseFloat(getComputedStyle(kitRoGrid.readoutEl.querySelector('.pos-k')).fontSize)
+         === parseFloat(getComputedStyle(kitRoFlex.readoutEl.querySelector('.pos-k')).fontSize),
+      `${vSize(kitRoGrid)} px against ${vSize(kitRoFlex)} px, with both keys at `
+      + `${getComputedStyle(kitRoGrid.readoutEl.querySelector('.pos-k')).fontSize}`);
+  }
+
+  // 🔴 NOTHING IN THE LOG IS WHITE. Asked 2026-09-19 with a photograph of a
+  // phone: *"do not color log items white, keep it gray or red or whatever you
+  // hae in palette"*. The emphasis on a `hi` line is carried by weight plus ONE
+  // step of ink now, so what is graded is that the step is real and that it
+  // stops short of the page's brightest colour.
+  // ⚠️ MEASURED AS INK, NEVER AS A RULE. shell.css already records what reading
+  // a stylesheet instead of a computed style costs: a rule that is present and
+  // inert reads exactly like one that works.
+  // ⚠️ AND THE SPECIMEN IS NEVER SEEN. `color` resolves on a `display: none`
+  // element, so it goes into the real log, is measured, and is gone inside one
+  // task.
+  {
+    const line = el('div', 'pos-line hi');
+    line.style.display = 'none';
+    const m = el('span', 'pos-m', 'probe');
+    line.append(m);
+    d.logEl.append(line);
+    const emph = getComputedStyle(m).color;
+    const brightest = getComputedStyle(document.body).color;
+    const body = getComputedStyle(d.logEl).color;
+    line.remove();
+    d.assert('the loudest line in the log is quieter than the page\u2019s brightest ink',
+      emph !== brightest && emph !== body,
+      `the log reads ${body}, its emphasis ${emph}, the page ${brightest}`);
+  }
+
+  // the readout specimen. An odd count leaves the last row short, and a
+  // cell with nothing in it must be EMPTY with its unit HIDDEN: an empty value
+  // beside a standing `%` reads as a number that went missing, and a pre-set 0
+  // reads as a very confident measurement of nothing.
+  // ⚠️ THIS COMMENT SAID "one em dash" UNTIL 2026-09-18, THREE MONTHS AFTER THE
+  // PLACEHOLDER WAS REMOVED. The assert below was right the whole time: it asks
+  // whether the UNIT is hidden and never what the cell draws, which is why it
+  // stayed green while the sentence above it described a different page.
+  const cells = [...document.querySelectorAll('.kit-box .pos-readout .pos-cell')];
+  const pending = cells.map((c) => c.querySelector('.pos-v[data-state="pending"]')).filter(Boolean);
+  const unitShown = pending.some((v) => {
+    const u = v.querySelector('.pos-u');
+    return u && getComputedStyle(u).display !== 'none';
+  });
+  d.assert('the readout specimen has an even number of cells and hides the unit of an unmeasured one',
+    cells.length > 0 && cells.length % 2 === 0 && pending.length > 0 && !unitShown,
+    `${cells.length} cells, ${pending.length} unmeasured, unit ${unitShown ? 'STILL SHOWING' : 'hidden'}`);
+
+  // 🔴 THE NEGATIVE CONTROL FOR IT, and it is the reason the rule holds at
+  // all: `mount()` REFUSES an odd count rather than trusting every page to
+  // remember. A rule enforced by nothing is a rule that is already broken
+  // somewhere. Called in a try, because passing is the throw.
+  let odd = null;
+  try {
+    mount({ name: 'kit-probe', readout: { a: '', b: '', c: '' } });
+    odd = 'it was accepted';
+  } catch (e) { odd = e.message; }
+  d.assert('NEGATIVE CONTROL: a readout with an odd number of cells is refused',
+    odd !== 'it was accepted', odd);
+
+  // 🔴 THE PRESENCE BADGE IS THE SAME WIDTH IN ALL FOUR STATES, which is
+  // this project's standing rule about anything that redraws: a live sentence
+  // under a picture reflowed between three and four lines and was reported as
+  // "a horrible jump of content each time it updates". A badge whose word goes
+  // from `online` to `coming online` would shove whatever sits to its right
+  // every time a board answered.
+  //
+  // ⚠️ FOUR BADGES, NOT ONE PRESSED THROUGH FOUR STATES. The claim is identical
+  // and this way nothing a visitor is looking at moves while it is graded,
+  // which is the other rule: a check that mutates is the test.
+  {
+    // 🔴 ONE BADGE, WALKED. This compared four badges side by side, which is a
+    // different claim and a weaker one: what must never happen is a badge
+    // changing width UNDER A READER as the thing it watches comes and goes.
+    // Four fixed specimens now sit at their own widths on purpose, so comparing
+    // them would measure the reserve rather than the guarantee.
+    const w = [];
+    for (const s of PRESENCE_STATES) {
+      presLive.set(s);
+      w.push([s, presLive.el.getBoundingClientRect().width]);
+    }
+    presLive.set('online');
+    const spread = Math.max(...w.map(([, x]) => x)) - Math.min(...w.map(([, x]) => x));
+    d.assert('one badge is the same width in every state it can be in',
+      w.length === PRESENCE_STATES.length && spread <= 0.5,
+      w.length === PRESENCE_STATES.length
+        ? `${w.map(([s, x]) => `${s} ${x.toFixed(1)}`).join(' · ')} px, spread ${spread.toFixed(2)}`
+        : `${w.length} states were measured of ${PRESENCE_STATES.length}, so nothing was compared`);
+
+    /**
+     * 🔴 AND THE SAME GUARANTEE HAS TO SURVIVE THE BUSY WORDS, which is the
+     * reason they are words on the badge rather than a mark beside it. A mark
+     * that appears when somebody starts driving would change the badge's width
+     * in a transport bar, and the reserve here is measured over every phrase
+     * this badge can ever say, busy variants included. Sabotage: drop the busy
+     * phrases out of the `widest` calculation in presence.mjs and this goes red
+     * by about four characters.
+     */
+    const bw = [...busySpec].map(([label, el2]) => [label, el2.getBoundingClientRect().width]);
+    const bs = bw.length > 1 ? Math.max(...bw.map(([, x]) => x)) - Math.min(...bw.map(([, x]) => x)) : -1;
+    d.assert('a badge is the same width whether nobody, a person or a harness is driving it',
+      bw.length === 3 && bs <= 0.5,
+      bw.length === 3
+        ? `${bw.map(([l, x]) => `${l} ${x.toFixed(1)}`).join(' · ')} px, spread ${bs.toFixed(2)}`
+        : `${bw.length} specimens of 3, so nothing was compared`);
+
+    // And that they actually SAY different things, because three badges the
+    // same width could equally be three badges saying nothing.
+    const said = [...busySpec].map(([l, el2]) => [l, el2.querySelector('.pos-pres-w').textContent.trim()]);
+    d.assert('and it says which of the three it is, in words',
+      new Set(said.map(([, t]) => t)).size === 3,
+      said.map(([l, t]) => `${l}: "${t}"`).join(' · '));
+
+    /**
+     * 🔴 THE WORD GREYS AND THE DOT DOES NOT, and both halves are the claim.
+     * A grey dot would say nobody has looked, which is what `checking` and
+     * `unknown` use it for, so a busy board would become indistinguishable from
+     * one we know nothing about. Asserting only the word would let the dot drift
+     * grey and nothing would catch it.
+     */
+    const ink = (el2, sel) => getComputedStyle(el2.querySelector(sel)).color;
+    const idle = busySpec.get('nobody'), person = busySpec.get('a person'), tool = busySpec.get('a harness');
+
+    d.assert('the busy word is greyer than the word it qualifies, and the dot is not',
+      ink(person, '.pos-pres-w') === ink(tool, '.pos-pres-w')
+      && ink(person, '.pos-pres-w') !== ink(idle, '.pos-pres-w')
+      && ink(person, '.pos-pres-dot') === ink(idle, '.pos-pres-dot'),
+      `word ${ink(idle, '.pos-pres-w')} -> ${ink(person, '.pos-pres-w')} · `
+      + `dot ${ink(idle, '.pos-pres-dot')} -> ${ink(person, '.pos-pres-dot')}`);
+  }
+
+  // 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate
+  // claim from the one above: the reserve fixes the four states against each
+  // other, this fixes every frame of the breathing dot against itself. Read off
+  // the KEYFRAMES rather than off two measurements a moment apart, because a
+  // property that moves the layout for one frame in eighty is a defect two
+  // rects would only catch by luck.
+  {
+    const after = (s) => getComputedStyle(presSpec.get(s).querySelector('.pos-pres-dot'), '::after');
+    const moving = PRESENCE_STATES.filter((s) => (after(s).animationName || 'none') !== 'none');
+    // Both moving states are meant to share ONE keyframe, so take the name only
+    // when they agree: two different animations here would be two ways of
+    // saying "something is happening", which is the drift this page exists for.
+    const names = new Set(moving.map((x) => after(x).animationName));
+    const name = names.size === 1 ? [...names][0] : null;
+    // Every declaration in every keyframe of it, out of the one stylesheet.
+    const props = new Set();
+    for (const sheet of document.styleSheets) {
+      let rules = [];
+      try { rules = [...sheet.cssRules]; } catch { continue; }   // never cross-origin here
+      for (const r of rules) {
+        if (r.type !== CSSRule.KEYFRAMES_RULE || r.name !== name) continue;
+        for (const k of r.cssRules) for (const p of k.style) props.add(p);
+      }
+    }
+    const only = props.size > 0 && [...props].every((p) => p === 'opacity');
+    /**
+     * 🔴 THE TWO AXES, AS A CHECK. Colour says what is KNOWN and motion says
+     * something is HAPPENING, so exactly two states move: `checking`, which is
+     * this page asking, and `coming`, which is the instrument starting. The
+     * three settled ones are still. Both moving states share one keyframe, and
+     * that keyframe may touch nothing but opacity, or a breathing dot could
+     * shove its neighbour once every eighty frames.
+     */
+    d.assert('exactly the two unsettled states move, and they move nothing but opacity',
+      moving.join(',') === 'checking,coming' && only,
+      `${moving.length ? moving.join(', ') : 'nothing'} moves · ${name || 'no keyframes'} touches `
+      + `${props.size ? [...props].join(', ') : 'nothing this page can read'}`);
+  }
+
+  // the four states are told apart by the DOT, not by the word beside it.
+  // Two states that differ only in their label are two states nobody reads,
+  // which undoes the whole reason there are four. Measured ink: the ring's
+  // colour, the fill's colour, the fill's opacity and whether it moves.
+  {
+    const ink = (s) => {
+      const dot = presSpec.get(s).querySelector('.pos-pres-dot');
+      const a = getComputedStyle(dot, '::after');
+      return [getComputedStyle(dot).borderTopColor, a.backgroundColor,
+        Math.round(Number(a.opacity)), a.animationName || 'none'].join(' ');
+    };
+    const inks = PRESENCE_STATES.map(ink);
+    d.assert('and the five are told apart by the dot alone, with the word covered up',
+      new Set(inks).size === PRESENCE_STATES.length,
+      PRESENCE_STATES.map((s, i) => `${s}: ${inks[i]}`).join(' · '));
+  }
+
+  // 🔴 A DOT WHOSE MEANING IS ONLY A COLOUR IS A DOT A SCREEN READER
+  // CANNOT READ. `display: none` on the word is how that happens by accident,
+  // so the embedded mode CLIPS it instead: still in the accessibility tree,
+  // still in the live region, and out of the flow so it costs the host nothing.
+  {
+    const dotMode = document.querySelector('.kit-box .pos-pres[data-mode="dot"]');
+    const wordEl = dotMode?.querySelector('.pos-pres-w');
+    const readable = !!wordEl && getComputedStyle(wordEl).display !== 'none'
+      && wordEl.textContent.trim().length > 0;
+    const wide = dotMode ? dotMode.getBoundingClientRect().width : -1;
+    d.assert('an embedded dot still says its state in words, and still takes only a dot of room',
+      readable && wide > 0 && wide <= 10,
+      dotMode ? `says "${wordEl.textContent}", lays out ${wide.toFixed(1)} px wide`
+              : 'no embedded dot was found, so nothing was compared');
+  }
+
+  // 🔴 JOINED IS ONE SURFACE, AND IT TAKES TWO MEASUREMENTS TO SAY SO.
+  // A border is the easiest thing in this arrangement to draw twice: the
+  // readout and the log both carry `border: 1px solid var(--line)` of their
+  // own on every other page, and the joined box has to take those off or the
+  // log sits inside a double rule with a stray line under the readout.
+  // ⚠️ THE SEAM CANNOT SEE THAT, WHICH IS WHY THE WIDTHS ARE READ TOO.
+  // MEASURED by putting the defect back on purpose: with the inner borders
+  // restored the seam still read **1.0 px** and only the widths moved, 0 and 0
+  // to 1 and 1 — because a border is drawn INSIDE the box's own rectangle, so
+  // two halves 1 px apart stay 1 px apart however thick their edges are. The
+  // seam proves the gap is the mosaic's, the widths prove there is one edge.
+  const px = (e, side) => Number.parseFloat(getComputedStyle(e)[`border${side}Width`]);
+  // ⚠️ AND THE SECOND HALF OF WHAT JOINED MEANS IS WHERE IT SITS: at the FOOT,
+  // under the BIG gap rather than the small one between two ordinary rows.
+  // There is ONE gap in this project, 40 px, and this surface takes it like
+  // everything else. It is stated on `.pos-report` as well as on `.pos-body`'s
+  // bottom margin because the surface sits outside the body, where the rhythm
+  // on that element's children cannot reach it; the two collapse rather than
+  // add.
+  {
+    const rep = joinedSpec?.foot;
+    const ro = joinedSpec?.readoutEl.getBoundingClientRect();
+    const lo = joinedSpec?.logEl.getBoundingClientRect();
+    const seam = ro && lo ? lo.top - ro.bottom : -1;
+    const foot = rep && joinedPage
+      ? rep.getBoundingClientRect().top - joinedPage.getBoundingClientRect().bottom : -1;
+    const outer = rep ? px(rep, 'Top') : -1;
+    const inner = joinedSpec ? [px(joinedSpec.readoutEl, 'Bottom'), px(joinedSpec.logEl, 'Top')] : [-1, -1];
+    d.assert('joined is one box at the foot of the page, with the two halves one pixel apart',
+      !!rep && rep.classList.contains('pos-report')
+      && rep.contains(joinedSpec.readoutEl) && rep.contains(joinedSpec.logEl)
+      && Math.abs(seam - 1) <= 0.5 && Math.abs(foot - 40) <= 0.5
+      && outer === 1 && inner[0] === 0 && inner[1] === 0,
+      `${foot.toFixed(1)} px under the page · seam ${seam.toFixed(1)} px · `
+      + `one edge of ${outer} px round both, ${inner.join(' and ')} inside`);
+  }
+
+  // and the opt-out is still two surfaces with the page between them. It stops
+  // being the default on 2026-09-28 and it is still built, still on this page
+  // and still graded, because an arrangement nothing on the site can be looked
+  // at in is an arrangement that rots. The
+  // readout is part of the flow above the body and takes the SMALL gap; the log
+  // is the foot and takes the BIG one, which is the same gap a joined report
+  // gets, so the two arrangements agree about where the page ends.
+  // ⚠️ THE TWO GAPS COME FROM DIFFERENT RULES AND ONLY ONE OF THEM IS THE
+  // READOUT'S. Above the page it is `.pos-readout`'s own bottom margin; below
+  // the page it is `.pos-body`'s, which is why the stand-in in that block IS a
+  // `.pos-body`. The log asks for nothing — a `.pos-log { margin-top: 22px }`
+  // stood in shell.css and was inert, beaten by a `margin` shorthand later in
+  // the same file, and this measurement is what found it.
+  {
+    const mid = splitPage?.getBoundingClientRect();
+    const ro = splitSpec?.readoutEl.getBoundingClientRect();
+    const lo = splitSpec?.logEl.getBoundingClientRect();
+    const above = mid && ro ? mid.top - ro.bottom : -1;
+    const below = mid && lo ? lo.top - mid.bottom : -1;
+    const own = splitSpec ? px(splitSpec.readoutEl, 'Top') === 1 && px(splitSpec.logEl, 'Top') === 1 : false;
+    d.assert('split leaves two surfaces, with the page\u2019s one gap above and below',
+      own && splitSpec.report === null
+      && !splitSpec.readoutEl.closest('.pos-report') && !splitSpec.logEl.closest('.pos-report')
+      && Math.abs(above - 40) <= 0.5 && Math.abs(below - 40) <= 0.5,
+      `${above.toFixed(1)} px above the page and ${below.toFixed(1)} px below it, ${own ? 'two edges' : 'NOT two edges'}`);
+  }
+
+  // 🔴 HALF A SURFACE IS NOT HALF A BOX. A page that declares no readout
+  // and joins anyway must get one bordered box holding a log, with no seam and
+  // no empty strip where the cells would have been. A `display: none` child
+  // takes no `gap` in a flex column, so the log starts exactly one border
+  // inside the box; anything else means the hidden row is still taking room.
+  {
+    const rep = logOnlySpec?.foot;
+    const drop = rep ? logOnlySpec.logEl.getBoundingClientRect().top - rep.getBoundingClientRect().top : -1;
+    const gone = logOnlySpec ? getComputedStyle(logOnlySpec.readoutEl).display === 'none' : false;
+    d.assert('a joined surface with no readout is one box with no seam in it',
+      !!rep && gone && Math.abs(drop - 1) <= 0.5,
+      `the log starts ${drop.toFixed(1)} px inside the box, which is its edge and nothing else`);
+  }
+
+  // 🔴 AND WITH THE LOG SWITCHED OFF, THE READOUT IS THE SURFACE, WITH NO
+  // WRAPPER ROUND IT. A glue of one block is that block, so the element handed
+  // back IS `readoutEl`, carrying `.pos-report` and its own single 1 px edge.
+  // Two claims, because they fail separately: that there is no second box (the
+  // doubled edge), and that hiding the readout leaves NOTHING on screen, which
+  // is what `/videoradio/` does to it in full screen and is the case a wrapper
+  // would have broken.
+  {
+    const rep = roOnlySpec?.foot;
+    const same = !!rep && rep === roOnlySpec.readoutEl;
+    const edge = rep ? px(rep, 'Top') : -1;
+    // measured by hiding it and reading the computed display back, because
+    // `el.hidden` is a fact about an attribute and this claim is about ink
+    let gone = false;
+    if (rep) {
+      rep.hidden = true;
+      gone = getComputedStyle(rep).display === 'none';
+      rep.hidden = false;
+    }
+    d.assert('a joined surface with no log is the readout itself, one edge and no wrapper',
+      same && edge === 1 && gone,
+      same ? `the readout is the surface, ${edge} px of edge, and hiding it leaves ${gone ? 'nothing' : 'a box behind'}`
+           : 'a wrapper was drawn round a single block');
+  }
+
+  // 🔴 AND WITH NEITHER HALF, NO BOX. This is the `/typist/` defect in the
+  // joined arrangement: an empty container painting its own two borders as a
+  // full-width band nobody wrote. `createReport` returns no surface at all, so
+  // there is nothing for a page to append and nothing to paint.
+  d.assert('and with neither half to draw, nothing is put on the page at all',
+    !!neitherSpec && neitherSpec.foot === null && neitherSpec.report === null
+    && !document.body.contains(neitherSpec.readoutEl) && !document.body.contains(neitherSpec.logEl),
+    neitherSpec && neitherSpec.foot === null
+      ? 'no surface was returned, so there is no box to paint'
+      : 'an empty surface was returned and would draw its own two edges');
+
+  /**
+   * 🔴 THE MIDI LOG, GRADED HERE BECAUSE THIS IS THE PAGE THAT CAN SEE ALL OF
+   * IT AT ONCE. Seven messages went into the specimen and two of them are a
+   * clock byte and an active sensing byte.
+   */
+  if (kitMidiLog) {
+    d.assert('the log listed five of seven and refused both floods',
+      kitMidiListed === 5 && kitMidiLog.count() === 5,
+      `${kitMidiListed} added, ${kitMidiLog.count()} rows, of ${kitMidi.length} messages`);
+
+    // ⚠️ THE NEGATIVE HALF. A component that listed everything would pass the
+    // line above by counting differently, so this reads the rendered text.
+    const text = kitMidiLog.el.textContent;
+    d.assert('and neither flood byte is anywhere in the rendered table',
+      !text.includes('F8') && !text.includes('FE'), 'looked for F8 and FE');
+
+    d.assert('every row kept its raw bytes beside the reading',
+      text.includes('90 3C 64') && text.includes('C4, velocity 100'),
+      'looked for the hex and the reading of one note on');
+
+    // A pitch bend is the case where a reading and its bytes disagree most:
+    // little endian, fourteen bit, centre 8192.
+    d.assert('a pitch bend is listed as its bytes and read as its value',
+      text.includes('E0 00 40') && text.includes('8192'),
+      'looked for E0 00 40 and 8192');
+  }
+  } // if (SELFCHECK)
+
+  d.ready();
+</script>

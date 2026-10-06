@@ -212,7 +212,9 @@ for (const w of (widths.length ? widths : WIDTHS)) {
     format: 'png', captureBeyondViewport: true,
     clip: { x: 0, y: page.top, width: w, height, scale: 1 },
   });
-  const file = join(OUT, `${slug}-${w}${HASH ? `-${HASH}` : ''}.png`);
+  // ⚠️ A NESTED SLUG IS ONE FILE NAME, 2026-10-06: `kit/input` would write into
+  // a `kit/` directory under OUT that does not exist (plans/plan-kit-split.md 2.3).
+  const file = join(OUT, `${slug.replace(/\//g, '-')}-${w}${HASH ? `-${HASH}` : ''}.png`);
   await writeFile(file, Buffer.from(data, 'base64'));
   shots.push({ w, file, page, height });
 

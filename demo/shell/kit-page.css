@@ -1,0 +1,447 @@
+/* demo/shell/kit-page.css, the stylesheet every `/kit/<part>/` page shares.
+
+   🔴 LIFTED OUT OF THE HEAD OF `demo/kit/index.html`, 2026-10-06, FOR THE KIT
+   SPLIT (plans/plan-kit-split.md section 7 step 1). Every `.kit-*` rule moved
+   VERBATIM, comments included, because the comments are where this page keeps
+   its measurements.
+   ⚠️ TWO THINGS DID NOT MOVE, ON PURPOSE. The tab row's rules (`.kit-tabs` and
+   the two comments about the dot that marked a part holding something new)
+   and the measuring window (`.kit-measuring`) exist only because the monolith
+   is one page with closed tabs; a part page has no tab row and no closed
+   panel, so there is nothing for either to do.
+   ⚠️ `/kit/` KEEPS ITS OWN COPY in its `<style>` until step 4 of that plan.
+   That duplication is temporary and named in the plan so nobody tidies it
+   early; a rule changed there before step 4 has to be changed here too. */
+/* ⚠️ 10 px UNDER THE TITLE, NOT 4. Asked 2026-09-17 with a photograph: *"add
+   bit more space afrer title and before examplebox"*. A heading at 10.5 px
+   with `line-height: 1` has a box tight to its letters, so 4 px of margin is
+   about two pixels of visible air and the sentence under it read as a second
+   line of the heading. */
+.kit-h { font: 600 10.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+         color: var(--hi); margin: 30px 0 10px; }
+/* ⚠️ PROSE IS SANS HERE, EVERYTHING ELSE STAYS MONO. This page is read rather
+   than operated: a paragraph explaining why a control looks the way it does
+   is not a value, a key or a line of code, and setting it in the same
+   monospace as the things it describes makes the description compete with
+   the sample. The controls, the snippets and every readout keep the mono
+   face, because there the fixed width is carrying meaning. */
+.kit-n { font: 400 13.5px/1.65 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+         color: var(--dim); margin: 0 0 12px; max-width: 66ch; }
+.kit-n code { font-family: var(--mono); font-size: .92em; }
+.kit-n code { color: var(--fg); }
+/* 🔴 A SECTION IS ONE BLOCK OF THE PAGE, AND THAT IS NOT A TIDY-UP. `.pos-body`
+   is a `.pos-stack` now, which puts the project's one gap between every pair
+   of its children — and this page used to append a heading, a note, a snippet
+   and a box to it as FOUR children, ninety-eight in all, so every title would
+   have sat 40 px from the sentence under it. A heading and the thing it
+   names are one pair; the stack has nothing to say about the inside of a
+   block, which is exactly the escape demo/shell/stack.mjs names. */
+.kit-sec > .kit-h { margin-top: 0; }
+/* ⚠️ AND AIR ABOVE THE BOX, for the same reason and in the same breath. The
+   snippet above it is mono at 11 px and the box's own border starts at its
+   last line, so the code and the specimen read as one block when they are a
+   description and the thing described. */
+.kit-box { border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+           padding: 14px; margin: 14px 0 0; display: flex; flex-wrap: wrap;
+           gap: 10px; align-items: center; }
+/* 🔴 THE LAST CHILD GIVES UP ITS BOTTOM MARGIN, AND THE PADDING WAS NEVER THE
+   PROBLEM. Reported 2026-09-21 with a crop of the `BUTTON GROUP` box as
+   *"bottom pading same as top"*. MEASURED before changing anything: the
+   padding was **already 14 px top and bottom on all 39 boxes**, and the ink
+   sat 15 px from the top and **29** from the bottom, because the last child
+   was a `.pos-controls` carrying its own `margin-bottom: 14px` which stacks
+   on the padding. Moving the padding would have moved 14 px of a 29 px gap
+   and been reported again, which is exactly what `/twelve/` was corrected by
+   screenshot twelve times for: *"less h padding on strip"*, where the padding
+   was already equal and a 146 px heading was leaving 50.2 px of air.
+   🔴 AND IT IS `:not(.kit-out)` BECAUSE EIGHT BOXES DO THIS ON PURPOSE.
+   `.kit-out` carries `margin-bottom: -14px`, deliberately cancelling the
+   padding so a readout strip sits flush to the box's bottom edge, and it is
+   the last child in eight of these. A blanket `:last-child { margin-bottom:
+   0 }` would have read as a tidy-up and silently unstuck all eight. The
+   survey is the only reason that is known: 11 of 39 boxes measured uneven,
+   and only ONE of the eleven was the reported defect. */
+.kit-box > :last-child:not(.kit-out) { margin-bottom: 0; }
+/* The three blocks in the layout specimen, so a gap has something to be
+   measured between. They are deliberately plain: what is being shown is the
+   air, not the boxes. */
+/* 🔴 A SPECIMEN'S EDGE IS LIGHTER THAN A REAL BORDER, AND IT IS ITS OWN TOKEN.
+   Asked 2026-09-17 with a screenshot: *"make border a bit lighter here"*. The
+   shell's line colours are `--line` #1f2937 and `--line2` #2b3546, and the
+   next thing up the scale is `--dim2` #6a7280, which is the caption's ink and
+   far too strong for a dashed box that is not part of what is being shown.
+   There is nothing between them, so this page names its own, once, here.
+   ⚠️ IT IS NOT A SHELL TOKEN ON PURPOSE. Nothing outside this sandbox draws a
+   dashed specimen edge, and putting it in shell.css would offer every page a
+   colour with no meaning attached to it. */
+:root { --kit-edge: #3a465c; }
+/* A row of specimens INSIDE a titled group. `.kit-box` is the flex row that
+   used to hold these directly; once a group has a heading the box holds the
+   group and the row needs the layout the box was providing.
+   ⚠️ MEASURED BEFORE THIS EXISTED: the class was used and never defined, so
+   five badges laid out as inline text and ran together into one band with
+   their dots touching the word before them. */
+.kit-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+/* Three panels across, wrapping to one column where a panel gets the full
+   width anyway. `min-width: 0` or they refuse to shrink below their content
+   and drag the page sideways, which is the defect the tab row shipped. */
+.kit-vps { align-items: flex-start; }
+.kit-vp { flex: 1 1 240px; min-width: 0; }
+/* A row of drawn figures, wrapping. `min-width: 0` or a canvas refuses to
+   shrink below its content and drags the page sideways, which is the defect
+   the tab row shipped and is recorded three lines up. */
+.kit-figs { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+            width: 100%; }
+/* A step grid's two halves, which is the arrangement `step-grid.mjs` expects
+   and which `/tom/` gets from `panel-layout.mjs`. It is written out here
+   rather than borrowed, because what this block is showing is the GRID and a
+   cased panel round it would be a second component in the picture.
+   🔴 `min-width: 0` ON THE SCROLLER OR THE PAGE DRAGS SIDEWAYS. `overflow-x`
+   cannot shrink a flex item below its content, and this repository has
+   measured 141 px of page overflow from exactly that pair being half
+   written. */
+/* 🔴 ROOM UNDER THE LAST ROW, ASKED FOR 2026-09-22 AS *"make stepgrid
+   distance from glue line same as left padding"*, with a crop of the pads
+   sitting on the seam.
+   ⚠️ **THE WORDS COULD NOT BE TAKEN LITERALLY AND THE MEASUREMENT IS WHY.**
+   MEASURED inside the glue at 900 px: left 1.0 px, right 1.0 px, bottom
+   1.0 px. All three are the glue's own seam and there is no left padding to
+   match, so what reads as a left inset is the LABEL COLUMN's own width, not
+   a gap. The bottom had nothing playing that part, which is why only that
+   edge looked wrong.
+   ⚠️ AND IT IS BOTTOM ONLY, DELIBERATELY. A symmetric inset here would be
+   the double padding `/pack/` was reported for on the same day, where a
+   glued part painted its own box inside the glue's. */
+/* 🔴 THE RIGHT MATCHES THE BOTTOM SINCE 2026-09-22, ASKED FOR AS *"make sure
+   right padding is same as bottom"* with a crop of the last pad nearly
+   touching the right edge while there was clear room under it.
+   ⚠️ **ONE NUMBER READ TWICE, NOT TWO THAT HAPPEN TO MATCH.** Right and bottom
+   being equal is a claim that they are the same measurement, and `shell.css`
+   has repaired exactly this twice, as `--sld-col` and as `--ctl-gap`.
+   ⚠️ **AND IT IS ON `.kit-pg` RATHER THAN ON THE SCROLLER, WHICH IS THE TRAP
+   WORTH NAMING.** `.kit-pg-strip` is the scroll container, and a scroll
+   container's END padding is not reliably honoured once its content overflows:
+   it can be declared, be correct in the computed style, and render as nothing
+   at the far end. `.kit-pg` is the flex parent and is never the thing that
+   scrolls, so its padding is real at every width. */
+.kit-pg { --kit-pg-inset: 10px;
+          display: flex; align-items: flex-start; gap: 6px; width: 100%;
+          padding-bottom: var(--kit-pg-inset); padding-right: var(--kit-pg-inset); }
+.kit-pg-strip { overflow-x: auto; min-width: 0; flex: 1 1 auto; }
+/* 🔴 THE SPECIMEN'S OWN FRAME COMES OFF WHERE A GLUE IS THE SPECIMEN, ASKED
+   FOR 2026-09-22 AS *"rm wrapper and info footer"* with a screenshot of two
+   nested rounded boxes.
+   ⚠️ **THE REDUNDANT ONE IS THIS PAGE'S, NOT THE COMPONENT'S**, which is the
+   half worth checking before deleting. `createGlue` draws one edge round the
+   whole component and its children give up theirs, so a glue is ALREADY a
+   bounded object; `.kit-pg` contributes no border at all. What was left was
+   `.kit-box`'s frame round a thing that draws its own, which is a box around
+   a box and an edge nobody wrote. */
+.kit-nobox { border: 0; border-radius: 0; background: none; padding: 0; }
+.kit-fig { flex: 1 1 200px; min-width: 0; }
+/* two surfaces in the kit's phone frame, spaced by the page's one gap */
+.kit-narrow { display: grid; gap: var(--pos-gap); }
+/* One column's worth of a figure and the word naming it, so a row of four can
+   be read without a legend. The word is under the box rather than in it,
+   because what is IN the box is the component's own honesty mark. */
+/* 🔴 AIR ABOVE THE NAME, ASKED FOR 2026-09-22 AS *"add more space on top of
+   tese env 1, CC 73 75 70 72"*. The word sat directly on the canvas edge, so
+   a row of four figures read as four boxes with their captions stuck to
+   them rather than as four labelled figures. */
+.kit-fig-l { display: block; margin-top: 8px; font: 500 9.5px/1.6 var(--mono);
+             letter-spacing: .1em; text-transform: uppercase; color: var(--dim2); }
+/* ⚠️ NOTHING HERE UNDOES A COMPONENT'S MARGIN ANY MORE, because no component
+   has one. That was the first fix and it was the wrong one: a sandbox
+   cancelling a side effect leaves the side effect everywhere else. The margins
+   came off the components instead, and `.pos-stack` gives the gap. */
+/* A phone's width, on any screen. 320 px is narrower than an iPhone SE's 375
+   and the commonest 390 and 412, so what overflows here overflows on all of
+   them. The border says where the box ends, because a scroller whose edge is
+   invisible reads as a row that has been cut off. */
+.kit-phone { width: 320px; max-width: 100%; border: 1px dashed var(--kit-edge);
+             border-radius: 4px; padding: 8px; }
+/* ⚠️ CENTRED AND NOT BALANCED, WHICH WAS DECIDED BY MEASURING IT ON
+   2026-09-23. A stand-in block carries a short label at `line-height: 1`,
+   never a sentence, and of the 44 centred elements measured on this page at
+   756 px and again at 390 not one `.kit-blk` or `.kit-mid` wrapped: the
+   longest is `this block carries .panel-grow`. `text-wrap: balance` does
+   nothing to a line that does not wrap. See `.pos-lr-say` in `shell.css`. */
+.kit-blk { border: 1px dashed var(--kit-edge); border-radius: 4px; color: var(--dim2);
+           font: 400 11px/1 var(--mono); text-align: center; padding: 18px 0; }
+/* The stand-in for a page that covers the screen with a bare canvas, which is
+   the shape `/weight/` and `/floor/` have and the shape the report came from.
+   ⚠️ NO `position` DECLARED HERE ON PURPOSE. `createFullscreenExit` gives a
+   static host `position: relative` itself, and a specimen that did it first
+   would be this page hiding the half of the component it is grading. */
+.kit-cover { width: 260px; height: 146px; background: var(--card2);
+             border: 1px solid var(--line); border-radius: 4px;
+             display: flex; align-items: center; justify-content: center; }
+.kit-cover-p { font: 400 11px/1 var(--mono); color: var(--dim2); }
+/* 🔴 THE DEFECT, KEPT ALIVE ON PURPOSE. `.kbd { margin: 0 0 10px }` in
+   shell.css is what put a keyboard flush against a transport bar on `/keys/`:
+   a `margin` shorthand's implied `margin-top: 0`, at (0,1,0), beating a
+   rhythm rule that was (0,1,0) too. This class is that shorthand, in a page
+   stylesheet, which is the worst case there is — it loads after shell.css, so
+   source order is on its side and only specificity can beat it. The check at
+   the bottom measures the gap above it. */
+.kit-tight { margin: 0 0 10px; }
+.kit-src { font: 400 11px/1.6 var(--mono); color: var(--dim2); white-space: pre-wrap;
+           margin: 0 0 6px; padding-left: 2px; }
+/* ⚠️ GREY, NOT `--hi`. This is what the control beside it last reported, and
+   it was yellow — the colour this project uses for the one thing on a page
+   that matters. Beside eight sample controls that all report, yellow is
+   eight highlights, which is none: the sandbox lit up like a page where
+   everything is urgent. It is a value, and values are `--dim`.
+   ⚠️ AND `align-self: center`, because `align-items: center` on the box
+   centres each FLEX LINE's items and the button rows beside these carry
+   their own height — so the readout sat low against the row it describes. */
+/* ⚠️ ITS OWN LINE, ALWAYS. Beside a control it reads as part of the control —
+   `LOOK ‹ random › KALEIDOSCOPE` looks like a picker with a fourth segment,
+   which is exactly what it is not: it is what the picker REPORTED. A readout
+   sharing a row with the thing it reports on has to be told apart by colour
+   alone, and colour is already carrying whether a control is armed.
+   `flex: 1 1 100%` in a wrapping row is the whole mechanism. */
+/* 🔴 THE OUTPUT LINE IS THE BOX'S FOOTER, NOT A LINE FLOATING UNDER IT. Asked
+   2026-09-17 with a photograph: *"space top of 'nothing pressed'. make this
+   kit example box a component to get similar example component. make that
+   bottom text have border on top of it like videpanel"*.
+   It sat flush against the specimen above it with no air and no edge, so a
+   readout and the control it describes read as one undifferentiated block.
+   `video-panel.mjs` had already solved this exact shape: one box, a hairline,
+   and the row that reports sitting under it. This is the same, so the two
+   surfaces on the site that pair a thing with what it says about itself look
+   the same.
+   ⚠️ NEGATIVE MARGINS, because the box carries 14 px of padding and a footer
+   has to reach its edges. The bottom corners are rounded to match, rather than
+   clipping the box, which would cut anything a specimen deliberately overflows.
+   ⚠️ THE TOP MARGIN IS 4 AND NOT 14: the box is a flex row with a 10 px gap,
+   so the gap and the margin add to the 14 the padding uses everywhere else. */
+.kit-out { font: 500 12px/1.6 var(--mono); color: var(--dim); min-height: 1.6em;
+           flex: 1 1 100%;
+           margin: 4px -14px -14px; padding: 10px 14px;
+           border-top: 1px solid var(--line); border-radius: 0 0 4px 4px; }
+/* A block holding a diagram is not a row of controls: the picture wants the
+   whole width and the report under it wants the line below, so these two
+   turn the flex row off rather than fighting it with `flex: 1 1 100%` on
+   each child. Setting `display` matters — a flex property on a non-flex box
+   is silence, and a flex CHILD of a `flex-wrap` row is sized by its content
+   no matter what width it asks for. */
+.kit-wide { display: block; }
+/* A SLIDE IS A SURFACE WITH ITS OWN EDGE AND GROUND, so the box round it
+   gives up its chrome rather than drawing a bordered box round a bordered
+   box (the PANEL part's `bare` argument, for a block that keeps its heading
+   and its note beside it). (0,2,0) against `.kit-box`. */
+.kit-box.kit-sl { display: block; padding: 0; border: 0; background: none; }
+/* HALF WIDTH PLAYERS: two columns that ask the block's OWN width, never the
+   window's, and become one below 560 px of it, as `/cam/` and `/flipper/`
+   do. The gap is the control gap twice, theirs too. */
+.kit-sl-pair { container-type: inline-size; }
+.kit-sl-pair-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(2 * var(--ctl-gap)); }
+@container (max-width: 560px) { .kit-sl-pair-in { grid-template-columns: minmax(0, 1fr); } }
+/* Half of whatever the box gives it, for a specimen that does not need the
+   full width. A fraction rather than a pixel count, so the layout keeps
+   owning the width and this page has no second opinion about it to defend.
+   ⚠️ THE MEDIA BLOCK SITS AFTER THE PLAIN RULE, never before it. A media
+   query adds no specificity, so a later plain rule of the same weight wins at
+   every width — which is how `.pos-pick`'s entire phone layout sat in
+   shell.css for weeks and never once ran. Under 560 px half a box is narrower
+   than the transport bar's own controls, so the specimen takes it all back. */
+.kit-half { max-width: 50%; }
+@media (max-width: 560px) { .kit-half { max-width: 100%; } }
+/* the phone case. A fixed width so the one-column layout can be seen on a
+   desktop, `max-width` so it is never wider than a real phone. */
+.kit-phone { width: 320px; max-width: 100%; }
+/* 🔴 THE OLED, 2026-10-04, FOR THE HARDWARE PART. A black panel in a thin
+   frame, as wide as the panel and no wider, holding a 128x64 canvas drawn at
+   a WHOLE NUMBER scale, `--oled-k`, which the page works out from the box it
+   is in (1 to 4). `pixelated`, so a panel pixel is a square of screen pixels
+   and never a blur, and the 128 and 64 are the panel's, not a layout's.
+   ⚠️ A CUSTOM PROPERTY AND NOT `style.width`, because a component that varies
+   a property per instance sets a custom property, never the property. */
+/* a kit component filling a slide's fit box edge to edge (the instrument panel) */
+.sl-fit-in > .kit-sl-fill { width: 100%; box-sizing: border-box; }
+/* a link in a slide caption keeps the caption's ink; the underline says it is one */
+.kit-sl .sl-cap a { color: inherit; }
+/* THE SCALE set solid so all six steps fit one column: line height 1, no gap
+   between the lines, nothing above them. Same weight as the slide's own rules. */
+.kit-sl .sl[aria-label="the scale"] .sl-ev { gap: 0; margin-top: 0; justify-content: center; }
+.kit-sl .sl[aria-label="the scale"] .sl-line { line-height: 1; margin: 0; }
+/* SCREEN AND KEYS ON A SLIDE: the screen and the standing key group side by
+   side, centred in the slot, the keys as tall as they are and no taller. */
+.kit-sl-hw { display: flex; align-items: center; justify-content: center; column-gap: 4cqh; height: 100%; }
+/* the keys: four separate buttons a gap apart, sized in the slide's own
+   units so they shrink with it on a phone the way its type does: 9cqh is
+   the 34 px of a button on a 385 px slide at the desk */
+.kit-sl-keys { display: flex; flex-direction: column; align-items: stretch; gap: 2.6cqh; }
+.kit-sl-keys button { height: 9cqh; font-size: 3.4cqh; padding: 0 4cqh; border-radius: 1cqh; }
+.kit-oled { width: fit-content; max-width: 100%; padding: 10px; background: #000;
+            border: 1px solid var(--line); border-radius: 4px; }
+.kit-oled canvas { display: block; image-rendering: pixelated;
+                   width: calc(128px * var(--oled-k, 2)); height: calc(64px * var(--oled-k, 2)); }
+/* Two panels side by side when there is room for both at a whole scale, and
+   one under the other on a phone, each sized by `oledScreen` off its own box. */
+.kit-oled-pair { display: flex; flex-wrap: wrap; gap: 18px; }
+.kit-oled-fig { flex: 0 0 auto; max-width: 100%; }
+.kit-cut { font: 400 11px/1.6 var(--mono); color: var(--dim); margin-top: 8px;
+           white-space: pre-wrap; }
+.kit-cut b { color: var(--warn); font-weight: 500; }
+/* The stand-in for everything between a split readout and a split log, which
+   on a real page is the whole demo. 🔴 IT IS A REAL `.pos-body` AND THIS
+   RULE DECLARES NO MARGIN. The gap under a split readout and the gap over a
+   split log are both the shell's, and one of them is `.pos-body`'s own
+   `margin-bottom` rather than anything the log asks for — so a stand-in with
+   a margin typed here would be this page inventing the number it then grades
+   itself against. */
+.kit-mid { border: 1px dashed var(--kit-edge); border-radius: 4px; color: var(--dim2);
+           font: 400 11px/1 var(--mono); text-align: center; padding: 26px 0; }
+/* ⚠️ AND NO RULE HERE RESETTING WHAT FOLLOWS A CAPTION. The split specimen
+   below is measured, and its gaps are the shell's own 22 px: a `margin-top:
+   0` typed here would make this page move the thing it is grading, which is
+   the same mistake as a check that mutates. */
+/* 🔴 AND A GAP UNDERNEATH, BECAUSE THERE WAS NONE. REPORTED 2026-09-17 with a
+   screenshot of a caption sitting on the dashed edge of the box it labels:
+   *"what is this crap? ... you are breaking you own rules in this example you
+   made for preventing"*, which is exactly right. MEASURED on the live page:
+   all FOUR captions read a gap of 0.0 px to their specimen, so this was never
+   one section. `line-height: 1` makes the caption's box tight to its letters,
+   and the specimen below starts at its edge, so uppercase text at 9.5 px
+   touches a border a pixel away. The caption belongs to the thing under it,
+   so it owns both sides of its own air. */
+.kit-cap { font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+           color: var(--dim2); margin: 0 0 10px; }
+/* A caption belongs to the specimen UNDER it, so the air goes above the
+   caption rather than below it. Nothing measured passes through this gap:
+   the two numbers graded in the split block are readout-to-page and
+   page-to-log, and no caption stands in either.
+   🔴 AND THE 44 px THE SHELL PUTS ABOVE A JOINED SURFACE IS MOVED HERE, NOT
+   SHRUNK. That gap is the distance from the PAGE to the surface at the foot
+   of it, and there is no page inside a sandbox box: what sits directly above
+   each specimen is its own caption, so leaving the margin on the box put
+   44 px between a label and the thing it labels. Photographed: the word
+   JOINED floating in the middle of the gap, reading as a heading for
+   nothing. The caption takes the air and its specimen sits under it, so the
+   pair is still one group with the shell's own 44 px above it. */
+.kit-box > * + .kit-cap { margin-top: 44px; }
+
+/* The PANEL specimen's fixed column and its row, which need a gap the shared
+   component deliberately does not have: `.panel-fixed` and `.panel-row` carry
+   no gap because what goes in them is an instrument's business, and every
+   caller declares its own (`/evo/` uses 12 and 20). A sandbox is a caller
+   like any other and says so rather than leaning on a default. */
+.kit-panelcol { gap: 10px; }
+.kit-panelrow { gap: 10px; }
+
+/* 🔴 `.kit-hwrow`, `.kit-hwitems` AND `.kit-hwstrips` WENT ON 2026-09-22 WITH
+   THE CHANNEL STRIP THEY LAID OUT. They were four full width horizontal rows
+   inside a wrapping flex box, which is the arrangement the report
+   *"still not aligned to vertical separated lanes"* was about. `.kit-chans`
+   and `.kit-chan` below replace them, and the scroller pair that
+   `.kit-hwitems` carried moved to `.kit-chans` with it. */
+/* 🔴 THE FOUR SHAPES SIDE BY SIDE, ASKED FOR AS *"align channel strips
+   horiztlly"*. They were four full width rows stacked, which is a picture of
+   four separate demonstrations; a channel strip is the four TOGETHER, and
+   nothing about that reads off a column of them.
+   🔴 WRAPPING ALONE IS NOT ENOUGH AND THIS DRAGGED THE PAGE 65 px SIDEWAYS.
+   Reported 2026-09-22 from a phone and then MEASURED at 390 px: `flex-wrap`
+   wraps BETWEEN items, and **a single item wider than the container cannot
+   wrap**. One strip's content is 424 px against a 358 px box, so it hung 65
+   px off the right and took the whole document with it.
+   ⚠️ **AND THE LINE THAT STOOD HERE WAS WRONG ABOUT THIS PROJECT.** It said a
+   horizontal scroll is *"the thing shell.css already refuses everywhere
+   else"*. It does not: `.pos-tbl-row` scrolls against its own minimum,
+   `tabs.mjs` is an x-scrollable bar by design, and `step-grid.mjs` scrolls
+   its strip. What `positron-ui` actually refuses is the PAGE dragging, and
+   the repair for that is a scroller with `min-width: 0` beside it, because
+   `overflow-x` cannot shrink a flex item below its content.
+   ✅ SO IT WRAPS FIRST AND SCROLLS ONLY WHEN ONE ITEM CANNOT FIT. Four
+   strips on a wide screen still sit side by side, which is what was asked
+   for; on a phone they stack, and the one that is still too wide scrolls by
+   itself instead of moving the page. */
+
+/* 🔴 REAL CHANNELS, 2026-09-22, AND THE REPORT SAID *"still"*: *"still not
+   aligned to vertical separated lanes"*. What stood here was four independent
+   HORIZONTAL rows, six knobs over eight pad columns over six faders, three
+   pitches stacked, so a reader could not follow any channel down the picture.
+   It was a catalogue of four components arranged vertically and captioned as
+   a channel strip.
+
+   🔴 **THE DIVIDER IS THE PANEL'S, WHICH IS WHAT *"(see panels)"* MEANT.**
+   `.panel-fixed-l` is `border-right: 1px solid var(--line)` with
+   `padding-right: var(--panel-gap)`, so a divider here and a divider on
+   `/twelve/` are one line rather than two opinions. It goes on the lane
+   rather than between lanes, so the last one loses it and nothing has to
+   count children.
+
+   🔴 **THE ALIGNMENT IS `--ctl-head` AND `--ctl-foot` AND NOT ARITHMETIC.**
+   `positron-ui` is explicit that a row of different controls cannot be
+   aligned by a caller, and `/twelve/` was corrected twelve times in one
+   evening by people doing exactly that. There is no margin in this rule that
+   lifts or drops a control.
+
+   🔴 **A KNOB IS `--ctl-w * 1.1` WIDE SINCE TODAY AND A PAD IS `--ctl-w`, AND
+   THAT IS THE THING THAT BITES IN A COLUMN.** `/circuit/` solves it by
+   centring both in a pad sized track rather than by resizing either, which is
+   what `align-items: center` does here. Resizing a control to make a column
+   tidy is the page doing arithmetic about a component's insides. */
+.kit-chans { display: flex; align-items: stretch; min-width: 0; overflow-x: auto; }
+.kit-chan {
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--ctl-gap); flex: 0 0 auto;
+  border-right: 1px solid var(--line);
+  padding: 0 var(--panel-gap, 16px);
+}
+.kit-chan:last-child { border-right: 0; }
+/* The channel's own name, under the lane it names, in the panel's own ink. */
+.kit-chan-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--dim2); padding-top: 2px;
+}
+/* The vertical twins, beside the horizontal ones they are meant to match. */
+.kit-vrow { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
+
+/* A row of segment displays, each with its own caption above it. The caption
+   goes ABOVE for `.kit-cap`'s own reason, which is that a caption belongs to
+   the specimen under it, and the column's gap owns the air so no margin is
+   typed here. */
+.kit-disp { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+.kit-dispc { display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+             min-width: 0; }
+.kit-dispc .kit-cap { margin: 0; }
+/* 🔴 TWO FIELDS IN ONE WINDOW, DRAWN BY THE PAGE. `segment.mjs` refuses to
+   take a second field as an option and says why in its header; this is the
+   other half of that decision, and it is four declarations. Both displays
+   pass `frame: false`, so the pair has one edge rather than two inside a
+   third.
+   ⚠️ IT READS `--disp-back` OFF `:root`, which is exactly why that token is
+   declared there and not on `.pos-disp`: this box is a SIBLING of both
+   fields, and a custom property inherits downward and never sideways. */
+.kit-disp-window {
+  display: inline-flex; align-items: flex-end; gap: 12px; padding: 7px 10px;
+  background: var(--disp-back); border: 1px solid var(--line); border-radius: 3px;
+}
+.kit-swatch { display: inline-flex; align-items: baseline; gap: 7px; margin-right: 20px; }
+.kit-swatch-n { font: 600 12px/1.6 var(--mono); color: var(--fg); }
+.kit-swatch-w { font: 400 12px/1.6 var(--mono); color: var(--dim); }
+.kit-cap + .pos-report { margin-top: 0; }
+
+/* The three distances a stacked control keeps, drawn at the heights the
+   stylesheet states rather than at heights this page chose: every band's
+   `height` is `var(--ctl-*)`, set in the block that builds it. A figure typed
+   here would be a second copy of a measurement.
+   ⚠️ THE BANDS ARE TOLD APART BY INK RATHER THAN BY HUE, the same way the
+   readout's states are: two reserved slots and one real gap, where the gap is
+   the one that is not a slot. */
+.kit-step { display: flex; gap: 10px; align-items: flex-start; }
+.kit-step-c { width: 130px; }
+.kit-step-b { display: flex; align-items: center; padding-left: 8px;
+              border: 1px dashed var(--kit-edge); border-bottom: 0;
+              background: var(--card2); overflow: hidden; }
+/* the gap is the one band that is not a reserved slot, so it is the one band
+   with nothing painted in it */
+.kit-step-c > .kit-step-b:nth-child(2) { background: none; }
+.kit-step-c > .kit-step-b:last-child { border-bottom: 1px dashed var(--kit-edge); }
+.kit-step-n { font: 400 10px/1 var(--mono); color: var(--dim2); white-space: nowrap; }
+/* Two columns of the same height is the whole claim, so the step band keeps
+   all four of its edges and nothing else does. */
+.kit-step-s { border: 1px dashed var(--kit-edge); background: var(--card2); }
+
