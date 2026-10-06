@@ -966,6 +966,22 @@ export const DEMOS = [
   { name: 'kit/slides', title: 'slides', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'slides made from plain data at six type sizes, with live parts of this site running on them',
     tags: ['shell', 'no network'] },
+  // 🔴 THE NINTH PART, 2026-10-06: *"add kit/logo page and use individual slides
+  // from the brand slides. rm brand slids after it"*. The front page's `brand`
+  // deck, one block per slide; the deck itself is gone from shell/decks.mjs.
+  { name: 'kit/logo', title: 'logo', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'the positron mark and wordmarks drawn as slides, with the favicon and the app icon at the sizes they ship',
+    tags: ['shell', 'no network'] },
+
+  // 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.
+  // title is on footer on 1/2 w it replaces page count and becomes link to
+  // slides/(slug) page"*. UNLISTED because the deck's card on the front page is
+  // its half width player, whose footer links here. `slides/<deck>` deploys
+  // `demo/slides/<deck>/` to `/slides/<deck>/`; the archive row `slides` below
+  // copies only the flat files of `demo/slides/`, so the two do not meet.
+  { name: 'slides/synths', title: 'synths', group: 'slides', act: 0, created: '2026-10-06', built: true, unlisted: true,
+    one: 'A slide deck that turns a few lines of Faust into a sound in this page.',
+    tags: ['shell', 'no network'] },
 
   // 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
   // `built: true` deploys a page, runs it in `verify.mjs` AND puts a card on the

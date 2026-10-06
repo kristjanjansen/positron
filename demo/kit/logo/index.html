@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/logo</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<link rel="stylesheet" href="/shell/slide.css">
+<link rel="stylesheet" href="/shell/brand-slides.css">
+<script type="module">
+  import { createSlide, stepOf } from '/shell/slide.mjs';
+  import { BRAND_SLIDES } from '/shell/brand-slides.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+
+  /**
+   * 🔴 kit/logo, THE BRAND SLIDES ONE BY ONE, 2026-10-06. Asked: *"add kit/logo
+   * page and use individual slides from the brand slides. rm brand slids after
+   * it"*. The six slides the front page's `brand` deck played are blocks here,
+   * each its own `createSlide` with the ⛶, drawn from `BRAND_SLIDES` in
+   * `demo/shell/brand-slides.mjs`, in the order the deck had them. The deck is
+   * gone from `decks.mjs`.
+   * ⚠️ A VISIT OPENS NOTHING. The slides are drawn from data; the β costs the
+   * slide face's Greek subset from this origin, which the browser fetches
+   * when a β is laid out. Every check is behind `?selfcheck=1`.
+   */
+  const { d, section, land, checkPage } = createKitPage({
+    part: 'logo',
+    what: 'The positron mark and wordmarks drawn as slides, with the favicon and the app icon at the sizes they ship.',
+  });
+
+  // [block title, the slide's name in BRAND_SLIDES, the one sentence under it]
+  const BLOCKS = [
+    ['STACKED LOGO', 'logo', 'β+ at step 6 with the + raised in the accent, and positron and studio under it at step 4.'],
+    ['HORIZONTAL LOGO', 'logo horizontal', 'The same β+ with positron over studio beside it, the two blocks centred on each other.'],
+    ['WORDMARK IN FIVES', 'wordmark in fives', 'positron.studio cut into rows of five letters, every letter in a column of the mono face.'],
+    ['WORDMARK IN THREES', 'wordmark in threes', 'positron.studio cut into rows of three, the dot in the accent as on the fives.'],
+    ['FAVICON', 'favicon', 'The inline β+ drawn at 16 and 32 pixels, the pixels a browser tab really gets.'],
+    ['APP ICON', 'app icon', 'The raised β+ as iOS rounds an installed app and as Android masks it to a circle.'],
+  ];
+  const shown = new Map();
+  for (const [title, name, note] of BLOCKS) {
+    const spec = BRAND_SLIDES.find((s) => s.name === name);
+    section(title, note, null, (box) => {
+      if (!spec) throw new Error(`no brand slide called ${name}`);
+      box.classList.add('kit-sl', 'brand-sl');
+      shown.set(name, createSlide(spec, { host: box, full: true }));
+    });
+  }
+
+  // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
+  land();
+
+  if (SELFCHECK) {
+  const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+  const tol = (a, b, e) => Math.abs(a - b) <= e;
+  await document.fonts.ready;
+  await frames(3);
+  checkPage();
+
+  // 1. every block holds its own slide, 16:9, drawn, and nothing spills
+  {
+    const bad = [];
+    for (const [title, name] of BLOCKS) {
+      const s = shown.get(name);
+      const sec = document.getElementById(title.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+      const w = s?.el.clientWidth || 0, h = s?.el.clientHeight || 0;
+      const inn = s?.el.querySelector('.sl-in');
+      const spill = !inn || inn.scrollHeight > inn.clientHeight + 1 || inn.scrollWidth > inn.clientWidth + 1;
+      const inked = !!s && (s.el.querySelector('.sl-line, .sl-slot > *') !== null);
+      if (!s || !sec?.contains(s.el) || s.el.getAttribute('aria-label') !== name || w < 100 || !tol(h, w * 9 / 16, 1) || spill || !inked) {
+        bad.push(`${name}${!s ? ' MISSING' : ''}${spill ? ' SPILLS' : ''}${!inked ? ' EMPTY' : ''} ${w}x${h}`);
+      }
+    }
+    d.assert('every block holds its own brand slide, 16:9, with something drawn in it and nothing spilling',
+      shown.size === BLOCKS.length && BLOCKS.length === BRAND_SLIDES.length && bad.length === 0,
+      bad.length ? bad.join(', ') : `${shown.size} slides of ${BRAND_SLIDES.length}, each in its block, ${shown.get('logo').el.clientWidth} px wide`);
+  }
+
+  // 2. the stacked logo: β+, positron, studio, top to bottom, at steps 6, 4 and 4, the + raised
+  const L = shown.get('logo');
+  const lines = L.parts.lines;
+  {
+    const texts = lines.map((p) => p.textContent);
+    const h = L.el.clientHeight;
+    const steps = lines.map((p) => +p.dataset.step);
+    const sized = lines.every((p) => tol(parseFloat(getComputedStyle(p).fontSize), stepOf(+p.dataset.step).size / 100 * h, 0.5));
+    const order = lines.every((p, i) => i === 0 || p.getBoundingClientRect().top >= lines[i - 1].getBoundingClientRect().bottom - 1);
+    const sup = lines[0].querySelector('.sl-hi');
+    const fs = parseFloat(getComputedStyle(lines[0]).fontSize);
+    const raised = !!sup && parseFloat(getComputedStyle(sup).fontSize) < fs * 0.7
+      && sup.getBoundingClientRect().bottom < lines[0].getBoundingClientRect().bottom - 0.2 * fs;
+    d.assert('STACKED LOGO draws β+, then positron, then studio, top to bottom, at steps 6, 4 and 4, the + raised',
+      texts.join('|') === 'β+|positron|studio' && order && steps.join() === '6,4,4' && sized && raised,
+      `${texts.map((t) => `"${t}"`).join(', ')} ${order ? 'in order' : 'OUT OF ORDER'}, steps ${steps.join(', ')}, `
+      + `sizes ${sized ? 'at their step' : 'OFF THEIR STEP'} on a ${h} px slide, the + ${raised ? 'raised' : 'NOT RAISED'}`);
+  }
+
+  // 3. the β is drawn in the slide face from its Greek subset, from this origin.
+  // A missing glyph falls back to another face silently, and a fallback β
+  // beside a JetBrains + is a mark in two typefaces, so the Greek face is asked
+  // for by name, its INK is compared against the page's own mono (an advance
+  // alone cannot tell two mono faces apart), and the request that fetched it
+  // is read. Reused from the BRAND tab's checks in bcf56e1.
+  {
+    const greek = [...document.fonts].find((f) => f.family.replace(/["']/g, '') === 'Slide JetBrains Mono' && /U\+370/i.test(f.unicodeRange));
+    const span = lines[0];
+    const range = document.createRange(); range.setStart(span.firstChild, 0); range.setEnd(span.firstChild, 1);
+    const betaW = range.getBoundingClientRect().width, em = parseFloat(getComputedStyle(span).fontSize);
+    const advance = 0.6 + stepOf(6).ls;
+    const plus = span.querySelector('.sl-hi');
+    const ink = (font) => {
+      const c = document.createElement('canvas').getContext('2d');
+      c.font = font;
+      const m = c.measureText('β');
+      return [m.actualBoundingBoxAscent, m.actualBoundingBoxDescent, m.actualBoundingBoxLeft, m.actualBoundingBoxRight];
+    };
+    const monoStack = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
+    const inSlide = ink(`600 100px 'Slide JetBrains Mono'`), inFallback = ink(`600 100px ${monoStack}`);
+    const differs = inSlide.some((v, i) => Math.abs(v - inFallback[i]) > 0.5);
+    const faces = performance.getEntriesByType('resource').filter((e) => /\/shell\/vendor\/jetbrains-mono/.test(e.name));
+    const greekFile = faces.filter((e) => /greek/i.test(e.name));
+    d.assert('the β is drawn in the slide face from its Greek subset, fetched from this origin, and only the + wears the accent',
+      greek?.status === 'loaded' && differs && tol(betaW / em, advance, 0.005) && greekFile.length >= 1
+        && faces.every((e) => new URL(e.name).origin === location.origin)
+        && !!plus && plus.textContent === '+' && getComputedStyle(plus).color !== getComputedStyle(span).color,
+      `the Greek face ${greek ? greek.status : 'NOT DECLARED'}, ${greekFile.length} Greek file(s) of ${faces.length} face file(s); `
+      + `the β's ink at 100 px ${inSlide.map((v) => v.toFixed(1)).join('/')} against ${inFallback.map((v) => v.toFixed(1)).join('/')} `
+      + `in the page's mono, ${differs ? 'a different glyph' : 'THE SAME GLYPH, A FALLBACK'}; ${(betaW / em).toFixed(3)} em wide against ${advance.toFixed(3)}`);
+  }
+
+  // 4. the icon slides draw their canvases at the size they ship: the favicon
+  // at 16 and 32 CSS px, the app icon as two shapes, every canvas painted
+  {
+    const fav = [...shown.get('favicon').el.querySelectorAll('canvas.dk-real')];
+    const app = [...shown.get('app icon').el.querySelectorAll('canvas.dk-real')];
+    const painted = (cv) => {
+      const px = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      let n = 0; for (let i = 3; i < px.length; i += 4) if (px[i] > 0) n++;
+      return n;
+    };
+    const favSizes = fav.map((c) => `${c.width}/${c.getBoundingClientRect().width}`);
+    d.assert('FAVICON draws β+ at 16 and 32 px, pixel for pixel, and APP ICON draws two shapes, every canvas painted',
+      fav.length === 2 && fav[0].width === 16 && fav[1].width === 32
+        && fav.every((c) => tol(c.getBoundingClientRect().width, c.width, 0.5))
+        && app.length === 2 && [...fav, ...app].every((c) => painted(c) > 0),
+      `favicon canvases ${favSizes.join(', ')} (backing/css px), app icons ${app.length} at ${app.map((c) => c.width).join(', ')} px backing, `
+      + `painted ${[...fav, ...app].map(painted).join(', ')} pixels`);
+  }
+
+  // 5. NOTHING LEFT THIS ORIGIN, the visit and the checks together
+  {
+    const off = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => new URL(u).origin !== location.origin);
+    d.assert('the page fetched nothing from another origin',
+      off.length === 0, off.length ? off.slice(0, 3).join(', ') : `${performance.getEntriesByType('resource').length} requests, all to this origin`);
+  }
+
+  // 6. the ⛶ fills the screen with the logo at its steps and gives it back
+  {
+    L.fullBtn.click();
+    await frames(10);
+    const full = L.isFull(), fr = L.el.getBoundingClientRect();
+    const sizedFull = lines.every((p) => tol(parseFloat(getComputedStyle(p).fontSize), stepOf(+p.dataset.step).size / 100 * L.el.clientHeight, 0.5));
+    const gapFull = getComputedStyle(L.el.querySelector('.sl-ev')).rowGap;
+    await L.full(false);
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    await frames(6);
+    d.assert('the ⛶ fills the screen with the logo at its steps, still set solid, and gives it back',
+      full && fr.width > 0 && sizedFull && (gapFull === '0px' || gapFull === 'normal') && !L.isFull(),
+      `${full ? 'full' : 'NOT full'} at ${fr.width.toFixed(0)} px wide, the steps ${sizedFull ? 'held' : 'NOT held'}, `
+      + `the gap ${gapFull}, ${L.isFull() ? 'STILL full' : 'back'}`);
+  }
+  } // if (SELFCHECK)
+
+  d.ready();
+</script>
+</html>
