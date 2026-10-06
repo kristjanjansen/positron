@@ -1,5 +1,6 @@
 ## Open
 
+- **The shared AudioContext races when slides change hands quickly** (2026-10-06, found by kit/slides): after stepping across synth slides, a Start reported sounding while the node never took its knob value and measured silent; a broken edit's Stop left the context running. Both intermittent, both failed together twice, each run then lost 6 later asserts. Suspect `demo/shell/audio.mjs` suspend/resume ordering against `release()` on a step. A background agent.
 - **Variable names in slide text in monospace, a markup for any slide, and a kit/slides block showing it** (2026-10-06). Asked: *"var name is in monospace inside text. add vars example to slides kit too"*. Handed to the freq knob agent.
 - **Synths slides 3 and 4 words: "Code constant to an interactive knob", variable names in the text coloured by their knob's hue; slide 4 volume then freq with comments** (2026-10-06). Asked: *"A volume knob -> Code constant to a interactive knob. in the text use variable name with colorcoding."*, *"slide 4 is freq"*, *"volume ... freq ... this order, progressing. add comments"*. Handed to the freq knob agent.
 - **Synths deck: slide 3 a frequency knob, the volume knob moves to slide 4** (2026-10-06). Asked: *"slide 3 is freq knob"*, read as the 440 on a knob, then a slide with both knobs. A background agent.
