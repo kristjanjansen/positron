@@ -1,3 +1,55 @@
+# Handoff, 2026-10-06 afternoon, session 65 continued: the synths deck, six slides, and the audio race
+
+## Where it is right now
+
+- ✅ **Site: BUILD `192103c-115320-3177`**, confirmed on the edge, build output in `ccb79e5`. **Not pushed** (needs the personal account, see CLAUDE.md).
+- Counted: **56 demos, 54 built**, **93 plans**. No agent and no workflow is running. The tree is clean.
+
+## The synths deck, as it stands (https://positron.studio/slides/synths/)
+
+| slide | what |
+| --- | --- |
+| 1 | "Synths" over "in code", step 6, plain; caption "from sine wave to an instrument" |
+| 2 | `process = os.osc(440) * 0.5;` (half volume), Start / Stop |
+| 3 | `volume = hslider(...)`, the 0.5 on a knob |
+| 4 | volume then `freq = hslider("freq", 440, 50, 2000, 1);`, two knobs |
+| 5 | the same with `os.sawtooth` |
+| 6 | `wave = nentry("wave[style:radio{'sine':0;'saw':1}]", ...)`, `select2` inside `process`, drawn as a sine / saw choice in the knob row |
+
+The owner's rules for it, all asked today and all in force:
+- **No titles on slides 2 to 6**; one or two sentences, code and names in backticks render mono, a knob's name in its knob's hue (`hueVars`, one hue book).
+- **The owner's code layout**: no comment on the import, a short `//` over each control, a blank line between blocks. **`process` is the entry point**; no extra variable for the `select2` (`osc` and `tone` were both refused).
+- **One FAU size**: the panel is `PANEL_H` (599) on every slide, the code row takes what the scope, the knob row and the plate leave; the panel fills its slot (`fitBox({ h, top, fill })`) with the slot's inset again left and right.
+- **The scope is fixed at +-2**, no name, no "no signal", no auto range.
+- **1:2 columns, words at the bottom, body text in the sans** (`cols: '1:2'`, `bottom: true` on `split`).
+- Start / Stop one width; an edit compiles itself on a pause (`compile-idle.mjs`, as on /fau/) and replaces a sounding node; the first edit loads the 1 MB compiler, nothing loads on a visit or a step.
+- Every program is compiled ahead of time (`build-faust-aot.mjs`, `PROVENANCE.json`, `--check` 42 ok); the build refuses a stale one.
+
+## What else landed this afternoon
+
+| commits | what |
+| --- | --- |
+| `bc38cdb` `df44ab5` `6ca01e9` | a page per deck at `/slides/<slug>/` (`deckPage`), no description on it; the half width player's footer shows the deck title as a quiet sans link; `/kit/logo/` holds the brand slides and the brand deck left the front page |
+| `70ef017` | **the audio context race**: Chrome reports `suspended` for 1.5 to 3 ms after `resume()`, and a `suspend()` in that window left the context `running` with its clock frozen, so a broken edit's Start made every later Start silent. `release()` now waits for an in-flight resume (`audio.mjs`); `audio-test.mjs` 31 ok with a Chrome-ordered fake (2 red before) |
+| `bf20f85` | a `--fit-x` replace had reached the slide diagram's own fit (`wNow is not defined`), live from `0f54b63` until `518becf` |
+| `70ef017` | kit/slides: synth checks capped under the harness's 2 s of silence (a red no longer drops later asserts); the live log check counts a row within 1 px |
+
+kit/slides **104/104** on the last run.
+
+## Open
+
+- **The routing follow-ups** and **the pub container deadline**: unchanged, see the section below and BACKLOG.
+- A radio is always drawn after the knobs in the row; a radio declared between two sliders would still come last.
+- `plans/plan-live-slides.md` still describes the five step deck of the morning.
+- Not tested: a real phone, Safari, real browser full screen (the extension cannot trigger it).
+
+## Learned, worth keeping
+
+- **A string replace in a file with two similar functions changes both.** `--fit-x` lived in `fitBox` and in the slide diagram's fit; the second broke a page for an hour. Anchor a replace on the function, not on the line.
+- **A pause during a resume is not a pause in Chrome.** `state` lags `resume()` by milliseconds; never decide on `state` alone while a resume is in flight.
+- **A silent harness cutoff hides how many checks a red cost.** Two reds dropped six asserts with no word until the counts were compared; cap waits under the harness's silence.
+- **A half pixel moved by a new slide above is enough to flip a strict visibility test.** Keep a check's tolerances consistent with each other.
+
 # Handoff, 2026-10-06, session 65: decks on the front page, the kit split into eight pages, synths on a slide, brand
 
 ## Where it is right now
