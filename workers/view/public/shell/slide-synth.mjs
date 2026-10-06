@@ -71,12 +71,12 @@ const WAVE_PX = 120;
 export const WINDOW = 512;
 /** The scope's full scales, the smallest that clears the peak by a quarter is used. */
 export const FULL_SCALE = [0.05, 0.1, 0.2, 0.5, 1, 2];
-/** The scope at rest: its name and the scale the shipped sine
- * is drawn against (a 0.1 sine reads on the 0.2 scale over 512 samples at
+/** The scope at rest: no name (*"rm 'output'"*), only the scale the shipped sine
+ * is drawn against (a 0.5 sine reads on the 1 scale over 512 samples at
  * 48 kHz), so an idle scope says what it will measure. 2026-10-06, *"show
  * labels when no signal on waveform?"*. */
-const IDLE = Object.freeze({ points: null, name: 'output', reason: null,
-  axes: { y: '\u00b10.2', x: `${((WINDOW / 48000) * 1000).toFixed(1)} ms` } });
+const IDLE = Object.freeze({ points: null, name: '', reason: null,
+  axes: { y: '\u00b11', x: `${((WINDOW / 48000) * 1000).toFixed(1)} ms` } });
 
 /* 🔴 NO NOTE ON THE PLATE, AND AN EDIT COMPILES ITSELF, since 2026-10-06:
    *"rm labels from footer about compiling. autocompile, show compiling... as
@@ -110,7 +110,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
   const shipped = step.code.replace(/\n$/, '');
 
   return (host) => {
-    const scope = createWaveShape({ reason: null, colour: '--hi', height: WAVE_PX, name: 'output' });
+    const scope = createWaveShape({ reason: null, colour: '--hi', height: WAVE_PX, name: '' });
     scope.set(IDLE);
     const lines = shipped.split('\n').length;
     // NINE ROWS, three times the first program's three, asked 2026-10-06 as
@@ -167,7 +167,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       // sine fills half the box and its label is a number somebody would type
       const fs = FULL_SCALE.find((f) => f >= peak * 1.25) || FULL_SCALE[FULL_SCALE.length - 1];
       scope.set({
-        points: Array.from(win, (v) => v / fs), reason: '', name: 'output',
+        points: Array.from(win, (v) => v / fs), reason: '', name: '',
         axes: { y: `\u00b1${fs}`, x: `${((WINDOW / ctx.sampleRate) * 1000).toFixed(1)} ms` },
       });
       draws++;
