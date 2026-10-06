@@ -1,5 +1,6 @@
 ## Open
 
+- **Synths deck: slide 3 a frequency knob, the volume knob moves to slide 4** (2026-10-06). Asked: *"slide 3 is freq knob"*, read as the 440 on a knob, then a slide with both knobs. A background agent.
 - **Synths deck: 1:2 columns, useful slide texts, words at the bottom** (2026-10-06). Asked: *"use 1:2 cols layout. make useful slide texts. align text to bottom of slide"*. Handed to the slide 3 agent (a `cols: '1:2'` option on `split`).
 - **Synths deck slide 3: the sine's 0.5 as a knob from 0 to 1** (2026-10-06). Asked: *"slode 3: make 0.5 into knob 0..1"*. A background agent.
 - **A page per deck at `/slides/<slug>/`, the deck's title in the half width footer linking to it; `/kit/logo/` from the brand slides, then the brand deck removed** (2026-10-06). Asked: *"add slides/*slug* page on each slode deck. title is on footer on 1/2 w it replaces page count and becomes link to slides/*slug* page. add kit/logo page and use individual slides from the brand slides. rm brand slids after it"*. A background agent.
