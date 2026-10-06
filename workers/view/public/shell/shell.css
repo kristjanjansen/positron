@@ -6014,6 +6014,19 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    lights in `--hi` on every other knob; on a knob with a hue the yellow
    would be the one thing on it that is not its colour. Unset, it is `--hi`. */
 .pos-knob[data-param] .pos-knob-hand[data-on="1"] { color: var(--param-ink, var(--hi)); }
+/* 🔴 A PARAMETER'S CHOICE WEARS THE PARAMETER'S HUE THE WAY ITS KNOB DOES,
+   since 2026-10-06 (*"how to make it a radio (sawtooth?)"*): a Faust
+   `nentry` with `[style:radio{...}]` is drawn as `choice.mjs` beside the
+   knobs (`slide-synth.mjs`), and the armed option takes `--param-hue` set on
+   it or above it where every other choice takes `--hi`. Unset, `--param-ink`
+   is invalid and each falls back to `--hi`, so a plain choice is untouched.
+   One weight above `.pos-choice button[aria-pressed="true"]`, which it must
+   beat. */
+.pos-choice[data-param] { --param-ink: hsl(var(--param-hue) 70% 62%); }
+.pos-choice[data-param] button[aria-pressed="true"] {
+  color: var(--param-ink, var(--hi)); border-color: var(--param-ink, var(--hi));
+  background: color-mix(in oklab, var(--param-ink, var(--hi)) 12%, var(--card2));
+}
 .pos-pknobs-none { display: grid; }
 .pos-pknobs-none > * { grid-area: 1 / 1; }
 .pos-pknobs-ghost { visibility: hidden; }

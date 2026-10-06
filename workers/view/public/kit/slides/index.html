@@ -2222,7 +2222,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     const intro = p.slides[0];
     const lines = intro.parts.lines;
     d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 6 with a caption and no body',
-      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 5 && toneIdx === 1 && p.at() === 0
+      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 6 && toneIdx === 1 && p.at() === 0
         && lines.length === 2 && lines.every((l) => l.dataset.step === '6') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
         && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
       `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
@@ -2434,7 +2434,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         // ⚠️ THE HEADLINE'S TOP ON EVERY INSTRUMENT SLIDE, each read while it
         // is shown: the longest words are the ones that climb out of the column
         let sayTop = Infinity;
-        for (const i of [1, 2, 3, 4]) {
+        for (const i of [1, 2, 3, 4, 5]) {
           p.go(i);
           await frames(2);
           const S2 = p.slides[i];
@@ -2443,12 +2443,12 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         p.go(vIdx);
         await frames(2);
         const sayR = { top: wr.top + sayTop };
-        const both = [1, 2, 3, 4].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
-        d.assert('SYNTHS: slides 2 to 5 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
+        const both = [1, 2, 3, 4, 5].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
+        d.assert('SYNTHS: slides 2 to 6 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
           both && Math.abs(divide - sr.width / 3) < 1 && Math.abs(dark - (sr.width * 2) / 3) < 1 && Math.abs(tr.bottom - wr.bottom) < 1.5
             && sayR.top >= wr.top - 0.5 && Math.abs((xr.left - wr.right) - 2 * (wr.left - sr.left)) < 1,
           `the divide at ${divide.toFixed(1)} of ${sr.width.toFixed(1)} px (a third is ${(sr.width / 3).toFixed(1)}), the darker ground ${dark.toFixed(1)} px, `
-          + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start at least ${sayTop.toFixed(1)} px down it on slides 2 to 4, `
+          + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start at least ${sayTop.toFixed(1)} px down it on slides 2 to 6, `
           + `the gap ${(xr.left - wr.right).toFixed(1)} px against an inset of ${(wr.left - sr.left).toFixed(1)}`);
       }
 
@@ -2459,7 +2459,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       // passes
       {
         const ks = [], hs = [];
-        for (const i of [1, 2, 3, 4]) {
+        for (const i of [1, 2, 3, 4, 5]) {
           p.go(i);
           await frames(2);
           ks.push(p.slides[i].ctl.fb.fit());
@@ -2470,7 +2470,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         // ONE PANEL HEIGHT since 2026-10-06 (*"keep same fau size!!! knobs
         // condense code area"*): every panel is PANEL_H tall, a knob row
         // takes its height from the code row
-        d.assert('SYNTHS: slides 2 to 5 draw the FAU panel at one scale and one height, PANEL_H, the knobs taking room from the code',
+        d.assert('SYNTHS: slides 2 to 6 draw the FAU panel at one scale and one height, PANEL_H, the knobs taking room from the code',
           ks[0] > 0 && ks.every((k) => Math.abs(k - ks[0]) < 0.001) && hs.every((h) => Math.abs(h - PANEL_H) <= 1),
           hs.map((h, j) => `slide ${j + 2} at ${ks[j].toFixed(4)} (panel ${h} px)`).join(', ') + `, PANEL_H ${PANEL_H}`);
       }
@@ -2610,6 +2610,109 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         + `RMS ${lvHigh.toFixed(4)} then ${lvLow.toFixed(4)}, ${f.paramSends()} setParamValue in all, `
         + `the longest quiet stretch in the SYNTHS checks ${(Math.max(quietest, performance.now() - said)).toFixed(0)} ms of ${QUIET_MS}`);
       f.stop();
+      p.go(0);
+    }
+
+    // 11. SLIDE 6, slide 4's program with a third control, an `nentry` whose
+    // `[style:radio{...}]` the slot draws as the kit's choice (*"how to make
+    // it a radio (sawtooth?)"*): volume, freq and wave in one row, in that
+    // order, wave in its own hue. Every level is read off the analyser, every
+    // value the node holds off the node itself. A sine of amplitude 0.5 is
+    // RMS 0.354 and the band limited saw 0.286 (`build-faust-aot.mjs` EXPECT).
+    {
+      const wIdx = p.slides.findIndex((s) => s.ctl?.step?.id === 'wave');
+      const W = p.slides[wIdx], w = W.ctl;
+      const WAVE = /\/resources\/faust\/wave\.(json|wasm)$/;
+      const waveFetched = () => names().filter((n) => WAVE.test(new URL(n).pathname));
+      const SINE = 0.3536, SAW = 0.2860;
+      const comp0 = compiler().length;
+      const res0 = performance.getEntriesByType('resource').length;
+      p.go(wIdx);
+      await frames(3);
+      p.el.scrollIntoView({ block: 'center' });
+      await frames(2);
+      const stepRes = performance.getEntriesByType('resource').slice(res0).map((e) => e.name)
+        .filter((n) => !(new URL(n).pathname === '/_log' || /^\/shell\/vendor\/[^/]+\.woff2$/.test(new URL(n).pathname)));
+      const row = w.knobRow();
+      const r = w.radios().get('wave');
+      const cell = r?.cell;
+      const btn = (i) => r?.choice.buttons[i];
+      const knobEl = (n) => row?.querySelector(`.pos-knob[data-param="${n}"]`);
+      const mid = (e) => { const b = e?.getBoundingClientRect(); return b ? (b.top + b.bottom) / 2 : NaN; };
+      const vr = knobEl('volume')?.getBoundingClientRect(), fr = knobEl('freq')?.getBoundingClientRect(), cr = cell?.getBoundingClientRect(), rr = row?.getBoundingClientRect();
+      const hv = w.book.hueOf('volume'), hf = w.book.hueOf('freq'), hw = w.book.hueOf('wave');
+      const ink = (e) => (e ? getComputedStyle(e).color : '');
+      const lab = cell?.querySelector('.sl-radio-lab');
+      const codeHue = w.code.el.querySelector('[data-param="wave"]')?.dataset.hue;
+      const wordEl = W.parts.text?.querySelector('code.sl-var[data-var="wave"]');
+      const dialMid = mid(knobEl('volume')?.querySelector('.pos-knob-dial')), segMid = mid(cell?.querySelector('.pos-choice-seg'));
+      const labBottom = (e) => e?.getBoundingClientRect().bottom ?? NaN;
+      const noRadioBefore = [2, 3, 4].every((i) => p.slides[i].ctl.radios().size === 0 && !p.slides[i].el.querySelector('.sl-radio'));
+      d.assert('SYNTHS: slide 6 draws volume, freq and wave in one row in that order, wave as a choice of sine and saw in its own hue in the row, the code and the words, the step fetching nothing',
+        wIdx === 5 && p.slides.length === 6 && !!row && !!cell && row.contains(cell) && w.panel.shape().join(' ') === 'viz controls controls plate'
+          && w.knobs.names().join() === 'volume,freq' && [...w.radios().keys()].join() === 'wave'
+          && r.choice.buttons.map((b) => b.textContent).join() === 'sine,saw' && r.choice.get() === 0 && r.value === 0
+          && btn(0).getAttribute('aria-pressed') === 'true' && btn(1).getAttribute('aria-pressed') === 'false'
+          && !!vr && !!fr && vr.right <= fr.left && fr.right <= cr.left && cr.top >= rr.top - 0.5 && cr.bottom <= rr.bottom + 0.5
+          && Math.abs(segMid - dialMid) < 1.5 && Math.abs(labBottom(lab) - labBottom(knobEl('volume')?.querySelector('.pos-knob-lab'))) < 1
+          && Number.isFinite(hw) && new Set([hv, hf, hw]).size === 3 && cell.style.getPropertyValue('--param-hue') === String(hw)
+          && ink(btn(0)) === ink(lab) && ink(btn(0)) !== ink(btn(1)) && codeHue === String(hw) && wordEl?.dataset.hue === String(hw)
+          && ink(wordEl) === ink(w.code.el.querySelector('.pos-tk-pvar[data-param="wave"]') || W.parts.text)
+          && /wave = nentry\("wave\[style:radio\{'sine':0;'saw':1\}\]", 0, 0, 1, 1\);[\s\S]*process = select2\(wave, os\.osc\(freq\), os\.sawtooth\(freq\)\) \* volume;/.test(w.shipped)
+          && /`nentry`[\s\S]*`wave`[\s\S]*`select2`/.test(W.spec.text) && lintWords(W.spec.text).length === 0
+          && waveFetched().length === 0 && stepRes.length === 0 && !w.sounding() && noRadioBefore,
+        `slide ${wIdx + 1} of ${p.slides.length}, knobs ${w.knobs.names().join(', ')}, radios ${[...w.radios().keys()].join(', ') || 'NONE'} offering ${r?.choice.buttons.map((b) => b.textContent).join(' and ')}, `
+        + `lefts ${[vr, fr, cr].map((x) => x?.left.toFixed(0)).join(', ')} in a row ${rr?.top.toFixed(0)} to ${rr?.bottom.toFixed(0)}, the choice centred ${(segMid - dialMid).toFixed(2)} px off the dials, `
+        + `hues ${hv}, ${hf}, ${hw}, the armed option ${ink(btn(0))} and its name ${ink(lab)}, in the code ${codeHue}, in the words ${wordEl?.dataset.hue}, `
+        + `slides 3 to 5 ${noRadioBefore ? 'draw no radio' : 'DRAW A RADIO'}, ${waveFetched().length} wave file(s), ${stepRes.length} request(s) on the step`);
+
+      // a pick before the first Start is kept, and handed to the node Start
+      // makes before it is heard: saw, RMS 0.286, from the artefact, no compile
+      btn(1).click();
+      const keptValue = r.value, sendsBefore = w.paramSends(), pressedBefore = btn(1).getAttribute('aria-pressed');
+      w.tone.click();
+      await until(() => w.sounding() || w.error(), 3000);
+      await until(() => Math.abs(w.level() - SAW) < 0.01 && w.nodeValue('wave') === 1, 1500);
+      const lvKept = w.level(), hzKept = w.hz(), nodeKept = w.nodeValue('wave');
+      d.assert('SYNTHS: on slide 6 saw picked before Start is kept, and Start plays the saw from the wave artefact with no compile, RMS 0.286 at 440 Hz',
+        keptValue === 1 && pressedBefore === 'true' && sendsBefore === 0 && w.paramSends() > 0 && w.sounding()
+          && Math.abs(lvKept - SAW) < 0.01 && Math.abs(hzKept - 440) < 5 && nodeKept === 1 && p.at() === wIdx
+          && waveFetched().some((n) => /wave\.wasm$/.test(n)) && compiler().length === comp0 && w.compiles() === 0 && audioOwner() === w,
+        `${w.error() ? `it FAILED: ${w.error()}, ` : ''}picked ${keptValue} with ${sendsBefore} sends before Start, RMS ${lvKept.toFixed(4)} at ${hzKept.toFixed(1)} Hz after it with the node at ${nodeKept}, `
+        + `${waveFetched().length} wave file(s), ${compiler().length - comp0} new compiler file(s), ${w.compiles()} compile(s)`);
+
+      // while it plays, sine, then saw, then sine: the level follows the pick at the same pitch
+      const sends0 = w.paramSends();
+      btn(0).click();
+      await until(() => Math.abs(w.level() - SINE) < 0.01 && w.nodeValue('wave') === 0, 1500);
+      const lvSine = w.level();
+      btn(1).click();
+      await until(() => Math.abs(w.level() - SAW) < 0.01 && w.nodeValue('wave') === 1, 1500);
+      const lvSaw = w.level(), hzSaw = w.hz(), nodeSaw = w.nodeValue('wave');
+      btn(0).click();
+      await until(() => Math.abs(w.level() - SINE) < 0.01 && w.nodeValue('wave') === 0, 1500);
+      const lvBack = w.level();
+      d.assert('SYNTHS: picking on slide 6 while it plays moves the measured RMS between the sine’s 0.354 and the saw’s 0.286 at the same pitch, and back',
+        Math.abs(lvSine - SINE) < 0.01 && Math.abs(lvSaw - SAW) < 0.01 && Math.abs(hzSaw - 440) < 5 && nodeSaw === 1
+          && Math.abs(lvBack - SINE) < 0.01 && w.nodeValue('wave') === 0 && r.value === 0 && btn(0).getAttribute('aria-pressed') === 'true'
+          && w.paramSends() - sends0 === 3 && w.sounding() && p.at() === wIdx,
+        `RMS ${lvSine.toFixed(4)} on sine, ${lvSaw.toFixed(4)} on saw at ${hzSaw.toFixed(1)} Hz with the node at ${nodeSaw}, ${lvBack.toFixed(4)} on sine again, `
+        + `${w.paramSends() - sends0} setParamValue for the three picks`);
+
+      // and Start with the sine picked plays the sine, the shipped default
+      w.stop();
+      await until(() => ctx()?.state === 'suspended', 1000);
+      w.tone.click();
+      await until(() => w.sounding() || w.error(), 3000);
+      await until(() => Math.abs(w.level() - SINE) < 0.01 && Math.abs(w.hz() - 440) < 5, 1500);
+      const lvStart = w.level(), hzStart = w.hz();
+      d.assert('SYNTHS: Start on slide 6 with sine picked plays the sine, RMS 0.354 at 440 Hz, with no compile',
+        w.sounding() && Math.abs(lvStart - SINE) < 0.01 && Math.abs(hzStart - 440) < 5 && w.nodeValue('wave') === 0
+          && w.compiles() === 0 && compiler().length === comp0 && audioOwner() === w,
+        `${w.error() ? `it FAILED: ${w.error()}, ` : ''}RMS ${lvStart.toFixed(4)} at ${hzStart.toFixed(1)} Hz, the node's wave ${w.nodeValue('wave')}, ${w.compiles()} compile(s), `
+        + `the longest quiet stretch in the SYNTHS checks ${(Math.max(quietest, performance.now() - said)).toFixed(0)} ms of ${QUIET_MS}`);
+      btn(0).click();
+      w.stop();
       p.go(0);
     }
   }
