@@ -27,12 +27,13 @@
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createSlide, createSlidePlayer, createSlideLog, fitBox, slideDiagram, stepOf, stepCaption,
-           plain, lintWords, SCALE }
+           plain, lintWords, SCALE, hueVars }
     from '/shell/slide.mjs';
   import { KEYS as PICO_KEYS, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
   import { createKnob } from '/shell/knob.mjs';
-  import { createParamKnobs } from '/shell/param-knobs.mjs';
+  import { createParamKnobs, unmapSpec } from '/shell/param-knobs.mjs';
+  import { PANEL_H } from '/shell/slide-synth.mjs';
   import { createPanelLayout } from '/shell/panel-layout.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
   import { OLED_LIT, drawOled, oledText, createOledParts } from '/shell/oled-view.mjs';
@@ -184,6 +185,29 @@
   };
 
 
+  // ── NAMES FROM THE CODE IN THE WORDS ─────────────────────────────────────
+  // 🔴 A NAME OUT OF A PROGRAM, IN BACKTICKS, 2026-10-06: *"var name is in
+  // monospace inside text. add vars example to slides kit too"*, after *"in
+  // the text use variable name with colorcoding"*. The slide's mono face
+  // inside sans words, uncoloured until `hueVars(root, hueOf)` hands it a hue,
+  // which the synths deck's slot does from the same book its knobs and code
+  // box read. Here a book of one name, so `cutoff` is coloured and `process`,
+  // which has no knob, is not. The newest block, so it is the first.
+  section('NAMES FROM THE CODE IN THE WORDS',
+    'A name in backticks is set in the slide’s mono face inside the sans words, and wears its knob’s hue once a hue book names it.',
+    `{ text: 'Turn \`cutoff\` and the sound of \`process\` darkens' }; hueVars(slide.el, book.hueOf);`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const spec = { name: 'vars', say: 'Names from the code', text: 'Turn `cutoff` and the sound of `process` darkens', textStep: 3 };
+      const sl = createSlide(spec, { host: box, full: true });
+      const book = createHueBook();
+      book.assign(['cutoff']);
+      const coloured = hueVars(sl.el, book.hueOf);
+      slideKit.blocks.push({ title: 'NAMES FROM THE CODE IN THE WORDS', s: sl });
+      slideKit.specs.push(spec);
+      slideKit.comps.vars = { s: sl, book, coloured };
+    });
+
   // ── SYNTHS DECK ───────────────────────────────────────────────────────────
   // 🔴 THE FRONT PAGE'S DECKS, MOUNTED HERE THE WAY THE FRONT PAGE MOUNTS THEM,
   // 2026-10-06, for the `synths` deck (*"do slide deck Synths in code in the fau
@@ -199,7 +223,8 @@
   // editable code box and a FAU plate with `Start` / `Stop` at its right end.
   // THREE THE SAME DAY (*"slode 3: make 0.5 into knob 0..1"*): the same
   // instrument with the sine's 0.5 as a slider, drawn as a knob between the
-  // code and the plate.
+  // code and the plate. FOUR THE SAME DAY (*"slide 4 is freq"*): that program
+  // plus one line, its 440 on a second slider, two knobs in one row.
   // 🔴 ITS CHECKS ARE `plans/plan-live-slides.md` SECTION 7 AND RUN LAST, behind
   // `?selfcheck=1` like every check here, because they are the only ones on
   // this page that fetch anything: `Start` imports the Faust runtime and
@@ -208,7 +233,7 @@
   // asserted before the press.
   section('SYNTHS DECK',
     'The deck the front page plays, mounted the same way, its title in the footer linking to its own page. It is a title and one '
-    + 'instrument, a sine written in Faust, then the same sine with its volume on a knob. Start plays the program compiled ahead of time, and '
+    + 'instrument, a sine written in Faust, then the same sine with its volume on a knob, then its pitch on a second knob. Start plays the program compiled ahead of time, and '
     + 'after an edit the next press loads the compiler once and plays your version.',
     `mountDecks(holder);   // holder carries data-decks, as on the front page; one player per deck, titled`,
     (box) => {
@@ -2117,7 +2142,35 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     // Every reading is the far side of a boundary: the resource list the
     // browser keeps, the count of contexts `audio.mjs` has made, an analyser on
     // the graph, the context's own `state`.
+    varChecks();
     await synthChecks();
+  }
+
+  // NAMES FROM THE CODE: mono inside sans, the named one in its hue and the
+  // other in the words' own ink. ⚠️ BOTH HALVES, because a rule that coloured
+  // every `code` would pass the first and a rule that coloured none the second.
+  function varChecks() {
+    const V = slideKit.comps.vars;
+    const text = V.s.parts.text;
+    const cut = text?.querySelector('code.sl-var[data-var="cutoff"]'), proc = text?.querySelector('code.sl-var[data-var="process"]');
+    const fam = (e) => (e ? getComputedStyle(e).fontFamily : '');
+    const col = (e) => (e ? getComputedStyle(e).color : '');
+    const size = (e) => (e ? getComputedStyle(e).fontSize : '');
+    const hue = V.book.hueOf('cutoff');
+    // the colour a code box gives that hue, measured off a probe span with the code box's own class
+    const probe = el('span', 'pos-tk-pvar');
+    probe.dataset.hue = String(hue);
+    probe.style.setProperty('--param-hue', String(hue));
+    text.append(probe);
+    const want = col(probe);
+    probe.remove();
+    d.assert('NAMES FROM THE CODE: a name in backticks is mono inside sans text at the words’ size, the named one in its knob’s hue and the other in the words’ ink',
+      !!cut && !!proc && /JetBrains Mono/.test(fam(cut)) && /JetBrains Mono/.test(fam(proc)) && !/JetBrains Mono/.test(fam(text))
+        && size(cut) === size(text) && size(proc) === size(text)
+        && V.coloured === 1 && cut.dataset.hue === String(hue) && col(cut) === want && col(cut) !== col(text)
+        && !('hue' in proc.dataset) && col(proc) === col(text) && plain(V.s.spec.text) === 'Turn cutoff and the sound of process darkens',
+      `cutoff in "${fam(cut).split(',')[0]}" at ${size(cut)} coloured ${col(cut)} against the code box's ${want} for hue ${hue}, `
+      + `process in "${fam(proc).split(',')[0]}" at ${size(proc)} coloured ${col(proc)}, the words in "${fam(text).split(',')[0]}" at ${size(text)} coloured ${col(text)}`);
   }
 
   async function synthChecks() {
@@ -2139,7 +2192,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     const intro = p.slides[0];
     const lines = intro.parts.lines;
     d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 6 with a caption and no body',
-      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 3 && toneIdx === 1 && p.at() === 0
+      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 4 && toneIdx === 1 && p.at() === 0
         && lines.length === 2 && lines.every((l) => l.dataset.step === '6') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
         && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
       `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
@@ -2334,9 +2387,12 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         vIdx === 2 && !!row && getComputedStyle(row).display !== 'none' && shape === 'viz controls controls plate' && v.panel.controls()[1] === row
           && kr.top >= cr.bottom - 1 && kr.bottom <= pr.top + 1 && v.knobs.names().join() === 'volume' && v.knobs.value('volume') === 0.5 && shows() === '0.50'
           && /volume = hslider\("volume", 0\.5, 0, 1, 0\.01\);/.test(v.shipped) && v.code.value() === v.shipped
-          && volFetched().length === 0 && stepRes.length === 0 && !v.sounding() && V.parts.say?.textContent === 'A volume knob',
+          && volFetched().length === 0 && stepRes.length === 0 && !v.sounding() && V.parts.say?.textContent === 'Code constant to an interactive knob'
+          && V.parts.text?.querySelector('code.sl-var[data-var="volume"]')?.dataset.hue === String(v.book.hueOf('volume'))
+          && !('hue' in (V.parts.text?.querySelector('code.sl-var[data-var="process"]')?.dataset ?? { hue: 1 })),
         `slide ${vIdx + 1}, rows ${shape}, the knob row ${kr ? `${kr.top.toFixed(0)} to ${kr.bottom.toFixed(0)} px under code ending ${cr.bottom.toFixed(0)}, over the plate at ${pr.top.toFixed(0)}` : 'MISSING'}, `
-        + `knobs ${v.knobs.names().join(', ') || 'none'} showing "${shows()}", ${volFetched().length} volume file(s), ${stepRes.length} request(s) on the step`);
+        + `knobs ${v.knobs.names().join(', ') || 'none'} showing "${shows()}", the word volume in hue ${V.parts.text?.querySelector('code.sl-var[data-var="volume"]')?.dataset.hue} against the book's ${v.book.hueOf('volume')}, `
+        + `${volFetched().length} volume file(s), ${stepRes.length} request(s) on the step`);
 
       // the synths deck's splits are 1:2 with the words on the foot of their
       // column (*"use 1:2 cols layout"*, *"align text to bottom of slide"*)
@@ -2344,25 +2400,47 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         const sr = V.el.getBoundingClientRect(), wr = V.parts.words.getBoundingClientRect(), xr = V.parts.slot.getBoundingClientRect();
         const divide = (wr.right + xr.left) / 2 - sr.left;
         const dark = parseFloat(getComputedStyle(V.el, '::before').width);
-        const tr = (V.parts.text || V.parts.say).getBoundingClientRect(), sayR = V.parts.say.getBoundingClientRect();
-        const both = [1, 2].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
-        d.assert('SYNTHS: slides 2 and 3 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
+        const tr = (V.parts.text || V.parts.say).getBoundingClientRect();
+        // ⚠️ THE HEADLINE'S TOP ON EVERY INSTRUMENT SLIDE, each read while it
+        // is shown: the longest words are the ones that climb out of the column
+        let sayTop = Infinity;
+        for (const i of [1, 2, 3]) {
+          p.go(i);
+          await frames(2);
+          const S2 = p.slides[i];
+          sayTop = Math.min(sayTop, S2.parts.say.getBoundingClientRect().top - S2.parts.words.getBoundingClientRect().top);
+        }
+        p.go(vIdx);
+        await frames(2);
+        const sayR = { top: wr.top + sayTop };
+        const both = [1, 2, 3].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
+        d.assert('SYNTHS: slides 2, 3 and 4 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
           both && Math.abs(divide - sr.width / 3) < 1 && Math.abs(dark - (sr.width * 2) / 3) < 1 && Math.abs(tr.bottom - wr.bottom) < 1.5
             && sayR.top >= wr.top - 0.5 && Math.abs((xr.left - wr.right) - 2 * (wr.left - sr.left)) < 1,
           `the divide at ${divide.toFixed(1)} of ${sr.width.toFixed(1)} px (a third is ${(sr.width / 3).toFixed(1)}), the darker ground ${dark.toFixed(1)} px, `
-          + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start ${(sayR.top - wr.top).toFixed(1)} px down it, `
+          + `the words end ${(wr.bottom - tr.bottom).toFixed(1)} px above their column's foot and start at least ${sayTop.toFixed(1)} px down it on slides 2 to 4, `
           + `the gap ${(xr.left - wr.right).toFixed(1)} px against an inset of ${(wr.left - sr.left).toFixed(1)}`);
       }
 
-      // slides 2 and 3 draw the instrument at ONE scale (*"2 and 3 use same
-      // size of fau"*): slide 3 is on screen, so its scale is read live, and
-      // slide 2's fit box is asked to fit at the same slot size
+      // slides 2, 3 and 4 draw the instrument at ONE scale (*"2 and 3 use
+      // same size of fau"*), PANEL_H being the tallest of them. ⚠️ EACH HEIGHT
+      // IS READ WHILE ITS SLIDE IS SHOWN: a hidden slide's panel measures 0,
+      // and until 2026-10-06 this compared slide 2 at 0 px, which any height
+      // passes
       {
-        const k3 = v.fb.fit(), k2 = c.fb.fit();
-        const h2 = c.fb.inner.offsetHeight, h3 = v.fb.inner.offsetHeight;
-        d.assert('SYNTHS: slides 2 and 3 draw the FAU panel at one scale, the shorter one centred rather than grown',
-          k3 > 0 && Math.abs(k2 - k3) < 0.001 && h2 < h3,
-          `slide 2 at ${k2.toFixed(4)} (panel ${h2} px), slide 3 at ${k3.toFixed(4)} (panel ${h3} px)`);
+        const ks = [], hs = [];
+        for (const i of [1, 2, 3]) {
+          p.go(i);
+          await frames(2);
+          ks.push(p.slides[i].ctl.fb.fit());
+          hs.push(p.slides[i].ctl.fb.inner.offsetHeight);
+        }
+        p.go(vIdx);
+        await frames(2);
+        d.assert('SYNTHS: slides 2, 3 and 4 draw the FAU panel at one scale, PANEL_H the tallest of them and the shorter ones centred rather than grown',
+          ks[0] > 0 && ks.every((k) => Math.abs(k - ks[0]) < 0.001) && hs.every((h) => h > 0 && h <= PANEL_H + 1)
+            && Math.abs(Math.max(...hs) - PANEL_H) <= 1 && hs[0] < hs[1],
+          hs.map((h, j) => `slide ${j + 2} at ${ks[j].toFixed(4)} (panel ${h} px)`).join(', ') + `, PANEL_H ${PANEL_H}`);
       }
 
       // a turn before Start is kept and is what Start plays: Home, the bottom, 0
@@ -2372,6 +2450,9 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       v.tone.click();
       await until(() => v.sounding() || v.error(), 3000);
       await nap(300);
+      // ⚠️ THE NODE'S VALUE IS AN AudioParam's, WHICH MOVES WHEN THE CONTEXT
+      // RENDERS: read once, it said 0.5 over a silent tone on 2026-10-06
+      await until(() => v.nodeValue('volume') === 0, 600);
       const silent = v.level();
       d.assert('SYNTHS: on slide 3 the knob turned to 0 before Start is kept, and Start plays that from the volume artefact with no compile, silent',
         before === 0 && shownBefore === '0.00' && sendsBefore === 0 && p.at() === at0 && v.sounding() && silent < 1e-4 && v.nodeValue('volume') === 0
@@ -2421,6 +2502,81 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         !v.error() && backDisplay !== 'none' && v.knobs.names().join() === 'volume' && backShows === '0.50' && v.compiles() === 1,
         `${v.error() ? `it FAILED: ${v.error()}, ` : ''}the row ${backDisplay === 'none' ? 'STILL GONE' : 'drawn'} showing "${backShows}", ${v.compiles()} compile(s)`);
       v.stop();
+      p.go(0);
+    }
+
+    // 10. SLIDE 4, slide 3's program plus one line, its 440 on a second slider
+    // (*"slide 4 is freq"*, *"this order, progressing"*): volume then freq,
+    // one row, each knob in its own hue. Every frequency is read off the
+    // analyser, every value the node holds off the node itself.
+    {
+      const fIdx = p.slides.findIndex((s) => s.ctl?.step?.id === 'pitch');
+      const F = p.slides[fIdx], f = F.ctl;
+      const PITCH = /\/resources\/faust\/pitch\.(json|wasm)$/;
+      const pitchFetched = () => names().filter((n) => PITCH.test(new URL(n).pathname));
+      const comp0 = compiler().length;
+      const res0 = performance.getEntriesByType('resource').length;
+      p.go(fIdx);
+      await frames(3);
+      p.el.scrollIntoView({ block: 'center' });
+      await frames(2);
+      const stepRes = performance.getEntriesByType('resource').slice(res0).map((e) => e.name)
+        .filter((n) => !(new URL(n).pathname === '/_log' || /^\/shell\/vendor\/[^/]+\.woff2$/.test(new URL(n).pathname)));
+      const row = f.knobRow();
+      const knobEl = (n) => row?.querySelector(`.pos-knob[data-param="${n}"]`);
+      const shows = (n) => knobEl(n)?.querySelector('.pos-knob-v')?.textContent;
+      const hueOn = (n) => knobEl(n)?.style.getPropertyValue('--param-hue');
+      const codeHue = (n) => f.code.el.querySelector(`[data-param="${n}"]`)?.dataset.hue;
+      const wordHue = (n) => F.parts.text?.querySelector(`code.sl-var[data-var="${n}"]`)?.dataset.hue;
+      const hv = f.book.hueOf('volume'), hf = f.book.hueOf('freq');
+      const vr = knobEl('volume')?.getBoundingClientRect(), fr = knobEl('freq')?.getBoundingClientRect();
+      const shape = f.panel.shape().join(' ');
+      d.assert('SYNTHS: slide 4 draws volume then freq in one knob row from the text, each in its own hue in the knob, the code and the words, and the step fetched nothing',
+        fIdx === 3 && !!row && shape === 'viz controls controls plate' && f.knobs.names().join() === 'volume,freq'
+          && f.knobs.value('volume') === 0.5 && f.knobs.value('freq') === 440 && shows('volume') === '0.50' && shows('freq') === '440'
+          && Number.isFinite(hv) && Number.isFinite(hf) && hv !== hf && hueOn('volume') === String(hv) && hueOn('freq') === String(hf)
+          && codeHue('volume') === String(hv) && codeHue('freq') === String(hf)
+          && wordHue('volume') === String(hv) && wordHue('freq') === String(hf)
+          && getComputedStyle(F.parts.text.querySelector('code.sl-var[data-var="freq"]')).color
+            === getComputedStyle(f.code.el.querySelector('.pos-tk-pvar[data-param="freq"]') || F.parts.text).color
+          && !!vr && !!fr && Math.abs(vr.top - fr.top) < 1 && fr.left > vr.right
+          && /volume = hslider\("volume", 0\.5, 0, 1, 0\.01\);\n.*\nfreq = hslider\("freq", 440, 50, 2000, 1\);\nprocess = os\.osc\(freq\) \* volume;/.test(f.shipped)
+          && pitchFetched().length === 0 && stepRes.length === 0 && !f.sounding() && F.parts.say?.textContent === 'A second knob for the pitch',
+        `slide ${fIdx + 1}, rows ${shape}, knobs ${f.knobs.names().join(', ') || 'none'} showing "${shows('volume')}" and "${shows('freq')}", `
+        + `hues ${hv} and ${hf} on the knobs as ${hueOn('volume')} and ${hueOn('freq')}, in the code as ${codeHue('volume')} and ${codeHue('freq')}, in the words as ${wordHue('volume')} and ${wordHue('freq')}, `
+        + `the knobs' tops ${vr && fr ? (fr.top - vr.top).toFixed(1) : 'MISSING'} px apart, ${pitchFetched().length} pitch file(s), ${stepRes.length} request(s) on the step`);
+
+      // a turn of freq to 880 before Start is kept and is what Start plays
+      const at0 = p.at();
+      const spec = { min: 50, max: 2000, step: 1 };
+      f.knobs.knob('freq').set(unmapSpec(880, spec));
+      const before = f.knobs.value('freq'), shownBefore = shows('freq'), sendsBefore = f.paramSends();
+      f.tone.click();
+      await until(() => f.sounding() || f.error(), 3000);
+      // ⚠️ AND THE LEVEL TOO: the analyser's window still holds the silence
+      // from before Start for a few frames, which read RMS 0.1774, half, on
+      // 2026-10-06 while the frequency in the sounding half was already right
+      await until(() => Math.abs(f.hz() - 880) < 5 && f.nodeValue('freq') === 880 && Math.abs(f.level() - 0.3536) < 0.01, 1500);
+      const hzHigh = f.hz(), lvHigh = f.level(), nodeHigh = f.nodeValue('freq');
+      d.assert('SYNTHS: on slide 4 freq turned to 880 before Start is kept, and Start plays 880 Hz from the pitch artefact with no compile',
+        before === 880 && shownBefore === '880' && sendsBefore === 0 && p.at() === at0 && f.sounding()
+          && Math.abs(hzHigh - 880) < 5 && Math.abs(lvHigh - 0.3536) < 0.01 && nodeHigh === 880
+          && pitchFetched().some((n) => /pitch\.wasm$/.test(n)) && compiler().length === comp0 && f.compiles() === 0 && audioOwner() === f,
+        `${f.error() ? `it FAILED: ${f.error()}, ` : ''}freq at ${before} showing "${shownBefore}" with ${sendsBefore} sends before, `
+        + `${hzHigh.toFixed(1)} Hz at RMS ${lvHigh.toFixed(4)}, the node holds ${nodeHigh}, ${pitchFetched().length} pitch file(s), `
+        + `${compiler().length - comp0} new compiler file(s), ${f.compiles()} compile(s)`);
+
+      // and back to 440 while it plays: half the frequency, the same level
+      f.knobs.knob('freq').set(unmapSpec(440, spec));
+      await until(() => Math.abs(f.hz() - 440) < 5, 1500);
+      await nap(100);
+      const hzLow = f.hz(), lvLow = f.level();
+      d.assert('SYNTHS: turning slide 4’s freq from 880 to 440 while it plays halves the measured frequency and leaves the level alone',
+        Math.abs(hzLow - 440) < 5 && Math.abs(hzHigh / hzLow - 2) < 0.02 && Math.abs(lvLow - lvHigh) < 0.01
+          && shows('freq') === '440' && f.sounding() && p.at() === fIdx,
+        `${hzHigh.toFixed(1)} Hz at 880, ${hzLow.toFixed(1)} Hz at 440, ${(hzHigh / hzLow).toFixed(3)}x, `
+        + `RMS ${lvHigh.toFixed(4)} then ${lvLow.toFixed(4)}, ${f.paramSends()} setParamValue in all`);
+      f.stop();
       p.go(0);
     }
   }

@@ -483,6 +483,9 @@ const FILES = [
   // the third slide's program, the sine with its 0.5 on a slider (2026-10-06)
   ['demo/resources/faust/volume.json', 'resources/faust/volume.json'],
   ['demo/resources/faust/volume.wasm', 'resources/faust/volume.wasm'],
+  // the fourth slide's, the same with its 440 on a second slider (2026-10-06)
+  ['demo/resources/faust/pitch.json', 'resources/faust/pitch.json'],
+  ['demo/resources/faust/pitch.wasm', 'resources/faust/pitch.wasm'],
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //

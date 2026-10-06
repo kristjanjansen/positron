@@ -68,7 +68,7 @@
 // one is the slide's own (`OWN_TAPS`), so nothing here has to stop anything.
 
 import { el } from './shell.mjs';
-import { fitBox } from './slide.mjs';
+import { fitBox, hueVars } from './slide.mjs';
 import { createCodeBox } from './code-box.mjs';
 import { createWaveShape } from './synth-view.mjs';
 import { createInstrumentPanel } from './instrument-panel.mjs';
@@ -84,12 +84,13 @@ import { createParamKnobs } from './param-knobs.mjs';
  * logical panel is a wider panel on screen at the same type size, and it holds
  * slide 3's `hslider` line on one line (it wrapped at 340). */
 const PANEL_PX = 400;
-/** The logical height every synth panel is scaled by, the tallest of them
- * (slide 3's, with one knob row, MEASURED 544 px on 2026-10-06), so slides 2
- * and 3 draw the instrument at one scale and one type size (*"2 and 3 use
- * same size of fau"*). A panel shorter than this is centred in its slot; one
- * taller still fits, at a smaller scale, and the kit's check says so. */
-export const PANEL_H = 544;
+/** The logical height every synth panel is scaled by, the tallest of them, so
+ * every instrument slide draws it at one scale and one type size (*"2 and 3
+ * use same size of fau"*). Slide 4's since 2026-10-06, MEASURED 562 px: its
+ * two knobs share slide 3's one row (544 px), and its seven lines of code take
+ * the box from nine rows to ten. A panel shorter than this is centred in its
+ * slot; one taller still fits, at a smaller scale, and the kit's check says so. */
+export const PANEL_H = 562;
 /** The scope's height in logical px, `/muta/`'s 140 less a little for half a slide. */
 const WAVE_PX = 120;
 /** Samples shown per frame: about 10.7 ms at 48 kHz, four and a bit cycles of 440 Hz. */
@@ -238,11 +239,19 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         if (a) { n.setParamValue(a, v); paramSends++; }
       }
     }
+    /* THE SLIDE'S OWN WORDS WEAR THE BOOK TOO, 2026-10-06 (*"in the text use
+       variable name with colorcoding"*): every `` `name` `` in the words
+       beside this slot takes its knob's hue from the same book, every time
+       the book changes, so the word, the code and the knob cannot disagree,
+       and a name with no knob (`process`) stays in the slide's ink. */
+    const words = host.closest('.sl-in') || host;
+    const paintWords = () => hueVars(words, book.hueOf);
     /** The row from a list: made the first time there is a slider, hidden when there is none. */
     function showKnobs(list) {
       if (!list.length) {
         if (knobRow) { knobRow.hidden = true; knobs.set([]); }
         book.clear();
+        paintWords();
         return;
       }
       if (!knobRow) knobRow = panel.addRow(knobs.el);
@@ -255,6 +264,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         if (h === null) k.style.removeProperty('--param-hue');
         else k.style.setProperty('--param-hue', String(h));
       }
+      paintWords();
     }
     showKnobs(readSliders(shipped));
 
@@ -456,7 +466,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         return n > 1 ? ((n - 1) * ctx.sampleRate) / (last - first) : 0;
       },
       context: () => ctx,
-      step, code, scope, tone, idle, panel, codeRow, fb, url, shipped, book, knobs,
+      step, code, scope, tone, idle, panel, codeRow, fb, url, shipped, book, knobs, words,
     };
     return ctl;
   };
