@@ -59,7 +59,7 @@ const WORDS = {
       + 'Pick saw while the tone plays' },
 };
 const SYNTHS = [
-  { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in *code*']],
+  { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in code']],
     // asked 2026-10-06: *"make it better. no ref to faust"*
     cap: 'from one sine to an instrument, a line of code at a time' },
   ...SYNTH_STEPS.map((st) => ({
