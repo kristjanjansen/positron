@@ -144,7 +144,7 @@ export function placesFor({ min, max, warp = 'lin', step = 0 }) {
  *   values: () => Map<string, number>, value: (name:string) => number|undefined,
  *   knob: (name:string) => object|undefined, names: () => string[]}}
  */
-export function createParamKnobs({ onChange = () => {}, onHold = null } = {}) {
+export function createParamKnobs({ onChange = () => {}, onHold = null, cols = 4 } = {}) {
   const root = document.createElement('div');
   root.className = 'pos-pknobs';
   /** name -> { knob, spec, value } for what is on screen now. */
@@ -187,7 +187,10 @@ export function createParamKnobs({ onChange = () => {}, onHold = null } = {}) {
      square apart whatever their labels say. A plain bank spaced them by their
      label widths. One row of up to `COLS`, `/knobs/`' own gap; the old
      lattice is destroyed on every rebuild, because it holds a ResizeObserver. */
-  const COLS = 4, GAP = 10;
+  // ⚠️ `cols` IS AN OPTION SINCE 2026-10-06, default 4 so `/fau/` and
+  // `/collide/` are unchanged: the synths deck's LFO slide declares five
+  // sliders and a fifth knob on a second row took the code's room
+  const COLS = cols, GAP = 10;
   let grid = null;
   const lattice = (knobs) => {
     grid?.destroy();
