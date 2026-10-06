@@ -71,6 +71,12 @@ const WAVE_PX = 120;
 export const WINDOW = 512;
 /** The scope's full scales, the smallest that clears the peak by a quarter is used. */
 export const FULL_SCALE = [0.05, 0.1, 0.2, 0.5, 1, 2];
+/** The scope at rest: its name, `no signal`, and the scale the shipped sine
+ * is drawn against (a 0.1 sine reads on the 0.2 scale over 512 samples at
+ * 48 kHz), so an idle scope says what it will measure. 2026-10-06, *"show
+ * labels when no signal on waveform?"*. */
+const IDLE = Object.freeze({ points: null, name: 'output', reason: 'no signal',
+  axes: { y: '\u00b10.2', x: `${((WINDOW / 48000) * 1000).toFixed(1)} ms` } });
 
 /* 🔴 NO NOTE ON THE PLATE, AND AN EDIT COMPILES ITSELF, since 2026-10-06:
    *"rm labels from footer about compiling. autocompile, show compiling... as
@@ -105,11 +111,13 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
 
   return (host) => {
     const scope = createWaveShape({ reason: null, colour: '--hi', height: WAVE_PX, name: 'output' });
+    scope.set(IDLE);
     const lines = shipped.split('\n').length;
-    // THREE TIMES THE PROGRAM'S HEIGHT, asked 2026-10-06 as *"maeke code panel
-    // 3 x higher"*: room to write more than the two shipped lines.
+    // NINE ROWS, three times the first program's three, asked 2026-10-06 as
+    // *"maeke code panel 3 x higher"*: room to write more than the shipped
+    // lines, and never shorter than them plus three.
     const code = createCodeBox({
-      language: 'faust', rows: lines * 3, label: '', value: shipped,
+      language: 'faust', rows: Math.max(9, lines + 3), label: '', value: shipped,
       ariaLabel: `the Faust program Start plays, ${lines} lines, editable`,
     });
     // START AND STOP, ONE WIDTH, asked 2026-10-06 as *"Test tone -> Start Stop
@@ -223,7 +231,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
           await partsFor(t);
           err = null;
           if (on && ctx) { const n = await nodeFor(t); n.connect(out); }
-          else scope.set({ points: null, reason: null, name: 'output' });
+          else scope.set(IDLE);
         } catch (e) {
           err = e?.message || String(e);
           scope.set({ points: null, name: 'does not compile', reason: err });
@@ -239,7 +247,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       tone.setAttribute('aria-pressed', 'false');
       label();
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
-      if (!err) scope.set({ points: null, reason: null, name: 'output' });
+      if (!err) scope.set(IDLE);
       release(ctl);
     }
 

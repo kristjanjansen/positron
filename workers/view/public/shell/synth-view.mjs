@@ -934,6 +934,11 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
         f.say(v.name || 'no wave', PAD, foot - 13, { colour: C.ink, px: 11, room: W - PAD * 2 });
         if (label) f.say(label, W - PAD, foot - 13, { align: 'right', room: W / 2 });
       }
+      // the scale's labels stand with no trace too, when a caller gives them,
+      // so an idle scope says what it will measure (2026-10-06, *"show labels
+      // when no signal on waveform?"*); a caller with no `axes` draws none
+      if (v.axes?.y) f.say(v.axes.y, W - PAD, yTop + 9, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
+      if (v.axes?.x) f.say(v.axes.x, W - PAD, yBot - 3, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
       return;
     }
 
