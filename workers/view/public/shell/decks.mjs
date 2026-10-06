@@ -135,6 +135,14 @@ export async function deckPage(name) {
   createStack(d.el).add(p.el);
   if (SELFCHECK) await deckChecks(d, deck, p);
   d.ready();
+  // 🔴 THE SYNTHS DECK'S SOUND CHECKS, moved here from /kit/slides/ on
+  // 2026-10-06 (*"rm from slides kit page"*). After `ready`, because they
+  // take about twenty seconds and `ready` is also the harness's boot wait;
+  // each one asserts within its silence limit, so the count is collected.
+  if (SELFCHECK && name === 'synths') {
+    const { synthChecks } = await import('./deck-checks.mjs');
+    await synthChecks(d, p);
+  }
   return { d, deck, player: p };
 }
 

@@ -81,8 +81,8 @@ ok('a step caption names its size, line height and tracking',
 
 const css = scaleCss('.sl');
 const decl = (name) => (css.match(new RegExp(`${name}:\\s*([^;]+);`)) || [])[1];
-ok('the custom properties: the base in cqh, each step a calc off the one below',
-  decl('--sl-1') === 'calc(var(--sl-base) * 1cqh)'
+ok('the custom properties: the base in the slide unit, each step a calc off the one below',
+  decl('--sl-1') === 'calc(var(--sl-base) * var(--sl-u, 1cqh))'
   && [2, 3, 4, 5, 6].every((n) => decl(`--sl-${n}`) === `calc(var(--sl-${n - 1}) * var(--sl-ratio))`)
   && decl('--sl-base') === '4' && decl('--sl-ratio') === '1.5');
 ok('every line height and tracking is written from SCALE, once each',
