@@ -132,6 +132,9 @@
      which is the dead rule this project keeps measuring. The roll is
      `roll.mjs` and draws its own rows. */
   import { createDiagram } from '/shell/diagram.mjs';
+  import { createEngineNode, createEngineUi, memoryRelay, standInAccess } from '/fau/engine-node.mjs';
+  import { createBayNode } from '/shell/bay-node.mjs';
+  import { graphProblem } from '/shell/graph-registry.mjs';
 
   const q = new URLSearchParams(location.search);
 
@@ -1404,7 +1407,22 @@
      lower case word in a sentence about nothing else; nothing was said about
      the case of this one, so it takes the project's rule. */
   const plate = createNameplate({ lines: ['nola'], place: 'ends' });
-  instFoot.append(plate.el, instPick.el);
+
+  /* 🔴 ON THE PATCHBAY, AFTER A PRESS (plans/plan-routing-migration.md §2.1):
+     an engine node with a MIDI in and a sound that stays on this machine.
+     Building it opens nothing; Join beside the plate does, in `?room=` when the
+     page has one and in the run's own room under the harness. A keyboard linked
+     to it on /patchbay/ plays it alone, and the badge beside Join says whether
+     its notes are arriving: *"perhaps just visual indication"*, not a patch
+     view. With no link open every MIDI input plays it, which is this page as it
+     was. The handlers are the four below, by name, so no third copy exists. */
+  const engine = createEngineNode({
+    slug: 'nola', label: 'Nola',
+    handlers: { onDown: midiDown, onUp: midiUp, onControl: midiControl, onProgram: midiProgram },
+    allOff: () => keys.panic(), log: d.log,
+  });
+  const bayUi = createEngineUi(engine, { el, log: d.log });
+  instFoot.append(plate.el, bayUi.el, instPick.el);
   /* 🔴 THE CREDIT COMES OFF THE FACE AND DOES NOT LEAVE THE PAGE, because the
      licence is not a preference. Asked 2026-09-23 to remove the sentence, and
      CC BY-NC-SA 4.0 requires attribution to travel with the work: what it does
@@ -1621,11 +1639,18 @@
     keys.loops.press(slot);
   }
 
+  /* 🔴 EVERY INPUT PLAYS THIS PAGE UNTIL A LINK ON /patchbay/ SAYS WHICH ONE.
+     `createMidi` cannot say which keyboard a message came from, so while a link
+     is open its path is shut here and the linked keyboard arrives through
+     `engine`, into the same four functions. */
+  const omniHandlers = {
+    onDown: (...a) => engine.omni() && midiDown(...a),
+    onUp: (...a) => engine.omni() && midiUp(...a),
+    onControl: (...a) => engine.omni() && midiControl(...a),
+    onProgram: (...a) => engine.omni() && midiProgram(...a),
+  };
   const midi = createMidi({
-    onDown: midiDown,
-    onUp: midiUp,
-    onControl: midiControl,
-    onProgram: midiProgram,
+    ...omniHandlers,
     log: d.log,
     /* ⚠️ THE NAMES DECIDE THE `Loop` CONTROL AND THE COUNT DECIDES THE LOG
        LINE, and they are two different questions. Something being plugged in is
@@ -2765,6 +2790,8 @@
      * nothing about the keyboard.
      */
     const quiet = async () => { keys.panic(); await sleep(350); };
+
+    await checkPatchbay();
 
     /* 🔴 THE CHECKS START FROM THE MODE A VISITOR ARRIVES IN, AND `?learn=1`
        IS NOT IT. MEASURED the moment the query landed: `DEMO_QUERY=learn=1 node
@@ -4600,6 +4627,84 @@
       dg.ties === 1, `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
   }
 
+  /**
+   * 🔴 THE PATCHBAY HALF, FIRST AND SILENT. The round trip runs in an IN-MEMORY
+   * room with a stand-in MIDIAccess, so a run opens no socket, asks the browser
+   * for no MIDI and puts nothing on anybody's desk. The relay is graded by
+   * `/patchbay/`.
+   * 🔴 FIRST, BECAUSE LAST WAS MEASURED TO LOSE IT. Put after the diagram asserts
+   * it reported 4 of its 8 and dropped the rest without a word: this page's
+   * checks sleep about 21 s in total, `demo/verify.mjs` stops collecting at 24 s
+   * (`GROWTH_TRIES`), and the round trip landed past the ceiling.
+   * ⚠️ AND SILENT, BECAUSE FIRST MEANS BEFORE `a visit fetched nothing` IS READ
+   * AND BEFORE ANY CHECK HOLDS A NOTE. It sends NOTE OFFS only, on a note no
+   * check plays, so nothing sounds, nothing is fetched and nothing held is let
+   * go. A note off is still the real handler: the tap counts it, off the wire.
+   */
+  async function checkPatchbay() {
+    const t0 = performance.now();
+    const waitFor = async (f, ms = 3000) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < ms) await sleep(20); return f(); };
+    const shown = () => { bayUi.sync(); return getComputedStyle(bayUi.wrap).display !== 'none'; };
+    d.assert('building the page joined no room and asked for no MIDI for the patchbay',
+      !engine.joined() && !engine.joining() && engine.counts().midiAsked === 0 && !engine.midiStarted(),
+      `${engine.counts().midiAsked} MIDI asks, ${engine.joining() ? 'a socket is open' : 'no socket'}`);
+    d.assert('this tab is a site of its own and the harness is in a room of its own, never the studio’s',
+      /^nola-[a-z0-9]{4}$/.test(engine.site) && engine.room !== 'studio-1', `${engine.site} in ${engine.room}`);
+    const plateR = plate.el.getBoundingClientRect(), joinR = bayUi.el.getBoundingClientRect();
+    const pickR = instPick.el.getBoundingClientRect();
+    d.assert('Join sits next to the nameplate on the keyboard’s foot, outside the row the harness presses, and the badge is not drawn',
+      bayUi.el.parentElement === instFoot && !bayUi.button.closest('.pos-controls') && !shown()
+      && joinR.left - plateR.right > 0 && joinR.left - plateR.right < 20 && pickR.left > joinR.right,
+      `${Math.round(joinR.left - plateR.right)} px after the plate, ${Math.round(pickR.left - joinR.right)} px before the picker`);
+
+    const relay = memoryRelay();
+    const access = standInAccess(['Stand-in keys', 'Stand-in pads']);
+    await engine.join({ access, wire: relay.open });
+    const peer = createBayNode({ room: engine.room, wire: relay.open });
+    await peer.join();
+    const heard = await waitFor(() => peer.registry.merged().sites.some((s) => s.site === engine.site));
+    const g = engine.graph();
+    const keysOut = g.ports.find((p) => p.dir === 'out' && /keys/i.test(p.label))?.id;
+    const kinds = g.ports.filter((p) => p.id.startsWith(`${engine.site}:nola:`)).map((p) => `${p.id.split(':')[2]} ${p.dir}`).sort().join(', ');
+    d.assert('joined, another page hears an engine with a MIDI in and a sound that stays here, beside the keyboards',
+      heard && graphProblem(g) === '' && kinds === 'audio out, midi in'
+      && g.ports.find((p) => p.id === engine.ports.audio).transports.join() === 'webaudio'
+      && g.nodes.filter((n) => n.kind === 'device').length === 2,
+      `${kinds}; ${g.nodes.map((n) => `${n.kind} ${n.id}`).join(', ')}`);
+
+    /* A0 and B flat 0, which no check here plays, and note offs only. */
+    const off0 = tap.off;
+    const yes = await peer.request(keysOut, engine.ports.midi, true);
+    const startWord = (shown(), engine.badge.says());
+    access.emit(0, [0x80, 21, 0]);
+    engine.badge.poll();
+    const linkedArrived = tap.off - off0;
+    d.assert('a keyboard linked on the patchbay reaches the engine, and the badge on the keyboard goes from starting to receiving',
+      yes?.open === true && linkedArrived === 1 && startWord === 'starting' && engine.badge.says() === 'receiving' && shown(),
+      `${JSON.stringify(yes?.open)}, ${linkedArrived} message arrived, the badge said ${startWord} then ${engine.badge.says()}`);
+    const off1 = tap.off;
+    omniHandlers.onUp(22);
+    access.emit(1, [0x80, 22, 0]);
+    d.assert('NEGATIVE CONTROL: while that link is open, every other MIDI input reaches nothing',
+      tap.off === off1 && !engine.omni(), `${tap.off - off1} messages from unlinked inputs`);
+    const no = await peer.request(engine.ports.audio, 'elsewhere:screen:audio', true);
+    d.assert('a request to carry this page\u2019s sound anywhere is refused in words',
+      no?.open === false && /nothing here carries it off this machine/.test(no.why || ''), no?.why);
+    const shut = await peer.request(keysOut, engine.ports.midi, false);
+    const off2 = tap.off;
+    omniHandlers.onUp(22);
+    d.assert('closing the link hands the engine back to every input, and the badge is put away',
+      shut?.open === false && engine.omni() && tap.off === off2 + 1 && !shown(),
+      `${tap.off - off2} message from an ordinary input, badge ${shown() ? 'still drawn' : 'gone'}`);
+    peer.leave();
+    engine.leave();
+    keys.panic();
+    /* The time is in the detail because this page's checks sit at the harness's
+       24 s ceiling, and what this block adds to them is the number to argue with. */
+    d.assert('and leaving stops the re-announce clock', !engine.joined() && !engine.node.stats().ticking,
+      `the whole round trip took ${Math.round(performance.now() - t0)} ms of this page\u2019s checks`);
+  }
+
   // ── the picture ───────────────────────────────────────────────────────────
   //
   // 🔴 NO BOX FOR SYMPATHETIC RESONANCE AND NO BOX FOR A STRING MODEL. Neither
@@ -5053,5 +5158,11 @@
   .nola-credit a { color: var(--dim); text-decoration: underline;
                    text-underline-offset: 2px; }
   .nola-credit a:hover, .nola-credit a:focus-visible { color: var(--fg); }
+
+  /* Join and its badge, one cluster next to the nameplate on the keyboard's foot
+     (`/fau/engine-node.mjs`). `margin-right: auto` keeps it beside the plate
+     rather than centred in a row whose two ends are the plate and the picker. */
+  .eng-bay { display: inline-flex; align-items: center; gap: var(--ctl-gap); }
+  .kbd-foot > .eng-bay { margin-right: auto; }
 </style>
 </html>

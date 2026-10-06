@@ -10,6 +10,9 @@
 //      (plans/plan-stage-patchbay.md F6).
 //   3  The checks moved from load into the page's one SELFCHECK pass. They
 //      are still all on data in hand, plus one round trip to a wall in WALL.
+//   4  🔴 THE ROOM, THE ANNOUNCE AND `link.request` ARE `bay-node.mjs`'s SINCE
+//      2026-10-06 (plans/plan-routing-migration.md step 1), the one join helper
+//      `/patchbay/` and WALL use too. What it sends is unchanged.
 
 import { el } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -21,6 +24,7 @@ import { createDeck } from '/timeline/transport.mjs';
 import { openWire } from '/shell/wire.mjs';
 import { createRegistry } from '/shell/graph-registry.mjs';
 import { createBay } from '/shell/bay.mjs';
+import { createBayNode, randomSite } from '/shell/bay-node.mjs';
 import { ROOM } from './wall.mjs';
 
 /*
@@ -225,7 +229,7 @@ export function build({ panel, log, set }) {
   // studio's room as an out port, lists every wall it hears (the WALL tab), and a pick is a
   // link checked by `bay.mjs` like any other. Once linked, every change of
   // stripe at the playhead goes to that wall, playing or scrubbing.
-  const SITE = `partitur-${Math.random().toString(36).slice(2, 6)}`;
+  const SITE = randomSite('partitur');
   const OUT = `${SITE}:light:out`;
   /*
    * 🔴 THREE LANES, THREE OUT PORTS, asked 2026-10-04 (*"Do"*): the light lane
@@ -246,10 +250,28 @@ export function build({ panel, log, set }) {
       ({ id: port, label, dir, medium, ...(shape ? { shape } : {}), ...(emits ? { emits } : {}) })),
   };
 
-  const registry = createRegistry();
-  registry.ingest({ type: 'graph.announce', from: 'self', graph: GRAPH });
+  /* The room. Building it opens nothing; `join()` below does, on a press. */
+  const node = createBayNode({
+    room: ROOM, graphs: [GRAPH],
+    log: (line, kind) => log(line, kind),
+    onJoin: () => { find.button('find').disabled = true; showJoined(); log(`in ${ROOM}, listening for walls and instruments`, 'ok'); },
+    onGraph: () => drawChoices(),
+    onMessage: (m) => {
+      if (m.type === 'scene.list' && Array.isArray(m.scenes)) {
+        heardScenes.set(m.from, m.scenes.filter((n) => typeof n === 'string'));
+        drawMarkRow();
+      }
+    },
+    // `/patchbay/` asking for one of this page's links. bay-node answers only
+    // for this page's own ports, and sends the `link.state` itself.
+    onLinkRequest: ({ source, target, open }) => {
+      const k = kindOfPort(source);
+      return k ? setLink(k, open ? target : '') : { ok: false, why: `${source} is not one of this score\u2019s lanes` };
+    },
+  });
+  const registry = node.registry;
   const linked = { light: '', sirens: '', cues: '' };
-  let lastSent = '', me = null, lastCueSent = '', sirenOut = null, sirenNote = null;
+  let lastSent = '', lastCueSent = '', sirenOut = null, sirenNote = null;
   const wallHost = el('div', 'pt-text pt-links');
   const kindOfPort = (id) => Object.keys(SOURCES).find((k) => SOURCES[k].port === id);
   const targets = (k) => registry.merged().ports.filter((p) => p.dir === 'in' && !p.stale && !p.id.startsWith(`${SITE}:`)
@@ -290,13 +312,13 @@ export function build({ panel, log, set }) {
     set('links', n ? `${n} of 3` : 'none');
   }
   function sendLight(f) {
-    if (!linked.light || !me) return;
+    if (!linked.light || !node.joined()) return;
     const s1 = spanAt(lightSpans, f) || lightSpans[lightSpans.length - 1];
     const parts = lightInside.filter((x) => f >= x.from && f < x.to).map((x) => ({ hex: x.hex, across: x.across }));
     const key = `${s1.hex}|${parts.map((x) => x.hex).join(',')}`;
     if (key === lastSent) return;
     lastSent = key;
-    wire.send({ type: 'light.set', to: linked.light, hex: s1.hex, name: s1.colour, parts, sender: 'partitur' });
+    node.send({ type: 'light.set', to: linked.light, hex: s1.hex, name: s1.colour, parts, sender: 'partitur' });
   }
   /* The siren bands as held notes, one at a time, only while playing. The pitch
      is per colour and is this page's reading: Moholy's sirens have no pitch. */
@@ -315,53 +337,24 @@ export function build({ panel, log, set }) {
     if (want !== null) { sirenOut.wire.send(sirenMsg(true, want)); sirenNote = want; }
   }
   function sendCue(text) {
-    if (!linked.cues || !me || text === lastCueSent) return;
+    if (!linked.cues || !node.joined() || text === lastCueSent) return;
     lastCueSent = text;
-    wire.send({ type: 'cue.set', to: linked.cues, text, sender: 'partitur' });
+    node.send({ type: 'cue.set', to: linked.cues, text, sender: 'partitur' });
   }
   /*
    * 🔴 THE ROOM IS JOINED ON A PRESS, NOT ON LOAD: Find walls, the first press
    * on the transport bar, or a scene mark that needs the room. The old page
    * joined `studio-1` the moment it opened (`tab-page.mjs` rule 1).
    */
-  let wire = null, joined = null;
+  let joined = null;
   function join() {
-    if (joined) return joined;
-    joined = new Promise((resolve) => {
-      wire = openWire(ROOM, {
-        onOpen: (from) => {
-          me = from;
-          wire.send({ type: 'graph.announce', graph: GRAPH });
-          wire.send({ type: 'graph.ask' });
-          find.button('find').disabled = true;
-          showJoined();
-          log(`in ${ROOM}, listening for walls and instruments`, 'ok');
-          resolve();
-        },
-        onMessage: (got) => {
-          if (got.kind !== 'json' || got.msg.from === me) return;
-          const m = got.msg;
-          if (m.type === 'graph.ask') { wire.send({ type: 'graph.announce', graph: GRAPH }); return; }
-          if (m.type === 'scene.list') {
-            if (Array.isArray(m.scenes)) { heardScenes.set(m.from, m.scenes.filter((n) => typeof n === 'string')); drawMarkRow(); }
-            return;
-          }
-          // `/patchbay/` asking for one of this page's links.
-          if (m.type === 'link.request' && kindOfPort(m.source)) {
-            const r = setLink(kindOfPort(m.source), m.open ? m.target : '');
-            wire.send({ type: 'link.state', source: m.source, target: m.target, open: !!m.open && r.ok, why: r.why || '' });
-            return;
-          }
-          if (registry.ingest(m)) drawChoices();
-        },
-      });
-    });
+    if (!joined) joined = node.join();
     return joined;
   }
   function leave() {
     for (const k of Object.keys(linked)) if (linked[k]) setLink(k, '');
-    try { wire?.close(); } catch { /* already gone */ }
-    wire = null; me = null; joined = null;
+    node.leave();
+    joined = null;
     find.button('find').disabled = false;
     showJoined();
   }
@@ -418,8 +411,8 @@ export function build({ panel, log, set }) {
     log('every scene mark removed');
   }
   function sendRecall(m) {
-    if (!me) { log(`passed the mark for ${m.name}, and this page is not in ${ROOM} to ask for it`, 'warn'); return; }
-    wire.send({ type: 'scene.recall', name: m.name });
+    if (!node.joined()) { log(`passed the mark for ${m.name}, and this page is not in ${ROOM} to ask for it`, 'warn'); return; }
+    node.send({ type: 'scene.recall', name: m.name });
     log(`passed the mark for ${m.name}, the room was asked to recall it`);
   }
   drawMarkRow();
@@ -540,7 +533,7 @@ export function build({ panel, log, set }) {
     show() { size(); requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate?.(); })); },
     hide() { if (deck.playing?.()) deck.pause(); sirenOff(); siren(false); },
     async check({ A }) {
-      A('building the tab joined nothing, the room waits for a press', !wire && !joined, wire ? 'a socket is open' : 'no socket');
+      A('building the tab joined nothing, the room waits for a press', !node.joining() && !joined, node.joining() ? 'a socket is open' : 'no socket');
       A('the light column covers the plate end to end with no gap',
         lightSpans[0].from === 0 && lightSpans.at(-1).to === 1
           && lightSpans.every((s, i) => i === 0 || Math.abs(s.from - lightSpans[i - 1].to) < 1e-9),

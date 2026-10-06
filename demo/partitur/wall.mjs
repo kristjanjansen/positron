@@ -17,15 +17,19 @@
 //      it and announced into the real `studio-1`, so every suite run put a fake
 //      wall on the owner's patchbay (plans/plan-stage-patchbay.md F6). The
 //      harness hands every run a room of its own; a person gets `studio-1`.
+//   3  🔴 THE ROOM, THE ANNOUNCE AND THE RE-ANNOUNCE ARE `bay-node.mjs`'s SINCE
+//      2026-10-06 (plans/plan-routing-migration.md step 1), and so is the
+//      choice of room: `?room=`, or a room of the run's own under the harness
+//      even when no `?room=` was passed, or `studio-1` for a person.
 // ⚠️ IT ONLY LISTENS AND PAINTS. It asks nobody for anything, and a colour
 // arrives only because somebody linked a lane to this wall.
 
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
-import { openWire } from '/shell/wire.mjs';
+import { createBayNode, roomFor, randomSite } from '/shell/bay-node.mjs';
 
-/** The studio's room, or the run's own when the harness names one. The SCORE tab reads this too. */
-export const ROOM = new URLSearchParams(location.search).get('room') || 'studio-1';
+/** The studio's room, or the run's own under the harness. The SCORE tab reads this too, so both tabs meet in one. */
+export const ROOM = roomFor({ slug: 'partitur' });
 
 /** Under the tab row, in the page's one fixed box. */
 export const about = 'Press Become a wall on the screen that should show the light, then pick that wall under light to in SCORE from any browser.';
@@ -33,7 +37,7 @@ export const about = 'Press Become a wall on the screen that should show the lig
 export const readout = { colour: '', from: '' };
 
 export function build({ panel, log, set }) {
-  const SITE = `wall-${Math.random().toString(36).slice(2, 6)}`;
+  const SITE = randomSite('wall');
   const PORT = `${SITE}:wall:light`;
   const CUE = `${SITE}:wall:cue`;
   const NAME = `wall ${SITE.slice(5)}`;
@@ -91,48 +95,33 @@ export function build({ panel, log, set }) {
             { id: CUE, label: `wall ${SITE.slice(5)} captions`, dir: 'in', medium: 'state', shape: { schema: 'cue' } }],
   };
 
-  let wire = null, me = null, timer = 0, onAir = null;
-  const announce = () => wire?.send({ type: 'graph.announce', graph: GRAPH });
+  let onAir = null;
+  const node = createBayNode({
+    room: ROOM, graphs: [GRAPH],
+    log: (line, kind) => log(line, kind),
+    onJoin: () => { log(`on the patchbay in ${ROOM} as ${PORT}`, 'ok'); btns.button('join').disabled = true; paint(); },
+    onMessage: (m) => {
+      if (m.type === 'light.set' && m.to === PORT && /^#[0-9a-f]{6}$/i.test(m.hex || '')) {
+        now = { hex: m.hex, parts: Array.isArray(m.parts) ? m.parts.filter((p) => /^#[0-9a-f]{6}$/i.test(p.hex || '')) : [] };
+        heard++;
+        paint();
+        set('colour', m.name || m.hex);
+        set('from', m.sender || '');
+      }
+      if (m.type === 'cue.set' && m.to === CUE && typeof m.text === 'string') {
+        caption = m.text.slice(0, 80);
+        paint();
+      }
+    },
+  });
   /** Join the room as a wall. Answers once the room has heard the announce. */
   function join() {
-    if (onAir) return onAir;
-    onAir = new Promise((resolve) => {
-      wire = openWire(ROOM, {
-        onOpen: (from) => {
-          me = from;
-          announce();
-          log(`on the patchbay in ${ROOM} as ${PORT}`, 'ok');
-          btns.button('join').disabled = true;
-          paint();
-          resolve();
-        },
-        onMessage: (got) => {
-          if (got.kind !== 'json' || got.msg.from === me) return;
-          const m = got.msg;
-          if (m.type === 'graph.ask') { announce(); return; }
-          if (m.type === 'light.set' && m.to === PORT && /^#[0-9a-f]{6}$/i.test(m.hex || '')) {
-            now = { hex: m.hex, parts: Array.isArray(m.parts) ? m.parts.filter((p) => /^#[0-9a-f]{6}$/i.test(p.hex || '')) : [] };
-            heard++;
-            paint();
-            set('colour', m.name || m.hex);
-            set('from', m.sender || '');
-          }
-          if (m.type === 'cue.set' && m.to === CUE && typeof m.text === 'string') {
-            caption = m.text.slice(0, 80);
-            paint();
-          }
-        },
-      });
-      // Announce again now and then, so a patchbay that joins late hears this
-      // wall without having to ask.
-      timer = setInterval(announce, 10_000);
-    });
+    if (!onAir) onAir = node.join();
     return onAir;
   }
   function leave() {
-    clearInterval(timer);
-    try { wire?.close(); } catch { /* already gone */ }
-    wire = null; me = null; onAir = null;
+    node.leave();
+    onAir = null;
     btns.button('join').disabled = false;
     paint();
   }
@@ -149,8 +138,10 @@ export function build({ panel, log, set }) {
     async check({ A, page }) {
       A('the wall describes itself as a light input and a captions input on its own site',
         GRAPH.ports.length === 2 && GRAPH.ports.every((p) => p.id.startsWith(`${SITE}:`)));
-      A('building the tab joined nothing, the room waits for a press', !wire && !onAir,
-        wire ? 'a socket is open' : 'no socket');
+      A('building the tab joined nothing, the room waits for a press', !node.joining() && !onAir,
+        node.joining() ? 'a socket is open' : 'no socket');
+      // The check pass runs only under the harness, so this is the harness's room.
+      A('the harness is in a room of its own, never the studio\u2019s', ROOM !== 'studio-1', ROOM);
 
       // 🔴 THE ROUND TRIP THE TWO OLD PAGES NEVER HAD: SCORE and this tab join
       // the run's own room, SCORE hears the wall, links its light lane to it,

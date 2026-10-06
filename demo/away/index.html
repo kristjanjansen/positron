@@ -26,6 +26,16 @@
   // `RENEW_MS` and the board stops capturing a minute after the last one. A
   // visit alone starts nothing; it joins the room and shows whether the board is
   // there.
+  //
+  // 🔴 A NODE ON THE PATCHBAY SINCE 2026-10-06 (plans/plan-routing-migration.md
+  // step 5). The page says what it is in the studio's discovery room through
+  // `bay-node.mjs`: its keys as a MIDI out and its picture as an audio in, on a
+  // site of this tab's own. It JOINS ON A PRESS (Listen, or a key a person
+  // plays), never on load, so a visit puts nothing on the owner's desk. The
+  // lease is `openers.mjs`'s `createLease`, the one the patchbay uses, and the
+  // picture wears `link-badge.mjs`'s word while Listen is on, counted from the
+  // frames that reached this page. No patch view: the owner's answer on the
+  // stage was *"perhaps just visual indication of picture happening"*.
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { createWaveView } from '/shell/wave-view.mjs';
@@ -36,6 +46,11 @@
   import { createPresenceButton } from '/shell/presence.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createPicker } from '/shell/picker.mjs';
+  import { createBayNode, roomFor, randomSite, STUDIO_ROOM } from '/shell/bay-node.mjs';
+  import { createLease } from '/shell/openers.mjs';
+  import { createLinkBadge, linkStateOf } from '/shell/link-badge.mjs';
+  import { graphProblem } from '/shell/graph-registry.mjs';
+  import { RELAY_BASE } from '/shell/wire.mjs';
 
   const q = new URLSearchParams(location.search);
   const INPUT = q.get('input') || 'circuit';
@@ -46,7 +61,8 @@
   // A sample at or past this is on the rail. 32767 / 32768.
   const CLIP = 32767 / 32768;
   // Well inside the board's 60 s lease, so one lost message costs nothing.
-  const RENEW_MS = 20_000;
+  // ⚠️ THE NUMBER IS `openers.mjs`'s `RENEW_MS` NOW, which is this page's own
+  // 20 s lifted into the kit; `createLease` defaults to it.
   // 10 ms frames on the direct path unless `?frame=20`, which is there to
   // measure one against the other (plans/plan-away-webrtc.md §5.3, P3).
   const DIRECT_FRAME_MS = q.get('frame') === '20' ? 20 : 10;
@@ -66,7 +82,10 @@
 
   const board = createBoard({
     room: ROOM,
-    relay: q.get('relay') || undefined,
+    // ⚠️ NO `relay:` FROM THE QUERY SINCE 2026-10-06. This page handed
+    // `createBoard` its own `?relay=` unchecked, so a link could point it at
+    // any relay. `wire.mjs` reads `?relay=` itself and honours only a ws://
+    // address on this machine, which is what the stand-in board needs.
     of: 'Raspberry Pi',
     showName: false,
     // 🔴 80 ms, DOWN FROM 160, BECAUSE THE LUMPS ARE GONE. MEASURED 2026-09-30:
@@ -104,6 +123,19 @@
   // ── the picture ───────────────────────────────────────────────────────────
   const host = el('div', 'away-pic');
   const wave = createWaveView(host, { height: 160, label: `the last ${SECONDS} seconds from the board` });
+  /* 🔴 THE LINK'S WORD ON THE PICTURE IT FEEDS: STARTING, RECEIVING or STALLED,
+     from the frames that reached THIS page, the far side of the wire. The
+     video panel's own tag look (`.pos-vp-tag`), top left, hidden while Listen
+     is off. The presence badge beside the name says whether the board is
+     there; this says whether its sound is arriving here, which is a different
+     question with a different answer when the board is up and capturing
+     nothing. */
+  const tag = el('div', 'pos-vp-tag away-tag');
+  tag.hidden = true;
+  const linkBadge = createLinkBadge({ count: () => frames,
+    onChange: (st) => { tag.hidden = st === 'unknown'; } });
+  tag.append(linkBadge.el);
+  host.append(tag);
 
   // ── playing it ───────────────────────────────────────────────────────────
   //
@@ -210,7 +242,7 @@
        take heard over MIDI keeps the velocity it was played with. */
     loop: 'evolution',
     log: (line, kind) => d.log(line, kind),
-    onDown: (note, how, vel) => { kb.lightNote(note, true); noteOn(note, vel ?? VEL); },
+    onDown: (note, how, vel) => { kb.lightNote(note, true); joinBay(); noteOn(note, vel ?? VEL); },
     onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
     onPanic: () => panic(),
   });
@@ -236,7 +268,7 @@
   function openMidi() {
     if (midi) return midi;
     midi = createMidi({
-      onDown: (note, vel) => { kb.lightNote(note, true); noteOn(note, vel); },
+      onDown: (note, vel) => { kb.lightNote(note, true); joinBay(); noteOn(note, vel); },
       onUp: (note) => { kb.lightNote(note, false); noteOff(note); },
       log: (line, kind) => d.log(line, kind),
       onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} playing the Circuit`
@@ -370,14 +402,17 @@
   // "tap anywhere", which would be a false instruction after a deliberate mute.
   // ⚠️ AND MUTE STOPS RENEWING RATHER THAN SAYING `input.stop`, because somebody
   // else may be listening to the same input; the lease lapses on its own.
-  let listening = false, renew = null;
-  async function want() {
-    const r = await board.ask({ type: 'input.want' }, 'input.wanted', 6000);
-    if (!r) { d.log(`the board did not answer for ${INPUT}`, 'warn'); return; }
-    if (r.started) d.log(`the board started capturing ${INPUT}`, 'hi');
-    showSource(r.ok ? r.source : null);
-  }
+  // ⚠️ THE LEASE IS `createLease` FROM `openers.mjs`, the patchbay's own, which
+  // was lifted out of this page. It asks at once and renews every `RENEW_MS`;
+  // the ask is wrapped so each answer still says what the board is capturing.
+  let listening = false, lease = null;
+  const wantAsk = async (m, type, ms) => {
+    const r = await board.ask(m, type, ms);
+    if (r) showSource(r.ok ? r.source : null);
+    return r;
+  };
   d.on('listen', async () => {
+    joinBay();
     const ctx = await board.startAudio();
     const out = board.playout();
     if (!listening) {
@@ -385,15 +420,16 @@
       if (out) { try { out.connect(ctx.destination); } catch { /* already connected */ } }
       listenBtn.el.dataset.on = '1';
       listenBtn.el.title = 'listening. Press to mute';
+      linkBadge.start();
       // The relay starts the sound at once; the direct path, if it opens, takes
       // over the frames and the sends without a gap in either.
       board.goDirect({ frameMs: DIRECT_FRAME_MS }).then(showPath);
       board.watchRtt(2000);
-      await want();
-      renew = setInterval(want, RENEW_MS);
+      lease = createLease({ ask: wantAsk, what: `the ${INPUT} capture`, log: (line, kind) => d.log(line, kind) });
     } else {
       listening = false;
-      clearInterval(renew); renew = null;
+      lease?.stop(); lease = null;
+      linkBadge.stop();
       board.watchRtt(0);
       showPath();
       if (out) { try { out.disconnect(ctx.destination); } catch { /* already off */ } }
@@ -403,9 +439,63 @@
     }
   });
 
+  // ── a node on the patchbay ───────────────────────────────────────────────
+  //
+  // 🔴 THE DISCOVERY ROOM IS THE BOARD'S MAIN ROOM, NOT THE INPUT ROOM THIS PAGE
+  // LISTENS IN. `?room=` here names the input room (`studio-1-circuit`), so
+  // the bay room is that name without its `-<input>`, which is where the Pi
+  // and `/patchbay/` meet. Under a harness with no `?room=` it is the run's
+  // own room (`roomFor`), never `studio-1`.
+  const askedRoom = q.get('room');
+  const BAY_ROOM = askedRoom
+    ? roomFor({ slug: 'away', search: `?room=${askedRoom.endsWith(`-${INPUT}`) ? askedRoom.slice(0, -INPUT.length - 1) : askedRoom}` })
+    : roomFor({ slug: 'away' });
+  /** The board's main room, whose Circuit input this page's keys reach. */
+  const MAIN = ROOM.endsWith(`-${INPUT}`) ? ROOM.slice(0, -INPUT.length - 1) : ROOM;
+  /** The port the Pi announces for the Circuit's MIDI in (`boardGraph`). */
+  const INSTRUMENT_IN = `${MAIN}:${INPUT}:in`;
+  const SITE = randomSite('away');
+  const KEYS_OUT = `${SITE}:keys:out`;
+  const GRAPH = {
+    v: 1, site: SITE, place: 'browser',
+    nodes: [
+      { id: `${SITE}:keys`, kind: 'person', label: 'away keys', place: 'browser' },
+      { id: `${SITE}:screen`, kind: 'screen', label: 'away picture', place: 'browser' },
+    ],
+    ports: [
+      { id: KEYS_OUT, label: 'away keys', dir: 'out', medium: 'midi', emits: ['note', 'program'] },
+      { id: `${SITE}:screen:audio`, label: 'away picture', dir: 'in', medium: 'audio' },
+    ],
+  };
+  /* 🔴 WHAT THIS PAGE ANSWERS WHEN `/patchbay/` ASKS FOR ONE OF ITS LINKS. The
+     keys reach the Circuit in the room this page listens in, always, and that
+     is the one link it has: asked for, it is already open and says so. Any
+     other destination, and a close, is refused in words, because the keys here
+     are a person's hands on one instrument and a remote page does not get to
+     move them somewhere else or take them away. */
+  function answerLink({ source, target, open }) {
+    if (source !== KEYS_OUT) return { ok: false, why: `${source} is not one of this page’s ports` };
+    if (!open) return { ok: false, why: `this page’s keys always play the ${INPUT}, so close the page to stop them` };
+    if (target !== INSTRUMENT_IN) return { ok: false, why: `this page’s keys play the ${INPUT} at ${INSTRUMENT_IN} and nothing else, not ${target}` };
+    return { ok: true, why: `already open: every key here goes to the ${INPUT} through the board’s gate` };
+  }
+  const bay = createBayNode({
+    room: BAY_ROOM, graphs: [GRAPH],
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => d.log(`on the patchbay in ${BAY_ROOM}, as ${SITE}`, 'hi'),
+    onLinkRequest: answerLink,
+  });
+  /** Join on a press. Calling it twice joins once. */
+  function joinBay() { return bay.join(); }
+
   d.ready();
 
   // ── checks, for a harness only ───────────────────────────────────────────
+  /* What the bay node had done by the end of the module, which is the whole of
+     a visit. Read here and asserted in the checks, so a join on load is a red
+     row rather than a claim about a file. */
+  const bayOnLoad = { joined: bay.joined(), joining: bay.joining(), ticking: bay.stats().ticking };
+
   ifSelfcheck(async () => {
     // A harness may not start the capture: the board is shared hardware in
     // another building, and board.mjs refuses every send under selfcheck.
@@ -462,10 +552,75 @@
     d.assert('each frame is the 20 ms the board publishes',
       board.stats().shapeWrong === 0, board.stats().shapeSaid || '');
     d.assert('the picture has sound in it, not a flat line', (lastSet?.lit ?? 0) > 0, `${lastSet?.lit} lit columns`);
+    await badgeChecks();
+    await bayChecks();
   }, { log: d.log });
+
+  /* 🔴 THE BADGE READS THE FAR SIDE. Run only with frames arriving (the stand-in
+     board holds a listener, so they do under the harness): the page's own
+     badge, started on the frame counter the waveform reads, has to say
+     receiving, and a NEGATIVE CONTROL on a count that never grows must not.
+     Nothing is sent and no lease is taken: the badge is display only. */
+  async function badgeChecks() {
+    d.assert('the link badge sits on the picture and is hidden while Listen is off',
+      host.contains(tag) && tag.hidden && linkBadge.state() === 'unknown', `${linkBadge.state()}, hidden ${tag.hidden}`);
+    linkBadge.start();
+    const frozen = createLinkBadge({ count: () => 7 }).start();
+    await new Promise((r) => setTimeout(r, 700));
+    const said = linkBadge.poll(), frozenSaid = frozen.poll();
+    frozen.stop();
+    d.assert('frames arriving make the picture say receiving, and it shows', said === 'online' && !tag.hidden,
+      `${linkBadge.says()} after ${frames} frames, tag ${tag.hidden ? 'hidden' : 'shown'}`);
+    d.assert('NEGATIVE CONTROL: a count that never grows does not say receiving', frozenSaid !== 'online', frozenSaid);
+    d.assert('two seconds with nothing new is stalled, by the stage’s own rule',
+      linkStateOf({ now: 5000, lastCountAt: 2500, startedAt: 0 }) === 'offline'
+      && linkStateOf({ now: 5000, lastCountAt: 4000, startedAt: 0 }) === 'online');
+    linkBadge.stop();
+    d.assert('and it hides again when the link closes', tag.hidden, linkBadge.state());
+  }
+
+  /* 🔴 THE PAGE AS A NODE, GRADED IN THE RUN'S OWN ROOM. A visit joins nothing;
+     the harness joins on purpose and a stand-in patchbay in the same room asks
+     for the page's one link, another destination, and a close, and gets a yes
+     and two refusals in this page's words. A request about a port that is not
+     this page's gets no answer at all, which is the owner rule from the other
+     side. Only against a relay on this machine: a harness has no business
+     holding sockets on the production relay to find this out. */
+  async function bayChecks() {
+    d.assert('a visit joins nothing on the patchbay: no socket, no join and no announce clock',
+      !bayOnLoad.joined && !bayOnLoad.joining && !bayOnLoad.ticking, JSON.stringify(bayOnLoad));
+    d.assert('the harness room is the run’s own, never the studio’s', BAY_ROOM !== STUDIO_ROOM && !BAY_ROOM.startsWith(`${STUDIO_ROOM}-`), BAY_ROOM);
+    d.assert('the page announces a graph the registry accepts, on a site of this tab’s own',
+      graphProblem(GRAPH) === '' && SITE.startsWith('away-') && SITE !== 'web', graphProblem(GRAPH) || SITE);
+    if (!/^wss?:\/\/(127\.0\.0\.1|localhost|\[::1\])/.test(RELAY_BASE)) {
+      d.log(`the patchbay round trip runs only against a relay on this machine, and this run is on ${RELAY_BASE}`, 'dim');
+      return;
+    }
+    await joinBay();
+    const other = createBayNode({ room: BAY_ROOM, graphs: [] });
+    await other.join();
+    await other.ask();
+    const t0 = performance.now();
+    while (!other.registry.merged().sites.some((x) => x.site === SITE) && performance.now() - t0 < 3000) await new Promise((r) => setTimeout(r, 50));
+    const heard = other.registry.merged().ports.map((p) => p.id);
+    d.assert('a page in the same room hears this page’s keys and picture', heard.includes(KEYS_OUT) && heard.includes(`${SITE}:screen:audio`), heard.join(', '));
+    const yes = await other.request(KEYS_OUT, INSTRUMENT_IN, true, { timeoutMs: 3000 });
+    d.assert('asked for its keys to the Circuit, it answers open', yes?.open === true, yes ? `open ${yes.open}: ${yes.why}` : 'no answer');
+    const elsewhere = await other.request(KEYS_OUT, `${MAIN}:yoshimi:in`, true, { timeoutMs: 3000 });
+    d.assert('asked for its keys anywhere else, it refuses and names where they go', elsewhere?.open === false && elsewhere.why.includes(INSTRUMENT_IN),
+      elsewhere ? elsewhere.why : 'no answer');
+    const close = await other.request(KEYS_OUT, INSTRUMENT_IN, false, { timeoutMs: 3000 });
+    d.assert('asked to close it, it refuses in words', close?.open === false && /always play/.test(close.why), close ? close.why : 'no answer');
+    const notMine = await other.request(`${MAIN}:${INPUT}:audio`, `${SITE}:screen:audio`, true, { timeoutMs: 800 });
+    d.assert('NEGATIVE CONTROL: a request about a port that is not this page’s gets no answer from it', notMine === null, JSON.stringify(notMine));
+    other.leave();
+  }
 </script>
 <style>
   /* The picture fills its row of the panel. */
   .away-pic > .pos-wave { width: 100%; }
+  /* The link's word sits on the picture the way `.pos-vp-tag` sits on a
+     video panel's, so the picture is its containing block. */
+  .away-pic { position: relative; }
 </style>
 </html>

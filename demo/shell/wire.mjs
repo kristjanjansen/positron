@@ -35,8 +35,45 @@
 // 60 msg/s, dropped silently and counted only in the relay's own /stats) and a
 // reconnect gapping. A check written to catch reordering would pass forever.
 
-export const RELAY_BASE = 'wss://ws.positron.studio';
-export const HTTP_BASE = 'https://ws.positron.studio';
+export const DEFAULT_RELAY = 'wss://ws.positron.studio';
+
+/**
+ * 🔴 `?relay=` POINTS A PAGE AT A STAND-IN RELAY, THE WAY `?base=` POINTS THE
+ * OTHER THREE AT THEIRS. plans/plan-routing-migration.md §3.8: every page that
+ * plays the Raspberry Pi talked to the real one in another building, so nothing
+ * a page sends the board could be graded without spending the board. With
+ * `?relay=ws://127.0.0.1:<port>` every `openWire` and every page that builds a
+ * URL off `RELAY_BASE` joins `demo/fake-relay.mjs` instead, where
+ * `demo/fake-board.mjs` answers in the board's place.
+ *
+ * ⚠️ LOOPBACK ONLY, AND ANYTHING ELSE IS IGNORED RATHER THAN OBEYED. A query
+ * parameter is something a link can carry, so an unrestricted one would let a
+ * link a stranger posted point a visitor's page, and every note it sends, at a
+ * server that is nobody's here. A stand-in lives on this machine by definition,
+ * so `ws://` or `wss://` on 127.0.0.1, localhost or [::1] is the whole of what
+ * this needs. A refused value says so once in the console and changes nothing.
+ * ⚠️ AND IT CANNOT WORK FROM THE DEPLOY: a secure public origin may not reach a
+ * loopback address (positron-verify, measured on `fake-station.mjs`), so this
+ * is for a page served locally, which is how `demo/verify.mjs` runs it.
+ */
+export function relayOverride(search) {
+  let v;
+  try { v = new URLSearchParams(search || '').get('relay'); } catch { return null; }
+  if (!v) return null;
+  let u;
+  try { u = new URL(v); } catch { return null; }
+  const loop = ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname);
+  if (!/^wss?:$/.test(u.protocol) || !loop || u.pathname.replace(/\/$/, '') !== '' || u.search || u.hash) return null;
+  return `${u.protocol}//${u.host}`;
+}
+
+const askedRelay = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('relay') : null;
+const overridden = typeof location !== 'undefined' ? relayOverride(location.search) : null;
+if (askedRelay && !overridden && typeof console !== 'undefined') {
+  console.warn(`wire: ?relay=${askedRelay} is not a ws:// or wss:// address on this machine, so it is ignored and the page uses ${DEFAULT_RELAY}`);
+}
+export const RELAY_BASE = overridden || DEFAULT_RELAY;
+export const HTTP_BASE = RELAY_BASE.replace(/^ws/, 'http');
 
 /**
  * 🔴 EVERY NUMBER HERE WAS WRONG, UNDER A COMMENT SAYING IT COULD NOT BE. It

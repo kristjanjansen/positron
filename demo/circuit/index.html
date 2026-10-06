@@ -375,6 +375,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
+  import { createMidiNode, checkMidiNode } from '/shell/midi-node.mjs';
 
   /**
    * 🔴 A NOVATION CIRCUIT ON SCREEN. Two sources and they are kept apart on
@@ -488,6 +489,14 @@
   const right = el('div', 'circ-side circ-right');
   circScroll.append(circ);
   d.el.append(circScroll);
+
+  /* 🔴 ON THE PATCHBAY ON A PRESS OF Join, NEVER ON LOAD (plans/plan-routing-migration.md
+     step 5). The Circuit plugged into this machine is announced as a device,
+     keyed by its port and never by its name, so `/patchbay/` can draw it and
+     link it. Join sits outside `.pos-controls` and asks for MIDI first when
+     the presence button has not. `/shell/midi-node.mjs` has the rest. */
+  const bayMidi = createMidiNode({ slug: 'circuit', log: (line, kind) => d.log(line, kind),
+    listen: async () => { if (!access) await d.run('listen'); return access; } });
 
   // ── the knobs ───────────────────────────────────────────────────────────
 
@@ -760,6 +769,8 @@
    */
   const traffic = createMidiLog({ empty: '', reserve: 6 });
   d.el.append(traffic.el);
+  // The patchbay row goes under the log, after everything that belongs to the panel.
+  d.el.append(bayMidi.el);
 
   // ── what arrives ────────────────────────────────────────────────────────
 
@@ -901,6 +912,7 @@
         try { await p.open(); } catch { /* another client may hold it */ }
         p.onmidimessage = (e) => take(Array.from(e.data));
       }
+      bayMidi.attach(access);
       return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
@@ -1283,6 +1295,8 @@
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));
+
+    await checkMidiNode({ assert: d.assert, log: d.log, page: bayMidi, slug: 'circuit' });
   });
 
   d.ready();
