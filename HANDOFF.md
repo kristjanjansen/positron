@@ -2,15 +2,14 @@
 
 ## Where it is right now
 
-- ✅ **Site: BUILD `5c6f4e7-084447-a778`**, confirmed on the edge. Committed to `60ae2d1`. **Not pushed** (needs the personal account, see CLAUDE.md).
-- Counted: **54 demos, 52 built**, **93 plans**. CLAUDE.md's top line recounted to 54 and 52.
-- ⚠️ **THE ROUTING MIGRATION WORKFLOW IS STILL RUNNING** (`plans/plan-routing-migration.md`, asked *"implement plans/plan-routing-migration, parallelize"*). Three shared agents (bay corrections plus a `heldBy` rule, `bay-node.mjs` join helper and `openers.mjs` / `link-badge.mjs`; `midi-graph.mjs`; the `?relay=` override, a local room server and `demo/fake-board.mjs`), then five page agents for mirror, knobs and away, circuit evo twelve dump, nola and fau, collide and muta. Its files are the ~35 dirty paths in the tree (`git status`). Nothing of it is committed or deployed. When it reports: read every report, commit path-limited, and DEPLOY FROM A CLEAN WORKTREE OR AFTER IT IS DONE, because a deploy ships whatever is in the tree.
-- The agents were told not to touch `demo/manifest.mjs`; their reports list the row changes they need (e.g. `room: 'fixed'`).
+- ✅ **Site: BUILD `a3bfe31-090903-4c0b`**, confirmed on the edge. Committed to `9c0eda5` plus this handoff. **Not pushed** (needs the personal account, see CLAUDE.md).
+- Counted: **54 demos, 52 built**, **93 plans**. **No agent and no workflow is running.** The tree is clean.
 
 ## What landed, all deployed
 
 | commits | what | look at |
 | --- | --- | --- |
+| `a3bfe31` | **Routing migration** (`plans/plan-routing-migration.md` steps 0 to 5, an eight agent workflow): `bay.mjs` corrections (relay 1000 msg/s read from the relay, one 15 s stale window, per-port `transports` and per-link `via`, `heldBy`); `bay-node.mjs` (join on a press, `?room=`, a site per tab), `openers.mjs`, `link-badge.mjs`, `midi-graph.mjs`, `midi-node.mjs`; stand-ins `fake-relay.mjs` and `fake-board.mjs` (the board's own beat and inputs code, a pulsing tone), `?relay=` in `wire.mjs` for a local relay only. **/patchbay/ joins on Join and no longer announces into `studio-1` on every visit and suite run.** 14 of 54 pages on the patchbay: mirror (asks the Pi nothing until Show the board), knobs, away, circuit, evo, twelve, dump, nola, fau, collide, muta. patchbay+partitur 82/82, circuit evo twelve dump 205/205, mirror 50/50, collide 61, muta 59, away+knobs 95/97, fau 84/85, nola 114/116 (standing reds only) | https://positron.studio/patchbay/ |
 | `bcf56e1` `5c6f4e7` | **Front page `slides` group**, decks played in place (no deck pages): `demo/shell/decks.mjs`, `mountDecks()` on both renderers. **brand** deck: stacked β⁺ logo, horizontal logo, the `positron.studio` wordmark in fives and threes (dot yellow, centred), the favicon (inline β+) and the app icon (raised β⁺) | https://positron.studio/ |
 | `1163e11` `5c6f4e7` | **synths** deck: "Synths / in code", then a split with an instrument panel (scope, editable `os.osc(440) * 0.1`, FAU plate, Test tone). Shipped code plays from `resources/faust/sine.wasm` (2,345 B); an edit loads libfaust on the press (1 MB, said on the plate). kit/slides 87/87 | https://positron.studio/ then the synths deck |
 | `0cb3c1f` | **Synth on a page**: `demo/shell/audio.mjs` (one context per page, claim, release, suspend), `demo/shell/faust.mjs` (runtime and compiler memoised, mono path), `build-faust-aot.mjs` + `PROVENANCE.json` (build refuses a stale artefact), `demo/fau/presets.mjs`, /fau/ on them (75/76, the known diagram cut) | https://positron.studio/fau/ |
@@ -23,12 +22,12 @@
 
 ## Open
 
-- **The routing workflow** above: review, commit, deploy, then the manifest rows it asks for.
-- **`/patchbay/` announces into `studio-1` on every visit and suite run** (BACKLOG); step 1 of the routing migration fixes it, if the workflow's shared agent landed it.
+- **Routing follow-ups** (BACKLOG, nine items): one `engine-node.mjs` in the kit (two copies today), `/mirror/` on the shared video opener, a `listen` opener that hands frames to the page, a page to page MIDI opener, `fake-board.mjs` with video, evo in `BOARD_PAGES`, `/nola/` at the harness's 24 s limit (2 of 3 runs lost its last 5 asserts), `createMidi` naming the port, and the Pi's graph declaring `transports` only after `rig/board/push.sh`. Nothing was tried against the real Pi or a real keyboard.
+- **The plan's step 6**: a plan each for shape, wire (NOTES), grains, capture and cam.
 - **`workers/pub` sits on the `Container` class Cloudflare freezes 2026-12-31**; measure its cold start, then port to `ctx.container` (BACKLOG). Read the monthly log volume before the 2026-12-01 observability pricing.
 - **Synths deck at desk width**: two decks a row makes the code tiny (~336 px player). Offered a full width synths deck; unanswered.
 - **kit/slides "fetched exactly one file" was loosened twice**: vendored fonts, then `/favicon.ico`. Preloading the fonts would let it be strict again; asked, unanswered.
-- `plans/plan-live-slides.md` still describes the five step deck.
+- `plans/plan-live-slides.md` still describes the five step deck; the synths deck is two slides now (`5c6f4e7`). The Cloudflare reading is published at https://claude.ai/artifact/WCwZuYLKN6RTuBL3z1ue8h .
 - The moved kit pages carry the monolith's old em dashes and middots (verbatim move); fix per page as touched.
 - Not tested today: real iPhone, Safari, real full screen (the extension cannot trigger it; the cover path was tested).
 
