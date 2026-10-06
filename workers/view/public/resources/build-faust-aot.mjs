@@ -104,7 +104,10 @@ const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2, pitch: 0.5 / 
   // a sawtooth of amplitude 0.5 is 0.5 over root three; os.sawtooth is band
   // limited (no harmonics past Nyquist, so no aliasing), which takes about
   // 1 per cent off: measured 0.28605 against 0.28868, hence its own tolerance
-  saw: 0.5 / Math.sqrt(3) };
+  saw: 0.5 / Math.sqrt(3),
+  // slide 6's `wave` starts at 0, the sine, so the render, which picks
+  // nothing, predicts the sine's figure
+  wave: 0.5 / Math.SQRT2 };
 const TOL = { saw: 0.005 };
 {
   const ids = PROGRAMS.map((p) => p.id);
@@ -216,7 +219,7 @@ if (!CHECK) {
   mkdirSync(OUT, { recursive: true });
   for (const [f, b] of Object.entries(all)) writeFileSync(join(OUT, f), b);
   const prov = {
-    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the three mono programs of the synths deck on the front page, a sine, the same sine with its volume on a slider, that with its pitch on a slider too, and the same with a sawtooth.',
+    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the five mono programs of the synths deck on the front page, a sine, the same sine with its volume on a slider, that with its pitch on a slider too, the same with a sawtooth, and the same with a choice of sine or saw.',
     howToRemake: 'node demo/resources/build-faust-aot.mjs (and --check to compare without writing)',
     compiledOn: new Date().toISOString().slice(0, 10),
     compiler: {

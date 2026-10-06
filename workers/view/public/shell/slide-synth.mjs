@@ -77,6 +77,7 @@ import { synthUrl } from './synth-steps.mjs';
 import { createCompileIdle } from './compile-idle.mjs';
 import { createHueBook } from './code-lang.mjs';
 import { createParamKnobs } from './param-knobs.mjs';
+import { createChoice } from './choice.mjs';
 
 /** The panel's logical width, which the fitted box scales into the slot.
  * 400 since 2026-10-06, when the deck's splits went 1:2 and the slot two
@@ -133,6 +134,25 @@ export function firstLine(msg) {
 }
 
 const SLIDERS = ['hslider', 'vslider', 'nentry'];
+
+/**
+ * The options of a `style:radio{...}` control, `[[name, value], ...]` in the
+ * order written, or null for any other control. Faust's own JSON rewrites the
+ * quotes round each name (`radio{-sine-:0;-saw-:1}` for `{'sine':0;'saw':1}`,
+ * MEASURED 2026-10-06 in `demo/resources/faust/wave.json`), so either is read.
+ */
+export function radioOptions(style) {
+  const m = /^\s*radio\s*\{([^}]*)\}\s*$/.exec(String(style ?? ''));
+  if (!m) return null;
+  const out = [];
+  for (const part of m[1].split(';')) {
+    const o = /^\s*(['"-]?)(.*?)\1\s*:\s*(-?[\d.]+(?:e-?\d+)?)\s*$/.exec(part);
+    if (o && o[2]) out.push([o[2], Number(o[3])]);
+  }
+  return out.length ? out : null;
+}
+/** A control's `[style:...]` out of its label, or null. */
+const styleIn = (label) => /\[style:([^\]]*)\]/.exec(label)?.[1] ?? null;
 const num = String.raw`\s*(-?[\d.]+(?:e-?\d+)?)\s*`;
 const SLIDER_RE = new RegExp(String.raw`\b(?:hslider|vslider|nentry)\s*\(\s*"([^"]*)"\s*,${num},${num},${num},${num}\)`, 'g');
 
@@ -148,7 +168,9 @@ export function readSliders(code) {
     const name = m[1].replace(/\[[^\]]*\]/g, '').trim();
     if (!name || list.some((p) => p.name === name)) continue;
     const [value, min, max, step] = m.slice(2, 6).map(Number);
-    list.push({ name, value, min, max, step, warp: /\[scale:log\]/.test(m[1]) && min > 0 ? 'exp' : 'lin' });
+    const options = radioOptions(styleIn(m[1]));
+    list.push({ name, value, min, max, step, warp: /\[scale:log\]/.test(m[1]) && min > 0 ? 'exp' : 'lin',
+      ...(options ? { kind: 'radio', options } : {}) });
   }
   return list;
 }
@@ -180,8 +202,10 @@ export function slidersOf(parts) {
       if (it.items) { walk(it.items); continue; }
       if (!SLIDERS.includes(it.type) || addr.has(it.shortname)) continue;
       const log = (it.meta || []).some((m) => m.scale === 'log') && it.min > 0;
+      const options = radioOptions((it.meta || []).find((m) => 'style' in m)?.style);
       addr.set(it.shortname, it.address);
-      list.push({ name: it.shortname, value: it.init, min: it.min, max: it.max, step: it.step, warp: log ? 'exp' : 'lin' });
+      list.push({ name: it.shortname, value: it.init, min: it.min, max: it.max, step: it.step, warp: log ? 'exp' : 'lin',
+        ...(options ? { kind: 'radio', options } : {}) });
     }
   };
   walk(ui);
@@ -262,9 +286,57 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         if (node && a) { node.setParamValue(a, v); paramSends++; }
       },
     });
-    /** Every knob's value onto `n`, before it is heard. */
+    /* 🔴 A `style:radio{...}` CONTROL IS THE KIT'S CHOICE, NOT A KNOB, since
+       2026-10-06, asked as *"how to make it a radio (sawtooth?)"*: slide 6's
+       `wave`, sine or saw. It sits in the knob row after the knobs, its name
+       under it where a knob's is, in its own hue from the same book, and a
+       pick is `setParamValue` exactly as a turn is: on the sounding node at
+       once, and kept for the node a later Start makes. A name that survives a
+       compile keeps its pick when the pick is still one of its options.
+       ⚠️ AFTER THE KNOBS AND NOT AMONG THEM. The knobs sit on one measured
+       lattice (`createParamKnobs`), whose cells are a knob's pitch wide and a
+       choice is not, so a radio declared between two sliders would still be
+       drawn after both. Every program in the deck declares its radio last. */
+    const radios = new Map();
+    const radioBox = el('div', 'sl-radios');
+    const ctlRow = el('div', 'sl-synth-ctls');
+    ctlRow.append(knobs.el, radioBox);
+    function showRadios(list) {
+      const keep = new Map([...radios].map(([n, r]) => [n, r.value]));
+      radios.clear();
+      radioBox.replaceChildren();
+      for (const p of list) {
+        const had = keep.get(p.name);
+        const value = p.options.some(([, v]) => v === had) ? had : p.value;
+        const at = Math.max(0, p.options.findIndex(([, v]) => v === value));
+        const r = { value: p.options[at][1], options: p.options };
+        const choice = createChoice({
+          options: p.options, at,
+          onPick: (v) => {
+            r.value = v;
+            const a = nodeAddr.get(p.name);
+            if (node && a) { node.setParamValue(a, v); paramSends++; }
+          },
+        });
+        choice.el.dataset.param = p.name;
+        const cell = el('div', 'sl-radio');
+        cell.dataset.param = p.name;
+        // the knob's value line, held empty above the choice, so the choice
+        // centres on the dials beside it and its name lines up with theirs
+        const head = el('span', 'pos-knob-v sl-radio-head', '0');
+        head.setAttribute('aria-hidden', 'true');
+        cell.append(head, choice.el, el('span', 'pos-knob-lab sl-radio-lab', p.name));
+        r.choice = choice;
+        r.cell = cell;
+        radios.set(p.name, r);
+        radioBox.append(cell);
+      }
+      radioBox.hidden = !radios.size;
+    }
+    /** Every knob's value and every pick onto `n`, before it is heard. */
     function applyKnobs(n) {
-      for (const [k, v] of knobs.values()) {
+      const all = [...knobs.values(), ...[...radios].map(([k, r]) => [k, r.value])];
+      for (const [k, v] of all) {
         const a = nodeAddr.get(k);
         if (a) { n.setParamValue(a, v); paramSends++; }
       }
@@ -279,21 +351,27 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     /** The row from a list: made the first time there is a slider, hidden when there is none. */
     function showKnobs(list) {
       if (!list.length) {
-        if (knobRow) { knobRow.hidden = true; knobs.set([]); }
+        if (knobRow) { knobRow.hidden = true; knobs.set([]); showRadios([]); }
         book.clear();
         paintWords();
         return;
       }
-      if (!knobRow) knobRow = panel.addRow(knobs.el);
+      if (!knobRow) knobRow = panel.addRow(ctlRow);
       knobRow.hidden = false;
-      knobs.set(list);
-      book.assign(knobs.names());
-      for (const n of knobs.names()) {
-        const h = book.hueOf(n), k = knobs.knob(n)?.el;
-        if (!k) continue;
-        if (h === null) k.style.removeProperty('--param-hue');
-        else k.style.setProperty('--param-hue', String(h));
-      }
+      const dials = list.filter((p) => p.kind !== 'radio');
+      knobs.set(dials);
+      // a program with only a radio has no knob, and no knob's reserve either
+      knobs.el.hidden = !dials.length;
+      showRadios(list.filter((p) => p.kind === 'radio'));
+      book.assign(list.map((p) => p.name));
+      const paint = (n, e) => {
+        const h = book.hueOf(n);
+        if (!e) return;
+        if (h === null) e.style.removeProperty('--param-hue');
+        else e.style.setProperty('--param-hue', String(h));
+      };
+      for (const n of knobs.names()) paint(n, knobs.knob(n)?.el);
+      for (const [n, r] of radios) paint(n, r.cell);
       paintWords();
     }
     showKnobs(readSliders(shipped));
@@ -452,6 +530,8 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       sounding: () => on,
       /** The knob row, or null for a program that never had a slider. */
       knobRow: () => knobRow,
+      /** The radios in the knob row, by name: `{ value, options, choice, cell }`. */
+      radios: () => radios,
       /** How many `setParamValue`s a turn or a new node has sent. */
       paramSends: () => paramSends,
       /** The sounding node's own value for a slider, by name, or null. */

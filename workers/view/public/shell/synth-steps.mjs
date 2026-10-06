@@ -8,10 +8,12 @@
 // whose artefact was compiled from a different text, so the program on the
 // slide and the program in the speaker cannot drift apart.
 //
-// 🔴 THREE PROGRAMS SINCE 2026-10-06, ALL MONO, EACH ADDING ONE THING. The
+// 🔴 FIVE PROGRAMS SINCE 2026-10-06, ALL MONO, EACH ADDING ONE THING. The
 // second is the first with its 0.5 turned into a slider (*"slode 3: make 0.5
 // into knob 0..1"*), which the slide draws as a knob; the third is the second
-// with its 440 on a slider too (*"slide 4 is freq"*), two knobs in one row.
+// with its 440 on a slider too (*"slide 4 is freq"*), two knobs in one row;
+// the fourth swaps the sine for a sawtooth, and the fifth chooses between
+// them with a radio.
 // What follows is about the first.
 // 🔴 ONE PROGRAM UNTIL THEN, AND IT IS MONO WITH ITS NUMBERS TYPED IN.
 // Asked: *"rm fau slides c-f ... editable code, hardcoded params for minimal
@@ -102,6 +104,30 @@ freq = hslider("freq", 440, 50, 2000, 1);
 
 // a sawtooth instead of a sine
 process = os.sawtooth(freq) * volume;
+`,
+  },
+  {
+    id: 'wave',
+    name: 'a wave to choose',
+    mono: true,
+    // slide 6, asked 2026-10-06 as *"how to make it a radio (sawtooth?)"*:
+    // slide 4's program with a third control, an `nentry` whose
+    // `[style:radio{...}]` the slide draws as a choice of sine and saw
+    // (`slide-synth.mjs`), and `select2` picking between the two oscillators
+    // inside `process` (a variable of its own for the switch was tried and
+    // taken back the same day: *"no need for tone var"*)
+    code: `import("stdfaust.lib");
+
+// volume knob
+volume = hslider("volume", 0.5, 0, 1, 0.01);
+
+// freq knob
+freq = hslider("freq", 440, 50, 2000, 1);
+
+// wave choice
+wave = nentry("wave[style:radio{'sine':0;'saw':1}]", 0, 0, 1, 1);
+
+process = select2(wave, os.osc(freq), os.sawtooth(freq)) * volume;
 `,
   },
 ];
