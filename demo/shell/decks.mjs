@@ -50,7 +50,7 @@ const ink = (name) => getComputedStyle(document.documentElement).getPropertyValu
 const faceReady = () => (document.fonts?.load ? document.fonts.load(`600 32px ${FACE}`, 'β+').catch(() => {}) : Promise.resolve());
 
 /** β+ into a square canvas `px` device pixels wide, on a tile of `shape`. */
-function drawMark(cv, px, { sup, shape }) {
+export function drawMark(cv, px, { sup, shape }) {
   cv.width = cv.height = px;
   const c = cv.getContext('2d');
   c.clearRect(0, 0, px, px);

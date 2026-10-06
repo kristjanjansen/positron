@@ -1,5 +1,7 @@
 ## Open
 
+- **Favicon to the brand mark** (2026-10-06). Asked: *"update favicon to brand one"*. The inline β+ chosen on the brand deck's favicon slide (*"keep these for icons"*). Touches `workers/view/build.mjs` `favicon()` and the shell's inline icon.
+- **Brand font for page titles and subtitles everywhere** (2026-10-06). Asked: *"use brand font for page titles and subtitles everywhere"*. The brand face is the slide face, JetBrains Mono (vendored in `demo/shell/vendor/`); titles are `.pos-name`, subtitles `.pos-what`, in `demo/shell/shell.css`.
 - **Slides: keyboard control in full screen and mobile support** (2026-10-06). Asked: *"add keyboard control to slides in fullscreen and mobile support"*. Touches `demo/shell/slide.mjs` (`createSlidePlayer`), maybe `slide.css`.
 - **Kit cards titled by the part alone, and the slides group above kit on the front page** (2026-10-06). Asked: *"no need to \"kit/...\" in titles. move slides above kit in index page"*. Handed to the kit split agent with step 4, since it is editing `demo/manifest.mjs`.
 - **Implement `plans/plan-kit-split.md`** (2026-10-06). Asked: *"in bg implenetn kit plan"*. Steps 1 to 3 LIVE 2026-10-06 (BUILD 97fdd97-064000-8661): seven part pages listed, `kit` row unlisted. Step 4 (SLIDES to `/kit/slides/`, the forwarder at `/kit/`) approved with *"go"* and handed back to the same agent. Defaults taken where the plan asked: forwarder at `/kit/`, BRAND already gone to the front page deck, the kit group left out of the front page count, HARDWARE behind a start button.

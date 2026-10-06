@@ -714,76 +714,11 @@ async function queryHash(queryParams) {
 // e+ — the positron. A bold lowercase 'e' (a ring with a lower-right aperture
 // plus a crossbar) and a superscript plus, in the menu's palette.
 function favicon() {
-  const N = 32, px = Buffer.alloc(N * N * 4);
-  const put = (x, y, [r, g, b]) => {
-    if (x < 0 || y < 0 || x >= N || y >= N) return;
-    const i = (y * N + x) * 4;
-    px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = 255;
-  };
-  const BG = [0x0b, 0x0e, 0x14], HI = [0xff, 0xd4, 0x00];
-  // rounded corners, drawn by leaving the four corner arcs transparent — the
-  // same 6 px radius the SVG in demo/shell/shell.mjs uses. KEEP THE TWO IN
-  // SYNC: this is the .ico a bare browser asks for, that one is what a demo
-  // page declares, and a user sees whichever the tab happens to have.
-  const RAD = 6;
-  const inRounded = (x, y) => {
-    const dx = Math.min(x, N - 1 - x), dy = Math.min(y, N - 1 - y);
-    if (dx >= RAD || dy >= RAD) return true;
-    return Math.hypot(RAD - dx, RAD - dy) <= RAD + 0.5;
-  };
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (inRounded(x, y)) put(x, y, BG);
-
-  // the 'e': an annulus with the lower-right wedge removed. Smaller than it
-  // was, so the whole glyph sits inside the rounded field instead of running
-  // off the bottom-right corner.
-  //
-  // The aperture is 11°-38° and shell.mjs's SVG must agree. It was 5°-62°,
-  // which removed the terminal and clipped the crossbar, and the letter read as
-  // a bitten circle rather than an 'e'.
-  const cx = 13.5, cy = 19.3, R = 8.6, r = 5.4;
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const d = Math.hypot(x - cx, y - cy);
-    if (d > R || d < r) continue;
-    const a = (Math.atan2(y - cy, x - cx) * 180) / Math.PI;   // y down: +90 = down
-    if (a > 11 && a < 38) continue;                            // the aperture — KEEP IN SYNC with shell.mjs
-    put(x, y, HI);
-  }
-  // the crossbar is what makes a ring an 'e'
-  for (let y = Math.round(cy - 1.4); y <= Math.round(cy + 1.1); y++)
-    for (let x = Math.round(cx - R + 2.9); x <= Math.round(cx + R - 1.1); x++) put(x, y, HI);
-
-  // the superscript plus — the charge, and the whole name
-  const pxc = 24.5, pyc = 8, arm = 3.2, th = 1.1;
-  const R2 = (v) => Math.round(v);
-  for (let x = R2(pxc - arm); x <= R2(pxc + arm); x++) for (let y = R2(pyc - th); y <= R2(pyc + th); y++) put(x, y, HI);
-  for (let y = R2(pyc - arm); y <= R2(pyc + arm); y++) for (let x = R2(pxc - th); x <= R2(pxc + th); x++) put(x, y, HI);
-
-  const raw = Buffer.alloc(N * (N * 4 + 1));
-  for (let y = 0; y < N; y++) {
-    raw[y * (N * 4 + 1)] = 0;                                               // filter: none
-    px.copy(raw, y * (N * 4 + 1) + 1, y * N * 4, (y + 1) * N * 4);
-  }
-  const chunk = (type, data) => {
-    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
-    const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
-    const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(td) >>> 0);
-    return Buffer.concat([len, td, crc]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(N, 0); ihdr.writeUInt32BE(N, 4);
-  ihdr[8] = 8; ihdr[9] = 6;                                                 // 8-bit RGBA
-  const png = Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-
-  const dir = Buffer.alloc(22);                       // ICONDIR + one ICONDIRENTRY
-  dir.writeUInt16LE(0, 0); dir.writeUInt16LE(1, 2); dir.writeUInt16LE(1, 4);
-  dir[6] = N; dir[7] = N; dir[8] = 0; dir[9] = 0;
-  dir.writeUInt16LE(1, 10); dir.writeUInt16LE(32, 12);
-  dir.writeUInt32LE(png.length, 14); dir.writeUInt32LE(22, 18);
-  return Buffer.concat([dir, png]);
+  // 🔴 THE BRAND MARK SINCE 2026-10-06, ONE FILE. It was an `e+` plotted here
+  // pixel by pixel and drawn again as an SVG in shell.mjs. Now both serve
+  // `demo/favicon.ico`, β+ rendered in Chrome with the brand face at 16, 32
+  // and 48 px (see the favicon note in demo/shell/shell.mjs).
+  return readFileSync(join(REPO, 'demo/favicon.ico'));
 }
 
 // ── run ─────────────────────────────────────────────────────────────────────
