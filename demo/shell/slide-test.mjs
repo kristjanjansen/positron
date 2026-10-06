@@ -106,6 +106,13 @@ ok('marks become runs: plain, accent, hue',
 ok('NEGATIVE: a hue name nobody declared throws rather than printing a plain word',
   throws(() => parseMarks('[x|cloudflair]')));
 ok('plain() takes the marks out and keeps the words', plain('*26.2* ms on [Pi|raspberry]') === '26.2 ms on Pi');
+const vars = parseMarks('`volume` times `process` at *0.5*');
+ok('a backtick name is its own run, marked code, beside the other marks',
+  vars.length === 5 && vars[0].code && vars[0].text === 'volume' && !vars[1].code && vars[2].code && vars[2].text === 'process'
+  && vars[4].hi && !vars[4].code, JSON.stringify(vars));
+ok('NEGATIVE: a lone backtick is a character, not a name', parseMarks('it`s').every((r) => !r.code));
+ok('plain() takes the backticks out and keeps the name', plain('turn `volume` to *1*') === 'turn volume to 1');
+ok('a name in backticks does not hide a colon from the headline lint', lintWords('`volume`: the knob').length === 1);
 
 /* ── tables ────────────────────────────────────────────────────────────── */
 const t = padRows({ head: ['', 'p50', 'p99'], body: [['MoQ', '*26.2*', '104.8'], ['WHEP', '67.0', '84.1']], align: 'lrr' });

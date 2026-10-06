@@ -1,5 +1,5 @@
 {
-  "what": "Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the two mono programs of the synths deck on the front page, a sine and the same sine with its volume on a slider.",
+  "what": "Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the three mono programs of the synths deck on the front page, a sine, the same sine with its volume on a slider, and that with its pitch on a slider too.",
   "howToRemake": "node demo/resources/build-faust-aot.mjs (and --check to compare without writing)",
   "compiledOn": "2026-10-06",
   "compiler": {
@@ -15,7 +15,8 @@
   "sources": {
     "demo/fau/presets.mjs#organ": "720cca5b14c4464b77bb8e5c9b82620a",
     "demo/shell/synth-steps.mjs#sine": "99ccdaad8be93eb80cc18fd4d2dd1a0b",
-    "demo/shell/synth-steps.mjs#volume": "ee2da98c5be4d5862fd09c25e7cbb664"
+    "demo/shell/synth-steps.mjs#volume": "ee2da98c5be4d5862fd09c25e7cbb664",
+    "demo/shell/synth-steps.mjs#pitch": "db37af702859c230a872bcea8dc81805"
   },
   "artefacts": {
     "mixer32.wasm": {
@@ -49,13 +50,22 @@
     "volume.json": {
       "md5": "9e56d426848966bc85a6ddb6b9f4d621",
       "bytes": 1650
+    },
+    "pitch.wasm": {
+      "md5": "320e269ffbadbc6e9fa8b3670ff1ffa3",
+      "bytes": 2739
+    },
+    "pitch.json": {
+      "md5": "c4db0552b4bb33c39ef8d6a3bcddba4d",
+      "bytes": 1836
     }
   },
   "rms": {
     "values": {
       "organ": 0.09420737746123786,
       "sine": 0.353553492204339,
-      "volume": 0.353553492204339
+      "volume": 0.353553492204339,
+      "pitch": 0.353553492204339
     },
     "render": {
       "sampleRate": 48000,

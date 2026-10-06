@@ -98,8 +98,9 @@ const PROGRAMS = [
  * instead, from arithmetic rather than from the compiler that made the file.
  */
 // ⚠️ `volume` is the same sine with its 0.5 on a slider whose default is 0.5,
-// so the render, which turns no slider, predicts the same figure.
-const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2 };
+// so the render, which turns no slider, predicts the same figure; `pitch` is
+// that with its 440 on a slider whose default is 440, so the same again.
+const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2, pitch: 0.5 / Math.SQRT2 };
 {
   const ids = PROGRAMS.map((p) => p.id);
   const twice = ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -210,7 +211,7 @@ if (!CHECK) {
   mkdirSync(OUT, { recursive: true });
   for (const [f, b] of Object.entries(all)) writeFileSync(join(OUT, f), b);
   const prov = {
-    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the two mono programs of the synths deck on the front page, a sine and the same sine with its volume on a slider.',
+    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the three mono programs of the synths deck on the front page, a sine, the same sine with its volume on a slider, and that with its pitch on a slider too.',
     howToRemake: 'node demo/resources/build-faust-aot.mjs (and --check to compare without writing)',
     compiledOn: new Date().toISOString().slice(0, 10),
     compiler: {
