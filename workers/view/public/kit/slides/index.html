@@ -2256,7 +2256,11 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       c.tone.click();
       await until(() => c.sounding() || c.error(), 5000);
       await until(() => c.level() > FLOOR, 1200);
-      await frames(4);
+      // ⚠️ UNTIL THE READING IS 660, NOT A FIXED FEW FRAMES: compiled before the
+      // press, Start sounds at once, and the analyser still holds the earlier
+      // 440 tone from before the context was suspended, so a reading four
+      // frames in measured a mix (444 to 492 Hz) twice on 2026-10-06
+      await until(() => Math.abs(c.hz() - 660) < 8, 1500);
       const lv = c.level(), hz2 = c.hz();
       const files = compiler();
       const bytes = files.reduce((a, e) => a + (e.transferSize || e.encodedBodySize || 0), 0);

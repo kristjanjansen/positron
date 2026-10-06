@@ -14,7 +14,7 @@
   "flags": "-ftz 2",
   "sources": {
     "demo/fau/presets.mjs#organ": "720cca5b14c4464b77bb8e5c9b82620a",
-    "demo/shell/synth-steps.mjs#sine": "4586a20999e46aed2164b36e3d486937"
+    "demo/shell/synth-steps.mjs#sine": "cfbff446a4963c3e046c16be7f5e7f57"
   },
   "artefacts": {
     "mixer32.wasm": {
@@ -38,7 +38,7 @@
       "bytes": 2345
     },
     "sine.json": {
-      "md5": "96097f344f15f75398d839aab2cf2faa",
+      "md5": "e405977dbefae9a231f3923f49862269",
       "bytes": 1436
     }
   },
