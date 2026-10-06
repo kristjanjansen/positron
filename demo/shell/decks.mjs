@@ -60,7 +60,8 @@ const WORDS = {
 };
 const SYNTHS = [
   { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in *code*']],
-    cap: 'a few lines of Faust you can edit and hear in this page' },
+    // asked 2026-10-06: *"make it better. no ref to faust"*
+    cap: 'from one sine to an instrument, a line of code at a time' },
   ...SYNTH_STEPS.map((st) => ({
     // a third for the words and two for the instrument, the words on the
     // foot of their column, asked 2026-10-06 as *"use 1:2 cols layout"* and
