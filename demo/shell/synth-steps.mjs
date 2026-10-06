@@ -8,7 +8,8 @@
 // whose artefact was compiled from a different text, so the program on the
 // slide and the program in the speaker cannot drift apart.
 //
-// 🔴 FIVE PROGRAMS SINCE 2026-10-06, ALL MONO, EACH ADDING ONE THING. The
+// 🔴 SEVEN PROGRAMS SINCE 2026-10-06 (the filter and the LFO on it came
+// last, after the saw), ALL MONO, EACH ADDING ONE THING. The
 // second is the first with its 0.5 turned into a slider (*"slode 3: make 0.5
 // into knob 0..1"*), which the slide draws as a knob; the third is the second
 // with its 440 on a slider too (*"slide 4 is freq"*), two knobs in one row;
@@ -91,9 +92,11 @@ process = os.osc(freq) * volume;
     id: 'saw',
     name: 'a sawtooth',
     mono: true,
-    // HIDDEN 2026-10-06, asked as *"hide sawtooth and its selection"*: out of
-    // the deck, kept here with its artefact so it can come back by one line
-    hidden: true,
+    // HIDDEN 2026-10-06, asked as *"hide sawtooth and its selection"*, and
+    // BACK the same evening as the filter's source: a filter takes overtones
+    // away and a sine has none, so the step before the filter is the wave
+    // that has them (*"what abut filter? see some synth building tutorials
+    // what is rigth order?"*, then *"do filter, lfo"*)
     // slide 5, asked 2026-10-06 as *"sawtooth"* from four offered next steps:
     // slide 4's program with one word changed, `os.osc` to `os.sawtooth`, so
     // the step is the wave's shape and the scope shows it
@@ -107,6 +110,57 @@ freq = hslider("freq", 440, 50, 2000, 1);
 
 // a sawtooth instead of a sine
 process = os.sawtooth(freq) * volume;
+`,
+  },
+  {
+    id: 'filter',
+    name: 'a filter on a knob',
+    mono: true,
+    // after the sawtooth, asked 2026-10-06 as *"do filter, lfo (for filter?)"*:
+    // the saw's program with a `cutoff` knob and a two pole low pass, the
+    // order every subtractive tutorial teaches (source, filter, envelope,
+    // modulation). Turned down, the saw goes dark as its overtones go
+    code: `import("stdfaust.lib");
+
+// volume knob
+volume = hslider("volume", 0.5, 0, 1, 0.01);
+
+// freq knob
+freq = hslider("freq", 440, 50, 2000, 1);
+
+// cutoff knob
+cutoff = hslider("cutoff", 2000, 100, 8000, 1);
+
+// a low pass keeps what is under the cutoff
+process = os.sawtooth(freq) : fi.lowpass(2, cutoff) * volume;
+`,
+  },
+  {
+    id: 'lfo',
+    name: 'an lfo on the filter',
+    mono: true,
+    // the same ask, its second half: a slow sine moving the cutoff up and down
+    // around the knob, `rate` how fast and `depth` how far. Depth stops at
+    // 0.9 so the swept cutoff never reaches 0 Hz
+    code: `import("stdfaust.lib");
+
+// volume knob
+volume = hslider("volume", 0.5, 0, 1, 0.01);
+
+// freq knob
+freq = hslider("freq", 440, 50, 2000, 1);
+
+// cutoff knob
+cutoff = hslider("cutoff", 2000, 100, 8000, 1);
+
+// lfo knobs
+rate = hslider("rate", 2, 0.1, 10, 0.1);
+depth = hslider("depth", 0.5, 0, 0.9, 0.01);
+
+// the lfo sweeps the cutoff
+sweep = cutoff * (1 + depth * os.osc(rate));
+
+process = os.sawtooth(freq) : fi.lowpass(2, sweep) * volume;
 `,
   },
   {

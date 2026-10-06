@@ -54,6 +54,10 @@ const WORDS = {
       + 'Turn it to 880 and the tone goes up an octave' },
   saw: { text: '`os.sawtooth` puts a sawtooth where the sine was, brighter and buzzier. '
       + 'Watch the scope change shape' },
+  filter: { text: '`fi.lowpass` lets through what is under `cutoff` and takes the rest away. '
+      + 'Turn `cutoff` down and the saw goes dark' },
+  lfo: { text: 'An LFO is a sine too slow to hear, and `sweep` moves `cutoff` with it. '
+      + 'Turn `rate` and `depth` while it plays' },
   // slide 6, asked as *"how to make it a radio (sawtooth?)"*
   wave: { text: '`nentry` with a radio style draws `wave` as a choice, and `select2` plays the sine or the saw by it. '
       + 'Pick saw while the tone plays' },

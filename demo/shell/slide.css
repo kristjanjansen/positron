@@ -533,7 +533,11 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .pos-ipanel.sl-synth-panel > .pos-rows-r { flex: none; }
 .pos-ipanel.sl-synth-panel > .pos-rows-r.sl-synth-code { flex: 1 1 0; min-height: 0; }
 .pos-ipanel.sl-synth-panel > .pos-rows-r.sl-synth-code { align-items: stretch; }
-.sl-synth-code > .pos-code { align-self: stretch; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* ⚠️ `height: 100%` AS WELL AS STRETCH, 2026-10-06: the row lays out
+   sideways, so `flex` and `min-height` act on the width, and MEASURED on the
+   LFO slide the box took its 20 lines' 418 px in a 292 px row and painted
+   them over the knob row instead of scrolling */
+.sl-synth-code > .pos-code { align-self: stretch; flex: 1 1 auto; min-height: 0; height: 100%; display: flex; flex-direction: column; }
 .sl-synth-code .pos-code-scroll { flex: 1 1 auto; min-height: 0; max-height: none; height: auto; }
 /* THE KNOB ROW WITH A RADIO IN IT (slide-synth.mjs, slide 6's `wave`): the
    knobs' lattice, then each choice in a cell of its own with its name under it

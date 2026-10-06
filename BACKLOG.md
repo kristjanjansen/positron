@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Synths deck: a filter slide, then an LFO on the filter** (2026-10-06). Asked: *"what abut filter? see some synth building tutorials what is rigth order?"* then *"do filter, lfo (for filter?)"*. Order from the tutorials: source, filter, envelope, modulation. The sawtooth comes back as the filter's source (a sine has no overtones to cut). `demo/shell/synth-steps.mjs` gains `filter` and `lfo`, their AOT artefacts via `demo/resources/build-faust-aot.mjs`, checks in `demo/shell/deck-checks.mjs`. ~~ DONE 2026-10-06, the LFO slide's code scrolls by its last lines (asked: *"Leave it scrolling"*)
+
 - ~~**Synths deck: hide the sawtooth slide and the sine / saw choice slide** (2026-10-06). Asked: *"hide sawtooth and its selection. what shold be after freq?"*. Slides 5 and 6 (`saw`, `wave`) out of the deck, kept in `synth-steps.mjs` and their AOT artefacts; `deck-checks.mjs` drops what graded them. The question about the next slide is answered in chat, not built. ~~ DONE 2026-10-06
 
 - **Front page slides: reserve each player's frame before it loads, lazy load what is inside** (2026-10-06). Asked: *"in frontpage slides load longer and make content jump. provice frames and lazyload contents"*. `mountDecks()` in `demo/shell/decks.mjs`, both index renderers; the frame is the 16:9 box (plus its footer) drawn at once, the deck built when it comes near the viewport.

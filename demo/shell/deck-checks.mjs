@@ -429,6 +429,56 @@ export async function synthChecks(d, p) {
     p.go(0);
   }
 
+  // 10b. THE FILTER AND THE LFO ON IT, 2026-10-06 (*"do filter, lfo (for
+  // filter?)"*). The filter slide is the saw through a two pole low pass at
+  // `cutoff`: the offline render reads RMS 0.2663 at its 2000 Hz default
+  // (`build-faust-aot.mjs`), and at 100 Hz a 440 Hz saw keeps almost nothing,
+  // so the level read off the analyser has to FALL, which only a filter that
+  // is really in the signal can do. The LFO slide is graded on what it adds:
+  // two more knobs from the text and a sound from its own artefact.
+  {
+    const fiIdx = p.slides.findIndex((s) => s.ctl?.step?.id === 'filter');
+    const lfIdx = p.slides.findIndex((s) => s.ctl?.step?.id === 'lfo');
+    const FI = p.slides[fiIdx], fi = FI.ctl;
+    const fetched = (id) => names().filter((n) => new RegExp(`/resources/faust/${id}\\.wasm$`).test(new URL(n).pathname));
+    const comp0 = compiler().length;
+    p.go(fiIdx);
+    await frames(3);
+    const knobsOf = (c) => c.knobs.names().join();
+    fi.tone.click();
+    await until(() => fi.sounding() || fi.error(), 3000);
+    await until(() => Math.abs(fi.level() - 0.2663) < 0.015, 1500);
+    const lvOpen = fi.level();
+    d.assert('SYNTHS: the filter slide draws volume, freq and cutoff from the text, and Start plays the filtered saw from its artefact with no compile, RMS 0.266 at 2000 Hz',
+      fiIdx > 0 && knobsOf(fi) === 'volume,freq,cutoff' && fi.knobs.value('cutoff') === 2000 && fi.sounding()
+        && Math.abs(lvOpen - 0.2663) < 0.015 && fetched('filter').length > 0 && compiler().length === comp0 && fi.compiles() === 0,
+      `${fi.error() ? `it FAILED: ${fi.error()}, ` : ''}slide ${fiIdx + 1}, knobs ${knobsOf(fi) || 'none'}, cutoff ${fi.knobs.value('cutoff')}, `
+      + `RMS ${lvOpen.toFixed(4)}, ${fetched('filter').length} filter file(s), ${compiler().length - comp0} new compiler file(s), ${fi.compiles()} compile(s)`);
+
+    fi.knobs.knob('cutoff').set(unmapSpec(100, { min: 100, max: 8000, step: 1 }));
+    await until(() => fi.level() < lvOpen / 3, 1500);
+    await nap(100);
+    const lvShut = fi.level();
+    d.assert('SYNTHS: turning the cutoff from 2000 to 100 Hz while it plays takes the measured level below a third',
+      fi.knobs.value('cutoff') === 100 && fi.nodeValue('cutoff') === 100 && lvShut < lvOpen / 3 && lvShut > 0 && fi.sounding(),
+      `RMS ${lvOpen.toFixed(4)} at 2000 Hz, ${lvShut.toFixed(4)} at ${fi.nodeValue('cutoff')} Hz, ${(lvOpen / Math.max(lvShut, 1e-9)).toFixed(1)}x down`);
+    fi.stop();
+
+    const LF = p.slides[lfIdx], lf = LF.ctl;
+    p.go(lfIdx);
+    await frames(3);
+    lf.tone.click();
+    await until(() => (lf.sounding() && lf.level() > 0.1) || lf.error(), 3000);
+    const lvLfo = lf.level();
+    d.assert('SYNTHS: the LFO slide adds rate and depth to the knob row from the text, and Start plays it from its artefact with no compile',
+      lfIdx === fiIdx + 1 && knobsOf(lf) === 'volume,freq,cutoff,rate,depth' && lf.knobs.value('rate') === 2 && lf.knobs.value('depth') === 0.5
+        && lf.sounding() && lvLfo > 0.1 && fetched('lfo').length > 0 && compiler().length === comp0 && lf.compiles() === 0,
+      `${lf.error() ? `it FAILED: ${lf.error()}, ` : ''}slide ${lfIdx + 1}, knobs ${knobsOf(lf) || 'none'}, rate ${lf.knobs.value('rate')}, depth ${lf.knobs.value('depth')}, `
+      + `RMS ${lvLfo.toFixed(4)}, ${fetched('lfo').length} lfo file(s), ${compiler().length - comp0} new compiler file(s)`);
+    lf.stop();
+    p.go(0);
+  }
+
   // 11. SLIDE 6, slide 4's program with a third control, an `nentry` whose
   // `[style:radio{...}]` the slot draws as the kit's choice (*"how to make
   // it a radio (sawtooth?)"*): volume, freq and wave in one row, in that
