@@ -281,6 +281,8 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     const ui = (p) => { if (!uiOf.has(p)) uiOf.set(p, slidersOf(p)); return uiOf.get(p); };
     let nodeAddr = new Map(), paramSends = 0, knobRow = null;
     const knobs = createParamKnobs({
+      // one row for every program in the deck: the LFO slide has five
+      cols: 6,
       onChange: (name, v) => {
         const a = nodeAddr.get(name);
         if (node && a) { node.setParamValue(a, v); paramSends++; }
