@@ -396,7 +396,7 @@ export function rich(t) {
  * A component sized in px, laid out at `w` logical px and scaled into `host`.
  * The scale is a custom property, never the transform written by hand.
  */
-export function fitBox(host, w) {
+export function fitBox(host, w, { h = 0 } = {}) {
   const outer = el('div', 'sl-fit');
   const inner = el('div', 'sl-fit-in');
   inner.style.setProperty('--fit-w', `${w}px`);
@@ -407,7 +407,10 @@ export function fitBox(host, w) {
     const ow = outer.clientWidth, oh = outer.clientHeight;
     const ih = inner.offsetHeight || 1;
     if (!ow || !oh) return k;
-    k = Math.min(ow / w, oh / ih);
+    // `h`, a logical height to scale by when it is taller than the content, so
+    // several boxes of different heights come out at ONE scale (2026-10-06,
+    // *"2 and 3 use same size of fau"*): the shorter one is centred, not grown
+    k = Math.min(ow / w, oh / Math.max(ih, h));
     inner.style.setProperty('--fit-k', String(k));
     inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
     inner.style.setProperty('--fit-y', `${(oh - ih * k) / 2}px`);
