@@ -248,15 +248,30 @@
   const HOLD_WORDS = ['HOLD: REPLACE PATCH', 'HOLD: PATCH', 'PATCH?', '?'];
 
 
-  section('KEY LABELS',
+  // TWO BLOCKS, asked 2026-10-06 as *"KEY LABELS - aplit into without header
+  // with headers both havw 2 orientations"*: each shows the row along the
+  // bottom and the column down the right, once on a bare screen and once
+  // under the scene header, which is where the column's top moves to.
+  section('KEY LABELS WITHOUT HEADER',
     'What each of the four buttons does, in a row under the screen or in a column beside it '
     + 'where the module has its buttons, with a held key shown filled.',
     `ui_footer(label, hot)                 // returns the y of its top rule
-ui_keys_right(label, hot, width, top) // returns the x of its left rule, 4 cells from top down
-ui_area(x)                            // the link and the banner stop at the rule`,
+ui_keys_right(label, hot, width, 0)   // returns the x of its left rule, 4 cells from the top`,
     (box) => hwPart(box, [
       ['keys-bottom', 'a row along the bottom, OK held', (u) => { u.footer(KEY_WORDS, 8); }],
-      ['keys-right', 'a column down the right under the header, OK held', (u) => {
+      ['keys-right', 'a column down the right, OK held', (u) => { u.keysRight(KEY_WORDS, 8, 0); }],
+    ]));
+
+  section('KEY LABELS WITH HEADER',
+    'The same two, under the scene header: the row keeps the foot and the column starts where the header ends.',
+    `ui_footer(label, hot)                 // under ui_header, the same row
+ui_keys_right(label, hot, width, top) // top is ui_header's height
+ui_area(x)                            // the link and the banner stop at the rule`,
+    (box) => hwPart(box, [
+      ['keys-bottom-header', 'a row along the bottom, OK held', (u) => {
+        u.header('SCENE 1/2', 'THRU'); u.footer(KEY_WORDS, 8);
+      }],
+      ['keys-right-header', 'a column down the right, OK held', (u) => {
         u.keysRight(KEY_WORDS, 8, u.header('SCENE 1/2', 'THRU'));
       }],
     ]));
@@ -616,13 +631,22 @@ patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
       partsUp && !empty.length && hw.partsFetched === 1,
       `${hw.parts.length} parts, ${empty.length ? `blank: ${empty.join(', ')}` : 'none blank'}, `
       + `the module asked for ${hw.partsFetched} time(s)`);
-    const right = hw.parts.find((p) => p.name === 'keys-right');
+    const right = hw.parts.find((p) => p.name === 'keys-right-header');
     const rs = right?.px ? readScreen(right.px, F) : null;
     const colX = rs ? Math.min(...['PREV', 'NEXT', 'STOP'].map((t) => (rs.find(t).find((h) => !h.inv) || { x: -1 }).x)) : -1;
     const order = rs ? ['PREV', 'NEXT', 'STOP'].map((t) => (rs.find(t).find((h) => !h.inv) || { y: -1 }).y) : [];
     d.assert('KEY LABELS: the right column reads PREV, NEXT, STOP top to bottom past x 90, and OK filled at the foot',
       !!rs && colX > 90 && order.every((y, i) => y >= 0 && (!i || y > order[i - 1])) && rs.find('OK').some((h) => h.inv && h.y >= 48),
       `labels from x ${colX}, tops at ${order.join(' ')}`);
+    // and with no header the column starts at the top of the screen, which is
+    // the one thing the two orientations of the bare block do differently
+    {
+      const bare = hw.parts.find((p) => p.name === 'keys-right');
+      const bs = bare?.px ? readScreen(bare.px, F) : null;
+      const top = bs ? (bs.find('PREV').find((h) => !h.inv) || { y: -1 }).y : -1;
+      d.assert('KEY LABELS: with no header the right column starts at the top, PREV above row 16 where the header would be',
+        top >= 0 && top < 16 && top < order[0], `PREV at y ${top} bare, ${order[0]} under the header`);
+    }
 
     // The labels option is the byte after the font's, and a reboot.
     // the column's rule runs from under the header to the foot: rows 16 to 63 all lit

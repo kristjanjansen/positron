@@ -50,7 +50,7 @@ export const KIT_PARTS = [
     'fader', 'head-gap-and-foot', 'channel-strip',
   ] },
   { part: 'hardware', label: 'HARDWARE', ids: [
-    'key-labels', 'header', 'link', 'activity', 'hold', 'text', 'router-firmware',
+    'key-labels-without-header', 'key-labels-with-header', 'header', 'link', 'activity', 'hold', 'text', 'router-firmware',
     'oled-fonts',
   ] },
   { part: 'diagram', label: 'DIAGRAM', ids: [
