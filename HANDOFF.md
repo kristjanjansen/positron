@@ -1,3 +1,37 @@
+# Handoff, 2026-10-06 late afternoon, session 66: kit/slides reordered, the split in phone full screen, KEY LABELS in two
+
+## Where it is right now
+
+- ✅ **Site: BUILD `e2d28df-142357-5793`**, confirmed on the edge, build output in `6caf9e6`. **Not pushed** (needs the personal account, see CLAUDE.md).
+- Counted: **56 demos, 54 built**, **93 plans**. No agent and no workflow is running. The tree is clean.
+
+## What landed, all deployed
+
+| commits | what | check it at |
+| --- | --- | --- |
+| `e2d28df` `92c0212` | kit/slides: the SYNTHS DECK block removed; THE PLAYER first, then HALF WIDTH PLAYERS, then NAMES FROM THE CODE IN THE WORDS (*"rm from slides kit page. Move player to top, move hilited word to dowwards"*) | https://positron.studio/kit/slides/ |
+| same | the deck's 24 sound checks moved to its own page: `demo/shell/deck-checks.mjs`, run from `deckPage` AFTER `d.ready()` (they take about 20 s and `ready` is the harness's boot wait). Page asserts there 3 to 29. NOT moved: the half width footer's title link check, which only the front page's player can have | https://positron.studio/slides/synths/ |
+| same | slide body in the sans: `.sl-cap`, `.sl-list`, `.sl-under` join `.sl-text` (*"Use sans for slides body"*); a name in backticks stays mono | kit/slides, any caption |
+| same | **one slide unit `--sl-u`** (`1cqh` on a 16:9 slide) replaces every bare `cqh` in `slide.css` and `--sl-1`. `brand-slides.css` and `kit-page.css` still use `cqh` directly, which is right while they never sit in a taller slide | |
+| same | **a split stacks in FULL SCREEN on an upright phone only** (*"On mobile use horiz layout..."*, *"In mobile change layout in fullscreen"*, *"Non when in nonfulkscreen"*): `@media (max-width: 560px) { @container sl-player (max-width: 560px) }` on `.sl-player[data-full]`. The split slide fills the screen, `--sl-u` pinned to the width so type keeps its size, slot on top on the darker ground (its own bleed of one inset), words under it, clear of the ⛶ exit. In the page nothing changes. A sideways phone or a desk keeps 16:9 columns | slide 2 on a phone, press ⛶ |
+| same | `demo/shot.mjs --eval <js>`: an expression run in the page before the capture, e.g. stepping a deck | |
+| `bae77f3` `6caf9e6` | kit/hardware: KEY LABELS split into KEY LABELS WITHOUT HEADER and WITH HEADER, each with the bottom row and the right column; a new assert that the bare column starts at the top (PREV y 4 against 14) | https://positron.studio/kit/hardware/ |
+
+Verify: `slides/synths kit/slides` **114/114** (72 and 29 page asserts), `kit/hardware` **28/28** (22 page asserts).
+
+## Decided along the way, and why
+
+- **The phone stacking first went in for the page too, and was taken back.** A first version made the in-page player 3:4 on a narrow player; on the front page at 1280 the half width card (336 px) is as narrow as a phone (343) and went tall on a desk. Then the owner said full screen only. The rule is the player's width AND the window's, and `data-full`.
+- **The empty caption row.** A named grid area with nothing in it still collects a row gap; the caption is auto placed instead (`grid-area: auto / 1`).
+
+## Open
+
+- ⚠️ **Synths slides 3 to 6: the knob row draws as an empty band** in screenshots, live since at least `192103c`, in the page and in full screen, while *"slide 3 draws its volume knob ... at 0.50"* passes. Measure the knob's own rect before believing the check. In BACKLOG.
+- ⚠️ **On a desk in full screen the FAU panel's plate is cut at the slide's foot** (slide 3 at 1280). In BACKLOG.
+- ⚠️ **One `kit/hardware` run read 19/19 instead of 28/28**, nine asserts not collected, with only caption strings changed between runs; the next run was 28/28. Not chased.
+- Not tested on a real phone: the stacked full screen was measured in headless Chrome at 375 with the fallback cover. iPhone Safari's full screen of a `.sl-player` is the cover, which sets `data-full` too, so the rule should reach it.
+- Everything from the section below still stands: the routing follow-ups, the pub container deadline, `plans/plan-live-slides.md` describing the morning's five step deck.
+
 # Handoff, 2026-10-06 afternoon, session 65 continued: the synths deck, six slides, and the audio race
 
 ## Where it is right now
