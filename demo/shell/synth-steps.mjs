@@ -29,13 +29,14 @@ export const SYNTH_STEPS = [
     id: 'sine',
     name: 'a sine in code',
     mono: true,
+    // half volume, asked 2026-10-06 as *"make it half volume"* (it was 0.1)
     // single line comments in the code, asked 2026-10-06 as *"add comments to
     // fau code (single line ones)"* and *"why we multily with 0.1?"*
     // each comment kept short enough not to wrap in the half width panel
     code: `import("stdfaust.lib"); // has os.osc
 
-// 440 Hz at a tenth of full scale
-process = os.osc(440) * 0.1;
+// 440 Hz at half volume
+process = os.osc(440) * 0.5;
 `,
   },
 ];
