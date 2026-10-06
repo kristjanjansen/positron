@@ -14,7 +14,7 @@
   "flags": "-ftz 2",
   "sources": {
     "demo/fau/presets.mjs#organ": "720cca5b14c4464b77bb8e5c9b82620a",
-    "demo/shell/synth-steps.mjs#sine": "cfbff446a4963c3e046c16be7f5e7f57"
+    "demo/shell/synth-steps.mjs#sine": "99ccdaad8be93eb80cc18fd4d2dd1a0b"
   },
   "artefacts": {
     "mixer32.wasm": {
@@ -34,18 +34,18 @@
       "bytes": 5029
     },
     "sine.wasm": {
-      "md5": "26595ad8d94a5a651230fe90f280a286",
+      "md5": "55f9e3801a9a53f25d47d17b71fe1dab",
       "bytes": 2345
     },
     "sine.json": {
-      "md5": "e405977dbefae9a231f3923f49862269",
+      "md5": "fb84bf36d9c03ef05204dd0995babd64",
       "bytes": 1436
     }
   },
   "rms": {
     "values": {
       "organ": 0.09420737746123786,
-      "sine": 0.0707106996000446
+      "sine": 0.353553492204339
     },
     "render": {
       "sampleRate": 48000,

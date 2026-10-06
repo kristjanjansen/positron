@@ -2292,7 +2292,8 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       const noteSays = c.idle.el.textContent;
       c.tone.click();
       await until(() => c.sounding() || c.error(), 5000);
-      await nap(100);
+      // suspending is asynchronous: wait for it, as the off check does
+      await until(() => ctx()?.state === 'suspended', 1000);
       const said = c.scope.canvas.getAttribute('aria-label') || '';
       d.assert('SYNTHS: NEGATIVE, a broken edit shows the compiler’s error in words in the panel and sounds nothing',
         !!c.error() && /syntax error/i.test(c.error()) && said.includes(c.error()) && noteSays === 'Did not compile'

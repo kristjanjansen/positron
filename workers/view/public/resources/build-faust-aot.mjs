@@ -91,13 +91,13 @@ const PROGRAMS = [
 ];
 /**
  * 🔴 AN ANSWER WRITTEN DOWN BEFORE THE RENDER, FOR THE PROGRAM SIMPLE ENOUGH TO
- * HAVE ONE. `process = os.osc(440) * 0.1;` is a sine of amplitude 0.1, whose RMS
- * is 0.1 over root two, and 24000 samples at 48 kHz are exactly 220 of its
+ * HAVE ONE. `process = os.osc(440) * 0.5;` is a sine of amplitude 0.5, whose RMS
+ * is 0.5 over root two, and 24000 samples at 48 kHz are exactly 220 of its
  * cycles. A mono program has no key to leave up, so the poly programs' negative
  * control (no key, silence) has nothing to say about it; this is its control
  * instead, from arithmetic rather than from the compiler that made the file.
  */
-const EXPECT = { sine: 0.1 / Math.SQRT2 };
+const EXPECT = { sine: 0.5 / Math.SQRT2 };
 {
   const ids = PROGRAMS.map((p) => p.id);
   const twice = ids.filter((id, i) => ids.indexOf(id) !== i);

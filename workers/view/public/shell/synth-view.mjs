@@ -1052,7 +1052,7 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
        channels and only the drawn one was objected to. */
     const how = a.points?.length ? 'measured' : `${a.cycles} cycles of a ${a.shape}`;
     const one = pts
-      ? `${v.name || a.shape} drawn as ${how}`
+      ? `${v.name || a.shape || "waveform"} drawn as ${how}`
       : `${v.name || 'wave'}, not drawn: ${v.reason || NO_SHAPE}`;
     const two = b?.pts
       ? `, over ${v.over?.name || b.shape} in a second colour`
