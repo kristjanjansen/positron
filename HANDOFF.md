@@ -1,3 +1,45 @@
+# Handoff, 2026-10-06, session 65: decks on the front page, the kit split into eight pages, synths on a slide, brand
+
+## Where it is right now
+
+- ✅ **Site: BUILD `5c6f4e7-084447-a778`**, confirmed on the edge. Committed to `60ae2d1`. **Not pushed** (needs the personal account, see CLAUDE.md).
+- Counted: **54 demos, 52 built**, **93 plans**. CLAUDE.md's top line recounted to 54 and 52.
+- ⚠️ **THE ROUTING MIGRATION WORKFLOW IS STILL RUNNING** (`plans/plan-routing-migration.md`, asked *"implement plans/plan-routing-migration, parallelize"*). Three shared agents (bay corrections plus a `heldBy` rule, `bay-node.mjs` join helper and `openers.mjs` / `link-badge.mjs`; `midi-graph.mjs`; the `?relay=` override, a local room server and `demo/fake-board.mjs`), then five page agents for mirror, knobs and away, circuit evo twelve dump, nola and fau, collide and muta. Its files are the ~35 dirty paths in the tree (`git status`). Nothing of it is committed or deployed. When it reports: read every report, commit path-limited, and DEPLOY FROM A CLEAN WORKTREE OR AFTER IT IS DONE, because a deploy ships whatever is in the tree.
+- The agents were told not to touch `demo/manifest.mjs`; their reports list the row changes they need (e.g. `room: 'fixed'`).
+
+## What landed, all deployed
+
+| commits | what | look at |
+| --- | --- | --- |
+| `bcf56e1` `5c6f4e7` | **Front page `slides` group**, decks played in place (no deck pages): `demo/shell/decks.mjs`, `mountDecks()` on both renderers. **brand** deck: stacked β⁺ logo, horizontal logo, the `positron.studio` wordmark in fives and threes (dot yellow, centred), the favicon (inline β+) and the app icon (raised β⁺) | https://positron.studio/ |
+| `1163e11` `5c6f4e7` | **synths** deck: "Synths / in code", then a split with an instrument panel (scope, editable `os.osc(440) * 0.1`, FAU plate, Test tone). Shipped code plays from `resources/faust/sine.wasm` (2,345 B); an edit loads libfaust on the press (1 MB, said on the plate). kit/slides 87/87 | https://positron.studio/ then the synths deck |
+| `0cb3c1f` | **Synth on a page**: `demo/shell/audio.mjs` (one context per page, claim, release, suspend), `demo/shell/faust.mjs` (runtime and compiler memoised, mono path), `build-faust-aot.mjs` + `PROVENANCE.json` (build refuses a stale artefact), `demo/fau/presets.mjs`, /fau/ on them (75/76, the known diagram cut) | https://positron.studio/fau/ |
+| `bcf56e1` | slide engine: `band` layout (2:1, darker top), SCREEN AND KEYS ON A SLIDE, BIG NUMBER on band, `orient: 'column'` button groups, title slides with no speaker or date, full screen with no focus ring and no leave button on a pointer screen | https://positron.studio/kit/slides/ |
+| `ded2a77` | slide player: keys on the document while full screen (the hidden ⛶ held the focus), a finger swipe steps, a tap on a key stays a key | |
+| `97fdd97` `8fc420e` `ef1376e` | **`/kit/` split** (plan-kit-split.md): eight part pages at `/kit/<part>/` on `kit-page.mjs`, `kit-page.css`, `oled-view.mjs`, `kit-parts.mjs`; every check behind SELFCHECK (a visitor runs 0, /kit/ ran 230); `/kit/` is a forwarder for old `#block` links; cards titled by the part; slides above kit; the kit not counted in the title (41). devices 110, input 96, timeline 52, status 35, layout 33, hardware 27, diagram 16, slides 87 | https://positron.studio/kit/devices/ |
+| `44afde8` `ad38f16` | kit/hardware draws its screens and boots the board on a visit, no Start button, pauses when hidden | https://positron.studio/kit/hardware/ |
+| `9e89e22` | brand face (JetBrains Mono, swap) on every page title and subtitle; `demo/favicon.ico` is the inline β+ at 16, 32, 48, served by the dev server and copied by the build | |
+| `5d648e4` `9241085` | plans: `plan-kit-split.md`, `plan-live-slides.md`, `plan-routing-migration.md`; research: `cloudflare-birthday-week-2026-10-06.md` | |
+
+## Open
+
+- **The routing workflow** above: review, commit, deploy, then the manifest rows it asks for.
+- **`/patchbay/` announces into `studio-1` on every visit and suite run** (BACKLOG); step 1 of the routing migration fixes it, if the workflow's shared agent landed it.
+- **`workers/pub` sits on the `Container` class Cloudflare freezes 2026-12-31**; measure its cold start, then port to `ctx.container` (BACKLOG). Read the monthly log volume before the 2026-12-01 observability pricing.
+- **Synths deck at desk width**: two decks a row makes the code tiny (~336 px player). Offered a full width synths deck; unanswered.
+- **kit/slides "fetched exactly one file" was loosened twice**: vendored fonts, then `/favicon.ico`. Preloading the fonts would let it be strict again; asked, unanswered.
+- `plans/plan-live-slides.md` still describes the five step deck.
+- The moved kit pages carry the monolith's old em dashes and middots (verbatim move); fix per page as touched.
+- Not tested today: real iPhone, Safari, real full screen (the extension cannot trigger it; the cover path was tested).
+
+## Learned, worth keeping
+
+- **Deploy from a clean worktree while agents are writing.** `git worktree add --detach <dir> HEAD`, build and deploy there, rsync `public/` back, commit it. Used three times today; nothing in flight went out.
+- **A shell command refused by the tree guard runs NONE of its parts.** A refused `git add -A` took the `rsync` before it with it, and the commit after carried only a stamp. Check `git show --stat` after any commit that followed a refusal.
+- **A self-signed certificate on our own domain was the network, not the site.** positron.studio answered with a `Fortiguard SDNS Blocked Page` certificate for a while; `elektron-view.kristjan-jansen.workers.dev` confirmed the deploy. Check the issuer before believing a 000.
+- **A focusable control hidden by full screen drops the focus to the body**, so keys heard only on a panel go nowhere.
+- **A default taken one step too far looks like a broken page**: HARDWARE behind Start hid the drawing as well as the CPU.
+
 # Handoff, 2026-10-05 late, session 64 continued: kit slides grown, csound, diagrams on every technologies page, BRAND
 
 ## Where it is right now
