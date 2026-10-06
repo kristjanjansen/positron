@@ -248,52 +248,16 @@
   import { createCompileIdle, IDLE_MS, NOTE_SAYS } from '/shell/compile-idle.mjs';
   import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { createPicker } from '/shell/picker.mjs';
+  import { PRESETS } from '/fau/presets.mjs';
+  import { faustCompiler, hasCompiler, faustCompile, faustNode, FAUST_FLAGS } from '/shell/faust.mjs';
+  import { sharedAudio, claim, contexts } from '/shell/audio.mjs';
 
   const q = new URLSearchParams(location.search);
 
-  /**
-   * 🔴 THE VENDORED FILES, EACH WRITTEN OUT AS A WHOLE QUOTED PATH BECAUSE THAT
-   * IS WHAT THE BUILD CHECKS. `workers/view/build.mjs` copies only an
-   * allowlist, `demoFiles()` takes neither a `.wasm` nor a subdirectory, and
-   * `checkVendorUrls()` refuses the build when a vendor path in this file has
-   * nothing deployed behind it. Five explicit lines in that file are what this
-   * page costs, which is `LAYOUT.md` rule 6 working as designed: a 6 MB binary
-   * should cost somebody a deliberate line.
-   * ⚠️ AND THE GUARD READS COMMENTS TOO, WHICH IT PROVED ON ITS FIRST RUN HERE.
-   * The line above used to carry a quoted vendor path with an ellipsis standing
-   * in for the file name, and the build refused itself over a path that was
-   * never a path. Writing one out in prose here is the one way to break this
-   * page's own deploy, so it is not done.
-   * ⚠️ THE `.data` FILE IS NOT DATA, IT IS SOURCE CODE. 53 `.lib` files of
-   * plain Faust totalling 2,406,429 bytes, which the compiler reads out of its
-   * own in-memory filesystem. A page that imports three libraries pays for
-   * fifty three, and `tubes.lib`, which models valve amplifiers, is 15.7 per
-   * cent of the whole download on its own.
-   */
-  const VENDOR = {
-    js: '/fau/vendor/libfaust-wasm.js',
-    /**
-     * 🔴 `.txt`, AND THE EXTENSION IS WORTH 2 MB OF SOMEBODY'S BANDWIDTH.
-     * MEASURED against the deploy 2026-09-23, which is what `plan-fau.md` §11
-     * item 3 asked for and could not do: with its own `.data` name this file
-     * came back with **no content-type at all and no content-encoding**,
-     * 2,407,445 bytes raw, while the `.wasm` and the `.js` beside it were both
-     * brotli. Cloudflare compresses by content type and has no opinion about an
-     * extension it has never heard of, so the one file that compresses BEST was
-     * the one going out whole.
-     * ⚠️ AND IT REALLY IS TEXT: 99.95 per cent of its bytes are printable,
-     * because it is 53 Faust library sources concatenated by Emscripten's
-     * `file_packager`. It opens with a small WebAssembly module, which is the
-     * 0.05 per cent.
-     * ⚠️ THE NAME INSIDE THE COMPILER DOES NOT MOVE WITH IT. The glue asks its
-     * host for a package called `libfaust-wasm.data` and `faustwasm` answers
-     * with whatever bytes it fetched from the path below, so renaming the file
-     * on the wire cannot desynchronise anything.
-     */
-    data: '/fau/vendor/libfaust-wasm.data.txt',
-    wasm: '/fau/vendor/libfaust-wasm.wasm',
-    mjs: '/fau/vendor/faustwasm.mjs',
-  };
+  /* The four vendored paths, and why each is written out whole and why the
+     `.data` file ships as `.txt`, live in `demo/shell/faust.mjs` as
+     `FAUST_VENDOR` since 2026-10-06, moved there verbatim with their comment,
+     because that module is now what fetches them. */
   /** What the compiler weighs, measured on the vendored files with `wc -c`. */
   const COMPILER_BYTES = 3598106 + 2407445 + 156922;
   /** And what a page that COMPILES needs, which is that plus the runtime. */
@@ -365,278 +329,11 @@
    * other end will not know to pass. The board's `faust2rpialsaconsole` needs
    * this same argument or the two ends differ in their denormal handling.
    */
-  const FLAGS = '-ftz 2';
+  const FLAGS = FAUST_FLAGS;   // `demo/shell/faust.mjs`, one string for this page, the AOT build and its check
 
-  /**
-   * The presets, and each one is a whole instrument in the box.
-   *
-   * 🔴 THE THREE MAGIC NAMES ARE `freq`, `gain` AND `gate`. A Faust DSP becomes
-   * one VOICE of a polyphonic instrument by declaring those three, and the
-   * runtime replicates it. Rename any of them and the keyboard stops reaching
-   * it, which is a thing a visitor can do by accident and the log says so.
-   *
-   * ⚠️ AND THE COMPRESSION IS A DICTIONARY, NOT MAGIC, WHICH IS WHY `djembe` IS
-   * HERE. 0.27 kB of source becoming 17.21 kB of machine code is real, and it is
-   * real because `pm.djembe_ui_MIDI` is a NAME for something living in the
-   * 2.41 MB of library that was already downloaded. The moment the sound is
-   * something nobody wrote a library function for, the source is as long as the
-   * sound is complicated: the STK waveguide piano is 21.92 kB of it. Both halves
-   * of that belong on the page rather than only the flattering one.
-   * ⚠️ THOSE TWO FIGURES READ `75 bytes` AND `12,820 bytes` UNTIL 2026-09-25 AND
-   * BOTH WERE STALE. The djembe grew its comments on 2026-09-24 and nothing here
-   * moved with it. RE-MEASURED that day against this file's own source, which is
-   * the only reason the new pair is worth anything.
-   *
-   * ── A BLANK LINE AFTER EVERY COMMENT, AND IT IS ONLY THIS LISTING ──────────
-   *
-   * 🔴 ASKED 2026-09-25 AS *"add nl after comments"*, WITH A WORKED EXAMPLE
-   * RATHER THAN A DESCRIPTION, AND THE SCOPE WAS PUT TO THE OWNER AND ANSWERED:
-   * the Faust listing shown on this page, not a repository sweep and not a
-   * convention for new JavaScript. So it applies to the `code` strings below and
-   * to nothing else in this file.
-   * ✅ **THE FORM IS: A COMMENT ON ITS OWN LINE IS FOLLOWED BY A BLANK LINE
-   * BEFORE THE CODE IT INTRODUCES.** Two comment lines in a row are one comment
-   * and take one blank line after the pair, because the blank separates the
-   * comment from its code rather than the lines from each other.
-   * ⚠️ **A TRAILING COMMENT GETS NOTHING, AND THAT IS NOT AN OVERSIGHT.**
-   * `gate = button("gate");   // 1 while a key is held down` introduces no code:
-   * the code is to its left and already read. A blank line under it would
-   * separate two statements that belong together.
-   * ⚠️ **AND IT COSTS FOUR TO SIX LINES A PRESET, WHICH IS WHY `rows` MOVED.**
-   * See the code box below: the box is sized to the longest listing, MEASURED
-   * rather than guessed, and this ask changed which number that is.
-   */
-  const PRESETS = [
-    {
-      id: 'organ',
-      label: 'Organ',
-      what: 'three partials and an envelope, which is the one to edit first',
-      code: `import("stdfaust.lib");   // brings in os, en and si, used below
-
-freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
-gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
-gate = button("gate");                         // 1 while a key is held down
-
-// the knobs: how loud the octave and the twelfth are, and the release
-
-oct   = hslider("oct", 0.5, 0, 0.6, 0.01) : si.polySmooth(gate, 0.999, 1);
-quint = hslider("quint", 0.25, 0, 0.5, 0.01) : si.polySmooth(gate, 0.999, 1);
-rel   = hslider("rel[scale:log]", 0.35, 0.02, 3, 0.01);
-
-// attack, decay, sustain, release. Seconds, except the 0.7 which is a level
-
-env  = en.adsr(0.005, 0.12, 0.7, rel, gate);
-
-// three sine partials: the note, its octave, and its twelfth
-
-tone = os.osc(freq) + oct * os.osc(freq * 2) + quint * os.osc(freq * 3);
-
-// what you hear. <: splits one signal into the two the speakers want
-
-process = tone * env * gain * 0.2 <: _, _;
-effect  = _, _;   // runs once after the mixer. _ is a wire that changes nothing
-`,
-    },
-    {
-      /* 🔴 THE SAME INSTRUMENT AS `demo/shell/rhodes.mjs`, WRITTEN AGAIN IN
-         FOUR LINES. That file is 60 lines of per-sample JavaScript arithmetic
-         and its header explains the sound: a TINE operator at a high ratio
-         decaying in tens of milliseconds, a BODY at 1:1 decaying over a second,
-         and a carrier both of them phase-modulate. This is that description
-         with the loops taken out, which is what a signal language is for. */
-      id: 'rhodes',
-      label: 'Rhodes',
-      what: 'a tine, a body and a carrier they both bend, which is the DX7 electric piano',
-      code: `import("stdfaust.lib");   // brings in os, en and si, used below
-
-freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
-gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
-gate = button("gate");                         // 1 while a key is held down
-
-// the knobs: how far the tine and the body bend the note, and how long it rings
-
-index = hslider("index", 0.02, 0, 1, 0.01) : si.polySmooth(gate, 0.999, 1);
-decay = hslider("decay[scale:log]", 1.4, 0.3, 4, 0.01);
-
-// the tine: 14 times the note, gone in 20 ms. This is the hammer hitting it
-
-knock = os.osc(freq * 14) * en.ar(0.001, 0.02, gate) * 3.2 * gain;
-
-// the body: the note itself, ringing on for about a second
-
-body  = os.osc(freq) * en.ar(0.001, 0.9, gate) * 1.1;
-env   = en.adsr(0.002, decay, 0.0, 0.4, gate);   // 0.0 sustain, so it dies away
-
-// both of them bend the carrier's pitch instead of being added to it,
-// which is FM, and it is what makes this a Rhodes and not three oscillators
-
-process = os.osc(freq + (knock + body) * freq * index) * env * gain * 0.3 <: _, _;
-effect  = _, _;
-`,
-    },
-    {
-      /* 🔴 THE THIRD, ADDED 2026-09-28 IN PLACE OF `Bell`, WHICH IS THE ROW THE
-         ASK TOOK OUT: *"rm bell and hall from fau they do not diffentiate"*.
-         `Bell` was the Rhodes with `3.51` typed where a whole number had been,
-         and its own comment said so, so a visitor stepping onto it learned a
-         number rather than a mechanism.
-         🔴 WHAT THIS ONE SHOWS AND NOTHING ELSE ON THE PAGE DOES IS `~`, THE
-         OPERATOR THAT LETS A SIGNAL READ ITS OWN OUTPUT. Everything else here
-         runs forwards: the Organ adds oscillators up, the Rhodes bends one with
-         another, and the two library names below hide whatever they do. This
-         patch has no oscillator in it at all. Twelve milliseconds of noise go
-         into a delay line that feeds itself, the LENGTH of that delay is the
-         pitch, and the fraction that survives a lap is the decay. It is
-         Karplus-Strong, the cheapest physical model there is, and it is the
-         counterweight to `Djembe` and `Clarinet`: the same kind of thing those
-         two name in one word, written out where a visitor can change it.
-         ✅ MEASURED 2026-09-28, compiled the way THIS page compiles, which is
-         polyphonic with a voice, an effect and a mixer: 68 ms cold and 27 to
-         30 ms warm, 8.61 kB of machine code, 16.47 kB a voice. That per-voice
-         figure is the only one on this page that is a BUFFER rather than a
-         table or almost nothing, which is what a delay line is.
-         ⚠️ NOTHING NEW CROSSES THE WIRE. `no`, `de` and `fi` are all inside the
-         2.41 MB of library the page has already downloaded, the same condition
-         the Clarinet below was chosen under.
-         ⚠️ AND THE DAMPER IS ONE TERM RATHER THAN A SECOND ENVELOPE. A string
-         with a constant feedback rings on after the key comes up, which is what
-         a real one does and is wrong on a keyboard with eight voices and a
-         sustain pedal, because then nothing the foot does can be told apart
-         from the instrument ignoring it. `keep` drops to 0.9 when the gate
-         goes. MEASURED offline at 440 Hz: an RMS of 0.0009 in the first tenth
-         of a second after the key lifts, against 0.075 in the first tenth it
-         was held. */
-      id: 'pluck',
-      label: 'Pluck',
-      what: 'a burst of noise in a loop that reads its own output, which is a string',
-      code: `import("stdfaust.lib");   // brings in no, en, de and fi, used below
-
-freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
-gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
-gate = button("gate");                         // 1 while a key is held down
-
-// twelve milliseconds of noise, which is the finger leaving the string
-
-burst = no.noise * en.ar(0.001, 0.012, gate) * gain;
-
-// the knobs: how bright the string is, and how much of each lap is lost
-
-cutoff = hslider("cutoff[scale:log]", 5000, 500, 12000, 1);
-damp   = hslider("damp[scale:log]", 0.001, 0.0003, 0.03, 0.0001);
-
-// one lap of the loop. How long the lap is IS the note, and how much of it
-// comes back is the decay, which drops to 0.9 when the key lifts
-
-keep = 0.9 + (0.1 - damp) * gate;
-lap  = de.fdelay(2048, ma.SR / freq - 1) : fi.lowpass(1, cutoff) : *(keep);
-
-// ~ feeds the output back into the + it is written on, one sample later
-
-process = burst : (+ ~ lap) * 0.4 <: _, _;
-effect  = _, _;
-`,
-    },
-    {
-      /* 🔴 THE FOURTH, ADDED 2026-09-28 IN PLACE OF `Hall`, AND IT KEEPS THE ONE
-         THING `Hall` WAS FOR. That row was the Organ verbatim with
-         `effect = dm.freeverb_demo;` under it, which is a real lesson about the
-         last line of every listing sitting on a voice the page already had. The
-         room moves here, onto a voice that is nobody else's.
-         🔴 AND THE VOICE IS THE THIRD WAY OF MAKING A SOUND, WHICH THIS PAGE
-         DID NOT HAVE. The Organ adds oscillators together and the Rhodes bends
-         one with another, so both of them BUILD the sound up. This one starts
-         with a sawtooth, which has every harmonic of the note in it already,
-         and takes most of that away again with a filter whose corner is driven
-         by an envelope of its own rather than by the volume.
-         ✅ MEASURED 2026-09-28, compiled the way this page compiles: 106 to
-         118 ms, 21.29 kB of machine code, and 108 BYTES a voice, which is the
-         smallest per-voice figure this page has ever printed and is worth
-         having beside the Organ's 262.26 kB. A sawtooth and a two pole filter
-         keep almost nothing; `os.osc` carries a 65,536 entry sine table.
-         ⚠️ AND THE ROOM IS NOT IN THOSE 108 BYTES, WHICH IS WHAT THE ASSERT
-         BELOW GRADES. MEASURED the same day by compiling this listing twice,
-         once as it stands and once with a bare wire on the last line:
-         21.29 kB against 9.42 kB of machine code, and 108 bytes a voice either
-         way, so the room really does run once on the mix.
-         ⚠️ NOTHING NEW CROSSES THE WIRE. `dm` is `demos.lib` and `fi` is
-         `filters.lib`, both already in the downloaded library. */
-      id: 'sweep',
-      label: 'Sweep',
-      what: 'a sawtooth with most of it taken away again by a filter that moves',
-      code: `import("stdfaust.lib");   // brings in os, en, fi, si and dm, used below
-
-freq = hslider("freq", 440, 40, 8000, 0.01);   // the note a key asked for
-gain = hslider("gain", 0.5, 0, 1, 0.01);       // how hard that key was hit
-gate = button("gate");                         // 1 while a key is held down
-cutoff = hslider("cutoff[scale:log]", 8000, 100, 8000, 1) : si.smoo;
-res    = hslider("res[scale:log]", 6, 0.7, 8, 0.01);
-depth  = hslider("depth", 11, 0, 24, 0.1) : si.polySmooth(gate, 0.999, 1);
-
-saw = os.sawtooth(freq);                     // every harmonic is in here already
-env = en.adsr(0.005, 0.2, 0.6, 0.3, gate);   // this envelope is on the volume
-
-// and this one is on the corner the filter cuts at, which is where the sound
-// is. It opens depth times the note above it, never past the cutoff, and shuts
-
-cut = min(cutoff, freq * (1 + depth * en.ar(0.002, 0.5, gate)));
-
-process = saw : fi.resonlp(cut, res, 1) * env * gain * 0.12 <: _, _;
-
-// a real room, and it runs once on the mix rather than once per voice
-
-effect  = dm.freeverb_demo;
-`,
-    },
-    {
-      id: 'djembe',
-      label: 'Djembe',
-      what: 'a drum somebody else modelled, named in one line',
-      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
-
-// a physical model somebody else wrote, taken whole out of the library.
-// pm is physmodels. It builds its own controls, which is what _ui_ means
-
-process = pm.djembe_ui_MIDI <: _, _;
-effect  = _, _;
-`,
-    },
-    {
-      /* 🔴 ADDED 2026-09-25 ON *"add more patches if you have"*, AND `if you
-         have` WAS READ AS THE CONDITION IT IS. This one is not invented:
-         `plan-fau.md` §1.4 names `pm.clarinet_ui_MIDI` as the measured example
-         behind its own headline sentence, *"61 bytes of source becomes a
-         clarinet"*, and `physmodels.lib` is already inside the 2.41 MB of
-         library this page downloads. Nothing new crosses the wire for it.
-         🔴 AND THE PLAN'S COMPILE TIME DOES NOT TRANSFER TO THIS PAGE, MEASURED
-         2026-09-25 BEFORE IT WAS ADDED. §2.2 records 94 to 106 ms; compiled the
-         way THIS page compiles, which is polyphonic with a voice, an effect and
-         a mixer, it is 273 to 344 ms on this desk. The plan's figure is a MONO
-         compile and this page has never made one. That is the slowest preset
-         here and it is still an order of magnitude under the STK piano's
-         1,690 ms, which is the one refused.
-         ⚠️ `nearly three times over the next one` STOOD HERE UNTIL 2026-09-28
-         AND `Sweep` MOVED IT. RE-MEASURED that day with the vendored compiler
-         under node, every preset the same way so that only the ratio is being
-         quoted: clarinet 241 to 260 ms against Sweep's 106 to 118, which is
-         about twice rather than three times. The 273 to 344 above is the
-         in-browser figure and is unchanged.
-         ⚠️ `pm.brass_ui_MIDI` COMPILES IN 155 ms AND WAS NOT CHOSEN. It is in
-         the same library and it would have been the cheaper row; it has never
-         been measured in this repository, and picking a sound on a number the
-         page does not otherwise care about is how provenance gets lost. */
-      id: 'clarinet',
-      label: 'Clarinet',
-      what: 'the same one line as the drum with a blown tube behind it instead of a struck skin',
-      code: `import("stdfaust.lib");   // brings in os, en and pm, used below
-
-// another name out of the same library as the drum, and a blown tube keeps
-// a delay line per voice where a struck skin keeps almost nothing
-
-process = pm.clarinet_ui_MIDI <: _, _;
-effect  = _, _;
-`,
-    },
-  ];
+  /* The presets live in `demo/fau/presets.mjs` since 2026-10-06, with the
+     comment that explains them, so the ahead of time Organ in
+     `demo/resources/faust/` is compiled from the same text this page shows. */
 
   /**
    * 🔴 A PRESET IS REACHED BY `id`, NEVER BY INDEX, AND 2026-09-28 IS WHY THIS
@@ -745,15 +442,33 @@ effect  = _, _;
   // an AudioContext created on a visit is a visit making a sound device busy for
   // a page nobody has put a finger on. The compile moved to the load path on
   // 2026-09-28 and this deliberately did not go with it.
+  // 🔴 THE CONTEXT IS THE PAGE'S SHARED ONE SINCE 2026-10-06
+  // (`demo/shell/audio.mjs`), so a deck on this page plays into the same
+  // device rather than opening a second one. This page builds its own master
+  // gain and meter on top of it, and `FAU` below is the owner it claims with.
+  // ⚠️ IT IS 48 kHz NOW, WHERE IT WAS THE DEVICE'S OWN RATE. Faust takes the
+  // context's rate, so the instrument is the same; `audio.mjs` says why 48000.
   let ctx = null, master = null, meter = null, node = null;
+  /**
+   * The one thing this page has sounding, as `audio.mjs` counts owners. A tab
+   * going to the background calls `stop()`, which lets every note go, and the
+   * next key resumes the context through `claim()`.
+   */
+  const FAU = { stop: () => allOff() };
   function audio() {
     /* 🔴 THE RESUME IS OUTSIDE THE ONCE-ONLY HALF, because a context is
        suspended by more than its own creation: a tab in the background
        suspends one, and so does a switch-off if this page ever grows one. It
        used to sit beside `new AudioContext`, where it ran exactly once in the
-       life of the page and could never bring a stopped one back. */
-    if (ctx) { ctx.resume?.(); return ctx; }
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
+       life of the page and could never bring a stopped one back.
+       `sharedAudio()` fires that resume on every call after the first, and
+       `claim()` fires it on a suspended context. Neither is awaited: `resume()`
+       waits on a gesture in a real browser and never rejects, so awaiting it is
+       a hang rather than an error. */
+    const c = sharedAudio();
+    claim(FAU);
+    if (ctx) return ctx;
+    ctx = c;
     master = ctx.createGain();
     master.gain.value = 0.9;
     /* 🔴 512, NOT 2048, AND `/nola/` PAID FOR THAT NUMBER. An analyser at 2048
@@ -766,9 +481,6 @@ effect  = _, _;
     meter.fftSize = 512;
     master.connect(meter);
     master.connect(ctx.destination);
-    // Fired and not awaited. `resume()` waits on a gesture in a real browser
-    // and never rejects, so awaiting it is a hang rather than an error.
-    ctx.resume?.();
     return ctx;
   }
 
@@ -783,36 +495,23 @@ effect  = _, _;
   }
 
   // ── the compiler, fetched once, on purpose ─────────────────────────────────
-  let faust = null;              // { compiler, aborts: string[] }
+  //
+  // 🔴 THE COMPILER IS `demo/shell/faust.mjs`'s SINCE 2026-10-06, and so is the
+  // `console.error` shim this header's item 2 describes, moved there verbatim:
+  // the glue still binds `console.error` once, inside the one await that
+  // module wraps, and a captured line still comes back here through `onAbort`
+  // below, into this page's log and into `captured`. What stays here is what
+  // this page SAYS about the compiler: what it costs, how long it took, and
+  // whether whatever served it compressed it.
+  let faust = null;              // { compiler } once this page has logged its arrival
   let captured = [];             // every line the compiler's abort path printed
 
-  /**
-   * 🔴 THE THREE LINES THAT KEEP EMSCRIPTEN'S ABORT OFF THE CONSOLE, AND WHERE
-   * THEY SIT IS THE WHOLE TRICK. See the header: the glue binds `console.error`
-   * ONCE, at module evaluation, and that evaluation happens inside the await
-   * below. So the forwarding function is installed immediately before it and
-   * taken off immediately after, and the compiler is the only thing on the page
-   * holding it.
-   */
   async function bootCompiler() {
     if (faust) return faust;
     const t0 = performance.now();
-    d.log(`fetching the Faust compiler, ${mb(COMPILER_BYTES)} MB, once`);
-    const { instantiateFaustModuleFromFile, LibFaust, FaustCompiler, FaustPolyDspGenerator }
-      = await import(VENDOR.mjs);
-    const realError = console.error;
-    console.error = function (...a) {
-      if (sink) { sink(a.map(String).join(' ')); return undefined; }
-      return realError.apply(console, a);
-    };
-    let mod;
-    try {
-      mod = await instantiateFaustModuleFromFile(VENDOR.js, VENDOR.data, VENDOR.wasm);
-    } finally {
-      console.error = realError;
-    }
-    const compiler = new FaustCompiler(new LibFaust(mod));
-    faust = { compiler, FaustPolyDspGenerator };
+    if (!hasCompiler()) d.log(`fetching the Faust compiler, ${mb(COMPILER_BYTES)} MB, once`);
+    const compiler = await faustCompiler();
+    faust = { compiler };
     const ms = performance.now() - t0;
     const raw = vendorBytes(), wire = vendorBytes('encodedBodySize');
     d.log(`Faust ${compiler.version()} is in this tab, ready in ${ms.toFixed(0)} ms`, 'hi');
@@ -822,22 +521,11 @@ effect  = _, _;
     return faust;
   }
 
-  /**
-   * Where a captured `console.error` goes while a compile is running.
-   *
-   * 🔴 IT AWAITS. The first version of this returned `fn()` and cleared the
-   * sink in a `finally`, which runs the moment the PROMISE is handed back and
-   * not when it settles, so the window was open for the synchronous part of a
-   * compile and shut for all of it. The abort arrives inside the await.
-   */
-  let sink = null;
-  async function quietly(fn) {
-    sink = (s) => {
-      captured.push(s);
-      // The first line is the whole of it; the rest is an Emscripten stack.
-      d.log(`the compiler threw and caught it: ${s.split('\n')[0].slice(0, 70)}`);
-    };
-    try { return await fn(); } finally { sink = null; }
+  /** Where a captured `console.error` goes while a compile is running. */
+  function onAbort(s) {
+    captured.push(s);
+    // The first line is the whole of it; the rest is an Emscripten stack.
+    d.log(`the compiler threw and caught it: ${s.split('\n')[0].slice(0, 70)}`);
   }
 
   // ── the knobs under the text ──────────────────────────────────────────────
@@ -971,7 +659,7 @@ effect  = _, _;
     const first = node === null;
     const t0 = performance.now();
     audio();
-    const next = await ready.gen.createNode(ctx, VOICES);
+    const next = await faustNode(ctx, ready.gen, VOICES);
     const old = node;
     node = next;
     onThread = ready;
@@ -1015,8 +703,8 @@ effect  = _, _;
    */
   async function build(code, name, pin = '') {
     runs++;
-    const { compiler, FaustPolyDspGenerator } = await bootCompiler();
-    const gen = new FaustPolyDspGenerator();
+    await bootCompiler();
+    let gen = null;
     /* 🔴 A FRESH NAME PER COMPILE, BECAUSE libfaust CACHES A FACTORY BY NAME
        AND CODE. MEASURED: recompiling the same pair answers in 0.1 ms off that
        cache against 63 ms for the real thing, so a page that reused one name
@@ -1027,7 +715,7 @@ effect  = _, _;
     const t0 = performance.now();
     let ok = true, error = '';
     try {
-      await quietly(() => gen.compile(compiler, uniq, code, FLAGS));
+      gen = await faustCompile(uniq, code, { flags: FLAGS, onAbort });
     } catch (e) {
       ok = false;
       error = String(e?.message || e).split('\n').slice(0, 2).join(' ').trim();
@@ -1244,7 +932,9 @@ effect  = _, _;
   function press(note, vel = 100) {
     keys.lightNote?.(note, true);
     pedal.keyDown(note);
-    if (node) { node.keyOn(0, note, vel); voiced++; return undefined; }
+    /* `claim` is a comparison when this page already holds the audio, and a
+       resume when a background tab took it away (`demo/shell/audio.mjs`). */
+    if (node) { claim(FAU); node.keyOn(0, note, vel); voiced++; return undefined; }
     const job = arm();
     if (!job) {
       d.log('nothing is compiled yet, the note in the corner of the text says when it is');
@@ -1615,8 +1305,8 @@ effect  = _, _;
        was `runs === 0`, which has stopped being true on purpose. */
     d.assert('and a visit opens no sound device, puts nothing on the audio thread and asks about '
            + 'no MIDI keyboard',
-      ctx === null && node === null && midi === null,
-      `audio ${ctx ? 'open' : 'none'}, node ${node ? 'built' : 'none'}, `
+      ctx === null && contexts() === 0 && node === null && midi === null,
+      `audio ${ctx ? 'open' : 'none'}, ${contexts()} contexts made, node ${node ? 'built' : 'none'}, `
       + `MIDI ${midi ? 'asked' : 'not asked'}`);
     /* 🔴 THE CELL IS ROUND-TRIPPED THROUGH 1000 RATHER THAN COMPARED AGAINST
        `kb()`, AND THAT IS THE WHOLE POINT OF THIS ASSERT. The first version
@@ -1799,8 +1489,8 @@ effect  = _, _;
     /* The negative control beside it, and it is the one that would have gone
        red on any design that reached the audio thread at load. */
     d.assert('and it got there without opening a sound device, so nothing has been played at '
-           + 'anybody', ctx === null && node === null && midi === null,
-      `audio ${ctx ? 'open' : 'none'}, node ${node ? 'built' : 'none'}, `
+           + 'anybody', ctx === null && contexts() === 0 && node === null && midi === null,
+      `audio ${ctx ? 'open' : 'none'}, ${contexts()} contexts made, node ${node ? 'built' : 'none'}, `
       + `MIDI ${midi ? 'asked' : 'not asked'}`);
     /* 🔴 AND THE NOTE GOES WHEN THE COMPILE IS DONE, READ AS `display`.
        `hidden` is an attribute and `.pos-cnote` sets `display: flex`, so only
@@ -2342,6 +2032,14 @@ effect  = _, _;
       const handRan = knobs.handOn('cutoff');
       handBtn().click();
       const byHand = knobs.value('cutoff');
+      /* ⚠️ ONE BEAT BEFORE THE NODE IS ASKED. `getParamValue` reads the
+         AudioParam's `value`, which the audio thread updates when it renders
+         the next 128 frames after `setValueAtTime`, so a hand step sent in the
+         same task as this read is reported one step stale. MEASURED 2026-10-06:
+         `cutoff 109 after 74 setParamValue, the node says 108`, red once in
+         two runs with nothing about the knob or the node wrong. 50 ms is
+         eighteen render quanta at 48 kHz and the hand is already stopped. */
+      await sleep(50);
       const addr = onThread?.addr.get('cutoff');
       const onNode = addr ? node.getParamValue(addr) : NaN;
       d.assert('its invisible hand turns cutoff by itself, and the live node holds the value the knob shows',

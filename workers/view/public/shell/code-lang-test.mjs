@@ -66,19 +66,12 @@ const ok = (name, cond, detail = '') => {
 
 // ── the texts, read from what ships ─────────────────────────────────────────
 
-/** `/fau/`'s presets live inside its page as template literals. */
-function fauPresets() {
-  const html = readFileSync(join(HERE, '../fau/index.html'), 'utf8');
-  const at = html.indexOf('const PRESETS = [');
-  if (at < 0) throw new Error('no PRESETS in demo/fau/index.html');
-  const out = [];
-  const re = /\bid: '([^']+)'[\s\S]*?\bcode: `((?:[^`\\]|\\.)*)`/g;
-  re.lastIndex = at;
-  let m;
-  // the list ends at the first `];` at the start of a line after it
-  const end = html.indexOf('\n  ];', at);
-  while ((m = re.exec(html)) && m.index < end) out.push({ id: m[1], code: eval('`' + m[2] + '`') });
-  return out;
+/** `/fau/`'s presets, imported from the module the page imports since
+ *  2026-10-06. They were read out of the page with a regular expression until
+ *  then. */
+async function fauPresets() {
+  const { PRESETS } = await import('../fau/presets.mjs');
+  return PRESETS.map((p) => ({ id: p.id, code: p.code }));
 }
 /** `/csound/`'s one score, in its SCORE tab's module since the page got tabs
  *  (396ca4b), as an array joined with newlines. Read from the page before that
@@ -90,7 +83,7 @@ function undScore() {
   return eval(m[1]).join('\n');
 }
 
-const FAU = fauPresets();
+const FAU = await fauPresets();
 const UND = undScore();
 ok('the presets were found where they ship', FAU.length >= 4 && SC_PRESETS.length >= 3 && UND.length > 100,
   `${FAU.length} Faust, ${SC_PRESETS.length} SuperCollider, a ${UND.split('\n').length} line score`);

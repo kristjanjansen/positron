@@ -1155,6 +1155,10 @@ export function shortDate(iso) {
 export const GROUPS = new Map([
   // The kit first, asked 2026-10-04: *"move kit to first group in index page"*.
   ['kit', 'kit'],
+  // Decks, asked 2026-10-06: *"add grpup to frontpage: Slides (2 col)"* and
+  // *"use 2col slidedck here. no separate page"*. It holds no demo rows: the
+  // section is a holder that shell/decks.mjs fills with one player per deck.
+  ['slides', 'slides'],
   /**
    * 🔴 `TH` IS FIRST, ASKED 2026-09-24: *"move headset group first in
    * index. rename to 'TH'"*, with *"move making to TH"* and *"move typist to
@@ -1306,8 +1310,11 @@ export function byGroup(list = DEMOS) {
     id, title,
     rows: byNewest(list.filter((d) => d.group === id))
       .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)),
-  })).filter((g) => g.rows.length);
+  })).filter((g) => g.rows.length || DECK_GROUPS.has(g.id));
 }
+// Groups that are not demo cards: the front page fills their holder with the
+// players from shell/decks.mjs, so they are drawn with no rows.
+export const DECK_GROUPS = new Set(['slides']);
 
 /**
  * The front page's own name, with the number of demos on it COUNTED rather than
@@ -1364,6 +1371,7 @@ export function demoCardHTML(d) {
 
 /** A whole section: its name and its cards. */
 export function groupHTML(g) {
+  if (DECK_GROUPS.has(g.id)) return `<h2 class="pos-act-h">${g.title}</h2><div class="pos-decks" data-decks></div>`;
   return `<h2 class="pos-act-h">${g.title}</h2>`
     + `<div class="pos-cards" style="--card-min:210px">`
     + g.rows.map(demoCardHTML).join('') + '</div>';

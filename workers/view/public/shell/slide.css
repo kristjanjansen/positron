@@ -317,6 +317,29 @@
 .sl[data-layout="split"][data-side="right"]::before { right: 0; }
 .sl[data-layout="split"] .sl-in { position: relative; }
 
+/* `band`: TWO ROWS, 2:1, asked 2026-10-06 with a screenshot of a split: *"its
+   better to use vertical sections here. top 2/3 is darker, centered screen and
+   buttons ton the right, below in lighter area title an desc"*, and *"use this
+   vertical 2:1 layout also for big number example"*. The well (the slot or the
+   big figure) takes two shares of the height and the words one, a gap of twice
+   the inset between them, as a split's columns have. The darker ground runs
+   edge to edge across the top, ending in the middle of that gap: the inset,
+   two thirds of what is left, then half the gap, which is (2H - 2 pad) / 3. */
+.sl[data-layout="band"] .sl-in {
+  display: grid; grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
+  row-gap: calc(2 * var(--sl-pad)); position: relative;
+}
+.sl-well { min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; }
+.sl-well > .sl-slot { flex: 1 1 auto; align-self: stretch; }
+.sl[data-layout="band"] .sl-words { justify-content: center; }
+.sl[data-layout="band"] .sl-ev { flex: 0 0 auto; align-items: flex-start; text-align: left; margin-top: 0; }
+.sl[data-layout="band"] .sl-cap { margin-top: auto; }
+.sl[data-layout="band"]::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0;
+  height: calc((200% - 2 * var(--sl-pad)) / 3);
+  background: var(--bg); pointer-events: none;
+}
+
 /* THE SLOT: any element. In a split it is a whole column; anywhere else it
    takes what the evidence region has left. Its child is centred in it. */
 .sl-slot {
@@ -375,4 +398,61 @@
 .sl-count {
   font: 500 12px/1 var(--mono); color: var(--dim);
   font-variant-numeric: tabular-nums; min-width: 7ch; text-align: center;
+}
+
+/* ── the decks on the front page (shell/decks.mjs) ──────────────────────────
+   Two half width players a row, asking the row's OWN width and becoming one
+   column below 560 px of it, as the kit's HALF WIDTH PLAYERS and `/cam/` do.
+   The gap is the control gap twice, theirs too. */
+.pos-decks { container-type: inline-size; }
+.pos-decks-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(2 * var(--ctl-gap, 10px)); }
+@container (max-width: 560px) { .pos-decks-in { grid-template-columns: minmax(0, 1fr); } }
+/* THE BRAND DECK'S LOGO set solid, the three lines one mark, and the wordmarks,
+   which are grids of letters, the same way. Moved from /kit/ with the logo on
+   2026-10-06 at the weight it had there, so it still beats the slide's own rules. */
+.sl-player .sl[aria-label="logo"] .sl-ev,
+.sl-player .sl[aria-label^="wordmark"] .sl-ev { gap: 0; }
+/* THE + AS A SUPERSCRIPT, as the positron is written, β⁺. Asked 2026-10-05:
+   *"+ as superscript?"*. A span raised and made smaller rather than U+207A,
+   which the vendored subsets do not carry. */
+.sl-player .sl[aria-label="logo"] .sl-line .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
+/* ONE EMPTY LINE between β+ and the wordmark, asked 2026-10-06 as *"add one
+   line bettween β+ and workmark"*: a line of the wordmark's own step (`1lh`). */
+.sl-player .sl[aria-label="logo"] .sl-line + .sl-line:not(.sl-line + .sl-line + .sl-line) { margin-top: 1lh; }
+/* THE ICON SLIDES (decks.mjs): one column per mark shown, each holding
+   canvases drawn at the size they are shown. */
+.dk-icons { display: grid; grid-template-columns: repeat(var(--dk-n, 2), 1fr); width: 100%; height: 100%; align-items: center; justify-items: center; }
+.dk-col { display: flex; flex-direction: column; align-items: center; gap: 4cqh; }
+.dk-icons[data-n="1"] { --dk-n: 1; }
+.dk-sizes { display: flex; align-items: flex-end; gap: 3cqh; }
+/* the two app icons stand further apart, *"add hor gap a biiit"* */
+.dk-apps { gap: 7cqh; }
+.dk-real { display: block; }
+.dk-app { display: flex; flex-direction: column; align-items: center; gap: 6px; font: 400 11px/1 var(--sans); color: var(--fg); }
+
+/* ── FULL SCREEN IS THE SLIDE AND NOTHING ELSE ─────────────────────────────
+   Asked 2026-10-06 with two screenshots of a deck in full screen: *"rm pseudo
+   app frame, paint all bg properly. where is border of screen?"* and *"what
+   the f is going on"*. Three things were drawn on top of the slide:
+   1. THE FOCUS RING. The player keeps keyboard focus so it hears its keys, and
+      a key press makes that focus visible, so the yellow 1 px ring went round
+      the whole screen (its top edge was the line under the menu bar). In full
+      screen the screen's edge is the edge, so no ring.
+   2. THE ⛶ LEAVE BUTTON in the corner, on a screen with a pointer. Esc and f
+      leave, the browser says so itself, and on a screen with no hover (a phone)
+      the button stays, because there it is the only way out.
+   3. A `band` slide's darker top stopped at the slide when the screen is not
+      16:9. It runs to the screen's top edge now, ending where the slide's own
+      does: the screen's middle plus 0.1133 of the slide's height, which is
+      (2h - 2 pad) / 3 - h / 2 with the inset at 8 per cent of h. In full screen
+      the stage is the viewport, so h is min(100vh, 56.25vw). */
+.sl-player.pos-full:focus, .sl-player.pos-full:focus-visible,
+.sl-player[data-full]:focus, .sl-player[data-full]:focus-visible { outline: none; }
+@media (hover: hover) { .sl-player .pos-fsx { display: none; } }
+.sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="band"]:not([hidden])),
+.sl-player.pos-full .pos-vp-stage:has(> .sl[data-layout="band"]:not([hidden])) {
+  background: linear-gradient(to bottom, var(--bg) calc(50% + 0.1133 * min(100vh, 56.25vw)), var(--card) 0);
+}
+.sl-frame.pos-full:has(> .sl[data-layout="band"]) {
+  background: linear-gradient(to bottom, var(--bg) calc(50% + 0.1133 * min(100vh, 56.25vw)), var(--card) 0);
 }

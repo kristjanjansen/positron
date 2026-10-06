@@ -28,8 +28,13 @@
 //              and `place` at step 2 under it, on the bottom edge (see
 //              TITLE_STEPS); a title slide carries nothing else
 //   slot       any element: a kit component, a picture, a diagram
-//   layout     'stack' (default), 'top', 'left', 'split' (no 'right',
-//              removed 2026-10-05: *"no right align needed"*)
+//   layout     'stack' (default), 'top', 'left', 'split', 'band' (no 'right',
+//              removed 2026-10-05: *"no right align needed"*). `band` is
+//              two rows, 2:1: the slot or the big figure centred in a darker
+//              well across the top two thirds, the words under it on the
+//              slide's own ground (2026-10-06: *"its better to use vertical
+//              sections here. top 2/3 is darker ... below in lighter area
+//              title an desc"*)
 //   side       for 'split', which side the slot is on: 'left' or 'right'
 //
 // Marks in any string: `*x*` paints x in `--hi`, `[x|tech]` paints x in the
@@ -182,7 +187,7 @@ export const evStep = (rows) => (rows > 3 ? 2 : 3);
  * assert, four splits red). Step 3 holds 13 and step 2 holds 20. A `big`
  * figure and declared `lines` keep their step, because they name it.
  */
-export const wordsStep = (step, layout) => Math.max(1, layout === 'split' ? step - 1 : step);
+export const wordsStep = (step, layout) => Math.max(1, layout === 'split' || layout === 'band' ? step - 1 : step);
 
 /** The two spaces between character columns, in every table and log. */
 export const COL_GAP = 2;
@@ -235,7 +240,7 @@ export const FRAMES = ['none'];
 export const tableStep = (lines, frame) => (frame ? (lines > 2 ? 2 : 3) : evStep(lines));
 
 // ── the slide model ─────────────────────────────────────────────────────────
-export const LAYOUTS = ['stack', 'top', 'left', 'split'];
+export const LAYOUTS = ['stack', 'top', 'left', 'split', 'band'];
 const KEYS = new Set(['name', 'layout', 'side', 'say', 'statement', 'big', 'under', 'text', 'textStep',
   'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes', 'title', 'by', 'date', 'place']);
 
@@ -307,6 +312,7 @@ export function normalise(spec) {
     if (!spec.slot) throw new Error('a split slide needs a slot, the thing beside the words');
     if (spec.side !== 'left' && spec.side !== 'right') throw new Error('a split slide says which side its slot is on, left or right');
   } else if (spec.side) throw new Error(`side is for a split slide, not ${layout}`);
+  if (layout === 'band' && !spec.slot && !spec.big) throw new Error('a band slide needs a slot or a big figure for its top two thirds');
   if (spec.statement && (spec.big || spec.rows || spec.stack || spec.list)) {
     throw new Error('a statement is the whole slide, so it carries no evidence');
   }
@@ -531,10 +537,13 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
     parts.lines.push(p);
     ev.append(p);
   }
+  // a band's top two thirds: the slot or the big figure, centred in the well
+  const well = s.layout === 'band' ? el('div', 'sl-well') : null;
+  if (well) { parts.well = well; box.prepend(well); }
   if (s.big) {
     const p = el('p', 'sl-t sl-t6 sl-big');
     p.append(rich(s.big));
-    ev.append(p);
+    (well || ev).append(p);
     if (s.under) { const u = el('p', 'sl-t sl-t3 sl-dim sl-under'); u.append(rich(s.under)); ev.append(u); }
   }
   if (s.text) {
@@ -596,7 +605,8 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
     // evidence, under whatever words there are, taking the height left.
     if (s.layout === 'split') {
       if (s.side === 'left') box.prepend(slot); else box.append(slot);
-    } else ev.append(slot);
+    } else if (well) well.append(slot);
+    else ev.append(slot);
     const build = typeof s.slot === 'function' ? s.slot
       : s.slot instanceof Element ? (h) => { h.append(s.slot); return null; }
       : (s.slot.kind && slots[s.slot.kind]) ? (h) => slots[s.slot.kind](h, s.slot)
@@ -609,7 +619,8 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
     const cap = el('p', 'sl-t sl-t1 sl-cap');
     cap.append(rich(s.cap));
     parts.cap = cap;
-    box.append(cap);
+    // a band has one row for words, so the caption is the last of them
+    (well ? words : box).append(cap);
   }
 
   let fullBtn = null;
