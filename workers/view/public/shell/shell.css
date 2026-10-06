@@ -5248,6 +5248,10 @@ button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); pad
    nothing here sets letter-spacing: `ch` is the advance of `0`, and tracking
    would add one space per character on top of a reserve that did not budget
    for it. */
+/* A HIDDEN BADGE IS NOT DRAWN, 2026-10-06. `display: inline-flex` below beats
+   the browser's own `[hidden]`, so `link-badge.mjs` setting `hidden` left
+   "NOT RECEIVING" on screen; three pages hid a wrapper to work round it. */
+.pos-pres[hidden] { display: none; }
 .pos-pres {
   position: relative;
   /* 🔴 10 px BETWEEN THE DOT AND THE WORDS, UP FROM 6. Asked 2026-09-16 with a

@@ -249,6 +249,9 @@
   import { createParamKnobs } from '/shell/param-knobs.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { PRESETS } from '/fau/presets.mjs';
+  import { createEngineNode, createEngineUi, memoryRelay, standInAccess } from '/fau/engine-node.mjs';
+  import { createBayNode } from '/shell/bay-node.mjs';
+  import { graphProblem } from '/shell/graph-registry.mjs';
   import { faustCompiler, hasCompiler, faustCompile, faustNode, FAUST_FLAGS } from '/shell/faust.mjs';
   import { sharedAudio, claim, contexts } from '/shell/audio.mjs';
 
@@ -965,22 +968,50 @@
   // the 6 MB download beside it, in a thing that costs no bytes: a visit opens
   // nothing.
   let midi = null;
+  /* Both roads call the same two functions, which is what keeps the key that
+     lights and the note that sounds the same key. Named, so the patchbay's
+     linked path below calls exactly these and no third copy. */
+  const midiHandlers = {
+    onDown: (note, vel) => press(note, vel || 100),
+    onUp: (note) => lift(note),
+    onControl: (cc, value) => {
+      if (!pedal.control(cc, value)) return;
+      keys.sustain.set(pedal.down(), true);
+    },
+  };
+  /* 🔴 EVERY INPUT PLAYS THIS PAGE UNTIL A LINK ON /patchbay/ SAYS WHICH ONE.
+     `createMidi` hears every keyboard on the machine and says nothing about
+     which one a message came from, so while a link is open its path is shut
+     here and the linked keyboard arrives through `engine` instead
+     (`demo/fau/engine-node.mjs`). With no link, which is every visit that
+     never presses Join, this is exactly the page it was. */
+  const omniHandlers = {
+    onDown: (...a) => engine.omni() && midiHandlers.onDown(...a),
+    onUp: (...a) => engine.omni() && midiHandlers.onUp(...a),
+    onControl: (...a) => engine.omni() && midiHandlers.onControl(...a),
+  };
   function startMidi() {
     if (midi) return midi;
-    midi = createMidi({
-      /* Both roads call the same two functions, which is what keeps the key
-         that lights and the note that sounds the same key. */
-      onDown: (note, vel) => press(note, vel || 100),
-      onUp: (note) => lift(note),
-      onControl: (cc, value) => {
-        if (!pedal.control(cc, value)) return;
-        keys.sustain.set(pedal.down(), true);
-      },
-      log: d.log,
-      loop: keys,
-    });
+    midi = createMidi({ ...omniHandlers, log: d.log, loop: keys });
     return midi;
   }
+
+  // ── on the patchbay, after a press ─────────────────────────────────────────
+  //
+  // 🔴 AN ENGINE NODE WITH A PROGRAM IN, A MIDI IN AND AN AUDIO OUT, AND NOTHING
+  // LEAVES THIS MACHINE (plans/plan-routing-migration.md §2.1, univ §3). Building
+  // it opens nothing; the Join on the instrument's foot does, in `?room=` when the
+  // page has one, and the run's own room under the harness. A keyboard linked to
+  // it there plays it alone, and the badge beside Join says whether its notes are
+  // arriving: *"perhaps just visual indication"*, not a patch view.
+  // ⚠️ THE PROGRAM IN IS THE TEXT BOX. It is announced so the patchbay draws what
+  // the engine is made of; nothing on another page writes it, and a request to
+  // carry this page's sound anywhere is refused in words.
+  const engine = createEngineNode({
+    slug: 'fau', label: 'Faust', program: true, handlers: midiHandlers,
+    allOff: () => allOff(), log: d.log,
+  });
+  const bayUi = createEngineUi(engine, { el, log: d.log });
 
   // ── the patch selector, and the fourth state ───────────────────────────────
   //
@@ -1106,11 +1137,14 @@
   // the text, not on the foot, where the Compile button was before it
   // (*"rm compile from footer"*). The name is in the foot because the sketch
   // of 2026-09-26 puts it there (plans/plan-instrument-audit.md). This page
-  // has no stylesheet rules of its own.
+  // has one stylesheet rule of its own, the cluster Join and its badge make
+  // beside the name, which moves to `shell.css` when `engine-node.mjs` does.
   const panel = createInstrumentPanel({
     viz: source.el,
     keys: keys.el,
-    plate: { name: 'FAU', patch },
+    /* `status` is the place beside the name, and Join with its badge is what
+       sits there: the badge is about the keys this panel is played from. */
+    plate: { name: 'FAU', patch, status: bayUi.el },
   });
   /* The knobs are the row under the text, hidden until a compile has any. */
   knobRow = panel.addRow(knobs.el);
@@ -2093,8 +2127,75 @@
       stuck.length === 0,
       [...moved].map(([k, seen]) => `${k} ${seen.size}`).join(', '));
 
+    await checkPatchbay();
+
     /* The instrument is left live with the Organ on the thread, which is what a
        person opening this page with the checks running should find. */
+  }
+
+  /**
+   * 🔴 THE PATCHBAY HALF, LAST, BECAUSE IT PLAYS NOTES AND EVERY CHECK ABOVE
+   * COUNTS THEM. The round trip runs in an IN-MEMORY room with a stand-in
+   * MIDIAccess (`memoryRelay`, `standInAccess`), so a run opens no socket, asks
+   * the browser for no MIDI and puts nothing on anybody's desk. What it proves is
+   * this page's half: the graph it announces, the answer it gives a
+   * `link.request`, the gate on every other input, and the badge. The relay is
+   * graded by `/patchbay/` and `/partitur/`.
+   */
+  async function checkPatchbay() {
+    const waitFor = async (f, ms = 3000) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 20)); return f(); };
+    const shown = () => { bayUi.sync(); return getComputedStyle(bayUi.wrap).display !== 'none'; };
+    d.assert('building the page joined no room and asked for no MIDI for the patchbay',
+      !engine.joined() && !engine.joining() && engine.counts().midiAsked === 0 && !engine.midiStarted(),
+      `${engine.counts().midiAsked} MIDI asks, ${engine.joining() ? 'a socket is open' : 'no socket'}`);
+    d.assert('this tab is a site of its own and the harness is in a room of its own, never the studio’s',
+      /^fau-[a-z0-9]{4}$/.test(engine.site) && engine.room !== 'studio-1', `${engine.site} in ${engine.room}`);
+    d.assert('Join sits beside the name on the instrument, outside the row the harness presses, and the badge is not drawn',
+      panel.plateRow.contains(bayUi.button) && !bayUi.button.closest('.pos-controls') && !shown(),
+      `badge wrapper display ${getComputedStyle(bayUi.wrap).display}`);
+
+    const relay = memoryRelay();
+    const access = standInAccess(['Stand-in keys', 'Stand-in pads']);
+    await engine.join({ access, wire: relay.open });
+    const peer = createBayNode({ room: engine.room, wire: relay.open });
+    await peer.join();
+    const heard = await waitFor(() => peer.registry.merged().sites.some((s) => s.site === engine.site));
+    const g = engine.graph();
+    const keysOut = g.ports.find((p) => p.dir === 'out' && /keys/i.test(p.label))?.id;
+    const kinds = g.ports.filter((p) => p.id.startsWith(`${engine.site}:fau:`)).map((p) => `${p.id.split(':')[2]} ${p.dir}`).sort().join(', ');
+    d.assert('joined, another page hears an engine with a program in, a MIDI in and a sound that stays here, beside the keyboards',
+      heard && graphProblem(g) === '' && kinds === 'audio out, midi in, program in'
+      && g.ports.find((p) => p.id === engine.ports.audio).transports.join() === 'webaudio'
+      && g.nodes.filter((n) => n.kind === 'device').length === 2,
+      `${kinds}; ${g.nodes.map((n) => `${n.kind} ${n.id}`).join(', ')}`);
+
+    const v0 = voiced;
+    const yes = await peer.request(keysOut, engine.ports.midi, true);
+    const startWord = (shown(), engine.badge.says());
+    access.emit(0, [0x90, 60, 100]);
+    engine.badge.poll();
+    const linkedPlayed = voiced - v0;
+    access.emit(0, [0x80, 60, 0]);
+    d.assert('a keyboard linked on the patchbay plays the engine, and the badge on the panel goes from starting to receiving',
+      yes?.open === true && linkedPlayed === 1 && startWord === 'starting' && engine.badge.says() === 'receiving' && shown(),
+      `${JSON.stringify(yes?.open)}, ${linkedPlayed} note voiced, the badge said ${startWord} then ${engine.badge.says()}`);
+    const v1 = voiced;
+    omniHandlers.onDown(62, 100); omniHandlers.onUp(62);
+    access.emit(1, [0x90, 64, 100]);
+    d.assert('NEGATIVE CONTROL: while that link is open, every other MIDI input plays nothing',
+      voiced === v1 && !engine.omni(), `${voiced - v1} notes voiced from unlinked inputs`);
+    const no = await peer.request(engine.ports.audio, 'elsewhere:screen:audio', true);
+    d.assert('a request to carry this page’s sound anywhere is refused in words',
+      no?.open === false && /nothing here carries it off this machine/.test(no.why || ''), no?.why);
+    const shut = await peer.request(keysOut, engine.ports.midi, false);
+    const v2 = voiced;
+    omniHandlers.onDown(62, 100); omniHandlers.onUp(62);
+    d.assert('closing the link hands the engine back to every input, and the badge is put away',
+      shut?.open === false && engine.omni() && voiced === v2 + 1 && !shown(),
+      `${voiced - v2} note from an ordinary input, badge ${shown() ? 'still drawn' : 'gone'}`);
+    peer.leave();
+    engine.leave();
+    d.assert('and leaving stops the re-announce clock', !engine.joined() && !engine.node.stats().ticking);
   }
 
   ifSelfcheck(checks, { log: d.log,
@@ -2107,4 +2208,9 @@
      compiler is a page waiting for a harness that is waiting for the page. */
   d.ready();
 </script>
+
+<style>
+  /* Join and its badge, one cluster beside the name (`engine-node.mjs`). */
+  .eng-bay { display: inline-flex; align-items: center; gap: var(--ctl-gap); }
+</style>
 </html>
