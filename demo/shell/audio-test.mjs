@@ -193,5 +193,95 @@ console.log('\n== the shared AudioContext ==');
     A.stops === 1 && hub.owner() === null && ctx.state === 'suspended', ctx.calls.join(' '));
 }
 
+// ── a suspend while a resume is in flight, the way Chrome really orders them ─
+
+/* 🔴 THE FAKE ABOVE FLIPS `state` THE MOMENT A VERB IS CALLED, AND A REAL
+   CHROME DOES NOT. MEASURED 2026-10-06 in headless Chrome with a probe of its
+   own (no positron page): `resume()` on a suspended context leaves `state`
+   reading `suspended` for about 1.5 to 3 ms while the audio thread starts, and
+   a `suspend()` called in that window is a no-op on `state` that still stops
+   the device. The resume then lands and `state` reads `running` with
+   `currentTime` frozen: 25 of 40 trials at 1.5 to 2.9 ms. A context in that
+   shape is WEDGED: `resume()` resolves at once and changes nothing (0 ms of
+   `currentTime` in 200 ms after it), and only a suspend then a resume brings
+   it back. On `/kit/slides/` that was a Start on a broken edit (the compile
+   fails in a couple of ms, so the release suspends inside the press's resume)
+   followed by every later Start on the page sounding silence.
+   This fake models exactly that, so the cases below grade the ORDER. */
+function chromeContext() {
+  const c = {
+    sampleRate: 48000, state: 'suspended', rendering: false, calls: [], inFlight: 0,
+    resume() {
+      c.calls.push('resume');
+      if (c.state === 'running') return Promise.resolve();
+      c.rendering = true;                  // the audio thread is told to start now
+      c.inFlight++;
+      return new Promise((r) => setTimeout(() => {
+        c.inFlight--;
+        c.state = 'running';               // and the state is posted back later
+        r();
+      }, 2));
+    },
+    suspend() {
+      c.calls.push('suspend');
+      c.rendering = false;                 // stops the device whatever state reads
+      if (c.state === 'running') c.state = 'suspended';
+      return Promise.resolve();
+    },
+    close() { c.calls.push('close'); c.state = 'closed'; c.rendering = false; return Promise.resolve(); },
+  };
+  return c;
+}
+const settle = () => new Promise((r) => setTimeout(r, 20));
+const wedged = (c) => c.state === 'running' && !c.rendering;
+{
+  const doc = fakeDocument();
+  const hub = createAudioHub({ make: () => chromeContext(), doc: () => doc });
+  const ctx = hub.sharedAudio();
+  const A = slot('A', hub), B = slot('B', hub), C = slot('C', hub);
+  await settle();
+  ok('the Chrome-like fake starts: one resume, running and rendering', ctx.state === 'running' && ctx.rendering);
+  hub.claim(A);
+  hub.release(A);
+  ok('a release suspends it', ctx.state === 'suspended' && !ctx.rendering);
+
+  // a press: sharedAudio() and claim() fire resume(), then a compile fails in a couple of ms and releases
+  hub.sharedAudio();
+  hub.claim(B);
+  await new Promise((r) => setTimeout(r, 0));
+  hub.release(B);
+  await settle();
+  ok('NEGATIVE: a release while the press’s resume is in flight leaves the context suspended, not running and frozen',
+    ctx.state === 'suspended' && !ctx.rendering && !wedged(ctx),
+    `state ${ctx.state}, ${ctx.rendering ? 'rendering' : 'not rendering'}, calls ${ctx.calls.join(' ')}`);
+
+  // the next press, on another slide: it has to sound
+  hub.sharedAudio();
+  hub.claim(C);
+  await settle();
+  ok('NEGATIVE: and the next claim after it renders, rather than reading running over a frozen clock',
+    ctx.state === 'running' && ctx.rendering && hub.owner() === C,
+    `state ${ctx.state}, ${ctx.rendering ? 'rendering' : 'NOT RENDERING'}`);
+
+  // a step then Start within the same task: the release suspends, the claim resumes
+  hub.release(C);
+  const D = slot('D', hub);
+  hub.sharedAudio();
+  hub.claim(D);
+  await settle();
+  ok('a release then a claim in the same task ends running and rendering', ctx.state === 'running' && ctx.rendering && hub.owner() === D,
+    `state ${ctx.state}, ${ctx.rendering ? 'rendering' : 'NOT RENDERING'}`);
+
+  // a claim arriving while the deferred suspend waits must win
+  hub.release(D);
+  const E = slot('E', hub), F = slot('F', hub);
+  hub.sharedAudio(); hub.claim(E);
+  hub.release(E);                         // deferred behind the resume
+  hub.sharedAudio(); hub.claim(F);        // and a newer owner before it lands
+  await settle();
+  ok('NEGATIVE: a suspend held back behind a resume is dropped when somebody claims in the meantime',
+    ctx.state === 'running' && ctx.rendering && hub.owner() === F, `state ${ctx.state}, ${ctx.rendering ? 'rendering' : 'NOT RENDERING'}, owner ${hub.owner()?.name}`);
+}
+
 console.log(`\n${pass} ok, ${fail} failed`);
 process.exit(fail ? 1 : 0);

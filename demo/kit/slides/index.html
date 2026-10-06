@@ -1739,18 +1739,33 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         n1[0] > n0[0] && n2[0] > n1[0] && n1[1] > n0[1] && n2[1] > n1[1] && still && h0[0] > 0 && h0[1] > 0,
         `the log ${n0[0]} -> ${n1[0]} -> ${n2[0]} lines, the table ${n0[1]} -> ${n1[1]} -> ${n2[1]} rows, `
         + `heights ${h0.map((h) => h.toFixed(1)).join('/')} then ${h2.map((h) => h.toFixed(1)).join('/')}`);
-      // the newest at the bottom: the last row's foot is inside the body's, and the body has scrolled
-      const body = T.log.body.getBoundingClientRect(), lastRow = T.log.rows().at(-1).getBoundingClientRect();
-      const logBox = L.el.getBoundingClientRect(), lastLine = L.el.lastElementChild?.lastElementChild?.getBoundingClientRect();
-      const vis = T.log.rows().filter((r) => { const b = r.getBoundingClientRect(); return b.top >= body.top - 0.5 && b.bottom <= body.bottom + 0.5; });
-      const col = columns(vis, T.log.starts, T.log.widths, 'rlrl');
-      // the rule is UNDER each row but the newest, never over one, so a row
-      // leaving the top never stacks its rule under the header's
-      const dprL = devicePixelRatio || 1;
-      const ruleW = Math.max(1 / dprL, Math.floor(Math.max(1, 0.004 * T.log.el.closest('.sl').clientHeight) * dprL) / dprL);
-      const ruled = vis.slice(0, -1).every((r) => tol(parseFloat(getComputedStyle(r).borderBottomWidth), ruleW, 0.5))
-        && vis.every((r) => parseFloat(getComputedStyle(r).borderTopWidth) === 0)
-        && parseFloat(getComputedStyle(vis.at(-1)).borderBottomWidth) === 0;
+      // ⚠️ SAMPLED UNTIL THE TABLE IS NOT MID APPEND, up to five frames,
+      // 2026-10-06: the rule widths measured right (1 px each) while a read
+      // taken during a row being added saw the last row 0.5 px off the foot
+      // and a rule mid move, four runs running once new blocks moved this
+      // check's moment against the log's ticks
+      let body, lastRow, logBox, lastLine, vis, col, ruleW, ruled;
+      for (let tries = 0; tries < 5; tries++) {
+        body = T.log.body.getBoundingClientRect();
+        lastRow = T.log.rows().at(-1).getBoundingClientRect();
+        logBox = L.el.getBoundingClientRect();
+        lastLine = L.el.lastElementChild?.lastElementChild?.getBoundingClientRect();
+        // ⚠️ 1 px, THE SAME AS THE FOOT TEST BELOW: the newest row sits up to a
+        // half pixel past the foot by where the page puts this slide (a new
+        // slide above it moved it 2026-10-06), and at 0.5 it dropped out, so
+        // the row above it, rightly ruled, was read as the last and failed
+        vis = T.log.rows().filter((r) => { const b = r.getBoundingClientRect(); return b.top >= body.top - 1 && b.bottom <= body.bottom + 1; });
+        col = columns(vis, T.log.starts, T.log.widths, 'rlrl');
+        // the rule is UNDER each row but the newest, never over one, so a row
+        // leaving the top never stacks its rule under the header's
+        const dprL = devicePixelRatio || 1;
+        ruleW = Math.max(1 / dprL, Math.floor(Math.max(1, 0.004 * T.log.el.closest('.sl').clientHeight) * dprL) / dprL);
+        ruled = vis.slice(0, -1).every((r) => tol(parseFloat(getComputedStyle(r).borderBottomWidth), ruleW, 0.5))
+          && vis.every((r) => parseFloat(getComputedStyle(r).borderTopWidth) === 0)
+          && parseFloat(getComputedStyle(vis.at(-1)).borderBottomWidth) === 0;
+        if (ruled && tol(lastRow.bottom, body.bottom, 1)) break;
+        await frames(1);
+      }
       d.assert('SLIDES: the newest row is at the foot of each log, and the tabular log’s decimal points align within 0.5 px under its row lines',
         tol(lastRow.bottom, body.bottom, 1) && !!lastLine && lastLine.bottom <= logBox.bottom + 0.5 && lastLine.bottom > logBox.bottom - 2 * lastLine.height
           && vis.length >= 3 && col.dots.length === 2 && col.worst <= 0.5 && ruled,
@@ -2176,7 +2191,22 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
   async function synthChecks() {
     const nap = (ms) => new Promise((r) => setTimeout(r, ms));
     const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
-    const until = async (f, ms) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < ms) await nap(25); return f(); };
+    // 🔴 NO STRETCH OF THESE CHECKS IS SILENT FOR LONGER THAN THE HARNESS
+    // WAITS. `verify.mjs` stops collecting after 2.0 s with no new assert, and
+    // on 2026-10-06 a wedged AudioContext made slide 3's three level waits run
+    // out back to back, 4.7 s of silence, so the six asserts after them were
+    // never made and the run read 92/94 rather than 92/100. Every wait here
+    // is cut to what is left of QUIET_MS since the last assert, so a red lands
+    // as a red and the asserts after it still run. The longest quiet stretch
+    // is measured and printed on the last assert, so a check creeping towards
+    // the limit is visible before it is cut.
+    const QUIET_MS = 1800;
+    let said = performance.now(), quietest = 0;
+    const assert0 = d.assert;
+    d.assert = (...a) => { const t = performance.now(); quietest = Math.max(quietest, t - said); said = t; return assert0(...a); };
+    const left = () => Math.max(0, QUIET_MS - (performance.now() - said));
+    const until = async (f, ms) => { const t0 = performance.now(), cap = Math.min(ms, left()); while (!f() && performance.now() - t0 < cap) await nap(25); return f(); };
+    const settled = (x) => Promise.race([x.idle.settled(), nap(left())]);
     const Y = slideKit.comps.synths;
     const p = Y.p;
     const ENGINE = /\/fau\/vendor\/|\/resources\/faust\/|\/shell\/faust\.mjs/;
@@ -2192,7 +2222,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     const intro = p.slides[0];
     const lines = intro.parts.lines;
     d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 6 with a caption and no body',
-      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 4 && toneIdx === 1 && p.at() === 0
+      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 5 && toneIdx === 1 && p.at() === 0
         && lines.length === 2 && lines.every((l) => l.dataset.step === '6') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
         && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
       `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
@@ -2306,7 +2336,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       const t0 = performance.now();
       const shown = await until(() => !c.idle.el.hidden, 4000);
       const said = c.idle.el.textContent;
-      await c.idle.settled();
+      await settled(c);
       const wall = performance.now() - t0;
       const compiledAlone = c.compiles() === 1 && !c.sounding();
       c.tone.click();
@@ -2344,7 +2374,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       c.code.set('import("stdfaust.lib");\n\nprocess = os.osc(440 * 0.1;');
       c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
       await until(() => !c.idle.el.hidden, 4000);
-      await c.idle.settled();
+      await settled(c);
       const noteSays = c.idle.el.textContent;
       c.tone.click();
       await until(() => c.sounding() || c.error(), 5000);
@@ -2404,7 +2434,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         // ⚠️ THE HEADLINE'S TOP ON EVERY INSTRUMENT SLIDE, each read while it
         // is shown: the longest words are the ones that climb out of the column
         let sayTop = Infinity;
-        for (const i of [1, 2, 3]) {
+        for (const i of [1, 2, 3, 4]) {
           p.go(i);
           await frames(2);
           const S2 = p.slides[i];
@@ -2413,8 +2443,8 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         p.go(vIdx);
         await frames(2);
         const sayR = { top: wr.top + sayTop };
-        const both = [1, 2, 3].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
-        d.assert('SYNTHS: slides 2, 3 and 4 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
+        const both = [1, 2, 3, 4].every((i) => p.slides[i].el.dataset.cols === '1:2' && 'bottom' in p.slides[i].el.dataset);
+        d.assert('SYNTHS: slides 2 to 5 split 1:2, the divide a third of the way across in the middle of the gap, the darker ground two thirds, the words on the foot of their column',
           both && Math.abs(divide - sr.width / 3) < 1 && Math.abs(dark - (sr.width * 2) / 3) < 1 && Math.abs(tr.bottom - wr.bottom) < 1.5
             && sayR.top >= wr.top - 0.5 && Math.abs((xr.left - wr.right) - 2 * (wr.left - sr.left)) < 1,
           `the divide at ${divide.toFixed(1)} of ${sr.width.toFixed(1)} px (a third is ${(sr.width / 3).toFixed(1)}), the darker ground ${dark.toFixed(1)} px, `
@@ -2429,7 +2459,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       // passes
       {
         const ks = [], hs = [];
-        for (const i of [1, 2, 3]) {
+        for (const i of [1, 2, 3, 4]) {
           p.go(i);
           await frames(2);
           ks.push(p.slides[i].ctl.fb.fit());
@@ -2437,9 +2467,11 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         }
         p.go(vIdx);
         await frames(2);
-        d.assert('SYNTHS: slides 2, 3 and 4 draw the FAU panel at one scale, PANEL_H the tallest of them and the shorter ones centred rather than grown',
-          ks[0] > 0 && ks.every((k) => Math.abs(k - ks[0]) < 0.001) && hs.every((h) => h > 0 && h <= PANEL_H + 1)
-            && Math.abs(Math.max(...hs) - PANEL_H) <= 1 && hs[0] < hs[1],
+        // ONE PANEL HEIGHT since 2026-10-06 (*"keep same fau size!!! knobs
+        // condense code area"*): every panel is PANEL_H tall, a knob row
+        // takes its height from the code row
+        d.assert('SYNTHS: slides 2 to 5 draw the FAU panel at one scale and one height, PANEL_H, the knobs taking room from the code',
+          ks[0] > 0 && ks.every((k) => Math.abs(k - ks[0]) < 0.001) && hs.every((h) => Math.abs(h - PANEL_H) <= 1),
           hs.map((h, j) => `slide ${j + 2} at ${ks[j].toFixed(4)} (panel ${h} px)`).join(', ') + `, PANEL_H ${PANEL_H}`);
       }
 
@@ -2485,7 +2517,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       v.knobs.knob('volume').set(0.5);
       v.code.set('import("stdfaust.lib"); // has os.osc\n\nprocess = os.osc(440) * 0.5;');
       v.code.input.dispatchEvent(new Event('input', { bubbles: true }));
-      await v.idle.settled();
+      await settled(v);
       await until(() => Math.abs(v.level() - 0.3536) < 0.01, 1500);
       const goneDisplay = getComputedStyle(row).display, goneKnobs = v.knobs.names().length, goneLvl = v.level();
       const goneFound = !!v.panel.el.querySelector('.pos-knob[data-param]');
@@ -2495,7 +2527,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         + `RMS ${goneLvl.toFixed(4)}, ${v.compiles()} compile(s)`);
       v.code.set(v.shipped);
       v.code.input.dispatchEvent(new Event('input', { bubbles: true }));
-      await v.idle.settled();
+      await settled(v);
       await frames(2);
       const backDisplay = getComputedStyle(row).display, backShows = shows();
       d.assert('SYNTHS: putting slide 3’s slider back brings its knob row back, at 0.50',
@@ -2575,7 +2607,8 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         Math.abs(hzLow - 440) < 5 && Math.abs(hzHigh / hzLow - 2) < 0.02 && Math.abs(lvLow - lvHigh) < 0.01
           && shows('freq') === '440' && f.sounding() && p.at() === fIdx,
         `${hzHigh.toFixed(1)} Hz at 880, ${hzLow.toFixed(1)} Hz at 440, ${(hzHigh / hzLow).toFixed(3)}x, `
-        + `RMS ${lvHigh.toFixed(4)} then ${lvLow.toFixed(4)}, ${f.paramSends()} setParamValue in all`);
+        + `RMS ${lvHigh.toFixed(4)} then ${lvLow.toFixed(4)}, ${f.paramSends()} setParamValue in all, `
+        + `the longest quiet stretch in the SYNTHS checks ${(Math.max(quietest, performance.now() - said)).toFixed(0)} ms of ${QUIET_MS}`);
       f.stop();
       p.go(0);
     }

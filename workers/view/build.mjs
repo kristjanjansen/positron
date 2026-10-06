@@ -486,6 +486,8 @@ const FILES = [
   // the fourth slide's, the same with its 440 on a second slider (2026-10-06)
   ['demo/resources/faust/pitch.json', 'resources/faust/pitch.json'],
   ['demo/resources/faust/pitch.wasm', 'resources/faust/pitch.wasm'],
+  ['demo/resources/faust/saw.json', 'resources/faust/saw.json'],
+  ['demo/resources/faust/saw.wasm', 'resources/faust/saw.wasm'],
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //
