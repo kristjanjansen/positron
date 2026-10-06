@@ -1,5 +1,6 @@
 ## Open
 
+- **Synths slides 3 and 4 words: "Code constant to an interactive knob", variable names in the text coloured by their knob's hue; slide 4 volume then freq with comments** (2026-10-06). Asked: *"A volume knob -> Code constant to a interactive knob. in the text use variable name with colorcoding."*, *"slide 4 is freq"*, *"volume ... freq ... this order, progressing. add comments"*. Handed to the freq knob agent.
 - **Synths deck: slide 3 a frequency knob, the volume knob moves to slide 4** (2026-10-06). Asked: *"slide 3 is freq knob"*, read as the 440 on a knob, then a slide with both knobs. A background agent.
 - **Synths deck: 1:2 columns, useful slide texts, words at the bottom** (2026-10-06). Asked: *"use 1:2 cols layout. make useful slide texts. align text to bottom of slide"*. Handed to the slide 3 agent (a `cols: '1:2'` option on `split`).
 - **Synths deck slide 3: the sine's 0.5 as a knob from 0 to 1** (2026-10-06). Asked: *"slode 3: make 0.5 into knob 0..1"*. A background agent.
