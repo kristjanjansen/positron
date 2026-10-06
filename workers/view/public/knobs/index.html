@@ -19,6 +19,16 @@
   //
   // 🔴 NO GRANULATOR ANYWHERE IN HERE. It came out of the board's signal path
   // on 2026-09-16 (archive/box-pappus/), and this page has never had one.
+  //
+  // 🔴 A NODE ON THE PATCHBAY SINCE 2026-10-06 (plans/plan-routing-migration.md
+  // step 5). Its keys are a MIDI out and its sound an audio in, announced
+  // through `bay-node.mjs` on a site of this tab's own, joined on the first key
+  // and never on load. The foot wears `link-badge.mjs`'s word once a key has
+  // started the sound, counted from the frames that reached this page. No patch
+  // view, and nothing from `openers.mjs`: its `synth` opener sends
+  // `audio.start` unconditionally, which this page refuses to do over another
+  // instrument, so the page keeps its own board. The invisible hand is the
+  // page's own as well: no value to MIDI adapter exists in the kit yet.
   import { mount, guard, el } from '/shell/shell.mjs';
   import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
   // 🔴 REAL ROTARIES SINCE 2026-09-25, AND THE PAGE CALLED `knobs` HAD NONE.
@@ -43,6 +53,10 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { makeCcSend, SEND_GATE_MS, RESTATE_MS } from '/shell/cc-adapter.mjs';
   import { createBoard } from '/shell/board.mjs';
+  import { createBayNode, roomFor, randomSite, STUDIO_ROOM } from '/shell/bay-node.mjs';
+  import { createLinkBadge } from '/shell/link-badge.mjs';
+  import { graphProblem } from '/shell/graph-registry.mjs';
+  import { RELAY_BASE } from '/shell/wire.mjs';
 
   /**
    * 🔴 HOW MANY TIMES THIS PAGE HAS ASKED THE BROWSER FOR MIDI, COUNTED AT THE
@@ -454,7 +468,9 @@
 
   const board = createBoard({
     room: ROOM,
-    relay: q.get('relay') || undefined,
+    // ⚠️ NO `relay:` FROM THE QUERY SINCE 2026-10-06: `wire.mjs` reads `?relay=`
+    // itself and honours only a ws:// address on this machine, so a link can no
+    // longer point this page at somebody else's relay.
     of: 'Raspberry Pi',
     /**
      * 🔴 THE BADGE SAYS THE WORD AND NOT THE NAME, ASKED FOR 2026-09-29 AS
@@ -976,10 +992,24 @@
    * keyboard to the case's inner bottom 0.0 px, so the keys sat on the rule.
    * A glued surface is seams and insets and nothing for a page to type.
    */
+  /* 🔴 THE LINK'S WORD BESIDE THE BOARD'S, ON THE FOOT OF THE PANEL THE SOUND
+     FEEDS. The presence badge says whether the board is there; this one says
+     whether its sound is reaching THIS page, STARTING, RECEIVING or STALLED,
+     from the frames counted here. Hidden until a key starts the sound.
+     ⚠️ IN A WRAPPER THAT CARRIES `hidden`, because `.pos-pres` is
+     `display: inline-flex` and that beats the UA's `[hidden]`, so the badge's
+     own `hidden` hides nothing. `/stage/` and `/patchbay/` hide its tag. */
+  const linkWrap = el('span', 'knobs-link');
+  linkWrap.hidden = true;
+  const linkBadge = createLinkBadge({ count: () => board.stats().frames,
+    onChange: (st) => { linkWrap.hidden = st === 'unknown'; } });
+  linkWrap.append(linkBadge.el);
+  const statusEl = el('span', 'knobs-status');
+  statusEl.append(pres.el, linkWrap);
   const panel = createInstrumentPanel({
     rows: [[[knobs], { align: 'start' }]],
     keys: kb.el,
-    plate: { name: 'knobs', status: pres, patch: midiBtn },
+    plate: { name: 'knobs', status: statusEl, patch: midiBtn },
   });
   d.stack.add(panel.el);
 
@@ -1090,7 +1120,9 @@
    * hear is the key you pressed.
    */
   async function firstKey() {
+    joinBay();
     await board.startAudio();
+    startLinkWord();
     // The node exists from here on, so the far side of the panic below has
     // somebody listening to it. `startAudio` has already set its own
     // `onmessage` by the time this resolves, which is what makes a second
@@ -1130,7 +1162,9 @@
   }
 
   async function startNote() {
+    joinBay();
     await board.startAudio();
+    startLinkWord();
     watchPlayout();     // see `firstKey`: the same reason, the same one line
     await measureRtt();
     const status = boardAnswered ? { ok: playing !== null, source: playing } : await askStatus();
@@ -1673,7 +1707,9 @@
      * there is exactly ONE place on this page that says whether the Raspberry
      * Pi is answering, and this page has no position to seek to.
      */
-    const badges = document.querySelectorAll('.pos-pres');
+    // The link's word is a `.pos-pres` too and says something else, so it is
+    // not a second presence of the board.
+    const badges = [...document.querySelectorAll('.pos-pres')].filter((b) => b !== linkBadge.el);
     d.assert('the board’s presence is in the foot, once on the page and nowhere else',
       badges.length === 1 && panel.plateRow.contains(pres.el) && !document.querySelector('.tbar'),
       `${badges.length} presence badge(s), ${panel.plateRow.contains(pres.el) ? 'in' : 'NOT in'} the foot, `
@@ -2416,7 +2452,7 @@
     midiBtn.click();
     /* The panic drill is last on both routes, and `panicCheck` says why: the
        reset it drives wipes the two counters `checkAll` asserts on. */
-    if (MAY_PLAY) { await startNote(); await panicCheck(); return; }
+    if (MAY_PLAY) { await startNote(); await panicCheck(); await bayChecks(); return; }
     await sweepChecks();
     await handChecks();
     freeChecks();
@@ -2430,14 +2466,112 @@
       keys: kb, heard: () => board.refusedToBoard(),
       ports: (names) => offerLoopFor(kb, names, d.log), real: () => midi?.names() ?? [],
     });
+    await bayChecks();
+  }
+
+  // ── a node on the patchbay ───────────────────────────────────────────────
+  //
+  // 🔴 THE DISCOVERY ROOM IS `roomFor`'s: `?room=` when given (it is the board's
+  // own room here too), `studio-1` for a person, and the run's own room under
+  // a harness, never the owner's desk.
+  const BAY_ROOM = roomFor({ slug: 'knobs' });
+  const SITE = randomSite('knobs');
+  const KEYS_OUT = `${SITE}:keys:out`;
+  /** The port the Pi announces for Yoshimi's MIDI in (`boardGraph`). */
+  const SYNTH_IN = `${ROOM}:yoshimi:in`;
+  const GRAPH = {
+    v: 1, site: SITE, place: 'browser',
+    nodes: [
+      { id: `${SITE}:keys`, kind: 'person', label: 'knobs keys', place: 'browser' },
+      { id: `${SITE}:screen`, kind: 'screen', label: 'knobs sound', place: 'browser' },
+    ],
+    ports: [
+      { id: KEYS_OUT, label: 'knobs keys and rotaries', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+      { id: `${SITE}:screen:audio`, label: 'knobs sound', dir: 'in', medium: 'audio' },
+    ],
+  };
+  /* 🔴 WHAT THIS PAGE ANSWERS WHEN `/patchbay/` ASKS FOR ITS LINK. The keys and
+     the two rotaries play Yoshimi on the board in this page's room and nothing
+     else; asked for that, the link is already the page's, and anything else,
+     a close included, is refused in words. */
+  function answerLink({ source, target, open }) {
+    if (source !== KEYS_OUT) return { ok: false, why: `${source} is not one of this page’s ports` };
+    if (!open) return { ok: false, why: 'this page’s keys always play Yoshimi, so close the page or press notes off to stop them' };
+    if (target !== SYNTH_IN) return { ok: false, why: `this page’s keys play Yoshimi at ${SYNTH_IN} and nothing else, not ${target}` };
+    return { ok: true, why: 'already open: the first key starts Yoshimi if the board is free, and every key after it plays it' };
+  }
+  const bay = createBayNode({
+    room: BAY_ROOM, graphs: [GRAPH],
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => d.log(`on the patchbay in ${BAY_ROOM}, as ${SITE}`, 'hi'),
+    onLinkRequest: answerLink,
+  });
+  /** Join on a press. Calling it twice joins once. */
+  function joinBay() { return bay.join(); }
+  /** The link's word starts with the sound, once. */
+  function startLinkWord() { if (linkBadge.state() === 'unknown') linkBadge.start(); }
+
+  /* 🔴 THE PAGE AS A NODE, GRADED IN THE RUN'S OWN ROOM, last because a key
+     press is what joins and the Evolution drill above presses keys. A visit
+     joined nothing (read at the module's last line); a stand-in patchbay in the
+     same room asks for the page's link, another destination and a close, and
+     gets a yes and two refusals in this page's words; a request about a port
+     that is not this page's gets no answer. Only against a relay on this
+     machine. */
+  async function bayChecks() {
+    d.assert('a visit joins nothing on the patchbay: no socket, no join and no announce clock',
+      !bayOnLoad.joined && !bayOnLoad.joining && !bayOnLoad.ticking, JSON.stringify(bayOnLoad));
+    d.assert('the link’s word is on the foot and was hidden until a key started the sound',
+      panel.plateRow.contains(linkBadge.el) && bayOnLoad.badgeHidden, `hidden on load ${bayOnLoad.badgeHidden}`);
+    d.assert('the harness room is the run’s own, never the studio’s', BAY_ROOM !== STUDIO_ROOM, BAY_ROOM);
+    d.assert('the page announces a graph the registry accepts, on a site of this tab’s own',
+      graphProblem(GRAPH) === '' && SITE.startsWith('knobs-'), graphProblem(GRAPH) || SITE);
+    if (readying) {
+      const t0 = performance.now();
+      while (linkBadge.state() === 'unknown' && performance.now() - t0 < 2000) await wait(100);
+      d.assert('a key starts the link’s word, which then says what arrived rather than what was pressed',
+        linkBadge.state() !== 'unknown' && !linkWrap.hidden && (board.stats().frames > 0 || linkBadge.state() !== 'online'),
+        `${linkBadge.says()} at ${board.stats().frames} frames`);
+    } else {
+      d.log('no key was pressed in this run, so the link’s word was never started', 'dim');
+    }
+    if (!/^wss?:\/\/(127\.0\.0\.1|localhost|\[::1\])/.test(RELAY_BASE)) {
+      d.log(`the patchbay round trip runs only against a relay on this machine, and this run is on ${RELAY_BASE}`, 'dim');
+      return;
+    }
+    await joinBay();
+    const other = createBayNode({ room: BAY_ROOM, graphs: [] });
+    await other.join();
+    other.ask();
+    const t0 = performance.now();
+    while (!other.registry.merged().sites.some((x) => x.site === SITE) && performance.now() - t0 < 3000) await wait(50);
+    const heard = other.registry.merged().ports.map((p) => p.id);
+    d.assert('a page in the same room hears this page’s keys and sound', heard.includes(KEYS_OUT) && heard.includes(`${SITE}:screen:audio`), heard.join(', '));
+    const yes = await other.request(KEYS_OUT, SYNTH_IN, true, { timeoutMs: 3000 });
+    d.assert('asked for its keys to Yoshimi, it answers open', yes?.open === true, yes ? `open ${yes.open}: ${yes.why}` : 'no answer');
+    const elsewhere = await other.request(KEYS_OUT, `${ROOM}:circuit:in`, true, { timeoutMs: 3000 });
+    d.assert('asked for its keys anywhere else, it refuses and names where they go', elsewhere?.open === false && elsewhere.why.includes(SYNTH_IN),
+      elsewhere ? elsewhere.why : 'no answer');
+    const close = await other.request(KEYS_OUT, SYNTH_IN, false, { timeoutMs: 3000 });
+    d.assert('asked to close it, it refuses in words', close?.open === false && /always play/.test(close.why), close ? close.why : 'no answer');
+    const notMine = await other.request(`${ROOM}:yoshimi:audio`, `${SITE}:screen:audio`, true, { timeoutMs: 800 });
+    d.assert('NEGATIVE CONTROL: a request about a port that is not this page’s gets no answer from it', notMine === null, JSON.stringify(notMine));
+    other.leave();
   }
 
   /* The counter read at the LAST line of the module, which is the whole of a
      visit. A reading taken inside `checkAll` could not tell a visit apart from
      a press, because by then the press has happened. */
   midiAskedOnLoad = midiAsked;
+  const bayOnLoad = { joined: bay.joined(), joining: bay.joining(), ticking: bay.stats().ticking, badgeHidden: linkWrap.hidden };
 
   d.ready();
   runChecks();
 </script>
+<style>
+  /* The board's presence and the link's word, side by side after the name, at
+     the gap the name cluster already uses. A hidden wrapper is a plain span, so
+     the UA's `[hidden]` holds. */
+  .knobs-status { display: inline-flex; align-items: center; gap: var(--ctl-gap); }
+</style>
 </html>

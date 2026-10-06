@@ -22,6 +22,13 @@
     text-wrap: balance;
     font: 400 12px/1.7 var(--mono); color: var(--dim); padding: 18px;
   }
+  /* The sentence and the one button that asks the board, stacked and centred
+     in the empty right pane. Twice the control gap, so the button reads as the
+     answer to the sentence rather than as a word of it. */
+  .none-in {
+    display: grid; justify-items: center; gap: calc(2 * var(--ctl-gap));
+  }
+  .none-in [hidden] { display: none; }
   /* 🔴 THE FOOTER IS A ROW OF CELLS, AND IT USED TO BE ONE GLUED STRING.
      It read the renderer's name, then the word `locked`, then `29.9 fps`, all
      strung onto one line with a separator between them, and the separator
@@ -130,11 +137,43 @@
   import { createPanel, createPanelFooter, FOOT } from '/shell/panel.mjs';
   import { createXRPanels, beacon, facing, barOf, grabOffset, heldAt, PLACE } from '/shell/xr-panel.mjs';
   import { pickQuad } from '/shell/xr-pick.mjs';
-  import { format, parse, randomId, RELAY_BASE } from '/shell/wire.mjs';
+  import { RELAY_BASE } from '/shell/wire.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createRegistry, boardGraph } from '/shell/graph-registry.mjs';
+  import { createBayNode, roomFor, randomSite } from '/shell/bay-node.mjs';
+  import { createOpeners } from '/shell/openers.mjs';
+  import { createLinkBadge, linkStateOf, LINK_STALL_MS } from '/shell/link-badge.mjs';
 
-  const q = new URLSearchParams(location.search);
-  const ROOM = q.get('room') || 'studio-1';
+  /**
+   * 🔴 THE ROOM AND THE SOCKET ARE `bay-node.mjs`'s SINCE 2026-10-06, AND THE
+   * PAGE NO LONGER JOINS ON LOAD (plan-routing-migration step 5). It opened a
+   * socket to `studio-1` at the top of this script and asked the Pi to draw, so
+   * every visit and every harness run started the board's encoder. Now the
+   * room is `roomFor`: `?room=` when given, `studio-1` for a person, and a
+   * private room of the run's own under `?selfcheck=1`, so a harness cannot
+   * reach the Pi at all. Nothing is opened until somebody presses
+   * `Show the board` in the right-hand pane.
+   * ⚠️ AND THIS TAB IS A SITE OF ITS OWN, `web-<four>`, announcing two ports,
+   * so `/patchbay/` draws it: its shader as a `program` out, and its right
+   * pane as a `video` in. The Pi already announces `gpu:program` and
+   * `gpu:video` (`graph-registry.mjs` `boardGraph`).
+   */
+  const ROOM = roomFor({ slug: 'mirror' });
+  const SITE = randomSite('web');
+  const PROGRAM_PORT = `${SITE}:webgl:program`;
+  const SCREEN_PORT = `${SITE}:screen:video`;
+  const SELF = {
+    v: 1, site: SITE, place: 'browser',
+    nodes: [
+      { id: `${SITE}:webgl`, kind: 'engine', label: 'WebGL2', place: 'browser' },
+      { id: `${SITE}:screen`, kind: 'screen', label: 'right picture', place: 'browser' },
+    ],
+    ports: [
+      { id: PROGRAM_PORT, label: 'shader', dir: 'out', medium: 'program', shape: { language: 'glsl' } },
+      { id: SCREEN_PORT, label: 'right picture', dir: 'in', medium: 'video' },
+    ],
+  };
   const W = 640, H = 360;
 
   const d = mount({
@@ -381,13 +420,51 @@
    * second with thirty allowed to go missing is one second of silence, which is
    * the same deadline this page already uses to unlock its own frame counter,
    * written once rather than twice.
+   * ⚠️ IT STARTS FOLLOWING AT THE PRESS, NOT AT LOAD. Before anybody asks, the
+   * board has not been asked anything, so the dot stays `unknown` rather than
+   * counting down to a silence nobody requested.
    */
-  far.pres.follow({
+  const followFar = () => far.pres.follow({
     everyMs: 1000 / 30, misses: 30, since: Date.now(),
     why: 'nothing has answered in this room yet',
   });
-  const farNone = el('div', 'none', 'Waiting…');
+  /**
+   * 🔴 THE PRESS THAT ASKS THE BOARD LIVES IN THE PANE IT FILLS, AND OUTSIDE
+   * `.pos-controls` ON PURPOSE. Both harnesses press that row, so a button there
+   * would join a room on every run, and a control added there moves every other
+   * control's press. A person looks at the empty right-hand picture and finds
+   * the button in it.
+   */
+  const farNone = el('div', 'none');
+  const farSay = el('span', 'none-say', 'The Raspberry Pi is asked nothing until you press.');
+  const askRow = createButtonGroup({ buttons: [
+    { id: 'board', label: 'Show the board', onPress: () => askTheBoard() },
+  ] });
+  const farWrap = el('div', 'none-in');
+  farWrap.append(farSay, askRow.el);
+  farNone.append(farWrap);
   far.panel.stage.append(farNone);
+  /** What the empty right pane says, keeping the button in it until the press. */
+  function farWaits(words) {
+    farSay.textContent = words;
+    askRow.el.hidden = node.joining();
+    if (!farNone.isConnected) far.panel.stage.append(farNone);
+  }
+  /**
+   * 🔴 A LINK BADGE ON THE BOARD'S PICTURE, AND NOTHING MORE THAN THAT. The
+   * owner's words about a page moving onto the patchbay: *"perhaps just visual
+   * indication of picture happening"*. So no patch view here: the right pane
+   * wears STARTING, RECEIVING or STALLED, counted from frames DECODED here, the
+   * far side of the link, and `/patchbay/` stays where links are drawn.
+   * ⚠️ THE TAG SLOT IS HIDDEN WITH THE BADGE, because the slot paints its own
+   * dark pill and a hidden child does not make it `:empty`.
+   */
+  const badge = createLinkBadge({
+    count: () => (vws ? farDecoded : null),
+    onChange: (st) => { far.panel.slots.tag.hidden = st === 'unknown'; },
+  });
+  far.panel.slots.tag.append(badge.el);
+  far.panel.slots.tag.hidden = true;
   d.stack.add(panes);
 
   /**
@@ -469,9 +546,10 @@
       look.show(name, lookAt_);
       const okHere = window.__applyShader(body);
       d.log(okHere ? `“${name}” is fading in here` : `“${name}” was refused here`);
-      const open = ctl?.readyState === 1;
+      // `joined` is the press having happened: before it there is no socket.
+      const open = node.joined();
       let sent = false;
-      if (open) { try { send({ type: 'video.shader', body }); sent = true; } catch { sent = false; } }
+      if (open) { try { sent = send({ type: 'video.shader', body }); } catch { sent = false; } }
       d.assert('the new look compiled in this browser', okHere, name);
       d.assert('and the same body went to the box, when there is one',
         sent || !open, open ? (sent ? 'sent' : 'the socket refused it') : 'no board in the room, so nothing to send');
@@ -1437,25 +1515,94 @@
 
   // ── the picture, from the board ──────────────────────────────────────────
   //
-  // ⚠️ A SECOND SOCKET, TO `<room>-video`. The relay allows 60 messages a
-  // second per socket and the box's audio is already 50 of them; thirty video
-  // frames on the same socket would be 80 against a cap of 60 and the bucket
-  // drops the excess with no error at all. It also keeps the binary framing
-  // unambiguous — every other page here reads a binary frame as PCM.
-  const FROM = `mir-${randomId(6)}`;
-  let seq = 0;
-  const ctl = new WebSocket(`${RELAY_BASE}/room/${ROOM}/ws`);
-  const send = (m) => { const id = randomId(); ctl.send(format(m, { from: FROM, seq: seq++, id })); return id; };
-  ctl.onopen = () => {
-    d.log(`asking ${ROOM} what it can draw`);
-    // A question is out and no answer has come back: grey, and moving.
-    far.pres.checking(true);
-    send({ type: 'video.status' });
-  };
-  ctl.onmessage = (e) => {
-    if (typeof e.data !== 'string') return;
-    const { kind, msg } = parse(e.data);
-    if (kind !== 'json' || msg.from === FROM) return;
+  // ⚠️ A SECOND SOCKET, TO `<room>-video`. The relay counts messages per socket
+  // and the box's audio is already 50 a second; thirty video frames on the
+  // same socket would crowd it, and the bucket drops the excess with no error
+  // at all. It also keeps the binary framing unambiguous: every other page
+  // here reads a binary frame as PCM.
+  //
+  // 🔴 THE FIRST SOCKET IS `bay-node.mjs`'s, AND IT OPENS ON A PRESS. It used to
+  // be a WebSocket made at the top of this block, so a visit asked the Pi to
+  // draw. `node.join()` is called by `Show the board` and by nothing else; the
+  // harness never presses it, and the check pass grades the links on a scratch
+  // bay instead, so no run reaches the real Pi.
+  const node = createBayNode({
+    room: ROOM, graphs: [SELF],
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => {
+      d.log(`asking ${ROOM} what it can draw, as ${SITE}`);
+      // A question is out and no answer has come back: grey, and moving.
+      followFar();
+      far.pres.checking(true);
+      send({ type: 'video.status' });
+    },
+    onGraph: () => describeLinks(),
+    onMessage: (msg) => heard(msg),
+    // 🔴 `/patchbay/` MAY ASK THIS PAGE TO OPEN ITS SHADER LINK, and the answer
+    // is the same act a look press makes: the running body goes to the board in
+    // this page's room. Any other target is refused in words, because this page
+    // only ever sends to the one board it joined.
+    onLinkRequest: ({ source, target, open }) => {
+      if (source !== PROGRAM_PORT) return { ok: false, why: `${source} is not this page's shader` };
+      if (!open) return { ok: true, why: 'nothing to close: a shader that was sent stays sent' };
+      if (!/:gpu:program$/.test(target) || target.split(':')[0] !== ROOM) {
+        return { ok: false, why: `this page sends its shader only to ${ROOM}:gpu:program, not ${target}` };
+      }
+      const sent = send({ type: 'video.shader', body: LOOKS[lookAt_].body });
+      return sent ? { ok: true, why: `sent “${LOOKS[lookAt_].name}” to the board` }
+        : { ok: false, why: 'this page is not in the room yet' };
+    },
+  });
+  const send = (m) => node.send(m);
+
+  /**
+   * 🔴 TWO LINKS, DESCRIBED IN A BAY BEFORE ANYTHING IS OPENED. The shader goes
+   * out as `<site>:webgl:program -> <room>:gpu:program` and the picture comes back
+   * as `<room>:gpu:video -> <site>:screen:video`, which the bay gives the
+   * `relay-h264` session because that is the only way the board's port says it
+   * travels. Which opener takes the video is `openers.pick`, the same choice
+   * `/patchbay/` makes, so the two pages cannot disagree about it.
+   * ⚠️ THE PROGRAM LINK HAS NO OPENER IN THE KIT, AND `pick` SAYS SO. A shader
+   * is a light link, one message, and `openers.mjs` has no `program` row, so the
+   * page opens it itself with `video.shader`, which is exactly what it did before.
+   */
+  const openers = createOpeners({ log: (line, kind) => d.log(line, kind), host: el('div'),
+    self: { screenVideo: [SCREEN_PORT] } });
+  const linked = { program: null, video: null, pick: null, why: null };
+  window.__demo.links = linked;
+  function linkIn(b) {
+    const out = { program: null, video: null, pick: null, why: null };
+    const shader = b.link(PROGRAM_PORT, `${ROOM}:gpu:program`, [], { site: SITE });
+    const picture = b.link(`${ROOM}:gpu:video`, SCREEN_PORT, [], { site: SITE });
+    if (!shader.ok || !picture.ok) {
+      out.why = (!shader.ok ? shader : picture).why;
+      return out;
+    }
+    const lv = b.links().find((x) => x.id === picture.id);
+    out.program = printLink(b.links().find((x) => x.id === shader.id));
+    out.video = printLink(lv);
+    out.pick = openers.pick(lv, b);
+    if (out.pick.kind !== 'video') out.why = out.pick.why || `the picture would be opened by ${out.pick.kind}`;
+    return out;
+  }
+  /** Describe the two links once the board's graph is in this page's registry. */
+  function describeLinks() {
+    if (linked.video || linked.why || !node.registry.merged().sites.some((s) => s.site === ROOM)) return;
+    const got = linkIn(node.registry.fill(createBay()));
+    Object.assign(linked, got);
+    if (got.why) d.log(`the board announced itself and the links were refused: ${got.why}`, 'warn');
+    else d.log(`linked ${got.program}, and ${got.video} over ${got.pick.transport}`, 'ok');
+  }
+
+  /** The press. Answers once the room has answered, or at once if it already has. */
+  function askTheBoard() {
+    if (node.joining()) return node.join();
+    farWaits('Asking the board…');
+    return node.join();
+  }
+
+  function heard(msg) {
+    if (!msg || typeof msg.type !== 'string') return;
     // ⚠️ THE SAME BODY GOES TO BOTH ENDS. This page compiles it as 300 es and
     // forwards it untouched to the board, which compiles it as 310 es — so the
     // demo's claim ("the same shader, two GPUs") becomes literally one text
@@ -1499,13 +1646,32 @@
       // question tore this one's decoder down and built it again — which showed
       // up as a bar reading "not arriving" next to a live frame rate.
       far.pres.checking(false).because(null);
-      if (!vws) openVideo(msg.room, msg);
+      if (!vws) openPicture(msg);
     }
     if (msg.type === 'video.stopped') { d.log(`the box stopped after ${msg.frames ?? 0} frames`); closeVideo(); }
-  };
-  // ⚠️ ASK ON CONNECT, NOT ON A PRESS. A page whose first act is asking you to
-  // press something shows you nothing; and the box stops on its own when the
-  // room empties, so nobody has to remember to switch it off.
+  }
+  /**
+   * The picture link, opened through the description. 🔴 A REFUSAL FROM THE BAY
+   * STOPS IT, IN WORDS. The board's graph normally arrives first, because joining
+   * asks `graph.ask` before `video.status`; if it has not arrived after two
+   * seconds the picture is opened without a link and the log says so, which is
+   * what this page did for every visitor before links existed.
+   */
+  async function openPicture(info) {
+    for (let i = 0; i < 20 && !linked.video && !linked.why; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      describeLinks();
+    }
+    if (vws) return;
+    if (linked.why) { d.log(`the picture is not opened: ${linked.why}`, 'warn'); return; }
+    if (!linked.video) d.log('the board has not described itself yet, so its picture is opened without a link', 'warn');
+    openVideo(info.room, info);
+  }
+  // 🔴 ASKED ON A PRESS SINCE 2026-10-06. This said *"ask on connect, not on a
+  // press"*, and connecting happened on load, so a visit started the encoder.
+  // What survives is the half that was right: once somebody has pressed, the
+  // box is asked at once and stops on its own when the room empties, so nobody
+  // has to remember to switch it off.
   function askForPicture() {
     d.log('asking the box to draw…', 'hi');
     send({ type: 'video.start', w: 1280, h: 720, fps: 30 });
@@ -1610,16 +1776,16 @@
     // ⚠️ "Waiting…" HAS TO BE TRUE. Saying it and then doing nothing is the
     // worst of both: a reader waits for something nobody is asking for. The
     // page re-asks, and the word is a promise it keeps.
-    farNone.textContent = 'Waiting…';
+    badge.stop();
+    farWaits('Waiting…');
     far.pres.because('no frames are arriving from the board');
     scheduleRetry();
-    far.panel.stage.append(farNone);
   }
 
   function openVideo(room, info) {
     closeVideo();
     if (typeof VideoDecoder !== 'function') {
-      farNone.textContent = 'this browser has no WebCodecs, so the box’s picture cannot be decoded here';
+      farWaits('this browser has no WebCodecs, so the box’s picture cannot be decoded here');
       d.log('there is no WebCodecs here, so the right pane cannot be decoded on this browser', 'bad');
       return;
     }
@@ -1640,6 +1806,7 @@
     decoder.configure({ codec: info.codec ?? 'avc1.42E01E', optimizeForLatency: true });
 
     vws = new WebSocket(`${RELAY_BASE}/room/${room}/ws`);
+    badge.start();
     vws.binaryType = 'arraybuffer';
     let last = -1, tick = 0, at = performance.now();
     vws.onmessage = (e) => {
@@ -2138,6 +2305,76 @@
         }
       }
 
+      // ── the links, graded with no socket at all ──────────────────────────
+      //
+      // 🔴 A VISIT OPENS NOTHING, AND THAT IS ASSERTED RATHER THAN BELIEVED.
+      // Nothing on this page joins a room until `Show the board` is pressed, and
+      // the harness never presses it, so by here no socket was made, nothing
+      // was announced and no re-announce clock is running.
+      // ⚠️ FOR EVERYBODY, NOT ONLY THE HARNESS: a visit that has not pressed is
+      // the same claim, and reading three counters costs nothing.
+      // ⚠️ UNDER THE HARNESS IT IS ASSERTED WHATEVER HAPPENED, because nobody
+      // there can have pressed, so a join by then is the defect. Skipping it on
+      // `joining()` would make a page that joins on load skip its own check.
+      if (SELFCHECK || !node.joining()) {
+        const st = node.stats();
+        d.assert('nothing joined a room on load, so the board was asked for nothing',
+          !node.joining() && !node.joined() && st.announced === 0 && st.asked === 0 && !st.ticking && !vws,
+          `joining ${node.joining()}, joined ${node.joined()}, ${st.announced} announced, ${st.asked} asked, clock ${st.ticking ? 'running' : 'stopped'}, ${vws ? 'a video socket is open' : 'no video socket'}`);
+      }
+      d.assert('a person gets the studio, and a harness run gets a room of its own',
+        SELFCHECK ? ROOM !== 'studio-1' : ROOM === (new URLSearchParams(location.search).get('room') || 'studio-1'),
+        `room ${ROOM}, site ${SITE}`);
+      /**
+       * 🔴 THE TWO LINKS, ON A SCRATCH BAY FED THE BOARD'S REAL GRAPH. The graph
+       * is `boardGraph`, the function the Pi itself runs, so the ports linked
+       * here are the ports the Pi announces. The video link must get the
+       * `relay-h264` session and the shared `video` opener; the program link
+       * must be accepted and say in words that no kit opener takes it.
+       * ⚠️ NEGATIVE CONTROL: the same picture asked for over WHEP is refused,
+       * naming the one transport the board's port allows. A bay that accepted
+       * every link would pass the first half and fail this one.
+       */
+      {
+        const reg = createRegistry();
+        reg.ingest({ type: 'board.alive', from: 'pi', graph: boardGraph({ room: ROOM }) });
+        reg.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
+        const got = linkIn(reg.fill(createBay()));
+        d.assert('the picture is a link the bay gives the board’s own transport, and the shared video opener takes it',
+          !got.why && got.pick?.kind === 'video' && got.pick?.transport === 'relay-h264',
+          got.why || `${got.video}, ${got.pick?.kind} over ${got.pick?.transport}`);
+        const shaderPick = (() => {
+          const b = reg.fill(createBay());
+          const r = b.link(PROGRAM_PORT, `${ROOM}:gpu:program`, [], { site: SITE });
+          return r.ok ? openers.pick(b.links().find((x) => x.id === r.id), b) : { kind: null, why: r.why };
+        })();
+        d.assert('and the shader is a program link this page sends itself, because no kit opener takes one',
+          !!got.program && shaderPick.kind === null && /not something this page opens/.test(shaderPick.why || ''),
+          `${got.program}: ${shaderPick.why}`);
+        const whep = reg.fill(createBay()).link(`${ROOM}:gpu:video`, SCREEN_PORT, [], { site: SITE, via: 'whep' });
+        d.assert('the same picture asked for over WHEP is refused, naming the transport the board allows',
+          !whep.ok && /relay-h264/.test(whep.why || ''), whep.why || 'it was accepted');
+      }
+      /**
+       * 🔴 THE BADGE SAYS WHAT ARRIVED, NOT WHAT WAS ASKED. Its rule as fixtures:
+       * a press with nothing yet is `coming`, a count that grew a moment ago is
+       * `online`, and the same count gone quiet past the stall window is
+       * `offline`. And before any link the badge and its slot draw nothing.
+       */
+      {
+        const t0 = 1_000_000;
+        const s1 = linkStateOf({ now: t0 + 100, startedAt: t0 });
+        const s2 = linkStateOf({ now: t0 + 500, startedAt: t0, lastCountAt: t0 + 400 });
+        const s3 = linkStateOf({ now: t0 + 400 + LINK_STALL_MS * 2 + 50, startedAt: t0, lastCountAt: t0 + 400 });
+        d.assert('the badge on the board’s picture reads starting, then receiving, then stalled',
+          s1 === 'coming' && s2 === 'online' && s3 === 'offline', `${s1}, ${s2}, ${s3}`);
+        if (!vws) {
+          d.assert('and with no link open it draws nothing on the picture',
+            getComputedStyle(far.panel.slots.tag).display === 'none' && badge.state() === 'unknown',
+            `tag ${getComputedStyle(far.panel.slots.tag).display}, badge ${badge.state()}`);
+        }
+      }
+
       d.ready();
   }
   /**
@@ -2249,9 +2486,18 @@
     // ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC.
   }, { how: true, atEnd: true });
 
+  // ⚠️ IT WAITS FOR THE BOX ONLY WHEN SOMEBODY ASKED FOR IT. Nothing joins on
+  // load now, so waiting the box's twelve seconds would be a wait for nothing.
+  // 🔴 BUT IT STILL WAITS FOR THIS PAGE'S OWN FIRST FRAMES. Those twelve
+  // seconds were also what let the left pane start drawing before its checks
+  // read it: without them `the shader compiled and linked` read 0 frames on a
+  // page that was drawing a moment later. Measured 2026-10-06, so it waits for
+  // a drawn frame, bounded at the same twelve seconds.
   (async () => {
-    for (let i = 0; i < 30 && farDecoded === 0; i++) await new Promise((r) => setTimeout(r, 400));
-    if (farDecoded === 0) d.log('the box did not send in 12 s. Checking the left pane only', 'warn');
+    for (let i = 0; i < 30 && (node.joining() ? farDecoded === 0 : (gl && drewAny === 0)); i++) {
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    if (node.joining() && farDecoded === 0) d.log('the box did not send in 12 s. Checking the left pane only', 'warn');
     runChecks();
   })();
 

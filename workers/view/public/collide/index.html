@@ -117,6 +117,7 @@
   import { compile } from '/shell/sclang-lite.mjs';
   import { readSynthDef } from '/shell/synthdef.mjs';
   import { PRESETS } from '/collide/presets.mjs';
+  import { createEngineNode } from '/collide/engine-node.mjs';
 
   const ONE = 'a synth typed in a small subset of SuperCollider, compiled in this tab '
             + 'whenever you stop typing';
@@ -475,10 +476,20 @@
   /* The text is the picture row, edge to edge, as on `/fau/`. The live scope
      that sat above it went on 2026-09-30, asked as *"rm waveform from
      collide"*. */
+  /* 🔴 ON THE PATCHBAY AFTER A PRESS OF JOIN, AND NEVER ON A VISIT
+     (`plans/plan-routing-migration.md` step 5, `engine-node.mjs`). The engine
+     is a node with notes in, sound out and the program in; this browser's MIDI
+     devices come with it. Beside the name sit the control and the badge that
+     says whether a keyboard linked in from `/patchbay/` is arriving, which is
+     the owner's *"visual indication"* rather than a patch view. */
+  const bay = createEngineNode({
+    slug: 'collide', label: 'collide', accepts: ['note'], program: { language: 'sclang' },
+    playing: () => !!eng && !!current, log: (line, kind) => d.log(line, kind),
+  });
   const panel = createInstrumentPanel({
     viz: source.el,
     keys: keys.el,
-    plate: { name: 'COLLIDE', patch },
+    plate: { name: 'COLLIDE', status: bay.el, patch },
   });
   /* The knobs are the row under the text, hidden until a compile has any. */
   knobRow = panel.addRow(knobs.el);
@@ -698,6 +709,10 @@
     d.assert('SuperCollider came up and took the Pad, answering /done to /d_recv',
       !!eng && current === good && current.name === good.name,
       eng ? `${Math.round(eng.bootMs)} ms to boot, ${current?.name} on the server` : 'no engine');
+    /* The patchbay, with the engine up, on a bus inside this tab and two fake
+       MIDI devices, so nothing reaches a relay and the browser is asked for no
+       MIDI port (`engine-node.mjs`). */
+    await bay.check(d.assert);
     /* ⚠️ ASKED WITH THE ENGINE UP, because before it exists nothing can be
        sent at all and "a refusal sent nothing" would be true of any page. */
     const sentBefore = sent, onServer = current;

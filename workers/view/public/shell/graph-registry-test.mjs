@@ -28,7 +28,7 @@
 // *changed* every five seconds redraws `/graph/` on every beat and nobody sees
 // why.
 
-import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS } from './graph-registry.mjs';
+import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports } from './graph-registry.mjs';
 import { createBay } from './bay.mjs';
 
 let pass = 0, fail = 0;
@@ -236,6 +236,67 @@ console.log('\n== into a bay ==');
   b2.addPort({ id: 'x:n:out', label: 'n', dir: 'out', medium: 'audio' });
   b2.addPort({ id: 'y:m:in', label: 'm', dir: 'in', medium: 'audio' });
   ok('a port that declares nothing is still addressed by derivation', b2.link('x:n:out', 'y:m:in').session?.address === 'x-n-out');
+}
+
+// ── plans/plan-routing-migration.md steps 0 and 1, 2026-10-06 ─────────────
+
+{
+  /* One socket may be two sites, and each is kept. */
+  let t = 0;
+  const reg = createRegistry({ now: () => t });
+  const page = { v: 1, site: 'web-ab12', place: 'browser', nodes: [], ports: [{ id: 'web-ab12:keys:out', dir: 'out', medium: 'midi' }] };
+  const store = { v: 1, site: 'r2', place: 'cloudflare', nodes: [], ports: [{ id: 'r2:recordings:in', dir: 'in', medium: 'audio' }] };
+  reg.ingest({ type: 'graph.announce', from: 's1', graph: page });
+  const second = reg.ingest({ type: 'graph.announce', from: 's1', graph: store });
+  ok('one socket announcing two sites keeps both', second === true && reg.merged().sites.length === 2
+    && reg.graphs().every((g) => g.from === 's1'), reg.merged().sites.map((x) => x.site).join(', '));
+  /* NEGATIVE CONTROL: the same site again from that socket replaces, it does not add. */
+  t = 5;
+  const again = reg.ingest({ type: 'graph.announce', from: 's1', graph: { ...page, place: 'laptop' } });
+  ok('NEGATIVE CONTROL: a second announce of one site from one socket replaces the first',
+    again === true && reg.graphs().length === 2 && reg.graphs().find((g) => g.site === 'web-ab12').graph.place === 'laptop');
+  ok('forget with a site takes only that site', reg.forget('s1', 'r2') === true && reg.graphs().length === 1
+    && reg.graphs()[0].site === 'web-ab12');
+  reg.ingest({ type: 'graph.announce', from: 's1', graph: store });
+  ok('and forget with a socket alone takes every site it announced', reg.forget('s1') === true && reg.graphs().length === 0);
+  /* NEGATIVE CONTROL: two sockets announcing one site still merge as one, freshest winning. */
+  const two = createRegistry({ now: () => t });
+  t = 10; two.ingest({ type: 'graph.announce', from: 'a', graph: page });
+  t = 20; two.ingest({ type: 'graph.announce', from: 'b', graph: { ...page, place: 'phone' } });
+  ok('NEGATIVE CONTROL: two sockets announcing one site are still one site, the freshest drawn',
+    two.merged().sites.length === 1 && two.merged().sites[0].from === 'b');
+}
+
+{
+  /* The board's streams travel the way its code sends them. */
+  const g = boardGraph({ room: 'studio-1', instruments: { synth: true }, inputs: [{ name: 'circuit', midi: null }] });
+  const tx = (id) => g.ports.find((p) => p.id === id)?.transports?.join(',');
+  ok('the board declares relay or a data channel for its sound and relay H.264 for its picture',
+    tx('studio-1:synth:audio') === 'relay,datachannel' && tx('studio-1:circuit:audio') === 'relay,datachannel'
+      && tx('studio-1:gpu:video') === 'relay-h264', `${tx('studio-1:synth:audio')} | ${tx('studio-1:gpu:video')}`);
+  ok('NEGATIVE CONTROL: a MIDI in and a program in declare no transport, because they carry their own bytes',
+    !g.ports.some((p) => p.dir === 'in' && p.transports));
+  /* A board that predates the field, as the Pi on the desk does until a push. */
+  const old = { ...g, ports: g.ports.map(({ transports, ...p }) => p) };
+  const reg = createRegistry();
+  reg.ingest({ type: 'board.alive', from: 'b', graph: old });
+  const heard = reg.merged().ports.find((p) => p.id === 'studio-1:gpu:video');
+  ok('a board graph that says nothing about transports is given the board\'s own on ingest',
+    heard?.transports?.join(',') === BOARD_TRANSPORTS.video.join(','), JSON.stringify(heard?.transports));
+  /* NEGATIVE CONTROLS: a page's announce is not touched, and a board that says something keeps it. */
+  const pageG = { v: 1, site: 'cam-1', place: 'browser', nodes: [], ports: [{ id: 'cam-1:cam:video', dir: 'out', medium: 'video' }] };
+  reg.ingest({ type: 'graph.announce', from: 'p', graph: pageG });
+  ok('NEGATIVE CONTROL: a page\'s own announce is never given the board\'s transports',
+    !reg.merged().ports.find((p) => p.id === 'cam-1:cam:video')?.transports);
+  const own = withBoardTransports({ ...old, ports: old.ports.map((p) => (p.medium === 'video' ? { ...p, transports: ['whep'] } : p)) });
+  ok('NEGATIVE CONTROL: a board port that already names its transports keeps them',
+    own.ports.find((p) => p.id === 'studio-1:gpu:video').transports.join(',') === 'whep');
+  const b = reg.fill(createBay());
+  b.addNode({ id: 'home:page', kind: 'screen', label: 'home', place: 'home' });
+  b.addPort({ id: 'home:page:video', label: 'home', dir: 'in', medium: 'video', shape: { codec: 'h264' } });
+  const v = b.link('studio-1:gpu:video', 'home:page:video');
+  ok('so the bay gives the board\'s picture relay H.264, the way the page really opens it, and not WHEP',
+    v.ok && v.session?.transport === 'relay-h264', JSON.stringify(v.session || v.why));
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);

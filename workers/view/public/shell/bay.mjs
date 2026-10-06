@@ -25,6 +25,15 @@
 // the other. This checks the pair at CONNECT time instead of at play time.
 
 import { KINDS, kindOfDecoded } from './midi-kinds.mjs';
+/* 🔴 ONE STALE WINDOW FOR THE BAY AND THE REGISTRY, SINCE 2026-10-06
+   (plans/plan-routing-migration.md §3.3). This file said 30 s and the registry
+   15 s, so a port could be stale to the registry and fresh to the bay for
+   fifteen seconds. The registry's number wins because it is a fact about the
+   board (three missed five second beats), and the registry is import free on
+   purpose (the Pi ships it alone), so the bay imports it rather than the other
+   way round. */
+import { STALE_MS } from './graph-registry.mjs';
+export { STALE_MS };
 
 /**
  * What a link can carry. `clock` is its own medium: see plan-patchbay, §3.4.
@@ -75,13 +84,22 @@ export const WHERE = ['machine', 'network', 'internet-one', 'internet-many'];
  * chooser always returns the first; the second is kept so it is not lost.
  * ⚠️ `state` IS NOT IN THE §5 TABLE. Plan §3 says a room carries it, as a bus,
  * so every distance gets the relay room, and the one number on it is the
- * relay's cap, which is plan §5's own figure for the same relay.
+ * relay's cap.
+ * 🔴 THE RELAY'S CAP IS 1000 msg/s WITH A 2000 BURST, AND THIS TABLE SAID 60
+ * UNTIL 2026-10-06. READ from `workers/relay/src/index.js` (`MSG_PER_SEC`,
+ * `MSG_BURST`), and reported three times before it was fixed (HANDOFF
+ * 2026-10-04, plan-xr-together §3, plan-routing-migration §3.2). The stale
+ * figure was too SMALL, so every page that printed `says` told a visitor the
+ * relay refuses what it accepts. `bay-test.mjs` reads the worker's source and
+ * goes red when the two disagree.
  */
+export const RELAY = { msgPerSec: 1000, burst: 2000 };
+const RELAY_CAP = `cap ${RELAY.msgPerSec} msg/s, ${RELAY.burst} burst`;
 export const TRANSPORTS = {
   audio: {
     'machine':       { transport: 'webaudio', says: 'WebAudio or Core Audio, no number measured' },
     'network':       { transport: 'datachannel', says: 'board round trip 4 ms' },
-    'internet-one':  { transport: 'relay', says: 'relay round trip p50 36 ms, cap 60 msg/s, stay at 50' },
+    'internet-one':  { transport: 'relay', says: `relay round trip p50 36 ms, ${RELAY_CAP}` },
     'internet-many': { transport: 'moq', or: 'llhls', says: 'MoQ or LL-HLS, no number measured' },
   },
   video: {
@@ -98,12 +116,34 @@ export const TRANSPORTS = {
     'internet-many': { transport: 'r2-hls', says: 'R2 plus HLS, no number measured' },
   },
   state: {
-    'machine':       { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
-    'network':       { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
-    'internet-one':  { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
-    'internet-many': { transport: 'room', says: 'a relay room as a bus, cap 60 msg/s' },
+    'machine':       { transport: 'room', says: `a relay room as a bus, ${RELAY_CAP}` },
+    'network':       { transport: 'room', says: `a relay room as a bus, ${RELAY_CAP}` },
+    'internet-one':  { transport: 'room', says: `a relay room as a bus, ${RELAY_CAP}` },
+    'internet-many': { transport: 'room', says: `a relay room as a bus, ${RELAY_CAP}` },
   },
 };
+
+/**
+ * 🔴 READING ONE STORED OBJECT IS ITS OWN ROW, SINCE 2026-10-06
+ * (plan-routing-migration §3.2). A link OUT of a store used to ride the `file`
+ * row, whose `internet-one` cell is `ingest`, and ingest is the WRITE path: a
+ * playback was described as an upload. Reading one recording back is one https
+ * GET of the object (`/patchbay/`'s play opener fetches it from
+ * `archive.positron.studio`); many readers of one object is the `r2-hls` cell,
+ * which the `file` row already had.
+ */
+export const READS = {
+  'machine':       { transport: 'indexeddb', says: 'IndexedDB, no number measured' },
+  'network':       { transport: 'https', says: 'one https read of the stored object, no number measured' },
+  'internet-one':  { transport: 'https', says: 'one https read of the stored object, no number measured' },
+  'internet-many': { transport: 'r2-hls', says: 'R2 plus HLS, no number measured' },
+};
+
+/** Every transport the two tables name, which is what `via` may ask for. */
+export const TRANSPORT_NAMES = [...new Set([...Object.values(TRANSPORTS), READS]
+  .flatMap((row) => Object.values(row)).flatMap((c) => [c.transport, c.or]).filter(Boolean))];
+/** The transports that never leave one machine, so `via` cannot ask for them across a wire. */
+export const MACHINE_ONLY = ['webaudio', 'page', 'indexeddb'];
 
 /**
  * Which transport a heavy link rides, from plan §5's table.
@@ -698,6 +738,10 @@ export function delivers(emits, transforms) {
 // The moment the text can say something the graph cannot, there are two models
 // and they will disagree, which is this project's most expensive defect class.
 //
+// ⚠️ `via` IS IN IT, SINCE 2026-10-06, as a last word: `a -> b via moq`. It is
+// a person's choice and not the table's, so it is the one part of a session the
+// line must carry, or a scene recalled from text would come back on a
+// different transport from the one it was saved with.
 // ⚠️ A HEAVY LINK PRINTS AS THE SAME `from -> to` LINE AND ITS SESSION IS NOT
 // IN IT. The session is derived from the two ends and the table, so writing it
 // down would be the second source of truth this paragraph forbids. Reading the
@@ -726,15 +770,15 @@ export function printLink(link) {
       })
       .join(' ');
   }).join(', ');
-  return `${link.from} -> ${link.to}${t ? ` { ${t} }` : ''}`;
+  return `${link.from} -> ${link.to}${t ? ` { ${t} }` : ''}${link.via ? ` via ${link.via}` : ''}`;
 }
 
 /** The reverse. Throws with the offending text, because a parser that returns
  *  null makes every caller invent its own message for the same fault. */
 export function parseLink(line) {
-  const m = /^\s*([^\s>]+)\s*->\s*([^\s{]+)\s*(?:\{(.*)\})?\s*$/.exec(line);
-  if (!m) throw new Error(`bay: cannot read "${line.trim()}". A link is "from -> to { op arg }"`);
-  const [, from, to, body] = m;
+  const m = /^\s*([^\s>]+)\s*->\s*([^\s{]+)\s*(?:\{(.*)\})?\s*(?:via\s+([A-Za-z0-9-]+))?\s*$/.exec(line);
+  if (!m) throw new Error(`bay: cannot read "${line.trim()}". A link is "from -> to { op arg } via transport", the last two optional`);
+  const [, from, to, body, via] = m;
   const transforms = (body || '').split(',').map((s) => s.trim()).filter(Boolean).map((chunk) => {
     const parts = chunk.split(/\s+/);
     const op = parts.shift();
@@ -747,7 +791,7 @@ export function parseLink(line) {
     });
     return t;
   });
-  return { from, to, transforms };
+  return { from, to, transforms, ...(via ? { via } : {}) };
 }
 
 export function printPatch(links) { return links.map(printLink).join('\n'); }
@@ -758,9 +802,9 @@ export function parsePatch(text) {
 
 // ── the bay ───────────────────────────────────────────────────────────────
 
-/** How long since a heartbeat before a port is STALE, which is a third state
- *  and is not the same as absent. "I cannot ssh to it" is never "it is down". */
-export const STALE_MS = 30_000;
+/* How long since a heartbeat before a port is STALE, which is a third state
+   and is not the same as absent. "I cannot ssh to it" is never "it is down".
+   `STALE_MS` is the registry's, imported at the top of this file. */
 
 export function createBay({ now = () => Date.now() } = {}) {
   const ports = new Map();          // id -> port
@@ -809,12 +853,18 @@ export function createBay({ now = () => Date.now() } = {}) {
    * NOT EVERY LINK OUT OF THE PORT. A page on the same machine listening as well
    * does not make a relay leg into a broadcast, and plan §5's column is about
    * how many receive across the internet.
+   * ⚠️ AND A LINK INTO A STORE IS NOT A RECEIVER, SINCE 2026-10-06. Its session
+   * describes the upload, and the sound reaches the recorder on the leg a
+   * listening link would use anyway: `/patchbay/` records and listens to one
+   * board input through ONE held source. Counting it made the listen link that
+   * follows a recording `internet-many`, a broadcast nobody was making.
    */
   function whereOf(a, b) {
     if (placeOf(a) === placeOf(b)) return { where: 'machine', receivers: 1 };
     const na = netOf(a), nb = netOf(b);
     if (na && nb && na === nb) return { where: 'network', receivers: 1 };
     const far = [...links.values()].filter((l) => l.from === a.id
+      && nodeFor(ports.get(l.to) || { id: l.to })?.kind !== 'store'
       && /^internet/.test(l.session?.where || '')).length;
     return { where: far ? 'internet-many' : 'internet-one', receivers: far + 1 };
   }
@@ -852,11 +902,27 @@ export function createBay({ now = () => Date.now() } = {}) {
    *                               REFUSAL rather than a quiet drop. See below.
    * @param {string[]} [p.emits]   out-ports: the classes it can produce
    * @param {Function} [p.deliver] in-ports: where a delivered event goes
+   * @param {string[]} [p.transports] the only transports this port's stream
+   *                               really travels by, from TRANSPORT_NAMES. A
+   *                               session the table would give it otherwise is
+   *                               refused in words. See `sessionFor`.
+   * @param {string} [p.heldBy]    in-ports: the site that holds this input.
+   *                               A link into it from any other site is refused
+   *                               in words. See `validate`.
    */
   function addPort(p) {
     if (!p.id) throw new Error('bay: a port needs an id');
     if (!MEDIA.includes(p.medium)) throw new Error(`bay: medium is one of ${MEDIA.join(', ')}, not ${p.medium}`);
     if (p.dir !== 'in' && p.dir !== 'out') throw new Error('bay: dir is "in" or "out"');
+    /* ⚠️ A RESTRICTION NAMING A TRANSPORT NOBODY HAS IS A TYPO THAT WOULD REFUSE
+       EVERY LINK, so it throws here, where the port is declared, rather than
+       reading later as a port that will not link to anything. */
+    if (p.transports !== undefined) {
+      const bad = Array.isArray(p.transports) ? p.transports.filter((t) => !TRANSPORT_NAMES.includes(t)) : ['not a list'];
+      if (bad.length || !p.transports.length) {
+        throw new Error(`bay: ${p.id} transports are a list from ${TRANSPORT_NAMES.join(', ')}, not ${JSON.stringify(p.transports)}`);
+      }
+    }
     ports.set(p.id, { accepts: [], never: [], emits: [], shape: {}, seenAt: now(), heard: 0, ...p });
     return ports.get(p.id);
   }
@@ -921,6 +987,28 @@ export function createBay({ now = () => Date.now() } = {}) {
       return { ok: false,
                why: `${src.label} is somebody else's server, and this link would open a connection to it that they count as a listener.`,
                fix: 'Only a person who is going to listen can make this link, by asking for it themselves.' };
+    }
+
+    /**
+     * 🔴 AN INPUT SOMEBODY HOLDS TAKES LINKS FROM THAT SOMEBODY ONLY, SINCE
+     * 2026-10-06 (plan-universal-routing §6, plan-routing-migration §3.6 and
+     * §5.2). The Pi is one instrument with one JACK graph, and a second
+     * person's link into its synth takes the sound from whoever had it. A port
+     * carrying `heldBy: <site>` refuses a link INTO it from any other site, in
+     * words, with the holder named.
+     * ⚠️ THE ASKER IS `opts.site` WHEN A PAGE SAYS WHO IT IS, and the source's
+     * own site otherwise. A patchbay linking another page's lane into the board
+     * is the patchbay asking, not the lane.
+     * ⚠️ MODEL LEVEL ONLY. Nothing on the Pi sets or reads `heldBy` yet, so this
+     * refuses what a page describes and guards nothing a socket could send.
+     */
+    if (b.heldBy) {
+      const asker = typeof opts?.site === 'string' && opts.site ? opts.site : a.id.split(':')[0];
+      if (String(b.heldBy) !== asker) {
+        return { ok: false,
+                 why: `${b.label} is held by ${b.heldBy}, and only that site may link into it.`,
+                 fix: `Ask whoever is at ${b.heldBy} to let ${b.label} go, or link into another input.` };
+      }
     }
 
     /**
@@ -1027,8 +1115,10 @@ export function createBay({ now = () => Date.now() } = {}) {
       warns.push(`${p.label} has not been heard from for ${Math.round((now() - (p.seenAt ?? 0)) / 1000)}s`);
     }
     if (dropped.length) warns.push(`${b.label} will drop ${dropped.join(', ')}`);
+    const ses = sessionFor(a, b, opts);
+    if (ses.refuse) return { ok: false, ...ses.refuse };
     return { ok: true, why: '', ...(warns.length ? { warn: warns.join('. ') } : {}),
-             session: sessionFor(a, b) };
+             session: ses.session };
   }
 
   /**
@@ -1049,14 +1139,80 @@ export function createBay({ now = () => Date.now() } = {}) {
      recording is one upload; `r2-hls` is the row for many READING a store.
      ⚠️ THE ADDRESS IS THE STORE'S, so the row says where the recording lives
      rather than the room the sound came from. */
-  function sessionFor(a, b) {
-    if (!HEAVY.includes(a.medium)) return null;
-    const into = nodeFor(b)?.kind === 'store', outOf = nodeFor(a)?.kind === 'store';
+  /* 🔴 A LINK OUT OF A STORE TO ONE READER IS AN HTTPS READ, SINCE 2026-10-06,
+     from `READS` rather than from the `file` row, whose `internet-one` cell is
+     the WRITE path. Many readers of one object are still `r2-hls`.
+
+     🔴 TWO WAYS A SESSION CAN DIFFER FROM THE TABLE, BOTH SINCE 2026-10-06
+     (plan-routing-migration §3.2, `plans/plan-stage-patchbay.md` F1), and both
+     refuse in words rather than quietly picking something else:
+       - a PORT may say `transports: [...]`, the only ways its stream really
+         travels. The cell's first choice and its `or` are tried in order and
+         the first the port allows wins, which is how the board's video, which
+         is relay H.264 and never WHEP, gets the `or` of the WHEP cell. A cell
+         with nothing the port allows is a refusal that names both lists. A
+         WHIP-only input asked for by a second receiver is told no, not LL-HLS.
+       - a LINK may say `{ via }`, a person asking for one transport by name,
+         which is what `/cam/` needs to show one source three ways. It must be
+         a transport the tables name, it must not be a one-machine transport
+         across a wire, and it must be one the port allows. Whether an opener
+         exists for it is the opener's question, not this file's.
+     ⚠️ THE RESTRICTION THAT APPLIES IS THE ONE ON THE LEG THE TRANSPORT IS. A
+     recording's `ingest` is the store's leg, so the source's `relay` list does
+     not refuse it; a playback's `https` is the store's out port's leg.
+     ⚠️ A `says` FOR A TRANSPORT THE CELL DID NOT CHOOSE QUOTES NO NUMBER. The
+     cell's number is about the cell's transport, and borrowing it for another
+     is the invented figure this table exists to refuse. */
+  function sessionFor(a, b, opts = {}) {
+    const via = typeof opts?.via === 'string' && opts.via ? opts.via : null;
+    if (!HEAVY.includes(a.medium)) {
+      if (!via) return { session: null };
+      return { refuse: { why: `${a.label} carries ${a.medium}, which travels inside the link itself, so there is no transport to ask for.`,
+                         fix: `Make the link without via ${via}.` } };
+    }
+    const into = nodeFor(b)?.kind === 'store', outOf = !into && nodeFor(a)?.kind === 'store';
     const { where, receivers } = whereOf(a, b);
-    const w = into && where === 'internet-many' ? 'internet-one' : where;
-    const t = chooseTransport(into || outOf ? 'file' : a.medium, w, into ? 1 : receivers);
-    return { transport: t.transport, address: addressOf(into ? b : a), shape: { ...(a.shape || {}) },
-             where: t.where, says: t.says, ...(t.or ? { or: t.or } : {}) };
+    let t;
+    if (outOf) {
+      const col = where === 'internet-one' && receivers > 1 ? 'internet-many' : where;
+      t = { where: col, ...READS[col] };
+    } else {
+      const w = into && where === 'internet-many' ? 'internet-one' : where;
+      t = chooseTransport(into ? 'file' : a.medium, w, into ? 1 : receivers);
+    }
+    const legs = (into ? [b] : outOf ? [a] : [a, b]).filter((p) => Array.isArray(p.transports));
+    const allows = (x) => legs.every((p) => p.transports.includes(x));
+    const only = (p) => p.transports.join(' or ');
+    const firstBar = (x) => legs.find((p) => !p.transports.includes(x));
+    const cell = [t.transport, t.or].filter(Boolean);
+    let chosen;
+    if (via) {
+      if (!TRANSPORT_NAMES.includes(via)) {
+        return { refuse: { why: `no transport here is called ${via}.`,
+                           fix: `Ask for one of ${TRANSPORT_NAMES.join(', ')}, or leave via off.` } };
+      }
+      if (MACHINE_ONLY.includes(via) && t.where !== 'machine') {
+        return { refuse: { why: `${via} never leaves one machine, and ${a.label} and ${b.label} are on two.`,
+                           fix: `Leave via off and the link rides ${cell.find(allows) || t.transport}.` } };
+      }
+      const bar = firstBar(via);
+      if (bar) {
+        return { refuse: { why: `${bar.label} only travels by ${only(bar)}, and this link asks for ${via}.`,
+                           fix: `Ask for ${bar.transports[0]} instead.` } };
+      }
+      chosen = via;
+    } else {
+      chosen = cell.find(allows);
+      if (!chosen) {
+        const bar = firstBar(cell[0]);
+        return { refuse: { why: `${bar.label} only travels by ${only(bar)}, and at ${t.where} the table offers ${cell.join(' or ')}.`,
+                           fix: `Ask for ${bar.transports[0]} by name with via, or link it to a receiver nearer to it.` } };
+      }
+    }
+    const says = cell.includes(chosen) ? t.says : `${chosen}, asked for on this link, no number measured`;
+    return { session: { transport: chosen, address: addressOf(into ? b : a), shape: { ...(a.shape || {}) },
+             where: t.where, says, ...(t.or && chosen === t.transport ? { or: t.or } : {}),
+             ...(via ? { via } : {}) } };
   }
 
   /**
@@ -1107,7 +1263,7 @@ export function createBay({ now = () => Date.now() } = {}) {
     if (!v.ok) return { ok: false, why: v.why, fix: v.fix || '' };
     const id = `L${nextLink++}`;
     links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0,
-                    session: v.session });
+                    session: v.session, ...(v.session?.via ? { via: v.session.via } : {}) });
     return { ok: true, id, why: '', warn: v.warn, session: v.session };
   }
   function unlink(id) { return links.delete(id); }
@@ -1153,7 +1309,7 @@ export function createBay({ now = () => Date.now() } = {}) {
     load(text, opts = {}) {
       const bad = [];
       for (const l of parsePatch(text)) {
-        const r = link(l.from, l.to, l.transforms, opts);
+        const r = link(l.from, l.to, l.transforms, { ...opts, ...(l.via ? { via: l.via } : {}) });
         if (!r.ok) bad.push({ line: printLink(l), why: r.why, fix: r.fix || '' });
       }
       return bad;

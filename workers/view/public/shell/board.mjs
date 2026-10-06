@@ -54,7 +54,11 @@ export const FRAME_HEADER_BYTES = 12;
  *
  * @param {string} room        the relay room. `studio-1` is the ADDRESS OF THE
  *                             RASPBERRY PI, not a rendezvous a page invented.
- * @param {string} [relay]     override the relay base, for a local worker.
+ * @param {string} [relay]     override the relay base, for a local worker. Left
+ *                             out, `openWire` uses `RELAY_BASE`, which honours a
+ *                             loopback `?relay=` (wire.mjs `relayOverride`), so
+ *                             every board page reaches `demo/fake-board.mjs`
+ *                             with no code of its own.
  * @param {string} [of]        what the presence badge calls it.
  * @param {boolean} [showName] whether the badge PRINTS that name in front of
  *                             the word. Left alone it is today's behaviour,

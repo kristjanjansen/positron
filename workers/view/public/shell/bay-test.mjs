@@ -28,7 +28,9 @@
 
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
   classOf, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP,
-  OP_SAYS, HEAVY, NODE_KINDS, WHERE, TRANSPORTS, chooseTransport } from './bay.mjs';
+  OP_SAYS, HEAVY, NODE_KINDS, WHERE, TRANSPORTS, chooseTransport,
+  RELAY, READS, TRANSPORT_NAMES, MACHINE_ONLY } from './bay.mjs';
+import { STALE_MS as REGISTRY_STALE_MS } from './graph-registry.mjs';
 import { decode } from './midi-decode.mjs';
 
 /**
@@ -749,7 +751,7 @@ function world() {
   ok('the cells that carry a number carry the plan\'s number',
     chooseTransport('audio', 'network').says === 'board round trip 4 ms'
     && chooseTransport('audio', 'internet-one').says.includes('p50 36 ms')
-    && chooseTransport('audio', 'internet-one').says.includes('cap 60 msg/s')
+    && chooseTransport('audio', 'internet-one').says.includes('cap 1000 msg/s, 2000 burst')
     && chooseTransport('audio', 'internet-one').transport === 'relay',
     `${chooseTransport('audio', 'network').says} | ${chooseTransport('audio', 'internet-one').says}`);
   ok('and the cell the plan says is not measured says exactly "to measure"',
@@ -782,7 +784,7 @@ function world() {
   const plan = readFileSync(new URL('../../plans/plan-universal-routing.md', import.meta.url), 'utf8')
     .replace(/\*\*/g, '');
   const NUM = /\d+(?:\.\d+)?(?: ?(?:ms|msg\/s|s|kbit\/s|KB\/s|%))?\b/g;
-  const invented = Object.values(TRANSPORTS).flatMap((row) => Object.values(row))
+  const invented = [...Object.values(TRANSPORTS), READS].flatMap((row) => Object.values(row))
     .flatMap((c) => (c.says.match(NUM) || []).filter((n) => !plan.includes(n)).map((n) => `${n} in "${c.says}"`));
   ok('NEGATIVE CONTROL: no cell quotes a number the plan does not',
     invented.length === 0, invented.join(' | ') || 'every number found in the plan');
@@ -984,13 +986,172 @@ function world() {
     rec.ok && rec.session?.transport === 'ingest' && rec.session.where === 'internet-one'
       && rec.session.address === 'ingest.positron.studio', JSON.stringify(rec.session || rec.why));
   const play = b.link('r2:recordings:out', 'home:page:audio');
-  ok('and a sound out of a store is read back through ingest', play.ok && play.session?.transport === 'ingest',
-    JSON.stringify(play.session || play.why));
+  /* ⚠️ THIS SAID `read back through ingest` UNTIL 2026-10-06, and ingest is the
+     WRITE path. One reader of one stored object is one https read (`READS`). */
+  ok('and a sound out of a store to one reader is one https read of the object', play.ok && play.session?.transport === 'https'
+    && play.session.address === 'archive.positron.studio', JSON.stringify(play.session || play.why));
   /* NEGATIVE CONTROL: the same sound to a page that is not a store keeps the
      audio row, or the store rule would be true of every link. */
   const page = b.link('studio-1:circuit:audio', 'm1:page:audio');
   ok('NEGATIVE CONTROL: a sound to a page that is not a store keeps the audio row',
     page.ok && page.session?.transport === 'datachannel', JSON.stringify(page.session || page.why));
+}
+
+// ── step 0 of plans/plan-routing-migration.md, 2026-10-06 ─────────────────
+//
+// 🔴 THE RELAY'S REAL CAP, ONE STALE WINDOW, A READ ROW, A PORT'S OWN
+// TRANSPORTS, A LINK'S `via`, AND AN INPUT SOMEBODY HOLDS. Every one of them
+// refuses something, so most of what follows is a refusal with its reason and
+// the same case allowed beside it, which is what proves the refusal is the rule
+// and not a link that never matched.
+
+{
+  /* M. The relay figure is the worker's, read from the worker's source, so
+     the two cannot drift apart again without this going red. */
+  const { readFileSync } = await import('node:fs');
+  const relay = readFileSync(new URL('../../workers/relay/src/index.js', import.meta.url), 'utf8');
+  const num = (k) => Number((new RegExp(`const ${k} = (\\d+)`).exec(relay) || [])[1]);
+  ok('the relay figure in the table is the worker\'s own MSG_PER_SEC and MSG_BURST',
+    RELAY.msgPerSec === num('MSG_PER_SEC') && RELAY.burst === num('MSG_BURST'),
+    `bay ${RELAY.msgPerSec}/${RELAY.burst}, worker ${num('MSG_PER_SEC')}/${num('MSG_BURST')}`);
+  /* NEGATIVE CONTROL: the old figure is nowhere in either table. */
+  const stale = [...Object.values(TRANSPORTS), READS].flatMap((r) => Object.values(r)).filter((c) => /\b60 msg\/s|stay at 50/.test(c.says));
+  ok('NEGATIVE CONTROL: no cell still says the old 60 msg/s', stale.length === 0, stale.map((c) => c.says).join(' | ') || 'none');
+  ok('the bay and the registry go stale at the same moment', STALE_MS === REGISTRY_STALE_MS && STALE_MS === 15_000,
+    `bay ${STALE_MS}, registry ${REGISTRY_STALE_MS}`);
+}
+
+{
+  /* N. Reading a store: one reader is https, two over the internet are r2-hls,
+     and a recording into the store is still ingest. */
+  const b = world();
+  b.addNode({ id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' });
+  b.addPort({ id: 'r2:recordings:out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' });
+  b.addPort({ id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' });
+  const one = b.link('r2:recordings:out', 'home:page:audio');
+  const two = b.link('r2:recordings:out', 'away:page:audio');
+  ok('one reader of a stored object over the internet is an https read', one.session?.transport === 'https'
+    && one.session.where === 'internet-one', JSON.stringify(one.session || one.why));
+  ok('and a second reader of the same object is R2 plus HLS', two.session?.transport === 'r2-hls'
+    && two.session.where === 'internet-many', JSON.stringify(two.session || two.why));
+  /* NEGATIVE CONTROL: the write path did not move with the read. */
+  const rec = b.link('studio-1:circuit:audio', 'r2:recordings:in');
+  ok('NEGATIVE CONTROL: a sound into the store is still an upload through ingest', rec.session?.transport === 'ingest',
+    JSON.stringify(rec.session || rec.why));
+  /* A recording is not a receiver: a listener after it is the first one. */
+  const after = b.link('studio-1:circuit:audio', 'home:page:audio');
+  ok('a link into a store does not count as a receiver of the sound', after.session?.where === 'internet-one'
+    && after.session.transport === 'relay', JSON.stringify(after.session || after.why));
+  ok('every transport the tables name is one via may ask for, https included',
+    ['https', 'moq', 'relay-h264', 'whep'].every((x) => TRANSPORT_NAMES.includes(x))
+    && MACHINE_ONLY.every((x) => TRANSPORT_NAMES.includes(x)), TRANSPORT_NAMES.join(', '));
+}
+
+/** The board's GPU and a WHIP-only input, the two shapes plan-stage-patchbay F1 named. */
+function restricted() {
+  const b = world();
+  b.addNode({ id: 'studio-1:gpu', kind: 'engine', label: 'GPU', place: 'studio-1', net: 'studio-lan' });
+  b.addNode({ id: 'cf:stage', kind: 'endpoint', label: 'stage input', place: 'cloudflare', net: 'cloudflare' });
+  const V = { codec: 'h264' };
+  b.addPort({ id: 'studio-1:gpu:video', label: 'GPU', dir: 'out', medium: 'video', shape: V, transports: ['relay-h264'] });
+  b.addPort({ id: 'cf:stage:video', label: 'stage input', dir: 'out', medium: 'video', shape: V, transports: ['whep'] });
+  b.addPort({ id: 'cf:open:video', label: 'open input', dir: 'out', medium: 'video', shape: V });
+  for (const [id, label] of [['home:page:video', 'home screen'], ['away:page:video', 'away screen'], ['m1:page:video', 'M1 screen']]) {
+    b.addPort({ id, label, dir: 'in', medium: 'video', shape: V });
+  }
+  return b;
+}
+
+{
+  /* O. A port's own transports. */
+  const b = restricted();
+  const gpu = b.link('studio-1:gpu:video', 'home:page:video');
+  ok('a port that only travels by relay-h264 gets the cell\'s second choice, not WHEP', gpu.ok
+    && gpu.session?.transport === 'relay-h264' && gpu.session.where === 'internet-one', JSON.stringify(gpu.session || gpu.why));
+  const first = b.link('cf:stage:video', 'home:page:video');
+  const second = b.validate('cf:stage:video', 'away:page:video');
+  ok('a WHIP-only input takes its first receiver over WHEP', first.ok && first.session?.transport === 'whep',
+    JSON.stringify(first.session || first.why));
+  ok('and its second is refused in words naming both lists, not handed LL-HLS', !second.ok
+    && /only travels by whep/.test(second.why) && /llhls/.test(second.why) && /via/.test(second.fix || ''),
+    `${second.why} / ${second.fix}`);
+  /* NEGATIVE CONTROL: the same second receiver of a port with no restriction is LL-HLS. */
+  b.link('cf:open:video', 'home:page:video');
+  const open2 = b.link('cf:open:video', 'away:page:video');
+  ok('NEGATIVE CONTROL: the same second receiver without a restriction is told LL-HLS',
+    open2.ok && open2.session?.transport === 'llhls', JSON.stringify(open2.session || open2.why));
+  /* A restriction on the source does not refuse the store's own leg. */
+  const s = restricted();
+  s.addNode({ id: 'r2:clips', kind: 'store', label: 'clips', place: 'cloudflare', net: 'cloudflare' });
+  s.addPort({ id: 'r2:clips:in', label: 'clips', dir: 'in', medium: 'video', shape: V0(), address: 'ingest.positron.studio' });
+  const rec = s.link('studio-1:gpu:video', 'r2:clips:in');
+  ok('a recording of a restricted source is the store\'s leg and is not refused by the source\'s list',
+    rec.ok && rec.session?.transport === 'ingest', JSON.stringify(rec.session || rec.why));
+  let threw = '';
+  try { createBay().addPort({ id: 'x:y:video', label: 'y', dir: 'out', medium: 'video', transports: ['carrier-pigeon'] }); }
+  catch (e) { threw = e.message; }
+  ok('NEGATIVE CONTROL: a port naming a transport nobody has throws where it is declared, listing the real ones',
+    threw.includes('carrier-pigeon') && threw.includes('relay-h264'), threw);
+}
+function V0() { return { codec: 'h264' }; }
+
+{
+  /* P. A link's own via. */
+  const b = restricted();
+  const moq = b.link('cf:open:video', 'home:page:video', [], { via: 'moq' });
+  ok('a link may ask for moq by name, and its session says it was asked for, quoting no number',
+    moq.ok && moq.session?.transport === 'moq' && moq.session.via === 'moq'
+      && /asked for on this link/.test(moq.session.says) && !/\d/.test(moq.session.says), JSON.stringify(moq.session || moq.why));
+  const line = printLink(b.links().find((l) => l.id === moq.id));
+  const back = parseLink(line);
+  ok('and the line carries via, and reads back with it', line.endsWith(' via moq') && back.via === 'moq'
+    && back.from === 'cf:open:video' && back.transforms.length === 0, line);
+  const re = restricted();
+  ok('and loading that line into a fresh bay makes the same session', re.load(line).length === 0
+    && re.links()[0]?.session?.transport === 'moq', JSON.stringify(re.links()[0]?.session));
+  const relay = b.link('studio-1:gpu:video', 'm1:page:video', [], { via: 'relay-h264' });
+  ok('a via the port allows, at a distance whose cell lists it, keeps the cell\'s words', relay.ok
+    && relay.session?.transport === 'relay-h264', JSON.stringify(relay.session || relay.why));
+  const bad = b.validate('cf:open:video', 'away:page:video', [], { via: 'carrier-pigeon' });
+  ok('NEGATIVE CONTROL: a via nobody has is refused and the refusal lists the real ones', !bad.ok
+    && /carrier-pigeon/.test(bad.why) && /moq/.test(bad.fix), `${bad.why} / ${bad.fix}`);
+  const local = b.validate('cf:open:video', 'away:page:video', [], { via: 'page' });
+  ok('NEGATIVE CONTROL: a one machine transport across a wire is refused', !local.ok && /never leaves one machine/.test(local.why),
+    local.why);
+  const barred = b.validate('cf:stage:video', 'm1:page:video', [], { via: 'moq' });
+  ok('NEGATIVE CONTROL: a via the port does not allow is refused, naming what it does allow', !barred.ok
+    && /only travels by whep/.test(barred.why) && /whep/.test(barred.fix), `${barred.why} / ${barred.fix}`);
+  const d = desk();
+  const midi = d.validate('here:mk425c:out', 'here:circuit:in', [], { via: 'relay' });
+  ok('NEGATIVE CONTROL: via on a MIDI link is refused, because the link carries its own bytes', !midi.ok
+    && /travels inside the link itself/.test(midi.why), midi.why);
+  let lineErr = '';
+  try { parseLink('a:b:c -> d:e:f via'); } catch (e) { lineErr = e.message; }
+  ok('NEGATIVE CONTROL: a line ending in a bare via is not read as a link', /cannot read/.test(lineErr), lineErr);
+}
+
+{
+  /* Q. An input somebody holds, plan-routing-migration §3.6 and §5.2. */
+  const b = createBay();
+  b.addPort({ id: 'web-ab12:keys:out', label: 'keys at ab12', dir: 'out', medium: 'midi', emits: ['note'] });
+  b.addPort({ id: 'web-cd34:keys:out', label: 'keys at cd34', dir: 'out', medium: 'midi', emits: ['note'] });
+  b.addPort({ id: 'studio-1:synth:in', label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'], heldBy: 'web-ab12' });
+  b.addPort({ id: 'studio-1:free:in', label: 'free synth', dir: 'in', medium: 'midi', accepts: ['note'] });
+  const other = b.validate('web-cd34:keys:out', 'studio-1:synth:in');
+  ok('a link into an input held by another site is refused, naming the holder', !other.ok
+    && /held by web-ab12/.test(other.why) && /web-ab12/.test(other.fix || '') && !other.fix.includes(other.why),
+    `${other.why} / ${other.fix}`);
+  const own = b.validate('web-ab12:keys:out', 'studio-1:synth:in');
+  ok('and the holder\'s own site may link into it', own.ok, own.why);
+  const asked = b.validate('web-cd34:keys:out', 'studio-1:synth:in', [], { site: 'web-ab12' });
+  const notAsked = b.validate('web-ab12:keys:out', 'studio-1:synth:in', [], { site: 'web-cd34' });
+  ok('the asker is the page that says who it is, not the source', asked.ok && !notAsked.ok,
+    `${asked.why || 'allowed'} | ${notAsked.why}`);
+  /* NEGATIVE CONTROL: an input nobody holds takes links from anybody. */
+  const free = b.validate('web-cd34:keys:out', 'studio-1:free:in');
+  ok('NEGATIVE CONTROL: an input nobody holds takes a link from any site', free.ok, free.why);
+  const made = b.link('web-cd34:keys:out', 'studio-1:synth:in');
+  ok('and link refuses what validate refused, with the same words', !made.ok && made.why === other.why, made.why);
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);

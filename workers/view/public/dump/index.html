@@ -37,6 +37,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createMidiNode, checkMidiNode } from '/shell/midi-node.mjs';
   import {
     decode, isFlood, deviceInquiry, readInquiryReply, classifyEncoder, createNrpn,
   } from '/shell/midi-decode.mjs';
@@ -226,6 +227,17 @@
   clearRow.append(clearBtn);
 
   d.el.append(ports.el, traffic.el, clearRow);
+
+  /* 🔴 ON THE PATCHBAY ON A PRESS OF Join, NEVER ON LOAD (plans/plan-routing-migration.md
+     step 5). The instruments plugged into this machine are announced as devices,
+     keyed by their ports and never by their names, and this page announces a
+     sink of its own beside them: a tap a person can put on any of those outs
+     from `/patchbay/`, whose badge says whether anything is arriving. Join sits
+     outside `.pos-controls` and asks for MIDI first when Listen has not.
+     `midi-node.mjs` in the shell has the rest. */
+  const bayMidi = createMidiNode({ slug: 'dump', log: (line, kind) => d.log(line, kind), tap: true,
+    listen: async () => { if (!access) await open({ sysex: false }); return access; } });
+  d.el.append(bayMidi.el);
 
   // ---------------------------------------------------------------- state
 
@@ -425,6 +437,7 @@
       await wire();
       // Plugging something in after the page loaded is the ordinary case.
       access.onstatechange = async () => { await wire(); listPorts(); };
+      bayMidi.attach(access);
       return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
@@ -710,6 +723,8 @@
       d.log('these checks all ran against the known stream. Press Listen with '
           + 'something plugged in and the same columns describe it.');
     }
+
+    await checkMidiNode({ assert: d.assert, log: d.log, page: bayMidi, slug: 'dump', tap: true });
   });
 
 

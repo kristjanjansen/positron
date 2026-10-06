@@ -426,6 +426,7 @@
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
   import { createSegment, SCHEMES } from '/shell/segment.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
+  import { createMidiNode, checkMidiNode } from '/shell/midi-node.mjs';
   import { createPresenceButton, WIRED } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode, noteName } from '/shell/midi-decode.mjs';
@@ -1341,6 +1342,16 @@
   const traffic = createMidiLog({ empty: '', reserve: 6 });
   d.el.append(traffic.el);
 
+  /* 🔴 ON THE PATCHBAY ON A PRESS OF Join, NEVER ON LOAD (plans/plan-routing-migration.md
+     step 5). The instruments plugged into this machine are announced as devices,
+     keyed by their ports and never by their names, so `/patchbay/` can draw and
+     link them. `evo:out -> studio-1:circuit:in` is the plan's
+     own first demo: linked there, this page plays the board's Circuit. Join sits outside `.pos-controls` and asks for MIDI first
+     when Listen has not. `/shell/midi-node.mjs` has the rest. */
+  const bayMidi = createMidiNode({ slug: 'evo', log: (line, kind) => d.log(line, kind),
+    listen: async () => { if (!access) await d.run('listen'); return access; } });
+  d.el.append(bayMidi.el);
+
   // ── what arrives ────────────────────────────────────────────────────────
 
   let access = null;
@@ -1586,6 +1597,7 @@
          or pulled out after Listen. */
       offerLoopFor(kbd, inputNames(access), d.log);
       access.onstatechange = () => offerLoopFor(kbd, inputNames(access), d.log);
+      bayMidi.attach(access);
       return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
@@ -2708,6 +2720,8 @@
       rowShown && shownBtns.length === 1 && shownBtns[0] === 'Loop' && rowGone,
       `row ${rowShown ? 'drawn' : 'hidden'} holding ${JSON.stringify(shownBtns)}, and hidden again `
       + `${rowGone ? 'once' : 'NOT once'} the ports are back to what is really plugged in`);
+
+    await checkMidiNode({ assert: d.assert, log: d.log, page: bayMidi, slug: 'evo' });
   });
 
   d.ready();
