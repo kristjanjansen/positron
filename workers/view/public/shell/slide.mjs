@@ -292,6 +292,25 @@ export function tapZone(x, w) {
 }
 
 /**
+ * A SWIPE STEPS A SLIDE, asked 2026-10-06 as *"add keyboard control to slides
+ * in fullscreen and mobile support"*. A finger moved left goes forward and
+ * moved right goes back, the way every phone turns a page, at any size and in
+ * or out of full screen. It must travel `SWIPE_PX` and be clearly sideways
+ * (`SWIPE_RATIO` times further across than down), so a vertical scroll of the
+ * page past a deck never turns a slide. Returns -1, 0 or 1.
+ */
+// What on a slide is its own to press: a tap or a swipe that lands on one of
+// these is never a page turn.
+const OWN_TAPS = 'button, a, input, select, textarea, [role="slider"], [contenteditable], .k, [data-own-taps]';
+export const SWIPE_PX = 40;
+export const SWIPE_RATIO = 1.5;
+export function swipeStep(dx, dy) {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return 0;
+  if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < SWIPE_RATIO * Math.abs(dy)) return 0;
+  return dx < 0 ? 1 : -1;
+}
+
+/**
  * A spec checked and filled in, with no document. Throws on a shape that
  * cannot be drawn (an unknown key, layout or step, a split with no slot or no
  * side), because those are the author's mistakes and are said where the spec
@@ -774,7 +793,7 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {},
   const NEXT = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ']);
   const PREV = new Set(['ArrowLeft', 'ArrowUp', 'PageUp']);
   let heard = 0;
-  panel.el.addEventListener('keydown', (e) => {
+  const onKey = (e) => {
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target;
     if (t instanceof Element) {
@@ -794,7 +813,22 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {},
     heard++;
     e.preventDefault();
     e.stopPropagation();
+  };
+  panel.el.addEventListener('keydown', onKey);
+  // 🔴 IN FULL SCREEN THE KEYS ARE THE WHOLE DOCUMENT'S, asked 2026-10-06 as
+  // *"add keyboard control to slides in fullscreen"*. Entering full screen
+  // hides the footer, and with it the ⛶ that was just pressed and held the
+  // focus, so the focus fell back to the body and no arrow reached the panel.
+  // So while this player fills the screen, a key heard anywhere in the
+  // document is this player's (one player can be full at a time), and the
+  // panel takes the focus as it goes full, so its own listener hears it first.
+  document.addEventListener('keydown', (e) => {
+    if (!panel.isFull() || panel.el.contains(e.target)) return;
+    onKey(e);
   });
+  new MutationObserver(() => {
+    if (panel.isFull() && !panel.el.contains(document.activeElement)) panel.el.focus({ preventScroll: true });
+  }).observe(panel.el, { attributes: true, attributeFilter: ['class', 'data-full'] });
   // A press on the slide gives the panel the keys, the way clicking a video
   // player does; a press on one of its buttons focuses the button, which is
   // inside the root and so still heard.
@@ -802,7 +836,9 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {},
   let tapped = 0;
   panel.stage.addEventListener('click', (e) => {
     if (!panel.isFull() || !touch()) return;
-    const c = e.target instanceof Element ? e.target.closest('button, a, input, select, textarea, [role="slider"], [contenteditable]') : null;
+    // a keyboard key (`.k`) and anything marked `data-own-taps` are the
+    // slide's own, so a tap on a key plays the note and does not turn the page
+    const c = e.target instanceof Element ? e.target.closest(OWN_TAPS) : null;
     if (c && panel.stage.contains(c)) return;
     const r = panel.stage.getBoundingClientRect();
     const z = tapZone(e.clientX - r.left, r.width);
@@ -811,9 +847,30 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {},
     go(at + z);
   });
 
+  // A SWIPE, on a touch screen, in or out of full screen (see `swipeStep`).
+  // Only a finger counts, a mouse drag never does, and a swipe that starts on
+  // one of the slide's own controls is the control's.
+  let swiped = 0, from = null;
+  panel.stage.addEventListener('pointerdown', (e) => {
+    from = e.pointerType === 'touch' && !(e.target instanceof Element && e.target.closest(OWN_TAPS))
+      ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+  });
+  const endSwipe = (e) => {
+    if (!from || e.pointerId !== from.id) return;
+    const z = swipeStep(e.clientX - from.x, e.clientY - from.y);
+    from = null;
+    if (!z) return;
+    swiped++;
+    go(at + z);
+  };
+  panel.stage.addEventListener('pointerup', endSwipe);
+  panel.stage.addEventListener('pointercancel', () => { from = null; });
+
   go(0);
   return {
     el: panel.el, panel, slides, go, count,
+    /** how many swipes this player has stepped on, for an assert */
+    swipes: () => swiped,
     at: () => at,
     next: () => go(at + 1),
     prev: () => go(at - 1),
