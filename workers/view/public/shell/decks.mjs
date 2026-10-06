@@ -39,11 +39,14 @@ import { synthSlot } from './slide-synth.mjs';
 /** Each program's words on its slide, by `id`: what a line of the code does
  * and what to try, asked 2026-10-06 as *"make useful slide texts"*. The third
  * slide the same day: *"slode 3: make 0.5 into knob 0..1"*. */
+// TITLES NAME WHAT THE STEP MAKES, 2026-10-06: *"slide titles make no sense.
+// its educational step by step material. if you can not come up with to the
+// point titles drop them"*.
 const WORDS = {
-  sine: { say: '*process* is the sound',
+  sine: { say: 'A sine',
     text: 'os.osc(440) is a sine at 440 Hz and times 0.5 plays it at half volume. '
       + 'Change a number and press Start to hear yours' },
-  volume: { say: 'A slider becomes a knob',
+  volume: { say: 'A volume knob',
     text: 'hslider gives the 0.5 a name and a range from 0 to 1. '
       + 'Turn the knob while the tone plays' },
 };

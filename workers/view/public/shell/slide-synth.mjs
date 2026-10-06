@@ -75,6 +75,7 @@ import { createInstrumentPanel } from './instrument-panel.mjs';
 import { sharedAudio, claim, release } from './audio.mjs';
 import { synthUrl } from './synth-steps.mjs';
 import { createCompileIdle } from './compile-idle.mjs';
+import { createHueBook } from './code-lang.mjs';
 import { createParamKnobs } from './param-knobs.mjs';
 
 /** The panel's logical width, which the fitted box scales into the slot.
@@ -83,6 +84,12 @@ import { createParamKnobs } from './param-knobs.mjs';
  * logical panel is a wider panel on screen at the same type size, and it holds
  * slide 3's `hslider` line on one line (it wrapped at 340). */
 const PANEL_PX = 400;
+/** The logical height every synth panel is scaled by, the tallest of them
+ * (slide 3's, with one knob row, MEASURED 544 px on 2026-10-06), so slides 2
+ * and 3 draw the instrument at one scale and one type size (*"2 and 3 use
+ * same size of fau"*). A panel shorter than this is centred in its slot; one
+ * taller still fits, at a smaller scale, and the kit's check says so. */
+export const PANEL_H = 544;
 /** The scope's height in logical px, `/muta/`'s 140 less a little for half a slide. */
 const WAVE_PX = 120;
 /** Samples shown per frame: about 10.7 ms at 48 kHz, four and a bit cycles of 440 Hz. */
@@ -178,8 +185,13 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     // NINE ROWS, three times the first program's three, asked 2026-10-06 as
     // *"maeke code panel 3 x higher"*: room to write more than the shipped
     // lines, and never shorter than them plus three.
+    // EACH KNOB'S SLIDER IN THE KNOB'S OWN HUE, the rest of the code toned
+    // down, as on /fau/ (2026-10-06, *"why volume is not bright colored? we
+    // tone down syntaxt exept knobs"*): one hue book, read by the code box for
+    // the slider's name and written onto the knob as `--param-hue`
+    const book = createHueBook();
     const code = createCodeBox({
-      language: 'faust', rows: Math.max(9, lines + 3), label: '', value: shipped,
+      language: 'faust', hues: book, rows: Math.max(9, lines + 3), label: '', value: shipped,
       ariaLabel: `the Faust program Start plays, ${lines} lines, editable`,
     });
     // START AND STOP, ONE WIDTH, asked 2026-10-06 as *"Test tone -> Start Stop
@@ -201,7 +213,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     const codeRow = panel.addRow(code.el, { pad: false });
     const mid = el('div', 'sl-mid');
     mid.append(panel.el);
-    const fb = fitBox(host, PANEL_PX);
+    const fb = fitBox(host, PANEL_PX, { h: PANEL_H });
     fb.inner.append(mid);
 
     let ctx = null, out = null, meter = null, node = null, nodeText = null;
@@ -230,11 +242,19 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     function showKnobs(list) {
       if (!list.length) {
         if (knobRow) { knobRow.hidden = true; knobs.set([]); }
+        book.clear();
         return;
       }
       if (!knobRow) knobRow = panel.addRow(knobs.el);
       knobRow.hidden = false;
       knobs.set(list);
+      book.assign(knobs.names());
+      for (const n of knobs.names()) {
+        const h = book.hueOf(n), k = knobs.knob(n)?.el;
+        if (!k) continue;
+        if (h === null) k.style.removeProperty('--param-hue');
+        else k.style.setProperty('--param-hue', String(h));
+      }
     }
     showKnobs(readSliders(shipped));
 
@@ -243,6 +263,8 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     const say = () => {};
     let parts = null, partsText = null;
 
+    let shownFs = 0;
+    const REDUCED = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const buf = new Float32Array(2048);
     function frame() {
       raf = 0;
@@ -257,8 +279,14 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       // drawn against the smallest round full scale above the peak, so a 0.1
       // sine fills half the box and its label is a number somebody would type
       const fs = FULL_SCALE.find((f) => f >= peak * 1.25) || FULL_SCALE[FULL_SCALE.length - 1];
+      // THE SCALE GLIDES, 2026-10-06 (*"can scale change be animated?"*): the
+      // drawn scale eases a fifth of the way to the chosen one each frame, on a
+      // log scale so a step up and a step down take the same time, and the
+      // label names where it is going; reduced motion jumps
+      shownFs = !shownFs || REDUCED() ? fs : Math.exp(Math.log(shownFs) + (Math.log(fs) - Math.log(shownFs)) * 0.2);
+      if (Math.abs(Math.log(shownFs / fs)) < 0.005) shownFs = fs;
       scope.set({
-        points: Array.from(win, (v) => v / fs), reason: '', name: '',
+        points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / shownFs))), reason: '', name: '',
         axes: { y: `\u00b1${fs}`, x: `${((WINDOW / ctx.sampleRate) * 1000).toFixed(1)} ms` },
       });
       draws++;
@@ -428,7 +456,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         return n > 1 ? ((n - 1) * ctx.sampleRate) / (last - first) : 0;
       },
       context: () => ctx,
-      step, code, scope, tone, idle, panel, codeRow, fb, url, shipped, knobs,
+      step, code, scope, tone, idle, panel, codeRow, fb, url, shipped, book, knobs,
     };
     return ctl;
   };
