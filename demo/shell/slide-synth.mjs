@@ -233,7 +233,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     const codeRow = panel.addRow(code.el, { pad: false });
     const mid = el('div', 'sl-mid');
     mid.append(panel.el);
-    const fb = fitBox(host, PANEL_PX, { h: PANEL_H, top: true });
+    const fb = fitBox(host, PANEL_PX, { h: PANEL_H, top: true, fill: true });
     fb.inner.append(mid);
 
     let ctx = null, out = null, meter = null, node = null, nodeText = null;

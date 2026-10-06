@@ -432,7 +432,7 @@ export function rich(t) {
  * A component sized in px, laid out at `w` logical px and scaled into `host`.
  * The scale is a custom property, never the transform written by hand.
  */
-export function fitBox(host, w, { h = 0, top = false } = {}) {
+export function fitBox(host, w, { h = 0, top = false, fill = false } = {}) {
   const outer = el('div', 'sl-fit');
   const inner = el('div', 'sl-fit-in');
   inner.style.setProperty('--fit-w', `${w}px`);
@@ -447,8 +447,14 @@ export function fitBox(host, w, { h = 0, top = false } = {}) {
     // several boxes of different heights come out at ONE scale (2026-10-06,
     // *"2 and 3 use same size of fau"*): the shorter one is centred, not grown
     k = Math.min(ow / w, oh / Math.max(ih, h));
+    // `fill`: the box takes the slot's whole width at that scale (never less
+    // than `w`), so what is around it is the slot's own inset on every side
+    // and not a wide gap left and right (2026-10-06, *"make padding same from
+    // top and left and right and bottom"*); its content reflows to the width
+    const wNow = fill ? Math.max(w, ow / k) : w;
+    inner.style.setProperty('--fit-w', `${wNow}px`);
     inner.style.setProperty('--fit-k', String(k));
-    inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
+    inner.style.setProperty('--fit-x', `${(ow - wNow * k) / 2}px`);
     // `top`: anchored to the top rather than centred, so content that grows
     // (a knob row appearing) grows downward and nothing above it moves
     inner.style.setProperty('--fit-y', `${top ? Math.max(0, (oh - Math.max(ih, h) * k) / 2) : (oh - ih * k) / 2}px`);
@@ -519,7 +525,7 @@ export function slideDiagram(spec, { w = 580 } = {}) {
       const resv = any ? gap + 2 * lh : 0;
       const k = Math.min(ow / w, Math.max(1, oh - resv) / ih);
       inner.style.setProperty('--fit-k', String(k));
-      inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
+      inner.style.setProperty('--fit-x', `${(ow - wNow * k) / 2}px`);
       inner.style.setProperty('--fit-y', `${(oh - ih * k - resv) / 2}px`);
       if (!any) return;
       const ob = outer.getBoundingClientRect();
