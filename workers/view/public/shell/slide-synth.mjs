@@ -13,7 +13,7 @@
 //   viz       the output, live, drawn the way `/muta/` draws its scope
 //             (`createWaveShape` fed from an analyser while the tone sounds)
 //   controls  the code box, EDITABLE, edge to edge like `/fau/`'s
-//   plate     FAU, a short note about cost, and `Test tone` at the right end
+//   plate     FAU, and `Start` / `Stop` at the right end; `Compiling` breathes in the code box's corner
 //
 // No keyboard and no knobs: the program has no `freq`, `gain` or `gate`.
 // Until 2026-10-06 this module put a read only listing on the words side and
@@ -61,6 +61,7 @@ import { createWaveShape } from './synth-view.mjs';
 import { createInstrumentPanel } from './instrument-panel.mjs';
 import { sharedAudio, claim, release } from './audio.mjs';
 import { synthUrl } from './synth-steps.mjs';
+import { createCompileIdle } from './compile-idle.mjs';
 
 /** The panel's logical width, which the fitted box scales into the slot. */
 const PANEL_PX = 340;
@@ -71,14 +72,14 @@ export const WINDOW = 512;
 /** The scope's full scales, the smallest that clears the peak by a quarter is used. */
 export const FULL_SCALE = [0.05, 0.1, 0.2, 0.5, 1, 2];
 
-/** What the note on the plate says, by state. A few words, and only where a cost applies. */
-export const NOTE = Object.freeze({
-  shipped: '',
-  edited: 'compiles on press, 1 MB once',
-  compiler: 'compiles on press',
-  compiling: 'compiling',
-  error: 'does not compile',
-});
+/* 🔴 NO NOTE ON THE PLATE, AND AN EDIT COMPILES ITSELF, since 2026-10-06:
+   *"rm labels from footer about compiling. autocompile, show compiling... as
+   fau synth does?"*. The kit's `compile-idle.mjs` compiles the text once the
+   typing stops and breathes `Compiling` in the corner of the code box, exactly
+   as on `/fau/`. While the tone sounds, a good compile replaces the node at
+   once; a failed one keeps the last good sound and says why on the scope. The
+   first edit's compile loads the compiler (about 1 MB, once): an edit is the
+   visitor's own act, and a visit and a step still load nothing. */
 
 /**
  * The compiler's message cut to its first useful line, for the scope's foot.
@@ -105,14 +106,28 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
   return (host) => {
     const scope = createWaveShape({ reason: null, colour: '--hi', height: WAVE_PX, name: 'output' });
     const lines = shipped.split('\n').length;
+    // THREE TIMES THE PROGRAM'S HEIGHT, asked 2026-10-06 as *"maeke code panel
+    // 3 x higher"*: room to write more than the two shipped lines.
     const code = createCodeBox({
-      language: 'faust', rows: lines, label: '', value: shipped,
-      ariaLabel: `the Faust program the Test tone plays, ${lines} lines, editable`,
+      language: 'faust', rows: lines * 3, label: '', value: shipped,
+      ariaLabel: `the Faust program Start plays, ${lines} lines, editable`,
     });
-    const note = el('span', 'sl-tone-note', NOTE.shipped);
-    const tone = el('button', 'sl-tone', 'Test tone', { type: 'button', 'aria-pressed': 'false' });
+    // START AND STOP, ONE WIDTH, asked 2026-10-06 as *"Test tone -> Start Stop
+    // button. same w on both labels"*. Both words sit in one grid cell and the
+    // one not meant is hidden, so the button is as wide as the wider word in
+    // either state and nothing beside it moves.
+    const tone = el('button', 'sl-tone', null, { type: 'button', 'aria-pressed': 'false', 'aria-label': 'Start' });
+    const toneW = el('span', 'sl-tone-w');
+    toneW.append(el('span', 'sl-tone-start', 'Start'), el('span', 'sl-tone-stop', 'Stop'));
+    tone.append(toneW);
+    const label = () => {
+      const stop = want || on;
+      tone.dataset.state = stop ? 'stop' : 'start';
+      tone.setAttribute('aria-label', stop ? 'Stop' : 'Start');
+    };
+    tone.dataset.state = 'start';
 
-    const panel = createInstrumentPanel({ viz: scope.el, plate: { name: 'FAU', status: note, patch: tone }, full: true });
+    const panel = createInstrumentPanel({ viz: scope.el, plate: { name: 'FAU', patch: tone }, full: true });
     const codeRow = panel.addRow(code.el, { pad: false });
     const mid = el('div', 'sl-mid');
     mid.append(panel.el);
@@ -126,14 +141,8 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
 
     const text = () => code.value().replace(/\n$/, '');
     const edited = () => text() !== shipped;
-    function say() {
-      note.textContent = busy ? NOTE.compiling : err ? NOTE.error
-        : !edited() ? NOTE.shipped : compilerHere ? NOTE.compiler : NOTE.edited;
-    }
-    code.input.addEventListener('input', () => {
-      if (err) { err = null; scope.set({ points: null, reason: null, name: 'output' }); }
-      say();
-    });
+    const say = () => {};
+    let parts = null, partsText = null;
 
     const buf = new Float32Array(2048);
     function frame() {
@@ -166,41 +175,69 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       out.connect(meter);
     }
 
-    async function nodeFor(t) {
-      if (node && nodeText === t) return node;
+    /** The compiled program for `t`: the shipped file, or a compile, kept while it is the text. */
+    async function partsFor(t) {
+      if (parts && partsText === t) return parts;
       const f = await import('./faust.mjs');
-      let parts;
+      let p;
       if (t === shipped) {
-        parts = await f.faustFactory(url);
+        p = await f.faustFactory(url);
       } else {
         const t0 = performance.now();
         const aborts = [];
         busy = true;
-        tone.dataset.busy = '1';
-        say();
         try {
-          parts = await f.faustCompile(`${step.id}_edit_${++compiles}`, t, { mono: true, onAbort: (l) => aborts.push(l) });
+          p = await f.faustCompile(`${step.id}_edit_${++compiles}`, t, { mono: true, onAbort: (l) => aborts.push(l) });
         } catch (e) {
           throw new Error(firstLine([e?.message, ...aborts].filter(Boolean).join('\n')));
         } finally {
           busy = null;
-          delete tone.dataset.busy;
           compilerHere = f.hasCompiler();
         }
         lastCompileMs = performance.now() - t0;
       }
-      const n = await f.faustNode(ctx, parts);
+      parts = p;
+      partsText = t;
+      return p;
+    }
+
+    async function nodeFor(t) {
+      if (node && nodeText === t) return node;
+      const p = await partsFor(t);
+      const f = await import('./faust.mjs');
+      const n = await f.faustNode(ctx, p);
       if (node) { try { node.disconnect(); node.destroy?.(); } catch { /* already gone */ } }
       node = n;
       nodeText = t;
       return n;
     }
 
+    // An edit compiles once the typing stops; a good compile swaps the
+    // sounding node at once, a failed one keeps the last good sound.
+    const idle = createCompileIdle({
+      input: code.input,
+      host: code.el,
+      compile: async () => {
+        const t = text();
+        try {
+          await partsFor(t);
+          err = null;
+          if (on && ctx) { const n = await nodeFor(t); n.connect(out); }
+          else scope.set({ points: null, reason: null, name: 'output' });
+        } catch (e) {
+          err = e?.message || String(e);
+          scope.set({ points: null, name: 'does not compile', reason: err });
+          throw e;
+        }
+      },
+    });
+
     function off() {
       want = false;
       if (on) { try { node?.disconnect(); } catch { /* not connected */ } }
       on = false;
       tone.setAttribute('aria-pressed', 'false');
+      label();
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
       if (!err) scope.set({ points: null, reason: null, name: 'output' });
       release(ctl);
@@ -211,6 +248,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       const t0 = performance.now();
       want = true;
       err = null;
+      label();
       say();
       try {
         const n = await nodeFor(t);
@@ -219,12 +257,14 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         on = true;
         lastArmMs = performance.now() - t0;
         tone.setAttribute('aria-pressed', 'true');
+        label();
         if (!raf) raf = requestAnimationFrame(frame);
       } catch (e) {
         err = e?.message || String(e);
         on = false;
         want = false;
         tone.setAttribute('aria-pressed', 'false');
+        label();
         scope.set({ points: null, name: 'does not compile', reason: err });
         release(ctl);
       }
@@ -277,7 +317,7 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         return n > 1 ? ((n - 1) * ctx.sampleRate) / (last - first) : 0;
       },
       context: () => ctx,
-      step, code, scope, tone, note, panel, codeRow, fb, url, shipped,
+      step, code, scope, tone, idle, panel, codeRow, fb, url, shipped,
     };
     return ctl;
   };

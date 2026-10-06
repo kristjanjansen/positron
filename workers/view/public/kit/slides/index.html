@@ -196,16 +196,16 @@
   // link to https://positron.studio/slides/synths/ where the count was.
   // 🔴 TWO SLIDES SINCE 2026-10-06 (*"rm fau slides c-f"*): the title, and a
   // split whose slot is one instrument panel, a live scope, the program in an
-  // editable code box and a FAU plate with `Test tone` at its right end.
+  // editable code box and a FAU plate with `Start` / `Stop` at its right end.
   // 🔴 ITS CHECKS ARE `plans/plan-live-slides.md` SECTION 7 AND RUN LAST, behind
   // `?selfcheck=1` like every check here, because they are the only ones on
-  // this page that fetch anything: `Test tone` imports the Faust runtime and
+  // this page that fetch anything: `Start` imports the Faust runtime and
   // fetches the compiled program, and after an edit it loads the live
   // compiler. The visit, and a step through the deck, open nothing; that is
   // asserted before the press.
   section('SYNTHS DECK',
     'The deck the front page plays, mounted the same way, its title in the footer linking to its own page. It is a title and one '
-    + 'instrument, a sine written in Faust. Test tone plays the program compiled ahead of time, and '
+    + 'instrument, a sine written in Faust. Start plays the program compiled ahead of time, and '
     + 'after an edit the next press loads the compiler once and plays your version.',
     `mountDecks(holder);   // holder carries data-decks, as on the front page; one player per deck, titled`,
     (box) => {
@@ -2177,7 +2177,7 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       `${p.slides.length} slides at ${sw.toFixed(0)} px wide, ${stepped.length} request(s)${stepped.length ? `: ${stepped.slice(0, 2).join(', ')}` : ''}, `
       + `${audioContexts()} context(s)${spills.length ? `, SPILLING: ${spills.join(', ')}` : ''}`);
 
-    // 3. the instrument is one panel, scope, editable code and a FAU plate with Test tone at its right end
+    // 3. the instrument is one panel, scope, editable code and a FAU plate with Start at its right end
     const S = p.slides[toneIdx], c = S.ctl;
     p.go(toneIdx);
     await frames(3);
@@ -2186,13 +2186,13 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     {
       const shape = c.panel.shape().join(' ');
       const plateRow = c.panel.plateRow;
-      const pr = plateRow.getBoundingClientRect(), tr = c.tone.getBoundingClientRect(), nr = c.note.getBoundingClientRect();
+      const pr = plateRow.getBoundingClientRect(), tr = c.tone.getBoundingClientRect();
       const plateText = plateRow.querySelector('.panel-plate')?.textContent.trim();
       const inSlot = S.parts.slot.contains(c.panel.el) && S.parts.slot.contains(c.code.el) && !S.parts.words.contains(c.code.el);
       const noKeys = !S.el.querySelector('.kbd, .keys, .pos-knob, .sld-knob');
-      d.assert('SYNTHS: the slot holds one instrument panel, scope then editable code then a FAU plate with Test tone at its right end, and no keys or knobs',
+      d.assert('SYNTHS: the slot holds one instrument panel, scope then editable code then a FAU plate with Start at its right end, and no keys or knobs',
         shape === 'viz controls plate' && inSlot && noKeys && !c.code.input.readOnly && c.code.value() === c.shipped
-          && /os\.osc\(440\)/.test(c.shipped) && plateText === 'FAU' && plateRow.contains(c.tone) && tr.right > nr.right && tr.left > pr.left + pr.width / 2,
+          && /os\.osc\(440\)/.test(c.shipped) && plateText === 'FAU' && plateRow.contains(c.tone) && !plateRow.contains(c.idle.el) && c.code.el.contains(c.idle.el) && tr.left > pr.left + pr.width / 2,
         `rows ${shape}, ${inSlot ? 'in the slot' : 'NOT in the slot'}, ${noKeys ? 'no keys or knobs' : 'KEYS OR KNOBS FOUND'}, `
         + `the code ${c.code.input.readOnly ? 'READ ONLY' : 'editable'}, the plate "${plateText}", Test tone ${(tr.left - pr.left).toFixed(0)} to ${(tr.right - pr.left).toFixed(0)} px of a ${pr.width.toFixed(0)} px plate`);
     }
@@ -2222,9 +2222,9 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     await frames(8);
     const lvl = c.level(), hz = c.hz(), drew = c.draws() - d0;
     const fetched = engine();
-    d.assert('SYNTHS: Test tone sounds the shipped sine from its ahead of time file, RMS read off an analyser above a floor, 440 Hz, and no compiler fetched',
+    d.assert('SYNTHS: Start sounds the shipped sine from its ahead of time file, RMS read off an analyser above a floor, 440 Hz, and no compiler fetched',
       c.sounding() && lvl > FLOOR && Math.abs(hz - 440) < 5 && compiler().length === 0 && fetched.some((n) => /\/resources\/faust\/sine\.wasm$/.test(n))
-        && audioContexts() === 1 && audioOwner() === c && c.tone.getAttribute('aria-pressed') === 'true' && c.note.textContent === '',
+        && audioContexts() === 1 && audioOwner() === c && c.tone.getAttribute('aria-pressed') === 'true' && c.idle.el.hidden,
       `${c.error() ? `it FAILED: ${c.error()}, ` : ''}RMS ${lvl.toFixed(4)} against a floor of ${FLOOR}, ${hz.toFixed(1)} Hz, `
       + `${fetched.length} engine file(s) (${fetched.map((n) => new URL(n).pathname.split('/').pop()).join(', ')}), ${compiler().length} compiler file(s), `
       + `${audioContexts()} context(s), armed in ${c.lastArmMs()?.toFixed(0)} ms`);
@@ -2237,30 +2237,44 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     await until(() => ctx()?.state === 'suspended', 1000);
     const d1 = c.draws();
     await frames(6);
-    d.assert('SYNTHS: a second Test tone press silences it, lets go of the sound, suspends the context and stops the scope',
+    d.assert('SYNTHS: Stop silences it, lets go of the sound, suspends the context and stops the scope',
       !c.sounding() && c.tone.getAttribute('aria-pressed') === 'false' && audioOwner() === null && ctx()?.state === 'suspended' && c.draws() === d1,
       `${c.sounding() ? 'STILL SOUNDING' : 'off'}, the owner ${audioOwner() === null ? 'none' : 'STILL SET'}, the context ${ctx()?.state}, ${c.draws() - d1} frame(s) drawn after`);
 
-    // 7. an edit loads the compiler once on the next press and plays the edited program
+    // 7. an edit compiles ITSELF once the typing stops (the kit's compile on a
+    // pause, as on /fau/), loading the compiler once, breathing `Compiling` in
+    // the code box's corner and not on the plate; Start then plays it
     {
       c.code.set(c.shipped.replace('os.osc(440)', 'os.osc(660)'));
       c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
-      const noteEdited = c.note.textContent;
       const t0 = performance.now();
-      c.tone.click();
-      await until(() => c.sounding() || c.error(), 15000);
+      const shown = await until(() => !c.idle.el.hidden, 4000);
+      const said = c.idle.el.textContent;
+      await c.idle.settled();
       const wall = performance.now() - t0;
+      const compiledAlone = c.compiles() === 1 && !c.sounding();
+      c.tone.click();
+      await until(() => c.sounding() || c.error(), 5000);
       await until(() => c.level() > FLOOR, 1200);
       await frames(4);
       const lv = c.level(), hz2 = c.hz();
       const files = compiler();
       const bytes = files.reduce((a, e) => a + (e.transferSize || e.encodedBodySize || 0), 0);
       Y.cost = { wall, compile: c.lastCompileMs(), bytes, files: files.length };
-      d.assert('SYNTHS: after an edit Test tone loads the compiler once and plays the edited program, 660 Hz measured, the note saying what it costs',
-        c.sounding() && lv > FLOOR && Math.abs(hz2 - 660) < 8 && files.length === 3 && new Set(files.map((e) => e.name)).size === 3
-          && noteEdited === 'compiles on press, 1 MB once' && c.note.textContent === 'compiles on press' && c.compiles() === 1,
-        `${c.error() ? `it FAILED: ${c.error()}, ` : ''}RMS ${lv.toFixed(4)}, ${hz2.toFixed(1)} Hz, ${files.length} compiler file(s), ${(bytes / 1e6).toFixed(2)} MB on this origin, `
-        + `press to sound ${wall.toFixed(0)} ms of which the compile ${c.lastCompileMs()?.toFixed(0)} ms, the note "${noteEdited}" then "${c.note.textContent}"`);
+      d.assert('SYNTHS: an edit compiles itself once the typing stops, Compiling breathing in the code box, and Start plays it, 660 Hz measured',
+        shown && said === 'Compiling' && compiledAlone && c.code.el.contains(c.idle.el)
+          && c.sounding() && lv > FLOOR && Math.abs(hz2 - 660) < 8 && files.length === 3 && new Set(files.map((e) => e.name)).size === 3
+          && c.compiles() === 1,
+        `${c.error() ? `it FAILED: ${c.error()}, ` : ''}the note ${shown ? `said "${said}"` : 'NEVER SHOWED'}, ${compiledAlone ? 'compiled before any press' : 'NOT COMPILED ALONE'}, `
+        + `RMS ${lv.toFixed(4)}, ${hz2.toFixed(1)} Hz, ${files.length} compiler file(s), ${(bytes / 1e6).toFixed(2)} MB on this origin, `
+        + `edit to compiled ${wall.toFixed(0)} ms of which the compile ${c.lastCompileMs()?.toFixed(0)} ms`);
+      // and while it sounds, a new edit replaces it as soon as it compiles
+      c.code.set(c.shipped.replace('os.osc(440)', 'os.osc(330)'));
+      c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
+      await until(() => Math.abs(c.hz() - 330) < 8, 4000);
+      const hz3 = c.hz();
+      d.assert('SYNTHS: an edit compiled while it sounds replaces the sound with no press, 330 Hz measured',
+        c.sounding() && Math.abs(hz3 - 330) < 8, `${c.sounding() ? 'sounding' : 'SILENT'} at ${hz3.toFixed(1)} Hz`);
       c.tone.click();
       await until(() => ctx()?.state === 'suspended', 1000);
     }
@@ -2269,15 +2283,18 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     {
       c.code.set('import("stdfaust.lib");\n\nprocess = os.osc(440 * 0.1;');
       c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
+      await until(() => !c.idle.el.hidden, 4000);
+      await c.idle.settled();
+      const noteSays = c.idle.el.textContent;
       c.tone.click();
       await until(() => c.sounding() || c.error(), 5000);
       await nap(100);
       const said = c.scope.canvas.getAttribute('aria-label') || '';
       d.assert('SYNTHS: NEGATIVE, a broken edit shows the compiler’s error in words in the panel and sounds nothing',
-        !!c.error() && /syntax error/i.test(c.error()) && said.includes(c.error()) && c.note.textContent === 'does not compile'
+        !!c.error() && /syntax error/i.test(c.error()) && said.includes(c.error()) && noteSays === 'Did not compile'
           && !c.sounding() && c.tone.getAttribute('aria-pressed') === 'false' && audioOwner() === null && ctx()?.state === 'suspended'
-          && compiler().length === 3 && c.compiles() === 2,
-        `the panel says "${c.error()}", the note "${c.note.textContent}", ${c.sounding() ? 'SOUNDING' : 'silent'}, the context ${ctx()?.state}, `
+          && compiler().length === 3 && c.compiles() >= 3,
+        `the panel says "${c.error()}", the note "${noteSays}", ${c.sounding() ? 'SOUNDING' : 'silent'}, the context ${ctx()?.state}, `
         + `${compiler().length} compiler file(s) in all, ${c.compiles()} compile(s)`);
       c.code.set(c.shipped);
       c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
