@@ -472,6 +472,21 @@ const FILES = [
   ['demo/resources/faust/organ.effect.wasm', 'resources/faust/organ.effect.wasm'],
   ['demo/resources/faust/mixer32.wasm', 'resources/faust/mixer32.wasm'],
   ['demo/resources/faust/PROVENANCE.json', 'resources/faust/PROVENANCE.json'],
+  // ⚠️ AND THE FIVE STEPS OF THE FRONT PAGE'S `synths` DECK, 2026-10-06, from
+  // `demo/shell/synth-steps.mjs` by the same script, each fetched by
+  // `demo/shell/slide-synth.mjs` on the first key pressed on its slide. Only
+  // `echo` declares an effect, so it is the only step with an effect file.
+  ['demo/resources/faust/osc.json', 'resources/faust/osc.json'],
+  ['demo/resources/faust/osc.voice.wasm', 'resources/faust/osc.voice.wasm'],
+  ['demo/resources/faust/osc2.json', 'resources/faust/osc2.json'],
+  ['demo/resources/faust/osc2.voice.wasm', 'resources/faust/osc2.voice.wasm'],
+  ['demo/resources/faust/env.json', 'resources/faust/env.json'],
+  ['demo/resources/faust/env.voice.wasm', 'resources/faust/env.voice.wasm'],
+  ['demo/resources/faust/filter.json', 'resources/faust/filter.json'],
+  ['demo/resources/faust/filter.voice.wasm', 'resources/faust/filter.voice.wasm'],
+  ['demo/resources/faust/echo.json', 'resources/faust/echo.json'],
+  ['demo/resources/faust/echo.voice.wasm', 'resources/faust/echo.voice.wasm'],
+  ['demo/resources/faust/echo.effect.wasm', 'resources/faust/echo.effect.wasm'],
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //
@@ -1003,14 +1018,15 @@ function checkVendorUrls(copied) {
  * was weighed" is never in doubt.
  */
 /**
- * 🔴 THE AHEAD OF TIME ORGAN MUST HAVE BEEN COMPILED FROM THE ORGAN `/fau/`
- * SHOWS, BY THE COMPILER THIS REPOSITORY VENDORS, WITH THE FLAGS IT USES.
+ * 🔴 EVERY AHEAD OF TIME PROGRAM MUST HAVE BEEN COMPILED FROM THE TEXT ITS PAGE
+ * SHOWS, BY THE COMPILER THIS REPOSITORY VENDORS, WITH THE FLAGS IT USES: the
+ * Organ `/fau/` shows, and since 2026-10-06 each step of the `synths` deck.
  * `checkCompiledDefs()`'s twin, and for the same reason: a stale artefact
  * plays the old instrument and nothing anywhere says so.
  *
- * `demo/resources/faust/PROVENANCE.json` records the md5 of the preset's TEXT
- * (read out of `demo/fau/presets.mjs` by importing it, the same module the page
- * imports), the md5 of each compiler file, the flags, and the md5 of each
+ * `demo/resources/faust/PROVENANCE.json` records the md5 of each program's TEXT
+ * (read out of `demo/fau/presets.mjs` or `demo/shell/synth-steps.mjs` by
+ * importing it, the same module the page or the deck imports), the md5 of each compiler file, the flags, and the md5 of each
  * artefact. This re-takes all of them and refuses on any disagreement, with
  * the command that remakes them in the message.
  * ⚠️ IT DOES NOT COMPILE. A build must not boot a 6 MB compiler; the md5 of
@@ -1030,13 +1046,22 @@ async function checkFaustAot() {
   const bad = [];
   const sum = (b) => createHash('md5').update(b).digest('hex');
   const { PRESETS } = await import(join(REPO, 'demo/fau/presets.mjs'));
+  const { SYNTH_STEPS } = await import(join(REPO, 'demo/shell/synth-steps.mjs'));
   const { FAUST_FLAGS } = await import(join(REPO, 'demo/shell/faust.mjs'));
+  /* Where a recorded source is read from: the same two lists
+     `build-faust-aot.mjs` compiles, by the same `<file>#<id>` key. */
+  const LISTS = { 'demo/fau/presets.mjs': PRESETS, 'demo/shell/synth-steps.mjs': SYNTH_STEPS };
+  /* ⚠️ AND A PROGRAM THAT EXISTS AND WAS NEVER COMPILED IS STALE TOO: a step
+     added to the deck with no artefact would 404 on its first key. */
+  for (const s of SYNTH_STEPS) {
+    if (!(`demo/shell/synth-steps.mjs#${s.id}` in (doc.sources || {}))) bad.push(`the deck step ${s.id} in demo/shell/synth-steps.mjs was never compiled`);
+  }
   for (const [key, want] of Object.entries(doc.sources || {})) {
     const [file, id] = key.split('#');
-    const p = file === 'demo/fau/presets.mjs' ? PRESETS.find((x) => x.id === id) : null;
+    const p = LISTS[file] ? LISTS[file].find((x) => x.id === id) : null;
     if (!p) { bad.push(`${key} names no preset in ${file}`); continue; }
     const got = sum(p.code);
-    if (got !== want) bad.push(`the ${id} preset in ${file} has changed: ${want} recorded, ${got} now`);
+    if (got !== want) bad.push(`the ${id} program in ${file} has changed: ${want} recorded, ${got} now`);
   }
   for (const [rel, want] of Object.entries(doc.compiler?.files || {})) {
     let got = null;
