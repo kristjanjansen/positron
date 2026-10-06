@@ -38,6 +38,14 @@
    * the visit is not a press, and an emulated RP2040 is a core running flat
    * out, so the page has one control, Start the board, and it is this page's
    * control 0 (plans/plan-kit-split.md section 9, the default taken).
+   * 🔴 BUT THE SCREENS DRAW ON A VISIT, SINCE 2026-10-06. Reported the day the
+   * page went live: *"screens empty"*. Every panel was black until Start,
+   * which is the default above taken one step too far: what costs CPU is the
+   * emulated core RUNNING, not the drawing. So a visit fetches the two files
+   * (the 57 KB UF2 and the 7.8 KB `oled-ui.wasm`), draws every specimen screen
+   * and every font from them, and puts one still frame of the router's boot
+   * screen on its panel from half a second of emulation on this thread, once.
+   * Start runs the board live. `hwLoad()` is the visit, `hwOpen()` the press.
    */
   const { d, out, section, land, checkPage } = createKitPage({
     part: 'hardware',
@@ -147,28 +155,48 @@
     });
   }
 
+  /* The visit: both files fetched once, every specimen screen and font
+     drawn, and one still of the router's boot screen. Runs no board. Memoised,
+     so the press after it fetches nothing. */
+  function hwLoad() {
+    hw.loadP ??= (async () => {
+      if (!hw.ui) return false;
+      let image;
+      try {
+        hw.fetched++;
+        const res = await fetch(HW_UF2);
+        if (!res.ok) throw new Error(`${HW_UF2} answered ${res.status}`);
+        image = parseUF2(await res.arrayBuffer());
+      } catch (e) {
+        hw.state = 'failed';
+        hw.ui.o.textContent = `the firmware did not load: ${e.message}`;
+        d.log(`router firmware did not load: ${e.message}`, 'bad');
+        return false;
+      }
+      hw.image = image;
+      hw.fonts = fontsIn(image);
+      hwPartsLoad('hardware');
+      hw.defaultFont = hw.fonts.findIndex((f) => f.name === DEFAULT_FONT);
+      hwFontsDraw();
+      // the still: the same firmware booted for half a second on this thread
+      try {
+        const still = createPico({ image });
+        await still.sleep(500);
+        hw.stillPx = still.pixels();
+        if (!hw.px) drawOled(hw.ui.cv, hw.stillPx);
+      } catch (e) { d.log(`the boot screen still did not draw: ${e.message}`, 'warn'); }
+      return true;
+    })();
+    return hw.loadP;
+  }
+
   async function hwOpen() {
     if (hw.state === 'paused') { hw.state = 'running'; hw.runner.run(!document.hidden); return; }
     if (hw.state !== 'idle' || !hw.ui) return;
     hw.state = 'loading';
     hw.ui.o.textContent = 'loading the firmware';
-    let image;
-    try {
-      hw.fetched++;
-      const res = await fetch(HW_UF2);
-      if (!res.ok) throw new Error(`${HW_UF2} answered ${res.status}`);
-      image = parseUF2(await res.arrayBuffer());
-    } catch (e) {
-      hw.state = 'failed';
-      hw.ui.o.textContent = `the firmware did not load: ${e.message}`;
-      d.log(`router firmware did not load: ${e.message}`, 'bad');
-      return;
-    }
-    hw.image = image;
-    hw.fonts = fontsIn(image);
-    hwPartsLoad('hardware');
-    hw.defaultFont = hw.fonts.findIndex((f) => f.name === DEFAULT_FONT);
-    hwFontsDraw();
+    if (!(await hwLoad())) return;
+    const image = hw.image;
     /* ⚠️ A PICKER AND NOT A SEGMENTED CHOICE. Six names side by side are 440 px
        and a phone's box is about 310, so the choice ran off the right edge at
        375 px; a picker is one name wide at any count. Stepping reboots, and
@@ -440,6 +468,8 @@ patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
 
   // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
   land();
+  // The screens draw on a visit; the board runs on Start (see the header).
+  hwLoad();
 
   /* ── what a machine can say about this page ─────────────────────────────
      🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
@@ -495,14 +525,16 @@ patchFont(image, index)    // a copy with the one byte after UIFONT changed`,
     };
 
     // ── a visit ───────────────────────────────────────────────────────────
-    // ⚠️ ON ITS OWN PAGE A VISIT IS EVERYTHING BEFORE THE START PRESS. There
-    // is no SLIDES part here to have asked for the screen code first, so
-    // nothing at all may have been fetched.
-    d.assert('a visit that does not press start fetches no firmware and starts no emulator',
-      hw.fetched === 0 && hw.partsFetched === 0 && !hw.runner && hw.state === 'idle',
+    // ⚠️ ON ITS OWN PAGE A VISIT IS EVERYTHING BEFORE THE START PRESS, and
+    // since 2026-10-06 (*"screens empty"*) it draws: each file fetched once,
+    // the boot screen's still on the board's panel, and no emulator running.
+    await hwLoad();
+    const stillLit = hw.stillPx ? litCount(hw.stillPx) : 0;
+    d.assert('a visit draws the screens from one fetch of each file and a still of the boot screen, and runs no emulator',
+      hw.fetched === 1 && hw.partsFetched === 1 && stillLit > 100 && !hw.runner && hw.state === 'idle',
       `the start control reads "${startBtn.textContent}", the UF2 was asked for ${hw.fetched} time(s), `
       + `the screen parts ${hw.partsFetched} time(s)${hw.partsFrom ? ` by ${hw.partsFrom}` : ''}, `
-      + `the board is ${hw.state}${hw.runner ? ' with a worker' : ' with no worker'}`);
+      + `the still has ${stillLit} pixels lit, the board is ${hw.state}${hw.runner ? ' with a worker' : ' with no worker'}`);
 
     // ── the firmware, on a board of the check's own ───────────────────────
     const image = parseUF2(await (await fetch(HW_UF2)).arrayBuffer());
