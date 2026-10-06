@@ -464,3 +464,7 @@
 .dk-logo-row .sl-t { margin: 0; }
 .dk-logo-row .dk-word { line-height: 1; }
 .dk-logo-row .dk-mark .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
+
+/* A SWIPE ON A PHONE (slide.mjs `swipeStep`): the stage lets the browser keep
+   vertical scrolling and pinch, and hands a sideways drag to the player. */
+.sl-player .pos-vp-stage { touch-action: pan-y pinch-zoom; }

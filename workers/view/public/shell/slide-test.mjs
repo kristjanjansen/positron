@@ -30,7 +30,7 @@ import { dirname, join } from 'node:path';
 import {
   SCALE, STEPS, stepSize, stepOf, stepCaption, scaleCss, plain, parseMarks, lintWords,
   evStep, wordsStep, padRows, padRow, colStarts, tableStep, FRAMES, COL_GAP, normalise, LAYOUTS,
-  TITLE_STEPS, talkDate, tapZone,
+  TITLE_STEPS, talkDate, tapZone, swipeStep, SWIPE_PX,
 } from './slide.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -172,14 +172,31 @@ ok('NEGATIVE: a tap in the middle third steps nowhere, its edges included',
 ok('NEGATIVE: a box with no width, or no x, steps nowhere',
   tapZone(10, 0) === 0 && tapZone(NaN, 300) === 0 && tapZone(10, -5) === 0);
 
+/* ── a swipe on a player ───────────────────────────────────────────────── */
+ok('a finger moved left goes forward and moved right goes back',
+  swipeStep(-80, 5) === 1 && swipeStep(80, -5) === -1 && swipeStep(-SWIPE_PX, 0) === 1);
+ok('NEGATIVE: a short drag, or one more down than across, turns nothing',
+  swipeStep(-SWIPE_PX + 1, 0) === 0 && swipeStep(-60, 50) === 0 && swipeStep(0, 200) === 0);
+ok('NEGATIVE: no numbers, no step',
+  swipeStep(NaN, 0) === 0 && swipeStep(-80, Infinity) === 0);
+
 /* ── the source ────────────────────────────────────────────────────────── */
 const SRC = readFileSync(join(HERE, 'slide.mjs'), 'utf8');
 const C = code(SRC);
 /** A keydown listener on window or document (or bare, which is window), in code. */
 const globalKeys = (c) => [...c.matchAll(/([\w.]*?)\.?addEventListener\(\s*'keydown'/g)]
   .some((m) => m[1] === '' || /^(window|document)$/.test(m[1].split('.').pop()));
-ok('the player\'s keys are heard on its panel and stopped there, never on window or document',
-  /panel\.el\.addEventListener\('keydown'/.test(C) && !globalKeys(C) && /e\.stopPropagation\(\)/.test(C));
+// ⚠️ ONE DOCUMENT LISTENER IS ALLOWED SINCE 2026-10-06, AND ONLY IN FULL
+// SCREEN (*"add keyboard control to slides in fullscreen"*): entering full
+// screen hides the focused ⛶, so the focus falls to the body. It must open by
+// returning unless this player is full, which is when nothing else on the page
+// is on screen to want the keys.
+const FULL_ONLY = /document\.addEventListener\('keydown', \(e\) => \{\s*if \(!panel\.isFull\(\)/;
+ok('the player\'s keys are heard on its panel and stopped there, never on window or document outside full screen',
+  /panel\.el\.addEventListener\('keydown'/.test(C) && FULL_ONLY.test(C) && !globalKeys(C.replace(FULL_ONLY, ''))
+    && /e\.stopPropagation\(\)/.test(C));
+ok('NEGATIVE: a document listener that does not first ask for full screen is still found',
+  globalKeys("document.addEventListener('keydown', (e) => { onKey(e); });".replace(FULL_ONLY, '')));
 const DECK = join(HERE, '../slides/deck.mjs');
 ok('NEGATIVE: the same detector finds the archive deck\'s document-wide listener',
   existsSync(DECK) && globalKeys(code(readFileSync(DECK, 'utf8'))));

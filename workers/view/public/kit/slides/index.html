@@ -1,0 +1,2069 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/slides</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<script type="module">
+  import { el, createReport } from '/shell/shell.mjs';
+  import { createSlider } from '/shell/slider.mjs';
+  import { createStepGrid } from '/shell/step-grid.mjs';
+  import { assertBar, countInk, DRILL } from '/shell/bar-drill.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createWaveView } from '/shell/wave-view.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
+  import { GLCD5X7 } from '/shell/oled-font.mjs';
+  import { burn, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createSlide, createSlidePlayer, createSlideLog, fitBox, slideDiagram, stepOf, stepCaption,
+           plain, lintWords, SCALE }
+    from '/shell/slide.mjs';
+  import { KEYS as PICO_KEYS, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
+  import { markAdapter } from '/shell/fixture.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createParamKnobs } from '/shell/param-knobs.mjs';
+  import { createPanelLayout } from '/shell/panel-layout.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+  import { OLED_LIT, drawOled, oledText, createOledParts } from '/shell/oled-view.mjs';
+
+  /**
+   * 🔴 kit/slides, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
+   * (plans/plan-kit-split.md). Every block, holder and check below is copied
+   * VERBATIM from `demo/kit/index.html`, in that file's order, so the newest
+   * block is still the first. What changed is mechanical: `section()` lost its
+   * first argument, the holders sit here rather than at the top of the
+   * monolith, the measuring window and the tab row are gone, and every check
+   * is behind `?selfcheck=1`.
+   * ⚠️ THIS FILE IS `demo/kit/index.html`, MOVED WITH `git mv` SO ITS HISTORY
+   * FOLLOWS IT (step 4 of the plan), and cut down to the SLIDES part.
+   * ⚠️ AND IT STARTS ON A VISIT. In `/kit/` the part started when its tab was
+   * pressed; on its own page the visit is the press, so `slidesOpen()` runs
+   * once the blocks are built and `visibilitychange` pauses and resumes it
+   * (plans/plan-kit-split.md section 9, the default taken). That includes the
+   * one file it asks for, the router's screen code for the OLED slides.
+   */
+  const { d, section, land, checkPage } = createKitPage({
+    part: 'slides',
+    what: "Slides made from plain data at six type sizes, with live parts of this site running on them.",
+  });
+
+  /* ⚠️ THE ROUTER'S STATE OBJECT, KEPT WHOLE FROM `/kit/`, because the OLED
+     slides register their canvases in `hw.parts` and `hwPartsLoad` fills
+     `hw.oled`, `hw.partsFetched` and `hw.partsFrom`. The board fields are
+     unused on this page; the emulator is `/kit/hardware/`. */
+  const hw = {
+    state: 'idle',          // idle, loading, running, paused, failed
+    fetched: 0,             // how many times this page asked for the UF2
+    image: null, fonts: [], defaultFont: -1, font: null,
+    runner: null, px: null, frames: 0, boots: 0,
+    out: [],                // every message off DIN OUT, as hex
+    stats: null,
+    framer: null,
+    ui: null,               // the controls, for the checks
+    pointerUp: new Map(),   // key -> when a pointer last let go of it
+    keys: 'bottom',         // where the firmware puts its key labels, byte 7
+    fontAt: -1,             // the UI_FONTS index booted last
+    oled: null,             // ui.c as WebAssembly, for the parts blocks
+    partsFetched: 0,        // how many times this page asked for it
+    partsFrom: '',          // which tab asked: 'slides' or 'hardware'
+    parts: [],              // { name, cv, paint, px }, drawn when it arrives
+  };
+  // `drawOled`, `oledText` and the inks are `demo/shell/oled-view.mjs`, and so
+  // is `hwPartsLoad`, made over this page's own `hw`.
+  const { hwPartsLoad } = createOledParts(hw, { log: d.log });
+  /* 🔴 THE LINK SCREEN'S PAINT, WHICH THE OLED SLIDES DRAW WITH. In `/kit/` it
+     was registered by the HARDWARE part's LINK block and the slides found it
+     by name in `hw.parts`; that block is on `/kit/hardware/` now, so the same
+     paint, copied verbatim from it, is registered here on a canvas nobody is
+     shown, and the slides find it by the same name. */
+  {
+    const cv = document.createElement('canvas');
+    cv.width = OLED_W; cv.height = OLED_H;
+    hw.parts.push({ name: 'link', cv, px: null, paint: (u) => {
+        const bh = u.boxH(), wl = u.boxW('DIN IN'), wr = u.boxW('DIN OUT'), y = 26;
+        u.box(0, y, wl, bh, 'DIN IN');
+        u.box(128 - wr, y, wr, bh, 'DIN OUT');
+        const ax1 = wl + 2, ax2 = 128 - wr - 3, ops = '+12 CH2', ow = u.textW(ops);
+        u.arrow(ax1, ax2, y + (bh >> 1));
+        // main.c's rule: on the arrow when it fits between the boxes, else on a line of its own above
+        if (ow <= ax2 - ax1 - 4) u.text(ax1 + ((ax2 - ax1 + 1 - ow) >> 1), y + Math.min(0, (bh >> 1) - 2 - u.cap), ops);
+        else u.text((128 - ow) >> 1, y - 2 - u.cap, ops);
+      } });
+  }
+
+
+  /**
+   * 🔴 SLIDES, THE NEWEST PART, 2026-10-05. Asked as *"let's focus on the kit
+   * make a new tab there slides and methodically slide by slide you don't have
+   * to be a slide player there it's player is maybe a first component but the
+   * rest are just the slides"*, and then *"Also work on the actual components,
+   * interactive elements on a page"*. `/slides/` is an archive and nothing
+   * here imports it: `demo/shell/slide.mjs` renders one slide from plain data
+   * and `createSlidePlayer` steps several in a video panel.
+   * ⚠️ THE BLOCKS ARE IN READING ORDER, NOT NEWEST FIRST INSIDE THE PART, and
+   * that is the one place this page does it: the part is a lesson that starts
+   * at the largest type and walks down, then combines, then lays out, then
+   * puts the kit's own controls on a slide. Every block is newer than every
+   * block in every other part, so the newest-first rule is still true of the
+   * PAGE: these are the first calls to `section()` in the file.
+   * ⚠️ NOTHING RUNS UNTIL THE TAB IS OPENED. The video's canvas, the readout's
+   * frame loop and the step grid's clock start in `slidesOpen()` and stop in
+   * `slidesClose()`, which the tab row calls, the way HARDWARE boots its board.
+   * Nothing in the part fetches anything but ONE file, the router's screen
+   * code (`/resources/pico/oled-ui.wasm`) for the OLED slide, and that on the
+   * tab press: the face is two files of this origin, every other picture is
+   * drawn here, the samples are made here.
+   * ⚠️ DECLARED HERE, before the first block, for the dead zone reason this
+   * file gives four times over.
+   */
+  const slideKit = { blocks: [], player: null, halves: [], comps: {}, open: false, specs: [] };
+  function slidesOpen() {
+    if (slideKit.open) return;
+    slideKit.open = true;
+    for (const b of slideKit.blocks) b.s.start();
+    slideKit.player?.start();
+    for (const p of slideKit.halves) p.start();
+    // the OLED slide's real screen: ui.c as WebAssembly, the one request this
+    // tab makes, on this press and never on a visit (see `hwPartsLoad`)
+    hwPartsLoad('slides');
+  }
+  function slidesClose() {
+    if (!slideKit.open) return;
+    slideKit.open = false;
+    for (const b of slideKit.blocks) b.s.stop();
+    slideKit.player?.stop();
+    for (const p of slideKit.halves) p.stop();
+  }
+  /** One static slide in one block, its box giving up its chrome to the slide's own. */
+  const slideBlock = (title, note, src, spec) => section(title, note, src, (box) => {
+    box.classList.add('kit-sl');
+    const s = createSlide(spec, { host: box, full: true });
+    slideKit.blocks.push({ title, s });
+    slideKit.specs.push(spec);
+  });
+  /** A frame loop that runs between `start` and `stop`, for a slot. */
+  const looped = (tick) => {
+    let raf = 0;
+    const loop = (t) => { tick(t); raf = requestAnimationFrame(loop); };
+    return {
+      start() { if (!raf) raf = requestAnimationFrame(loop); },
+      stop() { cancelAnimationFrame(raf); raf = 0; },
+    };
+  };
+
+  /* THE MACHINES, for the diagram slide: box names only on the slide, and
+     what each outer box is goes under it as slide text (`desc`). The relay's
+     1 to 2 ms is PROGRESS.md:3472, the Durable Object hop measured +1.0, +1.6
+     and +0.8 ms over three runs. */
+  const SLIDE_MACHINES = {
+    nodes: [
+      { id: 'sbr', label: 'Browser', kind: 'here', tech: 'browser', desc: 'one page from the kit',
+        children: [{ id: 'spg', label: 'page', tech: 'browser', note: 'Every demo is one page that mounts the shell.' }] },
+      { id: 'scf', label: 'Cloudflare', tech: 'cloudflare', desc: 'a relay, 1 to 2 ms',
+        children: [{ id: 'srl', label: 'relay', tech: 'relay', note: 'One **Durable Object** per room.' }] },
+      { id: 'spi', label: 'Raspberry Pi', tech: 'raspberry', desc: 'Yoshimi and the Circuit',
+        children: [{ id: 'ssy', label: 'synths', tech: 'sound', note: 'The board plays what arrives.' }] },
+    ],
+    links: [
+      { from: 'spg', to: 'srl', note: 'Note on and note off as WebSocket messages.' },
+      { from: 'srl', to: 'ssy', note: 'The relay hands them to the board.' },
+    ],
+  };
+
+
+  // ── THE PLAYER ────────────────────────────────────────────────────────────
+  // 46 rows and 44 built: CLAUDE.md's count command over the manifest, run
+  // 2026-10-05 for this block, printed `46 44`. Counted, never remembered.
+  // 🔴 TWO SLIDES, asked 2026-10-05 as *"rm slide 3 from THE PLAYER and
+  // replace slide 2 from something below"*: the transports table went, and the
+  // 600/600 figure became the DIAGRAM slide from further down this tab, built a
+  // second time from the same `slideDiagram(SLIDE_MACHINES)`. It can be: every
+  // diagram takes its own `uid` for its arrow markers, so two on one page do not
+  // share an id. It has nothing running, so the player's start and stop on a
+  // step reach no loop; a slot that had one (a `{ start, stop }`) would run only
+  // while its slide is the one shown, because `go()` stops the slide it leaves
+  // and starts the one it shows.
+  section('THE PLAYER',
+    'Slides in a video panel: previous and next on the left, the count in the middle, full '
+    + 'screen on the right. Press the slide and the arrows, space, Page Up and Page Down, Home, '
+    + 'End and f are its, and no other control on this page hears them.',
+    `const player = createSlidePlayer([
+  { say: 'Positron is a lab for *live* media', statement: true, cap: '44 demos built' },
+  { say: '[Cloudflare|cloudflare] carries the streams', slot: slideDiagram(SLIDE_MACHINES) },
+]);   // keys are heard on player.el only, and stopped there`,
+    (box) => {
+      box.classList.add('kit-sl');
+      slideKit.player = createSlidePlayer([
+        { name: 'lab', say: 'Positron is a lab for *live* media', statement: true,
+          cap: '44 demos built, of 46 in the manifest' },
+        { name: 'machines in the player', say: '[Cloudflare|cloudflare] carries the streams',
+          slot: slideDiagram(SLIDE_MACHINES),
+          cap: 'notes from the page through the relay to the [Pi|raspberry]' },
+      ]);
+      slideKit.player.stop();
+      slideKit.specs.push(...slideKit.player.slides.map((s) => s.spec));
+      box.append(slideKit.player.el);
+    });
+
+  // ── HALF WIDTH PLAYERS ────────────────────────────────────────────────────
+  // 🔴 TWO PLAYERS SIDE BY SIDE, asked 2026-10-05: *"add 1/2 w slide palyer to
+  // kit, scale accordingly. put 2 side by side"*. Nothing about a slide is
+  // typed in px, so a player half as wide is the same slides at half the size:
+  // every step is a share of ITS slide's height, and the inset and the rules
+  // are too. The footer is the video panel's and stays at its px sizes, which
+  // fit at half width (asserted). One column below 560 px of the block's own
+  // width, the container query `/cam/` and `/flipper/` use, so a phone stacks
+  // them; each player's keys stay on its own panel.
+  // Every figure is sourced where it first appears above or below: the WHEP
+  // and MoQ table PROGRESS.md:4712-4719, the clocks HANDOFF.md:133-135, the
+  // refusals positron-streaming SKILL.md:228-230.
+  const HALF_A = [
+    { name: 'half a title', title: 'Latency off a burned clock',
+      cap: 'positron.studio' },
+    { name: 'half a figure', big: '*26.2*', under: 'ms glass to glass, MoQ p50',
+      cap: 'browser to [Cloudflare|cloudflare] to browser' },
+    { name: 'half a table', say: 'MoQ is quicker, WebRTC steadier',
+      rows: { head: ['', 'p50', 'p99'], body: [['MoQ', '*26.2*', '104.8'], ['WHEP', '67.0', '*84.1*']], align: 'lrr', frame: 'none' },
+      cap: 'ms, read off burned pixels' },
+  ];
+  const HALF_B = [
+    { name: 'half a statement', say: '*Break* the check first', statement: true,
+      cap: '38/38 still green with every recording silent' },
+    { name: 'half the clocks', say: 'Two clocks agree after measuring',
+      cap: 'median 1.8 ms between beats, one peer 137 ms fast' },
+    { name: 'half the refusals', layout: 'top', say: 'ERR refuses by programme, not age',
+      text: 'etv refused its newest 45 min, etv2 its oldest 78 min', textStep: 2 },
+  ];
+  section('HALF WIDTH PLAYERS',
+    'Two players side by side, each half the block, each with slides of its own. Type, inset and '
+    + 'rules are shares of each player’s own slide, so half the width is the same slides at half '
+    + 'the size. Below 560 px of block they stack. A key pressed in one never steps the other.',
+    `const a = createSlidePlayer(talkA), b = createSlidePlayer(talkB);
+pair.append(a.el, b.el);   // .kit-sl-pair, two columns, one under 560 px of its own width`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const pair = el('div', 'kit-sl-pair');
+      const grid = el('div', 'kit-sl-pair-in');
+      pair.append(grid);
+      slideKit.halves = [HALF_A, HALF_B].map((specs) => {
+        const p = createSlidePlayer(specs);
+        p.stop();
+        slideKit.specs.push(...p.slides.map((s) => s.spec));
+        grid.append(p.el);
+        return p;
+      });
+      slideKit.comps.halves = { pair, grid };
+      box.append(pair);
+    });
+
+  // ── STEP 6 DOWN TO STEP 1 ─────────────────────────────────────────────────
+  // One slide a step, the step alone, its three numbers in the caption from
+  // `stepCaption`, which reads `SCALE`, so the words cannot disagree with the
+  // type. The texts are real and sourced, each in the comment above it.
+  const STEP_TEXT = {
+    6: '*44*',                                  // demos built, the count above
+    5: 'A lab for live media',                  // what positron is, CLAUDE.md's opening line
+    4: 'Latency is read off a burned clock',    // positron-ui SKILL.md, the test picture
+    3: 'MoQ 26.2 ms, WHEP 67.0 ms at p50',      // PROGRESS.md:4712-4719
+    2: 'Two clocks agree to 1.8 ms once the offset is measured',   // HANDOFF.md:133-135
+    1: 'The relay hop measured 1 to 2 ms over three runs against the runtime\'s own ping',   // PROGRESS.md:3472
+  };
+  const STEP_USE = { 6: 'one figure', 5: 'a statement', 4: 'the headline', 3: 'evidence', 2: 'evidence of four rows', 1: 'the caption' };
+  for (const n of [6, 5, 4, 3, 2, 1]) {
+    slideBlock(`STEP ${n}`,
+      `Step ${n} alone, ${STEP_USE[n]}: ${stepOf(n).size.toFixed(2)} per cent of the slide's height, `
+      + `line height ${stepOf(n).lh}, tracking ${stepOf(n).ls} em.`,
+      `{ layout: 'left', lines: [[${n}, ${JSON.stringify(plain(STEP_TEXT[n]))}]], cap: stepCaption(${n}) }`,
+      { name: `step ${n}`, layout: 'left', lines: [[n, STEP_TEXT[n]]], cap: stepCaption(n) });
+  }
+
+  // ── THE SCALE ─────────────────────────────────────────────────────────────
+  // All six on one slide. Stacked in one column they need 90.9 per cent of the
+  // height in line boxes alone, against the 86 the inset leaves, so the two
+  // biggest stand in the slot and the four below them in the words column:
+  // a split whose slot holds slide text, which is a slot holding any element.
+  slideBlock('THE SCALE',
+    'All six steps on one slide, largest first, each 1.5 times the one under it. One column, no '
+    + 'colour, set solid: six lines at their own line heights need 91 per cent of the height and '
+    + 'the inset leaves 84, at line height 1 they need 83.',
+    `{ layout: 'left', lines: [[6, 'step 6'], [5, 'step 5'], [4, 'step 4'], [3, 'step 3'], [2, 'step 2'], [1, 'step 1']] }`,
+    // ONE COLUMN, NO COLOUR, asked 2026-10-05: *"THE SCALE no col layout. just
+    // all scales. no colors"*. It was a split with 6 and 5 in the slot.
+    { name: 'the scale', layout: 'left',
+      lines: [[6, 'step 6'], [5, 'step 5'], [4, 'step 4'], [3, 'step 3'], [2, 'step 2'], [1, 'step 1']] });
+
+  // ── TITLE SLIDE ───────────────────────────────────────────────────────────
+  // 🔴 THE OPENING OF A TALK, asked 2026-10-05 from the slides list as *"so
+  // slide title"*. The talk's name at step 5, the speaker at step 3, the date
+  // at step 2 (TITLE_STEPS in slide.mjs says why each), laid out `top`: the
+  // name where every headline sits, who and when on the bottom edge. The
+  // sample carries the name only since 2026-10-06, asked as *"rm Kristjan
+  // Jansen 5 October 2026"*; `by` and `date` stay graded in slide-test.mjs.
+  slideBlock('TITLE SLIDE',
+    'The opening of a talk: its name at step 5 top left. `by`, `date` and `place` are the optional '
+    + 'keys for who, when and where, and a title slide carries nothing else.',
+    `{ title: 'Latency off a burned clock' }`,
+    { name: 'title', title: 'Latency off a burned clock' });
+
+  // ── BIG NUMBER ────────────────────────────────────────────────────────────
+  // 🔴 ONE FIGURE ALONE, asked 2026-10-05 from the slides list as *"big
+  // number"*: step 6, centred, a short line under it at step 3. The figure is
+  // PROGRESS.md:4712-4713, re-read for this block: the WHEP rig re-run the same
+  // day as MoQ, n=17,501 over 300 s, *p50 67.0 / p95 76.9 / p99 84.1 ms*,
+  // browser to Cloudflare to browser off burned pixels.
+  slideBlock('BIG NUMBER',
+    'One figure alone at step 6, centred in the darker top two thirds (the band layout), with one '
+    + 'short line under it on the lighter third saying what it counts, and the caption.',
+    `{ layout: 'band', big: '*67.0*', under: 'ms glass to glass, WHEP p50', cap: 'n = 17,501 over 300 s ...' }`,
+    { name: 'big number', layout: 'band', big: '*67.0*', under: 'ms glass to glass, WHEP p50',
+      cap: 'n = 17,501 over 300 s, browser to [Cloudflare|cloudflare] to browser' });
+
+  // ── COMBINATIONS ──────────────────────────────────────────────────────────
+  // CLAUDE.md, the stand-ins paragraph: three fake servers make four pages
+  // runnable with zero bytes from anybody's server.
+  slideBlock('HEADLINE OVER TEXT',
+    'A combination: the headline at step 4 and a sentence of evidence at step 3, both on the left edge.',
+    `{ layout: 'left', say: 'Stand-ins replace other servers', text: 'Three fake servers ...' }`,
+    // LEFT, asked 2026-10-05: *"HEADLINE OVER TEXT align texts to left"*. A
+    // sentence of evidence is read, not looked at, so it starts where the
+    // headline starts rather than floating centred under it.
+    { name: 'stand-ins', layout: 'left', say: 'Stand-ins replace other servers',
+      text: 'Three fake servers make four pages runnable with no bytes from anybody else' });
+  // positron-verify SKILL.md:78-80: a stand-in serving silence still read
+  // 38/38 on /tapes/, a hole found only by breaking the stand-in.
+  slideBlock('STATEMENT',
+    'A combination of one: the sentence is the slide, at step 5, up to three lines, with a caption.',
+    `{ say: '*Break* the check first', statement: true, cap: '38/38 still green ...' }`,
+    { name: 'sabotage', say: '*Break* the check first', statement: true,
+      cap: '38/38 still green with every recording silent' });
+  // ── TABLES WITH ROW LINES ─────────────────────────────────────────────────
+  // Asked 2026-10-05: *"i do not see tables layout. horiz lines but try with
+  // rounded corner outer border and not"*. HEADLINE OVER A TABLE above stays
+  // the plain one; these two are the same component with `rows.frame`.
+  // PROGRESS.md:4712-4719 again: WHEP vs MoQ, browser to Cloudflare to
+  // browser off burned pixels, n=17,501 for WHEP over 300 s.
+  slideBlock('TABLE WITH ROW LINES',
+    'A table with a 1 px rule between rows and under the header and no line outside them: '
+    + '`frame: \'none\'`. The air in each row is from the table’s own step, so a rule never touches a glyph.',
+    `{ say: 'MoQ is quicker, WebRTC steadier', rows: { head: ['', 'p50', 'p95', 'p99'], body, align: 'lrrr', frame: 'none' } }`,
+    { name: 'transports lined', say: 'MoQ is quicker, WebRTC steadier',
+      rows: { head: ['', 'p50', 'p95', 'p99'],
+        body: [['MoQ', '*26.2*', '*42.4*', '104.8'], ['WHEP', '67.0', '76.9', '*84.1*']], align: 'lrrr', frame: 'none' },
+      cap: 'ms, browser to [Cloudflare|cloudflare] to browser, read off burned pixels' });
+  // ── LIVE LOGS ─────────────────────────────────────────────────────────────
+  // Asked 2026-10-05: *"show 2col layout with live logs / live tabular logs"*.
+  // Both are fed by this tab and nothing else: a timer asked to fire every
+  // 250 ms reports how late it fired, and the frame loop reports this
+  // screen's frames. Both start in `slidesOpen()` and stop in `slidesClose()`.
+  /** A timer asked for every `ms`, reporting how late each one fired. */
+  const lateTimer = (ms, onBeat) => {
+    let id = 0, due = 0, beat = 0;
+    const fire = () => {
+      const now = performance.now();
+      onBeat(++beat, now - due, now);
+      due += ms;
+      id = setTimeout(fire, Math.max(0, due - performance.now()));
+    };
+    return {
+      start() { if (id) return; beat = 0; due = performance.now() + ms; id = setTimeout(fire, ms); },
+      stop() { clearTimeout(id); id = 0; },
+      running: () => !!id,
+    };
+  };
+  slideBlock('LIVE LOG ON A SLIDE',
+    'Two columns: the words on the card, a live log on the darker side. It is the shell’s own '
+    + 'log at the slide’s step 1, newest line at the bottom, oldest leaving the top, in a box that '
+    + 'never changes height. A timer here asked to fire every 250 ms writes how late it fired.',
+    `slot: (host) => { const r = createReport({ readout: {}, showReadout: false, joined: false }); host.append(r.logEl); r.line(...) }`,
+    { name: 'live log', layout: 'split', side: 'right',
+      say: 'A timer is never on time', text: 'each line is one beat and how late it fired',
+      slot: (host) => {
+        const r = createReport({ readout: {}, showReadout: false, joined: false });
+        host.append(r.logEl);
+        let lines = 0;
+        const t = lateTimer(250, (n, late, now) => {
+          // short enough for one line in half a phone's slide; a timer can
+          // fire a fraction of a millisecond early, which is said as early
+          r.line(`beat ${n}, ${Math.abs(late).toFixed(1)} ms ${late < 0 ? 'early' : 'late'}`, late > 4 ? 'warn' : 'info', now);
+          lines++;
+          // the shell's log keeps every line; a slide keeps the last forty
+          while (r.logEl.children.length > 40) r.logEl.firstElementChild.remove();
+        });
+        slideKit.comps.liveLog = { el: r.logEl, lines: () => lines, running: t.running };
+        return t;
+      },
+      cap: 'this tab, now, nothing fetched' });
+  slideBlock('LIVE TABULAR LOG ON A SLIDE',
+    'The same, as rows of a table: time, source, value and unit, values right aligned with their '
+    + 'decimal points in one column and the row lines of `frame: \'none\'`. The widths are declared, '
+    + 'so a longer value never moves a column.',
+    `slot: (host) => { const log = createSlideLog({ head: ['s', 'from', 'value', 'unit'], widths: [6, 5, 6, 3], align: 'rlrl' }); host.append(log.el); log.add([...]) }`,
+    { name: 'live table', layout: 'split', side: 'left',
+      say: 'Read four times a second', text: 'how late the timer fired and how long a frame took',
+      slot: (host) => {
+        const log = createSlideLog({ head: ['s', 'from', 'value', 'unit'], widths: [6, 5, 6, 3], align: 'rlrl' });
+        host.append(log.el);
+        let t0 = 0, last = 0, gaps = [];
+        const frames = looped((t) => { if (last) gaps.push(t - last); last = t; });
+        const t = lateTimer(250, (n, late, now) => {
+          const s = ((now - t0) / 1000).toFixed(1);
+          log.add([s, 'timer', late.toFixed(2), 'ms']);
+          if (gaps.length) {
+            const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+            log.add([s, 'frame', mean.toFixed(2), 'ms']);
+            gaps = [];
+          }
+        });
+        slideKit.comps.liveTable = { log, running: t.running };
+        return {
+          start() { t0 = performance.now(); last = 0; gaps = []; frames.start(); t.start(); },
+          stop() { frames.stop(); t.stop(); },
+        };
+      },
+      cap: 'this tab, now, nothing fetched' });
+
+  // HANDOFF.md:133-135, AHEAD on /sync/: a peer 137 ms fast, beats a median
+  // 1.8 ms apart once the offset is found.
+  slideBlock('HEADLINE WITH A CAPTION',
+    'A combination: a headline and a caption and nothing between them. The caption is step 1, '
+    + 'bottom left, on every slide that has one.',
+    `{ say: 'Two clocks agree after measuring', cap: 'median 1.8 ms between beats ...' }`,
+    { name: 'clocks', say: 'Two clocks agree after measuring',
+      cap: 'median 1.8 ms between beats, one peer 137 ms fast' });
+  slideBlock('YELLOW AND HUE MARKS',
+    'A combination: *x* in any string is the accent, and [x|tech] is the hue the diagram gives '
+    + 'that technology, so a word on a slide is the colour of its box.',
+    `{ say: '[Cloudflare|cloudflare] carries the streams', list: ['*1 to 2 ms* through the relay', ...] }`,
+    { name: 'marks', say: '[Cloudflare|cloudflare] carries the streams',
+      // 1 to 2 ms: PROGRESS.md:3472, as above.
+      list: ['*1 to 2 ms* through the relay', 'notes on to the [Pi|raspberry]', 'sound back from [Yoshimi|sound]'] });
+
+  // ── LAYOUTS ───────────────────────────────────────────────────────────────
+  // positron-streaming SKILL.md:228-230, a 13 point sweep of each 2 h window
+  // on 2026-09-06.
+  slideBlock('TITLE ON TOP, TEXT AT THE BOTTOM',
+    'A layout: the headline holds the top and the words sit on the bottom edge, with the air between them.',
+    `{ layout: 'top', say: 'ERR refuses by programme, not age', text: '...' }`,
+    { name: 'refusals', layout: 'top', say: 'ERR refuses by programme, not age',
+      text: 'etv refused its newest 45 min, etv2 its oldest 78 min, etvpluss nothing', textStep: 2 });
+  slideBlock('INTERACTIVE ON THE RIGHT',
+    'The mirror: the words on the left and a knob on the right whose value is the figure, '
+    + 'so turning it changes the slide.',
+    `{ layout: 'split', side: 'right', slot: (host) => fitBox(host, 130) + createKnob(...), big: '120' }`,
+    { name: 'tempo', layout: 'split', side: 'right',
+      slot: (host) => {
+        const fb = fitBox(host, 130);
+        const k = createKnob({ label: 'tempo', min: 60, max: 180, step: 1, value: 120,
+          onInput: (v) => { host.closest('.sl').querySelector('.sl-big').textContent = String(Math.round(v)); } });
+        fb.inner.append(el('div', 'sl-mid')); fb.inner.lastChild.append(k.el);
+        slideKit.comps.tempo = k;
+        return null;
+      },
+      say: 'A knob turned on the slide', big: '120', under: 'bpm, specimen' });
+
+  // ── COMPONENTS ON A SLIDE ─────────────────────────────────────────────────
+  /* 🔴 THE OLED, DRAWN BY THE FIRMWARE. The HARDWARE part draws every screen
+     with `rig/pico/firmware/ui.c` compiled to WebAssembly. Since 2026-10-05
+     (*"oled"*, the slides list's item 7) pressing SLIDES fetches that module
+     too, the one request this tab makes, because a tab press is a person's
+     press exactly as HARDWARE's is; a visit still fetches nothing. Until it
+     arrives the slide shows a STAND-IN: the same 128x64 panel, the same two
+     colours and `drawOled`, lettered in the firmware's default font from
+     `oled-font.mjs`. The slide's canvas is registered as one more screen part,
+     so the module's arrival redraws it with the LINK part's own paint and the
+     stand-in is gone. */
+  section('OLED ON A SLIDE',
+    'The router’s 128 by 64 screen at slide scale, a whole number of screen pixels per panel '
+    + 'pixel, drawn by the firmware’s own ui.c: its LINK screen. That code is fetched when this '
+    + 'tab is opened, and a stand-in frame holds the place for the moment it takes.',
+    `slot: (host) => oledScreen at a whole scale, drawOled(cv, px)   // registered in hw.parts`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const s = createSlide({ name: 'oled', layout: 'split', side: 'right',
+        say: 'The Pico router draws its own screen', text: 'scene 2, an octave up onto channel 2',
+        cap: 'drawn by ui.c, the router firmware’s own screen code',
+        slot: (host) => {
+          const screen = el('div', 'kit-oled');
+          const cv = document.createElement('canvas');
+          cv.width = OLED_W; cv.height = OLED_H;
+          screen.append(cv);
+          host.append(screen);
+          // the stand-in, in the firmware's own default font (oled-font.mjs),
+          // so it is the same letters the real screen draws once HARDWARE loads
+          const px = new Uint8Array(OLED_W * OLED_H);
+          const box = (x, y, w, h) => { for (let i = x; i < x + w; i++) { px[y * OLED_W + i] = 1; px[(y + h - 1) * OLED_W + i] = 1; }
+            for (let j = y; j < y + h; j++) { px[j * OLED_W + x] = 1; px[j * OLED_W + x + w - 1] = 1; } };
+          for (let y = 0; y < 11; y++) for (let x = 0; x < OLED_W; x++) px[y * OLED_W + x] = 1;
+          const ink = (x, y, t) => oledText(px, GLCD5X7, x, y, t);
+          const dark = new Uint8Array(OLED_W * OLED_H); oledText(dark, GLCD5X7, 2, 2, 'SCENE 2/2'); oledText(dark, GLCD5X7, 104, 2, 'THRU');
+          for (let i = 0; i < px.length; i++) if (dark[i]) px[i] = 0;
+          ink(44, 19, '+12 CH2');
+          box(0, 30, 40, 14); ink(3, 33, 'DIN IN');
+          box(84, 30, 44, 14); ink(87, 33, 'DIN OUT');
+          for (let x = 42; x < 81; x++) px[37 * OLED_W + x] = 1;
+          px[36 * OLED_W + 79] = 1; px[38 * OLED_W + 79] = 1; px[35 * OLED_W + 78] = 1; px[39 * OLED_W + 78] = 1;
+          drawOled(cv, px);
+          hw.parts.push({ name: 'slide-oled', cv, px: null,
+            paint: (u) => hw.parts.find((p) => p.name === 'link').paint(u) });
+          // WHOLE NUMBERS ONLY. Asked 2026-10-05 with a screenshot:
+          // *"do not scale screen this way. just 1x 2x etc"*. It used to grow to
+          // fill the half slide and fall to a FRACTION on a phone, which is the
+          // one thing `oledScreen` above exists to refuse. The largest whole
+          // number that fits the column, 1x at least, never between.
+          const fit = () => {
+            const sc = getComputedStyle(screen);
+            const chrome = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+              .reduce((n, k) => n + parseFloat(sc[k]), 0);
+            const w = Math.min(host.clientWidth - chrome, 2 * (host.clientHeight - chrome));
+            if (!(w > 0)) return;
+            // and in full screen as many whole times as fit (*"2x on
+            // fullscreen?"*): still whole numbers, never a fraction
+            const k = Math.max(1, Math.floor(w / OLED_W));
+            screen.style.setProperty('--oled-k', String(k));
+          };
+          new ResizeObserver(fit).observe(host);
+          slideKit.comps.oled = { cv, screen, px, standIn: px.slice() };
+          return null;
+        } }, { host: box, full: true });
+      slideKit.blocks.push({ title: 'OLED ON A SLIDE', s });
+      slideKit.specs.push(s.spec);
+    });
+  // ── SCREEN AND KEYS ON A SLIDE ────────────────────────────────────────────
+  // 🔴 Asked 2026-10-06 as *"to the slides kit add example with hw screen on
+  // left and 4 buttons vertcally grouped on the right (mix of our primary and
+  // secodary buttons, shimmering on push)"*, rebuilt as a split on *"not good.
+  // use columned layout ... buttons on top right, not grouped, vert gap,
+  // separate, all secondary, additional desc"*, and then laid out `band` on
+  // *"its better to use vertical sections here. top 2/3 is darker, centered
+  // screen and buttons ton the right, below in lighter area title an desc"*.
+  // So the well holds the router's screen at a whole scale with its four keys
+  // to its right, four separate secondary buttons a gap apart, sized in slide
+  // units so they shrink with it; the headline and the sentence are under it.
+  // A press gives the button the one busy sweep every button here has, for
+  // 0.9 s, and is bound to nothing.
+  section('SCREEN AND KEYS ON A SLIDE',
+    'The band layout: the router’s screen and its four keys centred in the darker top two thirds, '
+    + 'the keys separate secondary buttons, and the title and a sentence on the lighter third under them.',
+    `{ layout: 'band', slot: screen and four buttons, say: 'The Pico router', text: '...' }`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const s = createSlide({ name: 'screen and keys', layout: 'band',
+        say: 'The Pico router',
+        text: 'Its screen drawn by the firmware’s ui.c, its four keys bound to nothing here.',
+        textStep: 2,
+        slot: (host) => {
+          const row = el('div', 'kit-sl-hw');
+          const screen = el('div', 'kit-oled');
+          const cv = document.createElement('canvas');
+          cv.width = OLED_W; cv.height = OLED_H;
+          screen.append(cv);
+          const keys = el('div', 'kit-sl-keys');
+          const buttons = PICO_KEYS.map((k) => {
+            const b = el('button', '', k.does, { type: 'button', 'aria-label': `${k.does}, key ${k.k}` });
+            b.dataset.id = k.does;
+            b.addEventListener('click', () => {
+              if (b.disabled) return;
+              b.dataset.busy = '1'; b.disabled = true; b.setAttribute('aria-busy', 'true');
+              setTimeout(() => { delete b.dataset.busy; b.disabled = false; b.removeAttribute('aria-busy'); }, 900);
+            });
+            keys.append(b);
+            return b;
+          });
+          row.append(screen, keys);
+          host.append(row);
+          // the stand-in the slide above drew, until the firmware's own screen code loads
+          const px = slideKit.comps.oled ? slideKit.comps.oled.standIn.slice() : new Uint8Array(OLED_W * OLED_H);
+          drawOled(cv, px);
+          hw.parts.push({ name: 'slide-hw', cv, px: null,
+            paint: (u) => hw.parts.find((p) => p.name === 'link').paint(u) });
+          // WHOLE NUMBERS ONLY, as above: the largest that fits beside the keys
+          const fit = () => {
+            const sc = getComputedStyle(screen), rs = getComputedStyle(row);
+            const chrome = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+              .reduce((n, k) => n + parseFloat(sc[k]), 0);
+            const w = Math.min(host.clientWidth - keys.offsetWidth - parseFloat(rs.columnGap || 0) - chrome,
+              2 * (host.clientHeight - chrome));
+            if (!(w > 0)) return;
+            screen.style.setProperty('--oled-k', String(Math.max(1, Math.floor(w / OLED_W))));
+          };
+          new ResizeObserver(fit).observe(host);
+          slideKit.comps.hwKeys = { screen, cv, keys, buttons };
+          return null;
+        } }, { host: box, full: true });
+      slideKit.comps.hwKeys.slide = s;
+      slideKit.blocks.push({ title: 'SCREEN AND KEYS ON A SLIDE', s });
+      slideKit.specs.push(s.spec);
+    });
+  slideBlock('SLIDER ON A SLIDE',
+    'The kit’s slider laid out at 150 logical px and scaled to its column. Its pointer maths '
+    + 'reads the lane’s own rectangle, which is the scaled one, so a press lands where it looks.',
+    `slot: (host) => { const fb = fitBox(host, 150); fb.inner.append(createSlider({ ... }).el) }`,
+    { name: 'slider', layout: 'split', side: 'left',
+      slot: (host) => {
+        const fb = fitBox(host, 150);
+        const sl = createSlider({ label: 'gain', min: 0, max: 1, step: 0.01, value: 0.25 });
+        fb.inner.append(el('div', 'sl-mid')); fb.inner.lastChild.append(sl.el);
+        slideKit.comps.slider = { sl, fb };
+        return null;
+      },
+      say: 'A slider is read by its handle', text: 'no fill, the handle is the reading',
+      cap: 'specimen, bound to nothing' });
+  slideBlock('KNOB ON A SLIDE',
+    'The kit’s knob at 140 logical px, scaled into the middle of the slide. It is dragged up '
+    + 'and down rather than round, so a scaled drag is still the same gesture.',
+    `slot: (host) => { const fb = fitBox(host, 140); fb.inner.append(createKnob({ label: 'cutoff' }).el) }`,
+    { name: 'knob', say: 'A knob is dragged up, not round',
+      slot: (host) => {
+        const fb = fitBox(host, 140);
+        const k = createKnob({ label: 'cutoff', min: 0, max: 127, value: 40 });
+        fb.inner.append(el('div', 'sl-mid')); fb.inner.lastChild.append(k.el);
+        slideKit.comps.knob = k;
+        return null;
+      },
+      cap: 'specimen, bound to nothing' });
+  /* The stand-in station's signal, made here: two tones a fifth apart, 220 and
+     330 Hz, the second swelling at 2 Hz (demo/fake-station.mjs:50-69). */
+  slideBlock('WAVEFORM ON A SLIDE',
+    'The kit’s wave view as the picture of a real instrument panel, with a row of knobs and a '
+    + 'nameplate, laid out at 360 logical px and scaled into its column.',
+    `slot: (host) => { const fb = fitBox(host, 360); fb.inner.append(createInstrumentPanel({ viz: waveView.el, rows: [[pitch, swell]], plate }).el) }`,
+    { name: 'tone', layout: 'split', side: 'right',
+      slot: (host) => {
+        const rate = 8000, n = rate * 1.5;
+        const s = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const t = i / rate;
+          const swell = 0.55 + 0.45 * Math.sin(2 * Math.PI * 2 * t);
+          s[i] = 0.4 * Math.sin(2 * Math.PI * 220 * t) + 0.4 * swell * Math.sin(2 * Math.PI * 330 * t);
+        }
+        // THE REAL INSTRUMENT PANEL, asked 2026-10-05: *"WAVEFORM ON A SLIDE use
+        // actual instument panel"*. The wave view is the panel's picture, two
+        // knobs its row, a nameplate its foot; the panel is px furniture, so it
+        // is laid out at 360 logical px and scaled into the column like the
+        // other kit controls here.
+        // SCALED LIKE THE KNOBS AND FILLING ITS FIT BOX, asked with a crop of a
+        // small panel adrift in its column: *"scale instrument as you do with
+        // knobs. equal padding. uppercase proper instrument nameplate"*. The
+        // panel takes the fit box's whole logical width, so the slot's own
+        // inset is the air on every side and the plate's name and patch sit at
+        // its two ends rather than run together.
+        const fb = fitBox(host, 300);
+        const tmp = el('div');
+        const wv = createWaveView(tmp, { label: 'two tones a fifth apart' });
+        wv.el.style.setProperty('--wave-h', '120px');
+        const knob = (label, value) => createKnob({ label, min: 0, max: 127, value });
+        const panel = createInstrumentPanel({
+          viz: wv.el,
+          rows: [[knob('PITCH', 64), knob('SWELL', 90)]],
+          plate: { name: 'POSITRON' },   // no patch line: *"rm Two tones"*
+        });
+        panel.el.classList.add('kit-sl-fill');
+        fb.inner.append(panel.el);
+        wv.set(s, rate, { name: 'tone' });
+        wv.head(0.5);
+        slideKit.comps.wave = wv;
+        slideKit.comps.wavePanel = panel;
+        return null;
+      },
+      say: 'A stand-in plays a tone, not silence', text: '220 and 330 Hz, a 2 Hz swell',
+      cap: 'made in this tab, nothing fetched' });
+  slideBlock('VIDEO ON A SLIDE',
+    'A video panel playing the test picture: drawn into a canvas each frame, captured as a stream '
+    + 'and played by a video element. No file, no network, and it runs only while this tab is open.',
+    `slot: (host) => createVideoPanel({ media: video })   // video.srcObject = canvas.captureStream(25)`,
+    { name: 'video', layout: 'split', side: 'left',
+      slot: (host) => {
+        const c = el('canvas');
+        c.width = FRAME_W; c.height = FRAME_H;
+        const g = c.getContext('2d');
+        let n = 0;
+        burn(g, FRAME_W, FRAME_H, n, { hue: videoHue(2) });
+        const video = el('video');
+        video.muted = true; video.playsInline = true; video.autoplay = true;
+        video.srcObject = c.captureStream(25);
+        let shown = 0;
+        const onFrame = () => { shown++; video.requestVideoFrameCallback?.(onFrame); };
+        video.requestVideoFrameCallback?.(onFrame);
+        // THE REAL VIDEO PANEL, footer and all, asked 2026-10-05: *"use actual
+        // videopanel VIDEO ON A SLIDE"*. Its name on the left, and a play
+        // glyph beside the panel's own full screen square on the right.
+        const play = el('button', 'ico', '\u275a\u275a', { type: 'button', 'aria-label': 'pause the test picture' });
+        centreSymbol(play);
+        let paused = false;
+        play.onclick = () => {
+          paused = !paused;
+          if (paused) { loop.stop(); video.pause(); } else { loop.start(); video.play().catch(() => {}); }
+          setSymbol(play, paused ? '\u25ba' : '\u275a\u275a');
+          play.setAttribute('aria-label', paused ? 'play the test picture' : 'pause the test picture');
+        };
+        const vp = createVideoPanel({ media: video, left: el('span', 'sl-count', 'test picture') });
+        vp.slots.right.prepend(play);
+        host.append(vp.el);
+        const loop = looped(() => burn(g, FRAME_W, FRAME_H, n++, { hue: videoHue(2) }));
+        slideKit.comps.video = { video, vp, shown: () => shown, drawn: () => n };
+        return {
+          start() { if (!paused) { loop.start(); video.play?.().catch(() => {}); } },
+          stop() { loop.stop(); video.pause?.(); },
+        };
+      },
+      say: 'The test picture draws itself', cap: 'pattern.mjs, a canvas stream, a video element' });
+  slideBlock('DIAGRAM ON A SLIDE',
+    'The diagram with box names only and 2 px edges, laid out at 580 logical px and scaled; what each outer box '
+    + 'is goes under it as slide text at step 1, the archive’s rule.',
+    `slot: slideDiagram({ nodes: [{ label: 'Browser', desc: 'one page from the kit', children }, ...] })`,
+    { name: 'machines', say: '[Cloudflare|cloudflare] carries the streams',
+      slot: (host) => { const ctl = slideDiagram(SLIDE_MACHINES)(host); slideKit.comps.diagram = ctl; return ctl; },
+      cap: 'notes from the page through the relay to the [Pi|raspberry]' });
+  /* ⚠️ DECLARED HERE, ABOVE STEP GRID ON A SLIDE, because that slot is the first
+     to call `slideCommand` while it is built, and a `const` read above its own
+     line throws.
+     🔴 A KEY FOR A BAR ON A SLIDE IS A KEY PRESSED INSIDE THAT SLIDE. The bar
+     listens on `window` and hears a key from the body, which is right for a
+     page's one transport and wrong for a specimen among thirty others: Space on
+     this page would start it from anywhere. `data-own-keys` does not answer it,
+     because that attribute silences a bar only while its panel is HIDDEN, and
+     an open tab is not. So the bar is handed `command` (its documented seam for
+     who owns position, `transport-bar.mjs`) and refuses play, pause and seek
+     while a keydown is being dispatched whose target is outside the slide's
+     frame. A click or a drag is not a keydown and goes straight through; a key
+     aimed at the bar is inside the frame, and the bar's own rule already keeps
+     it from every other bar. `transport-bar.mjs` is unchanged.
+     ⚠️ `slideKeys.ev` IS READ BY ITS PHASE, NOT CLEARED. A window capture
+     listener sees every keydown first; `eventPhase` is NONE once the dispatch is
+     over, so a later click never inherits the last key. A microtask clear would
+     run between listeners on a real key and lose it. */
+  const slideKeys = { ev: null };
+  addEventListener('keydown', (e) => { slideKeys.ev = e; }, true);
+  /** `command` for a bar on a slide: only a key whose target is inside `frameOf()` moves it. */
+  const slideCommand = (deck, frameOf) => {
+    let refused = 0;
+    const ok = () => {
+      const e = slideKeys.ev;
+      if (!e || e.eventPhase === Event.NONE) return true;
+      const f = frameOf(), t = e.target;
+      if (f && t instanceof Node && f.contains(t)) return true;
+      refused++;
+      return false;
+    };
+    return {
+      command: { play: () => ok() && deck.play(), pause: () => ok() && deck.pause(), seek: (p) => ok() && deck.seek(p) },
+      refused: () => refused,
+    };
+  };
+
+  /* STEP GRID ON A SLIDE, asked 2026-10-05 as *"STEP GRID ON A SLIDE - convert
+     to col layout with tom instrument (no labels)"*. `/tom/`'s drum machine
+     from the same kit parts `/tom/` uses (demo/tom/index.html, the bar at
+     ~620, the grid at ~750, the instrument at ~836): a transport bar with the
+     stop verb, glued over a step grid in a panel case, with the TOM plate at
+     the foot's right end. On the darker side of a split, scaled like the
+     waveform and FAU panels (`fitBox`, `.kit-sl-fill`).
+     🔴 32 STEPS, NO TEMPO ARROWS, DRAWABLE, asked the same day as *"more lines
+     on slide tom, 32?. no prev next. drawable"*. Two bars of four beats at four
+     steps a beat. The arrows are gone from the bar's right slot, so the tempo
+     is the clock's 120 and nothing on the slide changes it. The grid is the
+     editable one: a press toggles a pad and a drag carries that press's value
+     across the pads it crosses, which is `step-grid.mjs`'s own stroke, and
+     Enter on a focused pad toggles it, the component's own key.
+     ⚠️ THE STEPS SCROLL RATHER THAN SHRINK. A pad is never smaller than
+     `PAD_DRAW` (above `PAD_MIN`), and the case's strip is already its own x
+     scroller (`.panel-strip`), so 32 steps scroll inside the panel.
+     🔴 NO LABELS, AND THE PLATE IS KEPT. No row names (no `fixed`, so no label
+     column is built), no beat numbers (`ticks` off), no clock (`time: false`).
+     The plate stays: it is the instrument's name, not a label on one of its
+     controls. Glyphs stay too, because a play button with no glyph is a blank
+     square.
+     🔴 NO SAMPLES, NO AUDIO, NO FETCH. The grid plays its pattern on its own
+     frame clock while the tab is open and stops when it closes; the bar's
+     toggle stops and plays it.
+     ⚠️ THE BAR'S KEYS ARE THE SLIDE'S, by `slideCommand`, for the reason the
+     TRANSPORT BAR block gives: Space from the page must not start it. The
+     grid listens on its own rows only, so a key from the body never reaches
+     a pad. */
+  section('STEP GRID ON A SLIDE',
+    'The TOM drum machine at slide scale on the darker side of a split: its bar, a 32 step grid '
+    + 'you can draw on, playing on its own clock while this tab is open, and its plate, with no '
+    + 'labels on the rows or the steps. Nothing sounds here.',
+    `slot: (host) => { const fb = fitBox(host, 420); fb.inner.append(createInstrumentPanel({ rows: [[[bar.el], { pad: false }], [[layout.el], { pad: false }]], plate: { name: 'TOM', place: 'end' }, full: true }).el) }`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const s = createSlide({ name: 'tom', layout: 'split', side: 'right',
+        say: 'A drum machine is built from kit parts', text: 'a bar, a step grid and its plate',
+        cap: 'a picture, it plays at',
+        slot: (host) => {
+          const fb = fitBox(host, 420);
+          /* ⚠️ A PAD A FINGER CAN DRAW ON, NOT THE GRID'S FLOOR. MEASURED at
+             `PAD_MIN`: 32 steps in the 378 logical px strip are 10 px pads, and at
+             this slot's 0.67x to 0.75x that is about 7 screen px, which nobody
+             can hit. 18 logical px is about 13 screen px, and the steps scroll
+             inside the strip past the panel edge, as FAU's keys do. */
+          const STEPS = 32, PAD_DRAW = 18;
+          const kase = createPanelLayout({ side: null, flow: false, strip: { role: 'group', label: 'steps' } });
+          const grid = createStepGrid({ strip: kase.strip, rows: 6, steps: STEPS, minCell: PAD_DRAW,
+            rate: { bpm: 120, whose: 'this slide, which made it up' } });
+          // two bars: kick, snare, closed hat, open hat, clap, tom, the second bar with a fill
+          const PATTERN = [
+            [0, 8, 10, 16, 24, 27],
+            [4, 12, 20, 28],
+            [0, 2, 4, 6, 8, 10, 12, 16, 18, 20, 22, 24, 26],
+            [14, 30],
+            [12, 28],
+            [25, 29, 31],
+          ];
+          PATTERN.forEach((row, r) => row.forEach((st) => grid.set(r, st, true, 'quiet')));
+          let steps = 0;
+          grid.clock.onStep(() => { steps++; });
+          /* The deck is a follower with nothing on it, so the toggle's face can
+             say playing or stopped; the grid's clock is what moves. A stop goes
+             back to the first column, which is `/tom/`'s stop and the clock's. */
+          const deck = createDeck({ items: [], adapters: {}, range: [0, 3_600_000] });
+          const run = (on) => {
+            if (on) { grid.clock.play(); deck.play(); } else { grid.clock.stop(); deck.pause(); deck.seek(0); }
+          };
+          // the gate drives this facade, so a key from outside the slide moves nothing
+          const gate = slideCommand({ play: () => run(true), pause: () => run(false), seek: () => {} },
+            () => host.closest('.sl-frame'));
+          const bar = createTransportBar(el('div'), deck, {
+            publish: false, scrub: false, loop: false, time: false, endStop: false, verb: 'stop',
+            command: gate.command,
+          });
+          const panel = createInstrumentPanel({
+            rows: [[[bar.el], { pad: false }], [[kase.el], { pad: false }]],
+            plate: { name: 'TOM', place: 'end' },
+            full: true,
+          });
+          panel.el.classList.add('kit-sl-fill');
+          fb.inner.append(panel.el);
+          slideKit.comps.grid = { grid, steps: () => steps, panel, bar, deck, kase, fb, column: host, refused: gate.refused,
+            pattern: PATTERN };
+          return { start() { run(true); }, stop() { run(false); } };
+        } }, { host: box, full: true });
+      const a = el('a', '', 'positron.studio/tom/', { href: 'https://positron.studio/tom/' });
+      s.parts.cap.append(' ', a);
+      slideKit.blocks.push({ title: 'STEP GRID ON A SLIDE', s });
+      slideKit.specs.push(s.spec);
+    });
+  slideBlock('READOUT ON A SLIDE',
+    'The kit’s readout at 360 logical px and scaled, counting this screen’s frames while '
+    + 'the tab is open. `frames` is there because `fps` alone stands still on a locked screen.',
+    `slot: (host) => { const fb = fitBox(host, 360); fb.inner.append(createReport({ readout: { fps: '', frames: '' } }).readoutEl) }`,
+    { name: 'readout', say: 'The readout is live, measuring this screen',
+      slot: (host) => {
+        const fb = fitBox(host, 360);
+        const r = createReport({ readout: { fps: '', frames: '' }, showLog: false, joined: false });
+        fb.inner.append(r.readoutEl);
+        let last = 0, times = [], shown = 0, count = 0;
+        const loop = looped((t) => {
+          count++;
+          if (last) times.push(t - last);
+          if (times.length > 60) times.shift();
+          last = t;
+          if (t - shown > 250 && times.length > 4) {
+            r.set('fps', (1000 / (times.reduce((a, b) => a + b, 0) / times.length)).toFixed(1));
+            r.set('frames', count);
+            shown = t;
+          }
+        });
+        slideKit.comps.readout = { r, count: () => count };
+        return { start() { last = 0; times = []; loop.start(); }, stop() { loop.stop(); } };
+      },
+      cap: 'this screen, now' });
+
+  /* 🔴 THE TIME WORK ON A SLIDE, 2026-10-05. Asked as *"do 6 and 7"*, from a
+     list whose sixth item was a timeline or strip view on a slide and whose
+     seventh was a transport bar on a slide, left out before because a bar takes
+     Space. Both are fed by this tab alone: a deck with its own marks, no
+     network, playing only between `slidesOpen()` and `slidesClose()`. */
+
+  /* TIMELINE ON A SLIDE. HANDOFF.md:133-135, AHEAD on /sync/: a peer 137 ms
+     fast over a 20 ms hop, offset found to 0.00 ms, beats fired a median 1.8 ms
+     apart (worst 6.9). The strip under it is this tab's own: one beat every
+     500 ms, handed on three ways, each mark coloured by how late it landed, in
+     the one colour meaning `/time/`'s BEAT tab uses (`demo/time/beat.mjs`):
+     grey not landed yet, green inside 5 ms, amber inside 20, red past it.
+       deck   the deck's own scheduler, which looks 100 ms ahead (its drift)
+       timer  a timer re-armed from the last one, so its lateness adds up
+       frame  the deck's beat, drawn on the next frame after it fired
+     🔴 SIZED OFF THE SLOT, NOT `fitBox`. The strip measures its own rect with
+     `getBoundingClientRect`, which is the TRANSFORMED box, and draws in that
+     many pixels; inside a scaled box its own `autoHeight` then writes a CSS
+     height in visual pixels onto an element that is scaled again, and the
+     lanes fill a 1/k share of their canvas. So the canvas is the slot's width,
+     and the lanes split the slot's height between them, re-split whenever the
+     slot changes size (full screen included). Its gutter and ruler type stay
+     at the strip's own px size, which is the one thing that does not grow with
+     the slide. */
+  const BEAT_MS = 500, BEATS = 16, TL_SPAN = BEAT_MS * BEATS;
+  slideBlock('TIMELINE ON A SLIDE',
+    'A strip on a deck of this tab’s own, the playhead running while the tab is open: one beat '
+    + 'every 500 ms handed on three ways, each mark coloured by how late it landed, grey until it '
+    + 'has. The canvas is the slot’s width and the lanes share its height.',
+    `slot: (host) => createStripView(host, deck, { size: 'auto', follow: false, lanes: [{ id: 'deck', latch: true, colorOfRow }, ...] })`,
+    // a no-break space holds the figure to its unit
+    { name: 'timeline', say: 'Beats land *1.8\u00a0ms* apart',
+      slot: (host) => {
+        const tok = (n, f) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
+        const OK = tok('--ok', '#8fd6a8'), WARN = tok('--warn', '#e0b060'), BAD = tok('--bad', '#e0908a');
+        const NOT_YET = '#3b424e', SWATCH = tok('--dim', '#9aa3b2');
+        const band = (ms) => (Math.abs(ms) < 5 ? OK : Math.abs(ms) < 20 ? WARN : BAD);
+        const driftOf = new Map(), hopOf = new Map(), chainOf = new Map();
+        const at0 = (r) => Math.round(r.at);
+        const { adapter } = markAdapter({ rates: [1], onFire: (_p, ev) => {
+          // the frame lane: the deck's beat, painted on the next frame after it fired
+          const at = Math.round(ev?.at ?? -1), t = performance.now();
+          requestAnimationFrame(() => hopOf.set(at, performance.now() - t));
+        } });
+        const items = Array.from({ length: BEATS }, (_, i) => ({ id: `tl${i}`, kind: 'mark', at: i * BEAT_MS + BEAT_MS / 2, payload: { i } }));
+        const deck = createDeck({ items, adapters: { mark: adapter }, range: [0, TL_SPAN],
+          onDrift: (rows) => { for (const r of rows) if (r.deltaMs != null) driftOf.set(Math.round(r.at), r.deltaMs); } });
+        const late = {
+          deck: (r) => driftOf.get(at0(r)),
+          timer: (r) => chainOf.get(at0(r)),
+          frame: (r) => (hopOf.has(at0(r)) ? (driftOf.get(at0(r)) ?? 0) + hopOf.get(at0(r)) : undefined),
+        };
+        const LANES = [['deck', 'deck'], ['timer', 'timer'], ['frame', 'frame']];
+        let laneH = 24;
+        const spec = ([id, label]) => ({
+          id, kind: 'mark', label, height: laneH, width: 2, latch: true, color: SWATCH, terse: true,
+          colorOfRow: (r, fired) => { const m = late[id](r); return !fired || m === undefined ? NOT_YET : band(m); },
+          describeRow: (r) => { const m = late[id](r); return m === undefined ? 'not landed yet' : `${Math.abs(m).toFixed(2)} ms ${m < 0 ? 'early' : 'late'}`; },
+        });
+        const view = createStripView(host, deck, { size: 'auto', follow: false, minHeight: 1, lanes: LANES.map(spec) });
+        let lastW = 0;
+        const sizeLanes = () => {
+          const h = host.clientHeight, w = host.clientWidth;
+          if (!h || !w) return;
+          const axis = view.strip.state.axisH ?? 20;
+          // the canvas's own 1 px edge top and bottom comes out of the slot too
+          const lh = Math.max(6, Math.floor((h - axis - 4) / LANES.length));
+          if (lh === laneH && w === lastW) return;
+          laneH = lh; lastW = w;
+          view.strip.setLanes(LANES.map(spec));
+          view.strip.fit();
+        };
+        new ResizeObserver(sizeLanes).observe(host);
+
+        /* the timer lane: armed for the first beat ahead, then re-armed BEAT_MS
+           from whenever the last one fired, never corrected, which is the
+           mistake a deck exists to avoid */
+        let chainId = 0;
+        const chainFrom = (pos) => {
+          clearTimeout(chainId);
+          const wall0 = performance.now() - pos;
+          let i = items.findIndex((it) => it.at > pos);
+          if (i < 0) return;
+          const tick = () => {
+            chainOf.set(items[i].at, performance.now() - (wall0 + items[i].at));
+            if (++i < items.length) chainId = setTimeout(tick, BEAT_MS);
+          };
+          chainId = setTimeout(tick, items[i].at - pos);
+        };
+        // round and round while the tab is open: back to the top past the last beat
+        const lap = looped(() => {
+          if (deck.position() < TL_SPAN - 1) return;
+          driftOf.clear(); hopOf.clear(); chainOf.clear();
+          deck.seek(0);
+          chainFrom(0);
+        });
+        slideKit.comps.timeline = { view, deck, late, items, chainOf, driftOf, hopOf, NOT_YET, lanes: LANES.map(([id]) => id),
+          chainRunning: () => !!chainId, slot: host };
+        return {
+          start() { deck.play(); chainFrom(deck.position()); lap.start(); },
+          stop() { lap.stop(); clearTimeout(chainId); chainId = 0; deck.pause(); },
+        };
+      },
+      cap: 'a beat every 500 ms here, coloured by how late it landed' });
+
+  /* TRANSPORT BAR ON A SLIDE. The kit's bar on a deck of this tab's own,
+     `publish: false`, scaled like the other px controls (`fitBox`, 560 logical
+     px). No strip glued under it: a strip in a scaled box draws in the wrong
+     pixels (the note above), so the bar keeps its own scrub as the one
+     position surface. Its keys are the slide's, by `slideCommand` above. */
+  slideBlock('TRANSPORT BAR ON A SLIDE',
+    'The kit’s transport bar on a deck of this tab’s own, scaled to its slot. A key pressed inside '
+    + 'the slide drives this bar and no other; a key from the rest of the page, Space included, '
+    + 'moves nothing here.',
+    `const { command } = slideCommand(deck, () => host.closest('.sl-frame'));
+createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
+    { name: 'bar', say: 'A key belongs to the bar it was pressed on',
+      slot: (host) => {
+        const fb = fitBox(host, 560);
+        const { adapter } = markAdapter({ rates: [0.5, 1, 2] });
+        const items = Array.from({ length: 12 }, (_, i) => ({ id: `sb${i}`, kind: 'mark', at: (i + 0.5) * 2000, payload: { i } }));
+        const deck = createDeck({ items, adapters: { mark: adapter }, range: [0, 24_000] });
+        const gate = slideCommand(deck, () => host.closest('.sl-frame'));
+        const bar = createTransportBar(fb.inner, deck, { publish: false, command: gate.command });
+        slideKit.comps.bar = { bar, deck, fb, refused: gate.refused };
+        return {
+          start() {},
+          // leaving the tab stops it, past the gate: nobody's key is involved
+          stop() { if (deck.playing()) deck.pause(); },
+        };
+      },
+      cap: 'a key from the page moves nothing here' });
+
+  /* FAU ON A SLIDE, asked 2026-10-05 as *"build fau into slide. overflow
+     keyboard. col layout"*. `/fau/`'s instrument from the same kit parts: the
+     code box holding a Faust program, its knobs, two octaves of keys and the
+     FAU plate, on the darker side of a split, scaled like the waveform panel
+     (`fitBox`, `.kit-sl-fill`).
+     🔴 A PICTURE OF THE INSTRUMENT, NOT THE INSTRUMENT. No libfaust, no
+     compile, no audio, on a visit or on the tab opening: a key lights under a
+     press and the log says once where it plays. The caption links `/fau/`.
+     🔴 THE KEYS OVERFLOW AND ARE NOT SHRUNK. 25 keys at `/fau/`'s 44 px a white
+     are wider than the panel, and the keys row scrolls sideways inside it,
+     which is what `.keys` does on every page (`overflow-x: auto`).
+     ⚠️ `letters: false`, so the keyboard binds nothing on `window`: arrows,
+     Space and the letter row stay the rest of the page's. */
+  section('FAU ON A SLIDE',
+    'The FAU instrument at slide scale on the darker side of a split: its program, its knobs, two '
+    + 'octaves of keys running wider than the column and scrolling inside the panel, and its plate. '
+    + 'A picture: a press lights a key, nothing compiles and nothing sounds here.',
+    `slot: (host) => { const fb = fitBox(host, 420); fb.inner.append(createInstrumentPanel({ viz: code.el, keys: keys.el, plate: { name: 'FAU' } }).el) }`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const s = createSlide({ name: 'fau', layout: 'split', side: 'right',
+        say: 'Faust is compiled in the page and played', text: 'the program, its knobs and two octaves of keys',
+        cap: 'a picture, it plays at',
+        slot: (host) => {
+          const fb = fitBox(host, 420);
+          const book = createHueBook();
+          // `/fau/`'s Organ preset, cut to the lines a slide can hold
+          const code = createCodeBox({
+            language: 'faust', rows: 7, hues: book, label: '',
+            ariaLabel: 'a Faust program, shown and not compiled',
+            value: 'import("stdfaust.lib");\n'
+              + 'freq = hslider("freq", 440, 40, 8000, 0.01);\n'
+              + 'gate = button("gate");\n'
+              + 'oct = hslider("oct", 0.5, 0, 0.6, 0.01);\n'
+              + 'rel = hslider("rel[scale:log]", 0.35, 0.02, 3, 0.01);\n'
+              + 'tone = os.osc(freq) + oct * os.osc(freq * 2);\n'
+              + 'process = tone * en.adsr(0.005, 0.12, 0.7, rel, gate) * 0.2 <: _, _;',
+          });
+          const knobs = createParamKnobs({ onChange: () => {} });
+          knobs.set([
+            { name: 'oct', value: 0.5, min: 0, max: 0.6 },
+            { name: 'rel', value: 0.35, min: 0.02, max: 3, warp: 'exp' },
+          ]);
+          book.assign(['oct', 'rel']);
+          for (const n of knobs.names()) knobs.knob(n).el.style.setProperty('--param-hue', String(book.hueOf(n)));
+          let told = false, presses = 0;
+          const keys = createKeyboard(el('div'), {
+            ...keyRange(24), base: 48, letters: false, chord: false,
+            onDown: (n) => {
+              keys.lightNote(n, true);
+              presses++;
+              if (!told) { told = true; d.log('FAU ON A SLIDE is a picture, the instrument plays at https://positron.studio/fau/'); }
+            },
+            onUp: (n) => keys.lightNote(n, false),
+          });
+          keys.el.style.setProperty('--k-min', '44px');
+          const panel = createInstrumentPanel({ viz: code.el, keys: keys.el, plate: { name: 'FAU' } });
+          panel.addRow(knobs.el);
+          panel.el.classList.add('kit-sl-fill');
+          fb.inner.append(panel.el);
+          slideKit.comps.fau = { panel, code, knobs, keys, fb, column: host, presses: () => presses };
+          return null;
+        } }, { host: box, full: true });
+      const a = el('a', '', 'positron.studio/fau/', { href: 'https://positron.studio/fau/' });
+      s.parts.cap.append(' ', a);
+      slideKit.blocks.push({ title: 'FAU ON A SLIDE', s });
+      slideKit.specs.push(s.spec);
+    });
+
+  /* 🔴 THE PART RUNS WHILE THE PAGE IS SEEN. In `/kit/` the tab row called
+     `slidesOpen()` and `slidesClose()`; here the visit opens it and the
+     page being hidden closes it, and showing the page again reopens it. */
+  slidesOpen();
+  document.addEventListener('visibilitychange', () => (document.hidden ? slidesClose() : slidesOpen()));
+
+  // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
+  land();
+
+  /* ── what a machine can say about this page ─────────────────────────────
+     🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
+     included (CLAUDE.md: a self-check never runs for a visitor). The checks
+     below are copied from `demo/kit/index.html` VERBATIM and keep that
+     file's indent, so a diff against it reads clean; the one line taken out
+     of each is a `settle()` or `measure()`, the measuring window a page with
+     no closed tab has no use for. Their comments still name it.
+     ⚠️ THEY RUN AFTER A FRAME, because `getBoundingClientRect` before the
+     first paint answers about a page that has not been arranged yet. */
+  if (SELFCHECK) {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  checkPage();
+
+
+  /**
+   * 🔴 A KEY FROM THE PAGE DOES NOT REACH THE SLIDES' BAR OR KEYS, BEFORE
+   * `d.ready()` FOR THE TAB PAGE'S REASON: a key from the body reaches the
+   * PUBLISHED bar as well, and after `ready` the harness is drilling it. So
+   * the four keys go in pairs that undo each other on that bar (play then
+   * pause, right then left), and the assert says it came back.
+   * ⚠️ THE REFUSAL COUNT IS THE HALF THAT PROVES IT. A bar that never heard the
+   * keys would also stand still; four refusals say it heard every one and the
+   * gate said no.
+   */
+  if (SELFCHECK && slideKit.comps.bar && slideKit.comps.fau) {
+    const { bar, deck: sbDeck, refused } = slideKit.comps.bar;
+    const kb = slideKit.comps.fau.keys;
+    const pub = window.__demo?.transport ?? null;
+    const was = { pos: bar.api.position, playing: bar.api.playing, refused: refused() };
+    const pubWas = pub ? { pos: pub.position, playing: pub.playing } : null;
+    const notes = kb.notes().join();
+    for (const k of [' ', 'ArrowRight', ' ', 'ArrowLeft']) {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    }
+    const lit = slideKit.comps.fau.panel.el.querySelectorAll('.k.down').length;
+    const n = refused() - was.refused;
+    d.assert('SLIDES: Space and the arrows from the page leave the slide’s bar and the FAU keys alone, and no slide claims __demo.transport',
+      bar.api.position === was.pos && bar.api.playing === was.playing && !sbDeck.playing() && n === 4
+        && lit === 0 && kb.notes().join() === notes
+        // ⚠️ ON ITS OWN PAGE NOTHING PUBLISHES A BAR (the one that did is
+        // `/kit/timeline/`'s TRANSPORT BAR), so the claim is that no slide
+        // takes the page's playhead either.
+        && pub === null && window.__demo.transport === null,
+      `the slide's bar ${was.pos.toFixed(0)} -> ${bar.api.position.toFixed(0)}, ${bar.api.playing ? 'PLAYING' : 'stopped'}, `
+      + `${n} of 4 keys heard and refused; ${lit} FAU key(s) lit; the published bar `
+      + `${pub ? `${pubWas.pos.toFixed(0)} -> ${pub.position.toFixed(0)} and ${pub.playing ? 'playing' : 'stopped'}, ${pub === bar.api ? 'the SLIDE’S' : 'its own'}` : 'none, and this page publishes none'}`);
+  }
+  } // if (SELFCHECK)
+
+  d.ready();
+
+
+  /**
+   * 🔴 THE ROUTER FIRMWARE'S CHECKS, AFTER `d.ready()` AND NOT BEFORE IT. This
+   * page becomes ready about 5.9 s after navigation against a harness that
+   * waits about 7.4 s (see the keyboard looper's block), and booting a board
+   * is half a second of emulation, twice. After `ready` the harness keeps
+   * collecting while the count grows and tolerates 2 s of silence, so every
+   * wait below is shorter than that and each step asserts as it lands.
+   *
+   * 🔴 THE FIRMWARE IS GRADED ON A BOARD OF ITS OWN, ON THIS THREAD, AND THE
+   * PAGE'S WIRING ON THE PAGE'S OWN BOARD IN ITS WORKER. The first half is the
+   * three claims the firmware makes (it boots to SCENE 1/2, a note goes
+   * through, NEXT moves it an octave up to channel 2) and is the same reading
+   * `rig/pico/sim/run-router.mjs` does: a phrase is on the panel only when
+   * every pixel of its cells matches the firmware's own font. The second half
+   * is that pressing the tab, the keys and the button on this page reaches it.
+   * ⚠️ BOTH BEHIND `?selfcheck=1`. A visitor's board starts when they open the
+   * tab and not before, and nothing here presses anything for them.
+   */
+  if (SELFCHECK) {
+    slideChecks()
+      .catch((e) => d.assert('SLIDES: the checks ran to the end', false, `${e.message}`));
+  }
+
+
+  /**
+   * 🔴 THE SLIDES PART'S CHECKS, AFTER `d.ready()` AND BEFORE THE ROUTER'S. They
+   * open the SLIDES tab, which a closed tab gives no size, and wait for frames
+   * and for a video to present some, so they go where the router's checks go:
+   * after `ready`, each step asserting as it lands and no wait longer than the
+   * harness's 2 s of tolerated silence. CHAINED in front of `hwChecks` rather
+   * than beside it, because both open a tab and two checks pressing tabs at
+   * once would each measure the other's part.
+   * ⚠️ BEHIND `?selfcheck=1` like every check here: they press a slider, turn
+   * a knob and step the player, and a visitor never sees any of it.
+   */
+  async function slideChecks() {
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+    const resBefore = performance.getEntriesByType('resource').length;
+    // ⚠️ THE VISIT OPENED THE PART ON THIS PAGE, so the screen code has been
+    // asked for once already, by `slidesOpen()`, and never twice
+    const partsAtVisit = hw.partsFetched;
+    await document.fonts.ready;
+    await frames(3);
+    const blocks = slideKit.blocks;
+    // the static slides and the one slide each player is showing; the others
+    // are hidden on purpose and have no box to measure
+    const all = [...blocks.map((b) => b.s), ...[slideKit.player, ...slideKit.halves].flatMap((p) => p.slides.filter((s) => !s.el.hidden))];
+    const tol = (a, b, e) => Math.abs(a - b) <= e;
+
+    // ── the face ──────────────────────────────────────────────────────────
+    const faced = document.fonts.check(`600 20px 'Slide JetBrains Mono'`) && document.fonts.check(`400 20px 'Slide JetBrains Mono'`);
+    const famOf = getComputedStyle(blocks[0].s.el).fontFamily;
+    d.assert('SLIDES: the face is JetBrains Mono, both weights loaded from this origin',
+      faced && /Slide JetBrains Mono/.test(famOf),
+      `${faced ? 'both weights loaded' : 'NOT loaded'}, the slide asks for ${famOf.split(',')[0]}`);
+
+    // ── each step alone ──────────────────────────────────────────────────
+    for (const n of [6, 5, 4, 3, 2, 1]) {
+      const b = blocks.find((x) => x.title === `STEP ${n}`);
+      const line = b?.s.parts.lines[0];
+      if (!line) { d.assert(`SLIDES: STEP ${n} has its line`, false, 'no line'); continue; }
+      const h = b.s.el.clientHeight;
+      const { size, lh, ls } = stepOf(n);
+      const want = size / 100 * h;
+      const cs = getComputedStyle(line);
+      const got = parseFloat(cs.fontSize), gotLh = parseFloat(cs.lineHeight), gotLs = parseFloat(cs.letterSpacing) || 0;
+      d.assert(`SLIDES: STEP ${n} computes its token, size, line height and tracking`,
+        h > 0 && tol(got, want, 0.5) && tol(gotLh, lh * want, 0.5) && tol(gotLs, ls * want, 0.05)
+          && b.s.parts.cap.textContent === stepCaption(n),
+        `${got.toFixed(2)} px against ${want.toFixed(2)} (${size.toFixed(2)} per cent of ${h} px), `
+        + `line ${gotLh.toFixed(2)} against ${(lh * want).toFixed(2)}, tracking ${gotLs.toFixed(3)} against ${(ls * want).toFixed(3)}`);
+    }
+
+    // ── the scale on one slide ───────────────────────────────────────────
+    {
+      const b = blocks.find((x) => x.title === 'THE SCALE');
+      const ls = [...b.s.el.querySelectorAll('.sl-line')];
+      const steps = ls.map((l) => +l.dataset.step);
+      const sizes = ls.map((l) => parseFloat(getComputedStyle(l).fontSize));
+      const ratios = sizes.slice(1).map((s, i) => sizes[i] / s);
+      d.assert('SLIDES: THE SCALE shows all six steps, largest first, each 1.5 times the next',
+        steps.join() === '6,5,4,3,2,1' && ratios.every((r) => tol(r, SCALE.ratio, 0.02)),
+        `steps ${steps.join(' ')} at ${sizes.map((s) => s.toFixed(1)).join(', ')} px`);
+    }
+
+    // ── every slide ──────────────────────────────────────────────────────
+    const geo = all.map((s) => {
+      const r = s.el.getBoundingClientRect();
+      const inn = s.el.querySelector('.sl-in');
+      const ir = inn.getBoundingClientRect(), ics = getComputedStyle(inn);
+      const bottom = ir.bottom - parseFloat(ics.paddingBottom);
+      // the caption sits under the WORDS: on the inset's left edge, or in a
+      // split with its slot on the left, on the words column's left edge
+      // (asked 2026-10-05, *"no text going over to other column, wrap!"*)
+      const words = s.el.querySelector('.sl-words');
+      const left = s.spec.layout === 'split' && s.spec.side === 'left' && words
+        ? words.getBoundingClientRect().left : ir.left + parseFloat(ics.paddingLeft);
+      const cap = s.parts.cap?.getBoundingClientRect();
+      const texts = [...s.el.querySelectorAll('.sl-t')].filter((t) => t.getClientRects().length);
+      const out = texts.filter((t) => {
+        const tr = t.getBoundingClientRect();
+        return tr.left < ir.left - 1 || tr.right > ir.right + 1 || tr.top < ir.top - 1 || tr.bottom > ir.bottom + 1;
+      });
+      const spill = inn.scrollHeight > inn.clientHeight + 1 || inn.scrollWidth > inn.clientWidth + 1;
+      return { name: s.spec.name, w: s.el.clientWidth, h: s.el.clientHeight, r, left, bottom, cap, out, spill };
+    });
+    const shown = geo.filter((g) => g.w > 0);
+    const notWide = shown.filter((g) => !tol(g.h, g.w * 9 / 16, 1));
+    d.assert('SLIDES: every slide is 16:9',
+      shown.length === all.length && notWide.length === 0,
+      `${shown.length} of ${all.length} laid out, ${notWide.length ? `off: ${notWide.map((g) => `${g.name} ${g.w}x${g.h}`).join(', ')}` : `the first ${shown[0]?.w}x${shown[0]?.h}`}`);
+    const caps = geo.filter((g) => g.cap && g.w);
+    const offCap = caps.filter((g) => !tol(g.cap.left, g.left, 1) || !tol(g.cap.bottom, g.bottom, 1));
+    d.assert('SLIDES: every caption sits bottom left under its words, never across a split',
+      caps.length >= 10 && offCap.length === 0,
+      `${caps.length} captions, ${offCap.length ? `off: ${offCap.map((g) => `${g.name} ${(g.cap.left - g.left).toFixed(1)},${(g.cap.bottom - g.bottom).toFixed(1)}`).join('; ')}` : 'all within 1 px'}`);
+    const spilt = geo.filter((g) => g.spill || g.out.length);
+    d.assert('SLIDES: nothing spills past the inset on any slide',
+      spilt.length === 0,
+      spilt.length ? spilt.map((g) => `${g.name}${g.spill ? ' overflows' : ''}${g.out.length ? ` ${g.out.length} text past the edge` : ''}`).join('; ')
+        : `${geo.length} slides, every text box inside its inset`);
+
+    // ── layouts ──────────────────────────────────────────────────────────
+    const splits = all.filter((s) => s.spec.layout === 'split');
+    const wrong = splits.filter((s) => {
+      const mid = (e) => { const b = e.getBoundingClientRect(); return (b.left + b.right) / 2; };
+      const sl = mid(s.parts.slot), wd = mid(s.parts.words);
+      return s.spec.side === 'left' ? !(sl < wd) : !(sl > wd);
+    });
+    d.assert('SLIDES: a split puts its slot on the side it declares and the words on the other',
+      // floors follow the blocks the owner keeps removing: at least two splits, one each way
+      splits.length >= 2 && splits.some((s) => s.spec.side === 'left') && splits.some((s) => s.spec.side === 'right') && wrong.length === 0,
+      `${splits.length} splits, ${splits.filter((s) => s.spec.side === 'left').length} slot left, `
+      + `${wrong.length ? `wrong: ${wrong.map((s) => s.spec.name).join(', ')}` : 'every one on its side'}`);
+    {
+      const edge = (name, side) => {
+        const s = all.find((x) => x.spec.name === name);
+        const ir = s.el.querySelector('.sl-in').getBoundingClientRect(), ics = getComputedStyle(s.el.querySelector('.sl-in'));
+        const ev = [...s.parts.ev.children].map((c) => c.getBoundingClientRect());
+        return side === 'left' ? Math.min(...ev.map((b) => b.left)) - (ir.left + parseFloat(ics.paddingLeft))
+          : (ir.right - parseFloat(ics.paddingRight)) - Math.max(...ev.map((b) => b.right));
+      };
+      const top = all.find((x) => x.spec.name === 'refusals');
+      const tb = top.parts.text.getBoundingClientRect(), cb = top.parts.ev.getBoundingClientRect();
+      // no right layout since 2026-10-05, *"no right align needed"*
+      const l = edge('stand-ins', 'left');
+      d.assert('SLIDES: left and top layouts put the evidence on their edge',
+        tol(l, 0, 1) && tol(tb.bottom, cb.bottom, 1),
+        `left ${l.toFixed(1)} px off its edge, the top layout's words end ${(cb.bottom - tb.bottom).toFixed(1)} px above the region's foot`);
+    }
+
+    // ── words ────────────────────────────────────────────────────────────
+    const says = slideKit.specs.filter((s) => s.say);
+    const badSay = says.filter((s) => lintWords(s.say).length);
+    const his = [...document.querySelectorAll('.kit-sl .sl-hi')];
+    const hues = [...document.querySelectorAll('.kit-sl .sl-hue')];
+    const fg = getComputedStyle(blocks[0].s.el).color;
+    d.assert('SLIDES: every headline is one sentence with no colon, semicolon, dash, middot or full stop, and the marks paint',
+      badSay.length === 0 && says.length >= 20 && his.length >= 5 && his.every((h) => getComputedStyle(h).color !== fg) && hues.length >= 3 && hues.every((h) => getComputedStyle(h).color !== fg),
+      `${says.length} headlines${badSay.length ? `, failing: ${badSay.map((s) => `${plain(s.say)} (${lintWords(s.say).join(', ')})`).join('; ')}` : ''}, `
+      + `${his.length} accents, ${hues.length} hued words off the ink`);
+
+    // ── the player ───────────────────────────────────────────────────────
+    {
+      const p = slideKit.player;
+      p.go(0);
+      let leaked = 0;
+      const spy = () => { leaked++; };
+      window.addEventListener('keydown', spy);
+      const key = (target, k) => target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+      // two slides since 2026-10-05: right to the second, Home back, space
+      // forward again, and right at the end stays there
+      key(p.el, 'ArrowRight'); const a = p.at();
+      key(p.el, 'Home'); const e0 = p.at();
+      key(p.el, ' '); const b = p.at();
+      key(p.el, 'ArrowRight'); const c = p.at();
+      key(p.el, 'Home');
+      key(document.body, 'PageDown'); const body = p.at();
+      window.removeEventListener('keydown', spy);
+      p.panel.el.querySelector('.step button:last-child')?.click();
+      const btn = p.at();
+      p.go(0);
+      d.assert('SLIDES: the player steps on its own keys, clamps at the end, and no key it uses leaves its panel',
+        p.slides.length === 2 && a === 1 && e0 === 0 && b === 1 && c === 1 && body === 0 && btn === 1 && leaked === 1 && p.keys() === 5,
+        `${p.slides.length} slides, right ${a}, Home ${e0}, space ${b}, right at the end ${c}, a key from the page leaves it at ${body}, `
+        + `the next button ${btn}; ${leaked} key(s) reached window (the page's own), ${p.keys()} heard`);
+      const r = p.slides[0].el.getBoundingClientRect();
+      d.assert('SLIDES: the player’s slide fills its stage at 16:9',
+        tol(r.height, r.width * 9 / 16, 1) && tol(r.width, p.panel.stage.clientWidth, 1),
+        `${r.width.toFixed(1)} x ${r.height.toFixed(1)} in a ${p.panel.stage.clientWidth} px stage`);
+
+      // ── a tap steps it in full screen on a screen with no hover ─────────
+      // `(hover: none)` cannot be emulated from inside the page, so the player
+      // is told it is on one (`touchMode`), which is the code path a phone
+      // takes; the media query itself is graded by `shot.mjs` at 375.
+      p.go(0);
+      const sr = () => p.panel.stage.getBoundingClientRect();
+      const tap = (fx) => { const b = sr(); p.slides[p.at()].el.dispatchEvent(new MouseEvent('click', { clientX: b.left + fx * b.width, clientY: b.top + b.height / 2, bubbles: true, cancelable: true })); return p.at(); };
+      const t0 = p.taps();
+      p.touchMode(() => true);
+      const flat = tap(5 / 6);                  // not full: a press is a press
+      await p.panel.full(true);
+      await frames(6);
+      const full = p.panel.isFull();
+      const fwd = tap(5 / 6), mid = tap(1 / 2), back = tap(1 / 6);
+      p.touchMode(() => false);
+      const desk = tap(5 / 6);                  // full, but a screen with hover
+      p.touchMode(() => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches);
+      await p.panel.full(false);
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      await frames(6);
+      d.assert('SLIDES: in full screen on a touch screen a tap on the right third steps forward and the left third back, the middle and a desk do nothing',
+        full && flat === 0 && fwd === 1 && mid === 1 && back === 0 && desk === 0 && p.taps() - t0 === 2 && !p.panel.isFull(),
+        `${full ? 'full' : 'NOT full'}; not full ${flat}, right ${fwd}, middle ${mid}, left ${back}, with hover ${desk}; `
+        + `${p.taps() - t0} taps stepped, ${p.panel.isFull() ? 'STILL full' : 'out again'}`);
+      p.go(0);
+    }
+
+    // ── the ⛶ on a touch screen, top right ────────────────────────────────
+    {
+      // The rule, read off the stylesheet the slide links, because no harness
+      // here can make `(hover: none)` match: both corners declared, the touch
+      // one in a media block AFTER the plain rule of the same weight (a media
+      // query adds no specificity, so order is what lets it win).
+      const sheet = [...document.styleSheets].find((x) => /\/shell\/slide\.css$/.test(x.href || ''));
+      const rules = sheet ? [...sheet.cssRules] : [];
+      const baseAt = rules.findIndex((r) => r.selectorText === '.sl .sl-full');
+      const mediaAt = rules.findIndex((r, i) => i > baseAt && r instanceof CSSMediaRule && /hover:\s*none/.test(r.media.mediaText)
+        && [...r.cssRules].some((q) => q.selectorText === '.sl .sl-full' && q.style.top === '12px' && q.style.bottom === 'auto'));
+      const base = rules[baseAt]?.style;
+      const live = matchMedia('(hover: none)').matches;
+      const b0 = slideKit.blocks[0].s.fullBtn, sl0 = slideKit.blocks[0].s.el.getBoundingClientRect(), br = b0.getBoundingClientRect();
+      const corner = live ? tol(br.top - sl0.top, 12 + 1, 2) : tol(sl0.bottom - br.bottom, 12 + 1, 2);
+      d.assert('SLIDES: the slide’s ⛶ sits bottom right with a pointer and top right on a screen with no hover, so it never covers a caption',
+        baseAt >= 0 && base.bottom === '12px' && mediaAt > baseAt && corner,
+        `the plain rule at ${baseAt} (bottom ${base?.bottom}), the touch rule at ${mediaAt} (top 12px, bottom auto); `
+        + `this screen ${live ? 'has no hover' : 'hovers'} and the button sits ${(br.top - sl0.top).toFixed(1)} px from the top, `
+        + `${(sl0.bottom - br.bottom).toFixed(1)} from the bottom`);
+    }
+
+    // ── the title slide and the big number ────────────────────────────────
+    {
+      const T = slideKit.blocks.find((b) => b.s.spec.name === 'title').s;
+      const h = T.el.clientHeight;
+      const px = (e) => parseFloat(getComputedStyle(e).fontSize);
+      const share = (e, n) => tol(px(e), stepOf(n).size / 100 * h, 0.5);
+      const ir = T.el.querySelector('.sl-in').getBoundingClientRect(), ics = getComputedStyle(T.el.querySelector('.sl-in'));
+      const tr = T.parts.title.getBoundingClientRect();
+      const top = tol(tr.top, ir.top + parseFloat(ics.paddingTop), 1);
+      const left = tol(tr.left, ir.left + parseFloat(ics.paddingLeft), 1);
+      d.assert('SLIDES: the title slide sets the talk’s name at step 5 top left, with no speaker and no date',
+        share(T.parts.title, 5) && top && left && !T.parts.by && !T.parts.when && lintWords(T.spec.title).length === 0,
+        `name ${px(T.parts.title).toFixed(1)} px on a ${h} px slide, ${top && left ? 'on' : 'OFF'} the inset corner; `
+        + `speaker ${T.parts.by ? 'PRESENT' : 'none'}, date ${T.parts.when ? 'PRESENT' : 'none'}`);
+      const B = slideKit.blocks.find((b) => b.s.spec.name === 'big number').s;
+      const big = B.el.querySelector('.sl-big'), under = B.el.querySelector('.sl-under');
+      const sr0 = B.el.getBoundingClientRect(), bgr = big.getBoundingClientRect(), ur = under.getBoundingClientRect();
+      const range = document.createRange(); range.selectNodeContents(big);
+      const ink = range.getBoundingClientRect();
+      const mid = (r) => r.left + r.width / 2;
+      // laid out `band` since 2026-10-06: the figure centred in the darker top
+      // two thirds, its line on the lighter third under it, on the left inset
+      const well = B.parts.well.getBoundingClientRect(), dark = sr0.top + B.el.clientHeight * 2 / 3;
+      const inn = B.el.querySelector('.sl-in'), padL = parseFloat(getComputedStyle(inn).paddingLeft);
+      d.assert('SLIDES: the big number is one figure at step 6 centred in the band’s darker top two thirds, its line at step 3 on the lighter third under it',
+        share(big, 6) && share(under, 3) && tol(mid(ink), mid(well), 1.5) && bgr.bottom <= dark && ur.top >= dark - 2
+          && tol(ur.left, inn.getBoundingClientRect().left + padL, 1)
+          && big.textContent === '67.0' && !!big.querySelector('.sl-hi') && B.el.dataset.layout === 'band',
+        `"${big.textContent}" ${px(big).toFixed(1)} px and the line ${px(under).toFixed(1)} px on a ${B.el.clientHeight} px slide, `
+        + `the figure ${(mid(ink) - mid(well)).toFixed(1)} px off the well's centre and ending ${(dark - bgr.bottom).toFixed(1)} px above the divide, `
+        + `the line ${(ur.top - dark).toFixed(1)} px below it`);
+    }
+
+    // ── two half width players ────────────────────────────────────────────
+    {
+      const [pa, pb] = slideKit.halves, { pair, grid } = slideKit.comps.halves;
+      const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+      const measure = () => {
+        const W = grid.clientWidth, ra = pa.el.getBoundingClientRect(), rb = pb.el.getBoundingClientRect();
+        const side = tol(ra.top, rb.top, 1) && tol(ra.width, (W - gap) / 2, 1.5) && tol(rb.width, (W - gap) / 2, 1.5) && rb.left > ra.right;
+        const stacked = tol(ra.width, W, 1.5) && tol(rb.width, W, 1.5) && rb.top >= ra.bottom;
+        const steps = [pa, pb].flatMap((p) => {
+          const s = p.slides[p.at()], h = s.el.clientHeight;
+          return [...s.el.querySelectorAll('.sl-t')].filter((t) => t.getClientRects().length).map((t) => {
+            const n = +(t.className.match(/\bsl-t(\d)\b/) || [])[1];
+            return { ok: tol(parseFloat(getComputedStyle(t).fontSize), stepOf(n).size / 100 * h, 0.5), n };
+          });
+        });
+        const feet = [pa, pb].map((p) => { const f = p.panel.el.querySelector('.pos-vp-foot'); return f.scrollWidth <= f.clientWidth + 1; });
+        const spill = [pa, pb].map((p) => { const i = p.slides[p.at()].el.querySelector('.sl-in'); return i.scrollHeight > i.clientHeight + 1 || i.scrollWidth > i.clientWidth + 1; });
+        return { W: pair.clientWidth, side, stacked, wa: ra.width, wb: rb.width, steps, feet, spill };
+      };
+      const native = measure();
+      // and the other arrangement, by giving the block the other width: the
+      // grid asks its own box, so this is the phone's case at any viewport
+      pair.style.width = native.W > 560 ? '343px' : '900px';
+      await frames(4);
+      const other = measure();
+      pair.style.removeProperty('width');
+      await frames(2);
+      const wide = native.W > 560 ? native : other, narrow = native.W > 560 ? other : native;
+      const stepsOk = [...native.steps, ...other.steps].every((x) => x.ok);
+      const feetOk = [...native.feet, ...other.feet].every(Boolean), spillOk = ![...native.spill, ...other.spill].some(Boolean);
+      d.assert('SLIDES: two half width players sit side by side above 560 px of block and stack below it, every step a share of its own player’s slide, the footers fitting, nothing spilling',
+        wide.side && narrow.stacked && stepsOk && feetOk && spillOk && wide.steps.length >= 4,
+        `${wide.W} px block: ${wide.side ? 'side by side' : 'NOT side by side'}, ${wide.wa.toFixed(1)} and ${wide.wb.toFixed(1)} px; `
+        + `${narrow.W} px block: ${narrow.stacked ? 'stacked' : 'NOT stacked'}; ${[...native.steps, ...other.steps].filter((x) => x.ok).length} of `
+        + `${native.steps.length + other.steps.length} text boxes at their step; footers ${feetOk ? 'fit' : 'OVERFLOW'}; ${spillOk ? 'no spill' : 'SPILL'}`);
+      pa.go(0); pb.go(0);
+      const key = (target, k) => target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+      key(pa.el, 'ArrowRight'); const a1 = pa.at(), b1 = pb.at();
+      key(pb.el, 'End'); const a2 = pa.at(), b2 = pb.at();
+      d.assert('SLIDES: a key pressed in one half width player steps that player and leaves the other’s slide where it was',
+        a1 === 1 && b1 === 0 && a2 === 1 && b2 === pb.slides.length - 1,
+        `right in the first: ${a1} and ${b1}; End in the second: ${a2} and ${b2}`);
+      pa.go(0); pb.go(0);
+    }
+
+    // ── the components, at slide scale ───────────────────────────────────
+    const C = slideKit.comps;
+    {
+      const { sl } = C.slider;
+      const lane = sl.el.querySelector('.sld-lane');
+      const lr = lane.getBoundingClientRect(), kw = sl.el.querySelector('.sld-knob').getBoundingClientRect().width;
+      const x = lr.left + kw / 2 + 0.8 * (lr.width - kw), y = lr.top + lr.height / 2;
+      const was = sl.get();
+      lane.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, bubbles: true, pointerId: 7 }));
+      lane.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, bubbles: true, pointerId: 7 }));
+      const k = C.slider.fb.k();
+      d.assert('SLIDES: the slider on a slide moves where it is pressed, through the scale',
+        tol(sl.get(), 0.8, 0.02) && was === 0.25 && k > 0 && Math.abs(k - 1) > 0.01,
+        `pressed at 80 per cent of a lane drawn at ${k.toFixed(2)}x, it reads ${sl.get()} (was ${was})`);
+      sl.set(0.25, { quiet: true });
+    }
+    {
+      const k = C.knob;
+      const svg = k.el.querySelector('svg[role="slider"]');
+      const was = k.value();
+      svg.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+      const t = C.tempo, tWas = t.value();
+      const tsvg = t.el.querySelector('svg[role="slider"]');
+      tsvg.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+      const big = slideKit.blocks.find((b) => b.s.spec.name === 'tempo').s.el.querySelector('.sl-big').textContent;
+      d.assert('SLIDES: a knob on a slide turns, and the one beside the words changes the figure',
+        k.value() > was && t.value() > tWas && big === String(Math.round(t.value())),
+        `cutoff ${was} -> ${k.value()}, tempo ${tWas} -> ${t.value()} and the slide reads ${big}`);
+      k.set(was, { quiet: true }); t.set(tWas, { quiet: true });
+      slideKit.blocks.find((b) => b.s.spec.name === 'tempo').s.el.querySelector('.sl-big').textContent = String(tWas);
+    }
+    {
+      const wv = C.wave;
+      const ink = wv.ink();
+      const slideH = slideKit.blocks.find((b) => b.s.spec.name === 'tone').s.el.clientHeight;
+      const ch = wv.canvas.clientHeight;
+      const inPanel = !!wv.el.closest('.pos-glue, .panel, [class*="instr"]') && !!C.wavePanel?.el?.contains(wv.el);
+      d.assert('SLIDES: the wave view draws on a slide as the picture of an instrument panel',
+        ink.measured && ink.ink > 100 && ch > 0 && inPanel,
+        `${ink.ink} pixels of ink, the canvas ${ch} px tall on a ${slideH} px slide, ${inPanel ? 'inside' : 'NOT inside'} the instrument panel`);
+    }
+    {
+      // SCREEN AND KEYS, laid out `band`: in the darker top two thirds the
+      // screen at a whole scale with four separate secondary keys a gap apart
+      // to its right; the headline and the sentence on the lighter third under
+      // them; a press sweeps the key busy and gives it back
+      const H = C.hwKeys, S = H.slide;
+      const btns = H.buttons, sr = H.screen.getBoundingClientRect(), slr = S.el.getBoundingClientRect();
+      const dark = slr.top + S.el.clientHeight * 2 / 3;
+      const rs = btns.map((x) => x.getBoundingClientRect());
+      const gaps = rs.slice(1).map((r, i) => r.top - rs[i].bottom);
+      const column = rs.every((r) => Math.abs(r.left - rs[0].left) < 1) && gaps.every((g) => g > 1);
+      const separate = btns.every((x) => !x.closest('.pos-bgroup, .pos-seg')) && btns.every((x) => !x.classList.contains('pos-pri'));
+      const inWell = sr.bottom <= dark && rs[rs.length - 1].bottom <= dark && sr.right <= rs[0].left;
+      const words = [S.parts.say, S.parts.text].every((e) => e.getBoundingClientRect().top >= dark - 2);
+      const k = parseFloat(H.screen.style.getPropertyValue('--oled-k'));
+      const b = btns.find((x) => x.dataset.id === 'NEXT');
+      b.click();
+      await nap(60);
+      const busy = b.dataset.busy === '1' && getComputedStyle(b).animationName === 'pos-sweep';
+      await nap(1000);
+      const back = !b.dataset.busy && !b.disabled;
+      d.assert('SLIDES: screen and keys is a band, the screen and four separate secondary keys a gap apart in the darker top, the words on the lighter third, a pressed key sweeping and coming back',
+        btns.length === 4 && column && separate && inWell && words && S.el.dataset.layout === 'band' && Number.isInteger(k) && k >= 1 && busy && back,
+        `${btns.map((x) => x.dataset.id).join(' ')} ${column ? `stacked, gaps ${gaps.map((g) => g.toFixed(1)).join('/')} px` : 'NOT STACKED APART'}, `
+        + `${separate ? 'separate and secondary' : 'GROUPED OR PRIMARY'}; the screen at ${k}x ${inWell ? 'left of the keys in the well' : 'NOT IN THE WELL BESIDE THE KEYS'}, `
+        + `the words ${words ? 'under the divide' : 'ABOVE THE DIVIDE'}; NEXT ${busy ? 'swept' : 'DID NOT SWEEP'} and ${back ? 'came back' : 'STAYED BUSY'}`);
+    }
+    {
+      const o = C.oled;
+      let lit = 0;
+      const dt = o.cv.getContext('2d').getImageData(0, 0, OLED_W, OLED_H).data;
+      for (let i = 0; i < dt.length; i += 4) if (dt[i] === OLED_LIT[0] && dt[i + 2] === OLED_LIT[2]) lit++;
+      const k = parseFloat(o.screen.style.getPropertyValue('--oled-k'));
+      d.assert('SLIDES: the OLED on a slide is drawn at a whole scale, never between',
+        lit > 100 && Number.isInteger(k) && k >= 1 && hw.parts.some((p) => p.name === 'slide-oled'),
+        `${lit} panel pixels lit, ${k}x, registered as a screen part for ui.c`);
+      // the real screen: opening the tab asked for ui.c once, and its arrival
+      // redrew the slide's canvas with the LINK part's own paint
+      const end = performance.now() + 1500;
+      const part = hw.parts.find((p) => p.name === 'slide-oled');
+      while (performance.now() < end && !part.px) await nap(40);
+      let same = 0, diffStand = 0, litReal = 0;
+      if (part.px) {
+        const dt2 = o.cv.getContext('2d').getImageData(0, 0, OLED_W, OLED_H).data;
+        const want = hw.oled.screen(-1, hw.parts.find((p) => p.name === 'link').paint);
+        for (let i = 0; i < want.length; i++) {
+          const on = dt2[i * 4] === OLED_LIT[0] && dt2[i * 4 + 2] === OLED_LIT[2];
+          if (on === !!want[i]) same++;
+          if (!!want[i] !== !!o.standIn[i]) diffStand++;
+          if (want[i]) litReal++;
+        }
+      }
+      d.assert('SLIDES: the visit fetched ui.c once and the OLED slide shows its real LINK screen, pixel for pixel, not the stand-in',
+        partsAtVisit === 1 && hw.partsFetched === 1 && hw.partsFrom === 'slides' && !!part.px && same === OLED_W * OLED_H && diffStand > 0 && litReal > 100,
+        `before the press the module had been asked for ${partsAtVisit} time(s), after it ${hw.partsFetched} by ${hw.partsFrom || 'nobody'}; `
+        + `${same} of ${OLED_W * OLED_H} canvas pixels match ui.c's LINK screen, ${litReal} lit, ${diffStand} differ from the stand-in`);
+    }
+    {
+      const v = C.video, g = C.grid, r = C.readout;
+      const s0 = v.shown(), d0 = v.drawn(), g0 = g.steps(), r0 = r.count();
+      const q0 = v.video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
+      await nap(700);
+      const q1 = v.video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
+      const shownFrames = Math.max(v.shown() - s0, q1 - q0);
+      d.assert('SLIDES: the video on a slide presents frames of the canvas stream while the tab is open',
+        v.drawn() > d0 && shownFrames > 2 && !v.video.paused,
+        `${v.drawn() - d0} canvas frames drawn, ${shownFrames} presented by the video in 0.7 s`);
+      d.assert('SLIDES: the step grid and the readout run while the tab is open',
+        g.steps() > g0 && r.count() > r0,
+        `${g.steps() - g0} steps, ${r.count() - r0} frames counted`);
+    }
+    {
+      const dg = C.diagram;
+      dg.fit();
+      const boxes = dg.boxes();
+      const off = dg.descs.map((sp, i) => {
+        if (!sp || !boxes[i]) return 99;
+        const b = boxes[i].querySelector('.pos-dg-box').getBoundingClientRect(), s = sp.getBoundingClientRect();
+        return Math.abs((b.left + b.right) / 2 - (s.left + s.right) / 2) + (s.top < b.bottom ? 99 : 0);
+      });
+      const native = dg.subject().closest('.sl').querySelectorAll('.pos-dg-sub, .pos-dg-llab').length;
+      d.assert('SLIDES: the diagram draws names only, each outer box’s words centred under it',
+        off.length === 3 && off.every((o) => o < 2) && native === 0 && (dg.dg.cuts?.length ?? 0) === 0,
+        `${off.map((o) => o.toFixed(1)).join(', ')} px off centre, ${native} native subs or labels`);
+    }
+
+    // ── tables with row lines ────────────────────────────────────────────
+    /** The rect of character `i` of a row, walking its text nodes, so a mark's span counts. */
+    const charRect = (row, i) => {
+      const w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      let n, at = 0;
+      while ((n = w.nextNode())) {
+        if (i < at + n.length) {
+          const r = document.createRange();
+          r.setStart(n, i - at); r.setEnd(n, i - at + 1);
+          return r.getBoundingClientRect();
+        }
+        at += n.length;
+      }
+      return null;
+    };
+    /** Spread in px of each column's left edge, and of the decimal points in each right column. */
+    const columns = (rows, starts, widths, align) => {
+      const spread = (xs) => (xs.length > 1 ? Math.max(...xs) - Math.min(...xs) : 0);
+      const lefts = starts.map((st) => spread(rows.map((r) => charRect(r, st)?.left).filter(Number.isFinite)));
+      const dots = [];
+      starts.forEach((st, c) => {
+        if (align[c] !== 'r') return;
+        const xs = rows.map((r) => {
+          const i = r.textContent.slice(st, st + widths[c]).indexOf('.');
+          return i < 0 ? NaN : charRect(r, st + i)?.left;
+        }).filter(Number.isFinite);
+        if (xs.length > 1) dots.push(spread(xs));
+      });
+      return { lefts: Math.max(0, ...lefts), dots, worst: Math.max(0, ...lefts, ...dots) };
+    };
+    {
+      const tables = all.map((s) => s.parts.table).filter(Boolean);
+      const framed = tables.filter((t) => t.dataset.frame);
+      const bad = [];
+      let rules = 0;
+      for (const t of framed) {
+        const rows = [...t.children];
+        const cs = getComputedStyle(t);
+        // the slide's one rule width, 0.4 per cent of its height, never under 1 px
+        // what the browser DRAWS: a border is snapped down to whole device
+        // pixels and never under one, so 1.54 px is 1 px on a 1x screen
+        const dpr = devicePixelRatio || 1;
+        const rule = Math.max(1 / dpr, Math.floor(Math.max(1, 0.004 * t.closest('.sl').clientHeight) * dpr) / dpr);
+        const ev = t.parentElement.getBoundingClientRect(), tr = t.getBoundingClientRect();
+        if (!tol(tr.width, ev.width, 1)) bad.push(`${t.dataset.frame} table ${tr.width.toFixed(1)} wide in ${ev.width.toFixed(1)}`);
+        rows.forEach((r, i) => {
+          const rc = getComputedStyle(r);
+          const fs = parseFloat(rc.fontSize);
+          if (i > 0) { if (tol(parseFloat(rc.borderTopWidth), rule, 0.5) && rc.borderTopStyle === 'solid') rules++; else bad.push(`${t.dataset.frame} row ${i} rule ${rc.borderTopWidth} against ${rule.toFixed(2)}`); }
+          else if (parseFloat(rc.borderTopWidth) !== 0) bad.push(`${t.dataset.frame} first row has a rule above it`);
+          if (parseFloat(rc.borderBottomWidth) !== 0) bad.push(`${t.dataset.frame} row ${i} has a rule under it`);
+          if (!tol(parseFloat(rc.paddingTop), 0.3 * fs, 0.5) || !tol(parseFloat(rc.paddingLeft), 0.6 * fs, 0.5)) bad.push(`${t.dataset.frame} row ${i} padding ${rc.paddingTop} ${rc.paddingLeft}`);
+        });
+        if (t.dataset.frame === 'none' && ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(cs[`border${k}Width`]) !== 0)) bad.push('the none table has an outer border');
+      }
+      const none = framed.find((t) => t.dataset.frame === 'none');
+      d.assert('SLIDES: a ruled table spans the full width, with the slide’s rule between every row, none outside, and air from its step inside each row',
+        !!none && bad.length === 0 && rules >= 2,
+        `${framed.length} ruled tables, ${rules} rules between rows${bad.length ? `, wrong: ${bad.join('; ')}` : ''}`);
+      const align = tables.map((t) => ({ name: t.closest('.sl').getAttribute('aria-label'), frame: t.dataset.frame || 'plain',
+        ...columns([...t.children].slice(t.layout.head ? 1 : 0), t.layout.starts, t.layout.widths, t.align) }));
+      const off = align.filter((a) => a.worst > 0.5);
+      const dotCols = align.reduce((n, a) => n + a.dots.length, 0);
+      d.assert('SLIDES: every table keeps its character columns and decimal points within 0.5 px, lines and padding included',
+        // 3 since HEADLINE OVER A TABLE and the rounded box were removed on the owner's word, 2026-10-05
+        off.length === 0 && dotCols >= 3 && align.some((a) => a.frame === 'none'),
+        `${align.length} tables, ${dotCols} decimal columns, worst ${Math.max(...align.map((a) => a.worst)).toFixed(2)} px`
+        + `${off.length ? `, off: ${off.map((a) => `${a.name} ${a.worst.toFixed(2)}`).join(', ')}` : ''}`);
+    }
+
+    // ── live logs ────────────────────────────────────────────────────────
+    {
+      const L = C.liveLog, T = C.liveTable;
+      const lb = () => L.el.getBoundingClientRect().height, tb = () => T.log.el.getBoundingClientRect().height;
+      const sl = (x) => x.el.closest('.sl').getBoundingClientRect().height;
+      const h0 = [lb(), tb(), sl(L), sl(T.log)], n0 = [L.lines(), T.log.count()];
+      await nap(650);
+      const h1 = [lb(), tb(), sl(L), sl(T.log)], n1 = [L.lines(), T.log.count()];
+      await nap(650);
+      const h2 = [lb(), tb(), sl(L), sl(T.log)], n2 = [L.lines(), T.log.count()];
+      const still = h0.every((h, i) => h === h1[i] && h === h2[i]);
+      d.assert('SLIDES: both live logs append rows over time and their boxes do not change height while they do',
+        n1[0] > n0[0] && n2[0] > n1[0] && n1[1] > n0[1] && n2[1] > n1[1] && still && h0[0] > 0 && h0[1] > 0,
+        `the log ${n0[0]} -> ${n1[0]} -> ${n2[0]} lines, the table ${n0[1]} -> ${n1[1]} -> ${n2[1]} rows, `
+        + `heights ${h0.map((h) => h.toFixed(1)).join('/')} then ${h2.map((h) => h.toFixed(1)).join('/')}`);
+      // the newest at the bottom: the last row's foot is inside the body's, and the body has scrolled
+      const body = T.log.body.getBoundingClientRect(), lastRow = T.log.rows().at(-1).getBoundingClientRect();
+      const logBox = L.el.getBoundingClientRect(), lastLine = L.el.lastElementChild?.lastElementChild?.getBoundingClientRect();
+      const vis = T.log.rows().filter((r) => { const b = r.getBoundingClientRect(); return b.top >= body.top - 0.5 && b.bottom <= body.bottom + 0.5; });
+      const col = columns(vis, T.log.starts, T.log.widths, 'rlrl');
+      // the rule is UNDER each row but the newest, never over one, so a row
+      // leaving the top never stacks its rule under the header's
+      const dprL = devicePixelRatio || 1;
+      const ruleW = Math.max(1 / dprL, Math.floor(Math.max(1, 0.004 * T.log.el.closest('.sl').clientHeight) * dprL) / dprL);
+      const ruled = vis.slice(0, -1).every((r) => tol(parseFloat(getComputedStyle(r).borderBottomWidth), ruleW, 0.5))
+        && vis.every((r) => parseFloat(getComputedStyle(r).borderTopWidth) === 0)
+        && parseFloat(getComputedStyle(vis.at(-1)).borderBottomWidth) === 0;
+      d.assert('SLIDES: the newest row is at the foot of each log, and the tabular log’s decimal points align within 0.5 px under its row lines',
+        tol(lastRow.bottom, body.bottom, 1) && !!lastLine && lastLine.bottom <= logBox.bottom + 0.5 && lastLine.bottom > logBox.bottom - 2 * lastLine.height
+          && vis.length >= 3 && col.dots.length === 2 && col.worst <= 0.5 && ruled,
+        `the last row ends ${(body.bottom - lastRow.bottom).toFixed(1)} px from the table's foot, the last line ${(logBox.bottom - (lastLine?.bottom ?? 0)).toFixed(1)} px from the log's, `
+        + `${vis.length} rows in view, decimal spread ${col.dots.map((x) => x.toFixed(2)).join(' and ')} px, ${ruled ? 'every one ruled' : 'a rule missing'}`);
+    }
+
+    // ── full screen, on every static slide ──────────────────────────────
+    {
+      const noHover = matchMedia('(hover: none)').matches;
+      const btns = blocks.map((b) => b.s.fullBtn);
+      const op = (b) => parseFloat(getComputedStyle(b).opacity);
+      const missing = blocks.filter((b) => !b.s.fullBtn).map((b) => b.title);
+      // nobody's pointer is on a slide under the harness, so each reads as it does at rest
+      const rest = btns.filter(Boolean).map(op);
+      const target = blocks.find((b) => b.s.spec.name === 'stand-ins').s;
+      target.fullBtn.focus({ preventScroll: true });
+      await frames(10);   // past the 140 ms fade
+      const focused = op(target.fullBtn), focusedPe = getComputedStyle(target.fullBtn).pointerEvents;
+      target.fullBtn.blur();
+      d.assert('SLIDES: every static slide has its ⛶, hidden at rest and shown when the slide holds focus',
+        missing.length === 0 && btns.length >= 20 && rest.every((o) => o === (noHover ? 1 : 0)) && focused === 1 && focusedPe === 'auto'
+          && btns.every((b) => b.textContent.includes('⛶') && b.classList.contains('ico')),
+        `${btns.length} slides${missing.length ? `, missing on ${missing.join(', ')}` : ''}, at rest ${[...new Set(rest)].join('/')} opacity`
+        + `${noHover ? ' (a screen with no hover shows it always)' : ''}, focused ${focused} and ${focusedPe}`);
+
+      const was = target.el.getBoundingClientRect();
+      const say = target.parts.say;
+      target.fullBtn.click();
+      await frames(10);
+      const fr = target.frame, fcs = getComputedStyle(fr), r = target.el.getBoundingClientRect(), scs = getComputedStyle(target.el);
+      const vw = fr.clientWidth, vh = fr.clientHeight;
+      // the screen's edge is the border: the slide fits the screen, no edge drawn
+      const wantW = Math.min(vw, vh * 16 / 9);
+      const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim();
+      const probe = document.createElement('div'); probe.style.background = card; document.body.append(probe);
+      const cardRgb = getComputedStyle(probe).backgroundColor; probe.remove();
+      const sayPx = parseFloat(getComputedStyle(say).fontSize), sayWant = stepOf(4).size / 100 * target.el.clientHeight;
+      const rootR = getComputedStyle(document.documentElement).getPropertyValue('--r').trim();
+      const centred = tol(r.left + r.width / 2, fr.getBoundingClientRect().left + vw / 2, 1) && tol(r.top + r.height / 2, fr.getBoundingClientRect().top + vh / 2, 1);
+      d.assert('SLIDES: the ⛶ fills the screen with the slide’s ground, the slide 16:9 and centred with no edge of its own, type at its step',
+        target.isFull() && vw >= innerWidth - 1 && tol(r.width, wantW, 1.5) && tol(r.height, r.width * 9 / 16, 1.5) && centred
+          && fcs.backgroundColor === cardRgb && parseFloat(scs.borderTopWidth) === 0
+          && tol(sayPx, sayWant, 0.5),
+        `${target.isFull() ? 'full' : 'NOT full'} on a ${vw}x${vh} screen, the slide ${r.width.toFixed(1)}x${r.height.toFixed(1)} ${centred ? 'centred' : 'OFF CENTRE'}`
+        + `ground ${fcs.backgroundColor} against the card ${cardRgb}, edge ${scs.borderTopWidth} radius ${scs.borderTopLeftRadius} against --r ${rootR}, `
+        + `headline ${sayPx.toFixed(2)} px against ${sayWant.toFixed(2)} (step 4 of ${target.el.clientHeight} px)`);
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      await frames(6);
+      const back = target.el.getBoundingClientRect();
+      d.assert('SLIDES: Escape gives the screen back and the slide its place in the block',
+        !target.isFull() && tol(back.width, was.width, 0.5) && tol(back.height, was.height, 0.5)
+          && !document.documentElement.classList.contains('pos-faux-host'),
+        `${target.isFull() ? 'STILL full' : 'out'}, ${back.width.toFixed(1)}x${back.height.toFixed(1)} against ${was.width.toFixed(1)}x${was.height.toFixed(1)} before`);
+    }
+
+    // ── the diagram's lines on a slide ───────────────────────────────────
+    {
+      const dg = C.diagram;
+      const sl = dg.subject().closest('.sl');
+      const edge = parseFloat(getComputedStyle(sl).getPropertyValue('--sl-dg-edge'));
+      const link = parseFloat(getComputedStyle(sl).getPropertyValue('--sl-dg-link'));
+      const air = parseFloat(getComputedStyle(sl).getPropertyValue('--sl-dg-air'));
+      const boxesEls = [...dg.subject().querySelectorAll('.pos-dg-box')];
+      const links = [...dg.subject().querySelectorAll('.pos-dg-link')];
+      const wrongBox = boxesEls.filter((b) => parseFloat(getComputedStyle(b).strokeWidth) !== edge);
+      const wrongLink = links.filter((l) => parseFloat(getComputedStyle(l).strokeWidth) !== link);
+      const hued = boxesEls.filter((b) => getComputedStyle(b).stroke !== getComputedStyle(boxesEls[0]).stroke).length;
+      // the clearance between a name and the inside of its box's edge, in the
+      // diagram's own logical px: the screen distance over the fit's scale
+      const fitIn = dg.subject().closest('.sl-fit-in');
+      const k = parseFloat(fitIn.style.getPropertyValue('--fit-k')) || 1;
+      const clear = [...dg.subject().querySelectorAll('.pos-dg-n')].map((g) => {
+        const box = g.querySelector('.pos-dg-box'), lab = g.querySelector('.pos-dg-lab');
+        if (!box || !lab) return Infinity;
+        const b = box.getBoundingClientRect(), t = lab.getBoundingClientRect();
+        const inner = edge / 2 * k;
+        return Math.min(t.left - (b.left + inner), t.top - (b.top + inner), (b.right - inner) - t.right) / k;
+      }).filter(Number.isFinite);
+      const least = Math.min(...clear);
+      d.assert('SLIDES: a diagram on a slide draws its edges and arrows at the slide width and keeps the declared air inside every box',
+        edge === 1.5 && link === 1.5 && boxesEls.length >= 6 && links.length >= 2 && !wrongBox.length && !wrongLink.length
+          && hued >= 1 && clear.length >= 6 && least >= air,
+        `${boxesEls.length} edges at ${edge} px (${wrongBox.length} not), ${links.length} arrows at ${link} px (${wrongLink.length} not), `
+        + `${hued} edges keep a hue of their own, the tightest name ${least.toFixed(1)} logical px inside its edge against ${air}`);
+    }
+
+    // ── the time work on a slide: a strip, a bar, and FAU ────────────────
+    {
+      const T = C.timeline;
+      const cv = T.view.el;
+      const ink = () => countInk(cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data);
+      const p0 = T.view.strip.state.pos, d0 = T.deck.position();
+      await nap(400);
+      await frames(2);
+      const p1 = T.view.strip.state.pos, d1 = T.deck.position();
+      const lit = ink();
+      // a playhead that wrapped in the wait is still a playhead that moved
+      const moved = T.deck.playing() && (p1 > p0 + 100 || p1 < p0 - TL_SPAN / 2) && d1 !== d0;
+      d.assert('SLIDES: the strip on a slide draws ink and its playhead runs while the tab is open',
+        lit > 0 && moved,
+        `${lit} lit samples, the playhead ${p0.toFixed(0)} -> ${p1.toFixed(0)} ms over 0.4 s, the deck ${T.deck.playing() ? 'playing' : 'STOPPED'}`);
+      // every mark the playhead has passed and that has landed takes a band; the rest are grey
+      const pos = T.deck.position();
+      const lanes = T.view.strip.lanes();
+      let landed = 0, greyAhead = 0, ahead = 0, wrong = 0;
+      const bands = new Set();
+      for (const L of lanes) {
+        for (const r of T.items) {
+          const c = L.colorOfRow(r, r.at <= pos), m = T.late[L.id](r);
+          if (r.at > pos) { ahead++; if (c === T.NOT_YET) greyAhead++; else wrong++; continue; }
+          if (m === undefined) { if (c !== T.NOT_YET) wrong++; continue; }
+          landed++; bands.add(c);
+          if (c === T.NOT_YET) wrong++;
+        }
+      }
+      const cs = getComputedStyle(cv), slotH = T.slot.clientHeight;
+      const lanesH = lanes.reduce((a, L) => a + L.height, 0);
+      d.assert('SLIDES: the strip’s marks are grey until they land and take the colour of how late they landed, its lanes sharing the slot',
+        lanes.length === 3 && landed >= 3 && wrong === 0 && greyAhead === ahead
+          && tol(cv.getBoundingClientRect().width, T.slot.clientWidth, 1) && cv.getBoundingClientRect().height <= slotH + 0.5 && lanesH > slotH * 0.6,
+        `${landed} landed in ${bands.size} colour(s), ${greyAhead} of ${ahead} ahead grey, ${wrong} wrong; `
+        + `the canvas ${cv.getBoundingClientRect().width.toFixed(0)}x${parseFloat(cs.height).toFixed(0)} in a ${T.slot.clientWidth}x${slotH} slot, lanes ${lanesH} px`);
+    }
+    {
+      const B = C.bar;
+      await assertBar(d.assert, B.bar, { name: 'on a slide' });
+      const pub = window.__demo?.transport;
+      const pubWas = pub?.position;
+      B.bar.api.el.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true, cancelable: true }));
+      await nap(DRILL.keyMs);
+      const want = B.bar.api.range[0] + 0.2 * (B.bar.api.range[1] - B.bar.api.range[0]);
+      const pubNow = pub?.position;
+      // ⚠️ NO PUBLISHED BAR ON THIS PAGE, so what is graded is that the key
+      // moves the slide's bar and the bar still does not claim the playhead.
+      d.assert('SLIDES: a key aimed at the slide’s bar moves it and it does not claim the page’s playhead',
+        tol(B.bar.api.position, want, 1) && !pub && !window.__demo?.transport,
+        `the slide's bar at ${B.bar.api.position.toFixed(0)} against ${want.toFixed(0)}, the published bar ${pubWas?.toFixed(0)} -> ${pubNow?.toFixed(0)}`);
+    }
+    {
+      // full screen: the strip takes the slide's width and the bar is pressed through its scale
+      const tl = blocks.find((b) => b.s.spec.name === 'timeline').s, bs = blocks.find((b) => b.s.spec.name === 'bar').s;
+      const T = C.timeline, B = C.bar;
+      const w0 = T.view.el.getBoundingClientRect().width;
+      tl.fullBtn.click();
+      await frames(10);
+      const w1 = T.view.el.getBoundingClientRect().width, s1 = T.slot.getBoundingClientRect().width;
+      const lanes1 = T.view.strip.lanes().reduce((a, L) => a + L.height, 0), slotH1 = T.slot.clientHeight;
+      const full1 = tl.isFull();
+      await tl.full(false);
+      await frames(6);
+      bs.fullBtn.click();
+      await frames(10);
+      const k = B.fb.k(), full2 = bs.isFull();
+      const tg = B.bar.api.el.querySelector('.tbar-toggle');
+      const at0 = B.bar.api.position;
+      tg.click();
+      await nap(350);
+      const played = B.bar.api.playing && B.bar.api.position > at0;
+      tg.click();
+      await bs.full(false);
+      await frames(6);
+      d.assert('SLIDES: in full screen the strip spans the slide and splits its height, and the bar’s own button plays it',
+        full1 && w1 > w0 + 50 && tol(w1, s1, 1) && lanes1 > slotH1 * 0.6 && full2 && k > 1 && played && !B.bar.api.playing,
+        `the strip ${w0.toFixed(0)} -> ${w1.toFixed(0)} px in a ${s1.toFixed(0)} px slot with ${lanes1} of ${slotH1} px in lanes; `
+        + `the bar drawn at ${k.toFixed(2)}x ${played ? 'played' : 'DID NOT PLAY'} from its toggle and stopped again`);
+    }
+    {
+      const F = C.fau;
+      const has = !!F.panel.el.contains(F.code.el) && !!F.panel.el.contains(F.knobs.el) && F.knobs.names().length === 2
+        && !!F.panel.el.contains(F.keys.el) && /FAU/.test(F.panel.el.querySelector('.panel-plate')?.textContent || '');
+      const row = F.keys.el.querySelector('.keys');
+      const col = F.column.getBoundingClientRect();
+      const keysWide = row.scrollWidth * F.fb.k();
+      const sl = F.column.closest('.sl');
+      const inn = sl.querySelector('.sl-in');
+      const spill = inn.scrollWidth > inn.clientWidth + 1 || inn.scrollHeight > inn.clientHeight + 1;
+      const pr = F.panel.el.getBoundingClientRect();
+      const inCol = pr.left >= col.left - 1 && pr.right <= col.right + 1 && pr.top >= col.top - 1 && pr.bottom <= col.bottom + 1;
+      d.assert('SLIDES: FAU on a slide has its program, two knobs, keys and FAU plate, the keys wider than the column and nothing else past it',
+        has && keysWide > col.width && row.scrollWidth > row.clientWidth && !spill && inCol,
+        `${has ? 'all four parts' : 'a part MISSING'}, keys ${keysWide.toFixed(0)} px of content in a ${col.width.toFixed(0)} px column, `
+        + `scrolling ${row.scrollWidth} in ${row.clientWidth} logical px, the panel ${inCol ? 'inside' : 'OUTSIDE'} the column${spill ? ', the slide OVERFLOWS' : ''}`);
+      // a pointer press on the first white key, which has to be on screen for the hit test
+      const scrollWas = scrollY;
+      sl.scrollIntoView({ block: 'center' });
+      await frames(2);
+      const key = row.querySelector('.k:not(.sharp)') || row.querySelector('.k');
+      const kr = key.getBoundingClientRect();
+      const x = kr.left + kr.width / 2, y = kr.bottom - kr.height * 0.2;
+      const p0 = F.presses();
+      row.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, bubbles: true, pointerId: 31, pointerType: 'mouse', button: 0 }));
+      const down = key.classList.contains('down');
+      row.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, bubbles: true, pointerId: 31, pointerType: 'mouse', button: 0 }));
+      const up = !key.classList.contains('down');
+      scrollTo(0, scrollWas);
+      d.assert('SLIDES: a pointer press on a FAU key lights it and letting go puts it out',
+        down && up && F.presses() === p0 + 1,
+        `lit ${down}, out after ${up}, ${F.presses() - p0} press(es) heard`);
+    }
+
+    {
+      // TOM on a slide: the split, the words it may carry, the clock, the spill
+      const G = C.grid;
+      const sl = G.column.closest('.sl');
+      const slot = G.panel.el.closest('.sl-slot');
+      const slr = sl.getBoundingClientRect(), str = slot?.getBoundingClientRect();
+      const onDark = !!str && (str.left + str.right) / 2 > (slr.left + slr.right) / 2;
+      d.assert('SLIDES: the TOM slide is a split with the instrument on the slot side, the darker half',
+        sl.dataset.layout === 'split' && sl.dataset.side === 'right' && !!slot && onDark
+          && G.panel.el.contains(G.grid.el) && G.panel.el.contains(G.bar.el),
+        `${sl.dataset.layout} on the ${sl.dataset.side}, the panel ${slot ? 'in the slot' : 'NOT in a slot'}, `
+        + `the slot ${onDark ? 'on the darker half' : 'on the WORDS half'}`);
+      // every text node with a letter or a digit in it, outside the plate
+      const plate = G.panel.el.querySelector('.panel-plate');
+      const w = document.createTreeWalker(G.panel.el, NodeFilter.SHOW_TEXT);
+      const words = [];
+      let n;
+      while ((n = w.nextNode())) {
+        if (!/[\p{L}\p{N}]/u.test(n.data)) continue;
+        if (plate && plate.contains(n)) continue;
+        words.push(n.data.trim());
+      }
+      const plateText = (plate?.textContent || '').trim();
+      d.assert('SLIDES: the TOM instrument carries no text labels, only its plate',
+        words.length === 0 && plateText === 'TOM' && G.grid.labels.length === 0
+          && G.grid.ticks.every((t) => t.textContent === ''),
+        `${words.length} text node(s) outside the plate${words.length ? `: ${words.slice(0, 4).join(', ')}` : ''}, `
+        + `the plate reads ${JSON.stringify(plateText)}, ${G.grid.labels.length} row label(s)`);
+      const s0 = G.steps(), at0 = G.grid.step();
+      await nap(400);
+      d.assert('SLIDES: the TOM grid walks its pattern while the tab is open, the toggle saying so',
+        G.steps() > s0 && G.grid.clock.playing() && G.deck.playing() && G.grid.count() > 0,
+        `${G.steps() - s0} steps in 0.4 s from step ${at0} at ${G.grid.clock.bpm()} bpm, `
+        + `${G.grid.count()} pads lit, the bar's deck ${G.deck.playing() ? 'playing' : 'STOPPED'}`);
+      {
+        // 32 steps, two bars, and no tempo arrows in the bar
+        const g = G.grid, rows = g.pads;
+        const cell = parseFloat(g.el.style.getPropertyValue('--pg-cell'));
+        const glyphs = [...G.bar.el.querySelectorAll('button')].filter((b) => /[‹›]/.test(b.textContent));
+        d.assert('SLIDES: the TOM grid is 32 steps on every row at a drawable pad size, and its bar carries no tempo arrows',
+          g.steps === 32 && rows.length === 6 && rows.every((r) => r.length === 32)
+            && !G.bar.el.querySelector('.step') && glyphs.length === 0 && cell >= 18,
+          `${g.steps} steps, ${rows.length} rows of ${[...new Set(rows.map((r) => r.length))].join('/')}, `
+          + `pads ${cell} logical px, `
+          + `${G.bar.el.querySelectorAll('.step').length} stepper(s) and ${glyphs.length} arrow button(s) in the bar`);
+      }
+      {
+        // drawable: a press toggles, a second press toggles back, a drag paints, a body key reaches nothing
+        const g = G.grid, saved = g.pattern();
+        const fire = (c, type) => c.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, pointerId: 41, pointerType: 'mouse', button: 0 }));
+        const up = () => dispatchEvent(new PointerEvent('pointerup', { pointerId: 41, pointerType: 'mouse', button: 0 }));
+        const pad = g.pads[3][1];                         // open hat, step 2: dark in the pattern
+        const was = g.get(3, 1);
+        fire(pad, 'pointerdown'); up();
+        const onAfter = g.get(3, 1);
+        fire(pad, 'pointerdown'); up();
+        const offAfter = g.get(3, 1);
+        d.assert('SLIDES: a pointer press on a TOM pad lights it and a second press puts it out',
+          g.readOnly === false && pad.tagName === 'BUTTON' && !was && onAfter && !offAfter,
+          `${pad.tagName.toLowerCase()} pad, ${was ? 'lit' : 'dark'} before, ${onAfter ? 'lit' : 'DARK'} after one press, `
+          + `${offAfter ? 'STILL LIT' : 'dark'} after the second`);
+        // a drag along the clap row from a dark pad paints, then one from a lit pad erases
+        const row = g.pads[4], run = [0, 1, 2, 3, 4, 5];
+        fire(row[run[0]], 'pointerdown');
+        for (const s of run.slice(1)) fire(row[s], 'pointerover');
+        up();
+        const painted = run.filter((s) => g.get(4, s)).length;
+        fire(row[run[0]], 'pointerdown');
+        for (const s of run.slice(1)) fire(row[s], 'pointerover');
+        up();
+        const erased = run.filter((s) => !g.get(4, s)).length;
+        // a hover after the drag ended must paint nothing
+        fire(row[7], 'pointerover');
+        const stray = g.get(4, 7);
+        d.assert('SLIDES: a drag across a TOM row paints every pad it crosses, and one starting on a lit pad erases them',
+          painted === run.length && erased === run.length && !stray,
+          `${painted} of ${run.length} lit by the first drag, ${erased} of ${run.length} dark after the second, `
+          + `a hover after letting go ${stray ? 'PAINTED' : 'painted nothing'}`);
+        // Enter on a focused pad toggles it, as the component does
+        const k = g.pads[5][0];
+        const kWas = g.get(5, 0);
+        k.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        const kNow = g.get(5, 0);
+        // Space, an arrow and Enter from the body reach neither the grid nor the bar
+        const before = JSON.stringify(g.pattern()), refused0 = G.refused();
+        for (const key of [' ', 'ArrowRight', 'Enter']) {
+          document.body.dispatchEvent(new KeyboardEvent('keydown', { key, code: key === ' ' ? 'Space' : key, bubbles: true, cancelable: true }));
+        }
+        const bodyQuiet = JSON.stringify(g.pattern()) === before && g.clock.playing() && G.deck.playing();
+        d.assert('SLIDES: Enter on a TOM pad toggles it, and Space, an arrow or Enter from the page reach neither the grid nor its bar',
+          kNow === !kWas && bodyQuiet,
+          `Enter turned the pad ${kNow ? 'on' : 'off'} from ${kWas ? 'on' : 'off'}, the body's keys left the pattern `
+          + `${bodyQuiet ? 'unchanged and the grid playing' : 'CHANGED or the grid STOPPED'}, `
+          + `${G.refused() - refused0} refused by the bar's gate`);
+        // put the pattern back the way the slide drew it
+        saved.forEach((r, ri) => r.forEach((v, si) => { if (g.get(ri, si) !== !!v) g.set(ri, si, !!v, 'quiet'); }));
+        const back = JSON.stringify(g.pattern()) === JSON.stringify(saved)
+          && G.pattern.every((r, ri) => r.every((st) => g.get(ri, st)));
+        d.assert('SLIDES: the TOM pattern is put back after the drawing checks',
+          back, back ? `${g.count()} pads lit, as the slide drew them` : 'the pattern DIFFERS from the one the slide drew');
+      }
+      const inn = sl.querySelector('.sl-in');
+      const spill = inn.scrollWidth > inn.clientWidth + 1 || inn.scrollHeight > inn.clientHeight + 1;
+      const col = G.column.getBoundingClientRect(), pr = G.panel.el.getBoundingClientRect();
+      const inCol = pr.left >= col.left - 1 && pr.right <= col.right + 1 && pr.top >= col.top - 1 && pr.bottom <= col.bottom + 1;
+      const strip = G.kase.strip;
+      const over = strip.scrollWidth > strip.clientWidth + 1;
+      const scrolls = /auto|scroll/.test(getComputedStyle(strip).overflowX);
+      d.assert('SLIDES: the TOM panel stays inside its column, and the steps only ever spill into their own scroll',
+        !spill && inCol && (!over || scrolls),
+        `the panel ${inCol ? 'inside' : 'OUTSIDE'} a ${col.width.toFixed(0)} px column at ${G.fb.k().toFixed(2)}x, `
+        + `steps ${strip.scrollWidth} in ${strip.clientWidth} logical px (${over ? (scrolls ? 'scrolling' : 'SPILLING') : 'fit'})`
+        + `${spill ? ', the slide OVERFLOWS' : ''}`);
+    }
+
+    // ── nothing fetched ──────────────────────────────────────────────────
+    {
+      const after = performance.getEntriesByType('resource');
+      // ⚠️ NOT THE SHELL'S OWN LOG. On 127.0.0.1 every `d.log` line is POSTed
+      // to the dev server's `/_log` (shell.mjs), which is the page talking to
+      // the desk and not the tab opening anything; MEASURED as the one request
+      // in the first run. Anything else counts.
+      // ⚠️ AND ONE FILE IS ALLOWED, BY NAME, SINCE 2026-10-05: the router's
+      // screen code for the OLED slide, asked for once on the tab press.
+      const WASM = '/resources/pico/oled-ui.wasm';
+      const during = after.slice(resBefore).map((e) => e.name)
+        .filter((n) => !(new URL(n).origin === location.origin && new URL(n).pathname === '/_log'));
+      // ⚠️ OVER THE WHOLE VISIT, not only the checks: the visit is what opens
+      // the part here, so the one request was made before they began.
+      const wasm = after.map((e) => e.name).filter((n) => new URL(n).origin === location.origin && new URL(n).pathname === WASM);
+      // ⚠️ AND A FONT OF THIS ORIGIN'S IS NOT COUNTED HERE: on this page the
+      // slides are the first thing set in the face and in the accidentals, so
+      // a font file can arrive while the checks run, where in `/kit/` an
+      // earlier part had already asked for it. The face is graded below.
+      const other = during.filter((n) => !wasm.includes(n)
+        && !(new URL(n).origin === location.origin && /^\/shell\/vendor\/[^/]+\.woff2$/.test(new URL(n).pathname)));
+      const faces = after.filter((e) => /\/shell\/vendor\/jetbrains-mono/.test(e.name));
+      const foreign = faces.filter((e) => new URL(e.name).origin !== location.origin);
+      d.assert(`SLIDES: the visit and the grading fetched exactly one file, ${WASM} from this origin, and the face came from this origin`,
+        // at most three face files: Latin 400 and 600, and the Greek 600 that
+        // BRAND's β loaded until the logo moved to /brand/ on 2026-10-06
+        wasm.length === 1 && other.length === 0 && new Set(faces.map((e) => e.name)).size <= 3 && foreign.length === 0,
+        `${wasm.length} request(s) for the screen code, ${other.length} other${other.length ? `: ${other.slice(0, 3).join(', ')}` : ''}, `
+        + `the face ${faces.length} file(s), ${foreign.length} from another host`);
+    }
+
+    // the slide's bar is left PLAYING as the tab closes, so the close has something to stop
+    C.bar.bar.api.el.querySelector('.tbar-toggle').click();
+    // ⚠️ ON ITS OWN PAGE WHAT CLOSES THE PART IS THE PAGE BEING HIDDEN, which
+    // a page cannot do to itself, so the close is `slidesClose()`, the call
+    // the `visibilitychange` listener makes, and the listener is read.
+    slidesClose();
+    const logsAt = [C.liveLog.lines(), C.liveTable.log.count()];
+    await nap(600);
+    const logsStill = C.liveLog.lines() === logsAt[0] && C.liveTable.log.count() === logsAt[1]
+      && !C.liveLog.running() && !C.liveTable.running();
+    d.assert('SLIDES: closing the part stops everything it started, the live logs included',
+      !slideKit.open && C.video.video.paused && !C.grid.grid.clock.playing() && !C.grid.deck.playing() && logsStill,
+      `open ${slideKit.open}, the video ${C.video.video.paused ? 'paused' : 'playing'}, `
+      + `the logs ${logsStill ? 'still' : 'STILL WRITING'} at ${logsAt.join(' and ')} over 0.6 s`);
+    {
+      const G = C.grid, s0 = G.steps();
+      await nap(300);
+      d.assert('SLIDES: closing the part stops the TOM grid on its first column and it stays there',
+        G.steps() === s0 && G.grid.step() === 0 && !G.grid.clock.playing() && !G.deck.playing(),
+        `${G.steps() - s0} steps in 0.3 s after closing, the head at step ${G.grid.step()}`);
+    }
+    {
+      const T = C.timeline, B = C.bar;
+      const at = T.deck.position();
+      await nap(300);
+      d.assert('SLIDES: closing the part stops the strip’s deck, its timer and the slide’s bar',
+        !T.deck.playing() && T.deck.position() === at && !T.chainRunning() && !B.deck.playing(),
+        `the strip's deck ${T.deck.playing() ? 'PLAYING' : 'stopped'} at ${at.toFixed(0)}, its timer ${T.chainRunning() ? 'ARMED' : 'off'}, `
+        + `the bar's deck ${B.deck.playing() ? 'PLAYING' : 'stopped'}`);
+    }
+  }
+</script>

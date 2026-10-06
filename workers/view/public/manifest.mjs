@@ -910,7 +910,11 @@ export const DEMOS = [
   // fixed 7.4 s, because it builds and grades every specimen before ready and
   // its measuring window forbids deferring any of them. Re-measure before
   // raising this again; a page past 12 s has a build problem, not a budget one.
-  { name: 'kit', group: 'kit', act: 0, bootMs: 12000, created: '2026-09-12', unlisted: true, // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
+  // ✅ AND IT WENT, 2026-10-06, WITH THE PAGE IT WAS FOR (step 4 of
+  // plans/plan-kit-split.md). `/kit/` is the forwarder now: an old `#block`
+  // address goes to the part page holding the block, and anything else reads
+  // a list of the parts. The monolith moved with `git mv` to `/kit/slides/`.
+  { name: 'kit', group: 'kit', act: 0, created: '2026-09-12', unlisted: true, // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
     // double duty: hide this from the index, and skip it in `verify.mjs`, which
     // filters on the same field. So the one page whose entire job is to make
     // component drift visible was the one page the suite could not look at, and
@@ -919,7 +923,7 @@ export const DEMOS = [
     // harness grades like any other.
     built: true, page: '/kit/',
     src: 'demo/kit/index.html',
-    one: 'every reusable control in the shell, on one page, wired to nothing',
+    one: 'where every part of the kit lives now, and a way on from an old link to one of its blocks',
     tags: ['shell', 'no network'] },
 
   // 🔴 THE KIT, ONE PAGE PER PART, 2026-10-06 (plans/plan-kit-split.md). Each
@@ -930,31 +934,37 @@ export const DEMOS = [
   // ✅ LISTED 2026-10-06 (step 3 of the plan, asked as *"go"*); the `kit` row
   // below went unlisted the same moment, so the front page shows seven cards
   // and `/kit/` stays reachable at its address until SLIDES moves (step 4).
-  // SLIDES has no row: it is still the part being edited inside `/kit/` and
-  // moves last, with the owner (step 4).
+  // ✅ AND SLIDES JOINED THEM THE SAME DAY (step 4): `kit/slides` is the old
+  // `/kit/` file itself, moved with `git mv` and cut down to that part.
+  // 🔴 THE CARDS SAY THE PART ALONE, ASKED 2026-10-06: *"no need to "kit/..." in
+  // titles"*. `title` is the part and `name` stays `kit/<part>`, which is the
+  // address and what `verify.mjs` checks the page against.
   // ⚠️ NO `bootMs` ON ANY OF THEM. The monolith needed 12 s because two of
   // INPUT's timed checks and LAYOUT's tab page pass ran before `ready`; on
   // their own pages INPUT's run after it and LAYOUT's fits the default wait.
-  { name: 'kit/input', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/input', title: 'input', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'buttons, sliders, knobs, keys and fields that a visitor presses, drags or types into',
     tags: ['shell', 'no network'] },
-  { name: 'kit/status', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/status', title: 'status', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'readout cells, logs, tables and badges that say how a page is doing',
     tags: ['shell', 'no network'] },
-  { name: 'kit/timeline', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/timeline', title: 'timeline', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'transport bars, strips and video panels for watching something play out over time',
     tags: ['shell', 'no network'] },
-  { name: 'kit/layout', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/layout', title: 'layout', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'how blocks stack, sit in tabs and fall into cards from a wide screen down to a phone',
     tags: ['shell', 'no network'] },
-  { name: 'kit/devices', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/devices', title: 'devices', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'instrument panels and the knobs, pads, faders and displays they are built from',
     tags: ['shell', 'no network'] },
-  { name: 'kit/hardware', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/hardware', title: 'hardware', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'the Pico router’s small screen and four keys, drawn by its real firmware running in the browser',
     tags: ['shell', 'no network'] },
-  { name: 'kit/diagram', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/diagram', title: 'diagram', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'boxes and arrows drawn from plain data, down to a label that will not fit',
+    tags: ['shell', 'no network'] },
+  { name: 'kit/slides', title: 'slides', group: 'kit', act: 0, created: '2026-10-06', built: true,
+    one: 'slides made from plain data at six type sizes, with live parts of this site running on them',
     tags: ['shell', 'no network'] },
 
   // 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
@@ -1188,12 +1198,16 @@ export function shortDate(iso) {
  * some are phrases. Same rule as the diagram labels in CLAUDE.md.
  */
 export const GROUPS = new Map([
-  // The kit first, asked 2026-10-04: *"move kit to first group in index page"*.
-  ['kit', 'kit'],
   // Decks, asked 2026-10-06: *"add grpup to frontpage: Slides (2 col)"* and
   // *"use 2col slidedck here. no separate page"*. It holds no demo rows: the
   // section is a holder that shell/decks.mjs fills with one player per deck.
+  // FIRST since the same day, on the owner's word: *"move slides above kit in
+  // index page"*.
   ['slides', 'slides'],
+  // The kit first, asked 2026-10-04: *"move kit to first group in index page"*.
+  // ⚠️ SECOND SINCE 2026-10-06: the slides group now precedes it, asked as
+  // *"move slides above kit in index page"*.
+  ['kit', 'kit'],
   /**
    * 🔴 `TH` IS FIRST, ASKED 2026-09-24: *"move headset group first in
    * index. rename to 'TH'"*, with *"move making to TH"* and *"move typist to
@@ -1399,6 +1413,9 @@ export function demoCardHTML(d) {
     // round: a card that says one thing while its address says another is two
     // names for one page. The hook stays for the case where a slug must not
     // move (an address somebody has written down) and the label must.
+    // ⚠️ OVERRULED FOR THE KIT, 2026-10-06, by the owner: *"no need to "kit/..."
+    // in titles"*. The eight `kit/<part>` rows carry `title: '<part>'`, so their
+    // cards read the part alone while the address keeps the `kit/` in it.
     title: d.title || d.name,
     desc: d.one || '',
     tags: d.tags || [],
