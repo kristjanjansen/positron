@@ -466,13 +466,25 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    ⚠️ NOT A NUDGE. A typed offset would be right at this font size and wrong at
    the next one; `symbol.mjs` in this same kit measures rather than nudging for
    the same reason. */
+/* 🔴 THE BRAND FACE ON EVERY PAGE'S TITLE AND SUBTITLE, asked 2026-10-06 as
+   *"use brand font for page titles and subtitles everywhere"*. The brand face
+   is the slide face, JetBrains Mono, the same vendored files `slide.css`
+   declares (`workers/view/build.mjs` lists them by name), under a family of
+   its own so its `swap` is not the slides' `block`: a title shows at once in
+   `--mono` and changes face when the file lands, where a slide waits for it.
+   Two files, about 21 KB each, from this origin, cached across pages. */
+@font-face { font-family: 'Brand JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap;
+  src: url('/shell/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Brand JetBrains Mono'; font-weight: 600; font-style: normal; font-display: swap;
+  src: url('/shell/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
+:root { --brand: 'Brand JetBrains Mono', var(--mono); }
 .pos-title { display: flex; align-items: center; gap: 10px; }
 .pos-name {
-  font: 600 17px/1.2 var(--mono); letter-spacing: .01em; margin: 0;
+  font: 600 17px/1.2 var(--brand); letter-spacing: .01em; margin: 0;
 }
 /* One look for the sentence that says what a page is and the one that says
    what a tab is (`.pos-tabs-about-t`, below), so the two cannot drift apart. */
-.pos-what, .pos-tabs-about-t { color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+.pos-what, .pos-tabs-about-t { color: var(--dim); font-family: var(--brand); font-size: 13.5px; max-width: 62ch; }
 .pos-what { margin: 6px 0 0; }
 
 /* how it works — one plain paragraph */
