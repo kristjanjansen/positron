@@ -82,6 +82,8 @@ const slug = bare.find((a) => !/^\d+$/.test(a));
 const widths = bare.filter((a) => /^\d+$/.test(a)).map(Number);
 const BASE = flag('base', process.env.DEMO_BASE || 'http://127.0.0.1:8890');
 const HASH = flag('hash', '');
+// --eval: an expression run in the page after the wait, e.g. stepping a deck
+const EVAL = flag('eval', '');
 // The page's query string, without the `?`. Kept out of the file name, so a
 // URL in it cannot turn into directories.
 const QUERY = flag('query', '');
@@ -90,7 +92,7 @@ const WAIT = Number(flag('wait', 2500));
 const OUT = flag('out', 'tmp/shots');
 
 if (!slug) {
-  console.error('usage: node demo/shot.mjs <slug> [width ...] [--base URL] [--query k=v] [--hash id] [--clip px] [--wait ms] [--out dir]');
+  console.error('usage: node demo/shot.mjs <slug> [width ...] [--base URL] [--query k=v] [--hash id] [--eval js] [--clip px] [--wait ms] [--out dir]');
   process.exit(2);
 }
 
@@ -177,6 +179,7 @@ for (const w of (widths.length ? widths : WIDTHS)) {
   const url = `${BASE}/${slug}/${QUERY ? `?${QUERY}` : ''}${HASH ? `#${HASH}` : ''}`;
   await S('Page.navigate', { url });
   await sleep(WAIT);
+  if (EVAL) { await S('Runtime.evaluate', { expression: EVAL, awaitPromise: true }); await sleep(400); }
   if (HASH) {
     // ⚠️ THE HASH AGAIN AFTER THE WAIT. A tabbed page writes the opening part's
     // id over the address on its first `go`, so a fragment naming a block is

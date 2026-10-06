@@ -44,6 +44,13 @@
   background: var(--card);
   border: var(--edge); border-radius: var(--r);
   font-family: 'Slide JetBrains Mono', var(--mono);
+  /* 🔴 THE SLIDE'S ONE UNIT, a hundredth of the height of a 16:9 slide this
+     wide. On a 16:9 slide that is `1cqh`, which is what every step, inset and
+     rule was written in. A slide that is TALLER than 16:9 (a narrow player,
+     below) pins it to the width instead, so the type stays the size it is on a
+     16:9 slide and the extra height goes to the slot. Substituted where it is
+     used, so `cqh` resolves against the slide there. */
+  --sl-u: 1cqh;
 }
 .sl[hidden] { display: none; }
 
@@ -180,9 +187,9 @@
    evidence is looked at and sits in the middle. */
 .sl-ev {
   flex: 1 1 auto; min-height: 0;
-  margin-top: 4cqh;
+  margin-top: calc(4 * var(--sl-u));
   display: flex; flex-direction: column; justify-content: center; align-items: center;
-  gap: 3cqh;
+  gap: calc(3 * var(--sl-u));
   text-align: center;
 }
 .sl-ev:first-child { margin-top: 0; }
@@ -194,23 +201,27 @@
 /* BODY TEXT IN THE SANS, 2026-10-06, *"use sans-serif for slide body text"*:
    a sentence is read, so it is set in the page's reading face; headlines,
    lines, numbers, tables and code keep the slide face. */
-.sl .sl-text { font-family: var(--sans); letter-spacing: 0; }
+/* AND EVERY OTHER LINE OF BODY, the same day, asked again on /kit/slides/ as
+   *"Use sans for slides body"*: a caption, a list and the line under a big
+   figure are read the same way a sentence is. A name in backticks inside any
+   of them stays in the slide face (`.sl-var`). */
+.sl .sl-text, .sl .sl-cap, .sl .sl-list, .sl .sl-under { font-family: var(--sans); letter-spacing: 0; }
 /* WORDS UNDER A HEADLINE START WHERE THE HEADLINE STARTS. Asked 2026-10-05,
    twice: *"HEADLINE OVER TEXT align texts to left"*, then on the marks slide
    *"align left the same"*. A sentence or a list is read, so it goes on the
    headline's left edge; a number, a stack, a table or a picture is looked at
    and stays centred. */
 .sl[data-layout="stack"] .sl-ev:has(> .sl-list, > .sl-text) { align-items: flex-start; text-align: left; }
-.sl-big + .sl-under { margin-top: -2cqh; }
+.sl-big + .sl-under { margin-top: calc(-2 * var(--sl-u)); }
 /* THE TITLE SLIDE: the talk's name top left at step 5, who and when on the
    bottom edge (`top` layout), the date a step under the speaker and held to
    it, because the two are one fact about the talk. */
-.sl[data-kind="title"] .sl-by + .sl-when { margin-top: -1.5cqh; }
+.sl[data-kind="title"] .sl-by + .sl-when { margin-top: calc(-1.5 * var(--sl-u)); }
 
 /* THE CAPTION, STEP 1, BOTTOM LEFT, EVERY SLIDE. The last child of the inset
    column, so its left and bottom edges ARE the inset; nothing is positioned
    and no number says where the corner is. */
-.sl-cap { flex: 0 0 auto; margin-top: 3cqh; align-self: stretch; text-align: left; color: var(--dim); }
+.sl-cap { flex: 0 0 auto; margin-top: calc(3 * var(--sl-u)); align-self: stretch; text-align: left; color: var(--dim); }
 
 /* MONO DOING WHAT ONLY MONO CAN: a table of lines padded with spaces, so a
    column is a character position. */
@@ -227,7 +238,7 @@
    other lines. when on fullsc scale all borders proportionally"*. The diagram's
    1.5 logical px edge prints at about 1.5 px on the kit's 386 px slide, so 0.4
    per cent of the slide's height is the same line; never under 1 px. */
-.sl { --sl-rule: max(1px, 0.4cqh); --sl-pad: 8cqh;
+.sl { --sl-rule: max(1px, calc(0.4 * var(--sl-u))); --sl-pad: calc(8 * var(--sl-u));
   /* SUBTLER, asked 2026-10-05 on the tabular log: *"subtler gradiend undert
      hable header and trans to bg color"*. It was a full fade over two lines,
      which read as a dark band under the header. One line now, from a third
@@ -534,3 +545,48 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .sl-radio .pos-choice { margin-block: auto; }
 .sl-radio-head { visibility: hidden; }
 .sl-radio[data-param] .sl-radio-lab { color: hsl(var(--param-hue) 70% 62%); }
+
+/* 🔴 A SPLIT STACKS IN FULL SCREEN ON A PHONE: columns on a desk, rows on a
+   phone held upright. Asked 2026-10-06 as *"On mobile use horiz layout for
+   vertical cols in desktop"*, then *"In mobile change layout in fullscreen"*
+   and *"Non when in nonfulkscreen"*: in the page the slide stays 16:9 with its
+   columns; full screen on an upright phone it fills the screen in rows. Two
+   columns in a 375 px slide put the FAU panel at a fifth of its size.
+   Decided by the player's own width AND the window's, so a phone held sideways
+   (wider than 560) keeps the 16:9 slide with its columns.
+   - The split slide fills the screen, and `--sl-u` stays a share of a 16:9
+     slide of the same width, so the type is the size it was in the page and
+     the extra height is room for the slot. Other slides keep their 16:9 box.
+   - The split is rows: the slot on top on the darker ground, which reaches the
+     slide's edges through the slot's own bleed of one inset, the words under
+     it one inset further down, the caption last. */
+.sl-player { container: sl-player / inline-size; }
+@media (max-width: 560px) { @container sl-player (max-width: 560px) {
+  .sl-player[data-full] .sl[data-layout="split"] {
+    width: 100cqw; height: 100cqh;
+    --sl-u: calc(100cqw * 9 / 1600);
+  }
+  .sl-player[data-full] .sl[data-layout="split"] .sl-in,
+  .sl-player[data-full] .sl[data-layout="split"][data-cols] .sl-in {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "slot" "words";
+    column-gap: 0; row-gap: var(--sl-pad);
+  }
+  .sl-player[data-full] .sl[data-layout="split"]::before { content: none; }
+  .sl-player[data-full] .sl[data-layout="split"] .sl-slot {
+    margin: calc(-1 * var(--sl-pad)) calc(-1 * var(--sl-pad)) 0;
+    padding: var(--sl-pad);
+    background: var(--bg);
+  }
+  /* the words end clear of the way out, `.pos-fsx`, 34 px square 12 px in
+     from the corner, with the row's 8 px gap beside it; the slide's own inset
+     is already part of that distance */
+  .sl-player[data-full] .sl[data-layout="split"] .sl-words {
+    justify-content: flex-start;
+    padding-inline-end: max(0px, calc(34px + 12px + 8px - var(--sl-pad)));
+  }
+  /* a caption is a row of its own only when there is one: a named empty row
+     still takes a row gap, which showed as an inset of air under the words */
+  .sl-player[data-full] .sl[data-layout="split"] .sl-cap { grid-area: auto / 1; }
+} }

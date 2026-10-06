@@ -141,7 +141,7 @@ export function stepCaption(n, scale = SCALE) {
  * container, so every step is a share of the slide it sits on.
  */
 export function scaleCss(sel = '.sl', scale = SCALE) {
-  const p = [`--sl-base: ${scale.base}`, `--sl-ratio: ${scale.ratio}`, '--sl-1: calc(var(--sl-base) * 1cqh)'];
+  const p = [`--sl-base: ${scale.base}`, `--sl-ratio: ${scale.ratio}`, '--sl-1: calc(var(--sl-base) * var(--sl-u, 1cqh))'];
   for (let n = 2; n <= scale.steps.length; n++) p.push(`--sl-${n}: calc(var(--sl-${n - 1}) * var(--sl-ratio))`);
   for (const s of scale.steps) p.push(`--sl-${s.n}-lh: ${s.lh}`, `--sl-${s.n}-ls: ${s.ls}em`);
   return `${sel} { ${p.join('; ')}; }`;
