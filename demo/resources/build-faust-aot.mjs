@@ -100,6 +100,12 @@ const PROGRAMS = [
 // ⚠️ `volume` is the same sine with its 0.5 on a slider whose default is 0.5,
 // so the render, which turns no slider, predicts the same figure; `pitch` is
 // that with its 440 on a slider whose default is 440, so the same again.
+/** RMS of a band limited saw of amplitude 0.5 at `f` through a two pole Butterworth low pass at `fc()`. */
+function harmonicRms(f, fc) {
+  let s = 0;
+  for (let n = 1; n * f < RENDER.sampleRate / 2; n++) s += (1 / (Math.PI * n)) ** 2 / 2 / (1 + (n * f / fc()) ** 4);
+  return Math.sqrt(s);
+}
 const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2, pitch: 0.5 / Math.SQRT2,
   // a sawtooth of amplitude 0.5 is 0.5 over root three; os.sawtooth is band
   // limited (no harmonics past Nyquist, so no aliasing), which takes about
@@ -107,7 +113,15 @@ const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2, pitch: 0.5 / 
   saw: 0.5 / Math.sqrt(3),
   // slide 6's `wave` starts at 0, the sine, so the render, which picks
   // nothing, predicts the sine's figure
-  wave: 0.5 / Math.SQRT2 };
+  wave: 0.5 / Math.SQRT2,
+  // the filter and the LFO, from the harmonic series rather than from the
+  // compiler: a saw of amplitude 0.5 is harmonics of amplitude 1/(pi n) up to
+  // Nyquist, and a two pole Butterworth low pass passes each at
+  // 1/sqrt(1 + (f/fc)^4). At fc 2000 that sums to 0.26637 (rendered 0.26628);
+  // the LFO's cutoff 2000 * (1 + 0.5 sin) averaged over its one 2 Hz cycle in
+  // the half second render, 0.26275 (rendered 0.26266)
+  filter: harmonicRms(440, () => 2000),
+  lfo: (() => { let s = 0; const N = 2000; for (let i = 0; i < N; i++) s += harmonicRms(440, () => 2000 * (1 + 0.5 * Math.sin(2 * Math.PI * i / N))) ** 2; return Math.sqrt(s / N); })() };
 const TOL = { saw: 0.005 };
 {
   const ids = PROGRAMS.map((p) => p.id);
