@@ -47,7 +47,12 @@
 // Marks in any string: `*x*` paints x in `--hi`, `[x|tech]` paints x in the
 // hue `diagram.mjs` gives that technology (`[Cloudflare|cloudflare]`), at the
 // strength the diagram names a box in, so a word and a box can be joined by
-// colour.
+// colour. `` `x` `` is a name out of a program (`volume`, `process`), set in
+// the slide's monospace face inside sans text, 2026-10-06 (*"var name is in
+// monospace inside text"*). It is uncoloured until `hueVars(root, hueOf)`
+// gives it the hue `hueOf` answers for that name, which is how a slide's
+// words take the colour its knobs and its code box already wear (*"in the
+// text use variable name with colorcoding"*): one book, never a picked colour.
 //
 // 🔴 A SLIDE SET IS PLAIN DATA. Every key above is a string, a number or an
 // array of them, except `slot`, which may be a function `(host) => ctl` or a
@@ -144,15 +149,16 @@ export function scaleCss(sel = '.sl', scale = SCALE) {
 
 // ── words ───────────────────────────────────────────────────────────────────
 /** The text with the marks taken out. */
-export const plain = (t) => String(t ?? '').replace(/\*/g, '').replace(/\[([^|\]]+)\|[^\]]+\]/g, '$1');
+export const plain = (t) => String(t ?? '').replace(/[*`]/g, '').replace(/\[([^|\]]+)\|[^\]]+\]/g, '$1');
 
-/** The marks in a string as runs: `{ text }`, `{ text, hi: true }`, `{ text, hue, tech }`. */
+/** The marks in a string as runs: `{ text }`, `{ text, hi: true }`, `{ text, hue, tech }`, `{ text, code: true }`. */
 export function parseMarks(t, hues = TECH_HUE) {
   const out = [];
-  for (const part of String(t ?? '').split(/(\*[^*]+\*|\[[^|\]]+\|[^\]]+\])/)) {
+  for (const part of String(t ?? '').split(/(\*[^*]+\*|\[[^|\]]+\|[^\]]+\]|`[^`]+`)/)) {
     if (!part) continue;
     let m;
     if (/^\*[^*]+\*$/.test(part)) out.push({ text: part.slice(1, -1), hi: true });
+    else if (/^`[^`]+`$/.test(part)) out.push({ text: part.slice(1, -1), code: true });
     else if ((m = part.match(/^\[([^|\]]+)\|([^\]]+)\]$/))) {
       const tech = m[2].trim().toLowerCase();
       // A name with no hue throws, so a typo cannot quietly print a plain word.
@@ -161,6 +167,31 @@ export function parseMarks(t, hues = TECH_HUE) {
     } else out.push({ text: part });
   }
   return out;
+}
+
+/**
+ * Colour every `` `name` `` under `root` by `hueOf(name)`: a finite number
+ * puts `data-hue` and `--param-hue` on it, the two the code box's
+ * `.pos-tk-pvar` and a knob already read, anything else takes both off, so a
+ * name with no knob stays in the slide's ink. Returns how many it coloured.
+ * Called again whenever the book changes, it never leaves a stale hue.
+ * @param {ParentNode} root
+ * @param {(name: string) => number|null} hueOf
+ */
+export function hueVars(root, hueOf = () => null) {
+  let n = 0;
+  for (const c of root.querySelectorAll('code.sl-var')) {
+    const hue = hueOf(c.dataset.var);
+    if (typeof hue === 'number' && Number.isFinite(hue)) {
+      c.dataset.hue = String(hue);
+      c.style.setProperty('--param-hue', String(hue));
+      n++;
+    } else {
+      delete c.dataset.hue;
+      c.style.removeProperty('--param-hue');
+    }
+  }
+  return n;
 }
 
 /**
@@ -381,6 +412,11 @@ export function rich(t) {
   const f = document.createDocumentFragment();
   for (const r of parseMarks(t)) {
     if (r.hi) f.append(el('span', 'sl-hi', r.text));
+    else if (r.code) {
+      const c = el('code', 'sl-var', r.text);
+      c.dataset.var = r.text;
+      f.append(c);
+    }
     else if (r.hue != null) {
       const sp = el('span', 'sl-hue', r.text);
       sp.dataset.tech = r.tech;

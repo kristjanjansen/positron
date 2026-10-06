@@ -8,9 +8,11 @@
 // whose artefact was compiled from a different text, so the program on the
 // slide and the program in the speaker cannot drift apart.
 //
-// 🔴 TWO PROGRAMS SINCE 2026-10-06, BOTH MONO. The second is the first with its
-// 0.5 turned into a slider (*"slode 3: make 0.5 into knob 0..1"*), which the
-// slide draws as a knob. What follows is about the first.
+// 🔴 THREE PROGRAMS SINCE 2026-10-06, ALL MONO, EACH ADDING ONE THING. The
+// second is the first with its 0.5 turned into a slider (*"slode 3: make 0.5
+// into knob 0..1"*), which the slide draws as a knob; the third is the second
+// with its 440 on a slider too (*"slide 4 is freq"*), two knobs in one row.
+// What follows is about the first.
 // 🔴 ONE PROGRAM UNTIL THEN, AND IT IS MONO WITH ITS NUMBERS TYPED IN.
 // Asked: *"rm fau slides c-f ... editable code, hardcoded params for minimal
 // sine and then fau nameplate and test tone button on right"*. The deck was an
@@ -54,6 +56,26 @@ process = os.osc(440) * 0.5;
 // 440 Hz, its volume on a knob
 volume = hslider("volume", 0.5, 0, 1, 0.01);
 process = os.osc(440) * volume;
+`,
+  },
+  {
+    id: 'pitch',
+    name: 'the pitch on a knob',
+    mono: true,
+    // the 440 as a slider beside the volume, asked 2026-10-06 as *"slide 4 is
+    // freq"*, and in this order: *"volume = hslider(...); freq = hslider(...);
+    // this order, progressing. add comments"*. So it is slide 3's program
+    // plus one line, the knob row reads volume then freq, and each slider
+    // line carries a comment short enough not to wrap in the panel.
+    // ⚠️ NO `[scale:log]`, although `param-knobs.mjs` honours it (warp
+    // `exp`): the line is the owner's, written linear, and it stays short
+    code: `import("stdfaust.lib"); // has os.osc
+
+// the volume knob from slide 3
+volume = hslider("volume", 0.5, 0, 1, 0.01);
+// new: the pitch on a knob, 440 Hz to start
+freq = hslider("freq", 440, 50, 2000, 1);
+process = os.osc(freq) * volume;
 `,
   },
 ];
