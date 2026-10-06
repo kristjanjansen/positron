@@ -100,7 +100,12 @@ const PROGRAMS = [
 // ⚠️ `volume` is the same sine with its 0.5 on a slider whose default is 0.5,
 // so the render, which turns no slider, predicts the same figure; `pitch` is
 // that with its 440 on a slider whose default is 440, so the same again.
-const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2, pitch: 0.5 / Math.SQRT2 };
+const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2, pitch: 0.5 / Math.SQRT2,
+  // a sawtooth of amplitude 0.5 is 0.5 over root three; os.sawtooth is band
+  // limited (no harmonics past Nyquist, so no aliasing), which takes about
+  // 1 per cent off: measured 0.28605 against 0.28868, hence its own tolerance
+  saw: 0.5 / Math.sqrt(3) };
+const TOL = { saw: 0.005 };
 {
   const ids = PROGRAMS.map((p) => p.id);
   const twice = ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -206,12 +211,12 @@ if (!CHECK) {
     const aot = await rmsOf(await fromFiles(b.p.id, { ...b.files, [MIXER]: mixer }));
     if (aot !== b.live) { console.error(`REFUSED: ${b.p.id} ahead of time RMS ${aot} is not the live ${b.live}`); process.exit(1); }
     if (!(b.live > 0.001)) { console.error(`REFUSED: ${b.p.id} rendered silent, RMS ${b.live}`); process.exit(1); }
-    if (b.p.id in EXPECT && Math.abs(b.live - EXPECT[b.p.id]) > 1e-3) { console.error(`REFUSED: ${b.p.id} RMS ${b.live}, its arithmetic says ${EXPECT[b.p.id]}`); process.exit(1); }
+    if (b.p.id in EXPECT && Math.abs(b.live - EXPECT[b.p.id]) > (TOL[b.p.id] ?? 1e-3)) { console.error(`REFUSED: ${b.p.id} RMS ${b.live}, its arithmetic says ${EXPECT[b.p.id]}`); process.exit(1); }
   }
   mkdirSync(OUT, { recursive: true });
   for (const [f, b] of Object.entries(all)) writeFileSync(join(OUT, f), b);
   const prov = {
-    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the three mono programs of the synths deck on the front page, a sine, the same sine with its volume on a slider, and that with its pitch on a slider too.',
+    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the three mono programs of the synths deck on the front page, a sine, the same sine with its volume on a slider, that with its pitch on a slider too, and the same with a sawtooth.',
     howToRemake: 'node demo/resources/build-faust-aot.mjs (and --check to compare without writing)',
     compiledOn: new Date().toISOString().slice(0, 10),
     compiler: {
@@ -265,7 +270,7 @@ for (const b of built) {
       /* NEGATIVE, FROM ARITHMETIC: see EXPECT. A program that rendered the
          wrong thing loudly enough would pass both comparisons above. */
       ok(`${id}: NEGATIVE, the RMS is the one its arithmetic predicts, not just the same on both paths`,
-        Math.abs(aot - EXPECT[id]) < 1e-3, `rendered ${aot}, predicted ${EXPECT[id]}`);
+        Math.abs(aot - EXPECT[id]) < (TOL[id] ?? 1e-3), `rendered ${aot}, predicted ${EXPECT[id]}`);
     } else {
       /* NEGATIVE: the instrument the RMS cannot see past. With no key down the
          same render must be silent, or the comparison above would pass two

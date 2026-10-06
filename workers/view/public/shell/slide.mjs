@@ -525,7 +525,7 @@ export function slideDiagram(spec, { w = 580 } = {}) {
       const resv = any ? gap + 2 * lh : 0;
       const k = Math.min(ow / w, Math.max(1, oh - resv) / ih);
       inner.style.setProperty('--fit-k', String(k));
-      inner.style.setProperty('--fit-x', `${(ow - wNow * k) / 2}px`);
+      inner.style.setProperty('--fit-x', `${(ow - w * k) / 2}px`);
       inner.style.setProperty('--fit-y', `${(oh - ih * k - resv) / 2}px`);
       if (!any) return;
       const ob = outer.getBoundingClientRect();

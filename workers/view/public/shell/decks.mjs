@@ -52,6 +52,8 @@ const WORDS = {
       + 'Turn it while the tone plays' },
   pitch: { text: '`freq` puts the 440 on a knob beside `volume`, from 50 to 2000 Hz. '
       + 'Turn it to 880 and the tone goes up an octave' },
+  saw: { text: '`os.sawtooth` puts a sawtooth where the sine was, brighter and buzzier. '
+      + 'Watch the scope change shape' },
 };
 const SYNTHS = [
   { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in *code*']],
