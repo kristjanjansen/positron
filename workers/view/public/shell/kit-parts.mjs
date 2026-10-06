@@ -18,8 +18,11 @@
 // the same day) from that page's own `section()` and `slideBlock()` calls, and
 // that page asserts it like every other.
 // ⚠️ AN ID IS THE TITLE, LOWER CASE, WITH EVERY RUN OF OTHER CHARACTERS A DASH,
-// which is `idFor` below and the same function the monolith used. `brand` is
-// not here: the logo left `/kit/` for a deck on the front page.
+// which is `idFor` below and the same function the monolith used.
+// ⚠️ `logo` IS THE NINTH PART, 2026-10-06 (*"add kit/logo page and use
+// individual slides from the brand slides"*): the logo left `/kit/`'s BRAND
+// tab for a `brand` deck on the front page, and came back as this part when
+// that deck was removed, one block per slide.
 
 export const KIT_PARTS = [
   { part: 'input', label: 'INPUT', ids: [
@@ -66,6 +69,10 @@ export const KIT_PARTS = [
     'video-on-a-slide', 'diagram-on-a-slide', 'step-grid-on-a-slide',
     'readout-on-a-slide', 'timeline-on-a-slide', 'transport-bar-on-a-slide',
     'fau-on-a-slide',
+  ] },
+  { part: 'logo', label: 'LOGO', ids: [
+    'stacked-logo', 'horizontal-logo', 'wordmark-in-fives', 'wordmark-in-threes',
+    'favicon', 'app-icon',
   ] },
 ];
 
