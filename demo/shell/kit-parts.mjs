@@ -9,13 +9,14 @@
 // ⚠️ IT IS A SECOND COPY OF WHAT THE PAGES BUILD, SO BOTH ENDS ASSERT IT. Every
 // part page compares the ids its `section()` calls produced against its row
 // here, in order (`checkPage()` in `kit-page.mjs`), so a block added to a page
-// without being added here goes red on the page that added it. The forwarder
-// reads it and asserts nothing, because it builds nothing.
+// without being added here goes red on the page that added it. The forwarder,
+// which is `demo/kit/index.html` since step 4 of the plan, reads it and grades
+// only the lookup, because it builds nothing.
 // ⚠️ THE ORDER IS THE TAB ORDER `/kit/` HAD, and the order inside a row is the
 // order of the blocks on that page, which is newest first.
-// ⚠️ THE `slides` ROW IS A SNAPSHOT TAKEN THE DAY OF THE SPLIT, while that part
-// was still being edited inside `demo/kit/index.html`. Re-derive it when SLIDES
-// moves (step 4 of the plan): it is the one row no page asserts yet.
+// ⚠️ THE `slides` ROW WAS RE-DERIVED WHEN SLIDES MOVED TO `/kit/slides/` (step 4,
+// the same day) from that page's own `section()` and `slideBlock()` calls, and
+// that page asserts it like every other.
 // ⚠️ AN ID IS THE TITLE, LOWER CASE, WITH EVERY RUN OF OTHER CHARACTERS A DASH,
 // which is `idFor` below and the same function the monolith used. `brand` is
 // not here: the logo left `/kit/` for a deck on the front page.

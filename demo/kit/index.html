@@ -14,11 +14,10 @@
   import { KIT_PARTS, whereIs } from '/shell/kit-parts.mjs';
 
   /**
-   * 🔴 THE NEXT `/kit/`, WRITTEN AND NOT YET IN USE, 2026-10-06. It replaces
-   * `demo/kit/index.html` in step 4 of plans/plan-kit-split.md, when the
-   * monolith becomes `demo/kit/slides/index.html` with `git mv` so the file the
-   * owner has been editing keeps its history. Until then `/kit/` is still the
-   * whole monolith and this file is a page nobody links to.
+   * 🔴 `/kit/` SINCE STEP 4 OF plans/plan-kit-split.md, 2026-10-06. It used to
+   * be every part of the kit on one page of eight tabs; that file moved with
+   * `git mv` to `demo/kit/slides/index.html`, so its history follows SLIDES,
+   * and every other part is a page of its own at `/kit/<part>/`.
    * ⚠️ WHAT IT DOES: an old address naming a block, `/kit/#keyboard`, replaces
    * itself with the part page holding that block, `/kit/input/#keyboard`; one
    * naming a part, `/kit/#hardware`, goes to `/kit/hardware/`; anything else
