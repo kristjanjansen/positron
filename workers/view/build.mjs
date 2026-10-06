@@ -472,21 +472,14 @@ const FILES = [
   ['demo/resources/faust/organ.effect.wasm', 'resources/faust/organ.effect.wasm'],
   ['demo/resources/faust/mixer32.wasm', 'resources/faust/mixer32.wasm'],
   ['demo/resources/faust/PROVENANCE.json', 'resources/faust/PROVENANCE.json'],
-  // ⚠️ AND THE FIVE STEPS OF THE FRONT PAGE'S `synths` DECK, 2026-10-06, from
-  // `demo/shell/synth-steps.mjs` by the same script, each fetched by
-  // `demo/shell/slide-synth.mjs` on the first key pressed on its slide. Only
-  // `echo` declares an effect, so it is the only step with an effect file.
-  ['demo/resources/faust/osc.json', 'resources/faust/osc.json'],
-  ['demo/resources/faust/osc.voice.wasm', 'resources/faust/osc.voice.wasm'],
-  ['demo/resources/faust/osc2.json', 'resources/faust/osc2.json'],
-  ['demo/resources/faust/osc2.voice.wasm', 'resources/faust/osc2.voice.wasm'],
-  ['demo/resources/faust/env.json', 'resources/faust/env.json'],
-  ['demo/resources/faust/env.voice.wasm', 'resources/faust/env.voice.wasm'],
-  ['demo/resources/faust/filter.json', 'resources/faust/filter.json'],
-  ['demo/resources/faust/filter.voice.wasm', 'resources/faust/filter.voice.wasm'],
-  ['demo/resources/faust/echo.json', 'resources/faust/echo.json'],
-  ['demo/resources/faust/echo.voice.wasm', 'resources/faust/echo.voice.wasm'],
-  ['demo/resources/faust/echo.effect.wasm', 'resources/faust/echo.effect.wasm'],
+  // ⚠️ AND THE MONO SINE OF THE FRONT PAGE'S `synths` DECK, 2026-10-06, from
+  // `demo/shell/synth-steps.mjs` by the same script, fetched by
+  // `demo/shell/slide-synth.mjs` on the first `Test tone` press of the
+  // unedited program. A mono program is one `.wasm` and no mixer. The four
+  // polyphonic steps that were listed here (osc2, env, filter, echo) and the
+  // first one (osc) left the deck the same day.
+  ['demo/resources/faust/sine.json', 'resources/faust/sine.json'],
+  ['demo/resources/faust/sine.wasm', 'resources/faust/sine.wasm'],
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //
@@ -1020,7 +1013,7 @@ function checkVendorUrls(copied) {
 /**
  * 🔴 EVERY AHEAD OF TIME PROGRAM MUST HAVE BEEN COMPILED FROM THE TEXT ITS PAGE
  * SHOWS, BY THE COMPILER THIS REPOSITORY VENDORS, WITH THE FLAGS IT USES: the
- * Organ `/fau/` shows, and since 2026-10-06 each step of the `synths` deck.
+ * Organ `/fau/` shows, and since 2026-10-06 the program of the `synths` deck.
  * `checkCompiledDefs()`'s twin, and for the same reason: a stale artefact
  * plays the old instrument and nothing anywhere says so.
  *
@@ -1052,7 +1045,7 @@ async function checkFaustAot() {
      `build-faust-aot.mjs` compiles, by the same `<file>#<id>` key. */
   const LISTS = { 'demo/fau/presets.mjs': PRESETS, 'demo/shell/synth-steps.mjs': SYNTH_STEPS };
   /* ⚠️ AND A PROGRAM THAT EXISTS AND WAS NEVER COMPILED IS STALE TOO: a step
-     added to the deck with no artefact would 404 on its first key. */
+     added to the deck with no artefact would 404 on its first press. */
   for (const s of SYNTH_STEPS) {
     if (!(`demo/shell/synth-steps.mjs#${s.id}` in (doc.sources || {}))) bad.push(`the deck step ${s.id} in demo/shell/synth-steps.mjs was never compiled`);
   }
