@@ -43,6 +43,18 @@
 // the owner, clear it and suspend the context the new owner is about to sound
 // in. `audio-test.mjs` carries that exact case as a negative control.
 //
+// 🔴 NO SUSPEND WHILE A RESUME IS IN FLIGHT. MEASURED 2026-10-06 in headless
+// Chrome, outside any positron page: `resume()` on a suspended context leaves
+// `state` reading `suspended` for about 1.5 to 3 ms, and a `suspend()` in that
+// window stops the device without changing `state`; the resume then lands and
+// the context reads `running` with `currentTime` frozen, 25 trials of 40.
+// After that `resume()` resolves and does nothing, so every later press on the
+// page sounds silence until a reload. A Start on a broken edit did it on
+// `/kit/slides/`: the compile fails a couple of ms after the press resumed.
+// So a release that finds a resume in flight waits for it, then suspends only
+// if nobody has claimed in the meantime. `audio-test.mjs` carries the case
+// over a fake that orders the verbs the way Chrome does.
+//
 // ⚠️ WHAT AN OWNER IS: any object with a `stop()` method, compared by identity.
 // A page with one instrument passes one object for its whole life; a slide
 // passes itself.
@@ -64,6 +76,24 @@ export function createAudioHub({ make, doc }) {
   let ctx = null;
   let made = 0;
   let owner = null;
+  /** The latest `resume()` called on a context that did not read `running`, until it settles. */
+  let resuming = null;
+
+  function resume() {
+    if (!ctx) return;
+    const wasRunning = ctx.state === 'running';
+    const p = Promise.resolve(ctx.resume?.()).catch(() => {});
+    if (wasRunning) return;
+    resuming = p;
+    p.then(() => { if (resuming === p) resuming = null; });
+  }
+
+  /** Suspend when nobody holds the context, after any resume still in flight (see the header). */
+  function suspendIfFree() {
+    if (!ctx || owner) return;
+    if (resuming && ctx.state !== 'running') { resuming.then(suspendIfFree); return; }
+    ctx.suspend?.();
+  }
 
   function onVisibility() {
     const d = doc();
@@ -78,19 +108,19 @@ export function createAudioHub({ make, doc }) {
   function sharedAudio({ sampleRate = 48000 } = {}) {
     if (ctx) {
       // Fired and not awaited: `resume()` waits on a gesture and never rejects.
-      ctx.resume?.();
+      resume();
       return ctx;
     }
     ctx = make({ sampleRate });
     made++;
     doc()?.addEventListener?.('visibilitychange', onVisibility);
-    ctx.resume?.();
+    resume();
     return ctx;
   }
 
   function claim(next) {
     if (!next) throw new Error('claim() needs an owner, an object with a stop()');
-    if (ctx && ctx.state === 'suspended') ctx.resume?.();
+    if (ctx && ctx.state === 'suspended') resume();
     if (owner === next) return next;
     const prev = owner;
     owner = next;                       // first, see the header
@@ -101,7 +131,7 @@ export function createAudioHub({ make, doc }) {
   function release(who) {
     if (!who || owner !== who) return false;
     owner = null;
-    ctx?.suspend?.();
+    suspendIfFree();
     return true;
   }
 

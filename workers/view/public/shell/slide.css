@@ -511,3 +511,16 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 /* A SWIPE ON A PHONE (slide.mjs `swipeStep`): the stage lets the browser keep
    vertical scrolling and pinch, and hands a sideways drag to the player. */
 .sl-player .pos-vp-stage { touch-action: pan-y pinch-zoom; }
+
+/* THE SYNTH PANEL (slide-synth.mjs): one height on every slide, the code row
+   taking what the scope, the knob row and the plate leave, so a knob row
+   appearing shortens the code and nothing else moves (2026-10-06, *"keep
+   same fau size!!! knobs condense code area"*). And the slot's inset again
+   left and right of it (*"add x padding on fau area"*). */
+.sl-slot.sl-synth-slot { padding-inline: var(--sl-pad); }
+.pos-ipanel.sl-synth-panel { height: var(--synth-h); }
+.pos-ipanel.sl-synth-panel > .pos-rows-r { flex: none; }
+.pos-ipanel.sl-synth-panel > .pos-rows-r.sl-synth-code { flex: 1 1 0; min-height: 0; }
+.pos-ipanel.sl-synth-panel > .pos-rows-r.sl-synth-code { align-items: stretch; }
+.sl-synth-code > .pos-code { align-self: stretch; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.sl-synth-code .pos-code-scroll { flex: 1 1 auto; min-height: 0; max-height: none; height: auto; }

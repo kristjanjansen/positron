@@ -85,6 +85,25 @@ freq = hslider("freq", 440, 50, 2000, 1);
 process = os.osc(freq) * volume;
 `,
   },
+  {
+    id: 'saw',
+    name: 'a sawtooth',
+    mono: true,
+    // slide 5, asked 2026-10-06 as *"sawtooth"* from four offered next steps:
+    // slide 4's program with one word changed, `os.osc` to `os.sawtooth`, so
+    // the step is the wave's shape and the scope shows it
+    code: `import("stdfaust.lib");
+
+// volume knob
+volume = hslider("volume", 0.5, 0, 1, 0.01);
+
+// freq knob
+freq = hslider("freq", 440, 50, 2000, 1);
+
+// a sawtooth instead of a sine
+process = os.sawtooth(freq) * volume;
+`,
+  },
 ];
 
 /** Where a program's ahead of time instrument is served. */
