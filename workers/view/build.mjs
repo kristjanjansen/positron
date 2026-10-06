@@ -480,6 +480,9 @@ const FILES = [
   // first one (osc) left the deck the same day.
   ['demo/resources/faust/sine.json', 'resources/faust/sine.json'],
   ['demo/resources/faust/sine.wasm', 'resources/faust/sine.wasm'],
+  // the third slide's program, the sine with its 0.5 on a slider (2026-10-06)
+  ['demo/resources/faust/volume.json', 'resources/faust/volume.json'],
+  ['demo/resources/faust/volume.wasm', 'resources/faust/volume.wasm'],
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //
