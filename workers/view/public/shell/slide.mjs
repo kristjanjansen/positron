@@ -751,17 +751,28 @@ export function createSlideLog({ head, widths, align = '', step = 1, cap = 40 } 
  * @param specs        the slides, plain data
  * @param o.slots      as for `createSlide`
  * @param o.onStep     (index) after every move
+ * @param o.title      { text, href }: a link in the count's slot instead of `N / M`
  * @param o.touch      () => true when this is a screen with no hover; the
  *                     default asks `(hover: none)`, and `touchMode(fn)` swaps it
  * @returns { el, panel, slides, go, at, count, next, prev, keys, taps, touchMode }
  */
-export function createSlidePlayer(specs, { slots = {}, onStep = () => {},
+export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title = null,
   touch = () => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches } = {}) {
   ensureCss();
   if (!Array.isArray(specs) || !specs.length) throw new Error('a player needs at least one slide');
+  if (title && !(title.text && title.href)) throw new Error('a player title needs text and href');
   let at = -1;
   const stepper = createStepper({ prev: () => go(at - 1), next: () => go(at + 1), what: 'slide' });
-  const count = el('span', 'sl-count', '');
+  // 🔴 THE TITLE TAKES THE COUNT'S SLOT, asked 2026-10-06: *"title is on footer
+  // on 1/2 w it replaces page count and becomes link to slides/(slug) page"*, the
+  // slug written in brackets here because a slash and a star open a comment.
+  // A half width player on the front page names its deck where the `N / M`
+  // would be, as a link to the deck's own page, which keeps the count. An `<a>`
+  // so Enter and a click navigate; the player's keys leave Enter and space on a
+  // link alone and still take the arrows (see `onKey`).
+  const count = title
+    ? el('a', 'sl-count sl-title', title.text, { href: title.href })
+    : el('span', 'sl-count', '');
   const panel = createVideoPanel({ left: stepper, centre: count, fullMode: 'hover' });
   panel.el.classList.add('sl-player');
   panel.el.tabIndex = 0;
@@ -783,7 +794,7 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {},
     at = next;
     slides[at].el.hidden = false;
     slides[at].start();
-    count.textContent = `${at + 1} / ${slides.length}`;
+    if (!title) count.textContent = `${at + 1} / ${slides.length}`;
     stepper.buttons[0].disabled = at === 0;
     stepper.buttons[stepper.buttons.length - 1].disabled = at === slides.length - 1;
     onStep(at);

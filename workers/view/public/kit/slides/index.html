@@ -188,10 +188,12 @@
   // 🔴 THE FRONT PAGE'S DECKS, MOUNTED HERE THE WAY THE FRONT PAGE MOUNTS THEM,
   // 2026-10-06, for the `synths` deck (*"do slide deck Synths in code in the fau
   // examples ... keep it simple. add to frontpage"*). `mountDecks()` from
-  // `demo/shell/decks.mjs` into a `[data-decks]` holder, so the two half width
-  // players, the brand deck and the synths deck, are the ones a visitor to
-  // https://positron.studio/ gets, at the size they get them. The newest block,
-  // so it is the first.
+  // `demo/shell/decks.mjs` into a `[data-decks]` holder, so the half width
+  // player is the one a visitor to https://positron.studio/ gets, at the size
+  // they get it. The newest block, so it is the first.
+  // ⚠️ ONE DECK SINCE 2026-10-06: the brand deck became /kit/logo/ (*"rm brand
+  // slids after it"*), and the player's footer shows the deck's title as a
+  // link to https://positron.studio/slides/synths/ where the count was.
   // 🔴 TWO SLIDES SINCE 2026-10-06 (*"rm fau slides c-f"*): the title, and a
   // split whose slot is one instrument panel, a live scope, the program in an
   // editable code box and a FAU plate with `Test tone` at its right end.
@@ -202,10 +204,10 @@
   // compiler. The visit, and a step through the deck, open nothing; that is
   // asserted before the press.
   section('SYNTHS DECK',
-    'The two decks the front page plays, mounted the same way. The synths deck is a title and one '
+    'The deck the front page plays, mounted the same way, its title in the footer linking to its own page. It is a title and one '
     + 'instrument, a sine written in Faust. Test tone plays the program compiled ahead of time, and '
     + 'after an edit the next press loads the compiler once and plays your version.',
-    `mountDecks(holder);   // holder carries data-decks, as on the front page; one player per deck`,
+    `mountDecks(holder);   // holder carries data-decks, as on the front page; one player per deck, titled`,
     (box) => {
       box.classList.add('kit-sl');
       const holder = el('div', 'pos-decks');
@@ -2140,6 +2142,21 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
       + `${audioContexts()} context(s) made, ${p.slides.length} slides, the instrument on slide ${toneIdx + 1}, `
       + `the title ${lines.map((l) => `"${l.textContent}" at step ${l.dataset.step}`).join(' over ')}, caption "${intro.spec.cap}"`);
+
+    // 1b. the footer names the deck where the count would be, as a link to its
+    // page, and the arrows still step the deck with that link in the footer
+    {
+      const a = p.el.querySelector('a.sl-title');
+      const at0 = p.at();
+      p.el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      const stepped = p.at();
+      p.go(0);
+      d.assert('SYNTHS: the footer shows the deck’s title as a link to /slides/synths/ in place of the count, and the arrows still step it',
+        Y.players.length === 1 && !!a && a === p.count && a.textContent === 'Synths in code' && a.getAttribute('href') === '/slides/synths/'
+          && !/\d+ \/ \d+/.test(p.el.querySelector('.pos-vp-foot')?.textContent ?? '1 / 1') && stepped === at0 + 1,
+        `${Y.players.length} player(s), the footer ${a ? `links "${a.textContent}" to ${a.getAttribute('href')}` : 'HAS NO TITLE LINK'}, `
+        + `ArrowRight took it from slide ${at0 + 1} to ${stepped + 1}`);
+    }
 
     // 2. a step through the whole deck opened nothing, and every slide fits at half width
     const resAt = performance.getEntriesByType('resource').length;
