@@ -796,7 +796,7 @@ if ((TAP_LOCAL || TAP_FAR) && typeof addEventListener === 'function') {
  * deck's favicon slide as *"keep these for icons"*). It was an `e+` drawn twice
  * by hand, an SVG here and a pixel loop in the build, kept in sync by a
  * comment. Now there is ONE file, `demo/favicon.ico` (16, 32 and 48 px),
- * rendered in Chrome by `drawMark()` in demo/shell/decks.mjs with the brand
+ * rendered in Chrome by `drawMark()` in demo/shell/brand-slides.mjs with the brand
  * face, served at `/favicon.ico` by the dev server and copied by the build.
  * Declared here so a page that declares nothing does not leave the browser to
  * guess, and so nothing logs a 404 for it.

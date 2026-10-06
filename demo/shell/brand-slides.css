@@ -1,0 +1,37 @@
+/* demo/shell/brand-slides.css: the rules only the brand slides need, moved out
+   of slide.css with the slides themselves on 2026-10-06, when the `brand` deck
+   became the blocks of /kit/logo/ (brand-slides.mjs). Each rule is scoped to
+   `.brand-sl`, the class /kit/logo/ puts on every block holding one of these
+   slides, at the weight the `.sl-player` form had, so it still beats the
+   slide's own rules. */
+
+/* THE LOGO set solid, the three lines one mark, and the wordmarks, which are
+   grids of letters, the same way. */
+.brand-sl .sl[aria-label="logo"] .sl-ev,
+.brand-sl .sl[aria-label^="wordmark"] .sl-ev { gap: 0; }
+/* THE + AS A SUPERSCRIPT, as the positron is written, β⁺. Asked 2026-10-05:
+   *"+ as superscript?"*. A span raised and made smaller rather than U+207A,
+   which the vendored subsets do not carry. */
+.brand-sl .sl[aria-label="logo"] .sl-line .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
+/* ONE EMPTY LINE between β+ and the wordmark, asked 2026-10-06 as *"add one
+   line bettween β+ and workmark"*, a line of the wordmark's own step (`1lh`). */
+.brand-sl .sl[aria-label="logo"] .sl-line + .sl-line:not(.sl-line + .sl-line + .sl-line) { margin-top: 1lh; }
+
+/* THE ICON SLIDES (`favicon`, `appIcon`), one column per mark shown, each
+   holding canvases drawn at the size they are shown. */
+.dk-icons { display: grid; grid-template-columns: repeat(var(--dk-n, 2), 1fr); width: 100%; height: 100%; align-items: center; justify-items: center; }
+.dk-col { display: flex; flex-direction: column; align-items: center; gap: 4cqh; }
+.dk-icons[data-n="1"] { --dk-n: 1; }
+.dk-sizes { display: flex; align-items: flex-end; gap: 3cqh; }
+/* the two app icons stand further apart, *"add hor gap a biiit"* */
+.dk-apps { gap: 7cqh; }
+.dk-real { display: block; }
+.dk-app { display: flex; flex-direction: column; align-items: center; gap: 6px; font: 400 11px/1 var(--sans); color: var(--fg); }
+
+/* THE HORIZONTAL LOGO (`logoRow`), β+ and the two words side by side, centred
+   on each other, the slide's inset between them, the words left aligned and
+   set solid. The + raised as on the stacked logo. */
+.dk-logo-row { display: flex; align-items: center; gap: var(--sl-pad); text-align: left; }
+.dk-logo-row .sl-t { margin: 0; }
+.dk-logo-row .dk-word { line-height: 1; }
+.dk-logo-row .dk-mark .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
