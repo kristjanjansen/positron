@@ -1,5 +1,5 @@
 {
-  "what": "The Organ preset from /fau/, compiled ahead of time so a page can play it with faustwasm.mjs alone and no compiler in the tab.",
+  "what": "Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and every step of the synths deck on the front page.",
   "howToRemake": "node demo/resources/build-faust-aot.mjs (and --check to compare without writing)",
   "compiledOn": "2026-10-06",
   "compiler": {
@@ -13,9 +13,18 @@
   },
   "flags": "-ftz 2",
   "sources": {
-    "demo/fau/presets.mjs#organ": "720cca5b14c4464b77bb8e5c9b82620a"
+    "demo/fau/presets.mjs#organ": "720cca5b14c4464b77bb8e5c9b82620a",
+    "demo/shell/synth-steps.mjs#osc": "7c84c14a7bc9b29759b6e443fe62e56f",
+    "demo/shell/synth-steps.mjs#osc2": "7ecd7d8f85c4adc8178f1a6ab80175c9",
+    "demo/shell/synth-steps.mjs#env": "bdded95dd63c541ae4ec6baabd13aa0b",
+    "demo/shell/synth-steps.mjs#filter": "878056f6b5e29060b15f815337b6ded2",
+    "demo/shell/synth-steps.mjs#echo": "0203ba712d9c088d396c5a9c8171b7bf"
   },
   "artefacts": {
+    "mixer32.wasm": {
+      "md5": "33e66c0bf6e9207919e7ce2ee90878a5",
+      "bytes": 502
+    },
     "organ.voice.wasm": {
       "md5": "dcbc1d207be0ace0371f5b6a3681bef9",
       "bytes": 5578
@@ -24,17 +33,64 @@
       "md5": "3a352cdd5686270b014848b7cdce557b",
       "bytes": 2328
     },
-    "mixer32.wasm": {
-      "md5": "33e66c0bf6e9207919e7ce2ee90878a5",
-      "bytes": 502
-    },
     "organ.json": {
       "md5": "523f19e6f6a618d2ea9d6d96ad176860",
       "bytes": 5029
+    },
+    "osc.voice.wasm": {
+      "md5": "8f0238bf6e1342e44c6122ac563062ac",
+      "bytes": 2988
+    },
+    "osc.json": {
+      "md5": "cd43a907288574215ab8c17e68d73042",
+      "bytes": 2018
+    },
+    "osc2.voice.wasm": {
+      "md5": "2ab6bcd0b7b0b811685dbbd9b6411076",
+      "bytes": 4417
+    },
+    "osc2.json": {
+      "md5": "818b1b9924492ae6978c06e5d3a2e0e0",
+      "bytes": 2541
+    },
+    "env.voice.wasm": {
+      "md5": "8013565547b8e484d72a5d41f4c66d4a",
+      "bytes": 5684
+    },
+    "env.json": {
+      "md5": "8d6c3ba00ac1a1ebf57bc04dd2d20d42",
+      "bytes": 3304
+    },
+    "filter.voice.wasm": {
+      "md5": "419feea08e33e2591dcf1fe91f058361",
+      "bytes": 7725
+    },
+    "filter.json": {
+      "md5": "5de01b864189eaf7c8948fa3673fcb88",
+      "bytes": 5028
+    },
+    "echo.voice.wasm": {
+      "md5": "4689defd8d513f80458da963f8ed1185",
+      "bytes": 7697
+    },
+    "echo.effect.wasm": {
+      "md5": "f8521bf5f4cd38dc8e7ac6fef3aa2b34",
+      "bytes": 4442
+    },
+    "echo.json": {
+      "md5": "f072ab38caca87cd05d31db74bcd53c3",
+      "bytes": 8640
     }
   },
   "rms": {
-    "value": 0.09420737746123786,
+    "values": {
+      "organ": 0.09420737746123786,
+      "osc": 0.16706626821403692,
+      "osc2": 0.08960584873360737,
+      "env": 0.07451525298654298,
+      "filter": 0.09960178022515155,
+      "echo": 0.10708678890182902
+    },
     "render": {
       "sampleRate": 48000,
       "block": 128,
@@ -43,7 +99,7 @@
       "velocity": 100,
       "samples": 24000
     },
-    "how": "createOfflineProcessor in node, one keyOn, channel 0. The ahead of time files and a live compile of the same source both gave this, to every digit."
+    "how": "createOfflineProcessor in node, one keyOn, channel 0. The ahead of time files and a live compile of the same source both gave each value, to every digit."
   },
-  "guard": "workers/view/build.mjs (checkFaustAot) REFUSES the build when the source, the compiler files, the flags or any artefact disagrees with this record."
+  "guard": "workers/view/build.mjs (checkFaustAot) REFUSES the build when a source, the compiler files, the flags or any artefact disagrees with this record."
 }

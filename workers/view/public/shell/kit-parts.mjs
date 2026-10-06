@@ -56,7 +56,7 @@ export const KIT_PARTS = [
     'diagram-on-a-phone',
   ] },
   { part: 'slides', label: 'SLIDES', ids: [
-    'the-player', 'half-width-players', 'step-6', 'step-5', 'step-4', 'step-3',
+    'synths-deck', 'the-player', 'half-width-players', 'step-6', 'step-5', 'step-4', 'step-3',
     'step-2', 'step-1', 'the-scale', 'title-slide', 'big-number',
     'headline-over-text', 'statement', 'table-with-row-lines',
     'live-log-on-a-slide', 'live-tabular-log-on-a-slide', 'headline-with-a-caption',
