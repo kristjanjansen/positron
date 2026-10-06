@@ -365,6 +365,15 @@
 /* A control narrower than its logical width sits in the middle of it, so the
    scaled box centres the control and not an empty margin beside it. */
 .sl-fit-in > .sl-mid { display: flex; justify-content: center; }
+/* 🔴 A PANEL IN A FITTED BOX IS NEVER ON A PHONE. It is laid out at its own
+   logical width and scaled, so `shell.css`'s viewport query that centres an
+   instrument plate at 560 px and under, and moves the name after the
+   controls, is answering a question about the window this box never asks.
+   MEASURED 2026-10-06 at 375 px on the synths deck: the plate read
+   `[Test tone] FAU`, centred, where the ask was FAU with Test tone at its right
+   end. So the plate keeps its desk arrangement here at every width. */
+.sl-fit-in .pos-rows-r.pos-ipanel-plate { justify-content: space-between; }
+.sl-fit-in .pos-rows-r.pos-ipanel-plate > .pos-ipanel-name { justify-content: flex-start; order: 0; }
 /* The diagram's own caption line is page text in px; on a slide its words go
    under the boxes instead. */
 .sl-fit-in .pos-dg-cap { display: none; }
@@ -411,7 +420,8 @@
    which are grids of letters, the same way. Moved from /kit/ with the logo on
    2026-10-06 at the weight it had there, so it still beats the slide's own rules. */
 .sl-player .sl[aria-label="logo"] .sl-ev,
-.sl-player .sl[aria-label^="wordmark"] .sl-ev { gap: 0; }
+.sl-player .sl[aria-label^="wordmark"] .sl-ev,
+.sl-player .sl[aria-label="synths in code"] .sl-ev { gap: 0; }
 /* THE + AS A SUPERSCRIPT, as the positron is written, β⁺. Asked 2026-10-05:
    *"+ as superscript?"*. A span raised and made smaller rather than U+207A,
    which the vendored subsets do not carry. */
@@ -419,6 +429,10 @@
 /* ONE EMPTY LINE between β+ and the wordmark, asked 2026-10-06 as *"add one
    line bettween β+ and workmark"*: a line of the wordmark's own step (`1lh`). */
 .sl-player .sl[aria-label="logo"] .sl-line + .sl-line:not(.sl-line + .sl-line + .sl-line) { margin-top: 1lh; }
+/* THE SYNTHS DECK'S PLATE (slide-synth.mjs): the note beside FAU says what a
+   press will cost, in the plate's own small dim type, and never wraps. */
+.sl-tone-note { font: 500 11px/1 var(--mono); color: var(--dim); white-space: nowrap; }
+.sl-tone { flex: 0 0 auto; }
 /* THE ICON SLIDES (decks.mjs): one column per mark shown, each holding
    canvases drawn at the size they are shown. */
 .dk-icons { display: grid; grid-template-columns: repeat(var(--dk-n, 2), 1fr); width: 100%; height: 100%; align-items: center; justify-items: center; }

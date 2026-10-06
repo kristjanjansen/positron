@@ -192,15 +192,19 @@
   // players, the brand deck and the synths deck, are the ones a visitor to
   // https://positron.studio/ gets, at the size they get them. The newest block,
   // so it is the first.
+  // 🔴 TWO SLIDES SINCE 2026-10-06 (*"rm fau slides c-f"*): the title, and a
+  // split whose slot is one instrument panel, a live scope, the program in an
+  // editable code box and a FAU plate with `Test tone` at its right end.
   // 🔴 ITS CHECKS ARE `plans/plan-live-slides.md` SECTION 7 AND RUN LAST, behind
   // `?selfcheck=1` like every check here, because they are the only ones on
-  // this page that fetch anything: a key press arms the slide, which imports
-  // the Faust runtime and fetches that step's compiled instrument. The visit,
-  // and a step through the deck, open nothing; that is asserted before the press.
+  // this page that fetch anything: `Test tone` imports the Faust runtime and
+  // fetches the compiled program, and after an edit it loads the live
+  // compiler. The visit, and a step through the deck, open nothing; that is
+  // asserted before the press.
   section('SYNTHS DECK',
-    'The two decks the front page plays, mounted the same way. The synths deck grows a few lines '
-    + 'of Faust by one element a slide, the program on one side and the instrument it compiles to '
-    + 'on the other. A key arms its slide: the compiled program is fetched then and not before.',
+    'The two decks the front page plays, mounted the same way. The synths deck is a title and one '
+    + 'instrument, a sine written in Faust. Test tone plays the program compiled ahead of time, and '
+    + 'after an edit the next press loads the compiler once and plays your version.',
     `mountDecks(holder);   // holder carries data-decks, as on the front page; one player per deck`,
     (box) => {
       box.classList.add('kit-sl');
@@ -2118,16 +2122,24 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
     const Y = slideKit.comps.synths;
     const p = Y.p;
     const ENGINE = /\/fau\/vendor\/|\/resources\/faust\/|\/shell\/faust\.mjs/;
-    const engine = () => performance.getEntriesByType('resource').map((e) => e.name).filter((n) => ENGINE.test(new URL(n).pathname));
-    const ctlOf = (i) => p.slides[i].ctl;
-    const synthIdx = p.slides.map((s, i) => (s.ctl && s.ctl.press ? i : -1)).filter((i) => i >= 0);
+    const COMPILER = /\/fau\/vendor\/libfaust-wasm/;
+    const names = () => performance.getEntriesByType('resource').map((e) => e.name);
+    const engine = () => names().filter((n) => ENGINE.test(new URL(n).pathname));
+    const compiler = () => performance.getEntriesByType('resource').filter((e) => COMPILER.test(new URL(e.name).pathname));
+    const toneIdx = p.slides.findIndex((s) => s.ctl && s.ctl.tone);
+    const FLOOR = 0.01;
 
-    // 1. a visit loaded no engine and made no sound device
+    // 1. a visit loaded no engine and made no sound device, and the title is two lines at the top step
     const atVisit = engine();
-    d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext',
-      atVisit.length === 0 && audioContexts() === 0 && synthIdx.length === 5 && p.at() === 0,
+    const intro = p.slides[0];
+    const lines = intro.parts.lines;
+    d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 6 with a caption and no body',
+      atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 2 && toneIdx === 1 && p.at() === 0
+        && lines.length === 2 && lines.every((l) => l.dataset.step === '6') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
+        && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
       `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
-      + `${audioContexts()} context(s) made, ${synthIdx.length} playable slides in a deck of ${p.slides.length}`);
+      + `${audioContexts()} context(s) made, ${p.slides.length} slides, the instrument on slide ${toneIdx + 1}, `
+      + `the title ${lines.map((l) => `"${l.textContent}" at step ${l.dataset.step}`).join(' over ')}, caption "${intro.spec.cap}"`);
 
     // 2. a step through the whole deck opened nothing, and every slide fits at half width
     const resAt = performance.getEntriesByType('resource').length;
@@ -2148,107 +2160,112 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       `${p.slides.length} slides at ${sw.toFixed(0)} px wide, ${stepped.length} request(s)${stepped.length ? `: ${stepped.slice(0, 2).join(', ')}` : ''}, `
       + `${audioContexts()} context(s)${spills.length ? `, SPILLING: ${spills.join(', ')}` : ''}`);
 
-    // the code beside each instrument is the program the slide compiles to
-    {
-      const bad = synthIdx.filter((i) => {
-        const c = ctlOf(i);
-        return c.code.value() !== c.step.code.replace(/\n$/, '') || !c.code.input.readOnly
-          || !p.slides[i].parts.ev.contains(c.code.el) || !p.slides[i].parts.slot.contains(c.keys.el)
-          || (c.knobs ? c.knobs.names().join() : '') !== c.step.knobs.join();
-      });
-      d.assert('SYNTHS: each playable slide shows its program read only on the words side and its keys and knobs in the slot',
-        bad.length === 0, `${synthIdx.length - bad.length} of ${synthIdx.length}${bad.length ? `, WRONG on ${bad.map((i) => p.slides[i].spec.name).join(', ')}` : ''}`);
-    }
-
-    // 3. a real press on a key sounds, read off an analyser on the graph
-    const i1 = synthIdx[0], c1 = ctlOf(i1);
-    p.go(i1);
+    // 3. the instrument is one panel, scope, editable code and a FAU plate with Test tone at its right end
+    const S = p.slides[toneIdx], c = S.ctl;
+    p.go(toneIdx);
     await frames(3);
     p.el.scrollIntoView({ block: 'center' });
     await frames(2);
-    const row = c1.keys.el.querySelector('.keys');
-    const key = row.querySelector('.k:not(.sharp)');
-    const kr = key.getBoundingClientRect();
-    const kx = kr.left + kr.width / 2, ky = kr.bottom - kr.height * 0.2;
-    const atStep = p.at();
-    row.dispatchEvent(new PointerEvent('pointerdown', { clientX: kx, clientY: ky, bubbles: true, pointerId: 51, pointerType: 'mouse', button: 0 }));
-    const ctx = c1.context.bind(c1);
-    await until(() => c1.armed() || c1.failed(), 1800);
-    await until(() => c1.level() > 0.01, 1200);
-    const lvl = c1.level();
-    const fetched = engine();
-    const FLOOR = 0.01;
-    d.assert('SYNTHS: a pointer press on a key arms its slide and it sounds, RMS read off an analyser above a floor',
-      c1.armed() && lvl > FLOOR && audioContexts() === 1 && audioOwner() === c1 && p.at() === atStep && c1.presses() === 1,
-      `${c1.failed() ? `the arm FAILED: ${c1.failed().message}, ` : ''}RMS ${lvl.toFixed(4)} against a floor of ${FLOOR}, `
-      + `${audioContexts()} context(s), ${fetched.length} engine file(s) fetched by the press (${fetched.map((n) => new URL(n).pathname.split('/').pop()).join(', ')}), `
-      + `the deck ${p.at() === atStep ? 'stayed' : 'MOVED'} on slide ${atStep + 1}`);
-
-    // 4. leaving the slide lets every note go and suspends the context
-    const stops0 = c1.stops();
-    p.go(i1 + 1);
-    await until(() => ctx()?.state === 'suspended', 1000);
-    row.dispatchEvent(new PointerEvent('pointerup', { clientX: kx, clientY: ky, bubbles: true, pointerId: 51, pointerType: 'mouse', button: 0 }));
-    d.assert('SYNTHS: leaving a sounding slide lets its notes go, lets go of the sound and suspends the context',
-      c1.stops() === stops0 + 1 && c1.held().length === 0 && audioOwner() === null && ctx()?.state === 'suspended',
-      `${c1.stops() - stops0} stop(s), ${c1.held().length} note(s) still held, the owner ${audioOwner() === null ? 'none' : 'STILL SET'}, `
-      + `the context ${ctx()?.state}`);
-
-    // 5. one owner at a time: a second slide taking the sound stops the first
     {
-      const a = ctlOf(i1 + 1), b = ctlOf(i1 + 2);
-      a.press(64);
-      await until(() => a.armed() || a.failed(), 1800);
-      const aStops = a.stops(), aOwned = audioOwner() === a;
-      b.press(67);
-      const handed = audioOwner() === b && a.stops() === aStops + 1 && a.held().length === 0;
-      await until(() => b.armed() || b.failed(), 1800);
-      await until(() => b.level() > 0.01, 1200);
-      const bl = b.level();
-      b.lift(67);
-      b.stop();
-      await until(() => ctx()?.state === 'suspended', 1000);
-      d.assert('SYNTHS: one slide sounds at a time, a second one claiming the sound stops the first, and both share one context',
-        aOwned && a.armed() && handed && b.armed() && bl > FLOOR && audioContexts() === 1
-          && a.context() === b.context() && audioOwner() === null && ctx()?.state === 'suspended',
-        `${p.slides[i1 + 1].spec.name} ${aOwned ? 'owned it' : 'NEVER owned it'}, then ${p.slides[i1 + 2].spec.name} took it `
-        + `${handed ? 'and the first was stopped' : 'and the first was NOT stopped'}, RMS ${bl.toFixed(4)}, `
-        + `${audioContexts()} context(s), the context ${ctx()?.state} at the end`);
+      const shape = c.panel.shape().join(' ');
+      const plateRow = c.panel.plateRow;
+      const pr = plateRow.getBoundingClientRect(), tr = c.tone.getBoundingClientRect(), nr = c.note.getBoundingClientRect();
+      const plateText = plateRow.querySelector('.panel-plate')?.textContent.trim();
+      const inSlot = S.parts.slot.contains(c.panel.el) && S.parts.slot.contains(c.code.el) && !S.parts.words.contains(c.code.el);
+      const noKeys = !S.el.querySelector('.kbd, .keys, .pos-knob, .sld-knob');
+      d.assert('SYNTHS: the slot holds one instrument panel, scope then editable code then a FAU plate with Test tone at its right end, and no keys or knobs',
+        shape === 'viz controls plate' && inSlot && noKeys && !c.code.input.readOnly && c.code.value() === c.shipped
+          && /os\.osc\(440\)/.test(c.shipped) && plateText === 'FAU' && plateRow.contains(c.tone) && tr.right > nr.right && tr.left > pr.left + pr.width / 2,
+        `rows ${shape}, ${inSlot ? 'in the slot' : 'NOT in the slot'}, ${noKeys ? 'no keys or knobs' : 'KEYS OR KNOBS FOUND'}, `
+        + `the code ${c.code.input.readOnly ? 'READ ONLY' : 'editable'}, the plate "${plateText}", Test tone ${(tr.left - pr.left).toFixed(0)} to ${(tr.right - pr.left).toFixed(0)} px of a ${pr.width.toFixed(0)} px plate`);
     }
 
-    // 6. a tap on a key in full screen on a touch screen does not step the deck
+    // 4. a key typed in the code box is the box's; NEGATIVE, the same key on the slide steps
     {
-      p.go(i1);
-      await frames(3);
-      const keysNow = [...c1.keys.el.querySelectorAll('.keys .k')];
-      p.touchMode(() => true);
-      await p.panel.full(true);
-      await frames(6);
-      const full = p.panel.isFull();
-      const sr = p.panel.stage.getBoundingClientRect();
-      const right = keysNow.map((k) => k.getBoundingClientRect()).filter((r) => r.width > 0 && r.left + r.width / 2 > sr.left + sr.width * 2 / 3);
-      const t0 = p.taps();
       const at0 = p.at();
-      if (right.length) {
-        const r = right[right.length - 1];
-        const target = document.elementFromPoint(r.left + r.width / 2, r.bottom - 4);
-        (target || keysNow[keysNow.length - 1]).dispatchEvent(new MouseEvent('click',
-          { clientX: r.left + r.width / 2, clientY: r.bottom - 4, bubbles: true, cancelable: true }));
+      for (const key of ['ArrowRight', ' ', 'PageDown']) {
+        c.code.input.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
       }
-      const onKey = p.at();
-      // NEGATIVE: the same tap on the slide's own ground in that third does step
-      p.slides[p.at()].el.dispatchEvent(new MouseEvent('click',
-        { clientX: sr.left + sr.width * 5 / 6, clientY: sr.top + 4, bubbles: true, cancelable: true }));
-      const onGround = p.at();
-      p.touchMode(() => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches);
-      await p.panel.full(false);
-      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-      await frames(6);
+      const afterBox = p.at();
+      p.slides[at0].el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+      const afterSlide = p.at();
+      p.go(toneIdx);
+      await frames(2);
+      d.assert('SYNTHS: arrows, space and Page Down typed in the code box leave the deck where it is, and the same keys on the slide step it',
+        afterBox === at0 && afterSlide === at0 - 1 && p.at() === toneIdx,
+        `on slide ${at0 + 1}, after three keys in the box on ${afterBox + 1}, after ArrowLeft on the slide on ${afterSlide + 1}`);
+    }
+
+    // 5. Test tone with the shipped code sounds from the ahead of time file, no compiler, and the scope draws
+    const ctx = c.context.bind(c);
+    c.tone.click();
+    await until(() => c.sounding() || c.error(), 3000);
+    await until(() => c.level() > FLOOR, 1200);
+    const d0 = c.draws();
+    await frames(8);
+    const lvl = c.level(), hz = c.hz(), drew = c.draws() - d0;
+    const fetched = engine();
+    d.assert('SYNTHS: Test tone sounds the shipped sine from its ahead of time file, RMS read off an analyser above a floor, 440 Hz, and no compiler fetched',
+      c.sounding() && lvl > FLOOR && Math.abs(hz - 440) < 5 && compiler().length === 0 && fetched.some((n) => /\/resources\/faust\/sine\.wasm$/.test(n))
+        && audioContexts() === 1 && audioOwner() === c && c.tone.getAttribute('aria-pressed') === 'true' && c.note.textContent === '',
+      `${c.error() ? `it FAILED: ${c.error()}, ` : ''}RMS ${lvl.toFixed(4)} against a floor of ${FLOOR}, ${hz.toFixed(1)} Hz, `
+      + `${fetched.length} engine file(s) (${fetched.map((n) => new URL(n).pathname.split('/').pop()).join(', ')}), ${compiler().length} compiler file(s), `
+      + `${audioContexts()} context(s), armed in ${c.lastArmMs()?.toFixed(0)} ms`);
+    d.assert('SYNTHS: the scope draws the output while it sounds, a measured trace in the panel’s top row',
+      drew >= 4 && /drawn as measured/.test(c.scope.canvas.getAttribute('aria-label') || '') && c.panel.viz.contains(c.scope.el),
+      `${drew} frame(s) drawn in 8, the scope says "${c.scope.canvas.getAttribute('aria-label')}"`);
+
+    // 6. a second press switches it off, lets go of the sound and suspends the context, and the scope stops
+    c.tone.click();
+    await until(() => ctx()?.state === 'suspended', 1000);
+    const d1 = c.draws();
+    await frames(6);
+    d.assert('SYNTHS: a second Test tone press silences it, lets go of the sound, suspends the context and stops the scope',
+      !c.sounding() && c.tone.getAttribute('aria-pressed') === 'false' && audioOwner() === null && ctx()?.state === 'suspended' && c.draws() === d1,
+      `${c.sounding() ? 'STILL SOUNDING' : 'off'}, the owner ${audioOwner() === null ? 'none' : 'STILL SET'}, the context ${ctx()?.state}, ${c.draws() - d1} frame(s) drawn after`);
+
+    // 7. an edit loads the compiler once on the next press and plays the edited program
+    {
+      c.code.set(c.shipped.replace('os.osc(440)', 'os.osc(660)'));
+      c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
+      const noteEdited = c.note.textContent;
+      const t0 = performance.now();
+      c.tone.click();
+      await until(() => c.sounding() || c.error(), 15000);
+      const wall = performance.now() - t0;
+      await until(() => c.level() > FLOOR, 1200);
+      await frames(4);
+      const lv = c.level(), hz2 = c.hz();
+      const files = compiler();
+      const bytes = files.reduce((a, e) => a + (e.transferSize || e.encodedBodySize || 0), 0);
+      Y.cost = { wall, compile: c.lastCompileMs(), bytes, files: files.length };
+      d.assert('SYNTHS: after an edit Test tone loads the compiler once and plays the edited program, 660 Hz measured, the note saying what it costs',
+        c.sounding() && lv > FLOOR && Math.abs(hz2 - 660) < 8 && files.length === 3 && new Set(files.map((e) => e.name)).size === 3
+          && noteEdited === 'compiles on press, 1 MB once' && c.note.textContent === 'compiles on press' && c.compiles() === 1,
+        `${c.error() ? `it FAILED: ${c.error()}, ` : ''}RMS ${lv.toFixed(4)}, ${hz2.toFixed(1)} Hz, ${files.length} compiler file(s), ${(bytes / 1e6).toFixed(2)} MB on this origin, `
+        + `press to sound ${wall.toFixed(0)} ms of which the compile ${c.lastCompileMs()?.toFixed(0)} ms, the note "${noteEdited}" then "${c.note.textContent}"`);
+      c.tone.click();
+      await until(() => ctx()?.state === 'suspended', 1000);
+    }
+
+    // 8. NEGATIVE: a broken edit says why in words, sounds nothing and does not load the compiler again
+    {
+      c.code.set('import("stdfaust.lib");\n\nprocess = os.osc(440 * 0.1;');
+      c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
+      c.tone.click();
+      await until(() => c.sounding() || c.error(), 5000);
+      await nap(100);
+      const said = c.scope.canvas.getAttribute('aria-label') || '';
+      d.assert('SYNTHS: NEGATIVE, a broken edit shows the compiler’s error in words in the panel and sounds nothing',
+        !!c.error() && /syntax error/i.test(c.error()) && said.includes(c.error()) && c.note.textContent === 'does not compile'
+          && !c.sounding() && c.tone.getAttribute('aria-pressed') === 'false' && audioOwner() === null && ctx()?.state === 'suspended'
+          && compiler().length === 3 && c.compiles() === 2,
+        `the panel says "${c.error()}", the note "${c.note.textContent}", ${c.sounding() ? 'SOUNDING' : 'silent'}, the context ${ctx()?.state}, `
+        + `${compiler().length} compiler file(s) in all, ${c.compiles()} compile(s)`);
+      c.code.set(c.shipped);
+      c.code.input.dispatchEvent(new Event('input', { bubbles: true }));
+      c.stop();
       p.go(0);
-      d.assert('SYNTHS: in full screen on a touch screen a tap on a key in the right third leaves the slide, and a tap on the ground there steps',
-        full && right.length > 0 && onKey === at0 && onGround === at0 + 1 && p.taps() - t0 === 1 && !p.panel.isFull(),
-        `${full ? 'full' : 'NOT full'}, ${right.length} key(s) in the right third, a tap on one left the deck on ${onKey + 1}, `
-        + `a tap on the ground took it to ${onGround + 1}, ${p.taps() - t0} tap(s) stepped`);
     }
   }
 </script>

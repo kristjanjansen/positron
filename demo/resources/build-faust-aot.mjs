@@ -16,6 +16,11 @@
 //   mixer32.wasm       libfaust's own voice mixer, the same for every instrument
 //   PROVENANCE.json    what each was compiled from, by what, with what flags
 //
+// and for a MONO program (`mono: true` in `synth-steps.mjs`, since 2026-10-06):
+//
+//   <id>.json          the DSP JSON, its `shaKey`, `mono: true` and the one file name
+//   <id>.wasm          the whole program, no voice and no mixer
+//
 // 🔴 A LIST OF PROGRAMS SINCE 2026-10-06, NOT THE ONE ORGAN. `PROGRAMS` below is
 // the Organ from `demo/fau/presets.mjs` and every step of the `synths` deck
 // from `demo/shell/synth-steps.mjs`, each named by the file and id it is read
@@ -82,8 +87,17 @@ const organ = PRESETS.find((p) => p.id === 'organ');
 if (!organ) { console.error("no preset with id 'organ' in demo/fau/presets.mjs"); process.exit(1); }
 const PROGRAMS = [
   { id: 'organ', source: 'demo/fau/presets.mjs#organ', code: organ.code },
-  ...SYNTH_STEPS.map((s) => ({ id: s.id, source: `demo/shell/synth-steps.mjs#${s.id}`, code: s.code })),
+  ...SYNTH_STEPS.map((s) => ({ id: s.id, source: `demo/shell/synth-steps.mjs#${s.id}`, code: s.code, mono: !!s.mono })),
 ];
+/**
+ * 🔴 AN ANSWER WRITTEN DOWN BEFORE THE RENDER, FOR THE PROGRAM SIMPLE ENOUGH TO
+ * HAVE ONE. `process = os.osc(440) * 0.1;` is a sine of amplitude 0.1, whose RMS
+ * is 0.1 over root two, and 24000 samples at 48 kHz are exactly 220 of its
+ * cycles. A mono program has no key to leave up, so the poly programs' negative
+ * control (no key, silence) has nothing to say about it; this is its control
+ * instead, from arithmetic rather than from the compiler that made the file.
+ */
+const EXPECT = { sine: 0.1 / Math.SQRT2 };
 {
   const ids = PROGRAMS.map((p) => p.id);
   const twice = ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -93,7 +107,7 @@ const PROGRAMS = [
 const md5 = (b) => createHash('md5').update(b).digest('hex');
 
 // ── the compiler, booted in node the way demo/shell/code-lang-test.mjs does ──
-const { instantiateFaustModuleFromFile, LibFaust, FaustCompiler, FaustPolyDspGenerator }
+const { instantiateFaustModuleFromFile, LibFaust, FaustCompiler, FaustPolyDspGenerator, FaustMonoDspGenerator }
   = await import('../fau/vendor/faustwasm.mjs');
 /* ⚠️ THE GLUE IS COPIED OUT OF THE REPOSITORY FIRST, because it is CommonJS
    shaped and the repository's own `package.json` scope would have node read it
@@ -116,11 +130,11 @@ try {
  * compile the effect, libfaust aborts on a name that is not there, and the
  * generator carries on with no effect. It cannot be held back here, because
  * the glue bound `console.error` once when it was evaluated (`faust.mjs`
- * says why), so four of the six programs print it. A real failure is the
+ * says why), so every polyphonic program with no effect prints it. A real failure is the
  * `did not compile` line below, with the compiler's own message.
  */
 async function compileOne(p) {
-  const gen = new FaustPolyDspGenerator();
+  const gen = p.mono ? new FaustMonoDspGenerator() : new FaustPolyDspGenerator();
   if (!await gen.compile(compiler, p.id, p.code, FAUST_FLAGS)) {
     console.error(`${p.source} did not compile: ${compiler.getErrorMessage()}`);
     process.exit(1);
@@ -128,11 +142,14 @@ async function compileOne(p) {
   return gen;
 }
 
-/** RMS of channel 0 over the fixed render, from any parts `createNode` would take. */
+/** RMS of channel 0 over the fixed render, from any parts `createNode` would take. A mono program has no key. */
 async function rmsOf(parts, { key = true } = {}) {
-  const proc = await new FaustPolyDspGenerator().createOfflineProcessor(RENDER.sampleRate, RENDER.block,
-    RENDER.voices, parts.voiceFactory, parts.mixerModule, parts.effectFactory);
-  if (key) proc.keyOn(0, RENDER.note, RENDER.velocity);
+  const mono = !!(parts.mono || (parts.factory && !parts.voiceFactory));
+  const proc = mono
+    ? await new FaustMonoDspGenerator().createOfflineProcessor(RENDER.sampleRate, RENDER.block, parts.factory)
+    : await new FaustPolyDspGenerator().createOfflineProcessor(RENDER.sampleRate, RENDER.block,
+      RENDER.voices, parts.voiceFactory, parts.mixerModule, parts.effectFactory);
+  if (key && !mono) proc.keyOn(0, RENDER.note, RENDER.velocity);
   const [left] = proc.render([], RENDER.samples);
   let s = 0;
   for (const v of left) s += v * v;
@@ -144,6 +161,12 @@ const built = [];
 let mixer = null;
 for (const p of PROGRAMS) {
   const gen = await compileOne(p);
+  if (p.mono) {
+    const meta = { name: p.id, mono: true, files: { dsp: `${p.id}.wasm` }, dspSha: gen.factory.shaKey, dsp: gen.factory.json };
+    const files = { [`${p.id}.wasm`]: Buffer.from(gen.factory.code), [`${p.id}.json`]: Buffer.from(JSON.stringify(meta) + '\n') };
+    built.push({ p, gen, files, live: await rmsOf({ mono: true, factory: gen.factory }) });
+    continue;
+  }
   const mix = Buffer.from(gen.mixerBuffer);
   if (!mixer) mixer = mix;
   else if (!mixer.equals(mix)) {
@@ -167,6 +190,7 @@ for (const p of PROGRAMS) {
 /** A program's parts rebuilt from a set of files, the way a page rebuilds them. */
 const fromFiles = (id, f) => {
   const meta = JSON.parse(f[`${id}.json`].toString('utf8'));
+  if (meta.mono) return factoryFromParts({ meta, dsp: f[meta.files.dsp] });
   return factoryFromParts({
     meta, voice: f[meta.files.voice], effect: meta.files.effect ? f[meta.files.effect] : null, mixer: f[MIXER],
   });
@@ -179,11 +203,12 @@ if (!CHECK) {
     const aot = await rmsOf(await fromFiles(b.p.id, { ...b.files, [MIXER]: mixer }));
     if (aot !== b.live) { console.error(`REFUSED: ${b.p.id} ahead of time RMS ${aot} is not the live ${b.live}`); process.exit(1); }
     if (!(b.live > 0.001)) { console.error(`REFUSED: ${b.p.id} rendered silent, RMS ${b.live}`); process.exit(1); }
+    if (b.p.id in EXPECT && Math.abs(b.live - EXPECT[b.p.id]) > 1e-3) { console.error(`REFUSED: ${b.p.id} RMS ${b.live}, its arithmetic says ${EXPECT[b.p.id]}`); process.exit(1); }
   }
   mkdirSync(OUT, { recursive: true });
   for (const [f, b] of Object.entries(all)) writeFileSync(join(OUT, f), b);
   const prov = {
-    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and every step of the synths deck on the front page.',
+    what: 'Faust programs compiled ahead of time, so a page can play them with faustwasm.mjs alone and no compiler in the tab: the Organ from /fau/ and the mono sine of the synths deck on the front page.',
     howToRemake: 'node demo/resources/build-faust-aot.mjs (and --check to compare without writing)',
     compiledOn: new Date().toISOString().slice(0, 10),
     compiler: {
@@ -196,7 +221,7 @@ if (!CHECK) {
     rms: {
       values: Object.fromEntries(built.map((b) => [b.p.id, b.live])),
       render: RENDER,
-      how: 'createOfflineProcessor in node, one keyOn, channel 0. The ahead of time files and a live compile of the same source both gave each value, to every digit.',
+      how: 'createOfflineProcessor in node, one keyOn for a polyphonic program and none for a mono one, channel 0. The ahead of time files and a live compile of the same source both gave each value, to every digit.',
     },
     guard: 'workers/view/build.mjs (checkFaustAot) REFUSES the build when a source, the compiler files, the flags or any artefact disagrees with this record.',
   };
@@ -233,12 +258,19 @@ for (const b of built) {
     ok(`${id}: the files on disk sound like a live compile of the source, same RMS`, aot === b.live,
       `ahead of time ${aot}, live ${b.live}`);
     ok(`${id}: and like the figure PROVENANCE.json recorded`, prov?.rms?.values?.[id] === aot, `recorded ${prov?.rms?.values?.[id]}`);
-    /* NEGATIVE: the instrument the RMS cannot see past. With no key down the
-       same render must be silent, or the comparison above would pass two
-       instruments that both render the same nothing. */
-    const none = await rmsOf(b.gen, { key: false });
-    ok(`${id}: NEGATIVE, with no key down the same render is silent, so the RMS is measuring a note`,
-      none === 0 && b.live > 0.001, `no key ${none}, a key ${b.live}`);
+    if (b.p.mono) {
+      /* NEGATIVE, FROM ARITHMETIC: see EXPECT. A program that rendered the
+         wrong thing loudly enough would pass both comparisons above. */
+      ok(`${id}: NEGATIVE, the RMS is the one its arithmetic predicts, not just the same on both paths`,
+        Math.abs(aot - EXPECT[id]) < 1e-3, `rendered ${aot}, predicted ${EXPECT[id]}`);
+    } else {
+      /* NEGATIVE: the instrument the RMS cannot see past. With no key down the
+         same render must be silent, or the comparison above would pass two
+         instruments that both render the same nothing. */
+      const none = await rmsOf(b.gen, { key: false });
+      ok(`${id}: NEGATIVE, with no key down the same render is silent, so the RMS is measuring a note`,
+        none === 0 && b.live > 0.001, `no key ${none}, a key ${b.live}`);
+    }
   }
   ok(`${id}: the source is the one recorded`, prov?.sources?.[b.p.source] === md5(b.p.code), b.p.source);
 }

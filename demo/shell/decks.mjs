@@ -10,11 +10,11 @@
 //
 // ⚠️ NOTHING HERE OPENS ANYTHING. A slide is drawn from its data; the only
 // files a deck costs are the slide face's, from this origin.
-// ⚠️ AND THE `synths` DECK KEEPS THAT ON A VISIT. Its slides draw keys, knobs
-// and code; the Faust runtime and a step's compiled instrument are fetched by
-// the first key pressed on that slide and by nothing else, and the only
-// AudioContext is the page's shared one, made by that press
-// (`demo/shell/slide-synth.mjs`).
+// ⚠️ AND THE `synths` DECK KEEPS THAT ON A VISIT. Its second slide draws a
+// scope, code and a plate; the Faust runtime and the compiled program are
+// fetched by a `Test tone` press and by nothing else, the live compiler only
+// by a press after the code was edited, and the only AudioContext is the
+// page's shared one, made by that press (`demo/shell/slide-synth.mjs`).
 
 import { createSlidePlayer } from './slide.mjs';
 import { SYNTH_STEPS } from './synth-steps.mjs';
@@ -187,20 +187,25 @@ function logoRow(host) {
 
 /**
  * SYNTHS IN CODE, asked 2026-10-06: *"do slide deck Synths in code in the fau
- * examples. intro, basic osc (2 col view, synth in side), osc paramters, ...add
- * elements to synth... keep it simple. add to frontpage"*. An intro, then one
- * split slide per step of `SYNTH_STEPS`: the Faust program on the words side,
- * growing by one element a slide, and the instrument it compiles to on the
- * darker side, playable. The programs are compiled ahead of time
- * (`demo/resources/build-faust-aot.mjs`), so a press costs a few kB and no
- * compiler; the caption of the intro links `/fau/`, where the same language is
- * typed and compiled live.
+ * examples ... keep it simple. add to frontpage"*, and cut to TWO SLIDES the
+ * same day: *"rm fau slides c-f. first layout Synths / in code (better desc),
+ * no body text"*, then a split with the title and what is going on on the
+ * left and one instrument panel on the right (`demo/shell/slide-synth.mjs`).
+ * The intro sets its two lines the way the brand deck's logo sets its three:
+ * declared `lines` at step 6, the largest the scale has, solid, on the left
+ * edge, with only a caption under them. The program is compiled ahead of time
+ * (`demo/resources/build-faust-aot.mjs`), so `Test tone` costs a few kB and no
+ * compiler until somebody edits the code.
  */
 const SYNTHS = [
-  { name: 'synths in code', layout: 'left', say: 'Synths in *code*',
-    text: 'A few lines of Faust grow by one thing a slide, and every slide plays',
-    cap: 'the same language compiles live at positron.studio/fau/' },
-  ...SYNTH_STEPS.map((st) => ({ name: st.name, layout: 'split', side: 'right', say: st.say, cap: st.cap, slot: synthSlot(st) })),
+  { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in *code*']],
+    cap: 'a few lines of Faust become a sound in this page' },
+  ...SYNTH_STEPS.map((st) => ({
+    name: st.name, layout: 'split', side: 'right', say: 'A sine in two lines',
+    text: 'A short Faust program, compiled ahead of time, makes this tone. '
+      + 'Edit it and the browser compiles yours.',
+    slot: synthSlot(st),
+  })),
 ];
 
 export const DECKS = [

@@ -19,7 +19,17 @@
 //   hasCompiler()           true once the compiler has arrived; starts nothing
 //   faustFactory(url)       one ahead of time instrument, the Organ is 13,332 B raw
 //   faustCompile(name, code) a live compile through `faustCompiler()`
-//   faustNode(ctx, parts, voices) a polyphonic AudioWorkletNode from either
+//   faustNode(ctx, parts, voices) an AudioWorkletNode from either, polyphonic
+//                           or, for a `mono` program, mono
+//
+// 🔴 AND A MONO PATH SINCE 2026-10-06, THE SMALLEST ONE THERE IS. The front
+// page's `synths` deck plays `process = os.osc(440) * 0.1;`, which declares no
+// `freq`, `gain` or `gate`, so there is no key to press: a polyphonic node
+// would hold eight voices nobody can start. `faustCompile(..., { mono: true })`
+// and an ahead of time `<id>.json` carrying `mono: true` both give
+// `{ name, mono: true, factory }`, and `faustNode` builds that through the
+// runtime's own `FaustMonoDspGenerator`. A mono node sounds while it is
+// connected; it has no notes to let go of.
 //
 // 🔴 NOTHING HAPPENS ON IMPORT, AND THE RUNTIME IS REACHED ONLY THROUGH
 // `import()`. A static import of `faustwasm.mjs` here would cost every page
@@ -160,19 +170,19 @@ export function hasCompiler() {
  *
  * @param {string} name the factory's name. libfaust caches by name and code, so a caller timing a compile passes a fresh one
  * @param {string} code Faust source declaring `freq`, `gain` and `gate`
- * @param {{flags?: string, onAbort?: (line: string) => void}} [opt] where the compiler's abort lines go; without one they reach the console
- * @returns {Promise<any>} a `FaustPolyDspGenerator`, compiled; throws with the compiler's message
+ * @param {{flags?: string, onAbort?: (line: string) => void, mono?: boolean}} [opt] where the compiler's abort lines go (without one they reach the console), and `mono` for a program with no voice to start
+ * @returns {Promise<any>} a `FaustPolyDspGenerator`, compiled, or for `mono` the `{ name, mono: true, factory }` `faustNode` takes; throws with the compiler's message
  */
-export async function faustCompile(name, code, { flags = FAUST_FLAGS, onAbort = null } = {}) {
+export async function faustCompile(name, code, { flags = FAUST_FLAGS, onAbort = null, mono = false } = {}) {
   const compiler = await faustCompiler();
-  const { FaustPolyDspGenerator } = await faustRuntime();
-  const gen = new FaustPolyDspGenerator();
+  const { FaustPolyDspGenerator, FaustMonoDspGenerator } = await faustRuntime();
+  const gen = mono ? new FaustMonoDspGenerator() : new FaustPolyDspGenerator();
   const before = sink;
   sink = onAbort;
   try {
     const out = await gen.compile(compiler, name, code, flags);
     if (!out) throw new Error(compiler.getErrorMessage?.() || 'the compiler returned nothing');
-    return gen;
+    return mono ? { name, mono: true, factory: gen.factory } : gen;
   } finally {
     sink = before;
   }
@@ -188,13 +198,17 @@ export async function faustCompile(name, code, { flags = FAUST_FLAGS, onAbort = 
  * `shaKey` pair names the worklet processor, so two instruments on one context
  * register two processors and the same one twice registers one.
  *
- * @param {{meta: any, voice: ArrayBuffer|Uint8Array, effect: ArrayBuffer|Uint8Array|null, mixer: ArrayBuffer|Uint8Array}} p
+ * ⚠️ A `mono` META NAMES ONE FILE, `dsp`, AND NO MIXER, and comes back as
+ * `{ name, mono: true, factory }`; its bytes arrive as `dsp`.
+ *
+ * @param {{meta: any, voice?: ArrayBuffer|Uint8Array, effect?: ArrayBuffer|Uint8Array|null, mixer?: ArrayBuffer|Uint8Array, dsp?: ArrayBuffer|Uint8Array}} p
  */
-export async function factoryFromParts({ meta, voice, effect, mixer }) {
+export async function factoryFromParts({ meta, voice, effect, mixer, dsp }) {
   const one = async (bytes, json, shaKey, poly) => ({
     shaKey, code: new Uint8Array(bytes), module: await WebAssembly.compile(bytes),
     json, poly, soundfiles: {},
   });
+  if (meta.mono) return { name: meta.name, mono: true, factory: await one(dsp, meta.dsp, meta.dspSha, false) };
   return {
     name: meta.name,
     voiceFactory: await one(voice, meta.voice, meta.voiceSha, true),
@@ -226,6 +240,7 @@ export function faustFactory(url) {
       const r = await fetch(url);
       if (!r.ok) throw new Error(`${url}: ${r.status}`);
       const meta = await r.json();
+      if (meta.mono) return factoryFromParts({ meta, dsp: await bytes(meta.files.dsp) });
       const [voice, effect, mixer] = await Promise.all([
         bytes(meta.files.voice), meta.files.effect ? bytes(meta.files.effect) : null, bytes(meta.files.mixer)]);
       return factoryFromParts({ meta, voice, effect, mixer });
@@ -236,16 +251,18 @@ export function faustFactory(url) {
 }
 
 /**
- * A polyphonic AudioWorkletNode on `ctx`, from either kind of `parts`: the
- * generator `faustCompile` returns, or what `faustFactory` resolves to. Both
- * carry `name`, `voiceFactory`, `effectFactory` and `mixerModule`.
+ * An AudioWorkletNode on `ctx`, from either kind of `parts`: the generator
+ * `faustCompile` returns, or what `faustFactory` resolves to. A polyphonic one
+ * carries `name`, `voiceFactory`, `effectFactory` and `mixerModule`; a mono one
+ * carries `name`, `mono: true` and `factory`, and `voices` means nothing to it.
  *
  * @param {BaseAudioContext} ctx
- * @param {{name: string, voiceFactory: any, effectFactory: any, mixerModule: WebAssembly.Module}} parts
+ * @param {{name: string, voiceFactory?: any, effectFactory?: any, mixerModule?: WebAssembly.Module, mono?: boolean, factory?: any}} parts
  * @param {number} [voices]
  */
 export async function faustNode(ctx, parts, voices = 8) {
-  const { FaustPolyDspGenerator } = await faustRuntime();
+  const { FaustPolyDspGenerator, FaustMonoDspGenerator } = await faustRuntime();
+  if (parts.mono) return new FaustMonoDspGenerator().createNode(ctx, parts.name, parts.factory);
   return new FaustPolyDspGenerator().createNode(ctx, voices, parts.name,
     parts.voiceFactory, parts.mixerModule, parts.effectFactory);
 }

@@ -1,222 +1,284 @@
-// demo/shell/slide-synth.mjs: a playable Faust synth on a split slide, its code beside it.
+// demo/shell/slide-synth.mjs: a Faust program on a split slide, editable, with a Test tone.
 //
 //   import { synthSlot } from '/shell/slide-synth.mjs';
-//   { layout: 'split', side: 'right', say: 'One oscillator', slot: synthSlot(step) }
+//   { layout: 'split', side: 'right', say: 'A sine in two lines', text: '...', slot: synthSlot(step) }
 //
-// 🔴 THE SLOT BUILDER `plans/plan-live-slides.md` STEP 4 NAMES, 2026-10-06, for
-// the front page's `synths` deck (*"do slide deck Synths in code in the fau
-// examples ... basic osc (2 col view, synth in side)"*). `step` is one entry of
-// `SYNTH_STEPS` in `demo/shell/synth-steps.mjs`: its Faust text goes in a
-// read-only code box on the words side of the split, and the instrument (its
-// knobs, if the step names any, and one octave of keys) goes in the slot, on
-// the darker side.
+// 🔴 ONE INSTRUMENT PANEL IN THE SLOT SINCE 2026-10-06, asked as *"in right:
+// (instrument panel with waveform from muta, then editable code, hardcoded
+// params for minimal sine and then fau nameplate and test tone button on
+// right"*. `step` is the one entry of `SYNTH_STEPS` in
+// `demo/shell/synth-steps.mjs`, a MONO program with its numbers typed in. Top to
+// bottom, all in `createInstrumentPanel`:
 //
-// ── THE CONTRACT, plan section 3.3 ─────────────────────────────────────────
+//   viz       the output, live, drawn the way `/muta/` draws its scope
+//             (`createWaveShape` fed from an analyser while the tone sounds)
+//   controls  the code box, EDITABLE, edge to edge like `/fau/`'s
+//   plate     FAU, a short note about cost, and `Test tone` at the right end
 //
-//   build   (this function, called by `createSlide` on a VISIT, for every slide
-//           of every deck) DRAWS ONLY: the code box with the Faust hues, the
-//           knobs, the keys. No `import()`, no `fetch`, no AudioContext.
-//   arm     the first key pressed on THIS slide: `sharedAudio()` and `claim()`
-//           from `audio.mjs`, then `import('./faust.mjs')`, `faustFactory()` of
-//           this step's ahead of time files and `faustNode()`. Memoised, and a
-//           failed arm clears itself so the next press tries again.
-//   start   called by the player on show, INCLUDING on a visit for slide 0 and
-//           on every step. It never arms, never loads, never sounds. It only
-//           scrolls the code box to the lines this step added.
-//   stop    called on leaving the slide, and by `claim()` when another slot
-//           takes the sound: every note off, and `release()`, which suspends
-//           the context when nobody holds it.
+// No keyboard and no knobs: the program has no `freq`, `gain` or `gate`.
+// Until 2026-10-06 this module put a read only listing on the words side and
+// one octave of keys and the step's knobs in the slot, one slide per step of a
+// growing polyphonic voice; those steps left the deck the same day.
+//
+// ── THE CONTRACT, `plans/plan-live-slides.md` section 3.3 ─────────────────
+//
+//   build   (this function, called by `createSlide` on a VISIT) DRAWS ONLY: the
+//           empty scope, the code box with the Faust hues, the plate. No
+//           `import()`, no `fetch`, no AudioContext.
+//   press   `Test tone`. `sharedAudio()` and `claim()` from `audio.mjs` inside
+//           the gesture, then `import('./faust.mjs')` and:
+//             the code as shipped   `faustFactory()` of the ahead of time files,
+//                                   3.8 kB, no compiler
+//             the code edited       `faustCompile(..., { mono: true })`, which
+//                                   loads the live compiler (`faustCompiler()`,
+//                                   about 1 MB over the wire, once per tab) and
+//                                   compiles the text in the box
+//           A second press switches the tone off.
+//   start   on show, including slide 0 of a visit and every step: nothing.
+//   stop    on leaving the slide, and by `claim()` when another slot takes the
+//           sound: the tone off, and `release()`, which suspends the context
+//           when nobody holds it.
+//
+// 🔴 A COMPILE ERROR IS SHOWN, NEVER THROWN. The scope draws the compiler's
+// first line in words where the trace would be (`reason`, which
+// `createWaveShape` already lays out at the foot of an empty figure), the note
+// says `does not compile`, and nothing sounds. The figure keeps its height
+// either way, so an error arriving moves nothing.
 //
 // 🔴 `audio.mjs` IS A STATIC IMPORT AND `faust.mjs` IS NOT, ON PURPOSE.
-// `audio.mjs` does nothing on import (its header says so) and `sharedAudio()`
-// has to run INSIDE the gesture, synchronously, or a strict browser leaves the
-// new context suspended. `faust.mjs` is reached only through `import()`, so the
-// front page never pays for it on a visit (plan section 6.2's trap).
+// `audio.mjs` does nothing on import and `sharedAudio()` has to run INSIDE the
+// gesture. `faust.mjs` is reached only through `import()`, so the front page
+// never pays for it on a visit.
 //
-// 🔴 THE CODE GOES IN THE SPLIT'S WORDS COLUMN, WHICH A SLOT DOES NOT OWN. A
-// split has one slot, and the ask is the code on one side and the synth on the
-// other. So the builder appends the code box to the slide's own evidence
-// region (`.sl-ev`, under the headline), found from the slot host's parent,
-// which `createSlide` has built before it calls a slot builder. It is the one
-// place this module reaches outside its host, and it reaches only into the
-// slide it was built for.
-//
-// ⚠️ THE CODE BOX IS AT MOST 12 LINES AND SCROLLS TO ITS END, where every step
-// puts what it added and the `process` line it changed. 29 lines at once would
-// be 7 px type in half a front page player; 12 is width limited rather than
-// height limited there, which is the most a 56 character line allows.
-// ⚠️ KNOBS FOR WHAT THIS STEP ADDED, NOT FOR EVERY SLIDER. The step's `knobs`
-// list names them, and the earlier sliders keep the default the text shows.
+// ⚠️ TYPING IN THE BOX NEVER STEPS THE DECK. The player's key handler already
+// leaves a key aimed at a TEXTAREA to it (`slide.mjs`, `onKey`), and a tap on
+// one is the slide's own (`OWN_TAPS`), so nothing here has to stop anything.
 
 import { el } from './shell.mjs';
 import { fitBox } from './slide.mjs';
-import { createKeyboard, keyRange } from './keyboard.mjs';
 import { createCodeBox } from './code-box.mjs';
-import { createHueBook } from './code-lang.mjs';
-import { createParamKnobs } from './param-knobs.mjs';
+import { createWaveShape } from './synth-view.mjs';
 import { createInstrumentPanel } from './instrument-panel.mjs';
 import { sharedAudio, claim, release } from './audio.mjs';
 import { synthUrl } from './synth-steps.mjs';
 
-/** Voices per node: `/fau/`'s eight, so a chord on one octave never steals. */
-export const VOICES = 8;
-/** The velocity a pointer press plays at. A pointer has no velocity of its own. */
-export const VELOCITY = 100;
-/** The code box's height in lines, at most. See the header. */
-export const CODE_ROWS = 12;
-/** The keys: one octave and its top C, from middle C. */
-const SPAN = 12, BASE = 60;
-/** A white key's width in logical px, `/fau/`'s 44, which the fitted box scales. */
-const KEY_PX = 44;
+/** The panel's logical width, which the fitted box scales into the slot. */
+const PANEL_PX = 340;
+/** The scope's height in logical px, `/muta/`'s 140 less a little for half a slide. */
+const WAVE_PX = 120;
+/** Samples shown per frame: about 10.7 ms at 48 kHz, four and a bit cycles of 440 Hz. */
+export const WINDOW = 512;
+/** The scope's full scales, the smallest that clears the peak by a quarter is used. */
+export const FULL_SCALE = [0.05, 0.1, 0.2, 0.5, 1, 2];
+
+/** What the note on the plate says, by state. A few words, and only where a cost applies. */
+export const NOTE = Object.freeze({
+  shipped: '',
+  edited: 'compiles on press, 1 MB once',
+  compiler: 'compiles on press',
+  compiling: 'compiling',
+  error: 'does not compile',
+});
 
 /**
- * Every `hslider` the text declares, as `createParamKnobs` takes it. Read off
- * the text the slide shows, so a knob cannot disagree with the line it turns.
- * `[scale:log]` is the exponential warp, which is what Faust's own log scale
- * does to a slider's travel.
+ * The compiler's message cut to its first useful line, for the scope's foot.
+ * libfaust names the factory first (`sine_edit_2:3 : ERROR : syntax error`),
+ * and that name is this module's, so it is put as `line 3` instead.
  */
-export function slidersOf(code) {
-  const out = new Map();
-  const re = /hslider\(\s*"([^"[]+)(\[[^"]*\])?"\s*,\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/g;
-  for (const m of code.matchAll(re)) {
-    const [value, min, max, step] = [m[3], m[4], m[5], m[6]].map(Number);
-    out.set(m[1].trim(), { name: m[1].trim(), value, min, max, step,
-      warp: /scale:log/.test(m[2] || '') && min > 0 ? 'exp' : 'lin' });
-  }
-  return out;
+export function firstLine(msg) {
+  const lines = String(msg || '').split('\n').map((l) => l.trim()).filter(Boolean)
+    .filter((l) => !/^Aborted\(/.test(l));
+  const one = lines.find((l) => /error/i.test(l)) || lines[0] || 'the compiler refused it';
+  return one.replace(/^\S+?:(\d+)\s*:\s*ERROR\s*:\s*/i, 'line $1, ').slice(0, 160);
 }
 
 /**
- * The slot builder for one step. Returns `(host) => ctl`.
+ * The slot builder for one mono program. Returns `(host) => ctl`.
  *
- * @param {{id: string, code: string, knobs: string[]}} step one of `SYNTH_STEPS`
- * @param {{url?: string}} [o] where the ahead of time instrument is; the step's own by default
+ * @param {{id: string, code: string, mono: boolean}} step one of `SYNTH_STEPS`
+ * @param {{url?: string}} [o] where the ahead of time program is; the step's own by default
  */
 export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
-  const sliders = slidersOf(step.code);
-  for (const k of step.knobs) if (!sliders.has(k)) throw new Error(`synth step ${step.id}: no hslider called ${k} in its code`);
+  if (!step.mono) throw new Error(`synth step ${step.id}: this slot plays a mono program and has no keys for a polyphonic one`);
+  const shipped = step.code.replace(/\n$/, '');
 
   return (host) => {
-    // ── the code, on the words side ─────────────────────────────────────────
-    const ev = host.parentElement?.querySelector(':scope > .sl-words .sl-ev');
-    if (!ev) throw new Error('synthSlot is for a split slide, whose words column holds the code');
-    const book = createHueBook();
-    book.assign(step.knobs);
-    const lines = step.code.replace(/\n$/, '').split('\n').length;
+    const scope = createWaveShape({ reason: null, colour: '--hi', height: WAVE_PX, name: 'output' });
+    const lines = shipped.split('\n').length;
     const code = createCodeBox({
-      language: 'faust', rows: Math.min(lines, CODE_ROWS), hues: book, label: '',
-      ariaLabel: `the Faust program this slide plays, ${lines} lines`, value: step.code.replace(/\n$/, ''),
+      language: 'faust', rows: lines, label: '', value: shipped,
+      ariaLabel: `the Faust program the Test tone plays, ${lines} lines, editable`,
     });
-    code.input.readOnly = true;
-    // wide enough for the longest line at the code box's 12.5 px mono, whose
-    // advance is 0.6 em, plus its padding and border, so a line never wraps
-    const longest = Math.max(...step.code.split('\n').map((l) => l.length));
-    const codeFit = fitBox(ev, Math.ceil(longest * 7.5) + 40);
-    codeFit.inner.append(code.el);
-    const toEnd = () => { code.scroller.scrollTop = code.scroller.scrollHeight; };
-    new ResizeObserver(toEnd).observe(code.scroller);
+    const note = el('span', 'sl-tone-note', NOTE.shipped);
+    const tone = el('button', 'sl-tone', 'Test tone', { type: 'button', 'aria-pressed': 'false' });
 
-    // ── the instrument, in the slot ─────────────────────────────────────────
-    let node = null, out = null, meter = null, armP = null, failed = null;
-    let presses = 0, stops = 0, arms = 0;
-    const held = new Set();
-    const addr = new Map();
+    const panel = createInstrumentPanel({ viz: scope.el, plate: { name: 'FAU', status: note, patch: tone }, full: true });
+    const codeRow = panel.addRow(code.el, { pad: false });
+    const mid = el('div', 'sl-mid');
+    mid.append(panel.el);
+    const fb = fitBox(host, PANEL_PX);
+    fb.inner.append(mid);
 
-    const knobs = step.knobs.length ? createParamKnobs({
-      onChange: (name, v) => { const a = addr.get(name); if (node && a) node.setParamValue(a, v); },
-    }) : null;
-    if (knobs) {
-      knobs.set(step.knobs.map((n) => sliders.get(n)));
-      for (const n of knobs.names()) knobs.knob(n).el.style.setProperty('--param-hue', String(book.hueOf(n)));
+    let ctx = null, out = null, meter = null, node = null, nodeText = null;
+    let on = false, want = false, busy = null, err = null, raf = 0;
+    let presses = 0, stops = 0, compiles = 0, draws = 0, lastCompileMs = null, lastArmMs = null;
+    let compilerHere = false;
+
+    const text = () => code.value().replace(/\n$/, '');
+    const edited = () => text() !== shipped;
+    function say() {
+      note.textContent = busy ? NOTE.compiling : err ? NOTE.error
+        : !edited() ? NOTE.shipped : compilerHere ? NOTE.compiler : NOTE.edited;
+    }
+    code.input.addEventListener('input', () => {
+      if (err) { err = null; scope.set({ points: null, reason: null, name: 'output' }); }
+      say();
+    });
+
+    const buf = new Float32Array(2048);
+    function frame() {
+      raf = 0;
+      if (!on || !meter) return;
+      meter.getFloatTimeDomainData(buf);
+      // from the first rising zero crossing, so a steady tone stands still
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      const win = buf.subarray(i0, i0 + WINDOW);
+      let peak = 0;
+      for (const v of win) if (Math.abs(v) > peak) peak = Math.abs(v);
+      // drawn against the smallest round full scale above the peak, so a 0.1
+      // sine fills half the box and its label is a number somebody would type
+      const fs = FULL_SCALE.find((f) => f >= peak * 1.25) || FULL_SCALE[FULL_SCALE.length - 1];
+      scope.set({
+        points: Array.from(win, (v) => v / fs), reason: '', name: 'output',
+        axes: { y: `\u00b1${fs}`, x: `${((WINDOW / ctx.sampleRate) * 1000).toFixed(1)} ms` },
+      });
+      draws++;
+      raf = requestAnimationFrame(frame);
     }
 
-    const ctl = {
-      // never arms, never loads, never sounds: a step is not a press (plan 3.3)
-      start() { requestAnimationFrame(toEnd); },
-      stop() {
-        stops++;
-        for (const n of held) ctl.keys?.lightNote(n, false);
-        held.clear();
-        try { node?.allNotesOff?.(true); } catch { /* nothing sounding */ }
+    function graph(c) {
+      if (out) return;
+      out = c.createGain();
+      meter = c.createAnalyser();
+      meter.fftSize = 2048;
+      out.connect(c.destination);
+      out.connect(meter);
+    }
+
+    async function nodeFor(t) {
+      if (node && nodeText === t) return node;
+      const f = await import('./faust.mjs');
+      let parts;
+      if (t === shipped) {
+        parts = await f.faustFactory(url);
+      } else {
+        const t0 = performance.now();
+        const aborts = [];
+        busy = true;
+        tone.dataset.busy = '1';
+        say();
+        try {
+          parts = await f.faustCompile(`${step.id}_edit_${++compiles}`, t, { mono: true, onAbort: (l) => aborts.push(l) });
+        } catch (e) {
+          throw new Error(firstLine([e?.message, ...aborts].filter(Boolean).join('\n')));
+        } finally {
+          busy = null;
+          delete tone.dataset.busy;
+          compilerHere = f.hasCompiler();
+        }
+        lastCompileMs = performance.now() - t0;
+      }
+      const n = await f.faustNode(ctx, parts);
+      if (node) { try { node.disconnect(); node.destroy?.(); } catch { /* already gone */ } }
+      node = n;
+      nodeText = t;
+      return n;
+    }
+
+    function off() {
+      want = false;
+      if (on) { try { node?.disconnect(); } catch { /* not connected */ } }
+      on = false;
+      tone.setAttribute('aria-pressed', 'false');
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (!err) scope.set({ points: null, reason: null, name: 'output' });
+      release(ctl);
+    }
+
+    async function startTone() {
+      const t = text();
+      const t0 = performance.now();
+      want = true;
+      err = null;
+      say();
+      try {
+        const n = await nodeFor(t);
+        if (!want) return;
+        n.connect(out);
+        on = true;
+        lastArmMs = performance.now() - t0;
+        tone.setAttribute('aria-pressed', 'true');
+        if (!raf) raf = requestAnimationFrame(frame);
+      } catch (e) {
+        err = e?.message || String(e);
+        on = false;
+        want = false;
+        tone.setAttribute('aria-pressed', 'false');
+        scope.set({ points: null, name: 'does not compile', reason: err });
         release(ctl);
-      },
-      /** A note on, the way a pointer on a key plays one. For a check as well as for the keys. */
-      press(n) { down(n); },
-      /** That note off. */
-      lift(n) { up(n); },
-      armed: () => !!node,
-      /** The arm in flight or done, or null; it rejects when the arm failed. */
-      arming: () => armP,
-      failed: () => failed,
-      held: () => [...held],
+      }
+      say();
+    }
+
+    function press() {
+      presses++;
+      if (on || want) { off(); say(); return null; }
+      // inside the gesture, synchronously: the context, then this slot as its owner
+      ctx = sharedAudio();
+      claim(ctl);
+      graph(ctx);
+      return startTone();
+    }
+    tone.addEventListener('click', () => { press(); });
+
+    const ctl = {
+      start() {},
+      stop() { stops++; off(); say(); },
+      /** `Test tone`, the way a click on it does it. Returns the start in flight, or null for an off. */
+      press,
+      sounding: () => on,
+      /** What the scope last said in words, or null. */
+      error: () => err,
+      edited,
       presses: () => presses,
       stops: () => stops,
-      arms: () => arms,
-      /** RMS of one 2048 sample window of what this slot is putting out, 0 before it is armed. */
+      compiles: () => compiles,
+      draws: () => draws,
+      /** ms from a press to the tone sounding, and the compile inside it, for the last of each. */
+      lastArmMs: () => lastArmMs,
+      lastCompileMs: () => lastCompileMs,
+      /** RMS of one 2048 sample window of what this slot puts out, 0 before the first press. */
       level() {
         if (!meter) return 0;
-        const buf = new Float32Array(meter.fftSize);
         meter.getFloatTimeDomainData(buf);
         let s = 0;
         for (const v of buf) s += v * v;
         return Math.sqrt(s / buf.length);
       },
-      context: () => out?.context || null,
-      step, code, codeFit, knobs, url,
+      /** The frequency of what is sounding, from rising zero crossings across one window, or 0. */
+      hz() {
+        if (!meter || !ctx) return 0;
+        meter.getFloatTimeDomainData(buf);
+        let first = -1, last = -1, n = 0;
+        for (let i = 1; i < buf.length; i++) {
+          if (buf[i - 1] < 0 && buf[i] >= 0) { if (first < 0) first = i; last = i; n++; }
+        }
+        return n > 1 ? ((n - 1) * ctx.sampleRate) / (last - first) : 0;
+      },
+      context: () => ctx,
+      step, code, scope, tone, note, panel, codeRow, fb, url, shipped,
     };
-
-    function arm(ctx) {
-      if (!armP) {
-        armP = (async () => {
-          const { faustFactory, faustNode } = await import('./faust.mjs');
-          const parts = await faustFactory(url);
-          const n = await faustNode(ctx, parts, VOICES);
-          for (const a of n.getParams()) addr.set(a.split('/').pop(), a);
-          if (knobs) for (const [k, v] of knobs.values()) { const a = addr.get(k); if (a) n.setParamValue(a, v); }
-          out = ctx.createGain();
-          meter = ctx.createAnalyser();
-          meter.fftSize = 2048;
-          n.connect(out);
-          out.connect(ctx.destination);
-          out.connect(meter);
-          node = n;
-          arms++;
-          // the keys still down while it loaded are played now
-          for (const k of held) node.keyOn(0, k, VELOCITY);
-          return node;
-        })().catch((e) => { armP = null; failed = e; throw e; });
-        armP.catch(() => {});
-      }
-      return armP;
-    }
-
-    function down(n) {
-      presses++;
-      held.add(n);
-      // inside the gesture, synchronously: the context, then this slot as its owner
-      const ctx = sharedAudio();
-      claim(ctl);
-      if (node) node.keyOn(0, n, VELOCITY);
-      else arm(ctx);
-    }
-    function up(n) {
-      held.delete(n);
-      node?.keyOff(0, n, 0);
-    }
-
-    const keys = createKeyboard(el('div'), {
-      ...keyRange(SPAN), base: BASE, letters: false, chord: false, pad: false,
-      onDown: (n) => { keys.lightNote(n, true); down(n); },
-      onUp: (n) => { keys.lightNote(n, false); up(n); },
-    });
-    keys.el.style.setProperty('--k-min', `${KEY_PX}px`);
-    const panel = createInstrumentPanel({ keys: keys.el, plate: false });
-    if (knobs) panel.addRow(knobs.el);
-    const mid = el('div', 'sl-mid');
-    mid.append(panel.el);
-    const fb = fitBox(host, (keyRange(SPAN).whites + 1) * KEY_PX);
-    fb.inner.append(mid);
-    Object.assign(ctl, { keys, panel, fb });
     return ctl;
   };
 }
