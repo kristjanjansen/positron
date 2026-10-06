@@ -18,6 +18,8 @@
     "demo/shell/synth-steps.mjs#volume": "0c1ea757a7257081d3c9f0fdfc9ae9bd",
     "demo/shell/synth-steps.mjs#pitch": "f98c4f71b478c5c25578fa28d42338ad",
     "demo/shell/synth-steps.mjs#saw": "4363260dd36bd919c8f80485cb6d793e",
+    "demo/shell/synth-steps.mjs#filter": "8703f0354f1616e5276c3a1d4fc2d45d",
+    "demo/shell/synth-steps.mjs#lfo": "a36be72645013c1bf308fc88832e8220",
     "demo/shell/synth-steps.mjs#wave": "990c71285703ef862e85f576705ea674"
   },
   "artefacts": {
@@ -69,6 +71,22 @@
       "md5": "3a6f05647d3fdc3b71b221ae525af993",
       "bytes": 1805
     },
+    "filter.wasm": {
+      "md5": "a6c8e1cd6db34bb74f204bea8f2e3740",
+      "bytes": 4419
+    },
+    "filter.json": {
+      "md5": "074de41f58495c6d97001a20c4f507ff",
+      "bytes": 3553
+    },
+    "lfo.wasm": {
+      "md5": "919e545507a4e0a9b93be6b4773a1ebc",
+      "bytes": 5490
+    },
+    "lfo.json": {
+      "md5": "71278d8d8ace99f8202fc51093934fa9",
+      "bytes": 4055
+    },
     "wave.wasm": {
       "md5": "5920c50a52565f93ffd2a9888e47fe38",
       "bytes": 3391
@@ -85,6 +103,8 @@
       "volume": 0.353553492204339,
       "pitch": 0.353553492204339,
       "saw": 0.28605142609092316,
+      "filter": 0.26627529158442215,
+      "lfo": 0.2626555943428046,
       "wave": 0.353553492204339
     },
     "render": {

@@ -179,7 +179,12 @@ for (const w of (widths.length ? widths : WIDTHS)) {
   const url = `${BASE}/${slug}/${QUERY ? `?${QUERY}` : ''}${HASH ? `#${HASH}` : ''}`;
   await S('Page.navigate', { url });
   await sleep(WAIT);
-  if (EVAL) { await S('Runtime.evaluate', { expression: EVAL, awaitPromise: true }); await sleep(400); }
+  if (EVAL) {
+    // and prints what it returns, so one shot can also be a measurement
+    const r = await S('Runtime.evaluate', { expression: EVAL, awaitPromise: true, returnByValue: true });
+    if (r?.result?.value !== undefined) console.log(`  eval at ${w} px: ${typeof r.result.value === 'string' ? r.result.value : JSON.stringify(r.result.value)}`);
+    await sleep(400);
+  }
   if (HASH) {
     // ⚠️ THE HASH AGAIN AFTER THE WAIT. A tabbed page writes the opening part's
     // id over the address on its first `go`, so a fragment naming a block is
