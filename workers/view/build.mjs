@@ -27,6 +27,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { SYNTH_STEPS } from '../../demo/shell/synth-steps.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -478,19 +479,14 @@ const FILES = [
   // unedited program. A mono program is one `.wasm` and no mixer. The four
   // polyphonic steps that were listed here (osc2, env, filter, echo) and the
   // first one (osc) left the deck the same day.
-  ['demo/resources/faust/sine.json', 'resources/faust/sine.json'],
-  ['demo/resources/faust/sine.wasm', 'resources/faust/sine.wasm'],
-  // the third slide's program, the sine with its 0.5 on a slider (2026-10-06)
-  ['demo/resources/faust/volume.json', 'resources/faust/volume.json'],
-  ['demo/resources/faust/volume.wasm', 'resources/faust/volume.wasm'],
-  // the fourth slide's, the same with its 440 on a second slider (2026-10-06)
-  ['demo/resources/faust/pitch.json', 'resources/faust/pitch.json'],
-  ['demo/resources/faust/pitch.wasm', 'resources/faust/pitch.wasm'],
-  ['demo/resources/faust/saw.json', 'resources/faust/saw.json'],
-  ['demo/resources/faust/saw.wasm', 'resources/faust/saw.wasm'],
-  // the sixth slide's, the same with a choice of sine or saw (2026-10-06)
-  ['demo/resources/faust/wave.json', 'resources/faust/wave.json'],
-  ['demo/resources/faust/wave.wasm', 'resources/faust/wave.wasm'],
+  // 🔴 READ OFF `SYNTH_STEPS`, NOT TYPED, SINCE 2026-10-06: the filter and LFO
+  // slides shipped with their `.json` and `.wasm` missing from a hand list
+  // here, so both 404'd on the edge while every local check was green (the
+  // dev server serves `demo/` itself). Reported as *"does no compile"*. A
+  // step is one `.wasm` and its `.json`, hidden ones too, so a step brought
+  // back plays at once.
+  ...SYNTH_STEPS.flatMap((st) => [`${st.id}.json`, `${st.id}.wasm`]
+    .map((f) => [`demo/resources/faust/${f}`, `resources/faust/${f}`])),
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //
