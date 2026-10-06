@@ -147,7 +147,16 @@ export function createControlGrid(o = {}) {
       // The intrinsic size, with the pitch taken OFF, or the second call would
       // measure the width this function set on the first.
       c.style.width = 'auto';
-      const r = c.getBoundingClientRect();
+      /* 🔴 THE LAID OUT SIZE, NOT THE RECT, SINCE 2026-10-06. A rect is the
+         box AFTER every transform above it, and a grid scaled into a slide by
+         `fitBox` (`slide.mjs`) measured its cells at the slide's scale, wrote
+         that as its pitch and then drew at it scaled AGAIN: on the front
+         page's synths deck the knobs were clipped to their values, the dials
+         and names cut off. The computed width and height are the box before
+         any transform, and for a grid nobody scales they are the rect's own
+         numbers, so no other page moves. */
+      const cs = getComputedStyle(c);
+      const r = { width: parseFloat(cs.width) || 0, height: parseFloat(cs.height) || 0 };
       if (r.width > w) w = r.width;
       if (r.height > h) h = r.height;
     }

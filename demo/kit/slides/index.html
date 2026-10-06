@@ -36,6 +36,8 @@
   import { createPanelLayout } from '/shell/panel-layout.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
   import { OLED_LIT, drawOled, oledText, createOledParts } from '/shell/oled-view.mjs';
+  import { mountDecks } from '/shell/decks.mjs';
+  import { contexts as audioContexts, audioOwner } from '/shell/audio.mjs';
 
   /**
    * 🔴 kit/slides, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
@@ -181,6 +183,35 @@
     ],
   };
 
+
+  // ── SYNTHS DECK ───────────────────────────────────────────────────────────
+  // 🔴 THE FRONT PAGE'S DECKS, MOUNTED HERE THE WAY THE FRONT PAGE MOUNTS THEM,
+  // 2026-10-06, for the `synths` deck (*"do slide deck Synths in code in the fau
+  // examples ... keep it simple. add to frontpage"*). `mountDecks()` from
+  // `demo/shell/decks.mjs` into a `[data-decks]` holder, so the two half width
+  // players, the brand deck and the synths deck, are the ones a visitor to
+  // https://positron.studio/ gets, at the size they get them. The newest block,
+  // so it is the first.
+  // 🔴 ITS CHECKS ARE `plans/plan-live-slides.md` SECTION 7 AND RUN LAST, behind
+  // `?selfcheck=1` like every check here, because they are the only ones on
+  // this page that fetch anything: a key press arms the slide, which imports
+  // the Faust runtime and fetches that step's compiled instrument. The visit,
+  // and a step through the deck, open nothing; that is asserted before the press.
+  section('SYNTHS DECK',
+    'The two decks the front page plays, mounted the same way. The synths deck grows a few lines '
+    + 'of Faust by one element a slide, the program on one side and the instrument it compiles to '
+    + 'on the other. A key arms its slide: the compiled program is fetched then and not before.',
+    `mountDecks(holder);   // holder carries data-decks, as on the front page; one player per deck`,
+    (box) => {
+      box.classList.add('kit-sl');
+      const holder = el('div', 'pos-decks');
+      holder.dataset.decks = '';
+      box.append(holder);
+      const players = mountDecks(box);
+      const synths = players.find((p) => p.el.dataset.deck === 'synths');
+      slideKit.comps.synths = { players, p: synths, holder };
+      slideKit.specs.push(...synths.slides.map((s) => s.spec));
+    });
 
   // ── THE PLAYER ────────────────────────────────────────────────────────────
   // 46 rows and 44 built: CLAUDE.md's count command over the manifest, run
@@ -2023,8 +2054,11 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       // slides are the first thing set in the face and in the accidentals, so
       // a font file can arrive while the checks run, where in `/kit/` an
       // earlier part had already asked for it. The face is graded below.
+      // ⚠️ NOR THE PAGE'S OWN ICON, since 2026-10-06: the shell links
+      // `/favicon.ico` as a file now (the β+ brand mark), where it used to
+      // draw an inline SVG that fetched nothing.
       const other = during.filter((n) => !wasm.includes(n)
-        && !(new URL(n).origin === location.origin && /^\/shell\/vendor\/[^/]+\.woff2$/.test(new URL(n).pathname)));
+        && !(new URL(n).origin === location.origin && (/^\/shell\/vendor\/[^/]+\.woff2$/.test(new URL(n).pathname) || new URL(n).pathname === '/favicon.ico')));
       const faces = after.filter((e) => /\/shell\/vendor\/jetbrains-mono/.test(e.name));
       const foreign = faces.filter((e) => new URL(e.name).origin !== location.origin);
       d.assert(`SLIDES: the visit and the grading fetched exactly one file, ${WASM} from this origin, and the face came from this origin`,
@@ -2064,6 +2098,157 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
         !T.deck.playing() && T.deck.position() === at && !T.chainRunning() && !B.deck.playing(),
         `the strip's deck ${T.deck.playing() ? 'PLAYING' : 'stopped'} at ${at.toFixed(0)}, its timer ${T.chainRunning() ? 'ARMED' : 'off'}, `
         + `the bar's deck ${B.deck.playing() ? 'PLAYING' : 'stopped'}`);
+    }
+
+    // ── SYNTHS DECK: plans/plan-live-slides.md section 7 ───────────────────
+    // 🔴 LAST, BECAUSE THESE ARE THE ONLY CHECKS HERE THAT FETCH ANYTHING: a key
+    // press arms a slide, which imports the Faust runtime and fetches that
+    // step's compiled program. Everything above has already graded the visit as
+    // fetching one file, and these run after that and say what they add.
+    // Every reading is the far side of a boundary: the resource list the
+    // browser keeps, the count of contexts `audio.mjs` has made, an analyser on
+    // the graph, the context's own `state`.
+    await synthChecks();
+  }
+
+  async function synthChecks() {
+    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+    const until = async (f, ms) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < ms) await nap(25); return f(); };
+    const Y = slideKit.comps.synths;
+    const p = Y.p;
+    const ENGINE = /\/fau\/vendor\/|\/resources\/faust\/|\/shell\/faust\.mjs/;
+    const engine = () => performance.getEntriesByType('resource').map((e) => e.name).filter((n) => ENGINE.test(new URL(n).pathname));
+    const ctlOf = (i) => p.slides[i].ctl;
+    const synthIdx = p.slides.map((s, i) => (s.ctl && s.ctl.press ? i : -1)).filter((i) => i >= 0);
+
+    // 1. a visit loaded no engine and made no sound device
+    const atVisit = engine();
+    d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext',
+      atVisit.length === 0 && audioContexts() === 0 && synthIdx.length === 5 && p.at() === 0,
+      `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
+      + `${audioContexts()} context(s) made, ${synthIdx.length} playable slides in a deck of ${p.slides.length}`);
+
+    // 2. a step through the whole deck opened nothing, and every slide fits at half width
+    const resAt = performance.getEntriesByType('resource').length;
+    const spills = [];
+    let sw = 0;
+    for (let i = 0; i < p.slides.length; i++) {
+      p.go(i);
+      await frames(3);
+      // the shown slide's width, read while it is shown: a hidden one is 0
+      sw = p.slides[i].el.getBoundingClientRect().width;
+      const inn = p.slides[i].el.querySelector('.sl-in');
+      if (inn.scrollHeight > inn.clientHeight + 1 || inn.scrollWidth > inn.clientWidth + 1) spills.push(p.slides[i].spec.name);
+    }
+    const stepped = performance.getEntriesByType('resource').slice(resAt).map((e) => e.name)
+      .filter((n) => !(new URL(n).pathname === '/_log' || /^\/shell\/vendor\/[^/]+\.woff2$/.test(new URL(n).pathname)));
+    d.assert('SYNTHS: stepping through every slide fetched nothing and made no AudioContext, and no slide spills at half width',
+      stepped.length === 0 && engine().length === 0 && audioContexts() === 0 && spills.length === 0 && p.at() === p.slides.length - 1,
+      `${p.slides.length} slides at ${sw.toFixed(0)} px wide, ${stepped.length} request(s)${stepped.length ? `: ${stepped.slice(0, 2).join(', ')}` : ''}, `
+      + `${audioContexts()} context(s)${spills.length ? `, SPILLING: ${spills.join(', ')}` : ''}`);
+
+    // the code beside each instrument is the program the slide compiles to
+    {
+      const bad = synthIdx.filter((i) => {
+        const c = ctlOf(i);
+        return c.code.value() !== c.step.code.replace(/\n$/, '') || !c.code.input.readOnly
+          || !p.slides[i].parts.ev.contains(c.code.el) || !p.slides[i].parts.slot.contains(c.keys.el)
+          || (c.knobs ? c.knobs.names().join() : '') !== c.step.knobs.join();
+      });
+      d.assert('SYNTHS: each playable slide shows its program read only on the words side and its keys and knobs in the slot',
+        bad.length === 0, `${synthIdx.length - bad.length} of ${synthIdx.length}${bad.length ? `, WRONG on ${bad.map((i) => p.slides[i].spec.name).join(', ')}` : ''}`);
+    }
+
+    // 3. a real press on a key sounds, read off an analyser on the graph
+    const i1 = synthIdx[0], c1 = ctlOf(i1);
+    p.go(i1);
+    await frames(3);
+    p.el.scrollIntoView({ block: 'center' });
+    await frames(2);
+    const row = c1.keys.el.querySelector('.keys');
+    const key = row.querySelector('.k:not(.sharp)');
+    const kr = key.getBoundingClientRect();
+    const kx = kr.left + kr.width / 2, ky = kr.bottom - kr.height * 0.2;
+    const atStep = p.at();
+    row.dispatchEvent(new PointerEvent('pointerdown', { clientX: kx, clientY: ky, bubbles: true, pointerId: 51, pointerType: 'mouse', button: 0 }));
+    const ctx = c1.context.bind(c1);
+    await until(() => c1.armed() || c1.failed(), 1800);
+    await until(() => c1.level() > 0.01, 1200);
+    const lvl = c1.level();
+    const fetched = engine();
+    const FLOOR = 0.01;
+    d.assert('SYNTHS: a pointer press on a key arms its slide and it sounds, RMS read off an analyser above a floor',
+      c1.armed() && lvl > FLOOR && audioContexts() === 1 && audioOwner() === c1 && p.at() === atStep && c1.presses() === 1,
+      `${c1.failed() ? `the arm FAILED: ${c1.failed().message}, ` : ''}RMS ${lvl.toFixed(4)} against a floor of ${FLOOR}, `
+      + `${audioContexts()} context(s), ${fetched.length} engine file(s) fetched by the press (${fetched.map((n) => new URL(n).pathname.split('/').pop()).join(', ')}), `
+      + `the deck ${p.at() === atStep ? 'stayed' : 'MOVED'} on slide ${atStep + 1}`);
+
+    // 4. leaving the slide lets every note go and suspends the context
+    const stops0 = c1.stops();
+    p.go(i1 + 1);
+    await until(() => ctx()?.state === 'suspended', 1000);
+    row.dispatchEvent(new PointerEvent('pointerup', { clientX: kx, clientY: ky, bubbles: true, pointerId: 51, pointerType: 'mouse', button: 0 }));
+    d.assert('SYNTHS: leaving a sounding slide lets its notes go, lets go of the sound and suspends the context',
+      c1.stops() === stops0 + 1 && c1.held().length === 0 && audioOwner() === null && ctx()?.state === 'suspended',
+      `${c1.stops() - stops0} stop(s), ${c1.held().length} note(s) still held, the owner ${audioOwner() === null ? 'none' : 'STILL SET'}, `
+      + `the context ${ctx()?.state}`);
+
+    // 5. one owner at a time: a second slide taking the sound stops the first
+    {
+      const a = ctlOf(i1 + 1), b = ctlOf(i1 + 2);
+      a.press(64);
+      await until(() => a.armed() || a.failed(), 1800);
+      const aStops = a.stops(), aOwned = audioOwner() === a;
+      b.press(67);
+      const handed = audioOwner() === b && a.stops() === aStops + 1 && a.held().length === 0;
+      await until(() => b.armed() || b.failed(), 1800);
+      await until(() => b.level() > 0.01, 1200);
+      const bl = b.level();
+      b.lift(67);
+      b.stop();
+      await until(() => ctx()?.state === 'suspended', 1000);
+      d.assert('SYNTHS: one slide sounds at a time, a second one claiming the sound stops the first, and both share one context',
+        aOwned && a.armed() && handed && b.armed() && bl > FLOOR && audioContexts() === 1
+          && a.context() === b.context() && audioOwner() === null && ctx()?.state === 'suspended',
+        `${p.slides[i1 + 1].spec.name} ${aOwned ? 'owned it' : 'NEVER owned it'}, then ${p.slides[i1 + 2].spec.name} took it `
+        + `${handed ? 'and the first was stopped' : 'and the first was NOT stopped'}, RMS ${bl.toFixed(4)}, `
+        + `${audioContexts()} context(s), the context ${ctx()?.state} at the end`);
+    }
+
+    // 6. a tap on a key in full screen on a touch screen does not step the deck
+    {
+      p.go(i1);
+      await frames(3);
+      const keysNow = [...c1.keys.el.querySelectorAll('.keys .k')];
+      p.touchMode(() => true);
+      await p.panel.full(true);
+      await frames(6);
+      const full = p.panel.isFull();
+      const sr = p.panel.stage.getBoundingClientRect();
+      const right = keysNow.map((k) => k.getBoundingClientRect()).filter((r) => r.width > 0 && r.left + r.width / 2 > sr.left + sr.width * 2 / 3);
+      const t0 = p.taps();
+      const at0 = p.at();
+      if (right.length) {
+        const r = right[right.length - 1];
+        const target = document.elementFromPoint(r.left + r.width / 2, r.bottom - 4);
+        (target || keysNow[keysNow.length - 1]).dispatchEvent(new MouseEvent('click',
+          { clientX: r.left + r.width / 2, clientY: r.bottom - 4, bubbles: true, cancelable: true }));
+      }
+      const onKey = p.at();
+      // NEGATIVE: the same tap on the slide's own ground in that third does step
+      p.slides[p.at()].el.dispatchEvent(new MouseEvent('click',
+        { clientX: sr.left + sr.width * 5 / 6, clientY: sr.top + 4, bubbles: true, cancelable: true }));
+      const onGround = p.at();
+      p.touchMode(() => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches);
+      await p.panel.full(false);
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      await frames(6);
+      p.go(0);
+      d.assert('SYNTHS: in full screen on a touch screen a tap on a key in the right third leaves the slide, and a tap on the ground there steps',
+        full && right.length > 0 && onKey === at0 && onGround === at0 + 1 && p.taps() - t0 === 1 && !p.panel.isFull(),
+        `${full ? 'full' : 'NOT full'}, ${right.length} key(s) in the right third, a tap on one left the deck on ${onKey + 1}, `
+        + `a tap on the ground took it to ${onGround + 1}, ${p.taps() - t0} tap(s) stepped`);
     }
   }
 </script>
