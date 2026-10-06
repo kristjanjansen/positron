@@ -161,6 +161,16 @@
    same formula, so `Cloudflare` on a slide is the colour of the Cloudflare
    box. The hue is a custom property per span. */
 .sl-hue { color: color-mix(in oklab, hsl(var(--sl-hue) 72% 62%) 62%, var(--fg)); }
+/* A NAME OUT OF A PROGRAM, `` `volume` `` in a slide's words, 2026-10-06:
+   *"var name is in monospace inside text"*. The slide's own mono face at the
+   size, weight and ink of the words around it (a `<code>` would otherwise
+   take the UA's smaller monospace size). Coloured only when `hueVars()` gave
+   it a knob's hue, by the code box's own formula for that name
+   (`.pos-tk-pvar[data-hue]` in shell.css), so the word, the code and the knob
+   read one hue. */
+.sl-var { font-family: 'Slide JetBrains Mono', var(--mono); font-size: 1em; font-weight: inherit;
+  letter-spacing: 0; color: inherit; background: none; padding: 0; }
+.sl-var[data-hue] { color: hsl(var(--param-hue) 75% 72%); }
 /* Two lines of a headline, or of a specimen line, are kept even, so no word
    is left alone. */
 .sl-say, .sl-line { text-wrap: balance; }
