@@ -71,11 +71,11 @@ const WAVE_PX = 120;
 export const WINDOW = 512;
 /** The scope's full scales, the smallest that clears the peak by a quarter is used. */
 export const FULL_SCALE = [0.05, 0.1, 0.2, 0.5, 1, 2];
-/** The scope at rest: its name, `no signal`, and the scale the shipped sine
+/** The scope at rest: its name and the scale the shipped sine
  * is drawn against (a 0.1 sine reads on the 0.2 scale over 512 samples at
  * 48 kHz), so an idle scope says what it will measure. 2026-10-06, *"show
  * labels when no signal on waveform?"*. */
-const IDLE = Object.freeze({ points: null, name: 'output', reason: 'no signal',
+const IDLE = Object.freeze({ points: null, name: 'output', reason: null,
   axes: { y: '\u00b10.2', x: `${((WINDOW / 48000) * 1000).toFixed(1)} ms` } });
 
 /* 🔴 NO NOTE ON THE PLATE, AND AN EDIT COMPILES ITSELF, since 2026-10-06:
