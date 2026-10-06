@@ -409,11 +409,13 @@
   font-variant-numeric: tabular-nums; min-width: 7ch; text-align: center;
 }
 /* THE DECK'S TITLE IN THE COUNT'S SLOT (`createSlidePlayer({ title })`), a
-   link to the deck's own page. The count's face and size, one line, in the
-   page's ink rather than the count's dim, so it reads as a name and not as a
-   number; underlined only under a pointer, the way a card title is. */
-a.sl-title { color: var(--fg); text-decoration: none; white-space: nowrap; }
-a.sl-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+   link to the deck's own page. Since 2026-10-06 (*"ceter. less emphasis. sans
+   serif"*, with a screenshot): the page's sans at the count's size, in the
+   count's dim, centred in its slot; the page's ink and an underline only
+   under a pointer, the way a card title answers one. */
+a.sl-title { font: 400 12px/1 var(--sans); color: var(--dim); text-decoration: none;
+             white-space: nowrap; justify-self: center; text-align: center; }
+a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── the decks on the front page (shell/decks.mjs) ──────────────────────────
    Two half width players a row, asking the row's OWN width and becoming one
