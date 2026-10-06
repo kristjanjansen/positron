@@ -488,6 +488,9 @@ const FILES = [
   ['demo/resources/faust/pitch.wasm', 'resources/faust/pitch.wasm'],
   ['demo/resources/faust/saw.json', 'resources/faust/saw.json'],
   ['demo/resources/faust/saw.wasm', 'resources/faust/saw.wasm'],
+  // the sixth slide's, the same with a choice of sine or saw (2026-10-06)
+  ['demo/resources/faust/wave.json', 'resources/faust/wave.json'],
+  ['demo/resources/faust/wave.wasm', 'resources/faust/wave.wasm'],
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //

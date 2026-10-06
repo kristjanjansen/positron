@@ -54,6 +54,9 @@ const WORDS = {
       + 'Turn it to 880 and the tone goes up an octave' },
   saw: { text: '`os.sawtooth` puts a sawtooth where the sine was, brighter and buzzier. '
       + 'Watch the scope change shape' },
+  // slide 6, asked as *"how to make it a radio (sawtooth?)"*
+  wave: { text: '`nentry` with a radio style draws `wave` as a choice, and `select2` plays the sine or the saw by it. '
+      + 'Pick saw while the tone plays' },
 };
 const SYNTHS = [
   { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in *code*']],

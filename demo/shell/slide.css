@@ -524,3 +524,13 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .pos-ipanel.sl-synth-panel > .pos-rows-r.sl-synth-code { align-items: stretch; }
 .sl-synth-code > .pos-code { align-self: stretch; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .sl-synth-code .pos-code-scroll { flex: 1 1 auto; min-height: 0; max-height: none; height: auto; }
+/* THE KNOB ROW WITH A RADIO IN IT (slide-synth.mjs, slide 6's `wave`): the
+   knobs' lattice, then each choice in a cell of its own with its name under it
+   in the knobs' label type and its hue, the row no taller than a knob. */
+.sl-synth-ctls { display: flex; align-items: stretch; gap: var(--ctl-gap); min-width: 0; }
+.sl-synth-ctls > [hidden] { display: none; }
+.sl-radios { display: flex; gap: var(--ctl-gap); }
+.sl-radio { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.sl-radio .pos-choice { margin-block: auto; }
+.sl-radio-head { visibility: hidden; }
+.sl-radio[data-param] .sl-radio-lab { color: hsl(var(--param-hue) 70% 62%); }
