@@ -467,6 +467,15 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .pos-decks { container-type: inline-size; }
 .pos-decks-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(2 * var(--ctl-gap, 10px)); }
 @container (max-width: 560px) { .pos-decks-in { grid-template-columns: minmax(0, 1fr); } }
+/* 🔴 THE FRAME IS DRAWN BEFORE THE DECK, 2026-10-06, asked as *"slides "pop
+   in" in frontpage. show the frame, lazyload ocntents"*. `groupHTML` in
+   `manifest.mjs` writes one empty player box per deck into the page's own
+   HTML, from the player's own classes (`pos-vp`, `pos-vp-stage` at 16:9,
+   `pos-vp-foot`), so it is the same box by construction rather than by a
+   typed height; the footer's one reserved line is a control's 34 px, the
+   stepper's and the full screen button's. `mountDecks` builds the player when
+   the frame nears the screen and puts it in the frame's place. */
+.pos-deck-ph { display: block; height: 34px; }
 /* THE SYNTHS DECK'S TITLE set solid, its two lines one block. The brand rules
    that shared this selector moved to `brand-slides.css` on 2026-10-06. */
 .sl-player .sl[aria-label="synths in code"] .sl-ev { gap: 0; }
