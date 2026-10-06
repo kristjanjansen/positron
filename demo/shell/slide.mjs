@@ -36,6 +36,13 @@
 //              sections here. top 2/3 is darker ... below in lighter area
 //              title an desc"*)
 //   side       for 'split', which side the slot is on: 'left' or 'right'
+//   cols       for 'split', the words column to the slot's: '1:1' (default)
+//              or '1:2', the words a third of the slide and the slot two
+//              thirds, the divide at exactly one third from the words' edge
+//              (2026-10-06, the synths deck: *"use 1:2 cols layout"*)
+//   bottom     for 'split', true sets the headline and the words together on
+//              the foot of their column (the same day: *"align text to
+//              bottom of slide"*)
 //
 // Marks in any string: `*x*` paints x in `--hi`, `[x|tech]` paints x in the
 // hue `diagram.mjs` gives that technology (`[Cloudflare|cloudflare]`), at the
@@ -241,7 +248,9 @@ export const tableStep = (lines, frame) => (frame ? (lines > 2 ? 2 : 3) : evStep
 
 // ── the slide model ─────────────────────────────────────────────────────────
 export const LAYOUTS = ['stack', 'top', 'left', 'split', 'band'];
-const KEYS = new Set(['name', 'layout', 'side', 'say', 'statement', 'big', 'under', 'text', 'textStep',
+/** A split's words column to its slot, see `cols` in the header. */
+export const SPLIT_COLS = ['1:1', '1:2'];
+const KEYS = new Set(['name', 'layout', 'side', 'cols', 'bottom', 'say', 'statement', 'big', 'under', 'text', 'textStep',
   'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes', 'title', 'by', 'date', 'place']);
 
 /**
@@ -330,7 +339,12 @@ export function normalise(spec) {
   if (layout === 'split') {
     if (!spec.slot) throw new Error('a split slide needs a slot, the thing beside the words');
     if (spec.side !== 'left' && spec.side !== 'right') throw new Error('a split slide says which side its slot is on, left or right');
-  } else if (spec.side) throw new Error(`side is for a split slide, not ${layout}`);
+    if (spec.cols != null && !SPLIT_COLS.includes(spec.cols)) throw new Error(`a split's cols are ${SPLIT_COLS.join(' or ')}, not ${spec.cols}`);
+    if (spec.bottom != null && typeof spec.bottom !== 'boolean') throw new Error('bottom is true or false');
+  } else {
+    if (spec.side) throw new Error(`side is for a split slide, not ${layout}`);
+    if (spec.cols != null || spec.bottom != null) throw new Error(`cols and bottom are for a split slide, not ${layout}`);
+  }
   if (layout === 'band' && !spec.slot && !spec.big) throw new Error('a band slide needs a slot or a big figure for its top two thirds');
   if (spec.statement && (spec.big || spec.rows || spec.stack || spec.list)) {
     throw new Error('a statement is the whole slide, so it carries no evidence');
@@ -519,6 +533,9 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
   if (s.name) node.setAttribute('aria-label', s.name);
   node.dataset.layout = s.layout;
   if (s.side) node.dataset.side = s.side;
+  // ⚠️ 1:1 WRITES NO ATTRIBUTE, so every split before this option is untouched
+  if (s.cols && s.cols !== '1:1') node.dataset.cols = s.cols;
+  if (s.bottom) node.dataset.bottom = '';
   frame.append(node);
   const box = el('div', 'sl-in');
   node.append(box);
