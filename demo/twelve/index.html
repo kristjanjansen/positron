@@ -422,6 +422,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode, classifyEncoder, classifyBend } from '/shell/midi-decode.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
+  import { createMidiNode, checkMidiNode } from '/shell/midi-node.mjs';
   import { createPresenceButton, WIRED } from '/shell/presence.mjs';
 
   /**
@@ -967,6 +968,15 @@ const PAN_SCALE = 2;
   const traffic = createMidiLog({ empty: '', reserve: 6 });
   d.el.append(traffic.el);
 
+  /* 🔴 ON THE PATCHBAY ON A PRESS OF Join, NEVER ON LOAD (plans/plan-routing-migration.md
+     step 5). The instruments plugged into this machine are announced as devices,
+     keyed by their ports and never by their names, so `/patchbay/` can draw and
+     link them. Join sits outside `.pos-controls` and asks for MIDI first
+     when Listen has not. `/shell/midi-node.mjs` has the rest. */
+  const bayMidi = createMidiNode({ slug: 'twelve', log: (line, kind) => d.log(line, kind),
+    listen: async () => { if (!access) await d.run('listen'); return access; } });
+  d.el.append(bayMidi.el);
+
   /**
    * One message from the desk, routed by arithmetic.
    *
@@ -1092,6 +1102,7 @@ const PAN_SCALE = 2;
       access = await navigator.requestMIDIAccess({ sysex: false });
       await wire();
       access.onstatechange = () => wire();
+      bayMidi.attach(access);
       return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
@@ -1687,6 +1698,8 @@ const PAN_SCALE = 2;
       `${traffic.count()} rows`);
 
     d.assert('no secret in this page', !location.href.includes('token'));
+
+    await checkMidiNode({ assert: d.assert, log: d.log, page: bayMidi, slug: 'twelve' });
   });
 
   render();

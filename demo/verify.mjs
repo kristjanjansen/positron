@@ -15,6 +15,7 @@ import { claimProfile } from './harness-profile.mjs';
 import { startStation } from './fake-station.mjs';
 import { startTapes } from './fake-tapes.mjs';
 import { startErr } from './fake-err.mjs';
+import { startBoard } from './fake-board.mjs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // 🔴 A FIXED PORT IS A SHARED MUTABLE GLOBAL, and this file still had two of
@@ -200,6 +201,38 @@ if (all.some((t) => ERR_PAGES.includes(t.name))) {
     standIns.push(err);
     console.log(`stand-in broadcaster ${errAt} (nobody's ERR)`);
   }
+}
+
+/**
+ * 🔴 THE BOARD PAGES MEET A BOARD THAT IS NOBODY'S, AND THE RELAY GOES WITH IT.
+ * plans/plan-routing-migration.md §3.8, step 4. `/away/` and `/knobs/` are
+ * `room: 'fixed'`, so until this they joined the PRODUCTION relay's `studio-1`
+ * rooms on every run, beside the Raspberry Pi and whoever was listening to it.
+ * Now `demo/fake-board.mjs` starts its own `demo/fake-relay.mjs` on 127.0.0.1
+ * and these pages get `?relay=` (wire.mjs `relayOverride`), so a run opens no
+ * socket off this machine for them.
+ * ⚠️ `listening: true` HOLDS THE CIRCUIT'S LEASE AS ANOTHER LISTENER WOULD. A
+ * page under `?selfcheck=1` may not take one (`createBoard` refuses every send),
+ * so without it the frames never come and the page's level checks never run.
+ * A listener elsewhere is a state the real board is in every time somebody is
+ * playing, so it is not a generosity the real thing lacks.
+ * ⚠️ `board=1` IS NOT ADDED. The page's own guard asserts (a harness cannot
+ * drive the board) stay graded; `DEMO_QUERY=board=1` drives the stand-in for
+ * real. `DEMO_QUERY=relay=...` still comes first, but `relayOverride` takes a
+ * loopback address only, so it can move a page that leaves its relay to
+ * wire.mjs onto another stand-in and never back onto the production relay.
+ * (`/away/` hands `createBoard` its own `q.get('relay')` unchecked, so that
+ * page alone would follow any address it is given.)
+ * ⚠️ ONE LINE PER PAGE TO ADD ONE. `patchbay` and `shape` also open
+ * `createBoard` and are left out on purpose until their own agents move them.
+ */
+const BOARD_PAGES = ['away', 'knobs'];
+if (all.some((t) => BOARD_PAGES.includes(t.name))) {
+  const fb = startBoard({ port: 0, quiet: true, listening: true });
+  const relayUrl = await fb.ready;
+  for (const n of BOARD_PAGES) standIn.set(n, { relay: relayUrl });
+  standIns.push(fb);
+  console.log(`stand-in board ${relayUrl}/room/studio-1 (nobody's Raspberry Pi, on nobody's relay)`);
 }
 
 // DEMO_BASE=https://positron.studio node demo/verify.mjs  -> verify the DEPLOY
@@ -705,7 +738,8 @@ for (const t of targets) {
   // is a fact about the run, not a per-demo setting to keep in step. A page that
   // needs it opts in by reading it.
   const q = [process.env.DEMO_QUERY, own, DEEP ? 'selfcheck=2' : 'selfcheck=1',
-    standIn.has(t.name) ? `base=${standIn.get(t.name)}` : ''].filter(Boolean).join('&');
+    standIn.has(t.name) ? (typeof standIn.get(t.name) === 'object'
+      ? `relay=${standIn.get(t.name).relay}` : `base=${standIn.get(t.name)}`) : ''].filter(Boolean).join('&');
   const query = q ? `?${q}` : '';
   // 🔴 A PAGE WITH BOTH ENDS OF A WebRTC LEG IN ONE BROWSER NEEDS EVERY HOST
   // INTERFACE, AND CHROME ONLY OFFERS ONE UNTIL A MICROPHONE IS ALLOWED.

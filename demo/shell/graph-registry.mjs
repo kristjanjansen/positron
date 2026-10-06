@@ -19,7 +19,34 @@
 // `site:node:port`, exactly what `bay.addNode` and `bay.addPort` take.
 
 export const GRAPH_V = 1;
-export const STALE_MS = 15_000;          // three missed board beats
+/** Three missed board beats. `bay.mjs` imports this one number since
+ *  2026-10-06, so a port goes stale to the bay and to the registry together. */
+export const STALE_MS = 15_000;
+
+/**
+ * 🔴 HOW THE BOARD'S STREAMS REALLY TRAVEL, AS `bay.mjs` PORT `transports`,
+ * SINCE 2026-10-06 (plans/plan-routing-migration.md §3.2, stage plan F1 and
+ * F2). The board's sound is relay PCM, or a data channel once a page goes
+ * direct (`board.mjs` `goDirect`); its picture is relay H.264 decoded with
+ * WebCodecs, never WHEP. Without this the bay chose WHEP for the board's video
+ * from the table, and a page that dispatches on the session's transport would
+ * have nothing to open it with.
+ * ⚠️ THE PI ANNOUNCES WHAT ITS OWN COPY OF THIS FILE SAYS, and a change here
+ * reaches it only by `rig/board/push.sh`. Until then a board graph arrives
+ * without `transports`, so `withBoardTransports` fills them in on ingest, from
+ * this one table, and a graph that already says something keeps what it says.
+ */
+export const BOARD_TRANSPORTS = { audio: ['relay', 'datachannel'], video: ['relay-h264'] };
+export function withBoardTransports(g) {
+  if (!g || !Array.isArray(g.ports)) return g;
+  let changed = false;
+  const ports = g.ports.map((p) => {
+    if (p?.dir !== 'out' || p.transports || !BOARD_TRANSPORTS[p.medium]) return p;
+    changed = true;
+    return { ...p, transports: [...BOARD_TRANSPORTS[p.medium]] };
+  });
+  return changed ? { ...g, ports } : g;
+}
 
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 
@@ -50,12 +77,14 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
     // A synth lives in the board's MAIN room: `audio.start` and `note.on` go
     // there, and its sound comes back down the same socket.
     port(n, 'in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [], address: room });
-    port(n, 'audio', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room });
+    port(n, 'audio', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room,
+      transports: [...BOARD_TRANSPORTS.audio] });
   }
   if (gpu) {
     node('gpu', 'engine', 'GPU');
     port('gpu', 'program', { label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
-    port('gpu', 'video', { label: 'GPU', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-video` });
+    port('gpu', 'video', { label: 'GPU', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-video`,
+      transports: [...BOARD_TRANSPORTS.video] });
   }
   // A hardware input is an instrument on the desk: its sound comes in through
   // the board's audio interface, and its MIDI goes out through the gate.
@@ -66,7 +95,7 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
     // The address is the room the board's input really streams into, which
     // `rig/board/inputs.mjs` names `<room>-<input>`.
     port(n, 'audio', { label: i.name, dir: 'out', medium: 'audio',
-      shape: { rate: 48000, channels: 1, frameMs }, address: `${room}-${i.name}` });
+      shape: { rate: 48000, channels: 1, frameMs }, address: `${room}-${i.name}`, transports: [...BOARD_TRANSPORTS.audio] });
     if (i.midi) {
       inputPorts.add(String(i.midi.port).toLowerCase());
       port(n, 'in', { label: i.name, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], never: ['sysex'],
@@ -99,28 +128,45 @@ export function graphProblem(g) {
 }
 
 /**
- * What the pages hear. One announcement per socket, newest wins, and an
- * announcement that has gone quiet for `staleMs` is still listed but marked,
+ * What the pages hear. One announcement per socket AND SITE, newest wins, and
+ * an announcement that has gone quiet for `staleMs` is still listed but marked,
  * because a board that stopped answering is a fact worth drawing.
+ * 🔴 KEYED BY SOCKET AND SITE SINCE 2026-10-06 (plan-routing-migration §3.3,
+ * stage plan F3). It was one graph per socket, so a page that is two sites (a
+ * patchbay and the store it writes to, the stage and its fixed input) could
+ * only ever be one of them: its second announce replaced its first in every
+ * registry in the room.
+ * ⚠️ `merged` STILL KEEPS THE FRESHEST PER SITE ACROSS SOCKETS, which is why
+ * every page now takes a random site of its own (`bay-node.mjs`): two visitors
+ * announcing one site still overwrite each other, by design, because one site
+ * is one thing.
  */
 export function createRegistry({ now = () => Date.now(), staleMs = STALE_MS } = {}) {
-  const by = new Map();            // from -> { graph, at }
+  const by = new Map();            // `${from} ${site}` -> { from, graph, at }
 
   /** Read one wire message. Answers true when it changed what is known. */
   function ingest(msg) {
     if (!msg || !msg.from) return false;
-    const g = (msg.type === 'board.hello' || msg.type === 'board.alive' || msg.type === 'graph.announce') ? msg.graph : null;
+    const board = msg.type === 'board.hello' || msg.type === 'board.alive';
+    let g = (board || msg.type === 'graph.announce') ? msg.graph : null;
     if (!g) return false;
     if (graphProblem(g)) return false;
-    const was = by.get(msg.from);
+    if (board) g = withBoardTransports(g);
+    const key = `${msg.from} ${g.site}`;
+    const was = by.get(key);
     const same = was && JSON.stringify(was.graph) === JSON.stringify(g);
-    by.set(msg.from, { graph: g, at: now() });
+    by.set(key, { from: msg.from, graph: g, at: now() });
     return !same;
   }
-  const forget = (from) => by.delete(from);
+  /** Forget a socket, every site it announced, or one site of it when `site` is given. */
+  function forget(from, site = null) {
+    let gone = false;
+    for (const [k, e] of by) if (e.from === from && (site == null || e.graph.site === site)) { by.delete(k); gone = true; }
+    return gone;
+  }
   const stale = (e) => now() - e.at > staleMs;
   function graphs() {
-    return [...by.entries()].map(([from, e]) => ({ from, site: e.graph.site, at: e.at, stale: stale(e), graph: e.graph }));
+    return [...by.values()].map((e) => ({ from: e.from, site: e.graph.site, at: e.at, stale: stale(e), graph: e.graph }));
   }
   /** Every node and port heard, the freshest announcement per site winning. */
   function merged() {
