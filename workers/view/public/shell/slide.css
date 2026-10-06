@@ -456,3 +456,11 @@
 .sl-frame.pos-full:has(> .sl[data-layout="band"]) {
   background: linear-gradient(to bottom, var(--bg) calc(50% + 0.1133 * min(100vh, 56.25vw)), var(--card) 0);
 }
+
+/* THE HORIZONTAL LOGO (decks.mjs `logoRow`): β+ and the two words side by
+   side, centred on each other, the slide's inset between them, the words
+   left aligned and set solid. The + raised as on the stacked logo. */
+.dk-logo-row { display: flex; align-items: center; gap: var(--sl-pad); text-align: left; }
+.dk-logo-row .sl-t { margin: 0; }
+.dk-logo-row .dk-word { line-height: 1; }
+.dk-logo-row .dk-mark .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }

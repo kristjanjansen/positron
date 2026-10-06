@@ -150,9 +150,38 @@ const appIcon = iconSlot((col, sup, host) => {
   col.append(pair);
 }, [['raised', true]]);
 
+/**
+ * THE LOGO, HORIZONTAL, asked 2026-10-06 as *"add horizontal versoin for brand
+ * slide 1"*: the same β+ at step 6 with the + raised, and positron over studio
+ * at step 4 beside it instead of under it, the two blocks centred on each
+ * other. Built from the slide's own type classes (`sl-t6`, `sl-t4`), so every
+ * size is still a step of the slide's scale.
+ */
+function logoRow(host) {
+  const row = document.createElement('div');
+  row.className = 'dk-logo-row';
+  const mark = document.createElement('p');
+  mark.className = 'sl-t sl-t6 dk-mark';
+  const plus = document.createElement('span');
+  plus.className = 'sl-hi';
+  plus.textContent = '+';
+  mark.append('β', plus);
+  const words = document.createElement('div');
+  for (const w of ['positron', 'studio']) {
+    const p = document.createElement('p');
+    p.className = 'sl-t sl-t4 dk-word';
+    p.textContent = w;
+    words.append(p);
+  }
+  row.append(mark, words);
+  host.append(row);
+  return null;
+}
+
 export const DECKS = [
   { name: 'brand', slides: [
     { name: 'logo', layout: 'left', lines: [[6, 'β*+*'], [4, 'positron'], [4, 'studio']] },
+    { name: 'logo horizontal', slot: logoRow },
     { name: 'wordmark in fives', lines: ['posit', 'ron*.*s', 'tudio'].map((t) => [4, t]) },
     { name: 'wordmark in threes', lines: ['pos', 'itr', 'on*.*', 'stu', 'dio'].map((t) => [4, t]) },
     { name: 'favicon', slot: favicon, cap: 'the favicon at 16 and 32 px' },
