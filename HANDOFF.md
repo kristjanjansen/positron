@@ -2,13 +2,14 @@
 
 ## Where it is right now
 
-- ✅ **Site: BUILD `a3bfe31-090903-4c0b`**, confirmed on the edge. Committed to `9c0eda5` plus this handoff. **Not pushed** (needs the personal account, see CLAUDE.md).
-- Counted: **54 demos, 52 built**, **93 plans**. **No agent and no workflow is running.** The tree is clean.
+- ✅ **Site: BUILD `bc38cdb-093353-e25c`**, confirmed on the edge. **Not pushed** (needs the personal account, see CLAUDE.md).
+- Counted: **56 demos, 54 built**, **93 plans**. **No agent and no workflow is running.** The tree is clean.
 
 ## What landed, all deployed
 
 | commits | what | look at |
 | --- | --- | --- |
+| `bc38cdb` | **A page per deck**: `/slides/synths/` (`deckPage()`), the front page player's footer shows the deck title linking there (`createSlidePlayer({ title })`). **`/kit/logo/`**: the six brand slides one block each, from `demo/shell/brand-slides.mjs`; the brand deck is off the front page | https://positron.studio/kit/logo/ |
 | `a3bfe31` | **Routing migration** (`plans/plan-routing-migration.md` steps 0 to 5, an eight agent workflow): `bay.mjs` corrections (relay 1000 msg/s read from the relay, one 15 s stale window, per-port `transports` and per-link `via`, `heldBy`); `bay-node.mjs` (join on a press, `?room=`, a site per tab), `openers.mjs`, `link-badge.mjs`, `midi-graph.mjs`, `midi-node.mjs`; stand-ins `fake-relay.mjs` and `fake-board.mjs` (the board's own beat and inputs code, a pulsing tone), `?relay=` in `wire.mjs` for a local relay only. **/patchbay/ joins on Join and no longer announces into `studio-1` on every visit and suite run.** 14 of 54 pages on the patchbay: mirror (asks the Pi nothing until Show the board), knobs, away, circuit, evo, twelve, dump, nola, fau, collide, muta. patchbay+partitur 82/82, circuit evo twelve dump 205/205, mirror 50/50, collide 61, muta 59, away+knobs 95/97, fau 84/85, nola 114/116 (standing reds only) | https://positron.studio/patchbay/ |
 | `bcf56e1` `5c6f4e7` | **Front page `slides` group**, decks played in place (no deck pages): `demo/shell/decks.mjs`, `mountDecks()` on both renderers. **brand** deck: stacked β⁺ logo, horizontal logo, the `positron.studio` wordmark in fives and threes (dot yellow, centred), the favicon (inline β+) and the app icon (raised β⁺) | https://positron.studio/ |
 | `1163e11` `5c6f4e7` | **synths** deck: "Synths / in code", then a split with an instrument panel (scope, editable `os.osc(440) * 0.1`, FAU plate, Test tone). Shipped code plays from `resources/faust/sine.wasm` (2,345 B); an edit loads libfaust on the press (1 MB, said on the plate). kit/slides 87/87 | https://positron.studio/ then the synths deck |
