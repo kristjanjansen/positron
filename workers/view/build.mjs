@@ -416,8 +416,8 @@ const FILES = [
   // nor a subdirectory, and `.data` is not a web extension at all, so all four
   // of these would be declined in silence and the page would ship pointing at
   // four 404s. `checkVendorUrls()` is what refuses the build instead, which is
-  // why `demo/fau/index.html` writes each of them out as a whole quoted path in
-  // one object at the top of the file. ⚠️ AND WHY NEITHER FILE SPELLS A VENDOR
+  // why `demo/shell/faust.mjs` (until 2026-10-06 `demo/fau/index.html`) writes
+  // each of them out as a whole quoted path in one object. ⚠️ AND WHY NEITHER FILE SPELLS A VENDOR
   // PATH IN PROSE: this check reads comments as well as code, and refused this
   // very build over an ellipsis standing in for a file name.
   //
@@ -454,6 +454,24 @@ const FILES = [
   ['demo/fau/vendor/libfaust-wasm.js', 'fau/vendor/libfaust-wasm.js'],
   ['demo/fau/vendor/faustwasm.mjs', 'fau/vendor/faustwasm.mjs'],
   ['demo/fau/vendor/LICENSE-faustwasm', 'fau/vendor/LICENSE-faustwasm'],
+
+  // ── the Organ, compiled ahead of time, for a page with no compiler ─────────
+  //
+  // ⚠️ LISTED BY NAME FOR THE SAME REASON AS EVERY `.wasm` ABOVE: `demoFiles()`
+  // takes no `.wasm` and `demo/resources/` is not a demo. These are what
+  // `demo/shell/faust.mjs`'s `faustFactory('/resources/faust/organ.json')`
+  // fetches on a press: 13,332 B raw, against 6,162,473 B for the compiler
+  // (`plans/plan-live-slides.md` section 5). Made by
+  // `node demo/resources/build-faust-aot.mjs` from `demo/fau/presets.mjs`.
+  // 🔴 AND `checkFaustAot()` BELOW REFUSES THE BUILD WHEN THEY ARE STALE, which
+  // is `checkCompiledDefs()` for `/grains/` again: edit the Organ on `/fau/`
+  // and the ahead of time copy would go on playing the old one, with nothing
+  // 404ing and every number agreeing with itself.
+  ['demo/resources/faust/organ.json', 'resources/faust/organ.json'],
+  ['demo/resources/faust/organ.voice.wasm', 'resources/faust/organ.voice.wasm'],
+  ['demo/resources/faust/organ.effect.wasm', 'resources/faust/organ.effect.wasm'],
+  ['demo/resources/faust/mixer32.wasm', 'resources/faust/mixer32.wasm'],
+  ['demo/resources/faust/PROVENANCE.json', 'resources/faust/PROVENANCE.json'],
 
   // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
   //
@@ -786,6 +804,7 @@ checkImports(FILES);
 checkPresent(FILES);
 checkVendorUrls(FILES);
 checkCompiledDefs();
+await checkFaustAot();
 checkOut(OUT);
 
 // ⚠️ SAY WHICH BUILD THIS IS, BEFORE IT RUNS AND AGAIN AFTER. A scratch build
@@ -1048,6 +1067,65 @@ function checkVendorUrls(copied) {
  * own hash is checked too, so at least "the file in the repo is the file that
  * was weighed" is never in doubt.
  */
+/**
+ * 🔴 THE AHEAD OF TIME ORGAN MUST HAVE BEEN COMPILED FROM THE ORGAN `/fau/`
+ * SHOWS, BY THE COMPILER THIS REPOSITORY VENDORS, WITH THE FLAGS IT USES.
+ * `checkCompiledDefs()`'s twin, and for the same reason: a stale artefact
+ * plays the old instrument and nothing anywhere says so.
+ *
+ * `demo/resources/faust/PROVENANCE.json` records the md5 of the preset's TEXT
+ * (read out of `demo/fau/presets.mjs` by importing it, the same module the page
+ * imports), the md5 of each compiler file, the flags, and the md5 of each
+ * artefact. This re-takes all of them and refuses on any disagreement, with
+ * the command that remakes them in the message.
+ * ⚠️ IT DOES NOT COMPILE. A build must not boot a 6 MB compiler; the md5 of
+ * the source and of the compiler files is what a recompile would depend on,
+ * and `node demo/resources/build-faust-aot.mjs --check` is the full recompile,
+ * byte for byte and by RMS.
+ */
+async function checkFaustAot() {
+  const dir = 'demo/resources/faust';
+  const remake = 'node demo/resources/build-faust-aot.mjs';
+  let doc;
+  try { doc = JSON.parse(readFileSync(join(REPO, dir, 'PROVENANCE.json'), 'utf8')); }
+  catch (e) {
+    console.error(`\nBUILD REFUSED: ${dir}/PROVENANCE.json could not be read: ${e.message}\n  Make it with: ${remake}`);
+    process.exit(1);
+  }
+  const bad = [];
+  const sum = (b) => createHash('md5').update(b).digest('hex');
+  const { PRESETS } = await import(join(REPO, 'demo/fau/presets.mjs'));
+  const { FAUST_FLAGS } = await import(join(REPO, 'demo/shell/faust.mjs'));
+  for (const [key, want] of Object.entries(doc.sources || {})) {
+    const [file, id] = key.split('#');
+    const p = file === 'demo/fau/presets.mjs' ? PRESETS.find((x) => x.id === id) : null;
+    if (!p) { bad.push(`${key} names no preset in ${file}`); continue; }
+    const got = sum(p.code);
+    if (got !== want) bad.push(`the ${id} preset in ${file} has changed: ${want} recorded, ${got} now`);
+  }
+  for (const [rel, want] of Object.entries(doc.compiler?.files || {})) {
+    let got = null;
+    try { got = sum(readFileSync(join(REPO, rel))); } catch { bad.push(`${rel} is not on disk`); continue; }
+    if (got !== want) bad.push(`the compiler changed: ${rel} is ${got}, ${want} recorded`);
+  }
+  if (doc.flags !== FAUST_FLAGS) bad.push(`the flags changed: ${doc.flags} recorded, ${FAUST_FLAGS} in demo/shell/faust.mjs`);
+  for (const [name, meta] of Object.entries(doc.artefacts || {})) {
+    const rel = `${dir}/${name}`;
+    let got = null;
+    try { got = sum(readFileSync(join(REPO, rel))); } catch { bad.push(`${rel} is not on disk`); continue; }
+    if (got !== meta.md5) bad.push(`${rel} is not the file that was compiled: ${meta.md5} recorded, ${got} on disk`);
+  }
+  if (!Object.keys(doc.sources || {}).length || !Object.keys(doc.artefacts || {}).length) {
+    bad.push('PROVENANCE.json records no source or no artefact, so it proves nothing');
+  }
+  if (bad.length) {
+    console.error('\nBUILD REFUSED: the ahead of time Faust instrument no longer matches what it was compiled from:');
+    for (const b of bad) console.error('  ' + b);
+    console.error(`\n  Recompile it and re-take the hashes:\n  ${remake}`);
+    process.exit(1);
+  }
+}
+
 function checkCompiledDefs() {
   const dir = 'demo/grains/defs';
   let doc;

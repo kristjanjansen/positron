@@ -1,0 +1,49 @@
+{
+  "what": "The Organ preset from /fau/, compiled ahead of time so a page can play it with faustwasm.mjs alone and no compiler in the tab.",
+  "howToRemake": "node demo/resources/build-faust-aot.mjs (and --check to compare without writing)",
+  "compiledOn": "2026-10-06",
+  "compiler": {
+    "version": "2.89.2",
+    "files": {
+      "demo/fau/vendor/libfaust-wasm.wasm": "1e5eae88655b428decf4500be2fd591b",
+      "demo/fau/vendor/libfaust-wasm.data.txt": "4c807cafe4e8d7ef421bc24cc9f28b96",
+      "demo/fau/vendor/libfaust-wasm.js": "b24ed04dcf1ef3038325624a0fa97e07",
+      "demo/fau/vendor/faustwasm.mjs": "ea756db87333dffe7cd3b025ed375e23"
+    }
+  },
+  "flags": "-ftz 2",
+  "sources": {
+    "demo/fau/presets.mjs#organ": "720cca5b14c4464b77bb8e5c9b82620a"
+  },
+  "artefacts": {
+    "organ.voice.wasm": {
+      "md5": "dcbc1d207be0ace0371f5b6a3681bef9",
+      "bytes": 5578
+    },
+    "organ.effect.wasm": {
+      "md5": "3a352cdd5686270b014848b7cdce557b",
+      "bytes": 2328
+    },
+    "mixer32.wasm": {
+      "md5": "33e66c0bf6e9207919e7ce2ee90878a5",
+      "bytes": 502
+    },
+    "organ.json": {
+      "md5": "523f19e6f6a618d2ea9d6d96ad176860",
+      "bytes": 5029
+    }
+  },
+  "rms": {
+    "value": 0.09420737746123786,
+    "render": {
+      "sampleRate": 48000,
+      "block": 128,
+      "voices": 8,
+      "note": 60,
+      "velocity": 100,
+      "samples": 24000
+    },
+    "how": "createOfflineProcessor in node, one keyOn, channel 0. The ahead of time files and a live compile of the same source both gave this, to every digit."
+  },
+  "guard": "workers/view/build.mjs (checkFaustAot) REFUSES the build when the source, the compiler files, the flags or any artefact disagrees with this record."
+}
