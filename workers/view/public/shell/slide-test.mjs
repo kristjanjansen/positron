@@ -136,7 +136,7 @@ ok('in a split the words go one step down, never below step 1',
 
 /* ── the spec ──────────────────────────────────────────────────────────── */
 ok('a bare spec is a stack', normalise({ say: 'x' }).layout === 'stack');
-ok('all four layouts are known, right was removed', LAYOUTS.join() === 'stack,top,left,split');
+ok('all five layouts are known, right was removed', LAYOUTS.join() === 'stack,top,left,split,band');
 ok('a split with a slot and a side is fine',
   !throws(() => normalise({ layout: 'split', side: 'left', slot: () => null, say: 'x' })));
 ok('NEGATIVE: an unknown layout throws', throws(() => normalise({ layout: 'centre' })));
