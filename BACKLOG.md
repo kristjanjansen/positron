@@ -1,5 +1,7 @@
 ## Open
 
+- **Measure the new Cloudflare Containers start time against the old one** (2026-10-07). Asked: *"in bg test the speed of new cf containers, see the plan on lates news on it"*. The news is `research/cloudflare-birthday-week-2026-10-06.md` section 1: the `ctx.container` runtime with `scheduling_policy: "durable_object"`, quoted at 648 ms median start against "just over four seconds", for agent sandboxes and not for our image. Test bed `rig/containers/` (legacy `Container` class, earlier figures in `research/cf-containers-2026-08.md`). Production `workers/pub` is NOT touched. Background agent, reports, does not commit.
+
 - ~~**Front page type and whitespace as one system** (2026-10-07). Asked: *"help me imrove sdesign of frontpage. typo sizes and whitespace only. i am lost. use yr skills"*. Four sizes (24 name, 15 sentence, 12.5 card text, 10.5 section label) and two gaps (12 inside a group, 48 between groups) in `demo/shell/shell.css`.~~ DONE 2026-10-07
 
 - ~~**Three times the air above the front page sentence and twice under it** (2026-10-07). Asked: *"add 3 x more space on top and 2x more on bottom of Positron connects.."*.~~ DONE 2026-10-07
