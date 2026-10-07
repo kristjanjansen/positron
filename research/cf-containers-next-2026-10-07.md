@@ -304,3 +304,101 @@ pricing being per request and per active instance-second.
 - `rig/containers-next/sysinfo.txt`, `deploy-*.log`.
 - The main run used worker version `1865266b`; the probes used the next
   version, which adds only the `x-do-ms` and `x-proxy-ms` headers.
+
+## WebSockets and pub's lifecycle on the new runtime (2026-10-07, 16:34Z to 17:06Z)
+
+What `workers/pub` actually needs, read off `workers/pub/worker.mjs`: the DO
+TERMINATES every WebSocket itself (`ctx.acceptWebSocket`, hibernation API,
+tags `watch`, `cam`, `cam-refused`); no socket is proxied into the container.
+Camera chunks arrive as binary WebSocket messages on the DO and are POSTed
+into the container one by one. An alarm sweep every 30 s keeps the publish
+alive while anybody holds `/watch`. So a WebSocket upgrade through
+`getTcpPort().fetch()` was NOT tested: pub does not use one.
+
+Test bed: `rig/containers-next/` gained `/ws` (hibernatable socket on the DO,
+alarm sweep every 30 s that re-sets `setInactivityTimeout(60 s)`, two idle
+ticks of grace, then the alarm stops), and `container/server.mjs` gained
+`/enc/start` (a background `testsrc2` 720p30 x264 `-re` encode to null),
+`/enc/status`, `/echo` and `/udp`. Run by `rig/containers-next/ws-probe.mjs`,
+result in `ws-2026-10-07T16-41-49-682Z.json`. Two DOs at once, one holding
+`monitor()` for the container's life (as pub's port does) and one not.
+
+### MEASURED
+
+| | with monitor() | without monitor() |
+| --- | --- | --- |
+| socket open (client) | 931 ms | 870 ms |
+| container ready after start() | 562 ms | 546 ms |
+| socket held silent | 270 s | 270 s |
+| sweeps while held | 9, every one saw the same `bootAt` and the encode running | 9, same |
+| DO constructor runs (wakes) over the whole run | **1** | **13** (one per alarm, so it hibernated between sweeps) |
+| encode alive at the end of the hold | yes, 270 s | yes, 270 s |
+| binary 512 KiB over the socket, forwarded into the container by POST, checksum | match, 85 ms | match, 90 ms |
+| container running 102 s after the last alarm (alarm deleted, 60 s timeout) | **still running** | **stopped** |
+
+- **The container is not killed while a socket is held, with or without the
+  DO hibernating in between**, as long as an alarm wakes the object inside the
+  inactivity timeout. The alarm and `ctx.container` coexist; the alarm slot is
+  the DO's own.
+- **A pending `monitor()` keeps the DO in memory, and while it does the
+  inactivity timeout never starts.** That matches the docs (a pending
+  `monitor()` "prevents eviction for up to 15 minutes"). Consequence for pub:
+  with `monitor()` held, the timeout is not what stops an idle container; pub's
+  own sweep has to call `destroy()`. The port does exactly that.
+- A forward before the server listens THROWS `The container is not listening
+  in the TCP address 10.0.0.1:8080`, it does not answer 503. The first start
+  after an image push took about 10 s to listen (12.9 s in pub, below).
+- The client saw close code 1006 on one socket 8 s after it sent its own close
+  1000. INFERRED: the handler never answers a close and the object was
+  hibernated; pub's handler is the same on both runtimes, so this is not new.
+
+### The port's live test, behind `?rt=next` (pub worker, viewers untouched)
+
+- `positron-pub` now exports `Pub` (legacy, unchanged behaviour) and `PubNext`
+  (new runtime) from one class body; `?rt=next` routes any request to
+  `PubNext`, `PUB_RT` in `wrangler.jsonc` is the default and is still
+  `legacy`. Two container entries in one worker were accepted by wrangler
+  4.148.0. The first deploy returned `Internal Server Error 500` while creating
+  the new application ("The Worker version was deployed, but Wrangler could not
+  finish applying its Durable Object-managed Container application settings");
+  re-running the same deploy succeeded.
+- **The WHIP leg died on the new runtime and not on the legacy one.** MEASURED
+  over 150 s with the legacy publisher idle: `exit 245`, "Error muxing a packet
+  / Task finished with error code: -11 (Resource temporarily unavailable)", 2
+  to 15 s after each start, every retry, while the RTMPS leg in the same
+  container held. The legacy class held the same input minutes apart. A
+  STUN burst from the test bed container to `stun.cloudflare.com` showed UDP
+  works (2000 datagrams sent, no errors at the node level, `wmem_default`
+  212992, `wmem_max` 4194304, kernel `6.18.54-cloudflare-microvm`, interface
+  `cfeth0`). -11 is EAGAIN on a non-blocking UDP send. **Fix:** the whip
+  muxer's `-ts_buffer_size 4194304`, passed only by `PubNext` through
+  `PUB_WHIP_SNDBUF`. After it: **the WHIP leg held 132 s with 0 restarts, and
+  /stage/'s film WHIP leg held 61 s with 0 restarts.** n is 1 each. INFERRED:
+  the socket send buffer was filling on bursts (keyframes) faster than the
+  microVM's egress drained it; not settled.
+- `/status` on `PubNext` does not start a container (the legacy class did),
+  and the container is destroyed one sweep after the grace ends. MEASURED:
+  `running: false` and `exit: exited` about two minutes after the last viewer
+  left, three times.
+
+### Viewer cold start, `/watch` opened to `/status` reporting both legs publishing
+
+| runtime | run | container answers | RTMPS publishing | WHIP publishing | container `bootMs` |
+| --- | --- | --- | --- | --- | --- |
+| new | first start after the image push | 13.2 s | 13.5 s | 13.5 s | 12.9 s |
+| legacy | idle publisher, container restarted by the deploy's rollout | 1.2 s | 1.2 s | 1.6 s | n/a |
+
+Only one run each, at the owner's request. The new-runtime row is the image
+pull and is not representative; a warm-host new-runtime start (0.83 s to
+listening, above) was not measured end to end through pub.
+
+### Not done
+
+- **The cutover was not made.** Flipping `PUB_RT` to `next` and redeploying
+  was refused by this session's permission check, so `pub.positron.studio`
+  still answers from `Pub`. `PubNext` is deployed and reachable with `?rt=next`.
+- The device log ring is still only in `Pub`'s storage. `PubNext` copies it
+  object to object on its first `/logs` read (`#adoptLegacyLog`), untested
+  live, deliberately, so the copy happens after the cutover and not before.
+- No browser page ran against `PubNext`; WHEP frames off the new WHIP leg were
+  not seen by a player.

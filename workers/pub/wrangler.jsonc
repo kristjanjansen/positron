@@ -39,12 +39,29 @@
       // with 3 GiB instead of standard-2's 6 GiB and 2 GB of disk instead of
       // 12 GB. Same CPU as standard-2, half the memory, a sixth of the disk.
       "instance_type": { "vcpu": 1, "memory_mib": 3072, "disk_mb": 2048 }
+    },
+    {
+      // THE SAME IMAGE ON THE NEW RUNTIME (research/cf-containers-next-2026-10-07.md).
+      // A second application because `scheduling_policy` "Cannot be changed
+      // after the application is created", so `Pub` above cannot be switched.
+      // This policy refuses `image`, `instance_type` and `max_instances`: the
+      // size above travels in code (NEXT_INSTANCE in worker.mjs), and the cap
+      // of three is the entry worker's three instance names.
+      "class_name": "PubNext",
+      "scheduling_policy": "durable_object",
+      "images": { "pub": { "dockerfile": "./container/Dockerfile" } }
     }
   ],
   "durable_objects": {
-    "bindings": [{ "name": "PUB", "class_name": "Pub" }]
+    "bindings": [
+      { "name": "PUB", "class_name": "Pub" },
+      { "name": "PUB_NEXT", "class_name": "PubNext" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Pub"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Pub"] },
+    { "tag": "v2", "new_sqlite_classes": ["PubNext"] }
+  ],
   "vars": {
     // Both legs encode at once on ONE instance, so this is the real budget.
     // Tunable without rebuilding the image, which is how the stall got
@@ -62,7 +79,11 @@
     // commit, so without this the same deploy would ship testsrc2 with no
     // ABSOLUTE and no LOCAL at all. Both reach the container through
     // `envVars` in worker.mjs; a var here is not in the container's env alone.
-    "PUB_BURN": "1"
+    "PUB_BURN": "1",
+    // WHICH CLASS ANSWERS: "legacy" is `Pub`, "next" is `PubNext`. `?rt=` on
+    // any request overrides it, which is how the new one was driven live
+    // before anybody's viewers were moved.
+    "PUB_RT": "legacy"
   },
   "observability": { "enabled": true }
 }

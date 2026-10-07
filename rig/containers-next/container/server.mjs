@@ -94,6 +94,7 @@ async function runJob() {
   return report;
 }
 
+let enc = null, encAt = 0;
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj, null, 1)); };
@@ -151,6 +152,56 @@ const server = http.createServer(async (req, res) => {
         cgroupCpuMax: read("/sys/fs/cgroup/cpu.max"),
         cgroupMemMax: read("/sys/fs/cgroup/memory.max"),
         df: spawnSync("df", ["-h", "/tmp"], { encoding: "utf8" }).stdout });
+    } else if (url.pathname === "/enc/start") {
+      // Phase 1 of the WebSocket test (2026-10-07): a pub-shaped long encode,
+      // testsrc2 720p30 x264 paced with -re, to /dev/null, in the BACKGROUND so
+      // the server keeps answering while it runs.
+      if (!enc || enc.exitCode !== null) {
+        const { spawn } = await import("child_process");
+        encAt = Date.now();
+        enc = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-re", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30",
+          "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-bf", "0", "-f", "null", "-"], { stdio: "ignore" });
+      }
+      send(200, { ok: true, pid: enc.pid, since: encAt });
+    } else if (url.pathname === "/enc/status") {
+      send(200, { bootAt: BOOT, uptimeMs: Date.now() - BOOT, enc: enc ? { pid: enc.pid, running: enc.exitCode === null, exit: enc.exitCode, forMs: Date.now() - encAt } : null });
+    } else if (url.pathname === "/enc/stop") {
+      if (enc && enc.exitCode === null) enc.kill("SIGTERM");
+      send(200, { ok: true });
+    } else if (url.pathname === "/udp") {
+      // Phase 2 diagnosis (2026-10-07): ffmpeg's WHIP leg dies with EAGAIN on
+      // this runtime. One STUN binding request to Cloudflare's STUN server,
+      // then a burst of N 1200 byte datagrams (STUN binding requests, so the
+      // far end can answer them) sent as fast as sendto allows, counting
+      // send errors and replies. Cloudflare-owned target only.
+      const dgram = await import("dgram");
+      const dns = await import("dns");
+      const n = Math.min(Number(url.searchParams.get("n") || 300), 2000);
+      const host = (await dns.promises.lookup("stun.cloudflare.com", { family: 4 })).address;
+      const s = dgram.createSocket("udp4");
+      let replies = 0, firstReplyMs = null; const errs = {};
+      const t0 = Date.now();
+      s.on("message", () => { replies++; if (firstReplyMs === null) firstReplyMs = Date.now() - t0; });
+      s.on("error", (e) => { errs["sock " + e.code] = (errs["sock " + e.code] || 0) + 1; });
+      await new Promise((r) => s.bind(0, r));
+      const pkt = (i) => { const b = Buffer.alloc(1200); b.writeUInt16BE(0x0001, 0); b.writeUInt16BE(1180, 2); b.writeUInt32BE(0x2112A442, 4); b.writeUInt32BE(i, 8); return b; };
+      let sent = 0;
+      await Promise.all(Array.from({ length: n }, (_, i) => new Promise((r) => s.send(pkt(i), 3478, host, (e) => { if (e) errs[e.code] = (errs[e.code] || 0) + 1; else sent++; r(); }))));
+      const sendMs = Date.now() - t0;
+      await new Promise((r) => setTimeout(r, 1500));
+      s.close();
+      const read = (p) => { try { return fs.readFileSync(p, "utf8").trim(); } catch { return null; } };
+      send(200, { host, n, sent, sendMs, replies, firstReplyMs, errs,
+        wmem_default: read("/proc/sys/net/core/wmem_default"), wmem_max: read("/proc/sys/net/core/wmem_max"),
+        rmem_default: read("/proc/sys/net/core/rmem_default"), udp_mem: read("/proc/sys/net/ipv4/udp_mem"),
+        uname: spawnSync("uname", ["-a"], { encoding: "utf8" }).stdout.trim(),
+        ifaces: Object.fromEntries(Object.entries(os.networkInterfaces()).map(([k, v]) => [k, v.map((a) => a.address + "/" + a.family)])),
+        mtu: read("/sys/class/net/eth0/mtu") });
+    } else if (url.pathname === "/echo" && req.method === "POST") {
+      const parts = []; for await (const c of req) parts.push(c);
+      const b = Buffer.concat(parts);
+      let sum = 0; for (const x of b) sum = (sum + x) % 65521;
+      send(200, { bytes: b.length, sum });
     } else send(404, { err: "not found" });
   } catch (e) {
     console.error("ERROR:", e.message || e);

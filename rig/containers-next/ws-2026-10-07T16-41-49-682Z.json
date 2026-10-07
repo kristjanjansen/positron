@@ -1,0 +1,521 @@
+[
+ {
+  "name": "ws-mon-1",
+  "mon": 1,
+  "msgs": [
+   {
+    "t": "hello",
+    "viewers": 1,
+    "atMs": 932
+   },
+   {
+    "t": "echo",
+    "msg": "first",
+    "running": true,
+    "s": {
+     "err": "The container is not listening in the TCP address 10.0.0.1:8080"
+    },
+    "atMs": 10506
+   },
+   {
+    "t": "bin",
+    "err": "The container is not listening in the TCP address 10.0.0.1:8080",
+    "atMs": 10619,
+    "expectSum": 279,
+    "ok": false
+   },
+   {
+    "t": "bin",
+    "err": "The container is not listening in the TCP address 10.0.0.1:8080",
+    "atMs": 10705,
+    "expectSum": 65039,
+    "ok": false
+   },
+   {
+    "t": "bin",
+    "err": "The container is not listening in the TCP address 10.0.0.1:8080",
+    "atMs": 10894,
+    "expectSum": 34673,
+    "ok": false
+   },
+   {
+    "t": "bin",
+    "sent": 524288,
+    "bytes": 524288,
+    "sum": 15300,
+    "ms": 85,
+    "atMs": 11276,
+    "expectSum": 15300,
+    "ok": true
+   },
+   {
+    "t": "echo",
+    "msg": "after hold",
+    "running": true,
+    "s": {
+     "bootAt": 1791390886621,
+     "uptimeMs": 270342,
+     "enc": {
+      "pid": 10,
+      "running": true,
+      "exit": null,
+      "forMs": 270286
+     }
+    },
+    "atMs": 281355
+   }
+  ],
+  "openMs": 931,
+  "closedAt": 1791391159049,
+  "peek": {
+   "running": true,
+   "wakes": 1
+  },
+  "ticks": {
+   "running": true,
+   "wakes": 1,
+   "alarm": null,
+   "sockets": 0,
+   "ticks": [
+    {
+     "at": "2026-10-07T16:34:46.813Z",
+     "msg": "booted, ready in 562 ms after start()"
+    },
+    {
+     "at": "2026-10-07T16:35:06.619Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 19861,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 19805
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:35:36.632Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 49873,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 49817
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:36:06.641Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 79881,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 79825
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:36:36.647Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 109888,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 109832
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:37:06.658Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 139896,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 139840
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:37:36.670Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 169909,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 169853
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:38:06.681Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 199919,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 199863
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:38:36.690Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 229928,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 229872
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:39:06.702Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 1,
+     "s": {
+      "bootAt": 1791390886621,
+      "uptimeMs": 259940,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 259884
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:39:36.703Z",
+     "msg": "idle sweep",
+     "idle": 1,
+     "running": true,
+     "wakes": 1
+    },
+    {
+     "at": "2026-10-07T16:40:06.704Z",
+     "msg": "idle sweep",
+     "idle": 2,
+     "running": true,
+     "wakes": 1
+    },
+    {
+     "at": "2026-10-07T16:40:06.738Z",
+     "msg": "alarm stopped, encode stopped; the inactivity timeout has the container now"
+    }
+   ],
+   "lastError": null
+  }
+ },
+ {
+  "name": "ws-nomon-1",
+  "mon": 0,
+  "msgs": [
+   {
+    "t": "hello",
+    "viewers": 1,
+    "atMs": 873
+   },
+   {
+    "t": "echo",
+    "msg": "first",
+    "running": true,
+    "s": {
+     "err": "The container is not listening in the TCP address 10.0.0.1:8080"
+    },
+    "atMs": 10286
+   },
+   {
+    "t": "bin",
+    "err": "The container is not listening in the TCP address 10.0.0.1:8080",
+    "atMs": 10359,
+    "expectSum": 279,
+    "ok": false
+   },
+   {
+    "t": "bin",
+    "err": "The container is not listening in the TCP address 10.0.0.1:8080",
+    "atMs": 10443,
+    "expectSum": 65039,
+    "ok": false
+   },
+   {
+    "t": "bin",
+    "err": "The container is not listening in the TCP address 10.0.0.1:8080",
+    "atMs": 10638,
+    "expectSum": 34673,
+    "ok": false
+   },
+   {
+    "t": "bin",
+    "sent": 524288,
+    "bytes": 524288,
+    "sum": 15300,
+    "ms": 90,
+    "atMs": 11060,
+    "expectSum": 15300,
+    "ok": true
+   },
+   {
+    "t": "echo",
+    "msg": "after hold",
+    "running": true,
+    "s": {
+     "bootAt": 1791390883952,
+     "uptimeMs": 270357,
+     "enc": {
+      "pid": 10,
+      "running": true,
+      "exit": null,
+      "forMs": 270304
+     }
+    },
+    "atMs": 281129
+   }
+  ],
+  "openMs": 870,
+  "closedAt": 1791391158880,
+  "close": {
+   "code": 1006,
+   "reason": "",
+   "atMs": 291204
+  },
+  "peek": {
+   "running": false,
+   "wakes": 13
+  },
+  "ticks": {
+   "running": false,
+   "wakes": 13,
+   "alarm": null,
+   "sockets": 0,
+   "ticks": [
+    {
+     "at": "2026-10-07T16:34:46.630Z",
+     "msg": "booted, ready in 546 ms after start()"
+    },
+    {
+     "at": "2026-10-07T16:35:06.638Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 2,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 20066,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 20013
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:35:36.684Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 3,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 50112,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 50059
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:36:06.725Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 4,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 80153,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 80100
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:36:36.765Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 5,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 110192,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 110139
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:37:06.807Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 6,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 140232,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 140179
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:37:36.851Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 7,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 170276,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 170223
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:38:06.892Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 8,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 200318,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 200265
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:38:36.932Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 9,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 230357,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 230304
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:39:06.973Z",
+     "msg": "sweep",
+     "viewers": 1,
+     "running": true,
+     "wakes": 10,
+     "s": {
+      "bootAt": 1791390883952,
+      "uptimeMs": 260398,
+      "enc": {
+       "pid": 10,
+       "running": true,
+       "exit": null,
+       "forMs": 260345
+      }
+     }
+    },
+    {
+     "at": "2026-10-07T16:39:36.976Z",
+     "msg": "idle sweep",
+     "idle": 1,
+     "running": true,
+     "wakes": 11
+    },
+    {
+     "at": "2026-10-07T16:40:06.984Z",
+     "msg": "idle sweep",
+     "idle": 2,
+     "running": true,
+     "wakes": 12
+    },
+    {
+     "at": "2026-10-07T16:40:07.023Z",
+     "msg": "alarm stopped, encode stopped; the inactivity timeout has the container now"
+    }
+   ],
+   "lastError": null
+  }
+ }
+]
