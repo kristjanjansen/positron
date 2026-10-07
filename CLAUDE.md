@@ -55,6 +55,7 @@ somebody broke it.
 | `positron-xr` | any `gl: true` or headset page, `verify-gl.mjs`, `verify-quest.mjs`, full screen on a phone |
 | `positron-hardware` | anything under `rig/`, a page that plays real hardware, any claim about an instrument |
 | `positron-history` | following a link, slug or path out of an older file, or repeating a claim about a rename |
+| `positron-slides` | writing or revising any slide text, deck outline, speaker notes or playable lesson, including a deck in `demo/shell/decks.mjs`. It is the words half; drawing a slide is `positron-ui` |
 
 ⚠️ **AND THE TRIGGER IS THE WORK, NOT THE FILE.** Adding one button to a page
 is a `positron-ui` task AND a `positron-verify` task, because adding a control
