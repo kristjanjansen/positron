@@ -49,17 +49,19 @@ export async function synthChecks(d, p) {
   const inst = p.slides.map((s, i) => (s.ctl ? i : -1)).filter((i) => i >= 0);
   const FLOOR = 0.01;
 
-  // 1. a visit loaded no engine and made no sound device, and the title is two lines at the top step
+  // 1. a visit loaded no engine and made no sound device, and the opening is a
+  //    title slide in the positron deck's style (2026-10-07, *"use same style
+  //    for synths slide 1"*): the name, and one line under it on the bottom edge
   const atVisit = engine();
   const intro = p.slides[0];
-  const lines = intro.parts.lines;
-  d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 5 with a caption and no body',
+  const t = intro.parts.title, sub = intro.parts.by;
+  d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the opening is a title slide, Synths in code over one line on the bottom edge',
     atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 1 + SYNTH_STEPS.filter((st) => !st.hidden).length && toneIdx === 1 && p.at() === 0
-      && lines.length === 2 && lines.every((l) => l.dataset.step === '5') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
-      && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
+      && !!t && plain(t.textContent) === 'Synths in code' && !!sub && lintWords(intro.spec.by).length === 0
+      && !intro.parts.say && !intro.parts.text && !intro.parts.slot,
     `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
     + `${audioContexts()} context(s) made, ${p.slides.length} slides, the instrument on slide ${toneIdx + 1}, `
-    + `the title ${lines.map((l) => `"${l.textContent}" at step ${l.dataset.step}`).join(' over ')}, caption "${intro.spec.cap}"`);
+    + `the title "${t?.textContent}", under it "${sub?.textContent}"`);
 
   // 2. a step through the whole deck opened nothing, and every slide fits at this width
   const resAt = performance.getEntriesByType('resource').length;

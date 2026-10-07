@@ -65,10 +65,10 @@ const WORDS = {
       + 'Pick saw while the tone plays' },
 };
 const SYNTHS = [
-  { name: 'synths in code', layout: 'left', lines: [[5, 'Synths'], [5, 'in code']],
-    // step 5, not 6, asked 2026-10-07 as *"use smaller type in 1st slide in synth slids"*
-    // asked 2026-10-06: *"make it better. no ref to faust"*
-    cap: 'from sine wave to an instrument' },
+  // the positron deck's title slide, the name and one line on the bottom edge,
+  // asked 2026-10-07 as *"use same style for synths slide 1"*; it was two
+  // `lines` at step 6, then 5, with a caption
+  { name: 'synths in code', title: 'Synths in code', by: 'From a sine wave to an instrument' },
   ...SYNTH_STEPS.filter((st) => !st.hidden).map((st) => ({
     // a third for the words and two for the instrument, the words on the
     // foot of their column, asked 2026-10-06 as *"use 1:2 cols layout"* and
@@ -123,7 +123,8 @@ const POSITRON_WORDS = [
     // there, and it carries the subtitle here rather than a name
     // reworded the same day: *"studio is not clen enougj. also from microcotrollers
     // to distrubuted (or whaerver)"*
-    by: 'Instruments and media, from microcontrollers to distributed performances',
+    // and simpler again: *"too complex"*
+    by: 'From microcontrollers to distributed performances',
     notes: 'I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. The project now includes reusable tools, examples and lessons. I want other people to be able to understand those parts and adapt them for their own work. This is an introduction for curious artists, musicians and creative developers. Positron is an evolving R&D project.' },
   { name: 'instruments', say: '10 things you can do with Positron',
     text: 'A musician might start with a synth, someone interested in movement with Draw', textStep: 2,
@@ -173,8 +174,9 @@ const POSITRON = POSITRON_WORDS.map((sl) => (sl.title ? sl : { ...sl, sayStep: 3
  * *"no desc on slides pages"*: the deck is the page.
  */
 export const DECKS = [
-  { name: 'synths', title: 'Synths in code', slides: SYNTHS },
+  // positron first, asked 2026-10-07 as *"reverse their order"*
   { name: 'positron', title: 'What is Positron', slides: POSITRON, heading: 'logo' },
+  { name: 'synths', title: 'Synths in code', slides: SYNTHS },
 ];
 
 /** Where a deck's own page is: `/slides/<name>/`. */
