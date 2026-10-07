@@ -1,0 +1,74 @@
+prime
+legacy cold 0 200 total 5984.5 edge 871 uptime 275 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 0 200 total 1472.4 edge 1420 uptime 44 ready 930 RIX waw02 
+legacy cold 1 200 total 6642.2 edge 1614 uptime 287 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 1 200 total 1392 edge 1322 uptime 43 ready 845 RIX waw02 
+legacy cold 2 200 total 7571.9 edge 2471 uptime 346 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 2 200 total 1172.2 edge 1130 uptime 35 ready 694 RIX waw02 
+legacy cold 3 200 total 7163.9 edge 2196 uptime 275 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 3 200 total 1359.1 edge 1292 uptime 50 ready 781 RIX waw02 
+legacy cold 4 200 total 6458 edge 1659 uptime 286 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 4 200 total 1359.3 edge 1290 uptime 43 ready 809 RIX waw02 
+legacy cold 5 200 total 5777.1 edge 906 uptime 256 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 5 200 total 1597.5 edge 1457 uptime 70 ready 890 RIX waw02 
+legacy cold 6 200 total 6747.7 edge 1885 uptime 385 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 6 200 total 1671.5 edge 1533 uptime 47 ready 977 RIX waw02 
+legacy cold 7 200 total 6938.1 edge 1732 uptime 315 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 7 200 total 1354.7 edge 1270 uptime 45 ready 790 RIX waw02 
+legacy cold 8 200 total 6824.3 edge 1087 uptime 193 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 8 200 total 1516.9 edge 1345 uptime 47 ready 859 TLL waw02 
+legacy cold 9 200 total 7268.5 edge 2329 uptime 219 ready null RIX txl01 [
+  '503 There is no Container instance available at this time.\n' +
+    'This is likely because you have reached your max concurrent instance count (set in wrangler config) or ar'
+]
+next cold 9 200 total 1418.8 edge 1295 uptime 44 ready 760 TLL waw02 
+warm legacy { n: 20, median: 72, p90: 75, min: 66, max: 80 } next { n: 20, median: 104.5, p90: 118, min: 96, max: 132 }
+snapshot {
+  ok: true,
+  ms: 5583,
+  id: '70b4adb8-2afa-4b5b-a534-63bf4b28c399',
+  size: 23832
+}
+next snap 0 200 total 1531.7 edge 1446 uptime 50 ready 909 TLL waw02
+next snap 1 200 total 1462.7 edge 1376 uptime 44 ready 895 TLL waw02
+next snap 2 200 total 1366 edge 1306 uptime 46 ready 852 TLL waw02
+next snap 3 200 total 1375 edge 1331 uptime 42 ready 805 TLL waw02
+next snap 4 200 total 1447.7 edge 1406 uptime 46 ready 878 TLL waw02
+next snap 5 200 total 1520 edge 1466 uptime 63 ready 945 TLL waw02
+next snap 6 200 total 1585.2 edge 1501 uptime 48 ready 967 TLL waw02
+next snap 7 200 total 1685.5 edge 1482 uptime 81 ready 914 TLL waw02
+next snap 8 200 total 1803.8 edge 1721 uptime 53 ready 1085 TLL waw02
+next snap 9 200 total 2032.4 edge 1912 uptime 59 ready 1121 TLL waw02
+next fresh DO 0 200 total 2058.8 edge 1914 ready 998 waw02
+next fresh DO 1 200 total 1433.5 edge 1253 ready 615 arn06
+next fresh DO 2 200 total 1604.5 edge 1565 ready 739 arn06
+next fresh DO 3 200 total 1960.7 edge 1821 ready 868 waw02
+next fresh DO 4 200 total 2715.8 edge 2582 ready 831 waw02
+wrote /Users/s32863/personal/positron/rig/containers-next/results-2026-10-07T15-56-52-305Z.json

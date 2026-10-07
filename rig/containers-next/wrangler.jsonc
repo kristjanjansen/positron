@@ -1,0 +1,19 @@
+{
+  "name": "positron-cnt-next",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-29",
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "NextTest",
+      "scheduling_policy": "durable_object",
+      "images": {
+        "node": { "dockerfile": "./container/Dockerfile" }
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "NEXT_TEST", "class_name": "NextTest" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NextTest"] }]
+}

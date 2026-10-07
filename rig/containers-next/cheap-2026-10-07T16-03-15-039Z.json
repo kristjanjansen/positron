@@ -1,0 +1,99 @@
+{
+ "at": "2026-10-07T16:03:15.039Z",
+ "N": 5,
+ "SETTLE": 8000,
+ "legacy": [
+  {
+   "status": 404,
+   "clientMs": 2291.6,
+   "edgeMs": 2160,
+   "readyMs": null,
+   "doMs": null,
+   "proxyMs": null,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 1364.2,
+   "edgeMs": 1260,
+   "readyMs": null,
+   "doMs": null,
+   "proxyMs": null,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 892.7,
+   "edgeMs": 795,
+   "readyMs": null,
+   "doMs": null,
+   "proxyMs": null,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 955.1,
+   "edgeMs": 829,
+   "readyMs": null,
+   "doMs": null,
+   "proxyMs": null,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 997.2,
+   "edgeMs": 712,
+   "readyMs": null,
+   "doMs": null,
+   "proxyMs": null,
+   "ray": "RIX"
+  }
+ ],
+ "next": [
+  {
+   "status": 404,
+   "clientMs": 1017.5,
+   "edgeMs": 906,
+   "readyMs": 838,
+   "doMs": 844,
+   "proxyMs": 6,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 1112,
+   "edgeMs": 985,
+   "readyMs": 919,
+   "doMs": 923,
+   "proxyMs": 4,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 1033.6,
+   "edgeMs": 913,
+   "readyMs": 847,
+   "doMs": 852,
+   "proxyMs": 5,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 1069.8,
+   "edgeMs": 905,
+   "readyMs": 840,
+   "doMs": 846,
+   "proxyMs": 6,
+   "ray": "RIX"
+  },
+  {
+   "status": 404,
+   "clientMs": 1062.7,
+   "edgeMs": 892,
+   "readyMs": 823,
+   "doMs": 829,
+   "proxyMs": 6,
+   "ray": "RIX"
+  }
+ ]
+}
