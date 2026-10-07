@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Three times the air above the front page sentence and twice under it** (2026-10-07). Asked: *"add 3 x more space on top and 2x more on bottom of Positron connects.."*.~~ DONE 2026-10-07
+
 - ~~**See slides centred between the pager and the full screen button** (2026-10-07). Asked: *"align see slides centered horz better pager and fullscreen bittpns"*. `demo/shell/slide.css`.~~ DONE 2026-10-07
 
 - ~~**The front page sentence at the heading's size** (2026-10-07). Asked: *"same size as title"*. `.pos-index .pos-what` in `demo/shell/shell.css`, 17 px.~~ DONE 2026-10-07
