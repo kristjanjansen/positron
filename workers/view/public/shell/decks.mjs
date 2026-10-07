@@ -79,7 +79,91 @@ const SYNTHS = [
 ];
 
 /**
- * 🔴 ONE DECK SINCE 2026-10-06. The `brand` deck went the same day, asked as
+ * 🔴 THREE TALKS IN WORDS ONLY, 2026-10-07, asked as *"do some slide decs based
+ * on the slides skill and synthesis plan"*. Written to `positron-slides` from
+ * `plans/plan-synthesis-2026-10-07.md`, one audience each: musicians and
+ * creative developers (sections 12 and 13), heritage and research (2 and 5),
+ * timing (6). Every claim about a built page was checked against its source
+ * the same day, and the file is named in the caption; what is NOT built says
+ * so on the slide, because shortening must not turn a proposal into a fact.
+ * `notes` is what the speaker says and is not drawn.
+ * ⚠️ NO SLOTS, so nothing here opens anything and no slide adds a control.
+ */
+const STUDIO = [
+  { name: 'title', title: 'Positron', by: 'Kristjan Jansen', place: 'positron.studio' },
+  { name: 'what', say: 'I build instruments and recordings here',
+    text: 'The parts became reusable. Can other people learn and make things with them?', textStep: 2,
+    notes: 'Rather than explain the whole system, a few things to see and one to try.' },
+  { name: 'radio', say: 'The radio granulates live stations',
+    text: '*Proposed, not built*: a tuning dial where the space between stations is part of the instrument', textStep: 2,
+    cap: 'positron.studio/radio',
+    notes: 'Tuning picks and blends the material, granulation changes it, wet and dry sets the mix. Keep the three meanings apart on the interface.' },
+  { name: 'draw', say: 'Draw keeps every sample',
+    text: 'A knob sets how much a player invents between samples, from a staircase at 0 to a spline at 1', textStep: 2,
+    cap: 'positron.studio/draw',
+    notes: 'A sparse record is derived beside the full one, and the full one is never thinned.' },
+  { name: 'hands', say: 'One instrument, several players',
+    text: '*A proposal*. Each person holds a part you can hear, and every movement is kept', textStep: 2,
+    cap: 'Stockhausen, Mikrophonie I, 1964',
+    notes: 'Mikrophonie I shares a tam-tam, microphones and filters among six players. It is context, not a model, and not one knob per person.' },
+  { name: 'parts', say: 'A filter and an LFO from a sine',
+    text: 'Each slide of the synths deck adds a line of `Faust` and a knob, from the same kit as the demos', textStep: 2,
+    cap: 'positron.studio/slides/synths' },
+  { name: 'ask', say: 'Tell me what blocked you',
+    text: 'Change one example. I am looking for musicians, developers and educators to try it', textStep: 2,
+    cap: 'positron.studio',
+    notes: 'Also a partner for a short shared instrument workshop. Name the example and the session length before saying this in public.' },
+];
+const EVIDENCE = [
+  { name: 'title', title: 'What survives a recording', by: 'Kristjan Jansen', place: 'positron.studio' },
+  { name: 'trace', say: 'A recording and a score are two things',
+    text: 'The trace stays as captured. A score points at it with a place, a rate and repeats', textStep: 2,
+    cap: 'timeline/score.mjs' },
+  { name: 'two records', say: 'Two records of one gesture',
+    rows: { head: ['record', 'holds'], body: [['evidence', 'every sample'], ['stored', 'a sparse copy']], align: 'll', frame: 'none' },
+    cap: 'positron.studio/draw',
+    notes: 'The sparse record is derived from the evidence. The evidence is never thinned.' },
+  { name: 'invented', say: 'Smoother is not more evidence',
+    text: 'The knob blends hold, linear and spline. `invented` reads how much of the line no sample attests', textStep: 2,
+    cap: 'positron.studio/draw' },
+  { name: 'restored', say: 'A restored row says who restored it',
+    text: 'It names its method, confidence and tier. A view can ask for attested rows only', textStep: 2,
+    cap: 'timeline/transport.mjs',
+    notes: 'Attested is this project\'s own classification. It is not authentication, and nothing is signed.' },
+  { name: 'marks', say: 'A quotation can point at a mark',
+    text: '1200 ms into the tape breaks when the tape is re-cut. *The third chorus* does not', textStep: 2,
+    cap: 'timeline/score.mjs' },
+  { name: 'certainty', say: 'Two certainties about one segment',
+    text: '0.95 that this is the Kurenniemi segment, 0.6 on where it starts', textStep: 2,
+    cap: 'the certainty model is TEI\'s' },
+  { name: 'ask', say: 'Bring one recording',
+    text: 'I am looking for somebody with an archive who wants to see what was captured and what was inferred', textStep: 2,
+    cap: 'positron.studio' },
+];
+const TIMING = [
+  { name: 'title', title: 'Four questions about time', by: 'Kristjan Jansen', place: 'positron.studio' },
+  { name: 'clap', say: 'A clap is sound and picture at once',
+    text: 'A marker in the image travels with the image. Metadata travels apart and may be dropped', textStep: 2,
+    notes: 'Not every service strips metadata, and a marker in the picture can be cropped. The point is where the evidence of time travels.' },
+  { name: 'questions', say: 'Four separate questions',
+    list: ['Which frame is this', 'Are sound and picture aligned', 'Do we agree on a clock', 'What is on screen now'] },
+  { name: 'sent', say: 'Sending is not showing',
+    text: 'Buffering and playback sit in between. A page can follow when a link shows something', textStep: 2,
+    cap: 'demo/shell/timebase.mjs' },
+  { name: 'policies', say: 'When an event fires',
+    rows: { head: ['carries', 'fires'], body: [['nothing', 'on arrival'], ['at', 'by the shared clock'], ['stamp', 'when a link shows it']], align: 'll', frame: 'none' },
+    cap: 'demo/shell/timebase.mjs',
+    notes: 'A fourth, beat, fires on a loop clock, which is a shared time by arithmetic.' },
+  { name: 'hold', say: 'An unknown time means hold',
+    text: 'Firing on arrival would be the wrong moment, so the page gives the event no time and says why', textStep: 2,
+    cap: 'demo/shell/timebase.mjs' },
+  { name: 'witness', say: 'A proposed time witness',
+    text: '*Not built*. A frame number, a flash and a click go down different paths, and people see what changed', textStep: 2,
+    cap: 'positron.studio/sync' },
+];
+
+/**
+ * 🔴 ONE DECK SINCE 2026-10-06, FOUR SINCE 2026-10-07 (above). The `brand` deck went the same day, asked as
  * *"add kit/logo page and use individual slides from the brand slides. rm brand
  * slids after it"*: its six slides are blocks of `/kit/logo/` now, drawn by
  * `brand-slides.mjs`. `title` is the name a half width player shows in its
@@ -88,6 +172,9 @@ const SYNTHS = [
  */
 export const DECKS = [
   { name: 'synths', title: 'Synths in code', slides: SYNTHS },
+  { name: 'studio', title: 'Positron, a studio', slides: STUDIO },
+  { name: 'evidence', title: 'What survives a recording', slides: EVIDENCE },
+  { name: 'timing', title: 'Four questions about time', slides: TIMING },
 ];
 
 /** Where a deck's own page is: `/slides/<name>/`. */
@@ -208,7 +295,19 @@ async function deckChecks(d, deck, p) {
     p.go(i);
     await frames(2);
     const inn = p.slides[i].el.querySelector('.sl-in');
-    if (inn.scrollHeight > inn.clientHeight + 1 || inn.scrollWidth > inn.clientWidth + 1) spills.push(p.slides[i].spec.name);
+    // ⚠️ AND THE EVIDENCE REGION'S OWN CHILDREN, 2026-10-07. `.sl-ev` centres
+    // what it holds, so evidence taller than the room the headline leaves
+    // overflows UP over the headline and DOWN over the caption while `.sl-in`
+    // reports no spill at all. MEASURED on the first draft of the `studio` and
+    // `timing` decks: a three line headline drawn through by its own text, a
+    // four row table over its caption, and this assert green on both.
+    const ev = p.slides[i].el.querySelector('.sl-ev');
+    const er = ev?.getBoundingClientRect();
+    const evSpill = ev && [...ev.children].some((c) => {
+      const r = c.getBoundingClientRect();
+      return r.top < er.top - 1 || r.bottom > er.bottom + 1;
+    });
+    if (inn.scrollHeight > inn.clientHeight + 1 || inn.scrollWidth > inn.clientWidth + 1 || evSpill) spills.push(p.slides[i].spec.name);
   }
   p.go(0);
   const off = foreign();
