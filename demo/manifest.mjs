@@ -1386,35 +1386,6 @@ export function byGroup(list = DEMOS) {
 // players from shell/decks.mjs, so they are drawn with no rows.
 export const DECK_GROUPS = new Set(['slides']);
 
-/**
- * The front page's own name, with the number of demos on it COUNTED rather than
- * written down.
- *
- * 🔴 IT COUNTS WHAT `byGroup()` IS ABOUT TO DRAW, NOT `DEMOS.length`. The
- * question the title answers is how many experiments are ON THIS PAGE, and the
- * two numbers are different: `byGroup` drops an `unlisted` row and refuses one
- * with no group, so it runs short of the array. MEASURED 2026-09-25, after
- * `bay` and `able` were archived: **56 drawn against 57 in the array**, one
- * apart, where the same pair read 58 against 59 the day before. Deriving it
- * from the array would put a number on the page that disagrees with the cards
- * under it, and that is the disagreement nobody checks.
- * ⚠️ AND IT IS NEVER TYPED. CLAUDE.md opens with COUNT THE DEMOS, NEVER
- * REMEMBER THEM, written after that line read `47 of 49` one morning and
- * `51 of 53` the same afternoon, both true when written. A literal here would
- * be the same defect on the one page everybody opens first.
- * ⚠️ THE BROWSER TAB IS DELIBERATELY NOT THIS. Asked 2026-09-24: *"convert
- * title to positron: x media art experiments ... html <title> stays positron"*.
- * Both index pages carry `<title>positron</title>` by hand, and this string is
- * the visible `h1` only.
- */
-export function indexTitle(list = DEMOS) {
-  // ⚠️ THE KIT IS NOT COUNTED, 2026-10-06. Splitting `/kit/` into one page per
-  // part (plans/plan-kit-split.md) puts seven cards where there was one, and
-  // seven parts of a component sandbox are not six new experiments. Decided as
-  // the plan's default and reported so the owner can overrule it.
-  const n = byGroup(list).filter((g) => g.id !== 'kit').reduce((total, g) => total + g.rows.length, 0);
-  return `positron: ${n} media art experiments`;
-}
 
 /**
  * One demo as a card.

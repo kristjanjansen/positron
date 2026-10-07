@@ -69,7 +69,7 @@ const SCRATCH = OUT !== DEPLOY_OUT;
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
 // AND in demo/index.html, so fixing one left the other printing `undefined`.
 const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byGroup, groupHTML, noteHTML, extraPages,
-        indexTitle, LOGO_HTML } =
+        LOGO_HTML } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
@@ -788,14 +788,14 @@ await mkdir(OUT, { recursive: true });
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
   if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');
   if (!menu.includes('<!--NOTES-->')) throw new Error('menu.html lost its <!--NOTES--> marker');
-  // ⚠️ THE NAME CARRIES A COUNT, SO IT IS A MARKER LIKE THE OTHER TWO AND IS
-  // CHECKED LIKE THEM. A build that silently shipped the template's empty
-  // heading would put a nameless page on the domain and pass.
-  if (!menu.includes('<!--TITLE-->')) throw new Error('menu.html lost its <!--TITLE--> marker');
+  // ⚠️ THE HEADING IS THE LOGO, A MARKER LIKE THE OTHER TWO AND CHECKED LIKE
+  // THEM (it was the counted `indexTitle()` until 2026-10-07). A build that
+  // silently shipped the template's empty heading would put a nameless page on
+  // the domain and pass.
   if (!menu.includes('<!--LOGO-->')) throw new Error('menu.html lost its <!--LOGO--> marker');
   await writeFile(join(OUT, 'index.html'),
     menu.replace('<!--DEMOS-->', rows).replace('<!--NOTES-->', notes)
-        .replace('<!--TITLE-->', indexTitle(DEMO_MANIFEST)).replace('<!--LOGO-->', LOGO_HTML));
+        .replace('<!--LOGO-->', LOGO_HTML));
 }
 
 // favicon.ico — generated, not committed. Browsers request /favicon.ico for

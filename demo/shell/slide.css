@@ -475,12 +475,10 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
    studio, the two blocks centred on each other, but in the page's own px:
    `logoRow` is sized in a slide's cqh and a page heading is not in a slide. */
 .sl-logo-h { display: inline-flex; align-items: center; gap: 0.35em; margin: 0; }
-/* on the front page it stands above the heading, with air under it */
-.pos-logo { margin-bottom: 20px; }
-.pos-logo:empty { display: none; }
-.sl-logo-h .sl-logo-b { font: 600 40px/1 var(--mono); letter-spacing: -0.02em; }
+.sl-logo-h .sl-logo-b { font: 600 64px/1 var(--mono); letter-spacing: -0.02em; }
+/* 64 and 26, up from 40 and 16, asked 2026-10-07 as *"make logo bigger"* */
 .sl-logo-h .sl-logo-b .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
-.sl-logo-h .sl-logo-w { display: flex; flex-direction: column; font: 600 16px/1.1 var(--mono); }
+.sl-logo-h .sl-logo-w { display: flex; flex-direction: column; font: 600 26px/1.1 var(--mono); }
 
 /* ── the decks on the front page (shell/decks.mjs) ──────────────────────────
    Two half width players a row, asking the row's OWN width and becoming one

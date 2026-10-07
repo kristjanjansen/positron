@@ -5,22 +5,18 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<!-- 🔴 THE TAB SAYS `positron` AND THE PAGE SAYS MORE, ON INSTRUCTION
-     2026-09-24: *"convert title to positron: x media art experiments ... html
-     <title> stays positron"*. The visible name is built by `indexTitle()` in
-     `demo/manifest.mjs`, which COUNTS the rows it is about to draw; a tab
-     carrying a number would be one more copy of it to go stale, in the one
-     place a reader cannot see it change. -->
+<!-- THE TAB SAYS `positron`. The page's heading is the logo since 2026-10-07
+     (*"rm positron: 41 media art experiments"*); the counted name it carried
+     from 2026-09-24 is gone, and `indexTitle()` with it. -->
 <title>positron</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/slide.css">
 <link rel="icon" href="/favicon.ico">
 
 <div class="pos-head pos-index">
-  <!-- the horizontal logo, asked 2026-10-07 as *"add horiz positron logo to front
-       page"*; LOGO_HTML in demo/manifest.mjs -->
-  <div class="pos-logo"><span class="sl-logo-h" aria-hidden="true"><span class="sl-logo-b">β<span class="sl-hi">+</span></span><span class="sl-logo-w"><span>positron</span><span>studio</span></span></span></div>
-  <div class="pos-title"><h1 class="pos-name">positron: 41 media art experiments</h1></div>
+  <!-- 🔴 THE LOGO IS THE HEADING, 2026-10-07: *"rm positron: 41 media art experiments"* and
+       *"make logo bigger"*. LOGO_HTML in demo/manifest.mjs; the h1 keeps the name for a screen reader -->
+  <div class="pos-title"><h1 class="pos-name" aria-label="positron studio"><span class="sl-logo-h" aria-hidden="true"><span class="sl-logo-b">β<span class="sl-hi">+</span></span><span class="sl-logo-w"><span>positron</span><span>studio</span></span></span></h1></div>
 </div>
 
   <h2 class="pos-act-h">slides</h2><div class="pos-decks" data-decks><div class="pos-decks-in"><div class="pos-vp pos-deck-frame" data-deck-frame="positron" aria-hidden="true"><div class="pos-vp-stage"></div><div class="pos-vp-foot"><span class="pos-deck-ph"></span></div></div><div class="pos-vp pos-deck-frame" data-deck-frame="synths" aria-hidden="true"><div class="pos-vp-stage"></div><div class="pos-vp-foot"><span class="pos-deck-ph"></span></div></div></div></div>
