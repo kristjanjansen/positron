@@ -14,6 +14,8 @@
 // `scaleCss()`), and the parts a slide is made of:
 //
 //   say        the headline, step 4 (3 in a split), top left, one sentence, no full stop
+//   sayStep    the headline a step or two down for a whole talk of them, 2026-10-07
+//              (*"iside slides use lesser text size"*, the positron deck)
 //   statement  the sentence is the slide, step 5, up to three lines
 //   big        one figure, step 6, with `under` at step 3 beneath it
 //   text       a paragraph, step 3 (or `textStep`)
@@ -281,7 +283,7 @@ export const tableStep = (lines, frame) => (frame ? (lines > 2 ? 2 : 3) : evStep
 export const LAYOUTS = ['stack', 'top', 'left', 'split', 'band'];
 /** A split's words column to its slot, see `cols` in the header. */
 export const SPLIT_COLS = ['1:1', '1:2'];
-const KEYS = new Set(['name', 'layout', 'side', 'cols', 'bottom', 'say', 'statement', 'big', 'under', 'text', 'textStep',
+const KEYS = new Set(['name', 'layout', 'side', 'cols', 'bottom', 'say', 'sayStep', 'statement', 'big', 'under', 'text', 'textStep',
   'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes', 'title', 'by', 'date', 'place']);
 
 /**
@@ -382,6 +384,7 @@ export function normalise(spec) {
   }
   for (const [n] of spec.lines || []) stepOf(n);
   if (spec.textStep != null) stepOf(spec.textStep);
+  if (spec.sayStep != null) stepOf(spec.sayStep);
   if (spec.list && spec.list.length > 4) throw new Error('a list is two to four lines');
   if (spec.rows && spec.rows.frame != null && !FRAMES.includes(spec.rows.frame)) {
     throw new Error(`a table frame is none, not ${spec.rows.frame}`);
@@ -605,7 +608,7 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
     words.append(t);
   }
   if (s.say) {
-    const say = el('h2', s.statement ? 'sl-t sl-t5 sl-say sl-st' : `sl-t sl-t${wordsStep(4, s.layout)} sl-say`);
+    const say = el('h2', s.statement ? 'sl-t sl-t5 sl-say sl-st' : `sl-t sl-t${wordsStep(s.sayStep || 4, s.layout)} sl-say`);
     say.append(rich(s.say));
     parts.say = say;
   }
@@ -816,11 +819,12 @@ export function createSlideLog({ head, widths, align = '', step = 1, cap = 40 } 
  * @param o.slots      as for `createSlide`
  * @param o.onStep     (index) after every move
  * @param o.title      { text, href }: a link in the count's slot instead of `N / M`
+ * @param o.mark       true puts the β+ in the footer, before the ⛶
  * @param o.touch      () => true when this is a screen with no hover; the
  *                     default asks `(hover: none)`, and `touchMode(fn)` swaps it
  * @returns { el, panel, slides, go, at, count, next, prev, keys, taps, touchMode }
  */
-export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title = null,
+export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title = null, mark = false,
   touch = () => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches } = {}) {
   ensureCss();
   if (!Array.isArray(specs) || !specs.length) throw new Error('a player needs at least one slide');
@@ -839,6 +843,17 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title 
     : el('span', 'sl-count', '');
   const panel = createVideoPanel({ left: stepper, centre: count, fullMode: 'hover' });
   panel.el.classList.add('sl-player');
+  // 🔴 THE β+ IN THE FOOTER, asked 2026-10-07 as *"add postiron symoon (b+) on
+  // footer of both slides"*. Text, not the favicon's canvas: the footer is a row
+  // of words and glyphs in the page's face, and the + is raised the way the
+  // logo raises it (`brand-slides.css`). Before the ⛶, so the way out stays the
+  // last thing in the row; `aria-hidden`, because the deck's own name already
+  // says whose it is and a screen reader hearing "beta plus" learns nothing.
+  if (mark) {
+    const m = el('span', 'sl-mark', 'β', { 'aria-hidden': 'true' });
+    m.append(el('span', 'sl-hi', '+'));
+    panel.slots.right.prepend(m);
+  }
   panel.el.tabIndex = 0;
   panel.el.setAttribute('aria-roledescription', 'slide player');
   const slides = specs.map((spec) => {

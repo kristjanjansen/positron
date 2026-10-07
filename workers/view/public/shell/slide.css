@@ -459,6 +459,21 @@
 a.sl-title { font: 400 12px/1 var(--sans); color: var(--dim); text-decoration: none;
              white-space: nowrap; justify-self: center; text-align: center; }
 a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+/* THE β+ IN THE FOOTER (`createSlidePlayer({ mark: true })`), 2026-10-07. The
+   count's face and dim, a step larger because it is a mark and not a reading,
+   and the + raised and smaller as on the logo (`.dk-logo-row .dk-mark .sl-hi`). */
+.sl-mark { font: 600 15px/1 var(--mono); color: var(--dim); white-space: nowrap; user-select: none; }
+.sl-mark .sl-hi { font-size: 0.6em; vertical-align: 0.7em; line-height: 0; }
+
+/* THE HORIZONTAL LOGO AS A DECK PAGE'S HEADING (`deckPage`, `heading: 'logo'`),
+   2026-10-07, asked as *"change page title to positron horizonal logo"*. The
+   same arrangement as `logoRow` in brand-slides.mjs, β+ beside positron over
+   studio, the two blocks centred on each other, but in the page's own px:
+   `logoRow` is sized in a slide's cqh and a page heading is not in a slide. */
+.sl-logo-h { display: inline-flex; align-items: center; gap: 0.35em; margin: 0; }
+.sl-logo-h .sl-logo-b { font: 600 40px/1 var(--mono); letter-spacing: -0.02em; }
+.sl-logo-h .sl-logo-b .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
+.sl-logo-h .sl-logo-w { display: flex; flex-direction: column; font: 600 16px/1.1 var(--mono); }
 
 /* ── the decks on the front page (shell/decks.mjs) ──────────────────────────
    Two half width players a row, asking the row's OWN width and becoming one

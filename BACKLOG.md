@@ -1,5 +1,16 @@
 ## Open
 
+- ~~**A stream of deck asks, 2026-10-07**, collected before any is worked:~~ DONE 2026-10-07, BUILD `55e19ee-113009-e808`. 1, 2, 3, 5, 6, 7 and 9 built; 4 (interactive material per slide) and 8 (the `cf` CLI, beta since 2026-09-28) answered in chat, nothing built for either.
+  1. *"use smaller type in 1st slide in synth slids"*: `SYNTHS[0]` in `demo/shell/decks.mjs`, its two `lines` are step 6.
+  2. *"in positron sides in 1st add subtitle on botton"*: the `POSITRON` title slide, the subtitle from `what-is-positron.md` (*A programmable studio for learning, experimenting and creating with sound, image, code and devices*), as its bottom line.
+  3. *"iside slides use lesser text size"*: the `POSITRON` deck's inner slides, headline and body a step down. `say` has no step option today (step 4, 3 in a split), so this may need one in `demo/shell/slide.mjs`.
+  4. *"suggest interacive material next to each feature"*: a SUGGESTION, answered in chat, one existing demo or kit part per feature slide.
+  5. *"2nd slide: Rename to 10 things you can do with Positron"*: slide 2's heading; the ten slides after it are the ten things.
+  6. *"change page title to positron horizonal logo"*: the deck page's `h1` (`deckPage` sets it to the deck's name) becomes the horizontal logo, `logoRow` in `demo/shell/brand-slides.mjs`, for `/slides/positron/`.
+  7. *"Last slide: add actual prompt (see readme) that merges cf and positron skill lookup, put it into code box"*: the README's `Build one like it` prompt, in a code box on the `sharing` slide.
+  8. *"see also cf news about cf binary (is it relevant, is cf officioan prompts updated?)"*: research, answered in chat. Does `https://developers.cloudflare.com/agent-setup/prompt.md` still say what README.md quotes, and what is the new Cloudflare binary.
+  9. *"add postiron symoon (b+) on footer of both slides"*: the β+ mark in the player footer of the `synths` and `positron` decks (`createSlidePlayer` in `demo/shell/slide.mjs`), on the front page halves and the deck pages.
+
 - ~~**A `positron` deck from `what-is-positron.md`, the speaker notes shortened to the body text** (2026-10-07). Asked: *"/Users/s32863/Downloads/what-is-positron.md make slides. shorten speaker notes to body text"*. Headings kept as written, one short body sentence per slide from its notes, the full notes kept in `notes` (not drawn). `demo/shell/decks.mjs`, a `slides/positron` row, `demo/slides/positron/`. ~~ DONE 2026-10-07, BUILD `b9170d0-105908-90cf`, 12 slides
 
 - **Slide columns still overflow** (2026-10-07). Asked: *"cols still overflow!?!"*, interrupted by the request above before it was looked at. Not yet located: which deck, which width (front page half players, deck page, phone, full screen). Start by shooting `synths` split slides at 375 and 1280 and in the front page's half width players.
