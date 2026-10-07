@@ -459,10 +459,14 @@
 a.sl-title { font: 400 12px/1 var(--sans); color: var(--dim); text-decoration: none;
              white-space: nowrap; justify-self: center; text-align: center; }
 a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
-/* THE β+ IN THE FOOTER (`createSlidePlayer({ mark: true })`), 2026-10-07. The
-   count's face and dim, a step larger because it is a mark and not a reading,
-   and the + raised and smaller as on the logo (`.dk-logo-row .dk-mark .sl-hi`). */
-.sl-mark { font: 600 15px/1 var(--mono); color: var(--dim); white-space: nowrap; user-select: none; }
+/* THE β+ ON EACH SLIDE (`createSlidePlayer({ mark: true })`), 2026-10-07: in the
+   bottom right corner, INSIDE the slide's inset rather than at it, so it sits in
+   the margin and no content can run under it (MEASURED on the first try: the
+   prompt slide's code box ran under it). The caption's size and dim, the
+   + raised and smaller as on the logo (`.dk-logo-row .dk-mark .sl-hi`). */
+.sl-mark { position: absolute; right: calc(var(--sl-pad) / 3); bottom: calc(var(--sl-pad) / 3);
+  font: 600 var(--sl-1)/1 'Slide JetBrains Mono', var(--mono); color: var(--dim);
+  white-space: nowrap; user-select: none; pointer-events: none; }
 .sl-mark .sl-hi { font-size: 0.6em; vertical-align: 0.7em; line-height: 0; }
 
 /* THE HORIZONTAL LOGO AS A DECK PAGE'S HEADING (`deckPage`, `heading: 'logo'`),
@@ -471,6 +475,9 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
    studio, the two blocks centred on each other, but in the page's own px:
    `logoRow` is sized in a slide's cqh and a page heading is not in a slide. */
 .sl-logo-h { display: inline-flex; align-items: center; gap: 0.35em; margin: 0; }
+/* on the front page it stands above the heading, with air under it */
+.pos-logo { margin-bottom: 20px; }
+.pos-logo:empty { display: none; }
 .sl-logo-h .sl-logo-b { font: 600 40px/1 var(--mono); letter-spacing: -0.02em; }
 .sl-logo-h .sl-logo-b .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
 .sl-logo-h .sl-logo-w { display: flex; flex-direction: column; font: 600 16px/1.1 var(--mono); }

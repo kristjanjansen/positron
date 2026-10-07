@@ -819,7 +819,7 @@ export function createSlideLog({ head, widths, align = '', step = 1, cap = 40 } 
  * @param o.slots      as for `createSlide`
  * @param o.onStep     (index) after every move
  * @param o.title      { text, href }: a link in the count's slot instead of `N / M`
- * @param o.mark       true puts the β+ in the footer, before the ⛶
+ * @param o.mark       true draws the β+ in each slide's bottom right corner
  * @param o.touch      () => true when this is a screen with no hover; the
  *                     default asks `(hover: none)`, and `touchMode(fn)` swaps it
  * @returns { el, panel, slides, go, at, count, next, prev, keys, taps, touchMode }
@@ -843,21 +843,21 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title 
     : el('span', 'sl-count', '');
   const panel = createVideoPanel({ left: stepper, centre: count, fullMode: 'hover' });
   panel.el.classList.add('sl-player');
-  // 🔴 THE β+ IN THE FOOTER, asked 2026-10-07 as *"add postiron symoon (b+) on
-  // footer of both slides"*. Text, not the favicon's canvas: the footer is a row
-  // of words and glyphs in the page's face, and the + is raised the way the
-  // logo raises it (`brand-slides.css`). Before the ⛶, so the way out stays the
-  // last thing in the row; `aria-hidden`, because the deck's own name already
-  // says whose it is and a screen reader hearing "beta plus" learns nothing.
-  if (mark) {
-    const m = el('span', 'sl-mark', 'β', { 'aria-hidden': 'true' });
-    m.append(el('span', 'sl-hi', '+'));
-    panel.slots.right.prepend(m);
-  }
   panel.el.tabIndex = 0;
   panel.el.setAttribute('aria-roledescription', 'slide player');
   const slides = specs.map((spec) => {
     const s = createSlide(spec, { slots });
+    // 🔴 THE β+ ON THE SLIDE, NOT IN THE FOOTER, 2026-10-07. It was a footer
+    // glyph before the ⛶ for an hour, then asked as *"rm logos. add logo to
+    // slide ocntent"*: a mark belongs to what is shown, so it travels into full
+    // screen and a screenshot with the slide. Bottom right, sized off the
+    // slide's own unit like everything else on it; `aria-hidden`, because a
+    // screen reader hearing "beta plus" on every slide learns nothing.
+    if (mark) {
+      const m = el('span', 'sl-mark', 'β', { 'aria-hidden': 'true' });
+      m.append(el('span', 'sl-hi', '+'));
+      s.el.append(m);
+    }
     s.el.hidden = true;
     // The stage is the size container in a player, so the slide letterboxes
     // in full screen; the frame wrapper is not used here.
