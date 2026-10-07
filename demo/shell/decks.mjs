@@ -121,7 +121,9 @@ const POSITRON_WORDS = [
     // the source's subtitle on the bottom edge, asked 2026-10-07 as *"in positron
     // sides in 1st add subtitle on botton"*. `by` is the slot a title slide sets
     // there, and it carries the subtitle here rather than a name
-    by: 'A programmable studio for sound, image, code and devices',
+    // reworded the same day: *"studio is not clen enougj. also from microcotrollers
+    // to distrubuted (or whaerver)"*
+    by: 'Instruments and media, from microcontrollers to distributed performances',
     notes: 'I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. The project now includes reusable tools, examples and lessons. I want other people to be able to understand those parts and adapt them for their own work. This is an introduction for curious artists, musicians and creative developers. Positron is an evolving R&D project.' },
   { name: 'instruments', say: '10 things you can do with Positron',
     text: 'A musician might start with a synth, someone interested in movement with Draw', textStep: 2,
