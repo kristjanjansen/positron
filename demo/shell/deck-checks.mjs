@@ -53,9 +53,9 @@ export async function synthChecks(d, p) {
   const atVisit = engine();
   const intro = p.slides[0];
   const lines = intro.parts.lines;
-  d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 6 with a caption and no body',
+  d.assert('SYNTHS: the visit loaded no Faust engine and made no AudioContext, and the title is two lines at step 5 with a caption and no body',
     atVisit.length === 0 && audioContexts() === 0 && p.slides.length === 1 + SYNTH_STEPS.filter((st) => !st.hidden).length && toneIdx === 1 && p.at() === 0
-      && lines.length === 2 && lines.every((l) => l.dataset.step === '6') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
+      && lines.length === 2 && lines.every((l) => l.dataset.step === '5') && plain(lines.map((l) => l.textContent).join(' ')) === 'Synths in code'
       && !intro.parts.say && !intro.parts.text && !intro.parts.slot && !!intro.parts.cap && lintWords(intro.spec.cap).length === 0,
     `${atVisit.length} engine request(s)${atVisit.length ? `: ${atVisit.slice(0, 2).join(', ')}` : ''}, `
     + `${audioContexts()} context(s) made, ${p.slides.length} slides, the instrument on slide ${toneIdx + 1}, `

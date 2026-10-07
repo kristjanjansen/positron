@@ -20,7 +20,8 @@
 // by a press after the code was edited, and the only AudioContext is the
 // page's shared one, made by that press (`demo/shell/slide-synth.mjs`).
 
-import { createSlidePlayer } from './slide.mjs';
+import { createSlidePlayer, fitBox } from './slide.mjs';
+import { createCodeBox } from './code-box.mjs';
 import { SYNTH_STEPS } from './synth-steps.mjs';
 import { synthSlot } from './slide-synth.mjs';
 import { deckFrameHTML } from '../manifest.mjs';
@@ -64,7 +65,8 @@ const WORDS = {
       + 'Pick saw while the tone plays' },
 };
 const SYNTHS = [
-  { name: 'synths in code', layout: 'left', lines: [[6, 'Synths'], [6, 'in code']],
+  { name: 'synths in code', layout: 'left', lines: [[5, 'Synths'], [5, 'in code']],
+    // step 5, not 6, asked 2026-10-07 as *"use smaller type in 1st slide in synth slids"*
     // asked 2026-10-06: *"make it better. no ref to faust"*
     cap: 'from sine wave to an instrument' },
   ...SYNTH_STEPS.filter((st) => !st.hidden).map((st) => ({
@@ -86,10 +88,42 @@ const SYNTHS = [
  * format line (`MIDI · audio · ...`) is not on a slide: a row of facts glued
  * with middots is the thing this repository does not print.
  */
-const POSITRON = [
+/**
+ * THE PROMPT ON THE LAST SLIDE, asked 2026-10-07 as *"add actual prompt (see
+ * readme) that merges cf and positron skill lookup, put it into code box"*.
+ * VERBATIM from README.md's `Build one like it`, which is where it is kept and
+ * explained: Cloudflare's own setup line, then the positron-start skill. If
+ * one changes, change the other.
+ * ⚠️ READ ONLY, and a URL is coloured as a string so the two lookups stand out.
+ */
+export const SETUP_PROMPT = `Fetch and execute the appropriate instructions to set me up for Cloudflare from
+https://developers.cloudflare.com/agent-setup/prompt.md
+
+Then read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md
+and follow it exactly. Run every command yourself rather than asking me to.
+If you cannot read that file, stop and tell me. Do not guess what it says.
+
+I want to build something like the stage demo at https://positron.studio/stage/.`;
+const PROMPT_LANG = { name: 'prompt', rules: [[/https?:\/\/\S+/, 'string'], [/[^\s]+/, '']] };
+function promptSlot(host) {
+  const code = createCodeBox({ language: PROMPT_LANG, value: SETUP_PROMPT, rows: 9, label: '',
+    ariaLabel: 'the prompt to paste into a coding agent, read only' });
+  code.input.readOnly = true;
+  // a narrower logical width and soft wrapping, so the prompt is read at a
+  // larger size than its 107 character lines would allow unwrapped
+  const fb = fitBox(host, 560, { fill: true });
+  fb.inner.append(code.el);
+  return null;
+}
+
+const POSITRON_WORDS = [
   { name: 'title', title: 'What is Positron',
+    // the source's subtitle on the bottom edge, asked 2026-10-07 as *"in positron
+    // sides in 1st add subtitle on botton"*. `by` is the slot a title slide sets
+    // there, and it carries the subtitle here rather than a name
+    by: 'A programmable studio for sound, image, code and devices',
     notes: 'I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. The project now includes reusable tools, examples and lessons. I want other people to be able to understand those parts and adapt them for their own work. This is an introduction for curious artists, musicians and creative developers. Positron is an evolving R&D project.' },
-  { name: 'instruments', say: 'Instruments and media experiments',
+  { name: 'instruments', say: '10 things you can do with Positron',
     text: 'A musician might start with a synth, someone interested in movement with Draw', textStep: 2,
     notes: 'These are different ways into the same project. An artist might start with projected media or an archive. Show two or three real examples. Explain what each one does before introducing the underlying architecture. The proposed continuous radio-tuning slider is future work; do not present it as part of the current demo.' },
   { name: 'blocks', say: 'Reusable building blocks',
@@ -120,10 +154,13 @@ const POSITRON = [
     text: 'Moholy-Nagy asked how the senses join one composition, and Kurenniemi built instruments across media', textStep: 2,
     notes: 'Partitur uses a Moholy-Nagy graphic score. Other useful comparisons include Electronic Cafe for remote participation, Sandin for sharing construction knowledge, and ossia for interactive media scores. These are references and adjacent practices, not claims that every idea originated here.' },
   { name: 'sharing', say: 'Sharing examples and instructions',
-    text: 'Choose one example, try a change, and tell me where you needed help', textStep: 2,
-    cap: 'positron.studio',
-    notes: 'A skill carries working instructions alongside the code, so a person or a coding agent can begin with an example and change it. My purpose is to make tools that others can use for their own expression. Invite collaboration around that experience rather than asking someone to evaluate the whole project at once.' },
+    text: 'Paste this into a coding agent to build one of your own', textStep: 2,
+    slot: promptSlot,
+    notes: 'A skill carries working instructions alongside the code, so a person or a coding agent can begin with an example and change it. The first line is Cloudflare\'s own setup prompt, the rest points at positron-start. Close with a concrete invitation: choose one example, try a change, and tell me where you needed help.' },
 ];
+// every inner slide's headline at step 3, asked 2026-10-07 as *"iside slides use
+// lesser text size"*; the title slide keeps the title's own step
+const POSITRON = POSITRON_WORDS.map((sl) => (sl.title ? sl : { ...sl, sayStep: 3 }));
 
 /**
  * 🔴 ONE DECK SINCE 2026-10-06. The `brand` deck went the same day, asked as
@@ -135,7 +172,7 @@ const POSITRON = [
  */
 export const DECKS = [
   { name: 'synths', title: 'Synths in code', slides: SYNTHS },
-  { name: 'positron', title: 'What is Positron', slides: POSITRON },
+  { name: 'positron', title: 'What is Positron', slides: POSITRON, heading: 'logo' },
 ];
 
 /** Where a deck's own page is: `/slides/<name>/`. */
@@ -167,7 +204,7 @@ export function mountDecks(root = document) {
       // frame, lazyload ocntents"*): a deck is every slide's code box, knobs
       // and scope, and a visitor who never scrolls to it pays for none of it
       const build = () => {
-        const p = createSlidePlayer(deck.slides, { title: { text: deck.title, href: deckHref(deck) } });
+        const p = createSlidePlayer(deck.slides, { title: { text: deck.title, href: deckHref(deck) }, mark: true });
         p.el.dataset.deck = deck.name;
         frame.replaceWith(p.el);
         players.push(p);
@@ -208,7 +245,29 @@ export async function deckPage(name) {
   const d = mount({ name: `slides/${name}`, readout: null });
   const h1 = d.head.querySelector('.pos-name');
   if (h1) h1.textContent = name;
-  const p = createSlidePlayer(deck.slides);
+  // 🔴 THE HORIZONTAL LOGO AS THE HEADING, asked 2026-10-07 as *"change page
+  // title to positron horizonal logo"*, for a deck that says `heading: 'logo'`.
+  // The h1 keeps its name for a screen reader; `__demo.name` and
+  // `document.title` keep `slides/<name>`.
+  if (h1 && deck.heading === 'logo') {
+    h1.textContent = '';
+    h1.setAttribute('aria-label', 'positron studio');
+    const row = document.createElement('span');
+    row.className = 'sl-logo-h';
+    row.setAttribute('aria-hidden', 'true');
+    const b = document.createElement('span');
+    b.className = 'sl-logo-b';
+    const plus = document.createElement('span');
+    plus.className = 'sl-hi';
+    plus.textContent = '+';
+    b.append('β', plus);
+    const w = document.createElement('span');
+    w.className = 'sl-logo-w';
+    for (const t of ['positron', 'studio']) { const x = document.createElement('span'); x.textContent = t; w.append(x); }
+    row.append(b, w);
+    h1.append(row);
+  }
+  const p = createSlidePlayer(deck.slides, { mark: true });
   p.el.dataset.deck = name;
   createStack(d.el).add(p.el);
   if (SELFCHECK) await deckChecks(d, deck, p);
