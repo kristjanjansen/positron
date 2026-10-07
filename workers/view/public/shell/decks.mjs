@@ -79,6 +79,53 @@ const SYNTHS = [
 ];
 
 /**
+ * WHAT IS POSITRON, 2026-10-07, asked as *"what-is-positron.md make slides.
+ * shorten speaker notes to body text"*. The headings are the talk's own; each
+ * body is one sentence cut from that slide's speaker notes, and the notes
+ * themselves are kept whole in `notes`, which is not drawn. The source's
+ * format line (`MIDI · audio · ...`) is not on a slide: a row of facts glued
+ * with middots is the thing this repository does not print.
+ */
+const POSITRON = [
+  { name: 'title', title: 'Positron', by: 'Kristjan Jansen', place: 'positron.studio',
+    notes: 'I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. The project now includes reusable tools, examples and lessons. I want other people to be able to understand those parts and adapt them for their own work. This is an introduction for curious artists, musicians and creative developers. Positron is an evolving R&D project.' },
+  { name: 'instruments', say: 'Instruments and media experiments',
+    text: 'A musician might start with a synth, someone interested in movement with Draw', textStep: 2,
+    notes: 'These are different ways into the same project. An artist might start with projected media or an archive. Show two or three real examples. Explain what each one does before introducing the underlying architecture. The proposed continuous radio-tuning slider is future work; do not present it as part of the current demo.' },
+  { name: 'blocks', say: 'Reusable building blocks',
+    text: 'Parts are reused across works instead of rebuilding each instrument from scratch', textStep: 2,
+    notes: 'The project includes a UI kit, media runtimes, a patch bay and timeline tools. Reuse is concrete in the playable synth lessons and the timeline-based demos. This does not mean every example already uses every shared component. Show one component in a lesson and in another example, using an actual documented pair.' },
+  { name: 'connecting', say: 'Connecting instruments and streams',
+    text: 'A control message, an audio session and a program travel by different transports', textStep: 2,
+    notes: 'The patch bay describes what participants send and receive, and checks connections before opening them. They do not become the same kind of data because they appear in one patch bay. Show an existing compatible connection and identify its source and destination.' },
+  { name: 'interfaces', say: 'Interfaces for media and hardware',
+    text: 'An interface can control a device and show what it is doing', textStep: 2,
+    notes: 'Browser panels connect to familiar instruments, including Circuit and TASCAM examples. The hardware kit also presents the Pico router\'s screen and keys using its firmware in the browser. Show a control and the parameter or device behavior it represents. Avoid a gallery of unrelated widgets.' },
+  { name: 'programs', say: 'Media programs on supported devices',
+    text: 'Each program needs its runtime and a capable device, so portable means a path shown to work', textStep: 2,
+    notes: 'Send a rendered stream, or run the program that generates it. Examples: Faust, Plaits C++ compiled to WebAssembly, and shaders in a browser or on a Raspberry Pi. The browser SuperCollider example supports a subset of the language. The distinction matters when deciding where computation happens and what travels over the connection.' },
+  { name: 'time', say: 'Time and composition',
+    text: 'A position in a source, a local clock and what a player shows need explicit relationships', textStep: 2,
+    notes: 'The score model can place, repeat and change the playback rate of passages. The timing layer separately decides whether an action follows arrival, a shared time, a beat or media presentation. Use a short timeline example. Do not equate timeline resolution with measured network accuracy.' },
+  { name: 'gestures', say: 'Recording and reconstructing gestures',
+    text: 'A smooth line estimates what happened between points, and it need not match the hand', textStep: 2,
+    notes: 'Draw one stroke. Increase the interval between retained points, then compare hold, linear and spline reconstruction on the same samples. Ask the audience what changed. Do not claim that every instrument can already record and replay its controls through Draw.' },
+  { name: 'archives', say: 'Recordings and archives',
+    text: 'A trace keeps what was captured, and a score composes references to it', textStep: 2,
+    notes: 'Those references can carry boundaries, placement, rate, repetition and provenance. An uncertain recording date is a different issue from reconstructing missing content, and the timeline tools distinguish them. The project is not a general automated film-restoration system.' },
+  { name: 'learning', say: 'Learning with working examples',
+    text: 'Start by listening, then move into the code that makes the sound', textStep: 2,
+    notes: 'The lesson can introduce an oscillator, volume, pitch, filtering and modulation through working components. A concept learned in a small example should remain useful in a larger instrument. Positron uses established media languages and web technologies; avoid calling them all standards.' },
+  { name: 'related', say: 'Related artistic practices',
+    text: 'Moholy-Nagy asked how the senses join one composition, and Kurenniemi built instruments across media', textStep: 2,
+    notes: 'Partitur uses a Moholy-Nagy graphic score. Other useful comparisons include Electronic Cafe for remote participation, Sandin for sharing construction knowledge, and ossia for interactive media scores. These are references and adjacent practices, not claims that every idea originated here.' },
+  { name: 'sharing', say: 'Sharing examples and instructions',
+    text: 'Choose one example, try a change, and tell me where you needed help', textStep: 2,
+    cap: 'positron.studio',
+    notes: 'A skill carries working instructions alongside the code, so a person or a coding agent can begin with an example and change it. My purpose is to make tools that others can use for their own expression. Invite collaboration around that experience rather than asking someone to evaluate the whole project at once.' },
+];
+
+/**
  * 🔴 ONE DECK SINCE 2026-10-06. The `brand` deck went the same day, asked as
  * *"add kit/logo page and use individual slides from the brand slides. rm brand
  * slids after it"*: its six slides are blocks of `/kit/logo/` now, drawn by
@@ -88,6 +135,7 @@ const SYNTHS = [
  */
 export const DECKS = [
   { name: 'synths', title: 'Synths in code', slides: SYNTHS },
+  { name: 'positron', title: 'What is Positron', slides: POSITRON },
 ];
 
 /** Where a deck's own page is: `/slides/<name>/`. */
