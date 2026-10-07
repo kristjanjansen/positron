@@ -488,11 +488,25 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .pos-what { margin: 6px 0 0; }
 /* the front page's sentence at the heading's own size, asked 2026-10-07 as
    *"same size as title"*; every other page keeps 13.5 */
-.pos-index .pos-what { font-size: 17px; line-height: 1.45; margin: 24px 0 38px; }
-/* the margins, asked 2026-10-07 as *"add 3 x more space on top and 2x more on
-   bottom"*: MEASURED before, 8.8 px from the heading's foot to the sentence and
-   38 from the sentence to the first section heading; 24 on top makes the first
-   26.8 and 38 underneath makes the second 76 */
+/* 🔴 THE FRONT PAGE'S TYPE AND AIR AS ONE SYSTEM, 2026-10-07, asked as *"help me
+   imrove sdesign of frontpage. typo sizes and whitespace only. i am lost"*,
+   after an afternoon of single asks (*"same size as title"*, *"3 x more space
+   on top and 2x more on bottom"*) that each moved one number. MEASURED before:
+   the heading and the sentence both 17 px, so neither led; 26.8 px from the
+   heading to the sentence and 85 from the sentence to SLIDES, against 44
+   between every other pair of sections, so the intro was further from its own
+   page than the sections were from each other.
+   THE SCALE: four sizes, each a clear step from the next (positron-compose,
+   no two adjacent steps within about 25 per cent):
+     24  the page's name
+     15  the sentence, the same size as a card's title
+     12.5 a card's description (card.mjs, unchanged)
+     10.5 a section label (unchanged)
+   THE AIR: 12 inside a group, 48 between groups, so the heading and its
+   sentence read as one block and every section below it sits at one rhythm,
+   the intro's included. */
+.pos-index .pos-name { font-size: 24px; }
+.pos-index .pos-what { font-size: 15px; line-height: 1.55; max-width: 58ch; margin: 12px 0 0; }
 
 /* how it works — one plain paragraph */
 
@@ -1647,10 +1661,13 @@ button.pos-pri[data-busy="1"] {
    ran together and the headings read as labels on nothing. */
 .pos-act-h {
   font: 600 10.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
-  color: var(--hi); margin: 44px 0 12px;
+  color: var(--hi); margin: 48px 0 12px;
 }
-/* The first one has the page's own title above it and needs no separating. */
-.pos-act-h:first-of-type { margin-top: 26px; }
+/* The first one has the page's head above it, whose 12 px padding stands and
+   whose 16 px margin COLLAPSES into this one (the larger wins), so 36 here
+   makes the same 48 as every other section. MEASURED 2026-10-07: 20 gave 32,
+   which is how the collapse was found. */
+.pos-act-h:first-of-type { margin-top: 36px; }
 .pos-row { border-bottom: 1px solid var(--line); }
 .pos-row a {
   display: grid; grid-template-columns: 3.7em 1fr; gap: 2px 10px;

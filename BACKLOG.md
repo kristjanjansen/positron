@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Front page type and whitespace as one system** (2026-10-07). Asked: *"help me imrove sdesign of frontpage. typo sizes and whitespace only. i am lost. use yr skills"*. Four sizes (24 name, 15 sentence, 12.5 card text, 10.5 section label) and two gaps (12 inside a group, 48 between groups) in `demo/shell/shell.css`.~~ DONE 2026-10-07
+
 - ~~**Three times the air above the front page sentence and twice under it** (2026-10-07). Asked: *"add 3 x more space on top and 2x more on bottom of Positron connects.."*.~~ DONE 2026-10-07
 
 - ~~**See slides centred between the pager and the full screen button** (2026-10-07). Asked: *"align see slides centered horz better pager and fullscreen bittpns"*. `demo/shell/slide.css`.~~ DONE 2026-10-07
