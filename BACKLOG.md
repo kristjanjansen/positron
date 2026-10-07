@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Cut the positron deck's Build a synth from shared parts slide** (2026-10-07). Asked: *"rm Build a synth from shared parts slide"*. Nine things remain under a title that says ten.~~ DONE 2026-10-07
+
 - ~~**The front page heading reads positron.studio with a yellow dot** (2026-10-07). Asked: *"for index title use \"positron.studio\" with yellow do"*. Static in `demo/index.html` and `workers/view/menu.html`; the horizontal logo stays on `/slides/positron/`.~~ DONE 2026-10-07
 
 - ~~**β+ off the slides; the half width player's footer link reads See slides** (2026-10-07). Asked: *"rm positron logo from slides. in 1/2 w replace title with \"See slides\" link in footer"*. Read as the β+ on the two title slides (`mark: true` in `demo/shell/decks.mjs`); the horizontal logo heading on `/slides/positron/` stays unless said. `mountDecks`'s `title` text. ~~ DONE 2026-10-07
