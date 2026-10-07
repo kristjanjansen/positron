@@ -24,7 +24,7 @@ import { createSlidePlayer, fitBox } from './slide.mjs';
 import { createCodeBox } from './code-box.mjs';
 import { SYNTH_STEPS } from './synth-steps.mjs';
 import { synthSlot } from './slide-synth.mjs';
-import { deckFrameHTML } from '../manifest.mjs';
+import { deckFrameHTML, LOGO_HTML } from '../manifest.mjs';
 
 /**
  * SYNTHS IN CODE, asked 2026-10-06: *"do slide deck Synths in code in the fau
@@ -106,7 +106,7 @@ If you cannot read that file, stop and tell me. Do not guess what it says.
 I want to build something like the stage demo at https://positron.studio/stage/.`;
 const PROMPT_LANG = { name: 'prompt', rules: [[/https?:\/\/\S+/, 'string'], [/[^\s]+/, '']] };
 function promptSlot(host) {
-  const code = createCodeBox({ language: PROMPT_LANG, value: SETUP_PROMPT, rows: 9, label: '',
+  const code = createCodeBox({ language: PROMPT_LANG, value: SETUP_PROMPT, rows: 11, label: '',
     ariaLabel: 'the prompt to paste into a coding agent, read only' });
   code.input.readOnly = true;
   // a narrower logical width and soft wrapping, so the prompt is read at a
@@ -252,22 +252,8 @@ export async function deckPage(name) {
   // The h1 keeps its name for a screen reader; `__demo.name` and
   // `document.title` keep `slides/<name>`.
   if (h1 && deck.heading === 'logo') {
-    h1.textContent = '';
+    h1.innerHTML = LOGO_HTML;
     h1.setAttribute('aria-label', 'positron studio');
-    const row = document.createElement('span');
-    row.className = 'sl-logo-h';
-    row.setAttribute('aria-hidden', 'true');
-    const b = document.createElement('span');
-    b.className = 'sl-logo-b';
-    const plus = document.createElement('span');
-    plus.className = 'sl-hi';
-    plus.textContent = '+';
-    b.append('β', plus);
-    const w = document.createElement('span');
-    w.className = 'sl-logo-w';
-    for (const t of ['positron', 'studio']) { const x = document.createElement('span'); x.textContent = t; w.append(x); }
-    row.append(b, w);
-    h1.append(row);
   }
   const p = createSlidePlayer(deck.slides, { mark: true });
   p.el.dataset.deck = name;

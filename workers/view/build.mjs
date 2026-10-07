@@ -69,7 +69,7 @@ const SCRATCH = OUT !== DEPLOY_OUT;
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
 // AND in demo/index.html, so fixing one left the other printing `undefined`.
 const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byGroup, groupHTML, noteHTML, extraPages,
-        indexTitle } =
+        indexTitle, LOGO_HTML } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
@@ -792,9 +792,10 @@ await mkdir(OUT, { recursive: true });
   // CHECKED LIKE THEM. A build that silently shipped the template's empty
   // heading would put a nameless page on the domain and pass.
   if (!menu.includes('<!--TITLE-->')) throw new Error('menu.html lost its <!--TITLE--> marker');
+  if (!menu.includes('<!--LOGO-->')) throw new Error('menu.html lost its <!--LOGO--> marker');
   await writeFile(join(OUT, 'index.html'),
     menu.replace('<!--DEMOS-->', rows).replace('<!--NOTES-->', notes)
-        .replace('<!--TITLE-->', indexTitle(DEMO_MANIFEST)));
+        .replace('<!--TITLE-->', indexTitle(DEMO_MANIFEST)).replace('<!--LOGO-->', LOGO_HTML));
 }
 
 // favicon.ico — generated, not committed. Browsers request /favicon.ico for

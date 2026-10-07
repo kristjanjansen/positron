@@ -17,13 +17,16 @@
 <link rel="icon" href="/favicon.ico">
 
 <div class="pos-head pos-index">
+  <!-- the horizontal logo, asked 2026-10-07 as *"add horiz positron logo to front
+       page"*; LOGO_HTML in demo/manifest.mjs -->
+  <div class="pos-logo"><!--LOGO--></div>
   <div class="pos-title"><h1 class="pos-name">positron</h1></div>
 </div>
 
 <div id="rows"></div>
 
 <script type="module">
-  import { NOTES, byGroup, groupHTML, noteHTML, indexTitle } from '/manifest.mjs';
+  import { NOTES, byGroup, groupHTML, noteHTML, indexTitle, LOGO_HTML } from '/manifest.mjs';
   import { markIndex } from '/shell/caps.mjs';
 
   /**
@@ -81,6 +84,7 @@
   // The static `positron` in the markup above is what a reader sees for the one
   // frame before this runs, which is the page's name and not a wrong number.
   document.querySelector('.pos-name').textContent = indexTitle();
+  document.querySelector('.pos-logo').innerHTML = LOGO_HTML;
   document.getElementById('rows').innerHTML = byGroup().map(groupHTML).join('');
   // Nothing at all when there are no notes. `NOTES` is empty and this wrote the
   // heading over an empty list on every load; the build does the same test for
