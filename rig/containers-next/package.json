@@ -1,0 +1,8 @@
+{
+  "name": "positron-cnt-next",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "4.148.0"
+  }
+}

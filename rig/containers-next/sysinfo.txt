@@ -1,0 +1,12 @@
+None None MemTotal:        4263920 kB ['model name\t: AMD EPYC']
+1 {'CLOUDFLARE_LOCATION': 'txl01', 'CLOUDFLARE_REGION': 'EEUR', 'CLOUDFLARE_DEPLOYMENT_ID': 'd0301104'}
+1.190070 x-edge-ms: 75
+0.198815 x-edge-ms: 72
+0.165236 x-edge-ms: 72
+{"destroyed":true}
+None None MemTotal:        4401424 kB ['model name\t: AMD EPYC']
+8 {'CLOUDFLARE_LOCATION': 'waw02', 'CLOUDFLARE_REGION': 'EEUR', 'CLOUDFLARE_DEPLOYMENT_ID': ''}
+0.234536 x-edge-ms: 129
+0.212224 x-edge-ms: 113
+0.214832 x-edge-ms: 116
+{"destroyed":true,"running":false,"ms":116}

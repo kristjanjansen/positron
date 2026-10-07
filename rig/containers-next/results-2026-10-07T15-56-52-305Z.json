@@ -1,0 +1,1423 @@
+{
+ "startedAt": "2026-10-07T15:56:52.305Z",
+ "params": {
+  "N_COLD": 10,
+  "N_WARM": 20,
+  "N_SNAP": 10,
+  "N_FRESH": 5,
+  "KILL_SETTLE_MS": 2000
+ },
+ "legacy": {
+  "cold": [
+   {
+    "status": 200,
+    "clientMs": 963.2,
+    "edgeMs": 871,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 275,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 5984.5,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:57:03.155Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1661.1,
+    "edgeMs": 1614,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 287,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 6642.2,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:57:16.005Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 2555.7,
+    "edgeMs": 2471,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 346,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 7571.9,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:57:29.536Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 2244.7,
+    "edgeMs": 2196,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 275,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 7163.9,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:57:42.537Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1712.8,
+    "edgeMs": 1659,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 286,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 6458,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:57:55.141Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 949.5,
+    "edgeMs": 906,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 256,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 5777.1,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:58:06.851Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1937.5,
+    "edgeMs": 1885,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 385,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 6747.7,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:58:19.881Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1800.8,
+    "edgeMs": 1732,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 315,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 6938.1,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:58:33.072Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1137.9,
+    "edgeMs": 1087,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 193,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 6824.3,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:58:45.805Z",
+    "kill": {
+     "destroyed": true
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 2373.7,
+    "edgeMs": 2329,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 219,
+    "location": "txl01",
+    "err": null,
+    "totalMs": 7268.5,
+    "attempts": 2,
+    "nonOk": [
+     "503 There is no Container instance available at this time.\nThis is likely because you have reached your max concurrent instance count (set in wrangler config) or ar"
+    ],
+    "at": "2026-10-07T15:58:59.142Z",
+    "kill": {
+     "destroyed": true
+    }
+   }
+  ],
+  "warm": [
+   {
+    "status": 200,
+    "clientMs": 178.1,
+    "edgeMs": 75,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 4269,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:03.022Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 167.8,
+    "edgeMs": 71,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 4913,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:03.665Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 112.7,
+    "edgeMs": 70,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 5433,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:04.148Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 154.8,
+    "edgeMs": 69,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 5937,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:04.676Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 120.9,
+    "edgeMs": 78,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 6440,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:05.163Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 121,
+    "edgeMs": 69,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 6897,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:05.620Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 120.2,
+    "edgeMs": 66,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 7374,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:06.090Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 111.8,
+    "edgeMs": 72,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 7865,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:06.579Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 110.2,
+    "edgeMs": 73,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 8367,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:07.081Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 114,
+    "edgeMs": 69,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 8873,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:07.586Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 107.7,
+    "edgeMs": 75,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 9379,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:08.095Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 111.9,
+    "edgeMs": 68,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 9877,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:08.592Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 110.9,
+    "edgeMs": 70,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 10343,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:09.056Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 121.1,
+    "edgeMs": 71,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 10809,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:09.528Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 157.8,
+    "edgeMs": 80,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 11314,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:10.040Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 114.7,
+    "edgeMs": 72,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 11779,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:10.494Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 113.9,
+    "edgeMs": 72,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 12237,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:10.951Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 107.6,
+    "edgeMs": 72,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 12709,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:11.422Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 112,
+    "edgeMs": 72,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 13167,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:11.882Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 118.3,
+    "edgeMs": 75,
+    "readyMs": null,
+    "polls": null,
+    "cold": null,
+    "ray": "RIX",
+    "uptimeMs": 13629,
+    "location": "txl01",
+    "err": null,
+    "at": "2026-10-07T15:59:12.352Z"
+   }
+  ]
+ },
+ "next": {
+  "cold": [
+   {
+    "status": 200,
+    "clientMs": 1472.2,
+    "edgeMs": 1420,
+    "readyMs": 930,
+    "polls": 30,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 44,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1472.4,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:57:07.147Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 162
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1391.8,
+    "edgeMs": 1322,
+    "readyMs": 845,
+    "polls": 33,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 43,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1392,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:57:19.705Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 94
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1172,
+    "edgeMs": 1130,
+    "readyMs": 694,
+    "polls": 25,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 35,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1172.2,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:57:33.001Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 108
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1359.1,
+    "edgeMs": 1292,
+    "readyMs": 781,
+    "polls": 30,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 50,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1359.1,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:57:46.187Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 104
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1359.2,
+    "edgeMs": 1290,
+    "readyMs": 809,
+    "polls": 29,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 43,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1359.3,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:57:58.805Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 113
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1597.3,
+    "edgeMs": 1457,
+    "readyMs": 890,
+    "polls": 30,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 70,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1597.5,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:58:10.748Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 105
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1671.4,
+    "edgeMs": 1533,
+    "readyMs": 977,
+    "polls": 38,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 47,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1671.5,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:58:23.853Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 111
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1354.6,
+    "edgeMs": 1270,
+    "readyMs": 790,
+    "polls": 29,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 45,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1354.7,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:58:36.732Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 117
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1516.8,
+    "edgeMs": 1345,
+    "readyMs": 859,
+    "polls": 30,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 47,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1516.9,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:58:49.664Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 111
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1418.7,
+    "edgeMs": 1295,
+    "readyMs": 760,
+    "polls": 28,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 44,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1418.8,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:02.843Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 107
+    }
+   }
+  ],
+  "warm": [
+   {
+    "status": 200,
+    "clientMs": 273.4,
+    "edgeMs": 132,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 881,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:03.295Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 168.2,
+    "edgeMs": 108,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 1478,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:03.833Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 171.6,
+    "edgeMs": 116,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 1945,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:04.319Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 164.7,
+    "edgeMs": 105,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 2494,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:04.841Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 134.7,
+    "edgeMs": 97,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 2955,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:05.298Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 148.1,
+    "edgeMs": 103,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 3420,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:05.768Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 175,
+    "edgeMs": 102,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 3899,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:06.265Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 191.6,
+    "edgeMs": 100,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 4417,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:06.771Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 188.9,
+    "edgeMs": 101,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 4922,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:07.270Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 199.2,
+    "edgeMs": 102,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 5433,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:07.785Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 183.8,
+    "edgeMs": 113,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 5928,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:08.279Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 151.5,
+    "edgeMs": 104,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 6392,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:08.743Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 149.2,
+    "edgeMs": 101,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 6863,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:09.205Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 152.2,
+    "edgeMs": 112,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 7329,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:09.681Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 138,
+    "edgeMs": 96,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 7836,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:10.178Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 142,
+    "edgeMs": 104,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 8288,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:10.636Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 162.5,
+    "edgeMs": 118,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 8770,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:11.114Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 146.3,
+    "edgeMs": 105,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 9222,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:11.569Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 150.9,
+    "edgeMs": 114,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 9683,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:12.033Z"
+   },
+   {
+    "status": 200,
+    "clientMs": 158.3,
+    "edgeMs": 120,
+    "readyMs": null,
+    "polls": null,
+    "cold": "0",
+    "ray": "TLL",
+    "uptimeMs": 10151,
+    "location": "waw02",
+    "err": null,
+    "at": "2026-10-07T15:59:12.510Z"
+   }
+  ],
+  "snapshot": {
+   "ok": true,
+   "ms": 5583,
+   "id": "70b4adb8-2afa-4b5b-a534-63bf4b28c399",
+   "size": 23832
+  },
+  "snapCold": [
+   {
+    "status": 200,
+    "clientMs": 1531.6,
+    "edgeMs": 1446,
+    "readyMs": 909,
+    "polls": 32,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 50,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1531.7,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:22.174Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 116
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1462.6,
+    "edgeMs": 1376,
+    "readyMs": 895,
+    "polls": 30,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 44,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1462.7,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:25.823Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 110
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1365.9,
+    "edgeMs": 1306,
+    "readyMs": 852,
+    "polls": 31,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 46,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1366,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:29.398Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 128
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1374.9,
+    "edgeMs": 1331,
+    "readyMs": 805,
+    "polls": 27,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 42,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1375,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:32.953Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 97
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1447.6,
+    "edgeMs": 1406,
+    "readyMs": 878,
+    "polls": 30,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 46,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1447.7,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:36.589Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 104
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1519.7,
+    "edgeMs": 1466,
+    "readyMs": 945,
+    "polls": 32,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 63,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1520,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:40.318Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 111
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1585.2,
+    "edgeMs": 1501,
+    "readyMs": 967,
+    "polls": 36,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 48,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1585.2,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:44.101Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 104
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1685.3,
+    "edgeMs": 1482,
+    "readyMs": 914,
+    "polls": 31,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 81,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1685.5,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:48.002Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 116
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1803.6,
+    "edgeMs": 1721,
+    "readyMs": 1085,
+    "polls": 36,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 53,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1803.8,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:52.024Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 126
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 2032.2,
+    "edgeMs": 1912,
+    "readyMs": 1121,
+    "polls": 39,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 59,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 2032.4,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:56.312Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 165
+    }
+   }
+  ],
+  "freshDo": [
+   {
+    "status": 200,
+    "clientMs": 2058.7,
+    "edgeMs": 1914,
+    "readyMs": 998,
+    "polls": 35,
+    "cold": "1",
+    "ray": "TLL",
+    "uptimeMs": 62,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 2058.8,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T15:59:58.371Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 116
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1433.4,
+    "edgeMs": 1253,
+    "readyMs": 615,
+    "polls": 23,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 33,
+    "location": "arn06",
+    "err": null,
+    "totalMs": 1433.5,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T16:00:00.009Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 97
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1604.4,
+    "edgeMs": 1565,
+    "readyMs": 739,
+    "polls": 25,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 36,
+    "location": "arn06",
+    "err": null,
+    "totalMs": 1604.5,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T16:00:01.976Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 98
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 1960.7,
+    "edgeMs": 1821,
+    "readyMs": 868,
+    "polls": 28,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 46,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 1960.7,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T16:00:04.410Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 133
+    }
+   },
+   {
+    "status": 200,
+    "clientMs": 2715.7,
+    "edgeMs": 2582,
+    "readyMs": 831,
+    "polls": 32,
+    "cold": "1",
+    "ray": "RIX",
+    "uptimeMs": 42,
+    "location": "waw02",
+    "err": null,
+    "totalMs": 2715.8,
+    "attempts": 1,
+    "nonOk": [],
+    "at": "2026-10-07T16:00:07.690Z",
+    "kill": {
+     "destroyed": true,
+     "running": false,
+     "ms": 135
+    }
+   }
+  ]
+ },
+ "endKill": {
+  "legacy": {
+   "destroyed": true
+  },
+  "next": {
+   "destroyed": true,
+   "running": false,
+   "ms": 127
+  }
+ },
+ "endedAt": "2026-10-07T16:00:09.659Z",
+ "summary": {
+  "legacy": {
+   "coldTotalMs": {
+    "n": 10,
+    "median": 6786,
+    "p90": 7268.5,
+    "min": 5777.1,
+    "max": 7571.9
+   },
+   "coldEdgeMs": {
+    "n": 10,
+    "median": 1695.5,
+    "p90": 2329,
+    "min": 871,
+    "max": 2471
+   },
+   "coldUptimeMs": {
+    "n": 10,
+    "median": 280.5,
+    "p90": 346,
+    "min": 193,
+    "max": 385
+   },
+   "warmClientMs": {
+    "n": 20,
+    "median": 114.3,
+    "p90": 157.8,
+    "min": 107.6,
+    "max": 178.1
+   },
+   "warmEdgeMs": {
+    "n": 20,
+    "median": 72,
+    "p90": 75,
+    "min": 66,
+    "max": 80
+   }
+  },
+  "next": {
+   "coldTotalMs": {
+    "n": 10,
+    "median": 1405.4,
+    "p90": 1597.5,
+    "min": 1172.2,
+    "max": 1671.5
+   },
+   "coldEdgeMs": {
+    "n": 10,
+    "median": 1308.5,
+    "p90": 1457,
+    "min": 1130,
+    "max": 1533
+   },
+   "coldReadyMs": {
+    "n": 10,
+    "median": 827,
+    "p90": 930,
+    "min": 694,
+    "max": 977
+   },
+   "coldUptimeMs": {
+    "n": 10,
+    "median": 44.5,
+    "p90": 50,
+    "min": 35,
+    "max": 70
+   },
+   "warmClientMs": {
+    "n": 20,
+    "median": 160.4,
+    "p90": 191.6,
+    "min": 134.7,
+    "max": 273.4
+   },
+   "warmEdgeMs": {
+    "n": 20,
+    "median": 104.5,
+    "p90": 118,
+    "min": 96,
+    "max": 132
+   },
+   "snapTotalMs": {
+    "n": 10,
+    "median": 1525.8,
+    "p90": 1803.8,
+    "min": 1366,
+    "max": 2032.4
+   },
+   "snapEdgeMs": {
+    "n": 10,
+    "median": 1456,
+    "p90": 1721,
+    "min": 1306,
+    "max": 1912
+   },
+   "snapReadyMs": {
+    "n": 10,
+    "median": 911.5,
+    "p90": 1085,
+    "min": 805,
+    "max": 1121
+   },
+   "freshTotalMs": {
+    "n": 5,
+    "median": 1960.7,
+    "p90": 2715.8,
+    "min": 1433.5,
+    "max": 2715.8
+   },
+   "freshEdgeMs": {
+    "n": 5,
+    "median": 1821,
+    "p90": 2582,
+    "min": 1253,
+    "max": 2582
+   },
+   "freshReadyMs": {
+    "n": 5,
+    "median": 831,
+    "p90": 998,
+    "min": 615,
+    "max": 998
+   }
+  }
+ }
+}
