@@ -24,7 +24,7 @@ import { createSlidePlayer, fitBox } from './slide.mjs';
 import { createCodeBox } from './code-box.mjs';
 import { SYNTH_STEPS } from './synth-steps.mjs';
 import { synthSlot } from './slide-synth.mjs';
-import { deckFrameHTML, LOGO_HTML } from '../manifest.mjs';
+import { deckFrameHTML } from '../manifest.mjs';
 
 /**
  * SYNTHS IN CODE, asked 2026-10-06: *"do slide deck Synths in code in the fau
@@ -182,7 +182,7 @@ const POSITRON = POSITRON_WORDS.map((sl) => (sl.title ? sl : { ...sl, sayStep: 3
  */
 export const DECKS = [
   // positron first, asked 2026-10-07 as *"reverse their order"*
-  { name: 'positron', title: '10 things you can do with Positron', slides: POSITRON, heading: 'logo' },
+  { name: 'positron', title: '10 things you can do with Positron', slides: POSITRON },
   { name: 'synths', title: 'Synths in code', slides: SYNTHS },
 ];
 
@@ -256,17 +256,10 @@ export async function deckPage(name) {
   const { mount } = await import('./shell.mjs');
   const { createStack } = await import('./stack.mjs');
   const { SELFCHECK } = await import('./selfcheck.mjs');
-  const d = mount({ name: `slides/${name}`, readout: null });
+  // no log under the deck, asked 2026-10-07 as *"rm logs on slide pages"*
+  const d = mount({ name: `slides/${name}`, readout: null, showLog: false });
   const h1 = d.head.querySelector('.pos-name');
   if (h1) h1.textContent = name;
-  // 🔴 THE HORIZONTAL LOGO AS THE HEADING, asked 2026-10-07 as *"change page
-  // title to positron horizonal logo"*, for a deck that says `heading: 'logo'`.
-  // The h1 keeps its name for a screen reader; `__demo.name` and
-  // `document.title` keep `slides/<name>`.
-  if (h1 && deck.heading === 'logo') {
-    h1.innerHTML = LOGO_HTML;
-    h1.setAttribute('aria-label', 'positron studio');
-  }
   const p = createSlidePlayer(deck.slides);
   p.el.dataset.deck = name;
   createStack(d.el).add(p.el);
