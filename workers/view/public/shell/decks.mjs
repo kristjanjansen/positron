@@ -68,7 +68,7 @@ const SYNTHS = [
   // the positron deck's title slide, the name and one line on the bottom edge,
   // asked 2026-10-07 as *"use same style for synths slide 1"*; it was two
   // `lines` at step 6, then 5, with a caption
-  { name: 'synths in code', title: 'Synths in code', by: 'From a sine wave to an instrument' },
+  { name: 'synths in code', title: 'Synths in code', by: 'From a sine wave to an instrument', mark: true },
   ...SYNTH_STEPS.filter((st) => !st.hidden).map((st) => ({
     // a third for the words and two for the instrument, the words on the
     // foot of their column, asked 2026-10-06 as *"use 1:2 cols layout"* and
@@ -128,7 +128,7 @@ const POSITRON_WORDS = [
   // ⚠️ NO SUBTITLE NOW: the three line name and the two line subtitle spilled
   // the title slide (MEASURED by the deck's own spill check), so the subtitle
   // went to the notes rather than the name being cut
-  { name: 'title', title: '10 things you can do with Positron',
+  { name: 'title', title: '10 things you can do with Positron', mark: true,
     notes: 'From microcontrollers to distributed performances. I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. I want other people to be able to understand those parts and adapt them for their own work. Positron is an evolving R&D project.' },
   { name: 'synth', say: 'Build a synth from shared parts', layout: 'split', side: 'right', cols: '1:2', bottom: true,
     text: 'Press Start and turn `volume`. The same panel, knobs and code box play on positron.studio/fau', textStep: 2,
@@ -219,7 +219,7 @@ export function mountDecks(root = document) {
       // frame, lazyload ocntents"*): a deck is every slide's code box, knobs
       // and scope, and a visitor who never scrolls to it pays for none of it
       const build = () => {
-        const p = createSlidePlayer(deck.slides, { title: { text: deck.title, href: deckHref(deck) }, mark: true });
+        const p = createSlidePlayer(deck.slides, { title: { text: deck.title, href: deckHref(deck) } });
         p.el.dataset.deck = deck.name;
         frame.replaceWith(p.el);
         players.push(p);
@@ -268,7 +268,7 @@ export async function deckPage(name) {
     h1.innerHTML = LOGO_HTML;
     h1.setAttribute('aria-label', 'positron studio');
   }
-  const p = createSlidePlayer(deck.slides, { mark: true });
+  const p = createSlidePlayer(deck.slides);
   p.el.dataset.deck = name;
   createStack(d.el).add(p.el);
   if (SELFCHECK) await deckChecks(d, deck, p);
