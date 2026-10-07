@@ -488,7 +488,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .pos-what { margin: 6px 0 0; }
 /* the front page's sentence at the heading's own size, asked 2026-10-07 as
    *"same size as title"*; every other page keeps 13.5 */
-.pos-index .pos-what { font-size: 17px; line-height: 1.45; }
+.pos-index .pos-what { font-size: 17px; line-height: 1.45; margin: 24px 0 38px; }
+/* the margins, asked 2026-10-07 as *"add 3 x more space on top and 2x more on
+   bottom"*: MEASURED before, 8.8 px from the heading's foot to the sentence and
+   38 from the sentence to the first section heading; 24 on top makes the first
+   26.8 and 38 underneath makes the second 76 */
 
 /* how it works — one plain paragraph */
 
