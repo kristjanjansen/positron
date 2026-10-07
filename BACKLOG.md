@@ -1,6 +1,6 @@
 ## Open
 
-- **Deck β+ out of the footer and into the slide; horizontal logo on the front page** (2026-10-07). Asked with a screenshot of both front page players' footers: *"rm logos. add logo to slide ocntent. add horiz positron logo to front page"*. `createSlidePlayer({ mark })` in `demo/shell/slide.mjs` draws it in the slide instead; the front page heading in `demo/index.html` and `workers/view/menu.html` becomes the logo `deckPage` already draws.
+- ~~**Deck β+ out of the footer and into the slide; horizontal logo on the front page** (2026-10-07). Asked with a screenshot of both front page players' footers: *"rm logos. add logo to slide ocntent. add horiz positron logo to front page"*. `createSlidePlayer({ mark })` in `demo/shell/slide.mjs` draws it in the slide instead; the front page heading in `demo/index.html` and `workers/view/menu.html` becomes the logo `deckPage` already draws. ~~ DONE 2026-10-07, then the same session: a simpler positron subtitle (*"too complex"*), the synths opening in the same title style, positron first on the front page (*"reverse their order"*)
 
 - ~~**A stream of deck asks, 2026-10-07**, collected before any is worked:~~ DONE 2026-10-07, BUILD `55e19ee-113009-e808`. 1, 2, 3, 5, 6, 7 and 9 built; 4 (interactive material per slide) and 8 (the `cf` CLI, beta since 2026-09-28) answered in chat, nothing built for either.
   1. *"use smaller type in 1st slide in synth slids"*: `SYNTHS[0]` in `demo/shell/decks.mjs`, its two `lines` are step 6.
