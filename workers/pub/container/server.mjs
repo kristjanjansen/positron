@@ -84,6 +84,22 @@ const SOURCE = RAW_SOURCE === 'testsrc2' ? '' : RAW_SOURCE;
 const BURN = process.env.PUB_BURN === '1';
 
 /**
+ * 🔴 THE WHIP LEG'S UDP SEND BUFFER, SET ONLY WHERE IT IS ASKED FOR.
+ * MEASURED 2026-10-07 on the new `durable_object` Containers runtime: the WHIP
+ * leg died with exit 245, "Error muxing a packet / Task finished with error
+ * code: -11 (Resource temporarily unavailable)", 2 to 15 s after every start,
+ * eight times in a row over 150 s, while the RTMPS leg in the same container
+ * held, and the legacy runtime's WHIP leg held on the same input minutes
+ * apart. -11 is EAGAIN on a non-blocking UDP send, which the whip muxer treats
+ * as fatal, and a full socket send buffer is what returns it. `-ts_buffer_size`
+ * is the whip muxer's own pass-through to the UDP socket's buffer. Read from
+ * the environment so the legacy class, which never sets it, sends exactly the
+ * arguments it always did.
+ */
+const WHIP_SNDBUF = /^\d+$/.test(process.env.PUB_WHIP_SNDBUF || '') ? process.env.PUB_WHIP_SNDBUF : '';
+const whipOut = (url) => [...(WHIP_SNDBUF ? ['-ts_buffer_size', WHIP_SNDBUF] : []), '-f', 'whip', url];
+
+/**
  * The input arguments for one leg. A film and a test pattern are not the same
  * shape of input, and this is the one place that knows the difference.
  * ⚠️ `-stream_loop -1` BEFORE `-i`, because it is an INPUT option. A show that
@@ -384,7 +400,7 @@ function whipCopyArgs(url) {
     '-re', '-stream_loop', '-1', '-i', FILM_WHIP,
     '-map', '0:v:0', '-map', '0:a:0',
     '-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb', '-c:a', 'copy',
-    '-f', 'whip', url,
+    ...whipOut(url),
   ];
 }
 
@@ -421,7 +437,7 @@ function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720, source,
     '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.1',
     '-bf', '0', '-pix_fmt', 'yuv420p', '-g', String(gop), '-b:v', bitrate,
     '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
-    '-f', 'whip', url,
+    ...whipOut(url),
   ];
 }
 

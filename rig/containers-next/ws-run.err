@@ -1,0 +1,20 @@
+2026-10-07T16:34:36.621Z ws-nomon-1 {"t":"hello","viewers":1,"atMs":873}
+2026-10-07T16:34:36.625Z ws-mon-1 {"t":"hello","viewers":1,"atMs":932}
+2026-10-07T16:34:46.034Z ws-nomon-1 {"t":"echo","msg":"first","running":true,"s":{"err":"The container is not listening in the TCP address 10.0.0.1:8080"},"atMs":10286}
+2026-10-07T16:34:46.107Z ws-nomon-1 {"t":"bin","err":"The container is not listening in the TCP address 10.0.0.1:8080","atMs":10359}
+2026-10-07T16:34:46.191Z ws-nomon-1 {"t":"bin","err":"The container is not listening in the TCP address 10.0.0.1:8080","atMs":10443}
+2026-10-07T16:34:46.199Z ws-mon-1 {"t":"echo","msg":"first","running":true,"s":{"err":"The container is not listening in the TCP address 10.0.0.1:8080"},"atMs":10506}
+2026-10-07T16:34:46.312Z ws-mon-1 {"t":"bin","err":"The container is not listening in the TCP address 10.0.0.1:8080","atMs":10619}
+2026-10-07T16:34:46.386Z ws-nomon-1 {"t":"bin","err":"The container is not listening in the TCP address 10.0.0.1:8080","atMs":10638}
+2026-10-07T16:34:46.398Z ws-mon-1 {"t":"bin","err":"The container is not listening in the TCP address 10.0.0.1:8080","atMs":10705}
+2026-10-07T16:34:46.587Z ws-mon-1 {"t":"bin","err":"The container is not listening in the TCP address 10.0.0.1:8080","atMs":10894}
+2026-10-07T16:34:46.808Z ws-nomon-1 {"t":"bin","sent":524288,"bytes":524288,"sum":15300,"ms":90,"atMs":11060}
+2026-10-07T16:34:46.969Z ws-mon-1 {"t":"bin","sent":524288,"bytes":524288,"sum":15300,"ms":85,"atMs":11276}
+2026-10-07T16:39:16.876Z ws-nomon-1 {"t":"echo","msg":"after hold","running":true,"s":{"bootAt":1791390883952,"uptimeMs":270357,"enc":{"pid":10,"running":true,"exit":null,"forMs":270304}},"atMs":281129}
+2026-10-07T16:39:17.047Z ws-mon-1 {"t":"echo","msg":"after hold","running":true,"s":{"bootAt":1791390886621,"uptimeMs":270342,"enc":{"pid":10,"running":true,"exit":null,"forMs":270286}},"atMs":281355}
+2026-10-07T16:39:19.049Z both closed; leaving the DOs alone for 150000 ms
+2026-10-07T16:39:26.951Z ws-nomon-1 closed 1006
+2026-10-07T16:41:49.393Z ws-mon-1 peek after 150000 {"running":true,"wakes":1}
+2026-10-07T16:41:49.682Z ws-nomon-1 peek after 150000 {"running":false,"wakes":13}
+2026-10-07T16:41:49.685Z wrote ws-2026-10-07T16-41-49-682Z.json
+2026-10-07T16:42:31.224Z ws-mon-1 closed 1006

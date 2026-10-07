@@ -25,6 +25,7 @@
 // activity while anyone is connected and stops the publish once nobody is.
 
 import { Container, getContainer } from '@cloudflare/containers';
+import { DurableObject } from 'cloudflare:workers';
 
 const SWEEP_MS = 30_000;   // alarm cadence
 const WHIP_PER_HOUR = 20;  // browser publishes allowed per hour, DO-counted
@@ -45,6 +46,16 @@ const STAGE_PATHS = new Set(['/watch', '/status', '/start', '/stop']);
 // rebuild for whoever is watching. So the main instance and its pattern do not
 // know a camera exists, and a camera never waits on or refuses for a viewer.
 const CAM = 'cam';
+// NEXT (PubNext, the durable_object runtime). The instance is pub's custom
+// size from wrangler.jsonc, spelled the new API's way (camelCase, in code):
+// 1 vCPU, 3 GiB, 2 GB disk. The memory and vCPU coupling noted there applies.
+const NEXT_INSTANCE = { vcpu: 1, memoryMib: 3072, diskMb: 2048 };
+// The backstop sleepAfter was: how long the container outlives an object that
+// has gone quiet. The sweep wakes the object every SWEEP_MS while anybody
+// watches, so this only fires when the sweep itself has stopped.
+const NEXT_IDLE_MS = 10 * 60_000;
+const NEXT_READY_MS = 60_000;
+const NEXT_WHIP_SNDBUF = 4 * 1024 * 1024;
 const LOG_KEEP = 400;          // ring buffer of device reports
 const LOG_MAX_BODY = 2000;     // one report cannot flood the rest out
 const CAM_PER_HOUR = 20;       // camera sessions per hour, DO-counted like /whip
@@ -65,9 +76,22 @@ const CAM_TICK_MS = 5_000;     // the alarm's cadence while a camera is live
 // is then replaced.
 const CAM_WHIP_MISSING = 'the camera WebRTC input is not provisioned: the owner runs src/provision-cam-whip.sh, which stores CAM_WHIP_URL';
 
-export class Pub extends Container {
+/**
+ * TWO RUNTIMES, ONE BODY. `Pub` is the legacy `@cloudflare/containers` class
+ * on the `default` scheduling policy; `PubNext` is the same object on the
+ * `durable_object` policy, a plain DurableObject driving `this.ctx.container`
+ * (research/cf-containers-next-2026-10-07.md). Everything below is shared,
+ * and the ONE place they differ is `#c()`, which is how either reaches the
+ * container, plus the lifecycle lines marked NEXT.
+ * ⚠️ A NEW CLASS AND NOT AN EDIT: Cloudflare's docs say `scheduling_policy`
+ * "Cannot be changed after the application is created", so `Pub`'s container
+ * application cannot be switched in place. `Pub` stays exported with its own
+ * container entry so a rollback is redeploying the previous worker.mjs.
+ */
+const pubOn = (Base, NEXT) => class extends Base {
   defaultPort = 8080;
   // A generous backstop only. The sweep below is what actually decides.
+  // (Legacy only. NEXT's backstop is NEXT_IDLE_MS through setInactivityTimeout.)
   sleepAfter = '10m';
 
   /**
@@ -81,6 +105,8 @@ export class Pub extends Container {
    * ⚠️ ONLY WHAT IS SET. An absent var must stay absent, because
    * `PUB_SOURCE === undefined` is what selects the film, and `testsrc2`
    * or `''` is the test pattern.
+   * NEXT: the same object goes to `ctx.container.start({ env })`, which is
+   * also read at start, so the rule above holds unchanged.
    */
   constructor(ctx, env) {
     super(ctx, env);
@@ -88,7 +114,90 @@ export class Pub extends Container {
     for (const k of ['PUB_SOURCE', 'PUB_BURN']) {
       if (typeof env[k] === 'string') pass[k] = env[k];
     }
-    this.envVars = pass;
+    if (!NEXT) { this.envVars = pass; return; }
+    // NEXT ONLY: a bigger UDP send buffer for the WHIP leg, see WHIP_SNDBUF in
+    // container/server.mjs. 4 MiB is the runtime's wmem_max, MEASURED on the
+    // test bed (wmem_default 212992, wmem_max 4194304).
+    this.#pass = { ...pass, PUB_WHIP_SNDBUF: String(NEXT_WHIP_SNDBUF) };
+    // ⚠️ A RESTARTED OBJECT HAS NO INACTIVITY TIMEOUT. The docs: "A Durable
+    // Object that restarts, for example after a deploy, starts without one",
+    // and without one "Cloudflare stops the container shortly after the
+    // Durable Object becomes inactive". So it is set again on every wake that
+    // finds the container up. Not awaited: no other route waits on it.
+    if (ctx.container?.running) ctx.container.setInactivityTimeout(NEXT_IDLE_MS).catch(() => { /* next wake */ });
+  }
+
+  #pass = {};
+  #booting = null;
+  /** NEXT: how the container last exited, from monitor(), for /status. */
+  #exit = null;
+
+  /**
+   * The one way to the container. Legacy: the base class starts it if needed
+   * and forwards. NEXT: start it if needed, wait until server.mjs answers,
+   * then forward on the TCP port. Either way a caller gets a Response or a
+   * throw, and every caller already treats a throw as "still waking".
+   */
+  async #c(req) {
+    if (!NEXT) return super.fetch(req);
+    await this.#up();
+    return this.ctx.container.getTcpPort(8080).fetch(req);
+  }
+
+  /**
+   * NEXT: forward only to a container that is already up. A stop sent to a
+   * container that is gone has nothing to stop, and #c would START one to
+   * deliver it. Legacy: the same as #c, as before.
+   */
+  async #cIfUp(req) {
+    if (NEXT && !this.ctx.container.running && !this.#booting) return null;
+    return this.#c(req);
+  }
+
+  /** NEXT: a camera session ended, so come back in a minute and retire the box. */
+  async #camRetireLater() {
+    if (!NEXT || this.#camLive()) return;
+    try { await this.ctx.storage.setAlarm(Date.now() + 60_000); } catch { /* the timeout is the floor */ }
+  }
+
+  #up() {
+    const c = this.ctx.container;
+    if (this.#booting) return this.#booting;
+    if (c.running) return Promise.resolve();
+    this.#booting = this.#boot().finally(() => { this.#booting = null; });
+    return this.#booting;
+  }
+
+  /**
+   * NEXT: `start()` "returns before the Container is ready to accept requests",
+   * so readiness is ours to poll. `/status` is the cheap route: it spawns
+   * nothing. MEASURED on the test bed the same day: ready about 0.83 s after
+   * start() on a warm host, about 10 s on the first start after an image push,
+   * during which a forward throws "The container is not listening in the TCP
+   * address 10.0.0.1:8080".
+   */
+  async #boot() {
+    const c = this.ctx.container;
+    const t0 = Date.now();
+    c.start({ image: c.images.pub, instance: NEXT_INSTANCE, enableInternet: true, env: this.#pass });
+    this.#exit = null;
+    // monitor() resolves on exit and rejects on error. It also holds the
+    // object in memory for up to 15 minutes, which the docs say is the point.
+    c.monitor()
+      .then(() => { this.#exit = { at: Date.now(), how: 'exited' }; })
+      .catch((e) => { this.#exit = { at: Date.now(), how: 'error', error: String(e?.message || e).slice(0, 200) }; });
+    try { await c.setInactivityTimeout(NEXT_IDLE_MS); } catch { /* set again on the next wake */ }
+    const port = c.getTcpPort(8080);
+    for (;;) {
+      try {
+        const r = await port.fetch('http://c/status');
+        await r.arrayBuffer();
+        this.bootMs = Date.now() - t0;
+        return;
+      } catch { /* not listening yet */ }
+      if (Date.now() - t0 > NEXT_READY_MS) throw new Error(`container not listening ${NEXT_READY_MS / 1000} s after start`);
+      await new Promise((ok) => setTimeout(ok, 25));
+    }
   }
 
   #idleTicks = 0;
@@ -129,6 +238,32 @@ export class Pub extends Container {
     this.#hydrated = true;
     try { this.#log = (await this.ctx.storage.get('log')) || []; }
     catch { this.#log = []; }
+    if (NEXT) await this.#adoptLegacyLog();
+  }
+
+  /**
+   * NEXT: THE RING LIVED IN THE LEGACY `Pub` OBJECT'S STORAGE, and a new class
+   * is a new object with empty storage. So the first read of the ring on the
+   * main instance asks the legacy `p1` object for its lines, merges them by
+   * time with anything already here, and remembers that it did. No public
+   * import route: the copy happens inside this worker, object to object.
+   * ⚠️ The flag is written only after a copy that worked, so a failed one is
+   * tried again on the next read rather than leaving the old lines behind.
+   */
+  async #adoptLegacyLog() {
+    if ((await this.#getRole()) !== 'main' || !this.env.PUB) return;
+    try {
+      if (await this.ctx.storage.get('logAdopted')) return;
+      const r = await this.env.PUB.get(this.env.PUB.idFromName(NAME)).fetch('http://c/logs');
+      if (!r.ok) return;
+      const old = (await r.json()).log || [];
+      const seen = new Set(this.#log.map((l) => l.at + l.who + l.body));
+      const merged = old.filter((l) => !seen.has(l.at + l.who + l.body)).concat(this.#log)
+        .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+      this.#log = merged.slice(-LOG_KEEP);
+      await this.#persist();
+      await this.ctx.storage.put('logAdopted', { at: new Date().toISOString(), lines: old.length });
+    } catch { /* tried again on the next read */ }
   }
 
   /**
@@ -220,10 +355,19 @@ export class Pub extends Container {
 
     if (url.pathname === '/status') {
       let container = null;
-      try {
-        const r = await super.fetch(new Request('http://c/status'));
-        container = await r.json();
-      } catch (e) { container = { error: String(e).slice(0, 200) }; }
+      // NEXT: a status read does not START a container nobody is watching.
+      // The legacy base class did (any forward starts it), so a polling page
+      // kept a 3 GiB box up for sleepAfter with nothing in it. The shape is
+      // the one server.mjs answers with when idle, so a reader cannot tell.
+      if (NEXT && !this.ctx.container.running && !this.#booting) {
+        container = { publishing: false, running: false, whip: { publishing: false }, cam: { publishing: false }, exit: this.#exit };
+      } else {
+        try {
+          const r = await this.#c(new Request('http://c/status'));
+          container = await r.json();
+          if (NEXT) container.bootMs = this.bootMs ?? null;
+        } catch (e) { container = { error: String(e).slice(0, 200) }; }
+      }
       const c = this.#cam;
       return json({
         viewers: this.viewers(),
@@ -566,11 +710,12 @@ export class Pub extends Container {
       try { ws.close(4000, String(why).slice(0, 120)); } catch { /* gone */ }
     }
     try {
-      await super.fetch(new Request('http://c/cam/stop', {
+      await this.#cIfUp(new Request('http://c/cam/stop', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sid: c?.sid, why }),
       }));
     } catch { /* the container's watchdog is the floor */ }
+    await this.#camRetireLater();
   }
 
   /**
@@ -595,7 +740,7 @@ export class Pub extends Container {
       const url = this.env.STAGE_WHIP_URL;
       if (!url) return;
       try {
-        await super.fetch(new Request('http://c/start-whip', {
+        await this.#c(new Request('http://c/start-whip', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ url, source: 'film-copy', burn: false }),
@@ -609,7 +754,7 @@ export class Pub extends Container {
     // input, so 06 and 07 need separate inputs fed the same pattern.
     if (key) {
       try {
-        await super.fetch(new Request('http://c/start', {
+        await this.#c(new Request('http://c/start', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ key, ...this.#size(), ...(extra || {}) }),
@@ -618,7 +763,7 @@ export class Pub extends Container {
     }
     if (whip) {
       try {
-        await super.fetch(new Request('http://c/start-whip', {
+        await this.#c(new Request('http://c/start-whip', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ url: whip, ...this.#size() }),
@@ -628,8 +773,11 @@ export class Pub extends Container {
   }
 
   async #stopPublish() {
+    // NEXT: a container that is not running has nothing to stop, and a
+    // forward would START one just to tell it to stop.
+    if (NEXT && !this.ctx.container.running && !this.#booting) return;
     // /stop stops both legs
-    try { await super.fetch(new Request('http://c/stop', { method: 'POST' })); }
+    try { await this.#c(new Request('http://c/stop', { method: 'POST' })); }
     catch { /* already gone */ }
   }
 
@@ -640,7 +788,9 @@ export class Pub extends Container {
     // viewer sweep below, which is about the test pattern.
     if ((await this.#getRole()) === CAM) {
       const c = this.#camLive() ? this.#camState() : null;
-      if (!c) return;
+      // NEXT: no camera left, so the box goes (see #retire). The alarm that
+      // lands here is the one the session's end set CAM_TICK_MS out.
+      if (!c) { await this.#retire(); return; }
       const now = Date.now();
       if (c.open && now - c.lastAt > CAM_IDLE_MS) await this.#endCam('stopped', `no video from the camera for ${Math.round((now - c.lastAt) / 1000)} s`);
       else if (now - c.at > CAM_MAX_MS) await this.#endCam('stopped', `a camera session is capped at ${CAM_MAX_MS / 60000} minutes, because every one is recorded on Stream`);
@@ -651,9 +801,16 @@ export class Pub extends Container {
     if (n > 0) {
       this.#idleTicks = 0;
       // touching the container both checks health and renews its activity
-      // timeout, so sleepAfter cannot pull the stream out from under a viewer
+      // timeout, so sleepAfter cannot pull the stream out from under a viewer.
+      // NEXT: there is no request idleness to renew. What stops a container
+      // there is the object going inactive for NEXT_IDLE_MS, and this alarm
+      // wakes it every SWEEP_MS; the timeout is set again anyway, because a
+      // wake after an eviction starts without one.
+      if (NEXT && this.ctx.container.running) {
+        try { await this.ctx.container.setInactivityTimeout(NEXT_IDLE_MS); } catch { /* the constructor set it */ }
+      }
       try {
-        const r = await super.fetch(new Request('http://c/status'));
+        const r = await this.#c(new Request('http://c/status'));
         const s = await r.json();
         // either leg dying under a live viewer gets restarted
         const down = (await this.#getRole()) === STAGE
@@ -671,9 +828,46 @@ export class Pub extends Container {
       await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
       return;
     }
+    // NEXT: ONE MORE TICK, THEN THE CONTAINER IS DESTROYED. The publish is
+    // stopped first and the box goes a sweep later, so ffmpeg has a whole
+    // SWEEP_MS to close RTMPS cleanly before its container is taken away.
+    if (NEXT && this.#idleTicks > GRACE_TICKS) {
+      await this.#retire();
+      await this.ctx.storage.deleteAlarm();
+      this.#idleTicks = 0;
+      return;
+    }
     await this.#stopPublish();
+    if (NEXT && this.ctx.container.running) {
+      await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
+      return;
+    }
     await this.ctx.storage.deleteAlarm();
     this.#idleTicks = 0;
+  }
+
+  /**
+   * NEXT: destroy the container once nothing needs it.
+   *
+   * 🔴 THE INACTIVITY TIMEOUT DOES NOT RUN WHILE monitor() IS PENDING, AND
+   * monitor() IS PENDING FOR THE CONTAINER'S WHOLE LIFE. MEASURED on the test
+   * bed 2026-10-07: with monitor() held, the object never left memory (one
+   * constructor run in 5.5 minutes) and its container was STILL RUNNING 102 s
+   * after the last alarm, against a 60 s timeout; without monitor() the object
+   * hibernated between every sweep (13 constructor runs) and the container was
+   * gone by the same check. The docs agree: a pending monitor() "prevents
+   * eviction for up to 15 minutes", and the timeout counts from eviction. So
+   * leaving it to the timeout would keep a 3 GiB box up for up to 25 minutes
+   * after the last viewer, where the legacy class's sleepAfter took 10. The
+   * sweep decides instead, as it always did; the timeout stays as the floor
+   * for a sweep that stopped.
+   * ⚠️ AND IT COSTS A VIEWER LITTLE: the publish was already stopped at the end
+   * of the grace, so a returning viewer waits on Stream either way, and a fresh
+   * start was MEASURED at about 0.83 s to listening on the test bed.
+   */
+  async #retire() {
+    if (!NEXT || !this.ctx.container.running) return;
+    try { await this.ctx.container.destroy(); } catch { /* destroy may reject with the exit */ }
   }
 
   async webSocketClose(ws) {
@@ -686,11 +880,12 @@ export class Pub extends Container {
       if (!c || c.sid === a.sid) {
         this.#cam = null;
         try {
-          await super.fetch(new Request('http://c/cam/stop', {
+          await this.#cIfUp(new Request('http://c/cam/stop', {
             method: 'POST', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ sid: a.sid, why: 'the camera page closed its socket' }),
           }));
         } catch { /* the container's watchdog is the floor */ }
+        await this.#camRetireLater();
       }
       return;
     }
@@ -720,9 +915,16 @@ export class Pub extends Container {
         // after a deploy: `There is no Container instance available at this
         // time`, and the same instance up 30 s later. So a 503 is asked again,
         // four times 3 s apart, while the page is still there to want it.
+        // ⚠️ LEGACY ONLY IN PRACTICE. That 503 is written by the
+        // @cloudflare/containers forward, and server.mjs never answers 503 on
+        // /cam/open. On PubNext #c waits until the server answers before it
+        // forwards, and a container that is not listening THROWS ("The
+        // container is not listening in the TCP address 10.0.0.1:8080",
+        // MEASURED on the test bed) rather than answering 503, so there the
+        // loop runs once. Kept because Pub still runs this same body.
         let r = null;
         for (let i = 0; i < 5; i++) {
-          r = await super.fetch(new Request('http://c/cam/open', {
+          r = await this.#c(new Request('http://c/cam/open', {
             method: 'POST', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ key: this.env.CAM_STREAM_KEY, fmt: m.fmt === 'mp4' ? 'mp4' : 'webm', sid: c.sid }),
           }));
@@ -740,7 +942,7 @@ export class Pub extends Container {
       // the container's 5 s watchdog.
       if (this.#cam !== c) {
         try {
-          await super.fetch(new Request('http://c/cam/stop', {
+          await this.#cIfUp(new Request('http://c/cam/stop', {
             method: 'POST', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ sid: c.sid, why: 'the camera page left while the publisher was starting' }),
           }));
@@ -762,7 +964,7 @@ export class Pub extends Container {
     c.chain = c.chain.then(async () => {
       if (this.#cam !== c) return;
       try {
-        const r = await super.fetch(new Request(`http://c/cam/chunk?sid=${sid}`, { method: 'POST', body: msg }));
+        const r = await this.#c(new Request(`http://c/cam/chunk?sid=${sid}`, { method: 'POST', body: msg }));
         if (r.status === 409 || r.status === 503) {
           const why = r.status === 503 ? 'Stream stopped taking the camera\'s bytes' : 'the publisher lost the camera session';
           await this.#endCam('stopped', why);
@@ -770,7 +972,10 @@ export class Pub extends Container {
       } catch { /* one lost chunk; the idle checks catch a dead leg */ }
     });
   }
-}
+};
+
+export class Pub extends pubOn(Container, false) {}
+export class PubNext extends pubOn(DurableObject, true) {}
 
 // Group one device's lines without storing who it is: truncated SHA-256 of
 // ip+ua. Enough to tell two phones apart in the log, not enough to identify
@@ -786,6 +991,17 @@ const json = (o, status = 200) =>
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
   });
 
+/**
+ * Which runtime answers. `PUB_RT` in wrangler.jsonc is the default, and
+ * `?rt=next` or `?rt=legacy` on any request overrides it, so either class can
+ * be driven live without moving anybody's viewers. The three instance names
+ * are the same on both.
+ */
+const ns = (env, url) => {
+  const rt = url.searchParams.get('rt') || env.PUB_RT || 'legacy';
+  return rt === 'next' && env.PUB_NEXT ? env.PUB_NEXT : env.PUB;
+};
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -795,6 +1011,7 @@ export default {
         watch: 'wss://pub.positron.studio/watch',
         status: 'GET /status',
         note: 'publishes while at least one viewer holds /watch',
+        runtime: ns(env, url) === env.PUB_NEXT ? 'next' : 'legacy',
       });
     }
     // /stage/<path> is the stage instance, and only its four routes.
@@ -807,7 +1024,7 @@ export default {
       url.pathname = path;
       const req = new Request(url, request);
       req.headers.set('x-pub-role', STAGE);
-      return getContainer(env.PUB, STAGE).fetch(req);
+      return getContainer(ns(env, url), STAGE).fetch(req);
     }
     // /cam/whip[/<id>] is the camera's WebRTC publish, on the camera instance,
     // to the camera's own WebRTC input. The OPTIONS goes through whatever the
@@ -817,17 +1034,17 @@ export default {
       url.pathname = url.pathname.slice('/cam'.length);
       const req = new Request(url, request);
       req.headers.set('x-pub-role', CAM);
-      return getContainer(env.PUB, CAM).fetch(req);
+      return getContainer(ns(env, url), CAM).fetch(req);
     }
     // /cam and /cam/status are the camera instance, and nothing else reaches it.
     if (url.pathname === '/cam' || url.pathname === '/cam/status') {
       if (url.pathname === '/cam/status') url.pathname = '/status';
       const req = new Request(url, request);
       req.headers.set('x-pub-role', CAM);
-      return getContainer(env.PUB, CAM).fetch(req);
+      return getContainer(ns(env, url), CAM).fetch(req);
     }
     const req = new Request(request);
     req.headers.delete('x-pub-role');
-    return getContainer(env.PUB, NAME).fetch(req);
+    return getContainer(ns(env, url), NAME).fetch(req);
   },
 };
