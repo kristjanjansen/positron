@@ -982,6 +982,9 @@ export const DEMOS = [
   { name: 'slides/synths', title: 'synths', group: 'slides', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'A slide deck that turns a few lines of Faust into a sound in this page.',
     tags: ['shell', 'no network'] },
+  { name: 'slides/positron', title: 'positron', group: 'slides', act: 0, created: '2026-10-07', built: true, unlisted: true,
+    one: 'A short talk on what positron is, from its instruments to how its examples are shared.',
+    tags: ['shell', 'no network'] },
 
   // 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
   // `built: true` deploys a page, runs it in `verify.mjs` AND puts a card on the
