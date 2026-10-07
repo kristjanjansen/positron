@@ -87,7 +87,7 @@ const SYNTHS = [
  * with middots is the thing this repository does not print.
  */
 const POSITRON = [
-  { name: 'title', title: 'Positron', by: 'Kristjan Jansen', place: 'positron.studio',
+  { name: 'title', title: 'What is Positron',
     notes: 'I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. The project now includes reusable tools, examples and lessons. I want other people to be able to understand those parts and adapt them for their own work. This is an introduction for curious artists, musicians and creative developers. Positron is an evolving R&D project.' },
   { name: 'instruments', say: 'Instruments and media experiments',
     text: 'A musician might start with a synth, someone interested in movement with Draw', textStep: 2,
