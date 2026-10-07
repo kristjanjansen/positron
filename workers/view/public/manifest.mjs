@@ -1418,19 +1418,6 @@ export function demoCardHTML(d) {
 }
 
 /** One deck's player box before the deck is built: the player's own classes, nothing in them. */
-/**
- * 🔴 THE HORIZONTAL LOGO, β+ beside positron over studio, as markup, 2026-10-07.
- * Asked as *"change page title to positron horizonal logo"* for a deck page
- * and then *"add horiz positron logo to front page"*. One string, here beside
- * `deckFrameHTML` because both index renderers and `build.mjs` already read
- * this file. Only the deck page uses it now (`deckPage` in `shell/decks.mjs`):
- * the front page heading became the address `positron.studio` the same day. Its look is
- * `.sl-logo-h` in `shell/slide.css`. `aria-hidden`, because the heading beside
- * it or the h1 it sits in already says positron.
- */
-export const LOGO_HTML = '<span class="sl-logo-h" aria-hidden="true"><span class="sl-logo-b">β<span class="sl-hi">+</span></span>'
-  + '<span class="sl-logo-w"><span>positron</span><span>studio</span></span></span>';
-
 export const deckFrameHTML = (name) => `<div class="pos-vp pos-deck-frame" data-deck-frame="${name}" aria-hidden="true">`
   + '<div class="pos-vp-stage"></div><div class="pos-vp-foot"><span class="pos-deck-ph"></span></div></div>';
 

@@ -464,16 +464,6 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .sl-mark { margin-top: calc(3 * var(--sl-u)); }
 .sl-mark .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
 
-/* THE HORIZONTAL LOGO AS A DECK PAGE'S HEADING (`deckPage`, `heading: 'logo'`),
-   2026-10-07, asked as *"change page title to positron horizonal logo"*. The
-   same arrangement as `logoRow` in brand-slides.mjs, β+ beside positron over
-   studio, the two blocks centred on each other, but in the page's own px:
-   `logoRow` is sized in a slide's cqh and a page heading is not in a slide. */
-.sl-logo-h { display: inline-flex; align-items: center; gap: 0.35em; margin: 0; }
-.sl-logo-h .sl-logo-b { font: 600 64px/1 var(--mono); letter-spacing: -0.02em; }
-/* 64 and 26, up from 40 and 16, asked 2026-10-07 as *"make logo bigger"* */
-.sl-logo-h .sl-logo-b .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
-.sl-logo-h .sl-logo-w { display: flex; flex-direction: column; font: 600 26px/1.1 var(--mono); }
 
 /* ── the decks on the front page (shell/decks.mjs) ──────────────────────────
    Two half width players a row, asking the row's OWN width and becoming one
