@@ -14,15 +14,16 @@
 <link rel="icon" href="/favicon.ico">
 
 <div class="pos-head pos-index">
-  <!-- 🔴 THE LOGO IS THE HEADING, 2026-10-07: *"rm positron: 41 media art experiments"* and
-       *"make logo bigger"*. LOGO_HTML in demo/manifest.mjs; the h1 keeps the name for a screen reader -->
-  <div class="pos-title"><h1 class="pos-name" aria-label="positron studio"><!--LOGO--></h1></div>
+  <!-- THE HEADING IS THE ADDRESS, positron.studio with the dot in the accent, 2026-10-07:
+       *"for index title use "positron.studio" with yellow do"*. It was the horizontal logo
+       for an hour, and the counted `positron: N media art experiments` before that. -->
+  <div class="pos-title"><h1 class="pos-name">positron<span class="sl-hi">.</span>studio</h1></div>
 </div>
 
 <div id="rows"></div>
 
 <script type="module">
-  import { NOTES, byGroup, groupHTML, noteHTML, LOGO_HTML } from '/manifest.mjs';
+  import { NOTES, byGroup, groupHTML, noteHTML } from '/manifest.mjs';
   import { markIndex } from '/shell/caps.mjs';
 
   /**
@@ -79,7 +80,6 @@
   // function, because this page renders its own rows and the build renders its.
   // The static `positron` in the markup above is what a reader sees for the one
   // frame before this runs, which is the page's name and not a wrong number.
-  document.querySelector('.pos-name').innerHTML = LOGO_HTML;
   document.getElementById('rows').innerHTML = byGroup().map(groupHTML).join('');
   // Nothing at all when there are no notes. `NOTES` is empty and this wrote the
   // heading over an empty list on every load; the build does the same test for

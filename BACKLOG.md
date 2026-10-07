@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**The front page heading reads positron.studio with a yellow dot** (2026-10-07). Asked: *"for index title use \"positron.studio\" with yellow do"*. Static in `demo/index.html` and `workers/view/menu.html`; the horizontal logo stays on `/slides/positron/`.~~ DONE 2026-10-07
+
 - ~~**β+ off the slides; the half width player's footer link reads See slides** (2026-10-07). Asked: *"rm positron logo from slides. in 1/2 w replace title with \"See slides\" link in footer"*. Read as the β+ on the two title slides (`mark: true` in `demo/shell/decks.mjs`); the horizontal logo heading on `/slides/positron/` stays unless said. `mountDecks`'s `title` text. ~~ DONE 2026-10-07
 
 - ~~**The β+ only on each deck's first slide, bottom left at the slide's inset, bigger, as content** (2026-10-07). Asked with a crop of the corner mark: *"put logo to bottom left, respect slide paddings, make it bigger. onluy on frontpage of slides! its like content"*. A title slide key in `demo/shell/slide.mjs` instead of `createSlidePlayer({ mark })`. ~~ DONE 2026-10-07
