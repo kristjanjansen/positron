@@ -486,6 +486,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    what a tab is (`.pos-tabs-about-t`, below), so the two cannot drift apart. */
 .pos-what, .pos-tabs-about-t { color: var(--dim); font-family: var(--brand); font-size: 13.5px; max-width: 62ch; }
 .pos-what { margin: 6px 0 0; }
+/* the front page's sentence at the heading's own size, asked 2026-10-07 as
+   *"same size as title"*; every other page keeps 13.5 */
+.pos-index .pos-what { font-size: 17px; line-height: 1.45; }
 
 /* how it works — one plain paragraph */
 
