@@ -123,17 +123,13 @@ const POSITRON_WORDS = [
   // slides, each heading a thing a visitor can do, each body what to press and
   // what changes, each caption the page where it is done. Every body is read
   // off that page's own manifest line or source the same day. The first thing
-  // is done ON the slide: the synths deck's volume step, the same kit panel
-  // `/fau/` plays (`synthSlot`), opening nothing until Start.
+  // was done ON the slide (the synths deck's volume step) until it was cut the
+  // same day: *"rm Build a synth from shared parts slide"*.
   // ⚠️ NO SUBTITLE NOW: the three line name and the two line subtitle spilled
   // the title slide (MEASURED by the deck's own spill check), so the subtitle
   // went to the notes rather than the name being cut
   { name: 'title', title: '10 things you can do with Positron',
     notes: 'From microcontrollers to distributed performances. I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. I want other people to be able to understand those parts and adapt them for their own work. Positron is an evolving R&D project.' },
-  { name: 'synth', say: 'Build a synth from shared parts', layout: 'split', side: 'right', cols: '1:2', bottom: true,
-    text: 'Press Start and turn `volume`. The same panel, knobs and code box play on positron.studio/fau', textStep: 2,
-    slot: synthSlot(SYNTH_STEPS.find((st) => st.id === 'volume')),
-    notes: 'The aim is to reuse parts across works instead of rebuilding each instrument. This does not mean every example already uses every shared component.' },
   { name: 'connect', say: 'Connect instruments and streams',
     text: 'Link notes, sound, video and code between your browser and a Raspberry Pi, each link checked before it opens', textStep: 2,
     cap: 'positron.studio/patchbay',
