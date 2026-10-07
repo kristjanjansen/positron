@@ -1,3 +1,45 @@
+# Handoff, 2026-10-07, session 68: a positron deck, a slide-writing skill, and the front page as a system
+
+## Where it is right now
+
+- ✅ **Site: BUILD `d5e883a-132209-c2b5`**, confirmed on the edge, build output in `90f5fe7`. **Not pushed** (needs the personal account, see CLAUDE.md).
+- Counted: **57 demos, 55 built**, **94 plans**. No agent and no workflow is running. The tree is clean.
+
+## What landed, all deployed
+
+| commits | what | check it at |
+| --- | --- | --- |
+| `bb5dbe4` | `plans/plan-synthesis-2026-10-07.md`, the owner's synthesis document as received, not analysed | |
+| `9d95a2a` | **`positron-slides` skill** (`.claude/skills/positron-slides/SKILL.md`) from a supplied general slide-writing skill: renamed, pointed at `slide.mjs` and `decks.mjs`, its three `references/*.md` files were NOT supplied and it says so; a trigger row in CLAUDE.md | |
+| `9eaf593` to `b9170d0` | three word-only decks from the synthesis (studio, evidence, timing), then removed on *"rm new slides. not useful"*. **What stayed:** `deckChecks`' spill assert measures `.sl-ev`'s children against its rect, because a centred evidence region overflowed over its headline and caption while `.sl-in` reported nothing (went red on 14 draft slides, green on synths) | |
+| `306fd90` to `24da2b9` | **the `positron` deck, now "10 things you can do with Positron"**: a title slide and nine things, each heading an action, each body what to press and what changes, each caption the page. The last slide carries README's setup prompt verbatim in a read-only code box (`promptSlot`, `SETUP_PROMPT` in `decks.mjs`). Speaker notes kept whole in `notes`, not drawn. The title slide's subtitle went to notes because three-line name plus subtitle spilled | https://positron.studio/slides/positron/ |
+| same | `slide.mjs` gained `sayStep` (the positron deck's headlines at step 3) and a title-slide `mark` key (the β+ as content; **no deck uses it now**, *"rm positron logo from slides"*) | |
+| `877b82f` | synths opens as a title slide like positron's: "Synths in code", "From a sine wave to an instrument" on the bottom edge. `deck-checks.mjs`'s first assert reads the title slide now | https://positron.studio/slides/synths/ |
+| `877b82f` `125852a` `0a5c4aa` | front page decks: positron first (the manifest rows' order draws the frames, `DECKS` alone does not move them), the half-width footer link reads **See slides**, centred in the gap between the pager and ⛶ (`auto minmax(0,1fr) auto` via `:has(a.sl-title)`), measured 480.5 against 480.5 | https://positron.studio/ |
+| `95e117b` | deck pages: their name as heading (the horizontal logo and `LOGO_HTML` are gone), **no log** (`showLog: false` in `deckPage`) | |
+| `a0602e7` `889ea01` `3efba4e` | front page heading **positron.studio** with the dot in `--hi`; `indexTitle()` and its count are deleted; one sentence under it from the synthesis plan; the **kit group last** | https://positron.studio/ |
+| `90f5fe7` | **front page type and air as one system** (*"typo sizes and whitespace only. i am lost"*): 24 name, 15 sentence, 12.5 card text, 10.5 section label; 12 inside a group, 48 between. MEASURED at 375 and 1280: 12, 48, 48. The first try gave 32 because `.pos-head`'s 16 px margin collapses into `.pos-act-h:first-of-type`'s | https://positron.studio/ |
+
+Verify: `slides/positron slides/synths kit/slides` **124/124** before the last deck edits; the decks **45/45** after.
+
+## Decided along the way, and why
+
+- **The `cf` CLI (Cloudflare, open beta since 2026-09-28) changes nothing in README's prompt today.** Cloudflare's setup line is unchanged word for word; its `prompt.md` offers `cf` as an optional install and tells the agent to use `cf` unless a Wrangler config exists, which every positron-start project has. When the beta ends a final Wrangler release will point agents at `cf`, and then `positron-start`'s Wrangler steps need redoing. Its Step 0 still lists Windsurf, which Cloudflare's list replaced. Sources: the changelog post and launch blog of 2026-09-28, read by a research agent.
+- **One combined positioning sentence** (synthesis plan's artistic and technical lines), now under the front page heading: *"Positron connects sound, image, gesture, archives and people through reusable interfaces, connections and timelines, and shares the tools for making them."*
+
+## Mistakes worth knowing
+
+- ⚠️ **The spill assert was green on slides drawn through by their own text.** Shoot the densest slide before believing it; it measures children now.
+- ⚠️ **Single-number asks compound.** "Same size as title" and "3x space" each moved one value and the page lost its hierarchy; the fix was a scale, not another number.
+- ⚠️ **A mid-turn "cols still overflow!?!" was logged and never located**: the next request arrived first. Still open below.
+
+## Open
+
+- **Slide columns overflow** (BACKLOG, 2026-10-07): which deck, which width and which mode are unknown. Ask, or shoot the synths split slides at 375, 1280 and in the front page halves.
+- **The positron deck's title says 10 and holds 9 things** since the synth slide was cut; a tenth or "9 things" is the owner's call.
+- **Interactive material per slide** was suggested in chat (patchbay, circuit, mirror, sync, draw, tapes, partitur), nothing built. `/radio/` and `/tapes/` open other people's servers, so neither belongs on a slide that loads by itself.
+- Everything from the sections below still stands.
+
 # Handoff, 2026-10-06 evening, session 67: the synths deck grows a filter and an LFO, the front page frames its decks
 
 ## Where it is right now
