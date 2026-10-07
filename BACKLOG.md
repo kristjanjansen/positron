@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**See slides centred between the pager and the full screen button** (2026-10-07). Asked: *"align see slides centered horz better pager and fullscreen bittpns"*. `demo/shell/slide.css`.~~ DONE 2026-10-07
+
 - ~~**The front page sentence at the heading's size** (2026-10-07). Asked: *"same size as title"*. `.pos-index .pos-what` in `demo/shell/shell.css`, 17 px.~~ DONE 2026-10-07
 
 - ~~**One sentence under the front page heading, in grey** (2026-10-07). Asked: *"add that sentence under frontpage logo"*, then *"grayer?"*. The short combined line from the synthesis plan's artistic and technical formulations, as `.pos-what`.~~ DONE 2026-10-07

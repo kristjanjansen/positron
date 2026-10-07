@@ -459,6 +459,12 @@
 a.sl-title { font: 400 12px/1 var(--sans); color: var(--dim); text-decoration: none;
              white-space: nowrap; justify-self: center; text-align: center; }
 a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+/* AND CENTRED BETWEEN THE PAGER AND THE ⛶, NOT ON THE FOOTER, 2026-10-07: *"align
+   see slides centered horz better pager and fullscreen bittpns"*. The footer's
+   `1fr auto 1fr` centres the middle on the whole row, and the pager is two
+   buttons wide against the ⛶'s one, so the link sat 16 px left of the gap's
+   middle at 1280. `auto 1fr auto` gives the middle the gap itself. */
+.sl-player .pos-vp-foot:has(> .pos-vp-c > a.sl-title) { grid-template-columns: auto minmax(0, 1fr) auto; }
 /* THE β+ AT THE FOOT OF A TITLE SLIDE (`mark: true`), 2026-10-07: content, in the
    slide's flow and inset, the + raised and smaller as on the logo. */
 .sl-mark { margin-top: calc(3 * var(--sl-u)); }
