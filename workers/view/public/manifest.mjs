@@ -982,6 +982,16 @@ export const DEMOS = [
   { name: 'slides/synths', title: 'synths', group: 'slides', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'A slide deck that turns a few lines of Faust into a sound in this page.',
     tags: ['shell', 'no network'] },
+  // three talks in words, 2026-10-07, from plans/plan-synthesis-2026-10-07.md
+  { name: 'slides/studio', title: 'studio', group: 'slides', act: 0, created: '2026-10-07', built: true, unlisted: true,
+    one: 'A short talk for musicians and developers about what positron is and what to try first.',
+    tags: ['shell', 'no network'] },
+  { name: 'slides/evidence', title: 'evidence', group: 'slides', act: 0, created: '2026-10-07', built: true, unlisted: true,
+    one: 'A short talk about keeping what a recording captured apart from what was added to it later.',
+    tags: ['shell', 'no network'] },
+  { name: 'slides/timing', title: 'timing', group: 'slides', act: 0, created: '2026-10-07', built: true, unlisted: true,
+    one: 'A short talk about four different questions hidden in the word now.',
+    tags: ['shell', 'no network'] },
 
   // 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
   // `built: true` deploys a page, runs it in `verify.mjs` AND puts a card on the
