@@ -26,6 +26,7 @@
 //              the full width, absent is plain lines
 //   lines      [[step, text], ...], each line at its own step, for specimens
 //   cap        the caption, step 1, bottom left, always
+//   mark       true puts the β+ at the foot of a title slide (2026-10-07)
 //   title      THE OPENING OF A TALK, step 5, with `by` at step 3 and `date`
 //              and `place` at step 2 under it, on the bottom edge (see
 //              TITLE_STEPS); a title slide carries nothing else
@@ -284,7 +285,7 @@ export const LAYOUTS = ['stack', 'top', 'left', 'split', 'band'];
 /** A split's words column to its slot, see `cols` in the header. */
 export const SPLIT_COLS = ['1:1', '1:2'];
 const KEYS = new Set(['name', 'layout', 'side', 'cols', 'bottom', 'say', 'sayStep', 'statement', 'big', 'under', 'text', 'textStep',
-  'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes', 'title', 'by', 'date', 'place']);
+  'list', 'stack', 'rows', 'lines', 'cap', 'slot', 'notes', 'title', 'by', 'date', 'place', 'mark']);
 
 /**
  * 🔴 THE TITLE SLIDE'S STEPS, CHOSEN ONCE AND NOT PER TALK. Asked 2026-10-05
@@ -304,7 +305,7 @@ const KEYS = new Set(['name', 'layout', 'side', 'cols', 'bottom', 'say', 'saySte
  * the slide's and no number places either.
  */
 export const TITLE_STEPS = Object.freeze({ title: 5, by: 3, date: 2 });
-const TITLE_ONLY = ['title', 'by', 'date', 'place', 'cap', 'name', 'notes', 'layout'];
+const TITLE_ONLY = ['title', 'by', 'date', 'place', 'cap', 'name', 'notes', 'layout', 'mark'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December'];
 /**
@@ -362,6 +363,7 @@ export function normalise(spec) {
   if (!spec || typeof spec !== 'object') throw new Error('a slide is an object');
   for (const k of Object.keys(spec)) if (!KEYS.has(k)) throw new Error(`a slide has no key called ${k}`);
   if ((spec.by || spec.date || spec.place) && !spec.title) throw new Error('who, when and where open a talk, so they need a title');
+  if (spec.mark && !spec.title) throw new Error('the β+ opens a talk, so it is on a title slide');
   if (spec.title) {
     for (const k of Object.keys(spec)) if (!TITLE_ONLY.includes(k)) throw new Error(`a title slide is the talk's name, who, when and where, not ${k}`);
     if (spec.layout && spec.layout !== 'top') throw new Error('a title slide is laid out top, its name above and who and when on the bottom edge');
@@ -681,6 +683,17 @@ export function createSlide(spec, { host = null, slots = {}, full = false } = {}
     parts.when = p;
     ev.append(p);
   }
+  if (s.mark) {
+    // 🔴 THE β+ AS CONTENT OF THE OPENING SLIDE, 2026-10-07, asked as *"put logo
+    // to bottom left, respect slide paddings, make it bigger. onluy on
+    // frontpage of slides! its like content"*. Last in the bottom block, so it
+    // stands on the slide's own inset under who and when, at step 4 with the +
+    // raised as on the logo. It was a corner glyph on every slide for an hour.
+    const m = el('p', 'sl-t sl-t4 sl-mark', 'β', { 'aria-label': 'positron' });
+    m.append(el('span', 'sl-hi', '+'));
+    parts.mark = m;
+    ev.append(m);
+  }
   words.append(ev);
 
   let ctl = null;
@@ -819,12 +832,11 @@ export function createSlideLog({ head, widths, align = '', step = 1, cap = 40 } 
  * @param o.slots      as for `createSlide`
  * @param o.onStep     (index) after every move
  * @param o.title      { text, href }: a link in the count's slot instead of `N / M`
- * @param o.mark       true draws the β+ in each slide's bottom right corner
  * @param o.touch      () => true when this is a screen with no hover; the
  *                     default asks `(hover: none)`, and `touchMode(fn)` swaps it
  * @returns { el, panel, slides, go, at, count, next, prev, keys, taps, touchMode }
  */
-export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title = null, mark = false,
+export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title = null,
   touch = () => typeof matchMedia === 'function' && matchMedia('(hover: none)').matches } = {}) {
   ensureCss();
   if (!Array.isArray(specs) || !specs.length) throw new Error('a player needs at least one slide');
@@ -847,17 +859,6 @@ export function createSlidePlayer(specs, { slots = {}, onStep = () => {}, title 
   panel.el.setAttribute('aria-roledescription', 'slide player');
   const slides = specs.map((spec) => {
     const s = createSlide(spec, { slots });
-    // 🔴 THE β+ ON THE SLIDE, NOT IN THE FOOTER, 2026-10-07. It was a footer
-    // glyph before the ⛶ for an hour, then asked as *"rm logos. add logo to
-    // slide ocntent"*: a mark belongs to what is shown, so it travels into full
-    // screen and a screenshot with the slide. Bottom right, sized off the
-    // slide's own unit like everything else on it; `aria-hidden`, because a
-    // screen reader hearing "beta plus" on every slide learns nothing.
-    if (mark) {
-      const m = el('span', 'sl-mark', 'β', { 'aria-hidden': 'true' });
-      m.append(el('span', 'sl-hi', '+'));
-      s.el.append(m);
-    }
     s.el.hidden = true;
     // The stage is the size container in a player, so the slide letterboxes
     // in full screen; the frame wrapper is not used here.
