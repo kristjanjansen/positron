@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**β+ off the slides; the half width player's footer link reads See slides** (2026-10-07). Asked: *"rm positron logo from slides. in 1/2 w replace title with \"See slides\" link in footer"*. Read as the β+ on the two title slides (`mark: true` in `demo/shell/decks.mjs`); the horizontal logo heading on `/slides/positron/` stays unless said. `mountDecks`'s `title` text. ~~ DONE 2026-10-07
+
 - ~~**The β+ only on each deck's first slide, bottom left at the slide's inset, bigger, as content** (2026-10-07). Asked with a crop of the corner mark: *"put logo to bottom left, respect slide paddings, make it bigger. onluy on frontpage of slides! its like content"*. A title slide key in `demo/shell/slide.mjs` instead of `createSlidePlayer({ mark })`. ~~ DONE 2026-10-07
 
 - ~~**Positron deck becomes "10 things you can do with Positron"; front page loses its count heading** (2026-10-07). Asked: *"rename slides to 10 things you can do with Positron. make descs be useful, see slodes skills. cut 2ns slide. add first interactive element. rm positron: 41 media art experiments. make logo bigger"*. `POSITRON` in `demo/shell/decks.mjs` (title, bodies by `positron-slides`, slide 2 cut, an interactive slot on the first thing), `indexTitle` text off `demo/index.html` and `workers/view/menu.html` (the logo becomes the h1), `.sl-logo-h` sizes in `demo/shell/slide.css`. ~~ DONE 2026-10-07; the title slide's subtitle went to its notes, because name and subtitle together spilled the slide
