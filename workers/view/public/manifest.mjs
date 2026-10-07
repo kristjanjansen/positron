@@ -1423,8 +1423,8 @@ export function demoCardHTML(d) {
  * Asked as *"change page title to positron horizonal logo"* for a deck page
  * and then *"add horiz positron logo to front page"*. One string, here beside
  * `deckFrameHTML` because both index renderers and `build.mjs` already read
- * this file: the deck page (`deckPage` in `shell/decks.mjs`), `demo/index.html`
- * and `workers/view/menu.html` through its `<!--LOGO-->` marker. Its look is
+ * this file. Only the deck page uses it now (`deckPage` in `shell/decks.mjs`):
+ * the front page heading became the address `positron.studio` the same day. Its look is
  * `.sl-logo-h` in `shell/slide.css`. `aria-hidden`, because the heading beside
  * it or the h1 it sits in already says positron.
  */
