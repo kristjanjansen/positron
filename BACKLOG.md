@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**One sentence under the front page heading, in grey** (2026-10-07). Asked: *"add that sentence under frontpage logo"*, then *"grayer?"*. The short combined line from the synthesis plan's artistic and technical formulations, as `.pos-what`.~~ DONE 2026-10-07
+
 - ~~**No log under a deck on its own page** (2026-10-07). Asked: *"rm logs on slide pages"*. `deckPage` mounts with `showLog: false`.~~ DONE 2026-10-07
 
 - ~~**No logo at the top of any page; the front page reads positron.studio, every other page its demo name** (2026-10-07). Asked: *"top logo on pages: rm. in frontpage use positron.studio with yellow dot. in the others use demo name"*. Only `/slides/positron/` still drew the logo (`heading: 'logo'` in `demo/shell/decks.mjs`); it, `LOGO_HTML` and `.sl-logo-h` are gone.~~ DONE 2026-10-07
