@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**The kit group last on the front page** (2026-10-07). Asked: *"move kit to last on the index page"*. `GROUPS` in `demo/manifest.mjs`.~~ DONE 2026-10-07
+
 - ~~**Cut the positron deck's Build a synth from shared parts slide** (2026-10-07). Asked: *"rm Build a synth from shared parts slide"*. Nine things remain under a title that says ten.~~ DONE 2026-10-07
 
 - ~~**The front page heading reads positron.studio with a yellow dot** (2026-10-07). Asked: *"for index title use \"positron.studio\" with yellow do"*. Static in `demo/index.html` and `workers/view/menu.html`; the horizontal logo stays on `/slides/positron/`.~~ DONE 2026-10-07
