@@ -2,24 +2,41 @@
 
 ## Where it is right now
 
-- **Site unchanged**: still BUILD `d5e883a-132209-c2b5`. **Not pushed.**
-- ✅ **`pub.positron.studio` runs `PubNext`** (`"runtime":"next"` on `/`), version `dba1f624`. Rollback: `"PUB_RT": "legacy"` in `workers/pub/wrangler.jsonc` and redeploy with `rig/containers-next/node_modules/.bin/wrangler`.
-- ✅ **`positron-sweep` deployed**, cron `41 * * * *`. Stream storage **2.46 of 1000 minutes**, 3 recordings, all under a day old.
-- Deploys from the session went through this time; the classifier did not refuse them.
-- No agent running.
+- **Site: BUILD `d881601-090801-76c7`**, read off the edge at the end of the session. That deploy is a PEER session's (`cff8baf`, the `station` row retired to `archive/demos`), not this one's; this session built nothing under `workers/view`. **Not pushed.**
+- Counted: **56 demos, 55 built**, **96 plans**. No agent running, no loop or wakeup pending. Tree clean.
+- ✅ **`pub.positron.studio` runs `PubNext`**: `https://pub.positron.studio/` answers `"runtime":"next"`. Pub version `dba1f624`. Rollback: `"PUB_RT": "legacy"` in `workers/pub/wrangler.jsonc`, then `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN ../../rig/containers-next/node_modules/.bin/wrangler deploy` from `workers/pub`.
+- ✅ **`positron-sweep` runs hourly** (`41 * * * *`, version `2a557a68`) and fires: proven at 14:41 UTC. Stream holds **2 recordings** (`positron-demo` 08:59 and 09:00 today), which the 09:41 run tomorrow should take.
+- ⚠️ **The wrangler OAuth login expired at 11:23 UTC and does not refresh** (`wrangler whoami` fails). Deploys with it, and every analytics query, fail until the owner runs `! npx wrangler login`.
+- The VPN (Check Point, `utun4`) was UP all session.
+- Deploys and the Stream deletes went through from this session; the classifier did not refuse them as it did in session 69.
 
 ## What landed
 
-| what | measured |
-| --- | --- |
-| pub cutover, `PUB_RT` `next` | `/logs` kept the old ring (422 lines). `node demo/verify.mjs llhls stage` **47/47** once (12 + 35 before). Two viewer starts from a stopped container: RTMPS publishing **0.95 s / 0.85 s**, WHIP **1.25 s / 1.18 s**, container boot 0.67 / 0.63 s. Legacy was 1.2 / 1.6 s. VPN was UP for these runs (utun4) |
-| `workers/sweep` | deletes `ready` recordings of `positron-demo` and `positron-cam` (by input uid) older than 24 h, at most 40 a run (free plan subrequest cap). `POST /sweep` with the bearer `SWEEP_TOKEN` (in `.env`) runs it now, `?dry=1` lists only, 401 without the token. Secrets: `ACCOUNT_ID`, `STREAM_TOKEN` (= `CF_API_TOKEN`, owner's choice), `SWEEP_TOKEN`. First run deleted the 8 old `positron-cam` recordings, 14.97 min |
+| commit | what | measured |
+| --- | --- | --- |
+| `df0db93` | **pub cutover**, `PUB_RT` `next` | `/logs?format=text` kept the old ring (422 lines). `node demo/verify.mjs llhls stage` **47/47** once (12 + 35, the same as before). Two viewer starts from a stopped container, `/watch` held by a node WebSocket and `/status` polled every 200 ms: RTMPS publishing **0.95 s / 0.85 s**, WHIP **1.25 s / 1.18 s**, container boot 0.67 / 0.63 s. Legacy was 1.2 / 1.6 s. Rows added to `research/cf-containers-next-2026-10-07.md` |
+| `df0db93` | **`workers/sweep`** (`positron-sweep`) | deletes `ready` recordings of `positron-demo` and `positron-cam`, matched by INPUT UID, older than 24 h, at most 40 a run. Never `live-inprogress`, nothing still processing. `POST https://positron-sweep.kristjan-jansen.workers.dev/sweep` with bearer `SWEEP_TOKEN` (in `.env`) runs it now, `?dry=1` lists only, 401 without the token. Secrets `ACCOUNT_ID`, `STREAM_TOKEN` (= `CF_API_TOKEN`, owner's choice over a Stream-only token), `SWEEP_TOKEN`. First manual run deleted the 8 old `positron-cam` recordings, 14.97 min; storage went to 2.46 of 1000 |
+| `321f616` `aabb405` | the cron's first hours, and a station finding | below |
 
-## Still unknown
+## The sweep cron: what was measured
 
-- No browser has played WHEP from `PubNext`'s WHIP leg (stage's 35 asserts are the ordinary tier; the deep tier was not run).
-- ⚠️ **The hourly cron did NOT fire at 09:41 or 10:41** (`workersInvocationsScheduled` empty for sweep while `positron-ingest` at :17 and `positron-station` every 5 min both appear; analytics lags about 5 min). A `*/5` test deploy at 10:53 fired at 11:00 (`success`, 1.4 ms CPU) and missed 10:55. Hourly restored 11:06 (version `2a557a68`). ✅ **It fires since then: the 14:41 run deleted `positron-cam 07 Oct 14:14` (`0482703...`), which turned 24 h old at 14:14**; no manual `/sweep` call was made after 11:06. Whether 11:41 to 13:41 fired is unread (the wrangler login expired 11:23 and analytics refuses). Why 09:41 and 10:41 did not is unknown. Query: GraphQL `workersInvocationsScheduled` with the wrangler OAuth token from `~/Library/Preferences/.wrangler/config/default.toml` (neither it nor `CF_API_TOKEN` may read the observability telemetry API: 10000). `wrangler tail` lost its connection and caught nothing.
-- `positron-stage` and the other inputs are not swept; only demo and cam.
+- **09:41 and 10:41 did NOT fire.** GraphQL `workersInvocationsScheduled` was empty for `positron-sweep` while `positron-ingest` (`17 * * * *`, 06:17 to 10:17 all `success`) and `positron-station` (every 5 min) appeared. Analytics lags about 5 minutes, and station's 10:45 and 10:50 were in when 10:41 was not.
+- A **`*/5` test deploy at 10:53 fired at 11:00** (`success`, 1.4 ms CPU) and missed 10:55, 1.5 min after the deploy.
+- **Hourly restored at 11:06, and the 14:41 run deleted `positron-cam 07 Oct 14:14`** (`048270330276c6d2a07e9f95dcb0adea`), which turned 24 h old at 14:14. No manual `/sweep` call was made after 11:06, so only the cron can have done it. Read with `CF_API_TOKEN` listing Stream, because the analytics route was closed by then.
+- **Why the first two hours missed is unknown.** 11:41 to 13:41 are unread.
+- ⚠️ **What can read what.** `workersInvocationsScheduled` answers to the wrangler OAuth token from `~/Library/Preferences/.wrangler/config/default.toml`, and refuses `CF_API_TOKEN` (`not authorized for that account`). The observability telemetry API refuses both (code 10000). `wrangler tail` lost its connection and caught nothing (there is no `timeout` on macOS; kill it from the shell).
+
+## Open
+
+- **No browser has played WHEP from `PubNext`'s WHIP leg.** It needs the VPN off: the owner said *"Not now"*. Then once each: `node demo/check-whep.mjs` and `DEMO_DEEP=1 node demo/verify.mjs stage` (deep stage was 61/63 on legacy, the two are page frame-tag checks).
+- **`positron-station`'s cron throws every run** (BACKLOG, found here, not asked): `*/5 * * * *` reads `scriptThrewException` from at least 10:25 UTC. The repo's `workers/station` has no cron and no `scheduled` handler; the trigger outlived the code because `wrangler deploy` leaves an existing cron alone unless the config says `"triggers": { "crons": [] }`. That line and a redeploy fix it.
+- **`positron-stage` and the other inputs are not swept**, only demo and cam. Stage WHIPs and so records nothing so far, but check before assuming.
+- Session 68's open items still stand (slide columns overflow; the positron deck's title says 10 and holds 9).
+
+## Mistakes worth knowing
+
+- ⚠️ **A handoff written from this session's memory said "site unchanged" while a peer session had deployed.** The edge stamp is one `curl` and was the correction. Read it, never remember it.
+- ⚠️ **"The cron is registered" is not "the cron fires."** `GET .../schedules` listed `41 * * * *` for two hours that never ran. The outcome (a recording gone, or a scheduled invocation in analytics) is the evidence.
 
 ---
 
