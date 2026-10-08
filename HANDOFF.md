@@ -29,9 +29,9 @@
 ## Open
 
 - ✅ **WHEP from `PubNext`'s WHIP leg plays, 2026-10-08 18:50 UTC, VPN off** (`en0`), `/watch` held by a node WebSocket, `/status` read `whip.publishing: true` at 7 s, boot 732 ms. `node demo/check-whep.mjs`: **201, connected, 398 frames, 3,727,323 bytes**. `DEMO_DEEP=1 node demo/verify.mjs stage`: **61/63**, the same two frame-tag checks red as on legacy (`frames that keep coming past the stall window stay receiving`, `frames stopping turn the tag to stalled`); `receiver ice connected` and `playing the WHEP inbound stream` green. One run each. A peer's `positron-shot` Chrome was running alongside.
-- **`positron-station`'s cron throws every run** (BACKLOG, found here, not asked): `*/5 * * * *` reads `scriptThrewException` from at least 10:25 UTC. The repo's `workers/station` has no cron and no `scheduled` handler; the trigger outlived the code because `wrangler deploy` leaves an existing cron alone unless the config says `"triggers": { "crons": [] }`. That line and a redeploy fix it.
-- **`positron-stage` and the other inputs are not swept**, only demo and cam. Stage WHIPs and so records nothing so far, but check before assuming.
-- Session 68's open items still stand (slide columns overflow; the positron deck's title says 10 and holds 9).
+- ✅ **`positron-station`'s cron is gone** (2026-10-08 evening): `"triggers": { "crons": [] }`, version `2f794895`, the schedules API (OAuth token) reads `[]`.
+- ✅ **Inputs read for recording mode 2026-10-08**: `low-latency-demo` and `latency-rig-llhls` are `automatic` and are now in `INPUTS` (sweep `a39d9409`, dry run listed 3, all young); `positron-stage`, `whep-rig`, `positron-cam-whip` are `off`; `Maria` (2025) is not positron's and is untouched.
+- Session 68's items: **the positron deck now says 9 things** (BUILD `e403b38-191128-f668`). **The slide column overflow did not reproduce** on `/slides/synths/`, `/slides/positron/`, the front page players or `/kit/slides/`, at 375 and 1280; it needs the deck, slide and width it was seen at.
 
 ## Mistakes worth knowing
 
