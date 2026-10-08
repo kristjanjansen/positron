@@ -1,5 +1,7 @@
 ## Open
 
+- **Remove the positron deck for now** (2026-10-08). Asked: *"rm 9 things slides for now"*. The `positron` entry in `DECKS` (`demo/shell/decks.mjs`), the `slides/positron` row in `demo/manifest.mjs` and `demo/slides/positron/`. "For now": the slide words stay in `decks.mjs`, parked, so bringing it back is one `DECKS` line plus the row and the page out of git.
+
 - ~~**Positron deck title says 10 and holds 9** (session 68 open item; owner 2026-10-08: *"do them"*). `demo/shell/decks.mjs` title slide and deck title to *9 things you can do with Positron*.~~ DONE 2026-10-08
 - ~~**`positron-station`'s cron throws every run** (found session 70).~~ DONE 2026-10-08: `"triggers": { "crons": [] }` in `workers/station/wrangler.jsonc`, deployed `2f794895`, the schedules API reads `[]`
 - ~~**Sweep the other recording inputs** (session 70 open item).~~ DONE 2026-10-08: recording read per input; `low-latency-demo` and `latency-rig-llhls` are `automatic` and are swept now (`a39d9409`), `positron-stage`, `whep-rig` and `positron-cam-whip` are `off`, `Maria` is not positron's and is left alone
