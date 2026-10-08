@@ -387,6 +387,8 @@ result in `ws-2026-10-07T16-41-49-682Z.json`. Two DOs at once, one holding
 | --- | --- | --- | --- | --- | --- |
 | new | first start after the image push | 13.2 s | 13.5 s | 13.5 s | 12.9 s |
 | legacy | idle publisher, container restarted by the deploy's rollout | 1.2 s | 1.2 s | 1.6 s | n/a |
+| new, after cutover 2026-10-08 | container stopped, run 1 | n/a | 0.95 s | 1.25 s | 0.67 s |
+| new, after cutover 2026-10-08 | container stopped for 90 s, run 2 | n/a | 0.85 s | 1.18 s | 0.63 s |
 
 Only one run each, at the owner's request. The new-runtime row is the image
 pull and is not representative; a warm-host new-runtime start (0.83 s to
@@ -394,6 +396,7 @@ listening, above) was not measured end to end through pub.
 
 ### Not done
 
+- ✅ **Cut over 2026-10-08** (`PUB_RT` `next`, version `dba1f624`). The two 2026-10-08 rows above are through `pub.positron.studio` with `/watch` opened by a node WebSocket and `/status` polled every 200 ms; the 13.5 s row was the image pull. The log ring carried over (422 lines on the first read). What follows was true before it.
 - **The cutover was not made.** Flipping `PUB_RT` to `next` and redeploying
   was refused by this session's permission check, so `pub.positron.studio`
   still answers from `Pub`. `PubNext` is deployed and reachable with `?rt=next`.

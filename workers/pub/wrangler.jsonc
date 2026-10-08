@@ -83,7 +83,7 @@
     // WHICH CLASS ANSWERS: "legacy" is `Pub`, "next" is `PubNext`. `?rt=` on
     // any request overrides it, which is how the new one was driven live
     // before anybody's viewers were moved.
-    "PUB_RT": "legacy"
+    "PUB_RT": "next"
   },
   "observability": { "enabled": true }
 }

@@ -1,0 +1,21 @@
+{
+	// positron-sweep: deletes Stream recordings of the test inputs once they
+	// are a day old. See worker.mjs for why and what.
+	//
+	// Secrets (wrangler secret put): ACCOUNT_ID; STREAM_TOKEN, an API token
+	// with Stream edit on this account; SWEEP_TOKEN, the bearer for POST /sweep.
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "positron-sweep",
+	"main": "worker.mjs",
+	"compatibility_date": "2026-09-01",
+	"workers_dev": true,
+	"vars": {
+		// positron-demo (the /llhls/ and /stage/ test pattern) and positron-cam.
+		// By uid, never by name. Not positron-stage, not whep-rig, not anybody
+		// else's input.
+		"INPUTS": "0e390aa48b55d49a57284e6c2c535477,157863305ec9583187dfbb1c66c031ea",
+		"MAX_AGE_H": "24"
+	},
+	"triggers": { "crons": ["41 * * * *"] },
+	"observability": { "enabled": true }
+}
