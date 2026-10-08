@@ -394,17 +394,9 @@ export const DEMOS = [
   // `crate` was here until 2026-10-02: one long recording into R2 in pieces of 16 MiB through
   // positron-vain. Its protocol now runs eccm's uploads (workers/files in kristjanjansen/eccm), and the
   // page and the Worker are in archive/ (archive/demos/README.md says why).
-  // The far end of `crate`: once whole programmes are in R2, a running order is
-  // a playlist of BYTE RANGES into them and the station needs no encoder at all.
-  // ⚠️ `settleMs` is 50 s because the claim being checked is that the sound
-  // CROSSES a programme boundary, and the programmes are 40 s long. A shorter
-  // settle would assert that a station plays, which is not the subject.
-  // 2026-10-02: the station moved to eccm (src/station/station.mjs in kristjanjansen/eccm), its
-  // programmes, records and channels with it, so the row links to eccm's radio page and nothing here is
-  // built for it; demo/station/ stays on disk, pointed at eccm's /stream
-  { name: 'station', group: 'vain', act: 5, created: '2026-09-15', built: false, page: 'https://eccm.positron.studio/radio',
-    one: 'a schedule played as one stream: a text file names which seconds of which recording come next, now at eccm',
-    tags: ['HLS', 'R2', 'DO', 'mediaSession', 'archive'] },
+  // `station` was here until 2026-10-08: a running order played as one stream. It moved to eccm on
+  // 2026-10-02 and eccm removed its radio on 2026-10-07, so the row linked to a 404; the page is in
+  // archive/ (archive/demos/README.md says why).
 
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a

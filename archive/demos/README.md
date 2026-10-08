@@ -319,6 +319,16 @@ over. `/crate/` 404s on positron.studio from the next build. `demo/verify.mjs`
 still names `positron-vain` in its list of expected console errors, which is
 now a line that matches nothing.
 
+## `station-index.html`, retired 2026-10-08
+
+`/station/` played a running order as one stream: byte ranges into whole
+programmes in R2, no encoder. On 2026-10-02 the station moved to eccm
+(https://github.com/kristjanjansen/eccm) and the row stayed `built: false` with
+its link pointed at eccm's /radio. eccm removed its radio on 2026-10-07 (tag
+`radio-last` there, `archive/radio.md` to restore), so the row linked to a 404.
+Asked in eccm as *"fix these"*: the row is out of `demo/manifest.mjs` and the
+page, still pointed at eccm's `/stream`, is here.
+
 ## `graph-index.html`, `rout-index.html` and `looper-index.html`, retired 2026-10-04
 
 Decided by the owner with *"names ok, looper retires, no redrect, capture is
