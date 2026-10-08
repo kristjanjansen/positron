@@ -183,8 +183,11 @@ const POSITRON = POSITRON_WORDS.map((sl) => (sl.title ? sl : { ...sl, sayStep: 3
  * *"no desc on slides pages"*: the deck is the page.
  */
 export const DECKS = [
-  // positron first, asked 2026-10-07 as *"reverse their order"*
-  { name: 'positron', title: '9 things you can do with Positron', slides: POSITRON },
+  // the positron deck is PARKED since 2026-10-08, asked as *"rm 9 things slides
+  // for now"*: its words stay above as `POSITRON`, and bringing it back is
+  // `{ name: 'positron', title: '9 things you can do with Positron', slides: POSITRON }`
+  // here, its `slides/positron` row in `manifest.mjs` and `demo/slides/positron/`
+  // out of git (last at e403b38). It went FIRST, asked 2026-10-07 as *"reverse their order"*
   { name: 'synths', title: 'Synths in code', slides: SYNTHS },
 ];
 
