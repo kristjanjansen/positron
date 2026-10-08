@@ -1,5 +1,7 @@
 ## Open
 
+- **`positron-station`'s cron throws on every run** (found 2026-10-08, not asked). `workersInvocationsScheduled` reads `scriptThrewException` for `*/5 * * * *` at 10:25, 10:30, 10:35 and 10:40 UTC. The station moved to eccm on 2026-10-02 and the repo's `workers/station` has NO cron and NO `scheduled` handler: the trigger outlived the code, because `wrangler deploy` leaves an existing cron alone unless the config says `"triggers": { "crons": [] }`. The fix is that line and a redeploy; nothing changed yet.
+
 - ~~**A scheduled cleanup of Stream recordings** (2026-10-08). Asked: *"yes to both"*, to a scheduled sweep after storage reached 75 per cent (764 of 1000 minutes; 158 test pattern recordings deleted by hand on 2026-10-07). A cron that deletes `positron-demo` and `positron-cam` recordings older than a day, never one in state `live-inprogress`.~~ DONE 2026-10-08, `workers/sweep` (`positron-sweep`, cron `41 * * * *`, `POST /sweep` with `SWEEP_TOKEN` from `.env`, `?dry=1` lists only). First run deleted 8 `positron-cam` recordings, 14.97 min; storage 2.46 of 1000
 
 
