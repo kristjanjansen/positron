@@ -18,7 +18,7 @@
 ## Still unknown
 
 - No browser has played WHEP from `PubNext`'s WHIP leg (stage's 35 asserts are the ordinary tier; the deep tier was not run).
-- The first scheduled run at :41 has not been read back. `npx wrangler tail positron-sweep` or the dashboard log shows its JSON line.
+- ⚠️ **The hourly cron did NOT fire at 09:41 or 10:41** (`workersInvocationsScheduled` empty for sweep while `positron-ingest` at :17 and `positron-station` every 5 min both appear; analytics lags about 5 min). A `*/5` test deploy at 10:53 fired at 11:00 (`success`, 1.4 ms CPU) and missed 10:55. Hourly restored 11:06 (version `2a557a68`); **11:41 is the next test.** Query: GraphQL `workersInvocationsScheduled` with the wrangler OAuth token from `~/Library/Preferences/.wrangler/config/default.toml` (neither it nor `CF_API_TOKEN` may read the observability telemetry API: 10000). `wrangler tail` lost its connection and caught nothing.
 - `positron-stage` and the other inputs are not swept; only demo and cam.
 
 ---
