@@ -28,7 +28,7 @@
 
 ## Open
 
-- **No browser has played WHEP from `PubNext`'s WHIP leg.** It needs the VPN off: the owner said *"Not now"*. Then once each: `node demo/check-whep.mjs` and `DEMO_DEEP=1 node demo/verify.mjs stage` (deep stage was 61/63 on legacy, the two are page frame-tag checks).
+- ✅ **WHEP from `PubNext`'s WHIP leg plays, 2026-10-08 18:50 UTC, VPN off** (`en0`), `/watch` held by a node WebSocket, `/status` read `whip.publishing: true` at 7 s, boot 732 ms. `node demo/check-whep.mjs`: **201, connected, 398 frames, 3,727,323 bytes**. `DEMO_DEEP=1 node demo/verify.mjs stage`: **61/63**, the same two frame-tag checks red as on legacy (`frames that keep coming past the stall window stay receiving`, `frames stopping turn the tag to stalled`); `receiver ice connected` and `playing the WHEP inbound stream` green. One run each. A peer's `positron-shot` Chrome was running alongside.
 - **`positron-station`'s cron throws every run** (BACKLOG, found here, not asked): `*/5 * * * *` reads `scriptThrewException` from at least 10:25 UTC. The repo's `workers/station` has no cron and no `scheduled` handler; the trigger outlived the code because `wrangler deploy` leaves an existing cron alone unless the config says `"triggers": { "crons": [] }`. That line and a redeploy fix it.
 - **`positron-stage` and the other inputs are not swept**, only demo and cam. Stage WHIPs and so records nothing so far, but check before assuming.
 - Session 68's open items still stand (slide columns overflow; the positron deck's title says 10 and holds 9).

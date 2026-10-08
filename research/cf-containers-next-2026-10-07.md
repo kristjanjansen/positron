@@ -405,3 +405,4 @@ listening, above) was not measured end to end through pub.
   live, deliberately, so the copy happens after the cutover and not before.
 - No browser page ran against `PubNext`; WHEP frames off the new WHIP leg were
   not seen by a player.
+  ✅ **Seen 2026-10-08 18:50 UTC, VPN off**: `check-whep.mjs` 201, connected, 398 frames, 3,727,323 bytes; deep `stage` 61/63, the two reds the page's frame-tag checks that were red on legacy too.
