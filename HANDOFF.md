@@ -1,3 +1,40 @@
+# Handoff, 2026-10-08, session 69: Liquidsoap plan, the new Containers runtime measured, pub ported behind a flag, Stream storage cleared
+
+## Where it is right now
+
+- **Site unchanged this session**: still BUILD `d5e883a-132209-c2b5`. Nothing under `workers/view` was built or deployed. **Not pushed.**
+- **`pub.positron.studio` still runs the OLD `Pub` class.** The new `PubNext` is deployed in the same worker (version `e4e6cf12`) and answers only with `?rt=next`. `PUB_RT` in `workers/pub/wrangler.jsonc` reads `legacy`, which matches the edge.
+- **Stream storage 15.48 of 1000 minutes**, 9 recordings left (`positron-cam`, owner said they are not needed; not yet deleted).
+- No agent is running. Tree clean apart from this file.
+- 🔴 **The permission classifier refuses deploys and Stream mass deletes from this session** ("Production Deploy", "Cloud Storage Mass Delete"). The owner ran the delete with `!`. The pub cutover and the cleanup cron both need the owner to run the deploy or add a permission rule.
+
+## What landed
+
+| commit | what |
+| --- | --- |
+| `536b44a` | `plans/plan-liquidsoap.md`: five ideas (a source declares whether it may stop; clock crossings are named buffers; metadata inside the stream; prefetch only our own material; silence detection as an outcome assert) and one integration (our own Icecast mount with a Liquidsoap source on the Pi). From docs, nothing installed |
+| `740bf94` | `research/cf-containers-next-2026-10-07.md` + `rig/containers-next/`: new runtime 0.83 s median start to listening (Cloudflare quotes 648 ms). The legacy class is no longer 3.72 s either (about 0.83 s), but it answers 503 for about 5 s after a destroy |
+| `6cbb9bd` | `workers/pub`: `PubNext` beside `Pub`, one class body, `?rt=next\|legacy` over `PUB_RT`. WHIP leg needs `-ts_buffer_size 4194304` on the new runtime or dies with exit 245 within seconds (one run each after the fix). Log ring copied from old `Pub` p1 on first `/logs` read (untested live; backup of 400 lines was in the session scratchpad, which is temporary) |
+| `d3c173b` `426be67` | BACKLOG lines for the port and for the Stream sweep |
+
+## Next, in order
+
+1. **Pub cutover**, owner said yes. Run from `workers/pub`: set `"PUB_RT": "next"`, then `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN ../../rig/containers-next/node_modules/.bin/wrangler deploy` (wrangler 4.148; the `npx` there is 4.75). Check `https://pub.positron.studio/` reports `"runtime":"next"`, `https://pub.positron.studio/logs?format=text` still has old lines, then ONE run of `node demo/verify.mjs llhls stage` and two timed starts. Rollback: `legacy` and redeploy. Before: llhls 12/12, webrtc 12/12, cam 15/15, stage 35/35 (deep stage 61/63, the two are page frame-tag checks).
+2. **Stream sweep cron**, owner said "do it". Was about to write a small new worker (pattern: `workers/ingest/wrangler.jsonc`, `"triggers": { "crons": [...] }`): hourly, list Stream videos, delete `positron-demo` and `positron-cam` recordings older than a day, never `live-inprogress`, a token-gated route that runs the same function. Needs a Stream-edit token as a secret. Nothing written yet.
+3. Delete the 9 `positron-cam` recordings (command in the session; same as the demo one with `positron-cam`).
+
+## Still unknown
+
+- No browser has played WHEP from `PubNext`'s WHIP leg. Warm start through pub on the new runtime is unmeasured (one cold run after image push: 13.5 s vs old 1.2 s). Legacy 503 with `max_instances: 3` unmeasured.
+- Why the legacy class was 3.7 s in August.
+
+## Mistakes worth knowing
+
+- ⚠️ **A background brief without a time box took over an hour** and drew *"it takes loong"*, *"just do not waste time"*. The agent added a UDP side test of its own. Name the pages, the run count and a stop-and-report point in the brief.
+- ⚠️ `positron-streaming` says Stream recording fills at about 225 min a day of testing; it reached 75 per cent in about three weeks since the last clear. The sweep is the fix.
+
+---
+
 # Handoff, 2026-10-07, session 68: a positron deck, a slide-writing skill, and the front page as a system
 
 ## Where it is right now
