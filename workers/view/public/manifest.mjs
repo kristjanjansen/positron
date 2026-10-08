@@ -971,11 +971,8 @@ export const DEMOS = [
   // its half width player, whose footer links here. `slides/<deck>` deploys
   // `demo/slides/<deck>/` to `/slides/<deck>/`; the archive row `slides` below
   // copies only the flat files of `demo/slides/`, so the two do not meet.
-  // positron before synths on the front page, asked 2026-10-07 as *"reverse their order"*;
-  // the frames are drawn in THIS order, so `DECKS` alone would not move them
-  { name: 'slides/positron', title: 'positron', group: 'slides', act: 0, created: '2026-10-07', built: true, unlisted: true,
-    one: 'A short talk on what positron is, from its instruments to how its examples are shared.',
-    tags: ['shell', 'no network'] },
+  // the frames are drawn in THIS order, so `DECKS` alone would not move them.
+  // `slides/positron` was first here until 2026-10-08, parked on *"rm 9 things slides for now"*
   { name: 'slides/synths', title: 'synths', group: 'slides', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'A slide deck that turns a few lines of Faust into a sound in this page.',
     tags: ['shell', 'no network'] },
