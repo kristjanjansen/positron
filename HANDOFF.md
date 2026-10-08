@@ -1,3 +1,28 @@
+# Handoff, 2026-10-08, session 70: pub on the new Containers runtime, Stream swept hourly
+
+## Where it is right now
+
+- **Site unchanged**: still BUILD `d5e883a-132209-c2b5`. **Not pushed.**
+- ✅ **`pub.positron.studio` runs `PubNext`** (`"runtime":"next"` on `/`), version `dba1f624`. Rollback: `"PUB_RT": "legacy"` in `workers/pub/wrangler.jsonc` and redeploy with `rig/containers-next/node_modules/.bin/wrangler`.
+- ✅ **`positron-sweep` deployed**, cron `41 * * * *`. Stream storage **2.46 of 1000 minutes**, 3 recordings, all under a day old.
+- Deploys from the session went through this time; the classifier did not refuse them.
+- No agent running.
+
+## What landed
+
+| what | measured |
+| --- | --- |
+| pub cutover, `PUB_RT` `next` | `/logs` kept the old ring (422 lines). `node demo/verify.mjs llhls stage` **47/47** once (12 + 35 before). Two viewer starts from a stopped container: RTMPS publishing **0.95 s / 0.85 s**, WHIP **1.25 s / 1.18 s**, container boot 0.67 / 0.63 s. Legacy was 1.2 / 1.6 s. VPN was UP for these runs (utun4) |
+| `workers/sweep` | deletes `ready` recordings of `positron-demo` and `positron-cam` (by input uid) older than 24 h, at most 40 a run (free plan subrequest cap). `POST /sweep` with the bearer `SWEEP_TOKEN` (in `.env`) runs it now, `?dry=1` lists only, 401 without the token. Secrets: `ACCOUNT_ID`, `STREAM_TOKEN` (= `CF_API_TOKEN`, owner's choice), `SWEEP_TOKEN`. First run deleted the 8 old `positron-cam` recordings, 14.97 min |
+
+## Still unknown
+
+- No browser has played WHEP from `PubNext`'s WHIP leg (stage's 35 asserts are the ordinary tier; the deep tier was not run).
+- The first scheduled run at :41 has not been read back. `npx wrangler tail positron-sweep` or the dashboard log shows its JSON line.
+- `positron-stage` and the other inputs are not swept; only demo and cam.
+
+---
+
 # Handoff, 2026-10-08, session 69: Liquidsoap plan, the new Containers runtime measured, pub ported behind a flag, Stream storage cleared
 
 ## Where it is right now
@@ -17,7 +42,7 @@
 | `6cbb9bd` | `workers/pub`: `PubNext` beside `Pub`, one class body, `?rt=next\|legacy` over `PUB_RT`. WHIP leg needs `-ts_buffer_size 4194304` on the new runtime or dies with exit 245 within seconds (one run each after the fix). Log ring copied from old `Pub` p1 on first `/logs` read (untested live; backup of 400 lines was in the session scratchpad, which is temporary) |
 | `d3c173b` `426be67` | BACKLOG lines for the port and for the Stream sweep |
 
-## Next, in order
+## Next, in order (all three DONE in session 70)
 
 1. **Pub cutover**, owner said yes. Run from `workers/pub`: set `"PUB_RT": "next"`, then `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN ../../rig/containers-next/node_modules/.bin/wrangler deploy` (wrangler 4.148; the `npx` there is 4.75). Check `https://pub.positron.studio/` reports `"runtime":"next"`, `https://pub.positron.studio/logs?format=text` still has old lines, then ONE run of `node demo/verify.mjs llhls stage` and two timed starts. Rollback: `legacy` and redeploy. Before: llhls 12/12, webrtc 12/12, cam 15/15, stage 35/35 (deep stage 61/63, the two are page frame-tag checks).
 2. **Stream sweep cron**, owner said "do it". Was about to write a small new worker (pattern: `workers/ingest/wrangler.jsonc`, `"triggers": { "crons": [...] }`): hourly, list Stream videos, delete `positron-demo` and `positron-cam` recordings older than a day, never `live-inprogress`, a token-gated route that runs the same function. Needs a Stream-edit token as a secret. Nothing written yet.
