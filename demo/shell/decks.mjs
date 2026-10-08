@@ -128,7 +128,9 @@ const POSITRON_WORDS = [
   // ⚠️ NO SUBTITLE NOW: the three line name and the two line subtitle spilled
   // the title slide (MEASURED by the deck's own spill check), so the subtitle
   // went to the notes rather than the name being cut
-  { name: 'title', title: '10 things you can do with Positron',
+  // ⚠️ NINE SINCE 2026-10-08: the synth slide's cut left nine things under a
+  // title that said ten, so the title follows the count
+  { name: 'title', title: '9 things you can do with Positron',
     notes: 'From microcontrollers to distributed performances. I started building Positron for my own work: making instruments, working with recordings and connecting media across devices. I want other people to be able to understand those parts and adapt them for their own work. Positron is an evolving R&D project.' },
   { name: 'connect', say: 'Connect instruments and streams',
     text: 'Link notes, sound, video and code between your browser and a Raspberry Pi, each link checked before it opens', textStep: 2,
@@ -182,7 +184,7 @@ const POSITRON = POSITRON_WORDS.map((sl) => (sl.title ? sl : { ...sl, sayStep: 3
  */
 export const DECKS = [
   // positron first, asked 2026-10-07 as *"reverse their order"*
-  { name: 'positron', title: '10 things you can do with Positron', slides: POSITRON },
+  { name: 'positron', title: '9 things you can do with Positron', slides: POSITRON },
   { name: 'synths', title: 'Synths in code', slides: SYNTHS },
 ];
 

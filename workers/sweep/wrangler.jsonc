@@ -10,10 +10,13 @@
 	"compatibility_date": "2026-09-01",
 	"workers_dev": true,
 	"vars": {
-		// positron-demo (the /llhls/ and /stage/ test pattern) and positron-cam.
-		// By uid, never by name. Not positron-stage, not whep-rig, not anybody
-		// else's input.
-		"INPUTS": "0e390aa48b55d49a57284e6c2c535477,157863305ec9583187dfbb1c66c031ea",
+		// positron-demo (the /llhls/ and /stage/ test pattern), positron-cam, and
+		// since 2026-10-08 the two RTMPS rig inputs low-latency-demo and
+		// latency-rig-llhls, which record (`mode: automatic`) and had none at the
+		// time. By uid, never by name. Not positron-stage, whep-rig or
+		// positron-cam-whip: recording is off on all three (read 2026-10-08).
+		// Not `Maria`, which is not positron's.
+		"INPUTS": "0e390aa48b55d49a57284e6c2c535477,157863305ec9583187dfbb1c66c031ea,5cfa5053fffe478fffbb9b5c65773d34,4c93bc4b4809c29b03cc60fd8add29df",
 		"MAX_AGE_H": "24"
 	},
 	"triggers": { "crons": ["41 * * * *"] },

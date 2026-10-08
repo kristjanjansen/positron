@@ -33,5 +33,8 @@
 		// went with it (copied first, compared on all three channels), so they are deleted here
 		{ "tag": "v3", "deleted_classes": ["Schedule", "Library"] }
 	],
+	// 2026-10-08: the */5 cron outlived the scheduled handler and threw on every run.
+	// wrangler leaves an existing cron alone unless this says empty, so it says empty.
+	"triggers": { "crons": [] },
 	"observability": { "enabled": true }
 }
