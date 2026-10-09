@@ -8,6 +8,7 @@
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, dirname, extname, resolve, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -182,6 +183,13 @@ export function serve(port = PORT) {
 
     if (rel === '') rel = 'demo/index.html';
     if (rel.endsWith('/')) rel = join(rel, 'index.html');
+    // `/concepts/2` with no slash: a directory with a page in it gets the slash,
+    // as the deployed site does, instead of a 404.
+    else if (!extname(rel) && [ROOT, join(ROOT, 'demo')].some((r) => existsSync(join(r, rel, 'index.html')))) {
+      const q = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+      res.writeHead(301, { location: `/${rel}/${q}` }).end();
+      return;
+    }
     // LOCAL == DEPLOYED. On the worker, demo/<x> is served at /<x>, so a page
     // asking for /shell/shell.css or /llhls/ must resolve here too — try the
     // repo root first, then inside demo/.

@@ -28,7 +28,7 @@
 // *changed* every five seconds redraws `/graph/` on every beat and nobody sees
 // why.
 
-import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports } from './graph-registry.mjs';
+import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports, SITE_KINDS } from './graph-registry.mjs';
 import { createBay } from './bay.mjs';
 
 let pass = 0, fail = 0;
@@ -297,6 +297,37 @@ console.log('\n== into a bay ==');
   const v = b.link('studio-1:gpu:video', 'home:page:video');
   ok('so the bay gives the board\'s picture relay H.264, the way the page really opens it, and not WHEP',
     v.ok && v.session?.transport === 'relay-h264', JSON.stringify(v.session || v.why));
+}
+
+/* A site says what it is (plans/plan-site-names.md, 2026-10-09). `kind` and
+   `label` are optional, the ids do not move, and an older board that sends
+   neither is still read. */
+{
+  const g = boardGraph({ room: 'studio-1', instruments: { synth: true }, gpu: false });
+  ok('a board graph says it is a board, named Raspberry Pi', g.kind === 'board' && g.label === 'Raspberry Pi', `${g.kind} ${g.label}`);
+  ok('and its ids are still site:node:port on the room', g.site === 'studio-1' && g.ports.every((p) => p.id.startsWith('studio-1:')) && g.v === 1);
+  ok('a board may be given another label', boardGraph({ room: 'r', gpu: false, label: 'pi in the hall' }).label === 'pi in the hall');
+  ok('every listed kind passes', SITE_KINDS.every((k) => graphProblem({ v: 1, site: 's', kind: k, nodes: [], ports: [] }) === ''), SITE_KINDS.join(','));
+  ok('a graph with no kind and no label still passes', graphProblem({ v: 1, site: 's', nodes: [], ports: [] }) === '');
+  const typo = graphProblem({ v: 1, site: 's', kind: 'bord', nodes: [], ports: [] });
+  ok('NEGATIVE CONTROL: a kind outside the list is refused, and the reason names it', /kind bord/.test(typo), typo);
+  ok('NEGATIVE CONTROL: a kind of "you" is refused, because "you" is never sent',
+    graphProblem({ v: 1, site: 's', kind: 'you', nodes: [], ports: [] }) !== '');
+  ok('NEGATIVE CONTROL: a label that is not a string is refused',
+    graphProblem({ v: 1, site: 's', label: 7, nodes: [], ports: [] }) !== '');
+
+  const reg = createRegistry({ now: () => 0 });
+  reg.ingest({ type: 'board.alive', from: 'pi', graph: g });
+  const old = { ...g }; delete old.kind; delete old.label;
+  reg.ingest({ type: 'graph.announce', from: 'tab', graph: { v: 1, site: 'web-ab12', place: 'browser', kind: 'browser', label: 'browser', nodes: [], ports: [] } });
+  reg.ingest({ type: 'graph.announce', from: 'old', graph: { ...old, site: 'studio-2', nodes: [], ports: [] } });
+  const bad = reg.ingest({ type: 'graph.announce', from: 'typo', graph: { v: 1, site: 'web-zz', kind: 'phone', nodes: [], ports: [] } });
+  const sites = Object.fromEntries(reg.merged().sites.map((x) => [x.site, x]));
+  ok('merged sites carry the board\'s kind and label', sites['studio-1']?.kind === 'board' && sites['studio-1']?.label === 'Raspberry Pi');
+  ok('and a browser\'s', sites['web-ab12']?.kind === 'browser' && sites['web-ab12']?.label === 'browser');
+  ok('NEGATIVE CONTROL: a site that said nothing gets no kind, so a reader falls back to place',
+    sites['studio-2'] && sites['studio-2'].kind === undefined && sites['studio-2'].label === undefined);
+  ok('NEGATIVE CONTROL: a graph with a bad kind is not heard at all', bad === false && !sites['web-zz']);
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);

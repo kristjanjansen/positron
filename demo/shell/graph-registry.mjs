@@ -15,10 +15,19 @@
 //     page that joins late hears it within one five second beat;
 //   - a page sends `{ type: 'graph.announce', graph }` for its own nodes;
 //   - `{ type: 'graph.ask' }` asks every page to announce again now.
-// A graph is `{ v: 1, site, place, net, nodes: [...], ports: [...] }` with ids
-// `site:node:port`, exactly what `bay.addNode` and `bay.addPort` take.
+// A graph is `{ v: 1, site, place, net, kind, label, nodes: [...], ports: [...] }`
+// with ids `site:node:port`, exactly what `bay.addNode` and `bay.addPort` take.
+//
+// `kind` and `label` say what a SITE is, since 2026-10-09 (plans/plan-site-names.md,
+// finishing plan-patchbay.md §2.1). Both are optional and `v` stays 1: a board
+// still running an older copy of this file sends neither, and a reader then
+// falls back to guessing from `place`. Neither ever changes an id.
+// ⚠️ "you" IS NEVER SENT. A row is "you" when its site equals the reader's own,
+// so a label saying it would be wrong on every other screen.
 
 export const GRAPH_V = 1;
+/** What a site may say it is. Absent is allowed; anything else is refused. */
+export const SITE_KINDS = ['board', 'browser', 'store', 'node', 'mac', 'service'];
 /** Three missed board beats. `bay.mjs` imports this one number since
  *  2026-10-06, so a port goes stale to the bay and to the registry together. */
 export const STALE_MS = 15_000;
@@ -61,8 +70,11 @@ const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
  * @param {Array}  [o.alsa]      `alsa.mjs` `addressable()` rows
  * @param {number} [o.frameMs]
  * @param {boolean} [o.gpu]      whether the GPU video path exists here
+ * @param {string} [o.label]     the human name a reader shows for this site.
+ *   A fixed 'Raspberry Pi' rather than the board's hostname, because the
+ *   hostname is `raspberrypi` on every fresh Pi OS (`board.mjs`, `NAME`).
  */
-export function boardGraph({ room, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true }) {
+export function boardGraph({ room, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, label = 'Raspberry Pi' }) {
   const site = room, place = room;
   const nodes = [], ports = [];
   const node = (n, kind, label) => { nodes.push({ id: `${site}:${n}`, kind, label, place, ...(net ? { net } : {}) }); };
@@ -113,7 +125,7 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
     port(n, 'out', { label: a.client, dir: 'out', medium: 'midi', emits: ['note', 'cc', 'bend', 'clock'] });
     port(n, 'in', { label: a.client, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] });
   }
-  return { v: GRAPH_V, site, place, ...(net ? { net } : {}), nodes, ports };
+  return { v: GRAPH_V, site, place, ...(net ? { net } : {}), kind: 'board', label, nodes, ports };
 }
 
 /** Is this a graph this file can read. Answers a reason, or '' when it is. */
@@ -121,6 +133,8 @@ export function graphProblem(g) {
   if (!g || typeof g !== 'object') return 'not an object';
   if (g.v !== GRAPH_V) return `version ${g.v} is not ${GRAPH_V}`;
   if (typeof g.site !== 'string' || !g.site) return 'no site';
+  if (g.kind !== undefined && !SITE_KINDS.includes(g.kind)) return `kind ${g.kind} is not one of ${SITE_KINDS.join(', ')}`;
+  if (g.label !== undefined && typeof g.label !== 'string') return 'label is not a string';
   if (!Array.isArray(g.nodes) || !Array.isArray(g.ports)) return 'nodes and ports are lists';
   for (const n of g.nodes) if (typeof n?.id !== 'string' || n.id.split(':')[0] !== g.site) return `node ${n?.id} is not on site ${g.site}`;
   for (const p of g.ports) if (typeof p?.id !== 'string' || p.id.split(':').length !== 3 || p.id.split(':')[0] !== g.site) return `port ${p?.id} is not site:node:port on ${g.site}`;
@@ -180,7 +194,10 @@ export function createRegistry({ now = () => Date.now(), staleMs = STALE_MS } = 
       for (const n of g.graph.nodes) nodes.push({ place: g.graph.place, ...(g.graph.net ? { net: g.graph.net } : {}), ...n, stale: g.stale });
       for (const p of g.graph.ports) ports.push({ ...p, stale: g.stale });
     }
-    return { nodes, ports, sites: [...bySite.values()].map((g) => ({ site: g.site, stale: g.stale, from: g.from })) };
+    // `kind` and `label` are passed through as the site said them, and are
+    // undefined when it said nothing, so a reader can tell "no claim" apart.
+    return { nodes, ports, sites: [...bySite.values()].map((g) => ({ site: g.site, stale: g.stale, from: g.from,
+      kind: g.graph.kind, label: g.graph.label })) };
   }
   /** Put everything heard into a bay. A fresh bay per call is the caller's job. */
   function fill(bay) {
