@@ -37,6 +37,8 @@
   import { setSymbol } from '/shell/symbol.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
 
   // /concepts/12/ with the kit's own transport bar and timeline glued together in
   // place of the hand-made record buttons and notes table. A take is items on a
@@ -47,7 +49,7 @@
   const S = 'web';
   const bay = createBay();
   const DIR = { in: '→○', out: '○→' };
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['notes', 'engine', 'notes to dots'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
@@ -87,26 +89,28 @@
     voices.delete(n);
   }
 
-  // ── the shader: dots that wheel away from where a note was played ─────
-  // In the manner of dotpiano.com. A held note keeps dropping dots; each dot is
-  // born on an arc at its pitch, in its pitch class's colour, sized by velocity,
-  // then turns around the centre, drifts outward and fades. The dots live here
-  // in JavaScript and reach the shader as numbers, one vec4 each, every frame:
-  // a shader cannot hear an event, it only reads the state it is handed.
-  const MAXD = 96, DOT_EVERY = 45, LIFE = 3200, LO = 48, HI = 69;
-  const held = new Map();          // note -> { vel, last }
-  const dots = [];                 // { a0, r0, born, size, hue }
-  function drop(n, vel, now) {
-    const u = (n - LO) / (HI - LO);
-    dots.push({ a0: 3.6 - u * 2.4, r0: 0.18, born: now, size: 0.012 + 0.022 * vel / 127, hue: (n % 12) / 12 });
-    if (dots.length > MAXD) dots.shift();
+  // ── the shader's picture: rings, one per pitch ───────────────────────
+  // In the manner of dotpiano.com. Every pitch has its own ring, low notes inside.
+  // A pen sits at the top and the whole picture turns clockwise under it, so a
+  // held note draws a continuous arc on its ring for as long as it is held. On
+  // release the arc stops growing, carries on turning and fades. The strokes live
+  // here and reach the shader as numbers every frame: a shader cannot hear a note.
+  const MAXS = 48, LIFE = 3000, LO = 48, HI = 67, SPIN = 1.4;   // SPIN in radians a second
+  const strokes = [];              // { n, on, off, vel }
+  const pens = new Map();          // note -> its stroke while held
+  // ── the midi node: generic MIDI STATE, nothing about pictures ──────────
+  // What is sounding, the last value of every controller, sent once a frame
+  // out of midi:value-out to whatever is linked. CC 7 is volume and starts at 100.
+  const mstate = { notes: new Map(), cc: new Float32Array(128) };
+  mstate.cc[7] = 100 / 127;
+  function midiIn(e) {
+    if (e.cls === 'note') { if (e.d2) mstate.notes.set(e.d1, { vel: e.d2 }); else mstate.notes.delete(e.d1); }
+    else if (e.cls === 'cc') mstate.cc[e.d1] = e.d2 / 127;
   }
-  function visOn(n, vel) { const now = performance.now(); held.set(n, { vel, last: now }); drop(n, vel, now); }
-  function visOff(n) { held.delete(n); }
   const canvas = el('canvas', 'cc-vis');
   canvas.width = 1280; canvas.height = 720;
   const gl = canvas.getContext('webgl2');
-  let prog = null, uN = null, uDots = null, uHue = null;
+  let prog = null, uB = null, uA = null, uN = null, uS = null, uW = null;
   if (gl) {
     const vs = `#version 300 es
       in vec2 p; out vec2 uv;
@@ -114,18 +118,29 @@
     const fs = `#version 300 es
       precision highp float;
       in vec2 uv; out vec4 o;
-      uniform int uN; uniform vec4 uDots[${MAXD}]; uniform float uHue[${MAXD}];
+      uniform int uN; uniform vec4 uS[${MAXS}]; uniform vec2 uW[${MAXS}]; uniform float uAspect; uniform float uBright;
+      const float TAU = 6.2831853;
       void main() {
-        vec2 q = (uv - 0.5) * vec2(16.0 / 9.0, 1.0);
+        vec2 q = (uv - 0.5) * vec2(uAspect, 1.0);
+        float rho = length(q), th = atan(q.x, q.y);          // 0 at the top, clockwise positive
         vec3 c = vec3(0.0);
-        for (int i = 0; i < ${MAXD}; i++) {
+        for (int i = 0; i < ${MAXS}; i++) {
           if (i >= uN) break;
-          vec4 d = uDots[i];                          // x, y, size, alpha
-          float k = smoothstep(d.z, d.z * 0.4, length(q - d.xy)) * d.w;
-          vec3 hue = 0.55 + 0.45 * cos(6.283 * (uHue[i] + vec3(0.0, 0.33, 0.67)));
+          vec4 s = uS[i];                                    // ring radius, start angle, span, alpha
+          float w = uW[i].x;                                 // half the line width
+          float rel = mod(th - s.y, TAU);
+          float inside = step(rel, s.z);
+          float d = abs(rho - s.x);
+          // round ends: distance to each end of the arc
+          vec2 e0 = s.x * vec2(sin(s.y), cos(s.y));
+          vec2 e1 = s.x * vec2(sin(s.y + s.z), cos(s.y + s.z));
+          float dc = min(length(q - e0), length(q - e1));
+          float dist = mix(dc, min(d, dc), inside);
+          float k = smoothstep(w, w * 0.5, dist) * s.w;
+          vec3 hue = 0.55 + 0.45 * cos(TAU * (uW[i].y + vec3(0.0, 0.33, 0.67)));
           c = max(c, hue * k);
         }
-        o = vec4(c, 1.0);
+        o = vec4(c * uBright, 1.0);
       }`;
     const sh = (t, src) => { const x = gl.createShader(t); gl.shaderSource(x, src); gl.compileShader(x); return x; };
     prog = gl.createProgram();
@@ -138,28 +153,46 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, 'p');
     gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    uN = gl.getUniformLocation(prog, 'uN'); uDots = gl.getUniformLocation(prog, 'uDots'); uHue = gl.getUniformLocation(prog, 'uHue');
+    uB = gl.getUniformLocation(prog, 'uBright'); uA = gl.getUniformLocation(prog, 'uAspect'); uN = gl.getUniformLocation(prog, 'uN'); uS = gl.getUniformLocation(prog, 'uS'); uW = gl.getUniformLocation(prog, 'uW');
   }
-  // TWO NODES. `notes` turns note events into STATE: where every dot is right
-  // now. Once a frame it sends that state out of notes:value-out. `shader` takes
-  // whatever arrives on shader:value-in as its uniforms and draws; it never sees
-  // a note. Cut the value link and the picture freezes while the notes still play.
+  // TWO NODES. `midi` keeps generic MIDI state and sends it once a frame out of
+  // midi:value-out. `shader` takes whatever arrives on shader:value-in, keeps its
+  // own strokes from the notes in it, and turns CC 7 into brightness. It never
+  // sees an event. Cut the value link and the picture freezes.
   let latest = null;               // the last state shader:value-in was handed
   function frame(now) {
-    for (const [n, h] of held) if (now - h.last >= DOT_EVERY) { h.last = now; drop(n, h.vel, now); }
-    while (dots.length && now - dots[0].born > LIFE) dots.shift();
-    const data = new Float32Array(MAXD * 4), hues = new Float32Array(MAXD);
-    dots.forEach((d, i) => {
-      const age = (now - d.born) / 1000;
-      const a = d.a0 + age * 0.9, r = d.r0 + age * 0.09;
-      data.set([Math.cos(a) * r, Math.sin(a) * r, d.size, 1 - age * 1000 / LIFE], i * 4);
-      hues[i] = d.hue;
-    });
-    bay.send(`${S}:notes:value-out`, { n: dots.length, data, hues });
+    bay.send(`${S}:midi:value-out`, mstate);
+    if (latest) {
+      for (const [n, v] of latest.notes) if (!pens.has(n)) {
+        const st = { n, on: now, off: null, vel: v.vel };
+        strokes.push(st); pens.set(n, st);
+        if (strokes.length > MAXS) strokes.shift();
+      }
+      for (const [n, st] of pens) if (!latest.notes.has(n)) { st.off = now; pens.delete(n); }
+    }
+    while (strokes.length && strokes[0].off != null && now - strokes[0].off > LIFE) strokes.shift();
     if (gl && prog && latest) {
+      const sv = new Float32Array(MAXS * 4), wv = new Float32Array(MAXS * 2);
+      const turn = (t) => (t / 1000) * SPIN;                // how far the picture has turned at time t
+      strokes.forEach((st, i) => {
+        const end = st.off ?? now;
+        const span = Math.min(turn(end) - turn(st.on), 2 * Math.PI - 0.05);
+        // The pen is at the top (angle 0). A point drawn at time t sits turn(now) - turn(t)
+        // clockwise of the pen now, so the arc runs from the end of the note back to its start.
+        const start = turn(now) - turn(end);
+        const r = 0.05 + 0.37 * (st.n - LO) / (HI - LO);
+        const alpha = st.off == null ? 1 : Math.max(0, 1 - (now - st.off) / LIFE);
+        sv.set([r, start, Math.max(span, 0.0001), alpha], i * 4);
+        wv.set([0.004 + 0.006 * st.vel / 127, (st.n % 12) / 12], i * 2);
+      });
+      // The backing store follows the box it is shown in, so a ring is round in
+      // whatever shape the panel gives the canvas, and sharp in full screen.
+      const w = Math.round(canvas.clientWidth * devicePixelRatio), h = Math.round(canvas.clientHeight * devicePixelRatio);
+      if (w && h && (canvas.width !== w || canvas.height !== h)) { canvas.width = w; canvas.height = h; }
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(prog);
-      gl.uniform1i(uN, latest.n); gl.uniform4fv(uDots, latest.data); gl.uniform1fv(uHue, latest.hues);
+      gl.uniform1f(uA, canvas.width / canvas.height); gl.uniform1f(uB, latest.cc[7]);
+      gl.uniform1i(uN, strokes.length); gl.uniform4fv(uS, sv); gl.uniform2fv(uW, wv);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
     requestAnimationFrame(frame);
@@ -168,7 +201,7 @@
 
   let kb = null;
   const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes you play' },
+    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'], what: 'notes you play and the volume knob' },
     { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes that light the keys',
       deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
     { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the saw plays',
@@ -178,10 +211,10 @@
     { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes being recorded',
       deliver: (e) => take(e) },
     { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes played back' },
-    { id: `${S}:notes:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes that drop dots',
-      deliver: (e) => (e.d2 ? visOn(e.d1, e.d2) : visOff(e.d1)) },
-    { id: `${S}:notes:value-out`, dir: 'out', medium: 'value', what: 'where every dot is, each frame' },
-    { id: `${S}:shader:value-in`, dir: 'in', medium: 'value', what: 'the uniforms',
+    { id: `${S}:midi:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], what: 'notes and controllers',
+      deliver: (e) => midiIn(e) },
+    { id: `${S}:midi:value-out`, dir: 'out', medium: 'value', what: 'what is sounding and every CC, each frame' },
+    { id: `${S}:shader:value-in`, dir: 'in', medium: 'value', what: 'midi state, turned into uniforms',
       deliver: (e) => { latest = e; } },
     { id: `${S}:shader:video-out`, dir: 'out', medium: 'video', what: 'the picture' },
     { id: `${S}:screen:video-in`, dir: 'in', medium: 'video', what: 'what you see' },
@@ -193,14 +226,17 @@
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   function patch() {
     for (const l of bay.links()) bay.unlink(l.id);
-    const want = [[`${S}:keys:midi-out`, `${S}:synth:midi-in`, []]];
+    // The keys now send CC as well, and the synth and recorder take notes only, so
+    // their links say so: `{ only note }`. Without it the bay refuses the link.
+    const NOTES = [{ op: 'only', cls: 'note' }];
+    const want = [[`${S}:keys:midi-out`, `${S}:synth:midi-in`, NOTES]];
     // The recorder hears the keys; it plays back into the synth on a link of its own.
-    want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, []], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
+    want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, NOTES], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
     want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
     // The shader hears the same notes as the synth, from the keys and from the
     // recorder, and its picture goes to the screen on this page.
-    want.push([`${S}:keys:midi-out`, `${S}:notes:midi-in`, []], [`${S}:rec:midi-out`, `${S}:notes:midi-in`, []],
-      [`${S}:notes:value-out`, `${S}:shader:value-in`, []],
+    want.push([`${S}:keys:midi-out`, `${S}:midi:midi-in`, []], [`${S}:rec:midi-out`, `${S}:midi:midi-in`, []],
+      [`${S}:midi:value-out`, `${S}:shader:value-in`, []],
       [`${S}:shader:video-out`, `${S}:screen:video-in`, []]);
     for (const [a, b, tr] of want) {
       const r = bay.link(a, b, tr, { site: S });
@@ -306,9 +342,9 @@
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');
-  // C to A, 13 white keys: as many as the content width holds at the kit's 49 px minimum.
+  // C3 to G4, 12 white keys: as many as fit inside the instrument panel's inset at 49 px.
   kb = createKeyboard(host, {
-    ...keyRange(21), base: 48,
+    ...keyRange(19), base: 48,
     onDown: (note, how) => { if (how === 'midi') return; sentOut.n++; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); draw(); },
     onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
   });
@@ -316,9 +352,17 @@
   patch();
   const out = el('div', 'cc-stack');
   d.log(gl ? (typeof shaderSays === 'string' ? shaderSays : 'no shader') : 'this browser has no WebGL2, so the picture stays dark', gl && /did not/.test(shaderSays || '') ? 'warn' : undefined);
+  // The knobs above the keyboard. Volume sends CC 7 out of keys:midi-out, the same
+  // port the notes leave by; on this page it only brightens the picture.
+  const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100,
+    onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); } });
+  const knobs = createKnobBank([volume]);
+  // The knobs and the keyboard are one instrument, glued, as on /fau/.
+  const instrument = createInstrumentPanel({ keys: host, plate: false });
+  instrument.addRow(knobs.el);
   const panel = createVideoPanel({ media: canvas, left: false });
   panel.el.classList.add('cc-half');
-  out.append(panel.el, surface, host, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  out.append(panel.el, surface, instrument.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
   d.el.append(out);
   d.ready();
 </script>
