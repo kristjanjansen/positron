@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concepts 12</title>
+<title>POSITRON concepts 13</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
@@ -27,9 +27,16 @@
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { setSymbol } from '/shell/symbol.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
 
-  // /concepts/10/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
+  // /concepts/12/ with the kit's own transport bar and timeline glued together in
+  // place of the hand-made record buttons and notes table. A take is items on a
+  // DECK; the deck plays them back through an adapter that sends each note out of
+  // rec:midi-out. /concepts/10/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
   // keyboard's notes along a link while armed, `rec:midi-out` plays them back
   // into the synth along another.
   const S = 'web';
@@ -90,7 +97,7 @@
   ];
   for (const p of PORTS) bay.addPort(p);
 
-  const d = mount({ name: 'concepts 12', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  const d = mount({ name: 'concepts 13', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
 
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   function patch() {
@@ -114,80 +121,72 @@
     { key: 'medium', label: 'medium', width: 72 },
     { key: 'heard', label: 'heard', width: 64, align: 'right' },
   ] });
-  // ── the recorder ────────────────────────────────────────────────────────
+  // ── the recorder: a deck, its bar and its strip ─────────────────────────
   const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
-  let armed = false, t0 = 0;
-  const notes = [];                // { n, vel, at, len }
+  const TAKE_MS = 20000;
+  let armed = false, nid = 0;
+  const notes = [];                // { n, vel, at, len } for the strip
   const open = new Map();          // note -> its row, until the key comes up
+
+  // Playback: the deck fires each item at its position; the adapter sends it out
+  // of rec:midi-out, where the bay's link takes it to the synth.
+  const adapter = {
+    caps: { rates: [1], continuous: false },
+    actuate(payload) {
+      if (armed) return;           // a note scheduled while recording already sounded from the keys
+      bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: payload.n, d2: payload.vel });
+      draw();
+    },
+    reduce() { return {}; },
+    assertState() { for (const n of [...voices.keys()]) noteOff(n); return {}; },
+  };
+  const deck = createDeck({ items: [], adapters: { note: adapter }, range: [0, TAKE_MS] });
+  const pos = () => deck.transport.position();
+
   function take(e) {
     if (!armed) return;
-    const at = performance.now() - t0;
+    const at = pos();
+    deck.sched.schedule({ at, kind: 'note', id: `n${nid++}`, payload: { n: e.d1, vel: e.d2 } });
     if (e.d2) { const r = { n: e.d1, vel: e.d2, at, len: null }; notes.push(r); open.set(e.d1, r); }
     else { const r = open.get(e.d1); if (r) { r.len = at - r.at; open.delete(e.d1); } }
-    drawNotes();
-  }
-  const notesT = createTable({ columns: [
-    { key: 'i', label: '#', width: 36, align: 'right' },
-    { key: 'note', label: 'note', grow: true, hi: true },
-    { key: 'vel', label: 'vel', width: 48, align: 'right' },
-    { key: 'at', label: 'at', width: 80, align: 'right' },
-    { key: 'len', label: 'length', width: 80, align: 'right' },
-  ], minRows: 6, stick: true });
-  const ms = (v) => (v == null ? '' : `${(v / 1000).toFixed(2)} s`);
-  function drawNotes() {
-    notesT.set(notes.map((r, i) => ({ i: i + 1, note: nameOf(r.n), vel: r.vel, at: ms(r.at), len: r.len == null ? 'held' : ms(r.len) })));
-  }
-  let timers = [], playing = false;
-  // The rows sounding right now during playback, lit with the table's own mark.
-  const sounding = new Set();
-  // The table scrolls inside its own box to keep the lit row in the middle;
-  // scrollIntoView would move the whole page as well.
-  const lit = () => {
-    notesT.mark((row, i) => sounding.has(i));
-    const box = notesT.scroller(), on = box.querySelector('.pos-tbl-row.on');
-    if (on) box.scrollTop = on.offsetTop - box.offsetTop - (box.clientHeight - on.offsetHeight) / 2;
-  };
-  // Two toggles, glyphs only: ● records and becomes ■ while recording, ▶ plays
-  // and becomes ■ while playing. Recording and playing stop each other.
-  const GLYPH = { rec: '\u25CF', play: '\u25B6', stop: '\u25A0' };
-  function face() {
-    const r = transport.button('rec'), p = transport.button('play');
-    r.textContent = armed ? GLYPH.stop : GLYPH.rec;
-    r.title = armed ? 'stop recording' : 'record';
-    p.textContent = playing ? GLYPH.stop : GLYPH.play;
-    p.title = playing ? 'stop playing' : 'play';
-    p.disabled = !notes.length && !playing;
-  }
-  function play() {
-    stop();
-    playing = true;
-    const end = notes.reduce((m, r) => Math.max(m, r.at + (r.len ?? 200)), 0);
-    timers.push(setTimeout(() => { playing = false; face(); }, end + 50));
-    notes.forEach((r, i) => {
-      timers.push(setTimeout(() => { sounding.add(i); lit(); bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: r.vel }); draw(); }, r.at));
-      timers.push(setTimeout(() => { sounding.delete(i); lit(); bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: 0 }); }, r.at + (r.len ?? 200)));
-    });
-    face();
-  }
-  function stop() {
-    armed = false; playing = false;
-    sounding.clear(); lit();
-    for (const t of timers) clearTimeout(t);
-    timers = [];
-    for (const n of [...voices.keys()]) noteOff(n);
-    face();
   }
   function record() {
-    stop();
-    notes.length = 0; open.clear(); t0 = performance.now(); armed = true;
-    drawNotes(); face();
+    deck.pause();
+    deck.sched.clear();
+    notes.length = 0; open.clear();
+    deck.seek(0);
+    armed = true;
+    deck.play();
+    face();
   }
-  const transport = createButtonGroup({ buttons: [
-    { id: 'rec', label: GLYPH.rec, onPress: () => (armed ? stop() : record()) },
-    { id: 'play', label: GLYPH.play, onPress: () => (playing ? stop() : play()) },
-  ] });
-  transport.button('rec').classList.add('cc-rec');
+  function stopRecording() {
+    armed = false;
+    deck.pause();
+    face();
+  }
+  function face() {
+    const b = bar.extra?.('rec');
+    if (!b) return;
+    setSymbol(b, armed ? '■' : '●');
+    b.title = armed ? 'stop recording' : 'record';
+    b.classList.toggle('cc-rec', !armed);
+  }
+
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, {
+    scrub: false, loop: false, live: false,
+    extras: [{ id: 'rec', label: '●', aria: 'record', title: 'record', onPress: () => (armed ? stopRecording() : record()) }],
+  });
+  const strip = createStripView(glue, deck, {
+    size: 'auto', follow: true, gutter: 120,
+    lanes: [
+      { id: 'take', kind: 'note', label: 'take', height: 72, width: 2, as: 'ticks', terse: true,
+        rows: () => notes.map((r, i) => ({ at: r.at, id: `t${i}`, kind: 'note', payload: r })),
+        describeRow: (r) => [nameOf(r.payload.n), `vel ${r.payload.vel}`] },
+    ],
+  });
+  const surface = createGlue(bar.el, strip.surface);
   face();
 
   const linksT = createTable({ columns: [
@@ -220,8 +219,7 @@
 
   patch();
   const out = el('div', 'cc-stack');
-  drawNotes();
-  out.append(host, el('h3', 'cc-h', 'recording'), transport.el, notesT.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  out.append(host, el('h3', 'cc-h', 'recording'), surface, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
   d.el.append(out);
   d.ready();
 </script>

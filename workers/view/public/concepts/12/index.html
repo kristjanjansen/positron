@@ -10,7 +10,6 @@
 <style>
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
   .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
-  .cc-fx { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
   /* record is red, the one control that starts writing (shell.css --rec) */
   .cc-rec { color: var(--rec, #e5484d); }
   /* The same medium colours as /concepts/1/. */
@@ -28,54 +27,35 @@
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
-  import { createChoice } from '/shell/choice.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
 
-  // /concepts/11/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
+  // /concepts/10/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
   // keyboard's notes along a link while armed, `rec:midi-out` plays them back
-  // into the synth along another. /concepts/10/ plus effects. The MIDI fx, an octaver, is PARALLEL LINKS:
-  // a transform maps one note to one note, so three octaves are the plain link plus one
-  // `{ transpose }` link per added voice. The audio fx, a low-pass filter, is a
-  // NODE of its own that the sound is linked through: synth -> fx -> speakers.
-  // The on-screen keyboard and a sine synth as patchbay nodes, all in this tab.
-  // Named from the bay's side: what the keyboard PLAYS leaves it (an out), what
-  // it SHOWS arrives (an in). Notes travel keys -> synth only along a link the
-  // bay holds; the synth's sound goes to the speakers by WebAudio. No room.
+  // into the synth along another.
   const S = 'web';
   const bay = createBay();
   const DIR = { in: '→○', out: '○→' };
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['fx', 'engine', 'filter'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
   // ── the synth: one sine per held note, a short fade in and out ──────────
-  let ctx = null, bus = null, fxIn = null, fxOut = null;
+  let ctx = null, bus = null;
   const voices = new Map();
-  // The audio graph follows the links: the synth's bus goes to the filter when
-  // synth:audio-out -> fx:audio-in is held, and straight to the speakers otherwise.
+  // The audio graph follows the links: the synth's bus reaches the speakers only
+  // while synth:audio-out -> speaker:audio-in is held.
   function audio() {
     if (!ctx) return;
-    if (!bus) {
-      bus = ctx.createGain();
-      fxIn = ctx.createGain(); fxOut = ctx.createGain();
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 400; lp.Q.value = 6;
-      fxIn.connect(lp); lp.connect(fxOut);
-      fxOut.connect(ctx.destination);
-    }
+    bus ??= ctx.createGain();
     bus.disconnect();
-    const ls = bay.links();
-    const has = (a, b) => ls.some((l) => l.from === a && l.to === b);
-    if (has(`${S}:synth:audio-out`, `${S}:fx:audio-in`)) bus.connect(fxIn);
-    else if (has(`${S}:synth:audio-out`, `${S}:speaker:audio-in`)) bus.connect(ctx.destination);
+    if (bay.links().some((l) => l.from === `${S}:synth:audio-out` && l.to === `${S}:speaker:audio-in`)) bus.connect(ctx.destination);
   }
+
   const hz = (n) => 440 * 2 ** ((n - 69) / 12);
   function noteOn(n, vel) {
     if (!ctx) { ctx = new AudioContext(); audio(); }
     if (voices.has(n)) return;
     const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    // A sawtooth, not 10's sine: a sine has no overtones, so a low-pass filter
-    // had nothing to take away and could not be heard.
     o.type = 'sawtooth';
     o.frequency.value = hz(n);
     g.gain.setValueAtTime(0, t);
@@ -103,8 +83,6 @@
     { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the saw plays',
       deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
     { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', what: 'the saw' },
-    { id: `${S}:fx:audio-in`, dir: 'in', medium: 'audio', what: 'sound into the filter' },
-    { id: `${S}:fx:audio-out`, dir: 'out', medium: 'audio', what: 'sound out of the filter' },
     { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio', what: 'what you hear' },
     { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes being recorded',
       deliver: (e) => take(e) },
@@ -115,18 +93,12 @@
   const d = mount({ name: 'concepts 12', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
 
   // ── the links, rebuilt whenever an effect changes ─────────────────────
-  let harmony = false, filter = false;
-  const VOICES = [0, 12, -12];     // the played note, an octave up, an octave down
   function patch() {
     for (const l of bay.links()) bay.unlink(l.id);
-    const want = (harmony ? VOICES : [0]).map((by) =>
-      [`${S}:keys:midi-out`, `${S}:synth:midi-in`, by ? [{ op: 'transpose', by }] : []]);
-    // The recorder hears the keys as played, before any octaver, and plays back
-    // into the synth, so the octaver and filter apply to the playback too only
-    // where they sit on the synth side.
+    const want = [[`${S}:keys:midi-out`, `${S}:synth:midi-in`, []]];
+    // The recorder hears the keys; it plays back into the synth on a link of its own.
     want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, []], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
-    if (filter) want.push([`${S}:synth:audio-out`, `${S}:fx:audio-in`, []], [`${S}:fx:audio-out`, `${S}:speaker:audio-in`, []]);
-    else want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
+    want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
     for (const [a, b, tr] of want) {
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -221,7 +193,7 @@
   const linksT = createTable({ columns: [
     { key: 'line', label: 'link', grow: true, hi: true, clip: true },
     { key: 'sent', label: 'sent', width: 64, align: 'right' },
-  ], minRows: 8 });
+  ], minRows: 4 });
   const sentOut = { n: 0 };
   function draw() {
     const all = bay.ports ? bay.ports() : [];
@@ -246,23 +218,10 @@
     onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
   });
 
-  const midiFx = createChoice({
-    label: 'midi fx', at: 0,
-    options: [['none', false], ['octaver', true]],
-    onPick: (v) => { harmony = v; patch(); },
-  });
-  const audioFx = createChoice({
-    label: 'audio fx', at: 0,
-    options: [['none', false], ['filter', true]],
-    onPick: (v) => { filter = v; patch(); },
-  });
-  const fxRow = el('div', 'cc-fx');
-  fxRow.append(midiFx.el, audioFx.el);
-
   patch();
   const out = el('div', 'cc-stack');
   drawNotes();
-  out.append(host, fxRow, el('h3', 'cc-h', 'recording'), transport.el, notesT.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  out.append(host, el('h3', 'cc-h', 'recording'), transport.el, notesT.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
   d.el.append(out);
   d.ready();
 </script>

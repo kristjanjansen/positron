@@ -21,6 +21,8 @@
   .cc-card:hover { border-color: var(--fg); }
   .cc-n { font: 400 12px var(--mono); color: var(--dim); }
   .cc-t { margin: 0; font-size: 15px; }
+  /* The page number before the title, quieter than the title it belongs to. */
+  .cc-t .cc-n { color: var(--dim); margin-right: 10px; font-variant-numeric: tabular-nums; }
   .cc-s { margin: 0; color: var(--dim); font-size: 13.5px; }
 </style>
 <script type="module">
@@ -36,7 +38,8 @@
     ['Broadcast', 'The admin chat with a camera the admin can put on air.', 6],
     ['Keyboard', 'The on-screen keyboard patched to a sine synth.', 10],
     ['Effects', 'The keyboard and a saw synth with MIDI and audio effects.', 11],
-    ['Recorder', 'The same keyboard with a recorder you can play back.', 12],
+    ['Recorder', 'The keyboard and synth with a recorder you can play back.', 12],
+    ['Timeline', 'The recorder on the kit transport bar and timeline.', 13],
   ];
 
   const d = mount({ name: 'concepts', what: 'The ideas behind positron, one page each.', readout: null });
@@ -45,7 +48,10 @@
   CONCEPTS.forEach(([title, say, n], i) => {
     // A row may name its page number, so a new topic can start at 10.
     const a = el('a', 'cc-card', '', { href: `/concepts/${n ?? i + 1}/` });
-    a.append(el('h3', 'cc-t', title));
+    const num = n ?? i + 1;
+    const h = el('h3', 'cc-t');
+    h.append(el('span', 'cc-n', String(num)), document.createTextNode(title));
+    a.append(h);
     if (say) a.append(el('p', 'cc-s', say));
     grid.append(a);
   });
