@@ -39,6 +39,7 @@ import { createKeyboard, keyRange } from './keyboard.mjs';
 import { createCore, toHex } from './route-core.mjs';
 import { RELAY_BASE } from './wire.mjs';
 import { openSession, createShipper, fetchBack, ARCHIVE_BASE } from './ingest.mjs';
+import { checkOptions, videoStart } from './link-options.mjs';
 
 /** The board drops a capture nobody renews; `/away/` measured 20 s as safe. */
 export const RENEW_MS = 20_000;
@@ -235,11 +236,25 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
   async function video(l) {
     const site = l.from.split(':')[0];
     if (typeof VideoDecoder !== 'function') throw new Error('this browser has no WebCodecs, so the board’s video cannot be decoded here');
+    // 🔴 SIZE AND RATE ARE THE LINK'S, `{ w 640, h 360, fps 15 }` (link-options.mjs).
+    // A link with none asks 1280x720 at 30, the message this sent before. The
+    // bay has checked them already; checked again here because a link object
+    // can be built without the bay, and the board clamps rather than refusing.
+    const bad = checkOptions('video', l.options);
+    if (bad) throw new Error(bad.why);
+    const ask = videoStart(l.options);
     const board = await boardOn(site);
-    const r = await board.ask({ type: 'video.start', w: 1280, h: 720, fps: 30 }, 'video.started', 20000);
+    const r = await board.ask(ask, 'video.started', 20000);
     if (!r || !r.ok) { board.close(); throw new Error(r ? (r.reason || 'the board refused') : 'the board did not answer within 20 s'); }
+    // ⚠️ ONE ENCODER, SO THE FIRST VIEWER'S SIZE WINS. A board already drawing
+    // answers `already: true` with the shape it is drawing, and this link gets
+    // that shape, said in the log rather than pretended away (§4e: two viewers
+    // asking different sizes is the lease's question, not answered here).
+    if (r.w && (r.w !== ask.w || r.h !== ask.h || r.fps !== ask.fps)) {
+      log(`asked for ${ask.w}x${ask.h} at ${ask.fps}, and the board is ${r.already ? 'already ' : ''}drawing ${r.w}x${r.h} at ${r.fps}, so that is what this link shows`, 'warn');
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = 1280; canvas.height = 720;
+    canvas.width = r.w ?? ask.w; canvas.height = r.h ?? ask.h;
     const panel = createVideoPanel({ media: canvas, left: false });
     host.append(panel.el);
     const g = canvas.getContext('2d');
@@ -259,7 +274,7 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
       const dv = new DataView(e.data);
       const seq = dv.getUint32(0, true), key = (dv.getUint32(4, true) & 1) === 1;
       if (waitKey) { if (!key) return; waitKey = false; }
-      try { decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: seq * 1e6 / (r.fps ?? 30), data: new Uint8Array(e.data, 8) })); }
+      try { decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: seq * 1e6 / (r.fps ?? ask.fps), data: new Uint8Array(e.data, 8) })); }
       catch { waitKey = true; }
     };
     // The board stops drawing when nobody says they are watching.

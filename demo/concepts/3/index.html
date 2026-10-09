@@ -29,12 +29,15 @@
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createBay } from '/shell/bay.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
 
-  // The smallest multi-user chat built from patchbay blocks. Every tab is a SITE
-  // with one NODE and two PORTS of medium `value`. A line is shown only when the
-  // bay, filled from the REGISTRY, accepts a LINK from the sender's out to our in.
+  // The smallest multi-user chat built from patchbay blocks
+  // (plans/plan-site-names.md §4h). Every tab is a SITE with one NODE and two
+  // PORTS of medium `value`, shaped `of: text`. It holds two `*` LINKS: a speaker,
+  // `<me>:chat:out -> *:chat:in`, and a listener, `*:chat:out -> <me>:chat:in`.
+  // A line crosses the room as one `bay.event`, and the receiving bay delivers it
+  // only along the listener link. No chat code beyond drawing.
   // Its own room, never studio-1, so nothing lands on the studio's desk.
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-1';
@@ -44,8 +47,8 @@
     v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
     nodes: [{ id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' }],
     ports: [
-      { id: OUT, label: 'chat', dir: 'out', medium: 'value' },
-      { id: IN, label: 'chat', dir: 'in', medium: 'value' },
+      { id: OUT, label: 'chat', dir: 'out', medium: 'value', shape: { of: 'text' } },
+      { id: IN, label: 'chat', dir: 'in', medium: 'value', shape: { of: 'text' } },
     ],
   };
 
@@ -75,20 +78,28 @@
   setInterval(() => { if (said.length) draw(); }, 30000);
   const short = (site) => site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`;
 
+  const SPEAK = `${OUT} -> *:chat:in`;
+  // The bay as it stands now: everybody heard, this tab's in-port able to
+  // deliver, and the two links this tab holds.
+  function bay() {
+    const b = node.registry.fill(createBay());
+    b.addPort({ ...b.port(IN), deliver: heard });
+    b.link(OUT, '*:chat:in');
+    b.link('*:chat:out', IN);
+    return b;
+  }
   const node = createBayNode({
-    room: ROOM, graphs: [SELF],
+    room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
     onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.button('send').disabled = false; drawSites(); },
     onGraph: () => drawSites(),
-    onMessage: (m) => { if (m.type === 'chat.line') heard(m); },
+    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
 
-  function heard(m) {
-    const source = String(m.source || '');
-    const bay = node.registry.fill(createBay());
-    const l = bay.link(source, IN, [], { site: SITE });
-    said.push({ at: Number(m.sent) || Date.now(), who: short(source.split(':')[0]), text: String(m.text || ''),
-      link: l.ok ? `${source} -> ${IN}` : 'refused', why: l.ok ? (l.session?.transport || 'no transport needed') : l.why });
+  // Called by the bay, only along the listener link.
+  function heard(e, l, m) {
+    said.push({ at: Number(m.sent) || Date.now(), who: short(String(m.from).split(':')[0]), text: String(e.text || ''),
+      link: `${m.from} -> ${m.to}`, why: `delivered along the link you hold, ${printLink(l)}` });
     draw();
   }
 
@@ -97,15 +108,9 @@
   function say() {
     const t = text.value().trim();
     if (!t) return;
-    node.send({ type: 'chat.line', source: OUT, text: t });
-    // No link reaches many listeners yet (plans/plan-site-names.md, chat gaps), so
-    // the line goes to the room and this shows the one-to-one links it stands for.
-    const bay = node.registry.fill(createBay());
-    const to = node.registry.merged().ports.filter((p) => p.dir === 'in' && p.id.endsWith(':chat:in') && p.id !== IN)
-      .map((p) => ({ p, l: bay.link(OUT, p.id, [], { site: SITE }) }));
-    const ok = to.filter((x) => x.l.ok).map((x) => `${OUT} -> ${x.p.id}`);
-    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:in`,
-      why: ok.length ? ok.join('\n') : 'nobody else in the room' });
+    const r = node.emit(OUT, { text: t });
+    said.push({ at: Date.now(), who: 'you', text: t, link: SPEAK,
+      why: r.far.length ? r.far.map((to) => `${OUT} -> ${to}`).join('\n') : 'nobody else in the room' });
     draw();
     text.set('');
   }

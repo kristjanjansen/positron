@@ -36,12 +36,19 @@
  * this file can address it.
  */
 
+import { STORE_GRAPH } from './graph.js';
+
 const RELAY = 'https://ws.positron.studio';
 const CAP_DEFAULT = 1000;
 const CAP_MAX = 1000;
 const KEEP_MS = 24 * 60 * 60 * 1000;      // the newer of cap rows or 24 h
 const IDLE_STOP_MS = 30 * 60 * 1000;      // stop recording a room nobody uses
 const ALARM_MS = 30 * 1000;
+
+// `bay-node.mjs` REANNOUNCE_MS. A registry marks a site stale after STALE_MS,
+// 15 s, so the 30 s alarm is too slow to carry this and an in-memory interval
+// does it with no storage write.
+const REANNOUNCE_MS = 10 * 1000;
 
 export class Store {
   constructor(state, env) {
@@ -51,6 +58,9 @@ export class Store {
     this.ws = null;
     this.room = null;
     this.chain = Promise.resolve();
+    this.from = null;          // this socket's envelope id, minted per connection like wire.mjs
+    this.seq = 0;
+    this.beat = null;          // the re-announce interval, alive only while the socket is
     this.sql.exec(`CREATE TABLE IF NOT EXISTS msg(
       n INTEGER PRIMARY KEY AUTOINCREMENT,
       at INTEGER, sender TEXT, seq INTEGER, type TEXT,
@@ -87,11 +97,38 @@ export class Store {
     ws.addEventListener('message', (e) => {
       this.chain = this.chain.then(() => this.#onMessage(e.data)).catch(() => {});
     });
-    ws.addEventListener('close', () => { if (this.ws === ws) this.ws = null; });
-    ws.addEventListener('error', () => { if (this.ws === ws) this.ws = null; });
+    ws.addEventListener('close', () => { if (this.ws === ws) this.#gone(); });
+    ws.addEventListener('error', () => { if (this.ws === ws) this.#gone(); });
     this.ws = ws;
+    this.from = crypto.randomUUID().replace(/-/g, '').slice(0, 6);
+    this.seq = 0;
+    this.#announce();
+    clearInterval(this.beat);
+    this.beat = setInterval(() => this.#announce(), REANNOUNCE_MS);
     await this.state.storage.setAlarm(Date.now() + ALARM_MS);
     return true;
+  }
+
+  /** The socket is gone, so the store stops saying it is here. */
+  #gone() {
+    clearInterval(this.beat);
+    this.beat = null;
+    this.ws = null;
+  }
+
+  /**
+   * `graph.announce` in wire.mjs's envelope. ⚠️ NO `store: true`, so the
+   * store never keeps its own announcement, nor anybody else's `graph.*`,
+   * when the relay echoes them back to it.
+   */
+  #announce() {
+    if (!this.ws || this.ws.readyState !== WebSocket.READY_STATE_OPEN) return;
+    try {
+      this.ws.send(JSON.stringify({
+        id: crypto.randomUUID(), type: 'graph.announce', graph: STORE_GRAPH,
+        from: this.from, sent: Date.now(), seq: ++this.seq,
+      }));
+    } catch { /* closing; the close handler stops the beat */ }
   }
 
   /**
@@ -111,6 +148,8 @@ export class Store {
     if (typeof data === 'string') {
       let m = null;
       try { m = JSON.parse(data); } catch { /* an unreadable frame is a fact */ }
+      // Somebody joined and asked who is here. Not our own ask echoed back.
+      if (m?.type === 'graph.ask' && m.from !== this.from) this.#announce();
       if (m && typeof m === 'object' && m.store) {
         row = {
           // The column is called `at` and holds the SEND STAMP. The envelope
@@ -166,7 +205,7 @@ export class Store {
     if (!room) return;
     if (Date.now() - meta.lastUse > IDLE_STOP_MS) {
       try { this.ws?.close(1000, 'idle'); } catch { /* already gone */ }
-      this.ws = null;
+      this.#gone();
       return;                              // let the DO sleep
     }
     if (!this.ws) await this.#record(room, meta.cap);

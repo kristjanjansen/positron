@@ -253,9 +253,118 @@ a site:
   `cf-store:history:out -> <you>:chat:in`.
 - Recording keeps a Durable Object awake, with a 30 minute idle stop, which is
   why it starts on a press of Join and never on a visit.
-- Open: whether the store announces ITSELF into the room once recording, which
-  would make it §4d's option 1 for one service, and costs nothing new because
-  its socket is already in the room.
+- **Built 2026-10-09: the store announces ITSELF while recording**, which is
+  §4d's option 1 for one service. The graph is the literal `STORE_GRAPH` in
+  `workers/store/src/graph.js` (the worker imports nothing from `demo/`), and
+  `node workers/store/graph-check.mjs` runs it through `graphProblem` and a real
+  `createRegistry()`, with a bad `kind` as the negative control.
+  - It announces when the recorder socket opens, answers any `graph.ask` that is
+    not its own, and re-announces every 10 s with an in-memory interval, because
+    `STALE_MS` is 15 s and the 30 s alarm would leave it stale half the time.
+    The interval stops when the socket closes, errors, or hits the idle stop.
+  - The announce carries no `store: true`, so the store keeps neither its own
+    announcements nor anybody's `graph.*` (`#onMessage` keeps only flagged text).
+  - MEASURED against the deploy (version `dc221b61`), room `chat-test-044260`:
+    a `graph.ask` was answered in 502 ms, the next beat came at 9.8 s, and
+    `/stats` read `seen 4, kept 0, held 0`.
+  - Cost: no extra Durable Object duration, because an outbound socket cannot
+    hibernate and the store was already awake for as long as it recorded. What
+    is new is one relay message every 10 s, 360 an hour, fanned out to every
+    socket in the room. A recorded room with nobody talking now wakes the relay
+    every 10 s where it slept before. Recording time is unchanged: an announce
+    does not touch `lastUse`, so the 30 minute idle stop still applies.
+  - `/concepts/4/` still announces the store into its own registry as well. Both
+    rows have the same site, so `merged()` keeps the fresher one. Dropping the
+    page's copy is the page owner's call.
+
+## 4h. Chat core: a `*` link, and a light link across the network (designed 2026-10-09)
+
+§4f items 1 to 3, picked by the owner. Written before the code, kept as small as
+the two concept pages need. Everything below lives in `demo/shell/bay.mjs` and
+`demo/shell/bay-node.mjs`; nothing changes on the relay, the Pi or the store.
+
+### 1. `value` carries text; no `text` medium
+
+Chat stays on `value`, and `value` is redefined as *a small JSON payload that
+travels inside the link*: a number, a fader position, or a line of text.
+
+- **Why not `text`.** A ninth medium touches `MEDIA` (and every test that walks
+  it), `graph-registry.mjs`'s board transports, the medium colours on four
+  concept pages and `/patchbay/`, and the transport-row checks in `bay-test.mjs`,
+  for a medium that is light and so has no row anyway. `value` is already light,
+  already in every list, and both concept pages and the store's own graph
+  (`workers/store/src/graph.js`) already announce chat on it. Smallest change wins.
+- **What stops a chat line landing in a fader.** The existing shape rule, with
+  no new code. Chat ports declare `shape: { of: 'text' }`. A value port that
+  declares `of: 'number'` is then refused by the shape check that already
+  compares every key both ends declare. A port declaring neither still links,
+  which is today's behaviour.
+- **When to revisit.** The moment a page needs to refuse text by medium rather
+  than by shape, or a reader cannot tell from the medium column what flows.
+
+### 2. A `*` link: one to many
+
+Written `web-ab12:chat:out -> *:chat:in`. `*` stands for the SITE segment only
+and matches every site in the bay that has a port with that `node:port`.
+
+- **Parsed and printed as an ordinary line.** `parseLink` already reads `*:chat:in`
+  as an id; `printLink` already prints it. One rule is added: `*` is a whole
+  site segment or nothing (`*:chat:in`, never `we*:chat:in` or `*:*:in`).
+- **One `*` per link, at either end.** `a:chat:out -> *:chat:in` is a speaker,
+  `*:chat:out -> a:chat:in` is a listener. Both ends `*` is refused: it names
+  nobody.
+- **`*` never matches the other end's own site.** A speaker does not hear
+  itself through its own `*`, so there is no double line and no loop back into
+  the page that sent it.
+- **Light media other than MIDI only.** A heavy medium needs a session per
+  receiver, which is the opener's job and not a wildcard's. MIDI is refused
+  because a `*` into every site with a thru is a loop at wire speed, and the
+  cycle walk does not follow `*` links.
+- **Validated per concrete match, every time.** `link()` checks the concrete end
+  and the pattern, and answers with `matches`, every concrete pair it stands for
+  right now with `ok`/`why` from the ordinary `validate`. Zero matches is not a
+  refusal (a chat must work alone); it comes back with `warn: nobody matches yet`.
+  Matches are recomputed on every send, because sites come and go, and a match
+  that `validate` refuses at that moment is not delivered to.
+- `bay.expand(link)` gives the concrete pairs, which is what the hover listing on
+  `/concepts/3/` and `/concepts/4/` draws.
+
+### 3. One rule for a light link crossing the network
+
+**The sender says what left which port; the receiver delivers only along a
+link it holds into its own in-port.**
+
+- **Sender.** `node.emit(source, ev)` in `bay-node.mjs` runs the page's bay
+  locally (`bay.send`) and, if any link out of `source` reaches a port on a site
+  that is not this page's, puts ONE message on the room:
+  `{ type: 'bay.event', source, ev }`. The room fans it out, so a chat to twenty
+  is one message, not twenty.
+- **Receiver.** `bay-node.mjs` hands every `bay.event` to the page's bay,
+  `bay.send(source, ev)`, which delivers only along links whose `from` matches
+  `source` (concretely or by `*`) and whose concrete target has a `deliver`
+  here, which only a page's own in-ports have. A chat tab therefore holds a
+  listener link, `*:chat:out -> <me>:chat:in`, and that link is its consent: a
+  tab that holds none hears nothing.
+- **A source must belong to the socket that sent it.** The receiver drops a
+  `bay.event` whose `source` is on a site that the sending socket (`from`) has
+  not announced, so one tab cannot speak as another. Counted as `spoofed`.
+- **`bay.send` delivers light media.** It used to drop anything whose class was
+  not in `accepts`, which is a MIDI list, so a `value` event was never
+  delivered by anything. The class guard now applies to MIDI only.
+- **The same rule serves mirror's knobs (§4e).** `knobs:value-out -> pi-1:gpu:value-in`
+  is a concrete light link; the Pi would hold the listener side. Not built here:
+  it needs a Pi deploy.
+
+### What it costs and what it does not do
+
+- About 60 lines in `bay.mjs`, about 30 in `bay-node.mjs`, both concept pages
+  rewired. No new message on the relay besides `bay.event`.
+- **Not done:** §4f items 4 to 6 (a person's name, delivery proof). History on
+  `/concepts/4/` still arrives over https and is drawn with the concrete link
+  `cf-store:history:out -> <me>:chat:in`; the store keeps lines because the
+  `bay.event` carries `store: true`, which the store's filter already reads.
+- **Not measured.** Pure tests plus the two pages parsed; the pages were not
+  driven against a real room in this step.
 
 ## 5. Not settled
 
