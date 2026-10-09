@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concepts 12</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
+  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
+  .cc-fx { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
+  /* The same medium colours as /concepts/1/. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+  }
+  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
+  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
+  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
+  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+
+  // /concepts/11/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
+  // keyboard's notes along a link while armed, `rec:midi-out` plays them back
+  // into the synth along another. /concepts/10/ plus effects. The MIDI fx, an octaver, is PARALLEL LINKS:
+  // a transform maps one note to one note, so three octaves are the plain link plus one
+  // `{ transpose }` link per added voice. The audio fx, a low-pass filter, is a
+  // NODE of its own that the sound is linked through: synth -> fx -> speakers.
+  // The on-screen keyboard and a sine synth as patchbay nodes, all in this tab.
+  // Named from the bay's side: what the keyboard PLAYS leaves it (an out), what
+  // it SHOWS arrives (an in). Notes travel keys -> synth only along a link the
+  // bay holds; the synth's sound goes to the speakers by WebAudio. No room.
+  const S = 'web';
+  const bay = createBay();
+  const DIR = { in: '→○', out: '○→' };
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['fx', 'engine', 'filter'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
+    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+  }
+
+  // ── the synth: one sine per held note, a short fade in and out ──────────
+  let ctx = null, bus = null, fxIn = null, fxOut = null;
+  const voices = new Map();
+  // The audio graph follows the links: the synth's bus goes to the filter when
+  // synth:audio-out -> fx:audio-in is held, and straight to the speakers otherwise.
+  function audio() {
+    if (!ctx) return;
+    if (!bus) {
+      bus = ctx.createGain();
+      fxIn = ctx.createGain(); fxOut = ctx.createGain();
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 400; lp.Q.value = 6;
+      fxIn.connect(lp); lp.connect(fxOut);
+      fxOut.connect(ctx.destination);
+    }
+    bus.disconnect();
+    const ls = bay.links();
+    const has = (a, b) => ls.some((l) => l.from === a && l.to === b);
+    if (has(`${S}:synth:audio-out`, `${S}:fx:audio-in`)) bus.connect(fxIn);
+    else if (has(`${S}:synth:audio-out`, `${S}:speaker:audio-in`)) bus.connect(ctx.destination);
+  }
+  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  function noteOn(n, vel) {
+    if (!ctx) { ctx = new AudioContext(); audio(); }
+    if (voices.has(n)) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    // A sawtooth, not 10's sine: a sine has no overtones, so a low-pass filter
+    // had nothing to take away and could not be heard.
+    o.type = 'sawtooth';
+    o.frequency.value = hz(n);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
+    o.connect(g).connect(bus);
+    o.start();
+    voices.set(n, { o, g });
+  }
+  function noteOff(n) {
+    const v = voices.get(n);
+    if (!v) return;
+    const t = ctx.currentTime;
+    v.g.gain.cancelScheduledValues(t);
+    v.g.gain.setValueAtTime(v.g.gain.value, t);
+    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
+    v.o.stop(t + 0.06);
+    voices.delete(n);
+  }
+
+  let kb = null;
+  const PORTS = [
+    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes you play' },
+    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes that light the keys',
+      deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
+    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the saw plays',
+      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
+    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', what: 'the saw' },
+    { id: `${S}:fx:audio-in`, dir: 'in', medium: 'audio', what: 'sound into the filter' },
+    { id: `${S}:fx:audio-out`, dir: 'out', medium: 'audio', what: 'sound out of the filter' },
+    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio', what: 'what you hear' },
+    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes being recorded',
+      deliver: (e) => take(e) },
+    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes played back' },
+  ];
+  for (const p of PORTS) bay.addPort(p);
+
+  const d = mount({ name: 'concepts 12', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+
+  // ── the links, rebuilt whenever an effect changes ─────────────────────
+  let harmony = false, filter = false;
+  const VOICES = [0, 12, -12];     // the played note, an octave up, an octave down
+  function patch() {
+    for (const l of bay.links()) bay.unlink(l.id);
+    const want = (harmony ? VOICES : [0]).map((by) =>
+      [`${S}:keys:midi-out`, `${S}:synth:midi-in`, by ? [{ op: 'transpose', by }] : []]);
+    // The recorder hears the keys as played, before any octaver, and plays back
+    // into the synth, so the octaver and filter apply to the playback too only
+    // where they sit on the synth side.
+    want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, []], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
+    if (filter) want.push([`${S}:synth:audio-out`, `${S}:fx:audio-in`, []], [`${S}:fx:audio-out`, `${S}:speaker:audio-in`, []]);
+    else want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
+    for (const [a, b, tr] of want) {
+      const r = bay.link(a, b, tr, { site: S });
+      if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    }
+    for (const n of [...voices.keys()]) noteOff(n);
+    audio();
+    draw();
+  }
+
+  const portsT = createTable({ columns: [
+    { key: 'id', label: 'port', grow: true, hi: true, clip: true },
+    { key: 'dir', label: 'dir', width: 48 },
+    { key: 'medium', label: 'medium', width: 72 },
+    { key: 'heard', label: 'heard', width: 64, align: 'right' },
+  ] });
+  // ── the recorder ────────────────────────────────────────────────────────
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  let armed = false, t0 = 0;
+  const notes = [];                // { n, vel, at, len }
+  const open = new Map();          // note -> its row, until the key comes up
+  function take(e) {
+    if (!armed) return;
+    const at = performance.now() - t0;
+    if (e.d2) { const r = { n: e.d1, vel: e.d2, at, len: null }; notes.push(r); open.set(e.d1, r); }
+    else { const r = open.get(e.d1); if (r) { r.len = at - r.at; open.delete(e.d1); } }
+    drawNotes();
+  }
+  const notesT = createTable({ columns: [
+    { key: 'i', label: '#', width: 36, align: 'right' },
+    { key: 'note', label: 'note', grow: true, hi: true },
+    { key: 'vel', label: 'vel', width: 48, align: 'right' },
+    { key: 'at', label: 'at', width: 80, align: 'right' },
+    { key: 'len', label: 'length', width: 80, align: 'right' },
+  ], minRows: 6, stick: true });
+  const ms = (v) => (v == null ? '' : `${(v / 1000).toFixed(2)} s`);
+  function drawNotes() {
+    notesT.set(notes.map((r, i) => ({ i: i + 1, note: nameOf(r.n), vel: r.vel, at: ms(r.at), len: r.len == null ? 'held' : ms(r.len) })));
+  }
+  let timers = [];
+  function play() {
+    stop();
+    for (const r of notes) {
+      timers.push(setTimeout(() => { bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: r.vel }); draw(); }, r.at));
+      timers.push(setTimeout(() => bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: 0 }), r.at + (r.len ?? 200)));
+    }
+  }
+  function stop() {
+    armed = false;
+    for (const t of timers) clearTimeout(t);
+    timers = [];
+    for (const n of [...voices.keys()]) noteOff(n);
+    transport.button('rec').disabled = false;
+  }
+  const transport = createButtonGroup({ buttons: [
+    { id: 'rec', label: 'Record', onPress: () => { stop(); notes.length = 0; open.clear(); t0 = performance.now(); armed = true; transport.button('rec').disabled = true; drawNotes(); } },
+    { id: 'stop', label: 'Stop', onPress: () => stop() },
+    { id: 'play', label: 'Play', primary: true, onPress: () => play() },
+  ] });
+
+  const linksT = createTable({ columns: [
+    { key: 'line', label: 'link', grow: true, hi: true, clip: true },
+    { key: 'sent', label: 'sent', width: 64, align: 'right' },
+  ], minRows: 8 });
+  const sentOut = { n: 0 };
+  function draw() {
+    const all = bay.ports ? bay.ports() : [];
+    const heard = new Map(all.map((p) => [p.id, p.heard]));
+    portsT.set(PORTS.map((p) => ({ id: p.id, dir: DIR[p.dir], medium: p.medium, what: p.what,
+      heard: p.dir === 'out' ? (p.id.endsWith('keys:midi-out') ? sentOut.n : '') : heard.get(p.id) ?? 0 })));
+    const ls = bay.links ? bay.links() : [];
+    linksT.set(ls.map((l) => ({ line: printLink(l), by: l.session?.transport || 'the bay, one event at a time', sent: l.sent })));
+    for (const t of [portsT, linksT]) {
+      for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
+        if (/^(midi|audio)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
+      }
+    }
+  }
+
+  // A key press is one event leaving keys:midi-out, sent through the bay.
+  const host = el('div');
+  // C to A, 13 white keys: as many as the content width holds at the kit's 49 px minimum.
+  kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how === 'midi') return; sentOut.n++; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); draw(); },
+    onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+
+  const midiFx = createChoice({
+    label: 'midi fx', at: 0,
+    options: [['none', false], ['octaver', true]],
+    onPick: (v) => { harmony = v; patch(); },
+  });
+  const audioFx = createChoice({
+    label: 'audio fx', at: 0,
+    options: [['none', false], ['filter', true]],
+    onPick: (v) => { filter = v; patch(); },
+  });
+  const fxRow = el('div', 'cc-fx');
+  fxRow.append(midiFx.el, audioFx.el);
+
+  patch();
+  const out = el('div', 'cc-stack');
+  drawNotes();
+  out.append(host, fxRow, el('h3', 'cc-h', 'recording'), transport.el, notesT.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  d.el.append(out);
+  d.ready();
+</script>
