@@ -219,7 +219,7 @@
 
   patch();
   const out = el('div', 'cc-stack');
-  out.append(host, el('h3', 'cc-h', 'recording'), surface, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  out.append(surface, host, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
   d.el.append(out);
   d.ready();
 </script>
