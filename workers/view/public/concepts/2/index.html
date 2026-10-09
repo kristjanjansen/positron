@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concepts 2</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The same medium colours as /concepts/1/. If they stay, they move to shell.css. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+  }
+  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
+  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
+  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
+  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
+  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+
+  // /mirror/ as the patchbay sees it, read from demo/mirror/index.html (SELF, linkIn,
+  // and every send()). Nothing here joins a room. Port names are shown as
+  // <medium>-<dir>, one node per pane (plans/plan-site-names.md §4c); the announced id is on hover.
+  const DIR = { in: '→○', out: '○→' };
+  const COLS = [
+    { key: 'id', label: 'port', grow: true, hi: true, clip: true, hover: 'real' },
+    { key: 'who', label: 'who', width: 120 },
+    { key: 'dir', label: 'dir', width: 48 },
+    { key: 'medium', label: 'medium', width: 72 },
+    { key: 'by', label: 'transport', width: 120 },
+  ];
+  const row = (id, real, who, dir, medium, by = '') => ({ id, real, who, dir: DIR[dir], medium, by });
+
+  const ANNOUNCED = [
+    row('web:webgl:program-out', 'web-xxxx:webgl:program', 'you', 'out', 'program'),
+    row('web:right:video-in', 'web-xxxx:screen:video, the right pane', 'you', 'in', 'video'),
+    row('studio-1:gpu:program-in', 'studio-1:gpu:program', 'Raspberry Pi', 'in', 'program'),
+    row('studio-1:gpu:video-out', 'studio-1:gpu:video', 'Raspberry Pi', 'out', 'video', 'relay-h264'),
+    row('web:webgl:video-out', 'web-xxxx:webgl:video, the own render', 'you', 'out', 'video', 'page'),
+    row('web:left:video-in', 'web-xxxx:left:video, the left pane', 'you', 'in', 'video', 'page'),
+  ];
+  // What the page does that no port describes. Every one is a send() or a pane
+  // in demo/mirror/index.html with nothing in the bay standing for it.
+  const MISSING = [
+    row('web:knobs:value-out', 'not announced: video.params, the knob values', 'you', 'out', 'value'),
+    row('studio-1:gpu:value-in', 'not announced: the Pi takes video.params', 'Raspberry Pi', 'in', 'value'),
+  ];
+
+  const d = mount({ name: 'concepts 2', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+
+  function colour(t) {
+    for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
+      if (/^(midi|audio|clock|value|video|program|file|state)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
+    }
+  }
+  function block(title, rows) {
+    const t = createTable({ columns: COLS });
+    t.set(rows);
+    colour(t);
+    const b = el('div', 'cc-stack');
+    b.append(el('h3', 'cc-h', title), t.el);
+    return b;
+  }
+
+  const links = createTable({ columns: [
+    { key: 'line', label: 'link', grow: true, hi: true, clip: true },
+    { key: 'opened', label: 'opened by', width: 280, clip: true },
+  ] });
+  links.set([
+    { line: 'web:webgl:program-out -> studio-1:gpu:program-in', opened: 'the page itself' },
+    { line: 'studio-1:gpu:video-out -> web:right:video-in', opened: 'the video opener' },
+    { line: 'web:webgl:video-out -> web:left:video-in', opened: 'page, nothing crosses a wire' },
+  ]);
+
+  const out = el('div', 'cc-stack');
+  out.append(
+    block('announced', ANNOUNCED),
+    el('h3', 'cc-h', 'links'), links.el,
+    block('missing', MISSING),
+  );
+  d.el.append(out);
+  d.ready();
+</script>
