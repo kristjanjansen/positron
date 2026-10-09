@@ -133,7 +133,7 @@
   const linksT = createTable({ columns: [
     { key: 'line', label: 'link', grow: true, hi: true, clip: true },
     { key: 'sent', label: 'sent', width: 64, align: 'right' },
-  ], minRows: 8 });
+  ], minRows: 6 });
   const sentOut = { n: 0 };
   function draw() {
     const all = bay.ports ? bay.ports() : [];
