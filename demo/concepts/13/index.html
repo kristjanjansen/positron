@@ -155,14 +155,29 @@
     deck.pause();
     deck.sched.clear();
     notes.length = 0; open.clear();
+    deck.setRange([0, TAKE_MS]);
     deck.seek(0);
     armed = true;
     deck.play();
     face();
   }
+  // Stopping a take rewinds to its start, so the next play is the take from the
+  // top, and the timeline shrinks to the take plus a little air.
+  const TAIL_MS = 500, MIN_MS = 2000;
   function stopRecording() {
+    const end = pos();
     armed = false;
     deck.pause();
+    // a key still held when recording stopped gets its note off here
+    for (const [n, r] of open) {
+      deck.sched.schedule({ at: end, kind: 'note', id: `n${nid++}`, payload: { n, vel: 0 } });
+      r.len = end - r.at;
+    }
+    open.clear();
+    const len = Math.max(MIN_MS, end + TAIL_MS);
+    deck.setRange([0, len]);
+    deck.seek(0);
+    strip.strip.fit(0, len);
     face();
   }
   function face() {
