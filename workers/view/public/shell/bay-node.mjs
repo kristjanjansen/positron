@@ -30,6 +30,13 @@
 //      `graph.ask`, again every `REANNOUNCE_MS` so a page that joins late hears
 //      it without asking, and a `link.state` for every `link.request` about one
 //      of its own ports, refusing in words when the page has no handler.
+//   5  HOW A LIGHT LINK CROSSES THE NETWORK (`plans/plan-site-names.md` §4h).
+//      `emit(source, ev)` puts ONE `{ type: 'bay.event', source, ev }` on the
+//      room when the page's bay has a link out of `source` that reaches another
+//      site. A heard `bay.event` is handed to the page's bay, which delivers it
+//      only along a link it holds into one of its own in-ports. A `source` on a
+//      site the sending socket never announced is dropped, so no tab speaks as
+//      another.
 //
 // ⚠️ IT DOES NOT IMPORT `selfcheck.mjs`, ON PURPOSE. That module reads
 // `location` at load, which node does not have, and this file is graded by
@@ -97,17 +104,22 @@ export function randomSite(prefix = 'web') {
  * @param {Function} [o.log]       `(line, kind)`
  * @param {Function} [o.wire]      `openWire`, replaceable for a test
  * @param {number} [o.reannounceMs]
+ * @param {Function} [o.bay]     `() => bay`, the page's bay as it stands now,
+ *                                holding its links and its own in-ports with
+ *                                `deliver`. Absent, `bay.event` is ignored.
+ * @param {Function} [o.onEvent] `(msg, delivered)` for every `bay.event` heard,
+ *                                `delivered` -1 when its source was refused
  */
 export function createBayNode({
   room, graphs = [], local = [], onLinkRequest = null, onGraph = () => {}, onMessage = () => {},
   onJoin = () => {}, log = () => {}, wire: openSocket = openWire, reannounceMs = REANNOUNCE_MS,
-  registry = createRegistry(),
+  registry = createRegistry(), bay: bayNow = null, onEvent = () => {},
 } = {}) {
   if (!room || !ROOM_RE.test(room)) throw new Error(`bay-node: a room is ${ROOM_RE}, not ${JSON.stringify(room)}. Ask roomFor().`);
   let own = [...graphs], mineLocal = [...local];
   let socket = null, me = null, joining = null, timer = null;
   const pending = new Map();            // `${source} ${target}` -> resolve
-  const counts = { announced: 0, asked: 0, answered: 0, requests: 0 };
+  const counts = { announced: 0, asked: 0, answered: 0, requests: 0, emitted: 0, events: 0, delivered: 0, refused: 0 };
 
   const sites = () => new Set([...own, ...mineLocal].map((g) => g.site));
   /** Is this port on one of this page's own sites. */
@@ -163,8 +175,42 @@ export function createBayNode({
       onMessage(m);
       return;
     }
+    if (m.type === 'bay.event') { receive(m); return; }
     if (registry.ingest(m)) { onGraph(m); return; }
     onMessage(m);
+  }
+
+  /**
+   * An event leaving one of this page's ports. Delivered here along the page's
+   * own links, and put on the room ONCE when a link out of `source` reaches
+   * another site; the room fans it out. `extra` rides on the message
+   * (`store: true` asks positron-store to keep it).
+   * @returns {{ sent: boolean, far: string[], here: number }}
+   */
+  function emit(source, ev, extra = {}) {
+    const b = bayNow?.();
+    if (!b) return { sent: false, far: [], here: 0 };
+    /* ⚠️ "HERE" IS THIS PAGE'S ANNOUNCED SITES, NOT `owns()`. A `local` graph
+       describes something elsewhere on its behalf (the store on
+       `/concepts/4/`), so a link into it still has to cross the room. */
+    const mine = new Set(own.map((g) => g.site));
+    const far = b.targets(source).map((t) => t.to).filter((to) => !mine.has(to.split(':')[0]));
+    const here = b.send(source, ev) - far.length;
+    let sent = false;
+    if (far.length && me) { sent = send({ ...extra, type: 'bay.event', source, ev }); if (sent) counts.emitted++; }
+    return { sent, far, here };
+  }
+
+  /* The receiving half. The source must be on a site this socket announced,
+     or anybody could put words in another tab's port. */
+  function receive(m) {
+    counts.events++;
+    const site = String(m.source || '').split(':')[0];
+    const theirs = registry.graphs().some((g) => g.from === m.from && g.site === site);
+    if (!theirs || !bayNow) { if (!theirs) counts.refused++; onEvent(m, theirs ? 0 : -1); return; }
+    const n = bayNow().send(String(m.source), m.ev, { sent: m.sent, by: m.from });
+    counts.delivered += n;
+    onEvent(m, n);
   }
 
   /** Join the room. Answers this socket's `from` once it is open. Calling it twice joins once. */
@@ -227,7 +273,7 @@ export function createBayNode({
   }
 
   return {
-    room, registry, join, leave, send, announce, ask, request, setGraphs, refresh, owns,
+    room, registry, join, leave, send, emit, announce, ask, request, setGraphs, refresh, owns,
     me: () => me,
     joined: () => !!me,
     joining: () => !!joining,

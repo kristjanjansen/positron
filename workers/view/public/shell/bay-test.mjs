@@ -837,8 +837,8 @@ function world() {
   const g = b.link('rig:gpu:video', 'home:page:video');
   /* NEGATIVE CONTROL: the PLACE is the node's, not the id's first segment, or
      the address above would pass on a bay that only splits strings. */
-  ok('NEGATIVE CONTROL: the place in an address is the node\'s place, not the id\'s site',
-    g.session?.address === 'studio-1-gpu-video', g.session?.address);
+  ok('NEGATIVE CONTROL: the place in an address is the node\'s place, and the site follows it when the two differ',
+    g.session?.address === 'studio-1-rig-gpu-video', g.session?.address);
   const again = b.link('studio-1:circuit:audio', 'away:page:audio');
   ok('two links out of one port share one address, so the second joins the first',
     again.session?.address === r.session.address, `${again.session?.address}`);
@@ -1152,6 +1152,132 @@ function V0() { return { codec: 'h264' }; }
   ok('NEGATIVE CONTROL: an input nobody holds takes a link from any site', free.ok, free.why);
   const made = b.link('web-cd34:keys:out', 'studio-1:synth:in');
   ok('and link refuses what validate refused, with the same words', !made.ok && made.why === other.why, made.why);
+}
+
+{
+  /* R. A wire transport inside one site, 2026-10-09. `MACHINE_ONLY` stopped
+     `page` crossing a wire; nothing stopped `whep` being asked for inside one
+     tab, which answered `ok, whep, machine`. */
+  const b = createBay();
+  for (const n of [['web-ab12:webgl', 'engine', 'WebGL2'], ['web-ab12:left', 'screen', 'left picture'],
+    ['web-cd34:left', 'screen', 'their left picture']]) b.addNode({ id: n[0], kind: n[1], label: n[2], place: 'browser' });
+  b.addNode({ id: 'studio-1:gpu', kind: 'engine', label: 'GPU', place: 'studio-1' });
+  b.addPort({ id: 'web-ab12:webgl:video', label: 'WebGL2', dir: 'out', medium: 'video' });
+  b.addPort({ id: 'web-ab12:left:video', label: 'left picture', dir: 'in', medium: 'video' });
+  b.addPort({ id: 'web-cd34:left:video', label: 'their left picture', dir: 'in', medium: 'video' });
+  b.addPort({ id: 'studio-1:gpu:video', label: 'GPU', dir: 'out', medium: 'video' });
+  const tab = b.validate('web-ab12:webgl:video', 'web-ab12:left:video', [], { site: 'web-ab12', via: 'whep' });
+  ok('whep asked for between two ports of one tab is refused, naming the site and the way out', !tab.ok
+    && /both on web-ab12/.test(tab.why) && /whep/.test(tab.why) && /rides page/.test(tab.fix || ''),
+    `${tab.why} / ${tab.fix}`);
+  const relay = b.link('web-ab12:webgl:video', 'web-ab12:left:video', [], { via: 'relay-h264' });
+  ok('and so is any other wire transport, through link as well as validate', !relay.ok && /both on web-ab12/.test(relay.why), relay.why);
+  const plain = b.link('web-ab12:webgl:video', 'web-ab12:left:video');
+  ok('NEGATIVE CONTROL: the same pair with no via is made, and rides page', plain.ok
+    && plain.session?.transport === 'page' && plain.session.where === 'machine', JSON.stringify(plain.session || plain.why));
+  const page = b.validate('web-ab12:webgl:video', 'web-ab12:left:video', [], { via: 'page' });
+  ok('NEGATIVE CONTROL: and asking for page by name inside one tab is allowed', page.ok && page.session?.transport === 'page',
+    page.why || page.session?.transport);
+  const across = b.validate('studio-1:gpu:video', 'web-ab12:left:video', [], { site: 'web-ab12', via: 'whep' });
+  ok('NEGATIVE CONTROL: a real cross-site whep is still accepted', across.ok
+    && across.session?.transport === 'whep' && across.session.where !== 'machine', JSON.stringify(across.session || across.why));
+  const tabs = b.validate('web-ab12:webgl:video', 'web-cd34:left:video', [], { via: 'whep' });
+  ok('NEGATIVE CONTROL: two tabs both placed browser are two sites, so whep between them is accepted',
+    tabs.ok && tabs.session?.transport === 'whep', tabs.why || tabs.session?.transport);
+}
+
+{
+  /* S. A derived address is per site, 2026-10-09. Every tab is placed
+     `browser`, so `webgl:video` derived `browser-webgl-video` in all of them. */
+  const b = createBay();
+  for (const s of ['web-ab12', 'web-cd34']) {
+    b.addNode({ id: `${s}:webgl`, kind: 'engine', label: 'WebGL2', place: 'browser' });
+    b.addPort({ id: `${s}:webgl:video`, label: `WebGL2 ${s}`, dir: 'out', medium: 'video' });
+  }
+  b.addPort({ id: 'far:screen:video', label: 'far screen', dir: 'in', medium: 'video' });
+  const one = b.link('web-ab12:webgl:video', 'far:screen:video').session?.address;
+  const two = b.link('web-cd34:webgl:video', 'far:screen:video').session?.address;
+  ok('two tabs placed browser derive two addresses, each carrying its site', one === 'browser-web-ab12-webgl-video'
+    && two === 'browser-web-cd34-webgl-video', `${one}, ${two}`);
+  b.addNode({ id: 'studio-1:circuit', kind: 'device', label: 'Circuit', place: 'studio-1' });
+  b.addPort({ id: 'studio-1:circuit:audio', label: 'Circuit audio', dir: 'out', medium: 'audio' });
+  b.addPort({ id: 'far:screen:audio', label: 'far audio', dir: 'in', medium: 'audio' });
+  const pi = b.link('studio-1:circuit:audio', 'far:screen:audio').session?.address;
+  ok('NEGATIVE CONTROL: a site that is its own place keeps the address it had', pi === 'studio-1-circuit-audio', pi);
+  b.addPort({ id: 'studio-1:box:audio', label: 'box', dir: 'out', medium: 'audio', address: 'studio-1-box' });
+  const told = b.link('studio-1:box:audio', 'far:screen:audio').session?.address;
+  ok('NEGATIVE CONTROL: a declared address still wins over any derivation', told === 'studio-1-box', told);
+}
+
+{
+  /* T. A `*` link and a light link across the network, plans/plan-site-names.md §4h. */
+  const TEXT = { of: 'text' };
+  const chat = (b, site, deliver) => {
+    b.addPort({ id: `${site}:chat:out`, label: `chat ${site}`, dir: 'out', medium: 'value', shape: TEXT });
+    b.addPort({ id: `${site}:chat:in`, label: `chat ${site}`, dir: 'in', medium: 'value', shape: TEXT, ...(deliver ? { deliver } : {}) });
+  };
+  const line = 'web-ab12:chat:out -> *:chat:in';
+  const back = parseLink(line);
+  ok('a * link reads and prints as an ordinary line', back.from === 'web-ab12:chat:out' && back.to === '*:chat:in'
+    && printLink(back) === line, printLink(back));
+  let bad1 = '', bad2 = '';
+  try { parseLink('web-ab12:chat:out -> we*:chat:in'); } catch (e) { bad1 = e.message; }
+  try { parseLink('web-ab12:chat:out -> *:*:in'); } catch (e) { bad2 = e.message; }
+  ok('NEGATIVE CONTROL: a * that is not a whole site segment is not read', /whole site/.test(bad1) && /whole site/.test(bad2), `${bad1} | ${bad2}`);
+
+  const got = [];
+  const me = createBay();
+  chat(me, 'web-ab12', (e, l, m) => got.push({ e, link: l, ...m }));
+  chat(me, 'web-cd34'); chat(me, 'web-ef56');
+  me.addPort({ id: 'web-gh78:chat:in', label: 'a fader called chat', dir: 'in', medium: 'value', shape: { of: 'number' } });
+  const speak = me.link('web-ab12:chat:out', '*:chat:in');
+  const to = (speak.matches || []).map((x) => `${x.to}:${x.ok ? 'ok' : 'no'}`).sort().join(' ');
+  ok('a speaker * link is made and lists every concrete pair it stands for, its own site left out', speak.ok
+    && to === 'web-cd34:chat:in:ok web-ef56:chat:in:ok web-gh78:chat:in:no', to);
+  ok('and a pair the ordinary validate refuses is listed with the shape that refused it',
+    /of does not match/.test(speak.matches.find((x) => x.to === 'web-gh78:chat:in')?.why || ''),
+    speak.matches.find((x) => x.to === 'web-gh78:chat:in')?.why);
+  const tg = me.targets('web-ab12:chat:out').map((t) => t.to).sort().join(' ');
+  ok('targets are the pairs that validate now, so the fader is not one', tg === 'web-cd34:chat:in web-ef56:chat:in', tg);
+  ok('NEGATIVE CONTROL: the speaker does not deliver to itself', me.send('web-ab12:chat:out', { text: 'hi' }) === 2 && got.length === 0,
+    `${got.length} delivered here`);
+
+  ok('NEGATIVE CONTROL: without a listener link a line from another site is not delivered',
+    me.send('web-cd34:chat:out', { text: 'nobody asked' }) === 0 && got.length === 0, `${got.length}`);
+  const listen = me.link('*:chat:out', 'web-ab12:chat:in');
+  ok('a listener * link is made', listen.ok && listen.matches.length === 2, JSON.stringify(listen.matches));
+  me.send('web-cd34:chat:out', { text: 'hello' }, { sent: 123 });
+  ok('with it, a line from another site is delivered once, with who sent it and when', got.length === 1
+    && got[0].e.text === 'hello' && got[0].from === 'web-cd34:chat:out' && got[0].to === 'web-ab12:chat:in' && got[0].sent === 123
+    && got[0].link.id === listen.id, JSON.stringify(got));
+  ok('NEGATIVE CONTROL: a source this bay has never heard of is not delivered', me.send('web-zz99:chat:out', { text: 'who' }) === 0 && got.length === 1);
+  me.send('web-ab12:chat:out', { text: 'echo?' });
+  ok('NEGATIVE CONTROL: the listener does not deliver this site\'s own line back to it', got.length === 1, `${got.length}`);
+
+  const none = createBay(); chat(none, 'web-ab12');
+  const alone = none.link('web-ab12:chat:out', '*:chat:in');
+  ok('a * link with nobody to match is made, and says so', alone.ok && alone.matches.length === 0 && /nobody matches/.test(alone.warn || ''), alone.warn);
+  const both = none.validate('*:chat:out', '*:chat:in');
+  ok('NEGATIVE CONTROL: both ends * is refused', !both.ok && /names nobody/.test(both.why), both.why);
+  const turned = none.validate('web-ab12:chat:in', '*:chat:in');
+  ok('NEGATIVE CONTROL: a * speaker from an input is refused', !turned.ok && /input/.test(turned.why), turned.why);
+  const h = createBay();
+  h.addPort({ id: 'web-ab12:cam:out', label: 'camera', dir: 'out', medium: 'video' });
+  h.addPort({ id: 'web-ab12:keys:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+  const hv = h.validate('web-ab12:cam:out', '*:screen:in'), md = h.validate('web-ab12:keys:out', '*:synth:in');
+  ok('NEGATIVE CONTROL: a * link on a heavy medium or on MIDI is refused, saying why', !hv.ok && !md.ok
+    && /light media other than MIDI/.test(hv.why) && /loop/.test(md.fix), `${hv.why} | ${md.fix}`);
+  const tx = none.validate('web-ab12:chat:out', '*:chat:in', [{ op: 'transpose', by: 1 }]);
+  ok('NEGATIVE CONTROL: a * link with a transform is refused', !tx.ok && /transforms/.test(tx.why), tx.why);
+  const lb = createBay(); chat(lb, 'web-ab12');
+  ok('load reads a * line and makes the link', lb.load(line).length === 0 && lb.text() === line, lb.text());
+
+  /* The guard that used to drop every light event. */
+  const v = createBay(); const seenV = [];
+  v.addPort({ id: 'p:fader:out', label: 'fader', dir: 'out', medium: 'value' });
+  v.addPort({ id: 'q:gpu:in', label: 'gpu', dir: 'in', medium: 'value', deliver: (e) => seenV.push(e) });
+  v.link('p:fader:out', 'q:gpu:in');
+  ok('a value event is delivered along a concrete link', v.send('p:fader:out', { v: 0.5 }) === 1 && seenV[0]?.v === 0.5, JSON.stringify(seenV));
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
