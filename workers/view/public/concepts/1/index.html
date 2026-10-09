@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concepts 1</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* One colour per medium. Audio and video are one warm family (orange, coral); green is taken by the live dot and yellow by the brand. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+  }
+  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
+  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
+  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
+  /* Outside presence.mjs's flex row the span is inline, and an inline box ignores width. */
+  .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
+  .cc-ring::after { content: none; }
+  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+</style>
+<script type="module">
+  import { mount } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBayNode, roomFor, randomSite } from '/shell/bay-node.mjs';
+
+  const d = mount({ name: 'concepts 1', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+
+  // Joins on a press, never on load, and then says what it is, like any patchbay tab.
+  const ROOM = roomFor({ slug: 'patchbay' });
+  const SITE = randomSite('web');
+  const SELF = {
+    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
+    nodes: [
+      { id: `${SITE}:keys`, kind: 'person', label: 'keys', place: 'browser' },
+      { id: `${SITE}:screen`, kind: 'screen', label: 'screen', place: 'browser' },
+    ],
+    ports: [
+      { id: `${SITE}:keys:out`, label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+      { id: `${SITE}:screen:audio`, label: 'screen', dir: 'in', medium: 'audio' },
+      { id: `${SITE}:screen:video`, label: 'screen', dir: 'in', medium: 'video' },
+    ],
+  };
+  const DIR_SIM = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
+  // SIMULATED, plans/plan-site-names.md §4d: Cloudflare services as sites.
+  // Nothing on Cloudflare announces today; these rows are drawn, never sent.
+  const SIM = [
+    ['cf-stream', 'CF Stream', 'video', 'in', 'WHIP'],
+    ['cf-stream', 'CF Stream', 'video', 'out', 'WHEP'],
+    ['cf-stream', 'CF Stream', 'video', 'out', 'LL-HLS'],
+    ['cf-moq', 'CF MoQ', 'video', 'in', 'MoQ'],
+    ['cf-moq', 'CF MoQ', 'video', 'out', 'MoQ'],
+    ['cf-container', 'CF Container', 'video', 'in', 'RTMP'],
+    ['cf-container', 'CF Container', 'video', 'out', 'LL-HLS'],
+    ['cf-r2', 'CF R2', 'audio', 'in', 'HTTPS'],
+    ['cf-r2', 'CF R2', 'audio', 'out', 'HTTPS'],
+  ].map(([site, who, medium, dir, by], i, all) => {
+    const name = `${medium}-${dir}`;
+    const n = all.slice(0, i).filter((x) => x[0] === site && x[2] === medium && x[3] === dir).length;
+    return { who, id: `${site}:main:${name}${n ? `-${n + 1}` : ''}`, real: 'simulated, not announced',
+      dir: DIR_SIM[dir], medium, by, state: '' };
+  });
+
+  const node = createBayNode({
+    room: ROOM, graphs: [SELF],
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => { join.button('join').disabled = true; draw(); },
+    onGraph: () => draw(),
+  });
+
+  const table = createTable({
+    columns: [
+      { key: 'state', label: '', width: 16 },
+      { key: 'id', label: 'port', grow: true, hi: true, clip: true, hover: 'real' },
+      { key: 'who', label: 'who', width: 120 },
+      { key: 'dir', label: 'dir', width: 48 },
+      { key: 'medium', label: 'medium', width: 72 },
+      { key: 'by', label: 'transport', width: 120 },
+    ],
+    empty: `press Join to hear what announces itself in ${ROOM}`,
+  });
+
+  // Into the port, or out of it.
+  const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
+
+  function draw() {
+    const { nodes, ports, sites } = node.registry.merged();
+    const placeOf = new Map(nodes.map((n) => [n.id.split(':')[0], n.place]));
+    // A site says what it is in `kind` and `label` (plans/plan-site-names.md §3).
+    // One that says nothing, like a Pi on older code, is guessed from `place`.
+    const said = new Map(sites.map((x) => [x.site, x]));
+    const kindOf = (site) => said.get(site)?.kind
+      || (/^studio/.test(placeOf.get(site) || site) ? 'board' : placeOf.get(site) === 'browser' ? 'browser' : '');
+    const who = (site) => {
+      if (site === SITE) return 'you';
+      const label = said.get(site)?.label;
+      const kind = kindOf(site);
+      // Every tab is labelled `browser`, so the site's own four letters tell two apart.
+      if (kind === 'browser') return `${label || 'browser'} ${site.replace(/^web-/, '')}`;
+      if (label) return label;
+      return kind === 'board' ? 'Raspberry Pi' : site;
+    };
+    const rank = (site) => site === SITE ? 0 : kindOf(site) === 'board' ? 1 : 2;
+    // SIMULATED, plans/plan-site-names.md §4c: the port name shown as <medium>-<dir>.
+    // The id on the wire is unchanged and is on hover.
+    const taken = new Map();
+    const simId = (p) => {
+      const [site, n] = p.id.split(':');
+      const base = `${site}:${n}:${p.medium}-${p.dir}`;
+      const k = (taken.get(base) || 0) + 1;
+      taken.set(base, k);
+      return k === 1 ? base : `${base}-${k}`;
+    };
+    const rows = ports.map((p) => ({ p, site: p.id.split(':')[0], who: who(p.id.split(':')[0]), id: simId(p) })).sort((a, b) => rank(a.site) - rank(b.site) || a.who.localeCompare(b.who) || a.id.localeCompare(b.id));
+    table.set([...rows.map(({ p, who, id }) => ({
+      who, id, real: p.id, dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', '), state: p.stale ? 'stale' : 'live',
+    })), ...SIM]);
+    for (const cell of table.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
+      if (cell.textContent === 'live' || cell.textContent === 'stale') {
+        // The presence dot from presence.mjs: filled green when live, an empty ring when stale.
+        const live = cell.textContent === 'live';
+        const dot = document.createElement('span');
+        dot.className = 'pos-pres-dot' + (live ? '' : ' cc-ring');
+        dot.style.color = live ? 'var(--ok)' : 'var(--dim2)';
+        cell.textContent = '';
+        cell.append(dot);
+        cell.title = live ? 'live' : 'stale';
+        continue;
+      }
+      if (/^(midi|audio|clock|value|video|program|file|state)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
+    }
+  }
+
+  const join = createButtonGroup({ buttons: [
+    { id: 'join', label: 'Connect to Pi', onPress: () => node.join() },
+  ] });
+
+  d.el.append(join.el, table.el);
+  draw();
+  d.ready();
+</script>
