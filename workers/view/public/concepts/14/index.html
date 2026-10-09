@@ -355,7 +355,9 @@
   // The knobs above the keyboard. Volume sends CC 7 out of keys:midi-out, the same
   // port the notes leave by; on this page it only brightens the picture.
   const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100,
-    onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); } });
+    onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); draw(); } });
+  // The value link sends every frame, so its count is redrawn twice a second rather than per event.
+  setInterval(draw, 500);
   const knobs = createKnobBank([volume]);
   // The knobs and the keyboard are one instrument, glued, as on /fau/.
   const instrument = createInstrumentPanel({ keys: host, plate: false });
