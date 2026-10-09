@@ -165,7 +165,7 @@
   const ROOM = roomFor({ slug: 'patchbay' });
   const SITE = randomSite('web');
   const SELF = {
-    v: 1, site: SITE, place: 'browser',
+    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
     nodes: [
       { id: `${SITE}:keys`, kind: 'person', label: 'keys', place: 'browser' },
       { id: `${SITE}:screen`, kind: 'screen', label: 'screen', place: 'browser' },
@@ -193,7 +193,7 @@
      describes the same store, and its ports are used only by the page that
      announces them. It lives in this page's own registry (`local`). */
   const STORE = {
-    v: 1, site: 'r2', place: 'cloudflare', net: 'cloudflare',
+    v: 1, site: 'r2', place: 'cloudflare', net: 'cloudflare', kind: 'store', label: 'recordings',
     nodes: [{ id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' }],
     ports: [
       { id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' },

@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'a9b1adb-192313-abd2';
+export const BUILD = 'e329be8-155525-d2cc';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -78,13 +78,14 @@ export function mount({
   joined = true,
   controls = [],         // [{id, label, primary?}]
   index = '/',
+  indexLabel = 'demos',  // the word after the arrow; `/concepts/<n>/` says `concepts`
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();
   markHeadset();
 
   const head = el('div', 'pos-head');
-  if (index) head.append(el('a', 'pos-back', '← demos', { href: index }));
+  if (index) head.append(el('a', 'pos-back', `← ${indexLabel}`, { href: index }));
   const title = el('div', 'pos-title');
   title.append(el('h1', 'pos-name', name));
   // 🔴 EVERY SHELLED PAGE GETS THE FEEDBACK BUTTON, WHICH IS WHY IT IS HERE AND
