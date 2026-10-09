@@ -28,8 +28,8 @@
   import { createBay, printLink } from '/shell/bay.mjs';
   import { createChoice } from '/shell/choice.mjs';
 
-  // /concepts/10/ plus effects. The MIDI fx, a harmonizer, is PARALLEL LINKS:
-  // a transform maps one note to one note, so a chord is the plain link plus one
+  // /concepts/10/ plus effects. The MIDI fx, an octaver, is PARALLEL LINKS:
+  // a transform maps one note to one note, so three octaves are the plain link plus one
   // `{ transpose }` link per added voice. The audio fx, a low-pass filter, is a
   // NODE of its own that the sound is linked through: synth -> fx -> speakers.
   // The on-screen keyboard and a sine synth as patchbay nodes, all in this tab.
@@ -160,7 +160,7 @@
 
   const midiFx = createChoice({
     label: 'midi fx', at: 0,
-    options: [['none', false], ['harmonizer', true]],
+    options: [['none', false], ['octaver', true]],
     onPick: (v) => { harmony = v; patch(); },
   });
   const audioFx = createChoice({
