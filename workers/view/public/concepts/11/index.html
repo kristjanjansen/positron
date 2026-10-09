@@ -39,7 +39,7 @@
   const S = 'web';
   const bay = createBay();
   const DIR = { in: '→○', out: '○→' };
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'sine'], ['fx', 'engine', 'filter'], ['speaker', 'screen', 'speakers']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['fx', 'engine', 'filter'], ['speaker', 'screen', 'speakers']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
@@ -54,7 +54,7 @@
       bus = ctx.createGain();
       fxIn = ctx.createGain(); fxOut = ctx.createGain();
       const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = 8;
+      lp.type = 'lowpass'; lp.frequency.value = 400; lp.Q.value = 6;
       fxIn.connect(lp); lp.connect(fxOut);
       fxOut.connect(ctx.destination);
     }
@@ -69,9 +69,12 @@
     if (!ctx) { ctx = new AudioContext(); audio(); }
     if (voices.has(n)) return;
     const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    // A sawtooth, not 10's sine: a sine has no overtones, so a low-pass filter
+    // had nothing to take away and could not be heard.
+    o.type = 'sawtooth';
     o.frequency.value = hz(n);
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.2 * (vel / 127), t + 0.01);
+    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
     o.connect(g).connect(bus);
     o.start();
     voices.set(n, { o, g });
@@ -92,9 +95,9 @@
     { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes you play' },
     { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes that light the keys',
       deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the sine plays',
+    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the saw plays',
       deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', what: 'the sine' },
+    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', what: 'the saw' },
     { id: `${S}:fx:audio-in`, dir: 'in', medium: 'audio', what: 'sound into the filter' },
     { id: `${S}:fx:audio-out`, dir: 'out', medium: 'audio', what: 'sound out of the filter' },
     { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio', what: 'what you hear' },
