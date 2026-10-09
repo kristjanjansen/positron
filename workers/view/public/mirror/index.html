@@ -163,15 +163,30 @@
   const SITE = randomSite('web');
   const PROGRAM_PORT = `${SITE}:webgl:program`;
   const SCREEN_PORT = `${SITE}:screen:video`;
+  /**
+   * ⚠️ AND THE LEFT PANE IS IN THE GRAPH TOO SINCE 2026-10-09, so the bay sees
+   * this tab's local half (`plans/plan-site-names.md` §4e). The browser's own
+   * render goes out as `webgl:video` and the left pane takes it in as
+   * `left:video`. Both are on this tab, so the bay gives the link the `page`
+   * transport and nothing is opened for it: the page already draws that pane.
+   * The left pane is a node of its own rather than a second port on `screen`,
+   * because two ports that differ in role are two nodes (§4c). `screen` keeps
+   * its name until the §4c sweep renames it `right`.
+   */
+  const WEBGL_VIDEO_PORT = `${SITE}:webgl:video`;
+  const LEFT_PORT = `${SITE}:left:video`;
   const SELF = {
     v: 1, site: SITE, place: 'browser',
     nodes: [
       { id: `${SITE}:webgl`, kind: 'engine', label: 'WebGL2', place: 'browser' },
       { id: `${SITE}:screen`, kind: 'screen', label: 'right picture', place: 'browser' },
+      { id: `${SITE}:left`, kind: 'screen', label: 'left picture', place: 'browser' },
     ],
     ports: [
       { id: PROGRAM_PORT, label: 'shader', dir: 'out', medium: 'program', shape: { language: 'glsl' } },
+      { id: WEBGL_VIDEO_PORT, label: 'own render', dir: 'out', medium: 'video' },
       { id: SCREEN_PORT, label: 'right picture', dir: 'in', medium: 'video' },
+      { id: LEFT_PORT, label: 'left picture', dir: 'in', medium: 'video' },
     ],
   };
   const W = 640, H = 360;
@@ -1568,10 +1583,17 @@
    */
   const openers = createOpeners({ log: (line, kind) => d.log(line, kind), host: el('div'),
     self: { screenVideo: [SCREEN_PORT] } });
-  const linked = { program: null, video: null, pick: null, why: null };
+  const linked = { program: null, video: null, pick: null, why: null, left: null, leftTransport: null, leftWhy: null };
   window.__demo.links = linked;
   function linkIn(b) {
-    const out = { program: null, video: null, pick: null, why: null };
+    const out = { program: null, video: null, pick: null, why: null, left: null, leftTransport: null, leftWhy: null };
+    // The left pane's link is described first and on its own: it is local, it
+    // opens nothing, and a refusal of it must not stop the two board links.
+    const left = b.link(WEBGL_VIDEO_PORT, LEFT_PORT, [], { site: SITE });
+    if (left.ok) {
+      out.left = printLink(b.links().find((x) => x.id === left.id));
+      out.leftTransport = left.session?.transport ?? null;
+    } else out.leftWhy = left.why;
     const shader = b.link(PROGRAM_PORT, `${ROOM}:gpu:program`, [], { site: SITE });
     const picture = b.link(`${ROOM}:gpu:video`, SCREEN_PORT, [], { site: SITE });
     if (!shader.ok || !picture.ok) {
@@ -1592,6 +1614,8 @@
     Object.assign(linked, got);
     if (got.why) d.log(`the board announced itself and the links were refused: ${got.why}`, 'warn');
     else d.log(`linked ${got.program}, and ${got.video} over ${got.pick.transport}`, 'ok');
+    if (got.left) d.log(`and ${got.left} over ${got.leftTransport}, which this page draws itself`, 'ok');
+    else if (got.leftWhy) d.log(`the left picture's link was refused: ${got.leftWhy}`, 'warn');
   }
 
   /** The press. Answers once the room has answered, or at once if it already has. */
@@ -2354,6 +2378,20 @@
         const whep = reg.fill(createBay()).link(`${ROOM}:gpu:video`, SCREEN_PORT, [], { site: SITE, via: 'whep' });
         d.assert('the same picture asked for over WHEP is refused, naming the transport the board allows',
           !whep.ok && /relay-h264/.test(whep.why || ''), whep.why || 'it was accepted');
+        /**
+         * 🔴 THE LEFT PANE IS A LINK ON THIS TAB, AND THE BAY GIVES IT `page`.
+         * Both ends are this browser, so `TRANSPORTS.video.machine` applies and
+         * nothing is opened. ⚠️ NEGATIVE CONTROL: the board's picture linked
+         * into the same left pane crosses a wire and must NOT get `page`, or a
+         * bay answering `page` for every video link would pass the first half.
+         */
+        d.assert('the left picture is a link on this tab, and the bay gives it the page itself',
+          got.leftTransport === 'page' && !got.leftWhy,
+          got.leftWhy || `${got.left} over ${got.leftTransport}`);
+        const far = reg.fill(createBay()).link(`${ROOM}:gpu:video`, LEFT_PORT, [], { site: SITE });
+        d.assert('and the board’s picture into the same pane crosses a wire, so it is not the page',
+          far.ok && far.session?.transport !== 'page' && far.session?.where !== 'machine',
+          far.ok ? `${far.session?.transport}, ${far.session?.where}` : far.why);
       }
       /**
        * 🔴 THE BADGE SAYS WHAT ARRIVED, NOT WHAT WAS ASKED. Its rule as fixtures:
