@@ -95,18 +95,21 @@
   // held note draws a continuous arc on its ring for as long as it is held. On
   // release the arc stops growing, carries on turning and fades. The strokes live
   // here and reach the shader as numbers every frame: a shader cannot hear a note.
-  const MAXS = 48, LIFE = 3000, LO = 48, HI = 67, SPIN = 1.4;   // SPIN in radians a second
+  const MAXS = 48, LIFE = 3000, LO = 48, HI = 67, SPIN = 0.7;   // SPIN in radians a second
   const strokes = [];              // { n, on, off, vel }
   const pens = new Map();          // note -> its stroke while held
   // ── the midi node: generic MIDI STATE, nothing about pictures ──────────
-  // What is sounding, the last value of every controller, sent once a frame
-  // out of midi:value-out to whatever is linked. CC 7 is volume and starts at 100.
+  // What is sounding and the last value of every controller, sent out of
+  // midi:value-out ON CHANGE, as a copy, to whatever is linked. CC 7 is volume and
+  // starts at 100. The shader keeps the last copy it was handed.
   const mstate = { notes: new Map(), cc: new Float32Array(128) };
   mstate.cc[7] = 100 / 127;
   function midiIn(e) {
     if (e.cls === 'note') { if (e.d2) mstate.notes.set(e.d1, { vel: e.d2 }); else mstate.notes.delete(e.d1); }
     else if (e.cls === 'cc') mstate.cc[e.d1] = e.d2 / 127;
+    sendState();
   }
+  const sendState = () => bay.send(`${S}:midi:value-out`, { notes: new Map(mstate.notes), cc: Float32Array.from(mstate.cc) });
   const canvas = el('canvas', 'cc-vis');
   canvas.width = 1280; canvas.height = 720;
   const gl = canvas.getContext('webgl2');
@@ -156,12 +159,11 @@
     uB = gl.getUniformLocation(prog, 'uBright'); uA = gl.getUniformLocation(prog, 'uAspect'); uN = gl.getUniformLocation(prog, 'uN'); uS = gl.getUniformLocation(prog, 'uS'); uW = gl.getUniformLocation(prog, 'uW');
   }
   // TWO NODES. `midi` keeps generic MIDI state and sends it once a frame out of
-  // midi:value-out. `shader` takes whatever arrives on shader:value-in, keeps its
+  // midi:value-out when it changes. `shader` keeps whatever arrived last on shader:value-in, keeps its
   // own strokes from the notes in it, and turns CC 7 into brightness. It never
   // sees an event. Cut the value link and the picture freezes.
   let latest = null;               // the last state shader:value-in was handed
   function frame(now) {
-    bay.send(`${S}:midi:value-out`, mstate);
     if (latest) {
       for (const [n, v] of latest.notes) if (!pens.has(n)) {
         const st = { n, on: now, off: null, vel: v.vel };
@@ -244,6 +246,7 @@
     }
     for (const n of [...voices.keys()]) noteOff(n);
     audio();
+    sendState();                   // a new link hears the current state once, then only changes
     draw();
   }
 
@@ -356,8 +359,7 @@
   // port the notes leave by; on this page it only brightens the picture.
   const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100,
     onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); draw(); } });
-  // The value link sends every frame, so its count is redrawn twice a second rather than per event.
-  setInterval(draw, 500);
+
   const knobs = createKnobBank([volume]);
   // The knobs and the keyboard are one instrument, glued, as on /fau/.
   const instrument = createInstrumentPanel({ keys: host, plate: false });
