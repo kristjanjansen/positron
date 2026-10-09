@@ -47,7 +47,7 @@
   const S = 'web';
   const bay = createBay();
   const DIR = { in: '→○', out: '○→' };
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['dots', 'engine', 'dots'], ['screen', 'screen', 'picture']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['notes', 'engine', 'notes to dots'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
@@ -140,20 +140,26 @@
     gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     uN = gl.getUniformLocation(prog, 'uN'); uDots = gl.getUniformLocation(prog, 'uDots'); uHue = gl.getUniformLocation(prog, 'uHue');
   }
+  // TWO NODES. `notes` turns note events into STATE: where every dot is right
+  // now. Once a frame it sends that state out of notes:value-out. `shader` takes
+  // whatever arrives on shader:value-in as its uniforms and draws; it never sees
+  // a note. Cut the value link and the picture freezes while the notes still play.
+  let latest = null;               // the last state shader:value-in was handed
   function frame(now) {
     for (const [n, h] of held) if (now - h.last >= DOT_EVERY) { h.last = now; drop(n, h.vel, now); }
     while (dots.length && now - dots[0].born > LIFE) dots.shift();
-    if (gl && prog) {
-      const data = new Float32Array(MAXD * 4), hues = new Float32Array(MAXD);
-      dots.forEach((d, i) => {
-        const age = (now - d.born) / 1000;
-        const a = d.a0 + age * 0.9, r = d.r0 + age * 0.09;
-        data.set([Math.cos(a) * r, Math.sin(a) * r, d.size, 1 - age * 1000 / LIFE], i * 4);
-        hues[i] = d.hue;
-      });
+    const data = new Float32Array(MAXD * 4), hues = new Float32Array(MAXD);
+    dots.forEach((d, i) => {
+      const age = (now - d.born) / 1000;
+      const a = d.a0 + age * 0.9, r = d.r0 + age * 0.09;
+      data.set([Math.cos(a) * r, Math.sin(a) * r, d.size, 1 - age * 1000 / LIFE], i * 4);
+      hues[i] = d.hue;
+    });
+    bay.send(`${S}:notes:value-out`, { n: dots.length, data, hues });
+    if (gl && prog && latest) {
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(prog);
-      gl.uniform1i(uN, dots.length); gl.uniform4fv(uDots, data); gl.uniform1fv(uHue, hues);
+      gl.uniform1i(uN, latest.n); gl.uniform4fv(uDots, latest.data); gl.uniform1fv(uHue, latest.hues);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
     requestAnimationFrame(frame);
@@ -172,9 +178,12 @@
     { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes being recorded',
       deliver: (e) => take(e) },
     { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes played back' },
-    { id: `${S}:dots:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the shader draws',
+    { id: `${S}:notes:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes that drop dots',
       deliver: (e) => (e.d2 ? visOn(e.d1, e.d2) : visOff(e.d1)) },
-    { id: `${S}:dots:video-out`, dir: 'out', medium: 'video', what: 'the picture' },
+    { id: `${S}:notes:value-out`, dir: 'out', medium: 'value', what: 'where every dot is, each frame' },
+    { id: `${S}:shader:value-in`, dir: 'in', medium: 'value', what: 'the uniforms',
+      deliver: (e) => { latest = e; } },
+    { id: `${S}:shader:video-out`, dir: 'out', medium: 'video', what: 'the picture' },
     { id: `${S}:screen:video-in`, dir: 'in', medium: 'video', what: 'what you see' },
   ];
   for (const p of PORTS) bay.addPort(p);
@@ -190,8 +199,9 @@
     want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
     // The shader hears the same notes as the synth, from the keys and from the
     // recorder, and its picture goes to the screen on this page.
-    want.push([`${S}:keys:midi-out`, `${S}:dots:midi-in`, []], [`${S}:rec:midi-out`, `${S}:dots:midi-in`, []],
-      [`${S}:dots:video-out`, `${S}:screen:video-in`, []]);
+    want.push([`${S}:keys:midi-out`, `${S}:notes:midi-in`, []], [`${S}:rec:midi-out`, `${S}:notes:midi-in`, []],
+      [`${S}:notes:value-out`, `${S}:shader:value-in`, []],
+      [`${S}:shader:video-out`, `${S}:screen:video-in`, []]);
     for (const [a, b, tr] of want) {
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -289,7 +299,7 @@
     linksT.set(ls.map((l) => ({ line: printLink(l), by: l.session?.transport || 'the bay, one event at a time', sent: l.sent })));
     for (const t of [portsT, linksT]) {
       for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-        if (/^(midi|audio|video)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
+        if (/^(midi|audio|video|value)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
       }
     }
   }
