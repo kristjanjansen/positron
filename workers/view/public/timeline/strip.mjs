@@ -75,7 +75,15 @@ export function idToColor(id, { s = 72, l = 60 } = {}) {
 /** A lane's look derived from the DECK's provenance rollup rather than from a
  *  table keyed by a name the client chose. Colour/width from the reconstruction
  *  METHOD, hatch from the TIER. This is proto/paths' specFor(), generalised. */
-export function styleFor(deck, kind, base = {}) {
+export function styleFor(deck, kind, given = {}) {
+  /* 🔴 AN UNDEFINED KEY IS DROPPED BEFORE THE SPREAD, OR IT ERASES ITS OWN
+   * DEFAULT. `laneContext` hands over `{ color: L.color, width: L.width, ... }`
+   * for every lane, so a lane with no colour arrived as `color: undefined`,
+   * the spread wrote that over `idToColor(kind)`, the ticks stroked in the
+   * canvas default black and the gutter swatch fell back to `T.ink`. Measured
+   * 2026-10-09 on /concepts/13/. Explicit values still win. */
+  const base = {};
+  for (const k in given) if (given[k] !== undefined) base[k] = given[k];
   const p = (deck && deck.provenanceOf && deck.provenanceOf(kind)) || null;
   const tier = p ? p.tier : 0;
   return {
@@ -1901,7 +1909,16 @@ export function createStrip(canvas, deck, opts = {}) {
     };
     for (const L of S.lanes) {
       if (!L.show) continue;
-      const st = L._style || {};
+      const st0 = L._style || {};
+      /* ⚠️ A LANE THAT COLOURS ITS MARKS ITSELF (`colorOf`, `colorOfRow`,
+       * `byKey`, its own `render`, or an aggregate with no bars) AND NAMES NO
+       * COLOUR OF ITS OWN HAS NO ONE COLOUR TO SHOW, so its swatch and name
+       * stay ink rather than taking a hashed colour no mark on the lane is
+       * drawn in. Every other lane's swatch is the colour its marks are
+       * stroked in, read from the same `_style`. */
+      const perRow = !L.color && !!(L.colorOf || L.colorOfRow || L.byKey || L.render
+        || (L.aggregate && L.bars === false));
+      const st = perRow ? { ...st0, color: undefined } : st0;
       const subs = subLabelsOf(L);
       /**
        * 🔴 THE SWATCH IS AS TALL AS THE TEXT BESIDE IT, WHICH IS NOT WHAT IT

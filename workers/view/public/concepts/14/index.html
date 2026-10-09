@@ -5,11 +5,15 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concepts 13</title>
+<title>POSITRON concepts 14</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
   .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
+  /* The picture is half the content width. */
+  .cc-half { width: 50%; }
+  @media (max-width: 560px) { .cc-half { width: 100%; } }
+  .cc-vis { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
   /* record is red, the one control that starts writing (shell.css --rec) */
   .cc-rec { color: var(--rec, #e5484d); }
   /* The same medium colours as /concepts/1/. */
@@ -32,6 +36,7 @@
   import { createGlue } from '/shell/glue.mjs';
   import { setSymbol } from '/shell/symbol.mjs';
   import { createDeck } from '/timeline/transport.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
 
   // /concepts/12/ with the kit's own transport bar and timeline glued together in
   // place of the hand-made record buttons and notes table. A take is items on a
@@ -42,7 +47,7 @@
   const S = 'web';
   const bay = createBay();
   const DIR = { in: '→○', out: '○→' };
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['vis', 'engine', 'shader'], ['screen', 'screen', 'picture']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
@@ -82,6 +87,73 @@
     voices.delete(n);
   }
 
+  // ── the shader: one ring per sounding note ──────────────────────────────
+  // x from the pitch across the keyboard's range, size from the velocity, and a
+  // ring keeps fading for a moment after its key comes up.
+  const MAXN = 16;
+  const vis = new Map();           // note -> { vel, on, off }
+  function visOn(n, vel) { vis.set(n, { vel, on: performance.now(), off: null }); }
+  function visOff(n) { const v = vis.get(n); if (v) v.off = performance.now(); }
+  const canvas = el('canvas', 'cc-vis');
+  canvas.width = 1280; canvas.height = 720;
+  const gl = canvas.getContext('webgl2');
+  let prog = null, uN = null, uNotes = null, uT = null;
+  if (gl) {
+    const vs = `#version 300 es
+      in vec2 p; out vec2 uv;
+      void main() { uv = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`;
+    const fs = `#version 300 es
+      precision highp float;
+      in vec2 uv; out vec4 o;
+      uniform int uN; uniform vec4 uNotes[${MAXN}]; uniform float uT;
+      void main() {
+        vec2 q = vec2(uv.x * 16.0 / 9.0, uv.y);
+        vec3 c = vec3(0.02, 0.025, 0.035);
+        for (int i = 0; i < ${MAXN}; i++) {
+          if (i >= uN) break;
+          vec4 n = uNotes[i];                       // x, velocity, life 0..1, hue
+          vec2 at = vec2(n.x * 16.0 / 9.0, 0.5 + 0.18 * sin(uT * 1.3 + n.w * 6.283));
+          float r = 0.05 + 0.22 * n.y;
+          float d = abs(length(q - at) - r);
+          float ring = smoothstep(0.02, 0.0, d) * n.z;
+          vec3 hue = 0.5 + 0.5 * cos(6.283 * (n.w + vec3(0.0, 0.33, 0.67)));
+          c += hue * ring;
+        }
+        o = vec4(c, 1.0);
+      }`;
+    const sh = (t, src) => { const x = gl.createShader(t); gl.shaderSource(x, src); gl.compileShader(x); return x; };
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog);
+    // Said in the log once the page is mounted, so a shader that did not compile is visible.
+    var shaderSays = gl.getProgramParameter(prog, gl.LINK_STATUS) ? 'the shader compiled'
+      : `the shader did not compile: ${gl.getProgramInfoLog(prog)}`;
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    uN = gl.getUniformLocation(prog, 'uN'); uNotes = gl.getUniformLocation(prog, 'uNotes'); uT = gl.getUniformLocation(prog, 'uT');
+  }
+  const FADE_MS = 600, LO = 48, HI = 69;
+  function frame(now) {
+    if (gl && prog) {
+      const data = new Float32Array(MAXN * 4);
+      let k = 0;
+      for (const [n, v] of vis) {
+        const life = v.off == null ? 1 : 1 - (now - v.off) / FADE_MS;
+        if (life <= 0) { vis.delete(n); continue; }
+        if (k >= MAXN) continue;
+        data.set([0.05 + 0.9 * (n - LO) / (HI - LO), v.vel / 127, life, (n % 12) / 12], k * 4); k++;
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(prog);
+      gl.uniform1i(uN, k); gl.uniform4fv(uNotes, data); gl.uniform1f(uT, now / 1000);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
   let kb = null;
   const PORTS = [
     { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes you play' },
@@ -94,10 +166,14 @@
     { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes being recorded',
       deliver: (e) => take(e) },
     { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes played back' },
+    { id: `${S}:vis:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the shader draws',
+      deliver: (e) => (e.d2 ? visOn(e.d1, e.d2) : visOff(e.d1)) },
+    { id: `${S}:vis:video-out`, dir: 'out', medium: 'video', what: 'the picture' },
+    { id: `${S}:screen:video-in`, dir: 'in', medium: 'video', what: 'what you see' },
   ];
   for (const p of PORTS) bay.addPort(p);
 
-  const d = mount({ name: 'concepts 13', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  const d = mount({ name: 'concepts 14', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
 
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   function patch() {
@@ -106,6 +182,10 @@
     // The recorder hears the keys; it plays back into the synth on a link of its own.
     want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, []], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
     want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
+    // The shader hears the same notes as the synth, from the keys and from the
+    // recorder, and its picture goes to the screen on this page.
+    want.push([`${S}:keys:midi-out`, `${S}:vis:midi-in`, []], [`${S}:rec:midi-out`, `${S}:vis:midi-in`, []],
+      [`${S}:vis:video-out`, `${S}:screen:video-in`, []]);
     for (const [a, b, tr] of want) {
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -155,29 +235,14 @@
     deck.pause();
     deck.sched.clear();
     notes.length = 0; open.clear();
-    deck.setRange([0, TAKE_MS]);
     deck.seek(0);
     armed = true;
     deck.play();
     face();
   }
-  // Stopping a take rewinds to its start, so the next play is the take from the
-  // top, and the timeline shrinks to the take plus a little air.
-  const TAIL_MS = 500, MIN_MS = 2000;
   function stopRecording() {
-    const end = pos();
     armed = false;
     deck.pause();
-    // a key still held when recording stopped gets its note off here
-    for (const [n, r] of open) {
-      deck.sched.schedule({ at: end, kind: 'note', id: `n${nid++}`, payload: { n, vel: 0 } });
-      r.len = end - r.at;
-    }
-    open.clear();
-    const len = Math.max(MIN_MS, end + TAIL_MS);
-    deck.setRange([0, len]);
-    deck.seek(0);
-    strip.strip.fit(0, len);
     face();
   }
   function face() {
@@ -207,7 +272,7 @@
   const linksT = createTable({ columns: [
     { key: 'line', label: 'link', grow: true, hi: true, clip: true },
     { key: 'sent', label: 'sent', width: 64, align: 'right' },
-  ], minRows: 4 });
+  ], minRows: 8 });
   const sentOut = { n: 0 };
   function draw() {
     const all = bay.ports ? bay.ports() : [];
@@ -218,7 +283,7 @@
     linksT.set(ls.map((l) => ({ line: printLink(l), by: l.session?.transport || 'the bay, one event at a time', sent: l.sent })));
     for (const t of [portsT, linksT]) {
       for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-        if (/^(midi|audio)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
+        if (/^(midi|audio|video)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
       }
     }
   }
@@ -234,7 +299,10 @@
 
   patch();
   const out = el('div', 'cc-stack');
-  out.append(surface, host, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  d.log(gl ? (typeof shaderSays === 'string' ? shaderSays : 'no shader') : 'this browser has no WebGL2, so the picture stays dark', gl && /did not/.test(shaderSays || '') ? 'warn' : undefined);
+  const panel = createVideoPanel({ media: canvas, left: false });
+  panel.el.classList.add('cc-half');
+  out.append(panel.el, surface, host, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
   d.el.append(out);
   d.ready();
 </script>
