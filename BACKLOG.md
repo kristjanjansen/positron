@@ -1,5 +1,22 @@
 ## Open
 
+- **Concept 14 rewinds after recording, as 13 does** (2026-10-09). 13's `stopRecording()` sets the range to the take plus 500 ms (2 s minimum), seeks 0 and fits; 14 has the same recorder and not the fix.
+- **Concepts 5 and 6 chat through the bay** (2026-10-09). They still `node.send` raw `chat.line` / `chat.admin`; 3 and 4 use `node.emit` and `*` links (§4h). Port them, notices included (`admin:out -> *:notice:in`).
+- **Bay: first-join race** (2026-10-09, §4h). A `bay.event` that arrives before its sender's announce is refused as an unknown source. Rare, real.
+- **Bay: two browser tabs read `where: 'machine'` to each other** (2026-10-09). `whereOf` sees both placed `browser`; harmless for light links, wrong label for a WHEP between two tabs.
+- **Who may hold a port: admin and clear** (2026-10-09, `plans/plan-site-names.md` §4i item 8, §4f item 4). Any tab can be Admin and any tab can clear `positron-store` history (no key). Spec before `/stage/` uses it.
+- **A person's name on a site, and proof a message arrived** (2026-10-09, §4f items 4 and 6). Not built.
+- **State links: snapshot on link as a bay rule** (2026-10-09, §4i item 2). Concept 14 sends on change plus one snapshot by hand.
+- **`value` vs `state` vs `text` medium** (2026-10-09, §4i item 5). Decide once a page must refuse one by medium.
+- **A `uart` transport name, and the real desk Pico** (2026-10-09, §4i item 7). `rig/pico/rings/` builds for the RP2040 emulator only; the desk board is a Pico 2 W (`pico2_w`). Build it for that board and link the real one; never send it SysEx.
+- **Shader `program-in`** (2026-10-09, §4i item 6). Optional: GLSL arriving over a link, as `/mirror/` does to the Pi.
+- **Medium colours and the live dot into the kit** (2026-10-09). `--md-*` colours and the dot-in-a-cell hack are copied page-locally into concepts 1, 3, 4, 5, 6, 10 to 14. Move the colours to `shell.css` and give `table.mjs` a cell renderer (dot, medium colour) so pages stop post-processing cells by text.
+- **Concept 12's play glyph** (2026-10-09). U+25B6 `▶` has an emoji form (positron-ui); use `►` U+25BA.
+- **Concept 6: drop `filled()` and its stale comment** (2026-10-09). `bay.mjs` knows `whip` now.
+- **Transport bar `rewindOnStop`** (2026-10-09). Only if a third page records: `/stage/` and concept 13 each rewind by hand.
+- **Mirror opens its picture through the opener** (2026-10-09). Then `{ w h fps }` link options apply to it; today it sends its own `video.start` (traced, kept).
+- **Video options floor and even sizes are unmeasured on the Pi** (2026-10-09). `link-options.mjs` refuses below 16 and odd sizes on reasoning only; two viewers asking different sizes is the lease's question.
+- **Commit `4c9f5ae` is mislabelled** (2026-10-09). It carries the built copies of the lane colour fix and concept 13's rewind; its message is about concept 14. Leave it (pushed); noted here so archaeology finds it.
 - ~~**Concepts pages are not deployed**~~ DEPLOYED 2026-10-09 by a build rule, `conceptFiles()` in `workers/view/build.mjs`: any new `demo/concepts/<n>/` ships with no edit, not in the manifest, off the front page. Was (found 2026-10-09). `build.mjs` copies only manifest demos, so `/concepts/` and its pages exist on the local server only. For the presentation they need a manifest row (probably `unlisted: true`) or a build rule. Owner to decide.
 - **Concepts 6 broadcast shares /cam/'s WHIP input** (2026-10-09). One camera at a time (409 otherwise), a hold over 5 min can be taken over by `/cam/`, 20 publishes an hour. One headless loop measured 512 frames up to 1280x720. Its `filled()` workaround for `whip` can go now that `bay.mjs` knows `whip`.
 - **Concepts 5: toward stage, an admin chat message** (2026-10-09). Asked: *"concept 5: lets move towards stage. for now do concepts 4 copy to 5 and have concept of "admin chat message" somehow. First on page or figure it out"*. `demo/concepts/5/`.

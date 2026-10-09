@@ -177,8 +177,8 @@ Recommendation: start with 2 for `/cam/`, because nothing runs a service-side
 socket today and the bay only needs the ports while somebody is looking. Move to
 1 for a service that must be visible with no page open.
 
-`kind` gains `service`. `/concepts/1/` SIMULATES the four rows above, marked
-`sim`, with no network traffic.
+`kind` gains `service`. `/concepts/1/` SIMULATES these rows with no network traffic; their live cell
+is blank (the `sim` marker was removed on request).
 
 ## 4e. Mirror as a patchbay (asked on `/concepts/2/`, 2026-10-09)
 
@@ -365,6 +365,45 @@ link it holds into its own in-port.**
   `bay.event` carries `store: true`, which the store's filter already reads.
 - **Not measured.** Pure tests plus the two pages parsed; the pages were not
   driven against a real room in this step.
+
+## 4i. Modelling rules the concept pages settled, 2026-10-09 (not all built)
+
+Found while building `/concepts/10/` to `/concepts/14/`. Each is a rule the bay
+or the kit should state, and the status of each is said.
+
+1. **Events and state are different media in practice.** MIDI is events in
+   time; a picture, a light or a meter reads STATE. A node that turns one into
+   the other is a node of its own (`/concepts/14/`'s `midi`: notes and CC in,
+   `{ notes, cc[128] }` out on `value`). A shader never has a `midi-in`. BUILT on
+   14, not written into `bay.mjs` docs.
+2. **A light state link sends ON CHANGE, plus one snapshot when the link is
+   made.** Sending every frame made the link count measure frame rate, not
+   playing (asked: *"if i do nada, midi valueout increases. by design?"*). The
+   receiver keeps the last copy; copies, never a shared object. BUILT on 14 by
+   hand; the bay has no notion of "snapshot on link" yet. TO DO: a bay-level
+   `onLink` hook or a `state` medium that carries it.
+3. **A MIDI effect that maps one note to one note is a transform; one to many is
+   PARALLEL LINKS** (the octaver on `/concepts/11/` is three links with
+   `{ transpose }`). An audio effect is a NODE with `audio-in` and `audio-out`,
+   and the WebAudio graph follows the links. BUILT on 11.
+4. **A port that emits more classes than a destination takes needs a transform
+   saying so.** Once the keys sent CC 7, `keys -> synth` was refused until it
+   said `{ only note }`. That is the validator working; the rule worth writing
+   is that adding a class to a source re-checks every link out of it. BUILT on 14.
+5. **Video `value` state wants a medium decision.** `value` is used for chat text
+   (§4h), knob numbers and whole MIDI state. Revisit `value` vs `state` vs a
+   `text` medium once a page needs to refuse one of them by medium.
+6. **A shader's program could arrive on `program-in`**, the way `/mirror/` sends
+   GLSL to the Pi. Offered on 14, NOT BUILT.
+7. **A device in the page is a site-like node with its own transport.** The
+   emulated Pico on 14 is `pico:midi-in` (bytes into UART0) and
+   `pico:video-out` (its OLED). The bay has no transport name for "a UART in an
+   emulator"; the ports declare none. TO DO: decide whether `uart` is a
+   transport name, which matters once the real desk Pico is linked.
+8. **Who may hold a port is unanswered** (`/concepts/5/`, §4f item 4). Any tab
+   can pick the Admin tab and send notices; any tab can clear the store's
+   history (`POST /room/<name>/clear` takes no key). Before `/stage/` uses this,
+   decide: a token the admin holds, or the room deciding who the admin is.
 
 ## 5. Not settled
 
