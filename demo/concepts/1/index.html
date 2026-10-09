@@ -22,12 +22,14 @@
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
 </style>
 <script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
   import { mount } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createBayNode, roomFor, randomSite } from '/shell/bay-node.mjs';
 
   const d = mount({ name: 'concept 1', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(1);
 
   // Joins on a press, never on load, and then says what it is, like any patchbay tab.
   const ROOM = roomFor({ slug: 'patchbay' });

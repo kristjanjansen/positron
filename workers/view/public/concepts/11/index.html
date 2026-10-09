@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concepts 11</title>
+<title>POSITRON concept 11</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
@@ -22,6 +22,7 @@
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
 </style>
 <script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
@@ -104,7 +105,8 @@
   ];
   for (const p of PORTS) bay.addPort(p);
 
-  const d = mount({ name: 'concepts 11', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  const d = mount({ name: 'concept 11', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(11);
 
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   let harmony = false, filter = false;

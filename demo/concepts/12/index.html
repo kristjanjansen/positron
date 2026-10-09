@@ -23,6 +23,7 @@
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
 </style>
 <script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
@@ -91,6 +92,7 @@
   for (const p of PORTS) bay.addPort(p);
 
   const d = mount({ name: 'concept 12', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(12);
 
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   function patch() {

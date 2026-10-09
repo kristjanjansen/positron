@@ -28,25 +28,12 @@
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
 
-  // One card per concept, in teaching order. A card links to /concepts/<n>/.
-  const CONCEPTS = [
-    ['Announce', 'Every port the studio room can hear.'],
-    ['Mirror', 'The mirror demo as the patchbay sees it.'],
-    ['Chat', 'A multi-user chat built from patchbay blocks.'],
-    ['History', 'The same chat, with a store that keeps what was said.'],
-    ['Admin', 'The chat with an admin line every tab shows on top.'],
-    ['Broadcast', 'The admin chat with a camera the admin can put on air.', 6],
-    ['Keyboard', 'The on-screen keyboard patched to a sine synth.', 10],
-    ['Effects', 'The keyboard and a saw synth with MIDI and audio effects.', 11],
-    ['Recorder', 'The keyboard and synth with a recorder you can play back.', 12],
-    ['Timeline', 'The recorder on the kit transport bar and timeline.', 13],
-    ['Shader', 'The same notes drawn by a shader, patched like the synth.', 14],
-  ];
+  import { CONCEPTS } from '/concepts/list.mjs';
 
   const d = mount({ name: 'concepts', what: 'The ideas behind positron, one page each.', readout: null });
 
   const grid = el('div', 'cc-cards');
-  CONCEPTS.forEach(([title, say, n], i) => {
+  CONCEPTS.forEach(({ title, say, n }, i) => {
     // A row may name its page number, so a new topic can start at 10.
     const a = el('a', 'cc-card', '', { href: `/concepts/${n ?? i + 1}/` });
     const num = n ?? i + 1;

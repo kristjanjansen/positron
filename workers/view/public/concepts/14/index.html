@@ -5,15 +5,21 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concepts 14</title>
+<title>POSITRON concept 14</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
   .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
-  /* The picture is half the content width. */
-  .cc-half { width: 50%; }
-  @media (max-width: 560px) { .cc-half { width: 100%; } }
+  /* Two pictures side by side, each half the content width; one under the other on a phone. */
+  .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
+  .cc-pair > * { flex: 1 1 0; min-width: 0; }
+  @media (max-width: 560px) { .cc-pair { flex-direction: column; align-items: stretch; } }
   .cc-vis { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+  /* The emulated OLED: the panel's dark ink, the 128x64 canvas at a whole number scale in the middle. */
+  .cc-oled { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: #05070c; cursor: pointer; }
+  .pos-vp[data-full] .cc-oled { aspect-ratio: auto; height: 100%; }
+  .cc-oled canvas { display: block; image-rendering: pixelated; }
+  .cc-pico-say { font-size: 12px; color: var(--dim); }
   /* record is red, the one control that starts writing (shell.css --rec) */
   .cc-rec { color: var(--rec, #e5484d); }
   /* The same medium colours as /concepts/1/. */
@@ -28,6 +34,7 @@
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
+  import { conceptNav } from '/concepts/nav.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
@@ -39,6 +46,8 @@
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
+  import { createPicoRunner, parseUF2, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
+  import { drawOled } from '/shell/oled-view.mjs';
 
   // /concepts/12/ with the kit's own transport bar and timeline glued together in
   // place of the hand-made record buttons and notes table. A take is items on a
@@ -49,7 +58,7 @@
   const S = 'web';
   const bay = createBay();
   const DIR = { in: '→○', out: '○→' };
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture'], ['pico', 'device', 'Pico (emulated)'], ['oled', 'screen', 'OLED']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
@@ -201,6 +210,59 @@
   }
   requestAnimationFrame(frame);
 
+  // ── the Pico: the same rings drawn by C firmware on an emulated RP2040 ──────
+  // rig/pico/rings/main.c, built to /resources/pico/rings-pico.uf2 and run in
+  // rp2040js in a worker. pico:midi-in turns each event back into MIDI bytes and
+  // feeds them to UART0 RX, which is GP1, the DIN in. The firmware draws on its
+  // SSD1306 and every new screen comes back as 128x64 ones and zeros.
+  // ⚠️ NOTHING IS FETCHED ON A VISIT. The worker and the UF2 wait for the first
+  // key, knob or press of the panel; bytes that arrive meanwhile are kept and
+  // sent once it has booted.
+  const PICO_UF2 = '/resources/pico/rings-pico.uf2';
+  const pico = { state: 'off', runner: null, queue: [], frames: 0, px: null, bytes: 0 };
+  const oledCv = document.createElement('canvas');
+  oledCv.width = OLED_W; oledCv.height = OLED_H;
+  drawOled(oledCv, new Uint8Array(OLED_W * OLED_H));
+  const oledBox = el('div', 'cc-oled');
+  oledBox.title = 'press to start the Pico';
+  oledBox.append(oledCv);
+  // A whole number scale, so every panel pixel is the same size on screen.
+  new ResizeObserver(() => {
+    const k = Math.max(1, Math.floor(Math.min(oledBox.clientWidth / OLED_W, oledBox.clientHeight / OLED_H)));
+    oledCv.style.width = `${k * OLED_W}px`; oledCv.style.height = `${k * OLED_H}px`;
+  }).observe(oledBox);
+  const picoSays = el('span', 'cc-pico-say', 'off');
+  const showing = () => bay.links().some((l) => l.from === `${S}:pico:video-out` && l.to === `${S}:oled:video-in`);
+  async function picoStart() {
+    if (pico.state !== 'off') return;
+    pico.state = 'loading'; picoSays.textContent = 'loading';
+    try {
+      const res = await fetch(PICO_UF2);
+      if (!res.ok) throw new Error(`${PICO_UF2} answered ${res.status}`);
+      const image = parseUF2(await res.arrayBuffer());
+      pico.runner = createPicoRunner({ onFrame: (px) => {
+        pico.frames++; pico.px = px;
+        if (showing()) drawOled(oledCv, px);
+      } });
+      pico.runner.boot(image);
+      pico.state = 'running'; picoSays.textContent = 'running'; oledBox.title = '';
+      d.log(`the Pico booted rings-pico.uf2, ${image.length.toLocaleString('en')} bytes of flash`);
+      if (pico.queue.length) { pico.runner.send(pico.queue); pico.queue = []; }
+    } catch (e) {
+      pico.state = 'failed'; picoSays.textContent = 'failed';
+      d.log(`the Pico did not start: ${e.message}`, 'bad');
+    }
+  }
+  oledBox.addEventListener('pointerdown', () => picoStart());
+  // One bay event to MIDI bytes on channel 1: note on 0x90, note off 0x80, CC 0xB0.
+  function picoIn(e) {
+    const b = e.cls === 'note' ? (e.d2 ? [0x90, e.d1, e.d2] : [0x80, e.d1, 0]) : e.cls === 'cc' ? [0xB0, e.d1, e.d2] : null;
+    if (!b) return;
+    pico.bytes += b.length;
+    if (pico.state === 'running') pico.runner.send(b);
+    else if (pico.state !== 'failed') { pico.queue.push(...b); picoStart(); }
+  }
+
   let kb = null;
   const PORTS = [
     { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'], what: 'notes you play and the volume knob' },
@@ -220,10 +282,15 @@
       deliver: (e) => { latest = e; } },
     { id: `${S}:shader:video-out`, dir: 'out', medium: 'video', what: 'the picture' },
     { id: `${S}:screen:video-in`, dir: 'in', medium: 'video', what: 'what you see' },
+    { id: `${S}:pico:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], what: 'notes and CC 7, as bytes into UART0 RX',
+      deliver: (e) => picoIn(e) },
+    { id: `${S}:pico:video-out`, dir: 'out', medium: 'video', what: 'the SSD1306, 128x64, one bit' },
+    { id: `${S}:oled:video-in`, dir: 'in', medium: 'video', what: 'the Pico screen' },
   ];
   for (const p of PORTS) bay.addPort(p);
 
-  const d = mount({ name: 'concepts 14', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  const d = mount({ name: 'concept 14', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(14);
 
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   function patch() {
@@ -240,6 +307,9 @@
     want.push([`${S}:keys:midi-out`, `${S}:midi:midi-in`, []], [`${S}:rec:midi-out`, `${S}:midi:midi-in`, []],
       [`${S}:midi:value-out`, `${S}:shader:value-in`, []],
       [`${S}:shader:video-out`, `${S}:screen:video-in`, []]);
+    // The Pico hears the same notes and the volume knob, and its screen is the panel on the right.
+    want.push([`${S}:keys:midi-out`, `${S}:pico:midi-in`, []], [`${S}:rec:midi-out`, `${S}:pico:midi-in`, []],
+      [`${S}:pico:video-out`, `${S}:oled:video-in`, []]);
     for (const [a, b, tr] of want) {
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -327,7 +397,7 @@
   const linksT = createTable({ columns: [
     { key: 'line', label: 'link', grow: true, hi: true, clip: true },
     { key: 'sent', label: 'sent', width: 64, align: 'right' },
-  ], minRows: 8 });
+  ], minRows: 11 });
   const sentOut = { n: 0 };
   function draw() {
     const all = bay.ports ? bay.ports() : [];
@@ -365,8 +435,11 @@
   const instrument = createInstrumentPanel({ keys: host, plate: false });
   instrument.addRow(knobs.el);
   const panel = createVideoPanel({ media: canvas, left: false });
-  panel.el.classList.add('cc-half');
-  out.append(panel.el, surface, instrument.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  const picoPanel = createVideoPanel({ media: oledBox, left: false, centre: picoSays });
+  const pair = el('div', 'cc-pair');
+  pair.append(panel.el, picoPanel.el);
+  out.append(pair, surface, instrument.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
   d.el.append(out);
+  window.__demo.pico = pico;
   d.ready();
 </script>

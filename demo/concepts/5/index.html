@@ -27,6 +27,7 @@
   .cc-ring::after { content: none; }
 </style>
 <script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
@@ -80,6 +81,7 @@
   };
 
   const d = mount({ name: 'concept 5', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(5);
 
   const lines = createTable({
     columns: [
