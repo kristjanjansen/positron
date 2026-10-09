@@ -169,7 +169,13 @@
   let timers = [], playing = false;
   // The rows sounding right now during playback, lit with the table's own mark.
   const sounding = new Set();
-  const lit = () => notesT.mark((row, i) => sounding.has(i));
+  // The table scrolls inside its own box to keep the lit row in the middle;
+  // scrollIntoView would move the whole page as well.
+  const lit = () => {
+    notesT.mark((row, i) => sounding.has(i));
+    const box = notesT.scroller(), on = box.querySelector('.pos-tbl-row.on');
+    if (on) box.scrollTop = on.offsetTop - box.offsetTop - (box.clientHeight - on.offsetHeight) / 2;
+  };
   // Two toggles, glyphs only: ● records and becomes ■ while recording, ▶ plays
   // and becomes ■ while playing. Recording and playing stop each other.
   const GLYPH = { rec: '\u25CF', play: '\u25B6', stop: '\u25A0' };
