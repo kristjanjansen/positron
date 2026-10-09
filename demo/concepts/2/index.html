@@ -21,6 +21,7 @@
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
 </style>
 <script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
 
@@ -53,6 +54,7 @@
   ];
 
   const d = mount({ name: 'concept 2', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(2);
 
   function colour(t) {
     for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {

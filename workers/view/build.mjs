@@ -326,6 +326,9 @@ const FILES = [
   ['demo/shell/vendor/pico-bootrom.mjs', 'shell/vendor/pico-bootrom.mjs'],
   ['demo/shell/vendor/LICENSE-pico-bootrom', 'shell/vendor/LICENSE-pico-bootrom'],
   ['demo/resources/pico/router-pico.uf2', 'resources/pico/router-pico.uf2'],
+  // rig/pico/rings/build-pico/rings.uf2, byte for byte: the rings of /concepts/14/
+  // drawn by C on the emulated Pico (rig/pico/rings/build.sh copies it here).
+  ['demo/resources/pico/rings-pico.uf2', 'resources/pico/rings-pico.uf2'],
   // ui.c alone as WebAssembly, for the OLED part blocks (rig/pico/firmware/wasm/).
   // ⚠️ IT SHIPPED MISSING ONCE, 2026-10-04: green locally, because the dev
   // server serves the whole repository, and a 404 on the edge. A file the page

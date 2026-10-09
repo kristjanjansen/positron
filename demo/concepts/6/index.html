@@ -31,6 +31,7 @@
   .cc-say { margin: 0; color: var(--dim); font-size: 13.5px; }
 </style>
 <script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { fetchIceServers, camWhipPublish, camWhep, whepPlay } from '/shell/live.mjs';
@@ -114,6 +115,7 @@
   };
 
   const d = mount({ name: 'concept 6', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(6);
 
   const lines = createTable({
     columns: [

@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concepts 3</title>
+<title>POSITRON concept 3</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
@@ -25,6 +25,7 @@
   .cc-ring::after { content: none; }
 </style>
 <script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
@@ -52,7 +53,8 @@
     ],
   };
 
-  const d = mount({ name: 'concepts 3', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  const d = mount({ name: 'concept 3', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(3);
 
   const lines = createTable({
     columns: [
