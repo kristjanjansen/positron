@@ -105,7 +105,7 @@
 
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   let harmony = false, filter = false;
-  const VOICES = [0, 4, 7];       // the played note, a major third, a fifth
+  const VOICES = [0, 12, -12];     // the played note, an octave up, an octave down
   function patch() {
     for (const l of bay.links()) bay.unlink(l.id);
     const want = (harmony ? VOICES : [0]).map((by) =>
