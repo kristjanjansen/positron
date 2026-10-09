@@ -11,6 +11,8 @@
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
   .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   .cc-fx { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
+  /* record is red, the one control that starts writing (shell.css --rec) */
+  .cc-rec { color: var(--rec, #e5484d); }
   /* The same medium colours as /concepts/1/. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
@@ -164,26 +166,47 @@
   function drawNotes() {
     notesT.set(notes.map((r, i) => ({ i: i + 1, note: nameOf(r.n), vel: r.vel, at: ms(r.at), len: r.len == null ? 'held' : ms(r.len) })));
   }
-  let timers = [];
+  let timers = [], playing = false;
+  // Two toggles, glyphs only: ● records and becomes ■ while recording, ▶ plays
+  // and becomes ■ while playing. Recording and playing stop each other.
+  const GLYPH = { rec: '\u25CF', play: '\u25B6', stop: '\u25A0' };
+  function face() {
+    const r = transport.button('rec'), p = transport.button('play');
+    r.textContent = armed ? GLYPH.stop : GLYPH.rec;
+    r.title = armed ? 'stop recording' : 'record';
+    p.textContent = playing ? GLYPH.stop : GLYPH.play;
+    p.title = playing ? 'stop playing' : 'play';
+    p.disabled = !notes.length && !playing;
+  }
   function play() {
     stop();
+    playing = true;
+    const end = notes.reduce((m, r) => Math.max(m, r.at + (r.len ?? 200)), 0);
+    timers.push(setTimeout(() => { playing = false; face(); }, end + 50));
     for (const r of notes) {
       timers.push(setTimeout(() => { bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: r.vel }); draw(); }, r.at));
       timers.push(setTimeout(() => bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: 0 }), r.at + (r.len ?? 200)));
     }
+    face();
   }
   function stop() {
-    armed = false;
+    armed = false; playing = false;
     for (const t of timers) clearTimeout(t);
     timers = [];
     for (const n of [...voices.keys()]) noteOff(n);
-    transport.button('rec').disabled = false;
+    face();
+  }
+  function record() {
+    stop();
+    notes.length = 0; open.clear(); t0 = performance.now(); armed = true;
+    drawNotes(); face();
   }
   const transport = createButtonGroup({ buttons: [
-    { id: 'rec', label: 'Record', onPress: () => { stop(); notes.length = 0; open.clear(); t0 = performance.now(); armed = true; transport.button('rec').disabled = true; drawNotes(); } },
-    { id: 'stop', label: 'Stop', onPress: () => stop() },
-    { id: 'play', label: 'Play', primary: true, onPress: () => play() },
+    { id: 'rec', label: GLYPH.rec, onPress: () => (armed ? stop() : record()) },
+    { id: 'play', label: GLYPH.play, onPress: () => (playing ? stop() : play()) },
   ] });
+  transport.button('rec').classList.add('cc-rec');
+  face();
 
   const linksT = createTable({ columns: [
     { key: 'line', label: 'link', grow: true, hi: true, clip: true },
