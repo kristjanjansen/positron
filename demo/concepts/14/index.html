@@ -47,7 +47,7 @@
   const S = 'web';
   const bay = createBay();
   const DIR = { in: '→○', out: '○→' };
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['vis', 'engine', 'shader'], ['screen', 'screen', 'picture']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['dots', 'engine', 'dots'], ['screen', 'screen', 'picture']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
@@ -87,17 +87,26 @@
     voices.delete(n);
   }
 
-  // ── the shader: one ring per sounding note ──────────────────────────────
-  // x from the pitch across the keyboard's range, size from the velocity, and a
-  // ring keeps fading for a moment after its key comes up.
-  const MAXN = 16;
-  const vis = new Map();           // note -> { vel, on, off }
-  function visOn(n, vel) { vis.set(n, { vel, on: performance.now(), off: null }); }
-  function visOff(n) { const v = vis.get(n); if (v) v.off = performance.now(); }
+  // ── the shader: dots that wheel away from where a note was played ─────
+  // In the manner of dotpiano.com. A held note keeps dropping dots; each dot is
+  // born on an arc at its pitch, in its pitch class's colour, sized by velocity,
+  // then turns around the centre, drifts outward and fades. The dots live here
+  // in JavaScript and reach the shader as numbers, one vec4 each, every frame:
+  // a shader cannot hear an event, it only reads the state it is handed.
+  const MAXD = 96, DOT_EVERY = 45, LIFE = 3200, LO = 48, HI = 69;
+  const held = new Map();          // note -> { vel, last }
+  const dots = [];                 // { a0, r0, born, size, hue }
+  function drop(n, vel, now) {
+    const u = (n - LO) / (HI - LO);
+    dots.push({ a0: 3.6 - u * 2.4, r0: 0.18, born: now, size: 0.012 + 0.022 * vel / 127, hue: (n % 12) / 12 });
+    if (dots.length > MAXD) dots.shift();
+  }
+  function visOn(n, vel) { const now = performance.now(); held.set(n, { vel, last: now }); drop(n, vel, now); }
+  function visOff(n) { held.delete(n); }
   const canvas = el('canvas', 'cc-vis');
   canvas.width = 1280; canvas.height = 720;
   const gl = canvas.getContext('webgl2');
-  let prog = null, uN = null, uNotes = null, uT = null;
+  let prog = null, uN = null, uDots = null, uHue = null;
   if (gl) {
     const vs = `#version 300 es
       in vec2 p; out vec2 uv;
@@ -105,19 +114,16 @@
     const fs = `#version 300 es
       precision highp float;
       in vec2 uv; out vec4 o;
-      uniform int uN; uniform vec4 uNotes[${MAXN}]; uniform float uT;
+      uniform int uN; uniform vec4 uDots[${MAXD}]; uniform float uHue[${MAXD}];
       void main() {
-        vec2 q = vec2(uv.x * 16.0 / 9.0, uv.y);
-        vec3 c = vec3(0.02, 0.025, 0.035);
-        for (int i = 0; i < ${MAXN}; i++) {
+        vec2 q = (uv - 0.5) * vec2(16.0 / 9.0, 1.0);
+        vec3 c = vec3(0.0);
+        for (int i = 0; i < ${MAXD}; i++) {
           if (i >= uN) break;
-          vec4 n = uNotes[i];                       // x, velocity, life 0..1, hue
-          vec2 at = vec2(n.x * 16.0 / 9.0, 0.5 + 0.18 * sin(uT * 1.3 + n.w * 6.283));
-          float r = 0.05 + 0.22 * n.y;
-          float d = abs(length(q - at) - r);
-          float ring = smoothstep(0.02, 0.0, d) * n.z;
-          vec3 hue = 0.5 + 0.5 * cos(6.283 * (n.w + vec3(0.0, 0.33, 0.67)));
-          c += hue * ring;
+          vec4 d = uDots[i];                          // x, y, size, alpha
+          float k = smoothstep(d.z, d.z * 0.4, length(q - d.xy)) * d.w;
+          vec3 hue = 0.55 + 0.45 * cos(6.283 * (uHue[i] + vec3(0.0, 0.33, 0.67)));
+          c = max(c, hue * k);
         }
         o = vec4(c, 1.0);
       }`;
@@ -132,22 +138,22 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, 'p');
     gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    uN = gl.getUniformLocation(prog, 'uN'); uNotes = gl.getUniformLocation(prog, 'uNotes'); uT = gl.getUniformLocation(prog, 'uT');
+    uN = gl.getUniformLocation(prog, 'uN'); uDots = gl.getUniformLocation(prog, 'uDots'); uHue = gl.getUniformLocation(prog, 'uHue');
   }
-  const FADE_MS = 600, LO = 48, HI = 69;
   function frame(now) {
+    for (const [n, h] of held) if (now - h.last >= DOT_EVERY) { h.last = now; drop(n, h.vel, now); }
+    while (dots.length && now - dots[0].born > LIFE) dots.shift();
     if (gl && prog) {
-      const data = new Float32Array(MAXN * 4);
-      let k = 0;
-      for (const [n, v] of vis) {
-        const life = v.off == null ? 1 : 1 - (now - v.off) / FADE_MS;
-        if (life <= 0) { vis.delete(n); continue; }
-        if (k >= MAXN) continue;
-        data.set([0.05 + 0.9 * (n - LO) / (HI - LO), v.vel / 127, life, (n % 12) / 12], k * 4); k++;
-      }
+      const data = new Float32Array(MAXD * 4), hues = new Float32Array(MAXD);
+      dots.forEach((d, i) => {
+        const age = (now - d.born) / 1000;
+        const a = d.a0 + age * 0.9, r = d.r0 + age * 0.09;
+        data.set([Math.cos(a) * r, Math.sin(a) * r, d.size, 1 - age * 1000 / LIFE], i * 4);
+        hues[i] = d.hue;
+      });
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(prog);
-      gl.uniform1i(uN, k); gl.uniform4fv(uNotes, data); gl.uniform1f(uT, now / 1000);
+      gl.uniform1i(uN, dots.length); gl.uniform4fv(uDots, data); gl.uniform1fv(uHue, hues);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
     requestAnimationFrame(frame);
@@ -166,9 +172,9 @@
     { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes being recorded',
       deliver: (e) => take(e) },
     { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes played back' },
-    { id: `${S}:vis:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the shader draws',
+    { id: `${S}:dots:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the shader draws',
       deliver: (e) => (e.d2 ? visOn(e.d1, e.d2) : visOff(e.d1)) },
-    { id: `${S}:vis:video-out`, dir: 'out', medium: 'video', what: 'the picture' },
+    { id: `${S}:dots:video-out`, dir: 'out', medium: 'video', what: 'the picture' },
     { id: `${S}:screen:video-in`, dir: 'in', medium: 'video', what: 'what you see' },
   ];
   for (const p of PORTS) bay.addPort(p);
@@ -184,8 +190,8 @@
     want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
     // The shader hears the same notes as the synth, from the keys and from the
     // recorder, and its picture goes to the screen on this page.
-    want.push([`${S}:keys:midi-out`, `${S}:vis:midi-in`, []], [`${S}:rec:midi-out`, `${S}:vis:midi-in`, []],
-      [`${S}:vis:video-out`, `${S}:screen:video-in`, []]);
+    want.push([`${S}:keys:midi-out`, `${S}:dots:midi-in`, []], [`${S}:rec:midi-out`, `${S}:dots:midi-in`, []],
+      [`${S}:dots:video-out`, `${S}:screen:video-in`, []]);
     for (const [a, b, tr] of want) {
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
