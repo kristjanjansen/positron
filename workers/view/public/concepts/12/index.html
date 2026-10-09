@@ -167,6 +167,9 @@
     notesT.set(notes.map((r, i) => ({ i: i + 1, note: nameOf(r.n), vel: r.vel, at: ms(r.at), len: r.len == null ? 'held' : ms(r.len) })));
   }
   let timers = [], playing = false;
+  // The rows sounding right now during playback, lit with the table's own mark.
+  const sounding = new Set();
+  const lit = () => notesT.mark((row, i) => sounding.has(i));
   // Two toggles, glyphs only: ● records and becomes ■ while recording, ▶ plays
   // and becomes ■ while playing. Recording and playing stop each other.
   const GLYPH = { rec: '\u25CF', play: '\u25B6', stop: '\u25A0' };
@@ -183,14 +186,15 @@
     playing = true;
     const end = notes.reduce((m, r) => Math.max(m, r.at + (r.len ?? 200)), 0);
     timers.push(setTimeout(() => { playing = false; face(); }, end + 50));
-    for (const r of notes) {
-      timers.push(setTimeout(() => { bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: r.vel }); draw(); }, r.at));
-      timers.push(setTimeout(() => bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: 0 }), r.at + (r.len ?? 200)));
-    }
+    notes.forEach((r, i) => {
+      timers.push(setTimeout(() => { sounding.add(i); lit(); bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: r.vel }); draw(); }, r.at));
+      timers.push(setTimeout(() => { sounding.delete(i); lit(); bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: 0 }); }, r.at + (r.len ?? 200)));
+    });
     face();
   }
   function stop() {
     armed = false; playing = false;
+    sounding.clear(); lit();
     for (const t of timers) clearTimeout(t);
     timers = [];
     for (const n of [...voices.keys()]) noteOff(n);
