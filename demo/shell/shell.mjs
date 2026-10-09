@@ -78,13 +78,14 @@ export function mount({
   joined = true,
   controls = [],         // [{id, label, primary?}]
   index = '/',
+  indexLabel = 'demos',  // the word after the arrow; `/concepts/<n>/` says `concepts`
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();
   markHeadset();
 
   const head = el('div', 'pos-head');
-  if (index) head.append(el('a', 'pos-back', '← demos', { href: index }));
+  if (index) head.append(el('a', 'pos-back', `← ${indexLabel}`, { href: index }));
   const title = el('div', 'pos-title');
   title.append(el('h1', 'pos-name', name));
   // 🔴 EVERY SHELLED PAGE GETS THE FEEDBACK BUTTON, WHICH IS WHY IT IS HERE AND
