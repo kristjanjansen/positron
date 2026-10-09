@@ -24,7 +24,7 @@
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
-  import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
   import { createChoice } from '/shell/choice.mjs';
 
@@ -148,8 +148,9 @@
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');
+  // C to A, 13 white keys: as many as the content width holds at the kit's 49 px minimum.
   kb = createKeyboard(host, {
-    base: 60,
+    ...keyRange(21), base: 48,
     onDown: (note, how) => { if (how === 'midi') return; sentOut.n++; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); draw(); },
     onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
   });
