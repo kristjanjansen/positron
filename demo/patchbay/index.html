@@ -349,7 +349,7 @@
       if (have.has(m.line)) continue;
       let l;
       try { l = parseLink(m.line); } catch (e) { changes.push({ op: 'refused', line: m.line, why: e.message }); continue; }
-      const r = b.link(l.from, l.to, l.transforms, { consent: !!m.consent, via: l.via, site: SITE });
+      const r = b.link(l.from, l.to, l.transforms, { consent: !!m.consent, via: l.via, options: l.options, site: SITE });
       if (!r.ok) { changes.push({ op: 'refused', line: m.line, why: r.why }); continue; }
       const line = printLink(b.links().find((x) => x.id === r.id));
       next.push({ line, consent: !!m.consent });
@@ -442,7 +442,7 @@
     const keep = [];
     for (const m of made) {
       const l = parseLink(m.line);
-      const r = bay.link(l.from, l.to, l.transforms, { consent: m.consent, via: l.via, site: SITE });
+      const r = bay.link(l.from, l.to, l.transforms, { consent: m.consent, via: l.via, options: l.options, site: SITE });
       if (r.ok) keep.push(m); else d.log(`${m.line} is gone: ${r.why}`, 'bad');
     }
     made = keep;
@@ -490,7 +490,7 @@
     catch (e) { refused++; d.log(e.message.replace(/^bay: /, ''), 'bad'); redraw(); return { ok: false, why: e.message }; }
     /* `via` is the line's own last word, and `site` says this tab is the one
        asking, which is what an input somebody holds (`heldBy`) is checked against. */
-    const r = bay.link(l.from, l.to, l.transforms, { consent: consent.get(), via: l.via, site: SITE });
+    const r = bay.link(l.from, l.to, l.transforms, { consent: consent.get(), via: l.via, options: l.options, site: SITE });
     if (r.ok) {
       const lk = bay.links().find((x) => x.id === r.id);
       made.push({ line: printLink(lk), consent: consent.get() });

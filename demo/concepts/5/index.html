@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concepts 5</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
+  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
+  .cc-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
+  .cc-row > .pos-field { flex: 1 1 260px; min-width: 0; }
+  .cc-row[hidden] { display: none; }
+  .cc-ends { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: var(--ctl-gap, 8px); }
+  /* The same medium colours and live dot as /concepts/1/. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+  }
+  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
+  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
+  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
+  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+  .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
+  .cc-ring::after { content: none; }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createTabs } from '/shell/tabs.mjs';
+  import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+
+  // The smallest multi-user chat built from patchbay blocks. Every tab is a SITE
+  // with one NODE and two PORTS of medium `value`. A line is shown only when the
+  // bay, filled from the REGISTRY, accepts a LINK from the sender's out to our in.
+  // Its own room, never studio-1, so nothing lands on the studio's desk.
+  const asked = new URLSearchParams(location.search).get('room');
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-3';
+  // History: positron-store, a recorder that joins the room as an ordinary socket
+  // and keeps every message sent with `store: true` (workers/store/src/index.js).
+  const STORE_URL = 'https://store.positron.studio';
+  const SITE = randomSite('web');
+  const OUT = `${SITE}:chat:out`, IN = `${SITE}:chat:in`;
+  // ADMIN: toward /stage/. One more node on every tab, `notice`, with an in-port
+  // that takes admin lines and shows the last one above the chat. Only a tab
+  // on the admin tab announces `admin:out` and can send to it.
+  // ⚠️ NOTHING PROVES THE ADMIN. Any tab can pick the admin tab; the bay checks that the
+  // ports fit, not who holds them. That is the question this page exists to ask.
+  // The tab in the address wins, as tabs.mjs decides; ?admin=1 picks admin when there is none.
+  let admin = location.hash ? location.hash === '#admin' : new URLSearchParams(location.search).get('admin') === '1';
+  const AOUT = `${SITE}:admin:out`, NOTICE = `${SITE}:notice:in`;
+  const selfGraph = () => ({
+    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
+    nodes: [
+      { id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' },
+      { id: `${SITE}:notice`, kind: 'screen', label: 'notice', place: 'browser' },
+      ...(admin ? [{ id: `${SITE}:admin`, kind: 'person', label: 'admin', place: 'browser' }] : []),
+    ],
+    ports: [
+      { id: OUT, label: 'chat', dir: 'out', medium: 'value', transports: ['relay'] },
+      { id: IN, label: 'chat', dir: 'in', medium: 'value', transports: ['relay'] },
+      { id: NOTICE, label: 'notice', dir: 'in', medium: 'value', transports: ['relay'] },
+      ...(admin ? [{ id: AOUT, label: 'admin', dir: 'out', medium: 'value', transports: ['relay'] }] : []),
+    ],
+  });
+  // The store as a site, announced on its behalf into this page's own registry
+  // only, as /patchbay/ does for R2: every tab would describe the same store.
+  const STORE = {
+    v: 1, site: 'cf-store', place: 'cloudflare', net: 'cloudflare', kind: 'service', label: 'CF Store',
+    nodes: [{ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' }],
+    ports: [
+      { id: 'cf-store:history:in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
+      { id: 'cf-store:history:out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
+    ],
+  };
+
+  const d = mount({ name: 'concepts 5', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+
+  const lines = createTable({
+    columns: [
+      { key: 'who', label: 'who', width: 96 },
+      { key: 'text', label: 'line', grow: true, hi: true },
+      { key: 'ago', label: 'when', width: 72 },
+      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
+    ],
+    minRows: 4,
+    stick: true,
+  });
+  const said = [];
+  // How long ago, from the send stamp the relay envelope carries (`sent`).
+  const ago = (at) => {
+    const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+    if (s < 10) return 'now';
+    if (s < 60) return `${s} s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+    return `${Math.floor(s / 86400)} d ago`;
+  };
+  // Admin lines have a table of their own, with the same columns.
+  const notices = createTable({
+    columns: [
+      { key: 'who', label: 'who', width: 96 },
+      { key: 'text', label: 'notice', grow: true, hi: true },
+      { key: 'ago', label: 'when', width: 72 },
+      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
+    ],
+    minRows: 2,
+    stick: true,
+  });
+  const told = [];
+  const draw = () => {
+    lines.set(said.map((r) => ({ ...r, ago: ago(r.at) })));
+    notices.set(told.map((r) => ({ ...r, ago: ago(r.at) })));
+  };
+  setInterval(() => { if (said.length || told.length) draw(); }, 30000);
+  const short = (site) => site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : `browser ${site.replace(/^web-/, '')}`;
+
+  const node = createBayNode({
+    room: ROOM, graphs: [selfGraph()], local: [STORE],
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); drawSites(); },
+    onGraph: () => drawSites(),
+    onMessage: (m) => { if (m.type === 'chat.line') heard(m); else if (m.type === 'chat.admin') heardAdmin(m); else if (m.type === 'chat.clear') wipe(); },
+  });
+
+  function heard(m, old = false) {
+    const source = old ? 'cf-store:history:out' : String(m.source || '');
+    const from = String(m.source || '');
+    const bay = node.registry.fill(createBay());
+    const l = bay.link(source, IN, [], { site: SITE });
+    said.push({ at: Number(m.sent) || Date.now(), who: short(from.split(':')[0]), text: String(m.text || ''),
+      link: l.ok ? `${source} -> ${IN}` : 'refused', why: l.ok ? (l.session?.transport || 'no transport needed') : l.why });
+    draw();
+  }
+
+  // An admin line: shown in the chat AND as the notice, if the bay accepts a link
+  // from its admin:out to this tab's notice:in.
+  function heardAdmin(m, old = false) {
+    const from = String(m.source || '');
+    const source = old ? 'cf-store:history:out' : from;
+    const bay = node.registry.fill(createBay());
+    const l = bay.link(source, NOTICE, [], { site: SITE });
+    const site = from.split(':')[0];
+    told.push({ at: Number(m.sent) || Date.now(), who: site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`,
+      text: String(m.text || ''), link: l.ok ? `${source} -> ${NOTICE}` : 'refused', why: l.ok ? 'in the notices' : l.why });
+    draw();
+  }
+
+  // Wake the recorder into this room, then read what it kept. Our own worker,
+  // asked only on a press of Join.
+  async function loadHistory() {
+    try {
+      const r = await fetch(`${STORE_URL}/room/${ROOM}/record`, { method: 'POST' });
+      d.log(`store recording ${ROOM}: ${r.status}`);
+      const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
+      const rows = (await h.text()).split('\n').filter(Boolean);
+      let n = 0;
+      for (const line of rows) {
+        let m; try { m = JSON.parse(line); } catch { continue; }
+        if (m.type === 'chat.line') { heard(m, true); n++; }
+        else if (m.type === 'chat.admin') { heardAdmin(m, true); n++; }
+      }
+      d.log(`${n} earlier line${n === 1 ? '' : 's'} from the store`);
+    } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
+  }
+
+  const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
+  text.disabled(true);
+  function say() {
+    const t = text.value().trim();
+    if (!t) return;
+    node.send({ type: 'chat.line', source: OUT, text: t, store: true });
+    // No link reaches many listeners yet (plans/plan-site-names.md, chat gaps), so
+    // the line goes to the room and this shows the one-to-one links it stands for.
+    const bay = node.registry.fill(createBay());
+    const to = node.registry.merged().ports.filter((p) => p.dir === 'in' && (p.id.endsWith(':chat:in') || p.id === 'cf-store:history:in') && p.id !== IN)
+      .map((p) => ({ p, l: bay.link(OUT, p.id, [], { site: SITE }) }));
+    const ok = to.filter((x) => x.l.ok).map((x) => `${OUT} -> ${x.p.id}`);
+    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:in`,
+      why: ok.length ? ok.join('\n') : 'nobody else in the room' });
+    draw();
+    text.set('');
+  }
+  // The admin writes notices in a field of its own, and still chats like anyone.
+  const noticeText = createField({ label: 'notice', placeholder: 'tell everyone', grow: 'wide' });
+  noticeText.disabled(true);
+  function sayAdmin() {
+    const t = noticeText.value().trim();
+    if (!t) return;
+    node.send({ type: 'chat.admin', source: AOUT, text: t, store: true });
+    heardAdmin({ source: AOUT, text: t, sent: Date.now() });
+    told[told.length - 1].link = `${AOUT} -> *:notice:in`;
+    draw();
+    noticeText.set('');
+  }
+  noticeText.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sayAdmin(); } });
+  text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); say(); } });
+  const send = createButtonGroup({ buttons: [{ id: 'send', label: 'Send', primary: true, onPress: say }] });
+  const tell = createButtonGroup({ buttons: [{ id: 'tell', label: 'Send notice', primary: true, onPress: sayAdmin }] });
+  tell.button('tell').disabled = true;
+  const noticeRow = el('div', 'cc-row');
+  noticeRow.append(noticeText.el, tell.el);
+  noticeRow.hidden = !admin;
+
+  // The two roles. Switching re-announces this tab: the admin tab adds the
+  // `admin` node and its `admin:out`, the audience tab takes them away.
+  const roles = createTabs({
+    tabs: [{ id: 'admin', label: 'Admin' }, { id: 'audience', label: 'Audience' }],
+    at: admin ? 'admin' : 'audience',
+    onPick: (id) => {
+      admin = id === 'admin';
+      noticeRow.hidden = !admin;
+      node.setGraphs([selfGraph()], [STORE]);
+      drawSites();
+    },
+  });
+  send.button('send').disabled = true;
+  // Clear: the store forgets this room, and every tab in it empties its tables.
+  function wipe() { said.length = 0; told.length = 0; draw(); }
+  async function clearAll() {
+    try {
+      const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
+      d.log(`store cleared ${ROOM}: ${r.status}`);
+    } catch (e) { d.log(`the store did not clear: ${e.message || e}`, 'warn'); }
+    node.send({ type: 'chat.clear' });
+    wipe();
+  }
+  const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
+  const clear = createButtonGroup({ buttons: [{ id: 'clear', label: 'Clear history', onPress: clearAll }] });
+  clear.button('clear').disabled = true;
+  // Join on the left, Clear history on its own at the right of the same line.
+  const joinRow = el('div', 'cc-ends');
+  joinRow.append(join.el, clear.el);
+
+  // Who is in the room: the registry, as /concepts/1/ draws it. Port names are
+  // shown as <medium>-<dir> (plans/plan-site-names.md §4c); the real id is on hover.
+  const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
+  const sites = createTable({
+    columns: [
+      { key: 'state', label: '', width: 16 },
+      { key: 'id', label: 'port', grow: true, hi: true, clip: true, hover: 'real' },
+      { key: 'who', label: 'who', width: 120 },
+      { key: 'dir', label: 'dir', width: 48 },
+      { key: 'medium', label: 'medium', width: 72 },
+      { key: 'by', label: 'transport', width: 120 },
+    ],
+    minRows: 12,
+  });
+  function drawSites() {
+    const rows = node.registry.merged().ports.map((p) => {
+      const [site, n] = p.id.split(':');
+      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`, real: p.id,
+        who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
+    }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
+    sites.set(rows);
+    for (const cell of sites.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
+      const t = cell.textContent;
+      if (t === 'live' || t === 'stale') {
+        const dot = document.createElement('span');
+        dot.className = 'pos-pres-dot' + (t === 'live' ? '' : ' cc-ring');
+        dot.style.color = t === 'live' ? 'var(--ok)' : 'var(--dim2)';
+        cell.textContent = '';
+        cell.append(dot);
+        cell.title = t;
+      } else if (/^(midi|audio|clock|value|video|program|file|state)$/.test(t)) cell.classList.add(`md-${t}`);
+    }
+  }
+
+  const row = el('div', 'cc-row');
+  row.append(text.el, send.el);
+  const out = el('div', 'cc-stack');
+  out.append(roles.el, joinRow, el('h3', 'cc-h', 'notices'), noticeRow, notices.el, el('h3', 'cc-h', 'chat'), row, lines.el, el('h3', 'cc-h', 'in the room'), sites.el);
+  d.el.append(out);
+  d.ready();
+</script>

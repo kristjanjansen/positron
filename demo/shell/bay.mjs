@@ -34,6 +34,8 @@ import { KINDS, kindOfDecoded } from './midi-kinds.mjs';
    way round. */
 import { STALE_MS } from './graph-registry.mjs';
 export { STALE_MS };
+// Link options (`{ w 640, h 360, fps 15 }` on a video link) are not transforms; see link-options.mjs.
+import { isOption, checkOptions, printOptions } from './link-options.mjs';
 
 /**
  * What a link can carry. `clock` is its own medium: see plan-patchbay, §3.4.
@@ -770,7 +772,8 @@ export function printLink(link) {
       })
       .join(' ');
   }).join(', ');
-  return `${link.from} -> ${link.to}${t ? ` { ${t} }` : ''}${link.via ? ` via ${link.via}` : ''}`;
+  const body = [t, printOptions(link.options)].filter(Boolean).join(', ');   // link options, link-options.mjs
+  return `${link.from} -> ${link.to}${body ? ` { ${body} }` : ''}${link.via ? ` via ${link.via}` : ''}`;
 }
 
 /** The reverse. Throws with the offending text, because a parser that returns
@@ -779,7 +782,22 @@ export function parseLink(line) {
   const m = /^\s*([^\s>]+)\s*->\s*([^\s{]+)\s*(?:\{(.*)\})?\s*(?:via\s+([A-Za-z0-9-]+))?\s*$/.exec(line);
   if (!m) throw new Error(`bay: cannot read "${line.trim()}". A link is "from -> to { op arg } via transport", the last two optional`);
   const [, from, to, body, via] = m;
-  const transforms = (body || '').split(',').map((s) => s.trim()).filter(Boolean).map((chunk) => {
+  /* `*` IS A WHOLE SITE SEGMENT OR NOTHING (plans/plan-site-names.md §4h).
+     `we*:chat:in` or `*:*:in` would read as a pattern nobody defined. */
+  for (const end of [from, to]) {
+    if (end.includes('*') && !(end.startsWith('*:') && !end.slice(2).includes('*') && end.split(':').length === 3)) {
+      throw new Error(`bay: cannot read "${end}". A * stands for a whole site, as in *:chat:in`);
+    }
+  }
+  const options = {};   // link options, link-options.mjs: `w 640` is read here and checked by validate
+  const transforms = (body || '').split(',').map((s) => s.trim()).filter(Boolean).filter((chunk) => {
+    const [k, v, ...rest] = chunk.split(/\s+/);
+    if (!isOption(k)) return true;
+    if (k in options) throw new Error(`bay: ${k} is given twice in "${line.trim()}"`);
+    if (rest.length) throw new Error(`bay: ${k} takes one value, and "${chunk}" gives ${rest.length + 1}`);
+    options[k] = v === undefined ? undefined : (Number.isNaN(Number(v)) ? v : Number(v));
+    return false;
+  }).map((chunk) => {
     const parts = chunk.split(/\s+/);
     const op = parts.shift();
     if (!OPS[op]) throw new Error(`bay: no transform called "${op}". There are ${OP_NAMES.join(', ')}`);
@@ -791,7 +809,22 @@ export function parseLink(line) {
     });
     return t;
   });
-  return { from, to, transforms, ...(via ? { via } : {}) };
+  return { from, to, transforms, ...(Object.keys(options).length ? { options } : {}), ...(via ? { via } : {}) };
+}
+
+// ── a `*` link, one to many (plans/plan-site-names.md §4h) ──────────────────
+
+/** True of `*:node:port`, a link end that stands for every site with that port. */
+export const isAny = (id) => typeof id === 'string' && id.startsWith('*:');
+/**
+ * Does a link end match a concrete port id. A concrete end matches itself; a `*`
+ * end matches any site's port with the same `node:port`, EXCEPT a port on the
+ * other end's own site, so a speaker never hears itself through its own `*`.
+ */
+export function endMatches(end, id, other) {
+  if (!isAny(end)) return end === id;
+  const [site, ...rest] = String(id).split(':');
+  return rest.join(':') === end.slice(2) && site !== String(other).split(':')[0];
 }
 
 export function printPatch(links) { return links.map(printLink).join('\n'); }
@@ -841,7 +874,8 @@ export function createBay({ now = () => Date.now() } = {}) {
   }
   /* A port names its node with `node`, or by the first two segments of its id. */
   const nodeFor = (p) => nodes.get(p.node ?? nodeOf(p.id));
-  const placeOf = (p) => nodeFor(p)?.place ?? p.id.split(':')[0];
+  const siteOf = (p) => p.id.split(':')[0];
+  const placeOf = (p) => nodeFor(p)?.place ?? siteOf(p);
   const netOf = (p) => nodeFor(p)?.net;
 
   /**
@@ -874,7 +908,8 @@ export function createBay({ now = () => Date.now() } = {}) {
    * already derives `<room>-video` and `<room>-<input>` (plan §8): one port,
    * one room. It is `${place of the source}-${source node name}-${port name}`,
    * so `studio-1:circuit:audio` on a node placed at `studio-1` is
-   * `studio-1-circuit-audio`.
+   * `studio-1-circuit-audio`, and the site goes in after the place whenever
+   * the two differ (see below).
    * ⚠️ IT IS AN ADDRESS AND NOT A RENDEZVOUS. Two links out of one port share
    * it, which is what lets the second receiver join the first one's session
    * rather than starting another. `stage-<rand6>` is the other kind and does
@@ -884,8 +919,16 @@ export function createBay({ now = () => Date.now() } = {}) {
     // A port that knows where its stream really lives says so, and that wins:
     // the board's input rooms are `<room>-<input>`, not a derivation of an id.
     if (typeof a.address === 'string' && a.address) return a.address;
-    const [, node = '', port = ''] = a.id.split(':');
-    return [placeOf(a), node, port].filter(Boolean).join('-');
+    const [site, node = '', port = ''] = a.id.split(':');
+    /* 🔴 THE SITE IS IN IT WHEN IT IS NOT THE PLACE, SINCE 2026-10-09. Every
+       browser tab is placed `browser`, so `/mirror/`'s `webgl:video` derived
+       `browser-webgl-video` in EVERY tab, and two tabs would meet in one room
+       the moment such a port got a wire transport. Now it is
+       `browser-web-ab12-webgl-video`.
+       ⚠️ A SITE THAT IS ITS OWN PLACE IS UNCHANGED (`studio-1-circuit-audio`,
+       `err-vikerraadio-audio`), so nothing the Pi derives or declares moves. */
+    const place = placeOf(a);
+    return [place, site !== place ? site : '', node, port].filter(Boolean).join('-');
   }
 
   /**
@@ -950,6 +993,7 @@ export function createBay({ now = () => Date.now() } = {}) {
    * link exists*.
    */
   function validate(fromId, toId, transforms = [], opts = {}) {
+    if (isAny(fromId) || isAny(toId)) return validateAny(fromId, toId, transforms, opts);
     const a = ports.get(fromId), b = ports.get(toId);
     const NO_PORT = 'Nothing on this desk answers to that name, so this link cannot be made.';
     if (!a) return { ok: false, why: `there is no port called ${fromId}.`, fix: NO_PORT };
@@ -1029,6 +1073,8 @@ export function createBay({ now = () => Date.now() } = {}) {
        schema valid transform with its argument under the wrong key. */
     const badT = checkTransforms(transforms);
     if (badT) return { ok: false, ...badT };
+    const badO = checkOptions(a.medium, opts?.options);   // link options, link-options.mjs
+    if (badO) return { ok: false, ...badO };
 
     // Shape. ⚠️ THE FIELD THAT DISAGREES IS NAMED. "incompatible" is a refusal
     // somebody has to debug; "48000 against 44100" is one they can fix.
@@ -1122,6 +1168,87 @@ export function createBay({ now = () => Date.now() } = {}) {
   }
 
   /**
+   * 🔴 A `*` LINK, plans/plan-site-names.md §4h. `a:chat:out -> *:chat:in` is a
+   * speaker and `*:chat:out -> a:chat:in` a listener. The pattern is checked
+   * here; every concrete pair it stands for is checked by the ordinary
+   * `validate`, now and again on every send, because sites come and go.
+   * ⚠️ ZERO MATCHES IS NOT A REFUSAL. A chat has to work with one person in it,
+   * so it answers ok with a warning.
+   * ⚠️ LIGHT MEDIA OTHER THAN MIDI ONLY. A heavy medium needs a session per
+   * receiver, which is an opener's job, and a MIDI `*` into every site with a
+   * thru is a loop at wire speed that the cycle walk cannot see.
+   */
+  function validateAny(fromId, toId, transforms = [], opts = {}) {
+    if (isAny(fromId) && isAny(toId)) {
+      return { ok: false, why: 'both ends are *, so the link names nobody.',
+               fix: 'Name one end: your own port, as in web-ab12:chat:out -> *:chat:in.' };
+    }
+    const anyEnd = isAny(fromId) ? fromId : toId, realId = isAny(fromId) ? toId : fromId;
+    const real = ports.get(realId);
+    if (!real) return { ok: false, why: `there is no port called ${realId}.`,
+                        fix: 'Nothing on this desk answers to that name, so this link cannot be made.' };
+    const want = isAny(fromId) ? 'in' : 'out';
+    if (real.dir !== want) {
+      return { ok: false, why: `${real.label} is an ${real.dir === 'in' ? 'input' : 'output'}, and a * at the other end needs an ${want === 'in' ? 'input' : 'output'} here.`,
+               fix: 'A * speaker is your out -> *:node:in, and a * listener is *:node:out -> your in.' };
+    }
+    if (HEAVY.includes(real.medium) || real.medium === 'midi') {
+      return { ok: false, why: `${real.label} carries ${real.medium}, and a * link is only for light media other than MIDI.`,
+               fix: real.medium === 'midi' ? 'Link each instrument by name, so a thru cannot close a loop.'
+                 : 'Link each receiver by name, so each gets a session of its own.' };
+    }
+    if ((transforms || []).length) {
+      return { ok: false, why: `${real.label} carries ${real.medium}, and transforms only work on MIDI notes and controllers.`,
+               fix: 'Make the link with no transforms.' };
+    }
+    if (typeof opts?.via === 'string' && opts.via) {
+      return { ok: false, why: `${real.label} carries ${real.medium}, which travels inside the link itself, so there is no transport to ask for.`,
+               fix: `Make the link without via ${opts.via}.` };
+    }
+    const badO = checkOptions(real.medium, opts?.options);   // link options, link-options.mjs
+    if (badO) return { ok: false, ...badO };
+    const matches = expand({ from: fromId, to: toId }, opts);
+    return { ok: true, why: '', matches, session: null,
+             ...(matches.length ? {} : { warn: `nobody matches ${anyEnd} yet` }) };
+  }
+
+  /**
+   * The concrete pairs a link stands for right now, each with the ordinary
+   * `validate`'s answer. A concrete link is one pair.
+   */
+  function expand(l, opts = {}) {
+    let pairs;
+    if (isAny(l.from)) {
+      pairs = [...ports.values()].filter((p) => p.dir === 'out' && endMatches(l.from, p.id, l.to)).map((p) => [p.id, l.to]);
+    } else if (isAny(l.to)) {
+      pairs = [...ports.values()].filter((p) => p.dir === 'in' && endMatches(l.to, p.id, l.from)).map((p) => [l.from, p.id]);
+    } else pairs = [[l.from, l.to]];
+    return pairs.map(([from, to]) => {
+      const v = validate(from, to, l.transforms || [], opts);
+      return { from, to, ok: v.ok, why: v.why || '' };
+    });
+  }
+
+  /**
+   * Every concrete port an event leaving `fromId` would reach, along every
+   * enabled link, `*` links expanded and each pair validated now. This is what
+   * `bay-node.mjs` reads to decide whether an event has to cross the network.
+   */
+  function targets(fromId) {
+    const out = [];
+    for (const l of links.values()) {
+      if (!l.enabled) continue;
+      if (isAny(l.from) || isAny(l.to)) {
+        if (isAny(l.from) ? !endMatches(l.from, fromId, l.to) : l.from !== fromId) continue;
+        for (const m of expand({ from: isAny(l.from) ? fromId : l.from, to: l.to })) {
+          if (m.ok && m.from === fromId) out.push({ to: m.to, link: l });
+        }
+      } else if (l.from === fromId) out.push({ to: l.to, link: l });
+    }
+    return out;
+  }
+
+  /**
    * 🔴 WHAT A HEAVY LINK IS INSTEAD OF BYTES, plan §4: `{ transport, address,
    * shape, where, says }`, and each end opens it with code it already has.
    * Null for a light medium, whose link carries the bytes itself.
@@ -1195,6 +1322,20 @@ export function createBay({ now = () => Date.now() } = {}) {
         return { refuse: { why: `${via} never leaves one machine, and ${a.label} and ${b.label} are on two.`,
                            fix: `Leave via off and the link rides ${cell.find(allows) || t.transport}.` } };
       }
+      /* 🔴 AND THE REVERSE, SINCE 2026-10-09 (BACKLOG: *the bay accepts a wire
+         transport inside one tab*). `MACHINE_ONLY` stopped `page` crossing a
+         wire and nothing stopped `whep` being asked for between two ports of
+         ONE SITE: `/mirror/`'s own WebGL into its own left pane `via: 'whep'`
+         answered `ok, whep, machine`, a picture sent out to Cloudflare and back
+         into the tab that drew it. A site is one announcer (one tab, one
+         board), so both ends of such a link are already in the same process
+         or on the same machine.
+         ⚠️ SAME SITE, NOT SAME PLACE. Two tabs both placed `browser` are two
+         sites and may be two machines, so WHEP between them stays allowed. */
+      if (!MACHINE_ONLY.includes(via) && t.where === 'machine' && siteOf(a) === siteOf(b)) {
+        return { refuse: { why: `${a.label} and ${b.label} are both on ${siteOf(a)}, so ${via} would send it out over a wire and back to where it started.`,
+                           fix: `Leave via off and the link rides ${cell.find(allows) || t.transport}.` } };
+      }
       const bar = firstBar(via);
       if (bar) {
         return { refuse: { why: `${bar.label} only travels by ${only(bar)}, and this link asks for ${via}.`,
@@ -1237,6 +1378,9 @@ export function createBay({ now = () => Date.now() } = {}) {
       if (seenNodes.has(n)) return false;
       seenNodes.add(n);
       for (const l of links.values()) {
+        /* A `*` link is not walked: it is light and never MIDI (§4h), so it
+           cannot echo, and walking `*:chat` as a node would invent paths. */
+        if (isAny(l.from) || isAny(l.to)) continue;
         if (nodeOf(l.from) !== n) continue;
         if (medium && ports.get(l.from)?.medium !== medium) continue;
         if (walk(nodeOf(l.to))) return true;
@@ -1263,8 +1407,9 @@ export function createBay({ now = () => Date.now() } = {}) {
     if (!v.ok) return { ok: false, why: v.why, fix: v.fix || '' };
     const id = `L${nextLink++}`;
     links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0,
-                    session: v.session, ...(v.session?.via ? { via: v.session.via } : {}) });
-    return { ok: true, id, why: '', warn: v.warn, session: v.session };
+                    session: v.session, ...(v.session?.via ? { via: v.session.via } : {}),
+                    ...(opts.options && Object.keys(opts.options).length ? { options: { ...opts.options } } : {}) });
+    return { ok: true, id, why: '', warn: v.warn, session: v.session, ...(v.matches ? { matches: v.matches } : {}) };
   }
   function unlink(id) { return links.delete(id); }
 
@@ -1276,26 +1421,35 @@ export function createBay({ now = () => Date.now() } = {}) {
    * read identically to delivery while every note was being scheduled fifty six
    * years out.
    */
-  function send(fromId, ev) {
+  /* 🔴 SINCE 2026-10-09 (plans/plan-site-names.md §4h) `fromId` MAY BE ANOTHER
+     SITE'S PORT. A `bay.event` heard from the room is handed here, and it is
+     delivered only along a link this bay holds whose `from` matches it,
+     concretely or by `*`, into a port with a `deliver`, which only a page's own
+     in-ports have. Holding the link is the receiver's consent.
+     ⚠️ THE CLASS GUARD IS MIDI ONLY. `accepts` is a list of MIDI classes, so a
+     `value` event (a fader, a chat line) has no class and was dropped by this
+     line on every link, which nothing noticed because nothing sent one.
+     ⚠️ `meta` IS PASSED TO `deliver` AS ITS THIRD ARGUMENT with `from` and `to`,
+     so a page can draw who said it and when without a second channel. */
+  function send(fromId, ev, meta = {}) {
     seen(fromId);
     let out = 0;
-    for (const l of links.values()) {
-      if (l.from !== fromId || !l.enabled) continue;
+    for (const { to, link: l } of targets(fromId)) {
       const e = apply(l.transforms, ev);
       if (!e) { l.dropped++; continue; }
-      const dst = ports.get(l.to);
+      const dst = ports.get(to);
       if (!dst) continue;
-      if (!dst.accepts.includes(e.cls)) { l.dropped++; continue; }   // the guard is at the destination
+      if (dst.medium === 'midi' && !dst.accepts.includes(e.cls)) { l.dropped++; continue; }   // the guard is at the destination
       l.sent++;
       dst.heard++;
-      dst.deliver?.(e, l);
+      dst.deliver?.(e, l, { ...meta, from: fromId, to });
       out++;
     }
     return out;
   }
 
   return {
-    addPort, addNode, validate, link, unlink, send, seen,
+    addPort, addNode, validate, link, unlink, send, seen, expand, targets,
     port: (id) => ports.get(id),
     ports: () => [...ports.values()],
     node: (id) => nodes.get(id),
@@ -1309,7 +1463,7 @@ export function createBay({ now = () => Date.now() } = {}) {
     load(text, opts = {}) {
       const bad = [];
       for (const l of parsePatch(text)) {
-        const r = link(l.from, l.to, l.transforms, { ...opts, ...(l.via ? { via: l.via } : {}) });
+        const r = link(l.from, l.to, l.transforms, { ...opts, ...(l.via ? { via: l.via } : {}), ...(l.options ? { options: l.options } : {}) });
         if (!r.ok) bad.push({ line: printLink(l), why: r.why, fix: r.fix || '' });
       }
       return bad;
