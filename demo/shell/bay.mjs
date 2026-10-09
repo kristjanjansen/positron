@@ -142,8 +142,12 @@ export const READS = {
 };
 
 /** Every transport the two tables name, which is what `via` may ask for. */
+/* `whip` is a name a port may DECLARE (a camera publishing into Cloudflare) and the
+   table never chooses, so it is added here; without it `addPort` threw on any
+   graph announcing it, and every page in that room broke on `registry.fill`.
+   Found building /concepts/6/, 2026-10-09. */
 export const TRANSPORT_NAMES = [...new Set([...Object.values(TRANSPORTS), READS]
-  .flatMap((row) => Object.values(row)).flatMap((c) => [c.transport, c.or]).filter(Boolean))];
+  .flatMap((row) => Object.values(row)).flatMap((c) => [c.transport, c.or]).filter(Boolean).concat('whip'))];
 /** The transports that never leave one machine, so `via` cannot ask for them across a wire. */
 export const MACHINE_ONLY = ['webaudio', 'page', 'indexeddb'];
 

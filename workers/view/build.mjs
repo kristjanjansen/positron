@@ -503,6 +503,7 @@ const FILES = [
 
   ...extraPages(),
   ...demoFiles(),
+  ...conceptFiles(),
 ];
 
 /**
@@ -631,6 +632,34 @@ function demoFiles() {
       // deployed WITHOUT the demo/ prefix: the public URL is /<nn>-<name>/
       out.push([`${dir}/${e.name}`, `${dir.replace(/^demo\//, '')}/${e.name}`]);
     }
+  }
+  return out;
+}
+
+/**
+ * `demo/concepts/` deployed WHOLE, at /concepts/ and /concepts/<n>/, with no
+ * manifest row. Asked 2026-10-09: the concepts pages had to answer on the
+ * deploy without a card on the front page.
+ *
+ * ⚠️ A RULE AND NOT ROWS, ON PURPOSE. A manifest row is also a subject for
+ * `demo/verify.mjs`, which grades every `built` row, `unlisted` or not, and
+ * these pages publish nothing for it to grade beyond the shell's own. And a
+ * row per page means a new `concepts/11/` deploys only after somebody
+ * remembers to add one. This walks the directory, so a new page ships on the
+ * next build with no edit anywhere.
+ * ⚠️ SAME CONTAINMENT AS demoFiles(): one known subtree, filtered to the same
+ * web extensions, so nothing from the repo root can reach public/.
+ */
+function conceptFiles(rel = 'demo/concepts') {
+  const OK = new Set(['.html', '.mjs', '.js', '.css', '.json',
+                      '.png', '.jpg', '.jpeg', '.svg', '.webp']);
+  const out = [];
+  let entries = [];
+  try { entries = readdirSync(join(REPO, rel), { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const src = `${rel}/${e.name}`;
+    if (e.isDirectory()) out.push(...conceptFiles(src));
+    else if (e.isFile() && OK.has(extname(e.name))) out.push([src, src.replace(/^demo\//, '')]);
   }
   return out;
 }

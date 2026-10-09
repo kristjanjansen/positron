@@ -1,5 +1,7 @@
 ## Open
 
+- **Concepts pages are not deployed** (found 2026-10-09). `build.mjs` copies only manifest demos, so `/concepts/` and its pages exist on the local server only. For the presentation they need a manifest row (probably `unlisted: true`) or a build rule. Owner to decide.
+- **Concepts 6 broadcast shares /cam/'s WHIP input** (2026-10-09). One camera at a time (409 otherwise), a hold over 5 min can be taken over by `/cam/`, 20 publishes an hour. One headless loop measured 512 frames up to 1280x720. Its `filled()` workaround for `whip` can go now that `bay.mjs` knows `whip`.
 - **Concepts 5: toward stage, an admin chat message** (2026-10-09). Asked: *"concept 5: lets move towards stage. for now do concepts 4 copy to 5 and have concept of "admin chat message" somehow. First on page or figure it out"*. `demo/concepts/5/`.
 - ~~**Bay: chat core, a `*` link and a light link across the network**~~ BUILT 2026-10-09 (§4h): `value` carries text, `*` site link one to many, `bay.event` over the room via `node.emit`; concepts 3 and 4 rebuilt on it, never run in two tabs. Open: first-join race (event before announce is refused), two tabs read `where: machine` to each other. Concepts 5 still on raw `chat.line`, port it.
 - ~~**Store announces itself while recording** (2026-10-09, §4g).~~ DEPLOYED 2026-10-09, `positron-store` version `dc221b61`, heard live in a throwaway room at 0.5 s and 9.8 s; not committed. Follow-up: `/concepts/4/` and `/5/` still announce it locally too, harmless, remove later.
