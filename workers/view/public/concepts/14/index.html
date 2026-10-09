@@ -231,7 +231,8 @@
     const k = Math.max(1, Math.floor(Math.min(oledBox.clientWidth / OLED_W, oledBox.clientHeight / OLED_H)));
     oledCv.style.width = `${k * OLED_W}px`; oledCv.style.height = `${k * OLED_H}px`;
   }).observe(oledBox);
-  const picoSays = el('span', 'cc-pico-say', 'off');
+  // The footer's middle says the screen's resolution, and only says otherwise while it loads or if it failed.
+  const picoSays = el('span', 'cc-pico-say', '128\u00d764');
   const showing = () => bay.links().some((l) => l.from === `${S}:pico:video-out` && l.to === `${S}:oled:video-in`);
   async function picoStart() {
     if (pico.state !== 'off') return;
@@ -245,7 +246,7 @@
         if (showing()) drawOled(oledCv, px);
       } });
       pico.runner.boot(image);
-      pico.state = 'running'; picoSays.textContent = 'running'; oledBox.title = '';
+      pico.state = 'running'; picoSays.textContent = '128\u00d764'; oledBox.title = '';
       d.log(`the Pico booted rings-pico.uf2, ${image.length.toLocaleString('en')} bytes of flash`);
       if (pico.queue.length) { pico.runner.send(pico.queue); pico.queue = []; }
     } catch (e) {
@@ -434,8 +435,11 @@
   // The knobs and the keyboard are one instrument, glued, as on /fau/.
   const instrument = createInstrumentPanel({ keys: host, plate: false });
   instrument.addRow(knobs.el);
-  const panel = createVideoPanel({ media: canvas, left: false });
-  const picoPanel = createVideoPanel({ media: oledBox, left: false, centre: picoSays });
+  // Each panel names the device that draws it on the left and its resolution in the middle.
+  const glRes = el('span', 'cc-pico-say', '');
+  const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-pico-say', 'Browser GPU'), centre: glRes });
+  const picoPanel = createVideoPanel({ media: oledBox, left: el('span', 'cc-pico-say', 'Pico (emulated)'), centre: picoSays });
+  setInterval(() => { const t = `${canvas.width}\u00d7${canvas.height}`; if (glRes.textContent !== t) glRes.textContent = t; }, 500);
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, picoPanel.el);
   out.append(pair, surface, instrument.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
