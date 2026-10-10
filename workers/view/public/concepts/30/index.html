@@ -60,14 +60,24 @@
     { key: 'ida', site: 'ida', node: 'tallinn', mount: 'ida-tallinn', name: 'Ida Tallinn', label: 'Ida Radio Tallinn', kbps: 320 },
   ];
   const outOf = (st) => `${st.site}:${st.node}:audio-out`;
+  // The relay is a hop of its own: it holds the one connection to the station
+  // and every tab reads the relay, so the station's link ends there.
+  const relayIn = (st) => `shout:${st.mount}:audio-in`, relayOut = (st) => `shout:${st.mount}:audio-out`;
+  // Each station's wave is its own node, fed from the relay before the fader.
+  const waveIn = (st) => `${S}:wave-${st.key}:audio-in`;
   const FADER_IN = `${S}:fader:audio-in`, FADER_OUT = `${S}:fader:audio-out`, SPEAKER_IN = `${S}:speaker:audio-in`;
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
   for (const st of STATIONS) {
     bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.label, place: st.site, net: st.site });
-    bay.addPort({ id: outOf(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'],
+    bay.addPort({ id: outOf(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'] });
+    bay.addNode({ id: `shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'shout' });
+    bay.addPort({ id: relayIn(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
+    bay.addPort({ id: relayOut(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'],
       address: `${BASE}/${st.mount}` });
+    bay.addNode({ id: `${S}:wave-${st.key}`, kind: 'screen', label: `${st.key === 'err' ? 'ERR' : 'Ida'} wave`, place: 'browser' });
+    bay.addPort({ id: waveIn(st), label: 'wave', dir: 'in', medium: 'audio' });
   }
   bay.addNode({ id: `${S}:fader`, kind: 'engine', label: 'crossfader', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
@@ -79,7 +89,7 @@
   conceptNav(30);
 
   // ── the sound: two streams, two gains, one AudioContext ──────────────────
-  let ctx = null, sum = null;
+  let ctx = null, sum = null, pull = null;
   const legs = new Map();          // key -> { stream, gain, tap, buf, live }
   let x = 0.5;                     // 0 is all ERR, 1 is all Ida
   const gains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];   // equal power
@@ -107,12 +117,12 @@
 
   hold(FADER_OUT, SPEAKER_IN);
   // Asked once on load WITHOUT consent, so the refusal is on the page in the bay's own words.
-  hold(outOf(STATIONS[0]), FADER_IN);
+  hold(outOf(STATIONS[0]), relayIn(STATIONS[0]));
 
   const pb = createPatchbay(bay, {
     flowing: (l) => {
       if (l.from === FADER_OUT) return [...legs.values()].some((g) => g.live);
-      const st = STATIONS.find((s) => outOf(s) === l.from);
+      const st = STATIONS.find((s) => outOf(s) === l.from || relayOut(s) === l.from);
       return !!(st && legs.get(st.key)?.live);
     },
   });
@@ -129,10 +139,29 @@
   const pair = el('div', 'cc-pair');
   pair.append(...panels.map((p) => p.el));
 
+  // The sound follows the links the bay holds, as on /concepts/11/: a station
+  // reaches the fader only along relay -> fader, its wave only along relay ->
+  // wave, and the fader the speakers only along fader -> speaker. Unlink one
+  // and that edge goes quiet.
+  const holds = (a, b) => held.has(`${a} ${b}`);
+  function route() {
+    if (!ctx) return;
+    for (const st of STATIONS) {
+      const g = legs.get(st.key);
+      if (!g) continue;
+      try { g.tap.disconnect(); } catch { /* not connected */ }
+      g.tap.connect(pull);
+      if (holds(relayOut(st), FADER_IN)) g.tap.connect(g.gain);
+      g.wave = holds(relayOut(st), waveIn(st));
+    }
+    try { sum.disconnect(); } catch { /* not connected */ }
+    if (holds(FADER_OUT, SPEAKER_IN)) sum.connect(ctx.destination);
+  }
+
   function frame() {
     if (!legs.size) return;
     for (const [key, g] of legs) {
-      if (!g.live) continue;
+      if (!g.live || !g.wave) continue;
       g.tap.getFloatTimeDomainData(g.buf);
       scopes.get(key).feed(g.buf, ctx.sampleRate);
     }
@@ -144,17 +173,28 @@
   function play() {
     ctx ??= new AudioContext();
     ctx.resume();
-    if (!sum) { sum = ctx.createGain(); sum.connect(ctx.destination); }
+    if (!sum) {
+      sum = ctx.createGain();
+      // A silent sink that keeps every tap pulled, so a wave reads its station
+      // whether or not that station reaches the fader.
+      pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+    }
     playing = true;
     for (const st of STATIONS) {
       // The press is the person asking to listen, so the link carries consent.
-      if (!hold(outOf(st), FADER_IN, { consent: true, via: 'https' })) continue;
+      // The relay fetches the station; the page reads the relay, into the
+      // fader and into the station's own wave.
+      if (!hold(outOf(st), relayIn(st), { consent: true, via: 'https' })) continue;
+      hold(relayOut(st), FADER_IN, { via: 'https' });
+      hold(relayOut(st), waveIn(st), { via: 'https' });
       const gain = ctx.createGain(), tap = ctx.createAnalyser();
       tap.fftSize = 2048;
       const stream = createMp3Stream(ctx, { url: `${BASE}/${st.mount}`, log: (m) => d.log(`${st.label}: ${m}`) });
       // Through the tap, not beside it: an analyser nothing pulls from reads
       // silence, so the sound passes it on its way to the fader, as on /radio/.
-      stream.node.connect(tap).connect(gain).connect(sum);
+      // The tap -> gain -> fader edge is made by route(), from the bay's links.
+      stream.node.connect(tap);
+      gain.connect(sum);
       const leg = { stream, gain, tap, buf: new Float32Array(tap.fftSize), live: false };
       legs.set(st.key, leg);
       stream.started.then((path) => {
@@ -164,6 +204,7 @@
       }).catch((e) => d.log(`${st.label} did not start: ${e?.message || e}`, 'warn'));
     }
     applyFade();
+    route();
     pb.refresh();
     face();
     requestAnimationFrame(frame);
@@ -173,7 +214,9 @@
     for (const st of STATIONS) {
       const g = legs.get(st.key);
       if (g) { try { g.stream.stop(); } catch { /* already stopped */ } try { g.gain.disconnect(); } catch { /* gone */ } }
-      drop(outOf(st), FADER_IN);
+      drop(outOf(st), relayIn(st));
+      drop(relayOut(st), FADER_IN);
+      drop(relayOut(st), waveIn(st));
     }
     legs.clear();
     pb.refresh();
