@@ -26,6 +26,7 @@
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { makeCcSend } from '/shell/cc-adapter.mjs';
+  import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
   // The keyboard and two knobs playing Yoshimi on the Raspberry Pi in studio-1,
   // the way /knobs/ does: notes and CCs go to the board over the relay through
@@ -50,10 +51,11 @@
 
   // ── the bay: this page's nodes and the ports the Pi announces ───────────
   // The Pi's ids are boardGraph's (demo/shell/graph-registry.mjs): the site is
-  // the room, `yoshimi:in` takes notes and CCs, `yoshimi:audio` is its sound.
+  // `pi-1` and its room is `studio-1`, `yoshimi:midi-in` takes notes and CCs,
+  // `yoshimi:audio-out` is its sound.
   const S = 'web';
   const id = (n, p) => `${S}:${n}:${p}`;
-  const SYNTH_IN = `${ROOM}:yoshimi:in`, SYNTH_AUDIO = `${ROOM}:yoshimi:audio`;
+  const SYNTH_IN = boardPort('yoshimi', 'midi-in'), SYNTH_AUDIO = boardPort('yoshimi', 'audio-out');
   const bay = createBay();
   const KNOBS = [
     { name: 'cutoff', label: 'cutoff', cc: CUTOFF, home: CUTOFF_HOME },
@@ -61,7 +63,7 @@
   ];
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
   for (const k of KNOBS) bay.addNode({ id: `${S}:knob-${k.name}`, kind: 'person', label: `knob CC ${k.cc}`, place: 'browser' });
-  bay.addNode({ id: `${ROOM}:yoshimi`, kind: 'engine', label: 'Yoshimi on the Pi', place: ROOM });
+  bay.addNode({ id: `${BOARD_SITE}:yoshimi`, kind: 'engine', label: 'Yoshimi on the Pi', place: ROOM });
   bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
 
@@ -71,7 +73,7 @@
     const out = gate.tick(performance.now());
     if (out && armed && board) board.send({ type: 'ctl.set', channel: 0, set: out.set });
   }
-  // What reaches yoshimi:in leaves for the board, and only once it is armed.
+  // What reaches yoshimi:midi-in leaves for the board, and only once it is armed.
   function toSynth(ev) {
     if (ev.cls === 'note') {
       if (!armed || !board) return;
@@ -190,6 +192,7 @@
       board.send({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
       await wait(PATCH_SETTLE_MS);
       armed = true;
+      say(`${PATCH} on the Raspberry Pi, play the keys`);
       for (const k of KNOBS) gate.put(k.cc, Math.round(knobs.get(k.name).value?.() ?? k.home), { end: true });
       pump();
       transport.setIcon('play', 'stop', 'stop');
@@ -219,5 +222,20 @@
   top.append(transport.el, said);
   d.stack.add(top, wave.el, grid.el, host, pb.el);
   window.__demo.bay = bay;
+  // What this page hears from the Pi, for a driver: the scope's level and the
+  // board's own counters (frames, lost, peak, via). Reads only.
+  // `bright` is mean |first difference| over mean |sample|, which rises with
+  // high partials, so a closed filter reads lower than an open one.
+  window.__demo.probe = () => {
+    let bright = null;
+    if (analyser) {
+      const b = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(b);
+      let dsum = 0, asum = 0;
+      for (let i = 1; i < b.length; i++) { dsum += Math.abs(b[i] - b[i - 1]); asum += Math.abs(b[i]); }
+      bright = asum > 1e-3 ? dsum / asum : null;
+    }
+    return { armed, level, bright, said: said.textContent, stats: board ? board.stats() : null };
+  };
   d.ready();
 </script>

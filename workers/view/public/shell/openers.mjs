@@ -233,8 +233,12 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
     };
   }
 
-  async function video(l) {
-    const site = l.from.split(':')[0];
+  async function video(l, b) {
+    // 🔴 THE ROOM IS THE BOARD NODE'S PLACE, NOT THE PORT'S SITE. They were the
+    // same string until 2026-10-10, when the Pi's site became `pi-1` and its
+    // room stayed `studio-1` (plans/plan-site-names.md §0); asking the site
+    // would send `video.start` to a room nobody is in.
+    const room = b?.node(nodeOf(l.from))?.place ?? l.from.split(':')[0];
     if (typeof VideoDecoder !== 'function') throw new Error('this browser has no WebCodecs, so the board’s video cannot be decoded here');
     // 🔴 SIZE AND RATE ARE THE LINK'S, `{ w 640, h 360, fps 15 }` (link-options.mjs).
     // A link with none asks 1280x720 at 30, the message this sent before. The
@@ -243,7 +247,7 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
     const bad = checkOptions('video', l.options);
     if (bad) throw new Error(bad.why);
     const ask = videoStart(l.options);
-    const board = await boardOn(site);
+    const board = await boardOn(room);
     const r = await board.ask(ask, 'video.started', 20000);
     if (!r || !r.ok) { board.close(); throw new Error(r ? (r.reason || 'the board refused') : 'the board did not answer within 20 s'); }
     // ⚠️ ONE ENCODER, SO THE FIRST VIEWER'S SIZE WINS. A board already drawing

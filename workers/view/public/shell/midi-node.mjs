@@ -5,7 +5,7 @@
 // WebMIDI device pages: `/circuit/`, `/evo/`, `/twelve/` and `/dump/`. Each
 // one already asks for MIDI on a press and listens to every input. What it
 // lacked is a way for `/patchbay/` to see this machine's instruments and link
-// them, which is plan §3.1's first gap, and `evo:out -> studio-1:circuit:in`
+// them, which is plan §3.1's first gap, and `evo:out -> pi-1:circuit:midi-in`
 // is `plan-patchbay.md`'s own first demo.
 //
 // ⚠️ WHY THIS FILE LIVES IN `demo/dump/` AND NOT IN `demo/shell/`. It is
@@ -57,7 +57,7 @@ import { createLinkBadge } from '/shell/link-badge.mjs';
 import { createOpeners } from '/shell/openers.mjs';
 import { createCore } from '/shell/route-core.mjs';
 import { createBay } from '/shell/bay.mjs';
-import { boardGraph } from '/shell/graph-registry.mjs';
+import { boardGraph, boardPort } from '/shell/graph-registry.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
 import { relayOverride } from '/shell/wire.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -340,6 +340,8 @@ export function fakeMidiAccess(devices) {
 }
 
 /** The board's graph as `demo/fake-board.mjs` announces it, typed from that file's own config. */
+/** The Circuit's MIDI in on the Pi, `pi-1:circuit:midi-in` since 2026-10-10. */
+const CIRCUIT_IN = boardPort('circuit', 'midi-in');
 const STAND_IN_BOARD = () => boardGraph({ room: 'studio-1', gpu: false, frameMs: 20,
   inputs: [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
 
@@ -413,16 +415,16 @@ export async function checkMidiNode({ assert, log, page, slug, tap = false }) {
   assert('a request about a port this page does not have is left for its own page, not answered here', r3 === null,
     r3 ? JSON.stringify(r3) : 'unanswered');
 
-  // 🔴 THE PLAN'S FIRST DEMO, `evo:out -> studio-1:circuit:in`. The board's
+  // 🔴 THE PLAN'S FIRST DEMO, `evo:out -> pi-1:circuit:midi-in`. The board's
   // graph is the stand-in's own, as `fake-board.mjs` builds it; under a plain
   // harness run the link is refused, and with a stand-in on this machine
   // (`?relay=` local, and `board=1` so the board module may send) it is opened
   // for real and the board counts what it wrote.
   bayPeer.send({ type: 'board.hello', graph: STAND_IN_BOARD() });
-  await until(() => !!scratch.node.registry.fill(createBay()).port('studio-1:circuit:in'), 600);
+  await until(() => !!scratch.node.registry.fill(createBay()).port(CIRCUIT_IN), 600);
   const driving = new URLSearchParams(location.search).get('board') === '1';
   if (!STAND_IN()) {
-    const r4 = await bayPeer.request(evoOut, 'studio-1:circuit:in', true, { timeoutMs: 1500 });
+    const r4 = await bayPeer.request(evoOut, CIRCUIT_IN, true, { timeoutMs: 1500 });
     assert('under the harness a link to the board’s Circuit is refused in words, because no stand-in board is on this machine',
       r4?.open === false && /no stand-in board/.test(r4.why || ''), r4?.why);
     log('the link to the board was graded as a refusal; a run with a stand-in board grades it for real '
@@ -435,8 +437,8 @@ export async function checkMidiNode({ assert, log, page, slug, tap = false }) {
     // fails does not go red, it drops every assert after it while the run
     // stays green. MEASURED: a forwarding sabotaged to send nothing read
     // 77/77 with three asserts missing, when the waits here were 6 s.
-    const r4 = await bayPeer.request(evoOut, 'studio-1:circuit:in', true, { timeoutMs: 1500 });
-    const h = scratch.opened(`${evoOut} studio-1:circuit:in`);
+    const r4 = await bayPeer.request(evoOut, CIRCUIT_IN, true, { timeoutMs: 1500 });
+    const h = scratch.opened(`${evoOut} ${CIRCUIT_IN}`);
     assert('the board\u2019s Circuit, asked for by the patchbay, is opened by this page on the stand-in board',
       r4?.open === true && !!h, r4?.open ? 'opened' : `refused: ${r4?.why}`);
     // ⚠️ THE BADGE TAKES ITS BASELINE HERE, BEFORE A NOTE IS PLAYED. Its first
@@ -462,7 +464,7 @@ export async function checkMidiNode({ assert, log, page, slug, tap = false }) {
       assert('a pitch bend the Circuit\u2019s port does not take stops here and the board writes nothing for it',
         h.sent() === sentWas && h.count() === was, `sent ${sentWas} then ${h.sent()}, board ${was} then ${h.count()}`);
     }
-    await bayPeer.request(evoOut, 'studio-1:circuit:in', false, { timeoutMs: 1500 });
+    await bayPeer.request(evoOut, CIRCUIT_IN, false, { timeoutMs: 1500 });
   }
 
   if (tap) {

@@ -705,15 +705,15 @@ const SHAPE = { rate: 48000, channels: 2, frameMs: 20 };
 /** A small world with every distance in it, and the facts that decide them. */
 function world() {
   const b = createBay();
-  b.addNode({ id: 'studio-1:circuit', kind: 'device', label: 'Circuit', place: 'studio-1', net: 'studio-lan' });
-  b.addNode({ id: 'studio-1:pi', kind: 'engine', label: 'board', place: 'studio-1', net: 'studio-lan' });
+  b.addNode({ id: 'pi-1:circuit', kind: 'device', label: 'Circuit', place: 'studio-1', net: 'studio-lan' });
+  b.addNode({ id: 'pi-1:pi', kind: 'engine', label: 'board', place: 'studio-1', net: 'studio-lan' });
   b.addNode({ id: 'm1:page', kind: 'screen', label: 'the M1', place: 'm1', net: 'studio-lan' });
   b.addNode({ id: 'home:page', kind: 'screen', label: 'a page at home', place: 'home', net: 'home-lan' });
   b.addNode({ id: 'away:page', kind: 'screen', label: 'a page away', place: 'away', net: 'cafe' });
   b.addNode({ id: 'err:vikerraadio', kind: 'external', label: 'Vikerraadio', place: 'err' });
-  b.addPort({ id: 'studio-1:circuit:audio', label: 'Circuit audio', dir: 'out', medium: 'audio', shape: SHAPE });
+  b.addPort({ id: 'pi-1:circuit:audio-out', label: 'Circuit audio', dir: 'out', medium: 'audio', shape: SHAPE });
   b.addPort({ id: 'err:vikerraadio:audio', label: 'Vikerraadio audio', dir: 'out', medium: 'audio', shape: SHAPE });
-  for (const [id, label] of [['studio-1:pi:audio', 'board in'], ['m1:page:audio', 'M1 audio'],
+  for (const [id, label] of [['pi-1:pi:audio-out', 'board in'], ['m1:page:audio', 'M1 audio'],
                              ['home:page:audio', 'home audio'], ['away:page:audio', 'away audio']]) {
     b.addPort({ id, label, dir: 'in', medium: 'audio', shape: SHAPE });
   }
@@ -793,10 +793,10 @@ function world() {
 {
   // C. Where the two ends are, which picks the column.
   const b = world();
-  const mach = b.link('studio-1:circuit:audio', 'studio-1:pi:audio');
-  const net = b.link('studio-1:circuit:audio', 'm1:page:audio');
-  const one = b.link('studio-1:circuit:audio', 'home:page:audio');
-  const many = b.link('studio-1:circuit:audio', 'away:page:audio');
+  const mach = b.link('pi-1:circuit:audio-out', 'pi-1:pi:audio-out');
+  const net = b.link('pi-1:circuit:audio-out', 'm1:page:audio');
+  const one = b.link('pi-1:circuit:audio-out', 'home:page:audio');
+  const many = b.link('pi-1:circuit:audio-out', 'away:page:audio');
   ok('one machine is machine, and the transport is the machine\'s',
     mach.session?.where === 'machine' && mach.session.transport === 'webaudio', JSON.stringify(mach.session));
   ok('two machines on one network is network, a data channel at 4 ms',
@@ -826,9 +826,9 @@ function world() {
 {
   // D. The address is derived from the link, the way the Pi derives rooms.
   const b = world();
-  const r = b.link('studio-1:circuit:audio', 'home:page:audio');
+  const r = b.link('pi-1:circuit:audio-out', 'home:page:audio');
   ok('a session\'s address is the source\'s place, node and port',
-    r.session?.address === 'studio-1-circuit-audio', r.session?.address);
+    r.session?.address === 'studio-1-pi-1-circuit-audio-out', r.session?.address);
   ok('and its shape is the source port\'s shape',
     JSON.stringify(r.session.shape) === JSON.stringify(SHAPE), JSON.stringify(r.session.shape));
   b.addNode({ id: 'rig:gpu', kind: 'engine', label: 'GPU', place: 'studio-1', net: 'studio-lan' });
@@ -839,7 +839,7 @@ function world() {
      the address above would pass on a bay that only splits strings. */
   ok('NEGATIVE CONTROL: the place in an address is the node\'s place, and the site follows it when the two differ',
     g.session?.address === 'studio-1-rig-gpu-video', g.session?.address);
-  const again = b.link('studio-1:circuit:audio', 'away:page:audio');
+  const again = b.link('pi-1:circuit:audio-out', 'away:page:audio');
   ok('two links out of one port share one address, so the second joins the first',
     again.session?.address === r.session.address, `${again.session?.address}`);
 }
@@ -862,7 +862,7 @@ function world() {
   ok('and the consent is not stored on the link',
     !('consent' in b.links().find((l) => l.id === yes.id)), 'no consent field');
   ok('a node of another kind needs no consent',
-    b.link('studio-1:circuit:audio', 'home:page:audio').ok);
+    b.link('pi-1:circuit:audio-out', 'home:page:audio').ok);
   ok('NEGATIVE CONTROL: an external node cannot be declared out of needing consent',
     b.addNode({ id: 'icecast:mount', kind: 'external', consent: false }).consent === true);
 
@@ -880,29 +880,29 @@ function world() {
 {
   // F. Transforms are MIDI operations.
   const b = world();
-  const r = b.link('studio-1:circuit:audio', 'home:page:audio', [{ op: 'transpose', by: 1 }]);
+  const r = b.link('pi-1:circuit:audio-out', 'home:page:audio', [{ op: 'transpose', by: 1 }]);
   ok('transforms on an audio link are refused, naming the medium and the transform',
     !r.ok && r.why.includes('audio') && r.why.includes('transpose') && /MIDI/.test(r.why), `${r.why} / ${r.fix}`);
   b.addPort({ id: 'home:page:tilt', label: 'tilt', dir: 'out', medium: 'value', shape: { range: [0, 1] } });
-  b.addPort({ id: 'studio-1:pi:cutoff', label: 'cutoff', dir: 'in', medium: 'value', shape: { range: [0, 1] } });
-  const v = b.link('home:page:tilt', 'studio-1:pi:cutoff', [{ op: 'channel', to: 1 }]);
+  b.addPort({ id: 'pi-1:pi:cutoff', label: 'cutoff', dir: 'in', medium: 'value', shape: { range: [0, 1] } });
+  const v = b.link('home:page:tilt', 'pi-1:pi:cutoff', [{ op: 'channel', to: 1 }]);
   ok('and on a value link too', !v.ok && v.why.includes('value'), v.why);
   /* NEGATIVE CONTROL: the same two links with no transforms are made, or the
      refusals above would be a bay that refuses those ports. The value link also
      proves a range is compared by value, since `[0, 1] !== [0, 1]`. */
   ok('NEGATIVE CONTROL: the same audio and value links with no transforms are made',
-    b.link('studio-1:circuit:audio', 'home:page:audio').ok && b.link('home:page:tilt', 'studio-1:pi:cutoff').ok);
+    b.link('pi-1:circuit:audio-out', 'home:page:audio').ok && b.link('home:page:tilt', 'pi-1:pi:cutoff').ok);
 }
 
 {
   // G. A light link carries its bytes, so it has no session.
   const b = world();
   b.addPort({ id: 'home:keys:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
-  b.addPort({ id: 'studio-1:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi', accepts: ['note'] });
+  b.addPort({ id: 'pi-1:circuit:midi-in', label: 'Circuit', dir: 'in', medium: 'midi', accepts: ['note'] });
   b.addPort({ id: 'm1:mirror:program', label: 'mirror', dir: 'out', medium: 'program', shape: { language: 'glsl' } });
-  b.addPort({ id: 'studio-1:pi:program', label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
-  const m = b.link('home:keys:out', 'studio-1:circuit:in');
-  const p = b.link('m1:mirror:program', 'studio-1:pi:program');
+  b.addPort({ id: 'pi-1:pi:program-in', label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
+  const m = b.link('home:keys:out', 'pi-1:circuit:midi-in');
+  const p = b.link('m1:mirror:program', 'pi-1:pi:program-in');
   ok('a MIDI link across the internet has no session, on the answer or the stored link',
     m.ok && m.session === null && b.links().find((l) => l.id === m.id).session === null);
   ok('and neither does a program, which is one message',
@@ -912,12 +912,12 @@ function world() {
 {
   // H. The text form of a heavy link is the same line, and the session comes back.
   const b = world();
-  const r = b.link('studio-1:circuit:audio', 'home:page:audio');
+  const r = b.link('pi-1:circuit:audio-out', 'home:page:audio');
   const line = b.text();
   const back = world();
   const refused = back.load(line);
   ok('a heavy link prints as a plain from -> to line with nothing about its session in it',
-    line === 'studio-1:circuit:audio -> home:page:audio', line);
+    line === 'pi-1:circuit:audio-out -> home:page:audio', line);
   ok('and read back into the same world it derives the same session',
     refused.length === 0 && JSON.stringify(back.links()[0].session) === JSON.stringify(r.session),
     JSON.stringify(back.links()[0]?.session));
@@ -928,15 +928,15 @@ function world() {
   // I. A loop is an echo of ONE medium. Value out and audio back is a patch.
   const b = world();
   b.addPort({ id: 'home:page:tilt', label: 'tilt', dir: 'out', medium: 'value', shape: {} });
-  b.addPort({ id: 'studio-1:pi:cutoff', label: 'cutoff', dir: 'in', medium: 'value', shape: {} });
-  b.addPort({ id: 'studio-1:pi:out', label: 'board out', dir: 'out', medium: 'audio', shape: SHAPE });
-  b.link('home:page:tilt', 'studio-1:pi:cutoff');
-  const r = b.link('studio-1:pi:out', 'home:page:audio');
+  b.addPort({ id: 'pi-1:pi:cutoff', label: 'cutoff', dir: 'in', medium: 'value', shape: {} });
+  b.addPort({ id: 'pi-1:pi:audio-out', label: 'board out', dir: 'out', medium: 'audio', shape: SHAPE });
+  b.link('home:page:tilt', 'pi-1:pi:cutoff');
+  const r = b.link('pi-1:pi:audio-out', 'home:page:audio');
   ok('a phone that sends a value to an engine may hear its audio back', r.ok, r.why);
   /* NEGATIVE CONTROL: a loop in one medium is still a loop. */
-  b.addPort({ id: 'studio-1:pi:level', label: 'level', dir: 'out', medium: 'value', shape: {} });
+  b.addPort({ id: 'pi-1:pi:level', label: 'level', dir: 'out', medium: 'value', shape: {} });
   b.addPort({ id: 'home:page:knob', label: 'knob', dir: 'in', medium: 'value', shape: {} });
-  const loop = b.link('studio-1:pi:level', 'home:page:knob');
+  const loop = b.link('pi-1:pi:level', 'home:page:knob');
   ok('NEGATIVE CONTROL: a value loop between the same two nodes is still refused',
     !loop.ok && /loop/.test(loop.why), loop.why);
 }
@@ -945,7 +945,7 @@ function world() {
   // J. Nodes are optional, listed, and refuse what they cannot be.
   const b = world();
   ok('nodes are listed and found by id',
-    b.nodes().length === 6 && b.node('studio-1:circuit')?.kind === 'device' && b.node('nope:x') === undefined,
+    b.nodes().length === 6 && b.node('pi-1:circuit')?.kind === 'device' && b.node('nope:x') === undefined,
     `${b.nodes().length} nodes`);
   ok('every kind in the plan is a kind here',
     NODE_KINDS.join(',') === 'device,engine,endpoint,store,external,screen,person');
@@ -963,7 +963,7 @@ function world() {
   b.addPort({ id: 'here:k:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
   const said = [
     b.link('err:vikerraadio:audio', 'home:page:audio'),
-    b.link('studio-1:circuit:audio', 'home:page:audio', [{ op: 'channel', to: 1 }]),
+    b.link('pi-1:circuit:audio-out', 'home:page:audio', [{ op: 'channel', to: 1 }]),
   ];
   ok('NEGATIVE CONTROL: the consent and transform refusals are a problem and something to do, not one said twice',
     said.every((s) => !s.ok && /\.$/.test(s.why) && /\.$/.test(s.fix)
@@ -979,9 +979,9 @@ function world() {
   b.addNode({ id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' });
   b.addPort({ id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' });
   b.addPort({ id: 'r2:recordings:out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' });
-  b.link('studio-1:circuit:audio', 'home:page:audio');
-  b.link('studio-1:circuit:audio', 'away:page:audio');
-  const rec = b.link('studio-1:circuit:audio', 'r2:recordings:in');
+  b.link('pi-1:circuit:audio-out', 'home:page:audio');
+  b.link('pi-1:circuit:audio-out', 'away:page:audio');
+  const rec = b.link('pi-1:circuit:audio-out', 'r2:recordings:in');
   ok('a sound into a store is a recording through ingest, one writer, at the store’s address',
     rec.ok && rec.session?.transport === 'ingest' && rec.session.where === 'internet-one'
       && rec.session.address === 'ingest.positron.studio', JSON.stringify(rec.session || rec.why));
@@ -992,7 +992,7 @@ function world() {
     && play.session.address === 'archive.positron.studio', JSON.stringify(play.session || play.why));
   /* NEGATIVE CONTROL: the same sound to a page that is not a store keeps the
      audio row, or the store rule would be true of every link. */
-  const page = b.link('studio-1:circuit:audio', 'm1:page:audio');
+  const page = b.link('pi-1:circuit:audio-out', 'm1:page:audio');
   ok('NEGATIVE CONTROL: a sound to a page that is not a store keeps the audio row',
     page.ok && page.session?.transport === 'datachannel', JSON.stringify(page.session || page.why));
 }
@@ -1035,11 +1035,11 @@ function world() {
   ok('and a second reader of the same object is R2 plus HLS', two.session?.transport === 'r2-hls'
     && two.session.where === 'internet-many', JSON.stringify(two.session || two.why));
   /* NEGATIVE CONTROL: the write path did not move with the read. */
-  const rec = b.link('studio-1:circuit:audio', 'r2:recordings:in');
+  const rec = b.link('pi-1:circuit:audio-out', 'r2:recordings:in');
   ok('NEGATIVE CONTROL: a sound into the store is still an upload through ingest', rec.session?.transport === 'ingest',
     JSON.stringify(rec.session || rec.why));
   /* A recording is not a receiver: a listener after it is the first one. */
-  const after = b.link('studio-1:circuit:audio', 'home:page:audio');
+  const after = b.link('pi-1:circuit:audio-out', 'home:page:audio');
   ok('a link into a store does not count as a receiver of the sound', after.session?.where === 'internet-one'
     && after.session.transport === 'relay', JSON.stringify(after.session || after.why));
   ok('every transport the tables name is one via may ask for, https included',
@@ -1050,10 +1050,10 @@ function world() {
 /** The board's GPU and a WHIP-only input, the two shapes plan-stage-patchbay F1 named. */
 function restricted() {
   const b = world();
-  b.addNode({ id: 'studio-1:gpu', kind: 'engine', label: 'GPU', place: 'studio-1', net: 'studio-lan' });
+  b.addNode({ id: 'pi-1:gpu', kind: 'engine', label: 'GPU', place: 'studio-1', net: 'studio-lan' });
   b.addNode({ id: 'cf:stage', kind: 'endpoint', label: 'stage input', place: 'cloudflare', net: 'cloudflare' });
   const V = { codec: 'h264' };
-  b.addPort({ id: 'studio-1:gpu:video', label: 'GPU', dir: 'out', medium: 'video', shape: V, transports: ['relay-h264'] });
+  b.addPort({ id: 'pi-1:gpu:video-out', label: 'GPU', dir: 'out', medium: 'video', shape: V, transports: ['relay-h264'] });
   b.addPort({ id: 'cf:stage:video', label: 'stage input', dir: 'out', medium: 'video', shape: V, transports: ['whep'] });
   b.addPort({ id: 'cf:open:video', label: 'open input', dir: 'out', medium: 'video', shape: V });
   for (const [id, label] of [['home:page:video', 'home screen'], ['away:page:video', 'away screen'], ['m1:page:video', 'M1 screen']]) {
@@ -1065,7 +1065,7 @@ function restricted() {
 {
   /* O. A port's own transports. */
   const b = restricted();
-  const gpu = b.link('studio-1:gpu:video', 'home:page:video');
+  const gpu = b.link('pi-1:gpu:video-out', 'home:page:video');
   ok('a port that only travels by relay-h264 gets the cell\'s second choice, not WHEP', gpu.ok
     && gpu.session?.transport === 'relay-h264' && gpu.session.where === 'internet-one', JSON.stringify(gpu.session || gpu.why));
   const first = b.link('cf:stage:video', 'home:page:video');
@@ -1084,7 +1084,7 @@ function restricted() {
   const s = restricted();
   s.addNode({ id: 'r2:clips', kind: 'store', label: 'clips', place: 'cloudflare', net: 'cloudflare' });
   s.addPort({ id: 'r2:clips:in', label: 'clips', dir: 'in', medium: 'video', shape: V0(), address: 'ingest.positron.studio' });
-  const rec = s.link('studio-1:gpu:video', 'r2:clips:in');
+  const rec = s.link('pi-1:gpu:video-out', 'r2:clips:in');
   ok('a recording of a restricted source is the store\'s leg and is not refused by the source\'s list',
     rec.ok && rec.session?.transport === 'ingest', JSON.stringify(rec.session || rec.why));
   let threw = '';
@@ -1109,7 +1109,7 @@ function V0() { return { codec: 'h264' }; }
   const re = restricted();
   ok('and loading that line into a fresh bay makes the same session', re.load(line).length === 0
     && re.links()[0]?.session?.transport === 'moq', JSON.stringify(re.links()[0]?.session));
-  const relay = b.link('studio-1:gpu:video', 'm1:page:video', [], { via: 'relay-h264' });
+  const relay = b.link('pi-1:gpu:video-out', 'm1:page:video', [], { via: 'relay-h264' });
   ok('a via the port allows, at a distance whose cell lists it, keeps the cell\'s words', relay.ok
     && relay.session?.transport === 'relay-h264', JSON.stringify(relay.session || relay.why));
   const bad = b.validate('cf:open:video', 'away:page:video', [], { via: 'carrier-pigeon' });
@@ -1135,22 +1135,22 @@ function V0() { return { codec: 'h264' }; }
   const b = createBay();
   b.addPort({ id: 'web-ab12:keys:out', label: 'keys at ab12', dir: 'out', medium: 'midi', emits: ['note'] });
   b.addPort({ id: 'web-cd34:keys:out', label: 'keys at cd34', dir: 'out', medium: 'midi', emits: ['note'] });
-  b.addPort({ id: 'studio-1:synth:in', label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'], heldBy: 'web-ab12' });
-  b.addPort({ id: 'studio-1:free:in', label: 'free synth', dir: 'in', medium: 'midi', accepts: ['note'] });
-  const other = b.validate('web-cd34:keys:out', 'studio-1:synth:in');
+  b.addPort({ id: 'pi-1:synth:midi-in', label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'], heldBy: 'web-ab12' });
+  b.addPort({ id: 'pi-1:free:midi-in', label: 'free synth', dir: 'in', medium: 'midi', accepts: ['note'] });
+  const other = b.validate('web-cd34:keys:out', 'pi-1:synth:midi-in');
   ok('a link into an input held by another site is refused, naming the holder', !other.ok
     && /held by web-ab12/.test(other.why) && /web-ab12/.test(other.fix || '') && !other.fix.includes(other.why),
     `${other.why} / ${other.fix}`);
-  const own = b.validate('web-ab12:keys:out', 'studio-1:synth:in');
+  const own = b.validate('web-ab12:keys:out', 'pi-1:synth:midi-in');
   ok('and the holder\'s own site may link into it', own.ok, own.why);
-  const asked = b.validate('web-cd34:keys:out', 'studio-1:synth:in', [], { site: 'web-ab12' });
-  const notAsked = b.validate('web-ab12:keys:out', 'studio-1:synth:in', [], { site: 'web-cd34' });
+  const asked = b.validate('web-cd34:keys:out', 'pi-1:synth:midi-in', [], { site: 'web-ab12' });
+  const notAsked = b.validate('web-ab12:keys:out', 'pi-1:synth:midi-in', [], { site: 'web-cd34' });
   ok('the asker is the page that says who it is, not the source', asked.ok && !notAsked.ok,
     `${asked.why || 'allowed'} | ${notAsked.why}`);
   /* NEGATIVE CONTROL: an input nobody holds takes links from anybody. */
-  const free = b.validate('web-cd34:keys:out', 'studio-1:free:in');
+  const free = b.validate('web-cd34:keys:out', 'pi-1:free:midi-in');
   ok('NEGATIVE CONTROL: an input nobody holds takes a link from any site', free.ok, free.why);
-  const made = b.link('web-cd34:keys:out', 'studio-1:synth:in');
+  const made = b.link('web-cd34:keys:out', 'pi-1:synth:midi-in');
   ok('and link refuses what validate refused, with the same words', !made.ok && made.why === other.why, made.why);
 }
 
@@ -1161,11 +1161,11 @@ function V0() { return { codec: 'h264' }; }
   const b = createBay();
   for (const n of [['web-ab12:webgl', 'engine', 'WebGL2'], ['web-ab12:left', 'screen', 'left picture'],
     ['web-cd34:left', 'screen', 'their left picture']]) b.addNode({ id: n[0], kind: n[1], label: n[2], place: 'browser' });
-  b.addNode({ id: 'studio-1:gpu', kind: 'engine', label: 'GPU', place: 'studio-1' });
+  b.addNode({ id: 'pi-1:gpu', kind: 'engine', label: 'GPU', place: 'studio-1' });
   b.addPort({ id: 'web-ab12:webgl:video', label: 'WebGL2', dir: 'out', medium: 'video' });
   b.addPort({ id: 'web-ab12:left:video', label: 'left picture', dir: 'in', medium: 'video' });
   b.addPort({ id: 'web-cd34:left:video', label: 'their left picture', dir: 'in', medium: 'video' });
-  b.addPort({ id: 'studio-1:gpu:video', label: 'GPU', dir: 'out', medium: 'video' });
+  b.addPort({ id: 'pi-1:gpu:video-out', label: 'GPU', dir: 'out', medium: 'video' });
   const tab = b.validate('web-ab12:webgl:video', 'web-ab12:left:video', [], { site: 'web-ab12', via: 'whep' });
   ok('whep asked for between two ports of one tab is refused, naming the site and the way out', !tab.ok
     && /both on web-ab12/.test(tab.why) && /whep/.test(tab.why) && /rides page/.test(tab.fix || ''),
@@ -1178,7 +1178,7 @@ function V0() { return { codec: 'h264' }; }
   const page = b.validate('web-ab12:webgl:video', 'web-ab12:left:video', [], { via: 'page' });
   ok('NEGATIVE CONTROL: and asking for page by name inside one tab is allowed', page.ok && page.session?.transport === 'page',
     page.why || page.session?.transport);
-  const across = b.validate('studio-1:gpu:video', 'web-ab12:left:video', [], { site: 'web-ab12', via: 'whep' });
+  const across = b.validate('pi-1:gpu:video-out', 'web-ab12:left:video', [], { site: 'web-ab12', via: 'whep' });
   ok('NEGATIVE CONTROL: a real cross-site whep is still accepted', across.ok
     && across.session?.transport === 'whep' && across.session.where !== 'machine', JSON.stringify(across.session || across.why));
   const tabs = b.validate('web-ab12:webgl:video', 'web-cd34:left:video', [], { via: 'whep' });
@@ -1199,13 +1199,13 @@ function V0() { return { codec: 'h264' }; }
   const two = b.link('web-cd34:webgl:video', 'far:screen:video').session?.address;
   ok('two tabs placed browser derive two addresses, each carrying its site', one === 'browser-web-ab12-webgl-video'
     && two === 'browser-web-cd34-webgl-video', `${one}, ${two}`);
-  b.addNode({ id: 'studio-1:circuit', kind: 'device', label: 'Circuit', place: 'studio-1' });
-  b.addPort({ id: 'studio-1:circuit:audio', label: 'Circuit audio', dir: 'out', medium: 'audio' });
+  b.addNode({ id: 'pi-1:circuit', kind: 'device', label: 'Circuit', place: 'pi-1' });
+  b.addPort({ id: 'pi-1:circuit:audio-out', label: 'Circuit audio', dir: 'out', medium: 'audio' });
   b.addPort({ id: 'far:screen:audio', label: 'far audio', dir: 'in', medium: 'audio' });
-  const pi = b.link('studio-1:circuit:audio', 'far:screen:audio').session?.address;
-  ok('NEGATIVE CONTROL: a site that is its own place keeps the address it had', pi === 'studio-1-circuit-audio', pi);
-  b.addPort({ id: 'studio-1:box:audio', label: 'box', dir: 'out', medium: 'audio', address: 'studio-1-box' });
-  const told = b.link('studio-1:box:audio', 'far:screen:audio').session?.address;
+  const pi = b.link('pi-1:circuit:audio-out', 'far:screen:audio').session?.address;
+  ok('NEGATIVE CONTROL: a site that is its own place keeps the address it had', pi === 'pi-1-circuit-audio-out', pi);
+  b.addPort({ id: 'pi-1:box:audio-out', label: 'box', dir: 'out', medium: 'audio', address: 'studio-1-box' });
+  const told = b.link('pi-1:box:audio-out', 'far:screen:audio').session?.address;
   ok('NEGATIVE CONTROL: a declared address still wins over any derivation', told === 'studio-1-box', told);
 }
 

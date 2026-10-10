@@ -28,7 +28,7 @@
 // *changed* every five seconds redraws `/graph/` on every beat and nobody sees
 // why.
 
-import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports, SITE_KINDS } from './graph-registry.mjs';
+import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports, SITE_KINDS, BOARD_SITE, boardPort } from './graph-registry.mjs';
 import { createBay } from './bay.mjs';
 
 let pass = 0, fail = 0;
@@ -57,52 +57,52 @@ console.log('\n== what a board says it is ==');
 
 {
   const g = desk();
-  ok('the graph is version 1 on the board\'s room', g.v === GRAPH_V && g.site === 'studio-1' && g.place === 'studio-1');
+  ok('the graph is version 1, on site pi-1 and placed in the board\'s room', g.v === GRAPH_V && g.site === 'pi-1' && g.place === 'studio-1');
   ok('and a graph built from the desk is one graphProblem accepts', graphProblem(g) === '', graphProblem(g));
   ok('a synth the board can start is an engine node',
-    node(g, 'studio-1:synth')?.kind === 'engine' && node(g, 'studio-1:yoshimi')?.kind === 'engine');
+    node(g, 'pi-1:synth')?.kind === 'engine' && node(g, 'pi-1:yoshimi')?.kind === 'engine');
   ok('with a MIDI in that takes notes',
-    port(g, 'studio-1:yoshimi:in')?.dir === 'in' && port(g, 'studio-1:yoshimi:in')?.medium === 'midi'
-    && port(g, 'studio-1:yoshimi:in').accepts.includes('note'));
+    port(g, 'pi-1:yoshimi:midi-in')?.dir === 'in' && port(g, 'pi-1:yoshimi:midi-in')?.medium === 'midi'
+    && port(g, 'pi-1:yoshimi:midi-in').accepts.includes('note'));
   ok('and an audio out at the board\'s frame',
-    port(g, 'studio-1:yoshimi:audio')?.dir === 'out' && port(g, 'studio-1:yoshimi:audio')?.medium === 'audio'
-    && port(g, 'studio-1:yoshimi:audio').shape.frameMs === 20 && port(g, 'studio-1:yoshimi:audio').shape.rate === 48000);
+    port(g, 'pi-1:yoshimi:audio-out')?.dir === 'out' && port(g, 'pi-1:yoshimi:audio-out')?.medium === 'audio'
+    && port(g, 'pi-1:yoshimi:audio-out').shape.frameMs === 20 && port(g, 'pi-1:yoshimi:audio-out').shape.rate === 48000);
   ok('NEGATIVE CONTROL: pappusFx is an insert, so it is not a node',
     !g.nodes.some((n) => /pappus/i.test(n.id)) && !g.ports.some((p) => /pappus/i.test(p.id)));
   ok('NEGATIVE CONTROL: a synth the board cannot start is not described',
-    !node(g, 'studio-1:zynaddsubfx') && !g.ports.some((p) => p.id.startsWith('studio-1:zynaddsubfx:')));
+    !node(g, 'pi-1:zynaddsubfx') && !g.ports.some((p) => p.id.startsWith('pi-1:zynaddsubfx:')));
   ok('the GPU takes a program and gives video',
-    node(g, 'studio-1:gpu')?.kind === 'engine'
-    && port(g, 'studio-1:gpu:program')?.dir === 'in' && port(g, 'studio-1:gpu:program')?.medium === 'program'
-    && port(g, 'studio-1:gpu:video')?.dir === 'out' && port(g, 'studio-1:gpu:video')?.medium === 'video');
+    node(g, 'pi-1:gpu')?.kind === 'engine'
+    && port(g, 'pi-1:gpu:program-in')?.dir === 'in' && port(g, 'pi-1:gpu:program-in')?.medium === 'program'
+    && port(g, 'pi-1:gpu:video-out')?.dir === 'out' && port(g, 'pi-1:gpu:video-out')?.medium === 'video');
   const noGpu = desk({ gpu: false });
   ok('NEGATIVE CONTROL: a board with no video path has no GPU node and no GPU port',
-    !node(noGpu, 'studio-1:gpu') && !noGpu.ports.some((p) => p.id.startsWith('studio-1:gpu:')));
+    !node(noGpu, 'pi-1:gpu') && !noGpu.ports.some((p) => p.id.startsWith('pi-1:gpu:')));
 }
 
 {
   const g = desk();
   ok('a hardware input is a device with its audio out',
-    node(g, 'studio-1:circuit')?.kind === 'device' && port(g, 'studio-1:circuit:audio')?.medium === 'audio'
-    && port(g, 'studio-1:circuit:audio')?.dir === 'out');
-  const inP = port(g, 'studio-1:circuit:in');
+    node(g, 'pi-1:circuit')?.kind === 'device' && port(g, 'pi-1:circuit:audio-out')?.medium === 'audio'
+    && port(g, 'pi-1:circuit:audio-out')?.dir === 'out');
+  const inP = port(g, 'pi-1:circuit:midi-in');
   ok('and an input with MIDI gets a MIDI in carrying its channels',
     inP?.dir === 'in' && inP?.medium === 'midi' && JSON.stringify(inP.shape?.channels) === '[1,2,10]');
   ok('NEGATIVE CONTROL: that MIDI in never takes SysEx, which is the gate the Circuit lives behind',
     inP?.never.includes('sysex') && !inP.accepts.includes('sysex'), JSON.stringify(inP?.never));
   const noMidi = boardGraph({ room: 'studio-1', inputs: [{ name: 'mic', channels: 1, midi: null }] });
   ok('NEGATIVE CONTROL: an input with no MIDI has no MIDI in',
-    port(noMidi, 'studio-1:mic:audio') && !port(noMidi, 'studio-1:mic:in'));
+    port(noMidi, 'pi-1:mic:audio-out') && !port(noMidi, 'pi-1:mic:midi-in'));
 }
 
 {
   const g = desk();
   const circuits = g.nodes.filter((n) => /circuit/i.test(n.id));
   ok('NEGATIVE CONTROL: the Circuit, already an input, is not described a second time from ALSA',
-    circuits.length === 1 && !node(g, 'studio-1:midi-circuit'), circuits.map((n) => n.id).join(', '));
+    circuits.length === 1 && !node(g, 'pi-1:midi-circuit'), circuits.map((n) => n.id).join(', '));
   ok('the other ALSA devices are described, with a MIDI out and in each',
-    port(g, 'studio-1:midi-microfreak:out')?.medium === 'midi' && port(g, 'studio-1:midi-microfreak:in')?.dir === 'in'
-    && node(g, 'studio-1:midi-digitakt')?.kind === 'device');
+    port(g, 'pi-1:midi-microfreak:midi-out')?.medium === 'midi' && port(g, 'pi-1:midi-microfreak:midi-in')?.dir === 'in'
+    && node(g, 'pi-1:midi-digitakt')?.kind === 'device');
   ok('NEGATIVE CONTROL: virtual ALSA clients are plumbing and are skipped',
     !g.nodes.some((n) => /virtual|virmidi/i.test(n.id + n.label)));
   const twice = boardGraph({ room: 'r', gpu: false, alsa: [{ client: 'Digitakt' }, { client: 'Digitakt' }] });
@@ -122,8 +122,8 @@ console.log('\n== what a graph has to be ==');
   const g = desk();
   const r1 = graphProblem({ ...g, v: 2 });
   ok('NEGATIVE CONTROL: a graph of another version is refused, and says which', /version 2/.test(r1), r1);
-  const r2 = graphProblem({ ...g, ports: [...g.ports, { id: 'studio-1:loose', dir: 'out', medium: 'midi' }] });
-  ok('NEGATIVE CONTROL: a port that is not site:node:port is refused, and named', /studio-1:loose/.test(r2), r2);
+  const r2 = graphProblem({ ...g, ports: [...g.ports, { id: 'pi-1:loose', dir: 'out', medium: 'midi' }] });
+  ok('NEGATIVE CONTROL: a port that is not site:node:port is refused, and named', /pi-1:loose/.test(r2), r2);
   const r3 = graphProblem({ ...g, nodes: [...g.nodes, { id: 'elsewhere:synth', kind: 'engine' }] });
   ok('NEGATIVE CONTROL: a node on another site is refused, and named', /elsewhere:synth/.test(r3), r3);
   const r4 = graphProblem({ ...g, ports: [...g.ports, { id: 'elsewhere:synth:in', dir: 'in', medium: 'midi' }] });
@@ -147,7 +147,7 @@ console.log('\n== what a page hears ==');
     reg.ingest({ type: 'board.alive', from: 'b1', graph: desk({ gpu: false }) }) === true);
   ok('NEGATIVE CONTROL: a bad graph is ignored and leaves the good one in place',
     reg.ingest({ type: 'board.alive', from: 'b1', graph: { ...g, v: 9 } }) === false
-    && reg.graphs().length === 1 && !reg.graphs()[0].graph.nodes.some((n) => n.id === 'studio-1:gpu'));
+    && reg.graphs().length === 1 && !reg.graphs()[0].graph.nodes.some((n) => n.id === 'pi-1:gpu'));
   ok('NEGATIVE CONTROL: a message of another type is not read even when it carries a graph',
     reg.ingest({ type: 'midi.send', from: 'b2', graph: g }) === false && reg.graphs().length === 1);
   ok('NEGATIVE CONTROL: a message with no sender is not read',
@@ -178,7 +178,7 @@ console.log('\n== what a page hears ==');
   const m = reg.merged();
   ok('two sockets for one site merge as one site', m.sites.length === 1 && m.sites[0].from === 'new-socket');
   ok('NEGATIVE CONTROL: the freshest wins, so the older socket\'s GPU is not drawn',
-    !m.nodes.some((n) => n.id === 'studio-1:gpu'));
+    !m.nodes.some((n) => n.id === 'pi-1:gpu'));
   ok('NEGATIVE CONTROL: and no node is drawn twice',
     new Set(m.nodes.map((n) => n.id)).size === m.nodes.length);
   reg.ingest({ type: 'graph.announce', from: 'page-1',
@@ -200,17 +200,17 @@ console.log('\n== into a bay ==');
               { id: 'home:page:keys', label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] }] } });
   const b = reg.fill(createBay());
   ok('fill gives a bay with every node heard', b.nodes().length === reg.merged().nodes.length, `${b.nodes().length} nodes`);
-  const bad = b.validate('studio-1:yoshimi:audio', 'studio-1:circuit:in');
+  const bad = b.validate('pi-1:yoshimi:audio-out', 'pi-1:circuit:midi-in');
   ok('NEGATIVE CONTROL: audio into a MIDI in is refused, for the medium',
     !bad.ok && /audio/.test(bad.why) && /midi/.test(bad.why), bad.why);
-  const good = b.link('studio-1:yoshimi:audio', 'home:page:audio');
+  const good = b.link('pi-1:yoshimi:audio-out', 'home:page:audio');
   // A board synth's sound lives in the board's MAIN room (2026-10-04), so the
   // session names that room, not a derivation of the port's id.
   ok('a valid audio link is made, and carries a session in the board\'s own room',
     good.ok && good.session && good.session.address === 'studio-1', JSON.stringify(good.session));
   ok('and the session knows the two ends are on different machines',
     /^internet/.test(good.session?.where || ''), good.session?.where);
-  const keys = b.link('home:page:keys', 'studio-1:yoshimi:in');
+  const keys = b.link('home:page:keys', 'pi-1:yoshimi:midi-in');
   ok('a page\'s keys may reach a board synth, and a MIDI link has no session',
     keys.ok && keys.session === null, keys.why);
 }
@@ -227,8 +227,8 @@ console.log('\n== into a bay ==');
     ports: [{ id: 'web:screen:audio', label: 'screen', dir: 'in', medium: 'audio' },
             { id: 'web:screen:video', label: 'screen', dir: 'in', medium: 'video' }] } });
   const bay = reg.fill(createBay());
-  const a = bay.link('studio-1:circuit:audio', 'web:screen:audio');
-  const v = bay.link('studio-1:gpu:video', 'web:screen:video');
+  const a = bay.link('pi-1:circuit:audio-out', 'web:screen:audio');
+  const v = bay.link('pi-1:gpu:video-out', 'web:screen:video');
   ok('an input\'s stream is addressed to the room the board really uses', a.session?.address === 'studio-1-circuit', a.session?.address);
   ok('and the GPU\'s to its video room', v.session?.address === 'studio-1-video', v.session?.address);
   // NEGATIVE CONTROL: a port with no declared address still gets the derived one.
@@ -272,15 +272,15 @@ console.log('\n== into a bay ==');
   const g = boardGraph({ room: 'studio-1', instruments: { synth: true }, inputs: [{ name: 'circuit', midi: null }] });
   const tx = (id) => g.ports.find((p) => p.id === id)?.transports?.join(',');
   ok('the board declares relay or a data channel for its sound and relay H.264 for its picture',
-    tx('studio-1:synth:audio') === 'relay,datachannel' && tx('studio-1:circuit:audio') === 'relay,datachannel'
-      && tx('studio-1:gpu:video') === 'relay-h264', `${tx('studio-1:synth:audio')} | ${tx('studio-1:gpu:video')}`);
+    tx('pi-1:synth:audio-out') === 'relay,datachannel' && tx('pi-1:circuit:audio-out') === 'relay,datachannel'
+      && tx('pi-1:gpu:video-out') === 'relay-h264', `${tx('pi-1:synth:audio-out')} | ${tx('pi-1:gpu:video-out')}`);
   ok('NEGATIVE CONTROL: a MIDI in and a program in declare no transport, because they carry their own bytes',
     !g.ports.some((p) => p.dir === 'in' && p.transports));
   /* A board that predates the field, as the Pi on the desk does until a push. */
   const old = { ...g, ports: g.ports.map(({ transports, ...p }) => p) };
   const reg = createRegistry();
   reg.ingest({ type: 'board.alive', from: 'b', graph: old });
-  const heard = reg.merged().ports.find((p) => p.id === 'studio-1:gpu:video');
+  const heard = reg.merged().ports.find((p) => p.id === 'pi-1:gpu:video-out');
   ok('a board graph that says nothing about transports is given the board\'s own on ingest',
     heard?.transports?.join(',') === BOARD_TRANSPORTS.video.join(','), JSON.stringify(heard?.transports));
   /* NEGATIVE CONTROLS: a page's announce is not touched, and a board that says something keeps it. */
@@ -290,11 +290,11 @@ console.log('\n== into a bay ==');
     !reg.merged().ports.find((p) => p.id === 'cam-1:cam:video')?.transports);
   const own = withBoardTransports({ ...old, ports: old.ports.map((p) => (p.medium === 'video' ? { ...p, transports: ['whep'] } : p)) });
   ok('NEGATIVE CONTROL: a board port that already names its transports keeps them',
-    own.ports.find((p) => p.id === 'studio-1:gpu:video').transports.join(',') === 'whep');
+    own.ports.find((p) => p.id === 'pi-1:gpu:video-out').transports.join(',') === 'whep');
   const b = reg.fill(createBay());
   b.addNode({ id: 'home:page', kind: 'screen', label: 'home', place: 'home' });
   b.addPort({ id: 'home:page:video', label: 'home', dir: 'in', medium: 'video', shape: { codec: 'h264' } });
-  const v = b.link('studio-1:gpu:video', 'home:page:video');
+  const v = b.link('pi-1:gpu:video-out', 'home:page:video');
   ok('so the bay gives the board\'s picture relay H.264, the way the page really opens it, and not WHEP',
     v.ok && v.session?.transport === 'relay-h264', JSON.stringify(v.session || v.why));
 }
@@ -305,7 +305,7 @@ console.log('\n== into a bay ==');
 {
   const g = boardGraph({ room: 'studio-1', instruments: { synth: true }, gpu: false });
   ok('a board graph says it is a board, named Raspberry Pi', g.kind === 'board' && g.label === 'Raspberry Pi', `${g.kind} ${g.label}`);
-  ok('and its ids are still site:node:port on the room', g.site === 'studio-1' && g.ports.every((p) => p.id.startsWith('studio-1:')) && g.v === 1);
+  ok('and its ids are site:node:port on pi-1, not on the room', g.site === 'pi-1' && g.ports.every((p) => p.id.startsWith('pi-1:')) && g.v === 1);
   ok('a board may be given another label', boardGraph({ room: 'r', gpu: false, label: 'pi in the hall' }).label === 'pi in the hall');
   ok('every listed kind passes', SITE_KINDS.every((k) => graphProblem({ v: 1, site: 's', kind: k, nodes: [], ports: [] }) === ''), SITE_KINDS.join(','));
   ok('a graph with no kind and no label still passes', graphProblem({ v: 1, site: 's', nodes: [], ports: [] }) === '');
@@ -323,11 +323,45 @@ console.log('\n== into a bay ==');
   reg.ingest({ type: 'graph.announce', from: 'old', graph: { ...old, site: 'studio-2', nodes: [], ports: [] } });
   const bad = reg.ingest({ type: 'graph.announce', from: 'typo', graph: { v: 1, site: 'web-zz', kind: 'phone', nodes: [], ports: [] } });
   const sites = Object.fromEntries(reg.merged().sites.map((x) => [x.site, x]));
-  ok('merged sites carry the board\'s kind and label', sites['studio-1']?.kind === 'board' && sites['studio-1']?.label === 'Raspberry Pi');
+  ok('merged sites carry the board\'s kind and label', sites['pi-1']?.kind === 'board' && sites['pi-1']?.label === 'Raspberry Pi');
   ok('and a browser\'s', sites['web-ab12']?.kind === 'browser' && sites['web-ab12']?.label === 'browser');
   ok('NEGATIVE CONTROL: a site that said nothing gets no kind, so a reader falls back to place',
     sites['studio-2'] && sites['studio-2'].kind === undefined && sites['studio-2'].label === undefined);
   ok('NEGATIVE CONTROL: a graph with a bad kind is not heard at all', bad === false && !sites['web-zz']);
+}
+
+/* The Pi's site is `pi-1` and its port names are `<medium>-<dir>`, since
+   2026-10-10 (plans/plan-site-names.md §0, §4c). The room stays `studio-1`, so
+   every stream address is unchanged. Six of the eleven below are NEGATIVE
+   CONTROLS, written so the bug each names would take it red. */
+{
+  const g = desk();
+  const names = g.ports.map((p) => p.id.split(':')[2]);
+  ok('every board port is named for its medium and direction',
+    g.ports.every((p) => p.id.split(':')[2] === `${p.medium}-${p.dir}`), names.join(','));
+  ok('boardPort names a port the board really announces', BOARD_SITE === 'pi-1'
+    && g.ports.some((p) => p.id === boardPort('yoshimi', 'midi-in')) && boardPort('gpu', 'video-out') === 'pi-1:gpu:video-out');
+  ok('the addresses still name the room, so no stream moved',
+    g.ports.find((p) => p.id === 'pi-1:yoshimi:audio-out')?.address === 'studio-1'
+    && g.ports.find((p) => p.id === 'pi-1:gpu:video-out')?.address === 'studio-1-video'
+    && g.ports.find((p) => p.id === 'pi-1:circuit:audio-out')?.address === 'studio-1-circuit');
+  const two = boardGraph({ room: 'studio-2', site: 'pi-2', instruments: { synth: true }, gpu: false });
+  ok('a second board says pi-2 and still lives in its own room', two.site === 'pi-2' && two.place === 'studio-2'
+    && two.ports.every((p) => p.id.startsWith('pi-2:')) && graphProblem(two) === '', graphProblem(two));
+  ok('NEGATIVE CONTROL: no board id is left on the room', !JSON.stringify(g.ports.map((p) => p.id)).includes('studio-1:'));
+  const rename = (from, to) => ({ ...g, ports: g.ports.map((p) => (p.id === from ? { ...p, id: to } : p)) });
+  const old = rename('pi-1:yoshimi:audio-out', 'pi-1:yoshimi:audio');
+  ok('NEGATIVE CONTROL: a board port with the old bare name is refused, and the reason names it',
+    /pi-1:yoshimi:audio is named audio/.test(graphProblem(old)), graphProblem(old));
+  const backwards = rename('pi-1:yoshimi:midi-in', 'pi-1:yoshimi:midi-out');
+  ok('NEGATIVE CONTROL: a name that says out on an in port is refused', /audio-out|midi-in/.test(graphProblem(backwards)), graphProblem(backwards));
+  const wrongMedium = rename('pi-1:gpu:program-in', 'pi-1:gpu:video-in');
+  ok('NEGATIVE CONTROL: a name that says the wrong medium is refused', graphProblem(wrongMedium) !== '', graphProblem(wrongMedium));
+  ok('a numbered second port of one kind is allowed', graphProblem(rename('pi-1:gpu:program-in', 'pi-1:gpu:program-in-2')) === '');
+  ok('NEGATIVE CONTROL: a browser graph with an old style name still passes, the rule is for boards only',
+    graphProblem({ v: 1, site: 'web-ab12', kind: 'browser', nodes: [], ports: [{ id: 'web-ab12:keys:out', dir: 'out', medium: 'midi' }] }) === '');
+  ok('NEGATIVE CONTROL: and so does one that says nothing about its kind',
+    graphProblem({ v: 1, site: 'cf-store', nodes: [], ports: [{ id: 'cf-store:history:in', dir: 'in', medium: 'value' }] }) === '');
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);

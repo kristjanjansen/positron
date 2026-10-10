@@ -102,26 +102,26 @@
     { id: 'web:keys', kind: 'person', label: 'keys', place: 'browser', net: 'home' },
     { id: 'web:editor', kind: 'person', label: 'editor', place: 'browser', net: 'home' },
     { id: 'web:screen', kind: 'screen', label: 'screen', place: 'browser', net: 'home' },
-    { id: 'studio-1:circuit', kind: 'device', label: 'Circuit', place: 'pi', net: 'home' },
-    { id: 'studio-1:gpu', kind: 'engine', label: 'GPU', place: 'pi', net: 'home' },
+    { id: 'pi-1:circuit', kind: 'device', label: 'Circuit', place: 'pi', net: 'home' },
+    { id: 'pi-1:gpu', kind: 'engine', label: 'GPU', place: 'pi', net: 'home' },
     { id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' },
     { id: 'phone:screen', kind: 'screen', label: 'screen', place: 'phone', net: 'cell' },
     { id: 'err:klassika', kind: 'external', label: 'Klassikaraadio', place: 'err', net: 'err' },
   ];
   const PORTS = [
-    { id: 'web:keys:out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
-    { id: 'web:editor:program', label: 'editor', dir: 'out', medium: 'program', shape: { language: 'glsl' } },
-    { id: 'web:screen:audio', label: 'browser screen', dir: 'in', medium: 'audio', shape: { rate: 48000 } },
-    { id: 'web:screen:video', label: 'browser screen', dir: 'in', medium: 'video' },
-    { id: 'studio-1:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] },
-    { id: 'studio-1:circuit:audio', label: 'Circuit', dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 2, frameMs: 10 } },
-    { id: 'studio-1:gpu:program', label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } },
-    { id: 'studio-1:gpu:video', label: 'GPU', dir: 'out', medium: 'video', shape: { w: 1280, h: 720, fps: 30, codec: 'h264' } },
-    { id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' },
-    { id: 'r2:recordings:out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' },
-    { id: 'phone:screen:video', label: 'phone screen', dir: 'in', medium: 'video' },
-    { id: 'phone:screen:audio', label: 'phone screen', dir: 'in', medium: 'audio', shape: { rate: 48000 } },
-    { id: 'err:klassika:audio', label: 'Klassikaraadio', dir: 'out', medium: 'audio', shape: { rate: 48000 } },
+    { id: 'web:keys:midi-out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+    { id: 'web:editor:program-out', label: 'editor', dir: 'out', medium: 'program', shape: { language: 'glsl' } },
+    { id: 'web:screen:audio-in', label: 'browser screen', dir: 'in', medium: 'audio', shape: { rate: 48000 } },
+    { id: 'web:screen:video-in', label: 'browser screen', dir: 'in', medium: 'video' },
+    { id: 'pi-1:circuit:midi-in', label: 'Circuit', dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] },
+    { id: 'pi-1:circuit:audio-out', label: 'Circuit', dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 2, frameMs: 10 } },
+    { id: 'pi-1:gpu:program-in', label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } },
+    { id: 'pi-1:gpu:video-out', label: 'GPU', dir: 'out', medium: 'video', shape: { w: 1280, h: 720, fps: 30, codec: 'h264' } },
+    { id: 'r2:recordings:audio-in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' },
+    { id: 'r2:recordings:audio-out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' },
+    { id: 'phone:screen:video-in', label: 'phone screen', dir: 'in', medium: 'video' },
+    { id: 'phone:screen:audio-in', label: 'phone screen', dir: 'in', medium: 'audio', shape: { rate: 48000 } },
+    { id: 'err:klassika:audio-out', label: 'Klassikaraadio', dir: 'out', medium: 'audio', shape: { rate: 48000 } },
   ];
 
   /* The lines a visitor can step through, in the order they teach: a light
@@ -129,15 +129,15 @@
      internet, a recording, the same sound to a second listener, then the two
      a validator exists for. */
   const EXAMPLES = [
-    'web:keys:out -> studio-1:circuit:in { channel 1 }',
-    'studio-1:circuit:audio -> web:screen:audio',
-    'web:editor:program -> studio-1:gpu:program',
-    'studio-1:gpu:video -> phone:screen:video',
-    'studio-1:circuit:audio -> r2:recordings:in',
-    'studio-1:circuit:audio -> phone:screen:audio',
-    'err:klassika:audio -> web:screen:audio',
-    'studio-1:gpu:video -> web:screen:audio',
-    'r2:recordings:out -> web:screen:audio',
+    'web:keys:midi-out -> pi-1:circuit:midi-in { channel 1 }',
+    'pi-1:circuit:audio-out -> web:screen:audio-in',
+    'web:editor:program-out -> pi-1:gpu:program-in',
+    'pi-1:gpu:video-out -> phone:screen:video-in',
+    'pi-1:circuit:audio-out -> r2:recordings:audio-in',
+    'pi-1:circuit:audio-out -> phone:screen:audio-in',
+    'err:klassika:audio-out -> web:screen:audio-in',
+    'pi-1:gpu:video-out -> web:screen:audio-in',
+    'r2:recordings:audio-out -> web:screen:audio-in',
   ];
 
   function deskBay() {
@@ -171,17 +171,17 @@
       { id: `${SITE}:screen`, kind: 'screen', label: 'screen', place: 'browser' },
     ],
     ports: [
-      { id: `${SITE}:keys:out`, label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
-      { id: `${SITE}:screen:audio`, label: 'browser screen', dir: 'in', medium: 'audio' },
-      { id: `${SITE}:screen:video`, label: 'browser screen', dir: 'in', medium: 'video' },
+      { id: `${SITE}:keys:midi-out`, label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+      { id: `${SITE}:screen:audio-in`, label: 'browser screen', dir: 'in', medium: 'audio' },
+      { id: `${SITE}:screen:video-in`, label: 'browser screen', dir: 'in', medium: 'video' },
     ],
   };
   /* This browser's own ends, on the live desk (`SITE`) and the example desk
      (`web`, which is typed and never announced). */
   const OWN = {
-    keys: [`${SITE}:keys:out`, 'web:keys:out'],
-    screenAudio: [`${SITE}:screen:audio`, 'web:screen:audio'],
-    screenVideo: [`${SITE}:screen:video`, 'web:screen:video'],
+    keys: [`${SITE}:keys:midi-out`, 'web:keys:midi-out'],
+    screenAudio: [`${SITE}:screen:audio-in`, 'web:screen:audio-in'],
+    screenVideo: [`${SITE}:screen:video-in`, 'web:screen:video-in'],
   };
   const mine = (id) => id.startsWith(`${SITE}:`) || id.startsWith('web:');
   /* 🔴 THE STORE IS ANNOUNCED BY THIS PAGE, BECAUSE THIS PAGE IS WHAT WRITES
@@ -196,8 +196,8 @@
     v: 1, site: 'r2', place: 'cloudflare', net: 'cloudflare', kind: 'store', label: 'recordings',
     nodes: [{ id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' }],
     ports: [
-      { id: 'r2:recordings:in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' },
-      { id: 'r2:recordings:out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' },
+      { id: 'r2:recordings:audio-in', label: 'recordings', dir: 'in', medium: 'audio', address: 'ingest.positron.studio' },
+      { id: 'r2:recordings:audio-out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' },
     ],
   };
   /* The room, the announce, `graph.ask`, the re-announce and `link.request`
@@ -546,8 +546,8 @@
      column at one height and the browser's two boxes stood empty and tall. A
      link here is a description in memory and opens nothing. */
   function starter(site) {
-    const want = [`${SITE}:keys:out -> ${site}:circuit:in`, `${site}:circuit:audio -> ${SITE}:screen:audio`,
-      `${site}:gpu:video -> ${SITE}:screen:video`];
+    const want = [`${SITE}:keys:midi-out -> ${site}:circuit:midi-in`, `${site}:circuit:audio-out -> ${SITE}:screen:audio-in`,
+      `${site}:gpu:video-out -> ${SITE}:screen:video-in`];
     for (const line of want) {
       const [from, to] = line.split(' -> ');
       if (bay.port(from) && bay.port(to)) makeLink(line);
@@ -787,8 +787,8 @@
     reg.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1', instruments: { synth: true },
       inputs: [{ name: 'circuit', midi: { port: 'Circuit', channels: [1, 2] } }] }) });
     const t = reg.fill(createBay());
-    const toScreen = t.link('studio-1:circuit:audio', `${SITE}:screen:audio`);
-    const keys = t.link(`${SITE}:keys:out`, 'studio-1:circuit:in');
+    const toScreen = t.link('pi-1:circuit:audio-out', `${SITE}:screen:audio-in`);
+    const keys = t.link(`${SITE}:keys:midi-out`, 'pi-1:circuit:midi-in');
     d.assert('a board\u2019s announced Circuit can be linked to this browser, as a stream', toScreen.ok && !!toScreen.session, toScreen.why || toScreen.session?.transport);
     d.assert('and this browser\u2019s keys can be linked to the Circuit, as bytes', keys.ok && !keys.session, keys.why || keys.id);
     // ⚠️ NEGATIVE CONTROL: a graph that is not on its own site is not heard.
@@ -805,17 +805,17 @@
     reg.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1',
       inputs: [{ name: 'circuit', midi: { port: 'Circuit', channels: [1, 2] } }] }) });
     const t = reg.fill(createBay());
-    const rec = t.link('studio-1:circuit:audio', 'r2:recordings:in');
+    const rec = t.link('pi-1:circuit:audio-out', 'r2:recordings:audio-in');
     d.assert('a sound linked into the recordings is accepted as an upload through ingest, at the store’s address',
       rec.ok && rec.session?.transport === 'ingest' && rec.session.address === 'ingest.positron.studio',
       JSON.stringify(rec.session || rec.why));
-    const play = t.link('r2:recordings:out', `${SITE}:screen:audio`);
+    const play = t.link('r2:recordings:audio-out', `${SITE}:screen:audio-in`);
     const recL = t.links().find((x) => x.id === rec.id), playL = t.links().find((x) => x.id === play.id);
     d.assert('and the two store links open as a recording and a playback',
       !!recL && !!playL && kindOf(recL, t) === 'record' && kindOf(playL, t) === 'play',
       `${recL && kindOf(recL, t)} ${playL && kindOf(playL, t)}`);
     // ⚠️ NEGATIVE CONTROL: the store takes sound, so a picture is refused.
-    const vid = t.link('studio-1:gpu:video', 'r2:recordings:in');
+    const vid = t.link('pi-1:gpu:video-out', 'r2:recordings:audio-in');
     d.assert('video into the sound recordings is refused', !vid.ok && /video/.test(vid.why || ''), vid.why);
     // The guard, with openers that only count and a map that is not the page's.
     let called = 0;
@@ -929,17 +929,17 @@
     const pi = boardGraph({ room: 'studio-1', instruments: { synth: true }, inputs: [{ name: 'circuit', midi: { port: 'Circuit', channels: [1] } }] });
     reg.ingest({ type: 'board.alive', from: 'b', graph: { ...pi, ports: pi.ports.map(({ transports, ...p }) => p) } });
     reg.ingest({ type: 'graph.announce', from: 'cam', graph: { v: 1, site: 'cam-1', place: 'phone', nodes: [{ id: 'cam-1:cam', kind: 'device', label: 'camera', place: 'phone' }],
-      ports: [{ id: 'cam-1:cam:video', label: 'camera', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: 'cam-1-video' }] } });
+      ports: [{ id: 'cam-1:cam:video-out', label: 'camera', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: 'cam-1-video' }] } });
     const t = reg.fill(createBay());
     const at = (from, to) => { const r = t.link(from, to); const l = t.links().find((x) => x.id === r.id); return l ? openers.pick(l, t) : { kind: null, transport: r.why }; };
     const got = {
-      listen: at('studio-1:circuit:audio', `${SITE}:screen:audio`),
-      synth: at('studio-1:synth:audio', `${SITE}:screen:audio`),
-      video: at('studio-1:gpu:video', `${SITE}:screen:video`),
-      keys: at(`${SITE}:keys:out`, 'studio-1:circuit:in'),
-      notes: at(`${SITE}:keys:out`, 'studio-1:synth:in'),
-      record: at('studio-1:circuit:audio', 'r2:recordings:in'),
-      play: at('r2:recordings:out', `${SITE}:screen:audio`),
+      listen: at('pi-1:circuit:audio-out', `${SITE}:screen:audio-in`),
+      synth: at('pi-1:synth:audio-out', `${SITE}:screen:audio-in`),
+      video: at('pi-1:gpu:video-out', `${SITE}:screen:video-in`),
+      keys: at(`${SITE}:keys:midi-out`, 'pi-1:circuit:midi-in'),
+      notes: at(`${SITE}:keys:midi-out`, 'pi-1:synth:midi-in'),
+      record: at('pi-1:circuit:audio-out', 'r2:recordings:audio-in'),
+      play: at('r2:recordings:audio-out', `${SITE}:screen:audio-in`),
     };
     d.assert('each link is opened by the opener for its session\u2019s transport',
       Object.entries(got).every(([k, v]) => v.kind === k)
@@ -949,7 +949,7 @@
     // ⚠️ NEGATIVE CONTROL: a picture from a page that says nothing of how it
     // travels is WHEP by the table, and nothing here opens WHEP. Dispatch on the
     // medium would have sent it to the board's video.start.
-    const cam = at('cam-1:cam:video', `${SITE}:screen:video`);
+    const cam = at('cam-1:cam:video-out', `${SITE}:screen:video-in`);
     d.assert('a video link whose session is WHEP finds no opener, rather than the board\u2019s video one',
       cam.kind === null && cam.transport === 'whep' && /nothing here opens whep/.test(cam.why || ''), `${cam.kind} by ${cam.transport}: ${cam.why}`);
   }
@@ -1011,7 +1011,7 @@
       heard ? `${yes.kind} ${yes.why || 'opened'}, ${asked.length - pre} asked, in ${ROOM}` : `never heard ${PEER} in ${ROOM}`);
     d.assert('and a refusal comes back in that page\u2019s own words', !no.ok && /that wall is shut/.test(no.why || ''), no.why);
     // ⚠️ NEGATIVE CONTROL: this page's own keys, asked for by another page, are refused in words, not left unanswered.
-    const mineAsked = await peer.request(`${SITE}:keys:out`, `${PEER}:wall:in`, true, { timeoutMs: 4000 });
+    const mineAsked = await peer.request(`${SITE}:keys:midi-out`, `${PEER}:wall:in`, true, { timeoutMs: 4000 });
     d.assert('this page answers a request for its own keys with a refusal, because a person here opens them',
       mineAsked?.open === false && /a person here/.test(mineAsked.why || ''), JSON.stringify(mineAsked));
     for (const o of into.values()) o.close();

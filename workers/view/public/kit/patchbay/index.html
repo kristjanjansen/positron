@@ -46,7 +46,7 @@
   const demo = (slug) => `<a href="/${slug}/">/${slug}/</a>`;
   const EXAMPLES = [
     { title: 'MIRROR CONCEPT', n: 2, note: `${concept('091')}: a shader sent to the Pi and its picture back beside the local one.`,
-      links: [['web:webgl:program-out', 'studio-1:gpu:program-in'], ['studio-1:gpu:video-out', 'web:right:video-in'],
+      links: [['web:webgl:program-out', 'pi-1:gpu:program-in'], ['pi-1:gpu:video-out', 'web:right:video-in'],
         ['web:webgl:video-out', 'web:left:video-in']] },
     { title: 'CHAT CONCEPT', n: 3, note: `${concept('003')}: a speaker and a listener link to every other tab.`, links: CHAT },
     { title: 'HISTORY CONCEPT', n: 4, note: `${concept('004')}: the chat with a store that keeps what was said.`,
@@ -66,18 +66,19 @@
         ['web:keys:midi-out', 'web:midi:midi-in'], ['web:rec:midi-out', 'web:midi:midi-in'], ['web:midi:value-out', 'web:shader:value-in'],
         ['web:shader:video-out', 'web:screen:video-in'], ['web:keys:midi-out', 'web:pico:midi-in'], ['web:rec:midi-out', 'web:pico:midi-in'],
         ['web:pico:video-out', 'web:oled:video-in']] },
-    // Real demos, with the ids they announce today (older names, not <medium>-<dir> yet).
+    // Real demos, with the ids they announce today. The Pi's and /patchbay/'s are
+    // <medium>-<dir> since 2026-10-10; the other pages' own ports are not yet.
     { title: 'PATCHBAY DEMO', note: `${demo('patchbay')}: the desk example.`,
-      links: [['web:keys:out', 'studio-1:circuit:in', 'channel 1'],
-        ['studio-1:circuit:audio', 'web:screen:audio'], ['web:editor:program', 'studio-1:gpu:program'],
-        ['studio-1:gpu:video', 'phone:screen:video'], ['studio-1:circuit:audio', 'r2:recordings:in'],
-        ['studio-1:circuit:audio', 'phone:screen:audio'], ['err:klassika:audio', 'web:screen:audio']],
+      links: [['web:keys:midi-out', 'pi-1:circuit:midi-in', 'channel 1'],
+        ['pi-1:circuit:audio-out', 'web:screen:audio-in'], ['web:editor:program-out', 'pi-1:gpu:program-in'],
+        ['pi-1:gpu:video-out', 'phone:screen:video-in'], ['pi-1:circuit:audio-out', 'r2:recordings:audio-in'],
+        ['pi-1:circuit:audio-out', 'phone:screen:audio-in'], ['err:klassika:audio-out', 'web:screen:audio-in']],
       labels: { 'web:screen': 'browser screen', 'phone:screen': 'phone screen' } },
     { title: 'MIRROR DEMO', note: `${demo('mirror')}: the ids it announces today.`,
-      links: [['web:webgl:video', 'web:left:video'], ['web:webgl:program', 'studio-1:gpu:program'],
-        ['studio-1:gpu:video', 'web:screen:video']], labels: { 'web:screen': 'right pane' } },
-    { title: 'KNOBS DEMO', note: `${demo('knobs')}: keys to Yoshimi on the Pi.`, links: [['knobs:keys:out', 'studio-1:yoshimi:in']] },
-    { title: 'AWAY DEMO', note: `${demo('away')}: keys to the Circuit from another building.`, links: [['away:keys:out', 'studio-1:circuit:in']] },
+      links: [['web:webgl:video', 'web:left:video'], ['web:webgl:program', 'pi-1:gpu:program-in'],
+        ['pi-1:gpu:video-out', 'web:screen:video']], labels: { 'web:screen': 'right pane' } },
+    { title: 'KNOBS DEMO', note: `${demo('knobs')}: keys to Yoshimi on the Pi.`, links: [['knobs:keys:out', 'pi-1:yoshimi:midi-in']] },
+    { title: 'AWAY DEMO', note: `${demo('away')}: keys to the Circuit from another building.`, links: [['away:keys:out', 'pi-1:circuit:midi-in']] },
     { title: 'FAU DEMO', note: `${demo('fau')}: keys to a Faust engine in the page.`, links: [['web:keys:out', 'fau:fau:midi']] },
     { title: 'NOLA DEMO', note: `${demo('nola')}: keys to the nola engine.`, links: [['web:keys:out', 'nola:nola:midi']] },
     { title: 'WISH DEMO', note: `${demo('wish')}: two links the model wrote.`,

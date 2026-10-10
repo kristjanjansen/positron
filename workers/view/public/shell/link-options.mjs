@@ -4,7 +4,7 @@
 // The board's picture was asked for at 1280x720 and 30 a second, hard coded in
 // `openers.mjs`. The size and the rate belong to the LINK, because two links to
 // one encoder are the place where they could disagree. They are written in the
-// same body as transforms, `studio-1:gpu:video -> web-xx:screen:video { w 640,
+// same body as transforms, `pi-1:gpu:video-out -> web-xx:screen:video { w 640,
 // h 360, fps 15 }`, but they are a different thing:
 //   - a transform is a MIDI operation applied to every event (`apply`), and
 //     `bay.mjs` refuses any transform on a non-MIDI link in words;

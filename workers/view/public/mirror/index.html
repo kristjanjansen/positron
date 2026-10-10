@@ -140,7 +140,7 @@
   import { RELAY_BASE } from '/shell/wire.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
-  import { createRegistry, boardGraph } from '/shell/graph-registry.mjs';
+  import { createRegistry, boardGraph, boardPort, BOARD_SITE } from '/shell/graph-registry.mjs';
   import { createBayNode, roomFor, randomSite } from '/shell/bay-node.mjs';
   import { createOpeners } from '/shell/openers.mjs';
   import { createLinkBadge, linkStateOf, LINK_STALL_MS } from '/shell/link-badge.mjs';
@@ -156,10 +156,12 @@
    * `Show the board` in the right-hand pane.
    * ⚠️ AND THIS TAB IS A SITE OF ITS OWN, `web-<four>`, announcing two ports,
    * so `/patchbay/` draws it: its shader as a `program` out, and its right
-   * pane as a `video` in. The Pi already announces `gpu:program` and
-   * `gpu:video` (`graph-registry.mjs` `boardGraph`).
+   * pane as a `video` in. The Pi already announces `pi-1:gpu:program-in` and
+   * `pi-1:gpu:video-out` (`graph-registry.mjs` `boardGraph`); its site is
+   * `pi-1` and no longer the room, since 2026-10-10.
    */
   const ROOM = roomFor({ slug: 'mirror' });
+  const GPU_PROGRAM = boardPort('gpu', 'program-in'), GPU_VIDEO = boardPort('gpu', 'video-out');
   const SITE = randomSite('web');
   const PROGRAM_PORT = `${SITE}:webgl:program`;
   const SCREEN_PORT = `${SITE}:screen:video`;
@@ -1560,8 +1562,8 @@
     onLinkRequest: ({ source, target, open }) => {
       if (source !== PROGRAM_PORT) return { ok: false, why: `${source} is not this page's shader` };
       if (!open) return { ok: true, why: 'nothing to close: a shader that was sent stays sent' };
-      if (!/:gpu:program$/.test(target) || target.split(':')[0] !== ROOM) {
-        return { ok: false, why: `this page sends its shader only to ${ROOM}:gpu:program, not ${target}` };
+      if (target !== GPU_PROGRAM) {
+        return { ok: false, why: `this page sends its shader only to ${GPU_PROGRAM}, not ${target}` };
       }
       const sent = send({ type: 'video.shader', body: LOOKS[lookAt_].body });
       return sent ? { ok: true, why: `sent “${LOOKS[lookAt_].name}” to the board` }
@@ -1572,8 +1574,8 @@
 
   /**
    * 🔴 TWO LINKS, DESCRIBED IN A BAY BEFORE ANYTHING IS OPENED. The shader goes
-   * out as `<site>:webgl:program -> <room>:gpu:program` and the picture comes back
-   * as `<room>:gpu:video -> <site>:screen:video`, which the bay gives the
+   * out as `<site>:webgl:program -> pi-1:gpu:program-in` and the picture comes back
+   * as `pi-1:gpu:video-out -> <site>:screen:video`, which the bay gives the
    * `relay-h264` session because that is the only way the board's port says it
    * travels. Which opener takes the video is `openers.pick`, the same choice
    * `/patchbay/` makes, so the two pages cannot disagree about it.
@@ -1594,8 +1596,8 @@
       out.left = printLink(b.links().find((x) => x.id === left.id));
       out.leftTransport = left.session?.transport ?? null;
     } else out.leftWhy = left.why;
-    const shader = b.link(PROGRAM_PORT, `${ROOM}:gpu:program`, [], { site: SITE });
-    const picture = b.link(`${ROOM}:gpu:video`, SCREEN_PORT, [], { site: SITE });
+    const shader = b.link(PROGRAM_PORT, GPU_PROGRAM, [], { site: SITE });
+    const picture = b.link(GPU_VIDEO, SCREEN_PORT, [], { site: SITE });
     if (!shader.ok || !picture.ok) {
       out.why = (!shader.ok ? shader : picture).why;
       return out;
@@ -1609,7 +1611,7 @@
   }
   /** Describe the two links once the board's graph is in this page's registry. */
   function describeLinks() {
-    if (linked.video || linked.why || !node.registry.merged().sites.some((s) => s.site === ROOM)) return;
+    if (linked.video || linked.why || !node.registry.merged().sites.some((s) => s.site === BOARD_SITE)) return;
     const got = linkIn(node.registry.fill(createBay()));
     Object.assign(linked, got);
     if (got.why) d.log(`the board announced itself and the links were refused: ${got.why}`, 'warn');
@@ -2369,13 +2371,13 @@
           got.why || `${got.video}, ${got.pick?.kind} over ${got.pick?.transport}`);
         const shaderPick = (() => {
           const b = reg.fill(createBay());
-          const r = b.link(PROGRAM_PORT, `${ROOM}:gpu:program`, [], { site: SITE });
+          const r = b.link(PROGRAM_PORT, GPU_PROGRAM, [], { site: SITE });
           return r.ok ? openers.pick(b.links().find((x) => x.id === r.id), b) : { kind: null, why: r.why };
         })();
         d.assert('and the shader is a program link this page sends itself, because no kit opener takes one',
           !!got.program && shaderPick.kind === null && /not something this page opens/.test(shaderPick.why || ''),
           `${got.program}: ${shaderPick.why}`);
-        const whep = reg.fill(createBay()).link(`${ROOM}:gpu:video`, SCREEN_PORT, [], { site: SITE, via: 'whep' });
+        const whep = reg.fill(createBay()).link(GPU_VIDEO, SCREEN_PORT, [], { site: SITE, via: 'whep' });
         d.assert('the same picture asked for over WHEP is refused, naming the transport the board allows',
           !whep.ok && /relay-h264/.test(whep.why || ''), whep.why || 'it was accepted');
         /**
@@ -2388,7 +2390,7 @@
         d.assert('the left picture is a link on this tab, and the bay gives it the page itself',
           got.leftTransport === 'page' && !got.leftWhy,
           got.leftWhy || `${got.left} over ${got.leftTransport}`);
-        const far = reg.fill(createBay()).link(`${ROOM}:gpu:video`, LEFT_PORT, [], { site: SITE });
+        const far = reg.fill(createBay()).link(GPU_VIDEO, LEFT_PORT, [], { site: SITE });
         d.assert('and the board’s picture into the same pane crosses a wire, so it is not the page',
           far.ok && far.session?.transport !== 'page' && far.session?.where !== 'machine',
           far.ok ? `${far.session?.transport}, ${far.session?.where}` : far.why);

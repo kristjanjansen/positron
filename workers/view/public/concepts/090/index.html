@@ -41,9 +41,9 @@
       { id: `${SITE}:screen`, kind: 'screen', label: 'screen', place: 'browser' },
     ],
     ports: [
-      { id: `${SITE}:keys:out`, label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
-      { id: `${SITE}:screen:audio`, label: 'screen', dir: 'in', medium: 'audio' },
-      { id: `${SITE}:screen:video`, label: 'screen', dir: 'in', medium: 'video' },
+      { id: `${SITE}:keys:midi-out`, label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+      { id: `${SITE}:screen:audio-in`, label: 'screen', dir: 'in', medium: 'audio' },
+      { id: `${SITE}:screen:video-in`, label: 'screen', dir: 'in', medium: 'video' },
     ],
   };
   const DIR_SIM = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
@@ -106,8 +106,9 @@
       return kind === 'board' ? 'Raspberry Pi' : site;
     };
     const rank = (site) => site === SITE ? 0 : kindOf(site) === 'board' ? 1 : 2;
-    // SIMULATED, plans/plan-site-names.md §4c: the port name shown as <medium>-<dir>.
-    // The id on the wire is unchanged and is on hover.
+    // plans/plan-site-names.md §4c: the port name shown as <medium>-<dir>. This
+    // tab and the Pi (since 2026-10-10) announce it that way, so their rows are
+    // real; any other page's older name is SIMULATED, with the wire id on hover.
     const taken = new Map();
     const simId = (p) => {
       const [site, n] = p.id.split(':');

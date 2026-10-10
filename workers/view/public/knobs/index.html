@@ -55,7 +55,7 @@
   import { createBoard } from '/shell/board.mjs';
   import { createBayNode, roomFor, randomSite, STUDIO_ROOM } from '/shell/bay-node.mjs';
   import { createLinkBadge } from '/shell/link-badge.mjs';
-  import { graphProblem } from '/shell/graph-registry.mjs';
+  import { graphProblem, boardPort } from '/shell/graph-registry.mjs';
   import { RELAY_BASE } from '/shell/wire.mjs';
 
   /**
@@ -2477,8 +2477,9 @@
   const BAY_ROOM = roomFor({ slug: 'knobs' });
   const SITE = randomSite('knobs');
   const KEYS_OUT = `${SITE}:keys:out`;
-  /** The port the Pi announces for Yoshimi's MIDI in (`boardGraph`). */
-  const SYNTH_IN = `${ROOM}:yoshimi:in`;
+  /** The port the Pi announces for Yoshimi's MIDI in (`boardGraph`), on site
+   *  `pi-1` since 2026-10-10 while its room stays `studio-1`. */
+  const SYNTH_IN = boardPort('yoshimi', 'midi-in');
   const GRAPH = {
     v: 1, site: SITE, place: 'browser',
     nodes: [
@@ -2549,12 +2550,12 @@
     d.assert('a page in the same room hears this page’s keys and sound', heard.includes(KEYS_OUT) && heard.includes(`${SITE}:screen:audio`), heard.join(', '));
     const yes = await other.request(KEYS_OUT, SYNTH_IN, true, { timeoutMs: 3000 });
     d.assert('asked for its keys to Yoshimi, it answers open', yes?.open === true, yes ? `open ${yes.open}: ${yes.why}` : 'no answer');
-    const elsewhere = await other.request(KEYS_OUT, `${ROOM}:circuit:in`, true, { timeoutMs: 3000 });
+    const elsewhere = await other.request(KEYS_OUT, boardPort('circuit', 'midi-in'), true, { timeoutMs: 3000 });
     d.assert('asked for its keys anywhere else, it refuses and names where they go', elsewhere?.open === false && elsewhere.why.includes(SYNTH_IN),
       elsewhere ? elsewhere.why : 'no answer');
     const close = await other.request(KEYS_OUT, SYNTH_IN, false, { timeoutMs: 3000 });
     d.assert('asked to close it, it refuses in words', close?.open === false && /always play/.test(close.why), close ? close.why : 'no answer');
-    const notMine = await other.request(`${ROOM}:yoshimi:audio`, `${SITE}:screen:audio`, true, { timeoutMs: 800 });
+    const notMine = await other.request(boardPort('yoshimi', 'audio-out'), `${SITE}:screen:audio`, true, { timeoutMs: 800 });
     d.assert('NEGATIVE CONTROL: a request about a port that is not this page’s gets no answer from it', notMine === null, JSON.stringify(notMine));
     other.leave();
   }

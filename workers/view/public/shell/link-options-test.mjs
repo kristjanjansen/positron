@@ -66,7 +66,7 @@ ok('NEGATIVE CONTROL: options on an audio link are refused by medium',
   /an? audio link has no options, and this one was given w/.test(why('audio', { w: 640 })), why('audio', { w: 640 }));
 
 console.log('== the text form, through bay.mjs ==');
-const line = 'studio-1:gpu:video -> web-xx:screen:video { w 640, h 360, fps 15 }';
+const line = 'pi-1:gpu:video-out -> web-xx:screen:video { w 640, h 360, fps 15 }';
 const p = parseLink(line);
 ok('parseLink puts w, h, fps in options and none in transforms',
   p.transforms.length === 0 && JSON.stringify(p.options) === '{"w":640,"h":360,"fps":15}', JSON.stringify(p));
