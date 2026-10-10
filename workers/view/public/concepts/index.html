@@ -32,12 +32,13 @@
 
   const d = mount({ name: 'concepts', what: 'The ideas behind positron, one page each.', readout: null });
 
-  // Grouped by the hundreds digit (000s, 100s, 300s ...), a grid each, spaced by
-  // the page's own stack and with no group titles (asked 2026-10-10, *"have
-  // groups in concepts index. no titles"*).
+  // Grouped by tens (001 to 009, 010 to 019, 030 to 039 ...), a grid each,
+  // spaced by the page's own stack and with no group titles (asked 2026-10-10,
+  // *"have groups in concepts index. no titles"*, then *"grouping based on 10s"*).
+  // Numbers are three digits so they can run past 100.
   const grids = new Map();
   const gridFor = (num) => {
-    const k = String(num).padStart(3, '0')[0];
+    const k = Math.floor(Number(num) / 10);
     if (!grids.has(k)) { const g = el('div', 'cc-cards'); grids.set(k, g); d.stack.add(g); }
     return grids.get(k);
   };

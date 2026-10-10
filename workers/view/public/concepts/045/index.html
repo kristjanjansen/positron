@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept 045</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-top { display: flex; align-items: flex-end; gap: 12px; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  /* The pad and the knob group side by side on a desk. The row wraps when the
+     pad's own basis and the knob grid do not both fit, so a phone stacks them with
+     no media query: the decision is the row's width, not the window's. */
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createXyPad } from '/shell/xy-pad.mjs';
+  import { createSynth, KNOBS, PATCH, expo } from './modules.mjs';
+
+  // /concepts/040/'s synth as one fixed patch, with an XY pad that plays the
+  // filter. The pad is a bay node, `web:xy`, cabled to `web:filter:value-in`,
+  // so every move is a `{ of: 'param' }` event through the bay and the cable
+  // pulses with it.
+  //
+  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key or
+  // play press; moving the pad before that only changes the filter's state.
+  const d = mount({ name: 'concept 045', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('045');
+
+  const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
+  const { bay } = synth;
+  const ID = synth.id;
+
+  // ── one waveform, the output, as on /concepts/040/ ────────────────────────
+  const WINDOW = 512, FULL = 0.5;
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+
+  // ── the pad: x is cutoff, y is resonance ─────────────────────────────────
+  // The pad's axes are positions, 0 to 1, and the page maps them, because
+  // cutoff wants an exponential scale and the pad's axes are linear. y runs 1
+  // at the top to 0 at the bottom, so resonance grows upward.
+  // WebAudio's lowpass Q is in dB: 0 is no peak, 18 is a whistle.
+  const CUT = expo(60, 8000), QMAX = 18;
+  // Resolved here, above the pad: the pad paints once as it is made, and a
+  // canvas font cannot read a CSS variable.
+  const MONO = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
+  const pad = createXyPad(el('div'), {
+    label: 'filter',
+    x: { label: 'cutoff', min: 0, max: 1 },
+    y: { label: 'resonance', min: 1, max: 0 },
+    onInput: (x, y) => {
+      bay.send(ID('xy', 'value-out'), { of: 'param', name: 'cutoff', v: CUT.to(x) });
+      bay.send(ID('xy', 'value-out'), { of: 'param', name: 'q', v: y * QMAX });
+    },
+    // The mark is where the filter is now, so it sits still between gestures.
+    value: () => ({ x: CUT.from(synth.P.filter.cutoff), y: synth.P.filter.q / QMAX }),
+    // The pad is the kit's (/draw/'s), 2x2 grid included; the axis names and
+    // their ends are drawn here, through its overlay hook, in its own dim ink.
+    overlay: (c, view) => labels(c, view),
+  });
+  function labels(c, { W, H, colors }) {
+    c.save();
+    c.fillStyle = colors.dim;
+    // The pad draws in its own pixels and is shown at whatever width it has,
+    // so the type is sized from that width: 13 px on screen, the knob values' size.
+    const k = W / (c.canvas.clientWidth || W);
+    c.font = `${13 * k}px ${MONO}`;
+    const I = 10 * k;
+    c.textBaseline = 'bottom';
+    c.textAlign = 'left'; c.fillText('60 Hz', I, H - I);
+    c.textAlign = 'center'; c.fillText('cutoff', W / 2, H - I);
+    c.textAlign = 'right'; c.fillText('8 kHz', W - I, H - I);
+    c.textBaseline = 'top';
+    c.textAlign = 'left'; c.fillText('resonance', I, I);
+    c.restore();
+  }
+
+  // ── the knobs: one node each, `web:knob-<name>`, a turn is one event ─────
+  const knobs = new Map(KNOBS.map((k) => [k.name, createKnob({
+    label: k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
+    onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
+  })]));
+  // Three boxes across at most, so beside the pad they are one row.
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // The play button is the test tone: a held note out of web:tone, into the
+  // osc for its pitch and the amp for its gate (asked 2026-10-10, *"where is
+  // web:keys. there is only test tone"*).
+  const note = (n, v) => bay.send(ID('tone', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: v });
+
+  // ── play: a held A2 into the same keys:midi-out, so the pad has something
+  // to filter without holding a key. A key pressed over it plays that key and
+  // the drone comes back when it is let go (the osc plays the last held). ──
+  const DRONE = 45;
+  let ctx = null, droning = false;
+  function wake() {
+    if (!ctx) { ctx = new AudioContext(); synth.start(ctx); synth.sound(true); requestAnimationFrame(frame); }
+    ctx.resume();
+  }
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => drone(!droning) },
+  ] });
+  function drone(v) {
+    if (v) wake();
+    droning = v;
+    note(DRONE, v ? 100 : 0);
+    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
+  }
+
+  function frame() {
+    const buf = synth.sounding() ? synth.read() : null;
+    if (buf) {
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
+  }
+
+  // ── the patchbay ─────────────────────────────────────────────────────────
+  const pb = createPatchbay(bay, { flowing: () => synth.sounding() });
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  // Linear, as every concept synth: scope, pad, the knob row, then the patchbay,
+  // as blocks in the shell's stack at the shell's gap.
+  d.stack.add(top, wave.el, pad.el, grid.el, pb.el);
+
+  // The one patch.
+  const bad = synth.load(PATCH);
+  for (const b of bad) d.log(`${b.line} refused: ${b.why}`, 'warn');
+  pb.refresh();
+  window.__demo.synth = synth;
+  window.__demo.pad = pad;
+  window.__demo.drone = drone;
+  window.__demo.knobs = grid;
+  d.ready();
+</script>

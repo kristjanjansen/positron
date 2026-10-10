@@ -7,326 +7,389 @@
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON concept 050</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/slide.css">
 <style>
-  .cc-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
-  .cc-row > .pos-field { flex: 1 1 260px; min-width: 0; }
-  .cc-row[hidden] { display: none; }
-  .cc-ends { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: var(--ctl-gap, 8px); }
-  /* The same medium colours and live dot as /concepts/010/. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
+  /* ONE TUTORIAL SLIDE (plans/plan-tutorial-layout.md). Decided 2026-10-10:
+     *"I'm asking you to design a slide. So a page should contain a slide frame,
+     and the content inside of it can go to full screen and have some kind of
+     mobile support."* The frame sits in the page's own column (no wide body),
+     and everything inside it is laid out ONCE at a logical 1024 by 576 and
+     scaled, the way `fitBox` in slide.mjs scales a px control on a slide, so
+     nothing reflows at any width: only `--fit-k` changes.
+
+     🔴 PAGE LOCAL, NOT `createSlide`. Its `split` has two columns and no
+     footer band, and its words are fixed steps that clip rather than scroll.
+     What the kit would need is in the plan, section 2.
+
+     🔴 IN THE KIT'S SLIDE PLAYER'S CONTAINER, asked 2026-10-10 as *"50: use
+     standard slider container"*. Built from the pieces `createSlidePlayer`
+     uses (a video panel, the stepper on the left, `N / M` in the middle, the
+     panel's own ⛶, `sl-player`, its keys), not the player itself: the player
+     only shows `createSlide` slides, a slot sits inside the slide's inset and
+     under its words, and in full screen it letterboxes 16:9, so neither the
+     edge to edge frame nor the upright rows fit in it. */
+
+
+  /* The frame fills the panel's stage, which is 16:9 in the page and the
+     whole screen when full. It is the box the scale is measured off; the panel
+     draws the edge, so the frame draws none. */
+  .tf { position: absolute; inset: 0; overflow: hidden; background: var(--card); }
+
+  /* The inside, at its logical size, scaled from the top left corner. The same
+     transform `.sl-fit-in` uses, with the same custom properties. */
+  .tf-in {
+    position: absolute; left: 0; top: 0;
+    width: var(--fit-w, 1024px); height: var(--fit-h, 576px);
+    transform-origin: 0 0;
+    transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit-k, 1));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "words build" "words bay";
+    /* one surface, three regions: the seams are the ground between them */
+    gap: 1px; background: var(--line);
   }
-  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
-  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
-  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
-  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-  .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
-  .cc-ring::after { content: none; }
+  .tf-in > * { min-width: 0; min-height: 0; }
+
+  /* ── the words: a quarter of the width, the full height, NO SCROLLING ──
+     Asked 2026-10-10: *"could layout work with 1/4 left text col (no
+     scrolling), and then top synth and bottom patchbay?"*. So a step's words
+     are written to fit this column at reading size, and `measure()` reports
+     `wordsMore`, which must be 0. Cut, never clipped and never faded. */
+  .tf-words {
+    grid-area: words; background: var(--card);
+    overflow: hidden;
+    padding: 24px 22px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .tf-say {
+    margin: 0; font-family: 'Slide JetBrains Mono', var(--mono);
+    font-size: 21px; line-height: 1.15; letter-spacing: -0.03em; font-weight: 600;
+    text-wrap: balance;
+  }
+  .tf-p { margin: 0; font-size: 16px; line-height: 1.42; }
+  .tf-list { margin: 0; padding-left: 18px; font-size: 16px; line-height: 1.42; color: var(--dim); }
+  .tf-list li + li { margin-top: 4px; }
+
+  /* ── the build area: LINEAR, the concept synth layout (positron-concepts,
+     *"they are linear except knobs that are independent in the knobs area,
+     horiz scrollable. no half col scope, scope is always full w"*). The scope
+     at the full width, then one row of the kit's own boxed knobs that scrolls
+     sideways and never wraps (`createKnobGrid(..., { row: true })`, as on
+     /concepts/040/), then the keys. No module boxes: the band says which
+     modules are patched, and the live knobs say which are in play. ─────── */
+  .tf-build {
+    grid-area: build; background: var(--bg);
+    padding: 24px 28px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  /* the scope takes the height the knobs and keys leave, never a typed one */
+  .tf-scope { flex: 1 1 auto; display: flex; min-height: 0; }
+  .tf-scope .pos-sv { margin: 0; flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+  .tf-scope .pos-sv-c { flex: 1 1 0; height: auto; min-height: 0; }
+  /* a step with no scope in its patch keeps the scope's place, so nothing
+     below it moves between steps */
+  .tf-scope[data-off] { visibility: hidden; }
+  .tf-keys .kbd { margin: 0; }
+
+  /* ── the patchbay: a full width band, always one row ───────────────────── */
+  .tf-bay {
+    grid-area: bay; background: var(--bg);
+    padding: 14px 28px 18px;
+    display: flex; flex-direction: column;
+  }
+  /* The heading is the kit's .pos-sec-h, uppercase mono, as createPatchbay draws
+     it; its own 10 px margin is the gap to the picture it names. */
+
+  /* 🔴 ROWS, FULL SCREEN ON A SCREEN TALLER THAN IT IS WIDE. Decided as *"full
+     screen in portrait turns into rows: build on top, then the words
+     scrolling, then the patchbay"*, and since the quarter column the words do
+     not scroll here either: they are short enough to sit whole. The script
+     lays the inside out at a logical 730 wide (13 white keys and their padding) and as tall as the screen at
+     that scale, and sets `data-mode`. Same parts, one column; the words row
+     takes what is left. */
+  .tf-in[data-mode="rows"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "build" "words" "bay";
+  }
+  .tf-in[data-mode="rows"] .tf-build { padding: 20px 16px; }
+  /* rows: the build is an `auto` row, so the scope has no leftover height to
+     take and is given the kit's own figure height instead */
+  .tf-in[data-mode="rows"] .tf-scope { flex: none; height: 120px; }
+  .tf-in[data-mode="rows"] .tf-words { padding: 22px 20px; }
+  .tf-in[data-mode="rows"] .tf-bay { padding: 14px 16px 18px; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createTable } from '/shell/table.mjs';
-  import { createField } from '/shell/field.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createBay, printLink } from '/shell/bay.mjs';
-  import { createTabs } from '/shell/tabs.mjs';
-  import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
-  import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { swipeStep } from '/shell/slide.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createSynth, KNOBS } from './modules.mjs';
 
-  // The smallest multi-user chat built from patchbay blocks, with an admin who
-  // writes notices. Every tab is a SITE; every leg is a LINK its bay holds, and a
-  // line travels by `node.emit` along it (plans/plan-site-names.md §4h).
-  // Its own room, never studio-1, so nothing lands on the studio's desk.
-  const asked = new URLSearchParams(location.search).get('room');
-  const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-3';
-  // History: positron-store, a recorder that joins the room as an ordinary socket
-  // and keeps every message sent with `store: true` (workers/store/src/index.js).
-  const STORE_URL = 'https://store.positron.studio';
-  const SITE = randomSite('web');
-  const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
-  // ADMIN: toward /stage/. One more node on every tab, `notice`, with an in-port
-  // that takes admin lines and shows the last one above the chat. Only a tab
-  // on the admin tab announces `admin:value-out` and can send to it.
-  // ⚠️ NOTHING PROVES THE ADMIN. Any tab can pick the admin tab; the bay checks that the
-  // ports fit, not who holds them. That is the question this page exists to ask.
-  // The tab in the address wins, as tabs.mjs decides; ?admin=1 picks admin when there is none.
-  let admin = location.hash ? location.hash === '#admin' : new URLSearchParams(location.search).get('admin') === '1';
-  const AOUT = `${SITE}:admin:value-out`, NOTICE = `${SITE}:notice:value-in`;
-  const selfGraph = () => ({
-    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
-    nodes: [
-      { id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' },
-      { id: `${SITE}:notice`, kind: 'screen', label: 'notice', place: 'browser' },
-      ...(admin ? [{ id: `${SITE}:admin`, kind: 'person', label: 'admin', place: 'browser' }] : []),
-    ],
-    ports: [
-      { id: OUT, label: 'chat', dir: 'out', medium: 'value', transports: ['relay'] },
-      { id: IN, label: 'chat', dir: 'in', medium: 'value', transports: ['relay'] },
-      { id: NOTICE, label: 'notice', dir: 'in', medium: 'value', transports: ['relay'] },
-      ...(admin ? [{ id: AOUT, label: 'admin', dir: 'out', medium: 'value', transports: ['relay'] }] : []),
-    ],
-  });
-  // The store as a site, announced on its behalf into this page's own registry
-  // only, as /patchbay/ does for R2: every tab would describe the same store.
-  const STORE = {
-    v: 1, site: 'cf-store', place: 'cloudflare', net: 'cloudflare', kind: 'service', label: 'CF Store',
-    nodes: [{ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' }],
-    ports: [
-      { id: 'cf-store:history:value-in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
-      { id: 'cf-store:history:value-out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
-    ],
-  };
-
+  // One tutorial slide in three steps. A step changes the words, which boxes
+  // the build area shows and the patch the bay holds; the footer band draws
+  // that patch, and a key lights the cables it travels.
+  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key press.
   const d = mount({ name: 'concept 050', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('050');
 
-  const lines = createTable({
-    columns: [
-      { key: 'who', label: 'who', width: 96 },
-      { key: 'text', label: 'line', grow: true, hi: true },
-      { key: 'ago', label: 'when', width: 72 },
-      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
-    ],
-    minRows: 4,
-    stick: true,
-  });
-  const said = [];
-  // The patchbay picture, made once the node exists (at the foot of the page).
-  let pb = null;
-  // How long ago, from the send stamp the relay envelope carries (`sent`).
-  const ago = (at) => {
-    const s = Math.max(0, Math.round((Date.now() - at) / 1000));
-    if (s < 10) return 'now';
-    if (s < 60) return `${s} s ago`;
-    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-    return `${Math.floor(s / 86400)} d ago`;
+  const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
+  const { bay } = synth;
+  const ID = synth.id;
+
+  // ── the steps: the words, the boxes and the patch ─────────────────────────
+  const STEPS = [
+    {
+      name: 'oscillator', boxes: ['osc'],
+      say: 'An oscillator makes the sound',
+      text: ['A key sends a note, and the oscillator plays it as a wave at that pitch. A sine is smooth and a saw is bright.'],
+      list: ['Hold a key and watch the cables light', 'Turn wave from sine to saw'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:speaker:audio-in'],
+    },
+    {
+      name: 'filter', boxes: ['osc', 'filter'],
+      say: 'A filter takes the bright edge off a saw',
+      text: ['It lets through what is below its cutoff. Lower the cutoff and the sound gets darker. Q adds a ring at the cutoff.'],
+      list: ['Hold a key and turn cutoff down', 'Turn Q up and sweep again'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:filter:audio-in',
+        'web:filter:audio-out -> web:speaker:audio-in'],
+    },
+    {
+      name: 'scope', boxes: ['osc', 'filter', 'scope'],
+      say: 'A scope draws what reaches the speakers',
+      text: ['It draws one cycle of the wave. Close the cutoff and the sharp corner of a saw rounds off. Raise Q and a ripple follows it.'],
+      list: ['Turn cutoff down slowly', 'Turn Q up and watch the ripple'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:filter:audio-in',
+        'web:filter:audio-out -> web:scope:audio-in', 'web:scope:audio-out -> web:speaker:audio-in'],
+    },
+  ];
+
+  // ── the words ───────────────────────────────────────────────────────────
+  const words = el('div', 'tf-words');
+  function setWords(s) {
+    words.replaceChildren(el('h2', 'tf-say', s.say), ...s.text.map((t) => el('p', 'tf-p', t)));
+    const ul = el('ul', 'tf-list');
+    for (const t of s.list) ul.append(el('li', null, t));
+    words.append(ul);
+  }
+
+  // ── the build area: the scope, the knobs area, the keys ──────────────────
+  const knobs = new Map();
+  for (const k of KNOBS) {
+    knobs.set(k.name, createKnob({
+      label: k.name === 'q' ? 'Q' : k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
+      onInput: (r) => synth.setParam(k.owner, k.name, k.value(r)),
+    }));
+  }
+  // Every knob has a box at every step; a knob whose module the step does not
+  // patch is switched off and keeps its slot.
+  const grid = createKnobGrid(knobs, { row: true });
+  const scopeHost = el('div', 'tf-scope');
+  const wave = createWaveShape({ host: scopeHost, reason: null, colour: '--hi', name: '' });
+
+  let ctx = null;
+  const wake = () => {
+    if (!ctx) { ctx = new AudioContext(); synth.start(ctx); requestAnimationFrame(frame); }
+    ctx.resume();
   };
-  // Admin lines have a table of their own, with the same columns.
-  const notices = createTable({
-    columns: [
-      { key: 'who', label: 'who', width: 96 },
-      { key: 'text', label: 'notice', grow: true, hi: true },
-      { key: 'ago', label: 'when', width: 72 },
-      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
-    ],
-    minRows: 2,
-    stick: true,
-  });
-  const told = [];
-  const draw = () => {
-    lines.set(said.map((r) => ({ ...r, ago: ago(r.at) })));
-    notices.set(told.map((r) => ({ ...r, ago: ago(r.at) })));
-  };
-  setInterval(() => { if (said.length || told.length) draw(); }, 30000);
-  const short = (site) => site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : `browser ${site.replace(/^web-/, '')}`;
-
-  // ── the links this tab holds ──────────────────────────────────────────────
-  // Every leg is a link in this bay, and a line travels by `node.emit` along it:
-  // one `bay.event` on the room, delivered by the receiving bay only along a
-  // link IT holds. Holding the listener is a tab's consent to hear.
-  //   chat     <me>:chat:value-out -> *:chat:value-in        (speaker)
-  //            *:chat:value-out -> <me>:chat:value-in        (listener)
-  //   notices  <me>:admin:value-out -> *:notice:value-in     (admin tab only)
-  //            *:admin:value-out -> <me>:notice:value-in     (every tab)
-  //   store    chat and admin lines -> cf-store:history:value-in, and
-  //            cf-store:history:value-out -> chat and notice (the replay)
-  // ⚠️ THE STORE HAS ONE OUT PORT, so a kept line is offered to both in-ports
-  // and each takes only its own kind, read from where it was first said.
-  const KEEP = 'cf-store:history:value-in', KEPT = 'cf-store:history:value-out';
-  const isNotice = (src) => /:admin:value-out$/.test(String(src));
-  function bay() {
-    const b = node.registry.fill(createBay());
-    if (b.port(IN)) b.addPort({ ...b.port(IN), deliver: heard });
-    if (b.port(NOTICE)) b.addPort({ ...b.port(NOTICE), deliver: heardAdmin });
-    b.link(OUT, '*:chat:value-in');
-    b.link('*:chat:value-out', IN);
-    b.link('*:admin:value-out', NOTICE);
-    b.link(OUT, KEEP);
-    b.link(KEPT, IN);
-    b.link(KEPT, NOTICE);
-    if (admin && b.port(AOUT)) {
-      b.link(AOUT, '*:notice:value-in');
-      b.link(AOUT, KEEP);
-    }
-    return b;
-  }
-
-  const node = createBayNode({
-    room: ROOM, graphs: [selfGraph()], local: [STORE], bay,
-    log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); drawSites(); pb?.refresh(); },
-    onGraph: () => { drawSites(); pb?.refresh(); },
-    onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
-    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
-  });
-
-  // Called by the bay, only along a link this tab holds into chat:value-in.
-  // A line out of the store carries who first said it as `speaker`.
-  function heard(e, l, m) {
-    const by = String(m.speaker || m.from);
-    if (l.from === KEPT && isNotice(by)) return;          // a kept notice is the notice port's
-    pb?.pulse(l.from, l.to);
-    said.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
-      link: `${m.from} -> ${m.to}`,
-      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
-    draw();
-  }
-
-  // Called by the bay, only along a link this tab holds into notice:value-in.
-  function heardAdmin(e, l, m) {
-    const by = String(m.speaker || m.from);
-    if (l.from === KEPT && !isNotice(by)) return;         // a kept chat line is the chat port's
-    pb?.pulse(l.from, l.to);
-    told.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
-      link: `${m.from} -> ${m.to}`,
-      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
-    draw();
-  }
-
-  // Wake the recorder into this room, then read what it kept. Our own worker,
-  // asked only on a press of Join. Each kept line is handed to the bay as an
-  // event leaving the store's out port. `chat.line` and `chat.admin` rows are
-  // from before 2026-10-10, when this page sent its own message types.
-  async function loadHistory() {
-    try {
-      const r = await fetch(`${STORE_URL}/room/${ROOM}/record`, { method: 'POST' });
-      d.log(`store recording ${ROOM}: ${r.status}`);
-      const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
-      const rows = (await h.text()).split('\n').filter(Boolean);
-      const b = bay();
-      let n = 0;
-      for (const line of rows) {
-        let m; try { m = JSON.parse(line); } catch { continue; }
-        const kept = m.type === 'bay.event' && /:(chat|admin):value-out$/.test(String(m.source)) ? m.ev?.text
-          : m.type === 'chat.line' || m.type === 'chat.admin' ? m.text : undefined;
-        if (typeof kept !== 'string') continue;
-        if (b.send(KEPT, { text: kept }, { sent: m.sent, speaker: String(m.source || '') })) n++;
-      }
-      d.log(`${n} earlier line${n === 1 ? '' : 's'} from the store`);
-    } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
-  }
-
-  // Who a line went to, for the hover: the concrete pairs the `*` link stood for.
-  const reached = (r) => (r.far.length ? r.far.map((to) => `${r.source} -> ${to}`).join('\n') : 'nobody else in the room');
-  const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
-  text.disabled(true);
-  function say() {
-    const t = text.value().trim();
-    if (!t) return;
-    // `store: true` rides on the bay.event, which is what positron-store keeps.
-    const r = node.emit(OUT, { text: t }, { store: true });
-    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(OUT, '*:chat:value-in');
-    if (r.sent && r.far.includes(KEEP)) pb?.pulse(OUT, KEEP);
-    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:value-in`, why: reached({ ...r, source: OUT }) });
-    draw();
-    text.set('');
-  }
-  // The admin writes notices in a field of its own, and still chats like anyone.
-  const noticeText = createField({ label: 'notice', placeholder: 'tell everyone', grow: 'wide' });
-  noticeText.disabled(true);
-  function sayAdmin() {
-    const t = noticeText.value().trim();
-    if (!t) return;
-    const r = node.emit(AOUT, { text: t }, { store: true });
-    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(AOUT, '*:notice:value-in');
-    if (r.sent && r.far.includes(KEEP)) pb?.pulse(AOUT, KEEP);
-    told.push({ at: Date.now(), who: 'you', text: t, link: `${AOUT} -> *:notice:value-in`, why: reached({ ...r, source: AOUT }) });
-    draw();
-    noticeText.set('');
-  }
-  noticeText.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sayAdmin(); } });
-  text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); say(); } });
-  const send = createButtonGroup({ buttons: [{ id: 'send', label: 'Send', primary: true, onPress: say }] });
-  const tell = createButtonGroup({ buttons: [{ id: 'tell', label: 'Send notice', primary: true, onPress: sayAdmin }] });
-  tell.button('tell').disabled = true;
-  const noticeRow = el('div', 'cc-row');
-  noticeRow.append(noticeText.el, tell.el);
-  noticeRow.hidden = !admin;
-
-  // The two roles. Switching re-announces this tab: the admin tab adds the
-  // `admin` node and its `admin:value-out`, the audience tab takes them away.
-  const roles = createTabs({
-    tabs: [{ id: 'admin', label: 'Admin' }, { id: 'audience', label: 'Audience' }],
-    at: admin ? 'admin' : 'audience',
-    onPick: (id) => {
-      admin = id === 'admin';
-      noticeRow.hidden = !admin;
-      node.setGraphs([selfGraph()], [STORE]);
-      drawSites();
-      pb?.refresh();
+  const keysHost = el('div', 'tf-keys');
+  // C3 to A4, 13 white keys at the kit's 49 px floor, as on /concepts/040/:
+  // the build area is three quarters of 1024 now, 712 logical px inside
+  createKeyboard(keysHost, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => {
+      if (how === 'midi') return;
+      wake();
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
+    },
+    onUp: (note, how) => {
+      if (how === 'midi') return;
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 });
     },
   });
-  send.button('send').disabled = true;
-  // Clear: the store forgets this room, and every tab in it empties its tables.
-  function wipe() { said.length = 0; told.length = 0; draw(); }
-  async function clearAll() {
-    try {
-      const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
-      d.log(`store cleared ${ROOM}: ${r.status}`);
-    } catch (e) { d.log(`the store did not clear: ${e.message || e}`, 'warn'); }
-    node.send({ type: 'chat.clear' });
-    wipe();
-  }
-  const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
-  const clear = createButtonGroup({ buttons: [{ id: 'clear', label: 'Clear history', onPress: clearAll }] });
-  clear.button('clear').disabled = true;
-  // Join on the left, Clear history on its own at the right of the same line.
-  const joinRow = el('div', 'cc-ends');
-  joinRow.append(join.el, clear.el);
+  const build = el('div', 'tf-build');
+  build.append(scopeHost, grid.el, keysHost);
 
-  // Who is in the room: the registry, as /concepts/010/ draws it. Port names are
-  // shown as <medium>-<dir> (plans/plan-site-names.md §4c); the real id is on hover.
-  const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
-  const sites = createTable({
-    columns: [
-      { key: 'state', label: '', width: 16 },
-      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
-      { key: 'who', label: 'who', width: 120 },
-      { key: 'dir', label: 'dir', width: 48 },
-      { key: 'medium', label: 'medium', width: 72 },
-      { key: 'by', label: 'transport', width: 120 },
-    ],
-    minRows: 12,
-  });
-  function drawSites() {
-    const rows = node.registry.merged().ports.map((p) => {
-      const [site, n] = p.id.split(':');
-      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`,
-        who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
-    }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
-    sites.set(rows);
-    for (const cell of sites.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-      const t = cell.textContent;
-      if (t === 'live' || t === 'stale') {
-        const dot = document.createElement('span');
-        dot.className = 'pos-pres-dot' + (t === 'live' ? '' : ' cc-ring');
-        dot.style.color = t === 'live' ? 'var(--ok)' : 'var(--dim2)';
-        cell.textContent = '';
-        cell.append(dot);
-        cell.title = t;
-      } else if (/^(midi|audio|clock|value|video|program|file|state)$/.test(t)) cell.classList.add(`md-${t}`);
+  const WINDOW = 512, FULL = 0.5;
+  function frame() {
+    const buf = synth.read();
+    if (buf) {
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      wave.set({ points: Array.from(buf.subarray(i0, i0 + WINDOW), (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
+  }
+
+  // ── the patchbay band: the picture only, one row ─────────────────────────
+  // The band draws only the boxes the step's links use, so it is one row at
+  // every step: a box nothing is patched to would be drawn as a second row.
+  const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
+  const view = {
+    nodes: () => bay.nodes().filter((n) => inPatch(n.id.split(':')[1])),
+    ports: () => bay.ports().filter((p) => inPatch(p.id.split(':')[1])),
+    links: () => bay.links(),
+  };
+  // Compact boxes, the title and the ports: the node's label beside its title
+  // made five boxes wider than the band and the last one scrolled out of it.
+  const pb = createPatchbay(view, { flowing: () => synth.sounding(), detail: () => [] });
+  const bayBand = el('div', 'tf-bay');
+  bayBand.append(el('h3', 'pos-sec-h', 'PATCHBAY'), pb.view.el);
+
+  // ── the frame ───────────────────────────────────────────────────────────
+  const inner = el('div', 'tf-in');
+  inner.append(words, build, bayBand);
+  const tf = el('div', 'tf');
+  tf.append(inner);
+
+  // ── the container: the kit's slide player, piece by piece ────────────────
+  // ‹ › on the left, `N / M` in the middle, the panel's own ⛶ on the right.
+  let at = -1;
+  const stepper = createStepper({ prev: () => go(at - 1), next: () => go(at + 1), what: 'step' });
+  const count = el('span', 'sl-count', '');
+  const panel = createVideoPanel({ left: stepper, centre: count, fullMode: 'hover', onFull: () => fit() });
+  panel.el.classList.add('sl-player');
+  panel.el.tabIndex = 0;
+  panel.el.setAttribute('aria-roledescription', 'slide player');
+  panel.stage.append(tf);
+
+  /**
+   * The scale. A frame is laid out at 1024 by 576 and letterboxed; a full
+   * screen taller than it is wide is laid out in rows at 730 wide and as tall
+   * as the screen at that scale. `fitBox`'s arithmetic and custom properties,
+   * with a second shape, which `fitBox` cannot change once it is made.
+   */
+  const FRAME = { w: 1024, h: 576 }, ROWS_W = 730;
+  let mode = 'frame', k = 0;
+  function fit() {
+    const ow = tf.clientWidth, oh = tf.clientHeight;
+    if (!ow || !oh) return;
+    const rows = panel.isFull() && oh > ow;
+    let w, h, x, y;
+    if (rows) { k = ow / ROWS_W; w = ROWS_W; h = oh / k; x = 0; y = 0; }
+    else { k = Math.min(ow / FRAME.w, oh / FRAME.h); w = FRAME.w; h = FRAME.h; x = (ow - w * k) / 2; y = (oh - h * k) / 2; }
+    const next = rows ? 'rows' : 'frame';
+    if (next !== mode) { mode = next; inner.dataset.mode = mode; }
+    for (const [p, v] of [['--fit-w', `${w}px`], ['--fit-h', `${h}px`], ['--fit-k', String(k)], ['--fit-x', `${x}px`], ['--fit-y', `${y}px`]]) {
+      inner.style.setProperty(p, v);
     }
+    requestAnimationFrame(() => pb.refresh());
+  }
+  inner.dataset.mode = mode;
+  new ResizeObserver(fit).observe(tf);
+
+  // ── the steps ───────────────────────────────────────────────────────────
+  function go(i) {
+    const n = Math.max(0, Math.min(STEPS.length - 1, i));
+    if (n === at) return at;
+    at = n;
+    const s = STEPS[n];
+    setWords(s);
+    // A knob the step does not use is not shown at all, as on /concepts/040/.
+    for (const n of grid.names) {
+      const on = s.boxes.includes(KNOBS.find((x) => x.name === n).owner);
+      grid.show(n, on); grid.cellOf(n).hidden = !on;
+    }
+    if (s.boxes.includes('scope')) delete scopeHost.dataset.off; else scopeHost.dataset.off = '';
+    const bad = synth.load(s.patch.join('\n'));
+    for (const b of bad) d.log(`${b.line} refused: ${b.why}`, 'warn');
+    pb.refresh();
+    count.textContent = `${at + 1} / ${STEPS.length}`;
+    stepper.buttons[0].disabled = at === 0;
+    stepper.buttons[stepper.buttons.length - 1].disabled = at === STEPS.length - 1;
+    return at;
   }
 
+  // The player's keys, heard on the panel and stopped there, and on the whole
+  // document while it fills the screen (its footer, and the focus with it, is
+  // gone then). A key aimed at a field, a slider or a knob is that control's.
+  const NEXT = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ']);
+  const PREV = new Set(['ArrowLeft', 'ArrowUp', 'PageUp']);
+  let heard = 0;
+  const onKey = (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t instanceof Element) {
+      if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (t.closest('[role="slider"]')) return;
+      if (/^(BUTTON|A)$/.test(t.tagName) && (e.key === ' ' || e.key === 'Enter')) return;
+    }
+    let did = true;
+    if (NEXT.has(e.key)) go(at + 1);
+    else if (PREV.has(e.key)) go(at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(STEPS.length - 1);
+    else if (e.key === 'f' || e.key === 'F' || e.key === 'F5') panel.full(!panel.isFull());
+    else if (e.key === 'Escape' && panel.isFull()) panel.full(false);
+    else did = false;
+    if (!did) return;
+    heard++;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  panel.el.addEventListener('keydown', onKey);
+  document.addEventListener('keydown', (e) => {
+    if (!panel.isFull() || panel.el.contains(e.target)) return;
+    onKey(e);
+  });
+  new MutationObserver(() => {
+    if (panel.isFull() && !panel.el.contains(document.activeElement)) panel.el.focus({ preventScroll: true });
+  }).observe(panel.el, { attributes: true, attributeFilter: ['class', 'data-full'] });
+  panel.stage.addEventListener('pointerdown', () => panel.el.focus({ preventScroll: true }));
 
-  // ── the patchbay: the links this tab holds, read from bay() itself ─────────
-  // Before Join it is drawn from this tab's own graph and the store's, which
-  // opens nothing.
-  const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history' };
-  pb = createPatchbay(heldPicture(bay, SITE),
-    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
+  // A finger swiped sideways steps it, as in the player, so a phone in full
+  // screen (no footer, no keys) can still turn the page. The player's tap on a
+  // third of the screen is left out: this frame is knobs, keys and
+  // words, so a tap here is nearly always meant for a control.
+  const OWN = 'button, a, input, select, textarea, [role="slider"], .k, .pos-knob, .pos-kgrid-cell';
+  let from = null;
+  panel.stage.addEventListener('pointerdown', (e) => {
+    from = e.pointerType === 'touch' && !(e.target instanceof Element && e.target.closest(OWN))
+      ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+  });
+  panel.stage.addEventListener('pointerup', (e) => {
+    if (!from || e.pointerId !== from.id) return;
+    const z = swipeStep(e.clientX - from.x, e.clientY - from.y);
+    from = null;
+    if (z) go(at + z);
+  });
+  panel.stage.addEventListener('pointercancel', () => { from = null; });
 
-  const row = el('div', 'cc-row');
-  row.append(text.el, send.el);
-  // Blocks in the shell's stack; a heading and what it names are one block.
-  d.stack.add(roles.el, joinRow);
-  d.stack.titled('NOTICES', noticeRow, notices.el);
-  d.stack.titled('CHAT', row, lines.el);
-  d.stack.add(pb.el);
-  d.stack.titled('IN THE ROOM', sites.el);
+  d.el.append(panel.el);
+  go(0);
+
+  // What a shot reads back: the scale, the mode, every region's box in screen
+  // px, the knob boxes (equal and not overlapping), and whether the words and
+  // the bay fit.
+  function measure() {
+    const r = (e) => { const b = e.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) }; };
+    const cells = [...build.querySelectorAll('.pos-kgrid-cell')].map((c) => c.getBoundingClientRect());
+    const sizes = new Set(cells.map((c) => `${c.width.toFixed(1)}x${c.height.toFixed(1)}`));
+    let overlap = 0;
+    for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) {
+      const a = cells[i], b = cells[j];
+      if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) overlap++;
+    }
+    const knobsCut = [...build.querySelectorAll('.pos-kgrid-cell')].filter((c) => c.scrollWidth > c.clientWidth + 1 || c.scrollHeight > c.clientHeight + 1).length;
+    const xs = new Set([...pb.view.el.querySelectorAll('.lv-box')].map((g) => Math.round(g.getBoundingClientRect().top)));
+    const kbd = keysHost.querySelector('.keys');
+    return {
+      step: at, mode, k: +k.toFixed(3), full: panel.isFull(), count: count.textContent, keys: heard, vw: innerWidth, vh: innerHeight,
+      frame: r(tf), words: r(words), build: r(build), bay: r(bayBand),
+      wordsMore: Math.max(0, words.scrollHeight - words.clientHeight),
+      knobBoxes: cells.length, knobSizes: [...sizes], knobOverlap: overlap, knobsCut,
+      keysOverflow: kbd ? Math.max(0, kbd.scrollWidth - kbd.clientWidth) : null,
+      bayRows: xs.size, bayScroll: Math.max(0, pb.view.el.scrollWidth - pb.view.el.clientWidth),
+    };
+  }
+  window.__demo.tf = { show: go, full: (want) => panel.full(want), measure, panel };
+  window.__demo.synth = synth;
   d.ready();
 </script>

@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept 032</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The wave and the dial that drives it are one instrument, so one block,
+     tight inside; the page's own stack puts --pos-gap between blocks. */
+  .cc-tuner { display: flex; flex-direction: column; gap: 12px; }
+  .cc-say { font-size: 12px; color: var(--dim); }
+  /* The kit's live wave as the panel's picture, as /concepts/030/. */
+  .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
+  .cc-wave .pos-scope-gut { display: none; }
+  /* The slider row from /concepts/030/: an end label, the slider, an end label,
+     both label columns as wide as the longest end label (`--end`). A second
+     grid row holds the dial scale under the lane, in the lane's own column. */
+  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
+    align-items: center; column-gap: 14px; row-gap: 6px; width: 100%; font: 400 12px/1 var(--mono); }
+  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
+  .pos-stack > .pos-bgroup { align-self: flex-start; width: auto; }
+  .cc-fade .cc-end:first-child { text-align: right; }
+  .cc-fade > .sld { min-width: 0; }
+  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
+  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
+  /* The dial scale: each station's name centred on the point the engine tunes
+     it at. The point is a share of the handle's TRAVEL, not of the lane, which
+     is how slider.mjs places its handle, so a name sits under the handle when
+     the handle sits on that station. */
+  .cc-scale { grid-column: 2; position: relative; height: 14px; }
+  .cc-mark { position: absolute; top: 0; font-size: 11px; transform: translateX(-50%); color: var(--dim2);
+    white-space: nowrap; transition: color .12s; }
+  .cc-mark.on { color: var(--hi); }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createSlider } from '/shell/slider.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createMp3Stream } from '/shell/mp3-stream.mjs';
+
+  // An AM tuner as a patchbay: /concepts/030/ with four stations and a noise
+  // source, all into one tuner effect, whose dial picks which station is clear
+  // and lets the neighbours bleed in as echoes. `?base=` points the page at
+  // demo/fake-station.mjs instead of the relay.
+  //
+  // NOTHING OPENS ON A VISIT. No AudioContext and no fetch until play. The
+  // whole patch is held from load, so the picture does not change with play.
+  //
+  // 🔴 PLAY OPENS FOUR CONNECTIONS TO OTHER PEOPLE'S SERVERS PER LISTENER,
+  // through the relay: three ERR mounts and one Ida mount. So ERR counts THREE
+  // listeners for every person who presses play here, not one, and its
+  // audience figures are what it reports to its board. They open only on the
+  // press, because that is a person asking to listen. Never probe them; test
+  // against the stand-in.
+  const BASE = new URLSearchParams(location.search).get('base') || 'https://shout.positron.studio';
+  const S = 'web';
+  // `at` is the station's point on the dial, 0 to 1, and the scale under the
+  // slider is drawn from the same numbers the engine tunes by.
+  const STATIONS = [
+    { key: 'viker', site: 'err', node: 'vikerraadio', mount: 'vikerraadio', label: 'Vikerraadio', short: 'Viker', at: 0.15, echo: 0.07 },
+    { key: 'klassika', site: 'err', node: 'klassikaraadio', mount: 'klassikaraadio', label: 'Klassikaraadio', short: 'Klassika', at: 0.4, echo: 0.11 },
+    { key: 'r2', site: 'err', node: 'raadio2', mount: 'raadio2', label: 'Raadio 2', short: 'R2', at: 0.65, echo: 0.09 },
+    { key: 'ida', site: 'ida', node: 'tallinn', mount: 'ida-tallinn', label: 'Ida Radio Tallinn', short: 'Ida', at: 0.9, echo: 0.13 },
+  ];
+  const outOf = (st) => `${st.site}:${st.node}:audio-out`;
+  const relayIn = (st) => `shout:${st.mount}:audio-in`, relayOut = (st) => `shout:${st.mount}:audio-out`;
+  const NOISE_OUT = `${S}:noise:audio-out`;
+  const DIAL_OUT = `${S}:dial:value-out`;
+  const TUNER_IN = `${S}:tuner:audio-in`, TUNER_OUT = `${S}:tuner:audio-out`, TUNER_TUNE = `${S}:tuner:value-in`;
+  const WAVE_IN = `${S}:wave:audio-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const bay = createBay();
+  for (const st of STATIONS) {
+    bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.label, place: st.site, net: st.site });
+    bay.addPort({ id: outOf(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'] });
+    bay.addNode({ id: `shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'shout' });
+    bay.addPort({ id: relayIn(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
+    bay.addPort({ id: relayOut(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'],
+      address: `${BASE}/${st.mount}` });
+  }
+  // Noise is a source like a station, made in this tab, so it has a wire of
+  // its own into the tuner and can be unlinked like any other.
+  bay.addNode({ id: `${S}:noise`, kind: 'engine', label: 'noise', place: 'browser' });
+  bay.addPort({ id: NOISE_OUT, label: 'noise', dir: 'out', medium: 'audio' });
+  bay.addNode({ id: `${S}:dial`, kind: 'person', label: 'dial', place: 'browser' });
+  bay.addPort({ id: DIAL_OUT, label: 'dial', dir: 'out', medium: 'value', shape: { of: 'param' } });
+  bay.addNode({ id: `${S}:tuner`, kind: 'engine', label: 'tuner', place: 'browser' });
+  bay.addPort({ id: TUNER_IN, label: 'tuner', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: TUNER_OUT, label: 'tuner', dir: 'out', medium: 'audio' });
+  bay.addPort({ id: TUNER_TUNE, label: 'tune', dir: 'in', medium: 'value',
+    shape: { of: 'param', names: ['tune'] },
+    deliver: (e) => { if (e?.name === 'tune' && Number.isFinite(e.v)) { tune = e.v; applyTune(); } } });
+  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'wave', place: 'browser' });
+  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+
+  const d = mount({ name: 'concept 032', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('032');
+
+  // ── the links, all held from load ───────────────────────────────────────
+  function hold(a, b, opts) {
+    bay.seen(a); bay.seen(b);
+    if (bay.links().some((l) => l.from === a && l.to === b)) return true;
+    const r = bay.link(a, b, [], { site: S, ...opts });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    return r.ok;
+  }
+  // What the sound follows: the bay's own links, read every time, so an
+  // unlinked wire is a silent one.
+  const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+
+  for (const st of STATIONS) {
+    // Holding a link opens nothing. The streams open only on play, the press
+    // where a person asks to listen, so the consent is named here.
+    hold(outOf(st), relayIn(st), { consent: true, via: 'https' });
+    hold(relayOut(st), TUNER_IN, { via: 'https' });
+  }
+  hold(NOISE_OUT, TUNER_IN);
+  hold(DIAL_OUT, TUNER_TUNE);
+  hold(TUNER_OUT, WAVE_IN);
+  hold(TUNER_OUT, SPEAKER_IN);
+
+  // ── how the dial maps to sound ──────────────────────────────────────────
+  // d is the distance from the dial to a station's point. Clear is a narrow
+  // bell on the station; echo is a wide bell, faint, and only what clear
+  // leaves; noise fills what no station holds; the whistle is the beat of a
+  // carrier slightly off tune, silent dead on and gone far away, its pitch
+  // rising with the distance.
+  let tune = 0.4;
+  const CLEAR_W = 0.035, ECHO_W = 0.13, ECHO_MAX = 0.35;
+  function mix(t) {
+    const st = STATIONS.map((s) => {
+      const dist = Math.abs(t - s.at);
+      const clear = Math.exp(-((dist / CLEAR_W) ** 2));
+      const echo = ECHO_MAX * Math.exp(-((dist / ECHO_W) ** 2)) * (1 - clear);
+      // Off tune the sidebands go first, so the clear path also dulls.
+      const bright = 1200 + 2300 * Math.exp(-((dist / 0.03) ** 2));
+      return { dist, clear, echo, bright };
+    });
+    const best = Math.max(...st.map((s) => s.clear));
+    const near = st.reduce((a, s, i) => (s.dist < st[a].dist ? i : a), 0);
+    const nd = st[near].dist;
+    return {
+      st, near,
+      noise: 0.04 + 0.26 * (1 - best),
+      whistle: 0.05 * (1 - Math.exp(-((nd / 0.012) ** 2))) * Math.exp(-((nd / 0.07) ** 2)),
+      pitch: Math.min(3200, 150 + 40000 * nd),
+    };
+  }
+
+  // ── the sound ───────────────────────────────────────────────────────────
+  let ctx = null, tuner = null;
+  const legs = new Map();          // key -> { stream, in, clear, lp, echo, live }
+  let noiseSrc = null;
+
+  // Pink-ish noise, four seconds, looped (Paul Kellet's economy filter).
+  function noiseBuffer() {
+    const n = ctx.sampleRate * 4, buf = ctx.createBuffer(1, n, ctx.sampleRate), a = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0;
+    for (let i = 0; i < n; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99765 * b0 + w * 0.0990460; b1 = 0.96300 * b1 + w * 0.2965164; b2 = 0.57000 * b2 + w * 1.0526913;
+      a[i] = (b0 + b1 + b2 + w * 0.1848) * 0.12;
+    }
+    return buf;
+  }
+
+  // The tuner's own graph: every source into a shared AM colour (mono, a
+  // band-pass of 200 Hz to 3.5 kHz, a gentle saturation), a whistle inside it.
+  function buildTuner() {
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 200; hp.Q.value = 0.7;
+    // Mono: two channels in are summed to one here, as an AM set does.
+    hp.channelCount = 1; hp.channelCountMode = 'explicit'; hp.channelInterpretation = 'speakers';
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.7;
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(1024), k = 2.2;
+    for (let i = 0; i < curve.length; i++) { const x = (i / (curve.length - 1)) * 2 - 1; curve[i] = Math.tanh(k * x) / Math.tanh(k); }
+    shaper.curve = curve; shaper.oversample = '2x';
+    const master = ctx.createGain(); master.gain.value = 0.8;
+    const tap = ctx.createAnalyser(); tap.fftSize = 2048;
+    hp.connect(lp); lp.connect(shaper); shaper.connect(master); master.connect(tap);
+    // A silent sink keeps the tap pulled when the speakers are unlinked.
+    const pull = ctx.createGain(); pull.gain.value = 0; tap.connect(pull); pull.connect(ctx.destination);
+    const whistle = ctx.createOscillator(); whistle.type = 'sine';
+    const wGain = ctx.createGain(); wGain.gain.value = 0;
+    whistle.connect(wGain); wGain.connect(hp); whistle.start();
+    const nIn = ctx.createGain(), nGain = ctx.createGain(); nGain.gain.value = 0;
+    nGain.connect(hp);
+    return { bus: hp, tap, pull, whistle, wGain, nIn, nGain, buf: new Float32Array(tap.fftSize) };
+  }
+
+  function addLeg(st) {
+    const input = ctx.createGain();
+    const clear = ctx.createGain(); clear.gain.value = 0;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3500;
+    clear.connect(lp); lp.connect(tuner.bus);
+    // The echo: a neighbour heard faintly, late and dull, with a little
+    // feedback so it smears like a skywave.
+    const echo = ctx.createGain(); echo.gain.value = 0;
+    const delay = ctx.createDelay(0.5); delay.delayTime.value = st.echo;
+    const dull = ctx.createBiquadFilter(); dull.type = 'bandpass'; dull.frequency.value = 900; dull.Q.value = 0.9;
+    const fb = ctx.createGain(); fb.gain.value = 0.35;
+    echo.connect(delay); delay.connect(dull); dull.connect(tuner.bus); delay.connect(fb); fb.connect(delay);
+    const stream = createMp3Stream(ctx, { url: `${BASE}/${st.mount}`, log: (m) => d.log(`${st.label}: ${m}`) });
+    stream.node.connect(input);
+    const leg = { stream, input, clear, lp, echo, live: false, parts: [input, clear, lp, echo, delay, dull, fb] };
+    legs.set(st.key, leg);
+    stream.started.then((path) => {
+      if (legs.get(st.key) !== leg) return;
+      leg.live = true;
+      d.log(`${st.label} playing, ${path}`);
+      pb.refresh();
+    }).catch((e) => d.log(`${st.label} did not start: ${e?.message || e}`, 'warn'));
+  }
+
+  function applyTune() {
+    paintScale();
+    if (!ctx || !tuner) return;
+    const t = ctx.currentTime, m = mix(tune), tc = 0.04;
+    STATIONS.forEach((st, i) => {
+      const g = legs.get(st.key), s = m.st[i];
+      if (!g) return;
+      g.clear.gain.setTargetAtTime(s.clear, t, tc);
+      g.echo.gain.setTargetAtTime(s.echo, t, tc);
+      g.lp.frequency.setTargetAtTime(s.bright, t, tc);
+    });
+    tuner.nGain.gain.setTargetAtTime(m.noise, t, tc);
+    // The whistle is the nearest station's carrier, so it is there only while
+    // that station reaches the tuner.
+    const nearOn = holds(relayOut(STATIONS[m.near]), TUNER_IN);
+    tuner.wGain.gain.setTargetAtTime(nearOn ? m.whistle : 0, t, tc);
+    tuner.whistle.frequency.setTargetAtTime(m.pitch, t, tc);
+  }
+
+  // The sound follows the links the bay holds, as on /concepts/030/: a station
+  // reaches the tuner only along relay -> tuner, the noise only along
+  // noise -> tuner, and the tuner the speakers only along tuner -> speakers.
+  let waveOn = false;
+  function route() {
+    if (!ctx) return;
+    for (const st of STATIONS) {
+      const g = legs.get(st.key);
+      if (!g) continue;
+      try { g.input.disconnect(); } catch { /* not connected */ }
+      if (holds(relayOut(st), TUNER_IN)) { g.input.connect(g.clear); g.input.connect(g.echo); }
+    }
+    try { tuner.nIn.disconnect(); } catch { /* not connected */ }
+    if (holds(NOISE_OUT, TUNER_IN)) tuner.nIn.connect(tuner.nGain);
+    try { tuner.tap.disconnect(); } catch { /* not connected */ }
+    tuner.tap.connect(tuner.pull);
+    if (holds(TUNER_OUT, SPEAKER_IN)) tuner.tap.connect(ctx.destination);
+    waveOn = holds(TUNER_OUT, WAVE_IN);
+    applyTune();
+    pb.refresh();
+  }
+
+  // ── play and stop ───────────────────────────────────────────────────────
+  let playing = false;
+  function play() {
+    ctx ??= new AudioContext();
+    ctx.resume();
+    tuner ??= buildTuner();
+    playing = true;
+    noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = noiseBuffer(); noiseSrc.loop = true;
+    noiseSrc.connect(tuner.nIn); noiseSrc.start();
+    // The press is the person asking to listen: four streams open now.
+    for (const st of STATIONS) if (hold(outOf(st), relayIn(st), { consent: true, via: 'https' })) addLeg(st);
+    route();
+    face();
+    requestAnimationFrame(frame);
+  }
+  function stop() {
+    playing = false;
+    for (const g of legs.values()) {
+      try { g.stream.stop(); } catch { /* already stopped */ }
+      for (const n of g.parts) { try { n.disconnect(); } catch { /* gone */ } }
+    }
+    legs.clear();
+    try { noiseSrc?.stop(); noiseSrc?.disconnect(); } catch { /* gone */ }
+    noiseSrc = null;
+    if (tuner) { tuner.nGain.gain.setTargetAtTime(0, ctx.currentTime, 0.02); tuner.wGain.gain.setTargetAtTime(0, ctx.currentTime, 0.02); }
+    pb.refresh();
+    face();
+  }
+
+  const pb = createPatchbay(bay, {
+    flowing: (l) => {
+      if (!playing) return false;
+      if (l.from === NOISE_OUT) return true;
+      if (l.from === TUNER_OUT) return true;
+      const st = STATIONS.find((s) => outOf(s) === l.from || relayOut(s) === l.from);
+      return !!(st && legs.get(st.key)?.live);
+    },
+  });
+
+  // ── the picture: the tuner's output, one full-width wave ─────────────────
+  const host = el('div', 'cc-wave');
+  const scope = createGrainScope(host, { seconds: 4, height: 150, fullScale: 1 });
+  const panel = createVideoPanel({ media: host, aspect: 'auto', right: false, left: el('span', 'cc-say', 'tuner output') });
+  function frame() {
+    if (!playing) return;
+    if (waveOn) { tuner.tap.getFloatTimeDomainData(tuner.buf); scope.feed(tuner.buf, ctx.sampleRate); }
+    requestAnimationFrame(frame);
+  }
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
+  ] });
+  function face() { transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play'); }
+  face();
+
+  // ── the dial: a slider whose every move is one event out of dial:value-out
+  const dial = createSlider({ label: '', aria: 'tune', min: 0, max: 1, step: 0.001, value: tune,
+    onInput: (v) => bay.send(DIAL_OUT, { of: 'param', name: 'tune', v }) });
+  const scale = el('div', 'cc-scale');
+  const marks = STATIONS.map((st) => {
+    const m = el('span', 'cc-mark', st.short);
+    m.style.left = `calc(${st.at * 100}% - ${st.at * 100} * var(--sld-knob, 20px) / 100 + var(--sld-knob, 20px) / 2)`;
+    scale.append(m);
+    return m;
+  });
+  function paintScale() {
+    const m = mix(tune);
+    marks.forEach((el, i) => el.classList.toggle('on', m.st[i].clear > 0.5));
+  }
+  const fade = el('div', 'cc-fade');
+  fade.append(el('span', 'cc-end', '531'), dial.el, el('span', 'cc-end', '1602'),
+    el('span'), scale);
+  paintScale();
+
+  const tunerBlock = el('div', 'cc-tuner');
+  tunerBlock.append(panel.el, fade);
+  const ends = [...fade.querySelectorAll('.cc-end')].map((e) => e.textContent.length);
+  fade.style.setProperty('--end', `${Math.max(...ends)}ch`);
+  // Play alone top left, then the tuner, then the patchbay, at the page's own
+  // block gap (the shell's stack, as every concept page now is).
+  d.stack.add(transport.el, tunerBlock, pb.el);
+
+  // For a check, not for a visitor: the bay, so a wire can be unlinked and the
+  // sound seen to follow, and the mix the dial makes.
+  window.__demo.bay = bay;
+  window.__demo.route = route;
+  window.__demo.mix = () => mix(tune);
+  window.__demo.dial = dial;
+  d.ready();
+</script>

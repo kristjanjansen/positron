@@ -14,7 +14,7 @@
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
   /* ETV on the left, ETV2 on the right, each half the content width, as
-     /concepts/650/. On a phone they stack, ETV first. */
+     /concepts/065/. On a phone they stack, ETV first. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   /* The faded-out picture dims, never to nothing. The page sets the strength. */
@@ -22,7 +22,7 @@
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  /* The crossfader row, as /concepts/300/: an end label, the slider, an end
+  /* The crossfader row, as /concepts/030/: an end label, the slider, an end
      label, both label columns as wide as the longest end label on the page. */
   .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
     align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
@@ -160,7 +160,7 @@
     });
   }
 
-  // The sound follows the links the bay holds, as on /concepts/300/: a channel
+  // The sound follows the links the bay holds, as on /concepts/030/: a channel
   // reaches the fader only along its audio link, the fader the speakers only
   // along fader -> speaker.
   function route() {
