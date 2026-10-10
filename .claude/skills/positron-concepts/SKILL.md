@@ -205,6 +205,20 @@ flows; a TRANSPORT is what carries it (`relay`, `whep`, `whip`, `https`).
   keys while armed) and `rec:midi-out` (playing back into the synth on a link
   of its own).
 
+## A synth on a concept page is laid out one way
+
+🔴 **LINEAR, AND ONLY THE KNOBS LEAVE THE LINE.** Asked 2026-10-10: *"have
+standard logic for istrument panes when you lay out concept syths. they are
+linear execpt knobs that are are independet in the knobs area, horiz
+scrollable. no half col scope, scope is always full w"*.
+- The parts of an instrument stack in one column, each at the full width of
+  where it sits: the scope, the knobs area, the keyboard, the pad.
+- The knobs have an area of their own, one row of boxed knobs
+  (`createKnobGrid`) that scrolls sideways when it does not fit. It never
+  wraps to a second row and never shares a row with a picture.
+- The scope is always full width. Never a half column, never a cell beside
+  the module boxes.
+
 ## Kit pieces and their traps
 
 - **Keyboard**: `createKeyboard(host, { ...keyRange(21), base: 48, onDown,

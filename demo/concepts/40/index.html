@@ -65,7 +65,7 @@
   // Every knob has a box at every step; a knob the step does not offer is off.
   // Three across, so nine are a square at every width from a phone up, and no
   // width leaves one box alone on a row.
-  const grid = createKnobGrid(knobs, { cols: 3 });
+  const grid = createKnobGrid(knobs, { row: true });
 
   // ── the keyboard: a key is one note event out of keys:midi-out ───────────
   const keysHost = el('div');
