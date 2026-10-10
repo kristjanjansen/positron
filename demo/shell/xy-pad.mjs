@@ -330,14 +330,18 @@ export function createXyPad(host, {
     // nothing. See the note above; the axes speak through aria and the page.
   }
 
-  /** The playhead's position on the pad — a filled dot inside a ring, so it
-   *  reads over both the pale line and the bright one. */
+  /** The playhead's position on the pad: one filled dot with a border in the
+   *  pad's ground, so it reads over both the pale line and the bright one. */
   function mark(v) {
     const [mx, my] = px(v.x, v.y);
-    ctx.fillStyle = C.mark;
-    ctx.beginPath(); ctx.arc(mx, my, 4.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = C.mark; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.arc(mx, my, 10, 0, Math.PI * 2); ctx.stroke();
+    // One dot with a border in the pad's own ground, so it reads over the line
+    // without a ring around it (asked 2026-10-10, *"rm extra outline. make
+    // bg-colored border on yellow dot"*).
+    // In pad pixels, which are drawn at about half size on a page: the dot is
+    // the old ring's size, and the border is the old gap between dot and ring.
+    ctx.beginPath(); ctx.arc(mx, my, 11, 0, Math.PI * 2);
+    ctx.fillStyle = C.mark; ctx.fill();
+    ctx.strokeStyle = C.card; ctx.lineWidth = 6; ctx.stroke();
   }
 
   paint();

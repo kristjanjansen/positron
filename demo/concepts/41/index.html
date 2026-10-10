@@ -94,8 +94,10 @@
   // Three boxes across at most, so beside the pad they are one row.
   const grid = createKnobGrid(knobs, { cols: 3 });
 
-  // The keys node has no keyboard on this page: play holds a note through it.
-  const note = (n, v) => bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: v });
+  // The play button is the test tone: a held note out of web:tone, into the
+  // osc for its pitch and the amp for its gate (asked 2026-10-10, *"where is
+  // web:keys. there is only test tone"*).
+  const note = (n, v) => bay.send(ID('tone', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: v });
 
   // ── play: a held A2 into the same keys:midi-out, so the pad has something
   // to filter without holding a key. A key pressed over it plays that key and
