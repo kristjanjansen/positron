@@ -1,5 +1,6 @@
 ## Open
 
+- **An icon set, and a kit icons page** (2026-10-10). Asked: *"In bg see ../ eccm icon syarem. We need one from icones. Make a sample sheet in one of kit pages called icons"*. Read how `~/personal/eccm` does icons, pick one set from Icones (icones.js.org, Iconify), vendor what positron needs, and show a sample sheet at `/kit/icons/`. Background agent.
 - ~~**Concept 40: one bay node per knob** (2026-10-10). Asked: *"Per knob. Lets go eurorack :)"*, answering whether `web:knobs` should split. Each knob is its own node with a `value-out` linked to the module it moves, so the patch says which knob drives what.~~ DONE 2026-10-10.
 - ~~**A link button, beside the patchbay title** (2026-10-10). Asked: *"create linkbutton component, but it next to patchbay comppnent title See details"*. A kit component, a button that looks like a link, newest block on `/kit/input/`; `createPatchbay`'s `details` button becomes one reading `See details`, right after the title.~~ DONE 2026-10-10.
 - ~~**Bay view: no vertical layout on a desk** (2026-10-10). Asked: *"do not do vert layouts on desktop. overflow"*, after the stacking fix for 31. The desk keeps one row and scrolls sideways; only a phone stacks.~~ DONE 2026-10-10.
