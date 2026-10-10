@@ -93,7 +93,7 @@
   bay.addPort({ id: NOISE_OUT, label: 'noise', dir: 'out', medium: 'audio' });
   bay.addNode({ id: `${S}:dial`, kind: 'person', label: 'dial', place: 'browser' });
   bay.addPort({ id: DIAL_OUT, label: 'dial', dir: 'out', medium: 'value', shape: { of: 'param' } });
-  bay.addNode({ id: `${S}:tuner`, kind: 'engine', label: 'AM tuner', place: 'browser' });
+  bay.addNode({ id: `${S}:tuner`, kind: 'engine', label: 'tuner', place: 'browser' });
   bay.addPort({ id: TUNER_IN, label: 'tuner', dir: 'in', medium: 'audio' });
   bay.addPort({ id: TUNER_OUT, label: 'tuner', dir: 'out', medium: 'audio' });
   bay.addPort({ id: TUNER_TUNE, label: 'tune', dir: 'in', medium: 'value',
