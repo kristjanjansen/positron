@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/icons</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<style>
+  /* The sheet: one cell per icon, the cell sized for the longest name rather
+     than for the count, so the browser decides how many fit a row. */
+  .ico-sheet { flex: 1 1 100%; display: grid; gap: var(--ctl-gap);
+               grid-template-columns: repeat(auto-fill, minmax(min(92px, 100%), 1fr)); }
+  .ico-cell { display: flex; flex-direction: column; align-items: center; gap: var(--ctl-gap);
+              padding: 14px 4px 10px; color: var(--fg); min-width: 0; }
+  .ico-name { font: 400 11px/1.2 var(--mono); color: var(--dim); overflow-wrap: anywhere; text-align: center; }
+  .ico-cell svg, .ico-row svg { display: block; }
+  /* SIZES and COLOUR: a group of icons over the label naming the group */
+  .ico-row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; }
+  .ico-grp { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ctl-gap); }
+  .ico-set { display: flex; gap: 12px; align-items: flex-end; }
+  .ico-btns { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); align-items: center; }
+  .ico-btn-col { display: flex; flex-direction: column; gap: 12px; }
+</style>
+<script type="module">
+  import { el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+  import { icon, hasIcon, NAMES, GROUPS, SOURCE, BODIES } from '/shell/icons.mjs';
+
+  /**
+   * kit/icons, THE KIT'S ICONS, 2026-10-10. Asked: *"see ../eccm icon system.
+   * We need one from icones. Make a sample sheet in one of kit pages called
+   * icons."* The set is Feather, the one eccm chose, vendored into
+   * `demo/shell/icons.mjs` by `demo/resources/build-icons.mjs` from the
+   * Iconify package, so a visit asks nobody's server for a picture.
+   * ⚠️ A VISIT OPENS NOTHING. Every check is behind `?selfcheck=1`.
+   */
+  const { d, section, out, land, checkPage } = createKitPage({
+    part: 'icons',
+    what: 'Every icon in the kit, drawn from the Feather set in the ink of the text around it.',
+  });
+
+  // the blocks, newest first: the sheet is the reason for the page
+  const cells = [];
+  section('SAMPLE SHEET', 'Every name icon() knows, at 24 px, with the name to ask for it by under it.', null, (box) => {
+    const grid = el('div', 'ico-sheet');
+    for (const [, names] of GROUPS) for (const name of names) {
+      const cell = el('div', 'ico-cell');
+      cell.title = `Feather ${SOURCE[name]}`;
+      cell.append(icon(name, { size: 24 }), el('span', 'ico-name', name));
+      grid.append(cell);
+      cells.push({ name, cell });
+    }
+    box.append(grid);
+    box.append(out(`${NAMES.length} icons from Feather, MIT`));
+  });
+
+  const SIZES = [16, 20, 24, 32];
+  const SIZE_NAMES = ['play', 'settings', 'waveform', 'link'];
+  const sized = [];
+  section('SIZES', 'The same four icons at 16, 20, 24 and 32 px, with a 1.5 unit line that is one pixel at 16.', null, (box) => {
+    const row = el('div', 'ico-row');
+    for (const s of SIZES) {
+      const grp = el('div', 'ico-grp');
+      const set = el('div', 'ico-set');
+      for (const n of SIZE_NAMES) { const svg = icon(n, { size: s }); set.append(svg); sized.push({ s, svg }); }
+      grp.append(set, el('span', 'ico-name', `${s} px`));
+      row.append(grp);
+    }
+    box.append(row);
+  });
+
+  const BTN_NAMES = ['play', 'pause', 'stop', 'record', 'loop', 'settings', 'close', 'plus'];
+  const LABELS = { play: 'Play', pause: 'Pause', stop: 'Stop', record: 'Record', loop: 'Loop', settings: 'Settings', close: 'Close', plus: 'Add' };
+  const buttons = [];
+  section('IN A BUTTON', 'The kit’s glyph square at 34 px and its small square at 26, each holding one icon and named by its own label.', null, (box) => {
+    const col = el('div', 'ico-btn-col');
+    for (const [cls, size] of [['', 16], ['pos-sm', 14]]) {
+      const row = el('div', 'ico-btns');
+      for (const n of BTN_NAMES) {
+        const b = el('button', cls, '', { type: 'button', 'data-glyph': '1', 'aria-label': LABELS[n], title: LABELS[n] });
+        b.append(icon(n, { size }));
+        row.append(b);
+        buttons.push({ cls, size, b });
+      }
+      col.append(row);
+    }
+    box.append(col);
+  });
+
+  const INKS = [['--dim', 'dim'], ['--fg2', 'fg2'], ['--fg', 'fg'], ['--hi', 'hi']];
+  const inked = [];
+  section('COLOUR', 'An icon has no colour of its own and draws in the colour of its text, here the dim, the middle grey, the foreground and the accent.', null, (box) => {
+    const row = el('div', 'ico-row');
+    for (const [tok, label] of INKS) {
+      const grp = el('div', 'ico-grp');
+      const set = el('div', 'ico-set');
+      set.style.color = `var(${tok})`;
+      for (const n of ['record', 'mic', 'warning']) set.append(icon(n, { size: 24 }));
+      grp.append(set, el('span', 'ico-name', label));
+      row.append(grp);
+      inked.push({ tok, set });
+    }
+    box.append(row);
+  });
+
+  land();
+
+  if (SELFCHECK) {
+  const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+  await frames(3);
+  checkPage();
+
+  // 1. every name has a cell, and every cell draws an <svg> with ink in it
+  {
+    const bad = [];
+    for (const { name, cell } of cells) {
+      const svg = cell.querySelector('svg');
+      const shapes = svg ? svg.querySelectorAll('path, circle, rect, line, polyline, polygon, ellipse') : [];
+      const pathOk = [...shapes].every((s) => s.tagName !== 'path' || (s.getAttribute('d') || '').trim().length > 0);
+      const bb = svg && shapes.length ? svg.getBBox() : { width: 0, height: 0 };
+      const r = svg?.getBoundingClientRect();
+      if (!svg || !shapes.length || !pathOk || (bb.width <= 0 && bb.height <= 0) || !r || Math.round(r.width) !== 24) bad.push(name);
+    }
+    d.assert('every icon in the set draws an <svg> with shapes and ink in it, one cell per name',
+      cells.length === NAMES.length && cells.length > 0 && bad.length === 0,
+      bad.length ? `${bad.length} drew nothing: ${bad.join(', ')}` : `${cells.length} of ${NAMES.length} names drawn at 24 px, each with a non-empty shape`);
+  }
+
+  // 2. no two icons are the same picture
+  {
+    const bodies = NAMES.map((n) => BODIES[n]);
+    const drawn = cells.map(({ cell }) => cell.querySelector('svg').innerHTML);
+    const dupes = NAMES.filter((n, i) => bodies.indexOf(bodies[i]) !== i);
+    d.assert('no two icons are the same picture',
+      new Set(bodies).size === NAMES.length && new Set(drawn).size === cells.length,
+      dupes.length ? `repeated: ${dupes.join(', ')}` : `${new Set(bodies).size} distinct bodies of ${NAMES.length}, ${new Set(drawn).size} distinct on the page`);
+  }
+
+  // 3. a titled icon has a name, an untitled one is hidden from a screen reader
+  {
+    const named = icon('mic', { title: 'Microphone' });
+    const plain = icon('mic');
+    const t = named.querySelector('title');
+    const sheetHidden = cells.every(({ cell }) => cell.querySelector('svg').getAttribute('aria-hidden') === 'true');
+    const btnNamed = buttons.every(({ b }) => (b.getAttribute('aria-label') || '').length > 0 && b.querySelector('svg').getAttribute('aria-hidden') === 'true');
+    d.assert('an icon with a title is a named picture and one without is aria-hidden, and every icon button carries its own name',
+      named.getAttribute('role') === 'img' && named.getAttribute('aria-label') === 'Microphone' && t?.textContent === 'Microphone'
+        && !named.hasAttribute('aria-hidden') && plain.getAttribute('aria-hidden') === 'true' && !plain.hasAttribute('role')
+        && !plain.querySelector('title') && sheetHidden && btnNamed,
+      `titled: role ${named.getAttribute('role')}, aria-label "${named.getAttribute('aria-label')}", title "${t?.textContent}"; `
+      + `untitled: aria-hidden ${plain.getAttribute('aria-hidden')}; sheet ${sheetHidden ? 'all hidden' : 'NOT ALL HIDDEN'}, `
+      + `${buttons.length} buttons ${btnNamed ? 'named by aria-label' : 'NOT ALL NAMED'}`);
+  }
+
+  // 4. NEGATIVE CONTROL: a name the set does not have throws in words, rather
+  // than drawing an empty square that reads as an icon
+  {
+    let msg = null;
+    try { icon('no-such-icon'); } catch (e) { msg = e.message; }
+    d.assert('an unknown name throws and says which name, rather than drawing an empty square',
+      !hasIcon('no-such-icon') && hasIcon('play') && typeof msg === 'string' && msg.includes('no-such-icon'),
+      msg ? `threw: ${msg}` : 'DID NOT THROW');
+  }
+
+  // 5. SIZES: each icon lays out at exactly the size asked for
+  {
+    const off = sized.filter(({ s, svg }) => { const r = svg.getBoundingClientRect(); return Math.abs(r.width - s) > 0.01 || Math.abs(r.height - s) > 0.01; });
+    d.assert('SIZES lays every icon out at exactly 16, 20, 24 and 32 px',
+      sized.length === SIZES.length * SIZE_NAMES.length && off.length === 0,
+      off.length ? `${off.length} off: ${off.map(({ s, svg }) => `${s} drew ${svg.getBoundingClientRect().width}`).join(', ')}`
+        : `${sized.length} icons, ${SIZES.join(', ')} px, each its own size to the hundredth`);
+  }
+
+  // 6. IN A BUTTON: the squares are the kit's squares and the icon sits on
+  // their centre, read off the two rects rather than believed from the CSS
+  {
+    const sm = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-sm'));
+    const bad = [];
+    let worst = 0;
+    for (const { cls, size, b } of buttons) {
+      const r = b.getBoundingClientRect(), s = b.querySelector('svg').getBoundingClientRect();
+      const want = cls ? sm : 34;
+      const dx = Math.abs((s.left + s.width / 2) - (r.left + r.width / 2));
+      const dy = Math.abs((s.top + s.height / 2) - (r.top + r.height / 2));
+      worst = Math.max(worst, dx, dy);
+      if (Math.abs(r.width - want) > 0.5 || Math.abs(r.height - want) > 0.5 || dx > 0.5 || dy > 0.5 || Math.abs(s.width - size) > 0.01) bad.push(`${b.getAttribute('aria-label')} ${cls || 'square'} ${r.width.toFixed(1)}x${r.height.toFixed(1)}`);
+    }
+    d.assert('IN A BUTTON the glyph square is 34 px, the pos-sm square is --ctl-sm, and every icon sits on its button’s centre',
+      buttons.length === BTN_NAMES.length * 2 && bad.length === 0,
+      bad.length ? bad.join(', ') : `${buttons.length} buttons, 34 and ${sm} px squares, the worst icon ${worst.toFixed(2)} px off centre`);
+  }
+
+  // 7. COLOUR: each icon's stroke is the colour of the text it sits in, and
+  // the four inks really are four
+  {
+    const bad = [];
+    const cols = inked.map(({ tok, set }) => {
+      const c = getComputedStyle(set).color;
+      for (const svg of set.querySelectorAll('svg')) if (getComputedStyle(svg).stroke !== c) bad.push(`${tok} ${getComputedStyle(svg).stroke}`);
+      return c;
+    });
+    d.assert('COLOUR strokes every icon in the ink of its container, four different inks',
+      bad.length === 0 && new Set(cols).size === INKS.length,
+      bad.length ? `stroke not the text colour: ${bad.join(', ')}` : INKS.map(([t], i) => `${t} ${cols[i]}`).join(', '));
+  }
+
+  // 8. NOTHING LEFT THIS ORIGIN: the icons are vendored, not fetched
+  {
+    const off = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => new URL(u).origin !== location.origin);
+    d.assert('the page fetched nothing from another origin',
+      off.length === 0, off.length ? off.slice(0, 3).join(', ') : `${performance.getEntriesByType('resource').length} requests, all to this origin`);
+  }
+  } // if (SELFCHECK)
+
+  d.ready();
+</script>
+</html>
