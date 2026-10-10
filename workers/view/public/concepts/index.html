@@ -32,7 +32,15 @@
 
   const d = mount({ name: 'concepts', what: 'The ideas behind positron, one page each.', readout: null });
 
-  const grid = el('div', 'cc-cards');
+  // Grouped by the hundreds digit (000s, 100s, 300s ...), a grid each, spaced by
+  // the page's own stack and with no group titles (asked 2026-10-10, *"have
+  // groups in concepts index. no titles"*).
+  const grids = new Map();
+  const gridFor = (num) => {
+    const k = String(num).padStart(3, '0')[0];
+    if (!grids.has(k)) { const g = el('div', 'cc-cards'); grids.set(k, g); d.stack.add(g); }
+    return grids.get(k);
+  };
   CONCEPTS.forEach(({ title, say, n }, i) => {
     // A row may name its page number, so a new topic can start at 10.
     const a = el('a', 'cc-card', '', { href: `/concepts/${n ?? i + 1}/` });
@@ -41,8 +49,7 @@
     h.append(el('span', 'cc-n', String(num)), document.createTextNode(title));
     a.append(h);
     if (say) a.append(el('p', 'cc-s', say));
-    grid.append(a);
+    gridFor(num).append(a);
   });
-  d.el.append(grid);
   d.ready();
 </script>

@@ -1,4 +1,4 @@
-// demo/concepts/410/modules.mjs: the mono WebAudio synth of /concepts/400/, as one
+// demo/concepts/450/modules.mjs: the mono WebAudio synth of /concepts/400/, as one
 // fixed patch, with an XY pad as a node of its own that plays the filter.
 //
 // ⚠️ A COPY OF demo/concepts/400/modules.mjs, NOT AN IMPORT, ON PURPOSE. The two
