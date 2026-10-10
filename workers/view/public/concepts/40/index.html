@@ -16,20 +16,19 @@
   /* The step picker and the sound button on one row; on a phone they wrap. */
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* A knob or the keyboard the step does not use keeps its place and is not
+  /* The keyboard keeps its place when the step does not use it and is not
      drawn, so the panel is the same size at every step (asked 2026-10-10,
-     *"reserve space for kbow block and keyboard even when not present"*). */
+     *"reserve space for kbow block and keyboard even when not present"*). The
+     knobs do the same in the kit's knob grid, which keeps every box. */
   .cc-off { visibility: hidden; }
-  /* A knob the step does not offer leaves the row, so the ones it does sit
-     together (*"mess layout"*, 2026-10-10); the row keeps its height. */
-  .cc-stack .cc-gone { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createChoice } from '/shell/choice.mjs';
-  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { setSymbol } from '/shell/symbol.mjs';
@@ -64,7 +63,10 @@
       onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
     }));
   }
-  const bank = createKnobBank([...knobs.values()]);
+  // Every knob has a box at every step; a knob the step does not offer is off.
+  // Three across, so nine are a square at every width from a phone up, and no
+  // width leaves one box alone on a row.
+  const grid = createKnobGrid(knobs, { cols: 3 });
 
   // ── the keyboard: a key is one note event out of keys:midi-out ───────────
   const keysHost = el('div');
@@ -124,10 +126,8 @@
     // A knob shows while its own cable reaches its module.
     const reach = (k) => bay.links().some((l) => l.from === ID(`knob-${k.name}`, 'value-out') && l.to === ID(k.owner, 'value-in'));
     const on = new Set(KNOBS.filter(reach).map((k) => k.name));
-    // With none to offer, every knob stays in and the row is not drawn, so it
-    // keeps its height; otherwise the unused ones leave the row.
-    for (const k of KNOBS) knobs.get(k.name).el.classList.toggle('cc-gone', on.size > 0 && !on.has(k.name));
-    bank.el.classList.toggle('cc-off', on.size === 0);
+    // Every knob keeps its box; one whose cable the step does not lay is off.
+    for (const k of KNOBS) grid.show(k.name, on.has(k.name));
     keysHost.classList.toggle('cc-off', !inPatch('keys'));
     pb.refresh();
   }
@@ -161,7 +161,7 @@
   // The waveform, the knob group and the keys are three blocks of the page,
   // not glued (asked 2026-10-10, *"scope knobs keys are different blocks not
   // glued. just hide them when not there"*).
-  out.append(top, wave.el, bank.el, keysHost, pb.el);
+  out.append(top, wave.el, grid.el, keysHost, pb.el);
   d.el.append(out);
   for (const [name, v] of Object.entries(step.preset)) {
     synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);
@@ -169,5 +169,6 @@
   }
   apply(step.patch);
   window.__demo.synth = synth;
+  window.__demo.knobs = grid;
   d.ready();
 </script>

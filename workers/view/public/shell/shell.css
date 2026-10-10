@@ -161,6 +161,15 @@
      file along. */
   --knob-w: calc(var(--ctl-w) * 1.1);
   --ctl-gap: 8px;
+  /* 🔴 A KNOB IN A BOX OF ITS OWN, 2026-10-10 (`knob-grid.mjs`, asked as
+     *"Knobs: each has its own wrapper box, in a grid, already reserve room for
+     it"*). The box is the knob plus one inset each side, and the inset is a
+     step and a half of the control gap, so the air inside a box is visibly more
+     than the gap between two boxes and the boxes still read as one set.
+     ⚠️ DECLARED HERE AND NOT ON `.pos-kgrid`, so a page sizing a column beside
+     the grid reads the same number the grid does. */
+  --kgrid-inset: calc(var(--ctl-gap) * 1.5);
+  --kgrid-cell: calc(var(--knob-w) + 2 * var(--kgrid-inset));
   /* 🔴 THE SMALL CONTROL, ONE HEIGHT, DECLARED HERE ONCE. Asked 2026-09-26 for
      `/fau/`'s Compile as *"small button variant"*, and `/wish/`'s remove button
      has an open line asking for the same thing. MEASURED before this line
@@ -6021,6 +6030,52 @@ button.pos-linkbtn:active { background: none; }
    grouping true rather than saying it. Lifted from `/evo/`, which hand rolled
    both the row and this line before the bank could do either. */
 .pos-knob-div { align-self: stretch; width: 0; border-left: 1px solid var(--line2); }
+
+/* ── knob grid: every knob in a box of its own, shell/knob-grid.mjs ─────────
+   🔴 ONE CELL WIDTH, AND THE BROWSER DERIVES THE COUNT. `auto-fill` rather
+   than `auto-fit`, so a box keeps its size however many there are, and the
+   track is `--kgrid-cell` rather than `1fr`, so six boxes are not six
+   different sizes at six widths (*"bring back that original pad button size
+   square"*, one component along).
+   ⚠️ `min()` AGAINST 100% IN THE TRACK, so a frame narrower than one box is
+   one box wide and not a column wider than the page.
+   🔴 `grid-auto-rows: 1fr`, SO EVERY ROW IS THE TALLEST ROW. With no height on
+   the container a flexible row resolves to the largest row's content, which
+   is what makes a knob with a sub and one without the same box.
+   🔴 `--kgrid-cols` IS A CEILING ON THE COLUMNS, NOT A COUNT. A grid inside a
+   shrink-to-fit row has no width of its own, and `auto-fill` with no width
+   lays out ONE column, so a caller that names a ceiling gets a definite width:
+   that many boxes and their gaps, or the row, whichever is less. Unset, the
+   grid takes the row. It is a custom property written by the component from
+   its option, never `style.width`, so a page can still take it back. */
+.pos-kgrid {
+  display: grid; gap: var(--ctl-gap); min-width: 0;
+  grid-template-columns: repeat(auto-fill, min(100%, var(--kgrid-cell)));
+  grid-auto-rows: 1fr;
+}
+.pos-kgrid[data-cols] {
+  width: min(100%, calc(var(--kgrid-cols) * var(--kgrid-cell)
+                         + (var(--kgrid-cols) - 1) * var(--ctl-gap)));
+}
+/* ⚠️ THE BOX IS A SURFACE OF THIS KIT, SO IT READS `--edge` AND `--r`, and a
+   glue that holds a grid flattens every box by inheritance with no patch.
+   `--inset` is honoured the same way. */
+.pos-kgrid-cell {
+  display: flex; justify-content: center; align-items: flex-start; min-width: 0;
+  padding: var(--inset, var(--kgrid-inset)) 0;
+  background: var(--card); border: var(--edge); border-radius: var(--r);
+}
+/* 🔴 A KNOB THE PAGE SWITCHED OFF KEEPS ITS BOX, ITS GROUND AND ITS EDGE, and
+   only what is IN the box dims. The slot is the promise that nothing moves;
+   the knob inside it says it is off through its own `data-off` (.38, the
+   kit's disabled knob), and the box's ground goes back to the page so the row
+   reads as a set of slots with some empty rather than as a row of controls
+   with some broken. `--ctl-off` on the edge, the published number for a
+   switched-off control's furniture. */
+.pos-kgrid-cell[data-off] { background: none; border-color: color-mix(in oklab, var(--line) calc(var(--ctl-off) * 100%), transparent); }
+/* ⚠️ `[hidden]` SAID OUT LOUD, because `display: grid` above beats the
+   browser's own and a page hiding the whole grid would get a grid. */
+.pos-kgrid[hidden], .pos-kgrid-cell[hidden] { display: none; }
 
 /* 🔴 A PARAMETER'S KNOB CAN WEAR THE PARAMETER'S HUE, AND NOTHING SETS ONE
    YET. `param-knobs.mjs` stamps `data-param` on every knob it builds under a

@@ -35,6 +35,7 @@
   import { createPanelLayout } from '/shell/panel-layout.mjs';
   import { createInstrument, HEADER_STATES, HEADER_SAYS } from '/shell/instrument.mjs';
   import { createControlGrid } from '/shell/control-grid.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
 
   /**
@@ -165,6 +166,7 @@
   // behind, the build read it in its dead zone, `section()` swallowed the throw,
   // and the page died much later on an empty map.
   let ipanelSpec = null;      // { sketch, stomp, box16, desk, foot, pic, power, pick }
+  let kgSpec = null;          // { wide, phone, frame }  the knob grids
   let rowsSpec = null;        // the glued rows specimens, by name
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A pad grid, as of
@@ -241,6 +243,47 @@
    * PANEL block further down already shows a case full of real controls.
    */
 
+
+  /**
+   * 🔴 THE NEWEST BLOCK, AND THEREFORE THE FIRST CALL TO `section()`. A knob
+   * grid, 2026-10-10, asked as *"Knobs: each has its own wrapper box, in a
+   * grid, already reserve room for it. A kit component. In 40 41"*.
+   *
+   * 🔴 TWO OF THE SIX ARE SWITCHED OFF, BECAUSE THAT IS THE STATE THE
+   * COMPONENT EXISTS FOR. A grid showing six live knobs proves nothing about
+   * the slot an off knob keeps.
+   * 🔴 AND THE SAME SIX IN THE KIT'S 320 px FRAME, which is how this page
+   * grades a phone at desk width: the frame is narrower than any phone, so the
+   * columns the browser derives there are fewer than at full width, and a grid
+   * with a fixed column count would spill out of the frame instead.
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason every block
+   * below gives: both harnesses press that row by position.
+   */
+  section('KNOB GRID',
+    'Every knob in a box of its own, on a grid that keeps the box when a knob is switched off.',
+    `const g = createKnobGrid(knobs)          // or a Map of name to knob
+g.show('wave', false)    // the box stays, the knob dims
+g.show('wave', true)
+createKnobGrid(knobs, { cols: 3 })        // at most three across`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const o = out('nothing turned');
+      const mk = () => [
+        ['FREQ', 64], ['WAVE', 2, 0, 3, 1], ['CUTOFF', 90], ['RES', 30], ['ATTACK', 10], ['RELEASE', 50],
+      ].map(([label, value, min = 0, max = 127, step]) => createKnob({
+        label, min, max, step, value, onInput: (v) => { o.textContent = `${label.toLowerCase()} ${v}`; },
+      }));
+      const wide = createKnobGrid(mk());
+      wide.show('wave', false);
+      wide.show('attack', false);
+      const frame = el('div', 'kit-phone');
+      const phone = createKnobGrid(mk());
+      phone.show('wave', false);
+      phone.show('attack', false);
+      frame.append(phone.el);
+      kgSpec = { wide, phone, frame };
+      box.append(wide.el, el('p', 'kit-cap', 'the same six in a 320 px frame'), frame, o);
+    });
 
   /**
    * 🔴 THE NEWEST BLOCK ON THIS PAGE, AND THEREFORE THE FIRST CALL TO
@@ -1867,6 +1910,73 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   if (SELFCHECK) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   checkPage();
+
+  /* ── the knob grid ─────────────────────────────────────────────────────── */
+  if (kgSpec) {
+    const { wide, phone, frame } = kgSpec;
+    const rect = (c) => c.getBoundingClientRect();
+    const rects = (g) => g.cells.map((c) => { const r = rect(c); return [r.left, r.top, r.width, r.height]; });
+    const f1 = (n) => n.toFixed(1);
+    /** how many columns a grid laid out, read off the cells' own tops */
+    const across = (g) => { const t0 = rect(g.cells[0]).top; return g.cells.filter((c) => Math.abs(rect(c).top - t0) < 0.5).length; };
+
+    /* 1. Every box is one size, on and off, at full width and in the frame. */
+    {
+      const all = [...wide.cells, ...phone.cells].map(rect);
+      const ws = all.map((r) => r.width), hs = all.map((r) => r.height);
+      const spreadW = Math.max(...ws) - Math.min(...ws), spreadH = Math.max(...hs) - Math.min(...hs);
+      d.assert('every box in a knob grid is the same size, the switched off ones included',
+        spreadW < 0.5 && spreadH < 0.5 && ws[0] > 0,
+        `${all.length} boxes, ${f1(ws[0])} by ${f1(hs[0])} px, spread ${spreadW.toFixed(2)} across and ${spreadH.toFixed(2)} down`);
+    }
+
+    /* 2. Switching a knob off moves no box, and switching it back moves none
+          either. RES is on in the specimen, so this takes it off and puts it
+          back, and the reader is left with what was there. */
+    {
+      const before = rects(wide);
+      wide.show('res', false);
+      const off = rects(wide);
+      const offState = wide.on('res') === false && wide.cellOf('res').dataset.off === '1' && wide.knobs[3].disabled();
+      wide.show('res', true);
+      const back = rects(wide);
+      const moved = (a, b) => a.reduce((n, r, i) => n + (r.some((v, j) => Math.abs(v - b[i][j]) > 0.01) ? 1 : 0), 0);
+      d.assert('switching a knob off and on again moves no box in the grid',
+        offState && moved(before, off) === 0 && moved(before, back) === 0,
+        `off took: ${offState}, boxes moved going off ${moved(before, off)} of ${before.length}, coming back ${moved(before, back)}`);
+    }
+
+    /* 3. An off box is still a box in its slot: laid out, the knob still in
+          it, at the place its index says. */
+    {
+      const c = wide.cellOf('wave');
+      const cs = getComputedStyle(c);
+      const k = c.querySelector('.pos-knob');
+      const r1 = rect(wide.cells[0]), r = rect(c);
+      const gap = parseFloat(getComputedStyle(wide.el).columnGap) || 0;
+      const expectX = r1.left + (r1.width + gap) * 1;   // WAVE is the second box
+      d.assert('a switched off knob keeps its slot: its box is laid out where its index puts it, with the knob in it, dimmed',
+        cs.display !== 'none' && cs.visibility === 'visible' && !!k && k.hasAttribute('data-off')
+        && Math.abs(r.left - expectX) < 0.5 && Math.abs(r.top - r1.top) < 0.5
+        && parseFloat(getComputedStyle(k).opacity) < 1,
+        `display ${cs.display}, the box at x ${f1(r.left)} against ${f1(expectX)} and y ${f1(r.top)} against ${f1(r1.top)}, `
+        + `knob opacity ${getComputedStyle(k).opacity}`);
+    }
+
+    /* 4. The grid fits a phone: in the 320 px frame it wraps onto fewer
+          columns than at full width and nothing reaches past the frame. */
+    {
+      const fr = rect(frame), fcs = getComputedStyle(frame);
+      const inner = fr.right - parseFloat(fcs.borderRightWidth) - parseFloat(fcs.paddingRight);
+      const right = Math.max(...phone.cells.map((c) => rect(c).right));
+      const nW = across(wide), nP = across(phone);
+      d.assert('in a 320 px frame the grid wraps onto fewer columns and nothing spills past the frame',
+        nP < nW && nP >= 1 && right <= inner + 0.5 && phone.el.scrollWidth <= phone.el.clientWidth
+        && document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        `${nW} across at full width, ${nP} in the frame, the last box ends at ${f1(right)} against the frame's inside at ${f1(inner)}, `
+        + `grid scrollWidth ${phone.el.scrollWidth} against ${phone.el.clientWidth}`);
+    }
+  }
 
 
   /* ── the glued rows and the instrument panel built on them ──────────────── */
