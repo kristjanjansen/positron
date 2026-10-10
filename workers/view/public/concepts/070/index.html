@@ -8,15 +8,13 @@
 <title>POSITRON concept 070</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The Pico block: its screen, and its four keys under it. */
+  /* The Pico block: its screen, and its two keys under it. */
   .cc-col { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
   .cc-col > .pos-vp { align-self: stretch; }
-  /* The emulated OLED: the panel's dark ink, the 128x64 canvas at a whole number scale in the middle. */
+  /* The emulated OLED: the panel's dark ink, the 128x64 canvas at half the panel's width, at a whole number scale, in the middle. */
   .cc-oled { display: grid; place-items: center; width: 100%; aspect-ratio: 2 / 1; background: #05070c; cursor: pointer; }
   .cc-oled canvas { display: block; image-rendering: pixelated; }
   .cc-say { font-size: 12px; color: var(--dim); }
-  /* The dump's bytes column: what went over the wire, at full strength. */
-  .cc-dump .pos-tbl-body .pos-tbl-c:nth-child(3) { color: var(--fg); white-space: nowrap; }
   /* The same medium colours as /concepts/010/. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
@@ -33,27 +31,28 @@
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
-  import { createTable } from '/shell/table.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
-  import { decode, noteName } from '/shell/midi-decode.mjs';
+  import { createChoice } from '/shell/choice.mjs';
 
-  // /concepts/100/ with the router firmware in the middle. The keyboard's notes
-  // go into an emulated RP2040 as DIN MIDI bytes on UART0 RX, the router's C
-  // (rig/pico/firmware/main.c around rig/route-core/) routes them, and whatever
+  // /concepts/100/ with a Pico in the middle. The keyboard's notes go into an
+  // emulated RP2040 as DIN MIDI bytes on UART0 RX, the firmware's C
+  // (rig/pico/patch/main.c around rig/route-core/) routes them, and whatever
   // the firmware writes to UART0 TX comes back as events out of pico:midi-out
   // and into the synth. Nothing in this page copies a byte from in to out: if
   // the firmware sent nothing, the synth would be silent.
   //
-  // What the firmware does to the bytes (main.c SCENES, route_core.c op_run):
-  //   scene 1 THRU       channel 1: the status byte's low nibble set to 0, so
-  //                      the keyboard's channel 1 notes go out byte for byte.
-  //   scene 2 OCTAVE UP  transpose +12 then channel 2: 90 3C 64 goes out as
-  //                      91 48 64. A note pushed past 127 is dropped, not clamped.
-  //   changing scene     the old link is unlinked first: a note off for every
-  //                      note it still holds and CC 123 on every channel it
-  //                      played, then the new link. K1 and K2 do this.
-  //   K3                 CC 123 on all 16 channels, straight to the wire.
+  // ⚠️ IT IS NOT THE DESK ROUTER'S FIRMWARE. rig/pico/firmware/ runs on real
+  // hardware and keeps its own screen; this page's Pico runs a small firmware
+  // built for it, with the same routing core and a screen drawn like the
+  // patchbay below: KEYS, PICO and SYNTH joined by wires, a pulse per note.
+  //
+  // What the firmware does to the bytes (rig/pico/patch/main.c ROUTES):
+  //   K1 as played   the link has no ops: 90 3C 64 goes out as 90 3C 64.
+  //   K2 octave up   transpose +12: 90 3C 64 goes out as 90 48 64. A note
+  //                  pushed past 127 is dropped, not clamped.
+  //   changing route the old link is unlinked first: a note off for every
+  //                  note it still holds and CC 123 on every channel it
+  //                  played, then the new link.
   const S = 'web';
   const bay = createBay();
   for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['pico', 'device', 'Pico (emulated)'],
@@ -93,49 +92,19 @@
     v.o.stop(t + 0.06);
     voices.delete(n);
   }
-  // The firmware sends CC 123 on a scene change and on K3, so the synth takes it.
+  // The firmware sends CC 123 when the route changes, so the synth takes it.
   function synthIn(e) {
     if (e.cls === 'note') { if (e.d2) noteOn(e.d1, e.d2); else noteOff(e.d1); }
     else if (e.cls === 'cc' && (e.d1 === 123 || e.d1 === 120)) for (const n of [...voices.keys()]) noteOff(n);
   }
 
-  // ── the dump: every message into UART0 RX and out of UART0 TX ──────────
-  // Time is the page's clock from the first row. An IN row is stamped when the
-  // page hands the bytes to the board; an OUT row when the worker posts them,
-  // which it does once per slice of at most 16 ms, so an OUT time can trail
-  // the firmware by that much.
-  const dump = createTable({ columns: [
-    { key: 't', label: 'time', width: 72, align: 'right' },
-    { key: 'dir', label: 'dir', width: 44 },
-    { key: 'hex', label: 'bytes', width: 92 },
-    { key: 'say', label: 'reading', grow: true, clip: true },
-  ], minRows: 10, stick: true, cap: 500 });
-  dump.el.classList.add('cc-dump');
-  let t0 = 0;
-  const rows = [];
-  function short(m) {
-    const r = decode(m);
-    const ch = r.ch ? ` ch ${r.ch}` : '';
-    if (r.kind === 'note on') return `note on ${noteName(r.note)} vel ${r.d2}${ch}`;
-    if (r.kind === 'note off') return `note off ${noteName(r.note)}${ch}`;
-    if (r.kind === 'control') return `CC ${r.cc}${r.reading.includes('notes off') ? ' all notes off' : ` = ${r.d2}`}${ch}`;
-    return `${r.what} ${r.reading}`.trim();
-  }
-  function row(dir, m) {
-    const now = performance.now();
-    if (!rows.length) t0 = now;
-    const r = { t: ((now - t0) / 1000).toFixed(3), dir, hex: m.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' '), say: short(m) };
-    rows.push(r);
-    dump.add(r);
-  }
-
-  // ── the Pico: the router firmware on an emulated RP2040 ─────────────────
+  // ── the Pico: its own firmware on an emulated RP2040 ────────────────────
   // ⚠️ NOTHING IS FETCHED ON A VISIT, NOT EVEN THE EMULATOR. pico.mjs imports
   // rp2040js (216 KB) and the boot ROM (52 KB), so both modules are imported on
   // the first key, the first press of the screen or the first Pico key, then
-  // the 57,856 byte UF2 is fetched and a worker boots it. Bytes that arrive
+  // the 33,792 byte UF2 is fetched and a worker boots it. Bytes that arrive
   // meanwhile are kept and sent, in order, once it is running.
-  const UF2 = '/resources/pico/router-pico.uf2';
+  const UF2 = '/resources/pico/patch-pico.uf2';
   const pico = { state: 'off', runner: null, queue: [], frames: 0, rx: 0, tx: 0, boot: null };
   const oledBox = el('div', 'cc-oled');
   oledBox.title = 'press to start the Pico';
@@ -154,8 +123,9 @@
         oledCv = document.createElement('canvas');
         oledCv.width = P.W; oledCv.height = P.H;
         oledBox.append(oledCv);
+        // Half the panel's width, at the largest whole number scale that fits it.
         new ResizeObserver(() => {
-          const k = Math.max(1, Math.floor(Math.min(oledBox.clientWidth / P.W, oledBox.clientHeight / P.H)));
+          const k = Math.max(1, Math.floor(Math.min(oledBox.clientWidth / 2 / P.W, oledBox.clientHeight / 2 / P.H)));
           oledCv.style.width = `${k * P.W}px`; oledCv.style.height = `${k * P.H}px`;
         }).observe(oledBox);
         const res = await fetch(UF2);
@@ -170,7 +140,7 @@
               t.frame = performance.now();
               pico.boot = { importMs: Math.round(t.imported - t.press), fetchMs: Math.round(t.fetched - t.imported),
                 firstFrameMs: Math.round(t.frame - t.fetched), totalMs: Math.round(t.frame - t.press), flash: image.length };
-              d.log(`the Pico booted router-pico.uf2 (${image.length.toLocaleString('en')} bytes of flash) and drew its first screen ${pico.boot.totalMs} ms after the press: emulator imported in ${pico.boot.importMs}, UF2 fetched in ${pico.boot.fetchMs}, first frame ${pico.boot.firstFrameMs} later`);
+              d.log(`the Pico booted patch-pico.uf2 (${image.length.toLocaleString('en')} bytes of flash) and drew its first screen ${pico.boot.totalMs} ms after the press: emulator imported in ${pico.boot.importMs}, UF2 fetched in ${pico.boot.fetchMs}, first frame ${pico.boot.firstFrameMs} later`);
             }
             if (showing()) drawOled(oledCv, px);
           },
@@ -190,7 +160,7 @@
 
   // One whole message into UART0 RX, the DIN in.
   function toPico(m) {
-    if (pico.state === 'running') { row('in', m); pico.rx += m.length; pico.runner.send(m); }
+    if (pico.state === 'running') { pico.rx += m.length; pico.runner.send(m); }
     else if (pico.state !== 'failed') { pico.queue.push(m); picoStart(); }
   }
   // One bay event to MIDI bytes: note on 9n, note off 8n, CC Bn, on the event's channel.
@@ -202,7 +172,6 @@
   }
   // One whole message off UART0 TX, the DIN out, sent on out of pico:midi-out.
   function fromPico(m) {
-    row('out', m);
     const st = m[0] & 0xF0, ch = (m[0] & 15) + 1;
     let ev = null;
     if (st === 0x90 || st === 0x80) ev = { cls: 'note', ch, d1: m[1], d2: st === 0x90 ? m[2] : 0 };
@@ -245,48 +214,23 @@
   // while the sine sounds, the video wire while the Pico is drawing.
   const pb = createPatchbay(bay, { flowing: (l, medium) => (medium === 'video' ? pico.state === 'running' : voices.size > 0) });
 
-  // ── the Pico block: its screen, and its four keys ───────────────────────
-  // K1 previous scene, K2 next scene, K3 panic, K4 confirm a held SysEx. A key
-  // is down for as long as the pointer is, because the firmware reads the pin.
-  const KEYS = [['PREV', 1], ['NEXT', 2], ['STOP', 3], ['OK', 4]];
-  const keys = createButtonGroup({
-    label: 'keys',
-    buttons: KEYS.map(([does, k]) => ({ id: `k${k}`, label: String(k), aria: `${does}, key ${k}`, title: `${does}, K${k}` })),
-    onPress: (id) => {
-      // a pointer press already went down and up below; this is the keyboard's Enter or a check's click
-      if (performance.now() - (upAt.get(id) || 0) < 500) return;
-      tap(Number(id.slice(1)));
-    },
-  });
-  const upAt = new Map();
-  async function tap(k, heldMs = 0) {
+  // ── the Pico block: its screen, and its two keys ────────────────────────
+  // K1 plays the notes as played, K2 an octave up. The firmware reads the
+  // pins; the page only presses them, and the screen says which route is on.
+  const ROUTES = [['as played', 1], ['octave up', 2]];
+  async function tap(k) {
     await picoStart();
-    pico.runner?.key(k, true); pico.runner?.key(k, false, heldMs);
+    pico.runner?.key(k, true); pico.runner?.key(k, false, 0);
   }
-  for (const [, k] of KEYS) {
-    const id = `k${k}`, b = keys.button(id);
-    let downAt = 0;
-    b.addEventListener('pointerdown', async (e) => {
-      if (e.button !== 0) return;
-      downAt = performance.now();
-      try { b.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
-      await picoStart();
-      if (downAt) pico.runner?.key(k, true);
-    });
-    const up = () => {
-      if (!downAt) return;
-      const held = performance.now() - downAt;
-      downAt = 0;
-      upAt.set(id, performance.now());
-      if (pico.runner) pico.runner.key(k, false, held); else picoStart().then(() => tap(k, held));
-    };
-    b.addEventListener('pointerup', up);
-    b.addEventListener('pointercancel', up);
-    b.addEventListener('lostpointercapture', up);
-  }
+  const route = createChoice({
+    label: 'route',
+    options: ROUTES,
+    title: (k, name) => `K${k}, ${name}`,
+    onPick: (k) => tap(k),
+  });
   const panel = createVideoPanel({ media: oledBox, aspect: '2 / 1', left: el('span', 'cc-say', 'Pico (emulated)'), centre: picoSays, right: false });
   const picoBlock = el('div', 'cc-col');
-  picoBlock.append(panel.el, keys.el);
+  picoBlock.append(panel.el, route.el);
 
   // ── the keyboard: a press is one event leaving keys:midi-out ────────────
   const host = el('div');
@@ -297,8 +241,8 @@
   });
 
   // Blocks in the shell's stack, at the shell's gap.
-  d.stack.add(host, picoBlock, dump.el, pb.el);
-  window.__demo.c070 = { bay, pico, rows, voices, tap,
+  d.stack.add(picoBlock, host, pb.el);
+  window.__demo.c070 = { bay, pico, voices, tap, route,
     play: (n, ms = 300) => new Promise((ok) => {
       bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 100 });
       setTimeout(() => { bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 0 }); ok(); }, ms);

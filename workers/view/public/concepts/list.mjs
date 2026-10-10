@@ -8,7 +8,7 @@ export const CONCEPTS = [
   { n: '040', title: 'History', say: 'The same chat, with a store that keeps what was said.' },
   { n: '050', title: 'Admin', say: 'The chat with an admin line every tab shows on top.' },
   { n: '060', title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },
-  { n: '070', title: 'Pico router', say: 'The keyboard routed into a sine synth by C firmware on an emulated Pico, with every byte shown.' },
+  { n: '070', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
   { n: '100', title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
   { n: '110', title: 'Effects', say: 'The keyboard and a saw synth with MIDI and audio effects.' },
   { n: '120', title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
@@ -22,5 +22,5 @@ export const CONCEPTS = [
   { n: '500', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
   { n: '600', title: 'Camera', say: 'The local camera patched to a picture on this page.' },
   { n: '610', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
-  { n: '650', title: 'Camera loopback', say: 'The local camera beside the same picture sent through two WebRTC peers in this one tab.' },
+  { n: '650', title: 'Camera loopback', say: 'The local camera beside the same picture after a round trip through Cloudflare Stream by WHIP and back by WHEP.' },
 ];

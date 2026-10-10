@@ -251,6 +251,8 @@
   import { PRESETS } from '/fau/presets.mjs';
   import { createEngineNode, createEngineUi, memoryRelay, standInAccess } from '/fau/engine-node.mjs';
   import { createBayNode } from '/shell/bay-node.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
   import { graphProblem } from '/shell/graph-registry.mjs';
   import { faustCompiler, hasCompiler, faustCompile, faustNode, FAUST_FLAGS } from '/shell/faust.mjs';
   import { sharedAudio, claim, contexts } from '/shell/audio.mjs';
@@ -580,10 +582,17 @@
   }
   /** How many `setParamValue`s a turn or a new node has sent. */
   let paramSends = 0;
+  /* 🔴 A TURN TRAVELS THROUGH THE PAGE'S BAY, SINCE 2026-10-10. Asked:
+     *"implement faust external knobs"*, after *"can fau knobs be outside the
+     fau in patchbay or are they internal ones?"*. Each knob is a node of its
+     own, `<site>:knob-<name>`, with a `value-out` cabled into the engine's
+     `value-in`, and a turn is `bay.send` of `{ of: 'param', name, v }` along
+     that cable. The `setParamValue` is the port's `deliver`, below, so a knob
+     whose cable is gone moves its dial and nothing else. See `rebuildBay`. */
   const knobs = createParamKnobs({
     onChange: (name, v) => {
-      const a = onThread?.addr.get(name);
-      if (node && a) { node.setParamValue(a, v); paramSends++; }
+      const out = knobPort.get(name);
+      if (bay && out) bay.send(out, { of: 'param', name, v });
     },
     /* While a knob is held, its parameter's text in the box is lit. */
     onHold: (name, on) => source.mark(name, on),
@@ -598,6 +607,87 @@
    * gets one: `freq`, `gain` and `gate` are set by a key and stay plain.
    */
   const book = createHueBook();
+
+  // ── the page's own bay: keys, the engine, the speakers and one node a knob ──
+  //
+  // 🔴 A FRESH BAY PER COMPILE, BECAUSE THE NAMES COME FROM THE CODE AND
+  // `bay.mjs` HAS NO WAY TO TAKE A PORT AWAY. The knob nodes, their cables and
+  // the engine's `value-in` names are what the last good compile declared, so
+  // after every compile the bay is built again from `knobs.names()`:
+  //   - a parameter that is gone takes its node and its cable with it;
+  //   - a new one gets a node and a cable into the engine;
+  //   - one whose name survives keeps its cable, and the cable keeps its
+  //     `sent` and `dropped`, so a count read across a recompile does not
+  //     restart. A cable somebody took away (`bay.unlink`) stays away.
+  // `createPatchbay` keys a wire by its printed link, which is the same text
+  // in the new bay, so the picture keeps its wires too.
+  // ⚠️ THE KEYS AND SPEAKERS CABLES ARE DRAWN, NOT ROUTED. A key still calls
+  // `press`, which calls `keyOn`, and the picture is told with `pulse`; only
+  // the path a knob turn takes goes through this bay.
+  let bay = null, pb = null;
+  /** param name -> its knob's `value-out` port id, for the bay as it stands. */
+  let knobPort = new Map();
+  const safeName = (n) => String(n).replace(/[^A-Za-z0-9_-]/g, '-');
+  const FAU_IN = () => `${engine.site}:fau:value-in`;
+  const KEYS_OUT = () => `${engine.site}:keys:midi-out`;
+  const SPEAKERS_IN = () => `${engine.site}:speakers:audio-in`;
+  /** The link from a parameter's knob into the engine, in the bay as it stands. */
+  const knobLink = (name) => bay?.links().find((l) => l.from === knobPort.get(name) && l.to === FAU_IN());
+  /** The announced half: plain declarations, no `deliver`, for the room. */
+  function knobDecls(names) {
+    const s = engine.site;
+    const nodes = names.map((n) => ({ id: `${s}:knob-${safeName(n)}`, kind: 'person', label: n }));
+    const ports = [
+      { id: FAU_IN(), label: 'Faust knobs', dir: 'in', medium: 'value', shape: { of: 'param', names } },
+      ...names.map((n) => ({ id: `${s}:knob-${safeName(n)}:value-out`, label: n, dir: 'out', medium: 'value',
+        shape: { of: 'param' } })),
+    ];
+    return { nodes, ports };
+  }
+  function rebuildBay() {
+    const s = engine.site, names = knobs.names();
+    const old = bay, oldPort = knobPort;
+    const next = createBay();
+    next.addNode({ id: `${s}:keys`, kind: 'person', label: 'keys' });
+    next.addNode({ id: `${s}:fau`, kind: 'engine', label: 'Faust' });
+    next.addNode({ id: `${s}:speakers`, kind: 'screen', label: 'speakers' });
+    next.addPort({ id: KEYS_OUT(), label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+    next.addPort({ id: engine.ports.midi, label: 'Faust keys', dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'] });
+    next.addPort({ id: engine.ports.audio, label: 'Faust sound', dir: 'out', medium: 'audio' });
+    next.addPort({ id: SPEAKERS_IN(), label: 'speakers', dir: 'in', medium: 'audio' });
+    const decl = knobDecls(names);
+    for (const n of decl.nodes) next.addNode(n);
+    for (const p of decl.ports) {
+      next.addPort(p.id === FAU_IN() ? { ...p, deliver: (e) => {
+        if (e?.of !== 'param') return;
+        const a = onThread?.addr.get(e.name);
+        if (node && a) { node.setParamValue(a, e.v); paramSends++; }
+      } } : p);
+    }
+    const lay = (from, to) => {
+      const r = next.link(from, to);
+      if (!r.ok) d.log(`the picture could not cable ${from} to ${to}: ${r.why}`, 'warn');
+      return r;
+    };
+    lay(KEYS_OUT(), engine.ports.midi);
+    lay(engine.ports.audio, SPEAKERS_IN());
+    const nextPort = new Map();
+    for (const n of names) {
+      const out = `${s}:knob-${safeName(n)}:value-out`;
+      nextPort.set(n, out);
+      const was = oldPort.has(n) ? old?.links().find((l) => l.from === oldPort.get(n) && l.to === FAU_IN()) : null;
+      if (oldPort.has(n) && !was) continue;
+      const r = lay(out, FAU_IN());
+      if (r.ok && was) Object.assign(next.links().find((l) => l.id === r.id), { sent: was.sent, dropped: was.dropped });
+    }
+    bay = next;
+    knobPort = nextPort;
+    /* The room hears the same knobs, see the announcement below. Before a Join
+       this only refreshes the page's own registry, and opens nothing. */
+    engine.node.setGraphs([engine.graph()]);
+    pb?.refresh();
+  }
+
   function paintHues() {
     for (const n of knobs.names()) {
       const h = book.hueOf(n);
@@ -743,6 +833,7 @@
     knobs.set(kn.list);
     book.assign(knobs.names());
     paintHues();
+    rebuildBay();
     /* 🔴 A COMPILE DOES NOT OPEN A SOUND DEVICE. With the audio already open
        the new module goes straight onto the thread, which is what a recompile
        has always done; with it shut, this compile is what the first key press
@@ -935,6 +1026,8 @@
   function press(note, vel = 100) {
     keys.lightNote?.(note, true);
     pedal.keyDown(note);
+    /* The picture's keys cable pulses; the note itself does not go through the bay. */
+    pb?.pulse(KEYS_OUT(), engine.ports.midi);
     /* `claim` is a comparison when this page already holds the audio, and a
        resume when a background tab took it away (`demo/shell/audio.mjs`). */
     if (node) { claim(FAU); node.keyOn(0, note, vel); voiced++; return undefined; }
@@ -1012,6 +1105,28 @@
     allOff: () => allOff(), log: d.log,
   });
   const bayUi = createEngineUi(engine, { el, log: d.log });
+  /* 🔴 THE ROOM HEARS THE KNOBS TOO. Whatever graph the engine announces for
+     this site (its own `publish`, a Join, a MIDI device arriving) goes out with
+     the engine's `value-in`, its names, and one node and `value-out` a knob,
+     as the last good compile declared them. `rebuildBay` says it again after
+     every compile.
+     ⚠️ A STOPGAP AND NOT A DESIGN: it wraps `engine.node.setGraphs` from this
+     page because `engine-node.mjs` takes no extra ports and was not this
+     change's to edit. Its home is an option on `createEngineNode`.
+     ⚠️ ANNOUNCED, NOT LINKABLE FROM ANOTHER PAGE: the engine still refuses a
+     `link.request` into anything but its MIDI in, so the cables are this
+     page's own. */
+  {
+    const say = engine.node.setGraphs;
+    const knobId = (id) => /^knob-/.test(String(id).split(':')[1] || '');
+    engine.node.setGraphs = (next = engine.node.graphs(), loc) => say(next.map((g) => {
+      if (g.site !== engine.site) return g;
+      const k = knobDecls(knobs.names());
+      return { ...g,
+        nodes: [...g.nodes.filter((n) => !knobId(n.id)), ...k.nodes],
+        ports: [...g.ports.filter((p) => !knobId(p.id) && p.id !== FAU_IN()), ...k.ports] };
+    }), loc);
+  }
 
   // ── the patch selector, and the fourth state ───────────────────────────────
   //
@@ -1149,6 +1264,17 @@
   /* The knobs are the row under the text, hidden until a compile has any. */
   knobRow = panel.addRow(knobs.el);
   d.el.append(panel.el);
+
+  /* 🔴 THE PATCHBAY, ITS OWN BLOCK UNDER THE INSTRUMENT. The keys into the
+     engine, the engine to the speakers, and one node a knob cabled into the
+     engine's `value-in`, which is the cable a turn really travels. A knob
+     cable pulses once per turn it carried (the link's own `sent`), the keys
+     cable once per key, and the sound cable is lit while anything is heard. */
+  rebuildBay();
+  pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
+    flowing: (l, medium) => medium === 'audio' && !!node && level() > 0.001,
+  });
+  d.el.append(pb.el);
 
   /* 🔴 THE FIRST TOUCH ANYWHERE ON THE INSTRUMENT OPENS THE AUDIO, NOT THE
      FIRST KEY, AND THE NUMBER IS WHY. MEASURED 2026-09-28 in headless Chrome on
@@ -2013,13 +2139,23 @@
     press(55, 100);
     await sleep(400);
     const open = await avg();
-    const sendsBefore = paramSends;
+    const sendsBefore = paramSends, cableBefore = knobLink('cutoff')?.sent ?? NaN;
     cutDial().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
     await sleep(250);
     const shut = await avg();
     d.assert('turning cutoff to the bottom while two keys are held darkens both at once, with no recompile',
       knobs.value('cutoff') === 100 && paramSends > sendsBefore && shut < open * 0.4 && open > 0.005,
       `${open.toFixed(5)} rms open, ${shut.toFixed(5)} at 100 Hz, ${paramSends - sendsBefore} setParamValue`);
+    /* 🔴 AND THE TURN WENT THROUGH THE BAY. Every `setParamValue` it caused is
+       one the cable from `knob-cutoff` into the engine's `value-in` carried,
+       counted on the link's own `sent`, so a knob that still reached the node
+       directly would read 0 here. */
+    {
+      const cable = knobLink('cutoff'), carried = (cable?.sent ?? NaN) - cableBefore;
+      d.assert('that turn reached the node along the bay link from the cutoff knob node into the engine, one send for each setParamValue',
+        !!cable && carried > 0 && carried === paramSends - sendsBefore && bay.port(FAU_IN()).shape.names.includes('cutoff'),
+        `${cable ? `${cable.from} -> ${cable.to}` : 'no cable'}, sent grew by ${carried}, ${paramSends - sendsBefore} setParamValue`);
+    }
     lift(48);
     lift(55);
     /* ⚠️ AN ASSERT HERE, BECAUSE THE RECOMPILE BELOW IS THE IDLE WAIT PLUS THE
@@ -2082,6 +2218,55 @@
         `hand ${handRan ? 'ran' : 'did not run'}, cutoff ${byHand} after ${paramSends - sendsBeforeHand} `
         + `setParamValue, the node says ${onNode}`);
       cutDial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    }
+
+    /* ── the knobs are bay nodes, and they follow the code ─────────────────
+       🔴 A RECOMPILE THAT RENAMES A PARAMETER TAKES ITS KNOB NODE AND CABLE
+       AWAY AND LAYS NEW ONES, and the knob whose name survives keeps its
+       cable and the cable's count. `res` becomes `reso` by its label, so the
+       program is the same sound with one name changed. */
+    {
+      const S = engine.site, cutBefore = knobLink('cutoff'), cutSent = cutBefore?.sent ?? NaN;
+      const oldNode = `${S}:knob-res`, newNode = `${S}:knob-reso`;
+      const hadOld = !!bay.node(oldNode) && !!knobLink('res');
+      typeInto(byId('sweep').code.replace('hslider("res[', 'hslider("reso['));
+      await idle.settled();
+      const from = (n) => bay.links().filter((l) => l.from === `${n}:value-out`);
+      const names = bay.port(FAU_IN())?.shape.names.slice().sort().join(' ');
+      const cutNow = knobLink('cutoff');
+      d.assert('a recompile that renames res to reso takes the res knob node and its cable away and cables a reso node into the engine',
+        hadOld && !bay.node(oldNode) && from(oldNode).length === 0
+          && !!bay.node(newNode) && from(newNode).length === 1 && from(newNode)[0].to === FAU_IN()
+          && names === 'cutoff depth reso' && knobs.names().includes('reso') && !knobs.names().includes('res'),
+        `res node ${bay.node(oldNode) ? 'still there' : 'gone'} with ${from(oldNode).length} cables, `
+        + `reso node ${bay.node(newNode) ? 'there' : 'missing'} with ${from(newNode).length}, value-in names ${names}`);
+      d.assert('and the cutoff knob, whose name survived, keeps its cable and the cable keeps its count',
+        !!cutNow && cutNow.sent === cutSent && knobs.value('cutoff') === 8000
+          && pb.view.el.textContent.includes('reso'),
+        `cable ${cutNow ? 'there' : 'gone'}, sent ${cutSent} before and ${cutNow?.sent} after, knob ${knobs.value('cutoff')}`);
+      /* 🔴 NEGATIVE CONTROL: THE CABLE IS THE PATH. With the cutoff cable
+         unlinked the dial still turns and the node is not told: no
+         `setParamValue`, and the live node still says 8000. Then the cable is
+         laid again and the same turn reaches the node, so the control can see
+         a send when there is one. */
+      const addr = onThread?.addr.get('cutoff');
+      bay.unlink(cutNow?.id);
+      const sendsCut = paramSends;
+      cutDial().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+      await sleep(50);
+      const dialCut = knobs.value('cutoff'), nodeCut = addr ? node.getParamValue(addr) : NaN;
+      d.assert('NEGATIVE CONTROL: with its cable unlinked the cutoff knob turns and the node is not told',
+        dialCut === 100 && paramSends === sendsCut && Math.abs(nodeCut - 8000) < 0.5 && !knobLink('cutoff'),
+        `dial ${dialCut}, ${paramSends - sendsCut} setParamValue, the node says ${nodeCut}`);
+      bay.link(knobPort.get('cutoff'), FAU_IN());
+      pb.refresh();
+      const sendsBack = paramSends;
+      cutDial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      await sleep(50);
+      const nodeBack = addr ? node.getParamValue(addr) : NaN;
+      d.assert('and cabled again, the same knob reaches the node',
+        paramSends > sendsBack && knobs.value('cutoff') === 8000 && Math.abs(nodeBack - 8000) < 0.5 && (knobLink('cutoff')?.sent ?? 0) > 0,
+        `${paramSends - sendsBack} setParamValue, the node says ${nodeBack}`);
     }
 
     /* ── and typing into a LIVE instrument swaps the node after the pause ───
@@ -2193,6 +2378,34 @@
     d.assert('closing the link hands the engine back to every input, and the badge is put away',
       shut?.open === false && engine.omni() && voiced === v2 + 1 && !shown(),
       `${voiced - v2} note from an ordinary input, badge ${shown() ? 'still drawn' : 'gone'}`);
+    /* 🔴 THE ROOM HEARS THE KNOBS, AND A RECOMPILE IS ANNOUNCED. Read off what
+       the other page's registry holds, not off this page's own graph: the
+       engine's `value-in` with the program's names, and one knob node with a
+       `value-out` each. The Djembe types no slider, so after it the names are
+       empty and no knob node is announced; the Organ is put back after. */
+    {
+      const S = engine.site;
+      const heardNow = () => {
+        const m = peer.registry.merged();
+        const vin = m.ports.find((p) => p.id === FAU_IN());
+        const kn = m.nodes.filter((n) => n.id.startsWith(`${S}:knob-`)).map((n) => n.label).sort().join(' ');
+        return { names: vin ? vin.shape.names.slice().sort().join(' ') : null, kn,
+          outs: m.ports.filter((p) => p.id.startsWith(`${S}:knob-`) && p.dir === 'out').length };
+      };
+      const want = knobs.names().slice().sort().join(' ');
+      const before = heardNow();
+      d.assert('another page hears the engine take the knobs in by name, and one knob node with a value out for each',
+        want !== '' && before.names === want && before.kn === want && before.outs === knobs.names().length,
+        `value-in names ${before.names}, knob nodes ${before.kn || 'none'}, ${before.outs} value outs, the knobs here ${want}`);
+      await applyPatch(PRESETS.findIndex((p) => p.id === 'djembe'));
+      const emptied = await waitFor(() => heardNow().names === '' && heardNow().kn === '');
+      const after = heardNow();
+      await applyPatch(0);
+      const back = await waitFor(() => heardNow().names === knobs.names().slice().sort().join(' '));
+      d.assert('and a recompile is announced: the Djembe takes every knob node off the room, and the Organ puts its own back',
+        emptied && after.outs === 0 && back && heardNow().outs === knobs.names().length,
+        `Djembe ${after.names === '' ? 'no names' : after.names} and ${after.outs} knob outs, Organ ${heardNow().names}`);
+    }
     peer.leave();
     engine.leave();
     d.assert('and leaving stops the re-announce clock', !engine.joined() && !engine.node.stats().ticking);
