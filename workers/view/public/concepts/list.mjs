@@ -4,7 +4,8 @@
 // `group` places a card under its heading on the index, in the order the
 // groups first appear here; prev and next walk this order.
 export const CONCEPTS = [
-  { n: '001', group: 'patchbay', title: 'Patch from words', say: 'A model turns a spoken request into links that the patchbay checks and holds.' },
+  // 001 Patch from words is off the index since 2026-10-10 (*"hide concepts/001 now"*);
+  // the page stays at /concepts/001/.
   { n: '010', group: 'synths', title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
   { n: '012', group: 'synths', title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
   { n: '013', group: 'synths', title: 'Timeline', say: 'The recorder on the kit transport bar and timeline.' },
