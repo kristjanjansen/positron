@@ -14,9 +14,9 @@
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
   .cc-top > .pos-pick[hidden] { display: none; }
-  /* The camera as it is on the left, the same camera after the round trip on
-     the right, each half the content width, as /concepts/610/. On a phone they
-     stack, the original first. */
+  /* The camera as it is on the left, the same camera after it has been to
+     Cloudflare and back on the right, each half the content width, as
+     /concepts/610/. On a phone they stack, the original first. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
@@ -33,75 +33,78 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { drawCamera, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
+  import { fetchIceServers, camWhipPublish, camWhep, whepPlay, CAM_WHIP_PROXY } from '/shell/live.mjs';
 
-  // /concepts/600/ with a WebRTC round trip beside it. The camera feeds two
-  // pictures: the original, camera -> screen, and a loopback, camera -> peer a
-  // -> peer b -> loopback. Peer a and peer b are two RTCPeerConnections in THIS
-  // tab. The offer, the answer and every ICE candidate are handed from one to
-  // the other in JavaScript: no signalling server, no STUN, no TURN, and
-  // nothing leaves the machine. What the right panel shows has been encoded,
-  // packetised, sent over UDP on this machine, received, decoded and drawn.
+  // /concepts/600/ with a round trip through Cloudflare beside it. The camera
+  // feeds two pictures: the original, camera -> screen, and a loopback, camera
+  // -> Stream live input by WHIP -> back by WHEP -> loopback. The publish goes
+  // through pub.positron.studio/cam/whip, so the input's key never reaches this
+  // page, onto /cam/'s own WebRTC input (CAM_WHIP_UID in live.mjs), exactly as
+  // /concepts/060/'s broadcast does. What the right panel shows has been
+  // encoded here, sent to Cloudflare, forwarded back, decoded and drawn.
   //
-  // 🔴 TWO PEERS IN ONE TAB AND A VPN. MEASURED 2026-10-05 (demo/verify.mjs,
-  // PEER_IN_PAGE): with no capture permission Chrome gathers ONE host
-  // candidate, on the interface that routes to the internet. With the Check
-  // Point VPN up that is `utun4`, UDP sent to it never comes back to this
-  // machine, and the two peers sit in `checking` for good. Capture permission
-  // makes Chrome list every interface (127.0.0.1, en0, the bridges), and the
-  // loopback connects in about 100 ms. This page asks for the camera before it
-  // builds either peer, so the grant is already there when ICE gathers.
+  // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND AT MOST 10 SECONDS OF
+  // THEM. One WHIP publish and one WHEP play, billed by the minute delivered
+  // whatever the protocol (positron-streaming). Ten seconds after the publish
+  // is accepted the right picture has faded to the ground over its last second
+  // and the page stops itself exactly as a stop press does, so one press is
+  // bounded at about ten seconds on each leg. Asked for: "limit to 10 sec. just
+  // fade out".
   //
-  // NOTHING OPENS ON A VISIT. The camera and both peers are made on the start
-  // press; stop closes both connections and ends every track.
+  // 🔴 IT SHARES /cam/'s ONE WHIP INPUT. The worker allows one camera on it at a
+  // time, so a publish answered 409 means somebody else is on air there, /cam/
+  // or /concepts/060/'s broadcast. That is said in words in the log and the
+  // footer, and nothing is retried.
+  //
+  // ⚠️ A VPN PASSES THE HANDSHAKE AND DROPS THE MEDIA. With the Check Point
+  // tunnel up, WHIP and WHEP both answer 201 and no frame ever arrives (CLAUDE.md,
+  // measured 2026-09-25). So when the play side has signalled and no frame has
+  // been decoded after a while, the log names that as one possibility, never as
+  // the cause.
+  //
+  // NOTHING OPENS ON A VISIT. The camera, the relay servers, the publish and the
+  // play are all made on the start press.
   const S = 'web';
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
-  const PA_IN = `${S}:peer-a:video-in`, PA_OUT = `${S}:peer-a:video-out`;
-  const PB_IN = `${S}:peer-b:video-in`, PB_OUT = `${S}:peer-b:video-out`;
+  const LIVE_IN = 'cf-stream:live:video-in', LIVE_OUT = 'cf-stream:live:video-out';
   const LOOP = `${S}:loopback:video-in`;
+  const NO_MEDIA_MS = 7000, CAP_MS = 10000, FADE_MS = 1000;
 
   const d = mount({ name: 'concept 650', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('650');
 
   // ── the bay ─────────────────────────────────────────────────────────────
-  // ⚠️ THE PEER A TO PEER B LINK CARRIES NO `via`, AND THAT IS THE BAY'S
-  // ANSWER RATHER THAN AN OMISSION. Its transports are webaudio, datachannel,
-  // relay, moq, llhls, page, whep, relay-h264, indexeddb, ingest, r2-hls,
-  // room, https and whip: there is no `webrtc` or `peer`, and `via: 'whep'` or
-  // `via: 'datachannel'` between two ports of one site is refused as "out over
-  // a wire and back to where it started". So the link rides `page`, which is
-  // true of where it goes even though it does go through a real RTP stack.
+  // The same model as /concepts/060/: the camera's video goes to Stream's live
+  // input by WHIP, and comes back out of it by WHEP. Both transports are named
+  // on the ports, so the links carry them.
   const bay = createBay();
   const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
   camNode('camera');
   bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
-  bay.addNode({ id: `${S}:peer-a`, kind: 'engine', label: 'peer a, sends', place: 'browser' });
-  bay.addNode({ id: `${S}:peer-b`, kind: 'engine', label: 'peer b, receives', place: 'browser' });
+  bay.addNode({ id: 'cf-stream:live', kind: 'endpoint', label: 'Stream live input', place: 'cloudflare', net: 'cloudflare' });
   bay.addNode({ id: `${S}:loopback`, kind: 'screen', label: 'loopback', place: 'browser' });
-  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video', transports: ['page', 'whip'] });
   bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
-  bay.addPort({ id: PA_IN, label: 'peer-a:video-in', dir: 'in', medium: 'video' });
-  bay.addPort({ id: PA_OUT, label: 'peer-a:video-out', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: PB_IN, label: 'peer-b:video-in', dir: 'in', medium: 'video' });
-  bay.addPort({ id: PB_OUT, label: 'peer-b:video-out', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: LOOP, label: 'loopback', dir: 'in', medium: 'video' });
+  bay.addPort({ id: LIVE_IN, label: 'video', dir: 'in', medium: 'video', transports: ['whip'] });
+  bay.addPort({ id: LIVE_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['whep'] });
+  bay.addPort({ id: LOOP, label: 'loopback', dir: 'in', medium: 'video', transports: ['whep'] });
 
   const held = new Map();          // "from to" -> link id
-  function hold(a, b) {
+  function hold(a, b, via) {
     const k = `${a} ${b}`;
     if (held.has(k)) return true;
     bay.seen(a); bay.seen(b);
-    const r = bay.link(a, b, [], { site: S });
+    const r = bay.link(a, b, [], { site: S, ...(via ? { via } : {}) });
     if (r.ok) { held.set(k, r.id); return true; }
     d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
     return false;
   }
   const holds = (a, b) => held.has(`${a} ${b}`);
   // Held from load, so the picture of the patch is the same running or not.
-  // Holding a link opens nothing; the camera and the peers wait for the press.
+  // Holding a link opens nothing; the camera and both legs wait for the press.
   hold(CAM, SCREEN);
-  hold(CAM, PA_IN);
-  hold(PA_OUT, PB_IN);
-  hold(PB_OUT, LOOP);
+  hold(CAM, LIVE_IN, 'whip');
+  hold(LIVE_OUT, LOOP, 'whep');
 
   // ── the camera, and the picture that comes back ─────────────────────────
   const video = el('video');
@@ -110,7 +113,7 @@
   back.muted = true; back.playsInline = true; back.autoplay = true;
   let cam = null, gen = 0, raf = 0;
   let devices = [], deviceId = null;
-  let pcA = null, pcB = null, statsTimer = 0;
+  let pub = null, sub = null, statsTimer = 0, ice = null, noMedia = 0, capTimer = 0, endAt = 0;
   // When the last frame was presented, per video element: what lights a video wire.
   const last = new Map([[video, 0], [back, 0]]);
   function watchFrames(v) {
@@ -137,13 +140,13 @@
   const size = el('span', 'cc-say', '');
   const panel = createVideoPanel({ media: L.c, left: name });
   panel.el.querySelector('.pos-vp-r').prepend(size);
-  // The loopback's footer is what getStats() measured, each cell empty until
-  // it has been read, so the row is not there until the first number lands.
-  // ⚠️ FOUR CELLS, BECAUSE FOUR IS WHAT FITS ONE LINE OF A HALF PANEL AT
-  // 1280. Measured with six: the rtt was cut at the panel's edge and the
-  // dropped count was off screen. The codec is logged once when it is first
-  // read, and the codec with the decoded and dropped counts is the row's hover.
-  const loopPanel = createVideoPanel({ media: R.c, left: null, values: [
+  // The loopback's footer is what getStats() of the WHEP connection measured,
+  // each cell empty until it has been read. The word at the left is where the
+  // round trip has got to, and the words for a refusal.
+  // ⚠️ FOUR CELLS, BECAUSE FOUR IS WHAT FITS ONE LINE OF A HALF PANEL AT 1280.
+  // The codec and the decoded and dropped counts are the row's hover.
+  const state = el('span', 'cc-say', '');
+  const loopPanel = createVideoPanel({ media: R.c, left: state, values: [
     { key: 'size', label: '', reserve: 7 },
     { key: 'fps', label: 'fps', reserve: 2 },
     { key: 'rate', label: 'kbit/s', reserve: 4 },
@@ -154,27 +157,46 @@
   pair.append(panel.el, loopPanel.el);
 
   // The routing follows the links: without camera -> original the left panel
-  // is the ground; without peer b -> loopback the right one is, whatever
-  // arrives; without camera -> peer a nothing is sent at all (see start).
-  function paint(p, v, on) {
-    if (on && v.readyState >= 2 && v.videoWidth > 0) drawCamera(p.ctx, v, FRAME_W, FRAME_H, { scrim: 0 });
-    else { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
+  // is the ground; without the WHEP link the right one is.
+  // `alpha` below 1 lays the picture over the ground at that strength, which
+  // is how the right one fades out over the last second of the cap.
+  function paint(p, v, on, alpha = 1) {
+    p.ctx.globalAlpha = 1;
+    if (on && alpha < 1) { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
+    if (on && alpha > 0 && v.readyState >= 2 && v.videoWidth > 0) {
+      p.ctx.globalAlpha = alpha;
+      drawCamera(p.ctx, v, FRAME_W, FRAME_H, { scrim: 0 });
+      p.ctx.globalAlpha = 1;
+    } else if (!on || alpha <= 0) { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
   }
+  const fade = () => (endAt ? Math.max(0, Math.min(1, (endAt - performance.now()) / FADE_MS)) : 1);
   function render() {
     paint(L, video, !!cam && holds(CAM, SCREEN));
-    paint(R, back, !!cam && holds(PB_OUT, LOOP));
+    paint(R, back, !!cam && !!sub && holds(LIVE_OUT, LOOP), fade());
   }
   function frame() { render(); if (cam) raf = requestAnimationFrame(frame); }
   render();
 
   // ── what getStats() says, about once a second ───────────────────────────
-  const stat = { state: 'new', ice: 'new', bytes: 0, at: 0, arriving: false };
-  async function readStats() {
-    const p = pcB;
+  // Two connections: the publish (bytes sent, which lights the WHIP wire) and
+  // the play (everything in the footer, and frames decoded for the WHEP wire).
+  const stat = { pub: 'new', play: 'new', sent: 0, sending: false, bytes: 0, at: 0, decoded: 0, arriving: false };
+  async function readPub() {
+    const p = pub?.pc;
+    if (!p) return;
+    const stats = await p.getStats().catch(() => null);
+    if (!stats || p !== pub?.pc) return;
+    let sent = 0;
+    for (const s of stats.values()) if (s.type === 'outbound-rtp' && s.kind === 'video') sent += s.bytesSent || 0;
+    stat.sending = sent > stat.sent;
+    stat.sent = sent;
+  }
+  async function readPlay() {
+    const p = sub?.pc;
     if (!p) return;
     const stats = await p.getStats().catch(() => null);
     // Stopped while the reading was in flight: nothing lands in emptied cells.
-    if (!stats || p !== pcB) return;
+    if (!stats || p !== sub?.pc) return;
     let vin = null, rtt = null;
     for (const s of stats.values()) {
       if (s.type === 'inbound-rtp' && s.kind === 'video') vin = s;
@@ -187,78 +209,110 @@
     const bytes = vin.bytesReceived || 0;
     if (stat.at) {
       const kbps = ((bytes - stat.bytes) * 8) / (now - stat.at);
-      stat.arriving = bytes > stat.bytes;
       if (bytes > 0) V.set('rate', Math.round(kbps));
     }
     stat.bytes = bytes; stat.at = now;
+    const decoded = vin.framesDecoded || 0;
+    stat.arriving = decoded > stat.decoded;
+    stat.decoded = decoded;
     if (vin.frameWidth && vin.frameHeight) V.set('size', `${vin.frameWidth}x${vin.frameHeight}`);
     if (Number.isFinite(vin.framesPerSecond)) V.set('fps', Math.round(vin.framesPerSecond));
     const codec = vin.codecId && stats.get(vin.codecId);
     const cname = codec?.mimeType ? codec.mimeType.replace(/^video\//i, '') : '';
-    if (cname && cname !== stat.cname) d.log(`peer b decodes ${cname}`);
+    if (cname && cname !== stat.cname) d.log(`the WHEP leg decodes ${cname}`);
     stat.cname = cname;
-    if (Number.isFinite(vin.framesDecoded)) {
-      V.el.title = `${cname}\n${vin.framesDecoded} frames decoded\n${vin.framesDropped ?? 0} dropped`.trim();
-    }
+    V.el.title = `${cname}\n${decoded} frames decoded\n${vin.framesDropped ?? 0} dropped`.trim();
+    if (stat.arriving && state.textContent !== 'playing') state.textContent = 'playing';
     Object.assign(stat, {
       w: vin.frameWidth, h: vin.frameHeight, fps: vin.framesPerSecond, rtt,
-      codec: codec?.mimeType || null, decoded: vin.framesDecoded, dropped: vin.framesDropped,
+      codec: codec?.mimeType || null, dropped: vin.framesDropped,
     });
-    pb.refresh();
   }
-  const clearStats = () => { for (const k of V.keys()) V.set(k, ''); V.el.title = ''; Object.assign(stat, { bytes: 0, at: 0, arriving: false, cname: '' }); };
+  async function readStats() { await Promise.all([readPub(), readPlay()]); pb.refresh(); }
+  const clearStats = () => {
+    for (const k of V.keys()) V.set(k, '');
+    V.el.title = '';
+    Object.assign(stat, { sent: 0, sending: false, bytes: 0, at: 0, decoded: 0, arriving: false, cname: '' });
+  };
 
-  // ── the two peers ───────────────────────────────────────────────────────
-  // No iceServers: host candidates only, which is all a loopback needs.
-  // A candidate that arrives before the far side has its remote description
-  // waits, because addIceCandidate before setRemoteDescription throws.
-  function ferry(from, to) {
-    const waiting = [];
-    from.onicecandidate = (e) => {
-      if (!e.candidate) return;
-      if (to.remoteDescription) to.addIceCandidate(e.candidate).catch((x) => d.log(`a candidate was refused: ${x?.message || x}`, 'warn'));
-      else waiting.push(e.candidate);
-    };
-    return () => { for (const c of waiting.splice(0)) to.addIceCandidate(c).catch(() => {}); };
-  }
-  async function connect(mine) {
-    const a = new RTCPeerConnection(), b = new RTCPeerConnection();
-    pcA = a; pcB = b;
-    const flushB = ferry(a, b), flushA = ferry(b, a);
-    b.ontrack = (e) => {
-      back.srcObject = new MediaStream([e.track]);
-      back.play().catch(() => {});
-      watchFrames(back);
-    };
-    b.onconnectionstatechange = () => {
-      stat.state = b.connectionState;
-      d.log(`peer b ${b.connectionState}`, b.connectionState === 'connected' ? 'hi' : b.connectionState === 'failed' ? 'bad' : '');
-      pb.refresh();
-    };
-    b.oniceconnectionstatechange = () => { stat.ice = b.iceConnectionState; };
-    // Camera -> peer a not held: peer a still offers a video it will send,
-    // and sends nothing.
-    const track = cam.getVideoTracks()[0];
-    if (holds(CAM, PA_IN)) a.addTrack(track, cam);
-    else a.addTransceiver('video', { direction: 'sendonly' });
-    const offer = await a.createOffer();
-    await a.setLocalDescription(offer);
-    await b.setRemoteDescription(offer);
-    flushB();
-    const answer = await b.createAnswer();
-    await b.setLocalDescription(answer);
-    await a.setRemoteDescription(answer);
-    flushA();
+  // The HTTP status of the last request to a URL, from resource timing, so the
+  // log can say 201 rather than "ok". Empty where the browser does not say.
+  const statusOf = (prefix) => {
+    const e = performance.getEntriesByType('resource').filter((x) => x.name.startsWith(prefix)).pop();
+    return e?.responseStatus || '';
+  };
+
+  // ── the round trip ──────────────────────────────────────────────────────
+  async function roundTrip(mine) {
+    if (!holds(CAM, LIVE_IN)) { d.log(`${CAM} -> ${LIVE_IN} is not held, so nothing is sent`); return; }
+    d.log('this costs Cloudflare Stream minutes, one WHIP publish and one WHEP play, until stop', 'warn');
+    state.textContent = 'publishing';
+    ice = ice || await fetchIceServers({ log: (m) => d.log(`webrtc ${m}`) });
     if (gen !== mine) return;
-    d.log('offer and answer handed across in this tab, no server');
+    let p;
+    try {
+      p = await camWhipPublish(cam, { iceServers: ice.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
+    } catch (e) {
+      if (gen !== mine) return;
+      const busy = /\b409\b/.test(e.message);
+      d.log(busy ? 'publish 409: another camera is on /cam/\'s input (/cam/ or concept 060 is on air), so nothing was sent'
+        : `the publish did not start: ${e.message}`, 'bad');
+      state.textContent = busy ? 'another camera is on air' : 'did not publish';
+      stat.pub = 'refused';
+      return;
+    }
+    if (gen !== mine) { p.stop(); return; }
+    pub = p;
+    stat.pub = pub.pc.connectionState;
+    d.log(`WHIP publish answered ${statusOf(CAM_WHIP_PROXY) || 'ok'}: ${CAM} -> ${LIVE_IN}`, 'hi');
+    // The cap starts when Cloudflare starts counting, and ends as a stop press.
+    endAt = performance.now() + CAP_MS;
+    capTimer = setTimeout(() => {
+      if (gen !== mine) return;
+      d.log(`${CAP_MS / 1000} s is the most one press runs through Cloudflare`);
+      stop();
+    }, CAP_MS);
+    pub.pc.addEventListener('connectionstatechange', () => {
+      stat.pub = pub?.pc.connectionState || 'closed';
+      if (stat.pub === 'failed') d.log('the publish could not reach Cloudflare: UDP blocked, or a VPN, are both possible', 'bad');
+      pb.refresh();
+    });
     statsTimer = setInterval(readStats, 1000);
+    if (!holds(LIVE_OUT, LOOP)) { d.log(`${LIVE_OUT} -> ${LOOP} is not held, so nothing is played back`); state.textContent = 'on air'; return; }
+    state.textContent = 'connecting';
+    let s;
+    try {
+      s = await whepPlay(camWhep(), back, { iceServers: ice.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
+    } catch (e) {
+      if (gen !== mine) return;
+      d.log(`the play back did not start: ${e.message}`, 'bad');
+      state.textContent = 'did not play';
+      return;
+    }
+    if (gen !== mine) { try { s.pc.close(); } catch { /* fine */ } return; }
+    sub = s;
+    stat.play = sub.pc.connectionState;
+    d.log(`WHEP play answered ${statusOf(camWhep()) || 'ok'}: ${LIVE_OUT} -> ${LOOP}`, 'hi');
+    watchFrames(back);
+    sub.pc.addEventListener('connectionstatechange', () => {
+      stat.play = sub?.pc.connectionState || 'closed';
+      d.log(`WHEP leg ${stat.play}`, stat.play === 'connected' ? 'hi' : stat.play === 'failed' ? 'bad' : '');
+      pb.refresh();
+    });
+    // The handshake succeeded; if no frame is decoded within a while, say what
+    // that shape usually is, as a possibility and with the state it was read from.
+    noMedia = setTimeout(() => {
+      if (gen !== mine || !sub || stat.decoded > 0) return;
+      d.log(`no frame back after ${NO_MEDIA_MS / 1000} s with WHEP ${stat.play} and the publish ${stat.pub}. `
+        + 'A VPN passes the handshake and drops WebRTC media, so that is one possibility to check first', 'warn');
+      state.textContent = 'no media yet, a VPN?';
+    }, NO_MEDIA_MS);
   }
 
   const lit = (l) => {
     if (l.from === CAM && l.to === SCREEN) return fresh(video);
-    if (l.from === CAM && l.to === PA_IN) return fresh(video) && !!pcA && holds(CAM, PA_IN);
-    if (l.from === PA_OUT) return stat.state === 'connected' && stat.arriving;
-    if (l.from === PB_OUT) return fresh(back) && holds(PB_OUT, LOOP);
+    if (l.from === CAM && l.to === LIVE_IN) return stat.pub === 'connected' && stat.sending;
+    if (l.from === LIVE_OUT) return stat.play === 'connected' && stat.arriving;
     return false;
   };
   const pb = createPatchbay(bay, { flowing: lit });
@@ -278,7 +332,7 @@
       const why = e?.name === 'NotAllowedError' ? 'the camera was refused'
         : e?.name === 'NotFoundError' ? 'this machine has no camera'
         : `the camera did not start (${e?.name || e})`;
-      d.log(why, 'bad');
+      d.log(`${why}, so nothing was sent anywhere`, 'bad');
       face(false);
       return;
     }
@@ -299,17 +353,21 @@
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(frame);
     face(true);
-    try { await connect(mine); } catch (e) { d.log(`the loopback did not negotiate: ${e?.message || e}`, 'bad'); }
+    pb.refresh();
+    try { await roundTrip(mine); } catch (e) { d.log(`the round trip did not start: ${e?.message || e}`, 'bad'); }
     pb.refresh();
     await listCameras();
   }
 
   function stop() {
     gen++;
-    clearInterval(statsTimer);
-    for (const p of [pcA, pcB]) { try { p?.close(); } catch { /* fine */ } }
-    pcA = pcB = null;
-    stat.state = 'closed'; stat.ice = 'closed';
+    clearInterval(statsTimer); clearTimeout(noMedia); clearTimeout(capTimer);
+    endAt = 0;
+    const p = pub, s = sub;
+    pub = sub = null;
+    try { s?.pc.close(); } catch { /* fine */ }
+    p?.stop();
+    stat.pub = 'closed'; stat.play = 'closed';
     for (const v of [video, back]) {
       v.srcObject?.getTracks?.().forEach((t) => t.stop());
       try { v.pause(); } catch { /* fine */ }
@@ -318,13 +376,14 @@
     cam?.getTracks().forEach((t) => t.stop());
     cam = null;
     cancelAnimationFrame(raf);
-    name.textContent = ''; size.textContent = '';
+    name.textContent = ''; size.textContent = ''; state.textContent = '';
     clearStats();
     render();
     pb.refresh();
     face(false);
-    d.log('both connections closed, every track stopped');
+    d.log(p || s ? 'off air: the publish ended, the play closed, every track stopped' : 'camera off, every track stopped');
   }
+  addEventListener('pagehide', () => { if (cam) stop(); });
 
   // ── which camera, once there is more than one ───────────────────────────
   // Device labels are empty until the camera has been allowed, so the list is
@@ -363,6 +422,6 @@
   const top = el('div', 'cc-top');
   top.append(transport.el, picker.el);
   d.stack.add(top, pair, pb.el);
-  window.__demo.loopback = { stat, values: () => Object.fromEntries(V.keys().map((k) => [k, V.cell(k).textContent])) };
+  window.__demo.loopback = { stat, values: () => Object.fromEntries(V.keys().map((k) => [k, V.cell(k).textContent])), state: () => state.textContent };
   d.ready();
 </script>
