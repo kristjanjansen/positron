@@ -261,9 +261,13 @@
   // 1. Two bands of the relay's sound, a low pass at 150 Hz (the kick and the
   //    bass) and a band pass at 1.5 kHz (snares, hats, consonants), merged into
   //    one two channel input.
-  // 2. Every HOP samples (5.8 ms at 44.1 kHz), the energy of each band on a log
-  //    scale, and how much it ROSE since the hop before. The rises, summed over
-  //    both bands, are the onset envelope: high where something starts.
+  // 2. Each band's energy through a follower (the square, smoothed by two
+  //    one pole low passes at FOLLOW_HZ), read every HOP samples (5.8 ms at
+  //    44.1 kHz) on a log scale, and how much it ROSE since the hop before. The
+  //    rises, summed over both bands and smoothed by a five hop triangle, are
+  //    the onset envelope: high where something starts. A plain sum of squares
+  //    per hop was tried first and aliased: a steady tone left a ripple that
+  //    moved the reading by 2 per cent.
   // 3. Every half second, the autocorrelation of the last WIN_S seconds of that
   //    envelope, at every lag between 80 and 160 bpm. A lag scores its own
   //    correlation plus half the correlation at twice the lag, so a beat that
@@ -289,11 +293,14 @@
   const MIN_CONF = 0.25;           // under this nothing is sent
   const MOVE_BPM = 1;              // a change bigger than this is sent again
   const STRIP_S = 6;               // what the onset strip shows
+  const FOLLOW_HZ = 10;            // the energy follower's corner, two poles
+  const SMOOTH = 2;                // the envelope's triangle smoothing, hops either side
   function detBuild() {
     const sr = ctx.sampleRate, rate = sr / HOP, n = Math.round(WIN_S * rate);
     const t = { rate, n, env: new Float32Array(n), w: 0, count: 0, newest: 0,
       pa: 0, pb: 0, o1: 0, o2: 0, m: 0, v: 0, last: -1, onsets: [], since: 0,
-      raws: [], est: null, sent: null, conf: null, beatAt: null };
+      raws: [], est: null, sent: null, conf: null, beatAt: null,
+      f: new Float64Array(4), h: 0, k: 1 - Math.exp(-2 * Math.PI * FOLLOW_HZ / sr) };
     t.in = ctx.createGain();
     const low = ctx.createBiquadFilter(); low.type = 'lowpass'; low.frequency.value = 150;
     const mid = ctx.createBiquadFilter(); mid.type = 'bandpass'; mid.frequency.value = 1500; mid.Q.value = 0.6;
@@ -308,10 +315,11 @@
       const a = e.inputBuffer.getChannelData(0), b = e.inputBuffer.getChannelData(1);
       // The block's first sample, on the audio clock: one block before it plays out.
       const t0 = e.playbackTime - a.length / sr;
-      for (let h = 0; h + HOP <= a.length; h += HOP) {
-        let ea = 0, eb = 0;
-        for (let i = h; i < h + HOP; i++) { ea += a[i] * a[i]; eb += b[i] * b[i]; }
-        detHop(Math.log1p(1e4 * ea / HOP), Math.log1p(1e4 * eb / HOP), t0 + (h + HOP) / sr);
+      const f = t.f, k = t.k;
+      for (let i = 0; i < a.length; i++) {
+        f[0] += (a[i] * a[i] - f[0]) * k; f[1] += (f[0] - f[1]) * k;
+        f[2] += (b[i] * b[i] - f[2]) * k; f[3] += (f[2] - f[3]) * k;
+        if (++t.h === HOP) { t.h = 0; detHop(Math.log1p(1e4 * f[1]), Math.log1p(1e4 * f[3]), t0 + (i + 1) / sr); }
       }
     };
     return t;
@@ -335,9 +343,22 @@
   function detEstimate() {
     const t = det, N = Math.min(t.count, t.n), rate = t.rate;
     if (N < MIN_S * rate) return;
-    const x = new Float32Array(N);
+    const raw = new Float32Array(N), x = new Float32Array(N);
+    for (let i = 0; i < N; i++) raw[i] = t.env[(t.w - N + i + t.n) % t.n];
+    // A short triangle over the envelope. Without it what is left of the
+    // carrier after the follower alternates hop by hop, the correlation zigzags
+    // between neighbouring lags, and a slow swell read 122 for 120.
     let mean = 0;
-    for (let i = 0; i < N; i++) { x[i] = t.env[(t.w - N + i + t.n) % t.n]; mean += x[i]; }
+    for (let i = 0; i < N; i++) {
+      let sum = 0, wsum = 0;
+      for (let j = -SMOOTH; j <= SMOOTH; j++) {
+        const u = i + j;
+        if (u < 0 || u >= N) continue;
+        const wt = SMOOTH + 1 - Math.abs(j);
+        sum += raw[u] * wt; wsum += wt;
+      }
+      x[i] = sum / wsum; mean += x[i];
+    }
     mean /= N;
     let e0 = 0;
     for (let i = 0; i < N; i++) { x[i] -= mean; e0 += x[i] * x[i]; }
