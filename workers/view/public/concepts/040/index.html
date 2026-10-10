@@ -7,168 +7,335 @@
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON concept 040</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<script src="/proto/remixer/hls.min.js"></script>
 <style>
-  /* Every part of this page follows the links, so a part the patch does not use
-     is hidden, and the kit's components set `display` of their own. (0,2,0). */
-  .pos-body [hidden] { display: none; }
-  /* The step picker and the sound button on one row; on a phone they wrap. */
-  .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  /* Start and stop on their own row at the left. A flex row blockifies the
+     group, so it sits on no text line. */
+  .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  .cc-reserve { visibility: hidden; }
-  /* On a desk the step selector sits at the right end of the row (asked
-     2026-10-10, *"move step selector to the right in desktop"*). */
-  @media (min-width: 561px) { .cc-top { justify-content: space-between; } }
-  /* The keyboard keeps its place when the step does not use it and is not
-     drawn, so the panel is the same size at every step (asked 2026-10-10,
-     *"reserve space for kbow block and keyboard even when not present"*). The
-     knobs do the same in the kit's knob grid, which keeps every box. */
+  /* ETV on the left, ETV2 on the right, each half the content width, as
+     /concepts/065/. On a phone they stack, ETV first. */
+  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
+  /* The faded-out picture dims, never to nothing. The page sets the strength. */
+  .cc-pair video { transition: opacity 120ms linear; }
+  .cc-say { font-size: 12px; color: var(--dim); }
+  /* A footer line never wraps: one line, cut at the slot's edge. */
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  /* The crossfader row, as /concepts/030/: an end label, the slider, an end
+     label, both label columns as wide as the longest end label on the page. */
+  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
+    align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
+  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
+  .cc-fade .cc-end:first-child { text-align: right; }
+  .cc-fade > .sld { min-width: 0; }
+  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
+  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
-  import { mount, el } from '/shell/shell.mjs';
+  import { mount, el, armVideo } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
-  import { createChoice } from '/shell/choice.mjs';
-  import { createKnob } from '/shell/knob.mjs';
-  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createWaveShape } from '/shell/synth-view.mjs';
-  import { createSynth, STEPS, KNOBS, knobRaw } from './modules.mjs';
+  import { CHANNELS, NATIVE_HLS, readPlaylist, findServedEdge, wallHandler } from '/shell/err-live.mjs';
 
-  // A WebAudio synth built in the patchbay, in six steps (plans/plan-synth-patch.md).
-  // Every module is a bay node and every part of this page follows the links the
-  // bay holds: the sound is wired by the router in modules.mjs, and a picture, a
-  // knob or the keyboard shows only while its module is in the patch.
+  // Two ERR television channels live, side by side, with one crossfader
+  // between their sound. The pictures come straight from ERR's own CDN
+  // (live.err.ee), not through positron's relay, and the patchbay says so.
+  // `?base=` points every ERR URL at demo/fake-err.mjs instead, through
+  // `errUrl` in err-live.mjs, which is how this page is tested.
   //
-  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key or play
-  // press.
+  // 🔴 ONE START PRESS OPENS TWO ERR LIVE CHANNELS, AND ERR COUNTS THAT AS TWO
+  // VIEWERS. Every connection to ERR appears in a public broadcaster's
+  // audience measurement (CLAUDE.md, "What costs real money and somebody else's
+  // server"). So NOTHING OPENS ON A VISIT: no playlist, no probe, no engine,
+  // no AudioContext until the press. Stop closes both. Per channel a press
+  // costs one master read (one ERR session), up to eight two-byte probes to
+  // find where ERR serves from, and then the variant playlist and segments the
+  // engine pulls. The engine is handed the VARIANT readPlaylist already got,
+  // so it does not read the master a second time and mint a second session.
+  //
+  // THE SOUND. Each video element goes through MediaElementSource into one
+  // AudioContext, an equal-power gain per channel, and the speakers. On the
+  // hls.js path the element plays a MediaSource blob, which is same-origin,
+  // so the graph gets real samples. On the native path (WebKit) the element
+  // loads ERR directly, so `crossOrigin` is set before `src` and ERR's
+  // `access-control-allow-origin: *` is what lets the samples through; that
+  // path is UNTESTED here. Only when there is no AudioContext, or the element
+  // refuses to be a source, does the fader set each element's `volume`
+  // instead, and the log says so.
+  //
+  // THE PICTURE. The crossfader also dims the picture it fades out, from full
+  // strength at the centre down to 0.35 at the far end, never to nothing.
+  const S = 'web';
+  const ON_PAGE = CHANNELS.filter((c) => c.id === 'etv' || c.id === 'etv2');
+  const DIM = 0.35;
+  const PROBE_STEPS = 8, WALL_BACKOFF_S = 90;
+
+  const vOut = (c) => `err:${c.id}:video-out`, aOut = (c) => `err:${c.id}:audio-out`;
+  const screenIn = (c) => `${S}:screen-${c.id}:video-in`;
+  const FADER_IN = `${S}:fader:audio-in`, FADER_OUT = `${S}:fader:audio-out`, SPEAKER_IN = `${S}:speaker:audio-in`;
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  // Each channel is an external site with a picture and a sound out of it.
+  // One HLS stream carries both, so both links ride `llhls` (the bay's name
+  // for HLS to many viewers) from ERR's CDN straight into this tab, and both
+  // need consent, because ERR counts whoever opens them.
+  const bay = createBay();
+  for (const c of ON_PAGE) {
+    const host = new URL(c.url).host;
+    bay.addNode({ id: `err:${c.id}`, kind: 'external', label: c.name, place: 'err', net: 'err' });
+    bay.addPort({ id: vOut(c), label: `${c.name} picture`, dir: 'out', medium: 'video', transports: ['llhls'], address: host });
+    bay.addPort({ id: aOut(c), label: `${c.name} sound`, dir: 'out', medium: 'audio', transports: ['llhls'], address: host });
+    bay.addNode({ id: `${S}:screen-${c.id}`, kind: 'screen', label: `${c.name} panel`, place: 'browser' });
+    bay.addPort({ id: screenIn(c), label: `${c.name} panel`, dir: 'in', medium: 'video', transports: ['llhls'] });
+  }
+  bay.addNode({ id: `${S}:fader`, kind: 'engine', label: 'crossfader', place: 'browser' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addPort({ id: FADER_IN, label: 'crossfader', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: FADER_OUT, label: 'crossfader', dir: 'out', medium: 'audio' });
+  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+
   const d = mount({ name: 'concept 040', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('040');
 
-  const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
-  const { bay, P } = synth;
-  const ID = synth.id;
-  const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
-
-  // ── one waveform, the output, drawn as the synths slide draws it ──────────
-  // `createWaveShape` fed one window from the first rising zero crossing, so a
-  // steady tone stands still, at one fixed scale, so a level change shows.
-  const WINDOW = 512, FULL = 0.5;
-  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
-
-  // ── the knobs: one `web:knobs` node, each turn one event out of value-out ─
-  const knobs = new Map();
-  for (const k of KNOBS) {
-    knobs.set(k.name, createKnob({
-      label: k.name === 'q' ? 'Q' : k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
-      onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
-    }));
+  const held = new Map();          // "from to" -> link id
+  function hold(a, b, opts) {
+    const k = `${a} ${b}`;
+    if (held.has(k)) return true;
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S, ...opts });
+    if (r.ok) { held.set(k, r.id); return true; }
+    d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    return false;
   }
-  // Every knob has a box at every step; a knob the step does not offer is off.
-  // Three across, so nine are a square at every width from a phone up, and no
-  // width leaves one box alone on a row.
-  const grid = createKnobGrid(knobs, { row: true });
-
-
-  // ── sound on and off ────────────────────────────────────────────────────
-  let ctx = null;
-  function wake() {
-    if (!ctx) { ctx = new AudioContext(); synth.start(ctx); requestAnimationFrame(frame); }
-    ctx.resume();
+  const holds = (a, b) => held.has(`${a} ${b}`);
+  // The whole patch is held from load, so the picture is the same playing or
+  // stopped. Holding a link opens nothing: the channels open only on start,
+  // which is the press where a person asks to watch, so the consent is named
+  // here rather than at the press.
+  for (const c of ON_PAGE) {
+    hold(vOut(c), screenIn(c), { consent: true, via: 'llhls' });
+    hold(aOut(c), FADER_IN, { consent: true, via: 'llhls' });
   }
-  const transport = createButtonGroup({ buttons: [
-    { id: 'play', icon: 'play', label: 'play', onPress: () => { if (!synth.on()) wake(); sound(!synth.on()); } },
-  ] });
-  // The test tone: while sound is on and the step patches web:tone, one held
-  // A3 (220 Hz) goes out of tone:midi-out, so the amp's envelope opens.
-  const TONE = 57;
-  let toneOn = false;
-  function tone(v) {
-    v = v && synth.on() && inPatch('tone');
-    if (v === toneOn) return;
-    toneOn = v;
-    bay.send(ID('tone', 'midi-out'), { cls: 'note', ch: 1, d1: TONE, d2: v ? 100 : 0 });
-  }
-  function sound(v) {
-    if (!v) tone(false);
-    synth.sound(v);
-    if (v) tone(true);
-    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
+  hold(FADER_OUT, SPEAKER_IN);
+
+  // ── the two panels ──────────────────────────────────────────────────────
+  const tv = ON_PAGE.map((c) => {
+    const video = el('video');
+    video.muted = true; video.playsInline = true;
+    // Before any src, or the native path's samples are withheld from the graph.
+    video.crossOrigin = 'anonymous';
+    const size = el('span', 'cc-say', '');
+    const panel = createVideoPanel({ media: video, left: el('span', 'cc-say', c.name) });
+    panel.el.querySelector('.pos-vp-r').prepend(size);
+    const ch = { c, video, size, panel, hls: null, src: null, tap: null, gain: null, buf: null,
+      lastFrame: 0, lastSound: 0, frames: 0, refused: false };
+    video.addEventListener('resize', () => showSize(ch));
+    return ch;
+  });
+  const pair = el('div', 'cc-pair');
+  pair.append(...tv.map((ch) => ch.panel.el));
+
+  function showSize(ch) {
+    const v = ch.video;
+    ch.size.textContent = v.videoWidth && v.videoHeight ? `${v.videoWidth}x${v.videoHeight}` : '';
   }
 
-  function frame() {
-    const buf = synth.on() ? synth.read('scope') : null;
-    if (buf) {
-      let i0 = 0;
-      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
-      const win = buf.subarray(i0, i0 + WINDOW);
-      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
-    } else wave.set({ points: null, reason: null, name: '' });
-    requestAnimationFrame(frame);
+  // ── the fader ───────────────────────────────────────────────────────────
+  let x = 0.5;                     // 0 is all ETV, 1 is all ETV2
+  const gains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];   // equal power
+  // Full strength at the centre, where each gain is 0.707, down to DIM at the end.
+  const strength = (g) => DIM + (1 - DIM) * Math.min(1, g * Math.SQRT2);
+  let ctx = null, sum = null, mode = null;   // mode: 'graph' or 'volume'
+  function applyFade() {
+    const g = gains();
+    tv.forEach((ch, i) => {
+      ch.video.style.opacity = String(strength(g[i]));
+      if (mode === 'graph' && ch.gain) ch.gain.gain.setTargetAtTime(g[i], ctx.currentTime, 0.02);
+      if (mode === 'volume') ch.video.volume = g[i];
+    });
   }
 
-  // ── the patch: a step is a text, and the text is the links ───────────────
-  let step = STEPS[0];
-  function apply(text) {
-    let bad;
-    try { bad = synth.load(text); } catch (e) { bad = [{ line: '', why: e.message.replace(/^bay: /, '') }]; }
-    for (const b of bad) d.log(b.line ? `${b.line} refused: ${b.why}` : b.why, 'warn');
-    follow();
+  // The sound follows the links the bay holds, as on /concepts/030/: a channel
+  // reaches the fader only along its audio link, the fader the speakers only
+  // along fader -> speaker.
+  function route() {
+    if (mode !== 'graph') return;
+    for (const ch of tv) {
+      if (!ch.tap) continue;
+      try { ch.tap.disconnect(); } catch { /* not connected */ }
+      if (holds(aOut(ch.c), FADER_IN)) ch.tap.connect(ch.gain);
+    }
+    try { sum.disconnect(); } catch { /* not connected */ }
+    if (holds(FADER_OUT, SPEAKER_IN)) sum.connect(ctx.destination);
   }
-  // Show what the links use, and nothing else.
-  function follow() {
-    // A knob shows while its own cable reaches its module.
-    const reach = (k) => bay.links().some((l) => l.from === ID(`knob-${k.name}`, 'value-out') && l.to === ID(k.owner, 'value-in'));
-    const on = new Set(KNOBS.filter(reach).map((k) => k.name));
-    // Every knob keeps its box; one whose cable the step does not lay is off.
-    // A knob the step does not use is not shown at all (asked 2026-10-10, *"do
-    // not show inactive / disabled knobs"*), and with none the row goes too.
-    // With none to show, the row keeps its height: every box stays in and the
-    // row is not drawn (asked 2026-10-10, *"fix their area h even when no
-    // knob is shown"*).
-    for (const k of KNOBS) { grid.show(k.name, on.has(k.name)); grid.cellOf(k.name).hidden = on.size > 0 && !on.has(k.name); }
-    grid.el.classList.toggle('cc-reserve', on.size === 0);
-    // A step that patches the tone starts it if sound is on; one that does not, stops it.
-    if (toneOn && !inPatch('tone')) { toneOn = false; }
-    tone(true);
+
+  // Inside the press: one AudioContext, and each element made a source once.
+  // An element can only ever be a source once, so this survives stop.
+  function soundGraph() {
+    if (mode) { ctx?.resume(); return; }
+    try {
+      ctx = new AudioContext();
+      ctx.resume();
+      sum = ctx.createGain();
+      for (const ch of tv) {
+        ch.src = ctx.createMediaElementSource(ch.video);
+        ch.tap = ctx.createAnalyser();
+        ch.tap.fftSize = 1024;
+        ch.buf = new Float32Array(ch.tap.fftSize);
+        ch.gain = ctx.createGain();
+        ch.src.connect(ch.tap);
+        ch.gain.connect(sum);
+      }
+      mode = 'graph';
+      d.log('sound: each picture through MediaElementSource into one AudioContext, equal power');
+    } catch (e) {
+      mode = 'volume';
+      d.log(`sound: no audio graph here (${e?.message || e}), so the fader sets each picture's volume`, 'warn');
+    }
+    route();
+  }
+
+  // ── what lights the wires ───────────────────────────────────────────────
+  let playing = false, gen = 0, timer = 0;
+  function watchFrames(ch, mine) {
+    const v = ch.video;
+    if (typeof v.requestVideoFrameCallback !== 'function') return;
+    const tick = () => {
+      if (gen !== mine) return;
+      ch.lastFrame = performance.now(); ch.frames++;
+      if (ch.frames === 1) { showSize(ch); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
+      v.requestVideoFrameCallback(tick);
+    };
+    v.requestVideoFrameCallback(tick);
+  }
+  function listen() {
+    const now = performance.now();
+    for (const ch of tv) {
+      if (mode === 'graph' && ch.tap) {
+        ch.tap.getFloatTimeDomainData(ch.buf);
+        let s = 0;
+        for (const v of ch.buf) s += v * v;
+        if (Math.sqrt(s / ch.buf.length) > 1e-4) ch.lastSound = now;
+      } else if (mode === 'volume' && !ch.video.paused && !ch.video.muted && ch.frames > 0) ch.lastSound = now;
+    }
+    pb.refresh();
+  }
+  const fresh = (t) => playing && performance.now() - t < 600;
+  const pb = createPatchbay(bay, {
+    flowing: (l) => {
+      if (l.from === FADER_OUT) return tv.some((ch) => fresh(ch.lastSound));
+      const ch = tv.find((t) => l.from === vOut(t.c) || l.from === aOut(t.c));
+      if (!ch) return false;
+      return l.from === vOut(ch.c) ? fresh(ch.lastFrame) : fresh(ch.lastSound);
+    },
+  });
+
+  // ── start and stop ──────────────────────────────────────────────────────
+  // One channel: one master read, where ERR serves from, one engine on the
+  // variant that read returned. As /flipper/, minus its timeline.
+  async function open(ch, mine) {
+    const c = ch.c, v = ch.video;
+    let pl;
+    try { pl = await readPlaylist(c.url); } catch (e) {
+      d.log(`${c.name}: the playlist did not come (${e.message})`, 'bad');
+      return;
+    }
+    if (gen !== mine) return;
+    // ERR blocks live segments by programme. Ask where it serves before playing.
+    const served = await findServedEdge(pl, { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
+    if (gen !== mine) return;
+    if (served?.none) d.log(`${c.name}: ERR refused every point asked, across the whole window`, 'bad');
+    else if (served && !served.edgeServed) d.log(`${c.name}: ERR refuses its newest ${Math.round(served.blockedMin)} min, so it starts behind that`, 'warn');
+    if (holds(vOut(c), screenIn(c)) || holds(aOut(c), FADER_IN)) {
+      if (NATIVE_HLS) {
+        v.src = pl.variant;
+      } else if (window.Hls?.isSupported()) {
+        const hls = ch.hls = new window.Hls({ enableWorker: true,
+          ...(served?.position != null ? { startPosition: served.position } : {}) });
+        hls.loadSource(pl.variant);
+        hls.attachMedia(v);
+        wallHandler(hls, window.Hls, () => {
+          ch.refused = true;
+          d.log(`${c.name}: ERR refused three fragments in a row, so loading stopped`, 'bad');
+        });
+      } else { d.log('this browser cannot play HLS', 'bad'); return; }
+    }
+    watchFrames(ch, mine);
+    // Unmuted, because a muted element hands the graph silence too.
+    v.muted = false;
+    try { await v.play(); } catch (e) {
+      if (e?.name === 'NotAllowedError') {
+        v.muted = true;
+        d.log(`the browser refused sound without a press here, so ${c.name} plays muted`, 'bad');
+        await v.play().catch(() => {});
+      }
+    }
+    d.log(`${c.name} playing from ${new URL(c.url).host}`);
+  }
+
+  async function start() {
+    const mine = ++gen;
+    playing = true;
+    face();
+    // Inside the press, before any await, or iOS refuses later.
+    for (const ch of tv) armVideo(ch.video);
+    soundGraph();
+    applyFade();
+    d.log('opening ETV and ETV2: two live channels at ERR, which counts them as two viewers', 'warn');
+    timer = setInterval(listen, 250);
+    await Promise.all(tv.map((ch) => open(ch, mine)));
     pb.refresh();
   }
 
-  // Choosing a step sets its starting sound and replaces the whole patch.
-  const picker = createChoice({ label: 'step', at: 0,
-    options: STEPS.map((s, i) => [`${i + 1} ${s.name}`, i]),
-    onPick: (i) => {
-      step = STEPS[i];
-      for (const [name, v] of Object.entries(step.preset)) {
-        const k = KNOBS.find((x) => x.name === name);
-        synth.setParam(k.owner, name, v);
-        knobs.get(name).set(knobRaw(name, v), { quiet: true });
-      }
-      apply(step.patch);
-    } });
+  function stop() {
+    gen++;
+    playing = false;
+    clearInterval(timer);
+    for (const ch of tv) {
+      if (ch.hls) { try { ch.hls.destroy(); } catch { /* already gone */ } }
+      ch.hls = null;
+      const v = ch.video;
+      v.muted = true;
+      try { v.pause(); } catch { /* fine */ }
+      v.removeAttribute('src');
+      v.load();
+      ch.size.textContent = '';
+      Object.assign(ch, { lastFrame: 0, lastSound: 0, frames: 0, refused: false });
+    }
+    ctx?.suspend();
+    pb.refresh();
+    face();
+    d.log('stopped: both engines destroyed, both pictures emptied');
+  }
+  addEventListener('pagehide', () => { if (playing) stop(); });
 
-  // ── the patchbay, drawing only the nodes the links use ───────────────────
-  const view = {
-    nodes: () => bay.nodes().filter((n) => inPatch(n.id.split(':')[1])),
-    ports: () => bay.ports().filter((p) => inPatch(p.id.split(':')[1])),
-    links: () => bay.links(),
-  };
-  const pb = createPatchbay(view, {
-    flowing: (l) => (l.from === ID('lfo', 'audio-out') ? synth.on() : synth.sounding()),
-  });
+  const transport = createButtonGroup({ buttons: [
+    { id: 'tv', icon: 'play', label: 'start ETV and ETV2', onPress: () => (playing ? stop() : start()) },
+  ] });
+  function face() {
+    transport.setIcon('tv', playing ? 'stop' : 'play', playing ? 'stop both channels' : 'start ETV and ETV2');
+  }
+
+  const fader = createSlider({ label: '', aria: 'crossfade', min: 0, max: 1, step: 0.01, value: x,
+    onInput: (v) => { x = v; applyFade(); } });
+  const fade = el('div', 'cc-fade');
+  fade.append(el('span', 'cc-end', ON_PAGE[0].name), fader.el, el('span', 'cc-end', ON_PAGE[1].name));
+  applyFade();
 
   const top = el('div', 'cc-top');
-  top.append(transport.el, picker.el);
-  // The waveform and the knob group are blocks of the page, not glued (asked
-  // 2026-10-10, *"scope knobs keys are different blocks not
-  // glued. just hide them when not there"*).
-  // Blocks in the shell's stack, at the shell's gap.
-  d.stack.add(top, wave.el, grid.el, pb.el);
-  for (const [name, v] of Object.entries(step.preset)) {
-    synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);
-    knobs.get(name).set(knobRaw(name, v), { quiet: true });
-  }
-  apply(step.patch);
-  window.__demo.synth = synth;
-  window.__demo.knobs = grid;
+  top.append(transport.el);
+  d.stack.add(top, pair, fade, pb.el);
+  const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
+  d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
+  window.__demo.tv = {
+    fader, mode: () => mode, playing: () => playing,
+    channels: () => tv.map((ch) => ({ id: ch.c.id, frames: ch.frames, size: ch.size.textContent,
+      opacity: ch.video.style.opacity, sound: fresh(ch.lastSound), refused: ch.refused, muted: ch.video.muted })),
+  };
   d.ready();
 </script>

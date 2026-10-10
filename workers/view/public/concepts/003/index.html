@@ -10,7 +10,7 @@
 <style>
   .cc-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
   .cc-row > .pos-field { flex: 1 1 260px; min-width: 0; }
-  /* The same medium colours and live dot as /concepts/001/. */
+  /* The same medium colours and live dot as /concepts/090/. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
     --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
@@ -125,7 +125,7 @@
   send.button('send').disabled = true;
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
 
-  // Who is in the room: the registry, as /concepts/001/ draws it. Port names are
+  // Who is in the room: the registry, as /concepts/090/ draws it. Port names are
   // shown as <medium>-<dir> (plans/plan-site-names.md §4c); the real id is on hover.
   const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
   const sites = createTable({

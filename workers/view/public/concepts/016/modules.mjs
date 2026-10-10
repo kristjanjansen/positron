@@ -1,7 +1,7 @@
-// demo/concepts/045/modules.mjs: the mono WebAudio synth of /concepts/040/, as one
+// demo/concepts/016/modules.mjs: the mono WebAudio synth of /concepts/015/, as one
 // fixed patch, with an XY pad as a node of its own that plays the filter.
 //
-// ⚠️ A COPY OF demo/concepts/040/modules.mjs, NOT AN IMPORT, ON PURPOSE. The two
+// ⚠️ A COPY OF demo/concepts/015/modules.mjs, NOT AN IMPORT, ON PURPOSE. The two
 // pages stay independent: 40 can change its steps, knobs or router without
 // moving this page, and this one can drop what it does not use (the steps, the
 // LFO, the freq, detune, cutoff and q knobs). If both settle, the shared half
@@ -225,7 +225,7 @@ export function createSynth({ log = () => {} } = {}) {
   }
 
   /**
-   * THE ROUTER, as on /concepts/040/. Reads `bay.links()` and connects exactly
+   * THE ROUTER, as on /concepts/015/. Reads `bay.links()` and connects exactly
    * what is held. Every out is disconnected first, so an unlinked edge goes
    * silent. Called after every link change.
    */

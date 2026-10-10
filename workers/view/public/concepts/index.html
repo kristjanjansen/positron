@@ -32,17 +32,19 @@
 
   const d = mount({ name: 'concepts', what: 'The ideas behind positron, one page each.', readout: null });
 
-  // Grouped by tens (001 to 009, 010 to 019, 030 to 039 ...), a grid each,
-  // spaced by the page's own stack and with no group titles (asked 2026-10-10,
-  // *"have groups in concepts index. no titles"*, then *"grouping based on 10s"*).
-  // Numbers are three digits so they can run past 100.
+  // One block per group, in the order the groups first appear in list.mjs,
+  // each under the kit's section heading (asked 2026-10-10, *"add subtitles to
+  // index page"*, with the groups synths, radio, camera, pico, chat, misc).
   const grids = new Map();
-  const gridFor = (num) => {
-    const k = Math.floor(Number(num) / 10);
-    if (!grids.has(k)) { const g = el('div', 'cc-cards'); grids.set(k, g); d.stack.add(g); }
-    return grids.get(k);
+  const gridFor = (group) => {
+    if (!grids.has(group)) {
+      const g = el('div', 'cc-cards');
+      grids.set(group, g);
+      d.stack.titled(group, g);
+    }
+    return grids.get(group);
   };
-  CONCEPTS.forEach(({ title, say, n }, i) => {
+  CONCEPTS.forEach(({ title, say, n, group = 'misc' }, i) => {
     // A row may name its page number, so a new topic can start at 10.
     const a = el('a', 'cc-card', '', { href: `/concepts/${n ?? i + 1}/` });
     const num = n ?? i + 1;
@@ -50,7 +52,7 @@
     h.append(el('span', 'cc-n', String(num)), document.createTextNode(title));
     a.append(h);
     if (say) a.append(el('p', 'cc-s', say));
-    gridFor(num).append(a);
+    gridFor(group).append(a);
   });
   d.ready();
 </script>
