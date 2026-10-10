@@ -55,7 +55,11 @@ echo "== shipping to $IP:$DEST"
 # ⚠️ rig/vis GOES TOO. The renderer is a C program that has to be COMPILED on
 # the board, and it lived in /tmp there until 2026-09-11 — one reboot from
 # taking every number in plan-visuals §3 with it.
-( cd "$SRC/../.." && tar cf - --exclude=node_modules \
+# ⚠️ COPYFILE_DISABLE=1: macOS tar otherwise adds an AppleDouble `._name` beside
+# every file with extended attributes, and 18 of them were sitting in /opt on
+# the board on 2026-10-10 (harmless, but they make an md5 comparison of the two
+# trees read as 18 differences).
+( cd "$SRC/../.." && COPYFILE_DISABLE=1 tar cf - --no-xattrs --exclude=node_modules --exclude='._*' \
     rig/board rig/vis \
     $(cd rig/board && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
 ) | ssh "$USER_@$IP" "sudo tar xf - -C $DEST && sudo chown -R $USER_ $DEST && echo '   unpacked'"

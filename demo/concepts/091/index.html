@@ -26,6 +26,7 @@
   // /mirror/ as the patchbay sees it, read from demo/mirror/index.html (SELF, linkIn,
   // and every send()). Nothing here joins a room. Port names are shown as
   // <medium>-<dir>, one node per pane (plans/plan-site-names.md §4c); the announced id is on hover.
+  // The Pi announces its rows exactly as shown since 2026-10-10; the page's own are still simulated.
   const DIR = { in: '→○', out: '○→' };
   const COLS = [
     { key: 'id', label: 'port', grow: true, hi: true, clip: true },
@@ -39,8 +40,8 @@
   const ANNOUNCED = [
     row('web:webgl:program-out', 'web-xxxx:webgl:program', 'you', 'out', 'program'),
     row('web:right:video-in', 'web-xxxx:screen:video, the right pane', 'you', 'in', 'video'),
-    row('studio-1:gpu:program-in', 'studio-1:gpu:program', 'Raspberry Pi', 'in', 'program'),
-    row('studio-1:gpu:video-out', 'studio-1:gpu:video', 'Raspberry Pi', 'out', 'video', 'relay-h264'),
+    row('pi-1:gpu:program-in', 'pi-1:gpu:program-in', 'Raspberry Pi', 'in', 'program'),
+    row('pi-1:gpu:video-out', 'pi-1:gpu:video-out', 'Raspberry Pi', 'out', 'video', 'relay-h264'),
     row('web:webgl:video-out', 'web-xxxx:webgl:video, the own render', 'you', 'out', 'video', 'page'),
     row('web:left:video-in', 'web-xxxx:left:video, the left pane', 'you', 'in', 'video', 'page'),
   ];
@@ -48,7 +49,7 @@
   // in demo/mirror/index.html with nothing in the bay standing for it.
   const MISSING = [
     row('web:knobs:value-out', 'not announced: video.params, the knob values', 'you', 'out', 'value'),
-    row('studio-1:gpu:value-in', 'not announced: the Pi takes video.params', 'Raspberry Pi', 'in', 'value'),
+    row('pi-1:gpu:value-in', 'not announced: the Pi takes video.params', 'Raspberry Pi', 'in', 'value'),
   ];
 
   const d = mount({ name: 'concept 091', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
@@ -72,8 +73,8 @@
     { key: 'opened', label: 'opened by', width: 280, clip: true },
   ] });
   links.set([
-    { line: 'web:webgl:program-out -> studio-1:gpu:program-in', opened: 'the page itself' },
-    { line: 'studio-1:gpu:video-out -> web:right:video-in', opened: 'the video opener' },
+    { line: 'web:webgl:program-out -> pi-1:gpu:program-in', opened: 'the page itself' },
+    { line: 'pi-1:gpu:video-out -> web:right:video-in', opened: 'the video opener' },
     { line: 'web:webgl:video-out -> web:left:video-in', opened: 'page, nothing crosses a wire' },
   ]);
 

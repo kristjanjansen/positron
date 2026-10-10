@@ -26,6 +26,21 @@
 // so a label saying it would be wrong on every other screen.
 
 export const GRAPH_V = 1;
+/**
+ * 🔴 THE PI'S SITE IS `pi-1`, NOT ITS ROOM, SINCE 2026-10-10
+ * (plans/plan-site-names.md §0, §4b). Until then the site WAS the room, so every
+ * id read `studio-1:...` and nothing in it said Raspberry Pi. The ROOM is still
+ * `studio-1`: it is where the board's socket lives and every `address` below
+ * still names it, so no stream moved. A second board is `pi-2`, set on the
+ * board with `--site` or `BOARD_SITE` (`rig/board/board.mjs`).
+ * ⚠️ A page names a Pi port through this constant, never by gluing the room
+ * onto a port name: `${ROOM}:yoshimi:in` was how five pages did it, and that is
+ * exactly the coupling the rename broke.
+ */
+export const BOARD_SITE = 'pi-1';
+/** A port on the Pi, `pi-1:<node>:<medium>-<dir>`. */
+export const boardPort = (node, name, site = BOARD_SITE) => `${site}:${node}:${name}`;
+
 /** What a site may say it is. Absent is allowed; anything else is refused. */
 export const SITE_KINDS = ['board', 'browser', 'store', 'node', 'mac', 'service'];
 /** Three missed board beats. `bay.mjs` imports this one number since
@@ -63,7 +78,10 @@ const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
  * What a Raspberry Pi board is, as a graph. Everything here is something the
  * board already has a verb for; nothing is described that it cannot do.
  * @param {object} o
- * @param {string} o.room        the board's room, which is its site and its place
+ * @param {string} o.room        the board's room, which is its place and the
+ *   address of its streams. Not its site since 2026-10-10.
+ * @param {string} [o.site]      the board's site, `BOARD_SITE` unless a second
+ *   board says otherwise.
  * @param {string} [o.net]       the network it is on, if known
  * @param {object} [o.instruments]  `board.hello`'s own map: name -> available
  * @param {Array}  [o.inputs]    `[{ name, channels, midi: { port, channels } | null }]`
@@ -74,8 +92,10 @@ const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
  *   A fixed 'Raspberry Pi' rather than the board's hostname, because the
  *   hostname is `raspberrypi` on every fresh Pi OS (`board.mjs`, `NAME`).
  */
-export function boardGraph({ room, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, label = 'Raspberry Pi' }) {
-  const site = room, place = room;
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, label = 'Raspberry Pi' }) {
+  const place = room;
+  // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
+  // says what a port carries and which way. `graphProblem` holds a board to it.
   const nodes = [], ports = [];
   const node = (n, kind, label) => { nodes.push({ id: `${site}:${n}`, kind, label, place, ...(net ? { net } : {}) }); };
   const port = (n, p, o) => { ports.push({ id: `${site}:${n}:${p}`, ...o }); };
@@ -88,14 +108,14 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
     node(n, 'engine', k);
     // A synth lives in the board's MAIN room: `audio.start` and `note.on` go
     // there, and its sound comes back down the same socket.
-    port(n, 'in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [], address: room });
-    port(n, 'audio', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room,
+    port(n, 'midi-in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [], address: room });
+    port(n, 'audio-out', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room,
       transports: [...BOARD_TRANSPORTS.audio] });
   }
   if (gpu) {
     node('gpu', 'engine', 'GPU');
-    port('gpu', 'program', { label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
-    port('gpu', 'video', { label: 'GPU', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-video`,
+    port('gpu', 'program-in', { label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
+    port('gpu', 'video-out', { label: 'GPU', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-video`,
       transports: [...BOARD_TRANSPORTS.video] });
   }
   // A hardware input is an instrument on the desk: its sound comes in through
@@ -106,11 +126,11 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
     node(n, 'device', i.name);
     // The address is the room the board's input really streams into, which
     // `rig/board/inputs.mjs` names `<room>-<input>`.
-    port(n, 'audio', { label: i.name, dir: 'out', medium: 'audio',
+    port(n, 'audio-out', { label: i.name, dir: 'out', medium: 'audio',
       shape: { rate: 48000, channels: 1, frameMs }, address: `${room}-${i.name}`, transports: [...BOARD_TRANSPORTS.audio] });
     if (i.midi) {
       inputPorts.add(String(i.midi.port).toLowerCase());
-      port(n, 'in', { label: i.name, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], never: ['sysex'],
+      port(n, 'midi-in', { label: i.name, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], never: ['sysex'],
         shape: { channels: i.midi.channels }, address: `${room}-${i.name}` });
     }
   }
@@ -122,8 +142,8 @@ export function boardGraph({ room, net = null, instruments = {}, inputs = [], al
     const n = `midi-${slug(a.client)}`;
     if (nodes.some((x) => x.id === `${site}:${n}`)) continue;
     node(n, 'device', a.client);
-    port(n, 'out', { label: a.client, dir: 'out', medium: 'midi', emits: ['note', 'cc', 'bend', 'clock'] });
-    port(n, 'in', { label: a.client, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] });
+    port(n, 'midi-out', { label: a.client, dir: 'out', medium: 'midi', emits: ['note', 'cc', 'bend', 'clock'] });
+    port(n, 'midi-in', { label: a.client, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] });
   }
   return { v: GRAPH_V, site, place, ...(net ? { net } : {}), kind: 'board', label, nodes, ports };
 }
@@ -138,6 +158,16 @@ export function graphProblem(g) {
   if (!Array.isArray(g.nodes) || !Array.isArray(g.ports)) return 'nodes and ports are lists';
   for (const n of g.nodes) if (typeof n?.id !== 'string' || n.id.split(':')[0] !== g.site) return `node ${n?.id} is not on site ${g.site}`;
   for (const p of g.ports) if (typeof p?.id !== 'string' || p.id.split(':').length !== 3 || p.id.split(':')[0] !== g.site) return `port ${p?.id} is not site:node:port on ${g.site}`;
+  // A board's port name starts with its own medium and direction, so a name and
+  // its fields cannot disagree (plans/plan-site-names.md §4c). ⚠️ BOARDS ONLY
+  // for now: browser pages and the store still announce `keys:out` and
+  // `history:in`, and holding them to it would refuse every one of them.
+  if (g.kind === 'board') {
+    for (const p of g.ports) {
+      const want = `${p.medium}-${p.dir}`, name = p.id.split(':')[2];
+      if (name !== want && !name.startsWith(`${want}-`)) return `port ${p.id} is named ${name}, and a ${p.medium} ${p.dir} on a board is named ${want}`;
+    }
+  }
   return '';
 }
 

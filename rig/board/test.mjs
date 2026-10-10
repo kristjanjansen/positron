@@ -653,7 +653,7 @@ console.log('\nbeat: the graph on the hello and on every beat');
   is('the beat carries a graph graphProblem accepts', graphProblem(alive.graph), '');
   is('and it is the same graph the hello sent', JSON.stringify(alive.graph), JSON.stringify(hello.graph));
   is('the input from BOARD_INPUTS is a node, and its ALSA client is not a second one',
-    hello.graph.nodes.filter((n) => /circuit/.test(n.id)).map((n) => n.id), ['studio-1:circuit']);
+    hello.graph.nodes.filter((n) => /circuit/.test(n.id)).map((n) => n.id), ['pi-1:circuit']);
   ok('the ALSA name of an input does not ride on the beat', !JSON.stringify(alive).includes('hw:CARD'));
   is('the virtual clients are not in it', hello.graph.nodes.some((n) => /Virtual/.test(n.label)), false);
   is('no BOARD_NET means no net', 'net' in hello.graph, false);
@@ -662,10 +662,10 @@ console.log('\nbeat: the graph on the hello and on every beat');
   // input's sound stays (the audio interface is there); its MIDI in goes.
   const gone = graphOf({ ...graphFacts, midiPresent: () => false });
   const there = graphOf({ ...graphFacts, midiPresent: () => true });
-  is('an input whose MIDI device is unplugged announces no MIDI in', gone.ports.some((p) => p.id === 'studio-1:circuit:in'), false);
-  is('and still announces its sound', gone.ports.some((p) => p.id === 'studio-1:circuit:audio'), true);
-  is('NEGATIVE CONTROL: plugged in, the MIDI in is back', there.ports.some((p) => p.id === 'studio-1:circuit:in'), true);
-  is('no video path means no GPU node', graphOf({ ...graphFacts, gpu: false }).nodes.some((n) => n.id === 'studio-1:gpu'), false);
+  is('an input whose MIDI device is unplugged announces no MIDI in', gone.ports.some((p) => p.id === 'pi-1:circuit:midi-in'), false);
+  is('and still announces its sound', gone.ports.some((p) => p.id === 'pi-1:circuit:audio-out'), true);
+  is('NEGATIVE CONTROL: plugged in, the MIDI in is back', there.ports.some((p) => p.id === 'pi-1:circuit:midi-in'), true);
+  is('no video path means no GPU node', graphOf({ ...graphFacts, gpu: false }).nodes.some((n) => n.id === 'pi-1:gpu'), false);
   is('a beat before the first hello carries no graph rather than an empty one',
     'graph' in aliveMsg({ insert: {}, graphFacts: null }), false);
   const errHello = helloMsg({ backend: 'alsa', ports: [], error: 'cannot open sequencer', hint: 'modprobe snd-seq',

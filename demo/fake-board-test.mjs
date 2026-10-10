@@ -115,7 +115,7 @@ console.log('\n[fake-board, main room]');
   await p.opened;
   const g = await p.answer('board.alive', null, 500) || (p.send({ type: 'graph.ask' }), await p.answer('board.alive', null, 2000));
   ok('graph.ask is answered with a beat carrying a readable graph', !!g?.graph && graphProblem(g.graph) === '', g?.graph ? `${g.graph.ports.length} ports` : 'no beat');
-  const cin = g?.graph?.ports.find((x) => x.id === 'studio-1:circuit:in');
+  const cin = g?.graph?.ports.find((x) => x.id === 'pi-1:circuit:midi-in');
   ok('the Circuit input refuses SysEx in the graph, the never class', cin?.never?.includes('sysex'));
   ok('no GPU is announced, because the stand-in sends no picture', !g?.graph?.ports.some((x) => x.medium === 'video'));
   const id = p.send({ type: 'audio.start', source: 'yoshimi' });

@@ -28,6 +28,7 @@ import { boardGraph } from '../../demo/shell/graph-registry.mjs';
  * The board as a graph, from what the board knows.
  * @param {object} f
  * @param {string} f.room
+ * @param {string} [f.site]         `BOARD_SITE`, `pi-1` when unset
  * @param {string} [f.net]          `BOARD_NET`, left out when unset
  * @param {object} f.instruments    the map `board.hello` sends: name -> available
  * @param {Map|Array} f.inputs      `parseInputs(...).inputs`, a Map, or its values
@@ -43,7 +44,7 @@ const present = (f, port) => (typeof f.midiPresent === 'function'
 export function graphOf(f) {
   const inputs = f.inputs instanceof Map ? [...f.inputs.values()] : (f.inputs || []);
   return boardGraph({
-    room: f.room, net: f.net || null, instruments: f.instruments || {},
+    room: f.room, ...(f.site ? { site: f.site } : {}), net: f.net || null, instruments: f.instruments || {},
     // Only what the graph reads. `device` is an ALSA name on the board and
     // means nothing to a page, so it does not ride on every beat.
     // 🔴 AN INPUT'S MIDI IS ANNOUNCED ONLY WHILE ITS DEVICE IS THERE. MEASURED

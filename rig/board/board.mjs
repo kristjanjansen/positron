@@ -65,6 +65,13 @@ const BOARD_ID = arg('id', process.env.BOARD_ID || null);
  * transport that two buildings cannot open. `/etc/default/positron-board`.
  */
 const NET = arg('net', process.env.BOARD_NET || null);
+/**
+ * This board's SITE in the patchbay, the first part of every port id it
+ * announces. `pi-1` by default (graph-registry.mjs `BOARD_SITE`), a second
+ * board is `pi-2`. Not the room: the room is where the socket lives, the site
+ * is what a reader is told the thing is (plans/plan-site-names.md §0).
+ */
+const SITE = arg('site', process.env.BOARD_SITE || null);
 const DRY = flag('dry');
 const ONCE = flag('once');
 const AUDIO_DEV = arg('audio', process.env.BOARD_AUDIO || 'default');
@@ -1425,7 +1432,7 @@ function connect() {
     // and the beat every five seconds should not be.
     const instruments = { synth: true, pappusFx: pappusAvailable(),
                           ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) };
-    graphFacts = { room: ROOM, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports,
+    graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable() };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,

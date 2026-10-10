@@ -911,9 +911,12 @@ export function createBay({ now = () => Date.now() } = {}) {
    * 🔴 THE ADDRESS IS DERIVED FROM THE LINK, NEVER CHOSEN, the way the Pi
    * already derives `<room>-video` and `<room>-<input>` (plan §8): one port,
    * one room. It is `${place of the source}-${source node name}-${port name}`,
-   * so `studio-1:circuit:audio` on a node placed at `studio-1` is
-   * `studio-1-circuit-audio`, and the site goes in after the place whenever
-   * the two differ (see below).
+   * so `err:vikerraadio:audio` on a node placed at `err` is
+   * `err-vikerraadio-audio`, and the site goes in after the place whenever
+   * the two differ (see below). The Pi never relies on this: every stream port
+   * it announces DECLARES its address (`studio-1`, `studio-1-video`,
+   * `studio-1-circuit`), which is why its site could become `pi-1` on
+   * 2026-10-10 without one stream moving.
    * ⚠️ IT IS AN ADDRESS AND NOT A RENDEZVOUS. Two links out of one port share
    * it, which is what lets the second receiver join the first one's session
    * rather than starting another. `stage-<rand6>` is the other kind and does
@@ -929,8 +932,8 @@ export function createBay({ now = () => Date.now() } = {}) {
        `browser-webgl-video` in EVERY tab, and two tabs would meet in one room
        the moment such a port got a wire transport. Now it is
        `browser-web-ab12-webgl-video`.
-       ⚠️ A SITE THAT IS ITS OWN PLACE IS UNCHANGED (`studio-1-circuit-audio`,
-       `err-vikerraadio-audio`), so nothing the Pi derives or declares moves. */
+       ⚠️ A SITE THAT IS ITS OWN PLACE IS UNCHANGED (`err-vikerraadio-audio`),
+       and the Pi declares every address it streams on, so nothing it sends moves. */
     const place = placeOf(a);
     return [place, site !== place ? site : '', node, port].filter(Boolean).join('-');
   }

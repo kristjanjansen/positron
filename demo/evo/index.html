@@ -1345,7 +1345,7 @@
   /* 🔴 ON THE PATCHBAY ON A PRESS OF Join, NEVER ON LOAD (plans/plan-routing-migration.md
      step 5). The instruments plugged into this machine are announced as devices,
      keyed by their ports and never by their names, so `/patchbay/` can draw and
-     link them. `evo:out -> studio-1:circuit:in` is the plan's
+     link them. `evo:out -> pi-1:circuit:midi-in` is the plan's
      own first demo: linked there, this page plays the board's Circuit. Join sits outside `.pos-controls` and asks for MIDI first
      when Listen has not. `/shell/midi-node.mjs` has the rest. */
   const bayMidi = createMidiNode({ slug: 'evo', log: (line, kind) => d.log(line, kind),

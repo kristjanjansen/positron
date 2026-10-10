@@ -49,7 +49,7 @@
   import { createBayNode, roomFor, randomSite, STUDIO_ROOM } from '/shell/bay-node.mjs';
   import { createLease } from '/shell/openers.mjs';
   import { createLinkBadge, linkStateOf } from '/shell/link-badge.mjs';
-  import { graphProblem } from '/shell/graph-registry.mjs';
+  import { graphProblem, boardPort } from '/shell/graph-registry.mjs';
   import { RELAY_BASE } from '/shell/wire.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -450,10 +450,9 @@
   const BAY_ROOM = askedRoom
     ? roomFor({ slug: 'away', search: `?room=${askedRoom.endsWith(`-${INPUT}`) ? askedRoom.slice(0, -INPUT.length - 1) : askedRoom}` })
     : roomFor({ slug: 'away' });
-  /** The board's main room, whose Circuit input this page's keys reach. */
-  const MAIN = ROOM.endsWith(`-${INPUT}`) ? ROOM.slice(0, -INPUT.length - 1) : ROOM;
-  /** The port the Pi announces for the Circuit's MIDI in (`boardGraph`). */
-  const INSTRUMENT_IN = `${MAIN}:${INPUT}:in`;
+  /** The port the Pi announces for the Circuit's MIDI in (`boardGraph`), on
+   *  site `pi-1` since 2026-10-10 while its room stays `studio-1`. */
+  const INSTRUMENT_IN = boardPort(INPUT, 'midi-in');
   const SITE = randomSite('away');
   const KEYS_OUT = `${SITE}:keys:out`;
   const GRAPH = {
@@ -606,12 +605,12 @@
     d.assert('a page in the same room hears this page’s keys and picture', heard.includes(KEYS_OUT) && heard.includes(`${SITE}:screen:audio`), heard.join(', '));
     const yes = await other.request(KEYS_OUT, INSTRUMENT_IN, true, { timeoutMs: 3000 });
     d.assert('asked for its keys to the Circuit, it answers open', yes?.open === true, yes ? `open ${yes.open}: ${yes.why}` : 'no answer');
-    const elsewhere = await other.request(KEYS_OUT, `${MAIN}:yoshimi:in`, true, { timeoutMs: 3000 });
+    const elsewhere = await other.request(KEYS_OUT, boardPort('yoshimi', 'midi-in'), true, { timeoutMs: 3000 });
     d.assert('asked for its keys anywhere else, it refuses and names where they go', elsewhere?.open === false && elsewhere.why.includes(INSTRUMENT_IN),
       elsewhere ? elsewhere.why : 'no answer');
     const close = await other.request(KEYS_OUT, INSTRUMENT_IN, false, { timeoutMs: 3000 });
     d.assert('asked to close it, it refuses in words', close?.open === false && /always play/.test(close.why), close ? close.why : 'no answer');
-    const notMine = await other.request(`${MAIN}:${INPUT}:audio`, `${SITE}:screen:audio`, true, { timeoutMs: 800 });
+    const notMine = await other.request(boardPort(INPUT, 'audio-out'), `${SITE}:screen:audio`, true, { timeoutMs: 800 });
     d.assert('NEGATIVE CONTROL: a request about a port that is not this page’s gets no answer from it', notMine === null, JSON.stringify(notMine));
     other.leave();
   }
