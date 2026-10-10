@@ -23,6 +23,9 @@
 // individual slides from the brand slides"*): the logo left `/kit/`'s BRAND
 // tab for a `brand` deck on the front page, and came back as this part when
 // that deck was removed, one block per slide.
+// ⚠️ `icons` IS THE ELEVENTH, 2026-10-10 (*"see ../eccm icon system. We need
+// one from icones. Make a sample sheet in one of kit pages called icons."*):
+// the Feather set vendored as demo/shell/icons.mjs, drawn whole.
 
 export const KIT_PARTS = [
   { part: 'input', label: 'INPUT', ids: [
@@ -78,6 +81,9 @@ export const KIT_PARTS = [
   { part: 'logo', label: 'LOGO', ids: [
     'stacked-logo', 'horizontal-logo', 'wordmark-in-fives', 'wordmark-in-threes',
     'favicon', 'app-icon',
+  ] },
+  { part: 'icons', label: 'ICONS', ids: [
+    'sample-sheet', 'sizes', 'in-a-button', 'colour',
   ] },
 ];
 

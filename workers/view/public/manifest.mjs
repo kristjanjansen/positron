@@ -969,6 +969,11 @@ export const DEMOS = [
   { name: 'kit/logo', title: 'logo', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'the positron mark and wordmarks drawn as slides, with the favicon and the app icon at the sizes they ship',
     tags: ['shell', 'no network'] },
+  // The eleventh part, 2026-10-10: *"see ../eccm icon system. We need one from
+  // icones. Make a sample sheet in one of kit pages called icons."*
+  { name: 'kit/icons', title: 'icons', group: 'kit', act: 0, created: '2026-10-10', built: true,
+    one: 'every icon the kit can draw, from the Feather set in the colour of the text around it',
+    tags: ['shell', 'no network'] },
 
   // 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.
   // title is on footer on 1/2 w it replaces page count and becomes link to

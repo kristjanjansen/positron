@@ -88,9 +88,10 @@ const L6 = `${L5}
 web:lfo:audio-out -> web:filter:cutoff-in`;
 
 // One node per knob, eurorack style (*"Per knob. Lets go eurorack :)"*): each
-// knob a step offers is a box of its own with a cable into the module it moves.
+// knob a step offers is a box of its own, `web:knob-<name>`, with a cable into
+// the module it moves.
 const withKnobs = (patch, names) => [patch,
-  ...names.map((k) => `web:${k}:value-out -> web:${KNOBS.find((x) => x.name === k).owner}:value-in`)].join('\n');
+  ...names.map((k) => `web:knob-${k}:value-out -> web:${KNOBS.find((x) => x.name === k).owner}:value-in`)].join('\n');
 const STEP_LIST = [
   { name: 'sine', patch: L1, knobs: [], preset: { wave: 'sine', freq: 220 } },
   { name: 'knob', patch: L2, knobs: ['freq'], preset: { wave: 'sine' } },
@@ -182,7 +183,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   // ── the bay ─────────────────────────────────────────────────────────────
   const NODES = [
     ['keys', 'person', 'keyboard'],
-    ...KNOBS.map((k) => [k.name, 'person', 'knob']),
+    ...KNOBS.map((k) => [`knob-${k.name}`, 'person', 'knob']),
     ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
     ['amp', 'engine', 'amp and envelope'], ['lfo', 'engine', 'lfo'],
     ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
@@ -195,7 +196,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     // No `names` on a knob: the bay's shape check wants names to be equal, and
     // one knob names one of a module's several. The module ignores and logs a
     // name it does not have.
-    ...KNOBS.map((k) => ({ id: id(k.name, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
+    ...KNOBS.map((k) => ({ id: id(`knob-${k.name}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
     { id: id('osc', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: oscNote },
     param('osc'),
     { id: id('osc', 'audio-out'), dir: 'out', medium: 'audio' },
