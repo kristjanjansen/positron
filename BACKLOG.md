@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**A link button, beside the patchbay title** (2026-10-10). Asked: *"create linkbutton component, but it next to patchbay comppnent title See details"*. A kit component, a button that looks like a link, newest block on `/kit/input/`; `createPatchbay`'s `details` button becomes one reading `See details`, right after the title.~~ DONE 2026-10-10.
 - ~~**Bay view: no vertical layout on a desk** (2026-10-10). Asked: *"do not do vert layouts on desktop. overflow"*, after the stacking fix for 31. The desk keeps one row and scrolls sideways; only a phone stacks.~~ DONE 2026-10-10.
 - ~~**Concept 31 wet only, with the owner's settings** (2026-10-10). Asked, with a screenshot of the three rows at where about 0.22, spread about 0.19 and the mix at grains: *"keep this. onlu show wet try"*. Those become the defaults, the dry path and the dry to grains slider go.~~ DONE 2026-10-10.
 - ~~**Concept 31: the granulator is not on the patchbay and sounds uninteresting** (2026-10-10). Asked: *"grnulator is not on pactbay amd sounds noninteresting"*, with a 1280 screenshot: the bay view scrolls sideways and the gran, wave and speaker boxes are past the right edge. Fix the desk layout in `demo/shell/bay-view.mjs` so a chain that does not fit is not hidden, and make the granulator sound like one.~~ DONE 2026-10-10.

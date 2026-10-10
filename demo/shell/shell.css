@@ -5007,6 +5007,24 @@ button[data-glyph="1"] {
 button.pos-sm { height: var(--ctl-sm); padding: 0 calc(var(--pad-btn) / 2); }
 button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; }
 
+/* ── the link button (button.pos-linkbtn), demo/shell/link-button.mjs ────
+   A button that reads as a link, asked 2026-10-10 for the patchbay's
+   `See details`. Everything the base `button` gives a face is taken back here:
+   no background, no border, no height, no padding, no uppercase, so it sits in
+   a line of text at that text's size. (0,1,1) beats the base `button` (0,0,1),
+   and `.pos-sm`'s uppercase list does not name it.
+   ⚠️ THE UNDERLINE IS ALWAYS THERE, NOT ONLY ON HOVER: on a phone there is no
+   hover, and the line is the whole affordance that this is pressable.
+   ⚠️ THE FOCUS RING IS THE GLOBAL `:focus-visible` ONE, untouched. */
+button.pos-linkbtn {
+  height: auto; padding: 0; border: 0; border-radius: 2px; background: none;
+  font: inherit; font-family: var(--sans); color: var(--fg2, var(--fg));
+  text-decoration: underline; text-decoration-color: var(--dim2);
+  text-underline-offset: 3px; text-transform: none; cursor: pointer;
+}
+button.pos-linkbtn:hover { color: var(--fg); text-decoration-color: currentColor; }
+button.pos-linkbtn:active { background: none; }
+
 /* ── the compile note (.pos-cnote), demo/shell/compile-idle.mjs ──────────
    🔴 A NOTE, NOT A BUTTON, IN THE CORNER WHERE `/fau/`'s COMPILE BUTTON SAT.
    Asked 2026-09-30: *"Small breating "Compiling" note (not button) on right

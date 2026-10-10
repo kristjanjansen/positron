@@ -18,11 +18,13 @@ const W = 2;                         // every wire the same thin line
 const PULSE = { w: 0.025, ms: 900 };
 // A stream line fades quickly but over a small range so it never flickers. An
 // event line sits lighter, so a pulse is a small step up from it.
-const IDLE = 0.35, FLOW = 0.8, FADE_MS = 150, EVENT_LINE = 0.55;
-// While a stream flows, a soft gradient also moves along it out to in: about
-// one and a half waves on the wire, a wave a second past any point, and never
-// more than half bright on top of the line, so it moves without flickering.
-const WAVE = { k: 1.5, perSec: 1, depth: 0.5 };
+const IDLE = 0.35, FLOW = 0.45, FADE_MS = 150, EVENT_LINE = 0.55;
+// While a stream flows, bright bands move along it out to in: two on the wire,
+// one a second past any point, full strength over a line that stays dim. Half
+// strength over a line raised to 0.8 was the same colour on the same colour and
+// read as still, reported 2026-10-10: *"i still do not see audio / vide
+// connector animation"*.
+const WAVE = { k: 2, perSec: 1, depth: 1 };
 let seq = 0;
 
 export function createBayTraffic() {

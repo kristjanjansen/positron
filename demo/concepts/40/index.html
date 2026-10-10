@@ -20,6 +20,9 @@
      drawn, so the panel is the same size at every step (asked 2026-10-10,
      *"reserve space for kbow block and keyboard even when not present"*). */
   .cc-off { visibility: hidden; }
+  /* A knob the step does not offer leaves the row, so the ones it does sit
+     together (*"mess layout"*, 2026-10-10); the row keeps its height. */
+  .cc-stack .cc-gone { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -28,7 +31,6 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { setSymbol } from '/shell/symbol.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
@@ -68,7 +70,7 @@
   const keysHost = el('div');
   const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
   const kb = createKeyboard(keysHost, {
-    ...keyRange(19), base: 48,   // 12 white keys, as many as fit inside the instrument panel, as on /concepts/14/
+    ...keyRange(21), base: 48,   // 13 white keys, the content width at the kit's 49 px minimum, as on /concepts/10/
     onDown: (note, how) => {
       if (how === 'midi' || !inPatch('keys')) return;
       wake(); sound(true);
@@ -121,10 +123,11 @@
   function follow() {
     // A knob shows when the step offers it and the knobs reach its module.
     const reach = (mod) => bay.links().some((l) => l.from === ID('knobs', 'value-out') && l.to === ID(mod, 'value-in'));
-    for (const k of KNOBS) {
-      const on = step.knobs.includes(k.name) && reach(k.owner);
-      knobs.get(k.name).el.classList.toggle('cc-off', !on);
-    }
+    const on = new Set(KNOBS.filter((k) => step.knobs.includes(k.name) && reach(k.owner)).map((k) => k.name));
+    // With none to offer, every knob stays in and the row is not drawn, so it
+    // keeps its height; otherwise the unused ones leave the row.
+    for (const k of KNOBS) knobs.get(k.name).el.classList.toggle('cc-gone', on.size > 0 && !on.has(k.name));
+    bank.el.classList.toggle('cc-off', on.size === 0);
     keysHost.classList.toggle('cc-off', !inPatch('keys'));
     pb.refresh();
   }
@@ -155,10 +158,10 @@
   const top = el('div', 'cc-top');
   top.append(transport.el, picker.el);
   const out = el('div', 'cc-stack');
-  // One instrument: the waveform on top, the knob group, then the keys.
-  const panel = createInstrumentPanel({ viz: wave.el, keys: keysHost, plate: false });
-  panel.addRow(bank.el);
-  out.append(top, panel.el, pb.el);
+  // The waveform, the knob group and the keys are three blocks of the page,
+  // not glued (asked 2026-10-10, *"scope knobs keys are different blocks not
+  // glued. just hide them when not there"*).
+  out.append(top, wave.el, bank.el, keysHost, pb.el);
   d.el.append(out);
   for (const [name, v] of Object.entries(step.preset)) {
     synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);

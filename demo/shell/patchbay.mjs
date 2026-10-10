@@ -1,5 +1,5 @@
 // demo/shell/patchbay.mjs: a bay as a block of a page. A `patchbay` heading
-// with a small `details` button at its right, the picture `createBayView`
+// with a `See details` link button right after it, the picture `createBayView`
 // draws, and behind the button the links and the ports as tables. Generic:
 // it reads `nodes()`, `ports()` and `links()` and nothing a page types, so
 // any bay, or `heldPicture()` of one, can be handed to it.
@@ -18,6 +18,7 @@ import { MEDIA, printLink } from './bay.mjs';
 import { createBayView, BAY_VIEW_CSS } from './bay-view.mjs';
 import { createBayTraffic, STREAMY } from './bay-traffic.mjs';
 import { createPortInk } from './port-ink.mjs';
+import { createLinkButton } from './link-button.mjs';
 
 // The medium colours, one place for every page that draws a bay.
 export const MEDIUM_COLOURS = {
@@ -28,7 +29,8 @@ const CSS = `
   :root { ${Object.entries(MEDIUM_COLOURS).map(([m, c]) => `--md-${m}: ${c};`).join(' ')} }
   ${MEDIA.map((m) => `.md-${m} { color: var(--md-${m}); }`).join('\n  ')}
   .pb { display: flex; flex-direction: column; gap: 12px; }
-  .pb-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .pb-head { display: flex; align-items: baseline; gap: 12px; }
+  .pb-head .pos-linkbtn { font-size: 13px; }
   .pb-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   .pb-more { display: flex; flex-direction: column; gap: 12px; }
   .pb-more[hidden] { display: none; }
@@ -66,7 +68,8 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
   const traffic = createBayTraffic();
   const traced = new Set();
 
-  const button = el('button', 'pos-sm', 'details', { type: 'button', 'aria-expanded': String(open) });
+  const more = createLinkButton({ label: open ? 'Hide details' : 'See details', expanded: open, onPress: () => toggle() });
+  const button = more.el;
   const head = el('div', 'pb-head');
   head.append(el('h3', 'pb-h', title), button);
 
@@ -84,19 +87,20 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
     { key: 'cls', label: 'messages', width: 120, clip: true, hover: 'cls' },
     { key: 'by', label: 'transport', width: 96, clip: true },
   ] });
-  const more = el('div', 'pb-more');
-  more.append(el('h3', 'pb-h', 'links'), linksT.el, el('h3', 'pb-h', 'ports'), portsT.el);
-  more.hidden = !open;
+  const box = el('div', 'pb-more');
+  box.append(el('h3', 'pb-h', 'links'), linksT.el, el('h3', 'pb-h', 'ports'), portsT.el);
+  box.hidden = !open;
 
   const root = el('div', 'pb');
-  root.append(head, view.el, more);
+  root.append(head, view.el, box);
 
-  button.addEventListener('click', () => {
-    more.hidden = !more.hidden;
-    button.setAttribute('aria-expanded', String(!more.hidden));
+  function toggle() {
+    box.hidden = !box.hidden;
+    more.expanded(!box.hidden);
+    more.label(box.hidden ? 'See details' : 'Hide details');
     tables();
     ink.paint(root);
-  });
+  }
 
   const mediumOf = (ports, id) => ports.find((p) => p.id === id)?.medium || '';
   // A light link has no session: inside one site the bay hands the event over
@@ -105,7 +109,7 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
   const byOf = (l) => l.session?.transport || l.via || (siteOf(l.from) === siteOf(l.to) ? 'bay' : 'relay');
 
   function tables() {
-    if (more.hidden) return;
+    if (box.hidden) return;
     const ports = source.ports(), links = source.links();
     const label = new Map(source.nodes().map((n) => [n.id, n.label || '']));
     linksT.set(links.map((l) => ({ line: printLink(l), medium: mediumOf(ports, l.from) || mediumOf(ports, l.to),
