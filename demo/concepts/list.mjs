@@ -15,4 +15,5 @@ export const CONCEPTS = [
   { n: 14, title: 'Shader', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
   { n: 30, title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
   { n: 31, title: 'Granulator', say: 'The radio with a granulator in the browser that sends its grains as events.' },
+  { n: 40, title: 'Synth', say: 'A WebAudio synth built one patched module at a time.' },
 ];

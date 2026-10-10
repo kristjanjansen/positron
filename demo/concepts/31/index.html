@@ -121,7 +121,10 @@
   const REVERSED = 0.25;           // the share of grains played backwards
   const SEMIS = [7, 12, -12];      // the other pitches a grain can take; 0 is the rest
   let gran = null, grains = 0, timer = 0;
-  let where = 0.6, spread = 0.35, mix = 0.8, frozen = false;   // 0 oldest, 1 newest; 0 plain, 1 every grain moved; 0 dry, 1 grains
+  // The owner's settings, asked as *"keep this. onlu show wet"*, the mix at
+  // grains. Dry / wet works like opacity (*"on dry fade out frains"*): toward
+  // dry the grains fade out, in the speakers and in their panel alike.
+  let where = 0.22, spread = 0.19, mix = 1, frozen = false;   // 0 oldest, 1 newest; 0 plain, 1 every grain moved; 0 dry, 1 grains
   const legs = new Map();          // key -> { stream, gain, tap, buf, live }
   let x = 0.5;                     // 0 is all ERR, 1 is all Ida
   const gains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];   // equal power
@@ -262,6 +265,7 @@
   }
   // Equal power between the dry crossfade and the grains.
   function applyMix() {
+    ghost.style.opacity = String(mix);
     if (!ctx) return;
     const t = ctx.currentTime;
     dryG.gain.setTargetAtTime(Math.cos(mix * Math.PI / 2), t, 0.03);
@@ -380,7 +384,7 @@
   fade.append(transport.el, el('span', 'cc-end', 'ERR'), fader.el, el('span', 'cc-end', 'Ida'));
 
   // The granulator's controls, under its panel: where it reads with freeze
-  // beside it, how far the pitch spreads, and the dry / grains mix.
+  // beside it, how far the pitch spreads, and dry / wet.
   const freeze = createToggle({ label: 'freeze', title: 'stop writing, play this moment',
     onChange: (on) => { frozen = on; d.log(on ? 'frozen, the granulator holds these 3 seconds' : 'writing again'); } });
   const row = (a, slider, b, lead) => {
