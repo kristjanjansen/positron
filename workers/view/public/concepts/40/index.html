@@ -18,7 +18,6 @@
      drawn, so the panel is the same size at every step (asked 2026-10-10,
      *"reserve space for kbow block and keyboard even when not present"*). The
      knobs do the same in the kit's knob grid, which keeps every box. */
-  .cc-off { visibility: hidden; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -27,7 +26,6 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
-  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createSynth, STEPS, KNOBS, knobRaw } from './modules.mjs';
@@ -45,6 +43,7 @@
   const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
   const { bay, P } = synth;
   const ID = synth.id;
+  const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
 
   // ── one waveform, the output, drawn as the synths slide draws it ──────────
   // `createWaveShape` fed one window from the first rising zero crossing, so a
@@ -65,21 +64,6 @@
   // width leaves one box alone on a row.
   const grid = createKnobGrid(knobs, { row: true });
 
-  // ── the keyboard: a key is one note event out of keys:midi-out ───────────
-  const keysHost = el('div');
-  const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
-  const kb = createKeyboard(keysHost, {
-    ...keyRange(21), base: 48,   // 13 white keys, the content width at the kit's 49 px minimum, as on /concepts/10/
-    onDown: (note, how) => {
-      if (how === 'midi' || !inPatch('keys')) return;
-      wake(); sound(true);
-      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
-    },
-    onUp: (note, how) => {
-      if (how === 'midi' || !inPatch('keys')) return;
-      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 });
-    },
-  });
 
   // ── sound on and off ────────────────────────────────────────────────────
   let ctx = null;
@@ -90,8 +74,20 @@
   const transport = createButtonGroup({ buttons: [
     { id: 'play', icon: 'play', label: 'play', onPress: () => { if (!synth.on()) wake(); sound(!synth.on()); } },
   ] });
+  // The test tone: while sound is on and the step patches web:tone, one held
+  // A3 (220 Hz) goes out of tone:midi-out, so the amp's envelope opens.
+  const TONE = 57;
+  let toneOn = false;
+  function tone(v) {
+    v = v && synth.on() && inPatch('tone');
+    if (v === toneOn) return;
+    toneOn = v;
+    bay.send(ID('tone', 'midi-out'), { cls: 'note', ch: 1, d1: TONE, d2: v ? 100 : 0 });
+  }
   function sound(v) {
+    if (!v) tone(false);
     synth.sound(v);
+    if (v) tone(true);
     transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
   }
 
@@ -121,7 +117,9 @@
     const on = new Set(KNOBS.filter(reach).map((k) => k.name));
     // Every knob keeps its box; one whose cable the step does not lay is off.
     for (const k of KNOBS) grid.show(k.name, on.has(k.name));
-    keysHost.classList.toggle('cc-off', !inPatch('keys'));
+    // A step that patches the tone starts it if sound is on; one that does not, stops it.
+    if (toneOn && !inPatch('tone')) { toneOn = false; }
+    tone(true);
     pb.refresh();
   }
 
@@ -150,11 +148,11 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el, picker.el);
-  // The waveform, the knob group and the keys are three blocks of the page,
-  // not glued (asked 2026-10-10, *"scope knobs keys are different blocks not
+  // The waveform and the knob group are blocks of the page, not glued (asked
+  // 2026-10-10, *"scope knobs keys are different blocks not
   // glued. just hide them when not there"*).
   // Blocks in the shell's stack, at the shell's gap.
-  d.stack.add(top, wave.el, grid.el, keysHost, pb.el);
+  d.stack.add(top, wave.el, grid.el, pb.el);
   for (const [name, v] of Object.entries(step.preset)) {
     synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);
     knobs.get(name).set(knobRaw(name, v), { quiet: true });
