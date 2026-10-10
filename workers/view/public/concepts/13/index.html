@@ -31,7 +31,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
-  import { setSymbol } from '/shell/symbol.mjs';
+  import { setIcon } from '/shell/icon-button.mjs';
   import { createDeck } from '/timeline/transport.mjs';
 
   // /concepts/12/ with the kit's own transport bar and timeline glued together in
@@ -179,15 +179,16 @@
   function face() {
     const b = bar.extra?.('rec');
     if (!b) return;
-    setSymbol(b, armed ? '■' : '●');
-    b.title = armed ? 'stop recording' : 'record';
+    // the bar's extras take a label, and `extra(id)` hands back the button for
+    // a page to re-face, so the icon goes on here and the bar is unchanged
+    setIcon(b, armed ? 'stop' : 'record', armed ? 'stop recording' : 'record');
     b.classList.toggle('cc-rec', !armed);
   }
 
   const glue = el('div');
   const bar = createTransportBar(glue, deck, {
     scrub: false, loop: false, live: false,
-    extras: [{ id: 'rec', label: '●', aria: 'record', title: 'record', onPress: () => (armed ? stopRecording() : record()) }],
+    extras: [{ id: 'rec', label: '', aria: 'record', title: 'record', onPress: () => (armed ? stopRecording() : record()) }],
   });
   const strip = createStripView(glue, deck, {
     size: 'auto', follow: true, gutter: 120,

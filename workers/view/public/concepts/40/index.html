@@ -31,7 +31,6 @@
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { setSymbol } from '/shell/symbol.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createSynth, STEPS, KNOBS, knobRaw } from './modules.mjs';
 
@@ -90,16 +89,12 @@
     if (!ctx) { ctx = new AudioContext(); synth.start(ctx); requestAnimationFrame(frame); }
     ctx.resume();
   }
-  const GLYPH = { play: '►', stop: '■' };
   const transport = createButtonGroup({ buttons: [
-    { id: 'play', label: GLYPH.play, aria: 'play', onPress: () => { if (!synth.on()) wake(); sound(!synth.on()); } },
+    { id: 'play', icon: 'play', label: 'play', onPress: () => { if (!synth.on()) wake(); sound(!synth.on()); } },
   ] });
   function sound(v) {
     synth.sound(v);
-    const b = transport.button('play');
-    setSymbol(b, v ? GLYPH.stop : GLYPH.play);
-    b.title = v ? 'stop' : 'play';
-    b.setAttribute('aria-label', b.title);
+    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
   }
 
   function frame() {

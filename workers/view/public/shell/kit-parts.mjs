@@ -25,7 +25,8 @@
 // that deck was removed, one block per slide.
 // ⚠️ `icons` IS THE ELEVENTH, 2026-10-10 (*"see ../eccm icon system. We need
 // one from icones. Make a sample sheet in one of kit pages called icons."*):
-// the Feather set vendored as demo/shell/icons.mjs, drawn whole.
+// the Feather set vendored as demo/shell/icons.mjs, drawn whole. Its newest
+// block, ICON BUTTON, is `demo/shell/icon-button.mjs`, the same day.
 
 export const KIT_PARTS = [
   { part: 'input', label: 'INPUT', ids: [
@@ -83,7 +84,7 @@ export const KIT_PARTS = [
     'favicon', 'app-icon',
   ] },
   { part: 'icons', label: 'ICONS', ids: [
-    'sample-sheet', 'sizes', 'in-a-button', 'colour',
+    'icon-button', 'sample-sheet', 'sizes', 'in-a-button', 'colour',
   ] },
 ];
 

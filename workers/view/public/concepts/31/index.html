@@ -43,7 +43,6 @@
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createToggle } from '/shell/toggle.mjs';
-  import { setSymbol } from '/shell/symbol.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
 
   // Concept 30 plus one node: a very basic granulator in this tab, fed from the
@@ -366,15 +365,11 @@
     face();
   }
 
-  const GLYPH = { play: '►', stop: '■' };
   const transport = createButtonGroup({ buttons: [
-    { id: 'play', label: GLYPH.play, aria: 'play', onPress: () => (playing ? stop() : play()) },
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
   ] });
   function face() {
-    const b = transport.button('play');
-    setSymbol(b, playing ? GLYPH.stop : GLYPH.play);
-    b.title = playing ? 'stop' : 'play';
-    b.setAttribute('aria-label', b.title);
+    transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play');
   }
   face();
 

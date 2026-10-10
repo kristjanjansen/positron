@@ -25,7 +25,6 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { setSymbol } from '/shell/symbol.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createXyPad } from '/shell/xy-pad.mjs';
   import { createSynth, KNOBS, PATCH, expo } from './modules.mjs';
@@ -107,18 +106,14 @@
     if (!ctx) { ctx = new AudioContext(); synth.start(ctx); synth.sound(true); requestAnimationFrame(frame); }
     ctx.resume();
   }
-  const GLYPH = { play: '►', stop: '■' };
   const transport = createButtonGroup({ buttons: [
-    { id: 'play', label: GLYPH.play, aria: 'play', onPress: () => drone(!droning) },
+    { id: 'play', icon: 'play', label: 'play', onPress: () => drone(!droning) },
   ] });
   function drone(v) {
     if (v) wake();
     droning = v;
     note(DRONE, v ? 100 : 0);
-    const b = transport.button('play');
-    setSymbol(b, v ? GLYPH.stop : GLYPH.play);
-    b.title = v ? 'stop' : 'play';
-    b.setAttribute('aria-label', b.title);
+    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
   }
 
   function frame() {

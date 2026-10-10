@@ -17,4 +17,5 @@ export const CONCEPTS = [
   { n: 31, title: 'Granulator', say: 'The radio with a granulator in the browser that sends its grains as events.' },
   { n: 40, title: 'Synth', say: 'A WebAudio synth built one patched module at a time.' },
   { n: 41, title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
+  { n: 50, title: 'Layouts', say: 'Four ways to lay out a tutorial with its words, its build area and its patchbay.' },
 ];
