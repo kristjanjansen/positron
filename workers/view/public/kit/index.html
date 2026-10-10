@@ -8,10 +8,24 @@
 <title>POSITRON kit</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/kit-page.css">
+<style>
+  /* The parts as cards, as /concepts/ draws its pages. */
+  .kit-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .kit-card {
+    display: flex; flex-direction: column; gap: 6px; min-height: 110px;
+    padding: var(--inset, 12px); background: var(--card);
+    border: var(--edge, 1px solid var(--line)); border-radius: var(--r, 4px);
+    color: inherit; text-decoration: none;
+  }
+  .kit-card:hover { border-color: var(--fg); }
+  .kit-card-t { margin: 0; font-size: 15px; }
+  .kit-card-s { margin: 0; color: var(--dim); font-size: 13.5px; }
+</style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { KIT_PARTS, whereIs } from '/shell/kit-parts.mjs';
+  import { DEMOS } from '/manifest.mjs';
 
   /**
    * 🔴 `/kit/` SINCE STEP 4 OF plans/plan-kit-split.md, 2026-10-06. It used to
@@ -36,14 +50,19 @@
     readout: null,
   });
 
-  const list = el('ul', 'kit-parts');
+  // 🔴 THE KIT'S OWN INDEX SINCE 2026-10-10 (*"make a separate kit page (rm
+  // from frontpage)"*): the parts are off the front page and are cards here,
+  // each with the one line its manifest row carries, so the words cannot drift.
+  const one = (part) => DEMOS.find((x) => x.name === `kit/${part}`)?.one || '';
+  const cards = el('div', 'kit-cards');
   for (const p of KIT_PARTS) {
-    const li = el('li');
-    li.append(el('a', '', `kit/${p.part}`, { href: `/kit/${p.part}/` }),
-      document.createTextNode(` ${p.ids.length} blocks`));
-    list.append(li);
+    const a = el('a', 'kit-card', '', { href: `/kit/${p.part}/` });
+    a.append(el('h3', 'kit-card-t', p.part));
+    const say = one(p.part);
+    if (say) a.append(el('p', 'kit-card-s', say.charAt(0).toUpperCase() + say.slice(1) + '.'));
+    cards.append(a);
   }
-  d.el.append(list);
+  d.el.append(cards);
 
   if (SELFCHECK) {
     d.assert('an old block address goes to the part page that holds it, and an old part address to the part',
