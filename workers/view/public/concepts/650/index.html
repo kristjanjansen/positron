@@ -43,9 +43,13 @@
   // /concepts/060/'s broadcast does. What the right panel shows has been
   // encoded here, sent to Cloudflare, forwarded back, decoded and drawn.
   //
-  // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES. One WHIP publish and one
-  // WHEP play for as long as it runs, billed by the minute delivered whatever
-  // the protocol (positron-streaming). Stop ends both.
+  // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND AT MOST 10 SECONDS OF
+  // THEM. One WHIP publish and one WHEP play, billed by the minute delivered
+  // whatever the protocol (positron-streaming). Ten seconds after the publish
+  // is accepted the right picture has faded to the ground over its last second
+  // and the page stops itself exactly as a stop press does, so one press is
+  // bounded at about ten seconds on each leg. Asked for: "limit to 10 sec. just
+  // fade out".
   //
   // 🔴 IT SHARES /cam/'s ONE WHIP INPUT. The worker allows one camera on it at a
   // time, so a publish answered 409 means somebody else is on air there, /cam/
@@ -64,7 +68,7 @@
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const LIVE_IN = 'cf-stream:live:video-in', LIVE_OUT = 'cf-stream:live:video-out';
   const LOOP = `${S}:loopback:video-in`;
-  const NO_MEDIA_MS = 12000;
+  const NO_MEDIA_MS = 7000, CAP_MS = 10000, FADE_MS = 1000;
 
   const d = mount({ name: 'concept 650', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('650');
@@ -109,7 +113,7 @@
   back.muted = true; back.playsInline = true; back.autoplay = true;
   let cam = null, gen = 0, raf = 0;
   let devices = [], deviceId = null;
-  let pub = null, sub = null, statsTimer = 0, ice = null, noMedia = 0;
+  let pub = null, sub = null, statsTimer = 0, ice = null, noMedia = 0, capTimer = 0, endAt = 0;
   // When the last frame was presented, per video element: what lights a video wire.
   const last = new Map([[video, 0], [back, 0]]);
   function watchFrames(v) {
@@ -154,13 +158,21 @@
 
   // The routing follows the links: without camera -> original the left panel
   // is the ground; without the WHEP link the right one is.
-  function paint(p, v, on) {
-    if (on && v.readyState >= 2 && v.videoWidth > 0) drawCamera(p.ctx, v, FRAME_W, FRAME_H, { scrim: 0 });
-    else { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
+  // `alpha` below 1 lays the picture over the ground at that strength, which
+  // is how the right one fades out over the last second of the cap.
+  function paint(p, v, on, alpha = 1) {
+    p.ctx.globalAlpha = 1;
+    if (on && alpha < 1) { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
+    if (on && alpha > 0 && v.readyState >= 2 && v.videoWidth > 0) {
+      p.ctx.globalAlpha = alpha;
+      drawCamera(p.ctx, v, FRAME_W, FRAME_H, { scrim: 0 });
+      p.ctx.globalAlpha = 1;
+    } else if (!on || alpha <= 0) { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
   }
+  const fade = () => (endAt ? Math.max(0, Math.min(1, (endAt - performance.now()) / FADE_MS)) : 1);
   function render() {
     paint(L, video, !!cam && holds(CAM, SCREEN));
-    paint(R, back, !!cam && !!sub && holds(LIVE_OUT, LOOP));
+    paint(R, back, !!cam && !!sub && holds(LIVE_OUT, LOOP), fade());
   }
   function frame() { render(); if (cam) raf = requestAnimationFrame(frame); }
   render();
@@ -253,6 +265,13 @@
     pub = p;
     stat.pub = pub.pc.connectionState;
     d.log(`WHIP publish answered ${statusOf(CAM_WHIP_PROXY) || 'ok'}: ${CAM} -> ${LIVE_IN}`, 'hi');
+    // The cap starts when Cloudflare starts counting, and ends as a stop press.
+    endAt = performance.now() + CAP_MS;
+    capTimer = setTimeout(() => {
+      if (gen !== mine) return;
+      d.log(`${CAP_MS / 1000} s is the most one press runs through Cloudflare`);
+      stop();
+    }, CAP_MS);
     pub.pc.addEventListener('connectionstatechange', () => {
       stat.pub = pub?.pc.connectionState || 'closed';
       if (stat.pub === 'failed') d.log('the publish could not reach Cloudflare: UDP blocked, or a VPN, are both possible', 'bad');
@@ -342,7 +361,8 @@
 
   function stop() {
     gen++;
-    clearInterval(statsTimer); clearTimeout(noMedia);
+    clearInterval(statsTimer); clearTimeout(noMedia); clearTimeout(capTimer);
+    endAt = 0;
     const p = pub, s = sub;
     pub = sub = null;
     try { s?.pc.close(); } catch { /* fine */ }
