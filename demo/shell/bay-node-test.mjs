@@ -81,7 +81,13 @@ const graph = (site, ports = []) => ({ v: 1, site, place: 'browser', nodes: [{ i
 {
   // 2. A site per tab.
   const a = randomSite('web'), b = randomSite('web');
-  ok('a site is the prefix and four characters, new on every call', /^web-[a-z0-9]{4}$/.test(a) && a !== b, `${a} ${b}`);
+  ok('a site is the prefix and three characters, new on every call', /^web-[a-z0-9]{3}$/.test(a) && a !== b, `${a} ${b}`);
+  const many = Array.from({ length: 500 }, () => randomSite('web').slice(4));
+  ok('every site name holds exactly one digit and two letters',
+    many.every((x) => /^[a-z0-9]{3}$/.test(x) && (x.match(/[0-9]/g) || []).length === 1),
+    many.slice(0, 6).join(' '));
+  ok('NEGATIVE CONTROL: the digit is not always in the same place',
+    new Set(many.map((x) => x.search(/[0-9]/))).size === 3, `${new Set(many.map((x) => x.search(/[0-9]/))).size} places`);
 }
 
 {

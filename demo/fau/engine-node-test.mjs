@@ -63,7 +63,7 @@ function build({ program = false, search = '?selfcheck=1' } = {}) {
   ok('under the harness the room is the run’s own, never the studio’s', /^nola-test-/.test(e.room) && e.room !== 'studio-1', e.room);
   ok('a person gets the studio’s room', build({ search: '' }).e.room === 'studio-1');
   ok('and ?room= wins', build({ search: '?room=desk-7&selfcheck=1' }).e.room === 'desk-7');
-  ok('the site is the page’s own and new per tab', /^nola-[a-z0-9]{4}$/.test(e.site) && e.site !== build().e.site, e.site);
+  ok('the site is the page’s own and new per tab', /^nola-[a-z0-9]{3}$/.test(e.site) && e.site !== build().e.site, e.site);
   const g = e.graph();
   ok('the graph is one the registry reads', graphProblem(g) === '' && g.nodes.length === 1 && g.nodes[0].kind === 'engine', graphProblem(g));
   ok('nola is an engine with a midi in and an audio out that stays on this machine',

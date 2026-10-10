@@ -4649,7 +4649,7 @@
       !engine.joined() && !engine.joining() && engine.counts().midiAsked === 0 && !engine.midiStarted(),
       `${engine.counts().midiAsked} MIDI asks, ${engine.joining() ? 'a socket is open' : 'no socket'}`);
     d.assert('this tab is a site of its own and the harness is in a room of its own, never the studio’s',
-      /^nola-[a-z0-9]{4}$/.test(engine.site) && engine.room !== 'studio-1', `${engine.site} in ${engine.room}`);
+      /^nola-[a-z0-9]{3}$/.test(engine.site) && engine.room !== 'studio-1', `${engine.site} in ${engine.room}`);
     const plateR = plate.el.getBoundingClientRect(), joinR = bayUi.el.getBoundingClientRect();
     const pickR = instPick.el.getBoundingClientRect();
     d.assert('Join sits next to the nameplate on the keyboard’s foot, outside the row the harness presses, and the badge is not drawn',

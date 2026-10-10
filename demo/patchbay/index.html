@@ -981,7 +981,7 @@
   d.assert('building the page joined no room, the room waits for Join', !node.joined() && !node.joining(),
     node.joining() ? 'a socket is open' : 'no socket');
   d.assert('this tab is a site of its own and the harness is in a room of its own, never the studio\u2019s',
-    /^web-[a-z0-9]{4}$/.test(SITE) && (!SELFCHECK || ROOM !== 'studio-1'), `${SITE} in ${ROOM}`);
+    /^web-[a-z0-9]{3}$/.test(SITE) && (!SELFCHECK || ROOM !== 'studio-1'), `${SITE} in ${ROOM}`);
   if (SELFCHECK) {
     // 🔴 THE ROUND TRIP, in the run's own room only: a second node in this tab
     // stands in for another page, announces a lane, and answers link.request.

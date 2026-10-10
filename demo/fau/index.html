@@ -2334,7 +2334,7 @@
       !engine.joined() && !engine.joining() && engine.counts().midiAsked === 0 && !engine.midiStarted(),
       `${engine.counts().midiAsked} MIDI asks, ${engine.joining() ? 'a socket is open' : 'no socket'}`);
     d.assert('this tab is a site of its own and the harness is in a room of its own, never the studio’s',
-      /^fau-[a-z0-9]{4}$/.test(engine.site) && engine.room !== 'studio-1', `${engine.site} in ${engine.room}`);
+      /^fau-[a-z0-9]{3}$/.test(engine.site) && engine.room !== 'studio-1', `${engine.site} in ${engine.room}`);
     d.assert('Join sits beside the name on the instrument, outside the row the harness presses, and the badge is not drawn',
       panel.plateRow.contains(bayUi.button) && !bayUi.button.closest('.pos-controls') && !shown(),
       `badge wrapper display ${getComputedStyle(bayUi.wrap).display}`);
