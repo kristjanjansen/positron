@@ -154,9 +154,10 @@
     size.textContent = playing && v.videoWidth && v.videoHeight ? `${v.videoWidth}x${v.videoHeight}` : '';
   }
   // One name at either end, both with their share in between: `ETV 70 ETV2 30`.
+  // Empty while stopped, as the camera pages, so no name sits under an empty picture.
   function showWho() {
     const p = Math.round(x * 100);
-    who.textContent = p <= 0 ? tv[0].c.name : p >= 100 ? tv[1].c.name
+    who.textContent = !playing ? '' : p <= 0 ? tv[0].c.name : p >= 100 ? tv[1].c.name
       : `${tv[0].c.name} ${100 - p} ${tv[1].c.name} ${p}`;
   }
 
@@ -323,7 +324,7 @@
       Object.assign(ch, { lastFrame: 0, lastSound: 0, frames: 0, refused: false });
     }
     ctx?.suspend();
-    showSize();
+    showWho(); showSize();
     pb.refresh();
     face();
     d.log('stopped: both engines destroyed, both pictures emptied');
