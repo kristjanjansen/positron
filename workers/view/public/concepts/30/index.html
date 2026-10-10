@@ -14,6 +14,8 @@
   /* In a column a 0 basis is a 0 height, so on a phone each panel takes its own height. */
   @media (max-width: 560px) { .cc-pair { flex-direction: column; align-items: stretch; } .cc-pair > * { flex: none; } }
   .cc-say { font-size: 12px; color: var(--dim); }
+  /* A footer line never wraps: one line, cut at the slot's edge. */
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
   /* The kit's live wave (grain-scope) as a panel's picture: the panel's stage is the
      edge and the ground, so the scope gives up its own margin, border and corner
      through the kit's tokens, and its always-empty caption takes no room. The stage
@@ -143,8 +145,10 @@
     const host = el('div', 'cc-wave');
     const scope = createGrainScope(host, { seconds: 4, height: 150, fullScale: 1 });
     scopes.set(st.key, scope);
-    return createVideoPanel({ media: host, aspect: 'auto', left: el('span', 'cc-say', st.name),
-      centre: el('span', 'cc-say', `${st.kbps} kbit/s`) });
+    // The rate at the right, beside the full-screen button.
+    const p = createVideoPanel({ media: host, aspect: 'auto', left: el('span', 'cc-say', st.name) });
+    p.el.querySelector('.pos-vp-r').prepend(el('span', 'cc-say', `${st.kbps} kbit/s`));
+    return p;
   });
   const pair = el('div', 'cc-pair');
   pair.append(...panels.map((p) => p.el));

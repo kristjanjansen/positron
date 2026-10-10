@@ -8,6 +8,7 @@ export const CONCEPTS = [
   { n: 4, title: 'History', say: 'The same chat, with a store that keeps what was said.' },
   { n: 5, title: 'Admin', say: 'The chat with an admin line every tab shows on top.' },
   { n: 6, title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },
+  { n: '070', title: 'Pico router', say: 'The keyboard routed into a sine synth by C firmware on an emulated Pico, with every byte shown.' },
   { n: 10, title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
   { n: 11, title: 'Effects', say: 'The keyboard and a saw synth with MIDI and audio effects.' },
   { n: 12, title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
@@ -20,4 +21,5 @@ export const CONCEPTS = [
   { n: 41, title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
   { n: 50, title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
   { n: 60, title: 'Camera', say: 'The local camera patched to a picture on this page.' },
+  { n: 61, title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
 ];

@@ -21,6 +21,8 @@
   @media (max-width: 560px) { .cc-half { width: 100%; } }
   .cc-half canvas { display: block; width: 100%; height: 100%; }
   .cc-say { font-size: 12px; color: var(--dim); }
+  /* A footer line never wraps: one line, cut at the slot's edge. */
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -89,9 +91,14 @@
   const canvas = el('canvas');
   canvas.width = FRAME_W; canvas.height = FRAME_H;
   const ctx = canvas.getContext('2d', { alpha: false });
-  const name = el('span', 'cc-say', 'camera');
+  // Empty until the camera is on, so no placeholder name sits in the footer.
+  const name = el('span', 'cc-say', '');
   const size = el('span', 'cc-say', '');
-  const panel = createVideoPanel({ media: canvas, left: name, centre: size, right: false });
+  // The name at the left, the resolution at the right beside the panel's own
+  // full-screen button (asked 2026-10-10, *"no wrapping for footer. is id
+  // needed? move rest to right ... add fullscreenbutton"*).
+  const panel = createVideoPanel({ media: canvas, left: name });
+  panel.el.querySelector('.pos-vp-r').prepend(size);
   panel.el.classList.add('cc-half');
 
   // The picture follows the link, as /concepts/30/'s sound does: without
@@ -132,9 +139,11 @@
     deviceId = set.deviceId || deviceId;
     video.srcObject = cam;
     video.play().catch(() => {});
-    name.textContent = track.label || 'camera';
+    // A camera's label ends in its USB ids, `(2C0E:82E3)`, which name nothing a reader needs.
+    const label = (track.label || '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
+    name.textContent = label;
     size.textContent = set.width && set.height ? `${set.width}x${set.height}` : '';
-    camNode(track.label || 'camera');
+    camNode(label || 'camera');
     d.log(`camera on: ${track.label || 'default'} at ${set.width}x${set.height}`, 'hi');
     watchFrames();
     cancelAnimationFrame(raf);
