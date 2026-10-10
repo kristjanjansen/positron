@@ -45,11 +45,11 @@
   //
   // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND AT MOST 10 SECONDS OF
   // THEM. One WHIP publish and one WHEP play, billed by the minute delivered
-  // whatever the protocol (positron-streaming). Ten seconds after the publish
-  // is accepted the right picture has faded to the ground over its last second
-  // and the page stops itself exactly as a stop press does, so one press is
-  // bounded at about ten seconds on each leg. Asked for: "limit to 10 sec. just
-  // fade out".
+  // whatever the protocol (positron-streaming). Twenty seconds after the
+  // publish is accepted the right picture has faded slowly to the ground over
+  // its last five, and the page stops itself exactly as a stop press does, so
+  // one press is bounded at about twenty seconds on each leg. Asked for:
+  // "limit to 10 sec. just fade out", then "limit to 20sec. fade out sloowly".
   //
   // 🔴 IT SHARES /cam/'s ONE WHIP INPUT. The worker allows one camera on it at a
   // time, so a publish answered 409 means somebody else is on air there, /cam/
@@ -68,7 +68,9 @@
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const LIVE_IN = 'cf-stream:live:video-in', LIVE_OUT = 'cf-stream:live:video-out';
   const LOOP = `${S}:loopback:video-in`;
-  const NO_MEDIA_MS = 7000, CAP_MS = 10000, FADE_MS = 1000;
+  // 20 s a press, the last 5 of them a slow fade (asked 2026-10-10, *"limit to
+  // 20sec. fade out sloowly"*).
+  const NO_MEDIA_MS = 7000, CAP_MS = 20000, FADE_MS = 5000;
 
   const d = mount({ name: 'concept 650', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('650');
