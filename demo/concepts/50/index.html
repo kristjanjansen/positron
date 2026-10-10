@@ -9,249 +9,400 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/slide.css">
 <style>
-  /* A SANDBOX FOR TUTORIAL LAYOUTS (plans/plan-tutorial-layout.md). Every rule
-     here is page local on purpose: this page tries four arrangements of the
-     same three regions (the words, the build area, the patchbay) and the one
-     that wins moves into the kit, not this CSS.
+  /* ONE TUTORIAL SLIDE (plans/plan-tutorial-layout.md). Decided 2026-10-10:
+     *"I'm asking you to design a slide. So a page should contain a slide frame,
+     and the content inside of it can go to full screen and have some kind of
+     mobile support."* The frame sits in the page's own column (no wide body),
+     and everything inside it is laid out ONCE at a logical 1024 by 576 and
+     scaled, the way `fitBox` in slide.mjs scales a px control on a slide, so
+     nothing reflows at any width: only `--fit-k` changes.
 
-     🔴 THE PAGE IS WIDER THAN THE SITE'S 720 px COLUMN, and that is the first
-     finding rather than a styling choice: a words column, a build area and a
-     patchbay do not share 688 px of content at desk width. Desktop first was
-     asked for, so the body takes up to 1440 px here. */
-  body { max-width: 1440px; }
-  :root { --tl-side: 360px; --tl-dock: 280px; --tl-gap: 24px; }
+     🔴 PAGE LOCAL, NOT `createSlide`. Its `split` has two columns and no
+     footer band, and its words are fixed steps that clip rather than scroll.
+     What the kit would need is in the plan, section 2. */
 
-  .tl-bar { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: var(--tl-gap); }
-  .tl-bar .pos-linkbtn { font-size: 13px; }
 
-  .tl { display: grid; gap: var(--tl-gap); align-items: start; }
-  .tl > [hidden] { display: none; }
-  .tl-words { grid-area: words; min-width: 0; }
-  .tl-build { grid-area: build; min-width: 0; }
-  .tl-bay { grid-area: bay; min-width: 0; }
-  .tl-slide { grid-area: slide; min-width: 0; }
-
-  /* the words as a column: the slide's own content, set as page text */
-  .tl-words {
-    background: var(--card); border: var(--edge); border-radius: var(--r);
-    padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  /* The frame: a 16:9 box in the page, the whole screen when full. It is the
+     box the scale is measured off, and it paints the edge. */
+  .tf {
+    position: relative; overflow: hidden;
+    aspect-ratio: 16 / 9;
+    background: var(--card);
+    border: var(--edge); border-radius: var(--r);
   }
-  .tl-say { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 600; text-wrap: balance; }
-  .tl-p { margin: 0; color: var(--fg); max-width: 62ch; }
-  .tl-list { margin: 0; padding-left: 18px; color: var(--dim); }
+  /* full: the screen is the frame, its ground is the slide's, no edge (the
+     slide's own rule, *"just all bg is slide bg and border is screens border"*).
+     A class, never `:fullscreen` (shell.css says why). (0,2,0). */
+  .tf.pos-full { aspect-ratio: auto; width: 100%; height: 100%; border: 0; border-radius: 0; }
 
-  /* the build area: two module boxes side by side, the keyboard under them */
-  .tl-build { display: flex; flex-direction: column; gap: 16px; }
-  .tl-mods { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-  .tl-mod-name { font-size: 13px; color: var(--dim); }
-  .tl-knobs { display: flex; gap: var(--ctl-gap); }
-
-  /* A: words left a third, build right two thirds, patchbay a band under both */
-  .tl[data-layout="a"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-areas: "words build" "bay bay"; }
-  .tl[data-layout="a"][data-words="off"] { grid-template-areas: "build build" "bay bay"; }
-  .tl[data-layout="a"][data-bay="off"] { grid-template-areas: "words build"; }
-  .tl[data-layout="a"][data-words="off"][data-bay="off"] { grid-template-areas: "build build"; }
-
-  /* B: words over build in the main column, patchbay a fixed right sidebar */
-  .tl[data-layout="b"] { grid-template-columns: minmax(0, 1fr) var(--tl-side); grid-template-areas: "words bay" "build bay"; grid-template-rows: auto 1fr; }
-  .tl[data-layout="b"][data-words="off"] { grid-template-areas: "build bay"; grid-template-rows: auto; }
-  .tl[data-layout="b"][data-bay="off"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "words" "build"; }
-  .tl[data-layout="b"][data-words="off"][data-bay="off"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "build"; }
-  .tl[data-layout="b"] .tl-bay { position: sticky; top: 16px; }
-
-  /* C: a real slide, split 1:2, the build area in its slot, patchbay under it */
-  .tl[data-layout="c"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "build" "bay"; }
-  .tl[data-layout="c"][data-bay="off"] { grid-template-areas: "build"; }
-  .tl[data-layout="c"][data-slide="on"] { grid-template-areas: "slide" "bay"; }
-  .tl[data-layout="c"][data-slide="on"][data-bay="off"] { grid-template-areas: "slide"; }
-  /* the build area inside the slot is page sized, not slide sized */
-  .tl-slot { align-self: stretch; display: flex; align-items: center; justify-content: center; min-width: 0; }
-
-  /* D: build on top, full width; under it a dock of fixed height, the words
-     scrolling inside themselves on the left and the patchbay on the right */
-  .tl[data-layout="d"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-areas: "build build" "words bay"; }
-  .tl[data-layout="d"][data-words="off"] { grid-template-areas: "build build" "bay bay"; }
-  .tl[data-layout="d"][data-bay="off"] { grid-template-areas: "build build" "words words"; }
-  .tl[data-layout="d"][data-words="off"][data-bay="off"] { grid-template-areas: "build build"; }
-  .tl[data-layout="d"] .tl-words { height: var(--tl-dock); overflow-y: auto; }
-  .tl[data-layout="d"] .tl-bay { max-height: var(--tl-dock); overflow-y: auto; }
-
-  /* THE PHONE: one column for every layout, the build first, then the words in
-     a box that scrolls inside itself (the owner's phone note), then the bay.
-     Flex rather than grid, so a hidden region leaves no track and no gap.
-     Last in the sheet, so it wins its ties on order. */
-  @media (max-width: 560px) {
-    .tl[data-layout] { display: flex; flex-direction: column; align-items: stretch; }
-    .tl[data-layout] .tl-build { order: 1; }
-    .tl[data-layout] .tl-words { order: 2; height: auto; max-height: 40svh; overflow-y: auto; }
-    .tl[data-layout] .tl-bay { order: 3; position: static; max-height: none; }
+  /* The inside, at its logical size, scaled from the top left corner. The same
+     transform `.sl-fit-in` uses, with the same custom properties. */
+  .tf-in {
+    position: absolute; left: 0; top: 0;
+    width: var(--fit-w, 1024px); height: var(--fit-h, 576px);
+    transform-origin: 0 0;
+    transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit-k, 1));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "words build" "bay bay";
+    /* one surface, three regions: the seams are the ground between them */
+    gap: 1px; background: var(--line);
   }
+  .tf-in > * { min-width: 0; min-height: 0; }
+
+  /* ── the words: a third of the width, scrolling inside themselves ──────── */
+  .tf-words {
+    grid-area: words; background: var(--card);
+    overflow-y: auto; overscroll-behavior: contain;
+    padding: 28px 28px 36px;
+    display: flex; flex-direction: column; gap: 14px;
+    scrollbar-width: thin;
+  }
+  /* 🔴 THE CUT EDGE FADES, asked as *"words scroll with a fade"*: a mask over
+     the column's foot while there is more below, and none at the end, so the
+     last line is never dimmed for nothing. A mask and not a shadow: it fades
+     the words themselves rather than painting over them. */
+  .tf-words[data-more] {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+  }
+  .tf-say {
+    margin: 0; font-family: 'Slide JetBrains Mono', var(--mono);
+    font-size: 26px; line-height: 1.12; letter-spacing: -0.03em; font-weight: 600;
+    text-wrap: balance;
+  }
+  .tf-p { margin: 0; font-size: 17px; line-height: 1.42; }
+  .tf-list { margin: 0; padding-left: 20px; font-size: 17px; line-height: 1.42; color: var(--dim); }
+  .tf-list li + li { margin-top: 4px; }
+
+  /* ── the build area: the module boxes, the keyboard under them ─────────── */
+  .tf-build {
+    grid-area: build; background: var(--bg);
+    padding: 24px 28px;
+    display: flex; flex-direction: column; justify-content: center; gap: 22px;
+    /* the knobs are the kit's knob grid at a slide's size: the dial and its
+       box grow together from the kit's own tokens, so every box stays square
+       and equal (shell.css computes `--kgrid-cell` at :root, so it is said
+       again here where the dial changes) */
+    --knob-w: 60px;
+    --kgrid-inset: 12px;
+    --kgrid-cell: calc(var(--knob-w) + 2 * var(--kgrid-inset));
+  }
+  .tf-mods { display: flex; gap: 20px; align-items: stretch; }
+  .tf-mod { display: flex; flex-direction: column; gap: 8px; }
+  /* 🔴 A KNOB GRID IN A SHRINK TO FIT BOX HAS NO WIDTH TO FILL, and its
+     `min(100%, ...)` resolved against a box sized by a grid of one column, so
+     two knobs stacked. The module is given the grid's own width, read off the
+     kit's tokens: two cells and the gap between them. */
+  .tf-mod[data-mod="osc"], .tf-mod[data-mod="filter"] { width: calc(2 * var(--kgrid-cell) + var(--ctl-gap)); }
+  /* a box the step does not use keeps its place, so nothing moves between steps */
+  .tf-mod[data-off] { visibility: hidden; }
+  .tf-mod-name { font-size: 13px; color: var(--dim); }
+  /* the scope is as tall as a knob box, by stretching to the row the knobs
+     set, never by a typed height, so the three boxes end on one line */
+  .tf-scope { width: 220px; flex: 1 1 auto; display: flex; min-height: 0; }
+  .tf-scope .pos-sv { margin: 0; flex: 1 1 auto; display: flex; flex-direction: column; }
+  .tf-scope .pos-sv-c { flex: 1 1 0; height: auto; min-height: 0; }
+  .tf-keys .kbd { margin: 0; }
+
+  /* ── the patchbay: a full width band, always one row ───────────────────── */
+  .tf-bay {
+    grid-area: bay; background: var(--bg);
+    padding: 14px 28px 18px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .tf-bay-h { margin: 0; font-size: 13px; color: var(--dim); font-weight: 500; }
+
+  /* ── the ⛶. In the page it ends the step row, outside the frame: inside a
+     frame scaled to a third on a phone, any corner of the build area it sat on
+     was a corner a box needed. Full, it moves into the frame's top right,
+     real size because it is outside the scaled box, and is the way back out
+     on a screen with no Escape key. ───────────────────────────────────── */
+  .tf-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .tf-full {
+    width: 34px; height: 34px; padding: 0; font-size: 15px; line-height: 1; flex: none;
+    touch-action: manipulation; -webkit-touch-callout: none;
+  }
+  .tf .tf-full { position: absolute; right: 12px; top: 12px; z-index: 2; }
+
+  /* 🔴 ROWS, FULL SCREEN ON A SCREEN TALLER THAN IT IS WIDE. Decided as *"full
+     screen in portrait turns into rows: build on top, then the words
+     scrolling, then the patchbay"*. The script lays the inside out at a
+     logical 660 wide and as tall as the screen at that scale, and sets
+     `data-mode`. Same parts, one column; the words take what is left and
+     scroll, which is what `slide.css`'s upright split cannot do (its words sit
+     in an `auto` row inside `overflow: hidden` and are clipped). The type of
+     the words grows a step, because the logical width is smaller than the
+     frame's but a phone is read closer than a projector is not. */
+  .tf-in[data-mode="rows"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "build" "words" "bay";
+  }
+  /* the build starts under the ⛶ (12 px in, 34 px tall, the row gap under
+     it), a real size read back into the scaled box through `--fit-k` */
+  .tf-in[data-mode="rows"] .tf-build { padding: calc((12px + 34px + 8px) / var(--fit-k, 1)) 16px 20px; }
+  .tf-in[data-mode="rows"] .tf-mods { flex-wrap: wrap; row-gap: 14px; }
+  .tf-in[data-mode="rows"] .tf-words { padding: 22px 20px 32px; }
+  .tf-in[data-mode="rows"] .tf-bay { padding: 14px 16px 18px; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createGlueRows } from '/shell/glue.mjs';
-  import { createLinkButton } from '/shell/link-button.mjs';
-  import { createSlide } from '/shell/slide.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { toggle as fsToggle, exit as fsExit, isFull, watch as fsWatch } from '/shell/fullscreen.mjs';
+  import { centreSymbol } from '/shell/symbol.mjs';
+  import { createSynth, KNOBS } from './modules.mjs';
 
-  // Layouts for a future tutorial: the words, the thing being built and the
-  // patchbay, arranged four ways. No sound and nothing opened on a visit: a key
-  // sends a note along the bay, which lights the cables, and that is all.
+  // One tutorial slide in three steps. A step changes the words, which boxes
+  // the build area shows and the patch the bay holds; the footer band draws
+  // that patch, and a key lights the cables it travels.
+  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key press.
   const d = mount({ name: 'concept 50', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav(50);
 
-  // ── the words, one spec, drawn as a slide (C) or as a column (A, B, D) ───
-  const WORDS = {
-    say: 'A filter takes the bright edge off a saw',
-    text: [
-      'The oscillator makes a sawtooth wave, which carries many overtones above the note you play. That is why it sounds bright and buzzy.',
-      'The low-pass filter lets everything below its cutoff through and turns down what is above it. Lower the cutoff and fewer overtones reach the speaker, so the sound gets darker.',
-      'Q raises the level right at the cutoff. Turn it up and a ring appears that moves with the cutoff knob.',
-    ],
-    list: ['Hold a key and watch the cables light', 'Turn cutoff down on the filter', 'Turn Q up and sweep cutoff again'],
+  const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
+  const { bay } = synth;
+  const ID = synth.id;
+
+  // ── the steps: the words, the boxes and the patch ─────────────────────────
+  const STEPS = [
+    {
+      name: 'oscillator', boxes: ['osc'],
+      say: 'An oscillator makes the sound',
+      text: [
+        'A key sends a note to the oscillator, and the oscillator plays it as a wave at that pitch.',
+        'The wave knob picks the shape of that wave. A sine is smooth and quiet. A saw is bright and buzzy, because it carries many overtones above the note.',
+        'The oscillator goes straight to the speakers here, so what you hear is the raw wave.',
+      ],
+      list: ['Hold a key and watch the cables light', 'Turn wave from sine to saw', 'Turn detune to bend the note a little'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:speaker:audio-in'],
+    },
+    {
+      name: 'filter', boxes: ['osc', 'filter'],
+      say: 'A filter takes the bright edge off a saw',
+      text: [
+        'The filter now sits between the oscillator and the speakers.',
+        'A low-pass filter lets everything below its cutoff through and turns down what is above it. Lower the cutoff and fewer overtones reach the speakers, so the sound gets darker.',
+        'Q raises the level right at the cutoff. Turn it up and a ring appears that moves with the cutoff knob.',
+      ],
+      list: ['Hold a key and turn cutoff down', 'Turn Q up and sweep cutoff again', 'Try the filter on a square wave'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:filter:audio-in',
+        'web:filter:audio-out -> web:speaker:audio-in'],
+    },
+    {
+      name: 'scope', boxes: ['osc', 'filter', 'scope'],
+      say: 'A scope draws what reaches the speakers',
+      text: [
+        'The scope sits between the filter and the speakers and passes the sound on unchanged.',
+        'It draws one cycle of the wave at a time. A saw with the cutoff open has a sharp corner on every cycle. Close the cutoff and the corner rounds off.',
+        'That rounding is the overtones going. Raise Q and a ripple appears after each corner, which is the ring you hear.',
+      ],
+      list: ['Hold a key and turn cutoff down slowly', 'Turn Q up and watch the ripple', 'Switch wave to square and do it again'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:filter:audio-in',
+        'web:filter:audio-out -> web:scope:audio-in', 'web:scope:audio-out -> web:speaker:audio-in'],
+    },
+  ];
+
+  // ── the words ───────────────────────────────────────────────────────────
+  const words = el('div', 'tf-words');
+  function setWords(s) {
+    words.replaceChildren(el('h2', 'tf-say', s.say), ...s.text.map((t) => el('p', 'tf-p', t)));
+    const ul = el('ul', 'tf-list');
+    for (const t of s.list) ul.append(el('li', null, t));
+    words.append(ul);
+    words.scrollTop = 0;
+    fade();
+  }
+  // the fade is on while there is more below and off at the end
+  function fade() {
+    const more = words.scrollHeight - words.clientHeight - words.scrollTop > 2;
+    if (more) words.dataset.more = ''; else delete words.dataset.more;
+  }
+  words.addEventListener('scroll', fade, { passive: true });
+
+  // ── the build area: three module boxes and the keyboard ──────────────────
+  const knobs = new Map();
+  for (const k of KNOBS) {
+    knobs.set(k.name, createKnob({
+      label: k.name === 'q' ? 'Q' : k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format,
+      onInput: (r) => synth.setParam(k.owner, k.name, k.value(r)),
+    }));
+  }
+  const module = (key, name, body) => {
+    const m = el('div', 'tf-mod');
+    m.dataset.mod = key;
+    m.append(el('span', 'tf-mod-name', name), body);
+    return m;
   };
-  const words = el('div', 'tl-words');
-  words.append(el('h2', 'tl-say', WORDS.say));
-  for (const t of WORDS.text) words.append(el('p', 'tl-p', t));
-  const ul = el('ul', 'tl-list');
-  for (const t of WORDS.list) ul.append(el('li', null, t));
-  words.append(ul);
+  const oscGrid = createKnobGrid([{ name: 'wave', knob: knobs.get('wave') }, { name: 'detune', knob: knobs.get('detune') }], { cols: 2 });
+  const filGrid = createKnobGrid([{ name: 'cutoff', knob: knobs.get('cutoff') }, { name: 'q', knob: knobs.get('q') }], { cols: 2 });
+  const scopeHost = el('div', 'tf-scope');
+  const wave = createWaveShape({ host: scopeHost, reason: null, colour: '--hi', name: '' });
+  const MODS = {
+    osc: module('osc', 'oscillator', oscGrid.el),
+    filter: module('filter', 'lowpass filter', filGrid.el),
+    scope: module('scope', 'waveform', scopeHost),
+  };
+  const mods = el('div', 'tf-mods');
+  mods.append(MODS.osc, MODS.filter, MODS.scope);
 
-  // ── the bay: keys to osc to filter to speaker ────────────────────────────
-  const bay = createBay();
-  const ID = (n, p) => `web:${n}:${p}`;
-  for (const [n, label] of [['keys', 'keyboard'], ['osc', 'oscillator'], ['filter', 'lowpass filter'], ['speaker', 'speakers']]) {
-    bay.addNode({ id: `web:${n}`, kind: n === 'keys' ? 'person' : 'engine', label, place: 'browser' });
-  }
-  for (const p of [
-    { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: ID('osc', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: () => {} },
-    { id: ID('osc', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('filter', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('filter', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
-  ]) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
-  for (const [a, b] of [[ID('keys', 'midi-out'), ID('osc', 'midi-in')], [ID('osc', 'audio-out'), ID('filter', 'audio-in')],
-    [ID('filter', 'audio-out'), ID('speaker', 'audio-in')]]) {
-    const r = bay.link(a, b);
-    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
-  }
-  const held = new Set();
-  const pb = createPatchbay(bay, { flowing: () => held.size > 0 });
-  const bayBox = el('div', 'tl-bay');
-  bayBox.append(pb.el);
-
-  // ── the build area: an oscillator box, a filter box, a keyboard ──────────
-  function module(name, knobs) {
-    const box = createGlueRows();
-    box.row(el('span', 'tl-mod-name', name));
-    const row = el('div', 'tl-knobs');
-    for (const k of knobs) row.append(createKnob(k).el);
-    box.row(row);
-    return box.el;
-  }
-  const WAVES = ['sine', 'tri', 'saw', 'square'];
-  const mods = el('div', 'tl-mods');
-  mods.append(
-    module('oscillator', [
-      { label: 'freq', min: 0, max: 127, value: 64 },
-      { label: 'wave', min: 0, max: 3, step: 1, value: 2, format: (r) => WAVES[Math.round(r)] },
-    ]),
-    module('filter', [
-      { label: 'cutoff', min: 0, max: 127, value: 80 },
-      { label: 'Q', min: 0.7, max: 15, value: 5, format: (r) => r.toFixed(1) },
-    ]),
-  );
-  const keysHost = el('div');
+  let ctx = null;
+  const wake = () => {
+    if (!ctx) { ctx = new AudioContext(); synth.start(ctx); requestAnimationFrame(frame); }
+    ctx.resume();
+  };
+  const keysHost = el('div', 'tf-keys');
+  // C3 to F4, 11 white keys: the widest range that fits the build area's
+  // logical 627 px with the keyboard's own padding, keys at the kit's 49 px floor
   createKeyboard(keysHost, {
-    ...keyRange(21), base: 48,
+    ...keyRange(17), base: 48,
     onDown: (note, how) => {
       if (how === 'midi') return;
-      held.add(note);
+      wake();
       bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
     },
     onUp: (note, how) => {
       if (how === 'midi') return;
-      held.delete(note);
       bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 });
     },
   });
-  const build = el('div', 'tl-build');
+  const build = el('div', 'tf-build');
   build.append(mods, keysHost);
 
-  // ── C's slide: the same words, the build area moved into its slot ────────
-  const slotHost = el('div', 'tl-slot');
-  const slide = createSlide({ name: 'tutorial step', layout: 'split', cols: '1:2', side: 'right',
-    say: WORDS.say, sayStep: 3, text: WORDS.text[0], textStep: 2, slot: slotHost });
-  const slideBox = el('div', 'tl-slide');
-  slideBox.append(slide.frame);
-
-  // ── the layout and the switches ──────────────────────────────────────────
-  const LAYOUTS = [['A footer', 'a'], ['B sidebar', 'b'], ['C slide', 'c'], ['D dock', 'd']];
-  const root = el('div', 'tl');
-  root.append(words, build, slideBox, bayBox);
-  const phone = matchMedia('(max-width: 560px)');
-  const S = { layout: 'a', words: true, bay: true };
-  const fromHash = location.hash.slice(1);
-  if (LAYOUTS.some(([, v]) => v === fromHash)) S.layout = fromHash;
-
-  function apply() {
-    // The slide holds the build only on a desk with the words showing; a 16:9
-    // slide on a phone puts the keyboard at a fifth of its size.
-    const useSlide = S.layout === 'c' && S.words && !phone.matches;
-    root.dataset.layout = S.layout;
-    root.dataset.words = S.words ? 'on' : 'off';
-    root.dataset.bay = S.bay ? 'on' : 'off';
-    root.dataset.slide = useSlide ? 'on' : 'off';
-    if (useSlide) { if (build.parentNode !== slotHost) slotHost.append(build); }
-    else if (build.parentNode !== root) root.insertBefore(build, slideBox);
-    slideBox.hidden = !useSlide;
-    words.hidden = !S.words || useSlide;
-    bayBox.hidden = !S.bay;
-    wordsBtn.label(S.words ? 'Hide words' : 'Show words'); wordsBtn.expanded(S.words);
-    bayBtn.label(S.bay ? 'Hide patchbay' : 'Show patchbay'); bayBtn.expanded(S.bay);
-    history.replaceState(null, '', `#${S.layout}`);
-    requestAnimationFrame(() => pb.refresh());
+  const WINDOW = 512, FULL = 0.5;
+  function frame() {
+    const buf = synth.read();
+    if (buf) {
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      wave.set({ points: Array.from(buf.subarray(i0, i0 + WINDOW), (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
   }
 
-  const choice = createChoice({ label: 'layout', at: LAYOUTS.findIndex(([, v]) => v === S.layout),
-    options: LAYOUTS, onPick: (v) => { S.layout = v; apply(); } });
-  const wordsBtn = createLinkButton({ label: 'Hide words', expanded: true, onPress: () => { S.words = !S.words; apply(); } });
-  const bayBtn = createLinkButton({ label: 'Hide patchbay', expanded: true, onPress: () => { S.bay = !S.bay; apply(); } });
-  const bar = el('div', 'tl-bar');
-  bar.append(choice.el, wordsBtn.el, bayBtn.el);
-  phone.addEventListener('change', apply);
+  // ── the patchbay band: the picture only, one row ─────────────────────────
+  // The band draws only the boxes the step's links use, so it is one row at
+  // every step: a box nothing is patched to would be drawn as a second row.
+  const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
+  const view = {
+    nodes: () => bay.nodes().filter((n) => inPatch(n.id.split(':')[1])),
+    ports: () => bay.ports().filter((p) => inPatch(p.id.split(':')[1])),
+    links: () => bay.links(),
+  };
+  // Compact boxes, the title and the ports: the node's label beside its title
+  // made five boxes wider than the band and the last one scrolled out of it.
+  const pb = createPatchbay(view, { flowing: () => synth.sounding(), detail: () => [] });
+  const bayBand = el('div', 'tf-bay');
+  bayBand.append(el('h3', 'tf-bay-h', 'patchbay'), pb.view.el);
 
-  d.el.append(bar, root);
-  apply();
+  // ── the frame ───────────────────────────────────────────────────────────
+  const inner = el('div', 'tf-in');
+  inner.append(words, build, bayBand);
+  const tf = el('div', 'tf');
+  tf.append(inner);
+  const fullBtn = el('button', 'ico tf-full', '⛶', { type: 'button', title: 'fill the screen', 'aria-label': 'fill the screen' });
+  centreSymbol(fullBtn);
 
-  // What a shot needs to read back: each region's box, whether the keyboard
-  // fits its column, whether the bay drew one row or stacked, and whether the
-  // whole tutorial fits one screen.
+  /**
+   * The scale. A frame is laid out at 1024 by 576 and letterboxed; a full
+   * screen taller than it is wide is laid out in rows at 660 wide and as tall
+   * as the screen at that scale. `fitBox`'s arithmetic and custom properties,
+   * with a second shape, which `fitBox` cannot change once it is made.
+   */
+  const top = el('div', 'tf-top');
+  const FRAME = { w: 1024, h: 576 }, ROWS_W = 660;
+  let mode = 'frame', k = 0;
+  function fit() {
+    const ow = tf.clientWidth, oh = tf.clientHeight;
+    if (!ow || !oh) return;
+    const rows = isFull(tf) && oh > ow;
+    let w, h, x, y;
+    if (rows) { k = ow / ROWS_W; w = ROWS_W; h = oh / k; x = 0; y = 0; }
+    else { k = Math.min(ow / FRAME.w, oh / FRAME.h); w = FRAME.w; h = FRAME.h; x = (ow - w * k) / 2; y = (oh - h * k) / 2; }
+    const next = rows ? 'rows' : 'frame';
+    if (next !== mode) { mode = next; inner.dataset.mode = mode; }
+    for (const [p, v] of [['--fit-w', `${w}px`], ['--fit-h', `${h}px`], ['--fit-k', String(k)], ['--fit-x', `${x}px`], ['--fit-y', `${y}px`]]) {
+      inner.style.setProperty(p, v);
+    }
+    requestAnimationFrame(() => { pb.refresh(); fade(); });
+  }
+  inner.dataset.mode = mode;
+  new ResizeObserver(fit).observe(tf);
+
+  let watched = false;
+  async function full(want) {
+    if (want === isFull(tf)) return want;
+    if (!watched) { fsWatch(tf, () => place()); watched = true; }
+    if (want) await fsToggle(tf); else await fsExit(tf);
+    place();
+    return isFull(tf);
+  }
+  // the ⛶ lives in the step row in the page and in the frame when full
+  function place() {
+    const f = isFull(tf);
+    if (f && fullBtn.parentNode !== tf) tf.append(fullBtn);
+    if (!f && fullBtn.parentNode !== top) top.append(fullBtn);
+    fullBtn.title = f ? 'leave full screen' : 'fill the screen';
+    fullBtn.setAttribute('aria-label', fullBtn.title);
+    fit();
+  }
+  fullBtn.addEventListener('click', () => full(!isFull(tf)));
+
+  // ── the steps ───────────────────────────────────────────────────────────
+  let at = 0;
+  function show(i) {
+    at = i;
+    const s = STEPS[i];
+    setWords(s);
+    for (const [key, m] of Object.entries(MODS)) {
+      const on = s.boxes.includes(key);
+      if (on) delete m.dataset.off; else m.dataset.off = '';
+      for (const g of [oscGrid, filGrid]) for (const n of g.names) if (KNOBS.find((x) => x.name === n).owner === key) g.show(n, on);
+    }
+    const bad = synth.load(s.patch.join('\n'));
+    for (const b of bad) d.log(`${b.line} refused: ${b.why}`, 'warn');
+    pb.refresh();
+  }
+  const picker = createChoice({ label: 'step', at: 0,
+    options: STEPS.map((s, i) => [`${i + 1} ${s.name}`, i]),
+    onPick: (i) => show(i) });
+  top.append(picker.el, fullBtn);
+
+  d.el.append(top, tf);
+  show(0);
+
+  // What a shot reads back: the scale, the mode, every region's box in screen
+  // px, the knob boxes (equal and not overlapping), and whether the words and
+  // the bay fit.
   function measure() {
-    const r = (e) => { if (!e || e.hidden || !e.isConnected) return null; const b = e.getBoundingClientRect();
-      return b.width ? { x: Math.round(b.left), y: Math.round(b.top + scrollY), w: Math.round(b.width), h: Math.round(b.height) } : null; };
-    const kbd = keysHost.querySelector('.kbd') || keysHost.firstElementChild;
-    const xs = new Set([...pb.view.el.querySelectorAll('.lv-box rect')].map((x) => x.getAttribute('x')));
-    const lv = pb.view.el;
+    const r = (e) => { const b = e.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) }; };
+    const cells = [...build.querySelectorAll('.pos-kgrid-cell')].map((c) => c.getBoundingClientRect());
+    const sizes = new Set(cells.map((c) => `${c.width.toFixed(1)}x${c.height.toFixed(1)}`));
+    let overlap = 0;
+    for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) {
+      const a = cells[i], b = cells[j];
+      if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) overlap++;
+    }
+    const knobsCut = [...build.querySelectorAll('.pos-kgrid-cell')].filter((c) => c.scrollWidth > c.clientWidth + 1 || c.scrollHeight > c.clientHeight + 1).length;
+    const xs = new Set([...pb.view.el.querySelectorAll('.lv-box')].map((g) => Math.round(g.getBoundingClientRect().top)));
+    const kbd = keysHost.querySelector('.keys');
     return {
-      layout: S.layout, vw: innerWidth, vh: innerHeight,
-      words: r(words), build: r(build), slide: r(slideBox.hidden ? null : slideBox), bay: r(bayBox),
-      keys: r(kbd), keysOverflow: kbd ? Math.max(0, Math.round(kbd.scrollWidth - kbd.clientWidth)) : null,
-      bayRow: xs.size > 1 ? 'one row' : 'stacked', bayScroll: Math.max(0, lv.scrollWidth - lv.clientWidth),
-      wordsScroll: Math.max(0, words.scrollHeight - words.clientHeight),
-      pageBottom: Math.round(root.getBoundingClientRect().bottom + scrollY),
+      step: at, mode, k: +k.toFixed(3), full: isFull(tf), vw: innerWidth, vh: innerHeight,
+      frame: r(tf), words: r(words), build: r(build), bay: r(bayBand),
+      wordsMore: Math.max(0, words.scrollHeight - words.clientHeight), fade: 'more' in words.dataset,
+      knobBoxes: cells.length, knobSizes: [...sizes], knobOverlap: overlap, knobsCut,
+      keysOverflow: kbd ? Math.max(0, kbd.scrollWidth - kbd.clientWidth) : null,
+      bayRows: xs.size, bayScroll: Math.max(0, pb.view.el.scrollWidth - pb.view.el.clientWidth),
     };
   }
-  window.__demo.tl = {
-    set(layout, o = {}) { if (layout) { S.layout = layout; choice.set?.(LAYOUTS.findIndex(([, v]) => v === layout)); }
-      if ('words' in o) S.words = o.words; if ('bay' in o) S.bay = o.bay; apply(); },
-    measure,
-  };
+  window.__demo.tf = { show: (i) => picker.set(i), full, measure };
+  window.__demo.synth = synth;
   d.ready();
 </script>
