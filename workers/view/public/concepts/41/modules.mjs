@@ -55,8 +55,8 @@ const NAMES = {
 /** The one patch. Keys to osc and amp, osc to filter to amp to speaker and
  *  scope, the pad to the filter, and a cable per knob. */
 export const PATCH = [
-  'web:keys:midi-out -> web:osc:midi-in',
-  'web:keys:midi-out -> web:amp:midi-in',
+  'web:tone:midi-out -> web:osc:midi-in',
+  'web:tone:midi-out -> web:amp:midi-in',
   'web:osc:audio-out -> web:filter:audio-in',
   'web:filter:audio-out -> web:amp:audio-in',
   'web:amp:audio-out -> web:speaker:audio-in',
@@ -141,7 +141,7 @@ export function createSynth({ log = () => {} } = {}) {
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const NODES = [
-    ['keys', 'person', 'keyboard'],
+    ['tone', 'person', 'test tone'],
     ['xy', 'person', 'xy pad'],
     ...KNOBS.map((k) => [`knob-${k.name}`, 'person', 'knob']),
     ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
@@ -152,7 +152,7 @@ export function createSynth({ log = () => {} } = {}) {
   const param = (mod) => ({ id: id(mod, 'value-in'), dir: 'in', medium: 'value',
     shape: { of: 'param', names: NAMES[mod] }, deliver: deliverParam(mod) });
   const PORTS = [
-    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: id('tone', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
     // No `names` on a knob or the pad: the bay's shape check wants names to be
     // equal, and a knob names one of a module's several. The module ignores and
     // logs a name it does not have.
