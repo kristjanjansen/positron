@@ -36,7 +36,6 @@
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
-  import { createChoice } from '/shell/choice.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -69,8 +68,7 @@
   // fader set each element's `volume` instead, and the log says so.
   //
   // THE MIXER. Each frame both videos are drawn into one offscreen canvas:
-  // ETV at full strength, then ETV2 over it at the fader's alpha, with the
-  // blend choice as the canvas's `globalCompositeOperation`. ETV stays at 1
+  // ETV at full strength, then ETV2 over it at the fader's alpha. ETV stays at 1
   // under it on purpose: fading both (ETV at 1 - x) would let the ground
   // through and the middle would go dark. Unlike the old layered screen, this
   // IS a mixed picture that something else can take, so the mixer has a
@@ -191,8 +189,7 @@
   const mix = document.createElement('canvas');
   mix.width = FRAME_W; mix.height = FRAME_H;
   const mctx = mix.getContext('2d', { alpha: false });
-  const OPS = { mix: 'source-over', screen: 'screen', difference: 'difference' };
-  let blendOp = 'source-over', mixHas = false, lastMix = 0;
+  let mixHas = false, lastMix = 0;
   // Contained, as drawCamera does: a channel that is not 16:9 keeps its shape.
   function drawContained(v) {
     const va = v.videoWidth / v.videoHeight, ca = FRAME_W / FRAME_H;
@@ -208,9 +205,8 @@
     let n = 0;
     // ETV first, at full strength, as the base layer.
     if (ready(tv[0])) { drawContained(tv[0].video); n++; }
-    // ETV2 over it at the fader's alpha, in the chosen blend.
+    // ETV2 over it at the fader's alpha, as a plain mix.
     if (ready(tv[1]) && x > 0) {
-      mctx.globalCompositeOperation = blendOp;
       mctx.globalAlpha = x;
       drawContained(tv[1].video);
       n++;
@@ -534,12 +530,6 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  // The blend is how the mixer lays ETV2 over ETV (asked 2026-10-10, *"some
-  // diff filter to make video more interesting?"*): `difference` cuts each
-  // into the other where they differ.
-  const blend = createChoice({ label: 'blend', at: 0,
-    options: [['mix', 'mix'], ['screen', 'screen'], ['difference', 'difference']],
-    onPick: (v) => { blendOp = OPS[v] || 'source-over'; if (!playing) render(); } });
 
   // ── the knob: its own node, `web:knob-size`, a turn is one event ─────────
   const knobs = new Map(KNOBS.map((k) => [k.name, createKnob({
@@ -549,16 +539,16 @@
   const grid = createKnobGrid(knobs, { row: true });
 
   applyFade();
-  // Linear, as every concept instrument: the picture, its fader and blend,
+  // Linear, as every concept instrument: the picture, its fader,
   // then the knobs area, then the patchbay.
-  d.stack.add(top, panel.el, fade, blend.el, grid.el, pb.el);
+  d.stack.add(top, panel.el, fade, grid.el, pb.el);
   const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
   d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
   window.__demo.knobs = grid;
   window.__demo.tv = {
     fader, mode: () => mode, playing: () => playing,
     footer: () => ({ left: who.textContent, right: `${size.textContent} ${dsize.textContent}`.trim() }),
-    dither: () => ({ gl: !!gl, compiled: !!prog, size: P.size, tainted, mixing: mixHas, op: blendOp }),
+    dither: () => ({ gl: !!gl, compiled: !!prog, size: P.size, tainted, mixing: mixHas }),
     channels: () => tv.map((ch) => ({ id: ch.c.id, frames: ch.frames,
       size: ch.video.videoWidth ? `${ch.video.videoWidth}x${ch.video.videoHeight}` : '',
       sound: fresh(ch.lastSound), refused: ch.refused, muted: ch.video.muted })),
