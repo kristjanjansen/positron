@@ -6066,6 +6066,14 @@ button.pos-linkbtn:active { background: none; }
   grid-template-columns: repeat(auto-fill, min(100%, var(--kgrid-cell)));
   grid-auto-rows: 1fr;
 }
+/* A knob row: the same boxes in one row that scrolls sideways rather than
+   wrapping, so the knobs area of an instrument is one line however many it
+   holds. `min-width: 0` above lets it scroll inside its column instead of
+   dragging the page. */
+.pos-kgrid[data-row] {
+  grid-template-columns: none; grid-auto-flow: column;
+  grid-auto-columns: var(--kgrid-cell); overflow-x: auto; overscroll-behavior-x: contain;
+}
 .pos-kgrid[data-cols] {
   width: min(100%, calc(var(--kgrid-cols) * var(--kgrid-cell)
                          + (var(--kgrid-cols) - 1) * var(--ctl-gap)));

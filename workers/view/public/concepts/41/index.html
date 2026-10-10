@@ -14,9 +14,6 @@
   /* The pad and the knob group side by side on a desk. The row wraps when the
      pad's own basis and the knob grid do not both fit, so a phone stacks them with
      no media query: the decision is the row's width, not the window's. */
-  .cc-play { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
-  .cc-pad { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-  .cc-play > .pos-kgrid { flex: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -73,8 +70,11 @@
   function labels(c, { W, H, colors }) {
     c.save();
     c.fillStyle = colors.dim;
-    c.font = `22px ${MONO}`;
-    const I = 16;
+    // The pad draws in its own pixels and is shown at whatever width it has,
+    // so the type is sized from that width: 13 px on screen, the knob values' size.
+    const k = W / (c.canvas.clientWidth || W);
+    c.font = `${13 * k}px ${MONO}`;
+    const I = 10 * k;
     c.textBaseline = 'bottom';
     c.textAlign = 'left'; c.fillText('60 Hz', I, H - I);
     c.textAlign = 'center'; c.fillText('cutoff', W / 2, H - I);
@@ -83,8 +83,6 @@
     c.textAlign = 'left'; c.fillText('resonance', I, I);
     c.restore();
   }
-  const padBox = el('div', 'cc-pad');
-  padBox.append(pad.el);
 
   // ── the knobs: one node each, `web:knob-<name>`, a turn is one event ─────
   const knobs = new Map(KNOBS.map((k) => [k.name, createKnob({
@@ -92,7 +90,7 @@
     onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
   })]));
   // Three boxes across at most, so beside the pad they are one row.
-  const grid = createKnobGrid(knobs, { cols: 3 });
+  const grid = createKnobGrid(knobs, { row: true });
 
   // The play button is the test tone: a held note out of web:tone, into the
   // osc for its pitch and the amp for its gate (asked 2026-10-10, *"where is
@@ -134,10 +132,9 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  const play = el('div', 'cc-play');
-  play.append(padBox, grid.el);
   const out = el('div', 'cc-stack');
-  out.append(top, wave.el, play, pb.el);
+  // Linear, as every concept synth: scope, pad, the knob row, then the patchbay.
+  out.append(top, wave.el, pad.el, grid.el, pb.el);
   d.el.append(out);
 
   // The one patch.

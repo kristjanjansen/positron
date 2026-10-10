@@ -41,7 +41,7 @@ function nameOf(item, i) {
  * @param {string} [o.cls]   an extra class for a page's own rules
  * @returns {{el, cells, knobs, names, show, on, cellOf}}
  */
-export function createKnobGrid(knobs = [], { cols, cls = '' } = {}) {
+export function createKnobGrid(knobs = [], { cols, row = false, cls = '' } = {}) {
   const list = knobs instanceof Map
     ? [...knobs].map(([name, knob]) => ({ name, knob }))
     : [...knobs].map((k, i) => (k && k.knob ? { name: nameOf(k, i), knob: k.knob } : { name: nameOf(k, i), knob: k }));
@@ -59,6 +59,13 @@ export function createKnobGrid(knobs = [], { cols, cls = '' } = {}) {
 
   const root = document.createElement('div');
   root.className = cls ? `pos-kgrid ${cls}` : 'pos-kgrid';
+  // `row`: one row that scrolls sideways and never wraps, the knobs area of a
+  // concept synth (asked 2026-10-10, *"knobs ... independent in the knobs
+  // area, horiz scrollable"*). It takes no `cols`.
+  if (row) {
+    if (cols) throw new Error('a knob row is one row; cols is for a wrapping grid');
+    root.dataset.row = '';
+  }
   if (cols) {
     root.dataset.cols = String(cols);
     root.style.setProperty('--kgrid-cols', String(cols));
