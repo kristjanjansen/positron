@@ -26,7 +26,9 @@
   .cc-fade { display: flex; align-items: center; gap: 14px; width: min(100%, 520px); margin-inline: auto; }
   .cc-fade .cc-end { font: 400 12px/1 var(--mono); color: var(--dim); white-space: nowrap; }
   /* The kit stretches a button group across a phone; this one is one glyph square beside the fader. */
-  .cc-fade > .pos-bgroup { flex: none; width: auto; }
+  .cc-fade > .pos-bgroup, .cc-fade > .pos-toggle { flex: none; width: auto; }
+  /* A row with no button in front of it starts its words where the fader row's ERR does. */
+  .cc-fade .cc-end:first-child { min-width: 48px; text-align: right; }
   .cc-fade > .sld { flex: 1 1 auto; min-width: 0; }
   .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
   .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
@@ -40,6 +42,7 @@
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createToggle } from '/shell/toggle.mjs';
   import { setSymbol } from '/shell/symbol.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
 
@@ -110,10 +113,15 @@
   conceptNav(31);
 
   // ── the sound: two streams, two gains, one AudioContext ──────────────────
-  let ctx = null, sum = null, pull = null;
+  let ctx = null, sum = null, pull = null, dryG = null, wetG = null;
   // The granulator's state, up here because the patchbay asks `flowing` as soon as it is built.
   const RING_S = 3;
-  let gran = null, grains = 0, density = 15, timer = 0, head = 0.5;
+  const DENSITY = 28;              // grains a second; at 80 to 400 ms that is about seven at once
+  const SPRAY = 0.06;              // how far either side of `where` a grain may read, as a share of the ring
+  const REVERSED = 0.25;           // the share of grains played backwards
+  const SEMIS = [7, 12, -12];      // the other pitches a grain can take; 0 is the rest
+  let gran = null, grains = 0, timer = 0;
+  let where = 0.6, spread = 0.35, mix = 0.8, frozen = false;   // 0 oldest, 1 newest; 0 plain, 1 every grain moved; 0 dry, 1 grains
   const legs = new Map();          // key -> { stream, gain, tap, buf, live }
   let x = 0.5;                     // 0 is all ERR, 1 is all Ida
   const gains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];   // equal power
@@ -178,9 +186,9 @@
   // then `bornAt`. The grain's READ position is a place in the granulator's
   // input buffer, which is not this wave, so it travels in the event and is not
   // drawn here (grain-scope's own header on why the two axes must not be mixed).
-  // `fadeMs` is most of the window, so a tick scrolls left with its own sound and fades as it goes.
+  // A tick fades in 1.2 s: at 28 grains a second a longer fade drew a wall of ticks over the wave.
   const ghost = el('div', 'cc-wave');
-  const gscope = createGrainScope(ghost, { seconds: 4, height: 150, fullScale: 1, grainSeconds: 4, fadeMs: 3500 });
+  const gscope = createGrainScope(ghost, { seconds: 4, height: 150, fullScale: 1, grainSeconds: 4, fadeMs: 1200 });
   const gpanel = createVideoPanel({ media: ghost, aspect: 'auto', left: el('span', 'cc-say', 'granulator'),
     centre: el('span', 'cc-say', 'output and grains') });
 
@@ -199,12 +207,19 @@
       if (holds(relayOut(st), FADER_IN)) g.tap.connect(g.gain);
       g.wave = holds(relayOut(st), waveIn(st));
     }
+    // The dry / grains mix sits where each link meets the speakers, so the
+    // granulator records the dry sound and its wave shows the grains whatever
+    // the mix is.
     try { sum.disconnect(); } catch { /* not connected */ }
-    if (holds(FADER_OUT, SPEAKER_IN)) sum.connect(ctx.destination);
+    sum.connect(dryG);
+    try { dryG.disconnect(); } catch { /* not connected */ }
+    if (holds(FADER_OUT, SPEAKER_IN)) dryG.connect(ctx.destination);
     if (holds(FADER_OUT, GRAN_IN)) sum.connect(gran.rec);
     try { gran.out.disconnect(); } catch { /* not connected */ }
     gran.out.connect(gran.tap);
-    if (holds(GRAN_OUT, SPEAKER_IN)) gran.out.connect(ctx.destination);
+    gran.out.connect(wetG);
+    try { wetG.disconnect(); } catch { /* not connected */ }
+    if (holds(GRAN_OUT, SPEAKER_IN)) wetG.connect(ctx.destination);
     gran.wave = holds(GRAN_OUT, GWAVE_IN);
   }
 
@@ -222,52 +237,71 @@
     requestAnimationFrame(frame);
   }
 
-  // ── the granulator: a ring of the last few seconds, and short windowed grains
-  // read out of it. A ScriptProcessor rather than an AudioWorklet because it is
-  // one node with no module to load and runs the same in Chrome and Safari; the
-  // looper (demo/shell/looper.mjs) keeps its ring the same way.
+  // ── the granulator: a ring of the last few seconds, and a cloud of long,
+  // overlapping grains read out of it. A ScriptProcessor rather than an
+  // AudioWorklet because it is one node with no module to load and runs the
+  // same in Chrome and Safari; the looper (demo/shell/looper.mjs) keeps its
+  // ring the same way. Freeze stops the writing, so the ring holds one moment
+  // and `where` walks through it.
   function granBuild() {
     const n = Math.round(RING_S * ctx.sampleRate);
     const g = { ring: new Float32Array(n), w: 0, filled: 0, wave: false };
     g.rec = ctx.createScriptProcessor(4096, 1, 1);
     g.rec.onaudioprocess = (e) => {
+      if (frozen) return;
       const x = e.inputBuffer.getChannelData(0);
       for (let i = 0; i < x.length; i++) { g.ring[g.w] = x[i]; g.w = (g.w + 1) % n; }
       g.filled = Math.min(n, g.filled + x.length);
     };
     g.rec.connect(pull);           // a processor nothing pulls never runs
-    g.out = ctx.createGain(); g.out.gain.value = 0.9;
+    g.out = ctx.createGain(); g.out.gain.value = 1;
     g.tap = ctx.createAnalyser(); g.tap.fftSize = 2048;
     g.tap.connect(pull);
     g.buf = new Float32Array(g.tap.fftSize);
     return g;
   }
-  // One grain: 50 to 150 ms, Hann window, read from a point that drifts slowly
-  // through the ring with a little scatter. Its event leaves by the bay.
+  // Equal power between the dry crossfade and the grains.
+  function applyMix() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    dryG.gain.setTargetAtTime(Math.cos(mix * Math.PI / 2), t, 0.03);
+    wetG.gain.setTargetAtTime(Math.sin(mix * Math.PI / 2) * 1.4, t, 0.03);
+  }
+  // One grain: 80 to 400 ms with a Hann window, read around `where` with a
+  // little spray, sometimes backwards, sometimes a fifth or an octave away,
+  // somewhere across the stereo field. Its event leaves by the bay.
   function grain() {
     const g = gran, sr = ctx.sampleRate, n = g.ring.length;
-    const dur = 0.05 + Math.random() * 0.1, len = Math.round(dur * sr);
-    head += (Math.random() - 0.5) * 0.04;
-    head = Math.min(0.95, Math.max(0.1, head));
-    const pos = Math.min(1, Math.max(0, head + (Math.random() - 0.5) * 0.1));   // 0 oldest, 1 newest
-    const ago = (1 - pos) * RING_S + dur;                                       // seconds before the write head
-    if (g.filled < ago * sr || !holds(FADER_OUT, GRAN_IN)) return;
+    if (!holds(FADER_OUT, GRAN_IN)) return;
+    const dur = 0.08 + Math.random() * 0.32;
+    const semis = Math.random() < spread ? SEMIS[Math.floor(Math.random() * SEMIS.length)] : 0;
+    const rate = 2 ** ((semis + (Math.random() - 0.5) * 0.12) / 12);   // and a few cents either way, which is the chorus
+    const len = Math.max(2, Math.round(dur * rate * sr));               // a grain up an octave reads twice the sound
+    const rev = Math.random() < REVERSED;
+    const pos = Math.min(1, Math.max(0, where + (Math.random() * 2 - 1) * SPRAY));   // 0 oldest, 1 newest
+    const ago = (1 - pos) * (RING_S - len / sr) + len / sr;             // seconds before the write head, inside the ring
+    if (g.filled < ago * sr) return;
     const buf = ctx.createBuffer(1, len, sr), d0 = buf.getChannelData(0);
     let at = (g.w - Math.round(ago * sr) + n) % n, peak = 0;
     for (let i = 0; i < len; i++) {
       const v = g.ring[at] * 0.5 * (1 - Math.cos(2 * Math.PI * i / (len - 1)));
-      d0[i] = v; if (Math.abs(v) > peak) peak = Math.abs(v);
+      d0[rev ? len - 1 - i : i] = v; if (Math.abs(v) > peak) peak = Math.abs(v);
       at = (at + 1) % n;
     }
-    const src = ctx.createBufferSource();
-    src.buffer = buf; src.connect(g.out); src.start();
+    const src = ctx.createBufferSource(), amp = ctx.createGain(), pan = ctx.createStereoPanner();
+    src.buffer = buf; src.playbackRate.value = rate;
+    amp.gain.value = 0.42;         // about seven overlap, so each is quieter than the dry sound
+    pan.pan.value = (Math.random() * 2 - 1) * 0.8;
+    src.connect(amp).connect(pan).connect(g.out);
+    src.start();
+    src.onended = () => { try { pan.disconnect(); } catch { /* gone */ } };
     grains++;
-    bay.send(GRAN_EV, { of: 'grain', pos, dur, level: Math.min(1, peak * 3) });
+    bay.send(GRAN_EV, { of: 'grain', pos, dur, semis, rev, pan: pan.pan.value, level: Math.min(1, peak * 3) });
   }
   function granLoop() {
     if (!playing) return;
     grain();
-    timer = setTimeout(granLoop, (1000 / density) * (0.6 + Math.random() * 0.8));
+    timer = setTimeout(granLoop, (1000 / DENSITY) * (0.5 + Math.random()));
   }
 
   // ── play and stop ───────────────────────────────────────────────────────
@@ -281,6 +315,7 @@
       // whether or not that station reaches the fader.
       pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
       gran = granBuild();
+      dryG = ctx.createGain(); wetG = ctx.createGain();
     }
     playing = true;
     for (const st of STATIONS) {
@@ -307,6 +342,7 @@
       }).catch((e) => d.log(`${st.label} did not start: ${e?.message || e}`, 'warn'));
     }
     applyFade();
+    applyMix();
     route();
     pb.refresh();
     face();
@@ -343,14 +379,26 @@
   const fade = el('div', 'cc-fade');
   fade.append(transport.el, el('span', 'cc-end', 'ERR'), fader.el, el('span', 'cc-end', 'Ida'));
 
-  // Density, the one granulator control: grains a second, under its panel.
-  const dens = createSlider({ label: '', aria: 'grains a second', min: 5, max: 25, step: 1, value: density,
-    onInput: (v) => { density = v; } });
-  const drow = el('div', 'cc-fade');
-  drow.append(el('span', 'cc-end', 'sparse'), dens.el, el('span', 'cc-end', 'dense'));
+  // The granulator's controls, under its panel: where it reads with freeze
+  // beside it, how far the pitch spreads, and the dry / grains mix.
+  const freeze = createToggle({ label: 'freeze', title: 'stop writing, play this moment',
+    onChange: (on) => { frozen = on; d.log(on ? 'frozen, the granulator holds these 3 seconds' : 'writing again'); } });
+  const row = (a, slider, b, lead) => {
+    const r = el('div', 'cc-fade');
+    r.append(...(lead ? [lead] : []), el('span', 'cc-end', a), slider.el, el('span', 'cc-end', b));
+    return r;
+  };
+  const whereS = createSlider({ label: '', aria: 'where it reads', min: 0, max: 1, step: 0.01, value: where,
+    onInput: (v) => { where = v; } });
+  const spreadS = createSlider({ label: '', aria: 'pitch spread', min: 0, max: 1, step: 0.01, value: spread,
+    onInput: (v) => { spread = v; } });
+  const mixS = createSlider({ label: '', aria: 'dry or grains', min: 0, max: 1, step: 0.01, value: mix,
+    onInput: (v) => { mix = v; applyMix(); } });
+  const controls = el('div', 'cc-stack');
+  controls.append(row('older', whereS, 'newer', freeze.el), row('plain', spreadS, 'spread'), row('dry', mixS, 'grains'));
 
   const out = el('div', 'cc-stack');
-  out.append(pair, fade, gpanel.el, drow, pb.el);
+  out.append(pair, fade, gpanel.el, controls, pb.el);
   d.el.append(out);
   d.ready();
 </script>
