@@ -1,5 +1,7 @@
 ## Open
 
+- **A knob grid kit component** (2026-10-10). Asked: *"Knobs:each has its own wrapper box, in a grid, already reserve room for it. A kit component. In 40 41"*. Each knob in a box of its own, the boxes in a grid whose slots are reserved, used on concepts 40 and 41.
+- ~~**Concept 41: no keyboard, a labelled pad with a 2x2 grid** (2026-10-10). Asked: *"Rm keyboard from 41. Make xy have labels and 2x2 grid lines, similar to draw (can you reuse?)"*.~~ DONE 2026-10-10.
 - **Icons: open questions** (2026-10-10, from the icons agent). Feather has no keyboard, plug, cable, knob, unlink or broadcast icon (Lucide has them, refused for eccm as rounded); positron keeps Feather's round caps where eccm squares them; at 375 px `fullscreen-exit` breaks after its hyphen. No page uses `icons.mjs` yet.
 - ~~**Concept 40 knobs named `web:knob-<name>`** (2026-10-10). Asked: *"web:knob:…?"*, then *"Yes"* to `web:knob-cutoff:value-out`.~~ DONE 2026-10-10.
 - ~~**Concept 41, a basic synth with an XY pad on the filter** (2026-10-10). Asked: *"Make next demo with basic syth but with xy pad controlling filter"*. `demo/concepts/41/`, from 40's modules, the kit's `xy-pad.mjs` as a bay node cabled to the filter.~~ DONE 2026-10-10.
