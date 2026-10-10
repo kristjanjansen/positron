@@ -33,6 +33,7 @@
   import { createXrProbe, xrCaps, onXrCaps, reasonFor, canEnter, answered, XR_STATES }
     from '/shell/xr-caps.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
+  import { createLinkButton } from '/shell/link-button.mjs';
 
   /**
    * 🔴 kit/input, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
@@ -136,6 +137,34 @@
    * parameter at all. Six rows for seven lines, so it scrolls.
    * ⚠️ `codeSpec` IS DECLARED ABOVE THE BLOCK, for the reason `cnoteSpec` is.
    */
+  /**
+   * THE NEWEST BLOCK ON THIS PAGE, 2026-10-10, AND THE FIRST CALL TO
+   * `section()`. Asked as *"create linkbutton component, but it next to
+   * patchbay comppnent title See details"*. A button that reads as a link,
+   * beside a heading, as `createPatchbay` uses it.
+   */
+  let linkSpec = null;
+  section('LINK BUTTON',
+    'A button that reads as a link, for an action beside a heading, such as opening details.',
+    `const more = createLinkButton({ label: 'See details', expanded: false,
+  onPress: () => { open = !open; more.expanded(open); more.label(open ? 'Hide details' : 'See details') } })
+head.append(title, more.el)`,
+    (box) => {
+      const head = el('div', 'kit-linkrow');
+      head.style.cssText = 'display: flex; align-items: baseline; gap: 12px;';
+      const title = el('h3', '', 'patchbay');
+      title.style.cssText = 'margin: 0; font-size: 14px; color: var(--dim); font-weight: 500;';
+      let open = false;
+      const shown = el('div', '', 'the details');
+      shown.hidden = true;
+      const more = createLinkButton({ label: 'See details', expanded: false, onPress: () => {
+        open = !open; shown.hidden = !open; more.expanded(open); more.label(open ? 'Hide details' : 'See details');
+      } });
+      head.append(title, more.el);
+      box.append(head, shown);
+      linkSpec = { more, shown };
+    });
+
   let codeSpec = null;
   section('CODE BOX',
     'A program box whose text is coloured by language, with each parameter that has a knob in its own hue.',
@@ -1107,6 +1136,18 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
   if (SELFCHECK) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   checkPage();
+  {
+    const b = linkSpec?.more.el, cs = b && getComputedStyle(b);
+    const flat = !!cs && cs.borderTopStyle === 'none' && cs.backgroundColor === 'rgba(0, 0, 0, 0)'
+      && cs.textTransform === 'none' && /underline/.test(cs.textDecorationLine) && b.getBoundingClientRect().height < 26;
+    b?.click();
+    const opened = !!linkSpec && !linkSpec.shown.hidden && b.getAttribute('aria-expanded') === 'true' && b.textContent === 'Hide details';
+    b?.click();
+    const shut = !!linkSpec && linkSpec.shown.hidden && b.getAttribute('aria-expanded') === 'false' && b.textContent === 'See details';
+    d.assert('LINK BUTTON is a button with no face, underlined, that opens and shuts what it names',
+      b?.tagName === 'BUTTON' && flat && opened && shut,
+      cs ? `border ${cs.borderTopStyle}, background ${cs.backgroundColor}, ${cs.textTransform}, ${cs.textDecorationLine}, ${Math.round(b.getBoundingClientRect().height)} px, opened ${opened}, shut ${shut}` : 'not built');
+  }
 
 
   /* ── the code box, the newest block ────────────────────────────────────────
