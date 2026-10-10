@@ -18,6 +18,10 @@
      the positioned box. ETV2's opacity is the crossfade. */
   .cc-tv .pos-vp-stage > video { position: absolute; inset: 0; }
   .cc-tv .pos-vp-stage > video + video { transition: opacity 120ms linear; }
+  /* How ETV2 lays over ETV (asked 2026-10-10, *"some diff filter to make video
+     more interesting?"*): `difference` cuts each into the other where they differ. */
+  .cc-tv[data-blend="screen"] .pos-vp-stage > video + video { mix-blend-mode: screen; }
+  .cc-tv[data-blend="difference"] .pos-vp-stage > video + video { mix-blend-mode: difference; }
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
@@ -36,6 +40,7 @@
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -153,12 +158,10 @@
     const v = tv[x < 0.5 ? 0 : 1].video;
     size.textContent = playing && v.videoWidth && v.videoHeight ? `${v.videoWidth}x${v.videoHeight}` : '';
   }
-  // One name at either end, both with their share in between: `ETV 70 ETV2 30`.
-  // Empty while stopped, as the camera pages, so no name sits under an empty picture.
+  // The footer names no shares (asked 2026-10-10, *"rm ETV 34 ETV2 66"*): the
+  // fader's end labels already say which is which. Empty while stopped.
   function showWho() {
-    const p = Math.round(x * 100);
-    who.textContent = !playing ? '' : p <= 0 ? tv[0].c.name : p >= 100 ? tv[1].c.name
-      : `${tv[0].c.name} ${100 - p} ${tv[1].c.name} ${p}`;
+    who.textContent = playing ? `${tv[0].c.name} and ${tv[1].c.name}` : '';
   }
 
   // ── the fader ───────────────────────────────────────────────────────────
@@ -346,7 +349,10 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  d.stack.add(top, panel.el, fade, pb.el);
+  const blend = createChoice({ label: 'blend', at: 0,
+    options: [['mix', 'mix'], ['screen', 'screen'], ['difference', 'difference']],
+    onPick: (v) => { if (v === 'mix') delete panel.el.dataset.blend; else panel.el.dataset.blend = v; } });
+  d.stack.add(top, panel.el, fade, blend.el, pb.el);
   const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
   d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
   window.__demo.tv = {
