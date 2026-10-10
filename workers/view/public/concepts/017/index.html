@@ -193,7 +193,6 @@
       for (const k of KNOBS) gate.put(k.cc, Math.round(knobs.get(k.name).value?.() ?? k.home), { end: true });
       pump();
       transport.setIcon('play', 'stop', 'stop');
-      say(`${PATCH} is loaded, so play the keys and turn the knobs`, 'hi');
     } finally { starting = false; }
   }
   function stop() {
