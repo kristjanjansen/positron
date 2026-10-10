@@ -13,15 +13,11 @@
      group, so it sits on no text line. */
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* One screen, two pictures stacked in its stage: ETV underneath, ETV2 on
-     top. Both fill the stage, which keeps its own aspect ratio and is already
-     the positioned box. ETV2's opacity is the crossfade. */
-  .cc-tv .pos-vp-stage > video { position: absolute; inset: 0; }
-  .cc-tv .pos-vp-stage > video + video { transition: opacity 120ms linear; }
-  /* How ETV2 lays over ETV (asked 2026-10-10, *"some diff filter to make video
-     more interesting?"*): `difference` cuts each into the other where they differ. */
-  .cc-tv[data-blend="screen"] .pos-vp-stage > video + video { mix-blend-mode: screen; }
-  .cc-tv[data-blend="difference"] .pos-vp-stage > video + video { mix-blend-mode: difference; }
+  /* The panel shows one canvas, the dither's output. The two videos are decode
+     sources only: kept in the document so they go on decoding, one pixel and
+     invisible, never the picture. */
+  .cc-tv canvas { display: block; width: 100%; height: 100%; }
+  .cc-src { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
@@ -44,10 +40,15 @@
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { CHANNELS, NATIVE_HLS, readPlaylist, findServedEdge, wallHandler } from '/shell/err-live.mjs';
 
-  // Two ERR television channels live, layered in one screen, with one
-  // crossfader between them, picture and sound. The pictures come straight from ERR's own CDN
+  // Two ERR television channels live, mixed into one picture, dithered, and
+  // shown. The chain is ETV and ETV2 into `web:mixer`, the mixer into
+  // `web:dither`, the dither into `web:screen`, and every step follows the
+  // links the bay holds. The pictures come straight from ERR's own CDN
   // (live.err.ee), not through positron's relay, and the patchbay says so.
   // `?base=` points every ERR URL at demo/fake-err.mjs instead, through
   // `errUrl` in err-live.mjs, which is how this page is tested.
@@ -63,27 +64,57 @@
   // so it does not read the master a second time and mint a second session.
   //
   // THE SOUND. Each video element goes through MediaElementSource into one
-  // AudioContext, an equal-power gain per channel, and the speakers. On the
-  // hls.js path the element plays a MediaSource blob, which is same-origin,
-  // so the graph gets real samples. On the native path (WebKit) the element
-  // loads ERR directly, so `crossOrigin` is set before `src` and ERR's
-  // `access-control-allow-origin: *` is what lets the samples through; that
-  // path is UNTESTED here. Only when there is no AudioContext, or the element
-  // refuses to be a source, does the fader set each element's `volume`
-  // instead, and the log says so.
+  // AudioContext, an equal-power gain per channel, and the speakers. Only when
+  // there is no AudioContext, or the element refuses to be a source, does the
+  // fader set each element's `volume` instead, and the log says so.
   //
-  // THE PICTURE. Both videos sit in one stage, ETV underneath at full
-  // strength and ETV2 on top with its opacity equal to the fader, 0 to 1. So
-  // the ETV end shows only ETV, the ETV2 end only ETV2, and the middle is a
-  // straight mix. ETV stays at 1 under it on purpose: fading both (ETV at
-  // 1 - x) would let the page background through and the middle would go dark.
+  // THE MIXER. Each frame both videos are drawn into one offscreen canvas:
+  // ETV at full strength, then ETV2 over it at the fader's alpha, with the
+  // blend choice as the canvas's `globalCompositeOperation`. ETV stays at 1
+  // under it on purpose: fading both (ETV at 1 - x) would let the ground
+  // through and the middle would go dark. Unlike the old layered screen, this
+  // IS a mixed picture that something else can take, so the mixer has a
+  // video-out and the dither takes it.
+  //
+  // THE DITHER is /concepts/061/'s shader, copied: a two tone 4x4 Bayer dither
+  // over the mixed picture's brightness, the page's ground for off and a warm
+  // off-white for on, leaning toward --hi only in the brightest cells.
+  //
+  // 🔴 CROSS-ORIGIN. A canvas that has drawn a cross-origin frame without CORS
+  // is TAINTED, and uploading it to WebGL throws a SecurityError. On the
+  // hls.js path the element plays a MediaSource blob, which is same-origin, so
+  // the frames are clean. On the native path (WebKit) the element loads ERR
+  // directly, so `crossOrigin` is set before `src` and ERR's
+  // `access-control-allow-origin: *` is what keeps the frames clean; that path
+  // is UNTESTED here. If the upload still throws, the page says in words that
+  // this browser's video cannot be filtered and draws the ground. It does not
+  // crash and it does not retry every frame.
   const S = 'web';
   const ON_PAGE = CHANNELS.filter((c) => c.id === 'etv' || c.id === 'etv2');
   const PROBE_STEPS = 8, WALL_BACKOFF_S = 90;
 
   const vOut = (c) => `err:${c.id}:video-out`, aOut = (c) => `err:${c.id}:audio-out`;
+  const MIX_IN = `${S}:mixer:video-in`, MIX_OUT = `${S}:mixer:video-out`;
+  const DITH_IN = `${S}:dither:video-in`, DITH_OUT = `${S}:dither:video-out`, DITH_VAL = `${S}:dither:value-in`;
   const SCREEN_IN = `${S}:screen:video-in`;
   const FADER_IN = `${S}:fader:audio-in`, FADER_OUT = `${S}:fader:audio-out`, SPEAKER_IN = `${S}:speaker:audio-in`;
+  const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
+
+  const d = mount({ name: 'concept 066', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('066');
+
+  // ── the dither's one parameter, set only through value-in ───────────────
+  const KNOBS = [
+    { name: 'size', min: 2, max: 16, step: 1, raw: 4, format: (r) => `${Math.round(r)} px` },
+  ];
+  const P = { size: 4 };
+  function setParam(e) {
+    if (e?.of !== 'param') { d.log('the dither takes parameters, and this was not one', 'warn'); return; }
+    if (e.name === 'size') P.size = Math.max(1, Math.round(e.v));
+    else { d.log(`the dither has no parameter called ${e.name}`, 'warn'); return; }
+    showDither();
+    if (!playing) render();
+  }
 
   // ── the bay ─────────────────────────────────────────────────────────────
   // Each channel is an external site with a picture and a sound out of it.
@@ -97,20 +128,28 @@
     bay.addPort({ id: vOut(c), label: `${c.name} picture`, dir: 'out', medium: 'video', transports: ['llhls'], address: host });
     bay.addPort({ id: aOut(c), label: `${c.name} sound`, dir: 'out', medium: 'audio', transports: ['llhls'], address: host });
   }
-  // One screen, and both pictures link into its one video-in. The blend
-  // happens in the screen itself (two layers, one opacity), so no node makes
-  // a mixed picture that anything else could take, and a mixer with a
-  // video-out would draw one that does not exist.
+  // The mixer takes both pictures on its one video-in, as the fader takes both
+  // sounds on its one audio-in; which picture is the base layer is a fact about
+  // the channel, not about the port.
+  bay.addNode({ id: `${S}:mixer`, kind: 'engine', label: 'video mixer', place: 'browser' });
+  bay.addPort({ id: MIX_IN, label: 'mixer:video-in', dir: 'in', medium: 'video', transports: ['llhls'] });
+  bay.addPort({ id: MIX_OUT, label: 'mixer:video-out', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addNode({ id: `${S}:dither`, kind: 'engine', label: 'dither shader', place: 'browser' });
+  bay.addPort({ id: DITH_IN, label: 'dither:video-in', dir: 'in', medium: 'video' });
+  bay.addPort({ id: DITH_OUT, label: 'dither:video-out', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addPort({ id: DITH_VAL, label: 'dither:value-in', dir: 'in', medium: 'value',
+    shape: { of: 'param', names: KNOBS.map((k) => k.name) }, deliver: setParam });
+  for (const k of KNOBS) {
+    bay.addNode({ id: `${S}:knob-${k.name}`, kind: 'person', label: 'knob', place: 'browser' });
+    bay.addPort({ id: KNOB_OUT(k.name), label: `knob-${k.name}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
+  }
   bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'TV panel', place: 'browser' });
-  bay.addPort({ id: SCREEN_IN, label: 'TV panel', dir: 'in', medium: 'video', transports: ['llhls'] });
+  bay.addPort({ id: SCREEN_IN, label: 'TV panel', dir: 'in', medium: 'video' });
   bay.addNode({ id: `${S}:fader`, kind: 'engine', label: 'crossfader', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: FADER_IN, label: 'crossfader', dir: 'in', medium: 'audio' });
   bay.addPort({ id: FADER_OUT, label: 'crossfader', dir: 'out', medium: 'audio' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
-
-  const d = mount({ name: 'concept 066', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('066');
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b, opts) {
@@ -128,30 +167,177 @@
   // which is the press where a person asks to watch, so the consent is named
   // here rather than at the press.
   for (const c of ON_PAGE) {
-    hold(vOut(c), SCREEN_IN, { consent: true, via: 'llhls' });
+    hold(vOut(c), MIX_IN, { consent: true, via: 'llhls' });
     hold(aOut(c), FADER_IN, { consent: true, via: 'llhls' });
   }
+  hold(MIX_OUT, DITH_IN);
+  hold(DITH_OUT, SCREEN_IN);
+  for (const k of KNOBS) hold(KNOB_OUT(k.name), DITH_VAL);
   hold(FADER_OUT, SPEAKER_IN);
 
-  // ── the one panel ───────────────────────────────────────────────────────
+  // ── the decode sources ──────────────────────────────────────────────────
   const tv = ON_PAGE.map((c) => {
     const video = el('video');
     video.muted = true; video.playsInline = true;
-    // Before any src, or the native path's samples are withheld from the graph.
+    // Before any src, or the native path's frames and samples are withheld.
     video.crossOrigin = 'anonymous';
     const ch = { c, video, hls: null, src: null, tap: null, gain: null, buf: null,
-      lastFrame: 0, lastSound: 0, frames: 0, refused: false };
+      lastFrame: 0, lastT: -1, lastSound: 0, frames: 0, refused: false };
     video.addEventListener('resize', () => showSize());
     return ch;
   });
-  // One footer line, as the camera pages: which channel is showing at the
-  // left, the resolution and the panel's own full-screen button at the right.
+
+  // ── the mixer: one offscreen canvas ─────────────────────────────────────
+  const mix = document.createElement('canvas');
+  mix.width = FRAME_W; mix.height = FRAME_H;
+  const mctx = mix.getContext('2d', { alpha: false });
+  const OPS = { mix: 'source-over', screen: 'screen', difference: 'difference' };
+  let blendOp = 'source-over', mixHas = false, lastMix = 0;
+  // Contained, as drawCamera does: a channel that is not 16:9 keeps its shape.
+  function drawContained(v) {
+    const va = v.videoWidth / v.videoHeight, ca = FRAME_W / FRAME_H;
+    const w = va > ca ? FRAME_W : FRAME_H * va, h = va > ca ? FRAME_W / va : FRAME_H;
+    mctx.drawImage(v, (FRAME_W - w) / 2, (FRAME_H - h) / 2, w, h);
+  }
+  const ready = (ch) => playing && holds(vOut(ch.c), MIX_IN) && ch.video.readyState >= 2 && ch.video.videoWidth > 0;
+  function drawMix() {
+    mctx.globalCompositeOperation = 'source-over';
+    mctx.globalAlpha = 1;
+    mctx.fillStyle = '#000';
+    mctx.fillRect(0, 0, FRAME_W, FRAME_H);
+    let n = 0;
+    // ETV first, at full strength, as the base layer.
+    if (ready(tv[0])) { drawContained(tv[0].video); n++; }
+    // ETV2 over it at the fader's alpha, in the chosen blend.
+    if (ready(tv[1]) && x > 0) {
+      mctx.globalCompositeOperation = blendOp;
+      mctx.globalAlpha = x;
+      drawContained(tv[1].video);
+      n++;
+    }
+    mctx.globalCompositeOperation = 'source-over';
+    mctx.globalAlpha = 1;
+    mixHas = n > 0;
+    if (mixHas) lastMix = performance.now();
+  }
+
+  // ── the panel: one canvas, the dither's output ──────────────────────────
+  const canvas = el('canvas');
+  canvas.width = FRAME_W; canvas.height = FRAME_H;
+  const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
+  // One footer line, as the camera pages: which channels at the left, the
+  // resolution, the dither size and the panel's own full-screen button at the
+  // right.
   const who = el('span', 'cc-say', '');
   const size = el('span', 'cc-say', '');
-  const panel = createVideoPanel({ media: tv[0].video, left: who });
+  const dsize = el('span', 'cc-say', gl ? '' : 'no WebGL2');
+  const panel = createVideoPanel({ media: canvas, left: who });
   panel.el.classList.add('cc-tv');
-  tv[0].video.after(tv[1].video);   // ETV2 on top, under the caption and tag slots
-  panel.el.querySelector('.pos-vp-r').prepend(size);
+  panel.el.querySelector('.pos-vp-r').prepend(size, dsize);
+  const srcs = el('div', 'cc-src');
+  srcs.append(...tv.map((ch) => ch.video));
+  panel.el.querySelector('.pos-vp-stage').append(srcs);
+
+  let prog = null, tex = null, U = {}, tainted = false;
+  if (gl) {
+    const vs = `#version 300 es
+      in vec2 p;
+      void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
+    // As /concepts/061/: brightness per cell of uSize pixels, a little
+    // contrast, then one Bayer threshold. Below it the page's ground, above it
+    // warm off-white, which leans toward --hi only in the brightest cells.
+    const fs = `#version 300 es
+      precision highp float;
+      uniform sampler2D uTex; uniform vec2 uRes;
+      uniform float uHas; uniform float uSize;
+      out vec4 o;
+      const vec3 GROUND = vec3(0.043, 0.055, 0.078);
+      const vec3 INK = vec3(0.92, 0.89, 0.82);
+      const vec3 HI = vec3(1.0, 0.831, 0.0);
+      const float M[16] = float[16](0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.);
+      float bayer(vec2 c) { ivec2 i = ivec2(mod(c, 4.0)); return (M[i.x + i.y * 4] + 0.5) / 16.0; }
+      vec3 src(vec2 frag) {
+        if (uHas < 0.5) return vec3(0.0);
+        return texture(uTex, clamp(frag / uRes, 0.0, 1.0)).rgb;
+      }
+      void main() {
+        vec2 cell = floor(gl_FragCoord.xy / uSize);
+        float l = dot(src((cell + 0.5) * uSize), vec3(0.2126, 0.7152, 0.0722));
+        l = smoothstep(0.04, 0.96, l);
+        vec3 ink = mix(INK, HI, smoothstep(0.86, 1.0, l) * 0.55);
+        vec3 dith = mix(GROUND, ink, step(bayer(cell), l));
+        o = vec4(dith, 1.0);
+      }`;
+    const sh = (t, s) => { const v = gl.createShader(t); gl.shaderSource(v, s); gl.compileShader(v); return v; };
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      d.log(`the dither did not compile: ${gl.getProgramInfoLog(prog)}`, 'bad');
+      prog = null;
+    }
+    if (prog) {
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, 'p');
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      for (const u of ['uTex', 'uRes', 'uHas', 'uSize']) U[u] = gl.getUniformLocation(prog, u);
+      tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.uniform1i(U.uTex, 0);
+      gl.uniform2f(U.uRes, FRAME_W, FRAME_H);
+    }
+  } else d.log('this browser has no WebGL2, so there is no dither and the picture stays dark', 'bad');
+
+  // The routing follows the links. Without mixer -> dither the dither runs
+  // with no input and draws only its ground; without dither -> screen the
+  // panel clears to the ground.
+  function dither() {
+    if (!gl) return;
+    gl.viewport(0, 0, FRAME_W, FRAME_H);
+    if (!prog || !holds(DITH_OUT, SCREEN_IN)) { gl.clearColor(11 / 255, 14 / 255, 20 / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
+    let has = !tainted && mixHas && holds(MIX_OUT, DITH_IN);
+    if (has) {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      try {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, mix);
+      } catch (e) {
+        // A frame from another origin without CORS taints the mixer's canvas.
+        tainted = true; has = false;
+        dsize.textContent = 'not filterable';
+        d.log(`this browser's video cannot be filtered: its frames come from another origin without permission to read them (${e?.name || e})`, 'bad');
+      }
+    }
+    gl.uniform1f(U.uHas, has ? 1 : 0);
+    gl.uniform1f(U.uSize, P.size);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  // A frame arrived when the playhead moved. Read off the draw loop rather
+  // than requestVideoFrameCallback, because the sources are invisible and a
+  // browser may skip presenting what nobody can see.
+  function watchFrames() {
+    const now = performance.now();
+    for (const ch of tv) {
+      const v = ch.video;
+      if (!playing || v.readyState < 2 || v.currentTime === ch.lastT) continue;
+      const first = ch.lastT < 0;
+      ch.lastT = v.currentTime;
+      // The count is the decoder's own when it has one; draw ticks are not frames.
+      ch.lastFrame = now;
+      ch.frames = v.getVideoPlaybackQuality?.().totalVideoFrames || ch.frames + 1;
+      if (first) { showSize(); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
+    }
+  }
+  function render() { watchFrames(); drawMix(); dither(); }
+  let raf = 0;
+  function frame() { render(); if (playing) raf = requestAnimationFrame(frame); }
 
   // The stronger picture's resolution, the one a viewer is mostly looking at.
   function showSize() {
@@ -163,21 +349,25 @@
   function showWho() {
     who.textContent = playing ? `${tv[0].c.name} and ${tv[1].c.name}` : '';
   }
+  function showDither() {
+    if (!gl) { dsize.textContent = 'no WebGL2'; return; }
+    if (tainted) { dsize.textContent = 'not filterable'; return; }
+    dsize.textContent = playing ? `${P.size} px` : '';
+  }
 
   // ── the fader ───────────────────────────────────────────────────────────
   let x = 0.5;                     // 0 is all ETV, 1 is all ETV2
   const gains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];   // equal power
   let ctx = null, sum = null, mode = null;   // mode: 'graph' or 'volume'
   function applyFade() {
+    // The picture reads x on its next frame; the sound is set here.
     const g = gains();
-    // The picture is a linear crossfade: ETV2 over ETV at the fader's value.
-    tv[0].video.style.opacity = '1';
-    tv[1].video.style.opacity = String(x);
     tv.forEach((ch, i) => {
       if (mode === 'graph' && ch.gain) ch.gain.gain.setTargetAtTime(g[i], ctx.currentTime, 0.02);
       if (mode === 'volume') ch.video.volume = g[i];
     });
     showWho(); showSize();
+    if (!playing) render();
   }
 
   // The sound follows the links the bay holds, as on /concepts/030/: a channel
@@ -222,17 +412,6 @@
 
   // ── what lights the wires ───────────────────────────────────────────────
   let playing = false, gen = 0, timer = 0;
-  function watchFrames(ch, mine) {
-    const v = ch.video;
-    if (typeof v.requestVideoFrameCallback !== 'function') return;
-    const tick = () => {
-      if (gen !== mine) return;
-      ch.lastFrame = performance.now(); ch.frames++;
-      if (ch.frames === 1) { showSize(); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
-      v.requestVideoFrameCallback(tick);
-    };
-    v.requestVideoFrameCallback(tick);
-  }
   function listen() {
     const now = performance.now();
     for (const ch of tv) {
@@ -249,6 +428,8 @@
   const pb = createPatchbay(bay, {
     flowing: (l) => {
       if (l.from === FADER_OUT) return tv.some((ch) => fresh(ch.lastSound));
+      if (l.from === MIX_OUT) return fresh(lastMix);
+      if (l.from === DITH_OUT) return !!prog && !tainted && holds(MIX_OUT, DITH_IN) && fresh(lastMix);
       const ch = tv.find((t) => l.from === vOut(t.c) || l.from === aOut(t.c));
       if (!ch) return false;
       return l.from === vOut(ch.c) ? fresh(ch.lastFrame) : fresh(ch.lastSound);
@@ -271,7 +452,7 @@
     if (gen !== mine) return;
     if (served?.none) d.log(`${c.name}: ERR refused every point asked, across the whole window`, 'bad');
     else if (served && !served.edgeServed) d.log(`${c.name}: ERR refuses its newest ${Math.round(served.blockedMin)} min, so it starts behind that`, 'warn');
-    if (holds(vOut(c), SCREEN_IN) || holds(aOut(c), FADER_IN)) {
+    if (holds(vOut(c), MIX_IN) || holds(aOut(c), FADER_IN)) {
       if (NATIVE_HLS) {
         v.src = pl.variant;
       } else if (window.Hls?.isSupported()) {
@@ -285,7 +466,6 @@
         });
       } else { d.log('this browser cannot play HLS', 'bad'); return; }
     }
-    watchFrames(ch, mine);
     // Unmuted, because a muted element hands the graph silence too.
     v.muted = false;
     try { await v.play(); } catch (e) {
@@ -306,8 +486,11 @@
     for (const ch of tv) armVideo(ch.video);
     soundGraph();
     applyFade();
+    showDither();
     d.log('opening ETV and ETV2: two live channels at ERR, which counts them as two viewers', 'warn');
     timer = setInterval(listen, 250);
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(frame);
     await Promise.all(tv.map((ch) => open(ch, mine)));
     pb.refresh();
   }
@@ -316,6 +499,7 @@
     gen++;
     playing = false;
     clearInterval(timer);
+    cancelAnimationFrame(raf);
     for (const ch of tv) {
       if (ch.hls) { try { ch.hls.destroy(); } catch { /* already gone */ } }
       ch.hls = null;
@@ -324,10 +508,12 @@
       try { v.pause(); } catch { /* fine */ }
       v.removeAttribute('src');
       v.load();
-      Object.assign(ch, { lastFrame: 0, lastSound: 0, frames: 0, refused: false });
+      Object.assign(ch, { lastFrame: 0, lastT: -1, lastSound: 0, frames: 0, refused: false });
     }
     ctx?.suspend();
-    showWho(); showSize();
+    lastMix = 0;
+    render();
+    showWho(); showSize(); showDither();
     pb.refresh();
     face();
     d.log('stopped: both engines destroyed, both pictures emptied');
@@ -345,22 +531,37 @@
     onInput: (v) => { x = v; applyFade(); } });
   const fade = el('div', 'cc-fade');
   fade.append(el('span', 'cc-end', ON_PAGE[0].name), fader.el, el('span', 'cc-end', ON_PAGE[1].name));
-  applyFade();
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
+  // The blend is how the mixer lays ETV2 over ETV (asked 2026-10-10, *"some
+  // diff filter to make video more interesting?"*): `difference` cuts each
+  // into the other where they differ.
   const blend = createChoice({ label: 'blend', at: 0,
     options: [['mix', 'mix'], ['screen', 'screen'], ['difference', 'difference']],
-    onPick: (v) => { if (v === 'mix') delete panel.el.dataset.blend; else panel.el.dataset.blend = v; } });
-  d.stack.add(top, panel.el, fade, blend.el, pb.el);
+    onPick: (v) => { blendOp = OPS[v] || 'source-over'; if (!playing) render(); } });
+
+  // ── the knob: its own node, `web:knob-size`, a turn is one event ─────────
+  const knobs = new Map(KNOBS.map((k) => [k.name, createKnob({
+    label: k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
+    onInput: (r) => bay.send(KNOB_OUT(k.name), { of: 'param', name: k.name, v: r }),
+  })]));
+  const grid = createKnobGrid(knobs, { row: true });
+
+  applyFade();
+  // Linear, as every concept instrument: the picture, its fader and blend,
+  // then the knobs area, then the patchbay.
+  d.stack.add(top, panel.el, fade, blend.el, grid.el, pb.el);
   const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
   d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
+  window.__demo.knobs = grid;
   window.__demo.tv = {
     fader, mode: () => mode, playing: () => playing,
-    footer: () => ({ left: who.textContent, right: size.textContent }),
+    footer: () => ({ left: who.textContent, right: `${size.textContent} ${dsize.textContent}`.trim() }),
+    dither: () => ({ gl: !!gl, compiled: !!prog, size: P.size, tainted, mixing: mixHas, op: blendOp }),
     channels: () => tv.map((ch) => ({ id: ch.c.id, frames: ch.frames,
       size: ch.video.videoWidth ? `${ch.video.videoWidth}x${ch.video.videoHeight}` : '',
-      opacity: ch.video.style.opacity, sound: fresh(ch.lastSound), refused: ch.refused, muted: ch.video.muted })),
+      sound: fresh(ch.lastSound), refused: ch.refused, muted: ch.video.muted })),
   };
   d.ready();
 </script>
