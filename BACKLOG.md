@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**Invisible hand on every concept knob; 40's step 3 is wave; freq on 5 amp** (2026-10-10). Asked: *"on all concept knobs add inviible hand mode"*, *"3 saw -> 3 wave"*, *"keep freq on 5 amp"*. `hand: true` on 14, 40, 41, 50; freq on 40's steps 5 and 6.~~ DONE 2026-10-10.
 - ~~**Knob area keeps its height with no knob** (2026-10-10). Asked: *"in individual knobs demos fix their area h even when no know is shown"*.~~ DONE 2026-10-10 on 40.
 - **Concept 31: a BPM detector feeding the granulator, Ida only** (2026-10-10). Asked: *"for 31 make bmp detector sepatate block that feeds into granualtoer. use ida tallinn only, rm top waves and crossfader"*, then *"can not see 31 updatref"*. One station (Ida Tallinn) through its relay into the granulator and into a `web:bpm` node whose tempo events cable into the granulator's clock; the station panels and the crossfader go.
 - ~~**Concept 40: steps on the right; unused knobs not shown** (2026-10-10). Asked: *"move step selector to the right in desktop"* and *"do not show inactive / disabled knobs"*. Also on 50.~~ DONE 2026-10-10.
