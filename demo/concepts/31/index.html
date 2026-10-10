@@ -16,6 +16,8 @@
   .cc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 32px; }
   @media (max-width: 560px) { .cc-two { grid-template-columns: 1fr; } }
   .cc-say { font-size: 12px; color: var(--dim); }
+  /* A footer line never wraps: one line, cut at the slot's edge. */
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
   /* The kit's live wave (grain-scope) as a panel's picture: the panel's stage is the
      edge and the ground, so the scope gives up its own margin, border and corner
      through the kit's tokens, and its always-empty caption takes no room. The stage
@@ -214,8 +216,8 @@
   // on screen at once: the grid, the rests and the ratchets' tight clusters.
   const ghost = el('div', 'cc-wave');
   const gscope = createGrainScope(ghost, { seconds: 4, height: 150, fullScale: 1, grainSeconds: 4, fadeMs: 2400 });
-  const gpanel = createVideoPanel({ media: ghost, aspect: 'auto', right: false, left: el('span', 'cc-say', 'granulator'),
-    centre: el('span', 'cc-say', 'output and grains') });
+  const gpanel = createVideoPanel({ media: ghost, aspect: 'auto', right: el('span', 'cc-say', 'output and grains'),
+    left: el('span', 'cc-say', 'granulator') });
 
   // The sound follows the links the bay holds, as on /concepts/11/: the relay
   // reaches the speakers only along relay -> speaker, the granulator only along
