@@ -25,8 +25,6 @@
   .cc-say { font-size: 12px; color: var(--dim); }
   .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
   .cc-wave .pos-scope-gut { display: none; }
-  /* A refusal from the bay, under the patch it was about. */
-  .cc-why { font: 400 12px/1.5 var(--mono); color: var(--bad); white-space: pre-wrap; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -35,7 +33,6 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createField } from '/shell/field.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -146,14 +143,11 @@
   }
 
   // ── the patch: a step is a text, and the text is the links ───────────────
-  const why = el('div', 'cc-why');
-  why.hidden = true;
   let step = STEPS[0];
   function apply(text) {
     let bad;
     try { bad = synth.load(text); } catch (e) { bad = [{ line: '', why: e.message.replace(/^bay: /, '') }]; }
-    why.textContent = bad.map((b) => (b.line ? `${b.line}\n  ${b.why}` : b.why)).join('\n');
-    why.hidden = !bad.length;
+    for (const b of bad) d.log(b.line ? `${b.line} refused: ${b.why}` : b.why, 'warn');
     follow();
   }
   // Show what the links use, and nothing else.
@@ -181,10 +175,6 @@
     pb.refresh();
   }
 
-  const box = createField({ label: '', rows: 12, code: true, value: step.patch,
-    onInput: () => { clearTimeout(box.t); box.t = setTimeout(() => apply(box.value()), 400); } });
-  box.input.setAttribute('aria-label', 'the patch, one link a line');
-
   // Choosing a step sets its starting sound and replaces the whole patch.
   const picker = createChoice({ label: 'step', at: 0,
     options: STEPS.map((s, i) => [`${i + 1} ${s.name}`, i]),
@@ -195,7 +185,6 @@
         synth.setParam(k.owner, name, v);
         knobs.get(name).set(knobRaw(name, v), { quiet: true });
       }
-      box.set(step.patch);
       apply(step.patch);
     } });
 
@@ -212,7 +201,7 @@
   const top = el('div', 'cc-top');
   top.append(picker.el, transport.el);
   const out = el('div', 'cc-stack');
-  out.append(top, picRow, pair, bank.el, keysHost, el('h3', 'cc-h', 'patch'), box.el, why, pb.el);
+  out.append(top, picRow, pair, bank.el, keysHost, pb.el);
   d.el.append(out);
   for (const [name, v] of Object.entries(step.preset)) {
     synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);
