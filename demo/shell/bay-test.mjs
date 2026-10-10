@@ -1213,53 +1213,53 @@ function V0() { return { codec: 'h264' }; }
   /* T. A `*` link and a light link across the network, plans/plan-site-names.md §4h. */
   const TEXT = { of: 'text' };
   const chat = (b, site, deliver) => {
-    b.addPort({ id: `${site}:chat:out`, label: `chat ${site}`, dir: 'out', medium: 'value', shape: TEXT });
-    b.addPort({ id: `${site}:chat:in`, label: `chat ${site}`, dir: 'in', medium: 'value', shape: TEXT, ...(deliver ? { deliver } : {}) });
+    b.addPort({ id: `${site}:chat:value-out`, label: `chat ${site}`, dir: 'out', medium: 'value', shape: TEXT });
+    b.addPort({ id: `${site}:chat:value-in`, label: `chat ${site}`, dir: 'in', medium: 'value', shape: TEXT, ...(deliver ? { deliver } : {}) });
   };
-  const line = 'web-ab12:chat:out -> *:chat:in';
+  const line = 'web-ab12:chat:value-out -> *:chat:value-in';
   const back = parseLink(line);
-  ok('a * link reads and prints as an ordinary line', back.from === 'web-ab12:chat:out' && back.to === '*:chat:in'
+  ok('a * link reads and prints as an ordinary line', back.from === 'web-ab12:chat:value-out' && back.to === '*:chat:value-in'
     && printLink(back) === line, printLink(back));
   let bad1 = '', bad2 = '';
-  try { parseLink('web-ab12:chat:out -> we*:chat:in'); } catch (e) { bad1 = e.message; }
-  try { parseLink('web-ab12:chat:out -> *:*:in'); } catch (e) { bad2 = e.message; }
+  try { parseLink('web-ab12:chat:value-out -> we*:chat:value-in'); } catch (e) { bad1 = e.message; }
+  try { parseLink('web-ab12:chat:value-out -> *:*:in'); } catch (e) { bad2 = e.message; }
   ok('NEGATIVE CONTROL: a * that is not a whole site segment is not read', /whole site/.test(bad1) && /whole site/.test(bad2), `${bad1} | ${bad2}`);
 
   const got = [];
   const me = createBay();
   chat(me, 'web-ab12', (e, l, m) => got.push({ e, link: l, ...m }));
   chat(me, 'web-cd34'); chat(me, 'web-ef56');
-  me.addPort({ id: 'web-gh78:chat:in', label: 'a fader called chat', dir: 'in', medium: 'value', shape: { of: 'number' } });
-  const speak = me.link('web-ab12:chat:out', '*:chat:in');
+  me.addPort({ id: 'web-gh78:chat:value-in', label: 'a fader called chat', dir: 'in', medium: 'value', shape: { of: 'number' } });
+  const speak = me.link('web-ab12:chat:value-out', '*:chat:value-in');
   const to = (speak.matches || []).map((x) => `${x.to}:${x.ok ? 'ok' : 'no'}`).sort().join(' ');
   ok('a speaker * link is made and lists every concrete pair it stands for, its own site left out', speak.ok
-    && to === 'web-cd34:chat:in:ok web-ef56:chat:in:ok web-gh78:chat:in:no', to);
+    && to === 'web-cd34:chat:value-in:ok web-ef56:chat:value-in:ok web-gh78:chat:value-in:no', to);
   ok('and a pair the ordinary validate refuses is listed with the shape that refused it',
-    /of does not match/.test(speak.matches.find((x) => x.to === 'web-gh78:chat:in')?.why || ''),
-    speak.matches.find((x) => x.to === 'web-gh78:chat:in')?.why);
-  const tg = me.targets('web-ab12:chat:out').map((t) => t.to).sort().join(' ');
-  ok('targets are the pairs that validate now, so the fader is not one', tg === 'web-cd34:chat:in web-ef56:chat:in', tg);
-  ok('NEGATIVE CONTROL: the speaker does not deliver to itself', me.send('web-ab12:chat:out', { text: 'hi' }) === 2 && got.length === 0,
+    /of does not match/.test(speak.matches.find((x) => x.to === 'web-gh78:chat:value-in')?.why || ''),
+    speak.matches.find((x) => x.to === 'web-gh78:chat:value-in')?.why);
+  const tg = me.targets('web-ab12:chat:value-out').map((t) => t.to).sort().join(' ');
+  ok('targets are the pairs that validate now, so the fader is not one', tg === 'web-cd34:chat:value-in web-ef56:chat:value-in', tg);
+  ok('NEGATIVE CONTROL: the speaker does not deliver to itself', me.send('web-ab12:chat:value-out', { text: 'hi' }) === 2 && got.length === 0,
     `${got.length} delivered here`);
 
   ok('NEGATIVE CONTROL: without a listener link a line from another site is not delivered',
-    me.send('web-cd34:chat:out', { text: 'nobody asked' }) === 0 && got.length === 0, `${got.length}`);
-  const listen = me.link('*:chat:out', 'web-ab12:chat:in');
+    me.send('web-cd34:chat:value-out', { text: 'nobody asked' }) === 0 && got.length === 0, `${got.length}`);
+  const listen = me.link('*:chat:value-out', 'web-ab12:chat:value-in');
   ok('a listener * link is made', listen.ok && listen.matches.length === 2, JSON.stringify(listen.matches));
-  me.send('web-cd34:chat:out', { text: 'hello' }, { sent: 123 });
+  me.send('web-cd34:chat:value-out', { text: 'hello' }, { sent: 123 });
   ok('with it, a line from another site is delivered once, with who sent it and when', got.length === 1
-    && got[0].e.text === 'hello' && got[0].from === 'web-cd34:chat:out' && got[0].to === 'web-ab12:chat:in' && got[0].sent === 123
+    && got[0].e.text === 'hello' && got[0].from === 'web-cd34:chat:value-out' && got[0].to === 'web-ab12:chat:value-in' && got[0].sent === 123
     && got[0].link.id === listen.id, JSON.stringify(got));
-  ok('NEGATIVE CONTROL: a source this bay has never heard of is not delivered', me.send('web-zz99:chat:out', { text: 'who' }) === 0 && got.length === 1);
-  me.send('web-ab12:chat:out', { text: 'echo?' });
+  ok('NEGATIVE CONTROL: a source this bay has never heard of is not delivered', me.send('web-zz99:chat:value-out', { text: 'who' }) === 0 && got.length === 1);
+  me.send('web-ab12:chat:value-out', { text: 'echo?' });
   ok('NEGATIVE CONTROL: the listener does not deliver this site\'s own line back to it', got.length === 1, `${got.length}`);
 
   const none = createBay(); chat(none, 'web-ab12');
-  const alone = none.link('web-ab12:chat:out', '*:chat:in');
+  const alone = none.link('web-ab12:chat:value-out', '*:chat:value-in');
   ok('a * link with nobody to match is made, and says so', alone.ok && alone.matches.length === 0 && /nobody matches/.test(alone.warn || ''), alone.warn);
-  const both = none.validate('*:chat:out', '*:chat:in');
+  const both = none.validate('*:chat:value-out', '*:chat:value-in');
   ok('NEGATIVE CONTROL: both ends * is refused', !both.ok && /names nobody/.test(both.why), both.why);
-  const turned = none.validate('web-ab12:chat:in', '*:chat:in');
+  const turned = none.validate('web-ab12:chat:value-in', '*:chat:value-in');
   ok('NEGATIVE CONTROL: a * speaker from an input is refused', !turned.ok && /input/.test(turned.why), turned.why);
   const h = createBay();
   h.addPort({ id: 'web-ab12:cam:out', label: 'camera', dir: 'out', medium: 'video' });
@@ -1267,7 +1267,7 @@ function V0() { return { codec: 'h264' }; }
   const hv = h.validate('web-ab12:cam:out', '*:screen:in'), md = h.validate('web-ab12:keys:out', '*:synth:in');
   ok('NEGATIVE CONTROL: a * link on a heavy medium or on MIDI is refused, saying why', !hv.ok && !md.ok
     && /light media other than MIDI/.test(hv.why) && /loop/.test(md.fix), `${hv.why} | ${md.fix}`);
-  const tx = none.validate('web-ab12:chat:out', '*:chat:in', [{ op: 'transpose', by: 1 }]);
+  const tx = none.validate('web-ab12:chat:value-out', '*:chat:value-in', [{ op: 'transpose', by: 1 }]);
   ok('NEGATIVE CONTROL: a * link with a transform is refused', !tx.ok && /transforms/.test(tx.why), tx.why);
   const lb = createBay(); chat(lb, 'web-ab12');
   ok('load reads a * line and makes the link', lb.load(line).length === 0 && lb.text() === line, lb.text());

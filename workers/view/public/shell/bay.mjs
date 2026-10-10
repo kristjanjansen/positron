@@ -787,10 +787,10 @@ export function parseLink(line) {
   if (!m) throw new Error(`bay: cannot read "${line.trim()}". A link is "from -> to { op arg } via transport", the last two optional`);
   const [, from, to, body, via] = m;
   /* `*` IS A WHOLE SITE SEGMENT OR NOTHING (plans/plan-site-names.md §4h).
-     `we*:chat:in` or `*:*:in` would read as a pattern nobody defined. */
+     `we*:chat:value-in` or `*:*:in` would read as a pattern nobody defined. */
   for (const end of [from, to]) {
     if (end.includes('*') && !(end.startsWith('*:') && !end.slice(2).includes('*') && end.split(':').length === 3)) {
-      throw new Error(`bay: cannot read "${end}". A * stands for a whole site, as in *:chat:in`);
+      throw new Error(`bay: cannot read "${end}". A * stands for a whole site, as in *:chat:value-in`);
     }
   }
   const options = {};   // link options, link-options.mjs: `w 640` is read here and checked by validate
@@ -1172,8 +1172,8 @@ export function createBay({ now = () => Date.now() } = {}) {
   }
 
   /**
-   * 🔴 A `*` LINK, plans/plan-site-names.md §4h. `a:chat:out -> *:chat:in` is a
-   * speaker and `*:chat:out -> a:chat:in` a listener. The pattern is checked
+   * 🔴 A `*` LINK, plans/plan-site-names.md §4h. `a:chat:value-out -> *:chat:value-in` is a
+   * speaker and `*:chat:value-out -> a:chat:value-in` a listener. The pattern is checked
    * here; every concrete pair it stands for is checked by the ordinary
    * `validate`, now and again on every send, because sites come and go.
    * ⚠️ ZERO MATCHES IS NOT A REFUSAL. A chat has to work with one person in it,
@@ -1185,7 +1185,7 @@ export function createBay({ now = () => Date.now() } = {}) {
   function validateAny(fromId, toId, transforms = [], opts = {}) {
     if (isAny(fromId) && isAny(toId)) {
       return { ok: false, why: 'both ends are *, so the link names nobody.',
-               fix: 'Name one end: your own port, as in web-ab12:chat:out -> *:chat:in.' };
+               fix: 'Name one end: your own port, as in web-ab12:chat:value-out -> *:chat:value-in.' };
     }
     const anyEnd = isAny(fromId) ? fromId : toId, realId = isAny(fromId) ? toId : fromId;
     const real = ports.get(realId);

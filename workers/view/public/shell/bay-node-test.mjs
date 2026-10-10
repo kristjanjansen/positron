@@ -200,16 +200,16 @@ const graph = (site, ports = []) => ({ v: 1, site, place: 'browser', nodes: [{ i
   const relay = fakeRelay();
   const TEXT = { of: 'text' };
   const chatGraph = (site) => ({ v: 1, site, place: 'browser', nodes: [{ id: `${site}:chat`, kind: 'person', label: 'chat', place: 'browser' }],
-    ports: [{ id: `${site}:chat:out`, label: 'chat', dir: 'out', medium: 'value', shape: TEXT },
-            { id: `${site}:chat:in`, label: 'chat', dir: 'in', medium: 'value', shape: TEXT }] });
+    ports: [{ id: `${site}:chat:value-out`, label: 'chat', dir: 'out', medium: 'value', shape: TEXT },
+            { id: `${site}:chat:value-in`, label: 'chat', dir: 'in', medium: 'value', shape: TEXT }] });
   const tab = (site, { listen = true } = {}) => {
     const heard = [];
     let node;
     const bay = () => {
       const b = node.registry.fill(createBay());
-      b.addPort({ ...b.port(`${site}:chat:in`), deliver: (e, l, m) => heard.push({ text: e.text, ...m }) });
-      b.link(`${site}:chat:out`, '*:chat:in');
-      if (listen) b.link('*:chat:out', `${site}:chat:in`);
+      b.addPort({ ...b.port(`${site}:chat:value-in`), deliver: (e, l, m) => heard.push({ text: e.text, ...m }) });
+      b.link(`${site}:chat:value-out`, '*:chat:value-in');
+      if (listen) b.link('*:chat:value-out', `${site}:chat:value-in`);
       return b;
     };
     node = createBayNode({ room: 'chat-test-r7', graphs: [chatGraph(site)], wire: relay.open, bay });
@@ -217,29 +217,29 @@ const graph = (site, ports = []) => ({ v: 1, site, place: 'browser', nodes: [{ i
   };
   const A = tab('web-aaaa'), B = tab('web-bbbb'), C = tab('web-cccc', { listen: false });
   await A.node.join(); await B.node.join(); await C.node.join(); await tick(15);
-  const r = A.node.emit('web-aaaa:chat:out', { text: 'hello' }, { store: true });
+  const r = A.node.emit('web-aaaa:chat:value-out', { text: 'hello' }, { store: true });
   await tick(15);
   ok('an emit with listeners on other sites puts one message on the room', r.sent && A.node.stats().emitted === 1
-    && r.far.sort().join(' ') === 'web-bbbb:chat:in web-cccc:chat:in', JSON.stringify(r));
+    && r.far.sort().join(' ') === 'web-bbbb:chat:value-in web-cccc:chat:value-in', JSON.stringify(r));
   ok('a tab holding a listener link hears it, with who and when', B.heard.length === 1 && B.heard[0].text === 'hello'
-    && B.heard[0].from === 'web-aaaa:chat:out' && B.heard[0].to === 'web-bbbb:chat:in' && typeof B.heard[0].by === 'string', JSON.stringify(B.heard));
+    && B.heard[0].from === 'web-aaaa:chat:value-out' && B.heard[0].to === 'web-bbbb:chat:value-in' && typeof B.heard[0].by === 'string', JSON.stringify(B.heard));
   ok('NEGATIVE CONTROL: a tab holding no listener link hears nothing', C.heard.length === 0 && C.node.stats().events === 1,
     JSON.stringify(C.node.stats()));
   ok('NEGATIVE CONTROL: the speaker does not hear its own line come back', A.heard.length === 0);
   /* A socket saying a line came out of somebody else's port. */
   const liar = createBayNode({ room: 'chat-test-r7', graphs: [chatGraph('web-dddd')], wire: relay.open });
   await liar.join(); await tick(15);
-  liar.send({ type: 'bay.event', source: 'web-aaaa:chat:out', ev: { text: 'not me' } });
+  liar.send({ type: 'bay.event', source: 'web-aaaa:chat:value-out', ev: { text: 'not me' } });
   await tick(15);
   ok('NEGATIVE CONTROL: a bay.event whose source is another socket\'s site is refused', B.heard.length === 1
     && B.node.stats().refused === 1, JSON.stringify(B.node.stats()));
-  liar.send({ type: 'bay.event', source: 'web-dddd:chat:out', ev: { text: 'me' } });
+  liar.send({ type: 'bay.event', source: 'web-dddd:chat:value-out', ev: { text: 'me' } });
   await tick(15);
   ok('and the same socket speaking from its own site is heard', B.heard.length === 2 && B.heard[1].text === 'me', JSON.stringify(B.heard));
   const solo = createBayNode({ room: 'chat-test-r8', graphs: [chatGraph('web-eeee')], wire: relay.open,
-    bay: () => { const b = solo.registry.fill(createBay()); b.link('web-eeee:chat:out', '*:chat:in'); return b; } });
+    bay: () => { const b = solo.registry.fill(createBay()); b.link('web-eeee:chat:value-out', '*:chat:value-in'); return b; } });
   await solo.join(); await tick(10);
-  const alone = solo.emit('web-eeee:chat:out', { text: 'anyone?' });
+  const alone = solo.emit('web-eeee:chat:value-out', { text: 'anyone?' });
   ok('NEGATIVE CONTROL: with nobody to reach, nothing is put on the room', !alone.sent && solo.stats().emitted === 0, JSON.stringify(alone));
   for (const n of [A.node, B.node, C.node, liar, solo]) n.leave();
 }

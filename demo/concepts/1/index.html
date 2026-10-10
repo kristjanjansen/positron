@@ -11,7 +11,7 @@
   /* One colour per medium. Audio and video are one warm family (orange, coral); green is taken by the live dot and yellow by the brand. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
   }
   .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
@@ -62,7 +62,7 @@
   ].map(([site, who, medium, dir, by], i, all) => {
     const name = `${medium}-${dir}`;
     const n = all.slice(0, i).filter((x) => x[0] === site && x[2] === medium && x[3] === dir).length;
-    return { who, id: `${site}:main:${name}${n ? `-${n + 1}` : ''}`, real: 'simulated, not announced',
+    return { who, id: `${site}:main:${name}${n ? `-${n + 1}` : ''}`,
       dir: DIR_SIM[dir], medium, by, state: '' };
   });
 
@@ -76,7 +76,7 @@
   const table = createTable({
     columns: [
       { key: 'state', label: '', width: 16 },
-      { key: 'id', label: 'port', grow: true, hi: true, clip: true, hover: 'real' },
+      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
       { key: 'who', label: 'who', width: 120 },
       { key: 'dir', label: 'dir', width: 48 },
       { key: 'medium', label: 'medium', width: 72 },
@@ -118,7 +118,7 @@
     };
     const rows = ports.map((p) => ({ p, site: p.id.split(':')[0], who: who(p.id.split(':')[0]), id: simId(p) })).sort((a, b) => rank(a.site) - rank(b.site) || a.who.localeCompare(b.who) || a.id.localeCompare(b.id));
     table.set([...rows.map(({ p, who, id }) => ({
-      who, id, real: p.id, dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', '), state: p.stale ? 'stale' : 'live',
+      who, id, dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', '), state: p.stale ? 'stale' : 'live',
     })), ...SIM]);
     for (const cell of table.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
       if (cell.textContent === 'live' || cell.textContent === 'stale') {

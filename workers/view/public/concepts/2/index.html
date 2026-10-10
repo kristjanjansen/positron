@@ -11,7 +11,7 @@
   /* The same medium colours as /concepts/1/. If they stay, they move to shell.css. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
   }
   .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
@@ -30,7 +30,7 @@
   // <medium>-<dir>, one node per pane (plans/plan-site-names.md §4c); the announced id is on hover.
   const DIR = { in: '→○', out: '○→' };
   const COLS = [
-    { key: 'id', label: 'port', grow: true, hi: true, clip: true, hover: 'real' },
+    { key: 'id', label: 'port', grow: true, hi: true, clip: true },
     { key: 'who', label: 'who', width: 120 },
     { key: 'dir', label: 'dir', width: 48 },
     { key: 'medium', label: 'medium', width: 72 },

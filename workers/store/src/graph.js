@@ -13,7 +13,7 @@ export const STORE_GRAPH = {
   v: 1, site: 'cf-store', place: 'cloudflare', net: 'cloudflare', kind: 'service', label: 'CF Store',
   nodes: [{ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' }],
   ports: [
-    { id: 'cf-store:history:in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
-    { id: 'cf-store:history:out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
+    { id: 'cf-store:history:value-in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
+    { id: 'cf-store:history:value-out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
   ],
 };

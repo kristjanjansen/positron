@@ -1,5 +1,10 @@
 ## Open
 
+- **Node `kind` becomes flags, waiting on the owner** (2026-10-10). `plans/plan-node-kind.md`: `{ store?, consent?, synth? }` replace the seven kinds; five open questions in its last section (field names, eccm, how long desk tabs stay open). Nothing built.
+- **The bay view's open questions** (2026-10-10, `plans/plan-links-view-phone.md`): box order on a phone (link depth today), one port column (built) or two, and whether the desk layout takes the gutter too, which would stop wires crossing boxes on `/concepts/21/`'s pictures of 6 and 14.
+- **`/concepts/21/` keeps its own node labels** (2026-10-10). Its `INFO` table (`on-screen keyboard`, `Pico OLED, 128x64`) is a copy, not what the concept pages declare (`keyboard`, `OLED`). Either the pages take the longer labels or 21 reads them from the pages.
+- **`heard` reads `received` on `/concepts/20/` only** (2026-10-10). Asked as *"heard -> received?"*; concepts 10 to 14 still say `heard`.
+
 - **Concept 14 rewinds after recording, as 13 does** (2026-10-09). 13's `stopRecording()` sets the range to the take plus 500 ms (2 s minimum), seeks 0 and fits; 14 has the same recorder and not the fix.
 - **Concepts 5 and 6 chat through the bay** (2026-10-09). They still `node.send` raw `chat.line` / `chat.admin`; 3 and 4 use `node.emit` and `*` links (§4h). Port them, notices included (`admin:out -> *:notice:in`).
 - **Bay: first-join race** (2026-10-09, §4h). A `bay.event` that arrives before its sender's announce is refused as an unknown source. Rare, real.

@@ -15,7 +15,7 @@
   /* The same medium colours as /concepts/1/. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
   }
   .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
@@ -85,16 +85,16 @@
 
   let kb = null;
   const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes you play' },
-    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes that light the keys',
+    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
       deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes the saw plays',
+    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
       deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', what: 'the saw' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio', what: 'what you hear' },
-    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], what: 'notes being recorded',
+    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio' },
+    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' },
+    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
       deliver: (e) => take(e) },
-    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], what: 'notes played back' },
+    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
   ];
   for (const p of PORTS) bay.addPort(p);
 
@@ -214,7 +214,7 @@
   function draw() {
     const all = bay.ports ? bay.ports() : [];
     const heard = new Map(all.map((p) => [p.id, p.heard]));
-    portsT.set(PORTS.map((p) => ({ id: p.id, dir: DIR[p.dir], medium: p.medium, what: p.what,
+    portsT.set(PORTS.map((p) => ({ id: p.id, dir: DIR[p.dir], medium: p.medium,
       heard: p.dir === 'out' ? (p.id.endsWith('keys:midi-out') ? sentOut.n : '') : heard.get(p.id) ?? 0 })));
     const ls = bay.links ? bay.links() : [];
     linksT.set(ls.map((l) => ({ line: printLink(l), by: l.session?.transport || 'the bay, one event at a time', sent: l.sent })));

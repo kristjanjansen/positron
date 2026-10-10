@@ -17,7 +17,7 @@
   /* The same medium colours and live dot as /concepts/1/. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
   }
   .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
@@ -52,15 +52,15 @@
   // and keeps every message sent with `store: true` (workers/store/src/index.js).
   const STORE_URL = 'https://store.positron.studio';
   const SITE = randomSite('web');
-  const OUT = `${SITE}:chat:out`, IN = `${SITE}:chat:in`;
+  const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
   // ADMIN: toward /stage/. One more node on every tab, `notice`, with an in-port
   // that takes admin lines and shows the last one above the chat. Only a tab
-  // on the admin tab announces `admin:out` and can send to it.
+  // on the admin tab announces `admin:value-out` and can send to it.
   // ⚠️ NOTHING PROVES THE ADMIN. Any tab can pick the admin tab; the bay checks that the
   // ports fit, not who holds them. That is the question this page exists to ask.
   // The tab in the address wins, as tabs.mjs decides; ?admin=1 picks admin when there is none.
   let admin = location.hash ? location.hash === '#admin' : new URLSearchParams(location.search).get('admin') === '1';
-  const AOUT = `${SITE}:admin:out`, NOTICE = `${SITE}:notice:in`;
+  const AOUT = `${SITE}:admin:value-out`, NOTICE = `${SITE}:notice:value-in`;
   const CAM = `${SITE}:camera:video-out`, BOUT = `${SITE}:broadcast:value-out`;
   const SCREEN = `${SITE}:screen:video-in`, ONAIR = `${SITE}:screen:value-in`;
   const selfGraph = () => ({
@@ -109,8 +109,8 @@
     v: 1, site: 'cf-store', place: 'cloudflare', net: 'cloudflare', kind: 'service', label: 'CF Store',
     nodes: [{ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' }],
     ports: [
-      { id: 'cf-store:history:in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
-      { id: 'cf-store:history:out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
+      { id: 'cf-store:history:value-in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
+      { id: 'cf-store:history:value-out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
     ],
   };
 
@@ -197,7 +197,7 @@
   });
 
   function heard(m, old = false) {
-    const source = old ? 'cf-store:history:out' : String(m.source || '');
+    const source = old ? 'cf-store:history:value-out' : String(m.source || '');
     const from = String(m.source || '');
     const b = filled();
     const l = b.link(source, IN, [], { site: SITE });
@@ -207,10 +207,10 @@
   }
 
   // An admin line: shown in the chat AND as the notice, if the bay accepts a link
-  // from its admin:out to this tab's notice:in.
+  // from its admin:value-out to this tab's notice:value-in.
   function heardAdmin(m, old = false) {
     const from = String(m.source || '');
-    const source = old ? 'cf-store:history:out' : from;
+    const source = old ? 'cf-store:history:value-out' : from;
     const b = filled();
     const l = b.link(source, NOTICE, [], { site: SITE });
     const site = from.split(':')[0];
@@ -246,10 +246,10 @@
     // No link reaches many listeners yet (plans/plan-site-names.md, chat gaps), so
     // the line goes to the room and this shows the one-to-one links it stands for.
     const b = filled();
-    const to = node.registry.merged().ports.filter((p) => p.dir === 'in' && (p.id.endsWith(':chat:in') || p.id === 'cf-store:history:in') && p.id !== IN)
+    const to = node.registry.merged().ports.filter((p) => p.dir === 'in' && (p.id.endsWith(':chat:value-in') || p.id === 'cf-store:history:value-in') && p.id !== IN)
       .map((p) => ({ p, l: b.link(OUT, p.id, [], { site: SITE }) }));
     const ok = to.filter((x) => x.l.ok).map((x) => `${OUT} -> ${x.p.id}`);
-    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:in`,
+    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:value-in`,
       why: ok.length ? ok.join('\n') : 'nobody else in the room' });
     draw();
     text.set('');
@@ -262,7 +262,7 @@
     if (!t) return;
     node.send({ type: 'chat.admin', source: AOUT, text: t, store: true });
     heardAdmin({ source: AOUT, text: t, sent: Date.now() });
-    told[told.length - 1].link = `${AOUT} -> *:notice:in`;
+    told[told.length - 1].link = `${AOUT} -> *:notice:value-in`;
     draw();
     noticeText.set('');
   }
@@ -426,7 +426,7 @@
   setInterval(() => { if (sub && Date.now() - lastOn > 35_000) stopWatching('no word from the admin for 35 s'); }, 5000);
 
   // The two roles. Switching re-announces this tab: the admin tab adds the
-  // `admin` node and its `admin:out`, the audience tab takes them away.
+  // `admin` node and its `admin:value-out`, the audience tab takes them away.
   const roles = createTabs({
     tabs: [{ id: 'admin', label: 'Admin' }, { id: 'audience', label: 'Audience' }],
     at: admin ? 'admin' : 'audience',
@@ -464,7 +464,7 @@
   const sites = createTable({
     columns: [
       { key: 'state', label: '', width: 16 },
-      { key: 'id', label: 'port', grow: true, hi: true, clip: true, hover: 'real' },
+      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
       { key: 'who', label: 'who', width: 120 },
       { key: 'dir', label: 'dir', width: 48 },
       { key: 'medium', label: 'medium', width: 72 },
@@ -475,7 +475,7 @@
   function drawSites() {
     const rows = node.registry.merged().ports.map((p) => {
       const [site, n] = p.id.split(':');
-      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`, real: p.id,
+      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`,
         who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
     }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
     sites.set(rows);

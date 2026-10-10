@@ -15,7 +15,7 @@
   /* The same medium colours and live dot as /concepts/1/. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #a89a8a; --md-state: #8a9fc4;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
   }
   .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
@@ -36,14 +36,14 @@
   // The smallest multi-user chat built from patchbay blocks
   // (plans/plan-site-names.md §4h). Every tab is a SITE with one NODE and two
   // PORTS of medium `value`, shaped `of: text`. It holds two `*` LINKS: a speaker,
-  // `<me>:chat:out -> *:chat:in`, and a listener, `*:chat:out -> <me>:chat:in`.
+  // `<me>:chat:value-out -> *:chat:value-in`, and a listener, `*:chat:value-out -> <me>:chat:value-in`.
   // A line crosses the room as one `bay.event`, and the receiving bay delivers it
   // only along the listener link. No chat code beyond drawing.
   // Its own room, never studio-1, so nothing lands on the studio's desk.
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-1';
   const SITE = randomSite('web');
-  const OUT = `${SITE}:chat:out`, IN = `${SITE}:chat:in`;
+  const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
   const SELF = {
     v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
     nodes: [{ id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' }],
@@ -80,14 +80,14 @@
   setInterval(() => { if (said.length) draw(); }, 30000);
   const short = (site) => site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`;
 
-  const SPEAK = `${OUT} -> *:chat:in`;
+  const SPEAK = `${OUT} -> *:chat:value-in`;
   // The bay as it stands now: everybody heard, this tab's in-port able to
   // deliver, and the two links this tab holds.
   function bay() {
     const b = node.registry.fill(createBay());
     b.addPort({ ...b.port(IN), deliver: heard });
-    b.link(OUT, '*:chat:in');
-    b.link('*:chat:out', IN);
+    b.link(OUT, '*:chat:value-in');
+    b.link('*:chat:value-out', IN);
     return b;
   }
   const node = createBayNode({
@@ -127,7 +127,7 @@
   const sites = createTable({
     columns: [
       { key: 'state', label: '', width: 16 },
-      { key: 'id', label: 'port', grow: true, hi: true, clip: true, hover: 'real' },
+      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
       { key: 'who', label: 'who', width: 120 },
       { key: 'dir', label: 'dir', width: 48 },
       { key: 'medium', label: 'medium', width: 72 },
@@ -138,7 +138,7 @@
   function drawSites() {
     const rows = node.registry.merged().ports.map((p) => {
       const [site, n] = p.id.split(':');
-      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`, real: p.id,
+      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`,
         who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
     }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
     sites.set(rows);

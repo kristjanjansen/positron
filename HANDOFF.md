@@ -1,3 +1,42 @@
+# Handoff, 2026-10-10, session 72: the bay drawn from its own data, and the ports renamed
+
+## Where it is right now
+
+- **Site: BUILD `469e132-072304-9ec8`**, confirmed on the edge, deployed from this session's main commit.
+- **`positron-store` version `6d41e31e`** announces `cf-store:history:value-in` / `value-out`. It and the site went out together, because concept 4's links name the new ports.
+- **Not pushed.** `6c70db5` (session 71's handoff) and this session's commit are local. Push needs the account switch in CLAUDE.md.
+- Counted: **55 demos, 54 built**, **99 plans**. No agent running.
+- The Pi still runs old board code (session 71, unchanged).
+
+## What landed
+
+| what | where |
+| --- | --- |
+| **Concept 20, Links UI**: keyboard, then a `patchbay` picture, then links and ports tables; each box carries its node label grey at top right; MIDI wires pulse once per event the link delivered (`l.sent`), the audio wire brightens with a moving gradient while the sine sounds; the ports column reads `received` | `demo/concepts/20/index.html` |
+| **Concept 21, Patchbay viz**: every link concepts 2 to 14 hold, then `/patchbay/`'s desk example, `/mirror/`, `/knobs/`, `/away/`, `/fau/`, `/nola/`, `/wish/` with the ids they announce today, all with stand-in traffic | `demo/concepts/21/index.html` |
+| **`bay-view.mjs`** (`createBayView`): draws `bay.nodes()`, `ports()`, `links()` and nothing typed. Desk: left to right chain, ins left, outs right, twins (same two ends) split, run side by side and rejoin in a gap of at least 64 px, return links run under the row in their own lanes with rounded corners, a chain that does not fit at 28 px gaps scrolls sideways. Below 480 px: full width cards, title top left, label under it, ports on the right, every wire in a gutter lane (`plans/plan-links-view-phone.md`, built with its defaults). Options `detail(node)`, `stretch`, `sizeAs`, `maxWire`; `wires` hands each link's path to a page | `demo/concepts/20/bay-view.mjs` |
+| **`bay-traffic.mjs`** (`createBayTraffic`): shades the drawn wires from `read(t) -> { n, flowing }`; events are narrow pulses (30 ms apart stay two), streams fade 0.35 to 0.8 in 150 ms with a half bright gradient at about a wave a second | `demo/concepts/20/bay-traffic.mjs` |
+| **`port-ink.mjs`**: colours the port part of every `site:node:port` on the page in its medium colour with the CSS Custom Highlight API, the text stays plain ASCII | `demo/concepts/20/port-ink.mjs` |
+| **Ports renamed to `<medium>-<dir>`** for chat, admin, notice and the store's history (`chat:value-out`, `notice:value-in`, `cf-store:history:value-in`) | concepts 3 to 6, `workers/store/src/graph.js`, `bay.mjs` messages, `bay-test.mjs` 170/170, `bay-node-test.mjs` 40/40 |
+| **File medium is orchid `#d68fc6`** (was a dull `#a89a8a`) | 13 concept pages, positron-concepts skill |
+| **Removed**: the port `what` field (read by nothing), the port tables' `hover: 'real'` and their `real` row fields | concepts 1 to 6, 10 to 14, 20 |
+
+## Specs written, not built
+
+- **`plans/plan-node-kind.md`** (a background agent): `kind` becomes `store?`, `consent?`, `synth?`. `engine` is READ by `openers.mjs:133-137` (note.on versus raw MIDI, audio.start versus listen), so it cannot just go. Five open questions at its end. Reported in full in the session.
+- **`plans/plan-links-view-phone.md`**: the phone layout, now built; its three open questions are in BACKLOG.
+
+## Open
+
+`BACKLOG.md` under `## Open`, the four 2026-10-10 lines on top, then session 71's list (Pi deploy, concept 14 rewind, who may hold a port, the id sweep, medium colours into the kit, Containers start times).
+
+## Mistakes worth knowing
+
+- **I briefed an agent with a claim I had not checked** ("only bay.mjs reads kind"). It found `openers.mjs` reading `engine` and said so. Brief from a grep, and say which claims were verified.
+- **`perl -pi ... $FILES` in zsh did not split the list** and edited nothing, twice; the second time `${F[@]}` inside double quotes was escaped wrong. Use an array (`"${F[@]}"`) or a script file, and check the diff stat after.
+- **I read "its patchbay viz" as a title** when it was the answer to "what name is it" for the module; the card is now "Patchbay viz" and the modules `bay-view` / `bay-traffic`. Ask when a two word reply could attach to more than one open question.
+- **A deploy was refused mid-iteration** (the owner was still changing the page). Deploy at a pause, not between two asks on the same picture.
+
 # Handoff, 2026-10-09, session 71: the concepts pages, the patchbay unpacked
 
 ## Where it is right now

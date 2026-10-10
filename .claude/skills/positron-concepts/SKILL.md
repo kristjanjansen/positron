@@ -129,7 +129,7 @@ stay they move there.
 | value | `#9ad16b` |
 | video | `#e07a5f` coral |
 | program | `#c39af0` |
-| file | `#a89a8a` |
+| file | `#d68fc6` orchid |
 | state | `#8a9fc4` |
 
 Why video is coral: it was brand yellow `--hi` first (*"conflict with brand"*),
@@ -172,8 +172,8 @@ flows; a TRANSPORT is what carries it (`relay`, `whep`, `whip`, `https`).
   in the tree, the rename is not.
 - **A `*` link is one to many** (§4h): `*` is a whole site segment, one per
   link, never matches its own site, light media other than MIDI only. A chat
-  tab holds a speaker `<me>:chat:out -> *:chat:in` and a listener
-  `*:chat:out -> <me>:chat:in`, and holding the listener is its consent.
+  tab holds a speaker `<me>:chat:value-out -> *:chat:value-in` and a listener
+  `*:chat:value-out -> <me>:chat:value-in`, and holding the listener is its consent.
 - **`value` carries text**, shaped `{ of: 'text' }`. No `text` medium.
 - **A light event crosses the room as one `bay.event`**: `node.emit(source, ev)`
   in `bay-node.mjs` sends it once when a link reaches another site, and the
@@ -181,9 +181,9 @@ flows; a TRANSPORT is what carries it (`relay`, `whep`, `whip`, `https`).
   sending socket never announced is refused.
 - **The store is a site, the relay is not** (§4g). The relay is the room and
   keeps nothing, so it shows as the `relay` transport. `positron-store` is
-  `cf-store:history:in/out`.
+  `cf-store:history:value-in/out`.
 - **Admin notices** are a `notice` node with an in-port on every tab and an
-  `admin:out` only on the admin tab (5, 6). ⚠️ **NOTHING PROVES THE ADMIN**:
+  `admin:value-out` only on the admin tab (5, 6). ⚠️ **NOTHING PROVES THE ADMIN**:
   any tab can pick the admin tab, the bay checks that ports fit, not who holds
   them. That open gap is what the page asks.
 - **The broadcast** (6) is the admin's camera `video-out` by WHIP to
