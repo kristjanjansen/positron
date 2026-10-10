@@ -19,9 +19,25 @@
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
   /* The requests and the ask button: a column of sentences, the button under it. */
   .cc-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; min-width: 0; }
-  .cc-stack > .pos-bgroup { flex: none; width: auto; }
+  .cc-stack > * { flex: none; }
+  .cc-stack > .pos-bgroup { width: auto; }
   .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
-  .cc-no { color: var(--bad, #e06c6c); }
+  /* KIT DEFECT, REPAIRED HERE ONLY BECAUSE shell.css IS NOT THIS PAGE'S TO
+     CHANGE: `.step { height: 34px }` (shell.css 3831) beats the column choice,
+     whose rule never sets the segment's height, so five options were squeezed
+     into one 34 px box at 13 px each. MEASURED 2026-10-10. Belongs in
+     `.pos-choice[data-orient="column"] .pos-seg`. */
+  .cc-stack .pos-choice[data-orient="column"] .pos-seg { height: auto; }
+  .cc-stack .pos-choice[data-orient="column"] .pos-seg > button { text-align: left; }
+  /* A request is a sentence, not a name, so on a phone it wraps rather than
+     dragging the page 104 px sideways. */
+  @media (max-width: 560px) {
+    .cc-stack .pos-choice[data-orient="column"] .pos-seg > button {
+      white-space: normal; height: auto; min-height: 34px; text-align: left; padding-block: 6px;
+    }
+  }
+  .cc-no { color: var(--bad); }
+  .cc-stack.cc-wide { align-items: stretch; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -49,8 +65,8 @@
   // quoted in demo/wish/index.html, 2026-09-22).
   //
   // WHAT IT COSTS: every press of Ask is ONE Workers AI call on a paid account.
-  // MEASURED 2026-10-10 on this page: about 1,000 prompt tokens and 60 to 120
-  // completion tokens a press, so roughly $0.0005 a press. Nothing opens on a
+  // MEASURED 2026-10-10 on this page, two presses: 781 and 783 prompt tokens,
+  // 109 and 86 completion tokens, $0.00047 and $0.00042, about 3 s each. Nothing opens on a
   // visit: no fetch, no AudioContext, until somebody presses.
   const S = 'web';
   const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
@@ -236,11 +252,10 @@
 
   const top = el('div', 'cc-stack');
   top.append(pick.el, ask.el);
-  const patchBlock = el('div', 'cc-stack');
-  patchBlock.style.alignItems = 'stretch';
+  const patchBlock = el('div', 'cc-stack cc-wide');
   patchBlock.append(el('h3', 'cc-h', 'what the model proposed'), patchT.el);
   d.stack.add(top, wave.el, host, patchBlock, pb.el);
-  window.__demo.ask = (i) => { pick.set?.(i); chosen = i; return go(i); };
+  window.__demo.ask = (i) => { pick.set(i, true); chosen = i; return go(i); };
   window.__demo.bay = bay;
   d.ready();
 </script>

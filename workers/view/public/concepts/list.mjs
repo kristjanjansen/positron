@@ -4,6 +4,7 @@
 // `group` places a card under its heading on the index, in the order the
 // groups first appear here; prev and next walk this order.
 export const CONCEPTS = [
+  { n: '001', group: 'patchbay', title: 'Patch from words', say: 'A model turns a spoken request into links that the patchbay checks and holds.' },
   { n: '010', group: 'synths', title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
   { n: '012', group: 'synths', title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
   { n: '013', group: 'synths', title: 'Timeline', say: 'The recorder on the kit transport bar and timeline.' },
@@ -11,7 +12,7 @@ export const CONCEPTS = [
   { n: '015', group: 'synths', title: 'Synth', say: 'A WebAudio synth built one patched module at a time.' },
   { n: '016', group: 'synths', title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
   { n: '017', group: 'synths', title: 'Yoshimi', say: 'The keyboard and knobs playing Yoshimi on the Raspberry Pi in another building.' },
-  { n: '018', group: 'synths', title: 'Faust synth', say: 'A Faust program played from the patchbay with every parameter a knob of its own.' },
+  { n: '018', group: 'synths', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: '030', group: 'radio', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
   { n: '031', group: 'radio', title: 'Granulator', say: 'One station into a granulator that a BPM detector keeps in tempo.' },
   { n: '032', group: 'radio', title: 'Tuner', say: 'Four stations and a noise source tuned through one crackly AM dial.' },
