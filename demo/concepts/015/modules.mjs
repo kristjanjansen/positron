@@ -44,7 +44,11 @@ export const KNOBS = [
   { name: 'attack', owner: 'amp', min: 0, max: 127, raw: A.from(0.008), value: A.to, format: (r) => sText(A.to(r)) },
   { name: 'release', owner: 'amp', min: 0, max: 127, raw: R.from(0.45), value: R.to, format: (r) => sText(R.to(r)) },
   { name: 'rate', owner: 'lfo', min: 0, max: 127, raw: L.from(0.35), value: L.to, format: (r) => `${L.to(r).toFixed(2)} Hz` },
-  { name: 'depth', owner: 'lfo', min: 0, max: 3000, step: 10, raw: 800, value: (r) => r, format: (r) => `${Math.round(r)} Hz` },
+  // Depth is in octaves and travels as cents, because the LFO moves the
+  // filter's detune rather than its frequency. A swing in Hz below a low
+  // cutoff drove the frequency to 0 and the wave went flat for half of
+  // every cycle (asked 2026-10-10, *"lfo just flattens osc"*).
+  { name: 'depth', owner: 'lfo', min: 0, max: 4, step: 0.1, raw: 1.5, value: (r) => r * 1200, format: (r) => `${r.toFixed(1)} oct` },
 ];
 export const knobRaw = (name, v) => {
   const k = KNOBS.find((x) => x.name === name);
@@ -54,6 +58,7 @@ export const knobRaw = (name, v) => {
   if (name === 'attack') return A.from(v);
   if (name === 'release') return R.from(v);
   if (name === 'rate') return L.from(v);
+  if (name === 'depth') return v / 1200;
   return k ? v : 0;
 };
 
@@ -99,7 +104,7 @@ const STEP_LIST = [
   // No keyboard since 2026-10-10 (*"from 40 rm keys and detune"*): play is a
   // test tone, one held note out of web:tone into the osc and the amp.
   { name: 'amp', patch: L5, knobs: ['freq', 'wave', 'cutoff', 'q', 'attack', 'release'], preset: { wave: 'sawtooth' } },
-  { name: 'lfo', patch: L6, knobs: ['freq', 'wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 800 } },
+  { name: 'lfo', patch: L6, knobs: ['freq', 'wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 1800 } },
 ];
 export const STEPS = STEP_LIST.map((st) => ({ ...st, patch: withKnobs(st.patch, st.knobs) }));
 
@@ -116,7 +121,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     osc: { freq: 220, detune: 0, wave: 'sine' },
     filter: { cutoff: 1100, q: 5 },
     amp: { attack: 0.008, decay: 0.35, sustain: 0.55, release: 0.45 },
-    lfo: { rate: 0.35, depth: 800 },
+    lfo: { rate: 0.35, depth: 1800 },
   };
   let ctx = null;
   const N = {};                       // module -> { out, input(port) } once started
@@ -266,7 +271,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
 
     const f = ctx.createBiquadFilter();
     f.type = 'lowpass'; f.frequency.value = P.filter.cutoff; f.Q.value = P.filter.q;
-    N.filter = { f, out: f, input: (p) => (p === 'cutoff-in' ? f.frequency : f) };
+    N.filter = { f, out: f, input: (p) => (p === 'cutoff-in' ? f.detune : f) };
 
     const vca = ctx.createGain(); vca.gain.value = 0;
     N.amp = { vca, out: vca, input: () => vca };
@@ -288,7 +293,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   /**
    * THE ROUTER. Reads `bay.links()` and connects exactly what is held: a
    * module's audio out to the far module's input, which is a node or, for
-   * `cutoff-in`, the filter's frequency AudioParam. Every out is disconnected
+   * `cutoff-in`, the filter's detune AudioParam. Every out is disconnected
    * first, so an unlinked edge goes silent. Called after every link change.
    * As `route()` on /concepts/030/, lifted to every module.
    */
