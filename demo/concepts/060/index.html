@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept 060</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
+  .cc-row > .pos-field { flex: 1 1 260px; min-width: 0; }
+  .cc-row[hidden] { display: none; }
+  .cc-ends { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: var(--ctl-gap, 8px); }
+  /* The same medium colours and live dot as /concepts/010/. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
+  }
+  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
+  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
+  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
+  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+  .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
+  .cc-ring::after { content: none; }
+  /* The picture is only on screen while a broadcast is. The wrapper carries
+     [hidden], because .pos-vp sets display and would beat it. */
+  .cc-air[hidden] { display: none; }
+  .cc-say { margin: 0; color: var(--dim); font-size: 13.5px; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el, armVideo } from '/shell/shell.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { fetchIceServers, camWhipPublish, camWhep, whepPlay } from '/shell/live.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createTabs } from '/shell/tabs.mjs';
+  import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+
+  // The smallest multi-user chat built from patchbay blocks, with an admin who
+  // writes notices and broadcasts a camera. Every tab is a SITE; every leg is a
+  // LINK its bay holds, and a line travels by `node.emit` along it.
+  // Its own room, never studio-1, so nothing lands on the studio's desk.
+  const asked = new URLSearchParams(location.search).get('room');
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-4';
+  // History: positron-store, a recorder that joins the room as an ordinary socket
+  // and keeps every message sent with `store: true` (workers/store/src/index.js).
+  const STORE_URL = 'https://store.positron.studio';
+  const SITE = randomSite('web');
+  const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
+  // ADMIN: toward /stage/. One more node on every tab, `notice`, with an in-port
+  // that takes admin lines and shows the last one above the chat. Only a tab
+  // on the admin tab announces `admin:value-out` and can send to it.
+  // ⚠️ NOTHING PROVES THE ADMIN. Any tab can pick the admin tab; the bay checks that the
+  // ports fit, not who holds them. That is the question this page exists to ask.
+  // The tab in the address wins, as tabs.mjs decides; ?admin=1 picks admin when there is none.
+  let admin = location.hash ? location.hash === '#admin' : new URLSearchParams(location.search).get('admin') === '1';
+  const AOUT = `${SITE}:admin:value-out`, NOTICE = `${SITE}:notice:value-in`;
+  const CAM = `${SITE}:camera:video-out`, BOUT = `${SITE}:broadcast:value-out`;
+  const SCREEN = `${SITE}:screen:video-in`, ONAIR = `${SITE}:screen:value-in`;
+  const selfGraph = () => ({
+    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
+    nodes: [
+      { id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' },
+      { id: `${SITE}:notice`, kind: 'screen', label: 'notice', place: 'browser' },
+      ...(admin ? [{ id: `${SITE}:admin`, kind: 'person', label: 'admin', place: 'browser' }] : []),
+      { id: `${SITE}:screen`, kind: 'screen', label: 'screen', place: 'browser' },
+      ...(admin ? [
+        { id: `${SITE}:camera`, kind: 'device', label: 'camera', place: 'browser' },
+        { id: `${SITE}:broadcast`, kind: 'endpoint', label: 'broadcast', place: 'browser' },
+      ] : []),
+    ],
+    ports: [
+      { id: OUT, label: 'chat', dir: 'out', medium: 'value', transports: ['relay'] },
+      { id: IN, label: 'chat', dir: 'in', medium: 'value', transports: ['relay'] },
+      { id: NOTICE, label: 'notice', dir: 'in', medium: 'value', transports: ['relay'] },
+      ...(admin ? [{ id: AOUT, label: 'admin', dir: 'out', medium: 'value', transports: ['relay'] }] : []),
+      { id: SCREEN, label: 'screen', dir: 'in', medium: 'video', transports: ['whep'] },
+      { id: ONAIR, label: 'on air', dir: 'in', medium: 'value', transports: ['relay'] },
+      ...(admin ? [
+        { id: CAM, label: 'camera', dir: 'out', medium: 'video', transports: ['whip'] },
+        { id: BOUT, label: 'broadcast', dir: 'out', medium: 'value', transports: ['relay'] },
+      ] : []),
+    ],
+  });
+  // BROADCAST: the admin's camera goes out by WHIP to Cloudflare Stream and every
+  // other tab plays it back by WHEP. It rides /cam/'s own WebRTC input
+  // (CAM_WHIP_UID in live.mjs), published through pub.positron.studio/cam/whip so
+  // the key never reaches this page, and that worker allows one camera at a time:
+  // while /cam/ holds it this page is told 409 in words, and the other way round.
+  // Whether it is on is a light state, a `bay.event` out of `<admin>:broadcast:value-out`
+  // to `*:screen:value-in`, which a tab hears only along the listener link it holds.
+  const STREAM = {
+    v: 1, site: 'cf-stream', place: 'cloudflare', net: 'cloudflare', kind: 'service', label: 'CF Stream',
+    nodes: [{ id: 'cf-stream:live', kind: 'endpoint', label: 'live input', place: 'cloudflare', net: 'cloudflare' }],
+    ports: [
+      { id: 'cf-stream:live:video-in', label: 'video', dir: 'in', medium: 'video', transports: ['whip'] },
+      { id: 'cf-stream:live:video-out', label: 'video', dir: 'out', medium: 'video', transports: ['whep'] },
+    ],
+  };
+  // The store as a site, announced on its behalf into this page's own registry
+  // only, as /patchbay/ does for R2: every tab would describe the same store.
+  const STORE = {
+    v: 1, site: 'cf-store', place: 'cloudflare', net: 'cloudflare', kind: 'service', label: 'CF Store',
+    nodes: [{ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' }],
+    ports: [
+      { id: 'cf-store:history:value-in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
+      { id: 'cf-store:history:value-out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
+    ],
+  };
+
+  const d = mount({ name: 'concept 060', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('060');
+
+  const lines = createTable({
+    columns: [
+      { key: 'who', label: 'who', width: 96 },
+      { key: 'text', label: 'line', grow: true, hi: true },
+      { key: 'ago', label: 'when', width: 72 },
+      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
+    ],
+    minRows: 4,
+    stick: true,
+  });
+  const said = [];
+  // The patchbay picture, made once the node exists (at the foot of the page).
+  let pb = null;
+  // How long ago, from the send stamp the relay envelope carries (`sent`).
+  const ago = (at) => {
+    const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+    if (s < 10) return 'now';
+    if (s < 60) return `${s} s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+    return `${Math.floor(s / 86400)} d ago`;
+  };
+  // Admin lines have a table of their own, with the same columns.
+  const notices = createTable({
+    columns: [
+      { key: 'who', label: 'who', width: 96 },
+      { key: 'text', label: 'notice', grow: true, hi: true },
+      { key: 'ago', label: 'when', width: 72 },
+      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
+    ],
+    minRows: 2,
+    stick: true,
+  });
+  const told = [];
+  const draw = () => {
+    lines.set(said.map((r) => ({ ...r, ago: ago(r.at) })));
+    notices.set(told.map((r) => ({ ...r, ago: ago(r.at) })));
+  };
+  setInterval(() => { if (said.length || told.length) draw(); }, 30000);
+  const short = (site) => site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : site === 'cf-stream' ? 'CF Stream'
+    : `browser ${site.replace(/^web-/, '')}`;
+
+  // ── the links this tab holds ──────────────────────────────────────────────
+  // Every leg is a link in this bay, and a line travels by `node.emit` along it:
+  // one `bay.event` on the room, delivered by the receiving bay only along a
+  // link IT holds. Holding the listener is a tab's consent to hear.
+  //   chat     <me>:chat:value-out -> *:chat:value-in        (speaker)
+  //            *:chat:value-out -> <me>:chat:value-in        (listener)
+  //   notices  <me>:admin:value-out -> *:notice:value-in     (admin tab only)
+  //            *:admin:value-out -> <me>:notice:value-in     (every tab)
+  //   store    chat and admin lines -> cf-store:history:value-in, and
+  //            cf-store:history:value-out -> chat and notice (the replay)
+  //   on air   *:broadcast:value-out -> <me>:screen:value-in  (every tab)
+  //            <me>:broadcast:value-out -> *:screen:value-in  (admin tab only)
+  //   camera   <me>:camera:video-out -> cf-stream:live:video-in by WHIP (admin tab)
+  //            cf-stream:live:video-out -> <me>:screen:video-in by WHEP (every other tab)
+  // The camera legs are opened by the page itself (live.mjs); the bay holds them
+  // and names their transport, it does not open them.
+  // ⚠️ THE STORE HAS ONE OUT PORT, so a kept line is offered to both in-ports
+  // and each takes only its own kind, read from where it was first said.
+  const KEEP = 'cf-store:history:value-in', KEPT = 'cf-store:history:value-out';
+  const isNotice = (src) => /:admin:value-out$/.test(String(src));
+  function bay() {
+    const b = node.registry.fill(createBay());
+    if (b.port(IN)) b.addPort({ ...b.port(IN), deliver: heard });
+    if (b.port(NOTICE)) b.addPort({ ...b.port(NOTICE), deliver: heardAdmin });
+    b.link(OUT, '*:chat:value-in');
+    b.link('*:chat:value-out', IN);
+    b.link('*:admin:value-out', NOTICE);
+    b.link(OUT, KEEP);
+    b.link(KEPT, IN);
+    b.link(KEPT, NOTICE);
+    if (b.port(ONAIR)) b.addPort({ ...b.port(ONAIR), deliver: onAir });
+    b.link('*:broadcast:value-out', ONAIR);
+    if (admin && b.port(AOUT)) {
+      b.link(AOUT, '*:notice:value-in');
+      b.link(AOUT, KEEP);
+    }
+    if (admin && b.port(BOUT)) b.link(BOUT, '*:screen:value-in');
+    // WHIP has to be asked for by name: at internet-one the transport table
+    // offers whep or relay-h264 for a video out, and this input takes only whip.
+    if (admin && b.port(CAM)) b.link(CAM, 'cf-stream:live:video-in', [], { site: SITE, via: 'whip' });
+    if (!admin) b.link('cf-stream:live:video-out', SCREEN, [], { site: SITE });
+    return b;
+  }
+
+  const node = createBayNode({
+    room: ROOM, graphs: [selfGraph()], local: [STORE, STREAM], bay,
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); air.enable('start', !pub, 'already on air'); drawSites(); pb?.refresh(); },
+    onGraph: () => { drawSites(); pb?.refresh(); if (pub) tellAir(true, false); },
+    onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
+    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
+  });
+
+  // Called by the bay, only along a link this tab holds into chat:value-in.
+  // A line out of the store carries who first said it as `speaker`.
+  function heard(e, l, m) {
+    const by = String(m.speaker || m.from);
+    if (l.from === KEPT && isNotice(by)) return;          // a kept notice is the notice port's
+    pb?.pulse(l.from, l.to);
+    said.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
+      link: `${m.from} -> ${m.to}`,
+      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
+    draw();
+  }
+
+  // Called by the bay, only along a link this tab holds into notice:value-in.
+  function heardAdmin(e, l, m) {
+    const by = String(m.speaker || m.from);
+    if (l.from === KEPT && !isNotice(by)) return;         // a kept chat line is the chat port's
+    pb?.pulse(l.from, l.to);
+    told.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
+      link: `${m.from} -> ${m.to}`,
+      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
+    draw();
+  }
+
+  // Wake the recorder into this room, then read what it kept. Our own worker,
+  // asked only on a press of Join. Each kept line is handed to the bay as an
+  // event leaving the store's out port. `chat.line` and `chat.admin` rows are
+  // from before 2026-10-10, when this page sent its own message types.
+  async function loadHistory() {
+    try {
+      const r = await fetch(`${STORE_URL}/room/${ROOM}/record`, { method: 'POST' });
+      d.log(`store recording ${ROOM}: ${r.status}`);
+      const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
+      const rows = (await h.text()).split('\n').filter(Boolean);
+      const b = bay();
+      let n = 0;
+      for (const line of rows) {
+        let m; try { m = JSON.parse(line); } catch { continue; }
+        const kept = m.type === 'bay.event' && /:(chat|admin):value-out$/.test(String(m.source)) ? m.ev?.text
+          : m.type === 'chat.line' || m.type === 'chat.admin' ? m.text : undefined;
+        if (typeof kept !== 'string') continue;
+        if (b.send(KEPT, { text: kept }, { sent: m.sent, speaker: String(m.source || '') })) n++;
+      }
+      d.log(`${n} earlier line${n === 1 ? '' : 's'} from the store`);
+    } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
+  }
+
+  // Who a line went to, for the hover: the concrete pairs the `*` link stood for.
+  const reached = (r) => (r.far.length ? r.far.map((to) => `${r.source} -> ${to}`).join('\n') : 'nobody else in the room');
+  const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
+  text.disabled(true);
+  function say() {
+    const t = text.value().trim();
+    if (!t) return;
+    // `store: true` rides on the bay.event, which is what positron-store keeps.
+    const r = node.emit(OUT, { text: t }, { store: true });
+    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(OUT, '*:chat:value-in');
+    if (r.sent && r.far.includes(KEEP)) pb?.pulse(OUT, KEEP);
+    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:value-in`, why: reached({ ...r, source: OUT }) });
+    draw();
+    text.set('');
+  }
+  // The admin writes notices in a field of its own, and still chats like anyone.
+  const noticeText = createField({ label: 'notice', placeholder: 'tell everyone', grow: 'wide' });
+  noticeText.disabled(true);
+  function sayAdmin() {
+    const t = noticeText.value().trim();
+    if (!t) return;
+    const r = node.emit(AOUT, { text: t }, { store: true });
+    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(AOUT, '*:notice:value-in');
+    if (r.sent && r.far.includes(KEEP)) pb?.pulse(AOUT, KEEP);
+    told.push({ at: Date.now(), who: 'you', text: t, link: `${AOUT} -> *:notice:value-in`, why: reached({ ...r, source: AOUT }) });
+    draw();
+    noticeText.set('');
+  }
+  noticeText.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sayAdmin(); } });
+  text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); say(); } });
+  const send = createButtonGroup({ buttons: [{ id: 'send', label: 'Send', primary: true, onPress: say }] });
+  const tell = createButtonGroup({ buttons: [{ id: 'tell', label: 'Send notice', primary: true, onPress: sayAdmin }] });
+  tell.button('tell').disabled = true;
+  const noticeRow = el('div', 'cc-row');
+  noticeRow.append(noticeText.el, tell.el);
+  noticeRow.hidden = !admin;
+
+  // ── the broadcast ──────────────────────────────────────────────────────────
+  // One picture, under the tabs. The admin sees its own camera here (nothing
+  // leaves for that), every other tab sees the broadcast once it is on air.
+  // Nothing is opened on a visit: the camera waits for Start broadcast, and a
+  // tab only plays after Join, because only a joined tab can hear the on-air state.
+  const video = el('video');
+  video.muted = true; video.playsInline = true;
+  const panel = createVideoPanel({ media: video, of: 'the broadcast', fullMode: 'hover',
+    values: [{ key: 'frames', label: 'frames', reserve: 6 }, { key: 'state', label: '' }] });
+  const airBox = el('div', 'cc-air');
+  airBox.append(panel.el);
+  airBox.hidden = true;
+  const airSay = el('p', 'cc-say', 'off air');
+  const frames = () => video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
+  setInterval(() => { if (!airBox.hidden) panel.values.set('frames', String(frames())); }, 1000);
+  const showAir = (on, state, words) => {
+    airBox.hidden = !on;
+    panel.presence?.set(state);
+    panel.values.set('state', words);
+    airSay.textContent = words;
+  };
+
+  let pub = null, cam = null, beat = null, ice = null;
+  // What the bay says about a video link, for the log. The page opens the leg
+  // itself; the bay holds it and names its transport.
+  const verdict = (from, to) => {
+    const l = bay().links().find((x) => x.from === from && x.to === to);
+    return l ? `this tab holds ${from} -> ${to} (${l.session?.transport || 'light'})` : `this tab does not hold ${from} -> ${to}`;
+  };
+  const iceOnce = async () => ice || (ice = await fetchIceServers({ log: (m) => d.log(`webrtc ${m}`) }));
+  // The on-air state, out of this tab's broadcast port. A late tab hears the
+  // next beat, so it is said again every 10 s while on air and whenever the
+  // room changes. `notice` also puts a line in the notices, which the store keeps.
+  function tellAir(on, notice = true) {
+    const r = node.emit(BOUT, { on, at: Date.now() });
+    if (r.sent) pb?.pulse(BOUT, '*:screen:value-in');
+    if (notice) {
+      const t = on ? 'broadcast started' : 'broadcast stopped';
+      const n = node.emit(AOUT, { text: t }, { store: true });
+      if (n.sent && n.far.some((to) => to !== KEEP)) pb?.pulse(AOUT, '*:notice:value-in');
+      if (n.sent && n.far.includes(KEEP)) pb?.pulse(AOUT, KEEP);
+      told.push({ at: Date.now(), who: 'you', text: t, link: `${BOUT} -> *:screen:value-in`, why: reached({ ...r, source: BOUT }) });
+      draw();
+    }
+    return r;
+  }
+  async function startBroadcast() {
+    armVideo(video);   // before any await, or iOS refuses later
+    try {
+      cam = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: false });
+    } catch (e) {
+      const why = e?.name === 'NotAllowedError' ? 'the camera was refused'
+        : e?.name === 'NotFoundError' ? 'this machine has no camera' : `the camera did not start (${e?.name || e})`;
+      d.log(`${why}, so nothing was sent anywhere`, 'bad');
+      showAir(false, 'offline', why);
+      return;
+    }
+    video.srcObject = cam;
+    video.play().catch(() => {});
+    showAir(true, 'coming', 'camera on, going on air');
+    try {
+      const { iceServers } = await iceOnce();
+      pub = await camWhipPublish(cam, { iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
+    } catch (e) {
+      const busy = /409/.test(e.message);
+      d.log(busy ? 'another camera is on the camera input (/cam/ or another admin), so this one stays off air'
+        : `the broadcast did not start: ${e.message}`, 'bad');
+      dropCamera();
+      showAir(false, 'offline', busy ? 'another camera is on air' : 'did not go on air');
+      return;
+    }
+    pub.pc.addEventListener('connectionstatechange', () => {
+      const st = pub?.pc.connectionState;
+      if (st === 'connected') showAir(true, 'online', 'on air');
+      if (st === 'failed') stopBroadcast('the camera could not reach Cloudflare (UDP blocked, or a VPN)');
+    });
+    air.enable('start', false, 'already on air');
+    air.enable('stop', true);
+    tellAir(true);
+    beat = setInterval(() => tellAir(true, false), 10_000);
+    d.log(`on air: ${CAM} -> cf-stream:live:video-in`, 'hi');
+    d.log(verdict(CAM, 'cf-stream:live:video-in'));
+  }
+  function dropCamera() {
+    cam?.getTracks().forEach((t) => t.stop());
+    cam = null;
+    video.srcObject = null;
+  }
+  async function stopBroadcast(why = '') {
+    clearInterval(beat); beat = null;
+    const p = pub; pub = null;
+    if (p) tellAir(false);
+    dropCamera();
+    air.enable('stop', false, 'not on air');
+    air.enable('start', join.button('join').disabled, 'join the room first');   // Join is off once joined
+    showAir(false, 'offline', 'off air');
+    if (why) d.log(`off air: ${why}`);
+    await p?.stop();
+  }
+  const air = createButtonGroup({ buttons: [
+    { id: 'start', label: 'Start broadcast', primary: true, onPress: startBroadcast },
+    { id: 'stop', label: 'Stop broadcast', onPress: () => stopBroadcast('stopped by the admin') },
+  ] });
+  air.enable('start', false, 'join the room first');
+  air.enable('stop', false, 'not on air');
+  const airRow = el('div', 'cc-row');
+  airRow.append(air.el);
+  airRow.hidden = !admin;
+  addEventListener('pagehide', () => { if (pub) { tellAir(false, false); pub.stop(); } if (sub) sub.pc.close(); });
+
+  // The audience half: called by the bay, only along the listener link this tab holds.
+  let sub = null, lastOn = 0, opening = false;
+  function onAir(e, l, m) {
+    pb?.pulse(l.from, l.to);
+    if (admin) return;   // an admin tab shows its own camera, never somebody else's
+    if (e?.on) {
+      lastOn = Date.now();
+      if (!sub && !opening) watch(m.from);
+    } else if (sub || opening) stopWatching('the admin stopped the broadcast');
+  }
+  async function watch(from) {
+    opening = true;
+    showAir(true, 'coming', 'on air, connecting');
+    d.log(`on air, said by ${from}: playing cf-stream:live:video-out -> ${SCREEN}`, 'hi');
+    d.log(verdict('cf-stream:live:video-out', SCREEN));
+    try {
+      const { iceServers } = await iceOnce();
+      const s = await whepPlay(camWhep(), video, { iceServers, log: (x, k) => d.log(`webrtc ${x}`, k) });
+      if (!opening) { s.pc.close(); return; }
+      sub = s;
+      sub.pc.addEventListener('connectionstatechange', () => {
+        const st = sub?.pc.connectionState;
+        if (st === 'connected') showAir(true, 'online', 'playing');
+        if (st === 'failed') stopWatching('the picture could not get here (UDP blocked, or a VPN)');
+      });
+    } catch (e) {
+      d.log(`the broadcast did not play: ${e.message}`, 'bad');
+      showAir(false, 'offline', 'did not play');
+    } finally { opening = false; }
+  }
+  function stopWatching(why) {
+    opening = false;
+    try { sub?.pc.close(); } catch { /* already */ }
+    sub = null;
+    video.srcObject = null;
+    showAir(false, 'offline', 'off air');
+    d.log(`stopped playing: ${why}`);
+  }
+  // An admin that left without saying so: three missed beats and the picture goes.
+  setInterval(() => { if (sub && Date.now() - lastOn > 35_000) stopWatching('no word from the admin for 35 s'); }, 5000);
+
+  // The two roles. Switching re-announces this tab: the admin tab adds the
+  // `admin` node and its `admin:value-out`, the audience tab takes them away.
+  const roles = createTabs({
+    tabs: [{ id: 'admin', label: 'Admin' }, { id: 'audience', label: 'Audience' }],
+    at: admin ? 'admin' : 'audience',
+    onPick: (id) => {
+      admin = id === 'admin';
+      noticeRow.hidden = !admin;
+      airRow.hidden = !admin;
+      if (!admin && pub) stopBroadcast('left the admin tab');
+      if (admin && sub) stopWatching('this tab is the admin now');
+      node.setGraphs([selfGraph()], [STORE, STREAM]);
+      drawSites();
+      pb?.refresh();
+    },
+  });
+  send.button('send').disabled = true;
+  // Clear: the store forgets this room, and every tab in it empties its tables.
+  function wipe() { said.length = 0; told.length = 0; draw(); }
+  async function clearAll() {
+    try {
+      const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
+      d.log(`store cleared ${ROOM}: ${r.status}`);
+    } catch (e) { d.log(`the store did not clear: ${e.message || e}`, 'warn'); }
+    node.send({ type: 'chat.clear' });
+    wipe();
+  }
+  const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => { armVideo(video); node.join(); } }] });
+  const clear = createButtonGroup({ buttons: [{ id: 'clear', label: 'Clear history', onPress: clearAll }] });
+  clear.button('clear').disabled = true;
+  // Join on the left, Clear history on its own at the right of the same line.
+  const joinRow = el('div', 'cc-ends');
+  joinRow.append(join.el, clear.el);
+
+  // Who is in the room: the registry, as /concepts/010/ draws it. Port names are
+  // shown as <medium>-<dir> (plans/plan-site-names.md §4c); the real id is on hover.
+  const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
+  const sites = createTable({
+    columns: [
+      { key: 'state', label: '', width: 16 },
+      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
+      { key: 'who', label: 'who', width: 120 },
+      { key: 'dir', label: 'dir', width: 48 },
+      { key: 'medium', label: 'medium', width: 72 },
+      { key: 'by', label: 'transport', width: 120 },
+    ],
+    minRows: 12,
+  });
+  function drawSites() {
+    const rows = node.registry.merged().ports.map((p) => {
+      const [site, n] = p.id.split(':');
+      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`,
+        who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
+    }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
+    sites.set(rows);
+    for (const cell of sites.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
+      const t = cell.textContent;
+      if (t === 'live' || t === 'stale') {
+        const dot = document.createElement('span');
+        dot.className = 'pos-pres-dot' + (t === 'live' ? '' : ' cc-ring');
+        dot.style.color = t === 'live' ? 'var(--ok)' : 'var(--dim2)';
+        cell.textContent = '';
+        cell.append(dot);
+        cell.title = t;
+      } else if (/^(midi|audio|clock|value|video|program|file|state)$/.test(t)) cell.classList.add(`md-${t}`);
+    }
+  }
+
+  // ── the patchbay: the links this tab holds, read from bay() itself ─────────
+  // Before Join it is drawn from this tab's graph and the two services', which
+  // opens nothing. A video wire is lit while its peer connection is connected.
+  const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history',
+    screen: 'on air video', camera: 'camera', broadcast: 'on air switch', live: 'Stream live input' };
+  pb = createPatchbay(heldPicture(bay, SITE), {
+    detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }],
+    flowing: (l) => (l.from === CAM ? pub?.pc.connectionState === 'connected'
+      : l.to === SCREEN ? sub?.pc.connectionState === 'connected' : false),
+  });
+
+  const row = el('div', 'cc-row');
+  row.append(text.el, send.el);
+  // Blocks in the shell's stack; a heading and what it names are one block.
+  d.stack.add(roles.el, joinRow);
+  d.stack.titled('BROADCAST', airRow, airSay, airBox);
+  d.stack.titled('NOTICES', noticeRow, notices.el);
+  d.stack.titled('CHAT', row, lines.el);
+  d.stack.add(pb.el);
+  d.stack.titled('IN THE ROOM', sites.el);
+  d.ready();
+</script>
