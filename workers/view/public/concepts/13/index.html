@@ -8,8 +8,6 @@
 <title>POSITRON concept 13</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
-  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   /* record is red, the one control that starts writing (shell.css --rec) */
   .cc-rec { color: var(--rec, #e5484d); }
   /* The same medium colours as /concepts/1/. */
@@ -216,8 +214,7 @@
   });
 
   patch();
-  const out = el('div', 'cc-stack');
-  out.append(surface, host, pb.el);
-  d.el.append(out);
+  // Blocks in the shell's stack, at the shell's gap.
+  d.stack.add(surface, host, pb.el);
   d.ready();
 </script>

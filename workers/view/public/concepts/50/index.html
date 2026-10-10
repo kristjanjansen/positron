@@ -96,9 +96,10 @@
   .tf-bay {
     grid-area: bay; background: var(--bg);
     padding: 14px 28px 18px;
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: column;
   }
-  .tf-bay-h { margin: 0; font-size: 13px; color: var(--dim); font-weight: 500; }
+  /* The heading is the kit's .pos-sec-h, uppercase mono, as createPatchbay draws
+     it; its own 10 px margin is the gap to the picture it names. */
 
   /* 🔴 ROWS, FULL SCREEN ON A SCREEN TALLER THAN IT IS WIDE. Decided as *"full
      screen in portrait turns into rows: build on top, then the words
@@ -240,7 +241,7 @@
   // made five boxes wider than the band and the last one scrolled out of it.
   const pb = createPatchbay(view, { flowing: () => synth.sounding(), detail: () => [] });
   const bayBand = el('div', 'tf-bay');
-  bayBand.append(el('h3', 'tf-bay-h', 'patchbay'), pb.view.el);
+  bayBand.append(el('h3', 'pos-sec-h', 'PATCHBAY'), pb.view.el);
 
   // ── the frame ───────────────────────────────────────────────────────────
   const inner = el('div', 'tf-in');

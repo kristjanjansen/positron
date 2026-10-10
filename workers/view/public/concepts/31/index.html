@@ -8,7 +8,9 @@
 <title>POSITRON concept 31</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
+  /* The page is the shell's stack (`createStack`, `--pos-gap`). A block that
+     belongs tight to what is under it is one `.cc-block`, its own column at 12. */
+  .cc-block { display: flex; flex-direction: column; gap: 12px; }
   /* Two pictures side by side, each half the content width; one under the other on a phone. As /concepts/14/. */
   .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
   .cc-pair > * { flex: 1 1 0; min-width: 0; }
@@ -31,8 +33,9 @@
   .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
     align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
   .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
-  /* Play on its own row: the button's own size, at the left. */
-  .cc-stack > .pos-bgroup { align-self: flex-start; width: auto; }
+  /* Play on its own row: the button's own size, at the left. A block box rather
+     than an inline one, so no line box adds air under it in the stack. */
+  .cc-page > .pos-bgroup { display: flex; width: fit-content; }
   .cc-fade .cc-end:first-child { text-align: right; }
   .cc-fade > .sld { min-width: 0; }
   .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
@@ -48,9 +51,11 @@
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
+  import { createStack } from '/shell/stack.mjs';
 
-  // Concept 30 plus one node: a very basic granulator in this tab, fed from the
-  // crossfader, playing into the speakers beside the dry sound. It outputs a
+  // Concept 30 plus one node: a rhythmic granulator in this tab, fed from the
+  // crossfader, playing into the speakers beside the dry sound. Its grains fall
+  // on a 16th note grid out of a few remembered slices of the sound. It outputs a
   // wave (its audio, drawn in a third panel) and events (one per grain, along a
   // `value` link into that panel's wave node, which draws each one as a tick).
   //
@@ -118,16 +123,30 @@
   // ── the sound: two streams, two gains, one AudioContext ──────────────────
   let ctx = null, sum = null, pull = null, dryG = null, wetG = null;
   // The granulator's state, up here because the patchbay asks `flowing` as soon as it is built.
-  const RING_S = 3;
-  const DENSITY = 28;              // grains a second; at 80 to 400 ms that is about seven at once
-  const SPRAY = 0.06;              // how far either side of `where` a grain may read, as a share of the ring
-  const REVERSED = 0.25;           // the share of grains played backwards
-  const SEMIS = [7, 12, -12];      // the other pitches a grain can take; 0 is the rest
+  // The ring is 8 s so a slice remembered at a pattern change (0.8 to 2.6 s
+  // back) is still in it when the next change comes, two bars (4.3 s) later.
+  const RING_S = 8;
+  const BPM = 112;
+  const STEP = 60 / BPM / 4;       // one 16th, 134 ms
+  const SWING = 0.12;              // the off 16ths land this share of a step late
+  const BARS_PER_CELL = 2;         // a rhythm cell plays twice, then another takes over
+  const AHEAD = 0.12;              // how far ahead of the sound the steps are scheduled, in seconds
+  // Rhythm cells, 16 steps each: 3 an accent, 2 a step, 1 a ghost, 0 a rest.
+  const CELLS = [
+    [3, 0, 1, 0, 2, 0, 1, 1, 3, 0, 0, 1, 2, 0, 1, 0],   // a straight beat
+    [3, 0, 0, 2, 0, 0, 3, 0, 0, 2, 0, 0, 3, 0, 1, 1],   // threes against the bar
+    [3, 1, 1, 0, 3, 1, 0, 1, 2, 0, 3, 0, 1, 0, 2, 1],   // busy
+    [3, 0, 0, 0, 0, 0, 2, 0, 3, 0, 0, 0, 1, 0, 2, 0],   // half time
+    [3, 0, 2, 0, 1, 2, 0, 1, 0, 3, 0, 2, 1, 0, 0, 2],   // syncopated
+  ];
+  const SCALE = [0, 3, 5, 7, 10];  // minor pentatonic, in semitones; a cell's motif is four of these
   let gran = null, grains = 0, timer = 0;
+  let seq = null;                  // { step, bar, next, cell } while playing
   // The owner's settings, asked as *"keep this. onlu show wet"*, the mix at
   // grains. Dry / wet works like opacity (*"on dry fade out frains"*): toward
   // dry the grains fade out, in the speakers and in their panel alike.
-  let where = 0.22, spread = 0.19, mix = 1, frozen = false;   // 0 oldest, 1 newest; 0 plain, 1 every grain moved; 0 dry, 1 grains
+  let mix = 1;                     // 0 dry, 1 grains
+  let density = 0.6;               // 0 accents only, 1 every ghost and more ratchets
   const legs = new Map();          // key -> { stream, gain, tap, buf, live }
   let x = 0.5;                     // 0 is all ERR, 1 is all Ida
   const gains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];   // equal power
@@ -192,9 +211,10 @@
   // then `bornAt`. The grain's READ position is a place in the granulator's
   // input buffer, which is not this wave, so it travels in the event and is not
   // drawn here (grain-scope's own header on why the two axes must not be mixed).
-  // A tick fades in 1.2 s: at 28 grains a second a longer fade drew a wall of ticks over the wave.
+  // A tick fades in 2.4 s, about a bar at 112 bpm, so the last bar's rhythm is
+  // on screen at once: the grid, the rests and the ratchets' tight clusters.
   const ghost = el('div', 'cc-wave');
-  const gscope = createGrainScope(ghost, { seconds: 4, height: 150, fullScale: 1, grainSeconds: 4, fadeMs: 1200 });
+  const gscope = createGrainScope(ghost, { seconds: 4, height: 150, fullScale: 1, grainSeconds: 4, fadeMs: 2400 });
   const gpanel = createVideoPanel({ media: ghost, aspect: 'auto', right: false, left: el('span', 'cc-say', 'granulator'),
     centre: el('span', 'cc-say', 'output and grains') });
 
@@ -244,23 +264,33 @@
   }
 
   // ── the granulator: a ring of the last few seconds, and a cloud of long,
-  // overlapping grains read out of it. A ScriptProcessor rather than an
+  // grains read out of it on a tempo grid. A ScriptProcessor rather than an
   // AudioWorklet because it is one node with no module to load and runs the
   // same in Chrome and Safari; the looper (demo/shell/looper.mjs) keeps its
-  // ring the same way. Freeze stops the writing, so the ring holds one moment
-  // and `where` walks through it.
+  // ring the same way. `total` counts every sample ever written, so a slice is
+  // an absolute sample number and stays the same sound until the ring laps it.
   function granBuild() {
     const n = Math.round(RING_S * ctx.sampleRate);
-    const g = { ring: new Float32Array(n), w: 0, filled: 0, wave: false };
+    const g = { ring: new Float32Array(n), w: 0, total: 0, wave: false };
     g.rec = ctx.createScriptProcessor(4096, 1, 1);
     g.rec.onaudioprocess = (e) => {
-      if (frozen) return;
       const x = e.inputBuffer.getChannelData(0);
       for (let i = 0; i < x.length; i++) { g.ring[g.w] = x[i]; g.w = (g.w + 1) % n; }
-      g.filled = Math.min(n, g.filled + x.length);
+      g.total += x.length;
     };
     g.rec.connect(pull);           // a processor nothing pulls never runs
     g.out = ctx.createGain(); g.out.gain.value = 1;
+    // Every grain goes into `voices`, which reaches `out` straight and through
+    // one feedback delay at a dotted 8th, darkened a little on each repeat. It
+    // is inside the granulator, so it is on the wet path only.
+    g.voices = ctx.createGain();
+    g.voices.connect(g.out);
+    const send = ctx.createGain(); send.gain.value = 0.28;
+    const delay = ctx.createDelay(2); delay.delayTime.value = STEP * 3;
+    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 2600;
+    const fb = ctx.createGain(); fb.gain.value = 0.34;
+    g.voices.connect(send).connect(delay).connect(tone).connect(g.out);
+    tone.connect(fb).connect(delay);
     g.tap = ctx.createAnalyser(); g.tap.fftSize = 2048;
     g.tap.connect(pull);
     g.buf = new Float32Array(g.tap.fftSize);
@@ -274,41 +304,119 @@
     dryG.gain.setTargetAtTime(Math.cos(mix * Math.PI / 2), t, 0.03);
     wetG.gain.setTargetAtTime(Math.sin(mix * Math.PI / 2) * 1.4, t, 0.03);
   }
-  // One grain: 80 to 400 ms with a Hann window, read around `where` with a
-  // little spray, sometimes backwards, sometimes a fifth or an octave away,
-  // somewhere across the stereo field. Its event leaves by the bay.
-  function grain() {
+  // ── the rhythm. A 16th note clock at BPM, scheduled AHEAD on the audio
+  // clock so the grid holds whatever the main thread is doing. A cell is a
+  // pattern of accents, steps, ghosts and rests, plus where each step reads
+  // (one of four slices remembered when the cell began) and a motif of four
+  // pitches. It plays BARS_PER_CELL bars, so the chop repeats, then another
+  // cell takes over with fresh slices.
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  function newCell(prev) {
+    const g = gran, sr = ctx.sampleRate;
+    let i;
+    do { i = Math.floor(Math.random() * CELLS.length); } while (prev && i === prev.i && CELLS.length > 1);
+    // Where each step reads: the downbeat always slice 0, other beats 0 or 1,
+    // the 16ths in between any of the four.
+    const map = CELLS[i].map((_, s) => (s === 0 ? 0 : s % 4 === 0 ? pick([0, 1]) : pick([0, 1, 2, 3])));
+    const motif = [0, pick(SCALE), pick(SCALE), pick([-5, -2, ...SCALE])];
+    const c = { i, pat: CELLS[i], map, motif };
+    slicesFor(c);
+    return c;
+  }
+  // Four slices, 0.8 to 2.6 s back, oldest first so slice 0 is the downbeat's.
+  // Until the ring holds 2.6 s (the first seconds after play) they reach only as
+  // far back as there is sound, and `full` stays false so the next step asks again.
+  function slicesFor(c) {
+    const sr = ctx.sampleRate, have = gran.total / sr;
+    const span = Math.max(0, Math.min(1.8, have - 0.8));
+    const back = [0, 1, 2, 3].map(() => 0.8 + Math.random() * span).sort((a, b) => b - a);
+    c.slices = back.map((b) => gran.total - Math.round(b * sr));
+    c.full = span >= 1.8;
+  }
+  // One grain's envelope, baked into its buffer. `hit` is a 3 ms attack and an
+  // exponential fall, `swell` rises over most of its length, `hann` is even.
+  function env(shape, i, len, sr) {
+    const x = i / (len - 1);
+    if (shape === 'hit') {
+      const a = Math.max(1, Math.round(0.003 * sr)), tail = Math.max(1, Math.round(0.004 * sr));
+      const v = i < a ? i / a : Math.exp(-5 * (i - a) / Math.max(1, len - a));
+      return i > len - tail ? v * (len - i) / tail : v;
+    }
+    if (shape === 'swell') return x < 0.7 ? Math.sin(x / 0.7 * Math.PI / 2) ** 2 : Math.cos((x - 0.7) / 0.3 * Math.PI / 2) ** 2;
+    return 0.5 * (1 - Math.cos(2 * Math.PI * x));
+  }
+  // One grain at `when` on the audio clock, read forward from an absolute
+  // sample number. Returns its event, or null when the ring no longer holds it.
+  function grain(when, { slice, dur, semis, shape, level, pan, rev }) {
     const g = gran, sr = ctx.sampleRate, n = g.ring.length;
-    if (!holds(FADER_OUT, GRAN_IN)) return;
-    const dur = 0.08 + Math.random() * 0.32;
-    const semis = Math.random() < spread ? SEMIS[Math.floor(Math.random() * SEMIS.length)] : 0;
-    const rate = 2 ** ((semis + (Math.random() - 0.5) * 0.12) / 12);   // and a few cents either way, which is the chorus
+    const rate = 2 ** ((semis + (Math.random() - 0.5) * 0.1) / 12);   // and a few cents either way
     const len = Math.max(2, Math.round(dur * rate * sr));               // a grain up an octave reads twice the sound
-    const rev = Math.random() < REVERSED;
-    const pos = Math.min(1, Math.max(0, where + (Math.random() * 2 - 1) * SPRAY));   // 0 oldest, 1 newest
-    const ago = (1 - pos) * (RING_S - len / sr) + len / sr;             // seconds before the write head, inside the ring
-    if (g.filled < ago * sr) return;
+    const ago = g.total - slice;
+    if (ago < len || ago > n - 4096) return null;                        // not written yet, or already lapped
     const buf = ctx.createBuffer(1, len, sr), d0 = buf.getChannelData(0);
-    let at = (g.w - Math.round(ago * sr) + n) % n, peak = 0;
+    let at = ((slice % n) + n) % n, peak = 0;
     for (let i = 0; i < len; i++) {
-      const v = g.ring[at] * 0.5 * (1 - Math.cos(2 * Math.PI * i / (len - 1)));
+      const v = g.ring[at] * env(shape, rev ? len - 1 - i : i, len, sr);
       d0[rev ? len - 1 - i : i] = v; if (Math.abs(v) > peak) peak = Math.abs(v);
       at = (at + 1) % n;
     }
-    const src = ctx.createBufferSource(), amp = ctx.createGain(), pan = ctx.createStereoPanner();
+    const src = ctx.createBufferSource(), amp = ctx.createGain(), p = ctx.createStereoPanner();
     src.buffer = buf; src.playbackRate.value = rate;
-    amp.gain.value = 0.42;         // about seven overlap, so each is quieter than the dry sound
-    pan.pan.value = (Math.random() * 2 - 1) * 0.8;
-    src.connect(amp).connect(pan).connect(g.out);
-    src.start();
-    src.onended = () => { try { pan.disconnect(); } catch { /* gone */ } };
+    amp.gain.value = level;
+    p.pan.value = pan;
+    src.connect(amp).connect(p).connect(g.voices);
+    src.start(when);
+    src.onended = () => { try { p.disconnect(); } catch { /* gone */ } };
     grains++;
-    bay.send(GRAN_EV, { of: 'grain', pos, dur, semis, rev, pan: pan.pan.value, level: Math.min(1, peak * 3) });
+    return { of: 'grain', pos: 1 - ago / sr / RING_S, dur, semis, rev, pan, shape, level: Math.min(1, peak * level * 3) };
+  }
+  // One 16th: decide whether it sounds, how, and whether it ratchets.
+  function step(when) {
+    const s = seq.step, c = seq.cell, kind = c.pat[s];
+    if (!c.full) slicesFor(c);
+    let sounds;
+    if (kind === 3) sounds = true;
+    else if (kind === 2) sounds = Math.random() < 0.25 + 0.75 * density;
+    else if (kind === 1) sounds = Math.random() < 0.9 * density ** 1.5;
+    else sounds = density > 0.7 && Math.random() < (density - 0.7) * 1.2;   // a busy bar fills its rests with ghosts
+    if (!sounds || !holds(FADER_OUT, GRAN_IN)) return;
+    const ghost = kind <= 1, accent = kind === 3, slice = c.slices[c.map[s]];
+    let v;
+    if (accent) {
+      // Long, loud and percussive, in the middle; now and then an octave away.
+      v = { dur: STEP * 2.2, shape: 'hit', level: 0.95, rev: false, pan: (Math.random() - 0.5) * 0.3,
+        semis: Math.random() < 0.3 ? pick([12, -12]) : 0 };
+    } else if (!ghost) {
+      // A step follows the cell's motif, and leans left or right by its place.
+      v = { dur: STEP * 1.2, shape: Math.random() < 0.5 ? 'hit' : 'hann', level: 0.6, rev: Math.random() < 0.15,
+        pan: (s % 2 ? 0.45 : -0.45) + (Math.random() - 0.5) * 0.2, semis: Math.random() < 0.6 ? c.motif[s % 4] : 0 };
+    } else {
+      // A ghost is short, quiet and soft, wide in the field.
+      v = { dur: STEP * 0.5, shape: 'swell', level: 0.3, rev: Math.random() < 0.25,
+        pan: (Math.random() * 2 - 1) * 0.75, semis: Math.random() < 0.5 ? c.motif[(s + 1) % 4] + 12 : c.motif[s % 4] };
+    }
+    // A ratchet: 2 to 4 quick hits of the same slice inside the step, falling away.
+    const n = !ghost && s !== 0 && Math.random() < 0.04 + 0.18 * density ? pick([2, 3, 3, 4]) : 1;
+    for (let k = 0; k < n; k++) {
+      const t = when + k * STEP / n;
+      const r = n === 1 ? v : { ...v, dur: STEP / n * 0.9, shape: 'hit', level: v.level * 0.78 ** k };
+      const ev = grain(t, { slice, ...r });
+      if (!ev) continue;
+      // The tick is drawn when the grain starts, so the event leaves then.
+      Object.assign(ev, { step: s, bar: seq.bar, kind: accent ? 'accent' : ghost ? 'ghost' : 'step', accent, ratchet: n > 1 ? `${k + 1}/${n}` : null });
+      setTimeout(() => { if (playing) bay.send(GRAN_EV, ev); }, Math.max(0, (t - ctx.currentTime) * 1000));
+    }
   }
   function granLoop() {
     if (!playing) return;
-    grain();
-    timer = setTimeout(granLoop, (1000 / DENSITY) * (0.5 + Math.random()));
+    while (seq.next < ctx.currentTime + AHEAD) {
+      if (seq.step === 0 && seq.bar % BARS_PER_CELL === 0) seq.cell = newCell(seq.cell);
+      step(seq.next + (seq.step % 2 ? SWING * STEP : 0));
+      seq.next += STEP;
+      seq.step = (seq.step + 1) % 16;
+      if (seq.step === 0) seq.bar++;
+    }
+    timer = setTimeout(granLoop, 25);
   }
 
   // ── play and stop ───────────────────────────────────────────────────────
@@ -355,6 +463,7 @@
     face();
     requestAnimationFrame(frame);
     clearTimeout(timer);
+    seq = { step: 0, bar: 0, next: ctx.currentTime + 0.05, cell: null };
     granLoop();
   }
   function stop() {
@@ -382,17 +491,27 @@
   const fade = el('div', 'cc-fade');
   fade.append(el('span', 'cc-end', 'ERR'), fader.el, el('span', 'cc-end', 'Ida'));
 
-  // One control under the granulator: dry / wet. Where it reads and how far
-  // the pitch spreads stay at the owner's settings, and freeze is gone for now
-  // (*"no older, plain, freeze controls for now"*).
+  // Two controls under the granulator: dry / wet, and how busy the rhythm is.
+  // Where it reads, the pitch and freeze are not controls for now (*"no older,
+  // plain, freeze controls for now"*). Density keeps the accents at every
+  // setting, so the bar is always there; toward busy the steps, ghosts,
+  // ratchets and filled rests come in.
   const mixS = createSlider({ label: '', aria: 'dry or grains', min: 0, max: 1, step: 0.01, value: mix,
     onInput: (v) => { mix = v; applyMix(); } });
   const mixRow = el('div', 'cc-fade');
   mixRow.append(el('span', 'cc-end', 'dry'), mixS.el, el('span', 'cc-end', 'grains'));
+  const densS = createSlider({ label: '', aria: 'sparse or busy', min: 0, max: 1, step: 0.01, value: density,
+    onInput: (v) => { density = v; } });
+  const densRow = el('div', 'cc-fade');
+  densRow.append(el('span', 'cc-end', 'sparse'), densS.el, el('span', 'cc-end', 'busy'));
 
-  const out = el('div', 'cc-stack');
+  // The shell's stack, at the project's one gap. Each picture and the sliders
+  // that work it are one block, tight inside.
+  const block = (...parts) => { const b = el('div', 'cc-block'); b.append(...parts); return b; };
+  const page = createStack(undefined, 'cc-page');
   // Play on its own row, top left under the title.
-  out.append(transport.el, pair, fade, gpanel.el, mixRow, pb.el);
+  page.add(transport.el, block(pair, fade), block(gpanel.el, mixRow, densRow), pb.el);
+  const out = page.el;
   // Both label columns of every slider row take the longest end label's width.
   const ends = [...out.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
   out.style.setProperty('--end', `${Math.max(...ends)}ch`);

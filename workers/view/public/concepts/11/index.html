@@ -8,8 +8,6 @@
 <title>POSITRON concept 11</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
-  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   .cc-fx { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
   /* The same medium colours as /concepts/1/. */
   :root {
@@ -154,8 +152,7 @@
   fxRow.append(midiFx.el, audioFx.el);
 
   patch();
-  const out = el('div', 'cc-stack');
-  out.append(host, fxRow, pb.el);
-  d.el.append(out);
+  // Blocks in the shell's stack; the two fx choices are one row, one block.
+  d.stack.add(host, fxRow, pb.el);
   d.ready();
 </script>
