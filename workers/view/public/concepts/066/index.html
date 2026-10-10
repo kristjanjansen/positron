@@ -92,7 +92,6 @@
   const S = 'web';
   const ON_PAGE = CHANNELS.filter((c) => c.id === 'etv' || c.id === 'etv2');
   const PROBE_STEPS = 8, WALL_BACKOFF_S = 90;
-  const GROUND = '#0b0e14';
 
   const vOut = (c) => `err:${c.id}:video-out`, aOut = (c) => `err:${c.id}:audio-out`;
   const MIX_IN = `${S}:mixer:video-in`, MIX_OUT = `${S}:mixer:video-out`;
@@ -328,9 +327,12 @@
     for (const ch of tv) {
       const v = ch.video;
       if (!playing || v.readyState < 2 || v.currentTime === ch.lastT) continue;
+      const first = ch.lastT < 0;
       ch.lastT = v.currentTime;
-      ch.lastFrame = now; ch.frames++;
-      if (ch.frames === 1) { showSize(); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
+      // The count is the decoder's own when it has one; draw ticks are not frames.
+      ch.lastFrame = now;
+      ch.frames = v.getVideoPlaybackQuality?.().totalVideoFrames || ch.frames + 1;
+      if (first) { showSize(); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
     }
   }
   function render() { watchFrames(); drawMix(); dither(); }
