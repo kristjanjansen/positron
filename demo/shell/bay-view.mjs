@@ -129,12 +129,12 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       .map((l) => rank.get(nodeOf(l.from))));
     const extra = (g) => wide.size * Math.max(0, TWIN_GAP - g);
     const gapFor = (g) => cols.length * boxW + (cols.length - 1) * g + extra(g) + 2 * M <= avail;
-    // Too wide even then: the boxes stack, at any width. A chain that scrolled
-    // sideways hid its right end on a desk, and the boxes there (a granulator,
-    // the speakers) were reported as missing, 2026-10-10.
+    // Too wide even then: a wide host keeps the chain and scrolls sideways;
+    // only a phone stacks. Stacking on a desk was tried 2026-10-10 and
+    // refused: *"do not do vert layouts on desktop. overflow"*.
     const GAPX = gapFor(GAP) ? GAP : MIN_GAP;
     const need = cols.length * boxW + (cols.length - 1) * GAPX + extra(GAPX) + 2 * M;
-    const across = gapFor(GAPX);
+    const across = gapFor(GAPX) || avail >= STACK_BELOW;
     if (across && need > avail) avail = need;
     el.style.overflowX = across && need > el.clientWidth ? 'auto' : '';
     const room = avail - 2 * M;
