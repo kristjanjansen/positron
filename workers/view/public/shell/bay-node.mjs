@@ -84,8 +84,16 @@ export function roomFor({ slug = 'page', search = searchNow(), selfcheck = isSel
 }
 
 /** `web-ab12`: a site of this tab's own, new on every load. */
+/* A tab's site is three characters, two letters and one digit in any place
+   (asked 2026-10-10, *"make sure its 3 chars and includes 1 num"*): short
+   enough to read in a patchbay box, and 20,280 of them, so two tabs in one
+   room meet the same name about once in twenty thousand pairs. */
+const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 export function randomSite(prefix = 'web') {
-  return `${prefix}-${rand(4)}`;
+  const pick = (s) => s[Math.floor(Math.random() * s.length)];
+  const chars = [pick(LETTERS), pick(LETTERS)];
+  chars.splice(Math.floor(Math.random() * 3), 0, pick('0123456789'));
+  return `${prefix}-${chars.join('')}`;
 }
 
 /**

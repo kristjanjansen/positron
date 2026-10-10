@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept 620</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Start and stop on their own row at the left, the camera picker after them
+     once there is more than one camera. */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  .cc-top > .pos-pick[hidden] { display: none; }
+  /* The camera on the left, the dither on the right, each half the content
+     width, as /concepts/610/. On a phone they stack, the original first. */
+  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
+  .cc-pair canvas, .cc-pair video { display: block; width: 100%; height: 100%; }
+  /* The right picture is the live dither OR the stored take, never both, and
+     `display` above would otherwise beat the browser's own [hidden]. */
+  .cc-pair .pos-vp-stage > [hidden] { display: none; }
+  .cc-say { font-size: 12px; color: var(--dim); }
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  /* record is red, the one control that starts writing, as /concepts/130/ */
+  .cc-rec { color: var(--rec, #e5484d); }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el, armVideo, recorderMime } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { setIcon } from '/shell/icon-button.mjs';
+  import { resolveDuration } from '/shell/media.mjs';
+  import { drawCamera, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+
+  // /concepts/610/ with a RECORDER. What the dither panel shows is recorded with
+  // `canvas.captureStream()` and `MediaRecorder`, at most 10 seconds, kept in
+  // IndexedDB in this browser, and played back on the kit's transport bar and
+  // timeline glued together, as /concepts/130/ does for notes.
+  //
+  // THE BAY: the recorder is a node of its own, `web:rec`, taking the shader's
+  // picture on `rec:video-in` and handing the finished file out of
+  // `rec:file-out` into a store node labelled "this browser", `web:store`. That
+  // link rides `indexeddb`, which is what bay.mjs's TRANSPORTS table chooses for
+  // `file` on one machine; the read back out of the store into `web:player` is
+  // READS' machine cell, `indexeddb` again. The player's `video-out` goes to the
+  // right panel, which shows either the live dither or the take.
+  //
+  // ONE TAKE, REPLACED EACH TIME. A new recording overwrites the stored one, so
+  // this browser holds at most one ten second take for this page.
+  //
+  // 🔴 NOTHING OPENS ON A VISIT. The camera is asked for on its press.
+  // IndexedDB is not opened, read or listed on load, not even to show whether a
+  // take exists: it is opened on the first record, or on the first play when no
+  // take is in memory, which is how a take recorded before a reload comes back.
+  // Nothing ever leaves this machine.
+  const S = 'web';
+  const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
+  const FX = `${S}:dither:video-in`;
+  const SH_IN = `${S}:shader:video-in`, SH_OUT = `${S}:shader:video-out`, SH_VAL = `${S}:shader:value-in`;
+  const REC_IN = `${S}:rec:video-in`, REC_OUT = `${S}:rec:file-out`;
+  const ST_IN = `${S}:store:file-in`, ST_OUT = `${S}:store:file-out`;
+  const PL_IN = `${S}:player:file-in`, PL_OUT = `${S}:player:video-out`;
+  const REC_MS = 10000;            // a recording stops itself here
+
+  const d = mount({ name: 'concept 620', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('620');
+
+  // ── the shader's one parameter, set only through value-in ───────────────
+  const KNOBS = [
+    { name: 'size', min: 2, max: 16, step: 1, raw: 4, format: (r) => `${Math.round(r)} px` },
+  ];
+  const P = { size: 4 };
+  function setParam(e) {
+    if (e?.of !== 'param') { d.log('the shader takes parameters, and this was not one', 'warn'); return; }
+    if (e.name === 'size') P.size = Math.max(1, Math.round(e.v));
+    else { d.log(`the shader has no parameter called ${e.name}`, 'warn'); return; }
+    if (!cam) render();
+  }
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const bay = createBay();
+  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
+  camNode('camera');
+  bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'dither shader', place: 'browser' });
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
+  bay.addNode({ id: `${S}:dither`, kind: 'screen', label: 'dithered', place: 'browser' });
+  bay.addNode({ id: `${S}:rec`, kind: 'engine', label: 'recorder', place: 'browser' });
+  bay.addNode({ id: `${S}:store`, kind: 'store', label: 'this browser', place: 'browser' });
+  bay.addNode({ id: `${S}:player`, kind: 'engine', label: 'player', place: 'browser' });
+  for (const k of KNOBS) bay.addNode({ id: `${S}:knob-${k.name}`, kind: 'person', label: 'knob', place: 'browser' });
+  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addPort({ id: SH_IN, label: 'shader:video-in', dir: 'in', medium: 'video' });
+  bay.addPort({ id: SH_OUT, label: 'shader:video-out', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addPort({ id: SH_VAL, label: 'shader:value-in', dir: 'in', medium: 'value',
+    shape: { of: 'param', names: KNOBS.map((k) => k.name) }, deliver: setParam });
+  bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
+  bay.addPort({ id: FX, label: 'dithered', dir: 'in', medium: 'video' });
+  bay.addPort({ id: REC_IN, label: 'rec:video-in', dir: 'in', medium: 'video' });
+  bay.addPort({ id: REC_OUT, label: 'rec:file-out', dir: 'out', medium: 'file' });
+  bay.addPort({ id: ST_IN, label: 'store:file-in', dir: 'in', medium: 'file' });
+  bay.addPort({ id: ST_OUT, label: 'store:file-out', dir: 'out', medium: 'file' });
+  bay.addPort({ id: PL_IN, label: 'player:file-in', dir: 'in', medium: 'file' });
+  bay.addPort({ id: PL_OUT, label: 'player:video-out', dir: 'out', medium: 'video', transports: ['page'] });
+  const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
+  for (const k of KNOBS) bay.addPort({ id: KNOB_OUT(k.name), label: `knob-${k.name}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
+
+  const held = new Map();          // "from to" -> link id
+  function hold(a, b) {
+    const k = `${a} ${b}`;
+    if (held.has(k)) return true;
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S });
+    if (r.ok) { held.set(k, r.id); return true; }
+    d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    return false;
+  }
+  const holds = (a, b) => held.has(`${a} ${b}`);
+  // Held from load, so the picture of the patch is the same running or not.
+  // Holding a link opens nothing: the camera and the store wait for a press.
+  hold(CAM, SCREEN);
+  hold(CAM, SH_IN);
+  hold(SH_OUT, FX);
+  hold(SH_OUT, REC_IN);
+  hold(REC_OUT, ST_IN);
+  hold(ST_OUT, PL_IN);
+  hold(PL_OUT, FX);
+  for (const k of KNOBS) hold(KNOB_OUT(k.name), SH_VAL);
+  const via = (a, b) => bay.links().find((l) => l.from === a && l.to === b)?.session?.transport || 'none';
+  d.log(`rec -> store rides ${via(REC_OUT, ST_IN)}, store -> player rides ${via(ST_OUT, PL_IN)}`);
+
+  // ── the camera ──────────────────────────────────────────────────────────
+  const video = el('video');
+  video.muted = true; video.playsInline = true; video.autoplay = true;
+  let cam = null, gen = 0, lastFrame = 0, raf = 0;
+  let devices = [], deviceId = null;
+
+  function watchFrames() {
+    if (typeof video.requestVideoFrameCallback !== 'function') return;
+    const tick = () => { if (!cam) return; lastFrame = performance.now(); video.requestVideoFrameCallback(tick); };
+    video.requestVideoFrameCallback(tick);
+  }
+  const flowing = () => !!cam && performance.now() - lastFrame < 500;
+
+  // ── the original, as /concepts/600/ draws it ─────────────────────────────
+  const orig = el('canvas');
+  orig.width = FRAME_W; orig.height = FRAME_H;
+  const ctx = orig.getContext('2d', { alpha: false });
+  const name = el('span', 'cc-say', '');
+  const size = el('span', 'cc-say', '');
+  const panel = createVideoPanel({ media: orig, left: name });
+  panel.el.querySelector('.pos-vp-r').prepend(size);
+  const GROUND = '#0b0e14';
+  function drawOrig() {
+    if (cam && holds(CAM, SCREEN)) drawCamera(ctx, video, FRAME_W, FRAME_H, { scrim: 0 });
+    else { ctx.fillStyle = GROUND; ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
+  }
+
+  // ── the shader's picture, and the take in the same panel ────────────────
+  const canvas = el('canvas');
+  canvas.width = FRAME_W; canvas.height = FRAME_H;
+  const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
+  const fxName = el('span', 'cc-say', '');
+  const fxSize = el('span', 'cc-say', gl ? '' : 'no WebGL2');
+  const fxPanel = createVideoPanel({ media: canvas, left: fxName });
+  fxPanel.el.querySelector('.pos-vp-r').prepend(fxSize);
+  // The player's picture: a second element in the same well, shown in place of
+  // the live dither from the first play until the next recording.
+  const pv = el('video');
+  pv.muted = true; pv.playsInline = true; pv.preload = 'auto'; pv.hidden = true;
+  canvas.after(pv);
+  const pair = el('div', 'cc-pair');
+  pair.append(panel.el, fxPanel.el);
+
+  let prog = null, tex = null, U = {};
+  if (gl) {
+    const vs = `#version 300 es
+      in vec2 p;
+      void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
+    const fs = `#version 300 es
+      precision highp float;
+      uniform sampler2D uTex; uniform vec2 uRes; uniform vec2 uFit;
+      uniform float uHas; uniform float uSize;
+      out vec4 o;
+      const vec3 GROUND = vec3(0.043, 0.055, 0.078);
+      const vec3 INK = vec3(0.92, 0.89, 0.82);
+      const vec3 HI = vec3(1.0, 0.831, 0.0);
+      const float M[16] = float[16](0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.);
+      float bayer(vec2 c) { ivec2 i = ivec2(mod(c, 4.0)); return (M[i.x + i.y * 4] + 0.5) / 16.0; }
+      vec3 src(vec2 frag) {
+        vec2 uv = (frag / uRes - 0.5) / uFit + 0.5;
+        if (uHas < 0.5 || any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return vec3(0.0);
+        return texture(uTex, uv).rgb;
+      }
+      void main() {
+        vec2 cell = floor(gl_FragCoord.xy / uSize);
+        float l = dot(src((cell + 0.5) * uSize), vec3(0.2126, 0.7152, 0.0722));
+        l = smoothstep(0.04, 0.96, l);
+        vec3 ink = mix(INK, HI, smoothstep(0.86, 1.0, l) * 0.55);
+        vec3 dith = mix(GROUND, ink, step(bayer(cell), l));
+        o = vec4(dith, 1.0);
+      }`;
+    const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); return x; };
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      d.log(`the shader did not compile: ${gl.getProgramInfoLog(prog)}`, 'bad');
+      prog = null;
+    } else d.log('the shader compiled');
+    if (prog) {
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, 'p');
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      for (const u of ['uTex', 'uRes', 'uFit', 'uHas', 'uSize']) U[u] = gl.getUniformLocation(prog, u);
+      tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.uniform1i(U.uTex, 0);
+      gl.uniform2f(U.uRes, FRAME_W, FRAME_H);
+    }
+  } else d.log('this browser has no WebGL2, so there is no shader and the picture stays dark', 'bad');
+
+  function render() {
+    drawOrig();
+    if (cam && !showing) fxSize.textContent = gl ? `${P.size} px` : 'no WebGL2';
+    if (!gl) return;
+    gl.viewport(0, 0, FRAME_W, FRAME_H);
+    if (!prog || !holds(SH_OUT, FX)) { gl.clearColor(11 / 255, 14 / 255, 20 / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
+    const has = !!cam && holds(CAM, SH_IN) && video.readyState >= 2 && video.videoWidth > 0;
+    if (has) {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, video);
+      const va = video.videoWidth / video.videoHeight, ca = FRAME_W / FRAME_H;
+      gl.uniform2f(U.uFit, va > ca ? 1 : va / ca, va > ca ? ca / va : 1);
+    }
+    gl.uniform1f(U.uHas, has ? 1 : 0);
+    gl.uniform1f(U.uSize, P.size);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  function frame() { render(); if (cam) raf = requestAnimationFrame(frame); }
+
+  // ── the store: one take in IndexedDB, the /stage/ pattern ───────────────
+  // One record under one key, written once when a take has landed (ten seconds
+  // of picture is one Blob, so there is nothing to write piece by piece). A
+  // browser that refuses IndexedDB (a private window can) keeps the take in
+  // this tab's memory, and the log says which.
+  const LOCAL_DB = 'positron-concept-620';
+  const LOCAL_STORE = 'takes';
+  const KEY = 'take';
+  let localDb = null;              // the IDBDatabase, or null when refused or not yet opened
+  let where = null;                // 'IndexedDB' or 'memory', once a take was written
+  const idbDone = (req) => new Promise((res, rej) => {
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error || new Error('IndexedDB refused'));
+  });
+  const txDone = (tx) => new Promise((res, rej) => {
+    tx.oncomplete = () => res();
+    tx.onerror = tx.onabort = () => rej(tx.error || new Error('IndexedDB transaction failed'));
+  });
+  async function openLocal() {
+    if (localDb) return localDb;
+    try {
+      const req = indexedDB.open(LOCAL_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(LOCAL_STORE);
+      localDb = await idbDone(req);
+    } catch (e) {
+      d.log(`IndexedDB refused (${e && e.message}), so the take is kept in this tab's memory`, 'warn');
+      localDb = null;
+    }
+    return localDb;
+  }
+  async function storeTake(t) {
+    const db = await openLocal();
+    if (!db) { where = 'memory'; return false; }
+    try {
+      const tx = db.transaction(LOCAL_STORE, 'readwrite');
+      tx.objectStore(LOCAL_STORE).put({ blob: t.blob, mime: t.mime, ms: t.ms, bytes: t.bytes, at: t.at }, KEY);
+      await txDone(tx);
+      where = 'IndexedDB';
+      return true;
+    } catch (e) {
+      where = 'memory';
+      d.log(`IndexedDB would not take the recording (${e && e.message}), so it lives in this tab only`, 'warn');
+      return false;
+    }
+  }
+  async function readTake() {
+    const db = await openLocal();
+    if (!db) return null;
+    try {
+      const tx = db.transaction(LOCAL_STORE, 'readonly');
+      return (await idbDone(tx.objectStore(LOCAL_STORE).get(KEY))) || null;
+    } catch (e) {
+      d.log(`IndexedDB would not give the take back (${e && e.message})`, 'warn');
+      return null;
+    }
+  }
+  const kib = (b) => `${Math.round(b / 1024)} KiB`;
+  const secs = (ms) => `${(ms / 1000).toFixed(1)} s`;
+
+  // ── the timeline: a deck, its bar and its strip ─────────────────────────
+  // While recording the deck runs on its own clock from 0, so the bar and the
+  // strip move with the recording. Once a take is in the player the player's
+  // element is the clock (media-master's L1) and the deck follows it.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, REC_MS] });
+  let take = null;                 // { blob, mime, ms, bytes, at, url, fileMs, len, ready }
+  let recording = null;            // { r, t0, chunks, mime, stream, timer, iv }
+  let showing = false;             // the right panel shows the take, not the live dither
+  let inServo = false;
+  const mm = mediaMaster(deck, pv, { autoPlayPause: false, attachTimeupdate: false });
+
+  const takeLen = () => (recording ? Math.min(REC_MS, performance.now() - recording.t0) : take?.ready ? take.len : 0);
+  const lane = {
+    id: 'take', kind: 'take', label: 'take', height: 44, barPad: 8,
+    as: 'spans', stack: false, terse: true, spanLine: false, alpha: 0.9,
+    colorOf: () => (recording ? '#e5484d' : '#e07a5f'),
+    labelOf: (s, { bw }) => (bw > 90 ? `${recording ? 'recording' : 'take'}, ${secs(s.row?.payload?.durMs || 0)}` : ''),
+    rows: () => { const len = takeLen(); return len > 0 ? [{ at: 0, id: 'take', kind: 'take', payload: { durMs: len } }] : []; },
+    describeRow: (r) => [secs(r.payload.durMs), take?.ready && !recording ? `${kib(take.bytes)} in ${where === 'IndexedDB' ? 'IndexedDB' : 'tab memory'}` : 'recording'],
+  };
+  function paintLane() {
+    const L = strip.strip.lanes().find((l) => l.id === 'take');
+    if (L) L.gen = (L.gen || 0) + 1;
+    strip.strip.invalidate();
+  }
+
+  // Every seek is a command to the player's element. With a media master
+  // attached a `deck.seek()` alone does nothing visible: L1 reads the picture
+  // and pulls the vector straight back.
+  deck.transport.onState((st) => {
+    if (st.reason !== 'seek' || inServo || recording || !take?.ready) return;
+    pv.currentTime = Math.max(0, Math.min(take.len - 40, st.p0)) / 1000;
+  });
+
+  let ticking = false;
+  function ptick() {
+    requestAnimationFrame(ptick);
+    if (recording || !take?.ready) return;
+    const playing = deck.playing();
+    if (pv.ended && playing) deck.pause();
+    if (playing && pv.paused && !pv.ended) pv.play().catch(() => {});
+    if (!playing && !pv.paused) pv.pause();
+    inServo = true;
+    try { mm.tick(); } finally { inServo = false; }
+  }
+  function startTick() { if (!ticking) { ticking = true; requestAnimationFrame(ptick); } }
+
+  function show(on) {
+    showing = on;
+    canvas.hidden = on;
+    pv.hidden = !on;
+    if (on) { fxName.textContent = 'playback'; fxSize.textContent = take?.ready ? secs(take.len) : ''; }
+    else { fxName.textContent = cam ? 'dither' : ''; fxSize.textContent = cam && gl ? `${P.size} px` : (gl ? '' : 'no WebGL2'); }
+    pb.refresh();
+  }
+
+  // Hand a take to the player: an object URL into the element, then the
+  // duration, because MediaRecorder writes `duration: Infinity` (media.mjs).
+  async function intoPlayer(t) {
+    if (take?.url && take !== t) URL.revokeObjectURL(take.url);
+    t.url = URL.createObjectURL(t.blob);
+    t.ready = false;
+    take = t;
+    pv.src = t.url;
+    t.fileMs = await resolveDuration(pv);
+    t.len = Math.round(Math.min(REC_MS + 500, t.fileMs ?? t.ms));
+    if (t.fileMs == null) d.log(`the file would not say how long it is, so the recorder's own ${secs(t.ms)} is used`, 'warn');
+    t.ready = true;
+    deck.setRange([0, t.len]);
+    deck.seek(0);
+    strip.strip.fit(0, t.len);
+    paintLane();
+    startTick();
+  }
+
+  // ── recording ───────────────────────────────────────────────────────────
+  function record() {
+    if (recording) return;
+    if (!cam) { d.log('the recorder takes the dither, which is dark until the camera is on', 'warn'); return; }
+    if (!holds(SH_OUT, REC_IN)) { d.log('nothing is cabled into rec:video-in, so there is nothing to record', 'warn'); return; }
+    const mime = recorderMime(d);
+    if (!mime) return;
+    deck.pause();
+    pv.pause();
+    show(false);
+    const stream = canvas.captureStream(30);
+    const r = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_000_000 });
+    const chunks = [];
+    r.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    r.start(1000);
+    recording = { r, t0: performance.now(), chunks, mime, stream,
+      timer: setTimeout(() => stopRecording(`stopped itself at ${REC_MS / 1000} s`), REC_MS),
+      iv: setInterval(paintLane, 200) };
+    openLocal();                   // the first record is when IndexedDB may open
+    deck.setRange([0, REC_MS]);
+    deck.seek(0);
+    deck.play();
+    strip.strip.fit(0, REC_MS);
+    face();
+    pb.refresh();
+    d.log(`recording the dither, at most ${REC_MS / 1000} s`, 'hi');
+  }
+
+  async function stopRecording(why = 'stopped') {
+    const rc = recording;
+    if (!rc) return;
+    clearTimeout(rc.timer); clearInterval(rc.iv);
+    const ms = Math.round(Math.min(REC_MS, performance.now() - rc.t0));
+    const done = new Promise((res) => { rc.r.onstop = res; });
+    try { rc.r.stop(); } catch { /* already stopped */ }
+    await done;
+    rc.stream.getTracks().forEach((t) => t.stop());
+    recording = null;
+    deck.pause();
+    face();
+    const blob = new Blob(rc.chunks, { type: rc.mime });
+    d.log(`${why}: ${secs(ms)}, ${kib(blob.size)}`);
+    const t = { blob, mime: rc.mime, ms, bytes: blob.size, at: Date.now() };
+    // Rewind as /concepts/130/ does: the next play is the take from the top.
+    await intoPlayer(t);
+    const kept = await storeTake(t);
+    d.log(kept ? `stored in IndexedDB on this machine, ${kib(t.bytes)}, replacing the last take` : 'kept in this tab only', kept ? 'hi' : 'warn');
+    paintLane();
+    pb.refresh();
+  }
+
+  // A take recorded before a reload is read back on the first play, never on load.
+  let loading = null;
+  async function loadStored() {
+    if (take) return take;
+    loading ??= (async () => {
+      const row = await readTake();
+      if (!row?.blob) { d.log('nothing is stored on this machine yet, so record a take first', 'warn'); return null; }
+      d.log(`read a take back out of IndexedDB, ${kib(row.bytes)}, recorded ${new Date(row.at).toLocaleTimeString()}`);
+      where = 'IndexedDB';
+      await intoPlayer({ ...row });
+      return take;
+    })().finally(() => { loading = null; });
+    return loading;
+  }
+
+  async function play() {
+    if (recording) return;
+    if (!take) await loadStored();
+    if (!take?.ready) return;
+    show(true);
+    if (deck.position() >= take.len - 50) { deck.seek(0); pv.currentTime = 0; }
+    deck.play();
+    pv.play().catch(() => {});
+  }
+  function pause() { deck.pause(); pv.pause(); }
+
+  function face() {
+    const b = bar.extra?.('rec');
+    if (!b) return;
+    setIcon(b, recording ? 'stop' : 'record', recording ? 'stop recording' : 'record');
+    b.classList.toggle('cc-rec', !recording);
+  }
+
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, {
+    scrub: false, loop: false, live: false,
+    command: { play, pause },
+    extras: [{ id: 'rec', label: '', aria: 'record', title: `record, ${REC_MS / 1000} s at most`,
+               onPress: () => (recording ? stopRecording('stopped') : record()) }],
+  });
+  const strip = createStripView(glue, deck, { size: 'auto', follow: true, gutter: 120, lanes: [lane] });
+  const surface = createGlue(bar.el, strip.surface);
+  face();
+
+  // ── the knobs ────────────────────────────────────────────────────────────
+  const knobs = new Map(KNOBS.map((k) => [k.name, createKnob({
+    label: k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
+    onInput: (r) => bay.send(KNOB_OUT(k.name), { of: 'param', name: k.name, v: r }),
+  })]));
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // Camera wires while frames arrive; the live dither wire only while it is the
+  // picture on screen; the recorder's wires while recording; the player's while
+  // the take plays.
+  const lit = (l) => {
+    if (l.from === CAM) return flowing();
+    if (l.from === SH_OUT && l.to === FX) return flowing() && holds(CAM, SH_IN) && !showing;
+    if (l.from === SH_OUT && l.to === REC_IN) return !!recording;
+    if (l.from === REC_OUT) return !!recording;
+    if (l.from === ST_OUT || l.from === PL_OUT) return showing && deck.playing();
+    return false;
+  };
+  const pb = createPatchbay(bay, { flowing: lit });
+  render();
+
+  // ── start and stop the camera ───────────────────────────────────────────
+  async function start() {
+    const mine = ++gen;
+    armVideo(video);
+    let s;
+    try {
+      s = await navigator.mediaDevices.getUserMedia({
+        video: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          width: { ideal: FRAME_W }, height: { ideal: FRAME_H }, frameRate: { ideal: 30 } },
+        audio: false,
+      });
+    } catch (e) {
+      const why = e?.name === 'NotAllowedError' ? 'the camera was refused'
+        : e?.name === 'NotFoundError' ? 'this machine has no camera'
+        : `the camera did not start (${e?.name || e})`;
+      d.log(why, 'bad');
+      faceCam(false);
+      return;
+    }
+    if (gen !== mine) { s.getTracks().forEach((t) => t.stop()); return; }
+    cam = s;
+    const track = cam.getVideoTracks()[0];
+    const set = track.getSettings();
+    deviceId = set.deviceId || deviceId;
+    video.srcObject = cam;
+    video.play().catch(() => {});
+    const label = (track.label || '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
+    name.textContent = label;
+    size.textContent = set.width && set.height ? `${set.width}x${set.height}` : '';
+    if (!showing) fxName.textContent = 'dither';
+    camNode(label || 'camera');
+    d.log(`camera on: ${track.label || 'default'} at ${set.width}x${set.height}`, 'hi');
+    watchFrames();
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(frame);
+    pb.refresh();
+    faceCam(true);
+    await listCameras();
+  }
+
+  function stop() {
+    if (recording) stopRecording('the camera went off');
+    gen++;
+    cam?.getTracks().forEach((t) => t.stop());
+    cam = null;
+    cancelAnimationFrame(raf);
+    try { video.pause(); } catch { /* fine */ }
+    video.srcObject = null;
+    size.textContent = '';
+    if (!showing) { fxName.textContent = ''; if (gl) fxSize.textContent = ''; }
+    render();
+    pb.refresh();
+    faceCam(false);
+    d.log('camera off, every track stopped');
+  }
+
+  const picker = createPicker({ what: 'camera',
+    prev: () => pick((at() - 1 + devices.length) % devices.length),
+    next: () => pick((at() + 1) % devices.length),
+    onPick: (i) => pick(i) });
+  picker.el.hidden = true;
+  const at = () => Math.max(0, devices.findIndex((x) => x.deviceId === deviceId));
+  async function listCameras() {
+    try {
+      devices = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput');
+    } catch { devices = []; }
+    picker.options(devices.map((x, i) => x.label || `camera ${i + 1}`));
+    picker.show(at());
+    picker.el.hidden = devices.length < 2;
+  }
+  async function pick(i) {
+    const dev = devices[i];
+    if (!dev || dev.deviceId === deviceId) return;
+    deviceId = dev.deviceId;
+    picker.show(i);
+    if (cam) { stop(); await start(); }
+  }
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'cam', icon: 'video', label: 'start the camera', onPress: () => (cam ? stop() : start()) },
+  ] });
+  function faceCam(on) {
+    transport.setIcon('cam', on ? 'stop' : 'video', on ? 'stop the camera' : 'start the camera');
+  }
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el, picker.el);
+  // Linear: the pictures, the timeline under them, the knobs area, the patchbay.
+  d.stack.add(top, pair, surface, grid.el, pb.el);
+  window.__demo.knobs = grid;
+  window.__demo.rec = () => ({
+    recording: !!recording, showing, where, pos: Math.round(deck.position()), playing: deck.playing(),
+    range: deck.range ? [...deck.range] : null,
+    take: take && { ms: take.ms, fileMs: take.fileMs, len: take.len, bytes: take.bytes, mime: take.mime, ready: take.ready },
+    pv: { t: +pv.currentTime.toFixed(2), paused: pv.paused, w: pv.videoWidth, h: pv.videoHeight },
+    rides: { recToStore: via(REC_OUT, ST_IN), storeToPlayer: via(ST_OUT, PL_IN) },
+  });
+  d.ready();
+</script>

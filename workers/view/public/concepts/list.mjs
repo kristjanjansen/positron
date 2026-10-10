@@ -22,5 +22,6 @@ export const CONCEPTS = [
   { n: '500', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
   { n: '600', title: 'Camera', say: 'The local camera patched to a picture on this page.' },
   { n: '610', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
+  { n: '620', title: 'Camera recorder', say: 'The dithered camera recorded for up to ten seconds into this browser and played back on a timeline.' },
   { n: '650', title: 'Camera loopback', say: 'The local camera beside the same picture after a round trip through Cloudflare Stream by WHIP and back by WHEP.' },
 ];

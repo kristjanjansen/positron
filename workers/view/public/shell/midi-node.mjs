@@ -364,7 +364,7 @@ export async function checkMidiNode({ assert, log, page, slug, tap = false }) {
   assert('building the page joined no room, the patchbay waits for Join', !page.node.joined() && !page.node.joining(),
     page.node.joining() ? 'a socket is open' : 'no socket');
   assert('this tab is a site of its own, and a harness run is never in the studio’s room',
-    /^web-[a-z0-9]{4}$/.test(page.site) && (!SELFCHECK || page.room !== 'studio-1'), `${page.site} in ${page.room}`);
+    /^web-[a-z0-9]{3}$/.test(page.site) && (!SELFCHECK || page.room !== 'studio-1'), `${page.site} in ${page.room}`);
   assert('Join is not in the row the harness presses', !page.el.closest('.pos-controls') && !page.el.querySelector('.pos-controls'));
 
   // 🔴 A SCRATCH NODE, built the same way, on a relay that lives in this file.

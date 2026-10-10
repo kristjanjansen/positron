@@ -45,11 +45,11 @@
   //
   // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND AT MOST 10 SECONDS OF
   // THEM. One WHIP publish and one WHEP play, billed by the minute delivered
-  // whatever the protocol (positron-streaming). Ten seconds after the publish
-  // is accepted the right picture has faded to the ground over its last second
-  // and the page stops itself exactly as a stop press does, so one press is
-  // bounded at about ten seconds on each leg. Asked for: "limit to 10 sec. just
-  // fade out".
+  // whatever the protocol (positron-streaming). Twenty seconds after the
+  // publish is accepted the right picture has faded to the ground over
+  // its last three, both pictures together, and the page stops itself exactly as a stop press does, so
+  // one press is bounded at about twenty seconds on each leg. Asked for:
+  // "limit to 10 sec. just fade out", then "limit to 20sec. fade out sloowly".
   //
   // 🔴 IT SHARES /cam/'s ONE WHIP INPUT. The worker allows one camera on it at a
   // time, so a publish answered 409 means somebody else is on air there, /cam/
@@ -68,7 +68,9 @@
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const LIVE_IN = 'cf-stream:live:video-in', LIVE_OUT = 'cf-stream:live:video-out';
   const LOOP = `${S}:loopback:video-in`;
-  const NO_MEDIA_MS = 7000, CAP_MS = 10000, FADE_MS = 1000;
+  // 20 s a press, the last 5 of them a slow fade (asked 2026-10-10, *"limit to
+  // 20sec. fade out sloowly"*, then *"fade out bit faster, both videopanels"*).
+  const NO_MEDIA_MS = 7000, CAP_MS = 20000, FADE_MS = 3000;
 
   const d = mount({ name: 'concept 650', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('650');
@@ -171,7 +173,8 @@
   }
   const fade = () => (endAt ? Math.max(0, Math.min(1, (endAt - performance.now()) / FADE_MS)) : 1);
   function render() {
-    paint(L, video, !!cam && holds(CAM, SCREEN));
+    // Both pictures fade together as the press runs out.
+    paint(L, video, !!cam && holds(CAM, SCREEN), fade());
     paint(R, back, !!cam && !!sub && holds(LIVE_OUT, LOOP), fade());
   }
   function frame() { render(); if (cam) raf = requestAnimationFrame(frame); }
@@ -222,7 +225,7 @@
     if (cname && cname !== stat.cname) d.log(`the WHEP leg decodes ${cname}`);
     stat.cname = cname;
     V.el.title = `${cname}\n${decoded} frames decoded\n${vin.framesDropped ?? 0} dropped`.trim();
-    if (stat.arriving && state.textContent !== 'back from Cloudflare') state.textContent = 'back from Cloudflare';
+    if (stat.arriving && state.textContent !== 'playing') state.textContent = 'playing';
     Object.assign(stat, {
       w: vin.frameWidth, h: vin.frameHeight, fps: vin.framesPerSecond, rtt,
       codec: codec?.mimeType || null, dropped: vin.framesDropped,
