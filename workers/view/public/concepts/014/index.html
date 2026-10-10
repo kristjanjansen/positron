@@ -11,7 +11,7 @@
   /* Two pictures side by side, each half the content width; one under the other on a phone. */
   .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
   .cc-pair > * { flex: 1 1 0; min-width: 0; }
-  @media (max-width: 560px) { .cc-pair { flex-direction: column; align-items: stretch; } }
+  @media (max-width: 560px) { .cc-pair { flex-direction: column; align-items: stretch; } .cc-pair > * { flex: none; } }
   .cc-vis { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
   /* The emulated OLED: the panel's dark ink, the 128x64 canvas at a whole number scale in the middle. */
   .cc-oled { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: #05070c; cursor: pointer; }
@@ -42,7 +42,8 @@
   import { setIcon } from '/shell/icon-button.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createPicoRunner, parseUF2, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
   import { drawOled } from '/shell/oled-view.mjs';
@@ -55,7 +56,7 @@
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture'], ['pico', 'device', 'Pico (emulated)'], ['oled', 'screen', 'OLED']]) {
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture'], ['pico', 'device', 'Pico (emulated)'], ['oled', 'screen', 'OLED'], ['knob-volume', 'person', 'knob']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
 
@@ -263,7 +264,10 @@
 
   let kb = null;
   const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
+    // The volume knob is a node of its own, as on /concepts/015/: a turn is one CC 7
+    // out of its own port, so its cable is the one that pulses.
+    { id: `${S}:knob-volume:midi-out`, dir: 'out', medium: 'midi', emits: ['cc'] },
     { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
       deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
     { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
@@ -293,21 +297,23 @@
   // ── the links, rebuilt whenever an effect changes ─────────────────────
   function patch() {
     for (const l of bay.links()) bay.unlink(l.id);
-    // The keys now send CC as well, and the synth and recorder take notes only, so
-    // their links say so: `{ only note }`. Without it the bay refuses the link.
-    const NOTES = [{ op: 'only', cls: 'note' }];
-    const want = [[`${S}:keys:midi-out`, `${S}:synth:midi-in`, NOTES]];
+    // The keys send notes only, since the volume knob has its own node, so the
+    // synth and the recorder take them with no transform on the link.
+    const want = [[`${S}:keys:midi-out`, `${S}:synth:midi-in`, []]];
     // The recorder hears the keys; it plays back into the synth on a link of its own.
-    want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, NOTES], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
+    want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, []], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
     want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
     // The shader hears the same notes as the synth, from the keys and from the
     // recorder, and its picture goes to the screen on this page.
     want.push([`${S}:keys:midi-out`, `${S}:midi:midi-in`, []], [`${S}:rec:midi-out`, `${S}:midi:midi-in`, []],
       [`${S}:midi:value-out`, `${S}:shader:value-in`, []],
       [`${S}:shader:video-out`, `${S}:screen:video-in`, []]);
-    // The Pico hears the same notes and the volume knob, and its screen is the panel on the right.
+    // The Pico hears the same notes, and its screen is the panel on the right.
     want.push([`${S}:keys:midi-out`, `${S}:pico:midi-in`, []], [`${S}:rec:midi-out`, `${S}:pico:midi-in`, []],
       [`${S}:pico:video-out`, `${S}:oled:video-in`, []]);
+    // The volume knob's CC 7 reaches the midi state (the shader's brightness) and
+    // the Pico, whose firmware reads CC 7 as its brightness too (rig/pico/rings/main.c).
+    want.push([`${S}:knob-volume:midi-out`, `${S}:midi:midi-in`, []], [`${S}:knob-volume:midi-out`, `${S}:pico:midi-in`, []]);
     for (const [a, b, tr] of want) {
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -404,15 +410,13 @@
 
   patch();
   d.log(gl ? (typeof shaderSays === 'string' ? shaderSays : 'no shader') : 'this browser has no WebGL2, so the picture stays dark', gl && /did not/.test(shaderSays || '') ? 'warn' : undefined);
-  // The knobs above the keyboard. Volume sends CC 7 out of keys:midi-out, the same
-  // port the notes leave by; on this page it only brightens the picture.
+  // The knobs, in their own row above the keyboard, as on /concepts/015/ and 016.
+  // Volume sends CC 7 out of web:knob-volume:midi-out; on this page it brightens
+  // both pictures and sounds nothing.
   const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100, hand: true,
-    onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); } });
-
-  const knobs = createKnobBank([volume]);
-  // The knobs and the keyboard are one instrument, glued, as on /fau/.
+    onInput: (v) => { bay.send(`${S}:knob-volume:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); } });
+  const knobs = createKnobGrid(new Map([['volume', volume]]), { row: true });
   const instrument = createInstrumentPanel({ keys: host, plate: false });
-  instrument.addRow(knobs.el);
   // Each panel names the device that draws it on the left and its resolution in the middle.
   const glRes = el('span', 'cc-pico-say', '');
   const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-pico-say', 'Browser GPU'), centre: glRes });
@@ -421,7 +425,9 @@
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, picoPanel.el);
   // Blocks in the shell's stack, at the shell's gap. The pair is one block.
-  d.stack.add(pair, surface, instrument.el, pb.el);
+  d.stack.add(pair, surface, knobs.el, instrument.el, pb.el);
   window.__demo.pico = pico;
+  window.__demo.knobs = knobs;
+  window.__demo.bay = bay;
   d.ready();
 </script>
