@@ -306,7 +306,7 @@
   // ── the picture: the tuner's output, one full-width wave ─────────────────
   const host = el('div', 'cc-wave');
   const scope = createGrainScope(host, { seconds: 4, height: 150, fullScale: 1 });
-  const panel = createVideoPanel({ media: host, aspect: 'auto', left: el('span', 'cc-say', 'tuner output') });
+  const panel = createVideoPanel({ media: host, aspect: 'auto', right: false, left: el('span', 'cc-say', 'tuner output') });
   function frame() {
     if (!playing) return;
     if (waveOn) { tuner.tap.getFloatTimeDomainData(tuner.buf); scope.feed(tuner.buf, ctx.sampleRate); }
