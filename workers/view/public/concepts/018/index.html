@@ -343,7 +343,9 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
   // The program itself in the kit's code box, read only (asked 2026-10-10,
   // *"show faust code"*, *"use code panel"*): the knobs below are its sliders.
   const lines = CODE.replace(/\n$/, '').split('\n').length;
-  const code = createCodeBox({ language: 'faust', rows: lines, label: '', value: CODE.replace(/\n$/, ''),
+  // A third of the program's height; it scrolls (asked 2026-10-10, *"make faust
+  // source code 1/3 of current h"*).
+  const code = createCodeBox({ language: 'faust', rows: Math.max(6, Math.round(lines / 3)), label: '', value: CODE.replace(/\n$/, ''),
     ariaLabel: 'the Faust program this synth plays, read only' });
   code.input.readOnly = true;
   d.stack.add(top, wave.el, code.el, grid.el, host, pb.el);
