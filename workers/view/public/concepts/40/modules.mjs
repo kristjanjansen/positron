@@ -94,12 +94,12 @@ const withKnobs = (patch, names) => [patch,
 const STEP_LIST = [
   { name: 'sine', patch: L1, knobs: [], preset: { wave: 'sine', freq: 220 } },
   { name: 'knob', patch: L2, knobs: ['freq'], preset: { wave: 'sine' } },
-  { name: 'saw', patch: L2, knobs: ['freq', 'wave'], preset: { wave: 'sawtooth' } },
+  { name: 'wave', patch: L2, knobs: ['freq', 'wave'], preset: { wave: 'sawtooth' } },
   { name: 'filter', patch: L4, knobs: ['freq', 'wave', 'cutoff', 'q'], preset: { wave: 'sawtooth' } },
   // No keyboard since 2026-10-10 (*"from 40 rm keys and detune"*): play is a
   // test tone, one held note out of web:tone into the osc and the amp.
-  { name: 'amp', patch: L5, knobs: ['wave', 'cutoff', 'q', 'attack', 'release'], preset: { wave: 'sawtooth' } },
-  { name: 'lfo', patch: L6, knobs: ['wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 800 } },
+  { name: 'amp', patch: L5, knobs: ['freq', 'wave', 'cutoff', 'q', 'attack', 'release'], preset: { wave: 'sawtooth' } },
+  { name: 'lfo', patch: L6, knobs: ['freq', 'wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 800 } },
 ];
 export const STEPS = STEP_LIST.map((st) => ({ ...st, patch: withKnobs(st.patch, st.knobs) }));
 

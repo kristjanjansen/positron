@@ -406,7 +406,7 @@
   d.log(gl ? (typeof shaderSays === 'string' ? shaderSays : 'no shader') : 'this browser has no WebGL2, so the picture stays dark', gl && /did not/.test(shaderSays || '') ? 'warn' : undefined);
   // The knobs above the keyboard. Volume sends CC 7 out of keys:midi-out, the same
   // port the notes leave by; on this page it only brightens the picture.
-  const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100,
+  const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100, hand: true,
     onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); } });
 
   const knobs = createKnobBank([volume]);

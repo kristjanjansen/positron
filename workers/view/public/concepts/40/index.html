@@ -59,7 +59,7 @@
   const knobs = new Map();
   for (const k of KNOBS) {
     knobs.set(k.name, createKnob({
-      label: k.name === 'q' ? 'Q' : k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format,
+      label: k.name === 'q' ? 'Q' : k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
       onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
     }));
   }
