@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**014 Dot piano: the volume knob its own node and row** (2026-10-10). Asked: *"make dotpiano knob separate as in recent synth ones"*. `web:knob-volume` cabled into midi state and the Pico; keys send notes only; the phone pictures no longer collapse.~~ DONE 2026-10-10.
+- ~~**Front page: no slides, no slogan** (2026-10-10). Asked: *"rm slide from frontpage"* and *"rm frontpage slogan"*.~~ DONE 2026-10-10.
 - ~~**011 (Effects) moves to misc** (2026-10-10). Asked: *"move 011 to misc"*. It is 093.~~ DONE 2026-10-10.
 - ~~**The kit on its own page, off the front page** (2026-10-10). Asked: *"make a separate kit page (rm from frontpage) "/kit""*. Every kit part unlisted; `/kit/` draws the parts as cards, as `/concepts/` does, and still forwards old `#block` links.~~ DONE 2026-10-10.
 - ~~**Concepts in named groups** (2026-10-10). Asked: *"lets clean up concepts / rename. add subtitles to index page and rename"* with synths, radio, camera, pico, chat, misc, and *"tv is separate"*. 040 and 045 are 015 and 016, Pico 007 is 070, TV 008 is 040, misc 001 002 050 are 090 091 092; the index draws a heading per group.~~ DONE 2026-10-10. Open: *"chat: 003 004 005 006 (rename title)"*, what to rename was not settled.

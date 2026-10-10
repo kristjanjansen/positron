@@ -1381,7 +1381,9 @@ export function byGroup(list = DEMOS) {
     id, title,
     rows: byNewest(list.filter((d) => d.group === id))
       .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)),
-  })).filter((g) => g.rows.length || DECK_GROUPS.has(g.id));
+  // A deck group used to show with no listed rows; since 2026-10-10 it does not
+  // (*"rm slide from frontpage"*), so a group with nothing listed is gone.
+  })).filter((g) => g.rows.length);
 }
 // Groups that are not demo cards: the front page fills their holder with the
 // players from shell/decks.mjs, so they are drawn with no rows.
