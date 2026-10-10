@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Stream wires: much longer bands** (2026-10-10). Asked: *"make streamy connectoins animation waaaay longer than currentlu"*.~~ DONE 2026-10-10.
+- ~~**Concept 41 pad labels the wrong size** (2026-10-10). Asked: *"wrong font size on xy"*. Sized from the pad's on-screen width, 13 px.~~ DONE 2026-10-10.
 - **Concept synths laid out one way** (2026-10-10). Asked: *"have standard logic for istrument panes when you lay out concept syths. they are linear execpt knobs that are are independet in the knobs area, horiz scrollable. no half col scope, scope is always full w"*. Rule in the positron-concepts skill; `createKnobGrid` gains a one-row scrolling mode; 40, 41 and 50 follow it.
 - ~~**Concept 41: the keys box with no keyboard** (2026-10-10). Asked: *"where is web:keys. there is only test tone"*. The node is `web:tone`, labelled test tone.~~ DONE 2026-10-10.
 - ~~**XY pad mark: no ring, a ground-coloured border** (2026-10-10). Asked, with a crop of 41's pad: *"rm extra outline. make bg-colored border on yellow dot"*.~~ DONE 2026-10-10.

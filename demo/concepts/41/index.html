@@ -70,8 +70,11 @@
   function labels(c, { W, H, colors }) {
     c.save();
     c.fillStyle = colors.dim;
-    c.font = `22px ${MONO}`;
-    const I = 16;
+    // The pad draws in its own pixels and is shown at whatever width it has,
+    // so the type is sized from that width: 13 px on screen, the knob values' size.
+    const k = W / (c.canvas.clientWidth || W);
+    c.font = `${13 * k}px ${MONO}`;
+    const I = 10 * k;
     c.textBaseline = 'bottom';
     c.textAlign = 'left'; c.fillText('60 Hz', I, H - I);
     c.textAlign = 'center'; c.fillText('cutoff', W / 2, H - I);
