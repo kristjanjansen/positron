@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**Concept 40 without keys or detune** (2026-10-10). Asked: *"from 40 rm keys and detune"*. Play is a test tone (`web:tone`, a held A3) into the osc and amp; step 5 is called amp.~~ DONE 2026-10-10.
 - ~~**Concept 31 granulator rhythmic and expressive** (2026-10-10). Asked: *"make 31 granulator more ryhymic and expressive. in bg"*. 112 bpm 16ths, five patterns, accents, ratchets, slices, a pentatonic motif, a dotted eighth delay; one new sparse to busy control.~~ DONE 2026-10-10.
 - ~~**Patchbay title a standard heading, concepts on the standard vertical rhythm** (2026-10-10). Asked: *"patchbay title should be standard heading, uppercase mono"* and *"also make concepts follow standar layout vertical gaps"*. `createPatchbay`'s title uses the kit's section heading; concept pages drop their page-local `.cc-stack { gap: 12px }` for the shell's stack and `--pos-gap`.~~ DONE 2026-10-10, 40 px measured on twelve pages. Open: a titled block is itself a stack, so a field and its table under one heading sit 40 apart (5, 6, 12); the shell has no tight group.
 - ~~**Concept 31: no full-screen buttons on the wave panels** (2026-10-10). Asked: *"build fullscreen buttons from videopanels in 31"*, confirmed as remove. `right: false` on all three.~~ DONE 2026-10-10.

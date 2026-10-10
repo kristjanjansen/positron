@@ -38,7 +38,6 @@ const sText = (v) => (v >= 1 ? `${v.toFixed(2)} s` : `${Math.round(v * 1000)} ms
  */
 export const KNOBS = [
   { name: 'freq', owner: 'osc', min: 0, max: 127, raw: F.from(220), value: F.to, format: (r) => hzText(F.to(r)) },
-  { name: 'detune', owner: 'osc', min: -100, max: 100, step: 1, raw: 0, value: (r) => r, format: (r) => `${Math.round(r)} ct` },
   { name: 'wave', owner: 'osc', min: 0, max: 3, step: 1, raw: 2, value: (r) => WAVES[Math.round(r)], format: (r) => WAVES[Math.round(r)].replace('sawtooth', 'saw') },
   { name: 'cutoff', owner: 'filter', min: 0, max: 127, raw: C.from(1100), value: C.to, format: (r) => hzText(C.to(r)) },
   { name: 'q', owner: 'filter', min: 0.7, max: 15, raw: 5, value: (r) => r, format: (r) => r.toFixed(1) },
@@ -78,8 +77,8 @@ const L2 = L1;
 const L4 = `web:osc:audio-out -> web:filter:audio-in
 web:filter:audio-out -> web:speaker:audio-in
 web:filter:audio-out -> web:scope:audio-in`;
-const L5 = `web:keys:midi-out -> web:osc:midi-in
-web:keys:midi-out -> web:amp:midi-in
+const L5 = `web:tone:midi-out -> web:osc:midi-in
+web:tone:midi-out -> web:amp:midi-in
 web:osc:audio-out -> web:filter:audio-in
 web:filter:audio-out -> web:amp:audio-in
 web:amp:audio-out -> web:speaker:audio-in
@@ -97,8 +96,10 @@ const STEP_LIST = [
   { name: 'knob', patch: L2, knobs: ['freq'], preset: { wave: 'sine' } },
   { name: 'saw', patch: L2, knobs: ['freq', 'wave'], preset: { wave: 'sawtooth' } },
   { name: 'filter', patch: L4, knobs: ['freq', 'wave', 'cutoff', 'q'], preset: { wave: 'sawtooth' } },
-  { name: 'keys', patch: L5, knobs: ['detune', 'wave', 'cutoff', 'q', 'attack', 'release'], preset: { wave: 'sawtooth' } },
-  { name: 'lfo', patch: L6, knobs: ['detune', 'wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 800 } },
+  // No keyboard since 2026-10-10 (*"from 40 rm keys and detune"*): play is a
+  // test tone, one held note out of web:tone into the osc and the amp.
+  { name: 'amp', patch: L5, knobs: ['wave', 'cutoff', 'q', 'attack', 'release'], preset: { wave: 'sawtooth' } },
+  { name: 'lfo', patch: L6, knobs: ['wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 800 } },
 ];
 export const STEPS = STEP_LIST.map((st) => ({ ...st, patch: withKnobs(st.patch, st.knobs) }));
 
@@ -182,7 +183,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const NODES = [
-    ['keys', 'person', 'keyboard'],
+    ['tone', 'person', 'test tone'],
     ...KNOBS.map((k) => [`knob-${k.name}`, 'person', 'knob']),
     ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
     ['amp', 'engine', 'amp and envelope'], ['lfo', 'engine', 'lfo'],
@@ -192,7 +193,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   const param = (mod) => ({ id: id(mod, 'value-in'), dir: 'in', medium: 'value',
     shape: { of: 'param', names: NAMES[mod] }, deliver: deliverParam(mod) });
   const PORTS = [
-    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: id('tone', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
     // No `names` on a knob: the bay's shape check wants names to be equal, and
     // one knob names one of a module's several. The module ignores and logs a
     // name it does not have.
@@ -314,7 +315,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   /** Is a voice audible: sound on, and either no amp in the chain or a key held or releasing. */
   function sounding() {
     if (!ctx || !on) return false;
-    const gated = has(id('keys', 'midi-out'), id('amp', 'midi-in')) && bay.links().some((l) => l.to === id('amp', 'audio-in'));
+    const gated = has(id('tone', 'midi-out'), id('amp', 'midi-in')) && bay.links().some((l) => l.to === id('amp', 'audio-in'));
     return !gated || ampHeld.size > 0 || at() < releaseEnd;
   }
 
