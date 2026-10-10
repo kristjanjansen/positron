@@ -7,7 +7,7 @@ export const CONCEPTS = [
   { n: '010', group: 'synths', title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
   { n: '012', group: 'synths', title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
   { n: '013', group: 'synths', title: 'Timeline', say: 'The recorder on the kit transport bar and timeline.' },
-  { n: '014', group: 'synths', title: 'Shader', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
+  { n: '014', group: 'synths', title: 'Dot piano', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
   { n: '015', group: 'synths', title: 'Synth', say: 'A WebAudio synth built one patched module at a time.' },
   { n: '016', group: 'synths', title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
   { n: '030', group: 'radio', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
