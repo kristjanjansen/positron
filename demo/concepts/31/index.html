@@ -11,6 +11,10 @@
   /* The page is the shell's stack (`createStack`, `--pos-gap`). A block that
      belongs tight to what is under it is one `.cc-block`, its own column at 12. */
   .cc-block { display: flex; flex-direction: column; gap: 12px; }
+  /* The granulator's two slider rows side by side (asked 2026-10-10, *"dry
+     grains sparse busy - 2 cols"*), one under the other on a phone. */
+  .cc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 32px; }
+  @media (max-width: 560px) { .cc-two { grid-template-columns: 1fr; } }
   /* Two pictures side by side, each half the content width; one under the other on a phone. As /concepts/14/. */
   .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
   .cc-pair > * { flex: 1 1 0; min-width: 0; }
@@ -510,7 +514,9 @@
   const block = (...parts) => { const b = el('div', 'cc-block'); b.append(...parts); return b; };
   const page = createStack(undefined, 'cc-page');
   // Play on its own row, top left under the title.
-  page.add(transport.el, block(pair, fade), block(gpanel.el, mixRow, densRow), pb.el);
+  const two = el('div', 'cc-two');
+  two.append(mixRow, densRow);
+  page.add(transport.el, block(pair, fade), block(gpanel.el, two), pb.el);
   const out = page.el;
   // Both label columns of every slider row take the longest end label's width.
   const ends = [...out.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
