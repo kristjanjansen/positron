@@ -8,7 +8,6 @@
 <title>POSITRON concept 41</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
   .cc-top { display: flex; align-items: flex-end; gap: 12px; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
   /* The pad and the knob group side by side on a desk. The row wraps when the
@@ -132,10 +131,9 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  const out = el('div', 'cc-stack');
-  // Linear, as every concept synth: scope, pad, the knob row, then the patchbay.
-  out.append(top, wave.el, pad.el, grid.el, pb.el);
-  d.el.append(out);
+  // Linear, as every concept synth: scope, pad, the knob row, then the patchbay,
+  // as blocks in the shell's stack at the shell's gap.
+  d.stack.add(top, wave.el, pad.el, grid.el, pb.el);
 
   // The one patch.
   const bad = synth.load(PATCH);

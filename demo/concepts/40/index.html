@@ -8,11 +8,9 @@
 <title>POSITRON concept 40</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
-  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   /* Every part of this page follows the links, so a part the patch does not use
      is hidden, and the kit's components set `display` of their own. (0,2,0). */
-  .cc-stack [hidden] { display: none; }
+  .pos-body [hidden] { display: none; }
   /* The step picker and the sound button on one row; on a phone they wrap. */
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
@@ -152,12 +150,11 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el, picker.el);
-  const out = el('div', 'cc-stack');
   // The waveform, the knob group and the keys are three blocks of the page,
   // not glued (asked 2026-10-10, *"scope knobs keys are different blocks not
   // glued. just hide them when not there"*).
-  out.append(top, wave.el, grid.el, keysHost, pb.el);
-  d.el.append(out);
+  // Blocks in the shell's stack, at the shell's gap.
+  d.stack.add(top, wave.el, grid.el, keysHost, pb.el);
   for (const [name, v] of Object.entries(step.preset)) {
     synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);
     knobs.get(name).set(knobRaw(name, v), { quiet: true });

@@ -8,8 +8,6 @@
 <title>POSITRON concept 14</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
-  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   /* Two pictures side by side, each half the content width; one under the other on a phone. */
   .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
   .cc-pair > * { flex: 1 1 0; min-width: 0; }
@@ -405,7 +403,6 @@
   });
 
   patch();
-  const out = el('div', 'cc-stack');
   d.log(gl ? (typeof shaderSays === 'string' ? shaderSays : 'no shader') : 'this browser has no WebGL2, so the picture stays dark', gl && /did not/.test(shaderSays || '') ? 'warn' : undefined);
   // The knobs above the keyboard. Volume sends CC 7 out of keys:midi-out, the same
   // port the notes leave by; on this page it only brightens the picture.
@@ -423,8 +420,8 @@
   setInterval(() => { const t = `${canvas.width}\u00d7${canvas.height}`; if (glRes.textContent !== t) glRes.textContent = t; }, 500);
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, picoPanel.el);
-  out.append(pair, surface, instrument.el, pb.el);
-  d.el.append(out);
+  // Blocks in the shell's stack, at the shell's gap. The pair is one block.
+  d.stack.add(pair, surface, instrument.el, pb.el);
   window.__demo.pico = pico;
   d.ready();
 </script>

@@ -8,8 +8,6 @@
 <title>POSITRON concept 10</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
-  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   /* The same medium colours as /concepts/1/. */
   :root {
     --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
@@ -112,8 +110,7 @@
 
   patch(true);
 
-  const out = el('div', 'cc-stack');
-  out.append(host, pb.el);
-  d.el.append(out);
+  // Blocks in the shell's stack, at the shell's gap.
+  d.stack.add(host, pb.el);
   d.ready();
 </script>

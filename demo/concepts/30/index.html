@@ -8,7 +8,6 @@
 <title>POSITRON concept 30</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
   /* Two pictures side by side, each half the content width; one under the other on a phone. As /concepts/14/. */
   .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
   .cc-pair > * { flex: 1 1 0; min-width: 0; }
@@ -31,8 +30,10 @@
   .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
     align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
   .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
-  /* Play on its own row: the button's own size, at the left. */
-  .cc-stack > .pos-bgroup { align-self: flex-start; width: auto; }
+  /* Play on its own row: the button's own size, at the left. A flex row
+     blockifies it, so it sits on no text line. */
+  .cc-top { display: flex; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
   .cc-fade .cc-end:first-child { text-align: right; }
   .cc-fade > .sld { min-width: 0; }
   .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
@@ -242,13 +243,13 @@
   const fade = el('div', 'cc-fade');
   fade.append(el('span', 'cc-end', 'ERR'), fader.el, el('span', 'cc-end', 'Ida'));
 
-  const out = el('div', 'cc-stack');
   // Play on its own row, top left under the title.
-  out.append(transport.el, pair, fade, pb.el);
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  // Blocks in the shell's stack, at the shell's gap.
+  d.stack.add(top, pair, fade, pb.el);
   // Both label columns of every slider row take the longest end label's width.
-  const ends = [...out.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
-  out.style.setProperty('--end', `${Math.max(...ends)}ch`);
-
-  d.el.append(out);
+  const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
+  d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
   d.ready();
 </script>

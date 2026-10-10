@@ -8,8 +8,6 @@
 <title>POSITRON concept 6</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
-  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
   .cc-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
   .cc-row > .pos-field { flex: 1 1 260px; min-width: 0; }
   .cc-row[hidden] { display: none; }
@@ -530,8 +528,12 @@
 
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);
-  const out = el('div', 'cc-stack');
-  out.append(roles.el, joinRow, el('h3', 'cc-h', 'broadcast'), airRow, airSay, airBox, el('h3', 'cc-h', 'notices'), noticeRow, notices.el, el('h3', 'cc-h', 'chat'), row, lines.el, pb.el, el('h3', 'cc-h', 'in the room'), sites.el);
-  d.el.append(out);
+  // Blocks in the shell's stack; a heading and what it names are one block.
+  d.stack.add(roles.el, joinRow);
+  d.stack.titled('BROADCAST', airRow, airSay, airBox);
+  d.stack.titled('NOTICES', noticeRow, notices.el);
+  d.stack.titled('CHAT', row, lines.el);
+  d.stack.add(pb.el);
+  d.stack.titled('IN THE ROOM', sites.el);
   d.ready();
 </script>

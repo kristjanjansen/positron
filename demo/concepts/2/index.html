@@ -17,12 +17,10 @@
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
   .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
-  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
-  import { mount, el } from '/shell/shell.mjs';
+  import { mount } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
 
   // /mirror/ as the patchbay sees it, read from demo/mirror/index.html (SELF, linkIn,
@@ -61,13 +59,12 @@
       if (/^(midi|audio|clock|value|video|program|file|state)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
     }
   }
-  function block(title, rows) {
+  // A heading and its table are one block, so the shell's stack spaces the blocks.
+  function table(rows) {
     const t = createTable({ columns: COLS });
     t.set(rows);
     colour(t);
-    const b = el('div', 'cc-stack');
-    b.append(el('h3', 'cc-h', title), t.el);
-    return b;
+    return t.el;
   }
 
   const links = createTable({ columns: [
@@ -80,12 +77,8 @@
     { line: 'web:webgl:video-out -> web:left:video-in', opened: 'page, nothing crosses a wire' },
   ]);
 
-  const out = el('div', 'cc-stack');
-  out.append(
-    block('announced', ANNOUNCED),
-    el('h3', 'cc-h', 'links'), links.el,
-    block('missing', MISSING),
-  );
-  d.el.append(out);
+  d.stack.titled('ANNOUNCED', table(ANNOUNCED));
+  d.stack.titled('LINKS', links.el);
+  d.stack.titled('MISSING', table(MISSING));
   d.ready();
 </script>
