@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept 050</title>
+<title>POSITRON concept 092</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/slide.css">
 <style>
@@ -76,7 +76,7 @@
      horiz scrollable. no half col scope, scope is always full w"*). The scope
      at the full width, then one row of the kit's own boxed knobs that scrolls
      sideways and never wraps (`createKnobGrid(..., { row: true })`, as on
-     /concepts/040/), then the keys. No module boxes: the band says which
+     /concepts/015/), then the keys. No module boxes: the band says which
      modules are patched, and the live knobs say which are in play. ─────── */
   .tf-build {
     grid-area: build; background: var(--bg);
@@ -137,8 +137,8 @@
   // the build area shows and the patch the bay holds; the footer band draws
   // that patch, and a key lights the cables it travels.
   // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key press.
-  const d = mount({ name: 'concept 050', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('050');
+  const d = mount({ name: 'concept 092', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('092');
 
   const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
   const { bay } = synth;
@@ -200,7 +200,7 @@
     ctx.resume();
   };
   const keysHost = el('div', 'tf-keys');
-  // C3 to A4, 13 white keys at the kit's 49 px floor, as on /concepts/040/:
+  // C3 to A4, 13 white keys at the kit's 49 px floor, as on /concepts/015/:
   // the build area is three quarters of 1024 now, 712 logical px inside
   createKeyboard(keysHost, {
     ...keyRange(21), base: 48,
@@ -292,7 +292,7 @@
     at = n;
     const s = STEPS[n];
     setWords(s);
-    // A knob the step does not use is not shown at all, as on /concepts/040/.
+    // A knob the step does not use is not shown at all, as on /concepts/015/.
     for (const n of grid.names) {
       const on = s.boxes.includes(KNOBS.find((x) => x.name === n).owner);
       grid.show(n, on); grid.cellOf(n).hidden = !on;

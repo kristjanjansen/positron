@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**Concepts in named groups** (2026-10-10). Asked: *"lets clean up concepts / rename. add subtitles to index page and rename"* with synths, radio, camera, pico, chat, misc, and *"tv is separate"*. 040 and 045 are 015 and 016, Pico 007 is 070, TV 008 is 040, misc 001 002 050 are 090 091 092; the index draws a heading per group.~~ DONE 2026-10-10. Open: *"chat: 003 004 005 006 (rename title)"*, what to rename was not settled.
 - ~~**Concept numbers are the original ones zero-padded** (2026-10-10). Asked: *"numbers are messed up. you just added 0 to end not start"* and *"i want grouping based on 10s (as original). just support beyond 100 so we have always 3 digits"*. Every number divided by ten and padded (100 to 010, 450 to 045, 620 to 062); the index groups by tens. The new Faust copy of 040 is 041; 080 (TV) becomes 008 when its agent lands.~~ DONE 2026-10-10.
 - ~~**070 one octave up toggle; concepts index in groups; 410 is 450** (2026-10-10). Asked: *"only octave up"*, *"have groups in concepts index. no titles"*, *"rename 410 to 450"*.~~ DONE 2026-10-10.
 - **Concept 041 (was asked as 410): 040 with a Faust engine and its external knobs** (2026-10-10). Asked: *"410 is copy of 400 but with fau and its "external knobs""*.

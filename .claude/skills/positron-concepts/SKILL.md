@@ -5,7 +5,7 @@ description: The /concepts/ pages, small numbered pages that each unpack one pat
 
 # Concepts pages
 
-Written 2026-10-09 from the session that built `/concepts/001/` to `/concepts/012/`.
+Written 2026-10-09 from the session that built `/concepts/090/` to `/concepts/012/`.
 Every claim below was checked against the files that day. The pages change fast,
 so check a page before quoting it.
 
@@ -21,7 +21,7 @@ numbered, kept as cards in `/concepts/`.
   The pages are not in `manifest.mjs`, so `demo/verify.mjs` does not grade them
   anyway.
 - Local: `node demo/server.mjs`, then `http://127.0.0.1:8890/concepts/<n>/`.
-  The server 301s a slashless directory URL (`/concepts/2` to `/concepts/002/`)
+  The server 301s a slashless directory URL (`/concepts/2` to `/concepts/091/`)
   as the deploy does, so either form works.
 - ⚠️ **ONE IDEA PER PAGE.** A new idea is a new number. Later pages copy an
   earlier one and add one thing (4 is 3 plus a store, 5 is 4 plus admin, 6 is 5
@@ -80,7 +80,7 @@ numbered, kept as cards in `/concepts/`.
 ## The port table
 
 Concepts 1, 3, 4, 5 and 6 draw the room's ports the same way. Copy it from
-`/concepts/001/` rather than inventing a variant.
+`/concepts/090/` rather than inventing a variant.
 
 | column | key | width | what |
 | --- | --- | --- | --- |
@@ -111,7 +111,7 @@ Concepts 1, 3, 4, 5 and 6 draw the room's ports the same way. Copy it from
     (`.pos-tbl-body .pos-tbl-c`). The header cell is empty on purpose; do not
     turn it into a dot.
 - **Simulated rows are drawn, never announced.** Cloudflare services on
-  `/concepts/001/` (`plans/plan-site-names.md` §4d) are page rows only, real id on
+  `/concepts/090/` (`plans/plan-site-names.md` §4d) are page rows only, real id on
   hover reads `simulated, not announced`, and their live cell is BLANK, because
   nothing is alive to say so. No `sim` tag in the who column (*"rm (sim)"*).
 

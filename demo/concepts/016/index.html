@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept 045</title>
+<title>POSITRON concept 016</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-top { display: flex; align-items: flex-end; gap: 12px; }
@@ -25,21 +25,21 @@
   import { createXyPad } from '/shell/xy-pad.mjs';
   import { createSynth, KNOBS, PATCH, expo } from './modules.mjs';
 
-  // /concepts/040/'s synth as one fixed patch, with an XY pad that plays the
+  // /concepts/015/'s synth as one fixed patch, with an XY pad that plays the
   // filter. The pad is a bay node, `web:xy`, cabled to `web:filter:value-in`,
   // so every move is a `{ of: 'param' }` event through the bay and the cable
   // pulses with it.
   //
   // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key or
   // play press; moving the pad before that only changes the filter's state.
-  const d = mount({ name: 'concept 045', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('045');
+  const d = mount({ name: 'concept 016', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('016');
 
   const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
   const { bay } = synth;
   const ID = synth.id;
 
-  // ── one waveform, the output, as on /concepts/040/ ────────────────────────
+  // ── one waveform, the output, as on /concepts/015/ ────────────────────────
   const WINDOW = 512, FULL = 0.5;
   const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
 

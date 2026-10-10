@@ -1,7 +1,7 @@
-// demo/concepts/040/modules.mjs: a mono WebAudio synth whose modules are bay
+// demo/concepts/015/modules.mjs: a mono WebAudio synth whose modules are bay
 // nodes, and the router that wires the WebAudio graph from the links the bay
 // holds. plans/plan-synth-patch.md §1 to §4. Page-local on purpose: the owner
-// decided it lives inside /concepts/040/ ("yes 40 this way"), not in the shell.
+// decided it lives inside /concepts/015/ ("yes 40 this way"), not in the shell.
 //
 // A module is a node with ports. An audio link is a `connect()` made by
 // `route()`, a MIDI link carries notes through `bay.send`, and a value link
