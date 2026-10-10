@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept 018</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-top { display: flex; align-items: flex-end; gap: 12px; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { faustFactory, faustNode } from '/shell/faust.mjs';
+  import { SYNTH_STEPS, synthUrl } from '/shell/synth-steps.mjs';
+
+  // /concepts/015/'s patchbay synth with the sound made by a Faust program,
+  // and every parameter that program declares a knob node of its own, cabled
+  // into the engine's `value-in`, as on /fau/.
+  //
+  // THE PROGRAM IS THE SYNTHS DECK'S `lfo`: a sawtooth through a two pole low
+  // pass whose cutoff a slow sine sweeps, compiled ahead of time into
+  // /resources/faust/lfo.*, so a press fetches about 3 kB and no compiler.
+  // It is mono and declares no `freq`, `gain` and `gate` trio as a voice, so
+  // there is no keyboard: play holds a test tone, which opens the gate the
+  // page puts after the node (the program itself has no gate).
+  //
+  // NOTHING OPENS ON A VISIT. The knobs a visit shows are read off the
+  // program's TEXT; the AudioContext, the fetch and the node come on the first
+  // press, and the knobs are then rebuilt from the program's own JSON.
+  const d = mount({ name: 'concept 018', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('018');
+
+  const PROGRAM = SYNTH_STEPS.find((s) => s.id === 'lfo');
+  const S = 'web';
+  const ID = (node, port) => `${S}:${node}:${port}`;
+  const FAU_IN = ID('fau', 'value-in');
+  const safeName = (n) => String(n).replace(/[^A-Za-z0-9_-]/g, '-');
+
+  // ── the program's parameters, page-local copies of slide-synth.mjs's two readers ──
+  const num = String.raw`\s*(-?[\d.]+(?:e-?\d+)?)\s*`;
+  const SLIDER_RE = new RegExp(String.raw`\b(?:hslider|vslider|nentry)\s*\(\s*"([^"]*)"\s*,${num},${num},${num},${num}\)`, 'g');
+  /** The sliders written in the text, for a visit, which has loaded nothing. */
+  function readSliders(code) {
+    const list = [];
+    for (const m of String(code).matchAll(SLIDER_RE)) {
+      const name = m[1].replace(/\[[^\]]*\]/g, '').trim();
+      if (!name || list.some((p) => p.name === name)) continue;
+      const [value, min, max, step] = m.slice(2, 6).map(Number);
+      list.push({ name, value, min, max, step });
+    }
+    return list;
+  }
+  /** The sliders the loaded program declares, with the address each is set at. */
+  function slidersOf(parts) {
+    const list = [], addr = new Map();
+    let ui = [];
+    try { ui = JSON.parse(parts?.factory?.json || '{}').ui || []; } catch { /* no UI */ }
+    const walk = (items) => {
+      for (const it of items || []) {
+        if (it.items) { walk(it.items); continue; }
+        if (!['hslider', 'vslider', 'nentry'].includes(it.type) || addr.has(it.shortname)) continue;
+        addr.set(it.shortname, it.address);
+        list.push({ name: it.shortname, value: it.init, min: it.min, max: it.max, step: it.step });
+      }
+    };
+    walk(ui);
+    // Faust lists controls in the order `process` uses them; keep the text's order.
+    const order = readSliders(PROGRAM.code).map((p) => p.name);
+    const at = (n) => { const i = order.indexOf(n); return i < 0 ? order.length : i; };
+    list.sort((a, b) => at(a.name) - at(b.name));
+    return { list, addr };
+  }
+
+  // ── the sound, made on the first press ───────────────────────────────────
+  let ctx = null, node = null, gate = null, master = null, pull = null, an = null, buf = null;
+  let addr = new Map();
+  let on = false, toneOn = false, loading = null;
+  let paramSends = 0;
+  /** name -> the value its knob last said, so a value survives a rebuild. */
+  const values = new Map();
+
+  async function wake() {
+    if (!ctx) {
+      ctx = new AudioContext();
+      master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+      // A silent sink that keeps the analyser pulled, as on /concepts/015/.
+      pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+      an = ctx.createAnalyser(); an.fftSize = 2048; an.connect(pull);
+      buf = new Float32Array(an.fftSize);
+      gate = ctx.createGain(); gate.gain.value = 0;
+      requestAnimationFrame(frame);
+    }
+    ctx.resume();
+    if (!node) {
+      loading ??= (async () => {
+        const t0 = performance.now();
+        const parts = await faustFactory(synthUrl(PROGRAM.id));
+        node = await faustNode(ctx, parts);
+        node.connect(gate);
+        const read = slidersOf(parts);
+        addr = read.addr;
+        rebuild(read.list);
+        // Whatever a hand left a knob at before the press is the first sound.
+        for (const [n, v] of values) { const a = addr.get(n); if (a) node.setParamValue(a, v); }
+        route();
+        d.log(`${PROGRAM.id} loaded ahead of time in ${Math.round(performance.now() - t0)} ms, ${read.list.length} parameters: ${read.list.map((p) => p.name).join(', ')}`);
+      })().catch((e) => { loading = null; d.log(`the program did not load: ${e.message}`, 'warn'); throw e; });
+      await loading;
+    }
+  }
+
+  /** THE ROUTER: the node's sound goes where the bay's audio links say, and nowhere else. */
+  function route() {
+    if (!gate) return;
+    try { gate.disconnect(); } catch { /* not connected */ }
+    for (const l of bay.links()) {
+      if (l.from !== ID('fau', 'audio-out')) continue;
+      if (l.to === ID('scope', 'audio-in')) gate.connect(an);
+      if (l.to === ID('speaker', 'audio-in')) gate.connect(master);
+    }
+  }
+
+  /** The engine's `midi-in`: the program has no gate, so a held note opens the page's own. */
+  const held = new Set();
+  function fauNote(e) {
+    if (e?.cls !== 'note') return;
+    if (e.d2) held.add(e.d1); else held.delete(e.d1);
+    if (gate) gate.gain.setTargetAtTime(held.size ? 1 : 0, ctx.currentTime, 0.01);
+  }
+
+  // ── the bay, built again whenever the parameter list changes ─────────────
+  // `bay.mjs` cannot take a port away, so, as on /fau/, the knob nodes, their
+  // cables and the names on `web:fau:value-in` are rebuilt into a fresh bay
+  // from the list: a name that survives keeps its value and its cable's
+  // counts, a gone one takes its node with it, a new one gets a node and a
+  // cable. `createPatchbay` keys a wire by its printed link, so the picture
+  // keeps the wires that survive.
+  let bay = createBay();
+  let knobs = new Map(), grid = null, names = [];
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+
+  function makeKnob(p) {
+    const v = values.has(p.name) ? Math.min(p.max, Math.max(p.min, values.get(p.name))) : p.value;
+    values.set(p.name, v);
+    const step = p.step > 0 && p.step <= p.max - p.min ? p.step : undefined;
+    return createKnob({
+      label: p.name, min: p.min, max: p.max, step, value: v, hand: true,
+      onInput: (r) => { values.set(p.name, r); bay.send(ID(`knob-${safeName(p.name)}`, 'value-out'), { of: 'param', name: p.name, v: r }); },
+    });
+  }
+
+  function rebuild(list) {
+    const old = bay;
+    const oldLink = (n) => old.links().find((l) => l.from === ID(`knob-${safeName(n)}`, 'value-out') && l.to === FAU_IN);
+    const next = createBay();
+    names = list.map((p) => p.name);
+    const N = [
+      ['tone', 'person', 'test tone'],
+      ...names.map((n) => [`knob-${safeName(n)}`, 'person', n]),
+      ['fau', 'engine', 'Faust'],
+      ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
+    ];
+    for (const [n, kind, label] of N) next.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+    const P = [
+      { id: ID('tone', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+      ...names.map((n) => ({ id: ID(`knob-${safeName(n)}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
+      { id: ID('fau', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: fauNote },
+      { id: FAU_IN, dir: 'in', medium: 'value', shape: { of: 'param', names }, deliver: (e) => {
+        if (e?.of !== 'param') return;
+        const a = addr.get(e.name);
+        if (node && a) { node.setParamValue(a, e.v); paramSends++; }
+      } },
+      { id: ID('fau', 'audio-out'), dir: 'out', medium: 'audio' },
+      { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+      { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+    ];
+    for (const p of P) next.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+    const lay = (from, to) => {
+      const r = next.link(from, to);
+      if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+      return r;
+    };
+    lay(ID('tone', 'midi-out'), ID('fau', 'midi-in'));
+    lay(ID('fau', 'audio-out'), ID('scope', 'audio-in'));
+    lay(ID('fau', 'audio-out'), ID('speaker', 'audio-in'));
+    for (const n of names) {
+      const was = oldLink(n);
+      const r = lay(ID(`knob-${safeName(n)}`, 'value-out'), FAU_IN);
+      if (r.ok && was) Object.assign(next.links().find((l) => l.id === r.id), { sent: was.sent, dropped: was.dropped });
+    }
+    bay = next;
+
+    // The knobs, rebuilt with the bay. An old knob's hand is stopped before it
+    // is thrown away, and a surviving name's hand starts again on the new one.
+    const running = new Set();
+    for (const [n, k] of knobs) { if (k.hand?.running) { running.add(n); k.hand.stop("page"); } }
+    knobs = new Map(list.map((p) => [p.name, makeKnob(p)]));
+    for (const n of running) knobs.get(n)?.hand?.start?.(0, 'page');
+    const g = createKnobGrid(knobs, { row: true });
+    if (grid) grid.el.replaceWith(g.el);
+    grid = g;
+    if (window.__demo) window.__demo.knobs = grid;
+    route();
+    pb?.refresh();
+  }
+
+  // ── play, and the held test tone ─────────────────────────────────────────
+  const TONE = 57;
+  function tone(v) {
+    if (v === toneOn) return;
+    toneOn = v;
+    bay.send(ID('tone', 'midi-out'), { cls: 'note', ch: 1, d1: TONE, d2: v ? 100 : 0 });
+  }
+  function sound(v) {
+    on = v;
+    tone(v);
+    if (master) master.gain.setTargetAtTime(v ? 0.7 : 0, ctx.currentTime, 0.03);
+    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
+  }
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: async () => {
+      if (on) { sound(false); return; }
+      try { await wake(); } catch { return; }
+      sound(true);
+    } },
+  ] });
+
+  function frame() {
+    const scoped = bay.links().some((l) => l.to === ID('scope', 'audio-in'));
+    if (on && node && scoped) {
+      an.getFloatTimeDomainData(buf);
+      const WINDOW = 512, FULL = 0.5;
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
+  }
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  let pb = null;
+  rebuild(readSliders(PROGRAM.code));
+  pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
+    flowing: (l) => !!node && on && (l.from !== ID('tone', 'midi-out') || toneOn),
+  });
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  d.stack.add(top, wave.el, grid.el, pb.el);
+  window.__demo.knobs = grid;
+  window.__demo.fau = {
+    bay: () => bay, node: () => node, names: () => names.slice(),
+    paramSends: () => paramSends, program: PROGRAM.id,
+  };
+  d.ready();
+</script>

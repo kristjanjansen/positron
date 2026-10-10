@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Concepts 017 Yoshimi and 018 Faust synth** (2026-10-10). Asked: *"where is fau and yoshimi concepts???"*, *"go. add asap"*. 017 untested against the real Pi; 018 loads its Faust node on a press.~~ DONE 2026-10-10.
+- **Concept 001, patch from words** (2026-10-10). Asked: *"build a wish-like demo as first group: patchbay. select from predef list, have best (leftmost) model interpers and use patchbay to visualize"*.
 - ~~**093 Effects archived** (2026-10-10). Asked: *"arvhive / rm 093"*. Kept as `archive/concepts/effects.md` (*"093 just keep in md or smth"*), off the list; the kit patchbay picture of its links stays, without a link.~~ DONE 2026-10-10.
 - ~~**TV is 066 in a video group** (2026-10-10). Asked: *"move 040 to 066 and rename group "video""*.~~ DONE 2026-10-10.
 - ~~**066: one video screen, the crossfader crossfades the pictures** (2026-10-10). Asked: *"040: single vidosceen, crossfade crossfades"*.~~ DONE 2026-10-10, one panel, ETV2 over ETV by the fader.
