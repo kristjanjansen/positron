@@ -329,6 +329,9 @@ const FILES = [
   // rig/pico/rings/build-pico/rings.uf2, byte for byte: the rings of /concepts/14/
   // drawn by C on the emulated Pico (rig/pico/rings/build.sh copies it here).
   ['demo/resources/pico/rings-pico.uf2', 'resources/pico/rings-pico.uf2'],
+  // rig/pico/patch/build-pico/patch.uf2, byte for byte: concept 070's own firmware,
+  // keys to Pico to synth on a patchbay screen (rig/pico/patch/build.sh copies it here).
+  ['demo/resources/pico/patch-pico.uf2', 'resources/pico/patch-pico.uf2'],
   // ui.c alone as WebAssembly, for the OLED part blocks (rig/pico/firmware/wasm/).
   // ⚠️ IT SHIPPED MISSING ONCE, 2026-10-04: green locally, because the dev
   // server serves the whole repository, and a 404 on the edge. A file the page
