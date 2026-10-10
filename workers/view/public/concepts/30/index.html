@@ -49,10 +49,10 @@
   // connection per mount, exactly as /radio/ reaches them. `?base=` points the
   // page at demo/fake-station.mjs instead.
   //
-  // NOTHING OPENS ON A VISIT. No AudioContext, no fetch and no link to either
-  // station until somebody presses play. The bay enforces the same thing: an
-  // `external` node refuses a link out of it unless the link carries
-  // `consent: true`, which only the press passes.
+  // NOTHING OPENS ON A VISIT. No AudioContext and no fetch to either station
+  // until somebody presses play. The patch is held from load so the picture
+  // does not change with play; an `external` node refuses a link out of it
+  // without `consent: true`, so the page names it where the link is made.
   const BASE = new URLSearchParams(location.search).get('base') || 'https://shout.positron.studio';
   const S = 'web';
   const STATIONS = [
@@ -110,14 +110,17 @@
     d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
     return false;
   }
-  function drop(a, b) {
-    const k = `${a} ${b}`;
-    if (held.has(k)) { bay.unlink(held.get(k)); held.delete(k); }
-  }
 
   hold(FADER_OUT, SPEAKER_IN);
-  // Asked once on load WITHOUT consent, so the refusal is on the page in the bay's own words.
-  hold(outOf(STATIONS[0]), relayIn(STATIONS[0]));
+  // The whole patch is held from load, so the picture is the same playing or
+  // stopped. Holding a link opens nothing: the streams open only on play,
+  // which is the press where a person asks to listen, so the station link is
+  // made with that consent named here rather than at the press.
+  for (const st of STATIONS) {
+    hold(outOf(st), relayIn(st), { consent: true, via: 'https' });
+    hold(relayOut(st), FADER_IN, { via: 'https' });
+    hold(relayOut(st), waveIn(st), { via: 'https' });
+  }
 
   const pb = createPatchbay(bay, {
     flowing: (l) => {
@@ -214,9 +217,6 @@
     for (const st of STATIONS) {
       const g = legs.get(st.key);
       if (g) { try { g.stream.stop(); } catch { /* already stopped */ } try { g.gain.disconnect(); } catch { /* gone */ } }
-      drop(outOf(st), relayIn(st));
-      drop(relayOut(st), FADER_IN);
-      drop(relayOut(st), waveIn(st));
     }
     legs.clear();
     pb.refresh();
